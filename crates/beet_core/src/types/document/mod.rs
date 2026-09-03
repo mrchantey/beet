@@ -1,3 +1,4 @@
+mod doc_ref;
 mod document;
 mod document_plugin;
 mod document_query;
@@ -15,6 +16,7 @@ pub mod reflect_value_ext;
 mod resource_binding;
 mod source_binding;
 mod typed_document;
+pub use doc_ref::*;
 pub use document::*;
 pub use document_plugin::*;
 pub use document_query::*;

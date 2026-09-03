@@ -8,7 +8,7 @@
 //! descendant [`FieldRef`]. The accumulated prefix is materialized as
 //! [`ResolvedFieldPath`] (the component the sync systems read) by the
 //! [`resolve_field_path`] observer on insert and the
-//! [`update_resolved_field_paths`] system on ancestor scope changes.
+//! [`update_field_bindings`] system on ancestor scope changes.
 //!
 //! The canonical use is [`ReactiveChildren`]: each spawned child carries its
 //! fully-resolved absolute item path as a terminating scope, so a
@@ -46,7 +46,7 @@ pub struct ResolvedFieldPath {
 
 /// Shared upward resolver for the [`DocumentScope`] prefix.
 ///
-/// A slim [`SystemParam`] reused by both [`update_resolved_field_paths`] and
+/// A slim [`SystemParam`] reused by both [`update_field_bindings`] and
 /// [`DocumentQuery`] (which holds it as a field), so read and write resolution
 /// share one walk. Splitting it out avoids borrowing all of [`DocumentQuery`]
 /// (with its [`Commands`]) in the resolve system.
@@ -54,6 +54,7 @@ pub struct ResolvedFieldPath {
 pub struct ScopeQuery<'w, 's> {
 	traverse: ElementTraverseQuery<'w, 's>,
 	scopes: Query<'w, 's, &'static DocumentScope>,
+	doc_refs: Query<'w, 's, (), With<DocRef>>,
 }
 
 impl ScopeQuery<'_, '_> {
@@ -66,6 +67,10 @@ impl ScopeQuery<'_, '_> {
 	/// document's namespace and must not prefix this one. The canonical case is
 	/// a `@prop` binding inside a `bx:scope`d subtree: the user scope must not
 	/// reach into the template's props store.
+	///
+	/// A [`DocRef`] bounds it the same way, for the same reason: the document it
+	/// targets is never an ancestor, so nothing else would stop the walk, and the
+	/// host's prefix names paths in the host's namespace, not the foreign one.
 	pub fn scope_prefix(
 		&self,
 		subject: Entity,
@@ -81,8 +86,9 @@ impl ScopeQuery<'_, '_> {
 					break;
 				}
 			}
-			// scopes above the bound document are out of its namespace
-			if document == Some(ancestor) {
+			// scopes above the bound document, or above the declaration that
+			// re-rooted the subtree into it, are out of its namespace
+			if document == Some(ancestor) || self.doc_refs.contains(ancestor) {
 				break;
 			}
 		}
@@ -131,43 +137,59 @@ pub(super) fn resolve_field_path(
 	Ok(())
 }
 
-/// Run condition gating [`update_resolved_field_paths`] to frames where an
-/// ancestor scope was added, mutated, removed, or an entity reparented, so the
-/// subtree descent does not run on quiet frames.
-pub(super) fn resolved_paths_need_update(
+/// Run condition gating [`update_field_bindings`] to frames where an ancestor
+/// scope or [`DocRef`] was added, mutated or removed, or an entity reparented,
+/// so the subtree descent does not run on quiet frames.
+pub(super) fn field_bindings_need_update(
 	changed_scopes: Query<(), Changed<DocumentScope>>,
+	changed_refs: Query<(), Changed<DocRef>>,
 	reparented: Query<(), Changed<ChildOf>>,
 	removed_scopes: RemovedComponents<DocumentScope>,
+	removed_refs: RemovedComponents<DocRef>,
 ) -> bool {
 	!changed_scopes.is_empty()
+		|| !changed_refs.is_empty()
 		|| !reparented.is_empty()
 		|| !removed_scopes.is_empty()
+		|| !removed_refs.is_empty()
 }
 
-/// System that recomputes [`ResolvedFieldPath`] for existing refs whose
-/// *ancestor* scope changed — a change the descendant's own change ticks cannot
-/// see.
+/// System that recomputes both derived halves of a binding — the scoped
+/// [`ResolvedFieldPath`] and the [`FieldOf`] document link — for existing refs
+/// whose *ancestor* declarations changed, a change the descendant's own change
+/// ticks cannot see.
 ///
-/// For each changed entity (scope add/mutate, scope removal, or reparent),
-/// descend its subtree and recompute every [`FieldRef`] found, pruning subtrees
-/// that a terminating scope seals off. The descent only *selects* refs; the path
-/// is always produced by the shared upward resolver, and the equality guard
-/// absorbs redundant recomputes.
-pub(super) fn update_resolved_field_paths(
+/// For each changed entity (scope or [`DocRef`] add/mutate/removal, or a
+/// reparent), descend its subtree and recompute every [`FieldRef`] found,
+/// pruning subtrees that a terminating scope or a nested [`DocRef`] seals off.
+/// The descent only *selects* refs; both facts are always produced by the shared
+/// resolvers, and the equality guards absorb redundant recomputes.
+///
+/// The link half matters as much as the path half: a stale [`FieldOf`] is a
+/// widget quietly writing its edits into the document it used to be under.
+pub(super) fn update_field_bindings(
+	mut commands: Commands,
 	changed_scopes: Query<Entity, Changed<DocumentScope>>,
+	changed_refs: Query<Entity, Changed<DocRef>>,
 	reparented: Query<Entity, Changed<ChildOf>>,
 	mut removed_scopes: RemovedComponents<DocumentScope>,
+	mut removed_refs: RemovedComponents<DocRef>,
 	children: Query<&Children>,
 	scopes: Query<&DocumentScope>,
+	nested_refs: Query<(), With<DocRef>>,
+	has_document: Query<(), With<Document>>,
 	docs: DocumentResolver,
 	resolver: ScopeQuery,
 	has_ref: Query<&FieldRef>,
+	links: Query<&FieldOf>,
 	mut resolved: Query<&mut ResolvedFieldPath>,
 ) -> Result {
 	let roots = changed_scopes
 		.iter()
+		.chain(changed_refs.iter())
 		.chain(reparented.iter())
-		.chain(removed_scopes.read());
+		.chain(removed_scopes.read())
+		.chain(removed_refs.read());
 	for root in roots {
 		let mut stack = vec![root];
 		while let Some(node) = stack.pop() {
@@ -184,16 +206,24 @@ pub(super) fn update_resolved_field_paths(
 				if slot.field_path != next {
 					slot.field_path = next;
 				}
+				// equality guard: only relink when the document actually changed
+				if let Some(document) =
+					FieldOf::linkable(node, document, &has_document)
+					&& links.get(node).ok().map(|link| link.document)
+						!= Some(document)
+				{
+					commands.entity(node).insert(FieldOf { document });
+				}
 			}
 			if let Ok(kids) = children.get(node) {
-				kids.iter()
-					// a terminating child scope seals itself + its subtree from `root`
-					.filter(|child| {
-						scopes
+				// a terminating child scope, or a child re-rooting its own
+				// subtree into another document, seals it off from `root`
+				stack.extend(kids.iter().filter(|child| {
+					!nested_refs.contains(*child)
+						&& scopes
 							.get(*child)
 							.map_or(true, |scope| !scope.terminate)
-					})
-					.for_each(|child| stack.push(child));
+				}));
 			}
 		}
 	}

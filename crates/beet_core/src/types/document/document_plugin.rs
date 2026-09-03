@@ -37,6 +37,8 @@ impl Plugin for DocumentPlugin {
 			// Register document types
 			.register_type::<Document>()
 			.register_type::<PropsDocument>()
+			.register_type::<DocRef>()
+			.register_type::<DocConsumers>()
 			.register_type::<DocumentSchema>()
 			.register_type::<DocumentPath>()
 			.register_type::<OnMissing>()
@@ -81,10 +83,10 @@ impl Plugin for DocumentPlugin {
 		app.add_systems(
 			DocumentSync,
 			(
-				update_resolved_field_paths.run_if(resolved_paths_need_update),
+				update_field_bindings.run_if(field_bindings_need_update),
 				sync_schema.run_if(schema_needs_sync),
 				sync_document_to_local,
-				sync_resolved_path_changes,
+				sync_rebound_fields,
 				// after the read path so a same-pass conflict resolves source-wins,
 				// before the write-back so the mirrored value lands the same pass.
 				sync_source_field_refs,

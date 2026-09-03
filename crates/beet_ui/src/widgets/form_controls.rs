@@ -613,3 +613,185 @@ mod test {
 			.xpect_eq("hi");
 	}
 }
+
+/// Provenance conformance: the properties the schema-driven form and view layers
+/// are built on, asserted against the controls they will spawn.
+///
+/// Provenance here is *structural*, not evented. Every editing widget binds
+/// exactly one `(document, field path)` through a [`FieldRef`] and writes only
+/// its own local [`Value`]; the bidirectional syncs carry the
+/// `(target, field path, new value)` triple, so nothing holds a copy of a
+/// document and no edit is ever reconstructed by diffing.
+#[cfg(test)]
+mod conformance {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// Build `template` under a root carrying `document`, settled.
+	fn build(
+		document: Value,
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> (World, Entity) {
+		let mut world = world_ext::ui_world();
+		let root = world.spawn_template(template).unwrap().id();
+		world.entity_mut(root).insert(Document::new(document));
+		world.update_local();
+		(world, root)
+	}
+
+	/// A form with one control per leaf, the shape a schema-driven form emits.
+	fn form() -> impl bevy::ecs::template::Template<Output = ()> {
+		rsx! {
+			<Form>
+				<TextField field={FieldRef::new("label")}/>
+				<TextArea field={FieldRef::new("notes")}/>
+				<Select field={FieldRef::new("role")}>
+					<option value="engineer">"Engineer"</option>
+				</Select>
+			</Form>
+		}
+	}
+
+	/// The bound path and element tag of every [`FieldRef`] in the world, sorted
+	/// by path (a query iterates archetypes, not document order).
+	fn bindings(world: &mut World) -> Vec<(FieldPath, String)> {
+		world
+			.query_once::<(&Element, &FieldRef)>()
+			.into_iter()
+			.map(|(element, field)| {
+				(field.field_path.clone(), element.tag().to_string())
+			})
+			.collect::<Vec<_>>()
+			.xtap(|bindings| bindings.sort())
+	}
+
+	/// The entity of the first element with `tag`.
+	fn element(world: &mut World, tag: &str) -> Entity {
+		world
+			.query_once::<(Entity, &Element)>()
+			.into_iter()
+			.find(|(_, element)| element.tag() == tag)
+			.map(|(entity, _)| entity)
+			.unwrap()
+	}
+
+	/// The local [`Value`] of the first element with `tag`.
+	fn value_of(world: &mut World, tag: &str) -> Value {
+		let entity = element(world, tag);
+		world.entity(entity).get::<Value>().unwrap().clone()
+	}
+
+	/// Overwrite a control's local [`Value`], the only thing a widget writes.
+	fn edit(world: &mut World, tag: &str, value: Value) {
+		let entity = element(world, tag);
+		*world.entity_mut(entity).get_mut::<Value>().unwrap() = value;
+		world.update_local();
+	}
+
+	/// The document on `entity`.
+	fn document(world: &mut World, entity: Entity) -> Value {
+		world.entity(entity).get::<Document>().unwrap().0.clone()
+	}
+
+	/// One field entity per editable leaf, the binding contract a schema-driven
+	/// form walks a schema to produce: the ref sits on the control itself, one per
+	/// control, and never on a wrapper or an `<option>` child.
+	#[beet_core::test]
+	fn each_control_binds_exactly_one_leaf() {
+		let (mut world, _) = build(
+			value!({ "label": "buy milk", "notes": "", "role": "engineer" }),
+			form(),
+		);
+		bindings(&mut world).xpect_eq(vec![
+			(FieldPath::new(["label"]), "input".to_string()),
+			(FieldPath::new(["notes"]), "textarea".to_string()),
+			(FieldPath::new(["role"]), "select".to_string()),
+		]);
+	}
+
+	/// No widget holds a copy of a document: the authored root is the only entity
+	/// carrying one, and each control reads through its own local [`Value`].
+	#[beet_core::test]
+	fn no_widget_holds_a_document() {
+		let (mut world, root) = build(
+			value!({ "label": "buy milk", "notes": "", "role": "engineer" }),
+			form(),
+		);
+		world
+			.query_once::<(Entity, &Document)>()
+			.into_iter()
+			.map(|(entity, _)| entity)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![root]);
+		value_of(&mut world, "input").xpect_eq(Value::Str("buy milk".into()));
+	}
+
+	/// A widget's only write is its local [`Value`]; the sync carries it to the
+	/// bound field and leaves every sibling leaf alone, which is what lets a
+	/// schema-driven form spawn one control per leaf and own no state itself.
+	#[beet_core::test]
+	fn an_edit_reaches_only_its_own_leaf() {
+		let (mut world, root) = build(
+			value!({
+				"label": "buy milk",
+				"notes": "later",
+				"role": "engineer"
+			}),
+			form(),
+		);
+		edit(&mut world, "input", Value::Str("buy bread".into()));
+
+		document(&mut world, root).xpect_eq(value!({
+			"label": "buy bread",
+			"notes": "later",
+			"role": "engineer"
+		}));
+	}
+
+	/// Clearing a control reaches the document: an emptied widget writes `null`
+	/// rather than silently leaving the old value in place.
+	#[beet_core::test]
+	fn clearing_a_control_reaches_the_document() {
+		let (mut world, root) = build(
+			value!({ "label": "buy milk", "notes": "", "role": "engineer" }),
+			form(),
+		);
+		edit(&mut world, "input", Value::Null);
+
+		document(&mut world, root).xpect_eq(value!({
+			"label": null,
+			"notes": "",
+			"role": "engineer"
+		}));
+	}
+
+	/// A [`DocRef`] retargets a whole form at a document it is not nested under,
+	/// which is how an editor form binds the document it edits from anywhere in
+	/// the tree. The host document it sits inside is never touched.
+	#[beet_core::test]
+	fn a_doc_ref_form_edits_the_targeted_document() {
+		let mut world = world_ext::ui_world();
+		let foreign = world
+			.spawn(Document::new(value!({ "label": "foreign" })))
+			.id();
+		let root = world
+			.spawn_template(rsx! {
+				<Form {DocRef(foreign)}>
+					<TextField field={FieldRef::new("label")}/>
+				</Form>
+			})
+			.unwrap()
+			.id();
+		world
+			.entity_mut(root)
+			.insert(Document::new(value!({ "label": "host" })));
+		world.update_local();
+
+		// the control read the targeted document, not the one it is nested under
+		value_of(&mut world, "input").xpect_eq(Value::Str("foreign".into()));
+
+		edit(&mut world, "input", Value::Str("edited".into()));
+		document(&mut world, foreign).xpect_eq(value!({ "label": "edited" }));
+		document(&mut world, root).xpect_eq(value!({ "label": "host" }));
+	}
+}

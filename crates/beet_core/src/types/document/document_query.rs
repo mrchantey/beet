@@ -12,6 +12,7 @@ pub struct DocumentResolver<'w, 's> {
 	traverse: ElementTraverseQuery<'w, 's>,
 	docs: Query<'w, 's, (), With<Document>>,
 	props: Query<'w, 's, (), With<PropsDocument>>,
+	doc_refs: Query<'w, 's, &'static DocRef>,
 }
 
 impl DocumentResolver<'_, '_> {
@@ -20,12 +21,17 @@ impl DocumentResolver<'_, '_> {
 		match path {
 			DocumentPath::Root => self.traverse.root(subject),
 			// nearest ancestor document, skipping props stores so user document
-			// scoping inside a template body is unaffected
+			// scoping inside a template body is unaffected. A `DocRef` ends the
+			// walk at the document it targets, and wins over a `Document` on the
+			// same entity: the redirect is deliberate, the storage incidental.
 			DocumentPath::Ancestor => self
 				.traverse
 				.ancestors_inclusive(subject)
-				.find(|entity| {
-					self.docs.contains(*entity) && !self.props.contains(*entity)
+				.find_map(|entity| match self.doc_refs.get(entity) {
+					Ok(doc_ref) => Some(doc_ref.document()),
+					Err(_) => (self.docs.contains(entity)
+						&& !self.props.contains(entity))
+					.then_some(entity),
 				})
 				.unwrap_or_else(|| self.traverse.root(subject)),
 			// nearest ancestor props store, ie a template's materialized props
@@ -59,6 +65,10 @@ pub struct DocumentQuery<'w, 's> {
 	resolver: DocumentResolver<'w, 's>,
 	doc_query: Query<'w, 's, &'static mut Document>,
 	schemas: Query<'w, 's, &'static DocumentSchema>,
+	/// Entities a [`DocRef`] declared to *be* a document, so a write to one that
+	/// answered none fails naming the relation instead of creating a stray
+	/// document there.
+	declared: Query<'w, 's, (), With<DocConsumers>>,
 	/// Shared upward resolver for the [`DocumentScope`] prefix, so reads and
 	/// writes scope through the same walk.
 	scopes: ScopeQuery<'w, 's>,
@@ -159,6 +169,16 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				.into());
 			};
 			Ok(func(value))
+		} else if self.declared.contains(doc_entity) {
+			// a `DocRef` names a document that must already exist; creating one
+			// here would silently answer the widget with an empty document while
+			// the real one sits elsewhere.
+			bevybail!(
+				"`DocRef` targets entity {doc_entity}, which has no `Document`. \
+				 Give the targeted entity a document, or point the relation at \
+				 the entity that carries one.\nWriting field {}",
+				field_path
+			)
 		} else if let OnMissing::Default(init_value) = &field.on_missing {
 			// create the document and run the method with it
 			let mut doc = Document::default();

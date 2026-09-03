@@ -278,6 +278,9 @@ pub struct PropsDocument;
 pub enum DocumentPath {
 	/// The nearest ancestor (inclusive) with a [`Document`] component,
 	/// skipping props stores ([`PropsDocument`]).
+	///
+	/// A [`DocRef`] on that walk ends it, redirecting the subtree at the
+	/// document it targets.
 	#[default]
 	Ancestor,
 	/// This entity only, do not traverse.
@@ -288,6 +291,10 @@ pub enum DocumentPath {
 	/// with [`PropsDocument`], a template's materialized props.
 	Props,
 	/// A specific document by entity id.
+	///
+	/// Resolution's output, not an authored input: an entity id means nothing in
+	/// a file. Markup names a foreign document with a [`DocRef`], which resolves
+	/// to this for the whole subtree beneath it.
 	Entity(Entity),
 }
 

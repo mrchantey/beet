@@ -102,6 +102,28 @@ pub struct FieldOf {
 	pub document: Entity,
 }
 
+impl FieldOf {
+	/// The resolved `document` when a field on `subject` may link to it now,
+	/// `None` when linking must wait.
+	///
+	/// A self-link only forms when the entity actually owns a [`Document`] (ie a
+	/// co-located `(Document, FieldRef)`, as [`BlobStoreList`] does). A
+	/// self-resolving ref with no document yet (eg [`DocumentPath::This`] with an
+	/// [`OnMissing::Default`]) defers creation to write-back and must not link
+	/// prematurely, else the read path would clobber its value.
+	///
+	/// Shared by the insert-time [`link_field_to_document`] and the reactive
+	/// [`update_field_bindings`], so both establish the same link.
+	pub(super) fn linkable(
+		subject: Entity,
+		document: Entity,
+		documents: &Query<(), With<Document>>,
+	) -> Option<Entity> {
+		(document != subject || documents.contains(document))
+			.then_some(document)
+	}
+}
+
 /// Observer that creates the [`FieldOf`] relationship when a [`FieldRef`] is inserted.
 ///
 /// Resolves the [`DocumentPath`] to find the actual document entity and
@@ -115,13 +137,9 @@ pub(super) fn link_field_to_document(
 ) -> Result {
 	let field = fields.get(ev.entity)?;
 	let document = doc_query.entity(ev.entity, &field.document);
-	// a self-link only forms when the entity actually owns a Document (ie a
-	// co-located `(Document, FieldRef)`). A self-resolving ref with no Document
-	// yet (eg `DocumentPath::This` + Init) defers creation to write-back and
-	// must not link prematurely, else the read path would clobber its value.
-	if document == ev.entity && !docs.contains(document) {
+	let Some(document) = FieldOf::linkable(ev.entity, document, &docs) else {
 		return Ok(());
-	}
+	};
 	commands.entity(ev.entity).insert(FieldOf { document });
 	Ok(())
 }
@@ -192,16 +210,18 @@ pub fn sync_document_to_local(
 	Ok(())
 }
 
-/// Second document → local sync, gated on `Changed<ResolvedFieldPath>` instead
-/// of `Changed<Document>`.
+/// Second document → local sync, gated on a rebound field instead of a changed
+/// document.
 ///
-/// A scope change recomputes [`ResolvedFieldPath`] **without** dirtying the
-/// document, so [`sync_document_to_local`]'s `Fields` fan-out never fires for it.
-/// This re-syncs those fields, reading each field's document via [`FieldOf`].
-pub(super) fn sync_resolved_path_changes(
+/// Rebinding recomputes a field's derived halves — its [`ResolvedFieldPath`]
+/// (a scope change) or its [`FieldOf`] (a [`DocRef`] change or a reparent) —
+/// **without** dirtying any document, so [`sync_document_to_local`]'s `Fields`
+/// fan-out never fires for it. This re-syncs those fields, reading each field's
+/// document via [`FieldOf`].
+pub(super) fn sync_rebound_fields(
 	changed: Populated<
 		(&FieldOf, &ResolvedFieldPath, &mut Value),
-		Changed<ResolvedFieldPath>,
+		Or<(Changed<ResolvedFieldPath>, Changed<FieldOf>)>,
 	>,
 	docs: Query<&Document>,
 ) -> Result {
@@ -964,6 +984,83 @@ mod test {
 			value!({ "name": "reloaded" });
 		world.update_local();
 		read_value(&mut world, child).xpect_eq(Value::Str("reloaded".into()));
+	}
+
+	/// Clearing a bound field reaches the document: a widget that empties its
+	/// value writes `null`, it does not silently keep the old one.
+	///
+	/// The write-back's one exception is the *freshly added* null every field is
+	/// seeded with, which carries no signal and must not clobber the document
+	/// before the read path has filled it. A later null is a real edit.
+	#[crate::test]
+	fn clearing_a_field_reaches_the_document() {
+		let mut world = DocumentPlugin::world();
+		let doc = world.spawn(Document::new(value!({ "name": "old" }))).id();
+		let child = world
+			.spawn((ChildOf(doc), Value::default(), FieldRef::new("name")))
+			.id();
+		world.update_local();
+		// the seeded null was inert: the read path won
+		read_field(&mut world, child, &FieldRef::new("name"))
+			.xpect_eq(Value::Str("old".into()));
+
+		// clearing the local value reaches the document as a real null
+		*world.entity_mut(child).get_mut::<Value>().unwrap() = Value::Null;
+		world.update_local();
+		read_field(&mut world, child, &FieldRef::new("name"))
+			.xpect_eq(Value::Null);
+
+		// and it stays cleared: nothing restores the old value
+		world.update_local();
+		read_value(&mut world, child).xpect_eq(Value::Null);
+	}
+
+	/// Reparenting a bound field under a different document rebinds it. The link
+	/// is derived from ancestry, so a stale one is a widget quietly writing its
+	/// edits into the document it used to be under.
+	#[crate::test]
+	fn reparenting_rebinds_the_document() {
+		let mut world = DocumentPlugin::world();
+		let first =
+			world.spawn(Document::new(value!({ "name": "first" }))).id();
+		let second = world
+			.spawn(Document::new(value!({ "name": "second" })))
+			.id();
+		let child = world
+			.spawn((ChildOf(first), Value::default(), FieldRef::new("name")))
+			.id();
+		world.update_local();
+		read_value(&mut world, child).xpect_eq(Value::Str("first".into()));
+
+		world.entity_mut(child).insert(ChildOf(second));
+		world.update_local();
+
+		world
+			.entity(child)
+			.get::<FieldOf>()
+			.unwrap()
+			.document
+			.xpect_eq(second);
+		read_value(&mut world, child).xpect_eq(Value::Str("second".into()));
+
+		// an edit lands in the new document, leaving the old one untouched
+		*world.entity_mut(child).get_mut::<Value>().unwrap() =
+			Value::Str("edited".into());
+		world.update_local();
+		world
+			.entity(second)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "name": "edited" }));
+		world
+			.entity(first)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "name": "first" }));
 	}
 
 	#[cfg(feature = "json")]
