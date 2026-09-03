@@ -52,8 +52,8 @@ Bevy's ECS architecture makes its serialized representation very simple, and bas
 
 | Engine | Model | Component Composition | Spatial Info | Relations |
 | :--- | :--- | :--- | :--- | :--- |
-| **Unity** | GameObjects | ✅ Strongly typed | 👎 Required | 👎 Required and fixed |
-| **Godot** | Nodes | 👎 Convention-based | ✅ Optional | 👎 Required and fixed |
+| **Unity** | GameObjects | ✅ Strongly typed | ❗ Required | ❗ Required and fixed |
+| **Godot** | Nodes | ❗ Conventional | ✅ Optional | ❗ Required and fixed |
 | **Bevy** | Entities | ✅ Strongly typed | ✅ Optional | ✅ Optional & extensible |
 
 ECS representations need only a lightweight adaptor for interoperability with more opinionated formats. A Bevy scene can be used to describe a Godot or Unity scene, but the reverse requires lossy convention mapping.
@@ -71,8 +71,6 @@ The missing piece for true engine interoperability is standardization around com
 }
 ```
 
-This follows a similar pattern to how the HTML spec defines a `<details>` element and browsers implement its behavior accordingly. Where this aligns more closely with ATProto lexicons than WHATWG standards is in decentralization. The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec.
+The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec. In this way the standard is a *method for resolving component schemas and semantics*, not the schemas themselves. This reflects how ATProto defines the spec but not the actual lexicons, BlueSky lexicons are no more standardized than any others. 
 
-In this way the standard is a *method for resolving component schemas*, not the schemas themselves, just as ATProto defines the spec, not the lexicons themselves. The BlueSky lexicons are no more standardized than any others. This is one area I'm excited to explore further on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem like [Patchwork](https://www.inkandswitch.com/patchwork/notebook/).
-
-Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
+This is one area I'm excited to explore further on over the next year, perhaps by writing a scene adaptor for some other ecosystem like [Patchwork](https://www.inkandswitch.com/patchwork/notebook/). Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
