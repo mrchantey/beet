@@ -9,10 +9,10 @@ author = "Pete Hayman"
 # Bevy standardizes malleable software
 
 In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:
-1. Developing the storytelling and positioning of my work by presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS).
-2. Meeting and hearing from other people who rethinking software from first principles in adjacent fields like the Decentralized Web.
+1. Developing the storytelling of my work by presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS).
+2. Meeting and hearing from other people who rethinking software from first principles in adjacent fields like Decentralized Web.
 
-Both of these endeavours have been utterly exhausting but exciting, my back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
+Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
 
 ## Tech Sovereignty is ready
 
@@ -26,7 +26,7 @@ Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨
 
 In my last blog post, [ATProto isn't malleable yet](/blog/atproto-isnt-malleable-yet), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
 
-Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. It seems interoperability is not a priority at the application layer like it is for protocols, but *it should be!* In my favorite panel discussion of all time [Robin Berjon advocates for sync standards](https://youtu.be/gjG_cUx_ueU?t=1013), another application layer problem, and the same arguments can be made for malleability.
+Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. It seems interoperability is not a priority at the application layer like it is for protocols, but *it should be!* In my favorite panel discussion of all time [Robin Berjon advocates for sync standards](https://youtu.be/gjG_cUx_ueU?t=1013), another application layer problem, and similar arguments can be made for malleability.
 
 There is plenty of discussion within the Local-First community about **data standards**, the [malleable software essay itself](https://www.inkandswitch.com/essay/malleable-software/#tools-not-apps) calls for tools that operate on shared data, not apps that silo it. The call for **malleable standards** takes this idea further: the tools themselves are data, agnostic to the client used to run them.
 
@@ -36,7 +36,7 @@ Bevy's killer feature is its *layers of malleability*, each targeting a differen
 
 ### 1. Bevy Plugins for engineers
 
-Bevy apps are plugins all the way down. Engine internals, external libraries and business logic are all plugins, creating an unprecedented level of interoperability in application code.
+Bevy apps are plugins all the way down. Engine internals, external libraries and business logic are all plugins registering components, systems and other plugins.
 
 ### 2. Dynamic Scripts for modders
 
@@ -46,11 +46,9 @@ Application code has unrestricted access to the filesystem, network and computer
 
 Data-driven software has been the industry standard for video games since id Software's WAD files in Doom. Games are naturally multi-diciplinary and deep access for non-technical team members and modders is very valuable.
 
-Each of these layers is itself a challenge to implement in a way thats ergonomic and performant, Bevy combines all three.
-
 ## Interoperable Scenes
 
-Bevy's ECS architecture makes its serialized representation very simple, and basically *already interoperable* with other ECS engines. The clearest way to understand why this is unique is by comparing three data-driven engines:
+Bevy's ECS architecture makes its serialized representation very simple, and basically *already interoperable* with other ECS engines. This can be seen by comparing three data-driven engines:
 
 | Engine | Model | Component Composition | Spatial Info | Relations |
 | :--- | :--- | :--- | :--- | :--- |
@@ -58,9 +56,9 @@ Bevy's ECS architecture makes its serialized representation very simple, and bas
 | **Godot** | Nodes | 👎 Convention-based | ✅ Optional | 👎 Required and fixed |
 | **Bevy** | Entities | ✅ Strongly typed | ✅ Optional | ✅ Optional & extensible |
 
-ECS representations need only a lightweight adaptor for interoperability with more opinionated formats. A Bevy scene can be used to describe a Godot or Unity scene, but the reverse requires lossy convention mapping, making Bevy the lowest common denominator.
+ECS representations need only a lightweight adaptor for interoperability with more opinionated formats. A Bevy scene can be used to describe a Godot or Unity scene, but the reverse requires lossy convention mapping.
 
-The missing piece from true engine interoperability is standardization around components. This is the application layer equivalent of an [ATProto lexicon](https://atproto.com/specs/lexicon) and means representing components via namespaced identities extensible beyond the cargo/crates ecosystem:
+The missing piece for true engine interoperability is standardization around components. This is the application layer equivalent of an [ATProto lexicon](https://atproto.com/specs/lexicon) and means representing components via namespaced identities extensible beyond the cargo/crates ecosystem:
 
 ```jsonc
 {
@@ -73,20 +71,8 @@ The missing piece from true engine interoperability is standardization around co
 }
 ```
 
-This follows a similar pattern to how the HTML spec defines a `<details>` element and browsers implement accordingly. Where this aligns more closely with ATProto lexicons than WHATWG standards is in decentralization. The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec.
+This follows a similar pattern to how the HTML spec defines a `<details>` element and browsers implement its behavior accordingly. Where this aligns more closely with ATProto lexicons than WHATWG standards is in decentralization. The standard specifies how components are defined but implementation is optional. Applications only implement the component definitions they care about and silently carry the rest, respecting round-trip data retention in a similar spirit to the USD spec.
 
-In this way the standard is a *method for resolving component schemas*, not the schemas themselves, just as ATProto defines the spec, not the lexicons themselves. The BlueSky lexicons are no more standardized than any others. This is one area I'm excited to explore further on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem like React.
+In this way the standard is a *method for resolving component schemas*, not the schemas themselves, just as ATProto defines the spec, not the lexicons themselves. The BlueSky lexicons are no more standardized than any others. This is one area I'm excited to explore further on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem like [Patchwork](https://www.inkandswitch.com/patchwork/notebook/).
 
-## Malleable Engines
-
-Bevy is an engine capable of running just about all software *without compromise*. My [Local-First Conf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running in a single engine, but in a **single data-driven binary**. Usually cross-domain capability is achieved by stitching two ecosystems together, ie react-three-fiber. In Bevy ECS the domains mesh together seamlessly.
-
-Bevy is still largely marketed as a game engine, reflecting its orgins and community, but for the project to thrive we need substantial funding and practically that means appealing to those beyond the games industry. The funding available for `a unified malleable core underpinning the application layer` is bigger than that of `games` or even `games + apps`, and reframing attracts these use-cases:
-
-> before: **A game engine capable of running apps**
->
-> after: **A malleable engine capable of running games**
-
-Thats a big pivot and far above my pay grade to know if its the right decision for Bevy, and it isn't required for downstream projects like Beet to continue exploring these broader areas.
-
-Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground that I am thrilled to be involved in! 🐦
+Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
