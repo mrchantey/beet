@@ -240,103 +240,156 @@ fn commit_schema_edit(
 	ev: On<Submit>,
 	editors: AncestorQuery<&DocRef>,
 	hosts: AncestorQuery<Entity, With<Document>>,
-	mut documents: Query<&mut Document>,
-	schemas: Query<&DocumentSchema>,
-	mut registry: ResMut<SchemaRegistry>,
-	mut commands: Commands,
+	commands: AsyncCommands,
 ) -> Result {
-	let form = ev.form;
-	// the draft is the form's own document, the nearest one above it; the
-	// schema document is named by the editor's `DocRef` above that, and the data
-	// document is the one the editor as a whole is mounted in.
-	let draft = hosts.get_exclusive(form)?;
-	let outcome = editors.get_exclusive(draft).and_then(|doc_ref| {
-		let data_doc = hosts.get_exclusive(draft)?;
-		commit(
-			&ev.values,
-			doc_ref.document(),
-			data_doc,
-			&mut documents,
-			&schemas,
-			&mut registry,
-			&mut commands,
-		)
+	// resolution is structural and synchronous: the draft is the form's own
+	// document, the schema document is the one the editor's `DocRef` above it
+	// names, and the data document is the one the editor is mounted in.
+	let draft = hosts.get_exclusive(ev.form)?;
+	let targets = editors.get_exclusive(draft).and_then(|doc_ref| {
+		(doc_ref.document(), hosts.get_exclusive(draft)?).xok()
 	});
-	let mut draft_document = documents.get_mut(draft)?;
-	match outcome {
-		// the edit is spent: a fresh draft, so the next one starts clean and
-		// the error line clears with it
-		Ok(()) => draft_document.0 = fresh_draft()?,
-		Err(err) => {
-			draft_document
-				.0
-				.insert(ERROR_FIELD, Value::str(err.to_string()))?;
-		}
-	}
+	let values = ev.values.clone();
+	// off a task, never inline: item 20 makes `OnMissing::Computed` an async js
+	// script, so evolving data is genuinely async, and blocking the world on it
+	// would freeze every other binding and deadlock the thread the script needs.
+	commands.run(async move |world| {
+		let outcome = match targets {
+			Ok((schema_doc, data_doc)) => {
+				commit(&world, values, schema_doc, data_doc).await
+			}
+			Err(err) => Err(err),
+		};
+		report(&world, draft, outcome).await
+	});
 	OK
 }
 
-/// The commit itself: read the pair, apply the edit to the schema, evolve the
-/// data under it, and publish the result so every subtree generated from that
-/// schema rebuilds.
-fn commit(
-	values: &Value,
+/// The commit itself, across two exclusive world hops: read the pair out,
+/// evolve it, then write it back and publish the new schema so every subtree
+/// generated from it rebuilds.
+///
+/// The registry is *cloned* into the task rather than borrowed, because no world
+/// borrow may be held across the evolution's awaits. The gap between the hops is
+/// the one window in which a concurrent write to either document would be lost;
+/// multi-writer arbitration is the workstream item 15 parks, and until it lands
+/// the editor is the only writer of a schema.
+async fn commit(
+	world: &AsyncWorld,
+	values: Value,
 	schema_doc: Entity,
 	data_doc: Entity,
-	documents: &mut Query<&mut Document>,
-	schemas: &Query<&DocumentSchema>,
-	registry: &mut SchemaRegistry,
-	commands: &mut Commands,
 ) -> Result {
-	let Ok(data_schema) = schemas.get(data_doc).map(|schema| schema.0.clone())
-	else {
-		bevybail!(
-			"the document a schema editor is mounted in declares no schema, \
-			so a schema edit has no data to evolve"
-		);
-	};
-	// the declaration's own arm is the meta-schema by definition: a schema
-	// document is a `ValueSchema` stored as data.
-	let mut declaration = TypedDocument::new(
-		FieldSchema::TypePath(ValueSchema::type_path().into()),
-		documents.get(schema_doc)?.0.clone(),
-	);
-	let mut data = TypedDocument::new(
-		data_schema.clone(),
-		documents.get(data_doc)?.0.clone(),
-	);
-	let mut next = declaration.to_schema()?;
-	values.clone().into_serde::<FieldEdit>()?.apply(&mut next)?;
+	let (registry, mut declaration, mut data) = world
+		.with(move |world: &mut World| {
+			let Some(data_schema) = world
+				.get::<DocumentSchema>(data_doc)
+				.map(|schema| schema.0.clone())
+			else {
+				bevybail!(
+					"the document a schema editor is mounted in declares no \
+					schema, so a schema edit has no data to evolve"
+				);
+			};
+			(
+				world.resource::<SchemaRegistry>().clone(),
+				// a schema document is a `ValueSchema` stored as data, so its
+				// own arm is the meta-schema by definition
+				TypedDocument::new(
+					FieldSchema::TypePath(ValueSchema::type_path().into()),
+					document_value(world, schema_doc, "`DocRef`")?,
+				),
+				TypedDocument::new(
+					data_schema,
+					document_value(world, data_doc, "host")?,
+				),
+			)
+				.xok()
+		})
+		.await?;
 
-	// one poll: every resolution but `OnMissing::Computed` (which is the js
-	// runtime seam, and panics) settles without an executor.
-	async_ext::try_block_on(data.commit_schema(
-		SchemaResolver::default().with_schemas(registry),
+	let mut next = declaration.to_schema()?;
+	values.into_serde::<FieldEdit>()?.apply(&mut next)?;
+	data.commit_schema(
+		SchemaResolver::default().with_schemas(&registry),
 		"the data document",
 		&mut declaration,
 		next.clone(),
-	))??;
+	)
+	.await?;
 
-	documents.get_mut(schema_doc)?.0 = declaration.value;
-	documents.get_mut(data_doc)?.0 = data.value;
-	if data.schema != data_schema {
-		commands
-			.entity(data_doc)
-			.insert(DocumentSchema(data.schema.clone()));
-	}
-	// the same publication `commit_schema` evolved the data against, now made
-	// real, so a `Reference` to this schema resolves to what was committed
-	match &data.schema {
-		FieldSchema::Document(path) => {
-			registry.insert_located(path.clone(), next)
-		}
-		_ => {
-			if let Some(name) = next.name().cloned() {
-				registry.insert(name, next);
+	world
+		.with(move |world: &mut World| {
+			*world.get_mut::<Document>(schema_doc).ok_or_else(|| {
+				bevyhow!("the schema document was despawned")
+			})? = Document::new(declaration.value);
+			*world
+				.get_mut::<Document>(data_doc)
+				.ok_or_else(|| bevyhow!("the data document was despawned"))? =
+				Document::new(data.value);
+			// the data document's own declaration moves only when the commit
+			// moved it, ie when it inlined exactly what the schema document held
+			if world
+				.get::<DocumentSchema>(data_doc)
+				.map(|schema| &schema.0)
+				!= Some(&data.schema)
+			{
+				world
+					.entity_mut(data_doc)
+					.insert(DocumentSchema(data.schema.clone()));
 			}
-		}
-	}
-	OK
+			// the publication `commit_schema` evolved the data against, now made
+			// real, so a `Reference` to this schema resolves to what was committed
+			let mut registry = world.resource_mut::<SchemaRegistry>();
+			match &data.schema {
+				FieldSchema::Document(path) => {
+					registry.insert_located(path.clone(), next)
+				}
+				_ => {
+					if let Some(name) = next.name().cloned() {
+						registry.insert(name, next);
+					}
+				}
+			}
+			OK
+		})
+		.await
+}
+
+/// Write the commit's outcome into the draft: a fresh draft when it landed, so
+/// the next edit starts clean and the error line clears with it, else the
+/// message, leaving the edit in place to be fixed and resubmitted.
+async fn report(world: &AsyncWorld, draft: Entity, outcome: Result) -> Result {
+	let message = outcome.err().map(|err| err.to_string());
+	world
+		.entity(draft)
+		.with(move |mut entity: EntityWorldMut| -> Result {
+			let mut document =
+				entity.get_mut::<Document>().ok_or_else(|| {
+					bevyhow!("the editor draft holds no document")
+				})?;
+			match message {
+				None => document.0 = fresh_draft()?,
+				Some(message) => {
+					document.0.insert(ERROR_FIELD, Value::str(message))?;
+				}
+			}
+			OK
+		})
+		.await?
+}
+
+/// A document's value, or a message naming the role of the entity that has none.
+///
+/// The loud half of item 27: a `DocRef` names an entity declared to *be* a
+/// document, so one that answers none is an error rather than a fallback.
+fn document_value(world: &World, entity: Entity, role: &str) -> Result<Value> {
+	world
+		.get::<Document>(entity)
+		.map(|document| document.0.clone())
+		.ok_or_else(|| {
+			bevyhow!("the schema editor\'s {role} entity holds no document")
+		})
 }
 
 #[cfg(test)]

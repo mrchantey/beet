@@ -80,14 +80,39 @@ pub fn form_app() -> App {
 	app
 }
 
-/// The entity of the first element with `tag`, in archetype order.
+/// The entity of the first element with `tag`, in **document order**.
+///
+/// Not archetype order: a query iterates archetypes, whose order shifts with
+/// component registration, so `element(app, "input")` meaning "the first input"
+/// silently became "some input" the moment a plugin was added. Roots are visited
+/// by entity id and each subtree depth-first in child order, which is the order
+/// the renderers and the focus path use.
 pub fn element(app: &mut App, tag: &str) -> Entity {
-	app.world_mut()
-		.query::<(Entity, &Element)>()
-		.iter(app.world())
-		.find(|(_, element)| element.tag() == tag)
-		.map(|(entity, _)| entity)
+	let world = app.world_mut();
+	let mut roots = world
+		.query_filtered::<Entity, Without<ChildOf>>()
+		.iter(world)
+		.collect::<Vec<_>>();
+	roots.sort();
+	roots
+		.into_iter()
+		.find_map(|root| find_element(world, root, tag))
 		.unwrap()
+}
+
+/// The first descendant of `entity` (inclusive) whose element tag matches,
+/// depth-first in child order.
+fn find_element(world: &World, entity: Entity, tag: &str) -> Option<Entity> {
+	if world
+		.get::<Element>(entity)
+		.is_some_and(|element| element.tag() == tag)
+	{
+		return Some(entity);
+	}
+	world
+		.get::<Children>(entity)?
+		.iter()
+		.find_map(|child| find_element(world, child, tag))
 }
 
 /// Focus the first element with `tag` on a fresh window surface, returning

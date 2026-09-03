@@ -197,7 +197,11 @@ impl Plugin for FormPlugin {
 		app.add_observer(ensure_form_field_value)
 			.add_observer(fire_form_submit)
 			.add_observer(super::checkbox::toggle_checkbox_on_activate)
-			.add_systems(Update, super::checkbox::sync_checkbox_checked);
+			.add_systems(Update, super::checkbox::sync_checkbox_checked)
+			// a `Submit` handler doing real work is async by nature (the
+			// `SchemaEditor`'s commit evolves data through a js seam), so the
+			// plugin that fires the event declares the bridge that carries it.
+			.init_plugin::<AsyncPlugin>();
 		// Enter-to-submit needs the keyboard/focus stack, gated with the renderer.
 		// `InputPlugin` is a hard dependency of it, not an ambient assumption: the
 		// `MessageReader` fails validation every frame without the message type,
