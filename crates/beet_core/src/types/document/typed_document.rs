@@ -1,26 +1,27 @@
-//! [`DataDocument`]: the self-describing on-disk form of an editable document.
+//! [`TypedDocument`]: the self-describing on-disk form of an editable document.
 use crate::prelude::*;
 use bevy_reflect::TypeRegistry;
 
 /// A runtime-editable document as it is stored: `{ "schema": .., "value": .. }`.
 ///
 /// A `.bsx` file is the authored *original* state of an application; anything
-/// the running application may rewrite is a data document, so it carries its own
-/// schema rather than depending on the binary that opens it to know the shape.
+/// the running application may rewrite is a typed document, so it carries its
+/// own schema rather than depending on the binary that opens it to know the
+/// shape.
 /// The three ways it can name that schema are the three [`FieldSchema`] arms.
 ///
 /// Landing it on an entity ([`bundle`](Self::bundle)) produces exactly the
 /// [`Document`] / [`DocumentSchema`] pair the binding layer already syncs.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DataDocument {
+pub struct TypedDocument {
 	/// How to resolve the schema the value must satisfy.
 	pub schema: FieldSchema,
 	/// The document's value.
 	pub value: Value,
 }
 
-impl DataDocument {
+impl TypedDocument {
 	/// Declare a data document from a schema and its value.
 	pub fn new(schema: FieldSchema, value: Value) -> Self {
 		Self { schema, value }
@@ -78,8 +79,8 @@ mod test {
 	use bevy_reflect::TypeRegistry;
 
 	/// Read `json` as `"todos.json"`, the subject every test here names.
-	async fn read(registry: &TypeRegistry, json: &str) -> DataDocument {
-		DataDocument::read(registry, "todos.json", json)
+	async fn read(registry: &TypeRegistry, json: &str) -> TypedDocument {
+		TypedDocument::read(registry, "todos.json", json)
 			.await
 			.unwrap()
 	}
@@ -118,7 +119,7 @@ mod test {
 	/// read, naming both the document and the field.
 	#[crate::test]
 	async fn read_rejects_a_diverged_document() {
-		DataDocument::read(
+		TypedDocument::read(
 			&TypeRegistry::default(),
 			"todos.json",
 			&todo_json().replace(r#"{ "label": "buy milk" }"#, "{}"),

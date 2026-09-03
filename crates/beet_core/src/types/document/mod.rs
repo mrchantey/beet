@@ -1,4 +1,3 @@
-mod data_document;
 mod document;
 mod document_plugin;
 mod document_query;
@@ -15,7 +14,7 @@ pub mod reflect_value_ext;
 #[cfg(feature = "json")]
 mod resource_binding;
 mod source_binding;
-pub use data_document::*;
+mod typed_document;
 pub use document::*;
 pub use document_plugin::*;
 pub use document_query::*;
@@ -30,3 +29,4 @@ pub use reflect_binding::*;
 #[cfg(feature = "json")]
 pub use resource_binding::*;
 pub use source_binding::*;
+pub use typed_document::*;
