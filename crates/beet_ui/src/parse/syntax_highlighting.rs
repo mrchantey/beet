@@ -68,7 +68,7 @@ pub struct HighlightSpan {
 
 impl SyntaxHighlighting {
 	/// A highlighter pre-registered with `rust`, `javascript`, `json`,
-	/// and `html` (plus common aliases).
+	/// and `html` (plus common aliases like `rs` and `jsonc`).
 	pub fn with_defaults() -> Self {
 		let mut this = Self {
 			languages: HashMap::default(),
@@ -100,13 +100,14 @@ impl SyntaxHighlighting {
 		)
 	}
 
-	/// Register the json grammar.
+	/// Register the json grammar. The grammar treats comments as extras, so
+	/// `jsonc` resolves to it too.
 	pub fn add_json(&mut self) -> &mut Self {
 		self.add_language(
 			"json",
 			tree_sitter_json::LANGUAGE.into(),
 			tree_sitter_json::HIGHLIGHTS_QUERY,
-			&[],
+			&["jsonc"],
 		)
 	}
 
@@ -337,6 +338,18 @@ mod test {
 			.iter()
 			.any(|s| s.capture.as_deref() == Some("keyword"))
 			.xpect_true();
+	}
+
+	#[beet_core::test]
+	fn highlights_jsonc() {
+		let hl = SyntaxHighlighting::with_defaults();
+		let spans = hl.highlight("jsonc", "{\n\t// hi\n\t\"a\": 1\n}");
+		let captured = |name: &str| {
+			spans.iter().any(|s| s.capture.as_deref() == Some(name))
+		};
+		captured("comment").xpect_true();
+		captured("string.special.key").xpect_true();
+		captured("number").xpect_true();
 	}
 
 	#[beet_core::test]

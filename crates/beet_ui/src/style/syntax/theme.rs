@@ -125,6 +125,7 @@ fn declarations(p: &SyntaxPalette) -> Vec<(TokenKey, TokenValue)> {
 		.with_value(t::StringEscape,         p.accent)
 		.with_value(t::StringRegexp,         p.number)
 		.with_value(t::StringSpecial,        p.number)
+		.with_value(t::StringSpecialKey,     p.function)
 		.with_value(t::StringSpecialSymbol,  p.number)
 		.with_value(t::Tag,                  p.function)
 		.with_value(t::Type,                 p.r#type)
@@ -200,6 +201,7 @@ pub(crate) fn class_rules() -> Vec<Rule> {
 		hl_rule("string.escape",         t::StringEscape),
 		hl_rule("string.regexp",         t::StringRegexp),
 		hl_rule("string.special",        t::StringSpecial),
+		hl_rule("string.special.key",    t::StringSpecialKey),
 		hl_rule("string.special.symbol", t::StringSpecialSymbol),
 		hl_rule("tag",                   t::Tag),
 		hl_rule("type",                  t::Type),

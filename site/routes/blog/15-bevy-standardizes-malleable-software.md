@@ -63,8 +63,8 @@ The missing piece for true engine interoperability is standardization around com
 ```jsonc
 {
   "0": {
-	  // Closed: cargo/rust module path convention
-  	"bevy_ecs::Name": "Billy"
+    // Closed: cargo/rust module path convention
+    "bevy_ecs::Name": "Billy",
     // Open: reverse domain name notation prefix
     "org.bevy.bevy_ecs.Name": "Billy"
   }

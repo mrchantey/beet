@@ -47,6 +47,7 @@ pub(crate) fn token_map() -> CssTokenMap {
 		.insert(StringEscape)
 		.insert(StringRegexp)
 		.insert(StringSpecial)
+		.insert(StringSpecialKey)
 		.insert(StringSpecialSymbol)
 		.insert(Tag)
 		.insert(Type)
@@ -117,6 +118,7 @@ css_variable!(String, Color);
 css_variable!(StringEscape, Color);
 css_variable!(StringRegexp, Color);
 css_variable!(StringSpecial, Color);
+css_variable!(StringSpecialKey, Color);
 css_variable!(StringSpecialSymbol, Color);
 
 // ── Tags ──────────────────────────────────────────────────────────────────
