@@ -107,7 +107,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 	/// read cannot dirty it.
 	///
 	/// A document or field that does not exist answers with the
-	/// [`OnMissingField::Init`] seed, ie `[]` for a list field, without writing
+	/// [`OnMissing::Default`] seed, ie `[]` for a list field, without writing
 	/// it back.
 	pub fn field_value(
 		&mut self,
@@ -128,12 +128,15 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		{
 			Some(value) => value.clone().xok(),
 			None => match &field.on_missing {
-				OnMissingField::Init { value } => value.clone().xok(),
-				_ => Err(DocumentError::ObjectKeyNotFound {
-					key: format!("{field_path}"),
-					path: field_path,
+				OnMissing::Default(value) => value.clone().xok(),
+				// a sync read runs no script, and an error policy is an error
+				OnMissing::Error | OnMissing::Computed { .. } => {
+					Err(DocumentError::ObjectKeyNotFound {
+						key: format!("{field_path}"),
+						path: field_path,
+					}
+					.into())
 				}
-				.into()),
 			},
 		}
 	}
