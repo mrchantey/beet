@@ -26,7 +26,7 @@ use tree_sitter::QueryCursor;
 /// Registry of tree-sitter grammars used to tokenize fenced code blocks.
 ///
 /// [`Default`] returns a registry pre-populated with rust, javascript,
-/// json, and html grammars; this is what [`StylePlugin`] inserts via
+/// json, html and bash grammars; this is what [`StylePlugin`] inserts via
 /// `init_resource`.
 #[derive(Clone, Resource)]
 pub struct SyntaxHighlighting {
@@ -68,7 +68,7 @@ pub struct HighlightSpan {
 
 impl SyntaxHighlighting {
 	/// A highlighter pre-registered with `rust`, `javascript`, `json`,
-	/// and `html` (plus common aliases like `rs` and `jsonc`).
+	/// `html` and `bash` (plus common aliases like `rs`, `jsonc` and `sh`).
 	pub fn with_defaults() -> Self {
 		let mut this = Self {
 			languages: HashMap::default(),
@@ -77,6 +77,7 @@ impl SyntaxHighlighting {
 		this.add_javascript();
 		this.add_json();
 		this.add_html();
+		this.add_bash();
 		this
 	}
 
@@ -118,6 +119,16 @@ impl SyntaxHighlighting {
 			tree_sitter_html::LANGUAGE.into(),
 			tree_sitter_html::HIGHLIGHTS_QUERY,
 			&["htm"],
+		)
+	}
+
+	/// Register the bash grammar, covering the posix-shell family.
+	pub fn add_bash(&mut self) -> &mut Self {
+		self.add_language(
+			"bash",
+			tree_sitter_bash::LANGUAGE.into(),
+			tree_sitter_bash::HIGHLIGHT_QUERY,
+			&["sh", "shell", "zsh", "console"],
 		)
 	}
 
@@ -350,6 +361,19 @@ mod test {
 		captured("comment").xpect_true();
 		captured("string.special.key").xpect_true();
 		captured("number").xpect_true();
+	}
+
+	#[beet_core::test]
+	fn highlights_bash() {
+		let hl = SyntaxHighlighting::with_defaults();
+		let spans =
+			hl.highlight("sh", "# build\nif true; then\n\techo \"hi\"\nfi\n");
+		let captured = |name: &str| {
+			spans.iter().any(|s| s.capture.as_deref() == Some(name))
+		};
+		captured("comment").xpect_true();
+		captured("keyword").xpect_true();
+		captured("string").xpect_true();
 	}
 
 	#[beet_core::test]

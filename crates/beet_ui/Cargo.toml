@@ -91,6 +91,7 @@ syntax_highlighting = [
 	"dep:tree-sitter-javascript",
 	"dep:tree-sitter-json",
 	"dep:tree-sitter-html",
+	"dep:tree-sitter-bash",
 	"dep:streaming-iterator"
 ]
 
@@ -143,6 +144,7 @@ tree-sitter-rust = { version = "0.24", optional = true }
 tree-sitter-javascript = { version = "0.25", optional = true }
 tree-sitter-json = { version = "0.24", optional = true }
 tree-sitter-html = { version = "0.23", optional = true }
+tree-sitter-bash = { version = "0.25", optional = true }
 streaming-iterator = { version = "0.1", optional = true }
 
 
