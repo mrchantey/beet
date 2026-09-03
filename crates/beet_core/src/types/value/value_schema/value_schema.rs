@@ -177,7 +177,8 @@ impl ValueSchema {
 	/// Resolve the schema of a nested field by `path`.
 	///
 	/// The dual of [`Document::get_field_ref`](crate::prelude::Document):
-	/// descends into struct fields, map values, list items and tuple elements.
+	/// descends into struct fields, map values, list items, tuple elements and
+	/// an externally tagged enum's payload (keyed by its variant name).
 	/// [`ValueSchema::Any`] swallows the remaining path and matches anything,
 	/// as does a [`ValueSchema::Reference`] nothing in hand can resolve.
 	pub fn get_field_schema(
@@ -229,6 +230,23 @@ impl ValueSchema {
 							ValueSchema::Map(schema),
 							FieldSegment::ObjectKey(_),
 						) => schema.value.as_ref(),
+						// an enum is externally tagged, so its payload sits
+						// under the variant name the value itself carries: a
+						// schema document's `Struct.fields` is this hop then a
+						// struct one.
+						(
+							ValueSchema::Enum(schema),
+							FieldSegment::ObjectKey(key),
+						) => schema
+							.variants
+							.iter()
+							.find(|variant| variant.name == *key)
+							.and_then(|variant| variant.payload.as_ref())
+							.ok_or_else(|| {
+								bevyhow!(
+									"enum schema has no variant `{key}` carrying a payload"
+								)
+							})?,
 						(
 							ValueSchema::List(schema),
 							FieldSegment::ArrayIndex(_),
@@ -1025,6 +1043,32 @@ mod test {
 			ValueSchema::I64(_)
 		)
 		.xpect_true();
+	}
+
+	/// An enum's payload is reached by its variant name, the key the externally
+	/// tagged value itself carries. This is what makes a *schema* document's
+	/// own fields addressable: `Struct.fields` is the list of a struct schema's
+	/// fields, which is what a schema editor binds.
+	#[crate::test]
+	fn get_field_schema_walks_an_enum_payload() {
+		let meta = ValueSchema::meta();
+		matches!(
+			meta.get_field_schema(&[
+				FieldSegment::key("Struct"),
+				FieldSegment::key("fields")
+			])
+			.unwrap(),
+			ValueSchema::List(_)
+		)
+		.xpect_true();
+		// a unit variant carries no payload to descend into
+		meta.get_field_schema(&[
+			FieldSegment::key("Any"),
+			FieldSegment::key("nope"),
+		])
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("Any");
 	}
 
 	#[crate::test]

@@ -12,6 +12,11 @@
 //! whose headers are the item's own fields. Reading is total where editing is
 //! not: every kind renders, because a [`Value`] is already text, so the view
 //! needs no [`UneditableField`] to fall back to.
+//!
+//! Three things are reactive, at three grains: a leaf's value through its own
+//! binding, a list's rows through [`ReactiveChildren`], and the layout itself
+//! through [`SchemaRebuild`], so a committed schema edit grows the table a
+//! column.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -62,12 +67,21 @@ pub fn DynamicView(
 		.as_deref()
 		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
 		.unwrap_or_default();
-	let cx = ViewCx {
-		resolver,
-		vertical_lines,
+	// the laid-out value is one generation, respawned when a committed schema
+	// edit changes what this schema resolves to (a table gaining a column)
+	let rows = {
+		let schema = schema.clone();
+		let field = field.clone();
+		move |resolver: SchemaResolver| {
+			let cx = ViewCx {
+				resolver,
+				vertical_lines,
+			};
+			view_field(cx, &schema, field.clone(), None, 0)
+		}
 	};
 	rsx! {
-		<div>{view_field(cx, &schema, field, None, 0)}</div>
+		<div>{SchemaRebuild::new(resolver, schema, rows).holder(resolver)}</div>
 	}
 }
 

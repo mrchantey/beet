@@ -13,6 +13,10 @@
 //! as its `name`, so the whole form gathers as a typed [`Value`] map on
 //! [`Submit`] — the commit boundary a transactional edit rides.
 //!
+//! The controls are one generation held by a [`SchemaRebuild`], so a committed
+//! schema edit regenerates them in place while the slot's authored children
+//! stay put.
+//!
 //! Surface-agnostic: the widgets it spawns are ordinary elements, so the same
 //! form paints in a terminal and serves as HTML.
 use crate::prelude::*;
@@ -70,9 +74,18 @@ pub fn DynamicForm(
 		.as_deref()
 		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
 		.unwrap_or_default();
+	// the controls are one generation, respawned when a committed schema edit
+	// changes what this schema resolves to; the slot's children are its siblings
+	let controls = {
+		let schema = schema.clone();
+		let field = field.clone();
+		move |resolver: SchemaResolver| {
+			schema_field(resolver, &schema, field.clone(), None, 0)
+		}
+	};
 	rsx! {
 		<Form>
-			{schema_field(resolver, &schema, field, None, 0)}
+			{SchemaRebuild::new(resolver, schema, controls).holder(resolver)}
 			<Slot/>
 		</Form>
 	}

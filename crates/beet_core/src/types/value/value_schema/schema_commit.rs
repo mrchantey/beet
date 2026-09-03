@@ -13,7 +13,9 @@ type BackfillFuture<'a> = Pin<Box<dyn 'a + Send + Future<Output = Result>>>;
 /// carries a resolution. An added required field needs an
 /// [`OnMissing::Default`], an [`OnMissing::Computed`], or to be optional; a
 /// retyped field needs its existing values to validate, or an
-/// [`OnMissing::Computed`] conversion.
+/// [`OnMissing::Computed`] conversion. A *removed* field needs nothing: a
+/// struct schema that forbids additional keys is the exhaustive statement of
+/// what the data is, so the commit drops the values it no longer declares.
 ///
 /// The commit is transactional: the walk runs against a copy, so the new schema
 /// and every backfill apply together or not at all, and every backfilled value
@@ -66,6 +68,19 @@ impl SchemaCommit {
 				(ValueSchema::Struct(schema), Value::Map(map)) => {
 					for field in &schema.fields {
 						Self::backfill_field(resolver, field, map).await?;
+					}
+					// a schema declaring its keys exhaustively is what the data
+					// now is, so a removed field's values go with it. The commit
+					// is where a schema edit resolves against its data, and an
+					// orphaned key has nothing left that could resolve it: it
+					// would only fail validation, with removal impossible.
+					if !schema.allow_additional {
+						let declared = schema
+							.fields
+							.iter()
+							.map(|field| field.key.clone())
+							.collect::<HashSet<_>>();
+						map.0.retain(|key, _| declared.contains(key));
 					}
 				}
 				(ValueSchema::List(schema), Value::List(items)) => {
@@ -304,6 +319,35 @@ mod test {
 		.unwrap();
 		value
 			.xpect_eq(value!([{ "label": "a", "is_really_difficult": false }]));
+	}
+
+	/// Removing a field takes its data with it: a schema forbidding additional
+	/// keys says exactly what the data is, and an orphaned value has nothing
+	/// that could resolve it, so it would only fail validation forever.
+	#[crate::test]
+	async fn a_removed_field_drops_its_values() {
+		let mut value = value!({ "label": "buy milk", "done": true });
+		SchemaCommit::new(item_schema(vec![label()]))
+			.apply(&mut value)
+			.await
+			.unwrap();
+		value.xpect_eq(value!({ "label": "buy milk" }));
+	}
+
+	/// A schema that permits additional keys keeps them: it never claimed to be
+	/// the whole story.
+	#[crate::test]
+	async fn additional_keys_survive_where_permitted() {
+		let ValueSchema::Struct(mut schema) = item_schema(vec![label()]) else {
+			panic!("a struct schema");
+		};
+		schema.allow_additional = true;
+		let mut value = value!({ "label": "buy milk", "note": "later" });
+		SchemaCommit::new(ValueSchema::Struct(schema))
+			.apply(&mut value)
+			.await
+			.unwrap();
+		value.xpect_eq(value!({ "label": "buy milk", "note": "later" }));
 	}
 
 	/// A retype with no computed conversion is rejected: the existing value

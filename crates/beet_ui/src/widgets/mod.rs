@@ -19,6 +19,15 @@
 //! the native events (see `input/pointer.rs`), and an async store can sync
 //! `BlobStore::list()` into a `Vec<_>` field via
 //! [`AsyncWorld`](beet_core::prelude::AsyncWorld) when that integration is wanted.
+//!
+//! **Schema-driven widgets.** Three widgets take a
+//! [`ValueSchema`](beet_core::prelude::ValueSchema) rather than authored
+//! children: [`DynamicForm`] generates one control per editable leaf,
+//! [`DynamicView`] the read side of the same walk, and [`SchemaEditor`] edits
+//! the *schema* itself, generated from the meta-schema and committing through
+//! [`TypedDocument::commit_schema`](beet_core::prelude::TypedDocument). All
+//! three hold their generated subtree in a [`SchemaRebuild`], so a committed
+//! schema edit regenerates every form and view of that schema.
 
 #[cfg(feature = "net")]
 mod analytics;
@@ -43,6 +52,8 @@ mod header;
 mod layout;
 mod preflight;
 mod render_console;
+mod schema_editor;
+mod schema_rebuild;
 mod sidebar;
 #[cfg(feature = "style")]
 mod stylesheet;
@@ -75,6 +86,8 @@ pub use preflight::*;
 // only the widget is public; its style consts (`CONSOLE_*`) stay `pub(crate)`,
 // reached prefixed as `render_console::CONSOLE_INFO` within the crate.
 pub use render_console::RenderConsole;
+pub use schema_editor::*;
+pub use schema_rebuild::*;
 pub use sidebar::*;
 #[cfg(feature = "style")]
 pub use stylesheet::*;
@@ -109,6 +122,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<Form>()
 		.register_template::<DynamicForm>()
 		.register_template::<DynamicView>()
+		.register_template::<SchemaEditor>()
 		.register_template::<Head>()
 		.register_template::<Header>()
 		.register_template::<HtmlDocument>()
@@ -122,6 +136,13 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<SidebarScript>()
 		.register_template::<MenuButton>()
 		.register_template::<Table>();
+	// a schema-driven widget regenerates its subtree when the schema it renders
+	// changes, so a committed schema edit reaches every form and view of it.
+	app.add_systems(
+		Update,
+		schema_rebuild::rebuild_schema_widgets
+			.run_if(resource_changed::<SchemaRegistry>),
+	);
 	// register the `RenderConsole` rules into the global rule set at build time, so
 	// `<Stylesheet>` emits them without coupling a generic widget to the material
 	// `classes` module (the line classes are set by `render_console.js`).
