@@ -247,6 +247,21 @@ fn scalar_to_reflect(
 		return Ok(Box::new(duration));
 	}
 
+	// a `YYYY-MM-DD` string targeting a `Timestamp` field coerces to midnight UTC
+	// on that date, so a markup `{ArticleMeta{created:"2026-08-28"}}` authors a
+	// publication date directly (mirroring the duration string above). Any other
+	// string errors rather than silently landing on the epoch.
+	if let (Value::Str(string), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<Timestamp>()
+	{
+		let Some(timestamp) = Timestamp::parse_date(string) else {
+			bevybail!(
+				"invalid date {string:?}: expected a `YYYY-MM-DD` string like \"2026-08-28\""
+			);
+		};
+		return Ok(Box::new(timestamp));
+	}
+
 	// a `"true"`/`"false"` string targeting a `bool` field coerces to the bool, so a
 	// markup `<RouteSidebar home="false"/>` authors a flag directly (mirroring the
 	// duration string above). Any other string errors rather than silently applying

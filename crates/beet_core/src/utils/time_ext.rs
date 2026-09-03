@@ -99,6 +99,42 @@ pub fn format_date(unix: Duration) -> String {
 	format!("{year:04}-{month:02}-{day:02}")
 }
 
+/// The English name of a month, `1..=12`. `None` outside that range.
+pub fn month_name(month: u64) -> Option<&'static str> {
+	MONTH_NAMES.get(month.checked_sub(1)? as usize).copied()
+}
+
+/// The month names [`month_name`] indexes, January first.
+const MONTH_NAMES: [&str; 12] = [
+	"January",
+	"February",
+	"March",
+	"April",
+	"May",
+	"June",
+	"July",
+	"August",
+	"September",
+	"October",
+	"November",
+	"December",
+];
+
+/// Formats a unix epoch [`Duration`] as a UTC date for a reader rather than a
+/// key, eg `6 September 2025`.
+///
+/// Day-month-year with the month spelled out: unambiguous in every locale (where
+/// `06/09/2025` is not), and free of the ordinal suffix and comma that make
+/// `6th September, 2025` read like handwriting.
+pub fn format_long_date(unix: Duration) -> String {
+	let (year, month, day) = civil_date(unix);
+	match month_name(month) {
+		Some(name) => format!("{day} {name} {year}"),
+		// unreachable via `civil_date`, whose month is always 1..=12
+		None => format_date(unix),
+	}
+}
+
 /// The unix epoch [`Duration`] of midnight UTC on a `YYYY-MM-DD` date, the
 /// inverse of [`format_date`]. `None` on anything that is not that shape.
 ///
@@ -300,6 +336,17 @@ mod test {
 		// leap year day
 		time_ext::format_iso8601(Duration::from_secs(1_709_164_800))
 			.xpect_eq("2024-02-29T00:00:00.000Z");
+	}
+
+	/// The reader-facing form: no ordinal suffix, no comma, month spelled out.
+	#[crate::test]
+	fn formats_long_date() {
+		time_ext::format_long_date(Duration::ZERO).xpect_eq("1 January 1970");
+		time_ext::format_long_date(Duration::from_secs(1_757_116_800))
+			.xpect_eq("6 September 2025");
+		// leap year day
+		time_ext::format_long_date(Duration::from_secs(1_709_164_800))
+			.xpect_eq("29 February 2024");
 	}
 
 	/// The date half alone, the key a daily aggregate or archive object takes.

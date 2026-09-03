@@ -61,6 +61,12 @@ async fn site_store() -> BlobStore {
 			"routes/docs/intro.md",
 			"+++\ntitle = \"The Intro\"\norder = 1\n+++\n\n# Intro\n\nintro body",
 		),
+		// the BSX surface of the same metadata: the component itself, spread on
+		// the page root rather than written as frontmatter
+		(
+			"routes/docs/spread.bsx",
+			r#"<Fragment {ArticleMeta{title: "The Spread", sidebar: SidebarInfo{order: 2}}}><p>spread body</p></Fragment>"#,
+		),
 	] {
 		store.insert(&SmolPath::from(path), content).await.unwrap();
 	}
@@ -316,6 +322,22 @@ async fn page_renders_in_layout() {
 		// marking the active link
 		.xpect_contains(">The Intro<")
 		.xpect_contains("aria-current=\"page\"");
+}
+
+/// A BSX page declares its metadata as an `ArticleMeta` spread on its root,
+/// which the `<RoutesDir/>` scan reads without building the page (so the nav
+/// labels it) and the render carries onto the page root (so `RouteHead` titles
+/// it) — the same two places markdown frontmatter reaches.
+#[beet_core::test]
+async fn bsx_page_declares_meta_as_a_spread() {
+	let mut world = (AsyncPlugin, RouterPlugin).into_world();
+	let root = spawn_site(&mut world).await;
+	get(&mut world, root, "docs/spread")
+		.await
+		.as_str()
+		.xpect_contains("<title>The Spread</title>")
+		.xpect_contains("spread body")
+		.xpect_contains(">The Spread<");
 }
 
 /// The counter page through the full route pipeline. The `@` binding values are

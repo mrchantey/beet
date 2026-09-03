@@ -96,6 +96,19 @@ where
 	}
 }
 
+/// Emits the constructor rather than the private field, since a [`Timestamp`] is
+/// opaque: a codegen-emitted `created` reconstructs the same instant.
+impl TokenizeSelf for Timestamp {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		let millis = self.unix_epoch_elapsed().as_millis() as u64;
+		tokens.extend(quote! {
+			Timestamp::from_unix_epoch_elapsed(
+				std::time::Duration::from_millis(#millis)
+			)
+		});
+	}
+}
+
 impl TokenizeSelf for String {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { String::from(#self) });

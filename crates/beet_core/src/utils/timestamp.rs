@@ -27,4 +27,34 @@ impl Timestamp {
 
 	/// Time elapsed since the Unix epoch.
 	pub fn unix_epoch_elapsed(&self) -> Duration { self.0 }
+
+	/// Midnight UTC on a `YYYY-MM-DD` date, ie the instant a date-only field
+	/// (a post's `created`, an archive key) names. `None` on any other shape.
+	pub fn parse_date(date: &str) -> Option<Self> {
+		time_ext::parse_date(date).map(Self)
+	}
+
+	/// This instant's UTC date as `YYYY-MM-DD`, the inverse of
+	/// [`parse_date`](Self::parse_date).
+	pub fn format_date(&self) -> String { time_ext::format_date(self.0) }
+
+	/// This instant's UTC date spelled for a reader, eg `6 September 2025`.
+	pub fn format_long_date(&self) -> String {
+		time_ext::format_long_date(self.0)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	/// A date-only field round-trips through the instant it names, and anything
+	/// that is not a date has none.
+	#[crate::test]
+	fn parses_and_formats_dates() {
+		let created = Timestamp::parse_date("2025-09-06").unwrap();
+		created.format_date().xpect_eq("2025-09-06");
+		created.format_long_date().xpect_eq("6 September 2025");
+		Timestamp::parse_date("someday").xpect_none();
+	}
 }

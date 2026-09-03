@@ -1,0 +1,16 @@
+<!--
+The blog listing, generated from each post's frontmatter rather than maintained
+by hand: <RouteIndex/> lists this route's children, ordered by the number their
+filenames carry and reversed so the newest reads first. A post's title,
+description, author and date all come from its own `+++` block, so adding a post
+is adding a file.
+
+The `{ArticleMeta{..}}` spread is what frontmatter would be in a markdown page:
+route metadata as a component, read off this file by the `<RoutesDir/>` scan (so
+the nav knows this page before anyone visits it) and applied to the rendered page
+as well (so the document title binds to it).
+-->
+<Fragment {ArticleMeta{title: "The Full Moon Harvest", sidebar: SidebarInfo{label: "Blog", order: 1, expanded: true}}}>
+	<h1>The Full Moon Harvest</h1>
+	<RouteIndex reverse="true"/>
+</Fragment>

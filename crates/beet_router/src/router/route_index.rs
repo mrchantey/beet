@@ -125,7 +125,8 @@ fn index_entry(
 fn entry_eyebrow(meta: &ArticleMeta) -> Snippet {
 	let text = [
 		meta.author.as_deref().map(str::to_uppercase),
-		meta.created.as_deref().map(format_date),
+		meta.created
+			.map(|created| created.format_long_date().to_uppercase()),
 	]
 	.into_iter()
 	.flatten()
@@ -143,52 +144,6 @@ fn entry_description(meta: &ArticleMeta) -> Snippet {
 		return Snippet::from_bundle(());
 	};
 	rsx! { <p>{text}</p> }
-}
-
-/// Month names in the eyebrow's shouted form, indexed by month number - 1.
-const MONTHS: [&str; 12] = [
-	"JANUARY",
-	"FEBRUARY",
-	"MARCH",
-	"APRIL",
-	"MAY",
-	"JUNE",
-	"JULY",
-	"AUGUST",
-	"SEPTEMBER",
-	"OCTOBER",
-	"NOVEMBER",
-	"DECEMBER",
-];
-
-/// An ISO `2026-08-28` as the eyebrow's `28TH AUGUST 2026`. Anything that is not
-/// an ISO date passes through uppercased, since frontmatter is free text and a
-/// listing is no place to fail a render.
-fn format_date(created: &str) -> String {
-	iso_to_eyebrow(created).unwrap_or_else(|| created.to_uppercase())
-}
-
-/// [`format_date`]'s fallible half: `None` when `created` is not `YYYY-MM-DD`.
-fn iso_to_eyebrow(created: &str) -> Option<String> {
-	let &[year, month, day] = created.split('-').collect::<Vec<_>>().as_slice()
-	else {
-		return None;
-	};
-	let day: u32 = day.parse().ok()?;
-	let month = MONTHS.get(month.parse::<usize>().ok()?.checked_sub(1)?)?;
-	Some(format!("{day}{} {month} {year}", ordinal_suffix(day)))
-}
-
-/// The uppercase ordinal suffix for a day of the month: `1ST`, `2ND`, `3RD`,
-/// `4TH`, with the 11th-13th exception.
-fn ordinal_suffix(day: u32) -> &'static str {
-	match (day % 10, day % 100) {
-		(_, 11..=13) => "TH",
-		(1, _) => "ST",
-		(2, _) => "ND",
-		(3, _) => "RD",
-		_ => "TH",
-	}
 }
 
 #[cfg(test)]
@@ -213,7 +168,7 @@ mod test {
 			title: Some(title.into()),
 			description: Some(format!("about {title}")),
 			author: Some("Pete Hayman".into()),
-			created: Some(created.into()),
+			created: Timestamp::parse_date(created),
 			sidebar: SidebarInfo {
 				order: Some(order),
 				..default()
@@ -284,7 +239,10 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let store = BlobStore::temp();
 		for (path, content) in [
-			("blog/index.md", "# Blog\n\n<RouteIndex reverse=\"true\"/>"),
+			(
+				"blog/index.bsx",
+				r#"<Fragment {ArticleMeta{title: "Blog"}}><h1>Blog</h1><RouteIndex reverse="true"/></Fragment>"#,
+			),
 			(
 				"blog/1-full-stack-bevy.md",
 				"+++\ntitle = \"Full Stack Bevy\"\nslug = \"full-stack-bevy\"\ndescription = \"the first one\"\ncreated = \"2025-07-11\"\nauthor = \"Pete Hayman\"\n+++\n\n# One",
@@ -311,18 +269,5 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_snapshot();
-	}
-
-	#[beet_core::test]
-	fn formats_eyebrow_dates() {
-		format_date("2026-08-28").xpect_eq("28TH AUGUST 2026");
-		format_date("2025-07-01").xpect_eq("1ST JULY 2025");
-		format_date("2026-05-02").xpect_eq("2ND MAY 2026");
-		format_date("2026-01-03").xpect_eq("3RD JANUARY 2026");
-		// the teens are all `TH`, whatever their last digit
-		format_date("2026-12-11").xpect_eq("11TH DECEMBER 2026");
-		format_date("2026-12-22").xpect_eq("22ND DECEMBER 2026");
-		// not an ISO date, so it passes through rather than failing the render
-		format_date("someday").xpect_eq("SOMEDAY");
 	}
 }

@@ -20,7 +20,7 @@ use beet_core::prelude::*;
 /// [`with_file_defaults`](Self::with_file_defaults)): a `slug` renames the
 /// route's last segment, and a numbered filename orders it.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "codegen", derive(ToTokens))]
 pub struct ArticleMeta {
@@ -33,11 +33,13 @@ pub struct ArticleMeta {
 	/// url stays a stable name: `blog/1-full-stack-bevy.md` declaring
 	/// `slug = "full-stack-bevy"` serves at `blog/full-stack-bevy`.
 	pub slug: Option<SmolStr>,
-	/// Publication date as an ISO `YYYY-MM-DD` string, eg `2026-08-28`.
+	/// Publication date, ie midnight UTC on the day the page was published.
 	///
-	/// A string, not a date type: [`Frontmatter`](beet_ui::prelude::Frontmatter)
-	/// carries flat scalars only. ISO order is lexical order, so it sorts as-is.
-	pub created: Option<SmolStr>,
+	/// Authored as a `YYYY-MM-DD` string in either surface — markdown frontmatter
+	/// (`created = "2026-08-28"`) or a BSX spread (`{ArticleMeta{created:".."}}`,
+	/// coerced by the reflect string-to-[`Timestamp`] rule) — and parsed to an
+	/// instant here, so it sorts and formats as a date rather than as text.
+	pub created: Option<Timestamp>,
 	/// Who wrote the page.
 	pub author: Option<SmolStr>,
 	/// Excludes the page from production builds when `true`.
@@ -120,7 +122,8 @@ impl ArticleMeta {
 	///
 	/// Reads the flat keys `title`, `description`, `slug`, `created`, `author`,
 	/// `draft`, plus the sidebar keys `sidebar_label`, `order`, `expanded`. The
-	/// sidebar label falls back to the page title.
+	/// sidebar label falls back to the page title, and a `created` that is not a
+	/// `YYYY-MM-DD` date reads as absent rather than failing the scan.
 	#[cfg(feature = "markdown_parser")]
 	pub fn from_frontmatter(
 		frontmatter: &beet_ui::prelude::Frontmatter,
@@ -129,7 +132,9 @@ impl ArticleMeta {
 			title: frontmatter.get_str("title").map(String::from),
 			description: frontmatter.get_str("description").map(String::from),
 			slug: frontmatter.get_str("slug").map(SmolStr::new),
-			created: frontmatter.get_str("created").map(SmolStr::new),
+			created: frontmatter
+				.get_str("created")
+				.and_then(Timestamp::parse_date),
 			author: frontmatter.get_str("author").map(SmolStr::new),
 			draft: frontmatter.get_bool("draft").unwrap_or(false),
 			sidebar: SidebarInfo {
@@ -172,7 +177,10 @@ mod test {
 		.unwrap();
 		let meta = ArticleMeta::from_frontmatter(&frontmatter);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
-		meta.created.as_deref().unwrap().xpect_eq("2025-07-11");
+		meta.created
+			.unwrap()
+			.format_long_date()
+			.xpect_eq("11 July 2025");
 		meta.author.as_deref().unwrap().xpect_eq("Pete Hayman");
 	}
 

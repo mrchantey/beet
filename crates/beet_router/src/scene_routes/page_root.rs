@@ -195,7 +195,17 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 	cx.caller
 		.world()
 		.with(move |world: &mut World| -> Result<PageRequest> {
+			// seed the render root with the route's own metadata, read off this
+			// same file by the discovering scan. Whichever surface declared it —
+			// markdown frontmatter or a BSX root spread — a widget reading the
+			// RENDER ROOT (the document `<title>` binding) finds it, and a
+			// markdown parse below simply rewrites it with the frontmatter it
+			// just read, the same value by construction.
+			let route_meta = world.entity(route).get::<ArticleMeta>().cloned();
 			let content = world.spawn(render_store).id();
+			if let Some(meta) = route_meta {
+				world.entity_mut(content).insert(meta);
+			}
 			// the entity owning this request's route tree, resolved from the
 			// in-tree route exactly as the layout middleware resolves it
 			let router = world
@@ -214,9 +224,11 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 					let mut entity = world.entity_mut(content);
 					MediaParser::new()
 						.parse(ParseContext::new(&mut entity, &bytes))?;
-					// derive per-page metadata from the parsed frontmatter, if any,
-					// so the render context can expose this route's
-					// title/description/sidebar info.
+
+					// derive per-page metadata from the parsed frontmatter, if any:
+					// the authoritative read for a markdown page, whose file the
+					// scan may never have seen (a `<Template src>` include, a
+					// codegen blob route).
 					#[cfg(feature = "markdown_parser")]
 					if let Some(meta) = entity
 						.get::<beet_ui::prelude::Frontmatter>()

@@ -115,16 +115,32 @@ impl RoutesDir {
 							if let Some(watch) = watch {
 								entity_mut.insert(watch);
 							}
+							// every valid route still spawns, so one bad slug does
+							// not take the site down with it; the failures are
+							// reported together once the guard has resolved.
+							let mut failures = Vec::new();
 							for spec in specs {
-								Self::spawn_route_spec(world, entity, spec);
+								if let Err(err) =
+									Self::spawn_route_spec(world, entity, spec)
+								{
+									failures.push(err.to_string());
+								}
 							}
 							world.flush();
 							// routes are spawned: resolve, draining the root's set so
 							// the deferred `Ready` fires.
 							guard.resolve(world);
+							failures
 						})
-						.await;
-					Ok(())
+						.await
+						.xmap(|failures| match failures.is_empty() {
+							true => Ok(()),
+							false => Err(bevyhow!(
+								"{} discovered route(s) failed to spawn:\n{}",
+								failures.len(),
+								failures.join("\n")
+							)),
+						})
 				},
 			);
 		});
@@ -132,13 +148,24 @@ impl RoutesDir {
 	}
 
 	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
-	fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
+	///
+	/// The metadata is resolved first because it has the last word on the url: a
+	/// `slug` renames the filename-derived final segment. A BSX page's metadata
+	/// resolves here rather than in the scan because reflect-building its spread
+	/// needs the world's type registry.
+	fn spawn_route_spec(
+		world: &mut World,
+		parent: Entity,
+		spec: RouteSpec,
+	) -> Result {
+		let meta = spec
+			.meta
+			.resolve(world)
+			.map(|meta| meta.with_file_defaults(&spec.store_path));
+		let route_path = Self::route_path_for(&spec.store_path, meta.as_ref())?;
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
-			route::new(
-				spec.route_path.as_str(),
-				BlobScene::new(spec.store_path),
-			),
+			route::new(route_path.as_str(), BlobScene::new(spec.store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			// a discovered content file is a user-facing page, so it carries
@@ -146,19 +173,19 @@ impl RoutesDir {
 			PageRoute,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		if let Some(meta) = spec.meta {
+		if let Some(meta) = meta {
 			route_entity.insert(meta);
 		}
+		Ok(())
 	}
 
-	/// List the store's content files and read each markdown file's frontmatter,
+	/// List the store's content files and read each one's declared metadata,
 	/// returning route specs in lexical path order so zero-padded routes (eg slides
 	/// `01..20`) spawn in sequence, giving a deterministic [`RouteTree`] child order.
 	///
-	/// The frontmatter is read before the route path is settled, since a `slug`
-	/// renames the filename-derived final segment
-	/// ([`ArticleMeta::apply_slug`]). The rename happens after the sort, so it
-	/// cannot reshuffle the discovered order.
+	/// This half is the store I/O; what the bytes MEAN settles at spawn time (see
+	/// [`spawn_route_spec`](Self::spawn_route_spec)), which is also where a `slug`
+	/// renames the route path — after the sort, so it cannot reshuffle the order.
 	async fn discover_routes(store: &BlobStore) -> Result<Vec<RouteSpec>> {
 		let mut paths = store.list().await?;
 		paths.sort();
@@ -166,17 +193,8 @@ impl RoutesDir {
 			.into_iter()
 			.filter(|path| Self::is_content(path))
 			.map(async |path| -> Result<RouteSpec> {
-				let meta = Self::scan_meta(store, &path)
-					.await
-					.map(|meta| meta.with_file_defaults(&path));
-				let route_path = Self::route_path_of(&path);
-				let route_path = match &meta {
-					Some(meta) => meta.apply_slug(&route_path)?,
-					None => route_path,
-				};
 				Ok(RouteSpec {
-					route_path,
-					meta,
+					meta: Self::scan_meta(store, &path).await,
 					store_path: path,
 				})
 			})
@@ -210,38 +228,97 @@ impl RoutesDir {
 		SmolPath::from_segments(&segments)
 	}
 
-	/// Read a markdown file's leading frontmatter into [`ArticleMeta`] through the
-	/// store, if it is markdown and parses; any read/parse failure yields `None`,
-	/// as does a build without the `markdown_parser` feature.
-	async fn scan_meta(
-		store: &BlobStore,
-		path: &SmolPath,
-	) -> Option<ArticleMeta> {
-		#[cfg(not(feature = "markdown_parser"))]
-		{
-			let _ = (store, path);
-			return None;
+	/// The url a content file serves at: its filename-derived path
+	/// ([`route_path_of`](Self::route_path_of)) with a declared `slug` renaming
+	/// the final segment.
+	///
+	/// # Errors
+	/// Errors when an `index` file declares a slug. Such a file collapses into
+	/// its directory, so the segment a slug would rename belongs to the
+	/// DIRECTORY, not the page: `blog/index.md` with `slug = "journal"` would
+	/// serve at `/journal` while every sibling post stayed under `/blog`.
+	fn route_path_for(
+		store_path: &SmolPath,
+		meta: Option<&ArticleMeta>,
+	) -> Result<SmolPath> {
+		let route_path = Self::route_path_of(store_path);
+		let Some(meta) = meta.filter(|meta| meta.slug.is_some()) else {
+			return Ok(route_path);
+		};
+		if store_path.file_stem() == Some("index") {
+			bevybail!(
+				"`{store_path}` declares a slug, but an index file collapses into its directory, \
+				so it has no page segment of its own to rename"
+			);
 		}
-		#[cfg(feature = "markdown_parser")]
-		{
-			let is_markdown = path
-				.extension()
-				.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
-			if !is_markdown {
-				return None;
-			}
-			let bytes = store.get(path).await.ok()?;
-			ArticleMeta::from_markdown(core::str::from_utf8(&bytes).ok()?)
+		meta.apply_slug(&route_path)
+	}
+
+	/// Read a content file's declared page metadata through the store: markdown
+	/// frontmatter, or the root spreads of a BSX document. Any read/parse failure
+	/// yields [`RouteSpecMeta::None`], since a page without metadata is a page.
+	async fn scan_meta(store: &BlobStore, path: &SmolPath) -> RouteSpecMeta {
+		let Some(source) = store
+			.get(path)
+			.await
+			.ok()
+			.and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
+		else {
+			return RouteSpecMeta::None;
+		};
+		match path.extension() {
+			#[cfg(feature = "markdown_parser")]
+			Some("md" | "mdx" | "markdown") => ArticleMeta::from_markdown(&source)
+				.map(RouteSpecMeta::Article)
+				.unwrap_or(RouteSpecMeta::None),
+			Some("bsx") => BsxNode::parse_document(&source, &default())
+				.map(RouteSpecMeta::Bsx)
+				.unwrap_or(RouteSpecMeta::None),
+			_ => RouteSpecMeta::None,
 		}
 	}
 }
 
-/// A discovered content file: its route path, the store path its bytes load from,
-/// and any scan-time frontmatter metadata.
+/// A discovered content file: the store path its bytes load from, and the page
+/// metadata that file declares.
 struct RouteSpec {
-	route_path: SmolPath,
 	store_path: SmolPath,
-	meta: Option<ArticleMeta>,
+	meta: RouteSpecMeta,
+}
+
+/// How a discovered file declares its page metadata, in the form the scan could
+/// read without a world.
+///
+/// The two content surfaces name the same thing two ways: markdown writes
+/// frontmatter (`+++ title = ".." +++`), BSX writes the component itself
+/// (`<Fragment {ArticleMeta{title:".."}}>`). Frontmatter parses to an
+/// [`ArticleMeta`] in the scan; a spread is reflect-built at spawn time, where
+/// the type registry is in hand.
+enum RouteSpecMeta {
+	/// A page declaring nothing, ie a `.html` file or markdown with no
+	/// frontmatter.
+	None,
+	/// Markdown frontmatter, parsed during the scan.
+	Article(ArticleMeta),
+	/// A BSX document's root nodes, whose `ArticleMeta` spread (if any) builds
+	/// against the world's type registry.
+	Bsx(Vec<BsxNode>),
+}
+
+impl RouteSpecMeta {
+	/// The page's [`ArticleMeta`], reflect-building a BSX root spread against
+	/// the world's type registry (see [`BsxNode::scan_spread`], which reads the
+	/// document without building it).
+	fn resolve(self, world: &World) -> Option<ArticleMeta> {
+		match self {
+			Self::None => None,
+			Self::Article(meta) => Some(meta),
+			Self::Bsx(nodes) => BsxNode::scan_spread(
+				&nodes,
+				world.get_resource::<AppTypeRegistry>()?,
+			),
+		}
+	}
 }
 
 #[cfg(test)]
@@ -426,6 +503,67 @@ mod test {
 			.order
 			.unwrap()
 			.xpect_eq(1);
+	}
+
+	/// A slug renames the page's own segment, and an index file — which has none,
+	/// having collapsed into its directory — is told so rather than quietly
+	/// renaming the directory out from under its siblings.
+	#[beet_core::test]
+	fn route_path_for_applies_slug() {
+		let slugged = ArticleMeta {
+			slug: Some("full-stack-bevy".into()),
+			..default()
+		};
+		RoutesDir::route_path_for(
+			&SmolPath::from("blog/1-full-stack-bevy.md"),
+			Some(&slugged),
+		)
+		.unwrap()
+		.xpect_eq(SmolPath::new("blog/full-stack-bevy"));
+		// no slug declared, the filename stands
+		RoutesDir::route_path_for(&SmolPath::from("blog/index.bsx"), None)
+			.unwrap()
+			.xpect_eq(SmolPath::new("blog"));
+		RoutesDir::route_path_for(
+			&SmolPath::from("blog/index.bsx"),
+			Some(&slugged),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("no page segment of its own");
+	}
+
+	/// A BSX page declares the same metadata markdown puts in frontmatter, as the
+	/// component itself on its root; the scan reads it without building the
+	/// document, so the route carries it before anyone visits the page.
+	#[beet_core::test]
+	async fn scan_time_bsx_spread_meta() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"blog/index.bsx",
+				r#"<Fragment {ArticleMeta{title: "The Full Moon Harvest", created: "2025-09-06", sidebar: SidebarInfo{label: "Blog", order: 1}}}><h1>Blog</h1></Fragment>"#,
+			)])
+			.await,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		let node = tree.find(&["blog"]).unwrap();
+		let meta = world.entity(node.entity).get::<ArticleMeta>().unwrap();
+		meta.title
+			.as_deref()
+			.unwrap()
+			.xpect_eq("The Full Moon Harvest");
+		meta.sidebar.label.as_deref().unwrap().xpect_eq("Blog");
+		meta.sidebar.order.unwrap().xpect_eq(1);
+		// the date string coerces to the instant it names
+		meta.created
+			.unwrap()
+			.format_long_date()
+			.xpect_eq("6 September 2025");
 	}
 
 	/// Frontmatter is scanned from file content through the store, so it is store
