@@ -145,9 +145,9 @@ fn module_name() -> String {
 /// to `sink` as it arrives, serving each world call through `bridge`, and
 /// returning the script's completion value (`None` when it produced none).
 ///
-/// Backs every [`Script`] entry point: the pure transform ignores the console
-/// and needs the value, [`Script::run_console`] is the reverse, and
-/// [`Script::run_world`] is the one that passes a bridge.
+/// Backs both [`Script`] entry points, which differ only in what they do with
+/// the two: [`Script::run`] decodes the value and logs the console,
+/// [`Script::run_captured`] collects the console and drops the value.
 pub(crate) async fn run_deno_cli<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
@@ -337,11 +337,15 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::scripting::test_support::*;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
 	async fn transforms_its_input() {
-		Script::<i64, i64>::new("input + 1").run(41).await.unwrap().xpect_eq(42);
+		run_script::<i64, i64>("return input + 1", 41)
+			.await
+			.unwrap()
+			.xpect_eq(42);
 	}
 
 	#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -353,17 +357,16 @@ mod test {
 	/// Structured values survive the crossing intact, not just scalars.
 	#[beet_core::test]
 	async fn round_trips_a_struct() {
-		Script::<Player, Player>::new("input.score += 10; input")
-			.run(Player {
-				name: "ada".to_string(),
-				score: 5,
-			})
-			.await
-			.unwrap()
-			.xpect_eq(Player {
-				name: "ada".to_string(),
-				score: 15,
-			});
+		run_script::<Player, Player>("input.score += 10; return input", Player {
+			name: "ada".to_string(),
+			score: 5,
+		})
+		.await
+		.unwrap()
+		.xpect_eq(Player {
+			name: "ada".to_string(),
+			score: 15,
+		});
 	}
 
 	/// The request travels as a JSON string literal the runner parses, so markup
@@ -371,40 +374,77 @@ mod test {
 	/// transport has to escape around.
 	#[beet_core::test]
 	async fn markup_in_a_script_survives_the_crossing() {
-		Script::<(), String>::new(r#""a </script> b <!-- c " + (1 < 2)"#)
-			.run(())
-			.await
-			.unwrap()
-			.xpect_eq("a </script> b <!-- c true".to_string());
+		run_script::<(), String>(
+			r#"return "a </script> b <!-- c " + (1 < 2)"#,
+			(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq("a </script> b <!-- c true".to_string());
 	}
 
 	#[beet_core::test]
 	async fn awaits_an_async_script() {
-		Script::<(), i64>::new("Promise.resolve(20).then(value => value * 2)")
-			.run(())
+		run_script::<(), i64>(
+			"return Promise.resolve(20).then(value => value * 2)",
+			(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq(40);
+	}
+
+	/// Top-level `await` is legal in every script, since every script is an
+	/// async function body.
+	#[beet_core::test]
+	async fn awaits_at_the_top_level() {
+		run_script::<(), i64>("return await Promise.resolve(7)", ())
 			.await
 			.unwrap()
-			.xpect_eq(40);
+			.xpect_eq(7);
 	}
 
 	#[beet_core::test]
 	async fn splits_the_console_streams() {
-		Script::<(), ()>::new(r#"console.log("out"); console.error("err")"#)
-			.run_captured(())
+		let script = Script::<(), ()>::new(
+			r#"console.log("out"); console.error("err")"#,
+		);
+		AsyncPlugin::world()
+			.run_async_local_then(move |world| async move {
+				script.run_captured((), world, &ScriptConfig::default()).await
+			})
 			.await
 			.unwrap()
-			.xpect_eq("out\n".to_string());
+			.xpect_eq("out
+".to_string());
 	}
 
-	/// The bridge is opt-in surface, not ambient authority: only a world-bridged
-	/// evaluation installs the shim, so a plain run has no `world` to reach for.
+	/// A withheld world is absent, not inert: `world: false` is what makes a
+	/// script provably pure, here as on the embedded engine.
 	#[beet_core::test]
-	async fn a_pure_script_has_no_world_global() {
-		Script::<(), String>::new("typeof world")
-			.run(())
-			.await
-			.unwrap()
-			.xpect_eq("undefined".to_string());
+	async fn a_worldless_script_has_no_world_global() {
+		run_script_with::<(), String>(
+			"return typeof world",
+			(),
+			ScriptConfig::default().without_world(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq("undefined".to_string());
+	}
+
+	/// Its sibling toggle: a withheld console is deleted rather than left as the
+	/// host realm's own, which would write straight into the protocol stream.
+	#[beet_core::test]
+	async fn a_consoleless_script_has_no_console_global() {
+		run_script_with::<(), String>(
+			"return typeof console",
+			(),
+			ScriptConfig::default().without_console(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq("undefined".to_string());
 	}
 
 	/// A script that floods stderr cannot wedge the exchange. `Deno.stderr` needs
@@ -413,12 +453,12 @@ mod test {
 	/// and the terminal event never arriving.
 	#[beet_core::test]
 	async fn a_stderr_flood_does_not_wedge_the_exchange() {
-		Script::<(), i64>::new(
+		run_script::<(), i64>(
 			r#"const noise = new TextEncoder().encode("x".repeat(1024));
 			for (let i = 0; i < 512; i++) Deno.stderr.writeSync(noise);
-			7"#,
+			return 7"#,
+			(),
 		)
-		.run(())
 		.await
 		.unwrap()
 		.xpect_eq(7);
@@ -426,8 +466,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn script_errors_propagate() {
-		Script::<(), ()>::new(r#"throw new Error("boom")"#)
-			.run(())
+		run_script::<(), ()>(r#"throw new Error("boom")"#, ())
 			.await
 			.unwrap_err()
 			.to_string()
@@ -444,21 +483,20 @@ mod test {
 	#[beet_core::test]
 	async fn denies_every_ambient_authority() {
 		let denied = [
-			(r#"Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
-			(r#"Deno.env.get("HOME")"#, "--allow-env"),
+			(r#"return Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
+			(r#"return Deno.env.get("HOME")"#, "--allow-env"),
 			(
-				r#"Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
+				r#"return Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
 				"--allow-write",
 			),
-			(r#"fetch("https://example.com")"#, "--allow-net"),
+			(r#"return fetch("https://example.com")"#, "--allow-net"),
 			(
-				r#"new Deno.Command("sh", { args: ["-c", "echo escaped"] }).outputSync()"#,
+				r#"return new Deno.Command("sh", { args: ["-c", "echo escaped"] }).outputSync()"#,
 				"--allow-run",
 			),
 		];
 		for (source, expected) in denied {
-			Script::<(), ()>::new(source)
-				.run(())
+			run_script::<(), ()>(source, ())
 				.await
 				.unwrap_err()
 				.to_string()
@@ -478,11 +516,10 @@ mod test {
 	async fn blocks_local_imports() {
 		let path = std::env::temp_dir().join("beet_import_probe.js");
 		fs_ext::write(&path, r#"export const secret = "unreadable";"#).unwrap();
-		let failure = Script::<(), ()>::new(format!(
-			r#"import("file://{}")"#,
-			path.display()
-		))
-		.run(())
+		let failure = run_script::<(), ()>(
+			&format!(r#"return import("file://{}")"#, path.display()),
+			(),
+		)
 		.await
 		.unwrap_err()
 		.to_string();
@@ -496,29 +533,32 @@ mod test {
 	/// `--no-remote` blocks the other way out: pulling in code from the network.
 	#[beet_core::test]
 	async fn blocks_remote_imports() {
-		Script::<(), ()>::new(r#"import("https://deno.land/std/version.ts")"#)
-			.run(())
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("--no-remote");
+		run_script::<(), ()>(
+			r#"return import("https://deno.land/std/version.ts")"#,
+			(),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("--no-remote");
 	}
 
 	/// A runaway script is killed at the deadline and the host survives it.
 	#[beet_core::test]
 	async fn runaway_scripts_are_killed_at_the_deadline() {
-		Script::<(), ()>::new("while (true) {}")
-			.with_limits(ScriptLimits {
+		run_script_with::<(), ()>(
+			"while (true) {}",
+			(),
+			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(500),
 				..default()
-			})
-			.run(())
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("timed out");
-		Script::<i64, i64>::new("input + 1")
-			.run(1)
+			}),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("timed out");
+		run_script::<i64, i64>("return input + 1", 1)
 			.await
 			.unwrap()
 			.xpect_eq(2);
@@ -528,8 +568,7 @@ mod test {
 	/// host happens to be.
 	#[beet_core::test]
 	async fn runs_in_utc() {
-		Script::<(), String>::new("new Date(0).toISOString()")
-			.run(())
+		run_script::<(), String>("return new Date(0).toISOString()", ())
 			.await
 			.unwrap()
 			.xpect_eq("1970-01-01T00:00:00.000Z".to_string());

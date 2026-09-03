@@ -23,19 +23,19 @@ pub(crate) fn test_world() -> World {
 /// Spawned as a task rather than polled inline: the bridge resolves at a sync
 /// point, which drives the executor's tasks, not this one.
 pub(crate) async fn serve(world: &mut World, call: &str) -> WorldReply {
-	serve_with(world, call, ScriptExposure::default()).await
+	serve_with(world, call, ScriptConfig::default()).await
 }
 
-/// [`serve`], under an exposure narrower than the open default.
+/// [`serve`], under an config narrower than the open default.
 pub(crate) async fn serve_with(
 	world: &mut World,
 	call: &str,
-	exposure: ScriptExposure,
+	config: ScriptConfig,
 ) -> WorldReply {
 	let call = serde_json::from_str::<WorldCall>(call).unwrap();
 	world
 		.run_async_then(move |world| async move {
-			WorldBridge::new(world, exposure).serve(call).await
+			WorldBridge::new(world, config).serve(call).await
 		})
 		.await
 }

@@ -20,10 +20,11 @@ use serde_json::Value as JsonValue;
 
 /// One evaluation request: the whole of what a backend needs to run a script.
 ///
-/// There is deliberately little else here. A script is a pure `Input -> Output`
-/// transform, so its source, its bound input and its resource ceilings are the
-/// bulk of the authority it receives; the one addition is the world flag, which
-/// is authority the caller grants explicitly and per evaluation.
+/// There is deliberately little else here. The source, the bound input and the
+/// resource ceilings are the bulk of what a script receives; the two flags are
+/// the globals the host grants it. What the two flags do *not* carry is the
+/// read/write reach: that is enforced at the `WorldBridge` on the host, per
+/// call, and never crosses the wire — a backend is not a policy engine.
 #[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
 pub struct ScriptRequest {
 	/// The JavaScript source to evaluate.
@@ -39,7 +40,18 @@ pub struct ScriptRequest {
 	/// older bootstrap) still decodes as the worldless run it means.
 	#[serde(default)]
 	pub world: bool,
+	/// Whether to install the `console` global. False deletes whatever the host
+	/// realm ambiently provides, so a withheld console is absent rather than
+	/// quietly writing to the host's own stdout.
+	///
+	/// Defaulted to true: a console is the ordinary grant, and a request written
+	/// without one means the run it reads like.
+	#[serde(default = "console_granted")]
+	pub console: bool,
 }
+
+/// The `true` a missing [`ScriptRequest::console`] decodes as.
+fn console_granted() -> bool { true }
 
 /// One event from a running script: console output and world calls as they
 /// happen, then exactly one terminal event ([`Output`](Self::Output) or
@@ -70,9 +82,9 @@ pub enum ScriptEvent {
 	},
 	/// The script's completion value, the last event of a successful run.
 	///
-	/// `None` when the script produced no value (a bare `console.log("hi")`),
-	/// which [`Script::run`] rejects and [`Script::run_console`] tolerates. The
-	/// JS side simply omits the key, since `JSON.stringify` drops `undefined`.
+	/// `None` when the script returned nothing (a bare `console.log("hi")`),
+	/// which decodes as `null` for the script's `Output`. The JS side simply
+	/// omits the key, since `JSON.stringify` drops `undefined`.
 	Output {
 		/// The completion value, absent when the script produced none.
 		#[serde(default)]
@@ -127,13 +139,11 @@ impl JsonLine for ScriptEvent {}
 ///   reaches `__world_reply`. Spliced only for a world-bridged run, and never
 ///   awaited: it starts a listener or a background loop and returns.
 ///
-/// The source runs through *indirect* `eval`, so the completion value of its
-/// last expression is the output, matching the embedded engine (an
-/// `AsyncFunction` wrapper would demand an explicit `return` instead). Indirect
-/// eval also runs it in global scope, out of reach of the runner's own bindings.
-/// A returned promise is awaited, so an async script resolves before its output
-/// is emitted; top-level `await` inside the source is not supported, which is
-/// again the embedded engine's behaviour.
+/// The source arrives already wrapped in an async IIFE by `Script::async_body`,
+/// so it is one expression evaluating to a promise: `await` is legal anywhere
+/// inside it and the script answers with `return`. It runs through *indirect*
+/// `eval`, which evaluates it in global scope, out of reach of the runner's own
+/// bindings; the promise it yields is awaited before the output is emitted.
 const JS_RUNNER: &str = r#"
 const show = (arg) => {
 	if (typeof arg === "string") return arg;
@@ -155,10 +165,16 @@ const describe = (err) => {
 	return stack.startsWith(err.name) ? stack : String(err) + "\n" + stack;
 };
 try {
-	globalThis.console = {
-		log: write("stdout"), info: write("stdout"), debug: write("stdout"),
-		warn: write("stderr"), error: write("stderr"),
-	};
+	// the console the host granted, or none at all: an ambient one left in place
+	// would write to this realm's own stdout, which is the protocol stream.
+	if (request.console) {
+		globalThis.console = {
+			log: write("stdout"), info: write("stdout"), debug: write("stdout"),
+			warn: write("stderr"), error: write("stderr"),
+		};
+	} else {
+		delete globalThis.console;
+	}
 	globalThis.input = request.input;
 	// the world bridge, installed only for a world-bridged request: the host's
 	// inbound hook, then the shim (which installs the outbound `__world_reply`),
@@ -274,10 +290,11 @@ mod test {
 
 	fn request() -> ScriptRequest {
 		ScriptRequest {
-			source: "input.name".to_string(),
+			source: "return input.name".to_string(),
 			input: serde_json::json!({ "name": "ada" }),
 			limits: ScriptLimits::default(),
 			world: false,
+			console: true,
 		}
 	}
 
@@ -293,7 +310,7 @@ mod test {
 	#[beet_core::test]
 	fn multiline_payloads_stay_on_one_line() {
 		let request = ScriptRequest {
-			source: "const a = 1;\nconst b = 2;\na + b".to_string(),
+			source: "const a = 1;\nconst b = 2;\nreturn a + b".to_string(),
 			..request()
 		};
 		let line = request.to_line().unwrap();
@@ -301,16 +318,17 @@ mod test {
 		ScriptRequest::from_line(&line).unwrap().xpect_eq(request);
 	}
 
-	/// The worldless run is the common one, so an encoding that never mentions
-	/// `world` must decode as one rather than as a malformed request.
+	/// The two grants have opposite defaults, each the run its absence means: no
+	/// world unless one is asked for, a console unless one is withheld.
 	#[beet_core::test]
-	fn a_missing_world_decodes_as_false() {
+	fn missing_grants_decode_as_their_defaults() {
 		let mut encoded = serde_json::to_value(request()).unwrap();
-		encoded.as_object_mut().unwrap().remove("world");
-		serde_json::from_value::<ScriptRequest>(encoded)
-			.unwrap()
-			.world
-			.xpect_false();
+		let fields = encoded.as_object_mut().unwrap();
+		fields.remove("world");
+		fields.remove("console");
+		let request = serde_json::from_value::<ScriptRequest>(encoded).unwrap();
+		request.world.xpect_false();
+		request.console.xpect_true();
 	}
 
 	#[beet_core::test]

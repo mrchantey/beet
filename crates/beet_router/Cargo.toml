@@ -88,9 +88,11 @@ template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
 # `ExchangeScriptElement` reflect types and the `<ScriptRoute>` template).
 # Backend-agnostic and self-sufficient: this compiles and registers on its own,
 # and a route only errors if it is dispatched in a build with no backend.
-scripting = ["std", "beet_action/scripting", "serde"]
+# A script marshals its values as json in both directions, so the scripted
+# route surfaces ride that gate rather than half-existing without it.
+scripting = ["std", "beet_action/scripting", "serde", "json"]
 # The embedded QuickJS backend for the scripting registrations above.
-quickjs = ["scripting", "json", "beet_action/quickjs"]
+quickjs = ["scripting", "beet_action/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # `markdown_parser` lets the collection scan read content frontmatter so blob
 # routes are emitted with their scan-time `ArticleMeta`.

@@ -11,7 +11,7 @@ use core::any::TypeId;
 /// One identifier space covers both kinds of component: a registered rust type
 /// is named by its type path (short or full), a runtime-minted one by the name
 /// its [`DynamicComponent`] declaration gave it. Everything downstream, the
-/// reads, the writes and the exposure checks, addresses components through this.
+/// reads, the writes and the config checks, addresses components through this.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComponentIdent {
 	/// The identifier as it appears on the wire: a registered component's full
@@ -20,7 +20,7 @@ pub struct ComponentIdent {
 	/// The short form a human writes: a registered component's short type path,
 	/// or, for a dynamic component, its declared name again.
 	///
-	/// Carried alongside [`path`](Self::path) because a [`ScriptExposure`] is
+	/// Carried alongside [`path`](Self::path) because a [`ScriptConfig`] is
 	/// written either way and must match either way.
 	pub short: SmolStr,
 	/// The live component.

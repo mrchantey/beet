@@ -1,7 +1,7 @@
 //! The one place a script's reads leave the world.
 //!
 //! The mirror of [`WorldWrite`]: three operations, each checked against the
-//! exposure's read filter before it looks at anything, each serving from the
+//! config's read filter before it looks at anything, each serving from the
 //! world as it is at the moment of the call.
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -16,16 +16,16 @@ impl WorldRead {
 	/// Serialize `ident` off `entity`, absent when the entity does not carry it.
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown, the exposure excludes it, the
+	/// Errors when the identifier is unknown, the config excludes it, the
 	/// entity is gone, or the component does not serialize.
 	pub fn get(
 		world: &mut World,
 		entity: Entity,
 		ident: &str,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result<Option<Value>> {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_readable(&ident)?;
+		config.assert_readable(&ident)?;
 		let entity = world.get_entity(entity).map_err(|_| {
 			bevyhow!("{entity} was despawned before the script read it")
 		})?;
@@ -68,14 +68,14 @@ impl WorldRead {
 	/// The id of every entity carrying `ident`.
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown or the exposure excludes it.
+	/// Errors when the identifier is unknown or the config excludes it.
 	pub fn entities(
 		world: &mut World,
 		ident: &str,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result<Value> {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_readable(&ident)?;
+		config.assert_readable(&ident)?;
 		QueryBuilder::<Entity>::new(world)
 			.with_id(ident.id)
 			.build()
@@ -98,14 +98,14 @@ impl WorldRead {
 	/// against.
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown or the exposure excludes it.
+	/// Errors when the identifier is unknown or the config excludes it.
 	pub fn schema(
 		world: &mut World,
 		ident: &str,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result<Value> {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_readable(&ident)?;
+		config.assert_readable(&ident)?;
 		let Some(type_id) = ident.type_id else {
 			// a runtime component's declaration is its whole definition, so its
 			// declared schema is the honest and complete answer.
@@ -238,7 +238,7 @@ mod test {
 	fn reads_a_registered_component() {
 		let mut world = test_world();
 		let entity = world.spawn(Name::new("ada")).id();
-		WorldRead::get(&mut world, entity, "Name", &ScriptExposure::default())
+		WorldRead::get(&mut world, entity, "Name", &ScriptConfig::default())
 			.unwrap()
 			.unwrap()
 			.xpect_eq(Value::from("ada"));
@@ -259,14 +259,14 @@ mod test {
 			entity,
 			"game.Health",
 			Value::Uint(3),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		WorldRead::get(
 			&mut world,
 			entity,
 			"game.Health",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap()
 		.unwrap()
@@ -279,7 +279,7 @@ mod test {
 		world.spawn_empty();
 		world.spawn(Name::new("ada"));
 		world.spawn(Name::new("bob"));
-		WorldRead::entities(&mut world, "Name", &ScriptExposure::default())
+		WorldRead::entities(&mut world, "Name", &ScriptConfig::default())
 			.unwrap()
 			.as_list()
 			.unwrap()
@@ -288,14 +288,14 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn a_read_outside_the_exposure_names_the_path() {
+	fn a_read_outside_the_config_names_the_path() {
 		let mut world = test_world();
 		let entity = world.spawn(Name::new("ada")).id();
 		WorldRead::get(
 			&mut world,
 			entity,
 			"Name",
-			&ScriptExposure::new(["game.Health"]),
+			&ScriptConfig::new(["game.Health"]),
 		)
 		.unwrap_err()
 		.to_string()
@@ -305,7 +305,7 @@ mod test {
 	#[beet_core::test]
 	fn describes_a_registered_component() {
 		let mut world = test_world();
-		WorldRead::schema(&mut world, "Name", &ScriptExposure::default())
+		WorldRead::schema(&mut world, "Name", &ScriptConfig::default())
 			.unwrap()
 			.to_string()
 			.xpect_contains("bevy_ecs::name::Name")
@@ -323,19 +323,15 @@ mod test {
 			ValueSchema::U64(default()),
 		)
 		.unwrap();
-		WorldRead::schema(
-			&mut world,
-			"game.Health",
-			&ScriptExposure::default(),
-		)
-		.unwrap()
-		.xpect_eq(WorldRead::map([
-			("component", Value::str("game.Health")),
-			(
-				"schema",
-				Value::from_serde(&ValueSchema::U64(default())).unwrap(),
-			),
-		]));
+		WorldRead::schema(&mut world, "game.Health", &ScriptConfig::default())
+			.unwrap()
+			.xpect_eq(WorldRead::map([
+				("component", Value::str("game.Health")),
+				(
+					"schema",
+					Value::from_serde(&ValueSchema::U64(default())).unwrap(),
+				),
+			]));
 	}
 
 	/// An undeclared runtime component is `Any`, so its schema says so rather
@@ -345,7 +341,7 @@ mod test {
 		let mut world = test_world();
 		DynamicComponents::register(&mut world, "game.Loot", ValueSchema::Any)
 			.unwrap();
-		WorldRead::schema(&mut world, "game.Loot", &ScriptExposure::default())
+		WorldRead::schema(&mut world, "game.Loot", &ScriptConfig::default())
 			.unwrap()
 			.to_string()
 			.xpect_contains("Any");

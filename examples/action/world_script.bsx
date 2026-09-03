@@ -1,18 +1,19 @@
 <!--
-# Dynamic Scripting - a sandboxed script acting on the live world
+# World Scripting - a sandboxed script acting on the live world
 
 `<DynamicComponent>` mints a component type with no rust definition behind it,
-and `<DynamicScript>` runs a sandboxed script with a `world` API installed.
-Every `world` method is served the moment it is awaited, so a script reads what
-it just wrote, a `spawn` hands back a real entity id the next line can use, and
-a refused call is an error the script can catch.
+and `<RunScript>` runs a sandboxed script with a `world` API installed. Every
+`world` method is served the moment it is awaited, so a script reads what it
+just wrote, a `spawn` hands back a real entity id the next line can use, and a
+refused call is an error the script can catch.
 
 The muster script spawns the squad and reads one of them straight back, so the
 world it describes is the world it just made. The round script uses real ids
-throughout, and the last beat asks for something its exposure forbids, catches
-the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
+throughout, and the last beat asks for something its `<ScriptConfig>` forbids,
+catches the refusal and writes it onto the roll call, whose `<Log::Name>`
+reports it.
 
-    beet --main=examples/action/dynamic_script.bsx
+    beet --main=examples/action/world_script.bsx
 -->
 <Fragment>
 	<!-- the vocabulary this document mints, kept by the scene rather than
@@ -20,8 +21,8 @@ the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
 	word means: every write to it is validated before it lands -->
 	<DynamicComponent name="game.Health" schema="u64"/>
 	<Sequence {CallOnReady}>
-		<DynamicScript
-			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
+		<RunScript
+			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
 			script="
 			// muster: each fighter is spawned with a registered rust component,
 			// addressed by its full type path, beside the minted one
@@ -33,8 +34,8 @@ the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
 			const health = await world.get(cleo, 'game.Health');
 			console.log('cleo mustered with ' + health + ' health');
 			"/>
-		<DynamicScript
-			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
+		<RunScript
+			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
 			script="
 			// the roll call is named but carries no health, so it is no fighter
 			let report = null;
@@ -60,8 +61,8 @@ the refusal and writes it onto the roll call, whose `<Log::Name>` reports it.
 			await world.insert(weakest.id, 'bevy_ecs::name::Name', weakest.name + ' (wounded)');
 			await world.insert(report, 'bevy_ecs::name::Name', 'roll call ' + roster.join(', '));
 			"/>
-		<DynamicScript
-			{ScriptExposure{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}
+		<RunScript
+			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}
 			script="
 			// this script may read a name but not write one, and the refusal
 			// arrives as an error where the call was made

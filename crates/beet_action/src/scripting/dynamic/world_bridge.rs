@@ -4,7 +4,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The seat a bridged script's calls are served from: an [`AsyncWorld`] handle
-/// and the [`ScriptExposure`] every call is checked against.
+/// and the [`ScriptConfig`] every call is checked against.
 ///
 /// The only path a [`WorldCall`] is executed through, on every backend. An
 /// out-of-process backend holds one for the duration of a run and answers each
@@ -16,13 +16,13 @@ pub struct WorldBridge {
 	/// The world every call is served against.
 	world: AsyncWorld,
 	/// The reach every call is checked against.
-	exposure: ScriptExposure,
+	config: ScriptConfig,
 }
 
 impl WorldBridge {
-	/// A bridge serving `exposure`'s reach against `world`.
-	pub fn new(world: AsyncWorld, exposure: ScriptExposure) -> Self {
-		Self { world, exposure }
+	/// A bridge serving `config`'s reach against `world`.
+	pub fn new(world: AsyncWorld, config: ScriptConfig) -> Self {
+		Self { world, config }
 	}
 
 	/// Perform one call and produce its reply.
@@ -69,7 +69,7 @@ mod test {
 		// sync point, which drives the executor's tasks, not this one.
 		world
 			.run_async_then(|world| async move {
-				WorldBridge::new(world, ScriptExposure::default())
+				WorldBridge::new(world, ScriptConfig::default())
 					.serve_line(WorldCall {
 						id: 0,
 						op: WorldOp::Spawn {

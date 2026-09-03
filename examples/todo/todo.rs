@@ -109,7 +109,7 @@ fn create() -> impl Bundle {
 }
 
 /// `read --body=<index>` — return a single todo by its index.
-fn read() -> impl Bundle { (todos(), route::exchange("read", ReadTodo)) }
+fn read() -> impl Bundle { (todos(), route::exchange_serde("read", ReadTodo)) }
 
 /// `update --body='[<index>,{..}]'` — replace the todo at an index.
 fn update() -> impl Bundle { (todos(), route::exchange("update", UpdateTodo)) }
@@ -120,7 +120,7 @@ fn delete() -> impl Bundle {
 }
 
 /// `list` — return the entire list.
-fn list() -> impl Bundle { (todos(), route::exchange("list", ReadField)) }
+fn list() -> impl Bundle { (todos(), route::exchange_serde("list", ReadField)) }
 
 /// Returns a single todo by its index, erroring when out of bounds.
 ///

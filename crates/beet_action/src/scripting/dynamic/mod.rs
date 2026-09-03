@@ -1,9 +1,8 @@
 //! The world bridge: how a sandboxed [`Script`](crate::prelude::Script) reaches
 //! the [`World`](bevy::prelude::World) without holding any authority over it.
 //!
-//! A `Script` on its own is a pure `Input -> Output` transform with no `world`
-//! global at all. A bridged evaluation adds one, and every method on it is a
-//! *request*: the script sends a [`WorldCall`] and awaits a promise, the host
+//! A script's `world` global is a channel, not the world: every method on it is
+//! a *request*: the script sends a [`WorldCall`] and awaits a promise, the host
 //! performs the operation against the live world and answers with a
 //! [`WorldReply`], and that reply settles the promise.
 //!
@@ -20,15 +19,15 @@
 //! [`WorldRead`] and [`WorldWrite`] are the synchronous `&mut World` halves
 //! those sections call.
 //!
-//! ## Exposure
+//! ## Reach
 //!
-//! A world-bridged script may address any component by default. A scene running
-//! a script it trusts less declares a [`ScriptExposure`], and the bridge, not
-//! the script, enforces it per call: reads check the read filter, mutations
-//! check the write filter, and a small set of components ([`ScriptExposure`]
-//! itself and the script carriers) is refused unconditionally, so a script can
-//! never widen its own grant. Sandboxed by default in authority, restrictable
-//! per script in reach.
+//! A world-capable script may address any component by default. A scene running
+//! a script it trusts less narrows its [`ScriptConfig`], and the bridge, not the
+//! script, enforces it per call: reads check the read filter, mutations check
+//! the write filter, and a small set of components (the config itself and the
+//! script carriers) is refused unconditionally, so a script can never widen its
+//! own grant. Withholding the world entirely is the same config's `world: false`,
+//! which leaves no `world` global to reach for at all.
 //!
 //! ## Vocabulary
 //!
@@ -47,16 +46,12 @@ pub mod entity_id;
 
 mod component_ident;
 mod dynamic_component;
-mod dynamic_script;
-mod script_exposure;
 mod world_bridge;
 mod world_call;
 mod world_read;
 mod world_write;
 pub use component_ident::*;
 pub use dynamic_component::*;
-pub use dynamic_script::*;
-pub use script_exposure::*;
 pub use world_bridge::*;
 pub use world_call::*;
 pub use world_read::*;

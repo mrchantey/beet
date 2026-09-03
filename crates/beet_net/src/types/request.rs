@@ -524,6 +524,55 @@ impl FromRequest<Self> for RequestParts {
 	}
 }
 
+/// Marker for the [`FromRequest`] impl shaping a request into a script `input`.
+///
+/// Distinct from [`SerdeFromRequestMarker`], which would deserialize the *body*
+/// into a [`Value`]: a script wants the whole request, so it selects this one.
+#[derive(TypePath)]
+pub struct ScriptInputMarker;
+
+/// The request as a script's `input`: a `{ path, params, body }` [`Value`] map.
+///
+/// The body is awaited and bound at `input.body` via [`Request::into_value`], as
+/// a string or bytes per its `content-type` (a text media type is a string,
+/// otherwise bytes; with no `content-type` the bytes are a string if valid
+/// UTF-8, else bytes).
+impl FromRequest<ScriptInputMarker> for Value {
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+		Box::pin(async move {
+			let path = request
+				.path_string()
+				.split('/')
+				.filter(|segment| !segment.is_empty())
+				.map(Value::str)
+				.xmap(Value::new_list);
+			let params = request
+				.params()
+				.iter_all()
+				.map(|(key, values)| {
+					let values = Value::new_list(
+						values.iter().map(|value| value.as_str()),
+					);
+					(key.clone(), values)
+				})
+				.collect::<Map>();
+			// consumes the request, awaiting and decoding the body; path/params
+			// are already owned above, so the borrow is released before this.
+			let body = request
+				.into_value()
+				.await
+				.map_err(|err| err.into_response())?;
+			let mut input = Map::default();
+			input.insert("path", path);
+			input.insert("params", Value::Map(params));
+			input.insert("body", body);
+			Ok(Value::Map(input))
+		})
+	}
+}
+
 /// Marker type for [`FromRequest`] implementations via [`TryFrom`].
 pub struct TryFromRequestMarker;
 

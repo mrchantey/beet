@@ -33,9 +33,12 @@ reflect = ["beet_core/bevy_reflect_documentation"]
 # target whose table does not declare it, and a wasm build without `scripting`
 # pays for none of the web-sys bindings — which is the point, since binary size
 # is the whole reason the iframe backend exists.
+# `beet_core/rsx` is the `#[template]` macro, which the `<RunScript>` markup
+# front-end is; it enables a macro feature and pulls no extra dependency.
 scripting = [
 	"serde",
 	"json",
+	"beet_core/rsx",
 	"dep:futures-lite",
 	"dep:js-sys",
 	"dep:wasm-bindgen",

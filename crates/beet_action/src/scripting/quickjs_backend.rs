@@ -14,12 +14,15 @@
 use rquickjs_wasm as rquickjs;
 
 use crate::prelude::ConsoleStream;
+use crate::prelude::ScriptConfig;
 use crate::prelude::ScriptLimits;
 use crate::prelude::WorldBridge;
 use crate::prelude::WorldCall;
 use crate::prelude::WorldReply;
 use crate::scripting::dynamic::WORLD_SHIM;
+use alloc::rc::Rc;
 use beet_core::prelude::*;
+use core::cell::RefCell;
 use rquickjs::CatchResultExt;
 use rquickjs::Context;
 use rquickjs::Ctx;
@@ -27,8 +30,6 @@ use rquickjs::Function;
 use rquickjs::Runtime;
 use rquickjs::Value as JsValue;
 use rquickjs::function::MutFn;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::Value as JsonValue;
 
 /// The engine's single host import on wasm: microseconds since the unix epoch.
@@ -226,90 +227,6 @@ const CONSOLE_PRELUDE: &str = r#"
 })();
 "#;
 
-/// Evaluate a QuickJS `script` as a pure `Input -> Output` function, bounded by
-/// `limits`.
-///
-/// `input` is serialized to JSON and bound to the `input` global; the value of
-/// the script's final expression is JSON-stringified and deserialized as the
-/// output. JSON is QuickJS's native marshalling currency, so this needs no
-/// intermediary `Value` hop — `serde_json` (alloc) is already `no_std`.
-pub(crate) fn run_quickjs<Input, Output>(
-	script: &str,
-	input: Input,
-	limits: &ScriptLimits,
-) -> Result<Output>
-where
-	Input: Serialize,
-	Output: DeserializeOwned,
-{
-	// the console forwards to the host log rather than the floor: a stray
-	// `console.log` in a pure transform must not throw (it runs fine on every
-	// other backend), and a script whose printing silently vanishes is the one
-	// thing in beet you cannot debug by printing.
-	eval_quickjs(script, input, limits, ConsoleStream::log)?
-		.ok_or_else(|| bevyhow!("quickjs: script returned no value"))?
-		.xmap(|output| serde_json::from_str(&output))
-		.map_err(|err| bevyhow!("quickjs: failed to decode output: {err}"))
-}
-
-/// Evaluate `script` for its side effects under `limits`, streaming each `console`
-/// call to `sink` the moment it runs.
-///
-/// Unlike [`run_quickjs`] (a pure `Input -> Output` transform), `console`
-/// `log`/`info`/`debug` forward to [`ConsoleStream::Stdout`] and `warn`/`error` to
-/// [`ConsoleStream::Stderr`] through a direct FFI binding, not a buffer read back
-/// after `eval` runs. So a long-running or async script's output is not held back
-/// until `eval` returns (it may never). Tolerates a script that returns no value
-/// (a bare `console.log("hi")`, which [`run_quickjs`] rejects).
-///
-/// `sink` is `FnMut` and runs on the single-threaded [`Context::full`], so it needs
-/// no `Send`.
-pub(crate) fn run_quickjs_console<Input, Sink>(
-	script: &str,
-	input: Input,
-	sink: Sink,
-	limits: &ScriptLimits,
-) -> Result<()>
-where
-	Input: Serialize,
-	Sink: 'static + FnMut(ConsoleStream, &str),
-{
-	eval_quickjs(script, input, limits, sink).map(|_| ())
-}
-
-/// Evaluate `script` with the `world` bridge installed, serving every call it
-/// makes through `bridge` as it makes it.
-///
-/// The engine is synchronous and its `Context` is `!Send`, so this is a local
-/// future: it never holds a `Ctx` across an await. Each pump step is one
-/// re-entry into the context (drain the job queue, take what the script asked
-/// for), and each call is then served with nothing held, which is what lets an
-/// operation be asynchronous. That is also what makes a read see the write
-/// before it.
-///
-/// The presence of a world is what installs the bridge at all: a plain
-/// [`run_quickjs`] leaves the script with no `world` global to reach for.
-pub(crate) async fn run_quickjs_world<Input>(
-	script: &str,
-	input: Input,
-	bridge: &WorldBridge,
-	limits: &ScriptLimits,
-) -> Result<Option<Value>>
-where
-	Input: Serialize,
-{
-	eval_quickjs_world(script, input, limits, bridge)
-		.await?
-		.map(|output| {
-			serde_json::from_str::<serde_json::Value>(&output)
-				.map(Value::from_json)
-				.map_err(|err| {
-					bevyhow!("quickjs: failed to decode output: {err}")
-				})
-		})
-		.transpose()
-}
-
 /// The rust half of the bridge the embedded engine cannot get from a host
 /// realm: the `__world_send` encoder and the `__world_begin` completion
 /// recorder the pump loop reads.
@@ -339,33 +256,66 @@ enum Pumped {
 	Done(String),
 }
 
-/// The one embedded evaluation path, returning the JSON encoding of the
-/// script's completion value (`None` when it produced none).
+/// The one embedded evaluation path: evaluate `source` under `config`, serving
+/// every world call it makes through `bridge` as it makes it.
 ///
-/// Every public entry point is this function or [`eval_quickjs_world`] with a
-/// different sink and a different use of the result, so they cannot drift in
-/// how they treat `console`, a returned promise or the job queue, a drift that
-/// would mean a script running on the deno backends and failing on this one.
-fn eval_quickjs<Input, Sink>(
-	script: &str,
-	input: Input,
-	limits: &ScriptLimits,
+/// `source` is an async function body wrapped by [`Script::async_body`], so the
+/// evaluation always yields a promise; `input` is bound to the `input` global,
+/// and the value the script returns comes back as JSON, absent when it returned
+/// none. What globals it sees at all is `config`'s to say: a withheld `console`
+/// or `world` is simply not installed, so reaching for it is an ordinary
+/// catchable `ReferenceError`.
+///
+/// The engine is synchronous and its `Context` is `!Send`, so this is a local
+/// future: it never holds a `Ctx` across an await. A bridged run pumps between
+/// awaits — one re-entry to drain the job queue and take what the script asked
+/// for, then each call served with nothing held — which is what lets an
+/// operation be asynchronous, and what makes a read see the write before it.
+///
+/// [`Script::async_body`]: crate::prelude::Script
+pub(crate) async fn run_quickjs<Sink>(
+	source: &str,
+	input: &JsonValue,
+	config: &ScriptConfig,
+	bridge: Option<&WorldBridge>,
 	sink: Sink,
-) -> Result<Option<String>>
+) -> Result<Option<JsonValue>>
 where
-	Input: Serialize,
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
 	let input = encode_input(input)?;
-	let bounded = BoundedRuntime::new(limits)?;
-	bounded.context.with(|ctx| {
-		install_prelude(&ctx, &input, sink)?;
+	let bounded = BoundedRuntime::new(&config.limits)?;
+	// a bridged script's calls queue here rather than crossing a transport: the
+	// engine runs on this thread, so `__world_send_json` is a host function that
+	// hands one over and returns, leaving the promise it minted pending until
+	// the pump below answers it.
+	let queue = Rc::new(RefCell::new(Vec::<String>::new()));
+
+	// one context entry installs everything and evaluates. An unbridged run
+	// settles its promise here and yields the value; a bridged one hands the
+	// promise to the pump and yields `None`, since the pump is what records how
+	// it settled.
+	let settled = bounded.context.with(|ctx| -> Result<Option<String>> {
+		install_prelude(&ctx, &input, config, sink)?;
+		if bridge.is_some() {
+			install_bridge(&ctx, &queue)?;
+		}
 		let output = ctx
-			.eval::<JsValue, _>(script)
+			.eval::<JsValue, _>(source)
 			.catch(&ctx)
 			.map_err(|err| bounded.error(err))?;
-		// settle a returned promise, then drain what is left, so an async
-		// script completes and its trailing microtasks get to run.
+		if bridge.is_some() {
+			return ctx
+				.globals()
+				.get::<_, Function>("__world_begin")
+				.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
+				.call::<_, ()>((output,))
+				.catch(&ctx)
+				.map_err(|err| bounded.error(err))
+				.map(|_| None);
+		}
+		// settle the returned promise, then drain what is left, so trailing
+		// microtasks get to run.
 		let output = bounded.settle(&ctx, output)?;
 		bounded.drain_jobs(&ctx)?;
 		ctx.json_stringify(output)
@@ -374,64 +324,55 @@ where
 			.map(|output| output.to_string())
 			.transpose()
 			.map_err(|err| bounded.error(err))
-	})
-}
-
-/// The bridged evaluation path: [`eval_quickjs`] plus the pump that serves the
-/// script's world calls.
-async fn eval_quickjs_world<Input>(
-	script: &str,
-	input: Input,
-	limits: &ScriptLimits,
-	bridge: &WorldBridge,
-) -> Result<Option<String>>
-where
-	Input: Serialize,
-{
-	let input = encode_input(input)?;
-	let bounded = BoundedRuntime::new(limits)?;
-	// calls queue here rather than crossing a transport: the engine runs on
-	// this thread, so `__world_send_json` is a host function that hands one
-	// over and returns, leaving the promise it minted pending until the pump
-	// below answers it.
-	let queue =
-		alloc::rc::Rc::new(core::cell::RefCell::new(Vec::<String>::new()));
-
-	bounded.context.with(|ctx| {
-		install_prelude(&ctx, &input, ConsoleStream::log)?;
-		let sender = queue.clone();
-		let send = Function::new(
-			ctx.clone(),
-			MutFn::new(move |json: String| sender.borrow_mut().push(json)),
-		)
-		.map_err(|err| bevyhow!("quickjs: bind world sink: {err}"))?;
-		ctx.globals()
-			.set("__world_send_json", send)
-			.map_err(|err| bevyhow!("quickjs: bind world send: {err}"))?;
-		ctx.eval::<JsValue, _>(WORLD_PUMP)
-			.catch(&ctx)
-			.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?;
-		ctx.eval::<JsValue, _>(WORLD_SHIM)
-			.catch(&ctx)
-			.map_err(|err| bevyhow!("quickjs: world shim: {err}"))?;
-		let output = ctx
-			.eval::<JsValue, _>(script)
-			.catch(&ctx)
-			.map_err(|err| bounded.error(err))?;
-		ctx.globals()
-			.get::<_, Function>("__world_begin")
-			.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
-			.call::<_, ()>((output,))
-			.catch(&ctx)
-			.map_err(|err| bounded.error(err))
 	})?;
 
-	// the pump: drain what the engine has queued, answer everything the script
-	// asked for while it drained, and repeat. A call answered here resolves a
-	// promise, which queues more work, which may ask again. The engine is only
-	// entered between awaits, never across one.
+	match bridge {
+		Some(bridge) => drive_bridge(&bounded, &queue, bridge).await,
+		None => Ok(settled),
+	}?
+	.map(|output| {
+		serde_json::from_str(&output)
+			.map_err(|err| bevyhow!("quickjs: failed to decode output: {err}"))
+	})
+	.transpose()
+}
+
+/// Bind the host half of the world bridge: the sink the shim sends calls
+/// through, then the pump and the shim that use it.
+fn install_bridge(
+	ctx: &Ctx<'_>,
+	queue: &Rc<RefCell<Vec<String>>>,
+) -> Result<()> {
+	let sender = queue.clone();
+	let send = Function::new(
+		ctx.clone(),
+		MutFn::new(move |json: String| sender.borrow_mut().push(json)),
+	)
+	.map_err(|err| bevyhow!("quickjs: bind world sink: {err}"))?;
+	ctx.globals()
+		.set("__world_send_json", send)
+		.map_err(|err| bevyhow!("quickjs: bind world send: {err}"))?;
+	ctx.eval::<JsValue, _>(WORLD_PUMP)
+		.catch(ctx)
+		.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?;
+	ctx.eval::<JsValue, _>(WORLD_SHIM)
+		.catch(ctx)
+		.map_err(|err| bevyhow!("quickjs: world shim: {err}"))
+		.map(|_| ())
+}
+
+/// Serve the script's world calls until its own promise settles, and answer
+/// with the JSON it settled with (absent when it produced none).
+///
+/// A call answered here resolves a promise, which queues more work, which may
+/// ask again. The engine is only entered between awaits, never across one.
+async fn drive_bridge(
+	bounded: &BoundedRuntime,
+	queue: &Rc<RefCell<Vec<String>>>,
+	bridge: &WorldBridge,
+) -> Result<Option<String>> {
 	loop {
-		match bounded.pump(&queue)? {
+		match bounded.pump(queue)? {
 			Pumped::Done(done) => {
 				return match serde_json::from_str::<Completion>(&done)
 					.map_err(|err| bevyhow!("quickjs: world pump: {err}"))?
@@ -463,14 +404,22 @@ where
 }
 
 /// `input` as the JSON encoding the engine parses it from.
-fn encode_input<Input: Serialize>(input: Input) -> Result<String> {
-	serde_json::to_string(&input)
+fn encode_input(input: &JsonValue) -> Result<String> {
+	serde_json::to_string(input)
 		.map_err(|err| bevyhow!("quickjs: failed to encode input: {err}"))
 }
 
-/// Bind the `input` global and install the streaming `console`, the two things
-/// every evaluation gets.
-fn install_prelude<Sink>(ctx: &Ctx<'_>, input: &str, sink: Sink) -> Result<()>
+/// Bind the `input` global, then install the streaming `console` if the config
+/// grants one.
+///
+/// The engine has no ambient `console` of its own, so withholding it is simply
+/// not installing it: the script reaches for a global that is not there.
+fn install_prelude<Sink>(
+	ctx: &Ctx<'_>,
+	input: &str,
+	config: &ScriptConfig,
+	sink: Sink,
+) -> Result<()>
 where
 	Sink: 'static + FnMut(ConsoleStream, &str),
 {
@@ -479,6 +428,9 @@ where
 	globals
 		.set("input", ctx.json_parse(input)?)
 		.map_err(|err| bevyhow!("quickjs: failed to bind input: {err}"))?;
+	if !config.console {
+		return Ok(());
+	}
 
 	// the single FFI sink the `console` prelude forwards every call to. `MutFn`
 	// wraps the `FnMut` for QuickJS's reentrant calls; the closure writes through
@@ -510,13 +462,15 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::scripting::test_support::*;
 	use beet_core::prelude::*;
+	use serde_json::Value as JsonValue;
 
 	#[beet_core::test]
 	async fn increments_a_number() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<i64, i64>::new("input + 1"),
+				Script::<i64, i64>::new("return input + 1"),
 				ScriptAction::<i64, i64>::default(),
 			))
 			.call::<i64, i64>(41)
@@ -529,7 +483,7 @@ mod test {
 	async fn concatenates_strings() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<String, String>::new(r#""hello " + input"#),
+				Script::<String, String>::new(r#"return "hello " + input"#),
 				ScriptAction::<String, String>::default(),
 			))
 			.call::<String, String>("world".to_string())
@@ -548,7 +502,9 @@ mod test {
 	async fn mutates_a_struct_field() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<Player, Player>::new("input.score += 10; input"),
+				Script::<Player, Player>::new(
+					"input.score += 10; return input",
+				),
 				ScriptAction::<Player, Player>::default(),
 			))
 			.call::<Player, Player>(Player {
@@ -569,34 +525,68 @@ mod test {
 	/// the dev-speed backend would fail on the primary one.
 	#[beet_core::test]
 	async fn awaits_an_async_script() {
-		Script::<(), i64>::new("Promise.resolve(20).then(value => value * 2)")
-			.run(())
-			.await
-			.unwrap()
-			.xpect_eq(40);
+		run_script::<(), i64>(
+			"return Promise.resolve(20).then(value => value * 2)",
+			(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq(40);
 	}
 
 	/// A promise that can never settle is an error, not a hang: the job queue
 	/// running dry with it still pending says so outright.
 	#[beet_core::test]
 	async fn an_unsettleable_promise_errors() {
-		Script::<(), i64>::new("new Promise(() => {})")
-			.run(())
+		run_script::<(), i64>("return new Promise(() => {})", ())
 			.await
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("never settle");
 	}
 
+	/// A script answers with `return`, so a typed output that never arrives is an
+	/// error naming the one way to answer, not an opaque serde type mismatch.
+	#[beet_core::test]
+	async fn a_valueless_script_names_the_return() {
+		run_script::<(), String>(r#"console.log("noise")"#, ())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("a script answers with `return`");
+	}
+
+	/// The corollary: an output that accepts null tolerates the same script, so
+	/// a leaf run for its effects needs no ceremony.
+	#[beet_core::test]
+	async fn a_valueless_script_suits_a_valueless_output() {
+		run_script::<(), ()>(r#"console.log("noise")"#, ())
+			.await
+			.unwrap();
+	}
+
 	/// Parity again: every other backend installs a `console`, so a stray
 	/// `console.log` in a pure transform must not be a `ReferenceError` here.
 	#[beet_core::test]
 	async fn a_pure_run_still_has_a_console() {
-		Script::<(), i64>::new(r#"console.log("noise"); 7"#)
-			.run(())
+		run_script::<(), i64>(r#"console.log("noise"); return 7"#, ())
 			.await
 			.unwrap()
 			.xpect_eq(7);
+	}
+
+	/// A withheld global is simply absent, so reaching for it throws the
+	/// ordinary error a script can catch.
+	#[beet_core::test]
+	async fn a_withheld_console_is_a_reference_error() {
+		run_script_with::<(), i64>(
+			r#"try { console.log("noise"); return 1 } catch (err) { return err instanceof ReferenceError ? 2 : 3 }"#,
+			(),
+			ScriptConfig::default().without_console(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq(2);
 	}
 
 	#[beet_core::test]
@@ -615,10 +605,10 @@ mod test {
 	/// there to reach for.
 	#[beet_core::test]
 	async fn has_no_host_globals() {
-		Script::<(), Vec<String>>::new(
-			"[typeof fetch, typeof Deno, typeof process, typeof require]",
+		run_script::<(), Vec<String>>(
+			"return [typeof fetch, typeof Deno, typeof process, typeof require]",
+			(),
 		)
-		.run(())
 		.await
 		.unwrap()
 		.xpect_eq(vec!["undefined".to_string(); 4]);
@@ -628,19 +618,20 @@ mod test {
 	/// handler, and the host is unharmed: the next script runs normally.
 	#[beet_core::test]
 	async fn infinite_loop_stops_at_the_deadline() {
-		Script::<(), ()>::new("while (true) {}")
-			.with_limits(ScriptLimits {
+		run_script_with::<(), ()>(
+			"while (true) {}",
+			(),
+			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(200),
 				..default()
-			})
-			.run(())
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("timed out");
+			}),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("timed out");
 		// the host survived the containment
-		Script::<i64, i64>::new("input + 1")
-			.run(1)
+		run_script::<i64, i64>("return input + 1", 1)
 			.await
 			.unwrap()
 			.xpect_eq(2);
@@ -650,14 +641,14 @@ mod test {
 	/// job returns, so only the drain loop's own deadline check stops it.
 	#[beet_core::test]
 	async fn runaway_microtasks_stop_at_the_deadline() {
-		Script::<(), ()>::new(
+		run_script_with::<(), ()>(
 			"const loop = () => Promise.resolve().then(loop); loop()",
+			(),
+			ScriptConfig::default().with_limits(ScriptLimits {
+				timeout: Duration::from_millis(200),
+				..default()
+			}),
 		)
-		.with_limits(ScriptLimits {
-			timeout: Duration::from_millis(200),
-			..default()
-		})
-		.run_console((), |_, _| {})
 		.await
 		.unwrap_err()
 		.to_string()
@@ -667,14 +658,14 @@ mod test {
 	/// An allocation bomb is contained by the memory cap, not the clock.
 	#[beet_core::test]
 	async fn allocation_bomb_hits_the_memory_cap() {
-		Script::<(), ()>::new(
+		run_script_with::<(), ()>(
 			"const held = []; while (true) held.push(new Array(100000).fill(0))",
+			(),
+			ScriptConfig::default().with_limits(ScriptLimits {
+				memory: 8 * 1024 * 1024,
+				..default()
+			}),
 		)
-		.with_limits(ScriptLimits {
-			memory: 8 * 1024 * 1024,
-			..default()
-		})
-		.run(())
 		.await
 		.unwrap_err()
 		.to_string()
@@ -685,15 +676,15 @@ mod test {
 	/// the script itself can catch, rather than overflowing the host stack.
 	#[beet_core::test]
 	async fn deep_recursion_is_a_catchable_range_error() {
-		Script::<(), bool>::new(
-			r#"(() => {
-				try {
-					(function recurse() { return 1 + recurse() })();
-					return false;
-				} catch (err) { return err instanceof RangeError }
-			})()"#,
+		run_script::<(), bool>(
+			r#"
+			try {
+				(function recurse() { return 1 + recurse() })();
+				return false;
+			} catch (err) { return err instanceof RangeError }
+			"#,
+			(),
 		)
-		.run(())
 		.await
 		.unwrap()
 		.xpect_true();
@@ -709,14 +700,19 @@ mod test {
 	/// Run a script with a capturing sink, collecting its streamed output. The sink
 	/// must be `'static`, so it shares the buffer through an `Rc` rather than
 	/// borrowing the local.
-	fn capture(script: &str, input: impl serde::Serialize) -> ConsoleOutput {
+	///
+	/// Straight to the backend, since the point is the split the host-facing
+	/// [`Script::run_captured`] flattens into one body.
+	async fn capture(script: &str, input: JsonValue) -> ConsoleOutput {
 		use std::cell::RefCell;
 		use std::rc::Rc;
 		let output = Rc::new(RefCell::new(ConsoleOutput::default()));
 		let sink = output.clone();
-		super::run_quickjs_console(
-			script,
-			input,
+		super::run_quickjs(
+			&Script::<(), ()>::async_body(script),
+			&input,
+			&ScriptConfig::default(),
+			None,
 			move |stream, msg| {
 				let mut out = sink.borrow_mut();
 				match stream {
@@ -724,35 +720,39 @@ mod test {
 					ConsoleStream::Stderr => out.stderr.push(msg.to_string()),
 				}
 			},
-			&ScriptLimits::default(),
 		)
+		.await
 		.unwrap();
 		// the sink (and its `Rc` clone) is dropped with the context inside
-		// `run_quickjs_console`, leaving `output` the sole owner.
+		// `run_quickjs`, leaving `output` the sole owner.
 		Rc::try_unwrap(output).unwrap().into_inner()
 	}
 
 	/// Values `JSON.stringify` cannot render (undefined, BigInt) still print as
 	/// something, rather than as an empty string or a thrown `TypeError`.
 	#[beet_core::test]
-	fn console_formats_unstringifiable_values() {
-		let output = capture(r#"console.log(undefined, 1n, "x")"#, ());
-		output.stdout.xpect_eq(vec!["undefined 1 x".to_string()]);
+	async fn console_formats_unstringifiable_values() {
+		capture(r#"console.log(undefined, 1n, "x")"#, JsonValue::Null)
+			.await
+			.stdout
+			.xpect_eq(vec!["undefined 1 x".to_string()]);
 	}
 
 	#[beet_core::test]
-	fn console_log_streams_stdout() {
-		let output = capture(r#"console.log("hello world")"#, ());
+	async fn console_log_streams_stdout() {
+		let output =
+			capture(r#"console.log("hello world")"#, JsonValue::Null).await;
 		output.stdout.xpect_eq(vec!["hello world".to_string()]);
 		output.stderr.xpect_empty();
 	}
 
 	#[beet_core::test]
-	fn console_reads_input_and_splits_streams() {
+	async fn console_reads_input_and_splits_streams() {
 		let output = capture(
 			r#"console.log(input.name); console.error("oops")"#,
-			value!({ "name": "ada" }),
-		);
+			serde_json::json!({ "name": "ada" }),
+		)
+		.await;
 		output.stdout.xpect_eq(vec!["ada".to_string()]);
 		output.stderr.xpect_eq(vec!["oops".to_string()]);
 	}
@@ -761,11 +761,13 @@ mod test {
 	/// resolved promise still runs and its output streams. The old
 	/// buffer-after-eval shim missed it.
 	#[beet_core::test]
-	fn drains_async_microtasks() {
-		let output = capture(
+	async fn drains_async_microtasks() {
+		capture(
 			r#"Promise.resolve().then(() => console.log("later"))"#,
-			(),
-		);
-		output.stdout.xpect_eq(vec!["later".to_string()]);
+			JsonValue::Null,
+		)
+		.await
+		.stdout
+		.xpect_eq(vec!["later".to_string()]);
 	}
 }

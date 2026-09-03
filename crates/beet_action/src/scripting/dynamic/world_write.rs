@@ -1,7 +1,7 @@
 //! The one place a script's mutations reach the world.
 //!
 //! The mirror of [`WorldRead`]: four operations, each checked against the
-//! exposure's write filter before it touches anything, each landing the moment
+//! config's write filter before it touches anything, each landing the moment
 //! the script asks for it. Every one tolerates a target that has gone: a
 //! despawned entity is an error naming it, never a panic.
 use crate::prelude::*;
@@ -24,17 +24,17 @@ impl WorldWrite {
 	/// this, in [`WorldOp`], where the check can be asynchronous.
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown, the exposure excludes it, the
+	/// Errors when the identifier is unknown, the config excludes it, the
 	/// value does not deserialize into the component, or the entity is gone.
 	pub fn insert(
 		world: &mut World,
 		entity: Entity,
 		ident: &str,
 		value: Value,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_writable(&ident)?;
+		config.assert_writable(&ident)?;
 		match ident.type_id {
 			None => {
 				Self::entity_mut(world, entity)?.xmap(|mut entity| {
@@ -90,16 +90,16 @@ impl WorldWrite {
 	/// Remove `ident` from `entity`, tolerating an entity that never had it.
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown, the exposure excludes it, or the
+	/// Errors when the identifier is unknown, the config excludes it, or the
 	/// entity is gone.
 	pub fn remove(
 		world: &mut World,
 		entity: Entity,
 		ident: &str,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_writable(&ident)?;
+		config.assert_writable(&ident)?;
 		Self::entity_mut(world, entity)?.remove_by_id(ident.id);
 		Ok(())
 	}
@@ -112,12 +112,11 @@ impl WorldWrite {
 	pub fn spawn(
 		world: &mut World,
 		components: Map,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result<Entity> {
 		let entity = world.spawn_empty().id();
 		for (ident, value) in components {
-			if let Err(err) =
-				Self::insert(world, entity, &ident, value, exposure)
+			if let Err(err) = Self::insert(world, entity, &ident, value, config)
 			{
 				world.entity_mut(entity).despawn();
 				return Err(err);
@@ -135,7 +134,7 @@ impl WorldWrite {
 		Ok(())
 	}
 
-	/// The schema `ident` declares, having checked this exposure may write it.
+	/// The schema `ident` declares, having checked this config may write it.
 	///
 	/// The read half of a write: the short exclusive section an async operation
 	/// runs before validating, so the validation itself happens with no world
@@ -144,15 +143,15 @@ impl WorldWrite {
 	/// [`Any`](ValueSchema::Any).
 	///
 	/// # Errors
-	/// Errors when the identifier is unknown or the exposure excludes it, which
+	/// Errors when the identifier is unknown or the config excludes it, which
 	/// is why this runs before the value is looked at rather than after.
 	pub fn declared_schema(
 		world: &mut World,
 		ident: &str,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 	) -> Result<Option<ValueSchema>> {
 		let ident = ComponentIdent::resolve(world, ident)?;
-		exposure.assert_writable(&ident)?;
+		config.assert_writable(&ident)?;
 		let Some(schema) = DynamicComponents::schema_of(world, ident.id) else {
 			return None.xok();
 		};
@@ -180,7 +179,7 @@ impl WorldWrite {
 	///
 	/// # Errors
 	/// Errors naming the component and every failing path, as one line, so the
-	/// script catches a schema failure exactly the way it catches an exposure
+	/// script catches a schema failure exactly the way it catches an config
 	/// refusal.
 	pub async fn validate(
 		schema: &ValueSchema,
@@ -235,7 +234,7 @@ mod test {
 			entity,
 			"Name",
 			Value::from("ada"),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		world
@@ -253,7 +252,7 @@ mod test {
 			&mut world,
 			entity,
 			"Name",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		world.entity(entity).contains::<Name>().xpect_false();
@@ -265,7 +264,7 @@ mod test {
 		let entity = WorldWrite::spawn(
 			&mut world,
 			components("Name", "ada"),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		world
@@ -290,14 +289,14 @@ mod test {
 		WorldWrite::spawn(
 			&mut world,
 			components("Nonesuch", 1u64),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap_err();
 		entity_count(&world).xpect_eq(0);
 	}
 
 	#[beet_core::test]
-	fn a_write_outside_the_exposure_names_the_path() {
+	fn a_write_outside_the_config_names_the_path() {
 		let mut world = test_world();
 		let entity = world.spawn_empty().id();
 		WorldWrite::insert(
@@ -305,7 +304,7 @@ mod test {
 			entity,
 			"Name",
 			Value::from("ada"),
-			&ScriptExposure::new(["game.Health"]),
+			&ScriptConfig::new(["game.Health"]),
 		)
 		.unwrap_err()
 		.to_string()
@@ -325,7 +324,7 @@ mod test {
 			entity,
 			"Name",
 			Value::from("bob"),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap_err()
 		.to_string()
@@ -340,7 +339,7 @@ mod test {
 		WorldWrite::declared_schema(
 			&mut world,
 			"Name",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap()
 		.is_none()
@@ -357,7 +356,7 @@ mod test {
 		WorldWrite::declared_schema(
 			&mut world,
 			"game.Loot",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap()
 		.is_none()

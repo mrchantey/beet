@@ -209,31 +209,12 @@ fn set(target: &js_sys::Object, key: &str, value: &JsValue) -> Result<()> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::scripting::test_support::*;
 	use beet_core::prelude::*;
-
-	/// An async world whose registry knows [`Name`], the component the bridged
-	/// scripts below read and write.
-	fn bridged_world() -> World {
-		let world = AsyncPlugin::world();
-		world
-			.resource::<AppTypeRegistry>()
-			.write()
-			.register::<Name>();
-		world
-	}
-
-	/// Run `script` as a bridged leaf action, the shape every backend serves.
-	async fn run_bridged(world: &mut World, script: &str) -> Result<Outcome> {
-		world
-			.spawn(DynamicScript::new(script))
-			.call::<(), Outcome>(())
-			.await
-	}
 
 	#[beet_core::test]
 	async fn transforms_its_input() {
-		Script::<i64, i64>::new("input + 1")
-			.run(41)
+		run_script::<i64, i64>("return input + 1", 41)
 			.await
 			.unwrap()
 			.xpect_eq(42);
@@ -247,32 +228,38 @@ mod test {
 
 	#[beet_core::test]
 	async fn round_trips_a_struct() {
-		Script::<Player, Player>::new("input.score += 10; input")
-			.run(Player {
-				name: "ada".to_string(),
-				score: 5,
-			})
-			.await
-			.unwrap()
-			.xpect_eq(Player {
-				name: "ada".to_string(),
-				score: 15,
-			});
+		run_script::<Player, Player>("input.score += 10; return input", Player {
+			name: "ada".to_string(),
+			score: 5,
+		})
+		.await
+		.unwrap()
+		.xpect_eq(Player {
+			name: "ada".to_string(),
+			score: 15,
+		});
 	}
 
 	#[beet_core::test]
 	async fn awaits_an_async_script() {
-		Script::<(), i64>::new("Promise.resolve(20).then(value => value * 2)")
-			.run(())
-			.await
-			.unwrap()
-			.xpect_eq(40);
+		run_script::<(), i64>(
+			"return Promise.resolve(20).then(value => value * 2)",
+			(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq(40);
 	}
 
 	#[beet_core::test]
 	async fn splits_the_console_streams() {
-		Script::<(), ()>::new(r#"console.log("out"); console.error("err")"#)
-			.run_captured(())
+		let script = Script::<(), ()>::new(
+			r#"console.log("out"); console.error("err")"#,
+		);
+		AsyncPlugin::world()
+			.run_async_local_then(move |world| async move {
+				script.run_captured((), world, &ScriptConfig::default()).await
+			})
 			.await
 			.unwrap()
 			.xpect_eq("out\n".to_string());
@@ -283,8 +270,8 @@ mod test {
 	/// next one is made.
 	#[beet_core::test]
 	async fn a_script_reads_its_own_write() {
-		let mut world = bridged_world();
-		run_bridged(
+		let mut world = test_world();
+		run_leaf(
 			&mut world,
 			r#"
 			const entry = await world.spawn({ "Name": "ada" });
@@ -307,7 +294,7 @@ mod test {
 	/// the run, so the script can catch it.
 	#[beet_core::test]
 	async fn a_refused_write_is_catchable_in_the_script() {
-		let mut world = bridged_world();
+		let mut world = test_world();
 		DynamicComponents::register(
 			&mut world,
 			"game.Refused",
@@ -315,56 +302,48 @@ mod test {
 		)
 		.unwrap();
 		let entity = world.spawn(Name::new("ada")).id();
-		world
-			.spawn((
-				DynamicScript::new(
-					r#"
-					const [entry] = await world.entities("Name");
-					try {
-						await world.insert(entry, "Name", "bob");
-					} catch (err) {
-						await world.insert(entry, "game.Refused", err.message);
-					}
-					"#,
-				),
-				// everything but the name, so the catch block can still record
-				// what it was refused
-				ScriptExposure {
-					write: GlobFilter::default().with_exclude("*Name"),
-					..default()
-				},
-			))
-			.call::<(), Outcome>(())
-			.await
-			.unwrap();
-		world.entity(entity).get::<Name>().unwrap().as_str().xpect_eq("ada");
-		WorldRead::get(
+		run_leaf_with(
 			&mut world,
-			entity,
-			"game.Refused",
-			&ScriptExposure::default(),
+			r#"
+			const [entry] = await world.entities("Name");
+			try {
+				await world.insert(entry, "Name", "bob");
+			} catch (err) {
+				await world.insert(entry, "game.Refused", err.message);
+			}
+			"#,
+			// everything but the name, so the catch block can still record what
+			// it was refused
+			ScriptConfig {
+				write: GlobFilter::default().with_exclude("*Name"),
+				..default()
+			},
 		)
-		.unwrap()
-		.unwrap()
-		.to_string()
-		.xpect_contains("may not write");
+		.await
+		.unwrap();
+		world.entity(entity).get::<Name>().unwrap().as_str().xpect_eq("ada");
+		read_value(&mut world, entity, "game.Refused")
+			.to_string()
+			.xpect_contains("may not write");
 	}
 
-	/// The bridge is opt-in surface, not ambient authority: only a world-bridged
-	/// evaluation installs the shim, so a plain run has no `world` to reach for.
+	/// A withheld world is absent, not inert: `world: false` leaves the script
+	/// no `world` to reach for, on this backend as on every other.
 	#[beet_core::test]
-	async fn a_pure_script_has_no_world_global() {
-		Script::<(), String>::new("typeof world")
-			.run(())
-			.await
-			.unwrap()
-			.xpect_eq("undefined".to_string());
+	async fn a_worldless_script_has_no_world_global() {
+		run_script_with::<(), String>(
+			"return typeof world",
+			(),
+			ScriptConfig::default().without_world(),
+		)
+		.await
+		.unwrap()
+		.xpect_eq("undefined".to_string());
 	}
 
 	#[beet_core::test]
 	async fn script_errors_propagate() {
-		Script::<(), ()>::new(r#"throw new Error("boom")"#)
-			.run(())
+		run_script::<(), ()>(r#"throw new Error("boom")"#, ())
 			.await
 			.unwrap_err()
 			.to_string()
@@ -378,17 +357,16 @@ mod test {
 	#[beet_core::test]
 	async fn denies_every_ambient_authority() {
 		let denied = [
-			(r#"Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
-			(r#"Deno.env.get("HOME")"#, "--allow-env"),
+			(r#"return Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
+			(r#"return Deno.env.get("HOME")"#, "--allow-env"),
 			(
-				r#"Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
+				r#"return Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
 				"--allow-write",
 			),
-			(r#"fetch("https://example.com")"#, "--allow-net"),
+			(r#"return fetch("https://example.com")"#, "--allow-net"),
 		];
 		for (source, expected) in denied {
-			Script::<(), ()>::new(source)
-				.run(())
+			run_script::<(), ()>(source, ())
 				.await
 				.unwrap_err()
 				.to_string()
@@ -402,11 +380,11 @@ mod test {
 	/// the worker, so a script cannot reach the host's fs through them either.
 	#[beet_core::test]
 	async fn the_runner_globals_are_absent() {
-		Script::<(), Vec<String>>::new(
-			"[typeof read_file, typeof write_file, typeof remove, \
+		run_script::<(), Vec<String>>(
+			"return [typeof read_file, typeof write_file, typeof remove, \
 typeof set_env, typeof exit]",
+			(),
 		)
-		.run(())
 		.await
 		.unwrap()
 		.xpect_eq(vec!["undefined".to_string(); 5]);
@@ -415,18 +393,19 @@ typeof set_env, typeof exit]",
 	/// A runaway script is terminated at the deadline and the host survives it.
 	#[beet_core::test]
 	async fn runaway_scripts_are_terminated_at_the_deadline() {
-		Script::<(), ()>::new("while (true) {}")
-			.with_limits(ScriptLimits {
+		run_script_with::<(), ()>(
+			"while (true) {}",
+			(),
+			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(500),
 				..default()
-			})
-			.run(())
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("timed out");
-		Script::<i64, i64>::new("input + 1")
-			.run(1)
+			}),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("timed out");
+		run_script::<i64, i64>("return input + 1", 1)
 			.await
 			.unwrap()
 			.xpect_eq(2);

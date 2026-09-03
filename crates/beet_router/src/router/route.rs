@@ -39,6 +39,27 @@ where
 	)
 }
 
+/// [`exchange`] pinned to the serde markers.
+///
+/// [`Value`] converts two ways — the serde blanket, and the script-answer impl a
+/// scripted route selects — so a handler speaking it leaves `M1`/`M2` ambiguous.
+/// This names the ordinary choice, content negotiation both ways, so such a
+/// route reads no differently from any other.
+pub fn exchange_serde<In, Out, M, B>(
+	path: &str,
+	action: B,
+) -> (PathPartial, B, ExchangeOverload)
+where
+	In: 'static + Send + Sync + FromRequest<SerdeFromRequestMarker>,
+	Out: 'static
+		+ Send
+		+ Sync
+		+ IntoResponseWithRequestParts<SerdeIntoResponseMarker>,
+	B: Bundle + IntoAction<M, In = In, Out = Out>,
+{
+	exchange(path, action)
+}
+
 /// Builds the [`ExchangeOverload`] adapting a typed handler `Action<In, Out>` to
 /// request/response dispatch.
 ///

@@ -157,25 +157,25 @@ impl WorldOp {
 	/// synchronous `&mut World` operations.
 	async fn execute(self, bridge: &WorldBridge) -> Result<Option<Value>> {
 		let world = bridge.world().clone();
-		let exposure = bridge.exposure().clone();
+		let config = bridge.config().clone();
 		match self {
 			Self::Get { entity, component } => {
 				let entity = entity_id::decode(&entity)?;
 				world
 					.with(move |world| {
-						WorldRead::get(world, entity, &component, &exposure)
+						WorldRead::get(world, entity, &component, &config)
 					})
 					.await
 			}
 			Self::Entities { component } => world
 				.with(move |world| {
-					WorldRead::entities(world, &component, &exposure)
+					WorldRead::entities(world, &component, &config)
 				})
 				.await
 				.map(Some),
 			Self::Schema { component } => world
 				.with(move |world| {
-					WorldRead::schema(world, &component, &exposure)
+					WorldRead::schema(world, &component, &config)
 				})
 				.await
 				.map(Some),
@@ -184,12 +184,12 @@ impl WorldOp {
 				// rejected value never leaves a half-built entity behind
 				let mut validated = Map::default();
 				for (ident, mut value) in components {
-					Self::check(&world, &exposure, &ident, &mut value).await?;
+					Self::check(&world, &config, &ident, &mut value).await?;
 					validated.insert(ident, value);
 				}
 				world
 					.with(move |world| {
-						WorldWrite::spawn(world, validated, &exposure)
+						WorldWrite::spawn(world, validated, &config)
 					})
 					.await?
 					.xmap(entity_id::encode)
@@ -203,11 +203,11 @@ impl WorldOp {
 				mut value,
 			} => {
 				let entity = entity_id::decode(&entity)?;
-				Self::check(&world, &exposure, &component, &mut value).await?;
+				Self::check(&world, &config, &component, &mut value).await?;
 				world
 					.with(move |world| {
 						WorldWrite::insert(
-							world, entity, &component, value, &exposure,
+							world, entity, &component, value, &config,
 						)
 					})
 					.await
@@ -217,7 +217,7 @@ impl WorldOp {
 				let entity = entity_id::decode(&entity)?;
 				world
 					.with(move |world| {
-						WorldWrite::remove(world, entity, &component, &exposure)
+						WorldWrite::remove(world, entity, &component, &config)
 					})
 					.await
 					.map(|_| None)
@@ -245,16 +245,14 @@ impl WorldOp {
 	/// than anywhere else.
 	async fn check(
 		world: &AsyncWorld,
-		exposure: &ScriptExposure,
+		config: &ScriptConfig,
 		ident: &str,
 		value: &mut Value,
 	) -> Result {
 		let Some(schema) = world
 			.with({
-				let (ident, exposure) = (ident.to_string(), exposure.clone());
-				move |world| {
-					WorldWrite::declared_schema(world, &ident, &exposure)
-				}
+				let (ident, config) = (ident.to_string(), config.clone());
+				move |world| WorldWrite::declared_schema(world, &ident, &config)
 			})
 			.await?
 		else {

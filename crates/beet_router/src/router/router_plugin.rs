@@ -206,24 +206,20 @@ impl Plugin for RouterPlugin {
 			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
 			app.register_type::<SshTuiServer>();
+			// the scripted route marker in the one instantiation `<ScriptRoute>`
+			// builds: the whole request in, whatever the script returned out.
+			// `Script<Value, Value>` itself is registered upstream by
+			// `ActionPlugin`, the sole registered instantiation, so base-name tag
+			// resolution stays unambiguous.
 			#[cfg(feature = "scripting")]
-			app.register_type::<Script<RequestParts, String>>()
-				.register_type::<ExchangeScript<(), String>>()
-				.register_type::<ExchangeScript<
-					RequestParts,
-					String,
-					RequestParts,
-					SerdeIntoResponseMarker,
-				>>()
-				// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
-				.register_template::<ScriptRoute>();
-			// the world-bridged route front-end: a script that serves a route and
-			// reaches the world. The values it speaks are json, so it rides that
-			// gate too.
-			#[cfg(all(feature = "scripting", feature = "json"))]
-			app.register_type::<DynamicScriptExchange>()
-				.register_type::<DynamicScriptExchangeAction>()
-				.register_template::<DynamicScriptRoute>();
+			app.register_type::<ExchangeScript<
+				Value,
+				Value,
+				ScriptInputMarker,
+				ScriptAnswerMarker,
+			>>()
+			// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
+			.register_template::<ScriptRoute>();
 
 			// the `ExchangeScriptElement` console-capturing entry action, so a
 			// `<script {ExchangeScriptElement}>` entry resolves it. The backend it

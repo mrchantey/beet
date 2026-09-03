@@ -63,6 +63,40 @@ impl IntoResponseWithRequestParts<Self> for MediaBytes {
 	}
 }
 
+/// Marker for the [`IntoResponseWithRequestParts`] impl answering with a
+/// script's value.
+///
+/// Distinct from [`SerdeIntoResponseMarker`], which would negotiate a [`Value`]
+/// against `Accept`: a script's answer is already the body the author meant.
+#[derive(TypePath)]
+pub struct ScriptAnswerMarker;
+
+/// What a script returned, as a response.
+///
+/// A string answers as plain text, so `'signed: ada'` reads back verbatim over
+/// http and cli alike; anything else answers as JSON, and a script that returned
+/// nothing answers JSON `null` rather than an empty body, so a caller can tell
+/// "nothing to say" from "no answer".
+#[cfg(feature = "json")]
+impl IntoResponseWithRequestParts<ScriptAnswerMarker> for Value {
+	fn into_response_with_request_parts(
+		self,
+		_caller: AsyncEntity,
+		_parts: RequestParts,
+	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
+		Box::pin(async move {
+			match self {
+				Value::Str(text) => Response::ok()
+					.with_media(MediaBytes::new_text(text.to_string())),
+				answer => Response::ok().with_media(MediaBytes::new_json(
+					serde_json::to_string(&answer)?,
+				)),
+			}
+			.xok()
+		})
+	}
+}
+
 /// Marker type for the [`Serialize`] blanket impl of [`IntoResponseWithRequestParts`].
 #[cfg(feature = "serde")]
 #[derive(TypePath)]

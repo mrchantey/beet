@@ -31,7 +31,7 @@ use core::mem::ManuallyDrop;
 /// undeclared behaviour; name a schema and every write is validated against it
 /// before it reaches the component's storage, including a write from a
 /// sandboxed script, which sees a rejection as the same catchable error an
-/// exposure refusal is.
+/// config refusal is.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::component_hook(DynamicComponent::mint))]
@@ -328,14 +328,14 @@ mod test {
 			entity,
 			"game.Loot",
 			value,
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		WorldRead::get(
 			&mut world,
 			entity,
 			"game.Loot",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap()
 		.unwrap()
@@ -383,7 +383,7 @@ mod test {
 			source,
 			"game.Loot",
 			value!(["sword"]),
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap();
 		let target = world.entity_mut(source).clone_and_spawn();
@@ -391,7 +391,7 @@ mod test {
 			&mut world,
 			target,
 			"game.Loot",
-			&ScriptExposure::default(),
+			&ScriptConfig::default(),
 		)
 		.unwrap()
 		.unwrap()

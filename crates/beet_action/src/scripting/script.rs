@@ -3,19 +3,27 @@ use beet_core::prelude::*;
 use core::marker::PhantomData;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde_json::Value as JsonValue;
 
-/// A scripted, pure `Input -> Output` transformation, carried as data.
+/// A JavaScript program carried as data, transforming `Input` into `Output`.
 ///
-/// The [`Script::content`] is JavaScript, evaluated with the input bound to a
-/// variable named `input`; the value of the script's final expression becomes the
-/// output. Scripts have no access to the [`World`], so they are deterministic
-/// transformations of their input.
+/// The [`Script::content`] is the body of an async function: the input is bound
+/// to a variable named `input`, `await` is legal anywhere, and the script
+/// answers with `return`. What it returns is deserialized into `Output`, so
+/// `Script::<(), String>::new("return 'hi'")` is a `() -> String`.
+///
+/// `Script` is the program; its sibling [`ScriptConfig`] is what the host grants
+/// it: world access, console access, the components the world bridge will
+/// address on its behalf, and its resource ceilings. An absent config is
+/// [`ScriptConfig::default`], so a script is world-capable and unrestricted in
+/// reach until a scene says otherwise, and `world: false` makes it provably
+/// pure.
 ///
 /// `Script` is pure data: it holds the program but installs no [`Action`]. To
-/// run it as a behaviour-tree leaf add [`ScriptAction`] (which requires a
-/// `Script`); to dispatch it from a route add `ExchangeScript`. Keeping the
-/// data and the action separate lets a domain action gather its own input and
-/// apply its own output around the shared [`Script::run`] backend without a
+/// run it as a behaviour-tree leaf add [`OutcomeScript`] (which requires a
+/// [`ScriptAction`]); to dispatch it from a route add `ExchangeScript`. Keeping
+/// the data and the action separate lets a domain action gather its own input
+/// and apply its own output around the shared [`Script::run`] backend without a
 /// second, dormant action fighting over the entity's [`ActionMeta`].
 ///
 /// The backend is chosen at compile time from the target and the `quickjs`
@@ -33,50 +41,10 @@ where
 	Input: 'static + Send + Sync + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
-	/// The JavaScript source to evaluate.
+	/// The JavaScript source to evaluate, as an async function body.
 	pub content: String,
-	/// The resources this script may consume before it is cut off.
-	pub limits: ScriptLimits,
 	#[reflect(ignore)]
 	_marker: PhantomData<fn() -> (Input, Output)>,
-}
-
-/// The resource ceilings a [`Script`] runs under.
-///
-/// Every field is enforced by the embedded engine, which can interrupt and cap a
-/// running script directly. A host-realm backend enforces what its host allows
-/// and documents the rest as not provided: a sandboxed iframe, for instance,
-/// cannot be terminated mid-loop, so its module doc states [`timeout`] as an
-/// unenforced guarantee rather than pretending otherwise.
-///
-/// [`timeout`]: Self::timeout
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, Reflect, Serialize, serde::Deserialize,
-)]
-#[reflect(Default)]
-pub struct ScriptLimits {
-	/// Wall-clock budget for the whole evaluation, including any microtasks it
-	/// drains. Default 10s.
-	pub timeout: Duration,
-	/// Maximum bytes the engine may allocate. Default 128MB.
-	pub memory: u64,
-	/// Maximum interpreter stack in bytes, so runaway recursion becomes a
-	/// catchable `RangeError` rather than a host stack overflow. Default 256KB.
-	///
-	/// Always set explicitly, never left to the engine default: QuickJS defaults
-	/// to 1MB, exactly the wasm shadow-stack size, and its `stack_top - 1MB`
-	/// arithmetic wraps there, disabling stack checking entirely.
-	pub stack: u32,
-}
-
-impl Default for ScriptLimits {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(10),
-			memory: 128 * 1024 * 1024,
-			stack: 256 * 1024,
-		}
-	}
 }
 
 // Manual impls avoid spurious `Input: Clone/Debug/Default` bounds the
@@ -89,7 +57,6 @@ where
 	fn default() -> Self {
 		Self {
 			content: String::new(),
-			limits: ScriptLimits::default(),
 			_marker: PhantomData,
 		}
 	}
@@ -103,7 +70,6 @@ where
 	fn clone(&self) -> Self {
 		Self {
 			content: self.content.clone(),
-			limits: self.limits,
 			_marker: PhantomData,
 		}
 	}
@@ -117,12 +83,11 @@ where
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_struct("Script")
 			.field("content", &self.content)
-			.field("limits", &self.limits)
 			.finish()
 	}
 }
 
-/// Which host stream a [`Script::run_console`] line targets.
+/// Which host stream a script's `console` line targets.
 ///
 /// The backend-agnostic console channel: `console.log`/`info`/`debug` is
 /// [`Stdout`](Self::Stdout), `console.warn`/`error` is [`Stderr`](Self::Stderr).
@@ -152,23 +117,22 @@ where
 	Input: 'static + Send + Sync + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
-	/// Create a [`Script`] from JavaScript source, with the default
-	/// [`ScriptLimits`].
+	/// Create a [`Script`] from an async function body.
 	pub fn new(content: impl Into<String>) -> Self {
 		Self {
 			content: content.into(),
-			limits: ScriptLimits::default(),
 			_marker: PhantomData,
 		}
 	}
 
-	/// Set the resource ceilings this script runs under.
-	pub fn with_limits(mut self, limits: ScriptLimits) -> Self {
-		self.limits = limits;
-		self
-	}
-
-	/// Evaluate the script, transforming `input` into the output value.
+	/// Evaluate the script under `config`, transforming `input` into the output
+	/// value.
+	///
+	/// `config` decides what the script is handed: the `world` bridge (served
+	/// live against `world`), the `console`, the reach every bridged call is
+	/// checked against, and the ceilings it runs under. A withheld global is
+	/// simply absent, so a script reaching for it throws a catchable
+	/// `ReferenceError`.
 	///
 	/// Async because only the embedded engine evaluates in-process: every other
 	/// backend is a child process or a host isolate reached over a message
@@ -184,184 +148,17 @@ where
 	///
 	/// # Errors
 	/// Propagates parse, evaluation, or (de)serialization errors, or names the
-	/// missing backend when the build has none.
-	pub async fn run(&self, input: Input) -> Result<Output> {
-		cfg_if! {
-			if #[cfg(feature = "quickjs")] {
-				crate::scripting::run_quickjs(&self.content, input, &self.limits)
-			} else if #[cfg(feature = "std")] {
-				host_backend(self.request(input, false)?, ConsoleStream::log, None)
-					.await?
-					.ok_or_else(|| bevyhow!("script returned no value"))?
-					.xmap(serde_json::from_value)
-					.map_err(|err| bevyhow!("failed to decode output: {err}"))
-			} else {
-				let _ = input;
-				no_backend()
-			}
-		}
-	}
-
-	/// Evaluate the script for its side effects, streaming each console line to
-	/// `sink` the moment it runs.
-	///
-	/// Unlike [`run`](Self::run) (a pure `Input -> Output` transform), this is the
-	/// console-capturing path: `console.log`/`info`/`debug` streams as
-	/// [`ConsoleStream::Stdout`], `console.warn`/`error` as
-	/// [`ConsoleStream::Stderr`]. `input` is bound the same way as
-	/// [`run`](Self::run) (the `input` global). A script that returns no value (a
-	/// bare `console.log("hi")`) is tolerated, where [`run`](Self::run) would reject
-	/// it.
-	///
-	/// `sink` is [`MaybeSend`] rather than plain `FnMut`: an out-of-process
-	/// backend holds it across an await, so in a multi-threaded build it moves
-	/// with the task. The embedded engine, being single-threaded and synchronous,
-	/// never needed that.
-	///
-	/// # Errors
-	/// Propagates parse, evaluation, or input-serialization errors, or names the
-	/// missing backend when the build has none.
-	pub async fn run_console<Sink>(
-		&self,
-		input: Input,
-		sink: Sink,
-	) -> Result<()>
-	where
-		Sink: 'static + MaybeSend + FnMut(ConsoleStream, &str),
-	{
-		cfg_if! {
-			if #[cfg(feature = "quickjs")] {
-				crate::scripting::run_quickjs_console(
-					&self.content,
-					input,
-					sink,
-					&self.limits,
-				)
-			} else if #[cfg(feature = "std")] {
-				host_backend(self.request(input, false)?, sink, None)
-					.await
-					.map(|_| ())
-			} else {
-				let _ = (input, sink);
-				no_backend()
-			}
-		}
-	}
-
-	/// Evaluate the script with the `world` bridge installed, serving every
-	/// `world` call live against `world` as it arrives.
-	///
-	/// The presence of a world is what installs the bridge: [`run`](Self::run)
-	/// and [`run_console`](Self::run_console) leave the script with no `world`
-	/// global to reach for, so world access is opt-in surface rather than
-	/// ambient authority.
-	///
-	/// Returns the script's completion value, absent when it produced none: a
-	/// leaf action ignores it, a route answers with it.
-	///
-	/// Every backend serves its calls through one [`WorldBridge`], so there is
-	/// one contract and one executor: an `await` is a real operation against the
-	/// world at the moment it runs. What differs is only how the call reaches
-	/// the bridge: a round trip over a transport for an out-of-process backend,
-	/// a direct await for the embedded engine, which runs in a local task
-	/// because its runtime is `!Send`.
-	///
-	/// # Errors
-	/// Propagates parse, evaluation, or input-serialization errors, or names the
-	/// missing backend when the build has none. An individual refused call is
-	/// *not* an error here: it rejects inside the script, which may catch it.
-	pub async fn run_world(
+	/// missing backend when the build has none. An individual refused world call
+	/// is *not* an error here: it rejects inside the script, which may catch it.
+	pub async fn run(
 		&self,
 		input: Input,
 		world: AsyncWorld,
-		exposure: ScriptExposure,
-	) -> Result<Option<Value>> {
-		let source = Self::async_body(&self.content);
-		let input = serde_json::to_value(input)
-			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
-		let bridge = WorldBridge::new(world, exposure);
-		cfg_if! {
-			if #[cfg(feature = "quickjs")] {
-				// the engine's runtime is `!Send`, and an `#[action]` future must
-				// be `Send`, so the whole evaluation lives in a local task and its
-				// result comes back over a oneshot. Nothing engine-shaped ever
-				// crosses one of this future's await points.
-				let limits = self.limits;
-				let (send, recv) = OnceValue::oneshot();
-				bridge
-					.world()
-					.clone()
-					.run_async_local(move |_| async move {
-						send.signal(
-							crate::scripting::run_quickjs_world(
-								&source, &input, &bridge, &limits,
-							)
-							.await,
-						);
-					})
-					.await;
-				recv.wait().await
-			} else if #[cfg(feature = "std")] {
-				host_backend(
-					self.request_source(source, input, true)?,
-					ConsoleStream::log,
-					Some(&bridge),
-				)
-				.await
-				.map(|value| value.map(Value::from_json))
-			} else {
-				let _ = (input, source, bridge);
-				no_backend()
-			}
-		}
-	}
-
-	/// Wrap a script body so its top-level `await` is legal.
-	///
-	/// Every backend evaluates a script as an expression, not a module, so a bare
-	/// `await world.spawn(..)` is a syntax error. The world-bridged path is
-	/// promise-shaped throughout, so it wraps the body in an async IIFE once,
-	/// here, before any backend sees it: the embedded engine settles the promise
-	/// it returns and the host runner awaits it, and both receive character-
-	/// identical source. Doing it per backend is exactly the drift the one-eval-
-	/// path design forbids.
-	///
-	/// A bridged script is therefore an async *function body*, not an
-	/// expression: it answers with `return`, where a pure
-	/// [`run`](Self::run) script answers with the value of its last expression.
-	/// JavaScript has no construct that offers both, and `await` is the half a
-	/// world-bridged script cannot do without.
-	fn async_body(content: &str) -> String {
-		format!("(async () => {{\n{content}\n}})()")
-	}
-
-	/// This script and `input` as a backend request.
-	///
-	/// Only the host-realm backends marshal one; the embedded engine takes the
-	/// input directly, so this exists exactly where the protocol does.
-	#[cfg(all(feature = "std", not(feature = "quickjs")))]
-	fn request(&self, input: Input, world: bool) -> Result<ScriptRequest> {
-		let input = serde_json::to_value(input)
-			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
-		self.request_source(self.content.clone(), input, world)
-	}
-
-	/// A backend request over `source` rather than this script's own body (the
-	/// world-bridged path wraps it first) and over an already encoded input.
-	#[cfg(all(feature = "std", not(feature = "quickjs")))]
-	fn request_source(
-		&self,
-		source: String,
-		input: serde_json::Value,
-		world: bool,
-	) -> Result<ScriptRequest> {
-		ScriptRequest {
-			source,
-			input,
-			limits: self.limits,
-			world,
-		}
-		.xok()
+		config: &ScriptConfig,
+	) -> Result<Output> {
+		self.eval(input, world, config, ConsoleStream::log)
+			.await?
+			.xmap(Self::decode_output)
 	}
 
 	/// Run the script for its console output, collecting each [`Stdout`] line into
@@ -369,8 +166,8 @@ where
 	/// to the host error log.
 	///
 	/// The "`node main.js`" shape: a `<script>` body run for its `console.log`,
-	/// returned as a body to stream. Built on [`run_console`](Self::run_console), so
-	/// it serves every backend.
+	/// returned as a body to stream. The completion value is discarded, so a
+	/// script that answers with nothing is exactly as welcome as one that does.
 	///
 	/// [`Stdout`]: ConsoleStream::Stdout
 	/// [`Stderr`]: ConsoleStream::Stderr
@@ -379,12 +176,17 @@ where
 	/// itself is single-threaded and needs no `Send`, but the buffer is held
 	/// across the await, so it must be: an async action's future is `Send` in a
 	/// multi-threaded build. `RwLock` is beet's no_std-capable one, so this builds
-	/// wherever [`run_console`](Self::run_console) does, not only on `std`.
-	pub async fn run_captured(&self, input: Input) -> Result<String> {
+	/// wherever [`run`](Self::run) does, not only on `std`.
+	pub async fn run_captured(
+		&self,
+		input: Input,
+		world: AsyncWorld,
+		config: &ScriptConfig,
+	) -> Result<String> {
 		use alloc::sync::Arc;
 		let lines = Arc::new(RwLock::new(Vec::<String>::new()));
 		let captured = lines.clone();
-		self.run_console(input, move |stream, line| match stream {
+		self.eval(input, world, config, move |stream, line| match stream {
 			ConsoleStream::Stdout => {
 				// the sink cannot report, and the lock is local to this call, so a
 				// poisoned buffer can only mean a panic already unwound through it.
@@ -402,6 +204,107 @@ where
 			.map(|line| line.clone() + "\n")
 			.collect::<String>()
 			.xok()
+	}
+
+	/// The one evaluation path: wrap the body, encode the input, build the
+	/// bridge `config` asks for, and hand all of it to whichever backend this
+	/// build has.
+	///
+	/// Returns the script's completion value, absent when it produced none.
+	/// `sink` is [`Send`] rather than plain `FnMut`: the evaluation is handed to
+	/// a task, so the sink moves with it.
+	async fn eval<Sink>(
+		&self,
+		input: Input,
+		world: AsyncWorld,
+		config: &ScriptConfig,
+		sink: Sink,
+	) -> Result<Option<JsonValue>>
+	where
+		Sink: 'static + Send + FnMut(ConsoleStream, &str),
+	{
+		let source = Self::async_body(&self.content);
+		let input = serde_json::to_value(input)
+			.map_err(|err| bevyhow!("failed to encode input: {err}"))?;
+		// the bridge exists only where the config grants a world, so a
+		// `world: false` script has no `world` global to reach for.
+		let bridge = config
+			.world
+			.then(|| WorldBridge::new(world.clone(), config.clone()));
+		cfg_if! {
+			if #[cfg(feature = "quickjs")] {
+				// the engine's runtime is `!Send`, and an `#[action]` future must
+				// be `Send`, so the whole evaluation lives in a local task and its
+				// result comes back over a oneshot. Nothing engine-shaped ever
+				// crosses one of this future's await points.
+				let config = config.clone();
+				let (send, recv) = OnceValue::oneshot();
+				world
+					.run_async_local(move |_| async move {
+						send.signal(
+							crate::scripting::run_quickjs(
+								&source,
+								&input,
+								&config,
+								bridge.as_ref(),
+								sink,
+							)
+							.await,
+						);
+					})
+					.await;
+				recv.wait().await
+			} else if #[cfg(feature = "std")] {
+				host_backend(
+					ScriptRequest {
+						source,
+						input,
+						limits: config.limits,
+						world: config.world,
+						console: config.console,
+					},
+					sink,
+					bridge.as_ref(),
+				)
+				.await
+			} else {
+				let _ = (input, source, bridge, sink, world);
+				no_backend()
+			}
+		}
+	}
+
+	/// The completion value as an [`Output`](Self).
+	///
+	/// A script that produced none is a `null` here, which `()` and
+	/// [`Value`](beet_core::prelude::Value) both accept and a typed output does
+	/// not: the error says how a script answers rather than reporting a serde
+	/// type mismatch the author cannot act on.
+	fn decode_output(value: Option<JsonValue>) -> Result<Output> {
+		let value = value.unwrap_or(JsonValue::Null);
+		let empty = value.is_null();
+		serde_json::from_value(value).map_err(|err| match empty {
+			true => bevyhow!(
+				"script produced no value: a script answers with `return`"
+			),
+			false => bevyhow!("failed to decode output: {err}"),
+		})
+	}
+
+	/// Wrap a script body so its top-level `await` is legal.
+	///
+	/// Every backend evaluates a script as an expression, not a module, so a bare
+	/// `await world.spawn(..)` is a syntax error. Wrapping the body in an async
+	/// IIFE once, here, is what makes every script an async *function body*: the
+	/// embedded engine settles the promise it returns and the host runner awaits
+	/// it, and both receive character-identical source. Doing it per backend is
+	/// exactly the drift the one-eval-path design forbids.
+	///
+	/// A script therefore answers with `return`, not with the value of its last
+	/// expression. JavaScript has no construct that offers both, and `await` is
+	/// the half a world-bridged script cannot do without.
+	pub(crate) fn async_body(content: &str) -> String {
+		format!("(async () => {{\n{content}\n}})()")
 	}
 }
 
@@ -421,7 +324,7 @@ async fn host_backend<Sink>(
 	request: ScriptRequest,
 	sink: Sink,
 	bridge: Option<&WorldBridge>,
-) -> Result<Option<serde_json::Value>>
+) -> Result<Option<JsonValue>>
 where
 	Sink: FnMut(ConsoleStream, &str),
 {
@@ -478,8 +381,15 @@ where
 	type Out = Output;
 
 	fn into_action(self) -> Action<Input, Output> {
-		Action::new_async(move |cx: ActionContext<Input>| async move {
-			self.run(cx.input).await
+		// the default grant: a bare `Script` turned into an action has no
+		// sibling to read a config from. [`ScriptAction`] is the entity-aware
+		// path that honours one.
+		Action::new_async(move |cx: ActionContext<Input>| {
+			let world = cx.world().clone();
+			let script = self.clone();
+			async move {
+				script.run(cx.input, world, &ScriptConfig::default()).await
+			}
 		})
 	}
 }

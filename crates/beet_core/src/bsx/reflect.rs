@@ -486,7 +486,7 @@ fn list_to_reflect(
 ) -> Result<Box<dyn PartialReflect>> {
 	// a list of patterns targeting a `GlobFilter` field builds the filter from
 	// them as includes, so an allowlist authors as the list it reads like:
-	// `{ScriptExposure{read:["guestbook.*","Text"]}}`. Its patterns are a
+	// `{ScriptConfig{read:["guestbook.*","Text"]}}`. Its patterns are a
 	// private `Vec<GlobPattern>`, so field-by-field reflect construction cannot
 	// reach them.
 	if let Some(info) = field_info

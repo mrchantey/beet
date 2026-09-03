@@ -6,9 +6,23 @@ mod script;
 #[cfg(feature = "scripting")]
 mod script_action;
 #[cfg(feature = "scripting")]
+mod script_config;
+#[cfg(feature = "scripting")]
 pub use script::*;
 #[cfg(feature = "scripting")]
 pub use script_action::*;
+#[cfg(feature = "scripting")]
+pub use script_config::*;
+
+// The behaviour-tree front-end: the `OutcomeScript` marker and its `<RunScript>`
+// template, which is all it takes to make a `Script` a leaf.
+#[cfg(feature = "scripting")]
+mod outcome_script;
+#[cfg(feature = "scripting")]
+pub use outcome_script::*;
+
+#[cfg(all(test, feature = "scripting"))]
+pub(crate) mod test_support;
 
 // The world bridge. Pure data and world work, so it needs no engine: which
 // backend evaluates the script is a separate question, answered below.
@@ -36,10 +50,6 @@ pub(crate) use protocol::*;
 mod quickjs_backend;
 #[cfg(feature = "quickjs")]
 pub(crate) use quickjs_backend::run_quickjs;
-#[cfg(feature = "quickjs")]
-pub(crate) use quickjs_backend::run_quickjs_console;
-#[cfg(feature = "quickjs")]
-pub(crate) use quickjs_backend::run_quickjs_world;
 
 // The host-realm fallbacks, compiled only when the embedded engine is absent.
 // Each borrows its isolation from the surrounding runtime, so which ones exist

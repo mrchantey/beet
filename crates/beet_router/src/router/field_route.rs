@@ -88,24 +88,27 @@ pub fn FieldRoute(
 	// shared `OnSpawn` insert seam rather than boxed per arm.
 	let route = match verb {
 		FieldVerb::Read => {
-			OnSpawn::insert(route::exchange(&path, ReadDocField))
+			OnSpawn::insert(route::exchange_serde(&path, ReadDocField))
 		}
 		FieldVerb::ReadAt => {
-			OnSpawn::insert(route::exchange(&path, ReadAtDocField))
+			OnSpawn::insert(route::exchange_serde(&path, ReadAtDocField))
 		}
 		FieldVerb::Push => {
-			OnSpawn::insert(route::exchange(&path, PushDocField))
+			OnSpawn::insert(route::exchange_serde(&path, PushDocField))
 		}
-		FieldVerb::Set => OnSpawn::insert(route::exchange(&path, SetDocField)),
+		FieldVerb::Set => {
+			OnSpawn::insert(route::exchange_serde(&path, SetDocField))
+		}
 		FieldVerb::SetAt => {
-			OnSpawn::insert(route::exchange(&path, SetAtDocField))
+			OnSpawn::insert(route::exchange_serde(&path, SetAtDocField))
 		}
 		FieldVerb::RemoveAt => {
-			OnSpawn::insert(route::exchange(&path, RemoveAtDocField))
+			OnSpawn::insert(route::exchange_serde(&path, RemoveAtDocField))
 		}
 	};
 	Ok((field_ref, route))
 }
+
 
 #[cfg(test)]
 // the routes exchange typed bodies, which need a serialization format;
