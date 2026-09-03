@@ -72,7 +72,7 @@ pub fn DynamicForm(
 		.unwrap_or_default();
 	rsx! {
 		<Form>
-			{schema_field(resolver, schema, field, None, 0)}
+			{schema_field(resolver, &schema, field, None, 0)}
 			<Slot/>
 		</Form>
 	}
@@ -112,9 +112,9 @@ macro_rules! number_bounds {
 /// `depth` counts *struct nesting* only: a reference hop or an `Optional`
 /// unwrap is the same leaf seen more precisely, so neither consumes budget, and
 /// depth `0` stays "the form's own top level".
-fn schema_field(
-	resolver: SchemaResolver<'_>,
-	schema: ValueSchema,
+fn schema_field<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a ValueSchema,
 	field: FieldRef,
 	label: Option<String>,
 	depth: usize,
@@ -143,17 +143,17 @@ fn schema_field(
 		}
 		// null is one of the values, which a control's empty state already is
 		ValueSchema::Optional(inner) => {
-			schema_field(resolver, *inner, field, label, depth)
+			schema_field(resolver, inner, field, label, depth)
 		}
-		ValueSchema::Reference(ref name) => {
-			match resolver.schema(name).cloned() {
-				Some(resolved) => {
-					schema_field(resolver, resolved, field, label, depth)
-				}
-				// still arriving, or never coming: loud, not silently empty
-				None => uneditable(schema, field, label),
+		// the registry's schema is borrowed, never copied out: a reference hop
+		// dispatches on the schema in place
+		ValueSchema::Reference(name) => match resolver.schema(name) {
+			Some(resolved) => {
+				schema_field(resolver, resolved, field, label, depth)
 			}
-		}
+			// still arriving, or never coming: loud, not silently empty
+			None => uneditable(schema, field, label),
+		},
 		ValueSchema::Struct(_) if depth >= MAX_DEPTH => {
 			uneditable(schema, field, label)
 		}
@@ -198,7 +198,7 @@ fn number_field(
 /// The string arm: a [`TextArea`] for multiline prose, else a [`TextField`],
 /// masked when the schema marks the value sensitive.
 fn string_field(
-	schema: StringSchema,
+	schema: &StringSchema,
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
@@ -222,14 +222,14 @@ fn string_field(
 /// The unit-enum arm: a [`Select`] with one `<option>` per variant, its value
 /// the variant name (the serde form of a unit variant).
 fn select_field(
-	schema: EnumSchema,
+	schema: &EnumSchema,
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
 	let name = field.field_path.to_string();
 	let options = schema
 		.variants
-		.into_iter()
+		.iter()
 		.map(|variant| {
 			let variant = variant.name.to_string();
 			rsx! { <option value=variant.clone()>{variant}</option> }
@@ -245,27 +245,24 @@ fn select_field(
 /// extending this one's path and labelled by the field's label hint (else its
 /// key). The form's own top level *is* the group, so only a nested struct wraps
 /// its rows in a disclosure.
-fn struct_field(
-	resolver: SchemaResolver<'_>,
-	schema: StructSchema,
+fn struct_field<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a StructSchema,
 	field: FieldRef,
 	label: Option<String>,
 	depth: usize,
 ) -> Snippet {
 	let rows = schema
 		.fields
-		.into_iter()
+		.iter()
 		.map(|named| {
 			let child = FieldRef {
 				document: field.document.clone(),
 				field_path: field.field_path.with_pushed(named.key.clone()),
 				on_missing: default(),
 			};
-			let label = named
-				.label
-				.map(|label| label.to_string())
-				.unwrap_or_else(|| named.key.to_string());
-			schema_field(resolver, named.schema, child, Some(label), depth + 1)
+			let label = named.label.as_ref().unwrap_or(&named.key).to_string();
+			schema_field(resolver, &named.schema, child, Some(label), depth + 1)
 		})
 		.collect::<Vec<_>>();
 	// the form's own top level is already the group
@@ -273,7 +270,7 @@ fn struct_field(
 		return labeled(None, rows);
 	}
 	let title = label
-		.or_else(|| schema.name.map(|name| name.to_string()))
+		.or_else(|| schema.name.as_ref().map(|name| name.to_string()))
 		.unwrap_or_else(|| field.field_path.to_string());
 	rsx! {
 		<details open>
@@ -286,8 +283,12 @@ fn struct_field(
 
 /// The read-only leaf for a schema with no control: the value is shown but not
 /// editable, and the gap is announced where it is built.
+///
+/// The one place the walk clones: a [`Component`] is owned `'static` data, so
+/// [`UneditableField`] cannot borrow the schema the rest of the dispatch reads
+/// in place.
 fn uneditable(
-	schema: ValueSchema,
+	schema: &ValueSchema,
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
@@ -297,7 +298,7 @@ fn uneditable(
 		field.field_path
 	);
 	labeled(label, rsx! {
-		<span {UneditableField(schema)}>{field}</span>
+		<span {UneditableField(schema.clone())}>{field}</span>
 	})
 }
 

@@ -45,7 +45,7 @@ pub fn DynamicView(
 		.as_deref()
 		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
 		.unwrap_or_default();
-	let columns = columns(resolver, schema, &field);
+	let columns = columns(resolver, &schema, &field);
 	let headers = columns
 		.iter()
 		.map(|column| {
@@ -82,18 +82,18 @@ struct Column {
 
 /// The columns `schema` describes: a struct item's fields, else the single
 /// column of the item itself.
-fn columns(
-	resolver: SchemaResolver<'_>,
-	schema: ValueSchema,
+fn columns<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a ValueSchema,
 	field: &FieldRef,
 ) -> Vec<Column> {
 	match item_schema(resolver, schema) {
 		Some(ValueSchema::Struct(schema)) => schema
 			.fields
-			.into_iter()
+			.iter()
 			.map(|named| Column {
 				key: Some(named.key.clone()),
-				label: named.label.unwrap_or(named.key),
+				label: named.label.clone().unwrap_or_else(|| named.key.clone()),
 			})
 			.collect(),
 		// a list of scalars, or a schema that never resolved: one column of the
@@ -114,15 +114,16 @@ fn columns(
 /// The schema of one item: a `List`'s item schema, seen through any number of
 /// `Reference`/`Optional` hops, else the schema itself (an item schema passed
 /// directly). `None` when a reference never resolved.
-fn item_schema(
-	resolver: SchemaResolver<'_>,
-	schema: ValueSchema,
-) -> Option<ValueSchema> {
+fn item_schema<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a ValueSchema,
+) -> Option<&'a ValueSchema> {
 	match schema {
-		ValueSchema::List(schema) => item_schema(resolver, *schema.item),
-		ValueSchema::Optional(inner) => item_schema(resolver, *inner),
+		ValueSchema::List(schema) => item_schema(resolver, &schema.item),
+		ValueSchema::Optional(inner) => item_schema(resolver, inner),
+		// the registry's schema is borrowed, never copied out
 		ValueSchema::Reference(name) => {
-			item_schema(resolver, resolver.schema(&name).cloned()?)
+			item_schema(resolver, resolver.schema(name)?)
 		}
 		schema => Some(schema),
 	}
