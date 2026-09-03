@@ -87,10 +87,26 @@ impl ValueSchema {
 	/// Validate (and possibly mutate) `value` against this schema.
 	///
 	/// Returns the list of [`ValidationError`]s collected; an empty list means
-	/// the value is valid.
+	/// the value is valid. A [`ValueSchema::Reference`] is a wildcard here,
+	/// since nothing in hand can resolve it; use
+	/// [`validate_in`](Self::validate_in) to follow references.
 	pub async fn validate(&self, value: &mut Value) -> Vec<ValidationError> {
+		self.validate_in(SchemaResolver::default(), value).await
+	}
+
+	/// [`validate`](Self::validate), resolving each [`ValueSchema::Reference`]
+	/// against `resolver` where the walk meets it.
+	///
+	/// Lazy rather than eager, so a self-recursive schema (a composed authored
+	/// schema, the meta-schema) descends exactly as far as the data does
+	/// instead of being expanded ahead of time.
+	pub async fn validate_in(
+		&self,
+		resolver: SchemaResolver<'_>,
+		value: &mut Value,
+	) -> Vec<ValidationError> {
 		let path = FieldPath::default();
-		self.apply(&path, value).await
+		self.apply_in(resolver, &path, value).await
 	}
 
 	/// Validate `value`, collecting every error into one [`Result`] naming
@@ -105,9 +121,20 @@ impl ValueSchema {
 		subject: &str,
 		value: &mut Value,
 	) -> Result {
-		self.validate(value)
+		self.assert_valid_in(SchemaResolver::default(), subject, value)
 			.await
-			.xmap(|errors| match errors.is_empty() {
+	}
+
+	/// [`assert_valid`](Self::assert_valid), resolving references against
+	/// `resolver`.
+	pub async fn assert_valid_in(
+		&self,
+		resolver: SchemaResolver<'_>,
+		subject: &str,
+		value: &mut Value,
+	) -> Result {
+		self.validate_in(resolver, value).await.xmap(|errors| {
+			match errors.is_empty() {
 				true => OK,
 				false => bevybail!(
 					"{subject} does not match its schema:\n{}",
@@ -117,58 +144,104 @@ impl ValueSchema {
 						.collect::<Vec<_>>()
 						.join("\n")
 				),
-			})
+			}
+		})
 	}
 
 	/// Resolve the schema of a nested field by `path`.
 	///
 	/// The dual of [`Document::get_field_ref`](crate::prelude::Document):
 	/// descends into struct fields, map values, list items and tuple elements.
-	/// [`ValueSchema::Any`] swallows the remaining path and matches anything.
+	/// [`ValueSchema::Any`] swallows the remaining path and matches anything,
+	/// as does a [`ValueSchema::Reference`] nothing in hand can resolve.
 	pub fn get_field_schema(
 		&self,
 		path: &[FieldSegment],
 	) -> Result<&ValueSchema> {
+		self.get_field_schema_in(SchemaResolver::default(), path)
+	}
+
+	/// [`get_field_schema`](Self::get_field_schema), descending through a
+	/// [`ValueSchema::Reference`] that `resolver` can resolve, so a field of a
+	/// composed authored schema is reachable.
+	pub fn get_field_schema_in<'a>(
+		&'a self,
+		resolver: SchemaResolver<'a>,
+		path: &[FieldSegment],
+	) -> Result<&'a ValueSchema> {
 		let mut current = self;
-		for (i, segment) in path.iter().enumerate() {
-			current = match (current, segment) {
-				// Any matches the rest of the path
-				(ValueSchema::Any, _) => return Ok(current),
-				// an unresolved reference swallows the rest of the path, like Any
-				(ValueSchema::Reference(_), _) => return Ok(current),
+		let mut remaining = path;
+		while let Some(segment) = remaining.first() {
+			current = match current {
+				// `Any` matches the rest of the path
+				ValueSchema::Any => return Ok(current),
+				// a reference descends into its target, or swallows the rest of
+				// the path like `Any` while it is still arriving
+				ValueSchema::Reference(name) => match resolver.schema(name) {
+					Some(target) => target,
+					None => return Ok(current),
+				},
 				// an optional descends into its inner schema for the same segment
-				(ValueSchema::Optional(inner), _) => {
-					return inner.get_field_schema(&path[i..]);
+				ValueSchema::Optional(inner) => inner,
+				_ => {
+					remaining = &remaining[1..];
+					match (current, segment) {
+						(
+							ValueSchema::Struct(schema),
+							FieldSegment::ObjectKey(key),
+						) => {
+							&schema
+								.fields
+								.iter()
+								.find(|field| field.key == *key)
+								.ok_or_else(|| {
+									bevyhow!("schema has no field `{key}`")
+								})?
+								.schema
+						}
+						(
+							ValueSchema::Map(schema),
+							FieldSegment::ObjectKey(_),
+						) => schema.value.as_ref(),
+						(
+							ValueSchema::List(schema),
+							FieldSegment::ArrayIndex(_),
+						) => schema.item.as_ref(),
+						(
+							ValueSchema::Tuple(schema),
+							FieldSegment::ArrayIndex(idx),
+						) => {
+							&schema
+								.fields
+								.get(*idx)
+								.ok_or_else(|| {
+									bevyhow!(
+										"tuple schema has no element {idx}"
+									)
+								})?
+								.schema
+						}
+						(schema, segment) => bevybail!(
+							"cannot resolve segment `{segment}` against schema `{schema:?}`"
+						),
+					}
 				}
-				(ValueSchema::Struct(schema), FieldSegment::ObjectKey(key)) => {
-					&schema
-						.fields
-						.iter()
-						.find(|field| field.key == *key)
-						.ok_or_else(|| bevyhow!("schema has no field `{key}`"))?
-						.schema
-				}
-				(ValueSchema::Map(schema), FieldSegment::ObjectKey(_)) => {
-					schema.value.as_ref()
-				}
-				(ValueSchema::List(schema), FieldSegment::ArrayIndex(_)) => {
-					schema.item.as_ref()
-				}
-				(ValueSchema::Tuple(schema), FieldSegment::ArrayIndex(idx)) => {
-					&schema
-						.fields
-						.get(*idx)
-						.ok_or_else(|| {
-							bevyhow!("tuple schema has no element {idx}")
-						})?
-						.schema
-				}
-				(schema, segment) => bevybail!(
-					"cannot resolve segment `{segment}` against schema `{schema:?}`"
-				),
 			};
 		}
 		Ok(current)
+	}
+
+	/// The name a composite schema declares for itself, if any.
+	///
+	/// The authored equivalent of a Rust type's short path, and the key an
+	/// authored schema joins the one by-name namespace under.
+	pub fn name(&self) -> Option<&SmolStr> {
+		match self {
+			ValueSchema::Struct(schema) => schema.name.as_ref(),
+			ValueSchema::Tuple(schema) => schema.name.as_ref(),
+			ValueSchema::Enum(schema) => schema.name.as_ref(),
+			_ => None,
+		}
 	}
 
 	/// Whether this schema is compatible with `other`, treating
@@ -207,12 +280,14 @@ impl ValueSchema {
 	}
 }
 
-impl ApplyConstraints for ValueSchema {
-	type Value = Value;
-	fn apply<'a>(
+impl ValueSchema {
+	/// The walk every validation entrypoint runs, carrying the `resolver` a
+	/// [`ValueSchema::Reference`] resolves through.
+	fn apply_in<'a>(
 		&'a self,
+		resolver: SchemaResolver<'a>,
 		path: &'a FieldPath,
-		value: &'a mut Self::Value,
+		value: &'a mut Value,
 	) -> ApplyFuture<'a> {
 		Box::pin(async move {
 			match self {
@@ -238,19 +313,19 @@ impl ApplyConstraints for ValueSchema {
 					validate_entity(schema, path, value).await
 				}
 				ValueSchema::Struct(schema) => {
-					validate_struct(schema, path, value).await
+					validate_struct(resolver, schema, path, value).await
 				}
 				ValueSchema::Tuple(schema) => {
-					validate_tuple(schema, path, value).await
+					validate_tuple(resolver, schema, path, value).await
 				}
 				ValueSchema::List(schema) => {
-					validate_list(schema, path, value).await
+					validate_list(resolver, schema, path, value).await
 				}
 				ValueSchema::Map(schema) => {
-					validate_map(schema, path, value).await
+					validate_map(resolver, schema, path, value).await
 				}
 				ValueSchema::Enum(schema) => {
-					validate_enum(schema, path, value).await
+					validate_enum(resolver, schema, path, value).await
 				}
 				ValueSchema::Optional(inner) => {
 					// a null satisfies an optional; anything else validates as the
@@ -258,12 +333,18 @@ impl ApplyConstraints for ValueSchema {
 					if matches!(value, Value::Null) {
 						Vec::new()
 					} else {
-						inner.apply(path, value).await
+						inner.apply_in(resolver, path, value).await
 					}
 				}
-				// an unresolved reference is a wildcard: the referenced schema may
-				// still be resolving asynchronously, so validation is deferred.
-				ValueSchema::Reference(_) => Vec::new(),
+				// a reference the resolver answers is followed here rather than
+				// expanded ahead of time; one it cannot (unregistered, still
+				// arriving, or a cycle) is a wildcard, so validation defers.
+				ValueSchema::Reference(name) => match resolver.schema(name) {
+					Some(target) => {
+						target.apply_in(resolver, path, value).await
+					}
+					None => Vec::new(),
+				},
 			}
 		})
 	}
@@ -425,6 +506,7 @@ async fn validate_entity(
 }
 
 async fn validate_struct(
+	resolver: SchemaResolver<'_>,
 	schema: &StructSchema,
 	path: &FieldPath,
 	value: &mut Value,
@@ -437,7 +519,8 @@ async fn validate_struct(
 		match map.0.get_mut(field.key.as_str()) {
 			Some(child) => {
 				let sub = path.with_pushed(field.key.clone());
-				errors.extend(field.schema.apply(&sub, child).await);
+				errors
+					.extend(field.schema.apply_in(resolver, &sub, child).await);
 			}
 			None if field.required => {
 				errors.push(ValidationError::new(
@@ -464,6 +547,7 @@ async fn validate_struct(
 }
 
 async fn validate_tuple(
+	resolver: SchemaResolver<'_>,
 	schema: &TupleSchema,
 	path: &FieldPath,
 	value: &mut Value,
@@ -487,12 +571,13 @@ async fn validate_tuple(
 		schema.fields.iter().zip(list.iter_mut()).enumerate()
 	{
 		let sub = path.with_pushed(idx);
-		errors.extend(field.schema.apply(&sub, child).await);
+		errors.extend(field.schema.apply_in(resolver, &sub, child).await);
 	}
 	errors
 }
 
 async fn validate_list(
+	resolver: SchemaResolver<'_>,
 	schema: &ListSchema,
 	path: &FieldPath,
 	value: &mut Value,
@@ -531,12 +616,13 @@ async fn validate_list(
 	}
 	for (idx, child) in list.iter_mut().enumerate() {
 		let sub = path.with_pushed(idx);
-		errors.extend(schema.item.apply(&sub, child).await);
+		errors.extend(schema.item.apply_in(resolver, &sub, child).await);
 	}
 	errors
 }
 
 async fn validate_map(
+	resolver: SchemaResolver<'_>,
 	schema: &MapSchema,
 	path: &FieldPath,
 	value: &mut Value,
@@ -547,12 +633,13 @@ async fn validate_map(
 	let mut errors = Vec::new();
 	for (key, child) in map.0.iter_mut() {
 		let sub = path.with_pushed(key.clone());
-		errors.extend(schema.value.apply(&sub, child).await);
+		errors.extend(schema.value.apply_in(resolver, &sub, child).await);
 	}
 	errors
 }
 
 async fn validate_enum(
+	resolver: SchemaResolver<'_>,
 	schema: &EnumSchema,
 	path: &FieldPath,
 	value: &mut Value,
@@ -607,7 +694,7 @@ async fn validate_enum(
 		)];
 	};
 	let sub = path.with_pushed(key.clone());
-	payload_schema.apply(&sub, payload).await
+	payload_schema.apply_in(resolver, &sub, payload).await
 }
 
 #[cfg(test)]

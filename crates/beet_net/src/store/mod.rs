@@ -63,6 +63,8 @@ pub use store_path::*;
 mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
+#[cfg(feature = "json")]
+mod document_store;
 #[cfg(feature = "std")]
 mod store_ref;
 #[cfg(feature = "std")]
@@ -73,6 +75,8 @@ mod template_store;
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
+#[cfg(feature = "json")]
+pub(crate) use document_store::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
 #[cfg(feature = "std")]
@@ -171,6 +175,14 @@ impl Plugin for StorePlugin {
 
 		#[cfg(feature = "template_serde")]
 		app.add_systems(PostUpdate, load_template_on_insert);
+
+		// the by-location half of schema resolution: a document naming its
+		// schema by path has that schema read out of its own store.
+		#[cfg(feature = "json")]
+		app.init_resource::<SchemaRegistry>().add_systems(
+			PreUpdate,
+			read_located_schemas.run_if(located_schemas_may_be_readable),
+		);
 
 		// wasm localStorage watcher lifecycle (NonSend, owns the JS closure)
 		#[cfg(target_arch = "wasm32")]

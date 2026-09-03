@@ -265,11 +265,16 @@ pub(super) fn schema_needs_sync(
 
 pub(super) fn sync_schema(
 	mut commands: Commands,
+	registry: Option<Res<SchemaRegistry>>,
 	fields: Query<(Entity, &FieldOf, &ResolvedFieldPath, Option<&ValueSchema>)>,
 	new_links: Query<(), Added<FieldOf>>,
 	changed_schemas: Query<(), Changed<DocumentSchema>>,
 	schemas: Query<&DocumentSchema>,
 ) -> Result {
+	let resolver = match registry.as_deref() {
+		Some(registry) => SchemaResolver::default().with_schemas(registry),
+		None => SchemaResolver::default(),
+	};
 	for (entity, field_of, resolved, local) in fields.iter() {
 		// lazy: skip unless the field just linked or its document schema changed
 		if !new_links.contains(entity)
@@ -277,14 +282,18 @@ pub(super) fn sync_schema(
 		{
 			continue;
 		}
-		// only an inlined schema resolves without a type registry
-		let Ok(DocumentSchema(FieldSchema::Inline(schema))) =
-			schemas.get(field_of.document)
+		// a schema that does not resolve (a schema document still arriving, a
+		// type path no registry in hand knows) leaves the field unseeded
+		let Ok(schema) = schemas
+			.get(field_of.document)
+			.map_err(|_| ())
+			.and_then(|schema| schema.0.resolve(resolver).map_err(|_| ()))
 		else {
 			continue;
 		};
 		// a path the schema does not describe leaves the local schema authoritative
-		let Ok(field_schema) = schema.get_field_schema(&resolved.field_path)
+		let Ok(field_schema) =
+			schema.get_field_schema_in(resolver, &resolved.field_path)
 		else {
 			continue;
 		};

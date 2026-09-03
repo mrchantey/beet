@@ -37,28 +37,25 @@ impl FieldSchema {
 		Self::Document(path.into())
 	}
 
-	/// Resolve to a [`ValueSchema`].
+	/// Resolve to a [`ValueSchema`] against `resolver`.
 	///
-	/// `TypePath` variants are looked up in the registry by their Rust type
-	/// path. `Inline` variants are returned as-is. A `Document` variant resolves
-	/// by location, not by registry, so it defers to [`ValueSchema::Any`] here
-	/// exactly as an unresolved [`ValueSchema::Reference`] does; the loader
-	/// substitutes the real schema when the referenced document arrives, and the
-	/// read backstop ([`ValueSchema::assert_valid`]) keeps the invariant honest
-	/// once it has.
-	pub fn resolve(
-		&self,
-		registry: &bevy_reflect::TypeRegistry,
-	) -> Result<ValueSchema> {
+	/// `Inline` variants are returned as-is. A `TypePath` resolves through the
+	/// one [`SchemaRegistry`] namespace first and bevy's type registry second,
+	/// so a hand-authored schema registered under a type path stands in for
+	/// what reflection would derive. A `Document` resolves by **location**, in
+	/// the by-location index a schema document read out of a store registers
+	/// into; until it arrives the arm defers to [`ValueSchema::Any`] exactly as
+	/// an unresolved [`ValueSchema::Reference`] does, and the read backstop
+	/// ([`ValueSchema::assert_valid`]) tightens the invariant once it has.
+	pub fn resolve(&self, resolver: SchemaResolver<'_>) -> Result<ValueSchema> {
 		match self {
 			Self::Inline(schema) => Ok(schema.clone()),
-			Self::Document(_) => Ok(ValueSchema::Any),
-			Self::TypePath(path) => registry
-				.get_with_type_path(path)
-				.ok_or_else(|| bevyhow!("type `{}` is not registered", path))?
-				.type_info()
-				.xmap(ValueSchema::from_type_info)
+			Self::Document(path) => resolver
+				.located(path)
+				.cloned()
+				.unwrap_or(ValueSchema::Any)
 				.xok(),
+			Self::TypePath(path) => resolver.type_schema(path),
 		}
 	}
 
@@ -111,24 +108,45 @@ mod test {
 	#[crate::test]
 	fn inline_resolves() {
 		let inline = ValueSchema::Bool(BoolSchema::default());
-		let schema = FieldSchema::inline(inline.clone());
-		let registry = bevy_reflect::TypeRegistry::default();
-		schema.resolve(&registry).unwrap().xpect_eq(inline);
+		FieldSchema::inline(inline.clone())
+			.resolve(SchemaResolver::default())
+			.unwrap()
+			.xpect_eq(inline);
 	}
 
 	#[crate::test]
 	fn type_path_resolves_from_registry() {
-		let schema = FieldSchema::of::<ResolveTarget>();
-		let mut registry = bevy_reflect::TypeRegistry::default();
-		registry.register::<ResolveTarget>();
-		let resolved = schema.resolve(&registry).unwrap();
+		let mut types = bevy_reflect::TypeRegistry::default();
+		types.register::<ResolveTarget>();
+		let resolved = FieldSchema::of::<ResolveTarget>()
+			.resolve(SchemaResolver::default().with_types(&types))
+			.unwrap();
 		matches!(resolved, ValueSchema::Struct(_)).xpect_true();
 	}
 
 	#[crate::test]
 	fn type_path_missing_errors() {
-		let schema = FieldSchema::of::<ResolveTarget>();
-		let registry = bevy_reflect::TypeRegistry::default();
-		schema.resolve(&registry).is_err().xpect_true();
+		FieldSchema::of::<ResolveTarget>()
+			.resolve(SchemaResolver::default())
+			.is_err()
+			.xpect_true();
+	}
+
+	/// Resolution by location: the arm defers until the schema document has
+	/// been read into the by-location index, and resolves to it after.
+	#[crate::test]
+	fn document_resolves_by_location() {
+		let schema = FieldSchema::document("schema/todo.json");
+		schema
+			.resolve(SchemaResolver::default())
+			.unwrap()
+			.xpect_eq(ValueSchema::Any);
+
+		let mut registry = SchemaRegistry::default();
+		registry.insert_located("schema/todo.json", ValueSchema::of::<i64>());
+		schema
+			.resolve(SchemaResolver::default().with_schemas(&registry))
+			.unwrap()
+			.xpect_eq(ValueSchema::of::<i64>());
 	}
 }

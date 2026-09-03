@@ -1,94 +1,224 @@
-//! The by-name schema registry backing composable and remote schemas.
+//! The by-name schema registry backing authored, composable and remote schemas.
 //!
-//! A [`ValueSchema::Reference`] names another template's (or registered type's)
-//! schema rather than inlining it, so schemas form a graph mirroring the
-//! template graph. [`SchemaRegistry`] is the index that resolves those names,
-//! and [`SchemaRegistry::resolve`] walks a schema, replacing every reference with
-//! the registered schema recursively, so the result validates without further
-//! lookups.
+//! A [`ValueSchema::Reference`] names another schema rather than inlining it, so
+//! schemas form a graph mirroring the template graph. [`SchemaRegistry`] is the
+//! index that resolves those names, and it holds authored schemas (a `bx:schema`
+//! block, a schema document) beside reflect-derived ones: one namespace, because
+//! an authored schema and a reflect-derived one are the same kind of thing.
 //!
-//! References may resolve asynchronously (a remote `bx:schema`), so a name that
-//! is not yet registered resolves to [`ValueSchema::Any`] (a wildcard that defers
-//! validation) rather than erroring. The async layer registers the real schema
-//! when it arrives and re-resolves.
+//! Identity is the **full** key: a Rust type path, a template module path, or an
+//! authored name. A short name is display and authoring sugar, indexed as an
+//! alias; a short name several full keys share is ambiguous, diagnosed where the
+//! collision is created and resolving to nothing rather than to whichever
+//! registered first.
+//!
+//! References may resolve asynchronously (a remote `bx:schema`, a schema
+//! document still being read), so a name that is not yet registered defers to
+//! [`ValueSchema::Any`] rather than erroring.
 
 use crate::prelude::*;
+use bevy::reflect::Typed;
 
-/// A by-name index of template/type schemas, the manifest a reactive client
+/// A by-name index of authored and type schemas, the manifest a reactive client
 /// layer reads and the resolver for [`ValueSchema::Reference`].
 ///
 /// Registered before any template is loaded (so a tag resolves to a known
 /// schema), it is the schema-side companion of the template-by-name registry.
-#[derive(Debug, Default, Clone, Resource)]
+/// [`SchemaRegistry::located`] is the by-*location* index beside it, which a
+/// schema document read out of a store registers into.
+#[derive(Debug, Clone, Resource)]
 pub struct SchemaRegistry {
+	/// Keyed by full identity: a Rust type path, a template module path, or an
+	/// authored name.
 	schemas: HashMap<SmolStr, ValueSchema>,
+	/// Short name to every full key ending in it. One key resolves, several are
+	/// a collision.
+	aliases: HashMap<SmolStr, Vec<SmolStr>>,
+	/// Schemas resolved by location: a schema document's store path.
+	located: HashMap<SmolPath, ValueSchema>,
+}
+
+impl Default for SchemaRegistry {
+	fn default() -> Self { Self::new() }
 }
 
 impl SchemaRegistry {
-	/// Register `schema` under `name` (a template module path or short type path).
-	pub fn insert(&mut self, name: impl Into<SmolStr>, schema: ValueSchema) {
-		self.schemas.insert(name.into(), schema);
+	/// A registry holding only the meta-schema.
+	///
+	/// The meta-schema is intrinsic rather than opt-in: a schema is itself a
+	/// value with a schema, so every registry can describe its own contents and
+	/// a schema document validates wherever it is read.
+	pub fn new() -> Self {
+		let mut registry = Self {
+			schemas: HashMap::default(),
+			aliases: HashMap::default(),
+			located: HashMap::default(),
+		};
+		registry.insert(ValueSchema::type_path(), ValueSchema::meta());
+		registry
 	}
 
-	/// The raw (still-referencing) schema registered under `name`, if any.
+	/// Register `schema` under `name`, its full identity key.
+	///
+	/// Re-registering a key replaces it, which is how a reloaded template dir or
+	/// an edited schema document updates in place.
+	pub fn insert(&mut self, name: impl Into<SmolStr>, schema: ValueSchema) {
+		let name = name.into();
+		let short = Self::short_name(&name);
+		if short != name {
+			let keys = self.aliases.entry(short.clone()).or_default();
+			if !keys.contains(&name) {
+				keys.push(name.clone());
+				if keys.len() > 1 {
+					warn!(
+						"schema short name `{short}` is ambiguous between {}; \
+						reference one of them by its full path",
+						keys.join(", ")
+					);
+				}
+			}
+		}
+		self.schemas.insert(name, schema);
+	}
+
+	/// Register the reflect-derived schema of `T` under its full type path.
+	pub fn register_type<T: TypePath + Typed>(&mut self) {
+		self.insert(T::type_path(), ValueSchema::of::<T>());
+	}
+
+	/// Register the schema of the schema document at `path`, the by-location
+	/// index a [`FieldSchema::Document`] resolves through.
+	///
+	/// Also registered by **name** when the schema names itself, which is how an
+	/// authored schema joins the one namespace beside the reflect-derived ones:
+	/// a `Reference("TodoItem")` in a document that only composes it then
+	/// resolves, and a second document declaring the same name collides loudly
+	/// rather than first-wins.
+	pub fn insert_located(
+		&mut self,
+		path: impl Into<SmolPath>,
+		schema: ValueSchema,
+	) {
+		if let Some(name) = schema.name() {
+			self.insert(name.clone(), schema.clone());
+		}
+		self.located.insert(path.into(), schema);
+	}
+
+	/// The schema of the schema document at `path`, if it has arrived.
+	pub fn located(&self, path: &SmolPath) -> Option<&ValueSchema> {
+		self.located.get(path)
+	}
+
+	/// The raw (still-referencing) schema registered under `name`, matching the
+	/// full key first and a short-name alias second.
+	///
+	/// An ambiguous short name resolves to `None`: a collision is never resolved
+	/// first-wins. Use [`try_get`](Self::try_get) to fail loudly instead.
 	pub fn get(&self, name: &str) -> Option<&ValueSchema> {
-		self.schemas.get(name)
+		self.schemas.get(name).or_else(|| {
+			self.unique_alias(name)
+				.and_then(|key| self.schemas.get(key))
+		})
+	}
+
+	/// [`get`](Self::get), naming both candidates when `name` is an ambiguous
+	/// short name.
+	pub fn try_get(&self, name: &str) -> Result<Option<&ValueSchema>> {
+		if self.schemas.contains_key(name) {
+			return Ok(self.schemas.get(name));
+		}
+		match self.aliases.get(name).map(Vec::as_slice) {
+			Some([key]) => Ok(self.schemas.get(key)),
+			Some(keys) => bevybail!(
+				"schema short name `{name}` is ambiguous between {}",
+				keys.join(", ")
+			),
+			None => Ok(None),
+		}
 	}
 
 	/// Whether a schema is registered under `name`.
-	pub fn contains(&self, name: &str) -> bool {
-		self.schemas.contains_key(name)
-	}
+	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
-	/// The number of registered schemas.
+	/// The number of registered schemas, the meta-schema included.
 	pub fn len(&self) -> usize { self.schemas.len() }
 
-	/// Whether the registry is empty.
+	/// Whether the registry is empty, which a registry built by
+	/// [`new`](Self::new) never is.
 	pub fn is_empty(&self) -> bool { self.schemas.is_empty() }
+
+	/// Every registered name paired with its schema.
+	pub fn iter(&self) -> impl Iterator<Item = (&SmolStr, &ValueSchema)> {
+		self.schemas.iter()
+	}
 
 	/// Resolve `schema` against this registry, replacing every
 	/// [`ValueSchema::Reference`] with the named schema recursively.
 	///
-	/// An unregistered reference resolves to [`ValueSchema::Any`] (deferred), so a
-	/// schema still resolving remotely validates as a wildcard until it arrives.
-	/// Recursion is bounded by `depth` so a cyclic reference graph (`A -> B -> A`)
-	/// terminates at a wildcard rather than looping.
+	/// An unregistered reference stays deferred as [`ValueSchema::Any`], so a
+	/// schema still arriving validates as a wildcard until it does. A reference
+	/// back to a name already being expanded is left as a reference, so a
+	/// recursive schema (the meta-schema is one) resolves to a finite tree
+	/// rather than expanding forever; validation follows it lazily instead.
 	pub fn resolve(&self, schema: &ValueSchema) -> ValueSchema {
-		self.resolve_inner(schema, MAX_RESOLVE_DEPTH)
+		self.resolve_inner(schema, &mut Vec::new())
 	}
 
 	/// Resolve a named reference directly, the entrypoint a tag resolution uses.
 	///
 	/// Returns [`ValueSchema::Any`] when the name is not (yet) registered.
 	pub fn resolve_name(&self, name: &str) -> ValueSchema {
-		match self.schemas.get(name) {
-			Some(schema) => self.resolve_inner(schema, MAX_RESOLVE_DEPTH),
+		match self.get(name) {
+			Some(schema) => {
+				self.resolve_inner(schema, &mut vec![SmolStr::from(name)])
+			}
 			None => ValueSchema::Any,
 		}
 	}
 
-	fn resolve_inner(&self, schema: &ValueSchema, depth: usize) -> ValueSchema {
-		if depth == 0 {
-			return ValueSchema::Any;
+	/// The trailing `::` segment of `name`, its display and authoring sugar.
+	fn short_name(name: &str) -> SmolStr {
+		name.rsplit("::").next().unwrap_or(name).into()
+	}
+
+	/// The sole full key `short` aliases, or `None` when it aliases several.
+	fn unique_alias(&self, short: &str) -> Option<&SmolStr> {
+		match self.aliases.get(short)?.as_slice() {
+			[key] => Some(key),
+			_ => None,
 		}
+	}
+
+	fn resolve_inner(
+		&self,
+		schema: &ValueSchema,
+		visiting: &mut Vec<SmolStr>,
+	) -> ValueSchema {
 		match schema {
 			ValueSchema::Reference(name) => {
-				match self.schemas.get(name.as_str()) {
-					Some(target) => self.resolve_inner(target, depth - 1),
-					None => ValueSchema::Any,
+				if visiting.iter().any(|visited| visited == name) {
+					return schema.clone();
 				}
+				let Some(target) = self.get(name) else {
+					return ValueSchema::Any;
+				};
+				visiting.push(name.clone());
+				let resolved = self.resolve_inner(target, visiting);
+				visiting.pop();
+				resolved
 			}
 			ValueSchema::Optional(inner) => ValueSchema::Optional(Box::new(
-				self.resolve_inner(inner, depth - 1),
+				self.resolve_inner(inner, visiting),
 			)),
 			ValueSchema::List(list) => ValueSchema::List(ListSchema {
-				item: Box::new(self.resolve_inner(&list.item, depth - 1)),
+				item: Box::new(self.resolve_inner(&list.item, visiting)),
 				min_items: list.min_items,
 				max_items: list.max_items,
 				unique: list.unique,
 			}),
 			ValueSchema::Map(map) => ValueSchema::Map(MapSchema {
-				value: Box::new(self.resolve_inner(&map.value, depth - 1)),
+				value: Box::new(self.resolve_inner(&map.value, visiting)),
 			}),
 			ValueSchema::Struct(struct_schema) => {
 				ValueSchema::Struct(StructSchema {
@@ -103,8 +233,7 @@ impl SchemaRegistry {
 							label: field.label.clone(),
 							description: field.description.clone(),
 							on_missing: field.on_missing.clone(),
-							schema: self
-								.resolve_inner(&field.schema, depth - 1),
+							schema: self.resolve_inner(&field.schema, visiting),
 						})
 						.collect(),
 				})
@@ -117,7 +246,7 @@ impl SchemaRegistry {
 					.map(|field| UnnamedFieldSchema {
 						required: field.required,
 						description: field.description.clone(),
-						schema: self.resolve_inner(&field.schema, depth - 1),
+						schema: self.resolve_inner(&field.schema, visiting),
 					})
 					.collect(),
 			}),
@@ -129,7 +258,7 @@ impl SchemaRegistry {
 					.map(|variant| VariantSchema {
 						name: variant.name.clone(),
 						payload: variant.payload.as_ref().map(|payload| {
-							self.resolve_inner(payload, depth - 1)
+							self.resolve_inner(payload, visiting)
 						}),
 					})
 					.collect(),
@@ -140,13 +269,12 @@ impl SchemaRegistry {
 	}
 }
 
-/// Bound on [`SchemaRegistry::resolve`] recursion, so a cyclic schema graph
-/// terminates at a wildcard rather than overflowing the stack.
-const MAX_RESOLVE_DEPTH: usize = 64;
-
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	#[derive(Reflect)]
+	struct Count(#[allow(dead_code)] u32);
 
 	#[crate::test]
 	fn resolves_a_reference() {
@@ -180,14 +308,147 @@ mod test {
 		(*list.item).xpect_eq(ValueSchema::of::<i64>());
 	}
 
+	/// A reference back into a name already being expanded is left in place, so
+	/// a recursive schema resolves to a finite tree.
 	#[crate::test]
 	fn cyclic_reference_terminates() {
 		let mut registry = SchemaRegistry::default();
-		// A references B, B references A
 		registry.insert("A", ValueSchema::Reference("B".into()));
 		registry.insert("B", ValueSchema::Reference("A".into()));
-		// terminates at a wildcard rather than looping
-		matches!(registry.resolve_name("A"), ValueSchema::Any).xpect_true();
+		registry
+			.resolve_name("A")
+			.xpect_eq(ValueSchema::Reference("A".into()));
+	}
+
+	/// A short name is sugar over the full key, which is the only identity.
+	#[crate::test]
+	fn a_short_name_aliases_its_full_key() {
+		let mut registry = SchemaRegistry::default();
+		registry.register_type::<Count>();
+		registry.get(Count::type_path()).is_some().xpect_true();
+		registry.get("Count").is_some().xpect_true();
+	}
+
+	/// Two full keys sharing a short name are a collision: it resolves to
+	/// nothing rather than to whichever registered first, and asking loudly
+	/// names both candidates.
+	#[crate::test]
+	fn an_ambiguous_short_name_never_first_wins() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert("a::Item", ValueSchema::of::<i64>());
+		registry.insert("b::Item", ValueSchema::of::<String>());
+		registry.get("Item").is_none().xpect_true();
+		registry
+			.try_get("Item")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("a::Item")
+			.xpect_contains("b::Item");
+		// each is still reachable by its full key
+		registry
+			.get("a::Item")
+			.unwrap()
+			.xpect_eq(ValueSchema::of::<i64>());
+	}
+
+	/// An authored schema and a reflect-derived one share the one namespace.
+	#[crate::test]
+	async fn an_authored_schema_sits_beside_a_derived_one() {
+		let mut registry = SchemaRegistry::default();
+		registry.register_type::<Count>();
+		registry.insert(
+			"TodoItem",
+			ValueSchema::Struct(StructSchema {
+				name: Some("TodoItem".into()),
+				allow_additional: false,
+				fields: vec![NamedFieldSchema::new(
+					"label",
+					ValueSchema::String(default()),
+				)],
+			}),
+		);
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		ValueSchema::Reference("TodoItem".into())
+			.validate_in(resolver, &mut value!({ "label": "buy milk" }))
+			.await
+			.is_empty()
+			.xpect_true();
+		ValueSchema::Reference("Count".into())
+			.validate_in(resolver, &mut value!(7u64))
+			.await
+			.is_empty()
+			.xpect_true();
+	}
+
+	/// By-location resolution sits beside the name namespace, so a store path
+	/// can never shadow a name.
+	#[crate::test]
+	fn a_located_schema_is_its_own_namespace() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert_located("schema/todo.json", ValueSchema::of::<i64>());
+		registry.get("schema/todo.json").is_none().xpect_true();
+		registry
+			.located(&SmolPath::from("schema/todo.json"))
+			.unwrap()
+			.xpect_eq(ValueSchema::of::<i64>());
+	}
+
+	/// A schema document that names itself joins the by-name namespace too, so
+	/// a document composing it by reference resolves without knowing where it
+	/// is stored.
+	#[crate::test]
+	fn a_named_schema_document_joins_the_namespace() {
+		let mut registry = SchemaRegistry::default();
+		let schema = ValueSchema::Struct(StructSchema {
+			name: Some("TodoItem".into()),
+			allow_additional: false,
+			fields: vec![NamedFieldSchema::new(
+				"label",
+				ValueSchema::String(default()),
+			)],
+		});
+		registry.insert_located("schema/todo.json", schema.clone());
+		registry.get("TodoItem").unwrap().xpect_eq(schema);
+	}
+
+	/// A self-referential Rust type lowers to a reference by short type path,
+	/// so registering it is what lets validation follow the recursion instead of
+	/// deferring one level in.
+	#[crate::test]
+	async fn a_recursive_type_validates_to_the_depth_of_its_data() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct SidebarNode {
+			label: String,
+			children: Vec<SidebarNode>,
+		}
+		let mut registry = SchemaRegistry::default();
+		registry.register_type::<SidebarNode>();
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		let schema = ValueSchema::of::<SidebarNode>();
+		schema
+			.validate_in(
+				resolver,
+				&mut value!({
+					"label": "root",
+					"children": [{ "label": "child", "children": [] }],
+				}),
+			)
+			.await
+			.is_empty()
+			.xpect_true();
+		// the nested level is really validated, not swallowed as a wildcard
+		schema
+			.validate_in(
+				resolver,
+				&mut value!({
+					"label": "root",
+					"children": [{ "children": [] }],
+				}),
+			)
+			.await
+			.is_empty()
+			.xpect_false();
 	}
 
 	#[crate::test]

@@ -53,6 +53,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - Functions longer than ~20 lines may have brief comments describing each step.
 - Never insert arbitrary ie 80 col manual reflow newlines in markdown documents.
 - all shared dependencies are declared in the workspace Cargo.toml; if one needs no-default-features, disable that at the workspace level and reenable as required
+- for reserved keyword idents, use escaping `r#struct`, never misspelling `strukt`  
 - Beet is cross-platform: use `fs_ext`, `env_ext` instead of `std::fs`/`std::env`, adding missing methods as needed.
 - The one canonical store an app runs from is the **repo store**, marked `RepoStore` and enforced as one per world: `RepoStore` for types, `repo_store` for idents, "repo store" in prose (never "site"/"entry"/"app" store). Every other `BlobStore` is a plain store, named by a `StoreRef` or scoped out of an ancestor by a `DirPath`.
 - Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them. `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).

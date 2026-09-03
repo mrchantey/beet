@@ -52,7 +52,9 @@ impl Plugin for DocumentPlugin {
 			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>()
 			.register_type::<Map>()
-			.register_type::<ValueSchema>();
+			.register_type::<ValueSchema>()
+			// the one by-name schema namespace, seeded with the meta-schema
+			.init_resource::<SchemaRegistry>();
 
 		app
 			// Add observers and systems

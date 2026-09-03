@@ -34,9 +34,22 @@ impl SchemaCommit {
 	/// Apply the commit to `value`, backfilling every field whose policy
 	/// resolves it and leaving `value` untouched if anything fails.
 	pub async fn apply(&self, value: &mut Value) -> Result {
+		self.apply_in(SchemaResolver::default(), value).await
+	}
+
+	/// [`apply`](Self::apply), resolving each [`ValueSchema::Reference`] against
+	/// `resolver`, so a commit of a composed schema evolves the data its
+	/// referenced schemas describe too.
+	pub async fn apply_in(
+		&self,
+		resolver: SchemaResolver<'_>,
+		value: &mut Value,
+	) -> Result {
 		let mut next = value.clone();
-		Self::backfill(&self.schema, &mut next).await?;
-		self.schema.assert_valid("schema commit", &mut next).await?;
+		Self::backfill(resolver, &self.schema, &mut next).await?;
+		self.schema
+			.assert_valid_in(resolver, "schema commit", &mut next)
+			.await?;
 		*value = next;
 		OK
 	}
@@ -44,6 +57,7 @@ impl SchemaCommit {
 	/// Walk `schema` over `value`, resolving every field the edit left absent or
 	/// mistyped. Errors name the field, so a rejected commit says what to add.
 	fn backfill<'a>(
+		resolver: SchemaResolver<'a>,
 		schema: &'a ValueSchema,
 		value: &'a mut Value,
 	) -> BackfillFuture<'a> {
@@ -51,26 +65,32 @@ impl SchemaCommit {
 			match (schema, value) {
 				(ValueSchema::Struct(schema), Value::Map(map)) => {
 					for field in &schema.fields {
-						Self::backfill_field(field, map).await?;
+						Self::backfill_field(resolver, field, map).await?;
 					}
 				}
 				(ValueSchema::List(schema), Value::List(items)) => {
 					for item in items.iter_mut() {
-						Self::backfill(&schema.item, item).await?;
+						Self::backfill(resolver, &schema.item, item).await?;
 					}
 				}
 				(ValueSchema::Map(schema), Value::Map(map)) => {
 					for item in map.0.values_mut() {
-						Self::backfill(&schema.value, item).await?;
+						Self::backfill(resolver, &schema.value, item).await?;
 					}
 				}
 				// a null satisfies an optional; anything else backfills as the inner
 				(ValueSchema::Optional(inner), value) => {
 					if !value.is_null() {
-						Self::backfill(inner, value).await?;
+						Self::backfill(resolver, inner, value).await?;
 					}
 				}
-				// scalars, enums and unresolved references carry no field policies
+				// a reference the resolver answers backfills as its target
+				(ValueSchema::Reference(name), value) => {
+					if let Some(target) = resolver.schema(name) {
+						Self::backfill(resolver, target, value).await?;
+					}
+				}
+				// scalars and enums carry no field policies
 				_ => {}
 			}
 			OK
@@ -78,7 +98,11 @@ impl SchemaCommit {
 	}
 
 	/// Resolve one struct field against the map holding it.
-	async fn backfill_field(field: &NamedFieldSchema, map: &mut Map) -> Result {
+	async fn backfill_field(
+		resolver: SchemaResolver<'_>,
+		field: &NamedFieldSchema,
+		map: &mut Map,
+	) -> Result {
 		let Some(current) = map.0.get_mut(field.key.as_str()) else {
 			// absent and optional is already valid, absent and required needs a
 			// resolution to have been declared.
@@ -93,16 +117,19 @@ impl SchemaCommit {
 				);
 			};
 			let value = policy.resolve(&field.key, None).await?;
-			map.insert(field.key.clone(), Self::checked(field, value).await?);
+			map.insert(
+				field.key.clone(),
+				Self::checked(resolver, field, value).await?,
+			);
 			return OK;
 		};
 
 		// resolve nested fields first, so a container evolves through its own
 		// children before the value as a whole is judged.
-		Self::backfill(&field.schema, current).await?;
+		Self::backfill(resolver, &field.schema, current).await?;
 		// a present value that now validates is left alone (validation coerces
 		// in place, eg an int key into a uint one).
-		if field.schema.validate(current).await.is_empty() {
+		if field.schema.validate_in(resolver, current).await.is_empty() {
 			return OK;
 		}
 
@@ -117,19 +144,24 @@ impl SchemaCommit {
 			);
 		};
 		let value = policy.resolve(&field.key, Some(current)).await?;
-		*current = Self::checked(field, value).await?;
+		*current = Self::checked(resolver, field, value).await?;
 		OK
 	}
 
 	/// Validate a resolved value against its field's schema before it is
 	/// assigned, so a bad policy fails the commit rather than corrupting data.
 	async fn checked(
+		resolver: SchemaResolver<'_>,
 		field: &NamedFieldSchema,
 		mut value: Value,
 	) -> Result<Value> {
 		field
 			.schema
-			.assert_valid(&format!("field `{}`", field.key), &mut value)
+			.assert_valid_in(
+				resolver,
+				&format!("field `{}`", field.key),
+				&mut value,
+			)
 			.await?;
 		value.xok()
 	}
@@ -244,6 +276,34 @@ mod test {
 			{ "label": "a", "is_really_difficult": false },
 			{ "label": "b", "is_really_difficult": false },
 		] }));
+	}
+
+	/// A commit of a composed schema evolves through its references, so editing
+	/// the `TodoItem` schema backfills the rows of a document that only names
+	/// it.
+	#[crate::test]
+	async fn backfills_through_a_reference() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert(
+			"TodoItem",
+			item_schema(vec![
+				label(),
+				difficult().with_on_missing(OnMissing::Default(value!(false))),
+			]),
+		);
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		let mut value = value!([{ "label": "a" }]);
+		SchemaCommit::new(ValueSchema::List(ListSchema {
+			item: Box::new(ValueSchema::Reference("TodoItem".into())),
+			min_items: None,
+			max_items: None,
+			unique: false,
+		}))
+		.apply_in(resolver, &mut value)
+		.await
+		.unwrap();
+		value
+			.xpect_eq(value!([{ "label": "a", "is_really_difficult": false }]));
 	}
 
 	/// A retype with no computed conversion is rejected: the existing value

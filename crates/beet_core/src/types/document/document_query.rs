@@ -72,6 +72,9 @@ pub struct DocumentQuery<'w, 's> {
 	/// Shared upward resolver for the [`DocumentScope`] prefix, so reads and
 	/// writes scope through the same walk.
 	scopes: ScopeQuery<'w, 's>,
+	/// The one by-name and by-location schema namespace, so a document naming
+	/// its shape indirectly type-checks a write like an inline one.
+	schema_registry: Option<Res<'w, SchemaRegistry>>,
 	commands: Commands<'w, 's>,
 }
 
@@ -198,6 +201,14 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		}
 	}
 
+	/// The resolver a document schema resolves its indirections through.
+	fn resolver(&self) -> SchemaResolver<'_> {
+		match &self.schema_registry {
+			Some(registry) => SchemaResolver::default().with_schemas(registry),
+			None => SchemaResolver::default(),
+		}
+	}
+
 	/// Type-check a write of `T` against the document's [`DocumentSchema`].
 	///
 	/// Passes silently when the document has no schema.
@@ -214,7 +225,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			Some(doc_entity),
 		);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
-			schema.assert_field_type::<T>(&field_path)?;
+			schema.assert_field_type::<T>(self.resolver(), &field_path)?;
 		}
 		Ok(())
 	}
@@ -234,7 +245,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 			Some(doc_entity),
 		);
 		if let Ok(schema) = self.schemas.get(doc_entity) {
-			schema.assert_list_item_type::<T>(&field_path)?;
+			schema.assert_list_item_type::<T>(self.resolver(), &field_path)?;
 		}
 		Ok(())
 	}
