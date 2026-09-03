@@ -1,10 +1,15 @@
 use crate::prelude::*;
 
-/// Identifies the value type of a field or token.
+/// Identifies the value type of a field or token, in exactly three ways.
 ///
-/// A field schema is either a reference to a Rust [`TypePath`] (resolved at
-/// runtime via the [`TypeRegistry`](bevy_reflect::TypeRegistry)), or a fully
-/// inlined [`ValueSchema`].
+/// This is how a self-describing data document names its schema: inline (the
+/// [`ValueSchema`] in place), by document (another document in the same store,
+/// resolved by **location**), or by Rust [`TypePath`] (a registered type,
+/// resolved at runtime via the [`TypeRegistry`](bevy_reflect::TypeRegistry)).
+///
+/// Resolution by location sits *beside* the one [`SchemaRegistry`] namespace,
+/// which resolves [`ValueSchema::Reference`] by **name**; it does not replace
+/// it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -13,6 +18,9 @@ pub enum FieldSchema {
 	TypePath(SmolStr),
 	/// A schema defined inline, without a corresponding registered type.
 	Inline(ValueSchema),
+	/// Another document holding the schema, by default resolved in this
+	/// document's own store (the `AncestorQuery<&BlobStore>` idiom).
+	Document(SmolPath),
 }
 
 impl FieldSchema {
@@ -24,16 +32,27 @@ impl FieldSchema {
 	/// Creates a schema from an inline [`ValueSchema`].
 	pub fn inline(schema: ValueSchema) -> Self { Self::Inline(schema) }
 
+	/// Creates a schema referencing another document by location.
+	pub fn document(path: impl Into<SmolPath>) -> Self {
+		Self::Document(path.into())
+	}
+
 	/// Resolve to a [`ValueSchema`].
 	///
 	/// `TypePath` variants are looked up in the registry by their Rust type
-	/// path. `Inline` variants are returned as-is.
+	/// path. `Inline` variants are returned as-is. A `Document` variant resolves
+	/// by location, not by registry, so it defers to [`ValueSchema::Any`] here
+	/// exactly as an unresolved [`ValueSchema::Reference`] does; the loader
+	/// substitutes the real schema when the referenced document arrives, and the
+	/// read backstop ([`ValueSchema::assert_valid`]) keeps the invariant honest
+	/// once it has.
 	pub fn resolve(
 		&self,
 		registry: &bevy_reflect::TypeRegistry,
 	) -> Result<ValueSchema> {
 		match self {
 			Self::Inline(schema) => Ok(schema.clone()),
+			Self::Document(_) => Ok(ValueSchema::Any),
 			Self::TypePath(path) => registry
 				.get_with_type_path(path)
 				.ok_or_else(|| bevyhow!("type `{}` is not registered", path))?
@@ -47,6 +66,7 @@ impl FieldSchema {
 	pub fn as_str(&self) -> &str {
 		match self {
 			Self::TypePath(path) => path.as_str(),
+			Self::Document(path) => path.as_str(),
 			Self::Inline(_) => "inline",
 		}
 	}
@@ -72,6 +92,7 @@ impl core::fmt::Display for FieldSchema {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match self {
 			Self::TypePath(s) => s.fmt(f),
+			Self::Document(path) => path.fmt(f),
 			Self::Inline(_) => write!(f, "inline"),
 		}
 	}

@@ -101,6 +101,7 @@ fn struct_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 				required: required.contains(key.as_str()),
 				label: None,
 				description: None,
+				on_missing: on_missing(descriptor)?,
 				schema: ValueSchema::from_json_value(descriptor)?,
 			})
 		})
@@ -146,6 +147,7 @@ fn shorthand_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 					.unwrap_or(false),
 				label: None,
 				description: None,
+				on_missing: on_missing(descriptor)?,
 				schema: ValueSchema::from_json_value(descriptor)?,
 			})
 		})
@@ -171,10 +173,29 @@ fn primitive_or_reference(name: &str) -> ValueSchema {
 			ValueSchema::F64(F64Schema::default())
 		}
 		"boolean" | "bool" => ValueSchema::Bool(BoolSchema::default()),
+		"entity" => ValueSchema::Entity(EntitySchema::default()),
 		"any" => ValueSchema::Any,
 		"null" => ValueSchema::Null,
 		other => ValueSchema::Reference(SmolStr::from(other)),
 	}
+}
+
+/// Read a field descriptor's commit-time resolution policy: `"default"` names a
+/// literal to backfill, `"computed"` a script to run. Absent means the field
+/// declares no resolution, so a commit that would leave it required-but-absent
+/// is rejected.
+fn on_missing(descriptor: &Json) -> Result<Option<OnMissing>> {
+	let Some(map) = descriptor.as_object() else {
+		return Ok(None);
+	};
+	if let Some(script) = map.get("computed").and_then(Json::as_str) {
+		return Ok(Some(OnMissing::Computed {
+			script: script.to_string(),
+		}));
+	}
+	map.get("default")
+		.map(|value| Value::from_serde(value).map(OnMissing::Default))
+		.transpose()
 }
 
 /// Strip the `#/$defs/` (or `#/definitions/`) prefix off a `$ref`, leaving the

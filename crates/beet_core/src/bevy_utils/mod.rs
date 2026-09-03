@@ -43,6 +43,7 @@ mod async_runner;
 mod bevyhow;
 #[cfg(feature = "bevy_keyboard")]
 mod common_systems;
+mod derived;
 mod despawn_after;
 mod entity_target_event;
 pub mod hook_ext;
@@ -69,6 +70,7 @@ pub use async_commands::*;
 pub use async_runner::*;
 #[cfg(feature = "bevy_keyboard")]
 pub use common_systems::*;
+pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use non_send_plugin::*;

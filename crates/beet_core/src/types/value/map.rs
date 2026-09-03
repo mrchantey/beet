@@ -8,6 +8,7 @@ use crate::prelude::*;
 /// use in fallible functions via `?`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque)]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Map(pub HashMap<SmolStr, Value>);

@@ -102,6 +102,7 @@ impl SchemaRegistry {
 							required: field.required,
 							label: field.label.clone(),
 							description: field.description.clone(),
+							on_missing: field.on_missing.clone(),
 							schema: self
 								.resolve_inner(&field.schema, depth - 1),
 						})
@@ -198,13 +199,10 @@ mod test {
 			ValueSchema::Struct(StructSchema {
 				name: Some("TodoItem".into()),
 				allow_additional: false,
-				fields: vec![NamedFieldSchema {
-					key: "label".into(),
-					required: true,
-					label: None,
-					description: None,
-					schema: ValueSchema::String(StringSchema::default()),
-				}],
+				fields: vec![NamedFieldSchema::new(
+					"label",
+					ValueSchema::String(StringSchema::default()),
+				)],
 			}),
 		);
 		let list_schema = ValueSchema::List(ListSchema {

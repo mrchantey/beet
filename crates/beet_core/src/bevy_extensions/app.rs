@@ -29,6 +29,24 @@ pub impl App {
 		}
 		self
 	}
+	/// Registers `T` and marks it [`Derived`](ReflectDerived): derived state that
+	/// a scene dump must never contain.
+	///
+	/// For a beet type, declare the mark on the type itself
+	/// (`#[reflect(Component, Derived)]`); this is for a foreign one, whose
+	/// registration is the only place the mark can be attached.
+	fn register_derived<T>(&mut self) -> &mut Self
+	where
+		T: Reflect + TypePath + bevy::reflect::GetTypeRegistration,
+	{
+		self.register_type::<T>();
+		self.world_mut()
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register_type_data::<T, ReflectDerived>();
+		self
+	}
+
 	/// Sets the error handler if one hasn't been set yet,
 	/// otherwise does nothing.
 	fn try_set_error_handler(

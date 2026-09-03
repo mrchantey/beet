@@ -382,6 +382,29 @@ impl ApplyConstraints for BoolSchema {
 	}
 }
 
+/// Schema for an [`Entity`] reference.
+///
+/// A reference is a node key, not a number: it serializes through the same
+/// entity map the surrounding document's node keys do, so it survives a save
+/// and reload, and a UI dispatching on this kind renders a node picker rather
+/// than a number input.
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EntitySchema {}
+
+impl ApplyConstraints for EntitySchema {
+	type Value = u64;
+	fn apply<'a>(
+		&'a self,
+		_path: &'a FieldPath,
+		_value: &'a mut Self::Value,
+	) -> ApplyFuture<'a> {
+		Box::pin(async { Vec::new() })
+	}
+}
+
 /// Schema for a bytes value.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
@@ -601,8 +624,38 @@ pub struct NamedFieldSchema {
 	pub label: Option<SmolStr>,
 	/// Optional description.
 	pub description: Option<SmolStr>,
+	/// How a schema commit resolves this field when the existing data has no
+	/// value for it. `None` declares no resolution, so a commit that would
+	/// leave the field required-but-absent is rejected.
+	pub on_missing: Option<OnMissing>,
 	/// The field's value schema.
 	pub schema: ValueSchema,
+}
+
+impl NamedFieldSchema {
+	/// A required field of the given key and schema, with no resolution policy.
+	pub fn new(key: impl Into<SmolStr>, schema: ValueSchema) -> Self {
+		Self {
+			key: key.into(),
+			required: true,
+			label: None,
+			description: None,
+			on_missing: None,
+			schema,
+		}
+	}
+
+	/// Mark the field optional, so an absent value validates.
+	pub fn optional(mut self) -> Self {
+		self.required = false;
+		self
+	}
+
+	/// Declare how a schema commit resolves an absent value.
+	pub fn with_on_missing(mut self, on_missing: OnMissing) -> Self {
+		self.on_missing = Some(on_missing);
+		self
+	}
 }
 
 /// A field within a [`TupleSchema`].

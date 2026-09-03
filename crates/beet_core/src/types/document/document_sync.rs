@@ -320,12 +320,10 @@ pub(super) fn sync_local_to_document(
 				// field exists: write only when the value differs
 				Ok(field_val) => *field_val != *value,
 				// field missing: create it unless the ref opts out
-				Err(_) => {
-					!matches!(field.on_missing, OnMissingField::EmitError)
-				}
+				Err(_) => !matches!(field.on_missing, OnMissing::Error),
 			},
 			// no document: create one only when the ref initializes on missing
-			Err(_) => matches!(field.on_missing, OnMissingField::Init { .. }),
+			Err(_) => matches!(field.on_missing, OnMissing::Default(_)),
 		};
 		if should_write {
 			let new = (*value).clone();

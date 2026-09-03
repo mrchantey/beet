@@ -6,6 +6,7 @@
 //! already a resolved value. The deferred-template slot is produced by the
 //! authoring front-ends (the parser and macros), not by extraction.
 
+use super::entity_map::FileEntityMapper;
 use crate::prelude::*;
 use alloc::collections::BTreeMap;
 use bevy::ecs::component::ComponentId;
@@ -33,6 +34,12 @@ use core::any::TypeId;
 /// By default, all resources registered with [`ReflectResource`] type data are
 /// extracted. Restrict this with a [filter](Self::with_resource_filter) or the
 /// [allow](Self::allow_resource)/[deny](Self::deny_resource) helpers.
+///
+/// # Derived State
+///
+/// A type marked [`Derived`](ReflectDerived) is skipped everywhere, whatever the
+/// filters say: derived state is not content. The filters are for scoping a
+/// particular dump, never for excluding state that is derived by nature.
 ///
 /// # Node Order
 ///
@@ -75,6 +82,8 @@ pub struct TemplateBuilder<'w> {
 	original_world: &'w World,
 	/// The type registry used to extract items through reflection.
 	type_registry: &'w TypeRegistry,
+	/// The file keys every node and every entity reference is written under.
+	entity_map: TemplateEntityMap,
 }
 
 impl<'w> TemplateBuilder<'w> {
@@ -94,7 +103,20 @@ impl<'w> TemplateBuilder<'w> {
 			resource_filter: TemplateFilter::default(),
 			original_world: world,
 			type_registry,
+			entity_map: default(),
 		}
+	}
+
+	/// Seed the builder with a loaded document's retained [`TemplateEntityMap`],
+	/// so every node it loaded is written back under its original file key and
+	/// only a genuinely new node mints one.
+	///
+	/// Without it every node mints a fresh key, which is what a first save wants
+	/// and the only case where that is correct.
+	#[must_use]
+	pub fn with_entity_map(mut self, entity_map: TemplateEntityMap) -> Self {
+		self.entity_map = entity_map;
+		self
 	}
 
 	/// Specify a custom component [`TemplateFilter`].
@@ -186,11 +208,19 @@ impl<'w> TemplateBuilder<'w> {
 	/// To avoid nodes without any components, call [`Self::remove_empty_nodes`]
 	/// first.
 	#[must_use]
-	pub fn build(self) -> DynamicTemplate {
-		DynamicTemplate {
-			resources: self.extracted_resources.into_values().collect(),
-			nodes: self.extracted_nodes,
-		}
+	pub fn build(self) -> DynamicTemplate { self.build_mapped().0 }
+
+	/// Consume the builder, producing a [`DynamicTemplate`] and the
+	/// [`TemplateEntityMap`] its keys came from, for the caller to retain.
+	#[must_use]
+	pub fn build_mapped(self) -> (DynamicTemplate, TemplateEntityMap) {
+		(
+			DynamicTemplate {
+				resources: self.extracted_resources.into_values().collect(),
+				nodes: self.extracted_nodes,
+			},
+			self.entity_map,
+		)
 	}
 
 	/// Extract one entity. Re-extracting an already-extracted entity is a no-op.
@@ -219,20 +249,28 @@ impl<'w> TemplateBuilder<'w> {
 		mut self,
 		entities: impl Iterator<Item = Entity>,
 	) -> Self {
-		for entity in entities {
-			if !self.extracted_entity_ids.insert(entity) {
-				continue;
-			}
+		// a resource entity is not a node, so it must never take a node key.
+		let world = self.original_world;
+		let entities = entities
+			.filter(|entity| !world.entity(*entity).contains_id(IS_RESOURCE))
+			.collect::<Vec<_>>();
+		// key every node first, in extraction order, so an entity reference
+		// resolves to the same file key whether it points back or forward.
+		let entities = entities
+			.into_iter()
+			.filter(|entity| self.extracted_entity_ids.insert(*entity))
+			.collect::<Vec<_>>();
+		for entity in &entities {
+			self.entity_map.file_key(*entity);
+		}
 
+		for entity in entities {
 			let mut node = DynamicTemplateNode {
-				entity,
+				entity: self.entity_map.file_entity(entity),
 				components: Vec::new(),
 			};
 
 			let original_entity = self.original_world.entity(entity);
-			if original_entity.contains_id(IS_RESOURCE) {
-				continue;
-			}
 
 			// for each component on the entity, extract it through the filter.
 			for &component_id in original_entity.archetype().components().iter()
@@ -262,16 +300,29 @@ impl<'w> TemplateBuilder<'w> {
 					}
 
 					let type_registration = self.type_registry.get(type_id)?;
+					// derived state is never authored content, so it never dumps
+					if type_registration.data::<ReflectDerived>().is_some() {
+						return None;
+					}
 					let component = type_registration
 						.data::<ReflectComponent>()?
 						.reflect(original_entity)?;
 
-					node.components.push(ComponentSlot::Value(
-						reflect_ext::clone_reflect_value(
-							component.as_partial_reflect(),
-							type_registration,
-						),
-					));
+					let mut value = reflect_ext::clone_reflect_value(
+						component.as_partial_reflect(),
+						type_registration,
+					);
+					// an `Entity`-typed field is a node reference, so it is
+					// written as the target's file key, never its live bits.
+					if let Some(reflect) = value.try_as_reflect_mut() {
+						type_registration
+							.data::<ReflectComponent>()?
+							.map_entities(
+								reflect,
+								&mut FileEntityMapper(&mut self.entity_map),
+							);
+					}
+					node.components.push(ComponentSlot::Value(value));
 					Some(())
 				};
 				extract_and_push();
@@ -312,6 +363,9 @@ impl<'w> TemplateBuilder<'w> {
 				}
 
 				let type_registration = self.type_registry.get(type_id)?;
+				if type_registration.data::<ReflectDerived>().is_some() {
+					return None;
+				}
 				type_registration.data::<ReflectResource>()?;
 				let component = type_registration
 					.data::<ReflectComponent>()?
@@ -356,6 +410,9 @@ mod test {
 	#[reflect(Resource)]
 	struct ResourceB;
 
+	/// The file key a node was written under.
+	fn key(node: &DynamicTemplateNode) -> u32 { node.entity.index_u32() }
+
 	/// True if the slot is a value that represents `T`.
 	fn slot_represents<T: bevy_reflect::Typed>(slot: &ComponentSlot) -> bool {
 		match slot {
@@ -376,7 +433,9 @@ mod test {
 			.build();
 
 		template.nodes.len().xpect_eq(1);
-		template.nodes[0].entity.xpect_eq(entity);
+		// keys are minted from zero in extraction order, never derived from the
+		// live entity's bits
+		key(&template.nodes[0]).xpect_eq(0);
 		template.nodes[0].components.len().xpect_eq(1);
 		slot_represents::<ComponentA>(&template.nodes[0].components[0])
 			.xpect_true();
@@ -399,7 +458,8 @@ mod test {
 	}
 
 	/// Nodes are stored in extraction order, not entity-index order, the
-	/// children-order contract.
+	/// children-order contract. A first save mints keys along that same order,
+	/// so the file reads `0`, `1`, `2`, `3`.
 	#[crate::test]
 	fn extract_node_order() {
 		let mut world = World::default();
@@ -409,18 +469,23 @@ mod test {
 		let entity_d = world.spawn_empty().id();
 
 		let type_registry = TypeRegistry::default();
-		let nodes = TemplateBuilder::from_world(&world, &type_registry)
-			.extract_entity(entity_b)
-			.extract_entities([entity_d, entity_a].into_iter())
-			.extract_entity(entity_c)
-			.build()
-			.nodes
-			.into_iter()
-			.map(|node| node.entity)
-			.collect::<Vec<_>>();
+		let (template, entity_map) =
+			TemplateBuilder::from_world(&world, &type_registry)
+				.extract_entity(entity_b)
+				.extract_entities([entity_d, entity_a].into_iter())
+				.extract_entity(entity_c)
+				.build_mapped();
 
+		template
+			.nodes
+			.iter()
+			.map(key)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![0, 1, 2, 3]);
 		// extraction order: b, then d, a, then c.
-		nodes.xpect_eq(vec![entity_b, entity_d, entity_a, entity_c]);
+		[entity_b, entity_d, entity_a, entity_c]
+			.map(|entity| entity_map.get_file_key(entity).unwrap())
+			.xpect_eq([0, 1, 2, 3]);
 	}
 
 	#[crate::test]
@@ -430,8 +495,8 @@ mod test {
 		type_registry.register::<ComponentA>();
 		type_registry.register::<ComponentB>();
 
-		let entity_a_b = world.spawn((ComponentA, ComponentB)).id();
-		let entity_a = world.spawn(ComponentA).id();
+		world.spawn((ComponentA, ComponentB));
+		world.spawn(ComponentA);
 		world.spawn(ComponentB);
 
 		let mut query = world.query_filtered::<Entity, With<ComponentA>>();
@@ -440,10 +505,9 @@ mod test {
 			.build();
 
 		template.nodes.len().xpect_eq(2);
-		let mut entities =
-			vec![template.nodes[0].entity, template.nodes[1].entity];
-		entities.sort();
-		entities.xpect_eq(vec![entity_a, entity_a_b]);
+		let mut keys = template.nodes.iter().map(key).collect::<Vec<_>>();
+		keys.sort();
+		keys.xpect_eq(vec![0, 1]);
 	}
 
 	#[crate::test]
@@ -461,7 +525,7 @@ mod test {
 			.build();
 
 		template.nodes.len().xpect_eq(1);
-		template.nodes[0].entity.xpect_eq(entity_a);
+		key(&template.nodes[0]).xpect_eq(0);
 	}
 
 	#[crate::test]

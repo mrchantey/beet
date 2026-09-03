@@ -25,12 +25,15 @@
 //! - [`TemplateBuilder`] - Extracts a resolved-value [`DynamicTemplate`] from a
 //!   [`World`](bevy::prelude::World).
 //! - [`TemplateFilter`] - Allow/deny lists controlling which types are extracted.
+//! - [`TemplateEntityMap`] - The file-key to world-entity map a loaded document
+//!   retains, so a re-save writes every node back under the key it loaded from.
 //! - [`DynamicTemplateSerializer`] / [`DynamicTemplateDeserializer`] - The serde
 //!   implementations for the resolved-value form.
 
 #[cfg(feature = "bevy_asset")]
 mod asset;
 mod dynamic_template;
+mod entity_map;
 mod loader;
 mod saver;
 mod template_builder;
@@ -42,6 +45,7 @@ mod serde;
 #[cfg(feature = "bevy_asset")]
 pub use asset::*;
 pub use dynamic_template::*;
+pub use entity_map::*;
 pub use loader::*;
 pub use saver::*;
 pub use serde::DynamicTemplateDeserializer;

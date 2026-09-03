@@ -149,9 +149,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		if let Ok(mut doc) = self.doc_query.get_mut(doc_entity) {
 			let value = if let Ok(value) = doc.get_field_mut(&field_path) {
 				value
-			} else if let OnMissingField::Init { value: init_value } =
-				&field.on_missing
-			{
+			} else if let OnMissing::Default(init_value) = &field.on_missing {
 				doc.insert(&field_path, init_value)?
 			} else {
 				return Err(DocumentError::ObjectKeyNotFound {
@@ -161,9 +159,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 				.into());
 			};
 			Ok(func(value))
-		} else if let OnMissingField::Init { value: init_value } =
-			&field.on_missing
-		{
+		} else if let OnMissing::Default(init_value) = &field.on_missing {
 			// create the document and run the method with it
 			let mut doc = Document::default();
 			let value = doc.insert(&field_path, init_value)?;

@@ -92,7 +92,12 @@ impl Serialize for DynamicTemplateSerializer<'_> {
 	}
 }
 
-/// Serializes nodes as a map of in-template entity id to serialized node.
+/// Serializes nodes as a map of file key to serialized node.
+///
+/// A node key is its in-template [`Entity`] with the generation stripped, so a
+/// file reads `0`, `1`, `2` rather than raw 64-bit entity bits. Which key a node
+/// gets is the saver's business ([`TemplateEntityMap`]); this is only the
+/// encoding. Node *order* is the children-order contract and is emitted as-is.
 struct NodesSerializer<'a> {
 	nodes: &'a [DynamicTemplateNode],
 	registry: &'a TypeRegistry,
@@ -108,10 +113,13 @@ impl Serialize for NodesSerializer<'_> {
 	{
 		let mut state = serializer.serialize_map(Some(self.nodes.len()))?;
 		for node in self.nodes {
-			state.serialize_entry(&node.entity, &NodeSerializer {
-				node,
-				registry: self.registry,
-			})?;
+			state.serialize_entry(
+				&node.entity.index_u32(),
+				&NodeSerializer {
+					node,
+					registry: self.registry,
+				},
+			)?;
 		}
 		state.end()
 	}
@@ -343,7 +351,7 @@ impl<'de> Visitor<'de> for TemplateVisitor<'_> {
 	}
 }
 
-/// Deserializes a map of in-template entity id to node.
+/// Deserializes a map of file key to node.
 struct NodesDeserializer<'a> {
 	type_registry: &'a TypeRegistry,
 }
@@ -383,7 +391,12 @@ impl<'de> Visitor<'de> for NodesVisitor<'_> {
 		A: MapAccess<'de>,
 	{
 		let mut nodes = Vec::new();
-		while let Some(entity) = map.next_key::<Entity>()? {
+		while let Some(key) = map.next_key::<u32>()? {
+			// a file key is generation-free, so it rehydrates as the in-template
+			// entity the build path already keys references on: its index.
+			let entity = Entity::from_raw_u32(key).ok_or_else(|| {
+				Error::custom(format_args!("`{key}` is not a valid node key"))
+			})?;
 			nodes.push(map.next_value_seed(NodeDeserializer {
 				entity,
 				type_registry: self.type_registry,

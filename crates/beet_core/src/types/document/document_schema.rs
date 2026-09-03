@@ -34,6 +34,26 @@ impl DocumentSchema {
 	/// resolved against a registry, since the path alone is not enough.
 	pub fn type_path<T: TypePath>() -> Self { Self(FieldSchema::of::<T>()) }
 
+	/// Validate `value` against this schema, naming `subject` on failure.
+	///
+	/// The read backstop: documents can diverge from their schema outside the
+	/// editor, so a required field missing at read is a hard error naming the
+	/// field and the document, never a silently substituted default.
+	/// [`OnMissing`] policies deliberately play no part here; they belong to
+	/// [`SchemaCommit`].
+	///
+	/// A schema that cannot yet be resolved (a document reference still in
+	/// flight) validates as a wildcard, so an arriving schema tightens the
+	/// invariant rather than a missing one inventing failures.
+	pub async fn assert_valid(
+		&self,
+		subject: &str,
+		value: &mut Value,
+		registry: &bevy_reflect::TypeRegistry,
+	) -> Result {
+		self.0.resolve(registry)?.assert_valid(subject, value).await
+	}
+
 	/// Assert the field at `path` accepts a value of type `T`.
 	///
 	/// Mirrors `FieldSchema::assert_eq_ty` on the token side. Passes silently
@@ -109,6 +129,19 @@ mod test {
 			.assert_list_item_type::<i64>(&[FieldSegment::key("count")])
 			.is_err()
 			.xpect_true();
+	}
+
+	/// The read backstop names both the document and the field it is missing.
+	#[crate::test]
+	async fn missing_required_field_is_an_error() {
+		let registry = bevy_reflect::TypeRegistry::default();
+		DocumentSchema::of::<CountDoc>()
+			.assert_valid("data.json", &mut value!({ "todos": [] }), &registry)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("data.json")
+			.xpect_contains("count");
 	}
 
 	#[crate::test]

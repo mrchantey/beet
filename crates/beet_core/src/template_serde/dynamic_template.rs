@@ -68,14 +68,15 @@ pub struct DynamicTemplate {
 // opt-out documents the intent and guards against a future `Clone`.
 subtree_template!(DynamicTemplate);
 
-/// A transient sink the loader installs to capture the real entities a
-/// [`DynamicTemplate`] build maps each node to, in node order.
+/// A transient sink the loader installs to capture the `(file key, real entity)`
+/// pairing a [`DynamicTemplate`] build produces for each node, in node order.
 ///
 /// The loader inserts it before building and drains it after, so it learns every
-/// spawned entity without a second remapping model. Absent for a plain
-/// `spawn_template`, where the caller only needs the root.
+/// spawned entity without a second remapping model, and retains the pairs as the
+/// document's [`TemplateEntityMap`]. Absent for a plain `spawn_template`, where
+/// the caller only needs the root.
 #[derive(Default, Resource)]
-pub(crate) struct TemplateBuildSink(pub Vec<Entity>);
+pub(crate) struct TemplateBuildSink(pub Vec<(u32, Entity)>);
 
 /// One node of a [`DynamicTemplate`]: an entity and its ordered component slots.
 pub struct DynamicTemplateNode {
@@ -164,7 +165,7 @@ impl DynamicTemplate {
 			if let Some(mut sink) =
 				world.get_resource_mut::<TemplateBuildSink>()
 			{
-				sink.0.push(entity_id);
+				sink.0.push((node.entity.index_u32(), entity_id));
 			}
 			build_node(node, entity_id, registry, app_registry, cx)?;
 		}

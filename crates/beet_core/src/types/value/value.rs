@@ -9,6 +9,10 @@ use alloc::borrow::Cow;
 /// representation of the float.
 #[derive(Debug, Default, Clone, PartialEq, Reflect, Component)]
 #[reflect(Default, Component)]
+// a `Value` is json by nature, so a scene writes it through its own json-native
+// serde rather than the reflect-structural `{"Map": ..}` form, which is what
+// keeps a saved document hand-editable.
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub enum Value {
 	/// A null value
 	#[default]

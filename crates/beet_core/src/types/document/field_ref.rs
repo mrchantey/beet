@@ -35,14 +35,16 @@ pub struct FieldRef {
 	/// The path to the field within the document
 	pub field_path: FieldPath,
 	/// Behavior when the field is missing from the document.
-	pub on_missing: OnMissingField,
+	pub on_missing: OnMissing,
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
 	if !world.entity(cx.entity).contains::<Value>() {
 		let this = world.entity(cx.entity).get::<FieldRef>().unwrap();
+		// only a literal default seeds synchronously; a computed policy is
+		// resolved by the commit path, which has an executor.
 		let value = match this.on_missing.clone() {
-			OnMissingField::Init { value } => value,
+			OnMissing::Default(value) => value,
 			_ => Value::default(),
 		};
 		world.commands().entity(cx.entity).insert(value);
@@ -66,21 +68,19 @@ impl FieldRef {
 		Self {
 			document: DocumentPath::default(),
 			field_path: field_path.into_field_path(),
-			on_missing: OnMissingField::default(),
+			on_missing: OnMissing::default(),
 		}
 	}
 
 	/// Set this field reference to error if the field is missing instead of initializing it.
 	pub fn error_on_missing(mut self) -> Self {
-		self.on_missing = OnMissingField::EmitError;
+		self.on_missing = OnMissing::Error;
 		self
 	}
 
 	/// Set the field to initialize with a specific value if missing.
 	pub fn with_init(mut self, value: impl Into<Value>) -> Self {
-		self.on_missing = OnMissingField::Init {
-			value: value.into(),
-		};
+		self.on_missing = OnMissing::Default(value.into());
 		self
 	}
 }
@@ -90,7 +90,7 @@ impl FieldRef {
 /// A thin newtype over [`FieldRef`] that derefs to the inner ref, so all the
 /// [`FieldRef`] builders and [`Get`] accessors work through deref. The typed
 /// layer adds one behavior: the field is seeded with `T::default()` on first
-/// touch (via [`OnMissingField::Init`]) and reads/writes go through `T` with
+/// touch (via [`OnMissing::Default`]) and reads/writes go through `T` with
 /// [`FieldQuery`].
 ///
 /// ## Placement is explicit
@@ -284,9 +284,7 @@ mod tests {
 			.field_path
 			.deref()
 			.xpect_eq(vec![FieldSegment::key("field")]);
-		field
-			.on_missing
-			.xpect_eq(OnMissingField::Init { value: Value::Null });
+		field.on_missing.xpect_eq(OnMissing::Default(Value::Null));
 	}
 
 	#[crate::test]

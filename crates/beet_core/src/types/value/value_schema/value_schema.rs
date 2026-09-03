@@ -32,6 +32,8 @@ pub enum ValueSchema {
 	String(StringSchema),
 	/// Raw bytes.
 	Bytes(BytesSchema),
+	/// A reference to another node, ie an [`Entity`].
+	Entity(EntitySchema),
 	/// A struct with named fields.
 	Struct(StructSchema),
 	/// A fixed-arity tuple (also used for tuple structs).
@@ -89,6 +91,33 @@ impl ValueSchema {
 	pub async fn validate(&self, value: &mut Value) -> Vec<ValidationError> {
 		let path = FieldPath::default();
 		self.apply(&path, value).await
+	}
+
+	/// Validate `value`, collecting every error into one [`Result`] naming
+	/// `subject` (the document, field or commit the value belongs to).
+	///
+	/// The read backstop: data must never observably violate its schema, so a
+	/// document that diverged outside the editor fails loudly here rather than
+	/// being silently patched. [`OnMissing`] policies deliberately play no part;
+	/// they belong to [`SchemaCommit`].
+	pub async fn assert_valid(
+		&self,
+		subject: &str,
+		value: &mut Value,
+	) -> Result {
+		self.validate(value)
+			.await
+			.xmap(|errors| match errors.is_empty() {
+				true => OK,
+				false => bevybail!(
+					"{subject} does not match its schema:\n{}",
+					errors
+						.iter()
+						.map(ToString::to_string)
+						.collect::<Vec<_>>()
+						.join("\n")
+				),
+			})
 	}
 
 	/// Resolve the schema of a nested field by `path`.
@@ -204,6 +233,9 @@ impl ApplyConstraints for ValueSchema {
 				}
 				ValueSchema::Bytes(schema) => {
 					validate_bytes(schema, path, value).await
+				}
+				ValueSchema::Entity(schema) => {
+					validate_entity(schema, path, value).await
 				}
 				ValueSchema::Struct(schema) => {
 					validate_struct(schema, path, value).await
@@ -363,6 +395,33 @@ fn as_bytes(items: &[Value]) -> Option<Vec<u8>> {
 			_ => None,
 		})
 		.collect()
+}
+
+/// An entity reference is a node key: the generation-stripped index the
+/// surrounding document keys its nodes by, so it reads as an unsigned integer.
+/// That the key names a live node is checked where a world is in hand (the
+/// build path's entity map), not here.
+async fn validate_entity(
+	schema: &EntitySchema,
+	path: &FieldPath,
+	value: &mut Value,
+) -> Vec<ValidationError> {
+	let Value::Uint(mut key) = *value else {
+		// an entity key written as a signed integer (every json number parses
+		// signed) coerces when it fits.
+		if let Value::Int(signed) = *value
+			&& let Ok(unsigned) = u64::try_from(signed)
+		{
+			let mut key = unsigned;
+			let errors = schema.apply(path, &mut key).await;
+			*value = Value::Uint(key);
+			return errors;
+		}
+		return type_mismatch(path, "entity", value);
+	};
+	let errors = schema.apply(path, &mut key).await;
+	*value = Value::Uint(key);
+	errors
 }
 
 async fn validate_struct(
@@ -779,6 +838,47 @@ mod test {
 			.await
 			.is_empty()
 			.xpect_true();
+	}
+
+	/// An [`Entity`] field is its own schema kind, not a number: a UI dispatches
+	/// a node picker on it, and the serde layer routes it through the entity map.
+	#[crate::test]
+	async fn entity_is_its_own_kind() {
+		let schema = ValueSchema::of::<Entity>();
+		schema.clone().xpect_eq(ValueSchema::Entity(default()));
+		// a node key validates, and a signed json number coerces to one
+		schema
+			.validate(&mut value!(3u64))
+			.await
+			.is_empty()
+			.xpect_true();
+		let mut signed = value!(3);
+		schema.validate(&mut signed).await.is_empty().xpect_true();
+		signed.xpect_eq(value!(3u64));
+		// anything that is not a key does not
+		schema
+			.validate(&mut value!("some-entity"))
+			.await
+			.is_empty()
+			.xpect_false();
+	}
+
+	/// A struct holding an entity reference lowers the field to the entity kind,
+	/// so a form generated from the type knows to render a picker.
+	#[crate::test]
+	fn entity_field_lowers_to_the_entity_kind() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Link {
+			target: Entity,
+		}
+		let ValueSchema::Struct(schema) = ValueSchema::of::<Link>() else {
+			panic!("expected struct schema");
+		};
+		schema.fields[0]
+			.schema
+			.clone()
+			.xpect_eq(ValueSchema::Entity(default()));
 	}
 
 	#[crate::test]

@@ -38,7 +38,7 @@ pub struct DocumentScope {
 /// stays in [`FieldRef`]. The sync systems consume this component instead of
 /// the authored `field_path`.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Derived)]
 pub struct ResolvedFieldPath {
 	/// scope prefix (outermost first) ++ authored field_path.
 	pub field_path: FieldPath,

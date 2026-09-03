@@ -13,6 +13,16 @@ use bevy::ecs::query::QueryFilter;
 ///
 /// The output is a resolved-value [`DynamicTemplate`]: every component is a
 /// concrete value, the save-game form.
+///
+/// # A dump is never a source
+///
+/// A dump and an authored source are distinct artifact roles and never share a
+/// path. A `.bsx` entry is the authored *original* state of an application and
+/// is never written here; what this produces is either a document the editor
+/// owns (loaded through [`TemplateLoader`], re-saved through its retained
+/// [`TemplateEntityMap`]) or a snapshot of a running world. A caller that writes
+/// a dump over the file its scene was authored from has destroyed the original,
+/// and no amount of key stability makes that recoverable.
 #[derive(Default)]
 pub struct TemplateSaver {
 	component_filter: TemplateFilter,
@@ -26,11 +36,14 @@ impl TemplateSaver {
 	/// or [`with_entities`](Self::with_entities), then [`save`](Self::save).
 	pub fn new() -> Self { Self::default() }
 
-	/// Creates a saver that extracts all entities and resources, denying [`Time<Real>`].
+	/// Creates a saver that extracts all entities and resources.
+	///
+	/// Types marked [`Derived`](ReflectDerived) (the clocks, reactively
+	/// recomputed paths) are skipped by the extractor itself, so this carries no
+	/// deny list of its own.
 	pub fn new_all(world: &World) -> Self {
 		Self::new()
 			.with_entities(world.iter_entities().map(|entity| entity.id()))
-			.deny_resource::<Time<Real>>()
 			.extract_resources()
 	}
 
@@ -98,12 +111,27 @@ impl TemplateSaver {
 		for root in &roots {
 			self = self.with_entity_tree(world, *root);
 		}
-		let result = self.save(world, media_type);
+		// the document's retained keys, so a re-save is a rewrite of the same
+		// nodes rather than a fresh file that happens to look similar. One file
+		// is one keyspace however many roots it holds, so the map lives on the
+		// first root, which is also where a load lands it.
+		let entity_map = roots
+			.first()
+			.and_then(|root| {
+				world.entity(*root).get::<TemplateEntityMap>().cloned()
+			})
+			.unwrap_or_default();
+		let result = self.save_mapped(world, media_type, default(), entity_map);
+		// a first save mints the document's keys, so it retains them too: the
+		// next save is then a rewrite like any other.
+		if let (Some(root), Ok((_, entity_map))) = (roots.first(), &result) {
+			world.entity_mut(*root).insert(entity_map.clone());
+		}
 
 		roots_with_parents.into_iter().for_each(|(root, parent)| {
 			world.entity_mut(root).insert(ChildOf(parent));
 		});
-		result
+		result.map(|(bytes, _)| bytes)
 	}
 
 	/// Like [`save_roots`](Self::save_roots) but collects the roots from a query
@@ -136,18 +164,36 @@ impl TemplateSaver {
 		media_type: MediaType,
 		options: SerializeOptions,
 	) -> Result<MediaBytes> {
+		self.save_mapped(world, media_type, options, default())
+			.map(|(bytes, _)| bytes)
+	}
+
+	/// Serialize with `entity_map` seeding the file keys, returning the map the
+	/// save wrote so the caller can retain it.
+	///
+	/// The mapped form of [`save_with_options`](Self::save_with_options): an
+	/// empty map mints every key, which is what a first save wants.
+	fn save_mapped(
+		self,
+		world: &World,
+		media_type: MediaType,
+		options: SerializeOptions,
+		entity_map: TemplateEntityMap,
+	) -> Result<(MediaBytes, TemplateEntityMap)> {
 		let registry = world.resource::<AppTypeRegistry>();
 		let registry = registry.read();
 		let mut builder = TemplateBuilder::from_world(world, &registry)
 			.with_component_filter(self.component_filter)
 			.with_resource_filter(self.resource_filter)
+			.with_entity_map(entity_map)
 			.extract_entities(self.entities.into_iter());
 		if self.extract_resources {
 			builder = builder.extract_resources();
 		}
-		let template = builder.build();
+		let (template, entity_map) = builder.build_mapped();
 		let serializer = DynamicTemplateSerializer::new(&template, &registry);
 		MediaBytes::serialize_with_options(media_type, &serializer, options)
+			.map(|bytes| (bytes, entity_map))
 	}
 
 	/// Collects an entity and all its descendants into the entity set.
@@ -159,5 +205,53 @@ impl TemplateSaver {
 				self.collect_descendants(world, child);
 			}
 		}
+	}
+}
+
+#[cfg(all(test, feature = "json"))]
+mod test {
+	use crate::prelude::*;
+
+	/// The standing tripwire for the derived-state rule: the exact set of
+	/// component type paths a document scene dumps.
+	///
+	/// A new type appearing in this snapshot is either genuinely authored
+	/// content or a cache that leaked into the format. The snapshot makes that
+	/// a review decision instead of an accident nobody notices until a reopened
+	/// document has grown fields it never had.
+	#[crate::test]
+	fn dumped_component_types() {
+		let mut world = <(DocumentPlugin, MinimalTypesPlugin)>::world();
+		let root = world
+			.spawn((Document::new(value!({ "count": 1 })), children![(
+				Value::default(),
+				FieldRef::new("count")
+			)]))
+			.flush();
+		// settle the sync so the derived path is actually on the field entity
+		world.update_local();
+		let field = world.entity(root).get::<Children>().unwrap()[0];
+		world
+			.entity(field)
+			.contains::<ResolvedFieldPath>()
+			.xpect_true();
+
+		let json = TemplateSaver::new()
+			.save_roots(&mut world, MediaType::Json, [root])
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xmap(serde_json::from_str::<serde_json::Value>)
+			.unwrap();
+		let mut dumped = json["nodes"]
+			.as_object()
+			.unwrap()
+			.values()
+			.flat_map(|node| node["components"].as_object().unwrap().keys())
+			.cloned()
+			.collect::<Vec<_>>();
+		dumped.sort();
+		dumped.dedup();
+		dumped.join("\n").xpect_snapshot();
 	}
 }

@@ -39,7 +39,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<PropsDocument>()
 			.register_type::<DocumentSchema>()
 			.register_type::<DocumentPath>()
-			.register_type::<OnMissingField>()
+			.register_type::<OnMissing>()
 			.register_type::<FieldRef>()
 			.register_type::<SourceFieldRef>()
 			.register_type::<LayoutContent>()
@@ -49,6 +49,7 @@ impl Plugin for DocumentPlugin {
 			.register_type::<DocumentScope>()
 			.register_type::<ResolvedFieldPath>()
 			.register_type::<Value>()
+			.register_type::<Map>()
 			.register_type::<ValueSchema>();
 
 		app

@@ -71,11 +71,24 @@ impl<'a> TemplateLoader<'a> {
 		// install the sink so a serde build records every real entity it maps to.
 		self.world.insert_resource(TemplateBuildSink::default());
 		let root = self.world.spawn_template(entry)?.id();
-		let mut spawned = self
+		let pairs = self
 			.world
 			.remove_resource::<TemplateBuildSink>()
 			.map(|sink| sink.0)
 			.unwrap_or_default();
+		// the document retains its file keys for its lifetime, so a later save
+		// writes every node back under the key it loaded from. A markup build
+		// feeds no pairs: a `.bsx` file is authored original state, never a
+		// document the editor rewrites.
+		if !pairs.is_empty() {
+			self.world
+				.entity_mut(root)
+				.insert(TemplateEntityMap::from_pairs(pairs.iter().copied()));
+		}
+		let mut spawned = pairs
+			.into_iter()
+			.map(|(_, entity)| entity)
+			.collect::<Vec<_>>();
 		// a markup build does not feed the serde sink, so its single spawned root
 		// is the whole result.
 		if spawned.is_empty() {
@@ -343,25 +356,31 @@ mod test {
 	fn serde_world() -> App {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
-		app.register_type::<Name>();
-		// the relationship that carries hierarchy through a round-trip, plus its
-		// `Children` mirror: registering `Children` would let a naive extractor
-		// serialize it and double-apply the hierarchy, so this guards that the
-		// builder skips the mirror and rebuilds it from `ChildOf` hooks.
-		app.register_type::<ChildOf>();
-		app.register_type::<Children>();
+		// `Name`, plus the relationship that carries hierarchy through a
+		// round-trip and its `Children` mirror: registering `Children` would let
+		// a naive extractor serialize it and double-apply the hierarchy, so this
+		// guards that the builder skips the mirror and rebuilds it from `ChildOf`
+		// hooks. It also marks the clocks derived.
+		app.init_plugin::<MinimalTypesPlugin>();
 		app.init();
 		app.update();
 		app
 	}
 
+	/// A whole-world dump round-trips, and carries no clock: [`Time`] is derived
+	/// state, marked once at registration rather than denied by this save site.
 	#[crate::test]
 	fn round_trip_ron() {
 		let mut app = serde_world();
 		let bytes = TemplateSaver::new_all(app.world())
 			.save(app.world(), MediaType::Ron)
 			.unwrap();
-		bytes.as_utf8().unwrap().xref().xpect_contains("Time");
+		bytes
+			.as_utf8()
+			.unwrap()
+			.xref()
+			.xnot()
+			.xpect_contains("Time");
 		TemplateLoader::new(app.world_mut()).load(&bytes).unwrap();
 	}
 

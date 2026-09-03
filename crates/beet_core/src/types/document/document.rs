@@ -254,23 +254,6 @@ pub enum DocumentError {
 	},
 }
 
-/// Specifies behavior when a field is missing from a document.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) enum OnMissingField {
-	/// Initialize the field with the provided value if it doesn't exist.
-	Init {
-		/// The value to initialize the field with.
-		value: Value,
-	},
-	/// Emit an error if the field doesn't exist.
-	EmitError,
-}
-
-impl Default for OnMissingField {
-	fn default() -> Self { Self::Init { value: Value::Null } }
-}
-
 /// Marker for a [`Document`] that stores a `.bsx` template's props.
 ///
 /// Inserted alongside the [`Document`] on a template's entity when its tag is

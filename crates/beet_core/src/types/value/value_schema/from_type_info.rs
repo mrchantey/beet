@@ -108,6 +108,7 @@ impl Builder {
 			required,
 			label: None,
 			description,
+			on_missing: None,
 			schema,
 		}
 	}
@@ -284,6 +285,9 @@ fn primitive_schema(type_path: &str) -> ValueSchema {
 		}
 		"f32" | "f64" => ValueSchema::F64(F64Schema::default()),
 		"bool" => ValueSchema::Bool(BoolSchema::default()),
+		// a node reference, not a number: its own kind so it remaps through the
+		// entity map and a UI renders a picker.
+		"Entity" => ValueSchema::Entity(EntitySchema::default()),
 		"()" => ValueSchema::Null,
 		_ => ValueSchema::Null,
 	}
