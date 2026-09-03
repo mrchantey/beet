@@ -30,11 +30,22 @@ use core::fmt::Write;
 /// Returns the position immediately after `\r\n\r\n` (or a lenient `\n\n`), or
 /// `None` if the header block has not arrived yet.
 pub fn find_header_end(buf: &[u8]) -> Option<usize> {
+	split_header_body(buf).map(|(_, body)| buf.len() - body.len())
+}
+
+/// Split raw request bytes at the blank line ending the headers, into the
+/// header block (without its terminator) and the body.
+///
+/// Returns `None` if that line has not arrived yet. This splits on the BYTES
+/// deliberately: a request carrying invalid utf8 widens under
+/// [`String::from_utf8_lossy`] (every bad byte becomes a three-byte replacement
+/// char), so an offset found in the lossy string overshoots `buf`.
+fn split_header_body(buf: &[u8]) -> Option<(&[u8], &[u8])> {
 	if let Some(pos) = buf.windows(4).position(|window| window == b"\r\n\r\n") {
-		return Some(pos + 4);
+		return Some((&buf[..pos], &buf[pos + 4..]));
 	}
 	if let Some(pos) = buf.windows(2).position(|window| window == b"\n\n") {
-		return Some(pos + 2);
+		return Some((&buf[..pos], &buf[pos + 2..]));
 	}
 	None
 }
@@ -54,19 +65,12 @@ pub fn parse_content_length(header_bytes: &[u8]) -> usize {
 
 /// Parse raw HTTP/1.1 request bytes into a beet [`Request`].
 pub fn parse_http_request(raw: &[u8]) -> Result<Request> {
-	let raw_str = String::from_utf8_lossy(raw);
-
-	// Split headers from body
-	let (header_section, body_bytes) =
-		if let Some(split_pos) = raw_str.find("\r\n\r\n") {
-			let body_start = split_pos + 4;
-			(&raw_str[..split_pos], &raw[body_start..])
-		} else if let Some(split_pos) = raw_str.find("\n\n") {
-			let body_start = split_pos + 2;
-			(&raw_str[..split_pos], &raw[body_start..])
-		} else {
-			(raw_str.as_ref(), &[][..])
-		};
+	// split on the raw bytes, then decode only the header block: splitting the
+	// lossy string instead would index `raw` with an offset that grew by two
+	// bytes per invalid byte
+	let (header_bytes, body_bytes) =
+		split_header_body(raw).unwrap_or((raw, &[][..]));
+	let header_section = String::from_utf8_lossy(header_bytes);
 
 	let mut lines = header_section.lines();
 
@@ -520,6 +524,55 @@ mod test {
 
 	#[beet_core::test]
 	fn parse_empty_returns_error() { parse_http_request(b"").xpect_err(); }
+
+	/// A public port 22/80 is scanned continuously with binary junk, and a
+	/// header carrying invalid utf8 used to panic the slice: the split offset
+	/// was found in the `from_utf8_lossy` string, which is two bytes longer per
+	/// bad byte, so it ran off the end of `raw`.
+	#[beet_core::test]
+	fn parse_invalid_utf8_headers() {
+		let mut raw = b"GET / HTTP/1.1\r\nX-Junk: ".to_vec();
+		raw.extend_from_slice(&[0xff, 0xfe, 0xfd, 0xfc]);
+		raw.extend_from_slice(b"\r\nHost: localhost\r\n\r\nbody");
+		let request = parse_http_request(&raw).unwrap();
+		request.method().xpect_eq(HttpMethod::Get);
+		request.path_string().as_str().xpect_eq("/");
+		request.headers.get_raw("host").unwrap()[0]
+			.as_str()
+			.xpect_eq("localhost");
+		request
+			.body
+			.try_into_bytes()
+			.unwrap()
+			.xpect_eq(&b"body"[..]);
+	}
+
+	/// The lenient `\n\n` split is the same trap, and the body must still start
+	/// at the byte after the blank line rather than a widened offset.
+	#[beet_core::test]
+	fn parse_invalid_utf8_lenient_split() {
+		let mut raw = b"POST /api HTTP/1.1\nX-Junk: ".to_vec();
+		raw.extend_from_slice(&[0x80, 0x81]);
+		raw.extend_from_slice(b"\n\nhello body");
+		let request = parse_http_request(&raw).unwrap();
+		request.method().xpect_eq(HttpMethod::Post);
+		request
+			.body
+			.try_into_bytes()
+			.unwrap()
+			.xpect_eq(&b"hello body"[..]);
+	}
+
+	#[beet_core::test]
+	fn find_header_end_points_past_the_blank_line() {
+		find_header_end(b"GET / HTTP/1.1\r\n\r\nbody")
+			.unwrap()
+			.xpect_eq(18);
+		find_header_end(b"GET / HTTP/1.1\n\nbody")
+			.unwrap()
+			.xpect_eq(16);
+		find_header_end(b"GET / HTTP/1.1\r\n").xpect_none();
+	}
 
 	// -- encode_request --
 
