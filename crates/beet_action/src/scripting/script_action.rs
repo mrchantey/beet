@@ -14,13 +14,16 @@ use serde::de::DeserializeOwned;
 ///
 /// Async, like [`Script::run`] itself: the embedded engine resolves immediately,
 /// while every other backend is a child process or host isolate reached over a
-/// message channel.
+/// message channel. `local`, so the evaluation shares the world thread: every
+/// `world` call the script makes is a bridge round trip, and a task on the
+/// shared pool belongs to a worker thread under `bevy_multithreaded`, which a
+/// sync point can only wake and hope for, one call per frame.
 ///
 /// ## Errors
 ///
 /// Errors if the caller has no matching [`Script`] component, or if the
 /// script fails to parse, evaluate, or (de)serialize its values.
-#[action]
+#[action(local)]
 #[derive(Component)]
 #[require(Script<Input, Output>)]
 pub async fn ScriptAction<Input, Output>(

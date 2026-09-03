@@ -85,7 +85,7 @@ where
 	Input: 'static + Send + Sync + Default + Serialize,
 	Output: 'static + Send + Sync + DeserializeOwned,
 {
-	ActionOverload::new(Action::new_async(
+	ActionOverload::new(Action::new_async_local(
 		async |cx: ActionContext<()>| -> Result<Outcome> {
 			let action = cx
 				.caller
@@ -576,6 +576,11 @@ mod test {
 	/// Embedded engine only: an out-of-process backend is bounded by its
 	/// transport (a process spawn, a `postMessage` round trip), not by the tick
 	/// budget, so the question this pins does not arise there.
+	///
+	/// Both the driver and the script action are local tasks, so they share the
+	/// world thread. A task on the shared pool belongs to a worker thread under
+	/// `bevy_multithreaded`, which a sync point can only wake and hope for, and
+	/// the dozen calls dribble out roughly one per frame.
 	#[cfg(feature = "quickjs")]
 	#[beet_core::test]
 	async fn a_dozen_calls_settle_in_one_update() {
@@ -595,7 +600,7 @@ mod test {
 		let (send, recv) = OnceValue::oneshot();
 		world
 			.entity_mut(entity)
-			.run_async(move |entity| async move {
+			.run_async_local(move |entity| async move {
 				send.signal(entity.call::<(), Outcome>(()).await);
 			});
 		let mut settled = Box::pin(recv.wait());

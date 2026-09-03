@@ -384,7 +384,7 @@ where
 		// the default grant: a bare `Script` turned into an action has no
 		// sibling to read a config from. [`ScriptAction`] is the entity-aware
 		// path that honours one.
-		Action::new_async(move |cx: ActionContext<Input>| {
+		Action::new_async_local(move |cx: ActionContext<Input>| {
 			let world = cx.world().clone();
 			let script = self.clone();
 			async move {
