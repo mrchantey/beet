@@ -78,13 +78,12 @@ In this way the standard is a *method for resolving component schemas*, not the 
 
 Bevy is an engine capable of running just about all software *without compromise*. My [Local-First Conf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running in a single engine, but in a **single data-driven binary**. Usually cross-domain capability is achieved by stitching two ecosystems together, ie react-three-fiber. In Bevy ECS the domains mesh together seamlessly.
 
-Bevy is still largely marketed as a game engine, reflecting its orgins and community, but for the project to thrive we need substantial funding and practically that means appealing to those beyond the games industry. The value prop for `a unified malleable core underpinning the application layer` is bigger than that of `games` or even `games + apps`, and a reframing lends credibility to use-cases beyond games and GUIs:
+Bevy is still largely marketed as a game engine, reflecting its orgins and community, but for the project to thrive we need substantial funding and practically that means appealing to those beyond the games industry. The funding available for `a unified malleable core underpinning the application layer` is bigger than that of `games` or even `games + apps`, and reframing attracts these use-cases:
 
 > before: **A game engine capable of running apps**
 >
 > after: **A malleable engine capable of running games**
 
+Thats a big pivot and far above my pay grade to know if its the right decision for Bevy, and it isn't required for downstream projects like Beet to continue exploring these broader areas.
 
-Beet will continue exploring these broader developments regardless, I am having so much fun pulling on this thread of breadth and depth in software and have no intention of slowing down.
-
-Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
+Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground that I am thrilled to be involved in! 🐦
