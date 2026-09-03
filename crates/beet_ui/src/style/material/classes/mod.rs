@@ -113,6 +113,7 @@ pub fn all_rules() -> Vec<Rule> {
 		page(),
 		// form controls — state/compound rules first so they win the cascade
 		input_focus(),
+		checkbox_focus(),
 		select_focus(),
 		form_layout(),
 		label_field(),
@@ -120,6 +121,7 @@ pub fn all_rules() -> Vec<Rule> {
 		input_outlined(),
 		input_filled(),
 		input_text(),
+		checkbox_base(),
 		select_base(),
 		select_outlined(),
 		select_filled(),

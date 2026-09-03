@@ -36,28 +36,13 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 
 #[cfg(test)]
 mod test {
+	use super::super::test_ext;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Render a template to plain charcell with the Material rule set.
-	fn render_charcell(
-		template: impl bevy::ecs::template::Template<Output = ()>,
-	) -> String {
-		let mut world = (
-			TemplatePlugin,
-			DocumentPlugin,
-			CharcellPlugin,
-			crate::style::material::MaterialStylePlugin::default(),
-		)
-			.into_world();
-		let root = world.spawn_template(template).unwrap().id();
-		world.entity_mut(root).insert(FlexBuffer::new(40));
-		world.run_schedule(crate::parse::PostParseTree);
-		world
-			.entity_mut(root)
-			.take::<FlexBuffer>()
-			.unwrap()
-			.render_plain()
+	/// Render the demo table to plain charcell with the Material rule set.
+	fn render_charcell(vertical_lines: bool) -> String {
+		test_ext::render_charcell(40, (), demo(vertical_lines))
 	}
 
 	fn demo(vertical_lines: bool) -> Snippet {
@@ -74,12 +59,12 @@ mod test {
 	/// ancestor-scoped sibling rule, so `apply_table_vertical_borders` adds them.
 	#[beet_core::test]
 	fn vertical_lines_draw_column_dividers() {
-		render_charcell(demo(true)).xpect_contains("│");
+		render_charcell(true).xpect_contains("│");
 	}
 
 	/// A default table has only horizontal row rules, no column dividers.
 	#[beet_core::test]
 	fn default_table_has_no_column_dividers() {
-		render_charcell(demo(false)).xnot().xpect_contains("│");
+		render_charcell(false).xnot().xpect_contains("│");
 	}
 }

@@ -23,6 +23,7 @@
 #[cfg(feature = "net")]
 mod analytics;
 mod button;
+mod checkbox;
 // `code_snippet` calls `SyntaxHighlighting`, which is native-only (tree-sitter),
 // so mirror its `not(wasm32)` gate.
 #[cfg(all(
@@ -32,6 +33,8 @@ mod button;
 ))]
 mod code_snippet;
 mod color_scheme;
+mod dynamic_form;
+mod dynamic_view;
 mod error_text;
 mod footer;
 mod form_controls;
@@ -44,11 +47,15 @@ mod sidebar;
 #[cfg(feature = "style")]
 mod stylesheet;
 mod table;
+/// Shared harness for the widget tests.
+#[cfg(test)]
+pub(crate) mod test_ext;
 mod toast;
 
 #[cfg(feature = "net")]
 pub use analytics::*;
 pub use button::*;
+pub use checkbox::*;
 #[cfg(all(
 	feature = "net",
 	feature = "syntax_highlighting",
@@ -56,6 +63,8 @@ pub use button::*;
 ))]
 pub use code_snippet::*;
 pub use color_scheme::*;
+pub use dynamic_form::*;
+pub use dynamic_view::*;
 pub use error_text::*;
 pub use footer::*;
 pub use form_controls::*;
@@ -94,8 +103,12 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<Footer>()
 		.register_template::<TextField>()
 		.register_template::<TextArea>()
+		.register_template::<NumberField>()
+		.register_template::<Checkbox>()
 		.register_template::<Select>()
 		.register_template::<Form>()
+		.register_template::<DynamicForm>()
+		.register_template::<DynamicView>()
 		.register_template::<Head>()
 		.register_template::<Header>()
 		.register_template::<HtmlDocument>()

@@ -190,7 +190,7 @@ mod test {
 					"label": null,
 					"description": null,
 					"on_missing": null,
-					"schema": { "String": { "sensitive": false, "constraints": [] } }
+					"schema": { "String": { "sensitive": false, "multiline": false, "constraints": [] } }
 				}]
 			} } },
 			"value": { "label": "buy milk" }

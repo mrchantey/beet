@@ -1,4 +1,5 @@
-//! Form-control widgets: `TextField`, `TextArea`, `Select`, `Form`.
+//! Form-control widgets: `TextField`, `TextArea`, `NumberField`, `Select`,
+//! `Form` (and the `Checkbox` next door, which carries its own toggle systems).
 //!
 //! Values bind through the [`document`](crate::document) module — an input
 //! attached to a [`FieldRef`] reads/writes its value via the resolved
@@ -44,22 +45,56 @@ impl TextFieldVariant {
 /// syncs with the resolved [`Document`](beet_core::prelude::Document).
 ///
 /// `name` and `placeholder` are optional — when unset their attributes are
-/// omitted rather than rendered empty.
+/// omitted rather than rendered empty. `sensitive` renders a masked
+/// `type="password"`, the widget side of [`StringSchema::sensitive`].
 #[template]
 pub fn TextField(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	placeholder: Option<String>,
 	field: Option<FieldRef>,
+	#[prop] sensitive: bool,
 ) -> impl Bundle {
 	let class = variant.class();
+	let input_type = if sensitive { "password" } else { "text" };
 	rsx! {
 		<input
 			{Classes::new([classes::INPUT, class])}
 			{field}
-			type="text"
+			type={input_type}
 			{Attribute::bundle_option("name", name)}
 			{Attribute::bundle_option("placeholder", placeholder)}
+		/>
+	}
+}
+
+/// A styled numeric `<input type="number">`, the widget for an integer or float
+/// schema. `min`/`max`/`step` mirror the schema's numeric constraints and are
+/// omitted when unbounded.
+///
+/// Typing preserves the bound value's numeric kind: [`Value::edit_text`]
+/// stringifies, edits and re-parses into the same variant, so an `i64` field
+/// never degrades into a string.
+#[template]
+pub fn NumberField(
+	variant: TextFieldVariant,
+	name: Option<String>,
+	field: Option<FieldRef>,
+	min: Option<f64>,
+	max: Option<f64>,
+	step: Option<f64>,
+) -> impl Bundle {
+	let class = variant.class();
+	let number = |value: Option<f64>| value.map(|value| value.to_string());
+	rsx! {
+		<input
+			{Classes::new([classes::INPUT, class])}
+			{field}
+			type="number"
+			{Attribute::bundle_option("name", name)}
+			{Attribute::bundle_option("min", number(min))}
+			{Attribute::bundle_option("max", number(max))}
+			{Attribute::bundle_option("step", number(step))}
 		/>
 	}
 }
@@ -160,14 +195,19 @@ pub struct FormPlugin;
 impl Plugin for FormPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(ensure_form_field_value)
-			.add_observer(fire_form_submit);
+			.add_observer(fire_form_submit)
+			.add_observer(super::checkbox::toggle_checkbox_on_activate)
+			.add_systems(Update, super::checkbox::sync_checkbox_checked);
 		// Enter-to-submit needs the keyboard/focus stack, gated with the renderer.
+		// `InputPlugin` is a hard dependency of it, not an ambient assumption: the
+		// `MessageReader` fails validation every frame without the message type,
+		// so the plugin that reads it declares it.
 		// Order after `write_focus_input` so a batch of input delivered in one
 		// frame (a paste, fast typing, or a cooked-mode terminal sending the whole
 		// line at once) has its typed chars committed to the field `Value` before
 		// the Enter in that same batch gathers and submits them.
 		#[cfg(feature = "tui")]
-		app.add_systems(
+		app.init_plugin::<bevy::input::InputPlugin>().add_systems(
 			Update,
 			submit_form_on_enter.after(crate::prelude::write_focus_input),
 		);
@@ -178,7 +218,8 @@ impl Plugin for FormPlugin {
 ///
 /// A control bound by `name` alone (not a [`FieldRef`]/[`Document`]) has no
 /// `Value` for [`write_focus_input`](crate::prelude::write_focus_input) to edit
-/// without this.
+/// without this. A [`Checkbox`] never reaches here: it requires its own
+/// `Value::Bool(false)`, since its resting state is a boolean, not text.
 fn ensure_form_field_value(
 	ev: On<Add, Element>,
 	elements: Query<&Element>,
@@ -249,10 +290,14 @@ fn submit_form_on_enter(
 		return;
 	}
 	for target in focused.iter() {
-		// only text controls submit on Enter; a select/button does not
+		// only text controls submit on Enter; a select/button/checkbox does not
+		// (Enter activates those through `activate_focused_on_enter`)
 		if !elements
 			.get(target)
-			.map(|view| matches!(view.tag(), "input" | "textarea"))
+			.map(|view| {
+				matches!(view.tag(), "input" | "textarea")
+					&& view.attribute_string("type") != "checkbox"
+			})
 			.unwrap_or(false)
 		{
 			continue;
@@ -293,18 +338,21 @@ fn trigger_form_submit(
 
 /// The current value of a form field: its edited [`Value`], or for an untouched
 /// `<select>` its first `<option>`'s value (the browser's default selection).
+///
+/// The control's own [`Value`] passes through untouched rather than being
+/// stringified, so a [`Checkbox`] submits a `Bool` and a [`NumberField`] an
+/// `Int`/`Float` — [`Submit::values`] is a typed map, which is what lets a
+/// schema-driven form's submission validate against that schema.
 fn field_value(
 	elements: &ElementQuery,
 	values: &Query<&Value>,
 	view: &ElementView,
 ) -> Value {
-	let edited = values
-		.get(view.entity)
-		.ok()
-		.and_then(|value| value.as_str().ok())
-		.unwrap_or_default();
-	if !edited.is_empty() || view.tag() != "select" {
-		return Value::str(edited);
+	let edited = values.get(view.entity).cloned().unwrap_or_default();
+	let untouched_select = view.tag() == "select"
+		&& edited.as_str().is_ok_and(|edited| edited.is_empty());
+	if !untouched_select {
+		return edited;
 	}
 	elements
 		.iter_descendants_inclusive(view.entity)
@@ -336,27 +384,16 @@ fn ancestor_form(
 
 #[cfg(test)]
 mod test {
+	use super::super::test_ext;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-
-	/// Render a template to an HTML string through the substrate.
-	fn render_html(
-		template: impl bevy::ecs::template::Template<Output = ()>,
-	) -> String {
-		let mut world = world_ext::ui_world();
-		let root = world.spawn_template(template).unwrap().id();
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
-	}
 
 	// A literal attribute (`type`) and multiple block attributes
 	// (`optional_attr` for `name`/`placeholder`) must all survive: each `attr`
 	// adds a related attribute entity rather than clobbering the set.
 	#[beet_core::test]
 	fn text_field_keeps_all_attributes() {
-		render_html(rsx! {
+		test_ext::render_html(rsx! {
 			<TextField name="email" placeholder="ada@example.com"/>
 		})
 		.xpect_contains("type=\"text\"")
@@ -366,9 +403,22 @@ mod test {
 
 	#[beet_core::test]
 	fn text_area_keeps_all_attributes() {
-		render_html(rsx! { <TextArea name="message" placeholder="hi"/> })
-			.xpect_contains("name=\"message\"")
-			.xpect_contains("placeholder=\"hi\"");
+		test_ext::render_html(
+			rsx! { <TextArea name="message" placeholder="hi"/> },
+		)
+		.xpect_contains("name=\"message\"")
+		.xpect_contains("placeholder=\"hi\"");
+	}
+
+	/// The numeric control carries only the bounds it is given, so an
+	/// unconstrained number renders no `min`/`max`/`step` at all.
+	#[beet_core::test]
+	fn number_field_omits_absent_bounds() {
+		test_ext::render_html(rsx! { <NumberField name="count" min=0.0/> })
+			.xpect_contains("type=\"number\"")
+			.xpect_contains("min=\"0\"")
+			.xnot()
+			.xpect_contains("max=");
 	}
 
 	/// A focused `TextField` widget bound to a document field is editable: typing
@@ -378,20 +428,7 @@ mod test {
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn input_widget_edits_bound_document_field() {
-		use bevy::input::ButtonState;
-		use bevy::input::keyboard::Key;
-		use bevy::input::keyboard::KeyCode;
-		use bevy::input::keyboard::KeyboardInput;
-
-		let mut app = App::new();
-		app.add_plugins((
-			MinimalPlugins,
-			bevy::input::InputPlugin,
-			CharcellPlugin,
-			RealtimeParsePlugin,
-			DocumentPlugin,
-			FocusPlugin,
-		));
+		let mut app = test_ext::form_app();
 		// a document with a `name` field, and a TextField bound to it.
 		let root = app
 			.world_mut()
@@ -407,37 +444,13 @@ mod test {
 			.insert(Document::new(value!({ "name": "" })));
 		app.update();
 
-		// focus the input (the <input> element) and type "hi".
-		let input = app
-			.world_mut()
-			.query::<(Entity, &Element)>()
-			.iter(app.world())
-			.find(|(_, element)| element.tag() == "input")
-			.map(|(entity, _)| entity)
-			.unwrap();
-		// scope the input to a window surface so the per-surface focus path delivers
-		// the typed text (the real app binds the page to a RenderSurface).
-		let window = app.world_mut().spawn_empty().id();
-		app.world_mut()
-			.entity_mut(input)
-			.insert((Focus, RenderSurface(window)));
-		for ch in ["h", "i"] {
-			app.world_mut().write_message(KeyboardInput {
-				key_code: KeyCode::KeyH,
-				logical_key: Key::Character(ch.into()),
-				state: ButtonState::Pressed,
-				text: Some(ch.into()),
-				repeat: false,
-				window,
-			});
-		}
-		// a few frames for the edit to flow through the document sync chain.
-		for _ in 0..3 {
-			app.update();
-		}
+		let (window, _) = test_ext::focus_element(&mut app, "input");
+		test_ext::type_text(&mut app, window, "hi");
 		// the document's `name` field now holds the typed text.
-		let doc = app.world().get::<Document>(root).unwrap();
-		doc.get_field::<String>(&[FieldSegment::key("name")])
+		app.world()
+			.get::<Document>(root)
+			.unwrap()
+			.get_field::<String>(&[FieldSegment::key("name")])
 			.unwrap()
 			.xpect_eq("hi".to_string());
 	}
@@ -448,21 +461,7 @@ mod test {
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn submit_fires_with_field_values() {
-		use bevy::input::ButtonState;
-		use bevy::input::keyboard::Key;
-		use bevy::input::keyboard::KeyCode;
-		use bevy::input::keyboard::KeyboardInput;
-
-		let mut app = App::new();
-		app.add_plugins((
-			MinimalPlugins,
-			bevy::input::InputPlugin,
-			CharcellPlugin,
-			RealtimeParsePlugin,
-			DocumentPlugin,
-			FocusPlugin,
-			FormPlugin,
-		));
+		let mut app = test_ext::form_app();
 		// capture the carried values when Submit fires.
 		let captured = Store::new(None::<Value>);
 		app.world_mut().add_observer(move |ev: On<Submit>| {
@@ -482,41 +481,13 @@ mod test {
 			.unwrap();
 		app.update();
 
-		let element = |app: &mut App, tag: &str| {
-			app.world_mut()
-				.query::<(Entity, &Element)>()
-				.iter(app.world())
-				.find(|(_, el)| el.tag() == tag)
-				.map(|(entity, _)| entity)
-				.unwrap()
-		};
 		// focus the input and type a name.
-		let input = element(&mut app, "input");
-		// scope the input to a window surface so the per-surface focus path delivers
-		// the typed text (the real app binds the page to a RenderSurface).
-		let window = app.world_mut().spawn_empty().id();
-		app.world_mut()
-			.entity_mut(input)
-			.insert((Focus, RenderSurface(window)));
-		for ch in ["A", "d", "a"] {
-			app.world_mut().write_message(KeyboardInput {
-				key_code: KeyCode::KeyA,
-				logical_key: Key::Character(ch.into()),
-				state: ButtonState::Pressed,
-				text: Some(ch.into()),
-				repeat: false,
-				window,
-			});
-		}
-		app.update();
+		let (window, _) = test_ext::focus_element(&mut app, "input");
+		test_ext::type_text(&mut app, window, "Ada");
 
 		// click Submit, firing Submit on the form.
-		let button = element(&mut app, "button");
-		let pointer = app.world_mut().spawn_empty().id();
-		app.world_mut()
-			.entity_mut(button)
-			.trigger(PointerUp::new(pointer));
-		app.update();
+		let button = test_ext::element(&mut app, "button");
+		test_ext::click(&mut app, button);
 
 		let values = captured.get().unwrap();
 		values
@@ -540,21 +511,7 @@ mod test {
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn submit_fires_on_enter_in_input() {
-		use bevy::input::ButtonState;
-		use bevy::input::keyboard::Key;
-		use bevy::input::keyboard::KeyCode;
-		use bevy::input::keyboard::KeyboardInput;
-
-		let mut app = App::new();
-		app.add_plugins((
-			MinimalPlugins,
-			bevy::input::InputPlugin,
-			CharcellPlugin,
-			RealtimeParsePlugin,
-			DocumentPlugin,
-			FocusPlugin,
-			FormPlugin,
-		));
+		let mut app = test_ext::form_app();
 		let captured = Store::new(None::<Value>);
 		app.world_mut().add_observer(move |ev: On<Submit>| {
 			captured.set(Some(ev.values.clone()));
@@ -569,39 +526,11 @@ mod test {
 		app.update();
 
 		// focus the input on a surface and type a message.
-		let input = app
-			.world_mut()
-			.query::<(Entity, &Element)>()
-			.iter(app.world())
-			.find(|(_, el)| el.tag() == "input")
-			.map(|(entity, _)| entity)
-			.unwrap();
-		let window = app.world_mut().spawn_empty().id();
-		app.world_mut()
-			.entity_mut(input)
-			.insert((Focus, RenderSurface(window)));
-		for ch in ["h", "i"] {
-			app.world_mut().write_message(KeyboardInput {
-				key_code: KeyCode::KeyH,
-				logical_key: Key::Character(ch.into()),
-				state: ButtonState::Pressed,
-				text: Some(ch.into()),
-				repeat: false,
-				window,
-			});
-		}
-		app.update();
+		let (window, _) = test_ext::focus_element(&mut app, "input");
+		test_ext::type_text(&mut app, window, "hi");
 
 		// press Enter on the focused field: Submit fires with the typed value.
-		app.world_mut().write_message(KeyboardInput {
-			key_code: KeyCode::Enter,
-			logical_key: Key::Enter,
-			state: ButtonState::Pressed,
-			text: None,
-			repeat: false,
-			window,
-		});
-		app.update();
+		test_ext::press_enter(&mut app, window);
 
 		captured
 			.get()
@@ -611,6 +540,33 @@ mod test {
 			.as_str()
 			.unwrap()
 			.xpect_eq("hi");
+	}
+
+	/// Enter on a focused checkbox toggles it rather than submitting: activation
+	/// is Enter's job for every non-text control.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn enter_on_a_checkbox_does_not_submit() {
+		let mut app = test_ext::form_app();
+		let captured = Store::new(None::<Value>);
+		app.world_mut().add_observer(move |ev: On<Submit>| {
+			captured.set(Some(ev.values.clone()));
+		});
+		app.world_mut()
+			.spawn_template(rsx! {
+				<Form><Checkbox name="done"/></Form>
+			})
+			.unwrap();
+		app.update();
+
+		let (window, input) = test_ext::focus_element(&mut app, "input");
+		test_ext::press_enter(&mut app, window);
+		captured.get().is_none().xpect_true();
+		// it toggled instead, and a later submit carries the `Bool`
+		app.world()
+			.get::<Value>(input)
+			.unwrap()
+			.xpect_eq(Value::Bool(true));
 	}
 }
 

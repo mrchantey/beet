@@ -9,6 +9,7 @@ pub const INPUT: ClassName = ClassName::new_static("input");
 pub const INPUT_OUTLINED: ClassName = ClassName::new_static("input-outlined");
 pub const INPUT_FILLED: ClassName = ClassName::new_static("input-filled");
 pub const INPUT_TEXT: ClassName = ClassName::new_static("input-text");
+pub const CHECKBOX: ClassName = ClassName::new_static("checkbox");
 pub const SELECT: ClassName = ClassName::new_static("select");
 pub const SELECT_OUTLINED: ClassName = ClassName::new_static("select-outlined");
 pub const SELECT_FILLED: ClassName = ClassName::new_static("select-filled");
@@ -89,6 +90,26 @@ pub fn input_focus() -> Rule {
 			Selector::state(ElementState::Focused),
 		]))
 		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+}
+
+/// Checkbox control. The browser draws its own native box, and the terminal
+/// paints a `[x]`/`[ ]` marker from the bound value, so the base rule only pins
+/// the surface foreground the marker inherits.
+pub fn checkbox_base() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(CHECKBOX))
+		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
+}
+
+/// Focused checkbox - primary-colored. The marker *is* the control on the
+/// terminal, so focus tints the glyph rather than a border.
+pub fn checkbox_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::class(CHECKBOX),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::ForegroundColor,colors::Primary).unwrap()
 }
 
 /// Shared baseline for `.select` elements, matching the `.input` width so a

@@ -84,6 +84,32 @@ impl ValueSchema {
 		from_type_info::build(type_info)
 	}
 
+	/// This schema's variant name, ie its externally tagged serde key and the
+	/// kind a diagnostic names.
+	///
+	/// The match is exhaustive, so adding a variant fails to compile until the
+	/// meta-schema (which round trips through these names) describes it.
+	pub fn variant_name(&self) -> &'static str {
+		match self {
+			Self::Any => "Any",
+			Self::Null => "Null",
+			Self::Bool(_) => "Bool",
+			Self::I64(_) => "I64",
+			Self::U64(_) => "U64",
+			Self::F64(_) => "F64",
+			Self::String(_) => "String",
+			Self::Bytes(_) => "Bytes",
+			Self::Entity(_) => "Entity",
+			Self::Struct(_) => "Struct",
+			Self::Tuple(_) => "Tuple",
+			Self::List(_) => "List",
+			Self::Map(_) => "Map",
+			Self::Enum(_) => "Enum",
+			Self::Optional(_) => "Optional",
+			Self::Reference(_) => "Reference",
+		}
+	}
+
 	/// Validate (and possibly mutate) `value` against this schema.
 	///
 	/// Returns the list of [`ValidationError`]s collected; an empty list means

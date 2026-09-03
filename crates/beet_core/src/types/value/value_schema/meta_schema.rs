@@ -143,6 +143,7 @@ fn on_missing() -> ValueSchema {
 fn string_schema() -> ValueSchema {
 	r#struct("StringSchema", vec![
 		field("sensitive", boolean()),
+		field("multiline", boolean()),
 		field("constraints", list(string_constraint())),
 	])
 }
@@ -326,30 +327,6 @@ mod test {
 		]
 	}
 
-	/// The variant name the meta-schema must carry an entry for. The match is
-	/// exhaustive, so adding a [`ValueSchema`] variant fails to compile here
-	/// until the meta-schema describes it.
-	fn variant_name(schema: &ValueSchema) -> &'static str {
-		match schema {
-			ValueSchema::Any => "Any",
-			ValueSchema::Null => "Null",
-			ValueSchema::Bool(_) => "Bool",
-			ValueSchema::I64(_) => "I64",
-			ValueSchema::U64(_) => "U64",
-			ValueSchema::F64(_) => "F64",
-			ValueSchema::String(_) => "String",
-			ValueSchema::Bytes(_) => "Bytes",
-			ValueSchema::Entity(_) => "Entity",
-			ValueSchema::Struct(_) => "Struct",
-			ValueSchema::Tuple(_) => "Tuple",
-			ValueSchema::List(_) => "List",
-			ValueSchema::Map(_) => "Map",
-			ValueSchema::Enum(_) => "Enum",
-			ValueSchema::Optional(_) => "Optional",
-			ValueSchema::Reference(_) => "Reference",
-		}
-	}
-
 	#[crate::test]
 	fn describes_every_variant() {
 		let ValueSchema::Enum(meta) = ValueSchema::meta() else {
@@ -362,7 +339,7 @@ mod test {
 			.collect::<Vec<_>>();
 		samples()
 			.iter()
-			.map(variant_name)
+			.map(ValueSchema::variant_name)
 			.collect::<Vec<_>>()
 			.xpect_eq(described);
 	}
@@ -376,7 +353,7 @@ mod test {
 		for schema in samples() {
 			let mut value = Value::from_serde(&schema).unwrap();
 			ValueSchema::meta()
-				.assert_valid_in(resolver, &variant_name(&schema), &mut value)
+				.assert_valid_in(resolver, schema.variant_name(), &mut value)
 				.await
 				.unwrap();
 			value.into_serde::<ValueSchema>().unwrap().xpect_eq(schema);

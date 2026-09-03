@@ -266,6 +266,9 @@ pub struct StringSchema {
 	/// Whether this value is sensitive (password etc), should be hidden
 	/// from logs and rendered as `***`.
 	pub sensitive: bool,
+	/// Whether this value is prose spanning several lines, ie a `<textarea>`
+	/// rather than a single-line input.
+	pub multiline: bool,
 	/// Additional constraints.
 	pub constraints: Vec<StringConstraint>,
 }
@@ -274,6 +277,11 @@ impl StringSchema {
 	/// Mark this string as sensitive.
 	pub fn sensitive(mut self) -> Self {
 		self.sensitive = true;
+		self
+	}
+	/// Mark this string as multiline prose.
+	pub fn multiline(mut self) -> Self {
+		self.multiline = true;
 		self
 	}
 	/// Add a constraint.
@@ -648,6 +656,12 @@ impl NamedFieldSchema {
 	/// Mark the field optional, so an absent value validates.
 	pub fn optional(mut self) -> Self {
 		self.required = false;
+		self
+	}
+
+	/// Set the human readable label a generated form shows in place of the key.
+	pub fn with_label(mut self, label: impl Into<SmolStr>) -> Self {
+		self.label = Some(label.into());
 		self
 	}
 

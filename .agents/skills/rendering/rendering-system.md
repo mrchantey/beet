@@ -22,14 +22,15 @@ Classes are the contract between widgets (emit them) and the rule set (styles th
 <div {Classes::new([classes::CARD_FILLED])}>...</div>
 ```
 
-Families: `BTN*`, `CARD_*`, the type scale (`TEXT_DISPLAY/HEADLINE/TITLE/BODY/LABEL_*`), `SHAPE_*`, `ELEVATION_*`, layout (`PAGE`, `CONTAINER`, `APP_BAR`, `TABLE`, `SIDEBAR*`), form (`INPUT*`, `SELECT*`, `ERROR_TEXT`), scheme (`LIGHT_SCHEME`/`DARK_SCHEME`, on an ancestor), utilities (`HIDDEN`, `PRINT_HIDDEN`, `TEXT_LEFT/CENTER/RIGHT`, `TEXT_XS..2XL`).
+Families: `BTN*`, `CARD_*`, the type scale (`TEXT_DISPLAY/HEADLINE/TITLE/BODY/LABEL_*`), `SHAPE_*`, `ELEVATION_*`, layout (`PAGE`, `CONTAINER`, `APP_BAR`, `TABLE`, `SIDEBAR*`), form (`INPUT*`, `SELECT*`, `CHECKBOX`, `ERROR_TEXT`), scheme (`LIGHT_SCHEME`/`DARK_SCHEME`, on an ancestor), utilities (`HIDDEN`, `PRINT_HIDDEN`, `TEXT_LEFT/CENTER/RIGHT`, `TEXT_XS..2XL`).
 
 ## Widgets
 
 `#[template]` function components used as capitalized tags, imported via `crate::prelude::*` / `beet::prelude::*`. Source: `crates/beet_ui/src/widgets/`.
 
 - `Button`/`IconButton`/`Link` take their content as the **default slot** (`<Button>"Save"</Button>`), plus `variant: ButtonVariant` (`Filled` default, `Outlined`, `Text`, `Tonal`, `Elevated`, `Secondary`, `Tertiary`, `Error`); `Link` also `href`. `ErrorText` takes `message`.
-- `TextField`/`TextArea`/`Select`/`Form` take `name`/`field`/`placeholder` options and a `variant`; `Select`/`Form` take slot children.
+- `TextField`/`TextArea`/`NumberField`/`Select`/`Form` take `name`/`field`/`placeholder` options and a `variant`; `TextField` also `sensitive` (masked), `NumberField` also `min`/`max`/`step`; `Select`/`Form` take slot children. `Checkbox` is the boolean control (`name`/`field`), the only one that writes a `Value::Bool`; it paints a `[x]`/`[ ]` marker on the terminal and mirrors `checked` in HTML. All of them are registered by `FormPlugin`.
+- `DynamicForm`/`DynamicView` generate a `<form>` and a `<table>` from a `ValueSchema` (`schema` plus the `field` they bind under), one control per editable leaf and one column per item field. A schema kind with no control renders read-only as an `UneditableField`.
 - `Table` (slots `head`/default/`foot`), `Header` (`nav` slot), `Footer`, `Head`, `PageLayout`, `ContentLayout`, `HtmlDocument`, `PageBreak`.
 - Web-only head pieces: `Preflight`, `Reset`, `Stylesheet`, `ColorSchemeScript`.
 

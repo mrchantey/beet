@@ -60,9 +60,10 @@ pub(crate) fn apply_hyperlinks(mut commands: Commands, elements: ElementQuery) {
 }
 
 /// Attach a [`Marker`] to elements that carry generated content:
-/// `<li>` (bullet/number), `<hr>` (rule), `<img>` (alt text), and `<select>`
-/// (its selected option's label). The `<blockquote>` callout draws its own
-/// thick left border via the box model, so no per-paragraph quote bar is added.
+/// `<li>` (bullet/number), `<hr>` (rule), `<img>` (alt text), `<select>`
+/// (its selected option's label) and a checkbox `<input>` (its `[x]`/`[ ]` box).
+/// The `<blockquote>` callout draws its own thick left border via the box model,
+/// so no per-paragraph quote bar is added.
 pub(crate) fn apply_markers(
 	mut commands: Commands,
 	ruleset: RuleSetQuery,
@@ -88,6 +89,7 @@ pub(crate) fn apply_markers(
 			"img" => Some(img_marker(&view)),
 			"iframe" => Some(iframe_marker(&view)),
 			"select" => Some(select_marker(&view, &elements, &values)),
+			"input" => checkbox_marker(&view, &values),
 			_ => None,
 		};
 		if let Some(marker) = marker {
@@ -431,6 +433,22 @@ fn select_marker(
 		.map(option_label)
 		.unwrap_or_default();
 	format!("{label} ▾").into()
+}
+
+/// A checkbox `<input>`'s box, painted from its [`Value`]: the terminal has no
+/// native control to draw, so the state *is* the text. `None` for every other
+/// input type, which paints its value as an editable textbox instead.
+fn checkbox_marker(
+	view: &ElementView,
+	values: &Query<&Value, With<Element>>,
+) -> Option<SmolStr> {
+	if view.attribute_string("type") != "checkbox" {
+		return None;
+	}
+	match values.get(view.entity) {
+		Ok(Value::Bool(true)) => Some("[x]".into()),
+		_ => Some("[ ]".into()),
+	}
 }
 
 /// An `<option>`'s submission value: its `value` attribute, falling back to its
