@@ -45,7 +45,7 @@ impl S3Store {
 	}
 
 	/// Create a store whose region the SDK's default provider chain resolves,
-	/// the process-boundary convention: a `--store=s3://<bucket>` names a
+	/// the process-boundary convention: a `--repo=s3://<bucket>` names a
 	/// bucket, not a region.
 	///
 	/// `pub(crate)` deliberately. A store is below [`Stack`] in the crate graph

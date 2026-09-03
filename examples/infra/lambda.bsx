@@ -4,7 +4,7 @@
 Deploys `examples/bsx_site` as an http-only AWS Lambda (behind an API Gateway URL,
 no custom domain). The generic `beet` binary is packaged as a `provided.al2023`
 function and reads the site from an S3 bucket at request time (the zip's
-`bootstrap` script launches it with `--store=s3://<bucket> --server=http`, since
+`bootstrap` script launches it with `--repo=s3://<bucket> --server=http`, since
 the lambda runtime offers no argv), so a site change re-publishes by re-running
 `sync` with no redeploy.
 

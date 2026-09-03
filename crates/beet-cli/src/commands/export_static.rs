@@ -33,7 +33,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,
-		EntryParams::store(parts)?.as_ref(),
+		EntryParams::repo(parts)?.as_ref(),
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)
@@ -57,7 +57,7 @@ pub async fn ExportStatic(cx: ActionContext<Request>) -> Result<Response> {
 
 	// the output is a local write target, so an `fs` store: `--out` (absolute, or
 	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
-	// dir, not a `<StoreRoot>`-widened root).
+	// dir, not a `<RepoRoot>`-widened root).
 	let out_dir = match params.out {
 		Some(out) => AbsPathBuf::new(out)?,
 		None => entry_dir(&entry_path)?.join(DIST_DIR),

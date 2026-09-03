@@ -33,9 +33,9 @@ pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 		.register_type::<Collectable>();
 }
 
-/// A scene `.bsx` builds under the entry's store-root entity, which carries no
+/// A scene `.bsx` builds under the entry's repo-store root entity, which carries no
 /// `Transform`: even though `<Scene3d>` now hosts its transform without a wrapper
-/// element, the entry store-root above it is still transformless, so the chain to
+/// element, that root above it is still transformless, so the chain to
 /// the scene root has a transformless link. Bevy's propagation skips any subtree
 /// broken by such a link, so the scene keeps identity `GlobalTransform`s (a camera
 /// stuck at the origin renders nothing). Give every transformless entity that has

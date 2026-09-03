@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// Scopes the nearest ancestor [`BlobStore`] to a subdirectory, inserting the scoped
 /// store on the same entity (which then backs that entity's descendants).
 ///
-/// The markup-spawnable "serve/read this subtree of the site store", eg a
+/// The markup-spawnable "serve/read this subtree of the repo store", eg a
 /// `ServeBlobs` route paired with `DirPath("assets")` to serve the store's
 /// `assets/` subdir.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]

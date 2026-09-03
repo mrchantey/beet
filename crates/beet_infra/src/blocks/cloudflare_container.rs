@@ -37,7 +37,7 @@ pub struct CloudflareContainerBlock {
 	/// Maximum concurrent container instances.
 	max_instances: u32,
 	/// Extra literal env injected into the container. The entry-store selection is
-	/// *not* env: the deploy action bakes `--store=s3://<bucket>?endpoint=..` into
+	/// *not* env: the deploy action bakes `--repo=s3://<bucket>?endpoint=..` into
 	/// the image `CMD`; only the R2 credentials (SDK convention) ride env.
 	env_vars: Vec<Variable>,
 }
@@ -77,7 +77,7 @@ impl CloudflareContainerBlock {
 	/// constrained to the http transport.
 	pub fn cmd_bootstrap(&self, endpoint: &str) -> Result<BootstrapConfig> {
 		BootstrapConfig {
-			store: Some(StoreUri::parse(&format!(
+			repo: Some(StoreUri::parse(&format!(
 				"s3://{}?endpoint={endpoint}",
 				self.bucket
 			))?),
@@ -114,7 +114,7 @@ mod test {
 			.to_cmd_json("/app")
 			.unwrap()
 			.xpect_eq(
-				r#"["/app", "--store=s3://beet-site?endpoint=https://acc.r2.cloudflarestorage.com", "--server=http"]"#,
+				r#"["/app", "--repo=s3://beet-site?endpoint=https://acc.r2.cloudflarestorage.com", "--server=http"]"#,
 			);
 	}
 

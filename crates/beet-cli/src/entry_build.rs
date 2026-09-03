@@ -3,8 +3,8 @@
 //! commands.
 //!
 //! An entry load splits into resolution ([`resolve_main`]: the store + the entry
-//! document name within it, honouring `--store` and the entry's own
-//! `<StoreRoot src>`), a world-free async read ([`read_sources`]: the
+//! document name within it, honouring `--repo` and the entry's own
+//! `<RepoRoot src>`), a world-free async read ([`read_sources`]: the
 //! entry document and the templates under its declared `<TemplateDir>`s, through the
 //! [`BlobStore`]) and a synchronous world build ([`build_root`]: register the
 //! templates, parse the entry, build it into a root carrying the store). The entry's
@@ -56,10 +56,10 @@ pub fn cli_registration() -> CrateRegistration {
 /// Pre-scan the raw entry document through `store`, the one registry-free walk
 /// entry resolution reads its declarations from.
 pub async fn read_prescan(
-	store: &BlobStore,
+	repo_store: &BlobStore,
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
-	store
+	repo_store
 		.get_media(&SmolPath::from(entry_name))
 		.await?
 		.xmap(|entry| EntryPrescan::parse(&entry))
@@ -71,7 +71,7 @@ pub async fn read_prescan(
 /// backend).
 #[derive(Debug)]
 pub struct ResolvedEntry {
-	pub store: BlobStore,
+	pub repo_store: BlobStore,
 	pub entry_name: String,
 	/// The entry document's declarations, read by the same pass that resolved the
 	/// store, so the load never re-parses it.
@@ -81,8 +81,8 @@ pub struct ResolvedEntry {
 }
 
 /// Resolve an entry within its store: read the prescan once, and rebase the
-/// store through the entry's own `<StoreRoot src>` declaration
-/// ([`BlobStore::rebase_entry`]) when it carries one. The one widening path
+/// store through the entry's own `<RepoRoot src>` declaration
+/// ([`BlobStore::rebase_repo`]) when it carries one. The one widening path
 /// every entry load shares (the binary, discovery, `serve`/`check`/
 /// `export-static`, the Worker); callers differ only in how the initial
 /// `(store, entry_name)` pair is derived (a local path walk vs a key in a
@@ -92,21 +92,21 @@ pub struct ResolvedEntry {
 /// ([`BlobStoreProvider::watch_dir`]) — the rebased root, so the watcher sees
 /// the entry's whole declared universe; a store with no local directory
 /// watches nothing.
-pub async fn resolve_in_store(
-	store: BlobStore,
+pub async fn resolve_in_repo_store(
+	repo_store: BlobStore,
 	entry_name: String,
 ) -> Result<ResolvedEntry> {
-	let prescan = read_prescan(&store, &entry_name).await?;
+	let prescan = read_prescan(&repo_store, &entry_name).await?;
 	// the rebased store holds the same entry document, so its pre-scan is the
 	// one already read: entry resolution parses the entry exactly once.
-	let (store, entry_name) = match &prescan.store_root {
-		Some(src) => store.rebase_entry(&entry_name, src)?,
-		None => (store, entry_name),
+	let (repo_store, entry_name) = match &prescan.repo_root {
+		Some(src) => repo_store.rebase_repo(&entry_name, src)?,
+		None => (repo_store, entry_name),
 	};
 	Ok(ResolvedEntry {
 		#[cfg(not(target_arch = "wasm32"))]
-		watch_dir: store.watch_dir(),
-		store,
+		watch_dir: repo_store.watch_dir(),
+		repo_store,
 		entry_name,
 		prescan,
 	})
@@ -115,14 +115,14 @@ pub async fn resolve_in_store(
 /// Resolve an explicit entry path (the binary's `--main`, a command's `<entry>`
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
-/// the entry may rebase its own store root with a `<StoreRoot src>` declaration
-/// (see [`resolve_in_store`]), and the `--store` param picks the backend.
+/// the entry may rebase its own store root with a `<RepoRoot src>` declaration
+/// (see [`resolve_in_repo_store`]), and the `--repo` param picks the backend.
 pub async fn resolve_main(
-	store_uri: Option<&StoreUri>,
+	repo_uri: Option<&StoreUri>,
 	main: &str,
 ) -> Result<ResolvedEntry> {
 	let path = AbsPathBuf::new(main)?;
-	let (store, entry_name) = if path.extension().is_some() {
+	let (repo_store, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
 		let dir = path.parent().ok_or_else(|| {
 			bevyhow!("entry `{path}` has no parent directory")
@@ -132,41 +132,44 @@ pub async fn resolve_main(
 			.and_then(|name| name.to_str())
 			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
 			.to_string();
-		(resolve_store(store_uri, dir)?, entry_name)
+		(resolve_repo_store(repo_uri, dir)?, entry_name)
 	} else {
 		// a directory: probe it for an entry document
-		let store = resolve_store(store_uri, path.clone())?;
-		let entry_name = probe_entry_names(&store).await?.ok_or_else(|| {
-			bevyhow!(
-				"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
+		let repo_store = resolve_repo_store(repo_uri, path.clone())?;
+		let entry_name =
+			probe_entry_names(&repo_store).await?.ok_or_else(|| {
+				bevyhow!(
+					"no entry document found in `{path}`: looked for {ENTRY_NAMES:?}. \
 				Create one, or name the entry file itself."
-			)
-		})?;
-		(store, entry_name)
+				)
+			})?;
+		(repo_store, entry_name)
 	};
-	resolve_in_store(store, entry_name).await
+	resolve_in_repo_store(repo_store, entry_name).await
 }
 
 /// The first [`ENTRY_NAMES`] match at the store's root, if any.
-pub async fn probe_entry_names(store: &BlobStore) -> Result<Option<String>> {
+pub async fn probe_entry_names(
+	repo_store: &BlobStore,
+) -> Result<Option<String>> {
 	for name in ENTRY_NAMES {
-		if store.exists(&SmolPath::from(*name)).await? {
+		if repo_store.exists(&SmolPath::from(*name)).await? {
 			return Ok(Some(name.to_string()));
 		}
 	}
 	Ok(None)
 }
 
-/// Build the [`BlobStore`] a `--store` [`StoreUri`] names, defaulting to a
+/// Build the [`BlobStore`] a `--repo` [`StoreUri`] names, defaulting to a
 /// filesystem store rooted at `dir` (the resolved entry directory). Shared by
-/// the binary's entry resolution (the launch config's `--store`) and the
-/// `check`/`serve`/`export-static` commands (each command's own `--store`
+/// the binary's entry resolution (the launch config's `--repo`) and the
+/// `check`/`serve`/`export-static` commands (each command's own `--repo`
 /// param) so every entry load is store-driven rather than filesystem-bound.
-pub fn resolve_store(
-	store_uri: Option<&StoreUri>,
+pub fn resolve_repo_store(
+	repo_uri: Option<&StoreUri>,
 	dir: AbsPathBuf,
 ) -> Result<BlobStore> {
-	BlobStore::from_uri(store_uri.unwrap_or(&StoreUri::default()), dir)
+	BlobStore::from_uri(repo_uri.unwrap_or(&StoreUri::default()), dir)
 }
 
 /// The entry sources read from a store: the entry document bytes + name, its
@@ -187,13 +190,13 @@ pub struct EntrySources {
 /// since the read itself is world-free, and hands over the `prescan` entry
 /// resolution already produced, so the document is never re-parsed.
 pub async fn read_sources(
-	store: &BlobStore,
+	repo_store: &BlobStore,
 	formats: TemplateFormats,
 	entry_name: impl Into<String>,
 	prescan: EntryPrescan,
 ) -> Result<EntrySources> {
 	let entry_name = entry_name.into();
-	let entry = store
+	let entry = repo_store
 		.get_media(&SmolPath::from(entry_name.as_str()))
 		.await?;
 	// a markup entry may declare `<TemplateDir>`s naming template directories; read
@@ -201,8 +204,9 @@ pub async fn read_sources(
 	// non-markup (serde) entry declares none.
 	let mut template_sources = Vec::new();
 	for dir in &prescan.template_dirs {
-		template_sources
-			.extend(TemplateDir::read_sources(store, dir, &formats).await?);
+		template_sources.extend(
+			TemplateDir::read_sources(repo_store, dir, &formats).await?,
+		);
 	}
 	EntrySources {
 		entry_name,
@@ -221,10 +225,12 @@ pub async fn read_sources(
 /// [`DisableCallOnReady`] in `extra` to build the tree disarmed. Registers the
 /// entry's declared template sources *before* parsing the entry (so its own tags
 /// resolve), then marks the root [`TemplatesLoaded`]. The synchronous
-/// world-mutating tail of an entry load; returns the root entity.
+/// world-mutating tail of an entry load; returns the root entity. A driver
+/// passes [`RepoStore`] in `extra` to claim the built store as the process's
+/// canonical one.
 pub fn build_root(
 	world: &mut World,
-	store: BlobStore,
+	repo_store: BlobStore,
 	sources: EntrySources,
 	extra: impl Bundle,
 ) -> Result<Entity> {
@@ -255,11 +261,15 @@ pub fn build_root(
 	let template = EntryTemplate::from_bytes(world, &entry).map_err(|err| {
 		bevyhow!("failed to parse entry `{entry_name}`: {err}")
 	})?;
-	// the site store on the root: descendants resolve it by ancestry. `TemplatesLoaded`
-	// marks the entry-level templates registered (the readiness signal a wasm Worker
-	// waits on before serving).
+	// the store on the root: descendants resolve it by ancestry. The `RepoStore`
+	// marker rides `extra` rather than landing here, since only a *driver* build
+	// (the process's own entry) claims the app's one canonical store: a command
+	// loading a foreign entry into the same world builds a second rooted store,
+	// which is that sub-app's, not this process's. `TemplatesLoaded` marks the
+	// entry-level templates registered (the readiness signal a wasm Worker waits
+	// on before serving).
 	let mut root_entity = world.entity_mut(root);
-	root_entity.insert((extra, store, TemplatesLoaded));
+	root_entity.insert((extra, repo_store, TemplatesLoaded));
 	root_entity.insert_template(template).map_err(|err| {
 		bevyhow!("failed to load entry `{entry_name}`: {err}")
 	})?;
@@ -279,19 +289,25 @@ pub fn build_root(
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub(crate) async fn build_entry_owned(
 	world: &mut World,
-	store: BlobStore,
+	repo_store: BlobStore,
 	entry_name: String,
 ) -> Result<Entity> {
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	// the shared resolution: the entry's `<StoreRoot>` rebases the bucket view
+	// the shared resolution: the entry's `<RepoRoot>` rebases the bucket view
 	// exactly as it does every other store kind.
 	let ResolvedEntry {
-		store,
+		repo_store,
 		entry_name,
 		prescan,
-	} = resolve_in_store(store, entry_name).await?;
-	let sources = read_sources(&store, formats, entry_name, prescan).await?;
-	let root = build_root(world, store, sources, DisableCallOnReady)?;
+	} = resolve_in_repo_store(repo_store, entry_name).await?;
+	let sources =
+		read_sources(&repo_store, formats, entry_name, prescan).await?;
+	let root = build_root(
+		world,
+		repo_store,
+		sources,
+		(DisableCallOnReady, RepoStore),
+	)?;
 	TemplatePending::settle_owned(world).await;
 	Ok(root)
 }
@@ -309,17 +325,17 @@ pub(crate) async fn build_entry_owned(
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn rebuild_watched(
 	world: &AsyncWorld,
-	store: BlobStore,
+	repo_store: BlobStore,
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
-	let prescan = read_prescan(&store, &entry_name).await?;
+	let prescan = read_prescan(&repo_store, &entry_name).await?;
 	let sources =
-		read_sources(&store, formats, entry_name.clone(), prescan).await?;
+		read_sources(&repo_store, formats, entry_name.clone(), prescan).await?;
 	// recompute the structural source set from the current content, so a
 	// `<Template src>` include added by this very edit is structural on the next
 	// one without a restart.
-	let structural = entry_source_paths(&store, &entry_name).await;
+	let structural = entry_source_paths(&repo_store, &entry_name).await;
 	world
 		.with(move |world: &mut World| -> Result {
 			if let Some(mut reloader) =
@@ -329,7 +345,7 @@ pub async fn rebuild_watched(
 			}
 			// the entry's own dir, watched for edits to the entry doc / its includes;
 			// computed before `build_root` consumes `store`.
-			let entry_watch = WatchDir::for_entry(&store, &entry_name);
+			let entry_watch = WatchDir::for_entry(&repo_store, &entry_name);
 			// tear down the previous entry scene so servers close and sockets drop
 			// before the fresh tree binds (a no-op on the first build).
 			BeetSceneRoot::despawn_all(world);
@@ -337,9 +353,9 @@ pub async fn rebuild_watched(
 			// itself on its own `Ready`, so its servers rebind.
 			let root = build_root(
 				world,
-				store,
+				repo_store,
 				sources,
-				(BeetSceneRoot, LiveReload::new()),
+				(BeetSceneRoot, LiveReload::new(), RepoStore),
 			)?;
 			if let Some(entry_watch) = entry_watch {
 				world.entity_mut(root).insert(entry_watch);
@@ -359,7 +375,7 @@ pub async fn rebuild_watched(
 /// broken include never blocks watch startup.
 #[cfg(not(target_arch = "wasm32"))]
 async fn entry_source_paths(
-	store: &BlobStore,
+	repo_store: &BlobStore,
 	entry_name: &str,
 ) -> HashSet<SmolPath> {
 	let mut seen = HashSet::default();
@@ -368,7 +384,7 @@ async fn entry_source_paths(
 		if !seen.insert(path.clone()) {
 			continue;
 		}
-		let Ok(media) = store.get_media(&path).await else {
+		let Ok(media) = repo_store.get_media(&path).await else {
 			continue;
 		};
 		stack.extend(
@@ -384,7 +400,7 @@ async fn entry_source_paths(
 /// Build an entry from in-memory BSX text rather than a store read: the browser
 /// path, where the program is inlined in a `<script type="application/x-bsx">`, not
 /// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
-/// builds onto a storeless ([`BlobStore::temp`]) root, so the same
+/// builds onto an in-memory ([`BlobStore::temp`]) repo store, so the same
 /// [`build_root`] core runs as the store-backed native path.
 pub fn build_from_bsx(
 	world: &mut World,
@@ -400,7 +416,7 @@ pub fn build_from_bsx(
 		template_sources: Vec::new(),
 		formats,
 	};
-	build_root(world, BlobStore::temp(), sources, ())
+	build_root(world, BlobStore::temp(), sources, RepoStore)
 }
 
 #[cfg(test)]
@@ -412,8 +428,8 @@ mod test {
 	/// `<DefaultAppRoutes/>` lands on the built router root.
 	#[beet::test]
 	async fn builds_an_entry_from_an_in_memory_store() {
-		let store = BlobStore::temp();
-		store
+		let repo_store = BlobStore::temp();
+		repo_store
 			.insert(
 				&SmolPath::from("main.bsx"),
 				"<Router><DefaultAppRoutes/></Router>",
@@ -422,11 +438,11 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&store, "main.bsx").await.unwrap();
-		let sources = read_sources(&store, formats, "main.bsx", prescan)
+		let prescan = read_prescan(&repo_store, "main.bsx").await.unwrap();
+		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, repo_store, sources, ()).unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -442,18 +458,18 @@ mod test {
 	/// `build_root` returns; the gate must return rather than hang.
 	#[beet::test]
 	async fn gate_settles_when_ready() {
-		let store = BlobStore::temp();
-		store
+		let repo_store = BlobStore::temp();
+		repo_store
 			.insert(&SmolPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&store, "main.bsx").await.unwrap();
-		let sources = read_sources(&store, formats, "main.bsx", prescan)
+		let prescan = read_prescan(&repo_store, "main.bsx").await.unwrap();
+		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
-		let root = build_root(&mut world, store, sources, ()).unwrap();
+		let root = build_root(&mut world, repo_store, sources, ()).unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()
@@ -462,7 +478,7 @@ mod test {
 		TemplatePending::settle_owned(&mut world).await;
 	}
 
-	/// An fs entry declaring `<StoreRoot src="..">` re-roots the store at the
+	/// An fs entry declaring `<RepoRoot src="..">` re-roots the store at the
 	/// resolved ancestor directory: the watch dir is the widened root and the
 	/// entry name grows the path back down to the document.
 	#[cfg(not(target_arch = "wasm32"))]
@@ -473,7 +489,7 @@ mod test {
 		fs_ext::create_dir_all(&entry_dir).unwrap();
 		fs_ext::write(
 			entry_dir.join("main.bsx"),
-			"<Router><StoreRoot src=\"..\"/></Router>",
+			"<Router><RepoRoot src=\"..\"/></Router>",
 		)
 		.unwrap();
 		let resolved = resolve_main(None, entry_dir.to_string_lossy().as_ref())
@@ -482,7 +498,7 @@ mod test {
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
-			.store
+			.repo_store
 			.exists(&SmolPath::from("app/main.bsx"))
 			.await
 			.unwrap()
@@ -491,27 +507,27 @@ mod test {
 
 	/// A store with no parent universe honours the same declaration as a
 	/// key-prefix view of itself; the binary's self-rooted branch resolves
-	/// through this same [`resolve_in_store`], so the declaration is never
+	/// through this same [`resolve_in_repo_store`], so the declaration is never
 	/// dropped by policy.
 	#[beet::test]
 	async fn self_rooted_entry_rebases_to_a_prefix_view() {
-		let store = BlobStore::temp();
-		store
+		let repo_store = BlobStore::temp();
+		repo_store
 			.insert(
 				&SmolPath::from("apps/site/main.bsx"),
-				"<Router><StoreRoot src=\"..\"/></Router>",
+				"<Router><RepoRoot src=\"..\"/></Router>",
 			)
 			.await
 			.unwrap();
 		let resolved =
-			resolve_in_store(store, "apps/site/main.bsx".to_string())
+			resolve_in_repo_store(repo_store, "apps/site/main.bsx".to_string())
 				.await
 				.unwrap();
 		resolved.entry_name.xpect_eq("site/main.bsx");
 		#[cfg(not(target_arch = "wasm32"))]
 		resolved.watch_dir.xpect_none();
 		resolved
-			.store
+			.repo_store
 			.exists(&SmolPath::from("site/main.bsx"))
 			.await
 			.unwrap()
@@ -522,22 +538,22 @@ mod test {
 	/// universe fails loudly naming the mis-publish.
 	#[beet::test]
 	async fn self_rooted_escape_fails_loudly() {
-		let store = BlobStore::temp();
-		store
+		let repo_store = BlobStore::temp();
+		repo_store
 			.insert(
 				&SmolPath::from("main.bsx"),
-				"<Router><StoreRoot src=\"../..\"/></Router>",
+				"<Router><RepoRoot src=\"../..\"/></Router>",
 			)
 			.await
 			.unwrap();
-		resolve_in_store(store, "main.bsx".to_string())
+		resolve_in_repo_store(repo_store, "main.bsx".to_string())
 			.await
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("mis-published");
 	}
 
-	/// The binary path and the command path share [`resolve_in_store`], so the
+	/// The binary path and the command path share [`resolve_in_repo_store`], so the
 	/// same inputs resolve an identical `(store, entry_name)`: here the
 	/// command-shaped `resolve_main` against the binary-shaped store + name
 	/// pair.
@@ -547,20 +563,23 @@ mod test {
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(
 			tmp.path().join("main.bsx"),
-			"<Router><StoreRoot src=\".\"/></Router>",
+			"<Router><RepoRoot src=\".\"/></Router>",
 		)
 		.unwrap();
 		let by_path = resolve_main(None, tmp.path().to_string_lossy().as_ref())
 			.await
 			.unwrap();
-		let by_store = resolve_in_store(
-			resolve_store(None, tmp.path().clone()).unwrap(),
+		let by_store = resolve_in_repo_store(
+			resolve_repo_store(None, tmp.path().clone()).unwrap(),
 			"main.bsx".to_string(),
 		)
 		.await
 		.unwrap();
 		by_path.entry_name.xpect_eq(by_store.entry_name);
-		by_path.store.same_scope(&by_store.store).xpect_true();
+		by_path
+			.repo_store
+			.same_scope(&by_store.repo_store)
+			.xpect_true();
 		by_path.watch_dir.xpect_eq(by_store.watch_dir);
 	}
 
@@ -570,8 +589,8 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet::test]
 	async fn rebuild_fires_ready_every_time() {
-		let store = BlobStore::temp();
-		store
+		let repo_store = BlobStore::temp();
+		repo_store
 			.insert(&SmolPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
@@ -592,7 +611,7 @@ mod test {
 				for _ in 0..2 {
 					rebuild_watched(
 						&world,
-						store.clone(),
+						repo_store.clone(),
 						"main.bsx".to_string(),
 						formats.clone(),
 					)

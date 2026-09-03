@@ -3,7 +3,7 @@
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
 //! `<RoutesDir src="routes"/>`) triggers [`RoutesDir::spawn_on_insert`]: the
-//! nearest ancestor [`BlobStore`] (the site store composed on the loaded root) is
+//! nearest ancestor [`BlobStore`] (the repo store composed on the loaded root) is
 //! scoped to `src` and listed, and each content file
 //! (`.md`/`.mdx`/`.bsx`/`.html`) spawns a [`BlobScene`] route child served through
 //! the shared media-parse pipeline. The scoped [`BlobStore`] is composed onto the
@@ -332,7 +332,7 @@ mod test {
 	/// Spawn `bundle` and settle the async runtime so the [`RoutesDir`] discovery
 	/// task (an async store scan) completes, returning the root entity. Mirrors a
 	/// boot path settling before it serves.
-	/// Compose `store` on the root (the site store an entry carries) so the
+	/// Compose `store` on the root (the repo store an entry carries) so the
 	/// [`RoutesDir`] resolves it by ancestry, then settle the async runtime so the
 	/// discovery task (an async store scan) completes. Mirrors a boot path settling
 	/// before it serves.

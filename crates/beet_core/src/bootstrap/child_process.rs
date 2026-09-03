@@ -205,7 +205,7 @@ impl ChildProcess {
 	///
 	/// ```ignore
 	/// let child = BootstrapConfig {
-	///     store: config.store.clone(), // deliberate inheritance
+	///     repo: config.repo.clone(), // deliberate inheritance
 	///     ..default()                  // everything else: not inherited
 	/// };
 	/// ChildProcess::new("beet").with_bootstrap(&child)?

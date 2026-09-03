@@ -45,7 +45,7 @@ pub fn CodeSnippet(
 	OnSpawn::new_async_local(move |snippet: AsyncEntity| async move {
 		let target = snippet.id();
 		// the nearest self-or-ancestor store backs the read; a render tree carries it
-		// on its root (see `BlobScene`), an entry tree inherits the site store.
+		// on its root (see `BlobScene`), an entry tree inherits the repo store.
 		let store = snippet
 			.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
 				|entity, stores| stores.get(entity).cloned(),

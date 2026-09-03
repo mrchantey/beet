@@ -45,7 +45,7 @@ const COUNTER_BSX: &str = r#"
 </article>
 "#;
 
-/// Seed an in-memory site store (entry, layout template, content routes) so the
+/// Seed an in-memory repo store (entry, layout template, content routes) so the
 /// suite runs storage-agnostic, on wasm too, with no temp-dir concurrency hazard.
 async fn site_store() -> BlobStore {
 	let store = BlobStore::temp();
@@ -75,12 +75,12 @@ async fn site_store() -> BlobStore {
 
 /// The example's `main.rs` setup in miniature: plugins + the compile-time
 /// package config (the title/description come from `MAIN_BSX`), then build the
-/// entry into a root carrying the site store so the markup-declared `<TemplateDir>`
+/// entry into a root carrying the repo store so the markup-declared `<TemplateDir>`
 /// and `<RoutesDir>` resolve it by ancestry.
 async fn spawn_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
 	// the same store-backed load the binary and Worker run: read the entry through
-	// the site store and build into a root carrying that store, so `<TemplateDir>`
+	// the repo store and build into a root carrying that store, so `<TemplateDir>`
 	// (registering `templates/`), `<RoutesDir>` and `<Template src>` resolve it by
 	// ancestry. None of the entry's own tags are dir-loaded templates, so the
 	// reactive `<TemplateDir>` registration settles below before any route renders.
@@ -141,7 +141,7 @@ async fn entry_components_land_on_root() {
 }
 
 /// The markup `<ServeBlobs prefix="assets" {DirPath("assets")}/>`
-/// mounts the on-disk `assets/` directory (the `DirPath` scopes the site store to
+/// mounts the on-disk `assets/` directory (the `DirPath` scopes the repo store to
 /// that subdir, resolved at insert time) and streams files beneath it.
 #[beet_core::test]
 async fn serve_blobs_serves_assets() {

@@ -10,7 +10,7 @@ The root is a one-shot `<CliServer always=true {CallOnReady}>` dispatcher whose
 `Router` is its child, so the entry is a set of commands and the served site is ONE
 of them: `serve`. `always=true` makes the dispatcher run on every boot regardless of
 `--server`, since `--server` selects the *served site's* transports, not this
-entry's. The box launches `app --store=s3://.. --server=http,ssh serve` and a
+entry's. The box launches `app --repo=s3://.. --server=http,ssh serve` and a
 developer launches `beet --main=site serve --server=http`: one process, one
 argv, the same verb, so local and deployed take the same path.
 

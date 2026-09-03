@@ -30,7 +30,7 @@ use core::str::FromStr;
 ///
 /// One rule, no per-field exceptions: **every field parses from both transports,
 /// `--kebab-name` argv and `BEET_SCREAMING_NAME` env, and argv wins.** So
-/// `--store` / `BEET_STORE`, `--port` / `BEET_HTTP_PORT`, `--stage` /
+/// `--repo` / `BEET_REPO`, `--port` / `BEET_HTTP_PORT`, `--stage` /
 /// `BEET_STAGE`, and so on. Both channels exist because both are natural
 /// affordances: a human types argv, a platform writes env into a unit file or a
 /// task definition.
@@ -69,11 +69,11 @@ use core::str::FromStr;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
-	/// The entry document: a path for a dir-rooted store, a name within a
+	/// The entry document: a path for a dir-rooted repo store, a name within a
 	/// self-rooted one. `--main` / `BEET_MAIN`.
 	pub main: Option<SmolStr>,
-	/// The store the entry loads through. `--store` / `BEET_STORE`.
-	pub store: Option<StoreUri>,
+	/// The repo store the entry loads through. `--repo` / `BEET_REPO`.
+	pub repo: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
 	pub watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
@@ -121,12 +121,12 @@ pub struct BootstrapConfig {
 /// Every field's static default, ie what an unset knob resolves to. Also the
 /// baseline the renderers diff against, so a field left at its default never
 /// reaches an argv line or an env pair, and the base a launch description is
-/// built over: `BootstrapConfig { store, ..default() }`.
+/// built over: `BootstrapConfig { repo, ..default() }`.
 impl Default for BootstrapConfig {
 	fn default() -> Self {
 		Self {
 			main: None,
-			store: None,
+			repo: None,
 			watch: false,
 			features: default(),
 			server: None,
@@ -169,9 +169,9 @@ impl BootstrapConfig {
 		arg: "main",
 		env: "BEET_MAIN",
 	};
-	const STORE: Knob = Knob {
-		arg: "store",
-		env: "BEET_STORE",
+	const REPO: Knob = Knob {
+		arg: "repo",
+		env: "BEET_REPO",
 	};
 	const WATCH: Knob = Knob {
 		arg: "watch",
@@ -247,7 +247,7 @@ impl BootstrapConfig {
 	///
 	/// In a browser [`env_ext::args`] yields the location query, so `?server=http`
 	/// still selects; in a Cloudflare Worker both sources are empty and every field
-	/// resolves to `None`, which is correct (the Worker resolves its store from
+	/// resolves to `None`, which is correct (the Worker resolves its repo store from
 	/// bindings).
 	pub fn from_env() -> Result<Self> {
 		Self::parse(&CliArgs::parse_env().params, &Self::env_var)
@@ -278,7 +278,7 @@ impl BootstrapConfig {
 	/// one flag reads that flag from its own params type.
 	///
 	/// Env participates because such a caller is itself configured like a process
-	/// (`BEET_STORE=.. cargo test ..` reaches the runner only through the
+	/// (`BEET_REPO=.. cargo test ..` reaches the runner only through the
 	/// environment), and the child's environment is scrubbed of `BEET_*` on the
 	/// way out, so the argv is the whole delivery.
 	pub fn take_params(
@@ -301,7 +301,7 @@ impl BootstrapConfig {
 	/// field is either listed here or is not a knob at all.
 	const KNOBS: [Knob; 18] = [
 		Self::MAIN,
-		Self::STORE,
+		Self::REPO,
 		Self::WATCH,
 		Self::FEATURES,
 		Self::SERVER,
@@ -352,7 +352,7 @@ impl BootstrapConfig {
 	fn read(reader: ConfigReader) -> Result<Self> {
 		Self {
 			main: reader.value(Self::MAIN),
-			store: reader.parsed(Self::STORE)?,
+			repo: reader.parsed(Self::REPO)?,
 			watch: reader.flag(Self::WATCH),
 			features: reader.list(Self::FEATURES),
 			server: reader.filter(Self::SERVER),
@@ -410,7 +410,7 @@ impl BootstrapConfig {
 			}
 		};
 		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
-		push(Self::STORE, self.store.as_ref().map(ToString::to_string));
+		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
 		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
 		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
 		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
@@ -467,7 +467,7 @@ impl BootstrapConfig {
 			}
 		};
 		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
-		push(Self::STORE, self.store.as_ref().map(ToString::to_string));
+		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
 		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
 		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
 		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
@@ -523,17 +523,17 @@ impl BootstrapConfig {
 	}
 
 	/// Split into the `(argv, env)` pair a platform encoder emits, each field on
-	/// its documented default channel: boot selection (the store, the server
+	/// its documented default channel: boot selection (the repo store, the server
 	/// selection, the opening path) is visible on argv, ambient service config
 	/// (the bind address, the ports, the stage, the deploy identity) rides env.
 	///
 	/// The dev-harness fields (`main`, `watch`, `features`, `remote_url`,
 	/// `tls_dir`, `headless`, `screenshot*`) belong to neither deploy channel and
 	/// are dropped: a deploy has no use for them, and a deployed process probes
-	/// its store for the entry rather than being told.
+	/// its repo store for the entry rather than being told.
 	pub fn split_channels(self) -> (Self, Self) {
 		let argv = Self {
-			store: self.store,
+			repo: self.repo,
 			server: self.server,
 			path: self.path,
 			..default()
@@ -770,7 +770,7 @@ mod test {
 	fn full() -> BootstrapConfig {
 		BootstrapConfig {
 			main: Some("main.bsx".into()),
-			store: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
+			repo: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
 			watch: true,
 			features: vec!["thread".into(), "sockets".into()],
 			server: Some(RunningSetFilter::new("http,ssh")),
@@ -886,13 +886,13 @@ mod test {
 	#[crate::test]
 	fn renders_cmd_json() {
 		BootstrapConfig {
-			store: Some(StoreUri::parse("s3://site").unwrap()),
+			repo: Some(StoreUri::parse("s3://site").unwrap()),
 			server: Some(RunningSetFilter::new("http,ssh")),
 			..default()
 		}
 		.to_cmd_json("/app")
 		.unwrap()
-		.xpect_eq(r#"["/app", "--store=s3://site", "--server=http,ssh"]"#);
+		.xpect_eq(r#"["/app", "--repo=s3://site", "--server=http,ssh"]"#);
 	}
 
 	/// Boot selection rides argv, ambient service config rides env, and the
@@ -901,7 +901,7 @@ mod test {
 	fn splits_channels() {
 		let (argv, env) = full().split_channels();
 		argv.to_argv().unwrap().join(" ").xpect_eq(
-			"--store=s3://site?region=us-west-2 --server=http,ssh --path=/docs",
+			"--repo=s3://site?region=us-west-2 --server=http,ssh --path=/docs",
 		);
 		env.to_env()
 			.iter()

@@ -7,8 +7,8 @@
 //! any recognized extension) or a directory probed for [`entry_build::ENTRY_NAMES`]
 //! (`--main=examples/hello`); with no `--main` discovery walks the cwd and its
 //! ancestors for the first match, so a bare `beet` is `--main=.` plus the walk.
-//! The entry may rebase its own store root with a `<StoreRoot src="../.."/>`
-//! declaration (see [`StoreRoot`]), so callers never re-supply it. The entry
+//! The entry may rebase its own store root with a `<RepoRoot src="../.."/>`
+//! declaration (see [`RepoRoot`]), so callers never re-supply it. The entry
 //! builds on the async runtime through its [`BlobStore`] (so every store read is
 //! awaited, never blocked), and runs itself: its own `CallOnReady` verb acts at
 //! its own `Ready`. A one-shot streams its response and exits; a long-running
@@ -21,12 +21,12 @@
 //! [`BlobStore`]); only entry *resolution* differs by target where the platform
 //! genuinely differs: a runtime with a filesystem (native, deno/node through the
 //! runner's fs globals) walks for `main.bsx` or honours `--main`; a browser reads
-//! its DOM program; a fs-less runtime needs a self-rooted `--store`
+//! its DOM program; a fs-less runtime needs a self-rooted `--repo`
 //! (`s3://<bucket>`, `local-storage`, `indexed-db`). The dev-command and
 //! winit-render paths are native-only.
 use beet::prelude::*;
 // `entry_build::ENTRY_NAMES` (the entry-document name list discovery looks for), `entry_build::resolve_main`
-// and `entry_build::resolve_store` (the `--store` backend selector) are shared with the
+// and `entry_build::resolve_repo_store` (the `--repo` backend selector) are shared with the
 // `check`/`serve`/`export-static` commands, so they live in the lib's
 // `entry_build` module rather than here.
 use beet_cli::prelude::*;
@@ -92,7 +92,7 @@ fn build_app() -> App {
 	app
 }
 
-/// `Startup`: resolve the entry store + name and build the entry, all on the async
+/// `Startup`: resolve the repo store + name and build the entry, all on the async
 /// runtime so discovery (a store walk), template registration, and every store read
 /// (`templates/`, the entry document, `<RoutesDir>`/`<Template src>`) go through the
 /// one [`BlobStore`] without ever blocking the runtime (which is single-threaded on
@@ -181,7 +181,7 @@ async fn build_entry(
 	formats: TemplateFormats,
 ) -> Result {
 	let ResolvedEntry {
-		store,
+		repo_store,
 		entry_name,
 		prescan,
 		#[cfg(not(target_arch = "wasm32"))]
@@ -194,19 +194,24 @@ async fn build_entry(
 	// entry has no local dir to watch, and the wasm runner has no fs watcher.
 	#[cfg(not(target_arch = "wasm32"))]
 	if watch_dir.is_some() && config.watch {
-		return build_watched_entry(world, store, entry_name, formats).await;
+		return build_watched_entry(world, repo_store, entry_name, formats)
+			.await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
 	// simply loads, and the entry's own markup decides how it runs by carrying
 	// a `CallOnReady` or not.
 	#[cfg(target_arch = "wasm32")]
 	let _ = config;
-	let sources =
-		entry_build::read_sources(&store, formats, entry_name.clone(), prescan)
-			.await?;
+	let sources = entry_build::read_sources(
+		&repo_store,
+		formats,
+		entry_name.clone(),
+		prescan,
+	)
+	.await?;
 	world
 		.with(move |world: &mut World| -> Result {
-			entry_build::build_root(world, store, sources, ())?;
+			entry_build::build_root(world, repo_store, sources, RepoStore)?;
 			Ok(())
 		})
 		.await
@@ -224,7 +229,7 @@ async fn build_entry(
 #[cfg(not(target_arch = "wasm32"))]
 async fn build_watched_entry(
 	world: &AsyncWorld,
-	store: BlobStore,
+	repo_store: BlobStore,
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
@@ -232,15 +237,17 @@ async fn build_watched_entry(
 	// (it is an `Fn`, re-run on every structural change). The structural source
 	// set starts empty; the first build below populates it.
 	let rebuild = {
-		let store = store.clone();
+		let repo_store = repo_store.clone();
 		let entry_name = entry_name.clone();
 		let formats = formats.clone();
 		move |world: AsyncWorld| -> LocalBoxedFuture<'static, Result> {
-			let (store, entry_name, formats) =
-				(store.clone(), entry_name.clone(), formats.clone());
+			let (repo_store, entry_name, formats) =
+				(repo_store.clone(), entry_name.clone(), formats.clone());
 			Box::pin(async move {
-				entry_build::rebuild_watched(&world, store, entry_name, formats)
-					.await
+				entry_build::rebuild_watched(
+					&world, repo_store, entry_name, formats,
+				)
+				.await
 			})
 		}
 	};
@@ -250,7 +257,7 @@ async fn build_watched_entry(
 		})
 		.await;
 	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
-	entry_build::rebuild_watched(world, store, entry_name, formats).await
+	entry_build::rebuild_watched(world, repo_store, entry_name, formats).await
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
@@ -258,17 +265,17 @@ async fn build_watched_entry(
 /// local root, ie a self-rooted store).
 ///
 /// Resolution order:
-/// 1. a self-rooted `--store` (`s3://<bucket>`, `local-storage`, `indexed-db`):
+/// 1. a self-rooted `--repo` (`s3://<bucket>`, `local-storage`, `indexed-db`):
 ///    the store roots itself, so `--main` names the entry document *within* it,
 ///    defaulting to an [`entry_build::ENTRY_NAMES`] probe. A deployed task passes
-///    `--store=s3://<bucket>` (deploy config as args, not env).
+///    `--repo=s3://<bucket>` (deploy config as args, not env).
 /// 2. `--main=<path>`: the entry file itself (a recognized extension) or a
 ///    directory probed for [`entry_build::ENTRY_NAMES`]; see [`entry_build::resolve_main`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store
 ///    for the first [`entry_build::ENTRY_NAMES`] match.
 ///
-/// Every path then resolves through [`entry_build::resolve_in_store`], so an
-/// entry's `<StoreRoot src>` declaration rebases any store kind uniformly (an
+/// Every path then resolves through [`entry_build::resolve_in_repo_store`], so an
+/// entry's `<RepoRoot src>` declaration rebases any store kind uniformly (an
 /// fs store re-roots, a self-rooted store takes a key-prefix view or fails
 /// loudly on a mis-publish). The config's [`StoreUri`] selects the backend
 /// (default `fs`).
@@ -282,33 +289,34 @@ async fn resolve_entry(
 	config: &BootstrapConfig,
 ) -> Result<ResolvedEntry> {
 	// the wasm runner forwards the *module's* flags on this same argv, so a
-	// `beet run-wasm <module> --main=<wasm-entry> --store=fs ...` invocation
-	// carries a `--main`/`--store` meant for the wasm module, not this native
+	// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
+	// carries a `--main`/`--repo` meant for the wasm module, not this native
 	// runner. When acting as the runner (first positional `run-wasm`), drop them
 	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
 	// module's own config on via `ChildProcess::with_bootstrap`.
 	let is_wasm_runner = RunWasm::is_runner(args);
-	let store_uri = (!is_wasm_runner).then(|| config.store.as_ref()).flatten();
+	let repo_uri = (!is_wasm_runner).then(|| config.repo.as_ref()).flatten();
 	let main = (!is_wasm_runner).then(|| config.main.as_ref()).flatten();
 
 	// a self-rooted store: no local dir and no ancestor walk, so `--main` is a
 	// key within the store, defaulting to the entry-name probe.
-	if store_uri.is_some_and(StoreUri::is_self_rooted) {
-		let store =
-			entry_build::resolve_store(store_uri, AbsPathBuf::new(".")?)?;
+	if repo_uri.is_some_and(StoreUri::is_self_rooted) {
+		let repo_store =
+			entry_build::resolve_repo_store(repo_uri, AbsPathBuf::new(".")?)?;
 		let entry_name = match main {
 			Some(main) => main.to_string(),
-			None => entry_build::probe_entry_names(&store).await?.ok_or_else(
-				|| {
+			None => entry_build::probe_entry_names(&repo_store)
+				.await?
+				.ok_or_else(|| {
 					bevyhow!(
-						"no entry document found in the `--store` backend: looked \
+						"no entry document found in the `--repo` backend: looked \
 					for {:?}. Seed one, or pass `--main=<name>`.",
 						entry_build::ENTRY_NAMES
 					)
-				},
-			)?,
+				})?,
 		};
-		return entry_build::resolve_in_store(store, entry_name).await;
+		return entry_build::resolve_in_repo_store(repo_store, entry_name)
+			.await;
 	}
 
 	// dir-rooted: an explicit `--main`, else the ancestor walk. On wasm the `fs`
@@ -317,13 +325,13 @@ async fn resolve_entry(
 	#[cfg(target_arch = "wasm32")]
 	if !js_runtime::environment().has_fs() {
 		bevybail!(
-			"this runtime has no filesystem: pass a self-rooted `--store` \
+			"this runtime has no filesystem: pass a self-rooted `--repo` \
 			(s3://<bucket>, local-storage, indexed-db)"
 		);
 	}
 	match main {
-		Some(main) => entry_build::resolve_main(store_uri, main.as_str()).await,
-		None => discover_entry(store_uri).await,
+		Some(main) => entry_build::resolve_main(repo_uri, main.as_str()).await,
+		None => discover_entry(repo_uri).await,
 	}
 }
 
@@ -348,16 +356,19 @@ fn features_self_check(
 /// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still rebase its own
-/// root ([`entry_build::resolve_in_store`]), and no match errors with guidance.
-async fn discover_entry(store_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
+/// root ([`entry_build::resolve_in_repo_store`]), and no match errors with guidance.
+async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
 	let start = AbsPathBuf::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
-		let store = BlobStore::new(FsStore::new(current.clone()));
-		if let Some(entry_name) = entry_build::probe_entry_names(&store).await?
+		let repo_store = BlobStore::new(FsStore::new(current.clone()));
+		if let Some(entry_name) =
+			entry_build::probe_entry_names(&repo_store).await?
 		{
-			let store = entry_build::resolve_store(store_uri, current)?;
-			return entry_build::resolve_in_store(store, entry_name).await;
+			let repo_store =
+				entry_build::resolve_repo_store(repo_uri, current)?;
+			return entry_build::resolve_in_repo_store(repo_store, entry_name)
+				.await;
 		}
 		dir = current.parent();
 	}

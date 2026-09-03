@@ -29,7 +29,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 -->
 <Fragment>
 	<!-- the head routes, wasm binary and eye sprites live workspace-relative -->
-	<StoreRoot src="../.."/>
+	<RepoRoot src="../.."/>
 	<CrateCheck features={["thread", "sockets", "secure", "extra"]}/>
 	<!-- the always-socket agent: a socket server whose head capabilities forward to the
 	     browser head over the socket, bound by the `whoami` handshake. -->

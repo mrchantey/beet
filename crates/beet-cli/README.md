@@ -41,7 +41,9 @@ cd examples/bsx_site && beet --server=http
 
 `--main` accepts an entry file (`--main=examples/hello/main.bsx`) or a directory probed for `main.bsx` (`--main=examples/hello`); with no `--main`, discovery walks the cwd and its ancestors.
 
-An entry that mounts paths outside its own directory declares `<StoreRoot src="../.."/>` (there is no `--root` flag): `src` names a position relative to the entry's location *in its store*, not a filesystem directory, so an fs store re-roots at the resolved ancestor while a self-rooted store (a bucket, browser storage) takes a key-prefix view and fails loudly when the root escapes the store. Live reload watches the store's local root when it has one (a self-rooted store watches nothing), and command outputs (`dist/`, `site.pdf`) land beside the entry deliberately.
+An entry loads through its **repo store**, the app's one canonical store (`--repo` / `BEET_REPO` picks the backend, defaulting to a filesystem store at the entry directory; `--repo=s3://<bucket>` is what a deployed box launches with). The built root carries it marked `RepoStore`, so everything below resolves content by ancestry and a second repo store anywhere in the world is an error.
+
+An entry that mounts paths outside its own directory declares `<RepoRoot src="../.."/>` (there is no `--root` flag): `src` names a position relative to the entry's location *in its repo store*, not a filesystem directory, so an fs store re-roots at the resolved ancestor while a self-rooted store (a bucket, browser storage) takes a key-prefix view and fails loudly when the root escapes the store. Live reload watches the store's local root when it has one (a self-rooted store watches nothing), and command outputs (`dist/`, `site.pdf`) land beside the entry deliberately.
 
 An entry declares its required features with `<CrateCheck features={["thread", "sockets"]}/>`, which errors when the running binary lacks them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<CrateCheck>` is the verification mechanism.
 

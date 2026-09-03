@@ -10,13 +10,13 @@ use beet_core::prelude::*;
 /// that can go through the registry, so it is a plain pre-scan.
 ///
 /// One parse per bootstrap, versus the three the same bytes used to get. The
-/// [`StoreRoot`], [`TemplateDir`] and [`CrateCheck`] components are untouched:
+/// [`RepoRoot`], [`TemplateDir`] and [`CrateCheck`] components are untouched:
 /// they remain the authoring vocabulary, this is only the extraction.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct EntryPrescan {
-	/// The `<StoreRoot src>` the entry widens its store to, relative to the entry
+	/// The `<RepoRoot src>` the entry widens its store to, relative to the entry
 	/// document's directory.
-	pub store_root: Option<SmolStr>,
+	pub repo_root: Option<SmolStr>,
 	/// Every `<TemplateDir src>` the entry declares, in document order.
 	pub template_dirs: Vec<SmolStr>,
 	/// Every `<CrateCheck/>` the entry declares.
@@ -55,11 +55,11 @@ impl EntryPrescan {
 				continue;
 			};
 			match element.tag.as_str() {
-				// the first `<StoreRoot>` wins; a second is ignored rather than
+				// the first `<RepoRoot>` wins; a second is ignored rather than
 				// silently re-rooting the store mid-document.
-				"StoreRoot" => {
-					if self.store_root.is_none() {
-						self.store_root = Self::str_attr(element, "src");
+				"RepoRoot" => {
+					if self.repo_root.is_none() {
+						self.repo_root = Self::str_attr(element, "src");
 					}
 				}
 				"TemplateDir" => {
@@ -140,7 +140,7 @@ mod test {
 	fn parses_every_declaration() {
 		let prescan = EntryPrescan::parse(&MediaBytes::new_bsx(
 			r#"<Router>
-				<StoreRoot src="../.."/>
+				<RepoRoot src="../.."/>
 				<TemplateDir src="templates"/>
 				<CrateCheck features={["sockets"]} versions={["0.1.0"]}/>
 				<Template src="header.bsx"/>
@@ -153,7 +153,7 @@ mod test {
 			</Router>"#,
 		))
 		.unwrap();
-		prescan.store_root.xpect_eq(Some(SmolStr::from("../..")));
+		prescan.repo_root.xpect_eq(Some(SmolStr::from("../..")));
 		prescan
 			.template_dirs
 			.xpect_eq(vec![SmolStr::from("templates"), SmolStr::from("more")]);
@@ -174,15 +174,15 @@ mod test {
 		]);
 	}
 
-	/// The first `<StoreRoot>` wins, and a document declaring nothing yields the
+	/// The first `<RepoRoot>` wins, and a document declaring nothing yields the
 	/// default.
 	#[beet_core::test]
-	fn first_store_root_wins() {
+	fn first_repo_root_wins() {
 		EntryPrescan::parse(&MediaBytes::new_bsx(
-			r#"<Router><StoreRoot src="../.."/><StoreRoot src="nope"/></Router>"#,
+			r#"<Router><RepoRoot src="../.."/><RepoRoot src="nope"/></Router>"#,
 		))
 		.unwrap()
-		.store_root
+		.repo_root
 		.xpect_eq(Some(SmolStr::from("../..")));
 		EntryPrescan::parse(&MediaBytes::new_bsx("<Router/>"))
 			.unwrap()

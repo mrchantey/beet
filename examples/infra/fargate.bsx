@@ -3,7 +3,7 @@
 
 Deploys `examples/bsx_site` as an http-only Fargate service. The generic `beet`
 binary runs in the container and reads the site from an S3 bucket at request time
-(the block bakes `--store=s3://<bucket> --server=http` into the container `CMD`),
+(the block bakes `--repo=s3://<bucket> --server=http` into the container `CMD`),
 so a site change re-publishes by re-running `sync` with no image rebuild. The ALB
 serves http on its own DNS name (no custom domain).
 
@@ -36,7 +36,7 @@ and a container engine.
 			     bucket the site is served from -->
 			<TofuApply layer="storage"/>
 			<!-- bake the freshly built binary into the container image; the block's
-			     bootstrap config (`--store=s3://<bucket> --server=http`) rides the CMD -->
+			     bootstrap config (`--repo=s3://<bucket> --server=http`) rides the CMD -->
 			<BuildDockerImage/>
 			<SiteSync/>
 			<!-- the full apply rolls the service, onto an image that is pushed and a

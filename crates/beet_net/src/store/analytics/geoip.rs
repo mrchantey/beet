@@ -17,7 +17,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::net::IpAddr;
 
-/// The default path of the country database, relative to the app store root.
+/// The default path of the country database, relative to the repo store root.
 const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
 
 /// Declares the country database an analytics surface looks its visitors up in:
@@ -217,7 +217,7 @@ mod test {
 
 	/// The real country database resolves a known ip to its country, proving the
 	/// mmdb loads and the lookup path works end to end. The store roots at the
-	/// workspace, the same shape as an app store containing `assets/`. The file is
+	/// workspace, the same shape as a repo store containing `assets/`. The file is
 	/// gitignored, so an unhydrated checkout skips rather than fails.
 	#[cfg(feature = "geoip")]
 	#[beet_core::test]

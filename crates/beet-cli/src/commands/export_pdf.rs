@@ -62,7 +62,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,
-		EntryParams::store(parts)?.as_ref(),
+		EntryParams::repo(parts)?.as_ref(),
 		&entry_path,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)
@@ -164,7 +164,7 @@ pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
 
 	// `--separate` writes one file per route to a dir; the default merges into one
 	// file (which needs the `pdf` feature). The default lands in the entry's own
-	// dir (not a `<StoreRoot>`-widened root).
+	// dir (not a `<RepoRoot>`-widened root).
 	let output = match params.output {
 		Some(output) => AbsPathBuf::new(output)?,
 		None => entry_dir(&entry_path)?.join(if params.separate {

@@ -11,7 +11,7 @@
 //! env binding to store, the worker request/response conversion, and the
 //! per-isolate world cache with version invalidation.
 //!
-//! The entry builds into a root carrying the site store, disarmed via
+//! The entry builds into a root carrying the repo store, disarmed via
 //! `DisableCallOnReady` (so its declared servers stay down; the Worker itself
 //! serves each request). The universal seam is the same
 //! `entity.exchange(request) -> Response` the native servers use.
@@ -64,8 +64,8 @@ async fn handle(
 
 	// resolve the entry document through the shared discovery: the first
 	// `entry_build::ENTRY_NAMES` match present in the bucket.
-	let blob_store = BlobStore::new(store.clone());
-	let entry_name = entry_build::probe_entry_names(&blob_store)
+	let repo_store = BlobStore::new(store.clone());
+	let entry_name = entry_build::probe_entry_names(&repo_store)
 		.await?
 		.ok_or_else(|| {
 			bevyhow!(
@@ -87,7 +87,7 @@ async fn handle(
 		.unwrap_or(true);
 	if stale {
 		worker_world = Some(
-			build_worker_world(blob_store, entry_name, current_version).await?,
+			build_worker_world(repo_store, entry_name, current_version).await?,
 		);
 	}
 	let mut worker_world = worker_world.expect("world built above");
@@ -117,7 +117,7 @@ async fn handle(
 /// start would hit the (wasm-absent) backend and panic. Same disarmed build
 /// `export-static`/`check` use.
 async fn build_worker_world(
-	store: BlobStore,
+	repo_store: BlobStore,
 	entry_name: String,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
@@ -128,7 +128,7 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-	entry_build::build_entry_owned(&mut world, store, entry_name).await?;
+	entry_build::build_entry_owned(&mut world, repo_store, entry_name).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world

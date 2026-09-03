@@ -365,7 +365,7 @@ build-wasm-full:
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet program (examples/wasm/hello.bsx) in the browser; its
 # console output renders on the page via <RenderConsole>. The entry roots at the
-# workspace (<StoreRoot>) so the served examples are reachable and --watch
+# workspace (<RepoRoot>) so the served examples are reachable and --watch
 # live-reloads on edit. Its /scripting page mounts the full binary, so run
 # `just build-wasm-full` once to serve that page too.
 serve-wasm *args:

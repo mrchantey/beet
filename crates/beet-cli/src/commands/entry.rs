@@ -11,8 +11,8 @@ use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
 /// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the
-/// command's [`EntryParams`] `--store` picks the backend, the entry's
-/// `<StoreRoot src>` rebases the root), so the same resolution serves
+/// command's [`EntryParams`] `--repo` picks the backend, the entry's
+/// `<RepoRoot src>` rebases the root), so the same resolution serves
 /// `beet --main=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the build
@@ -29,26 +29,32 @@ use beet::prelude::*;
 /// stall to wait out, not a failed run.
 pub(crate) async fn build_entry(
 	caller: &AsyncEntity,
-	store_uri: Option<&StoreUri>,
+	repo_uri: Option<&StoreUri>,
 	entry_path: &str,
 	settle_deadline: Option<Duration>,
 ) -> Result<Entity> {
 	let ResolvedEntry {
-		store,
+		repo_store,
 		entry_name,
 		prescan,
 		..
-	} = entry_build::resolve_main(store_uri, entry_path).await?;
+	} = entry_build::resolve_main(repo_uri, entry_path).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()
 		})
 		.await?;
 	let sources =
-		entry_build::read_sources(&store, formats, entry_name, prescan).await?;
+		entry_build::read_sources(&repo_store, formats, entry_name, prescan)
+			.await?;
 	let root = caller
 		.with_world(move |world, _| {
-			entry_build::build_root(world, store, sources, DisableCallOnReady)
+			entry_build::build_root(
+				world,
+				repo_store,
+				sources,
+				DisableCallOnReady,
+			)
 		})
 		.await??;
 	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
@@ -73,7 +79,7 @@ pub(crate) const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
 
 /// The entry's own directory (an entry file's parent, or the dir itself), the
 /// default home for command outputs like `dist/` and `site.pdf`. Deliberately
-/// not the `<StoreRoot>`-widened root, so outputs land beside the entry.
+/// not the `<RepoRoot>`-widened root, so outputs land beside the entry.
 pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPathBuf> {
 	let path = AbsPathBuf::new(entry_path)?;
 	if path.extension().is_some() {
@@ -84,28 +90,28 @@ pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPathBuf> {
 	}
 }
 
-/// The store selector every entry-loading command shares (`serve`, `check`,
+/// The repo store selector every entry-loading command shares (`serve`, `check`,
 /// `export-static`, `export-pdf`), naming the backend the entry loads through.
 ///
 /// A command loads an entry into *this* process rather than launching one, so
-/// it reads its own `--store` param (documented in its `--help`) rather than
+/// it reads its own `--repo` param (documented in its `--help`) rather than
 /// parsing a whole [`BootstrapConfig`] out of the request to reach one field.
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 pub(crate) struct EntryParams {
-	/// The store the entry loads through, eg `--store=s3://my-bucket`. Defaults
-	/// to the filesystem, rooted at the entry directory.
-	store: Option<String>,
+	/// The repo store the entry loads through, eg `--repo=s3://my-bucket`.
+	/// Defaults to the filesystem, rooted at the entry directory.
+	repo: Option<String>,
 }
 
 impl EntryParams {
-	/// The entry store `parts` select, `None` for the default filesystem store
+	/// The repo store `parts` select, `None` for the default filesystem store
 	/// rooted at the entry dir.
-	pub fn store(parts: &RequestParts) -> Result<Option<StoreUri>> {
+	pub fn repo(parts: &RequestParts) -> Result<Option<StoreUri>> {
 		parts
 			.params()
 			.parse_reflect::<Self>()?
-			.store
+			.repo
 			.map(|uri| StoreUri::parse(&uri))
 			.transpose()
 	}
@@ -203,7 +209,7 @@ mod test {
 	async fn entry_declares_server_and_app_routes() {
 		let mut world = render_world();
 		let ResolvedEntry {
-			store,
+			repo_store,
 			entry_name,
 			prescan,
 			..
@@ -214,13 +220,17 @@ mod test {
 		.await
 		.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let sources =
-			entry_build::read_sources(&store, formats, entry_name, prescan)
-				.await
-				.unwrap();
+		let sources = entry_build::read_sources(
+			&repo_store,
+			formats,
+			entry_name,
+			prescan,
+		)
+		.await
+		.unwrap();
 		let root = entry_build::build_root(
 			&mut world,
-			store,
+			repo_store,
 			sources,
 			DisableCallOnReady,
 		)

@@ -18,7 +18,7 @@ runtime, so its program sticks to the core vocabulary), `/render` boots
 (`web_full`, the kitchen sink, so `just build-wasm-full` first). Any
 `examples/action/*.bsx` runs off the full binary: point a page's `<MainBsx src>`
 at eg `/examples/action/malenia.bsx`. The entry roots at the workspace
-(`<StoreRoot>`), so `<AssetsDir>` serves the examples the browser fetches and
+(`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser fetches and
 `--watch` live-reloads the browser on any edit under them.
 
 `<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
@@ -26,7 +26,7 @@ workspace assets (the wasm binaries) at /assets and the examples tree at /exampl
 -->
 <HttpServer>
 <Router>
-	<StoreRoot src="../.."/>
+	<RepoRoot src="../.."/>
 	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
 	<Theme color={Srgba(Srgba{red:0.0, green:0.8, blue:0.6, alpha:1.0})}/>
 	<!-- the whole document tracks the scheme: surface bg + on-surface text, bound to

@@ -35,7 +35,7 @@ pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
 	let params = parts.params().parse_reflect::<CheckParams>()?;
 	let root = build_entry(
 		&cx.caller,
-		EntryParams::store(parts)?.as_ref(),
+		EntryParams::repo(parts)?.as_ref(),
 		&entry_arg(parts)?,
 		Some(ONE_SHOT_SETTLE_DEADLINE),
 	)

@@ -94,7 +94,7 @@ pub struct LightsailBlock {
 	#[set_with(unwrap_option)]
 	app_port: Option<u16>,
 	/// The positional route the unit dispatches on boot, appended after the
-	/// argv channel: `exec /opt/<app>/app --store=.. --server=.. serve`.
+	/// argv channel: `exec /opt/<app>/app --repo=.. --server=.. serve`.
 	///
 	/// An entry whose root is a `CliServer` dispatcher selects its command with
 	/// a positional arg, so a deployed site says which of its routes *is* the
@@ -1615,7 +1615,7 @@ mod tests {
 		let stack = stack.with_stage("staging");
 		let script = LightsailBlock::default()
 			.with_bootstrap(BootstrapConfig {
-				store: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
+				repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
@@ -1625,7 +1625,7 @@ mod tests {
 		script
 			.as_str()
 			.xpect_contains(
-				"exec /opt/beet_infra/app --store=s3://beet--dev--app \
+				"exec /opt/beet_infra/app --repo=s3://beet--dev--app \
 				--server=http serve",
 			)
 			// the unit runs the launcher, which resolves the release per start
@@ -1633,7 +1633,7 @@ mod tests {
 			.xpect_contains("Environment=BEET_STAGE=staging")
 			// the store never leaks onto the env channel
 			.xnot()
-			.xpect_contains("BEET_STORE");
+			.xpect_contains("BEET_REPO");
 	}
 
 	/// No boot route renders the bare invocation, ie an entry whose root boots

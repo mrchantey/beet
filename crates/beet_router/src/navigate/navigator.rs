@@ -498,7 +498,7 @@ mod test {
 	/// page.
 	///
 	/// Regression: `beet --main=site serve --server=tui` and every deployed ssh session
-	/// (`app --store=.. --server=ssh serve`) opened on a "no route matched
+	/// (`app --repo=.. --server=ssh serve`) opened on a "no route matched
 	/// //serve" error page, because the whole request path became the opening
 	/// route.
 	#[beet_core::test]

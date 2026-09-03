@@ -321,12 +321,12 @@ pub fn LightsailBeetSiteBlock(
 		.with_allow_ssh(true)
 		.with_exec_route(exec_route)
 		// one declaration for both channels: the block splits boot selection (the
-		// entry store, the transports) onto the unit's `ExecStart` and the service
+		// repo store, the transports) onto the unit's `ExecStart` and the service
 		// config the runtime reads onto its `Environment=` lines. The analytics
 		// table is NOT here: the site declares it, and the deployed process
 		// resolves the same declaration.
 		.with_bootstrap(BootstrapConfig {
-			store: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
+			repo: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
 			server: Some(RunningSetFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
 			..default()

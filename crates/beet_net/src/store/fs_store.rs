@@ -75,7 +75,7 @@ impl BlobStoreProvider for FsStore {
 	/// The filesystem has a parent universe above the store's root, so a
 	/// `../..` root re-roots the store at the absolute resolved directory
 	/// rather than erroring — walking above the entry's directory is the
-	/// point of an fs `<StoreRoot>`.
+	/// point of an fs `<RepoRoot>`.
 	fn rebase(
 		&self,
 		entry_name: &SmolPath,
@@ -210,7 +210,7 @@ mod test {
 	/// the entry name grows the path back down to it.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
-	async fn rebases_above_the_store_root() {
+	async fn rebases_above_the_repo_root() {
 		let tmp =
 			AbsPathBuf::new_workspace_rel("target/tests/beet_net/rebase-fs")
 				.unwrap();
@@ -220,7 +220,7 @@ mod test {
 		fs_ext::write(tmp.join("shared.txt"), "shared").unwrap();
 		let store = BlobStore::new(FsStore::new(entry_dir));
 		let (rebased, entry_name) =
-			store.rebase_entry("main.bsx", "../..").unwrap();
+			store.rebase_repo("main.bsx", "../..").unwrap();
 		entry_name.xpect_eq("a/b/main.bsx");
 		rebased
 			.get_media(&SmolPath::from("a/b/main.bsx"))

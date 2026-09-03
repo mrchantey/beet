@@ -10,6 +10,16 @@
 //! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //!
+//! ## The repo store
+//!
+//! One store in an app is special: the [`RepoStore`], the canonical store an
+//! entry loads through, holding the entry document, its templates, routes and
+//! assets. A world carries exactly one (the marker errors on a second), and a
+//! consumer reaches it either by ancestry (`AncestorQuery<&BlobStore>`, which
+//! honours any intervening scope) or directly through [`RepoStore::get`]. Every
+//! other store is a plain one: declared for a purpose and named by a
+//! [`StoreRef`], or scoped out of an ancestor by a [`DirPath`].
+//!
 //! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
 //! on_add hooks auto-insert the type-erased currencies: a [`BlobStore`], and a
@@ -38,10 +48,13 @@ pub use blob_event::*;
 pub use blob_store_provider::*;
 mod blob_store;
 mod in_memory_store;
+// the one canonical store an app runs from, and the singleton it enforces.
+mod repo_store;
 mod store_path;
 pub use blob::*;
 pub use blob_store::*;
 pub use in_memory_store::*;
+pub use repo_store::*;
 pub use store_path::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store
@@ -129,6 +142,10 @@ impl Plugin for StorePlugin {
 			// consumer to a declaration (`{StoreRef($analytics)}`).
 			.register_type::<StoreRef>()
 			.register_type::<StoreConsumers>()
+			// the repo store marker and its singleton enforcement: one canonical
+			// store per app, the one an entry loads through.
+			.register_type::<RepoStore>()
+			.add_observer(on_insert_repo_store)
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_store)

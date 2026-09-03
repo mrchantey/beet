@@ -95,7 +95,7 @@ tui = ["beet/tui_server"]
 ssh = ["tui", "beet/ssh_tui"]
 # S3-backed stores, so a deployed `beet` task loads its entry (`main.bsx`,
 # `routes/`, `templates/`) from an S3 bucket instead of the local filesystem,
-# selected at runtime by `--store=s3://<bucket>`. Adds no deploy/terraform
+# selected at runtime by `--repo=s3://<bucket>`. Adds no deploy/terraform
 # machinery, keeping the container binary lean.
 aws_sdk = ["beet/aws_sdk"]
 # The AWS Lambda backend: builds the generic `beet` binary as a `provided.al2023`

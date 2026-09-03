@@ -34,14 +34,14 @@ pub use route_query::*;
 mod template_dir;
 #[cfg(feature = "bsx")]
 pub use template_dir::*;
-// the entry-declared store root (`<StoreRoot src="../.."/>`), pre-scanned by
+// the entry-declared store root (`<RepoRoot src="../.."/>`), pre-scanned by
 // entry resolution like an entry's own `<TemplateDir>`s.
 #[cfg(feature = "bsx")]
-mod store_root;
+mod repo_root;
 #[cfg(feature = "bsx")]
-pub use store_root::*;
+pub use repo_root::*;
 // the one registry-free walk entry resolution reads its pre-scanned declarations
-// (`<StoreRoot>`, `<TemplateDir>`, `<CrateCheck>`, `<Template src>`) from.
+// (`<RepoRoot>`, `<TemplateDir>`, `<CrateCheck>`, `<Template src>`) from.
 #[cfg(feature = "bsx")]
 mod entry_prescan;
 #[cfg(feature = "bsx")]

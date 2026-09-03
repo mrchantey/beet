@@ -31,7 +31,7 @@ launched directly and names its own verb, exactly as its deploy verbs are
     beet --main=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
     beet --main=examples/bsx_site --server=http   # a zero-code BSX site, whose root IS the server
 
-That is the identical path the deployed box takes (`app --store=s3://.. serve`),
+That is the identical path the deployed box takes (`app --repo=s3://.. serve`),
 and it is why the site's resources and deploy verbs live in `site/main.bsx`: the
 application that runs on them is the thing that declares them (`just beet-deploy`
 runs `beet --main=site deploy`).

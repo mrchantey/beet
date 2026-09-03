@@ -37,7 +37,7 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 }
 
 /// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
-/// from its bucket: the self-rooted `s3://<bucket>` entry store (the entry
+/// from its bucket: the self-rooted `s3://<bucket>` repo store (the entry
 /// document is probed at the bucket root) constrained to the http transport. A
 /// deploy serving more transports overrides `server`.
 ///
@@ -48,10 +48,7 @@ pub fn remote_bootstrap(
 	bucket_name: impl AsRef<str>,
 ) -> Result<BootstrapConfig> {
 	BootstrapConfig {
-		store: Some(StoreUri::parse(&format!(
-			"s3://{}",
-			bucket_name.as_ref()
-		))?),
+		repo: Some(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?),
 		server: Some(RunningSetFilter::new("http")),
 		..default()
 	}

@@ -9,7 +9,7 @@
 //!
 //! The read is an async *pending* dependency, not a blocking call: the handler
 //! parks a [`PendingId`] on the build root and spawns a task that resolves the
-//! nearest ancestor [`BlobStore`] (the site store on the loaded root), reads `src`
+//! nearest ancestor [`BlobStore`] (the repo store on the loaded root), reads `src`
 //! through it, and builds the included entry at the include site, then resolves the
 //! dependency so `Ready` proceeds. So an include never blocks the runtime
 //! (single-threaded on wasm) and an S3-backed site composes the same way as a local
@@ -83,7 +83,7 @@ async fn resolve_include(
 		.await;
 }
 
-/// Resolve the include base (the nearest ancestor [`BlobStore`], the site store on
+/// Resolve the include base (the nearest ancestor [`BlobStore`], the repo store on
 /// the loaded root), read `src` through it, then parse and build the entry at the
 /// include site. A store-less tree is an error: every platform resolves includes
 /// through the store, never the filesystem directly (there is none on wasm).

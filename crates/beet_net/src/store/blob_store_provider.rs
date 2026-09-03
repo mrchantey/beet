@@ -16,7 +16,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 
 	/// A view of this store rooted at `root` (a normalized store-relative key
 	/// path), plus `entry_name` re-expressed relative to that root. The seam
-	/// behind [`BlobStore::rebase_entry`].
+	/// behind [`BlobStore::rebase_repo`].
 	///
 	/// The default is the key-prefix view every provider supports
 	/// ([`with_subdir`](Self::with_subdir)), erroring loudly when `root` walks
@@ -32,7 +32,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
 		if root.first_segment() == Some("..") {
 			bevybail!(
-				"entry `{entry_name}` declares a `<StoreRoot>` above the store \
+				"entry `{entry_name}` declares a `<RepoRoot>` above the store \
 				itself (`{root}`), and a `{}` store has no parent universe. \
 				This usually means a mis-published store: the entry's directory \
 				was synced instead of its declared root.",

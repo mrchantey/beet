@@ -1,4 +1,4 @@
-//! The store-selection grammar behind `--store` / `BEET_STORE`.
+//! The store-selection grammar behind `--repo` / `BEET_REPO`.
 
 use crate::prelude::*;
 use core::fmt;
@@ -13,7 +13,7 @@ use core::str::FromStr;
 /// The grammar round-trips through [`Display`]:
 ///
 /// 1. `fs` / `fs:<path>`: a filesystem store, rooted at the resolution context
-///    dir (the resolved entry dir for an entry store) or at `<path>` when given,
+///    dir (the resolved entry dir for a repo store) or at `<path>` when given,
 ///    relative paths resolved against the context dir.
 /// 2. `memory`: a temporary in-memory store.
 /// 3. `s3://<bucket>[?endpoint=<url>][&region=<region>]`: an S3-compatible
