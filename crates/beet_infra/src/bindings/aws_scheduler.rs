@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -102,8 +101,8 @@ pub struct AwsSchedulerScheduleDetails {
 	pub target: Option<Vec<AwsSchedulerScheduleResourceBlockTypeTarget>>,
 }
 impl terra::ToJson for AwsSchedulerScheduleDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsSchedulerScheduleDetails {

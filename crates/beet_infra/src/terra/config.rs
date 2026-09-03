@@ -283,10 +283,7 @@ impl Config {
 			.entry(resource.resource_type().into())
 			.or_insert_with(Value::map)
 			.as_map_mut()?;
-		if map
-			.insert(label.clone(), Value::from_json(resource.to_json()))
-			.is_some()
-		{
+		if map.insert(label.clone(), resource.to_json()).is_some() {
 			bevybail!(
 				"duplicate resource: type `{}` label `{}` already exists",
 				resource.resource_type(),
@@ -321,10 +318,7 @@ impl Config {
 			.entry(source.data_type().into())
 			.or_insert_with(Value::map)
 			.as_map_mut()?;
-		if map
-			.insert(label.clone(), Value::from_json(source.to_json()))
-			.is_some()
-		{
+		if map.insert(label.clone(), source.to_json()).is_some() {
 			bevybail!(
 				"duplicate data source: type `{}` label `{}` already exists",
 				source.data_type(),

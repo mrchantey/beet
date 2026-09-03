@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -147,8 +146,8 @@ pub struct AwsAcmCertificateDetails {
 		Option<Vec<AwsAcmCertificateResourceBlockTypeValidationOption>>,
 }
 impl terra::ToJson for AwsAcmCertificateDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsAcmCertificateDetails {
@@ -306,8 +305,8 @@ pub struct AwsAcmCertificateValidationDetails {
 		Option<Vec<AwsAcmCertificateValidationResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsAcmCertificateValidationDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsAcmCertificateValidationDetails {

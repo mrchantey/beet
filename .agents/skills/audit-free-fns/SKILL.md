@@ -34,7 +34,7 @@ A module qualifies as a namespace when it is a coherent API over one domain and 
 - `beet_net/src/server/stream_sniff.rs` — `stream_sniff::write_and_close(..)`: classify an accepted connection and answer it, already the call idiom at every site
 - `beet_net/src/mdns/wire.rs` — `wire::build_ptr_query(..)`, `wire::MDNS_PORT`: the mDNS wire format (constants + codec), one layer of the protocol
 - `beet_infra/src/terra/tofu.rs` — `tofu::apply(&dir)`: one fn per `tofu` subcommand, already the call idiom at every site
-- `beet-cli/src/entry_build.rs` — `entry_build::resolve_main(..)`: the entry resolve/read/build pipeline, one coherent step set (due a rewrite in master-plan phase 31)
+- `beet-cli/src/entry_build.rs` — `entry_build::resolve_main(..)`: the entry resolve/read/build pipeline, one coherent step set
 
 To sanction a new one, add it here in the same changeset with the call-site idiom as justification.
 

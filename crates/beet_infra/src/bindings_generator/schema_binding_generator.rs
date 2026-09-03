@@ -388,7 +388,6 @@ fn build_preamble() -> String {
 		"#![allow(unused_imports, non_snake_case, non_camel_case_types, non_upper_case_globals)]",
 		"use std::collections::BTreeMap as Map;",
 		"use serde::{Serialize, Deserialize};",
-		"use serde_json;",
 		"#[allow(unused)]",
 		"use beet_core::prelude::*;",
 		"#[allow(unused)]",
@@ -429,7 +428,6 @@ fn preamble_with_versions(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	fn test_provider() -> terra::Provider {
 		terra::Provider::new(

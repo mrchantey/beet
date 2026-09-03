@@ -463,8 +463,8 @@ impl<'a> CodeGenerator<'a> {
 
 		quote! {
 			impl terra::ToJson for #struct_ident {
-				fn to_json(&self) -> serde_json::Value {
-					serde_json::to_value(self).expect("serialization should not fail")
+				fn to_json(&self) -> Value {
+					Value::from_serde(self).expect("serialization should not fail")
 				}
 			}
 

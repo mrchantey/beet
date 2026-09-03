@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -81,8 +80,8 @@ pub struct AwsSesv2ConfigurationSetDetails {
 		Option<Vec<AwsSesv2ConfigurationSetResourceBlockTypeTrackingOptions>>,
 }
 impl terra::ToJson for AwsSesv2ConfigurationSetDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsSesv2ConfigurationSetDetails {
@@ -151,8 +150,8 @@ pub struct AwsSesv2ConfigurationSetEventDestinationDetails {
     >,
 }
 impl terra::ToJson for AwsSesv2ConfigurationSetEventDestinationDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsSesv2ConfigurationSetEventDestinationDetails {
@@ -245,8 +244,8 @@ pub struct AwsSesv2EmailIdentityDetails {
 	>,
 }
 impl terra::ToJson for AwsSesv2EmailIdentityDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsSesv2EmailIdentityDetails {
@@ -339,8 +338,8 @@ pub struct AwsSesv2EmailIdentityMailFromAttributesDetails {
 	pub region: Option<SmolStr>,
 }
 impl terra::ToJson for AwsSesv2EmailIdentityMailFromAttributesDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsSesv2EmailIdentityMailFromAttributesDetails {

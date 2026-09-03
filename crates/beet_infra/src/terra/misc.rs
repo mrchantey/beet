@@ -2,11 +2,10 @@
 //!
 //! These form the typed foundation of beet_infra:
 //! - [`Provider`] identifies a provider (AWS, Cloudflare, etc.)
-//! - [`ToJson`] converts a value to Terraform-compatible JSON
+//! - [`ToJson`] converts a value to a Terraform-compatible [`Value`]
 //! - [`Resource`] marks a struct as a typed Terraform resource
 
 use beet_core::prelude::*;
-use serde_json::Value;
 use std::borrow::Cow;
 use thiserror::Error;
 
@@ -108,7 +107,7 @@ impl Provider {
 // Traits
 // ---------------------------------------------------------------------------
 
-/// Convert a value into Terraform-compatible JSON.
+/// Convert a value into a Terraform-compatible [`Value`] tree.
 pub trait ToJson {
 	fn to_json(&self) -> Value;
 }

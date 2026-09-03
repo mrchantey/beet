@@ -9,6 +9,12 @@ Cloud resources are declared as Bevy entities and exported to Terraform/OpenTofu
 - `bindings_generator` - generate typed Rust bindings from a provider schema (`bindings_generator` feature)
 - actions for the deploy lifecycle: validate, plan, deploy, watch, show, destroy (`deploy` feature)
 
+## Bindings
+
+The committed provider bindings (`bindings`) are generated, never hand-edited: regenerate with `just bindings`. A provider bump is a two-line deliberate act, edit its `schema_version` in `terra::Provider` and rerun, which is what makes generation reproducible (`Provider::version` floats and would not).
+
+Every generated resource implements `terra::ToJson`, whose output is a `beet_core::Value` rather than a `serde_json::Value`, so a rendered body enters `terra::Config` in the type the config already holds and no conversion sits at that boundary.
+
 ## Deploy layers
 
 A deploy publishes into its stores and then rolls the service that reads them, so a deploy route applies once per phase: `<TofuApply layer="storage"/>` creates the resources the fill steps publish into (buckets, tables, the image registry), the fill steps run (image push, content sync), then a bare `<TofuApply/>` converges the whole stack and rolls the service. Blocks declare their publish-into resources with `Config::add_layer_resource`, defaulting the assignment to the `storage` layer and exposing it as a field. Naming a layer no block declares is a loud error, never a silent no-op.

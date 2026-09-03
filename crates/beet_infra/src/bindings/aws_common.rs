@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -89,8 +88,8 @@ pub struct AwsCloudwatchLogGroupDetails {
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
 }
 impl terra::ToJson for AwsCloudwatchLogGroupDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsCloudwatchLogGroupDetails {
@@ -240,8 +239,8 @@ pub struct AwsCloudwatchMetricAlarmDetails {
 		Option<Vec<AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery>>,
 }
 impl terra::ToJson for AwsCloudwatchMetricAlarmDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsCloudwatchMetricAlarmDetails {
@@ -329,8 +328,8 @@ pub struct AwsIamAccessKeyDetails {
 	pub user: SmolStr,
 }
 impl terra::ToJson for AwsIamAccessKeyDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamAccessKeyDetails {
@@ -480,8 +479,8 @@ pub struct AwsIamRoleDetails {
 	pub inline_policy: Option<Vec<AwsIamRoleResourceBlockTypeInlinePolicy>>,
 }
 impl terra::ToJson for AwsIamRoleDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamRoleDetails {
@@ -557,8 +556,8 @@ pub struct AwsIamRolePolicyAttachmentDetails {
 	pub role: SmolStr,
 }
 impl terra::ToJson for AwsIamRolePolicyAttachmentDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamRolePolicyAttachmentDetails {
@@ -624,8 +623,8 @@ pub struct AwsIamRolePolicyDetails {
 	pub role: SmolStr,
 }
 impl terra::ToJson for AwsIamRolePolicyDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamRolePolicyDetails {
@@ -708,8 +707,8 @@ pub struct AwsIamUserDetails {
 	pub unique_id: Option<SmolStr>,
 }
 impl terra::ToJson for AwsIamUserDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamUserDetails {
@@ -777,8 +776,8 @@ pub struct AwsIamUserPolicyAttachmentDetails {
 	pub user: SmolStr,
 }
 impl terra::ToJson for AwsIamUserPolicyAttachmentDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamUserPolicyAttachmentDetails {
@@ -844,8 +843,8 @@ pub struct AwsIamUserPolicyDetails {
 	pub user: SmolStr,
 }
 impl terra::ToJson for AwsIamUserPolicyDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamUserPolicyDetails {
@@ -992,8 +991,8 @@ pub struct AwsS3BucketDetails {
 	pub website: Option<Vec<AwsS3BucketResourceBlockTypeWebsite>>,
 }
 impl terra::ToJson for AwsS3BucketDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsS3BucketDetails {
@@ -1100,8 +1099,8 @@ pub struct AwsS3BucketPolicyDetails {
 	pub region: Option<SmolStr>,
 }
 impl terra::ToJson for AwsS3BucketPolicyDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsS3BucketPolicyDetails {
@@ -1180,8 +1179,8 @@ pub struct AwsS3BucketPublicAccessBlockDetails {
 	pub skip_destroy: Option<bool>,
 }
 impl terra::ToJson for AwsS3BucketPublicAccessBlockDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsS3BucketPublicAccessBlockDetails {

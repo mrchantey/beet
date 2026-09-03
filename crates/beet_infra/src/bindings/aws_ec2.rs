@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -73,8 +72,8 @@ pub struct AwsEipAssociationDetails {
 	pub region: Option<SmolStr>,
 }
 impl terra::ToJson for AwsEipAssociationDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEipAssociationDetails {
@@ -198,8 +197,8 @@ pub struct AwsEipDetails {
 	pub timeouts: Option<Vec<AwsEipResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsEipDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEipDetails {
@@ -353,8 +352,8 @@ pub struct AwsIamInstanceProfileDetails {
 	pub unique_id: Option<SmolStr>,
 }
 impl terra::ToJson for AwsIamInstanceProfileDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsIamInstanceProfileDetails {
@@ -648,8 +647,8 @@ pub struct AwsInstanceDetails {
 	pub timeouts: Option<Vec<AwsInstanceResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsInstanceDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsInstanceDetails {
@@ -808,8 +807,8 @@ pub struct AwsKeyPairDetails {
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
 }
 impl terra::ToJson for AwsKeyPairDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsKeyPairDetails {

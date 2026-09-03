@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -130,8 +129,8 @@ pub struct AwsApiGatewayRestApiDetails {
 	pub timeouts: Option<Vec<AwsApiGatewayRestApiResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsApiGatewayRestApiDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApiGatewayRestApiDetails {
@@ -287,8 +286,8 @@ pub struct AwsApigatewayv2ApiDetails {
 		Option<Vec<AwsApigatewayv2ApiResourceBlockTypeCorsConfiguration>>,
 }
 impl terra::ToJson for AwsApigatewayv2ApiDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2ApiDetails {
@@ -383,8 +382,8 @@ pub struct AwsApigatewayv2ApiMappingDetails {
 	pub stage: SmolStr,
 }
 impl terra::ToJson for AwsApigatewayv2ApiMappingDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2ApiMappingDetails {
@@ -480,8 +479,8 @@ pub struct AwsApigatewayv2DomainNameDetails {
 		Option<Vec<AwsApigatewayv2DomainNameResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsApigatewayv2DomainNameDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2DomainNameDetails {
@@ -621,8 +620,8 @@ pub struct AwsApigatewayv2IntegrationDetails {
 		Option<Vec<AwsApigatewayv2IntegrationResourceBlockTypeTlsConfig>>,
 }
 impl terra::ToJson for AwsApigatewayv2IntegrationDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2IntegrationDetails {
@@ -732,8 +731,8 @@ pub struct AwsApigatewayv2RouteDetails {
 		Option<Vec<AwsApigatewayv2RouteResourceBlockTypeRequestParameter>>,
 }
 impl terra::ToJson for AwsApigatewayv2RouteDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2RouteDetails {
@@ -845,8 +844,8 @@ pub struct AwsApigatewayv2StageDetails {
 		Option<Vec<AwsApigatewayv2StageResourceBlockTypeRouteSettings>>,
 }
 impl terra::ToJson for AwsApigatewayv2StageDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsApigatewayv2StageDetails {
@@ -1113,8 +1112,8 @@ pub struct AwsLambdaFunctionDetails {
 	pub vpc_config: Option<Vec<AwsLambdaFunctionResourceBlockTypeVpcConfig>>,
 }
 impl terra::ToJson for AwsLambdaFunctionDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLambdaFunctionDetails {
@@ -1281,8 +1280,8 @@ pub struct AwsLambdaFunctionUrlDetails {
 	pub timeouts: Option<Vec<AwsLambdaFunctionUrlResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsLambdaFunctionUrlDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLambdaFunctionUrlDetails {
@@ -1411,8 +1410,8 @@ pub struct AwsLambdaPermissionDetails {
 	pub timeouts: Option<Vec<AwsLambdaPermissionResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsLambdaPermissionDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLambdaPermissionDetails {

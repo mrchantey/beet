@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -94,8 +93,8 @@ pub struct AwsEcrRepositoryDetails {
 	pub timeouts: Option<Vec<AwsEcrRepositoryResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsEcrRepositoryDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEcrRepositoryDetails {
@@ -189,8 +188,8 @@ pub struct AwsEcsClusterDetails {
 	pub setting: Option<Vec<AwsEcsClusterResourceBlockTypeSetting>>,
 }
 impl terra::ToJson for AwsEcsClusterDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEcsClusterDetails {
@@ -378,8 +377,8 @@ pub struct AwsEcsServiceDetails {
 		Option<Vec<AwsEcsServiceResourceBlockTypeVpcLatticeConfigurations>>,
 }
 impl terra::ToJson for AwsEcsServiceDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEcsServiceDetails {
@@ -522,8 +521,8 @@ pub struct AwsEcsTaskDefinitionDetails {
 	pub volume: Option<Vec<AwsEcsTaskDefinitionResourceBlockTypeVolume>>,
 }
 impl terra::ToJson for AwsEcsTaskDefinitionDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsEcsTaskDefinitionDetails {
@@ -746,8 +745,8 @@ pub struct AwsLbDetails {
 	pub timeouts: Option<Vec<AwsLbResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsLbDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLbDetails {
@@ -970,8 +969,8 @@ pub struct AwsLbListenerDetails {
 	pub timeouts: Option<Vec<AwsLbListenerResourceBlockTypeTimeouts>>,
 }
 impl terra::ToJson for AwsLbListenerDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLbListenerDetails {
@@ -1130,8 +1129,8 @@ pub struct AwsLbTargetGroupDetails {
 		Option<Vec<AwsLbTargetGroupResourceBlockTypeTargetHealthState>>,
 }
 impl terra::ToJson for AwsLbTargetGroupDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLbTargetGroupDetails {

@@ -15,7 +15,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json;
 use std::collections::BTreeMap as Map;
 
 #[derive(
@@ -123,8 +122,8 @@ pub struct AwsLightsailInstanceDetails {
 	pub add_on: Option<Vec<AwsLightsailInstanceResourceBlockTypeAddOn>>,
 }
 impl terra::ToJson for AwsLightsailInstanceDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLightsailInstanceDetails {
@@ -270,8 +269,8 @@ pub struct AwsLightsailInstancePublicPortsDetails {
 		Option<Vec<AwsLightsailInstancePublicPortsResourceBlockTypePortInfo>>,
 }
 impl terra::ToJson for AwsLightsailInstancePublicPortsDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLightsailInstancePublicPortsDetails {
@@ -366,8 +365,8 @@ pub struct AwsLightsailKeyPairDetails {
 	pub tags_all: Option<Map<SmolStr, SmolStr>>,
 }
 impl terra::ToJson for AwsLightsailKeyPairDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLightsailKeyPairDetails {
@@ -462,8 +461,8 @@ pub struct AwsLightsailStaticIpAttachmentDetails {
 	pub static_ip_name: SmolStr,
 }
 impl terra::ToJson for AwsLightsailStaticIpAttachmentDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLightsailStaticIpAttachmentDetails {
@@ -544,8 +543,8 @@ pub struct AwsLightsailStaticIpDetails {
 	pub support_code: Option<SmolStr>,
 }
 impl terra::ToJson for AwsLightsailStaticIpDetails {
-	fn to_json(&self) -> serde_json::Value {
-		serde_json::to_value(self).expect("serialization should not fail")
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
 	}
 }
 impl terra::Resource for AwsLightsailStaticIpDetails {
