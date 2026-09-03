@@ -1032,7 +1032,23 @@ impl LightsailBlock {
 			.add_resource(&keypair)?
 			.add_resource(&log_group)?
 			.add_resource(&instance)?
-			.add_resource(&ports)?;
+			.add_resource(&ports)?
+			.xmap(|config| {
+				// A replaced instance comes up with Lightsail's DEFAULT firewall
+				// (22 + 80), so the rules must be re-applied with the box. The
+				// resource refers to the instance by name, which does not change
+				// across a rebuild, so without this the plan leaves ports alone
+				// and state claims open ports AWS has closed: 443 shut is a 522
+				// at the edge, and a shut `management_ssh_port` hangs the release
+				// step until it exhausts its attempts.
+				config.set_lifecycle(
+					"aws_lightsail_instance_public_ports",
+					ports.ident().label(),
+					json!({
+						"replace_triggered_by": [instance.field("id")]
+					}),
+				)
+			})?;
 
 		// conditionally add static IP resources and resolve public address
 		let (public_address_value, ip_mode) = match &self.networking {
@@ -1233,6 +1249,51 @@ mod tests {
 			.xpect_not_eq(rotation_input(&block));
 		rotation_input(&block.clone().with_app_port(9001))
 			.xpect_not_eq(rotation_input(&block));
+	}
+
+	/// A rebuild re-applies the firewall, because a replaced instance comes up
+	/// with Lightsail's DEFAULT rules rather than the rendered ones.
+	///
+	/// The ports resource names the instance by NAME, which survives a rebuild,
+	/// so nothing in its own config diffs and the plan leaves it untouched:
+	/// state then claims ports AWS has closed. Live, a `--store` -> `--repo`
+	/// change to the launch argv replaced the prod box and silently reset it to
+	/// 22 + 80, which shut 443 (`522` at the edge, prod down) and shut the
+	/// management ssh port (the release step hung until it ran out of attempts).
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn rebuilding_the_box_reapplies_the_firewall() {
+		let block = LightsailBlock::default()
+			.with_allow_ssh(true)
+			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+		let (scope, _dir) = render_block(&block);
+		let stack = scope.stack().clone();
+		let ports_label = stack
+			.resource_ident(block.build_label("ports"))
+			.label()
+			.to_string();
+		let instance_label = stack
+			.resource_ident(block.build_label("instance"))
+			.label()
+			.to_string();
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		let ports = &config["resource"]["aws_lightsail_instance_public_ports"]
+			[&ports_label];
+		ports["lifecycle"]["replace_triggered_by"][0]
+			.as_str()
+			.unwrap()
+			.xpect_eq(&format!("aws_lightsail_instance.{instance_label}.id"));
+		// the rules the rebuild must restore, ie every port the box needs to be
+		// reachable on: without 443 the edge cannot reach the origin at all
+		ports["port_info"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.map(|port| port["from_port"].as_u64().unwrap())
+			.collect::<Vec<_>>()
+			.xtap(|ports| ports.sort())
+			.xpect_eq(vec![22, 80, 443, u64::from(block.management_ssh_port)]);
 	}
 
 	/// The box's fetch script and the artifacts client name the SAME pointer,
