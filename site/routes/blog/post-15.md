@@ -74,20 +74,17 @@ This follows a similar pattern to how the HTML spec defines a `<details>` elemen
 
 In this way the standard is a *method for resolving component schemas*, not the schemas themselves, just as ATProto defines the spec, not the lexicons themselves. The BlueSky lexicons are no more standardized than any others. This is one area I'm excited to explore further on over the next year, perhaps starting by writing a bevy scene adaptor for some other ecosystem like React.
 
-## Get Bevy Funded
+## Malleable Engines
 
-Bevy is an engine capable of running just about all software *without compromise*. My [Local-First Conf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running on a single engine, but **on a single data-driven binary**. Usually cross-domain capability is achieved through bridges like react-three-fiber, stitching two ecosystems together at the seam, but for Bevy each domain is a natural fit.
+Bevy is an engine capable of running just about all software *without compromise*. My [Local-First Conf '26 presentation](https://youtu.be/eRpMQhOR93U?si=dK8lPL4dO3cSWUWi) demonstrated static sites, web apps, TUIs, servers, games, robots, infra deploys and agent harnesses not just running in a single engine, but in a **single data-driven binary**. Usually cross-domain capability is achieved by stitching two ecosystems together, ie react-three-fiber. In Bevy ECS the domains mesh together seamlessly.
 
-However none of these exceptional capabilities are evident on the home page. We still present Bevy primarily as a game engine and I think this marketing should be inverted:
+Bevy is still largely marketed as a game engine, reflecting its orgins and community, but for the project to thrive we need substantial funding and practically that means appealing to those beyond the games industry. The value prop for `a unified malleable core underpinning the application layer` is bigger than that of `games` or even `games + apps`, and a reframing lends credibility to use-cases beyond games and GUIs:
 
 > before: **A game engine capable of running apps**
 >
 > after: **A malleable engine capable of running games**
 
-The value prop for *a unified malleable core underpinning the application layer* is bigger than that of *games* or even *games+apps*. For Bevy to thrive we need substantial funding and practically that means appealing to those beyond the games industry.
 
-## If it ain't broke
-
-Bevy is the healthiest online community I've ever been a part of so it makes sense not to rock the boat. Beet will continue exploring these broader developments regardless, I am having so much fun pulling on this thread of breadth and depth in software and have no intention of slowing down.
+Beet will continue exploring these broader developments regardless, I am having so much fun pulling on this thread of breadth and depth in software and have no intention of slowing down.
 
 Thank you Cart, Alice and the bevy of people who created this incredible community and technological playground! 🐦
