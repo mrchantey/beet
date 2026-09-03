@@ -120,7 +120,7 @@ impl RouteCollection {
 				continue;
 			};
 			let route_path =
-				self.base_route.join(route_path_from_file(&store_path));
+				self.base_route.join(RoutesDir::route_path_of(&store_path));
 			match ext {
 				"rs" => {
 					let bytes = store.get(&store_path).await?;
@@ -146,8 +146,16 @@ impl RouteCollection {
 						_ => {
 							let bytes = store.get(&store_path).await?;
 							let src = String::from_utf8(bytes.to_vec())?;
-							ArticleMeta::from_markdown(&src)
+							ArticleMeta::from_markdown(&src).map(|meta| {
+								meta.with_file_defaults(&store_path)
+							})
 						}
+					};
+					// the frontmatter has the last word on the url, exactly as it
+					// does in `RoutesDir` discovery
+					let route_path = match &meta {
+						Some(meta) => meta.apply_slug(&route_path)?,
+						None => route_path,
 					};
 					files.push(RouteFile {
 						route_path,
@@ -221,25 +229,6 @@ pub struct RouteMethod {
 	pub method: HttpMethod,
 	/// The parsed handler function.
 	pub item: ItemFn,
-}
-
-/// Derives the route path from a source file path, stripping the extension and
-/// collapsing `index` files into their parent directory.
-fn route_path_from_file(store_path: &SmolPath) -> SmolPath {
-	let mut segments: Vec<String> = store_path
-		.segments()
-		.iter()
-		.map(|s| s.to_string())
-		.collect();
-	if let Some(last) = segments.last_mut() {
-		if let Some(dot) = last.rfind('.') {
-			last.truncate(dot);
-		}
-	}
-	if segments.last().map(|s| s == "index").unwrap_or(false) {
-		segments.pop();
-	}
-	SmolPath::from_segments(&segments)
 }
 
 /// Derives a unique module identifier from a source file path.

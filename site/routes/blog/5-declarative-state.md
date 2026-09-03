@@ -1,6 +1,9 @@
 +++
-title="Declarative State"
-created="2025-11-05"
+title = "Declarative State"
+slug = "declarative-state"
+description = "Proposal for declarative, local-first state bindings as an alternative to Astro-style client islands."
+created = "2025-11-05"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #5 - Declarative State

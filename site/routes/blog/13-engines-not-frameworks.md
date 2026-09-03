@@ -1,6 +1,9 @@
 +++
-title="Engines, not frameworks"
-created="2026-06-30"
+title = "Engines, not frameworks"
+slug = "engines-not-frameworks"
+description = "Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are generalizable and the natural fit for 'tools, not apps'."
+created = "2026-06-30"
+author = "Pete Hayman"
 +++
 
 # Engines, not frameworks

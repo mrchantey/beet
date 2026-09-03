@@ -76,7 +76,7 @@ async fn verifies_client() {
 	// the beacon runs on content pages, where the client error class
 	// was originally reported
 	cross_log!("stage: in-page nav done");
-	for path in ["/blog", "/blog/post-3"] {
+	for path in ["/blog", "/blog/bevys-five-and-beets-alive"] {
 		page.navigate(&format!("{base}{path}")).await.unwrap();
 		page.find("body").await;
 	}
@@ -85,7 +85,9 @@ async fn verifies_client() {
 	// reference fetches 200 through the page itself (a private bucket
 	// handing out public urls turns each into a redirect to a 403)
 	cross_log!("stage: blog pages done");
-	page.navigate(&format!("{base}/blog/post-6")).await.unwrap();
+	page.navigate(&format!("{base}/blog/folk-technology"))
+		.await
+		.unwrap();
 	let statuses = page
 		.evaluate_value(
 			r#"Promise.all(
@@ -111,7 +113,7 @@ async fn verifies_client() {
 	cross_log!("stage: asset sweep done");
 	for width in [375, 320] {
 		page.set_viewport(width, 812).await.unwrap();
-		for path in ["/", "/blog", "/blog/post-3"] {
+		for path in ["/", "/blog", "/blog/bevys-five-and-beets-alive"] {
 			page.navigate(&format!("{base}{path}")).await.unwrap();
 			page.find("body").await;
 			page.xpect_no_horizontal_overflow().await;

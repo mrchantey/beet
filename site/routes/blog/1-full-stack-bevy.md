@@ -1,6 +1,9 @@
 +++
 title = "Full Stack Bevy"
-created= "2025-07-11"
+slug = "full-stack-bevy"
+description = "Bevy ECS as the foundation for a full-stack application framework, achieving SSR, CSR, SSG, client islands, and server actions."
+created = "2025-07-11"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #1 - Full Stack Bevy

@@ -1,6 +1,9 @@
 +++
-title="Bevy's Five and Beet's Alive!"
-created="2025-09-06"
+title = "Bevy's Five and Beet's Alive!"
+slug = "bevys-five-and-beets-alive"
+description = "The recurring lesson that ECS data models must come first, illustrated by rewrites and initial DOM diffing."
+created = "2025-09-06"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #3 - Bevy's Five and Beet's Alive!

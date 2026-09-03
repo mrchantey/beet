@@ -1,6 +1,9 @@
 +++
-title="Bevy standardizes malleable software"
-created="2026-08-28"
+title = "Bevy standardizes malleable software"
+slug = "bevy-standardizes-malleable-software"
+description = "Why I think Bevy will rule the world."
+created = "2026-08-28"
+author = "Pete Hayman"
 +++
 
 # Bevy standardizes malleable software
@@ -21,7 +24,7 @@ Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨
 
 ## Malleable Standards
 
-In my last blog post, [ATProto isn't malleable yet](/blog/post-14), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
+In my last blog post, [ATProto isn't malleable yet](/blog/atproto-isnt-malleable-yet), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 
 
 Over the decades we have seen many genuinely awesome solutions to malleable software but none have been standardized in the same way other technologies have. It seems interoperability is not a priority at the application layer like it is for protocols, but *it should be!* In my favorite panel discussion of all time [Robin Berjon advocates for sync standards](https://youtu.be/gjG_cUx_ueU?t=1013), another application layer problem, and the same arguments can be made for malleability.
 

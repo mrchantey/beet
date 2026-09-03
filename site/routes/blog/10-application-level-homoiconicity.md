@@ -1,6 +1,9 @@
 +++
-title="Application Level Homoiconicity"
-created="2026-04-06"
+title = "Application Level Homoiconicity"
+slug = "application-level-homoiconicity"
+description = "Malleable software bends but doesn't break. Encoding behavior as data is a natural fit for sync engines and provides a fine-grained boundary for developers to safely expose parts of the application."
+created = "2026-04-06"
+author = "Pete Hayman"
 +++
 
 # Application Level Homoiconicity

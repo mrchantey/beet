@@ -67,6 +67,11 @@ pub(crate) fn verify_props_against(
 		struct_schema.allow_additional = true;
 	}
 	let mut props = props_value(el);
+	// every markup attribute arrives as a string, and the apply layer coerces a
+	// `"true"`/`"false"` onto a `bool` field (see `reflect.rs`), so validation reads
+	// it the same way — otherwise `<RouteSidebar home="false"/>` is rejected before
+	// the coercion it was written for can run.
+	coerce_bool_props(&resolved, &mut props);
 	// `validate` is async-shaped but resolves in one poll without an executor, so
 	// `try_block_on` drives it on both std and no_std.
 	let errors = async_ext::try_block_on(resolved.validate(&mut props))?;
@@ -79,6 +84,38 @@ pub(crate) fn verify_props_against(
 			.collect::<Vec<_>>()
 			.join(", ");
 		bevybail!("template `{tag}` prop validation failed: {report}")
+	}
+}
+
+/// Rewrite each `"true"`/`"false"` prop whose schema expects a `bool` into a
+/// [`Value::Bool`], so validation accepts the string form markup can express.
+///
+/// Only the top level, and only a bool-schema field: a string prop stays a
+/// string, and a malformed value is left alone so validation names it.
+fn coerce_bool_props(schema: &ValueSchema, props: &mut Value) {
+	let (ValueSchema::Struct(struct_schema), Value::Map(map)) = (schema, props)
+	else {
+		return;
+	};
+	for field in &struct_schema.fields {
+		// `Option<bool>` is a bool field that also accepts null
+		let is_bool = match &field.schema {
+			ValueSchema::Bool(_) => true,
+			ValueSchema::Optional(inner) => {
+				matches!(**inner, ValueSchema::Bool(_))
+			}
+			_ => false,
+		};
+		if !is_bool {
+			continue;
+		}
+		if let Ok(Value::Str(string)) = map.get(field.key.as_str()) {
+			match string.as_str().trim() {
+				"true" => map.insert(field.key.clone(), Value::Bool(true)),
+				"false" => map.insert(field.key.clone(), Value::Bool(false)),
+				_ => continue,
+			};
+		}
 	}
 }
 
@@ -302,6 +339,52 @@ mod test {
 			.clone()
 			.xpect_eq(Value::Str("hi".into()));
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
+	}
+
+	/// A markup attribute is always a string, so a `bool` prop must validate in
+	/// the `"true"`/`"false"` form the apply layer coerces, eg
+	/// `<RouteSidebar home="false"/>`.
+	#[crate::test]
+	fn bool_props_coerce_from_strings() {
+		let schema = ValueSchema::Struct(StructSchema {
+			name: None,
+			allow_additional: true,
+			fields: vec![
+				NamedFieldSchema::new("home", ValueSchema::Bool(default())),
+				NamedFieldSchema::new(
+					"expanded",
+					ValueSchema::Optional(Box::new(ValueSchema::Bool(
+						default(),
+					))),
+				),
+				NamedFieldSchema::new("label", ValueSchema::String(default())),
+			],
+		});
+		let mut props = props_value(&element(&[
+			("home", AttrValue::Str("false".into())),
+			("expanded", AttrValue::Str("true".into())),
+			("label", AttrValue::Str("true".into())),
+		]));
+		coerce_bool_props(&schema, &mut props);
+		let Value::Map(map) = props else {
+			panic!("expected map");
+		};
+		map.0
+			.get("home")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Bool(false));
+		map.0
+			.get("expanded")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Bool(true));
+		// a string field is left alone, even spelling a bool
+		map.0
+			.get("label")
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::Str("true".into()));
 	}
 
 	#[crate::test]

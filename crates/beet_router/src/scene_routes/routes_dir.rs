@@ -22,7 +22,11 @@ use beet_net::prelude::*;
 ///
 /// Route paths mirror the file tree: `docs/intro.md` serves at `docs/intro`,
 /// and an `index.*` file collapses to its directory (`docs/index.md` serves at
-/// `docs`). Add a [`PathPartial`] alongside to prefix every discovered route.
+/// `docs`). Frontmatter then has the last word on both the url and the ordering:
+/// a `slug` renames the final segment and a leading `<number>-` on the filename
+/// sets the nav order, so `blog/1-full-stack-bevy.md` declaring
+/// `slug = "full-stack-bevy"` reads first and serves at `blog/full-stack-bevy`.
+/// Add a [`PathPartial`] alongside to prefix every discovered route.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RoutesDir {
@@ -129,10 +133,12 @@ impl RoutesDir {
 
 	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
 	fn spawn_route_spec(world: &mut World, parent: Entity, spec: RouteSpec) {
-		#[allow(unused_mut, unused_variables)]
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
-			route::new(&spec.route_path, BlobScene::new(spec.store_path)),
+			route::new(
+				spec.route_path.as_str(),
+				BlobScene::new(spec.store_path),
+			),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			// a discovered content file is a user-facing page, so it carries
@@ -140,7 +146,6 @@ impl RoutesDir {
 			PageRoute,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		#[cfg(feature = "markdown_parser")]
 		if let Some(meta) = spec.meta {
 			route_entity.insert(meta);
 		}
@@ -149,6 +154,11 @@ impl RoutesDir {
 	/// List the store's content files and read each markdown file's frontmatter,
 	/// returning route specs in lexical path order so zero-padded routes (eg slides
 	/// `01..20`) spawn in sequence, giving a deterministic [`RouteTree`] child order.
+	///
+	/// The frontmatter is read before the route path is settled, since a `slug`
+	/// renames the filename-derived final segment
+	/// ([`ArticleMeta::apply_slug`]). The rename happens after the sort, so it
+	/// cannot reshuffle the discovered order.
 	async fn discover_routes(store: &BlobStore) -> Result<Vec<RouteSpec>> {
 		let mut paths = store.list().await?;
 		paths.sort();
@@ -156,10 +166,17 @@ impl RoutesDir {
 			.into_iter()
 			.filter(|path| Self::is_content(path))
 			.map(async |path| -> Result<RouteSpec> {
+				let meta = Self::scan_meta(store, &path)
+					.await
+					.map(|meta| meta.with_file_defaults(&path));
+				let route_path = Self::route_path_of(&path);
+				let route_path = match &meta {
+					Some(meta) => meta.apply_slug(&route_path)?,
+					None => route_path,
+				};
 				Ok(RouteSpec {
-					route_path: Self::route_path_of(&path),
-					#[cfg(feature = "markdown_parser")]
-					meta: Self::scan_meta(store, &path).await,
+					route_path,
+					meta,
 					store_path: path,
 				})
 			})
@@ -173,9 +190,15 @@ impl RoutesDir {
 			.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
 	}
 
-	/// The route path of a content file: the extension is dropped and a trailing
-	/// `index` collapses to its directory, eg `docs/index.md` -> `docs`.
-	fn route_path_of(rel: &SmolPath) -> String {
+	/// The route path a content file serves at before frontmatter has its say:
+	/// the extension is dropped and a trailing `index` collapses to its
+	/// directory, eg `docs/index.md` -> `docs`.
+	///
+	/// A pure function of the filename, shared with the codegen collection scan
+	/// so a route path never depends on which scan found the file. The
+	/// frontmatter `slug` override is applied on top by the caller, which holds
+	/// the parsed [`ArticleMeta`] (see [`ArticleMeta::apply_slug`]).
+	pub(crate) fn route_path_of(rel: &SmolPath) -> SmolPath {
 		let mut segments = rel.segments();
 		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
 		{
@@ -184,33 +207,40 @@ impl RoutesDir {
 		if segments.last() == Some(&"index") {
 			segments.pop();
 		}
-		segments.join("/")
+		SmolPath::from_segments(&segments)
 	}
 
 	/// Read a markdown file's leading frontmatter into [`ArticleMeta`] through the
-	/// store, if it is markdown and parses; any read/parse failure yields `None`.
-	#[cfg(feature = "markdown_parser")]
+	/// store, if it is markdown and parses; any read/parse failure yields `None`,
+	/// as does a build without the `markdown_parser` feature.
 	async fn scan_meta(
 		store: &BlobStore,
 		path: &SmolPath,
 	) -> Option<ArticleMeta> {
-		let is_markdown = path
-			.extension()
-			.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
-		if !is_markdown {
+		#[cfg(not(feature = "markdown_parser"))]
+		{
+			let _ = (store, path);
 			return None;
 		}
-		let bytes = store.get(path).await.ok()?;
-		ArticleMeta::from_markdown(core::str::from_utf8(&bytes).ok()?)
+		#[cfg(feature = "markdown_parser")]
+		{
+			let is_markdown = path
+				.extension()
+				.is_some_and(|ext| matches!(ext, "md" | "mdx" | "markdown"));
+			if !is_markdown {
+				return None;
+			}
+			let bytes = store.get(path).await.ok()?;
+			ArticleMeta::from_markdown(core::str::from_utf8(&bytes).ok()?)
+		}
 	}
 }
 
 /// A discovered content file: its route path, the store path its bytes load from,
 /// and any scan-time frontmatter metadata.
 struct RouteSpec {
-	route_path: String,
+	route_path: SmolPath,
 	store_path: SmolPath,
-	#[cfg(feature = "markdown_parser")]
 	meta: Option<ArticleMeta>,
 }
 
@@ -270,12 +300,13 @@ mod test {
 	#[beet_core::test]
 	fn route_path_of() {
 		RoutesDir::route_path_of(&SmolPath::from("docs/intro.md"))
-			.xpect_eq("docs/intro");
-		RoutesDir::route_path_of(&SmolPath::from("index.md")).xpect_eq("");
+			.xpect_eq(SmolPath::new("docs/intro"));
+		RoutesDir::route_path_of(&SmolPath::from("index.md"))
+			.xpect_eq(SmolPath::default());
 		RoutesDir::route_path_of(&SmolPath::from("docs/index.md"))
-			.xpect_eq("docs");
+			.xpect_eq(SmolPath::new("docs"));
 		RoutesDir::route_path_of(&SmolPath::from("about.bsx"))
-			.xpect_eq("about");
+			.xpect_eq(SmolPath::new("about"));
 	}
 
 	/// Assert the three fixture routes render their content, shared by the
@@ -364,6 +395,37 @@ mod test {
 			.map(|seg| seg.name().to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["01-alpha", "02-beta", "03-gamma"]);
+	}
+
+	/// A numbered file declaring a `slug` serves at the slug, not at its
+	/// filename, and keeps the filename's number as its nav order — the pair
+	/// that lets a directory read in order while its urls stay stable names.
+	#[cfg(feature = "markdown_parser")]
+	#[beet_core::test]
+	async fn slug_overrides_the_filename_path() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"blog/1-full-stack-bevy.md",
+				"+++\nslug = \"full-stack-bevy\"\n+++\n\n# Post",
+			)])
+			.await,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		tree.find(&["blog", "1-full-stack-bevy"]).xpect_none();
+		let node = tree.find(&["blog", "full-stack-bevy"]).unwrap();
+		world
+			.entity(node.entity)
+			.get::<ArticleMeta>()
+			.unwrap()
+			.sidebar
+			.order
+			.unwrap()
+			.xpect_eq(1);
 	}
 
 	/// Frontmatter is scanned from file content through the store, so it is store

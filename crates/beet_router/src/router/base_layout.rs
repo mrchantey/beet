@@ -135,15 +135,14 @@ pub(crate) fn wrap_content_with(
 	// the request-scoped render context, read by the layout's scene systems: the
 	// request parts, the rendered content entity (off which widgets query
 	// per-route components, eg `ArticleMeta` parsed from frontmatter), the matched
-	// route entity, and its tree-owning `router`. Pushed onto the stack for the
-	// synchronous layout build, then popped — a stack so a nested render restores
-	// this context on completion.
-	world
-		.resource_mut::<RequestContextStack>()
-		.push(RequestContext::new(parts, rendered, route, router));
-	let layout_result = build_layout(world, rendered);
-	world.resource_mut::<RequestContextStack>().pop();
-	let layout = layout_result?;
+	// route entity, and its tree-owning `router`. Scoped to the synchronous layout
+	// build — a stack, so the content's own context (pushed around its build)
+	// and any nested render are restored on completion.
+	let layout = RequestContextStack::scoped(
+		world,
+		RequestContext::new(parts, rendered, route, router),
+		|world| build_layout(world, rendered),
+	)?;
 
 	// link the layout root to the transcluded content, distinct from the
 	// self-referential render root: a layout-head `@entity:PageRoot::` binding

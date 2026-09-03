@@ -1,6 +1,9 @@
 +++
-title="Multi-Interface Applications"
-created="2026-03-06"
+title = "Multi-Interface Applications"
+slug = "multi-interface-applications"
+description = "Content negotiation and multi-interface rendering from a single beet application serving HTML, Markdown, ANSI, and Bevy scenes."
+created = "2026-03-06"
+author = "Pete Hayman"
 +++
 
 # The Harvest #9 - Multi-Interface Applications
@@ -9,7 +12,7 @@ created="2026-03-06"
 
 <iframe src="https://www.youtube.com/embed/MIlRSPAZ1Fo" alt-src="https://youtu.be/MIlRSPAZ1Fo" title="The Harvest #9 - Multi-Interface Applications" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
-Last month I [began exploring](/blog/post-8) an agnostic `Request/Response` pattern so I could use the same router library for both a cli and a server.
+Last month I [began exploring](/blog/its-all-been-done-before) an agnostic `Request/Response` pattern so I could use the same router library for both a cli and a server.
 
 
 **Request**

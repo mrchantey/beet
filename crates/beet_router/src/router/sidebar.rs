@@ -329,7 +329,10 @@ impl SidebarState {
 use std::cmp::Ordering;
 
 /// Compare with [natural sort order](https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/)
-fn natural_cmp(a: &str, b: &str) -> Ordering {
+///
+/// Shared with [`RouteIndex`](crate::prelude::RouteIndex), so a generated page
+/// listing orders siblings exactly as the nav does.
+pub(crate) fn natural_cmp(a: &str, b: &str) -> Ordering {
 	let mut a = a.chars().peekable();
 	let mut b = b.chars().peekable();
 

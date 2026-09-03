@@ -1,6 +1,9 @@
 +++
-title="Folk Technology"
-created="2025-12-04"
+title = "Folk Technology"
+slug = "folk-technology"
+description = "Drawing parallels between folk festival culture and open, malleable software design in the spirit of Alan Kay."
+created = "2025-12-04"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #6 - Folk Technology

@@ -1,6 +1,9 @@
 +++
-title="It's All Been Done Before"
-created="2026-02-01"
+title = "It's All Been Done Before"
+slug = "its-all-been-done-before"
+description = "A unified `Request/Response` abstraction brings CLI, server, and AI tool calls under one ECS routing architecture."
+created = "2026-02-01"
+author = "Pete Hayman"
 +++
 
 # The Harvest #8 - It's all been done before

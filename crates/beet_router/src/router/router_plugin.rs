@@ -115,6 +115,9 @@ impl Plugin for RouterPlugin {
 				.register_type::<BsxLayout>()
 				.register_template::<RouteHead>()
 				.register_template::<RouteSidebar>()
+				// the generated page listing a content index page places instead
+				// of a hand-maintained list, eg `<RouteIndex reverse="true"/>`
+				.register_template::<RouteIndex>()
 				// the shipped document shell a no-code site wraps its pages in,
 				// requested with `<SiteLayout>`.
 				.register_template::<SiteLayout>()
@@ -147,6 +150,10 @@ impl Plugin for RouterPlugin {
 			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
 			app.register_template::<Route>()
+				// the renamed-page redirect (`<Redirect path="post-1"
+				// redirect="full-stack-bevy"/>`), an ordinary GET route
+				// answering a 301
+				.register_template::<Redirect>()
 				// the document-field route (`<FieldRoute path=".." field=".."
 				// verb="push"/>`): a typed document action plus the
 				// `ExchangeOverload` that markup cannot spread for itself.

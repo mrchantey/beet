@@ -43,6 +43,8 @@ pub use interrupt::*;
 mod article_meta;
 #[cfg(feature = "std")]
 pub use article_meta::*;
+mod redirect;
+pub use redirect::*;
 mod request_context;
 pub use request_context::*;
 mod middleware;
@@ -76,6 +78,10 @@ pub use base_layout::*;
 mod bsx_layout;
 #[cfg(feature = "std")]
 pub use bsx_layout::*;
+#[cfg(feature = "std")]
+mod route_index;
+#[cfg(feature = "std")]
+pub use route_index::*;
 #[cfg(feature = "std")]
 mod sidebar;
 #[cfg(feature = "std")]

@@ -25,11 +25,12 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// A re-entrant stack of [`RequestContext`]s: the active render's context is the
-/// top, pushed when a layout render begins and popped when it ends.
+/// top, pushed when a render begins and popped when it ends.
 ///
 /// Installed as a resource by [`RouterPlugin`](crate::prelude::RouterPlugin).
-/// Layout `#[template(system)]` widgets read the active context with
-/// [`current`](Self::current) through a `Res<RequestContextStack>` parameter.
+/// Route-aware `#[template(system)]` widgets read the active context with
+/// [`current`](Self::current) through a `Res<RequestContextStack>` parameter,
+/// whether they sit in the page content or in the layout around it.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct RequestContextStack(Vec<RequestContext>);
 
@@ -41,12 +42,31 @@ impl RequestContextStack {
 	/// render's context as the new top.
 	pub fn pop(&mut self) -> Option<RequestContext> { self.0.pop() }
 
+	/// Run `build` with `cx` as the active context, popping it however `build`
+	/// ends.
+	///
+	/// The one push site: a request renders its CONTENT and then its LAYOUT, and
+	/// widgets in either read these facts (`<RouteIndex/>` in a page,
+	/// `<RouteSidebar/>` in a layout), so both go through here rather than each
+	/// hand-rolling the pair.
+	pub fn scoped<O>(
+		world: &mut World,
+		cx: RequestContext,
+		build: impl FnOnce(&mut World) -> O,
+	) -> O {
+		world.resource_mut::<Self>().push(cx);
+		let out = build(world);
+		world.resource_mut::<Self>().pop();
+		out
+	}
+
 	/// The active (top) context.
 	///
 	/// # Panics
 	///
-	/// Panics if read with an empty stack, ie outside a render. A layout widget
-	/// never is: the middleware pushes the context before building the layout.
+	/// Panics if read with an empty stack, ie outside a render. A route widget
+	/// never is: the content build and the layout middleware each push a context
+	/// around their build (see [`scoped`](Self::scoped)).
 	pub fn current(&self) -> &RequestContext {
 		self.0
 			.last()

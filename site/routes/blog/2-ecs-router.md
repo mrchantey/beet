@@ -1,6 +1,9 @@
 +++
 title = "ECS Router"
-created= "2025-08-09"
+slug = "ecs-router"
+description = "An ECS-native HTTP router unifies server actions, client island scenes, and static file serving under one paradigm."
+created = "2025-08-09"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #2 - ECS Router

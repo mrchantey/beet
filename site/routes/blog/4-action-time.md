@@ -1,6 +1,9 @@
 +++
-title="Action Time!"
-created="2025-10-07"
+title = "Action Time!"
+slug = "action-time"
+description = "A groundwork release for the upcoming `bsn!` templating system, adding browser testing, analytics, and PDF export utilities."
+created = "2025-10-07"
+author = "Pete Hayman"
 +++
 
 # The Full Moon Harvest #4 - Action time!

@@ -170,6 +170,26 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<Styles/>
 			<DefaultAppRoutes/>
 			<RoutesDir src="routes"/>
+			<!-- the urls the blog served at before its posts were named: the files
+			     stay numbered so they read in order, and every link ever published
+			     keeps resolving, with a 301 to the name. -->
+			<Route path="blog">
+				<Redirect path="post-1" redirect="full-stack-bevy"/>
+				<Redirect path="post-2" redirect="ecs-router"/>
+				<Redirect path="post-3" redirect="bevys-five-and-beets-alive"/>
+				<Redirect path="post-4" redirect="action-time"/>
+				<Redirect path="post-5" redirect="declarative-state"/>
+				<Redirect path="post-6" redirect="folk-technology"/>
+				<Redirect path="post-7" redirect="malleable-application-framework"/>
+				<Redirect path="post-8" redirect="its-all-been-done-before"/>
+				<Redirect path="post-9" redirect="multi-interface-applications"/>
+				<Redirect path="post-10" redirect="application-level-homoiconicity"/>
+				<Redirect path="post-11" redirect="user-modifiable-users"/>
+				<Redirect path="post-12" redirect="gentle-slopes-up-lonely-mountains"/>
+				<Redirect path="post-13" redirect="engines-not-frameworks"/>
+				<Redirect path="post-14" redirect="atproto-isnt-malleable-yet"/>
+				<Redirect path="post-15" redirect="bevy-standardizes-malleable-software"/>
+			</Route>
 			<AssetsDir src="assets" cache="1h"/>
 		</Router>
 	</Route>

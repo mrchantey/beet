@@ -1,6 +1,9 @@
 +++
-title="ATProto isn't malleable yet"
-created="2026-08-18"
+title = "ATProto isn't malleable yet"
+slug = "atproto-isnt-malleable-yet"
+description = "The locked open stack is missing a layer."
+created = "2026-08-18"
+author = "Pete Hayman"
 +++
 
 # ATProto Isn't Malleable Yet

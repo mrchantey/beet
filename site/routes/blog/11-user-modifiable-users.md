@@ -1,6 +1,9 @@
 +++
-title="User Modifiable Users"
-created="2026-05-01"
+title = "User Modifiable Users"
+slug = "user-modifiable-users"
+description = "Is malleable software the key to effective personal development tech? Also some progression on cross-application state."
+created = "2026-05-01"
+author = "Pete Hayman"
 +++
 
 # User Modifiable Users
@@ -120,4 +123,4 @@ The architechture I'm currently exploring is inspired by design tokens, where ea
 
 Token keys can be universally unique, using urls or reverse domain name notation, and possibly even versioned for integration with document migration projects like [Cambria](https://www.inkandswitch.com/cambria/). 
 
-I'm currently exploring using this same pattern for state, a typed version of my declarative state proposal from [post 5](https://beet.org/blog/post-5).
+I'm currently exploring using this same pattern for state, a typed version of my declarative state proposal from [post 5](https://beet.org/blog/declarative-state).

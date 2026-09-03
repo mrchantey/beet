@@ -175,6 +175,10 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 		.await??;
 
 	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
+	// the in-tree route anchor and the request being served, threaded into the
+	// render context the content builds under (below)
+	let route = cx.caller.id();
+	let parts = cx.input.parts().clone();
 	let bytes = store.get_media(&path).await?;
 	// carry the store onto the render root: the per-request tree is a detached root
 	// (below), so a render-time widget that reads a file (eg `<CodeSnippet src>`)
@@ -191,20 +195,39 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 	cx.caller
 		.world()
 		.with(move |world: &mut World| -> Result<PageRequest> {
-			let mut entity = world.spawn(render_store);
-			MediaParser::new().parse(ParseContext::new(&mut entity, &bytes))?;
-			// derive per-page metadata from the parsed frontmatter, if any, so the
-			// render context can expose this route's title/description/sidebar info.
-			#[cfg(feature = "markdown_parser")]
-			if let Some(meta) = entity
-				.get::<beet_ui::prelude::Frontmatter>()
-				.map(ArticleMeta::from_frontmatter)
-			{
-				entity.insert(meta);
-			}
-			let id = entity.id();
-			PageRoot::insert(&mut entity, vec![id]);
-			Ok(PageRequest(id))
+			let content = world.spawn(render_store).id();
+			// the entity owning this request's route tree, resolved from the
+			// in-tree route exactly as the layout middleware resolves it
+			let router = world
+				.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
+					trees.get_entity(route)
+				})
+				.unwrap_or(route);
+			// the page is a request-scoped render like the layout around it, so
+			// its own build gets the same context: that is what lets a route-aware
+			// widget (`<RouteIndex/>`) live in the CONTENT rather than only in a
+			// layout, where it would have no request to read.
+			RequestContextStack::scoped(
+				world,
+				RequestContext::new(parts, content, route, router),
+				|world| -> Result<PageRequest> {
+					let mut entity = world.entity_mut(content);
+					MediaParser::new()
+						.parse(ParseContext::new(&mut entity, &bytes))?;
+					// derive per-page metadata from the parsed frontmatter, if any,
+					// so the render context can expose this route's
+					// title/description/sidebar info.
+					#[cfg(feature = "markdown_parser")]
+					if let Some(meta) = entity
+						.get::<beet_ui::prelude::Frontmatter>()
+						.map(ArticleMeta::from_frontmatter)
+					{
+						entity.insert(meta);
+					}
+					PageRoot::insert(&mut entity, vec![content]);
+					Ok(PageRequest(content))
+				},
+			)
 		})
 		.await
 }
