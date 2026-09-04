@@ -194,10 +194,18 @@ pub struct FormPlugin;
 
 impl Plugin for FormPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_observer(ensure_form_field_value)
-			.add_observer(fire_form_submit)
+		app.add_observer(fire_form_submit)
 			.add_observer(super::checkbox::toggle_checkbox_on_activate)
-			.add_systems(Update, super::checkbox::sync_checkbox_checked)
+			.add_systems(
+				Update,
+				(
+					ensure_form_field_value,
+					super::checkbox::sync_checkbox_checked,
+				),
+			)
+			// the payload-enum control's select edits which variant its field
+			// carries, which is a write no ordinary binding makes for it
+			.add_systems(Update, super::variant_select::write_selected_variant)
 			// a `Submit` handler doing real work is async by nature (the
 			// `SchemaEditor`'s commit evolves data through a js seam), so the
 			// plugin that fires the event declares the bridge that carries it.
@@ -224,19 +232,27 @@ impl Plugin for FormPlugin {
 /// `Value` for [`write_focus_input`](crate::prelude::write_focus_input) to edit
 /// without this. A [`Checkbox`] never reaches here: it requires its own
 /// `Value::Bool(false)`, since its resting state is a boolean, not text.
+///
+/// A **bound** control is skipped, because its value is its field's: the empty
+/// string is a value, and seeding one over the [`FieldRef`]'s null would write
+/// `""` into every absent optional field a generated form touched, ie invent
+/// data by rendering. An absent field's null is typable (it promotes to a
+/// string) and displays as empty, which is what nothing-typed looks like.
+///
+/// A system rather than an `On<Add, Element>` observer for that same reason: a
+/// widget's `{field}` spread lands as a deferred insert, so at the moment the
+/// element is added a bound control does not yet look like one.
 fn ensure_form_field_value(
-	ev: On<Add, Element>,
-	elements: Query<&Element>,
-	has_value: Query<(), With<Value>>,
+	elements: Populated<
+		(Entity, &Element),
+		(Without<Value>, Without<FieldRef>),
+	>,
 	mut commands: Commands,
 ) {
-	let Ok(element) = elements.get(ev.entity) else {
-		return;
-	};
-	if matches!(element.tag(), "input" | "textarea" | "select")
-		&& !has_value.contains(ev.entity)
-	{
-		commands.entity(ev.entity).insert(Value::str(""));
+	for (entity, element) in elements.iter() {
+		if matches!(element.tag(), "input" | "textarea" | "select") {
+			commands.entity(entity).insert(Value::str(""));
+		}
 	}
 }
 
@@ -252,11 +268,16 @@ fn fire_form_submit(
 	// `PointerUp` propagates up the tree, firing this global observer per
 	// ancestor; act exactly once, at the activated `<button>` itself.
 	let target = ev.event_target();
-	let is_button = elements
+	let is_submit = elements
 		.get(target)
-		.map(|view| view.tag() == "button")
+		.map(|view| {
+			// the browser's own rule: `type="button"` is an action button that
+			// does nothing to its form, which is what lets a form carry the
+			// per-row add and remove controls a list field needs.
+			view.tag() == "button" && view.attribute_string("type") != "button"
+		})
 		.unwrap_or(false);
-	if !is_button {
+	if !is_submit {
 		return;
 	}
 	let Some(form) = ancestor_form(&elements, &parents, target) else {
@@ -353,8 +374,11 @@ fn field_value(
 	view: &ElementView,
 ) -> Value {
 	let edited = values.get(view.entity).cloned().unwrap_or_default();
+	// a bound select whose field is absent holds a null rather than an empty
+	// string, and is untouched in exactly the same sense
 	let untouched_select = view.tag() == "select"
-		&& edited.as_str().is_ok_and(|edited| edited.is_empty());
+		&& (edited.is_null()
+			|| edited.as_str().is_ok_and(|edited| edited.is_empty()));
 	if !untouched_select {
 		return edited;
 	}

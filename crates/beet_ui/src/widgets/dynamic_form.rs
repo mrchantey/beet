@@ -3,8 +3,8 @@
 //!
 //! The bridge between the schema layer and the form controls. A schema kind
 //! picks the widget, its hints and constraints supply the widget's bounds, and
-//! a struct schema recurses into a disclosure group whose [`FieldRef`]s extend
-//! the parent's path.
+//! a composite schema recurses into a group whose [`FieldRef`]s extend the
+//! parent's path.
 //!
 //! It owns no state and performs no writes: every leaf binds one
 //! `(document, field path)` through its own [`FieldRef`] and writes only its
@@ -13,18 +13,26 @@
 //! as its `name`, so the whole form gathers as a typed [`Value`] map on
 //! [`Submit`] — the commit boundary a transactional edit rides.
 //!
-//! The controls are one generation held by a [`SchemaRebuild`], so a committed
-//! schema edit regenerates them in place while the slot's authored children
-//! stay put.
+//! Where a schema alone does not decide the controls, the *value* does, through
+//! a [`ValueRebuild`]: a list's rows, a map's entries, an enum's payload and a
+//! field whose schema a sibling names are all generated from the bound value and
+//! regenerated when its shape changes. The schema-decided layout around them is
+//! one generation of a [`SchemaRebuild`], so a committed schema edit regenerates
+//! the form while the slot's authored children stay put.
 //!
 //! Surface-agnostic: the widgets it spawns are ordinary elements, so the same
 //! form paints in a terminal and serves as HTML.
+use super::collection_edit::CollectionEdit;
+use super::collection_edit::add_entry_row;
+use super::collection_edit::edit_button;
+use super::variant_select::variant_name;
+use super::variant_select::variant_select;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Cap on nested [`ValueSchema::Struct`] recursion. A schema graph is finite by
-/// construction ([`SchemaResolver`] bounds a reference chain and leaves a cycle
-/// unresolved), so this is a defensive bound; a deeper subtree renders as an
+/// Cap on nested composite recursion. A schema graph is finite by construction
+/// ([`SchemaResolver`] bounds a reference chain and leaves a cycle unresolved),
+/// so this is a defensive bound; a deeper subtree renders as an
 /// [`UneditableField`].
 const MAX_DEPTH: usize = 8;
 
@@ -36,17 +44,22 @@ const MAX_DEPTH: usize = 8;
 ///   `Step` constraints as bounds
 /// - `String` -> [`TextField`], masked when `sensitive`, a [`TextArea`] when
 ///   `multiline`
-/// - an all-unit `Enum` -> [`Select`] with an option per variant
 /// - `Optional` -> its inner schema (a missing value reads as empty)
 /// - `Reference` -> the schema it names, resolved against the [`SchemaRegistry`]
 /// - `Struct` -> a labelled group, one nested control per field, each
 ///   [`FieldRef`] extending this one's path. At the top level the fields are the
 ///   form's own rows; nested, they sit in an open `<details>` disclosure.
-/// - anything else (`List`/`Map`/`Tuple`/`Entity`/`Bytes`/a payload-carrying
-///   `Enum`/`Any`/an unresolved `Reference`) -> a read-only
-///   [`UneditableField`], since no control can produce a valid value for it.
-///   A list is the [`DynamicView`](crate::prelude::DynamicView)'s side of the
-///   contract, and an `Entity` reference wants a picker no phase has built.
+/// - `Tuple` -> the same group over its elements, labelled by position
+/// - `List` -> one generated control per item, a remove button beside each and
+///   an add button after them, appending the item schema's
+///   [`default_value`](ValueSchema::default_value)
+/// - `Map` -> the same over its entries, each labelled by its key, added under a
+///   key typed beside the add button
+/// - `Enum` -> a [`Select`] of variant names; a payload-carrying variant renders
+///   its payload's own controls beside it, regenerated when the variant changes
+/// - anything else (`Entity`/`Bytes`/`Any`/an unresolved `Reference`) -> a
+///   read-only [`UneditableField`], since no control can produce a valid value
+///   for it. An `Entity` reference wants the picker item 18 names.
 ///
 /// The default slot lands inside the `<form>` after the generated controls, ie
 /// where a submit [`Button`] goes.
@@ -92,7 +105,7 @@ pub fn DynamicForm(
 }
 
 /// Marks a [`DynamicForm`] leaf whose schema has no editing widget, naming the
-/// kind that found none (`"List"`, `"Entity"`, an unresolved `"Reference"`).
+/// kind that found none (`"Entity"`, an unresolved `"Ref"`).
 ///
 /// The leaf still renders, read-only, so a form keeps its shape with only the
 /// editing missing — the same bargain an unregistered tag strikes. The mark sits
@@ -127,11 +140,12 @@ macro_rules! number_bounds {
 }
 
 /// One dispatched leaf. Returns a [`Snippet`] because each arm builds a
-/// differently-shaped tree, which is also what lets the struct arm recurse.
+/// differently-shaped tree, which is also what lets the composite arms recurse.
 ///
-/// `depth` counts *struct nesting* only: a reference hop or an `Optional`
-/// unwrap is the same leaf seen more precisely, so neither consumes budget, and
-/// depth `0` stays "the form's own top level".
+/// `depth` counts *composite nesting* — a struct, tuple, list, map or enum
+/// payload, the positions the walk can descend through — so a reference hop or
+/// an `Optional` unwrap is the same leaf seen more precisely and neither
+/// consumes budget, and depth `0` stays "the form's own top level".
 fn schema_field<'a>(
 	resolver: SchemaResolver<'a>,
 	schema: &'a ValueSchema,
@@ -151,16 +165,6 @@ fn schema_field<'a>(
 			number_field(number_bounds!(schema, F64Constraint), field, label)
 		}
 		ValueSchema::String(schema) => string_field(schema, field, label),
-		// a payload carries data no `<option>` value can express, so only an
-		// all-unit enum is a select
-		ValueSchema::Enum(schema)
-			if schema
-				.variants
-				.iter()
-				.all(|variant| variant.payload.is_none()) =>
-		{
-			select_field(schema, field, label)
-		}
 		// null is one of the values, which a control's empty state already is
 		ValueSchema::Optional(inner) => {
 			schema_field(resolver, inner, field, label, depth)
@@ -176,11 +180,42 @@ fn schema_field<'a>(
 				None => uneditable(schema, field, label),
 			}
 		}
-		ValueSchema::Struct(_) if depth >= MAX_DEPTH => {
+		// a composite deeper than the budget is the one place the walk gives up
+		_ if depth >= MAX_DEPTH && schema.is_composite() => {
 			uneditable(schema, field, label)
+		}
+		// a payload carries data no `<option>` value can express, so only an
+		// all-unit enum is a plain select
+		ValueSchema::Enum(schema)
+			if schema
+				.variants
+				.iter()
+				.all(|variant| variant.payload.is_none()) =>
+		{
+			unit_enum_field(schema, field, label)
+		}
+		ValueSchema::Enum(schema) => enum_field(schema, field, label, depth),
+		// a field naming a sibling cannot be dispatched until that sibling's
+		// value is in hand, so the container binds before it descends
+		ValueSchema::Struct(schema)
+			if schema
+				.fields
+				.iter()
+				.any(|named| named.schema.binds_a_field()) =>
+		{
+			bound_struct_field(schema, field, label, depth)
 		}
 		ValueSchema::Struct(schema) => {
 			struct_field(resolver, schema, field, label, depth)
+		}
+		ValueSchema::Tuple(schema) => {
+			tuple_field(resolver, schema, field, label, depth)
+		}
+		ValueSchema::List(schema) => {
+			list_field(resolver, schema, field, label, depth)
+		}
+		ValueSchema::Map(schema) => {
+			map_field(resolver, schema, field, label, depth)
 		}
 		_ => uneditable(schema, field, label),
 	}
@@ -241,15 +276,23 @@ fn string_field(
 	labeled(label, widget)
 }
 
-/// The unit-enum arm: a [`Select`] with one `<option>` per variant, its value
-/// the variant name (the serde form of a unit variant).
-fn select_field(
+/// The unit-enum arm: a [`Select`] bound to the field, with one `<option>` per
+/// variant, its value the variant name (the serde form of a unit variant).
+fn unit_enum_field(
 	schema: &EnumSchema,
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
 	let name = field.field_path.to_string();
-	let options = schema
+	labeled(label, rsx! {
+		<Select field={field} name={name}>{variant_options(schema)}</Select>
+	})
+}
+
+/// One `<option>` per variant, shared by the unit-enum select and the
+/// payload-carrying one.
+pub(super) fn variant_options(schema: &EnumSchema) -> Vec<Snippet> {
+	schema
 		.variants
 		.iter()
 		.map(|variant| {
@@ -257,10 +300,59 @@ fn select_field(
 			rsx! { <option value=variant.clone()>{variant}</option> }
 				.any_snippet()
 		})
-		.collect::<Vec<_>>();
-	labeled(label, rsx! {
-		<Select field={field} name={name}>{options}</Select>
-	})
+		.collect()
+}
+
+/// The payload-carrying enum arm: the variant [`Select`], and the selected
+/// variant's own controls beneath it.
+///
+/// The payload is a different shape per variant, so the pair rides a
+/// [`ValueRebuild`] keyed on the variant the bound value carries: choosing a
+/// variant writes that variant's zero into the field, and the controls for it
+/// arrive with the value, not with the choice.
+fn enum_field(
+	schema: &EnumSchema,
+	field: FieldRef,
+	label: Option<String>,
+	depth: usize,
+) -> Snippet {
+	let (owned, bound_field) = (schema.clone(), field.clone());
+	let rebuild = ValueRebuild::new(
+		|value| variant_name(value).unwrap_or_default(),
+		move |resolver, value| {
+			variant_control(resolver, &owned, &bound_field, value, depth)
+		},
+	);
+	// the holder carries the enum's own value, so it must be an element
+	group(label, rsx! { <div {(field, rebuild)}/> })
+}
+
+/// One generation of a payload-carrying enum: the select showing the variant the
+/// value carries, and the controls of that variant's payload.
+fn variant_control(
+	resolver: SchemaResolver,
+	schema: &EnumSchema,
+	field: &FieldRef,
+	value: &Value,
+	depth: usize,
+) -> Snippet {
+	let current = variant_name(value);
+	let mut rows =
+		vec![variant_select(resolver, schema, field, current.clone())];
+	let payload = current.as_ref().and_then(|name| {
+		schema
+			.variants
+			.iter()
+			.find(|variant| &variant.name == name)
+			.and_then(|variant| variant.payload.as_ref())
+			.map(|payload| (name.clone(), payload))
+	});
+	if let Some((name, payload)) = payload {
+		// the payload sits under the variant name, the externally tagged form
+		let inner = child_field(field, name);
+		rows.push(schema_field(resolver, payload, inner, None, depth + 1));
+	}
+	labeled(None, rows)
 }
 
 /// The struct arm: one nested control per named field, each [`FieldRef`]
@@ -274,33 +366,294 @@ fn struct_field<'a>(
 	label: Option<String>,
 	depth: usize,
 ) -> Snippet {
-	let rows = schema
+	let rows = struct_rows(resolver, schema, &field, depth);
+	// the form's own top level is already the group
+	match depth {
+		0 => labeled(None, rows),
+		_ => group(Some(struct_title(schema, &field, label)), rows),
+	}
+}
+
+/// The struct arm for a struct whose fields name each other: the rows are a
+/// [`ValueRebuild`] over the struct's own value, since a field saying "my schema
+/// is the one described at `schema`" cannot be dispatched until that sibling's
+/// value is in hand.
+///
+/// The container binds and then descends, which is the rule
+/// [`ValueSchema::bind`] states for validation, here at the widget layer: the
+/// enclosing struct is the only scope that can answer an
+/// [`AtField`](SchemaRef::AtField), so it is the only place the substitution can
+/// happen.
+fn bound_struct_field(
+	schema: &StructSchema,
+	field: FieldRef,
+	label: Option<String>,
+	depth: usize,
+) -> Snippet {
+	let title = (depth > 0).then(|| struct_title(schema, &field, label));
+	let (shape_schema, owned, bound_field) =
+		(schema.clone(), schema.clone(), field.clone());
+	let rebuild = ValueRebuild::new(
+		move |value| bound_shape(&shape_schema, value),
+		move |resolver, value| {
+			let bound = bind_fields(&owned, value);
+			labeled(None, struct_rows(resolver, &bound, &bound_field, depth))
+		},
+	);
+	// the holder carries the struct's own value, so it must be an element
+	group(title, rsx! { <div {(field, rebuild)}/> })
+}
+
+/// One control per named field, each [`FieldRef`] extending the struct's path.
+fn struct_rows<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a StructSchema,
+	field: &FieldRef,
+	depth: usize,
+) -> Vec<Snippet> {
+	schema
 		.fields
 		.iter()
 		.map(|named| {
-			let child = FieldRef {
-				document: field.document.clone(),
-				field_path: field.field_path.with_pushed(named.key.clone()),
-				on_missing: default(),
-			};
 			let label = named.label.as_ref().unwrap_or(&named.key).to_string();
-			schema_field(resolver, &named.schema, child, Some(label), depth + 1)
+			schema_field(
+				resolver,
+				&named.schema,
+				child_field(field, named.key.clone()),
+				Some(label),
+				depth + 1,
+			)
+		})
+		.collect()
+}
+
+/// The title a nested struct's disclosure wears: its label hint, else the name
+/// the schema declares for itself, else the path it binds.
+fn struct_title(
+	schema: &StructSchema,
+	field: &FieldRef,
+	label: Option<String>,
+) -> String {
+	label
+		.or_else(|| schema.name.as_ref().map(|name| name.to_string()))
+		.unwrap_or_else(|| field.field_path.to_string())
+}
+
+/// Every [`SchemaRef::AtField`] in `schema`'s fields substituted with the schema
+/// the struct's own value describes, the widget twin of validation's
+/// bind-then-descend.
+fn bind_fields(schema: &StructSchema, value: &Value) -> StructSchema {
+	let Ok(scope) = value.as_map() else {
+		return schema.clone();
+	};
+	StructSchema {
+		fields: schema
+			.fields
+			.iter()
+			.map(|named| NamedFieldSchema {
+				schema: named.schema.bind(scope),
+				..named.clone()
+			})
+			.collect(),
+		..schema.clone()
+	}
+}
+
+/// The shape a bound struct's controls are decided by: what its own value says
+/// its dependent fields are. Anything else the value holds is a leaf's business.
+fn bound_shape(schema: &StructSchema, value: &Value) -> SmolStr {
+	let bound = bind_fields(schema, value);
+	schema
+		.fields
+		.iter()
+		.zip(bound.fields.iter())
+		.filter(|(named, _)| named.schema.binds_a_field())
+		.map(|(named, bound)| format!("{}={:?}", named.key, bound.schema))
+		.collect::<Vec<_>>()
+		.join(";")
+		.into()
+}
+
+/// The tuple arm: one control per element, labelled by the element's
+/// description hint else its position. A tuple's arity is its schema's, so it
+/// has no add or remove.
+fn tuple_field<'a>(
+	resolver: SchemaResolver<'a>,
+	schema: &'a TupleSchema,
+	field: FieldRef,
+	label: Option<String>,
+	depth: usize,
+) -> Snippet {
+	let rows = schema
+		.fields
+		.iter()
+		.enumerate()
+		.map(|(index, unnamed)| {
+			let label = unnamed
+				.description
+				.as_ref()
+				.map(|description| description.to_string())
+				.unwrap_or_else(|| index.to_string());
+			schema_field(
+				resolver,
+				&unnamed.schema,
+				child_field(&field, index),
+				Some(label),
+				depth + 1,
+			)
 		})
 		.collect::<Vec<_>>();
-	// the form's own top level is already the group
-	if depth == 0 {
-		return labeled(None, rows);
-	}
-	let title = label
-		.or_else(|| schema.name.as_ref().map(|name| name.to_string()))
-		.unwrap_or_else(|| field.field_path.to_string());
+	group(label, rows)
+}
+
+/// The list arm: one control per item with a remove button beside it, and an add
+/// button appending the item schema's zero.
+///
+/// The rows ride a [`ValueRebuild`] keyed on the list's *length*, so adding or
+/// removing an item regenerates them while editing one is its own control's
+/// business.
+fn list_field(
+	resolver: SchemaResolver,
+	schema: &ListSchema,
+	field: FieldRef,
+	label: Option<String>,
+	depth: usize,
+) -> Snippet {
+	let (item, rows_field) = (schema.item.clone(), field.clone());
+	let rebuild = ValueRebuild::new(
+		|value| item_count(value).to_string().into(),
+		move |resolver, value| {
+			(0..item_count(value))
+				.map(|index| {
+					list_row(resolver, &item, &rows_field, index, depth)
+				})
+				.collect::<Vec<_>>()
+				.xmap(|rows| labeled(None, rows))
+		},
+	);
+	let zero = schema.item.default_value_in(resolver);
+	group(label, rsx! {
+		<div {(field.clone(), rebuild)}/>
+		{edit_button("add", field, CollectionEdit::Push(zero))}
+	})
+}
+
+/// One list row: the item's own controls, and the button that drops it.
+fn list_row(
+	resolver: SchemaResolver,
+	item: &ValueSchema,
+	field: &FieldRef,
+	index: usize,
+	depth: usize,
+) -> Snippet {
 	rsx! {
-		<details open>
-			<summary>{title}</summary>
-			{rows}
-		</details>
+		<div>
+			{schema_field(
+				resolver,
+				item,
+				child_field(field, index),
+				None,
+				depth + 1,
+			)}
+			{edit_button(
+				"remove",
+				field.clone(),
+				CollectionEdit::RemoveIndex(index),
+			)}
+		</div>
 	}
 	.any_snippet()
+}
+
+/// The map arm: one control per entry, labelled by its key, with a remove button
+/// beside it and a key to type beside the add button.
+///
+/// The entries ride a [`ValueRebuild`] keyed on the map's *keys*, in sorted
+/// order so a rebuild does not reshuffle a control's neighbours.
+fn map_field(
+	resolver: SchemaResolver,
+	schema: &MapSchema,
+	field: FieldRef,
+	label: Option<String>,
+	depth: usize,
+) -> Snippet {
+	let (value_schema, entries_field) = (schema.value.clone(), field.clone());
+	let rebuild = ValueRebuild::new(
+		|value| entry_keys(value).join(";").into(),
+		move |resolver, value| {
+			entry_keys(value)
+				.into_iter()
+				.map(|key| {
+					map_entry(
+						resolver,
+						&value_schema,
+						&entries_field,
+						key,
+						depth,
+					)
+				})
+				.collect::<Vec<_>>()
+				.xmap(|rows| labeled(None, rows))
+		},
+	);
+	let zero = schema.value.default_value_in(resolver);
+	group(label, rsx! {
+		<div {(field.clone(), rebuild)}/>
+		{add_entry_row(field, zero)}
+	})
+}
+
+/// One map entry: the value's own controls under the key's label, and the button
+/// that drops the entry.
+fn map_entry(
+	resolver: SchemaResolver,
+	schema: &ValueSchema,
+	field: &FieldRef,
+	key: SmolStr,
+	depth: usize,
+) -> Snippet {
+	rsx! {
+		<div>
+			{schema_field(
+				resolver,
+				schema,
+				child_field(field, key.clone()),
+				Some(key.to_string()),
+				depth + 1,
+			)}
+			{edit_button("remove", field.clone(), CollectionEdit::RemoveKey(key))}
+		</div>
+	}
+	.any_snippet()
+}
+
+/// The number of items a list-typed value holds, `0` for anything else (a field
+/// the document has yet to answer).
+fn item_count(value: &Value) -> usize {
+	value.as_list().map(Vec::len).unwrap_or_default()
+}
+
+/// A map-typed value's keys, sorted, empty for anything else.
+fn entry_keys(value: &Value) -> Vec<SmolStr> {
+	value
+		.as_map()
+		.map(|map| {
+			map.0
+				.keys()
+				.cloned()
+				.collect::<Vec<_>>()
+				.xtap(|keys| keys.sort())
+		})
+		.unwrap_or_default()
+}
+
+/// A child position of `field`: the same document, one segment deeper.
+fn child_field(field: &FieldRef, segment: impl Into<FieldSegment>) -> FieldRef {
+	FieldRef {
+		document: field.document.clone(),
+		field_path: field.field_path.with_pushed(segment),
+		on_missing: default(),
+	}
 }
 
 /// The read-only leaf for a schema with no control: a bound text node, so the
@@ -329,6 +682,21 @@ fn labeled<M>(label: Option<String>, widget: impl IntoSnippet<M>) -> Snippet {
 	}
 }
 
+/// Wrap a composite's rows in a titled disclosure, or pass them through when
+/// there is no title (the form's own top level, which is already the group).
+fn group<M>(title: Option<String>, rows: impl IntoSnippet<M>) -> Snippet {
+	match title {
+		Some(title) => rsx! {
+			<details open>
+				<summary>{title}</summary>
+				{rows}
+			</details>
+		}
+		.any_snippet(),
+		None => Snippet::from_bundle(rows.into_snippet()),
+	}
+}
+
 /// Lift a constructed widget into a child-position [`Snippet`], the
 /// struct-literal twin of an `rsx!` `<Widget/>` tag — reached for here because a
 /// dispatched arm passes `Option`s straight into optional props, which a tag
@@ -348,6 +716,22 @@ mod test {
 		test_ext::render_html(rsx! {
 			<DynamicForm schema={schema} field={FieldRef::new("field")}/>
 		})
+	}
+
+	/// Build a form over `schema` and `document`, settled.
+	fn build(schema: ValueSchema, document: Value) -> (World, Entity) {
+		let mut world = test_ext::form_world();
+		let root = world
+			.spawn_template(rsx! {
+				<div>
+					<DynamicForm schema={schema} field={FieldRef::new("field")}/>
+				</div>
+			})
+			.unwrap()
+			.id();
+		world.entity_mut(root).insert(Document::new(document));
+		test_ext::settle_world(&mut world);
+		(world, root)
 	}
 
 	#[beet_core::test]
@@ -411,10 +795,9 @@ mod test {
 	/// document. An unresolved reference lands here too, so a schema that never
 	/// arrived is loud rather than an empty form.
 	#[beet_core::test]
-	fn structural_shapes_are_uneditable() {
+	fn unreachable_shapes_are_uneditable() {
 		for schema in [
-			ValueSchema::List(default()),
-			ValueSchema::Map(default()),
+			ValueSchema::Entity(default()),
 			ValueSchema::Any,
 			ValueSchema::reference("NotRegistered"),
 		] {
@@ -575,6 +958,145 @@ mod test {
 			.0
 			.clone()
 			.xpect_eq(value!({ "name": "ada", "count": 1, "active": true }));
+	}
+
+	/// A list's items each get the control their item schema asks for, bound to
+	/// their own index, so an edit reaches one row and no other.
+	#[beet_core::test]
+	fn a_list_generates_a_control_per_item() {
+		let (mut world, root) = build(
+			ValueSchema::of::<Vec<String>>(),
+			value!({ "field": ["buy milk", "walk dog"] }),
+		);
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("name=\"field.[0]\"")
+			.xpect_contains("name=\"field.[1]\"");
+
+		let input = test_ext::elements_in(&mut world, "input")[1];
+		*world.entity_mut(input).get_mut::<Value>().unwrap() =
+			Value::str("walk cat");
+		test_ext::settle_world(&mut world);
+		world
+			.entity(root)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "field": ["buy milk", "walk cat"] }));
+	}
+
+	/// A list of structs is a control per field per row, so the todo app's rows
+	/// are editable rather than a read-only table.
+	#[beet_core::test]
+	fn a_list_of_structs_recurses_per_row() {
+		let (mut world, root) = build(
+			ValueSchema::of::<Vec<Profile>>(),
+			value!({ "field": [{ "name": "ada", "count": 1, "active": true }] }),
+		);
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("name=\"field.[0].name\"")
+			.xpect_contains("name=\"field.[0].count\"")
+			.xpect_contains("name=\"field.[0].active\"");
+	}
+
+	/// A tuple is one control per element, labelled by position, and has no add
+	/// or remove: its arity is its schema's.
+	#[beet_core::test]
+	fn a_tuple_generates_a_control_per_element() {
+		let (mut world, root) = build(
+			ValueSchema::of::<(String, i64)>(),
+			value!({ "field": ["ada", 3] }),
+		);
+		let html = test_ext::render_world(&mut world, root);
+		html.clone()
+			.xpect_contains("name=\"field.[0]\"")
+			.xpect_contains("name=\"field.[1]\"");
+		html.xnot().xpect_contains("<button");
+	}
+
+	/// A map is one labelled control per entry, bound to its own key.
+	#[beet_core::test]
+	fn a_map_generates_a_control_per_entry() {
+		let (mut world, root) = build(
+			ValueSchema::Map(MapSchema {
+				value: Box::new(ValueSchema::Bool(default())),
+			}),
+			value!({ "field": { "done": true, "urgent": false } }),
+		);
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("name=\"field.done\"")
+			.xpect_contains("name=\"field.urgent\"");
+	}
+
+	/// A payload-carrying enum is a variant select plus the payload's own
+	/// controls, and choosing another variant rewrites the field with that
+	/// variant's zero and regenerates the controls under it.
+	#[beet_core::test]
+	fn a_payload_enum_selects_and_rebuilds() {
+		let schema = ValueSchema::Enum(EnumSchema {
+			name: Some("Status".into()),
+			variants: vec![
+				VariantSchema {
+					name: "Active".into(),
+					payload: None,
+				},
+				VariantSchema {
+					name: "Snoozed".into(),
+					payload: Some(ValueSchema::Struct(StructSchema {
+						name: None,
+						allow_additional: false,
+						fields: vec![NamedFieldSchema::new(
+							"days",
+							ValueSchema::U64(default()),
+						)],
+					})),
+				},
+			],
+		});
+		let (mut world, root) =
+			build(schema, value!({ "field": { "Snoozed": { "days": 2 } } }));
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("<option value=\"Active\"")
+			.xpect_contains("name=\"field.Snoozed.days\"");
+
+		// choosing a variant writes that variant's zero, and the payload
+		// controls follow the value rather than the choice
+		let select = test_ext::element_in(&mut world, "select");
+		*world.entity_mut(select).get_mut::<Value>().unwrap() =
+			Value::str("Active");
+		test_ext::settle_world(&mut world);
+		world
+			.entity(root)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "field": "Active" }));
+		test_ext::render_world(&mut world, root)
+			.xnot()
+			.xpect_contains("field.Snoozed.days");
+	}
+
+	/// A field whose schema a sibling names gets the control that sibling's
+	/// *value* asks for, which is the dependent arm made editable: the pair
+	/// `{ schema, value }` renders a checkbox when the schema says `Bool`.
+	#[beet_core::test]
+	fn a_dependent_field_dispatches_on_its_sibling() {
+		let pair = ValueSchema::Struct(StructSchema {
+			name: Some("Pair".into()),
+			allow_additional: false,
+			fields: vec![
+				NamedFieldSchema::new("schema", ValueSchema::meta()),
+				NamedFieldSchema::new("value", ValueSchema::at_field("schema")),
+			],
+		});
+		let (mut world, root) = build(
+			pair,
+			value!({ "field": { "schema": { "Bool": {} }, "value": true } }),
+		);
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("name=\"field.value\"")
+			.xpect_contains("type=\"checkbox\"");
 	}
 
 	/// The whole form gathers on submit as a *typed* map: a checkbox submits a

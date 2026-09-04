@@ -156,8 +156,10 @@ impl ValueSchema {
 	/// scope, names a field of its enclosing struct.
 	///
 	/// The cheap check that skips [`bind`](Self::bind) entirely for the schemas
-	/// that need no binding, which is nearly all of them.
-	pub(super) fn binds_a_field(&self) -> bool {
+	/// that need no binding, which is nearly all of them. Public because the
+	/// widget layer asks it too: a form over a struct whose fields bind needs
+	/// the struct's value in hand before it can dispatch them.
+	pub fn binds_a_field(&self) -> bool {
 		match self {
 			Self::Ref(SchemaRef::AtField(_)) => true,
 			// a nested struct opens its own scope, so its fields bind against it
@@ -188,7 +190,7 @@ impl ValueSchema {
 	/// scope has no value for stays unbound, deferring to a wildcard exactly as
 	/// an unregistered name does, since a document can legitimately be read
 	/// before the field describing it has arrived.
-	pub(super) fn bind(&self, scope: &Map) -> Self {
+	pub fn bind(&self, scope: &Map) -> Self {
 		match self {
 			Self::Ref(SchemaRef::AtField(key)) => scope
 				.0

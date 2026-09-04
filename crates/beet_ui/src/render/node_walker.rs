@@ -84,9 +84,13 @@ impl NodeWalker<'_, '_> {
 		// 4. Value
 		// an element's own Value is binding state (eg a `bx:click` field mirror),
 		// not markup content: text content lives on dedicated text-node children.
-		// Form controls are the exception, displaying their bound value.
+		// Form controls are the exception, displaying their bound value — except
+		// a null, which for a *control* is nothing typed rather than the word
+		// "null". A bound text node still reads its null as the value it is,
+		// since a view is total where an editor is empty.
 		if let Some(value) = value
 			&& element.is_none_or(|element| is_value_element(element.tag()))
+			&& !(element.is_some() && value.is_null())
 		{
 			visitor.visit_value(&cx, value);
 		}

@@ -87,8 +87,19 @@ pub fn form_app() -> App {
 /// silently became "some input" the moment a plugin was added. Roots are visited
 /// by entity id and each subtree depth-first in child order, which is the order
 /// the renderers and the focus path use.
+#[cfg(feature = "tui")]
 pub fn element(app: &mut App, tag: &str) -> Entity {
-	let world = app.world_mut();
+	element_in(app.world_mut(), tag)
+}
+
+/// [`element`], for a world driven without an [`App`].
+pub fn element_in(world: &mut World, tag: &str) -> Entity {
+	elements_in(world, tag).into_iter().next().unwrap()
+}
+
+/// Every element with `tag` in document order, ie the several buttons a
+/// generated collection control emits.
+pub fn elements_in(world: &mut World, tag: &str) -> Vec<Entity> {
 	let mut roots = world
 		.query_filtered::<Entity, Without<ChildOf>>()
 		.iter(world)
@@ -96,23 +107,100 @@ pub fn element(app: &mut App, tag: &str) -> Entity {
 	roots.sort();
 	roots
 		.into_iter()
-		.find_map(|root| find_element(world, root, tag))
-		.unwrap()
+		.flat_map(|root| find_elements(world, root, tag))
+		.collect()
 }
 
-/// The first descendant of `entity` (inclusive) whose element tag matches,
+/// The descendants of `entity` (inclusive) whose element tag matches,
 /// depth-first in child order.
-fn find_element(world: &World, entity: Entity, tag: &str) -> Option<Entity> {
-	if world
+fn find_elements(world: &World, entity: Entity, tag: &str) -> Vec<Entity> {
+	let matched = world
 		.get::<Element>(entity)
 		.is_some_and(|element| element.tag() == tag)
-	{
-		return Some(entity);
-	}
+		.then_some(entity);
+	matched
+		.into_iter()
+		.chain(
+			world
+				.get::<Children>(entity)
+				.into_iter()
+				.flat_map(|children| children.iter())
+				.flat_map(|child| find_elements(world, child, tag)),
+		)
+		.collect()
+}
+
+/// The one button that submits the form it sits in, ie the only one no
+/// `type="button"` excludes ([`Button`]'s `action`).
+pub fn submit_button(world: &mut World) -> Entity {
+	let actions = world
+		.query_once::<(&Attribute, &Value, &AttributeOf)>()
+		.into_iter()
+		.filter(|(attribute, value, _)| {
+			attribute.as_str() == "type"
+				&& value
+					.as_str()
+					.map(|value| value == "button")
+					.unwrap_or_default()
+		})
+		.map(|(_, _, attribute_of)| **attribute_of)
+		.collect::<HashSet<_>>();
+	elements_in(world, "button")
+		.into_iter()
+		.find(|button| !actions.contains(button))
+		.expect("no submit button")
+}
+
+/// The generated control bound to `path`, ie the leaf a form emitted for it.
+pub fn bound(world: &mut World, path: &str) -> Entity {
 	world
-		.get::<Children>(entity)?
-		.iter()
-		.find_map(|child| find_element(world, child, tag))
+		.query_once::<(Entity, &ResolvedFieldPath)>()
+		.into_iter()
+		.find(|(_, resolved)| resolved.field_path.to_string() == path)
+		.map(|(entity, _)| entity)
+		.unwrap_or_else(|| panic!("no control is bound to `{path}`"))
+}
+
+/// The generated variant `<select>` choosing the enum at `path`, which binds no
+/// field of its own (its value is the variant name).
+pub fn variant_select(world: &mut World, path: &str) -> Entity {
+	world
+		.query_once::<(Entity, &super::variant_select::VariantSelect)>()
+		.into_iter()
+		.find(|(_, select)| select.field.field_path.to_string() == path)
+		.map(|(entity, _)| entity)
+		.unwrap_or_else(|| panic!("no variant select chooses `{path}`"))
+}
+
+/// The generated add button of the collection control bound to `path`.
+pub fn collection_add(world: &mut World, path: &str) -> Entity {
+	world
+		.query_once::<(Entity, &super::collection_edit::CollectionButton)>()
+		.into_iter()
+		.find(|(_, button)| {
+			button.field.field_path.to_string() == path
+				&& matches!(
+					button.edit,
+					super::collection_edit::CollectionEdit::Push(_)
+						| super::collection_edit::CollectionEdit::Insert(_)
+				)
+		})
+		.map(|(entity, _)| entity)
+		.unwrap_or_else(|| panic!("no collection add button edits `{path}`"))
+}
+
+/// Run the frames a document-driven rebuild needs: the edit, the syncs it
+/// dirties, the generation those spawn, and that generation's own first sync.
+pub fn settle_world(world: &mut World) {
+	for _ in 0..4 {
+		world.update_local();
+	}
+}
+
+/// Activate `entity`, the pointer half of the activation path, then settle.
+pub fn click_world(world: &mut World, entity: Entity) {
+	world.entity_mut(entity).trigger(PointerUp::new(entity));
+	settle_world(world);
 }
 
 /// Focus the first element with `tag` on a fresh window surface, returning

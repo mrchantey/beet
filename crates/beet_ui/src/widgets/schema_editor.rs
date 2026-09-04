@@ -1,49 +1,39 @@
 //! [`SchemaEditor`]: editing a schema with the machinery that renders the data
 //! it describes.
 //!
-//! The keystone closure made concrete. A schema is a value, so the schema of a
-//! schema (the meta-schema) describes it, so the widgets that lay out a todo
-//! item lay out its *schema*: the current fields are a [`DynamicView`] over the
-//! meta-schema's own `NamedFieldSchema`, and the pending edit is a
-//! [`DynamicForm`] over [`FieldEdit`]'s.
+//! The keystone closure, whole. A schema is a value, so the schema of a schema
+//! (the meta-schema) describes it, so the editor **is** a [`DynamicForm`] over
+//! [`ValueSchema::meta`]. There is no schema-editing vocabulary left in this
+//! file — no kinds to offer, no field-edit record, no apply — because the form
+//! that edits a todo item is the form that edits the todo item's schema.
 //!
 //! Nothing here writes a schema document field by field. A schema edit changes
-//! what existing data must satisfy, so it is a **transaction**: the drafted
-//! edit lives in the editor's own document, and the form's `Submit` applies it
-//! through [`TypedDocument::commit_schema`], which evolves the schema document
-//! and the data document together or neither. What it refuses lands in the
-//! editor's error line, which is where item 21's "add a default" conversation
-//! happens.
+//! what existing data must satisfy, so it is a **transaction**: the editor edits
+//! a [`DraftOf`] the schema document, forked once and sticky, and the form syncs
+//! into that draft continuously and freely. The schema document is written only
+//! by the commit, and only through [`TypedDocument::commit_schema`], which
+//! evolves the schema document and the data document together or neither. What
+//! it refuses lands in the editor's error line, which is where item 21's "add a
+//! default" conversation happens, with the drafted schema still in place to be
+//! fixed — or discarded with Revert.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// The draft field holding the last commit's failure, empty when it succeeded.
-const ERROR_FIELD: &str = "error";
-
-/// The path to a struct schema's field list within a schema document, ie the
-/// `fields` of the meta-schema's `Struct` variant payload.
-fn fields_path() -> FieldPath { FieldPath::new(["Struct", "fields"]) }
-
-/// A fresh draft: an empty edit and no error, the state the editor opens in and
-/// returns to once a commit is spent.
-fn fresh_draft() -> Result<Value> {
-	let mut draft = Value::from_serde(FieldEdit::default())?;
-	draft.insert(ERROR_FIELD, Value::str(""))?;
-	draft.xok()
-}
-
-/// An editor for a *schema* document: the fields it declares as a table, one
-/// drafted field edit as a generated form, and a transactional commit behind
-/// the form's submit button.
+/// An editor for a *schema* document: a generated form over the meta-schema,
+/// bound to a sticky draft of that document, and a transactional commit behind
+/// its submit button.
 ///
 /// Name the schema document with a [`DocRef`], exactly as any foreign document
 /// is named; the **data** document the schema describes is the one the editor
 /// is mounted in, and a commit evolves the pair together, backfilling every
 /// existing row (item 21) or refusing and touching neither.
 ///
-/// One edit at a time, keyed by field name: an unknown name adds the field, a
-/// known one retypes it, and `remove` drops it. A field the commit would leave
-/// required-but-absent needs a value for existing rows, and says so.
+/// Every schema edit is expressible, because the form is generated from the
+/// meta-schema rather than from a curated set of operations: adding a field is
+/// the `fields` list's add button, retyping one is its `schema` variant select,
+/// removing one is its remove button, and a backfill for existing rows is the
+/// `on_missing` field, whose `Default` payload is typed by the sibling `schema`
+/// it names ([`SchemaRef::AtField`]).
 ///
 /// ```rsx
 /// <div {data.bundle()}>
@@ -52,222 +42,139 @@ fn fresh_draft() -> Result<Value> {
 /// </div>
 /// ```
 #[template]
-pub fn SchemaEditor() -> Result<impl Bundle> {
-	// what a schema document holds at `Struct.fields`, asked of the meta-schema
-	// rather than restated here
-	let meta = ValueSchema::meta();
-	let fields = meta.get_field_schema(&fields_path()).map(Clone::clone)?;
-	let draft = fresh_draft()?;
-
+pub fn SchemaEditor() -> impl Bundle {
 	rsx! {
 		<div>
-			// the schema document's own fields, read-only by construction: a
-			// bound text node carries no element, so nothing can type into one
-			// and bypass the commit
-			<DynamicView schema={fields} field={FieldRef::new(fields_path())}/>
-			// the draft is the editor's own document, so the generated controls
-			// sync into it continuously without ever touching the schema
-			<div {Document::new(draft)}>
-				<DynamicForm schema={FieldEdit::schema()} {SchemaEditForm}>
+			// the draft is an ordinary document, so the generated controls sync
+			// into it continuously without ever touching the schema. It carries
+			// a `Document` from the start, so a control built before the fork
+			// binds the draft rather than falling through to the data document.
+			<div {(SchemaDraft, Document::default())}>
+				<DynamicForm schema={ValueSchema::meta()} {SchemaEditForm}>
 					<Button>"Apply"</Button>
+					<Button action=true variant={ButtonVariant::Text} {RevertButton}>
+						"Revert"
+					</Button>
 				</DynamicForm>
-				// the `.error-text` rule directly rather than `ErrorText`,
-				// whose message is a static prop: this one is bound, so a
-				// commit's report reflows into it like any other value
-				<span {Classes::new([classes::ERROR_TEXT])}>
-					{FieldRef::new(ERROR_FIELD)}
-				</span>
 			</div>
+			// the `.error-text` rule directly rather than `ErrorText`, whose
+			// message is a static prop: this one is written by the commit
+			<span {Classes::new([classes::ERROR_TEXT])}>
+				{(Value::str(""), ErrorLine)}
+			</span>
 		</div>
 	}
-	.xok()
 }
 
-/// The value kinds a [`SchemaEditor`] gives a field: one per [`ValueSchema`]
-/// variant [`DynamicForm`] dispatches to a control, since a field the form
-/// cannot edit is a field the editor should not create.
-#[derive(
-	Debug, Default, Clone, Copy, PartialEq, Reflect, Serialize, Deserialize,
-)]
-pub enum SchemaKind {
-	/// [`ValueSchema::String`], edited by a text field.
-	#[default]
-	String,
-	/// [`ValueSchema::Bool`], edited by a checkbox.
-	Bool,
-	/// [`ValueSchema::I64`], edited by a number field.
-	I64,
-	/// [`ValueSchema::U64`], edited by a number field.
-	U64,
-	/// [`ValueSchema::F64`], edited by a number field.
-	F64,
-}
-
-impl SchemaKind {
-	/// Every kind, in the order the generated `<select>` offers them.
-	pub const ALL: [Self; 5] =
-		[Self::String, Self::Bool, Self::I64, Self::U64, Self::F64];
-
-	/// The schema a field of this kind takes, its variant's default.
-	pub fn schema(&self) -> ValueSchema {
-		match self {
-			Self::String => ValueSchema::String(default()),
-			Self::Bool => ValueSchema::Bool(default()),
-			Self::I64 => ValueSchema::I64(default()),
-			Self::U64 => ValueSchema::U64(default()),
-			Self::F64 => ValueSchema::F64(default()),
-		}
-	}
-
-	/// Read `text` as a value of this kind, the backfill a commit assigns to
-	/// every row that has none.
-	///
-	/// Kind-directed rather than optimistic: `"3"` is a string for a `String`
-	/// field and a number for a numeric one, so the parsed value satisfies the
-	/// schema that asked for it.
-	pub fn parse(&self, text: &str) -> Result<Value> {
-		let text = text.trim();
-		match self {
-			Self::String => Some(Value::str(text)),
-			Self::Bool => text.parse().ok().map(Value::Bool),
-			Self::I64 => text.parse().ok().map(Value::Int),
-			Self::U64 => text.parse().ok().map(Value::Uint),
-			Self::F64 => text.parse().ok().map(Value::Float),
-		}
-		.ok_or_else(|| bevyhow!("`{text}` is not a {self:?} value"))
-	}
-}
-
-/// One drafted field edit: the value a [`SchemaEditor`]'s generated form edits,
-/// and the whole input of a commit.
+/// Marks a [`SchemaEditor`]'s draft document, the fork of the schema document
+/// the editor's [`DocRef`] names.
 ///
-/// Its own schema is what [`DynamicForm`] walks, so the editor's controls are
-/// generated exactly as the form over the data is.
-#[derive(Debug, Default, Clone, PartialEq, Reflect, Serialize, Deserialize)]
-pub struct FieldEdit {
-	/// The field to add, retype or remove, by key.
-	pub key: String,
-	/// The kind the field takes.
-	pub kind: SchemaKind,
-	/// Whether the field must be present, which is what makes a value for
-	/// existing rows mandatory rather than optional.
-	pub required: bool,
-	/// The value existing rows are backfilled with; empty declares no
-	/// resolution, which a required field is rejected for.
-	pub default: String,
-	/// Remove the named field rather than adding it.
-	pub remove: bool,
-}
+/// The relation itself is derived rather than authored, exactly as [`FieldOf`]
+/// is: the editor is authored with one `DocRef` and the draft's origin follows
+/// from it, so an author never names the same document twice.
+#[derive(Component)]
+pub(super) struct SchemaDraft;
 
-impl FieldEdit {
-	/// The schema the editor's form is generated from: this type's own,
-	/// relabelled so each control reads as what it does rather than as a struct
-	/// field name.
-	pub fn schema() -> ValueSchema {
-		let mut schema = ValueSchema::of::<Self>();
-		if let ValueSchema::Struct(fields) = &mut schema {
-			for field in &mut fields.fields {
-				field.label = match field.key.as_str() {
-					"key" => Some("field name".into()),
-					"kind" => Some("type".into()),
-					"default" => Some("value for existing rows".into()),
-					"remove" => Some("remove instead".into()),
-					_ => continue,
-				};
-			}
-		}
-		schema
-	}
+/// Marks the editor's error line, the whole report of a commit.
+#[derive(Component)]
+struct ErrorLine;
 
-	/// Apply this edit to the struct schema a schema document holds.
-	///
-	/// Only the schema is changed here; whether the *data* survives the change
-	/// is [`SchemaCommit`]'s judgement, made against every existing row.
-	fn apply(&self, schema: &mut ValueSchema) -> Result {
-		let key = self.key.trim();
-		if key.is_empty() {
-			bevybail!("name the field to edit");
-		}
-		let ValueSchema::Struct(schema) = schema else {
-			bevybail!(
-				"a `{}` schema has no named fields to edit; a schema editor \
-				edits a struct schema",
-				schema.variant_name()
-			);
-		};
-		let existing = schema.fields.iter().position(|field| field.key == key);
-		if self.remove {
-			let Some(index) = existing else {
-				bevybail!("no field `{key}` to remove");
-			};
-			schema.fields.remove(index);
-			return OK;
-		}
-		let mut field = NamedFieldSchema::new(key, self.kind.schema());
-		if !self.required {
-			field = field.optional();
-		}
-		if !self.default.trim().is_empty() {
-			field = field.with_on_missing(OnMissing::Default(
-				self.kind.parse(&self.default)?,
-			));
-		}
-		match existing {
-			// a retype keeps the field where it was, so the columns hold still
-			Some(index) => schema.fields[index] = field,
-			None => schema.fields.push(field),
-		}
-		OK
-	}
-}
+/// Marks the editor's revert button.
+#[derive(Component)]
+#[component(on_add = hook_ext::observe(revert_draft_on_click))]
+struct RevertButton;
 
 /// Marks the `<form>` a [`SchemaEditor`] commits through, wiring the commit to
 /// its [`Submit`].
 ///
-/// The commit boundary of item 29: everything the form gathers applies as one
-/// transaction, never as a stream of per-field syncs into the schema.
+/// The commit boundary of item 29: the drafted schema applies as one
+/// transaction, never as a stream of per-field syncs into the schema. The
+/// submission's gathered *values* are unread — the draft is what is committed,
+/// and it is already whole — so this rides `Submit` for the boundary, not for
+/// the payload.
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(commit_schema_edit))]
 struct SchemaEditForm;
 
-/// Apply the drafted edit to the schema document the editor names and the data
+/// System: give each editor's draft the document it forks from, the one its
+/// [`DocRef`] names.
+pub(super) fn link_schema_drafts(
+	drafts: Populated<Entity, (With<SchemaDraft>, Without<DraftOf>)>,
+	editors: AncestorQuery<&DocRef>,
+	mut commands: Commands,
+) {
+	for draft in drafts.iter() {
+		// a `DocRef` arriving late (the spread lands with the editor's own
+		// entity) leaves the draft unlinked and tries again next frame
+		if let Ok(doc_ref) = editors.get_exclusive(draft) {
+			commands.entity(draft).insert(DraftOf(doc_ref.document()));
+		}
+	}
+}
+
+/// Observer: the revert button discards the draft and forks the schema document
+/// again, the explicit half of a sticky draft.
+fn revert_draft_on_click(
+	ev: On<PointerUp>,
+	buttons: Query<(), With<RevertButton>>,
+	drafts: AncestorQuery<Entity, With<SchemaDraft>>,
+	mut commands: Commands,
+) -> Result {
+	// the event bubbles; act only at the button itself
+	let target = ev.event_target();
+	if !buttons.contains(target) {
+		return OK;
+	}
+	let draft = drafts.get_exclusive(target)?;
+	commands.trigger(RevertDraft { draft });
+	OK
+}
+
+/// Apply the drafted schema to the schema document the editor names and the data
 /// document it is mounted in, reporting the outcome in the editor's error line.
 ///
 /// A refused commit is the editor's ordinary conversation, not a raised error:
-/// "this field needs a value for existing rows" is what the author reads, types
-/// and resubmits. A miswired editor reports there too, naming what is missing.
+/// "this field needs a value for existing rows" is what the author reads, fixes
+/// in the still-drafted schema, and resubmits. A miswired editor reports there
+/// too, naming what is missing.
 fn commit_schema_edit(
 	ev: On<Submit>,
+	drafts: AncestorQuery<Entity, With<SchemaDraft>>,
 	editors: AncestorQuery<&DocRef>,
 	hosts: AncestorQuery<Entity, With<Document>>,
+	children: Query<&Children>,
+	error_lines: Query<(), With<ErrorLine>>,
 	commands: AsyncCommands,
 ) -> Result {
-	// resolution is structural and synchronous: the draft is the form's own
-	// document, the schema document is the one the editor's `DocRef` above it
+	// resolution is structural and synchronous: the draft is the document the
+	// form sits in, the schema document is the one the editor's `DocRef` above it
 	// names, and the data document is the one the editor is mounted in.
-	let draft = hosts.get_exclusive(ev.form)?;
+	let draft = drafts.get_exclusive(ev.form)?;
+	let editor = editors.get_entity(draft)?;
 	let targets = editors.get_exclusive(draft).and_then(|doc_ref| {
 		(doc_ref.document(), hosts.get_exclusive(draft)?).xok()
 	});
-	let values = ev.values.clone();
+	let error_line = children
+		.iter_descendants(editor)
+		.find(|entity| error_lines.contains(*entity));
 	// off a task, never inline: item 20 makes `OnMissing::Computed` an async js
 	// script, so evolving data is genuinely async, and blocking the world on it
 	// would freeze every other binding and deadlock the thread the script needs.
 	commands.run(async move |world| {
 		let outcome = match targets {
 			Ok((schema_doc, data_doc)) => {
-				commit(&world, values, schema_doc, data_doc).await
+				commit(&world, draft, schema_doc, data_doc).await
 			}
 			Err(err) => Err(err),
 		};
-		report(&world, draft, outcome).await
+		report(&world, error_line, outcome).await
 	});
 	OK
 }
 
-/// The commit itself, across two exclusive world hops: read the pair out,
-/// evolve it, then write it back and publish the new schema so every subtree
-/// generated from it rebuilds.
+/// The commit itself, across two exclusive world hops: read the pair and the
+/// draft out, evolve them, then write them back and publish the new schema so
+/// every subtree generated from it rebuilds.
 ///
 /// The registry is *cloned* into the task rather than borrowed, because no world
 /// borrow may be held across the evolution's awaits. The gap between the hops is
@@ -276,11 +183,11 @@ fn commit_schema_edit(
 /// the editor is the only writer of a schema.
 async fn commit(
 	world: &AsyncWorld,
-	values: Value,
+	draft: Entity,
 	schema_doc: Entity,
 	data_doc: Entity,
 ) -> Result {
-	let (registry, mut declaration, mut data) = world
+	let (registry, mut declaration, mut data, next) = world
 		.with(move |world: &mut World| {
 			let Some(data_schema) = world
 				.get::<DocumentSchema>(data_doc)
@@ -303,13 +210,14 @@ async fn commit(
 					data_schema,
 					document_value(world, data_doc, "host")?,
 				),
+				// the drafted schema, read as the schema it is a value of
+				document_value(world, draft, "draft")?
+					.into_serde::<ValueSchema>()?,
 			)
 				.xok()
 		})
 		.await?;
 
-	let mut next = declaration.to_schema()?;
-	values.into_serde::<FieldEdit>()?.apply(&mut next)?;
 	data.commit_schema(
 		SchemaResolver::default().with_schemas(&registry),
 		"the data document",
@@ -356,24 +264,27 @@ async fn commit(
 		.await
 }
 
-/// Write the commit's outcome into the draft: a fresh draft when it landed, so
-/// the next edit starts clean and the error line clears with it, else the
-/// message, leaving the edit in place to be fixed and resubmitted.
-async fn report(world: &AsyncWorld, draft: Entity, outcome: Result) -> Result {
-	let message = outcome.err().map(|err| err.to_string());
+/// Write the commit's outcome into the error line: the message when it was
+/// refused, else nothing, leaving the draft in place either way.
+///
+/// A spent draft is deliberately *not* reset: it now holds exactly what was
+/// committed, which is where the next edit starts from.
+async fn report(
+	world: &AsyncWorld,
+	error_line: Option<Entity>,
+	outcome: Result,
+) -> Result {
+	let message = outcome.err().map(|err| err.to_string()).unwrap_or_default();
+	let Some(error_line) = error_line else {
+		bevybail!("the schema editor has no error line to report {message}");
+	};
 	world
-		.entity(draft)
+		.entity(error_line)
 		.with(move |mut entity: EntityWorldMut| -> Result {
-			let mut document =
-				entity.get_mut::<Document>().ok_or_else(|| {
-					bevyhow!("the editor draft holds no document")
-				})?;
-			match message {
-				None => document.0 = fresh_draft()?,
-				Some(message) => {
-					document.0.insert(ERROR_FIELD, Value::str(message))?;
-				}
-			}
+			entity
+				.get_mut::<Value>()
+				.ok_or_else(|| bevyhow!("the error line holds no value"))?
+				.set_if_neq(Value::str(message));
 			OK
 		})
 		.await?
@@ -468,32 +379,31 @@ mod test {
 		(schema_doc, data_doc)
 	}
 
-	/// Run the frames a commit needs: the submit, the document syncs it dirties,
-	/// the registry-driven rebuild, and that rebuild's own first sync.
+	/// Run the frames a commit needs, plus the ones its regenerated controls
+	/// take to arrive: a nested generation syncs, rebuilds and syncs again.
 	fn settle(world: &mut World) {
-		for _ in 0..4 {
+		for _ in 0..8 {
 			world.update_local();
 		}
 	}
 
-	/// Fill the editor's drafted edit and press its submit button.
-	fn apply(world: &mut World, edit: FieldEdit) {
-		let draft = world
-			.query_once::<(Entity, &Document)>()
+	/// The editor's draft, ie the schema being edited.
+	fn draft(world: &mut World) -> Entity {
+		world
+			.query_once::<(Entity, &DraftOf)>()
 			.into_iter()
-			.find(|(_, doc)| doc.0.get("key").is_some())
 			.map(|(entity, _)| entity)
-			.unwrap();
-		world.entity_mut(draft).get_mut::<Document>().unwrap().0 =
-			Value::from_serde(edit).unwrap();
-		settle(world);
+			.next()
+			.unwrap()
+	}
 
-		let button = world
-			.query_once::<(Entity, &Element)>()
-			.into_iter()
-			.find(|(_, element)| element.tag() == "button")
-			.map(|(entity, _)| entity)
-			.unwrap();
+	/// Draft `schema` and press Apply, the whole input of a commit.
+	fn apply(world: &mut World, schema: &ValueSchema) {
+		let draft = draft(world);
+		world.entity_mut(draft).get_mut::<Document>().unwrap().0 =
+			Value::from_serde(schema).unwrap();
+		settle(world);
+		let button = test_ext::submit_button(world);
 		world.entity_mut(button).trigger(PointerUp::new(button));
 		settle(world);
 	}
@@ -516,16 +426,27 @@ mod test {
 	/// The editor's own error line, the commit's whole report.
 	fn error(world: &mut World) -> String {
 		world
-			.query_once::<(&ResolvedFieldPath, &Value)>()
+			.query_once::<(&super::ErrorLine, &Value)>()
 			.into_iter()
-			.find(|(resolved, _)| resolved.field_path.to_string() == "error")
 			.map(|(_, value)| value.to_string())
+			.next()
 			.unwrap()
 	}
 
-	/// Item 3's acceptance loop through the widgets: add a bool field to the
-	/// schema, and the schema document declares it, every existing row is
-	/// backfilled, and the view generated from that schema grows the column.
+	/// `label` plus a required bool field with a value for existing rows, ie
+	/// item 3's edit expressed as the schema it produces.
+	fn with_difficulty(on_missing: Option<OnMissing>) -> ValueSchema {
+		let mut field = NamedFieldSchema::new(
+			"is_really_difficult",
+			ValueSchema::Bool(default()),
+		);
+		field.on_missing = on_missing;
+		todo_schema(vec![label(), field])
+	}
+
+	/// Item 3's acceptance loop: commit a schema with an extra bool field, and
+	/// the schema document declares it, every existing row is backfilled, and
+	/// the view generated from that schema grows the column.
 	#[beet_core::test]
 	fn adding_a_field_evolves_the_schema_the_data_and_the_view() {
 		let (mut world, schema_doc, data_doc) = app();
@@ -533,13 +454,10 @@ mod test {
 			.xnot()
 			.xpect_contains("is_really_difficult");
 
-		apply(&mut world, FieldEdit {
-			key: "is_really_difficult".into(),
-			kind: SchemaKind::Bool,
-			required: true,
-			default: "false".into(),
-			remove: false,
-		});
+		apply(
+			&mut world,
+			&with_difficulty(Some(OnMissing::Default(value!(false)))),
+		);
 
 		// the schema document declares the field
 		schema_of(&mut world, schema_doc)
@@ -556,42 +474,52 @@ mod test {
 			.xpect_contains("buy milk");
 	}
 
-	/// The same loop driven by the terminal: type the field name into the
-	/// editor's own generated control, click Apply, and the view generated from
-	/// that schema grows the column. An optional field needs no value for
-	/// existing rows, so the default draft commits as typed.
-	#[cfg(feature = "tui")]
+	/// The same loop through the *generated controls*, which is the closure
+	/// itself: the add button of the meta-schema's own `fields` list appends a
+	/// field, its key is typed into a generated text control, and Apply commits
+	/// what they drafted.
 	#[beet_core::test]
-	fn typing_an_edit_and_applying_it_adds_the_column() {
-		let mut app = test_ext::form_app();
-		let (_, data_doc) = spawn_app(app.world_mut());
-		test_ext::settle(&mut app);
+	fn adding_a_field_through_the_generated_controls() {
+		let (mut world, schema_doc, data_doc) = app();
+		let add = test_ext::collection_add(&mut world, "Struct.fields");
+		test_ext::click_world(&mut world, add);
+		settle(&mut world);
 
-		// the editor's `key` control, the one element bound to that draft path
-		let key_input = app
-			.world_mut()
-			.query_once::<(Entity, &ResolvedFieldPath, &Element)>()
-			.into_iter()
-			.find(|(_, resolved, _)| resolved.field_path.to_string() == "key")
-			.map(|(entity, ..)| entity)
-			.unwrap();
-		let window = app.world_mut().spawn_empty().id();
-		app.world_mut()
-			.entity_mut(key_input)
-			.insert((Focus, RenderSurface(window)));
-		test_ext::type_text(&mut app, window, "note");
+		// the appended row is the item schema's zero, so it arrives as a real
+		// `NamedFieldSchema` rather than a null
+		let key = test_ext::bound(&mut world, "Struct.fields.[1].key");
+		world
+			.entity_mut(key)
+			.get_mut::<Value>()
+			.unwrap()
+			.set_if_neq(Value::str("note"));
+		// ...and its schema is chosen with the variant select the meta-schema's
+		// own enum generated
+		let kind =
+			test_ext::variant_select(&mut world, "Struct.fields.[1].schema");
+		world
+			.entity_mut(kind)
+			.get_mut::<Value>()
+			.unwrap()
+			.set_if_neq(Value::str("String"));
+		settle(&mut world);
 
-		let button = test_ext::element(&mut app, "button");
-		test_ext::click(&mut app, button);
-		test_ext::settle(&mut app);
+		let button = test_ext::submit_button(&mut world);
+		test_ext::click_world(&mut world, button);
+		settle(&mut world);
 
-		test_ext::render_world(app.world_mut(), data_doc)
+		error(&mut world).xpect_eq("");
+		schema_of(&mut world, schema_doc)
+			.get_field_schema(&FieldPath::new(["note"]))
+			.unwrap()
+			.xpect_eq(ValueSchema::String(default()));
+		test_ext::render_world(&mut world, data_doc)
 			.xpect_contains("<th>note</th>");
 	}
 
 	/// A required field with nothing for existing rows is refused, and the
 	/// refusal names the field: item 21's conversation, in the error line.
-	/// Both documents are left exactly as they were.
+	/// Both documents are left exactly as they were, and so is the draft.
 	#[beet_core::test]
 	fn a_required_field_without_a_value_is_refused() {
 		let (mut world, schema_doc, data_doc) = app();
@@ -600,23 +528,21 @@ mod test {
 			document(&mut world, data_doc),
 		);
 
-		apply(&mut world, FieldEdit {
-			key: "is_really_difficult".into(),
-			kind: SchemaKind::Bool,
-			required: true,
-			default: String::new(),
-			remove: false,
-		});
+		let refused = with_difficulty(None);
+		apply(&mut world, &refused);
 
 		error(&mut world).xpect_contains("is_really_difficult");
 		document(&mut world, schema_doc).xpect_eq(schema_before);
 		document(&mut world, data_doc).xpect_eq(data_before);
+		// the drafted schema stays put, to be fixed and resubmitted
+		let draft = draft(&mut world);
+		document(&mut world, draft)
+			.xpect_eq(Value::from_serde(&refused).unwrap());
 	}
 
-	/// Retyping is the third operation the editor offers, and the one item 21
-	/// most often refuses: existing values must validate under the new kind, or
-	/// the commit names the conversion it would need and touches neither
-	/// document. A field no row carries retypes freely.
+	/// Retyping is the edit item 21 most often refuses: existing values must
+	/// validate under the new schema, or the commit names the conversion it
+	/// would need and touches neither document.
 	#[beet_core::test]
 	fn a_retype_is_accepted_only_where_the_values_survive() {
 		let (mut world, schema_doc, data_doc) = app();
@@ -624,12 +550,13 @@ mod test {
 			document(&mut world, schema_doc),
 			document(&mut world, data_doc),
 		);
-		apply(&mut world, FieldEdit {
-			key: "label".into(),
-			kind: SchemaKind::U64,
-			required: true,
-			..default()
-		});
+		apply(
+			&mut world,
+			&todo_schema(vec![NamedFieldSchema::new(
+				"label",
+				ValueSchema::U64(default()),
+			)]),
+		);
 		error(&mut world)
 			.xpect_contains("label")
 			.xpect_contains("computed conversion");
@@ -640,14 +567,15 @@ mod test {
 			.xpect_eq(before);
 
 		// an optional field no existing row carries has nothing to invalidate
-		for kind in [SchemaKind::String, SchemaKind::U64] {
-			apply(&mut world, FieldEdit {
-				key: "count".into(),
-				kind,
-				..default()
-			});
-			error(&mut world).xpect_eq("");
-		}
+		apply(
+			&mut world,
+			&todo_schema(vec![
+				label(),
+				NamedFieldSchema::new("count", ValueSchema::U64(default()))
+					.optional(),
+			]),
+		);
+		error(&mut world).xpect_eq("");
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["count"]))
 			.unwrap()
@@ -655,105 +583,127 @@ mod test {
 	}
 
 	/// A refusal is not sticky: the next commit that succeeds clears the error
-	/// line with the draft it spends.
+	/// line.
 	#[beet_core::test]
 	fn a_later_success_clears_the_refusal() {
 		let (mut world, _, _) = app();
-		apply(&mut world, FieldEdit {
-			key: "is_really_difficult".into(),
-			kind: SchemaKind::Bool,
-			required: true,
-			..default()
-		});
+		apply(&mut world, &with_difficulty(None));
 		error(&mut world).xpect_contains("is_really_difficult");
 
-		apply(&mut world, FieldEdit {
-			key: "is_really_difficult".into(),
-			kind: SchemaKind::Bool,
-			required: true,
-			default: "false".into(),
-			remove: false,
-		});
+		apply(
+			&mut world,
+			&with_difficulty(Some(OnMissing::Default(value!(false)))),
+		);
 		error(&mut world).xpect_eq("");
 	}
 
-	/// Removing a field is the same transaction in reverse, and an unknown one
-	/// is refused rather than silently doing nothing.
+	/// Removing a field is the same transaction in reverse: the field goes and
+	/// so does its data, which is the reading `allow_additional: false` already
+	/// had (item 89).
 	#[beet_core::test]
 	fn removing_a_field_is_the_same_commit() {
-		let (mut world, schema_doc, _) = app();
-		apply(&mut world, FieldEdit {
-			key: "nope".into(),
-			remove: true,
-			..default()
-		});
-		error(&mut world).xpect_contains("nope");
-
-		apply(&mut world, FieldEdit {
-			key: "label".into(),
-			remove: true,
-			..default()
-		});
+		let (mut world, schema_doc, data_doc) = app();
+		apply(&mut world, &todo_schema(vec![]));
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["label"]))
 			.is_err()
 			.xpect_true();
+		document(&mut world, data_doc).xpect_eq(value!({ "items": [{}] }));
 	}
 
-	/// The editor lists the fields the schema document declares, generated from
-	/// the meta-schema rather than authored: the keystone closure, rendered.
+	/// The editor is a form over the meta-schema, so the schema document's own
+	/// fields are the controls: the keystone closure, rendered.
 	#[beet_core::test]
-	fn the_field_list_is_generated_from_the_meta_schema() {
+	fn the_form_is_generated_from_the_meta_schema() {
 		let (mut world, _, data_doc) = app();
-		test_ext::render_world(&mut world, data_doc)
-			// the meta-schema's own `NamedFieldSchema` columns
-			.xpect_contains("<th>key</th>")
-			.xpect_contains("<th>required</th>")
-			.xpect_contains("<th>schema</th>")
-			// ...over the schema document's one field
-			.xpect_contains("label");
+		let html = test_ext::render_world(&mut world, data_doc);
+		html.clone()
+			// the schema is a value of the meta-schema's own enum...
+			.xpect_contains("<option value=\"Struct\"")
+			// ...whose `Struct` payload is a struct of named fields
+			.xpect_contains("name=\"Struct.fields.[0].key\"")
+			.xpect_contains("name=\"Struct.fields.[0].required\"")
+			// ...each with its own schema, chosen by the same enum again
+			.xpect_contains("name=\"Struct.fields.[0].schema\"");
+		// and the field's key is the schema document's, not a placeholder
+		html.xpect_contains("label");
 	}
 
-	/// Every offered kind has a control: the editor never creates a field the
-	/// form it generates cannot edit.
+	/// The draft is forked from the schema document and is **sticky**: editing
+	/// it leaves the schema document alone, which is what makes the commit a
+	/// commit rather than a stream of field syncs.
 	#[beet_core::test]
-	fn every_kind_dispatches_to_a_control() {
-		for kind in SchemaKind::ALL {
-			let mut world = world_ext::ui_world();
-			let schema = kind.schema();
-			world
-				.spawn_template(rsx! {
-					<DynamicForm schema={schema} field={FieldRef::new("field")}/>
-				})
-				.unwrap();
-			world.update_local();
-			world.query_once::<&UneditableField>().len().xpect_eq(0);
-		}
-	}
-
-	/// The kinds are exactly the `<select>`'s options, so a kind added to the
-	/// enum but not to `ALL` is caught rather than silently unofferable.
-	#[beet_core::test]
-	fn every_kind_is_offered() {
-		let ValueSchema::Enum(kinds) = ValueSchema::of::<SchemaKind>() else {
-			panic!("SchemaKind is a unit enum");
-		};
-		kinds.variants.len().xpect_eq(SchemaKind::ALL.len());
-	}
-
-	/// A value for existing rows is read as the kind that asked for it, so `"3"`
-	/// backfills a string field with text and a numeric one with a number.
-	#[beet_core::test]
-	fn a_backfill_is_parsed_as_its_own_kind() {
-		SchemaKind::String
-			.parse("3")
+	fn the_draft_is_a_sticky_fork_of_the_schema_document() {
+		let (mut world, schema_doc, _) = app();
+		let draft = draft(&mut world);
+		world
+			.entity(draft)
+			.get::<DraftOf>()
 			.unwrap()
-			.xpect_eq(Value::str("3"));
-		SchemaKind::U64.parse("3").unwrap().xpect_eq(Value::Uint(3));
-		SchemaKind::Bool
-			.parse("yes")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("Bool");
+			.origin()
+			.xpect_eq(schema_doc);
+		document(&mut world, draft).xpect_eq(document(&mut world, schema_doc));
+
+		let before = document(&mut world, schema_doc);
+		world.entity_mut(draft).get_mut::<Document>().unwrap().0 =
+			Value::from_serde(&todo_schema(vec![])).unwrap();
+		settle(&mut world);
+		document(&mut world, schema_doc).xpect_eq(before);
+	}
+
+	/// Revert is the way back out of a draft, and it is a button rather than an
+	/// automatic reset, because a refused commit must leave the edit in place.
+	#[beet_core::test]
+	fn reverting_discards_the_draft() {
+		let (mut world, schema_doc, _) = app();
+		let draft = draft(&mut world);
+		world.entity_mut(draft).get_mut::<Document>().unwrap().0 =
+			Value::from_serde(&todo_schema(vec![])).unwrap();
+		settle(&mut world);
+
+		let revert = world
+			.query_once::<(Entity, &super::RevertButton)>()
+			.into_iter()
+			.map(|(entity, _)| entity)
+			.next()
+			.unwrap();
+		test_ext::click_world(&mut world, revert);
+		document(&mut world, draft).xpect_eq(document(&mut world, schema_doc));
+	}
+
+	/// The same loop driven by the terminal: press the `fields` list's own add
+	/// button, type the new field's key with real keys, press Apply, and the view
+	/// generated from that schema grows the column.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn typing_an_edit_and_applying_it_adds_the_column() {
+		let mut app = test_ext::form_app();
+		let (_, data_doc) = spawn_app(app.world_mut());
+		let settle = |app: &mut App| {
+			for _ in 0..8 {
+				app.update();
+			}
+		};
+		settle(&mut app);
+
+		let add = test_ext::collection_add(app.world_mut(), "Struct.fields");
+		test_ext::click(&mut app, add);
+		settle(&mut app);
+
+		// the appended field's key control, typed into as the terminal does
+		let key = test_ext::bound(app.world_mut(), "Struct.fields.[1].key");
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.entity_mut(key)
+			.insert((Focus, RenderSurface(window)));
+		test_ext::type_text(&mut app, window, "note");
+		settle(&mut app);
+
+		let button = test_ext::submit_button(app.world_mut());
+		test_ext::click(&mut app, button);
+		settle(&mut app);
+
+		test_ext::render_world(app.world_mut(), data_doc)
+			.xpect_contains("<th>note</th>");
 	}
 }

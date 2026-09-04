@@ -124,6 +124,23 @@ impl ValueSchema {
 		}
 	}
 
+	/// Whether this schema describes a value with *parts*: a struct, tuple,
+	/// list, map or enum.
+	///
+	/// The kinds a walk can descend through, and so the ones a depth budget is
+	/// spent on; an `Optional` or a [`ValueSchema::Ref`] is the same value seen
+	/// more precisely rather than a level of it.
+	pub fn is_composite(&self) -> bool {
+		matches!(
+			self,
+			Self::Struct(_)
+				| Self::Tuple(_)
+				| Self::List(_)
+				| Self::Map(_)
+				| Self::Enum(_)
+		)
+	}
+
 	/// Validate (and possibly mutate) `value` against this schema.
 	///
 	/// Returns the list of [`ValidationError`]s collected; an empty list means

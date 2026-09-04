@@ -39,6 +39,8 @@ impl Plugin for DocumentPlugin {
 			.register_type::<PropsDocument>()
 			.register_type::<DocRef>()
 			.register_type::<DocConsumers>()
+			.register_type::<DraftOf>()
+			.register_type::<Drafts>()
 			.register_type::<DocumentSchema>()
 			.register_type::<DocumentPath>()
 			.register_type::<OnMissing>()
@@ -58,6 +60,7 @@ impl Plugin for DocumentPlugin {
 
 		app
 			// Add observers and systems
+			.add_observer(revert_draft)
 			.add_observer(link_field_to_document)
 			.add_observer(unlink_field_from_document)
 			.add_observer(resolve_field_path);
@@ -85,6 +88,9 @@ impl Plugin for DocumentPlugin {
 		app.add_systems(
 			DocumentSync,
 			(
+				// a fresh fork dirties the draft, so it reaches every widget
+				// bound to it in this same pass
+				fork_drafts,
 				update_field_bindings.run_if(field_bindings_need_update),
 				sync_schema.run_if(schema_needs_sync),
 				sync_document_to_local,

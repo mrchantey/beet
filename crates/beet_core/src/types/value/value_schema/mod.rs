@@ -7,6 +7,7 @@
 //! Run validation with [`ValueSchema::validate`].
 
 mod constraint;
+mod default_value;
 #[cfg(feature = "json")]
 mod from_json;
 mod from_type_info;

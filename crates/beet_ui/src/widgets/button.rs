@@ -46,10 +46,18 @@ impl ButtonVariant {
 }
 
 /// A styled `<button>`; its content is the default slot's children.
+///
+/// `action` renders `type="button"`, the browser's own rule for a button that
+/// does something other than submit the form it sits in: a list control's add
+/// and remove, a schema editor's revert. Without it a button inside a `<form>`
+/// submits, which is what [`Submit`] is fired from.
 #[template]
-pub fn Button(variant: ButtonVariant) -> impl Bundle {
+pub fn Button(variant: ButtonVariant, #[prop] action: bool) -> impl Bundle {
 	rsx! {
-		<button {Classes::new([classes::BTN, variant.class()])}><Slot/></button>
+		<button
+			{Classes::new([classes::BTN, variant.class()])}
+			{Attribute::bundle_option("type", action.then_some("button"))}
+		><Slot/></button>
 	}
 }
 
