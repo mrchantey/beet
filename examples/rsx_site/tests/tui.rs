@@ -146,7 +146,7 @@ impl SiteHost {
 async fn homepage_boots_with_chrome_and_scheme() {
 	let mut host = SiteHost::new(UVec2::new(120, 64), "/");
 	host.step_until("very cool site");
-	// the BaseLayout chrome renders: header nav and footer.
+	// the layout chrome renders: header nav and footer.
 	let frame = host.frame();
 	frame
 		.as_str()

@@ -248,7 +248,7 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 ///
 /// The `<RouteList>` is wrapped in a [`PageClasses`] root (`PAGE` plus the
 /// resolved color scheme) so a bare render with no host layout — the dev CLI
-/// `--help`, where the entry declares no `BsxLayout` — resolves the scheme's
+/// `--help`, where the entry declares no `Layout` — resolves the scheme's
 /// `Background` base (the conservative app tone) and its foreground, rather than
 /// the black-on-black light `:root` fallback. The list inherits that same neutral
 /// `Background` on both the web and the terminal, reading as the regular site's
@@ -623,7 +623,7 @@ mod test {
 	#[beet_core::test]
 	async fn help_renders_through_layout() {
 		#[template]
-		fn PageLayout() -> impl Bundle {
+		fn HelpShell() -> impl Bundle {
 			rsx! {
 				<html>
 					<head><meta charset="utf-8"/></head>
@@ -633,10 +633,11 @@ mod test {
 		}
 
 		let mut world = router_world();
+		world.register_template::<HelpShell>();
 		let root = world
 			.spawn((
 				Router::with_defaults(),
-				BaseLayout::<PageLayout>::default(),
+				Layout::new("HelpShell"),
 				children![Increment::bundle(FieldRef::new("count"))],
 			))
 			.flush();

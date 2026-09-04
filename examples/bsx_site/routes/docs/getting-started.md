@@ -17,7 +17,7 @@ my-site/
 The entrypoint declares the whole app as a single root element:
 
 ```html
-<Router {(RequestLogger, HelpHandler, BsxLayout{template:"Layout"})}>
+<Router {(RequestLogger, HelpHandler, Layout{template:"Layout"})}>
 	<RoutesDir src="routes"/>
 </Router>
 ```

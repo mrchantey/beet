@@ -9,7 +9,11 @@ fn site_world() -> World {
 	// `Theme` defaults to the brand green, so the plugin needs no seed colour.
 	(RouterPlugin, material::MaterialStylePlugin)
 		.into_world()
-		.xtap(|world| world.insert_resource(pkg_config!()))
+		.xtap(|world| {
+			world.insert_resource(pkg_config!());
+			// the layout the router names, registered here as `server_plugin` does
+			world.register_template::<BeetLayout>();
+		})
 }
 
 /// A `GET {path}` request negotiating HTML (the web render target).

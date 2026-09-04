@@ -90,7 +90,7 @@ fn assert_crate_check_passed(app: &mut App) {
 }
 
 /// Every scene declares the same served shape: a root carrying the local TUI
-/// server (default-booting) plus the two opt-in ones, a `ThreadLayout`
+/// server (default-booting) plus the two opt-in ones, a `ThreadShell`-wrapped
 /// router, one `FixedPage` route, and a `ThreadView` whose `$thread` reference
 /// resolved to the scene's own thread. Asserted per scene, since an unresolved
 /// tag would otherwise reduce to a thread that renders nowhere.
@@ -117,7 +117,7 @@ fn assert_served_shape(app: &mut App) {
 		.xpect_eq(vec![false]);
 	// one layout-wrapped router serving one persistent page
 	world
-		.query_filtered_once::<Entity, (With<Router>, With<ThreadLayout>)>()
+		.query_filtered_once::<Entity, (With<Router>, With<Layout>)>()
 		.len()
 		.xpect_eq(1);
 	world

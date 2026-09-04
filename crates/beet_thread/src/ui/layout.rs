@@ -14,25 +14,6 @@ use beet_ui::prelude::*;
 // which glob (`beet_router::prelude` vs `beet_ui::prelude`) also defines a `Reset`.
 use beet_ui::prelude::Reset;
 
-/// Wraps every descendant route in the thread document shell: a themed
-/// full-height column, and nothing else.
-///
-/// The markup-spreadable form of `BaseLayout<ThreadShell>`, spread on the router
-/// like any other layout middleware:
-///
-/// ```bsx
-/// <Router {ThreadLayout}>
-///     <Route path="/" {FixedPage}>..</Route>
-/// </Router>
-/// ```
-///
-/// The wrapper exists because a generic `BaseLayout<C>` cannot be authored from
-/// markup, and [`BsxLayout`] resolves only `.bsx` file templates, not rust ones.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(BaseLayout<ThreadShell>)]
-pub struct ThreadLayout;
-
 /// The document shell itself: an html document whose body is one full-height
 /// flex column around the page.
 ///
@@ -42,7 +23,8 @@ pub struct ThreadLayout;
 /// the color-scheme script) is non-visual in the terminal, where `<head>` is
 /// `display: none`, so it is emitted only for the HTML target.
 ///
-/// `pub(crate)` because [`ThreadLayout`] is its whole public surface.
+/// Registered by name (see `ThreadUiPlugin`), so a thread scene wraps its routes
+/// in it with `<Router {Layout{template:"ThreadShell"}}>`.
 #[template(system)]
 pub(crate) fn ThreadShell(
 	stack: Res<RequestContextStack>,
@@ -135,14 +117,14 @@ mod test {
 		app
 	}
 
-	/// A router serving `page` as its one persistent route, wrapped in
-	/// [`ThreadLayout`] — the shape every thread example declares. `page` is the
+	/// A router serving `page` as its one persistent route, wrapped in the
+	/// [`ThreadShell`] — the shape every thread example declares. `page` is the
 	/// route's `children!` bundle, so its members are the page's own top-level
 	/// nodes (a view and a composer, as siblings), never nested under a wrapper.
 	/// Returns the router entity, which surfaces browse.
 	fn spawn_router(app: &mut App, page: impl Bundle) -> Entity {
 		app.world_mut()
-			.spawn((Router, ThreadLayout, children![(
+			.spawn((Router, Layout::new("ThreadShell"), children![(
 				route::new("", FixedPage),
 				page
 			)]))

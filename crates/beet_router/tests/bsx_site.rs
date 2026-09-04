@@ -11,7 +11,7 @@ use beet_router::prelude::*;
 const MAIN_BSX: &str = r#"
 <!-- the whole site: middleware as spreads, routes discovered from disk,
 the package resource patched from markup -->
-<Router {(RequestLogger, BsxLayout{template:"Layout"})}>
+<Router {(RequestLogger, Layout{template:"Layout"})}>
 	<PackageConfig title="Beet Test Site" description="markup declared"/>
 	<TemplateDir src="templates"/>
 	<RoutesDir src="routes"/>
@@ -117,7 +117,7 @@ async fn entry_components_land_on_root() {
 	// middleware stacked alongside the router
 	world.entity(root).contains::<Router>().xpect_true();
 	world.entity(root).contains::<RequestLogger>().xpect_true();
-	world.entity(root).contains::<BsxLayout>().xpect_true();
+	world.entity(root).contains::<Layout>().xpect_true();
 	// the markup `<PackageConfig/>` patched the real resource, the unnamed
 	// fields keeping their compile-time values
 	world

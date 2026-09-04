@@ -5,7 +5,7 @@ A site can be authored entirely in markup — no crate, no `main.rs`, no codegen
 ## The host (`main.bsx`)
 A `<Router>` whose middleware/server attach as component spreads, then the site config as child tags. The whole site, declared in markup:
 ```html
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8339})}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"}, HttpServer{port:8339})}>
   <PackageConfig title="Beet" description="..." version="0.0.9-dev.16"/>
   <Theme color={Srgba(Srgba{red:0.0,green:1.0,blue:0.75,alpha:1.0})}/>
   <Styles/>            <!-- templates/Styles.bsx: the site's <Rule>s -->
@@ -15,6 +15,14 @@ A `<Router>` whose middleware/server attach as component spreads, then the site 
 </Router>
 ```
 `templates/Layout.bsx` is a thin `<SiteLayout/>` (the shipped shell). No typed `routes::` module exists; internal links are string hrefs, validated by `beet check`.
+
+A `Layout` names a `.bsx` template or a rust `#[template]` registered by short type path, and layouts nest: a declaration on a child route wraps *inside* its ancestors', so a subtree gets its own chrome without repeating the shell. `site/` splits its blog out that way, the root dir excluding what the scoped one serves:
+```html
+<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
+<Route path="blog" {Layout{template:"ArticleLayout"}}>
+  <RoutesDir src="routes/blog"/>
+</Route>
+```
 
 ## Markup analogues of the typed primitives
 | Typed (Rust) | No-code (markup) |

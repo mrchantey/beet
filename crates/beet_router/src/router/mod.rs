@@ -71,13 +71,9 @@ mod help;
 #[cfg(feature = "std")]
 pub use help::*;
 #[cfg(feature = "std")]
-mod base_layout;
+mod layout;
 #[cfg(feature = "std")]
-pub use base_layout::*;
-#[cfg(feature = "std")]
-mod bsx_layout;
-#[cfg(feature = "std")]
-pub use bsx_layout::*;
+pub use layout::*;
 #[cfg(feature = "std")]
 mod route_index;
 #[cfg(feature = "std")]

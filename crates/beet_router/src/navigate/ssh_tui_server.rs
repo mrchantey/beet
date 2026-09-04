@@ -783,8 +783,8 @@ mod test {
 			.xpect_contains("Beta page");
 	}
 
-	/// Regression: the real beet-site path — a [`BsxLayout`]-wrapped [`BlobScene`]
-	/// route (`RoutesDir` `.bsx` page + `BsxLayout{template:"Layout"}`) — must render
+	/// Regression: the real beet-site path — a [`Layout`]-wrapped [`BlobScene`]
+	/// route (`RoutesDir` `.bsx` page + `Layout{template:"Layout"}`) — must render
 	/// once per SSH session. The route's content lives on the shared route entity,
 	/// transcluded into each session's layout; a second session must not double it.
 	#[cfg(feature = "bsx")]
@@ -812,7 +812,7 @@ mod test {
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("")),
-				children![(store, Router, BsxLayout::default(), children![
+				children![(store, Router, Layout::default(), children![
 					route::new("", BlobScene::new("index.html"))
 				])],
 			))
@@ -930,7 +930,7 @@ mod test {
 	/// A per-session document layout with the responsive-drawer chrome: a menu
 	/// button wired to `#sidebar` via `aria-controls`, the `<nav id="sidebar">`
 	/// rail, and the route content transcluded into `<main>` — the shape every
-	/// live page has once wrapped by [`BaseLayout`].
+	/// live page has once wrapped by [`Layout`].
 	#[template]
 	fn DrawerLayout() -> impl Bundle {
 		rsx! {
@@ -945,23 +945,22 @@ mod test {
 	/// An SSH-TUI server root opening on `home`, its router child carrying the
 	/// drawer layout and serving that one route. Returns the server entity.
 	fn spawn_drawer_router(app: &mut App) -> Entity {
+		app.register_template::<DrawerLayout>();
 		app.world_mut()
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("home")),
-				children![(
-					Router,
-					BaseLayout::<DrawerLayout>::default(),
-					children![render_action::fixed_func_route("home", || {
+				children![(Router, Layout::new("DrawerLayout"), children![
+					render_action::fixed_func_route("home", || {
 						rsx! { <p>"Home page"</p> }
-					})]
-				)],
+					})
+				])],
 			))
 			.flush()
 	}
 
 	/// Regression: the teardown holds for the deployed page shape, a
-	/// [`BaseLayout`]-wrapped route. The layout chrome is a second ephemeral tree
+	/// [`Layout`]-wrapped route. The layout chrome is a second ephemeral tree
 	/// built per session on top of the route's own, both recorded on the page's
 	/// [`DespawnAfterRender`], so a closed session must reclaim the pair. Runs on
 	/// the plain harness: no input is driven, only the page lifecycle.
@@ -1144,7 +1143,7 @@ mod test {
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("counter")),
-				children![(store, Router, BsxLayout::default(), children![
+				children![(store, Router, Layout::default(), children![
 					route::new("counter", BlobScene::new("counter.bsx"))
 				])],
 			))
@@ -1451,13 +1450,14 @@ mod test {
 		/// The page the stress sessions browse: the shared drawer chrome every
 		/// deployed page has, wrapped around a body that fills the window.
 		fn spawn_stress_router(app: &mut App) -> Entity {
+			app.register_template::<DrawerLayout>();
 			app.world_mut()
 				.spawn((
 					SshTuiServer::default(),
 					OpeningRoute(Url::parse("home")),
 					children![(
 						Router,
-						BaseLayout::<DrawerLayout>::default(),
+						Layout::new("DrawerLayout"),
 						children![render_action::fixed_func_route(
 							"home",
 							|| {

@@ -16,7 +16,7 @@ use beet::prelude::*;
 /// The load declares no run, so the entry's declared servers stay
 /// dormant: callers render or navigate the site rather than boot it.
 /// `RouterPlugin` registers the spread server/middleware types (`CliServer`,
-/// `TuiServer`, `BsxLayout`, ...); `SshTuiServer` needs the ssh transport and is
+/// `TuiServer`, `Layout`, ...); `SshTuiServer` needs the ssh transport and is
 /// absent, so its spread is skipped, exactly as a lean serve build would.
 pub async fn build_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());

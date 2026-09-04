@@ -65,3 +65,20 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 - `content` — the rendered content entity, off which per-route components (eg `ArticleMeta`) are queried.
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
+
+### Layouts
+
+A layout is render middleware, `Layout{template:"Layout"}` declared on an ancestor of the routes it wraps (typically the router). The name resolves exactly as it would in tag position: a `.bsx` document in the `BsxTemplateRegistry` first, else a rust `#[template]` registered by short type path, so markup and rust layouts are one mechanism with one declaration.
+
+Layouts **nest**: every ancestor declaring one wraps the route exactly once, furthest ancestor outermost. So a site shell on the router and an article shell on `<Route path="blog">` render as `Layout(ArticleLayout(post))`, and the inner one is chrome only, never a second document.
+
+```bsx
+<Router {Layout{template:"Layout"}}>
+	<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
+	<Route path="blog" {Layout{template:"ArticleLayout"}}>
+		<RoutesDir src="routes/blog"/>
+	</Route>
+</Router>
+```
+
+Each wrap adds one layout root to the chain, so `LayoutContent` on an outer layout would name the layout beneath it rather than the page. It never does: the wrap resolves `LayoutContent::terminal` first, so both the link and `cx.content()` name the route content however deep the nesting, and a head `<title>` binding reads the post's meta through both shells.

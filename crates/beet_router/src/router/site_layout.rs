@@ -117,7 +117,7 @@ pub fn SiteLayout(
 /// The one page-body class resolution every layout shares: a document root is
 /// themed by request, not by host.
 ///
-/// Public so a layout in another crate (eg `beet_thread`'s `ThreadLayout`) pins
+/// Public so a layout in another crate (eg `beet_thread`'s `ThreadShell`) pins
 /// the scheme the same way rather than re-deriving it; the site layout, the
 /// help/not-found page and every downstream layout go through this.
 pub struct PageClasses;

@@ -234,6 +234,11 @@ mod test {
 	/// End to end through the real page path: a discovered `blog/index.md`
 	/// placing `<RouteIndex/>` lists the posts discovered beside it, at the urls
 	/// their `slug` frontmatter names.
+	///
+	/// The posts declare their metadata as frontmatter, which only the
+	/// `markdown_parser` build reads; without it a post carries no `ArticleMeta`
+	/// and the index has nothing to list.
+	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	async fn lists_discovered_posts() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();

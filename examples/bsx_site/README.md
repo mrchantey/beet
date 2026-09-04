@@ -38,7 +38,7 @@ There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sib
 `main.bsx` declares the whole app as a single root element:
 
 ```html
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"}, HttpServer{port:8337}, TuiServer, CliServer, ServeOnLoad)}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"}, HttpServer{port:8337}, TuiServer, CliServer, ServeOnLoad)}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<RoutesDir src="routes"/>
 </Router>
@@ -48,7 +48,7 @@ There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sib
 - The three servers (`HttpServer`, `TuiServer`, `CliServer`) are transport components, and `ServeOnLoad` is the boot verb: on load it triggers the servers `--server` selects, so the same markup serves every target with no host binary.
 - `<PackageConfig/>` is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title and description), leaving the rest, eg the compile-time version, untouched. It produces no markup.
 - The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, `--help`, terminal link navigation, and the layout.
-- `BsxLayout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<Slot/>` of the `templates/Layout.bsx` template, resolved from the registry by name.
+- `Layout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<Slot/>` of the `templates/Layout.bsx` template, resolved by name exactly as the tag `<Layout/>` would be (a `.bsx` file, else a rust `#[template]`). Declared on a child route instead, it nests inside its ancestors', giving a subtree its own chrome.
 - `<RoutesDir src="routes"/>` scans its directory at spawn time and creates one route per content file (`.md`/`.bsx`/`.html`), served through the shared media-parse pipeline. `index.*` collapses to its directory, and markdown frontmatter is read at scan time so navigation knows every page's title and order.
 
 `templates/Layout.bsx` composes registered widgets (`<RouteHead>`, `<Header>`, `<RouteSidebar/>`, `<Stylesheet/>`) with plain markup. Site-local templates resolve by module path, eg `templates/widgets/Card.bsx` is `<widgets::Card>`, taking props as tag attributes and routing caller content into its `<Slot/>` (see `routes/counter.bsx`).

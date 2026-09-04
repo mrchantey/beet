@@ -10,7 +10,7 @@ complete and the terminal holds it until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<CrateCheck features={["thread", "tui", "ssh", "extra"]}/>
-	<Router {ThreadLayout}>
+	<Router {Layout{template:"ThreadShell"}}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>
 		</Route>

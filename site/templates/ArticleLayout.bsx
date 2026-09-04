@@ -1,0 +1,14 @@
+<!--
+The chrome every blog post wears, nested INSIDE the site `Layout`: the site
+shell is already applied by the router's declaration, so this file adds only
+what an article has and a docs page does not, and never repeats the document
+(no <html>, no <head>, no header or footer).
+
+Nesting is by ancestry, so the wrapping is `Layout(ArticleLayout(post))`:
+declared on <Route path="blog"> in main.bsx, it reaches every discovered post
+and nothing else.
+
+For now the post body passes straight through; the article header (title,
+byline, date) arrives with the page metadata work.
+-->
+<Slot/>

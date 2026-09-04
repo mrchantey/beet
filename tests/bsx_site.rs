@@ -56,7 +56,7 @@ async fn entry_lands_on_root() {
 		.entity(router)
 		.contains::<RequestLogger>()
 		.xpect_true();
-	world.entity(router).contains::<BsxLayout>().xpect_true();
+	world.entity(router).contains::<Layout>().xpect_true();
 	// the markup `<PackageConfig/>` patched the live resource
 	world
 		.resource::<PackageConfig>()

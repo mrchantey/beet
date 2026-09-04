@@ -14,14 +14,6 @@ In the tradition of Bevy Birthdays we get a chance to reflect on our adventures 
 
 Both of these endeavours have been utterly exhausting but exciting, a back-to-back DWeb Camp/Local-First adventure in Berlin has crystalized my view of the impending tech revolution and I can't wait to see Bevy's role in it unfold.
 
-## Tech Sovereignty is ready
-
-Martin Kleppmann headlined Local-First Conf '26 presenting the importance of ✨*Tech Sovereignty*✨ now more than ever, and over the next two days community members proposed solutions for each layer of this sovereign stack:
-
-- **Social protocols:** ATProto/Matrix
-- **Sync engines:** Automerge/PowerSync
-- **Malleable software:** Patchwork/Beet
-
 ## Malleable Standards
 
 In my last blog post, [ATProto isn't malleable yet](/blog/atproto-isnt-malleable-yet), I argued that sovereign protocols like ATProto are missing a *truely malleable* application layer. 

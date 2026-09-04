@@ -190,9 +190,13 @@ impl GlobFilter {
 }
 
 /// A validated glob pattern, stored as a [`SmolStr`] for cheap clones.
+///
+/// Public because it is the item type of a [`GlobFilter`]'s lists, which a
+/// markup struct literal writes into (`{filter:{exclude:["blog/**"]}}`, each
+/// string coerced to a validated pattern).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub(crate) struct GlobPattern(SmolStr);
+pub struct GlobPattern(SmolStr);
 
 impl GlobPattern {
 	/// Creates a new [`GlobPattern`], validating it is a valid glob pattern.

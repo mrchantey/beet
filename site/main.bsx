@@ -77,6 +77,12 @@ runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
 src="assets" cache="1h"/>` mounts the assets the site and blog reference,
 browser-cacheable for an hour.
 
+Layouts nest, so the blog is a subtree with its own chrome: the root
+`<RoutesDir/>` excludes `blog/**` and a second, scoped one under `<Route
+path="blog">` discovers those posts instead, wrapping them in `ArticleLayout`
+INSIDE the site `Layout`. Urls are unchanged, since a discovered route composes
+its ancestors' paths either way.
+
 `site/assets` is a real directory whose source of record is the site's own shared
 bucket (`beet-site--shared--assets`), hydrated with `just site-shared pull`. A
 few files it serves are BUILT in the workspace tree (the wasm binary the tutorial
@@ -153,7 +159,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		social_image="https://beet.org/assets/branding/social-card.png"
 		theme_color="#006c4f"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
-		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 			<!-- the brand palette, one key colour per Material palette. The neutral
 			     is split per mode: light is the handout cream (print), dark is the
 			     green-cast ink (terminal phosphor). See docs/design/beet-branding. -->
@@ -169,11 +175,18 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<TemplateDir src="templates"/>
 			<Styles/>
 			<DefaultAppRoutes/>
-			<RoutesDir src="routes"/>
-			<!-- the urls the blog served at before its posts were named: the files
-			     stay numbered so they read in order, and every link ever published
-			     keeps resolving, with a 301 to the name. -->
-			<Route path="blog">
+			<RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
+			<!-- the blog is its own url subtree so it can wear its own chrome: the
+			     posts are discovered here rather than by the root dir (which excludes
+			     them), so they render inside `ArticleLayout` nested within the site
+			     `Layout`, and their urls are unchanged (`routes/blog/x.md` under
+			     `<Route path="blog">` still serves at `/blog/x`).
+
+			     The redirects are the urls the blog served at before its posts were
+			     named: the files stay numbered so they read in order, and every link
+			     ever published keeps resolving, with a 301 to the name. -->
+			<Route path="blog" {Layout{template:"ArticleLayout"}}>
+				<RoutesDir src="routes/blog"/>
 				<Redirect path="post-1" redirect="full-stack-bevy"/>
 				<Redirect path="post-2" redirect="ecs-router"/>
 				<Redirect path="post-3" redirect="bevys-five-and-beets-alive"/>

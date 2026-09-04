@@ -33,6 +33,8 @@ pub fn server_plugin(app: &mut App) {
 	app.world_mut()
 		.get_resource_or_init::<RuleSet>()
 		.insert_rule(design_row_rule());
+	// the document shell the router names in its `Layout` declaration
+	app.register_template::<BeetLayout>();
 }
 
 /// The store backing the markdown `content` routes, read at request time by each
@@ -43,7 +45,7 @@ fn content_store() -> FsStore {
 
 /// The site router: the typed `pages`, the markdown `content`, and the `add`
 /// server `actions` collections, all wrapped in the global [`BeetLayout`] via the
-/// [`BaseLayout`] render middleware, so every route's body is placed into the
+/// [`Layout`] render middleware, so every route's body is placed into the
 /// layout's `<main>`. The batteries-included [`Router::with_defaults`] adds `/app-info`
 /// and the cached `/js/reactivity.js` runtime the reactive counter loads.
 pub fn rsx_site_router() -> impl Bundle {
@@ -53,6 +55,6 @@ pub fn rsx_site_router() -> impl Bundle {
 		pages_routes(),
 		content_routes(),
 		actions_routes(),
-		BaseLayout::<BeetLayout>::default(),
+		Layout::new("BeetLayout"),
 	)
 }

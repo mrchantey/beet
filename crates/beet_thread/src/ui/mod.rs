@@ -43,9 +43,10 @@ impl Plugin for ThreadUiPlugin {
 			// the thread<->UI relationship binding views/forms to their thread
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
-			.register_type::<UserInput>()
-			// the document shell a thread scene's routes are wrapped in
-			.register_type::<ThreadLayout>()
+			.register_type::<UserInput>();
+		// the document shell a thread scene's routes are wrapped in, resolved by
+		// name from a `Layout{template:"ThreadShell"}` declaration
+		app.register_template::<ThreadShell>()
 			// project each window into its views' documents, then pin to the bottom
 			.add_systems(
 				Update,

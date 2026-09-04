@@ -62,16 +62,16 @@ impl BindingTarget {
 	///
 	/// A matched marker carrying a [`LayoutContent`] (a layout root linked to its
 	/// transcluded route content, installed by the router's layout wrap) resolves
-	/// to that content instead, so a layout-head `@entity:PageRoot::` binding reads
-	/// the route's `ArticleMeta` across the transclusion boundary. A
-	/// self-referential render root has no such link and resolves to itself, as
-	/// before.
+	/// to that content instead ([`LayoutContent::terminal`], so nested layouts
+	/// resolve to the page rather than to each other), letting a layout-head
+	/// `@entity:PageRoot::` binding read the route's `ArticleMeta` across the
+	/// transclusion boundary. A self-referential render root has no such link and
+	/// resolves to itself, as before.
 	pub fn resolve(
 		&self,
 		world: &World,
 		binding_entity: Entity,
 	) -> Option<Entity> {
-		use bevy::ecs::relationship::Relationship;
 		match self {
 			Self::Reserved(name) => {
 				let component_id = component_id_by_short_path(world, name)?;
@@ -83,15 +83,14 @@ impl BindingTarget {
 					binding_entity,
 				)
 				.find_map(|entity| {
-					let entity_ref = world.get_entity(entity).ok()?;
-					entity_ref.contains_id(component_id).then(|| {
+					world
+						.get_entity(entity)
+						.ok()?
+						.contains_id(component_id)
 						// a render root linked to detached content (the layout case)
 						// resolves into the content; a self-referential one stays put.
-						entity_ref
-							.get::<LayoutContent>()
-							.map(|content| content.get())
-							.unwrap_or(entity)
-					})
+						.then(|| LayoutContent::terminal(world, entity).ok())
+						.flatten()
 				})
 			}
 			_ => self.fixed(binding_entity),
@@ -123,6 +122,10 @@ impl BindingTarget {
 /// A self-referential render root (a fixed or per-request route that is its own
 /// content) carries no [`LayoutContent`]: the reserved walk resolves to the
 /// marker entity itself, the pre-transclusion behavior.
+///
+/// Layouts nest, so a wrap resolves [`terminal`](Self::terminal) before linking:
+/// every layout in a chain points at the PAGE, not at the layout it structurally
+/// wraps (which the `Portal` already names).
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = LayoutContentOf)]
@@ -131,7 +134,37 @@ pub struct LayoutContent(#[entities] pub Entity);
 impl LayoutContent {
 	/// Link a render root to the `content` entity its reserved bindings read.
 	pub fn new(content: Entity) -> Self { Self(content) }
+
+	/// The content at the end of `entity`'s layout chain: follows
+	/// [`LayoutContent`] until an entity carries none, returning `entity` itself
+	/// when it is not a layout root.
+	///
+	/// Layouts nest, so what a layout root links to may be another layout root,
+	/// while every consumer wants the page at the end: the route's own components
+	/// (`ArticleMeta`) live there, never on an intermediate shell.
+	///
+	/// # Errors
+	/// Errors when the chain does not terminate within [`MAX_LAYOUT_DEPTH`] hops,
+	/// which a wrap can only produce by linking a layout back into its own chain.
+	pub fn terminal(world: &World, entity: Entity) -> Result<Entity> {
+		let mut entity = entity;
+		for _ in 0..MAX_LAYOUT_DEPTH {
+			match world.get::<LayoutContent>(entity) {
+				Some(content) => entity = content.get(),
+				None => return Ok(entity),
+			}
+		}
+		bevybail!(
+			"`LayoutContent` chain from {entity} exceeded {MAX_LAYOUT_DEPTH} \
+			 hops, so a layout links back into its own chain"
+		)
+	}
 }
+
+/// The hop budget [`LayoutContent::terminal`] walks before calling a chain
+/// cyclic. Far above any real nesting: a document layout, a section layout and
+/// a page is three.
+const MAX_LAYOUT_DEPTH: usize = 32;
 
 /// On route content: the render roots transcluding it, the reverse edge of
 /// [`LayoutContent`]. Gives content -> render-root traversal for free.

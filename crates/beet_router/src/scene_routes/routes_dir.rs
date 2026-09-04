@@ -27,11 +27,30 @@ use beet_net::prelude::*;
 /// sets the nav order, so `blog/1-full-stack-bevy.md` declaring
 /// `slug = "full-stack-bevy"` reads first and serves at `blog/full-stack-bevy`.
 /// Add a [`PathPartial`] alongside to prefix every discovered route.
+///
+/// A [`filter`](Self::filter) narrows which files are discovered, so one
+/// directory can be served by several dirs: the root excludes a subtree another
+/// scans under its own [`Route`](crate::prelude::route), giving that subtree its
+/// own layout and redirects while the urls stay where they were.
+///
+/// ```bsx
+/// <RoutesDir src="routes" filter={GlobFilter{exclude:["blog/**"]}}/>
+/// <Route path="blog" {Layout{template:"ArticleLayout"}}>
+///     <RoutesDir src="routes/blog"/>
+/// </Route>
+/// ```
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RoutesDir {
 	/// The content directory, relative to the nearest ancestor [`BlobStore`].
 	pub src: String,
+	/// Which of `src`'s content files to serve, matched against each file's
+	/// path relative to `src` (eg `blog/1-post.md`). Open by default.
+	///
+	/// A bare string or list authors the include allowlist
+	/// (`filter="docs/**"`); the struct literal names either list
+	/// (`filter={GlobFilter{exclude:["blog/**"]}}`).
+	pub filter: GlobFilter,
 }
 
 /// The content file extensions served as [`BlobScene`] routes.
@@ -39,7 +58,19 @@ const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
 impl RoutesDir {
 	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
-	pub fn new(src: impl Into<String>) -> Self { Self { src: src.into() } }
+	pub fn new(src: impl Into<String>) -> Self {
+		Self {
+			src: src.into(),
+			..default()
+		}
+	}
+
+	/// Discover only the files passing `filter`, matched against each path
+	/// relative to `src`.
+	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
+		self
+	}
 
 	/// Observer: scan the [`RoutesDir`] store and spawn its routes (see the module docs).
 	///
@@ -65,7 +96,9 @@ impl RoutesDir {
 		mut commands: Commands,
 	) -> Result {
 		let entity = ev.entity;
-		let src = SmolPath::from(dirs.get(entity)?.src.as_str());
+		let dir = dirs.get(entity)?;
+		let src = SmolPath::from(dir.src.as_str());
+		let filter = dir.filter.clone();
 		let root = build_root.map(|root| **root);
 		// one queued command parks the guard (ahead of the build's synchronous
 		// drain, like the scene-ready gate) and spawns the scan task holding it,
@@ -104,7 +137,7 @@ impl RoutesDir {
 						)
 						.await??
 						.with_subdir(src);
-					let specs = Self::discover_routes(&store).await?;
+					let specs = Self::discover_routes(&store, &filter).await?;
 					dir.world()
 						.with(move |world| {
 							// watch the discovered routes dir for live reload (keyed to
@@ -186,12 +219,15 @@ impl RoutesDir {
 	/// This half is the store I/O; what the bytes MEAN settles at spawn time (see
 	/// [`spawn_route_spec`](Self::spawn_route_spec)), which is also where a `slug`
 	/// renames the route path — after the sort, so it cannot reshuffle the order.
-	async fn discover_routes(store: &BlobStore) -> Result<Vec<RouteSpec>> {
+	async fn discover_routes(
+		store: &BlobStore,
+		filter: &GlobFilter,
+	) -> Result<Vec<RouteSpec>> {
 		let mut paths = store.list().await?;
 		paths.sort();
 		paths
 			.into_iter()
-			.filter(|path| Self::is_content(path))
+			.filter(|path| Self::is_content(path) && filter.passes(path))
 			.map(async |path| -> Result<RouteSpec> {
 				Ok(RouteSpec {
 					meta: Self::scan_meta(store, &path).await,
@@ -531,6 +567,39 @@ mod test {
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("no page segment of its own");
+	}
+
+	/// A filtered root dir and a scoped dir under a `<Route>` compose to the urls
+	/// one unfiltered dir would serve: the excluded subtree is discovered by the
+	/// second dir instead, which is what lets it carry its own layout.
+	#[beet_core::test]
+	async fn filter_splits_a_dir_across_two_scans() {
+		let mut world = router_world();
+		let files = &[
+			("index.md", "# Home"),
+			("docs/intro.md", "# Intro"),
+			("blog/index.md", "# Blog"),
+			("blog/1-post.md", "# Post"),
+		];
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(files).await,
+			(Router, children![
+				RoutesDir::default()
+					.with_filter(GlobFilter::default().with_exclude("blog/**")),
+				(PathPartial::new("blog"), children![RoutesDir::new("blog")])
+			]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		// the blog subtree serves at the same urls the single-dir scan gave it
+		tree.find(&["blog"]).xpect_some();
+		tree.find(&["blog", "1-post"]).xpect_some();
+		tree.find(&["docs", "intro"]).xpect_some();
+		// ..and the root dir discovered it once, not twice (a duplicate route
+		// would have failed the tree build outright)
+		tree.find(&["blog", "blog"]).xpect_none();
 	}
 
 	/// A BSX page declares the same metadata markdown puts in frontmatter, as the

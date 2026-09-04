@@ -25,7 +25,7 @@ use beet::prelude::*;
 fn site() -> impl Bundle {
 	(
 		Router,
-		BaseLayout::<SiteLayout>::default(),
+		Layout::new("SiteLayout"),
 		Children::spawn(bevy::ecs::spawn::SpawnIter(page_routes())),
 	)
 }

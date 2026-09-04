@@ -293,6 +293,16 @@ fn scalar_to_reflect(
 			.map(|filter| Box::new(filter) as Box<dyn PartialReflect>);
 	}
 
+	// a string targeting a `GlobPattern` builds one validated pattern, the item
+	// form of the filter coercions: a `GlobFilter` struct literal writes its
+	// lists as plain strings, `{filter:{exclude:["blog/**"]}}`.
+	if let (Value::Str(pattern), Some(info)) = (value, field_info)
+		&& info.type_id() == TypeId::of::<GlobPattern>()
+	{
+		return glob_pattern(pattern.as_str())
+			.map(|pattern| Box::new(pattern) as Box<dyn PartialReflect>);
+	}
+
 	// a bare string targeting a `ValueSchema` field names the shape the field
 	// accepts, so `<DynamicComponent name=".." schema="u64"/>` declares what a
 	// runtime component means. `ValueSchema` is reflect-opaque, so this is the
@@ -772,20 +782,27 @@ fn named_tuple_struct_to_reflect(
 /// A [`GlobFilter`] over `patterns`, as includes.
 ///
 /// The markup form of a filter is the allowlist a human writes; an exclude
-/// needs the struct literal (`{read:{exclude:[..]}}`), which reflects normally.
+/// needs the struct literal (`{read:{exclude:[..]}}`), which reflects normally
+/// now that each pattern coerces from its string.
 fn glob_filter<'a>(
 	patterns: impl IntoIterator<Item = &'a str>,
 ) -> Result<GlobFilter> {
 	let mut filter = GlobFilter::default();
 	for pattern in patterns {
-		// `GlobFilter::include` panics on a malformed pattern, and a markup
-		// attribute is authored input, so it is validated into an error first.
-		GlobFilter::parse_glob_pattern(pattern).map_err(|err| {
-			bevyhow!("invalid glob pattern {pattern:?}: {err}")
-		})?;
+		glob_pattern(pattern)?;
 		filter.include(pattern);
 	}
 	filter.xok()
+}
+
+/// One validated [`GlobPattern`].
+///
+/// `GlobPattern::new` panics on a malformed pattern, and a markup attribute is
+/// authored input, so it is validated into an error first.
+fn glob_pattern(pattern: &str) -> Result<GlobPattern> {
+	GlobFilter::parse_glob_pattern(pattern)
+		.map_err(|err| bevyhow!("invalid glob pattern {pattern:?}: {err}"))?;
+	GlobPattern::new(pattern).xok()
 }
 
 /// A [`ValueSchema`] from the one word a human means, or from a JSON Schema.
@@ -839,8 +856,7 @@ mod test {
 	use bevy::reflect::Typed;
 
 	/// A `GlobFilter` field takes the allowlist a human writes, as a list or as
-	/// a bare string, because its patterns are private and reflect cannot build
-	/// them field by field.
+	/// a bare string: the shorthand for the common case, an allowlist.
 	#[crate::test]
 	fn coerces_patterns_to_a_glob_filter() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
@@ -868,6 +884,35 @@ mod test {
 			)]),
 		}))
 		.xpect_eq(Exposure { read: expected });
+	}
+
+	/// The full form: a `GlobFilter` struct literal names either list, each
+	/// pattern coercing from its string, so a denylist authors as directly as an
+	/// allowlist (`{filter:{exclude:["blog/**"]}}`).
+	#[crate::test]
+	fn coerces_a_glob_filter_struct_literal() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Discovery {
+			filter: GlobFilter,
+		}
+		resolve::<Discovery>(DataLiteral::Enum(NamedLiteral {
+			name: "Discovery".into(),
+			fields: NamedFields::Struct(vec![(
+				"filter".into(),
+				DataLiteral::Enum(NamedLiteral {
+					name: "GlobFilter".into(),
+					fields: NamedFields::Struct(vec![(
+						"exclude".into(),
+						DataLiteral::List(vec![DataLiteral::Scalar(
+							Value::Str("blog/**".into()),
+						)]),
+					)]),
+				}),
+			)]),
+		}))
+		.xpect_eq(Discovery {
+			filter: GlobFilter::default().with_exclude("blog/**"),
+		});
 	}
 
 	/// A malformed pattern errors rather than panicking inside the glob

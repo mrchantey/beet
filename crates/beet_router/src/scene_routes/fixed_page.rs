@@ -22,7 +22,7 @@ use beet_net::prelude::*;
 /// live tree (a thread projection, a document sync) is seen by the next render,
 /// and a `$thread`-style entity reference resolves once at entry build rather
 /// than per request. An ancestor layout still wraps it per request, transcluding
-/// the fixed tree by reference (see [`BaseLayout`]).
+/// the fixed tree by reference (see [`Layout`]).
 ///
 /// # One surface only
 ///
@@ -167,12 +167,13 @@ mod test {
 	#[beet_core::test]
 	async fn survives_its_layout() {
 		#[template]
-		fn PageLayout() -> impl Bundle {
+		fn FixedShell() -> impl Bundle {
 			rsx! { <html><body><main><Slot/></main></body></html> }
 		}
 		let mut world = router_world();
+		world.register_template::<FixedShell>();
 		let root = world
-			.spawn((Router, BaseLayout::<PageLayout>::default(), children![(
+			.spawn((Router, Layout::new("FixedShell"), children![(
 				route::new("", FixedPage),
 				children![rsx! { <p>"page body"</p> }]
 			)]))

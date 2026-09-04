@@ -18,7 +18,7 @@ fields of the resource, creating it from defaults if absent, so the title and
 description are set in markup with no compile-time host config.
 -->
 <CallOnReady {(HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer)}>
-<Router {(RequestLogger, HelpHandler, NavigateHandler, BsxLayout{template:"Layout"})}>
+<Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
 	<TemplateDir src="templates"/>

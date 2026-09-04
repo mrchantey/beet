@@ -155,6 +155,11 @@ where
 	Out: 'static,
 {
 	/// Wraps an action with all ancestor middleware for the given entity.
+	///
+	/// Applied leaf-first, so the FURTHEST ancestor's middleware ends up the
+	/// outermost wrapper: a router's request logger sees a call before a route's
+	/// own middleware does, and a router's [`Layout`](crate::prelude::Layout)
+	/// wraps the layout a nested route declares.
 	pub fn resolve_action<M>(
 		&self,
 		entity: Entity,
@@ -165,7 +170,9 @@ where
 		Out: 'static + Send + Sync,
 	{
 		let mut wrapped = action.into_action();
-		for list in self.middleware.get_ancestors(entity) {
+		// `get_ancestors` yields root-first, and each wrap lands outside the last,
+		// so walk it in reverse to leave the root ancestor outermost.
+		for list in self.middleware.get_ancestors(entity).into_iter().rev() {
 			wrapped = list.wrap(&wrapped);
 		}
 		wrapped

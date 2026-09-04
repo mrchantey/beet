@@ -110,9 +110,9 @@ impl Plugin for RouterPlugin {
 				// like `PackageConfig`, eg `<RenderDiagnostics unknown_class="Off"/>`
 				.register_type::<RenderDiagnostics>()
 				// the no-code site surface: markup-resolved router components
-				// (`<RoutesDir/>`, a `BsxLayout` spread) and the by-name
+				// (`<RoutesDir/>`, a `Layout` spread) and the by-name
 				// route-aware head/sidebar widgets.
-				.register_type::<BsxLayout>()
+				.register_type::<Layout>()
 				.register_template::<RouteHead>()
 				.register_template::<RouteSidebar>()
 				// the generated page listing a content index page places instead

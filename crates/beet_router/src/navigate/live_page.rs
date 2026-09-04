@@ -146,7 +146,7 @@ pub(crate) async fn build_live_page(
 	// canonical action, skipping the `ExchangeOverload` adapter that would serialize
 	// then despawn the tree.
 	let content = route.call::<Request, PageRequest>(request).await?.0;
-	// wrap it in the ancestor layout middleware (the `BaseLayout` document chrome),
+	// wrap it in the ancestor layout middleware (the `Layout` document chrome),
 	// transcluding the content by reference, exactly as `PageRoot::render` does
 	// for the static path; here the wrapped tree is kept alive as the page.
 	route
@@ -529,7 +529,7 @@ mod test {
 
 	/// A document layout that transcludes the route content into its `<main>` slot
 	/// by reference (a [`Portal`]), the shape every live page has once wrapped in
-	/// [`BaseLayout`]. The chrome carries no link of its own.
+	/// [`Layout`]. The chrome carries no link of its own.
 	#[template]
 	fn SlotLayout() -> impl Bundle {
 		rsx! { <body><main><Slot/></main></body> }
@@ -557,9 +557,10 @@ mod test {
 	#[beet_core::test]
 	async fn link_in_layouted_content_navigates() {
 		let mut app = nav_app();
+		app.register_template::<SlotLayout>();
 		let router = app
 			.world_mut()
-			.spawn((Router, BaseLayout::<SlotLayout>::default(), children![
+			.spawn((Router, Layout::new("SlotLayout"), children![
 				render_action::fixed_func_route("alpha", || {
 					rsx! { <p>"go "<a href="/beta">"to beta"</a>" now"</p> }
 				}),
