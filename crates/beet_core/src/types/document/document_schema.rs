@@ -7,32 +7,30 @@ use bevy::reflect::Typed;
 /// type-checked. A field's schema is derived by walking the document schema
 /// with the field's [`FieldPath`]. When absent, writes are untyped.
 ///
-/// Wraps a [`FieldSchema`] so a document can either inline its [`ValueSchema`]
+/// Wraps a [`ValueSchema`] so a document can either inline its [`ValueSchema`]
 /// or reference a registered Rust type by path.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DocumentSchema(pub FieldSchema);
+pub struct DocumentSchema(pub ValueSchema);
 
 impl DocumentSchema {
 	/// Build a schema describing the whole document from a Rust type.
 	///
 	/// The schema is inlined immediately via [`ValueSchema::of`], so no type
 	/// registry is needed to type-check field writes.
-	pub fn of<T: Typed>() -> Self {
-		Self(FieldSchema::Inline(ValueSchema::of::<T>()))
-	}
+	pub fn of<T: Typed>() -> Self { Self(ValueSchema::of::<T>()) }
 
 	/// Build a schema from an inline [`ValueSchema`].
-	pub fn inline(schema: ValueSchema) -> Self {
-		Self(FieldSchema::Inline(schema))
-	}
+	pub fn inline(schema: ValueSchema) -> Self { Self(schema) }
 
 	/// Build a schema referencing a registered Rust type by its path.
 	///
 	/// Type-checks against this variant are skipped unless the schema is first
 	/// resolved against a registry, since the path alone is not enough.
-	pub fn type_path<T: TypePath>() -> Self { Self(FieldSchema::of::<T>()) }
+	pub fn type_path<T: TypePath>() -> Self {
+		Self(ValueSchema::type_ref::<T>())
+	}
 
 	/// Validate `value` against this schema, naming `subject` on failure.
 	///
@@ -59,7 +57,7 @@ impl DocumentSchema {
 
 	/// Assert the field at `path` accepts a value of type `T`.
 	///
-	/// Mirrors `FieldSchema::assert_eq_ty` on the token side. Passes silently
+	/// Mirrors `ValueSchema::assert_eq_ty` on the token side. Passes silently
 	/// when the schema does not resolve (no registry in hand, or a schema
 	/// document still arriving) or when either side is [`ValueSchema::Any`].
 	pub fn assert_field_type<T: Typed>(
@@ -173,8 +171,7 @@ mod test {
 		let mut registry = SchemaRegistry::default();
 		registry.insert("TodoItem", ValueSchema::of::<CountDoc>());
 		let resolver = SchemaResolver::default().with_schemas(&registry);
-		let schema =
-			DocumentSchema::inline(ValueSchema::Reference("TodoItem".into()));
+		let schema = DocumentSchema::inline(ValueSchema::reference("TodoItem"));
 		schema
 			.assert_field_type::<i64>(resolver, &[FieldSegment::key("count")])
 			.unwrap();

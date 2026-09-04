@@ -24,7 +24,7 @@ pub(crate) fn build(type_info: &TypeInfo) -> ValueSchema {
 
 /// The recursive walk, tracking named ancestor types so a self-referential
 /// type (eg `SidebarNode { children: Vec<SidebarNode> }`) lowers to a
-/// [`ValueSchema::Reference`] by short type path instead of recursing forever.
+/// [`SchemaRef::Name`] by short type path instead of recursing forever.
 #[derive(Default)]
 struct Builder {
 	visiting: Vec<SmolStr>,
@@ -40,9 +40,9 @@ impl Builder {
 		let path = SmolStr::from(type_info.type_path());
 		if named {
 			if self.visiting.contains(&path) {
-				return ValueSchema::Reference(SmolStr::from(
+				return ValueSchema::Ref(SchemaRef::Name(SmolStr::from(
 					type_info.type_path_table().short_path(),
-				));
+				)));
 			}
 			self.visiting.push(path);
 		}
@@ -338,8 +338,6 @@ mod test {
 		let ValueSchema::List(list) = &children.schema else {
 			panic!("expected list schema");
 		};
-		list.item
-			.as_ref()
-			.xpect_eq(ValueSchema::Reference("Node".into()));
+		list.item.as_ref().xpect_eq(ValueSchema::reference("Node"));
 	}
 }

@@ -142,7 +142,7 @@ impl BsxTemplateRegistry {
 	}
 
 	/// Mirror the schemas of the world's [`BsxTemplateRegistry`] into the
-	/// [`SchemaRegistry`], so a composable [`ValueSchema::Reference`] between BSX
+	/// [`SchemaRegistry`], so a composable [`SchemaRef::Name`] between BSX
 	/// templates resolves. Called after any template registration (eg the reactive
 	/// [`TemplateDir`](crate::prelude::TemplateDir) loader). Wasm-safe (no I/O).
 	pub fn refresh_schemas(world: &mut World) {

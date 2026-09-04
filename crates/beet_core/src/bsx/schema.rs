@@ -10,7 +10,7 @@
 //!
 //! Verification is always at runtime: [`verify_props`] gathers a tag's prop
 //! attributes into a [`Value`], resolves the template's schema (substituting
-//! composable [`ValueSchema::Reference`]s against the [`SchemaRegistry`]), and
+//! composable [`SchemaRef::Name`]s against the [`SchemaRegistry`]), and
 //! validates, surfacing a missing required field or a type mismatch as a graceful
 //! error that rides [`TemplateError`](beet_core::prelude::TemplateError) on the
 //! root rather than panicking.
@@ -24,7 +24,7 @@ use bevy::ecs::template::TemplateContext;
 ///
 /// Builds a [`Value::Map`] from the element's literal prop attributes, resolves
 /// the template's [`ValueSchema`] against the world's [`SchemaRegistry`] (so a
-/// composable [`ValueSchema::Reference`] is substituted), and validates. Returns
+/// composable [`SchemaRef::Name`] is substituted), and validates. Returns
 /// an `Err` describing the failures, which rides the root's `TemplateError`.
 ///
 /// A tag with no registered schema, or props that are not plain values (an entity
@@ -46,7 +46,7 @@ pub(crate) fn verify_props(
 /// Rust template (schema looked up via [`ValueSchema::template_by_name`]) and a BSX
 /// template (schema from its `bx:schema` block).
 ///
-/// Resolves composable [`ValueSchema::Reference`]s against the world's
+/// Resolves composable [`SchemaRef::Name`]s against the world's
 /// [`SchemaRegistry`], then validates. A missing required field or type mismatch
 /// is an `Err` that rides the root's `TemplateError`.
 pub(crate) fn verify_props_against(

@@ -2,7 +2,7 @@
 //! resolution.
 //!
 //! A data document may name its schema by pointing at another document
-//! ([`FieldSchema::Document`]), resolved by default in the naming document's own
+//! ([`ValueSchema::Document`]), resolved by default in the naming document's own
 //! store, the `AncestorQuery<&BlobStore>` idiom. The index that answers such a
 //! reference is [`SchemaRegistry`]'s by-location one, which sits beside the
 //! by-name namespace rather than inside it; a store sits above the schema layer
@@ -53,7 +53,7 @@ pub(crate) fn located_schemas_may_be_readable(
 	!documents.is_empty() || !stores.is_empty()
 }
 
-/// Read the schema document each [`FieldSchema::Document`] names out of the
+/// Read the schema document each [`ValueSchema::Document`] names out of the
 /// naming document's own store, into [`SchemaRegistry`]'s by-location index.
 ///
 /// Lazy by decision, as `DocRef` resolution is: a document legitimately arrives
@@ -70,7 +70,7 @@ pub(crate) fn read_located_schemas(
 	>,
 ) {
 	for (entity, schema) in documents.iter() {
-		let FieldSchema::Document(path) = &schema.0 else {
+		let ValueSchema::Ref(SchemaRef::Document(path)) = &schema.0 else {
 			continue;
 		};
 		if registry.located(path).is_some() {
@@ -156,7 +156,7 @@ mod test {
 			.insert_document(
 				&SmolPath::from("todos.json"),
 				&TypedDocument::new(
-					FieldSchema::document("schema.json"),
+					ValueSchema::document("schema.json"),
 					value!({ "label": "buy milk" }),
 				),
 			)
@@ -236,7 +236,7 @@ mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
 		let store = todo_store().await;
 		app.world_mut().spawn((store, children![DocumentSchema(
-			FieldSchema::document("schema.json")
+			ValueSchema::document("schema.json")
 		)]));
 		app.update_async().await;
 		app.world()

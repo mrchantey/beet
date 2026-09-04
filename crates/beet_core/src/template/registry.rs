@@ -163,7 +163,7 @@ pub impl World {
 		// attach the prop schema (from `GetTemplateSchema`) beside the build bridge.
 		registry.register_type_data::<T, ReflectTemplateSchema>();
 		drop(registry);
-		// index the schema by short type path so a `ValueSchema::Reference` resolves.
+		// index the schema by short type path so a `SchemaRef::Name` resolves.
 		let name = T::type_info().type_path_table().short_path();
 		self.get_resource_or_init::<SchemaRegistry>()
 			.insert(SmolStr::from(name), T::template_schema());

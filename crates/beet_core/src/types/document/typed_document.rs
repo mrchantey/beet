@@ -6,8 +6,15 @@ use crate::prelude::*;
 /// A `.bsx` file is the authored *original* state of an application; anything
 /// the running application may rewrite is a typed document, so it carries its
 /// own schema rather than depending on the binary that opens it to know the
-/// shape.
-/// The three ways it can name that schema are the three [`FieldSchema`] arms.
+/// shape. `schema` is an ordinary [`ValueSchema`]: written in place, or naming
+/// one of the ways a [`SchemaRef`] finds one.
+///
+/// The shape is not hardcoded, it is *described*
+/// ([`describing_schema`](Self::describing_schema)): `value` is declared by
+/// [`SchemaRef::AtField`] to be whatever its `schema` sibling says, which is the
+/// same dependent arm that types an [`OnMissing::Default`]. So a typed document
+/// validates through the ordinary walk rather than through a reader that knows
+/// about this one shape.
 ///
 /// A **schema** document is one of these too, holding a [`ValueSchema`] as its
 /// value and naming the meta-schema as its schema
@@ -20,15 +27,32 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypedDocument {
 	/// How to resolve the schema the value must satisfy.
-	pub schema: FieldSchema,
+	pub schema: ValueSchema,
 	/// The document's value.
 	pub value: Value,
 }
 
 impl TypedDocument {
 	/// Declare a data document from a schema and its value.
-	pub fn new(schema: FieldSchema, value: Value) -> Self {
+	pub fn new(schema: ValueSchema, value: Value) -> Self {
 		Self { schema, value }
+	}
+
+	/// The schema of a typed document itself, `{ schema, value }` written in the
+	/// schema language rather than assumed by a reader.
+	///
+	/// `value` is [`SchemaRef::AtField`] over `schema`, so validating a map
+	/// against this is exactly what [`read`](Self::read) does by hand, and the
+	/// self-describing pair stops being a special case of the format.
+	pub fn describing_schema() -> ValueSchema {
+		ValueSchema::Struct(StructSchema {
+			name: Some("TypedDocument".into()),
+			allow_additional: false,
+			fields: vec![
+				NamedFieldSchema::new("schema", ValueSchema::meta()),
+				NamedFieldSchema::new("value", ValueSchema::at_field("schema")),
+			],
+		})
 	}
 
 	/// A schema document: `schema` stored as data, described by the
@@ -40,7 +64,7 @@ impl TypedDocument {
 	#[cfg(feature = "serde")]
 	pub fn schema_document(schema: &ValueSchema) -> Result<Self> {
 		Self::new(
-			FieldSchema::TypePath(ValueSchema::type_path().into()),
+			ValueSchema::type_ref::<ValueSchema>(),
 			Value::from_serde(schema)?,
 		)
 		.xok()
@@ -119,7 +143,7 @@ impl TypedDocument {
 		declaration: &mut Self,
 		schema: ValueSchema,
 	) -> Result {
-		if let FieldSchema::TypePath(path) = &self.schema {
+		if let ValueSchema::Ref(SchemaRef::TypePath(path)) = &self.schema {
 			bevybail!(
 				"{subject} is described by the Rust type `{path}`, which an \
 				editor cannot evolve; author its schema as a document first"
@@ -137,7 +161,7 @@ impl TypedDocument {
 		// the one it is replacing.
 		let mut overlay = resolver.registry().cloned().unwrap_or_default();
 		match &self.schema {
-			FieldSchema::Document(path) => {
+			ValueSchema::Ref(SchemaRef::Document(path)) => {
 				overlay.insert_located(path.clone(), schema.clone())
 			}
 			// anything else reaches the declaration by name, if it has one
@@ -153,7 +177,7 @@ impl TypedDocument {
 		// a document inlining exactly what the declaration held is its own
 		// declaration, so the schema moves with it; one that merely composes the
 		// declaration by reference keeps the composition it was authored with.
-		if let FieldSchema::Inline(inline) = &mut next.schema
+		if let inline = &mut next.schema
 			&& declaration.to_schema().ok().as_ref() == Some(inline)
 		{
 			*inline = schema;
@@ -181,7 +205,7 @@ mod test {
 
 	fn todo_json() -> &'static str {
 		r#"{
-			"schema": { "Inline": { "Struct": {
+			"schema": { "Struct": {
 				"name": "TodoItem",
 				"allow_additional": false,
 				"fields": [{
@@ -192,7 +216,7 @@ mod test {
 					"on_missing": null,
 					"schema": { "String": { "sensitive": false, "multiline": false, "constraints": [] } }
 				}]
-			} } },
+			} },
 			"value": { "label": "buy milk" }
 		}"#
 	}
@@ -243,15 +267,15 @@ mod test {
 	#[crate::test]
 	fn schema_arms() {
 		let resolver = SchemaResolver::default();
-		FieldSchema::document("schema.json")
+		ValueSchema::document("schema.json")
 			.resolve(resolver)
 			.unwrap()
 			.xpect_eq(ValueSchema::Any);
-		FieldSchema::inline(ValueSchema::Bool(default()))
+		ValueSchema::Bool(default())
 			.resolve(resolver)
 			.unwrap()
 			.xpect_eq(ValueSchema::Bool(default()));
-		FieldSchema::TypePath("nope::Nope".into())
+		ValueSchema::Ref(SchemaRef::TypePath("nope::Nope".into()))
 			.resolve(resolver)
 			.is_err()
 			.xpect_true();
@@ -271,6 +295,34 @@ mod test {
 			.as_str()
 			.unwrap()
 			.xpect_eq("buy milk");
+	}
+
+	/// The pair is described, not assumed: a whole typed document validates
+	/// against `TypedDocument::describing_schema`, whose `value` field is typed
+	/// by its `schema` sibling. Item 19's shape is now a derivation of the
+	/// schema language rather than an axiom of the reader.
+	#[crate::test]
+	async fn the_pair_is_expressible_in_the_schema_language() {
+		let registry = SchemaRegistry::default();
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		let mut document = serde_json::from_str::<Value>(todo_json()).unwrap();
+		TypedDocument::describing_schema()
+			.assert_valid_in(resolver, "todos.json", &mut document)
+			.await
+			.unwrap();
+
+		// and a value its own declared schema rejects fails the same walk,
+		// naming the field, with nothing hardcoded about the pair
+		let mut diverged = serde_json::from_str::<Value>(
+			&todo_json().replace(r#""label": "buy milk""#, r#""label": 7"#),
+		)
+		.unwrap();
+		TypedDocument::describing_schema()
+			.assert_valid_in(resolver, "todos.json", &mut diverged)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("label");
 	}
 
 	/// A schema document round trips through its own value, and validates
@@ -302,7 +354,7 @@ mod test {
 			TypedDocument::schema_document(&todo_schema(vec![label()]))
 				.unwrap();
 		let mut data = TypedDocument::new(
-			FieldSchema::document("schema.json"),
+			ValueSchema::document("schema.json"),
 			value!({ "label": "buy milk" }),
 		);
 
@@ -330,7 +382,7 @@ mod test {
 			.get_field_schema(&[FieldSegment::key("is_really_difficult")])
 			.unwrap()
 			.xpect_eq(ValueSchema::Bool(default()));
-		data.schema.xpect_eq(FieldSchema::document("schema.json"));
+		data.schema.xpect_eq(ValueSchema::document("schema.json"));
 	}
 
 	/// The todo app's own shape: the schema document holds the *row* schema and
@@ -345,13 +397,13 @@ mod test {
 			TypedDocument::schema_document(&todo_schema(vec![label()]))
 				.unwrap();
 		let rows = ValueSchema::List(ListSchema {
-			item: Box::new(ValueSchema::Reference("TodoItem".into())),
+			item: Box::new(ValueSchema::reference("TodoItem")),
 			min_items: None,
 			max_items: None,
 			unique: false,
 		});
 		let mut data = TypedDocument::new(
-			FieldSchema::inline(rows.clone()),
+			rows.clone(),
 			value!([{ "label": "a" }, { "label": "b" }]),
 		);
 
@@ -376,7 +428,7 @@ mod test {
 			{ "label": "b", "is_really_difficult": false },
 		]));
 		// the data document still composes its rows exactly as authored
-		data.schema.xpect_eq(FieldSchema::inline(rows));
+		data.schema.xpect_eq(rows);
 	}
 
 	/// A commit with no resolution for what it breaks leaves *both* documents
@@ -387,10 +439,8 @@ mod test {
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		let before = todo_schema(vec![label()]);
 		let mut declaration = TypedDocument::schema_document(&before).unwrap();
-		let mut data = TypedDocument::new(
-			FieldSchema::inline(before.clone()),
-			value!({ "label": "buy milk" }),
-		);
+		let mut data =
+			TypedDocument::new(before.clone(), value!({ "label": "buy milk" }));
 		let (declaration_before, data_before) =
 			(declaration.clone(), data.clone());
 
@@ -421,7 +471,7 @@ mod test {
 	async fn a_type_backed_document_refuses_to_evolve() {
 		let mut declaration =
 			TypedDocument::schema_document(&ValueSchema::Any).unwrap();
-		TypedDocument::new(FieldSchema::of::<i64>(), value!(7))
+		TypedDocument::new(ValueSchema::type_ref::<i64>(), value!(7))
 			.commit_schema(
 				SchemaResolver::default(),
 				"count.json",

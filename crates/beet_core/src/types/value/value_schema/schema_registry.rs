@@ -1,6 +1,6 @@
 //! The by-name schema registry backing authored, composable and remote schemas.
 //!
-//! A [`ValueSchema::Reference`] names another schema rather than inlining it, so
+//! A [`SchemaRef::Name`] names another schema rather than inlining it, so
 //! schemas form a graph mirroring the template graph. [`SchemaRegistry`] is the
 //! index that resolves those names, and it holds authored schemas (a `bx:schema`
 //! block, a schema document) beside reflect-derived ones: one namespace, because
@@ -20,7 +20,7 @@ use crate::prelude::*;
 use bevy::reflect::Typed;
 
 /// A by-name index of authored and type schemas, the manifest a reactive client
-/// layer reads and the resolver for [`ValueSchema::Reference`].
+/// layer reads and the resolver for [`SchemaRef::Name`].
 ///
 /// Registered before any template is loaded (so a tag resolves to a known
 /// schema), it is the schema-side companion of the template-by-name registry.
@@ -89,7 +89,7 @@ impl SchemaRegistry {
 	}
 
 	/// Register the schema of the schema document at `path`, the by-location
-	/// index a [`FieldSchema::Document`] resolves through.
+	/// index a [`ValueSchema::Document`] resolves through.
 	///
 	/// The schema is stored **once**, in the one by-name namespace, under the
 	/// name it declares for itself or, declaring none, under `path`; the
@@ -160,7 +160,7 @@ impl SchemaRegistry {
 	}
 
 	/// Resolve `schema` against this registry, replacing every
-	/// [`ValueSchema::Reference`] with the named schema recursively.
+	/// [`SchemaRef::Name`] with the named schema recursively.
 	///
 	/// An unregistered reference stays deferred as [`ValueSchema::Any`], so a
 	/// schema still arriving validates as a wildcard until it does. A reference
@@ -202,7 +202,7 @@ impl SchemaRegistry {
 		visiting: &mut Vec<SmolStr>,
 	) -> ValueSchema {
 		match schema {
-			ValueSchema::Reference(name) => {
+			ValueSchema::Ref(SchemaRef::Name(name)) => {
 				if visiting.iter().any(|visited| visited == name) {
 					return schema.clone();
 				}
@@ -298,7 +298,7 @@ mod test {
 	fn resolves_a_reference() {
 		let mut registry = SchemaRegistry::default();
 		registry.insert("Count", ValueSchema::of::<i64>());
-		let schema = ValueSchema::Reference("Count".into());
+		let schema = ValueSchema::reference("Count");
 		registry.resolve(&schema).xpect_eq(ValueSchema::of::<i64>());
 	}
 
@@ -306,7 +306,7 @@ mod test {
 	fn unresolved_reference_is_wildcard() {
 		let registry = SchemaRegistry::default();
 		registry
-			.resolve(&ValueSchema::Reference("Missing".into()))
+			.resolve(&ValueSchema::reference("Missing"))
 			.xpect_eq(ValueSchema::Any);
 	}
 
@@ -315,7 +315,7 @@ mod test {
 		let mut registry = SchemaRegistry::default();
 		registry.insert("Item", ValueSchema::of::<i64>());
 		let schema = ValueSchema::List(ListSchema {
-			item: Box::new(ValueSchema::Reference("Item".into())),
+			item: Box::new(ValueSchema::reference("Item")),
 			min_items: None,
 			max_items: None,
 			unique: false,
@@ -331,11 +331,11 @@ mod test {
 	#[crate::test]
 	fn cyclic_reference_terminates() {
 		let mut registry = SchemaRegistry::default();
-		registry.insert("A", ValueSchema::Reference("B".into()));
-		registry.insert("B", ValueSchema::Reference("A".into()));
+		registry.insert("A", ValueSchema::reference("B"));
+		registry.insert("B", ValueSchema::reference("A"));
 		registry
 			.resolve_name("A")
-			.xpect_eq(ValueSchema::Reference("A".into()));
+			.xpect_eq(ValueSchema::reference("A"));
 	}
 
 	/// A short name is sugar over the full key, which is the only identity.
@@ -386,12 +386,12 @@ mod test {
 			}),
 		);
 		let resolver = SchemaResolver::default().with_schemas(&registry);
-		ValueSchema::Reference("TodoItem".into())
+		ValueSchema::reference("TodoItem")
 			.validate_in(resolver, &mut value!({ "label": "buy milk" }))
 			.await
 			.is_empty()
 			.xpect_true();
-		ValueSchema::Reference("Count".into())
+		ValueSchema::reference("Count")
 			.validate_in(resolver, &mut value!(7u64))
 			.await
 			.is_empty()
@@ -484,7 +484,7 @@ mod test {
 			}),
 		);
 		let list_schema = ValueSchema::List(ListSchema {
-			item: Box::new(ValueSchema::Reference("TodoItem".into())),
+			item: Box::new(ValueSchema::reference("TodoItem")),
 			min_items: None,
 			max_items: None,
 			unique: false,

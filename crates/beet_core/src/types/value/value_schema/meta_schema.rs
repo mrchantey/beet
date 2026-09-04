@@ -16,7 +16,7 @@ use crate::prelude::*;
 impl ValueSchema {
 	/// The schema describing a [`ValueSchema`] as data.
 	///
-	/// Recursive: every nested schema position is a [`ValueSchema::Reference`]
+	/// Recursive: every nested schema position is a [`ValueSchema::Ref`]
 	/// back to this schema's own registration, which validation follows lazily,
 	/// so the walk descends as far as the data does.
 	///
@@ -50,16 +50,27 @@ impl ValueSchema {
 			variant("List", list_schema()),
 			variant("Map", map_schema()),
 			variant("Enum", enum_schema()),
-			variant("Optional", schema_ref()),
-			variant("Reference", string()),
+			variant("Optional", meta_ref()),
+			variant("Ref", schema_ref_schema()),
 		])
 	}
 }
 
 /// A reference back to the meta-schema, by the full type path that is its
 /// identity in the [`SchemaRegistry`].
-fn schema_ref() -> ValueSchema {
-	ValueSchema::Reference(ValueSchema::type_path().into())
+fn meta_ref() -> ValueSchema {
+	ValueSchema::reference(ValueSchema::type_path())
+}
+
+/// The [`SchemaRef`] vocabulary: the four ways a schema names another rather
+/// than writing it in place.
+fn schema_ref_schema() -> ValueSchema {
+	enumeration("SchemaRef", vec![
+		variant("Name", string()),
+		variant("TypePath", string()),
+		variant("Document", string()),
+		variant("AtField", string()),
+	])
 }
 
 // ── The composite payloads ─────────────────────────────────────────────
@@ -81,7 +92,7 @@ fn tuple_schema() -> ValueSchema {
 
 fn list_schema() -> ValueSchema {
 	r#struct("ListSchema", vec![
-		field("item", schema_ref()),
+		field("item", meta_ref()),
 		optional("min_items", unsigned()),
 		optional("max_items", unsigned()),
 		field("unique", boolean()),
@@ -89,7 +100,7 @@ fn list_schema() -> ValueSchema {
 }
 
 fn map_schema() -> ValueSchema {
-	r#struct("MapSchema", vec![field("value", schema_ref())])
+	r#struct("MapSchema", vec![field("value", meta_ref())])
 }
 
 fn enum_schema() -> ValueSchema {
@@ -106,7 +117,7 @@ fn named_field_schema() -> ValueSchema {
 		optional("label", string()),
 		optional("description", string()),
 		optional("on_missing", on_missing()),
-		field("schema", schema_ref()),
+		field("schema", meta_ref()),
 	])
 }
 
@@ -114,14 +125,14 @@ fn unnamed_field_schema() -> ValueSchema {
 	r#struct("UnnamedFieldSchema", vec![
 		field("required", boolean()),
 		optional("description", string()),
-		field("schema", schema_ref()),
+		field("schema", meta_ref()),
 	])
 }
 
 fn variant_schema() -> ValueSchema {
 	r#struct("VariantSchema", vec![
 		field("name", string()),
-		optional("payload", schema_ref()),
+		optional("payload", meta_ref()),
 	])
 }
 
@@ -129,8 +140,9 @@ fn variant_schema() -> ValueSchema {
 fn on_missing() -> ValueSchema {
 	enumeration("OnMissing", vec![
 		unit_variant("Error"),
-		// a default is a value of the field's own schema, unknowable from here
-		variant("Default", ValueSchema::Any),
+		// a default is a value of the field's own schema, which the sibling
+		// `schema` key describes: the dependent arm, and the case it exists for
+		variant("Default", ValueSchema::at_field("schema")),
 		variant(
 			"Computed",
 			r#struct("Computed", vec![field("script", string())]),
@@ -301,7 +313,7 @@ mod test {
 				}],
 			}),
 			ValueSchema::List(ListSchema {
-				item: Box::new(ValueSchema::Reference("TodoItem".into())),
+				item: Box::new(ValueSchema::reference("TodoItem")),
 				min_items: Some(1),
 				max_items: None,
 				unique: true,
@@ -323,7 +335,7 @@ mod test {
 				],
 			}),
 			ValueSchema::Optional(Box::new(ValueSchema::Bool(default()))),
-			ValueSchema::Reference("TodoItem".into()),
+			ValueSchema::reference("TodoItem"),
 		]
 	}
 

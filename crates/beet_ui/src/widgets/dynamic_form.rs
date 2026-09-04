@@ -65,7 +65,7 @@ pub fn DynamicForm(
 	/// own [`FieldRef`] extends. Defaults to the whole document.
 	#[prop]
 	field: FieldRef,
-	/// The by-name registry a [`ValueSchema::Reference`] resolves against;
+	/// The by-name registry a [`SchemaRef::Name`] resolves against;
 	/// absent until [`DocumentPlugin`] has initialized it, which defers every
 	/// reference to an [`UneditableField`] exactly as an unregistered name does.
 	schemas: Option<Res<SchemaRegistry>>,
@@ -167,13 +167,15 @@ fn schema_field<'a>(
 		}
 		// the registry's schema is borrowed, never copied out: a reference hop
 		// dispatches on the schema in place
-		ValueSchema::Reference(name) => match resolver.schema(name) {
-			Some(resolved) => {
-				schema_field(resolver, resolved, field, label, depth)
+		ValueSchema::Ref(SchemaRef::Name(name)) => {
+			match resolver.schema(name) {
+				Some(resolved) => {
+					schema_field(resolver, resolved, field, label, depth)
+				}
+				// still arriving, or never coming: loud, not silently empty
+				None => uneditable(schema, field, label),
 			}
-			// still arriving, or never coming: loud, not silently empty
-			None => uneditable(schema, field, label),
-		},
+		}
 		ValueSchema::Struct(_) if depth >= MAX_DEPTH => {
 			uneditable(schema, field, label)
 		}
@@ -414,7 +416,7 @@ mod test {
 			ValueSchema::List(default()),
 			ValueSchema::Map(default()),
 			ValueSchema::Any,
-			ValueSchema::Reference("NotRegistered".into()),
+			ValueSchema::reference("NotRegistered"),
 		] {
 			let kind = schema.variant_name();
 			let mut world = world_ext::ui_world();
@@ -502,7 +504,7 @@ mod test {
 		let root = world
 			.spawn_template(rsx! {
 				<DynamicForm
-					schema={ValueSchema::Reference("Role".into())}
+					schema={ValueSchema::reference("Role")}
 					field={FieldRef::new("role")}
 				/>
 			})

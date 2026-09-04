@@ -398,7 +398,7 @@ mod test {
 	async fn validates_against_a_schema_the_world_resolved() {
 		let (mut world, entity) = world_with([(
 			"game.Health",
-			ValueSchema::Reference("game.HealthValue".into()),
+			ValueSchema::reference("game.HealthValue"),
 		)]);
 		let mut registry = SchemaRegistry::default();
 		registry.insert("game.HealthValue", ValueSchema::U64(default()));

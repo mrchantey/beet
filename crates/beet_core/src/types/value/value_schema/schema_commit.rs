@@ -39,7 +39,7 @@ impl SchemaCommit {
 		self.apply_in(SchemaResolver::default(), value).await
 	}
 
-	/// [`apply`](Self::apply), resolving each [`ValueSchema::Reference`] against
+	/// [`apply`](Self::apply), resolving each [`ValueSchema::Ref`] against
 	/// `resolver`, so a commit of a composed schema evolves the data its
 	/// referenced schemas describe too.
 	pub async fn apply_in(
@@ -100,7 +100,7 @@ impl SchemaCommit {
 					}
 				}
 				// a reference the resolver answers backfills as its target
-				(ValueSchema::Reference(name), value) => {
+				(ValueSchema::Ref(SchemaRef::Name(name)), value) => {
 					if let Some(target) = resolver.schema(name) {
 						Self::backfill(resolver, target, value).await?;
 					}
@@ -309,7 +309,7 @@ mod test {
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		let mut value = value!([{ "label": "a" }]);
 		SchemaCommit::new(ValueSchema::List(ListSchema {
-			item: Box::new(ValueSchema::Reference("TodoItem".into())),
+			item: Box::new(ValueSchema::reference("TodoItem")),
 			min_items: None,
 			max_items: None,
 			unique: false,

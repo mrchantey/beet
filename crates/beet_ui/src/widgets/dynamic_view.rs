@@ -58,7 +58,7 @@ pub fn DynamicView(
 	/// row rules.
 	#[prop]
 	vertical_lines: bool,
-	/// The by-name registry a [`ValueSchema::Reference`] resolves against;
+	/// The by-name registry a [`SchemaRef::Name`] resolves against;
 	/// absent until [`DocumentPlugin`] has initialized it, which leaves every
 	/// reference unresolved and reads its value raw.
 	schemas: Option<Res<SchemaRegistry>>,
@@ -114,11 +114,13 @@ fn view_field<'a>(
 			view_field(cx, inner, field, label, depth)
 		}
 		// the registry's schema is borrowed, never copied out
-		ValueSchema::Reference(name) => match cx.resolver.schema(name) {
-			Some(resolved) => view_field(cx, resolved, field, label, depth),
-			// still arriving, or never coming: the value still reads
-			None => value_row(field, label),
-		},
+		ValueSchema::Ref(SchemaRef::Name(name)) => {
+			match cx.resolver.schema(name) {
+				Some(resolved) => view_field(cx, resolved, field, label, depth),
+				// still arriving, or never coming: the value still reads
+				None => value_row(field, label),
+			}
+		}
 		ValueSchema::Struct(_) if depth >= MAX_DEPTH => value_row(field, label),
 		ValueSchema::Struct(schema) => {
 			struct_block(cx, schema, field, label, depth)
@@ -200,7 +202,7 @@ fn resolved<'a>(
 ) -> Option<&'a ValueSchema> {
 	match schema {
 		ValueSchema::Optional(inner) => resolved(resolver, inner),
-		ValueSchema::Reference(name) => {
+		ValueSchema::Ref(SchemaRef::Name(name)) => {
 			resolved(resolver, resolver.schema(name)?)
 		}
 		schema => Some(schema),
@@ -536,7 +538,7 @@ mod test {
 				<div>
 					<DynamicView
 						schema={ValueSchema::List(ListSchema {
-							item: Box::new(ValueSchema::Reference("TodoItem".into())),
+							item: Box::new(ValueSchema::reference("TodoItem")),
 							..default()
 						})}
 						field={FieldRef::new("items")}

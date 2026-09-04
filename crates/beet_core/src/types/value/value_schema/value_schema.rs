@@ -48,16 +48,30 @@ pub enum ValueSchema {
 	/// validated against the inner schema. This is how an `Option`-typed field
 	/// is represented so a missing or null value validates rather than failing.
 	Optional(Box<ValueSchema>),
-	/// A reference to another template's (or registered type's) schema, resolved
-	/// by name against the [`SchemaRegistry`].
+	/// A schema named rather than written in place, by any of the ways a
+	/// [`SchemaRef`] can name one.
 	///
 	/// This is what makes schemas composable: an `items` array of `TodoItem`
-	/// references `TodoItem`'s schema, so schemas form a graph mirroring the
-	/// template graph and validate recursively. The name is a registered
-	/// template's module path (`path::to::TodoItem`) or a Rust short type path.
+	/// names `TodoItem`'s schema, so schemas form a graph mirroring the template
+	/// graph and validate recursively. It is also how a document declares its
+	/// own shape, and how a field says it is described by a sibling.
 	/// Until resolved, validation against it is a wildcard (deferred), since the
-	/// referenced schema may resolve asynchronously.
-	Reference(SmolStr),
+	/// named schema may resolve asynchronously.
+	Ref(SchemaRef),
+}
+
+impl core::fmt::Display for ValueSchema {
+	/// The name a diagnostic calls this schema: what it names when it names
+	/// something, else the name it declares for itself, else its kind.
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		match self {
+			Self::Ref(schema_ref) => write!(f, "{schema_ref}"),
+			schema => match schema.name() {
+				Some(name) => write!(f, "{name}"),
+				None => write!(f, "{}", schema.variant_name()),
+			},
+		}
+	}
 }
 
 impl Default for ValueSchema {
@@ -106,21 +120,21 @@ impl ValueSchema {
 			Self::Map(_) => "Map",
 			Self::Enum(_) => "Enum",
 			Self::Optional(_) => "Optional",
-			Self::Reference(_) => "Reference",
+			Self::Ref(_) => "Ref",
 		}
 	}
 
 	/// Validate (and possibly mutate) `value` against this schema.
 	///
 	/// Returns the list of [`ValidationError`]s collected; an empty list means
-	/// the value is valid. A [`ValueSchema::Reference`] is a wildcard here,
+	/// the value is valid. A [`ValueSchema::Ref`] is a wildcard here,
 	/// since nothing in hand can resolve it; use
 	/// [`validate_in`](Self::validate_in) to follow references.
 	pub async fn validate(&self, value: &mut Value) -> Vec<ValidationError> {
 		self.validate_in(SchemaResolver::default(), value).await
 	}
 
-	/// [`validate`](Self::validate), resolving each [`ValueSchema::Reference`]
+	/// [`validate`](Self::validate), resolving each [`ValueSchema::Ref`]
 	/// against `resolver` where the walk meets it.
 	///
 	/// Lazy rather than eager, so a self-recursive schema (a composed authored
@@ -180,7 +194,7 @@ impl ValueSchema {
 	/// descends into struct fields, map values, list items, tuple elements and
 	/// an externally tagged enum's payload (keyed by its variant name).
 	/// [`ValueSchema::Any`] swallows the remaining path and matches anything,
-	/// as does a [`ValueSchema::Reference`] nothing in hand can resolve.
+	/// as does a [`ValueSchema::Ref`] nothing in hand can resolve.
 	pub fn get_field_schema(
 		&self,
 		path: &[FieldSegment],
@@ -189,7 +203,7 @@ impl ValueSchema {
 	}
 
 	/// [`get_field_schema`](Self::get_field_schema), descending through a
-	/// [`ValueSchema::Reference`] that `resolver` can resolve, so a field of a
+	/// [`ValueSchema::Ref`] that `resolver` can resolve, so a field of a
 	/// composed authored schema is reachable.
 	pub fn get_field_schema_in<'a>(
 		&'a self,
@@ -204,10 +218,12 @@ impl ValueSchema {
 				ValueSchema::Any => return Ok(current),
 				// a reference descends into its target, or swallows the rest of
 				// the path like `Any` while it is still arriving
-				ValueSchema::Reference(name) => match resolver.schema(name) {
-					Some(target) => target,
-					None => return Ok(current),
-				},
+				ValueSchema::Ref(SchemaRef::Name(name)) => {
+					match resolver.schema(name) {
+						Some(target) => target,
+						None => return Ok(current),
+					}
+				}
 				// an optional descends into its inner schema for the same segment
 				ValueSchema::Optional(inner) => inner,
 				_ => {
@@ -288,13 +304,37 @@ impl ValueSchema {
 		}
 	}
 
+	/// Assert this schema is exactly `other`, naming both on mismatch.
+	///
+	/// Strict equality, unlike [`matches`](Self::matches): the token layer
+	/// identifies a value by the schema it declares, so a near-miss is an error
+	/// rather than a coercion.
+	pub fn assert_eq(&self, other: &ValueSchema) -> Result<&Self> {
+		match self == other {
+			true => self.xok(),
+			false => bevybail!(
+				"Schema Mismatch\nExpected: `{other}`\nReceived: `{self}`"
+			),
+		}
+	}
+
+	/// Assert this schema is the one naming `T` by its type path
+	/// ([`type_ref`](Self::type_ref)), the identity a token declares.
+	pub fn assert_eq_ty<T: TypePath>(&self) -> Result<&Self> {
+		self.assert_eq(&Self::type_ref::<T>())
+	}
+
 	/// Whether this schema is compatible with `other`, treating
 	/// [`ValueSchema::Any`] on either side as a wildcard.
 	pub fn matches(&self, other: &ValueSchema) -> bool {
 		match (self, other) {
 			// an unresolved reference or `Any` is a wildcard on either side
-			(ValueSchema::Any | ValueSchema::Reference(_), _) => true,
-			(_, ValueSchema::Any | ValueSchema::Reference(_)) => true,
+			(ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_)), _) => {
+				true
+			}
+			(_, ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_))) => {
+				true
+			}
 			// an optional matches its bare inner and another optional's inner, so a
 			// typed write of `T` validates against an `Option<T>` field
 			(ValueSchema::Optional(inner), other)
@@ -326,7 +366,7 @@ impl ValueSchema {
 
 impl ValueSchema {
 	/// The walk every validation entrypoint runs, carrying the `resolver` a
-	/// [`ValueSchema::Reference`] resolves through.
+	/// [`ValueSchema::Ref`] resolves through.
 	fn apply_in<'a>(
 		&'a self,
 		resolver: SchemaResolver<'a>,
@@ -382,13 +422,17 @@ impl ValueSchema {
 				}
 				// a reference the resolver answers is followed here rather than
 				// expanded ahead of time; one it cannot (unregistered, still
-				// arriving, or a cycle) is a wildcard, so validation defers.
-				ValueSchema::Reference(name) => match resolver.schema(name) {
-					Some(target) => {
-						target.apply_in(resolver, path, value).await
+				// arriving, or a cycle) is a wildcard, so validation defers. An
+				// `AtField` never reaches here: the struct holding it binds it
+				// before descending, which is the only scope it resolves against.
+				ValueSchema::Ref(schema_ref) => {
+					match resolver.follow(schema_ref) {
+						Some(target) => {
+							target.apply_in(resolver, path, value).await
+						}
+						None => Vec::new(),
 					}
-					None => Vec::new(),
-				},
+				}
 			}
 		})
 	}
@@ -559,12 +603,24 @@ async fn validate_struct(
 		return type_mismatch(path, "struct", value);
 	};
 	let mut errors = Vec::new();
-	for field in &schema.fields {
+	// a field described by a sibling is bound here, while the whole struct is
+	// still in hand: this is the only scope a `SchemaRef::AtField` resolves
+	// against, and binding before the descent is what keeps the walk itself
+	// value-independent.
+	let bound = schema
+		.fields
+		.iter()
+		.map(|field| {
+			field.schema.binds_a_field().then(|| field.schema.bind(map))
+		})
+		.collect::<Vec<_>>();
+	for (field, bound) in schema.fields.iter().zip(bound.iter()) {
+		let field_schema = bound.as_ref().unwrap_or(&field.schema);
 		match map.0.get_mut(field.key.as_str()) {
 			Some(child) => {
 				let sub = path.with_pushed(field.key.clone());
 				errors
-					.extend(field.schema.apply_in(resolver, &sub, child).await);
+					.extend(field_schema.apply_in(resolver, &sub, child).await);
 			}
 			None if field.required => {
 				errors.push(ValidationError::new(

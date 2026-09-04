@@ -69,7 +69,9 @@ fn object_to_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 			} else if let Some(reference) =
 				map.get("$ref").and_then(Json::as_str)
 			{
-				ValueSchema::Reference(SmolStr::from(strip_ref(reference)))
+				ValueSchema::Ref(SchemaRef::Name(SmolStr::from(strip_ref(
+					reference,
+				))))
 			} else {
 				// the compact shorthand: this object is a map of prop -> descriptor.
 				shorthand_schema(map)?
@@ -161,7 +163,7 @@ fn shorthand_schema(map: &Map<String, Json>) -> Result<ValueSchema> {
 
 /// Map a descriptor name to a primitive schema, accepting both JSON Schema names
 /// (`integer`, `number`, `boolean`) and beet's shorthand (`i64`, `f64`, `bool`),
-/// or a composable [`ValueSchema::Reference`] to another schema by name.
+/// or a composable [`SchemaRef::Name`] to another schema by name.
 fn primitive_or_reference(name: &str) -> ValueSchema {
 	match name {
 		"string" | "str" => ValueSchema::String(StringSchema::default()),
@@ -176,7 +178,7 @@ fn primitive_or_reference(name: &str) -> ValueSchema {
 		"entity" => ValueSchema::Entity(EntitySchema::default()),
 		"any" => ValueSchema::Any,
 		"null" => ValueSchema::Null,
-		other => ValueSchema::Reference(SmolStr::from(other)),
+		other => ValueSchema::Ref(SchemaRef::Name(SmolStr::from(other))),
 	}
 }
 
@@ -272,7 +274,7 @@ mod test {
 	fn reference_via_ref() {
 		ValueSchema::from_json_schema(r##"{ "$ref": "#/$defs/TodoItem" }"##)
 			.unwrap()
-			.xpect_eq(ValueSchema::Reference("TodoItem".into()));
+			.xpect_eq(ValueSchema::reference("TodoItem"));
 	}
 
 	// a top-level shorthand prop literally named `items` is a struct field, not a

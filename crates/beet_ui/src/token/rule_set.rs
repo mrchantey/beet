@@ -140,7 +140,7 @@ impl RuleSet {
 	where
 		T: Typed + Serialize,
 	{
-		let key = Token::new_inline(FieldSchema::of::<T>());
+		let key = Token::new_inline(ValueSchema::type_ref::<T>());
 		self.with(key, TypedValue::new(value)?)
 	}
 

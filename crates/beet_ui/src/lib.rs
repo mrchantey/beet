@@ -82,8 +82,8 @@ pub mod prelude {
 	#[cfg(feature = "template")]
 	pub use crate::widgets::*;
 
-	// re-exported so the `token!` macro can resolve `$crate::prelude::FieldSchema`
-	pub use beet_core::prelude::FieldSchema;
+	// re-exported so the `token!` macro can resolve `$crate::prelude::ValueSchema`
+	pub use beet_core::prelude::ValueSchema;
 }
 
 pub mod exports {

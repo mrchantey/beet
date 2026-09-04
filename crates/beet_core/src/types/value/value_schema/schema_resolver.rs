@@ -2,12 +2,12 @@
 use crate::prelude::*;
 use bevy_reflect::TypeRegistry;
 
-/// The registries a [`ValueSchema`] or [`FieldSchema`] resolves against,
+/// The registries a [`ValueSchema`] or [`ValueSchema`] resolves against,
 /// threaded through every resolution and validation seam.
 ///
 /// [`SchemaRegistry`] is the one by-name namespace, authored and reflect-derived
 /// schemas alike, plus the by-location index a schema document registers into.
-/// Bevy's [`TypeRegistry`] is the reflect fallback a [`FieldSchema::TypePath`]
+/// Bevy's [`TypeRegistry`] is the reflect fallback a [`ValueSchema::TypePath`]
 /// resolves through, and the only place the schema layer meets reflection: the
 /// by-name registry answers first, so a hand-authored schema registered under a
 /// type path wins over what reflection would derive for it.
@@ -30,7 +30,7 @@ impl core::fmt::Debug for SchemaResolver<'_> {
 	}
 }
 
-/// Bound on a chain of [`ValueSchema::Reference`] hops, so a cyclic graph
+/// Bound on a chain of [`SchemaRef::Name`] hops, so a cyclic graph
 /// (`A -> B -> A`) terminates at a deferred wildcard rather than looping.
 const MAX_REFERENCE_HOPS: usize = 64;
 
@@ -69,11 +69,32 @@ impl<'a> SchemaResolver<'a> {
 		let mut name = name;
 		for _ in 0..MAX_REFERENCE_HOPS {
 			match registry.get(name)? {
-				ValueSchema::Reference(next) => name = next.as_str(),
+				ValueSchema::Ref(SchemaRef::Name(next)) => name = next.as_str(),
 				schema => return Some(schema),
 			}
 		}
 		None
+	}
+
+	/// Follow one [`SchemaRef`] to the schema it names, where the walk meets it.
+	///
+	/// `None` defers to a wildcard, which every arm does when it cannot answer:
+	/// an unregistered or cyclic name, a schema document still arriving, and an
+	/// [`AtField`](SchemaRef::AtField), which only the struct holding it can
+	/// resolve and which is therefore bound before the walk descends.
+	///
+	/// A [`TypePath`](SchemaRef::TypePath) resolves through the by-name registry
+	/// here rather than through reflection, because reflection builds an owned
+	/// schema and this hop borrows. The reflect fallback lives at the
+	/// declaration seam ([`ValueSchema::resolve`]), which returns one.
+	pub fn follow(&self, schema_ref: &SchemaRef) -> Option<&'a ValueSchema> {
+		match schema_ref {
+			SchemaRef::Name(name) | SchemaRef::TypePath(name) => {
+				self.schema(name)
+			}
+			SchemaRef::Document(path) => self.located(path),
+			SchemaRef::AtField(_) => None,
+		}
 	}
 
 	/// The schema of the schema document at `path`, once it has arrived.
@@ -108,7 +129,7 @@ mod test {
 	#[crate::test]
 	fn follows_a_reference_chain() {
 		let mut registry = SchemaRegistry::default();
-		registry.insert("A", ValueSchema::Reference("B".into()));
+		registry.insert("A", ValueSchema::reference("B"));
 		registry.insert("B", ValueSchema::of::<i64>());
 		SchemaResolver::default()
 			.with_schemas(&registry)
@@ -120,8 +141,8 @@ mod test {
 	#[crate::test]
 	fn a_cyclic_chain_defers() {
 		let mut registry = SchemaRegistry::default();
-		registry.insert("A", ValueSchema::Reference("B".into()));
-		registry.insert("B", ValueSchema::Reference("A".into()));
+		registry.insert("A", ValueSchema::reference("B"));
+		registry.insert("B", ValueSchema::reference("A"));
 		SchemaResolver::default()
 			.with_schemas(&registry)
 			.schema("A")

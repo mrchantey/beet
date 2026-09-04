@@ -296,7 +296,7 @@ async fn commit(
 				// a schema document is a `ValueSchema` stored as data, so its
 				// own arm is the meta-schema by definition
 				TypedDocument::new(
-					FieldSchema::TypePath(ValueSchema::type_path().into()),
+					ValueSchema::type_ref::<ValueSchema>(),
 					document_value(world, schema_doc, "`DocRef`")?,
 				),
 				TypedDocument::new(
@@ -342,7 +342,7 @@ async fn commit(
 			// real, so a `Reference` to this schema resolves to what was committed
 			let mut registry = world.resource_mut::<SchemaRegistry>();
 			match &data.schema {
-				FieldSchema::Document(path) => {
+				ValueSchema::Ref(SchemaRef::Document(path)) => {
 					registry.insert_located(path.clone(), next)
 				}
 				_ => {
@@ -439,7 +439,7 @@ mod test {
 				<div>
 					<DynamicView
 						schema={ValueSchema::List(ListSchema {
-							item: Box::new(ValueSchema::Reference("TodoItem".into())),
+							item: Box::new(ValueSchema::reference("TodoItem")),
 							..default()
 						})}
 						field={FieldRef::new("items")}
@@ -457,9 +457,9 @@ mod test {
 				fields: vec![NamedFieldSchema::new(
 					"items",
 					ValueSchema::List(ListSchema {
-						item: Box::new(ValueSchema::Reference(
+						item: Box::new(ValueSchema::Ref(SchemaRef::Name(
 							"TodoItem".into(),
-						)),
+						))),
 						..default()
 					}),
 				)],
@@ -506,7 +506,7 @@ mod test {
 	/// consumer does.
 	fn schema_of(world: &mut World, entity: Entity) -> ValueSchema {
 		TypedDocument::new(
-			FieldSchema::TypePath(ValueSchema::type_path().into()),
+			ValueSchema::type_ref::<ValueSchema>(),
 			document(world, entity),
 		)
 		.to_schema()

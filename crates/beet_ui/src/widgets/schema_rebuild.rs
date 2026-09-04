@@ -22,7 +22,7 @@ use bevy::platform::sync::Arc;
 /// A rebuild fires exactly when the schema the subtree renders *changed*: the
 /// authored schema is re-resolved against the registry on every registry change
 /// and compared with what the current generation was built from. A schema
-/// naming no [`ValueSchema::Reference`] resolves to itself and so never
+/// naming no [`ValueSchema::Ref`] resolves to itself and so never
 /// rebuilds; a reference that was still arriving at build time rebuilds the
 /// moment it lands.
 #[derive(Component)]
@@ -116,7 +116,7 @@ mod test {
 			.insert("Profile", ValueSchema::of::<Profile>());
 		let root = world
 			.spawn_template(rsx! {
-				<DynamicForm schema={ValueSchema::Reference("Profile".into())}/>
+				<DynamicForm schema={ValueSchema::reference("Profile")}/>
 			})
 			.unwrap()
 			.id();
@@ -157,7 +157,7 @@ mod test {
 			.insert("Profile", ValueSchema::of::<Profile>());
 		world
 			.spawn_template(rsx! {
-				<DynamicForm schema={ValueSchema::Reference("Profile".into())}/>
+				<DynamicForm schema={ValueSchema::reference("Profile")}/>
 			})
 			.unwrap();
 		world.update_local();
@@ -185,7 +185,7 @@ mod test {
 			.insert("Profile", ValueSchema::of::<Profile>());
 		let root = world
 			.spawn_template(rsx! {
-				<DynamicForm schema={ValueSchema::Reference("Profile".into())}>
+				<DynamicForm schema={ValueSchema::reference("Profile")}>
 					<Button>"Save"</Button>
 				</DynamicForm>
 			})
