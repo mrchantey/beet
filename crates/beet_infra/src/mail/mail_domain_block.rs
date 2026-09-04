@@ -98,8 +98,8 @@ pub struct MailDomainBlock {
 	/// `StalwartProvision`.
 	#[set_with(skip)]
 	aliases: Vec<Alias>,
-	/// The members whose identities this domain carries. Their atproto handles
-	/// are published when [`handle_domain`](Self::handle_domain) names where.
+	/// The members whose identities this domain carries, read by
+	/// `StalwartProvision`.
 	#[set_with(skip)]
 	members: Vec<Member>,
 	/// The mailbox every otherwise unmatched address on this domain delivers
@@ -108,13 +108,6 @@ pub struct MailDomainBlock {
 	/// trap that accepts).
 	#[set_with(unwrap_option, into)]
 	catch_all: Option<SmolStr>,
-	/// The domain member handles hang off, ie the `beetmash.com` in
-	/// `_atproto.pete.beetmash.com`. Handles are an organisation-level name and
-	/// several mail domains share one organisation, so exactly one block names
-	/// it and the rest leave it unset rather than each publishing the same
-	/// records.
-	#[set_with(unwrap_option, into)]
-	handle_domain: Option<SmolStr>,
 	/// The SNS topic, by bare name in this account and region, that this
 	/// domain's bounces, complaints, rejections and delivery delays publish to,
 	/// and that its reputation alarms notify. Without one the configuration set
@@ -231,7 +224,6 @@ impl MailDomainBlock {
 			aliases: Vec::new(),
 			members: Vec::new(),
 			catch_all: None,
-			handle_domain: None,
 			events_topic: None,
 			dns_stage: None,
 			domain,
@@ -439,7 +431,7 @@ impl MailDomainBlock {
 	/// these is a typo and the cheapest place to catch a typo is before any
 	/// resource exists.
 	pub fn validate(&self) -> Result {
-		validate_dns_label(&self.slug(), "mail domain")?;
+		DnsProvider::validate_label(&self.slug(), "mail domain")?;
 		for member in &self.members {
 			member.validate()?;
 		}
@@ -552,7 +544,6 @@ impl MailDomainBlock {
 			Some(dns) => {
 				self.emit_identity_records(stack, config, &dns, &identity)?;
 				self.emit_delivery_records(stack, deployment, config, &dns)?;
-				self.emit_handle_records(stack, config, &dns)?;
 			}
 			// a domain that declares records but resolves no zone would apply
 			// clean and publish nothing, which is the one failure a mail stack
@@ -879,32 +870,6 @@ impl MailDomainBlock {
 		}
 		Ok(())
 	}
-
-	/// The atproto handle of every member carrying a DID. Not a mail record: it
-	/// rides here because a member declaration is already the one place an
-	/// identity is described, and splitting it would mean declaring the same
-	/// people twice.
-	fn emit_handle_records(
-		&self,
-		stack: &ResolvedStack,
-		config: &mut terra::Config,
-		dns: &DnsProvider,
-	) -> Result {
-		let Some(handle_domain) = &self.handle_domain else {
-			return Ok(());
-		};
-		for member in self.members.iter().filter(|it| it.did().is_some()) {
-			let did = member.did().as_ref().unwrap();
-			dns.emit_txt(
-				stack,
-				config,
-				&self.label(&format!("atproto-{}", member.name())),
-				&member.handle_record_name(handle_domain),
-				&format!("did={did}"),
-			)?;
-		}
-		Ok(())
-	}
 }
 
 #[cfg(test)]
@@ -922,13 +887,10 @@ mod tests {
 				"stalwart.beetmash.com",
 				"zone123",
 			))
-			.with_member(
-				Member::new("pete").with_did("did:plc:examplepetehandle"),
-			)
+			.with_member(Member::new("pete"))
 			.with_member(Member::new("info"))
 			.with_mailbox(Mailbox::new("probe"))
 			.with_role_aliases("pete", "info")
-			.with_handle_domain("beetmash.com")
 	}
 
 	/// The publications domain, which shares the box and the zone but nothing
@@ -1046,7 +1008,6 @@ mod tests {
 				"SRV _imaps._tcp.stalwart.beetmash.com",
 				"SRV _jmap._tcp.stalwart.beetmash.com",
 				"SRV _submissions._tcp.stalwart.beetmash.com",
-				"TXT _atproto.pete.beetmash.com",
 				"TXT _dmarc.stalwart.beetmash.com",
 				"TXT _mta-sts.stalwart.beetmash.com",
 				"TXT _smtp._tls.stalwart.beetmash.com",
@@ -1152,14 +1113,7 @@ mod tests {
 	/// taken off a live provider.
 	#[beet_core::test]
 	fn staging_never_touches_the_apex() {
-		for (record_type, name) in records(&[staging(), news()]) {
-			match record_type.as_str() {
-				// the one apex-scoped name that is legitimately published, and
-				// it is not a mail record: an atproto handle is namespaced under
-				// the member's own label.
-				"TXT" if name.starts_with("_atproto.") => continue,
-				_ => {}
-			}
+		for (_, name) in records(&[staging(), news()]) {
 			// a record AT the apex, rather than one merely under it
 			["beetmash.com", "_dmarc.beetmash.com"]
 				.contains(&name.as_str())
@@ -1335,23 +1289,6 @@ mod tests {
 		content("_smtp._tls.news.beetmash.com")
 			.as_str()
 			.xpect_eq("v=TLSRPTv1; rua=mailto:tlsrpt@stalwart.beetmash.com");
-	}
-
-	/// Handles are an organisation-level name, so the block that names a handle
-	/// domain publishes them and the ones that do not stay silent. Without this
-	/// two mail domains would each publish the same `_atproto` records and race
-	/// for the same terraform address.
-	#[beet_core::test]
-	fn handles_are_published_once_and_only_with_a_did() {
-		records(&[staging(), news()])
-			.into_iter()
-			.filter(|(_, name)| name.starts_with("_atproto."))
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![(
-				"TXT".to_string(),
-				// `info` was declared without a DID, so has no handle to publish
-				"_atproto.pete.beetmash.com".to_string(),
-			)]);
 	}
 
 	/// The policy body names the box, not the domain: a sender matches the

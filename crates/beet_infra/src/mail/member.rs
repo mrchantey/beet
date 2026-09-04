@@ -1,51 +1,17 @@
-//! The declarative identity inputs of the mail stack: who has a mailbox, which
-//! addresses redirect into it, and which names are infrastructure rather than
-//! anyone's to claim.
+//! The declarative identity inputs of the mail stack: who has a mailbox, and
+//! which addresses redirect into it.
 //!
-//! One [`Member`] declaration is read twice, exactly as a bucket declaration is:
-//! the deploy publishes their atproto handle record, and `StalwartProvision`
-//! creates their account. Neither restates the other.
+//! A [`Member`] is declared once and read by `StalwartProvision`, which creates
+//! their account; the mailbox they own on each domain composes from the same
+//! declaration rather than restating it.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Hostnames a [`Member`] may never take, because member handles and
-/// infrastructure names share one zone: a member called `mail` would own
-/// `mail.beetmash.com`, which is the box.
+/// A person or agent with an identity in the zone: a mailbox localpart and the
+/// aliases that reach it.
 ///
-/// Kept deliberately wider than the names in use, since the cost of reserving a
-/// name nobody wanted is nothing and the cost of handing out one the stack later
-/// needs is a rename of a live identity.
-pub const RESERVED_HOSTNAMES: &[&str] = &[
-	"admin",
-	"api",
-	"app",
-	"autoconfig",
-	"autodiscover",
-	"blog",
-	"bounce",
-	"cdn",
-	"dev",
-	"docs",
-	"imap",
-	"jmap",
-	"mail",
-	"mta-sts",
-	"news",
-	"pds",
-	"smtp",
-	"stalwart",
-	"staging",
-	"static",
-	"status",
-	"support",
-	"www",
-];
-
-/// A person or agent with an identity in the zone: a mailbox localpart, the
-/// aliases that reach it, and (given a DID) an atproto handle published as
-/// `_atproto.<name>.<handle domain>`.
-///
-/// Members are not assumed human. An agent identity is a member with a mailbox
-/// and a handle, which is why nothing here names a person.
+/// Members are not assumed human. An agent identity is a member with a mailbox,
+/// which is why nothing here names a person.
 #[derive(
 	Debug,
 	Default,
@@ -60,39 +26,24 @@ pub const RESERVED_HOSTNAMES: &[&str] = &[
 )]
 #[reflect(Default)]
 pub struct Member {
-	/// The handle label and default mailbox localpart, eg `pete`. Validated
-	/// against [`RESERVED_HOSTNAMES`] and the DNS label rules, since it becomes
-	/// a hostname.
+	/// The default mailbox localpart, eg `pete`. Validated against
+	/// [`RESERVED_HOSTNAMES`](DnsProvider::RESERVED_HOSTNAMES) and the DNS label
+	/// rules, since a member name is a name in the zone like any other.
 	name: SmolStr,
-	/// The atproto DID this member's handle resolves to. Without one no
-	/// `_atproto` record is published: the handle is only meaningful once a DID
-	/// exists to point it at.
-	#[set_with(unwrap_option, into)]
-	did: Option<SmolStr>,
 }
 
 impl Member {
-	/// A member named `name`, with no atproto handle yet.
-	pub fn new(name: impl Into<SmolStr>) -> Self {
-		Self {
-			name: name.into(),
-			did: None,
-		}
-	}
-
-	/// The record name this member's atproto handle is published at, ie
-	/// `_atproto.pete.beetmash.com`.
-	pub fn handle_record_name(&self, handle_domain: &str) -> String {
-		format!("_atproto.{}.{handle_domain}", self.name)
-	}
+	/// A member named `name`.
+	pub fn new(name: impl Into<SmolStr>) -> Self { Self { name: name.into() } }
 
 	/// Reject a name that is not a legal DNS label, or that is one of the
-	/// [`RESERVED_HOSTNAMES`] the stack itself needs.
+	/// [`RESERVED_HOSTNAMES`](DnsProvider::RESERVED_HOSTNAMES) the stack itself
+	/// needs.
 	pub fn validate(&self) -> Result {
-		validate_dns_label(&self.name, "member name")?;
-		if RESERVED_HOSTNAMES.contains(&self.name.as_str()) {
+		DnsProvider::validate_label(&self.name, "member name")?;
+		if DnsProvider::RESERVED_HOSTNAMES.contains(&self.name.as_str()) {
 			bevybail!(
-				"member name '{}' is a reserved hostname: member handles share the zone with infrastructure names",
+				"member name '{}' is a reserved hostname: member names share the zone with infrastructure names",
 				self.name
 			);
 		}
@@ -203,26 +154,6 @@ impl Alias {
 			)
 			.collect()
 	}
-}
-
-/// Reject anything that is not a legal single DNS label: lowercase
-/// alphanumerics and inner hyphens, at most 63 characters. `context` names what
-/// is being validated, so the error says which declaration to fix.
-pub(crate) fn validate_dns_label(label: &str, context: &str) -> Result {
-	if label.is_empty() || label.len() > 63 {
-		bevybail!("{context} '{label}' must be 1 to 63 characters");
-	}
-	if label.starts_with('-') || label.ends_with('-') {
-		bevybail!("{context} '{label}' must not start or end with a hyphen");
-	}
-	if let Some(bad) = label.chars().find(|char| {
-		!char.is_ascii_lowercase() && !char.is_ascii_digit() && *char != '-'
-	}) {
-		bevybail!(
-			"{context} '{label}' contains '{bad}': only lowercase letters, digits and hyphens are legal in a hostname"
-		);
-	}
-	Ok(())
 }
 
 #[cfg(test)]

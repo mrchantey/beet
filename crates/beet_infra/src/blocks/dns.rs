@@ -40,6 +40,62 @@ pub enum DnsProvider {
 }
 
 impl DnsProvider {
+	/// Names a declaration may never claim as a label in the zone, because the
+	/// names people are given and the names the stack needs for itself share one
+	/// zone: a member called `mail` would own `mail.beetmash.com`, which is the
+	/// box.
+	///
+	/// Kept deliberately wider than the names in use, since the cost of
+	/// reserving a name nobody wanted is nothing and the cost of handing out one
+	/// the stack later needs is a rename of a live identity.
+	pub const RESERVED_HOSTNAMES: &'static [&'static str] = &[
+		"admin",
+		"api",
+		"app",
+		"autoconfig",
+		"autodiscover",
+		"blog",
+		"bounce",
+		"cdn",
+		"dev",
+		"docs",
+		"imap",
+		"jmap",
+		"mail",
+		"mta-sts",
+		"news",
+		"pds",
+		"smtp",
+		"stalwart",
+		"staging",
+		"static",
+		"status",
+		"support",
+		"www",
+	];
+
+	/// Reject anything that is not a legal single DNS label: lowercase
+	/// alphanumerics and inner hyphens, at most 63 characters. `context` names
+	/// what is being validated, so the error says which declaration to fix.
+	pub fn validate_label(label: &str, context: &str) -> Result {
+		if label.is_empty() || label.len() > 63 {
+			bevybail!("{context} '{label}' must be 1 to 63 characters");
+		}
+		if label.starts_with('-') || label.ends_with('-') {
+			bevybail!(
+				"{context} '{label}' must not start or end with a hyphen"
+			);
+		}
+		if let Some(bad) = label.chars().find(|char| {
+			!char.is_ascii_lowercase() && !char.is_ascii_digit() && *char != '-'
+		}) {
+			bevybail!(
+				"{context} '{label}' contains '{bad}': only lowercase letters, digits and hyphens are legal in a hostname"
+			);
+		}
+		Ok(())
+	}
+
 	/// A Cloudflare record, DNS-only (not proxied) by default.
 	#[cfg(feature = "cloudflare_dns")]
 	pub fn cloudflare(

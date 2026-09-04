@@ -194,7 +194,10 @@ impl RenderScope {
 /// The generic Declare-set system: contribute each declared `T`'s grants and
 /// variables to the scope above it. A block outside every rendering scope is
 /// simply not being rendered.
-pub(crate) fn declare<T: Block>(
+///
+/// Public because a block crate outside `beet_infra` registers it for its own
+/// type, exactly as [`InfraPlugin`] does for the blocks defined here.
+pub fn declare<T: Block>(
 	mut scopes: AncestorQuery<&mut RenderScope>,
 	blocks: Query<(Entity, &T)>,
 ) {
@@ -211,7 +214,10 @@ pub(crate) fn declare<T: Block>(
 /// The generic Render-set system for a simple block: emit each declared `T`
 /// into the scope above it, collecting per-entity errors attributed to the
 /// block rather than short-circuiting the rest.
-pub(crate) fn render<T: EmitBlock>(
+///
+/// Public for the same reason as [`declare`]: an out-of-tree block rides these
+/// two systems rather than restating them.
+pub fn render<T: EmitBlock>(
 	mut scopes: AncestorQuery<&mut RenderScope>,
 	blocks: Query<(Entity, &T)>,
 ) {
@@ -236,6 +242,9 @@ pub(crate) fn render<T: EmitBlock>(
 /// a target outside the consumer's scope, or a target carrying no `T` is an
 /// error naming `relation` and the consumer's `label` (collect it with
 /// [`RenderScope::error`]), never a panic.
+// unused in a build whose feature set compiles no block with a relation, ie a
+// downstream crate taking `cloudflare_dns` alone for its own block
+#[allow(unused)]
 pub(crate) fn related<'a, T: Component>(
 	scopes: &AncestorQuery<&mut RenderScope>,
 	consumer: Entity,

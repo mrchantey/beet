@@ -47,6 +47,24 @@ An entry that mounts paths outside its own directory declares `<RepoRoot src="..
 
 An entry declares its required features with `<CrateCheck features={["thread", "sockets"]}/>`, which errors when the running binary lacks them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<CrateCheck>` is the verification mechanism.
 
+## Downstream binaries
+
+The stock `beet` binary resolves the types beet itself registers, so a workspace that only names those runs through it. A workspace that EXTENDS beet — its own `#[action]`s, deploy blocks, reflect components — builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
+
+Such a binary is a thin `main`, since the whole runner is the lib's `launch::app`:
+
+```rust,ignore
+use beet::prelude::*;
+use beet_cli::prelude::*;
+
+fn main() -> AppExit {
+	env_ext::load_dotenv().ok();
+	launch::app(MyCratePlugin).run()
+}
+```
+
+It then has the same entry resolution, load, `--features` self-check and process lifecycle the stock binary has. `beet-cli` is the only beet crate such a workspace depends on directly (everything else goes through the `beet` facade), it belongs to the binary rather than to any library crate, and it is worth putting behind a `cli` feature with `[[bin]] required-features = ["cli"]` so a library consumer never links it.
+
 ## Development
 
 - when editing rust, run the workspace CLI: `cargo run -p beet-cli --features=feat1,feat2 -- arg1 arg2`

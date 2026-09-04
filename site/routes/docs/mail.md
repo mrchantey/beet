@@ -36,7 +36,7 @@ The reason this works rather than merely deferring risk is that MX, SPF, DKIM an
 
 One detail makes the eventual cutover short rather than a second build: the *box* is not a mail domain. Name it `mail.<your domain>` from the beginning and keep that name forever. Its reverse DNS record, its TLS certificate and its SMTP banner then never change across the cutover, which removes the riskiest churn from the riskiest step. Only the mail domains move.
 
-Treat "no apex mail record before the cutover" as an invariant, not a preference. Write it as a test: every record name a staging block emits should be asserted to be *under* the apex and never at it. There is exactly one apex-scoped name a mail stack has any business publishing early, and it is not a mail record ([atproto](https://atproto.com) handle TXTs, if you use them).
+Treat "no apex mail record before the cutover" as an invariant, not a preference. Write it as a test: every record name a staging block emits should be asserted to be *under* the apex and never at it.
 
 ## 3. Credentials and preflight
 

@@ -331,7 +331,7 @@ impl StalwartBlock {
 			);
 		}
 		for label in self.hostname.split('.') {
-			validate_dns_label(label, "mail box hostname")?;
+			DnsProvider::validate_label(label, "mail box hostname")?;
 		}
 		#[cfg(feature = "cloudflare_dns")]
 		if let Some(DnsProvider::Cloudflare { proxied: true, .. }) = &self.dns {

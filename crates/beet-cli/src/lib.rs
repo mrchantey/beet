@@ -29,11 +29,16 @@ mod worker_entry;
 // check/export-static commands.
 pub mod entry_build;
 
+// the app body every target runs (plugins + the `Startup` entry load), shared by
+// the `beet` binary and by any downstream binary linking capabilities of its own.
+pub mod launch;
+
 pub mod prelude {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::commands::*;
 	pub use crate::entry_build;
 	pub use crate::entry_build::ResolvedEntry;
+	pub use crate::launch;
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	pub use crate::render::*;
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
