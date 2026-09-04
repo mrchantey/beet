@@ -530,6 +530,7 @@ mod tests {
 				mail_box,
 				database: RdsPostgresBlock::new("db"),
 				domains: Vec::new(),
+				relays: default(),
 			},
 			"db.example.ap-southeast-2.rds.amazonaws.com",
 		);

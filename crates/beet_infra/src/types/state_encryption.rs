@@ -13,6 +13,12 @@ pub const STATE_ENCRYPTION_VAR: &str = "tf_state_passphrase";
 /// password, an SES SMTP credential, an admin password: anything an
 /// `EnsureSecret`-style action feeds through a tofu variable) should enable
 /// this, since those values land in state regardless of how they arrived.
+///
+/// Not every mail credential is one of them: a comail api key is parked in
+/// parameter store by the operator and read by the deploy verbs directly, so it
+/// never transits state at all, and neither does the sovereign DKIM private
+/// half (only its PUBLIC half is a variable). What state carries is what
+/// terraform DERIVES, which for mail is the SES pair and nothing else.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum StateEncryption {
 	/// State and plan files are plaintext (the default).

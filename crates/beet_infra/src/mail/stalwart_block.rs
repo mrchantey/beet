@@ -272,25 +272,35 @@ impl StalwartBlock {
 	}
 
 	/// Where terraform puts the SES SMTP username (the sending user's access
-	/// key id). Read by `StalwartProvision` when it writes the relay route, not
-	/// by the box.
+	/// key id). Read by `StalwartProvision` when it writes the SES relay route,
+	/// not by the box.
+	///
+	/// The SES arm's credential is terraform-derived and so lives on the box's
+	/// own parameter prefix; a comail credential is minted at enrolment and
+	/// parked per DOMAIN ([`ComailRelay::did_secret`]), because its key pins the
+	/// one domain it may send from.
+	pub fn ses_smtp_user_secret(&self) -> SecretRef {
+		self.secret("ses-smtp-user")
+	}
+
+	/// The full parameter name of [`ses_smtp_user_secret`](Self::ses_smtp_user_secret).
 	pub fn ses_smtp_user_secret_name(&self, stack: &ResolvedStack) -> String {
-		self.secret_name(stack, "ses-smtp-user")
+		self.ses_smtp_user_secret().name(stack)
 	}
 
 	/// Where terraform puts the SES SMTP password, derived from the access key
 	/// (`ses_smtp_password_v4`) so it exists nowhere else.
+	pub fn ses_smtp_password_secret(&self) -> SecretRef {
+		self.secret("ses-smtp-password")
+	}
+
+	/// The full parameter name of
+	/// [`ses_smtp_password_secret`](Self::ses_smtp_password_secret).
 	pub fn ses_smtp_password_secret_name(
 		&self,
 		stack: &ResolvedStack,
 	) -> String {
-		self.secret_name(stack, "ses-smtp-password")
-	}
-
-	/// The regional SES SMTP endpoint the relay route submits to, port 587
-	/// STARTTLS.
-	pub fn ses_smtp_endpoint(stack: &ResolvedStack) -> String {
-		format!("email-smtp.{}.amazonaws.com", stack.region())
+		self.ses_smtp_password_secret().name(stack)
 	}
 
 	fn build_label(&self, suffix: &str) -> String {
@@ -348,8 +358,13 @@ impl StalwartBlock {
 /// type registration.
 impl StalwartBlock {
 	/// Render the box and its secondaries into the config, resolving the
-	/// [`VpcRef`] and [`DatabaseRef`] relations and lowering the grants the
-	/// stack's declarations contributed.
+	/// [`VpcRef`] and [`DatabaseRef`] relations, reaching up to the mail
+	/// domains declared beside it, and lowering the grants the stack's
+	/// declarations contributed.
+	///
+	/// The domains are a cross-entity input like the relations are: the SES
+	/// sending identity exists exactly when SOME domain relays through SES, and
+	/// the box cannot see that from its own declaration.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		blocks: Query<(
@@ -360,11 +375,26 @@ impl StalwartBlock {
 		)>,
 		vpcs: Query<&VpcBlock>,
 		databases: Query<&RdsPostgresBlock>,
+		domains: Query<(Entity, &MailDomainBlock)>,
+		relays: RelayQuery,
 	) {
 		for (entity, block, vpc_ref, database_ref) in blocks.iter() {
-			if scopes.get_entity(entity).is_err() {
+			let Ok(root) = scopes.get_entity(entity) else {
 				continue;
-			}
+			};
+			// every domain rendering into the same scope, ie the box's own
+			// stack and no other
+			let relayed = domains
+				.iter()
+				.filter(|(domain, _)| {
+					scopes.get_entity(*domain).is_ok_and(|it| it == root)
+				})
+				.map(|(domain, block)| {
+					relays
+						.resolve(domain, block.domain())
+						.map(|relay| (block.domain().clone(), relay))
+				})
+				.collect::<Result<Vec<_>>>();
 			let vpc = crate::types::related(
 				&scopes,
 				entity,
@@ -384,18 +414,27 @@ impl StalwartBlock {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
-			match (vpc, database) {
-				(Ok(vpc), Ok(database)) => {
+			match (vpc, database, relayed) {
+				(Ok(vpc), Ok(database), Ok(relayed)) => {
+					let relays = relayed.into_iter().fold(
+						RelayModes::default(),
+						|mut relays, (domain, relay)| {
+							relays.insert(domain, relay);
+							relays
+						},
+					);
 					let access = scope.access();
 					let (stack, _deployment, config) = scope.ctx();
-					if let Err(err) =
-						block.emit(stack, vpc, database, &access, config)
+					if let Err(err) = block
+						.emit(stack, vpc, database, &access, &relays, config)
 					{
 						scope.error(err);
 					}
 				}
-				(vpc, database) => {
-					for err in [vpc.err(), database.err()].into_iter().flatten()
+				(vpc, database, relayed) => {
+					for err in [vpc.err(), database.err(), relayed.err()]
+						.into_iter()
+						.flatten()
 					{
 						scope.error(err);
 					}
@@ -405,20 +444,26 @@ impl StalwartBlock {
 	}
 
 	/// Emit this box's resources: the security group, the instance role
-	/// lowered from the declared grants, the SES sending identity and the
-	/// instance itself.
+	/// lowered from the declared grants, the SES sending identity if any domain
+	/// asks for one, and the instance itself.
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
 		vpc: &VpcBlock,
 		database: &RdsPostgresBlock,
 		access: &AccessGrants,
+		relays: &RelayModes,
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
 		let group = self.emit_security_group(stack, config, vpc, database)?;
 		let role = self.emit_instance_role(stack, config, access)?;
-		self.emit_ses_sender(stack, config)?;
+		// an IAM user holding a static credential is the one thing in this
+		// stack that exists only because a provider's protocol demands it, so
+		// it exists only while a domain actually relays through that provider.
+		if relays.any_ses() {
+			self.emit_ses_sender(stack, config)?;
+		}
 		self.emit_instance(stack, config, vpc, database, &group, &role)?;
 		Ok(())
 	}
@@ -1320,13 +1365,46 @@ mod tests {
 	}
 
 	/// Spawn `block` beside its [`siblings`], related to the network and the
-	/// database the way the markup relates them.
+	/// database the way the markup relates them, serving one SES-relayed
+	/// domain.
 	fn spawn_stack(block: StalwartBlock, parent: &mut ChildSpawner) {
+		spawn_relayed(block, RelayMode::Ses(SesRelay::default()), parent);
+	}
+
+	/// [`spawn_stack`] with the served domain relayed through `relay`, ie what
+	/// decides whether the box declares a SES sending identity at all.
+	fn spawn_relayed(
+		block: StalwartBlock,
+		relay: RelayMode,
+		parent: &mut ChildSpawner,
+	) {
 		let (network, db, blobs) = siblings();
 		let vpc = parent.spawn(network).id();
 		let db = parent.spawn((db, VpcRef(vpc))).id();
 		parent.spawn((block, VpcRef(vpc), DatabaseRef(db)));
 		parent.spawn(blobs);
+		relay.insert(
+			&mut parent.spawn(
+				MailDomainBlock::new(
+					"stalwart.beetmash.com",
+					"mail.beetmash.com",
+				)
+				.with_records(MailRecords::None),
+			),
+		);
+	}
+
+	/// The config the whole set emits with its domain relayed through `relay`.
+	fn build_config_relayed(
+		block: &StalwartBlock,
+		relay: RelayMode,
+	) -> terra::Config {
+		let block = block.clone();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				spawn_relayed(block, relay, parent);
+			});
+		scope.finish().unwrap().2
 	}
 
 	/// The Sydney stack every test renders against.
@@ -1547,6 +1625,37 @@ mod tests {
 			.xpect_contains("ses:SendRawEmail")
 			.xnot()
 			.xpect_contains("ses:*");
+	}
+
+	/// The SES sending identity exists exactly while some domain relays through
+	/// SES: an IAM user holding a static credential is the one thing in this
+	/// stack that exists only because a provider's protocol demands it, so a
+	/// stack that relays through comail or delivers directly holds no static
+	/// credential at all.
+	#[beet_core::test]
+	fn no_ses_domain_means_no_ses_sender() {
+		for relay in
+			[RelayMode::None, RelayMode::Comail(ComailRelay::default())]
+		{
+			build_config_relayed(&mail_box(), relay)
+				.to_json_string()
+				.unwrap()
+				.as_str()
+				.xnot()
+				.xpect_contains("aws_iam_user")
+				.xnot()
+				.xpect_contains("aws_iam_access_key")
+				.xnot()
+				.xpect_contains("ses-smtp-user");
+		}
+		// ..and the box is still a box: the instance and its role are not the
+		// relay's to take away
+		build_config_relayed(&mail_box(), RelayMode::None)
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xpect_contains("aws_instance")
+			.xpect_contains("aws_iam_role");
 	}
 
 	/// The firewall is the port list and nothing else: one tcp ingress per

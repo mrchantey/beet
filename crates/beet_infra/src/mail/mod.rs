@@ -1,10 +1,14 @@
-//! The self-hosted mail stack: mailboxes and receiving on our own box, all
-//! outbound relayed through SES so delivery never depends on one IP's
-//! reputation.
+//! The self-hosted mail stack: mailboxes and receiving on our own box, and
+//! outbound leaving through whichever relay each domain composes beside it:
+//! Amazon SES, comail, or none at all.
 //!
 //! A domain is declared once, as a [`MailDomainBlock`], and everything else
-//! composes from it: the SES identity that signs its mail, the records that make
-//! it deliverable, and the members whose mailboxes it holds.
+//! composes from it: the records that make it deliverable, the sovereign key
+//! that signs its mail whatever carries it, and the members whose mailboxes it
+//! holds. The relay is the one thing NOT a field on it: `{SesRelay}` beside the
+//! domain buys Amazon's reputation, `{ComailRelay}` rides an atproto identity,
+//! and nothing at all delivers straight to each recipient's MX (see
+//! [`RelayMode`]).
 // the post-apply deploy verbs, which shell out (ssh, the aws cli, curl) or
 // drive the mail server's own api, so they are native-only and `deploy`-gated
 // like the rest of the actions.
@@ -18,5 +22,7 @@ mod member;
 pub use member::*;
 mod mta_sts;
 pub use mta_sts::*;
+mod relay;
+pub use relay::*;
 mod stalwart_block;
 pub use stalwart_block::*;

@@ -99,6 +99,8 @@ impl IamPolicy {
 		let mut read_tables = Vec::<String>::new();
 		#[cfg(feature = "bindings_aws_dynamo")]
 		let mut write_tables = Vec::<String>::new();
+		#[cfg(feature = "mail")]
+		let mut metric_namespaces = Vec::<String>::new();
 		for grant in access.iter() {
 			match grant.kind.as_str() {
 				S3BucketBlock::ACCESS_KIND => match grant.permissions {
@@ -120,6 +122,10 @@ impl IamPolicy {
 						write_tables.push(grant.name.clone())
 					}
 				},
+				#[cfg(feature = "mail")]
+				crate::prelude::ComailRelay::ACCESS_KIND => {
+					metric_namespaces.push(grant.name.clone())
+				}
 				kind => bevybail!(
 					"a `{kind}` resource was declared alongside this {compute}, \
 					which has no IAM lowering for that kind. Add one to \
@@ -194,6 +200,27 @@ impl IamPolicy {
 				"Resource": resource
 			}));
 		}
+		// `cloudwatch:PutMetricData` takes no resource-level permission at all,
+		// so the scope is the CONDITION: this identity may write these
+		// namespaces and no other, which is the difference between "the job
+		// reports its own numbers" and "the job may rewrite any metric in the
+		// account". One statement for every namespace, since a `Sid` must be
+		// unique within an identity policy.
+		#[cfg(feature = "mail")]
+		if !metric_namespaces.is_empty() {
+			metric_namespaces.sort();
+			metric_namespaces.dedup();
+			self.statements.push(json!({
+				"Sid": "PublishMetrics",
+				"Effect": "Allow",
+				"Action": ["cloudwatch:PutMetricData"],
+				"Resource": "*",
+				"Condition": {
+					"StringEquals": { "cloudwatch:namespace": metric_namespaces }
+				}
+			}));
+		}
+
 		#[cfg(feature = "bindings_aws_dynamo")]
 		if !write_tables.is_empty() {
 			let resource = self.table_arns(&write_tables);

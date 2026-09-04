@@ -4,13 +4,13 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<MailCredentials/>` — print every mailbox credential this stack holds, as
+/// `<MailCredentials/>`: print every mailbox credential this stack holds, as
 /// the address that uses it.
 ///
 /// Nothing in this stack ever shows a password: `StalwartProvision` mints each
 /// mailbox credential, parks it in parameter store and moves on, and the
 /// server mints its own administrator's. That is the right default, and it
-/// leaves one real gap — a human setting up a mail client needs the value, and
+/// leaves one real gap: a human setting up a mail client needs the value, and
 /// the honest alternative to this verb is a hand-composed `aws ssm
 /// get-parameter` per mailbox with the parameter name typed from memory. The
 /// name is composed by [`AccountPlan::secret_ref`], so a verb that reads it
@@ -23,9 +23,9 @@ use beet_net::prelude::*;
 /// buffer and whatever is recording the session.
 ///
 /// `--infra` adds the credentials no human signs in with: the database master
-/// password, the SES SMTP pair and the DKIM signing keys. Separate because
-/// reading a mailbox password is setting up a mail client, and reading the
-/// database password is an incident.
+/// password, whichever relay credentials the stack's domains actually use, and
+/// the DKIM signing keys. Separate because reading a mailbox password is
+/// setting up a mail client, and reading the database password is an incident.
 #[derive(Debug, Clone, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(MailCredentialsAction)]
@@ -83,6 +83,39 @@ pub async fn MailCredentialsAction(
 			mail.database.secret(),
 			"postgres master password".to_string(),
 		));
+		// exactly the relay credentials in use: an all-comail stack has no SES
+		// pair to print, and a direct-delivering one has no relay credential at
+		// all, so listing either would read as a value somebody forgot to set.
+		if mail.relays.any_ses() {
+			for (secret, note) in [
+				(
+					mail.mail_box.ses_smtp_user_secret(),
+					"ses smtp username, ie the sending user's access key id",
+				),
+				(
+					mail.mail_box.ses_smtp_password_secret(),
+					"ses smtp password, derived from it by terraform",
+				),
+			] {
+				entries.push((
+					format!("{} ses relay", mail.mail_box.label()),
+					secret,
+					note.to_string(),
+				));
+			}
+		}
+		for (domain, relay) in mail.relayed() {
+			if !matches!(relay, RelayMode::Comail(_)) {
+				continue;
+			}
+			for (secret, holds) in ComailRelay::secrets(&domain.slug()) {
+				entries.push((
+					format!("{} comail", domain.domain()),
+					secret,
+					holds.to_string(),
+				));
+			}
+		}
 		// keys exist exactly where `EnsureDkimKey` mints them, ie wherever the
 		// records prove the identity, which includes a cutover-staged domain.
 		for domain in mail
@@ -117,7 +150,7 @@ pub async fn MailCredentialsAction(
 	}
 	if !infra {
 		info!(
-			"pass --infra for the credentials no human signs in with (database, dkim)"
+			"pass --infra for the credentials no human signs in with (database, relay, dkim)"
 		);
 	}
 	Pass(cx.input).xok()
@@ -126,6 +159,7 @@ pub async fn MailCredentialsAction(
 /// Parameters for the listing.
 #[derive(Reflect)]
 struct MailCredentialsParams {
-	/// Also print the database master password and the DKIM signing keys.
+	/// Also print the database master password, the relay credentials in use
+	/// and the DKIM signing keys.
 	infra: bool,
 }

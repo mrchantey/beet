@@ -17,9 +17,12 @@ use serde_json::Value;
 ///
 /// The declared set is read from the config the blocks emit rather than
 /// restated here, so a block that adds a record does not also have to be added
-/// to an audit. Records whose value is only known after apply (the SES DKIM
-/// selectors, whose tokens are computed) are matched as patterns on the part of
-/// the name that IS known.
+/// to an audit. Records whose NAME is only known after apply are matched as
+/// patterns on the part that IS known, which covers both shapes a relay
+/// produces: a SES selector, whose token is computed by the apply
+/// (`<token>._domainkey.<domain>`), and a comail selector, whose date-based
+/// stem was minted at enrolment and arrives as a variable
+/// (`atmos<YYYYMMDD>r._domainkey.<domain>`).
 ///
 /// Reports by default and deletes only when asked, since the audit's own
 /// allowlist is the thing most likely to be wrong the first time it runs.
@@ -262,7 +265,8 @@ fn declared_records(config: &terra::Config) -> Vec<DeclaredRecord> {
 }
 
 /// Turn a declared name into a match pattern: an interpolation whose value is
-/// only known after apply (a computed DKIM selector) becomes a `*` label.
+/// only known after apply (a computed or enrolment-minted DKIM selector)
+/// becomes a `*` label.
 ///
 /// The alternative is reading the applied state to resolve them, which would
 /// make the audit useless before the first apply, which is exactly when a stray
@@ -390,7 +394,9 @@ mod tests {
 
 	fn declared() -> Vec<DeclaredRecord> {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn(staging());
+			// relayed through SES, whose selector tokens are the computed names
+			// this pattern matching exists for
+			parent.spawn((staging(), SesRelay::default()));
 		});
 		declared_records(&scope.finish().unwrap().2)
 	}
@@ -432,6 +438,36 @@ mod tests {
 		declared
 			.iter()
 			.any(|record| record.matches("anything.beetmash.com", "CNAME"))
+			.xpect_false();
+	}
+
+	/// A comail selector's stem is minted at enrolment rather than computed by
+	/// the apply, but it reaches the config the same way (as a variable
+	/// reference) and so matches by the same wildcard. The two selectors are
+	/// `TXT` and differ by ONE letter before the label break, which is exactly
+	/// the case a pattern that swallowed the whole label would get wrong.
+	#[beet_core::test]
+	fn enrolled_selectors_match_as_patterns() {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn((staging(), ComailRelay::default()));
+		});
+		let declared = declared_records(&scope.finish().unwrap().2);
+		for name in [
+			"atmos20260904r._domainkey.stalwart.beetmash.com",
+			"atmos20260904e._domainkey.stalwart.beetmash.com",
+		] {
+			declared
+				.iter()
+				.any(|record| record.matches(name, "TXT"))
+				.xpect_true();
+		}
+		// ..and the stem is not a licence for every selector in the zone: an
+		// incumbent provider's own selector is still a stray
+		declared
+			.iter()
+			.any(|record| {
+				record.matches("fm1._domainkey.stalwart.beetmash.com", "TXT")
+			})
 			.xpect_false();
 	}
 

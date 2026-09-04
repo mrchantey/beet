@@ -9,11 +9,13 @@ This is a runbook, not a tutorial. The [tutorials](/docs/tutorials) teach beet's
 
 It is also the longest-running thing in the docs. You start it on a Monday and finish it the following week, and most of that time is spent waiting on an Amazon support case. Plan for that rather than being surprised by it.
 
-The shape is: [Stalwart](https://stalw.art) owns your mailboxes, your receiving and your policy, on one small box you control. Every outbound message relays through Amazon SES, so you never fight for the reputation of a single IP address. Postgres and S3 hold the state, the box itself is disposable, and the whole thing is declared as [`beet_infra`](/docs/crates/beet_infra) blocks in one `.bsx` file.
+The shape is: [Stalwart](https://stalw.art) owns your mailboxes, your receiving and your policy, on one small box you control. Outbound leaves through whichever relay each domain declares, or through no relay at all. Postgres and S3 hold the state, the box itself is disposable, and the whole thing is declared as [`beet_infra`](/docs/crates/beet_infra) blocks in one `.bsx` file.
+
+This runbook takes the Amazon SES path throughout, because that is the one it was written against and the one with the longest tail of real operational detail. Section 1a says what the choice is and how to take a different one; nothing else in the runbook changes if you do.
 
 ## 1. What you get, what it costs, what it demands
 
-You get mailboxes whose message bodies sit in a bucket you own and whose metadata sits in a database you own. You get [JMAP](https://jmap.io) on port 443, which is the reason to do this at all if agents are going to read your mail: it is JSON over HTTP with batching and push, not a 1986 line protocol with a decade of extensions bolted on. You get IMAP, submission and CardDAV/CalDAV alongside it, so ordinary mail clients work with no special handling. And you get SES in front of delivery, which means your messages leave from IP addresses Amazon spends a great deal of money keeping trusted.
+You get mailboxes whose message bodies sit in a bucket you own and whose metadata sits in a database you own. You get [JMAP](https://jmap.io) on port 443, which is the reason to do this at all if agents are going to read your mail: it is JSON over HTTP with batching and push, not a 1986 line protocol with a decade of extensions bolted on. You get IMAP, submission and CardDAV/CalDAV alongside it, so ordinary mail clients work with no special handling. And with a relay in front of delivery, your messages leave from IP addresses somebody else spends a great deal of money keeping trusted.
 
 It costs about US$43 a month in Sydney on-demand pricing: EC2 `t4g.small` around $15, an elastic IP around $4, EBS around $3, an RDS `db.t4g.micro` around $16 plus $3 of storage, a couple of dollars of S3, and cents of SES. About $25 of that is mail-specific once you treat the database as company infrastructure that mail is merely the first tenant of. A savings plan takes roughly 30% off the compute later.
 
@@ -25,6 +27,44 @@ It demands four things:
 - Patience for a support case argued in prose. See section 4.
 
 What you do not get is escape from operations. This is a server that other servers connect to on port 25 at three in the morning, and it stays that way.
+
+## 1a. Choosing a relay, or not having one
+
+Outbound delivery is composed beside a domain rather than assumed by it. A relay is a component you spread onto the `<MailDomainBlock/>`, or onto an ancestor of it so every domain underneath inherits:
+
+```jsx
+<MailDomainBlock domain="example.com" mail_host="mail.example.com" {SesRelay}/>
+<MailDomainBlock domain="example.com" mail_host="mail.example.com" {ComailRelay}/>
+<MailDomainBlock domain="example.com" mail_host="mail.example.com"/>
+```
+
+The three are genuinely different trades, and none is the safe default in the abstract.
+
+**No relay** is what a bare declaration means: the box dials each recipient's MX itself, publishes `v=spf1 mx -all`, and signs with the key this stack holds. Everything that makes that respectable is already in the stack, which is the point: a stable elastic address whose reverse record matches the SMTP banner, MTA-STS, TLS-RPT and DMARC at `p=reject` from the first deploy. What you take on is that a fresh address has no reputation, so early mail to the large receivers lands in spam until weeks of ordinary correspondence fix it, and that a listing is yours to get delisted from. What you keep is that nobody can revoke your sending, and no third party is in the path of your mail.
+
+**Amazon SES** buys that reputation. It adds a sending identity and a configuration set per domain, three rotating Easy DKIM selectors, a custom MAIL FROM subdomain that makes SPF *align*, an event stream and reputation alarms, and one static IAM SMTP credential because the protocol demands one. It is what the rest of this runbook does, including the support case in section 4.
+
+**[comail](https://comail.at)** is an atproto-identity SMTP relay: you enrol a domain against a DID you already own, and it signs that domain's mail with a pair of selectors it publishes. Nothing is created in AWS. Four things are worth knowing before you choose it:
+
+- **One domain per DID, and a subdomain is a separate domain.** Every match is exact string equality. Two mail domains through comail means two atproto accounts.
+- **Enrolment is a human in a browser.** Both endpoints are gated on an OAuth session cookie; there is no api-key path. The deploy verifies rather than provisions, which is what `<ComailEnroll/>` is.
+- **The envelope sender is rewritten per recipient**, to a VERP address at the relay's own domain. SPF therefore never aligns and DMARC rides the DKIM signature, so there is no `bounce.` subdomain and no aligned `spf=pass` to assert.
+- **A warming curve and an auto-pause.** Two messages an hour for the first week, ten for the second; a pause at a 5% bounce rate or a 0.08% complaint rate over a rolling day. The warming clock is keyed to the atproto account's age, so create it early. The pause is why a comail stack should also declare the `<ComailDeliverability/>` job: it is the only thing writing the metrics the alarms read.
+
+`examples/infra/mail.bsx`, `mail_ses.bsx` and `mail_comail.bsx` are the three, each minimal.
+
+Whichever you pick, the sovereign `stalwart._domainkey` selector is published in all three. That is deliberate: a receiver needs one signature to pass, so holding a key nobody else can revoke is what makes the relay replaceable at all rather than a dependency you are stuck with.
+
+### Moving between them
+
+There is no prescribed sequence, because the right one depends on what you are protecting. The facts that constrain it:
+
+- A relay change is an SPF change and a DKIM change, both of which are DNS with propagation delay, and both of which the apply makes atomically per domain.
+- The sovereign selector spans the change. A message signed by it verifies before and after, which is the whole reason it exists.
+- Comail's warming caps apply to the member account, not to the domain, so a fortnight-old account starts at full rate.
+- SES has no warming to lose and no cost to keeping an identity around, so leaving it declared on a domain you are moving off costs nothing but the identity.
+
+Two shapes people actually use. Put a greenfield domain (a newsletter subdomain, say) straight onto the new relay and let it warm while nothing depends on it. Or stage the change on a domain that matters using the same `records="IdentityOnly"` machinery section 8 uses for the apex cutover, so the new selectors verify while the incumbent relay keeps carrying the mail, then flip in one apply. Which one you want is a judgement about your traffic, not something a runbook can decide for you.
 
 ## 2. Build on a staging domain
 
@@ -53,6 +93,8 @@ TF_STATE_PASSPHRASE=$(openssl rand -base64 32)
 ```
 
 The account variable beet reads is `CLOUDFLARE_ACCOUNT_ID`, not `CLOUDFLARE_DEFAULT_ACCOUNT_ID`. The passphrase is the one unrecoverable value in the file: it encrypts the OpenTofu state client-side, and state carries the database master password and the SES SMTP credential, because `sensitive = true` on a tofu variable redacts a value from plan and apply output and *not* from state. Back it up somewhere durable before you run anything.
+
+Not every mail credential is in there. A comail api key is parked in parameter store by you and read by the deploy verbs directly, and the sovereign DKIM private half never leaves parameter store either; only its public half is a tofu variable. What state carries is what terraform *derives*, which for mail is the SES pair.
 
 Cloudflare token scopes, all narrowed to the one zone: Zone > DNS > Edit, Zone > Zone > Read, Account > Workers Scripts > Edit.
 
@@ -171,7 +213,8 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 	<MailDomainBlock
 		domain="stalwart.example.com"
 		mail_host="mail.example.com"
-		events_topic="acme-ses-events"
+		alarms_topic="acme-ses-events"
+		{SesRelay{events_topic:"acme-ses-events"}}
 		dns_stage="prod"
 		mailboxes={[
 			{localpart:"pete", admin:true},
@@ -186,7 +229,9 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 </Stack>
 ```
 
-A domain is one `MailDomainBlock`, and everything composes from it: the SES identity, every record that makes the domain deliverable and discoverable, and the mailboxes it holds. A second domain is a second tag rather than an edit, which is exactly what makes the cutover in section 8 one more tag beside the others.
+A domain is one `MailDomainBlock` plus the relay spread beside it, and everything else composes from the pair: the SES identity, every record that makes the domain deliverable and discoverable, and the mailboxes it holds. A second domain is a second tag rather than an edit, which is exactly what makes the cutover in section 8 one more tag beside the others.
+
+The two topics are two different things and are named separately for that reason. `alarms_topic` on the domain is where a reputation alarm fires, and every relay has one. `events_topic` on the `SesRelay` is where the raw stream of bounce, complaint, rejection and delay *objects* is published, and only SES emits that. In practice they are the same topic, as here; one of them survives a change of relay.
 
 Some notes on the declarations that are not obvious from reading them:
 
@@ -198,7 +243,7 @@ Some notes on the declarations that are not obvious from reading them:
 
 **The box is cattle.** All state is in RDS and S3, machine config is cloud-init user data, and any change to that user data replaces the instance. Inbound SMTP during a rebuild is covered by sender retries, which run for days. Config that should *not* rebuild the box rides a fetch-at-boot pattern instead: the machine config holds SSM parameter *names* only, and an `ExecStartPre` script renders the real config from parameter store at every service start. Rotation is then `systemctl restart`, not a redeploy.
 
-**The one static credential in the stack is the SES SMTP key pair**, because the SMTP protocol forces it. Terraform derives it into two SecureString parameters and it belongs to a dedicated IAM user whose only permission is `ses:SendRawEmail`. Everything else, including the instance's access to its own buckets, is an instance profile with IMDSv2 required.
+**The one static credential in the stack is the SES SMTP key pair**, because the SMTP protocol forces it. Terraform derives it into two SecureString parameters and it belongs to a dedicated IAM user whose only permission is `ses:SendRawEmail`. Everything else, including the instance's access to its own buckets, is an instance profile with IMDSv2 required. That user exists exactly while some domain relays through SES: move the last one off and the next apply removes it, which is the point of the relay being composed rather than assumed.
 
 **The ports are 22, 25, 443, 465, 587 and 993, and nothing else.** The management HTTP port is deliberately *not* among them: provisioning reaches it through an SSH tunnel, and the listener that serves it is destroyed at the end of the first provision.
 
@@ -286,6 +331,8 @@ Some failure shapes worth recognising, because each cost us hours:
 ### The probe
 
 `MailProbe` is the assertion that matters, and it works inside the SES sandbox. The outbound leg sends through the box's own submission listener with `curl` speaking implicit-TLS SMTP with AUTH, which exercises the listener exactly as a mail client would, TLS verification included. The inbound leg sends from your publication domain via `aws sesv2 send-email` to the probe mailbox, then reads the message back over JMAP and asserts its `Authentication-Results` header carries `spf=pass`, `dkim=pass` *and* `dmarc=pass`. Both simulator addresses and a once-verified recipient identity are permitted in the sandbox, so no production access is needed to prove the whole loop.
+
+Both legs follow the *sending* domain's relay, since that is what decides what a receiver can conclude. A comail domain sends its inbound leg over the HTTP send API and is judged on `dkim=pass` and `dmarc=pass` only, because its envelope sender is a VERP address at the relay's domain and can never align; a `429` during the warming window is logged and skipped rather than failing the deploy. A domain with no relay has nothing external to ask, so its inbound leg is submitted through the box's own port and only exercises the local route, and the probe says so in its logs. Its *outbound* leg is the one that matters there: a real send to a third-party sink over a real MX lookup.
 
 Assert all three verdicts, not any of them. A partial pass is how a broken SPF record ships unnoticed.
 

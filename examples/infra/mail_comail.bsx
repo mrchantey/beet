@@ -1,0 +1,165 @@
+<!--
+# Mail, relayed through comail
+
+`mail.bsx` plus `{ComailRelay}` beside the domain, and the observability job
+that makes its alarms mean something.
+
+[comail](https://comail.at) is an atproto-identity SMTP relay: you enrol a
+domain against a DID you already own, and the relay signs that domain's mail
+with a pair of selectors it publishes for you. Nothing in AWS is created for it.
+What the deploy declares is four TXT records and five parameters, and what it
+VERIFIES is that the enrolment behind them is real.
+
+## Setting it up
+
+**1. Create the atproto account first, and early.** The warming curve is keyed
+to the MEMBER's age, not the domain's: days 0 to 7 are capped at 2 messages an
+hour and 10 a day, days 7 to 14 at 10 and 50, and only then do the member
+defaults of 50 and 500 apply. The clock starts when the account does, so an
+account made a fortnight before you need it is a fortnight of warming you do not
+have to wait through.
+
+**2. Enrol the domain** at <https://comail.at>, signed in with that account.
+This step cannot be automated and is not meant to be: both enrolment endpoints
+are gated on an OAuth session cookie whose DID must match the claim, with no
+api-key path beside it. Two things to know before you pick a domain:
+
+- **One domain per DID.** Paid tiers exist in the code but ship switched off, so
+  the effective cap is one.
+- **A subdomain is a separate domain.** Enrolling `example.com` does not cover
+  `news.example.com`; every match is exact string equality, in the send API, in
+  the SMTP `MAIL FROM` gate and in enrolment itself. A stack relaying two mail
+  domains through comail needs two atproto accounts.
+
+**3. Park the five values the response returns**, as SecureString parameters:
+
+    aws ssm put-parameter --type SecureString --region us-west-2 \
+      --name /mail-comail-example/dev/comail-did-news-example-com       --value did:plc:...
+    aws ssm put-parameter --type SecureString --region us-west-2 \
+      --name /mail-comail-example/dev/comail-api-key-news-example-com   --value atmos_...
+    aws ssm put-parameter --type SecureString --region us-west-2 \
+      --name /mail-comail-example/dev/comail-dkim-selector-news-example-com --value atmos20260904
+    aws ssm put-parameter --type SecureString --region us-west-2 \
+      --name /mail-comail-example/dev/comail-dkim-rsa-news-example-com  --value 'v=DKIM1; k=rsa; p=...'
+    aws ssm put-parameter --type SecureString --region us-west-2 \
+      --name /mail-comail-example/dev/comail-dkim-ed-news-example-com   --value 'v=DKIM1; k=ed25519; p=...'
+
+`<ComailEnroll/>` prints exactly these names if any is missing, so you can also
+just deploy and read the error.
+
+**4. Deploy.** `<ComailEnroll/>` checks the five parameters exist, checks the key
+actually authenticates, hands the selector and its two record values to the
+apply as tofu variables, and reports on whether the records resolve yet. The
+apply then publishes them, `<StalwartProvision/>` writes one relay route per
+enrolled domain, and `<MailProbe/>` sends through it.
+
+## What the records look like, and what is deliberately absent
+
+Two `TXT` selectors off the date-based stem enrolment minted
+(`atmos<YYYYMMDD>r._domainkey` for RSA, `...e._domainkey` for Ed25519), an apex
+SPF of `v=spf1 include:atmos.email ~all`, and the sovereign `stalwart._domainkey`
+selector this stack holds the key for, which every mode publishes.
+
+There is NO `bounce.` subdomain, and that is not an omission. Comail rewrites the
+envelope sender per recipient to a VERP address at its own domain, so SPF is
+evaluated against `atmos.email` and can never ALIGN with your header From. DMARC
+passes on the DKIM signature instead, which is why the probe demands `dkim=pass`
+and `dmarc=pass` and does not demand an aligned `spf=pass`.
+
+Keep your own `MX`. Comail's reply forwarding wants the MX pointed at
+`smtp.atmos.email`, which would take your inbound mail off this box; replies and
+bounce DSNs arrive here directly instead, and `forward_to` stays unset.
+
+## The observability job is not optional trim
+
+Comail pauses a domain automatically at a 5% bounce rate or a 0.08% complaint
+rate over a rolling 24 hours with at least ten messages. There is no event
+stream on our side to notice that coming: the per-event webhooks exist but their
+registration is session-cookie gated, so nothing a deploy runs can subscribe.
+What can be automated is the deliverability aggregates endpoint, and
+`<ComailDeliverability/>` polls it on a schedule and publishes the numbers into a
+`Comail` CloudWatch namespace, where the alarms the domain block emits read them
+at 4% and 0.05%, deliberately under the pause.
+
+So the `<ScheduledJobBlock/>` and its `<LambdaJobBlock/>` below are part of what
+using comail means. Without them the alarms sit on a metric nothing writes, which
+in CloudWatch looks exactly like a healthy one, and your first complaint arrives
+as a pause.
+
+## Usage
+
+    beet --main=examples/infra/mail_comail.bsx validate
+    beet --main=examples/infra/mail_comail.bsx deploy
+
+`validate` needs only `tofu`. Live deploy needs everything `mail.bsx` needs plus
+a completed enrolment. A `429` from the send API during the 14-day warming
+window is expected rather than a fault, and the probe logs it and skips the
+inbound assertion rather than failing the deploy.
+-->
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
+	<CrateCheck features={["infra", "extra"]}/>
+	<Stack app_name="mail-comail-example" region="us-west-2">
+		<DeployRoutes/>
+
+		<VpcBlock bx:ref="net" label="net"/>
+		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
+		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
+			runtime_write=true object_versioning=true/>
+
+		<StalwartBlock label="mail" hostname="mail.example.com"
+			blob_bucket="mail-blobs"
+			{(VpcRef($net), DatabaseRef($db))}
+			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
+
+		<!-- one enrolled domain, one DID. `{ComailRelay}` takes the hosted relay
+		     by default; the relay is AGPL, so a self-hosted one is
+		     `{ComailRelay{host:"..", relay_domain:".."}}` and nothing else
+		     changes. -->
+		<MailDomainBlock
+			domain="news.example.com"
+			mail_host="mail.example.com"
+			dns={Cloudflare{authority:"news.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			alarms_topic="mail-example-alarms"
+			{ComailRelay}
+			catch_all="replies"
+			mailboxes={[
+				{localpart:"replies", admin:true},
+				{localpart:"probe"},
+			]}
+			aliases={[
+				{localpart:"postmaster", target:"replies"},
+				{localpart:"abuse", target:"replies"},
+			]}/>
+
+		<!-- the observability pair. The function is invoke-only (no gateway), so
+		     nothing but the timer can reach a job that publishes metrics. -->
+		<LambdaJobBlock bx:ref="observer" label="mail-observer" exec_route="jobs"
+			features="infra,extra"/>
+		<ScheduledJobBlock label="comail-deliverability" {InvokeTarget($observer)}
+			schedule="rate(30 minutes)" path="comail-deliverability"/>
+
+		<!-- ..and the route it invokes, which is where the poll actually runs. -->
+		<Route path="jobs" {HttpServer}>
+			<Router>
+				<Route path="comail-deliverability" {ComailDeliverability}/>
+			</Router>
+		</Route>
+
+		<Route path="deploy" {ExchangeSequence}>
+			<EnsureSecret secret="db-password" variable="db_password"/>
+			<EnsureSecret secret="mail-admin-password"/>
+			<EnsureDkimKey/>
+			<!-- before the apply, because the selector records read the values it
+			     hands over; a variable nobody supplied resolves to empty, and an
+			     empty `p=` is a REVOKED selector rather than a missing one. -->
+			<ComailEnroll/>
+			<TofuApply/>
+			<EipReverseDns/>
+			<StalwartProvision/>
+			<MailProbe mailbox="probe" sender_domain="news.example.com" sender="replies"/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

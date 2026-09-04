@@ -189,22 +189,31 @@ impl Plugin for InfraPlugin {
 		// (`<MailDomainBlock domain="stalwart.beetmash.com"/>`), the box that
 		// serves it, and the identity inputs both are authored from. Definitions,
 		// so every target: a wasm consumer can author the stack it cannot deploy.
+		//
+		// Both mail blocks render bespoke, because both read the relay composed
+		// beside the domains: the domain emits against it, and the box emits its
+		// SES sending identity only if some domain resolves SES.
 		#[cfg(feature = "mail")]
 		app.add_systems(
 			DeployRender,
 			(
-				crate::types::declare::<crate::prelude::MailDomainBlock>
+				crate::prelude::MailDomainBlock::declare
 					.in_set(DeployRenderSet::Declare),
 				(
-					crate::types::render::<crate::prelude::MailDomainBlock>,
+					crate::prelude::MailDomainBlock::render,
 					crate::prelude::StalwartBlock::render,
 				)
 					.in_set(DeployRenderSet::Render),
 			),
 		);
+		// the relays a domain composes to say where its outbound mail leaves
+		// through, ie `<MailDomainBlock domain=".." {SesRelay}/>`; absent both,
+		// the box delivers directly.
 		#[cfg(feature = "mail")]
 		app.register_type::<crate::prelude::MailDomainBlock>()
 			.register_type::<crate::prelude::MailRecords>()
+			.register_type::<crate::prelude::SesRelay>()
+			.register_type::<crate::prelude::ComailRelay>()
 			.register_type::<crate::prelude::StalwartBlock>()
 			.register_type::<crate::prelude::Member>()
 			.register_type::<crate::prelude::Mailbox>()
@@ -245,7 +254,9 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::EnsureSecretAction>();
 
 		// the mail stack's deploy verbs: the sovereign signing key minted
-		// before the apply that publishes it, the reverse record, the
+		// before the apply that publishes it, the comail enrolment check that
+		// hands over the records a human enrolled and the scheduled poll that
+		// gives its alarms something to read, the reverse record, the
 		// declarative apply into the mail server's own data store, the
 		// mta-sts policy host, the end-to-end probe, the two liveness checks,
 		// the restore drill and the zone audit.
@@ -256,6 +267,10 @@ impl Plugin for InfraPlugin {
 		))]
 		app.register_type::<crate::prelude::EnsureDkimKey>()
 			.register_type::<crate::prelude::EnsureDkimKeyAction>()
+			.register_type::<crate::prelude::ComailEnroll>()
+			.register_type::<crate::prelude::ComailEnrollAction>()
+			.register_type::<crate::prelude::ComailDeliverability>()
+			.register_type::<crate::prelude::ComailDeliverabilityAction>()
 			.register_type::<crate::prelude::EipReverseDns>()
 			.register_type::<crate::prelude::EipReverseDnsAction>()
 			.register_type::<crate::prelude::StalwartProvision>()
@@ -422,6 +437,45 @@ mod test {
 			.label()
 			.as_str()
 			.xpect_eq("db");
+	}
+
+	/// The relay is composed BESIDE the domain rather than named as a field, so
+	/// it authors as a spread and resolves by ancestry: a stack-level one covers
+	/// every domain under it, a domain's own overrides it, and neither is the
+	/// default.
+	///
+	/// A relay component the binary did not register would resolve to nothing,
+	/// and a stack whose author wrote `{SesRelay}` would deploy delivering
+	/// directly: green, and quietly a different mail system.
+	#[beet_core::test]
+	fn the_relays_spawn_as_spreads_and_resolve_by_ancestry() {
+		let mut world = spawn(
+			r#"<Fragment {SesRelay{events_topic:"acme-ses-events"}}>
+				<MailDomainBlock domain="stalwart.example.com" mail_host="mail.example.com"/>
+				<MailDomainBlock domain="news.example.com" mail_host="mail.example.com"
+					{ComailRelay}/>
+			</Fragment>"#,
+		);
+		let mut domains = world
+			.query::<(Entity, &MailDomainBlock)>()
+			.iter(&world)
+			.map(|(entity, block)| (entity, block.domain().clone()))
+			.collect::<Vec<_>>();
+		domains.sort_by_key(|(_, domain)| domain.clone());
+		let resolved = world.with_state::<RelayQuery, _>(|relays| {
+			domains
+				.iter()
+				.map(|(entity, domain)| {
+					relays.resolve(*entity, domain).unwrap()
+				})
+				.collect::<Vec<_>>()
+		});
+		// the ancestor's, inherited by the domain that declares none
+		resolved[1].xpect_eq(RelayMode::Ses(
+			SesRelay::default().with_events_topic("acme-ses-events"),
+		));
+		// ..and the domain's own, which wins over it
+		resolved[0].xpect_eq(RelayMode::Comail(ComailRelay::default()));
 	}
 
 	/// A field DERIVED from another at construction cannot survive being

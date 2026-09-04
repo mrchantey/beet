@@ -18,13 +18,14 @@ pub enum MailRecords {
 	/// Everything: this stack serves the domain's mail.
 	#[default]
 	All,
-	/// Only the records that prove the SES identity: its DKIM selectors and its
-	/// custom MAIL FROM pair. Both are namespaced (by selector token, and under
-	/// a `bounce.` subdomain), so they coexist with a third party still serving
-	/// the domain's mail. This is a cutover prepared ahead of its window: the
-	/// identity verifies, and not one message changes hands.
+	/// Only the records that prove the sending identity: the relay's selectors
+	/// (and, for SES, its custom MAIL FROM pair) beside the sovereign one. All
+	/// are namespaced, by selector or under a `bounce.` subdomain, so they
+	/// coexist with a third party still serving the domain's mail. This is a
+	/// cutover prepared ahead of its window: the identity verifies, and not one
+	/// message changes hands.
 	IdentityOnly,
-	/// None. The SES identity exists and its records are published elsewhere.
+	/// None. The identity exists and its records are published elsewhere.
 	None,
 }
 
@@ -40,14 +41,18 @@ impl MailRecords {
 	}
 }
 
-/// One mail domain, end to end: the SES sending identity that signs its
-/// outbound mail, and every DNS record that makes the domain deliverable and
-/// discoverable.
+/// One mail domain, end to end: every DNS record that makes it deliverable and
+/// discoverable, and the sending identity behind whichever relay it composes.
 ///
-/// The domain is the only thing declared. Every record name, every SES resource
+/// The domain is the only thing declared. Every record name, every resource
 /// name and the MTA-STS host all derive from it, so serving a second domain is
 /// a second instance rather than an edit, and the eventual cutover from a
 /// staging domain to the apex is one more instance beside the others.
+///
+/// What the domain does NOT declare is which relay carries its outbound mail:
+/// that is a [`SesRelay`] or [`ComailRelay`] composed beside it (or on an
+/// ancestor), and absent both the box delivers straight to each recipient's MX.
+/// See [`RelayMode`].
 ///
 /// The domain a mailbox lives on is not the host that serves it: `mail_host` is
 /// infrastructure and stays put while the domains it serves come and go, which
@@ -77,8 +82,8 @@ pub struct MailDomainBlock {
 	/// See [`MailRecords`].
 	records: MailRecords,
 	/// The zone the records are published into. Without one the block declares
-	/// the SES identity and nothing else, ie a domain whose records are held by
-	/// somebody else.
+	/// the sending identity and nothing else, ie a domain whose records are
+	/// held by somebody else.
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	dns: Option<DnsProvider>,
@@ -108,17 +113,21 @@ pub struct MailDomainBlock {
 	/// trap that accepts).
 	#[set_with(unwrap_option, into)]
 	catch_all: Option<SmolStr>,
-	/// The SNS topic, by bare name in this account and region, that this
-	/// domain's bounces, complaints, rejections and delivery delays publish to,
-	/// and that its reputation alarms notify. Without one the configuration set
-	/// still collects reputation metrics but nothing consumes them, which is a
-	/// sending domain whose first complaint is discovered by a suspension.
+	/// The SNS topic, by bare name in this account and region, this domain's
+	/// reputation alarms notify. Without one nothing consumes the numbers,
+	/// which is a sending domain whose first complaint is discovered by a
+	/// suspension.
+	///
+	/// Provider-neutral: every relay has a bounce rate and a complaint rate,
+	/// and both arms fire their alarms here. The SES event stream is a
+	/// different thing and names its own topic
+	/// ([`SesRelay::events_topic`]), because only SES emits it.
 	///
 	/// A name rather than a block reference because one topic serves every
-	/// domain in the account: events carry the configuration set that emitted
-	/// them, so a topic per domain would only move routing into IAM.
+	/// domain in the account: an alarm carries the domain it fired for, so a
+	/// topic per domain would only move routing into IAM.
 	#[set_with(unwrap_option, into)]
-	events_topic: Option<SmolStr>,
+	alarms_topic: Option<SmolStr>,
 	/// The stage that OWNS the shared names below, ie the one whose deploy may
 	/// publish them.
 	///
@@ -130,7 +139,7 @@ pub struct MailDomainBlock {
 	/// whatever the other stage stood up, so an experiment takes production
 	/// mail down without erroring anywhere.
 	///
-	/// So a stage that is not this one emits its SES identity and its
+	/// So a stage that is not this one emits its sending identity and its
 	/// infrastructure and touches no record at all. Empty means no guard,
 	/// which is right for a stack whose domain nothing else serves.
 	#[set_with(unwrap_option, into)]
@@ -142,55 +151,15 @@ impl Default for MailDomainBlock {
 }
 
 impl MailDomainBlock {
-	/// The SPF policy every domain this stack sends for publishes: SES is the
-	/// only authorised sender, and `-all` (hard fail) rather than `~all`,
-	/// because a soft fail asks receivers to accept forgeries and think about
-	/// it.
-	pub const SPF: &'static str = "v=spf1 include:amazonses.com -all";
-
-	/// The subdomain SES's custom MAIL FROM uses, ie the envelope sender's
-	/// domain. Its own `MX` and SPF are what make SPF *aligned* with the header
-	/// From, which is one of the two ways to pass DMARC.
-	pub const MAIL_FROM_LABEL: &'static str = "bounce";
-
 	/// The single-MX preference. Nothing weighs against anything, so the value
 	/// is convention rather than a choice.
 	pub const MX_PRIORITY: u16 = 10;
-
-	/// Easy DKIM publishes three rotating selectors, so three `CNAME`s per
-	/// identity. Fixed by SES.
-	pub const DKIM_TOKENS: usize = 3;
-
-	/// The sesv2 key-length enum. Note the `_BIT` suffix: the v1 API and most
-	/// documentation say `RSA_2048`, which sesv2 rejects.
-	pub const DKIM_KEY_LENGTH: &'static str = "RSA_2048_BIT";
 
 	/// The selector the SOVEREIGN key signs under, ie the one this stack holds
 	/// rather than the three Amazon rotates. Named for the server that signs
 	/// with it, so a reader of the zone can tell the two sources apart at a
 	/// glance.
 	pub const DKIM_SELECTOR: &'static str = "stalwart";
-
-	/// The event destination's name, which is the one phase 0B made by hand and
-	/// this block now declares: terraform adopts it rather than adding a second
-	/// stream beside it.
-	pub const EVENT_DESTINATION: &'static str = "sns-events";
-
-	/// The SES events a destination forwards. Deliveries themselves are
-	/// deliberately absent: they are the overwhelming majority of the stream
-	/// and carry no decision, while these four are each a reason to stop
-	/// sending to an address.
-	pub const EVENT_TYPES: &'static [&'static str] =
-		&["BOUNCE", "COMPLAINT", "REJECT", "DELIVERY_DELAY"];
-
-	/// The bounce rate SES itself treats as review-worthy, and the level this
-	/// stack alarms at so the warning arrives before the review does.
-	pub const BOUNCE_ALARM_RATE: f64 = 0.05;
-
-	/// The complaint rate with the same relationship to a suspension. An order
-	/// of magnitude below the bounce threshold, because a complaint is a
-	/// recipient saying so rather than a server.
-	pub const COMPLAINT_ALARM_RATE: f64 = 0.001;
 
 	/// The client-facing services advertised by `SRV`, as
 	/// `(service name, port)`. JMAP is first because it is the one an agent
@@ -224,7 +193,7 @@ impl MailDomainBlock {
 			aliases: Vec::new(),
 			members: Vec::new(),
 			catch_all: None,
-			events_topic: None,
+			alarms_topic: None,
 			dns_stage: None,
 			domain,
 		}
@@ -319,20 +288,11 @@ impl MailDomainBlock {
 	/// composition drifts.
 	pub fn slug_of(domain: &str) -> String { domain.replace('.', "-") }
 
-	/// The SES configuration set this domain sends through. Named from the
-	/// domain and NOT stack-composed, so an account's sets read as the domains
-	/// they belong to and terraform can adopt one made by hand.
-	pub fn configuration_set_name(&self) -> String { self.slug() }
-
-	/// The envelope-sender domain, ie `bounce.stalwart.beetmash.com`.
-	pub fn mail_from_domain(&self) -> String {
-		format!("{}.{}", Self::MAIL_FROM_LABEL, self.domain)
-	}
-
-	/// The SES bounce/complaint feedback host for `region`, the `MX` the
-	/// [`mail from domain`](Self::mail_from_domain) points at.
-	pub fn feedback_host(region: &str) -> String {
-		format!("feedback-smtp.{region}.amazonses.com")
+	/// The SES configuration set this domain sends through, ie the SES arm's
+	/// per-domain reporting scope. Composed here rather than at each call site
+	/// because a probe and an alarm must name the same set.
+	pub fn configuration_set_name(&self) -> String {
+		SesRelay::configuration_set_name(&self.slug())
 	}
 
 	/// The DMARC policy: reject outright, and report. `p=reject` from the first
@@ -407,15 +367,21 @@ impl MailDomainBlock {
 		metric.replace('.', "-").to_lowercase()
 	}
 
-	/// The ARN of [`events_topic`](Self::events_topic) in `stack`'s region,
-	/// composed against the account the apply is running in.
-	fn events_topic_arn(&self, stack: &ResolvedStack) -> Option<String> {
-		self.events_topic.as_ref().map(|topic| {
-			format!(
-				"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{topic}",
-				stack.region()
-			)
-		})
+	/// The ARN of `topic` in `stack`'s region, composed against the account the
+	/// apply is running in.
+	fn topic_arn(stack: &ResolvedStack, topic: &SmolStr) -> String {
+		format!(
+			"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{topic}",
+			stack.region()
+		)
+	}
+
+	/// The ARN of [`alarms_topic`](Self::alarms_topic), ie where every arm's
+	/// reputation alarms fire.
+	fn alarms_topic_arn(&self, stack: &ResolvedStack) -> Option<String> {
+		self.alarms_topic
+			.as_ref()
+			.map(|topic| Self::topic_arn(stack, topic))
 	}
 
 	/// A terraform label for this domain's `suffix` resource, distinct from
@@ -486,6 +452,9 @@ impl Block for MailDomainBlock {
 	/// [`EnsureDkimKey`](crate::mail::EnsureDkimKey) set. The filter mirrors
 	/// that action's exactly: a domain whose records somebody else holds gets
 	/// no key minted, so a variable here would fail resolution.
+	///
+	/// The relay-supplied variables are NOT here, because a block cannot see
+	/// the component composed beside it: [`declare`](Self::declare) adds them.
 	fn variables(&self) -> Vec<Variable> {
 		match self.records.proves_identity() {
 			true => vec![self.dkim_public_key_variable()],
@@ -494,36 +463,149 @@ impl Block for MailDomainBlock {
 	}
 }
 
-impl EmitBlock for MailDomainBlock {
-	fn emit(
-		&self,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-		config: &mut terra::Config,
-	) -> Result {
-		self.emit(stack, deployment, config)
+/// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the type
+/// registration.
+///
+/// Bespoke rather than the generic pair, because a domain's emission depends on
+/// the relay component composed beside it (or above it), which is a
+/// cross-entity input.
+impl MailDomainBlock {
+	/// Contribute each domain's grants and variables, both of which the
+	/// resolved relay adds to: a comail domain reads three records out of
+	/// parameter store as `-var`s, and grants the metric namespace its
+	/// deliverability poll publishes into.
+	pub(crate) fn declare(
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &MailDomainBlock)>,
+		relays: RelayQuery,
+	) {
+		for (entity, block) in blocks.iter() {
+			if scopes.get_entity(entity).is_err() {
+				continue;
+			}
+			let relay = relays.resolve(entity, Block::label(block));
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
+			match relay {
+				Err(err) => scope.error(err),
+				Ok(relay) => {
+					let grants =
+						block.grants(scope.stack()).xmap(|mut grants| {
+							grants.extend(block.relay_grants(&relay));
+							grants
+						});
+					let variables = block.variables().xmap(|mut variables| {
+						variables.extend(block.relay_variables(&relay));
+						variables
+					});
+					scope.declare(grants, variables);
+				}
+			}
+		}
+	}
+
+	/// Emit each domain against its resolved relay, collecting per-entity
+	/// errors rather than short-circuiting the rest.
+	pub(crate) fn render(
+		mut scopes: AncestorQuery<&mut RenderScope>,
+		blocks: Query<(Entity, &MailDomainBlock)>,
+		relays: RelayQuery,
+	) {
+		for (entity, block) in blocks.iter() {
+			if scopes.get_entity(entity).is_err() {
+				continue;
+			}
+			let relay = relays.resolve(entity, Block::label(block));
+			let Ok(mut scope) = scopes.get_mut(entity) else {
+				continue;
+			};
+			match relay {
+				Err(err) => scope.error(err),
+				Ok(relay) => {
+					let (stack, deployment, config) = scope.ctx();
+					if let Err(err) =
+						block.emit(stack, deployment, config, &relay)
+					{
+						scope.error(bevyhow!(
+							"MailDomainBlock '{}': {err}",
+							Block::label(block)
+						));
+					}
+				}
+			}
+		}
+	}
+
+	/// What a process running beside this domain needs, which for every mode
+	/// but comail is nothing: only the deliverability poll writes anything at
+	/// all, and it writes one CloudWatch namespace.
+	fn relay_grants(&self, relay: &RelayMode) -> Vec<AccessGrant> {
+		match relay {
+			RelayMode::Comail(_) => vec![AccessGrant::read_write(
+				ComailRelay::ACCESS_KIND,
+				ComailRelay::METRIC_NAMESPACE,
+			)],
+			RelayMode::None | RelayMode::Ses(_) => Vec::new(),
+		}
+	}
+
+	/// The variables the relay contributes: comail's selector stem and its two
+	/// record values, each parked in parameter store by the operator and handed
+	/// to the apply by [`ComailEnroll`].
+	///
+	/// The same shape as the sovereign key's, and for the same reason: the
+	/// value is minted somewhere this deploy cannot reach, so the record reads
+	/// it out of one parameter rather than restating it.
+	fn relay_variables(&self, relay: &RelayMode) -> Vec<Variable> {
+		match relay {
+			RelayMode::Comail(_) if self.records.proves_identity() => {
+				ComailRelay::dkim_variables(&self.slug())
+					.into_iter()
+					.map(|(variable, _)| variable)
+					.collect()
+			}
+			_ => Vec::new(),
+		}
 	}
 }
 
 impl MailDomainBlock {
-	/// Emit this domain's resources: the SES identity and its configuration
-	/// set, the event stream and alarms, the dkim variable declaration, and —
-	/// for the stage that owns the names — every dns record.
+	/// Emit this domain against `relay`: the relay's own resources and identity
+	/// records, the alarms that watch it, the dkim variable declarations, and,
+	/// for the stage that owns the names, every dns record.
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
 		config: &mut terra::Config,
+		relay: &RelayMode,
 	) -> Result {
 		self.validate()?;
-		let identity = self.emit_ses(stack, config)?;
-		self.emit_events(stack, config)?;
-		// declared whenever `variables` resolves it, not only when the record
-		// that reads it is published: a `-var` for a variable the config never
+		// only the SES arm has resources at all: a comail domain is five
+		// parameters and two TXT records, and a direct one is not even that.
+		let identity = match relay {
+			RelayMode::Ses(ses) => {
+				let identity = self.emit_ses(stack, config)?;
+				self.emit_ses_events(stack, config, ses)?;
+				self.emit_ses_alarms(stack, config)?;
+				Some(identity)
+			}
+			RelayMode::Comail(_) => {
+				self.emit_comail_alarms(stack, config)?;
+				None
+			}
+			RelayMode::None => None,
+		};
+		// declared whenever a variable resolves, not only when the record that
+		// reads it is published: a `-var` for a variable the config never
 		// declared fails the apply, and a stage outside `dns_stage` still
-		// resolves this one.
-		if self.records.proves_identity() {
-			let variable = self.dkim_public_key_variable();
+		// resolves them.
+		for variable in self
+			.variables()
+			.into_iter()
+			.chain(self.relay_variables(relay))
+		{
 			config.ensure_variable(
 				variable.key().to_string(),
 				variable.tf_declaration(),
@@ -542,8 +624,16 @@ impl MailDomainBlock {
 		}
 		match self.resolved_dns() {
 			Some(dns) => {
-				self.emit_identity_records(stack, config, &dns, &identity)?;
-				self.emit_delivery_records(stack, deployment, config, &dns)?;
+				self.emit_identity_records(
+					stack,
+					config,
+					&dns,
+					relay,
+					identity.as_ref(),
+				)?;
+				self.emit_delivery_records(
+					stack, deployment, config, &dns, relay,
+				)?;
 			}
 			// a domain that declares records but resolves no zone would apply
 			// clean and publish nothing, which is the one failure a mail stack
@@ -610,7 +700,7 @@ impl MailDomainBlock {
 				dkim_signing_attributes: Some(vec![
 					AwsSesv2EmailIdentityResourceBlockTypeDkimSigningAttributes {
 						next_signing_key_length: Some(
-							Self::DKIM_KEY_LENGTH.into(),
+							SesRelay::DKIM_KEY_LENGTH.into(),
 						),
 						..default()
 					},
@@ -627,7 +717,9 @@ impl MailDomainBlock {
 			stack.resource_ident(self.label("ses-mail-from")),
 			AwsSesv2EmailIdentityMailFromAttributesDetails {
 				email_identity: identity.field_ref("email_identity").into(),
-				mail_from_domain: Some(self.mail_from_domain().into()),
+				mail_from_domain: Some(
+					SesRelay::mail_from_domain(&self.domain).into(),
+				),
 				behavior_on_mx_failure: Some("USE_DEFAULT_VALUE".into()),
 				..default()
 			},
@@ -639,21 +731,23 @@ impl MailDomainBlock {
 		identity.xok()
 	}
 
-	/// What watches this domain's sending: the event destination that streams
-	/// every bounce, complaint, rejection and delay onto the account's topic,
-	/// and the two reputation alarms that fire on the same topic before SES
-	/// acts on the same numbers itself.
+	/// The SES event destination that streams every bounce, complaint,
+	/// rejection and delay onto the account's topic.
 	///
-	/// The alarms read the `AWS/SES` reputation metrics the configuration set
-	/// publishes, which is why `reputation_metrics_enabled` is not optional
-	/// here: without it the metric never appears and an alarm on it sits in
-	/// `INSUFFICIENT_DATA` forever, reading exactly like a healthy one.
-	fn emit_events(
+	/// SES-only: it is a stream of SES event objects, so nothing but the SES
+	/// arm can emit it, and it is named by [`SesRelay::events_topic`] rather
+	/// than by the provider-neutral [`alarms_topic`](Self::alarms_topic).
+	fn emit_ses_events(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		ses: &SesRelay,
 	) -> Result {
-		let Some(topic) = self.events_topic_arn(stack) else {
+		let Some(topic) = ses
+			.events_topic()
+			.as_ref()
+			.map(|topic| Self::topic_arn(stack, topic))
+		else {
 			return Ok(());
 		};
 		// the account the apply runs in, since a topic name is not an address
@@ -666,7 +760,7 @@ impl MailDomainBlock {
 			stack.resource_ident(self.label("ses-events")),
 			AwsSesv2ConfigurationSetEventDestinationDetails {
 				configuration_set_name: self.configuration_set_name().into(),
-				event_destination_name: Self::EVENT_DESTINATION.into(),
+				event_destination_name: SesRelay::EVENT_DESTINATION.into(),
 				// the set is named by string rather than by field reference,
 				// because the destination is a property OF the set rather than
 				// a resource pointing at one; terraform sees no edge in a
@@ -681,7 +775,7 @@ impl MailDomainBlock {
 				event_destination: Some(vec![
 					AwsSesv2ConfigurationSetEventDestinationResourceBlockTypeEventDestination {
 						enabled: Some(true),
-						matching_event_types: Self::EVENT_TYPES
+						matching_event_types: SesRelay::EVENT_TYPES
 							.iter()
 							.map(|event| SmolStr::from(*event))
 							.collect(),
@@ -696,18 +790,102 @@ impl MailDomainBlock {
 				..default()
 			},
 		))?;
-		for (metric, threshold, description) in [
-			(
-				"Reputation.BounceRate",
-				Self::BOUNCE_ALARM_RATE,
-				"bounce rate: SES suspends a sender that stays here",
-			),
-			(
-				"Reputation.ComplaintRate",
-				Self::COMPLAINT_ALARM_RATE,
-				"complaint rate: recipients marking this domain as spam",
-			),
-		] {
+		Ok(())
+	}
+
+	/// The two reputation alarms on the `AWS/SES` metrics the configuration set
+	/// publishes, which fire on the same numbers SES itself acts on and before
+	/// it does.
+	///
+	/// `reputation_metrics_enabled` is not optional in [`emit_ses`](Self::emit_ses)
+	/// because of these: without it the metric never appears and an alarm on it
+	/// sits in `INSUFFICIENT_DATA` forever, reading exactly like a healthy one.
+	fn emit_ses_alarms(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit_alarms(
+			stack,
+			config,
+			SesRelay::METRIC_NAMESPACE,
+			"ses:configuration-set",
+			&self.configuration_set_name(),
+			&[
+				(
+					"Reputation.BounceRate",
+					SesRelay::BOUNCE_ALARM_RATE,
+					"bounce rate: SES suspends a sender that stays here",
+				),
+				(
+					"Reputation.ComplaintRate",
+					SesRelay::COMPLAINT_ALARM_RATE,
+					"complaint rate: recipients marking this domain as spam",
+				),
+			],
+		)
+	}
+
+	/// The same two alarms on the metrics [`ComailDeliverability`] publishes,
+	/// at thresholds under comail's own auto-pause so a warning beats the
+	/// pause.
+	///
+	/// The metrics are written by that scheduled job and by nothing else, so a
+	/// comail stack without it alarms on a metric that never appears, which
+	/// reads exactly like a healthy one. That is why the example treats the job
+	/// as part of what using comail means rather than as optional trim.
+	fn emit_comail_alarms(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+	) -> Result {
+		self.emit_alarms(
+			stack,
+			config,
+			ComailRelay::METRIC_NAMESPACE,
+			ComailRelay::METRIC_DIMENSION,
+			&self.domain,
+			&[
+				(
+					ComailRelay::BOUNCE_RATE_METRIC,
+					ComailRelay::BOUNCE_ALARM_RATE,
+					"bounce rate: comail pauses a domain that stays here",
+				),
+				(
+					ComailRelay::COMPLAINT_RATE_METRIC,
+					ComailRelay::COMPLAINT_ALARM_RATE,
+					"complaint rate: recipients marking this domain as spam",
+				),
+			],
+		)
+	}
+
+	/// One CloudWatch alarm per `(metric, threshold, description)`, all on
+	/// `namespace` scoped by one `dimension`, firing on
+	/// [`alarms_topic`](Self::alarms_topic).
+	///
+	/// Shared by both arms because a reputation alarm is the same statement
+	/// whoever publishes the numbers: only the namespace, the dimension and the
+	/// thresholds are the provider's.
+	fn emit_alarms(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		namespace: &str,
+		dimension: &str,
+		dimension_value: &str,
+		alarms: &[(&str, f64, &str)],
+	) -> Result {
+		let Some(topic) = self.alarms_topic_arn(stack) else {
+			return Ok(());
+		};
+		// the account the apply runs in, since a topic name is not an address
+		config.add_untyped_data_source(
+			"aws_caller_identity",
+			"current",
+			&json!({}),
+		)?;
+		for (metric, threshold, description) in alarms {
 			// UNTYPED, for the same reason the bucket's versioning is: a
 			// reputation threshold is a fraction of a percent and the generated
 			// binding types `threshold` as an integer, so 0.001 would round to
@@ -720,11 +898,9 @@ impl MailDomainBlock {
 				&json!({
 					"alarm_name": format!("{}-{metric}", self.slug()),
 					"alarm_description": format!("{} {description}", self.domain),
-					"namespace": "AWS/SES",
+					"namespace": namespace,
 					"metric_name": metric,
-					"dimensions": {
-						"ses:configuration-set": self.configuration_set_name(),
-					},
+					"dimensions": { dimension: dimension_value },
 					"statistic": "Average",
 					"comparison_operator": "GreaterThanThreshold",
 					"threshold": threshold,
@@ -740,21 +916,67 @@ impl MailDomainBlock {
 		Ok(())
 	}
 
-	/// The records that prove the identity: the three Easy DKIM selectors read
-	/// straight off the identity's computed tokens, and the custom MAIL FROM
-	/// pair. Selector- and subdomain-scoped, so they never collide with another
-	/// provider's records on the same domain.
+	/// The records that prove the identity: the relay's own selectors, and the
+	/// sovereign selector beside them.
+	///
+	/// Every one of them is selector- or subdomain-scoped, so they never
+	/// collide with another provider's records on the same domain, which is
+	/// what makes an [`IdentityOnly`](MailRecords::IdentityOnly) cutover
+	/// possible at all.
 	fn emit_identity_records(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		dns: &DnsProvider,
+		relay: &RelayMode,
+		identity: Option<&ResourceDef<AwsSesv2EmailIdentityDetails>>,
+	) -> Result {
+		if !self.records.proves_identity() {
+			return Ok(());
+		}
+		// the sovereign selector, whose public half arrives as a variable: the
+		// key is minted before the apply rather than by it, so the record and
+		// the signing server read one value from one parameter. Published in
+		// EVERY mode, which is the point of holding a key at all: nothing about
+		// this domain's deliverability depends on a relay's.
+		dns.emit_txt(
+			stack,
+			config,
+			&self.label("dkim-sovereign"),
+			&self.dkim_record_name(),
+			&self.dkim_record_value(),
+		)?;
+		match relay {
+			RelayMode::Ses(_) => {
+				let identity = identity.ok_or_else(|| {
+					bevyhow!(
+						"the SES arm emits its identity before its records"
+					)
+				})?;
+				self.emit_ses_identity_records(stack, config, dns, identity)?;
+			}
+			RelayMode::Comail(_) => {
+				self.emit_comail_identity_records(stack, config, dns)?;
+			}
+			// direct delivery signs with the sovereign key and nothing else,
+			// and has no envelope domain of its own to prove
+			RelayMode::None => {}
+		}
+		Ok(())
+	}
+
+	/// The SES arm's identity records: the three Easy DKIM selectors read
+	/// straight off the identity's computed tokens, and the custom MAIL FROM
+	/// pair whose `MX` and SPF are what ALIGN the envelope sender with the
+	/// header From.
+	fn emit_ses_identity_records(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		dns: &DnsProvider,
 		identity: &ResourceDef<AwsSesv2EmailIdentityDetails>,
 	) -> Result {
-		if !self.records.proves_identity() {
-			return Ok(());
-		}
-		for index in 0..Self::DKIM_TOKENS {
+		for index in 0..SesRelay::DKIM_TOKENS {
 			// the token is only known after apply, so both halves of the record
 			// are field-refs rather than the literal the console would show.
 			let token = identity.field_ref(&format!(
@@ -768,32 +990,57 @@ impl MailDomainBlock {
 				&format!("{token}.dkim.amazonses.com"),
 			)?;
 		}
-		// the sovereign selector, whose public half arrives as a variable: the
-		// key is minted before the apply rather than by it, so the record and
-		// the signing server read one value from one parameter.
-		dns.emit_txt(
-			stack,
-			config,
-			&self.label("dkim-sovereign"),
-			&self.dkim_record_name(),
-			&self.dkim_record_value(),
-		)?;
-		let mail_from = self.mail_from_domain();
+		let mail_from = SesRelay::mail_from_domain(&self.domain);
 		dns.emit_mx(
 			stack,
 			config,
 			&self.label("mail-from-mx"),
 			&mail_from,
 			Self::MX_PRIORITY,
-			&Self::feedback_host(&stack.region()),
+			&SesRelay::feedback_host(&stack.region()),
 		)?;
 		dns.emit_txt(
 			stack,
 			config,
 			&self.label("mail-from-spf"),
 			&mail_from,
-			Self::SPF,
+			SesRelay::SPF,
 		)?;
+		Ok(())
+	}
+
+	/// The comail arm's identity records: two `TXT` selectors off the
+	/// date-based stem enrolment minted, RSA and Ed25519.
+	///
+	/// No custom MAIL FROM pair, and that is not an omission. Comail rewrites
+	/// the envelope sender per recipient to a VERP address at its own domain,
+	/// so a `bounce.<domain>` subdomain would authorise a sender that never
+	/// sends and prove nothing; DMARC passes on the DKIM signature instead.
+	///
+	/// Both values and the stem arrive as variables, resolved from parameter
+	/// store by [`ComailEnroll`], because enrolment mints them somewhere no
+	/// deploy can reach.
+	fn emit_comail_identity_records(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		dns: &DnsProvider,
+	) -> Result {
+		let slug = self.slug();
+		for (label, name, value) in [
+			(
+				"comail-dkim-rsa",
+				ComailRelay::dkim_rsa_record_name(&self.domain, &slug),
+				ComailRelay::dkim_rsa_variable(&slug).tf_var_ref(),
+			),
+			(
+				"comail-dkim-ed",
+				ComailRelay::dkim_ed_record_name(&self.domain, &slug),
+				ComailRelay::dkim_ed_variable(&slug).tf_var_ref(),
+			),
+		] {
+			dns.emit_txt(stack, config, &self.label(label), &name, &value)?;
+		}
 		Ok(())
 	}
 
@@ -802,12 +1049,15 @@ impl MailDomainBlock {
 	/// client finds the server. Every one of them is the dns specification's
 	/// row for this domain, and nothing here names a domain other than the one
 	/// declared.
+	///
+	/// Provider-neutral but for the SPF, which names whatever `relay` is.
 	fn emit_delivery_records(
 		&self,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
 		config: &mut terra::Config,
 		dns: &DnsProvider,
+		relay: &RelayMode,
 	) -> Result {
 		if !self.records.serves_mail() {
 			return Ok(());
@@ -821,7 +1071,16 @@ impl MailDomainBlock {
 			Self::MX_PRIORITY,
 			&self.mail_host,
 		)?;
-		dns.emit_txt(stack, config, &self.label("spf"), domain, Self::SPF)?;
+		// the one delivery record the relay decides: who may send as this
+		// domain is exactly the question a relay answers, so `mx` (the box
+		// itself), an `include:` of the relay, or nothing at all.
+		dns.emit_txt(
+			stack,
+			config,
+			&self.label("spf"),
+			domain,
+			&relay.spf_value(),
+		)?;
 		dns.emit_txt(
 			stack,
 			config,
@@ -911,13 +1170,33 @@ mod tests {
 		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
 	}
 
-	/// The config `blocks` emit against a Sydney stack.
-	fn build_config(blocks: &[MailDomainBlock]) -> terra::Config {
+	/// One domain and the relay composed beside it, ie what a declaration
+	/// authors as `<MailDomainBlock domain=".." {SesRelay}/>`.
+	type Relayed = (MailDomainBlock, RelayMode);
+
+	/// `blocks` each relayed through SES, ie the arrangement every record set
+	/// pinned below was written against.
+	fn ses(blocks: &[MailDomainBlock]) -> Vec<Relayed> {
+		relayed(blocks, RelayMode::Ses(SesRelay::default()))
+	}
+
+	/// `blocks` each relayed through `mode`.
+	fn relayed(blocks: &[MailDomainBlock], mode: RelayMode) -> Vec<Relayed> {
+		blocks
+			.iter()
+			.cloned()
+			.map(|block| (block, mode.clone()))
+			.collect()
+	}
+
+	/// The config `blocks` emit against a Sydney stack, each with its relay
+	/// composed on the same entity.
+	fn build_config(blocks: &[Relayed]) -> terra::Config {
 		let blocks = blocks.to_vec();
 		let (scope, _dir) =
 			RenderScope::test_render_stack(sydney_stack(), |parent| {
-				for block in blocks {
-					parent.spawn(block);
+				for (block, mode) in blocks {
+					mode.insert(&mut parent.spawn(block));
 				}
 			});
 		scope.finish().unwrap().2
@@ -927,7 +1206,7 @@ mod tests {
 	/// interpolation in the name collapsed to `<dkim-N>`. The dns specification
 	/// is a table of exactly these two columns, so the tests read as the table
 	/// does rather than as terraform.
-	fn records(blocks: &[MailDomainBlock]) -> Vec<(String, String)> {
+	fn records(blocks: &[Relayed]) -> Vec<(String, String)> {
 		record_values(blocks)
 			.into_iter()
 			.map(|(record_type, name, _)| (record_type, collapse_refs(&name)))
@@ -951,9 +1230,7 @@ mod tests {
 
 	/// As [`records`], with each record's content (`data.target` for the `SRV`s,
 	/// which carry no `content`).
-	fn record_values(
-		blocks: &[MailDomainBlock],
-	) -> Vec<(String, String, String)> {
+	fn record_values(blocks: &[Relayed]) -> Vec<(String, String, String)> {
 		let json = build_config(blocks).to_json().into_json();
 		let Some(Value::Object(records)) = json
 			.get("resource")
@@ -993,7 +1270,7 @@ mod tests {
 	/// without saying so.
 	#[beet_core::test]
 	fn staging_domain_emits_the_specification() {
-		records(&[staging()])
+		records(&ses(&[staging()]))
 			.into_iter()
 			.map(|(record_type, name)| format!("{record_type} {name}"))
 			.collect::<Vec<_>>()
@@ -1022,8 +1299,8 @@ mod tests {
 	/// key the server signs with one value from one parameter.
 	#[beet_core::test]
 	fn the_sovereign_selector_reads_the_minted_key() {
-		let config = build_config(&[staging()]);
-		record_values(&[staging()])
+		let config = build_config(&ses(&[staging()]));
+		record_values(&ses(&[staging()]))
 			.into_iter()
 			.find(|(_, name, _)| name.starts_with("stalwart._domainkey."))
 			.unwrap()
@@ -1040,10 +1317,11 @@ mod tests {
 
 	/// Nothing consumes a sending domain's events until a topic is named, and a
 	/// reputation alarm with nowhere to fire is worse than none: it reads as
-	/// monitoring. So both are emitted together or not at all.
+	/// monitoring. So each arrives with the topic that names it, and neither
+	/// without.
 	#[beet_core::test]
-	fn events_and_alarms_arrive_with_the_topic() {
-		build_config(&[staging()])
+	fn events_and_alarms_arrive_with_their_topics() {
+		build_config(&ses(&[staging()]))
 			.to_json_string()
 			.unwrap()
 			.as_str()
@@ -1052,10 +1330,14 @@ mod tests {
 			.xnot()
 			.xpect_contains("aws_sesv2_configuration_set_event_destination");
 
-		let json =
-			build_config(&[staging().with_events_topic("beetmash-ses-events")])
-				.to_json()
-				.into_json();
+		let json = build_config(&[(
+			staging().with_alarms_topic("beetmash-ses-events"),
+			RelayMode::Ses(
+				SesRelay::default().with_events_topic("beetmash-ses-events"),
+			),
+		)])
+		.to_json()
+		.into_json();
 		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
 			.as_object()
 			.unwrap()
@@ -1085,7 +1367,7 @@ mod tests {
 			.as_array()
 			.unwrap()
 			.len()
-			.xpect_eq(MailDomainBlock::EVENT_TYPES.len());
+			.xpect_eq(SesRelay::EVENT_TYPES.len());
 	}
 
 	/// Exactly one SPF record per NAME, which is the invariant that makes the
@@ -1095,7 +1377,7 @@ mod tests {
 	#[beet_core::test]
 	fn one_spf_record_per_name() {
 		let mut names = HashMap::<String, usize>::default();
-		for (_, name, _) in record_values(&[staging(), news()])
+		for (_, name, _) in record_values(&ses(&[staging(), news()]))
 			.into_iter()
 			.filter(|(record_type, _, content)| {
 				record_type == "TXT" && content.starts_with("v=spf1")
@@ -1113,7 +1395,7 @@ mod tests {
 	/// taken off a live provider.
 	#[beet_core::test]
 	fn staging_never_touches_the_apex() {
-		for (_, name) in records(&[staging(), news()]) {
+		for (_, name) in records(&ses(&[staging(), news()])) {
 			// a record AT the apex, rather than one merely under it
 			["beetmash.com", "_dmarc.beetmash.com"]
 				.contains(&name.as_str())
@@ -1130,7 +1412,7 @@ mod tests {
 		let apex = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
 			.with_records(MailRecords::IdentityOnly)
 			.with_dns(DnsProvider::cloudflare("beetmash.com", "zone123"));
-		records(&[apex])
+		records(&ses(&[apex]))
 			.into_iter()
 			.map(|(record_type, name)| format!("{record_type} {name}"))
 			.collect::<Vec<_>>()
@@ -1159,7 +1441,10 @@ mod tests {
 			let (scope, _dir) = RenderScope::test_render_stack(
 				Stack::new("beet_infra").with_stage(stage),
 				|parent| {
-					parent.spawn(staging().with_dns_stage("prod"));
+					parent.spawn((
+						staging().with_dns_stage("prod"),
+						SesRelay::default(),
+					));
 				},
 			);
 			scope.finish().unwrap().2.to_json().into_json()
@@ -1202,7 +1487,10 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render_stack(
 			Stack::new("beet_infra").with_stage("drill"),
 			|parent| {
-				parent.spawn(staging().with_dns_stage("prod"));
+				parent.spawn((
+					staging().with_dns_stage("prod"),
+					SesRelay::default(),
+				));
 			},
 		);
 		scope.finish().unwrap().2.to_json().into_json()["variable"]
@@ -1218,8 +1506,8 @@ mod tests {
 	fn records_none_emits_no_records() {
 		let block = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
 			.with_records(MailRecords::None);
-		records(&[block.clone()]).xpect_eq(Vec::new());
-		build_config(&[block])
+		records(&ses(&[block.clone()])).xpect_eq(Vec::new());
+		build_config(&ses(&[block]))
 			.to_json_string()
 			.unwrap()
 			.xpect_contains("aws_sesv2_email_identity");
@@ -1230,7 +1518,7 @@ mod tests {
 	/// re-apply and not a hunt through the zone.
 	#[beet_core::test]
 	fn dkim_records_reference_the_identity_outputs() {
-		let (_, _, content) = record_values(&[staging()])
+		let (_, _, content) = record_values(&ses(&[staging()]))
 			.into_iter()
 			.find(|(_, name, _)| name.contains("._domainkey."))
 			.unwrap();
@@ -1245,7 +1533,7 @@ mod tests {
 	/// stack-composed: `stalwart-beetmash-com`, not `beet-infra--dev--...`.
 	#[beet_core::test]
 	fn configuration_set_is_named_from_the_domain() {
-		build_config(&[staging(), news()])
+		build_config(&ses(&[staging(), news()]))
 			.to_json_string()
 			.unwrap()
 			.xpect_contains(
@@ -1258,7 +1546,7 @@ mod tests {
 	/// relocated stack moves it without the block naming a region at all.
 	#[beet_core::test]
 	fn mail_from_mx_follows_the_stack_region() {
-		record_values(&[staging()])
+		record_values(&ses(&[staging()]))
 			.into_iter()
 			.find(|(record_type, name, _)| {
 				record_type == "MX" && name.starts_with("bounce.")
@@ -1274,7 +1562,7 @@ mod tests {
 	/// the declared report domain rather than assuming their own.
 	#[beet_core::test]
 	fn reports_are_addressed_to_the_report_domain() {
-		let values = record_values(&[news()]);
+		let values = record_values(&ses(&[news()]));
 		let content = |name: &str| {
 			values
 				.iter()
@@ -1291,6 +1579,7 @@ mod tests {
 			.xpect_eq("v=TLSRPTv1; rua=mailto:tlsrpt@stalwart.beetmash.com");
 	}
 
+
 	/// The policy body names the box, not the domain: a sender matches the
 	/// certificate the box presents, which is the same certificate whichever
 	/// domain the mail was addressed to.
@@ -1301,7 +1590,7 @@ mod tests {
 			.as_str()
 			.xpect_eq("version: STSv1\r\nmode: testing\r\nmx: mail.beetmash.com\r\nmax_age: 604800\r\n");
 		// ..and the record advertising it is published for the domain
-		records(&[staging()])
+		records(&ses(&[staging()]))
 			.contains(&(
 				"TXT".to_string(),
 				"_mta-sts.stalwart.beetmash.com".to_string(),
@@ -1334,5 +1623,163 @@ mod tests {
 			.xpect_contains("reserved hostname");
 		block(base().with_catch_all("publications"))
 			.xpect_contains("catch-all");
+	}
+
+	/// A comail domain declares nothing in AWS at all: no identity, no
+	/// configuration set, no IAM. What it publishes is the two selectors
+	/// enrolment minted and an SPF that includes the relay, both of which sit
+	/// beside the sovereign selector rather than replacing it.
+	#[beet_core::test]
+	fn a_comail_domain_publishes_two_selectors_and_no_aws() {
+		let blocks =
+			relayed(&[news()], RelayMode::Comail(ComailRelay::default()));
+		build_config(&blocks)
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_sesv2")
+			.xnot()
+			.xpect_contains("aws_iam")
+			.xnot()
+			.xpect_contains("amazonses.com");
+		let names = records(&blocks)
+			.into_iter()
+			.map(|(record_type, name)| format!("{record_type} {name}"))
+			.collect::<Vec<_>>();
+		// the selector stem is a variable, so the interpolation collapses to
+		// `<dkim->` the way a computed SES token does
+		names
+			.iter()
+			.filter(|name| name.contains("_domainkey"))
+			.cloned()
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"TXT <dkim->e._domainkey.news.beetmash.com".to_string(),
+				"TXT <dkim->r._domainkey.news.beetmash.com".to_string(),
+				"TXT stalwart._domainkey.news.beetmash.com".to_string(),
+			]);
+		// and NO envelope-sender subdomain: comail rewrites MAIL FROM to a VERP
+		// address at its own domain, so a `bounce.` pair would authorise a
+		// sender that never sends
+		names
+			.iter()
+			.any(|name| name.contains("bounce."))
+			.xpect_false();
+		record_values(&blocks)
+			.into_iter()
+			.find(|(record_type, name, content)| {
+				record_type == "TXT"
+					&& name == "news.beetmash.com"
+					&& content.starts_with("v=spf1")
+			})
+			.unwrap()
+			.2
+			.as_str()
+			.xpect_eq("v=spf1 include:atmos.email ~all");
+	}
+
+	/// A domain with no relay delivers straight to each recipient's MX, so its
+	/// SPF authorises the box by the `mx` mechanism (the box IS the domain's
+	/// MX target) and nothing else, and it holds one selector: its own.
+	#[beet_core::test]
+	fn a_direct_domain_authorises_its_own_mx() {
+		let blocks = relayed(&[news()], RelayMode::None);
+		build_config(&blocks)
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("aws_sesv2")
+			.xnot()
+			.xpect_contains("amazonses.com")
+			.xnot()
+			.xpect_contains("atmos.email");
+		records(&blocks)
+			.into_iter()
+			.map(|(record_type, name)| format!("{record_type} {name}"))
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"CNAME autoconfig.news.beetmash.com",
+				"CNAME autodiscover.news.beetmash.com",
+				"MX news.beetmash.com",
+				"SRV _imaps._tcp.news.beetmash.com",
+				"SRV _jmap._tcp.news.beetmash.com",
+				"SRV _submissions._tcp.news.beetmash.com",
+				"TXT _dmarc.news.beetmash.com",
+				"TXT _mta-sts.news.beetmash.com",
+				"TXT _smtp._tls.news.beetmash.com",
+				"TXT news.beetmash.com",
+				"TXT stalwart._domainkey.news.beetmash.com",
+			]);
+		record_values(&blocks)
+			.into_iter()
+			.find(|(_, name, content)| {
+				name == "news.beetmash.com" && content.starts_with("v=spf1")
+			})
+			.unwrap()
+			.2
+			.as_str()
+			.xpect_eq("v=spf1 mx -all");
+	}
+
+	/// The comail arm alarms on the metrics its poll publishes, under the rates
+	/// comail itself pauses a domain at, and fires on the provider-neutral
+	/// topic rather than on a SES event stream it does not have.
+	#[beet_core::test]
+	fn comail_alarms_sit_below_the_auto_pause() {
+		let json = build_config(&[(
+			news().with_alarms_topic("beetmash-mail-alarms"),
+			RelayMode::Comail(ComailRelay::default()),
+		)])
+		.to_json()
+		.into_json();
+		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
+			.as_object()
+			.unwrap()
+			.values()
+			.collect::<Vec<_>>();
+		alarms.len().xpect_eq(2);
+		for alarm in alarms {
+			alarm["namespace"].as_str().unwrap().xpect_eq("Comail");
+			alarm["dimensions"]["Domain"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("news.beetmash.com");
+			alarm["alarm_actions"][0]
+				.as_str()
+				.unwrap()
+				.xpect_contains("beetmash-mail-alarms");
+			let threshold = alarm["threshold"].as_f64().unwrap();
+			threshold.xpect_greater_than(0.);
+			threshold.xpect_less_than(ComailRelay::PAUSE_BOUNCE_RATE);
+		}
+		// no SES event stream exists to point at, and none is emitted
+		json["resource"]["aws_sesv2_configuration_set_event_destination"]
+			.is_null()
+			.xpect_true();
+	}
+
+	/// A comail domain hands the apply the three values enrolment minted, and
+	/// declares them, for the same reason the sovereign key is handed over: a
+	/// variable that only defaults resolves to empty, and an empty selector
+	/// record is a REVOKED one.
+	#[beet_core::test]
+	fn a_comail_domain_declares_its_enrolled_records() {
+		let blocks =
+			relayed(&[news()], RelayMode::Comail(ComailRelay::default()));
+		let variables = build_config(&blocks).to_json().into_json()["variable"]
+			.as_object()
+			.unwrap()
+			.keys()
+			.cloned()
+			.collect::<HashSet<_>>();
+		for suffix in ["dkim_selector", "dkim_rsa", "dkim_ed"] {
+			variables
+				.contains(&format!("comail_{suffix}_news_beetmash_com"))
+				.xpect_true();
+		}
+		// ..and the sovereign key's, which every mode keeps
+		variables.contains("dkim_news_beetmash_com").xpect_true();
 	}
 }

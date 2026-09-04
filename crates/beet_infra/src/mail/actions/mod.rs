@@ -7,6 +7,10 @@
 //! nobody declared. These are the steps that close those gaps, and each one is
 //! a verb rather than a resource: idempotent, safe to re-run, and reporting
 //! what it converged.
+mod comail_deliverability;
+pub use comail_deliverability::*;
+mod comail_enroll;
+pub use comail_enroll::*;
 mod dkim_key;
 pub use dkim_key::*;
 mod eip_reverse_dns;

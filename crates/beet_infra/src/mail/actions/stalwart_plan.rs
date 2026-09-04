@@ -26,8 +26,17 @@ pub struct StalwartPlan {
 	pub acme_contact: String,
 	/// One listener per open port.
 	pub listeners: Vec<Value>,
-	/// The relay route every outbound message takes, ie SES.
-	pub relay: Value,
+	/// The relay routes outbound mail takes, one per distinct credential: a
+	/// shared `ses` route when any domain relays through SES, plus one
+	/// `comail-<slug>` per enrolled domain.
+	pub relays: Vec<Value>,
+	/// Which route each RELAYED domain's mail leaves on, as
+	/// `(sender domain, route name)` in declaration order. A domain delivering
+	/// directly is absent, which is what makes it fall through to `mx`.
+	pub routing: Vec<(SmolStr, String)>,
+	/// The route the outbound strategy falls through to: `mx` when any domain
+	/// delivers directly, else the route the most domains relay through.
+	pub fallback: String,
 	/// The domains served, in declaration order.
 	pub domains: Vec<DomainPlan>,
 }
@@ -86,14 +95,14 @@ impl StalwartPlan {
 	pub const ACME_DIRECTORY: &'static str =
 		"https://acme-v02.api.letsencrypt.org/directory";
 
-	/// The route name the outbound strategy sends every remote message to. Not
-	/// `mx`: an MTA relaying through SES never dials a recipient's MX itself,
-	/// which is the entire point of not fighting an IP's reputation.
-	pub const RELAY_ROUTE: &'static str = "ses";
-
 	/// The route name Stalwart delivers local mail on, which is the one branch
-	/// of the outbound strategy that must survive the relay override.
+	/// of the outbound strategy that must survive any relay override.
 	pub const LOCAL_ROUTE: &'static str = "local";
+
+	/// Stalwart's built-in route, ie dial the recipient's own `MX`. What an
+	/// unconfigured server does, and what a domain declaring no relay wants:
+	/// the box delivers its own mail on its own address.
+	pub const MX_ROUTE: &'static str = "mx";
 
 	/// The listeners a freshly claimed server seeds that this stack does not
 	/// declare, and which provision therefore removes.
@@ -113,9 +122,16 @@ impl StalwartPlan {
 	/// Read the plan off the blocks that declared it.
 	///
 	/// `admin_contact` is the address ACME registers and reports are addressed
-	/// to; `ses` is the SMTP credential the relay route authenticates with,
-	/// read from parameter store by the caller rather than by the plan, so a
-	/// rendered plan can be asserted without a secret in it.
+	/// to; `relays` is each domain's resolved provider and `credentials` holds
+	/// one SMTP credential per ROUTE, read from parameter store by the caller
+	/// rather than by the plan, so a rendered plan can be asserted without a
+	/// secret in it.
+	///
+	/// Routing is per SENDER domain rather than one blanket override, because a
+	/// comail credential pins the single domain its session may send from
+	/// (`internal/relay/smtp.go:391`): two enrolled domains are two routes with
+	/// two credentials, and handing either's mail to the other's route is a
+	/// `550 Sender domain must be ...`.
 	///
 	/// Only the domains whose records this stack serves are planned. An
 	/// [`IdentityOnly`](MailRecords::IdentityOnly) domain is a cutover
@@ -143,14 +159,25 @@ impl StalwartPlan {
 	pub fn new(
 		mail_box: &StalwartBlock,
 		domains: &[MailDomainBlock],
+		relays: &RelayModes,
 		stack: &ResolvedStack,
 		admin_contact: &str,
-		ses: &SesCredential,
+		credentials: &HashMap<String, RelayCredential>,
 	) -> Result<Self> {
 		let hostname = mail_box.hostname().clone();
-		let domains = domains
+		let served = domains
 			.iter()
 			.filter(|domain| domain.records().serves_mail())
+			.collect::<Vec<_>>();
+		let (routes, routing) =
+			Self::relay_routes(&served, relays, stack, credentials)?;
+		// a served domain with no route is a domain delivering directly, which
+		// is read off the routing rather than off `relays`: a stack renders
+		// from the domains it declared, and a mode map missing one of them
+		// would otherwise silently put its mail behind somebody else's relay.
+		let any_direct = routing.len() < served.len();
+		let domains = served
+			.iter()
 			.enumerate()
 			.map(|(index, domain)| {
 				DomainPlan::new(domain, mail_box, index == 0)
@@ -162,10 +189,83 @@ impl StalwartPlan {
 				.iter()
 				.filter_map(|(port, service)| Self::listener(*port, service))
 				.collect(),
-			relay: Self::relay(stack, ses),
+			fallback: Self::fallback(&routing, any_direct),
+			relays: routes,
+			routing,
 			hostname,
 			domains,
 		})
+	}
+
+	/// The relay routes the served domains add up to, and which route each
+	/// relayed domain's mail leaves on.
+	///
+	/// One shared [`SES_ROUTE`](SesRelay::ROUTE) however many domains relay
+	/// through SES, and one route per COMAIL domain however few. Deliberately
+	/// asymmetric, because the credentials are: SES's one IAM user sends for
+	/// every identity in the account, while a comail key is issued per enrolled
+	/// domain and pins it.
+	fn relay_routes(
+		served: &[&MailDomainBlock],
+		relays: &RelayModes,
+		stack: &ResolvedStack,
+		credentials: &HashMap<String, RelayCredential>,
+	) -> Result<(Vec<Value>, Vec<(SmolStr, String)>)> {
+		let mut routes = Vec::new();
+		let mut routing = Vec::new();
+		let mut seen = HashSet::<String>::default();
+		for domain in served {
+			let relay = relays.get(domain.domain());
+			let Some(name) = relay.route_name(&domain.slug()) else {
+				continue;
+			};
+			routing.push((domain.domain().clone(), name.clone()));
+			if !seen.insert(name.clone()) {
+				continue;
+			}
+			let credential = credentials.get(&name).ok_or_else(|| {
+				bevyhow!(
+					"no credential for the '{name}' relay route, which \
+					'{}' sends on",
+					domain.domain()
+				)
+			})?;
+			routes.push(match relay {
+				RelayMode::Ses(_) => Self::ses_route(stack, credential),
+				RelayMode::Comail(comail) => {
+					Self::comail_route(&name, comail, credential)
+				}
+				RelayMode::None => continue,
+			});
+		}
+		Ok((routes, routing))
+	}
+
+	/// Where a message whose sender domain matched no route goes: `mx` if any
+	/// served domain delivers directly, else whichever route the most domains
+	/// use.
+	///
+	/// The fallback is only ever reached by mail this stack's own domains did
+	/// not send (a DMARC report addressed from the box's primary, a DSN), so
+	/// the rule is deterministic rather than clever: honour a stack that has
+	/// declared direct delivery anywhere, and otherwise stay behind the relay
+	/// the stack mostly uses.
+	fn fallback(routing: &[(SmolStr, String)], any_direct: bool) -> String {
+		if any_direct || routing.is_empty() {
+			return Self::MX_ROUTE.to_string();
+		}
+		let mut counts = HashMap::<&String, usize>::default();
+		for (_, route) in routing {
+			*counts.entry(route).or_default() += 1;
+		}
+		counts
+			.into_iter()
+			// count first, then name, so a tie resolves the same way every run
+			.max_by(|left, right| {
+				left.1.cmp(&right.1).then_with(|| right.0.cmp(left.0))
+			})
+			.map(|(route, _)| route.clone())
+			.unwrap_or_else(|| Self::MX_ROUTE.to_string())
 	}
 
 	/// The ACME provider object, ie how every certificate is obtained.
@@ -208,43 +308,99 @@ impl StalwartPlan {
 		.xmap(Some)
 	}
 
-	/// The relay route: every outbound message submitted to SES on 587 with
+	/// The SES relay route: every outbound message submitted to SES on 587 with
 	/// STARTTLS, authenticating as the dedicated sending user.
 	///
 	/// `implicitTls: false` and port 587 rather than 465 because that is the
 	/// endpoint SES documents for SMTP relay; the session is still TLS, just
 	/// negotiated after the greeting.
-	fn relay(stack: &ResolvedStack, ses: &SesCredential) -> Value {
+	fn ses_route(stack: &ResolvedStack, credential: &RelayCredential) -> Value {
+		Self::route(
+			SesRelay::ROUTE,
+			"Amazon SES relay",
+			&SesRelay::smtp_endpoint(stack),
+			587,
+			credential,
+		)
+	}
+
+	/// One enrolled domain's comail route, on the same 587 STARTTLS shape.
+	///
+	/// There is no implicit-TLS port to prefer here: the relay serves 587 and
+	/// only 587 (`cmd/relay/submission.go`), so the session negotiates or it
+	/// does not open.
+	fn comail_route(
+		name: &str,
+		comail: &ComailRelay,
+		credential: &RelayCredential,
+	) -> Value {
+		Self::route(
+			name,
+			&format!("comail relay via {}", comail.host()),
+			comail.host(),
+			ComailRelay::SMTP_PORT,
+			credential,
+		)
+	}
+
+	/// One `Relay` route object.
+	fn route(
+		name: &str,
+		description: &str,
+		address: &str,
+		port: i64,
+		credential: &RelayCredential,
+	) -> Value {
 		json!({
 			"@type": "Relay",
-			"name": Self::RELAY_ROUTE,
-			"description": "Amazon SES relay",
-			"address": StalwartBlock::ses_smtp_endpoint(stack),
-			"port": 587,
+			"name": name,
+			"description": description,
+			"address": address,
+			"port": port,
 			"protocol": "smtp",
 			"implicitTls": false,
 			"allowInvalidCerts": false,
-			"authUsername": ses.username,
-			"authSecret": { "@type": "Value", "secret": ses.password },
+			"authUsername": credential.username,
+			"authSecret": { "@type": "Value", "secret": credential.password },
 		})
 	}
 
-	/// The outbound strategy patch that puts [`RELAY_ROUTE`](Self::RELAY_ROUTE)
-	/// in front of every remote delivery.
+	/// The outbound strategy patch: local mail first, then each relayed domain
+	/// matched by its SENDER domain, then everything else on
+	/// [`fallback`](Self::fallback).
 	///
-	/// The local branch is restated rather than dropped: without it a message
-	/// between two mailboxes on this server would be handed to SES and arrive
-	/// back through the front door, which is a loop with a bill attached.
+	/// The local branch is restated rather than dropped, and stays FIRST:
+	/// without it a message between two mailboxes on this server would be
+	/// handed to a relay and arrive back through the front door, which is a
+	/// loop with a bill attached.
+	///
+	/// Sender domain rather than one blanket override, because that is the only
+	/// key that can tell two comail credentials apart: the recipient says
+	/// nothing about which of our domains is sending.
 	pub fn outbound_strategy(&self) -> Value {
+		// a `List` on the wire is an object keyed by index, never an array,
+		// exactly like an account's aliases
+		let mut branches = serde_json::Map::new();
+		branches.insert(
+			"0".to_string(),
+			json!({
+				"if": "is_local_domain(rcpt_domain)",
+				"then": format!("'{}'", Self::LOCAL_ROUTE),
+			}),
+		);
+		for (index, (domain, route)) in self.routing.iter().enumerate() {
+			branches.insert(
+				(index + 1).to_string(),
+				json!({
+					"if": format!("sender_domain == '{domain}'"),
+					"then": format!("'{route}'"),
+				}),
+			);
+		}
 		json!({
 			"route": {
-				"else": format!("'{}'", Self::RELAY_ROUTE),
-				// a `List` on the wire is an object keyed by index, never an
-				// array, exactly like an account's aliases
-				"match": { "0": {
-					"if": "is_local_domain(rcpt_domain)",
-					"then": format!("'{}'", Self::LOCAL_ROUTE),
-				}},
+				"else": format!("'{}'", self.fallback),
+				"match": Value::Object(branches),
 			}
 		})
 	}
@@ -338,13 +494,17 @@ impl StalwartPlan {
 	}
 }
 
-/// The SES SMTP credential the relay route authenticates with, read out of the
-/// two parameters terraform parked it in.
+/// The SMTP credential one relay route authenticates with, read out of the
+/// parameters it was parked in.
 ///
 /// A pair rather than two loose strings so a caller cannot hand the password in
-/// as the username, which SES would report only as a delivery failure.
+/// as the username, which either provider would report only as a delivery
+/// failure. The two arms park it differently and mean different things by it:
+/// SES's pair is an IAM access key id and its derived SMTP password, written by
+/// terraform; comail's is the enrolled DID and its `atmos_…` api key, written
+/// by the operator from the enrolment response.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SesCredential {
+pub struct RelayCredential {
 	pub username: String,
 	pub password: String,
 }
@@ -587,16 +747,47 @@ mod tests {
 			.with_catch_all("publications")
 	}
 
+	/// Every domain relayed through `mode`, ie the arrangement a stack that
+	/// declares one relay above its domains resolves to.
+	fn all(domains: &[MailDomainBlock], mode: RelayMode) -> RelayModes {
+		let mut relays = RelayModes::default();
+		for domain in domains {
+			relays.insert(domain.domain().clone(), mode.clone());
+		}
+		relays
+	}
+
+	/// One credential per route name, with the password naming the route so an
+	/// assertion can tell two comail credentials apart.
+	fn credentials(names: &[&str]) -> HashMap<String, RelayCredential> {
+		names
+			.iter()
+			.map(|name| {
+				(name.to_string(), RelayCredential {
+					username: format!("user-{name}"),
+					password: format!("password-{name}"),
+				})
+			})
+			.collect()
+	}
+
+	/// The all-SES plan, ie exactly what this stack rendered before a domain
+	/// could relay through anything else.
 	fn plan() -> StalwartPlan {
+		let domains = [staging(), news()];
 		StalwartPlan::new(
 			&mail_box(),
-			&[staging(), news()],
+			&domains,
+			&all(&domains, RelayMode::Ses(SesRelay::default())),
 			&stack(),
 			"postmaster@stalwart.beetmash.com",
-			&SesCredential {
-				username: "AKIATEST".into(),
-				password: "smtp-derived-password".into(),
-			},
+			&HashMap::from_iter([(
+				SesRelay::ROUTE.to_string(),
+				RelayCredential {
+					username: "AKIATEST".into(),
+					password: "smtp-derived-password".into(),
+				},
+			)]),
 		)
 		.unwrap()
 	}
@@ -653,24 +844,27 @@ mod tests {
 		implicit("https").xpect_true();
 	}
 
-	/// The relay is the whole outbound design: SES on 587, authenticating with
-	/// the credential terraform derived, and never dialling a recipient's MX.
+	/// The relay is the whole outbound design when SES carries it: one route on
+	/// 587, authenticating with the credential terraform derived, and never
+	/// dialling a recipient's MX.
 	#[beet_core::test]
 	fn outbound_goes_to_ses_and_local_mail_does_not() {
 		let plan = plan();
-		plan.relay["@type"].as_str().unwrap().xpect_eq("Relay");
-		plan.relay["address"]
+		plan.relays.len().xpect_eq(1);
+		let relay = &plan.relays[0];
+		relay["@type"].as_str().unwrap().xpect_eq("Relay");
+		relay["name"].as_str().unwrap().xpect_eq("ses");
+		relay["address"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("email-smtp.ap-southeast-2.amazonaws.com");
-		plan.relay["port"].as_i64().unwrap().xpect_eq(587);
-		plan.relay["implicitTls"].as_bool().unwrap().xpect_false();
-		plan.relay["authUsername"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("AKIATEST");
+		relay["port"].as_i64().unwrap().xpect_eq(587);
+		relay["implicitTls"].as_bool().unwrap().xpect_false();
+		relay["authUsername"].as_str().unwrap().xpect_eq("AKIATEST");
 
 		let strategy = plan.outbound_strategy();
+		// every served domain is matched by name, and anything else falls
+		// through to the only relay the stack has
 		strategy["route"]["else"]
 			.as_str()
 			.unwrap()
@@ -682,6 +876,144 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("'local'");
+		strategy["route"]["match"]["1"]["if"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("sender_domain == 'stalwart.beetmash.com'");
+		strategy["route"]["match"]["1"]["then"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("'ses'");
+	}
+
+	/// Two comail domains are TWO routes with two credentials, never one shared
+	/// route: the submission gate rejects an envelope sender whose domain is
+	/// not the one the key enrolled
+	/// (`internal/relay/smtp.go:391-403`, `550 Sender domain must be ...`), so
+	/// a shared route would deliver one domain's mail and 550 the other's.
+	#[beet_core::test]
+	fn each_comail_domain_gets_its_own_route_and_credential() {
+		let domains = [staging(), news()];
+		let plan = StalwartPlan::new(
+			&mail_box(),
+			&domains,
+			&all(&domains, RelayMode::Comail(ComailRelay::default())),
+			&stack(),
+			"postmaster@stalwart.beetmash.com",
+			&credentials(&[
+				"comail-stalwart-beetmash-com",
+				"comail-news-beetmash-com",
+			]),
+		)
+		.unwrap();
+		plan.relays
+			.iter()
+			.map(|relay| {
+				(
+					relay["name"].as_str().unwrap().to_string(),
+					relay["authUsername"].as_str().unwrap().to_string(),
+					relay["address"].as_str().unwrap().to_string(),
+					relay["port"].as_i64().unwrap(),
+				)
+			})
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				(
+					"comail-stalwart-beetmash-com".to_string(),
+					"user-comail-stalwart-beetmash-com".to_string(),
+					"smtp.atmos.email".to_string(),
+					587,
+				),
+				(
+					"comail-news-beetmash-com".to_string(),
+					"user-comail-news-beetmash-com".to_string(),
+					"smtp.atmos.email".to_string(),
+					587,
+				),
+			]);
+		let strategy = plan.outbound_strategy();
+		strategy["route"]["match"]["1"]["then"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("'comail-stalwart-beetmash-com'");
+		strategy["route"]["match"]["2"]["then"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("'comail-news-beetmash-com'");
+	}
+
+	/// A mixed stack routes each sender domain to its own provider and falls
+	/// through to `mx`: local first, then one branch per relayed domain, then
+	/// direct delivery for everything else.
+	#[beet_core::test]
+	fn a_mixed_stack_routes_by_sender_domain() {
+		let domains = [staging(), news()];
+		let mut relays = RelayModes::default();
+		relays.insert("news.beetmash.com", RelayMode::Comail(default()));
+		// `staging` declares nothing, so it delivers directly
+		let plan = StalwartPlan::new(
+			&mail_box(),
+			&domains,
+			&relays,
+			&stack(),
+			"postmaster@stalwart.beetmash.com",
+			&credentials(&["comail-news-beetmash-com"]),
+		)
+		.unwrap();
+		plan.relays.len().xpect_eq(1);
+		let strategy = plan.outbound_strategy();
+		strategy["route"]["match"]["0"]["then"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("'local'");
+		strategy["route"]["match"]["1"]["if"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("sender_domain == 'news.beetmash.com'");
+		// the direct domain has no branch at all, which is what makes it fall
+		// through to the box's own MX delivery
+		strategy["route"]["match"]["2"].is_null().xpect_true();
+		strategy["route"]["else"].as_str().unwrap().xpect_eq("'mx'");
+	}
+
+	/// A stack with no relay anywhere declares no route at all and delivers
+	/// every message itself, which is what a fresh `<MailDomainBlock/>` means.
+	#[beet_core::test]
+	fn no_relay_declares_no_route() {
+		let domains = [staging()];
+		let plan = StalwartPlan::new(
+			&mail_box(),
+			&domains,
+			&RelayModes::default(),
+			&stack(),
+			"postmaster@stalwart.beetmash.com",
+			&HashMap::default(),
+		)
+		.unwrap();
+		plan.relays.xpect_eq(Vec::<serde_json::Value>::new());
+		plan.outbound_strategy()["route"]["else"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("'mx'");
+	}
+
+	/// A route with no credential is a relay the box would authenticate to as
+	/// nobody, so it fails naming the route rather than rendering a plan that
+	/// 535s on the first message.
+	#[beet_core::test]
+	fn a_route_without_a_credential_fails() {
+		let domains = [news()];
+		StalwartPlan::new(
+			&mail_box(),
+			&domains,
+			&all(&domains, RelayMode::Comail(ComailRelay::default())),
+			&stack(),
+			"postmaster@stalwart.beetmash.com",
+			&HashMap::default(),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("no credential for the 'comail-news-beetmash-com'");
 	}
 
 	/// The certificate must cover every name a client opens TLS to, and the
@@ -732,15 +1064,14 @@ mod tests {
 	fn a_cutover_staged_domain_is_not_provisioned() {
 		let apex = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
 			.with_records(MailRecords::IdentityOnly);
+		let domains = [staging(), news(), apex];
 		let plan = StalwartPlan::new(
 			&mail_box(),
-			&[staging(), news(), apex],
+			&domains,
+			&all(&domains, RelayMode::Ses(SesRelay::default())),
 			&stack(),
 			"postmaster@stalwart.beetmash.com",
-			&SesCredential {
-				username: "AKIATEST".into(),
-				password: "smtp-derived-password".into(),
-			},
+			&credentials(&[SesRelay::ROUTE]),
 		)
 		.unwrap();
 		plan.domains
@@ -821,15 +1152,14 @@ mod tests {
 				.with_mailbox(
 					Mailbox::new("pete").with_admin(true).with_member("pete"),
 				);
+		let domains = [domain];
 		StalwartPlan::new(
 			&mail_box(),
-			&[domain],
+			&domains,
+			&all(&domains, RelayMode::Ses(SesRelay::default())),
 			&stack(),
 			"postmaster@stalwart.beetmash.com",
-			&SesCredential {
-				username: "AKIATEST".into(),
-				password: "x".into(),
-			},
+			&credentials(&[SesRelay::ROUTE]),
 		)
 		.unwrap()
 		.domains[0]
@@ -915,12 +1245,12 @@ mod tests {
 	/// The plan carries the secret only where the relay route needs it, and a
 	/// rendered plan is otherwise safe to log: everything else is names.
 	#[beet_core::test]
-	fn the_ses_password_appears_only_on_the_relay_route() {
+	fn the_relay_password_appears_only_on_the_relay_route() {
 		let plan = plan();
 		let rendered =
 			serde_json::to_string(&plan.domains[0].object("acme1")).unwrap();
 		rendered.contains("smtp-derived-password").xpect_false();
-		plan.relay["authSecret"]["secret"]
+		plan.relays[0]["authSecret"]["secret"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("smtp-derived-password");

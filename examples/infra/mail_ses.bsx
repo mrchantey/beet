@@ -1,0 +1,104 @@
+<!--
+# Mail, relayed through Amazon SES
+
+`mail.bsx` minus nothing and plus one spread. The stack is the same box, the
+same database, the same buckets and the same domain; the only difference is
+`{SesRelay}` beside the `<MailDomainBlock/>`, and everything below follows from
+it.
+
+## What the spread adds
+
+A sending identity per domain, and a configuration set beside it that collects
+reputation metrics and suppresses addresses that bounce or complain, scoped to
+this domain so a newsletter cannot suppress anyone's mail but its own. Three
+Easy DKIM `CNAME`s whose selector tokens are computed by the apply. A custom
+MAIL FROM subdomain (`bounce.example.com`) with its own `MX` and SPF, which is
+what makes SPF *aligned* with the header From and so a second way to pass DMARC.
+An apex SPF of `v=spf1 include:amazonses.com -all` rather than the direct
+`v=spf1 mx -all`.
+
+It also adds the one static credential this stack has: SMTP AUTH is a fixed
+username and password by protocol, so the box's render emits an IAM user whose
+only permission is `ses:SendRawEmail`, an access key, and two SecureString
+parameters holding the key id and the SMTP password terraform derives from it.
+The values transit tofu state, which is why a stack with a relay wants state
+encryption. `<StalwartProvision/>` reads the pair back out and writes it into the
+one `ses` relay route every SES-relayed domain sends on: one route, because one
+IAM user sends for every identity in the account.
+
+Note that the IAM user exists exactly while some domain relays through SES. Move
+the last one off and the next apply removes it, which is the point of the relay
+being composed rather than assumed.
+
+## events_topic and alarms_topic are two different things
+
+`alarms_topic` on the domain is where a reputation alarm fires, and every relay
+has one. `events_topic` on the `SesRelay` is where the raw stream of bounce,
+complaint, rejection and delay OBJECTS is published, and only SES emits that. In
+practice they are the same topic, as here, and they are named separately because
+one of them survives a change of relay.
+
+Both are named topics rather than declared ones, because one topic serves every
+domain in the account. Create it, and grant `SNS:Publish` to the
+`ses.amazonaws.com` service principal under an `AWS:SourceAccount` condition:
+without that grant SES fails to publish SILENTLY, and you discover it the first
+time you go looking for a bounce that should have been recorded.
+
+## Usage
+
+    beet --main=examples/infra/mail_ses.bsx validate
+    beet --main=examples/infra/mail_ses.bsx deploy
+
+`validate` needs only `tofu`. Live deploy needs the same things `mail.bsx` does,
+plus SES production access if you want to send to anyone who has not verified
+themselves as a recipient. The probe works inside the sandbox either way: the
+simulator address it sends to is always permitted.
+-->
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
+	<CrateCheck features={["infra", "extra"]}/>
+	<Stack app_name="mail-ses-example" region="us-west-2">
+		<DeployRoutes/>
+
+		<VpcBlock bx:ref="net" label="net"/>
+		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
+		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
+			runtime_write=true object_versioning=true/>
+
+		<StalwartBlock label="mail" hostname="mail.example.com"
+			blob_bucket="mail-blobs"
+			{(VpcRef($net), DatabaseRef($db))}
+			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
+
+		<!-- the whole delta. `{SesRelay}` on the domain relays this one; put it
+		     on the `<Stack>` above and every domain under it inherits, which is
+		     what a stack that relays everything through SES wants. -->
+		<MailDomainBlock
+			domain="example.com"
+			mail_host="mail.example.com"
+			dns={Cloudflare{authority:"example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			alarms_topic="mail-example-alarms"
+			{SesRelay{events_topic:"mail-example-alarms"}}
+			mailboxes={[
+				{localpart:"hello", admin:true},
+				{localpart:"news"},
+				{localpart:"probe"},
+			]}
+			aliases={[
+				{localpart:"postmaster", target:"hello"},
+				{localpart:"abuse", target:"hello"},
+			]}/>
+
+		<Route path="deploy" {ExchangeSequence}>
+			<EnsureSecret secret="db-password" variable="db_password"/>
+			<EnsureSecret secret="mail-admin-password"/>
+			<EnsureDkimKey/>
+			<TofuApply/>
+			<EipReverseDns/>
+			<StalwartProvision/>
+			<MailProbe mailbox="probe" sender_domain="example.com"/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

@@ -112,22 +112,12 @@ pub async fn StalwartProvisionAction(
 		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
-	// the credentials this step writes into the relay route, read from
+	// the credentials this step writes into the relay routes, read from
 	// parameter store rather than passed in: the box reads the same values, so
-	// the two cannot drift.
+	// the two cannot drift. Exactly the routes in use, so an all-comail stack
+	// never asks for a SES pair terraform did not park.
 	let region = mail.stack.region().clone();
-	let ses = SesCredential {
-		username: read_secret(
-			&region,
-			&mail.mail_box.ses_smtp_user_secret_name(&mail.stack),
-		)
-		.await?,
-		password: read_secret(
-			&region,
-			&mail.mail_box.ses_smtp_password_secret_name(&mail.stack),
-		)
-		.await?,
-	};
+	let credentials = read_credentials(&mail, &region).await?;
 
 	// the ACME contact and the reports address are the same human, ie whoever
 	// answers `postmaster@` on the first domain served.
@@ -141,9 +131,10 @@ pub async fn StalwartProvisionAction(
 	let plan = StalwartPlan::new(
 		&mail.mail_box,
 		&mail.domains,
+		&mail.relays,
 		&mail.stack,
 		&admin_contact,
-		&ses,
+		&credentials,
 	)?;
 
 	// ssh is needed either way: the unit is restarted over it, and the tunnel
@@ -686,11 +677,24 @@ async fn apply_plan(
 	}
 	info!("{} listeners declared", plan.listeners.len());
 
-	converge(client, "x:MtaRoute", &["name"], &plan.relay).await?;
+	for relay in &plan.relays {
+		converge(client, "x:MtaRoute", &["name"], relay).await?;
+	}
 	client
 		.update_singleton("x:MtaOutboundStrategy", &plan.outbound_strategy())
 		.await?;
-	info!("outbound relays through {}", plan.relay["address"]);
+	match plan.relays.is_empty() {
+		true => info!("outbound delivers directly to each recipient's mx"),
+		false => info!(
+			"outbound relays through {}, else {}",
+			plan.relays
+				.iter()
+				.map(|relay| relay["name"].as_str().unwrap_or_default())
+				.collect::<Vec<_>>()
+				.join(", "),
+			plan.fallback
+		),
+	}
 
 	let mut domain_ids = Vec::new();
 	for domain in &plan.domains {
@@ -936,6 +940,86 @@ async fn read_secret(region: &str, name: &str) -> Result<String> {
 	})
 }
 
+/// One credential per relay route the served domains resolve, keyed by route
+/// name.
+///
+/// Exactly the routes in use: the SES pair is read once however many domains
+/// relay through it (one IAM user sends for every identity in the account), and
+/// a comail pair is read per domain because its key pins the one domain it may
+/// send from. A stack that relays through neither reads nothing at all, which
+/// is what lets a direct-delivery stack deploy without a single mail secret.
+async fn read_credentials(
+	mail: &MailStack,
+	region: &str,
+) -> Result<HashMap<String, RelayCredential>> {
+	let mut credentials = HashMap::<String, RelayCredential>::default();
+	for (domain, relay) in mail.relayed() {
+		let Some(route) = relay.route_name(&domain.slug()) else {
+			continue;
+		};
+		if credentials.contains_key(&route) {
+			continue;
+		}
+		let credential = match relay {
+			RelayMode::Ses(_) => RelayCredential {
+				username: read_secret(
+					region,
+					&mail.mail_box.ses_smtp_user_secret_name(&mail.stack),
+				)
+				.await?,
+				password: read_secret(
+					region,
+					&mail.mail_box.ses_smtp_password_secret_name(&mail.stack),
+				)
+				.await?,
+			},
+			// parked by the operator from the enrolment response rather than by
+			// any step here, so a missing one names the enrolment and the verb
+			// that checks it rather than reading as a deploy bug.
+			RelayMode::Comail(_) => {
+				let slug = domain.slug();
+				RelayCredential {
+					username: read_comail_secret(
+						region,
+						mail,
+						&ComailRelay::did_secret(&slug),
+						domain.domain(),
+					)
+					.await?,
+					password: read_comail_secret(
+						region,
+						mail,
+						&ComailRelay::api_key_secret(&slug),
+						domain.domain(),
+					)
+					.await?,
+				}
+			}
+			RelayMode::None => continue,
+		};
+		credentials.insert(route, credential);
+	}
+	Ok(credentials)
+}
+
+/// One of the parameters a comail enrolment is parked in, failing with the step
+/// that fills it rather than with a 535 three minutes later.
+async fn read_comail_secret(
+	region: &str,
+	mail: &MailStack,
+	secret: &SecretRef,
+	domain: &str,
+) -> Result<String> {
+	let name = secret.name(&mail.stack);
+	ssm_ext::get(region, &name).await?.ok_or_else(|| {
+		bevyhow!(
+			"'{domain}' relays through comail but {name} does not exist: \
+			enrol the domain at https://comail.at and park the response, then \
+			run <ComailEnroll/>, which checks all five parameters and says \
+			what each one holds"
+		)
+	})
+}
 
 
 /// Poll the management endpoint until it authenticates, which is also the check

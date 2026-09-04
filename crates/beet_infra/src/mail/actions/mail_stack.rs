@@ -21,6 +21,10 @@ pub struct MailStack {
 	pub database: RdsPostgresBlock,
 	/// Every domain it serves, in declaration order.
 	pub domains: Vec<MailDomainBlock>,
+	/// The relay each of those domains resolved, by the same ancestry the
+	/// render used. Resolved once here so a probe, a plan and a credential
+	/// listing cannot disagree about which provider carries a domain.
+	pub relays: RelayModes,
 }
 
 impl MailStack {
@@ -67,6 +71,19 @@ impl MailStack {
 		self.project
 			.output(&format!("{}_eip_allocation", self.mail_box.label()))
 			.await
+	}
+
+	/// The relay `domain` leaves through.
+	pub fn relay(&self, domain: &MailDomainBlock) -> &RelayMode {
+		self.relays.get(domain.domain())
+	}
+
+	/// Every served domain paired with its relay, ie what a step that behaves
+	/// differently per provider iterates.
+	pub fn relayed(
+		&self,
+	) -> impl Iterator<Item = (&MailDomainBlock, &RelayMode)> {
+		self.serving().map(|domain| (domain, self.relay(domain)))
 	}
 
 	/// The domains this box actually serves, ie the ones whose records hand
@@ -138,6 +155,7 @@ pub struct MailQuery<'w, 's> {
 		Query<'w, 's, (&'static StalwartBlock, Option<&'static DatabaseRef>)>,
 	databases: Query<'w, 's, &'static RdsPostgresBlock>,
 	domains: Query<'w, 's, &'static MailDomainBlock>,
+	relays: RelayQuery<'w, 's>,
 }
 
 impl MailQuery<'_, '_> {
@@ -190,11 +208,18 @@ impl MailQuery<'_, '_> {
 				)
 			})?
 			.clone();
-		let domains = declared
-			.iter()
-			.filter_map(|child| self.domains.get(*child).ok())
-			.cloned()
-			.collect::<Vec<_>>();
+		let mut relays = RelayModes::default();
+		let mut domains = Vec::new();
+		for child in declared.iter() {
+			let Ok(domain) = self.domains.get(*child) else {
+				continue;
+			};
+			relays.insert(
+				domain.domain().clone(),
+				self.relays.resolve(*child, domain.domain())?,
+			);
+			domains.push(domain.clone());
+		}
 		if domains.is_empty() {
 			bevybail!(
 				"no MailDomainBlock is declared under this stack, so the box \
@@ -207,6 +232,7 @@ impl MailQuery<'_, '_> {
 			mail_box,
 			database,
 			domains,
+			relays,
 		})
 	}
 }

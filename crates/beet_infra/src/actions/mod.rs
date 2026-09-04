@@ -4,6 +4,7 @@ mod build_docker_image;
 #[cfg(feature = "cloudflare_block")]
 mod cloudflare;
 mod cloudflare_zone;
+pub mod cloudwatch_ext;
 mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
@@ -24,6 +25,7 @@ pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]
 pub use cloudflare::*;
 pub use cloudflare_zone::*;
+pub use cloudwatch_ext::MetricDatum;
 pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;

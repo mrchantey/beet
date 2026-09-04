@@ -2,21 +2,45 @@
 # Hello Mail
 
 A self-hosted mail server for two domains: one EC2 box running Stalwart, its
-metadata in RDS Postgres and its message bodies in S3, with every outbound
-message relayed through Amazon SES so delivery never rides one IP's reputation.
+metadata in RDS Postgres and its message bodies in S3, delivering its own
+outbound mail straight to each recipient's MX.
 
 The point of the example is the pair of `<MailDomainBlock/>`s. A mail domain is
-declared once, as the domain it serves, and everything composes from it: the SES
-sending identity, its three DKIM selectors, the `MX`/`SPF`/`DMARC`/`MTA-STS`
-records that make it deliverable, the `SRV` and autoconfig records that make it
-discoverable, and the mailboxes it holds. Serving a second domain is a second
-tag, which is exactly what the second one here is.
+declared once, as the domain it serves, and everything composes from it: its
+signing key, the `MX`/`SPF`/`DMARC`/`MTA-STS` records that make it deliverable,
+the `SRV` and autoconfig records that make it discoverable, and the mailboxes it
+holds. Serving a second domain is a second tag, which is exactly what the second
+one here is.
 
 The two are deliberately unalike, because that is what a second domain is for:
 `example.com` holds people's mailboxes, and `news.example.com` sends
 publications and welcomes replies into a catch-all. They share the box and the
 zone and nothing else, so a newsletter that burns its reputation cannot take
 anyone's mail down with it.
+
+## No relay, and what that means
+
+Neither domain declares one, so the box dials each recipient's MX itself. That is
+the default and it is a real choice rather than a missing step: your address's
+reputation is yours to build and yours to keep, nobody else can revoke your
+sending, and there is no third party in the path of your mail. What it costs is
+that a fresh address starts with no reputation at all, so early mail to the big
+receivers lands in spam until a few weeks of ordinary correspondence fixes it.
+
+Everything that makes direct delivery respectable is already here: an elastic
+address whose reverse record `<EipReverseDns/>` sets to match the SMTP banner,
+MTA-STS, TLS-RPT, DMARC at `p=reject` from the first deploy, and a DKIM key this
+stack holds rather than rents. The apex SPF is `v=spf1 mx -all`, which authorises
+exactly the box the `MX` already points at.
+
+A relay is one spread away when you want one:
+
+    <MailDomainBlock domain="example.com" .. {SesRelay}/>
+    <MailDomainBlock domain="example.com" .. {ComailRelay}/>
+
+See `mail_ses.bsx` and `mail_comail.bsx` for what each adds. Put the spread on
+the `<Stack>` instead and every domain under it inherits, which is what a stack
+that relays everything wants.
 
 ## Usage
 
@@ -29,6 +53,12 @@ anyone's mail down with it.
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
 machine. It also needs domains you actually own: every name below is an RFC 2606
 example domain and the zone id is a placeholder, so a real deploy replaces both.
+
+Direct delivery also needs port 25 EGRESS from the box, which it has (the
+security group allows all outbound) and which no relay arm needs at all. Note
+that `<MailHealth/>`'s banner check dials port 25 INBOUND from wherever you run
+it, and most residential ISPs block that, so run it from somewhere with 25 egress
+or trust the probe instead.
 
 Note the zone is written out on all three blocks (`dns={Cloudflare{..}}`) only
 so the example validates with nothing configured, which is also why it repeats.
@@ -46,7 +76,11 @@ not a mail domain, so it owns that name rather than borrowing one.
 `<EnsureSecret/>` hands its generated value to the apply as a request param, so
 it sits in this route and ahead of `<TofuApply/>`: the database is created WITH
 its master password, and the box boots reading its admin credential out of the
-parameter the same step minted. Neither value appears here or in any log.
+parameter the same step minted. `<EnsureDkimKey/>` is there for the same reason
+and is not optional: the selector record reads its public half out of a tofu
+variable, and a variable nobody supplied resolves to empty, which for `p=` is
+the wire form of a REVOKED selector rather than a missing one. Neither value
+appears here or in any log.
 
 Then the reverse record (AWS validates the forward one first, so it waits for
 dns), then `<StalwartProvision/>`. That last one is not a nicety: Stalwart 0.16
@@ -55,6 +89,12 @@ its own data store, so a freshly built box serves nothing until they are applied
 over its management api. Terraform owns the machine; provision owns the mail
 server. Finally `<MailProbe/>` sends a message out through the whole stack and
 reads one back in, asserting the receiving end believes both.
+
+With no relay the probe's two legs are worth different amounts, and it says so
+in its logs: the outbound leg is a real send to a third-party sink over a real MX
+lookup, which is exactly what direct delivery has to prove, while the inbound leg
+is submitted through the box's own port and so only ever exercises the local
+route.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
@@ -126,10 +166,18 @@ reads one back in, asserting the receiving end believes both.
 		<Route path="deploy" {ExchangeSequence}>
 			<EnsureSecret secret="db-password" variable="db_password"/>
 			<EnsureSecret secret="mail-admin-password"/>
+			<!-- the sovereign signing key, minted before the apply that
+			     publishes its public half: the selector record reads a tofu
+			     variable, and a variable nobody supplied resolves to empty,
+			     which for `p=` is the wire form of a REVOKED selector. -->
+			<EnsureDkimKey/>
 			<TofuApply/>
 			<EipReverseDns/>
 			<StalwartProvision/>
-			<MailProbe mailbox="probe" sender_domain="news.example.com"/>
+			<!-- with no relay the inbound leg is submitted through the box's own
+			     port as the sending domain, so `sender` must name a mailbox that
+			     exists on it rather than the default `news`. -->
+			<MailProbe mailbox="probe" sender_domain="news.example.com" sender="replies"/>
 		</Route>
 	</Stack>
 </Router>
