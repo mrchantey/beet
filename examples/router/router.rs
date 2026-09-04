@@ -85,7 +85,7 @@ fn routes() -> impl Bundle {
 	(
 		// render middleware wrapping every descendant route's content in the
 		// `RouterLayout` document, transcluded in place at its `<Slot/>`
-		Layout::new("RouterLayout"),
+		Layout::of::<RouterLayout>(),
 		children![
 			route::new("", BlobScene::new("content/home.md")),
 			route::new("about", BlobScene::new("content/about.md")),

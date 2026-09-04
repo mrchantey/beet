@@ -173,7 +173,7 @@ mod test {
 		let mut world = router_world();
 		world.register_template::<FixedShell>();
 		let root = world
-			.spawn((Router, Layout::new("FixedShell"), children![(
+			.spawn((Router, Layout::of::<FixedShell>(), children![(
 				route::new("", FixedPage),
 				children![rsx! { <p>"page body"</p> }]
 			)]))

@@ -223,7 +223,7 @@ pub(crate) fn render<T: EmitBlock>(
 		if let Err(err) = block.emit(stack, deployment, config) {
 			let err = bevyhow!(
 				"{} '{}': {err}",
-				crate::blocks::short_type_name::<T>(),
+				type_ext::short_name::<T>(),
 				block.label()
 			);
 			scope.error(err);
@@ -268,7 +268,7 @@ pub(crate) fn related<'a, T: Component>(
 		bevyhow!(
 			"the `{relation}` of '{label}' targets {target}, which carries \
 			 no `{}`",
-			crate::blocks::short_type_name::<T>()
+			type_ext::short_name::<T>()
 		)
 	})
 }

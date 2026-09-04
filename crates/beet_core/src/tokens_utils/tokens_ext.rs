@@ -7,7 +7,7 @@ use crate::prelude::*;
 /// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
 /// the output is `Option<Vec<usize>>`
 pub fn short_type_path<T>() -> syn::Path {
-	let short_name = ShortName::of::<T>().to_string();
+	let short_name = type_ext::short_name::<T>();
 	syn::parse_str::<syn::Path>(&short_name).expect(&format!(
 		"Failed to parse type name {short_name} into syn::Path"
 	))

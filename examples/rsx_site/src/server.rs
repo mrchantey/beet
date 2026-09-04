@@ -55,6 +55,6 @@ pub fn rsx_site_router() -> impl Bundle {
 		pages_routes(),
 		content_routes(),
 		actions_routes(),
-		Layout::new("BeetLayout"),
+		Layout::of::<BeetLayout>(),
 	)
 }

@@ -62,7 +62,7 @@ pub trait EmitBlock: Block {
 #[component(immutable)]
 pub struct ErasedBlock {
 	/// The concrete block's short type name, for diagnostics.
-	pub type_name: &'static str,
+	pub type_name: SmolStr,
 	/// The block's [`label`](Block::label).
 	pub label: SmolStr,
 	/// The block's [`artifact_label`](Block::artifact_label).
@@ -87,19 +87,19 @@ impl ErasedBlock {
 			};
 			let existing = entity_ref
 				.get::<ErasedBlock>()
-				.map(|erased| erased.type_name);
+				.map(|erased| erased.type_name.clone());
 			let block = entity_ref.get_or_else::<T>()?.clone();
 			if let Some(existing) = existing
-				&& existing != short_type_name::<T>()
+				&& existing != type_ext::short_name::<T>()
 			{
 				bevybail!(
 					"an entity holds at most one block, but {entity} already \
 					 declares a {existing}. Remove it before inserting a {}.",
-					short_type_name::<T>()
+					type_ext::short_name::<T>()
 				);
 			}
 			let erased = Self {
-				type_name: short_type_name::<T>(),
+				type_name: type_ext::short_name::<T>(),
 				label: block.label().clone(),
 				artifact_label: block.artifact_label().cloned(),
 			};
@@ -116,14 +116,6 @@ impl ErasedBlock {
 		let entity = cx.entity;
 		world.commands().entity(entity).try_remove::<ErasedBlock>();
 	}
-}
-
-/// The short type name of `T`, ie `S3BucketBlock`.
-pub(crate) fn short_type_name<T>() -> &'static str {
-	core::any::type_name::<T>()
-		.rsplit("::")
-		.next()
-		.unwrap_or_default()
 }
 
 #[cfg(all(

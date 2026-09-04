@@ -950,7 +950,7 @@ mod test {
 			.spawn((
 				SshTuiServer::default(),
 				OpeningRoute(Url::parse("home")),
-				children![(Router, Layout::new("DrawerLayout"), children![
+				children![(Router, Layout::of::<DrawerLayout>(), children![
 					render_action::fixed_func_route("home", || {
 						rsx! { <p>"Home page"</p> }
 					})
@@ -1457,7 +1457,7 @@ mod test {
 					OpeningRoute(Url::parse("home")),
 					children![(
 						Router,
-						Layout::new("DrawerLayout"),
+						Layout::of::<DrawerLayout>(),
 						children![render_action::fixed_func_route(
 							"home",
 							|| {

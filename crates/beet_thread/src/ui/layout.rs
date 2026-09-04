@@ -124,7 +124,7 @@ mod test {
 	/// Returns the router entity, which surfaces browse.
 	fn spawn_router(app: &mut App, page: impl Bundle) -> Entity {
 		app.world_mut()
-			.spawn((Router, Layout::new("ThreadShell"), children![(
+			.spawn((Router, Layout::of::<ThreadShell>(), children![(
 				route::new("", FixedPage),
 				page
 			)]))

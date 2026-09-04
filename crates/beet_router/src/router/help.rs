@@ -637,7 +637,7 @@ mod test {
 		let root = world
 			.spawn((
 				Router::with_defaults(),
-				Layout::new("HelpShell"),
+				Layout::of::<HelpShell>(),
 				children![Increment::bundle(FieldRef::new("count"))],
 			))
 			.flush();

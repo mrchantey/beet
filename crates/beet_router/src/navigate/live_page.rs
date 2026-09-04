@@ -560,7 +560,7 @@ mod test {
 		app.register_template::<SlotLayout>();
 		let router = app
 			.world_mut()
-			.spawn((Router, Layout::new("SlotLayout"), children![
+			.spawn((Router, Layout::of::<SlotLayout>(), children![
 				render_action::fixed_func_route("alpha", || {
 					rsx! { <p>"go "<a href="/beta">"to beta"</a>" now"</p> }
 				}),

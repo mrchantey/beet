@@ -60,6 +60,9 @@ pub mod time_ext;
 /// An absolute, serializable wall-clock instant, the persistable counterpart of
 /// the monotonic [`Instant`], and the owner of the UTC calendar math.
 mod timestamp;
+/// Naming a rust type the way markup and the reflect registry name it
+/// ([`type_ext::short_name`]).
+pub mod type_ext;
 /// Typed physical quantities ([`units::Angle`], [`units::Distance`],
 /// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot
 /// transport and the `SetDrive` action.

@@ -53,6 +53,18 @@ use beet_ui::prelude::*;
 /// [`register_template`](beet_core::prelude::WorldRegisterTemplateExt::register_template)).
 /// A name resolving to neither fails the request rather than serving an
 /// unwrapped page.
+///
+/// From rust the name comes from the type ([`Layout::of`]), so it is a symbol
+/// the compiler checks:
+///
+/// ```
+/// # use beet_router::prelude::*;
+/// # use beet_core::prelude::*;
+/// # use beet_ui::prelude::*;
+/// #[template]
+/// fn PageShell() -> impl Bundle { rsx! { <html><body><Slot/></body></html> } }
+/// let bundle = (Router, Layout::of::<PageShell>());
+/// ```
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = push_layout_middleware)]
@@ -70,7 +82,20 @@ impl Default for Layout {
 }
 
 impl Layout {
-	/// Wrap descendant routes in the named layout template.
+	/// Wrap descendant routes in the rust template `T`, named by its short type
+	/// path, the name [`register_template`](beet_core::prelude::WorldRegisterTemplateExt::register_template)
+	/// registers it under.
+	///
+	/// The rust-side spelling of [`new`](Self::new): a symbol the compiler
+	/// checks and a rename follows, where a `.bsx` layout has no type to name
+	/// and takes its filename.
+	pub fn of<T: BuildTemplate>() -> Self {
+		Self::new(type_ext::short_name::<T>())
+	}
+
+	/// Wrap descendant routes in the named layout template, ie a `.bsx`
+	/// document's filename. For a rust template prefer [`of`](Self::of), which
+	/// derives the same name from the type.
 	pub fn new(template: impl Into<SmolStr>) -> Self {
 		Self {
 			template: template.into(),
@@ -336,10 +361,10 @@ mod test {
 			.await
 	}
 
-	/// A single route serving `body` under the layout `template`.
-	fn layout_root(world: &mut World, template: &str) -> Entity {
+	/// A single route serving one page body under `layout`.
+	fn layout_root(world: &mut World, layout: Layout) -> Entity {
 		world
-			.spawn((Router, Layout::new(template), children![
+			.spawn((Router, layout, children![
 				render_action::fixed_func_route(
 					"",
 					|| rsx! { <p>"page body"</p> }
@@ -353,7 +378,7 @@ mod test {
 	#[beet_core::test]
 	async fn wraps_route_in_a_rust_template() {
 		let mut world = router_world();
-		let root = layout_root(&mut world, "PageShell");
+		let root = layout_root(&mut world, Layout::of::<PageShell>());
 		get(&mut world, root, "")
 			.await
 			.as_str()
@@ -364,7 +389,7 @@ mod test {
 	#[beet_core::test]
 	async fn wraps_route_in_a_bsx_template() {
 		let mut world = bsx_world(LAYOUT_BSX);
-		let root = layout_root(&mut world, "Layout");
+		let root = layout_root(&mut world, Layout::new("Layout"));
 		get(&mut world, root, "")
 			.await
 			.as_str()
@@ -378,7 +403,7 @@ mod test {
 		// the layout decides placement; here the content lands inside <nav>
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::new("NavLayout"), children![
+			.spawn((Router, Layout::of::<NavLayout>(), children![
 				render_action::fixed_func_route("", || rsx! { <a>"home"</a> })
 			]))
 			.flush();
@@ -396,7 +421,7 @@ mod test {
 		// the shared fixed content must not be despawned with the layout; each
 		// request must render identically (the despawn-hazard regression).
 		let mut world = router_world();
-		let root = layout_root(&mut world, "PageShell");
+		let root = layout_root(&mut world, Layout::of::<PageShell>());
 		let first = get(&mut world, root, "").await;
 		let second = get(&mut world, root, "").await;
 		second.as_str().xpect_contains("<p>page body</p>");
@@ -410,7 +435,7 @@ mod test {
 		}
 		let mut world = router_world();
 		let root = world
-			.spawn((Router, Layout::new("PageShell"), children![
+			.spawn((Router, Layout::of::<PageShell>(), children![
 				render_action::async_route("", page)
 			]))
 			.flush();
@@ -435,7 +460,7 @@ mod test {
 
 		let mut world = router_world();
 		let root = world
-			.spawn((store, Router, Layout::new("PageShell"), children![
+			.spawn((store, Router, Layout::of::<PageShell>(), children![
 				route::new("post", BlobScene::new("post.md"))
 			]))
 			.flush();
@@ -467,7 +492,7 @@ mod test {
 
 		let mut world = router_world();
 		let root = world
-			.spawn((store, Router, Layout::new("PageShell"), children![
+			.spawn((store, Router, Layout::of::<PageShell>(), children![
 				route::new("post", BlobScene::new("post.md"))
 			]))
 			.flush();
@@ -485,7 +510,7 @@ mod test {
 	#[beet_core::test]
 	async fn missing_template_errors() {
 		let mut world = router_world();
-		let root = layout_root(&mut world, "Nope");
+		let root = layout_root(&mut world, Layout::new("Nope"));
 		world
 			.entity_mut(root)
 			.exchange(Request::get(""))
@@ -504,7 +529,7 @@ mod test {
 		let mut world = bsx_world("<SiteLayout/>");
 		// SiteLayout's Header/RouteHead read the site name off PackageConfig.
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, "Layout");
+		let root = layout_root(&mut world, Layout::new("Layout"));
 
 		let html = get(&mut world, root, "").await;
 		// the body sits inside <main>, not leaked above the header.
@@ -535,7 +560,7 @@ mod test {
 	async fn site_layout_slotted_idiom_routes_body_and_slots() {
 		let mut world = bsx_world(SLOTTED_LAYOUT_BSX);
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, "Layout");
+		let root = layout_root(&mut world, Layout::new("Layout"));
 
 		let html = get(&mut world, root, "").await;
 		// the named-slot overrides filled their slots.
@@ -561,7 +586,7 @@ mod test {
 	async fn site_layout_nested_multiroot_routes_body_into_main() {
 		let mut world = bsx_world(SLOTTED_LAYOUT_BSX);
 		world.init_resource::<PackageConfig>();
-		let root = layout_root(&mut world, "Layout");
+		let root = layout_root(&mut world, Layout::new("Layout"));
 		// the web lands the body inside <main>, not leaked up into the <head>.
 		assert_within_main(&get(&mut world, root, "").await, "page body");
 		// the terminal must keep the body too: a body misrouted into the non-visual
@@ -765,7 +790,7 @@ mod test {
 			..default()
 		});
 		let root = world
-			.spawn((Router, Layout::new("MetaLayout"), children![
+			.spawn((Router, Layout::of::<MetaLayout>(), children![
 				meta_route("alpha", "Alpha"),
 				meta_route("beta", "Beta"),
 			]))
@@ -816,7 +841,7 @@ mod test {
 			.unwrap();
 		world.insert_resource(registry);
 		let root = world
-			.spawn((Router, Layout::new("MetaLayout"), children![(
+			.spawn((Router, Layout::of::<MetaLayout>(), children![(
 				PathPartial::new("blog"),
 				Layout::new("ArticleLayout"),
 				children![meta_route("post", "Post")]
