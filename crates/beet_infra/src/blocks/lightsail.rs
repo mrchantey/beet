@@ -685,15 +685,84 @@ exec /opt/__APP__/app__EXEC_ARGS__
 		timeout: Duration,
 		poll: Duration,
 	) -> String {
+		self.unit_gate_script(
+			stack,
+			&format!(
+				"expect={deploy_id}\n\
+				identity_ok() {{ [ \"$(running_release)\" = \"$expect\" ]; }}"
+			),
+			r#"if identity_ok; then
+	echo "beet: already serving $expect" >&2
+else
+	echo "beet: restarting $unit onto $expect" >&2
+	systemctl restart "$unit" >&2 || true
+fi"#,
+			"$expect",
+			"carrying release $expect",
+			timeout,
+			poll,
+		)
+	}
+
+	/// The script [`LightsailRestart`] runs on the box: bounce the unit so it
+	/// re-reads the repo store, and prove it came back serving.
+	///
+	/// The counterpart to [`release_script`](Self::release_script) for a content
+	/// sync, which publishes no artifact and moves no release pointer. A page's
+	/// bytes are read from the store per request, so a sync is already live
+	/// without this; what the restart buys is everything resolved ONCE at boot,
+	/// ie `<RoutesDir/>` discovery (a page added, deleted, or renamed by its
+	/// `slug`) and the entry document itself (`main.bsx`, so its `<Redirect/>`
+	/// block and middleware).
+	///
+	/// The gate is [`release_script`](Self::release_script)'s minus the identity
+	/// check, which has nothing to check here: the unit comes back on the same
+	/// release it was already running, so the proof is that it is active,
+	/// answers a request on its own port, and does not restart underneath that.
+	pub fn restart_script(
+		&self,
+		stack: &ResolvedStack,
+		timeout: Duration,
+		poll: Duration,
+	) -> String {
+		self.unit_gate_script(
+			stack,
+			// no release to identify: the sync published content, not a binary
+			"identity_ok() { true; }",
+			r#"echo "beet: restarting $unit onto the published stores" >&2
+systemctl restart "$unit" >&2 || true"#,
+			"$(running_release)",
+			"after a restart",
+			timeout,
+			poll,
+		)
+	}
+
+	/// The gate both scripts above converge on, ie everything except WHICH unit
+	/// state counts as arrived.
+	///
+	/// `prelude` defines `identity_ok`, the extra test an attempt must pass;
+	/// `restart` decides whether to bounce the unit at all; `success` is echoed
+	/// once the gate passes and `failure` names what never happened.
+	fn unit_gate_script(
+		&self,
+		stack: &ResolvedStack,
+		prelude: &str,
+		restart: &str,
+		success: &str,
+		failure: &str,
+		timeout: Duration,
+		poll: Duration,
+	) -> String {
 		let poll_secs = poll.as_secs().max(1);
 		let attempts = (timeout.as_secs() / poll_secs).max(1);
 		Self::render_script(
 			r#"#!/bin/bash
-# Roll the unit onto a release, and prove the process now running IS it and
+# Make the unit run what the stores now hold, and prove the process now running
 # answers a request without crash looping underneath.
 set -uo pipefail
 unit=__APP__.service
-expect=__DEPLOY_ID__
+__PRELUDE__
 
 running_release() {
 	local pid
@@ -716,34 +785,32 @@ for _ in $(seq 1 __ATTEMPTS__); do
 	sleep __POLL__
 done
 
-if [ "$(running_release)" = "$expect" ]; then
-	echo "beet: already serving $expect" >&2
-else
-	echo "beet: restarting $unit onto $expect" >&2
-	systemctl restart "$unit" >&2 || true
-fi
+__RESTART__
 
 for _ in $(seq 1 __ATTEMPTS__); do
 	# read the restart counter first, so the comparison spans every check below
 	# and any restart during the attempt invalidates it
 	before=$(restarts)
 	if [ "$(systemctl is-active "$unit")" = active ] &&
-		[ "$(running_release)" = "$expect" ] &&
+		identity_ok &&
 		serves &&
 		[ "$(restarts)" = "$before" ]; then
-		echo "$expect"
+		echo "__SUCCESS__"
 		exit 0
 	fi
 	sleep __POLL__
 done
 
-echo "beet: $unit never served a request on port __APP_PORT__ carrying release $expect" >&2
+echo "beet: $unit never served a request on port __APP_PORT__ __FAILURE__" >&2
 systemctl status "$unit" --no-pager --lines=40 >&2 || true
 exit 1
 "#,
 			stack,
 			&[
-				("__DEPLOY_ID__", deploy_id),
+				("__PRELUDE__", prelude),
+				("__RESTART__", restart),
+				("__SUCCESS__", success),
+				("__FAILURE__", failure),
 				("__ATTEMPTS__", &attempts.to_string()),
 				("__POLL__", &poll_secs.to_string()),
 				("__APP_PORT__", &self.app_port().to_string()),
@@ -1403,6 +1470,43 @@ mod tests {
 			.xpect_contains("beet: already serving $expect")
 			// 60s of 5s attempts
 			.xpect_contains("seq 1 12");
+	}
+
+	/// The sync's restart keeps the release gate but drops the identity check,
+	/// which a content sync has nothing to satisfy.
+	///
+	/// A sync publishes no artifact and moves no release pointer, so the unit
+	/// comes back on the release it was already running: gating on the deploy id
+	/// would restart the box and then fail for the whole timeout. What still has
+	/// to hold is everything that caught a box that was not serving — active,
+	/// answers a request on its own port, and no restart underneath that check.
+	#[beet_core::test]
+	fn restart_gates_on_serving_not_identity() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let block = LightsailBlock::default();
+		let script = block.restart_script(
+			&stack,
+			Duration::from_secs(60),
+			Duration::from_secs(5),
+		);
+		script
+			.as_str()
+			// the whole gate, shared with the release script
+			.xpect_contains("identity_ok &&")
+			.xpect_contains(&format!(
+				"curl -fsS -o /dev/null --max-time 5 \"http://127.0.0.1:{}/\"",
+				block.app_port()
+			))
+			.xpect_contains("before=$(restarts)")
+			.xpect_contains("[ \"$(restarts)\" = \"$before\" ]")
+			.xpect_contains("seq 1 12")
+			// ... minus the identity, and it always bounces: the box is serving
+			// content it read at boot, so "already serving" is never the answer
+			.xpect_contains("identity_ok() { true; }")
+			.xnot()
+			.xpect_contains("already serving")
+			.xnot()
+			.xpect_contains("BEET_DEPLOY_ID=$expect");
 	}
 
 	/// The gate probes the port the unit was told to listen on.

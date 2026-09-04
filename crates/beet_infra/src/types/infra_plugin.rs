@@ -307,15 +307,18 @@ impl Plugin for InfraPlugin {
 		))]
 		app.register_type::<crate::prelude::LifecycleProbe>();
 
-		// the post-apply release step: rolls a running Lightsail box onto the
-		// deploy's binary, the counterpart to its machine-config-only user data.
+		// the two steps that make a running Lightsail box run what the stores
+		// hold: a release onto the deploy's binary (the counterpart to its
+		// machine-config-only user data), and a restart after a content sync.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "lightsail_block",
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::LightsailRelease>()
-			.register_type::<crate::prelude::LightsailReleaseAction>();
+			.register_type::<crate::prelude::LightsailReleaseAction>()
+			.register_type::<crate::prelude::LightsailRestart>()
+			.register_type::<crate::prelude::LightsailRestartAction>();
 
 		// the docker/podman image build action + its engine selector. It lives in
 		// the `actions` module, so it is `deploy`-gated and native-only like the
