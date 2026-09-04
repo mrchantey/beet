@@ -659,6 +659,19 @@ async fn apply_plan(
 		.await?;
 	info!("spam filter on, learning from replies and traps");
 
+	client
+		.update_singleton(
+			"x:DmarcReportSettings",
+			&plan.dmarc_report_settings(),
+		)
+		.await?;
+	for settings in ["x:DkimReportSettings", "x:SpfReportSettings"] {
+		client
+			.update_singleton(settings, &plan.auth_failure_report_settings())
+			.await?;
+	}
+	info!("aggregate reports daily, per-message failure reports off");
+
 	let acme = converge(
 		client,
 		"x:AcmeProvider",

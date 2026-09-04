@@ -190,6 +190,8 @@ A domain is one `MailDomainBlock`, and everything composes from it: the SES iden
 
 Some notes on the declarations that are not obvious from reading them:
 
+**The order of the `MailDomainBlock` tags is load-bearing, and nothing at the tag says so.** The first one declared becomes the server's *primary* domain, which settles two things you would not go looking for in a list of domains. It is what `system('domain')` resolves to, so it is the domain every outbound report is addressed from (`noreply-dmarc@<primary>`, section 7). And it is the only domain whose ACME order carries the *box's* own hostname, since that name belongs to no mail domain and has to ride along on one. Reordering the tags therefore moves the server's identity and reissues a certificate, and deleting the first tag hands both to whichever domain happens to be next. Put the domain you intend to keep second, directly behind the staging domain it will replace, so that retiring staging promotes the right one rather than the newsletter domain.
+
 **No NAT gateway.** The box lives in a public subnet with an elastic IP, and the database has nothing to call out to, so the private subnets are left on the VPC's main route table whose only route is the local CIDR. That is about $32 a month not spent, expressed as an absence rather than a setting. A private workload that genuinely needs one AWS service wants a VPC endpoint, not a gateway to the whole internet.
 
 **The database security group emits ingress and no egress at all.** A security group declared with rules of its own loses the default allow-all egress rule, and for a database that is precisely right. It looks like an omission and is not.
@@ -333,31 +335,66 @@ curl -s -H 'accept: application/dns-json' \
 
 **Hand step, and a judgement call.** MTA-STS ships in `testing` mode. Flip it to `enforce` after two clean weeks of TLS-RPT reports and not before. A `testing` policy withholds no mail whether or not it is fetched; an `enforce` policy withholds mail from senders whose TLS your box fails to satisfy, which is the point of it and also the risk. Also note that a wrangler custom domain's certificate is not instantly live at every edge: our deploy verified both policy fetches, a `curl` two minutes later got a TLS error from the same machine, and five minutes after that it was clean. Do not roll back over that.
 
+### You are now a reporter, whether or not you meant to be
+
+A server that checks DMARC on inbound mail also generates DMARC reports on outbound. Nothing in the build asks for this and no tag declares it. It is simply what a conforming receiver does, and it starts the day your MX goes live.
+
+The day after our apex cutover, two SES bounce notifications arrived in a personal inbox. Both were reports our own box had sent: a DMARC failure report, and a day later the aggregate report covering the same window. Both were addressed to the `dmarc@` mailbox that a heavily spoofed finance domain publishes for `rua=` and `ruf=` alike, and both were bounced by that domain's provider.
+
+The alarming reading is the wrong one. At the volume a new mail server sends, one bounce a day against two or three messages looks like a 50% bounce rate and an account about to be suspended. It is not. AWS does not count transient bounces toward the reputation metric, and ours read `0.0` on both days, with `EnforcementStatus: HEALTHY` and an empty suppression list throughout. Read the metric before you react to the mail:
+
+```sh
+aws cloudwatch get-metric-statistics --namespace AWS/SES \
+  --metric-name Reputation.BounceRate --period 86400 --statistics Maximum \
+  --start-time <from> --end-time <to>
+```
+
+What is worth acting on is the split between the two kinds of report. Aggregate (`rua`) reports are one message per reporting domain per day carrying counts. They are how the mechanism works at all, and they are what answers the `rua=` you publish yourself. Failure (`ruf`) reports are one message per spoofed message, they forward the headers of mail addressed to your users out to whatever address a third party published, and almost nothing consumes them. Their volume is a function of how much spam you receive, which is not a quantity you control.
+
+So send the aggregate half and not the failure half. On Stalwart 0.16 that is three singletons, `x:DmarcReportSettings` plus the pre-DMARC `x:DkimReportSettings` and `x:SpfReportSettings`, and one constant:
+
+```json
+{ "aggregateSendFrequency": { "else": "daily" },
+  "failureSendFrequency": { "else": "disable" } }
+```
+
+Leave TLS-RPT alone. It is aggregate, it is daily, and it is the evidence the MTA-STS `enforce` flip above is judged against.
+
+Two details that generalise past this server. A frequency is an expression *constant*, so it is unquoted where a string literal in the same position would carry its quotes, and a quoted `'disable'` is a string that no constant matches, which leaves the shipped default silently in place. And the two settings are off by different mechanisms: the aggregate one has a real "never" value, while the failure ones are `[count, period]` rates whose conversion rejects anything that is not a pair of positive numbers, and the send path reads that rejection as off. Both spell it `disable`, and only one of them means it.
+
+One last thing the bounce notifications are worth checking for. The report sender is `noreply-dmarc@` at the server's *default domain*, which on a box serving several domains is decided by something you probably did not think of as a decision. See section 6's note on declaration order.
+
 ## 8. Cutover
 
-This section is a plan rather than a lived path: at the time of writing, our own cutover is behind a soak gate and has not run. Everything before this point has been executed and everything after it has. Treat the ordering rules as load-bearing and the timings as estimates.
+This section is a lived path: our own cutover ran on 2026-09-01, and the timings below are what it measured. From the first hand DNS change to a fully verified apex was about fifteen minutes.
 
 The cutover changes *which* domain the working system serves and nothing else. The box, its IP, its reverse DNS, its certificate and its banner are all unchanged, which is why this is a short window rather than a second build.
 
 Ahead of the window, each of these is safe on its own and none of them move mail:
 
-1. Add the apex `MailDomainBlock` with `records={MailRecords::IdentityOnly}`, so the SES identity, DKIM and configuration set exist and verify while every record that would move mail stays unpublished.
-2. Declare the apex addresses on your existing members and provision the mailboxes and aliases, empty. The server accepts nothing at them yet, because the apex MX still points at your incumbent.
-3. Copy the mail across with an IMAP sync. Run it more than once; the last run happens inside the window.
-4. Lower the apex TTLs a day ahead. On Cloudflare, records with the proxy off are TTL 1 meaning "auto", so confirm what the authoritative TTL actually is rather than assuming.
-5. Write the rollback: the exact incumbent MX and SPF values, ready to paste back. Keep the incumbent account paid and live until the window is a week behind you.
+1. Add the apex `MailDomainBlock` with `records={MailRecords::IdentityOnly}`, so the SES identity, DKIM and configuration set exist and verify while every record that would move mail stays unpublished. Ours verified in under a minute, weeks ahead.
+2. Write the rollback: the exact incumbent MX and SPF values, captured from the live zone rather than from memory, ready to paste back. Keep the incumbent account paid and live until the window is a week behind you.
+3. Confirm the TTLs rather than lowering them on faith. On Cloudflare, records with the proxy off are TTL 1 meaning "auto", which is authoritative 300 seconds; there was nothing to lower.
+4. Run `plan` and read it. Ours showed the base AMI had drifted, which would have rebuilt the box inside the cutover apply. If the plan contains anything that is not a DNS record, deploy that part FIRST as its own baseline deploy, with the apex still `IdentityOnly`: it absorbs the churn and proves the whole path end to end while the incumbent still holds the apex, and the cutover apply then replaces nothing.
 
-The window itself, and the order matters:
+Do NOT provision the apex mailboxes weeks ahead. Mailboxes need the domain on the server, and a local domain hijacks every submission addressed to it away from the MX the world still resolves. They land at the start of the window instead, which shrinks that hazard to minutes.
 
-6. **Replace** the apex SPF TXT with `v=spf1 include:amazonses.com -all`. There must be exactly one SPF TXT at the apex at every moment. This is a replace, never an add.
-7. Publish `_dmarc`, `_mta-sts`, `_smtp._tls`, the autoconfig and autodiscover CNAMEs and the SRV records at the apex.
-8. Final incremental IMAP sync.
-9. Swap the apex MX to your box and delete the incumbent's MX records.
-10. Run the probe against the apex. Smoke test both directions with a personal account. Watch the old mailbox for stragglers for a few days; sender retries cover the propagation gap in either direction.
-11. Retire the incumbent's DKIM CNAMEs and drop them from the audit allowlist, so the audit goes back to asserting that the zone is exactly yours.
-12. Keep the staging addresses as aliases for a deprecation window, then remove the staging block and let the audit clean up its records.
+The window itself. Ours resolved the one open mechanical question as: one `records="All"` deploy, with the hand steps interleaved around it, and the hand steps only ever *delete* records so nothing collides with what terraform creates:
+
+5. Hand-create temporary `autoconfig.<apex>` and `autodiscover.<apex>` CNAMEs to the box. Provisioning a served domain issues its ACME certificate, and the order dies on names that do not resolve, so these two must exist before the records that will own them are applied. Then flip the entry: `records="All"`, members, mailboxes, aliases.
+6. Run `provision` (no apply, no DNS change). The apex becomes local, the mailboxes and role aliases exist empty, and the certificate issues against the temporary names. From here until the MX swap, submissions from your own accounts to apex addresses land locally instead of at the incumbent — ours lasted about two minutes. The win: the box accepts apex mail from the first second the MX lands, so there is no window where your published MX 550s inbound mail.
+7. Delete the two temporary CNAMEs and **delete the incumbent's apex SPF TXT**, then immediately run `deploy`. The apply publishes the SPF replacement, `_dmarc`, `_mta-sts`, `_smtp._tls`, the autoconfig and autodiscover CNAMEs, the SRVs and the apex MX in one run. There must be exactly one SPF TXT at the apex at every moment: the delete-then-apply is the replace.
+8. The moment the apply completes, delete the incumbent's MX records. Do not rely on the zone audit to catch a missed one: the audit matches declared records by name and type, and the incumbent's MX shares both with yours. Enumerate the zone raw and look.
+9. Verify from the outside: DoH the MX, SPF, DMARC and `_mta-sts`; fetch the MTA-STS policy over https; then round-trip real mail both directions (below). Watch the old mailbox for stragglers for a few days; sender retries cover the propagation gap in either direction.
+10. Days later, not in the window: retire the incumbent's DKIM CNAMEs and drop them from the audit allowlist, so the audit goes back to asserting that the zone is exactly yours. Keep the staging addresses for a deprecation window, then remove the staging block and let the audit clean up its records.
 
 The rule behind the ordering is: sending first, receiving second. A half-applied cutover then degrades to "we can send but mail still arrives at the old provider", which is inconvenient, rather than to mail arriving nowhere.
+
+### What the window's round trip caught
+
+Verify the cutover with the worst-case message, not the best one. Our post-cutover round trip (curl submission to a throwaway inbox, raw bytes back over an API, `dkimpy` verifying every signature by index) found the sovereign DKIM signature failing on real mail while both of SES's signatures passed and DMARC stayed green — the same hiding pattern as the `Message-ID` rewrite the soak had already caught, one layer deeper. SES re-parses and re-emits the *address* headers, so the bare angle form (`To: <a@b.c>`, the shape every script and agent composes) is rewritten to `To: a@b.c` in transit, and a signature covering `To`, `Cc` or `Reply-To` dies with it. The display-name form survives, which is why a round trip from a mail client passes and one from curl does not — test with both, or you will prove the form your users happen to use and ship broken signatures for the rest.
+
+The diagnosis method generalises: send a message local-to-local (it never touches the relay) and verify the signature on the raw stored copy. If pure server output verifies and relayed output does not, diff the delivered covered headers against the stored ones byte by byte; the rewritten header is visible to the eye. The fix is the same shape as before — the signed set contains no header the relay rewrites, which for address headers means none but the RFC-mandatory `From` — and it ships as a `provision` patch in under a minute.
 
 ## 9. Backups, and the drill
 

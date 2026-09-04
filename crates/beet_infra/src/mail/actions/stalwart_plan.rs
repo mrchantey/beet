@@ -123,6 +123,23 @@ impl StalwartPlan {
 	/// incumbent provider keeps the mail, and a local domain on the server
 	/// would hijack every submission addressed to it away from the MX the
 	/// world still resolves.
+	///
+	/// DECLARATION ORDER IS LOAD-BEARING, and quietly so: the FIRST domain
+	/// left after that filter is the box's primary, which decides two things
+	/// no reader of the entry would guess from the order of its tags. It
+	/// becomes `defaultDomainId` in
+	/// [`system_settings`](Self::system_settings), which is what
+	/// `system('domain')` resolves to, which is the domain every outbound
+	/// report is addressed FROM (`noreply-dmarc@<primary>`). And it is the
+	/// only domain whose certificate order carries the BOX's own hostname
+	/// (see `DomainPlan::new`), since that name belongs to no mail domain
+	/// and has to ride on one.
+	///
+	/// So reordering the tags in an entry, or deleting the first one, moves
+	/// the server's identity and re-orders an ACME request. That is why
+	/// `infra/mail.bsx` declares the apex directly after the staging domain it
+	/// replaces rather than last: when phase 12 deletes the staging block, the
+	/// primary falls through to the apex instead of to the newsletter domain.
 	pub fn new(
 		mail_box: &StalwartBlock,
 		domains: &[MailDomainBlock],
@@ -254,6 +271,63 @@ impl StalwartPlan {
 		})
 	}
 
+	/// Outbound authentication reporting: the aggregate half on, the
+	/// per-message failure half off.
+	///
+	/// A server that checks DMARC is also a REPORTER, which is a sending
+	/// obligation nothing here declared and this box acquired the moment it
+	/// started accepting mail. The two halves are not the same trade.
+	/// Aggregate (`rua`) reports are one message per reporting domain per day
+	/// carrying counts, which is how the ecosystem works and how the `rua=`
+	/// rows [`MailDomainBlock`] publishes get answered by everyone else.
+	/// Failure (`ruf`) reports are one message per spoofed message, they carry
+	/// the headers of mail addressed to OUR users out to whatever address a
+	/// third party published, and almost nothing consumes them.
+	///
+	/// Found 2026-09-02 from two SES bounce notifications: spoofed
+	/// `investing.com` mail arrived here, this server reported it to the
+	/// `dmarc@investing.com` their record names for both `rua=` and `ruf=`,
+	/// and Google bounced both reports. Reputation was never at risk, since
+	/// transient bounces do not count toward the SES bounce rate and ours
+	/// stayed at `0.0` through both days. But it is our SES quota and our
+	/// bounce notifications spent on a third party's telemetry, and the
+	/// failure half is the half whose volume tracks how much spam we
+	/// receive.
+	///
+	/// Verified against the pinned tag rather than inferred, per decision 18.
+	/// `daily` and `disable` are `ExpressionConstant` words, so they are
+	/// UNQUOTED where a string literal in the same position would be quoted
+	/// (`outbound_strategy`'s route names, which are strings, carry their
+	/// quotes). The aggregate frequency maps `disable` to
+	/// `AggregateFrequency::Never`; every failure frequency is instead a
+	/// `[count, period]` rate whose conversion rejects anything that is not a
+	/// two-element array of POSITIVE numbers, and the send paths read that
+	/// rejection (`eval_if` turns the error into `None`) as "off". So one word
+	/// turns both off, for two different reasons.
+	pub fn dmarc_report_settings(&self) -> Value {
+		json!({
+			"aggregateSendFrequency": { "else": "daily" },
+			"failureSendFrequency": { "else": "disable" },
+		})
+	}
+
+	/// The DKIM and SPF authentication failure reports, off for the reason the
+	/// DMARC failure half is off and by the same rate-rejection mechanism.
+	///
+	/// One shape for both singletons because both objects name the property
+	/// `sendFrequency`, and both ship the same `[1, 1d]` default: a per-message
+	/// report to whatever address a remote domain asked for. These are the
+	/// pre-DMARC reporting mechanisms and they are quieter than `ruf` only
+	/// because fewer domains still request them, which is not a reason to
+	/// leave them on.
+	///
+	/// TLS-RPT is deliberately NOT here: `x:TlsReportSettings` is aggregate
+	/// (`daily`), it is the other half of the reports the MTA-STS enforce
+	/// flips are judged against, and it stays exactly as it is.
+	pub fn auth_failure_report_settings(&self) -> Value {
+		json!({ "sendFrequency": { "else": "disable" } })
+	}
+
 	/// The system settings patch: the box's own name, which is what its SMTP
 	/// greeting, its reports and its discovery documents all publish.
 	pub fn system_settings(&self, default_domain_id: &str) -> Value {
@@ -351,14 +425,20 @@ impl DomainPlan {
 	/// default-configured signature is broken by its own relay the moment the
 	/// message leaves — while SES's own two signatures pass, because they are
 	/// applied after the rewrite. Found by a Gmail round trip reading
-	/// `dkim=fail header.s=stalwart` beside two passes. Headers absent from a
-	/// message are signed as absent (RFC 6376 explicitly allows this), which
-	/// also blocks their later addition.
+	/// `dkim=fail header.s=stalwart` beside two passes.
+	///
+	/// The ADDRESS headers are out for the same reason, found at the apex
+	/// cutover: SES re-parses and re-emits `To`, `Cc` and `Reply-To`, so a
+	/// bare angle form (`To: <a@b.c>`, the shape every script and agent
+	/// composes) is rewritten to `To: a@b.c` in transit and a signature
+	/// covering it dies, while the display-name form happens to survive —
+	/// which is why a round trip from a mail client passes and one from curl
+	/// does not. `From` stays because RFC 6376 requires it signed; senders
+	/// should compose it in display-name form, which the relay preserves.
+	/// Headers absent from a message are signed as absent (RFC 6376
+	/// explicitly allows this), which also blocks their later addition.
 	pub const SIGNED_HEADERS: &'static [&'static str] = &[
 		"From",
-		"To",
-		"Cc",
-		"Reply-To",
 		"Subject",
 		"MIME-Version",
 		"Content-Type",
@@ -881,10 +961,84 @@ mod tests {
 			.unwrap()
 			.dkim_object("d1", None);
 		let headers = object["headers"].as_object().unwrap();
+		// rewritten by SES on every message
 		headers.contains_key("Message-ID").xpect_false();
 		headers.contains_key("Date").xpect_false();
+		// re-parsed and re-emitted by SES, so a bare angle form is rewritten
+		headers.contains_key("To").xpect_false();
+		headers.contains_key("Cc").xpect_false();
+		headers.contains_key("Reply-To").xpect_false();
 		headers["From"].as_bool().unwrap().xpect_true();
 		headers["Subject"].as_bool().unwrap().xpect_true();
+	}
+
+	/// A receiver is a reporter, and the reporting this box does on the
+	/// ecosystem's behalf is the aggregate half only.
+	///
+	/// REGRESSION: neither singleton was declared, so the server ran its own
+	/// defaults: `daily` aggregates (wanted) beside a `[1, 1d]` failure rate
+	/// (not). Two SES bounces on 2026-09-02 and 2026-09-03 are what surfaced
+	/// it: a spoofed `investing.com` message produced a failure report AND an
+	/// aggregate report to an address that bounces both.
+	#[beet_core::test]
+	fn aggregate_reports_are_sent_and_failure_reports_are_not() {
+		let dmarc = plan().dmarc_report_settings();
+		dmarc["aggregateSendFrequency"]["else"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("daily");
+		dmarc["failureSendFrequency"]["else"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("disable");
+	}
+
+	/// The pre-DMARC per-message reports go off the same way, and share one
+	/// shape because both singletons name the property `sendFrequency`.
+	#[beet_core::test]
+	fn the_dkim_and_spf_failure_reports_are_off_too() {
+		plan().auth_failure_report_settings()["sendFrequency"]["else"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("disable");
+	}
+
+	/// A frequency is an expression CONSTANT, so it carries no quotes, unlike
+	/// the string literals in the same position elsewhere in the plan (a
+	/// quoted `'disable'` is a string that no constant matches, which would
+	/// leave the shipped default in place and report exactly as before).
+	#[beet_core::test]
+	fn a_frequency_is_an_unquoted_constant() {
+		let dmarc = plan().dmarc_report_settings();
+		for value in ["aggregateSendFrequency", "failureSendFrequency"] {
+			dmarc[value]["else"]
+				.as_str()
+				.unwrap()
+				.contains('\'')
+				.xpect_false();
+		}
+	}
+
+	/// The primary is the FIRST declared domain, and it is what every outbound
+	/// report is addressed from and the only certificate order carrying the
+	/// box's own hostname. Both are invisible at the tag that decides them,
+	/// which is why the entry's tag order is a documented decision rather than
+	/// a layout preference.
+	#[beet_core::test]
+	fn the_first_declared_domain_is_the_primary() {
+		let plan = plan();
+		plan.domains[0]
+			.name
+			.as_str()
+			.xpect_eq("stalwart.beetmash.com");
+		plan.domains[0]
+			.certificate_names
+			.contains(&"mail.beetmash.com".to_string())
+			.xpect_true();
+		plan.domains[1]
+			.certificate_names
+			.contains(&"mail.beetmash.com".to_string())
+			.xpect_false();
 	}
 
 	/// The key is absent from the form convergence MATCHES on, exactly as an
