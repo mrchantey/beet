@@ -58,7 +58,7 @@ curl -sH 'Accept: text/markdown' https://developer.wordpress.org/reference/funct
 
 The above example demonstrates serving either the raw data (json) or a html view (html/md), but what if we took this idea a little further?
 
-Seeing as terminals are so hot right now, maybe you'd like to build a TUI alongside your website. Or maybe you'd like to provide the view as a json tree structure for a game engine ui. Usually that means writing two entirely seperate frontends, but it sounds like the kind of thing a framework should be able to do.
+Seeing as terminals are so hot right now, maybe you'd like to build a TUI alongside your website. Or maybe you'd like to provide the view as a json tree structure for a game engine ui. Usually that means writing two entirely separate frontends, but it sounds like the kind of thing a framework should be able to do.
 
 ```rust
 fn render_page(request: Request, page: Page) -> Response {

@@ -100,12 +100,8 @@ where
 /// opaque: a codegen-emitted `created` reconstructs the same instant.
 impl TokenizeSelf for Timestamp {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
-		let millis = self.unix_epoch_elapsed().as_millis() as u64;
-		tokens.extend(quote! {
-			Timestamp::from_unix_epoch_elapsed(
-				std::time::Duration::from_millis(#millis)
-			)
-		});
+		let millis = self.millis();
+		tokens.extend(quote! { Timestamp::from_millis(#millis) });
 	}
 }
 

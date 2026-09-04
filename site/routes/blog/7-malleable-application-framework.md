@@ -16,7 +16,7 @@ This post and [pr #75](https://github.com/mrchantey/beet/pull/75) marks the comp
 
 In celebration I'd like to dive a bit deeper into this specific refactor. Its all well and good to make grandious statements how ECS architecture is the bees knees, but these kinds of claims are best served alongside concrete examples.
 
-### Before: Seperate Runtimes
+### Before: Separate Runtimes
 
 The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accomodating for this resulted in two completely different runtimes.
 
@@ -31,7 +31,7 @@ pub fn test_runner(tests: &[&TestDescAndFn]) {
 
 ### After: Unified Runtime
 
-Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and and bespoke implementation, to a standardized well trodden path, reducing bugs and maintenance costs.
+Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well trodden path, reducing bugs and maintenance costs.
 
 ```rust
 pub fn test_runner(tests: &[&TestDescAndFn]) {

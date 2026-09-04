@@ -314,7 +314,7 @@ pub trait TableStoreRow: TableContent {
 	fn timestamp(&self) -> Timestamp {
 		let timestamp = self.id().get_timestamp().unwrap();
 		let (secs, nanos) = timestamp.to_unix();
-		Timestamp::from_unix_epoch_elapsed(Duration::new(secs, nanos))
+		Timestamp::from_millis(secs as i64 * 1_000 + nanos as i64 / 1_000_000)
 	}
 }
 /// Helper blanket trait constraining types which may be included in a table.

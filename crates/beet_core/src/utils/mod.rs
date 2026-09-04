@@ -58,7 +58,7 @@ pub use stream_ext::TextStream;
 /// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
 /// An absolute, serializable wall-clock instant, the persistable counterpart of
-/// the monotonic [`Instant`].
+/// the monotonic [`Instant`], and the owner of the UTC calendar math.
 mod timestamp;
 /// Typed physical quantities ([`units::Angle`], [`units::Distance`],
 /// [`units::LinearVelocity`], [`units::AngularVelocity`]) shared by the robot

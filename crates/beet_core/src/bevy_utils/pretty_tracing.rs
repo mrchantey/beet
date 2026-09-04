@@ -264,10 +264,10 @@ pub struct Iso8601Timer;
 
 impl FormatTime for Iso8601Timer {
 	fn format_time(&self, writer: &mut Writer<'_>) -> core::fmt::Result {
-		let Ok(now) = time_ext::try_now() else {
+		let Ok(now) = Timestamp::try_now() else {
 			return Err(core::fmt::Error);
 		};
-		writer.write_str(&time_ext::format_iso8601(now))
+		writer.write_str(&now.format_iso8601())
 	}
 }
 
@@ -387,9 +387,7 @@ mod test {
 	}
 
 	/// Today's date, the prefix of every timestamp [`Iso8601Timer`] emits.
-	fn today() -> String {
-		time_ext::format_iso8601(time_ext::now())[..10].into()
-	}
+	fn today() -> String { Timestamp::now().format_iso8601()[..10].into() }
 
 	#[crate::test]
 	fn non_interactive_stamps_lines() {

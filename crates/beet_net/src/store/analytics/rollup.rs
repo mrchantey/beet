@@ -184,9 +184,7 @@ impl AnalyticsRollup {
 impl TableStoreRow for AnalyticsRollup {
 	fn id(&self) -> Uuid { self.id }
 	fn timestamp(&self) -> Timestamp {
-		time_ext::parse_date(&self.date)
-			.unwrap_or_default()
-			.xmap(Timestamp::from_unix_epoch_elapsed)
+		Timestamp::parse_date(&self.date).unwrap_or_default()
 	}
 }
 
@@ -407,7 +405,8 @@ mod test {
 
 	/// A day's epoch milliseconds, `hour` into the UTC day.
 	fn at(date: &str, hour: u64) -> u64 {
-		(time_ext::parse_date(date).unwrap().as_secs() + hour * 3600) * 1000
+		(Timestamp::parse_date(date).unwrap().secs() as u64 + hour * 3600)
+			* 1000
 	}
 
 	/// An event of `data` at `path` on `date`, attributed to `session`.

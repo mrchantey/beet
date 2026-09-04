@@ -236,7 +236,9 @@ impl AnalyticsEvent {
 	/// The UTC day this event was recorded on, `YYYY-MM-DD`: the key its
 	/// aggregate row and its archive object are both named by.
 	pub fn date(&self) -> SmolStr {
-		time_ext::format_date(Duration::from_millis(self.timestamp)).into()
+		Timestamp::from_millis(self.timestamp as i64)
+			.format_date()
+			.into()
 	}
 
 	/// Stamp the expiry `retention` gives this event's kind, from the server

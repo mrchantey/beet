@@ -2057,6 +2057,14 @@ mod test {
 				},
 				created: None,
 			});
+		// a `YYYY-MM-DD` string coerces to the instant it names, through the
+		// `Option` wrapper the field declares
+		scan(r#"<Fragment {Meta{created:"2025-09-06"}}/>"#)
+			.unwrap()
+			.created
+			.unwrap()
+			.format_date()
+			.xpect_eq("2025-09-06");
 		// a tuple spread names it alongside others
 		scan(r#"<Fragment {(Meta{draft: true}, PackageConfig)}/>"#)
 			.unwrap()

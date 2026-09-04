@@ -220,18 +220,6 @@ fn scalar_to_reflect(
 		return Ok(Box::new(dynamic));
 	}
 
-	// a non-numeric string targeting a numeric field errors rather than silently
-	// falling through to `String` (whose `from_reflect` miss would keep the
-	// target's default, eg a `port="nope"` leaving the default port)
-	if let (Value::Str(string), None, Some(info)) = (value, as_f64, field_info)
-		&& is_numeric_target(info)
-	{
-		bevybail!(
-			"invalid number {string:?}: expected a numeric string for a `{}` field",
-			info.type_path()
-		);
-	}
-
 	// a human duration string targeting a `Duration` field, so a markup
 	// `<EndInDuration duration="50ms"/>` authors a delay directly. A malformed value
 	// (a non-string, or a missing/unknown unit) errors rather than silently falling
@@ -260,6 +248,20 @@ fn scalar_to_reflect(
 			);
 		};
 		return Ok(Box::new(timestamp));
+	}
+
+	// a non-numeric string targeting a numeric field errors rather than silently
+	// falling through to `String` (whose `from_reflect` miss would keep the
+	// target's default, eg a `port="nope"` leaving the default port). Runs after
+	// the domain coercions above because a domain newtype is numeric-shaped:
+	// `Timestamp` wraps an `i64`, and its date string is not a number.
+	if let (Value::Str(string), None, Some(info)) = (value, as_f64, field_info)
+		&& is_numeric_target(info)
+	{
+		bevybail!(
+			"invalid number {string:?}: expected a numeric string for a `{}` field",
+			info.type_path()
+		);
 	}
 
 	// a `"true"`/`"false"` string targeting a `bool` field coerces to the bool, so a

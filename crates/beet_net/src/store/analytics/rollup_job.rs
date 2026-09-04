@@ -210,7 +210,7 @@ impl AnalyticsRollupRun {
 		&self,
 		by_date: &HashMap<SmolStr, Vec<AnalyticsEvent>>,
 	) -> Result<Vec<SmolStr>> {
-		let today = SmolStr::from(time_ext::format_date(time_ext::now()));
+		let today = SmolStr::from(Timestamp::now().format_date());
 		let mut complete = by_date
 			.keys()
 			.filter(|date| **date < today)

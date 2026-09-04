@@ -9,7 +9,7 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 	let PackageConfig { title, version, .. } = &*pkg_config;
 	let bootstrap = BootstrapConfig::get();
 
-	let current_year = time_ext::current_year();
+	let current_year = Timestamp::now().civil_date().0;
 	let footer_text = format!("© {title} {current_year}");
 
 	let mut build_text = format!("v{version}");

@@ -131,7 +131,7 @@ prefix, provisioned as its own step since a source shared by developers is a
 different process from a stage deploy. No stage deploy or destroy touches it.
 
     just beet-deploy [--stage=prod]        # build -> stores -> sync -> release -> watch -> purge
-    just beet-sync                         # re-publish the site (no redeploy)
+    just beet-sync                         # re-publish the site + restart (no redeploy)
     just beet-watch                        # tail the instance logs
     just site-shared apply                 # provision the site assets bucket
     just site-shared pull                  # hydrate site/assets from it (no credentials)
@@ -241,6 +241,12 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<Route path="sync" {ExchangeSequence}>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<!-- content is read from the store per request, so the sync above is
+			     already live; the restart is for what the box resolves ONCE at
+			     boot: `<RoutesDir/>` discovery (a page added, removed, or renamed
+			     by its slug) and this entry document itself. Before the purge,
+			     since purging while the old process serves re-caches it. -->
+			<LightsailRestart/>
 			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
