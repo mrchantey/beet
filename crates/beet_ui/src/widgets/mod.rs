@@ -28,6 +28,11 @@
 //! [`DraftOf`](beet_core::prelude::DraftOf) the schema document and committing
 //! through
 //! [`TypedDocument::commit_schema`](beet_core::prelude::TypedDocument).
+//! [`ToggleSchemaEditor`] is the last of those behind a closed disclosure, which
+//! is how an app opts into editing its own shape.
+//!
+//! A form or view that names no schema takes the one its document declares, so
+//! a document read out of a store describes its own widgets.
 //!
 //! Their reactivity has three independent grains: a leaf's value through its own
 //! binding, the layout the *schema* decides through [`SchemaRebuild`] (so a
@@ -133,6 +138,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<DynamicForm>()
 		.register_template::<DynamicView>()
 		.register_template::<SchemaEditor>()
+		.register_template::<ToggleSchemaEditor>()
 		.register_template::<Head>()
 		.register_template::<Header>()
 		.register_template::<HtmlDocument>()
@@ -147,11 +153,13 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<MenuButton>()
 		.register_template::<Table>();
 	// a schema-driven widget regenerates its subtree when the schema it renders
-	// changes, so a committed schema edit reaches every form and view of it.
+	// changes, so a committed schema edit reaches every form and view of it —
+	// and a widget reading its document's schema generates itself when the
+	// document arrives.
 	app.add_systems(
 		Update,
 		schema_rebuild::rebuild_schema_widgets
-			.run_if(resource_changed::<SchemaRegistry>),
+			.run_if(schema_rebuild::schema_widgets_may_rebuild),
 	);
 	// ...and the value-driven twin, for the controls a schema alone does not
 	// decide: a list's rows, a map's entries, an enum's payload.

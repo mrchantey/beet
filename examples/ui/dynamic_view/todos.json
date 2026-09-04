@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "List": {
+      "item": {
+        "Ref": {
+          "Name": "TodoItem"
+        }
+      },
+      "min_items": null,
+      "max_items": null,
+      "unique": false
+    }
+  },
+  "value": [
+    {
+      "done": true,
+      "label": "buy milk"
+    },
+    {
+      "done": false,
+      "label": "walk dog"
+    }
+  ]
+}

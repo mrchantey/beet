@@ -1,0 +1,51 @@
+<!--
+A todo app with nothing todo-specific in it. Run it through the one binary:
+
+    beet --main=examples/ui/dynamic_view.bsx
+
+Nothing here knows what a todo is. `dynamic_view/schema.json` is a schema
+document holding the row schema (`TodoItem`), `dynamic_view/todos.json` is the
+data document holding the rows and composing that schema by reference, and every
+widget on the page is generated from whichever one it is bound to:
+
+- `<DynamicView/>` reads the list as a table, one column per field of the row.
+- `<DynamicForm/>` edits the same list: a control per field per row, a remove
+  button beside each row and an add button that appends the row schema's zero.
+- `<ToggleSchemaEditor/>` is edit mode, closed by default. Open it and the form
+  inside edits the *schema* document, generated from the schema of schemas, and
+  Apply commits the new schema and backfills every existing row in one
+  transaction (or refuses and touches neither document).
+
+So the demonstration is the loop: open edit mode, add a field named
+`is_really_difficult`, choose `Bool` for its schema, press Apply, close edit mode
+— and the table has a new column and the form a new control, because both are
+generated from the schema that just changed. A commit must leave the rows that
+already exist valid, so a *required* field also needs an `on_missing` of
+`Default`; leaving the new field optional is the other way to say the same
+thing, and a commit with neither is refused in the error line under the form.
+
+Naming which document is which is the whole wiring. `<DocumentBlob>` is a
+document that lives in the store (here the entry's own directory), so the schema
+document is a sibling declaration the editor points at with `{DocRef($schema)}`
+and the data document is the subtree everything else sits in. The widgets name
+no schema at all: a document is the authority on the shape of its own value, so
+they read it from the document they bind, whenever it arrives.
+
+The two JSON files are the *living* state, not the authored original: editing in
+the app rewrites them, so `git diff examples/ui/dynamic_view` is the record of
+what the session changed and `git checkout` is the reset.
+-->
+<CallOnReady {(TuiServer, SweepDescendants)}>
+	<CrateCheck features={["tui_server", "json", "fs"]}/>
+	<Router>
+		<Route path="/" {FixedPage}>
+			<DocumentBlob bx:ref="schema" path="dynamic_view/schema.json"/>
+			<DocumentBlob path="dynamic_view/todos.json">
+				<h1>Todos</h1>
+				<DynamicView/>
+				<DynamicForm/>
+				<ToggleSchemaEditor {DocRef($schema)}/>
+			</DocumentBlob>
+		</Route>
+	</Router>
+</CallOnReady>

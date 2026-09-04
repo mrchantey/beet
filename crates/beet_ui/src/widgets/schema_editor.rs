@@ -66,6 +66,39 @@ pub fn SchemaEditor() -> impl Bundle {
 	}
 }
 
+/// Edit mode: a [`SchemaEditor`] behind a closed disclosure, so an app ships the
+/// ability to change its own shape without wearing it.
+///
+/// Item 11's opt-in, as a component rather than a feature: an app that wants no
+/// schema editing simply does not author this, and one that does gets the
+/// toggle, the editor and the whole commit path with one tag. The `DocRef`
+/// naming the schema document rides this tag, since the editor resolves it by
+/// ancestor walk.
+///
+/// The disclosure is a plain `<details>`, closed by default: the terminal
+/// collapses it exactly as the browser does, so edit mode costs no widget of its
+/// own and stays true on every surface.
+///
+/// ```rsx
+/// <div {data.bundle()}>
+///   <Fragment bx:ref="schema" {schema.bundle()}/>
+///   <ToggleSchemaEditor {DocRef($schema)}/>
+/// </div>
+/// ```
+#[template]
+pub fn ToggleSchemaEditor(
+	/// The disclosure's label.
+	#[prop(default = "Edit schema".to_string())]
+	label: String,
+) -> impl Bundle {
+	rsx! {
+		<details>
+			<summary>{label}</summary>
+			<SchemaEditor/>
+		</details>
+	}
+}
+
 /// Marks a [`SchemaEditor`]'s draft document, the fork of the schema document
 /// the editor's [`DocRef`] names.
 ///

@@ -36,15 +36,41 @@ pub(super) struct CharcellNodeData<'a> {
 	kitty: Option<&'a KittyImage>,
 }
 
+/// Whether a control's value is nothing typed: a null, or an empty string.
+fn nothing_typed(value: &Value) -> bool {
+	value.is_null() || value.to_string().is_empty()
+}
+
 impl CharcellNodeData<'_> {
 	/// The node's displayed [`Value`]: a text leaf's content, or a form
 	/// control's bound value. An element's own `Value` is otherwise binding
 	/// state (eg a `bx:click` field mirror), never painted as text.
+	///
+	/// A **control** with nothing in it — a null, which for a control is nothing
+	/// typed rather than the word "null", or an empty string — displays nothing
+	/// and reads as its own empty box, while a bound text node reads its null as
+	/// the value it is (a view is total where an editor is empty). The same rule
+	/// the render walker applies, so an optional field reads the same in the
+	/// terminal as it serves. A control generating a [`Marker`] is exempt: a
+	/// `<select>`'s empty value is submission state and its marker label is what
+	/// paints.
 	pub fn value(&self) -> Option<&Value> {
 		self.element
 			.is_none_or(|element| is_value_element(element.tag()))
 			.then_some(self.value)
 			.flatten()
+			.filter(|value| {
+				self.element.is_none()
+					|| self.marker.is_some()
+					|| !nothing_typed(value)
+			})
+	}
+
+	/// Whether this node is a form control, ie displays and edits its own
+	/// [`Value`] rather than carrying text content.
+	pub fn is_control(&self) -> bool {
+		self.element
+			.is_some_and(|element| is_value_element(element.tag()))
 	}
 
 	pub fn intrinsic_size(&self) -> UVec2 { self.intrinsic_size.0 }

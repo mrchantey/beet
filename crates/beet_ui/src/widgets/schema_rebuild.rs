@@ -6,12 +6,44 @@
 //! schema is not: a committed schema edit adds a column only if the subtree
 //! generated from it is rebuilt. This is that rebuild, and the one place a
 //! schema-driven widget's reactivity to its *schema* lives.
+//!
+//! A schema arrives two ways ([`SchemaSource`]): authored on the widget, or
+//! declared by the document it binds into. Both are re-read here every time
+//! something that could change them changes, so a widget mounted over a document
+//! still being read out of a store generates itself the moment it lands.
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 
+/// Where a schema-driven widget's schema comes from.
+///
+/// One or the other, never both: a widget that names a schema means it, and a
+/// widget that names none takes the document's, since a document is the one
+/// authority on the shape of its own value. Restating it on the widget would be
+/// a second copy nothing keeps in step, which is the rule the bindings already
+/// follow.
+#[derive(Clone)]
+pub enum SchemaSource {
+	/// The schema authored on the widget.
+	Authored(ValueSchema),
+	/// The schema the bound document declares at `field`, absent until the
+	/// document arrives.
+	Document(FieldRef),
+}
+
+impl SchemaSource {
+	/// The authored schema, or `None` for a document source, whose schema only
+	/// the world can answer.
+	fn authored(&self) -> Option<&ValueSchema> {
+		match self {
+			Self::Authored(schema) => Some(schema),
+			Self::Document(_) => None,
+		}
+	}
+}
+
 /// Holds the schema a subtree was generated from and the builder that
-/// regenerates it, so a schema edit landing in the [`SchemaRegistry`] respawns
-/// every subtree that schema describes.
+/// regenerates it, so a schema edit landing in the [`SchemaRegistry`] — or in
+/// the bound document — respawns every subtree that schema describes.
 ///
 /// The holder is **element-less**, so it adds a transparent node rather than a
 /// wrapper: both renderers pass through a node with no `Element`. Its children
@@ -20,45 +52,64 @@ use bevy::platform::sync::Arc;
 /// siblings and survive untouched.
 ///
 /// A rebuild fires exactly when the schema the subtree renders *changed*: the
-/// authored schema is re-resolved against the registry on every registry change
-/// and compared with what the current generation was built from. A schema
-/// naming no [`ValueSchema::Ref`] resolves to itself and so never
-/// rebuilds; a reference that was still arriving at build time rebuilds the
-/// moment it lands.
+/// source schema is re-resolved against the registry and compared with what the
+/// current generation was built from. A schema naming no [`ValueSchema::Ref`]
+/// resolves to itself and so never rebuilds; a reference that was still
+/// arriving at build time rebuilds the moment it lands, and a document-sourced
+/// widget has no generation at all until its document answers one.
 #[derive(Component)]
 pub struct SchemaRebuild {
-	/// The authored schema, re-resolved on every registry change.
-	schema: ValueSchema,
+	/// Where the schema comes from, re-read on every pass.
+	source: SchemaSource,
 	/// The fully resolved schema the current generation was built from, the
-	/// fingerprint a rebuild is decided by.
-	resolved: ValueSchema,
-	/// Builds one generation.
-	build: Arc<dyn for<'a> Fn(SchemaResolver<'a>) -> Snippet + Send + Sync>,
+	/// fingerprint a rebuild is decided by. `None` before the first generation.
+	resolved: Option<ValueSchema>,
+	/// Builds one generation from the schema as its source currently reads it.
+	build: Arc<
+		dyn for<'a> Fn(SchemaResolver<'a>, &ValueSchema) -> Snippet
+			+ Send
+			+ Sync,
+	>,
 }
 
 impl SchemaRebuild {
-	/// Hold `schema` and the `build` that renders it, fingerprinted against
+	/// Hold `source` and the `build` that renders it, fingerprinted against
 	/// `resolver` as it stands now.
 	pub fn new(
 		resolver: SchemaResolver,
-		schema: ValueSchema,
+		source: SchemaSource,
 		build: impl 'static
 		+ Send
 		+ Sync
-		+ for<'a> Fn(SchemaResolver<'a>) -> Snippet,
+		+ for<'a> Fn(SchemaResolver<'a>, &ValueSchema) -> Snippet,
 	) -> Self {
 		Self {
-			resolved: Self::resolve(resolver, &schema),
-			schema,
+			resolved: source
+				.authored()
+				.map(|schema| Self::resolve(resolver, schema)),
+			source,
 			build: Arc::new(build),
 		}
 	}
 
 	/// The holder node a schema-driven template emits in place of its generated
 	/// subtree: this rebuild, carrying the first generation as its only child.
+	///
+	/// A document-sourced widget has no schema at build time, so it emits the
+	/// holder alone and [`rebuild_schema_widgets`] spawns its first generation
+	/// when the document answers one — the same shape `ValueRebuild` takes for
+	/// a value that has not synced yet.
 	pub fn holder(self, resolver: SchemaResolver) -> Snippet {
-		let generation = (self.build)(resolver);
-		Snippet::from_bundle((self, children![generation]))
+		match self
+			.source
+			.authored()
+			.map(|schema| (self.build)(resolver, schema))
+		{
+			Some(generation) => {
+				Snippet::from_bundle((self, children![generation]))
+			}
+			None => Snippet::from_bundle(self),
+		}
 	}
 
 	/// The schema as `resolver` currently resolves it, or the schema itself when
@@ -71,26 +122,55 @@ impl SchemaRebuild {
 	}
 }
 
-/// Respawn the generation of every [`SchemaRebuild`] whose schema a registry
-/// edit changed, leaving the rest (and every holder's siblings) alone.
+/// Run condition for [`rebuild_schema_widgets`]: the three ways the schema a
+/// holder renders can change — a registry edit, a document declaring a new
+/// schema (or arriving with one), and a holder built after the document it
+/// reads.
+pub(super) fn schema_widgets_may_rebuild(
+	registry: Option<Res<SchemaRegistry>>,
+	changed_schemas: Query<(), Changed<DocumentSchema>>,
+	new_holders: Query<(), Added<SchemaRebuild>>,
+) -> bool {
+	registry.is_some_and(|registry| registry.is_changed())
+		|| !changed_schemas.is_empty()
+		|| !new_holders.is_empty()
+}
+
+/// Respawn the generation of every [`SchemaRebuild`] whose schema changed,
+/// leaving the rest (and every holder's siblings) alone.
 pub(super) fn rebuild_schema_widgets(
-	registry: Res<SchemaRegistry>,
+	registry: Option<Res<SchemaRegistry>>,
+	documents: DocumentQuery,
 	mut holders: Populated<(Entity, &mut SchemaRebuild, Option<&Children>)>,
 	mut commands: Commands,
 ) {
-	let resolver = SchemaResolver::default().with_schemas(&registry);
+	let resolver = match registry.as_deref() {
+		Some(registry) => SchemaResolver::default().with_schemas(registry),
+		None => SchemaResolver::default(),
+	};
 	for (entity, mut rebuild, children) in holders.iter_mut() {
-		let resolved = SchemaRebuild::resolve(resolver, &rebuild.schema);
-		if resolved == rebuild.resolved {
+		// the source is re-read rather than remembered: a document's schema is
+		// its own, and may arrive, change or be committed long after this holder
+		let schema = match &rebuild.source {
+			SchemaSource::Authored(schema) => Some(schema.clone()),
+			SchemaSource::Document(field) => {
+				documents.field_schema(entity, field)
+			}
+		};
+		// a document that has not answered yet leaves the holder empty, which is
+		// the still-arriving case rather than a failure
+		let Some(schema) = schema else { continue };
+		let resolved = SchemaRebuild::resolve(resolver, &schema);
+		if rebuild.resolved.as_ref() == Some(&resolved) {
 			continue;
 		}
-		rebuild.resolved = resolved;
+		rebuild.resolved = Some(resolved);
 		if let Some(children) = children {
 			for child in children.iter() {
 				commands.entity(child).despawn();
 			}
 		}
-		commands.spawn((ChildOf(entity), (rebuild.build)(resolver)));
+		commands.spawn((ChildOf(entity), (rebuild.build)(resolver, &schema)));
 	}
 }
 
@@ -214,5 +294,78 @@ mod test {
 			.unwrap()
 			.lt(&html.find("Save").unwrap())
 			.xpect_true();
+	}
+
+	/// A rebuilt view keeps its rows: the regenerated subtree's own bindings
+	/// must be seeded from the document that is already there, since nothing
+	/// changes it afterwards to fan out to them.
+	#[beet_core::test]
+	fn a_rebuilt_view_keeps_its_rows() {
+		let mut world = world_ext::ui_world();
+		let item = |fields: Vec<NamedFieldSchema>| {
+			ValueSchema::Struct(StructSchema {
+				name: Some("TodoItem".into()),
+				allow_additional: false,
+				fields,
+			})
+		};
+		let label =
+			NamedFieldSchema::new("label", ValueSchema::String(default()));
+		world
+			.get_resource_or_init::<SchemaRegistry>()
+			.insert("TodoItem", item(vec![label.clone()]));
+		let root = world
+			.spawn((
+				Document::new(value!([{ "label": "buy milk" }])),
+				DocumentSchema(ValueSchema::List(ListSchema {
+					item: Box::new(ValueSchema::reference("TodoItem")),
+					min_items: None,
+					max_items: None,
+					unique: false,
+				})),
+			))
+			.id();
+		let view = world.spawn_template(rsx! { <DynamicView/> }).unwrap().id();
+		world.entity_mut(root).add_child(view);
+		test_ext::settle_world(&mut world);
+		test_ext::render_world(&mut world, root).xpect_contains("buy milk");
+
+		world.get_resource_or_init::<SchemaRegistry>().insert(
+			"TodoItem",
+			item(vec![
+				label,
+				NamedFieldSchema::new("done", ValueSchema::Bool(default())),
+			]),
+		);
+		test_ext::settle_world(&mut world);
+
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("<th>done</th>")
+			.xpect_contains("buy milk");
+	}
+
+	/// A widget naming no schema takes the one its document declares, and takes
+	/// it whenever it lands: the store read that answers a document resolves
+	/// frames after the tree that binds it is built, so a view mounted over one
+	/// has no generation until then and a full one after.
+	#[beet_core::test]
+	fn a_document_schema_arriving_late_generates_the_view() {
+		let mut world = world_ext::ui_world();
+		let root = world.spawn_template(rsx! { <DynamicView/> }).unwrap().id();
+		world.update_local();
+		// nothing to read yet: the holder is there, its generation is not
+		test_ext::render_world(&mut world, root)
+			.xnot()
+			.xpect_contains("name");
+
+		world.entity_mut(root).insert((
+			Document::new(value!({ "name": "buy milk" })),
+			DocumentSchema::of::<Profile>(),
+		));
+		test_ext::settle_world(&mut world);
+
+		test_ext::render_world(&mut world, root)
+			.xpect_contains("name")
+			.xpect_contains("buy milk");
 	}
 }

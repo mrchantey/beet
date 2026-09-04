@@ -201,6 +201,39 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		}
 	}
 
+	/// The schema the document declares at `field`, or `None` when it declares
+	/// none, cannot resolve it yet, or does not describe that path.
+	///
+	/// The read twin of [`assert_field_type`](Self::assert_field_type), for a
+	/// widget generated *from* a schema: the document is the one authority on
+	/// the shape of its own value, so a widget that names no schema reads the
+	/// one it is bound to rather than restating it. `None` is the ordinary
+	/// still-arriving case, not a failure.
+	pub fn field_schema(
+		&self,
+		subject: Entity,
+		field: &FieldRef,
+	) -> Option<ValueSchema> {
+		let doc_entity = self.entity(subject, &field.document);
+		let field_path = self.scopes.resolved_path(
+			subject,
+			&field.field_path,
+			Some(doc_entity),
+		);
+		let resolver = self.resolver();
+		let schema = self
+			.schemas
+			.get(doc_entity)
+			.ok()?
+			.0
+			.resolve(resolver)
+			.ok()?;
+		schema
+			.get_field_schema_in(resolver, &field_path)
+			.ok()
+			.cloned()
+	}
+
 	/// The resolver a document schema resolves its indirections through.
 	fn resolver(&self) -> SchemaResolver<'_> {
 		match &self.schema_registry {

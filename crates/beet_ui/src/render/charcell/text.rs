@@ -18,19 +18,24 @@ use super::truncate_to_width;
 /// Compute the intrinsic size of a text node.
 ///
 /// Wraps the text to `max_width` columns and returns `(max_line_width, line_count)`.
-/// An empty value with no generated [`Marker`] reserves no row, so a form control
-/// with an empty bound value (eg a blank `<input>` after `FormPlugin` seeds
-/// `Value::str("")`) hugs its padding/border rather than gaining a phantom content
-/// line — matching a control with no value at all. A `<select>` keeps its row: the
-/// empty value is submission state, but the marker label is what paints, so the box
-/// must still reserve a line for it.
+/// An empty text node with no generated [`Marker`] reserves nothing, so a node
+/// whose bound value is empty hugs its padding/border rather than gaining a
+/// phantom content line. An empty **control** instead reserves a single caret
+/// cell: a field with nothing typed is still the thing the user clicks into, and
+/// a zero-sized box cannot be hit or focused, so the empty `<input>` a generated
+/// form emits for a fresh row would be unreachable. A `<select>` keeps its row
+/// through its marker: the empty value is submission state, but the marker label
+/// is what paints.
 pub(crate) fn measure_text(node: &CharcellNodeData, max_width: u32) -> UVec2 {
 	let value = node
 		.value()
 		.map(|value| value.to_string())
 		.unwrap_or_default();
 	if value.is_empty() && node.marker().is_none() {
-		return UVec2::ZERO;
+		return match node.is_control() {
+			true => UVec2::ONE,
+			false => UVec2::ZERO,
+		};
 	}
 	measure_scaled(node.visual_style(), &value, max_width)
 }
@@ -269,6 +274,42 @@ mod tests {
 	}
 	fn render_pluses(bundle: impl Bundle) -> String {
 		render(bundle).replace(" ", "+")
+	}
+
+	/// An empty form control is still a target: a field with nothing typed is
+	/// what the user clicks into, and a zero-sized box can be neither hit nor
+	/// focused. Regression for the live TUI, where the blank `<input>` a
+	/// generated form emits for a freshly appended row could not be reached at
+	/// all, so a new list item could never be named.
+	#[beet_core::test]
+	fn an_empty_control_keeps_a_caret() {
+		let mut world = CharcellPlugin::world();
+		world.spawn((
+			Buffer::new(UVec2::new(20, 4)).into_double_buffer(),
+			rsx! { <input/> },
+		));
+		world.run_schedule(PostParseTree);
+		world
+			.query_once::<(&Element, &LayoutRect)>()
+			.into_iter()
+			.find(|(element, _)| element.tag() == "input")
+			.unwrap()
+			.1
+			.0
+			.width()
+			.xpect_greater_than(0);
+	}
+
+	/// A **control**'s null is nothing typed rather than the word "null", while a
+	/// bound text node reads its null as the value it is: the render walker's
+	/// rule, now the terminal's too, so an optional field reads the same painted
+	/// as it does served.
+	#[beet_core::test]
+	fn a_control_null_paints_nothing() {
+		render(rsx! { <input {Value::Null}/> })
+			.xnot()
+			.xpect_contains("null");
+		render(rsx! { <span>{(Value::Null,)}</span> }).xpect_contains("null");
 	}
 
 	// ── Layout ────────────────────────────────────────────────────────────────

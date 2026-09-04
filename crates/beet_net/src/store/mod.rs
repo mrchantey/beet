@@ -64,6 +64,8 @@ mod analytics;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 mod aws_cli;
 #[cfg(feature = "json")]
+mod document_blob;
+#[cfg(feature = "json")]
 mod document_store;
 #[cfg(feature = "std")]
 mod store_ref;
@@ -75,6 +77,8 @@ mod template_store;
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
+#[cfg(feature = "json")]
+pub use document_blob::*;
 #[cfg(feature = "json")]
 pub(crate) use document_store::*;
 #[cfg(feature = "std")]
@@ -179,10 +183,19 @@ impl Plugin for StorePlugin {
 		// the by-location half of schema resolution: a document naming its
 		// schema by path has that schema read out of its own store.
 		#[cfg(feature = "json")]
-		app.init_resource::<SchemaRegistry>().add_systems(
-			PreUpdate,
-			read_located_schemas.run_if(located_schemas_may_be_readable),
-		);
+		app.init_resource::<SchemaRegistry>()
+			.register_type::<DocumentBlob>()
+			.add_systems(
+				PreUpdate,
+				(
+					read_located_schemas
+						.run_if(located_schemas_may_be_readable),
+					// the documents an app edits: read out of the store onto
+					// their own entities, and written back on every edit.
+					read_document_blobs.run_if(document_blobs_may_be_readable),
+				),
+			)
+			.add_systems(PostUpdate, write_document_blobs);
 
 		// wasm localStorage watcher lifecycle (NonSend, owns the JS closure)
 		#[cfg(target_arch = "wasm32")]

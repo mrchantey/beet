@@ -71,9 +71,11 @@ const MAX_DEPTH: usize = 8;
 /// ```
 #[template(system)]
 pub fn DynamicForm(
-	/// The schema of the value this form edits.
-	#[prop(required)]
-	schema: ValueSchema,
+	/// The schema of the value this form edits. Omitted, the form edits under
+	/// the schema the bound document declares at `field`, which is the authored
+	/// form for a document loaded out of a store.
+	#[prop]
+	schema: Option<ValueSchema>,
 	/// The document field the form edits: the path every generated control's
 	/// own [`FieldRef`] extends. Defaults to the whole document.
 	#[prop]
@@ -90,15 +92,18 @@ pub fn DynamicForm(
 	// the controls are one generation, respawned when a committed schema edit
 	// changes what this schema resolves to; the slot's children are its siblings
 	let controls = {
-		let schema = schema.clone();
 		let field = field.clone();
-		move |resolver: SchemaResolver| {
-			schema_field(resolver, &schema, field.clone(), None, 0)
+		move |resolver: SchemaResolver, schema: &ValueSchema| {
+			schema_field(resolver, schema, field.clone(), None, 0)
 		}
+	};
+	let source = match schema {
+		Some(schema) => SchemaSource::Authored(schema),
+		None => SchemaSource::Document(field),
 	};
 	rsx! {
 		<Form>
-			{SchemaRebuild::new(resolver, schema, controls).holder(resolver)}
+			{SchemaRebuild::new(resolver, source, controls).holder(resolver)}
 			<Slot/>
 		</Form>
 	}

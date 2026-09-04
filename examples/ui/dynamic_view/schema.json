@@ -1,0 +1,39 @@
+{
+  "schema": {
+    "Ref": {
+      "TypePath": "beet_core::types::value::value_schema::value_schema::ValueSchema"
+    }
+  },
+  "value": {
+    "Struct": {
+      "allow_additional": false,
+      "fields": [
+        {
+          "description": null,
+          "key": "label",
+          "label": null,
+          "on_missing": null,
+          "required": true,
+          "schema": {
+            "String": {
+              "constraints": [],
+              "multiline": false,
+              "sensitive": false
+            }
+          }
+        },
+        {
+          "description": null,
+          "key": "done",
+          "label": null,
+          "on_missing": null,
+          "required": true,
+          "schema": {
+            "Bool": {}
+          }
+        }
+      ],
+      "name": "TodoItem"
+    }
+  }
+}

@@ -47,9 +47,11 @@ const MAX_DEPTH: usize = 8;
 /// ```
 #[template(system)]
 pub fn DynamicView(
-	/// The schema of the value this view reads.
-	#[prop(required)]
-	schema: ValueSchema,
+	/// The schema of the value this view reads. Omitted, the view reads the
+	/// schema the bound document declares at `field`, which is the authored
+	/// form for a document loaded out of a store.
+	#[prop]
+	schema: Option<ValueSchema>,
 	/// The document field the view reads: the path every generated leaf's own
 	/// [`FieldRef`] extends. Defaults to the whole document.
 	#[prop]
@@ -70,18 +72,21 @@ pub fn DynamicView(
 	// the laid-out value is one generation, respawned when a committed schema
 	// edit changes what this schema resolves to (a table gaining a column)
 	let rows = {
-		let schema = schema.clone();
 		let field = field.clone();
-		move |resolver: SchemaResolver| {
+		move |resolver: SchemaResolver, schema: &ValueSchema| {
 			let cx = ViewCx {
 				resolver,
 				vertical_lines,
 			};
-			view_field(cx, &schema, field.clone(), None, 0)
+			view_field(cx, schema, field.clone(), None, 0)
 		}
 	};
+	let source = match schema {
+		Some(schema) => SchemaSource::Authored(schema),
+		None => SchemaSource::Document(field),
+	};
 	rsx! {
-		<div>{SchemaRebuild::new(resolver, schema, rows).holder(resolver)}</div>
+		<div>{SchemaRebuild::new(resolver, source, rows).holder(resolver)}</div>
 	}
 }
 

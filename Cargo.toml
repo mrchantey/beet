@@ -775,6 +775,14 @@ path = "tests/bsx_site_tui.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "tui_server", "testing"]
 
+# the embodiment gate: the on-disk `examples/ui/dynamic_view.bsx` todo app, its
+# schema and data documents, and item 3's schema-edit loop through the terminal.
+[[test]]
+name = "dynamic_view_tui"
+path = "tests/dynamic_view_tui.rs"
+harness = false
+required-features = ["router", "style", "json", "fs", "tui_server", "testing"]
+
 # The cross-transport analytics flow: an http request + web beacon persist to the
 # store (with prior data retained), the web half of the deploy skill's check `e`.
 [[test]]
