@@ -104,8 +104,12 @@ impl Plugin for RouterPlugin {
 				.register_template::<RouteList>()
 				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
-				// `@entity:PageRoot::ArticleMeta.title`
-				.register_type::<ArticleMeta>()
+				// `@entity:PageRoot::PageMeta.title`
+				.register_type::<PageMeta>()
+				// the component a document's unsectioned frontmatter keys declare,
+				// overridable per dir, eg
+				// `<RoutesDir {FrontmatterType{component:"MyMeta"}}/>`
+				.register_type::<FrontmatterType>()
 				// the no-code render-diagnostics config, patchable from markup
 				// like `PackageConfig`, eg `<RenderDiagnostics unknown_class="Off"/>`
 				.register_type::<RenderDiagnostics>()
@@ -118,6 +122,10 @@ impl Plugin for RouterPlugin {
 				// the generated page listing a content index page places instead
 				// of a hand-maintained list, eg `<RouteIndex reverse="true"/>`
 				.register_template::<RouteIndex>()
+				// the article chrome a blog layout places above the post body,
+				// rendered from the page's own `PageMeta`
+				.register_template::<ArticleHeader>()
+				.register_template::<YouTubeEmbed>()
 				// the shipped document shell a no-code site wraps its pages in,
 				// requested with `<SiteLayout>`.
 				.register_template::<SiteLayout>()

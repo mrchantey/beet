@@ -7,15 +7,19 @@
 //! scoped to `src` and listed, and each content file
 //! (`.md`/`.mdx`/`.bsx`/`.html`) spawns a [`BlobScene`] route child served through
 //! the shared media-parse pipeline. The scoped [`BlobStore`] is composed onto the
-//! [`RoutesDir`] entity so the routes read their bytes from it, and markdown
-//! frontmatter is read at scan time into [`ArticleMeta`] so navigation (eg
-//! [`RouteSidebar`](crate::prelude::RouteSidebar)) knows every page's title/order
-//! without visiting it. Discovery is store-backed, so it reads identically from
-//! the local filesystem in dev and from S3 in a deployed task.
+//! [`RoutesDir`] entity so the routes read their bytes from it, and each file's
+//! ROOT declarations ([`RootDeclarations`]: markdown frontmatter or a BSX root
+//! spread) are read at scan time and hoisted onto the route entity, so navigation
+//! (eg [`RouteSidebar`](crate::prelude::RouteSidebar)) knows every page's
+//! title/order without visiting it. The scan knows no metadata type: it hoists
+//! whatever components a document declares, and [`PageMeta`] is one consumer of
+//! that set like any other. Discovery is store-backed, so it reads identically
+//! from the local filesystem in dev and from S3 in a deployed task.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::*;
 
 /// Spawns one [`BlobScene`] route child per content file under `src`,
 /// discovered at spawn time (see the module docs).
@@ -129,15 +133,33 @@ impl RoutesDir {
 			// observers settle against the whole hierarchy.
 			entity_mut.run_async_local(
 				async move |dir: AsyncEntity| -> Result {
-					let store = dir
-						.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-							|entity, stores| {
-								stores.get(entity).map(BlobStore::clone)
+					// resolved together, inside the task where the whole tree is
+					// built so the ancestor links are reliably present: the store
+					// the files load from, and the component this dir's unsectioned
+					// frontmatter keys declare.
+					let (store, frontmatter_type) = dir
+						.with_state::<(
+							AncestorQuery<&BlobStore>,
+							AncestorQuery<&FrontmatterType>,
+						), Result<(BlobStore, FrontmatterType)>>(
+							|entity, (stores, types)| {
+								Ok((
+									stores.get(entity).cloned()?,
+									types
+										.get(entity)
+										.cloned()
+										.unwrap_or_default(),
+								))
 							},
 						)
-						.await??
-						.with_subdir(src);
-					let specs = Self::discover_routes(&store, &filter).await?;
+						.await??;
+					let store = store.with_subdir(src);
+					let specs = Self::discover_routes(
+						&store,
+						&filter,
+						&frontmatter_type.component,
+					)
+					.await?;
 					dir.world()
 						.with(move |world| {
 							// watch the discovered routes dir for live reload (keyed to
@@ -180,21 +202,25 @@ impl RoutesDir {
 		Ok(())
 	}
 
-	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`.
+	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`,
+	/// hoisting the components its root declared onto the route entity.
 	///
-	/// The metadata is resolved first because it has the last word on the url: a
-	/// `slug` renames the filename-derived final segment. A BSX page's metadata
-	/// resolves here rather than in the scan because reflect-building its spread
-	/// needs the world's type registry.
+	/// The declarations resolve here rather than in the scan because
+	/// reflect-building them needs the world's type registry, and the router reads
+	/// [`PageMeta`] out of them first because a `slug` has the last word on the
+	/// url — before the route entity it would live on exists.
 	fn spawn_route_spec(
 		world: &mut World,
 		parent: Entity,
-		spec: RouteSpec,
+		mut spec: RouteSpec,
 	) -> Result {
-		let meta = spec
-			.meta
-			.resolve(world)
-			.map(|meta| meta.with_file_defaults(&spec.store_path));
+		PageMeta::declare_file_defaults(
+			&mut spec.declarations,
+			&spec.store_path,
+		);
+		let meta = world
+			.get_resource::<AppTypeRegistry>()
+			.and_then(|registry| spec.declarations.get(&registry.read()));
 		let route_path = Self::route_path_for(&spec.store_path, meta.as_ref())?;
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
@@ -206,10 +232,7 @@ impl RoutesDir {
 			PageRoute,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		if let Some(meta) = meta {
-			route_entity.insert(meta);
-		}
-		Ok(())
+		spec.declarations.insert(&mut route_entity)
 	}
 
 	/// List the store's content files and read each one's declared metadata,
@@ -222,6 +245,7 @@ impl RoutesDir {
 	async fn discover_routes(
 		store: &BlobStore,
 		filter: &GlobFilter,
+		frontmatter_type: &str,
 	) -> Result<Vec<RouteSpec>> {
 		let mut paths = store.list().await?;
 		paths.sort();
@@ -230,7 +254,12 @@ impl RoutesDir {
 			.filter(|path| Self::is_content(path) && filter.passes(path))
 			.map(async |path| -> Result<RouteSpec> {
 				Ok(RouteSpec {
-					meta: Self::scan_meta(store, &path).await,
+					declarations: Self::scan_declarations(
+						store,
+						&path,
+						frontmatter_type,
+					)
+					.await,
 					store_path: path,
 				})
 			})
@@ -251,7 +280,7 @@ impl RoutesDir {
 	/// A pure function of the filename, shared with the codegen collection scan
 	/// so a route path never depends on which scan found the file. The
 	/// frontmatter `slug` override is applied on top by the caller, which holds
-	/// the parsed [`ArticleMeta`] (see [`ArticleMeta::apply_slug`]).
+	/// the resolved [`PageMeta`] (see [`PageMeta::apply_slug`]).
 	pub(crate) fn route_path_of(rel: &SmolPath) -> SmolPath {
 		let mut segments = rel.segments();
 		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
@@ -275,7 +304,7 @@ impl RoutesDir {
 	/// serve at `/journal` while every sibling post stayed under `/blog`.
 	fn route_path_for(
 		store_path: &SmolPath,
-		meta: Option<&ArticleMeta>,
+		meta: Option<&PageMeta>,
 	) -> Result<SmolPath> {
 		let route_path = Self::route_path_of(store_path);
 		let Some(meta) = meta.filter(|meta| meta.slug.is_some()) else {
@@ -290,71 +319,41 @@ impl RoutesDir {
 		meta.apply_slug(&route_path)
 	}
 
-	/// Read a content file's declared page metadata through the store: markdown
+	/// Read a content file's ROOT declarations through the store: markdown
 	/// frontmatter, or the root spreads of a BSX document. Any read/parse failure
-	/// yields [`RouteSpecMeta::None`], since a page without metadata is a page.
-	async fn scan_meta(store: &BlobStore, path: &SmolPath) -> RouteSpecMeta {
+	/// yields no declarations, since a page declaring nothing is a page.
+	async fn scan_declarations(
+		store: &BlobStore,
+		path: &SmolPath,
+		frontmatter_type: &str,
+	) -> RootDeclarations {
 		let Some(source) = store
 			.get(path)
 			.await
 			.ok()
 			.and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
 		else {
-			return RouteSpecMeta::None;
+			return default();
 		};
 		match path.extension() {
-			#[cfg(feature = "markdown_parser")]
-			Some("md" | "mdx" | "markdown") => ArticleMeta::from_markdown(&source)
-				.map(RouteSpecMeta::Article)
-				.unwrap_or(RouteSpecMeta::None),
+			Some("md" | "mdx" | "markdown") => Frontmatter::extract(&source)
+				.ok()
+				.flatten()
+				.map(|frontmatter| frontmatter.declarations(frontmatter_type))
+				.unwrap_or_default(),
 			Some("bsx") => BsxNode::parse_document(&source, &default())
-				.map(RouteSpecMeta::Bsx)
-				.unwrap_or(RouteSpecMeta::None),
-			_ => RouteSpecMeta::None,
+				.map(|nodes| RootDeclarations::from_bsx(&nodes))
+				.unwrap_or_default(),
+			_ => default(),
 		}
 	}
 }
 
-/// A discovered content file: the store path its bytes load from, and the page
-/// metadata that file declares.
+/// A discovered content file: the store path its bytes load from, and the
+/// components that file declares at its root.
 struct RouteSpec {
 	store_path: SmolPath,
-	meta: RouteSpecMeta,
-}
-
-/// How a discovered file declares its page metadata, in the form the scan could
-/// read without a world.
-///
-/// The two content surfaces name the same thing two ways: markdown writes
-/// frontmatter (`+++ title = ".." +++`), BSX writes the component itself
-/// (`<Fragment {ArticleMeta{title:".."}}>`). Frontmatter parses to an
-/// [`ArticleMeta`] in the scan; a spread is reflect-built at spawn time, where
-/// the type registry is in hand.
-enum RouteSpecMeta {
-	/// A page declaring nothing, ie a `.html` file or markdown with no
-	/// frontmatter.
-	None,
-	/// Markdown frontmatter, parsed during the scan.
-	Article(ArticleMeta),
-	/// A BSX document's root nodes, whose `ArticleMeta` spread (if any) builds
-	/// against the world's type registry.
-	Bsx(Vec<BsxNode>),
-}
-
-impl RouteSpecMeta {
-	/// The page's [`ArticleMeta`], reflect-building a BSX root spread against
-	/// the world's type registry (see [`BsxNode::scan_spread`], which reads the
-	/// document without building it).
-	fn resolve(self, world: &World) -> Option<ArticleMeta> {
-		match self {
-			Self::None => None,
-			Self::Article(meta) => Some(meta),
-			Self::Bsx(nodes) => BsxNode::scan_spread(
-				&nodes,
-				world.get_resource::<AppTypeRegistry>()?,
-			),
-		}
-	}
+	declarations: RootDeclarations,
 }
 
 #[cfg(test)]
@@ -362,6 +361,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
@@ -513,7 +513,6 @@ mod test {
 	/// A numbered file declaring a `slug` serves at the slug, not at its
 	/// filename, and keeps the filename's number as its nav order — the pair
 	/// that lets a directory read in order while its urls stay stable names.
-	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	async fn slug_overrides_the_filename_path() {
 		let mut world = router_world();
@@ -533,9 +532,8 @@ mod test {
 		let node = tree.find(&["blog", "full-stack-bevy"]).unwrap();
 		world
 			.entity(node.entity)
-			.get::<ArticleMeta>()
+			.get::<PageMeta>()
 			.unwrap()
-			.sidebar
 			.order
 			.unwrap()
 			.xpect_eq(1);
@@ -546,7 +544,7 @@ mod test {
 	/// renaming the directory out from under its siblings.
 	#[beet_core::test]
 	fn route_path_for_applies_slug() {
-		let slugged = ArticleMeta {
+		let slugged = PageMeta {
 			slug: Some("full-stack-bevy".into()),
 			..default()
 		};
@@ -612,7 +610,7 @@ mod test {
 			&mut world,
 			memory_fixture(&[(
 				"blog/index.bsx",
-				r#"<Fragment {ArticleMeta{title: "The Full Moon Harvest", created: "2025-09-06", sidebar: SidebarInfo{label: "Blog", order: 1}}}><h1>Blog</h1></Fragment>"#,
+				r#"<Fragment {PageMeta{title: "The Full Moon Harvest", created: "2025-09-06", sidebar_label: "Blog", order: 1}}><h1>Blog</h1></Fragment>"#,
 			)])
 			.await,
 			(Router, children![RoutesDir::default()]),
@@ -621,13 +619,13 @@ mod test {
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		let node = tree.find(&["blog"]).unwrap();
-		let meta = world.entity(node.entity).get::<ArticleMeta>().unwrap();
+		let meta = world.entity(node.entity).get::<PageMeta>().unwrap();
 		meta.title
 			.as_deref()
 			.unwrap()
 			.xpect_eq("The Full Moon Harvest");
-		meta.sidebar.label.as_deref().unwrap().xpect_eq("Blog");
-		meta.sidebar.order.unwrap().xpect_eq(1);
+		meta.sidebar_label.as_deref().unwrap().xpect_eq("Blog");
+		meta.order.unwrap().xpect_eq(1);
 		// the date string coerces to the instant it names
 		meta.created
 			.unwrap()
@@ -635,9 +633,107 @@ mod test {
 			.xpect_eq("6 September 2025");
 	}
 
+	/// The scan hoists WHATEVER a document declares, not one blessed type: a
+	/// TOML `[Section]` names its component by short type path and lands beside
+	/// the default component's keys.
+	#[beet_core::test]
+	async fn hoists_sectioned_components() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"blog/post.md",
+				"+++\ntitle = \"Post\"\n[Layout]\ntemplate = \"ArticleLayout\"\n+++\n\n# Post",
+			)])
+			.await,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		let entity = tree.find(&["blog", "post"]).unwrap().entity;
+		world
+			.entity(entity)
+			.get::<PageMeta>()
+			.unwrap()
+			.title
+			.as_deref()
+			.unwrap()
+			.xpect_eq("Post");
+		world
+			.entity(entity)
+			.get::<Layout>()
+			.unwrap()
+			.template
+			.as_str()
+			.xpect_eq("ArticleLayout");
+	}
+
+	/// A dir declaring its own [`FrontmatterType`] redirects the unsectioned
+	/// keys, so a site's own metadata component needs no change to the scan.
+	#[beet_core::test]
+	async fn frontmatter_type_overrides_the_default_component() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"post.md",
+				"+++\ntemplate = \"ArticleLayout\"\n+++\n\n# Post",
+			)])
+			.await,
+			(Router, children![(RoutesDir::default(), FrontmatterType {
+				component: "Layout".into()
+			})]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		let entity = tree.find(&["post"]).unwrap().entity;
+		world
+			.entity(entity)
+			.get::<Layout>()
+			.unwrap()
+			.template
+			.as_str()
+			.xpect_eq("ArticleLayout");
+		world
+			.entity(entity)
+			.get::<PageMeta>()
+			.is_none()
+			.xpect_true();
+	}
+
+	/// A section naming a component this binary does not register warns and is
+	/// skipped: the page still serves, carrying every declaration that did
+	/// resolve, exactly as an unregistered tag still builds its subtree.
+	#[beet_core::test]
+	async fn unknown_section_does_not_take_the_page_down() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[(
+				"post.md",
+				"+++\ntitle = \"Post\"\n[NotInThisBinary]\nfoo = \"bar\"\n+++\n\n# Post",
+			)])
+			.await,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		let entity = tree.find(&["post"]).unwrap().entity;
+		world
+			.entity(entity)
+			.get::<PageMeta>()
+			.unwrap()
+			.title
+			.as_deref()
+			.unwrap()
+			.xpect_eq("Post");
+	}
+
 	/// Frontmatter is scanned from file content through the store, so it is store
 	/// agnostic and runs over the in-memory store (covering wasm too).
-	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	async fn scan_time_frontmatter_meta() {
 		let mut world = router_world();
@@ -654,8 +750,8 @@ mod test {
 
 		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
 		let node = tree.find(&["docs", "intro"]).unwrap().clone();
-		let meta = world.entity(node.entity).get::<ArticleMeta>().unwrap();
+		let meta = world.entity(node.entity).get::<PageMeta>().unwrap();
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
-		meta.sidebar.order.unwrap().xpect_eq(2);
+		meta.order.unwrap().xpect_eq(2);
 	}
 }

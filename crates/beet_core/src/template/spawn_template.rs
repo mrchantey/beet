@@ -262,8 +262,8 @@ pub(crate) fn anchor_pre_slot_children(
 }
 
 /// The entity a layout's `<Slot>`s live under: the root if it built an
-/// [`Element`], else the content [`Element`] nested below it, else the root
-/// unchanged.
+/// [`Element`] or declares the slots itself, else the content [`Element`] nested
+/// below it, else the root unchanged.
 ///
 /// A multi-root document nests the content element under a tag-less wrapper, and
 /// the nesting can be more than one level deep: a layout `<!-- comment --><Layout>`
@@ -272,11 +272,35 @@ pub(crate) fn anchor_pre_slot_children(
 /// wrong level widens its composition scope so the default body matches a nested
 /// widget's default `<Slot>` (eg `RouteHead`'s, first in document order) instead
 /// of the layout's own, so the descent must reach the real content element.
+///
+/// The descent stops at a level that declares slots of its own, since those ARE
+/// the layout's: a chrome-only layout (`<ArticleHeader/><Slot/>`) puts its
+/// `<Slot>` beside an element rather than inside one, and descending would anchor
+/// the body inside that element — a SIBLING of the slot it belongs in.
 fn content_root(world: &World, root: Entity) -> Entity {
-	if world.entity(root).contains::<Element>() {
+	if world.entity(root).contains::<Element>()
+		|| declares_slot_target(world, root)
+	{
 		return root;
 	}
 	descend_to_content_element(world, root).unwrap_or(root)
+}
+
+/// Whether `entity`'s own tag-less span declares a [`SlotTarget`], ie one is
+/// reachable below it without passing through an [`Element`] (which would own
+/// that slot instead).
+fn declares_slot_target(world: &World, entity: Entity) -> bool {
+	world
+		.entity(entity)
+		.get::<Children>()
+		.into_iter()
+		.flat_map(Children::iter)
+		.any(|child| {
+			let child_ref = world.entity(child);
+			child_ref.contains::<SlotTarget>()
+				|| (!child_ref.contains::<Element>()
+					&& declares_slot_target(world, child))
+		})
 }
 
 /// The first [`Element`] reachable below `entity` through tag-less wrapper nodes,

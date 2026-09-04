@@ -1340,69 +1340,6 @@ fn apply_attributes(
 	apply_spreads(el, entity, entity_refs)
 }
 
-impl BsxNode {
-	/// The component `T` a parsed document declares in a bare-position spread on
-	/// one of its ROOT elements, reflect-built over `T::default()`.
-	///
-	/// The BSX counterpart of markdown frontmatter: a `.bsx` page names its
-	/// route-level metadata as a spread on its root
-	/// (`<Fragment {ArticleMeta{title:".."}}>`), and a *scan* reads it without
-	/// building the document — nothing is spawned, so no component hook runs, no
-	/// child is built and no route is registered. That is what lets route
-	/// discovery know a BSX page's title, order and slug before anyone visits it,
-	/// exactly as it knows a markdown page's.
-	///
-	/// Only the roots, and only a spread: a nested element's spread is content,
-	/// belonging to the page rather than to the route that serves it. `None` when
-	/// no root names `T`, when `T` is unregistered, or when the literal does not
-	/// fit it.
-	pub fn scan_spread<T: Default + Reflect + bevy::reflect::Typed>(
-		nodes: &[BsxNode],
-		app_registry: &AppTypeRegistry,
-	) -> Option<T> {
-		let name = T::type_info().type_path_table().short_path();
-		let named = nodes
-			.iter()
-			.filter_map(|node| match node {
-				BsxNode::Element(el) => Some(el),
-				_ => None,
-			})
-			.flat_map(|el| el.attributes.iter())
-			.filter_map(|attr| match &attr.value {
-				AttrValue::Spread(spread) => Some(spread),
-				_ => None,
-			})
-			.flat_map(|spread| match spread {
-				SpreadExpr::Named(named) => vec![named],
-				SpreadExpr::Tuple(items) => items
-					.iter()
-					.filter_map(|item| match item {
-						SpreadItem::Named(named) => Some(named),
-						SpreadItem::Binding(_) => None,
-					})
-					.collect(),
-			})
-			.find(|named| named.name == name)?;
-
-		let registry = app_registry.read();
-		let info = registry.get(core::any::TypeId::of::<T>())?.type_info();
-		// a spread carries no `$ref`, having no tree to resolve one against
-		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		let patch = DataLiteral::to_reflect(
-			&DataLiteral::Enum(named.clone()),
-			Some(info),
-			&registry,
-			&mut resolver,
-		)
-		.ok()?;
-		// patch over default, the same fill `insert_component` performs, so a
-		// spread naming only some fields still yields a whole value
-		let mut value = T::default();
-		value.try_apply(patch.as_ref()).ok()?;
-		Some(value)
-	}
-}
-
 /// Insert every bare-position spread's components/templates onto `entity`,
 /// shared by every tag kind (an HTML element, a component, a template). The
 /// `AppTypeRegistry` is only touched when a spread is present, so a plain
@@ -1810,7 +1747,7 @@ fn write_resource_patch(
 }
 
 /// Insert a reflect-patched component over its default onto `entity`.
-fn insert_component(
+pub(crate) fn insert_component(
 	entity: &mut EntityWorldMut,
 	patch: &dyn bevy::reflect::PartialReflect,
 	app_registry: &AppTypeRegistry,
@@ -2010,70 +1947,6 @@ mod test {
 
 	impl Default for Bound {
 		fn default() -> Self { Self(Entity::PLACEHOLDER) }
-	}
-
-	/// A nested struct field, so the scan test covers a spread that is not flat.
-	#[derive(Debug, Default, Clone, PartialEq, Reflect)]
-	struct Nested {
-		label: Option<String>,
-		order: Option<u32>,
-	}
-
-	/// A page-metadata shaped component, the scan-time spread `RoutesDir` reads.
-	#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-	#[reflect(Component, Default)]
-	struct Meta {
-		title: Option<String>,
-		draft: bool,
-		nested: Nested,
-		created: Option<Timestamp>,
-	}
-
-	/// A root spread reads without building: the document is never spawned, so
-	/// nothing but the named component is produced.
-	#[crate::test]
-	fn scans_root_spread() {
-		let mut world = World::new();
-		world.init_resource::<AppTypeRegistry>();
-		world
-			.resource_mut::<AppTypeRegistry>()
-			.write()
-			.register::<Meta>();
-		let registry = world.resource::<AppTypeRegistry>().clone();
-		let scan = |markup: &str| {
-			let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())
-				.unwrap();
-			BsxNode::scan_spread::<Meta>(&nodes, &registry)
-		};
-		// the declared fields land, the rest fill from `Default`
-		scan(r#"<Fragment {Meta{title:"Blog", nested: Nested{order: 1}}}><h1>hi</h1></Fragment>"#)
-			.unwrap()
-			.xpect_eq(Meta {
-				title: Some("Blog".into()),
-				draft: false,
-				nested: Nested {
-					label: None,
-					order: Some(1),
-				},
-				created: None,
-			});
-		// a `YYYY-MM-DD` string coerces to the instant it names, through the
-		// `Option` wrapper the field declares
-		scan(r#"<Fragment {Meta{created:"2025-09-06"}}/>"#)
-			.unwrap()
-			.created
-			.unwrap()
-			.format_date()
-			.xpect_eq("2025-09-06");
-		// a tuple spread names it alongside others
-		scan(r#"<Fragment {(Meta{draft: true}, PackageConfig)}/>"#)
-			.unwrap()
-			.draft
-			.xpect_true();
-		// a nested spread is page content, not route metadata
-		scan(r#"<main><span {Meta{title:"nope"}}/></main>"#).xpect_none();
-		// nothing named it at all
-		scan("<main><h1>hi</h1></main>").xpect_none();
 	}
 
 	/// Build `markup` into a world registering `PackageConfig` and [`Bound`],

@@ -4,15 +4,10 @@ slug = "ecs-router"
 description = "An ECS-native HTTP router unifies server actions, client island scenes, and static file serving under one paradigm."
 created = "2025-08-09"
 author = "Pete Hayman"
+video_url = "https://youtu.be/YKiHKQJmEoU"
 +++
 
-# The Full Moon Harvest #2 - ECS Router
-
-*Pete Hayman — 9th August, 2025*
-
 The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!
-
-<iframe src="https://www.youtube.com/embed/YKiHKQJmEoU" alt-src="https://youtu.be/YKiHKQJmEoU" title="Full Moon Harverst #2 | Bevy Router" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## A Very Bevy Router
 
@@ -102,7 +97,7 @@ fn pages_collection() -> impl Bundle {
 			..default()
 		},
 		ModifyRoutePath::default().base_route("/docs"),
-		MetaType::new(syn::parse_quote!(beet::prelude::ArticleMeta)),
+		MetaType::new(syn::parse_quote!(beet::prelude::PageMeta)),
 		CodegenFile::new(
 			AbsPathBuf::new_workspace_rel("crates/beet_site/src/codegen/pages.rs").unwrap(),
 		),
@@ -112,7 +107,6 @@ fn pages_collection() -> impl Bundle {
 ### Syntax Highlighting
 
 Last but not least we now have an integration with `syntect`, which provides all the syntax highlighting in this post :)
-
 
 ### Onward
 

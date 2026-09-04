@@ -87,8 +87,11 @@ pub(crate) fn emit_collection(
 					)?);
 				}
 			}
-			RouteFileKind::Blob { store_path, meta } => {
-				children.push(emit_blob_route(file, store_path, meta));
+			RouteFileKind::Blob {
+				store_path,
+				declarations,
+			} => {
+				children.push(emit_blob_route(file, store_path, declarations));
 			}
 		}
 	}
@@ -212,18 +215,22 @@ fn server_cfg(collection: &RouteCollection) -> Option<syn::Attribute> {
 	}
 }
 
-/// Emits the route bundle for a markdown/html content file, including its
-/// scan-time [`ArticleMeta`] when the frontmatter declared one.
+/// Emits the route bundle for a markdown/html content file, including the
+/// components its root declared as scan-time literals.
+///
+/// The literals are emitted rather than a resolved struct, so the emitted route
+/// hoists them through the same registry resolution `RoutesDir` discovery runs:
+/// codegen knows no metadata type beyond the `slug` that named its url.
 fn emit_blob_route(
 	file: &RouteFile,
 	store_path: &SmolPath,
-	meta: &Option<ArticleMeta>,
+	declarations: &RootDeclarations,
 ) -> TokenStream {
 	let path = file.route_path.to_string();
 	let store_path = store_path.to_string();
-	let meta = meta.as_ref().map(|meta| {
-		let meta = meta.self_token_stream();
-		quote! { #meta, }
+	let declarations = (!declarations.is_empty()).then(|| {
+		let declarations = declarations.self_token_stream();
+		quote! { #declarations.hoist(), }
 	});
 	quote! {
 		(
@@ -231,7 +238,7 @@ fn emit_blob_route(
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			PageRoute,
-			#meta
+			#declarations
 		)
 	}
 }

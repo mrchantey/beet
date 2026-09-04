@@ -236,7 +236,7 @@ fn scalar_to_reflect(
 	}
 
 	// a `YYYY-MM-DD` string targeting a `Timestamp` field coerces to midnight UTC
-	// on that date, so a markup `{ArticleMeta{created:"2026-08-28"}}` authors a
+	// on that date, so a markup `{PageMeta{created:"2026-08-28"}}` authors a
 	// publication date directly (mirroring the duration string above). Any other
 	// string errors rather than silently landing on the epoch.
 	if let (Value::Str(string), Some(info)) = (value, field_info)

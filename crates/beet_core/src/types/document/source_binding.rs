@@ -64,7 +64,7 @@ impl BindingTarget {
 	/// transcluded route content, installed by the router's layout wrap) resolves
 	/// to that content instead ([`LayoutContent::terminal`], so nested layouts
 	/// resolve to the page rather than to each other), letting a layout-head
-	/// `@entity:PageRoot::` binding read the route's `ArticleMeta` across the
+	/// `@entity:PageRoot::` binding read the route's `PageMeta` across the
 	/// transclusion boundary. A self-referential render root has no such link and
 	/// resolves to itself, as before.
 	pub fn resolve(
@@ -141,7 +141,7 @@ impl LayoutContent {
 	///
 	/// Layouts nest, so what a layout root links to may be another layout root,
 	/// while every consumer wants the page at the end: the route's own components
-	/// (`ArticleMeta`) live there, never on an intermediate shell.
+	/// (`PageMeta`) live there, never on an intermediate shell.
 	///
 	/// # Errors
 	/// Errors when the chain does not terminate within [`MAX_LAYOUT_DEPTH`] hops,

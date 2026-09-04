@@ -62,6 +62,40 @@ impl MediaParser {
 		self.markdown_parser = parser;
 		self
 	}
+
+	/// The components `bytes` declares at its document ROOT, dispatched by media
+	/// type: markdown reads its leading frontmatter, markup its root spreads.
+	///
+	/// The metadata half of [`parse`](NodeParser::parse), and deliberately not
+	/// part of it: this reads the root only, building nothing, so a route scan
+	/// can know a page's title, order and slug without spawning its content. A
+	/// media type with no declaration surface, or a source that does not parse,
+	/// declares nothing.
+	#[cfg(feature = "bsx")]
+	pub fn scan_root_declarations(
+		bytes: &MediaBytes,
+		frontmatter_type: &str,
+	) -> RootDeclarations {
+		let Ok(source) = core::str::from_utf8(bytes) else {
+			return default();
+		};
+		match bytes.media_type() {
+			MediaType::Markdown => Frontmatter::extract(source)
+				.ok()
+				.flatten()
+				.map(|frontmatter| frontmatter.declarations(frontmatter_type))
+				.unwrap_or_default(),
+			MediaType::Bsx => BsxNode::parse_document(source, &default())
+				.map(|nodes| RootDeclarations::from_bsx(&nodes))
+				.unwrap_or_default(),
+			MediaType::Html => {
+				BsxNode::parse_document(source, &BsxParseConfig::html())
+					.map(|nodes| RootDeclarations::from_bsx(&nodes))
+					.unwrap_or_default()
+			}
+			_ => default(),
+		}
+	}
 }
 
 impl NodeParser for MediaParser {

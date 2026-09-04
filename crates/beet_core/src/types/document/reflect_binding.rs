@@ -36,7 +36,7 @@ use bevy::ecs::reflect::ReflectComponent;
 /// entity, by the component's short type path and a field path within it.
 ///
 /// Co-locate with a [`FieldRef`] (which supplies the [`Value`] and the document
-/// link): `(MyComponent::default(), FieldRef::new("path"), ReflectFieldRef::new("MyComponent", "value"))`
+/// link): `(MyComponent::default(), FieldRef::new("path"), ReflectFieldRef::of::<MyComponent>("value")?)`
 /// binds document field `path` to `MyComponent.value`, both ways. Use
 /// [`with_target`](Self::with_target) to bind a component on another entity.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, MapEntities)]
@@ -66,6 +66,28 @@ impl ReflectFieldRef {
 		}
 	}
 
+	/// Bind to `T`'s `field` on this entity, naming the component by the type
+	/// rather than by a string a rename would leave behind.
+	///
+	/// The typed counterpart of [`new`](Self::new), and the binding twin of
+	/// `Layout::of::<T>()`: the name comes from
+	/// [`type_ext::short_name`](crate::prelude::type_ext::short_name), which
+	/// shortens generics the way the reflect registry indexes them. Keep
+	/// [`new`](Self::new) for a name with no type behind it (a `.bsx`-declared
+	/// component, a dynamic selector).
+	///
+	/// # Errors
+	/// Errors when `T` declares no such field. A field ref naming a field that
+	/// does not exist is a dead binding that syncs nothing, so it fails where it
+	/// is written rather than going quiet at render.
+	pub fn of<T: bevy::reflect::Typed>(
+		field: impl Into<SmolStr>,
+	) -> Result<Self> {
+		let field = field.into();
+		validate_field_path(T::type_info(), &field)?;
+		Self::new(type_ext::short_name::<T>(), field).xok()
+	}
+
 	/// Retarget the bound component: an entity, or a lazily resolved
 	/// [`BindingTarget::Reserved`] name.
 	pub fn with_target(mut self, target: impl Into<BindingTarget>) -> Self {
@@ -76,6 +98,36 @@ impl ReflectFieldRef {
 	/// The `GetPath` access string for the bound field, ie `.field.path` (empty
 	/// for the whole component).
 	fn access(&self) -> String { reflect_value_ext::field_access(&self.field) }
+}
+
+/// Walk a dot-separated field path through `info`, erroring at the first segment
+/// its type does not declare.
+///
+/// An empty path binds the whole component value, so it always passes. The walk
+/// stops accepting once a segment's type is not a struct (a collection index, an
+/// opaque type): what it can check, it checks.
+fn validate_field_path(
+	info: &'static bevy::reflect::TypeInfo,
+	field: &str,
+) -> Result<()> {
+	use bevy::reflect::TypeInfo;
+	let mut info = info;
+	for segment in field.split('.').filter(|segment| !segment.is_empty()) {
+		let TypeInfo::Struct(struct_info) = info else {
+			return Ok(());
+		};
+		let Some(named) = struct_info.field(segment) else {
+			bevybail!(
+				"`{}` declares no field `{segment}`, so the binding `{field}` would sync nothing",
+				struct_info.type_path_table().short_path()
+			);
+		};
+		match named.type_info() {
+			Some(next) => info = next,
+			None => return Ok(()),
+		}
+	}
+	Ok(())
 }
 
 /// Bidirectionally sync every [`ReflectFieldRef`]'s [`Value`] with its bound
@@ -210,6 +262,23 @@ mod test {
 		world
 	}
 
+	/// The typed constructor names the component by its type and validates the
+	/// field, so a rename follows the symbol and a dead binding is loud.
+	#[crate::test]
+	fn of_validates_the_field() {
+		ReflectFieldRef::of::<Dial>("value")
+			.unwrap()
+			.component
+			.as_str()
+			.xpect_eq("Dial");
+		// the empty path binds the whole component
+		ReflectFieldRef::of::<Dial>("").unwrap();
+		ReflectFieldRef::of::<Dial>("nope")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("declares no field `nope`");
+	}
+
 	#[crate::test]
 	fn document_writes_component_field() {
 		let mut world = world();
@@ -220,7 +289,7 @@ mod test {
 			Dial::default(),
 			Value::default(),
 			FieldRef::new("level"),
-			ReflectFieldRef::new("Dial", "value"),
+			ReflectFieldRef::of::<Dial>("value").unwrap(),
 		));
 		world.update_local();
 
@@ -238,7 +307,7 @@ mod test {
 				Dial::default(),
 				Value::default(),
 				FieldRef::new("level"),
-				ReflectFieldRef::new("Dial", "value"),
+				ReflectFieldRef::of::<Dial>("value").unwrap(),
 			))
 			.id();
 		// settle the initial document -> component sync.
@@ -267,7 +336,9 @@ mod test {
 		let entity = world
 			.spawn((
 				Value::Int(7),
-				ReflectFieldRef::new("Dial", "value").with_target(target),
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
+					.with_target(target),
 			))
 			.id();
 		world.update_local();
@@ -298,7 +369,9 @@ mod test {
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Dial", "value").with_target(target),
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
+					.with_target(target),
 			))
 			.id();
 		// settle the initial component -> Value sync.
@@ -349,10 +422,13 @@ mod test {
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Dial", "value").with_target(target),
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
+					.with_target(target),
 			))
 			.id();
 		// an entirely unknown component type is also silent.
+		// a name with no type behind it stays stringly, and stays silent
 		world.spawn((Value::default(), ReflectFieldRef::new("Nope", "field")));
 		world.update_local();
 
@@ -378,7 +454,8 @@ mod test {
 			.spawn((
 				ChildOf(mid),
 				Value::default(),
-				ReflectFieldRef::new("Dial", "value")
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			))
 			.id();
@@ -423,7 +500,8 @@ mod test {
 			(
 				ChildOf(marked),
 				Value::default(),
-				ReflectFieldRef::new("Dial", "value")
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			)
 		};
@@ -453,7 +531,8 @@ mod test {
 		let entity = world
 			.spawn((
 				Value::default(),
-				ReflectFieldRef::new("Dial", "value")
+				ReflectFieldRef::of::<Dial>("value")
+					.unwrap()
 					.with_target(BindingTarget::Reserved("Marker".into())),
 			))
 			.id();
@@ -498,8 +577,9 @@ mod test {
 		// mapping remaps the Entity target variant.
 		let old_target = world.spawn_empty().id();
 		let new_target = world.spawn_empty().id();
-		let mut binding =
-			ReflectFieldRef::new("Dial", "value").with_target(old_target);
+		let mut binding = ReflectFieldRef::of::<Dial>("value")
+			.unwrap()
+			.with_target(old_target);
 		let mut mapping = <bevy::ecs::entity::EntityHashMap<Entity>>::default();
 		mapping.insert(old_target, new_target);
 		binding.map_entities(&mut mapping);

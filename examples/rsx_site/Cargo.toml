@@ -48,9 +48,9 @@ tui = ["terminal", "beet/tui_server"]
 
 # Build-time route codegen. Compiles without the generated `src/codegen` modules
 # so it can bootstrap them: `cargo run -p rsx_site --no-default-features
-# --features codegen`. Run this before a `web`/`terminal` build. `markdown` lets
-# the content collection scan read frontmatter so blob routes carry their
-# `ArticleMeta`; `json` matches the action collection's emitted body type.
+# --features codegen`. Run this before a `web`/`terminal` build. `markdown` is the
+# content parser the served blob routes need; `json` matches the action
+# collection's emitted body type.
 codegen = ["beet/codegen", "beet/markdown", "beet/json"]
 
 [dependencies]

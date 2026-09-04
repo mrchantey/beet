@@ -540,10 +540,10 @@ mod test {
 
 	#[crate::test]
 	fn entity_binding_reserved_name() {
-		let parsed = binding("@entity:PageRoot::ArticleMeta.title");
+		let parsed = binding("@entity:PageRoot::PageMeta.title");
 		parsed.source.xpect_eq(BindingSource::Comp);
 		parsed.selector.xpect_eq(Some("PageRoot".into()));
-		parsed.type_path.xpect_eq(Some("ArticleMeta".into()));
+		parsed.type_path.xpect_eq(Some("PageMeta".into()));
 		parsed.field_path.to_string().xpect_eq("title".to_string());
 	}
 

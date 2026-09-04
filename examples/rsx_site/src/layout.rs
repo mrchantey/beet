@@ -6,7 +6,7 @@ use beet::prelude::*;
 /// Composes the library [`Header`]/[`Footer`] around the route content (the
 /// default `<Slot/>`, transcluded in place by the [`Layout`] middleware). The
 /// shared [`RouteHead`] carries the web-only stylesheet/color-scheme/preflight,
-/// sourcing the title/description from the matched route's [`ArticleMeta`]. The
+/// sourcing the title/description from the matched route's [`PageMeta`]. The
 /// `<head>` is non-visual, so the same layout renders in the terminal.
 #[template(system)]
 pub fn BeetLayout(

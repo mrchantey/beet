@@ -14,8 +14,6 @@
 use super::HtmlParseConfig;
 use super::diff::HtmlDiffConfig;
 use super::diff::HtmlNode;
-use super::frontmatter::Frontmatter;
-use super::frontmatter::FrontmatterKind;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use pulldown_cmark::Event;

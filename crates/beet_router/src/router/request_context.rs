@@ -17,7 +17,7 @@
 //! context and pops it on completion, leaving the outer context intact on top.
 //!
 //! Per-route metadata is **not** carried here: it lives on the route/content
-//! entity (eg [`ArticleMeta`](crate::prelude::ArticleMeta) from frontmatter).
+//! entity (eg [`PageMeta`](crate::prelude::PageMeta) from frontmatter).
 //! Widgets query whatever components they need off
 //! [`content`](RequestContext::content), keeping this fixed type decoupled from
 //! the user-extensible metadata mapped from frontmatter.
@@ -81,7 +81,7 @@ pub struct RequestContext {
 	/// The parts of the request being rendered (method, url, headers, query).
 	parts: RequestParts,
 	/// The rendered content entity for this route, carrying any per-route
-	/// components (eg [`ArticleMeta`](crate::prelude::ArticleMeta)) for widgets
+	/// components (eg [`PageMeta`](crate::prelude::PageMeta)) for widgets
 	/// to query. This may be a *detached* render root (a per-request page built
 	/// by `spawn_template`), so it is not a reliable route-tree anchor.
 	content: Entity,

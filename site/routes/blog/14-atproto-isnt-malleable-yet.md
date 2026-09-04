@@ -6,8 +6,6 @@ created = "2026-08-18"
 author = "Pete Hayman"
 +++
 
-# ATProto Isn't Malleable Yet
-
 I'm a malleable software nerd, I love thinking about applications and how we can improve them from first principles. DWeb Camp '26 was my first opportunity to talk to people who do the same at the protocol layer. It was also the first time I heard Brewster Kahle eccentrically yell on stage that we are "Locking the web open!" and in that moment something clicked for me, the application layer is only half the battle, its the *whole damn system man!*
 
 Later that day I was introduced to Kevin Triplett who explained that while the [Project Weave](https://projectweave.tech/) protocol standards are reaching maturity, the picture is incomplete without malleable application standards. It feels like we're builing two sides of the same coin.

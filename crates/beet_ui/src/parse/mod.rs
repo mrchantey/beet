@@ -2,6 +2,13 @@
 mod bsx;
 #[cfg(feature = "bsx")]
 pub use bsx::*;
+// the document-metadata block a markdown source leads with. Not a markdown-parser
+// internal: route discovery reads it to scan a page's declarations without a
+// content parse, so it rides `bsx` (for `RootDeclarations`), not `markdown_parser`.
+#[cfg(feature = "bsx")]
+mod frontmatter;
+#[cfg(feature = "bsx")]
+pub use frontmatter::*;
 #[cfg(feature = "markdown_parser")]
 mod markdown;
 #[cfg(feature = "markdown_parser")]

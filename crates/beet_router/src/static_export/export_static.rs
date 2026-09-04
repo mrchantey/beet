@@ -8,6 +8,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::*;
 
 /// Static-site export: collect the qualifying routes, render each, write the
 /// resulting HTML to a [`BlobStore`].
@@ -54,7 +55,7 @@ impl StaticExport {
 	/// method is `GET`, and it is either a scene route or marked
 	/// [`ExportStrategy::Static`].
 	///
-	/// A route whose [`ArticleMeta`] marks it a draft ships unless `is_prod`, so
+	/// A route whose [`PageMeta`] marks it a draft ships unless `is_prod`, so
 	/// dev/staging builds can preview drafts while a production export drops
 	/// them.
 	fn exports(world: &World, node: &ActionNode, is_prod: bool) -> bool {
@@ -65,8 +66,7 @@ impl StaticExport {
 			return false;
 		}
 		let entity = world.entity(node.entity);
-		if is_prod && entity.get::<ArticleMeta>().is_some_and(|meta| meta.draft)
-		{
+		if is_prod && entity.get::<PageMeta>().is_some_and(|meta| meta.draft) {
 			return false;
 		}
 		node.is_scene()
@@ -136,6 +136,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
 
 	#[beet_core::test]
 	async fn exports_static_scenes() {
@@ -225,7 +226,7 @@ mod test {
 	}
 
 	/// A `published` route plus a `secret` route eagerly marked
-	/// `ArticleMeta { draft: true }` (the codegen `BlobScene` shape).
+	/// `PageMeta { draft: true }` (the codegen `BlobScene` shape).
 	fn spawn_draft_router(world: &mut World) -> Entity {
 		world
 			.spawn((Router::with_defaults(), children![
@@ -242,7 +243,7 @@ mod test {
 						|| rsx! { <p>"Secret"</p> }
 					),
 					HttpMethod::Get,
-					ArticleMeta {
+					PageMeta {
 						draft: true,
 						..default()
 					},

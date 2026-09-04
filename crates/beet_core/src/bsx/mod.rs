@@ -146,6 +146,7 @@ mod registry;
 #[cfg(feature = "bevy_async")]
 mod remote;
 mod resolve;
+mod root_declarations;
 mod schema;
 mod style_resolver;
 mod tag_resolver;
@@ -159,6 +160,7 @@ pub use registry::*;
 #[cfg(feature = "bevy_async")]
 pub(crate) use remote::*;
 pub use resolve::*;
+pub use root_declarations::*;
 pub(crate) use schema::*;
 pub use style_resolver::*;
 pub use tag_resolver::*;

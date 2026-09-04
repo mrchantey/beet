@@ -8,7 +8,10 @@ Nesting is by ancestry, so the wrapping is `Layout(ArticleLayout(post))`:
 declared on <Route path="blog"> in main.bsx, it reaches every discovered post
 and nothing else.
 
-For now the post body passes straight through; the article header (title,
-byline, date) arrives with the page metadata work.
+<ArticleHeader/> renders the title, byline and video embed from the post's own
+frontmatter, so a post is its prose and nothing else. It renders nothing for a
+page with no `created` date, which is what lets the undated blog index share
+this layout and keep its own heading.
 -->
+<ArticleHeader/>
 <Slot/>

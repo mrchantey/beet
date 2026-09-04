@@ -12,10 +12,8 @@
 //! Enable with the `markdown_parser` feature flag.
 
 mod diff;
-mod frontmatter;
 mod tree_builder;
 pub use diff::*;
-pub use frontmatter::*;
 
 use crate::prelude::*;
 use beet_core::prelude::*;

@@ -116,6 +116,53 @@ impl TokenizeSelf for SmolStr {
 		tokens.extend(quote! { SmolStr::new(#s) });
 	}
 }
+/// Emits the variant constructor rather than the structural form, so an emitted
+/// literal reads as the value it names.
+impl TokenizeSelf for Value {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		match self {
+			Value::Null => tokens.extend(quote! { Value::Null }),
+			Value::Bool(value) => tokens.extend(quote! { Value::Bool(#value) }),
+			Value::Int(value) => tokens.extend(quote! { Value::Int(#value) }),
+			Value::Uint(value) => tokens.extend(quote! { Value::Uint(#value) }),
+			Value::Float(value) => {
+				tokens.extend(quote! { Value::Float(#value) })
+			}
+			Value::Bytes(value) => {
+				let value = value.self_token_stream();
+				tokens.extend(quote! { Value::Bytes(#value) });
+			}
+			Value::Str(value) => {
+				let value = value.as_str();
+				tokens.extend(quote! { Value::str(#value) });
+			}
+			Value::Map(value) => {
+				let value = value.self_token_stream();
+				tokens.extend(quote! { Value::Map(#value) });
+			}
+			Value::List(value) => {
+				let value = value.self_token_stream();
+				tokens.extend(quote! { Value::List(#value) });
+			}
+		}
+	}
+}
+
+/// Entries are emitted sorted by key, matching the deterministic [`Hash`]/[`Ord`]
+/// impls, so a codegen output does not churn with hash-iteration order.
+impl TokenizeSelf for Map {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		let mut entries: Vec<_> = self.0.iter().collect();
+		entries.sort_by_key(|(key, _)| key.as_str());
+		let entries = entries.into_iter().map(|(key, value)| {
+			let key = key.as_str();
+			let value = value.self_token_stream();
+			quote! { (SmolStr::new(#key), #value) }
+		});
+		tokens.extend(quote! { Map::from_iter([#(#entries),*]) });
+	}
+}
+
 impl TokenizeSelf for Span {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { proc_macro2::Span::call_site() });

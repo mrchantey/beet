@@ -37,12 +37,12 @@ mod require_features;
 pub(crate) use require_features::*;
 mod interrupt;
 pub use interrupt::*;
-// std-only: `ArticleMeta::sidebar` is a `SidebarInfo`, which lives in the
-// std-only `sidebar` module.
+// the article chrome (`<ArticleHeader/>`, `<YouTubeEmbed/>`) a layout places
+// above a post's body. std-only: it renders through the beet_ui widget layer.
 #[cfg(feature = "std")]
-mod article_meta;
+mod article_header;
 #[cfg(feature = "std")]
-pub use article_meta::*;
+pub use article_header::*;
 mod redirect;
 pub use redirect::*;
 mod request_context;

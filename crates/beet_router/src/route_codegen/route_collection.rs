@@ -8,6 +8,8 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::*;
+use bevy::reflect::TypeRegistry;
 use proc_macro2::Span;
 use std::str::FromStr;
 use syn::Ident;
@@ -110,6 +112,12 @@ impl RouteCollection {
 		let store = self.store();
 		let mut paths = store.list().await?;
 		paths.sort();
+		// codegen has no world, so the one type it reads out of a document's
+		// declarations (a `slug` renaming the emitted route) registers here; the
+		// rest resolve against the app registry when the emitted route spawns.
+		let mut registry = TypeRegistry::default();
+		registry.register::<PageMeta>();
+		let frontmatter_type = FrontmatterType::default();
 
 		let mut files = Vec::new();
 		for store_path in paths {
@@ -139,29 +147,39 @@ impl RouteCollection {
 					});
 				}
 				"md" | "mdx" | "markdown" | "html" => {
-					// markdown frontmatter is read at scan time so the emitted
-					// route carries eager `ArticleMeta` (sidebar labels, drafts)
-					let meta = match ext {
-						"html" => None,
+					// a content file's root declarations are read at scan time so
+					// the emitted route hoists them eagerly (sidebar labels,
+					// drafts), exactly as `RoutesDir` discovery does
+					let mut declarations = match ext {
+						"html" => RootDeclarations::default(),
 						_ => {
 							let bytes = store.get(&store_path).await?;
 							let src = String::from_utf8(bytes.to_vec())?;
-							ArticleMeta::from_markdown(&src).map(|meta| {
-								meta.with_file_defaults(&store_path)
-							})
+							Frontmatter::extract(&src)?
+								.map(|frontmatter| {
+									frontmatter.declarations(
+										&frontmatter_type.component,
+									)
+								})
+								.unwrap_or_default()
 						}
 					};
+					PageMeta::declare_file_defaults(
+						&mut declarations,
+						&store_path,
+					);
 					// the frontmatter has the last word on the url, exactly as it
 					// does in `RoutesDir` discovery
-					let route_path = match &meta {
-						Some(meta) => meta.apply_slug(&route_path)?,
-						None => route_path,
-					};
+					let route_path =
+						match declarations.get::<PageMeta>(&registry) {
+							Some(meta) => meta.apply_slug(&route_path)?,
+							None => route_path,
+						};
 					files.push(RouteFile {
 						route_path,
 						kind: RouteFileKind::Blob {
 							store_path: store_path.clone(),
-							meta,
+							declarations,
 						},
 					});
 				}
@@ -207,8 +225,9 @@ pub enum RouteFileKind {
 	Blob {
 		/// Path of the content file relative to the store root.
 		store_path: SmolPath,
-		/// Scan-time frontmatter metadata, emitted alongside the route.
-		meta: Option<ArticleMeta>,
+		/// The components the file declares at its root, emitted as literals and
+		/// hoisted when the route spawns.
+		declarations: RootDeclarations,
 	},
 }
 

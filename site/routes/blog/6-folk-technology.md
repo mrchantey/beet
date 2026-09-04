@@ -4,20 +4,14 @@ slug = "folk-technology"
 description = "Drawing parallels between folk festival culture and open, malleable software design in the spirit of Alan Kay."
 created = "2025-12-04"
 author = "Pete Hayman"
+video_url = "https://youtu.be/NFjdN8KGkg8"
 +++
-
-# The Full Moon Harvest #6 - Folk Technology
-
-*Pete Hayman — 4th December, 2025*
-
-<iframe src="https://www.youtube.com/embed/NFjdN8KGkg8" alt-src="https://youtu.be/NFjdN8KGkg8" title="Full Moon Harvest #6 | Folk Technology" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 Last week I was lucky enough to attend the first DevOps Days in my hometown of Wollongong, Australia. DevOps Days has a very cool format, employing tools like five-minute Ignite Talks and group discussions called Open Spaces to ensure all voices have an opportunity to be heard. It is designed to foster a marketplace of ideas and the experience reminded me of my love for folk festivals. The same principles of abundance that bring these events to life can and should shape how we design software.
 
 ## Scarcity vs abundance
 
 I spent much of my twenties traveling the festival circuit in Serenity, my beloved Mitsubishi Express. I started working at the commercial festivals I'd attended as a teenager, but quickly discovered what I love about festivals is better represented in folk culture. Before long I was exclusively seeking folk festivals and alternative gatherings where the lines between organizer, performer, and attendee are blurred, and in some cases disappear completely. In this culture, the experience is crafted by each participant and the result is radical individuality. For me, this meant dressing up like a pirate and performing to an audience not much bigger than our own motley crew.
-
 
 <img alt="Kiama Sea Shanty Club at Folk by the Sea 2023" src="/assets/blog/kiama-sea-shanty-club.jpg"/>
 

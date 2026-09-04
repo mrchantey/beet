@@ -94,12 +94,12 @@ scripting = ["std", "beet_action/scripting", "serde", "json"]
 # The embedded QuickJS backend for the scripting registrations above.
 quickjs = ["scripting", "beet_action/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
-# `markdown_parser` lets the collection scan read content frontmatter so blob
-# routes are emitted with their scan-time `ArticleMeta`.
+# The collection scan reads a content file's frontmatter (which rides `std`, not
+# the markdown *content* parser) so blob routes are emitted with the root
+# declarations they hoist.
 codegen = [
 	"std",
 	"serde",
-	"markdown_parser",
 	"beet_core/tokens",
 	"beet_net/tokens",
 	"dep:syn",

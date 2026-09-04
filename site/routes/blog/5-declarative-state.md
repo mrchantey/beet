@@ -4,13 +4,8 @@ slug = "declarative-state"
 description = "Proposal for declarative, local-first state bindings as an alternative to Astro-style client islands."
 created = "2025-11-05"
 author = "Pete Hayman"
+video_url = "https://youtu.be/BhLvfvw1rgw"
 +++
-
-# The Full Moon Harvest #5 - Declarative State
-
-*Pete Hayman — 5th November, 2025*
-
-<iframe src="https://www.youtube.com/embed/BhLvfvw1rgw" alt-src="https://youtu.be/BhLvfvw1rgw" title="Full Moon Harvest #5 | Declarative State" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 Writing a metaframework can be surprisingly straightforward: Start with an unmet need, and copy-pasta the best modern patterns and principles that align with this need. So far the web layer of beet has been entirely based on Astro which is taking the web dev world by storm with a single principle:
 
@@ -125,7 +120,6 @@ Of course there are limitations to this approach. State mutations are constraine
 Here we're counting on the HTMX insight: 80% of reactive operations are CRUD-like and do not require custom client code. We can use Astro-style JS sprinkling for special cases and we still have client islands in the back pocket for inherently heavy applications like 3D rendering or robotics dashboards.
 
 There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the [Beet Roomy space](https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm).
-
 
 ## A Fully ECS Router
 

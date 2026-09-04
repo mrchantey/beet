@@ -4,18 +4,12 @@ slug = "user-modifiable-users"
 description = "Is malleable software the key to effective personal development tech? Also some progression on cross-application state."
 created = "2026-05-01"
 author = "Pete Hayman"
+video_url = "https://youtu.be/iDhZLY5WvlM"
 +++
-
-# User Modifiable Users
-
-*Pete Hayman — 1st May, 2026*
-
-<iframe src="https://www.youtube.com/embed/iDhZLY5WvlM" alt-src="https://youtu.be/iDhZLY5WvlM" title="The Harvest #11 - User Modifiable Users" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 > *Computers aren’t the thing. They’re the thing that gets us to the thing.*
 > 
 > Joe MacMillan — Halt and Catch Fire
-
 
 Three nights ago I had a few scoops of ice cream for desert. Next night, an even bigger helping, and this afternoon I found myself vegging out on the couch in the middle of the day polishing off the tub to random YouTube videos.
 

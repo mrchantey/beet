@@ -8,6 +8,8 @@ pub use beet_core::types::element::*;
 pub use element_query::*;
 pub use element_view::*;
 pub use expression::*;
+mod page_meta;
+pub use page_meta::*;
 mod into_bundle;
 pub use into_bundle::*;
 mod portal;

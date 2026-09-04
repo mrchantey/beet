@@ -1,19 +1,22 @@
 //! Frontmatter parsing for YAML and TOML metadata blocks.
 //!
-//! Provides the [`Frontmatter`] component and lightweight hand-rolled
-//! parsers for simple key-value frontmatter. Values are parsed into
-//! the existing [`Value`](crate::prelude::Value) type and assembled
-//! into a `bevy::reflect::DynamicStruct`.
+//! Provides the [`Frontmatter`] component and lightweight hand-rolled parsers
+//! for simple key-value frontmatter. Values parse into the existing
+//! [`Value`](beet_core::prelude::Value) type, and the block as a whole lowers to
+//! [`RootDeclarations`]: frontmatter is the markdown surface for a document's
+//! root component declarations exactly as a root spread is the BSX surface, so
+//! both resolve through one reflect path rather than a hand-written key mapping.
 
+use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::reflect::structs::DynamicStruct;
 
 /// Parsed frontmatter metadata from a YAML or TOML block.
 ///
-/// Inserted on the root entity when frontmatter is present in the
-/// markdown source. The `value` field is a [`DynamicStruct`] built
-/// from the parsed key-value pairs, suitable for reflection-based
-/// access.
+/// Inserted on the root entity when frontmatter is present in the markdown
+/// source. The `value` field is a [`DynamicStruct`] built from the unsectioned
+/// key-value pairs, for reflection-based access by a document's own systems; the
+/// route-metadata path instead reads [`declarations`](Self::declarations).
 ///
 /// ## Example
 /// ```rust
@@ -28,6 +31,42 @@ pub struct Frontmatter {
 	pub value: DynamicStruct,
 	/// The frontmatter format that was parsed.
 	pub kind: FrontmatterKind,
+	/// The parsed pairs grouped by the component their section names, in source
+	/// order. Unsectioned pairs (and all of YAML, which is flat) carry `None` and
+	/// target the document's [`FrontmatterType`].
+	sections: Vec<FrontmatterSection>,
+}
+
+/// The component a document's unsectioned frontmatter keys declare, resolved by
+/// self-or-ancestor from whichever entity discovered the document.
+///
+/// Defaults to [`PageMeta`], the general page metadata beet ships. A site
+/// declaring its own names it on the dir that discovers those documents,
+/// `<RoutesDir src="routes" {FrontmatterType{component:"MyMeta"}}/>`, and a TOML
+/// `[Section]` header names a component explicitly, winning over this default.
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct FrontmatterType {
+	/// Short type path of the component, resolved against the type registry
+	/// exactly as a BSX tag is.
+	pub component: SmolStr,
+}
+
+impl Default for FrontmatterType {
+	fn default() -> Self {
+		Self {
+			component: type_ext::short_name::<PageMeta>(),
+		}
+	}
+}
+
+/// One `[Component]` group of a frontmatter block.
+#[derive(Debug)]
+struct FrontmatterSection {
+	/// The component this group's keys declare, `None` for the unsectioned
+	/// group targeting the document's [`FrontmatterType`].
+	component: Option<SmolStr>,
+	pairs: Vec<(String, Value)>,
 }
 
 /// The format of a frontmatter metadata block.
@@ -69,12 +108,58 @@ impl Frontmatter {
 	///
 	/// Dispatches to the appropriate parser based on `kind`.
 	pub fn parse(content: &str, kind: FrontmatterKind) -> Result<Self> {
-		let pairs = match kind {
-			FrontmatterKind::Yaml => parse_yaml_kv(content)?,
-			FrontmatterKind::Toml => parse_toml_kv(content)?,
+		let sections = match kind {
+			FrontmatterKind::Yaml => vec![FrontmatterSection {
+				component: None,
+				pairs: parse_yaml_kv(content)?,
+			}],
+			FrontmatterKind::Toml => parse_toml_sections(content)?,
 		};
-		let value = build_dynamic_struct(pairs)?;
-		Ok(Self { value, kind })
+		// the reflect surface mirrors the default component's keys, ie the
+		// unsectioned ones; a `[Section]` group is read through `declarations`.
+		let value = sections
+			.iter()
+			.filter(|section| section.component.is_none())
+			.flat_map(|section| section.pairs.iter().cloned())
+			.collect::<Vec<_>>()
+			.xmap(build_dynamic_struct)?;
+		Ok(Self {
+			value,
+			kind,
+			sections,
+		})
+	}
+
+	/// This block as document root declarations: each `[Section]` names its own
+	/// component by short type path, and every unsectioned key declares
+	/// `default_component` (the document's [`FrontmatterType`]).
+	///
+	/// The one lowering, so a frontmatter key coerces to its field type through
+	/// the same [`DataLiteral`] rules a BSX spread does — `created = "2025-07-11"`
+	/// becomes a [`Timestamp`], `order = 2` a `u32`. A key with no value declares
+	/// nothing and is dropped rather than resolving to null.
+	pub fn declarations(&self, default_component: &str) -> RootDeclarations {
+		self.sections
+			.iter()
+			.filter_map(|section| {
+				let fields = section
+					.pairs
+					.iter()
+					.filter(|(_, value)| !matches!(value, Value::Null))
+					.map(|(key, value)| {
+						(SmolStr::new(key), DataLiteral::Scalar(value.clone()))
+					})
+					.collect::<Vec<_>>();
+				(!fields.is_empty()).then(|| NamedLiteral {
+					name: section
+						.component
+						.clone()
+						.unwrap_or_else(|| SmolStr::new(default_component)),
+					fields: NamedFields::Struct(fields),
+				})
+			})
+			.collect::<Vec<_>>()
+			.xmap(RootDeclarations)
 	}
 
 	/// Get a string field from the frontmatter by name.
@@ -99,7 +184,7 @@ impl Frontmatter {
 
 	/// Get an unsigned-integer field from the frontmatter by name.
 	///
-	/// Unsigned scalars parse to [`Value::Uint`](crate::prelude::Value::Uint)
+	/// Unsigned scalars parse to [`Value::Uint`](beet_core::prelude::Value::Uint)
 	/// (stored as `u64`); returns `None` if the field is missing or non-uint.
 	pub fn get_uint(&self, key: &str) -> Option<u64> {
 		self.value
@@ -208,22 +293,34 @@ fn parse_yaml_value(raw: &str) -> Value {
 	Value::parse_string(unquoted)
 }
 
-/// Parse simple TOML key-value pairs.
+/// Parse TOML key-value pairs, grouped by `[Section]` header.
 ///
-/// Supports flat `key = value` lines. Blank lines and comment lines
-/// (starting with `#`) are skipped. Section headers (`[section]`) are
-/// currently ignored. String values must be quoted.
-fn parse_toml_kv(content: &str) -> Result<Vec<(String, Value)>> {
-	let mut pairs = Vec::new();
+/// Supports flat `key = value` lines. Blank lines and comment lines (starting
+/// with `#`) are skipped; string values must be quoted. A `[Section]` header
+/// opens a new group naming the component its keys declare, so the keys before
+/// the first header are the unsectioned group.
+fn parse_toml_sections(content: &str) -> Result<Vec<FrontmatterSection>> {
+	let mut sections = vec![FrontmatterSection {
+		component: None,
+		pairs: Vec::new(),
+	}];
 
 	for line in content.lines() {
 		let trimmed = line.trim();
 
-		// skip blanks, comments, and section headers
-		if trimmed.is_empty()
-			|| trimmed.starts_with('#')
-			|| trimmed.starts_with('[')
+		// skip blanks and comments
+		if trimmed.is_empty() || trimmed.starts_with('#') {
+			continue;
+		}
+
+		// a section header opens a new group, naming its component
+		if let Some(header) = trimmed.strip_prefix('[')
+			&& let Some(name) = header.strip_suffix(']')
 		{
+			sections.push(FrontmatterSection {
+				component: Some(SmolStr::new(name.trim())),
+				pairs: Vec::new(),
+			});
 			continue;
 		}
 
@@ -239,10 +336,13 @@ fn parse_toml_kv(content: &str) -> Result<Vec<(String, Value)>> {
 
 		let raw_value = trimmed[eq_pos + 1..].trim();
 		let value = parse_toml_value(raw_value);
-		pairs.push((key, value));
+		// unreachable-empty: the vec is seeded with the unsectioned group
+		if let Some(section) = sections.last_mut() {
+			section.pairs.push((key, value));
+		}
 	}
 
-	Ok(pairs)
+	Ok(sections)
 }
 
 /// Parse a single TOML value string into a [`Value`].
@@ -374,9 +474,19 @@ mod test {
 
 	// -- TOML parsing --
 
+	/// The unsectioned pairs, ie the group targeting the default component.
+	fn toml_pairs(content: &str) -> Vec<(String, Value)> {
+		parse_toml_sections(content)
+			.unwrap()
+			.into_iter()
+			.filter(|section| section.component.is_none())
+			.flat_map(|section| section.pairs)
+			.collect()
+	}
+
 	#[beet_core::test]
 	fn toml_quoted_string() {
-		let pairs = parse_toml_kv("title = \"Hello World\"").unwrap();
+		let pairs = toml_pairs("title = \"Hello World\"");
 		pairs.len().xpect_eq(1);
 		pairs[0].0.as_str().xpect_eq("title");
 		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
@@ -384,34 +494,80 @@ mod test {
 
 	#[beet_core::test]
 	fn toml_boolean() {
-		let pairs = parse_toml_kv("draft = true").unwrap();
-		pairs[0].1.xpect_eq(Value::Bool(true));
+		toml_pairs("draft = true")[0].1.xpect_eq(Value::Bool(true));
 	}
 
 	#[beet_core::test]
 	fn toml_integer() {
-		let pairs = parse_toml_kv("count = 42").unwrap();
-		pairs[0].1.xpect_eq(Value::Uint(42));
+		toml_pairs("count = 42")[0].1.xpect_eq(Value::Uint(42));
 	}
 
 	#[beet_core::test]
 	fn toml_float() {
-		let pairs = parse_toml_kv("weight = 3.14").unwrap();
-		pairs[0].1.xpect_eq(Value::Float(3.14));
+		toml_pairs("weight = 3.14")[0]
+			.1
+			.xpect_eq(Value::Float(3.14));
 	}
 
+	/// A `[Section]` header names the component its keys declare, so the pairs
+	/// after it leave the unsectioned group.
 	#[beet_core::test]
-	fn toml_skips_sections() {
-		let content = "[meta]\ntitle = \"Hello\"\n[other]\ncount = 5";
-		let pairs = parse_toml_kv(content).unwrap();
-		pairs.len().xpect_eq(2);
+	fn toml_groups_by_section() {
+		let sections =
+			parse_toml_sections("title = \"Hello\"\n[Extra]\ncount = 5")
+				.unwrap();
+		sections.len().xpect_eq(2);
+		sections[0].component.is_none().xpect_true();
+		sections[0].pairs.len().xpect_eq(1);
+		sections[1].component.as_deref().unwrap().xpect_eq("Extra");
+		sections[1].pairs[0].1.xpect_eq(Value::Uint(5));
 	}
 
 	#[beet_core::test]
 	fn toml_skips_comments() {
-		let content = "# comment\ntitle = \"Hello\"";
-		let pairs = parse_toml_kv(content).unwrap();
-		pairs.len().xpect_eq(1);
+		toml_pairs("# comment\ntitle = \"Hello\"").len().xpect_eq(1);
+	}
+
+	// -- root declarations --
+
+	/// Every key lowers to a literal against the default component, so nothing
+	/// hand-maps frontmatter to a struct.
+	#[beet_core::test]
+	fn declares_the_default_component() {
+		let fm = Frontmatter::parse(
+			"title = \"Hello\"\norder = 2\nempty =",
+			FrontmatterKind::Toml,
+		)
+		.unwrap();
+		let RootDeclarations(declarations) = fm.declarations("PageMeta");
+		declarations.len().xpect_eq(1);
+		declarations[0].name.as_str().xpect_eq("PageMeta");
+		let NamedFields::Struct(fields) = &declarations[0].fields else {
+			panic!("expected named fields")
+		};
+		// the valueless key declares nothing
+		fields.len().xpect_eq(2);
+		fields[0].0.as_str().xpect_eq("title");
+		fields[1].1.xpect_eq(DataLiteral::Scalar(Value::Uint(2)));
+	}
+
+	/// A `[Section]` header declares its own component alongside the default.
+	#[beet_core::test]
+	fn declares_sectioned_components() {
+		let fm = Frontmatter::parse(
+			"title = \"Hello\"\n[Extra]\nnote = \"hi\"",
+			FrontmatterKind::Toml,
+		)
+		.unwrap();
+		fm.declarations("PageMeta")
+			.0
+			.iter()
+			.map(|named| named.name.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["PageMeta".to_string(), "Extra".to_string()]);
+		// only the default component's keys reach the reflect surface
+		fm.get_str("title").unwrap().xpect_eq("Hello");
+		fm.get_str("note").is_none().xpect_true();
 	}
 
 	// -- extraction from raw source --

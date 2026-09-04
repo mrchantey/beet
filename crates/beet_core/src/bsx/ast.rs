@@ -115,7 +115,7 @@ pub enum ValueExpr {
 /// `@entity:` is `@comp` retargeted to a named entity: the [`selector`] names a
 /// `bx:ref` entity, or one of the reserved well-known entities `BuildRoot`,
 /// `SnippetRoot`, `PageRoot`, `Router` (see `ReservedRef` in the resolver), eg
-/// `@entity:PageRoot::ArticleMeta.title`. `@comp:` (no `@entity:`) binds the
+/// `@entity:PageRoot::PageMeta.title`. `@comp:` (no `@entity:`) binds the
 /// current entity.
 ///
 /// [`selector`]: Self::selector
@@ -259,6 +259,7 @@ impl DataLiteral {
 /// bare enum variant from a typed component only at resolution, against the
 /// target's `TypeInfo`.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct NamedLiteral {
 	/// The variant or type name, eg `Center`, `Rgb`, `MyComponent`.
 	pub name: SmolStr,
@@ -275,4 +276,67 @@ pub enum NamedFields {
 	Tuple(Vec<DataLiteral>),
 	/// Named fields, ie a struct variant `Point { x: 1, y: 2 }`.
 	Struct(Vec<(SmolStr, DataLiteral)>),
+}
+
+/// The named-field literals are hand-tokenized: a `(key, value)` pair has no
+/// blanket [`TokenizeSelf`], since the component tokenizer's blanket impl
+/// already claims every tuple.
+#[cfg(feature = "tokens")]
+impl NamedFields {
+	/// The `vec![(key, value), ..]` tokens of a named-field list.
+	fn field_tokens(
+		fields: &[(SmolStr, DataLiteral)],
+	) -> proc_macro2::TokenStream {
+		let fields = fields.iter().map(|(key, value)| {
+			let key = key.self_token_stream();
+			let value = value.self_token_stream();
+			quote::quote! { (#key, #value) }
+		});
+		quote::quote! { vec![#(#fields),*] }
+	}
+}
+
+#[cfg(feature = "tokens")]
+impl TokenizeSelf for NamedFields {
+	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		match self {
+			Self::Unit => tokens.extend(quote::quote! { NamedFields::Unit }),
+			Self::Tuple(items) => {
+				let items = items.self_token_stream();
+				tokens.extend(quote::quote! { NamedFields::Tuple(#items) });
+			}
+			Self::Struct(fields) => {
+				let fields = Self::field_tokens(fields);
+				tokens.extend(quote::quote! { NamedFields::Struct(#fields) });
+			}
+		}
+	}
+}
+
+#[cfg(feature = "tokens")]
+impl TokenizeSelf for DataLiteral {
+	fn self_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		match self {
+			Self::Scalar(value) => {
+				let value = value.self_token_stream();
+				tokens.extend(quote::quote! { DataLiteral::Scalar(#value) });
+			}
+			Self::List(items) => {
+				let items = items.self_token_stream();
+				tokens.extend(quote::quote! { DataLiteral::List(#items) });
+			}
+			Self::Struct(fields) => {
+				let fields = NamedFields::field_tokens(fields);
+				tokens.extend(quote::quote! { DataLiteral::Struct(#fields) });
+			}
+			Self::Enum(named) => {
+				let named = named.self_token_stream();
+				tokens.extend(quote::quote! { DataLiteral::Enum(#named) });
+			}
+			Self::EntityRef(name) => {
+				let name = name.self_token_stream();
+				tokens.extend(quote::quote! { DataLiteral::EntityRef(#name) });
+			}
+		}
+	}
 }

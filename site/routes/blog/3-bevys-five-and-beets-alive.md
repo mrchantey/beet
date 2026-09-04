@@ -4,13 +4,8 @@ slug = "bevys-five-and-beets-alive"
 description = "The recurring lesson that ECS data models must come first, illustrated by rewrites and initial DOM diffing."
 created = "2025-09-06"
 author = "Pete Hayman"
+video_url = "https://youtu.be/J0zxMdsAk_I"
 +++
-
-# The Full Moon Harvest #3 - Bevy's Five and Beet's Alive!
-
-*Pete Hayman — 6th September, 2025*
-
-<iframe src="https://www.youtube.com/embed/J0zxMdsAk_I" alt-src="https://youtu.be/J0zxMdsAk_I" title="Full Moon Harvest #3 | Big Diff" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 It's been a very good year, but for this reflection I'd like to share my journey of seemingly relentless deviations from The Way of the ECS.
 

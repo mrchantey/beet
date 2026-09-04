@@ -4,20 +4,14 @@ slug = "action-time"
 description = "A groundwork release for the upcoming `bsn!` templating system, adding browser testing, analytics, and PDF export utilities."
 created = "2025-10-07"
 author = "Pete Hayman"
+video_url = "https://youtu.be/yI9tuBsrW1M"
 +++
-
-# The Full Moon Harvest #4 - Action time!
-
-*Pete Hayman — 7th October, 2025*
-
-<iframe src="https://www.youtube.com/embed/yI9tuBsrW1M" alt-src="https://youtu.be/yI9tuBsrW1M" title="Full Moon Harvest #4 | Action Time" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 This one's a bit of a groundwork harvest, I have some exciting ideas for where to take beet next but to do it properly we need a firm base to launch from.
 
 ## Action Time
 
 The Bevy `0.17` release introduces event triggers, which I used as an opportunity to dramatically clean up the `beet_flow` integration, leaning into a simple request-response format. `beet_flow` will play a critical role in the next pass at `beet_router`, which is gonna be a behavior tree router! cant wait.
-
 
 ## Webdriver BiDi
 
@@ -34,7 +28,6 @@ Also partial initial support for DynamoDb which will likely be the place where t
 ## PDF Exports
 
 Preparing for a conference i didnt want to copy all my beetmash stuff into a word doc and do formatting all over again so instead worked on print-to-pdf utilities like page breaks, hidden-unless-printing etc.
-
 
 ## Preparing for `bsn!`
 

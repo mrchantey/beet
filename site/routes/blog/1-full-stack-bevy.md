@@ -4,15 +4,10 @@ slug = "full-stack-bevy"
 description = "Bevy ECS as the foundation for a full-stack application framework, achieving SSR, CSR, SSG, client islands, and server actions."
 created = "2025-07-11"
 author = "Pete Hayman"
+video_url = "https://youtu.be/7koepBSRoUI"
 +++
 
-# The Full Moon Harvest #1 - Full Stack Bevy
-
-*Pete Hayman — 11th July, 2025*
-
 I'm very excited for the `0.0.6-rc.3` of beet, now available.
-
-<iframe src="https://www.youtube.com/embed/7koepBSRoUI" alt-src="https://youtu.be/7koepBSRoUI" title="Full Moon Harvest #1 | Full Stack Bevy" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 In March I [spoke at the bevy meetup](https://youtu.be/JeXOajFv8Dk) about unifying structural representations (games, dom trees, behavior etc), since then I've only become more certain this is how I want to develop applications. One language (rust), one paradigm (bevy ecs) across the entire stack.
 

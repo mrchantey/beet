@@ -6,8 +6,6 @@ created = "2026-08-28"
 author = "Pete Hayman"
 +++
 
-# Bevy standardizes malleable software
-
 In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:
 1. Developing the storytelling of my work by presenting at [DevOps Days Wollongong](https://youtu.be/a-Sx0aEhDhc?list=PLKIKuXdn4ZMjKxet6G2oQkdIZqsKXLit7) and [Local-First Conf '26](https://youtu.be/eRpMQhOR93U?si=6SMyrZWDEOyQFphS).
 2. Meeting and hearing from other people who rethinking software from first principles in adjacent fields like Decentralized Web.

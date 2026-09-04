@@ -189,7 +189,7 @@ fn wrap_content(
 	// what this layout STRUCTURALLY wraps may itself be a layout (a nested
 	// declaration), while every consumer of the link wants the route content at
 	// the end of that chain: the per-route components a layout widget queries
-	// (`ArticleMeta`) live there, not on an intermediate shell.
+	// (`PageMeta`) live there, not on an intermediate shell.
 	let page_content = LayoutContent::terminal(world, rendered)?;
 
 	// resolve the entity owning this request's route tree once, as the nearest
@@ -206,7 +206,7 @@ fn wrap_content(
 
 	// the request-scoped render context, read by the layout's scene systems: the
 	// request parts, the rendered content entity (off which widgets query
-	// per-route components, eg `ArticleMeta` parsed from frontmatter), the matched
+	// per-route components, eg `PageMeta` parsed from frontmatter), the matched
 	// route entity, and its tree-owning `router`. Scoped to the synchronous layout
 	// build — a stack, so the content's own context (pushed around its build)
 	// and any nested render are restored on completion.
@@ -218,7 +218,7 @@ fn wrap_content(
 
 	// link the layout root to the transcluded content, distinct from the
 	// self-referential render root: a layout-head `@entity:PageRoot::` binding
-	// follows this to read the route's `ArticleMeta` across the transclusion.
+	// follows this to read the route's `PageMeta` across the transclusion.
 	world
 		.entity_mut(layout)
 		.insert(LayoutContent::new(page_content));
@@ -231,7 +231,7 @@ fn wrap_content(
 }
 
 /// Spawn the named template as the layout around `rendered`: the slot child
-/// carrying the content [`Portal`] spawns first, then the template builds into
+/// carrying the content [`Portal`] spawns first, then the template builds below
 /// the same entity, whose slot-resolution pass routes the content into the
 /// template's default `<Slot/>`.
 ///
@@ -258,11 +258,18 @@ fn build_layout(
 		self_closing: true,
 	})];
 	let layout = world
-		.spawn(children![(Portal::new(rendered), SlotChild::new())])
+		.spawn(children![(
+			beet_ui::prelude::Portal::new(rendered),
+			SlotChild::new()
+		)])
 		.id();
+	// `container` (not `new`): a layout is a DOCUMENT, so its body hangs below the
+	// layout entity rather than building onto it. A passthrough layout whose whole
+	// body is `<Slot/>` would otherwise land its `SlotTarget` on the very entity
+	// holding the transcluded content, where slot resolution cannot see it.
 	world
 		.entity_mut(layout)
-		.insert_template(BsxTemplate::new(nodes, registry))?;
+		.insert_template(BsxTemplate::container(nodes, registry))?;
 	layout.xok()
 }
 
@@ -303,7 +310,9 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+	use beet_ui::prelude::PageMeta;
 	// the `MetaLayout` test template's site-title link, gated like its only user.
+	// Named rather than glob-imported: `beet_net` has a `Header` trait too.
 	#[cfg(feature = "json")]
 	use beet_ui::prelude::Header;
 
@@ -645,6 +654,36 @@ mod test {
 		body.xpect_greater_than(inner);
 	}
 
+	/// The shapes a layout document may take: the `<Slot/>` is not always inside
+	/// an element, and the body must reach it in every one.
+	///
+	/// A chrome-only layout (`<ArticleHeader/><Slot/>`) is the regression this
+	/// covers: a multi-root document anchored its transcluded body inside the
+	/// FIRST element it found, a sibling of the slot the body belonged in, and a
+	/// bare `<Slot/>` passthrough built its target onto the very entity holding
+	/// the content, where slot resolution could not see it.
+	#[beet_core::test]
+	async fn layout_shapes_all_receive_the_body() {
+		for source in [
+			// the whole layout is the passthrough
+			"<Slot/>",
+			// chrome beside the slot, at the document root
+			"<p>chrome</p><Slot/>",
+			"<Slot/><p>chrome</p>",
+			// ..and under a tag-less host
+			"<Fragment><p>chrome</p><Slot/></Fragment>",
+			// the ordinary element-wrapped shapes
+			"<main><p>chrome</p><Slot/></main>",
+			"<html><body><main><Slot/></main></body></html>",
+			// a leading comment nests the content element below the root
+			"<!-- c --><html><body><main><Slot/></main></body></html>",
+		] {
+			let mut world = bsx_world(source);
+			let root = layout_root(&mut world, Layout::default());
+			get(&mut world, root, "").await.xpect_contains("page body");
+		}
+	}
+
 	/// A route under only the router's layout is untouched by a sibling subtree's
 	/// declaration, and each sibling subtree gets its own.
 	#[beet_core::test]
@@ -695,19 +734,19 @@ mod test {
 	}
 
 	/// A world whose `Layout` binds its `<title>` from the transcluded route's
-	/// `ArticleMeta` via the reserved `@entity:PageRoot::` selector. This is the
+	/// `PageMeta` via the reserved `@entity:PageRoot::` selector. This is the
 	/// in-markup replacement for the Rust `RouteHead` title lookup: the layout
 	/// builds detached and the binding follows the `LayoutContent` link
 	/// (installed by `wrap_content`) across the transclusion boundary.
 	fn meta_layout_world() -> World {
 		bsx_world(
-			"<html><head><title>{@entity:PageRoot::ArticleMeta.title}</title></head><body><main><Slot/></main></body></html>",
+			"<html><head><title>{@entity:PageRoot::PageMeta.title}</title></head><body><main><Slot/></main></body></html>",
 		)
 	}
 
 	/// A route whose rendered content carries the given frontmatter title.
 	fn meta_route(path: &str, title: &str) -> impl Bundle {
-		let meta = ArticleMeta {
+		let meta = PageMeta {
 			title: Some(title.into()),
 			..default()
 		};
@@ -716,7 +755,7 @@ mod test {
 		})
 	}
 
-	/// A layout-head `@entity:PageRoot::ArticleMeta.title` binding resolves to the
+	/// A layout-head `@entity:PageRoot::PageMeta.title` binding resolves to the
 	/// transcluded route's meta, and differs per route (the gap this stream
 	/// closes: the layout root's self-referential render root is not the content,
 	/// so the walk must follow the distinct content link).
@@ -742,7 +781,7 @@ mod test {
 
 	/// The nested-layout title hop: the site layout's head binds the ROUTE's meta
 	/// through the intervening article layout, rather than the article layout root
-	/// (which carries no `ArticleMeta`, so the title would go blank).
+	/// (which carries no `PageMeta`, so the title would go blank).
 	#[beet_core::test]
 	async fn layout_title_binds_through_a_nested_layout() {
 		let mut world = meta_layout_world();

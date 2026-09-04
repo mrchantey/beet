@@ -17,13 +17,12 @@ use beet_ui::prelude::*;
 /// [`RouteSidebar`](crate::prelude::RouteSidebar) for why the handle rather than
 /// a walk) and lists the children of the node the request matched, so an
 /// `index.md` under `blog/` lists the posts beside it. Every field comes from
-/// each page's [`ArticleMeta`], ie its markdown frontmatter: a child with no
-/// frontmatter has nothing to list and is skipped, as is one that is not a
-/// [`PageRoute`], and a draft is skipped in production exactly as static export
-/// drops it.
+/// each page's [`PageMeta`], ie its root declarations: a child declaring none
+/// has nothing to list and is skipped, as is one that is not a [`PageRoute`],
+/// and a draft is skipped in production exactly as static export drops it.
 ///
 /// Entries are ordered like the nav — frontmatter `order`, which a numbered
-/// filename fills in ([`ArticleMeta::with_file_defaults`]), then natural order
+/// filename fills in ([`PageMeta::declare_file_defaults`]), then natural order
 /// by path — and numbered `#1..#N` by their place in that ascending order.
 /// `reverse` flips the *display* only, so a blog reads newest first while post
 /// `#1` stays post `#1`.
@@ -40,13 +39,13 @@ pub fn RouteIndex(
 	reverse: bool,
 	stack: Res<RequestContextStack>,
 	trees: Query<&RouteTree>,
-	metas: Query<&ArticleMeta>,
+	metas: Query<&PageMeta>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	// drafts are listed everywhere but production, matching `StaticExport`
 	let is_prod = BootstrapConfig::get().is_prod();
 	let current = SmolPath::new(cx.current_path());
-	let mut entries: Vec<(SmolPath, ArticleMeta)> = trees
+	let mut entries: Vec<(SmolPath, PageMeta)> = trees
 		.get(cx.router())
 		.ok()
 		.and_then(|tree| tree.find_subtree(&current.segments()))
@@ -65,14 +64,14 @@ pub fn RouteIndex(
 		})
 		.unwrap_or_default();
 	entries.sort_by(|(path_a, meta_a), (path_b, meta_b)| {
-		let order = |meta: &ArticleMeta| meta.sidebar.order.unwrap_or(u32::MAX);
+		let order = |meta: &PageMeta| meta.order.unwrap_or(u32::MAX);
 		order(meta_a)
 			.cmp(&order(meta_b))
 			.then_with(|| natural_cmp(path_a.as_str(), path_b.as_str()))
 	});
 	// numbered in ascending order, then flipped for display, so `reverse`
 	// renumbers nothing
-	let mut items: Vec<(usize, SmolPath, ArticleMeta)> = entries
+	let mut items: Vec<(usize, SmolPath, PageMeta)> = entries
 		.into_iter()
 		.enumerate()
 		.map(|(idx, (path, meta))| (idx + 1, path, meta))
@@ -92,11 +91,11 @@ pub fn RouteIndex(
 
 /// One index entry: the `<hr/>` separating it from the entry above (every entry
 /// but the first), its numbered heading linking to the page, then whichever of
-/// the eyebrow and description the frontmatter supplied.
+/// the byline, thumbnail and description the frontmatter supplied.
 fn index_entry(
 	number: usize,
 	path: &SmolPath,
-	meta: &ArticleMeta,
+	meta: &PageMeta,
 	separator: bool,
 ) -> Snippet {
 	let rule = match separator {
@@ -110,36 +109,24 @@ fn index_entry(
 			.as_deref()
 			.unwrap_or_else(|| path.last_segment().unwrap_or_default())
 	);
-	let eyebrow = entry_eyebrow(meta);
+	let byline = article_byline(meta);
+	// the entry's own thumbnail, alt-texted by the heading it illustrates
+	let thumbnail = meta.image_url.as_deref().map(|src| {
+		let (src, alt, href) = (src.to_string(), heading.clone(), href.clone());
+		rsx! { <a href=href><img src=src alt=alt/></a> }
+	});
 	let description = entry_description(meta);
 	rsx! {
 		{rule}
 		<h4><a href=href>{heading}</a></h4>
-		{eyebrow}
+		{byline}
+		{thumbnail}
 		{description}
 	}
 }
 
-/// The `AUTHOR · DATE` eyebrow line, or nothing when the frontmatter declares
-/// neither: an entry without one renders no empty paragraph.
-fn entry_eyebrow(meta: &ArticleMeta) -> Snippet {
-	let text = [
-		meta.author.as_deref().map(str::to_uppercase),
-		meta.created
-			.map(|created| created.format_long_date().to_uppercase()),
-	]
-	.into_iter()
-	.flatten()
-	.collect::<Vec<_>>()
-	.join(" · ");
-	if text.is_empty() {
-		return Snippet::from_bundle(());
-	}
-	rsx! { <p {Classes::new([classes::TEXT_EYEBROW])}>{text}</p> }
-}
-
 /// The entry's summary, or nothing when the frontmatter has no `description`.
-fn entry_description(meta: &ArticleMeta) -> Snippet {
+fn entry_description(meta: &PageMeta) -> Snippet {
 	let Some(text) = meta.description.clone() else {
 		return Snippet::from_bundle(());
 	};
@@ -154,7 +141,7 @@ mod test {
 	/// A page route at `path` carrying the frontmatter an index entry reads.
 	/// The rendered body is irrelevant: collection keys off the tree and the
 	/// metadata, so every fixture route shares one.
-	fn post(path: &str, meta: ArticleMeta) -> impl Bundle {
+	fn post(path: &str, meta: PageMeta) -> impl Bundle {
 		(
 			render_action::fixed_func_route(path, || rsx! { <p>"post"</p> }),
 			PageRoute,
@@ -163,16 +150,13 @@ mod test {
 	}
 
 	/// Frontmatter as a numbered blog post would declare it.
-	fn meta(title: &str, created: &str, order: u32) -> ArticleMeta {
-		ArticleMeta {
+	fn meta(title: &str, created: &str, order: u32) -> PageMeta {
+		PageMeta {
 			title: Some(title.into()),
 			description: Some(format!("about {title}")),
 			author: Some("Pete Hayman".into()),
 			created: Timestamp::parse_date(created),
-			sidebar: SidebarInfo {
-				order: Some(order),
-				..default()
-			},
+			order: Some(order),
 			..default()
 		}
 	}
@@ -234,11 +218,6 @@ mod test {
 	/// End to end through the real page path: a discovered `blog/index.md`
 	/// placing `<RouteIndex/>` lists the posts discovered beside it, at the urls
 	/// their `slug` frontmatter names.
-	///
-	/// The posts declare their metadata as frontmatter, which only the
-	/// `markdown_parser` build reads; without it a post carries no `ArticleMeta`
-	/// and the index has nothing to list.
-	#[cfg(feature = "markdown_parser")]
 	#[beet_core::test]
 	async fn lists_discovered_posts() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -246,7 +225,7 @@ mod test {
 		for (path, content) in [
 			(
 				"blog/index.bsx",
-				r#"<Fragment {ArticleMeta{title: "Blog"}}><h1>Blog</h1><RouteIndex reverse="true"/></Fragment>"#,
+				r#"<Fragment {PageMeta{title: "Blog"}}><h1>Blog</h1><RouteIndex reverse="true"/></Fragment>"#,
 			),
 			(
 				"blog/1-full-stack-bevy.md",

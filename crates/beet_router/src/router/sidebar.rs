@@ -3,7 +3,7 @@
 //!
 //! [`SidebarState`] walks the route tree, applies per-route [`SidebarInfo`]
 //! overrides (label/order/expanded, sourced from markdown frontmatter via
-//! [`ArticleMeta`](crate::prelude::ArticleMeta)), computes active-link +
+//! [`PageMeta`](crate::prelude::PageMeta)), computes active-link +
 //! auto-expansion against a `current_path`, sorts siblings in natural order, and
 //! returns the `Vec<SidebarNode>` the widget renders. The widget itself emits
 //! the `<nav>`/`<details>`/`<a>` DOM, so this module no longer hand-rolls bundles.
@@ -29,10 +29,11 @@ use beet_ui::prelude::*;
 
 /// The document [`Head`] with a per-route `<title>`: the base [`Head`] omits its
 /// own `<title>` and this widget owns the single one, bound to the route's
-/// [`ArticleMeta`] title (`@entity:PageRoot::ArticleMeta.title`) so it differs
-/// per route and stays live. The base head's social/PWA meta names the site from
-/// [`PackageConfig`](beet_core::prelude::PackageConfig). Extra tags (stylesheet,
-/// favicon, ...) flow through to the `<head>` via the default slot.
+/// [`PageMeta`] title (`@entity:PageRoot::PageMeta.title`) so it differs
+/// per route and stays live. The route's whole [`PageMeta`] is handed to the base
+/// [`Head`] so its social card previews this page, falling back to
+/// [`PackageConfig`](beet_core::prelude::PackageConfig) per field. Extra tags
+/// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout declares `<RouteHead>...</RouteHead>`. Builds inside a layout
@@ -40,47 +41,53 @@ use beet_ui::prelude::*;
 #[template(system)]
 pub fn RouteHead(
 	stack: Res<RequestContextStack>,
-	metas: Query<&ArticleMeta>,
+	metas: Query<&PageMeta>,
 	pkg: Res<PackageConfig>,
-) -> impl Bundle {
+) -> Result<impl Bundle> {
 	let cx = stack.current();
-	// the SSR seed: the resolved title rendered before any document sync, read
-	// off the rendered content. The binding then keeps it live and per-route, so
-	// the title is never sticky.
-	let seed = metas
-		.get(cx.content())
-		.ok()
-		.and_then(|meta| meta.title.clone())
-		.unwrap_or_else(|| pkg.title.to_string());
+	// the route's own metadata, read off the rendered content exactly as the
+	// `<title>` binding resolves it, so the social card previews this page.
+	let meta = metas.get(cx.content()).cloned().unwrap_or_default();
+	// the SSR seed: the resolved title rendered before any document sync. The
+	// binding then keeps it live and per-route, so the title is never sticky.
+	let seed = meta.title.clone().unwrap_or_else(|| pkg.title.to_string());
+	let title = route_title(&seed)?;
 	rsx! {
-		<Head omit_title=true>
-			<title>{route_title(&seed)}</title>
+		<Head omit_title=true meta=meta>
+			<title>{title}</title>
 			<Slot/>
 		</Head>
 	}
+	.xok()
 }
 
 /// The bound text child of the route `<title>`: a [`Value`] seeded with the
 /// resolved title (so SSR renders it before any sync) plus, under `json`, a
-/// [`ReflectFieldRef`] resolving `@entity:PageRoot::ArticleMeta.title` — the
+/// [`ReflectFieldRef`] resolving `@entity:PageRoot::PageMeta.title` — the
 /// nearest render-root ancestor, hopping the layout's [`LayoutContent`] into the
 /// transcluded route content. Re-resolved each sync pass and each request, so the
 /// title tracks the current route. Without `json` it stays the static seed.
-fn route_title(seed: &str) -> impl Bundle {
+///
+/// # Errors
+/// Errors when [`PageMeta`] declares no `title`, which
+/// [`ReflectFieldRef::of`] catches at construction rather than leaving a
+/// binding that silently syncs nothing.
+fn route_title(seed: &str) -> Result<impl Bundle> {
 	let value = Value::new(seed);
 	#[cfg(feature = "json")]
 	return (
 		value,
-		ReflectFieldRef::new("ArticleMeta", "title")
+		ReflectFieldRef::of::<PageMeta>("title")?
 			.with_target(BindingTarget::Reserved("PageRoot".into())),
-	);
+	)
+		.xok();
 	#[cfg(not(feature = "json"))]
-	return value;
+	return value.xok();
 }
 
 /// The route-tree navigation rail as a widget: collects the route tree this
 /// page belongs to into [`Sidebar`] nodes against the current request, applying
-/// each route entity's [`ArticleMeta`] (scan-time or parsed frontmatter) as its
+/// each route entity's [`PageMeta`] (scan-time or parsed frontmatter) as its
 /// [`SidebarInfo`] override.
 ///
 /// The tree is read directly off the [`RequestContext::router`] handle — the
@@ -109,7 +116,7 @@ pub fn RouteSidebar(
 	exclude: Vec<String>,
 	stack: Res<RequestContextStack>,
 	trees: Query<&RouteTree>,
-	metas: Query<&ArticleMeta>,
+	metas: Query<&PageMeta>,
 ) -> impl Bundle {
 	let cx = stack.current();
 	let nodes = trees
@@ -123,10 +130,8 @@ pub fn RouteSidebar(
 			// each route's metadata drives its label/order/expansion
 			for node in tree.flatten_nodes() {
 				if let Ok(meta) = metas.get(node.entity) {
-					state = state.with_info(
-						node.path.annotated_path(),
-						meta.sidebar_info(),
-					);
+					state = state
+						.with_info(node.path.annotated_path(), meta.into());
 				}
 			}
 			state.collect(tree)
@@ -135,14 +140,13 @@ pub fn RouteSidebar(
 	rsx! { <Sidebar nodes=nodes/> }
 }
 
-/// Per-route override for a sidebar entry, sourced from markdown frontmatter
-/// (the `sidebar` field of [`ArticleMeta`](crate::prelude::ArticleMeta)).
+/// Per-route override for a sidebar entry, derived from the page's
+/// [`PageMeta`](crate::prelude::PageMeta).
 ///
 /// Unset fields fall back to derived defaults: the label to the route's last
 /// path segment, expansion to "open when the current path is a descendant".
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "codegen", derive(ToTokens))]
 pub struct SidebarInfo {
 	/// Display label override. Defaults to the last path segment.
 	pub label: Option<String>,
@@ -151,6 +155,21 @@ pub struct SidebarInfo {
 	/// Force the branch open (`Some(true)`) or closed (`Some(false)`); `None`
 	/// auto-expands when the current path is a descendant.
 	pub expanded: Option<bool>,
+}
+
+/// The nav slice of a page's metadata, with the label resolved through
+/// [`PageMeta::sidebar_label`] so an unlabelled page falls back to its title.
+///
+/// The conversion lives here rather than on [`PageMeta`] because the nav is a
+/// router concern: the page merely declares label, order and expansion.
+impl From<&PageMeta> for SidebarInfo {
+	fn from(meta: &PageMeta) -> Self {
+		Self {
+			label: meta.sidebar_label().map(String::from),
+			order: meta.order,
+			expanded: meta.expanded,
+		}
+	}
 }
 
 /// Collector that turns a [`RouteTree`] into a [`SidebarNode`] render tree.
