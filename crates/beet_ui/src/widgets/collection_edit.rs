@@ -15,23 +15,26 @@ use beet_core::prelude::*;
 
 /// One structural edit to a collection field, the whole vocabulary of what a
 /// generated add or remove button does.
+///
+/// A list and a map differ in how a position is *named*, not in what removing
+/// one means, so both removes are one arm over the [`FieldSegment`] the document
+/// layer already calls a position. Adding is the arm that genuinely differs:
+/// appending needs nothing, and an entry needs a name first.
 #[derive(Debug, Clone)]
 pub(super) enum CollectionEdit {
 	/// Append the item schema's zero to the list.
 	Push(Value),
-	/// Drop the list item at this index.
-	RemoveIndex(usize),
 	/// Insert the value schema's zero under the key typed into the sibling
-	/// [`NewEntryKey`] input.
+	/// [`NewEntryKey`] input, the one edit with a precondition.
 	Insert(Value),
-	/// Drop the map entry under this key.
-	RemoveKey(SmolStr),
+	/// Drop the item or entry at this position.
+	Remove(FieldSegment),
 }
 
 /// A button applying one [`CollectionEdit`] to the field it names.
 ///
-/// The field is the *collection's* path, not the item's, so an index or key
-/// edit is resolved against the whole collection in one write.
+/// The field is the *collection's* path, not the item's, so an edit at a
+/// position is resolved against the whole collection in one write.
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(apply_collection_edit))]
 pub(super) struct CollectionButton {
@@ -109,18 +112,18 @@ fn apply_collection_edit(
 			CollectionEdit::Push(item) => {
 				value.as_list_mut_or_init()?.push(item)
 			}
-			CollectionEdit::RemoveIndex(index) => {
-				let list = value.as_list_mut_or_init()?;
-				if index < list.len() {
-					list.remove(index);
-				}
-			}
 			CollectionEdit::Insert(zero) => {
 				let key =
 					key.ok_or_else(|| bevyhow!("a map entry needs a key"))?;
 				as_map_mut_or_init(value)?.insert(key, zero);
 			}
-			CollectionEdit::RemoveKey(key) => {
+			CollectionEdit::Remove(FieldSegment::ArrayIndex(index)) => {
+				let list = value.as_list_mut_or_init()?;
+				if index < list.len() {
+					list.remove(index);
+				}
+			}
+			CollectionEdit::Remove(FieldSegment::ObjectKey(key)) => {
 				as_map_mut_or_init(value)?.remove(key.as_str());
 			}
 		}

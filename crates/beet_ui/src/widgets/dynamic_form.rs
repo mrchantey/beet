@@ -558,7 +558,7 @@ fn list_row(
 			{edit_button(
 				"remove",
 				field.clone(),
-				CollectionEdit::RemoveIndex(index),
+				CollectionEdit::Remove(FieldSegment::index(index)),
 			)}
 		</div>
 	}
@@ -621,7 +621,11 @@ fn map_entry(
 				Some(key.to_string()),
 				depth + 1,
 			)}
-			{edit_button("remove", field.clone(), CollectionEdit::RemoveKey(key))}
+			{edit_button(
+				"remove",
+				field.clone(),
+				CollectionEdit::Remove(FieldSegment::ObjectKey(key)),
+			)}
 		</div>
 	}
 	.any_snippet()
