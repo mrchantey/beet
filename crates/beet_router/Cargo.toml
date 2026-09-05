@@ -49,6 +49,9 @@ sockets = ["beet_net/sockets"]
 # native `router` enables this; the wasm render target leaves it off. (The
 # `webbrowser` link opener rides `std` itself, off wasm — see the `std` feature.)
 native = ["std", "beet_net/fs", "beet_net/http"]
+# The Cloudflare Worker target (wasm32-only): the R2-backed store an entry loads
+# from, and the world-owning `entry_build` driver the Worker's fetch handler runs.
+cloudflare = ["std", "beet_net/cloudflare"]
 # The S3-backed store, native-only: lets a deployed binary serve its routes from
 # a bucket-backed `BlobStore`.
 aws_sdk = ["std", "beet_net/aws_sdk"]
@@ -145,7 +148,10 @@ heck = { workspace = true, optional = true }
 webbrowser = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_core = { workspace = true, features = ["testing"] }
+# `fs` + `rand`: the entry-resolution tests walk a real `TempDir` (which the
+# `rand` feature mints the name of), since a store walk is exactly what they are
+# asserting.
+beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

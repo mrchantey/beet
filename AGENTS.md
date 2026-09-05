@@ -18,7 +18,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Actions: one-per-entity, overloads, providers, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
-- The beet CLI, entries, wasm binaries: `crates/beet-cli/README.md`
+- The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Rendering (web + charcell): `.agents/skills/rendering`
 

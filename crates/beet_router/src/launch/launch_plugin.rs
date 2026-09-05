@@ -1,63 +1,55 @@
-//! The app body the `beet` binary runs, exposed so a downstream binary linking
-//! its own capabilities serves an entry exactly as the stock binary does.
+//! The `Startup` entry loader: resolve a repo store and an entry document name,
+//! build the entry into a root that carries the store, and let the loaded tree
+//! run itself.
 //!
-//! beet is unopinionated like a game engine: a binary links a library of
-//! capabilities (registered reflect types) and ships zero behaviour, and the
-//! entry document decides what runs. A workspace that names only beet types runs
-//! through the stock `beet` binary; a workspace that EXTENDS beet with reflect
-//! types of its own builds a binary of its own and reaches for [`app`], which is
-//! the same resolution, load and lifecycle with those types linked in.
-//!
-//! The entry resolves from `--main`, which names the entry file itself
-//! (`--main=examples/hello/main.bsx`, any recognized extension) or a directory
-//! probed for [`entry_build::ENTRY_NAMES`] (`--main=examples/hello`); with no
-//! `--main` discovery walks the cwd and its ancestors for the first match, so a
-//! bare `beet` is `--main=.` plus the walk. The entry may rebase its own store
-//! root with a `<RepoRoot src="../.."/>` declaration (see [`RepoRoot`]), so
-//! callers never re-supply it. The entry builds on the async runtime through its
-//! [`BlobStore`] (so every store read is awaited, never blocked), and runs
-//! itself: its own `CallOnReady` verb acts at its own `Ready`. A one-shot
-//! streams its response and exits; a long-running server parks its call to
-//! persist the process.
-//!
-//! `--features=a,b` verifies the running binary was compiled with those cargo
-//! features (see [`CrateCheck`]), failing fast with the full missing list.
-//!
-//! The entry load is target-agnostic (the shared [`entry_build`] core reads any
-//! [`BlobStore`]); only entry *resolution* differs by target where the platform
-//! genuinely differs: a runtime with a filesystem (native, deno/node through the
-//! runner's fs globals) walks for `main.bsx` or honours `--main`; a browser reads
-//! its DOM program; a fs-less runtime needs a self-rooted `--repo`
-//! (`s3://<bucket>`, `local-storage`, `indexed-db`). The dev-command path is
-//! native-only.
-use beet::exports::bevy::app::Plugins;
-use beet::prelude::*;
-
+//! Added by [`LaunchPlugin`], which is the whole of what makes a binary a beet
+//! runtime. The facade composes it with `BeetPlugins` as `beet::launch::app`.
 use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_net::prelude::*;
 
-/// The one app body every target runs: the trusted defaults ([`BeetPlugins`]:
-/// the runner, beet's logging, the async runtime, and the router/scene/server
-/// capabilities selected by feature flag), `plugins` on top, the native-only
-/// extras where compiled, and the entry loader at `Startup`. The process exits
-/// when the loaded tree writes `AppExit` for the one-shot it resolves; a
-/// long-running server parks its boot call, so its unresolved
-/// `Running<Response>` persists the process with no refcount.
+/// Adds the [`Startup`] entry loader, ie the half of a beet binary that is not
+/// its capabilities.
 ///
-/// `plugins` is where a downstream binary links what the stock one cannot know:
-/// its own registered types, so an entry naming them resolves rather than
-/// degrading into an `UnregisteredTag`. Pass `()` for none.
-pub fn app<M>(plugins: impl Plugins<M>) -> App {
-	let mut app = App::new();
-	app.add_plugins(BeetPlugins);
-	// whatever the binary links on top: a downstream crate's block/action
-	// registrations, the stock binary's window lifecycle.
-	app.add_plugins(plugins);
-	// the native-only dev-command capabilities, linked as registered types and
-	// inert until a `main.bsx` names them.
-	#[cfg(not(target_arch = "wasm32"))]
-	app.add_plugins(CliCommandsPlugin);
-	app.add_systems(Startup, load_entry);
-	app
+/// A binary is otherwise unopinionated: it links a library of capabilities
+/// (registered reflect types) and ships zero behaviour, and the entry document
+/// decides what runs. This plugin is what finds and builds that document.
+///
+/// The binary spawns its own [`CrateRegistration`] before `run`, marked
+/// [`with_skip_prefix`](CrateRegistration::with_skip_prefix): a `<CrateCheck/>`
+/// naming an unprefixed feature resolves against it, and only the binary knows
+/// which cargo features it was compiled with. A binary that spawns none fails
+/// any unprefixed check with a message saying so.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct LaunchPlugin;
+
+impl Plugin for LaunchPlugin {
+	fn build(&self, app: &mut App) { app.add_systems(Startup, load_entry); }
+}
+
+/// Positional commands that run ANOTHER program, so the `--main` and `--repo`
+/// on this process's argv belong to that program and are forwarded untouched
+/// rather than read as this launch's own.
+///
+/// Absent by default: a binary whose commands all run in-process has nothing to
+/// forward. `beet run-wasm <module>` is the one beet ships, and the crate that
+/// owns that command is the one that inserts this.
+#[derive(Debug, Default, Clone, Resource)]
+pub struct ArgvPassthrough(Vec<SmolStr>);
+
+impl ArgvPassthrough {
+	/// Declare the commands whose argv belongs to a child program.
+	pub fn new(commands: impl IntoIterator<Item = impl Into<SmolStr>>) -> Self {
+		Self(commands.into_iter().map(Into::into).collect())
+	}
+
+	/// Whether `args` names one of them, ie whether this launch's `--main` and
+	/// `--repo` are somebody else's.
+	pub fn forwards(&self, args: &CliArgs) -> bool {
+		args.path
+			.first()
+			.is_some_and(|command| self.0.contains(command))
+	}
 }
 
 /// `Startup`: resolve the repo store + name and build the entry, all on the async
@@ -70,12 +62,18 @@ pub fn app<M>(plugins: impl Plugins<M>) -> App {
 /// hand here. A failed resolve/build logs and exits with an error rather than
 /// panicking. Target-agnostic: every runtime builds the same way, differing only
 /// in how [`resolve_entry`] finds the store.
+///
+/// The binary's own [`CrateRegistration`] is NOT spawned here: it names the
+/// binary's cargo features, which only the binary knows, so it spawns its own
+/// before `run` (see [`LaunchPlugin`]).
 fn load_entry(world: &mut World) {
 	// the binary consumes only its own args here; the loaded tree re-parses argv.
 	let args = CliArgs::parse_env();
-	// the binary's compiled surface: `--features` and any loaded `<CrateCheck/>`
-	// verify against it.
-	world.spawn(entry_build::cli_registration());
+	// whether those args belong to a CHILD program this process is only hosting,
+	// declared by whichever crate owns such a command.
+	let forwards_argv = world
+		.get_resource::<ArgvPassthrough>()
+		.is_some_and(|passthrough| passthrough.forwards(&args));
 	// the process config, parsed strictly once: entry resolution and the build
 	// both read it, and a malformed knob fails the launch rather than warning.
 	let config = match BootstrapConfig::from_env() {
@@ -86,7 +84,7 @@ fn load_entry(world: &mut World) {
 			return;
 		}
 	};
-	if let Some(check) = features_self_check(&args, &config) {
+	if let Some(check) = features_self_check(&args, &config, forwards_argv) {
 		world.spawn(check);
 	}
 	// the recognized template formats (`.bsx`, `.js`), read once here so the async
@@ -105,7 +103,7 @@ fn load_entry(world: &mut World) {
 			return;
 		}
 		// resolve on the runtime, since discovery now awaits the store.
-		let resolved = match resolve_entry(&args, &config).await {
+		let resolved = match resolve_entry(&config, forwards_argv).await {
 			Ok(resolved) => resolved,
 			Err(err) => {
 				error!("{err}");
@@ -159,8 +157,9 @@ async fn build_entry(
 	// the shared rebuild path, so the initial build and a structural rebuild are
 	// identical and the entry root is a `BeetSceneRoot` the reload can tear down.
 	// Opt-in, so a running presentation never reloads underfoot; a deployed (remote)
-	// entry has no local dir to watch, and the wasm runner has no fs watcher.
-	#[cfg(not(target_arch = "wasm32"))]
+	// entry has no local dir to watch, the wasm runner has no fs watcher, and a
+	// binary without `client_io` has no reload channel to serve.
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	if watch_dir.is_some() && config.watch {
 		return build_watched_entry(world, repo_store, entry_name, formats)
 			.await;
@@ -168,8 +167,10 @@ async fn build_entry(
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
 	// simply loads, and the entry's own markup decides how it runs by carrying
 	// a `CallOnReady` or not.
-	#[cfg(target_arch = "wasm32")]
+	#[cfg(any(target_arch = "wasm32", not(feature = "client_io")))]
 	let _ = config;
+	#[cfg(all(not(feature = "client_io"), not(target_arch = "wasm32")))]
+	let _ = watch_dir;
 	let sources = entry_build::read_sources(
 		&repo_store,
 		formats,
@@ -194,7 +195,7 @@ async fn build_entry(
 /// So editing the entry document or an included `<Template src>` tears the old
 /// scene down and rebuilds it with no leaked entities (servers rebind, sockets
 /// reconnect), while a markdown/template edit keeps the light content re-fire.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 async fn build_watched_entry(
 	world: &AsyncWorld,
 	repo_store: BlobStore,
@@ -253,8 +254,8 @@ async fn build_watched_entry(
 /// errors with guidance (the browser never reaches here, reading its DOM program
 /// instead).
 async fn resolve_entry(
-	args: &CliArgs,
 	config: &BootstrapConfig,
+	forwards_argv: bool,
 ) -> Result<ResolvedEntry> {
 	// the wasm runner forwards the *module's* flags on this same argv, so a
 	// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
@@ -262,9 +263,8 @@ async fn resolve_entry(
 	// runner. When acting as the runner (first positional `run-wasm`), drop them
 	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
 	// module's own config on via `ChildProcess::with_bootstrap`.
-	let is_wasm_runner = is_wasm_runner(args);
-	let repo_uri = (!is_wasm_runner).then(|| config.repo.as_ref()).flatten();
-	let main = (!is_wasm_runner).then(|| config.main.as_ref()).flatten();
+	let repo_uri = (!forwards_argv).then(|| config.repo.as_ref()).flatten();
+	let main = (!forwards_argv).then(|| config.main.as_ref()).flatten();
 
 	// a self-rooted store: no local dir and no ancestor walk, so `--main` is a
 	// key within the store, defaulting to the entry-name probe.
@@ -312,27 +312,13 @@ async fn resolve_entry(
 fn features_self_check(
 	args: &CliArgs,
 	config: &BootstrapConfig,
+	forwards_argv: bool,
 ) -> Option<CrateCheck> {
 	let runs_entry = config.main.is_some() || args.path.is_empty();
-	if is_wasm_runner(args) || !runs_entry || config.features.is_empty() {
+	if forwards_argv || !runs_entry || config.features.is_empty() {
 		return None;
 	}
 	Some(CrateCheck::features(config.features.clone()))
-}
-
-/// Whether this process was invoked as cargo's wasm runner, ie [`RunWasm`]'s
-/// `beet run-wasm <module>`, whose argv carries the MODULE's flags rather than
-/// this process's own.
-///
-/// Always false on wasm: the runner is the native process that HOSTS a module,
-/// so a module is never it, and the `run-wasm` command itself is native-only.
-fn is_wasm_runner(
-	#[cfg_attr(target_arch = "wasm32", allow(unused))] args: &CliArgs,
-) -> bool {
-	#[cfg(not(target_arch = "wasm32"))]
-	return RunWasm::is_runner(args);
-	#[cfg(target_arch = "wasm32")]
-	false
 }
 
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving

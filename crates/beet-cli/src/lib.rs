@@ -24,21 +24,14 @@ mod workers;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod worker_entry;
 
-// the cross-platform entry build core (resolve + read a store, build the entry
-// into a root), shared by the native binary, the wasm Worker, and the
-// check/export-static commands.
-pub mod entry_build;
-
-// the app body every target runs (plugins + the `Startup` entry load), shared by
-// the `beet` binary and by any downstream binary linking capabilities of its own.
-pub mod launch;
+// this binary's compiled cargo features, which only it knows: the entry loader
+// itself is `beet::launch`, shared with every other beet binary.
+pub mod registration;
 
 pub mod prelude {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::commands::*;
-	pub use crate::entry_build;
-	pub use crate::entry_build::ResolvedEntry;
-	pub use crate::launch;
+	pub use crate::registration;
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	pub use crate::render::*;
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]

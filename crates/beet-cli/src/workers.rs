@@ -39,7 +39,7 @@ pub(crate) fn build_app() -> App {
 	app.add_plugins(BeetPlugins).add_plugins(WorkersPlugin);
 	// the binary's compiled surface, so a loaded site's `<CrateCheck/>` verifies
 	// against this Worker build like any other entry driver.
-	app.world_mut().spawn(entry_build::cli_registration());
+	app.world_mut().spawn(crate::registration::cli());
 	app
 }
 

@@ -1,10 +1,11 @@
 //! The `beet` binary: discover an entry, load it as a live build, let the loaded
 //! tree run itself, and exit unless something kept it alive.
 //!
-//! All of that is [`launch::app`] in the lib, so a downstream binary linking
-//! capabilities of its own runs an entry identically. What is left here is what
-//! only the binary can own: the two target entrypoints (native `main`, the wasm
-//! exported [`start`]) and the windowed render path's window lifecycle.
+//! All of that is [`beet::launch::app`], shared with every other beet binary.
+//! What is left here is what only this binary can own: the two target
+//! entrypoints (native `main`, the wasm exported [`start`]), its own compiled
+//! feature surface, the dev-command capabilities, and the windowed render
+//! path's window lifecycle.
 use beet::prelude::*;
 use beet_cli::prelude::*;
 
@@ -44,12 +45,15 @@ pub async fn start() -> i32 {
 	build_app().run_async().await.exit_code()
 }
 
-/// The one app body every target runs, ie [`launch::app`] plus the stock
-/// binary's own window lifecycle.
+/// The one app body every target runs, ie [`beet::launch::app`] plus what only
+/// this binary supplies: the dev-command capabilities, its own compiled feature
+/// surface, and the windowed render path's window lifecycle.
 fn build_app() -> App {
-	// only the winit branch below mutates it
-	#[allow(unused_mut)]
-	let mut app = launch::app(());
+	let mut app = launch::app(cli_plugins);
+	// this binary's cargo features, spawned before the entry loads so its
+	// `<CrateCheck/>` and any `--features` verify against them. The primary
+	// registration, ie the one an unprefixed requirement resolves to.
+	app.world_mut().spawn(registration::cli());
 	// the windowed render path's window lifecycle + screenshot harness. The
 	// facade's `BeetPlugins` links winit windowless (a capability, not a window);
 	// the binary owns the lifecycle (continuous updates, escape/close-to-exit,
@@ -58,4 +62,17 @@ fn build_app() -> App {
 	#[cfg(all(not(target_arch = "wasm32"), feature = "winit"))]
 	app.add_plugins(render_window_plugin);
 	app
+}
+
+/// The capabilities this binary links on top of the trusted defaults: the
+/// native-only dev commands, inert until a `main.bsx` names them, and the one
+/// command among them that runs ANOTHER program, whose `--main`/`--repo` the
+/// loader must therefore leave alone.
+fn cli_plugins(app: &mut App) {
+	#[cfg(not(target_arch = "wasm32"))]
+	app.add_plugins(CliCommandsPlugin)
+		.insert_resource(ArgvPassthrough::new([RunWasm::COMMAND]));
+	// the wasm binary is a module a runner HOSTS, never the runner itself
+	#[cfg(target_arch = "wasm32")]
+	let _ = app;
 }

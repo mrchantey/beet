@@ -49,21 +49,25 @@ An entry declares its required features with `<CrateCheck features={["thread", "
 
 ## Downstream binaries
 
-The stock `beet` binary resolves the types beet itself registers, so a workspace that only names those runs through it. A workspace that EXTENDS beet — its own `#[action]`s, deploy blocks, reflect components — builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
+The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet — its own `#[action]`s, deploy blocks, reflect components — builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
 
-Such a binary is a thin `main`, since the whole runner is the lib's `launch::app`:
+Such a binary is a thin `main`, and it depends on the `beet` facade alone. The runner is `beet::launch::app` (`BeetPlugins` + `beet_router`'s `LaunchPlugin`), so nothing about it is this crate's:
 
 ```rust,ignore
 use beet::prelude::*;
-use beet_cli::prelude::*;
 
 fn main() -> AppExit {
 	env_ext::load_dotenv().ok();
-	launch::app(MyCratePlugin).run()
+	let mut app = launch::app(MyCratePlugin);
+	// only the binary knows its own cargo features; an unprefixed `<CrateCheck/>`
+	// resolves against this
+	app.world_mut()
+		.spawn(crate_registration!({ features: ["my-feature"] }).with_skip_prefix());
+	app.run()
 }
 ```
 
-It then has the same entry resolution, load, `--features` self-check and process lifecycle the stock binary has. `beet-cli` is the only beet crate such a workspace depends on directly (everything else goes through the `beet` facade), it belongs to the binary rather than to any library crate, and it is worth putting behind a `cli` feature with `[[bin]] required-features = ["cli"]` so a library consumer never links it.
+It then has the same entry resolution, load and process lifecycle this binary has. What it does NOT get is the dev commands below (`run-wasm`, `build-wasm`, `check`, `export-static`, …), which are `CliCommandsPlugin` and live here — this binary adds them as its own `launch::app` argument, exactly as a downstream one adds its own.
 
 ## Development
 

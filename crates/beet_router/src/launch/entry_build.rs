@@ -1,6 +1,6 @@
-//! The cross-platform entry resolution + build core shared by the native `beet`
-//! binary, the wasm Worker entry, and the `check`/`serve`/`export-static`
-//! commands.
+//! The cross-platform entry resolution + build core: every binary that loads a
+//! beet entry runs through here, as do the `check`/`serve`/`export-static`
+//! commands and the wasm Worker entry.
 //!
 //! An entry load splits into resolution ([`resolve_main`]: the store + the entry
 //! document name within it, honouring `--repo` and the entry's own
@@ -14,44 +14,15 @@
 //! async runtime and the single-threaded wasm Worker, so an entry build never
 //! requires a filesystem.
 
-use beet::prelude::*;
+use crate::prelude::*;
+use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// Entry-document file names discovery looks for, in priority order. The native
 /// binary walks the cwd and its ancestors for the first match; the `check`/`serve`/
 /// `export-static` commands search a single given site dir for it. Shared so both
 /// agree on what an entry document is named.
 pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json", "main.ron"];
-
-/// The binary's own [`CrateRegistration`]: every feature `beet-cli` can be
-/// compiled with, each recorded if enabled, so an entry's `<CrateCheck/>` and
-/// the `--features` flag verify against the running binary. Spawned by every
-/// entry driver (the native binary, the wasm binary, the Worker).
-pub fn cli_registration() -> CrateRegistration {
-	crate_registration!({
-		features: [
-			"aws_sdk",
-			"cloudflare",
-			"extra",
-			"geoip",
-			"infra",
-			"lambda",
-			"ml",
-			"net",
-			"pdf",
-			"qrcode",
-			"secure",
-			"sockets",
-			"ssh",
-			"thread",
-			"tui",
-			"web",
-			"web_examples",
-			"web_head",
-			"winit",
-		]
-	})
-	.with_skip_prefix()
-}
 
 /// Pre-scan the raw entry document through `store`, the one registry-free walk
 /// entry resolution reads its declarations from.
@@ -287,7 +258,7 @@ pub fn build_root(
 /// The build is disarmed ([`DisableCallOnReady`]): this driver serves each
 /// request itself, so the entry's declared servers must not start.
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-pub(crate) async fn build_entry_owned(
+pub async fn build_entry_owned(
 	world: &mut World,
 	repo_store: BlobStore,
 	entry_name: String,
@@ -322,7 +293,10 @@ pub(crate) async fn build_entry_owned(
 ///
 /// The [`EntryReloader`] resource (installed once) survives the teardown and drives
 /// this on a change to the entry document or an included `<Template src>`.
-#[cfg(not(target_arch = "wasm32"))]
+///
+/// Gated on `client_io`: live reload is the browser channel plus the fs watcher,
+/// so a binary that links neither simply has no `--watch`.
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 pub async fn rebuild_watched(
 	world: &AsyncWorld,
 	repo_store: BlobStore,
@@ -374,6 +348,7 @@ pub async fn rebuild_watched(
 /// A missing / unreadable / non-markup source is skipped rather than erroring, so a
 /// broken include never blocks watch startup.
 #[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 async fn entry_source_paths(
 	repo_store: &BlobStore,
 	entry_name: &str,
@@ -426,7 +401,7 @@ mod test {
 	/// The shared core builds an entry from any store: an in-memory store here, so
 	/// it runs storage-agnostic (on wasm too), no filesystem involved. The entry's
 	/// `<DefaultAppRoutes/>` lands on the built router root.
-	#[beet::test]
+	#[beet_core::test]
 	async fn builds_an_entry_from_an_in_memory_store() {
 		let repo_store = BlobStore::temp();
 		repo_store
@@ -456,7 +431,7 @@ mod test {
 	/// The readiness gate settles and returns once the entry has nothing pending.
 	/// This entry has no `<RoutesDir>`/`<TemplateDir>`, so it is ready the moment
 	/// `build_root` returns; the gate must return rather than hang.
-	#[beet::test]
+	#[beet_core::test]
 	async fn gate_settles_when_ready() {
 		let repo_store = BlobStore::temp();
 		repo_store
@@ -482,7 +457,7 @@ mod test {
 	/// resolved ancestor directory: the watch dir is the widened root and the
 	/// entry name grows the path back down to the document.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet::test]
+	#[beet_core::test]
 	async fn fs_entry_rebases_through_resolve_main() {
 		let tmp = TempDir::new().unwrap();
 		let entry_dir = tmp.path().join("app");
@@ -509,7 +484,7 @@ mod test {
 	/// key-prefix view of itself; the binary's self-rooted branch resolves
 	/// through this same [`resolve_in_repo_store`], so the declaration is never
 	/// dropped by policy.
-	#[beet::test]
+	#[beet_core::test]
 	async fn self_rooted_entry_rebases_to_a_prefix_view() {
 		let repo_store = BlobStore::temp();
 		repo_store
@@ -536,7 +511,7 @@ mod test {
 
 	/// A root-level entry declaring a root above a store with no parent
 	/// universe fails loudly naming the mis-publish.
-	#[beet::test]
+	#[beet_core::test]
 	async fn self_rooted_escape_fails_loudly() {
 		let repo_store = BlobStore::temp();
 		repo_store
@@ -558,7 +533,7 @@ mod test {
 	/// command-shaped `resolve_main` against the binary-shaped store + name
 	/// pair.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet::test]
+	#[beet_core::test]
 	async fn both_paths_resolve_identically() {
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(
@@ -587,7 +562,7 @@ mod test {
 	/// so a rebuilt tree boots exactly as the first one did: nothing is retained
 	/// between builds.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet::test]
+	#[beet_core::test]
 	async fn rebuild_fires_ready_every_time() {
 		let repo_store = BlobStore::temp();
 		repo_store

@@ -17,6 +17,12 @@ mod client_io;
 #[cfg(feature = "std")]
 mod diagnostics;
 mod extra;
+// finding, building and running an entry document: the half of a beet binary
+// that is not its capabilities. Store-backed (`std`) and document-building
+// (`template_serde`, for the `EntryTemplate` sources and the `BeetSceneRoot` a
+// watched rebuild swaps), so gated on both.
+#[cfg(all(feature = "std", feature = "template_serde"))]
+pub mod launch;
 mod navigate;
 #[cfg(all(feature = "codegen", feature = "std"))]
 mod route_codegen;
@@ -37,6 +43,10 @@ pub mod prelude {
 	#[cfg(feature = "std")]
 	pub use crate::diagnostics::*;
 	pub use crate::extra::*;
+	#[cfg(all(feature = "std", feature = "template_serde"))]
+	pub use crate::launch::entry_build;
+	#[cfg(all(feature = "std", feature = "template_serde"))]
+	pub use crate::launch::*;
 	pub use crate::navigate::*;
 	#[cfg(all(feature = "codegen", feature = "std"))]
 	pub use crate::route_codegen::*;

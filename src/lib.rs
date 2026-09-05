@@ -8,6 +8,15 @@ extern crate alloc;
 #[cfg(feature = "std")]
 mod beet_plugins;
 
+// the app body a beet binary runs, ie `BeetPlugins` + `beet_router`'s entry
+// loader. Composition only, so it exists wherever both halves do.
+#[cfg(all(
+	feature = "std",
+	feature = "template_serde",
+	any(feature = "router", feature = "router_render")
+))]
+pub mod launch;
+
 // #[cfg(feature = "build")]
 // pub use beet_build as build;
 #[cfg(feature = "action")]
@@ -63,6 +72,12 @@ pub mod prelude {
 	pub use crate::action::prelude::Command;
 	#[cfg(feature = "std")]
 	pub use crate::beet_plugins::*;
+	#[cfg(all(
+		feature = "std",
+		feature = "template_serde",
+		any(feature = "router", feature = "router_render")
+	))]
+	pub use crate::launch;
 	pub use crate::core::prelude::*;
 	#[cfg(feature = "infra")]
 	pub use crate::infra::prelude::*;

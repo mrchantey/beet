@@ -406,7 +406,7 @@ router_embedded = ["action", "net", "dep:beet_router"]
 # The Cloudflare Worker target: the portable render router plus the R2 store
 # backend, so a wasm `beet-cli` lib loads its site from an R2 bucket and serves
 # it through the router. wasm32-only (the `worker` crate is wasm-gated in beet_net).
-cloudflare = ["router_render", "json", "markdown", "serde_plain", "beet_net/cloudflare"]
+cloudflare = ["router_render", "json", "markdown", "serde_plain", "beet_net/cloudflare", "beet_router?/cloudflare"]
 # The browser-wasm base: the minimum any in-browser `beet` binary needs regardless
 # of `--no-default-features`. The portable render router (bsx parse + template +
 # action runtime) plus media/route output and the ui `style` widgets `<RenderConsole>`
