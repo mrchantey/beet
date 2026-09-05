@@ -21,7 +21,7 @@ mod path;
 mod result_x;
 mod str;
 #[cfg(feature = "json")]
-mod value;
+mod json_value;
 
 pub use duration::*;
 #[cfg(feature = "std")]
@@ -33,4 +33,4 @@ pub use path::*;
 pub use result_x::*;
 pub use str::*;
 #[cfg(feature = "json")]
-pub use value::*;
+pub use json_value::*;
