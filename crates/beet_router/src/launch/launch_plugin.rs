@@ -3,7 +3,7 @@
 //! run itself.
 //!
 //! Added by [`LaunchPlugin`], which is the whole of what makes a binary a beet
-//! runtime. The facade composes it with `BeetPlugins` as `beet::launch::app`.
+//! runtime beyond its chosen capability plugins.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

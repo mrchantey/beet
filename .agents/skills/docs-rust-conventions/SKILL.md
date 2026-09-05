@@ -1,9 +1,9 @@
 ---
 name: docs-rust-conventions
 description: Rust documentation conventions (RFC 1574). Apply when writing doc comments on public Rust items. Covers summary sentences, section headings, type references, and examples.
-metadata:
-	source: https://gist.github.com/davidbarsky/8fae6dc45c294297db582378284bd1f2
 ---
+<!--metadata:
+	source: https://gist.github.com/davidbarsky/8fae6dc45c294297db582378284bd1f2-->
 
 # Rust Documentation Conventions (RFC 1574)
 

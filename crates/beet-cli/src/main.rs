@@ -1,7 +1,7 @@
 //! The `beet` binary: discover an entry, load it as a live build, let the loaded
 //! tree run itself, and exit unless something kept it alive.
 //!
-//! All of that is [`beet::launch::app`], shared with every other beet binary.
+//! All of that is plugin composition shared with every other beet binary.
 //! What is left here is what only this binary can own: the two target
 //! entrypoints (native `main`, the wasm exported [`start`]), its own compiled
 //! feature surface, the dev-command capabilities, and the windowed render
@@ -45,11 +45,12 @@ pub async fn start() -> i32 {
 	build_app().run_async().await.exit_code()
 }
 
-/// The one app body every target runs, ie [`beet::launch::app`] plus what only
-/// this binary supplies: the dev-command capabilities, its own compiled feature
-/// surface, and the windowed render path's window lifecycle.
+/// The one app body every target runs: the trusted defaults and entry loader,
+/// plus what only this binary supplies: the dev-command capabilities, its own
+/// compiled feature surface, and the windowed render path's window lifecycle.
 fn build_app() -> App {
-	let mut app = launch::app(cli_plugins);
+	let mut app = App::new();
+	app.add_plugins((BeetPlugins, cli_plugins, LaunchPlugin));
 	// this binary's cargo features, spawned before the entry loads so its
 	// `<CrateCheck/>` and any `--features` verify against them. The primary
 	// registration, ie the one an unprefixed requirement resolves to.

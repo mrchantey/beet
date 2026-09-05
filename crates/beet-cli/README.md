@@ -51,14 +51,15 @@ An entry declares its required features with `<CrateCheck features={["thread", "
 
 The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet — its own `#[action]`s, deploy blocks, reflect components — builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
 
-Such a binary is a thin `main`, and it depends on the `beet` facade alone. The runner is `beet::launch::app` (`BeetPlugins` + `beet_router`'s `LaunchPlugin`), so nothing about it is this crate's:
+Such a binary is a thin `main`, and it depends on the `beet` facade alone. Compose `BeetPlugins`, the binary's capability plugin, and `LaunchPlugin`:
 
 ```rust,ignore
 use beet::prelude::*;
 
 fn main() -> AppExit {
 	env_ext::load_dotenv().ok();
-	let mut app = launch::app(MyCratePlugin);
+	let mut app = App::new();
+	app.add_plugins((BeetPlugins, MyCratePlugin, LaunchPlugin));
 	// only the binary knows its own cargo features; an unprefixed `<CrateCheck/>`
 	// resolves against this
 	app.world_mut()
@@ -67,7 +68,7 @@ fn main() -> AppExit {
 }
 ```
 
-It then has the same entry resolution, load and process lifecycle this binary has. What it does NOT get is the dev commands below (`run-wasm`, `build-wasm`, `check`, `export-static`, …), which are `CliCommandsPlugin` and live here — this binary adds them as its own `launch::app` argument, exactly as a downstream one adds its own.
+It then has the same entry resolution, load and process lifecycle this binary has. What it does NOT get is the dev commands below (`run-wasm`, `build-wasm`, `check`, `export-static`, …), which are `CliCommandsPlugin` and live here — this binary adds it alongside its other plugins, exactly as a downstream binary adds its own plugin.
 
 ## Development
 

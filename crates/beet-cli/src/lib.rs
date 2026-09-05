@@ -24,8 +24,8 @@ mod workers;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 mod worker_entry;
 
-// this binary's compiled cargo features, which only it knows: the entry loader
-// itself is `beet::launch`, shared with every other beet binary.
+// this binary's compiled cargo features, which only it knows; the shared entry
+// loader is `LaunchPlugin`.
 pub mod registration;
 
 pub mod prelude {
