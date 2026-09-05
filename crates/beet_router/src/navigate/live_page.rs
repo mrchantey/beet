@@ -136,7 +136,7 @@ pub(crate) async fn build_live_page(
 		)
 		.await?;
 	let Some(node) = node else {
-		bevybail!("no route matched /{}", request.path_string());
+		bevybail!("no route matched {}", request.path_string());
 	};
 	// surface matched dynamic segments (`:id`) to the handler
 	node.merge_path_params(&mut request);

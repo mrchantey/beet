@@ -166,8 +166,7 @@ fn on_ssh_recv(
 	ev: On<SshRecv>,
 	peers: Query<&ChildOf, With<SshPeerInfo>>,
 	tui_servers: Query<&OpeningRoute, With<SshTuiServer>>,
-	children: Query<&Children>,
-	routers: Query<(), With<Router>>,
+	routes: RouteQuery,
 	mut terminals: Query<&mut ChannelTerminal>,
 	mut buffers: Query<&mut DoubleBuffer>,
 	mut commands: Commands,
@@ -183,10 +182,11 @@ fn on_ssh_recv(
 	};
 	// the navigator resolves routes against a `RouteTree`, which lives on the
 	// url space's own `Router` rather than on the server that hosts it, so
-	// address the router itself (the same hop `exchange_child` makes).
-	let router = children
-		.iter_descendants_inclusive(host)
-		.find(|entity| routers.contains(*entity))
+	// address the router itself (the same hop `exchange_child` makes); a
+	// route-less host is its own address.
+	let router = routes
+		.resolve_tree(host)
+		.map(|(router, _)| router)
 		.unwrap_or(host);
 	match ev.event().inner() {
 		// wait for the pty before building the surface; its size sizes the buffer.
@@ -564,7 +564,7 @@ mod test {
 	///
 	/// This is the deployed shape (`app --repo=.. --server=ssh serve`, and `beet
 	/// --main=site serve --server=ssh` locally): the site hangs off a `serve` route, so
-	/// every session used to open on a "no route matched //serve" error page.
+	/// every session used to open on a "no route matched /serve" error page.
 	#[beet_core::test]
 	async fn boot_opens_at_the_mounted_url_space() {
 		let mut app = ssh_tui_app();

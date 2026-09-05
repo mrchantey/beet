@@ -197,14 +197,16 @@ impl RouteTree {
 	/// Resolves the [`RouteTree`] governing `entity` from live queries,
 	/// returning the entity the winning tree lives on alongside the tree.
 	///
-	/// `entity`'s own enclosing namespace ([`PathPattern::namespace_root`])
-	/// carries a tree directly when `entity` sits inside one — the common
-	/// case, unambiguous. When `entity` sits *above* one or more namespaces
-	/// instead (an entry root, a command dispatcher), its own namespace
-	/// carries no tree, so this descends and prefers whichever descendant
-	/// namespace [serves pages](Self::serves_pages) — that is the *site* such
-	/// a caller means (rendering, forwarding a capability call) — else the
-	/// first tree found.
+	/// A url space at or under `entity` wins over the one hosting it, and among
+	/// several the one that [serves pages](Self::serves_pages) wins — that is the
+	/// *site* such a caller means (rendering, forwarding a capability call) —
+	/// else the first tree found. A server mounted under a command route
+	/// (`<Route path="serve" {TuiServer}>`) sits *inside* the command namespace
+	/// while serving its own `Router` child, so preferring the enclosing one
+	/// would dispatch its pages at the command url space, where no page route
+	/// exists. Only when nothing beneath carries a tree does `entity` sit inside
+	/// a url space rather than above one, and its enclosing namespace
+	/// ([`PathPattern::namespace_root`]) answers.
 	///
 	/// Lives in the no_std core (rather than as a method on the std-only
 	/// `RouteQuery`) so [`find_router`](crate::prelude::find_router), also
@@ -221,12 +223,10 @@ impl RouteTree {
 		children_query: &Query<&Children>,
 		trees: &'a Query<&RouteTree>,
 	) -> Result<(Entity, &'a RouteTree)> {
-		let near = PathPattern::namespace_root(entity, ancestors, paths);
-		if let Ok(tree) = trees.get(near) {
-			return Ok((near, tree));
-		}
+		// every url space at or under `entity`, nested ones included: a command
+		// dispatcher hosts both its own commands and the site under `serve`.
 		let mut candidates: Vec<(Entity, &RouteTree)> = Vec::new();
-		let mut queue = vec![near];
+		let mut queue = vec![entity];
 		while let Some(entity) = queue.pop() {
 			if let Ok(tree) = trees.get(entity) {
 				candidates.push((entity, tree));
@@ -240,6 +240,13 @@ impl RouteTree {
 			.find(|(_, tree)| tree.serves_pages())
 			.or(candidates.first())
 			.copied()
+			// nothing beneath: `entity` sits inside a url space rather than above
+			// one, so the space it belongs to is the answer.
+			.or_else(|| {
+				let near =
+					PathPattern::namespace_root(entity, ancestors, paths);
+				trees.get(near).ok().map(|tree| (near, tree))
+			})
 			.ok_or_else(|| bevyhow!("no RouteTree at or under {entity}"))
 	}
 
@@ -692,6 +699,42 @@ mod test {
 			.collect();
 		paths.contains(&"api/users".to_string()).xpect_true();
 		paths.contains(&"api/posts".to_string()).xpect_true();
+	}
+
+	/// A server mounted under a command route serves the `Router` *beneath* it,
+	/// not the command url space it is addressed from; a route inside a url
+	/// space still resolves to the space holding it.
+	///
+	/// Regression: `beet --main=site serve --server=tui` resolved the command
+	/// dispatcher's tree, so its home page opened on "no route matched /".
+	#[beet_core::test]
+	fn resolves_a_mounted_servers_own_router() {
+		let mut world = router_world();
+		let commands = world.spawn(Router).id();
+		let server = world
+			.spawn((ChildOf(commands), PathPartial::new("serve")))
+			.id();
+		let site = world.spawn((ChildOf(server), Router)).id();
+		let page = world
+			.spawn((ChildOf(site), PageRoute, action_at("about")))
+			.id();
+		world.flush();
+
+		let resolve = |entity: Entity, world: &mut World| {
+			world
+				.run_system_cached_with::<_, Result<Entity>, _, _>(
+					find_router,
+					entity,
+				)
+				.unwrap()
+				.unwrap()
+		};
+		// the mounted server dispatches into its own url space..
+		resolve(server, &mut world).xpect_eq(site);
+		// ..which is also the site an entry root means, over its commands
+		resolve(commands, &mut world).xpect_eq(site);
+		// ..and a route resolves the space it belongs to
+		resolve(page, &mut world).xpect_eq(site);
 	}
 
 	#[beet_core::test]

@@ -40,14 +40,13 @@ impl<'w, 's> RouteQuery<'w, 's> {
 	/// Resolves the [`RouteTree`] governing `entity`, returning the entity the
 	/// winning tree lives on alongside the tree.
 	///
-	/// `entity`'s own enclosing namespace ([`PathPattern::namespace_root`])
-	/// carries a tree directly when `entity` sits inside one — the common
-	/// case, unambiguous. When `entity` sits *above* one or more namespaces
-	/// instead (an entry root, a command dispatcher), its own namespace
-	/// carries no tree, so this descends and prefers whichever descendant
-	/// namespace [serves pages](RouteTree::serves_pages) — that is the *site*
-	/// such a caller means (rendering, forwarding a capability call) — else
-	/// the first tree found.
+	/// A url space at or under `entity` wins over the one hosting it (a server
+	/// mounted under a command route serves its own `Router` child, not the
+	/// command space it is addressed from), and among several the one that
+	/// [serves pages](RouteTree::serves_pages) wins — that is the *site* such a
+	/// caller means (rendering, forwarding a capability call) — else the first
+	/// tree found. Absent any, `entity`'s own enclosing namespace
+	/// ([`PathPattern::namespace_root`]) answers.
 	///
 	/// A thin wrapper over [`RouteTree::resolve`] (the no_std-core walk, shared
 	/// with [`find_router`](crate::prelude::find_router) which cannot depend on

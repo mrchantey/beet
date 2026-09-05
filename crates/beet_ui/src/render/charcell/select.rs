@@ -253,16 +253,23 @@ mod test {
 	use crate::render::charcell::test_host::TestHost;
 	use bevy::math::UVec2;
 
-	/// A host showing a `Select` with two options, stepped once so the closed
-	/// control is painted. Material rules style the control and position the
-	/// dropdown, exactly as a real app composes them.
-	fn select_host() -> TestHost {
+	/// A host showing `content`, stepped once so it is painted. Material rules
+	/// style the control and position the dropdown, exactly as a real app
+	/// composes them.
+	fn host_showing(content: impl Bundle) -> TestHost {
 		let mut host = TestHost::sized(UVec2::new(30, 14));
 		host.app
 			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.spawn_content(content);
+		host.step();
+		host
+	}
+
+	/// A host showing a `Select` with two options.
+	fn select_host() -> TestHost {
 		// wrapped in a block container (and followed by a sibling) so the select
 		// takes its content height and the panel must overlay what follows.
-		host.spawn_content(rsx! {
+		host_showing(rsx! {
 			<div>
 				<Select name="role">
 					<option value="engineer">"Engineer"</option>
@@ -270,19 +277,22 @@ mod test {
 				</Select>
 				<p>"below"</p>
 			</div>
-		});
-		host.step();
-		host
+		})
 	}
 
-	fn select_entity(host: &mut TestHost) -> Entity {
+	/// Every `<select>` in the host, in spawn order.
+	fn select_entities(host: &mut TestHost) -> Vec<Entity> {
 		host.app
 			.world_mut()
 			.query::<(Entity, &Element)>()
 			.iter(host.app.world())
-			.find(|(_, element)| element.tag() == "select")
+			.filter(|(_, element)| element.tag() == "select")
 			.map(|(entity, _)| entity)
-			.unwrap()
+			.collect()
+	}
+
+	fn select_entity(host: &mut TestHost) -> Entity {
+		select_entities(host).remove(0)
 	}
 
 	fn dropdown(host: &mut TestHost) -> Option<Entity> {
@@ -445,6 +455,37 @@ mod test {
 		activate(&mut host, select);
 		host.step();
 		host.frame_plain().xpect_snapshot();
+	}
+
+	/// The panel overlays a following `<select>` too, not just in-flow content:
+	/// a select is `position: relative` with no `z-index`, which forms no
+	/// stacking context, so the panel's `z-index` sorts against that sibling
+	/// rather than being trapped in the open select.
+	///
+	/// Regression: the second select overdrew the first one's open panel.
+	#[beet_core::test]
+	fn open_dropdown_overlays_a_following_select() {
+		let mut host = host_showing(rsx! {
+			<div>
+				<Select name="role">
+					<option value="engineer">"Engineer"</option>
+					<option value="designer">"Designer"</option>
+				</Select>
+				<Select name="team">
+					<option value="alpha">"Alpha"</option>
+					<option value="beta">"Beta"</option>
+				</Select>
+				<p>"below"</p>
+			</div>
+		});
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		host.step();
+		// the panel covers the next control's label, so only its box edges remain
+		host.frame_plain()
+			.xpect_contains("Designer")
+			.xnot()
+			.xpect_contains("Alpha");
 	}
 
 	/// A press outside the select and its panel dismisses the panel.
