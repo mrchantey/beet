@@ -2,10 +2,10 @@
 //!
 //! Mirrors [`crate::types::json_schema`] but produces a [`ValueSchema`] suitable
 //! for validation and UI generation.
-use super::*;
 use crate::prelude::*;
 use bevy::reflect::NamedField;
 use bevy::reflect::TypeInfo;
+use bevy::reflect::Typed;
 use bevy::reflect::UnnamedField;
 use bevy::reflect::array::ArrayInfo;
 use bevy::reflect::enums::EnumInfo;
@@ -17,9 +17,14 @@ use bevy::reflect::structs::StructInfo;
 use bevy::reflect::tuple::TupleInfo;
 use bevy::reflect::tuple_struct::TupleStructInfo;
 
-/// Builds a [`ValueSchema`] from a bevy reflect [`TypeInfo`].
-pub(crate) fn build(type_info: &TypeInfo) -> ValueSchema {
-	Builder::default().build(type_info)
+impl ValueSchema {
+	/// Build a schema for `T` via its bevy reflect type info.
+	pub fn of<T: Typed>() -> Self { Self::from_type_info(T::type_info()) }
+
+	/// Build a schema from a bevy reflect [`TypeInfo`].
+	pub fn from_type_info(type_info: &TypeInfo) -> Self {
+		Builder::default().build(type_info)
+	}
 }
 
 /// The recursive walk, tracking named ancestor types so a self-referential
@@ -203,40 +208,40 @@ impl Builder {
 		let variants =
 			info.iter()
 				.map(|variant| match variant {
-					VariantInfo::Unit(v) => VariantSchema {
-						name: SmolStr::from(v.name()),
+					VariantInfo::Unit(variant) => VariantSchema {
+						name: SmolStr::from(variant.name()),
 						payload: None,
 					},
-					VariantInfo::Tuple(v) => {
-						if v.field_len() == 1 {
-							let field = v.field_at(0).expect("len == 1");
+					VariantInfo::Tuple(variant) => {
+						if variant.field_len() == 1 {
+							let field = variant.field_at(0).expect("len == 1");
 							VariantSchema {
-								name: SmolStr::from(v.name()),
+								name: SmolStr::from(variant.name()),
 								payload: Some(self.resolve_field(
 									field.type_info(),
 									field.type_path(),
 								)),
 							}
 						} else {
-							let fields = v
+							let fields = variant
 								.iter()
 								.map(|field| self.unnamed_field_schema(field))
 								.collect();
 							VariantSchema {
-								name: SmolStr::from(v.name()),
+								name: SmolStr::from(variant.name()),
 								payload: Some(ValueSchema::Tuple(
 									TupleSchema { name: None, fields },
 								)),
 							}
 						}
 					}
-					VariantInfo::Struct(v) => {
-						let fields = v
+					VariantInfo::Struct(variant) => {
+						let fields = variant
 							.iter()
 							.map(|field| self.named_field_schema(field))
 							.collect();
 						VariantSchema {
-							name: SmolStr::from(v.name()),
+							name: SmolStr::from(variant.name()),
 							payload: Some(ValueSchema::Struct(StructSchema {
 								name: None,
 								allow_additional: false,
@@ -317,11 +322,96 @@ fn extract_option_inner(type_path: &str) -> Option<&str> {
 mod test {
 	use crate::prelude::*;
 
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct UserProfile {
+		name: String,
+		age: u32,
+		email: Option<String>,
+	}
+
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	enum Status {
+		Active,
+		Banned,
+		Pending(String),
+	}
+
 	/// A self-referential tree type, the schema cycle case.
 	#[derive(Default, Reflect)]
 	struct Node {
+		#[allow(dead_code)]
 		label: String,
+		#[allow(dead_code)]
 		children: Vec<Node>,
+	}
+
+	#[crate::test]
+	fn primitive_schemas() {
+		matches!(ValueSchema::of::<bool>(), ValueSchema::Bool(_)).xpect_true();
+		matches!(ValueSchema::of::<i32>(), ValueSchema::I64(_)).xpect_true();
+		matches!(ValueSchema::of::<u32>(), ValueSchema::U64(_)).xpect_true();
+		matches!(ValueSchema::of::<f32>(), ValueSchema::F64(_)).xpect_true();
+		matches!(ValueSchema::of::<String>(), ValueSchema::String(_))
+			.xpect_true();
+		matches!(ValueSchema::of::<()>(), ValueSchema::Null).xpect_true();
+	}
+
+	#[crate::test]
+	fn struct_schema_from_type_info() {
+		let schema = ValueSchema::of::<UserProfile>();
+		let ValueSchema::Struct(schema) = schema else {
+			panic!("expected struct schema");
+		};
+		schema.fields.len().xpect_eq(3);
+		schema.fields[0].key.as_str().xpect_eq("name");
+		schema.fields[0].required.xpect_true();
+		// Option<String> is represented by an optional, non-required field.
+		schema.fields[2].key.as_str().xpect_eq("email");
+		schema.fields[2].required.xpect_false();
+	}
+
+	#[crate::test]
+	fn enum_schema_from_type_info() {
+		let schema = ValueSchema::of::<Status>();
+		let ValueSchema::Enum(schema) = schema else {
+			panic!("expected enum schema");
+		};
+		schema.variants.len().xpect_eq(3);
+		schema.variants[0].name.as_str().xpect_eq("Active");
+		schema.variants[0].payload.is_none().xpect_true();
+		schema.variants[2].name.as_str().xpect_eq("Pending");
+		schema.variants[2].payload.is_some().xpect_true();
+	}
+
+	#[crate::test]
+	fn optional_schema_built_for_option_field() {
+		let schema = ValueSchema::of::<UserProfile>();
+		let ValueSchema::Struct(struct_schema) = schema else {
+			panic!("expected struct schema");
+		};
+		// `email: Option<String>` is an Optional wrapper over String.
+		let email = &struct_schema.fields[2];
+		matches!(email.schema, ValueSchema::Optional(_)).xpect_true();
+	}
+
+	/// A struct holding an entity reference lowers the field to the entity kind,
+	/// so a form generated from the type knows to render a picker.
+	#[crate::test]
+	fn entity_field_lowers_to_the_entity_kind() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Link {
+			target: Entity,
+		}
+		let ValueSchema::Struct(schema) = ValueSchema::of::<Link>() else {
+			panic!("expected struct schema");
+		};
+		schema.fields[0]
+			.schema
+			.clone()
+			.xpect_eq(ValueSchema::Entity(default()));
 	}
 
 	#[crate::test]

@@ -89,7 +89,7 @@ impl SchemaRegistry {
 	}
 
 	/// Register the schema of the schema document at `path`, the by-location
-	/// index a [`ValueSchema::Document`] resolves through.
+	/// index a [`SchemaRef::Document`] resolves through.
 	///
 	/// The schema is stored **once**, in the one by-name namespace, under the
 	/// name it declares for itself or, declaring none, under `path`; the

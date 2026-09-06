@@ -34,7 +34,7 @@ impl ValueSchema {
 	///   so the zero validates against the schema that produced it
 	///
 	/// Three kinds have no zero and answer [`Value::Null`]: `Any`/`Null`,
-	/// an `Entity` (a reference to nothing, which item 18's picker fills), and
+	/// an `Entity` (an unbound reference filled by an entity picker), and
 	/// a reference that resolves to neither.
 	pub fn default_value_in(&self, resolver: SchemaResolver) -> Value {
 		self.default_at(resolver, 0)

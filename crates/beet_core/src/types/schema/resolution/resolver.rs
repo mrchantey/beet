@@ -2,12 +2,12 @@
 use crate::prelude::*;
 use bevy_reflect::TypeRegistry;
 
-/// The registries a [`ValueSchema`] or [`ValueSchema`] resolves against,
+/// The registries a [`ValueSchema`] or [`SchemaRef`] resolves against,
 /// threaded through every resolution and validation seam.
 ///
 /// [`SchemaRegistry`] is the one by-name namespace, authored and reflect-derived
 /// schemas alike, plus the by-location index a schema document registers into.
-/// Bevy's [`TypeRegistry`] is the reflect fallback a [`ValueSchema::TypePath`]
+/// Bevy's [`TypeRegistry`] is the reflect fallback a [`SchemaRef::TypePath`]
 /// resolves through, and the only place the schema layer meets reflection: the
 /// by-name registry answers first, so a hand-authored schema registered under a
 /// type path wins over what reflection would derive for it.
@@ -116,6 +116,37 @@ impl<'a> SchemaResolver<'a> {
 			.type_info()
 			.xmap(ValueSchema::from_type_info)
 			.xok()
+	}
+}
+
+impl ValueSchema {
+	/// This schema with its outermost [`SchemaRef`] followed, or itself when it
+	/// names nothing.
+	///
+	/// One hop, not a deep expansion: [`SchemaRegistry::resolve`] is the eager
+	/// walk, and validation follows a reference lazily where it meets it. A name
+	/// or document that has not arrived defers to [`ValueSchema::Any`], exactly
+	/// as it does everywhere else, and so does
+	/// [`AtField`](SchemaRef::AtField), which only the struct holding it can
+	/// answer. A [`TypePath`](SchemaRef::TypePath) is the one arm that errors,
+	/// because an unregistered Rust type is a build mistake rather than a late
+	/// arrival.
+	pub fn resolve(&self, resolver: SchemaResolver<'_>) -> Result<ValueSchema> {
+		match self {
+			Self::Ref(SchemaRef::Name(name)) => resolver
+				.schema(name)
+				.cloned()
+				.unwrap_or(ValueSchema::Any)
+				.xok(),
+			Self::Ref(SchemaRef::Document(path)) => resolver
+				.located(path)
+				.cloned()
+				.unwrap_or(ValueSchema::Any)
+				.xok(),
+			Self::Ref(SchemaRef::TypePath(path)) => resolver.type_schema(path),
+			Self::Ref(SchemaRef::AtField(_)) => ValueSchema::Any.xok(),
+			schema => schema.clone().xok(),
+		}
 	}
 }
 

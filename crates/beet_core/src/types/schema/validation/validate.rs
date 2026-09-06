@@ -1,146 +1,39 @@
-//! [`ValueSchema`]: an interface-oriented schema for [`Value`]s.
-use super::*;
+//! Validation entrypoints, recursive walk and errors for [`ValueSchema`].
+use super::scalar_constraints::ApplyConstraints;
+use super::scalar_constraints::ApplyFuture;
 use crate::prelude::*;
-use bevy::reflect::TypeInfo;
-use bevy::reflect::Typed;
 
-/// An interface-oriented description of a [`Value`]'s shape.
-///
-/// Used for driving dynamic UIs, performing validation and producing a
-/// [`JsonSchema`] representation.
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
-)]
-#[reflect(opaque)]
-#[reflect(Component)]
+/// An error produced by validating a [`Value`] against a [`ValueSchema`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum ValueSchema {
-	/// Matches any value. An escape hatch that disables validation and
-	/// type-checking for this field.
-	Any,
-	/// Always [`Value::Null`].
-	Null,
-	/// A boolean value.
-	Bool(BoolSchema),
-	/// A signed 64-bit integer.
-	I64(I64Schema),
-	/// An unsigned 64-bit integer.
-	U64(U64Schema),
-	/// A 64-bit float.
-	F64(F64Schema),
-	/// A string.
-	String(StringSchema),
-	/// Raw bytes.
-	Bytes(BytesSchema),
-	/// A reference to another node, ie an [`Entity`].
-	Entity(EntitySchema),
-	/// A struct with named fields.
-	Struct(StructSchema),
-	/// A fixed-arity tuple (also used for tuple structs).
-	Tuple(TupleSchema),
-	/// A homogenous sequence (list, array or set).
-	List(ListSchema),
-	/// A map with string keys.
-	Map(MapSchema),
-	/// A tagged union.
-	Enum(EnumSchema),
-	/// An optional value: [`Value::Null`] is accepted, anything else is
-	/// validated against the inner schema. This is how an `Option`-typed field
-	/// is represented so a missing or null value validates rather than failing.
-	Optional(Box<ValueSchema>),
-	/// A schema named rather than written in place, by any of the ways a
-	/// [`SchemaRef`] can name one.
-	///
-	/// This is what makes schemas composable: an `items` array of `TodoItem`
-	/// names `TodoItem`'s schema, so schemas form a graph mirroring the template
-	/// graph and validate recursively. It is also how a document declares its
-	/// own shape, and how a field says it is described by a sibling.
-	/// Until resolved, validation against it is a wildcard (deferred), since the
-	/// named schema may resolve asynchronously.
-	Ref(SchemaRef),
+pub struct ValidationError {
+	/// The path within the root value where the error occurred.
+	pub path: FieldPath,
+	/// A human readable description of what failed.
+	pub message: SmolStr,
 }
 
-impl core::fmt::Display for ValueSchema {
-	/// The name a diagnostic calls this schema: what it names when it names
-	/// something, else the name it declares for itself, else its kind.
+impl ValidationError {
+	/// Create a new validation error.
+	pub fn new(path: FieldPath, message: impl Into<SmolStr>) -> Self {
+		Self {
+			path,
+			message: message.into(),
+		}
+	}
+}
+
+impl core::fmt::Display for ValidationError {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		match self {
-			Self::Ref(schema_ref) => write!(f, "{schema_ref}"),
-			schema => match schema.name() {
-				Some(name) => write!(f, "{name}"),
-				None => write!(f, "{}", schema.variant_name()),
-			},
+		if self.path.is_empty() {
+			write!(f, "{}", self.message)
+		} else {
+			write!(f, "{}: {}", self.path, self.message)
 		}
 	}
 }
 
-impl Default for ValueSchema {
-	fn default() -> Self { Self::Null }
-}
-
-/// Fallback when the `json` feature is off (the real parser lives in
-/// `from_json.rs`): JSON schema parsing is unavailable, so a `bx:schema` block is
-/// treated as absent by its `.ok()` callers.
-#[cfg(not(feature = "json"))]
 impl ValueSchema {
-	/// Parsing a JSON schema requires the `json` feature.
-	pub fn from_json_schema(_json: &str) -> Result<ValueSchema> {
-		bevybail!("parsing a JSON schema requires the `json` feature")
-	}
-}
-
-impl ValueSchema {
-	/// Build a schema for `T` via its bevy reflect type info.
-	pub fn of<T: Typed>() -> Self { Self::from_type_info(T::type_info()) }
-
-	/// Build a schema from a bevy reflect [`TypeInfo`].
-	pub fn from_type_info(type_info: &TypeInfo) -> Self {
-		from_type_info::build(type_info)
-	}
-
-	/// This schema's variant name, ie its externally tagged serde key and the
-	/// kind a diagnostic names.
-	///
-	/// The match is exhaustive, so adding a variant fails to compile until the
-	/// meta-schema (which round trips through these names) describes it.
-	pub fn variant_name(&self) -> &'static str {
-		match self {
-			Self::Any => "Any",
-			Self::Null => "Null",
-			Self::Bool(_) => "Bool",
-			Self::I64(_) => "I64",
-			Self::U64(_) => "U64",
-			Self::F64(_) => "F64",
-			Self::String(_) => "String",
-			Self::Bytes(_) => "Bytes",
-			Self::Entity(_) => "Entity",
-			Self::Struct(_) => "Struct",
-			Self::Tuple(_) => "Tuple",
-			Self::List(_) => "List",
-			Self::Map(_) => "Map",
-			Self::Enum(_) => "Enum",
-			Self::Optional(_) => "Optional",
-			Self::Ref(_) => "Ref",
-		}
-	}
-
-	/// Whether this schema describes a value with *parts*: a struct, tuple,
-	/// list, map or enum.
-	///
-	/// The kinds a walk can descend through, and so the ones a depth budget is
-	/// spent on; an `Optional` or a [`ValueSchema::Ref`] is the same value seen
-	/// more precisely rather than a level of it.
-	pub fn is_composite(&self) -> bool {
-		matches!(
-			self,
-			Self::Struct(_)
-				| Self::Tuple(_)
-				| Self::List(_)
-				| Self::Map(_)
-				| Self::Enum(_)
-		)
-	}
-
 	/// Validate (and possibly mutate) `value` against this schema.
 	///
 	/// Returns the list of [`ValidationError`]s collected; an empty list means
@@ -205,183 +98,6 @@ impl ValueSchema {
 		})
 	}
 
-	/// Resolve the schema of a nested field by `path`.
-	///
-	/// The dual of [`Document::get_field_ref`](crate::prelude::Document):
-	/// descends into struct fields, map values, list items, tuple elements and
-	/// an externally tagged enum's payload (keyed by its variant name).
-	/// [`ValueSchema::Any`] swallows the remaining path and matches anything,
-	/// as does a [`ValueSchema::Ref`] nothing in hand can resolve.
-	pub fn get_field_schema(
-		&self,
-		path: &[FieldSegment],
-	) -> Result<&ValueSchema> {
-		self.get_field_schema_in(SchemaResolver::default(), path)
-	}
-
-	/// [`get_field_schema`](Self::get_field_schema), descending through a
-	/// [`ValueSchema::Ref`] that `resolver` can resolve, so a field of a
-	/// composed authored schema is reachable.
-	pub fn get_field_schema_in<'a>(
-		&'a self,
-		resolver: SchemaResolver<'a>,
-		path: &[FieldSegment],
-	) -> Result<&'a ValueSchema> {
-		let mut current = self;
-		let mut remaining = path;
-		while let Some(segment) = remaining.first() {
-			current = match current {
-				// `Any` matches the rest of the path
-				ValueSchema::Any => return Ok(current),
-				// a reference descends into its target, or swallows the rest of
-				// the path like `Any` while it is still arriving
-				ValueSchema::Ref(SchemaRef::Name(name)) => {
-					match resolver.schema(name) {
-						Some(target) => target,
-						None => return Ok(current),
-					}
-				}
-				// an optional descends into its inner schema for the same segment
-				ValueSchema::Optional(inner) => inner,
-				_ => {
-					remaining = &remaining[1..];
-					match (current, segment) {
-						(
-							ValueSchema::Struct(schema),
-							FieldSegment::ObjectKey(key),
-						) => {
-							&schema
-								.fields
-								.iter()
-								.find(|field| field.key == *key)
-								.ok_or_else(|| {
-									bevyhow!("schema has no field `{key}`")
-								})?
-								.schema
-						}
-						(
-							ValueSchema::Map(schema),
-							FieldSegment::ObjectKey(_),
-						) => schema.value.as_ref(),
-						// an enum is externally tagged, so its payload sits
-						// under the variant name the value itself carries: a
-						// schema document's `Struct.fields` is this hop then a
-						// struct one.
-						(
-							ValueSchema::Enum(schema),
-							FieldSegment::ObjectKey(key),
-						) => schema
-							.variants
-							.iter()
-							.find(|variant| variant.name == *key)
-							.and_then(|variant| variant.payload.as_ref())
-							.ok_or_else(|| {
-								bevyhow!(
-									"enum schema has no variant `{key}` carrying a payload"
-								)
-							})?,
-						(
-							ValueSchema::List(schema),
-							FieldSegment::ArrayIndex(_),
-						) => schema.item.as_ref(),
-						(
-							ValueSchema::Tuple(schema),
-							FieldSegment::ArrayIndex(idx),
-						) => {
-							&schema
-								.fields
-								.get(*idx)
-								.ok_or_else(|| {
-									bevyhow!(
-										"tuple schema has no element {idx}"
-									)
-								})?
-								.schema
-						}
-						(schema, segment) => bevybail!(
-							"cannot resolve segment `{segment}` against schema `{schema:?}`"
-						),
-					}
-				}
-			};
-		}
-		Ok(current)
-	}
-
-	/// The name a composite schema declares for itself, if any.
-	///
-	/// The authored equivalent of a Rust type's short path, and the key an
-	/// authored schema joins the one by-name namespace under.
-	pub fn name(&self) -> Option<&SmolStr> {
-		match self {
-			ValueSchema::Struct(schema) => schema.name.as_ref(),
-			ValueSchema::Tuple(schema) => schema.name.as_ref(),
-			ValueSchema::Enum(schema) => schema.name.as_ref(),
-			_ => None,
-		}
-	}
-
-	/// Assert this schema is exactly `other`, naming both on mismatch.
-	///
-	/// Strict equality, unlike [`matches`](Self::matches): the token layer
-	/// identifies a value by the schema it declares, so a near-miss is an error
-	/// rather than a coercion.
-	pub fn assert_eq(&self, other: &ValueSchema) -> Result<&Self> {
-		match self == other {
-			true => self.xok(),
-			false => bevybail!(
-				"Schema Mismatch\nExpected: `{other}`\nReceived: `{self}`"
-			),
-		}
-	}
-
-	/// Assert this schema is the one naming `T` by its type path
-	/// ([`type_ref`](Self::type_ref)), the identity a token declares.
-	pub fn assert_eq_ty<T: TypePath>(&self) -> Result<&Self> {
-		self.assert_eq(&Self::type_ref::<T>())
-	}
-
-	/// Whether this schema is compatible with `other`, treating
-	/// [`ValueSchema::Any`] on either side as a wildcard.
-	pub fn matches(&self, other: &ValueSchema) -> bool {
-		match (self, other) {
-			// an unresolved reference or `Any` is a wildcard on either side
-			(ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_)), _) => {
-				true
-			}
-			(_, ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_))) => {
-				true
-			}
-			// an optional matches its bare inner and another optional's inner, so a
-			// typed write of `T` validates against an `Option<T>` field
-			(ValueSchema::Optional(inner), other)
-			| (other, ValueSchema::Optional(inner)) => inner.matches(other),
-			(a, b) => a == b,
-		}
-	}
-
-	/// Assert this schema [`matches`](Self::matches) `other`, reporting the
-	/// field `path` on mismatch.
-	///
-	/// Shared by the `DocumentSchema` field-type checks and the field-local
-	/// typed write fast path.
-	pub fn assert_matches(
-		&self,
-		other: &ValueSchema,
-		path: &[FieldSegment],
-	) -> Result {
-		if self.matches(other) {
-			Ok(())
-		} else {
-			bevybail!(
-				"Field Schema Mismatch at `{}`\nExpected: `{other:?}`\nReceived: `{self:?}`",
-				FieldPath::from(path)
-			)
-		}
-	}
-}
-
-impl ValueSchema {
 	/// The walk every validation entrypoint runs, carrying the `resolver` a
 	/// [`ValueSchema::Ref`] resolves through.
 	fn apply_in<'a>(
@@ -487,20 +203,20 @@ async fn validate_i64(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	let Value::Int(mut n) = *value else {
+	let Value::Int(mut number) = *value else {
 		// allow coercion from Uint that fits
-		if let Value::Uint(u) = *value
-			&& let Ok(i) = i64::try_from(u)
+		if let Value::Uint(unsigned) = *value
+			&& let Ok(signed) = i64::try_from(unsigned)
 		{
-			let mut n = i;
-			let errors = schema.apply(path, &mut n).await;
-			*value = Value::Int(n);
+			let mut number = signed;
+			let errors = schema.apply(path, &mut number).await;
+			*value = Value::Int(number);
 			return errors;
 		}
 		return type_mismatch(path, "i64", value);
 	};
-	let errors = schema.apply(path, &mut n).await;
-	*value = Value::Int(n);
+	let errors = schema.apply(path, &mut number).await;
+	*value = Value::Int(number);
 	errors
 }
 
@@ -509,19 +225,19 @@ async fn validate_u64(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	let Value::Uint(mut n) = *value else {
-		if let Value::Int(i) = *value
-			&& let Ok(u) = u64::try_from(i)
+	let Value::Uint(mut number) = *value else {
+		if let Value::Int(signed) = *value
+			&& let Ok(unsigned) = u64::try_from(signed)
 		{
-			let mut n = u;
-			let errors = schema.apply(path, &mut n).await;
-			*value = Value::Uint(n);
+			let mut number = unsigned;
+			let errors = schema.apply(path, &mut number).await;
+			*value = Value::Uint(number);
 			return errors;
 		}
 		return type_mismatch(path, "u64", value);
 	};
-	let errors = schema.apply(path, &mut n).await;
-	*value = Value::Uint(n);
+	let errors = schema.apply(path, &mut number).await;
+	*value = Value::Uint(number);
 	errors
 }
 
@@ -530,14 +246,14 @@ async fn validate_f64(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	let mut n = match *value {
-		Value::Float(f) => f,
-		Value::Int(i) => i as f64,
-		Value::Uint(u) => u as f64,
+	let mut number = match *value {
+		Value::Float(float) => float,
+		Value::Int(signed) => signed as f64,
+		Value::Uint(unsigned) => unsigned as f64,
 		_ => return type_mismatch(path, "f64", value),
 	};
-	let errors = schema.apply(path, &mut n).await;
-	*value = Value::Float(n);
+	let errors = schema.apply(path, &mut number).await;
+	*value = Value::Float(number);
 	errors
 }
 
@@ -546,10 +262,10 @@ async fn validate_string(
 	path: &FieldPath,
 	value: &mut Value,
 ) -> Vec<ValidationError> {
-	let Value::Str(s) = value else {
+	let Value::Str(string) = value else {
 		return type_mismatch(path, "string", value);
 	};
-	schema.apply(path, s).await
+	schema.apply(path, string).await
 }
 
 async fn validate_bytes(
@@ -565,10 +281,10 @@ async fn validate_bytes(
 	{
 		*value = Value::Bytes(bytes);
 	}
-	let Value::Bytes(b) = value else {
+	let Value::Bytes(bytes) = value else {
 		return type_mismatch(path, "bytes", value);
 	};
-	schema.apply(path, b).await
+	schema.apply(path, bytes).await
 }
 
 /// `items` as bytes, when every one of them is a byte-sized integer.
@@ -649,8 +365,11 @@ async fn validate_struct(
 		}
 	}
 	if !schema.allow_additional {
-		let allowed: HashSet<&str> =
-			schema.fields.iter().map(|f| f.key.as_str()).collect();
+		let allowed: HashSet<&str> = schema
+			.fields
+			.iter()
+			.map(|field| field.key.as_str())
+			.collect();
 		for key in map.0.keys() {
 			if !allowed.contains(key.as_str()) {
 				errors.push(ValidationError::new(
@@ -684,10 +403,10 @@ async fn validate_tuple(
 		));
 		return errors;
 	}
-	for (idx, (field, child)) in
+	for (index, (field, child)) in
 		schema.fields.iter().zip(list.iter_mut()).enumerate()
 	{
-		let sub = path.with_pushed(idx);
+		let sub = path.with_pushed(index);
 		errors.extend(field.schema.apply_in(resolver, &sub, child).await);
 	}
 	errors
@@ -731,8 +450,8 @@ async fn validate_list(
 			}
 		}
 	}
-	for (idx, child) in list.iter_mut().enumerate() {
-		let sub = path.with_pushed(idx);
+	for (index, child) in list.iter_mut().enumerate() {
+		let sub = path.with_pushed(index);
 		errors.extend(schema.item.apply_in(resolver, &sub, child).await);
 	}
 	errors
@@ -767,11 +486,10 @@ async fn validate_enum(
 	// (which expects the bare name) succeeds.
 	if let Value::Str(name) = value {
 		let variant = name.rsplit("::").next().unwrap_or(name.as_str());
-		if schema
-			.variants
-			.iter()
-			.any(|v| v.payload.is_none() && v.name.as_str() == variant)
-		{
+		if schema.variants.iter().any(|variant_schema| {
+			variant_schema.payload.is_none()
+				&& variant_schema.name.as_str() == variant
+		}) {
 			if variant != name.as_str() {
 				*value = Value::Str(variant.into());
 			}
@@ -797,7 +515,7 @@ async fn validate_enum(
 	let Some(variant) = schema
 		.variants
 		.iter()
-		.find(|v| v.name.as_str() == key.as_str())
+		.find(|variant| variant.name.as_str() == key.as_str())
 	else {
 		return vec![ValidationError::new(
 			path.clone(),
@@ -816,7 +534,7 @@ async fn validate_enum(
 
 #[cfg(test)]
 mod test {
-	use super::*;
+	use crate::prelude::*;
 
 	#[derive(Reflect)]
 	#[allow(dead_code)]
@@ -832,44 +550,6 @@ mod test {
 		Active,
 		Banned,
 		Pending(String),
-	}
-
-	#[crate::test]
-	fn primitive_schemas() {
-		matches!(ValueSchema::of::<bool>(), ValueSchema::Bool(_)).xpect_true();
-		matches!(ValueSchema::of::<i32>(), ValueSchema::I64(_)).xpect_true();
-		matches!(ValueSchema::of::<u32>(), ValueSchema::U64(_)).xpect_true();
-		matches!(ValueSchema::of::<f32>(), ValueSchema::F64(_)).xpect_true();
-		matches!(ValueSchema::of::<String>(), ValueSchema::String(_))
-			.xpect_true();
-		matches!(ValueSchema::of::<()>(), ValueSchema::Null).xpect_true();
-	}
-
-	#[crate::test]
-	fn struct_schema_from_type_info() {
-		let schema = ValueSchema::of::<UserProfile>();
-		let ValueSchema::Struct(s) = schema else {
-			panic!("expected struct schema");
-		};
-		s.fields.len().xpect_eq(3);
-		s.fields[0].key.as_str().xpect_eq("name");
-		s.fields[0].required.xpect_true();
-		// Option<String> is unwrapped to its inner schema
-		s.fields[2].key.as_str().xpect_eq("email");
-		s.fields[2].required.xpect_false();
-	}
-
-	#[crate::test]
-	fn enum_schema_from_type_info() {
-		let schema = ValueSchema::of::<Status>();
-		let ValueSchema::Enum(e) = schema else {
-			panic!("expected enum schema");
-		};
-		e.variants.len().xpect_eq(3);
-		e.variants[0].name.as_str().xpect_eq("Active");
-		e.variants[0].payload.is_none().xpect_true();
-		e.variants[2].name.as_str().xpect_eq("Pending");
-		e.variants[2].payload.is_some().xpect_true();
 	}
 
 	#[crate::test]
@@ -907,48 +587,6 @@ mod test {
 	}
 
 	#[crate::test]
-	async fn validate_min_constraint() {
-		let schema = ValueSchema::I64(I64Schema {
-			constraints: vec![I64Constraint::Min(I64Min {
-				value: 10,
-				behavior: ConstraintBehavior::Error,
-			})],
-		});
-		let mut value = value!(5);
-		let errors = schema.validate(&mut value).await;
-		errors.len().xpect_eq(1);
-		// no mutation
-		value.as_i64().unwrap().xpect_eq(5);
-	}
-
-	#[crate::test]
-	async fn validate_min_mutate() {
-		let schema = ValueSchema::I64(I64Schema {
-			constraints: vec![I64Constraint::Min(I64Min {
-				value: 10,
-				behavior: ConstraintBehavior::Mutate,
-			})],
-		});
-		let mut value = value!(5);
-		let errors = schema.validate(&mut value).await;
-		errors.is_empty().xpect_true();
-		value.as_i64().unwrap().xpect_eq(10);
-	}
-
-	#[crate::test]
-	async fn validate_string_min_length() {
-		let schema = ValueSchema::String(StringSchema::default().with(
-			StringConstraint::MinLength {
-				value: 3,
-				behavior: ConstraintBehavior::Error,
-			},
-		));
-		let mut value = value!("hi");
-		let errors = schema.validate(&mut value).await;
-		errors.len().xpect_eq(1);
-	}
-
-	#[crate::test]
 	async fn validate_list_unique() {
 		let schema = ValueSchema::List(ListSchema {
 			item: Box::new(ValueSchema::I64(I64Schema::default())),
@@ -960,7 +598,7 @@ mod test {
 		let errors = schema.validate(&mut value).await;
 		errors
 			.iter()
-			.any(|e| e.message.contains("unique"))
+			.any(|error| error.message.contains("unique"))
 			.xpect_true();
 	}
 
@@ -1019,17 +657,6 @@ mod test {
 	}
 
 	#[crate::test]
-	fn optional_schema_built_for_option_field() {
-		let schema = ValueSchema::of::<UserProfile>();
-		let ValueSchema::Struct(struct_schema) = schema else {
-			panic!("expected struct schema");
-		};
-		// `email: Option<String>` is an Optional wrapper over String.
-		let email = &struct_schema.fields[2];
-		matches!(email.schema, ValueSchema::Optional(_)).xpect_true();
-	}
-
-	#[crate::test]
 	async fn any_matches_everything() {
 		let schema = ValueSchema::Any;
 		schema
@@ -1065,97 +692,5 @@ mod test {
 			.await
 			.is_empty()
 			.xpect_false();
-	}
-
-	/// A struct holding an entity reference lowers the field to the entity kind,
-	/// so a form generated from the type knows to render a picker.
-	#[crate::test]
-	fn entity_field_lowers_to_the_entity_kind() {
-		#[derive(Reflect)]
-		#[allow(dead_code)]
-		struct Link {
-			target: Entity,
-		}
-		let ValueSchema::Struct(schema) = ValueSchema::of::<Link>() else {
-			panic!("expected struct schema");
-		};
-		schema.fields[0]
-			.schema
-			.clone()
-			.xpect_eq(ValueSchema::Entity(default()));
-	}
-
-	#[crate::test]
-	fn get_field_schema_walks_struct() {
-		let schema = ValueSchema::of::<UserProfile>();
-		matches!(
-			schema
-				.get_field_schema(&[FieldSegment::key("name")])
-				.unwrap(),
-			ValueSchema::String(_)
-		)
-		.xpect_true();
-		matches!(
-			schema
-				.get_field_schema(&[FieldSegment::key("age")])
-				.unwrap(),
-			ValueSchema::U64(_)
-		)
-		.xpect_true();
-		schema
-			.get_field_schema(&[FieldSegment::key("missing")])
-			.is_err()
-			.xpect_true();
-	}
-
-	#[crate::test]
-	fn get_field_schema_walks_list() {
-		let schema = ValueSchema::of::<Vec<i64>>();
-		matches!(
-			schema.get_field_schema(&[FieldSegment::index(0)]).unwrap(),
-			ValueSchema::I64(_)
-		)
-		.xpect_true();
-	}
-
-	/// An enum's payload is reached by its variant name, the key the externally
-	/// tagged value itself carries. This is what makes a *schema* document's
-	/// own fields addressable: `Struct.fields` is the list of a struct schema's
-	/// fields, which is what a schema editor binds.
-	#[crate::test]
-	fn get_field_schema_walks_an_enum_payload() {
-		let meta = ValueSchema::meta();
-		matches!(
-			meta.get_field_schema(&[
-				FieldSegment::key("Struct"),
-				FieldSegment::key("fields")
-			])
-			.unwrap(),
-			ValueSchema::List(_)
-		)
-		.xpect_true();
-		// a unit variant carries no payload to descend into
-		meta.get_field_schema(&[
-			FieldSegment::key("Any"),
-			FieldSegment::key("nope"),
-		])
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("Any");
-	}
-
-	#[crate::test]
-	fn get_field_schema_any_swallows_path() {
-		let schema = ValueSchema::Any;
-		matches!(
-			schema
-				.get_field_schema(&[
-					FieldSegment::key("a"),
-					FieldSegment::index(2)
-				])
-				.unwrap(),
-			ValueSchema::Any
-		)
-		.xpect_true();
 	}
 }
