@@ -36,8 +36,8 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// Render the demo table to plain charcell with the Material rule set.

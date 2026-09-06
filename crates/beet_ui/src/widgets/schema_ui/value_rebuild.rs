@@ -62,7 +62,7 @@ impl ValueRebuild {
 /// Respawn the generation of every [`ValueRebuild`] whose bound value changed
 /// shape, leaving the rest (and every leaf inside an unchanged generation)
 /// alone.
-pub(super) fn rebuild_value_widgets(
+pub(in crate::widgets) fn rebuild_value_widgets(
 	schemas: Option<Res<SchemaRegistry>>,
 	mut holders: Populated<
 		(Entity, &mut ValueRebuild, &Value, Option<&Children>),
@@ -91,8 +91,8 @@ pub(super) fn rebuild_value_widgets(
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// A holder keyed on a list's length: an appended item regenerates the

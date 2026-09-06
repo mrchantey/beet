@@ -99,11 +99,11 @@ pub(crate) fn apply_markers(
 }
 
 /// Draw internal column dividers for a `.table-vertical-borders` table on the
-/// terminal. The web does this with an adjacent-sibling rule in `reset.css`,
-/// which the charcell cascade can't express (no sibling combinator, only
-/// child/descendant), so here every cell but the first in its row gets a left
-/// border mirroring its own bottom rule — the dividers fall between columns,
-/// matching the web.
+/// terminal. The web does this with an adjacent-sibling rule in
+/// `browser_overrides.css`, which the charcell cascade can't express (no
+/// sibling combinator, only child/descendant), so here every cell but the first
+/// in its row gets a left border mirroring its own bottom rule — the dividers
+/// fall between columns, matching the web.
 pub(crate) fn apply_table_vertical_borders(
 	elements: ElementQuery,
 	children: Query<&Children>,

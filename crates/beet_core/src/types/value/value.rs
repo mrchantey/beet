@@ -377,87 +377,27 @@ impl Value {
 		}
 	}
 
-	/// Convert from a [`serde_json::Value`].
-	#[cfg(feature = "json")]
-	pub fn from_json(json: serde_json::Value) -> Self {
-		crate::types::value::serde_ext::json_to_value(json)
-	}
-
-	/// Convert into a [`serde_json::Value`].
-	#[cfg(feature = "json")]
-	pub fn into_json(self) -> serde_json::Value {
-		crate::types::value::serde_ext::value_to_json(self)
-	}
-	/// Convert into a pretty-printed JSON string.
-	#[cfg(feature = "json")]
-	pub fn to_string_pretty(&self) -> Result<String> {
-		serde_json::to_string_pretty(self)?.xok()
-	}
 
 	/// Convert from any serializable type.
 	#[cfg(feature = "serde")]
-	pub fn from_serde<T: serde::Serialize>(foo: T) -> Result<Self> {
-		serde::Serialize::serialize(
+	pub fn from_serde<T: ::serde::Serialize>(foo: T) -> Result<Self> {
+		::serde::Serialize::serialize(
 			&foo,
-			crate::types::value::serde_ext::ValueSerializer,
+			crate::types::value::serde::ValueSerializer,
 		)
 		.map_err(|e| bevyhow!("failed to serialize into Value: {e}"))
 	}
 
 	/// Convert into any deserializable type.
 	#[cfg(feature = "serde")]
-	pub fn into_serde<T: serde::de::DeserializeOwned>(self) -> Result<T> {
-		<T as serde::Deserialize>::deserialize(
-			crate::types::value::serde_ext::ValueDeserializer::new(self),
+	pub fn into_serde<T: ::serde::de::DeserializeOwned>(self) -> Result<T> {
+		<T as ::serde::Deserialize>::deserialize(
+			crate::types::value::serde::ValueDeserializer::new(self),
 		)
 		.map_err(|e| bevyhow!("failed to deserialize from Value: {e}"))
 	}
 }
 
-/// wasm-only: marshal a [`Value`] into a live JS value for a wasm script host.
-#[cfg(target_arch = "wasm32")]
-impl Value {
-	/// Convert into a live [`wasm_bindgen::JsValue`] for binding into a wasm script
-	/// host, the wasm analogue of the native runtimes' input marshalling.
-	///
-	/// Mirrors the shape `JSON.parse` of the native JSON encoding would yield:
-	/// numbers (incl. bytes) become JS numbers, [`Value::Bytes`] an array of byte
-	/// numbers, a [`Value::List`] an array, and a [`Value::Map`] an object with
-	/// string keys.
-	pub fn to_js_value(&self) -> wasm_bindgen::JsValue {
-		use wasm_bindgen::JsValue;
-		match self {
-			Value::Null => JsValue::NULL,
-			Value::Bool(bool) => JsValue::from_bool(*bool),
-			Value::Int(int) => JsValue::from_f64(*int as f64),
-			Value::Uint(uint) => JsValue::from_f64(*uint as f64),
-			Value::Float(float) => JsValue::from_f64(*float),
-			Value::Str(str) => JsValue::from_str(str),
-			Value::Bytes(bytes) => bytes
-				.iter()
-				.map(|byte| JsValue::from_f64(*byte as f64))
-				.collect::<js_sys::Array>()
-				.into(),
-			Value::List(list) => list
-				.iter()
-				.map(Value::to_js_value)
-				.collect::<js_sys::Array>()
-				.into(),
-			Value::Map(map) => {
-				let obj = js_sys::Object::new();
-				map.iter().for_each(|(key, value)| {
-					js_sys::Reflect::set(
-						&obj,
-						&JsValue::from_str(key.as_str()),
-						&value.to_js_value(),
-					)
-					.ok();
-				});
-				obj.into()
-			}
-		}
-	}
-}
 
 /// Parse the trimmed text into a number `T`, erroring with the original text.
 fn parse_number<T: core::str::FromStr>(text: &str) -> Result<T> {
@@ -951,7 +891,7 @@ mod test {
 		value.get("key").unwrap().as_i64().unwrap().xpect_eq(42);
 	}
 
-	#[cfg(feature = "json")]
+	#[cfg(feature = "serde")]
 	mod serde_tests {
 		use super::*;
 		use bevy::math::Vec3;
@@ -963,8 +903,8 @@ mod test {
 			T: Clone
 				+ core::fmt::Debug
 				+ PartialEq
-				+ serde::Serialize
-				+ serde::de::DeserializeOwned,
+				+ ::serde::Serialize
+				+ ::serde::de::DeserializeOwned,
 		{
 			let v = Value::from_serde(&val).unwrap();
 			v.into_serde::<T>().unwrap().xpect_eq(val);
@@ -1029,8 +969,8 @@ mod test {
 			Default,
 			PartialEq,
 			bevy::reflect::Reflect,
-			serde::Serialize,
-			serde::Deserialize,
+			::serde::Serialize,
+			::serde::Deserialize,
 		)]
 		#[reflect(Default)]
 		enum TestEnum {

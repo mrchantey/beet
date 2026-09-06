@@ -3,8 +3,8 @@
 //! and styling reacts through attribute selectors (eg
 //! `.sidebar:not([aria-hidden="false"])`), so one rule drives both the browser
 //! and this runtime. The web twin is the menu-button wiring in
-//! `widgets/sidebar.js`; the breakpoint seeding that pairs with it lives in
-//! `widgets::sync_sidebar_breakpoint`.
+//! `widgets/chrome/sidebar.js`; the breakpoint seeding that pairs with it
+//! lives in `widgets::sync_sidebar_breakpoint`.
 //!
 //! Attribute values live on attribute entities (see [`AttributeOf`]), which the
 //! cascade's change filters cannot see, so every mutation here also dirties the
@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// Observer: clicking an element that carries `aria-controls` toggles
 /// `aria-hidden` on the element it references by id — the ARIA disclosure
 /// pattern, eg the header `MenuButton` collapsing the sidebar rail. The native
-/// twin of the menu-button click in `widgets/sidebar.js`, with its exact
+/// twin of the menu-button click in `widgets/chrome/sidebar.js`, with its exact
 /// semantics: the target is hidden when the attribute is `"true"` (absent
 /// counts as shown), and a click flips between the two.
 ///

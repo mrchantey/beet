@@ -33,9 +33,9 @@ pub fn table() -> Rule {
 }
 
 /// The marker rule for [`TABLE_VERTICAL_BORDERS`]: the dividers themselves are
-/// drawn per target (an adjacent-sibling rule in `reset.css` on the web, the
-/// charcell decorate system on the terminal), so this declares nothing — it
-/// registers the class so the render diagnostics know it is real.
+/// drawn per target (an adjacent-sibling rule in `browser_overrides.css` on the
+/// web, the charcell decorate system on the terminal), so this declares nothing
+/// — it registers the class so the render diagnostics know it is real.
 pub fn table_vertical_borders() -> Rule {
 	Rule::new().with_selector(Selector::class(TABLE_VERTICAL_BORDERS))
 }

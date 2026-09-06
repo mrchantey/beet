@@ -33,7 +33,7 @@ A throwaway harness beats re-rendering the whole site. Build the *real* widget i
 - **Charcell:** spawn the scene in a `(scene plugins, CharcellPlugin, MaterialStylePlugin)` world, attach a `FlexBuffer`, run the `PostParseTree` schedule, then query every entity's `Element`/`LayoutRect`/`LayoutStyle`/`BoxStyle` and print tag, display, `x..max`, resolved padding. One run shows whether a node is misplaced by its own box or by an inherited/leaked value.
 - **Web:** in `page.evaluate`, `getComputedStyle` + `getBoundingClientRect` over the elements in question; dump width/display/padding/transform. A "134px rail that should be 256px" is one query from the answer (a flex sibling shrinking it).
 
-Promote a harness that earns its keep into a regression test (see `widgets/sidebar.rs` `mod test`).
+Promote a harness that earns its keep into a regression test (see `widgets/chrome/sidebar.rs` `mod test`).
 
 ## Read the generated CSS, not just pixels
 

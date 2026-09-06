@@ -105,8 +105,8 @@ pub(super) fn sync_checkbox_checked(
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// The bare `checked` attribute tracks the bound document value: present

@@ -716,8 +716,8 @@ fn widget(template: impl BuildTemplate) -> Snippet {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// Render a `DynamicForm` for `schema` bound to a `"field"` key.
@@ -907,7 +907,7 @@ mod test {
 	}
 
 	/// One control per editable leaf, each binding its own path and nothing
-	/// else: the binding contract `form_controls::conformance` fences, now
+	/// else: the binding contract `controls::form::conformance` fences, now
 	/// generated from a schema rather than authored by hand.
 	#[beet_core::test]
 	fn each_leaf_binds_its_own_path() {

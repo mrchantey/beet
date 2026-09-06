@@ -313,8 +313,8 @@ fn flatten<M>(rows: impl IntoSnippet<M>) -> Snippet {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	#[derive(Reflect)]
@@ -406,7 +406,7 @@ mod test {
 	}
 
 	/// Every leaf binds its own path and nothing else, the read half of the
-	/// binding contract `form_controls::conformance` fences.
+	/// binding contract `controls::form::conformance` fences.
 	#[beet_core::test]
 	fn each_leaf_binds_its_own_path() {
 		bindings(build(

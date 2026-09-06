@@ -1,6 +1,9 @@
 //! Shared harness for the widget tests: HTML renders through the substrate,
 //! and (under `tui`) a live app with the focus/keyboard/pointer drivers, so an
 //! interaction test drives the same systems the real terminal does.
+use super::schema_ui::collection_edit::CollectionButton;
+use super::schema_ui::collection_edit::CollectionEdit;
+use super::schema_ui::variant_select::VariantSelect;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -165,7 +168,7 @@ pub fn bound(world: &mut World, path: &str) -> Entity {
 /// field of its own (its value is the variant name).
 pub fn variant_select(world: &mut World, path: &str) -> Entity {
 	world
-		.query_once::<(Entity, &super::variant_select::VariantSelect)>()
+		.query_once::<(Entity, &VariantSelect)>()
 		.into_iter()
 		.find(|(_, select)| select.field.field_path.to_string() == path)
 		.map(|(entity, _)| entity)
@@ -175,14 +178,13 @@ pub fn variant_select(world: &mut World, path: &str) -> Entity {
 /// The generated add button of the collection control bound to `path`.
 pub fn collection_add(world: &mut World, path: &str) -> Entity {
 	world
-		.query_once::<(Entity, &super::collection_edit::CollectionButton)>()
+		.query_once::<(Entity, &CollectionButton)>()
 		.into_iter()
 		.find(|(_, button)| {
 			button.field.field_path.to_string() == path
 				&& matches!(
 					button.edit,
-					super::collection_edit::CollectionEdit::Push(_)
-						| super::collection_edit::CollectionEdit::Insert(_)
+					CollectionEdit::Push(_) | CollectionEdit::Insert(_)
 				)
 		})
 		.map(|(entity, _)| entity)

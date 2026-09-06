@@ -134,7 +134,7 @@ pub fn all_rules() -> Vec<Rule> {
 		error_text(),
 		error(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
-		// an adjacent-sibling rule in `reset.css` on the web, the
+		// an adjacent-sibling rule in `browser_overrides.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)
 		table(),
 		table_vertical_borders(),

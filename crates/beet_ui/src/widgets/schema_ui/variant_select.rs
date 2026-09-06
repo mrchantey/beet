@@ -17,9 +17,9 @@ use beet_core::prelude::*;
 /// `(document, field path)` and writes only through it, so nothing here
 /// reconstructs an edit by diffing or holds a copy of a document.
 #[derive(Component)]
-pub(super) struct VariantSelect {
+pub(in crate::widgets) struct VariantSelect {
 	/// The enum field this select chooses the variant of.
-	pub(super) field: FieldRef,
+	pub(in crate::widgets) field: FieldRef,
 	/// Each variant as the whole value choosing it writes: `"Name"` for a unit
 	/// variant, `{"Name": zero}` for a payload-carrying one. Values, not
 	/// schemas: the registry owns those, and a generation is built from the
@@ -51,7 +51,7 @@ pub(super) fn variant_select(
 	let value = Value::Str(current.unwrap_or_default());
 	rsx! {
 		<Select name={name} {(select, value)}>
-			{super::dynamic_form::variant_options(schema)}
+			{super::form::variant_options(schema)}
 		</Select>
 	}
 	.any_snippet()
@@ -71,9 +71,9 @@ pub(super) fn variant_name(value: &Value) -> Option<SmolStr> {
 ///
 /// Equality-guarded like every other sync: a select showing what the field
 /// already carries is reporting, not asking, so only a *changed* variant writes.
-/// Registered by [`FormPlugin`](super::FormPlugin), the plugin that owns control
+/// Registered by [`FormPlugin`](crate::prelude::FormPlugin), the plugin that owns control
 /// behavior.
-pub(super) fn write_selected_variant(
+pub(in crate::widgets) fn write_selected_variant(
 	selects: Populated<(Entity, &VariantSelect, &Value), Changed<Value>>,
 	mut docs: DocumentQuery,
 ) -> Result {

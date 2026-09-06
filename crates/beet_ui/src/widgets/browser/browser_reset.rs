@@ -4,8 +4,9 @@
 //! without pulling in Tailwind's utility classes.
 //!
 //! `preflight.css` is a verbatim copy of upstream and must not be edited. Site
-//! overrides go in the adjacent `reset.css`, emitted by [`Reset`] and dropped
-//! into the `<head>` immediately after [`Preflight`] so it wins the cascade.
+//! overrides go in the adjacent `browser_overrides.css`, emitted by [`Reset`]
+//! and dropped into the `<head>` immediately after [`Preflight`] so it wins the
+//! cascade.
 use beet_core::prelude::*;
 
 /// Emits the bundled Tailwind Preflight reset (`preflight.css`) as a `<style>`
@@ -18,7 +19,8 @@ pub fn Preflight() -> impl Bundle {
 	}
 }
 
-/// Emits the beet web-only reset overrides (`reset.css`) as a `<style>` element.
+/// Emits the beet web-only reset overrides (`browser_overrides.css`) as a
+/// `<style>` element.
 ///
 /// Web target only. Load it right after [`Preflight`] in the document `<head>`
 /// so its rules layer over the verbatim Tailwind reset (eg restoring prose list
@@ -26,7 +28,7 @@ pub fn Preflight() -> impl Bundle {
 /// rule or class where one can express the intent.
 #[template]
 pub fn Reset() -> impl Bundle {
-	let reset = include_str!("./reset.css");
+	let reset = include_str!("./browser_overrides.css");
 	rsx! {
 		<style>{reset}</style>
 	}

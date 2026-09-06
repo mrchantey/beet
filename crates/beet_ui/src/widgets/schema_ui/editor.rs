@@ -106,7 +106,7 @@ pub fn ToggleSchemaEditor(
 /// is: the editor is authored with one `DocRef` and the draft's origin follows
 /// from it, so an author never names the same document twice.
 #[derive(Component)]
-pub(super) struct SchemaDraft;
+pub(in crate::widgets) struct SchemaDraft;
 
 /// Marks the editor's error line, the whole report of a commit.
 #[derive(Component)]
@@ -131,7 +131,7 @@ struct SchemaEditForm;
 
 /// System: give each editor's draft the document it forks from, the one its
 /// [`DocRef`] names.
-pub(super) fn link_schema_drafts(
+pub(in crate::widgets) fn link_schema_drafts(
 	drafts: Populated<Entity, (With<SchemaDraft>, Without<DraftOf>)>,
 	editors: AncestorQuery<&DocRef>,
 	mut commands: Commands,
@@ -338,8 +338,8 @@ fn document_value(world: &World, entity: Entity, role: &str) -> Result<Value> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// `{ label: String }`, the row schema the editor edits.

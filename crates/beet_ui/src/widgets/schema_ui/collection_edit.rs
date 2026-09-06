@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// layer already calls a position. Adding is the arm that genuinely differs:
 /// appending needs nothing, and an entry needs a name first.
 #[derive(Debug, Clone)]
-pub(super) enum CollectionEdit {
+pub(in crate::widgets) enum CollectionEdit {
 	/// Append the item schema's zero to the list.
 	Push(Value),
 	/// Insert the value schema's zero under the key typed into the sibling
@@ -37,9 +37,9 @@ pub(super) enum CollectionEdit {
 /// position is resolved against the whole collection in one write.
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(apply_collection_edit))]
-pub(super) struct CollectionButton {
-	pub(super) field: FieldRef,
-	pub(super) edit: CollectionEdit,
+pub(in crate::widgets) struct CollectionButton {
+	pub(in crate::widgets) field: FieldRef,
+	pub(in crate::widgets) edit: CollectionEdit,
 }
 
 /// Marks the key input of a map control's add-entry row: an unbound text field
@@ -162,8 +162,8 @@ fn as_map_mut_or_init(value: &mut Value) -> Result<&mut Map> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	/// A form over `schema` bound to an `"items"` field, settled.

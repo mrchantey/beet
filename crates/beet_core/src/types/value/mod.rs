@@ -1,17 +1,18 @@
+#[cfg(target_arch = "wasm32")]
+mod js;
+#[cfg(feature = "json")]
+mod json;
 pub mod map;
 pub use map::*;
+#[cfg(feature = "serde")]
+mod serde;
+#[cfg(feature = "serde")]
+pub use serde::DeError;
+#[cfg(feature = "serde")]
+pub use serde::SerError;
+#[cfg(feature = "serde")]
+pub use serde::ValueDeserializer;
+#[cfg(feature = "serde")]
+pub use serde::ValueSerializer;
 mod value;
 pub use value::*;
-
-#[cfg(feature = "serde")]
-mod serde_ext;
-// the serde data formats only, not the module: `utils::serde_ext` already owns
-// that name, and these four are what a caller outside `beet_core` reaches for.
-#[cfg(feature = "serde")]
-pub use serde_ext::DeError;
-#[cfg(feature = "serde")]
-pub use serde_ext::SerError;
-#[cfg(feature = "serde")]
-pub use serde_ext::ValueDeserializer;
-#[cfg(feature = "serde")]
-pub use serde_ext::ValueSerializer;

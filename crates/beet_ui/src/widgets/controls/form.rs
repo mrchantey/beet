@@ -205,7 +205,10 @@ impl Plugin for FormPlugin {
 			)
 			// the payload-enum control's select edits which variant its field
 			// carries, which is a write no ordinary binding makes for it
-			.add_systems(Update, super::variant_select::write_selected_variant)
+			.add_systems(
+				Update,
+				crate::widgets::schema_ui::variant_select::write_selected_variant,
+			)
 			// a `Submit` handler doing real work is async by nature (the
 			// `SchemaEditor`'s commit evolves data through a js seam), so the
 			// plugin that fires the event declares the bridge that carries it.
@@ -412,8 +415,8 @@ fn ancestor_form(
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	// A literal attribute (`type`) and multiple block attributes

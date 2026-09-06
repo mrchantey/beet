@@ -126,7 +126,7 @@ impl SchemaRebuild {
 /// holder renders can change — a registry edit, a document declaring a new
 /// schema (or arriving with one), and a holder built after the document it
 /// reads.
-pub(super) fn schema_widgets_may_rebuild(
+pub(in crate::widgets) fn schema_widgets_may_rebuild(
 	registry: Option<Res<SchemaRegistry>>,
 	changed_schemas: Query<(), Changed<DocumentSchema>>,
 	new_holders: Query<(), Added<SchemaRebuild>>,
@@ -138,7 +138,7 @@ pub(super) fn schema_widgets_may_rebuild(
 
 /// Respawn the generation of every [`SchemaRebuild`] whose schema changed,
 /// leaving the rest (and every holder's siblings) alone.
-pub(super) fn rebuild_schema_widgets(
+pub(in crate::widgets) fn rebuild_schema_widgets(
 	registry: Option<Res<SchemaRegistry>>,
 	documents: DocumentQuery,
 	mut holders: Populated<(Entity, &mut SchemaRebuild, Option<&Children>)>,
@@ -176,8 +176,8 @@ pub(super) fn rebuild_schema_widgets(
 
 #[cfg(test)]
 mod test {
-	use super::super::test_ext;
 	use crate::prelude::*;
+	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
 	#[derive(Reflect)]
