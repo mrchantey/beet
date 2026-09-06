@@ -7,7 +7,7 @@ use bevy::reflect::Typed;
 /// An interface-oriented description of a [`Value`]'s shape.
 ///
 /// Used for driving dynamic UIs, performing validation and producing a
-/// [`Schema`] (JSON Schema) representation.
+/// [`JsonSchema`] representation.
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
 )]

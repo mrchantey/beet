@@ -69,7 +69,7 @@ impl MockPostStreamer {
 	}
 
 	/// Generates default arguments for a tool based on its parameter schema.
-	fn generate_default_arguments(schema: &Schema) -> String {
+	fn generate_default_arguments(schema: &JsonSchema) -> String {
 		// Convert to serde_json::Value for traversal and serialization
 		let json_schema = schema.clone().into_inner().into_json();
 		let Some(properties) =
@@ -128,7 +128,7 @@ impl PostStreamer for MockPostStreamer {
 						ActorId,
 						ThreadId,
 						String,
-						Option<(String, Schema)>,
+						Option<(String, JsonSchema)>,
 					)> {
 						let (_, thread, window) =
 							query.thread_and_window(actor_entity)?;

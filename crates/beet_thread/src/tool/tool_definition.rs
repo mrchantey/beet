@@ -44,7 +44,7 @@ impl ToolDefinition {
 	pub fn function(
 		name: impl Into<String>,
 		description: impl Into<String>,
-		params_schema: impl Into<Schema>,
+		params_schema: impl Into<JsonSchema>,
 	) -> Self {
 		Self::Function(FunctionToolDefinition::new(
 			name,
@@ -84,13 +84,13 @@ pub struct FunctionToolDefinition {
 	/// A description of the function. Used by the model to decide when to call it.
 	description: String,
 	/// A json schema for the parameters.
-	params_schema: Schema,
+	params_schema: JsonSchema,
 }
 impl FunctionToolDefinition {
 	pub fn new(
 		path: impl Into<String>,
 		description: impl Into<String>,
-		params_schema: impl Into<Schema>,
+		params_schema: impl Into<JsonSchema>,
 	) -> Self {
 		Self {
 			path: path.into(),
@@ -100,10 +100,10 @@ impl FunctionToolDefinition {
 	}
 	pub fn path(&self) -> &str { &self.path }
 	pub fn description(&self) -> &str { &self.description }
-	pub fn params_schema(&self) -> &Schema { &self.params_schema }
+	pub fn params_schema(&self) -> &JsonSchema { &self.params_schema }
 	/// Mutable access to the parameter schema, eg to inject a runtime `enum`
 	/// constraint on a field (see [`StringEnumOptions`](crate::prelude::StringEnumOptions)).
-	pub fn params_schema_mut(&mut self) -> &mut Schema {
+	pub fn params_schema_mut(&mut self) -> &mut JsonSchema {
 		&mut self.params_schema
 	}
 

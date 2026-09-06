@@ -776,13 +776,13 @@ impl From<Value> for serde_json::Value {
 }
 
 #[cfg(feature = "json")]
-impl From<Schema> for serde_json::Value {
-	fn from(schema: Schema) -> Self { value_to_json(schema.into_inner()) }
+impl From<JsonSchema> for serde_json::Value {
+	fn from(schema: JsonSchema) -> Self { value_to_json(schema.into_inner()) }
 }
 
 #[cfg(feature = "json")]
-impl From<serde_json::Value> for Schema {
+impl From<serde_json::Value> for JsonSchema {
 	fn from(json: serde_json::Value) -> Self {
-		Schema::from_value(json_to_value(json))
+		JsonSchema::from_value(json_to_value(json))
 	}
 }

@@ -17,7 +17,7 @@
 //! }
 //!
 //! // Returns a JSON Schema object with properties, required fields, etc.
-//! let schema = Schema::new::<MyRequest>();
+//! let schema = JsonSchema::new::<MyRequest>();
 //! ```
 use crate::prelude::*;
 use bevy::reflect::NamedField;
@@ -40,13 +40,13 @@ use bevy::reflect::tuple_struct::TupleStructInfo;
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Schema(Value);
+pub struct JsonSchema(Value);
 
-impl Schema {
-	/// Generate a schema for type `T`.
+impl JsonSchema {
+	/// Generates a schema for type `T`.
 	pub fn new<T: Typed>() -> Self { Self::from_type_info(T::type_info()) }
 
-	/// Generate a schema from [`TypeInfo`].
+	/// Generates a schema from [`TypeInfo`].
 	pub fn from_type_info(type_info: &TypeInfo) -> Self {
 		let mut ctx = SchemaCtx::new();
 		let mut schema = build_schema(type_info, &mut ctx);
@@ -74,7 +74,7 @@ impl Schema {
 		self
 	}
 
-	/// Constrain a top-level string property to a runtime set of allowed values by
+	/// Constrains a top-level string property to a runtime set of allowed values by
 	/// injecting a JSON-schema `enum`, so a tool field's options can come from data
 	/// (eg a blob-store listing) rather than a fixed Rust enum. Rewrites the property
 	/// to `{"type":"string","enum":[..]}`, preserving any sibling keywords like
@@ -821,7 +821,7 @@ mod test {
 	#[crate::test]
 	fn set_field_enum_constrains_a_string_field() {
 		// a plain string field gains a runtime `enum` constraint at a top-level property.
-		let mut schema = Schema::new::<SimpleStruct>();
+		let mut schema = JsonSchema::new::<SimpleStruct>();
 		schema.set_field_enum("name", ["red", "green"].map(SmolStr::from));
 		schema
 			.get("properties")
@@ -836,7 +836,7 @@ mod test {
 
 	#[crate::test]
 	fn simple_struct_schema() {
-		let schema = Schema::new::<SimpleStruct>();
+		let schema = JsonSchema::new::<SimpleStruct>();
 
 		schema
 			.get("type")
@@ -883,7 +883,7 @@ mod test {
 
 	#[crate::test]
 	fn complex_struct_schema() {
-		let schema = Schema::new::<ComplexStruct>();
+		let schema = JsonSchema::new::<ComplexStruct>();
 
 		let defs = schema.get("$defs").unwrap().as_map().unwrap();
 		defs.contains_key("SimpleEnum").xpect_true();
@@ -942,7 +942,7 @@ mod test {
 
 	#[crate::test]
 	fn nested_struct_schema() {
-		let schema = Schema::new::<WithNested>();
+		let schema = JsonSchema::new::<WithNested>();
 
 		let defs = schema.get("$defs").unwrap().as_map().unwrap();
 		defs.contains_key("SimpleStruct").xpect_true();
@@ -985,7 +985,7 @@ mod test {
 
 	#[crate::test]
 	fn optional_fields_not_required() {
-		let schema = Schema::new::<WithOptional>();
+		let schema = JsonSchema::new::<WithOptional>();
 
 		let required = schema.get("required").unwrap().as_list().unwrap();
 		required.len().xpect_eq(1);
@@ -998,7 +998,7 @@ mod test {
 
 	#[crate::test]
 	fn vec_field_schema() {
-		let schema = Schema::new::<WithVec>();
+		let schema = JsonSchema::new::<WithVec>();
 		let props = schema.get("properties").unwrap().as_map().unwrap();
 
 		let items_schema = props.get("items").unwrap();
@@ -1020,7 +1020,7 @@ mod test {
 
 	#[crate::test]
 	fn simple_enum_schema() {
-		let schema = Schema::new::<SimpleEnum>();
+		let schema = JsonSchema::new::<SimpleEnum>();
 
 		schema
 			.get("type")
@@ -1041,14 +1041,14 @@ mod test {
 
 	#[crate::test]
 	fn complex_enum_schema() {
-		let schema = Schema::new::<ComplexEnum>();
+		let schema = JsonSchema::new::<ComplexEnum>();
 		let one_of = schema.get("oneOf").unwrap().as_list().unwrap();
 		one_of.len().xpect_eq(3);
 	}
 
 	#[crate::test]
 	fn tuple_struct_schema() {
-		let schema = Schema::new::<TupleStruct>();
+		let schema = JsonSchema::new::<TupleStruct>();
 		schema
 			.get("type")
 			.unwrap()
@@ -1062,7 +1062,7 @@ mod test {
 
 	#[crate::test]
 	fn newtype_struct_unwraps() {
-		let schema = Schema::new::<NewtypeStruct>();
+		let schema = JsonSchema::new::<NewtypeStruct>();
 		schema
 			.get("type")
 			.unwrap()
@@ -1073,7 +1073,7 @@ mod test {
 
 	#[crate::test]
 	fn unit_type_schema() {
-		let schema = Schema::new::<()>();
+		let schema = JsonSchema::new::<()>();
 		schema
 			.get("type")
 			.unwrap()
@@ -1128,7 +1128,7 @@ mod test {
 		struct WithPath {
 			path: SmolPath,
 		}
-		let schema = Schema::new::<WithPath>();
+		let schema = JsonSchema::new::<WithPath>();
 		let props = schema.get("properties").unwrap().as_map().unwrap();
 		props
 			.get("path")
@@ -1149,7 +1149,7 @@ mod test {
 		struct WithDuration {
 			duration: core::time::Duration,
 		}
-		let schema = Schema::new::<WithDuration>();
+		let schema = JsonSchema::new::<WithDuration>();
 		let props = schema.get("properties").unwrap().as_map().unwrap();
 		props
 			.get("duration")

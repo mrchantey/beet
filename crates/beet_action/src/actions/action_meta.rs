@@ -178,18 +178,18 @@ impl ActionMeta {
 
 	/// JSON schema for the input type, if full reflection data is available.
 	#[cfg(feature = "json")]
-	pub fn input_json_schema(&self) -> Option<Schema> {
+	pub fn input_json_schema(&self) -> Option<JsonSchema> {
 		self.type_info
 			.and_then(|info| info.input_info)
-			.map(Schema::from_type_info)
+			.map(JsonSchema::from_type_info)
 	}
 
 	/// JSON schema for the output type, if full reflection data is available.
 	#[cfg(feature = "json")]
-	pub fn output_json_schema(&self) -> Option<Schema> {
+	pub fn output_json_schema(&self) -> Option<JsonSchema> {
 		self.type_info
 			.and_then(|info| info.output_info)
-			.map(Schema::from_type_info)
+			.map(JsonSchema::from_type_info)
 	}
 
 	/// Assert that the provided types match this action's input/output types.

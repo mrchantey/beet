@@ -1,7 +1,7 @@
 {
   "schema": {
     "Ref": {
-      "TypePath": "beet_core::types::value::value_schema::value_schema::ValueSchema"
+      "TypePath": "beet_core::types::schema::value_schema::ValueSchema"
     }
   },
   "value": {

@@ -1,7 +1,7 @@
 //! Conversion from bevy reflect [`TypeInfo`] to [`ValueSchema`].
 //!
-//! Mirrors [`crate::types::value::schema`] (JSON Schema) but produces a
-//! [`ValueSchema`] suitable for validation and UI generation.
+//! Mirrors [`crate::types::json_schema`] but produces a [`ValueSchema`] suitable
+//! for validation and UI generation.
 use super::*;
 use crate::prelude::*;
 use bevy::reflect::NamedField;

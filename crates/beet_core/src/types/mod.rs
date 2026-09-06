@@ -1,8 +1,16 @@
-//! Various widely used types
+//! Various widely used types.
 
-/// Bytes paired with a [`MediaType`], for typed content handling.
 mod value;
 pub use value::*;
+mod field_path;
+pub use field_path::*;
+mod on_missing;
+pub use on_missing::*;
+pub mod schema;
+pub use schema::*;
+pub mod json_schema;
+pub use json_schema::*;
+/// Bytes paired with a [`MediaType`], for typed content handling.
 mod media;
 pub use media::*;
 pub mod element;

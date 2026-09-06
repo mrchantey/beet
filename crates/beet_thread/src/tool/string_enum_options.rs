@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 ///
 /// Empty `options` leaves the field an unconstrained string (an empty `enum` is not
 /// valid strict-mode schema), so it is safe to author with no options and fill them
-/// in later. See [`Schema::set_field_enum`].
+/// in later. See [`JsonSchema::set_field_enum`].
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct StringEnumOptions {
@@ -88,7 +88,7 @@ mod test {
 				ToolDefinition::function(
 					"show",
 					"show an image",
-					Schema::from_value(image_object_schema()),
+					JsonSchema::from_value(image_object_schema()),
 				),
 				StringEnumOptions::new("image", ["happy", "sad"]),
 			))
