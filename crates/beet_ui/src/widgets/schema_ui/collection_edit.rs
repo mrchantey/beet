@@ -21,7 +21,7 @@ use beet_core::prelude::*;
 /// layer already calls a position. Adding is the arm that genuinely differs:
 /// appending needs nothing, and an entry needs a name first.
 #[derive(Debug, Clone)]
-pub(in crate::widgets) enum CollectionEdit {
+pub(super) enum CollectionEdit {
 	/// Append the item schema's zero to the list.
 	Push(Value),
 	/// Insert the value schema's zero under the key typed into the sibling
@@ -37,9 +37,9 @@ pub(in crate::widgets) enum CollectionEdit {
 /// position is resolved against the whole collection in one write.
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(apply_collection_edit))]
-pub(in crate::widgets) struct CollectionButton {
-	pub(in crate::widgets) field: FieldRef,
-	pub(in crate::widgets) edit: CollectionEdit,
+pub(super) struct CollectionButton {
+	pub(super) field: FieldRef,
+	pub(super) edit: CollectionEdit,
 }
 
 /// Marks the key input of a map control's add-entry row: an unbound text field
@@ -163,27 +163,12 @@ fn as_map_mut_or_init(value: &mut Value) -> Result<&mut Map> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use crate::widgets::test_ext;
+	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
 	/// A form over `schema` bound to an `"items"` field, settled.
 	fn build(schema: ValueSchema, document: Value) -> (World, Entity) {
-		let mut world = test_ext::form_world();
-		let root = world
-			.spawn_template(rsx! {
-				<div>
-					<DynamicForm schema={schema} field={FieldRef::new("items")}/>
-				</div>
-			})
-			.unwrap()
-			.id();
-		world.entity_mut(root).insert(Document::new(document));
-		test_ext::settle_world(&mut world);
-		(world, root)
-	}
-
-	fn document(world: &mut World, root: Entity) -> Value {
-		world.entity(root).get::<Document>().unwrap().0.clone()
+		test_ext::build_form(schema, "items", document)
 	}
 
 	/// The generated buttons in document order: one remove per row, then the add.
@@ -199,7 +184,8 @@ mod test {
 			build(ValueSchema::of::<Vec<String>>(), value!({ "items": [] }));
 		let add = *buttons(&mut world).last().unwrap();
 		test_ext::click_world(&mut world, add);
-		document(&mut world, root).xpect_eq(value!({ "items": [""] }));
+		test_ext::document_of(&mut world, root)
+			.xpect_eq(value!({ "items": [""] }));
 	}
 
 	/// A remove button drops its own row and nothing else, so the control edits
@@ -212,7 +198,8 @@ mod test {
 		);
 		let remove = buttons(&mut world)[1];
 		test_ext::click_world(&mut world, remove);
-		document(&mut world, root).xpect_eq(value!({ "items": ["a", "c"] }));
+		test_ext::document_of(&mut world, root)
+			.xpect_eq(value!({ "items": ["a", "c"] }));
 	}
 
 	/// A collection control inside a form never submits it: its buttons are
@@ -249,7 +236,7 @@ mod test {
 			.set_if_neq(Value::str("done"));
 		let add = *buttons(&mut world).last().unwrap();
 		test_ext::click_world(&mut world, add);
-		document(&mut world, root)
+		test_ext::document_of(&mut world, root)
 			.xpect_eq(value!({ "items": { "done": false } }));
 		// the spent key is cleared, so the next entry starts empty
 		world
@@ -262,7 +249,8 @@ mod test {
 		// the entry's own remove button drops it
 		let remove = buttons(&mut world)[0];
 		test_ext::click_world(&mut world, remove);
-		document(&mut world, root).xpect_eq(value!({ "items": {} }));
+		test_ext::document_of(&mut world, root)
+			.xpect_eq(value!({ "items": {} }));
 	}
 
 	/// An add with nothing typed does nothing, rather than creating an entry
@@ -272,6 +260,7 @@ mod test {
 		let (mut world, root) = build(map_schema(), value!({ "items": {} }));
 		let add = *buttons(&mut world).last().unwrap();
 		test_ext::click_world(&mut world, add);
-		document(&mut world, root).xpect_eq(value!({ "items": {} }));
+		test_ext::document_of(&mut world, root)
+			.xpect_eq(value!({ "items": {} }));
 	}
 }

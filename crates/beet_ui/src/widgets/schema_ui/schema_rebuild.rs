@@ -22,7 +22,7 @@ use bevy::platform::sync::Arc;
 /// a second copy nothing keeps in step, which is the rule the bindings already
 /// follow.
 #[derive(Clone)]
-pub enum SchemaSource {
+pub(in crate::widgets) enum SchemaSource {
 	/// The schema authored on the widget.
 	Authored(ValueSchema),
 	/// The schema the bound document declares at `field`, absent until the
@@ -58,7 +58,7 @@ impl SchemaSource {
 /// arriving at build time rebuilds the moment it lands, and a document-sourced
 /// widget has no generation at all until its document answers one.
 #[derive(Component)]
-pub struct SchemaRebuild {
+pub(in crate::widgets) struct SchemaRebuild {
 	/// Where the schema comes from, re-read on every pass.
 	source: SchemaSource,
 	/// The fully resolved schema the current generation was built from, the
@@ -75,7 +75,7 @@ pub struct SchemaRebuild {
 impl SchemaRebuild {
 	/// Hold `source` and the `build` that renders it, fingerprinted against
 	/// `resolver` as it stands now.
-	pub fn new(
+	pub(in crate::widgets) fn new(
 		resolver: SchemaResolver,
 		source: SchemaSource,
 		build: impl 'static
@@ -99,7 +99,10 @@ impl SchemaRebuild {
 	/// holder alone and [`rebuild_schema_widgets`] spawns its first generation
 	/// when the document answers one — the same shape `ValueRebuild` takes for
 	/// a value that has not synced yet.
-	pub fn holder(self, resolver: SchemaResolver) -> Snippet {
+	pub(in crate::widgets) fn holder(
+		self,
+		resolver: SchemaResolver,
+	) -> Snippet {
 		match self
 			.source
 			.authored()
@@ -177,7 +180,7 @@ pub(in crate::widgets) fn rebuild_schema_widgets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use crate::widgets::test_ext;
+	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
 	#[derive(Reflect)]

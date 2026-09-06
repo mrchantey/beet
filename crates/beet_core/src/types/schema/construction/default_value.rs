@@ -104,7 +104,7 @@ impl ValueSchema {
 				.xmap(Value::List),
 			Self::Map(_) => Value::map(),
 			Self::Enum(schema) => match schema.variants.first() {
-				Some(variant) => variant.default_value(resolver, hops),
+				Some(variant) => variant.default_at(resolver, hops),
 				None => Value::Null,
 			},
 			// a reference is the same zero seen more precisely, so it costs a hop
@@ -120,15 +120,19 @@ impl ValueSchema {
 
 impl VariantSchema {
 	/// This variant as a value: the bare name for a unit variant, else the
-	/// externally tagged `{"Name": zero}` its payload's zero fills.
+	/// externally tagged `{"Name": zero}` its payload's zero fills, following
+	/// each [`ValueSchema::Ref`] through `resolver`.
 	///
 	/// The value an enum control writes when the variant is chosen, and the
 	/// enum's own zero when it is the first variant.
-	pub fn default_value(
-		&self,
-		resolver: SchemaResolver,
-		hops: usize,
-	) -> Value {
+	pub fn default_value_in(&self, resolver: SchemaResolver) -> Value {
+		self.default_at(resolver, 0)
+	}
+
+	/// [`default_value_in`](Self::default_value_in), `hops` counting the
+	/// references already followed to reach this variant, so an enum reached
+	/// through a chain of them shares the one budget.
+	fn default_at(&self, resolver: SchemaResolver, hops: usize) -> Value {
 		match &self.payload {
 			None => Value::Str(self.name.clone()),
 			Some(payload) => {
@@ -274,6 +278,21 @@ mod test {
 			// `Any`, the first variant it declares
 			ValueSchema::Any,
 		);
+	}
+
+	/// A variant's own zero is what an enum control writes when that variant is
+	/// chosen, resolving a payload that names a registered schema.
+	#[crate::test]
+	fn a_variant_zero_resolves_its_payload() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert("TodoItem", ValueSchema::of::<TodoItem>());
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		VariantSchema {
+			name: "Item".into(),
+			payload: Some(ValueSchema::reference("TodoItem")),
+		}
+		.default_value_in(resolver)
+		.xpect_eq(value!({ "Item": { "label": "", "done": false } }));
 	}
 
 	/// A schema whose field names its own type terminates on the hop budget

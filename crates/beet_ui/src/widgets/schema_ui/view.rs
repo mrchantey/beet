@@ -15,8 +15,10 @@
 //!
 //! Three things are reactive, at three grains: a leaf's value through its own
 //! binding, a list's rows through [`ReactiveChildren`], and the layout itself
-//! through [`SchemaRebuild`], so a committed schema edit grows the table a
-//! column.
+//! through the [`SchemaRebuild`] it holds, so a committed schema edit grows the
+//! table a column.
+use super::schema_rebuild::SchemaRebuild;
+use super::schema_rebuild::SchemaSource;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -314,7 +316,7 @@ fn flatten<M>(rows: impl IntoSnippet<M>) -> Snippet {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use crate::widgets::test_ext;
+	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
 	#[derive(Reflect)]

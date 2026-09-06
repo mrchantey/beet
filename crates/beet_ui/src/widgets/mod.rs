@@ -4,7 +4,7 @@
 //! (never `class="…"` strings); the active rule set (Material Design 3 via
 //! `MaterialStylePlugin` today) maps those classes to design tokens.
 //!
-//! Gated behind the `scene` feature; rendering targets and styling come from
+//! Gated behind the `template` feature; rendering targets and styling come from
 //! the same DOM + rule machinery as parsed HTML.
 //!
 //! Grouped by what a widget *is*: [`controls`] the authored form controls,
@@ -41,10 +41,11 @@
 //! a document read out of a store describes its own widgets.
 //!
 //! Their reactivity has three independent grains: a leaf's value through its own
-//! binding, the layout the *schema* decides through [`SchemaRebuild`] (so a
-//! committed schema edit regenerates every form and view of that schema), and
-//! the controls the *value* decides through [`ValueRebuild`] (a list's rows, a
-//! map's entries, an enum's payload, a field whose schema a sibling names).
+//! binding, the layout the *schema* decides (so a committed schema edit
+//! regenerates every form and view of that schema), and the controls the *value*
+//! decides (a list's rows, a map's entries, an enum's payload, a field whose
+//! schema a sibling names). The two rebuild engines behind the last two are
+//! internal to the widget set: an author names a widget, never a rebuild.
 
 mod browser;
 mod chrome;

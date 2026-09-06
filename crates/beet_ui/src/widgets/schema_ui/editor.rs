@@ -339,7 +339,7 @@ fn document_value(world: &World, entity: Entity, role: &str) -> Result<Value> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use crate::widgets::test_ext;
+	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
 	/// `{ label: String }`, the row schema the editor edits.
@@ -441,16 +441,12 @@ mod test {
 		settle(world);
 	}
 
-	fn document(world: &mut World, entity: Entity) -> Value {
-		world.entity(entity).get::<Document>().unwrap().0.clone()
-	}
-
 	/// The [`ValueSchema`] a schema document holds, read back the way any
 	/// consumer does.
 	fn schema_of(world: &mut World, entity: Entity) -> ValueSchema {
 		TypedDocument::new(
 			ValueSchema::type_ref::<ValueSchema>(),
-			document(world, entity),
+			test_ext::document_of(world, entity),
 		)
 		.to_schema()
 		.unwrap()
@@ -498,7 +494,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(ValueSchema::Bool(default()));
 		// every existing row was backfilled
-		document(&mut world, data_doc).xpect_eq(
+		test_ext::document_of(&mut world, data_doc).xpect_eq(
 			value!({ "items": [{ "label": "buy milk", "is_really_difficult": false }] }),
 		);
 		// ...and the table generated from that schema grew the column
@@ -557,19 +553,19 @@ mod test {
 	fn a_required_field_without_a_value_is_refused() {
 		let (mut world, schema_doc, data_doc) = app();
 		let (schema_before, data_before) = (
-			document(&mut world, schema_doc),
-			document(&mut world, data_doc),
+			test_ext::document_of(&mut world, schema_doc),
+			test_ext::document_of(&mut world, data_doc),
 		);
 
 		let refused = with_difficulty(None);
 		apply(&mut world, &refused);
 
 		error(&mut world).xpect_contains("is_really_difficult");
-		document(&mut world, schema_doc).xpect_eq(schema_before);
-		document(&mut world, data_doc).xpect_eq(data_before);
+		test_ext::document_of(&mut world, schema_doc).xpect_eq(schema_before);
+		test_ext::document_of(&mut world, data_doc).xpect_eq(data_before);
 		// the drafted schema stays put, to be fixed and resubmitted
 		let draft = draft(&mut world);
-		document(&mut world, draft)
+		test_ext::document_of(&mut world, draft)
 			.xpect_eq(Value::from_serde(&refused).unwrap());
 	}
 
@@ -580,8 +576,8 @@ mod test {
 	fn a_retype_is_accepted_only_where_the_values_survive() {
 		let (mut world, schema_doc, data_doc) = app();
 		let before = (
-			document(&mut world, schema_doc),
-			document(&mut world, data_doc),
+			test_ext::document_of(&mut world, schema_doc),
+			test_ext::document_of(&mut world, data_doc),
 		);
 		apply(
 			&mut world,
@@ -594,8 +590,8 @@ mod test {
 			.xpect_contains("label")
 			.xpect_contains("computed conversion");
 		(
-			document(&mut world, schema_doc),
-			document(&mut world, data_doc),
+			test_ext::document_of(&mut world, schema_doc),
+			test_ext::document_of(&mut world, data_doc),
 		)
 			.xpect_eq(before);
 
@@ -641,7 +637,8 @@ mod test {
 			.get_field_schema(&FieldPath::new(["label"]))
 			.is_err()
 			.xpect_true();
-		document(&mut world, data_doc).xpect_eq(value!({ "items": [{}] }));
+		test_ext::document_of(&mut world, data_doc)
+			.xpect_eq(value!({ "items": [{}] }));
 	}
 
 	/// The editor is a form over the meta-schema, so the schema document's own
@@ -675,13 +672,14 @@ mod test {
 			.unwrap()
 			.origin()
 			.xpect_eq(schema_doc);
-		document(&mut world, draft).xpect_eq(document(&mut world, schema_doc));
+		test_ext::document_of(&mut world, draft)
+			.xpect_eq(test_ext::document_of(&mut world, schema_doc));
 
-		let before = document(&mut world, schema_doc);
+		let before = test_ext::document_of(&mut world, schema_doc);
 		world.entity_mut(draft).get_mut::<Document>().unwrap().0 =
 			Value::from_serde(&todo_schema(vec![])).unwrap();
 		settle(&mut world);
-		document(&mut world, schema_doc).xpect_eq(before);
+		test_ext::document_of(&mut world, schema_doc).xpect_eq(before);
 	}
 
 	/// Revert is the way back out of a draft, and it is a button rather than an
@@ -701,7 +699,8 @@ mod test {
 			.next()
 			.unwrap();
 		test_ext::click_world(&mut world, revert);
-		document(&mut world, draft).xpect_eq(document(&mut world, schema_doc));
+		test_ext::document_of(&mut world, draft)
+			.xpect_eq(test_ext::document_of(&mut world, schema_doc));
 	}
 
 	/// The same loop driven by the terminal: press the `fields` list's own add

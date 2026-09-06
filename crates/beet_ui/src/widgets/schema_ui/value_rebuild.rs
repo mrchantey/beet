@@ -1,11 +1,11 @@
 //! [`ValueRebuild`]: regenerating a value-generated subtree when the shape of
 //! the value it was generated from changes.
 //!
-//! [`SchemaRebuild`](super::SchemaRebuild)'s twin, and the third grain of a
-//! schema-driven widget's reactivity. A leaf's *value* rides its own binding and
-//! a subtree's *schema* rides the registry; what neither covers is a control
-//! whose very shape is decided by the value it edits: a list's rows, a map's
-//! entries, an enum's payload, and a field whose schema a sibling names
+//! [`SchemaRebuild`](super::schema_rebuild::SchemaRebuild)'s twin, and the third
+//! grain of a schema-driven widget's reactivity. A leaf's *value* rides its own
+//! binding and a subtree's *schema* rides the registry; what neither covers is a
+//! control whose very shape is decided by the value it edits: a list's rows, a
+//! map's entries, an enum's payload, and a field whose schema a sibling names
 //! ([`SchemaRef::AtField`]).
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
@@ -29,7 +29,7 @@ use bevy::platform::sync::Arc;
 /// [`ValueSchema::Ref`] only the registry can answer, and the registry is a
 /// resource this system holds rather than something a closure can own.
 #[derive(Component)]
-pub struct ValueRebuild {
+pub(in crate::widgets) struct ValueRebuild {
 	/// What about the value decides the subtree, ie the fingerprint a rebuild is
 	/// decided by.
 	shape: Arc<dyn Fn(&Value) -> SmolStr + Send + Sync>,
@@ -44,7 +44,7 @@ pub struct ValueRebuild {
 
 impl ValueRebuild {
 	/// Hold the `build` that renders a value, keyed on the `shape` of it.
-	pub fn new(
+	pub(in crate::widgets) fn new(
 		shape: impl 'static + Send + Sync + Fn(&Value) -> SmolStr,
 		build: impl 'static
 		+ Send
@@ -91,8 +91,9 @@ pub(in crate::widgets) fn rebuild_value_widgets(
 
 #[cfg(test)]
 mod test {
+	use super::ValueRebuild;
 	use crate::prelude::*;
-	use crate::widgets::test_ext;
+	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
 	/// A holder keyed on a list's length: an appended item regenerates the

@@ -1,9 +1,11 @@
-//! Shared harness for the widget tests: HTML renders through the substrate,
-//! and (under `tui`) a live app with the focus/keyboard/pointer drivers, so an
-//! interaction test drives the same systems the real terminal does.
-use super::schema_ui::collection_edit::CollectionButton;
-use super::schema_ui::collection_edit::CollectionEdit;
-use super::schema_ui::variant_select::VariantSelect;
+//! Shared harness for the widget tests: HTML and charcell renders through the
+//! substrate, the worlds a control needs to run in, and (under `tui`) a live app
+//! with the focus/keyboard/pointer drivers, so an interaction test drives the
+//! same systems the real terminal does.
+//!
+//! Generic to the widget set. The helpers that know what a *schema* generated
+//! live in [`schema_ui::test_ext`](super::schema_ui::test_ext), which layers
+//! onto this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -131,64 +133,6 @@ fn find_elements(world: &World, entity: Entity, tag: &str) -> Vec<Entity> {
 				.flat_map(|child| find_elements(world, child, tag)),
 		)
 		.collect()
-}
-
-/// The one button that submits the form it sits in, ie the only one no
-/// `type="button"` excludes ([`Button`]'s `action`).
-pub fn submit_button(world: &mut World) -> Entity {
-	let actions = world
-		.query_once::<(&Attribute, &Value, &AttributeOf)>()
-		.into_iter()
-		.filter(|(attribute, value, _)| {
-			attribute.as_str() == "type"
-				&& value
-					.as_str()
-					.map(|value| value == "button")
-					.unwrap_or_default()
-		})
-		.map(|(_, _, attribute_of)| **attribute_of)
-		.collect::<HashSet<_>>();
-	elements_in(world, "button")
-		.into_iter()
-		.find(|button| !actions.contains(button))
-		.expect("no submit button")
-}
-
-/// The generated control bound to `path`, ie the leaf a form emitted for it.
-pub fn bound(world: &mut World, path: &str) -> Entity {
-	world
-		.query_once::<(Entity, &ResolvedFieldPath)>()
-		.into_iter()
-		.find(|(_, resolved)| resolved.field_path.to_string() == path)
-		.map(|(entity, _)| entity)
-		.unwrap_or_else(|| panic!("no control is bound to `{path}`"))
-}
-
-/// The generated variant `<select>` choosing the enum at `path`, which binds no
-/// field of its own (its value is the variant name).
-pub fn variant_select(world: &mut World, path: &str) -> Entity {
-	world
-		.query_once::<(Entity, &VariantSelect)>()
-		.into_iter()
-		.find(|(_, select)| select.field.field_path.to_string() == path)
-		.map(|(entity, _)| entity)
-		.unwrap_or_else(|| panic!("no variant select chooses `{path}`"))
-}
-
-/// The generated add button of the collection control bound to `path`.
-pub fn collection_add(world: &mut World, path: &str) -> Entity {
-	world
-		.query_once::<(Entity, &CollectionButton)>()
-		.into_iter()
-		.find(|(_, button)| {
-			button.field.field_path.to_string() == path
-				&& matches!(
-					button.edit,
-					CollectionEdit::Push(_) | CollectionEdit::Insert(_)
-				)
-		})
-		.map(|(entity, _)| entity)
-		.unwrap_or_else(|| panic!("no collection add button edits `{path}`"))
 }
 
 /// Run the frames a document-driven rebuild needs: the edit, the syncs it
