@@ -93,7 +93,7 @@ pub(crate) fn parse_literal(cursor: &mut Cursor) -> Result<DataLiteral> {
 /// entity name, `::` separates it from the `Type.field` path
 /// (`@entity:slider::Slider.value`). The name is a `bx:ref` name or a reserved
 /// well-known name (`BuildRoot`, `SnippetRoot`, `PageRoot`, `Router`);
-/// reservation is the resolver's concern ([`ReservedRef`](super::resolve::ReservedRef)),
+/// reservation is the resolver's concern (`ReservedRef`),
 /// the grammar does not distinguish them.
 pub(crate) fn parse_binding(cursor: &mut Cursor) -> Result<BindingExpr> {
 	cursor.eat("@");

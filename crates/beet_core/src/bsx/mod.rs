@@ -5,7 +5,7 @@
 //! directives); HTML is BSX with that surface disabled. The parser is
 //! XML-inspired markup, not "an HTML subset": one grammar, with HTML the markup
 //! it accepts when the extra surface is switched off. It builds a
-//! [`BsxNode`](ast::BsxNode) syntax tree, resolved into a document-wired entity
+//! [`BsxNode`] syntax tree, resolved into a document-wired entity
 //! tree through the template substrate by [`BsxTemplate`], so a `.bsx` file
 //! produces trees identical to what `rsx!` lowers to.
 //!
@@ -14,11 +14,13 @@
 //! dispatch also stays in `beet_ui`, delegating BSX parsing to
 //! [`BsxNode::parse_document`] + [`BsxTemplate`].
 //!
-//! Internal split: the syntax tree ([`ast`]), the cursor
-//! ([`cursor`]), the markup parser ([`parse`]), the value grammar ([`value`]),
-//! literal-to-reflect resolution ([`reflect`]), AST-to-world resolution
-//! ([`resolve`]), the event/verb seam ([`events`]), and the BSX-template
-//! registry ([`registry`]).
+//! Internal split, one directory per stage: source text to syntax tree in
+//! `parse` (the cursor, the markup parser, the value grammar, the
+//! source-format registry), literal to reflected value in `reflect` (with the
+//! root declaration block and prop-schema verification), and syntax tree to
+//! world in `resolve` (the build walk, the event/verb seam, and the resolver
+//! hooks a host installs into it). Alongside them sit the BSX-template registry
+//! ([`BsxTemplateRegistry`]) and the entry-document front-end.
 //!
 //! # Syntax
 //!
@@ -53,7 +55,7 @@
 //!   position
 //! - `@entity:Name::` retargets a component binding to a `bx:ref` named entity;
 //!   the names `BuildRoot`, `SnippetRoot`, `PageRoot` and `Router` are reserved
-//!   ([`ReservedRef`]) for well-known entities (the latter two resolved lazily
+//!   (`ReservedRef`) for well-known entities (the latter two resolved lazily
 //!   each sync pass) and may not be shadowed
 //! - `@prop:` the enclosing `.bsx` template's props store, materialized from
 //!   the caller's tag attributes (a binding-valued prop chains reactively)
@@ -64,7 +66,7 @@
 //! a binding on the same entity. Event directives are a verb call:
 //! `bx:click=increment{ field: @doc:count, amount: 3 }` runs the registered
 //! `increment` verb with its named arguments against the host entity, the verb
-//! writing the bound source directly ([`events`]). No mirror is lowered onto the
+//! writing the bound source directly (see [`VerbRegistry`]). No mirror is lowered onto the
 //! host: the verb mutates the real document/resource and document-sync fans the
 //! change out to display bindings.
 //!
@@ -134,55 +136,25 @@
 //!
 //! The remaining surface (bare-position component spreads `{(A, B)}`, the `$ref`
 //! entity references, enum/struct/list literals) lives in the value grammar
-//! ([`value`]) and AST-to-world resolution ([`resolve`]).
+//! (`parse`) and AST-to-world resolution (`resolve`).
+//!
+//! [`Document`]: crate::prelude::Document
+//! [`Element`]: crate::prelude::Element
+//! [`FieldRef`]: crate::prelude::FieldRef
+//! [`ReflectFieldRef`]: crate::prelude::ReflectFieldRef
+//! [`ResourceFieldRef`]: crate::prelude::ResourceFieldRef
+//! [`UnregisteredTag`]: crate::prelude::UnregisteredTag
+//! [`Value`]: crate::prelude::Value
 
-mod ast;
-mod cursor;
+mod bsx_plugin;
 mod entry;
-mod events;
 mod parse;
 mod reflect;
 mod registry;
-#[cfg(feature = "bevy_async")]
-mod remote;
 mod resolve;
-mod root_declarations;
-mod schema;
-mod style_resolver;
-mod tag_resolver;
-mod template_format;
-mod value;
 
-pub use ast::*;
-pub use events::*;
+pub use bsx_plugin::*;
 pub use parse::*;
+pub use reflect::*;
 pub use registry::*;
-#[cfg(feature = "bevy_async")]
-pub(crate) use remote::*;
 pub use resolve::*;
-pub use root_declarations::*;
-pub(crate) use schema::*;
-pub use style_resolver::*;
-pub use tag_resolver::*;
-pub use template_format::*;
-
-use crate::prelude::*;
-
-/// Registers the BSX event/verb seam resources so
-/// `bx:<event>=verb{ arg: value, .. }` resolves at build time.
-///
-/// Both registries are **empty by default**: core knows no concrete event or
-/// verb. An app (or `beet_ui`'s default registration) installs the concrete
-/// `click` event installer and the example verb set.
-pub struct BsxPlugin;
-
-impl Plugin for BsxPlugin {
-	fn build(&self, app: &mut App) {
-		app.init_resource::<EventRegistry>()
-			.init_resource::<VerbRegistry>()
-			.init_resource::<BsxTagResolvers>()
-			.init_resource::<StyleResolver>()
-			.init_resource::<TemplateFormats>()
-			.init_resource::<BsxTemplateRegistry>();
-	}
-}

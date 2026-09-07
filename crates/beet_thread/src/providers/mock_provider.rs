@@ -23,7 +23,9 @@ fn next_id(prefix: &str) -> String {
 ///
 /// - **With tools**: Calls the first tool. Its arguments are the next entry of
 ///   [`tool_arguments`](Self::tool_arguments) (cycled, looping) when that is set,
-///   else schema defaults (strings become "", integers become 0, etc.)
+///   else the zero of its parameter schema ([`default_arguments`](Self::default_arguments)):
+///   a required string becomes `""`, a required integer `0`, an optional field
+///   is absent
 /// - **Without tools**: Returns the user's input prefixed with "you said:"
 #[derive(Debug, Clone, Default, PartialEq, Eq, Component)]
 #[component(on_add = hook_ext::entity_hook(|entity| {
@@ -68,43 +70,37 @@ impl MockPostStreamer {
 		}
 	}
 
-	/// Generates default arguments for a tool based on its parameter schema.
-	fn generate_default_arguments(schema: &JsonSchema) -> String {
-		// Convert to serde_json::Value for traversal and serialization
-		let json_schema = schema.clone().into_inner().into_json();
-		let Some(properties) =
-			json_schema.get("properties").and_then(|p| p.as_object())
-		else {
-			return "{}".to_string();
-		};
-
-		let mut args = serde_json::Map::new();
-		for (name, field_schema) in properties {
-			let default_value = Self::default_value_for_schema(field_schema);
-			args.insert(name.clone(), default_value);
-		}
-		serde_json::to_string(&serde_json::Value::Object(args))
-			.unwrap_or_else(|_| "{}".to_string())
-	}
-
-	/// Generates a default value based on JSON Schema type.
-	fn default_value_for_schema(
-		schema: &serde_json::Value,
-	) -> serde_json::Value {
-		match schema
-			.get("type")
-			.and_then(|t| t.as_str())
-			.unwrap_or("string")
+	/// The default arguments for a tool call: the zero of its parameter schema,
+	/// as a JSON object.
+	///
+	/// Reads the exported JSON Schema back into a [`ValueSchema`] and takes its
+	/// [`default_value_in`](ValueSchema::default_value_in), so the mock answers
+	/// whatever the schema layer already defines a zero to be: a field's own
+	/// [`OnMissing::Default`], a declared numeric floor, an enum's first variant
+	/// carrying its payload's zero.
+	///
+	/// The schema's `$defs` seed a [`SchemaRegistry`] first, so a nested composite
+	/// property (which the exporter hoists into `$defs` and references with a
+	/// `$ref`) resolves to that composite's real default rather than a wildcard.
+	///
+	/// # Errors
+	///
+	/// Returns an error if the tool's schema is not a readable JSON Schema.
+	fn default_arguments(schema: &JsonSchema) -> Result<String> {
+		let json = schema.clone().into_inner().into_json();
+		let mut registry = SchemaRegistry::new();
+		if let Some(defs) = json.get("$defs").and_then(|defs| defs.as_object())
 		{
-			"string" => serde_json::Value::String(String::new()),
-			"integer" => serde_json::Value::Number(0.into()),
-			"number" => serde_json::json!(0.0),
-			"boolean" => serde_json::Value::Bool(false),
-			"array" => serde_json::Value::Array(vec![]),
-			"object" => serde_json::Value::Object(serde_json::Map::new()),
-			"null" => serde_json::Value::Null,
-			_ => serde_json::Value::String(String::new()),
+			for (name, def) in defs {
+				registry
+					.insert(name.as_str(), ValueSchema::from_json_value(def)?);
+			}
 		}
+		ValueSchema::from_json_value(&json)?
+			.default_value_in(SchemaResolver::default().with_schemas(&registry))
+			.into_json()
+			.xmap(|json| serde_json::to_string(&json))?
+			.xok()
 	}
 }
 
@@ -166,7 +162,7 @@ impl PostStreamer for MockPostStreamer {
 			let posts = if let Some((name, params)) = first_tool {
 				// cycle a canned payload if given, else schema defaults.
 				let arguments = if tool_arguments.is_empty() {
-					Self::generate_default_arguments(&params)
+					Self::default_arguments(&params)?
 				} else {
 					let index = TOOL_ARG_CURSOR.fetch_add(1, Ordering::SeqCst)
 						as usize % tool_arguments.len();
@@ -251,7 +247,8 @@ mod test {
 				"properties": {
 					"name": { "type": "string" },
 					"age": { "type": "integer" }
-				}
+				},
+				"required": ["name", "age"]
 			}),
 		)
 		.into();
@@ -336,5 +333,53 @@ mod test {
 		.unwrap()
 		.to_string()
 		.xpect_eq("Custom answer");
+	}
+
+	/// The exporter hoists a named composite into `$defs` and references it with
+	/// a `$ref`, so a nested struct property only has a real default if the
+	/// `$defs` are resolved: unresolved it is a wildcard, ie null.
+	#[beet_core::test]
+	async fn nested_composite_default_resolves_through_defs() {
+		let tool: ToolDefinition = FunctionToolDefinition::new(
+			"place",
+			"Place a marker",
+			serde_json::json!({
+				"type": "object",
+				"properties": {
+					"label": { "type": "string" },
+					"at": { "$ref": "#/$defs/Point" }
+				},
+				"required": ["label", "at"],
+				"$defs": {
+					"Point": {
+						"type": "object",
+						"properties": {
+							"x": { "type": "integer" },
+							"y": { "type": "integer" }
+						},
+						"required": ["x", "y"]
+					}
+				}
+			}),
+		)
+		.into();
+
+		let args = Post::run_oneshot(children![
+			(Actor::user(), children![Post::spawn("place one")]),
+			(Actor::agent(), MockPostStreamer::default(), children![tool]),
+		])
+		.await
+		.unwrap()
+		.into_iter()
+		.find_map(|post| match post.as_agent_post() {
+			AgentPost::FunctionCall(fc) => Some(fc.arguments().to_string()),
+			_ => None,
+		})
+		.unwrap();
+
+		let parsed: serde_json::Value = serde_json::from_str(&args).unwrap();
+		parsed["label"].as_str().unwrap().xpect_eq("");
+		parsed["at"]["x"].as_i64().unwrap().xpect_eq(0);
+		parsed["at"]["y"].as_i64().unwrap().xpect_eq(0);
 	}
 }

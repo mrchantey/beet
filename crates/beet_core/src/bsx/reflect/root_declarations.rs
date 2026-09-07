@@ -1,8 +1,7 @@
 //! The components a document declares at its ROOT, read without building it.
 
-use super::ast::*;
-use super::reflect::*;
-use super::resolve::insert_component;
+use super::literal::*;
+use crate::bsx::resolve::insert_component;
 use crate::prelude::*;
 use bevy::ecs::reflect::ReflectComponent;
 use bevy::reflect::PartialReflect;

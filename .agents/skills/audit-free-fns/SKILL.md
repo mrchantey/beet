@@ -30,7 +30,7 @@ A module qualifies as a namespace when it is a coherent API over one domain and 
 - `beet_core/src/terminal/escape.rs` — `escape::RESET`, `escape::cursor_goto(..)`: raw ANSI/VT100 sequences, already called module-qualified at every site
 - `beet_thread/src/streaming/completions_mapper.rs` and `beet_thread/src/streaming/o11s_mapper.rs` — `completions_mapper::response_to_partial(..)`: one module per provider wire format, and the two deliberately share fn names, which only module-qualification disambiguates
 - `beet_router/src/scene_routes/render_action.rs` — `render_action::pure_route(path, handler)`: the render-route constructors, one per handler kind, called module-qualified in- and cross-crate
-- `beet_router/src/router/route.rs` — `route::new(path, bundle)`, `route::exchange(..)`: the Rust twin of the `<Route>` template. A route is a child of a router, not a router, so hanging these off `Router` reads as dissonant; the namespace is the fix
+- `beet_router/src/router/model/route.rs` — `route::new(path, bundle)`, `route::exchange(..)`: the Rust twin of the `<Route>` template. A route is a child of a router, not a router, so hanging these off `Router` reads as dissonant; the namespace is the fix
 - `beet_net/src/server/stream_sniff.rs` — `stream_sniff::write_and_close(..)`: classify an accepted connection and answer it, already the call idiom at every site
 - `beet_net/src/mdns/wire.rs` — `wire::build_ptr_query(..)`, `wire::MDNS_PORT`: the mDNS wire format (constants + codec), one layer of the protocol
 - `beet_infra/src/terra/tofu.rs` — `tofu::apply(&dir)`: one fn per `tofu` subcommand, already the call idiom at every site

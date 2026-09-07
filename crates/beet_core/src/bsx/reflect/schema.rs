@@ -15,8 +15,7 @@
 //! error that rides [`TemplateError`](beet_core::prelude::TemplateError) on the
 //! root rather than panicking.
 
-use super::ast::*;
-use super::resolve::is_directive;
+use crate::bsx::resolve::is_directive;
 use crate::prelude::*;
 use bevy::ecs::template::TemplateContext;
 
@@ -30,7 +29,7 @@ use bevy::ecs::template::TemplateContext;
 /// A tag with no registered schema, or props that are not plain values (an entity
 /// reference, a field binding), is left unverified, since those resolve by other
 /// means.
-pub(crate) fn verify_props(
+pub(in crate::bsx) fn verify_props(
 	el: &BsxElement,
 	tag: &str,
 	app_registry: &AppTypeRegistry,
@@ -49,7 +48,7 @@ pub(crate) fn verify_props(
 /// Resolves composable [`SchemaRef::Name`]s against the world's
 /// [`SchemaRegistry`], then validates. A missing required field or type mismatch
 /// is an `Err` that rides the root's `TemplateError`.
-pub(crate) fn verify_props_against(
+pub(in crate::bsx) fn verify_props_against(
 	el: &BsxElement,
 	tag: &str,
 	schema: &ValueSchema,
@@ -123,7 +122,7 @@ fn coerce_bool_props(schema: &ValueSchema, props: &mut Value) {
 /// validation and as a props store's initial document (see
 /// `resolve.rs::apply_props_store`). Directives, spreads, references and entity
 /// refs are skipped, as they are not plain prop values.
-pub(super) fn props_value(el: &BsxElement) -> Value {
+pub(in crate::bsx) fn props_value(el: &BsxElement) -> Value {
 	let mut map = Map::default();
 	for attr in &el.attributes {
 		if is_directive(&attr.key) || attr.key.is_empty() {
@@ -222,7 +221,7 @@ fn variant_name(name: &str) -> &str { name.rsplit("::").next().unwrap_or(name) }
 /// A template's `bx:schema` declaration: an inline JSON schema, a remote schema
 /// referenced by `src` (resolved asynchronously), or none.
 #[derive(Debug, Clone, Default)]
-pub(crate) enum SchemaDirective {
+pub(in crate::bsx) enum SchemaDirective {
 	/// No `bx:schema` block.
 	#[default]
 	None,
@@ -234,7 +233,9 @@ pub(crate) enum SchemaDirective {
 
 /// Extract the `bx:schema` directive declared among `nodes`: the first
 /// `<script bx:schema>` block, inline (a JSON body) or remote (a `src` url).
-pub(crate) fn extract_schema_directive(nodes: &[BsxNode]) -> SchemaDirective {
+pub(in crate::bsx) fn extract_schema_directive(
+	nodes: &[BsxNode],
+) -> SchemaDirective {
 	nodes
 		.iter()
 		.find_map(|node| {
@@ -273,7 +274,7 @@ fn string_attr(el: &BsxElement, key: &str) -> Option<String> {
 
 /// Remove every `<script bx:schema>` block from `nodes`, so a template's body
 /// does not render its schema declaration.
-pub(crate) fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
+pub(in crate::bsx) fn strip_schema_blocks(nodes: Vec<BsxNode>) -> Vec<BsxNode> {
 	nodes
 		.into_iter()
 		.filter(

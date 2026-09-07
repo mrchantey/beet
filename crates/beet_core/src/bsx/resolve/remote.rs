@@ -26,7 +26,7 @@ use bevy::ecs::template::TemplateContext;
 ///
 /// The async resolution + validation is therefore registered into the
 /// `Ready` pending set, exactly as assets are.
-pub(crate) fn register_remote_schema(
+pub(super) fn register_remote_schema(
 	name: SmolStr,
 	url: SmolStr,
 	cx: &mut TemplateContext,
@@ -108,7 +108,7 @@ async fn fetch_remote_schema(_url: &str) -> ValueSchema { ValueSchema::Any }
 /// asynchronously and resolved through the same registry as `<path::to::X>`.
 /// This is the stub: it parks a [`PendingGuard`] and spawns a task that resolves
 /// it, so a real fetch slots in later without rework.
-pub(crate) fn register_remote_template(
+pub(super) fn register_remote_template(
 	src: SmolStr,
 	cx: &mut TemplateContext,
 ) -> Result {

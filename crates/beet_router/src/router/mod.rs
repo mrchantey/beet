@@ -1,96 +1,17 @@
-// no_std core: route tree, path patterns, standalone middleware, and the
-// server-action client.
-mod cors;
-pub use cors::*;
-mod no_cache;
-pub use no_cache::*;
-mod cache_headers;
-pub use cache_headers::*;
-mod exchange_overload;
-pub use exchange_overload::*;
-mod exchange_sequence;
-/// The Rust route constructors: `route::new`, `route::exchange`, `route::fallback`.
-pub mod route;
-pub use exchange_sequence::*;
-// the `<FieldRoute>` document-field route front-end. std-only: it names the
-// `beet_ui` document actions, which ride `dep:beet_ui`.
-#[cfg(feature = "std")]
-mod field_route;
-#[cfg(feature = "std")]
-pub use field_route::*;
-// the `ExchangeScript` route marker, the `<ScriptRoute>` front-end, and the
-// `ExchangeScriptElement` console-capturing `<script>` entry action.
-#[cfg(feature = "scripting")]
-mod exchange_script;
-#[cfg(feature = "scripting")]
-pub use exchange_script::*;
-// the `<Template src>` include: needs the BSX tag seam + the unified loader. It
-// reads through the store as an async pending dependency, so it relies on the
-// async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).
-#[cfg(all(feature = "bsx", feature = "template_serde"))]
-mod template_include;
-#[cfg(all(feature = "bsx", feature = "template_serde"))]
-pub(crate) use template_include::*;
-mod request_logger;
-pub use request_logger::*;
-mod require_features;
-pub(crate) use require_features::*;
-mod interrupt;
-pub use interrupt::*;
-// the article chrome (`<ArticleHeader/>`, `<YouTubeEmbed/>`) a layout places
-// above a post's body. std-only: it renders through the beet_ui widget layer.
-#[cfg(feature = "std")]
-mod article_header;
-#[cfg(feature = "std")]
-pub use article_header::*;
-mod redirect;
-pub use redirect::*;
-mod request_context;
-pub use request_context::*;
-mod middleware;
-pub use middleware::*;
-mod route_tree;
-pub use route_tree::*;
-mod server_action_client;
-pub use server_action_client::*;
+//! The url space and what runs in it, in four groups: the [`model`] a request is
+//! matched against, the [`dispatch`] that runs it, the [`policy`] middleware
+//! wrapped around it, and the [`site`] chrome a page route renders through.
+//!
+//! The no_std core is `model` + `dispatch` + `policy`: the route tree, path
+//! patterns, standalone middleware, and the server-action client. `site` is
+//! std-only throughout, being built on the `beet_ui` scene pipeline.
 
-// The `Router` dispatch action and the route-building `RouterPlugin` are shared
-// across std and no_std (one `Router` type, one plugin). The single builder that
-// assembles them with the standard middleware and app routes is `Router::with_defaults`
-// (in `extra`). The std-only scene/help rendering pipeline stays feature-gated
-// inside these and in the `help`/`sidebar` modules below; the no_std build falls
-// back to a plain-text route listing.
-mod router;
-pub use router::*;
-mod router_plugin;
-pub use router_plugin::*;
+mod dispatch;
+mod model;
+mod policy;
+mod site;
 
-// std-only: the help/sidebar rendering built on the beet_ui scene pipeline.
-#[cfg(feature = "std")]
-mod help;
-#[cfg(feature = "std")]
-pub use help::*;
-#[cfg(feature = "std")]
-mod layout;
-#[cfg(feature = "std")]
-pub use layout::*;
-#[cfg(feature = "std")]
-mod route_index;
-#[cfg(feature = "std")]
-pub use route_index::*;
-#[cfg(feature = "std")]
-mod sidebar;
-#[cfg(feature = "std")]
-pub use sidebar::*;
-#[cfg(feature = "std")]
-mod site_layout;
-#[cfg(feature = "std")]
-pub use site_layout::*;
-// the browser-wasm page templates `<Wasm>` + `<MainBsx>`: serve-side, building a
-// page that boots a wasm `beet` binary and references its `.bsx` program. Plain
-// synchronous templates, so they render inside a route's content (std-gated like
-// the rest of the render pipeline).
-#[cfg(feature = "std")]
-mod wasm;
-#[cfg(feature = "std")]
-pub use wasm::*;
+pub use dispatch::*;
+pub use model::*;
+pub use policy::*;
+pub use site::*;

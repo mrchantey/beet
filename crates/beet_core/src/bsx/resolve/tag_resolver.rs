@@ -12,7 +12,6 @@
 //! lives in a higher crate that core cannot reference. A handler closes that gap
 //! without core depending on the concrete type.
 
-use super::ast::*;
 use crate::prelude::*;
 use alloc::sync::Arc;
 

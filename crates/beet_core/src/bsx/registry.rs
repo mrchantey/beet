@@ -13,9 +13,8 @@
 //! `BlobStore` and hands each pair here. The source format is pluggable per file
 //! type via [`TemplateFormats`]: `.bsx` parses through the markup grammar, `.js`
 //! wraps in a `<script>`. A `<script type="json" bx:schema>` block in a `.bsx`
-//! declares the template's prop schema (see [`super::schema`]).
+//! declares the template's prop schema (see [`super::reflect::schema`]).
 
-use super::ast::*;
 use crate::prelude::*;
 
 /// An in-memory registry mapping a BSX template's module path (eg
@@ -47,16 +46,16 @@ impl BsxTemplateRegistry {
 	/// `bx:schema` block (inline or remote) as its schema.
 	pub fn insert(&mut self, name: impl Into<SmolStr>, nodes: Vec<BsxNode>) {
 		let (schema, remote_schema) =
-			match super::schema::extract_schema_directive(&nodes) {
-				super::schema::SchemaDirective::Inline(schema) => {
+			match super::reflect::schema::extract_schema_directive(&nodes) {
+				super::reflect::schema::SchemaDirective::Inline(schema) => {
 					(Some(schema), None)
 				}
-				super::schema::SchemaDirective::Remote(src) => {
+				super::reflect::schema::SchemaDirective::Remote(src) => {
 					(None, Some(src))
 				}
-				super::schema::SchemaDirective::None => (None, None),
+				super::reflect::schema::SchemaDirective::None => (None, None),
 			};
-		let nodes = super::schema::strip_schema_blocks(nodes);
+		let nodes = super::reflect::schema::strip_schema_blocks(nodes);
 		self.templates.insert(name.into(), BsxTemplateDef {
 			nodes,
 			schema,

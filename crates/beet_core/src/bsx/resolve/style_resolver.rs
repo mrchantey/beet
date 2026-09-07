@@ -11,7 +11,6 @@
 //! The seam exists because the declaration grammar and the `RuleSet` live in a
 //! higher crate that core cannot reference, exactly as for `<Rule>`.
 
-use super::ast::*;
 use crate::prelude::*;
 use alloc::sync::Arc;
 

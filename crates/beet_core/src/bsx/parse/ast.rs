@@ -5,7 +5,7 @@
 //! raw tag, its attributes (each a key plus an [`AttrValue`]), and its children.
 //! The value grammar ([`DataLiteral`], [`ValueExpr`]) is shared by attribute
 //! values, text-position `{..}` blocks, and bare-position spreads. Resolution
-//! ([`super::resolve`]) walks this tree; type inference happens there, against
+//! ([`crate::bsx::resolve`]) walks this tree; type inference happens there, against
 //! the target's `TypeInfo`, not here.
 
 use crate::prelude::*;
