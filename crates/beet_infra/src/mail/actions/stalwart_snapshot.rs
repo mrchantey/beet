@@ -11,7 +11,9 @@ use serde_json::json;
 ///
 /// The step belongs immediately before `<TofuApply/>`. A first deploy has no
 /// volume yet and is skipped; later deploys wait for a complete snapshot before
-/// an apply can replace the instance or otherwise change its attachment.
+/// an apply can replace the instance or otherwise change its attachment. A
+/// retry within one deploy reuses the snapshot that deploy already took, found
+/// by its own tag ([`reusable`](Self::reusable)).
 ///
 /// This is an INTERLOCK, not a backup schedule. It fires when a deploy is about
 /// to do something dangerous, so its depth is how many recent deploys you can
@@ -80,6 +82,39 @@ impl StalwartSnapshot {
 			format!("Name=tag:Project,Values={}", stack.app_name()),
 			format!("Name=tag:Stage,Values={}", stack.stage()),
 		]
+	}
+
+	/// The tag filter narrowing that lineage to one deploy's snapshot.
+	fn deploy_filter(deploy_id: &str) -> String {
+		format!("Name=tag:{},Values={deploy_id}", Self::DEPLOY_TAG)
+	}
+
+	/// The snapshot an earlier attempt of THIS deploy already took, if any.
+	///
+	/// `CreateSnapshot` has no idempotency token — only the multi-volume
+	/// `CreateSnapshots` does — so a retry is made idempotent by reading back
+	/// the [`DEPLOY_TAG`](Self::DEPLOY_TAG) the step writes. The deploy id is
+	/// stable across the whole sequence, so a re-run finds its own snapshot
+	/// instead of taking a second. An `error` snapshot is not a backup and is
+	/// passed over, so a retry after a failed capture takes a fresh one.
+	fn reusable(body: &str) -> Result<Option<String>> {
+		let listing: Value = serde_json::from_str(body)?;
+		let mut snapshots = listing["Snapshots"]
+			.as_array()
+			.into_iter()
+			.flatten()
+			.filter_map(|snapshot| {
+				let id = snapshot["SnapshotId"].as_str()?;
+				let started = snapshot["StartTime"].as_str()?;
+				matches!(
+					snapshot["State"].as_str(),
+					Some("completed" | "pending")
+				)
+				.then(|| (started.to_string(), id.to_string()))
+			})
+			.collect::<Vec<_>>();
+		snapshots.sort_by(|left, right| right.0.cmp(&left.0));
+		snapshots.into_iter().next().map(|(_, id)| id).xok()
 	}
 
 	fn volume_id(body: &str) -> Result<Option<String>> {
@@ -191,34 +226,61 @@ pub async fn StalwartSnapshotAction(
 		&mail.mail_box,
 		&deploy_id,
 	);
-	info!("snapshotting Stalwart data volume {volume_id}");
-	let snapshot_id = aws_cli_ext::ec2(region, [
-		"create-snapshot",
-		"--volume-id",
-		&volume_id,
-		// a retry within one deploy reuses the snapshot rather than taking a
-		// second, since the deploy id is stable across the whole sequence
-		"--client-token",
-		&deploy_id,
-		"--description",
-		&description,
-		"--tag-specifications",
-		&tags,
-		"--query",
-		"SnapshotId",
+	// a retry within one deploy reuses its own snapshot rather than taking a
+	// second: the deploy id is stable across the whole sequence and rides the
+	// snapshot as a tag, which is the only idempotency `CreateSnapshot` offers
+	let lineage =
+		StalwartSnapshot::snapshot_filters(&mail.stack, &mail.mail_box);
+	let deploy_filter = StalwartSnapshot::deploy_filter(&deploy_id);
+	let reusable = aws_cli_ext::ec2(region, [
+		"describe-snapshots",
+		"--owner-ids",
+		"self",
+		"--filters",
+		&lineage[0],
+		&lineage[1],
+		&lineage[2],
+		&deploy_filter,
 		"--output",
-		"text",
+		"json",
 	])
 	.run_async_stdout()
 	.await?
-	.trim()
-	.to_string();
-	if snapshot_id.is_empty() || snapshot_id == "None" {
-		bevybail!(
-			"AWS created no snapshot id for Stalwart data volume {}",
-			mail.mail_box.data_volume_tag_name()
-		);
-	}
+	.xmap(|body| StalwartSnapshot::reusable(&body))?;
+
+	let snapshot_id = match reusable {
+		Some(snapshot_id) => {
+			info!("reusing Stalwart snapshot {snapshot_id} from this deploy");
+			snapshot_id
+		}
+		None => {
+			info!("snapshotting Stalwart data volume {volume_id}");
+			let snapshot_id = aws_cli_ext::ec2(region, [
+				"create-snapshot",
+				"--volume-id",
+				&volume_id,
+				"--description",
+				&description,
+				"--tag-specifications",
+				&tags,
+				"--query",
+				"SnapshotId",
+				"--output",
+				"text",
+			])
+			.run_async_stdout()
+			.await?
+			.trim()
+			.to_string();
+			if snapshot_id.is_empty() || snapshot_id == "None" {
+				bevybail!(
+					"AWS created no snapshot id for Stalwart data volume {}",
+					mail.mail_box.data_volume_tag_name()
+				);
+			}
+			snapshot_id
+		}
+	};
 
 	info!("waiting for Stalwart snapshot {snapshot_id}");
 	aws_cli_ext::ec2(region, [
@@ -315,6 +377,47 @@ mod tests {
 		StalwartSnapshot::snapshot_filters(&stack, &mail_box)[0]
 			.as_str()
 			.xpect_eq("Name=tag:SourceVolumeName,Values=mail--data");
+	}
+
+	/// One deploy's own snapshot is found by its tag rather than by an
+	/// idempotency token, because `CreateSnapshot` accepts none: passing
+	/// `--client-token` to it fails the whole deploy at the aws cli.
+	#[beet_core::test]
+	fn a_retry_reuses_this_deploys_snapshot() {
+		StalwartSnapshot::deploy_filter("01990000-0000-7000-8000-000000000000")
+			.as_str()
+			.xpect_eq(
+				"Name=tag:DeployId,Values=01990000-0000-7000-8000-000000000000",
+			);
+		// nothing yet, so the step creates one
+		StalwartSnapshot::reusable(r#"{"Snapshots":[]}"#)
+			.unwrap()
+			.xpect_none();
+		// a capture still running is this deploy's, and is waited on rather
+		// than duplicated
+		StalwartSnapshot::reusable(
+			r#"{"Snapshots":[{"SnapshotId":"snap-pending","StartTime":"2026-09-03T00:00:00+00:00","State":"pending"}]}"#,
+		)
+		.unwrap()
+		.unwrap()
+		.as_str()
+		.xpect_eq("snap-pending");
+		StalwartSnapshot::reusable(LISTING)
+			.unwrap()
+			.unwrap()
+			.as_str()
+			.xpect_eq("snap-new");
+	}
+
+	/// A failed capture is not a backup, so the retry takes a fresh one rather
+	/// than waiting forever on a snapshot that will never complete.
+	#[beet_core::test]
+	fn an_errored_snapshot_is_never_reused() {
+		StalwartSnapshot::reusable(
+			r#"{"Snapshots":[{"SnapshotId":"snap-bad","StartTime":"2026-09-05T00:00:00+00:00","State":"error"}]}"#,
+		)
+		.unwrap()
+		.xpect_none();
 	}
 
 	const LISTING: &str = r#"{"Snapshots":[

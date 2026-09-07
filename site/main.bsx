@@ -33,7 +33,9 @@ this?" rather than one inferred from the process stage.
 
 ## Analytics, and what outlives it
 
-Raw events buffer into immutable gzip NDJSON segments in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.ndjson.gz` archive, writes and verifies that archive plus deterministic daily rows in the `analytics-rollup` blob store, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
+Raw events buffer into immutable gzip NDJSON segments under `analytics/raw/segments/` in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.ndjson.gz` archive, writes and verifies that archive plus deterministic daily rows under `analytics/rollup/` in that same bucket, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
+
+Two buckets rather than three: the rollup rows are a different dataset from the segments but not a different trust boundary or durability grade, so they ride a sibling prefix. The archive is genuinely separate — it is the sole copy, and it lives in the `archive` bucket whose whole identity is that nothing there expires.
 
 `<Route path="jobs">` hosts that job and the deployed `rollup` lambda is the only
 thing that boots it: the schedule invokes the function, the function's `bootstrap`
@@ -193,17 +195,21 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	     unreachable from the served site even though both live in this file. -->
 	<Route path="jobs" {HttpServer}>
 		<Router>
-			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($archive))}/>
+			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
 		</Router>
 	</Route>
 	<!-- the stage stack: every resource the running site needs, the verbs that
 	     provision them, and the one `RequireFeatures` guarding the whole subtree -->
 	<Stack {RequireFeatures(["infra","extra"])}>
-		<!-- Raw segments and aggregate rows are separate writable blob stores. Both
-		     are stable across deploys; the rollup rows use the blanket JSON-over-blob
-		     TableProvider and can be re-derived from the archive. -->
+		<!-- Raw segments and aggregate rows share ONE writable store, under the
+		     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
+		     A bucket is this codebase's unit of IAM grant, so it earns its place
+		     by a different writer or a different durability grade, not by
+		     holding a different dataset: these two have the same writer, the
+		     same grant, and neither is a sole copy (rollup rows use the blanket
+		     JSON-over-blob TableProvider and are re-derivable from the archive,
+		     segments are transient by design). -->
 		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
-		<S3BucketBlock bx:ref="rollup" label="analytics-rollup" deploy_versioned=false runtime_write=true/>
 		<S3BucketBlock label="app" deploy_versioned=false/>
 		<!-- the `archive` profile: append-only cold data, the inverse of the app
 		     bucket by lifecycle. Never touched by a deploy sync, which would prune

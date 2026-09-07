@@ -46,14 +46,7 @@ impl AnalyticsStore {
 	/// The remote S3 analytics store at `bucket_name`, using the SDK's default
 	/// region provider chain. Errors without the native `aws_sdk` backend.
 	pub fn remote(bucket_name: &str) -> Result<Self> {
-		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Self::new(BlobStore::new(S3Store::new_default_region(bucket_name))).xok()
-			} else {
-				let _ = bucket_name;
-				bevybail!("a remote analytics store requires the `aws_sdk` feature")
-			}
-		}
+		Self::new(BlobStore::remote(bucket_name)?).xok()
 	}
 
 	/// Buffers an event, flushing when the configured size is reached.

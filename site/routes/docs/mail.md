@@ -199,7 +199,7 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 <Stack app_name="acme" region="ap-southeast-2">
 	<DeployRoutes/>
 
-	<VpcBlock bx:ref="net" label="net"/>
+	<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 	<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 		runtime_write=true object_versioning=true/>
 	<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
@@ -319,6 +319,8 @@ Some failure shapes worth recognising, because each cost us hours:
 **The box is silent and provisioning times out.** `systemctl status stalwart` says the unit could not be found, which means cloud-init never got that far. `sudo cloud-init status` and then `/var/log/cloud-init-output.log` is the path. Ours was a tarball download dying mid-transfer on a transient network error. User data runs *once* per instance under `set -e`, so a flaky download is a permanently dead box that answers SSH perfectly: the service just does not exist. Fix it in the block (retry flags on the download) rather than on the box, and redeploy, which replaces the instance and proves the fix on a fresh boot.
 
 **An instance replacement changes the host key**, and a stale `known_hosts` entry makes the next SSH fail with `REMOTE HOST IDENTIFICATION HAS CHANGED`. `ssh-keygen -R <ip>` between replacements.
+
+**Deleting a block whose resource is protected leaves a resource nothing can destroy.** Removing an `<RdsPostgresBlock/>` declaration and applying fails with `Cannot delete protected DB Instance`: terraform plans a destroy, but the attribute that forbids it is only settable through the declaration that is no longer there, so there is nothing left to turn it off with. Retiring a protected resource is therefore two applies, in this order: set `deletion_protection=false` (or `data_volume_protected=false`) on the block while it is still declared and apply, *then* delete the block and apply again. Clearing the flag out of band with `aws rds modify-db-instance --no-deletion-protection` gets you unstuck once, but it leaves the live resource disagreeing with the state until the destroy lands, so prefer the two applies when you have the choice. The protection did its job either way — it is meant to cost you a deliberate step.
 
 **A config parse error reporting "line 1 column N".** Check whether N is the *length* of the file. An error at EOF means the parser consumed everything and a required field was missing at the top level, which is to say the document shape is wrong rather than a field in it being wrong.
 
@@ -451,10 +453,12 @@ Our first restore drill found that the nightly dump had never once produced a ba
 
 Nothing observes a backup except restoring one. Read that before you read any of the machinery below.
 
+The same shape bit the layer above it. `<StalwartSnapshot/>` had been in the deploy route through a whole migration without ever once running, because the volume it snapshots did not exist until late and every deploy before that took the first-deploy skip. The first time it genuinely fired it died at the aws cli on an option that does not exist, and the account had zero snapshots to show it. A step that has never executed is not a step that works, however carefully it reads; the tell is an artefact count, not a green deploy.
+
 The layers, ordered by how much losing them would hurt:
 
 1. **The data volume.** Stalwart's SQLite database is at `/var/lib/stalwart/stalwart.db` on its own encrypted gp3 volume, which is not the box. In production it carries `prevent_destroy` and asks AWS for a final snapshot, so a stray `destroy` cannot eat the mail. This is the layer that replaced RDS's 14-day point-in-time recovery, and losing that window is the one thing this trade genuinely gave up.
-2. **The pre-apply snapshot.** `<StalwartSnapshot/>` sits immediately before the full `<TofuApply/>`, finds the volume by its `Name`/`Project`/`Stage` tags, and waits for a complete EBS snapshot before an apply is allowed to replace the box. A retry within one deploy reuses the deploy id as EC2's idempotency token rather than taking a second snapshot. Nothing else prunes a snapshot lineage, so the step prunes its own: the newest `snapshot_retain` (7 by default) of the snapshots *it* tagged survive, and a snapshot you took by hand before something frightening is never one of them.
+2. **The pre-apply snapshot.** `<StalwartSnapshot/>` sits immediately before the full `<TofuApply/>`, finds the volume by its `Name`/`Project`/`Stage` tags, and waits for a complete EBS snapshot before an apply is allowed to replace the box. A retry within one deploy finds that deploy's own snapshot by its `DeployId` tag rather than taking a second, because `CreateSnapshot` offers no idempotency token to use instead (only the multi-volume `CreateSnapshots` has one). Nothing else prunes a snapshot lineage, so the step prunes its own: the newest `snapshot_retain` (3 by default) of the snapshots *it* tagged survive, and a snapshot you took by hand before something frightening is never one of them.
 3. **Off-box.** A systemd timer on the box runs SQLite's online `.backup`, checks `PRAGMA integrity_check` on the result, uploads it under `sqlite/` in the `archive` bucket, downloads it again, compares the bytes and re-verifies the copy that came back. The backup runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup. The `sqlite/` prefix expires at 180 days, which is only safe because the live database is on the volume and not in that bucket.
 4. **Blobs.** S3 versioning, a lifecycle expiring noncurrent versions, a public access block and server-side encryption. Message bodies were never in the database and are not in these snapshots.
 5. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exception is the DKIM private key once its selector is published, so include it in the export.

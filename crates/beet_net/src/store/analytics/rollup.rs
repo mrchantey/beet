@@ -102,6 +102,13 @@ impl AnalyticsRollup {
 	/// field changes, never when one is added.
 	pub const VERSION: u32 = 1;
 
+	/// The prefix aggregate rows own in a rollup store.
+	///
+	/// A sibling of [`AnalyticsSegment::PREFIX`] rather than a nesting of it:
+	/// the two are disjoint by construction, so one store holds both and the
+	/// rollup rows never look like a segment day to compaction.
+	pub const PREFIX: &'static str = "analytics/rollup";
+
 	/// The namespace every aggregate row id derives from, so an id is a pure
 	/// function of what it summarizes and re-running a day overwrites it.
 	const NAMESPACE: Uuid =
@@ -113,6 +120,16 @@ impl AnalyticsRollup {
 			&Self::NAMESPACE,
 			format!("{}:{date}:{}", Self::VERSION, scope.id_key()).as_bytes(),
 		)
+	}
+
+	/// The aggregate table `store` holds, scoped to [`Self::PREFIX`].
+	///
+	/// Every reader and writer of aggregates goes through here, so the prefix is
+	/// stated once and a store holding raw segments too is addressed correctly
+	/// by both.
+	#[cfg(feature = "json")]
+	pub fn table(store: BlobStore) -> Table<Self> {
+		Table::new(store.with_subdir(SmolPath::new(Self::PREFIX)))
 	}
 
 	/// A zeroed row for `date` and `scope`.

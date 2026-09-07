@@ -192,6 +192,7 @@ mod tests {
 
 	/// The name the action reads is the one the database's boot script reads,
 	/// which is the whole reason `SecretRef` exists.
+	#[cfg(feature = "rds_postgres_block")]
 	#[beet_core::test]
 	fn the_name_is_the_database_composition() {
 		let stack = Stack::new("beetmash")

@@ -14,23 +14,23 @@
 mod duration;
 #[cfg(feature = "std")]
 mod exit_status;
+#[cfg(feature = "json")]
+mod json_value;
 mod multimap;
 mod option;
 #[cfg(feature = "std")]
 mod path;
 mod result_x;
 mod str;
-#[cfg(feature = "json")]
-mod json_value;
 
 pub use duration::*;
 #[cfg(feature = "std")]
 pub use exit_status::*;
+#[cfg(feature = "json")]
+pub use json_value::*;
 pub use multimap::*;
 pub use option::*;
 #[cfg(feature = "std")]
 pub use path::*;
 pub use result_x::*;
 pub use str::*;
-#[cfg(feature = "json")]
-pub use json_value::*;

@@ -65,6 +65,26 @@ impl BlobStore {
 		}
 	}
 
+	/// The remote S3 store for `bucket_name`, using the SDK's default region
+	/// provider chain.
+	///
+	/// For a tool that names a bucket directly and has no `<S3BucketBlock/>`
+	/// declaration to resolve a region from; a store reached through its
+	/// declaration is handed the region that block resolved. Errors without the
+	/// native `aws_sdk` backend rather than degrading.
+	pub fn remote(bucket_name: &str) -> Result<BlobStore> {
+		cfg_if! {
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+				BlobStore::new(S3Store::new_default_region(bucket_name)).xok()
+			} else {
+				let _ = bucket_name;
+				bevybail!(
+					"a remote blob store requires the `aws_sdk` feature (native only)"
+				)
+			}
+		}
+	}
+
 	/// Build the store a [`StoreUri`] names, `dir` rooting the dir-rooted kinds
 	/// (the resolved entry directory for a repo store) and ignored by the
 	/// self-rooted ones.

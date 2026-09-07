@@ -479,16 +479,11 @@ mod test {
 	///
 	/// REGRESSION: `report_domain` was copied from `domain` in the constructor,
 	/// so a markup-declared domain addressed its DMARC reports to `dmarc@` with
-	/// no domain at all; and the database's master-password variable was stored
-	/// as a field composed from the label, so a markup-declared database asked
-	/// the apply for `var._password` while `EnsureSecret` supplied `db_password`.
+	/// no domain at all.
 	#[beet_core::test]
 	fn derived_fields_survive_a_markup_declaration() {
 		let mut world = spawn(
-			r#"<Fragment>
-				<MailDomainBlock domain="stalwart.beetmash.com" mail_host="mail.beetmash.com"/>
-				<RdsPostgresBlock label="db" database="mail"/>
-			</Fragment>"#,
+			r#"<MailDomainBlock domain="stalwart.beetmash.com" mail_host="mail.beetmash.com"/>"#,
 		);
 		world
 			.query::<&MailDomainBlock>()
@@ -496,6 +491,16 @@ mod test {
 			.unwrap()
 			.dmarc_value()
 			.xpect_contains("rua=mailto:dmarc@stalwart.beetmash.com");
+	}
+
+	/// REGRESSION: the database's master-password variable was stored as a
+	/// field composed from the label, so a markup-declared database asked the
+	/// apply for `var._password` while `EnsureSecret` supplied `db_password`.
+	#[cfg(feature = "rds_postgres_block")]
+	#[beet_core::test]
+	fn a_markup_declared_database_derives_its_password_variable() {
+		let mut world =
+			spawn(r#"<RdsPostgresBlock label="db" database="mail"/>"#);
 		world
 			.query::<&RdsPostgresBlock>()
 			.single(&world)

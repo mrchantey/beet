@@ -546,9 +546,15 @@ mod test {
 		world.query::<&FsStore>().single(&world).xpect_ok();
 	}
 
-	/// The analytics compaction stack the site entry declares end to end: raw,
-	/// aggregate, and archive buckets, the invoke-only function, and the timer
-	/// that drives it — plus the job bound to all three stores by relation.
+	/// The analytics compaction stack the site entry declares end to end: the
+	/// analytics and archive buckets, the invoke-only function, and the timer
+	/// that drives it — plus the job bound to its stores by relation.
+	///
+	/// TWO buckets, not three: segments and aggregate rows share the
+	/// `analytics` bucket under disjoint prefixes, because a bucket is the unit
+	/// of IAM grant and those two have the same writer, the same grant, and
+	/// neither is a sole copy. The archive is separate because it IS the sole
+	/// copy and lives where nothing expires.
 	///
 	/// The deploy has to RENDER, not just spawn: an unpointed schedule and a
 	/// hostname on a gateway-less function are both render-time failures, and a
@@ -567,12 +573,11 @@ mod test {
 			r#"<Fragment>
 				<Route path="jobs" {HttpServer}>
 					<Router>
-						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($rollup), ArchiveStoreRef($archive))}/>
+						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
 					</Router>
 				</Route>
 				<Stack>
 					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
-					<S3BucketBlock bx:ref="rollup" label="analytics-rollup" deploy_versioned=false runtime_write=true/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
@@ -596,7 +601,6 @@ mod test {
 		buckets.sort();
 		buckets.xpect_eq(vec![
 			("analytics".to_string(), true, false, false),
-			("analytics-rollup".to_string(), true, false, false),
 			("archive".to_string(), true, false, true),
 		]);
 		// nothing but the timer may reach analytics compaction
@@ -607,8 +611,9 @@ mod test {
 			.http()
 			.xpect_false();
 
-		// the job names all three stores by relation, and each one resolves to
-		// the declaration whose name the deploy provisions
+		// the job names its stores by relation, and each one resolves to the
+		// declaration whose name the deploy provisions — raw and rollup at the
+		// same one, which is what collapsing to two buckets means
 		let (job, events, rollups, archive) = world
 			.query::<(Entity, &StoreRef, &RollupStoreRef, &ArchiveStoreRef)>()
 			.single(&world)
@@ -641,12 +646,13 @@ mod test {
 			.unwrap()
 			.bucket_name(&stack)
 			.xpect_eq("beet-site--dev--analytics");
+		rollups.xpect_eq(events);
 		world
 			.entity(rollups)
 			.get::<S3BucketBlock>()
 			.unwrap()
 			.bucket_name(&stack)
-			.xpect_eq("beet-site--dev--analytics-rollup");
+			.xpect_eq("beet-site--dev--analytics");
 		world
 			.entity(archive)
 			.get::<S3BucketBlock>()
@@ -671,9 +677,8 @@ mod test {
 			.as_str()
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")
-			// all three stores are writable buckets; only archive is versioned
+			// both stores are writable buckets; only archive is versioned
 			.xpect_contains("beet-site--dev--analytics")
-			.xpect_contains("beet-site--dev--analytics-rollup")
 			.xpect_contains("beet-site--dev--archive")
 			.xpect_contains("s3:PutObject")
 			.xpect_contains("aws_s3_bucket_versioning")
@@ -682,7 +687,10 @@ mod test {
 			.xpect_contains(r#""timeout":900"#)
 			// an invoke-only function publishes nothing
 			.xnot()
-			.xpect_contains("aws_apigatewayv2");
+			.xpect_contains("aws_apigatewayv2")
+			// ..and the collapsed third bucket is provisioned by nothing
+			.xnot()
+			.xpect_contains("beet-site--dev--analytics-rollup");
 	}
 
 	/// The `shared`-stage stack, the shape the site entry declares: its verb

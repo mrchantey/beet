@@ -46,10 +46,13 @@ pub struct AnalyticsRollupRun {
 
 impl AnalyticsRollupRun {
 	/// Creates a run over raw, rollup, and archive blob stores.
+	///
+	/// The three may be one store: each keyspace is a disjoint prefix, so a
+	/// deployment collapses them by pointing two refs at one declaration.
 	pub fn new(raw: BlobStore, rollups: BlobStore, archive: BlobStore) -> Self {
 		Self {
 			raw,
-			rollups: Table::new(rollups),
+			rollups: AnalyticsRollup::table(rollups),
 			archive,
 			full: false,
 		}
@@ -340,7 +343,7 @@ mod test {
 				archive.clone(),
 			),
 			raw,
-			Table::new(rollup_store),
+			AnalyticsRollup::table(rollup_store),
 			archive,
 		)
 	}
@@ -525,7 +528,7 @@ mod test {
 			.xpect_contains("deleted:    1 segments");
 		let rollup_store =
 			world.entity(rollups).get::<BlobStore>().unwrap().clone();
-		Table::<AnalyticsRollup>::new(rollup_store)
+		AnalyticsRollup::table(rollup_store)
 			.get(AnalyticsRollup::row_id(
 				&event.date(),
 				&AnalyticsScope::Site,

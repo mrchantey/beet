@@ -65,7 +65,10 @@ pub fn analytics_plugin(app: &mut App) {
 		.register_type::<GeoIpDb>()
 		// the nightly job and the two store relations it names its aggregate
 		// table and its archive by, so `<Route path="rollup" {(
-		// AnalyticsRollupJob, RollupStoreRef($rollup))}/>` authors from markup.
+		// AnalyticsRollupJob, RollupStoreRef($analytics))}/>` authors from
+		// markup. A relation rather than a field is what lets a deployment
+		// point raw and rollup at ONE declaration, since their prefixes are
+		// disjoint, or at two when it wants them apart.
 		.register_type::<AnalyticsRollupJob>()
 		.register_type::<RollupStoreRef>()
 		.register_type::<RollupStoreConsumers>()
