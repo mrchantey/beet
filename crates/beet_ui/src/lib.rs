@@ -59,7 +59,6 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::style::TextAlign;
 	#[cfg(feature = "style")]
-	#[cfg(feature = "style")]
 	pub use crate::style::VisualStyle;
 	/// The Material styling system. Its design-token roles are deliberately
 	/// reached through the `material::` prefix (eg `material::colors::Primary`),

@@ -179,25 +179,16 @@ mod enabled {
 		}))
 	}
 
-	/// Map a descriptor name to a primitive schema, accepting both JSON Schema names
-	/// (`integer`, `number`, `boolean`) and beet's shorthand (`i64`, `f64`, `bool`),
-	/// or a composable [`SchemaRef::Name`] to another schema by name.
+	/// The primitive a descriptor name declares, or a composable
+	/// [`SchemaRef::Name`] to another schema when the word names no primitive.
+	///
+	/// The accepted primitive names are the shared vocabulary (see
+	/// [`ValueSchema::primitive_by_name`]); only the fallback is local, since
+	/// here an unknown word is a reference rather than an error.
 	fn primitive_or_reference(name: &str) -> ValueSchema {
-		match name {
-			"string" | "str" => ValueSchema::String(StringSchema::default()),
-			"integer" | "int" | "i64" | "i32" => {
-				ValueSchema::I64(I64Schema::default())
-			}
-			"u64" | "uint" | "u32" => ValueSchema::U64(U64Schema::default()),
-			"number" | "float" | "f64" | "f32" => {
-				ValueSchema::F64(F64Schema::default())
-			}
-			"boolean" | "bool" => ValueSchema::Bool(BoolSchema::default()),
-			"entity" => ValueSchema::Entity(EntitySchema::default()),
-			"any" => ValueSchema::Any,
-			"null" => ValueSchema::Null,
-			other => ValueSchema::Ref(SchemaRef::Name(SmolStr::from(other))),
-		}
+		ValueSchema::primitive_by_name(name).unwrap_or_else(|| {
+			ValueSchema::Ref(SchemaRef::Name(SmolStr::from(name)))
+		})
 	}
 
 	/// Read a field descriptor's commit-time resolution policy: `"default"` names a

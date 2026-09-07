@@ -182,8 +182,9 @@ impl Plugin for CharcellPlugin {
 			);
 
 		// transient toasts (the clipboard-copy confirmation `flush_clipboard`
-		// pops) plus their self-despawn timer, co-located with `flush_clipboard`
-		// so any router/live app that can copy can also expire the toast.
+		// pops) plus their self-despawn timer. The widget set installs this too;
+		// repeated here (idempotently) so a charcell app that runs without the
+		// widget set can still copy and expire the toast.
 		#[cfg(all(feature = "tui", feature = "template"))]
 		app.init_plugin::<crate::prelude::ToastPlugin>();
 	}

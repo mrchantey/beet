@@ -100,8 +100,11 @@ pub struct ToastPlugin;
 
 impl Plugin for ToastPlugin {
 	fn build(&self, app: &mut App) {
+		// the widget set installs this on every target, including a world with no
+		// time source (an authoring/test `ui_world`), where there is nothing to
+		// tick and `Res<Time>` would otherwise fail parameter validation.
 		app.register_type::<Toast>()
-			.add_systems(Update, despawn_after);
+			.add_systems(Update, despawn_after.run_if(resource_exists::<Time>));
 	}
 }
 
@@ -261,5 +264,37 @@ mod test {
 		// despawned once it elapses
 		advance(&mut world, Duration::from_millis(2));
 		toast_count(&mut world, surface).xpect_eq(0);
+	}
+}
+
+/// The widget set, not one renderer, owns the toast lifecycle.
+#[cfg(all(test, feature = "bsx"))]
+mod widget_set_test {
+	use super::*;
+
+	/// A toast shown on a plain UI world (no terminal renderer) still expires,
+	/// because [`ToastPlugin`] is installed by the widget set rather than by the
+	/// charcell renderer that happens to pop toasts today.
+	#[beet_core::test]
+	fn default_widget_set_expires_a_toast() {
+		let mut world = world_ext::ui_world();
+		world.init_resource::<Time>();
+		let surface = world.spawn_empty().id();
+		world.commands().queue(move |world: &mut World| {
+			Toast::show(&mut world.commands(), surface, "hi")
+		});
+		world.flush();
+		world
+			.query_filtered::<(), With<Toast>>()
+			.iter(&world)
+			.count()
+			.xpect_eq(1);
+		world.resource_mut::<Time>().advance_by(Toast::DURATION);
+		world.update_local();
+		world
+			.query_filtered::<(), With<Toast>>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
 	}
 }

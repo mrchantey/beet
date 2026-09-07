@@ -2,8 +2,12 @@
 //! cascade that resolves them for both the web and charcell targets.
 //!
 //! Conventions:
-//! - Colocate a widget's classes with the widget, never in a central rules
-//!   file. A widget owns its styling.
+//! - Colocate a widget's own classes with the widget: a class only that widget
+//!   emits is declared and styled beside it, never in a central rules file.
+//!   The exception is the *shared* vocabulary in [`material::classes`], the
+//!   names more than one widget emits and any styling system may implement; a
+//!   widget reaching `classes::CARD_FILLED` is emitting a shared name, not
+//!   surrendering ownership of its own styling.
 //! - A widget with only one class uses `inline_class!` rather than registering
 //!   a named rule. A plain declaration is a `(prop, value)` pair; to point a
 //!   prop at a design token use `Declaration::token(prop, value)`, ie

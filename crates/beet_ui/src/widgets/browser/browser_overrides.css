@@ -1,15 +1,19 @@
 /*
-	Beet web-only reset overrides, loaded immediately AFTER `preflight.css`.
+	Beet's browser supplement, loaded immediately AFTER `preflight.css`.
+
+	Not a reset: `preflight.css` is the reset (a verbatim Tailwind copy). This
+	file is the browser-only layer over it, and it does two kinds of work: undo
+	a Preflight strip the beet look wants back (prose list markers, which
+	`ul,ol,menu { list-style: none }` removes so utility classes can opt in), and
+	express presentation the target-agnostic token/class system has no way to say
+	(an ancestor-scoped sibling selector, a pseudo-element, an intrinsic media
+	aspect ratio).
 
 	STRICTLY for web rendering: this raw CSS never reaches the native wgpu Bevy UI
-	or the charcell terminal renderer, both of which ignore `<style>`. Treat it as
-	an escape hatch of last resort for fixing up browser presentation that the
-	target-agnostic token/class system cannot express; prefer a Rule or class.
-
-	Today it only restores prose list markers, which Tailwind's Preflight strips
-	(`ul,ol,menu { list-style: none }`) so utility classes can opt back in. The
-	charcell renderer already draws its own bullets/numbers via `decorate.rs`, so
-	this is the web side catching up.
+	or the charcell terminal renderer, both of which ignore `<style>`. Anything
+	here is therefore a cross-target hole to be aware of, so prefer a Rule or
+	class wherever one can express the intent; the charcell twin of the vertical
+	table borders below lives in `decorate.rs`, as do its list bullets/numbers.
 */
 
 /* Vertical-border table: internal column dividers only. An adjacent-sibling

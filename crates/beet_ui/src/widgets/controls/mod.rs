@@ -6,7 +6,7 @@
 //! [`schema_ui`](super::schema_ui), which dispatches to these same controls.
 pub(in crate::widgets) mod button;
 mod checkbox;
-mod error;
+pub(in crate::widgets) mod error;
 mod form;
 mod table;
 

@@ -3,16 +3,18 @@
 //! Each submodule colocates a category's [`ClassName`] constants with the
 //! [`Rule`]s that map them to design tokens, so the names that widgets *emit*
 //! and the rules that *style* them live side by side. The constants are the
-//! contract between the two layers: widgets ([`scene`] feature) emit these
-//! classes and this rule set ([`style`] feature, Material Design 3 today) maps
+//! contract between the two layers: widgets (the `template` feature) emit these
+//! classes and this rule set (the `style` feature, Material Design 3 today) maps
 //! them to design tokens.
+//!
+//! This is the *shared* vocabulary, which is why it is central rather than
+//! colocated with one widget (see `style`'s module docs): a name here is claimed
+//! by more than one widget and implemented by whichever styling system is
+//! installed. A class only one widget emits stays with that widget.
 //!
 //! Exported as `pub mod classes`, so callers always reach a class name through
 //! the `classes::` prefix, eg `classes::CARD_FILLED` rather than a bare
 //! `CARD_FILLED`.
-//!
-//! [`scene`]: https://docs.rs/beet_ui
-//! [`style`]: https://docs.rs/beet_ui
 use crate::prelude::*;
 use crate::style::material::typography as type_tokens;
 use crate::style::*;

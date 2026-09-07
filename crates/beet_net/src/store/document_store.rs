@@ -2,7 +2,7 @@
 //! resolution.
 //!
 //! A data document may name its schema by pointing at another document
-//! ([`ValueSchema::Document`]), resolved by default in the naming document's own
+//! ([`SchemaRef::Document`]), resolved by default in the naming document's own
 //! store, the `AncestorQuery<&BlobStore>` idiom. The index that answers such a
 //! reference is [`SchemaRegistry`]'s by-location one, which sits beside the
 //! by-name namespace rather than inside it; a store sits above the schema layer
@@ -53,7 +53,7 @@ pub(crate) fn located_schemas_may_be_readable(
 	!documents.is_empty() || !stores.is_empty()
 }
 
-/// Read the schema document each [`ValueSchema::Document`] names out of the
+/// Read the schema document each [`SchemaRef::Document`] names out of the
 /// naming document's own store, into [`SchemaRegistry`]'s by-location index.
 ///
 /// Lazy by decision, as `DocRef` resolution is: a document legitimately arrives

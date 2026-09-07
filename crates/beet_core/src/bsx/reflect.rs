@@ -816,21 +816,14 @@ fn value_schema(source: &str) -> Result<ValueSchema> {
 	if source.starts_with('{') {
 		return json_schema(source);
 	}
-	match source {
-		"any" => ValueSchema::Any,
-		"null" => ValueSchema::Null,
-		"bool" => ValueSchema::Bool(default()),
-		"i64" => ValueSchema::I64(default()),
-		"u64" => ValueSchema::U64(default()),
-		"f64" => ValueSchema::F64(default()),
-		"string" => ValueSchema::String(default()),
-		"bytes" => ValueSchema::Bytes(default()),
-		other => bevybail!(
-			"unknown schema {other:?}: expected one of \"any\", \"null\", \
-\"bool\", \"i64\", \"u64\", \"f64\", \"string\", \"bytes\", or a JSON Schema object"
-		),
-	}
-	.xok()
+	// unlike a JSON Schema descriptor, an unrecognized word here is an authoring
+	// typo rather than a reference to a schema by name, so it is named as one.
+	ValueSchema::primitive_by_name(source).ok_or_else(|| {
+		bevyhow!(
+			"unknown schema {source:?}: expected one of {}, or a JSON Schema object",
+			ValueSchema::PRIMITIVE_NAMES
+		)
+	})
 }
 
 /// A [`ValueSchema`] from one JSON Schema descriptor.

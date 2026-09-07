@@ -28,6 +28,22 @@ fn layout_world() -> World {
 	world
 }
 
+/// Every widget the set defines resolves by name, not just the ones an `rsx!`
+/// call site reaches directly: `<Error>` is authored in markup and documented as
+/// such, but was absent from the registration list while its sibling
+/// `ErrorText` was present.
+#[beet_core::test]
+fn widgets_resolve_by_name() {
+	let world = world_ext::ui_world();
+	let registry = world.resource::<AppTypeRegistry>().read();
+	for tag in ["Error", "ErrorText", "Button", "Toast"] {
+		ReflectTemplate::registration_named(&registry, tag)
+			.or_else(|| registry.get_with_short_type_path(tag))
+			.is_some()
+			.xpect_true();
+	}
+}
+
 #[beet_core::test]
 fn head_emits_charset_meta() {
 	let mut world = layout_world();
