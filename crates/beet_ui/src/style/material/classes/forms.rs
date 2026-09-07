@@ -87,6 +87,27 @@ pub fn input_base() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(0.5)))
 }
 
+/// Terminal controls - trims the vertical padding so a text field or a select is
+/// three rows (border, value, border) rather than five.
+///
+/// The same trade [`app_bar_terminal`](super::app_bar_terminal) makes: `0.5rem`
+/// rounds to a whole cell row on each side, and a form of five-row fields
+/// pushes everything below it off a terminal window for padding no one reads.
+/// The horizontal inset is kept, since that is what separates the value from
+/// its border.
+pub fn control_terminal() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Terminal)
+		.with_selector(
+			Selector::class(INPUT).merge_any(Selector::class(SELECT)),
+		)
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(0.5),
+			right: Length::Rem(0.5),
+			..Spacing::DEFAULT
+		})
+}
+
 /// Outlined input - visible border, transparent fill.
 pub fn input_outlined() -> Rule {
 	Rule::new()

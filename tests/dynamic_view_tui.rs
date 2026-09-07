@@ -372,9 +372,10 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 	host.click_text("Edit schema");
 	host.step_until("Apply");
 
-	// the row schema's `fields` list is the last collection on the page, so its
-	// add button is the last one; it appends the field schema's own zero
-	host.click_last("add");
+	// each collection's add button names it, so the row schema's `fields` list is
+	// addressed by name rather than by being the last one on the page; it appends
+	// the field schema's own zero
+	host.click_text("Add to fields");
 	host.settle(8);
 	// name the field, in the empty control the appended row generated
 	host.click_control_of("key", 2);

@@ -76,11 +76,15 @@ pub(super) fn edit_button(
 
 /// The add-entry row of a map control: a key to type and the button that
 /// inserts it, holding the zero every new entry starts as.
-pub(super) fn add_entry_row(field: FieldRef, zero: Value) -> Snippet {
+pub(super) fn add_entry_row(
+	field: FieldRef,
+	zero: Value,
+	label: String,
+) -> Snippet {
 	rsx! {
 		<div>
 			<TextField {NewEntryKey} placeholder="key"/>
-			{edit_button("add", field, CollectionEdit::Insert(zero))}
+			{edit_button(label, field, CollectionEdit::Insert(zero))}
 		</div>
 	}
 	.any_snippet()

@@ -129,6 +129,8 @@ pub fn all_rules() -> Vec<Rule> {
 		select_outlined(),
 		select_filled(),
 		select_text(),
+		// trails both control bases so the terminal padding trim wins over them
+		control_terminal(),
 		// the dropdown state rules trail their base so they win the cascade
 		select_dropdown(),
 		select_option(),

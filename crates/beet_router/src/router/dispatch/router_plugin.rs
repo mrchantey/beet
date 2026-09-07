@@ -222,6 +222,12 @@ impl Plugin for RouterPlugin {
 				not(target_arch = "wasm32")
 			)))]
 			app.allow_unregistered("LiveReloadScript");
+			// the app shell's scroll region, extending the shared rule set the way
+			// the card-stack rules do, so it composes with the material set and
+			// overrides the bare `main` rule on a tie.
+			app.world_mut()
+				.get_resource_or_init::<RuleSet>()
+				.extend_rules(app_shell_rules());
 			#[cfg(feature = "template_serde")]
 			app.add_observer(rebuild_route_trees_on_load);
 			// the `<Template src>` include handler (local-file includes resolved

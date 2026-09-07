@@ -130,13 +130,33 @@ pub(super) fn list_field(
 		},
 	);
 	let zero = schema.item.default_value_in(resolver);
+	let add = add_label(label.as_deref(), "item");
 	group(label, rsx! {
 		<div {(field.clone(), rebuild)}/>
-		{edit_button("add", field, CollectionEdit::Push(zero))}
+		{edit_button(add, field, CollectionEdit::Push(zero))}
 	})
 }
 
-/// One list row: the item's own controls, and the button that drops it.
+/// What a collection's add button is called: `Add to constraints` where the
+/// collection has a name of its own, else `Add item`/`Add entry`.
+///
+/// A form nests collections (a schema's fields, each field's constraints), so
+/// several add buttons can share a screen; naming the collection is what says
+/// which list a press grows. The unnamed case is the top level, where there is
+/// only one collection and nothing to disambiguate.
+pub(super) fn add_label(collection: Option<&str>, noun: &str) -> String {
+	match collection {
+		Some(name) => format!("Add to {name}"),
+		None => format!("Add {noun}"),
+	}
+}
+
+/// One list row: the item's own controls under an ordinal title, and the button
+/// that drops it.
+///
+/// The ordinal is the label the item's own group wears, so a list of structs
+/// reads `Item 1`, `Item 2` rather than repeating the item schema's type name
+/// once per row, which named the *kind* and so distinguished nothing.
 fn list_row(
 	resolver: SchemaResolver,
 	item: &ValueSchema,
@@ -145,16 +165,16 @@ fn list_row(
 	depth: usize,
 ) -> Snippet {
 	rsx! {
-		<div {row_layout()}>
+		<div {row_card()}>
 			{schema_field(
 				resolver,
 				item,
 				child_field(field, index),
-				None,
+				Some(format!("Item {}", index + 1)),
 				depth + 1,
 			)}
 			{edit_button(
-				"remove",
+				"Remove",
 				field.clone(),
 				CollectionEdit::Remove(FieldSegment::index(index)),
 			)}
@@ -163,15 +183,19 @@ fn list_row(
 	.any_snippet()
 }
 
-/// A collection row's layout, colocated with the row: the same stretch column
-/// the shipped `<form>` rule is.
+/// A collection row's card, colocated with the row: an outlined panel laid out
+/// as the same stretch column the shipped `<form>` rule is.
 ///
-/// The item's controls fill the row's width while its `remove` keeps its own,
-/// which is the `form button` rule's `align-self` doing its job — a flex-only
-/// property a block container would ignore, leaving the button a full-width
-/// band.
-fn row_layout() -> impl Bundle {
-	inline_class![
+/// The outline is what makes the row's own `Remove` legibly *its*: the button
+/// sits inside a visible boundary with the controls it drops, where an unbounded
+/// row left it floating between two sets of fields belonging to neither.
+///
+/// The column stretches the item's controls to the row's width while `Remove`
+/// keeps its own, which is the `form button` rule's `align-self` doing its job —
+/// a flex-only property a block container would ignore, leaving the button a
+/// full-width band.
+fn row_card() -> impl Bundle {
+	(Classes::new([classes::CARD_OUTLINED]), inline_class![
 		(style::common_props::DisplayProp, style::Display::Flex),
 		(
 			style::common_props::FlexDirectionProp,
@@ -181,7 +205,7 @@ fn row_layout() -> impl Bundle {
 			style::common_props::AlignItemsProp,
 			style::AlignItems::Stretch
 		),
-	]
+	])
 }
 
 /// The map arm: one control per entry, labelled by its key, with a remove button
@@ -217,9 +241,10 @@ pub(super) fn map_field(
 		},
 	);
 	let zero = schema.value.default_value_in(resolver);
+	let add = add_label(label.as_deref(), "entry");
 	group(label, rsx! {
 		<div {(field.clone(), rebuild)}/>
-		{add_entry_row(field, zero)}
+		{add_entry_row(field, zero, add)}
 	})
 }
 
@@ -233,7 +258,7 @@ fn map_entry(
 	depth: usize,
 ) -> Snippet {
 	rsx! {
-		<div>
+		<div {row_card()}>
 			{schema_field(
 				resolver,
 				schema,
@@ -242,7 +267,7 @@ fn map_entry(
 				depth + 1,
 			)}
 			{edit_button(
-				"remove",
+				"Remove",
 				field.clone(),
 				CollectionEdit::Remove(FieldSegment::ObjectKey(key)),
 			)}
@@ -297,9 +322,9 @@ mod test {
 			)],
 		}));
 		html.clone()
-			// the top-level field is a row, its nested struct a disclosure
-			.xpect_contains("<details open")
-			.xpect_contains("<summary>profile</summary>")
+			// the top-level field is a row, its nested struct a titled section
+			.xpect_contains("<section>")
+			.xpect_contains(">profile</h3>")
 			.xpect_contains("name")
 			.xpect_contains("count")
 			.xpect_contains("type=\"text\"")
@@ -308,7 +333,7 @@ mod test {
 		// the nested paths are the leaves' names, so a submit gathers them whole
 		html.clone().xpect_contains("name=\"field.profile.name\"");
 		// ...and the top level is the form itself, not a group inside it
-		html.xnot().xpect_contains("<summary>Outer");
+		html.xnot().xpect_contains(">Outer</h3>");
 	}
 
 	/// A field's label hint replaces its key as the visible label; the key is

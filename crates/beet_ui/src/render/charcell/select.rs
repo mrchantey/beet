@@ -326,6 +326,30 @@ mod test {
 		host.step();
 	}
 
+	/// An authored `<select>` inside a `<label>` opens its panel too: the label
+	/// is a flex column (the shipped rule, so a key sits above its control), and
+	/// an absolutely positioned dropdown must still leave that flow rather than
+	/// being laid out as another flex item.
+	#[beet_core::test]
+	fn labelled_select_opens_a_panel() {
+		let mut host = TestHost::sized(UVec2::new(40, 20));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.spawn_content(rsx! {
+			<label>"role"
+				<Select name="role">
+					<option value="alpha">"Alpha"</option>
+					<option value="beta">"Beta"</option>
+				</Select>
+			</label>
+		});
+		host.step();
+		host.step();
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		host.frame_plain().xnot().xpect_contains("AlphaBeta");
+	}
+
 	/// The closed control renders its default (first) option label plus the
 	/// dropdown caret, with no option rows in flow.
 	#[beet_core::test]

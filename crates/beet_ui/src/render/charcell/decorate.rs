@@ -693,6 +693,41 @@ mod disclosure_test {
 		host.frame_plain().xnot().xpect_contains("Body text");
 	}
 
+	/// A styled disclosure collapses every one of its several children, which is
+	/// the shape a generated form takes: each row of a nested struct is its own
+	/// `<label>`, and the material rule set gives a `<label>` a display of its
+	/// own for the cascade to restore.
+	#[beet_core::test]
+	fn click_summary_collapses_every_styled_child() {
+		let mut host = TestHost::sized(UVec2::new(40, 16));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.spawn_content(rsx! {
+			<form>
+				<details open>
+					<summary>"Row"</summary>
+					<label>"first"<TextField/></label>
+					<label>"second"<TextField/></label>
+				</details>
+			</form>
+		});
+		host.step();
+		host.step();
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("first")
+			.xpect_contains("second");
+
+		let summary = element_by_tag(&mut host, "summary");
+		click(&mut host, summary);
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("▸ Row")
+			.xnot()
+			.xpect_contains("first");
+		host.frame_plain().xnot().xpect_contains("second");
+	}
+
 	/// Clicking a sidebar group's caret collapses and expands it, flipping the
 	/// in-place caret glyph rather than adding a left marker.
 	#[beet_core::test]

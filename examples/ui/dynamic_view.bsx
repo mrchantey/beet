@@ -8,6 +8,9 @@ document holding the row schema (`TodoItem`), `dynamic_view/todos.json` is the
 data document holding the rows and composing that schema by reference, and every
 widget on the page is generated from whichever one it is bound to:
 
+The page is three sections, because they are three different jobs: reading the
+list, editing it, and changing its shape.
+
 - `<DynamicView/>` reads the list as a table, one column per field of the row.
 - `<DynamicForm/>` edits the same list: a control per field per row, a remove
   button beside each row and an add button that appends the row schema's zero.
@@ -43,9 +46,18 @@ what the session changed and `git checkout` is the reset.
 			<DocumentBlob path="dynamic_view/todos.json">
 				<main>
 					<h1>Todos</h1>
-					<DynamicView/>
-					<DynamicForm/>
-					<ToggleSchemaEditor {DocRef($schema)}/>
+					<section>
+						<h2>Items</h2>
+						<DynamicView/>
+					</section>
+					<section>
+						<h2>Edit items</h2>
+						<DynamicForm/>
+					</section>
+					<section>
+						<h2>Schema</h2>
+						<ToggleSchemaEditor {DocRef($schema)}/>
+					</section>
 				</main>
 			</DocumentBlob>
 		</Route>

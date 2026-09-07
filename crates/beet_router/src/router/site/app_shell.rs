@@ -24,6 +24,16 @@ use beet_ui::prelude::Reset;
 /// A page wanting the padded, measure-capped content column authors its own
 /// `<main>`, which the shipped rules style.
 ///
+/// # Scrolling
+///
+/// The body is a *fixed* `100vh` column, so the content region is what scrolls
+/// rather than the page: [`app_shell_rules`] gives a `<main>` inside this shell
+/// `overflow-y: auto`, the same `flex-grow` + `auto` recipe a thread transcript
+/// uses for its own region. A page that wants the scroll elsewhere (a thread
+/// pinning its composer) simply scrolls that element instead, and one that
+/// authors no `<main>` is clipped to the viewport, which is what a fixed shell
+/// means.
+///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// an app wraps its routes in it with `<Router {Layout{template:"AppShell"}}>`.
 #[template(system)]
@@ -32,7 +42,8 @@ pub fn AppShell(
 	theme: Res<Theme>,
 ) -> impl Bundle {
 	let cx = stack.current();
-	let body_classes = PageClasses::resolve(cx.parts(), &theme);
+	let mut body_classes = PageClasses::resolve(cx.parts(), &theme);
+	body_classes.insert_class(APP_SHELL);
 	let html_head = cx.parts().accepts(MediaType::Html).then(|| {
 		rsx! {
 			<Preflight/>
@@ -84,5 +95,33 @@ fn page_column() -> impl Bundle {
 			style::common_props::ForegroundColor,
 			colors::OnSurface
 		),
+	]
+}
+
+/// The shell's own class, marking a body whose height is the viewport's.
+///
+/// Scopes [`app_shell_rules`] to this shell: the shipped `.page` is a
+/// *document-flow* body (`min-height: 100vh`) whose content grows and whose
+/// page-host scrollport scrolls, and giving its `<main>` a scroll region too
+/// would put two scrollbars on every site page.
+pub const APP_SHELL: ClassName = ClassName::new_static("app-shell");
+
+/// The shell's scroll region: a `<main>` inside an [`AppShell`] scrolls its own
+/// content, since the shell's body cannot grow past the viewport.
+///
+/// Contributed by [`RouterPlugin`](crate::prelude::RouterPlugin) through
+/// [`RuleSet::extend_rules`], the way the card-stack rules are, so it composes
+/// with the material set and overrides `main` on a tie.
+pub(crate) fn app_shell_rules() -> Vec<Rule> {
+	vec![
+		Rule::new()
+			.with_selector(Selector::descendant(
+				Selector::class(APP_SHELL),
+				Selector::tag("main"),
+			))
+			.with_value(
+				style::common_props::OverflowYProp,
+				style::Overflow::Auto,
+			),
 	]
 }
