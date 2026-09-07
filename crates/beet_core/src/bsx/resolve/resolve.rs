@@ -27,6 +27,7 @@
 //! Entity references resolve through `cx.entity_references` with a two-pass walk
 //! (collect `bx:ref` names, then resolve `$name`), so `$name` may point forward.
 use super::binding::*;
+use super::build_cfg::*;
 use super::element::*;
 use super::entity_refs::*;
 use crate::prelude::*;
@@ -79,10 +80,25 @@ impl BsxTemplate {
 impl Template for BsxTemplate {
 	type Output = ();
 	fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
+		// pass 0: `bx:cfg` exclusion, before anything looks at the tree. An
+		// excluded branch is removed from the SYNTAX, so no later pass can
+		// observe it: no pinned `bx:ref`, no entity, no build-time effect. Only
+		// a document that declares a condition pays for the walk.
+		let pruned = if contains_build_cfg(&self.nodes) {
+			// SAFETY: reads the condition seam and crate registrations, no flush.
+			let world = unsafe { cx.entity.world_mut() };
+			Some(prune_build_cfg(&self.nodes, world)?)
+		} else {
+			None
+		};
+		let nodes: &[BsxNode] = match &pruned {
+			Some(nodes) => nodes,
+			None => &self.nodes,
+		};
 		// pass 1: collect every `bx:ref` name -> a pinned reference id, so a `$name`
 		// forward reference resolves to the same placeholder entity.
 		let mut refs = RefBindings::default();
-		collect_refs(&self.nodes, &mut refs)?;
+		collect_refs(nodes, &mut refs)?;
 		// expose this build's root for `@entity:SnippetRoot::`, restoring any outer
 		// snippet root so nested registry-template builds nest correctly.
 		let root = cx.entity.id();
@@ -92,11 +108,11 @@ impl Template for BsxTemplate {
 		world.insert_resource(SnippetBuildRoot(root));
 		let result = if self.as_container {
 			// every root node spawns as a child of the container entity.
-			self.nodes.iter().try_for_each(|node| {
+			nodes.iter().try_for_each(|node| {
 				spawn_child(node, root, &self.registry, &refs, cx).map(|_| ())
 			})
 		} else {
-			build_root_nodes(&self.nodes, &self.registry, &refs, cx)
+			build_root_nodes(nodes, &self.registry, &refs, cx)
 		};
 		// SAFETY: only used to swap the snippet-root resource, no flush.
 		let world = unsafe { cx.entity.world_mut() };

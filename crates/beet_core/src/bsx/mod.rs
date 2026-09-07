@@ -34,6 +34,16 @@
 //! lean binary loads the same document shape a full one does and only its
 //! behavior is missing.
 //!
+//! [`bx:cfg`](BuildCondition) is the one directive that breaks that last
+//! sentence, deliberately: it removes its node and subtree from the syntax tree
+//! before the build walk, so an excluded branch has no shape to load. Structure
+//! stays universal by default because an inert entity costs nothing; a node that
+//! performs a build-time EFFECT (`<Template src>` reading a file) has no inert
+//! form, and `bx:cfg` is how such a branch is kept out of a build that must not
+//! run it. Gating BEHAVIOR rather than existence is
+//! [`RequireFeatures`](crate::prelude::RequireFeatures), which is enforced at
+//! dispatch and leaves the document whole.
+//!
 //! ## Bindings
 //!
 //! All interpolation is reactive and explicitly source-prefixed:

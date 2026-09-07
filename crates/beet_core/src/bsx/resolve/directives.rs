@@ -25,6 +25,7 @@ pub(in crate::bsx) fn is_directive(key: &str) -> bool {
 /// `bx:<event>` verb trigger. Anything else under `bx:` is treated as an event
 /// (resolved through the [`EventRegistry`], a graceful no-op when unregistered).
 const STRUCTURAL_DIRECTIVES: &[&str] = &[
+	"bx:cfg",
 	"bx:scope",
 	"bx:for",
 	"bx:key",

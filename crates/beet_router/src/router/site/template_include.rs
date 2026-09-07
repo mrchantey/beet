@@ -196,6 +196,61 @@ mod test {
 			.xpect_eq("article");
 	}
 
+	/// The property a deployed lean binary depends on: an include under an UNMET
+	/// `bx:cfg` never reads its file.
+	///
+	/// This is why `bx:cfg` exists rather than `RequireFeatures` covering the
+	/// case. `RequireFeatures` gates dispatch and lets the document build whole,
+	/// so the include would still run and still fail to find a file that was
+	/// never shipped. `bx:cfg` removes the node from the syntax tree, so there is
+	/// nothing left to read. The store here holds no `gated.bsx` at all: if the
+	/// include ran, it would error rather than silently pass.
+	#[beet_core::test]
+	async fn an_unmet_bx_cfg_never_reads_an_include() {
+		let mut world = (AsyncPlugin, TemplatePlugin).into_world();
+		register_template_include(&mut world);
+		world.init_resource::<BsxConditions>();
+		// a binary compiling `serve` and nothing else
+		world.spawn(
+			CrateRegistration::new("lean_bin", "0.1.0")
+				.with_feature("serve")
+				.with_skip_prefix(),
+		);
+
+		// deliberately EMPTY of `gated.bsx`: only the met include is shippable.
+		let store = BlobStore::temp();
+		store
+			.insert(&SmolPath::from("shipped.bsx"), "<article/>")
+			.await
+			.unwrap();
+
+		let root = BsxTemplate::parse_entry(
+			&world,
+			r#"<main>
+				<Fragment bx:cfg="feature:infra"><Template src="gated.bsx"/></Fragment>
+				<Template src="shipped.bsx"/>
+			</main>"#,
+		)
+		.unwrap()
+		.spawn(&mut world)
+		.unwrap();
+		world.entity_mut(root).insert(store);
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		// exactly one child: the ungated include, built at its site. The gated
+		// branch left no entity at all, so nothing ever resolved a store or read
+		// a path, and no `<Template src>` error was logged.
+		let children: Vec<Entity> =
+			world.entity(root).get::<Children>().unwrap().iter().collect();
+		children.len().xpect_eq(1);
+		world
+			.entity(children[0])
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("article");
+	}
+
 	/// Slot content *inside* an included entry resolves once the include settles:
 	/// the included `<Fragment slot="x">` collapses into the included `<Slot
 	/// name="x"/>`, leaving no routing markers behind. The resolution cannot run
