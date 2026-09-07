@@ -76,5 +76,5 @@ pub fn analytics_plugin(app: &mut App) {
 		.add_observer(store::spawn_store_on_config)
 		.add_observer(store::handle_analytics_event)
 		.add_systems(Update, store::flush_aged_buffers)
-		.add_systems(Last, store::flush_on_exit.before(AppExitSet::Exit));
+		.add_systems(Last, store::flush_on_exit.before(AppExitSet));
 }

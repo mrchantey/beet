@@ -61,7 +61,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 		};
 		(
 			AnalyticsStore::remote(bucket)?,
-			Table::<AnalyticsRollup>::remote(&rollup_name(bucket))?,
+			Table::<AnalyticsRollup>::remote_blob(&rollup_name(bucket))?,
 		)
 	} else {
 		let dir = match parts.get_param("dir") {

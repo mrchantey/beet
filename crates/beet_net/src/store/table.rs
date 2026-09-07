@@ -143,24 +143,41 @@ impl<T: TableStoreRow> Table<T> {
 		Self::new(BlobStore::new(FsStore::new(dir)))
 	}
 
-	/// The json-over-blobs table in the remote S3 bucket named `bucket_name`, in
-	/// whichever region the SDK's default provider chain resolves.
+	/// The json-over-blobs table in the remote S3 bucket named `bucket_name`.
 	///
-	/// Blobs rather than DynamoDB because the blob store is the portable
-	/// substrate every target shares; a caller that specifically wants a
-	/// table-native backend builds one, ie
-	/// `Table::new(DynamoStore::new_default_region(name))`. The region comes
-	/// from the process environment because there is no resource declaration
-	/// here to resolve one from; a store resolved through its
-	/// `<S3BucketBlock/>` is handed the region that block resolved. Errors
-	/// without the `aws_sdk` backend.
-	pub fn remote(bucket_name: &str) -> Result<Self> {
+	/// Two remote constructors rather than one `remote`, because two remote
+	/// backends implement [`TableProvider`] and which one a caller means is not
+	/// inferable: blobs are the portable substrate every target shares,
+	/// [`Self::remote_dynamo`] is the table-native one. A call site naming
+	/// neither is a call site that will silently mean the other after a
+	/// refactor.
+	///
+	/// The region is the SDK's default provider chain, ie the process
+	/// environment, because there is no resource declaration here to resolve one
+	/// from; a store resolved through its `<S3BucketBlock/>` is handed the
+	/// region that block resolved. Errors without the `aws_sdk` backend.
+	pub fn remote_blob(bucket_name: &str) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 				Self::new(BlobStore::new(S3Store::new_default_region(bucket_name))).xok()
 			} else {
 				let _ = bucket_name;
-				bevybail!("a remote table requires the `aws_sdk` feature")
+				bevybail!("a remote blob-backed table requires the `aws_sdk` feature")
+			}
+		}
+	}
+
+	/// The table-native DynamoDB table named `table_name`, for a workload that
+	/// wants indexed queries, conditional writes or native TTL rather than the
+	/// portability [`Self::remote_blob`] buys. Region as above; errors without
+	/// the `aws_sdk` backend.
+	pub fn remote_dynamo(table_name: &str) -> Result<Self> {
+		cfg_if! {
+			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
+				Self::new(DynamoStore::new_default_region(table_name)).xok()
+			} else {
+				let _ = table_name;
+				bevybail!("a remote dynamo table requires the `aws_sdk` feature")
 			}
 		}
 	}

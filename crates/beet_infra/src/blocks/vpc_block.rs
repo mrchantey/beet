@@ -3,14 +3,22 @@ use crate::prelude::*;
 use crate::terra::ResourceDef;
 use beet_core::prelude::*;
 
-/// A small private network: one vpc, a public and a private subnet in each of
-/// two availability zones, and an internet gateway the public side routes
-/// through.
+/// A small private network: one vpc, a public and optionally a private subnet in
+/// each declared availability zone, and an internet gateway the public side
+/// routes through.
+///
+/// The topology is DECLARED rather than assumed, because the right one is a
+/// property of the workloads and nothing here can infer it: `<VpcBlock
+/// zones={["a"]} private_tier=false/>` is one subnet for a single public box,
+/// the default two zones with both tiers is four and is what an RDS subnet
+/// group requires, and three zones with both tiers is six. A stack pays for
+/// none of them (subnets are free) but each is a resource in its plan, and a
+/// private tier nothing sits in is a tier somebody will later wonder about.
 ///
 /// Deliberately no NAT gateway. The private subnets stay on the vpc's main
 /// route table, whose only route is the local cidr, so a private instance has
 /// no path off the vpc at all. Giving it one costs about $32 a month, and the
-/// resource this network exists for (a database) has nothing to reach out to.
+/// resource this tier exists for (a database) has nothing to reach out to.
 /// A private workload that genuinely needs egress wants a vpc endpoint for the
 /// one service it calls, not a gateway to the whole internet.
 ///
@@ -31,6 +39,16 @@ pub struct VpcBlock {
 	/// The network this vpc owns, which must be a `/16`: every subnet is a
 	/// `/24` carved out of its third octet.
 	cidr: SmolStr,
+	/// The availability zones this vpc spans, as region suffixes, ie
+	/// `["a", "b"]` for `ap-southeast-2a` and `ap-southeast-2b`. One subnet per
+	/// tier per zone, in this order: the `index`th zone takes the `index`th
+	/// `/24` of its tier, so appending a zone never renumbers an existing
+	/// subnet and reordering the list renumbers all of them.
+	zones: Vec<SmolStr>,
+	/// Whether the private tier exists. On by default because the blocks that
+	/// consume this network mostly want one; a stack whose only workload is a
+	/// public box declares `false` and emits half as many subnets.
+	private_tier: bool,
 }
 
 impl Default for VpcBlock {
@@ -41,6 +59,15 @@ impl VpcBlock {
 	/// The default network. Private space, and a `/16` so the third octet is
 	/// free for subnets to number themselves with.
 	pub const CIDR: &'static str = "10.0.0.0/16";
+
+	/// The zones a vpc spans unless it declares otherwise. Two, because that is
+	/// the minimum an RDS subnet group accepts and every region has an `a` and
+	/// a `b`.
+	pub const ZONES: &'static [&'static str] = &["a", "b"];
+
+	/// The most zones one tier can hold before its `/24`s would collide with
+	/// the next tier's, ie the spacing in [`SubnetTier::octet`].
+	pub const MAX_ZONES: usize = 10;
 
 	/// The label suffixes of the resources this block emits, which are also
 	/// the `Name` tags they carry.
@@ -53,6 +80,8 @@ impl VpcBlock {
 		Self {
 			label: label.into(),
 			cidr: Self::CIDR.into(),
+			zones: Self::ZONES.iter().copied().map(SmolStr::from).collect(),
+			private_tier: true,
 		}
 	}
 
@@ -126,10 +155,58 @@ impl VpcBlock {
 		stack: &ResolvedStack,
 		tier: SubnetTier,
 	) -> Vec<SmolStr> {
-		SubnetTier::AZ_SUFFIXES
+		self.zones
 			.iter()
 			.map(|zone| self.subnet_id(stack, tier, zone).into())
 			.collect()
+	}
+
+	/// The tiers this vpc actually emits, public first.
+	pub fn tiers(&self) -> Vec<SubnetTier> {
+		match self.private_tier {
+			true => vec![SubnetTier::Public, SubnetTier::Private],
+			false => vec![SubnetTier::Public],
+		}
+	}
+
+	/// Whether this vpc emits `tier` at all, ie what a consumer needing a
+	/// private subnet asks before composing a reference to one.
+	pub fn has_tier(&self, tier: SubnetTier) -> bool {
+		self.tiers().contains(&tier)
+	}
+
+	/// Rejects a topology that cannot be emitted, at config time.
+	///
+	/// A zone list that is empty, repeats itself or outruns the `/24` spacing
+	/// between tiers would otherwise become a duplicate ident or a silently
+	/// overlapping cidr, both of which surface as an apply-time AWS error a
+	/// long way from the declaration that caused them.
+	pub fn validate(&self) -> Result {
+		if self.zones.is_empty() {
+			bevybail!(
+				"vpc '{}' declares no availability zones: a network with no subnet has nothing to put in it, ie `zones={{[\"a\"]}}`",
+				self.label
+			);
+		}
+		if self.zones.len() > Self::MAX_ZONES {
+			bevybail!(
+				"vpc '{}' declares {} availability zones, more than the {} its /24 tier spacing allows",
+				self.label,
+				self.zones.len(),
+				Self::MAX_ZONES
+			);
+		}
+		let mut seen = HashSet::<&SmolStr>::default();
+		for zone in &self.zones {
+			if !seen.insert(zone) {
+				bevybail!(
+					"vpc '{}' declares availability zone '{zone}' twice, so two subnets would compose the same ident",
+					self.label
+				);
+			}
+		}
+		self.network_prefix()?;
+		Ok(())
 	}
 
 	/// The first two octets of [`cidr`](Self::cidr), ie the `10.0` every subnet
@@ -212,6 +289,7 @@ impl VpcBlock {
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 	) -> Result {
+		self.validate()?;
 		let vpc = ResourceDef::new_secondary(
 			self.ident(stack, Self::VPC),
 			AwsVpcDetails {
@@ -240,16 +318,14 @@ impl VpcBlock {
 		config: &mut terra::Config,
 		vpc: &ResourceDef<AwsVpcDetails>,
 	) -> Result {
-		for tier in SubnetTier::ALL {
-			for (index, zone) in SubnetTier::AZ_SUFFIXES.iter().enumerate() {
+		for tier in self.tiers() {
+			for (index, zone) in self.zones.iter().enumerate() {
 				let kind = tier.kind(zone);
 				config.add_resource(&ResourceDef::new_secondary(
 					self.ident(stack, &kind),
 					AwsSubnetDetails {
 						vpc_id: vpc.field_ref("id").into(),
-						cidr_block: Some(
-							self.subnet_cidr(*tier, index)?.into(),
-						),
+						cidr_block: Some(self.subnet_cidr(tier, index)?.into()),
 						availability_zone: Some(
 							format!("{}{zone}", stack.region()).into(),
 						),
@@ -304,7 +380,7 @@ impl VpcBlock {
 			.add_resource(&gateway)?
 			.add_resource(&table)?
 			.add_resource(&default_route)?;
-		for zone in SubnetTier::AZ_SUFFIXES {
+		for zone in &self.zones {
 			let subnet = SubnetTier::Public.kind(zone);
 			config.add_resource(&ResourceDef::new_secondary(
 				self.ident(stack, &format!("{subnet}-routes")),
@@ -336,9 +412,6 @@ pub enum SubnetTier {
 }
 
 impl SubnetTier {
-	/// The availability zones a vpc spans, as region suffixes. Two, because a
-	/// db subnet group requires at least two and every region has these.
-	pub const AZ_SUFFIXES: &'static [&'static str] = &["a", "b"];
 	pub const ALL: &'static [Self] = &[Self::Public, Self::Private];
 
 	pub fn is_public(&self) -> bool { matches!(self, Self::Public) }
@@ -446,6 +519,84 @@ mod tests {
 			"net--public-a 10.0.0.0/24 ap-southeast-2a",
 			"net--public-b 10.0.1.0/24 ap-southeast-2b",
 		]);
+	}
+
+	/// The declared topology is what gets emitted, and the default is unchanged:
+	/// a zone list of one drops to a public subnet alone, three zones with both
+	/// tiers is six, and a zone's `/24` is its POSITION in the list, so
+	/// appending never renumbers an existing subnet.
+	#[beet_core::test]
+	fn the_topology_follows_the_declaration() {
+		let names = |block: &VpcBlock| {
+			let (_stack, config) = build_config(block);
+			let mut subnets = resources(&config, "aws_subnet")
+				.values()
+				.map(|subnet| {
+					format!(
+						"{} {}",
+						subnet["tags"]["Name"].as_str().unwrap(),
+						subnet["cidr_block"].as_str().unwrap(),
+					)
+				})
+				.collect::<Vec<_>>();
+			subnets.sort();
+			subnets
+		};
+		// one public box wants one subnet
+		names(
+			&VpcBlock::new("net")
+				.with_private_tier(false)
+				.with_zones(vec!["a".into()]),
+		)
+		.xpect_eq(vec!["net--public-a 10.0.0.0/24"]);
+		// ..and a third zone appends rather than renumbering
+		names(&VpcBlock::new("net").with_zones(
+			["a", "b", "c"].into_iter().map(SmolStr::from).collect(),
+		))
+		.xpect_eq(vec![
+			"net--private-a 10.0.10.0/24",
+			"net--private-b 10.0.11.0/24",
+			"net--private-c 10.0.12.0/24",
+			"net--public-a 10.0.0.0/24",
+			"net--public-b 10.0.1.0/24",
+			"net--public-c 10.0.2.0/24",
+		]);
+		// every public subnet keeps its route-table association
+		let (_stack, config) = build_config(&VpcBlock::new("net").with_zones(
+			["a", "b", "c"].into_iter().map(SmolStr::from).collect(),
+		));
+		resources(&config, "aws_route_table_association")
+			.len()
+			.xpect_eq(3);
+	}
+
+	/// A topology that cannot be emitted fails at config time rather than
+	/// becoming a duplicate ident or an overlapping cidr AWS reports at apply.
+	#[beet_core::test]
+	fn an_unemittable_topology_fails_at_config_time() {
+		VpcBlock::new("net")
+			.with_zones(Vec::new())
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("declares no availability zones");
+		VpcBlock::new("net")
+			.with_zones(["a", "a"].into_iter().map(SmolStr::from).collect())
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("twice");
+		VpcBlock::new("net")
+			.with_zones(
+				(b'a'..=b'k')
+					.map(|zone| SmolStr::from((zone as char).to_string()))
+					.collect(),
+			)
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("tier spacing allows");
+		VpcBlock::new("net").validate().unwrap();
 	}
 
 	/// Only the public subnets take a public address at launch. A private

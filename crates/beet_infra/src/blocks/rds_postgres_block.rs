@@ -83,6 +83,10 @@ impl RdsPostgresBlock {
 	/// whose vpc is `net--vpc`.
 	pub const INSTANCE: &'static str = "db";
 	pub const SUBNET_GROUP: &'static str = "subnets";
+
+	/// The fewest availability zones an RDS subnet group accepts, and therefore
+	/// the fewest the [`VpcBlock`] this sits in must declare.
+	pub const MIN_ZONES: usize = 2;
 	/// The [`AccessGrant::kind`] for an SSM parameter, ie the master password
 	/// this block tucks away for a consumer to read at boot.
 	pub const ACCESS_KIND: &'static str = "ssm_parameter";
@@ -392,6 +396,25 @@ impl RdsPostgresBlock {
 		vpc: &VpcBlock,
 		group: &ResourceDef<AwsSecurityGroupDetails>,
 	) -> Result {
+		// the network's topology is declared, so the requirement this block puts
+		// on it is stated HERE rather than assumed: a subnet group is the one
+		// consumer that cannot work with a single-zone or public-only vpc, and
+		// AWS reports both as an apply-time error a long way from the markup.
+		if !vpc.has_tier(SubnetTier::Private) {
+			bevybail!(
+				"the vpc '{}' declares no private tier, so there are no private subnets for database '{}' to sit in: declare `private_tier=true` on it",
+				vpc.label(),
+				self.label
+			);
+		}
+		if vpc.zones().len() < Self::MIN_ZONES {
+			bevybail!(
+				"the vpc '{}' spans {} availability zone(s), but an RDS subnet group needs at least {}: declare `zones={{[\"a\", \"b\"]}}` on it",
+				vpc.label(),
+				vpc.zones().len(),
+				Self::MIN_ZONES
+			);
+		}
 		let subnets = ResourceDef::new_secondary(
 			stack.resource_ident(format!(
 				"{}--{}",
@@ -520,6 +543,33 @@ mod tests {
 			});
 		let (stack, _deployment, config) = scope.finish().unwrap();
 		(stack, config)
+	}
+
+	/// The topology a subnet group needs is DECLARED on the vpc, so a network
+	/// that cannot host one says so at render rather than letting AWS reject
+	/// the subnet group at apply, where the message names neither block.
+	#[beet_core::test]
+	fn a_network_that_cannot_host_a_subnet_group_fails_at_render() {
+		let render = |vpc: VpcBlock| {
+			let (scope, _dir) =
+				RenderScope::test_render_stack(sydney_stack(), |parent| {
+					let vpc = parent.spawn(vpc).id();
+					let db = parent.spawn((database(), VpcRef(vpc))).id();
+					parent.spawn(DatabaseRef(db));
+				});
+			scope.finish().map(|_| ())
+		};
+		render(VpcBlock::new("net").with_private_tier(false))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("declares no private tier")
+			.xpect_contains("private_tier=true");
+		render(VpcBlock::new("net").with_zones(vec!["a".into()]))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("availability zone")
+			.xpect_contains("at least 2");
+		render(VpcBlock::new("net")).unwrap();
 	}
 
 	/// The sole `aws_db_instance` the config carries.

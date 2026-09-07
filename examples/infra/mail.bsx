@@ -110,9 +110,11 @@ route.
 	<Stack app_name="mail-example" region="us-west-2">
 		<DeployRoutes/>
 
-		<!-- the one public subnet the box sits in. The embedded database and its EBS
-		     volume share zone `a`, so no private tier or second zone is needed. -->
-		<VpcBlock bx:ref="net" label="net"/>
+		<!-- the network is DECLARED, not assumed: this stack is one public box and
+		     one EBS volume in the same zone, so it says so and emits one subnet.
+		     The default (two zones, both tiers, four subnets) is what an
+		     `<RdsPostgresBlock/>` subnet group requires. -->
+		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 		<!-- message bodies: the source of record, so versioned and not
 		     force-destroyable. -->
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false

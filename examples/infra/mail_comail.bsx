@@ -103,7 +103,7 @@ inbound assertion rather than failing the deploy.
 	<Stack app_name="mail-comail-example" region="us-west-2">
 		<DeployRoutes/>
 
-		<VpcBlock bx:ref="net" label="net"/>
+		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
 		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true

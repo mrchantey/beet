@@ -13,6 +13,12 @@ use serde_json::json;
 /// volume yet and is skipped; later deploys wait for a complete snapshot before
 /// an apply can replace the instance or otherwise change its attachment.
 ///
+/// This is an INTERLOCK, not a backup schedule. It fires when a deploy is about
+/// to do something dangerous, so its depth is how many recent deploys you can
+/// roll back through, not how far back in time you can recover: the scheduled
+/// backup is the box's own nightly `stalwart-backup.timer`, which produces a
+/// verified, restore-anywhere copy that this snapshot cannot.
+///
 /// A snapshot every deploy is a lineage nothing else prunes, and EBS keeps one
 /// until it is deleted, so the step prunes its own: after a snapshot completes,
 /// every older one this block took of the same volume beyond
@@ -24,7 +30,7 @@ use serde_json::json;
 #[require(StalwartSnapshotAction)]
 pub struct StalwartSnapshot {
 	/// How many of this block's own snapshots of the data volume survive a
-	/// deploy, newest first. One deploy a day at the default keeps a week.
+	/// deploy, newest first: a rollback depth in DEPLOYS, not in days.
 	#[get(copy)]
 	snapshot_retain: usize,
 }
@@ -38,8 +44,10 @@ impl Default for StalwartSnapshot {
 }
 
 impl StalwartSnapshot {
-	/// The default depth of the pre-deploy snapshot lineage.
-	pub const SNAPSHOT_RETAIN: usize = 7;
+	/// The default rollback depth. Three deploys is enough to step back past a
+	/// bad one and the one before it; time-based recovery is the nightly
+	/// timer's job, not this step's.
+	pub const SNAPSHOT_RETAIN: usize = 3;
 
 	const DEPLOY_TAG: &'static str = "DeployId";
 	const SOURCE_TAG: &'static str = "SourceVolumeName";
