@@ -21,6 +21,13 @@ use serde_json::json;
 /// backup is the box's own nightly `stalwart-backup.timer`, which produces a
 /// verified, restore-anywhere copy that this snapshot cannot.
 ///
+/// What a *scheduled* volume snapshot would add over that timer is protection
+/// against filesystem-level corruption the online `.backup` would faithfully
+/// copy. It is deliberately not built: a verb that runs when a human deploys
+/// can never be a schedule, so if it is ever wanted it belongs in an AWS Data
+/// Lifecycle Manager policy with its own binding and block, declaring its
+/// schedule and retention, rather than in more work here.
+///
 /// A snapshot every deploy is a lineage nothing else prunes, and EBS keeps one
 /// until it is deleted, so the step prunes its own: after a snapshot completes,
 /// every older one this block took of the same volume beyond

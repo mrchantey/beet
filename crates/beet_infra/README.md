@@ -28,6 +28,8 @@ Two footguns the markup cannot yet make unrepresentable:
 
 A cloud resource is declared ONCE, in markup, as its provider block (`<S3BucketBlock label="app"/>`, `<DynamoTableBlock bx:ref="events" label="events"/>`). Both meanings hang off that one entity: the deploy meaning (the block's `Block` impl and `DeployRender` systems, always compiled) and the runtime meaning (a live store, attached by an `InfraPlugin` observer). Never derive a resource name a second time.
 
+Retiring a *protected* resource is two applies, and removing the declaration first is the wrong order: with the block gone there is nothing left to turn `deletion_protection` off with, so the destroy fails at the provider. Clear the flag while the block is still declared, apply, then delete the block and apply again.
+
 A block is a declaration, not a sequence step, so nothing dispatches it during a deploy. Anything a block must *do* belongs to whichever step consumes its output, never to the block being run: an artifact is built by the apply that uploads it (`TofuApplyAction` -> `BuildArtifact::build`), because a build wired as its own step is a build some other entry forgets, and an artifact uploaded but never built is a stale binary shipping under a green deploy.
 
 Blocks are immutable components (reinsertion is the only mutation path). `ErasedBlock` is the data projection of any block (its label and artifact label), derived by a generic `on_insert` hook so it can never go stale, removed with its block, and one per entity: a second block type on the same entity raises a clobber error rather than silently retagging it, mirroring `beet_action`'s one-action-per-entity rule.
