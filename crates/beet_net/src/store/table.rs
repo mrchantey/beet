@@ -13,7 +13,7 @@ use uuid::Uuid;
 /// The table twin of [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is
 /// materialized onto every store entity by the provider component hooks
 /// ([`BlobStore::on_add`] inserts the json-over-blobs form under `json`, a
-/// table-native provider like `DynamoStore` overrides it with its own via
+/// table-native provider like [`DynamoStore`] overrides it with its own via
 /// [`TableStore::on_add`]), so a consumer resolves `TableStore` from an entity
 /// and never names a backend. Typed access goes through [`Self::table`],
 /// mirroring [`BlobStore::blob`].
@@ -143,19 +143,23 @@ impl<T: TableStoreRow> Table<T> {
 		Self::new(BlobStore::new(FsStore::new(dir)))
 	}
 
-	/// The remote (DynamoDB) table named `table_name`, in whichever region the
-	/// SDK's default provider chain resolves.
+	/// The json-over-blobs table in the remote S3 bucket named `bucket_name`, in
+	/// whichever region the SDK's default provider chain resolves.
 	///
-	/// The region is the process environment's because there is no declaration
-	/// here to read one off; a store resolved through its `<DynamoTableBlock/>`
-	/// is handed the region that block resolved. Errors without the `aws_sdk`
-	/// backend.
-	pub fn remote(table_name: &str) -> Result<Self> {
+	/// Blobs rather than DynamoDB because the blob store is the portable
+	/// substrate every target shares; a caller that specifically wants a
+	/// table-native backend builds one, ie
+	/// `Table::new(DynamoStore::new_default_region(name))`. The region comes
+	/// from the process environment because there is no resource declaration
+	/// here to resolve one from; a store resolved through its
+	/// `<S3BucketBlock/>` is handed the region that block resolved. Errors
+	/// without the `aws_sdk` backend.
+	pub fn remote(bucket_name: &str) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Self::new(DynamoStore::new_default_region(table_name)).xok()
+				Self::new(BlobStore::new(S3Store::new_default_region(bucket_name))).xok()
 			} else {
-				let _ = table_name;
+				let _ = bucket_name;
 				bevybail!("a remote table requires the `aws_sdk` feature")
 			}
 		}
@@ -287,7 +291,7 @@ impl<T: TableStoreRow> Table<T> {
 		BlobStoreProvider::region(self.provider.as_ref())
 	}
 
-	/// Where this table actually lives, ie `dynamo:beet-site--prod--analytics
+	/// Where this table actually lives, ie `s3:beet-site--prod--analytics
 	/// (us-west-2)`. The one thing an operator needs from a store that will not
 	/// answer, so it belongs in any error naming this table.
 	pub fn describe(&self) -> String {
@@ -303,8 +307,7 @@ impl<T: TableStoreRow> Table<T> {
 /// - [`Clone`] - For copying objects
 /// - `'static` - For type safety across async boundaries
 ///
-/// The serialized row must carry its [`id`](Self::id) as an `id` field, the
-/// primary key a table-native backend (eg DynamoDB) retrieves by.
+/// The serialized row is stored under its [`id`](Self::id).
 pub trait TableStoreRow: TableContent {
 	/// Unique identifier for the object, used as the primary key in the table.
 	fn id(&self) -> Uuid;
@@ -362,7 +365,7 @@ impl<T: TableContent> TableStoreRow for TableItem<T> {
 /// Extends [`BlobStoreProvider`] with document operations, and is deliberately
 /// encoding-agnostic: only the [`BlobStore`] impl (under `json`) knows about
 /// bytes, encoding rows as JSON so any blob store backs a table; a table-native
-/// backend like `DynamoStore` stores structured documents directly.
+/// backend like [`DynamoStore`] stores structured documents directly.
 pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	/// Returns a boxed clone of this provider for type erasure.
 	fn box_clone_table(&self) -> Box<dyn TableProvider>;
@@ -380,8 +383,7 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	///
 	/// The default lists ids and fetches each row, bounded by
 	/// [`BlobStore::GET_ALL_CONCURRENCY`]. A provider whose listing already
-	/// carries the row bodies (ie a DynamoDB `Scan`) should override this to
-	/// read them in one pass, since the default is an N+1 over the network.
+	/// carries row bodies should override this to avoid an N+1 over the network.
 	fn get_all_rows(
 		&self,
 	) -> SendBoxedFuture<Result<Vec<(SmolPath, Result<Value>)>>> {

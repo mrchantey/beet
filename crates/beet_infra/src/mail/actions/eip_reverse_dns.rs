@@ -1,4 +1,5 @@
 //! The reverse-dns half of the box's identity.
+use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -76,7 +77,7 @@ pub async fn EipReverseDnsAction(
 	.await?;
 
 	info!("requesting PTR {address} -> {hostname}");
-	ec2(&region, [
+	aws_cli_ext::ec2(&region, [
 		"modify-address-attribute",
 		"--allocation-id",
 		&allocation,
@@ -172,7 +173,7 @@ async fn wait_for_ptr(
 ) -> Result<bool> {
 	let attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
 	for _ in 1..=attempts {
-		let output = ec2(region, [
+		let output = aws_cli_ext::ec2(region, [
 			"describe-addresses-attribute",
 			"--allocation-ids",
 			allocation,
@@ -208,22 +209,6 @@ fn ptr_is_published(body: &str, hostname: &str) -> Result<bool> {
 	Ok(published == hostname)
 }
 
-/// An `aws ec2` invocation in `region`. Drops a possibly-empty inherited
-/// `AWS_PROFILE`, which the cli reads as a profile literally named `""`.
-fn ec2<'a>(
-	region: &str,
-	args: impl IntoIterator<Item = &'a str>,
-) -> ChildProcess {
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args(
-			["ec2"]
-				.into_iter()
-				.chain(args)
-				.map(SmolStr::from)
-				.chain([SmolStr::from("--region"), SmolStr::from(region)]),
-		)
-}
 
 #[cfg(test)]
 mod tests {

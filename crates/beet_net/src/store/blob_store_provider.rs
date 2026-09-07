@@ -104,10 +104,8 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// answer, so it belongs in any error naming one.
 	fn describe(&self) -> String {
 		match self.region() {
-			Some(region) => {
-				format!("{}:{} ({region})", self.id(), self.root_key())
-			}
-			None => format!("{}:{}", self.id(), self.root_key()),
+			Some(region) => format!("{} ({region})", self.root_key()),
+			None => self.root_key().to_string(),
 		}
 	}
 

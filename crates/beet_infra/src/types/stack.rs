@@ -302,13 +302,12 @@ mod tests {
 		}
 	}
 
-	/// The storage layer the beet site's stage stack renders: the app bucket and
-	/// the analytics table, both named through the one composition and both in
-	/// the stack's region.
+	/// The storage layer the beet site's stage stack renders: the app and
+	/// analytics buckets, both named through the one composition and in the
+	/// stack's region.
 	///
-	/// These are the LIVE resources. A moved name or region replaces them, and
-	/// for the analytics table that is a silent data loss (a new empty table the
-	/// site happily writes to), so the values are pinned rather than the shape.
+	/// These are live resources. A moved name or region replaces them, so the
+	/// values are pinned rather than the shape.
 	#[beet_core::test]
 	fn the_storage_layer_renders_the_live_names() {
 		let (scope, _dir) = RenderScope::test_render_stack(
@@ -317,7 +316,9 @@ mod tests {
 				parent.spawn(
 					S3BucketBlock::new("app").with_deploy_versioned(false),
 				);
-				parent.spawn(DynamoTableBlock::new("analytics"));
+				parent.spawn(
+					S3BucketBlock::new("analytics").with_runtime_write(true),
+				);
 			},
 		);
 		let (_stack, _deployment, config) = scope.finish().unwrap();
@@ -326,7 +327,7 @@ mod tests {
 			.unwrap()
 			.as_str()
 			.xpect_contains("\"bucket\":\"beet-site--prod--app\"")
-			.xpect_contains("\"name\":\"beet-site--prod--analytics\"")
+			.xpect_contains("\"bucket\":\"beet-site--prod--analytics\"")
 			.xpect_contains("\"region\":\"us-west-2\"");
 		// both converge in the layer applied before anything that reads them
 		config.layer_targets("storage").unwrap().len().xpect_eq(2);

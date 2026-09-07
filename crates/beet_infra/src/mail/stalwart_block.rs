@@ -7,11 +7,11 @@ use heck::ToUpperCamelCase;
 use serde_json::Value;
 use serde_json::json;
 
-/// The mail box: one EC2 instance running a pinned [Stalwart] release, holding
-/// no state worth keeping. Mail metadata lives in the stack's
-/// [`RdsPostgresBlock`] and message bodies in its blob [`S3BucketBlock`], so the
-/// instance is cattle: any machine-config change replaces it, and inbound SMTP
-/// during the rebuild is covered by sender retries.
+/// The mail box: one EC2 instance running a pinned [Stalwart] release.
+/// Mail metadata lives in Stalwart's embedded SQLite database on a persistent
+/// data volume and message bodies live in its blob [`S3BucketBlock`], so the
+/// instance remains cattle: any machine-config change replaces it, and inbound
+/// SMTP during the rebuild is covered by sender retries.
 ///
 /// The box is infrastructure, not a mail domain. Its `hostname` (the `A` record
 /// this block emits, its rDNS, its certificate, its SMTP banner) stays put
@@ -29,21 +29,19 @@ use serde_json::json;
 ///
 /// The file's absence is itself a state: a box with no `config.json` boots in
 /// Stalwart's bootstrap mode, serving only the management endpoint, and the
-/// SERVER writes the file when provision claims the data store through the
+/// server writes the file when provision claims the data store through the
 /// `Bootstrap` singleton. So this block ships a `config.json.template` and
 /// never the file itself: first boot finds no file and waits to be claimed, and
-/// every later start re-renders the file from the template and SSM, so a
-/// credential rotation stays a restart. Reconfiguring a running server never
-/// touches this block at all.
+/// every later start copies the static SQLite template into place. Reconfiguring
+/// a running server never touches this block at all.
 ///
 /// ## The rebuild rule
 ///
 /// Everything rendered into user_data is machine identity, and any change to it
 /// replaces the instance (`user_data_replace_on_change`). Secrets are therefore
-/// deliberately absent: the boot script fetches them from SSM parameter store
-/// through the instance profile at every service start, so a credential
-/// rotation is `systemctl restart stalwart` rather than a rebuild, and the
-/// rendered script holds parameter *names* only.
+/// deliberately absent: until the store is claimed, the boot script fetches the
+/// recovery-admin password from SSM through the instance profile; afterwards it
+/// fetches nothing. The rendered script holds the parameter name only.
 ///
 /// [Stalwart]: https://stalw.art
 #[derive(
@@ -60,11 +58,7 @@ pub struct StalwartBlock {
 	/// The box's fqdn, ie `mail.beetmash.com`: the `A` record, the rDNS target,
 	/// the ACME certificate subject and the SMTP banner.
 	hostname: SmolStr,
-	/// The logical database and role inside the [`RdsPostgresBlock`] this box's
-	/// [`DatabaseRef`] targets, which must match that declaration; the entry
-	/// authoring both blocks passes one value to each.
-	db_name: SmolStr,
-	db_user: SmolStr,
+
 	/// The [`S3BucketBlock`] holding message bodies, by label. Declare it
 	/// `with_runtime_write(true)` so the grant this block lowers can store.
 	blob_bucket: SmolStr,
@@ -107,6 +101,16 @@ pub struct StalwartBlock {
 	instance_type: SmolStr,
 	/// Root EBS volume size in GB, encrypted gp3.
 	volume_gb: i64,
+	/// Persistent data volume size in GB, encrypted gp3. The volume survives an
+	/// instance replacement and mounts at [`DATA_MOUNT`](Self::DATA_MOUNT).
+	data_volume_gb: i64,
+	/// Whether tofu prevents destroying the persistent data volume and asks AWS
+	/// for a final snapshot. Defaults to protected in production and disposable
+	/// elsewhere, so the same declaration can run a restore drill in another
+	/// stage. Set explicitly to override that data grade.
+	#[get(skip)]
+	#[set_with(unwrap_option)]
+	data_volume_protected: Option<bool>,
 }
 
 impl Default for StalwartBlock {
@@ -145,6 +149,15 @@ impl StalwartBlock {
 	/// The smallest Graviton instance with enough memory for an MTA plus its
 	/// spam classifier.
 	pub const INSTANCE_TYPE: &'static str = "t4g.small";
+	/// The persistent EBS volume's tag and terraform-label suffix.
+	pub const DATA_VOLUME_KIND: &'static str = "data";
+	/// The stable EC2 attachment name. Nitro exposes it through an NVMe by-id
+	/// link containing the EBS volume id rather than at this path.
+	pub const DATA_DEVICE_NAME: &'static str = "/dev/sdf";
+	/// The persistent volume's mount point and Stalwart's working directory.
+	pub const DATA_MOUNT: &'static str = "/var/lib/stalwart";
+	/// The embedded SQLite database on the persistent data volume.
+	pub const DATABASE_PATH: &'static str = "/var/lib/stalwart/stalwart.db";
 
 	/// The SSM public parameter naming the current AL2023 arm64 AMI. Resolved
 	/// per apply, so an AMI release replaces the box on the next deploy: the
@@ -160,20 +173,14 @@ impl StalwartBlock {
 	/// moment a `config.json` exists.
 	pub const ADMIN_USER: &'static str = "admin";
 
-	/// The AWS-published bundle of every RDS certificate authority, installed
-	/// into the box's trust store so the database session is verified rather
-	/// than merely encrypted. RDS presents a certificate from Amazon's private
-	/// CA, which no distribution ships.
-	pub const RDS_CA_BUNDLE: &'static str =
-		"https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem";
 
 	/// When the nightly dump runs, in UTC (`systemd` calendar syntax). Late
 	/// evening in Sydney, ie the quietest hour for the mailboxes this serves.
 	pub const BACKUP_SCHEDULE: &'static str = "*-*-* 14:30:00";
 
-	/// The prefix every dump is written under, so the bucket's lifecycle rule
-	/// and an off-site `rclone` pull both have one path to name.
-	pub const BACKUP_PREFIX: &'static str = "postgres";
+	/// The prefix every database snapshot is written under, so the bucket's
+	/// lifecycle rule and an off-site `rclone` pull both have one path to name.
+	pub const BACKUP_PREFIX: &'static str = "sqlite";
 
 	pub fn new(
 		label: impl Into<SmolStr>,
@@ -182,8 +189,7 @@ impl StalwartBlock {
 		Self {
 			label: label.into(),
 			hostname: hostname.into(),
-			db_name: "mail".into(),
-			db_user: "postgres".into(),
+
 			blob_bucket: SmolStr::default(),
 			backup_bucket: SmolStr::default(),
 			dns: None,
@@ -191,6 +197,8 @@ impl StalwartBlock {
 			ssh_public_key: SmolStr::default(),
 			instance_type: Self::INSTANCE_TYPE.into(),
 			volume_gb: 30,
+			data_volume_gb: 20,
+			data_volume_protected: None,
 		}
 	}
 
@@ -223,13 +231,10 @@ impl StalwartBlock {
 			.is_none_or(|owner| owner == stack.stage())
 	}
 
-	/// The label suffix every security group takes, so this box's `mail--sg`
-	/// and the database's `db--sg` compose identically on both sides of an
-	/// admission.
+	/// The label suffix of this box's security group, ie `mail--sg`.
 	pub const SECURITY_GROUP: &'static str = "sg";
 
-	/// The terraform ident of the security group this block declares, ie the
-	/// source of its own admission to the database.
+	/// The terraform ident of the security group this block declares.
 	pub fn security_group_ident(&self, stack: &ResolvedStack) -> terra::Ident {
 		stack.resource_ident(format!(
 			"{}--{}",
@@ -258,9 +263,6 @@ impl StalwartBlock {
 		SecretRef::new(format!("{}-{suffix}", self.label))
 	}
 
-	fn secret_name(&self, stack: &ResolvedStack, suffix: &str) -> String {
-		self.secret(suffix).name(stack)
-	}
 
 	/// Where `EnsureSecret` puts the bootstrap admin password and the boot
 	/// script reads it back.
@@ -307,6 +309,24 @@ impl StalwartBlock {
 		format!("{}--{suffix}", self.label)
 	}
 
+	/// The `Name` tag identifying this box's persistent data volume. Snapshot
+	/// actions combine it with the stack's `Project` and `Stage` tags, so they
+	/// find the declaration without reading tofu state.
+	pub(crate) fn data_volume_tag_name(&self) -> String {
+		self.build_label(Self::DATA_VOLUME_KIND)
+	}
+
+	fn data_volume_ident(&self, stack: &ResolvedStack) -> terra::Ident {
+		stack.resource_ident(self.data_volume_tag_name())
+	}
+
+	fn data_volume_id(&self, stack: &ResolvedStack) -> String {
+		format!(
+			"${{aws_ebs_volume.{}.id}}",
+			self.data_volume_ident(stack).label()
+		)
+	}
+
 	fn tags(
 		&self,
 		stack: &ResolvedStack,
@@ -324,9 +344,17 @@ impl StalwartBlock {
 		.collect()
 	}
 
-	/// Reject a declaration that cannot serve mail, at config time. (A box with
-	/// no network or no database fails at render, where its [`VpcRef`] and
-	/// [`DatabaseRef`] relations resolve.)
+	/// Whether the persistent data volume is protected from stack destruction.
+	/// Production is durable and every other stage is disposable by default; an
+	/// explicit declaration overrides the stage-derived data grade.
+	pub fn data_volume_protected(&self, stack: &ResolvedStack) -> bool {
+		self.data_volume_protected
+			.unwrap_or_else(|| stack.is_production())
+	}
+
+	/// Rejects a declaration that cannot serve mail at config time.
+	///
+	/// A box with no network fails at render, where its [`VpcRef`] resolves.
 	pub fn validate(&self) -> Result {
 		if self.blob_bucket.is_empty() {
 			bevybail!(
@@ -357,28 +385,21 @@ impl StalwartBlock {
 /// The [`DeployRender`] systems, registered by [`InfraPlugin`] beside the
 /// type registration.
 impl StalwartBlock {
-	/// Render the box and its secondaries into the config, resolving the
-	/// [`VpcRef`] and [`DatabaseRef`] relations, reaching up to the mail
-	/// domains declared beside it, and lowering the grants the stack's
-	/// declarations contributed.
+	/// Renders the box and its secondaries into the config, resolving the
+	/// [`VpcRef`] relation, reaching up to the mail domains declared beside it,
+	/// and lowering the grants the stack's declarations contributed.
 	///
 	/// The domains are a cross-entity input like the relations are: the SES
 	/// sending identity exists exactly when SOME domain relays through SES, and
 	/// the box cannot see that from its own declaration.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
-		blocks: Query<(
-			Entity,
-			&StalwartBlock,
-			Option<&VpcRef>,
-			Option<&DatabaseRef>,
-		)>,
+		blocks: Query<(Entity, &StalwartBlock, Option<&VpcRef>)>,
 		vpcs: Query<&VpcBlock>,
-		databases: Query<&RdsPostgresBlock>,
 		domains: Query<(Entity, &MailDomainBlock)>,
 		relays: RelayQuery,
 	) {
-		for (entity, block, vpc_ref, database_ref) in blocks.iter() {
+		for (entity, block, vpc_ref) in blocks.iter() {
 			let Ok(root) = scopes.get_entity(entity) else {
 				continue;
 			};
@@ -403,19 +424,11 @@ impl StalwartBlock {
 				"VpcRef",
 				block.label(),
 			);
-			let database = crate::types::related(
-				&scopes,
-				entity,
-				&databases,
-				database_ref.map(|database_ref| database_ref.0),
-				"DatabaseRef",
-				block.label(),
-			);
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
-			match (vpc, database, relayed) {
-				(Ok(vpc), Ok(database), Ok(relayed)) => {
+			match (vpc, relayed) {
+				(Ok(vpc), Ok(relayed)) => {
 					let relays = relayed.into_iter().fold(
 						RelayModes::default(),
 						|mut relays, (domain, relay)| {
@@ -425,16 +438,14 @@ impl StalwartBlock {
 					);
 					let access = scope.access();
 					let (stack, _deployment, config) = scope.ctx();
-					if let Err(err) = block
-						.emit(stack, vpc, database, &access, &relays, config)
+					if let Err(err) =
+						block.emit(stack, vpc, &access, &relays, config)
 					{
 						scope.error(err);
 					}
 				}
-				(vpc, database, relayed) => {
-					for err in [vpc.err(), database.err(), relayed.err()]
-						.into_iter()
-						.flatten()
+				(vpc, relayed) => {
+					for err in [vpc.err(), relayed.err()].into_iter().flatten()
 					{
 						scope.error(err);
 					}
@@ -450,13 +461,12 @@ impl StalwartBlock {
 		&self,
 		stack: &ResolvedStack,
 		vpc: &VpcBlock,
-		database: &RdsPostgresBlock,
 		access: &AccessGrants,
 		relays: &RelayModes,
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
-		let group = self.emit_security_group(stack, config, vpc, database)?;
+		let group = self.emit_security_group(stack, config, vpc)?;
 		let role = self.emit_instance_role(stack, config, access)?;
 		// an IAM user holding a static credential is the one thing in this
 		// stack that exists only because a provider's protocol demands it, so
@@ -464,21 +474,21 @@ impl StalwartBlock {
 		if relays.any_ses() {
 			self.emit_ses_sender(stack, config)?;
 		}
-		self.emit_instance(stack, config, vpc, database, &group, &role)?;
+		self.emit_instance(stack, config, vpc, &group, &role)?;
 		Ok(())
 	}
 }
 
 impl StalwartBlock {
-	/// The box's security group (the mail port list in, everything out: an MTA
-	/// dials the world — peer MTAs on 25, SES on 587, S3, SSM, ACME, GitHub),
-	/// and its own admission to the database it consumes.
+	/// Emits the box's security group: the mail port list in and everything out.
+	///
+	/// An MTA dials the world: peer MTAs on 25, relays on 587, S3, SSM, ACME,
+	/// and GitHub.
 	fn emit_security_group(
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		vpc: &VpcBlock,
-		database: &RdsPostgresBlock,
 	) -> Result<ResourceDef<AwsSecurityGroupDetails>> {
 		let group = ResourceDef::new_primary(
 			self.security_group_ident(stack),
@@ -523,40 +533,14 @@ impl StalwartBlock {
 				..default()
 			},
 		))?;
-		// the box's admission to the database it consumes, which belongs to the
-		// CONSUMER: the box knows its own group and reads the database's through
-		// its `DatabaseRef` target, while the database's group admits nothing by
-		// itself.
-		config.add_resource(&ResourceDef::new_secondary(
-			stack.resource_ident(format!(
-				"{}--sg-from-{}",
-				database.label(),
-				self.label
-			)),
-			AwsSecurityGroupRuleDetails {
-				security_group_id: database.security_group_id(stack).into(),
-				r#type: "ingress".into(),
-				from_port: RdsPostgresBlock::PORT,
-				to_port: RdsPostgresBlock::PORT,
-				protocol: "tcp".into(),
-				// the consumer's group, never a cidr: an address range admits
-				// whatever happens to be in it later.
-				source_security_group_id: Some(
-					self.security_group_id(stack).into(),
-				),
-				description: Some(
-					format!("Postgres from {}", self.label).into(),
-				),
-				..default()
-			},
-		))?;
+
 		group.xok()
 	}
 
-	/// The instance role: what a compromised box can do, in full. LOWERED from
+	/// The instance role: what a compromised box can do, in full. Lowered from
 	/// the [`AccessGrants`] the stack's blocks declared, plus the two grants
-	/// nothing declares because this block owns them (the stack's secret prefix
-	/// and its own log group).
+	/// nothing declares because this block owns them (its bootstrap-admin
+	/// parameter and log group).
 	///
 	/// This is the improvement over [`LightsailBlock`]'s static key: EC2
 	/// carries a role through the instance profile, so no long-lived credential
@@ -609,13 +593,11 @@ impl StalwartBlock {
 		profile.xok()
 	}
 
-	/// The inline policy document, LOWERED through the shared [`IamPolicy`]
-	/// core, seeded with the two statements this block owns: the stack's
-	/// secret prefix first (the reason the names compose with slashes at all:
-	/// the db password, the admin password, the SES SMTP pair, and whatever
-	/// `EnsureSecret` adds later) and the box's own log group last, for the
-	/// CloudWatch agent. The blob store multiparts, so the write statement
-	/// carries `s3:AbortMultipartUpload` through the per-compute knob.
+	/// The inline policy document, lowered through the shared [`IamPolicy`]
+	/// core, seeded with the two statements this block owns: its bootstrap-admin
+	/// parameter and its CloudWatch log group. The blob store multiparts, so the
+	/// write statement carries `s3:AbortMultipartUpload` through the
+	/// per-compute knob.
 	///
 	/// SecureString decryption needs no `kms:` statement here: the AWS-managed
 	/// `aws/ssm` key authorises account principals through its own key policy
@@ -629,12 +611,12 @@ impl StalwartBlock {
 		let log_group = self.log_group(stack);
 		IamPolicy::new(region.clone(), "stalwart box")
 			.statement(json!({
-				"Sid": "StackSecrets",
+				"Sid": "BootstrapAdmin",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter"],
 				"Resource": format!(
-					"arn:aws:ssm:{region}:*:parameter{}/*",
-					SecretRef::prefix(stack)
+					"arn:aws:ssm:{region}:*:parameter{}",
+					self.admin_secret_name(stack)
 				)
 			}))
 			.write_action("s3:AbortMultipartUpload")
@@ -730,6 +712,51 @@ impl StalwartBlock {
 		Ok(())
 	}
 
+	/// The encrypted gp3 data volume. It lives in the same availability zone as
+	/// the box's subnet and is independent of the replaceable instance.
+	fn data_volume(
+		&self,
+		stack: &ResolvedStack,
+		vpc: &VpcBlock,
+	) -> ResourceDef<AwsEbsVolumeDetails> {
+		ResourceDef::new_secondary(
+			self.data_volume_ident(stack),
+			AwsEbsVolumeDetails {
+				// the SUBNET's zone, by reference: a volume in a zone the box
+				// is not in is an attachment that fails at apply
+				availability_zone: vpc
+					.subnet_availability_zone(stack, SubnetTier::Public, "a")
+					.into(),
+				encrypted: Some(true),
+				final_snapshot: Some(self.data_volume_protected(stack)),
+				size: Some(self.data_volume_gb),
+				r#type: Some("gp3".into()),
+				tags: Some(self.tags(stack, Self::DATA_VOLUME_KIND)),
+				..default()
+			},
+		)
+	}
+
+	/// The replaceable edge between the persistent volume and one generation of
+	/// the box. Stopping before detach flushes the old machine's filesystem.
+	fn data_volume_attachment(
+		&self,
+		stack: &ResolvedStack,
+		volume: &ResourceDef<AwsEbsVolumeDetails>,
+		instance: &ResourceDef<AwsInstanceDetails>,
+	) -> ResourceDef<AwsVolumeAttachmentDetails> {
+		ResourceDef::new_secondary(
+			stack.resource_ident(self.build_label("data-attachment")),
+			AwsVolumeAttachmentDetails {
+				device_name: Self::DATA_DEVICE_NAME.into(),
+				instance_id: instance.field_ref("id").into(),
+				stop_instance_before_detaching: Some(true),
+				volume_id: volume.field_ref("id").into(),
+				..default()
+			},
+		)
+	}
+
 	/// The box itself: AMI resolved from the public AL2023 arm64 pointer, key
 	/// pair, encrypted root, IMDSv2 required, user_data as machine identity,
 	/// an EIP so the address (and its rDNS) survives every rebuild, the log
@@ -739,7 +766,6 @@ impl StalwartBlock {
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		vpc: &VpcBlock,
-		database: &RdsPostgresBlock,
 		group: &ResourceDef<AwsSecurityGroupDetails>,
 		profile: &ResourceDef<AwsIamInstanceProfileDetails>,
 	) -> Result {
@@ -779,7 +805,8 @@ impl StalwartBlock {
 			},
 		);
 
-		let user_data = self.build_user_data(stack, database)?;
+		let data_volume = self.data_volume(stack, vpc);
+		let user_data = self.build_user_data(stack)?;
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
 		let instance = ResourceDef::new_secondary(
 			instance_ident.clone(),
@@ -845,13 +872,31 @@ impl StalwartBlock {
 				..default()
 			},
 		);
+		let data_attachment =
+			self.data_volume_attachment(stack, &data_volume, &instance);
 
 		config
 			.add_resource(&keypair)?
 			.add_resource(&log_group)?
+			.add_resource(&data_volume)?
 			.add_resource(&instance)?
+			.add_resource(&data_attachment)?
 			.add_resource(&eip)?
 			.add_resource(&association)?;
+		if self.data_volume_protected(stack) {
+			config.set_lifecycle(
+				"aws_ebs_volume",
+				data_volume.ident().label(),
+				json!({ "prevent_destroy": true }),
+			)?;
+		}
+		config.set_lifecycle(
+			"aws_volume_attachment",
+			data_attachment.ident().label(),
+			json!({
+				"replace_triggered_by": [instance.field("id")]
+			}),
+		)?;
 
 		// without an address record the hostname resolves nowhere, so the
 		// certificate never issues, the `MX` targets nothing and the reverse
@@ -912,35 +957,16 @@ impl StalwartBlock {
 /// The machine config renderers. Everything here lands in user_data, so
 /// everything here obeys the rebuild rule; see the type docs.
 impl StalwartBlock {
-	/// The on-disk `config.json`, as a template: Stalwart `0.16`'s `DataStore`
-	/// object alone — the file describes the data store and NOTHING else, with
-	/// the auth secret left as `None` for
-	/// [`secrets_script`](Self::secrets_script) to fill from SSM. The Postgres
-	/// host is a terraform ref (non-secret), so a replaced database instance
-	/// rebuilds the box that points at it.
+	/// Returns the on-disk `config.json` template.
 	///
-	/// The blob store is deliberately absent: it is a registry object the
-	/// server holds INSIDE the data store, written once by the `Bootstrap`
-	/// claim ([`Self::blob_store_config`] is that payload's half). The search
-	/// and in-memory stores are `Default`, ie the data store itself, so they
-	/// appear nowhere at all.
-	///
-	/// The certificate is VERIFIED, not merely negotiated: the boot script
-	/// installs [`RDS_CA_BUNDLE`](Self::RDS_CA_BUNDLE) into the box's trust
-	/// anchors, and Stalwart's Postgres client verifies against the platform
-	/// store, so `allowInvalidCerts` is absent rather than true. Without the
-	/// bundle the session would be encrypted against whoever answered, which
-	/// inside a private subnet is a small window and still a real one.
-	fn store_config_template(&self) -> Value {
+	/// Stalwart `0.16` expects the [`DataStore`](https://stalw.art/docs/storage/overview)
+	/// object alone. The blob store is a registry object written by the
+	/// `Bootstrap` claim, while search and in-memory stores use the data store via
+	/// `Default`.
+	pub(crate) fn data_store_config(&self) -> Value {
 		json!({
-			"@type": "PostgreSql",
-			"host": "__DB_HOST__",
-			"port": RdsPostgresBlock::PORT,
-			"database": self.db_name,
-			"authUsername": self.db_user,
-			"authSecret": { "@type": "None" },
-			"useTls": true,
-			"allowInvalidCerts": false
+			"@type": "Sqlite",
+			"path": Self::DATABASE_PATH
 		})
 	}
 
@@ -964,11 +990,11 @@ impl StalwartBlock {
 		})
 	}
 
-	/// The boot script at `/usr/local/bin/stalwart-secrets`, run before every
-	/// service start: render the bootstrap admin credential into
-	/// `stalwart.env` while the server still needs one, and — once the server
-	/// has been claimed — `config.json` from the template and SSM. Rotation is
-	/// therefore a restart.
+	/// Returns the boot script at `/usr/local/bin/stalwart-secrets`.
+	///
+	/// Before every service start it renders the bootstrap admin credential into
+	/// `stalwart.env` while the server still needs one, or copies the static
+	/// SQLite data-store template into `config.json` after the store is claimed.
 	///
 	/// The `config.json` existence guard is the commissioning protocol, not
 	/// caution: a box with NO file boots in Stalwart's bootstrap mode waiting
@@ -988,28 +1014,14 @@ impl StalwartBlock {
 	/// is missing and bootstrap mode is a lie. [`StalwartProvision`] is the one
 	/// caller, since only it can tell that state from a genuinely new store.
 	///
-	/// The JSON splice goes through python (present in the AL2023 base AMI)
-	/// rather than sed, so a password is escaped as data and can never be
-	/// interpreted as pattern syntax.
-	fn secrets_script(
-		&self,
-		stack: &ResolvedStack,
-		database: &RdsPostgresBlock,
-	) -> String {
+	fn secrets_script(&self, stack: &ResolvedStack) -> String {
 		let template = r#"#!/bin/bash
-# Render the secret-bearing config from SSM parameter store, at every start.
+# Render the bootstrap credential or the claimed store config at every start.
 set -euo pipefail
 umask 077
 get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
 if [ -f /etc/stalwart/config.json ] || [ "${1:-}" = "render-store" ]; then
-	db_password="$(get '__DB_SECRET__')"
-	python3 - "$db_password" <<'RENDER' > /etc/stalwart/config.json.next
-import json, sys
-with open("/etc/stalwart/config.json.template") as file:
-    config = json.load(file)
-config["authSecret"] = {"@type": "Value", "secret": sys.argv[1]}
-json.dump(config, sys.stdout)
-RENDER
+	cp /etc/stalwart/config.json.template /etc/stalwart/config.json.next
 	mv -f /etc/stalwart/config.json.next /etc/stalwart/config.json
 	# the store is claimed, so a real administrator account exists and the
 	# recovery credential is a second way in that nothing needs
@@ -1020,11 +1032,9 @@ else
 fi
 mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
-		let db_secret = database.secret_name(stack);
 		let admin_secret = self.admin_secret_name(stack);
 		[
 			("__REGION__", stack.region().as_str()),
-			("__DB_SECRET__", db_secret.as_str()),
 			("__ADMIN_SECRET__", admin_secret.as_str()),
 			("__ADMIN_USER__", Self::ADMIN_USER),
 		]
@@ -1036,58 +1046,45 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 		.to_string()
 	}
 
-	/// The nightly dump at `/usr/local/bin/stalwart-backup`: a custom-format
-	/// `pg_dump` of the mail database straight into the backups bucket, keyed
-	/// by date so a restore names a day rather than a file.
+	/// Returns the nightly SQLite backup script at
+	/// `/usr/local/bin/stalwart-backup`.
 	///
-	/// The box already holds the credential and the network path, so the dump
-	/// runs HERE rather than from a deploy machine: a backup that only happens
-	/// while somebody is deploying is not a backup. The dump is deleted
-	/// immediately after upload, since a copy on the instance's own disk
-	/// protects against nothing the instance can suffer.
-	///
-	/// `--format=custom` because it is what `pg_restore` reads selectively, and
-	/// `--no-owner --no-acl` so a restore into a differently-named role (the
-	/// drill stage's) does not fail on every ownership statement.
-	fn backup_script(
-		&self,
-		stack: &ResolvedStack,
-		database: &RdsPostgresBlock,
-	) -> String {
+	/// SQLite's online `.backup` command produces a consistent snapshot while
+	/// Stalwart continues serving. The script verifies that snapshot, uploads it,
+	/// downloads it again, compares the bytes, verifies the downloaded database,
+	/// and removes both local copies on every exit.
+	fn backup_script(&self, stack: &ResolvedStack) -> String {
 		let template = r#"#!/bin/bash
-# Nightly dump of the mail database into the backups bucket.
+# Nightly consistent snapshot of the mail database into the archive bucket.
 set -euo pipefail
 umask 077
-export PGPASSWORD="$(aws ssm get-parameter --region '__REGION__' --name '__DB_SECRET__' --with-decryption --query Parameter.Value --output text)"
-# the same verified-TLS posture the mail server's own connection takes, which
-# the boot script's trust anchor is what makes possible. `PGSSLROOTCERT` is not
-# optional beside it: libpq verifies against `~/.postgresql/root.crt` and NOT
-# the OS trust store, so `verify-full` alone fails with "root certificate file
-# does not exist" against a database whose CA the box already trusts.
-export PGSSLMODE=verify-full
-export PGSSLROOTCERT=system
-dump="$(mktemp /var/lib/stalwart/backup.XXXXXX.dump)"
-trap 'rm -f "$dump"' EXIT
-pg_dump --host '__DB_HOST__' --port __DB_PORT__ --username '__DB_USER__' --dbname '__DB_NAME__' --format=custom --no-owner --no-acl --file "$dump"
-aws s3 cp "$dump" "s3://__BUCKET__/__PREFIX__/__DB_NAME__/$(date -u +%Y/%m/%d/%H%M%SZ).dump" --region '__REGION__'
-echo "mail database backed up ($(stat -c %s "$dump") bytes)"
+database='__DATABASE__'
+snapshot="$(mktemp /var/lib/stalwart/backup.XXXXXX.db)"
+readback="$(mktemp /var/lib/stalwart/backup-readback.XXXXXX.db)"
+trap 'rm -f "$snapshot" "$readback"' EXIT
+check_integrity() {
+	result="$(sqlite3 "$1" 'PRAGMA integrity_check;')"
+	[ "$result" = "ok" ] || {
+		echo "SQLite integrity check failed for $1: $result" >&2
+		exit 1
+	}
+}
+sqlite3 "$database" ".backup '$snapshot'"
+check_integrity "$snapshot"
+object="s3://__BUCKET__/__PREFIX__/$(date -u +%Y/%m/%d/%H%M%SZ).db"
+aws s3 cp "$snapshot" "$object" --only-show-errors --region '__REGION__'
+aws s3 cp "$object" "$readback" --only-show-errors --region '__REGION__'
+cmp --silent "$snapshot" "$readback" || {
+	echo "S3 read verification differed from the uploaded SQLite snapshot" >&2
+	exit 1
+}
+check_integrity "$readback"
+echo "mail database backed up and read-verified at $object ($(stat -c %s "$snapshot") bytes)"
 "#;
-		let db_secret = database.secret_name(stack);
 		let bucket = stack.resource_name(self.backup_bucket.clone());
-		let port = RdsPostgresBlock::PORT.to_string();
-		// `__DB_HOST__` is deliberately NOT substituted here: it is the one
-		// terraform reference in the machine config, and [`Self::user_data`]
-		// fills it AFTER escaping every other `${..}` in the script. Resolving
-		// it early would put a live `${aws_db_instance..}` in front of that
-		// escape pass, which would ship the reference to the box as literal
-		// text and fail every nightly dump with "could not translate host
-		// name". That is exactly what it did until the first restore drill.
 		[
+			("__DATABASE__", Self::DATABASE_PATH),
 			("__REGION__", stack.region().as_str()),
-			("__DB_SECRET__", db_secret.as_str()),
-			("__DB_PORT__", port.as_str()),
-			("__DB_USER__", self.db_user.as_str()),
-			("__DB_NAME__", self.db_name.as_str()),
 			("__BUCKET__", bucket.as_str()),
 			("__PREFIX__", Self::BACKUP_PREFIX),
 		]
@@ -1108,8 +1105,9 @@ echo "mail database backed up ($(stat -c %s "$dump") bytes)"
 	/// `watch` tails rather than only the box's journal.
 	fn backup_units(&self) -> (String, String) {
 		let service = r#"[Unit]
-Description=Nightly pg_dump of the mail database into S3
+Description=Nightly SQLite snapshot of the mail database into S3
 After=network-online.target
+RequiresMountsFor=/var/lib/stalwart
 
 [Service]
 Type=oneshot
@@ -1144,6 +1142,7 @@ WantedBy=timers.target"#,
 Description=Stalwart Server
 Conflicts=postfix.service sendmail.service exim4.service
 After=network-online.target
+RequiresMountsFor=/var/lib/stalwart
 
 [Service]
 Type=simple
@@ -1196,18 +1195,14 @@ WantedBy=multi-user.target"#
 	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
 	/// declared.
 	///
-	fn backup_stanza(
-		&self,
-		stack: &ResolvedStack,
-		database: &RdsPostgresBlock,
-	) -> String {
+	fn backup_stanza(&self, stack: &ResolvedStack) -> String {
 		if self.backup_bucket.is_empty() {
 			return String::new();
 		}
-		let script = self.backup_script(stack, database);
+		let script = self.backup_script(stack);
 		let (service, timer) = self.backup_units();
 		format!(
-			r#"# the nightly dump: the box holds the credential and the network path, so
+			r#"# the nightly snapshot: the box holds the live database and network path, so
 # the backup runs here rather than from whatever machine last deployed
 cat > /usr/local/bin/stalwart-backup <<'BACKUP_EOF'
 {script}
@@ -1239,25 +1234,20 @@ BACKUP_TIMER_EOF
 	/// renders secrets once and starts the service. The first boot comes up in
 	/// Stalwart's bootstrap mode, serving management only, until
 	/// `StalwartProvision` applies the declarative config.
-	fn build_user_data(
-		&self,
-		stack: &ResolvedStack,
-		database: &RdsPostgresBlock,
-	) -> Result<SmolStr> {
+	fn build_user_data(&self, stack: &ResolvedStack) -> Result<SmolStr> {
 		let hostname = &self.hostname;
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
 		let sha256 = Self::STALWART_SHA256;
 		let store_template =
-			serde_json::to_string_pretty(&self.store_config_template())?;
-		let secrets_script = self.secrets_script(stack, database);
+			serde_json::to_string_pretty(&self.data_store_config())?;
+		let secrets_script = self.secrets_script(stack);
 		let unit = self.systemd_unit();
 		let cloudwatch =
 			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
-		let ca_bundle = Self::RDS_CA_BUNDLE;
-		let backup = self.backup_stanza(stack, database);
+		let backup = self.backup_stanza(stack);
 		let backup_enable = self.backup_enable();
-		let pg_major = RdsPostgresBlock::ENGINE_VERSION;
+		let data_mount = Self::DATA_MOUNT;
 
 		let script = format!(
 			r#"#!/bin/bash
@@ -1266,16 +1256,66 @@ set -euo pipefail
 # the box's own name, ie what its SMTP banner and HELO identify as
 hostnamectl set-hostname '{hostname}'
 
-# the service account and Stalwart's FHS layout
-id stalwart >/dev/null 2>&1 || useradd --system --home /var/lib/stalwart --create-home --shell /usr/sbin/nologin stalwart
-mkdir -p /etc/stalwart /var/lib/stalwart /var/log/stalwart
-chown -R stalwart:stalwart /etc/stalwart /var/lib/stalwart /var/log/stalwart
+# Terraform may attach the data volume after cloud-init starts. Nitro exposes an
+# EBS attachment by its volume id, not reliably by the requested /dev/sdf name,
+# so wait for that exact by-id path and never risk formatting another disk.
+dnf install -y e2fsprogs sqlite
+data_volume_id='__DATA_VOLUME_ID__'
+data_device="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${{data_volume_id//-/}}"
+udevadm settle || true
+for attempt in $(seq 1 300); do
+	[ -b "$data_device" ] && break
+	sleep 2
+done
+if [ ! -b "$data_device" ]; then
+	echo "timed out waiting for Stalwart data volume $data_volume_id" >&2
+	exit 1
+fi
 
-# the RDS certificate authorities, so the database session is VERIFIED and not
-# merely encrypted: Stalwart's postgres client checks against the platform trust
-# store, which carries no Amazon private CA until this lands in it
-curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 '{ca_bundle}' -o /etc/pki/ca-trust/source/anchors/rds-global-bundle.pem
-update-ca-trust extract
+# A blank volume is first-deploy state; any known ext4 volume is persistent state.
+# Refuse every other filesystem rather than turning a detection problem into loss.
+# `blkid` exits 2 for "nothing found", ie a genuinely blank device; every other
+# non-zero status is a failure to LOOK, which must never reach mkfs.
+set +e
+data_fs_type="$(blkid -s TYPE -o value "$data_device")"
+data_fs_status=$?
+set -e
+if [ "$data_fs_status" -ne 0 ] && [ "$data_fs_status" -ne 2 ]; then
+	echo "could not read the filesystem of Stalwart data volume $data_volume_id (blkid exit $data_fs_status)" >&2
+	exit 1
+fi
+if [ -z "$data_fs_type" ]; then
+	mkfs.ext4 -L stalwart-data "$data_device"
+elif [ "$data_fs_type" != ext4 ]; then
+	echo "Stalwart data volume $data_volume_id has unexpected filesystem $data_fs_type" >&2
+	exit 1
+fi
+data_uuid="$(blkid -s UUID -o value "$data_device")"
+if [ -z "$data_uuid" ]; then
+	echo "Stalwart data volume $data_volume_id has no filesystem UUID" >&2
+	exit 1
+fi
+mkdir -p '{data_mount}'
+fstab_line="UUID=$data_uuid {data_mount} ext4 defaults,nofail,x-systemd.device-timeout=5min 0 2"
+if grep -Eq '[[:space:]]{data_mount}[[:space:]]' /etc/fstab; then
+	grep -qF "$fstab_line" /etc/fstab || {{
+		echo "{data_mount} already has a different fstab entry" >&2
+		exit 1
+	}}
+else
+	printf '%s\n' "$fstab_line" >> /etc/fstab
+fi
+mountpoint -q '{data_mount}' || mount '{data_mount}'
+findmnt -rn -S "UUID=$data_uuid" -T '{data_mount}' >/dev/null || {{
+	echo "{data_mount} is not mounted from Stalwart data volume $data_volume_id" >&2
+	exit 1
+}}
+
+# the service account and Stalwart's FHS layout
+id stalwart >/dev/null 2>&1 || useradd --system --home {data_mount} --no-create-home --shell /usr/sbin/nologin stalwart
+mkdir -p /etc/stalwart {data_mount} /var/log/stalwart
+chown -R stalwart:stalwart /etc/stalwart {data_mount} /var/log/stalwart
+
 
 # the pinned release: a tarball that does not hash to the pinned digest never
 # reaches the disk, and the boot fails loudly instead. Retries cover a transient
@@ -1289,8 +1329,8 @@ rm /tmp/stalwart.tar.gz
 
 # the data store config as a TEMPLATE, never the file itself: config.json's
 # absence is what puts the first boot in bootstrap mode, the server writes the
-# real file when provision claims it, and every later start re-renders it from
-# this template and SSM
+# real file when provision claims it, and every later start copies this static
+# SQLite template back into place
 cat > /etc/stalwart/config.json.template <<'CONFIG_EOF'
 {store_template}
 CONFIG_EOF
@@ -1305,12 +1345,6 @@ cat > /etc/systemd/system/stalwart.service <<'UNIT_EOF'
 {unit}
 UNIT_EOF
 
-# the postgres client, for both directions of a backup: the nightly dump and
-# the restore a drill runs. Named from the DATABASE's own engine version, since
-# `pg_dump` refuses a server newer than itself and the two would otherwise
-# drift silently until the first dump failed; the unversioned package is the
-# fallback for a distribution that has not packaged that major yet.
-dnf install -y postgresql{pg_major} || dnf install -y postgresql
 
 # log forwarding into the block's own group, credentials from the instance role
 dnf install -y amazon-cloudwatch-agent
@@ -1330,9 +1364,10 @@ systemctl enable --now stalwart
 		);
 
 		// terraform reads user_data as a string, so every literal `${..}` must
-		// escape to `$${..}` BEFORE the one deliberate terraform ref lands.
+		// escape to `$${..}` BEFORE the deliberate terraform refs land.
 		let script = script.replace("${", "$${");
-		let script = script.replace("__DB_HOST__", &database.host(stack));
+		let script =
+			script.replace("__DATA_VOLUME_ID__", &self.data_volume_id(stack));
 		SmolStr::from(script).xok()
 	}
 }
@@ -1341,9 +1376,8 @@ systemctl enable --now stalwart
 mod tests {
 	use super::*;
 
-	/// The mail box as the plan declares it: label `mail`, metadata in `db`,
-	/// blobs in `mail-blobs` (the network and database ride relations, see
-	/// [`spawn_stack`]).
+	/// The mail box as the plan declares it: label `mail`, metadata on its data
+	/// volume and blobs in `mail-blobs`.
 	fn mail_box() -> StalwartBlock {
 		StalwartBlock::new("mail", "mail.beetmash.com")
 			.with_blob_bucket("mail-blobs")
@@ -1354,19 +1388,17 @@ mod tests {
 	}
 
 	/// The blocks the box is deployed beside, whose grants it lowers.
-	fn siblings() -> (VpcBlock, RdsPostgresBlock, S3BucketBlock) {
+	fn siblings() -> (VpcBlock, S3BucketBlock) {
 		(
 			VpcBlock::new("net"),
-			RdsPostgresBlock::new("db").with_database("mail"),
 			S3BucketBlock::new("mail-blobs")
 				.with_deploy_versioned(false)
 				.with_runtime_write(true),
 		)
 	}
 
-	/// Spawn `block` beside its [`siblings`], related to the network and the
-	/// database the way the markup relates them, serving one SES-relayed
-	/// domain.
+	/// Spawn `block` beside its [`siblings`], related to its network and serving
+	/// one SES-relayed domain.
 	fn spawn_stack(block: StalwartBlock, parent: &mut ChildSpawner) {
 		spawn_relayed(block, RelayMode::Ses(SesRelay::default()), parent);
 	}
@@ -1378,10 +1410,9 @@ mod tests {
 		relay: RelayMode,
 		parent: &mut ChildSpawner,
 	) {
-		let (network, db, blobs) = siblings();
+		let (network, blobs) = siblings();
 		let vpc = parent.spawn(network).id();
-		let db = parent.spawn((db, VpcRef(vpc))).id();
-		parent.spawn((block, VpcRef(vpc), DatabaseRef(db)));
+		parent.spawn((block, VpcRef(vpc)));
 		parent.spawn(blobs);
 		relay.insert(
 			&mut parent.spawn(
@@ -1412,35 +1443,49 @@ mod tests {
 		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
 	}
 
-	/// The config the whole set emits against a Sydney stack.
+	/// The config the whole set emits against `stack`.
+	fn build_config_at(
+		block: &StalwartBlock,
+		stack: Stack,
+	) -> (ResolvedStack, Deployment, terra::Config) {
+		let block = block.clone();
+		let (scope, _dir) = RenderScope::test_render_stack(stack, |parent| {
+			spawn_stack(block, parent);
+		});
+		scope.finish().unwrap()
+	}
+
+	/// The config the whole set emits against a Sydney development stack.
 	fn build_config(
 		block: &StalwartBlock,
 	) -> (ResolvedStack, Deployment, terra::Config) {
-		let block = block.clone();
-		let (scope, _dir) =
-			RenderScope::test_render_stack(sydney_stack(), |parent| {
-				spawn_stack(block, parent);
-			});
-		scope.finish().unwrap()
+		build_config_at(block, sydney_stack())
 	}
 
 	/// The rendered user_data, ie the machine identity.
 	fn user_data(block: &StalwartBlock) -> String {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let (_, db, _) = siblings();
-		block.build_user_data(&stack, &db).unwrap().to_string()
+		block.build_user_data(&stack).unwrap().to_string()
 	}
 
-	/// The sole `aws_instance` in the rendered config.
-	fn instance(config: &terra::Config) -> serde_json::Value {
-		config.to_json().into_json()["resource"]["aws_instance"]
+	/// The sole resource of `resource_type` in the rendered config.
+	fn resource(
+		config: &terra::Config,
+		resource_type: &str,
+	) -> serde_json::Value {
+		config.to_json().into_json()["resource"][resource_type]
 			.as_object()
 			.unwrap()
 			.values()
 			.next()
 			.unwrap()
 			.clone()
+	}
+
+	/// The sole `aws_instance` in the rendered config.
+	fn instance(config: &terra::Config) -> serde_json::Value {
+		resource(config, "aws_instance")
 	}
 
 	/// A code-only deploy renders the identical config, so terraform plans no
@@ -1517,18 +1562,17 @@ mod tests {
 	}
 
 	/// No secret exists in machine config or transits it: the only terraform
-	/// interpolation in the rendered user_data is the database HOST, and the
-	/// scripts hold SSM parameter names, never values. The SES SMTP secret
-	/// appears only as the `aws_ssm_parameter` resource's interpolation, which
-	/// is state-bound (hence state encryption), never user_data-bound.
+	/// interpolation in rendered user_data is the data volume ID, while the
+	/// script holds the bootstrap admin's SSM parameter name, never its value.
+	/// The SES SMTP secret appears only as the `aws_ssm_parameter` resource's
+	/// interpolation, which is state-bound, never user_data-bound.
 	#[beet_core::test]
 	fn no_secret_material_in_machine_config() {
-		let script = user_data(&mail_box());
+		let block = mail_box();
+		let script = user_data(&block);
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		// exactly once: the template is the data store alone, and the stores
-		// that used to restate the host (search, in-memory) default to it
-		let host = RdsPostgresBlock::new("db")
-			.host(&stack)
+		let volume = block
+			.data_volume_id(&stack)
 			.trim_end_matches('}')
 			.to_string();
 		script
@@ -1538,7 +1582,7 @@ mod tests {
 				script[index..].split('}').next().unwrap().to_string()
 			})
 			.collect::<Vec<_>>()
-			.xpect_eq(vec![host]);
+			.xpect_eq(vec![volume]);
 		script
 			.as_str()
 			.xnot()
@@ -1551,25 +1595,21 @@ mod tests {
 			.xpect_contains("AWS_SECRET");
 	}
 
-	/// The boot script reads exactly the parameters the stack composes: the
-	/// database password through [`RdsPostgresBlock::secret_name`] (the same
-	/// composition the declaring block grants) and the admin password
-	/// `EnsureSecret` creates. This is the join between the deploy and the
-	/// machine; a drift here is a box that boots with no credentials.
+	/// The boot script reads only the bootstrap admin password `EnsureSecret`
+	/// creates. SQLite has no database credential to fetch or expose.
 	#[beet_core::test]
-	fn boot_reads_the_parameters_the_stack_writes() {
+	fn boot_reads_only_the_bootstrap_admin_parameter() {
 		let block = mail_box();
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let (_, db, _) = siblings();
 		user_data(&block)
 			.as_str()
 			.xpect_contains(&format!(
 				"get '{}'",
 				block.admin_secret_name(&stack)
 			))
-			// the block composes the SAME name its declaration grants
-			.xpect_contains(&format!("get '{}'", db.secret_name(&stack)))
+			.xnot()
+			.xpect_contains("db-password")
 			.xpect_contains("--with-decryption")
 			.xpect_contains("STALWART_RECOVERY_ADMIN=admin:");
 		block
@@ -1731,10 +1771,152 @@ mod tests {
 			.xpect_contains("arm64");
 	}
 
-	/// The box sits in the vpc's PUBLIC subnet (an MTA is reachable by
-	/// definition) with an EIP whose association survives a rebuild, and its
-	/// security group is emitted under exactly the ident its own ingress
-	/// admission names as its source.
+	/// Production protects the persistent data volume and takes a final snapshot,
+	/// while the attachment remains replaceable with the cattle box.
+	#[beet_core::test]
+	fn production_data_volume_and_replaceable_attachment_are_protected() {
+		let (stack, _deployment, config) = build_config_at(
+			&mail_box(),
+			sydney_stack().with_stage(BootstrapConfig::PROD_STAGE),
+		);
+		let volume = resource(&config, "aws_ebs_volume");
+		// the subnet's zone by reference, never a second literal: a volume in a
+		// zone the box is not in is an attachment that fails at apply
+		volume["availability_zone"].as_str().unwrap().xpect_eq(
+			VpcBlock::new("net").subnet_availability_zone(
+				&stack,
+				SubnetTier::Public,
+				"a",
+			),
+		);
+		volume["encrypted"].as_bool().unwrap().xpect_true();
+		volume["final_snapshot"].as_bool().unwrap().xpect_true();
+		volume["type"].as_str().unwrap().xpect_eq("gp3");
+		volume["size"].as_i64().unwrap().xpect_eq(20);
+		volume["lifecycle"]["prevent_destroy"]
+			.as_bool()
+			.unwrap()
+			.xpect_true();
+		volume["tags"]["Name"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("mail--data");
+		volume["tags"]["Project"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("beet_infra");
+
+		let attachment = resource(&config, "aws_volume_attachment");
+		attachment["device_name"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(StalwartBlock::DATA_DEVICE_NAME);
+		attachment["stop_instance_before_detaching"]
+			.as_bool()
+			.unwrap()
+			.xpect_true();
+		attachment["volume_id"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(mail_box().data_volume_id(&stack));
+		attachment["lifecycle"]["replace_triggered_by"][0]
+			.as_str()
+			.unwrap()
+			.xpect_contains("aws_instance")
+			.xpect_contains(".id");
+	}
+
+	/// Non-production stages are disposable by default so a restore drill can
+	/// destroy the same declaration after proving the backup. An explicit override
+	/// can make even production disposable for a purpose-built temporary stack.
+	#[beet_core::test]
+	fn data_volume_protection_follows_the_stage_unless_overridden() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		let volume = resource(&config, "aws_ebs_volume");
+		volume["final_snapshot"].as_bool().unwrap().xpect_false();
+		volume["lifecycle"]["prevent_destroy"]
+			.is_null()
+			.xpect_true();
+
+		let (_stack, _deployment, config) = build_config_at(
+			&mail_box().with_data_volume_protected(false),
+			sydney_stack().with_stage(BootstrapConfig::PROD_STAGE),
+		);
+		let volume = resource(&config, "aws_ebs_volume");
+		volume["final_snapshot"].as_bool().unwrap().xpect_false();
+		volume["lifecycle"]["prevent_destroy"]
+			.is_null()
+			.xpect_true();
+	}
+
+	/// The mail store is the one thing on this box that cannot be rebuilt, so
+	/// cloud-init waits for the volume BY ID, formats only a device it has
+	/// positively established is blank, and mounts by filesystem UUID before
+	/// anything else touches the directory.
+	#[beet_core::test]
+	fn cloud_init_formats_once_and_mounts_by_uuid_before_stalwart() {
+		let block = mail_box().with_backup_bucket("archive");
+		let script = user_data(&block);
+		script
+			.as_str()
+			.xpect_contains(
+				"nvme-Amazon_Elastic_Block_Store_$${data_volume_id//-/}",
+			)
+			.xpect_contains("if [ -z \"$data_fs_type\" ]; then\n\tmkfs.ext4")
+			.xpect_contains("findmnt -rn -S \"UUID=$data_uuid\"")
+			.xpect_contains("RequiresMountsFor=/var/lib/stalwart");
+		let mount = script.find("mountpoint -q").unwrap();
+		let user = script.find("useradd --system").unwrap();
+		(mount < user).xpect_true();
+		block
+			.backup_units()
+			.0
+			.as_str()
+			.xpect_contains("RequiresMountsFor=/var/lib/stalwart");
+	}
+
+	/// `blkid` exits 2 when it finds no filesystem and non-zero for every other
+	/// reason, so an empty answer alone cannot be the format condition: a
+	/// transient failure to READ a populated volume would otherwise mkfs the
+	/// mail store. `set -e` would abort the script before the status could be
+	/// examined, hence the guarded pair around exactly that one command.
+	#[beet_core::test]
+	fn a_failure_to_detect_a_filesystem_never_reaches_mkfs() {
+		let script = user_data(&mail_box());
+		let guarded = script
+			.split_once("set +e")
+			.unwrap()
+			.1
+			.split_once("set -e")
+			.unwrap()
+			.0;
+		guarded
+			.xpect_contains("blkid -s TYPE")
+			.xpect_contains("data_fs_status=$?");
+		script
+			.as_str()
+			.xpect_contains(
+				"[ \"$data_fs_status\" -ne 0 ] && [ \"$data_fs_status\" -ne 2 ]",
+			)
+			.xnot()
+			.xpect_contains("blkid -s TYPE -o value \"$data_device\" || true");
+	}
+
+	/// The mount is `nofail`: a volume that does not appear must leave a box
+	/// that boots and can be reached over ssh, not one in an emergency shell
+	/// with no way in. `RequiresMountsFor` is what keeps Stalwart from starting
+	/// against a missing store, so the two are one decision.
+	#[beet_core::test]
+	fn a_missing_volume_leaves_a_reachable_box() {
+		user_data(&mail_box())
+			.as_str()
+			.xpect_contains(
+				"UUID=$data_uuid /var/lib/stalwart ext4 \
+				 defaults,nofail,x-systemd.device-timeout=5min 0 2",
+			)
+			.xpect_contains("RequiresMountsFor=/var/lib/stalwart");
+	}
+
 	#[beet_core::test]
 	fn public_subnet_eip_and_the_shared_group_label() {
 		let (stack, _deployment, config) = build_config(&mail_box());
@@ -1763,10 +1945,9 @@ mod tests {
 			.xpect_eq(1);
 	}
 
-	/// The role is lowered from what the siblings DECLARED: the stack's secret
-	/// prefix in one statement, read on every declared bucket, write only on
-	/// the blob bucket that declared it, the box's own log group, and no
-	/// static credential anywhere.
+	/// The role is lowered from what the siblings declared: its bootstrap-admin
+	/// parameter, write access only on the blob bucket that declared it, its own
+	/// log group, and no static credential anywhere.
 	#[beet_core::test]
 	fn role_lowers_the_declared_grants() {
 		let (stack, _deployment, config) = build_config(&mail_box());
@@ -1782,12 +1963,14 @@ mod tests {
 				.to_string();
 		policy
 			.as_str()
-			// one statement for the stack's whole secret prefix
+			// the one parameter the box reads during bootstrap
 			.xpect_contains(
-				"arn:aws:ssm:ap-southeast-2:*:parameter/beet-infra/dev/*",
+				"arn:aws:ssm:ap-southeast-2:*:parameter/beet-infra/dev/mail-admin-password",
 			)
-			// the database's declared parameter, composed by the same ref
-			.xpect_contains("parameter/beet-infra/dev/db-password")
+			.xnot()
+			.xpect_contains("parameter/beet-infra/dev/*")
+			.xnot()
+			.xpect_contains("db-password")
 			// blob bucket readable and writable, by declaration
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
@@ -1809,44 +1992,21 @@ mod tests {
 	}
 
 	/// The on-disk config template is Stalwart `0.16`'s `DataStore` object
-	/// ALONE: an internally-tagged Postgres store with the secret slot left
-	/// empty for the boot renderer, and no other store in the file.
-	///
-	/// REGRESSION: the first render was a map of all four stores, which the
-	/// server rejects at the top level (`missing field @type`) and the service
-	/// crash-loops. The file's whole schema is the one tagged enum; the blob
-	/// store rides the `Bootstrap` claim and the rest default to the data
-	/// store.
+	/// alone: an internally tagged SQLite store on the persistent volume, with no
+	/// credential or other store in the file.
 	#[beet_core::test]
-	fn store_config_template_is_the_data_store_alone() {
-		let template = mail_box().store_config_template();
-		template["@type"].as_str().unwrap().xpect_eq("PostgreSql");
-		template["authSecret"]["@type"]
+	fn data_store_config_is_static_sqlite() {
+		let config = mail_box().data_store_config();
+		config["@type"].as_str().unwrap().xpect_eq("Sqlite");
+		config["path"]
 			.as_str()
 			.unwrap()
-			.xpect_eq("None");
-		template["database"].as_str().unwrap().xpect_eq("mail");
-		template["host"].as_str().unwrap().xpect_eq("__DB_HOST__");
+			.xpect_eq(StalwartBlock::DATABASE_PATH);
+		config.get("authSecret").is_none().xpect_true();
 		for absent in ["DataStore", "SearchStore", "InMemoryStore", "BlobStore"]
 		{
-			template[absent].is_null().xpect_true();
+			config[absent].is_null().xpect_true();
 		}
-	}
-
-	/// The database session is VERIFIED, which is only possible because the
-	/// boot script installs the RDS certificate authorities: no distribution
-	/// ships Amazon's private CA, so the trust anchor and this flag are one
-	/// decision in two places.
-	#[beet_core::test]
-	fn the_database_certificate_is_verified() {
-		mail_box().store_config_template()["allowInvalidCerts"]
-			.as_bool()
-			.unwrap()
-			.xpect_false();
-		user_data(&mail_box())
-			.as_str()
-			.xpect_contains(StalwartBlock::RDS_CA_BUNDLE)
-			.xpect_contains("update-ca-trust extract");
 	}
 
 	/// The recovery credential exists ONLY while the data store is unclaimed:
@@ -1856,8 +2016,7 @@ mod tests {
 	#[beet_core::test]
 	fn the_recovery_credential_retires_with_the_claim() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let (_, db, _) = siblings();
-		let script = mail_box().secrets_script(&stack, &db);
+		let script = mail_box().secrets_script(&stack);
 		// the claimed branch renders the store and an EMPTY env file
 		let (claimed, unclaimed) = script
 			.split_once("else")
@@ -1873,16 +2032,14 @@ mod tests {
 		unclaimed.as_str().xpect_contains("STALWART_RECOVERY_ADMIN");
 	}
 
-	/// A rebuilt box has a fresh disk and an existing data store, so bootstrap
-	/// mode is a lie the missing file told. `render-store` is how provision
-	/// tells the box otherwise, and without it a machine-config change would
-	/// mean a box that can never boot against its own database.
+	/// A rebuilt box has a fresh root disk and an existing SQLite data store on
+	/// its persistent volume, so bootstrap mode is a lie the missing file told.
+	/// `render-store` is how provision tells the box otherwise.
 	#[beet_core::test]
 	fn the_store_render_can_be_forced() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let (_, db, _) = siblings();
 		mail_box()
-			.secrets_script(&stack, &db)
+			.secrets_script(&stack)
 			.as_str()
 			.xpect_contains("render-store");
 	}
@@ -1899,57 +2056,33 @@ mod tests {
 			.as_str()
 			.xpect_contains("/usr/local/bin/stalwart-backup")
 			.xpect_contains("stalwart-backup.timer")
-			.xpect_contains("pg_dump")
+			.xpect_contains("sqlite3")
 			.xpect_contains(StalwartBlock::BACKUP_SCHEDULE);
 	}
 
-	/// The dump carries no secret on its command line: the box reads the
-	/// database credential from the parameter every other consumer reads, so a
-	/// process list on the box is not a credential dump.
+	/// The online SQLite backup is checked before upload and again after S3
+	/// readback, with byte equality between those two verified files.
 	#[beet_core::test]
-	fn the_backup_reads_its_credential_rather_than_carrying_one() {
+	fn backup_is_consistent_and_read_verified() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let (_, db, _) = siblings();
 		mail_box()
 			.with_backup_bucket("archive")
-			.backup_script(&stack, &db)
+			.backup_script(&stack)
 			.as_str()
-			.xpect_contains("aws ssm get-parameter")
-			.xpect_contains("PGSSLMODE=verify-full")
-			.xpect_contains("PGSSLROOTCERT=system")
-			.xpect_contains(stack.resource_name("archive").as_str());
-	}
-
-	/// The dump reaches the database it is a dump OF.
-	///
-	/// The whole machine config is written by terraform, so `user_data` escapes
-	/// every literal `${..}` in it and then fills the ONE reference it means to
-	/// keep. A step that resolves its own reference lands in front of that
-	/// escape pass and is shipped to the box verbatim: `pg_dump --host
-	/// '${aws_db_instance...}'`, which fails on every line of a name resolver
-	/// and is discovered a fortnight later by a restore that has nothing to
-	/// restore. So both ends are pinned — the token survives the script, and
-	/// the reference survives the escape.
-	#[beet_core::test]
-	fn the_backup_names_the_database_rather_than_a_terraform_reference() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let block = mail_box().with_backup_bucket("archive");
-		let (_, db, _) = siblings();
-		// the script leaves the token for the one late substitution
-		block
-			.backup_script(&stack, &db)
-			.as_str()
-			.xpect_contains("pg_dump --host '__DB_HOST__'");
-		// ..and by the time it is machine config it carries a LIVE reference,
-		// ie one terraform will interpolate rather than one it will escape
-		let data = user_data(&block);
-		data.as_str()
-			.xpect_contains("pg_dump --host '${aws_db_instance");
-		data.as_str()
-			.xnot()
-			.xpect_contains("pg_dump --host '$${aws_db_instance");
+			.xpect_contains(&format!(
+				"database='{}'",
+				StalwartBlock::DATABASE_PATH
+			))
+			.xpect_contains(".backup '$snapshot'")
+			.xpect_contains("PRAGMA integrity_check;")
+			.xpect_contains("cmp --silent")
+			.xpect_contains(&format!(
+				"s3://{}/{}/",
+				stack.resource_name("archive"),
+				StalwartBlock::BACKUP_PREFIX
+			))
+			.xpect_contains(".db");
 	}
 
 	/// The blob store the `Bootstrap` claim declares: the stack's bucket with
@@ -2013,8 +2146,7 @@ mod tests {
 	}
 
 	/// A declaration that cannot serve mail fails before any resource exists,
-	/// and a box with no network to sit in fails at render, where its
-	/// relations resolve.
+	/// and a box with no network to sit in fails when its relation resolves.
 	#[beet_core::test]
 	fn invalid_declarations_fail_at_config_time() {
 		StalwartBlock::new("mail", "mail.beetmash.com")
@@ -2043,40 +2175,13 @@ mod tests {
 			.finish()
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("declares no `VpcRef`")
-			.xpect_contains("declares no `DatabaseRef`");
+			.xpect_contains("declares no `VpcRef`");
 	}
 
-	/// The box admits ITSELF to the database, through its `DatabaseRef` target:
-	/// one ingress rule on the postgres port, its target the database's group,
-	/// its source the box's own, and no cidr anywhere.
-	#[beet_core::test]
-	fn the_box_admits_itself_to_the_database() {
-		let (stack, _deployment, config) = build_config(&mail_box());
-		let (_, db, _) = siblings();
-		let rule =
-			config.to_json().into_json()["resource"]["aws_security_group_rule"]
-				[stack.resource_ident("db--sg-from-mail").label()]
-			.clone();
-		rule["type"].as_str().unwrap().xpect_eq("ingress");
-		rule["from_port"].as_i64().unwrap().xpect_eq(5432);
-		rule["to_port"].as_i64().unwrap().xpect_eq(5432);
-		rule["security_group_id"]
-			.as_str()
-			.unwrap()
-			.xpect_eq(db.security_group_id(&stack));
-		rule["source_security_group_id"]
-			.as_str()
-			.unwrap()
-			.xpect_eq(mail_box().security_group_id(&stack));
-		rule["cidr_blocks"].is_null().xpect_true();
-	}
-
-	/// The full stack through the real provider schemas: vpc, database, blob
-	/// bucket and box in one config, related exactly as the markup relates
-	/// them. Rendered-JSON assertions prove what the blocks meant; only tofu
-	/// proves the schema accepts it, and only the combined run proves every
-	/// cross-block interpolation resolves.
+	/// The full stack through the real provider schemas: vpc, blob bucket and
+	/// box in one config, related exactly as the markup relates them.
+	/// Rendered-JSON assertions prove what the blocks meant; only tofu proves
+	/// the schema accepts it and every cross-block interpolation resolves.
 	///
 	/// Drives the native tofu cli, so it cannot compile for wasm.
 	#[cfg(not(target_arch = "wasm32"))]

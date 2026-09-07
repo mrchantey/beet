@@ -3,6 +3,7 @@
 //! The cli for the same reason [`ssm_ext`](super::ssm_ext) uses it: every step
 //! that would call this already shells out to `aws` for the parameters it reads
 //! first, so an SDK client here would be a dependency bought for one verb.
+use crate::actions::aws_cli_ext;
 use beet_core::prelude::*;
 use serde_json::json;
 
@@ -77,20 +78,16 @@ pub async fn put_metric_data(
 		.iter()
 		.map(|datum| datum.to_json(dimension, dimension_value))
 		.collect::<Vec<_>>();
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args([
-			"cloudwatch".to_string(),
-			"put-metric-data".to_string(),
-			"--namespace".to_string(),
-			namespace.to_string(),
-			"--metric-data".to_string(),
-			serde_json::to_string(&metrics)?,
-			"--region".to_string(),
-			region.to_string(),
-		])
-		.run_async()
-		.await?;
+	let data = serde_json::to_string(&metrics)?;
+	aws_cli_ext::service("cloudwatch", region, [
+		"put-metric-data",
+		"--namespace",
+		namespace,
+		"--metric-data",
+		&data,
+	])
+	.run_async()
+	.await?;
 	Ok(())
 }
 

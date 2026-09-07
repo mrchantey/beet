@@ -42,10 +42,12 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::types::Variable>()
 			.register_type::<crate::types::VariableValue>();
 
-		// the two blocks a beet *application* declares (the bucket it is served
-		// from, the table it records to), so `<S3BucketBlock label="app"/>` and
-		// `<DynamoTableBlock label="analytics"/>` spawn by tag in any build
-		// carrying their default-on binding features.
+		// the blocks a beet *application* declares (the bucket it is served from,
+		// the stores it records to), so `<S3BucketBlock label="app"/>` and
+		// `<DynamoTableBlock label="events"/>` spawn by tag in any build
+		// carrying their default-on binding features. The site's own analytics
+		// are blob-backed, so its stores are buckets; a workload wanting
+		// indexed queries declares the table instead.
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
@@ -76,7 +78,6 @@ impl Plugin for InfraPlugin {
 		// markup declared.
 		#[cfg(all(
 			feature = "bindings_aws_common",
-			feature = "aws_sdk",
 			not(target_arch = "wasm32")
 		))]
 		app.add_observer(crate::blocks::attach_s3_store);
@@ -256,10 +257,10 @@ impl Plugin for InfraPlugin {
 		// the mail stack's deploy verbs: the sovereign signing key minted
 		// before the apply that publishes it, the comail enrolment check that
 		// hands over the records a human enrolled and the scheduled poll that
-		// gives its alarms something to read, the reverse record, the
-		// declarative apply into the mail server's own data store, the
-		// mta-sts policy host, the end-to-end probe, the two liveness checks,
-		// the restore drill and the zone audit.
+		// gives its alarms something to read, the pre-apply data snapshot,
+		// reverse record, declarative apply into the mail server's own data
+		// store, mta-sts policy host, end-to-end probe, two liveness checks,
+		// restore drill and zone audit.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "mail",
@@ -273,6 +274,8 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::ComailDeliverabilityAction>()
 			.register_type::<crate::prelude::EipReverseDns>()
 			.register_type::<crate::prelude::EipReverseDnsAction>()
+			.register_type::<crate::prelude::StalwartSnapshot>()
+			.register_type::<crate::prelude::StalwartSnapshotAction>()
 			.register_type::<crate::prelude::StalwartProvision>()
 			.register_type::<crate::prelude::StalwartProvisionAction>()
 			.register_type::<crate::prelude::MtaStsPublish>()
@@ -398,9 +401,8 @@ mod test {
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"
 					blob_bucket="mail-blobs"
 					ssh_public_key="ssh-ed25519 AAAA pete"
-					{(VpcRef($net), DatabaseRef($db))}/>
+					{VpcRef($net)}/>
 				<VpcBlock bx:ref="net" label="net"/>
-				<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 			</Fragment>"#,
 		);
 		let domain = world.query::<&MailDomainBlock>().single(&world).unwrap();
@@ -417,8 +419,8 @@ mod test {
 		domain.mta_sts().mode().xpect_eq(MtaStsMode::Enforce);
 		domain.validate().unwrap();
 
-		let (mail_box, vpc_ref, database_ref) = world
-			.query::<(&StalwartBlock, &VpcRef, &DatabaseRef)>()
+		let (mail_box, vpc_ref) = world
+			.query::<(&StalwartBlock, &VpcRef)>()
 			.single(&world)
 			.unwrap();
 		mail_box.validate().unwrap();
@@ -430,13 +432,6 @@ mod test {
 			.label()
 			.as_str()
 			.xpect_eq("net");
-		world
-			.entity(database_ref.0)
-			.get::<RdsPostgresBlock>()
-			.unwrap()
-			.label()
-			.as_str()
-			.xpect_eq("db");
 	}
 
 	/// The relay is composed BESIDE the domain rather than named as a field, so

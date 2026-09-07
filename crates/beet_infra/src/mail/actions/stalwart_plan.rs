@@ -7,9 +7,9 @@ use serde_json::json;
 /// The configuration a [`StalwartBlock`] and its [`MailDomainBlock`]s add up
 /// to, as the JMAP objects `0.16` stores them.
 ///
-/// `0.16` abolished the configuration file: the on-disk `config.json` describes
-/// the four stores and nothing else, and listeners, TLS, routing, the spam
-/// filter, domains and accounts all live in the data store as objects. So this
+/// `0.16` abolished the old configuration file: on disk `config.json` describes
+/// the data store alone, while listeners, TLS, routing, the spam filter, domains
+/// and accounts all live in that store as objects. So this
 /// is the moral equivalent of the config file the old release had, built from
 /// the same block declarations that emit the DNS records and the box, and
 /// applied by [`StalwartProvision`].

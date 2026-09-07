@@ -328,9 +328,9 @@ impl Management {
 		.xok()
 	}
 
-	/// Claim the data store, or recover the one state a claim cannot: a REBUILT
-	/// box, whose disk is new and whose database is not, and which therefore
-	/// boots into a bootstrap mode that is a lie the missing file told.
+	/// Claim the data store, or recover the one state a claim cannot: a rebuilt
+	/// box whose root disk is new while its persistent SQLite database is not, so
+	/// it boots into a bootstrap mode that is a lie the missing file told.
 	///
 	/// Called only while the server still answers to the recovery credential,
 	/// ie while it is genuinely running in bootstrap mode. The caller restarts
@@ -356,9 +356,7 @@ impl Management {
 			info!("the data store is already claimed; a restart finishes it");
 			return Ok(());
 		}
-		if let Err(err) =
-			bootstrap(client, connection, plan, mail, region).await
-		{
+		if let Err(err) = bootstrap(client, plan, mail, region).await {
 			warn!(
 				"the claim was refused, so this box is being treated as a \
 				rebuild onto an existing data store: {err}"
@@ -521,11 +519,9 @@ async fn converge_certificates(
 /// singleton exactly while bootstrap mode lasts, so a rerun against a claimed
 /// server skips the whole step.
 ///
-/// The data store settings are read off the BOX's own template
-/// (`config.json.template`, terraform-rendered) rather than re-composed here,
-/// so the host the claim names and the host the box re-renders at every later
-/// start are one string. Only the secret is filled in, from the same parameter
-/// the box reads.
+/// The data store is the box's static SQLite configuration, shared with the
+/// `config.json.template` it installs. It has no credential to fetch or inject:
+/// the database is a file on the persistent data volume.
 ///
 /// The server MINTS the admin account's password and returns it in the set
 /// response, this one time; it is parked at the same parameter composition
@@ -537,24 +533,12 @@ async fn converge_certificates(
 /// this box was rebuilt onto.
 async fn bootstrap(
 	client: &JmapClient,
-	connection: &SshConnection,
 	plan: &StalwartPlan,
 	mail: &MailStack,
 	region: &str,
 ) -> Result {
 	let stack = &mail.stack;
-	let template = connection
-		.run_command("cat /etc/stalwart/config.json.template")
-		.await?;
-	let template = String::from_utf8(template.stdout)?;
-	let mut data_store: Value =
-		serde_json::from_str(template.trim()).map_err(|err| {
-			bevyhow!("the box's config.json.template is not json: {err}")
-		})?;
-	data_store["authSecret"] = json!({
-		"@type": "Value",
-		"secret": read_secret(region, &mail.database.secret_name(stack)).await?,
-	});
+	let data_store = mail.mail_box.data_store_config();
 	let domain = mail
 		.serving()
 		.next()
@@ -575,8 +559,8 @@ async fn bootstrap(
 				"generateDkimKeys": false,
 				"dataStore": data_store,
 				"blobStore": mail.mail_box.blob_store_config(stack),
-				// `Default` IS the data store, which is the declared shape: postgres
-				// carries search and ephemera, S3 carries blobs
+				// `Default` IS the data store: SQLite carries search and ephemera,
+				// while S3 carries blobs
 				"searchStore": { "@type": "Default" },
 				"inMemoryStore": { "@type": "Default" },
 				"directory": { "@type": "Internal" },
@@ -1102,6 +1086,18 @@ async fn wait_for_health(
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[beet_core::test]
+	fn bootstrap_store_is_static_sqlite() {
+		let store =
+			StalwartBlock::new("mail", "mail.example.com").data_store_config();
+		store["@type"].as_str().unwrap().xpect_eq("Sqlite");
+		store["path"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(StalwartBlock::DATABASE_PATH);
+		store.get("authSecret").is_none().xpect_true();
+	}
 
 	fn existing() -> Vec<Value> {
 		vec![serde_json::json!({

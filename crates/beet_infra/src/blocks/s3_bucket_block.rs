@@ -6,8 +6,9 @@ use beet_net::prelude::*;
 use serde_json::json;
 
 /// An S3 bucket, declared once and read by both meanings of the declaration:
-/// the deploy creates it, and (with the `aws_sdk` backend) the runtime attaches
-/// an [`S3Store`](beet_net::prelude::S3Store) for it on the same entity.
+/// the deploy creates it, and the runtime attaches an
+/// [`S3Store`](beet_net::prelude::S3Store) remotely or an
+/// [`FsStore`](beet_net::prelude::FsStore) locally on the same entity.
 ///
 /// Authored directly from markup, ie `<S3BucketBlock label="app"
 /// deploy_versioned=false/>`. The label alone is declared; the
@@ -118,6 +119,11 @@ impl S3BucketBlock {
 			.unwrap_or_else(|| stack.region().clone())
 	}
 
+	/// Returns the composed bucket name, ie `beet-site--prod--analytics`.
+	pub fn bucket_name(&self, stack: &ResolvedStack) -> String {
+		stack.resource_name(self.label.clone())
+	}
+
 	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
 	/// against `stack` (the composed bucket name and the region). A
 	/// deploy-versioned bucket also nests under the deploy id, which only a
@@ -129,7 +135,7 @@ impl S3BucketBlock {
 		deploy_id: Option<&Uuid>,
 	) -> beet_net::prelude::S3Store {
 		let store = beet_net::prelude::S3Store::new(
-			stack.resource_name(self.label.clone()),
+			self.bucket_name(stack),
 			self.resolved_region(stack),
 		);
 		match (self.deploy_versioned, deploy_id) {
@@ -153,11 +159,11 @@ impl S3BucketBlock {
 }
 
 /// An expiry scoped to one key prefix of an [`S3BucketBlock`], ie the nightly
-/// database dumps under `postgres/` in an archive bucket whose other prefixes
+/// SQLite snapshots under `sqlite/` in an archive bucket whose other prefixes
 /// hold the only copy of what is in them and expire never.
 ///
 /// Authored inline on the bucket, ie
-/// `expire_prefixes={[{prefix:"postgres/", expire_days:180}]}`. The prefix is a
+/// `expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}`. The prefix is a
 /// writer convention rather than a boundary (a grant is whole-bucket), so this
 /// is where a bucket says which of its conventions are disposable.
 #[derive(
@@ -174,8 +180,8 @@ impl S3BucketBlock {
 )]
 #[reflect(Default)]
 pub struct PrefixExpiry {
-	/// The literal S3 key prefix the rule filters on, ie `postgres/`. The
-	/// trailing slash is load-bearing: `postgres` also matches `postgres-old/`,
+	/// The literal S3 key prefix the rule filters on, ie `sqlite/`. The
+	/// trailing slash is load-bearing: `sqlite` also matches `sqlite-old/`,
 	/// so a prefix naming a directory should say so.
 	prefix: SmolStr,
 	/// Days an object under [`prefix`](Self::prefix) is kept. Must be positive,
@@ -191,7 +197,7 @@ impl PrefixExpiry {
 		}
 	}
 
-	/// The rule id, ie `expire-postgres`. A function of the prefix rather than
+	/// The rule id, ie `expire-sqlite`. A function of the prefix rather than
 	/// of the declaration order, so reordering declarations never diffs a
 	/// rendered configuration.
 	pub fn rule_id(&self) -> String {
@@ -231,15 +237,15 @@ impl PrefixExpiry {
 	}
 }
 
-/// Observer: attach the runtime meaning of a declared bucket, the
-/// [`S3Store`](beet_net::prelude::S3Store) (which in turn inserts a
-/// [`BlobStore`]) for the name the deploy creates. Registered by [`InfraPlugin`]
-/// rather than hooked on the component, so a build without the SDK carries the
-/// declaration and nothing else.
+/// Observer: attaches the runtime meaning of a declared bucket. A remote process
+/// gets the [`S3Store`](beet_net::prelude::S3Store) the deploy names; a local
+/// process gets an [`FsStore`](beet_net::prelude::FsStore) under
+/// `target/stores/<label>`, so one declaration runs both ways.
 ///
-/// Deferred through the command queue because the ancestry a scope resolves
-/// against lands with the rest of the scene, after this insertion.
-#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+/// Registered by [`InfraPlugin`] rather than hooked on the component, so a
+/// backend-free build still carries the declaration. Deferred through the command
+/// queue because the ancestry a scope resolves against lands after insertion.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn attach_s3_store(
 	ev: On<Add, S3BucketBlock>,
 	mut commands: Commands,
@@ -248,11 +254,32 @@ pub(crate) fn attach_s3_store(
 		.entity(ev.entity)
 		.queue(|mut entity: EntityWorldMut| -> Result {
 			let block = entity.get_or_else::<S3BucketBlock>()?.clone();
-			let store = entity.with_state::<StackQuery, _>(|entity, stacks| {
-				let deploy_id = stacks.deployment().deploy_id().clone();
-				block.store(&stacks.resolve(entity), Some(&deploy_id))
+			let stack = entity.with_state::<StackQuery, _>(|entity, stacks| {
+				stacks.resolve(entity)
 			});
-			entity.insert(store);
+			match BootstrapConfig::get().service_access {
+				ServiceAccess::Remote => {
+					cfg_if! {
+						if #[cfg(feature = "aws_sdk")] {
+							let store = entity.with_state::<StackQuery, _>(|_, stacks| {
+								block.store(&stack, Some(stacks.deployment().deploy_id()))
+							});
+							entity.insert(store);
+						} else {
+							bevybail!(
+								"the bucket declared as `{}` resolves to the remote `{}`, but this binary has no `aws_sdk` backend to reach it",
+								block.label(),
+								block.bucket_name(&stack)
+							);
+						}
+					}
+				}
+				ServiceAccess::Local => {
+					entity.insert(FsStore::new(
+						ServiceAccess::local_store_dir(block.label().as_str()).into_abs(),
+					));
+				}
+			}
 			Ok(())
 		});
 }
@@ -264,7 +291,7 @@ impl Block for S3BucketBlock {
 	/// store, its assets); the deploy itself is what writes them. A bucket the
 	/// process stores into declares [`runtime_write`](Self::with_runtime_write).
 	fn grants(&self, stack: &ResolvedStack) -> Vec<AccessGrant> {
-		let name = stack.resource_name(self.label.clone());
+		let name = self.bucket_name(stack);
 		vec![match self.runtime_write {
 			true => AccessGrant::read_write(Self::ACCESS_KIND, name),
 			false => AccessGrant::read(Self::ACCESS_KIND, name),
@@ -622,15 +649,12 @@ mod tests {
 		let json = build_json(
 			S3BucketBlock::new("archive")
 				.with_object_versioning(true)
-				.with_expire_prefixes(vec![PrefixExpiry::new(
-					"postgres/",
-					180,
-				)]),
+				.with_expire_prefixes(vec![PrefixExpiry::new("sqlite/", 180)]),
 		);
 		json.as_str()
 			// the filtered rule, named for what it expires
-			.xpect_contains("\"id\":\"expire-postgres\"")
-			.xpect_contains("\"prefix\":\"postgres/\"")
+			.xpect_contains("\"id\":\"expire-sqlite\"")
+			.xpect_contains("\"prefix\":\"sqlite/\"")
 			.xpect_contains("\"days\":180")
 			// ..riding the same configuration as the noncurrent sweep
 			.xpect_contains("\"id\":\"expire-noncurrent-versions\"")
@@ -647,7 +671,7 @@ mod tests {
 		RenderScope::test_render(|parent| {
 			parent.spawn(
 				S3BucketBlock::new("archive").with_expire_prefixes(vec![
-					PrefixExpiry::new("postgres/", 0),
+					PrefixExpiry::new("sqlite/", 0),
 				]),
 			);
 		})

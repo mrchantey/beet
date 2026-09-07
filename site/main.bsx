@@ -24,15 +24,7 @@ command route.
 
 ## One declaration, two meanings
 
-`<DynamoTableBlock bx:ref="analytics" label="analytics"/>` is declared once, under
-the stage `<Stack>`. The DEPLOY provisions it into that stack, and the RUNTIME
-attaches a store for it, which the content router names with `StoreRef($analytics)`
-(a `bx:ref` is document-global, and the declaration builds in every binary, so the
-serving side reaches it from a different branch of the tree). Both sides compose
-`<app>--<stage>--analytics` through the one resolved `Stack`, whose app name comes
-from this entry's `<PackageConfig/>`, so they cannot disagree. The live site once
-spent a whole deploy writing to a table that did not exist because the two sides
-derived that name independently.
+`<S3BucketBlock bx:ref="analytics" label="analytics"/>` is declared once under the stage `<Stack>`. The deploy provisions it into that stack, and the runtime attaches a blob store for it, which the content router names with `StoreRef($analytics)` (a `bx:ref` is document-global, and the declaration builds in every binary, so the serving side reaches it from a different branch of the tree). Both sides compose `<app>--<stage>--analytics` through the one resolved `Stack`, whose app name comes from this entry's `<PackageConfig/>`, so they cannot disagree.
 
 A resource belongs to the stack it is authored under and to no other. There is no
 adoption: a declaration outside every `<Stack>` still resolves its runtime name,
@@ -41,21 +33,13 @@ this?" rather than one inferred from the process stage.
 
 ## Analytics, and what outlives it
 
-Raw per-event detail stops being useful after weeks; the aggregate trend is what
-the site records analytics FOR and must never be lost. Retention is therefore
-three things and **the order is the point**: a day's raw events are archived cold
-into the archive bucket (`analytics/raw/<date>.ndjson.gz`), rolled up into
-daily `analytics-rollup` aggregates that persist forever, and only then given the
-`ttl` DynamoDB expires them by. No row is ever stamped before both the archive
-object and the aggregate are confirmed present, so deletion from the table is a
-cost decision rather than information loss — the whole history is a few megabytes
-compressed.
+Raw events buffer into immutable gzip NDJSON segments in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.ndjson.gz` archive, writes and verifies that archive plus deterministic daily rows in the `analytics-rollup` blob store, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
 
 `<Route path="jobs">` hosts that job and the deployed `rollup` lambda is the only
 thing that boots it: the schedule invokes the function, the function's `bootstrap`
 loads THIS document out of the app bucket and dispatches `rollup` into the `jobs`
 router. The function publishes no url, no gateway and no hostname, so a sweep
-that rewrites every row in the table is reachable by nothing but its timer, and
+that compacts the analytics stores is reachable by nothing but its timer, and
 the site's own router is a different url space entirely.
 
     beet --main=site jobs                        # the job host, over http
@@ -106,9 +90,7 @@ lean binary reads the same stage and the same `shared` override off the same tre
 verbs it hosts) adds the tofu lifecycle routes `validate`/`plan`/`apply`/`show`/
 `list`/`destroy`/`rollback`/`rollforward` to whichever stack hosts it.
 
-The deploy route applies once per layer, and the order is the point: `<TofuApply
-layer="storage"/>` brings up the stores (the app bucket, the analytics table),
-`<DirSync/>` fills them, and a bare `<TofuApply/>` converges the whole stack:
+The deploy route applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the app, analytics, rollup, and archive buckets. `<DirSync/>` fills the app bucket, and a bare `<TofuApply/>` converges the whole stack:
 it uploads the built binary under the deploy id, publishes the release pointer
 naming it, and converges the instance against a bucket that already holds the
 site. One apply boots the new instance first, so it finds an empty bucket and no
@@ -207,7 +189,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		</Router>
 	</Route>
 	<!-- the nightly job host: its own url space and its own process. The rollup
-	     lambda is the only thing that ever boots this verb, so a table sweep is
+	     lambda is the only thing that ever boots this verb, so compaction is
 	     unreachable from the served site even though both live in this file. -->
 	<Route path="jobs" {HttpServer}>
 		<Router>
@@ -217,27 +199,22 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 	<!-- the stage stack: every resource the running site needs, the verbs that
 	     provision them, and the one `RequireFeatures` guarding the whole subtree -->
 	<Stack {RequireFeatures(["infra","extra"])}>
-		<!-- declared once: the deploy creates it, the runtime records to it. `ttl`
-		     is the attribute the nightly job stamps, and it stamps nothing until
-		     that day's cold archive and daily aggregate both exist. -->
-		<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
-		<!-- what the raws reduce to. Its own table because mixing row shapes would
-		     make every event scan warn-skip the aggregates, and because expiry is
-		     a property of the events table alone: these rows are forever. -->
-		<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
+		<!-- Raw segments and aggregate rows are separate writable blob stores. Both
+		     are stable across deploys; the rollup rows use the blanket JSON-over-blob
+		     TableProvider and can be re-derived from the archive. -->
+		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
+		<S3BucketBlock bx:ref="rollup" label="analytics-rollup" deploy_versioned=false runtime_write=true/>
 		<S3BucketBlock label="app" deploy_versioned=false/>
 		<!-- the `archive` profile: append-only cold data, the inverse of the app
-		     bucket by lifecycle and by grant. Never touched by a deploy sync
-		     (which would prune it), and the only bucket the running process may
-		     write. Analytics owns the `analytics/raw/` prefix in it and its
-		     objects are the ONLY copy once the table rows expire, so nothing
-		     here expires. -->
+		     bucket by lifecycle. Never touched by a deploy sync, which would prune
+		     it. Analytics owns the `analytics/raw/` prefix; these compact daily
+		     objects are the primary raw history, so nothing here expires. -->
 		<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
-		<!-- the box is destroyed and recreated by every deploy, so it can own no
-		     durable timer: the rollup runs as an invoke-only lambda the schedule
-		     calls at 03:00 UTC, booting the `jobs` verb of this same document. -->
+		<!-- the box is replaceable, so it owns no durable timer: the rollup runs
+		     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
+		     `jobs` verb of this same document. -->
 		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
 		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 		<DeployRoutes/>

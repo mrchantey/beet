@@ -2,8 +2,8 @@
 # Hello Mail
 
 A self-hosted mail server for two domains: one EC2 box running Stalwart, its
-metadata in RDS Postgres and its message bodies in S3, delivering its own
-outbound mail straight to each recipient's MX.
+metadata in embedded SQLite on a persistent EBS volume and its message bodies in
+S3, delivering its own outbound mail straight to each recipient's MX.
 
 The point of the example is the pair of `<MailDomainBlock/>`s. A mail domain is
 declared once, as the domain it serves, and everything composes from it: its
@@ -73,14 +73,19 @@ not a mail domain, so it owns that name rather than borrowing one.
 
 ## The deploy order, and why it is that
 
-`<EnsureSecret/>` hands its generated value to the apply as a request param, so
-it sits in this route and ahead of `<TofuApply/>`: the database is created WITH
-its master password, and the box boots reading its admin credential out of the
-parameter the same step minted. `<EnsureDkimKey/>` is there for the same reason
-and is not optional: the selector record reads its public half out of a tofu
-variable, and a variable nobody supplied resolves to empty, which for `p=` is
-the wire form of a REVOKED selector rather than a missing one. Neither value
-appears here or in any log.
+`<EnsureSecret/>` mints the bootstrap admin credential before the box boots to
+read it. `<EnsureDkimKey/>` sits ahead of the apply for a sharper reason and is
+not optional: the selector record reads its public half out of a tofu variable,
+and a variable nobody supplied resolves to empty, which for `p=` is the wire
+form of a REVOKED selector rather than a missing one. Neither value appears
+here or in any log.
+
+`<StalwartSnapshot/>` is the last thing before the apply, because the apply is
+what may replace the box: it finds the data volume by its stack tags, waits for
+a complete EBS snapshot, and only then lets terraform touch anything. A first
+deploy has no volume yet and is skipped, a retry inside one deploy reuses the
+deploy id as EC2's idempotency token rather than taking a second snapshot, and
+the lineage it builds is pruned to its own newest `snapshot_retain`.
 
 Then the reverse record (AWS validates the forward one first, so it waits for
 dns), then `<StalwartProvision/>`. That last one is not a nicety: Stalwart 0.16
@@ -99,39 +104,34 @@ route.
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<CrateCheck features={["infra", "extra"]}/>
-	<!-- the region is a DECISION here (an mta near its users, a database near
-	     its mta), so the stack pins it rather than inheriting `AWS_REGION`: a
-	     deploy from a differently-configured machine builds the same stack. -->
+	<!-- the region is a decision here (an mta near its users and its persistent
+	     volume), so the stack pins it rather than inheriting `AWS_REGION`: a deploy
+	     from a differently-configured machine builds the same stack. -->
 	<Stack app_name="mail-example" region="us-west-2">
 		<DeployRoutes/>
 
-		<!-- the network the box sits in. No NAT gateway: the box has a public
-		     address of its own and the database has nothing to call out to. -->
+		<!-- the one public subnet the box sits in. The embedded database and its EBS
+		     volume share zone `a`, so no private tier or second zone is needed. -->
 		<VpcBlock bx:ref="net" label="net"/>
-		<!-- mail metadata, in the private subnets, reachable only from the
-		     security groups of the consumers whose `DatabaseRef` targets it
-		     (the box below; each consumer emits its own admission). -->
-		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 		<!-- message bodies: the source of record, so versioned and not
 		     force-destroyable. -->
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
 		<!-- the `archive` profile: cold, append-only, written by the box rather
-		     than by any deploy. The nightly dump under `postgres/` is a copy of a
-		     live database and expires after a season; a prefix holding the only
-		     copy of something would sit beside it and expire never, which is why
-		     the expiry is scoped to a prefix rather than to the bucket. -->
+		     than by any deploy. The nightly verified SQLite snapshot under `sqlite/`
+		     is a copy and expires after a season; prefixes holding primary data beside
+		     it would expire never. -->
 		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
 			object_versioning=true
-			expire_prefixes={[{prefix:"postgres/", expire_days:180}]}/>
+			expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 
 		<!-- the box, which is infrastructure rather than a mail domain: its name,
 		     its reverse record, its certificate and its SMTP banner stay put while
-		     the domains it serves come and go. It holds no state worth keeping, so
-		     any machine-config change simply replaces it. -->
+		     the domains it serves come and go. Machine config remains replaceable;
+		     its protected data volume survives and is reattached to the next box. -->
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
-			{(VpcRef($net), DatabaseRef($db))}
+			{VpcRef($net)}
 			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 
@@ -164,13 +164,13 @@ route.
 			mailboxes={[{localpart:"replies"}]}/>
 
 		<Route path="deploy" {ExchangeSequence}>
-			<EnsureSecret secret="db-password" variable="db_password"/>
 			<EnsureSecret secret="mail-admin-password"/>
 			<!-- the sovereign signing key, minted before the apply that
 			     publishes its public half: the selector record reads a tofu
 			     variable, and a variable nobody supplied resolves to empty,
 			     which for `p=` is the wire form of a REVOKED selector. -->
 			<EnsureDkimKey/>
+			<StalwartSnapshot/>
 			<TofuApply/>
 			<EipReverseDns/>
 			<StalwartProvision/>

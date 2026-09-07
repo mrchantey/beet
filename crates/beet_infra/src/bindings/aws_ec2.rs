@@ -20,6 +20,138 @@ use std::collections::BTreeMap as Map;
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsEbsVolumeDetails {
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub availability_zone: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create_time: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub encrypted: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub final_snapshot: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub iops: Option<i64>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub kms_key_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub multi_attach_enabled: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub outpost_arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub size: Option<i64>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub snapshot_id: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub tags_all: Option<Map<SmolStr, SmolStr>>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub throughput: Option<i64>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub r#type: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub volume_initialization_rate: Option<i64>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts: Option<Vec<AwsEbsVolumeResourceBlockTypeTimeouts>>,
+}
+impl terra::ToJson for AwsEbsVolumeDetails {
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsEbsVolumeDetails {
+	fn resource_type(&self) -> &'static str { "aws_ebs_volume" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.arn.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "arn",
+				},
+			);
+		}
+		if self.availability_zone.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "availability_zone",
+			});
+		}
+		if self.create_time.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "create_time",
+				},
+			);
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 pub struct AwsEipAssociationDetails {
 	/// ## Attribute
 	/// `optional`, `computed`
@@ -861,6 +993,112 @@ impl terra::Resource for AwsKeyPairDetails {
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
+pub struct AwsVolumeAttachmentDetails {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub device_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub force_detach: Option<bool>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub instance_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Region where this resource will be [managed](https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints). Defaults to the Region set in the [provider configuration](https://registry.terraform.io/providers/hashicorp/aws/latest/docs#aws-configuration-reference).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub region: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub skip_destroy: Option<bool>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub stop_instance_before_detaching: Option<bool>,
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub volume_id: SmolStr,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeouts: Option<Vec<AwsVolumeAttachmentResourceBlockTypeTimeouts>>,
+}
+impl terra::ToJson for AwsVolumeAttachmentDetails {
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for AwsVolumeAttachmentDetails {
+	fn resource_type(&self) -> &'static str { "aws_volume_attachment" }
+	fn provider(&self) -> &'static terra::Provider { &terra::Provider::AWS }
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.device_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "device_name",
+			});
+		}
+		if self.instance_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "instance_id",
+			});
+		}
+		if self.volume_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "volume_id",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeouts")]
+pub struct AwsEbsVolumeResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub update: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
 #[serde(rename = "timeouts")]
 pub struct AwsEipResourceBlockTypeTimeouts {
 	/// ## Attribute
@@ -1248,6 +1486,20 @@ pub struct AwsInstanceResourceBlockTypeTimeouts {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub update: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeouts")]
+pub struct AwsVolumeAttachmentResourceBlockTypeTimeouts {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub create: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete: Option<SmolStr>,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,

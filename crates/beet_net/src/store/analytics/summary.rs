@@ -7,9 +7,8 @@ use beet_core::prelude::*;
 /// they viewed, and how long for.
 ///
 /// The read model behind `beet analytics` and any dashboard. It composes from
-/// two sources and needs neither: [`AnalyticsRollup`] rows for the long history
-/// (the raws they cover are archived cold and then expired) and raw
-/// [`AnalyticsEvent`]s for the recent window no aggregate covers yet. A day is
+/// two sources and needs neither: [`AnalyticsRollup`] rows for compacted history
+/// and raw [`AnalyticsEvent`]s from segments not yet compacted. A day is
 /// read from exactly one of them, so the two never double count.
 #[derive(Debug, Default, Clone)]
 pub struct AnalyticsSummary {
@@ -29,8 +28,8 @@ pub struct AnalyticsSummary {
 	/// The page-view dwell distribution ([`Buckets::DWELL`]).
 	///
 	/// A distribution, never a mean: heartbeat-accumulating tabs and views whose
-	/// closing beacon never arrived drag a mean into the hours, and a mean over
-	/// days whose raws have expired cannot be recombined at all.
+	/// closing beacon never arrived drag a mean into the hours, and daily means
+	/// cannot be recombined correctly.
 	pub dwell: Buckets,
 	/// The max-scroll-depth distribution ([`Buckets::SCROLL`]).
 	pub scroll: Buckets,
@@ -68,8 +67,7 @@ impl AnalyticsSummary {
 		acc.into_summary()
 	}
 
-	/// Aggregates a slice of daily [`AnalyticsRollup`] rows into a summary, ie
-	/// the long history whose raw events no longer exist.
+	/// Aggregates daily [`AnalyticsRollup`] rows into a summary.
 	pub fn from_rollups(rollups: &[AnalyticsRollup]) -> Self {
 		let mut acc = Accumulator::default();
 		for rollup in rollups {
@@ -81,9 +79,8 @@ impl AnalyticsSummary {
 	/// The full picture: aggregates for every day they cover, raw events for the
 	/// days they do not.
 	///
-	/// A day appears in exactly one source. Reading the raws of an already
-	/// aggregated day would count it twice, and a beet site keeps the tail of
-	/// its raw window around long after the day is rolled up.
+	/// A day appears in exactly one source. Reading an archived day's raws beside
+	/// its aggregate would count it twice.
 	pub fn compose(
 		rollups: &[AnalyticsRollup],
 		events: &[AnalyticsEvent],
@@ -394,9 +391,8 @@ mod test {
 		summary.requests.xpect_eq(5);
 	}
 
-	/// The long history reads out of aggregates, whose figures are the same ones
-	/// the raws would have produced. This is what the report says once the raws
-	/// have expired.
+	/// The compacted history reads out of aggregates, whose figures match the raw
+	/// archive.
 	#[beet_core::test]
 	fn reads_a_history_out_of_aggregates() {
 		let events = [
@@ -429,7 +425,7 @@ mod test {
 		let old = [page_view("2026-08-01", "/", 12_000)];
 		let recent = [page_view("2026-08-29", "/docs", 5_000)];
 		let rollups = AnalyticsRollup::from_events(&old);
-		// the raws of the aggregated day have not been expired yet
+		// An archived day's raw input may still be supplied without double counting.
 		let summary = AnalyticsSummary::compose(
 			&rollups,
 			&[old.as_slice(), recent.as_slice()].concat(),

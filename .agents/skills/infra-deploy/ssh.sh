@@ -95,9 +95,9 @@ echo "-- images (kitty graphics) --"
 # The sidebar overlay lists every post; "Folk Technology" is post-6, the one
 # carrying a raster, reached by label since every post added above it moves its
 # row. The image is well below the fold, so scroll it into view: a raster is
-# transmitted only once its box is on screen, and 32 downs lands it straddling
+# transmitted only once its box is on screen, and 31 downs lands it straddling
 # the bottom of the port.
-DOWNS="$(printf 'k:down;%.0s' {1..32})"
+DOWNS="$(printf 'k:down;%.0s' {1..31})"
 PTY_TERM=xterm-kitty PTY_RAW="$OUT/img.raw" \
 	python3 "$PTY" "$HOST" "$PORT" \
 	"w:$BOOT;m:3,1;w:$TICK;t:Folk Technology;w:$((NAV * 2));${DOWNS}w:$((NAV * 2))" \

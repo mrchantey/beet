@@ -395,8 +395,8 @@ mod test {
 	}
 
 	/// A block declared outside every `<Stack>` resolves the process default
-	/// rather than raising: it belongs to no deploy's config, but its RUNTIME
-	/// meaning still names the resource this process would.
+	/// rather than raising: it belongs to no deploy's config, but its declaration
+	/// still names the resource this process would.
 	///
 	/// REGRESSION: `examples/infra/bucket.bsx` and `lambda.bsx` both HUNG. Their
 	/// `<S3BucketBlock/>` sat in a host template's slot, so at attach time it was
@@ -419,11 +419,20 @@ mod test {
 			</Route>"#,
 		);
 		world
-			.query::<&S3Store>()
+			.query::<&S3BucketBlock>()
 			.single(&world)
 			.unwrap()
-			.bucket_name()
+			.bucket_name(&Stack::default().resolve(&PackageConfig {
+				app_name: "bucket-example".into(),
+				..default()
+			}))
 			.xpect_eq("bucket-example--dev--my-bucket");
+		world
+			.query::<&FsStore>()
+			.single(&world)
+			.unwrap()
+			.path()
+			.xpect_eq(ServiceAccess::local_store_dir("my-bucket").into_abs());
 	}
 
 	/// A block declared under an explicit `<Stack>` resolves THAT stack, through
@@ -444,18 +453,21 @@ mod test {
 			</Stack>"#,
 		);
 		world
-			.query::<&S3Store>()
+			.query::<&S3BucketBlock>()
 			.single(&world)
 			.unwrap()
-			.bucket_name()
+			.bucket_name(
+				&Stack::new("bucket-example")
+					.with_stage("staging")
+					.resolve(&PackageConfig::default()),
+			)
 			.xpect_eq("bucket-example--staging--my-bucket");
 	}
 
-	/// One declaration, two meanings. The site declares its analytics table
-	/// once, under its stage `<Stack>`; the DEPLOY provisions that table into
-	/// that stack's tofu config, and the RUNTIME attaches a store for the same
-	/// resolved name off the same entity. The invariant is that the two strings
-	/// agree, for any stage.
+	/// One declaration, two meanings. The site declares its analytics bucket
+	/// once under its stage `<Stack>`; the deploy provisions that bucket and the
+	/// runtime attaches a store for the same resolved name. The two strings agree
+	/// for every stage.
 	///
 	/// A resource belongs to the stack it is authored under and to no other, so
 	/// the `shared` stack (whose reason to exist is resources no stage deploy
@@ -465,12 +477,13 @@ mod test {
 	///
 	/// REGRESSION: the two sides used to derive the name independently, and
 	/// `site/main.bsx` declared no app name, so the runtime fell back to the
-	/// kebab-cased title and wrote to `beet--<stage>--analytics`, a table the
+	/// kebab-cased title and wrote to `beet--<stage>--analytics`, a store the
 	/// deploy never creates. Every event on the live site failed with a DynamoDB
 	/// `ResourceNotFoundException` while the site served perfectly and the
-	/// summary reported `0 events` on a green deploy.
+	/// summary reported `0 events` on a green deploy. The backend has changed;
+	/// the way two independent derivations disagree has not.
 	#[beet_core::test]
-	fn one_declaration_names_the_table_for_both_sides() {
+	fn one_declaration_names_the_bucket_for_both_sides() {
 		let mut world = test_world();
 		world.insert_resource(PackageConfig {
 			app_name: "beet-site".into(),
@@ -482,7 +495,7 @@ mod test {
 			router,
 			r#"<Fragment>
 				<Stack>
-					<DynamoTableBlock label="analytics"/>
+					<S3BucketBlock label="analytics" deploy_versioned=false runtime_write=true/>
 				</Stack>
 				<Route path="shared"><Stack stage="shared"/></Route>
 			</Fragment>"#,
@@ -514,7 +527,7 @@ mod test {
 		stacks.len().xpect_eq(2);
 		for (root, stage) in stacks {
 			let json = config_json(&mut world, root);
-			// the deploy side: the table lands in the stage stack's config only
+			// the deploy side: the bucket lands in the stage stack's config only
 			match stage.as_str() as &str {
 				"shared" => json.as_str().xnot().xpect_contains("analytics"),
 				_ => json.as_str().xpect_contains(&expected),
@@ -523,20 +536,19 @@ mod test {
 
 		// the runtime side: the same composition off the declaration entity
 		world
-			.query::<&DynamoTableBlock>()
+			.query::<&S3BucketBlock>()
 			.single(&world)
 			.unwrap()
-			.table_name(&scope)
+			.bucket_name(&scope)
 			.xpect_eq(expected);
 		// ..which locally is backed by a workspace directory rather than the
-		// remote table, so one declaration runs both ways
+		// remote bucket, so one declaration runs both ways
 		world.query::<&FsStore>().single(&world).xpect_ok();
 	}
 
-	/// The analytics retention stack the site entry declares, end to end: the
-	/// events table that expires, the aggregate table that does not, the bucket
-	/// the raws are archived into, the invoke-only function and the timer that
-	/// drives it — plus the job itself, bound to all three stores by relation.
+	/// The analytics compaction stack the site entry declares end to end: raw,
+	/// aggregate, and archive buckets, the invoke-only function, and the timer
+	/// that drives it — plus the job bound to all three stores by relation.
 	///
 	/// The deploy has to RENDER, not just spawn: an unpointed schedule and a
 	/// hostname on a gateway-less function are both render-time failures, and a
@@ -559,31 +571,35 @@ mod test {
 					</Router>
 				</Route>
 				<Stack>
-					<DynamoTableBlock bx:ref="analytics" label="analytics" ttl="ttl"/>
-					<DynamoTableBlock bx:ref="rollup" label="analytics-rollup"/>
+					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
+					<S3BucketBlock bx:ref="rollup" label="analytics-rollup" deploy_versioned=false runtime_write=true/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
 			</Fragment>"#,
 		);
-		// the expiring table and the aggregates that outlive it
-		let mut tables = world
-			.query::<&DynamoTableBlock>()
+		// Every analytics store is stable across deploys and runtime-writable; only
+		// the sole-copy archive keeps object versions.
+		let mut buckets = world
+			.query::<&S3BucketBlock>()
 			.iter(&world)
-			.map(|table| {
+			.map(|bucket| {
 				(
-					table.label().to_string(),
-					table.ttl().clone().map(|attribute| attribute.to_string()),
+					bucket.label().to_string(),
+					bucket.runtime_write(),
+					bucket.deploy_versioned(),
+					bucket.object_versioning(),
 				)
 			})
 			.collect::<Vec<_>>();
-		tables.sort();
-		tables.xpect_eq(vec![
-			("analytics".to_string(), Some("ttl".to_string())),
-			("analytics-rollup".to_string(), None),
+		buckets.sort();
+		buckets.xpect_eq(vec![
+			("analytics".to_string(), true, false, false),
+			("analytics-rollup".to_string(), true, false, false),
+			("archive".to_string(), true, false, true),
 		]);
-		// nothing but the timer may reach a sweep that rewrites every row
+		// nothing but the timer may reach analytics compaction
 		world
 			.query::<&LambdaBlock>()
 			.single(&world)
@@ -621,15 +637,15 @@ mod test {
 		});
 		world
 			.entity(events)
-			.get::<DynamoTableBlock>()
+			.get::<S3BucketBlock>()
 			.unwrap()
-			.table_name(&stack)
+			.bucket_name(&stack)
 			.xpect_eq("beet-site--dev--analytics");
 		world
 			.entity(rollups)
-			.get::<DynamoTableBlock>()
+			.get::<S3BucketBlock>()
 			.unwrap()
-			.table_name(&stack)
+			.bucket_name(&stack)
 			.xpect_eq("beet-site--dev--analytics-rollup");
 		world
 			.entity(archive)
@@ -655,11 +671,12 @@ mod test {
 			.as_str()
 			.xpect_contains("aws_scheduler_schedule")
 			.xpect_contains("cron(0 3 * * ? *)")
-			// the archive bucket is writable by the runtime, the app bucket is not
+			// all three stores are writable buckets; only archive is versioned
+			.xpect_contains("beet-site--dev--analytics")
+			.xpect_contains("beet-site--dev--analytics-rollup")
 			.xpect_contains("beet-site--dev--archive")
-			.xpect_contains(
-				r#""ttl":[{"attribute_name":"ttl","enabled":true}]"#,
-			)
+			.xpect_contains("s3:PutObject")
+			.xpect_contains("aws_s3_bucket_versioning")
 			// a job sweeps a store rather than answering a request, so it takes
 			// the long timeout a served function has no use for
 			.xpect_contains(r#""timeout":900"#)
@@ -706,13 +723,19 @@ mod test {
 		tree.find(&["shared", "apply"]).xpect_some();
 		tree.find(&["shared", "push"]).xpect_some();
 		tree.find(&["shared", "pull"]).xpect_some();
-		// the bucket block resolved the shared-stage stack by ancestry
+		// the bucket block resolves the shared-stage stack by ancestry, while
+		// local service access attaches the filesystem backend
 		world
-			.query::<&S3Store>()
+			.query::<&S3BucketBlock>()
 			.single(&world)
 			.unwrap()
-			.bucket_name()
+			.bucket_name(
+				&Stack::new("beet-site")
+					.with_stage("shared")
+					.resolve(&PackageConfig::default()),
+			)
 			.xpect_eq("beet-site--shared--assets");
+		world.query::<&FsStore>().single(&world).unwrap();
 		// ..and so did the syncs, which name the bucket by label alone
 		world
 			.query::<&S3FsStore>()

@@ -170,8 +170,8 @@ mod stalled_store_test {
 	const REQUESTS: usize = 32;
 
 	/// A write-only store whose every write parks for [`STALL`] and never lands,
-	/// standing in for a DynamoDB table behind a connect timeout. Reads answer
-	/// empty rather than delegating: nothing in this test reads the table, and a
+	/// standing in for a remote blob store behind a connect timeout. Reads answer
+	/// empty rather than delegating: nothing in this test reads the store, and a
 	/// write that never returns is the whole point.
 	#[derive(Clone, Component)]
 	#[component(on_add = BlobStore::on_add::<Self>)]

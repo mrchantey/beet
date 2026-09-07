@@ -22,10 +22,10 @@ use beet_net::prelude::*;
 /// the parameter store treats the value: it reaches a terminal, a scrollback
 /// buffer and whatever is recording the session.
 ///
-/// `--infra` adds the credentials no human signs in with: the database master
-/// password, whichever relay credentials the stack's domains actually use, and
-/// the DKIM signing keys. Separate because reading a mailbox password is
-/// setting up a mail client, and reading the database password is an incident.
+/// `--infra` adds the credentials no human signs in with: whichever relay
+/// credentials the stack's domains actually use and the DKIM signing keys.
+/// Separate because reading a mailbox password is setting up a mail client,
+/// while relay and signing credentials are infrastructure access.
 #[derive(Debug, Clone, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(MailCredentialsAction)]
@@ -78,11 +78,6 @@ pub async fn MailCredentialsAction(
 		}
 	}
 	if infra {
-		entries.push((
-			format!("{} database", mail.mail_box.db_name()),
-			mail.database.secret(),
-			"postgres master password".to_string(),
-		));
 		// exactly the relay credentials in use: an all-comail stack has no SES
 		// pair to print, and a direct-delivering one has no relay credential at
 		// all, so listing either would read as a value somebody forgot to set.
@@ -150,7 +145,7 @@ pub async fn MailCredentialsAction(
 	}
 	if !infra {
 		info!(
-			"pass --infra for the credentials no human signs in with (database, relay, dkim)"
+			"pass --infra for the credentials no human signs in with (relay, dkim)"
 		);
 	}
 	Pass(cx.input).xok()
@@ -159,7 +154,6 @@ pub async fn MailCredentialsAction(
 /// Parameters for the listing.
 #[derive(Reflect)]
 struct MailCredentialsParams {
-	/// Also print the database master password, the relay credentials in use
-	/// and the DKIM signing keys.
+	/// Also print the relay credentials in use and the DKIM signing keys.
 	infra: bool,
 }

@@ -2,7 +2,8 @@
 //! connect, what pages they visit, and for how long.
 //!
 //! One [`AnalyticsEvent`] type (built on beet's [`Value`], not `serde_json`)
-//! spans every transport, stored in a [`TableStore`]. Its [`AnalyticsEventKind`]
+//! spans every transport, buffered into gzip NDJSON [`AnalyticsSegment`] objects
+//! in a [`BlobStore`]. Its [`AnalyticsEventKind`]
 //! discriminates the [`AnalyticsEventData`] payload: a `Request` is the raw
 //! server traffic log, a `PageView` a viewed page with a dwell duration, and the
 //! client also reports `Click` / `Scroll` / `Error` interactions.
@@ -20,19 +21,20 @@ mod event;
 pub use event::*;
 mod geoip;
 pub use geoip::*;
-mod retention;
-pub use retention::*;
 mod rollup;
 pub use rollup::*;
 mod summary;
 pub use summary::*;
 pub mod analytics_ext;
-// the store persistence rides the json `TableStore` surface, and the cold
-// archive rides its ndjson.
+// raw segments, daily archives and rollup rows use JSON over BlobStore.
 #[cfg(feature = "json")]
 mod archive;
 #[cfg(feature = "json")]
 pub use archive::*;
+#[cfg(feature = "json")]
+mod segment;
+#[cfg(feature = "json")]
+pub use segment::*;
 #[cfg(feature = "json")]
 mod rollup_job;
 #[cfg(feature = "json")]
@@ -60,7 +62,6 @@ pub use store::*;
 #[cfg(feature = "json")]
 pub fn analytics_plugin(app: &mut App) {
 	app.register_type::<AnalyticsConfig>()
-		.register_type::<AnalyticsRetention>()
 		.register_type::<GeoIpDb>()
 		// the nightly job and the two store relations it names its aggregate
 		// table and its archive by, so `<Route path="rollup" {(
@@ -70,7 +71,10 @@ pub fn analytics_plugin(app: &mut App) {
 		.register_type::<RollupStoreConsumers>()
 		.register_type::<ArchiveStoreRef>()
 		.register_type::<ArchiveStoreConsumers>()
+		.init_resource::<store::AnalyticsShutdown>()
 		.add_observer(GeoIpDb::load_on_add)
 		.add_observer(store::spawn_store_on_config)
-		.add_observer(store::handle_analytics_event);
+		.add_observer(store::handle_analytics_event)
+		.add_systems(Update, store::flush_aged_buffers)
+		.add_systems(Last, store::flush_on_exit.before(AppExitSet::Exit));
 }

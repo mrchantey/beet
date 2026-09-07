@@ -9,20 +9,20 @@ This is a runbook, not a tutorial. The [tutorials](/docs/tutorials) teach beet's
 
 It is also the longest-running thing in the docs. You start it on a Monday and finish it the following week, and most of that time is spent waiting on an Amazon support case. Plan for that rather than being surprised by it.
 
-The shape is: [Stalwart](https://stalw.art) owns your mailboxes, your receiving and your policy, on one small box you control. Outbound leaves through whichever relay each domain declares, or through no relay at all. Postgres and S3 hold the state, the box itself is disposable, and the whole thing is declared as [`beet_infra`](/docs/crates/beet_infra) blocks in one `.bsx` file.
+The shape is: [Stalwart](https://stalw.art) owns your mailboxes, receiving and policy on one small box you control. Its embedded SQLite database lives on a persistent EBS volume, while message bodies live in S3. Outbound leaves through whichever relay each domain declares, or through no relay at all. The whole system is declared as [`beet_infra`](/docs/crates/beet_infra) blocks in one `.bsx` file.
 
 This runbook takes the Amazon SES path throughout, because that is the one it was written against and the one with the longest tail of real operational detail. Section 1a says what the choice is and how to take a different one; nothing else in the runbook changes if you do.
 
 ## 1. What you get, what it costs, what it demands
 
-You get mailboxes whose message bodies sit in a bucket you own and whose metadata sits in a database you own. You get [JMAP](https://jmap.io) on port 443, which is the reason to do this at all if agents are going to read your mail: it is JSON over HTTP with batching and push, not a 1986 line protocol with a decade of extensions bolted on. You get IMAP, submission and CardDAV/CalDAV alongside it, so ordinary mail clients work with no special handling. And with a relay in front of delivery, your messages leave from IP addresses somebody else spends a great deal of money keeping trusted.
+You get mailboxes whose message bodies sit in a bucket you own and whose metadata sits in an embedded SQLite database on a volume you own. You get [JMAP](https://jmap.io) on port 443, which is the reason to do this at all if agents are going to read your mail: it is JSON over HTTP with batching and push, not a 1986 line protocol with a decade of extensions bolted on. You get IMAP, submission and CardDAV/CalDAV alongside it, so ordinary mail clients work with no special handling. And with a relay in front of delivery, your messages leave from IP addresses somebody else spends a great deal of money keeping trusted.
 
-It costs about US$43 a month in Sydney on-demand pricing: EC2 `t4g.small` around $15, an elastic IP around $4, EBS around $3, an RDS `db.t4g.micro` around $16 plus $3 of storage, a couple of dollars of S3, and cents of SES. About $25 of that is mail-specific once you treat the database as company infrastructure that mail is merely the first tenant of. A savings plan takes roughly 30% off the compute later.
+It costs roughly US$25 a month in Sydney on-demand pricing: EC2 `t4g.small` around $15, an elastic IP around $4, the root and persistent EBS volumes around $5, plus S3 and SES usage. A savings plan takes roughly 30% off the compute later.
 
 It demands four things:
 
 - A domain, and a DNS provider with an API. This walkthrough uses Cloudflare, because the blocks speak its API and because being the registrar too makes DNSSEC one call instead of a registrar ticket.
-- An AWS account, with an IAM user or role that can create EC2, RDS, S3, SES, SSM, IAM and CloudWatch resources.
+- An AWS account, with an IAM user or role that can create EC2, EBS snapshots, S3, SES, SSM, IAM and CloudWatch resources.
 - A deploy machine carrying `tofu`, `aws`, `ssh`/`scp`, `curl`, `openssl` and `wrangler`. Two of those are load-bearing in ways worth knowing up front: `openssl` mints the DKIM key you own, piping the public half out so the private half never touches your disk, and `curl` is the SMTP client, because beet has no native one yet.
 - Patience for a support case argued in prose. See section 4.
 
@@ -92,7 +92,7 @@ CLOUDFLARE_ACCOUNT_ID=...
 TF_STATE_PASSPHRASE=$(openssl rand -base64 32)
 ```
 
-The account variable beet reads is `CLOUDFLARE_ACCOUNT_ID`, not `CLOUDFLARE_DEFAULT_ACCOUNT_ID`. The passphrase is the one unrecoverable value in the file: it encrypts the OpenTofu state client-side, and state carries the database master password and the SES SMTP credential, because `sensitive = true` on a tofu variable redacts a value from plan and apply output and *not* from state. Back it up somewhere durable before you run anything.
+The account variable beet reads is `CLOUDFLARE_ACCOUNT_ID`, not `CLOUDFLARE_DEFAULT_ACCOUNT_ID`. The passphrase is the one unrecoverable value in the file: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. Back it up somewhere durable before you run anything.
 
 Not every mail credential is in there. A comail api key is parked in parameter store by you and read by the deploy verbs directly, and the sovereign DKIM private half never leaves parameter store either; only its public half is a tofu variable. What state carries is what terraform *derives*, which for mail is the SES pair.
 
@@ -106,7 +106,7 @@ curl -s https://api.cloudflare.com/client/v4/user/tokens/verify \
 aws sts get-caller-identity
 ```
 
-Then one cheap read per AWS service you will touch (`ec2`, `rds`, `sesv2`, `ssm`, `iam`, `s3`, `logs`) in your chosen region, and a throwaway TXT record create and delete against the zone to prove DNS write rather than assume it. A missing permission discovered here costs seconds; the same permission discovered twenty minutes into an RDS provision costs twenty minutes and a partly-created stack.
+Then one cheap read per AWS service you will touch (`ec2`, `sesv2`, `ssm`, `iam`, `s3`, `logs`) in your chosen region, and a throwaway TXT record create and delete against the zone to prove DNS write rather than assume it. A missing permission discovered here costs seconds; the same permission discovered during an apply leaves a partly-created stack.
 
 *Gap:* this should be a `Preflight` action. It is the same check every stack wants and nothing in beet performs it yet.
 
@@ -197,17 +197,17 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 
 ```jsx
 <Stack app_name="acme" region="ap-southeast-2">
-	<DeployVerbs/>
+	<DeployRoutes/>
 
-	<VpcBlock label="net"/>
-	<RdsPostgresBlock label="db" vpc="net" database="mail" consumers={["mail"]}/>
-	<S3BucketBlock label="mail-blobs" object_versioning=true force_destroy=false runtime_write=true/>
-	<S3BucketBlock label="archive" object_versioning=true force_destroy=false
-		runtime_write=true expire_prefixes={[{prefix:"postgres/", expire_days:180}]}/>
+	<VpcBlock bx:ref="net" label="net"/>
+	<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
+		runtime_write=true object_versioning=true/>
+	<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
+		object_versioning=true expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 
 	<StalwartBlock label="mail" hostname="mail.example.com"
-		vpc="net" database="db" db_name="mail" db_user="postgres"
 		blob_bucket="mail-blobs" backup_bucket="archive" dns_stage="prod"
+		{VpcRef($net)}
 		ssh_public_key="ssh-ed25519 AAAA... deploy"/>
 
 	<MailDomainBlock
@@ -237,11 +237,11 @@ Some notes on the declarations that are not obvious from reading them:
 
 **The order of the `MailDomainBlock` tags is load-bearing, and nothing at the tag says so.** The first one declared becomes the server's *primary* domain, which settles two things you would not go looking for in a list of domains. It is what `system('domain')` resolves to, so it is the domain every outbound report is addressed from (`noreply-dmarc@<primary>`, section 7). And it is the only domain whose ACME order carries the *box's* own hostname, since that name belongs to no mail domain and has to ride along on one. Reordering the tags therefore moves the server's identity and reissues a certificate, and deleting the first tag hands both to whichever domain happens to be next. Put the domain you intend to keep second, directly behind the staging domain it will replace, so that retiring staging promotes the right one rather than the newsletter domain.
 
-**No NAT gateway.** The box lives in a public subnet with an elastic IP, and the database has nothing to call out to, so the private subnets are left on the VPC's main route table whose only route is the local CIDR. That is about $32 a month not spent, expressed as an absence rather than a setting. A private workload that genuinely needs one AWS service wants a VPC endpoint, not a gateway to the whole internet.
+**The VPC has one public subnet in zone `a`.** The stack contains one public EC2 box and one EBS volume that must share its availability zone. Private subnets and a second zone add no resilience to that topology, so the block does not create them.
 
-**The database security group emits ingress and no egress at all.** A security group declared with rules of its own loses the default allow-all egress rule, and for a database that is precisely right. It looks like an omission and is not.
+**The box is cattle; its data volume is not.** Machine config is cloud-init user data, and any change to that user data replaces the instance. Inbound SMTP during a rebuild is covered by sender retries, which run for days. What must survive that replacement is the mail itself, so Stalwart's SQLite database sits on its own encrypted gp3 volume at `/var/lib/stalwart`, a separate resource in the subnet's availability zone that is detached from the old box and reattached to the new one. Production defaults to `prevent_destroy` with a final snapshot; non-production defaults to disposable, so the same declaration can run a restore drill and then be destroyed. Set `data_volume_protected` explicitly only to override that stage-derived data grade.
 
-**The box is cattle.** All state is in RDS and S3, machine config is cloud-init user data, and any change to that user data replaces the instance. Inbound SMTP during a rebuild is covered by sender retries, which run for days. Config that should *not* rebuild the box rides a fetch-at-boot pattern instead: the machine config holds SSM parameter *names* only, and an `ExecStartPre` script renders the real config from parameter store at every service start. Rotation is then `systemctl restart`, not a redeploy.
+**Everything about the mount is written assuming the detection can fail.** Cloud-init waits for the exact `nvme-Amazon_Elastic_Block_Store_<volume-id>` by-id path rather than the `/dev/sdf` it asked for, because Nitro does not honour the requested name. It formats only a device `blkid` has positively reported as blank — `blkid` exits 2 for "no filesystem here" and non-zero for every other reason, and treating those alike is how a transient read failure comes to `mkfs` the mail store. It records the filesystem UUID in `fstab` with `nofail`, so a volume that never appears leaves a box you can still ssh into rather than an emergency shell you cannot; `RequiresMountsFor` on the units is what keeps Stalwart from starting against a missing store. The one machine-config value that is a terraform reference is the volume id, and it is substituted *after* the user data's `${` escape pass. See section 9 for why that ordering has its own paragraph.
 
 **The one static credential in the stack is the SES SMTP key pair**, because the SMTP protocol forces it. Terraform derives it into two SecureString parameters and it belongs to a dedicated IAM user whose only permission is `ses:SendRawEmail`. Everything else, including the instance's access to its own buckets, is an instance profile with IMDSv2 required. That user exists exactly while some domain relays through SES: move the last one off and the next apply removes it, which is the point of the relay being composed rather than assumed.
 
@@ -253,9 +253,9 @@ The deploy route is a sequence, and its order is the design:
 
 ```jsx
 <Route path="deploy" {ExchangeSequence}>
-	<EnsureSecret secret="db-password" variable="db_password"/>
 	<EnsureSecret secret="mail-admin-password"/>
 	<EnsureDkimKey/>
+	<StalwartSnapshot/>
 	<TofuApply/>
 	<EipReverseDns/>
 	<StalwartProvision ssh_key="~/.ssh/id_ed25519_mail"/>
@@ -265,15 +265,15 @@ The deploy route is a sequence, and its order is the design:
 </Route>
 ```
 
-Secrets are minted *before* the apply and handed to it as variables, so the database is created with its master password and the box boots reading its admin credential out of the parameter the same step wrote. `EnsureDkimKey` is create-if-missing for a sharper reason than the passwords: a rotated key under an already-published selector is a fortnight of unverifiable mail. The key is minted before the apply and the apply publishes its public half, so the selector the world resolves and the key the server signs with are one parameter read twice. Letting the server generate its own key would mean reading it back and publishing in a second apply, with a window in between where mail is signed by a selector nothing answers for.
+The bootstrap admin secret is minted before the box starts. `EnsureDkimKey` is create-if-missing for a sharper reason than the password: a rotated key under an already-published selector is a fortnight of unverifiable mail. The key is minted before the apply and the apply publishes its public half, so the selector the world resolves and the key the server signs with are one parameter read twice. Letting the server generate its own key would mean reading it back and publishing in a second apply, with a window in between where mail is signed by a selector nothing answers for. `StalwartSnapshot` then finds the persistent volume by its `Name`, `Project` and `Stage` tags and waits for its snapshot to complete. No volume exists on the first deploy, so that case is an intentional skip; retries within one deploy use its UUID as EC2's idempotency token.
 
-Reverse DNS comes after the apply because AWS validates the forward record before publishing the reverse one. Provisioning comes after that, because Stalwart 0.16 keeps listeners, routing, domains and accounts as objects *inside* its data store rather than in any file terraform writes. The MTA-STS policy body is published after the apply that published the record pointing at it. The probe proves a message goes out and a message comes back authenticated. And the audit runs last, because it is the only check that can see what the deploy did *not* do: a record left behind by a block that stopped declaring it.
+The apply starts only after the snapshot completes. Reverse DNS comes after the apply because AWS validates the forward record before publishing the reverse one. Provisioning comes after that, because Stalwart 0.16 keeps listeners, routing, domains and accounts as objects *inside* its data store rather than in any file terraform writes. The MTA-STS policy body is published after the apply that published the record pointing at it. The probe proves a message goes out and a message comes back authenticated. And the audit runs last, because it is the only check that can see what the deploy did *not* do: a record left behind by a block that stopped declaring it.
 
 Two things about running these verbs:
 
-`plan` and `deploy` do not produce the same diff, and reading a plan without knowing that is alarming. `deploy` runs the secret and DKIM steps before the apply and `plan` does not, so a plan will show the database password going to null and the DKIM record going to `p=` empty. Neither is real. The empty `p=` is worth recognising because it is also a genuine failure mode: `p=` with nothing after it is the wire form of a *revoked* key, and a bare `apply` that reaches past the deploy route will publish exactly that.
+`plan` and `deploy` do not produce the same diff, and reading a plan without knowing that is alarming. `deploy` runs the DKIM step before the apply and `plan` does not, so a plan will show the DKIM record going to `p=` empty. The empty `p=` is worth recognising because it is also a genuine failure mode: `p=` with nothing after it is the wire form of a *revoked* key, and a bare `apply` that reaches past the deploy route will publish exactly that.
 
-Run `validate`, then `plan`, then the audit, before you deploy anything. `plan` against real providers costs nothing and is the last cheap check before a phase that costs real money and real DNS. Ours reported 78 resources to add, 0 to change, 0 to destroy, with the planned DNS records matching the specification table exactly and nothing at the apex. Running `audit` before the first deploy is likewise worth it: against a zone of 30 records and a stack declaring 31 it reported clean, which means the allowlist was proven right while it was still free to be wrong.
+Run `validate`, then `plan`, then the audit, before you deploy anything. `plan` against real providers costs nothing and is the last cheap check before a phase that costs real money and real DNS. Check that the planned DNS records match the specification table exactly and that nothing moves the apex early. Running `audit` before the first deploy is likewise worth it: against a zone of 30 records and a stack declaring 31 it reported clean, which means the allowlist was proven right while it was still free to be wrong.
 
 The allowlist belongs on the stack rather than on the audit verb, so that the audit at the tail of `deploy` and the standalone `audit` route read the same list. Every entry is a decision with a reason attached, and on a staging build most of them retire at the cutover:
 
@@ -310,7 +310,7 @@ Then:
 beet --main=infra/mail.bsx --stage=prod deploy
 ```
 
-Budget an hour for the first one and expect it to fail at least once. The apply itself takes about twenty minutes, of which RDS is fifteen. A converged, idempotent re-deploy afterwards runs in under two minutes.
+Budget an hour for the first one and expect it to fail at least once. Most of that hour is the box: the AMI, the pinned release, the volume it waits for and the certificate it orders. A converged, idempotent re-deploy afterwards runs in under two minutes.
 
 ### When it fails
 
@@ -344,7 +344,7 @@ Every credential in this stack is generated and never displayed, which is right,
 beet --main=infra/mail.bsx --stage=prod export-passwords
 ```
 
-It composes the parameter names off the declaration rather than making you type `/acme/prod/mail-account-<localpart>-at-<domain-with-dots-as-hyphens>` from memory, which is the part that goes wrong. It lists every mailbox on every served domain plus `admin@`, the account the server itself creates when the data store is first claimed and which no declaration names. `--infra` adds the database master password and the DKIM private keys, kept behind a flag because reading a mailbox password is setting up a client and reading the database password is an incident.
+It composes the parameter names off the declaration rather than making you type `/acme/prod/mail-account-<localpart>-at-<domain-with-dots-as-hyphens>` from memory, which is the part that goes wrong. It lists every mailbox on every served domain plus `admin@`, the account the server itself creates when the data store is first claimed and which no declaration names. `--infra` adds the relay credentials in use and the DKIM private keys, kept behind a flag because reading a mailbox password is setting up a client while relay and signing credentials are infrastructure access.
 
 It prints secrets to stdout, deliberately and uniquely in this stack. Mind what is recording your session.
 
@@ -447,34 +447,35 @@ The diagnosis method generalises: send a message local-to-local (it never touche
 
 Start with the paragraph that justifies everything else in this section.
 
-Our first restore drill found that the nightly `pg_dump` had never once produced a backup. Every check the stack makes was green: the timer was scheduled, the unit existed, the deploy passed, the zone audit was clean. The bucket had been empty since the day the timer was armed and nothing anywhere said so.
+Our first restore drill found that the nightly dump had never once produced a backup. Every check the stack makes was green: the timer was scheduled, the unit existed, the deploy passed, the zone audit was clean. The bucket had been empty since the day the timer was armed and nothing anywhere said so.
 
 Nothing observes a backup except restoring one. Read that before you read any of the machinery below.
 
 The layers, ordered by how much losing them would hurt:
 
-1. **Postgres:** RDS automated backups with 14-day point-in-time recovery, roughly a five minute RPO, plus a final snapshot and deletion protection so that a stray `destroy` cannot eat the mail.
-2. **Blobs:** S3 versioning, a lifecycle expiring noncurrent versions at 90 days, a public access block, and server-side encryption.
-3. **Off-cloud:** a systemd timer on the box runs a nightly custom-format `pg_dump` into the `archive` bucket, whose `postgres/` prefix expires at 180 days. The dump runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup, and it reads its credential from parameter store so that no secret rides its command line and a process listing on a mail box is not a credential dump.
-4. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exception is the DKIM private key once its selector is published, so include it in the export.
+1. **The data volume.** Stalwart's SQLite database is at `/var/lib/stalwart/stalwart.db` on its own encrypted gp3 volume, which is not the box. In production it carries `prevent_destroy` and asks AWS for a final snapshot, so a stray `destroy` cannot eat the mail. This is the layer that replaced RDS's 14-day point-in-time recovery, and losing that window is the one thing this trade genuinely gave up.
+2. **The pre-apply snapshot.** `<StalwartSnapshot/>` sits immediately before the full `<TofuApply/>`, finds the volume by its `Name`/`Project`/`Stage` tags, and waits for a complete EBS snapshot before an apply is allowed to replace the box. A retry within one deploy reuses the deploy id as EC2's idempotency token rather than taking a second snapshot. Nothing else prunes a snapshot lineage, so the step prunes its own: the newest `snapshot_retain` (7 by default) of the snapshots *it* tagged survive, and a snapshot you took by hand before something frightening is never one of them.
+3. **Off-box.** A systemd timer on the box runs SQLite's online `.backup`, checks `PRAGMA integrity_check` on the result, uploads it under `sqlite/` in the `archive` bucket, downloads it again, compares the bytes and re-verifies the copy that came back. The backup runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup. The `sqlite/` prefix expires at 180 days, which is only safe because the live database is on the volume and not in that bucket.
+4. **Blobs.** S3 versioning, a lifecycle expiring noncurrent versions, a public access block and server-side encryption. Message bodies were never in the database and are not in these snapshots.
+5. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exception is the DKIM private key once its selector is published, so include it in the export.
 
-One consistency rule to encode in your runbook: blobs are hash-keyed and the database references them, so a restored database must never be *newer* than the blob store. Back up the database first; restore the blobs first.
+The off-cloud pull is `rclone sync :s3:<archive-bucket>/sqlite <local>` against a read-only key. *Gap:* ours is documented and not scheduled, so until something runs it the sovereignty claim honestly stops at "in another AWS service".
 
-The off-cloud pull is `rclone sync :s3:<archive-bucket>/postgres <local>` against a read-only key. *Gap:* ours is documented and not scheduled, so until something runs it the sovereignty claim honestly stops at "in another AWS service".
+### The bug, because it generalises
 
-### The two bugs, because both generalise
+**A terraform reference resolved before the user data escape pass.** The whole user data string is escaped (`${` becomes `$${`) and then the deliberate references are substituted in. A helper that resolves its *own* reference runs before that escape, so the escape turns a live reference into literal text, and the box once ran `pg_dump --host '${aws_db_instance.x.address}'` — which fails on every line of a name resolver and is discovered a fortnight later by a restore that has nothing to restore. Postgres is gone and the trap is not: `build_user_data` still makes exactly one late substitution, now the data volume id, and a box that mounts `/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_$${aws_ebs_volume...}` waits ten minutes and then refuses to boot. Every step that composes machine config must leave a *token* for the one late substitution, never a reference. Diagnosis is one line: `sudo cat` the script on the box and look at it.
 
-**A terraform reference resolved before the user data escape pass.** The whole user data string is escaped (`${` becomes `$${`) and then one deliberate reference is substituted in. A helper that resolves its *own* reference runs before that escape, so the escape turns a live reference into literal text, and the box ran `pg_dump --host '${aws_db_instance.x.address}'`. Every step that composes machine config must leave a *token* for the one late substitution, never a reference. Diagnosis is one line: `sudo cat` the script on the box and look at it.
+Useful commands: `systemctl list-timers stalwart-backup.timer` says when a timer will next run and whether it ever *has* (`LAST` is `-` if it never has), and `systemctl start <unit>` runs a timer's unit right now without disturbing the schedule. Verify by listing the bucket, not by the unit's exit code:
 
-**`PGSSLMODE=verify-full` needs `PGSSLROOTCERT=system` beside it.** We had installed the RDS CA bundle into `/etc/pki/ca-trust/source/anchors/` because Stalwart verifies through `rustls-platform-verifier`, which reads the OS trust store. libpq does not: it looks for `~/.postgresql/root.crt` and fails with "root certificate file does not exist" against a CA the machine trusts perfectly well. Two clients on one box, two different trust stores.
-
-Also, `pg_dump` refuses a server newer than itself, so name the postgres client package from the database's own engine version. Get that wrong and the failure is a timer that fails quietly every night rather than a boot that fails loudly.
-
-Useful commands: `systemctl list-timers stalwart-backup.timer` says when a timer will next run and whether it ever *has* (`LAST` is `-` if it never has), and `systemctl start <unit>` runs a timer's unit right now without disturbing the schedule. Verify by listing the bucket, not by the unit's exit code.
+```sh
+systemctl list-timers stalwart-backup.timer
+sudo systemctl start stalwart-backup.service
+aws s3 ls s3://<archive-bucket>/sqlite/ --recursive
+```
 
 ### The drill
 
-The drill is a whole parallel stage, not a spare database. `deploy` it, `restore-drill` into it, `destroy` it. Ours ran seven minutes to deploy (57 resources), 28 seconds to restore a 176 KB dump, and a few minutes to tear down. Budget half an hour and one extra RDS instance.
+The drill is a whole parallel stage, not a spare database file. `deploy` it, `restore-drill` into it, `destroy` it. A non-production Stalwart volume is disposable by default precisely so this works: the drill tears down the same declaration production protects, without either stage knowing about the other.
 
 Three things about building one over a shared zone, each of which is a consequence rather than a preference:
 
@@ -484,9 +485,9 @@ Three things about building one over a shared zone, each of which is a consequen
 
 **What it must share is its labels and its app name.** A resource name composes as `<app>--<stage>--<label>`, so identical labels resolved against the source stage are how the drill finds production's backup bucket and the credential it signs in with.
 
-Then the thing that reframes the whole exercise, which only appears once you actually run one. Stalwart 0.16 keeps its configuration *in the data store*, so a restore carries the source's entire identity: hostname, domains, listeners and certificates all live in the database the mail lives in. Ten seconds after `pg_restore` the drill box had stopped answering to its own name and was serving production's certificate for production's names.
+Then the thing that reframes the whole exercise, which only appears once you actually run one. Stalwart 0.16 keeps its configuration *in the data store*, so a restore carries the source's entire identity: hostname, domains, listeners and certificates all live in the database the mail lives in. Ten seconds after the restore the drill box had stopped answering to its own name and was serving production's certificate for production's names.
 
-A restore of this kind is not "the data came back". It is "the server came back", and restoring production's dump onto a second box produces a second production. Your runbook should say so.
+A restore of this kind is not "the data came back". It is "the server came back", and restoring production's snapshot onto a second box produces a second production. Your runbook should say so.
 
 Two consequences:
 
@@ -496,16 +497,18 @@ Two consequences:
 
 Smaller things the drill taught:
 
-- `scp` cannot write into `/var/lib/stalwart`, which is `0700 stalwart:stalwart` and correctly so for a directory holding mail. The dump lands in the login user's home and is `install -o stalwart -g stalwart -m 0600`'d across. Generally: anything delivered into a hardened service directory is installed, not copied.
-- Teardown leaves behind two things `destroy` cannot remove: the final DB snapshot (`skip_final_snapshot` is false, correctly) and the drill's SSM parameters, which actions create rather than terraform. Delete both, or the next drill collides on the snapshot name.
+- The staged file is integrity-checked *before* the healthy server is stopped. A damaged download that took the service down first would have turned a bad backup into an outage, which is the one failure mode a drill must not rehearse into the real procedure.
+- The replaced database's `-wal` and `-shm` sidecars are deleted rather than left. They belong to the file that was just overwritten, and SQLite opening a fresh database beside another database's write-ahead log is corruption with a green exit code.
+- `scp` cannot write into `/var/lib/stalwart`, which is `0700 stalwart:stalwart` and correctly so for a directory holding mail. The snapshot lands in the login user's home and is `install -o stalwart -g stalwart -m 0600`'d across. Generally: anything delivered into a hardened service directory is installed, not copied.
+- Teardown leaves behind the drill's SSM parameters, which actions create rather than terraform. Delete them, or the next drill signs in with a stale credential.
 - While a drill stage is up, an audit of the production stage reports the drill's records as strays. That is by design and it resolves on teardown. Run the production audit after, not during.
-- The drill does not prove the blob store. Message bodies are in S3 and only their metadata is in Postgres, so a drill with its own empty blob bucket proves the database came back and says nothing about the bodies. Versioning plus the public access block is the blob story, and it is a different rehearsal.
+- The drill does not prove the blob store. Message bodies are in S3 and only their metadata is in SQLite, so a drill with its own empty blob bucket proves the database came back and says nothing about the bodies. Versioning plus the public access block is the blob story, and it is a different rehearsal.
 
 ## What is automated, and what is not
 
 The honest summary, because a tutorial that blurs this line strands its reader at the first step with no command.
 
-**Fully declared and applied by beet:** the network, the database, both buckets, the box and its machine config, every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export and the restore drill.
+**Fully declared and applied by beet:** the network, the persistent SQLite data volume, both buckets, the box and its machine config, every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export and the restore drill.
 
 **Genuinely not automatable, and labelled as such:**
 

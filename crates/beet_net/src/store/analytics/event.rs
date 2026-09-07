@@ -1,5 +1,4 @@
-//! The [`AnalyticsEvent`] wire type: common columns plus the typed,
-//! variant-specific [`AnalyticsEventData`].
+//! The [`AnalyticsEvent`] wire type: common fields plus typed event data.
 use super::analytics_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -37,7 +36,7 @@ pub enum AnalyticsEventKind {
 
 /// The variant-specific payload of an [`AnalyticsEvent`], stored as JSON.
 ///
-/// The columns of [`AnalyticsEvent`] are what every event shares (who, where,
+/// The fields of [`AnalyticsEvent`] are what every event shares (who, where,
 /// when); this enum is what differs per kind (a request's status, a page view's
 /// dwell, a click's element). [`Self::kind`] is the discriminant that
 /// [`AnalyticsEvent::event_kind`] mirrors.
@@ -174,20 +173,19 @@ pub enum ClientKind {
 	Unknown,
 }
 
-/// A single analytics record: common columns plus a typed [`AnalyticsEventData`].
+/// A single analytics record: common fields plus typed [`AnalyticsEventData`].
 ///
-/// The columns are what every event shares; [`Self::data`] is the per-kind
-/// payload (stored as JSON), and [`Self::event_kind`] is its discriminant as a
-/// filterable column. For a [`AnalyticsEventKind::PageView`] the primary key
-/// [`Self::id`] is the client-generated page-view id, so re-recording it (a
-/// heartbeat or the final `beforeunload`) overwrites the row in place.
+/// The fields are what every event shares; [`Self::data`] is the per-kind
+/// payload and [`Self::event_kind`] is its discriminant. For an
+/// [`AnalyticsEventKind::PageView`], [`Self::id`] is the client-generated view
+/// id, so segment readers retain only its newest heartbeat.
 #[derive(Debug, Clone, Serialize, Deserialize, Event)]
 pub struct AnalyticsEvent {
-	/// UUIDv7 primary key (time-sortable), doubling as the storage row id.
+	/// UUIDv7 event ID, time-sortable and stable across page-view heartbeats.
 	pub id: Uuid,
 	/// Server wall-clock time the event was recorded, ms since the unix epoch.
 	pub timestamp: u64,
-	/// The kind discriminant (mirrors [`Self::data`]'s variant), a filter column.
+	/// The kind discriminant, mirroring [`Self::data`]'s variant.
 	pub event_kind: AnalyticsEventKind,
 	/// The coarse client kind.
 	pub client_kind: ClientKind,
@@ -202,15 +200,7 @@ pub struct AnalyticsEvent {
 	/// Raw client ip, only populated when [`AnalyticsConfig::store_ip`] is set;
 	/// off by default so the default posture collects no personal data.
 	pub ip: Option<SmolStr>,
-	/// The epoch SECOND this row expires at, stamped at record time from the
-	/// [`AnalyticsRetention`] the recording router resolves.
-	///
-	/// Seconds, not milliseconds, because DynamoDB's TTL reads this attribute as
-	/// a unix second and ignores a row it cannot read as one. Absent when the
-	/// kind is kept forever, and absent from every [`AnalyticsRollup`]: the raws
-	/// expire, the aggregates they were reduced to do not.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub ttl: Option<u64>,
+
 	/// The variant-specific payload.
 	pub data: AnalyticsEventData,
 }
@@ -228,7 +218,6 @@ impl AnalyticsEvent {
 			path: path.into(),
 			country: None,
 			ip: None,
-			ttl: None,
 			data,
 		}
 	}
@@ -241,13 +230,6 @@ impl AnalyticsEvent {
 			.into()
 	}
 
-	/// Stamp the expiry `retention` gives this event's kind, from the server
-	/// time it was recorded at.
-	pub fn with_retention(mut self, retention: &AnalyticsRetention) -> Self {
-		self.ttl = retention
-			.expires_at(self.event_kind, Duration::from_millis(self.timestamp));
-		self
-	}
 
 	/// Builder-style setter for the client kind.
 	pub fn with_client_kind(mut self, client_kind: ClientKind) -> Self {
@@ -344,11 +326,6 @@ impl AnalyticsEvent {
 	}
 }
 
-/// The storage row impl (needs the json store surface).
-#[cfg(feature = "json")]
-impl TableStoreRow for AnalyticsEvent {
-	fn id(&self) -> Uuid { self.id }
-}
 
 #[cfg(test)]
 mod test {

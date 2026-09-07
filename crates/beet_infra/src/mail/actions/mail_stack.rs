@@ -16,9 +16,6 @@ pub struct MailStack {
 	pub stack: ResolvedStack,
 	/// The one box under this stack.
 	pub mail_box: StalwartBlock,
-	/// The database the box's [`DatabaseRef`] targets, ie the one holding its
-	/// mail metadata, whose compositions every step reads.
-	pub database: RdsPostgresBlock,
 	/// Every domain it serves, in declaration order.
 	pub domains: Vec<MailDomainBlock>,
 	/// The relay each of those domains resolved, by the same ancestry the
@@ -43,28 +40,6 @@ impl MailStack {
 			.await
 	}
 
-	/// The address of the database this box's mail lives in, from the apply's
-	/// output.
-	///
-	/// Read from the output rather than from [`RdsPostgresBlock::host`], which
-	/// composes a terraform REFERENCE: the right value in a config file
-	/// terraform interpolates, and a literal `${aws_db_instance..}` anywhere
-	/// else. Anything that reaches the database over ssh — the restore, a
-	/// manual dump — needs the resolved name, and asking the project for it is
-	/// the only way to be sure the two agree.
-	pub async fn database_host(&self) -> Result<String> {
-		let endpoint = self
-			.project
-			.output(&format!("{}_endpoint", self.database.label()))
-			.await?;
-		// `endpoint` is `host:port` and every caller names the port itself
-		endpoint
-			.split(':')
-			.next()
-			.unwrap_or(endpoint.as_str())
-			.to_string()
-			.xok()
-	}
 
 	/// The EIP allocation id, ie what a reverse-dns request names.
 	pub async fn eip_allocation(&self) -> Result<String> {
@@ -146,14 +121,12 @@ impl MailStack {
 	}
 }
 
-/// The deploy tree a mail step reads: the stack traversal, the block types the
-/// mail stack is made of, and the box's [`DatabaseRef`] relation.
+/// The deploy tree a mail step reads: the stack traversal and the block types
+/// the mail stack is made of.
 #[derive(SystemParam)]
 pub struct MailQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
-	boxes:
-		Query<'w, 's, (&'static StalwartBlock, Option<&'static DatabaseRef>)>,
-	databases: Query<'w, 's, &'static RdsPostgresBlock>,
+	boxes: Query<'w, 's, &'static StalwartBlock>,
 	domains: Query<'w, 's, &'static MailDomainBlock>,
 	relays: RelayQuery<'w, 's>,
 }
@@ -177,37 +150,22 @@ impl MailQuery<'_, '_> {
 		let mut boxes = declared
 			.iter()
 			.filter_map(|child| self.boxes.get(*child).ok());
-		let (mail_box, database_ref) = boxes.next().ok_or_else(|| {
-			bevyhow!(
-				"no StalwartBlock is declared under this stack, so there is \
-				no mail box to provision"
-			)
-		})?;
-		let mail_box = mail_box.clone();
+		let mail_box = boxes
+			.next()
+			.ok_or_else(|| {
+				bevyhow!(
+					"no StalwartBlock is declared under this stack, so there is \
+					no mail box to provision"
+				)
+			})?
+			.clone();
 		if boxes.next().is_some() {
 			bevybail!(
 				"several StalwartBlocks are declared under this stack, so a \
 				mail step cannot tell which box it is talking to"
 			);
 		}
-		// the box's database, through the same relation its render resolves
-		let database_ref = database_ref.ok_or_else(|| {
-			bevyhow!(
-				"the mail box '{}' declares no `DatabaseRef`: relate it to the \
-				RdsPostgresBlock holding mail metadata, ie `{{DatabaseRef($db)}}`",
-				mail_box.label()
-			)
-		})?;
-		let database = self
-			.databases
-			.get(database_ref.0)
-			.map_err(|_| {
-				bevyhow!(
-					"the `DatabaseRef` of '{}' targets no RdsPostgresBlock",
-					mail_box.label()
-				)
-			})?
-			.clone();
+
 		let mut relays = RelayModes::default();
 		let mut domains = Vec::new();
 		for child in declared.iter() {
@@ -230,7 +188,6 @@ impl MailQuery<'_, '_> {
 			project,
 			stack,
 			mail_box,
-			database,
 			domains,
 			relays,
 		})

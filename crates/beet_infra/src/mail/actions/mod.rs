@@ -1,12 +1,10 @@
-//! The deploy steps a mail stack takes after its apply.
+//! The deploy steps a mail stack takes around its apply.
 //!
-//! An apply builds a box, a database and a zone full of records, and then stops
-//! at the edge of every system that has its own idea of state: the mail server
-//! keeps its configuration inside its own data store, the reverse record lives
-//! in AWS's PTR service rather than in any zone, and a zone accumulates records
-//! nobody declared. These are the steps that close those gaps, and each one is
-//! a verb rather than a resource: idempotent, safe to re-run, and reporting
-//! what it converged.
+//! A snapshot gates the apply; then the apply builds a box, its persistent data
+//! volume and a zone full of records before stopping at the edge of systems with
+//! their own state: the mail server's data store, AWS's PTR service and live DNS.
+//! These are verbs rather than resources: idempotent, safe to re-run, and
+//! reporting what they converged.
 mod comail_deliverability;
 pub use comail_deliverability::*;
 mod comail_enroll;
@@ -33,5 +31,7 @@ mod stalwart_plan;
 pub use stalwart_plan::*;
 mod stalwart_provision;
 pub use stalwart_provision::*;
+mod stalwart_snapshot;
+pub use stalwart_snapshot::*;
 mod zone_audit;
 pub use zone_audit::*;

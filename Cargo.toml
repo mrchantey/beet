@@ -507,8 +507,8 @@ cloudflare_block = ["deploy", "beet_infra?/cloudflare_block", "fs", "rand"]
 vpc_block = ["deploy", "aws_sdk", "bindings_aws_common", "beet_infra?/vpc_block", "fs", "rand"]
 rds_postgres_block = ["vpc_block", "beet_infra?/rds_postgres_block"]
 # The self-hosted mail stack: the per-domain DNS + SES declaration and the
-# member/mailbox/alias inputs it is authored from, on the vpc and the database.
-mail = ["rds_postgres_block", "cloudflare_dns", "beet_infra?/mail"]
+# member/mailbox/alias inputs it is authored from, on the vpc.
+mail = ["vpc_block", "cloudflare_dns", "beet_infra?/mail"]
 bindings_aws_common = ["infra","beet_infra?/bindings_aws_common"]
 bindings_aws_all = ["infra","beet_infra?/bindings_aws_all"]
 bindings_cloudflare_common = ["infra","beet_infra?/bindings_cloudflare_common"]

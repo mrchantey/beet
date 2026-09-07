@@ -2,7 +2,7 @@
 # Mail, relayed through Amazon SES
 
 `mail.bsx` minus nothing and plus one spread. The stack is the same box, the
-same database, the same buckets and the same domain; the only difference is
+same persistent SQLite data volume, buckets and domain; the only difference is
 `{SesRelay}` beside the `<MailDomainBlock/>`, and everything below follows from
 it.
 
@@ -61,13 +61,15 @@ simulator address it sends to is always permitted.
 		<DeployRoutes/>
 
 		<VpcBlock bx:ref="net" label="net"/>
-		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
+		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
+			object_versioning=true
+			expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 
 		<StalwartBlock label="mail" hostname="mail.example.com"
-			blob_bucket="mail-blobs"
-			{(VpcRef($net), DatabaseRef($db))}
+			blob_bucket="mail-blobs" backup_bucket="archive"
+			{VpcRef($net)}
 			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 
@@ -91,9 +93,9 @@ simulator address it sends to is always permitted.
 			]}/>
 
 		<Route path="deploy" {ExchangeSequence}>
-			<EnsureSecret secret="db-password" variable="db_password"/>
 			<EnsureSecret secret="mail-admin-password"/>
 			<EnsureDkimKey/>
+			<StalwartSnapshot/>
 			<TofuApply/>
 			<EipReverseDns/>
 			<StalwartProvision/>

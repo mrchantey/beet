@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// consumer marker so the relationship machinery remaps its `$name` reference:
 ///
 /// ```html
-/// <DynamoTableBlock bx:ref="analytics" label="analytics"/>
+/// <S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
 /// <Router {(AnalyticsConfig, StoreRef($analytics))}>..</Router>
 /// ```
 ///

@@ -45,17 +45,15 @@ impl core::fmt::Display for AnalyticsScope {
 /// One day of [`AnalyticsEvent`]s reduced to counts, for one
 /// [`AnalyticsScope`].
 ///
-/// Aggregates are forever and raw events are not: the raws are archived cold and
-/// then expired by the table's TTL, so everything a long-range report can ever
-/// say about a past day has to already be in this row. That is why it carries
-/// distributions rather than means (a mean over expired rows cannot be
-/// recombined, and a dwell mean is a lie anyway — see [`Buckets::DWELL`]) and
-/// why it carries a [`version`](Self::version).
+/// Aggregates and compacted raw archives are kept indefinitely, while transient
+/// segment shards are deleted after compaction. Everything a long-range report
+/// needs should still fit this tiny row, so it carries recombinable distributions
+/// rather than means (a dwell mean is a lie anyway — see [`Buckets::DWELL`]) and
+/// a [`version`](Self::version).
 ///
 /// The [`id`](Self::id) is a pure function of the version, date and scope, so
 /// re-running a day overwrites its rows in place and a backfill is safe to run
-/// twice. A rollup never carries a `ttl` attribute: the aggregates outlive the
-/// events they were computed from, which is the whole point of computing them.
+/// twice.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AnalyticsRollup {
 	/// The deterministic row id, composed by [`Self::row_id`].
@@ -302,10 +300,10 @@ pub struct BucketScale {
 /// A count per bucket of a [`BucketScale`], ie what an aggregate keeps instead
 /// of a mean.
 ///
-/// A mean cannot be recombined once the rows it averaged have expired, and for
-/// dwell it is not even meaningful before then: heartbeat-accumulating tabs and
-/// views whose closing beacon never arrived drag it into the hours. A
-/// distribution answers the same question honestly and survives the raws.
+/// A mean cannot be recombined across daily rows, and for dwell it is not even
+/// meaningful within one: heartbeat-accumulating tabs and views whose closing
+/// beacon never arrived drag it into the hours. A distribution answers the same
+/// question honestly.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Buckets {
 	/// One count per [`BucketScale::edges`] entry.
@@ -541,9 +539,7 @@ mod test {
 				"2026-08-01",
 				&AnalyticsScope::Path("site".into()),
 			));
-		// every row carries the schema it was written against, and NO row carries
-		// an expiry: the aggregates outlive the events they were reduced from,
-		// which is the whole reason for reducing them.
+		// Every row carries its schema and no storage-policy fields.
 		for row in AnalyticsRollup::from_events(&events) {
 			row.version.xpect_eq(AnalyticsRollup::VERSION);
 			Value::from_serde(&row)

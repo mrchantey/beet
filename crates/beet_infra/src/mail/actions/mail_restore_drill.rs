@@ -3,24 +3,24 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use serde_json::Value;
 use serde_json::json;
 
-/// `<MailRestoreDrill/>` — restore another stage's newest database dump into
+/// `<MailRestoreDrill/>` — restore another stage's newest SQLite snapshot into
 /// THIS stage's mail box, so the mailboxes that come back can be probed.
 ///
-/// A backup nobody has restored is a hypothesis. The nightly dump is written by
-/// a timer on the box and lands in a bucket where it is indistinguishable from
+/// A backup nobody has restored is a hypothesis. The nightly snapshot is written
+/// by a timer on the box and lands in a bucket where it is indistinguishable from
 /// a file of zeroes, and every property that matters — that it is complete,
-/// that the client can read it, that the schema comes back, that the server
-/// opens the store afterwards — is only observable by doing it. So the drill is
+/// readable, internally consistent, replaceable and accepted by Stalwart — is
+/// only observable by doing it. So the drill is
 /// a route rather than a runbook, and the assertion is the ordinary
 /// [`MailProbe`] running against the restored stage: mail flows, or the backup
 /// was not one.
 ///
-/// It is a whole STAGE, not a spare database: a drill deploy stands up its own
-/// network, database and box, restores production's dump into them, and is
-/// destroyed after. That also makes this the rehearsal for the region move
-/// decision 1 keeps open, since the steps are the same ones.
+/// It is a whole STAGE, not a spare file: a drill deploy stands up its own box
+/// and persistent volume, restores production's snapshot into them, and is
+/// destroyed after.
 ///
 /// The assertion is deliberately made HERE rather than by a [`MailProbe`]
 /// beside it. A restored store carries the SOURCE stage's domains and accounts,
@@ -32,9 +32,9 @@ use serde_json::json;
 /// is what "the backup came back" means.
 ///
 /// The one thing this action will not do is run against the stage it is
-/// restoring FROM. A `pg_restore --clean` into the live mail database is not a
-/// drill, it is the incident, so the stages are compared and a match fails
-/// before anything is downloaded.
+/// restoring FROM. Replacing the live stage's SQLite file is not a drill, it is
+/// the incident, so the stages are compared and a match fails before anything
+/// is downloaded.
 #[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(MailRestoreDrillAction)]
@@ -80,25 +80,25 @@ impl MailRestoreDrill {
 	/// The stage a drill proves by default, ie the one carrying real mail.
 	pub const SOURCE_STAGE: &'static str = "prod";
 
-	/// Where the dump is staged on the box. Under the service account's own
-	/// directory rather than `/tmp`, so it inherits the same ownership as
-	/// everything else the box holds and is removed on the same line.
-	pub const REMOTE_PATH: &'static str = "/var/lib/stalwart/restore.dump";
 
-	/// Where the dump lands off the wire, which is NOT where it is restored
+	/// Where the snapshot is staged on the box. Under the service account's own
+	/// directory rather than `/tmp`, so it inherits the same ownership as
+	/// everything else the box holds.
+	pub const REMOTE_PATH: &'static str = "/var/lib/stalwart/restore.db";
+
+	/// Where the snapshot lands off the wire, which is not where it is restored
 	/// from.
 	///
 	/// `scp` arrives as the login user and `/var/lib/stalwart` is `0700
 	/// stalwart:stalwart` — correct for a directory holding mail, and it means
-	/// a dump has to be INSTALLED into it rather than delivered. So the file
-	/// crosses into the login user's own directory and is moved across with
-	/// the service account's ownership, which is also the only moment either
-	/// end of the transfer is readable by anything but root.
+	/// a snapshot has to be installed into it rather than delivered. So the file
+	/// crosses into the login user's own directory and is moved across with the
+	/// service account's ownership.
 	pub fn upload_path() -> String {
-		format!("/home/{}/mail-restore.dump", StalwartProvision::SSH_USER)
+		format!("/home/{}/mail-restore.db", StalwartProvision::SSH_USER)
 	}
 
-	/// Put the uploaded dump where the service account can read it, and leave
+	/// Put the uploaded snapshot where the service account can read it, and leave
 	/// nothing behind on the login user's side.
 	fn stage_command() -> String {
 		format!(
@@ -108,10 +108,30 @@ impl MailRestoreDrill {
 			remote = Self::REMOTE_PATH,
 		)
 	}
+
+	/// Verify the staged file before stopping a healthy server.
+	fn integrity_command() -> String {
+		format!(
+			"result=\"$(sudo -n -u stalwart sqlite3 '{path}' 'PRAGMA integrity_check;')\"; \
+			[ \"$result\" = ok ] || {{ echo \"SQLite integrity check failed for restored snapshot: $result\" >&2; exit 1; }}",
+			path = Self::REMOTE_PATH,
+		)
+	}
+
+	/// Atomically replace the stopped server's main database and discard sidecars
+	/// belonging to the database that was replaced.
+	fn replace_command() -> String {
+		format!(
+			"sudo -n -u stalwart mv -f '{restore}' '{database}' && \
+			sudo -n -u stalwart rm -f '{database}-wal' '{database}-shm'",
+			restore = Self::REMOTE_PATH,
+			database = StalwartBlock::DATABASE_PATH,
+		)
+	}
 }
 
-/// Finds the newest dump, carries it to the box and restores it, leaving the
-/// server running against the restored store.
+/// Finds the newest snapshot, carries it to the box and restores it, leaving
+/// the server running against the restored store.
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -128,7 +148,7 @@ pub async fn MailRestoreDrillAction(
 	if &stage == drill.source_stage() {
 		bevybail!(
 			"this drill would restore {stage}'s own backup over {stage}'s live \
-			database. Deploy the stack to a throwaway stage and run it there: \
+			SQLite database. Deploy to a throwaway stage and run it there: \
 			`--stage=drill`"
 		);
 	}
@@ -140,21 +160,24 @@ pub async fn MailRestoreDrillAction(
 			drill.source_stage()
 		);
 	}
+	if mail.mail_box.backup_bucket().is_empty() {
+		bevybail!(
+			"mail box '{}' declares no backup bucket, so there is no snapshot \
+			archive to restore from",
+			mail.mail_box.label()
+		);
+	}
 
 	// the SOURCE stage's bucket, which is the same declaration resolved against
 	// a different stage: the one place the two stacks touch.
 	let source = mail.stack.clone().with_stage(drill.source_stage().clone());
 	let bucket = source.resource_name(mail.mail_box.backup_bucket().clone());
 	let region = mail.stack.region().clone();
-	let prefix = format!(
-		"{}/{}",
-		StalwartBlock::BACKUP_PREFIX,
-		mail.mail_box.db_name()
-	);
-	let key = newest_dump(&region, &bucket, &prefix).await?;
+	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);
+	let key = newest_snapshot(&region, &bucket, &prefix).await?;
 	info!("restoring s3://{bucket}/{key} into the {stage} stage");
 
-	let local = mail.project.work_dir().join("mail-restore.dump");
+	let local = mail.project.work_dir().join("mail-restore.db");
 	ChildProcess::new("aws")
 		.without_env("AWS_PROFILE")
 		.with_args([
@@ -185,9 +208,16 @@ pub async fn MailRestoreDrillAction(
 		.run_command(&MailRestoreDrill::stage_command())
 		.await?;
 
-	// the server holds the store open and caches most of it, so it is stopped
-	// around the restore rather than asked to notice: a `pg_restore --clean`
-	// under a live Stalwart drops tables it is mid-query on.
+	// Reject a damaged object while the current server is still healthy. Only a
+	// verified standalone database is allowed to trigger downtime.
+	connection
+		.run_command(&MailRestoreDrill::integrity_command())
+		.await?;
+	info!("SQLite integrity check passed for {key}");
+
+	// Stalwart owns the live database and may have uncheckpointed sidecars. Stop
+	// it, replace the main file, remove the old WAL/SHM pair, then start against
+	// exactly the verified snapshot.
 	info!("stopping {} for the restore", StalwartProvision::UNIT);
 	connection
 		.run_command(&format!(
@@ -195,13 +225,9 @@ pub async fn MailRestoreDrillAction(
 			StalwartProvision::UNIT
 		))
 		.await?;
-	let output = connection
-		.run_command(&restore_command(&mail, &mail.database_host().await?))
+	connection
+		.run_command(&MailRestoreDrill::replace_command())
 		.await?;
-	info!(
-		"pg_restore: {}",
-		String::from_utf8_lossy(&output.stdout).trim()
-	);
 	connection
 		.run_command(&format!(
 			"sudo -n systemctl start {}",
@@ -234,8 +260,8 @@ pub async fn MailRestoreDrillAction(
 ///
 /// The address is the SOURCE's, not this stack's. Before the restore the drill
 /// box served its own throwaway domain and its own empty accounts; a
-/// `pg_restore --clean` replaced all of it, so the only account there now is
-/// one this stack never declared.
+/// replacing the SQLite database replaced all of it, so the only account there
+/// now is one this stack never declared.
 ///
 /// Which is also why the CONNECTION is made the awkward way, and the
 /// awkwardness is worth stating because it is a property of the design rather
@@ -400,17 +426,18 @@ async fn jmap_curl(
 		.await
 }
 
-/// The newest object under `prefix`, by last-modified rather than by name.
+/// The newest `.db` object under `prefix`, by last-modified rather than name.
 ///
 /// The keys are date-ordered, so sorting by name would agree today — and stop
-/// agreeing the moment a dump is copied, re-uploaded or restored from an
-/// archive tier, which are exactly the circumstances a drill runs in.
-async fn newest_dump(
+/// agreeing the moment a snapshot is copied, re-uploaded or restored from an
+/// archive tier, which are exactly the circumstances a drill runs in. Filtering
+/// first prevents a marker or unrelated object under `sqlite/` winning.
+async fn newest_snapshot(
 	region: &str,
 	bucket: &str,
 	prefix: &str,
 ) -> Result<String> {
-	let key = ChildProcess::new("aws")
+	ChildProcess::new("aws")
 		.without_env("AWS_PROFILE")
 		.with_args([
 			"s3api",
@@ -419,53 +446,48 @@ async fn newest_dump(
 			bucket,
 			"--prefix",
 			prefix,
-			"--query",
-			"sort_by(Contents,&LastModified)[-1].Key",
 			"--output",
-			"text",
+			"json",
 			"--region",
 			region,
 		])
 		.run_async_stdout()
 		.await?
-		.trim()
-		.to_string();
-	match key.is_empty() || key == "None" {
-		true => bevybail!(
-			"s3://{bucket}/{prefix} holds no dump, so there is nothing to \
-			restore: the box's backup timer is what fills it, and `systemctl \
-			list-timers` on the box is where to look"
-		),
-		false => key.xok(),
-	}
+		.xmap(|body| newest_snapshot_key(&body, bucket, prefix))
 }
 
-/// The restore itself, run on the box because the database is in a private
-/// subnet and reachable from nowhere else.
-///
-/// The box reads its own stage's database credential from parameter store, so
-/// no secret rides this command line. `PGSSLROOTCERT=system` rides beside
-/// `verify-full` because libpq looks for `~/.postgresql/root.crt` rather than
-/// the OS trust store the boot script populated, and without it the restore
-/// fails on a CA the box demonstrably trusts. `--clean --if-exists` because a drill
-/// stage has already been provisioned with its own empty mailboxes, and
-/// `--no-owner --no-acl` because the dump's roles are the source stage's.
-fn restore_command(mail: &MailStack, host: &str) -> String {
-	let secret = mail.database.secret_name(&mail.stack);
-	format!(
-		"sudo -n -u stalwart env \
-		PGPASSWORD=\"$(aws ssm get-parameter --region '{region}' --name '{secret}' --with-decryption --query Parameter.Value --output text)\" \
-		PGSSLMODE=verify-full PGSSLROOTCERT=system \
-		pg_restore --host '{host}' --port {port} --username '{user}' \
-		--dbname '{database}' --clean --if-exists --no-owner --no-acl \
-		'{path}'; sudo -n rm -f '{path}'",
-		region = mail.stack.region(),
-		host = host,
-		port = RdsPostgresBlock::PORT,
-		user = mail.mail_box.db_user(),
-		database = mail.mail_box.db_name(),
-		path = MailRestoreDrill::REMOTE_PATH,
-	)
+/// Select the newest valid snapshot from an S3 listing.
+fn newest_snapshot_key(
+	body: &str,
+	bucket: &str,
+	prefix: &str,
+) -> Result<String> {
+	let listing: Value = serde_json::from_str(body)?;
+	let mut snapshots = listing["Contents"]
+		.as_array()
+		.into_iter()
+		.flatten()
+		.filter_map(|object| {
+			let key = object["Key"].as_str()?;
+			let modified = object["LastModified"].as_str()?;
+			(key.starts_with(prefix) && key.ends_with(".db"))
+				.then(|| (modified, key))
+		});
+	let Some(first) = snapshots.next() else {
+		bevybail!(
+			"s3://{bucket}/{prefix} holds no SQLite .db snapshot, so there is \
+			nothing to restore: the box's backup timer is what fills it, and \
+			`systemctl list-timers` on the box is where to look"
+		);
+	};
+	snapshots
+		.fold(first, |newest, candidate| match candidate.0 > newest.0 {
+			true => candidate,
+			false => newest,
+		})
+		.1
+		.to_string()
+		.xok()
 }
 
 #[cfg(test)]
@@ -494,13 +516,11 @@ mod tests {
 		.xpect_contains("mail-account-probe-at-stalwart-beetmash-com");
 	}
 
-	/// The dump is delivered to a path the login user can write and restored
+	/// The snapshot is delivered to a path the login user can write and restored
 	/// from one only the service account can read. They are not the same path,
-	/// and the reason is a directory mode rather than a preference: an scp
-	/// straight into the mail store's directory fails with "Permission denied"
-	/// after the dump has already crossed the wire.
+	/// because an scp straight into the mail store fails with permission denied.
 	#[beet_core::test]
-	fn the_dump_is_installed_rather_than_delivered() {
+	fn snapshot_is_installed_rather_than_delivered() {
 		let upload = MailRestoreDrill::upload_path();
 		upload.as_str().xpect_contains(StalwartProvision::SSH_USER);
 		(upload.as_str() == MailRestoreDrill::REMOTE_PATH).xpect_false();
@@ -510,36 +530,48 @@ mod tests {
 			.xpect_contains(MailRestoreDrill::REMOTE_PATH);
 	}
 
-	/// The restore reaches the database by name. `RdsPostgresBlock::host`
-	/// composes a terraform reference, which is the right value inside a config
-	/// file and a literal `${aws_db_instance..}` over ssh, so this command is
-	/// built from the apply's OUTPUT instead.
 	#[beet_core::test]
-	fn the_restore_names_a_host_rather_than_a_terraform_reference() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let mail_box = StalwartBlock::new("mail", "mail.beetmash.com")
-			.with_db_name("mail");
-		let command = restore_command(
-			&MailStack {
-				project: terra::Project::new(
-					stack.clone(),
-					deployment,
-					default(),
-				),
-				stack,
-				mail_box,
-				database: RdsPostgresBlock::new("db"),
-				domains: Vec::new(),
-				relays: default(),
-			},
-			"db.example.ap-southeast-2.rds.amazonaws.com",
-		);
-		command
+	fn newest_snapshot_selects_only_db_files() {
+		newest_snapshot_key(
+			r#"{"Contents":[
+				{"Key":"sqlite/2026/09/05/old.db","LastModified":"2026-09-05T14:30:00Z"},
+				{"Key":"sqlite/notes.txt","LastModified":"2026-09-07T14:30:00Z"},
+				{"Key":"sqlite/2026/09/06/new.db","LastModified":"2026-09-06T14:30:00Z"},
+				{"Key":"other/wrong.db","LastModified":"2026-09-08T14:30:00Z"}
+			]}"#,
+			"archive",
+			"sqlite/",
+		)
+		.unwrap()
+		.as_str()
+		.xpect_eq("sqlite/2026/09/06/new.db");
+		newest_snapshot_key(r#"{"Contents":[]}"#, "archive", "sqlite/")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no SQLite .db snapshot");
+	}
+
+	#[beet_core::test]
+	fn integrity_is_checked_before_the_live_database_is_named() {
+		MailRestoreDrill::integrity_command()
 			.as_str()
-			.xpect_contains(
-				"--host 'db.example.ap-southeast-2.rds.amazonaws.com'",
-			)
+			.xpect_contains(MailRestoreDrill::REMOTE_PATH)
+			.xpect_contains("PRAGMA integrity_check;")
+			.xpect_contains("[ \"$result\" = ok ]")
 			.xnot()
-			.xpect_contains("${aws_db_instance");
+			.xpect_contains(StalwartBlock::DATABASE_PATH);
+	}
+
+	#[beet_core::test]
+	fn replacement_removes_old_wal_and_shm() {
+		MailRestoreDrill::replace_command()
+			.as_str()
+			.xpect_contains(&format!(
+				"mv -f '{}' '{}'",
+				MailRestoreDrill::REMOTE_PATH,
+				StalwartBlock::DATABASE_PATH
+			))
+			.xpect_contains(&format!("{}-wal", StalwartBlock::DATABASE_PATH))
+			.xpect_contains(&format!("{}-shm", StalwartBlock::DATABASE_PATH));
 	}
 }

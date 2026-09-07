@@ -5,6 +5,11 @@ use bevy::app::AppExit;
 #[cfg(feature = "std")]
 use bevy::ecs::schedule::common_conditions;
 
+/// Ordering for work that must finish before process exit.
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
+pub struct AppExitSet;
+
 /// Plugin that exits the process upon an [`AppExit`] message.
 ///
 /// Uses [`process_ext::exit`] for cross-platform compatibility.
@@ -17,7 +22,9 @@ impl Plugin for AppExitPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Last,
-			cross_exit.run_if(common_conditions::on_message::<AppExit>),
+			cross_exit
+				.in_set(AppExitSet)
+				.run_if(common_conditions::on_message::<AppExit>),
 		);
 	}
 }

@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 ///
 /// A component on the router entity, authorable from markup as
 /// `<AnalyticsConfig/>`. Terminal page views and web beacons persist once it
-/// exists; the fields tune the [`AnalyticsKind::Request`](super::AnalyticsKind)
+/// exists; the fields tune buffering and the [`AnalyticsEventKind::Request`]
 /// stream the router middleware records.
 ///
 /// The store it records to is named by a
@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// at the entity that *declares* the store, ie
 ///
 /// ```html
-/// <DynamoTableBlock bx:ref="analytics" label="analytics"/>
+/// <S3BucketBlock bx:ref="analytics" label="analytics" runtime_write=true deploy_versioned=false/>
 /// <Router {(AnalyticsConfig, StoreRef($analytics))}>..</Router>
 /// ```
 ///
@@ -30,6 +30,10 @@ pub struct AnalyticsConfig {
 	/// Store the raw client ip on events. Off by default, so the default posture
 	/// derives only a country and collects no personal data.
 	pub store_ip: bool,
+	/// Maximum age of the oldest buffered event before its segment flushes.
+	pub segment_max_age: Duration,
+	/// Approximate uncompressed NDJSON bytes buffered before a segment flushes.
+	pub segment_max_bytes: usize,
 }
 
 impl Default for AnalyticsConfig {
@@ -37,6 +41,8 @@ impl Default for AnalyticsConfig {
 		Self {
 			record_requests: true,
 			store_ip: false,
+			segment_max_age: Duration::from_secs(60),
+			segment_max_bytes: 64 * 1024,
 		}
 	}
 }

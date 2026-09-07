@@ -49,9 +49,10 @@ just deploy and read the error.
 
 **4. Deploy.** `<ComailEnroll/>` checks the five parameters exist, checks the key
 actually authenticates, hands the selector and its two record values to the
-apply as tofu variables, and reports on whether the records resolve yet. The
-apply then publishes them, `<StalwartProvision/>` writes one relay route per
-enrolled domain, and `<MailProbe/>` sends through it.
+apply as tofu variables, and reports on whether the records resolve yet.
+`<StalwartSnapshot/>` snapshots the existing data volume (and skips the first
+deploy) before the apply publishes them, `<StalwartProvision/>` writes one relay
+route per enrolled domain, and `<MailProbe/>` sends through it.
 
 ## What the records look like, and what is deliberately absent
 
@@ -103,13 +104,15 @@ inbound assertion rather than failing the deploy.
 		<DeployRoutes/>
 
 		<VpcBlock bx:ref="net" label="net"/>
-		<RdsPostgresBlock bx:ref="db" label="db" database="mail" {VpcRef($net)}/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
+		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
+			object_versioning=true
+			expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 
 		<StalwartBlock label="mail" hostname="mail.example.com"
-			blob_bucket="mail-blobs"
-			{(VpcRef($net), DatabaseRef($db))}
+			blob_bucket="mail-blobs" backup_bucket="archive"
+			{VpcRef($net)}
 			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 
@@ -148,13 +151,13 @@ inbound assertion rather than failing the deploy.
 		</Route>
 
 		<Route path="deploy" {ExchangeSequence}>
-			<EnsureSecret secret="db-password" variable="db_password"/>
 			<EnsureSecret secret="mail-admin-password"/>
 			<EnsureDkimKey/>
 			<!-- before the apply, because the selector records read the values it
 			     hands over; a variable nobody supplied resolves to empty, and an
 			     empty `p=` is a REVOKED selector rather than a missing one. -->
 			<ComailEnroll/>
+			<StalwartSnapshot/>
 			<TofuApply/>
 			<EipReverseDns/>
 			<StalwartProvision/>

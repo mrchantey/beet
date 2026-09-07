@@ -98,6 +98,27 @@ impl VpcBlock {
 		self.field_ref(stack, "aws_subnet", &tier.kind(zone), "id")
 	}
 
+	/// One subnet's availability zone, as a reference rather than as the literal
+	/// this block composes it from.
+	///
+	/// An EBS volume must be created in the zone of the instance it attaches to,
+	/// so a consumer declaring one has to name that zone. Naming it by reference
+	/// is what stops the two from ever disagreeing: a vpc that renumbers its
+	/// zones moves the volumes with it instead of failing an attachment.
+	pub fn subnet_availability_zone(
+		&self,
+		stack: &ResolvedStack,
+		tier: SubnetTier,
+		zone: &str,
+	) -> String {
+		self.field_ref(
+			stack,
+			"aws_subnet",
+			&tier.kind(zone),
+			"availability_zone",
+		)
+	}
+
 	/// Every subnet id of one tier, in availability-zone order. What a db
 	/// subnet group or a load balancer is spread across.
 	pub fn subnet_ids(

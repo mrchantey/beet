@@ -57,7 +57,6 @@ mail = [
 	"bindings_aws_common",
 	"cloudflare_dns",
 	"vpc_block",
-	"rds_postgres_block",
 ]
 bindings_aws_common = []
 bindings_aws_dynamo = []
@@ -66,10 +65,10 @@ bindings_aws_acm = []
 bindings_aws_lightsail = []
 bindings_aws_lambda = []
 bindings_aws_fargate = []
-# The mail stack's EC2 box: instance, EIP (+ association), keypair, instance
-# profile and the role policy attached to it.
+# The mail stack's EC2 box: instance, persistent EBS volume (+ attachment), EIP
+# (+ association), keypair, instance profile and the role policy attached to it.
 bindings_aws_ec2 = []
-# The mail stack's RDS Postgres instance and its subnet group.
+# The RDS Postgres instance and its subnet group.
 bindings_aws_rds = []
 # The network resources every AWS compute block sits in: vpc, subnets, internet
 # gateway, route tables and security groups. Their own file rather than the

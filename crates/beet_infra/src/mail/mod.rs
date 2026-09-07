@@ -9,9 +9,9 @@
 //! domain buys Amazon's reputation, `{ComailRelay}` rides an atproto identity,
 //! and nothing at all delivers straight to each recipient's MX (see
 //! [`RelayMode`]).
-// the post-apply deploy verbs, which shell out (ssh, the aws cli, curl) or
-// drive the mail server's own api, so they are native-only and `deploy`-gated
-// like the rest of the actions.
+// The pre/post-apply deploy verbs shell out (ssh, the AWS CLI, curl) or drive
+// the mail server's own API, so they are native-only and `deploy`-gated like
+// the rest of the actions.
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 mod actions;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

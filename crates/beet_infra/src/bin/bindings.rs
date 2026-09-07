@@ -133,6 +133,8 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_ec2.rs")
 				.with_resources(terra::Provider::AWS, [
 					"aws_instance",
+					"aws_ebs_volume",
+					"aws_volume_attachment",
 					"aws_eip",
 					"aws_eip_association",
 					"aws_key_pair",

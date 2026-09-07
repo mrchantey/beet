@@ -60,8 +60,8 @@ action = ["dep:beet_action"]
 # tungstenite/web-sys transports and the server/channel backends ride their own
 # features on top of it.
 sockets = ["action", "dep:sha1", "dep:base64"]
-# `flate2` is the analytics archive's gzip: the cold copy a raw event is written
-# to before its expiry is ever stamped, and json is what it holds (ndjson).
+# `flate2` is the gzip codec shared by analytics segments and daily archives;
+# json is their newline-delimited payload.
 json = ["serde", "dep:serde_json", "dep:flate2", "beet_core/json", "beet_action?/json"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`

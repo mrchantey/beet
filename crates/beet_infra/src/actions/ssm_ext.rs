@@ -8,6 +8,7 @@
 //! Nothing here logs a value. A `SecureString` that reaches a terminal is a
 //! `SecureString` that reaches a scrollback buffer, a CI log and whatever
 //! ingests it.
+use crate::actions::aws_cli_ext;
 use beet_core::prelude::*;
 
 /// Read a parameter, decrypting a `SecureString`. `Ok(None)` when it does not
@@ -15,7 +16,7 @@ use beet_core::prelude::*;
 /// failure (no credentials, no permission) is an error rather than a silent
 /// mint of a second secret.
 pub async fn get(region: &str, name: &str) -> Result<Option<String>> {
-	let output = command(region, [
+	let output = aws_cli_ext::ssm(region, [
 		"get-parameter",
 		"--name",
 		name,
@@ -48,7 +49,7 @@ pub async fn get(region: &str, name: &str) -> Result<Option<String>> {
 /// authorises account principals through its own key policy, so the reader
 /// needs no `kms:` grant.
 pub async fn create(region: &str, name: &str, value: &str) -> Result {
-	command(region, [
+	aws_cli_ext::ssm(region, [
 		"put-parameter",
 		"--name",
 		name,
@@ -79,7 +80,7 @@ pub fn is_already_exists(err: &BevyError) -> bool {
 /// through [`create`], whose refusal to overwrite is what makes racing deploys
 /// safe.
 pub async fn overwrite(region: &str, name: &str, value: &str) -> Result {
-	command(region, [
+	aws_cli_ext::ssm(region, [
 		"put-parameter",
 		"--name",
 		name,
@@ -95,21 +96,4 @@ pub async fn overwrite(region: &str, name: &str, value: &str) -> Result {
 	.run_async()
 	.await?;
 	Ok(())
-}
-
-/// An `aws ssm` invocation in `region`. Drops a possibly-empty inherited
-/// `AWS_PROFILE`, which the cli reads as a profile literally named `""`.
-fn command<'a>(
-	region: &str,
-	args: impl IntoIterator<Item = &'a str>,
-) -> ChildProcess {
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args(
-			["ssm"]
-				.into_iter()
-				.chain(args)
-				.map(SmolStr::from)
-				.chain([SmolStr::from("--region"), SmolStr::from(region)]),
-		)
 }
