@@ -17,6 +17,7 @@ mod exchange_script;
 // (in `extra`). The std-only scene/help rendering pipeline stays feature-gated
 // inside these and in the `help`/`sidebar` modules under `site`; the no_std build
 // falls back to a plain-text route listing.
+mod route_matrix;
 mod router;
 mod router_plugin;
 mod server_action_client;
@@ -27,6 +28,7 @@ pub use exchange_script::*;
 pub use exchange_sequence::*;
 #[cfg(feature = "std")]
 pub use field_route::*;
+pub use route_matrix::*;
 pub use router::*;
 pub use router_plugin::*;
 pub use server_action_client::*;

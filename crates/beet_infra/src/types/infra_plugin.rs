@@ -290,7 +290,10 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::MailRestoreDrillAction>()
 			.register_type::<crate::prelude::ZoneAudit>()
 			.register_type::<crate::prelude::ZoneAuditAction>()
-			.register_type::<crate::prelude::AllowedRecord>();
+			.register_type::<crate::prelude::AllowedRecord>()
+			// the audit's scope selector, so `<ZoneAudit scope="Zone"/>`
+			// resolves the variant rather than silently keeping the default.
+			.register_type::<crate::prelude::ZoneAuditScope>();
 
 		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
 		// enum a markup attribute names by variant, and the `<DirSync>` front-end
@@ -561,6 +564,22 @@ mod test {
 			.label()
 			.as_str()
 			.xpect_eq("rollup");
+	}
+
+	/// The audit's scope is authored as its variant name, so an entry-level
+	/// audit that means the whole zone says so rather than inheriting the
+	/// stack-scoped default. A misspelling errors at build (the reflect scalar
+	/// path rejects a string naming no unit variant), which is what keeps this
+	/// from silently reading as a working declaration.
+	#[beet_core::test]
+	fn the_audit_scope_authors_by_variant_name() {
+		let mut world = spawn(r#"<ZoneAudit scope="Zone"/>"#);
+		world
+			.query::<&ZoneAudit>()
+			.single(&world)
+			.unwrap()
+			.scope()
+			.xpect_eq(ZoneAuditScope::Zone);
 	}
 
 	/// The post-apply verbs author as tags too, each naming what it works on

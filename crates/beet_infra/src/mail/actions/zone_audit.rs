@@ -46,6 +46,35 @@ pub struct ZoneAudit {
 	/// carrying the list is enough for all of them.
 	#[set_with(skip)]
 	allowed: Vec<AllowedRecord>,
+	/// How much of the world this audit renders before diffing, see
+	/// [`ZoneAuditScope`].
+	scope: ZoneAuditScope,
+}
+
+/// How much of the world a [`ZoneAudit`] renders before diffing it against the
+/// zone.
+///
+/// A zone is one namespace and several stacks publish into it, so "what should
+/// be here?" is a question only the whole world can answer. The default stays
+/// stack-scoped because that is what every existing audit means, and because a
+/// stack's own deploy tail should not fail on a sibling stack it cannot see.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Default)]
+pub enum ZoneAuditScope {
+	/// Diff the zone against the nearest ancestor `<Stack>` alone. Every record
+	/// another stack declares must then be an allowlist entry, which is a second
+	/// copy of a declaration that already exists.
+	#[default]
+	Stack,
+	/// Diff the zone against EVERY `<Stack>` in the world, unioning the records
+	/// each declares into this zone and the allowlists each carries.
+	///
+	/// The scope an entry-level audit wants: the zone is the unit, so the audit
+	/// belongs to no stack and a sibling stack's records are declarations rather
+	/// than strays.
+	Zone,
 }
 
 /// One record the audit expects to find without this stack declaring it.
@@ -83,6 +112,14 @@ impl AllowedRecord {
 			return false;
 		}
 		name_matches(&self.name, name)
+	}
+}
+
+impl ZoneAudit {
+	/// Diff against every stack in the world rather than this one, see
+	/// [`ZoneAuditScope::Zone`].
+	pub fn zone_scoped() -> Self {
+		Self::default().with_scope(ZoneAuditScope::Zone)
 	}
 }
 
@@ -135,29 +172,16 @@ pub async fn ZoneAuditAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let fix = cx.has_param("fix");
+	// resolved first: a zone-scoped render filters the declarations it unions by
+	// the zone they target, so the id is an input to the render, not just to the
+	// listing that follows it.
+	let (zone_id, token) = zone_env()?;
+	let audited = zone_id.clone();
 	let (declared, allowed) = cx
 		.caller
-		.with_world(|world, entity| -> Result<_> {
-			let (.., config) = RenderScope::render(world, entity)?.finish()?;
-			// every audit declared under this stack, so the list is stated
-			// once wherever it reads best
-			let allowed = world
-				.with_state::<(StackQuery, Query<&ZoneAudit>), _>(
-					|(stacks, audits)| -> Result<_> {
-						stacks
-							.declared(entity)?
-							.into_iter()
-							.filter_map(|child| audits.get(child).ok())
-							.flat_map(|audit| audit.allowed().iter().cloned())
-							.collect::<Vec<_>>()
-							.xok()
-					},
-				)?;
-			(declared_records(&config), allowed).xok()
-		})
+		.with_world(move |world, entity| audit_inputs(world, entity, &audited))
 		.await??;
 
-	let (zone_id, token) = zone_env()?;
 	let live = list_records(&zone_id, &token).await?;
 	info!(
 		"zone holds {} record(s); the stack declares {}",
@@ -212,6 +236,64 @@ pub async fn ZoneAuditAction(
 	Pass(cx.input).xok()
 }
 
+/// What the audit diffs the zone against: every record the audited scope
+/// declares, and every allowlist entry that scope carries.
+///
+/// Split out of the action because it is the whole of the scoping decision and
+/// the only part of an audit that can be exercised without a zone to call.
+fn audit_inputs(
+	world: &mut World,
+	entity: Entity,
+	zone_id: &str,
+) -> Result<(Vec<DeclaredRecord>, Vec<AllowedRecord>)> {
+	let scope = world
+		.entity(entity)
+		.get::<ZoneAudit>()
+		.map(|audit| audit.scope)
+		.unwrap_or_default();
+	match scope {
+		ZoneAuditScope::Stack => {
+			let (.., config) = RenderScope::render(world, entity)?.finish()?;
+			// every audit declared under this stack, so the list is stated
+			// once wherever it reads best
+			let allowed = world
+				.with_state::<(StackQuery, Query<&ZoneAudit>), _>(
+					|(stacks, audits)| -> Result<_> {
+						stacks
+							.declared(entity)?
+							.into_iter()
+							.filter_map(|child| audits.get(child).ok())
+							.flat_map(|audit| audit.allowed().iter().cloned())
+							.collect::<Vec<_>>()
+							.xok()
+					},
+				)?;
+			// unfiltered: a stack-scoped audit is asking about its own records,
+			// and it has always answered for whichever zone they name.
+			(declared_records(&config, None), allowed).xok()
+		}
+		ZoneAuditScope::Zone => {
+			// every stack in the world, each seeded its own scope, so a block
+			// still contributes to the stack it was authored under.
+			let mut declared = Vec::new();
+			for scope in RenderScope::render_all(world)? {
+				let (.., config) = scope.finish()?;
+				declared.extend(declared_records(&config, Some(zone_id)));
+			}
+			// and every allowlist in the world, for the same reason the stack
+			// scope reads every audit under its stack: an entry is a decision
+			// about the ZONE, so it counts wherever it reads best.
+			let allowed = world.with_state::<Query<&ZoneAudit>, _>(|audits| {
+				audits
+					.iter()
+					.flat_map(|audit| audit.allowed().iter().cloned())
+					.collect::<Vec<_>>()
+			});
+			(declared, allowed).xok()
+		}
+	}
+}
+
 /// Parameters for the audit.
 #[derive(Reflect)]
 struct ZoneAuditParams {
@@ -247,12 +329,26 @@ impl DeclaredRecord {
 /// Read off the emitted config rather than restated, so the audit and the apply
 /// cannot disagree about what this stack owns: a block that adds a record is
 /// audited the moment it is declared, with nothing else to remember.
-fn declared_records(config: &terra::Config) -> Vec<DeclaredRecord> {
+///
+/// `zone_id` filters the declarations to the zone being audited, which a
+/// zone-scoped run needs: it unions every stack in the world, and a stack
+/// publishing into a DIFFERENT zone declares nothing about this one. `None`
+/// takes them all, which is what a stack-scoped run has always done.
+fn declared_records(
+	config: &terra::Config,
+	zone_id: Option<&str>,
+) -> Vec<DeclaredRecord> {
 	config.to_json().into_json()["resource"]["cloudflare_dns_record"]
 		.as_object()
 		.map(|records| {
 			records
 				.values()
+				.filter(|record| match zone_id {
+					Some(zone_id) => {
+						record["zone_id"].as_str() == Some(zone_id)
+					}
+					None => true,
+				})
 				.filter_map(|record| {
 					Some(DeclaredRecord {
 						name: to_pattern(record["name"].as_str()?),
@@ -286,32 +382,21 @@ fn to_pattern(name: &str) -> String {
 	pattern
 }
 
-/// Whether `name` matches `pattern`, where `*` stands for any run of characters
-/// inside one label.
+/// Whether `name` matches `pattern`, through the shared [`GlobPattern`] engine
+/// rather than a wildcard matcher of the audit's own.
+///
+/// Both sides are normalised first, because Cloudflare returns names in its
+/// normalisation (`MAIL.beetmash.com.`) and a declaration writes them in ours.
+///
+/// [`GlobPattern::new`] rejects exactly one thing, an unterminated `[` character
+/// class, which no DNS name and no terraform-derived pattern can contain.
 fn name_matches(pattern: &str, name: &str) -> bool {
-	let pattern = pattern.trim_end_matches('.').to_ascii_lowercase();
-	let name = name.trim_end_matches('.').to_ascii_lowercase();
-	if !pattern.contains('*') {
-		return pattern == name;
-	}
-	let mut cursor = 0usize;
-	let segments = pattern.split('*').collect::<Vec<_>>();
-	for (index, segment) in segments.iter().enumerate() {
-		if segment.is_empty() {
-			continue;
-		}
-		let found = match index {
-			0 => name.starts_with(segment).then_some(0),
-			_ => name[cursor..].find(segment).map(|at| cursor + at),
-		};
-		let Some(at) = found else { return false };
-		cursor = at + segment.len();
-	}
-	// a trailing `*` may absorb the rest; anything else must have consumed it
-	match segments.last() {
-		Some(last) if last.is_empty() => true,
-		_ => cursor == name.len(),
-	}
+	GlobPattern::new(&normalize(pattern)).matches(&normalize(name))
+}
+
+/// A record name as matching sees it: lowercase and without the root label.
+fn normalize(name: &str) -> String {
+	name.trim_end_matches('.').to_ascii_lowercase()
 }
 
 /// The zone id + api token from the environment, the auth every zone call
@@ -392,13 +477,122 @@ mod tests {
 			.with_mailbox(Mailbox::new("pete"))
 	}
 
+	/// A second mail domain, for the sibling stack a zone-scoped audit must see.
+	fn news(zone: &str) -> MailDomainBlock {
+		MailDomainBlock::new("news.beetmash.com", "mail.beetmash.com")
+			.with_dns(DnsProvider::cloudflare("news.beetmash.com", zone))
+			.with_mailbox(Mailbox::new("pete"))
+	}
+
+	/// A world with the plugin, the launch and an app identity: the same seeding
+	/// `RenderScope::test_render_stack` does, for a test that needs SEVERAL
+	/// stack roots rather than one.
+	fn infra_world() -> (World, crate::types::TestWorkDir) {
+		let (deployment, dir) = Deployment::default_local();
+		let mut world = InfraPlugin.into_world();
+		world.insert_resource(deployment);
+		world.init_resource::<PackageConfig>();
+		(world, dir)
+	}
+
+	/// Two sibling stacks, the second publishing into `news_zone`, plus a
+	/// zone-scoped audit sitting OUTSIDE both — the entry-level shape, where the
+	/// zone belongs to no stack.
+	fn two_stacks(
+		news_zone: &str,
+	) -> (World, Entity, crate::types::TestWorkDir) {
+		let (mut world, dir) = infra_world();
+		world.spawn((Stack::new("beetmash-mail"), children![(
+			staging(),
+			SesRelay::default()
+		)]));
+		world.spawn((Stack::new("beetmash-news"), children![(
+			news(news_zone),
+			SesRelay::default()
+		)]));
+		let audit = world.spawn(ZoneAudit::zone_scoped()).id();
+		world.flush();
+		(world, audit, dir)
+	}
+
+	/// Whether `records` covers `name`/`kind`.
+	fn covers(records: &[DeclaredRecord], name: &str, kind: &str) -> bool {
+		records.iter().any(|record| record.matches(name, kind))
+	}
+
+	/// A `Zone`-scoped audit unions every stack in the world, so a sibling
+	/// stack's records are DECLARATIONS rather than strays — and the allowlist
+	/// that used to restate them can be empty.
+	#[beet_core::test]
+	fn zone_scope_sees_every_stack() {
+		let (mut world, audit, _dir) = two_stacks("zone1");
+		let (declared, allowed) =
+			audit_inputs(&mut world, audit, "zone1").unwrap();
+		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
+		covers(&declared, "news.beetmash.com", "MX").xpect_true();
+		// nothing had to be allowlisted to get there
+		allowed.is_empty().xpect_true();
+	}
+
+	/// The default scope is unchanged: an audit under a stack sees that stack
+	/// and no other, which is what every existing deploy tail means by it.
+	#[beet_core::test]
+	fn stack_scope_sees_only_its_own_stack() {
+		let (mut world, _dir) = infra_world();
+		let mail = world
+			.spawn((Stack::new("beetmash-mail"), children![(
+				staging(),
+				SesRelay::default()
+			)]))
+			.id();
+		// the audit sits UNDER the mail stack, the deploy-tail shape
+		let audit = world.spawn((ChildOf(mail), ZoneAudit::default())).id();
+		world.spawn((Stack::new("beetmash-news"), children![(
+			news("zone1"),
+			SesRelay::default()
+		)]));
+		world.flush();
+		let (declared, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
+		// the sibling stack's domain is invisible, hence the allowlist rows the
+		// zone scope exists to retire.
+		covers(&declared, "news.beetmash.com", "MX").xpect_false();
+	}
+
+	/// A stack publishing into a DIFFERENT zone declares nothing about this
+	/// one, so its records neither count as declared nor silence a stray.
+	#[beet_core::test]
+	fn zone_scope_ignores_other_zones() {
+		let (mut world, audit, _dir) = two_stacks("zone2");
+		let (declared, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
+		covers(&declared, "news.beetmash.com", "MX").xpect_false();
+	}
+
+	/// An allowlist entry is a decision about the ZONE, so a zone-scoped audit
+	/// gathers every one in the world rather than only its own.
+	#[beet_core::test]
+	fn zone_scope_gathers_every_allowlist() {
+		let (mut world, audit, _dir) = two_stacks("zone1");
+		world.spawn(
+			ZoneAudit::default()
+				.with_allowed_name("mta-sts.beetmash.com", "wrangler"),
+		);
+		world.flush();
+		let (_, allowed) = audit_inputs(&mut world, audit, "zone1").unwrap();
+		allowed
+			.iter()
+			.any(|allowed| allowed.matches("mta-sts.beetmash.com", "CNAME"))
+			.xpect_true();
+	}
+
 	fn declared() -> Vec<DeclaredRecord> {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			// relayed through SES, whose selector tokens are the computed names
 			// this pattern matching exists for
 			parent.spawn((staging(), SesRelay::default()));
 		});
-		declared_records(&scope.finish().unwrap().2)
+		declared_records(&scope.finish().unwrap().2, None)
 	}
 
 	/// The declared set comes off the emitted config, so a block that adds a
@@ -451,7 +645,7 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn((staging(), ComailRelay::default()));
 		});
-		let declared = declared_records(&scope.finish().unwrap().2);
+		let declared = declared_records(&scope.finish().unwrap().2, None);
 		for name in [
 			"atmos20260904r._domainkey.stalwart.beetmash.com",
 			"atmos20260904e._domainkey.stalwart.beetmash.com",
@@ -486,6 +680,25 @@ mod tests {
 	fn names_match_regardless_of_case_or_root_label() {
 		name_matches("mail.beetmash.com", "MAIL.beetmash.com.").xpect_true();
 		name_matches("mail.beetmash.com", "other.beetmash.com").xpect_false();
+	}
+
+	/// Matching runs on the shared glob engine rather than a matcher of the
+	/// audit's own, so the allowlist accepts what every other beet glob does.
+	/// `*` crosses label boundaries there, which widens `*.x.com` from one label
+	/// to any depth — deliberate, since an allowlist entry is a decision about a
+	/// NAME and a deeper name under it is the same decision.
+	#[beet_core::test]
+	fn matching_is_glob() {
+		name_matches("_*.beetmash.com", "_dmarc.beetmash.com").xpect_true();
+		name_matches("fm?._domainkey.x.com", "fm1._domainkey.x.com")
+			.xpect_true();
+		name_matches("fm?._domainkey.x.com", "fm12._domainkey.x.com")
+			.xpect_false();
+		// a star crosses the dot: a subdomain of an allowed name is allowed
+		name_matches("*.beetmash.com", "a.b.beetmash.com").xpect_true();
+		// but the literal parts still have to be there
+		name_matches("*._domainkey.beetmash.com", "www.beetmash.com")
+			.xpect_false();
 	}
 
 	/// The allowlist is what keeps an audit during staging silent rather than
