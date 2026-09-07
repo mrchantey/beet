@@ -68,33 +68,31 @@ impl MediaParser {
 	///
 	/// The metadata half of [`parse`](NodeParser::parse), and deliberately not
 	/// part of it: this reads the root only, building nothing, so a route scan
-	/// can know a page's title, order and slug without spawning its content. A
-	/// media type with no declaration surface, or a source that does not parse,
-	/// declares nothing.
+	/// can know a page's title, order and slug without spawning its content.
+	///
+	/// A media type with no declaration surface declares nothing. A source that
+	/// does not parse is an error: the same bytes are about to be parsed for
+	/// real, so swallowing it here only loses the reason twice over.
 	#[cfg(feature = "bsx")]
 	pub fn scan_root_declarations(
 		bytes: &MediaBytes,
 		frontmatter_type: &str,
-	) -> RootDeclarations {
-		let Ok(source) = core::str::from_utf8(bytes) else {
-			return default();
+	) -> Result<RootDeclarations> {
+		// only the declaring media types are decoded, so an image never fails utf8
+		let source = || core::str::from_utf8(bytes);
+		let markup = |config| {
+			BsxNode::parse_document(source()?, &config)
+				.map(|nodes| RootDeclarations::from_bsx(&nodes))
 		};
 		match bytes.media_type() {
-			MediaType::Markdown => Frontmatter::extract(source)
-				.ok()
-				.flatten()
+			MediaType::Markdown => Frontmatter::extract(source()?)?
 				.map(|frontmatter| frontmatter.declarations(frontmatter_type))
 				.unwrap_or_default(),
-			MediaType::Bsx => BsxNode::parse_document(source, &default())
-				.map(|nodes| RootDeclarations::from_bsx(&nodes))
-				.unwrap_or_default(),
-			MediaType::Html => {
-				BsxNode::parse_document(source, &BsxParseConfig::html())
-					.map(|nodes| RootDeclarations::from_bsx(&nodes))
-					.unwrap_or_default()
-			}
+			MediaType::Bsx => markup(BsxParseConfig::bsx())?,
+			MediaType::Html => markup(BsxParseConfig::html())?,
 			_ => default(),
 		}
+		.xok()
 	}
 }
 

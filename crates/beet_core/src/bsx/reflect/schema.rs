@@ -233,30 +233,32 @@ pub(in crate::bsx) enum SchemaDirective {
 
 /// Extract the `bx:schema` directive declared among `nodes`: the first
 /// `<script bx:schema>` block, inline (a JSON body) or remote (a `src` url).
+///
+/// A template declaring no block declares no schema; a block that IS declared
+/// and does not parse is an error, never a silently unschema'd template whose
+/// props then validate against nothing.
 pub(in crate::bsx) fn extract_schema_directive(
 	nodes: &[BsxNode],
-) -> SchemaDirective {
-	nodes
+) -> Result<SchemaDirective> {
+	let Some(el) = nodes
 		.iter()
-		.find_map(|node| {
-			let BsxNode::Element(el) = node else {
-				return None;
-			};
-			if !is_schema_block(el) {
-				return None;
-			}
-			// a `src` makes it remote; otherwise the raw-text body is inline JSON.
-			if let Some(src) = string_attr(el, "src") {
-				return Some(SchemaDirective::Remote(SmolStr::from(
-					src.as_str(),
-				)));
-			}
-			let json = schema_block_body(el)?;
-			ValueSchema::from_json_schema(&json)
-				.ok()
-				.map(SchemaDirective::Inline)
+		.filter_map(|node| match node {
+			BsxNode::Element(el) => Some(el),
+			_ => None,
 		})
-		.unwrap_or(SchemaDirective::None)
+		.find(|el| is_schema_block(el))
+	else {
+		return SchemaDirective::None.xok();
+	};
+	// a `src` makes it remote; otherwise the raw-text body is inline JSON.
+	if let Some(src) = string_attr(el, "src") {
+		return SchemaDirective::Remote(SmolStr::from(src.as_str())).xok();
+	}
+	schema_block_body(el)
+		.ok_or_else(|| bevyhow!("`bx:schema` block declares no schema body"))?
+		.xmap(|json| ValueSchema::from_json_schema(&json))?
+		.xmap(SchemaDirective::Inline)
+		.xok()
 }
 
 /// The string value of a literal-string attribute on `el`, if present.

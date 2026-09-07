@@ -44,9 +44,16 @@ pub struct BsxTemplateDef {
 impl BsxTemplateRegistry {
 	/// Register a template under `name` from already-parsed `nodes`, extracting a
 	/// `bx:schema` block (inline or remote) as its schema.
-	pub fn insert(&mut self, name: impl Into<SmolStr>, nodes: Vec<BsxNode>) {
+	///
+	/// # Errors
+	/// When the template declares a `bx:schema` block that does not parse.
+	pub fn insert(
+		&mut self,
+		name: impl Into<SmolStr>,
+		nodes: Vec<BsxNode>,
+	) -> Result {
 		let (schema, remote_schema) =
-			match super::reflect::schema::extract_schema_directive(&nodes) {
+			match super::reflect::schema::extract_schema_directive(&nodes)? {
 				super::reflect::schema::SchemaDirective::Inline(schema) => {
 					(Some(schema), None)
 				}
@@ -61,6 +68,7 @@ impl BsxTemplateRegistry {
 			schema,
 			remote_schema,
 		});
+		Ok(())
 	}
 
 	/// Parse `source` as a BSX template body and register it under `name`.
@@ -73,8 +81,7 @@ impl BsxTemplateRegistry {
 			source,
 			&super::parse::BsxParseConfig::bsx(),
 		)?;
-		self.insert(name, nodes);
-		Ok(())
+		self.insert(name, nodes)
 	}
 
 	/// Parse `source` through the format `formats` registers for its [`MediaType`]
@@ -103,7 +110,7 @@ impl BsxTemplateRegistry {
 				bevyhow!("could not derive a module path from `{path}`")
 			})?
 			.xmap(SmolStr::from);
-		self.insert(module.clone(), parse(source)?);
+		self.insert(module.clone(), parse(source)?)?;
 		Ok(Some(module))
 	}
 

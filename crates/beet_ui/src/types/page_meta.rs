@@ -143,6 +143,7 @@ mod test {
 			.unwrap()
 			.declarations(&type_ext::short_name::<PageMeta>())
 			.get::<PageMeta>(&registry)
+			.unwrap()
 			.unwrap_or_default()
 	}
 
@@ -228,7 +229,7 @@ mod test {
 				&mut declarations,
 				&SmolPath::new(file),
 			);
-			declarations.get::<PageMeta>(&registry)?.order
+			declarations.get::<PageMeta>(&registry).unwrap()?.order
 		};
 		order("blog/10-later.md", "title = \"Later\"")
 			.unwrap()

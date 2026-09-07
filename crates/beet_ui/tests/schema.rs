@@ -116,6 +116,23 @@ fn loader_missing_required_rides_template_error() {
 	has_template_error(&world, ok).xpect_false();
 }
 
+/// A declared `bx:schema` block that does not parse fails registration, rather
+/// than silently registering an unschema'd template whose props then validate
+/// against nothing.
+#[beet_core::test]
+fn malformed_schema_block_fails_registration() {
+	BsxTemplateRegistry::default()
+		.insert_source(
+			"Card",
+			"<script type=\"json\" bx:schema>not json</script><section/>",
+		)
+		.xpect_err();
+	// a template declaring no block registers with no schema, as before
+	BsxTemplateRegistry::default()
+		.insert_source("Card", "<section/>")
+		.unwrap();
+}
+
 // ---- module-path resolution: <path::to::X> from path/to/X.bsx ----------------
 
 #[beet_core::test]

@@ -221,7 +221,7 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 						types.get(route).cloned().unwrap_or_default()
 					})
 					.component,
-			);
+			)?;
 			let content = world.spawn(render_store).id();
 			declarations.insert(&mut world.entity_mut(content))?;
 			// the entity owning this request's route tree, resolved from the

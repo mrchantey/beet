@@ -65,19 +65,29 @@ impl RootDeclarations {
 	/// a consumer wanting one specific type (the router reading a page's `slug`
 	/// before the route entity exists).
 	///
-	/// `None` when no declaration names `T`, when `T` is absent from `registry`,
-	/// or when the literal does not fit it.
+	/// `Ok(None)` only when no declaration names `T`: a document declaring
+	/// nothing declared no such metadata. A declaration that IS present and does
+	/// not resolve is an error, never a silent default — an unregistered `T` or a
+	/// literal that does not fit its fields is an authoring mistake the caller
+	/// must hear about.
 	pub fn get<T: Default + Reflect + Typed>(
 		&self,
 		registry: &TypeRegistry,
-	) -> Option<T> {
+	) -> Result<Option<T>> {
 		let name = T::type_info().type_path_table().short_path();
-		let named = self.0.iter().find(|named| named.name == name)?;
-		let patch =
-			to_patch(named, registry.get(TypeId::of::<T>())?, registry).ok()?;
+		let Some(named) = self.0.iter().find(|named| named.name == name) else {
+			return Ok(None);
+		};
+		let registration =
+			registry.get(TypeId::of::<T>()).ok_or_else(|| {
+				bevyhow!(
+					"root declaration `{name}` names a type absent from the registry"
+				)
+			})?;
+		let patch = to_patch(named, registration, registry)?;
 		let mut value = T::default();
-		value.try_apply(patch.as_ref()).ok()?;
-		Some(value)
+		value.try_apply(patch.as_ref())?;
+		Some(value).xok()
 	}
 
 	/// Declare `field` on the `component` declaration when the document named
@@ -202,6 +212,13 @@ mod test {
 		created: Option<Timestamp>,
 	}
 
+	/// A type this test world never registers, so a document naming it resolves
+	/// to an error rather than to a default.
+	#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+	struct Unregistered {
+		note: Option<String>,
+	}
+
 	/// A second root component, proving the scan hoists whatever a document
 	/// declares rather than one blessed type.
 	#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
@@ -232,7 +249,7 @@ mod test {
 		let world = scan_world();
 		let app_registry = world.resource::<AppTypeRegistry>();
 		let registry = app_registry.read();
-		let get = |markup: &str| scan(markup).get::<Meta>(&registry);
+		let get = |markup: &str| scan(markup).get::<Meta>(&registry).unwrap();
 		// the declared fields land, the rest fill from `Default`
 		get(r#"<Fragment {Meta{title:"Blog", nested: Nested{order: 1}}}><h1>hi</h1></Fragment>"#)
 			.unwrap()
@@ -263,6 +280,15 @@ mod test {
 		get(r#"<Fragment><div {Meta{title:"nested"}}/></Fragment>"#)
 			.is_none()
 			.xpect_true();
+		// a declaration that IS made but cannot resolve is loud, never a default
+		scan(r#"<Fragment {Unregistered{note:"hi"}}/>"#)
+			.get::<Unregistered>(&registry)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("absent from the registry");
+		scan(r#"<Fragment {Meta{order:"not-a-number"}}/>"#)
+			.get::<Meta>(&registry)
+			.xpect_err();
 	}
 
 	/// Every root declaration hoists, not just the one a caller asked for.
@@ -312,7 +338,7 @@ mod test {
 			"title",
 			DataLiteral::Scalar(Value::str("other")),
 		);
-		let meta = declarations.get::<Meta>(&registry).unwrap();
+		let meta = declarations.get::<Meta>(&registry).unwrap().unwrap();
 		meta.order.unwrap().xpect_eq(3);
 		meta.title.as_deref().unwrap().xpect_eq("Blog");
 		// an undeclared component stays undeclared
@@ -322,6 +348,6 @@ mod test {
 			"order",
 			DataLiteral::Scalar(Value::Uint(3)),
 		);
-		none.get::<Meta>(&registry).is_none().xpect_true();
+		none.get::<Meta>(&registry).unwrap().is_none().xpect_true();
 	}
 }

@@ -175,10 +175,11 @@ impl RoutesDir {
 							// reported together once the guard has resolved.
 							let mut failures = Vec::new();
 							for spec in specs {
+								let path = spec.store_path.clone();
 								if let Err(err) =
 									Self::spawn_route_spec(world, entity, spec)
 								{
-									failures.push(err.to_string());
+									failures.push(format!("`{path}`: {err}"));
 								}
 							}
 							world.flush();
@@ -212,15 +213,18 @@ impl RoutesDir {
 	fn spawn_route_spec(
 		world: &mut World,
 		parent: Entity,
-		mut spec: RouteSpec,
+		spec: RouteSpec,
 	) -> Result {
-		PageMeta::declare_file_defaults(
-			&mut spec.declarations,
-			&spec.store_path,
-		);
-		let meta = world
-			.get_resource::<AppTypeRegistry>()
-			.and_then(|registry| spec.declarations.get(&registry.read()));
+		let mut declarations = spec.declarations?;
+		PageMeta::declare_file_defaults(&mut declarations, &spec.store_path);
+		let meta = declarations.get::<PageMeta>(
+			&world
+				.get_resource::<AppTypeRegistry>()
+				.ok_or_else(|| {
+					bevyhow!("route discovery requires an `AppTypeRegistry`")
+				})?
+				.read(),
+		)?;
 		let route_path = Self::route_path_for(&spec.store_path, meta.as_ref())?;
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
@@ -232,7 +236,7 @@ impl RoutesDir {
 			PageRoute,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		spec.declarations.insert(&mut route_entity)
+		declarations.insert(&mut route_entity)
 	}
 
 	/// List the store's content files and read each one's declared metadata,
@@ -242,6 +246,10 @@ impl RoutesDir {
 	/// This half is the store I/O; what the bytes MEAN settles at spawn time (see
 	/// [`spawn_route_spec`](Self::spawn_route_spec)), which is also where a `slug`
 	/// renames the route path — after the sort, so it cannot reshuffle the order.
+	///
+	/// Listing the dir is a hard error, but a file that will not scan rides its
+	/// own spec and fails at spawn alongside a bad slug, so a half-typed
+	/// frontmatter does not take the whole dir down on live reload.
 	async fn discover_routes(
 		store: &BlobStore,
 		filter: &GlobFilter,
@@ -252,19 +260,18 @@ impl RoutesDir {
 		paths
 			.into_iter()
 			.filter(|path| Self::is_content(path) && filter.passes(path))
-			.map(async |path| -> Result<RouteSpec> {
-				Ok(RouteSpec {
-					declarations: Self::scan_declarations(
-						store,
-						&path,
-						frontmatter_type,
-					)
-					.await,
-					store_path: path,
-				})
+			.map(async |path| RouteSpec {
+				declarations: Self::scan_declarations(
+					store,
+					&path,
+					frontmatter_type,
+				)
+				.await,
+				store_path: path,
 			})
-			.xmap(async_ext::try_join_all)
+			.xmap(async_ext::join_all)
 			.await
+			.xok()
 	}
 
 	/// Whether `path`'s extension marks it as a servable content file.
@@ -320,40 +327,35 @@ impl RoutesDir {
 	}
 
 	/// Read a content file's ROOT declarations through the store: markdown
-	/// frontmatter, or the root spreads of a BSX document. Any read/parse failure
-	/// yields no declarations, since a page declaring nothing is a page.
+	/// frontmatter, or the root spreads of a BSX document. An extension with no
+	/// declaration surface (`.html`) declares nothing; a file that cannot be read
+	/// or parsed is an error, so a malformed page fails discovery loudly instead
+	/// of silently serving with no title, order or slug.
 	async fn scan_declarations(
 		store: &BlobStore,
 		path: &SmolPath,
 		frontmatter_type: &str,
-	) -> RootDeclarations {
-		let Some(source) = store
-			.get(path)
-			.await
-			.ok()
-			.and_then(|bytes| String::from_utf8(bytes.to_vec()).ok())
-		else {
-			return default();
-		};
+	) -> Result<RootDeclarations> {
+		let source = store.get(path).await?.to_vec().xmap(String::from_utf8)?;
 		match path.extension() {
-			Some("md" | "mdx" | "markdown") => Frontmatter::extract(&source)
-				.ok()
-				.flatten()
+			Some("md" | "mdx" | "markdown") => Frontmatter::extract(&source)?
 				.map(|frontmatter| frontmatter.declarations(frontmatter_type))
 				.unwrap_or_default(),
-			Some("bsx") => BsxNode::parse_document(&source, &default())
-				.map(|nodes| RootDeclarations::from_bsx(&nodes))
-				.unwrap_or_default(),
+			Some("bsx") => BsxNode::parse_document(&source, &default())?
+				.xmap(|nodes| RootDeclarations::from_bsx(&nodes)),
 			_ => default(),
 		}
+		.xok()
 	}
 }
 
 /// A discovered content file: the store path its bytes load from, and the
-/// components that file declares at its root.
+/// components that file declares at its root — or the reason its root would not
+/// read, carried per file so it is reported by name with the other spawn
+/// failures rather than aborting the scan.
 struct RouteSpec {
 	store_path: SmolPath,
-	declarations: RootDeclarations,
+	declarations: Result<RootDeclarations>,
 }
 
 #[cfg(test)]
@@ -730,6 +732,30 @@ mod test {
 			.as_deref()
 			.unwrap()
 			.xpect_eq("Post");
+	}
+
+	/// A declaration that will not resolve fails its own file: the page gets no
+	/// route rather than silently serving with the field defaulted away, and its
+	/// siblings still spawn, the same resilience a bad slug gets.
+	#[beet_core::test]
+	async fn unresolvable_declaration_does_not_take_the_dir_down() {
+		let mut world = router_world();
+		let root = spawn_routes(
+			&mut world,
+			memory_fixture(&[
+				("good.md", "+++\norder = 1\n+++\n\n# Good"),
+				("bad_meta.md", "+++\norder = \"not-a-number\"\n+++\n\n# Bad"),
+				("bad_markup.bsx", "<main {Unterminated"),
+			])
+			.await,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+
+		let tree = world.entity(root).get::<RouteTree>().unwrap().clone();
+		tree.find(&["good"]).is_some().xpect_true();
+		tree.find(&["bad_meta"]).is_none().xpect_true();
+		tree.find(&["bad_markup"]).is_none().xpect_true();
 	}
 
 	/// Frontmatter is scanned from file content through the store, so it is store

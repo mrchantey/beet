@@ -171,7 +171,7 @@ impl RouteCollection {
 					// the frontmatter has the last word on the url, exactly as it
 					// does in `RoutesDir` discovery
 					let route_path =
-						match declarations.get::<PageMeta>(&registry) {
+						match declarations.get::<PageMeta>(&registry)? {
 							Some(meta) => meta.apply_slug(&route_path)?,
 							None => route_path,
 						};
