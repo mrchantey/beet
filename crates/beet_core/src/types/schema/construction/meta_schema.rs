@@ -78,6 +78,7 @@ fn schema_ref_schema() -> ValueSchema {
 fn struct_schema() -> ValueSchema {
 	r#struct("StructSchema", vec![
 		optional("name", string()),
+		optional("description", string()),
 		field("allow_additional", boolean()),
 		field("fields", list(named_field_schema())),
 	])
@@ -86,6 +87,7 @@ fn struct_schema() -> ValueSchema {
 fn tuple_schema() -> ValueSchema {
 	r#struct("TupleSchema", vec![
 		optional("name", string()),
+		optional("description", string()),
 		field("fields", list(unnamed_field_schema())),
 	])
 }
@@ -106,6 +108,7 @@ fn map_schema() -> ValueSchema {
 fn enum_schema() -> ValueSchema {
 	r#struct("EnumSchema", vec![
 		optional("name", string()),
+		optional("description", string()),
 		field("variants", list(variant_schema())),
 	])
 }
@@ -214,6 +217,7 @@ fn optional(key: &str, schema: ValueSchema) -> NamedFieldSchema {
 fn r#struct(name: &str, fields: Vec<NamedFieldSchema>) -> ValueSchema {
 	ValueSchema::Struct(StructSchema {
 		name: Some(name.into()),
+		description: None,
 		allow_additional: false,
 		fields,
 	})
@@ -222,6 +226,7 @@ fn r#struct(name: &str, fields: Vec<NamedFieldSchema>) -> ValueSchema {
 fn enumeration(name: &str, variants: Vec<VariantSchema>) -> ValueSchema {
 	ValueSchema::Enum(EnumSchema {
 		name: Some(name.into()),
+		description: None,
 		variants,
 	})
 }
@@ -293,6 +298,7 @@ mod test {
 			ValueSchema::Entity(default()),
 			ValueSchema::Struct(StructSchema {
 				name: Some("TodoItem".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![
 					NamedFieldSchema::new(
@@ -306,6 +312,7 @@ mod test {
 			}),
 			ValueSchema::Tuple(TupleSchema {
 				name: Some("Pair".into()),
+				description: None,
 				fields: vec![UnnamedFieldSchema {
 					required: true,
 					description: Some("the first".into()),
@@ -323,6 +330,7 @@ mod test {
 			}),
 			ValueSchema::Enum(EnumSchema {
 				name: Some("Status".into()),
+				description: None,
 				variants: vec![
 					VariantSchema {
 						name: "Active".into(),

@@ -192,6 +192,7 @@ mod test {
 	fn a_field_policy_wins_over_the_kind() {
 		ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("done", ValueSchema::Bool(default()))
@@ -235,12 +236,14 @@ mod test {
 		};
 		ValueSchema::Enum(EnumSchema {
 			name: None,
+			description: None,
 			variants: vec![unit.clone(), payload.clone()],
 		})
 		.default_value()
 		.xpect_eq(Value::str("Error"));
 		ValueSchema::Enum(EnumSchema {
 			name: None,
+			description: None,
 			variants: vec![payload, unit],
 		})
 		.default_value()
@@ -304,6 +307,7 @@ mod test {
 			"Node",
 			ValueSchema::Struct(StructSchema {
 				name: Some("Node".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"child",

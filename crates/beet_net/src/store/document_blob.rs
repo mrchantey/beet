@@ -216,6 +216,7 @@ mod test {
 	fn todo_schema() -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TodoItem".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("label", ValueSchema::String(default())),

@@ -346,6 +346,7 @@ mod test {
 	fn todo_schema(fields: Vec<NamedFieldSchema>) -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TodoItem".into()),
+			description: None,
 			allow_additional: false,
 			fields,
 		})
@@ -397,6 +398,7 @@ mod test {
 			Document::new(value!({ "items": [{ "label": "buy milk" }] })),
 			DocumentSchema::inline(ValueSchema::Struct(StructSchema {
 				name: None,
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"items",

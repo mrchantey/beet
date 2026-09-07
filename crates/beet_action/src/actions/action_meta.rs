@@ -177,19 +177,29 @@ impl ActionMeta {
 	}
 
 	/// JSON schema for the input type, if full reflection data is available.
+	///
+	/// # Errors
+	/// Returns an error if the input type's schema names something JSON Schema
+	/// cannot express, see [`JsonSchema::try_from_schema`].
 	#[cfg(feature = "json")]
-	pub fn input_json_schema(&self) -> Option<JsonSchema> {
+	pub fn input_json_schema(&self) -> Result<Option<JsonSchema>> {
 		self.type_info
 			.and_then(|info| info.input_info)
 			.map(JsonSchema::from_type_info)
+			.transpose()
 	}
 
 	/// JSON schema for the output type, if full reflection data is available.
+	///
+	/// # Errors
+	/// Returns an error if the output type's schema names something JSON Schema
+	/// cannot express, see [`JsonSchema::try_from_schema`].
 	#[cfg(feature = "json")]
-	pub fn output_json_schema(&self) -> Option<JsonSchema> {
+	pub fn output_json_schema(&self) -> Result<Option<JsonSchema>> {
 		self.type_info
 			.and_then(|info| info.output_info)
 			.map(JsonSchema::from_type_info)
+			.transpose()
 	}
 
 	/// Assert that the provided types match this action's input/output types.

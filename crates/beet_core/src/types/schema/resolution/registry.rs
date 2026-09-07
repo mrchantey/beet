@@ -229,6 +229,7 @@ impl SchemaRegistry {
 			ValueSchema::Struct(struct_schema) => {
 				ValueSchema::Struct(StructSchema {
 					name: struct_schema.name.clone(),
+					description: None,
 					allow_additional: struct_schema.allow_additional,
 					fields: struct_schema
 						.fields
@@ -246,6 +247,7 @@ impl SchemaRegistry {
 			}
 			ValueSchema::Tuple(tuple) => ValueSchema::Tuple(TupleSchema {
 				name: tuple.name.clone(),
+				description: None,
 				fields: tuple
 					.fields
 					.iter()
@@ -258,6 +260,7 @@ impl SchemaRegistry {
 			}),
 			ValueSchema::Enum(enum_schema) => ValueSchema::Enum(EnumSchema {
 				name: enum_schema.name.clone(),
+				description: None,
 				variants: enum_schema
 					.variants
 					.iter()
@@ -286,6 +289,7 @@ mod test {
 	fn todo_item() -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TodoItem".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![NamedFieldSchema::new(
 				"label",
@@ -378,6 +382,7 @@ mod test {
 			"TodoItem",
 			ValueSchema::Struct(StructSchema {
 				name: Some("TodoItem".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"label",
@@ -476,6 +481,7 @@ mod test {
 			"TodoItem",
 			ValueSchema::Struct(StructSchema {
 				name: Some("TodoItem".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"label",

@@ -1,7 +1,8 @@
 //! Conversion from bevy reflect [`TypeInfo`] to [`ValueSchema`].
 //!
-//! Mirrors [`crate::types::json_schema`] but produces a [`ValueSchema`] suitable
-//! for validation and UI generation.
+//! The one interpretation of a reflected Rust type: validation, form generation
+//! and the [`JsonSchema`] export in [`crate::types::json_schema`] all read what
+//! this walk produced, rather than walking [`TypeInfo`] again themselves.
 use crate::prelude::*;
 use bevy::reflect::NamedField;
 use bevy::reflect::TypeInfo;
@@ -52,10 +53,12 @@ impl Builder {
 			self.visiting.push(path);
 		}
 		let schema = match type_info {
-			TypeInfo::Struct(info) => {
-				ValueSchema::Struct(self.struct_schema(info))
+			TypeInfo::Struct(info) => ValueSchema::Struct(
+				self.struct_schema(info, type_docs(type_info)),
+			),
+			TypeInfo::TupleStruct(info) => {
+				self.tuple_struct_schema(info, type_docs(type_info))
 			}
-			TypeInfo::TupleStruct(info) => self.tuple_struct_schema(info),
 			TypeInfo::Tuple(info) => {
 				if info.field_len() == 0 {
 					ValueSchema::Null
@@ -67,8 +70,10 @@ impl Builder {
 			TypeInfo::Array(info) => ValueSchema::List(self.array_schema(info)),
 			TypeInfo::Map(info) => ValueSchema::Map(self.map_schema(info)),
 			TypeInfo::Set(info) => ValueSchema::List(set_schema(info)),
-			TypeInfo::Enum(info) => self.enum_schema(info),
-			TypeInfo::Opaque(info) => primitive_schema(info.type_path()),
+			TypeInfo::Enum(info) => {
+				self.enum_schema(info, type_docs(type_info))
+			}
+			TypeInfo::Opaque(info) => type_path_schema(info.type_path()),
 		};
 		if named {
 			self.visiting.pop();
@@ -83,17 +88,22 @@ impl Builder {
 	) -> ValueSchema {
 		match type_info {
 			Some(info) => self.build(info),
-			None => primitive_schema(type_path),
+			None => type_path_schema(type_path),
 		}
 	}
 
-	fn struct_schema(&mut self, info: &StructInfo) -> StructSchema {
+	fn struct_schema(
+		&mut self,
+		info: &StructInfo,
+		description: Option<SmolStr>,
+	) -> StructSchema {
 		let fields = info
 			.iter()
 			.map(|field| self.named_field_schema(field))
 			.collect();
 		StructSchema {
 			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			description,
 			allow_additional: false,
 			fields,
 		}
@@ -137,8 +147,13 @@ impl Builder {
 		}
 	}
 
-	fn tuple_struct_schema(&mut self, info: &TupleStructInfo) -> ValueSchema {
-		// Newtypes unwrap to their inner type.
+	fn tuple_struct_schema(
+		&mut self,
+		info: &TupleStructInfo,
+		description: Option<SmolStr>,
+	) -> ValueSchema {
+		// Newtypes unwrap to their inner type; the wrapper's own name and docs
+		// go with the wrapper.
 		if info.field_len() == 1 {
 			let field = info.field_at(0).expect("tuple struct has 1 field");
 			return self.resolve_field(field.type_info(), field.type_path());
@@ -149,6 +164,7 @@ impl Builder {
 			.collect();
 		ValueSchema::Tuple(TupleSchema {
 			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			description,
 			fields,
 		})
 	}
@@ -162,7 +178,11 @@ impl Builder {
 			.iter()
 			.map(|field| self.unnamed_field_schema(field))
 			.collect();
-		TupleSchema { name, fields }
+		TupleSchema {
+			name,
+			description: None,
+			fields,
+		}
 	}
 
 	fn list_schema(&mut self, info: &ListInfo) -> ListSchema {
@@ -193,10 +213,14 @@ impl Builder {
 		}
 	}
 
-	fn enum_schema(&mut self, info: &EnumInfo) -> ValueSchema {
+	fn enum_schema(
+		&mut self,
+		info: &EnumInfo,
+		description: Option<SmolStr>,
+	) -> ValueSchema {
 		// Treat `Option<T>` specially: an optional wrapper over the inner schema, so a
 		// null or missing value validates while a present value is typed as `T`.
-		if is_option_type(info.type_path())
+		if matches!(generic_parts(info.type_path()), Some(("Option", _)))
 			&& let Some(VariantInfo::Tuple(some_info)) = info.variant("Some")
 			&& let Some(field) = some_info.field_at(0)
 		{
@@ -205,61 +229,65 @@ impl Builder {
 			));
 		}
 
-		let variants =
-			info.iter()
-				.map(|variant| match variant {
-					VariantInfo::Unit(variant) => VariantSchema {
-						name: SmolStr::from(variant.name()),
-						payload: None,
-					},
-					VariantInfo::Tuple(variant) => {
-						if variant.field_len() == 1 {
-							let field = variant.field_at(0).expect("len == 1");
-							VariantSchema {
-								name: SmolStr::from(variant.name()),
-								payload: Some(self.resolve_field(
-									field.type_info(),
-									field.type_path(),
-								)),
-							}
-						} else {
-							let fields = variant
-								.iter()
-								.map(|field| self.unnamed_field_schema(field))
-								.collect();
-							VariantSchema {
-								name: SmolStr::from(variant.name()),
-								payload: Some(ValueSchema::Tuple(
-									TupleSchema { name: None, fields },
-								)),
-							}
+		let variants = info
+			.iter()
+			.map(|variant| match variant {
+				VariantInfo::Unit(variant) => VariantSchema {
+					name: SmolStr::from(variant.name()),
+					payload: None,
+				},
+				VariantInfo::Tuple(variant) => {
+					if variant.field_len() == 1 {
+						let field = variant.field_at(0).expect("len == 1");
+						VariantSchema {
+							name: SmolStr::from(variant.name()),
+							payload: Some(self.resolve_field(
+								field.type_info(),
+								field.type_path(),
+							)),
 						}
-					}
-					VariantInfo::Struct(variant) => {
+					} else {
 						let fields = variant
 							.iter()
-							.map(|field| self.named_field_schema(field))
+							.map(|field| self.unnamed_field_schema(field))
 							.collect();
 						VariantSchema {
 							name: SmolStr::from(variant.name()),
-							payload: Some(ValueSchema::Struct(StructSchema {
+							payload: Some(ValueSchema::Tuple(TupleSchema {
 								name: None,
-								allow_additional: false,
+								description: None,
 								fields,
 							})),
 						}
 					}
-				})
-				.collect();
+				}
+				VariantInfo::Struct(variant) => {
+					let fields = variant
+						.iter()
+						.map(|field| self.named_field_schema(field))
+						.collect();
+					VariantSchema {
+						name: SmolStr::from(variant.name()),
+						payload: Some(ValueSchema::Struct(StructSchema {
+							name: None,
+							description: None,
+							allow_additional: false,
+							fields,
+						})),
+					}
+				}
+			})
+			.collect();
 		ValueSchema::Enum(EnumSchema {
 			name: Some(SmolStr::from(info.type_path_table().short_path())),
+			description,
 			variants,
 		})
 	}
 }
 
 fn set_schema(info: &SetInfo) -> ListSchema {
-	let item = primitive_schema(info.value_ty().path());
+	let item = type_path_schema(info.value_ty().path());
 	ListSchema {
 		item: Box::new(item),
 		min_items: None,
@@ -268,20 +296,62 @@ fn set_schema(info: &SetInfo) -> ListSchema {
 	}
 }
 
-fn primitive_schema(type_path: &str) -> ValueSchema {
-	if is_option_type(type_path) {
-		// Outer Option<T> path with no resolvable inner type info: an optional
-		// wrapper over the inner primitive (best effort).
-		if let Some(inner) = extract_option_inner(type_path) {
-			return ValueSchema::Optional(Box::new(primitive_schema(inner)));
+/// The type's own doc comment, the type-level twin of a field's description.
+#[cfg(feature = "bevy_reflect_documentation")]
+fn type_docs(type_info: &TypeInfo) -> Option<SmolStr> {
+	type_info.docs().map(SmolStr::from)
+}
+#[cfg(not(feature = "bevy_reflect_documentation"))]
+fn type_docs(_type_info: &TypeInfo) -> Option<SmolStr> { None }
+
+/// The schema for a type known only by its path: an opaque type, or a field
+/// whose type carries no [`TypeInfo`].
+///
+/// The standard containers are recognized by base name, so a `Vec<String>` with
+/// no type info still lowers to a list of strings rather than losing its shape.
+/// An unrecognized type is [`ValueSchema::Any`], the "nothing is known about
+/// this" schema: a `Null` would instead reject every non-null value the type
+/// actually holds.
+fn type_path_schema(type_path: &str) -> ValueSchema {
+	match generic_parts(type_path) {
+		Some(("Option", inner)) => {
+			return ValueSchema::Optional(Box::new(type_path_schema(inner)));
 		}
+		Some(("Vec", inner)) => {
+			return ValueSchema::List(ListSchema {
+				item: Box::new(type_path_schema(inner)),
+				min_items: None,
+				max_items: None,
+				unique: false,
+			});
+		}
+		Some(("HashSet" | "BTreeSet", inner)) => {
+			return ValueSchema::List(ListSchema {
+				item: Box::new(type_path_schema(inner)),
+				min_items: None,
+				max_items: None,
+				unique: true,
+			});
+		}
+		Some(("HashMap" | "BTreeMap", args)) => {
+			return ValueSchema::Map(MapSchema {
+				value: Box::new(type_path_schema(map_value_arg(args))),
+			});
+		}
+		_ => {}
 	}
-	let short = type_path.rsplit("::").next().unwrap_or(type_path);
+	let short = type_path
+		.rsplit("::")
+		.next()
+		.unwrap_or(type_path)
+		.trim_start_matches('&');
 	match short {
 		// `Duration` reflects as opaque but is authored as a unit-suffixed string
 		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string.
-		"String" | "str" | "char" | "PathBuf" | "OsString" | "SmolStr"
-		| "SmolPath" | "Duration" => ValueSchema::String(StringSchema::default()),
+		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
+		| "SmolStr" | "SmolPath" | "Duration" => {
+			ValueSchema::String(StringSchema::default())
+		}
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())
 		}
@@ -294,28 +364,38 @@ fn primitive_schema(type_path: &str) -> ValueSchema {
 		// entity map and a UI renders a picker.
 		"Entity" => ValueSchema::Entity(EntitySchema::default()),
 		"()" => ValueSchema::Null,
-		_ => ValueSchema::Null,
+		_ => ValueSchema::Any,
 	}
 }
 
-fn is_required_field(type_path: &str) -> bool {
-	!type_path.starts_with("core::option::Option<")
-		&& !type_path.starts_with("Option<")
-}
-
-fn is_option_type(type_path: &str) -> bool {
-	type_path.starts_with("core::option::Option<")
-		|| type_path.starts_with("Option<")
-}
-
-fn extract_option_inner(type_path: &str) -> Option<&str> {
+/// The base name and generic arguments of a path like `alloc::vec::Vec<T>`,
+/// ie `("Vec", "T")`.
+fn generic_parts(type_path: &str) -> Option<(&str, &str)> {
 	let path = type_path.trim();
-	let inner = if let Some(rest) = path.strip_prefix("core::option::Option<") {
-		Some(rest)
-	} else {
-		path.strip_prefix("Option<")
-	}?;
-	inner.strip_suffix('>')
+	let open = path.find('<')?;
+	let args = path[open + 1..].strip_suffix('>')?;
+	Some((path[..open].rsplit("::").next()?, args))
+}
+
+/// The value argument of a map's `K, V` argument list, splitting at the one
+/// comma that is not itself inside a generic.
+fn map_value_arg(args: &str) -> &str {
+	let mut depth = 0;
+	for (idx, char) in args.char_indices() {
+		match char {
+			'<' => depth += 1,
+			'>' => depth -= 1,
+			',' if depth == 0 => return args[idx + 1..].trim(),
+			_ => {}
+		}
+	}
+	args.trim()
+}
+
+/// Whether a field must be present: everything but an `Option`, which is
+/// [`ValueSchema::Optional`] and validates when absent or null.
+fn is_required_field(type_path: &str) -> bool {
+	!matches!(generic_parts(type_path), Some(("Option", _)))
 }
 
 #[cfg(test)]
@@ -345,6 +425,65 @@ mod test {
 		label: String,
 		#[allow(dead_code)]
 		children: Vec<Node>,
+	}
+
+	/// A field whose type carries no [`TypeInfo`] is known only by its path, and
+	/// the standard containers still lower to their shape rather than to `Any`.
+	#[crate::test]
+	fn a_type_path_alone_still_names_a_shape() {
+		use super::type_path_schema;
+		type_path_schema("alloc::string::String")
+			.xpect_eq(ValueSchema::String(default()));
+		type_path_schema("smol_str::SmolStr")
+			.xpect_eq(ValueSchema::String(default()));
+		type_path_schema("core::time::Duration")
+			.xpect_eq(ValueSchema::String(default()));
+		type_path_schema("u32").xpect_eq(ValueSchema::U64(default()));
+		type_path_schema("i64").xpect_eq(ValueSchema::I64(default()));
+		type_path_schema("f64").xpect_eq(ValueSchema::F64(default()));
+		type_path_schema("bool").xpect_eq(ValueSchema::Bool(default()));
+		type_path_schema("()").xpect_eq(ValueSchema::Null);
+		type_path_schema("bevy_ecs::entity::Entity")
+			.xpect_eq(ValueSchema::Entity(default()));
+		// nothing is known about an unregistered opaque type, which is `Any`
+		// rather than a `Null` that would reject every value it holds
+		type_path_schema("my_crate::MyCustomType").xpect_eq(ValueSchema::Any);
+
+		type_path_schema("alloc::vec::Vec<alloc::string::String>").xpect_eq(
+			ValueSchema::List(ListSchema {
+				item: Box::new(ValueSchema::String(default())),
+				min_items: None,
+				max_items: None,
+				unique: false,
+			}),
+		);
+		type_path_schema("std::collections::HashSet<u32>").xpect_eq(
+			ValueSchema::List(ListSchema {
+				item: Box::new(ValueSchema::U64(default())),
+				min_items: None,
+				max_items: None,
+				unique: true,
+			}),
+		);
+		// the value type is what a map validates, past the key argument
+		type_path_schema("bevy::platform::collections::HashMap<String, bool>")
+			.xpect_eq(ValueSchema::Map(MapSchema {
+				value: Box::new(ValueSchema::Bool(default())),
+			}));
+		type_path_schema("core::option::Option<bool>").xpect_eq(
+			ValueSchema::Optional(Box::new(ValueSchema::Bool(default()))),
+		);
+	}
+
+	/// Only an `Option` may be absent; the check reads the path because a field
+	/// is asked about before its type is walked.
+	#[crate::test]
+	fn only_an_option_field_is_optional() {
+		use super::is_required_field;
+		is_required_field("alloc::string::String").xpect_true();
+		is_required_field("i32").xpect_true();
+		is_required_field("core::option::Option<String>").xpect_false();
+		is_required_field("Option<i32>").xpect_false();
 	}
 
 	#[crate::test]

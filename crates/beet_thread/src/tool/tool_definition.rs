@@ -120,7 +120,7 @@ impl FunctionToolDefinition {
 		let (true, Some(description), Some(params_schema)) = (
 			path.is_static(),
 			meta.description(),
-			meta.input_json_schema(),
+			meta.input_json_schema()?,
 		) else {
 			return Ok(None);
 		};

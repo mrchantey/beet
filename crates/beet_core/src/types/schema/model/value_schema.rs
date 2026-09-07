@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 /// An interface-oriented description of a [`Value`]'s shape.
 ///
-/// Used for driving dynamic UIs, performing validation and producing a
+/// Used for driving dynamic UIs, performing validation and exporting a
 /// [`JsonSchema`] representation.
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
@@ -129,6 +129,19 @@ impl ValueSchema {
 			ValueSchema::Struct(schema) => schema.name.as_ref(),
 			ValueSchema::Tuple(schema) => schema.name.as_ref(),
 			ValueSchema::Enum(schema) => schema.name.as_ref(),
+			_ => None,
+		}
+	}
+
+	/// The documentation a composite schema carries for itself, if any.
+	///
+	/// The type-level twin of a field's description: what the Rust type's doc
+	/// comment said, or what an authored schema wrote in its place.
+	pub fn description(&self) -> Option<&SmolStr> {
+		match self {
+			ValueSchema::Struct(schema) => schema.description.as_ref(),
+			ValueSchema::Tuple(schema) => schema.description.as_ref(),
+			ValueSchema::Enum(schema) => schema.description.as_ref(),
 			_ => None,
 		}
 	}

@@ -70,6 +70,56 @@ fn sanitize_value_for_strict_mode(value: &mut Value) {
 mod test {
 	use super::*;
 
+	/// The shape an action's tool schema actually reaches a provider in: exported
+	/// from reflection, then normalized. Every object, at the root and in
+	/// `$defs`, must be closed and fully required, and no `oneOf` may survive.
+	#[crate::test]
+	fn an_exported_schema_normalizes() {
+		#[derive(Reflect)]
+		struct Inner {
+			flag: bool,
+		}
+		#[derive(Reflect)]
+		struct Params {
+			inner: Inner,
+			maybe: Option<String>,
+		}
+		let mut schema = JsonSchema::new::<Params>().unwrap();
+		schema.sanitize_for_strict_mode();
+		assert_strict(&schema);
+	}
+
+	/// Every object schema reachable from `value` is closed and lists all of its
+	/// properties as required, and nothing is a `oneOf`.
+	fn assert_strict(value: &Value) {
+		match value {
+			Value::Map(map) => {
+				map.get("oneOf").is_ok().xpect_false();
+				if let Ok(Value::Map(properties)) = map.get("properties") {
+					map.get("additionalProperties")
+						.unwrap()
+						.clone()
+						.xpect_eq(Value::Bool(false));
+					map.get("required")
+						.unwrap()
+						.as_list()
+						.unwrap()
+						.len()
+						.xpect_eq(properties.len());
+				}
+				for nested in map.values() {
+					assert_strict(nested);
+				}
+			}
+			Value::List(list) => {
+				for nested in list {
+					assert_strict(nested);
+				}
+			}
+			_ => {}
+		}
+	}
+
 	#[crate::test]
 	fn normalizes_openai_strict_mode() {
 		let mut schema = JsonSchema::from_value(value!({

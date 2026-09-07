@@ -124,13 +124,14 @@ mod enabled {
 				})
 			})
 			.collect::<Result<Vec<_>>>()?;
-		// `additionalProperties` defaults to permitting extras unless explicitly false.
+		// an authored struct is closed unless `additionalProperties` says otherwise.
 		let allow_additional = map
 			.get("additionalProperties")
 			.and_then(Json::as_bool)
 			.unwrap_or(false);
 		Ok(ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional,
 			fields,
 		}))
@@ -172,6 +173,7 @@ mod enabled {
 			.collect::<Result<Vec<_>>>()?;
 		Ok(ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields,
 		}))

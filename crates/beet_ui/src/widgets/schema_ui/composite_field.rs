@@ -267,6 +267,7 @@ mod test {
 	fn a_struct_recurses_with_labels() {
 		let html = test_ext::form_html(ValueSchema::Struct(StructSchema {
 			name: Some("Outer".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![NamedFieldSchema::new(
 				"profile",
@@ -294,6 +295,7 @@ mod test {
 	fn a_label_hint_replaces_the_key() {
 		test_ext::form_html(ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("name", ValueSchema::String(default()))

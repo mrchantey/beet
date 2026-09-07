@@ -178,6 +178,7 @@ mod test {
 	fn a_payload_enum_selects_and_rebuilds() {
 		let schema = ValueSchema::Enum(EnumSchema {
 			name: Some("Status".into()),
+			description: None,
 			variants: vec![
 				VariantSchema {
 					name: "Active".into(),
@@ -187,6 +188,7 @@ mod test {
 					name: "Snoozed".into(),
 					payload: Some(ValueSchema::Struct(StructSchema {
 						name: None,
+						description: None,
 						allow_additional: false,
 						fields: vec![NamedFieldSchema::new(
 							"days",
@@ -223,6 +225,7 @@ mod test {
 	fn pair() -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("Pair".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("schema", ValueSchema::meta()),

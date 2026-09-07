@@ -73,6 +73,8 @@ pub struct UnnamedFieldSchema {
 pub struct StructSchema {
 	/// The type's short name, if known.
 	pub name: Option<SmolStr>,
+	/// The type's own documentation, if any.
+	pub description: Option<SmolStr>,
 	/// Whether keys not in [`fields`](Self::fields) are permitted.
 	pub allow_additional: bool,
 	/// Field schemas.
@@ -87,6 +89,8 @@ pub struct StructSchema {
 pub struct TupleSchema {
 	/// The type's short name, if known.
 	pub name: Option<SmolStr>,
+	/// The type's own documentation, if any.
+	pub description: Option<SmolStr>,
 	/// Field schemas in order.
 	pub fields: Vec<UnnamedFieldSchema>,
 }
@@ -138,6 +142,8 @@ pub struct VariantSchema {
 pub struct EnumSchema {
 	/// The type's short name, if known.
 	pub name: Option<SmolStr>,
+	/// The type's own documentation, if any.
+	pub description: Option<SmolStr>,
 	/// Variants in declaration order.
 	pub variants: Vec<VariantSchema>,
 }

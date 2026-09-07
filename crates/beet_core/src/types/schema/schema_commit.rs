@@ -190,6 +190,7 @@ mod test {
 	fn item_schema(fields: Vec<NamedFieldSchema>) -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TodoItem".into()),
+			description: None,
 			allow_additional: false,
 			fields,
 		})
@@ -271,6 +272,7 @@ mod test {
 		] });
 		let schema = ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields: vec![NamedFieldSchema::new(
 				"items",

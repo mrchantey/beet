@@ -348,6 +348,7 @@ mod test {
 	fn bool_props_coerce_from_strings() {
 		let schema = ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: true,
 			fields: vec![
 				NamedFieldSchema::new("home", ValueSchema::Bool(default())),

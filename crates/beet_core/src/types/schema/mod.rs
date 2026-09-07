@@ -1,9 +1,12 @@
-//! Interface-oriented schema for [`Value`]s.
+//! Interface-oriented schema for [`Value`](crate::types::Value)s.
 //!
 //! Loosely parallels bevy's [`TypeInfo`](bevy::reflect::TypeInfo), but is
 //! designed for driving dynamic UIs, validation and form generation.
 //!
-//! Convert from a bevy reflect type with [`ValueSchema::from_type_info`].
+//! Convert from a bevy reflect type with [`ValueSchema::from_type_info`], the
+//! one reflection interpretation: JSON Schema is exported from what it produced
+//! ([`JsonSchema::try_from_schema`](crate::types::JsonSchema::try_from_schema)),
+//! not walked separately.
 //! Run validation with [`ValueSchema::validate`].
 
 mod construction;

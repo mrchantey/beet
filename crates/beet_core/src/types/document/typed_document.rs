@@ -47,6 +47,7 @@ impl TypedDocument {
 	pub fn describing_schema() -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TypedDocument".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("schema", ValueSchema::meta()),
@@ -225,6 +226,7 @@ mod test {
 	fn todo_schema(fields: Vec<NamedFieldSchema>) -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("TodoItem".into()),
+			description: None,
 			allow_additional: false,
 			fields,
 		})

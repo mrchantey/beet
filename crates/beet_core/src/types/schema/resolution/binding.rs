@@ -59,6 +59,7 @@ impl ValueSchema {
 			}),
 			Self::Tuple(schema) => Self::Tuple(TupleSchema {
 				name: schema.name.clone(),
+				description: None,
 				fields: schema
 					.fields
 					.iter()
@@ -70,6 +71,7 @@ impl ValueSchema {
 			}),
 			Self::Enum(schema) => Self::Enum(EnumSchema {
 				name: schema.name.clone(),
+				description: None,
 				variants: schema
 					.variants
 					.iter()
@@ -112,6 +114,7 @@ mod test {
 	fn pair() -> ValueSchema {
 		ValueSchema::Struct(StructSchema {
 			name: Some("Pair".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("schema", ValueSchema::meta()),
@@ -155,6 +158,7 @@ mod test {
 			"Circle",
 			ValueSchema::Struct(StructSchema {
 				name: Some("Circle".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"radius",
@@ -165,6 +169,7 @@ mod test {
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		let shape = ValueSchema::Struct(StructSchema {
 			name: Some("Shape".into()),
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("kind", ValueSchema::String(default())),
@@ -198,6 +203,7 @@ mod test {
 	async fn an_unresolvable_key_defers() {
 		ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: true,
 			fields: vec![NamedFieldSchema::new(
 				"value",
@@ -215,6 +221,7 @@ mod test {
 	async fn a_nested_struct_opens_its_own_scope() {
 		let inner = ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("schema", ValueSchema::meta()),
@@ -223,6 +230,7 @@ mod test {
 		});
 		let outer = ValueSchema::Struct(StructSchema {
 			name: None,
+			description: None,
 			allow_additional: false,
 			fields: vec![
 				NamedFieldSchema::new("schema", ValueSchema::meta()),

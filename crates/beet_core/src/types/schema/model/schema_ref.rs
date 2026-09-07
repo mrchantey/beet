@@ -34,6 +34,7 @@ use crate::prelude::*;
 /// // `{ "schema": .., "value": .. }`: the value is whatever the sibling says
 /// let pair = ValueSchema::Struct(StructSchema {
 ///     name: Some("TypedDocument".into()),
+///     description: None,
 ///     allow_additional: false,
 ///     fields: vec![
 ///         NamedFieldSchema::new("schema", ValueSchema::meta()),

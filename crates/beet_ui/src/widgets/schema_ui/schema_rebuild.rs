@@ -212,6 +212,7 @@ mod test {
 			"Profile",
 			ValueSchema::Struct(StructSchema {
 				name: Some("Profile".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![
 					NamedFieldSchema::new(
@@ -279,6 +280,7 @@ mod test {
 			"Profile",
 			ValueSchema::Struct(StructSchema {
 				name: Some("Profile".into()),
+				description: None,
 				allow_additional: false,
 				fields: vec![NamedFieldSchema::new(
 					"done",
@@ -308,6 +310,7 @@ mod test {
 		let item = |fields: Vec<NamedFieldSchema>| {
 			ValueSchema::Struct(StructSchema {
 				name: Some("TodoItem".into()),
+				description: None,
 				allow_additional: false,
 				fields,
 			})
