@@ -200,20 +200,25 @@ mod test {
 	/// live — the server received the bytes, swapped them in via `set_scene`, and
 	/// now dispatches the pushed route.
 	///
-	/// The route is a `ExchangeScript`: its reflectable component re-derives
+	/// The route is a `<ScriptRoute>`: its reflectable `ExchangeScript` re-derives
 	/// its runtime dispatch (the `ExchangeOverload` adapter) from its `#[require]` hook on
 	/// load, so it survives the round-trip (a bare `exchange_route`'s adapter does not,
 	/// the scene-routing constraint a device scene authors around).
+	///
+	/// A scene carries only *registered* types, and a generic registers per
+	/// instantiation: `<ScriptRoute>` builds the one `ExchangeScript<Value, Value, ..>`
+	/// `RouterPlugin` registers. A directly spawned `ExchangeScript::<(), String>`
+	/// dispatches live but is invisible to reflection, so it would leave the loaded
+	/// entity with its path and no action, and the route would never join the tree.
 	#[beet_core::test(timeout_ms = 10000)]
 	async fn load_route_installs_pushed_scene() {
 		// the host builds + serializes a one-route scripted scene.
 		let mut host = server_world();
 		let root = host
-			.spawn((
-				Script::<(), String>::new(r#""pong""#),
-				ExchangeScript::<(), String>::default(),
-				PathPartial::new("ping"),
-			))
+			.spawn_template(rsx! {
+				<ScriptRoute path="ping" script={r#"return "pong""#}/>
+			})
+			.unwrap()
 			.flush();
 		let scene = TemplateSaver::new()
 			.with_entity_tree(&host, root)
