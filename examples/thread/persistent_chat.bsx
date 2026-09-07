@@ -13,7 +13,7 @@ thread, stay stable across runs.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
-	<Router {Layout{template:"ThreadShell"}}>
+	<Router {Layout{template:"AppShell"}}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>
 			<CreatePostForm {OfThread($thread)}/>

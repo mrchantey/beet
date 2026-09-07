@@ -610,4 +610,35 @@ mod tests {
 		selects(&mut world, em).xpect_true();
 		selects(&mut world, span).xpect_false();
 	}
+
+	/// The descendant combinator reaches through a `<details>`, the one element
+	/// whose children the charcell disclosure re-homes: a generated form nests
+	/// each collection row in a disclosure, so `form button` must match a row's
+	/// `remove` exactly as it matches the collection's `add`.
+	#[beet_core::test]
+	fn descendant_combinator_crosses_a_disclosure() {
+		let mut world = World::new();
+		world.insert_resource(
+			RuleSet::default().with_rule(
+				Rule::new()
+					.with_selector(Selector::descendant(
+						Selector::tag("form"),
+						Selector::tag("button"),
+					))
+					.with_value(Foo, 1u32),
+			),
+		);
+		world.spawn(rsx! {
+			<form>
+				<details open><summary>"row"</summary><button>"remove"</button></details>
+				<em>"add"</em>
+			</form>
+		});
+		let (button, em) = (
+			tag_entity(&mut world, "button"),
+			tag_entity(&mut world, "em"),
+		);
+		selects(&mut world, button).xpect_true();
+		selects(&mut world, em).xpect_false();
+	}
 }

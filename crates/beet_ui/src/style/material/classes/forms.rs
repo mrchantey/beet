@@ -33,17 +33,44 @@ pub fn form_layout() -> Rule {
 		.with_value(common_props::RowGapProp, Length::Rem(1.0))
 }
 
-/// Field `<label>` - a block sitting just above its input, medium weight so the
-/// key reads as a heading for its value.
+/// Field `<label>` - the key sitting just above its control, medium weight so
+/// the key reads as a heading for its value.
+///
+/// A column rather than a block, because a `<label>` here *wraps* its control
+/// (the association HTML gives without a `for` attribute, and the shape
+/// [`DynamicForm`](crate::prelude::DynamicForm) generates): as a block its key
+/// text and its input are two inline items on one line, so the key runs
+/// straight into the value. `start` rather than the flex default, so an
+/// unsized control (a checkbox) stays its own width instead of stretching to
+/// the field's.
 pub fn label_field() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("label"))
-		.with_value(common_props::DisplayProp, Display::Block)
+		.with_value(common_props::DisplayProp, Display::Flex)
+		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
+		.with_value(common_props::AlignItemsProp, AlignItems::Start)
 		.with_token(common_props::FontWeightProp,typography::WeightMedium).unwrap()
 		.with_value(common_props::MarginProp, Spacing {
 			bottom: Length::Rem(0.25),
 			..Spacing::DEFAULT
 		})
+}
+
+/// A `<button>` inside a form shrink-wraps instead of stretching to the field
+/// width.
+///
+/// [`form_layout`]'s stretch is for *fields*, which read as full-width rows; a
+/// button is a target the user aims at, and stretched it reads as a coloured
+/// band across the form rather than as a control. A descendant selector, since
+/// a generated form nests its structural buttons (a list's `add`, a row's
+/// `remove`) inside the collection they edit.
+pub fn form_button() -> Rule {
+	Rule::new()
+		.with_selector(Selector::descendant(
+			Selector::tag("form"),
+			Selector::tag("button"),
+		))
+		.with_value(common_props::AlignSelfProp, AlignSelf::Start)
 }
 
 /// Shared baseline for `.input` text fields and text areas. A fixed `15rem`

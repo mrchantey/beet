@@ -10,7 +10,7 @@ run is finite, so the transcript settles and the terminal holds it until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
 	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
-	<Router {Layout{template:"ThreadShell"}}>
+	<Router {Layout{template:"AppShell"}}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>
 		</Route>

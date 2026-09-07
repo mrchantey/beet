@@ -15,6 +15,7 @@ use super::field_layout::group;
 use super::field_layout::labeled;
 use super::form::schema_field;
 use super::value_rebuild::ValueRebuild;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The struct arm: one nested control per named field, each [`FieldRef`]
@@ -144,7 +145,7 @@ fn list_row(
 	depth: usize,
 ) -> Snippet {
 	rsx! {
-		<div>
+		<div {row_layout()}>
 			{schema_field(
 				resolver,
 				item,
@@ -160,6 +161,27 @@ fn list_row(
 		</div>
 	}
 	.any_snippet()
+}
+
+/// A collection row's layout, colocated with the row: the same stretch column
+/// the shipped `<form>` rule is.
+///
+/// The item's controls fill the row's width while its `remove` keeps its own,
+/// which is the `form button` rule's `align-self` doing its job — a flex-only
+/// property a block container would ignore, leaving the button a full-width
+/// band.
+fn row_layout() -> impl Bundle {
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Vertical
+		),
+		(
+			style::common_props::AlignItemsProp,
+			style::AlignItems::Stretch
+		),
+	]
 }
 
 /// The map arm: one control per entry, labelled by its key, with a remove button

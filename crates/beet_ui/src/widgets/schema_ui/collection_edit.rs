@@ -51,6 +51,13 @@ pub(super) struct CollectionButton {
 pub(super) struct NewEntryKey;
 
 /// A `<button type="button">` applying `edit` to `field` on activation.
+///
+/// Tonal rather than text: a structural edit is the only thing on a generated
+/// form that is not a labelled control, and a text button paints in the same
+/// `OnSurface` ink as the labels around it, so in the terminal an `add` reads
+/// as a word rather than as something to press. A tonal fill is the lightest
+/// variant that still carries its own container, and unlike an outlined one it
+/// stays a single row.
 pub(super) fn edit_button(
 	label: impl Into<String>,
 	field: FieldRef,
@@ -60,7 +67,7 @@ pub(super) fn edit_button(
 	rsx! {
 		<Button
 			action=true
-			variant={ButtonVariant::Text}
+			variant={ButtonVariant::Tonal}
 			{CollectionButton { field, edit }}
 		>{label}</Button>
 	}

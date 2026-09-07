@@ -90,7 +90,7 @@ fn assert_crate_check_passed(app: &mut App) {
 }
 
 /// Every scene declares the same served shape: a root carrying the local TUI
-/// server (default-booting) plus the two opt-in ones, a `ThreadShell`-wrapped
+/// server (default-booting) plus the two opt-in ones, an `AppShell`-wrapped
 /// router, one `FixedPage` route, and a `ThreadView` whose `$thread` reference
 /// resolved to the scene's own thread. Asserted per scene, since an unresolved
 /// tag would otherwise reduce to a thread that renders nowhere.

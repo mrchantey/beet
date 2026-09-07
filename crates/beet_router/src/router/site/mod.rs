@@ -4,6 +4,8 @@
 //! std-only throughout: every module here builds on the `beet_ui` scene
 //! pipeline.
 
+#[cfg(feature = "std")]
+mod app_shell;
 // the article chrome (`<ArticleHeader/>`, `<YouTubeEmbed/>`) a layout places
 // above a post's body. std-only: it renders through the beet_ui widget layer.
 #[cfg(feature = "std")]
@@ -34,6 +36,8 @@ mod template_include;
 #[cfg(feature = "std")]
 mod wasm;
 
+#[cfg(feature = "std")]
+pub use app_shell::*;
 #[cfg(feature = "std")]
 pub use article_header::*;
 #[cfg(feature = "std")]

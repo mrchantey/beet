@@ -1,91 +1,11 @@
-//! The minimal document shell a thread scene's routes are wrapped in.
+//! The served chat surface, end to end: a thread scene's view and composer
+//! wrapped in the shipped [`AppShell`], booted into the live-TUI stack and
+//! driven with terminal bytes.
 //!
-//! A thread app is a router app, so its pages are themed the same way a site's
-//! are: the layout middleware wraps every route, [`PageClasses`] pins the
-//! session scheme per request, and the web-only head chrome is gated on the
-//! HTML target. What it deliberately lacks is chrome: no header, sidebar or
-//! footer, just a full-height column for the transcript and its composer.
-
-use beet_core::prelude::*;
-use beet_router::prelude::*;
-use beet_ui::prelude::material::colors;
-use beet_ui::prelude::*;
-// the head-chrome widget, imported by name so the tag resolves regardless of
-// which glob (`beet_router::prelude` vs `beet_ui::prelude`) also defines a `Reset`.
-use beet_ui::prelude::Reset;
-
-/// The document shell itself: an html document whose body is one full-height
-/// flex column around the page.
-///
-/// Reads the request-scoped [`RequestContextStack`] and the session [`Theme`] as
-/// [`SiteLayout`] does, so `--color-scheme` reaches a thread page over the same
-/// two hops a site page uses. The web `<head>` chrome (the CSS bake, the reset,
-/// the color-scheme script) is non-visual in the terminal, where `<head>` is
-/// `display: none`, so it is emitted only for the HTML target.
-///
-/// Registered by name (see `ThreadUiPlugin`), so a thread scene wraps its routes
-/// in it with `<Router {Layout{template:"ThreadShell"}}>`.
-#[template(system)]
-pub(crate) fn ThreadShell(
-	stack: Res<RequestContextStack>,
-	theme: Res<Theme>,
-) -> impl Bundle {
-	let cx = stack.current();
-	let body_classes = PageClasses::resolve(cx.parts(), &theme);
-	let html_head = cx.parts().accepts(MediaType::Html).then(|| {
-		rsx! {
-			<Preflight/>
-			<Reset/>
-			<Stylesheet/>
-			<ColorSchemeScript/>
-		}
-	});
-	rsx! {
-		<html lang="en">
-			<head>{html_head}</head>
-			<body {(body_classes, page_column())}>
-				<Slot/>
-			</body>
-		</html>
-	}
-}
-
-/// The page body's column: a viewport-height flex column tinted with the surface
-/// palette, so the transcript grows and a composer pins to the bottom.
-///
-/// The shipped `.page` rule expresses the same column, but only once a rule set
-/// is registered ([`MaterialStylePlugin`]); declaring it inline keeps a bare
-/// thread app laid out correctly either way. Cascade styling (`inline_class!`),
-/// since the thread UI's rows are cascade-styled and `resolve_styles` rebuilds
-/// every node's `LayoutStyle` from the cascade, which would clobber a set
-/// component.
-fn page_column() -> impl Bundle {
-	inline_class![
-		(style::common_props::DisplayProp, style::Display::Flex),
-		(
-			style::common_props::FlexDirectionProp,
-			style::Direction::Vertical
-		),
-		// stretch children across the full width, so the transcript and the
-		// composer (and its top-border separator) span the terminal
-		(
-			style::common_props::AlignItemsProp,
-			style::AlignItems::Stretch
-		),
-		(
-			style::common_props::Height,
-			style::Length::ViewportHeight(100.)
-		),
-		Declaration::token(
-			style::common_props::BackgroundColor,
-			colors::Surface
-		),
-		Declaration::token(
-			style::common_props::ForegroundColor,
-			colors::OnSurface
-		),
-	]
-}
+//! What only this suite can show is that the pieces assemble: the projection
+//! reaching a painted frame, the composer's keystrokes advancing a user turn,
+//! and the transcript scrolling inside its own region rather than shoving the
+//! composer off screen.
 
 #[cfg(test)]
 mod test {
@@ -118,13 +38,13 @@ mod test {
 	}
 
 	/// A router serving `page` as its one persistent route, wrapped in the
-	/// [`ThreadShell`] — the shape every thread example declares. `page` is the
+	/// [`AppShell`] — the shape every thread example declares. `page` is the
 	/// route's `children!` bundle, so its members are the page's own top-level
 	/// nodes (a view and a composer, as siblings), never nested under a wrapper.
 	/// Returns the router entity, which surfaces browse.
 	fn spawn_router(app: &mut App, page: impl Bundle) -> Entity {
 		app.world_mut()
-			.spawn((Router, Layout::of::<ThreadShell>(), children![(
+			.spawn((Router, Layout::of::<AppShell>(), children![(
 				route::new("", FixedPage),
 				page
 			)]))

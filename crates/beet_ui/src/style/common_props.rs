@@ -46,6 +46,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(MarginProp)
 		.insert(FlexGrowProp)
 		.insert(AlignItemsProp)
+		.insert(AlignSelfProp)
 		.insert(AlignContentProp)
 		.insert(JustifyContentProp)
 		.insert(FlexDirectionProp)

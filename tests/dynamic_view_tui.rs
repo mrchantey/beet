@@ -76,7 +76,14 @@ impl TodoHost {
 		let store = seeded_store().await;
 		let entry = store.get_media(&SmolPath::from(ENTRY)).await.unwrap();
 		let source = entry.as_utf8().unwrap();
-		let root = app.world_mut().spawn_empty().id();
+		// the entry is built to be *driven*, not to boot: its `<CallOnReady>`
+		// would start the real stdio `TuiServer` inside the test process, giving
+		// the one `FixedPage` tree a second surface. That is not merely noisy —
+		// a page displayed on two surfaces is transcluded into two layout
+		// renders, and `SurfaceQuery` resolves the input's surface through the
+		// *first* portal holder, so scoped input (typing) would be routed to the
+		// stdio terminal rather than to this suite's channel one.
+		let root = app.world_mut().spawn(DisableCallOnReady).id();
 		let template =
 			BsxTemplate::parse_entry(app.world_mut(), source).unwrap();
 		app.world_mut()
@@ -123,20 +130,33 @@ impl TodoHost {
 			.unwrap();
 	}
 
+	/// The painted frame as rows of cells, the grid a mouse coordinate indexes.
+	///
+	/// A cell, not a byte: every box a generated control paints is drawn in
+	/// box-drawing characters, so a byte offset into a row holding one is three
+	/// times the column the terminal reports for it.
+	fn cells(&self) -> Vec<Vec<char>> {
+		self.frame()
+			.lines()
+			.map(|line| line.chars().collect())
+			.collect()
+	}
+
 	/// The 0-indexed start cell of the `nth` (0-based) occurrence of `text`,
 	/// scanning the frame top to bottom. Several generated controls share a
 	/// label (every collection has an `add`), so a click names which one.
 	fn cell_of_nth(&self, text: &str, nth: usize) -> (u32, u32) {
+		let needle: Vec<char> = text.chars().collect();
 		let mut seen = 0;
-		for (row, line) in self.frame().lines().enumerate() {
-			let mut from = 0;
-			while let Some(col) = line[from..].find(text) {
-				let col = from + col;
+		for (row, line) in self.cells().into_iter().enumerate() {
+			for col in 0..line.len().saturating_sub(needle.len() - 1) {
+				if line[col..col + needle.len()] != needle[..] {
+					continue;
+				}
 				if seen == nth {
 					return (col as u32, row as u32);
 				}
 				seen += 1;
-				from = col + text.len();
 			}
 		}
 		panic!(
@@ -144,6 +164,41 @@ impl TodoHost {
 			nth + 1,
 			self.frame()
 		);
+	}
+
+	/// Click into the control the `nth` (0-based) occurrence of key `text`
+	/// labels.
+	///
+	/// A generated form paints its key *above* the control it names, and an
+	/// empty control has no text to aim at, so the control is located from its
+	/// box rather than by an offset from the key: scan down the key's column for
+	/// the box top, find its bottom, and click the middle of the interior. A
+	/// click anywhere inside a text control focuses it, so the middle needs to
+	/// be no more precise than "not the border".
+	fn click_control_of(&mut self, text: &str, nth: usize) {
+		let (col, row) = self.cell_of_nth(text, nth);
+		let (col, row) = (col as usize, row as usize);
+		let cells = self.cells();
+		let at = |row: usize, col: usize| {
+			cells.get(row).and_then(|line| line.get(col)).copied()
+		};
+		let find = |from: usize, corner: char| {
+			(from..cells.len())
+				.find(|&row| at(row, col) == Some(corner))
+				.unwrap_or_else(|| {
+					panic!(
+						"no {corner:?} below occurrence {nth} of {text:?} at \
+						 column {col} in frame:\n{}",
+						self.frame()
+					)
+				})
+		};
+		let top = find(row + 1, '\u{250c}');
+		let bottom = find(top + 1, '\u{2514}');
+		let right = (col + 1..cells[top].len())
+			.find(|&col| at(top, col) == Some('\u{2510}'))
+			.unwrap();
+		self.click(((col + right) / 2) as u32, ((top + bottom) / 2) as u32);
 	}
 
 	/// Click (press + release) the cell at `(col, row)`.
@@ -217,6 +272,18 @@ impl TodoHost {
 		);
 	}
 
+	/// The `row`th todo's label, read out of the seeded document.
+	///
+	/// Every needle a case aims at is derived from this rather than written
+	/// down, because the two JSON documents are the example's *living* state
+	/// (item 126): running the example rewrites them, so an assertion naming
+	/// "buy milk" fails on any tree where someone has used the app.
+	async fn seeded_label(&self, row: usize) -> String {
+		Document::new(self.stored(TODOS).await.value)
+			.get_field(&[FieldSegment::index(row), "label".into()])
+			.unwrap()
+	}
+
 	/// The document persisted at `path` in the app's own store.
 	///
 	/// Read through a default registry, whose intrinsic meta-schema is what a
@@ -241,11 +308,13 @@ impl TodoHost {
 #[beet::test]
 async fn boots_and_paints_the_rows() {
 	let mut host = TodoHost::new(UVec2::new(120, 48)).await;
-	let frame = host.step_until("buy milk");
+	let (first, second) =
+		(host.seeded_label(0).await, host.seeded_label(1).await);
+	let frame = host.step_until(&first);
 	// the columns are the row schema's own fields, named by nothing in the entry
 	frame.as_str().xpect_contains("label");
 	frame.as_str().xpect_contains("done");
-	frame.xpect_contains("walk dog");
+	frame.xpect_contains(&second);
 }
 
 /// Editing a row through the generated form reaches the document, the view bound
@@ -254,18 +323,23 @@ async fn boots_and_paints_the_rows() {
 #[beet::test]
 async fn an_edit_reaches_the_view_and_the_store() {
 	let mut host = TodoHost::new(UVec2::new(120, 48)).await;
-	host.step_until("buy milk");
-	// the second "buy milk" is the form's control; the first is the view's cell
-	let (col, row) = host.cell_of_nth("buy milk", 1);
+	// what the document held before the edit, so every assertion below states
+	// what the edit *changed* rather than restating the living document
+	let mut expected = Document::new(host.stored(TODOS).await.value);
+	let label = host.seeded_label(0).await;
+	let edited = format!("{label} and eggs");
+	host.step_until(&label);
+	// the second occurrence is the form's control; the first is the view's cell
+	let (col, row) = host.cell_of_nth(&label, 1);
 	host.click(col + 1, row);
 	host.type_text(" and eggs");
 	// the read-only view is bound to the same field, so it reflows
-	host.step_until("buy milk and eggs");
+	host.step_until(&edited);
 
-	host.stored(TODOS).await.value.xpect_eq(value!([
-		{ "label": "buy milk and eggs", "done": true },
-		{ "label": "walk dog", "done": false },
-	]));
+	*expected
+		.get_field_mut(&[FieldSegment::index(0), "label".into()])
+		.unwrap() = Value::new(edited);
+	host.stored(TODOS).await.value.xpect_eq(expected.0);
 }
 
 /// Edit mode is opt-in (item 11): the schema editor ships with the app but stays
@@ -273,7 +347,8 @@ async fn an_edit_reaches_the_view_and_the_store() {
 #[beet::test]
 async fn edit_mode_is_opt_in() {
 	let mut host = TodoHost::new(UVec2::new(120, 220)).await;
-	host.step_until("buy milk");
+	let label = host.seeded_label(0).await;
+	host.step_until(&label);
 	// closed: the editor's commit button is not on the page
 	host.frame().xnot().xpect_contains("Apply");
 	host.click_text("Edit schema");
@@ -288,7 +363,12 @@ async fn edit_mode_is_opt_in() {
 #[beet::test]
 async fn adding_a_field_grows_the_table_and_the_form() {
 	let mut host = TodoHost::new(UVec2::new(120, 260)).await;
-	host.step_until("buy milk");
+	// the living rows, so the survival assertion below says "unchanged" rather
+	// than restating a document the example rewrites (item 126)
+	let rows = host.stored(TODOS).await.value;
+	let (first, second) =
+		(host.seeded_label(0).await, host.seeded_label(1).await);
+	host.step_until(&first);
 	host.click_text("Edit schema");
 	host.step_until("Apply");
 
@@ -297,8 +377,7 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 	host.click_last("add");
 	host.settle(8);
 	// name the field, in the empty control the appended row generated
-	let (col, row) = host.cell_of_nth("key", 2);
-	host.click(col + 4, row + 1);
+	host.click_control_of("key", 2);
 	host.type_text("is_really_difficult");
 	// ...and type it, through the variant select the meta-schema's own enum
 	// generated for the field's `schema`
@@ -316,7 +395,7 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 	// ...and every row survived it. The regenerated rows bind their values a
 	// frame after the layout they sit in, so this is a second wait, not the
 	// same frame.
-	host.step_until("buy milk").xpect_contains("walk dog");
+	host.step_until(&first).xpect_contains(&second);
 
 	// the commit is transactional across the pair, and both halves persisted
 	host.stored(SCHEMA)
@@ -326,8 +405,6 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 		.get_field_schema(&FieldPath::new(["is_really_difficult"]))
 		.unwrap()
 		.xpect_eq(ValueSchema::Bool(default()));
-	host.stored(TODOS).await.value.xpect_eq(value!([
-		{ "label": "buy milk", "done": true },
-		{ "label": "walk dog", "done": false },
-	]));
+	// an optional field needs no backfill, so the rows are untouched
+	host.stored(TODOS).await.value.xpect_eq(rows);
 }

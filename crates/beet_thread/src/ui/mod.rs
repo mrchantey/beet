@@ -11,15 +11,16 @@
 //! Keying on the post id means an appended post reuses every settled row's
 //! entity and binding, and a growing in-progress body re-syncs that row's bound
 //! [`Value`] rather than respawning it. The view + composer are host-agnostic
-//! ([`thread_view`] / [`input`]); hosting is the server's job, and [`layout`]
-//! supplies the minimal document shell its routes render into.
+//! ([`thread_view`] / [`input`]); hosting is the server's job, and a thread
+//! scene wraps its routes in `beet_router`'s chrome-free `AppShell`.
 //! `beet_ui` never depends on `beet_thread`; this layer is additive, behind the
 //! `ui` feature.
 
+// the served surface's end-to-end suite
+#[cfg(test)]
+mod chat_surface;
 mod input;
 pub use input::*;
-mod layout;
-pub use layout::*;
 mod of_thread;
 pub use of_thread::*;
 mod thread_view;
@@ -44,14 +45,11 @@ impl Plugin for ThreadUiPlugin {
 			.register_type::<OfThread>()
 			.register_type::<ThreadItems>()
 			.register_type::<UserInput>();
-		// the document shell a thread scene's routes are wrapped in, resolved by
-		// name from a `Layout{template:"ThreadShell"}` declaration
-		app.register_template::<ThreadShell>()
-			// project each window into its views' documents, then pin to the bottom
-			.add_systems(
-				Update,
-				(project_window_to_document, follow_thread_scroll).chain(),
-			);
+		// project each window into its views' documents, then pin to the bottom
+		app.add_systems(
+			Update,
+			(project_window_to_document, follow_thread_scroll).chain(),
+		);
 		// The form's empty-on-submit (`ClearOnSubmit`) and initial focus
 		// (`FocusOnAdd`) are generic `beet_ui` markers spread by the form's rust
 		// template (see `input.rs`); surface scoping is the host's job (it

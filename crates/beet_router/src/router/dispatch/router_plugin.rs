@@ -135,6 +135,9 @@ impl Plugin for RouterPlugin {
 				// the shipped document shell a no-code site wraps its pages in,
 				// requested with `<SiteLayout>`.
 				.register_template::<SiteLayout>()
+				// its chrome-free twin, for an app that wants the theme and
+				// nothing else: `<Router {Layout{template:"AppShell"}}>`.
+				.register_template::<AppShell>()
 				// the machine-readable faces of a site, each an opt-in static
 				// route scoped by where it is declared
 				.register_template::<Robots>()

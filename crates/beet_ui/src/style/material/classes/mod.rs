@@ -118,6 +118,7 @@ pub fn all_rules() -> Vec<Rule> {
 		checkbox_focus(),
 		select_focus(),
 		form_layout(),
+		form_button(),
 		label_field(),
 		input_base(),
 		input_outlined(),

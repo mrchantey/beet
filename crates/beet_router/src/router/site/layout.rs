@@ -30,7 +30,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_ui::prelude::*;
 
 /// Render middleware wrapping every descendant render route in the named
 /// layout template, with the route's content transcluded into the template's

@@ -1012,4 +1012,77 @@ mod test {
 		host.step();
 		(max_offset(&mut host, |offset| offset.x) < after_right).xpect_true();
 	}
+
+	/// A text control inside a labelled, centred content column is hit where its
+	/// value is *painted*, which is the shape every generated form takes: a
+	/// `<main>` centring its children, a `<label>` stacking its key above its
+	/// control, and a bordered `<input>` inside that.
+	///
+	/// Regression for a click landing on the label rather than the control: the
+	/// only cell a test (or a person) can aim at is the one the value is drawn
+	/// in, so the hit-test must resolve the control from it however deeply the
+	/// cascade has inset the box.
+	#[beet_core::test]
+	fn painted_value_cell_hits_its_control() {
+		let mut host = TestHost::sized(UVec2::new(60, 12));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.app.init_resource::<PointerLog>();
+		host.app.add_observer(
+			|ev: On<PointerDown>, mut log: ResMut<PointerLog>| {
+				log.down.push(ev.event_target());
+			},
+		);
+		host.spawn_content(rsx! {
+			<main>
+				<label>"label"<TextField {Value::new("buy milk")}/></label>
+			</main>
+		});
+		host.step();
+		host.step();
+
+		// the cell the value is painted in, found the way a viewer finds it
+		let frame = host.frame_plain();
+		let (row, col) = frame
+			.lines()
+			.enumerate()
+			.find_map(|(row, line)| {
+				line.chars()
+					.collect::<Vec<_>>()
+					.windows(8)
+					.position(|window| {
+						window.iter().collect::<String>() == "buy milk"
+					})
+					.map(|col| (row as u32, col as u32))
+			})
+			.unwrap_or_else(|| panic!("value never painted:\n{frame}"));
+
+		let input = host
+			.app
+			.world_mut()
+			.run_system_once(|elements: ElementQuery| {
+				elements
+					.iter()
+					.find(|view| view.tag() == "input")
+					.map(|view| view.entity)
+			})
+			.unwrap()
+			.unwrap();
+		host.send_input(&sgr(0, col, row, true));
+		host.step();
+		host.send_input(&sgr(0, col, row, false));
+		host.step();
+		host.app
+			.world()
+			.resource::<PointerLog>()
+			.down
+			.contains(&input)
+			.xpect_true();
+		// ...and focuses it, so the next keystroke is an edit of this value
+		host.app
+			.world()
+			.entity(input)
+			.contains::<Focus>()
+			.xpect_true();
+	}
 }
