@@ -46,7 +46,7 @@ async fn reduce(source: &str) -> App {
 		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
 		// the interactive chat scenes resolve
 		.init_plugin::<ThreadUiPlugin>()
-		// resolves each scene's `<CrateCheck features={[".."]}/>` tag
+		// resolves each scene's `<RequireCfg cfg=".."/>` tag
 		.init_plugin::<CrateCheckPlugin>()
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
@@ -77,7 +77,7 @@ fn cli_registration() -> CrateRegistration {
 		.with_skip_prefix()
 }
 
-/// No `<CrateCheck>` failed: its observer reports a missing feature by writing
+/// No `<RequireCfg>` failed: its observer reports a missing feature by writing
 /// `AppExit::error()`, which nothing else here reads, so an undeclared
 /// requirement would otherwise pass silently.
 fn assert_crate_check_passed(app: &mut App) {

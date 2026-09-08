@@ -20,7 +20,7 @@ cargo binstall beet-cli    # or cargo install beet-cli --all-features
 beet --help
 ```
 
-Running an entry is the zero-command path: `beet` discovers a `main.bsx` by walking the cwd and its ancestors, `--main` names an entry file or a directory holding one, and `--features=a,b` verifies the installed binary was compiled with those cargo features (entries also declare their own requirements with `<CrateCheck>`):
+Running an entry is the zero-command path: `beet` discovers a `main.bsx` by walking the cwd and its ancestors, `--main` names an entry file or a directory holding one, and `--features=a,b` verifies the installed binary was compiled with those cargo features (entries also declare their own requirements with `<RequireCfg>`):
 
 ```sh
 beet --main=examples/hello

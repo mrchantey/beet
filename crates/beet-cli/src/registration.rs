@@ -1,8 +1,8 @@
-//! This binary's own compiled surface, as an entry's `<CrateCheck/>` reads it.
+//! This binary's own compiled surface, as an entry's `<RequireCfg/>` reads it.
 use beet::prelude::*;
 
 /// Every feature `beet-cli` can be compiled with, each recorded if enabled, so
-/// an entry's `<CrateCheck/>` and the `--features` flag verify against the
+/// an entry's `<RequireCfg/>` and the `--features` flag verify against the
 /// running binary. Spawned by every entry driver (the native binary, the wasm
 /// binary, the Worker) before the entry loads.
 ///

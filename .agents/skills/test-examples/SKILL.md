@@ -111,7 +111,7 @@ The `examples,ml` feature only gates windowed scene code (now scene modules in `
 
 ### 8. BSX scenes (`beet --main=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead). Every entry documents its own `beet --features=..` command in its header, and entries declare hard requirements with `<CrateCheck>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead). Every entry documents its own `beet --features=..` command in its header, and entries declare hard requirements with `<RequireCfg>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
 
 ```sh
 beet --main=examples/hello                                       # prints "hello world"

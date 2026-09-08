@@ -41,7 +41,7 @@ mod repo_root;
 #[cfg(feature = "bsx")]
 pub use repo_root::*;
 // the one registry-free walk entry resolution reads its pre-scanned declarations
-// (`<RepoRoot>`, `<TemplateDir>`, `<CrateCheck>`, `<Template src>`) from.
+// (`<RepoRoot>`, `<TemplateDir>`, `<RequireCfg>`, `<Template src>`) from.
 #[cfg(feature = "bsx")]
 mod entry_prescan;
 #[cfg(feature = "bsx")]

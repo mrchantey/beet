@@ -45,7 +45,7 @@ An entry loads through its **repo store**, the app's one canonical store (`--rep
 
 An entry that mounts paths outside its own directory declares `<RepoRoot src="../.."/>` (there is no `--root` flag): `src` names a position relative to the entry's location *in its repo store*, not a filesystem directory, so an fs store re-roots at the resolved ancestor while a self-rooted store (a bucket, browser storage) takes a key-prefix view and fails loudly when the root escapes the store. Live reload watches the store's local root when it has one (a self-rooted store watches nothing), and command outputs (`dist/`, `site.pdf`) land beside the entry deliberately.
 
-An entry declares its required features with `<CrateCheck features={["thread", "sockets"]}/>`, which errors when the running binary lacks them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<CrateCheck>` is the verification mechanism.
+An entry declares its build requirements with `<RequireCfg cfg="feature:thread && feature:sockets"/>`, which errors when the running binary does not satisfy them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<RequireCfg>` is the verification mechanism.
 
 ## Downstream binaries
 
@@ -60,7 +60,7 @@ fn main() -> AppExit {
 	env_ext::load_dotenv().ok();
 	let mut app = App::new();
 	app.add_plugins((BeetPlugins, MyCratePlugin, LaunchPlugin));
-	// only the binary knows its own cargo features; an unprefixed `<CrateCheck/>`
+	// only the binary knows its own cargo features; an unprefixed `<RequireCfg/>`
 	// resolves against this
 	app.world_mut()
 		.spawn(crate_registration!({ features: ["my-feature"] }).with_skip_prefix());

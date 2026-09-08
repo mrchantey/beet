@@ -2,7 +2,6 @@
 //! `bx:cfg` still exists and still answers, naming the condition that removed
 //! it instead of vanishing into "unknown route".
 
-use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

@@ -109,35 +109,6 @@ impl EntryPrescan {
 		})
 	}
 
-	/// The string items of a list attribute, empty if absent. Reads the literal
-	/// directly, since the reflect path that would coerce it runs after this
-	/// scan; a non-string item is skipped rather than stringified, keeping the
-	/// two readings of the same markup in step.
-	fn list_attr(element: &BsxElement, key: &str) -> Vec<SmolStr> {
-		element
-			.attributes
-			.iter()
-			.find(|attr| attr.key == key)
-			.and_then(|attr| match &attr.value {
-				AttrValue::Expr(ValueExpr::Literal(DataLiteral::List(
-					items,
-				))) => Some(items),
-				_ => None,
-			})
-			.map(|items| {
-				items
-					.iter()
-					.filter_map(|item| match item {
-						DataLiteral::Scalar(Value::Str(value)) => {
-							Some(value.clone())
-						}
-						_ => None,
-					})
-					.collect()
-			})
-			.unwrap_or_default()
-	}
-
 	/// Whether `src` names a remote endpoint rather than a local path.
 	fn is_remote(src: &str) -> bool {
 		src.starts_with("http://")

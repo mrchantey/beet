@@ -52,7 +52,7 @@ fn build_app() -> App {
 	let mut app = App::new();
 	app.add_plugins((BeetPlugins, cli_plugins, LaunchPlugin));
 	// this binary's cargo features, spawned before the entry loads so its
-	// `<CrateCheck/>` and any `--features` verify against them. The primary
+	// `<RequireCfg/>` and any `--features` verify against them. The primary
 	// registration, ie the one an unprefixed requirement resolves to.
 	app.world_mut().spawn(registration::cli());
 	// the windowed render path's window lifecycle + screenshot harness. The

@@ -854,13 +854,18 @@ mod test {
 		// Tab into the field.
 		host.send_input(b"\t");
 		host.step();
+		// both controls are `<input>` and `ElementQuery` yields archetype order,
+		// so the text one is named by its lack of a `type`, not by being first.
 		let text_field = host
 			.app
 			.world_mut()
 			.run_system_once(|elements: ElementQuery| {
 				elements
 					.iter()
-					.find(|view| view.tag() == "input")
+					.find(|view| {
+						view.tag() == "input"
+							&& view.attribute("type").is_none()
+					})
 					.map(|view| view.entity)
 			})
 			.unwrap()

@@ -16,7 +16,7 @@ use beet_net::prelude::*;
 /// decides what runs. This plugin is what finds and builds that document.
 ///
 /// The binary spawns its own [`CrateRegistration`] before `run`, marked
-/// [`with_skip_prefix`](CrateRegistration::with_skip_prefix): a `<CrateCheck/>`
+/// [`with_skip_prefix`](CrateRegistration::with_skip_prefix): a `<RequireCfg/>`
 /// naming an unprefixed feature resolves against it, and only the binary knows
 /// which cargo features it was compiled with. A binary that spawns none fails
 /// any unprefixed check with a message saying so.
