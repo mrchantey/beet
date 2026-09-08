@@ -56,8 +56,8 @@ struct ExportPdfParams {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<(ExportPdfParams, EntryParams)>())]
-pub async fn ExportPdf(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input.request_parts();
+pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
+	let parts = &cx.input;
 	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(

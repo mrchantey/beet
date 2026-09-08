@@ -31,7 +31,7 @@ const SUITE_DEADLINE: Duration = Duration::from_secs(600);
 /// Serve `runner_dir`, drive a headless browser at it, stream the console and
 /// propagate the module's exit code.
 pub(crate) async fn run(
-	cx: &ActionContext<Request>,
+	cx: &ActionContext<RequestParts>,
 	runner_dir: &Path,
 	bootstrap: &BootstrapConfig,
 	args: Vec<String>,

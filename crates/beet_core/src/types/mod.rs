@@ -2,6 +2,8 @@
 
 mod value;
 pub use value::*;
+mod literal;
+pub use literal::*;
 mod field_path;
 pub use field_path::*;
 mod on_missing;

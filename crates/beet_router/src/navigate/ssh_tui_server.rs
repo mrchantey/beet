@@ -1183,7 +1183,9 @@ mod test {
 	//
 	// ================================================================
 
-	#[cfg(feature = "ssh_stress")]
+	// native-only: the harness binds a real listener and drives russh clients on
+	// their own threads, none of which a wasm module has.
+	#[cfg(all(feature = "ssh_stress", not(target_arch = "wasm32")))]
 	mod stress {
 		use super::*;
 

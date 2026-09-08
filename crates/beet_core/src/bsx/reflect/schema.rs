@@ -18,6 +18,10 @@
 use crate::bsx::resolve::is_directive;
 use crate::prelude::*;
 use bevy::ecs::template::TemplateContext;
+use bevy::reflect::TypeInfo;
+use bevy::reflect::TypeRegistration;
+use bevy::reflect::TypeRegistry;
+use core::any::TypeId;
 
 /// Verify the props supplied to `tag` against its registered prop schema.
 ///
@@ -38,7 +42,14 @@ pub(in crate::bsx) fn verify_props(
 	let Some(schema) = ValueSchema::template_by_name(app_registry, tag) else {
 		return Ok(());
 	};
-	verify_props_against(el, tag, &schema, cx)
+	let mut props = props_value(el);
+	// a Rust template names each prop's type, so an authored spelling (a
+	// `"30s"` duration, a `"guestbook.*"` glob, a `"false"` bool) parses here,
+	// before the structural validation below, which only knows the type's
+	// STRUCTURE and would reject the very form the coercion layer was written
+	// to accept.
+	let parsed = parse_literal_props(&app_registry.read(), tag, &mut props)?;
+	validate_props(tag, &schema, props, &parsed, cx)
 }
 
 /// Verify a tag's props against an explicit `schema`, the shared path for both a
@@ -54,6 +65,20 @@ pub(in crate::bsx) fn verify_props_against(
 	schema: &ValueSchema,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
+	// a BSX-authored template is typed by its `bx:schema` block alone, so there
+	// are no Rust prop types to parse an authored spelling into.
+	validate_props(tag, schema, props_value(el), &default(), cx)
+}
+
+/// Validate `props` against `schema`, skipping the `parsed` keys a
+/// [`LiteralParser`] already accepted.
+fn validate_props(
+	tag: &str,
+	schema: &ValueSchema,
+	mut props: Value,
+	parsed: &HashSet<SmolStr>,
+	cx: &mut TemplateContext,
+) -> Result<()> {
 	// resolve composable references against the schema registry snapshot.
 	let mut resolved = cx
 		.entity
@@ -64,13 +89,16 @@ pub(in crate::bsx) fn verify_props_against(
 	// forwarded rather than rejected, so prop validation permits extra keys.
 	if let ValueSchema::Struct(struct_schema) = &mut resolved {
 		struct_schema.allow_additional = true;
+		// a prop its type's parser already accepted is settled: its authored
+		// spelling is not its structure, so the structural field would reject
+		// the very form the coercion layer was written for.
+		struct_schema
+			.fields
+			.retain(|field| !parsed.contains(field.key.as_str()));
 	}
-	let mut props = props_value(el);
-	// every markup attribute arrives as a string, and the apply layer coerces a
-	// `"true"`/`"false"` onto a `bool` field (see `reflect.rs`), so validation reads
-	// it the same way — otherwise `<RouteSidebar home="false"/>` is rejected before
-	// the coercion it was written for can run.
-	coerce_bool_props(&resolved, &mut props);
+	if let Value::Map(map) = &mut props {
+		map.0.retain(|key, _| !parsed.contains(key.as_str()));
+	}
 	// `validate` is async-shaped but resolves in one poll without an executor, so
 	// `try_block_on` drives it on both std and no_std.
 	let errors = async_ext::try_block_on(resolved.validate(&mut props))?;
@@ -86,34 +114,68 @@ pub(in crate::bsx) fn verify_props_against(
 	}
 }
 
-/// Rewrite each `"true"`/`"false"` prop whose schema expects a `bool` into a
-/// [`Value::Bool`], so validation accepts the string form markup can express.
+/// Parse each authored prop through its field type's [`LiteralParser`],
+/// returning the keys that parsed.
 ///
-/// Only the top level, and only a bool-schema field: a string prop stays a
-/// string, and a malformed value is left alone so validation names it.
-fn coerce_bool_props(schema: &ValueSchema, props: &mut Value) {
-	let (ValueSchema::Struct(struct_schema), Value::Map(map)) = (schema, props)
-	else {
-		return;
+/// The prop-verification end of the seam contract: a parser that accepts the
+/// value settles the prop, one that errors is an authoring failure carrying the
+/// parser's message, and one that declines (or a type with no entry) leaves the
+/// prop to structural validation, so a `GlobFilter` struct literal still
+/// validates the old way.
+fn parse_literal_props(
+	registry: &TypeRegistry,
+	tag: &str,
+	props: &mut Value,
+) -> Result<HashSet<SmolStr>> {
+	let mut parsed = HashSet::default();
+	let (Value::Map(map), Some(TypeInfo::Struct(info))) = (
+		props,
+		ReflectTemplate::registration_named(registry, tag)
+			.map(TypeRegistration::type_info),
+	) else {
+		return Ok(parsed);
 	};
-	for field in &struct_schema.fields {
-		// `Option<bool>` is a bool field that also accepts null
-		let is_bool = match &field.schema {
-			ValueSchema::Bool(_) => true,
-			ValueSchema::Optional(inner) => {
-				matches!(**inner, ValueSchema::Bool(_))
-			}
-			_ => false,
-		};
-		if !is_bool {
+	for (key, value) in map.0.iter() {
+		let Some(type_id) = info
+			.field(key.as_str())
+			.and_then(|field| field.type_info())
+			.map(prop_target)
+		else {
 			continue;
+		};
+		match LiteralParser::parse_type(type_id, value) {
+			Ok(Some(_)) => {
+				parsed.insert(key.clone());
+			}
+			Ok(None) => {}
+			Err(err) => bevybail!(
+				"template `{tag}` prop validation failed: `{key}`: {err}"
+			),
 		}
-		if let Ok(Value::Str(string)) = map.get(field.key.as_str()) {
-			match string.as_str().trim() {
-				"true" => map.insert(field.key.clone(), Value::Bool(true)),
-				"false" => map.insert(field.key.clone(), Value::Bool(false)),
-				_ => continue,
-			};
+	}
+	Ok(parsed)
+}
+
+/// The [`TypeId`] a prop's authored value must parse into: the field's own
+/// type with the `PropOpt`/`Option` wrappers a `#[template]` signature adds
+/// peeled off, since neither changes how the value is spelled.
+fn prop_target(mut info: &'static TypeInfo) -> TypeId {
+	loop {
+		let inner = match info {
+			TypeInfo::TupleStruct(tuple)
+				if tuple
+					.type_path_table()
+					.short_path()
+					.starts_with("PropOpt<")
+					&& tuple.field_len() == 1 =>
+			{
+				tuple.field_at(0).and_then(|field| field.type_info())
+			}
+			_ => reflect_ext::option_some_inner(info),
+		};
+		match inner {
+			Some(inner) => info = inner,
+			None => return info.type_id(),
 		}
 	}
 }
@@ -344,51 +406,84 @@ mod test {
 		map.0.get("count").unwrap().clone().xpect_eq(Value::Int(3));
 	}
 
-	/// A markup attribute is always a string, so a `bool` prop must validate in
-	/// the `"true"`/`"false"` form the apply layer coerces, eg
-	/// `<RouteSidebar home="false"/>`.
+	/// A template's prop types, registered by short path exactly as
+	/// `registration_named` resolves them.
+	#[derive(Reflect, Default)]
+	struct Widget {
+		home: bool,
+		expanded: PropOpt<bool>,
+		label: String,
+		read: GlobFilter,
+		duration: Option<core::time::Duration>,
+	}
+
+	fn prop_registry() -> TypeRegistry {
+		let mut registry = TypeRegistry::default();
+		registry.register::<Widget>();
+		registry
+	}
+
+	/// Parse the props of a `<Widget ..>` element through the pre-pass.
+	fn parse_widget_props(
+		attrs: &[(&str, AttrValue)],
+	) -> Result<HashSet<SmolStr>> {
+		parse_literal_props(
+			&prop_registry(),
+			"Widget",
+			&mut props_value(&element(attrs)),
+		)
+	}
+
+	/// A markup attribute is always a string, so a prop must verify in the form
+	/// the apply layer coerces: a `"true"`/`"false"` bool
+	/// (`<RouteSidebar home="false"/>`), a `"30s"` duration, and a bare glob
+	/// pattern, each settled by its type's parser rather than rejected by the
+	/// structural field it does not look like.
 	#[crate::test]
-	fn bool_props_coerce_from_strings() {
-		let schema = ValueSchema::Struct(StructSchema {
-			name: None,
-			description: None,
-			allow_additional: true,
-			fields: vec![
-				NamedFieldSchema::new("home", ValueSchema::Bool(default())),
-				NamedFieldSchema::new(
-					"expanded",
-					ValueSchema::Optional(Box::new(ValueSchema::Bool(
-						default(),
-					))),
-				),
-				NamedFieldSchema::new("label", ValueSchema::String(default())),
-			],
-		});
-		let mut props = props_value(&element(&[
+	fn authored_spellings_verify() {
+		parse_widget_props(&[
 			("home", AttrValue::Str("false".into())),
 			("expanded", AttrValue::Str("true".into())),
 			("label", AttrValue::Str("true".into())),
-		]));
-		coerce_bool_props(&schema, &mut props);
-		let Value::Map(map) = props else {
-			panic!("expected map");
-		};
-		map.0
-			.get("home")
-			.unwrap()
-			.clone()
-			.xpect_eq(Value::Bool(false));
-		map.0
-			.get("expanded")
-			.unwrap()
-			.clone()
-			.xpect_eq(Value::Bool(true));
-		// a string field is left alone, even spelling a bool
-		map.0
-			.get("label")
-			.unwrap()
-			.clone()
-			.xpect_eq(Value::Str("true".into()));
+			("read", AttrValue::Str("guestbook.*".into())),
+			("duration", AttrValue::Str("30s".into())),
+		])
+		.unwrap()
+		.len()
+		.xpect_eq(5);
+	}
+
+	/// A prop shape the parser DECLINES is left to structural validation, so a
+	/// `GlobFilter` struct literal still validates the old way.
+	#[crate::test]
+	fn a_declined_prop_stays_structural() {
+		parse_widget_props(&[(
+			"read",
+			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Struct(vec![(
+				"exclude".into(),
+				DataLiteral::List(vec![DataLiteral::Scalar(Value::Str(
+					"blog/**".into(),
+				))]),
+			)]))),
+		)])
+		.unwrap()
+		.is_empty()
+		.xpect_true();
+	}
+
+	/// A malformed authored value is a verification failure carrying the
+	/// parser's own message, not a fallthrough to a structural check that would
+	/// pass it (the schema of a `Duration` prop is a plain string).
+	#[crate::test]
+	fn a_malformed_prop_names_itself() {
+		parse_widget_props(&[("duration", AttrValue::Str("30".into()))])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("invalid duration");
+		parse_widget_props(&[("home", AttrValue::Str("yes".into()))])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("invalid bool");
 	}
 
 	#[crate::test]

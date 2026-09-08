@@ -278,7 +278,14 @@ mod stalled_store_test {
 			// the server owns the boot, the analytics router is its dispatch child
 			app.world_mut().spawn((server, on_spawn, children![(
 				Router,
-				AnalyticsConfig::default(),
+				// every event flushes as it arrives: the buffer's default
+				// 64KB/60s thresholds would park these forty tiny events in
+				// memory, so the store is never reached and the invariant under
+				// test is never exercised.
+				AnalyticsConfig {
+					segment_max_bytes: 1,
+					..default()
+				},
 				StoreRef(store),
 				AnalyticsMiddleware::default(),
 				children![render_action::fixed_func_route("about", || rsx! {

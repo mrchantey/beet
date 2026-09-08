@@ -3,8 +3,10 @@ use crate::prelude::*;
 use alloc::boxed::Box;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::ReflectFromReflect;
+use bevy_reflect::TypeInfo;
 use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
+use bevy_reflect::enums::VariantInfo;
 
 /// Attempts to clone a [`PartialReflect`] value using various methods.
 ///
@@ -30,6 +32,25 @@ pub fn clone_reflect_value(
 				.map(PartialReflect::into_partial_reflect)
 				.unwrap_or_else(|| value.to_dynamic())
 		})
+}
+
+/// The `Some` variant's inner [`TypeInfo`] when `info` is an `Option<T>`, else
+/// `None`.
+///
+/// Every seam that reads a *declared* type has to see through the wrapper: an
+/// `Option<u16>` port is authored, validated and documented as a `u16`, its
+/// optionality carried by whether the value is present at all.
+pub fn option_some_inner(info: &TypeInfo) -> Option<&'static TypeInfo> {
+	let TypeInfo::Enum(info) = info else {
+		return None;
+	};
+	if !info.type_path().starts_with("core::option::Option<") {
+		return None;
+	}
+	match info.variant("Some")? {
+		VariantInfo::Tuple(tuple) => tuple.field_at(0)?.type_info(),
+		_ => None,
+	}
 }
 
 /// Look up a registered type by the name a human wrote, whether in markup or in

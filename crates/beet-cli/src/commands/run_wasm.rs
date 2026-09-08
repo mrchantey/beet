@@ -120,8 +120,8 @@ impl fmt::Display for WasmHost {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>())]
-pub async fn RunWasm(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input.request_parts();
+pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
+	let parts = &cx.input;
 	let mut cli = parts.to_cli_args();
 	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
 	// are the absolute binary path (split on `/`) followed by any positional module

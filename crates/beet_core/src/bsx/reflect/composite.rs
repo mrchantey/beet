@@ -2,7 +2,6 @@
 //! reflected value, recursing into each item or field against the target's info.
 
 use super::literal::*;
-use super::scalar::*;
 use crate::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
@@ -15,7 +14,6 @@ use bevy::reflect::list::DynamicList;
 use bevy::reflect::structs::DynamicStruct;
 use bevy::reflect::tuple::DynamicTuple;
 use bevy::reflect::tuple_struct::DynamicTupleStruct;
-use core::any::TypeId;
 
 /// Build a [`DynamicList`] (or a [`DynamicArray`] for an array-typed field, eg
 /// `host: [u8; 4]`) from items, recursing per the collection's item info.
@@ -25,27 +23,19 @@ pub(super) fn list_to_reflect(
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
 ) -> Result<Box<dyn PartialReflect>> {
-	// a list of patterns targeting a `GlobFilter` field builds the filter from
-	// them as includes, so an allowlist authors as the list it reads like:
-	// `{ScriptConfig{read:["guestbook.*","Text"]}}`. Its patterns are a
-	// private `Vec<GlobPattern>`, so field-by-field reflect construction cannot
-	// reach them.
+	// a list of scalars targeting a field type with its own authored spelling
+	// builds through it, so an allowlist authors as the list it reads like:
+	// `{ScriptConfig{read:["guestbook.*","Text"]}}` is one `GlobFilter`, whose
+	// patterns are a private `Vec<GlobPattern>` field-by-field construction
+	// cannot reach. A non-scalar item, or a parser that declines the list,
+	// falls to the structural walk below.
 	if let Some(info) = field_info
-		&& info.type_id() == TypeId::of::<GlobFilter>()
+		&& let Some(values) =
+			items.iter().map(scalar_value).collect::<Option<Vec<_>>>()
+		&& let Some(reflected) =
+			LiteralParser::parse_type(info.type_id(), &Value::List(values))?
 	{
-		let patterns = items
-			.iter()
-			.map(|item| match item {
-				DataLiteral::Scalar(Value::Str(pattern)) => {
-					pattern.as_str().xok()
-				}
-				other => bevybail!(
-					"invalid glob pattern {other:?}: expected a string"
-				),
-			})
-			.collect::<Result<Vec<_>>>()?;
-		return glob_filter(patterns)
-			.map(|filter| Box::new(filter) as Box<dyn PartialReflect>);
+		return Ok(reflected);
 	}
 	let item_info = match field_info {
 		Some(TypeInfo::List(info)) => info.item_info(),
@@ -69,6 +59,16 @@ pub(super) fn list_to_reflect(
 	}
 	list.set_represented_type(field_info);
 	Ok(Box::new(list))
+}
+
+/// The [`Value`] a list item carries when it is a plain scalar, for the
+/// parser lookup above. `None` for any richer shape, which has no `Value`
+/// form and so goes structural.
+fn scalar_value(item: &DataLiteral) -> Option<Value> {
+	match item {
+		DataLiteral::Scalar(value) => Some(value.clone()),
+		_ => None,
+	}
 }
 
 /// Build a [`DynamicStruct`] from named fields, recursing per field info.

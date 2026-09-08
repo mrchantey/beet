@@ -351,7 +351,14 @@ impl Plugin for InfraPlugin {
 	}
 }
 
-#[cfg(all(test, feature = "mail", feature = "deploy"))]
+// native-only, matching the deploy/mail verbs the plugin registers: those types
+// do not exist in a wasm build, so their tag tests cannot either.
+#[cfg(all(
+	test,
+	feature = "mail",
+	feature = "deploy",
+	not(target_arch = "wasm32")
+))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

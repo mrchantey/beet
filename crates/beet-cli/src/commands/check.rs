@@ -30,8 +30,8 @@ struct CheckParams {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<(CheckParams, EntryParams)>())]
-pub async fn Check(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input.request_parts();
+pub async fn Check(cx: ActionContext<RequestParts>) -> Result<Response> {
+	let parts = &cx.input;
 	let params = parts.params().parse_reflect::<CheckParams>()?;
 	let root = build_entry(
 		&cx.caller,

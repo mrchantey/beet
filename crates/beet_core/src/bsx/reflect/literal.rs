@@ -19,9 +19,7 @@ use bevy::reflect::TypeRegistration;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::enums::DynamicEnum;
 use bevy::reflect::enums::DynamicVariant;
-use bevy::reflect::enums::VariantInfo;
 use bevy::reflect::tuple::DynamicTuple;
-use core::any::TypeId;
 
 /// Resolves a `$name` entity reference to a concrete (possibly forward-mapped)
 /// [`Entity`], threaded through nested literals so a spread component's
@@ -41,7 +39,8 @@ impl DataLiteral {
 		// an `Option<T>` target wraps a plain value into `Some`: `title="x"` on an
 		// `Option<String>` field resolves to `Some("x")`. An explicit `Some`/`None`
 		// literal falls through to the ordinary enum path.
-		if let Some(some_info) = option_some_inner(field_info)
+		if let Some(some_info) =
+			field_info.and_then(reflect_ext::option_some_inner)
 			&& !is_option_literal(literal)
 		{
 			let inner = DataLiteral::to_reflect(
@@ -57,14 +56,15 @@ impl DataLiteral {
 			option.set_represented_type(field_info);
 			return Ok(Box::new(option));
 		}
-		// a `Name` target builds via `Name::new` from its single string, whether
-		// authored as a bare scalar (`name: "x"`) or the tuple form (`<Name("x")/>`,
-		// `{Name("x")}`); its hashed inner field cannot be reflect-built field-by-field.
+		// a named tuple literal wrapping ONE scalar (`<Name("x")/>`, `{Name("x")}`)
+		// reduces to that scalar for a target whose type carries its own authored
+		// spelling, so the parser sees the string the markup writes: a `Name`'s
+		// hashed inner field cannot be reflect-built field-by-field.
 		if let Some(info) = field_info
-			&& info.type_id() == TypeId::of::<Name>()
-			&& let Some(string) = name_literal_str(literal)
+			&& LiteralParser::get(info.type_id()).is_some()
+			&& let Some(value) = tuple_scalar(literal)
 		{
-			return scalar_to_reflect(&Value::Str(string.into()), field_info);
+			return scalar_to_reflect(value, field_info);
 		}
 		match literal {
 			DataLiteral::Scalar(value) => scalar_to_reflect(value, field_info),
@@ -82,41 +82,20 @@ impl DataLiteral {
 	}
 }
 
-/// The `Some` variant's inner [`TypeInfo`] when `field_info` is an
-/// `Option<T>` enum, else `None`.
-fn option_some_inner(
-	field_info: Option<&'static TypeInfo>,
-) -> Option<&'static TypeInfo> {
-	let TypeInfo::Enum(info) = field_info? else {
-		return None;
-	};
-	if !info.type_path().starts_with("core::option::Option<") {
-		return None;
-	}
-	match info.variant("Some")? {
-		VariantInfo::Tuple(tuple) => tuple.field_at(0)?.type_info(),
-		_ => None,
-	}
-}
-
 /// Whether a literal already names an `Option` variant (`Some`/`None`).
 fn is_option_literal(literal: &DataLiteral) -> bool {
 	matches!(literal, DataLiteral::Enum(named) if named.name == "Some" || named.name == "None")
 }
 
-/// The string a `Name` literal carries: a bare string scalar (`"x"`), or the
-/// single-string tuple form (`Name("x")`). `None` for any other shape, so it
-/// falls through to the ordinary path.
-fn name_literal_str(literal: &DataLiteral) -> Option<&str> {
-	match literal {
-		DataLiteral::Scalar(Value::Str(string)) => Some(string.as_str()),
-		DataLiteral::Enum(named) => match &named.fields {
-			NamedFields::Tuple(items) if items.len() == 1 => match &items[0] {
-				DataLiteral::Scalar(Value::Str(string)) => {
-					Some(string.as_str())
-				}
-				_ => None,
-			},
+/// The scalar a single-item named tuple literal wraps (`Name("x")`). `None` for
+/// any other shape, which falls through to the ordinary path.
+fn tuple_scalar(literal: &DataLiteral) -> Option<&Value> {
+	let DataLiteral::Enum(named) = literal else {
+		return None;
+	};
+	match &named.fields {
+		NamedFields::Tuple(items) if items.len() == 1 => match &items[0] {
+			DataLiteral::Scalar(value) => Some(value),
 			_ => None,
 		},
 		_ => None,
@@ -270,29 +249,29 @@ mod test {
 
 	/// A shape with more to say than a kind is written as a JSON Schema, which
 	/// is the schema language a document author is likeliest to already know.
+	#[cfg(feature = "json")]
 	#[crate::test]
 	fn coerces_a_json_schema_to_a_value_schema() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
 		struct Declaration {
 			schema: ValueSchema,
 		}
-		resolve::<Declaration>(schema_literal(
-			r#"{"type":"array","items":{"type":"integer"}}"#,
-		))
-		.schema
-		.xpect_eq(
-			json_schema(r#"{"type":"array","items":{"type":"integer"}}"#)
+		let source = r#"{"type":"array","items":{"type":"integer"}}"#;
+		resolve::<Declaration>(schema_literal(source))
+			.schema
+			.xpect_eq(
+				ValueSchema::from_json_value(
+					&serde_json::from_str(source).unwrap(),
+				)
 				.unwrap(),
-		);
+			);
 	}
 
 	/// A misspelled kind names the ones that exist rather than becoming a
 	/// wildcard that quietly validates nothing.
 	#[crate::test]
 	fn an_unknown_schema_names_the_kinds() {
-		value_schema("uint64")
-			.unwrap_err()
-			.to_string()
+		resolve_err::<ValueSchema>(DataLiteral::Scalar(Value::str("uint64")))
 			.xpect_contains("unknown schema")
 			.xpect_contains("\"u64\"");
 	}
@@ -306,6 +285,18 @@ mod test {
 				DataLiteral::Scalar(Value::Str(source.into())),
 			)]),
 		})
+	}
+
+	/// The message a literal that cannot resolve against `T` reports.
+	fn resolve_err<T: Typed>(literal: DataLiteral) -> String {
+		DataLiteral::to_reflect(
+			&literal,
+			Some(T::type_info()),
+			&TypeRegistry::default(),
+			&mut |_: &str| Entity::PLACEHOLDER,
+		)
+		.unwrap_err()
+		.to_string()
 	}
 
 	fn resolve<T: FromReflect + Typed>(literal: DataLiteral) -> T {
@@ -366,7 +357,9 @@ mod test {
 	}
 
 	/// ..but only a struct that wraps ONE string: a second field means the
-	/// string cannot say which one it is, so the coercion must not guess.
+	/// string cannot say which one it is, so the coercion must not guess, and
+	/// must say so, since a `String` fallthrough would miss in `from_reflect`
+	/// and leave the target at its default.
 	#[crate::test]
 	fn does_not_coerce_string_to_a_wider_struct() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
@@ -374,16 +367,9 @@ mod test {
 			label: SmolStr,
 			other: SmolStr,
 		}
-		let registry = TypeRegistry::default();
-		let mut resolver = |_: &str| Entity::PLACEHOLDER;
-		let reflected = DataLiteral::to_reflect(
-			&DataLiteral::Scalar(Value::Str("net".into())),
-			Some(Pair::type_info()),
-			&registry,
-			&mut resolver,
-		)
-		.unwrap();
-		Pair::from_reflect(reflected.as_ref()).xpect_none();
+		resolve_err::<Pair>(DataLiteral::Scalar(Value::Str("net".into())))
+			.xpect_contains("cannot author")
+			.xpect_contains("Pair");
 	}
 
 	/// A nested struct literal names only the fields it cares about, the rest
@@ -625,7 +611,6 @@ mod test {
 		// the unit is required
 		Duration::from_human_str("50").xpect_none();
 		Duration::from_human_str("50years").xpect_none();
-		coerce_duration(&Value::Uint(50)).xpect_none();
 		// a malformed value targeting a `Duration` field errors, rather than
 		// silently falling through to a value that cannot apply
 		let registry = TypeRegistry::default();

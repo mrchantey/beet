@@ -35,8 +35,10 @@ struct ScreenshotParams {
 // `CaptureScreenshot` not `Screenshot`: bevy's render stack registers its own
 // `Screenshot` component under the render features, and two short type paths
 // cannot share a tag
-pub async fn CaptureScreenshot(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input.request_parts();
+pub async fn CaptureScreenshot(
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let parts = &cx.input;
 	let params = parts.params().parse_reflect::<ScreenshotParams>()?;
 	// like `run-wasm`, the greedy capture keeps the url as intact trailing
 	// segments; rejoin and drop the command segment

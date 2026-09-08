@@ -70,21 +70,23 @@ pub fn write_field_from_value(
 	};
 	let registry = world.resource::<AppTypeRegistry>().clone();
 	let registry = registry.read();
-	let Some(mut component) =
-		reflect_component.reflect_mut(world.entity_mut(target))
-	else {
-		return;
-	};
 	// the bound field's current type, so the Value resolves to the concrete type.
-	let Ok(field) = component.reflect_path(access) else {
-		return;
+	let field_type_id = reflect_component
+		.reflect(world.entity(target))
+		.and_then(|component| component.reflect_path(access).ok())
+		.and_then(|field| field.get_represented_type_info())
+		.map(|info| info.type_id());
+	let patch = match value_to_reflect(&value, field_type_id, &registry) {
+		Ok(Some(patch)) => patch,
+		Ok(None) => return,
+		// a malformed authored value (a unit-less duration typed into a bound
+		// `Duration` field) is the human's, so it is raised rather than dropped.
+		Err(err) => return world.handle_command_error::<Value>(err),
 	};
-	let field_type_id =
-		field.get_represented_type_info().map(|info| info.type_id());
-	let Some(patch) = value_to_reflect(&value, field_type_id, &registry) else {
-		return;
-	};
-	if let Ok(field_mut) = component.reflect_path_mut(access) {
+	if let Some(mut component) =
+		reflect_component.reflect_mut(world.entity_mut(target))
+		&& let Ok(field_mut) = component.reflect_path_mut(access)
+	{
 		field_mut.apply(patch.as_ref());
 	}
 }
@@ -123,19 +125,82 @@ pub fn reflect_to_value(
 	Value::from_serde(serializer).ok()
 }
 
-/// Deserialize a [`Value`] into a reflected value of `type_id` via reflect serde,
-/// bridging through `serde_json::Value` so no private deserializer is needed.
+/// Deserialize a [`Value`] into a reflected value of `type_id`, taking the
+/// type's authored spelling first and its reflect serde otherwise.
+///
+/// The write-back end of the seam contract: a [`LiteralParser`] that accepts
+/// the value wins, so a human typing `"30s"` into a bound `Duration` field
+/// means that duration (serde refuses it); one that declines, or a type with no
+/// entry, continues into the deserializer, so a structural [`Value::Map`] never
+/// shadows serde. The read direction ([`reflect_to_value`]) stays serde.
+///
+/// Serde bridges through `serde_json::Value` so no private deserializer is
+/// needed, and a value it cannot read is `Ok(None)` rather than an error, as
+/// a binding syncs every pass.
 pub fn value_to_reflect(
 	value: &Value,
 	type_id: Option<TypeId>,
 	registry: &bevy::reflect::TypeRegistry,
-) -> Option<Box<dyn bevy::reflect::PartialReflect>> {
+) -> Result<Option<Box<dyn bevy::reflect::PartialReflect>>> {
 	use serde::de::DeserializeSeed;
-	let registration = registry.get(type_id?)?;
-	let json = serde_json::to_value(value).ok()?;
-	let deserializer = bevy::reflect::serde::TypedReflectDeserializer::new(
-		registration,
-		registry,
-	);
-	deserializer.deserialize(json).ok()
+	let Some(type_id) = type_id else {
+		return Ok(None);
+	};
+	if let Some(reflected) = LiteralParser::parse_type(type_id, value)? {
+		return Ok(Some(reflected));
+	}
+	// serde needs the type registered; the parser above does not.
+	let Some(registration) = registry.get(type_id) else {
+		return Ok(None);
+	};
+	let json = serde_json::to_value(value)?;
+	bevy::reflect::serde::TypedReflectDeserializer::new(registration, registry)
+		.deserialize(json)
+		.ok()
+		.xok()
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	use bevy::reflect::FromReflect;
+	use bevy::reflect::TypeRegistry;
+	use core::time::Duration;
+
+	/// A human typing an authored spelling into a bound field means what they
+	/// wrote: serde refuses `"30s"` for a `Duration`, whose structural form is
+	/// a seconds/nanos pair.
+	#[crate::test]
+	fn writes_back_an_authored_spelling() {
+		let registry = TypeRegistry::default();
+		value_to_reflect(
+			&Value::str("30s"),
+			Some(TypeId::of::<Duration>()),
+			&registry,
+		)
+		.unwrap()
+		.map(|reflected| Duration::from_reflect(reflected.as_ref()).unwrap())
+		.xpect_eq(Some(Duration::from_secs(30)));
+		// a malformed one is reported, never silently dropped
+		value_to_reflect(
+			&Value::str("30"),
+			Some(TypeId::of::<Duration>()),
+			&registry,
+		)
+		.xpect_err();
+	}
+
+	/// A parser that declines the shape continues into serde, so a structural
+	/// value never loses to a partial parser.
+	#[crate::test]
+	fn a_declined_shape_falls_through_to_serde() {
+		value_to_reflect(
+			&Value::Bool(true),
+			Some(TypeId::of::<bool>()),
+			&TypeRegistry::default(),
+		)
+		.unwrap()
+		.map(|reflected| bool::from_reflect(reflected.as_ref()).unwrap())
+		.xpect_eq(Some(true));
+	}
 }

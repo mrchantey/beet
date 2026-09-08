@@ -224,7 +224,8 @@ impl ParamMeta {
 		Self {
 			key: field.name().to_kebab_case(),
 			value,
-			type_path: kind_from_type_path(type_path),
+			type_path: authored_kind(field)
+				.unwrap_or_else(|| kind_from_type_path(type_path)),
 			options: ParamOptions::from_reflect(field),
 			required,
 		}
@@ -315,6 +316,22 @@ impl ParamValue {
 			Self::Multiple => "alloc::vec::Vec<alloc::string::String>",
 		}
 	}
+}
+
+/// How `field`'s type is WRITTEN, when its [`LiteralParser`] says, so a
+/// `--created` flag documents itself as `a YYYY-MM-DD date` rather than as
+/// `beet_core::utils::timestamp::Timestamp`.
+///
+/// `None` for a type with no parser or no hint, which falls back to the type
+/// path: for a structural type that path is the only clue to what to write.
+fn authored_kind(field: &bevy::reflect::NamedField) -> Option<String> {
+	// an `Option<T>` param is written exactly as its `T`, its optionality being
+	// whether the flag is there at all.
+	let type_id = field
+		.type_info()
+		.and_then(reflect_ext::option_some_inner)
+		.map_or_else(|| field.type_id(), TypeInfo::type_id);
+	LiteralParser::get(type_id)?.hint().map(str::to_string)
 }
 
 /// The concrete type path shown as a param's `kind`, with a `core::option::Option<..>`
@@ -418,6 +435,35 @@ mod test {
 		package
 			.to_string()
 			.xpect_contains("kind: alloc::string::String");
+	}
+
+	/// A field whose type is AUTHORED as text documents itself that way, since
+	/// its Rust path says nothing about what to type. Through an `Option`
+	/// wrapper too, which changes only whether the flag is required.
+	#[beet_core::test]
+	fn from_field_prefers_the_authored_spelling() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Params {
+			timeout: core::time::Duration,
+			created: Option<Timestamp>,
+			label: String,
+		}
+		let TypeInfo::Struct(info) = Params::type_info() else {
+			panic!("expected struct");
+		};
+		let by_name =
+			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
+		by_name("timeout")
+			.type_path()
+			.xpect_eq("a unit-suffixed duration, eg \"30s\"");
+		by_name("created")
+			.type_path()
+			.xpect_eq("a `YYYY-MM-DD` date");
+		// a type whose own name says how it is written keeps its path
+		by_name("label")
+			.type_path()
+			.xpect_eq("alloc::string::String");
 	}
 
 	#[beet_core::test]
