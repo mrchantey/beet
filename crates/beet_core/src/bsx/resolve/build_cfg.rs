@@ -445,7 +445,7 @@ fn prune_nodes(
 					"`bx:cfg` excluded `<{}>`: `{source}` is false in this build",
 					el.tag
 				);
-				kept.push(tombstone(el, source));
+				kept.extend(tombstones(el, source));
 				continue;
 			}
 		}
@@ -456,22 +456,71 @@ fn prune_nodes(
 	Ok(kept)
 }
 
-/// The node an excluded element is replaced by: a childless
-/// `<CfgExcluded condition=".." tag=".." path=".."/>`.
+/// The nodes an excluded element is replaced by: one childless
+/// `<CfgExcluded condition=".." tag=".." path=".."/>` per ADDRESSABLE node on
+/// the excluded branch's frontier.
 ///
-/// Emitted as a synthetic element rather than spawned directly so it resolves
+/// Emitted as synthetic elements rather than spawned directly so they resolve
 /// through the same uppercase-tag path as any other component, which keeps the
 /// build walk unaware that exclusion exists.
-fn tombstone(el: &BsxElement, condition: &str) -> BsxNode {
+///
+/// # Why the frontier rather than just the excluded node
+///
+/// A tombstone is only useful to a host if it can be addressed, which for
+/// `beet_router` means the element declared a `path`. Excluding a `<Route>`
+/// directly gives one; excluding a `<Fragment>` that GROUPS several routes
+/// would give a pathless one and lose every route under it.
+///
+/// That would make the grouping form strictly worse than repeating the
+/// condition on each route, which is a bad reason to write markup one way. So
+/// the walk descends through the pathless nodes of an excluded branch and
+/// leaves a tombstone at each addressable one it meets, stopping there rather
+/// than going deeper. Both forms then behave identically and the author picks
+/// on readability, which is the only thing that should decide it.
+///
+/// Reading attributes to find the frontier costs nothing and runs no effect:
+/// this walk touches the syntax tree only. It is BUILDING an excluded node that
+/// must not happen, and none of them is built.
+fn tombstones(el: &BsxElement, condition: &str) -> Vec<BsxNode> {
+	let mut out = Vec::new();
+	collect_tombstones(el, condition, &mut out);
+	// nothing addressable underneath: record the exclusion at the node itself,
+	// so it is still visible as data even though no route can report it
+	if out.is_empty() {
+		out.push(tombstone(el, condition, None));
+	}
+	out
+}
+
+/// Walk an excluded branch collecting its addressable frontier: the outermost
+/// `path`-declaring elements, each terminating its own descent.
+fn collect_tombstones(
+	el: &BsxElement,
+	condition: &str,
+	out: &mut Vec<BsxNode>,
+) {
+	if let Some(path) = path_attr(el) {
+		out.push(tombstone(el, condition, Some(path)));
+		return;
+	}
+	for child in &el.children {
+		if let BsxNode::Element(child) = child {
+			collect_tombstones(child, condition, out);
+		}
+	}
+}
+
+/// One tombstone node.
+fn tombstone(
+	el: &BsxElement,
+	condition: &str,
+	path: Option<&str>,
+) -> BsxNode {
 	let mut attributes = vec![
 		string_attribute("condition", condition),
 		string_attribute("tag", &el.tag),
 	];
-	// the element's own path, so a route-shaped exclusion stays addressable
-	if let Some(path) = el.attributes.iter().find_map(|attr| match &attr.value {
-		AttrValue::Str(value) if attr.key == "path" => Some(value.as_str()),
-		_ => None,
-	}) {
+	if let Some(path) = path {
 		attributes.push(string_attribute("path", path));
 	}
 	BsxNode::Element(BsxElement {
@@ -480,6 +529,14 @@ fn tombstone(el: &BsxElement, condition: &str) -> BsxNode {
 		attributes,
 		children: Vec::new(),
 		self_closing: true,
+	})
+}
+
+/// An element's `path` string attribute, if it declares one.
+fn path_attr(el: &BsxElement) -> Option<&str> {
+	el.attributes.iter().find_map(|attr| match &attr.value {
+		AttrValue::Str(value) if attr.key == "path" => Some(value.as_str()),
+		_ => None,
 	})
 }
 
@@ -849,6 +906,58 @@ mod test {
 		excluded.path.as_str().xpect_eq("site");
 		excluded.tag.as_str().xpect_eq("Route");
 		excluded.message().contains("feature:lambda").xpect_true();
+	}
+
+	/// Gating a GROUP is equivalent to gating each member: a `<Fragment>` that
+	/// wraps several routes leaves a tombstone per route, not one for itself.
+	///
+	/// Without this the grouping form would silently lose every route under it,
+	/// which would make it strictly worse than repeating the condition and let
+	/// an implementation detail decide how markup is written.
+	#[crate::test]
+	fn gating_a_group_is_the_same_as_gating_each_member() {
+		let paths = |markup: &str| {
+			let (world, root) = build(markup);
+			let mut paths = world
+				.entity(root)
+				.get::<Children>()
+				.unwrap()
+				.iter()
+				.filter_map(|child| {
+					world
+						.entity(child)
+						.get::<CfgExcluded>()
+						.map(|excluded| excluded.path.to_string())
+				})
+				.collect::<Vec<_>>();
+			paths.sort();
+			paths
+		};
+		let grouped = paths(
+			r#"<Fragment bx:cfg="feature:lambda">
+				<Route path="site"><Template src="infra/site.bsx"/></Route>
+				<Route path="mail"><Template src="infra/mail.bsx"/></Route>
+			</Fragment>"#,
+		);
+		let each = paths(
+			r#"<Route path="site" bx:cfg="feature:lambda"><Template src="infra/site.bsx"/></Route>
+			   <Route path="mail" bx:cfg="feature:lambda"><Template src="infra/mail.bsx"/></Route>"#,
+		);
+		grouped.xpect_eq(vec!["mail".to_string(), "site".to_string()]);
+		grouped.xpect_eq(each);
+	}
+
+	/// An excluded branch with nothing addressable under it still records the
+	/// exclusion, just with no path for a host to report at.
+	#[crate::test]
+	fn a_pathless_exclusion_is_still_recorded() {
+		let (world, root) =
+			build(r#"<Fragment bx:cfg="feature:lambda"><div/><span/></Fragment>"#);
+		let children = world.entity(root).get::<Children>().unwrap();
+		children.len().xpect_eq(1);
+		let excluded = world.entity(children[0]).get::<CfgExcluded>().unwrap();
+		excluded.tag.as_str().xpect_eq("Fragment");
+		excluded.path.is_empty().xpect_true();
 	}
 
 	#[crate::test]
