@@ -55,7 +55,7 @@ pub fn Head(
 	/// [`PackageConfig`] homepage, ie the SITE, which is all a standalone
 	/// `<Head/>` outside a route can honestly claim.
 	#[prop(into)]
-	url: Option<String>,
+	url: Option<Url>,
 	pkg_config: Res<PackageConfig>,
 ) -> impl Bundle {
 	// every PWA/application value names the site, sourced from the package config.
@@ -70,9 +70,7 @@ pub fn Head(
 		.unwrap_or_else(|| description.to_string());
 	// the page's own url, else the site's; both optional, so an unset origin
 	// omits the tags entirely rather than rendering empty attributes.
-	let canonical = url
-		.map(SmolStr::new)
-		.or_else(|| pkg_config.homepage.clone());
+	let canonical = url.or_else(|| pkg_config.homepage.clone());
 	let version = pkg_config.version.clone();
 	// the social card and the brand tint, each omitted rather than defaulted:
 	// an invented card url is a broken preview and an invented tint is another
@@ -101,7 +99,7 @@ pub fn Head(
 	// search result reads for its byline and date
 	let json_ld = JsonLd {
 		headline: card_title.clone(),
-		url: canonical.as_ref().map(|url| url.to_string()),
+		url: canonical.clone(),
 		published: published.clone(),
 		modified: modified.clone(),
 		author: article_author.clone(),
@@ -128,7 +126,7 @@ pub fn Head(
 			// the `<title>` is omittable so a layout owns the single per-route one;
 			// the seeded site title is the standalone fallback.
 			{(!omit_title).then(|| rsx!{ <title>{title.clone()}</title> })}
-			{canonical.as_ref().map(|url| rsx!{ <link rel="canonical" href={url.clone()}/> })}
+			{canonical.as_ref().map(|url| rsx!{ <link rel="canonical" href={url.to_string()}/> })}
 			<meta name="viewport" content={scale}/>
 			// the PAGE's description where it declares one: this is the snippet a
 			// search result shows, so a site-wide default under every page is a
@@ -143,8 +141,8 @@ pub fn Head(
 			// site name stays bound to `PackageConfig.title`, not snapshotted.
 			<meta property="og:site_name" {site_name_attr(&title)}/>
 			<meta property="og:description" content={&card_description}/>
-			{canonical.as_ref().map(|url| rsx!{ <meta property="og:url" content={url.clone()}/> })}
-			{social_image.as_ref().map(|image| rsx!{ <meta property="og:image" content={image.clone()}/> })}
+			{canonical.as_ref().map(|url| rsx!{ <meta property="og:url" content={url.to_string()}/> })}
+			{social_image.as_ref().map(|image| rsx!{ <meta property="og:image" content={image.to_string()}/> })}
 			// article facts, emitted only for a page that has a publication date
 			{published.as_ref().map(|time| rsx!{ <meta property="article:published_time" content={time.clone()}/> })}
 			{modified.as_ref().map(|time| rsx!{ <meta property="article:modified_time" content={time.clone()}/> })}
@@ -155,7 +153,7 @@ pub fn Head(
 			<meta name="twitter:card" content={twitter_card}/>
 			<meta name="twitter:title" content={&card_title}/>
 			<meta name="twitter:description" content={&card_description}/>
-			{social_image.as_ref().map(|image| rsx!{ <meta name="twitter:image" content={image.clone()}/> })}
+			{social_image.as_ref().map(|image| rsx!{ <meta name="twitter:image" content={image.to_string()}/> })}
 			// Apple PWA
 			<meta name="apple-mobile-web-app-capable" content="yes"/>
 			<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>

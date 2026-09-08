@@ -53,12 +53,13 @@ pub struct PageMeta {
 	pub author: Option<SmolStr>,
 	/// Who the page is for: everyone, whoever holds the link, or nobody yet.
 	///
-	/// Authored by variant name, ie `visibility = "Unlisted"`.
+	/// Authored by variant name, ie `visibility = "unlisted"` (the match is
+	/// case-insensitive, so the Rust spelling works too).
 	pub visibility: PageVisibility,
 	/// The page's thumbnail / social card image.
-	pub image_url: Option<SmolStr>,
+	pub image_url: Option<Url>,
 	/// The page's companion video, eg the YouTube watch url a post embeds.
-	pub video_url: Option<SmolStr>,
+	pub video_url: Option<Url>,
 	/// Sidebar label override. Defaults to the page [`title`](Self::title).
 	pub sidebar_label: Option<String>,
 	/// Sort order within siblings, in the nav and in a generated page index.
@@ -114,10 +115,10 @@ impl PageMeta {
 	/// frontmatter at all: the poster frame IS the card. `hqdefault` rather
 	/// than `maxresdefault`, which 404s for anything uploaded before high-res
 	/// thumbnails and so previews as a broken image.
-	pub fn social_image_url(&self) -> Option<SmolStr> {
+	pub fn social_image_url(&self) -> Option<Url> {
 		self.image_url.clone().or_else(|| {
-			Self::youtube_id(self.video_url.as_deref()?).map(|id| {
-				SmolStr::new(format!(
+			Self::youtube_id(self.video_url.as_ref()?).map(|id| {
+				Url::coerce(format!(
 					"https://i.ytimg.com/vi/{id}/hqdefault.jpg"
 				))
 			})
@@ -128,14 +129,22 @@ impl PageMeta {
 	/// `https://youtu.be/..`, `https://www.youtube.com/watch?v=..` or an
 	/// already-embed url. `None` for any other url, so a video hosted elsewhere
 	/// yields neither an embed nor a derived card.
-	pub fn youtube_id(url: &str) -> Option<&str> {
-		url.split_once("youtu.be/")
-			.or_else(|| url.split_once("youtube.com/embed/"))
-			.or_else(|| url.split_once("watch?v="))
-			.map(|(_, id)| id)?
-			.split(['?', '&', '#'])
-			.next()
-			.filter(|id| !id.is_empty())
+	///
+	/// Read off the url's parts rather than its text, so a share link's `?t=42`
+	/// and a watch link's `&list=..` are query params that were never in the
+	/// path to begin with.
+	pub fn youtube_id(url: &Url) -> Option<&str> {
+		let host = url.host()?.trim_start_matches("www.");
+		match (host, url.path().as_slice()) {
+			("youtu.be", [id]) => Some(id.as_str()),
+			("youtube.com", [segment, id]) if segment == "embed" => {
+				Some(id.as_str())
+			}
+			("youtube.com", [segment]) if segment == "watch" => {
+				url.get_param("v")
+			}
+			_ => None,
+		}
 	}
 
 	/// The sidebar label: explicit [`sidebar_label`](Self::sidebar_label), else
@@ -226,7 +235,7 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_flat_keys() {
 		let meta = parse(
-			"title: Getting Started\ndescription: A guide\nvisibility: Draft\norder: 2\nexpanded: true",
+			"title: Getting Started\ndescription: A guide\nvisibility: draft\norder: 2\nexpanded: true",
 			FrontmatterKind::Yaml,
 		);
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
@@ -259,8 +268,8 @@ mod test {
 			.xpect_eq("2025-08-01");
 		meta.author.as_deref().unwrap().xpect_eq("Pete Hayman");
 		meta.video_url
-			.as_deref()
 			.unwrap()
+			.to_string()
 			.xpect_eq("https://youtu.be/7koepBSRoUI");
 	}
 
@@ -276,24 +285,28 @@ mod test {
 			}
 			.social_image_url()
 		};
+		let thumbnail = "https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg";
 		card("https://youtu.be/7koepBSRoUI")
 			.unwrap()
-			.xpect_eq(SmolStr::new(
-				"https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg",
-			));
+			.to_string()
+			.xpect_eq(thumbnail);
 		// a share url carries a timestamp, the watch url a playlist
-		card("https://youtu.be/7koepBSRoUI?t=42").unwrap().xpect_eq(
-			SmolStr::new("https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg"),
-		);
+		card("https://youtu.be/7koepBSRoUI?t=42")
+			.unwrap()
+			.to_string()
+			.xpect_eq(thumbnail);
 		card("https://www.youtube.com/watch?v=7koepBSRoUI&list=PL")
 			.unwrap()
-			.xpect_eq(SmolStr::new(
-				"https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg",
-			));
-		PageMeta::youtube_id("https://www.youtube.com/embed/7koepBSRoUI")
-			.unwrap()
-			.xpect_eq("7koepBSRoUI");
+			.to_string()
+			.xpect_eq(thumbnail);
+		PageMeta::youtube_id(&Url::coerce(
+			"https://www.youtube.com/embed/7koepBSRoUI",
+		))
+		.unwrap()
+		.xpect_eq("7koepBSRoUI");
 		card("https://example.com/video.mp4").xpect_none();
+		// a bare path is no video at all
+		card("/assets/clip.mp4").xpect_none();
 		// an explicit image always wins over the derived one
 		PageMeta {
 			image_url: Some("/assets/card.png".into()),
@@ -302,7 +315,8 @@ mod test {
 		}
 		.social_image_url()
 		.unwrap()
-		.xpect_eq(SmolStr::new("/assets/card.png"));
+		.to_string()
+		.xpect_eq("/assets/card.png");
 	}
 
 	#[beet_core::test]

@@ -371,7 +371,7 @@ mod test {
 
 	/// Queue an in-world navigation to `path` on the navigator entity.
 	fn navigate(app: &mut App, nav: Entity, path: &str) {
-		let url = Url::parse(path);
+		let url = Url::coerce(path);
 		app.world_mut()
 			.entity_mut(nav)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));

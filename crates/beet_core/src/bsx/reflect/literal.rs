@@ -688,6 +688,10 @@ mod test {
 		}
 		resolve::<Records>(DataLiteral::Scalar(Value::str("IdentityOnly")))
 			.xpect_eq(Records::IdentityOnly);
+		// ..and case-insensitively, since a markup attribute is prose: a human
+		// writes `records="identityonly"`, the variant is `IdentityOnly`
+		resolve::<Records>(DataLiteral::Scalar(Value::str("identityonly")))
+			.xpect_eq(Records::IdentityOnly);
 		let registry = TypeRegistry::default();
 		let mut resolver = |_: &str| Entity::PLACEHOLDER;
 		DataLiteral::to_reflect(
@@ -697,6 +701,33 @@ mod test {
 			&mut resolver,
 		)
 		.xpect_err();
+	}
+
+	/// Two variants that differ only by case are an ambiguity a case-insensitive
+	/// match cannot resolve, so it refuses rather than picking the one declared
+	/// first. An exact spelling still resolves each of them.
+	#[beet_core::test]
+	fn an_ambiguous_variant_case_errors() {
+		#[derive(Debug, Default, PartialEq, Reflect)]
+		#[allow(non_camel_case_types)]
+		enum Casing {
+			#[default]
+			Draft,
+			draft,
+		}
+		resolve::<Casing>(DataLiteral::Scalar(Value::str("draft")))
+			.xpect_eq(Casing::draft);
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		DataLiteral::to_reflect(
+			&DataLiteral::Scalar(Value::str("DRAFT")),
+			Some(Casing::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("spell one exactly");
 	}
 
 	/// A hex string coerces to a `Color` field, bare or wrapped in an `Option`, so

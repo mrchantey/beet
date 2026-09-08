@@ -96,7 +96,7 @@ impl SiteHost {
 
 	/// Queue an in-world navigation to `path`.
 	fn navigate(&mut self, path: &str) {
-		let url = Url::parse(path);
+		let url = Url::coerce(path);
 		self.app
 			.world_mut()
 			.entity_mut(self.host)

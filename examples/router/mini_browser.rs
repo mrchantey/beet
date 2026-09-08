@@ -50,7 +50,7 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		StdioTerminal::default(),
 		PageHost::bundle(terminal_ext::size()),
-		Navigator::new(Url::parse(&url)),
+		Navigator::new(Url::coerce(&url)),
 	));
 	// an editable URL bar bound to the document field `url`.
 	commands.spawn((Document::new(value!({ "url": url })), children![
@@ -72,7 +72,7 @@ fn url_bar_enter(
 		return Ok(());
 	}
 	if let (Ok(value), Ok(navigator)) = (bars.single(), navigators.single()) {
-		let url = Url::parse(value.to_string());
+		let url = Url::coerce(value.to_string());
 		commands
 			.entity(navigator)
 			.queue_async(move |entity| Navigator::navigate_to(entity, url));

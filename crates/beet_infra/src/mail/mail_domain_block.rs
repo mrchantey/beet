@@ -522,9 +522,9 @@ impl MailDomainBlock {
 						});
 					let variables =
 						block.variables(scope.stack()).xmap(|mut variables| {
-						variables.extend(block.relay_variables(&relay));
-						variables
-					});
+							variables.extend(block.relay_variables(&relay));
+							variables
+						});
 					scope.declare(grants, variables);
 				}
 			}
@@ -1511,11 +1511,7 @@ mod tests {
 		// content, so every render resolves it..
 		variables[0].is_content().xpect_true();
 		// ..and it names the parameter the public half is published at
-		variables[0]
-			.tf_declaration()
-			.default
-			.is_none()
-			.xpect_true();
+		variables[0].tf_declaration().default.is_none().xpect_true();
 		// no key is minted for a domain whose records somebody else holds, so
 		// a variable here would fail resolution rather than default
 		MailDomainBlock::new("beetmash.com", "mail.beetmash.com")

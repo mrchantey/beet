@@ -232,7 +232,8 @@ impl BuildCondition {
 			// member, so only the members that actually failed are reported.
 			Self::All(members) | Self::Any(members) => {
 				for member in members {
-					member.collect_failures(conditions, cx, negated, failures)?;
+					member
+						.collect_failures(conditions, cx, negated, failures)?;
 				}
 			}
 		}
@@ -511,11 +512,7 @@ fn collect_tombstones(
 }
 
 /// One tombstone node.
-fn tombstone(
-	el: &BsxElement,
-	condition: &str,
-	path: Option<&str>,
-) -> BsxNode {
+fn tombstone(el: &BsxElement, condition: &str, path: Option<&str>) -> BsxNode {
 	let mut attributes = vec![
 		string_attribute("condition", condition),
 		string_attribute("tag", &el.tag),
@@ -549,7 +546,8 @@ fn string_attribute(key: &str, value: &str) -> BsxAttribute {
 
 /// An element's `bx:cfg` condition text, if it declares one.
 fn build_cfg_attr(el: &BsxElement) -> Result<Option<&str>> {
-	let Some(attr) = el.attributes.iter().find(|attr| attr.key == BUILD_CFG_KEY)
+	let Some(attr) =
+		el.attributes.iter().find(|attr| attr.key == BUILD_CFG_KEY)
 	else {
 		return Ok(None);
 	};
@@ -770,15 +768,17 @@ mod test {
 			atom("c", "3"),
 		]));
 		// the shape from the docs, whole
-		parse("(feature:infra && feature:extra && !feature:lean) || feature:all")
-			.xpect_eq(BuildCondition::Any(vec![
-				BuildCondition::All(vec![
-					atom("feature", "infra"),
-					atom("feature", "extra"),
-					BuildCondition::Not(Box::new(atom("feature", "lean"))),
-				]),
-				atom("feature", "all"),
-			]));
+		parse(
+			"(feature:infra && feature:extra && !feature:lean) || feature:all",
+		)
+		.xpect_eq(BuildCondition::Any(vec![
+			BuildCondition::All(vec![
+				atom("feature", "infra"),
+				atom("feature", "extra"),
+				BuildCondition::Not(Box::new(atom("feature", "lean"))),
+			]),
+			atom("feature", "all"),
+		]));
 	}
 
 	#[crate::test]
@@ -889,7 +889,11 @@ mod test {
 		children.len().xpect_eq(1);
 		let tombstone = children[0];
 		world.entity(tombstone).contains::<Element>().xpect_false();
-		world.entity(tombstone).get::<Children>().is_none().xpect_true();
+		world
+			.entity(tombstone)
+			.get::<Children>()
+			.is_none()
+			.xpect_true();
 		let excluded = world.entity(tombstone).get::<CfgExcluded>().unwrap();
 		excluded.tag.as_str().xpect_eq("div");
 		excluded.condition.as_str().xpect_eq("feature:lambda");
@@ -951,8 +955,9 @@ mod test {
 	/// exclusion, just with no path for a host to report at.
 	#[crate::test]
 	fn a_pathless_exclusion_is_still_recorded() {
-		let (world, root) =
-			build(r#"<Fragment bx:cfg="feature:lambda"><div/><span/></Fragment>"#);
+		let (world, root) = build(
+			r#"<Fragment bx:cfg="feature:lambda"><div/><span/></Fragment>"#,
+		);
 		let children = world.entity(root).get::<Children>().unwrap();
 		children.len().xpect_eq(1);
 		let excluded = world.entity(children[0]).get::<CfgExcluded>().unwrap();
@@ -1037,10 +1042,7 @@ mod test {
 			.unwrap()
 			.explain(conditions, &cx)
 			.unwrap()
-			.xpect_eq(vec![
-				"feature:a".to_string(),
-				"feature:b".to_string(),
-			]);
+			.xpect_eq(vec!["feature:a".to_string(), "feature:b".to_string()]);
 		// a satisfied condition explains nothing
 		BuildCondition::parse("feature:infra")
 			.unwrap()

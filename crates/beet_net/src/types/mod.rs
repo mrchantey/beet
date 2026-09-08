@@ -33,12 +33,14 @@ mod media_bytes_ext;
 mod parts;
 mod request;
 mod response;
-mod url;
+// http interop for the core `Url`: header-map conversions and the `http`
+// crate's scheme. The `Url` type itself lives in `beet_core::path`.
+mod http_interop;
 pub use body::*;
 pub use header_map::*;
+pub(crate) use http_interop::*;
 pub use media_bytes_ext::*;
 pub use response::*;
-pub use url::*;
 mod param_pattern;
 pub use param_pattern::*;
 mod path_pattern;

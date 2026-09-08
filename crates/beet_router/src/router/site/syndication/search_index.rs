@@ -52,7 +52,7 @@ pub fn SearchIndex() -> impl Bundle {
 struct SearchEntry {
 	/// The page's absolute url, which is both its identity and where a result
 	/// links to.
-	url: String,
+	url: Url,
 	title: Option<String>,
 	description: Option<String>,
 	author: Option<SmolStr>,
@@ -94,20 +94,32 @@ impl SearchEntry {
 			entries.len(),
 			started.elapsed()
 		);
-		json_ext::array(entries.iter().map(Self::to_json)).xok()
+		Value::new_list(entries.iter().map(Self::to_value))
+			.to_json_string()
+			.xok()
 	}
 
-	/// This entry as a json object, its unauthored fields absent rather than
-	/// `null`.
-	fn to_json(&self) -> String {
-		json_ext::object([
-			json_ext::member_opt("url", Some(&self.url)),
-			json_ext::member_opt("title", self.title.as_ref()),
-			json_ext::member_opt("description", self.description.as_ref()),
-			json_ext::member_opt("author", self.author.as_ref()),
-			json_ext::member_opt("created", self.created.as_ref()),
-			json_ext::member_opt("body", self.body.as_ref()),
-		])
+	/// This entry as a json object. An unauthored field is left OUT rather than
+	/// written `null`: a client branches on presence either way, and a document
+	/// every visitor fetches stays small.
+	fn to_value(&self) -> Value {
+		let mut map = Map::default();
+		map.insert("url", Value::str(self.url.to_string()));
+		for (key, value) in [
+			("title", self.title.clone()),
+			("description", self.description.clone()),
+			(
+				"author",
+				self.author.as_ref().map(|author| author.to_string()),
+			),
+			("created", self.created.clone()),
+			("body", self.body.clone()),
+		] {
+			if let Some(value) = value {
+				map.insert(key, Value::str(value));
+			}
+		}
+		Value::Map(map)
 	}
 }
 

@@ -77,7 +77,7 @@ async fn capture_webcam() -> Result<MediaBytes> {
 			&JPEG_QUALITY.into(),
 		)
 		.map_jserr()?;
-	MediaBytes::from_url(&Url::parse(data_url))
+	MediaBytes::from_url(&Url::coerce(data_url))
 }
 
 /// The longest edge a captured photo is scaled down to, matching what vision

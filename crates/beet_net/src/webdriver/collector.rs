@@ -98,7 +98,7 @@ impl RequestEvent {
 		let request = event.pointer("/params/request")?;
 		Some(Self {
 			method: request.get("method")?.as_str()?.parse().ok()?,
-			url: Url::parse(request.get("url")?.as_str()?),
+			url: Url::coerce(request.get("url")?.as_str()?),
 		})
 	}
 }
@@ -121,7 +121,7 @@ impl ResponseEvent {
 		let response = event.pointer("/params/response")?;
 		Some(Self {
 			status: StatusCode::new(response.get("status")?.as_u64()? as u16),
-			url: Url::parse(response.get("url")?.as_str()?),
+			url: Url::coerce(response.get("url")?.as_str()?),
 		})
 	}
 }

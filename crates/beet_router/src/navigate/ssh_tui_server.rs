@@ -401,7 +401,7 @@ mod test {
 		app.world_mut()
 			.spawn((
 				SshTuiServer::default(),
-				OpeningRoute(Url::parse("alpha")),
+				OpeningRoute(Url::coerce("alpha")),
 				children![(Router, children![
 					render_action::fixed_func_route("alpha", || {
 						rsx! { <p>"Alpha page"</p> }
@@ -643,7 +643,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				SshTuiServer::default(),
-				OpeningRoute(Url::parse("alpha")),
+				OpeningRoute(Url::coerce("alpha")),
 				children![(Router, children![render_action::async_route(
 					"alpha",
 					move |_cx: ActionContext<Request>| {
@@ -770,7 +770,7 @@ mod test {
 
 		// navigate only the second session to beta (its navigator is co-located on
 		// the connection surface)
-		let url = Url::parse("beta");
+		let url = Url::coerce("beta");
 		app.world_mut()
 			.entity_mut(second)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));
@@ -811,7 +811,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				SshTuiServer::default(),
-				OpeningRoute(Url::parse("")),
+				OpeningRoute(Url::coerce("")),
 				children![(store, Router, Layout::default(), children![
 					route::new("", BlobScene::new("index.html"))
 				])],
@@ -949,7 +949,7 @@ mod test {
 		app.world_mut()
 			.spawn((
 				SshTuiServer::default(),
-				OpeningRoute(Url::parse("home")),
+				OpeningRoute(Url::coerce("home")),
 				children![(Router, Layout::of::<DrawerLayout>(), children![
 					render_action::fixed_func_route("home", || {
 						rsx! { <p>"Home page"</p> }
@@ -1142,7 +1142,7 @@ mod test {
 			.world_mut()
 			.spawn((
 				SshTuiServer::default(),
-				OpeningRoute(Url::parse("counter")),
+				OpeningRoute(Url::coerce("counter")),
 				children![(store, Router, Layout::default(), children![
 					route::new("counter", BlobScene::new("counter.bsx"))
 				])],
@@ -1456,7 +1456,7 @@ mod test {
 			app.world_mut()
 				.spawn((
 					SshTuiServer::default(),
-					OpeningRoute(Url::parse("home")),
+					OpeningRoute(Url::coerce("home")),
 					children![(
 						Router,
 						Layout::of::<DrawerLayout>(),

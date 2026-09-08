@@ -112,6 +112,16 @@ fn add_strings(table: &mut Table) {
 		.add_str(|string| Name::new(string.to_string()))
 		// a logical path, so a markup `src="assets"` resolves to a `SmolPath`
 		.add_str(|string| SmolPath::new(string));
+
+	// a url is authored as the string it displays as, and the strict
+	// `Url::parse` is what makes a control character in a frontmatter
+	// `image_url` a loud error rather than a url nobody meant.
+	table.add_hinted("a url, eg \"https://beet.org/blog\"", |value: &Value| {
+		match value {
+			Value::Str(string) => Url::parse(string.as_str()).map(Some),
+			_ => Ok(None),
+		}
+	});
 }
 
 /// The domain types whose authored spelling is a single word rather than their

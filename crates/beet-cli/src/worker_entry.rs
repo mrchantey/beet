@@ -165,7 +165,7 @@ async fn worker_to_request(mut req: WorkerRequest) -> Result<Request> {
 	// read the body bytes up front (the Worker request is consumed once).
 	let body = req.bytes().await.unwrap_or_default();
 
-	let mut parts = RequestParts::new(method, Url::parse(url.as_str()));
+	let mut parts = RequestParts::new(method, Url::coerce(url.as_str()));
 	for (key, value) in req.headers() {
 		parts.headers.set_raw(key, value);
 	}

@@ -123,7 +123,7 @@ fn index_entry(
 	);
 	let byline = article_byline(meta);
 	// the entry's own thumbnail, alt-texted by the heading it illustrates
-	let thumbnail = meta.image_url.as_deref().map(|src| {
+	let thumbnail = meta.image_url.as_ref().map(|src| {
 		let (src, alt, href) = (src.to_string(), heading.clone(), href.clone());
 		rsx! { <a href=href><img src=src alt=alt/></a> }
 	});

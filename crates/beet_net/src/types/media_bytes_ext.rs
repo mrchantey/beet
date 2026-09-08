@@ -23,7 +23,7 @@ pub impl MediaBytes {
 	/// ```
 	/// # use beet_net::prelude::*;
 	/// # use beet_core::prelude::*;
-	/// let url = Url::parse("data:text/plain;base64,SGVsbG8=");
+	/// let url = Url::coerce("data:text/plain;base64,SGVsbG8=");
 	/// let mb = MediaBytes::from_url(&url).unwrap();
 	/// assert_eq!(mb.media_type(), &MediaType::Text);
 	/// assert_eq!(mb.as_utf8().unwrap(), "Hello");
@@ -99,11 +99,11 @@ pub impl MediaBytes {
 				use base64::Engine as _;
 				let encoded =
 					base64::engine::general_purpose::STANDARD.encode(self.bytes());
-				Url::parse(format!("data:{};base64,{}", self.media_type(), encoded))
+				Url::coerce(format!("data:{};base64,{}", self.media_type(), encoded))
 			} else {
 				// Fall back to URL (percent) encoding when base64 is unavailable.
 				let encoded = percent_encode(self.bytes());
-				Url::parse(format!("data:{},{}", self.media_type(), encoded))
+				Url::coerce(format!("data:{},{}", self.media_type(), encoded))
 			}
 		}
 	}
@@ -159,7 +159,7 @@ mod test {
 
 	#[beet_core::test]
 	fn from_url_base64() {
-		let url = Url::parse("data:text/plain;base64,SGVsbG8=");
+		let url = Url::coerce("data:text/plain;base64,SGVsbG8=");
 		let mb = MediaBytes::from_url(&url).unwrap();
 		mb.media_type().xpect_eq(MediaType::Text);
 		mb.as_utf8().unwrap().xpect_eq("Hello");
@@ -167,7 +167,7 @@ mod test {
 
 	#[beet_core::test]
 	fn from_url_percent_encoded() {
-		let url = Url::parse("data:text/html,<h1>Hello</h1>");
+		let url = Url::coerce("data:text/html,<h1>Hello</h1>");
 		let mb = MediaBytes::from_url(&url).unwrap();
 		mb.media_type().xpect_eq(MediaType::Html);
 		mb.as_utf8().unwrap().xpect_eq("<h1>Hello</h1>");
@@ -176,7 +176,7 @@ mod test {
 	#[beet_core::test]
 	fn from_url_default_media_type() {
 		// RFC 2397: missing media type defaults to text/plain
-		let url = Url::parse("data:,Hello%20World");
+		let url = Url::coerce("data:,Hello%20World");
 		let mb = MediaBytes::from_url(&url).unwrap();
 		mb.media_type().xpect_eq(MediaType::Text);
 		// %20 → space
@@ -185,7 +185,7 @@ mod test {
 
 	#[beet_core::test]
 	fn from_url_wrong_scheme() {
-		let url = Url::parse("https://example.com");
+		let url = Url::coerce("https://example.com");
 		MediaBytes::from_url(&url).xpect_err();
 	}
 
@@ -216,7 +216,7 @@ mod test {
 		let mb = MediaBytes::new_text("Hello");
 		let url = mb.into_url();
 		// Display then re-parse should produce identical bytes.
-		let reparsed = Url::parse(url.to_string());
+		let reparsed = Url::coerce(url.to_string());
 		let back = MediaBytes::from_url(&reparsed).unwrap();
 		back.as_utf8().unwrap().xpect_eq("Hello");
 	}

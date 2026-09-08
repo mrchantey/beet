@@ -1,4 +1,4 @@
-use crate::prelude::Url;
+use beet_core::prelude::Url;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::Mutex;
@@ -190,7 +190,7 @@ impl Socket {
 	}
 
 	/// Connects to a WebSocket server at the given [`Url`], eg
-	/// `ws://127.0.0.1:8338` (strings convert via `Url::parse`).
+	/// `ws://127.0.0.1:8338` (strings convert via `Url::coerce`).
 	///
 	/// Returns a connected [`Socket`] that can be used to send and receive messages.
 	#[allow(unused_variables)]

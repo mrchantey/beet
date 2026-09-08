@@ -83,8 +83,8 @@ pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Bundle {
 
 #[cfg(all(test, feature = "tui"))]
 mod test {
-	use crate::prelude::*;
 	use crate::prelude::Button;
+	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use bevy::input::ButtonState;
 	use bevy::input::keyboard::Key;

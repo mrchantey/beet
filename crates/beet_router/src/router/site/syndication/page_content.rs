@@ -29,7 +29,7 @@ impl PageContent {
 	///
 	/// `None` when the page does not answer `200`, with a warning naming it: one
 	/// broken page drops its own entry rather than failing the whole document.
-	/// Recursion is not a hazard — a page never requests the feed.
+	/// Recursion is not a hazard, since a page never requests the feed.
 	pub async fn render(
 		world: &AsyncWorld,
 		router: Entity,

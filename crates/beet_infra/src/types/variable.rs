@@ -81,10 +81,7 @@ impl Variable {
 
 	/// Create a variable read from AWS parameter store, see
 	/// [`VariableValue::Ssm`]. `parameter` is the full parameter name.
-	pub fn ssm(
-		key: impl Into<SmolStr>,
-		parameter: impl Into<SmolStr>,
-	) -> Self {
+	pub fn ssm(key: impl Into<SmolStr>, parameter: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),
 			value: VariableValue::Ssm(parameter.into()),

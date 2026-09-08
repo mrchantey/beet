@@ -18,7 +18,7 @@ pub(crate) struct JsonLd {
 	/// The page's headline, ie its own title else the site's.
 	pub headline: String,
 	/// The absolute page url, absent when the site names no origin.
-	pub url: Option<String>,
+	pub url: Option<Url>,
 	/// Publication date as ISO 8601. Its presence is what makes the page an
 	/// `Article` rather than a `WebPage`.
 	pub published: Option<String>,
@@ -27,7 +27,7 @@ pub(crate) struct JsonLd {
 	/// The author's name, rendered as a schema.org `Person`.
 	pub author: Option<SmolStr>,
 	/// The page's social card image.
-	pub image: Option<SmolStr>,
+	pub image: Option<Url>,
 	/// The site name, ie the publisher of every page on it.
 	pub publisher: SmolStr,
 }
@@ -43,38 +43,46 @@ impl JsonLd {
 			true => "Article",
 			false => "WebPage",
 		};
-		json_ext::object([
-			json_ext::member_opt("@context", Some("https://schema.org")),
-			json_ext::member_opt("@type", Some(kind)),
-			json_ext::member_opt("headline", Some(&self.headline)),
-			json_ext::member_opt("url", self.url.as_ref()),
-			json_ext::member_opt("datePublished", self.published.as_ref()),
-			json_ext::member_opt("dateModified", self.modified.as_ref()),
-			self.author.as_ref().map(|author| {
-				json_ext::member("author", person("Person", author))
-			}),
-			json_ext::member_opt("image", self.image.as_ref()),
-			Some(json_ext::member(
-				"publisher",
-				person("Organization", &self.publisher),
-			)),
-		])
+		let mut map = Map::default();
+		map.insert("@context", Value::str("https://schema.org"));
+		map.insert("@type", Value::str(kind));
+		map.insert("headline", Value::str(self.headline.as_str()));
+		map.insert("publisher", named("Organization", &self.publisher));
+		for (key, value) in [
+			("url", self.url.as_ref().map(|url| url.to_string())),
+			("datePublished", self.published.clone()),
+			("dateModified", self.modified.clone()),
+			("image", self.image.as_ref().map(|url| url.to_string())),
+		] {
+			if let Some(value) = value {
+				map.insert(key, Value::str(value));
+			}
+		}
+		if let Some(author) = &self.author {
+			map.insert("author", named("Person", author));
+		}
+		// this document is embedded in a `<script>`, where a `</script>` in any
+		// value would close the block early and spill the rest into the page as
+		// markup. Inside json text a `<` only ever appears within a string
+		// literal, so escaping every one is both safe and sufficient.
+		Value::Map(map).to_json_string().replace('<', "\\u003c")
 	}
 }
 
 /// A schema.org named entity, ie `{"@type":"Person","name":".."}`.
-fn person(kind: &str, name: &str) -> String {
-	json_ext::object([
-		json_ext::member_opt("@type", Some(kind)),
-		json_ext::member_opt("name", Some(name)),
-	])
+fn named(kind: &str, name: &str) -> Value {
+	let mut map = Map::default();
+	map.insert("@type", Value::str(kind));
+	map.insert("name", Value::str(name));
+	Value::Map(map)
 }
 
 #[cfg(test)]
 mod test {
 	use super::*;
 
-	/// A dated page is an `Article` carrying its dates and its author.
+	/// A dated page is an `Article` carrying its dates and its author. Keys are
+	/// written sorted, the one order that is the same every render.
 	#[beet_core::test]
 	fn describes_an_article() {
 		JsonLd {
@@ -88,8 +96,7 @@ mod test {
 		}
 		.to_json()
 		.xpect_eq(
-			r#"{"@context":"https://schema.org","@type":"Article","headline":"ECS Router","url":"https://beet.org/blog/ecs-router","datePublished":"2025-08-09T00:00:00.000Z","dateModified":"2025-09-01T00:00:00.000Z","author":{"@type":"Person","name":"Pete Hayman"},"image":"https://beet.org/card.png","publisher":{"@type":"Organization","name":"Beet"}}"#
-				.to_string(),
+			r#"{"@context":"https://schema.org","@type":"Article","author":{"@type":"Person","name":"Pete Hayman"},"dateModified":"2025-09-01T00:00:00.000Z","datePublished":"2025-08-09T00:00:00.000Z","headline":"ECS Router","image":"https://beet.org/card.png","publisher":{"@type":"Organization","name":"Beet"},"url":"https://beet.org/blog/ecs-router"}"#,
 		);
 	}
 
@@ -104,8 +111,7 @@ mod test {
 		}
 		.to_json()
 		.xpect_eq(
-			r#"{"@context":"https://schema.org","@type":"WebPage","headline":"Beet","publisher":{"@type":"Organization","name":"Beet"}}"#
-				.to_string(),
+			r#"{"@context":"https://schema.org","@type":"WebPage","headline":"Beet","publisher":{"@type":"Organization","name":"Beet"}}"#,
 		);
 	}
 

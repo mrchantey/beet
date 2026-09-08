@@ -8,13 +8,6 @@ impl FromRequestMeta<Self> for SmolPath {
 	}
 }
 
-impl From<SmolPath> for Url {
-	fn from(value: SmolPath) -> Url {
-		let path_str: &str = value.as_ref();
-		Url::parse(path_str)
-	}
-}
-
 impl From<SmolPath> for Request {
 	fn from(value: SmolPath) -> Request { Request::new(HttpMethod::Get, value) }
 }

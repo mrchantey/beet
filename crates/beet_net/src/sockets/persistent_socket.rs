@@ -1,6 +1,6 @@
 //! [`PersistentSocket`]: a client [`Socket`] that keeps itself connected.
-use crate::prelude::Url;
 use crate::sockets::*;
+use beet_core::prelude::Url;
 use beet_core::prelude::*;
 
 /// Keeps a client [`Socket`] connected to `url` for the life of the entity.

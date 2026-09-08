@@ -40,7 +40,7 @@ pub(crate) struct SyndicationScope {
 impl SyndicationScope {
 	/// A page path as an absolute url, ie
 	/// [`PackageConfig::absolute_url`] against this site's origin.
-	pub fn url(&self, path: &SmolPath) -> Result<String> {
+	pub fn url(&self, path: &SmolPath) -> Result<Url> {
 		self.package.absolute_url(path.as_str())
 	}
 }
@@ -123,7 +123,7 @@ pub(crate) mod test_fixtures {
 		world.insert_resource(PackageConfig {
 			title: "Beet".into(),
 			description: "A malleable engine for sovereign software".into(),
-			homepage: homepage.map(SmolStr::new),
+			homepage: homepage.map(Url::coerce),
 			..default()
 		});
 		world
@@ -150,8 +150,8 @@ pub(crate) mod test_fixtures {
 		}
 	}
 
-	/// A router serving a home page and a `blog` subtree of three posts — one
-	/// public and edited since publication, one public, one unlisted — plus a
+	/// A router serving a home page and a `blog` subtree of three posts (one
+	/// public and edited since publication, one public, one unlisted) plus a
 	/// draft, and whatever syndication markup the case declares.
 	pub fn spawn_syndication_router(
 		world: &mut World,

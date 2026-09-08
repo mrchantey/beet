@@ -30,9 +30,6 @@ pub mod env_ext;
 mod file_span;
 mod glob_filter;
 mod into_option;
-/// Writing small, fixed-shape JSON documents by hand, for a generator whose
-/// output must not depend on the `json` feature.
-pub mod json_ext;
 // LazyPool is built on async_lock (std-only).
 #[cfg(feature = "std")]
 mod lazy_pool;

@@ -83,10 +83,16 @@ impl RequestParts {
 	///
 	/// Accepts anything that converts [`Into<Url>`], including
 	/// `&str`, `String`, and a pre-parsed [`Url`].
+	///
+	/// The url is [rooted](Url::is_rooted) here whatever it arrived as: a
+	/// request names a resource on a host, so there is no document for a
+	/// relative reference to resolve against, and the wire form of a request
+	/// target is absolute-path. So `Request::get("about")` and
+	/// `Request::get("/about")` are the same request.
 	pub fn new(method: HttpMethod, url: impl Into<Url>) -> Self {
 		Self {
 			method,
-			url: url.into(),
+			url: url.into().with_rooted(true),
 			headers: HeaderMap::default(),
 			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
 		}
@@ -341,11 +347,12 @@ impl From<http::request::Parts> for RequestParts {
 	fn from(http_parts: http::request::Parts) -> Self {
 		let uri = &http_parts.uri;
 
-		let scheme = Scheme::from(uri.scheme());
+		let scheme = scheme_from_http(uri.scheme());
 		let authority =
 			uri.authority().map(|auth| SmolStr::from(auth.as_str()));
-		let path = split_path(uri.path());
-		let params = uri.query().map(parse_query_string).unwrap_or_default();
+		let path = Url::split_path(uri.path());
+		let params =
+			uri.query().map(Url::parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(http_parts.method);
@@ -366,11 +373,12 @@ impl From<&http::request::Parts> for RequestParts {
 	fn from(http_parts: &http::request::Parts) -> Self {
 		let uri = &http_parts.uri;
 
-		let scheme = Scheme::from(uri.scheme());
+		let scheme = scheme_from_http(uri.scheme());
 		let authority =
 			uri.authority().map(|auth| SmolStr::from(auth.as_str()));
-		let path = split_path(uri.path());
-		let params = uri.query().map(parse_query_string).unwrap_or_default();
+		let path = Url::split_path(uri.path());
+		let params =
+			uri.query().map(Url::parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
 		let version = http_ext::version_to_string(http_parts.version);
 		let method = HttpMethod::from(&http_parts.method);

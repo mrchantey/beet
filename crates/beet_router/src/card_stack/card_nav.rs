@@ -197,7 +197,7 @@ pub(crate) fn card_nav(
 	};
 
 	// navigate to the resolved card's absolute path (clamped at the stack's ends).
-	let url = Url::parse(format!("/{}", target.join("/")));
+	let url = Url::coerce(format!("/{}", target.join("/")));
 	commands.entity(entity).queue_async(async move |entity| {
 		Navigator::navigate_to(entity, url).await
 	});

@@ -98,7 +98,7 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 impl Default for Navigator {
 	fn default() -> Self {
-		let home = Url::parse(DEFAULT_HOME);
+		let home = Url::coerce(DEFAULT_HOME);
 		// let mut history = VecDeque::new();
 		// history.push_back(home.clone());
 		Self {
@@ -125,9 +125,15 @@ impl Default for Navigator {
 }
 
 impl Navigator {
+	/// A navigator opening at `home_url`.
+	///
+	/// The home is an address in a url space, so it is
+	/// [rooted](Url::is_rooted) however it was spelled: only a link FROM a page
+	/// is a relative reference, and those resolve against the current url (see
+	/// [`navigate_to`](Self::navigate_to)).
 	pub fn new(home_url: impl Into<Url>) -> Self {
 		Self {
-			home_url: home_url.into(),
+			home_url: home_url.into().with_rooted(true),
 			..default()
 		}
 	}
@@ -140,7 +146,7 @@ impl Navigator {
 	/// itself rather than relying on the web `color-scheme` script.
 	pub fn in_world(router: Entity, home_url: impl Into<Url>) -> Self {
 		Self {
-			home_url: home_url.into(),
+			home_url: home_url.into().with_rooted(true),
 			transport: NavigatorTransport::InWorld { router },
 			accepts: vec![
 				MediaType::AnsiTerm,
@@ -471,10 +477,12 @@ impl OpeningRoute {
 	/// binary's own args open the page they name (`beet --main=chat.bsx
 	/// docs/form`).
 	pub fn from_parts(parts: &RequestParts, mounted: bool) -> Result<Self> {
+		// an opening route addresses a page in the server's url space, so it is
+		// rooted however the flag spelled it (`--path=docs/form` or `=/docs/form`)
 		let url = match ServerParams::from_parts(parts)?.path {
-			Some(path) => Url::parse(path),
-			None if mounted => Url::NONE,
-			None => Url::NONE.with_path(parts.path().clone()),
+			Some(path) => Url::coerce(path).with_rooted(true),
+			None if mounted => Url::ROOT,
+			None => Url::ROOT.with_path(parts.path().clone()),
 		};
 		Self(url).xok()
 	}
@@ -599,7 +607,7 @@ mod test {
 		events.lock().unwrap().is_empty().xpect_true();
 
 		// navigating to beta emits the page view for the alpha page it leaves.
-		let url = Url::parse("beta");
+		let url = Url::coerce("beta");
 		app.world_mut()
 			.entity_mut(host)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));

@@ -113,7 +113,7 @@ mod test {
 	/// `beet_core/bevy_multithreaded` the task is dispatched to a worker and lands
 	/// several frames later, so the settle is what makes this deterministic.
 	async fn navigate(app: &mut App, surface: Entity, url: &str) {
-		let url = beet_net::prelude::Url::parse(url);
+		let url = beet_core::prelude::Url::coerce(url);
 		app.world_mut()
 			.entity_mut(surface)
 			.run_async_local(move |entity| Navigator::navigate_to(entity, url));

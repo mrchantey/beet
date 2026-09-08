@@ -166,12 +166,12 @@ impl StaticExport {
 					.location(&node.path);
 				// the canonical url must be absolute to consolidate anything,
 				// so a site naming no origin gets the stub without one
-				let canonical = package
-					.as_ref()
-					.and_then(|package| package.absolute_url(&target).ok());
+				let canonical = package.as_ref().and_then(|package| {
+					package.absolute_url(&target.to_string()).ok()
+				});
 				Some((
 					node.path.annotated_path(),
-					redirect_stub(&target, canonical.as_deref()),
+					redirect_stub(&target, canonical.as_ref()),
 				))
 			})
 			.collect::<Vec<_>>()
@@ -181,17 +181,27 @@ impl StaticExport {
 
 /// The body of a redirect stub: a zero-delay refresh, the canonical target, and
 /// a link for a reader whose browser honours neither.
-fn redirect_stub(target: &str, canonical: Option<&str>) -> String {
+///
+/// The stylesheet is one line and it earns it: this page paints for a single
+/// frame between two real ones, which is exactly when a default white document
+/// is a flash in the eyes of anyone reading in the dark. `color-scheme` opts
+/// into the user's preference and the `Canvas`/`CanvasText` system colours
+/// follow it, so the stub inherits the reader's theme without naming a colour
+/// or knowing anything about the site's.
+fn redirect_stub(target: &Url, canonical: Option<&Url>) -> String {
 	let canonical = canonical
 		.map(|url| format!("<link rel=\"canonical\" href=\"{url}\">\n"))
 		.unwrap_or_default();
 	format!(
 		"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
 		 <meta http-equiv=\"refresh\" content=\"0; url={target}\">\n{canonical}\
-		 <title>Redirecting</title>\n</head>\n\
+		 <title>Redirecting</title>\n\
+		 <style>:root{{color-scheme:light dark}}body{{background:Canvas;color:CanvasText;\
+		 font-family:system-ui,sans-serif;margin:2rem}}</style>\n</head>\n\
 		 <body><a href=\"{target}\">Continue to {target}</a></body>\n</html>\n"
 	)
 }
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -350,7 +360,10 @@ mod test {
 			.xpect_contains(
 				r#"<link rel="canonical" href="https://beet.org/blog/full-stack-bevy">"#,
 			)
-			.xpect_contains(r#"<a href="/blog/full-stack-bevy">"#);
+			.xpect_contains(r#"<a href="/blog/full-stack-bevy">"#)
+			// the stub paints for one frame between two real pages, so it
+			// follows the reader's colour scheme rather than flashing white
+			.xpect_contains("color-scheme:light dark");
 	}
 
 	/// Exports `router` to a temp store, returning the written paths. The process
@@ -428,7 +441,7 @@ mod test {
 		exported(&paths, "secret").xpect_false();
 	}
 
-	/// Write a `published`/`secret` (frontmatter `visibility = "Draft"`) content dir under
+	/// Write a `published`/`secret` (frontmatter `visibility = "draft"`) content dir under
 	/// a per-test `name` (so parallel cases never share a directory) and return
 	/// its root.
 	// `RoutesDir` scans the filesystem store, so this is native-only.
@@ -441,7 +454,7 @@ mod test {
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
 		fs_ext::write(
 			root.join("secret.md"),
-			"+++\nvisibility = \"Draft\"\n+++\n\n# Secret",
+			"+++\nvisibility = \"draft\"\n+++\n\n# Secret",
 		)
 		.unwrap();
 		AbsPathBuf::new(root).unwrap()
@@ -462,7 +475,7 @@ mod test {
 		router
 	}
 
-	/// The `RoutesDir` shape in dev: a scan-time `visibility = "Draft"` route is
+	/// The `RoutesDir` shape in dev: a scan-time `visibility = "draft"` route is
 	/// still exported for preview.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
@@ -476,7 +489,7 @@ mod test {
 	}
 
 	/// The `RoutesDir` shape in prod: scan-time frontmatter
-	/// `visibility = "Draft"` excludes the discovered route from the export.
+	/// `visibility = "draft"` excludes the discovered route from the export.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {

@@ -32,14 +32,17 @@ pub struct PackageConfig {
 	/// The package version, defaulting to `0.0.1` and usually overridden via
 	/// `CARGO_PKG_VERSION` in [`pkg_config!`].
 	pub version: SmolStr,
-	/// The homepage URL, usually set via `CARGO_PKG_HOMEPAGE` in [`pkg_config!`].
-	pub homepage: Option<SmolStr>,
+	/// The site's origin, ie `https://beet.org`, usually set via
+	/// `CARGO_PKG_HOMEPAGE` in [`pkg_config!`]. The base every absolute url the
+	/// app publishes is resolved against (see
+	/// [`absolute_url`](Self::absolute_url)).
+	pub homepage: Option<Url>,
 	/// The absolute URL of the social card, the image a link preview shows.
 	///
 	/// Absolute because a crawler resolves it against nothing, so a relative
 	/// path yields no preview at all. Unset omits the tag and the preview falls
 	/// back to the small summary card.
-	pub social_image: Option<SmolStr>,
+	pub social_image: Option<Url>,
 	/// The brand colour a browser tints its own chrome with, ie the mobile
 	/// address bar and the Microsoft tile. Unset leaves the browser default.
 	pub theme_color: Option<SmolStr>,
@@ -76,21 +79,24 @@ impl PackageConfig {
 	/// `blog/ecs-router` -> `https://beet.org/blog/ecs-router`.
 	///
 	/// # Errors
-	/// Errors when `homepage` is unset. A sitemap `<loc>` and a feed `<link>`
-	/// are resolved against nothing, so a relative url there is not a degraded
-	/// entry but a broken one: the loud failure names the field to set.
-	pub fn absolute_url(&self, path: &str) -> Result<String> {
+	/// Errors when `homepage` is unset, or names no origin to resolve against.
+	/// A sitemap `<loc>` and a feed `<link>` are read by a crawler with no base,
+	/// so a relative url there is not a degraded entry but a broken one: the
+	/// loud failure names the field to set.
+	pub fn absolute_url(&self, path: &str) -> Result<Url> {
 		let Some(homepage) = &self.homepage else {
 			bevybail!(
 				"cannot resolve an absolute url for '{path}': `PackageConfig.homepage` is unset, set it to this site's origin, ie `<PackageConfig homepage=\"https://example.com\"/>`"
 			);
 		};
-		let homepage = homepage.trim_end_matches('/');
-		match path.trim_matches('/') {
-			"" => format!("{homepage}/"),
-			path => format!("{homepage}/{path}"),
+		if !homepage.is_external() {
+			bevybail!(
+				"cannot resolve an absolute url for '{path}': `PackageConfig.homepage` is {homepage:?}, which names no origin, ie `https://example.com`"
+			);
 		}
-		.xok()
+		// the path is rooted before the join, so it replaces the origin's path
+		// rather than resolving beside it
+		homepage.join(Url::coerce(path).with_rooted(true)).xok()
 	}
 }
 
@@ -116,7 +122,11 @@ macro_rules! pkg_config {
 			description: env!("CARGO_PKG_DESCRIPTION").into(),
 			app_name: env!("CARGO_PKG_NAME").into(),
 			version: env!("CARGO_PKG_VERSION").into(),
-			homepage: Some(env!("CARGO_PKG_HOMEPAGE").into()),
+			// an unset manifest key is no homepage, not an empty url
+			homepage: match env!("CARGO_PKG_HOMEPAGE") {
+				"" => None,
+				homepage => Some($crate::prelude::Url::coerce(homepage)),
+			},
 			// no cargo manifest key names a social card or a brand colour, so
 			// these stay the caller's to set.
 			social_image: None,
@@ -145,28 +155,26 @@ mod test {
 			homepage: Some("https://beet.org/".into()),
 			..default()
 		};
-		config
-			.absolute_url("blog/ecs-router")
-			.unwrap()
-			.xpect_eq("https://beet.org/blog/ecs-router".to_string());
-		config
-			.absolute_url("/blog/ecs-router/")
-			.unwrap()
-			.xpect_eq("https://beet.org/blog/ecs-router".to_string());
+		let url = |path: &str| config.absolute_url(path).unwrap().to_string();
+		url("blog/ecs-router").xpect_eq("https://beet.org/blog/ecs-router");
+		url("/blog/ecs-router").xpect_eq("https://beet.org/blog/ecs-router");
 		// the root path is the origin itself, with its trailing slash
-		config
-			.absolute_url("")
-			.unwrap()
-			.xpect_eq("https://beet.org/".to_string());
-		config
-			.absolute_url("/")
-			.unwrap()
-			.xpect_eq("https://beet.org/".to_string());
+		url("").xpect_eq("https://beet.org/");
+		url("/").xpect_eq("https://beet.org/");
 		PackageConfig::default()
 			.absolute_url("blog")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("PackageConfig.homepage");
+		// a homepage that names no origin cannot resolve one either
+		PackageConfig {
+			homepage: Some("/beet".into()),
+			..default()
+		}
+		.absolute_url("blog")
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("names no origin");
 	}
 
 	#[crate::test]

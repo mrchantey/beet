@@ -244,8 +244,12 @@ mod test {
 		world.entity_mut(root).insert(store);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		let children: Vec<Entity> =
-			world.entity(root).get::<Children>().unwrap().iter().collect();
+		let children: Vec<Entity> = world
+			.entity(root)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.collect();
 		children.len().xpect_eq(2);
 		// the gated branch is a childless tombstone: the `<Template src>` inside
 		// it never became an entity, so nothing resolved a store or read a path
@@ -257,7 +261,11 @@ mod test {
 			.tag
 			.as_str()
 			.xpect_eq("Fragment");
-		world.entity(children[0]).get::<Children>().is_none().xpect_true();
+		world
+			.entity(children[0])
+			.get::<Children>()
+			.is_none()
+			.xpect_true();
 		// ..while the ungated include did build, at its site
 		world
 			.entity(children[1])

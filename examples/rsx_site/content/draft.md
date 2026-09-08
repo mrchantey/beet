@@ -1,8 +1,8 @@
 +++
 title = "Draft"
-visibility = "Draft"
+visibility = "draft"
 +++
 
 # Draft
 
-A draft page, excluded from production by its `visibility = "Draft"` frontmatter.
+A draft page, excluded from production by its `visibility = "draft"` frontmatter.

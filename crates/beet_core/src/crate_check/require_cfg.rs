@@ -36,7 +36,9 @@ pub struct RequireCfg {
 impl RequireCfg {
 	/// Require `condition`, the code counterpart of the markup tag.
 	pub fn new(condition: impl Into<SmolStr>) -> Self {
-		Self { cfg: condition.into() }
+		Self {
+			cfg: condition.into(),
+		}
 	}
 
 	/// Observer: validate an inserted [`RequireCfg`] against this build,
@@ -44,13 +46,19 @@ impl RequireCfg {
 	///
 	/// Failures across several declarations inserted in the same frame all
 	/// report before the exit processes in `Last`, so one run names everything.
+	///
+	/// Gated on `bsx`, which owns the condition grammar this parses: a build
+	/// without it carries the requirement as inert data rather than failing to
+	/// compile.
+	#[cfg(feature = "bsx")]
 	pub fn check_on_insert(
 		ev: On<Insert, RequireCfg>,
 		mut commands: Commands,
 	) -> Result {
 		let entity = ev.entity;
 		commands.queue(move |world: &mut World| -> Result {
-			let Some(require) = world.entity(entity).get::<RequireCfg>().cloned()
+			let Some(require) =
+				world.entity(entity).get::<RequireCfg>().cloned()
 			else {
 				return Ok(());
 			};
@@ -92,13 +100,17 @@ pub struct CrateCheckPlugin;
 impl Plugin for CrateCheckPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<CrateRegistration>()
-			.register_type::<RequireCfg>()
-			.register_type::<CfgExcluded>()
+			.register_type::<RequireCfg>();
+		// the condition grammar and the `bx:cfg` tombstone both live in the
+		// bsx layer, so a build without it registers the requirement type but
+		// has nothing to assert it against.
+		#[cfg(feature = "bsx")]
+		app.register_type::<CfgExcluded>()
 			.add_observer(RequireCfg::check_on_insert);
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "bsx"))]
 mod test {
 	use crate::prelude::*;
 

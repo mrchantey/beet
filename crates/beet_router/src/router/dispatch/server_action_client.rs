@@ -23,7 +23,7 @@ fn server_url_cell() -> &'static Mutex<Url> {
 		let raw = beet_core::exports::web_sys::window()
 			.and_then(|window| window.location().origin().ok())
 			.unwrap_or_else(|| DEFAULT_HTTP_LOCAL_URL.to_string());
-		Mutex::new(Url::parse(raw))
+		Mutex::new(Url::coerce(raw))
 	})
 }
 

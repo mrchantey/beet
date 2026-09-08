@@ -33,7 +33,7 @@ pub fn Robots(
 						})
 						.await?;
 					Response::ok_body(
-						robots_txt(&disallow, sitemap.as_deref()),
+						robots_txt(&disallow, sitemap.as_ref()),
 						MediaType::Text,
 					)
 					.xok()
@@ -47,7 +47,7 @@ pub fn Robots(
 
 /// The policy document: a blanket allow, the caller's `Disallow` lines, then
 /// the sitemap pointer when the site names an origin to resolve it against.
-fn robots_txt(disallow: &[SmolStr], sitemap: Option<&str>) -> String {
+fn robots_txt(disallow: &[SmolStr], sitemap: Option<&Url>) -> String {
 	let mut body = String::from("User-agent: *\nAllow: /\n");
 	for path in disallow {
 		body.push_str(&format!("Disallow: {path}\n"));

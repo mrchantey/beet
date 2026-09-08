@@ -41,9 +41,9 @@ pub fn Redirect(
 	#[prop(into)]
 	path: String,
 	/// Where to send the caller: a name resolved against this route's parent
-	/// scope, or an absolute url when it starts with `/`.
+	/// scope, a rooted path taken verbatim, or another site entirely.
 	#[prop(into)]
-	redirect: String,
+	redirect: Url,
 ) -> impl Bundle {
 	(
 		RedirectTo::new(&path, redirect),
@@ -64,7 +64,7 @@ pub fn Redirect(
 						},
 					)
 					.await??;
-				Response::permanent_redirect(location).xok()
+				Response::permanent_redirect(location.to_string()).xok()
 			},
 		),
 	)
@@ -80,9 +80,10 @@ pub fn Redirect(
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct RedirectTo {
-	/// The authored target: a name resolved against this route's parent scope,
-	/// or an absolute url when it starts with `/`.
-	pub target: String,
+	/// The authored target. A [rooted](Url::is_rooted) path or another origin
+	/// is taken verbatim; anything else is a relative reference resolved
+	/// against this route's parent scope.
+	pub target: Url,
 	/// How many segments of this route's own pattern are its own, ie how many
 	/// to drop to reach the scope its ancestors set. Resolved from the authored
 	/// `path` at build, since the full pattern only exists once the tree is
@@ -93,7 +94,7 @@ pub struct RedirectTo {
 impl RedirectTo {
 	/// The target of a route declaring `path`, eg
 	/// `RedirectTo::new("post-1", "full-stack-bevy")`.
-	pub fn new(path: &str, target: impl Into<String>) -> Self {
+	pub fn new(path: &str, target: impl Into<Url>) -> Self {
 		Self {
 			target: target.into(),
 			depth: SmolPath::new(path).segments().len(),
@@ -101,17 +102,27 @@ impl RedirectTo {
 	}
 
 	/// The `Location` this route sends a caller to, resolved against the full
-	/// route `pattern` its ancestors gave it and rooted at the url space.
-	pub fn location(&self, pattern: &PathPattern) -> String {
-		if self.target.starts_with('/') {
+	/// route `pattern` its ancestors gave it.
+	///
+	/// A target naming another origin, or a rooted one, is already a complete
+	/// destination and passes through; a relative one is resolved against the
+	/// scope this route's ancestors set, which is what lets a redirect block
+	/// read as a list of renames rather than a list of absolute urls.
+	pub fn location(&self, pattern: &PathPattern) -> Url {
+		if self.target.is_external() || self.target.is_rooted() {
 			return self.target.clone();
 		}
 		let path = pattern.annotated_path();
 		let mut segments = path.segments();
 		segments.truncate(segments.len().saturating_sub(self.depth));
 		SmolPath::from_segments(&segments)
-			.join(self.target.as_str())
-			.with_leading_slash()
+			.xmap(Url::from)
+			.with_rooted(true)
+			// the scope is a directory, so the reference resolves beside a
+			// trailing segment that is not there: push an empty one for `join`
+			// to drop, exactly as a browser resolves `href` against `/blog/`
+			.push("")
+			.join(self.target.clone())
 	}
 }
 
@@ -140,6 +151,8 @@ mod test {
 
 	/// A renamed page's old url answers a 301 at the new one, resolved against
 	/// the prefix its ancestors set rather than an absolute url authored here.
+	/// A rooted target, or one naming another origin, is already a complete
+	/// destination and passes through untouched.
 	#[beet_core::test]
 	async fn redirects_within_parent_scope() {
 		let mut world = router_world();
@@ -151,6 +164,7 @@ mod test {
 				<Route path="blog">
 					<Redirect path="post-1" redirect="full-stack-bevy"/>
 					<Redirect path="post-2" redirect="/elsewhere"/>
+					<Redirect path="post-3" redirect="https://example.com/moved"/>
 				</Route>
 			})))
 			.unwrap();
@@ -163,6 +177,11 @@ mod test {
 		location(&mut world, root, "blog/post-2")
 			.await
 			.xpect_eq("/elsewhere");
+		// ..and so does another origin, which the scope could not prefix
+		// meaningfully anyway
+		location(&mut world, root, "blog/post-3")
+			.await
+			.xpect_eq("https://example.com/moved");
 	}
 
 	/// A redirect is not a page: it stays out of the navigation and out of a

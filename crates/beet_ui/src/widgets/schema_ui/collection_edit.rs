@@ -11,8 +11,8 @@
 //! button is not a submit, which is what lets a list live inside a form without
 //! committing it on every row (`fire_form_submit`).
 use super::field_layout::labeled;
-use crate::prelude::*;
 use crate::prelude::Button;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// One structural edit to a collection field, the whole vocabulary of what a

@@ -184,7 +184,9 @@ fn head_falls_back_to_the_site() {
 	let html = render_html(&mut world, root);
 	html.as_str()
 		.xpect_contains(r#"name="description" content="test""#)
-		.xpect_contains(r#"rel="canonical" href="https://example.test""#)
+		// an origin with no path canonicalizes with its root slash, as a
+		// browser normalizes one
+		.xpect_contains(r#"rel="canonical" href="https://example.test/""#)
 		.xpect_contains(r#"property="og:type" content="website""#)
 		// an undated page is a `WebPage`, not an `Article`
 		.xpect_contains(r#""@type":"WebPage""#)

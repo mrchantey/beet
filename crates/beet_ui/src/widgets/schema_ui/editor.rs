@@ -16,8 +16,8 @@
 //! it refuses lands in the editor's error line, which is where item 21's "add a
 //! default" conversation happens, with the drafted schema still in place to be
 //! fixed — or discarded with Revert.
-use crate::prelude::*;
 use crate::prelude::Button;
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// An editor for a *schema* document: a generated form over the meta-schema,

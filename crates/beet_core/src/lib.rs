@@ -49,7 +49,6 @@ pub extern crate alloc as _alloc;
 extern crate test;
 
 pub use utils::async_ext;
-pub use utils::json_ext;
 pub use utils::time_ext;
 
 // Re-export the cross_log backend at crate root so `$crate::` in macros resolves it.
@@ -279,9 +278,6 @@ pub mod prelude {
 	// (eg an SNTP client) uses to supply time. Code that needs the std
 	// `SystemTime` type imports `std::time::SystemTime` directly.
 	pub use crate::time_ext;
-	// hand-written json for a generator that must emit it in every build; a
-	// serde `Serialize` would put the whole output behind the `json` feature.
-	pub use crate::json_ext;
 
 	#[cfg(feature = "std")]
 	pub use crate::abs_file;

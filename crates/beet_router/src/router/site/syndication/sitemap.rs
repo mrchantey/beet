@@ -58,7 +58,7 @@ pub fn Sitemap() -> impl Bundle {
 #[derive(Debug, Clone, PartialEq)]
 struct SitemapEntry {
 	/// The page's absolute url.
-	loc: String,
+	loc: Url,
 	/// The page's last substantive edit as a W3C date, ie `YYYY-MM-DD`. Absent
 	/// on a page whose frontmatter names neither `updated` nor `created`.
 	lastmod: Option<String>,
@@ -91,7 +91,7 @@ impl SitemapEntry {
 		);
 		for entry in Self::collect(scope)? {
 			out.push_str("\t<url>\n");
-			out.push_str(&element(2, "loc", &entry.loc));
+			out.push_str(&element(2, "loc", &entry.loc.to_string()));
 			out.push_str(&element_opt(2, "lastmod", entry.lastmod));
 			out.push_str("\t</url>\n");
 		}

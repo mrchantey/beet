@@ -119,7 +119,7 @@ fn on_link_click(
 	else {
 		return Ok(());
 	};
-	let url = Url::parse(&href);
+	let url = Url::coerce(&href);
 	// the navigator is co-located on the link's surface; resolve it from the link
 	// rather than assuming a single global navigator, so each session acts
 	// independently.
@@ -533,10 +533,10 @@ mod test {
 	/// `Url::is_external` classifies absolute (has authority) vs relative URLs.
 	#[beet_core::test]
 	fn url_external_classification() {
-		Url::parse("https://example.com/x")
+		Url::coerce("https://example.com/x")
 			.is_external()
 			.xpect_true();
-		Url::parse("/about").is_external().xpect_false();
-		Url::parse("./next").is_external().xpect_false();
+		Url::coerce("/about").is_external().xpect_false();
+		Url::coerce("./next").is_external().xpect_false();
 	}
 }

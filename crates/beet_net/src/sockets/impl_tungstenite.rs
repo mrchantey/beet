@@ -1,6 +1,4 @@
 use crate::prelude::MaybeTls;
-use crate::prelude::Scheme;
-use crate::prelude::Url;
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use crate::prelude::stream_sniff;
@@ -12,6 +10,8 @@ use async_tungstenite::tungstenite::Error as TungError;
 use async_tungstenite::tungstenite::Message as TungMessage;
 use async_tungstenite::tungstenite::protocol::CloseFrame as TungCloseFrame;
 use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode as TungCloseCode;
+use beet_core::prelude::Scheme;
+use beet_core::prelude::Url;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use futures::FutureExt;

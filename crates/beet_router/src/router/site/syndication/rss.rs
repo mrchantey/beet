@@ -34,6 +34,14 @@ pub fn RssFeed(
 	/// loses nothing and keeps a long-lived blog's feed small.
 	#[prop(default = 20_usize)]
 	limit: usize,
+	/// Carry each entry's whole rendered body as `<content:encoded>`, so a
+	/// reader shows the post rather than a teaser. On by default: a feed a
+	/// person can actually read in their reader is the point of publishing one.
+	///
+	/// Turn it off for a summary-only feed, which also skips rendering a page
+	/// per entry on every fetch.
+	#[prop(default = true)]
+	full_content: bool,
 ) -> impl Bundle {
 	(
 		route::exchange(
@@ -50,6 +58,7 @@ pub fn RssFeed(
 						title: title.clone(),
 						description: description.clone(),
 						limit,
+						full_content,
 					};
 					Response::ok_body(
 						channel.document(&cx.caller.world(), &scope).await?,
@@ -70,6 +79,7 @@ struct FeedChannel {
 	title: Option<String>,
 	description: Option<String>,
 	limit: usize,
+	full_content: bool,
 }
 
 impl FeedChannel {
@@ -82,25 +92,30 @@ impl FeedChannel {
 	) -> Result<String> {
 		let package = &scope.package;
 		let mut out = String::from(PROLOG);
-		// the content module's namespace, declared because every item carries a
-		// `<content:encoded>` body
-		out.push_str(
-			"<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n\t<channel>\n",
-		);
+		// the content module's namespace, declared only by a feed that carries
+		// bodies: an unused namespace on a summary feed is noise
+		out.push_str(match self.full_content {
+			true => "<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">\n\t<channel>\n",
+			false => "<rss version=\"2.0\">\n\t<channel>\n",
+		});
 		out.push_str(&element(
 			2,
 			"title",
 			self.title.as_deref().unwrap_or(&package.title),
 		));
-		out.push_str(&element(2, "link", &scope.url(&scope.root)?));
+		out.push_str(&element(2, "link", &scope.url(&scope.root)?.to_string()));
 		out.push_str(&element(
 			2,
 			"description",
 			self.description.as_deref().unwrap_or(&package.description),
 		));
 		for page in FeedItem::entries(scope, self.limit) {
-			let content =
-				PageContent::render(world, scope.router, &page.path).await;
+			let content = match self.full_content {
+				true => {
+					PageContent::render(world, scope.router, &page.path).await
+				}
+				false => None,
+			};
 			out.push_str(&FeedItem::new(scope, page, content)?.render());
 		}
 		out.push_str("\t</channel>\n</rss>\n");
@@ -114,7 +129,7 @@ impl FeedChannel {
 struct FeedItem {
 	title: String,
 	/// The page's absolute url, serving as both `<link>` and `<guid>`.
-	link: String,
+	link: Url,
 	/// The publication date as RFC 2822, the format the RSS spec names.
 	pub_date: String,
 	description: Option<String>,
@@ -175,12 +190,13 @@ impl FeedItem {
 	fn render(&self) -> String {
 		let mut out = String::from("\t\t<item>\n");
 		out.push_str(&element(3, "title", &self.title));
-		out.push_str(&element(3, "link", &self.link));
+		let link = self.link.to_string();
+		out.push_str(&element(3, "link", &link));
 		// the url is the permanent identity too, which is what a reader
 		// deduplicates on across refetches
 		out.push_str(&format!(
 			"\t\t\t<guid isPermaLink=\"true\">{}</guid>\n",
-			escape(&self.link)
+			escape(&link)
 		));
 		out.push_str(&element(3, "pubDate", &self.pub_date));
 		out.push_str(&element_opt(3, "description", self.description.as_ref()));
@@ -221,13 +237,18 @@ mod test {
 	}
 
 	/// Declared inside `<Route path="blog">` the feed serves at `/blog/rss.xml`
-	/// and covers that subtree alone, and `limit` keeps it to what is new.
+	/// and covers that subtree alone, `limit` keeps it to what is new, and
+	/// `full_content=false` makes it a summary feed: no rendered bodies, and no
+	/// content namespace declared for bodies that are not there.
 	#[beet_core::test]
 	async fn scopes_and_limits() {
 		let mut world = syndication_world(Some("https://beet.org"));
 		let root = spawn_syndication_router(&mut world, rsx! {
 			<Route path="blog">
-				<RssFeed title="The Full Moon Harvest" limit=1_usize/>
+				<RssFeed
+					title="The Full Moon Harvest"
+					limit=1_usize
+					full_content=false/>
 			</Route>
 		});
 		world

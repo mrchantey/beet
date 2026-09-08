@@ -98,7 +98,7 @@ fn loopback_rewrite(request: Request) -> Result<Request> {
 #[cfg(not(target_arch = "wasm32"))]
 fn loopback_to_port(mut request: Request, port: u16) -> Request {
 	let url = request.url_mut();
-	*url = core::mem::replace(url, Url::NONE)
+	*url = core::mem::replace(url, Url::ROOT)
 		.with_scheme(Scheme::Http)
 		.with_authority(format!("127.0.0.1:{port}"));
 	request

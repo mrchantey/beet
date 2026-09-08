@@ -139,7 +139,7 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
 	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));
 	let url = device_url(cx.input.request_parts())?;
-	let target = Url::parse(format!("{url}/{route}"));
+	let target = Url::coerce(format!("{url}/{route}"));
 	let (mut parts, body) = cx.input.into_parts();
 	// redirect the request onto the device, keeping its query + fragment.
 	*parts.url_mut() = parts.url().forward(&target);
