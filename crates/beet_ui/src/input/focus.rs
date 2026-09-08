@@ -141,7 +141,13 @@ pub struct Focusable;
 
 /// Tags that are focusable by default, mirroring the browser's sequential focus
 /// navigation order.
-const FOCUSABLE_TAGS: &[&str] = &["input", "button", "a", "textarea", "select"];
+///
+/// `summary` is in the list for the same reason a browser puts it there: it is
+/// the control half of a `<details>`, so a disclosure a mouse can open is one
+/// Tab can reach. [`activate_focused_on_enter`] already synthesizes the
+/// `PointerUp` its toggle listens for, so Enter opens it with nothing else.
+const FOCUSABLE_TAGS: &[&str] =
+	&["input", "button", "a", "textarea", "select", "summary"];
 
 /// Registers the focus model, focusable inference, click-to-focus, Tab
 /// traversal, the `:focus` state sync, and the keyboard-to-[`Value`] system.

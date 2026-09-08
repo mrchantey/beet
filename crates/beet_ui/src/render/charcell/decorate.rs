@@ -693,6 +693,38 @@ mod disclosure_test {
 		host.frame_plain().xnot().xpect_contains("Body text");
 	}
 
+	/// A `<details>` is reachable and operable by keyboard: Tab focuses its
+	/// summary and Enter toggles it.
+	///
+	/// The demo's edit mode is a disclosure, so a summary Tab skipped made the
+	/// headline feature mouse-only.
+	#[beet_core::test]
+	fn tab_and_enter_toggle_details() {
+		let mut host = TestHost::sized(UVec2::new(40, 12));
+		host.spawn_content(rsx! {
+			<details><summary>"More"</summary><p>"Body text"</p></details>
+		});
+		host.step();
+		host.step();
+		host.frame_plain().xnot().xpect_contains("Body text");
+
+		// Tab reaches the summary ...
+		host.send_input(b"\t");
+		host.step();
+		host.step();
+		let summary = element_by_tag(&mut host, "summary");
+		host.app
+			.world()
+			.entity(summary)
+			.contains::<Focus>()
+			.xpect_true();
+		// ... and Enter opens it, through the same PointerUp the click path fires
+		host.send_input(b"\r");
+		host.step();
+		host.step();
+		host.frame_plain().xpect_contains("Body text");
+	}
+
 	/// A styled disclosure collapses every one of its several children, which is
 	/// the shape a generated form takes: each row of a nested struct is its own
 	/// `<label>`, and the material rule set gives a `<label>` a display of its

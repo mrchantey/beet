@@ -41,6 +41,11 @@ pub(self) use query::*;
 mod renderer;
 mod scrollbar;
 pub(self) use scrollbar::*;
+// the focus model lives behind `keyboard`, so scroll-into-view does too.
+#[cfg(feature = "keyboard")]
+mod scroll_into_view;
+#[cfg(feature = "keyboard")]
+pub(crate) use scroll_into_view::*;
 #[cfg(feature = "tui")]
 mod scrollbar_hit_test;
 #[cfg(feature = "tui")]

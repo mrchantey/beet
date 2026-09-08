@@ -21,6 +21,91 @@ pub(super) fn labeled<M>(
 	}
 }
 
+/// The label a named field wears: its own hint verbatim, else its key made
+/// readable.
+///
+/// A key is an identifier and reads like one — a form that asks for
+/// `allow_additional` and `min_items` is showing its wiring. The schema's own
+/// `label` still wins untouched, since an author who named a field meant it.
+///
+/// Deliberately unmarked for `required`: a field is required by default, so the
+/// conventional `*` would land on almost every label and distinguish nothing.
+/// The one place it matters — a commit that would leave existing rows invalid —
+/// names the field in the editor's error line.
+pub(super) fn field_label(named: &NamedFieldSchema) -> String {
+	named
+		.label
+		.as_ref()
+		.map(|label| label.to_string())
+		.unwrap_or_else(|| humanize(&named.key))
+}
+
+/// An identifier as a person reads it: `on_missing` becomes `On missing`.
+///
+/// Sentence case rather than title case, because a key is a phrase (`allow
+/// additional`), not a heading, and capitalising every word reads as a menu.
+pub(super) fn humanize(key: &str) -> String {
+	let spaced = key.replace(['_', '-'], " ");
+	let mut chars = spaced.chars();
+	match chars.next() {
+		Some(first) => first.to_uppercase().chain(chars).collect(),
+		None => spaced,
+	}
+}
+
+/// Pair a generated field with its schema's description, rendered as help text
+/// under the control.
+///
+/// A description is the one thing a schema says *to the person filling the form*
+/// and nothing rendered it, so every hint an author wrote was invisible. The
+/// pair rides its own tight column so the form's row gap separates fields rather
+/// than a field from its own help.
+pub(super) fn hinted(hint: Option<&str>, field: Snippet) -> Snippet {
+	match hint {
+		None => field,
+		Some(hint) => {
+			let hint = hint.to_string();
+			rsx! {
+				<div {hint_column()}>
+					{field}
+					<small {hint_style()}>{hint}</small>
+				</div>
+			}
+			.any_snippet()
+		}
+	}
+}
+
+/// The field-plus-help column: tight, so the help sits against its control.
+fn hint_column() -> impl Bundle {
+	inline_class![
+		(style::common_props::DisplayProp, style::Display::Flex),
+		(
+			style::common_props::FlexDirectionProp,
+			style::Direction::Vertical
+		),
+		(
+			style::common_props::AlignItemsProp,
+			style::AlignItems::Stretch
+		),
+	]
+}
+
+/// Help text: the muted, smaller voice a hint speaks in, so it reads as
+/// guidance rather than as another field.
+fn hint_style() -> impl Bundle {
+	inline_class![
+		Declaration::token(
+			style::common_props::ForegroundColor,
+			style::material::colors::OnSurfaceVariant
+		),
+		Declaration::token(
+			style::common_props::FontSize,
+			style::material::typography::FontSizeBodySmall
+		),
+	]
+}
+
 /// Wrap a composite's rows in a titled section, or pass them through when there
 /// is no title (the form's own top level, which is already the group).
 ///
@@ -50,6 +135,11 @@ pub(super) fn group<M>(
 /// font renders fullwidth — right for a page's own headings, wrong for a group
 /// of inputs, where a poster-set `Ｉｔｅｍ　１` shouts over the fields it names.
 /// Body size at the heading's weight keeps the hierarchy without the scale.
+///
+/// The prose margin goes with it: `h1`-`h6` carry a `1rem` bottom gap for
+/// paragraphs to breathe under, which on a terminal is a whole blank row
+/// between a group's title and its first field. A title belongs *to* the
+/// fields under it, so it sits against them.
 fn group_title_style() -> impl Bundle {
 	inline_class![
 		Declaration::token(
@@ -60,6 +150,28 @@ fn group_title_style() -> impl Bundle {
 			style::common_props::LineHeight,
 			style::material::typography::LineHeightBodyLarge
 		),
+		(style::common_props::MarginProp, style::Spacing::DEFAULT),
+	]
+}
+
+/// What an empty collection shows in place of its rows.
+///
+/// An empty list otherwise renders as *nothing*: a heading, a gap, and an add
+/// button floating in space, which reads as a broken widget rather than an
+/// empty one. Muted and italic, because it is the absence of content and must
+/// never be mistaken for a value.
+pub(super) fn empty_note(text: &'static str) -> Snippet {
+	rsx! { <div {empty_note_style()}>{text}</div> }.any_snippet()
+}
+
+/// The empty note's voice.
+fn empty_note_style() -> impl Bundle {
+	inline_class![
+		Declaration::token(
+			style::common_props::ForegroundColor,
+			style::material::colors::OnSurfaceVariant
+		),
+		(style::common_props::FontStyleProp, style::FontStyle::Italic),
 	]
 }
 

@@ -67,6 +67,25 @@ pub(crate) fn clamp_scroll_positions<B: Component + AsBuffer>(
 	}
 }
 
+/// The scrollable extent of `entity` in cells (its
+/// [`max_offset`](ScrollState::max_offset)), or `None` when it is not a scroll
+/// container.
+///
+/// The shared "can this container scroll, and how far" question: the wheel and
+/// keyboard routing ask it while walking for a target, and scroll-into-view asks
+/// it to clamp a focused element's rect into the scrollport.
+pub(super) fn scrollable_extent(
+	entity: Entity,
+	query: &CharcellQuery,
+	viewport: UVec2,
+) -> Option<IVec2> {
+	query
+		.unresolved_node(entity)
+		.ok()
+		.filter(|node| node.is_scroll_container())
+		.map(|node| scroll_state(&node, query, viewport).max_offset())
+}
+
 /// Build the [`ScrollState`] for a scroll-container node: its scrollable content
 /// size against its scrollport (the laid-out content rect minus the reserved
 /// gutter), recomputed from the box model with the same `viewport` as the layout

@@ -12,6 +12,7 @@
 #![cfg(test)]
 
 use super::*;
+use crate::input::RenderSurface;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 
@@ -46,11 +47,22 @@ impl TestHost {
 
 		// the host entity stands in for a window surface: it carries the channel
 		// terminal, its paired Terminal, and the DoubleBuffer the pipeline paints.
+		//
+		// `RenderSurface(self)` makes it its own surface, which is what the
+		// per-surface input systems resolve against: `tab_focus` and
+		// `write_focus_input` scope their work to elements whose surface matches
+		// the key's window, so without it every keystroke in a test is discarded
+		// as belonging to no session.
 		let (channel, terminal) =
 			ChannelTerminal::new(TerminalConfig::default());
 		let host = app
 			.world_mut()
-			.spawn((channel, terminal, DoubleBuffer::new(size)))
+			.spawn((
+				channel,
+				terminal,
+				DoubleBuffer::new(size),
+				RenderSurface::self_referential(),
+			))
 			.id();
 		// the host carries its own Pointer (required by Terminal); run one update
 		// to settle Startup before any stepping.

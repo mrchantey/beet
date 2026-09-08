@@ -17,10 +17,29 @@
 //! binding, a list's rows through [`ReactiveChildren`], and the layout itself
 //! through the [`SchemaRebuild`] it holds, so a committed schema edit grows the
 //! table a column.
+use super::field_layout::empty_note;
+use super::field_layout::humanize;
 use super::schema_rebuild::SchemaRebuild;
 use super::schema_rebuild::SchemaSource;
+use super::value_rebuild::ValueRebuild;
 use crate::prelude::*;
 use beet_core::prelude::*;
+
+/// The name a field reads under: its own label hint verbatim, else its key made
+/// readable.
+///
+/// A view names no `required`, unlike the form's [`field_label`]: a column
+/// header describes what is in the column, and whether the schema demands a
+/// value is a question for whoever is filling it in.
+///
+/// [`field_label`]: super::field_layout::field_label
+fn column_label(named: &NamedFieldSchema) -> String {
+	named
+		.label
+		.as_ref()
+		.map(|label| label.to_string())
+		.unwrap_or_else(|| humanize(&named.key))
+}
 
 /// Cap on nested [`ValueSchema::Struct`] recursion, the twin of
 /// [`DynamicForm`]'s: a schema graph is finite by construction, so this is a
@@ -171,7 +190,7 @@ fn struct_block<'a>(
 				field_path: field.field_path.with_pushed(named.key.clone()),
 				on_missing: default(),
 			};
-			let label = named.label.as_ref().unwrap_or(&named.key).to_string();
+			let label = column_label(named);
 			view_field(cx, &named.schema, child, Some(label), depth + 1)
 		})
 		.collect::<Vec<_>>();
@@ -242,7 +261,7 @@ fn item_table(cx: ViewCx<'_>, item: &StructSchema, field: FieldRef) -> Snippet {
 		.iter()
 		.map(|named| Column {
 			key: named.key.clone(),
-			label: named.label.clone().unwrap_or_else(|| named.key.clone()),
+			label: column_label(named).into(),
 		})
 		.collect::<Vec<_>>();
 	let headers = columns
@@ -255,15 +274,33 @@ fn item_table(cx: ViewCx<'_>, item: &StructSchema, field: FieldRef) -> Snippet {
 	if cx.vertical_lines {
 		class_set.insert_class(classes::TABLE_VERTICAL_BORDERS);
 	}
+	// the empty note is a sibling of the table rather than a row in it, so it
+	// needs no colspan and cannot be mistaken for data. It rides its own
+	// `ValueRebuild` keyed on emptiness alone, so it is built once per
+	// transition rather than once per appended item.
+	let empty = ValueRebuild::new(
+		|value| is_empty_list(value).to_string().into(),
+		|_resolver, value| match is_empty_list(value) {
+			true => empty_note("No items yet"),
+			false => Snippet::from_bundle(()),
+		},
+	);
 	rsx! {
 		<table {class_set}>
 			<thead><tr>{headers}</tr></thead>
 			<tbody {(
-				field,
+				field.clone(),
 				ReactiveChildren::new(move |_index, item| row(&columns, item)),
 			)}/>
 		</table>
+		<div {(field, empty)}/>
 	}
+}
+
+/// Whether a value is a list with nothing in it, which is also how a field the
+/// document has yet to answer reads.
+fn is_empty_list(value: &Value) -> bool {
+	value.as_list().map(Vec::is_empty).unwrap_or(true)
 }
 
 /// One generated column: the item field its cells bind, and the header text
@@ -372,9 +409,9 @@ mod test {
 			FieldRef::default(),
 			settings(),
 		)
-		.xpect_contains("is_enabled: ")
+		.xpect_contains("Is enabled: ")
 		.xpect_contains("true")
-		.xpect_contains("retries: ")
+		.xpect_contains("Retries: ")
 		.xpect_contains("3");
 	}
 
@@ -401,10 +438,10 @@ mod test {
 	#[beet_core::test]
 	fn a_nested_struct_reads_as_a_titled_block() {
 		view(ValueSchema::of::<Account>(), FieldRef::default(), account())
-			.xpect_contains("name: ")
-			.xpect_contains("<strong>settings</strong>")
+			.xpect_contains("Name: ")
+			.xpect_contains("<strong>Settings</strong>")
 			.xpect_contains("<hr")
-			.xpect_contains("is_enabled: ");
+			.xpect_contains("Is enabled: ");
 	}
 
 	/// Every leaf binds its own path and nothing else, the read half of the
@@ -453,8 +490,8 @@ mod test {
 			FieldRef::new("items"),
 			todos(),
 		)
-		.xpect_contains("<th>label</th>")
-		.xpect_contains("<th>done</th>")
+		.xpect_contains("<th>Label</th>")
+		.xpect_contains("<th>Done</th>")
 		.xpect_contains("buy milk")
 		.xpect_contains("walk dog")
 		.xpect_contains("true");
@@ -559,7 +596,7 @@ mod test {
 		));
 		world.update_local();
 		test_ext::render_world(&mut world, root)
-			.xpect_contains("<th>label</th>")
+			.xpect_contains("<th>Label</th>")
 			.xpect_contains("buy milk");
 	}
 
@@ -572,9 +609,9 @@ mod test {
 			Document::new(account()),
 			rsx! { <DynamicView schema={ValueSchema::of::<Account>()}/> },
 		)
-		.xpect_contains("name: ada")
-		.xpect_contains("settings")
+		.xpect_contains("Name: ada")
+		.xpect_contains("Settings")
 		.xpect_contains("─")
-		.xpect_contains("is_enabled: true");
+		.xpect_contains("Is enabled: true");
 	}
 }

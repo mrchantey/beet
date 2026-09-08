@@ -326,6 +326,80 @@ mod test {
 		host.step();
 	}
 
+	/// A `<select>` that is the only child of a block container keeps its box and
+	/// opens a real panel.
+	///
+	/// The lone-child case is the one a generated form hits: a payload-less enum
+	/// variant (`on_missing: null`, a new field's `Any`) puts the variant select
+	/// alone in its holder, where an inline formatting context used to flatten
+	/// the control's border away and splice the open dropdown's rows into the
+	/// same text run — `▾AnyAnyNullBoolI64…` on one line.
+	#[beet_core::test]
+	fn lone_select_keeps_its_box_and_panel() {
+		let mut host = host_showing(rsx! {
+			<div>
+				<Select name="role">
+					<option value="alpha">"Alpha"</option>
+					<option value="beta">"Beta"</option>
+				</Select>
+			</div>
+		});
+		host.frame_plain().xpect_contains("┌");
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		host.frame_plain().xnot().xpect_contains("AlphaBeta");
+	}
+
+	/// The same shape a `DynamicForm` generates: a payload-less enum variant puts
+	/// the variant select alone in its holder, and it must still open a panel.
+	#[beet_core::test]
+	fn generated_variant_select_opens_a_panel() {
+		let mut host = TestHost::sized(UVec2::new(40, 20));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.spawn_content(rsx! {
+			<DynamicForm
+				schema={ValueSchema::Enum(EnumSchema {
+					// payload-carrying, so the form generates a `VariantSelect`;
+					// the *chosen* variant `Alpha` is a unit one, so the select is
+					// the holder's only child
+					variants: vec![
+						VariantSchema { name: "Alpha".into(), payload: None },
+						VariantSchema {
+							name: "Beta".into(),
+							payload: Some(ValueSchema::Bool(default())),
+						},
+					],
+					..default()
+				})}
+				field={FieldRef::new("choice")}/>
+		});
+		for _ in 0..4 {
+			host.step();
+		}
+		host.frame_plain().xpect_contains("┌");
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		host.frame_plain().xnot().xpect_contains("AlphaBeta");
+	}
+
+	/// A lone text control keeps its box once it holds a value.
+	///
+	/// The same mechanism read from the other end: a control counts as
+	/// inline-level only when it has something to show, so before this fix an
+	/// `<input>` alone in a `<div>` was a proper box while empty and lost its
+	/// border the moment you typed into it.
+	#[beet_core::test]
+	fn lone_text_field_keeps_its_box_when_filled() {
+		let host = host_showing(rsx! {
+			<div><TextField {Value::new("typed")}/></div>
+		});
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("typed")
+			.xpect_contains("┌");
+	}
+
 	/// An authored `<select>` inside a `<label>` opens its panel too: the label
 	/// is a flex column (the shipped rule, so a key sits above its control), and
 	/// an absolutely positioned dropdown must still leave that flow rather than

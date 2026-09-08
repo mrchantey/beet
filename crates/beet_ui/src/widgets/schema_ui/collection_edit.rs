@@ -10,6 +10,7 @@
 //! Every button is a `<button type="button">`: the browser's rule that an action
 //! button is not a submit, which is what lets a list live inside a form without
 //! committing it on every row (`fire_form_submit`).
+use super::field_layout::labeled;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -83,7 +84,13 @@ pub(super) fn add_entry_row(
 ) -> Snippet {
 	rsx! {
 		<div>
-			<TextField {NewEntryKey} placeholder="key"/>
+			// labelled, not merely placeheld: the charcell renderer paints no
+			// placeholder, so on a terminal this is otherwise an unexplained
+			// empty box beside a button
+			{labeled(
+				Some("New key".into()),
+				rsx! { <TextField {NewEntryKey} placeholder="key"/> },
+			)}
 			{edit_button(label, field, CollectionEdit::Insert(zero))}
 		</div>
 	}
@@ -155,11 +162,20 @@ fn new_entry_key(
 	parents: &Query<&ChildOf>,
 	new_keys: &Query<(), With<NewEntryKey>>,
 ) -> Option<Entity> {
-	children
-		.get(parents.get(button).ok()?.parent())
-		.ok()?
-		.iter()
-		.find(|sibling| new_keys.contains(*sibling))
+	// a descendant walk of the add row rather than a scan of the button's own
+	// siblings: the input wears a `<label>` (its key is not self-evident on a
+	// terminal, which paints no placeholder), so it sits a level deeper than the
+	// button it belongs to.
+	let mut stack = vec![parents.get(button).ok()?.parent()];
+	while let Some(entity) = stack.pop() {
+		if new_keys.contains(entity) {
+			return Some(entity);
+		}
+		if let Ok(kids) = children.get(entity) {
+			stack.extend(kids.iter());
+		}
+	}
+	None
 }
 
 /// A map field's entries, coercing a missing or null field into an empty map

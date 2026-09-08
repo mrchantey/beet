@@ -95,6 +95,23 @@ pub fn button_text() -> Rule {
 		.with_token(common_props::ForegroundColor,colors::OnSurface).unwrap()
 }
 
+/// Focused button - a primary-colored outline, the button's half of the focus
+/// ring `.input:focus` gives a text field.
+///
+/// Matches the tag as well as the class, like [`button_base`], so a `.btn` link
+/// rings too. Without it Tab lands on `Remove` or `Apply` with nothing on
+/// screen changing, and the next Enter is a blind press — on the terminal,
+/// where there is no cursor to follow, that is the whole affordance.
+pub fn button_focus() -> Rule {
+	Rule::new()
+		.with_selector(Selector::AllOf(vec![
+			Selector::tag("button").merge_any(Selector::class(BTN)),
+			Selector::state(ElementState::Focused),
+		]))
+		.with_token(common_props::BorderColorProp,colors::Primary).unwrap()
+		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
+}
+
 /// Tonal button - medium emphasis with secondary container color.
 pub fn button_tonal() -> Rule {
 	button_contained(BTN_TONAL, colors::SecondaryContainer, colors::OnSecondaryContainer, geometry::Elevation0)

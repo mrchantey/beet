@@ -346,7 +346,7 @@ mod test {
 		test_ext::settle_world(&mut world);
 
 		test_ext::render_world(&mut world, root)
-			.xpect_contains("<th>done</th>")
+			.xpect_contains("<th>Done</th>")
 			.xpect_contains("buy milk");
 	}
 
@@ -371,7 +371,7 @@ mod test {
 		test_ext::settle_world(&mut world);
 
 		test_ext::render_world(&mut world, root)
-			.xpect_contains("name")
+			.xpect_contains("Name")
 			.xpect_contains("buy milk");
 	}
 }

@@ -81,16 +81,28 @@ pub(super) fn measure_scaled(
 /// label — generated content replaces a raw [`Value`], which for a form
 /// control is submission state, not display text), else its [`Value`]; a
 /// no-op when it has neither.
+///
+/// A focused text control also paints an insertion [`CARET`] past its value.
 pub(super) fn paint_text(
 	node: &CharcellNodeData,
 	content_rect: IRect,
 	buffer: &mut impl AsBuffer,
 	clip: Clip,
 ) -> Result {
+	// a focused text control shows where the next character lands. A `<select>`
+	// or checkbox is excluded by its [`Marker`]: state to read, not text to type.
+	let caret =
+		node.is_focused() && node.is_control() && node.marker().is_none();
 	let mut text = match (node.marker(), node.value()) {
 		(Some(marker), _) => marker.to_string(),
 		(None, Some(value)) => value.to_string(),
-		(None, None) => return Ok(()),
+		// nothing typed: the caret alone, in the cell [`measure_text`] reserves
+		(None, None) => {
+			if caret {
+				paint_caret(node, content_rect, content_rect.min, buffer, clip);
+			}
+			return Ok(());
+		}
 	};
 	let mut visual = node.visual_style().clone();
 	let entity = node.entity;
@@ -139,6 +151,9 @@ pub(super) fn paint_text(
 		visual.clone().with_decoration_line(DecorationLine::DEFAULT);
 	let width = content_rect.width().max(0) as u32;
 	let lines = word_wrap(&text, width, space);
+	// the caret follows the last painted line's glyphs: the edit model is
+	// append-only, so the insertion point is always the end of the value.
+	let mut caret_pos = None;
 	for (i, line) in lines.iter().enumerate() {
 		let y = content_rect.min.y + i as i32;
 		if y >= content_rect.max.y {
@@ -177,8 +192,43 @@ pub(super) fn paint_text(
 				buffer.set_link(UVec2::new(col, y.max(0) as u32), link);
 			}
 		}
+		if caret {
+			caret_pos = Some(IVec2::new(
+				content_rect.min.x + (offset + glyph_width) as i32,
+				y,
+			));
+		}
+	}
+	// painted last, so the caret is never overwritten by its own line
+	if let Some(pos) = caret_pos {
+		paint_caret(node, content_rect, pos, buffer, clip);
 	}
 	Ok(())
+}
+
+/// The insertion caret of a focused text control: a bar on the left edge of the
+/// cell the next character lands in.
+const CARET: &str = "▏";
+
+/// Paint the [`CARET`] at `pos`, unless the value has already filled the box and
+/// left no cell for it: a typed character is worth more than the caret.
+fn paint_caret(
+	node: &CharcellNodeData,
+	content_rect: IRect,
+	pos: IVec2,
+	buffer: &mut impl AsBuffer,
+	clip: Clip,
+) {
+	if pos.x >= content_rect.max.x {
+		return;
+	}
+	buffer.write_text(
+		pos,
+		CARET,
+		node.visual_style().clone(),
+		node.entity,
+		clip,
+	);
 }
 
 // ── Word wrap ─────────────────────────────────────────────────────────────────
@@ -274,6 +324,41 @@ mod tests {
 	}
 	fn render_pluses(bundle: impl Bundle) -> String {
 		render(bundle).replace(" ", "+")
+	}
+
+	/// [`render`] as plain text, for asserting on painted glyphs alone.
+	#[cfg(feature = "keyboard")]
+	fn render_plain(bundle: impl Bundle) -> String {
+		Buffer::render_oneshot_plain_sized(UVec2::new(10, 1), bundle)
+			.trim_lines()
+	}
+
+	/// A focused text control paints an insertion caret past its value, so the
+	/// field shows where the next character lands; unfocused it paints its value
+	/// alone. An empty focused control gets the caret in the cell
+	/// [`measure_text`] already reserves for it, so focus never reflows the box.
+	#[cfg(feature = "keyboard")]
+	#[beet_core::test]
+	fn focused_control_paints_a_caret() {
+		render_plain(rsx! { <input {(Value::str("hi"), Focus)}/> })
+			.xpect_eq(format!("hi{CARET}"));
+		render_plain(rsx! { <input {Value::str("hi")}/> })
+			.xpect_eq("hi".to_string());
+		render_plain(rsx! { <input {Focus}/> }).xpect_eq(CARET.to_string());
+		render_plain(rsx! { <input/> }).xpect_eq(String::new());
+	}
+
+	/// A focused `<select>` or checkbox paints its [`Marker`] with no caret:
+	/// their state is read and toggled, never typed into.
+	#[cfg(feature = "keyboard")]
+	#[beet_core::test]
+	fn marker_controls_paint_no_caret() {
+		render_plain(rsx! { <input type="checkbox" {Focus}/> })
+			.xnot()
+			.xpect_contains(CARET);
+		render_plain(rsx! { <select {Focus}><option>"a"</option></select> })
+			.xnot()
+			.xpect_contains(CARET);
 	}
 
 	/// An empty form control is still a target: a field with nothing typed is

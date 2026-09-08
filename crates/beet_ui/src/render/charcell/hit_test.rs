@@ -242,6 +242,11 @@ pub(crate) fn pointer_input(
 /// 3. else the outermost scroll container of a buffer-root tree (the page
 ///    scrollport), so arrow/page keys scroll the document by default.
 ///
+/// A focused text control keeps the horizontal arrows (see [`is_text_control`]):
+/// they are caret keys while typing, so scrolling the page sideways under the
+/// typist is not an option. Up/Down keep scrolling either way, so a long form
+/// stays readable without leaving the field.
+///
 /// A `ScrollPosition` change repaints via change detection.
 //
 // crate-visible (not `pub`): it reads the crate-internal `CharcellTree`, like the
@@ -251,11 +256,13 @@ pub(crate) fn scroll_input(
 	mut keys: MessageReader<KeyboardInput>,
 	pointers: Query<&Pointer>,
 	focused: Query<Entity, With<Focus>>,
-	parents: Query<&ChildOf>,
-	// transclusion: a `Portal` holder is the charcell parent of the entity it
-	// points at, so the ancestor walk can cross from transcluded content (eg a
-	// page) up into the holder's container (eg the page-host scrollport).
-	refs: Query<&PortalOf>,
+	// the focused element's tag, to leave a text field its own arrow keys.
+	elements: ElementQuery,
+	// the shared per-surface resolver, so the focused element consulted for a
+	// key is the one on the key's own surface.
+	surfaces: SurfaceQuery,
+	// the ancestor walk (crossing `Portal` transclusion) that resolves which
+	// container a hovered/focused element scrolls.
 	tree: CharcellTree,
 	roots: Query<(Entity, &DoubleBuffer)>,
 	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
@@ -290,10 +297,15 @@ pub(crate) fn scroll_input(
 		let alt = pressed
 			.iter()
 			.any(|key| matches!(key, KeyCode::AltLeft | KeyCode::AltRight));
+		// this surface is being typed into: its horizontal arrows are the field's.
+		let typing = focused
+			.iter()
+			.filter(|entity| surfaces.matches(*entity, *surface))
+			.any(|entity| is_text_control(entity, &elements));
 		let delta = deltas.entry(*surface).or_default();
 		for key in pressed {
 			match key {
-				KeyCode::ArrowLeft | KeyCode::ArrowRight if alt => {}
+				KeyCode::ArrowLeft | KeyCode::ArrowRight if alt || typing => {}
 				KeyCode::ArrowDown => delta.y += KEY_SCROLL_LINES,
 				KeyCode::ArrowUp => delta.y -= KEY_SCROLL_LINES,
 				KeyCode::ArrowRight => delta.x += KEY_SCROLL_LINES,
@@ -328,41 +340,18 @@ pub(crate) fn scroll_input(
 			let charcell = params.p0();
 			// whether `entity` is a scroll container that can move on the delta axis.
 			let can_scroll = |entity: Entity| {
-				charcell
-					.unresolved_node(entity)
-					.ok()
-					.filter(|node| node.is_scroll_container())
-					.map(|node| {
-						scroll_state(&node, &charcell, viewport).max_offset()
-					})
-					.is_some_and(|max| {
+				scrollable_extent(entity, &charcell, viewport).is_some_and(
+					|max| {
 						(delta.y != 0 && max.y > 0)
 							|| (delta.x != 0 && max.x > 0)
-					})
+					},
+				)
 			};
-			// the nearest ancestor (self-inclusive) that can scroll the delta axis.
+			// the nearest visual ancestor (self-inclusive) that can scroll the delta
+			// axis, so a pinned/zero-extent inner container falls through.
 			let scrollable_ancestor = |start: Entity| {
-				let mut current = Some(start);
-				loop {
-					let entity = current?;
-					if can_scroll(entity) {
-						break Some(entity);
-					}
-					// transclusion wins for *visual* ancestry: a Portal holder is the
-					// visual parent of the entity it renders in place; else walk ChildOf.
-					current = refs
-						.get(entity)
-						.ok()
-						.and_then(|render_ref_of| {
-							render_ref_of.holders().first().copied()
-						})
-						.or_else(|| {
-							parents
-								.get(entity)
-								.ok()
-								.map(|child_of| child_of.parent())
-						});
-				}
+				tree.visual_ancestors(start)
+					.find(|entity| can_scroll(*entity))
 			};
 			pointers
 				.get(surface)
@@ -391,6 +380,17 @@ pub(crate) fn scroll_input(
 			}
 		}
 	}
+}
+
+/// Whether `entity` is a text control: an `<input>` other than a checkbox, or a
+/// `<textarea>`. These are the elements whose keyboard *is* text entry, so the
+/// horizontal arrows belong to their caret rather than to the page scroll.
+fn is_text_control(entity: Entity, elements: &ElementQuery) -> bool {
+	elements.get(entity).is_ok_and(|view| match view.tag() {
+		"input" => view.attribute_string("type") != "checkbox",
+		"textarea" => true,
+		_ => false,
+	})
 }
 
 /// Convert a bevy cursor [`Vec2`] (cell-space, 1:1) to a signed cell.
@@ -815,6 +815,97 @@ mod test {
 			host.step();
 			max_offset(&mut host, |offset| offset.y).xpect_eq(0);
 		}
+	}
+
+	/// A focused text field keeps the horizontal arrows: Left/Right are caret
+	/// keys while typing, so they must not scroll the page sideways under the
+	/// typist. Up/Down still scroll, so a long form is readable without leaving
+	/// the field.
+	#[beet_core::test]
+	fn focused_field_keeps_horizontal_arrows() {
+		let mut host = TestHost::sized(UVec2::new(20, 6));
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
+				// a page scrollport that can move on both axes
+				Rule::class("page")
+					.with_value(common_props::Width, Length::Rem(10.))
+					.with_value(common_props::Height, Length::Rem(3.))
+					.with_value(common_props::OverflowXProp, Overflow::Scroll)
+					.with_value(common_props::OverflowYProp, Overflow::Scroll),
+			]);
+		// long unbroken rows, so the page overflows on both axes.
+		let row: String =
+			('a'..='z').chain('A'..='Z').cycle().take(78).collect();
+		let body = (0..30)
+			.map(|i| format!("r{i}{row}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		host.spawn_content(rsx! {
+			<div class="page">
+				<input {Value::str("hi")}/>
+				<input type="checkbox"/>
+				<pre>{body}</pre>
+			</div>
+		});
+		host.step();
+
+		// Tab into the field.
+		host.send_input(b"\t");
+		host.step();
+		let text_field = host
+			.app
+			.world_mut()
+			.run_system_once(|elements: ElementQuery| {
+				elements
+					.iter()
+					.find(|view| view.tag() == "input")
+					.map(|view| view.entity)
+			})
+			.unwrap()
+			.unwrap();
+		host.app
+			.world()
+			.entity(text_field)
+			.contains::<Focus>()
+			.xpect_true();
+
+		// wheel the page sideways (a wheel is never a caret key), so a stolen
+		// arrow is detectable in either direction. Focus has already scrolled its
+		// own field into view, so this is the baseline the arrows must not move.
+		host.send_input(&sgr(35, 1, 1, true));
+		host.step();
+		for _ in 0..3 {
+			host.send_input(&sgr(67, 1, 1, true));
+			host.step();
+		}
+		let scrolled_x = max_offset(&mut host, |offset| offset.x);
+		(scrolled_x > 0).xpect_true();
+
+		// the arrows now belong to the caret: neither moves the page sideways.
+		host.send_input(b"\x1b[C");
+		host.step();
+		max_offset(&mut host, |offset| offset.x).xpect_eq(scrolled_x);
+		host.send_input(b"\x1b[D");
+		host.step();
+		max_offset(&mut host, |offset| offset.x).xpect_eq(scrolled_x);
+
+		// ...but the vertical arrows still scroll, so the form stays readable.
+		let scrolled_y = max_offset(&mut host, |offset| offset.y);
+		host.send_input(b"\x1b[B");
+		host.step();
+		(max_offset(&mut host, |offset| offset.y) > scrolled_y).xpect_true();
+
+		// Tab on to the checkbox, which has no caret to feed: the horizontal
+		// arrows are the page's again. Focusing it scrolls it into view, so take
+		// a fresh baseline.
+		host.send_input(b"\t");
+		host.step();
+		let checkbox_x = max_offset(&mut host, |offset| offset.x);
+		host.send_input(b"\x1b[C");
+		host.step();
+		(max_offset(&mut host, |offset| offset.x) > checkbox_x).xpect_true();
 	}
 
 	/// Hovering a link plays the hover tokens through the whole chain: the

@@ -307,7 +307,7 @@ async fn report(
 	error_line: Option<Entity>,
 	outcome: Result,
 ) -> Result {
-	let message = outcome.err().map(|err| err.to_string()).unwrap_or_default();
+	let message = outcome.err().map(commit_message).unwrap_or_default();
 	let Some(error_line) = error_line else {
 		bevybail!("the schema editor has no error line to report {message}");
 	};
@@ -321,6 +321,21 @@ async fn report(
 			OK
 		})
 		.await?
+}
+
+/// The reader-facing half of a refused commit: the error itself, without the
+/// trace that follows it.
+///
+/// [`BevyError`]'s `Display` writes the message and then its backtrace, which
+/// is a developer's artifact — a person told to add a default does not need the
+/// crate path and line number of the check that refused them.
+fn commit_message(error: BevyError) -> String {
+	error
+		.to_string()
+		.lines()
+		.next()
+		.unwrap_or_default()
+		.to_string()
 }
 
 /// A document's value, or a message naming the role of the entity that has none.
@@ -501,7 +516,7 @@ mod test {
 		);
 		// ...and the table generated from that schema grew the column
 		test_ext::render_world(&mut world, data_doc)
-			.xpect_contains("<th>is_really_difficult</th>")
+			.xpect_contains("<th>Is really difficult</th>")
 			.xpect_contains("buy milk");
 	}
 
@@ -545,7 +560,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(ValueSchema::String(default()));
 		test_ext::render_world(&mut world, data_doc)
-			.xpect_contains("<th>note</th>");
+			.xpect_contains("<th>Note</th>");
 	}
 
 	/// A required field with nothing for existing rows is refused, and the
@@ -738,6 +753,6 @@ mod test {
 		settle(&mut app);
 
 		test_ext::render_world(app.world_mut(), data_doc)
-			.xpect_contains("<th>note</th>");
+			.xpect_contains("<th>Note</th>");
 	}
 }

@@ -312,8 +312,9 @@ async fn boots_and_paints_the_rows() {
 		(host.seeded_label(0).await, host.seeded_label(1).await);
 	let frame = host.step_until(&first);
 	// the columns are the row schema's own fields, named by nothing in the entry
-	frame.as_str().xpect_contains("label");
-	frame.as_str().xpect_contains("done");
+	// (read back humanised, since a key is an identifier and a header is not)
+	frame.as_str().xpect_contains("Label");
+	frame.as_str().xpect_contains("Done");
 	frame.xpect_contains(&second);
 }
 
@@ -375,10 +376,11 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 	// each collection's add button names it, so the row schema's `fields` list is
 	// addressed by name rather than by being the last one on the page; it appends
 	// the field schema's own zero
-	host.click_text("Add to fields");
+	host.click_text("Add to Fields");
 	host.settle(8);
-	// name the field, in the empty control the appended row generated
-	host.click_control_of("key", 2);
+	// name the field, in the empty control the appended row generated. `Key` is
+	// the humanised label the generated form shows for the `key` field.
+	host.click_control_of("Key", 2);
 	host.type_text("is_really_difficult");
 	// ...and type it, through the variant select the meta-schema's own enum
 	// generated for the field's `schema`
@@ -390,9 +392,11 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 	// rows that already exist stay valid without a backfill
 	host.click_text("Apply");
 
-	// the table generated from the committed schema grew the column, beside the
-	// draft that named it...
-	host.step_until_count("is_really_difficult", 2);
+	// the table generated from the committed schema grew the column. The header
+	// is the key made readable, so it is a *different* string from the one still
+	// sitting in the draft's `key` control, which is what makes it evidence the
+	// column exists rather than a second sighting of what was typed.
+	host.step_until("Is really difficult");
 	// ...and every row survived it. The regenerated rows bind their values a
 	// frame after the layout they sit in, so this is a second wait, not the
 	// same frame.

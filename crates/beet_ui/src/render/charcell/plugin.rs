@@ -235,6 +235,16 @@ fn buffer_plugin<B: Component<Mutability = Mutable> + AsBuffer>(app: &mut App) {
 			.chain()
 			.in_set(CharcellRenderSet),
 	);
+	// keyboard focus pulls its element into view, against this frame's fresh
+	// rects and before the clamp settles the offset it writes.
+	#[cfg(feature = "keyboard")]
+	app.add_systems(
+		PostParseTree,
+		scroll_focus_into_view::<B>
+			.after(layout_nodes::<B>)
+			.before(clamp_scroll_positions::<B>)
+			.in_set(CharcellRenderSet),
+	);
 }
 
 /// [`PostParseTree`] set for post-resolve structural decorations: list/quote

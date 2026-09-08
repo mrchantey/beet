@@ -52,6 +52,8 @@ pub fn all_rules() -> Vec<Rule> {
 		button_tertiary(),
 		button_error(),
 		button_icon(),
+		// the focus ring trails every variant so it wins their border color
+		button_focus(),
 		card_filled(),
 		card_elevated(),
 		card_outlined(),

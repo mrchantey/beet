@@ -34,6 +34,7 @@ pub(super) struct CharcellNodeData<'a> {
 	scrollbar: Option<&'a ScrollbarStyle>,
 	transition: Option<&'a VisualTransition>,
 	kitty: Option<&'a KittyImage>,
+	focused: bool,
 }
 
 /// Whether a control's value is nothing typed: a null, or an empty string.
@@ -72,6 +73,12 @@ impl CharcellNodeData<'_> {
 		self.element
 			.is_some_and(|element| is_value_element(element.tag()))
 	}
+
+	/// Whether this node holds keyboard focus, ie the next keystroke edits it.
+	/// Read straight off the marker rather than the
+	/// [`Focused`](crate::prelude::ElementState) style state, so the caret paints
+	/// in the same frame focus moves, with no cascade round trip.
+	pub fn is_focused(&self) -> bool { self.focused }
 
 	pub fn intrinsic_size(&self) -> UVec2 { self.intrinsic_size.0 }
 	pub fn layout_rect(&self) -> IRect { self.layout_rect.0 }
@@ -278,6 +285,9 @@ impl WrapperQuery<'_, '_> {
 pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	refs: Query<'w, 's, &'static Portal>,
+	// the upward half of the walk (see [`visual_parent`](CharcellTree::visual_parent)).
+	parents: Query<'w, 's, &'static ChildOf>,
+	portals: Query<'w, 's, &'static PortalOf>,
 	// transparent grouping wrappers spliced out so every traversal agrees with
 	// [`CharcellNodeData::child_nodes`] (see [`WrapperQuery`]).
 	wrappers: WrapperQuery<'w, 's>,
@@ -365,6 +375,34 @@ impl CharcellTree<'_, '_> {
 	pub fn descendants(&self, entity: Entity) -> impl Iterator<Item = Entity> {
 		self.pre_order(entity).into_iter().skip(1)
 	}
+
+	/// The *visual* parent of `entity`: the [`Portal`] holder that renders it in
+	/// place when there is one, else its `ChildOf` parent.
+	///
+	/// Transclusion wins, mirroring [`children`](Self::children) downward: a
+	/// holder is the charcell parent of the entity it points at, so a walk up from
+	/// transcluded content (eg a route's page) crosses into the holder's container
+	/// (eg the page-host scrollport) rather than dead-ending at the content root.
+	pub fn visual_parent(&self, entity: Entity) -> Option<Entity> {
+		self.portals
+			.get(entity)
+			.ok()
+			.and_then(|portal_of| portal_of.holders().first().copied())
+			.or_else(|| self.parents.get(entity).ok().map(ChildOf::parent))
+	}
+
+	/// The visual ancestors of `entity`, innermost first and self-inclusive, each
+	/// hop through [`visual_parent`](Self::visual_parent). The upward twin of
+	/// [`pre_order`](Self::pre_order), shared by the scroll routing and
+	/// scroll-into-view so both agree on which container owns an element.
+	pub fn visual_ancestors(
+		&self,
+		entity: Entity,
+	) -> impl Iterator<Item = Entity> {
+		std::iter::successors(Some(entity), |entity| {
+			self.visual_parent(*entity)
+		})
+	}
 }
 
 /// System parameter shared by all charcell render systems.
@@ -392,6 +430,10 @@ pub(crate) struct CharcellQuery<'w, 's> {
 		),
 	>,
 	refs: Query<'w, 's, &'static Portal>,
+	// the focused entity, so a control can paint its caret. Gated with [`Focus`]
+	// itself: a build without a keyboard has nothing to focus.
+	#[cfg(feature = "keyboard")]
+	focused: Query<'w, 's, (), With<Focus>>,
 	// transparent grouping wrappers (see [`WrapperQuery`]); their children are
 	// hoisted into the parent's flow. Such a wrapper carries no box, so the render
 	// systems never assign it an `IntrinsicSize`/`LayoutRect` and it is absent from
@@ -430,6 +472,15 @@ impl CharcellQuery<'_, '_> {
 			FlowChild::Drop => {}
 		}
 	}
+
+	/// Whether `entity` holds keyboard focus. Always false without the `keyboard`
+	/// feature, which has no focus model to read.
+	#[cfg(feature = "keyboard")]
+	fn is_focused(&self, entity: Entity) -> bool {
+		self.focused.contains(entity)
+	}
+	#[cfg(not(feature = "keyboard"))]
+	fn is_focused(&self, _entity: Entity) -> bool { false }
 
 	/// Build a node for an entity that is already [`Portal`]-resolved,
 	/// without following holders again.
@@ -471,6 +522,7 @@ impl CharcellQuery<'_, '_> {
 			scrollbar,
 			transition,
 			kitty,
+			focused: self.is_focused(entity),
 		})
 	}
 }

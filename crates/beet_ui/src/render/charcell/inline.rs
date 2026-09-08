@@ -39,9 +39,20 @@ struct InlineSpan {
 }
 
 /// Whether `node` establishes an inline formatting context: a non-flex,
-/// non-grid container all of whose children are
-/// [inline-level](CharcellNodeData::is_inline_level) (flex/grid items are
-/// blockified, never flowed as text).
+/// non-grid container all of whose in-flow children are
+/// [inline-level](CharcellNodeData::is_inline_level) and none of which is a form
+/// control (flex/grid items are blockified, never flowed as text).
+///
+/// A control is excluded because it is an *atomic* inline box, the terminal's
+/// reading of CSS `inline-block`: it paints its own border and padding and its
+/// contents are its own business. Flowed as text it loses both — a `<select>`
+/// that is the only child of a `<div>` would paint as a bare run of letters with
+/// no box, and [`collect_runs_inner`] would splice its open dropdown panel into
+/// the same run.
+///
+/// Out-of-flow children are skipped rather than counted: an absolutely
+/// positioned child (a dropdown, a tooltip) is not part of its parent's flow, so
+/// it can neither make a container inline nor prevent it from being one.
 pub(super) fn establishes_inline_flow(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
@@ -50,9 +61,9 @@ pub(super) fn establishes_inline_flow(
 		return false;
 	}
 	let mut any = false;
-	for child in node.child_nodes(query) {
+	for child in node.flow_child_nodes(query) {
 		any = true;
-		if !child.is_inline_level() {
+		if child.is_control() || !child.is_inline_level() {
 			return false;
 		}
 	}
@@ -223,7 +234,10 @@ fn collect_runs_inner(
 			});
 		}
 	}
-	for child in node.child_nodes(query) {
+	// in-flow only: an out-of-flow descendant (an open `<select>`'s dropdown
+	// panel, a tooltip) paints as its own positioned box, so flowing its text
+	// into this container's run would both duplicate it and wreck the line.
+	for child in node.flow_child_nodes(query) {
 		collect_runs_inner(&child, query, link, runs);
 	}
 }

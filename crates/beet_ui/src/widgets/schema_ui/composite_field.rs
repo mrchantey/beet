@@ -11,7 +11,10 @@ use super::collection_edit::CollectionEdit;
 use super::collection_edit::add_entry_row;
 use super::collection_edit::edit_button;
 use super::field_layout::child_field;
+use super::field_layout::empty_note;
+use super::field_layout::field_label;
 use super::field_layout::group;
+use super::field_layout::hinted;
 use super::field_layout::labeled;
 use super::form::schema_field;
 use super::value_rebuild::ValueRebuild;
@@ -48,13 +51,15 @@ pub(super) fn struct_rows<'a>(
 		.fields
 		.iter()
 		.map(|named| {
-			let label = named.label.as_ref().unwrap_or(&named.key).to_string();
-			schema_field(
-				resolver,
-				&named.schema,
-				child_field(field, named.key.clone()),
-				Some(label),
-				depth + 1,
+			hinted(
+				named.description.as_deref(),
+				schema_field(
+					resolver,
+					&named.schema,
+					child_field(field, named.key.clone()),
+					Some(field_label(named)),
+					depth + 1,
+				),
 			)
 		})
 		.collect()
@@ -120,13 +125,14 @@ pub(super) fn list_field(
 	let (item, rows_field) = (schema.item.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
 		|value| item_count(value).to_string().into(),
-		move |resolver, value| {
-			(0..item_count(value))
+		move |resolver, value| match item_count(value) {
+			0 => empty_note("No items yet"),
+			count => (0..count)
 				.map(|index| {
 					list_row(resolver, &item, &rows_field, index, depth)
 				})
 				.collect::<Vec<_>>()
-				.xmap(|rows| labeled(None, rows))
+				.xmap(|rows| labeled(None, rows)),
 		},
 	);
 	let zero = schema.item.default_value_in(resolver);
@@ -224,8 +230,9 @@ pub(super) fn map_field(
 	let (value_schema, entries_field) = (schema.value.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
 		|value| entry_keys(value).join(";").into(),
-		move |resolver, value| {
-			entry_keys(value)
+		move |resolver, value| match entry_keys(value) {
+			keys if keys.is_empty() => empty_note("No entries yet"),
+			keys => keys
 				.into_iter()
 				.map(|key| {
 					map_entry(
@@ -237,7 +244,7 @@ pub(super) fn map_field(
 					)
 				})
 				.collect::<Vec<_>>()
-				.xmap(|rows| labeled(None, rows))
+				.xmap(|rows| labeled(None, rows)),
 		},
 	);
 	let zero = schema.value.default_value_in(resolver);
@@ -324,7 +331,7 @@ mod test {
 		html.clone()
 			// the top-level field is a row, its nested struct a titled section
 			.xpect_contains("<section>")
-			.xpect_contains(">profile</h3>")
+			.xpect_contains(">Profile</h3>")
 			.xpect_contains("name")
 			.xpect_contains("count")
 			.xpect_contains("type=\"text\"")
