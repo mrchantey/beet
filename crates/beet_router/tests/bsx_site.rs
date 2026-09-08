@@ -41,7 +41,7 @@ const COUNTER_BSX: &str = r#"
 <article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
+		<button bx:click="target.with_field('count', count => count + 1)">More</button>
 	</widgets::Card>
 </article>
 "#;

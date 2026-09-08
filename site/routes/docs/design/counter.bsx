@@ -6,8 +6,8 @@
 	<div bx:scope="counter" bx:style="max-width=Rem(20.0)">
 		<p>You have clicked {@doc:count=0} times.</p>
 		<div class="design-row">
-			<button class="btn btn-filled" bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
-			<button class="btn btn-tonal" bx:click="await target.set_field('count', (await target.get_field('count')) - 1)">Less</button>
+			<button class="btn btn-filled" bx:click="target.with_field('count', count => count + 1)">More</button>
+			<button class="btn btn-tonal" bx:click="target.with_field('count', count => count - 1)">Less</button>
 		</div>
 	</div>
 </article>

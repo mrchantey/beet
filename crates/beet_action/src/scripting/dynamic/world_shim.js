@@ -30,6 +30,19 @@
 	const id = (entity) => String(entity);
 	const json = (value) => (value === undefined ? null : value);
 
+	// read, apply, write. Composed here rather than as a host operation because
+	// a JavaScript closure has no wire form: it could never cross to the host,
+	// on this backend or any other. What `func` returns is the new value;
+	// returning nothing keeps the argument, which is what lets a map or a list
+	// be edited in place.
+	const update_field = async (entity, path, func) => {
+		const current = await globalThis.world.get_field(entity, path);
+		const next = func(current);
+		const value = next === undefined ? current : next;
+		await globalThis.world.set_field(entity, path, value);
+		return value;
+	};
+
 	globalThis.world = {
 		get: (entity, component) =>
 			call({ op: "get", entity: id(entity), component }),
@@ -56,6 +69,7 @@
 				path,
 				value: json(value),
 			}),
+		with_field: (entity, path, func) => update_field(entity, path, func),
 		entity: (entity) => handle(entity),
 	};
 
@@ -73,5 +87,6 @@
 		get_field: (path) => globalThis.world.get_field(entity, path),
 		set_field: (path, value) =>
 			globalThis.world.set_field(entity, path, value),
+		with_field: (path, func) => update_field(entity, path, func),
 	});
 })();

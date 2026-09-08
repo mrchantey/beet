@@ -41,6 +41,15 @@
 //! checked against `Document` itself, so a config narrowing components narrows
 //! the helpers with it.
 //!
+//! `with_field(path, func)` is the pair composed: read, apply `func`, write
+//! back. It lives in the shim rather than as a host operation because a closure
+//! has no wire form, which also means it is *not* one exclusive section: the
+//! read and the write are two calls with the ordinary window between them (the
+//! one [`WorldOp`]'s schema check documents). A script's own calls stay ordered,
+//! so that is invisible within one run; two scripts racing the same field would
+//! lose an update, and the answer there is a narrower named operation, not a
+//! closure.
+//!
 //! ## Vocabulary
 //!
 //! [`DynamicComponent`] mints a component type with no rust definition behind

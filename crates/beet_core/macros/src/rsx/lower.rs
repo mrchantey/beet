@@ -14,7 +14,9 @@
 //!   `IntoSnippet`.
 //! - `<Slot/>` lowers to a `SlotTarget` marker; `bx:slot="x"`/`slot="x"` on a
 //!   node lowers to a `SlotChild` marker. The walker resolves them.
-//! - `on*` / `bx:click` events lower to observers.
+//! - `on*` events lower to observers, taking a rust handler expression. A
+//!   `bx:<event>` is the BSX seam's JavaScript half and is not lowered here; in
+//!   `rsx!` it stays an ordinary attribute.
 use super::ast::*;
 use alloc::format;
 use alloc::vec;

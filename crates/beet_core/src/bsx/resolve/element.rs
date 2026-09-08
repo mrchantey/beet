@@ -151,7 +151,7 @@ pub(super) fn apply_common_directives(
 		let AttrValue::Str(script) = &attr.value else {
 			bevybail!(
 				"`{key}` expects a script string, ie \
-				 `{key}=\"await target.set_field('count', 1)\"`",
+				 `{key}=\"target.with_field('count', count => count + 1)\"`",
 				key = attr.key
 			);
 		};

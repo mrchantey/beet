@@ -75,9 +75,9 @@
 //! position (`{@doc:name}`), and as spread-tuple items
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
 //! a binding on the same entity. An event directive is a script:
-//! `bx:click="await target.set_field('count', 1)"` runs its source through the
-//! registered installer (see [`EventRegistry`]), with the event target entity
-//! bound to `target`. No mirror is lowered onto the host: the script writes the
+//! `bx:click="target.with_field('count', count => count + 1)"` runs its source
+//! through the registered installer (see [`EventRegistry`]), with the event
+//! target entity bound to `target`. No mirror is lowered onto the host: the script writes the
 //! real document through the same ancestor-document walk a display binding
 //! reads through, and document-sync fans the change out.
 //!
@@ -86,7 +86,7 @@
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 //! let nodes = BsxNode::parse_document(
-//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click="await target.set_field('clicks', 1)">+</button></section>"#,
+//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click="target.with_field('clicks', clicks => clicks + 1)">+</button></section>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
 //! .unwrap();

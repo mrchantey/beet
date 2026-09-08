@@ -20,8 +20,13 @@
 ///
 /// `world.entity(id)` narrows the same API to one entity, the JS face of an
 /// [`AsyncEntity`]: `get`/`insert`/`remove`/`despawn` with the entity already
-/// supplied, plus the `get_field`/`set_field` document helpers. An event script
-/// is handed its own event target as `target`.
+/// supplied, plus the `get_field`/`set_field`/`with_field` document helpers. An
+/// event script is handed its own event target as `target`.
+///
+/// `with_field(path, func)` is the read-apply-write pair composed in the shim,
+/// since a closure has no wire form and so could never be a host operation. It
+/// is why `target.with_field('count', count => count + 1)` is the whole counter:
+/// the read that would otherwise force an `await` happens inside the helper.
 ///
 /// [`AsyncEntity`]: beet_core::prelude::AsyncEntity
 ///
@@ -54,6 +59,7 @@ mod test {
 			"despawn",
 			"get_field",
 			"set_field",
+			"with_field",
 		] {
 			WORLD_SHIM.xpect_contains(&format!("{method}: ("));
 		}

@@ -1,8 +1,8 @@
 //! The BSX event seam: `bx:<event>="script"`.
 //!
 //! An event binds a **script** to a trigger **event**.
-//! `bx:click="await target.set_field('count', 1)"` lowers to DATA only: event
-//! `click`, plus the source it runs. Core knows neither the concrete event nor
+//! `bx:click="target.with_field('count', count => count + 1)"` lowers to DATA
+//! only: event `click`, plus the source it runs. Core knows neither the concrete event nor
 //! how to evaluate a script, so neither picking nor an engine enters it.
 //! Resolution is one registry lookup at build time:
 //!
@@ -14,8 +14,16 @@
 //! A script is the whole vocabulary: it reaches the world through the same
 //! capability-scoped `world`/`target` bridge every other beet script uses, so
 //! adding a behavior is authoring a document, never recompiling the binary.
-//! Mutating a document field is one such behavior (`target.set_field`), not a
+//! Mutating a document field is one such behavior (`target.with_field`), not a
 //! structural special case.
+//!
+//! **`bx:` rather than `onclick`, deliberately.** `on*` is a real HTML attribute
+//! and is passed through verbatim: it is not a directive, so it survives into
+//! the rendered page for the browser to run in page scope, which is the
+//! Astro-style sprinkling escape hatch. Overloading it would mean a handler the
+//! browser executes where `world` and `target` do not exist, and would cost the
+//! only way to emit a literal DOM handler. The `bx:` namespace means "beet
+//! machinery, stripped before render", and that is exactly the distinction.
 
 use crate::prelude::*;
 use alloc::sync::Arc;

@@ -778,9 +778,7 @@ async fn click_runs_its_script() {
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		r#"<button bx:click="
-			await target.set_field('count', (await target.get_field('count')) + 1);
-		">+</button>"#,
+		r#"<button bx:click="target.with_field('count', count => count + 1)">+</button>"#,
 	);
 	world.update_local();
 	// the host carries no mirror: the script writes the document, not a local Value.
@@ -808,7 +806,7 @@ async fn scoped_counter_page() {
 	let mut world = world();
 	let root = spawn_bsx(
 		&mut world,
-		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button></article>"#,
+		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="target.with_field('count', count => count + 1)">More</button></article>"#,
 	);
 	// settle the init -> document chain
 	world.update_local();
@@ -871,8 +869,8 @@ async fn scoped_counter_page() {
 const COUNTER_BSX: &str = r#"<article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
-		<button bx:click="await target.set_field('count', (await target.get_field('count')) - 1)">Less</button>
+		<button bx:click="target.with_field('count', count => count + 1)">More</button>
+		<button bx:click="target.with_field('count', count => count - 1)">Less</button>
 	</widgets::Card>
 </article>"#;
 

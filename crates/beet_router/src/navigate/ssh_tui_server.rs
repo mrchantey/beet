@@ -1126,7 +1126,7 @@ mod test {
 		store
 			.insert(
 				&"counter.bsx".into(),
-				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button></article>"#
+				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click="target.with_field('count', count => count + 1)">More</button></article>"#
 					.to_string(),
 			)
 			.await
