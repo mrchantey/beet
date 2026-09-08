@@ -45,10 +45,16 @@ pub struct PageMeta {
 	/// coerced by the reflect string-to-[`Timestamp`] rule) — and parsed to an
 	/// instant here, so it sorts and formats as a date rather than as text.
 	pub created: Option<Timestamp>,
+	/// The last substantive edit, ie the date a reader should judge the page's
+	/// freshness by. Authored exactly like [`created`](Self::created), and
+	/// unset on a page that has not changed since publication.
+	pub updated: Option<Timestamp>,
 	/// Who wrote the page.
 	pub author: Option<SmolStr>,
-	/// Excludes the page from production builds when `true`.
-	pub draft: bool,
+	/// Who the page is for: everyone, whoever holds the link, or nobody yet.
+	///
+	/// Authored by variant name, ie `visibility = "Unlisted"`.
+	pub visibility: PageVisibility,
 	/// The page's thumbnail / social card image.
 	pub image_url: Option<SmolStr>,
 	/// The page's companion video, eg the YouTube watch url a post embeds.
@@ -63,7 +69,75 @@ pub struct PageMeta {
 	pub expanded: Option<bool>,
 }
 
+/// Who a page is for, ie how far it travels: the one knob every listing,
+/// crawler and export gate reads.
+///
+/// Three states rather than a `draft` flag because "not finished" and "not
+/// advertised" are different intents with different handling: a draft must
+/// never reach production at all, while an unlisted page must serve to whoever
+/// holds its link and appear in no index.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum PageVisibility {
+	/// Fully public: served, exported, and listed everywhere.
+	#[default]
+	Public,
+	/// Served and exported, but excluded from the sitemap, the feeds and the
+	/// search index, and marked `noindex` for crawlers.
+	Unlisted,
+	/// Excluded from production entirely, whether exported or live-served.
+	Draft,
+}
+
 impl PageMeta {
+	/// Whether the page is listed: in a sitemap, a feed, a search index, and to
+	/// a crawler. False for both [`Unlisted`](PageVisibility::Unlisted) and
+	/// [`Draft`](PageVisibility::Draft) pages.
+	pub fn is_listed(&self) -> bool {
+		self.visibility == PageVisibility::Public
+	}
+
+	/// Whether the page is unfinished, ie must not reach production.
+	pub fn is_draft(&self) -> bool { self.visibility == PageVisibility::Draft }
+
+	/// The date a reader judges the page by: its
+	/// [`updated`](Self::updated), else its [`created`](Self::created).
+	pub fn last_modified(&self) -> Option<Timestamp> {
+		self.updated.or(self.created)
+	}
+
+	/// The page's social card image: its own [`image_url`](Self::image_url),
+	/// else the thumbnail of the YouTube video it companions.
+	///
+	/// The derivation is what gets a video post a real link preview with no
+	/// frontmatter at all: the poster frame IS the card. `hqdefault` rather
+	/// than `maxresdefault`, which 404s for anything uploaded before high-res
+	/// thumbnails and so previews as a broken image.
+	pub fn social_image_url(&self) -> Option<SmolStr> {
+		self.image_url.clone().or_else(|| {
+			Self::youtube_id(self.video_url.as_deref()?).map(|id| {
+				SmolStr::new(format!(
+					"https://i.ytimg.com/vi/{id}/hqdefault.jpg"
+				))
+			})
+		})
+	}
+
+	/// The video id in a YouTube url: the `7koepBSRoUI` in
+	/// `https://youtu.be/..`, `https://www.youtube.com/watch?v=..` or an
+	/// already-embed url. `None` for any other url, so a video hosted elsewhere
+	/// yields neither an embed nor a derived card.
+	pub fn youtube_id(url: &str) -> Option<&str> {
+		url.split_once("youtu.be/")
+			.or_else(|| url.split_once("youtube.com/embed/"))
+			.or_else(|| url.split_once("watch?v="))
+			.map(|(_, id)| id)?
+			.split(['?', '&', '#'])
+			.next()
+			.filter(|id| !id.is_empty())
+	}
+
 	/// The sidebar label: explicit [`sidebar_label`](Self::sidebar_label), else
 	/// the page [`title`](Self::title).
 	pub fn sidebar_label(&self) -> Option<&str> {
@@ -152,12 +226,13 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_flat_keys() {
 		let meta = parse(
-			"title: Getting Started\ndescription: A guide\ndraft: true\norder: 2\nexpanded: true",
+			"title: Getting Started\ndescription: A guide\nvisibility: Draft\norder: 2\nexpanded: true",
 			FrontmatterKind::Yaml,
 		);
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
 		meta.description.as_deref().unwrap().xpect_eq("A guide");
-		meta.draft.xpect_true();
+		meta.is_draft().xpect_true();
+		meta.is_listed().xpect_false();
 		meta.order.unwrap().xpect_eq(2);
 		meta.expanded.unwrap().xpect_true();
 		// no explicit sidebar_label, so the label falls back to the title
@@ -169,7 +244,7 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_article_keys() {
 		let meta = parse(
-			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nauthor = \"Pete Hayman\"\nvideo_url = \"https://youtu.be/7koepBSRoUI\"",
+			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthor = \"Pete Hayman\"\nvideo_url = \"https://youtu.be/7koepBSRoUI\"",
 			FrontmatterKind::Toml,
 		);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
@@ -177,11 +252,57 @@ mod test {
 			.unwrap()
 			.format_long_date()
 			.xpect_eq("11 July 2025");
+		// the freshness date a sitemap and a feed read, falling back to `created`
+		meta.last_modified()
+			.unwrap()
+			.format_date()
+			.xpect_eq("2025-08-01");
 		meta.author.as_deref().unwrap().xpect_eq("Pete Hayman");
 		meta.video_url
 			.as_deref()
 			.unwrap()
 			.xpect_eq("https://youtu.be/7koepBSRoUI");
+	}
+
+	/// The social card falls back to the companion video's poster frame, so a
+	/// video post previews without any `image_url` frontmatter, and a video
+	/// hosted elsewhere derives nothing.
+	#[beet_core::test]
+	fn derives_the_social_card_from_a_video() {
+		let card = |video_url: &str| {
+			PageMeta {
+				video_url: Some(video_url.into()),
+				..default()
+			}
+			.social_image_url()
+		};
+		card("https://youtu.be/7koepBSRoUI")
+			.unwrap()
+			.xpect_eq(SmolStr::new(
+				"https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg",
+			));
+		// a share url carries a timestamp, the watch url a playlist
+		card("https://youtu.be/7koepBSRoUI?t=42").unwrap().xpect_eq(
+			SmolStr::new("https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg"),
+		);
+		card("https://www.youtube.com/watch?v=7koepBSRoUI&list=PL")
+			.unwrap()
+			.xpect_eq(SmolStr::new(
+				"https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg",
+			));
+		PageMeta::youtube_id("https://www.youtube.com/embed/7koepBSRoUI")
+			.unwrap()
+			.xpect_eq("7koepBSRoUI");
+		card("https://example.com/video.mp4").xpect_none();
+		// an explicit image always wins over the derived one
+		PageMeta {
+			image_url: Some("/assets/card.png".into()),
+			video_url: Some("https://youtu.be/7koepBSRoUI".into()),
+			..default()
+		}
+		.social_image_url()
+		.unwrap()
+		.xpect_eq(SmolStr::new("/assets/card.png"));
 	}
 
 	#[beet_core::test]

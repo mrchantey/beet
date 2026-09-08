@@ -1,6 +1,6 @@
 +++
 title = "Secret"
-draft = true
+visibility = "Draft"
 +++
 
 # Secret

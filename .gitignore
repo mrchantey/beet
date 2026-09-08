@@ -10,6 +10,7 @@ assets
 .beet/infra
 out.txt
 examples/bsx_site/dist
+site/dist
 examples/thread/persistent_chat.json
 examples/router/router_serde.json
 examples/todo/todos.json

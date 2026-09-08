@@ -55,9 +55,11 @@ impl StaticExport {
 	/// method is `GET`, and it is either a scene route or marked
 	/// [`ExportStrategy::Static`].
 	///
-	/// A route whose [`PageMeta`] marks it a draft ships unless `is_prod`, so
-	/// dev/staging builds can preview drafts while a production export drops
-	/// them.
+	/// A page additionally passes [`ActionNode::is_public_page`], the shared
+	/// visibility rule the sitemap and the feeds read, so a draft ships to a
+	/// dev/staging preview and never to production. The non-page half stays
+	/// here: the runtime assets a self-contained export needs (eg
+	/// `js/reactivity.js`) are not pages and are listed nowhere.
 	fn exports(world: &World, node: &ActionNode, is_prod: bool) -> bool {
 		if !node.path.is_static() {
 			return false;
@@ -66,7 +68,9 @@ impl StaticExport {
 			return false;
 		}
 		let entity = world.entity(node.entity);
-		if is_prod && entity.get::<PageMeta>().is_some_and(|meta| meta.draft) {
+		if node.is_page_route
+			&& !node.is_public_page(entity.get::<PageMeta>(), is_prod)
+		{
 			return false;
 		}
 		node.is_scene()
@@ -115,7 +119,12 @@ impl StaticExport {
 		router: Entity,
 		out: &BlobStore,
 	) -> Result<Vec<SmolPath>> {
-		let pages = collect_static_html(world, router).await?;
+		let mut pages = collect_static_html(world, router).await?;
+		pages.extend(
+			world
+				.with(move |world: &mut World| Self::redirects(world, router))
+				.await?,
+		);
 		let mut written = Vec::new();
 		for (path, html) in pages {
 			let out_path = if path.segments().is_empty() {
@@ -130,6 +139,58 @@ impl StaticExport {
 		}
 		Ok(written)
 	}
+
+	/// The meta-refresh stub each [`Redirect`] route in the tree exports as,
+	/// paired with the path it serves at.
+	///
+	/// A static host serves files, not redirects, so the old url would 404 for
+	/// exactly the readers a redirect exists for: everyone who followed a link
+	/// published before the rename. The stub is the file that behaves like one
+	/// — an immediate refresh, a canonical link so the crawler consolidates
+	/// onto the new url rather than indexing the stub, and a plain anchor for
+	/// whoever has neither. Live serving is untouched and still answers a 301.
+	fn redirects(
+		world: &mut World,
+		router: Entity,
+	) -> Result<Vec<(SmolPath, String)>> {
+		let package = world.get_resource::<PackageConfig>().cloned();
+		RouteTree::of(world, router)?
+			.clone()
+			.flatten_nodes()
+			.into_iter()
+			.filter(|node| node.path.is_static())
+			.filter_map(|node| {
+				let target = world
+					.entity(node.entity)
+					.get::<RedirectTo>()?
+					.location(&node.path);
+				// the canonical url must be absolute to consolidate anything,
+				// so a site naming no origin gets the stub without one
+				let canonical = package
+					.as_ref()
+					.and_then(|package| package.absolute_url(&target).ok());
+				Some((
+					node.path.annotated_path(),
+					redirect_stub(&target, canonical.as_deref()),
+				))
+			})
+			.collect::<Vec<_>>()
+			.xok()
+	}
+}
+
+/// The body of a redirect stub: a zero-delay refresh, the canonical target, and
+/// a link for a reader whose browser honours neither.
+fn redirect_stub(target: &str, canonical: Option<&str>) -> String {
+	let canonical = canonical
+		.map(|url| format!("<link rel=\"canonical\" href=\"{url}\">\n"))
+		.unwrap_or_default();
+	format!(
+		"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
+		 <meta http-equiv=\"refresh\" content=\"0; url={target}\">\n{canonical}\
+		 <title>Redirecting</title>\n</head>\n\
+		 <body><a href=\"{target}\">Continue to {target}</a></body>\n</html>\n"
+	)
 }
 #[cfg(test)]
 mod test {
@@ -199,6 +260,99 @@ mod test {
 			.xpect_contains("App Info");
 	}
 
+	/// A syndication route is an ordinary static route, so it needs nothing of
+	/// the export pipeline: its path carries an extension, so it lands verbatim
+	/// at `sitemap.xml` rather than as `sitemap.xml/index.html`, with the body
+	/// the live site serves.
+	#[beet_core::test]
+	async fn exports_syndication_routes() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.insert_resource(PackageConfig {
+			homepage: Some("https://beet.org".into()),
+			..pkg_config!()
+		});
+		let root = world.spawn(Router).flush();
+		world
+			.spawn_template(Snippet::from_bundle((ChildOf(root), rsx! {
+				<Sitemap/>
+				<Robots/>
+			})))
+			.unwrap();
+		world.spawn((
+			ChildOf(root),
+			render_action::fixed_func_route(
+				"about",
+				|| rsx! { <p>"About"</p> },
+			),
+			HttpMethod::Get,
+			PageRoute,
+		));
+		world.flush();
+
+		let out = BlobStore::temp();
+		let out2 = out.clone();
+		let written = world
+			.run_async_then(async move |world| {
+				StaticExport::export(&world, root, &out2).await
+			})
+			.await
+			.unwrap();
+		exported(&written, "sitemap.xml").xpect_true();
+
+		let read = async |path: &str| {
+			out.get(&SmolPath::new(path))
+				.await
+				.unwrap()
+				.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+		};
+		read("sitemap.xml")
+			.await
+			.xpect_contains("<loc>https://beet.org/about</loc>");
+		read("robots.txt")
+			.await
+			.xpect_contains("Sitemap: https://beet.org/sitemap.xml");
+	}
+
+	/// A renamed page's old url exports as a meta-refresh stub, so a static host
+	/// keeps every link ever published resolving even though it serves no 301.
+	#[beet_core::test]
+	async fn exports_redirect_stubs() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.insert_resource(PackageConfig {
+			homepage: Some("https://beet.org".into()),
+			..pkg_config!()
+		});
+		let root = world.spawn(Router).flush();
+		world
+			.spawn_template(Snippet::from_bundle((ChildOf(root), rsx! {
+				<Route path="blog">
+					<Redirect path="post-1" redirect="full-stack-bevy"/>
+				</Route>
+			})))
+			.unwrap();
+		world.flush();
+
+		let out = BlobStore::temp();
+		let out2 = out.clone();
+		world
+			.run_async_then(async move |world| {
+				StaticExport::export(&world, root, &out2).await
+			})
+			.await
+			.unwrap();
+		out.get(&SmolPath::new("blog/post-1/index.html"))
+			.await
+			.unwrap()
+			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+			.xpect_contains(
+				r#"<meta http-equiv="refresh" content="0; url=/blog/full-stack-bevy">"#,
+			)
+			.xpect_contains(
+				r#"<link rel="canonical" href="https://beet.org/blog/full-stack-bevy">"#,
+			)
+			.xpect_contains(r#"<a href="/blog/full-stack-bevy">"#);
+	}
+
 	/// Exports `router` to a temp store, returning the written paths. The process
 	/// stage decides the draft gate, so this is always the dev path; the prod
 	/// path is asserted against [`StaticExport::exports`] directly.
@@ -225,8 +379,8 @@ mod test {
 		paths.iter().any(|path| path.starts_with(prefix))
 	}
 
-	/// A `published` route plus a `secret` route eagerly marked
-	/// `PageMeta { draft: true }` (the codegen `BlobScene` shape).
+	/// A `published` page plus a `secret` one eagerly marked
+	/// `PageMeta { visibility: Draft }` (the codegen `BlobScene` shape).
 	fn spawn_draft_router(world: &mut World) -> Entity {
 		world
 			.spawn((Router::with_defaults(), children![
@@ -236,6 +390,7 @@ mod test {
 						|| rsx! { <p>"Published"</p> }
 					),
 					HttpMethod::Get,
+					PageRoute,
 				),
 				(
 					render_action::fixed_func_route(
@@ -243,8 +398,9 @@ mod test {
 						|| rsx! { <p>"Secret"</p> }
 					),
 					HttpMethod::Get,
+					PageRoute,
 					PageMeta {
-						draft: true,
+						visibility: PageVisibility::Draft,
 						..default()
 					},
 				),
@@ -272,7 +428,7 @@ mod test {
 		exported(&paths, "secret").xpect_false();
 	}
 
-	/// Write a `published`/`secret` (frontmatter `draft = true`) content dir under
+	/// Write a `published`/`secret` (frontmatter `visibility = "Draft"`) content dir under
 	/// a per-test `name` (so parallel cases never share a directory) and return
 	/// its root.
 	// `RoutesDir` scans the filesystem store, so this is native-only.
@@ -285,7 +441,7 @@ mod test {
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
 		fs_ext::write(
 			root.join("secret.md"),
-			"+++\ndraft = true\n+++\n\n# Secret",
+			"+++\nvisibility = \"Draft\"\n+++\n\n# Secret",
 		)
 		.unwrap();
 		AbsPathBuf::new(root).unwrap()
@@ -306,8 +462,8 @@ mod test {
 		router
 	}
 
-	/// The `RoutesDir` shape in dev: a scan-time `draft = true` route is still
-	/// exported for preview.
+	/// The `RoutesDir` shape in dev: a scan-time `visibility = "Draft"` route is
+	/// still exported for preview.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes_dir() {
@@ -319,8 +475,8 @@ mod test {
 		exported(&written, "secret").xpect_true();
 	}
 
-	/// The `RoutesDir` shape in prod: scan-time frontmatter `draft = true`
-	/// excludes the discovered route from the export.
+	/// The `RoutesDir` shape in prod: scan-time frontmatter
+	/// `visibility = "Draft"` excludes the discovered route from the export.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {

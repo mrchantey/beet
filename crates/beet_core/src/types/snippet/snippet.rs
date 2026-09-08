@@ -131,6 +131,8 @@ pub trait IntoProp<F, M> {
 pub struct PropDirectMarker;
 /// Marker for the [`PropOpt`] wrap conversion.
 pub struct PropOptMarker;
+/// Marker for the [`PropOpt`] pass-through of an already-optional value.
+pub struct PropOptSomeMarker;
 
 /// A value flows directly into a field whose type is `From` it (the common case,
 /// and the identity conversion when the field type matches).
@@ -142,6 +144,13 @@ impl<T, F: From<T>> IntoProp<F, PropDirectMarker> for T {
 /// optional or required prop accepts the bare inner value.
 impl<T, U: Into<T>> IntoProp<PropOpt<T>, PropOptMarker> for U {
 	fn into_prop(self) -> PropOpt<T> { PropOpt(Some(self.into())) }
+}
+
+/// An [`Option`] flows into a [`PropOpt<T>`] field as itself, so a caller that
+/// already holds an optional value (a computed url, a looked-up label) passes
+/// it straight through instead of branching the markup around the attribute.
+impl<T, U: Into<T>> IntoProp<PropOpt<T>, PropOptSomeMarker> for Option<U> {
+	fn into_prop(self) -> PropOpt<T> { PropOpt(self.map(Into::into)) }
 }
 
 /// Lift `self` into a [`Bundle`] for an `rsx!` markup position (text, `{expr}`,

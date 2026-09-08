@@ -44,6 +44,35 @@ impl ActionNode {
 	/// The action's description from doc comments, if available.
 	pub fn description(&self) -> Option<&str> { self.meta.description() }
 
+	/// Whether this node is a page the public may reach: a [`PageRoute`] at a
+	/// fully static path answering `GET`, and not a draft in a production
+	/// build.
+	///
+	/// The ONE visibility predicate a static export, a sitemap, a feed and a
+	/// search index share, so a site can never export a page it does not list
+	/// or list one it does not export.
+	/// [`Unlisted`](beet_ui::prelude::PageVisibility::Unlisted) pages pass
+	/// here — they serve and export like any other — and each syndication route
+	/// drops them itself with [`PageMeta::is_listed`].
+	///
+	/// [`PageRoute`]: crate::prelude::PageRoute
+	// Takes the metadata rather than reading it, so the same predicate serves a
+	// `&World` caller (static export) and a `Query` one (the syndication
+	// routes). std-only: `PageMeta` is a beet_ui type, and a no_std router has
+	// no scene pipeline to render a page with.
+	#[cfg(feature = "std")]
+	pub fn is_public_page(
+		&self,
+		meta: Option<&beet_ui::prelude::PageMeta>,
+		is_prod: bool,
+	) -> bool {
+		use beet_ui::prelude::PageMeta;
+		self.is_page_route
+			&& self.path.is_static()
+			&& !self.method.is_some_and(|method| method != HttpMethod::Get)
+			&& !(is_prod && meta.is_some_and(PageMeta::is_draft))
+	}
+
 	/// Merge the dynamic path segments matched by this node's [`PathPattern`]
 	/// into the request params, so handlers can read a `:id` value via
 	/// [`RequestParts::get_param`] or the [`QueryParams`] extractor.

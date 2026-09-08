@@ -12,13 +12,14 @@
 //! `SceneList` 12-tuple cap no longer forces them out to the caller. Extra,
 //! app-specific tags still flow in through the default slot.
 //!
-//! Values are **site-level** by default, sourced from [`PackageConfig`], with the
-//! social card — `og:title`, `og:description`, the preview image — overridden by
-//! the page's own [`PageMeta`] when the caller supplies one, so a shared link
-//! previews as the PAGE rather than as the site. The per-page `<title>` is owned
-//! by the layout (eg [`RouteHead`](beet_router) binds it to the route's
-//! `PageMeta`), so `omit_title` drops this widget's own `<title>` to keep exactly
-//! one in the document.
+//! Values are **site-level** by default, sourced from [`PackageConfig`], with
+//! everything a search result or a link preview shows — the description, the
+//! social card, the canonical url, the `article:*` block — overridden by the
+//! page's own [`PageMeta`] and `url` when the caller supplies them, so a shared
+//! link previews as the PAGE rather than as the site. The per-page `<title>` is
+//! owned by the layout (eg [`RouteHead`](beet_router) binds it to the route's
+//! `PageMeta`), so `omit_title` drops this widget's own `<title>` to keep
+//! exactly one in the document.
 //!
 //! `og:site_name` is bound to [`PackageConfig::title`] through a
 //! [`ResourceFieldRef`] (the rsx counterpart of a bsx `@res:PackageConfig.title`
@@ -31,8 +32,9 @@ use beet_core::prelude::*;
 ///
 /// Renders charset, title, canonical, viewport (toggle `fixed_scale` for games),
 /// description, version, application-name, the core Open Graph and Twitter-card
-/// tags, and the Apple/Android/Microsoft PWA meta block. Extra app-specific tags
-/// can be added through the default slot.
+/// tags, the Apple/Android/Microsoft PWA meta block, and a schema.org
+/// [`JsonLd`] description of the page. Extra app-specific tags can be added
+/// through the default slot.
 ///
 /// The brand-dependent tags (the social card, the theme colour) render only when
 /// [`PackageConfig`] names them, so an app that has no card gets the small
@@ -48,6 +50,12 @@ pub fn Head(
 	/// card. Empty by default, ie a standalone `<Head/>` names the site.
 	#[prop]
 	meta: PageMeta,
+	/// This page's absolute url, the `<link rel="canonical">` and `og:url` a
+	/// crawler resolves every relative reference against. Defaults to the
+	/// [`PackageConfig`] homepage, ie the SITE, which is all a standalone
+	/// `<Head/>` outside a route can honestly claim.
+	#[prop(into)]
+	url: Option<String>,
 	pkg_config: Res<PackageConfig>,
 ) -> impl Bundle {
 	// every PWA/application value names the site, sourced from the package config.
@@ -60,19 +68,47 @@ pub fn Head(
 		.description
 		.clone()
 		.unwrap_or_else(|| description.to_string());
-	// homepage is optional: an unset field omits its tag entirely rather than
-	// rendering an empty attribute.
-	let homepage = pkg_config.homepage.clone();
+	// the page's own url, else the site's; both optional, so an unset origin
+	// omits the tags entirely rather than rendering empty attributes.
+	let canonical = url
+		.map(SmolStr::new)
+		.or_else(|| pkg_config.homepage.clone());
 	let version = pkg_config.version.clone();
 	// the social card and the brand tint, each omitted rather than defaulted:
 	// an invented card url is a broken preview and an invented tint is another
 	// brand's colour.
 	let social_image = meta
-		.image_url
-		.as_ref()
-		.map(|image| SmolStr::new(image))
+		.social_image_url()
 		.or_else(|| pkg_config.social_image.clone());
 	let theme_color = pkg_config.theme_color.clone();
+	// a dated page is an ARTICLE to a crawler and to a link preview, which is
+	// what earns it a byline and a date in a search result; the `article:*`
+	// block hangs off that same fact rather than off a second switch.
+	let published = meta.created.map(|created| created.format_iso8601());
+	let modified = meta
+		.created
+		.and(meta.updated)
+		.map(|updated| updated.format_iso8601());
+	let article_author = meta.created.and(meta.author.clone());
+	let og_type = match meta.created.is_some() {
+		true => "article",
+		false => "website",
+	};
+	// an unlisted page serves to whoever holds its link and is advertised
+	// nowhere, which for a crawler means `noindex` (it may still follow links).
+	let noindex = meta.visibility == PageVisibility::Unlisted;
+	// the same facts again as schema.org structured data, which is what a
+	// search result reads for its byline and date
+	let json_ld = JsonLd {
+		headline: card_title.clone(),
+		url: canonical.as_ref().map(|url| url.to_string()),
+		published: published.clone(),
+		modified: modified.clone(),
+		author: article_author.clone(),
+		image: social_image.clone(),
+		publisher: title.clone(),
+	}
+	.to_json();
 	// a card only fills the large preview when there is a card to fill it with.
 	let twitter_card = if social_image.is_some() {
 		"summary_large_image"
@@ -92,20 +128,29 @@ pub fn Head(
 			// the `<title>` is omittable so a layout owns the single per-route one;
 			// the seeded site title is the standalone fallback.
 			{(!omit_title).then(|| rsx!{ <title>{title.clone()}</title> })}
-			{homepage.as_ref().map(|homepage| rsx!{ <link rel="canonical" href={homepage.clone()}/> })}
+			{canonical.as_ref().map(|url| rsx!{ <link rel="canonical" href={url.clone()}/> })}
 			<meta name="viewport" content={scale}/>
-			<meta name="description" content={&description}/>
+			// the PAGE's description where it declares one: this is the snippet a
+			// search result shows, so a site-wide default under every page is a
+			// site of identical results.
+			<meta name="description" content={&card_description}/>
 			<meta name="version" content={&version}/>
 			<meta name="application-name" content={&title}/>
 			{theme_color.as_ref().map(|color| rsx!{ <meta name="theme-color" content={color.clone()}/> })}
 			// Open Graph
 			<meta property="og:title" content={&card_title}/>
-			<meta property="og:type" content="website"/>
+			<meta property="og:type" content={og_type}/>
 			// site name stays bound to `PackageConfig.title`, not snapshotted.
 			<meta property="og:site_name" {site_name_attr(&title)}/>
 			<meta property="og:description" content={&card_description}/>
-			{homepage.as_ref().map(|homepage| rsx!{ <meta property="og:url" content={homepage.clone()}/> })}
+			{canonical.as_ref().map(|url| rsx!{ <meta property="og:url" content={url.clone()}/> })}
 			{social_image.as_ref().map(|image| rsx!{ <meta property="og:image" content={image.clone()}/> })}
+			// article facts, emitted only for a page that has a publication date
+			{published.as_ref().map(|time| rsx!{ <meta property="article:published_time" content={time.clone()}/> })}
+			{modified.as_ref().map(|time| rsx!{ <meta property="article:modified_time" content={time.clone()}/> })}
+			{article_author.as_ref().map(|author| rsx!{ <meta property="article:author" content={author.clone()}/> })}
+			{noindex.then(|| rsx!{ <meta name="robots" content="noindex"/> })}
+			<script type="application/ld+json">{json_ld}</script>
 			// Twitter card
 			<meta name="twitter:card" content={twitter_card}/>
 			<meta name="twitter:title" content={&card_title}/>

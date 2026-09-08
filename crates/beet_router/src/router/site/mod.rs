@@ -18,6 +18,10 @@ mod route_index;
 mod sidebar;
 #[cfg(feature = "std")]
 mod site_layout;
+// the machine-readable faces of a site (`robots.txt`, `sitemap.xml`, `rss.xml`,
+// `search-index.json`): ordinary static routes over the `RouteTree`.
+#[cfg(feature = "std")]
+mod syndication;
 // the `<Template src>` include: needs the BSX tag seam + the unified loader. It
 // reads through the store as an async pending dependency, so it relies on the
 // async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).
@@ -42,6 +46,8 @@ pub use route_index::*;
 pub use sidebar::*;
 #[cfg(feature = "std")]
 pub use site_layout::*;
+#[cfg(feature = "std")]
+pub use syndication::*;
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
 pub(crate) use template_include::*;
 #[cfg(feature = "std")]

@@ -84,8 +84,8 @@ pub fn YouTubeEmbed(
 	#[prop(into, default)]
 	title: String,
 ) -> impl Bundle {
-	let embed =
-		video_id(&url).map(|id| format!("https://www.youtube.com/embed/{id}"));
+	let embed = PageMeta::youtube_id(&url)
+		.map(|id| format!("https://www.youtube.com/embed/{id}"));
 	rsx! {
 		{embed.map(|embed| rsx!{
 			<iframe
@@ -97,42 +97,5 @@ pub fn YouTubeEmbed(
 				referrerpolicy="strict-origin-when-cross-origin"
 				allowfullscreen></iframe>
 		})}
-	}
-}
-
-/// The video id in a YouTube url: the `7koepBSRoUI` in `https://youtu.be/..`,
-/// `https://www.youtube.com/watch?v=..` or an already-embed url. `None` for any
-/// other url, so a video hosted elsewhere declares no YouTube embed.
-fn video_id(url: &str) -> Option<&str> {
-	url.split_once("youtu.be/")
-		.or_else(|| url.split_once("youtube.com/embed/"))
-		.or_else(|| url.split_once("watch?v="))
-		.map(|(_, id)| id)?
-		.split(['?', '&', '#'])
-		.next()
-		.filter(|id| !id.is_empty())
-}
-
-#[cfg(test)]
-mod test {
-	use super::*;
-
-	#[beet_core::test]
-	fn parses_youtube_urls() {
-		video_id("https://youtu.be/7koepBSRoUI")
-			.unwrap()
-			.xpect_eq("7koepBSRoUI");
-		// a share url carries a timestamp, the watch url a playlist
-		video_id("https://youtu.be/7koepBSRoUI?t=42")
-			.unwrap()
-			.xpect_eq("7koepBSRoUI");
-		video_id("https://www.youtube.com/watch?v=7koepBSRoUI&list=PL")
-			.unwrap()
-			.xpect_eq("7koepBSRoUI");
-		video_id("https://www.youtube.com/embed/7koepBSRoUI")
-			.unwrap()
-			.xpect_eq("7koepBSRoUI");
-		// a video hosted elsewhere is not a YouTube embed
-		video_id("https://example.com/video.mp4").xpect_none();
 	}
 }

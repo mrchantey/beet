@@ -18,14 +18,15 @@ use beet_net::prelude::*;
 /// ([`RouteSidebar`]) and any generated [`RouteIndex`]; it is deliberately NOT
 /// [`RouteHidden`], which drops a route from the [`RouteTree`] altogether and
 /// so from dispatch. It leaves its [`ExportStrategy`] at the default `Dynamic`,
-/// so static export skips it too: an exported site serves the redirect only
-/// where the host understands one. Runtime serving (the deployed site, behind a
-/// caching proxy) answers the real 301. A future static-export story should
-/// emit a `<path>/index.html` meta-refresh stub with a canonical link for these.
+/// since there is no response to render: a static export instead writes a
+/// meta-refresh stub for it (see [`StaticExport`]), while runtime serving
+/// answers the real 301.
 ///
 /// The Rust equivalent is spawning the same bundle; like [`Route`] it is a
 /// [`template`](macro@template) rather than a component, so it expands away at
-/// build time with nothing left to re-fire on reload.
+/// build time with nothing left to re-fire on reload. What it leaves behind is
+/// [`RedirectTo`], the target as plain data, which both dispatch and the export
+/// read.
 ///
 /// [`PageRoute`]: crate::prelude::PageRoute
 /// [`RouteSidebar`]: crate::prelude::RouteSidebar
@@ -33,6 +34,7 @@ use beet_net::prelude::*;
 /// [`RouteHidden`]: crate::prelude::RouteHidden
 /// [`RouteTree`]: crate::prelude::RouteTree
 /// [`Route`]: crate::prelude::Route
+/// [`StaticExport`]: crate::prelude::StaticExport
 #[template]
 pub fn Redirect(
 	/// The route path pattern to redirect FROM, eg `post-1`.
@@ -43,35 +45,74 @@ pub fn Redirect(
 	#[prop(into)]
 	redirect: String,
 ) -> impl Bundle {
-	// how many segments of this route's pattern are its own, ie how many to drop
-	// to reach the scope its ancestors set
-	let depth = SmolPath::new(path.as_str()).segments().len();
 	(
+		RedirectTo::new(&path, redirect),
 		PathPartial::new(path),
 		HttpMethod::Get,
 		Action::<Request, Response>::new_async(
 			async move |cx: ActionContext<Request>| -> Result<Response> {
-				let location = match redirect.starts_with('/') {
-					true => redirect.clone(),
-					// the scope is only known once the tree is built, so it is read
-					// off the route's own resolved pattern at dispatch
-					false => cx
-						.caller
-						.get(|pattern: &PathPattern| pattern.annotated_path())
-						.await?
-						.xmap(|pattern| {
-							let mut segments = pattern.segments();
-							segments
-								.truncate(segments.len().saturating_sub(depth));
-							SmolPath::from_segments(&segments)
-						})
-						.join(redirect.as_str())
-						.with_leading_slash(),
-				};
+				let location = cx
+					.caller
+					.with_state::<Query<(&RedirectTo, &PathPattern)>, _>(
+						|entity, query| {
+							query
+								.get(entity)
+								.map(|(redirect, pattern)| {
+									redirect.location(pattern)
+								})
+								.map_err(BevyError::from)
+						},
+					)
+					.await??;
 				Response::permanent_redirect(location).xok()
 			},
 		),
 	)
+}
+
+/// Where a [`Redirect`] route sends a caller, as plain data on the route
+/// entity.
+///
+/// A component rather than a value captured in the handler because two
+/// consumers read it: dispatch answers the 301 with it, and a static export
+/// writes a meta-refresh stub from it for hosts that serve files and nothing
+/// else.
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct RedirectTo {
+	/// The authored target: a name resolved against this route's parent scope,
+	/// or an absolute url when it starts with `/`.
+	pub target: String,
+	/// How many segments of this route's own pattern are its own, ie how many
+	/// to drop to reach the scope its ancestors set. Resolved from the authored
+	/// `path` at build, since the full pattern only exists once the tree is
+	/// built.
+	depth: usize,
+}
+
+impl RedirectTo {
+	/// The target of a route declaring `path`, eg
+	/// `RedirectTo::new("post-1", "full-stack-bevy")`.
+	pub fn new(path: &str, target: impl Into<String>) -> Self {
+		Self {
+			target: target.into(),
+			depth: SmolPath::new(path).segments().len(),
+		}
+	}
+
+	/// The `Location` this route sends a caller to, resolved against the full
+	/// route `pattern` its ancestors gave it and rooted at the url space.
+	pub fn location(&self, pattern: &PathPattern) -> String {
+		if self.target.starts_with('/') {
+			return self.target.clone();
+		}
+		let path = pattern.annotated_path();
+		let mut segments = path.segments();
+		segments.truncate(segments.len().saturating_sub(self.depth));
+		SmolPath::from_segments(&segments)
+			.join(self.target.as_str())
+			.with_leading_slash()
+	}
 }
 
 #[cfg(test)]

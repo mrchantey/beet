@@ -18,8 +18,9 @@ use beet_ui::prelude::*;
 /// a walk) and lists the children of the node the request matched, so an
 /// `index.md` under `blog/` lists the posts beside it. Every field comes from
 /// each page's [`PageMeta`], ie its root declarations: a child declaring none
-/// has nothing to list and is skipped, as is one that is not a [`PageRoute`],
-/// and a draft is skipped in production exactly as static export drops it.
+/// has nothing to list and is skipped, as is one that is not a [`PageRoute`].
+/// An unlisted page never appears (an index is a listing), and a draft appears
+/// everywhere but production, exactly as static export drops it there.
 ///
 /// Entries are ordered like the nav — frontmatter `order`, which a numbered
 /// filename fills in ([`PageMeta::declare_file_defaults`]), then natural order
@@ -42,7 +43,6 @@ pub fn RouteIndex(
 	metas: Query<&PageMeta>,
 ) -> impl Bundle {
 	let cx = stack.current();
-	// drafts are listed everywhere but production, matching `StaticExport`
 	let is_prod = BootstrapConfig::get().is_prod();
 	let current = SmolPath::new(cx.current_path());
 	let mut entries: Vec<(SmolPath, PageMeta)> = trees
@@ -57,7 +57,7 @@ pub fn RouteIndex(
 				.filter(|(_, node)| node.is_page_route)
 				.filter_map(|(child, node)| {
 					let meta = metas.get(node.entity).ok()?;
-					(!(is_prod && meta.draft))
+					lists(meta, is_prod)
 						.then(|| (child.path.annotated_path(), meta.clone()))
 				})
 				.collect()
@@ -87,6 +87,18 @@ pub fn RouteIndex(
 		})
 		.collect();
 	rsx! { {items} }
+}
+
+/// Whether a child page appears in the index, ie its
+/// [`PageVisibility`](beet_ui::prelude::PageVisibility) read as a listing rule.
+fn lists(meta: &PageMeta, is_prod: bool) -> bool {
+	match meta.visibility {
+		PageVisibility::Public => true,
+		// an unlisted page is reachable by its link and from no index
+		PageVisibility::Unlisted => false,
+		// a draft is previewed everywhere but production, matching `StaticExport`
+		PageVisibility::Draft => !is_prod,
+	}
 }
 
 /// One index entry: the `<hr/>` separating it from the entry above (every entry
@@ -175,7 +187,7 @@ mod test {
 				post("ecs-router", meta("ECS Router", "2025-08-09", 2)),
 				post("declarative-state", {
 					let mut meta = meta("Declarative State", "2025-11-03", 3);
-					meta.draft = true;
+					meta.visibility = PageVisibility::Draft;
 					meta
 				}),
 			])])

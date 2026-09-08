@@ -1,8 +1,8 @@
 +++
 title = "Draft"
-draft = true
+visibility = "Draft"
 +++
 
 # Draft
 
-A draft page, excluded from static export by its `draft = true` frontmatter.
+A draft page, excluded from production by its `visibility = "Draft"` frontmatter.

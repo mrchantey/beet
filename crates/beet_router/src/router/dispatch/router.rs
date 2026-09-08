@@ -102,6 +102,24 @@ impl Router {
 				})
 				.await;
 
+				// a draft page never reaches production, live-served as well as
+				// exported: it is answered exactly as an unknown url, so a 404
+				// never confirms that the page exists.
+				#[cfg(feature = "std")]
+				let node = match node {
+					Ok(Some(matched))
+						if hides_draft(
+							&world,
+							matched.entity,
+							BootstrapConfig::get().is_prod(),
+						)
+						.await =>
+					{
+						Ok(None)
+					}
+					node => node,
+				};
+
 				// resolve the inner action and dispatch entity from the matched route
 				let (inner_action, dispatch_entity) = match &node {
 					Ok(Some(node)) => {
@@ -157,6 +175,33 @@ impl Router {
 		)
 	}
 }
+/// Whether the matched route is a page this process must not serve: a
+/// [`PageMeta`](beet_ui::prelude::PageMeta) marked
+/// [`Draft`](beet_ui::prelude::PageVisibility::Draft), in a production process.
+///
+/// The dispatch half of the one draft rule
+/// ([`ActionNode::is_public_page`](crate::prelude::ActionNode::is_public_page),
+/// which static export reads for the SSG half), so a draft is invisible in
+/// production however the site is served.
+///
+/// Takes the stage rather than reading it, both because the caller's read
+/// short-circuits the world roundtrip in dev and because the process stage is
+/// an immutable global, so the prod branch is only reachable from a test here.
+#[cfg(feature = "std")]
+pub(crate) async fn hides_draft(
+	world: &AsyncWorld,
+	entity: Entity,
+	is_prod: bool,
+) -> bool {
+	use beet_ui::prelude::PageMeta;
+	is_prod
+		&& world
+			.with_state::<Query<&PageMeta>, _>(move |metas| {
+				metas.get(entity).is_ok_and(PageMeta::is_draft)
+			})
+			.await
+}
+
 /// Builds the no_std not-found fallback: a plain-text `404` listing the
 /// available routes, queried from the ancestor [`RouteTree`].
 ///
@@ -278,6 +323,52 @@ mod test {
 		status(HttpMethod::Head, HttpMethod::Get)
 			.await
 			.xpect_eq(StatusCode::OK);
+	}
+
+	/// A draft page serves in dev and 404s in prod, the live-serving half of the
+	/// rule static export applies to the exported half.
+	///
+	/// The process stage is an immutable global, so the dev side runs through
+	/// real dispatch and the prod side is asserted against [`hides_draft`], the
+	/// one gate dispatch consults (the same split `StaticExport` uses).
+	#[beet_core::test]
+	async fn prod_hides_draft_pages() {
+		let mut world = router_world();
+		let router = world
+			.spawn((Router::with_defaults(), children![(
+				render_action::fixed_func_route(
+					"secret",
+					|| rsx! { <p>"Secret"</p> }
+				),
+				HttpMethod::Get,
+				PageRoute,
+				PageMeta {
+					visibility: PageVisibility::Draft,
+					..default()
+				},
+			)]))
+			.flush();
+		let entity = RouteTree::of(&world, router)
+			.unwrap()
+			.find(&["secret"])
+			.unwrap()
+			.entity;
+
+		world
+			.entity_mut(router)
+			.exchange(Request::get("secret"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		world
+			.run_async_then(async move |world| {
+				(
+					hides_draft(&world, entity, true).await,
+					hides_draft(&world, entity, false).await,
+				)
+			})
+			.await
+			.xpect_eq((true, false));
 	}
 
 	#[beet_core::test]

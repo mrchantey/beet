@@ -71,6 +71,27 @@ impl PackageConfig {
 
 	/// The app identity, ie the `beet-site` in `beet-site--prod--analytics`.
 	pub fn app_name(&self) -> &str { &self.app_name }
+
+	/// A route path as an absolute url under [`homepage`](Self::homepage), eg
+	/// `blog/ecs-router` -> `https://beet.org/blog/ecs-router`.
+	///
+	/// # Errors
+	/// Errors when `homepage` is unset. A sitemap `<loc>` and a feed `<link>`
+	/// are resolved against nothing, so a relative url there is not a degraded
+	/// entry but a broken one: the loud failure names the field to set.
+	pub fn absolute_url(&self, path: &str) -> Result<String> {
+		let Some(homepage) = &self.homepage else {
+			bevybail!(
+				"cannot resolve an absolute url for '{path}': `PackageConfig.homepage` is unset, set it to this site's origin, ie `<PackageConfig homepage=\"https://example.com\"/>`"
+			);
+		};
+		let homepage = homepage.trim_end_matches('/');
+		match path.trim_matches('/') {
+			"" => format!("{homepage}/"),
+			path => format!("{homepage}/{path}"),
+		}
+		.xok()
+	}
 }
 
 /// Macro to create a `PackageConfig` from compile time environment variables set by Cargo.
@@ -113,6 +134,39 @@ mod test {
 	#[crate::test]
 	fn app_name_from_the_package() {
 		pkg_config!().app_name().xpect_eq("beet_core");
+	}
+
+	/// A route path joins onto the homepage with exactly one slash between them,
+	/// however either side is spelled, and an unset homepage is a loud error
+	/// rather than a relative url.
+	#[crate::test]
+	fn joins_absolute_urls() {
+		let config = PackageConfig {
+			homepage: Some("https://beet.org/".into()),
+			..default()
+		};
+		config
+			.absolute_url("blog/ecs-router")
+			.unwrap()
+			.xpect_eq("https://beet.org/blog/ecs-router".to_string());
+		config
+			.absolute_url("/blog/ecs-router/")
+			.unwrap()
+			.xpect_eq("https://beet.org/blog/ecs-router".to_string());
+		// the root path is the origin itself, with its trailing slash
+		config
+			.absolute_url("")
+			.unwrap()
+			.xpect_eq("https://beet.org/".to_string());
+		config
+			.absolute_url("/")
+			.unwrap()
+			.xpect_eq("https://beet.org/".to_string());
+		PackageConfig::default()
+			.absolute_url("blog")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("PackageConfig.homepage");
 	}
 
 	#[crate::test]

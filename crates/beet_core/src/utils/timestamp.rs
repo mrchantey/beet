@@ -139,14 +139,46 @@ impl Timestamp {
 	/// This instant as an ISO 8601 / RFC 3339 UTC timestamp with millisecond
 	/// precision, eg `2024-09-09T19:46:02.102Z`.
 	pub fn format_iso8601(&self) -> String {
-		let millis_of_day = self.0.rem_euclid(Self::MILLIS_PER_DAY);
-		let secs = millis_of_day / 1_000;
-		let (hour, min, sec) = (secs / 3_600, (secs / 60) % 60, secs % 60);
-		let millis = millis_of_day % 1_000;
+		let (hour, min, sec, millis) = self.civil_time();
 		format!(
 			"{}T{hour:02}:{min:02}:{sec:02}.{millis:03}Z",
 			self.format_date()
 		)
+	}
+
+	/// This instant as an RFC 2822 date-time in UTC, eg
+	/// `Mon, 08 Sep 2026 00:00:00 GMT` — the format an RSS `pubDate` requires.
+	///
+	/// Always `GMT` rather than `+0000`: both are legal, and the named zone is
+	/// what every feed in the wild emits.
+	pub fn format_rfc2822(&self) -> String {
+		let (year, month, day) = self.civil_date();
+		let (hour, min, sec, _) = self.civil_time();
+		let month = Self::month_name(month).map_or("Jan", |name| &name[..3]);
+		format!(
+			"{}, {day:02} {month} {year:04} {hour:02}:{min:02}:{sec:02} GMT",
+			self.weekday_abbr()
+		)
+	}
+
+	/// This instant's UTC `(hour, minute, second, millisecond)`.
+	fn civil_time(&self) -> (i64, i64, i64, i64) {
+		let millis_of_day = self.0.rem_euclid(Self::MILLIS_PER_DAY);
+		let secs = millis_of_day / 1_000;
+		(
+			secs / 3_600,
+			(secs / 60) % 60,
+			secs % 60,
+			millis_of_day % 1_000,
+		)
+	}
+
+	/// The three-letter English weekday of this instant's UTC date, eg `Mon`.
+	pub fn weekday_abbr(&self) -> &'static str {
+		// `1970-01-01` was a Thursday, so the epoch day indexes from there
+		const NAMES: [&str; 7] =
+			["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+		NAMES[self.0.div_euclid(Self::MILLIS_PER_DAY).rem_euclid(7) as usize]
 	}
 
 	/// The English name of a month, `1..=12`. `None` outside that range.
@@ -238,6 +270,31 @@ mod test {
 		Timestamp::from_secs(1_709_164_800)
 			.format_iso8601()
 			.xpect_eq("2024-02-29T00:00:00.000Z");
+	}
+
+	/// The feed date format: an RFC 2822 date-time with the weekday its epoch
+	/// day implies, on both sides of the epoch.
+	#[crate::test]
+	fn formats_rfc2822() {
+		Timestamp::UNIX_EPOCH
+			.format_rfc2822()
+			.xpect_eq("Thu, 01 Jan 1970 00:00:00 GMT");
+		Timestamp::from_millis(1_725_911_162_102)
+			.format_rfc2822()
+			.xpect_eq("Mon, 09 Sep 2024 19:46:02 GMT");
+		Timestamp::parse_date("1969-07-20")
+			.unwrap()
+			.format_rfc2822()
+			.xpect_eq("Sun, 20 Jul 1969 00:00:00 GMT");
+		// the whole week, so no index is off by one
+		for (offset, day) in ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"]
+			.into_iter()
+			.enumerate()
+		{
+			Timestamp::from_secs(offset as i64 * 86_400)
+				.weekday_abbr()
+				.xpect_eq(day);
+		}
 	}
 
 	#[crate::test]

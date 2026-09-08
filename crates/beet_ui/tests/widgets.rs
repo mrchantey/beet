@@ -113,6 +113,106 @@ fn head_emits_single_og_site_name_from_package_config() {
 		.xpect_contains("property=\"og:site_name\" content=\"Beet UI\"");
 }
 
+/// The page's own metadata reaches the tags a search result and a link preview
+/// read: the description, the canonical url and the `article:*` block, each
+/// falling back to the site only where the page declares nothing.
+#[beet_core::test]
+fn head_prefers_page_metadata() {
+	let mut world = layout_world();
+	let meta = PageMeta {
+		title: Some("ECS Router".into()),
+		description: Some("routing as a tree of entities".into()),
+		created: Timestamp::parse_date("2025-08-09"),
+		updated: Timestamp::parse_date("2025-09-01"),
+		author: Some("Pete Hayman".into()),
+		video_url: Some("https://youtu.be/7koepBSRoUI".into()),
+		..default()
+	};
+	let root = world
+		.spawn_template(rsx! {
+			<Head meta=meta url="https://example.test/blog/ecs-router"/>
+		})
+		.unwrap()
+		.id();
+	let html = render_html(&mut world, root);
+	// the page description, not the package one, is what a result snippet shows
+	html.as_str()
+		.xpect_contains(
+			r#"name="description" content="routing as a tree of entities""#,
+		)
+		// per-page canonical and og:url, not the site homepage
+		.xpect_contains(
+			r#"rel="canonical" href="https://example.test/blog/ecs-router""#,
+		)
+		.xpect_contains(
+			r#"property="og:url" content="https://example.test/blog/ecs-router""#,
+		)
+		// a dated page is an article, with its dates and byline
+		.xpect_contains(r#"property="og:type" content="article""#)
+		.xpect_contains(
+			r#"property="article:published_time" content="2025-08-09T00:00:00.000Z""#,
+		)
+		.xpect_contains(
+			r#"property="article:modified_time" content="2025-09-01T00:00:00.000Z""#,
+		)
+		.xpect_contains(r#"property="article:author" content="Pete Hayman""#)
+		// the companion video's poster frame is the social card, with no
+		// `image_url` frontmatter at all
+		.xpect_contains(
+			r#"property="og:image" content="https://i.ytimg.com/vi/7koepBSRoUI/hqdefault.jpg""#,
+		)
+		.xpect_contains(r#"name="twitter:card" content="summary_large_image""#)
+		// ..and the same facts again as structured data, which is what earns a
+		// search result its byline and date
+		.xpect_contains(r#"<script type="application/ld+json">"#)
+		.xpect_contains(r#""@type":"Article""#)
+		.xpect_contains(r#""headline":"ECS Router""#)
+		.xpect_contains(r#""datePublished":"2025-08-09T00:00:00.000Z""#)
+		.xpect_contains(r#""dateModified":"2025-09-01T00:00:00.000Z""#)
+		.xpect_contains(r#""author":{"@type":"Person","name":"Pete Hayman"}"#)
+		.xpect_contains(r#""publisher":{"@type":"Organization","name":"Beet UI"}"#)
+		.xnot()
+		.xpect_contains(r#"name="robots""#);
+}
+
+/// A page declaring no metadata still names the site: the description, the
+/// canonical url and `og:type` all fall back, and no article tag is invented.
+#[beet_core::test]
+fn head_falls_back_to_the_site() {
+	let mut world = layout_world();
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
+	let html = render_html(&mut world, root);
+	html.as_str()
+		.xpect_contains(r#"name="description" content="test""#)
+		.xpect_contains(r#"rel="canonical" href="https://example.test""#)
+		.xpect_contains(r#"property="og:type" content="website""#)
+		// an undated page is a `WebPage`, not an `Article`
+		.xpect_contains(r#""@type":"WebPage""#)
+		.xpect_contains(r#""headline":"Beet UI""#)
+		.xnot()
+		.xpect_contains("article:")
+		.xnot()
+		.xpect_contains("datePublished");
+}
+
+/// An unlisted page serves to whoever holds its link and is advertised nowhere,
+/// so the head asks crawlers not to index it.
+#[beet_core::test]
+fn head_marks_unlisted_pages_noindex() {
+	let mut world = layout_world();
+	let meta = PageMeta {
+		visibility: PageVisibility::Unlisted,
+		..default()
+	};
+	let root = world
+		.spawn_template(rsx! { <Head meta=meta/> })
+		.unwrap()
+		.id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains(r#"name="robots" content="noindex""#);
+}
+
 #[beet_core::test]
 fn header_renders_title_from_package_config() {
 	let mut world = layout_world();

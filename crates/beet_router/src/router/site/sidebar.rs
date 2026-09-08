@@ -27,12 +27,13 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ui::prelude::*;
 
-/// The document [`Head`] with a per-route `<title>`: the base [`Head`] omits its
-/// own `<title>` and this widget owns the single one, bound to the route's
-/// [`PageMeta`] title (`@entity:PageRoot::PageMeta.title`) so it differs
+/// The document [`Head`] with a per-route `<title>` and url: the base [`Head`]
+/// omits its own `<title>` and this widget owns the single one, bound to the
+/// route's [`PageMeta`] title (`@entity:PageRoot::PageMeta.title`) so it differs
 /// per route and stays live. The route's whole [`PageMeta`] is handed to the base
 /// [`Head`] so its social card previews this page, falling back to
-/// [`PackageConfig`](beet_core::prelude::PackageConfig) per field. Extra tags
+/// [`PackageConfig`](beet_core::prelude::PackageConfig) per field, along with
+/// this request's own absolute url as the canonical one. Extra tags
 /// (stylesheet, favicon, ...) flow through to the `<head>` via the default slot.
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
@@ -52,8 +53,12 @@ pub fn RouteHead(
 	// binding then keeps it live and per-route, so the title is never sticky.
 	let seed = meta.title.clone().unwrap_or_else(|| pkg.title.to_string());
 	let title = route_title(&seed)?;
+	// this page's canonical url. Unlike the syndication routes, which cannot
+	// serve a relative `<loc>` at all, a head has plenty to say without an
+	// origin, so an unset `homepage` simply omits the tag.
+	let url = pkg.absolute_url(&cx.current_path()).ok();
 	rsx! {
-		<Head omit_title=true meta=meta>
+		<Head omit_title=true meta=meta url=url>
 			<title>{title}</title>
 			<Slot/>
 		</Head>

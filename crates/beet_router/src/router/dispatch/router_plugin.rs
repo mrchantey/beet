@@ -129,6 +129,12 @@ impl Plugin for RouterPlugin {
 				// the shipped document shell a no-code site wraps its pages in,
 				// requested with `<SiteLayout>`.
 				.register_template::<SiteLayout>()
+				// the machine-readable faces of a site, each an opt-in static
+				// route scoped by where it is declared
+				.register_template::<Robots>()
+				.register_template::<Sitemap>()
+				.register_template::<RssFeed>()
+				.register_template::<SearchIndex>()
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
 				.register_template::<DefaultAppRoutes>()
@@ -162,6 +168,9 @@ impl Plugin for RouterPlugin {
 				// redirect="full-stack-bevy"/>`), an ordinary GET route
 				// answering a 301
 				.register_template::<Redirect>()
+				// the redirect's target as plain data, read by dispatch and by
+				// the static export's meta-refresh stub
+				.register_type::<RedirectTo>()
 				// the document-field route (`<FieldRoute path=".." field=".."
 				// verb="push"/>`): a typed document action plus the
 				// `ExchangeOverload` that markup cannot spread for itself.
