@@ -103,7 +103,7 @@ route.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra"]}/>
+	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<!-- the region is a decision here (an mta near its users and its persistent
 	     volume), so the stack pins it rather than inheriting `AWS_REGION`: a deploy
 	     from a differently-configured machine builds the same stack. -->

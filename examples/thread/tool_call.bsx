@@ -9,7 +9,7 @@ tool (registered by the binary), looped twice by `{RepeatTimes}` and run by
 complete and the terminal holds it until Ctrl+C.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
-	<CrateCheck features={["thread", "tui", "ssh", "extra"]}/>
+	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh && feature:extra"/>
 	<Router {Layout{template:"ThreadShell"}}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>

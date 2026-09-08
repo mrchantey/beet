@@ -27,7 +27,7 @@ use beet_net::prelude::*;
 /// happened is the one outcome worse than a failure. A failed run over
 /// children with [`UnregisteredTag`] markers appends their names, so a lean
 /// binary's error explains itself even where no
-/// [`RequireFeatures`] was declared (the declaration is the better error: it
+/// `bx:cfg` excluded the branch (the tombstone is the better error: it
 /// names the missing features before any step runs).
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]

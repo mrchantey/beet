@@ -99,7 +99,7 @@ inbound assertion rather than failing the deploy.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra"]}/>
+	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="mail-comail-example" region="us-west-2">
 		<DeployRoutes/>
 

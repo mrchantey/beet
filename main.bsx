@@ -48,13 +48,12 @@ and to no other, so no stage deploy touches it.
     just beet-shared pull                  # hydrate ./assets from it (no credentials)
     just beet-shared push                  # publish ./assets to it
 
-Structure is universal, so a lean `beet` (the default build, ie `beet run-wasm`)
-loads that subtree too: the tags it never linked build as inert entities,
-quietly, because the route declares `RequireFeatures(["infra","extra"])`. Dispatching
-a shared verb in such a build fails naming the missing features. The stage rides
-the `<Stack>` COMPONENT, registered in every native build, so `shared` is correct
-even there; `<DeployRoutes/>` (a beet_extra template) adds the tofu lifecycle
-routes, and is one of the tags a lean build has no behavior for.
+A lean `beet` (the default build, ie `beet run-wasm`) does not load that subtree
+at all: `bx:cfg="feature:infra && feature:extra"` excludes it before the build
+walk, so none of its tags resolve and none of its deploy machinery is touched.
+What remains in its place is a tombstone that keeps the `shared` route
+addressable, so `--help` still lists it and dispatching a shared verb reports
+the condition that excluded it rather than 404ing.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 -->
@@ -69,7 +68,7 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<ExportPdf/>
 	<CaptureScreenshot/>
 	<SyncS3/>
-	<Route path="shared" {RequireFeatures(["infra","extra"])}>
+	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
 			<DeployRoutes/>

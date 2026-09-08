@@ -20,7 +20,7 @@ request, so the view and composer stay bound to the thread the loop drives (the
 is a sibling of the page, kicked by the same start.
 -->
 <CallOnReady {(TuiServer, HttpServer{default_boot:false}, SshTuiServer{default_boot:false}, SweepDescendants)}>
-	<CrateCheck features={["thread", "tui", "ssh"]}/>
+	<RequireCfg cfg="feature:thread && feature:tui && feature:ssh"/>
 	<Router {Layout{template:"ThreadShell"}}>
 		<Route path="/" {FixedPage}>
 			<ThreadView {OfThread($thread)}/>

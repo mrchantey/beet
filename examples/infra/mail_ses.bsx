@@ -56,7 +56,7 @@ simulator address it sends to is always permitted.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra"]}/>
+	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="mail-ses-example" region="us-west-2">
 		<DeployRoutes/>
 

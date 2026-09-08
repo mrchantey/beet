@@ -212,12 +212,12 @@ pub fn build_root(
 		template_sources,
 		formats,
 	} = sources;
-	// the pre-scanned `<CrateCheck>`s, spawned before the tree builds so a check
-	// fires with its missing-feature list even when the tree itself cannot build
-	// (eg its root tag is feature-gated out of this binary).
-	if !prescan.checks.is_empty() {
-		for check in prescan.checks {
-			world.spawn(check);
+	// the pre-scanned `<RequireCfg>`s, spawned before the tree builds so a
+	// requirement reports its unmet list even when the tree itself cannot build
+	// (eg its root tag is not registered in this binary).
+	if !prescan.requirements.is_empty() {
+		for requirement in prescan.requirements {
+			world.spawn(requirement);
 		}
 		world.flush();
 	}

@@ -84,13 +84,14 @@ one declaration of what is borrowed, and runs ahead of every publish.
 
 ## The deploy
 
-Structure is universal, so this same file loads whole in the deployed binary
-(built `--no-default-features --features aws_sdk,ssh,geoip`): the deploy tags it
-never linked build as inert entities, quietly, because the stack declares
-`RequireFeatures(["infra","extra"])`. That declaration is also the loudness:
-dispatching any deploy verb in a binary without those features fails naming
-them and the rebuild that fixes it, before any step runs. That is what lets the
-application declare its own infrastructure without shipping the deployer.
+This same file loads in the deployed binary (built `--no-default-features
+--features aws_sdk,ssh,geoip`), which never compiled the deploy stack:
+`bx:cfg="feature:infra && feature:extra"` on the `<Stack>` excludes that whole
+subtree before the build walk, so none of its tags resolve and none of its
+machinery is linked or touched. What is left in its place is a tombstone, so the
+routes it hosted report the condition that excluded them rather than vanishing.
+That is what lets the application declare its own infrastructure without
+shipping the deployer.
 
 `<Stack>` is the identity every resource beneath it composes its name from, and it
 is a registered component in every native build rather than a template prop, so the
@@ -215,8 +216,8 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		</Router>
 	</Route>
 	<!-- the stage stack: every resource the running site needs, the verbs that
-	     provision them, and the one `RequireFeatures` guarding the whole subtree -->
-	<Stack {RequireFeatures(["infra","extra"])}>
+	     provision them, and the one `bx:cfg` guarding the whole subtree -->
+	<Stack bx:cfg="feature:infra && feature:extra">
 		<!-- Raw segments and aggregate rows share ONE writable store, under the
 		     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
 		     A bucket is this codebase's unit of IAM grant, so it earns its place
@@ -268,7 +269,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 		</Route>
 	</Stack>
-	<Route path="shared" {RequireFeatures(["infra","extra"])}>
+	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">

@@ -38,10 +38,10 @@ impl Plugin for RouterPlugin {
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
 			.add_observer(rebuild_route_tree_on_build)
-			// `RequireFeatures` (a beet_core component) is enforced here, where
+			// `CfgExcluded` (a beet_core component) is reported here, where
 			// dispatch lives: an unmet declaration fails any call at or under
 			// it naming the missing features.
-			.add_observer(enforce_require_features);
+			.add_observer(report_cfg_excluded);
 
 		// no_std-core reflect registrations: these types are shared across std
 		// and no_std and reflection works on bare metal, so register them

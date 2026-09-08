@@ -279,7 +279,9 @@ impl Block for RdsPostgresBlock {
 	}
 
 	/// The sensitive password variable the apply resolves.
-	fn variables(&self) -> Vec<Variable> { vec![self.password()] }
+	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
+		vec![self.password()]
+	}
 }
 
 /// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside

@@ -281,8 +281,7 @@ mod test {
 			let mut registry = registry.write();
 			registry.register::<PackageConfig>();
 			registry.register::<Bound>();
-			registry.register::<RequireFeatures>();
-			registry.register::<CrateCheck>();
+			registry.register::<RequireCfg>();
 		}
 		let nodes =
 			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
@@ -331,32 +330,19 @@ mod test {
 			.xpect_eq(entity_count("<div><PackageConfig/></div>"));
 	}
 
-	/// A list literal fills a `Vec`-typed tuple-struct spread, the shape a
-	/// feature-dependent subtree declares its requirements in.
+	/// A string attribute fills a field, the shape an entry declares its cfg
+	/// requirement in.
 	#[crate::test]
-	fn spread_list_fills_a_vec_newtype() {
-		let (world, root) =
-			build(r#"<div {RequireFeatures(["infra","extra"])}/>"#);
+	fn attribute_fills_a_field() {
+		let (world, root) = build(
+			r#"<RequireCfg cfg="feature:ml && feature:beet_esp/alvik"/>"#,
+		);
 		let host = world.entity(root).get::<Children>().unwrap()[0];
 		world
 			.entity(host)
-			.get::<RequireFeatures>()
+			.get::<RequireCfg>()
 			.unwrap()
-			.xpect_eq(RequireFeatures::new(["infra", "extra"]));
-	}
-
-	/// A `{[..]}` attribute fills a `Vec`-typed field, the shape an entry
-	/// declares its crate requirements in.
-	#[crate::test]
-	fn attribute_list_fills_a_vec_field() {
-		let (world, root) =
-			build(r#"<CrateCheck features={["ml","beet_esp/alvik"]}/>"#);
-		let host = world.entity(root).get::<Children>().unwrap()[0];
-		world
-			.entity(host)
-			.get::<CrateCheck>()
-			.unwrap()
-			.xpect_eq(CrateCheck::features(["ml", "beet_esp/alvik"]));
+			.xpect_eq(RequireCfg::new("feature:ml && feature:beet_esp/alvik"));
 	}
 
 	/// A `$name` reference into a formerly-gated region resolves to the real

@@ -331,14 +331,30 @@ impl MailDomainBlock {
 		SecretRef::new(format!("dkim-{}", self.slug()))
 	}
 
+	/// The parameter the PUBLIC half is published at, ie
+	/// `/beetmash/prod/dkim-stalwart-beetmash-com-public`. Written beside the
+	/// private key by `<EnsureDkimKey/>`.
+	///
+	/// The public half is stored rather than re-derived because it is what the
+	/// record's content IS, and a value a render depends on should be readable
+	/// without also reading the private key that produced it.
+	pub fn dkim_public_secret(&self) -> SecretRef {
+		SecretRef::new(format!("dkim-{}-public", self.slug()))
+	}
+
 	/// The tofu variable the public half arrives as, ie
 	/// `dkim_stalwart_beetmash_com`. Underscores rather than the slug's
 	/// hyphens: `${var.a-b}` is a subtraction in HCL, not a name.
-	pub fn dkim_public_key_variable(&self) -> Variable {
-		Variable::param(
-			self.slug()
-				.replace('-', "_")
-				.xmap(|slug| format!("dkim_{slug}")),
+	///
+	/// Reads parameter store directly rather than waiting for a pipeline step to
+	/// hand it over. This value is the CONTENT of the selector record, and the
+	/// empty string is not a neutral placeholder for it: `p=` is DKIM's spelling
+	/// of "revoked", so a bare `plan` or `apply` that fell back to a default
+	/// would print, and then publish, the revocation of a live signing key.
+	pub fn dkim_public_key_variable(&self, stack: &ResolvedStack) -> Variable {
+		Variable::ssm(
+			self.dkim_variable_key(),
+			self.dkim_public_secret().name(stack),
 		)
 	}
 
@@ -356,9 +372,18 @@ impl MailDomainBlock {
 	/// signature it validates are described identically.
 	pub fn dkim_record_value(&self) -> String {
 		format!(
-			"v=DKIM1; k=rsa; h=sha256; p={}",
-			self.dkim_public_key_variable().tf_var_ref()
+			"v=DKIM1; k=rsa; h=sha256; p=${{var.{}}}",
+			self.dkim_variable_key()
 		)
+	}
+
+	/// The tofu variable NAME the public half arrives under, ie
+	/// `dkim_stalwart_beetmash_com`. Underscores rather than the slug's
+	/// hyphens: `${var.a-b}` is a subtraction in HCL, not a name.
+	fn dkim_variable_key(&self) -> String {
+		self.slug()
+			.replace('-', "_")
+			.xmap(|slug| format!("dkim_{slug}"))
 	}
 
 	/// The terraform label suffix an alarm on `metric` takes, ie
@@ -455,9 +480,9 @@ impl Block for MailDomainBlock {
 	///
 	/// The relay-supplied variables are NOT here, because a block cannot see
 	/// the component composed beside it: [`declare`](Self::declare) adds them.
-	fn variables(&self) -> Vec<Variable> {
+	fn variables(&self, stack: &ResolvedStack) -> Vec<Variable> {
 		match self.records.proves_identity() {
-			true => vec![self.dkim_public_key_variable()],
+			true => vec![self.dkim_public_key_variable(stack)],
 			false => Vec::new(),
 		}
 	}
@@ -495,7 +520,8 @@ impl MailDomainBlock {
 							grants.extend(block.relay_grants(&relay));
 							grants
 						});
-					let variables = block.variables().xmap(|mut variables| {
+					let variables =
+						block.variables(scope.stack()).xmap(|mut variables| {
 						variables.extend(block.relay_variables(&relay));
 						variables
 					});
@@ -602,7 +628,7 @@ impl MailDomainBlock {
 		// declared fails the apply, and a stage outside `dns_stage` still
 		// resolves them.
 		for variable in self
-			.variables()
+			.variables(stack)
 			.into_iter()
 			.chain(self.relay_variables(relay))
 		{
@@ -1462,28 +1488,44 @@ mod tests {
 			.xpect_true();
 	}
 
-	/// The block must HAND its dkim variable to the apply, not merely declare
-	/// it in the config: a declared-only variable resolves to its empty
-	/// default, and `p=` empty is the wire form of a REVOKED selector. This is
-	/// exactly what the first phase-8 deploy published.
+	/// `p=` empty is not "no key", it is DKIM's wire form of a REVOKED selector,
+	/// so every message the domain signs fails. The first phase-8 deploy
+	/// published exactly that, because the variable carrying the public half
+	/// fell through to its empty terraform default.
+	///
+	/// Two properties keep it from happening again, and the second is the one
+	/// that generalizes: the variable is CONTENT, so it is read from parameter
+	/// store by every verb that renders rather than handed over by one step in
+	/// one pipeline; and being content it carries NO default, so a value that
+	/// cannot be resolved makes terraform refuse instead of rendering a
+	/// revocation. A bare `plan` or `apply` can no longer print or publish one.
 	#[beet_core::test]
-	fn the_apply_resolves_the_dkim_variable() {
-		staging()
-			.variables()
-			.into_iter()
+	fn the_dkim_variable_is_content_and_has_no_default() {
+		let stack = ResolvedStack::default_local().0;
+		let variables = staging().variables(&stack);
+		variables
+			.iter()
 			.map(|variable| variable.key().to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["dkim_stalwart_beetmash_com".to_string()]);
+		// content, so every render resolves it..
+		variables[0].is_content().xpect_true();
+		// ..and it names the parameter the public half is published at
+		variables[0]
+			.tf_declaration()
+			.default
+			.is_none()
+			.xpect_true();
 		// no key is minted for a domain whose records somebody else holds, so
 		// a variable here would fail resolution rather than default
 		MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
 			.with_records(MailRecords::None)
-			.variables()
+			.variables(&stack)
 			.len()
 			.xpect_eq(0);
 		// ..and a stage outside `dns_stage` publishes no record but still
-		// declares the variable, since the apply passes the `-var` regardless
-		// and an undeclared one fails the apply
+		// declares the variable, since a `-var` for a variable the config never
+		// declared fails the apply
 		let (scope, _dir) = RenderScope::test_render_stack(
 			Stack::new("beet_infra").with_stage("drill"),
 			|parent| {

@@ -149,8 +149,10 @@ impl RenderScope {
 	/// hence native-only.
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn project(self) -> Result<terra::Project> {
+		let variables = self.variables.clone();
 		let (stack, deployment, config) = self.finish()?;
-		terra::Project::new(stack, deployment, config).xok()
+		terra::Project::new_with_variables(stack, deployment, config, variables)
+			.xok()
 	}
 
 	/// The resolved identity every rendered name composes from.
@@ -206,7 +208,7 @@ pub fn declare<T: Block>(
 			continue;
 		};
 		let grants = block.grants(scope.stack());
-		let variables = block.variables();
+		let variables = block.variables(scope.stack());
 		scope.declare(grants, variables);
 	}
 }

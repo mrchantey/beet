@@ -200,7 +200,7 @@ pub impl App {
 /// across builds.
 ///
 /// Loudness arrives later, where it can distinguish a lean binary from a typo:
-/// a subtree declaring [`RequireFeatures`] fails dispatch naming the missing
+/// a subtree excluded by `bx:cfg` reports its condition rather than the missing
 /// features, a failed sequence route appends its unregistered children's names
 /// at the reporting edge, and `beet check` (which registers everything)
 /// elevates every marker it finds to an error.

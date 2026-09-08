@@ -303,22 +303,32 @@ async fn resolve_entry(
 	}
 }
 
-/// The `--features` flag as a [`CrateCheck`]: verify this binary was compiled
+/// The `--features` flag as a [`RequireCfg`]: verify this binary was compiled
 /// with the named cargo features, failing with the full missing list rather
 /// than degrading into unresolved tags. Applies when running an entry (an
 /// explicit `--main`, or no positional command); a command dispatch (eg `beet
 /// build-wasm --features=..`) owns its own `--features` meaning, and the wasm
 /// runner forwards the module's flags untouched.
+///
+/// The flag is a list, so it lowers to a conjunction of `feature:` atoms, which
+/// is the same condition an entry would have written by hand.
 fn features_self_check(
 	args: &CliArgs,
 	config: &BootstrapConfig,
 	forwards_argv: bool,
-) -> Option<CrateCheck> {
+) -> Option<RequireCfg> {
 	let runs_entry = config.main.is_some() || args.path.is_empty();
 	if forwards_argv || !runs_entry || config.features.is_empty() {
 		return None;
 	}
-	Some(CrateCheck::features(config.features.clone()))
+	Some(RequireCfg::new(
+		config
+			.features
+			.iter()
+			.map(|feature| format!("feature:{feature}"))
+			.collect::<Vec<_>>()
+			.join(" && "),
+	))
 }
 
 /// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving

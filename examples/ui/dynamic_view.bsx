@@ -36,7 +36,7 @@ the app rewrites them, so `git diff examples/ui/dynamic_view` is the record of
 what the session changed and `git checkout` is the reset.
 -->
 <CallOnReady {(TuiServer, SweepDescendants)}>
-	<CrateCheck features={["tui_server", "json", "fs"]}/>
+	<RequireCfg cfg="feature:tui_server && feature:json && feature:fs"/>
 	<Router>
 		<Route path="/" {FixedPage}>
 			<DocumentBlob bx:ref="schema" path="dynamic_view/schema.json"/>

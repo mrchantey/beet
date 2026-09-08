@@ -167,10 +167,12 @@ pub(super) fn build_uppercase(
 /// dropped, since they are props of a type this binary does not have; a spread
 /// is not, since it names its own types and skips the ones it cannot resolve.
 ///
-/// A subtree whose self-or-ancestor [`RequireFeatures`] is unmet has declared
-/// its own inertness, so its tags build quietly at `debug!`; anywhere else the
-/// tag warns. A typo is caught by `beet check`, which registers everything and
-/// elevates every marker it finds to an error.
+/// The tag always warns. There used to be a "declared inertness" demotion to
+/// `debug!` for a subtree that had announced its behavior was feature-dependent,
+/// which `bx:cfg` retired: such a subtree is now EXCLUDED rather than built, so
+/// there is no unregistered tag in it to report. What is left here is always a
+/// surprise and always worth a warning. A typo is caught by `beet check`, which
+/// registers everything and elevates every marker it finds to an error.
 fn build_unregistered(
 	el: &BsxElement,
 	registry: &BsxTemplateRegistry,
@@ -180,41 +182,12 @@ fn build_unregistered(
 ) -> Result<()> {
 	cx.entity.insert(UnregisteredTag::new(el.tag.as_str()));
 	apply_common_directives(el, refs, cx)?;
-	// spreads before the log, so a host declaring its own `RequireFeatures`
-	// quiets its own tag as well as its subtree's.
 	apply_spreads(el, cx.entity, entity_refs)?;
-	if inertness_declared(cx.entity) {
-		debug!(
-			"tag `<{}>` is not registered in this binary, building it inert (declared by `RequireFeatures`)",
-			el.tag
-		);
-	} else {
-		warn!(
-			"no component, resource or template registered for tag `<{}>`, building it inert",
-			el.tag
-		);
-	}
+	warn!(
+		"no component, resource or template registered for tag `<{}>`, building it inert",
+		el.tag
+	);
 	build_children(el, registry, refs, cx)
-}
-
-/// Whether a self-or-ancestor [`RequireFeatures`] is unmet in this binary, ie
-/// the subtree has declared that its behavior is feature-dependent and the
-/// features are absent, making an unresolvable tag or spread the expected
-/// state rather than a surprise. Ancestry exists mid-build: a child spawns
-/// with its `ChildOf`, and a parent's spreads apply before its children build.
-pub(super) fn inertness_declared(entity: &mut EntityWorldMut) -> bool {
-	let id = entity.id();
-	entity.world_scope(|world| {
-		world.with_state::<(
-			AncestorQuery<&RequireFeatures>,
-			Query<&CrateRegistration>,
-		), _>(|(requires, registrations)| {
-			requires
-				.get_ancestors(id)
-				.iter()
-				.any(|require| !require.failures(&registrations).is_empty())
-		})
-	})
 }
 
 /// How an uppercase tag's type registration resolves.

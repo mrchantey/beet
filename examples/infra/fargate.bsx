@@ -25,7 +25,7 @@ and a container engine.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra"]}/>
+	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="fargate">
 		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>

@@ -87,8 +87,14 @@ pub async fn TofuApplyAction(
 						},
 					)?;
 			let (stack, deployment, config) = scope.finish()?;
-			let project =
-				terra::Project::new(stack.clone(), deployment.clone(), config);
+			// with the declared variables, so the apply resolves the content
+			// ones from their source rather than expecting them on the request
+			let project = terra::Project::new_with_variables(
+				stack.clone(),
+				deployment.clone(),
+				config,
+				variables.clone(),
+			);
 			(project, stack, deployment, artifacts, variables).xok()
 		})
 		.await??;
@@ -150,8 +156,13 @@ pub async fn TofuApplyAction(
 		"TofuApplyAction: step 4 - resolving {} variables",
 		variables.len()
 	);
+	// only the AMBIENT ones: a content variable's value is not in flight on this
+	// request, it is a fact about the stack, so `apply_with_vars` reads it from
+	// its source alongside the state passphrase. Asking the request for it would
+	// fail, and defaulting it is the revocation this split exists to prevent.
 	let resolved_vars: Vec<(SmolStr, SmolStr)> = variables
 		.iter()
+		.filter(|variable| !variable.is_content())
 		.map(|variable| {
 			variable
 				.resolve_value(cx.input.parts())

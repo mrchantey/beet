@@ -26,6 +26,20 @@ pub enum VariableValue {
 	Header,
 	/// Collected from the request params, see [`RequestParts::params`].
 	Param,
+	/// Read from AWS parameter store at the named parameter, every time the
+	/// config is rendered.
+	///
+	/// The others are AMBIENT: a pipeline step supplies them and an empty
+	/// default is harmless, because they feed runtime attributes (a lambda's
+	/// env) rather than what a resource IS. This one is the opposite, and the
+	/// distinction is load-bearing: it exists for a value that is the CONTENT of
+	/// a resource, where a wrong value is not a missing feature but a broken
+	/// one. A DKIM selector record holding `p=` does not mean "no key", it means
+	/// "this key is revoked", so every message the domain signs fails.
+	///
+	/// Hence: no default, resolved by every verb that renders, and a hard error
+	/// when the parameter is absent.
+	Ssm(SmolStr),
 }
 
 impl Variable {
@@ -65,10 +79,64 @@ impl Variable {
 		}
 	}
 
+	/// Create a variable read from AWS parameter store, see
+	/// [`VariableValue::Ssm`]. `parameter` is the full parameter name.
+	pub fn ssm(
+		key: impl Into<SmolStr>,
+		parameter: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			key: key.into(),
+			value: VariableValue::Ssm(parameter.into()),
+			sensitive: false,
+		}
+	}
+
+	/// Whether this variable's value is the CONTENT of a resource rather than an
+	/// ambient runtime attribute, so it carries no default and must resolve
+	/// before any render.
+	pub fn is_content(&self) -> bool {
+		matches!(self.value, VariableValue::Ssm(_))
+	}
+
+	/// The parameter store name this variable reads, if it is an
+	/// [`Ssm`](VariableValue::Ssm) one.
+	///
+	/// The READ itself belongs to the deploy side (`terra::Project`), not here:
+	/// this type is compiled into every build that describes infrastructure,
+	/// including the deployed binary, which links no aws bindings at all. A
+	/// declaration should not drag in the machinery that acts on it.
+	pub fn ssm_parameter(&self) -> Option<&str> {
+		match &self.value {
+			VariableValue::Ssm(parameter) => Some(parameter.as_str()),
+			_ => None,
+		}
+	}
+
+	/// A fixed value, if this variable carries one, so a render can resolve it
+	/// without a request.
+	pub fn fixed_value(&self) -> Option<&SmolStr> {
+		match &self.value {
+			VariableValue::Fixed(value) => Some(value),
+			_ => None,
+		}
+	}
+
 	/// Resolve the variable value from the given request context.
+	///
+	/// The request-bound counterpart of [`resolve_for_render`](Self::resolve_for_render),
+	/// used by a deploy pipeline where an earlier step has supplied the ambient
+	/// values as params. An [`Ssm`](VariableValue::Ssm) variable is not
+	/// resolvable from a request and is skipped here; the caller resolves it
+	/// through `resolve_for_render`.
 	pub fn resolve_value(&self, request: &RequestParts) -> Result<SmolStr> {
 		match &self.value {
 			VariableValue::Fixed(value) => Ok(value.clone()),
+			VariableValue::Ssm(parameter) => bevybail!(
+				"variable `{}` reads parameter store `{parameter}` and is not \
+				resolvable from a request",
+				self.key
+			),
 			VariableValue::ProcessEnv => env_ext::var(self.key.as_str())
 				.map(SmolStr::new)
 				.map_err(|_| {
@@ -103,7 +171,13 @@ impl Variable {
 			// these values only feed runtime resource attributes (eg a lambda's env),
 			// never resource identity, so the default is irrelevant to a teardown.
 			// `apply` always overrides it with the resolved value via `-var`.
-			default: Some("".into()),
+			//
+			// A CONTENT variable gets no default at all: an empty value there is
+			// not a harmless placeholder but a wrong resource, so terraform
+			// should refuse rather than render it. Every verb that renders
+			// resolves it first (`resolve_for_render`), so the only way to reach
+			// the refusal is a value that genuinely is not there yet.
+			default: (!self.is_content()).then(|| "".into()),
 			description: Some(format!("Variable: {}", self.key)),
 			sensitive: self.sensitive.then_some(true),
 		}

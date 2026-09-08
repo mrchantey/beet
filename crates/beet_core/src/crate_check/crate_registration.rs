@@ -3,15 +3,16 @@ use crate::prelude::*;
 /// The compiled-in surface of a crate: its version and enabled cargo features.
 ///
 /// Spawned once per participating crate, usually via [`crate_registration!`]
-/// in the crate's primary plugin, so a [`CrateCheck`](super::CrateCheck) can
-/// verify the running binary was built with the features an entry requires.
+/// in the crate's primary plugin, so a `feature:`/`version:` cfg atom can ask
+/// what this binary was actually built with.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct CrateRegistration {
 	/// The crate name as compiled, ie `CARGO_PKG_NAME`.
 	crate_name: SmolStr,
-	/// The primary registration: unprefixed [`CrateCheck`](super::CrateCheck)
-	/// requirements resolve here. Only the binary crate (`beet-cli`) sets this.
+	/// The primary registration: an unprefixed requirement (`feature:infra`
+	/// rather than `feature:beet_esp/alvik`) resolves here. Only the binary
+	/// crate (`beet-cli`) sets this.
 	skip_prefix: bool,
 	/// The compiled crate version, ie `CARGO_PKG_VERSION`.
 	version: SmolStr,
@@ -60,6 +61,63 @@ impl CrateRegistration {
 	pub fn has_feature(&self, feature: &str) -> bool {
 		self.features.contains(feature)
 	}
+
+	/// Whether a `feature:` requirement item holds across `registrations`, ie
+	/// `infra` (the primary crate) or `beet_esp/alvik` (a named one).
+	///
+	/// The ONE feature-requirement grammar. A `bx:cfg` atom and a
+	/// `<RequireCfg>` assertion both come through here, so there is no second
+	/// spelling to keep in step.
+	pub fn has_feature_item(registrations: &[Self], item: &str) -> bool {
+		let (crate_name, feature) = match item.split_once('/') {
+			Some((crate_name, feature)) => (Some(crate_name), feature),
+			None => (None, item),
+		};
+		Self::resolve(registrations, crate_name)
+			.is_some_and(|registration| registration.has_feature(feature))
+	}
+
+	/// Whether a `version:` requirement item holds across `registrations`, ie
+	/// `0.0.9` (the primary crate) or `beet_esp@0.5.9` (a named one). The
+	/// comparison is a minimum, so a newer compiled version satisfies it.
+	pub fn meets_version_item(registrations: &[Self], item: &str) -> bool {
+		let (crate_name, version) = match item.split_once('@') {
+			Some((crate_name, version)) => (Some(crate_name), version),
+			None => (None, item),
+		};
+		Self::resolve(registrations, crate_name).is_some_and(|registration| {
+			parse_version(registration.version()) >= parse_version(version)
+		})
+	}
+
+	/// The registration for `crate_name`, or the primary one when unprefixed.
+	fn resolve<'a>(
+		registrations: &'a [Self],
+		crate_name: Option<&str>,
+	) -> Option<&'a Self> {
+		registrations.iter().find(|registration| match crate_name {
+			Some(name) => registration.crate_name() == name,
+			None => registration.skip_prefix(),
+		})
+	}
+}
+
+/// A lenient semver triple for ordering, ignoring pre-release/build suffixes.
+fn parse_version(version: &str) -> (u32, u32, u32) {
+	let mut parts = version
+		.split('.')
+		.map(|part| {
+			part.split(|char: char| !char.is_ascii_digit())
+				.next()
+				.and_then(|digits| digits.parse().ok())
+				.unwrap_or(0)
+		})
+		.chain(core::iter::repeat(0));
+	(
+		parts.next().unwrap_or(0),
+		parts.next().unwrap_or(0),
+		parts.next().unwrap_or(0),
+	)
 }
 
 /// Builds a [`CrateRegistration`] for the calling crate from compile-time

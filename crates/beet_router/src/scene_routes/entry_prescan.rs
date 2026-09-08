@@ -10,8 +10,18 @@ use beet_core::prelude::*;
 /// that can go through the registry, so it is a plain pre-scan.
 ///
 /// One parse per bootstrap, versus the three the same bytes used to get. The
-/// [`RepoRoot`], [`TemplateDir`] and [`CrateCheck`] components are untouched:
+/// [`RepoRoot`], [`TemplateDir`] and [`RequireCfg`] components are untouched:
 /// they remain the authoring vocabulary, this is only the extraction.
+///
+/// A subtree carrying a `bx:cfg` is NOT scanned, whatever its condition says.
+/// This walk runs before the world that would answer the condition is reachable,
+/// and the two possible mistakes are not symmetric: skipping a met branch only
+/// defers work the build does anyway (a template dir registers via its observer
+/// instead, an include is one the watcher picks up on rebuild), while scanning an
+/// EXCLUDED branch would fire a `<RequireCfg>` this build was never meant to
+/// satisfy and fail the load over a requirement that does not apply. So the
+/// conditional case is left to the build, which is the stage that can answer it.
+/// Entry-level declarations belong at the entry's top level regardless.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct EntryPrescan {
 	/// The `<RepoRoot src>` the entry widens its store to, relative to the entry
@@ -19,8 +29,8 @@ pub struct EntryPrescan {
 	pub repo_root: Option<SmolStr>,
 	/// Every `<TemplateDir src>` the entry declares, in document order.
 	pub template_dirs: Vec<SmolStr>,
-	/// Every `<CrateCheck/>` the entry declares.
-	pub checks: Vec<CrateCheck>,
+	/// Every unconditional `<RequireCfg/>` the entry declares.
+	pub requirements: Vec<RequireCfg>,
 	/// Every local `<Template src>` include. Remote includes are skipped: they are
 	/// not local files a watcher sees.
 	pub includes: Vec<SmolStr>,
@@ -54,6 +64,10 @@ impl EntryPrescan {
 			let BsxNode::Element(element) = node else {
 				continue;
 			};
+			// a conditional subtree is the build's to answer, see the type docs
+			if element.attributes.iter().any(|attr| attr.key == "bx:cfg") {
+				continue;
+			}
 			match element.tag.as_str() {
 				// the first `<RepoRoot>` wins; a second is ignored rather than
 				// silently re-rooting the store mid-document.
@@ -65,10 +79,11 @@ impl EntryPrescan {
 				"TemplateDir" => {
 					self.template_dirs.extend(Self::str_attr(element, "src"));
 				}
-				"CrateCheck" => self.checks.push(CrateCheck {
-					features: Self::list_attr(element, "features"),
-					versions: Self::list_attr(element, "versions"),
-				}),
+				"RequireCfg" => {
+					self.requirements.extend(
+						Self::str_attr(element, "cfg").map(RequireCfg::new),
+					);
+				}
 				"Template" => {
 					self.includes.extend(
 						Self::str_attr(element, "src")
@@ -142,12 +157,12 @@ mod test {
 			r#"<Router>
 				<RepoRoot src="../.."/>
 				<TemplateDir src="templates"/>
-				<CrateCheck features={["sockets"]} versions={["0.1.0"]}/>
+				<RequireCfg cfg="feature:sockets && version:0.1.0"/>
 				<Template src="header.bsx"/>
 				<Template src="https://example.org/remote.bsx"/>
 				<div>
 					<TemplateDir src="more"/>
-					<CrateCheck features={["ssh"]}/>
+					<RequireCfg cfg="feature:ssh"/>
 					<Template src="footer.bsx"/>
 				</div>
 			</Router>"#,
@@ -157,16 +172,10 @@ mod test {
 		prescan
 			.template_dirs
 			.xpect_eq(vec![SmolStr::from("templates"), SmolStr::from("more")]);
-		prescan.checks.len().xpect_eq(2);
-		prescan.checks[0]
-			.features
-			.xpect_eq(vec![SmolStr::from("sockets")]);
-		prescan.checks[0]
-			.versions
-			.xpect_eq(vec![SmolStr::from("0.1.0")]);
-		prescan.checks[1]
-			.features
-			.xpect_eq(vec![SmolStr::from("ssh")]);
+		prescan.requirements.xpect_eq(vec![
+			RequireCfg::new("feature:sockets && version:0.1.0"),
+			RequireCfg::new("feature:ssh"),
+		]);
 		// the remote include is skipped: it is not a local file a watcher sees
 		prescan.includes.xpect_eq(vec![
 			SmolStr::from("header.bsx"),

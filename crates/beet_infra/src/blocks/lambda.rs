@@ -118,7 +118,9 @@ impl Block for LambdaBlock {
 
 	/// Tofu variables the function's environment reads, ie the
 	/// [`env_vars`](Self::env_vars).
-	fn variables(&self) -> Vec<Variable> { self.env_vars.clone() }
+	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
+		self.env_vars.clone()
+	}
 
 	fn artifact_label(&self) -> Option<&SmolStr> { Some(&self.label) }
 }

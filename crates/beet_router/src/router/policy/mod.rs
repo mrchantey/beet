@@ -8,7 +8,7 @@ mod middleware;
 mod no_cache;
 mod redirect;
 mod request_logger;
-mod require_features;
+mod cfg_excluded;
 
 pub use cache_headers::*;
 pub use cors::*;
@@ -17,4 +17,4 @@ pub use middleware::*;
 pub use no_cache::*;
 pub use redirect::*;
 pub use request_logger::*;
-pub(crate) use require_features::*;
+pub(crate) use cfg_excluded::*;

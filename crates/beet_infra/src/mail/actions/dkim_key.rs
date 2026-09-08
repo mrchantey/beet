@@ -96,8 +96,19 @@ impl EnsureDkimKey {
 	const OPENSSL_NOT_FOUND: &'static str = "openssl is not installed, and the sovereign DKIM key is generated with it";
 }
 
-/// Mints whatever is missing and passes every domain's public key on to the
-/// apply as a `-var`.
+/// Mints whatever is missing, and publishes each domain's PUBLIC half beside its
+/// private key in parameter store.
+///
+/// It does not hand the public key to the apply. The selector record's content
+/// is not a pipeline value that happens to be in flight, it is a fact about the
+/// domain, so the variable that carries it reads parameter store directly and
+/// every verb that renders resolves it the same way. That is what makes a bare
+/// `plan` truthful about DKIM instead of showing (and an `apply` publishing) the
+/// empty `p=` that means "revoked".
+///
+/// Minting stays here because it is a create-if-missing SIDE EFFECT with a
+/// sharp reason to run only on a deploy: a rotated key under a published
+/// selector is a fortnight of unverifiable mail.
 #[action(handler_only)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -145,10 +156,16 @@ pub async fn EnsureDkimKeyAction(
 				}
 			}
 		};
-		input = input.with_param(
-			domain.dkim_public_key_variable().key(),
-			&EnsureDkimKey::public_key(&private).await?,
-		);
+		// publish the derived public half beside the private key, so a render
+		// reads what it needs without also reading the secret that produced it.
+		// Rewritten every deploy rather than created once: it is derived, so a
+		// missing or stale copy should heal rather than need intervention.
+		let public = EnsureDkimKey::public_key(&private).await?;
+		let public_name = domain.dkim_public_secret().name(&mail.stack);
+		if ssm_ext::get(&region, &public_name).await? != Some(public.clone()) {
+			ssm_ext::overwrite(&region, &public_name, &public).await?;
+			info!("published the {} public selector", domain.domain());
+		}
 	}
 	Pass(input).xok()
 }

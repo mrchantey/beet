@@ -40,9 +40,10 @@
 //! stays universal by default because an inert entity costs nothing; a node that
 //! performs a build-time EFFECT (`<Template src>` reading a file) has no inert
 //! form, and `bx:cfg` is how such a branch is kept out of a build that must not
-//! run it. Gating BEHAVIOR rather than existence is
-//! [`RequireFeatures`](crate::prelude::RequireFeatures), which is enforced at
-//! dispatch and leaves the document whole.
+//! run it. It leaves a [`CfgExcluded`](crate::prelude::CfgExcluded) tombstone,
+//! so an excluded route still reports why it is missing rather than 404ing.
+//! Asserting the same condition instead of applying it is
+//! [`RequireCfg`](crate::prelude::RequireCfg), which refuses the whole load.
 //!
 //! ## Bindings
 //!

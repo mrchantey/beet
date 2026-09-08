@@ -103,17 +103,10 @@ pub(super) fn apply_spread_named(
 			.or_else(|| enum_variant_registration(&registry, &named.name))
 		else {
 			drop(registry);
-			if inertness_declared(entity) {
-				debug!(
-					"skipping spread `{}`: not registered in this binary (declared by `RequireFeatures`)",
-					named.name
-				);
-			} else {
-				warn!(
-					"skipping spread `{}`: no component or template of that name is registered in this binary",
-					named.name
-				);
-			}
+			warn!(
+				"skipping spread `{}`: no component or template of that name is registered in this binary",
+				named.name
+			);
 			return Ok(());
 		};
 		let info = Some(registration.type_info());

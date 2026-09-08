@@ -199,10 +199,10 @@ mod test {
 	/// The property a deployed lean binary depends on: an include under an UNMET
 	/// `bx:cfg` never reads its file.
 	///
-	/// This is why `bx:cfg` exists rather than `RequireFeatures` covering the
-	/// case. `RequireFeatures` gates dispatch and lets the document build whole,
-	/// so the include would still run and still fail to find a file that was
-	/// never shipped. `bx:cfg` removes the node from the syntax tree, so there is
+	/// This is the case that made exclusion a mechanism of its own rather than a
+	/// dispatch-time gate. Gating dispatch lets the document build whole, so the
+	/// include would still run and still fail to find a file that was never
+	/// shipped. `bx:cfg` removes the node from the syntax tree, so there is
 	/// nothing left to read. The store here holds no `gated.bsx` at all: if the
 	/// include ran, it would error rather than silently pass.
 	#[beet_core::test]
@@ -210,6 +210,13 @@ mod test {
 		let mut world = (AsyncPlugin, TemplatePlugin).into_world();
 		register_template_include(&mut world);
 		world.init_resource::<BsxConditions>();
+		// the tombstone type, so an excluded branch resolves to `CfgExcluded`
+		// rather than an unregistered tag (`CrateCheckPlugin` does this in a
+		// real binary, via `BeetPlugins`).
+		world
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register::<CfgExcluded>();
 		// a binary compiling `serve` and nothing else
 		world.spawn(
 			CrateRegistration::new("lean_bin", "0.1.0")
@@ -237,14 +244,23 @@ mod test {
 		world.entity_mut(root).insert(store);
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
-		// exactly one child: the ungated include, built at its site. The gated
-		// branch left no entity at all, so nothing ever resolved a store or read
-		// a path, and no `<Template src>` error was logged.
 		let children: Vec<Entity> =
 			world.entity(root).get::<Children>().unwrap().iter().collect();
-		children.len().xpect_eq(1);
+		children.len().xpect_eq(2);
+		// the gated branch is a childless tombstone: the `<Template src>` inside
+		// it never became an entity, so nothing resolved a store or read a path
+		// and no include error was logged.
 		world
 			.entity(children[0])
+			.get::<CfgExcluded>()
+			.unwrap()
+			.tag
+			.as_str()
+			.xpect_eq("Fragment");
+		world.entity(children[0]).get::<Children>().is_none().xpect_true();
+		// ..while the ungated include did build, at its site
+		world
+			.entity(children[1])
 			.get::<Element>()
 			.unwrap()
 			.tag()

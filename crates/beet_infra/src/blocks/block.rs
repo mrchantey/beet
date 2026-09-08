@@ -27,7 +27,11 @@ pub trait Block: Component + Clone {
 	/// derivation is a field a markup declaration cannot correct: reflect
 	/// patches the label over the default and the derived field keeps the
 	/// default's.
-	fn variables(&self) -> Vec<Variable> { Vec::new() }
+	///
+	/// Takes the stack for the same reason [`grants`](Self::grants) does: a
+	/// variable that reads parameter store names a parameter, and a parameter
+	/// name is stack-composed.
+	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> { Vec::new() }
 
 	/// If this block creates a deployable artifact, its label: the key the
 	/// artifact uploads under and the ledger records.

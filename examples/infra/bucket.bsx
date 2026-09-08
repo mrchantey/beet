@@ -15,7 +15,7 @@ Live run needs AWS credentials and `tofu`.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra"]}/>
+	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<!-- the state backend is a property of the LAUNCH, not of a stack's identity,
 	     so the toggle sits outside the stack and lands on the process `Deployment` -->
 	<StateBackendToggle/>
