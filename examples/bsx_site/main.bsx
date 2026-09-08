@@ -12,8 +12,7 @@ declares four servers, so `--server` picks one on load: the default `HttpServer`
 There is no `main.rs`: the binary discovers this entry and declares the load live,
 so the root `<CallOnReady>` calls its own action with the process request, starting
 the servers the site declares the moment the entry loads. `<DefaultAppRoutes/>`
-adds the default app routes (eg the `/js/reactivity.js` runtime a reactive page
-loads) as child routes. The `<PackageConfig/>` declaration patches the named
+adds the default app routes (eg `/app-info`) as child routes. The `<PackageConfig/>` declaration patches the named
 fields of the resource, creating it from defaults if absent, so the title and
 description are set in markup with no compile-time host config.
 -->

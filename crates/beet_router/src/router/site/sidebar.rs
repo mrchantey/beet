@@ -109,7 +109,7 @@ fn route_title(seed: &str) -> Result<impl Bundle> {
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
 /// (it reads [`RequestContext`]); only [`PageRoute`] routes appear (so infra
-/// routes like the `js/reactivity.js` asset are absent), and `exclude` adds
+/// routes like the `app-info` scene are absent), and `exclude` adds
 /// site-specific globs.
 #[template(system)]
 pub fn RouteSidebar(
@@ -277,7 +277,7 @@ impl SidebarState {
 			.filter_map(|child| self.collect_node(child))
 			.collect();
 		// only page routes belong in the nav; infra/data routes (eg the
-		// `js/reactivity.js` asset, `app-info`) carry no [`PageRoute`] marker.
+		// `app-info` scene, `/health`) carry no [`PageRoute`] marker.
 		let has_page_route = tree.node().is_some_and(|node| node.is_page_route);
 
 		if children.is_empty() {

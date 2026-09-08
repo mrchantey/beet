@@ -160,6 +160,18 @@ impl AsyncRunner {
 		}
 	}
 
+	/// Advance `app` one frame and let spawned tasks progress.
+	///
+	/// The [`App`]-level twin of the world loops above, for an async test or
+	/// driver stepping a full app (sub-apps included) rather than a bare world:
+	/// a task spawned by the frame just run is polled before the next one, so a
+	/// pipeline that crosses frames actually crosses them.
+	pub async fn step(app: &mut App) {
+		app.update();
+		tick_task_pools();
+		yield_to_executor().await;
+	}
+
 	/// Updates the app until `fut` resolves, returning its output.
 	///
 	/// Ticks task pools after yielding to ensure spawned local tasks make progress.

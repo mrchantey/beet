@@ -4,8 +4,8 @@
 //!
 //! Where `crates/beet_router/tests/bsx_site.rs` asserts the no-code mechanics from
 //! inline `const` BSX, this proves the *committed example files* render: the home
-//! and a markdown route inside the layout, the no-code counter's reactive wiring,
-//! and a plain page staying byte-clean. Mirrors `examples/rsx_site/tests/render.rs`'s
+//! and a markdown route inside the layout, and the no-code counter's bindings
+//! painting. Mirrors `examples/rsx_site/tests/render.rs`'s
 //! web + terminal assertions, but the site is markup on disk, not Rust.
 beet::test_main!();
 
@@ -115,44 +115,21 @@ async fn blog_markdown_route_renders() {
 		.xpect_contains("The obligatory first post");
 }
 
-/// The no-code counter page carries the full reactive wire format: the bound run
-/// wrapped in anchors with the scoped `@doc:count=0` init, the event verb with its
-/// `@doc` arg resolved absolute, the hydration blob, and the shared runtime script.
-/// The Rust counter's web mirror, but authored entirely in `routes/counter.bsx`.
+/// The no-code counter page paints its bindings from the committed files: the
+/// Card template's `@prop:title` and the scoped `@doc:count=0` init, with the
+/// `bx:click` script staying a directive rather than an emitted attribute. The
+/// Rust counter's web mirror, but authored entirely in `routes/counter.bsx`.
 #[beet::test]
-async fn counter_page_renders_reactively() {
+async fn counter_page_renders_its_bindings() {
 	let (mut world, _root, router) = site_world().await;
 	let html = render(&mut world, router, "counter").await;
 	html.as_str()
 		// the Card template's `@prop:title` binds the caller's prop into the heading
 		.xpect_contains("<h2>Counter</h2>")
-		// the document subtree marked, the bound run wrapped in anchors with the
-		// scoped init between them (correct first paint, no overwrite)
-		.xpect_contains("data-bx-doc=")
-		.xpect_contains(
-			"You have clicked <!--bx-ref=\"counter.count\"-->0<!--bx-end--> times.",
-		)
-		// the event verb re-emitted with its `@doc` arg resolved to an absolute path
-		.xpect_contains("@doc:counter.count")
-		// the hydration blob, keyed by document id
-		.xpect_contains("data-bx-blob")
-		.xpect_contains("\"count\":0")
-		// the runtime loads from the shared cached asset, not an inline script
-		.xpect_contains("<script defer src=\"/js/reactivity.js\"></script>");
-}
-
-/// A page with no `@doc`/`@prop` bindings (a plain markdown doc) stays byte-clean:
-/// the `Auto` reactive renderer emits no blob and no runtime script.
-#[beet::test]
-async fn plain_page_stays_clean() {
-	let (mut world, _root, router) = site_world().await;
-	render(&mut world, router, "blog/hello-world")
-		.await
-		.as_str()
+		// the scoped `@doc:count=0` init paints its value
+		.xpect_contains("You have clicked 0 times.")
 		.xnot()
-		.xpect_contains("data-bx")
-		.xnot()
-		.xpect_contains("/js/reactivity.js");
+		.xpect_contains("bx:click");
 }
 
 #[beet::test]

@@ -424,7 +424,7 @@ mod test {
 			.entity(root)
 			.get::<RouteTree>()
 			.unwrap()
-			.find(&["js", "reactivity.js"])
+			.find(&["app-info"])
 			.xpect_some();
 	}
 

@@ -78,6 +78,27 @@ pub enum WorldOp {
 		/// The entity, in [`entity_id`](super::entity_id) form.
 		entity: String,
 	},
+	/// `await world.get_field(entity, path)`, replying with the document field's
+	/// [`Value`], or with no value when the document or field is absent.
+	GetField {
+		/// The entity the binding resolves from, in [`entity_id`] form.
+		///
+		/// [`entity_id`]: super::entity_id
+		entity: String,
+		/// The dotted field path, eg `count` or `user.name`.
+		path: String,
+	},
+	/// `await world.set_field(entity, path, value)`, replying with no value.
+	SetField {
+		/// The entity the binding resolves from, in [`entity_id`] form.
+		///
+		/// [`entity_id`]: super::entity_id
+		entity: String,
+		/// The dotted field path, eg `count` or `user.name`.
+		path: String,
+		/// The value to write.
+		value: Value,
+	},
 }
 
 /// The host's answer to one [`WorldCall`].
@@ -229,6 +250,29 @@ impl WorldOp {
 					.await
 					.map(|_| None)
 			}
+			Self::GetField { entity, path } => {
+				let entity = entity_id::decode(&entity)?;
+				world
+					.with(move |world| {
+						WorldRead::get_field(world, entity, &path, &config)
+					})
+					.await
+			}
+			Self::SetField {
+				entity,
+				path,
+				value,
+			} => {
+				let entity = entity_id::decode(&entity)?;
+				world
+					.with(move |world| {
+						WorldWrite::set_field(
+							world, entity, &path, value, &config,
+						)
+					})
+					.await
+					.map(|_| None)
+			}
 		}
 	}
 
@@ -366,6 +410,91 @@ mod test {
 		};
 		id.xpect_eq(9);
 		message.xpect_contains("is not an entity id");
+	}
+
+	/// The field helpers resolve as a widget's binding does: the write walks up
+	/// to the nearest ancestor document, prefixed by the scope between them, and
+	/// the read that follows sees it.
+	#[beet_core::test]
+	async fn a_field_write_walks_to_the_ancestor_document() {
+		let mut world = test_world();
+		let doc = world.spawn(Document::new(value!({ "counter": {} }))).id();
+		let scope = world
+			.spawn((ChildOf(doc), DocumentScope {
+				path: FieldPath::new(["counter"]),
+				terminate: false,
+			}))
+			.id();
+		let button = world.spawn(ChildOf(scope)).id();
+		serve(
+			&mut world,
+			&format!(
+				r#"{{"id":0,"op":"set_field","entity":"{button}","path":"count","value":7}}"#
+			),
+		)
+		.await
+		.xpect_eq(WorldReply::Ok { id: 0, value: None });
+		// the scope prefix landed it under `counter`, never on the button
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.get_field::<i64>(&[
+				FieldSegment::key("counter"),
+				FieldSegment::key("count"),
+			])
+			.unwrap()
+			.xpect_eq(7);
+		serve(
+			&mut world,
+			&format!(
+				r#"{{"id":1,"op":"get_field","entity":"{button}","path":"count"}}"#
+			),
+		)
+		.await
+		// the wire carried an unsigned literal, and the field kept it verbatim
+		.xpect_eq(WorldReply::Ok {
+			id: 1,
+			value: Some(Value::Uint(7)),
+		});
+	}
+
+	/// A field that is not there reads as no value, the same `undefined` an
+	/// absent component answers with.
+	#[beet_core::test]
+	async fn an_absent_field_replies_with_no_value() {
+		let mut world = test_world();
+		let doc = world.spawn(Document::default()).id();
+		serve(
+			&mut world,
+			&format!(
+				r#"{{"id":0,"op":"get_field","entity":"{doc}","path":"nope"}}"#
+			),
+		)
+		.await
+		.xpect_eq(WorldReply::Ok { id: 0, value: None });
+	}
+
+	/// The helpers are checked against the [`Document`] component, so a config
+	/// that does not name it refuses them.
+	#[beet_core::test]
+	async fn a_narrow_config_refuses_a_field_write() {
+		let mut world = test_world();
+		let doc = world.spawn(Document::default()).id();
+		let WorldReply::Err { message, .. } = serve_with(
+			&mut world,
+			&format!(
+				r#"{{"id":0,"op":"set_field","entity":"{doc}","path":"count","value":1}}"#
+			),
+			ScriptConfig::new(["Name"]),
+		)
+		.await
+		else {
+			panic!(
+				"a config naming only `Name` should not permit a field write"
+			);
+		};
+		message.xpect_contains("may not write");
 	}
 
 	/// The wire tags are written by hand in the shared JS shim, so they are

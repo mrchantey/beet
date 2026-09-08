@@ -18,7 +18,7 @@ pub struct RouteHidden;
 /// Auto-attached by codegen route emission (`emit_routes`) to `.rs` page routes
 /// and markdown/blob content routes. Infrastructure routes injected by
 /// [`Router::with_defaults`](crate::prelude::default_router) (`app_info`, `analytics`,
-/// the `js/reactivity.js` asset, `client_io`) are not codegen-emitted, so they
+/// the `app-info` scene, `client_io`) are not codegen-emitted, so they
 /// never carry it and stay out of the nav.
 ///
 /// Distinct from [`PageRequest`]: a `PageRoute` marks a route entity, while a

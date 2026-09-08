@@ -45,6 +45,27 @@ impl FieldPath {
 		path.push(segment);
 		path
 	}
+
+	/// The path a dotted string names, the inverse of [`Display`](Self::fmt):
+	/// `user.name` is two keys, `items.[0].done` an index between two of them.
+	///
+	/// A segment is an index only when it reads `[n]`, never when it merely
+	/// looks numeric, so an object keyed by digits stays addressable. Empty
+	/// segments are dropped, so a leading or trailing `.` is not a segment.
+	pub fn parse(path: &str) -> Self {
+		path.split('.')
+			.filter(|segment| !segment.is_empty())
+			.map(|segment| {
+				segment
+					.strip_prefix('[')
+					.and_then(|inner| inner.strip_suffix(']'))
+					.and_then(|index| index.parse::<usize>().ok())
+					.map(FieldSegment::index)
+					.unwrap_or_else(|| FieldSegment::key(segment))
+			})
+			.collect::<Vec<_>>()
+			.into()
+	}
 }
 
 impl From<Vec<FieldSegment>> for FieldPath {
@@ -182,6 +203,26 @@ mod test {
 			FieldSegment::index(1),
 			FieldSegment::index(2),
 		]);
+	}
+
+	/// `parse` is the inverse of `Display`, indices included.
+	#[crate::test]
+	fn parse_round_trips_display() {
+		FieldPath::parse("user.name").into_inner().xpect_eq(vec![
+			FieldSegment::key("user"),
+			FieldSegment::key("name"),
+		]);
+		let path = FieldPath::parse("items.[2].done");
+		path.to_string().xpect_eq("items.[2].done");
+		path.into_inner().xpect_eq(vec![
+			FieldSegment::key("items"),
+			FieldSegment::index(2),
+			FieldSegment::key("done"),
+		]);
+		// a numeric-looking key is a key: only `[n]` is an index
+		FieldPath::parse("2")
+			.into_inner()
+			.xpect_eq(vec![FieldSegment::key("2")]);
 	}
 
 	#[crate::test]

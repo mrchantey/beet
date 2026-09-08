@@ -13,7 +13,6 @@ use super::parse::is_attr_key_char;
 use super::parse::is_tag_char;
 use super::parse::take_braced;
 use super::value::*;
-use crate::bsx::resolve::is_event_directive;
 use crate::prelude::*;
 
 /// One lenient, fragment-safe markup token produced by [`BsxFragmentToken::parse_fragment`].
@@ -254,9 +253,9 @@ fn parse_fragment_attributes(cursor: &mut Cursor) -> Result<Vec<BsxAttribute>> {
 /// A fragment is always BSX (it already parses `{..}` spreads and expressions),
 /// so the `bx:` directives are resolved here too, identically to the document
 /// parser ([`parse_attribute`]): a `bx:style` keeps its raw text plus span for a
-/// stable inline class, and a `bx:<event>` parses its verb call. Without this,
-/// embedded markdown markup silently drops these directives (the `.md`/`.bsx`
-/// parity gap surfaced by the no-code site rehearsal).
+/// stable inline class. Without this, embedded markdown markup silently drops
+/// these directives (the `.md`/`.bsx` parity gap surfaced by the no-code site
+/// rehearsal).
 fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 	let key_offset = cursor.offset();
 	let key = cursor.take_while(is_attr_key_char).to_string();
@@ -286,15 +285,6 @@ fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 					cursor.line_col(cursor.offset()),
 				),
 			},
-		});
-	}
-	// a `bx:<event>=verb{ .. }` directive is a verb call, parsed off the cursor so
-	// its internal whitespace survives. The braced form `bx:<event>={expr}` is a
-	// plain expression, so it falls through to the `{` arm below.
-	if is_event_directive(&key) && cursor.peek() != Some('{') {
-		return Ok(BsxAttribute {
-			key,
-			value: AttrValue::Verb(parse_verb_call(cursor)?),
 		});
 	}
 	let value = match cursor.peek() {

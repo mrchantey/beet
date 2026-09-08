@@ -29,6 +29,18 @@
 //! own grant. Withholding the world entirely is the same config's `world: false`,
 //! which leaves no `world` global to reach for at all.
 //!
+//! ## Documents
+//!
+//! `world.get_field`/`world.set_field` (and the `world.entity(id)` forms) address
+//! a *document field* rather than a component, resolving the way a widget's
+//! binding does: the subject entity's nearest ancestor
+//! [`Document`](beet_core::prelude::Document), prefixed by any
+//! [`DocumentScope`](beet_core::prelude::DocumentScope) between them. So a
+//! `bx:<event>` script writes the field its own markup names without ever naming
+//! a document, and the change fans out to every widget bound to it. Reach is
+//! checked against `Document` itself, so a config narrowing components narrows
+//! the helpers with it.
+//!
 //! ## Vocabulary
 //!
 //! [`DynamicComponent`] mints a component type with no rust definition behind

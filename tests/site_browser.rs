@@ -1,8 +1,12 @@
 //! The browser half of the deploy skill's client verification (check `b`),
 //! the in-house replacement for the retired playwright `verify_client.js`:
 //! drive the live site through the webdriver, fail on any client error, and
-//! prove the counter's reactive round trip, in-page navigability, asset
-//! store topology and mobile layout.
+//! prove the counter page's first paint, in-page navigability, asset store
+//! topology and mobile layout.
+//!
+//! Client-side interactivity is not asserted here: the thin client is gone and
+//! the wasm tier that replaces it is phase 8, so a served page is first paint
+//! plus whatever bespoke page script it ships.
 //!
 //! Three collectors gate the whole run, attached before the first navigation
 //! so nothing slips past: console errors (which include uncaught exceptions,
@@ -44,18 +48,15 @@ async fn verifies_client() {
 	// sidebar into a drawer, hiding every nav link from hit-testing
 	page.set_viewport(1280, 800).await.unwrap();
 
-	// the counter round trip: trusted clicks patch the count text
-	// locally (the reactive runtime, hydrated from the blob)
+	// the counter page's first paint: the `@doc:count=0` init reaches the
+	// served html, and the buttons it declares are there to be found
 	page.navigate(&format!("{base}/docs/design/counter"))
 		.await
 		.unwrap();
 	cross_log!("stage: counter page loaded");
-	let more = page.find_text("More").await;
-	more.click().await.unwrap();
-	more.click().await.unwrap();
-	wait_for_count(&page, "You have clicked 2 times").await;
-	page.find_text("Less").await.click().await.unwrap();
-	wait_for_count(&page, "You have clicked 1 times").await;
+	page.find_text("You have clicked 0 times").await;
+	page.find_text("More").await;
+	page.find_text("Less").await;
 
 	// in-page navigability: the site's own links reach docs and the
 	// counter (proves navigation, not just direct loads)
@@ -146,21 +147,4 @@ async fn verifies_client() {
 		.xpect_empty();
 
 	page.kill().await.unwrap();
-}
-
-/// Poll until the page body carries the expected count text.
-async fn wait_for_count(page: &Page, expected: &str) {
-	poll_ext::poll_async(async || {
-		let text = page
-			.evaluate_value("document.body.innerText")
-			.await?
-			.as_str()
-			.unwrap_or_default()
-			.to_string();
-		text.contains(expected)
-			.then_some(())
-			.ok_or_else(|| bevyhow!("count not patched yet"))
-	})
-	.await
-	.unwrap();
 }

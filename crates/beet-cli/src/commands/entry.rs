@@ -131,7 +131,7 @@ pub(crate) fn entry_arg(parts: &RequestParts) -> Result<String> {
 /// A world able to load and render a no-code entry for the `check` /
 /// `export-static` / entry-load tests. It mirrors the running app's widget surface:
 /// [`BsxDefaultsPlugin`] registers the beet_ui widget templates (`<Button>`/`<Form>`/…)
-/// and the default `bx:` verb vocabulary, so a markup entry using live widgets renders
+/// and the default `bx:` event vocabulary, so a markup entry using live widgets renders
 /// here as it would under `BeetPlugins`. It is added *before* [`RouterPlugin`] so its
 /// inner `BsxPlugin` registers once (the router's charcell stack reaches it through the
 /// idempotent `init_plugin`). [`RouterPlugin`] registers the markup-declarable
@@ -203,7 +203,7 @@ mod test {
 	/// The entry declares its own servers and app routes: loading its entry document
 	/// through the resolved store yields a markup-declared `<HttpServer>` root
 	/// carrying the router, plus the default app routes it requested with
-	/// `<DefaultAppRoutes/>` (eg `/js/reactivity.js`).
+	/// `<DefaultAppRoutes/>` (eg `/app-info`).
 	#[beet::test]
 	async fn entry_declares_server_and_app_routes() {
 		let mut world = render_world();
@@ -236,11 +236,11 @@ mod test {
 		.unwrap();
 		// the markup `<HttpServer>` owns the boot, with the router as its child
 		world.entity(root).contains::<HttpServer>().xpect_true();
-		// and `<DefaultAppRoutes/>` wired the reactivity-runtime route
+		// and `<DefaultAppRoutes/>` wired the app-info route
 		// the tree lives on the router's own url space, a child of the server
 		RouteTree::of(&world, root)
 			.unwrap()
-			.find(&["js", "reactivity.js"])
+			.find(&["app-info"])
 			.xpect_some();
 	}
 }

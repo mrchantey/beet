@@ -1112,12 +1112,13 @@ mod test {
 	}
 
 	/// Regression (multi-tenant reactive state): incrementing session A's counter
-	/// advances only A's own count; the idle session B's count is unchanged — the
-	/// deploy's multi-tenant check asserts independent per-session counts. Driven
-	/// through the full input pipeline (SGR bytes → hit-test → `bx:click` verb)
-	/// over the real shared-content Portal structure: the `bx:scope`/`@doc:count`
-	/// reactive document is parsed fresh per session, so each binds its own.
-	#[cfg(feature = "bsx")]
+	/// advances only A's own count; the idle session B's count is unchanged, the
+	/// deploy's multi-tenant check asserting independent per-session counts.
+	/// Driven through the full input pipeline (SGR bytes, hit-test, then the
+	/// `bx:click` script's own round trips through the world bridge) over the
+	/// real shared-content Portal structure: the `bx:scope`/`@doc:count` reactive
+	/// document is parsed fresh per session, so each binds its own.
+	#[cfg(all(feature = "bsx", feature = "scripting"))]
 	#[beet_core::test]
 	async fn counter_increments_only_its_own_session() {
 		let mut app = ssh_tui_live_app();
@@ -1125,7 +1126,7 @@ mod test {
 		store
 			.insert(
 				&"counter.bsx".into(),
-				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click=increment{ field: @doc:count }>More</button></article>"#
+				r#"<article bx:scope="counter"><p>You have clicked {@doc:count=0} times.</p><button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button></article>"#
 					.to_string(),
 			)
 			.await

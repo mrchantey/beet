@@ -100,7 +100,7 @@ Also fetch `/docs/design/counter?color-scheme=light` and `?color-scheme=dark` an
 
 ### b. browser verification (navigability, the counter, client errors, mobile layout)
 
-The counter (`site/routes/docs/design/counter.bsx`) is a reactive page: a "More" button increments and a "Less" button decrements a document field rendered as "You have clicked N times." The whole check is one committed test driving the in-house webdriver (`chromedriver` + a chromium on PATH are the only deps):
+The counter (`site/routes/docs/design/counter.bsx`) renders a document field as "You have clicked N times.", with a "More" and a "Less" button whose `bx:click` scripts mutate it. The browser check asserts first paint only: there is no client interactivity tier until the wasm one lands, so a click in the browser does nothing yet. The whole check is one committed test driving the in-house webdriver (`chromedriver` + a chromium on PATH are the only deps):
 
 ```sh
 BEET_BASE_URL=<BASE_URL> cargo test --test site_browser \
@@ -118,7 +118,7 @@ BEET_BASE_URL=<BASE_URL> cargo test --test site_browser \
 
 Ignore nothing by default; if a message is genuinely benign, match it exactly and log that it was skipped. CAVEAT: some faults only surface in an insecure context -- `crypto.randomUUID`/`crypto.subtle` are gated to secure contexts, and localhost + `https://` are both secure, so this check does NOT reproduce that specific bug. The durable fix is keeping secure-context-only APIs out of the client (the beacon now derives its id from `crypto.getRandomValues`, available on plain http); the collectors still catch the broad class of client JS errors on every env.
 
-**Counter + navigability.** Headless chromium: goto `BASE_URL/docs/design/counter`, click "More" twice and assert "You have clicked 2 times", click "Less" and assert "1 times" (trusted `performActions` clicks, so hit-testing is real). Then navigate `/` -> `/docs` -> `/docs/design` -> the counter via in-page links at a desktop viewport (the collapsed-nav links are zero-size and unclickable, exactly like a real user; proves the site is navigable, not just direct loads), and load `/blog` + a post (`/blog/bevys-five-and-beets-alive`) so the beacon runs on a content page -- the pages the client error was reported on.
+**Counter + navigability.** Headless chromium: goto `BASE_URL/docs/design/counter` and assert its first paint ("You have clicked 0 times", plus the "More"/"Less" buttons). Then navigate `/` -> `/docs` -> `/docs/design` -> the counter via in-page links at a desktop viewport (the collapsed-nav links are zero-size and unclickable, exactly like a real user; proves the site is navigable, not just direct loads), and load `/blog` + a post (`/blog/bevys-five-and-beets-alive`) so the beacon runs on a content page -- the pages the client error was reported on.
 
 **Mobile layout (no horizontal overflow).** At viewports 375x812 and 320x812, for `/`, `/blog`, and `/blog/bevys-five-and-beets-alive` assert `document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`, printing the offending elements on failure so the culprit is obvious. Regression guard: a `<pre>` code block or a wide embed used to blow `<main>` past the viewport (`<main>` is a flex item, fixed with `min-width: 0`), and the header nav overflowed at 320px (fixed with an `@media screen` app-bar `flex-wrap`).
 

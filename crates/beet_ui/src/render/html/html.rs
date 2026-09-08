@@ -12,9 +12,8 @@ pub struct HtmlRenderer {
 	/// HTML fragments to hoist into `<head>` (emitted before `</head>`),
 	/// contributed by any render feature via [`hoist_into_head`](Self::hoist_into_head).
 	/// Drained once at the head close, or post-walk for a fragment with no
-	/// `<head>` (the emptied vec gives once-only semantics). The reactive renderer
-	/// is the first contributor; a future build-time `bx:hoist` directive is
-	/// intended to feed this same collection.
+	/// `<head>` (the emptied vec gives once-only semantics). A future build-time
+	/// `bx:hoist` directive is intended to feed this same collection.
 	head_hoist: Vec<String>,
 	/// If `Some`, creates newlines after open/close tags
 	/// and indents children with the provided indentation.
@@ -39,11 +38,6 @@ pub struct HtmlRenderer {
 	raw_text_elements: Vec<Cow<'static, str>>,
 	/// Tracks whether we are currently inside a raw text element.
 	in_raw_text_element: bool,
-	/// When set, the renderer also emits the thin-client reactivity wire format
-	/// (see [`reactive_html_render`](super::reactive_html_render)); the resolved
-	/// text is unchanged, so a non-reactive page is byte-identical.
-	#[cfg(all(feature = "bsx", feature = "json"))]
-	reactive: Option<super::reactive_html_render::ReactiveHtmlRender>,
 }
 
 /// Indentation style for pretty-printing.
@@ -84,41 +78,12 @@ impl HtmlRenderer {
 			strip_comments: true,
 			raw_text_elements: default_raw_text_elements(),
 			in_raw_text_element: false,
-			#[cfg(all(feature = "bsx", feature = "json"))]
-			reactive: None,
 		}
 	}
 
 	/// Enable pretty-printing with the default indentation (one tab).
 	pub fn pretty(mut self) -> Self {
 		self.indent = Some(Indent::default());
-		self
-	}
-
-	/// Emit the thin-client reactivity wire format alongside the resolved HTML:
-	/// `data-bx-doc`/`data-bx-attr`/`bx:<event>` annotations, `<!--bx-ref-->` text
-	/// anchors, the document/verb blobs, and the runtime script (in `<head>`). In
-	/// the default [`InsertReactive::Auto`] mode the resolved text is unchanged and
-	/// a page with no bindings renders identically to the static output.
-	#[cfg(all(feature = "bsx", feature = "json"))]
-	pub fn reactive(self) -> Self {
-		self.reactive_with(InsertReactive::default(), false)
-	}
-
-	/// [`reactive`](Self::reactive) with explicit config: when to inject the
-	/// runtime ([`InsertReactive`]) and whether to inline [`Reactivity::JS`] rather
-	/// than reference it by URL.
-	#[cfg(all(feature = "bsx", feature = "json"))]
-	pub fn reactive_with(
-		mut self,
-		insert_reactive: InsertReactive,
-		inline_js_runtime: bool,
-	) -> Self {
-		self.reactive =
-			Some(super::reactive_html_render::ReactiveHtmlRender::new(
-				insert_reactive,
-				inline_js_runtime,
-			));
 		self
 	}
 
@@ -162,7 +127,7 @@ impl HtmlRenderer {
 
 	/// Contribute an HTML fragment to hoist into `<head>` (emitted before
 	/// `</head>`, or post-walk for a fragment with no `<head>`). Any feature can
-	/// push here; the reactive renderer is the first contributor.
+	/// push here.
 	pub fn hoist_into_head(&mut self, fragment: impl Into<String>) {
 		self.head_hoist.push(fragment.into());
 	}
@@ -228,10 +193,10 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
-		// Functional `bx`-prefixed anchors (eg `<!--bx-ref-->`, `<!--bx-end-->`)
-		// always render. Authoring comments are stripped by default (the framework
-		// emits anchors without a leading space, so a space-led `<!-- note -->` is
-		// authoring), unless `with_comments` opted to keep them.
+		// Functional `bx`-prefixed anchors (eg `<!--bx-ref-->`) always render.
+		// Authoring comments are stripped by default (the framework emits anchors
+		// without a leading space, so a space-led `<!-- note -->` is authoring),
+		// unless `with_comments` opted to keep them.
 		if self.strip_comments && !comment.starts_with("bx") {
 			return;
 		}
@@ -246,43 +211,6 @@ impl NodeVisitor for HtmlRenderer {
 		self.write_indent();
 		self.buffer.push('<');
 		self.buffer.push_str(view.tag());
-
-		// reactive mode: emit `data-bx-doc`, `bx:<event>`, and `data-bx-attr-*`
-		// for this element (computed first so the `reactive` borrow ends before
-		// the buffer writes).
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		{
-			let fragments = self
-				.reactive
-				.as_mut()
-				.map(|reactive| {
-					let mut fragments = Vec::new();
-					if let Some(id) = reactive.enter_element(_cx.entity) {
-						fragments.push(format!("data-bx-doc=\"d{id}\""));
-					}
-					for (event, call) in reactive.events(_cx.entity) {
-						fragments.push(format!(
-							"bx:{event}=\"{}\"",
-							escape_html_attribute(call)
-						));
-					}
-					for attr in &view.attributes {
-						if let Some(path) = reactive.attr_path(attr.entity) {
-							fragments.push(format!(
-								"data-bx-attr-{}=\"{}\"",
-								attr.attribute.as_str(),
-								escape_html_attribute(path)
-							));
-						}
-					}
-					fragments
-				})
-				.unwrap_or_default();
-			for fragment in fragments {
-				self.buffer.push(' ');
-				self.buffer.push_str(&fragment);
-			}
-		}
 
 		for attr in &view.attributes {
 			// the `class` attribute is merged with the `Classes` component and
@@ -346,12 +274,6 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
-		// reactive mode: pop this element's document scope (before the void
-		// early-return, so the stack balances with `visit_element`).
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		if let Some(reactive) = self.reactive.as_mut() {
-			reactive.leave_element();
-		}
 		let is_void = self.is_void_element(element.tag());
 		if is_void {
 			return;
@@ -363,9 +285,9 @@ impl NodeVisitor for HtmlRenderer {
 
 		// inject any hoisted head fragments inside `<head>`, before its close tag.
 		// `<head>` is the single injection point; a fragment with no head falls
-		// back to a post-walk append in `render`. Any feature can contribute (eg
-		// the reactive renderer's blob + runtime); a future build-time `bx:hoist`
-		// directive is intended to feed the same collection.
+		// back to a post-walk append in `render`. Any feature can contribute; a
+		// future build-time `bx:hoist` directive is intended to feed the same
+		// collection.
 		if element.tag() == "head" {
 			if let Some(hoisted) = self.take_head_hoist() {
 				self.write_indent();
@@ -386,32 +308,14 @@ impl NodeVisitor for HtmlRenderer {
 	}
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
-		// reactive mode: a bound text node is wrapped in `<!--bx-ref-->` anchors so
-		// the runtime can patch just this run (computed first to end the borrow).
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		let bx_ref = self
-			.reactive
-			.as_ref()
-			.and_then(|reactive| reactive.text_path(_cx.entity))
-			.map(|path| escape_html_attribute(path));
 		if self.is_pretty() {
 			self.write_indent();
-		}
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		if let Some(path) = &bx_ref {
-			self.buffer.push_str("<!--bx-ref=\"");
-			self.buffer.push_str(path);
-			self.buffer.push_str("\"-->");
 		}
 		let raw = value.to_string();
 		if self.escape_html && !self.in_raw_text_element {
 			self.buffer.push_str(&escape_html_text(&raw));
 		} else {
 			self.buffer.push_str(&raw);
-		}
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		if bx_ref.is_some() {
-			self.buffer.push_str("<!--bx-end-->");
 		}
 		if self.is_pretty() {
 			self.buffer.push('\n');
@@ -443,16 +347,6 @@ impl NodeRenderer for HtmlRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Html])?;
-		// collect the reactivity annotations once (the only world-reading pass)
-		// before the walk, then register them as one head-hoist contributor so the
-		// fragment is known when `<head>` closes.
-		#[cfg(all(feature = "bsx", feature = "json"))]
-		if let Some(reactive) = self.reactive.as_mut() {
-			reactive.collect(cx.world, cx.entity);
-			if let Some(fragment) = reactive.into_head_fragment() {
-				self.hoist_into_head(fragment);
-			}
-		}
 		cx.walk(self);
 		// fallback: a fragment with no `<head>` never triggered the in-walk drain,
 		// so emit any remaining hoisted fragments now (a no-op when the walk did).
@@ -561,7 +455,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn keeps_bx_comment() {
-		// functional `bx`-prefixed anchors survive (eg the reactive ref/end markers)
+		// functional `bx`-prefixed anchors survive
 		roundtrip("<!--bx-ref-->").xpect_eq("<!--bx-ref-->".to_string());
 	}
 
@@ -602,9 +496,9 @@ mod test {
 
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
-	fn non_reactive_caller_hoists_into_head() {
-		// a plain (non-reactive) contributor pushes a <meta> that must land inside
-		// <head>, before </head>, with no reactive feature involved.
+	fn caller_hoists_into_head() {
+		// a contributor pushes a <meta> that must land inside <head>, before
+		// </head>.
 		let mut renderer = HtmlRenderer::new();
 		renderer.hoist_into_head("<meta name=\"x\" content=\"y\">");
 		roundtrip_with(

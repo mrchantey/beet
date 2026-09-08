@@ -9,7 +9,7 @@ collections (`src/pages`, `content`, `actions`) by the codegen pass:
 - **`/`** — an `rsx!` hero page using `inline_class!` for one-off layout.
 - **`/counter`** — native (typed) reactivity: a `Document` atom driven by
   `PointerUp` observers through a `FieldQuery`, the Rust twin of the no-code
-  `bx:click` counter.
+  `bx:click` script counter.
 - **`/buttons`** — the `Button`/`Link` widgets laid out by a typed `Rule`
   (`design_row_rule`).
 - **`/about`** — a dynamic page: `async fn get(ActionContext<Request>)`, built

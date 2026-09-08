@@ -24,7 +24,9 @@
 	};
 
 	// an entity is an opaque string token, so `String(entity)` is what the host
-	// parses back; `undefined` becomes `null` because JSON has no undefined.
+	// parses back; an entity handle stringifies to the same token, so either
+	// form may be passed anywhere an entity is taken. `undefined` becomes `null`
+	// because JSON has no undefined.
 	const id = (entity) => String(entity);
 	const json = (value) => (value === undefined ? null : value);
 
@@ -45,5 +47,31 @@
 		remove: (entity, component) =>
 			call({ op: "remove", entity: id(entity), component }),
 		despawn: (entity) => call({ op: "despawn", entity: id(entity) }),
+		get_field: (entity, path) =>
+			call({ op: "get_field", entity: id(entity), path }),
+		set_field: (entity, path, value) =>
+			call({
+				op: "set_field",
+				entity: id(entity),
+				path,
+				value: json(value),
+			}),
+		entity: (entity) => handle(entity),
 	};
+
+	// one entity's half of the `world` API, with the entity already supplied.
+	// `world.entity(id)` is how a script holds onto one; an event script is
+	// handed its own as `target`.
+	const handle = (entity) => ({
+		id: id(entity),
+		toString: () => id(entity),
+		get: (component) => globalThis.world.get(entity, component),
+		insert: (component, value) =>
+			globalThis.world.insert(entity, component, value),
+		remove: (component) => globalThis.world.remove(entity, component),
+		despawn: () => globalThis.world.despawn(entity),
+		get_field: (path) => globalThis.world.get_field(entity, path),
+		set_field: (path, value) =>
+			globalThis.world.set_field(entity, path, value),
+	});
 })();

@@ -4,16 +4,19 @@ use beet_core::prelude::*;
 use bevy::ecs::resource::IS_RESOURCE;
 
 /// A world with the async bridge installed and a type registry holding
-/// [`Name`], the one component every bridge test writes through.
+/// [`Name`], the one component every bridge test writes through, and
+/// [`Document`], which the field helpers check their reach against.
 ///
 /// Async because every operation is served through a [`WorldBridge`], which
 /// resolves at a sync point.
 pub(crate) fn test_world() -> World {
 	let world = AsyncPlugin::world();
-	world
-		.resource::<AppTypeRegistry>()
-		.write()
-		.register::<Name>();
+	{
+		let registry = world.resource::<AppTypeRegistry>();
+		let mut registry = registry.write();
+		registry.register::<Name>();
+		registry.register::<Document>();
+	}
 	world
 }
 

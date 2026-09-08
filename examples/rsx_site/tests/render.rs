@@ -99,26 +99,21 @@ async fn buttons_page_renders_in_layout() {
 		.xpect_contains("Outlined");
 }
 
-/// The Rust-authored counter renders reactively on the web: its `{count}`
-/// display is wrapped in `<!--bx-ref-->` anchors with the SSR value, the document
-/// state ships as a blob, and the runtime loads from the shared
-/// `/js/reactivity.js`, so the count hydrates with no flash. Its buttons drive
-/// the count through native `PointerUp` observers (the native-target path); the
-/// fully web-interactive `bx:click` verb counter is the no-code `bsx_site` page.
+/// The Rust-authored counter renders its document atom's value into the page:
+/// the `{count}` display reads the field at render time, and its buttons drive
+/// the count through native `PointerUp` observers (the native-target path). The
+/// web-interactive `bx:click` script counter is the no-code `bsx_site` page.
 #[beet::test]
-async fn counter_renders_reactively() {
+async fn counter_renders_its_document_value() {
 	site_world()
 		.spawn(rsx_site_router())
 		.exchange_str(html_get("counter"))
 		.await
-		// the count display is a bound run wrapping the correct SSR value
-		.xpect_contains("<!--bx-ref=")
-		.xpect_contains("<!--bx-end-->")
-		// the hydration blob carries the initial document state
-		.xpect_contains("data-bx-blob")
-		.xpect_contains("\"count\":0")
-		// the runtime ships, loaded from the shared cached asset
-		.xpect_contains("<script defer src=\"/js/reactivity.js\">");
+		.xpect_contains("You have clicked ")
+		.xpect_contains(" times.")
+		// the page is plain SSR html: nothing thin-client ships any more
+		.xnot()
+		.xpect_contains("data-bx-");
 }
 
 #[beet::test]

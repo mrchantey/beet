@@ -4,7 +4,7 @@
 /// to `spawn_template`: the substrate's
 /// [`TemplatePlugin`](beet_core::prelude::TemplatePlugin), the
 /// [`DocumentPlugin`](beet_core::prelude::DocumentPlugin) templates lean on, and
-/// (when `bsx` is enabled) the default BSX event/verb vocabulary
+/// (when `bsx` is enabled) the default BSX event vocabulary
 /// ([`BsxDefaultsPlugin`](crate::prelude::BsxDefaultsPlugin)) so a parsed
 /// `bx:click` resolves. Insert any required resources before spawning.
 #[cfg(feature = "bsx")]

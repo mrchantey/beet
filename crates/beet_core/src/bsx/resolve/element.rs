@@ -105,7 +105,7 @@ fn build_slot(el: &BsxElement, entity: &mut EntityWorldMut) -> Result<()> {
 	Ok(())
 }
 
-/// Apply the `bx:scope`/`bx:for`/`bx:key`/`bx:ref`/`bx:click`/`slot` directives
+/// Apply the `bx:scope`/`bx:for`/`bx:key`/`bx:ref`/`bx:<event>`/`slot` directives
 /// shared by every tag kind onto `cx.entity`.
 pub(super) fn apply_common_directives(
 	el: &BsxElement,
@@ -142,40 +142,21 @@ pub(super) fn apply_common_directives(
 			handler(cx.entity, source, span)?;
 		}
 	}
-	// `bx:<event>=verb{ arg: value, .. }` events. The event name is the directive
-	// suffix after `bx:`; the verb + args resolve through the core registries.
+	// `bx:<event>="script"` events. The event name is the directive suffix after
+	// `bx:`; the script resolves through the core seam.
 	for attr in &el.attributes {
 		if !is_event_directive(&attr.key) {
 			continue;
 		}
-		let AttrValue::Verb(call) = &attr.value else {
+		let AttrValue::Str(script) = &attr.value else {
 			bevybail!(
-				"`{}` expects a verb call, ie `{}=increment{{ field: @doc:count }}`",
-				attr.key,
-				attr.key
+				"`{key}` expects a script string, ie \
+				 `{key}=\"await target.set_field('count', 1)\"`",
+				key = attr.key
 			);
 		};
 		let event = attr.key.strip_prefix("bx:").unwrap_or(&attr.key);
-		let binding = EventBinding::new(event, call.clone());
-		// pre-resolve each binding argument's `@entity:ref::` selector to its target
-		// (needs `cx`), so the install closure is a plain lookup with no `cx`
-		// borrow conflicting with `cx.entity`.
-		let targets = binding
-			.args
-			.iter()
-			.filter_map(|(_, arg)| match arg {
-				VerbArg::Binding(BindingExpr {
-					selector: Some(name),
-					..
-				}) => Some((name.clone(), selector_target(name, refs, cx))),
-				_ => None,
-			})
-			.collect::<HashMap<SmolStr, BindingTarget>>();
-		install_event(cx.entity, &binding, |selector| {
-			selector
-				.and_then(|name| targets.get(name).cloned())
-				.unwrap_or(BindingTarget::This)
-		})?;
+		install_event(cx.entity, &EventBinding::new(event, script.as_str()));
 	}
 	Ok(())
 }
@@ -320,11 +301,9 @@ fn apply_attributes(
 						attr_comp_target(expr, parent, entity_refs);
 					apply_value_expr(expr, &mut attr_entity, comp_target)?;
 				}
-				// spreads, `bx:<event>` verb calls and `bx:style` are handled
-				// elsewhere (the directives pass / spread pass).
-				AttrValue::Spread(_)
-				| AttrValue::Verb(_)
-				| AttrValue::Style { .. } => {}
+				// spreads and `bx:style` are handled elsewhere (the
+				// directives pass / spread pass).
+				AttrValue::Spread(_) | AttrValue::Style { .. } => {}
 			}
 			Ok(())
 		})?;

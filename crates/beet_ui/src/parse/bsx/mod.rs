@@ -1,14 +1,17 @@
 //! The `beet_ui` BSX front-end: a thin [`NodeParser`] that delegates parsing to
 //! the core BSX parser ([`beet_core::bsx`]).
 //!
-//! The grammar, the value model, the `bx:` directives, the event/verb seam, and
-//! the AST-to-world resolution all live in `beet_core`; this file only adapts
-//! that to the ui-side [`MediaParser`] dispatch. One parser, one grammar:
+//! The grammar, the value model, the `bx:` directives, the event seam, and the
+//! AST-to-world resolution all live in `beet_core`; this file only adapts that
+//! to the ui-side [`MediaParser`] dispatch. One parser, one grammar:
 //! [`MediaType::Bsx`] parses with BSX features on, [`MediaType::Html`] with them
-//! off (the HTML-only subset). The default event/verb registration lives in
-//! [`BsxDefaultsPlugin`].
+//! off (the HTML-only subset). The default event registration lives in
+//! [`BsxDefaultsPlugin`], and the `bx:<event>` script installer it wires in
+//! `event_script`.
 mod defaults;
 pub use defaults::*;
+#[cfg(feature = "scripting")]
+mod event_script;
 
 use crate::prelude::*;
 use beet_core::prelude::*;

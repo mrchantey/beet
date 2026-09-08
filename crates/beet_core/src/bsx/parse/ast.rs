@@ -71,8 +71,6 @@ pub enum AttrValue {
 	Expr(ValueExpr),
 	/// A bare-position spread `<el {..}>`: one or more components/templates.
 	Spread(SpreadExpr),
-	/// A `bx:<event>` directive's verb call, eg `bx:click=increment{ field: @doc:count }`.
-	Verb(VerbCall),
 	/// A `bx:style` directive's one-off rule declarations, eg
 	/// `bx:style="display=Flex max-width=Rem(40.0)"`. The raw declaration text is
 	/// kept verbatim (parsed downstream where the style types live), paired with
@@ -148,30 +146,6 @@ impl BindingExpr {
 	}
 }
 
-/// A parsed `verb{ arg: value, .. }` event-verb call, the value of a
-/// `bx:<event>` directive (eg `bx:click=increment{ field: @doc:count, amount: 3 }`).
-///
-/// The verb name resolves against the [`VerbRegistry`](crate::prelude::VerbRegistry)
-/// at build time; each named argument is a literal value or an `@` binding,
-/// kept distinct so a binding argument resolves to a live source rather than a
-/// frozen [`Value`].
-#[derive(Debug, Clone, PartialEq)]
-pub struct VerbCall {
-	/// The verb name, eg `increment`.
-	pub verb: SmolStr,
-	/// The named arguments in author order.
-	pub args: Vec<(SmolStr, VerbArg)>,
-}
-
-/// A single argument of a [`VerbCall`]: a literal value or an `@` binding.
-#[derive(Debug, Clone, PartialEq)]
-pub enum VerbArg {
-	/// A literal value, eg `amount: 3`.
-	Literal(DataLiteral),
-	/// An `@` binding to a live source, eg `field: @doc:count`.
-	Binding(BindingExpr),
-}
-
 /// The source kinds of an `@` binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindingSource {
@@ -227,8 +201,7 @@ impl DataLiteral {
 	/// The plain [`Value`] of this literal, or `None` for a non-literal (an
 	/// entity ref carries no inline value).
 	///
-	/// Used both for build-time verification and by the reactive renderer to
-	/// serialize a literal verb argument into the emitted `bx:<event>` attribute.
+	/// Used at build time to resolve an authored literal against its target.
 	pub fn value(&self) -> Option<Value> {
 		match self {
 			DataLiteral::Scalar(value) => Some(value.clone()),

@@ -41,7 +41,7 @@ const COUNTER_BSX: &str = r#"
 <article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click=increment{ field: @doc:count }>More</button>
+		<button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
 	</widgets::Card>
 </article>
 "#;
@@ -341,62 +341,29 @@ async fn bsx_page_declares_meta_as_a_spread() {
 		.xpect_contains(">The Spread<");
 }
 
-/// The counter page through the full route pipeline. The `@` binding values are
+/// The counter page through the full route pipeline: every `@` binding value is
 /// correct first paint (the default head's `og:site_name` resource bind, the
-/// Card's `@prop:title`, the scoped `@doc:count` init); and because the router
-/// always renders through the reactive renderer, the same page carries the
-/// thin-client wire format: the bound run wrapped in anchors (no flash), the
-/// document blob, the event verb with its `@doc` arg resolved absolute, the
-/// default verb twins, and the runtime `<script defer>` loaded from the shared
-/// `/js/reactivity.js`. The in-browser proof is `reactivity_in_browser` in
-/// `beet_ui`, driven through the in-house webdriver.
+/// Card's `@prop:title`, the scoped `@doc:count` init), and the page is plain
+/// server-rendered html, since the interactivity tier is the wasm binary rather
+/// than anything shipped in the markup.
 #[beet_core::test]
-async fn counter_page_renders_reactively() {
+async fn counter_page_renders_its_bindings() {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let root = spawn_site(&mut world).await;
 	let html = get(&mut world, root, "counter").await;
 	html.as_str()
-		// --- binding values, correct first paint ---
 		// the default head binds og:site_name to `PackageConfig.title` (no
 		// hand-written tag in the layout), so the markup-declared title surfaces
 		.xpect_contains("property=\"og:site_name\" content=\"Beet Test Site\"")
 		// the Card's `@prop:title` binds the caller's prop into the heading
 		.xpect_contains("<h2>Counter</h2>")
-		// --- reactive wire format ---
-		// the document subtree is marked, and the bound run wrapped in anchors with
-		// the scoped `@doc:count=0` init between them (correct paint, no overwrite)
-		.xpect_contains("data-bx-doc=")
-		.xpect_contains(
-			"You have clicked <!--bx-ref=\"counter.count\"-->0<!--bx-end--> times.",
-		)
-		// the event verb re-emitted with its `@doc` arg resolved to an absolute
-		// path, so the client needs no scope walk
-		.xpect_contains("bx:click=\"increment{ field: @doc:counter.count }\"")
-		// the hydration blob, keyed by document id
-		.xpect_contains("data-bx-blob")
-		.xpect_contains("\"count\":0")
-		// the default verb twins ship (the runtime has zero built in)
-		.xpect_contains("data-bx-verbs")
-		// the runtime loads from the shared cached asset, not an inline script
-		.xpect_contains("<script defer src=\"/js/reactivity.js\"></script>");
+		// the scoped `@doc:count=0` init paints its value
+		.xpect_contains("You have clicked 0 times.")
+		// the `bx:click` script is a directive, never an emitted html attribute
+		.xnot()
+		.xpect_contains("bx:click");
 	// exactly one og:site_name: the default head owns it, no duplicate.
 	html.matches("og:site_name").count().xpect_eq(1);
-}
-
-/// A page with no `@doc`/`@prop` bindings (the markdown home page) stays
-/// byte-clean: the `Auto` reactive renderer emits no blob and no runtime script,
-/// so the static output is unchanged.
-#[beet_core::test]
-async fn plain_page_stays_clean() {
-	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = spawn_site(&mut world).await;
-	get(&mut world, root, "docs/intro")
-		.await
-		.as_str()
-		.xnot()
-		.xpect_contains("data-bx")
-		.xnot()
-		.xpect_contains("/js/reactivity.js");
 }
 
 /// Regression: when a host root carries its own command [`RouteTree`] (eg the

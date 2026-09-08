@@ -58,8 +58,8 @@ impl StaticExport {
 	/// A page additionally passes [`ActionNode::is_public_page`], the shared
 	/// visibility rule the sitemap and the feeds read, so a draft ships to a
 	/// dev/staging preview and never to production. The non-page half stays
-	/// here: the runtime assets a self-contained export needs (eg
-	/// `js/reactivity.js`) are not pages and are listed nowhere.
+	/// here: the assets a self-contained export needs are not pages and are
+	/// listed nowhere.
 	fn exports(world: &World, node: &ActionNode, is_prod: bool) -> bool {
 		if !node.path.is_static() {
 			return false;
@@ -111,9 +111,8 @@ async fn collect_static_html(
 impl StaticExport {
 	/// Renders every static route and writes it to the output store, returning the
 	/// written paths. A page writes to `<path>/index.html` (clean URLs); an asset
-	/// route with a file extension (eg `js/reactivity.js`) writes its raw file, so
-	/// the `<script src="/js/reactivity.js">` a reactive page references resolves and
-	/// the export is self-contained.
+	/// route with a file extension (eg `sitemap.xml`) writes its raw file, so a
+	/// page referencing it resolves and the export is self-contained.
 	pub async fn export(
 		world: &AsyncWorld,
 		router: Entity,
@@ -243,9 +242,9 @@ mod test {
 			.await
 			.unwrap();
 
-		// the two user scene routes plus the `app-info` scene and the
-		// `js/reactivity.js` runtime asset, both wired by `Router::with_defaults`.
-		written.len().xpect_eq(4);
+		// the two user scene routes plus the `app-info` scene, wired by
+		// `Router::with_defaults`.
+		written.len().xpect_eq(3);
 		out.get(&SmolPath::new("index.html"))
 			.await
 			.unwrap()
@@ -256,13 +255,6 @@ mod test {
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("About");
-		// the runtime asset is a raw file (not `<path>/index.html`), so a reactive
-		// page's `<script src="/js/reactivity.js">` resolves: a self-contained export.
-		out.get(&SmolPath::new("js/reactivity.js"))
-			.await
-			.unwrap()
-			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
-			.xpect_contains("class EntityMut");
 		out.get(&SmolPath::new("app-info/index.html"))
 			.await
 			.unwrap()

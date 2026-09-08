@@ -1,6 +1,6 @@
 //! The one place a script's reads leave the world.
 //!
-//! The mirror of [`WorldWrite`]: three operations, each checked against the
+//! The mirror of [`WorldWrite`]: four operations, each checked against the
 //! config's read filter before it looks at anything, each serving from the
 //! world as it is at the moment of the call.
 use crate::prelude::*;
@@ -9,10 +9,38 @@ use bevy::reflect::TypeInfo;
 use bevy::reflect::serde::TypedReflectSerializer;
 use serde::Serialize;
 
-/// The three world reads a script can express.
+/// The world read methods a script can express.
 pub struct WorldRead;
 
 impl WorldRead {
+	/// The [`Value`] at `path` in the document `subject` is bound to, absent
+	/// when neither the document nor the field is there.
+	///
+	/// Resolved exactly as a widget's binding is: the nearest ancestor
+	/// [`Document`], with any [`DocumentScope`] between them prefixed onto
+	/// `path`. So a script reads the field its own markup names, without ever
+	/// naming a document.
+	///
+	/// # Errors
+	/// Errors when the config excludes [`Document`].
+	pub fn get_field(
+		world: &mut World,
+		subject: Entity,
+		path: &str,
+		config: &ScriptConfig,
+	) -> Result<Option<Value>> {
+		config.assert_readable(&ComponentIdent::document(world)?)?;
+		// `error_on_missing` so an absent field answers `undefined` rather than
+		// the seed a default policy would hand back, matching `get`.
+		let field = FieldRef::new(FieldPath::parse(path)).error_on_missing();
+		world
+			.with_state::<DocumentQuery, _>(|mut docs| {
+				docs.field_value(subject, &field)
+			})
+			.ok()
+			.xok()
+	}
+
 	/// Serialize `ident` off `entity`, absent when the entity does not carry it.
 	///
 	/// # Errors

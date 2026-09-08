@@ -46,7 +46,7 @@ pub enum CardNav {
 ///
 /// Only user-facing [`PageRoute`](crate::prelude::PageRoute)s are cards: the
 /// infrastructure routes a deck serves alongside its slides (`/health`, the
-/// reactivity-runtime asset, the `client_io` websocket, a mounted blob store of
+/// `app-info` scene, the `client_io` websocket, a mounted blob store of
 /// assets) are not steppable cards, so they never become the opening card or land
 /// in the stack.
 fn deck_cards(tree: &RouteTree) -> Vec<&RouteTree> {

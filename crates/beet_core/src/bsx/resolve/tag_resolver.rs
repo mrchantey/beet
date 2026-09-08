@@ -1,8 +1,8 @@
 //! The BSX custom-tag seam: an uppercase tag resolved by a registered handler
 //! rather than the type registry or the [`BsxTemplateRegistry`].
 //!
-//! Core knows no concrete tag: like the [`EventRegistry`](crate::prelude::EventRegistry)
-//! and [`VerbRegistry`](crate::prelude::VerbRegistry), this registry is empty by
+//! Core knows no concrete tag: like the
+//! [`EventRegistry`](crate::prelude::EventRegistry), this registry is empty by
 //! default and populated by a downstream layer (eg `beet_ui` registers `Rule`).
 //! A handler reads the parsed element's raw attributes and mutates the world,
 //! producing no entity content — the markup analogue of a build-time effect like

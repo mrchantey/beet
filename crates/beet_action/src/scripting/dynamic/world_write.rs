@@ -1,6 +1,6 @@
 //! The one place a script's mutations reach the world.
 //!
-//! The mirror of [`WorldRead`]: four operations, each checked against the
+//! The mirror of [`WorldRead`]: each operation checked against the
 //! config's write filter before it touches anything, each landing the moment
 //! the script asks for it. Every one tolerates a target that has gone: a
 //! despawned entity is an error naming it, never a panic.
@@ -10,11 +10,37 @@ use bevy::ptr::OwningPtr;
 use bevy::reflect::serde::TypedReflectDeserializer;
 use serde::de::DeserializeSeed;
 
-/// The four world mutations a script can express, and the schema lookup that
+/// The world mutations a script can express, and the schema lookup that
 /// precedes one.
 pub struct WorldWrite;
 
 impl WorldWrite {
+	/// Write `value` at `path` in the document `subject` is bound to.
+	///
+	/// The write twin of [`WorldRead::get_field`]: the same ancestor-document
+	/// walk and the same [`DocumentScope`] prefix, so the document sync fans the
+	/// change out to every widget bound to that field. A document or field that
+	/// is not there yet is created, which is what makes a first click on a
+	/// freshly loaded page land.
+	///
+	/// # Errors
+	/// Errors when the config excludes [`Document`], or when the path names a
+	/// field the document's shape cannot hold.
+	pub fn set_field(
+		world: &mut World,
+		subject: Entity,
+		path: &str,
+		value: Value,
+		config: &ScriptConfig,
+	) -> Result {
+		config.assert_writable(&ComponentIdent::document(world)?)?;
+		let field =
+			FieldRef::new(FieldPath::parse(path)).with_init(value.clone());
+		world.with_state::<DocumentQuery, _>(|mut docs| {
+			docs.with_field(subject, &field, |slot| *slot = value)
+		})
+	}
+
 	/// Insert or replace `ident` on `entity`.
 	///
 	/// A runtime component takes the [`Value`] as it stands, so anything the

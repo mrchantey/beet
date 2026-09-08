@@ -14,8 +14,6 @@ impl Router {
 	///   (`json` + std), both of which require a [`PackageConfig`] resource.
 	/// - a `GET /health` route (std-only) returning 200 + json metrics, the
 	///   load-balancer health check and autoscaling signal.
-	/// - a cached `GET /js/reactivity.js` route (std-only) serving the thin-client
-	///   reactivity runtime, the asset the reactive renderer's injected script loads.
 	///
 	/// On no_std the std-only children/middleware are omitted and the not-found
 	/// fallback is a plain-text route listing; add any extra `Request`/`Response`
@@ -36,16 +34,14 @@ impl Router {
 		)
 	}
 }
-/// The default app routes as a bundle of [`OnSpawn::insert_child`] effects: the
-/// reactivity-runtime asset (`/js/reactivity.js`), `/app-info`, `POST /analytics`,
-/// and the `/__client_io` websocket channel, each attached as its own child so it
-/// keeps its own path. Shared by [`Router::with_defaults`] and the [`DefaultAppRoutes`]
+/// The default app routes as a bundle of [`OnSpawn::insert_child`] effects:
+/// `/app-info`, `GET /health`, `POST /analytics`, and the `/__client_io`
+/// websocket channel, each attached as its own child so it keeps its own path. Shared by [`Router::with_defaults`] and the [`DefaultAppRoutes`]
 /// template. `app_info`/`analytics` need a [`PackageConfig`] resource.
 #[cfg(feature = "std")]
 fn default_app_routes() -> impl Bundle {
 	(
 		OnSpawn::insert_child(app_info()),
-		OnSpawn::insert_child(reactivity_js_route()),
 		// the load-balancer health check + autoscaling signal.
 		OnSpawn::insert_child(health_route()),
 		#[cfg(feature = "json")]

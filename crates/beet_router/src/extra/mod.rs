@@ -29,13 +29,6 @@ mod app_info;
 #[cfg(feature = "std")]
 pub(crate) use app_info::*;
 
-// std-only: the reactivity runtime route serves beet_ui's `Reactivity::JS`, the
-// shared asset the renderer's auto-injected `<script defer>` loads.
-#[cfg(feature = "std")]
-mod reactivity_js;
-#[cfg(feature = "std")]
-pub(crate) use reactivity_js::*;
-
 // std-only: the `/health` route (uptime + active sessions derived from world
 // state), the load-balancer health check and autoscaling signal.
 #[cfg(feature = "std")]

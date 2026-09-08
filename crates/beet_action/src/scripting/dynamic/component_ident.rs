@@ -85,6 +85,14 @@ it is missing `#[reflect(Component)]`"
 		.xok()
 	}
 
+	/// The [`Document`] identifier, which the `get_field`/`set_field` helpers'
+	/// reach is checked against: reading or writing a document field is reading
+	/// or writing the document that holds it, so a config narrowing components
+	/// narrows the helpers with it.
+	pub fn document(world: &mut World) -> Result<Self> {
+		Self::resolve(world, <Document as bevy::reflect::TypePath>::type_path())
+	}
+
 	/// Whether this identifier names a runtime-minted component rather than a
 	/// registered rust type.
 	pub fn is_dynamic(&self) -> bool { self.type_id.is_none() }

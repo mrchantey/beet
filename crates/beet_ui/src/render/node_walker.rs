@@ -82,7 +82,7 @@ impl NodeWalker<'_, '_> {
 			visitor.visit_element(&cx, view);
 		}
 		// 4. Value
-		// an element's own Value is binding state (eg a `bx:click` field mirror),
+		// an element's own Value is binding state,
 		// not markup content: text content lives on dedicated text-node children.
 		// Form controls are the exception, displaying their bound value — except
 		// a null, which for a *control* is nothing typed rather than the word

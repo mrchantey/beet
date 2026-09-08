@@ -1,16 +1,16 @@
-<!-- A BSX page: site templates by module path, document state, and event verbs. -->
+<!-- A BSX page: site templates by module path, document state, and event scripts. -->
 <article bx:scope="counter">
 	<h1>A page with state</h1>
 	<p>
 		Pages can be BSX too. This one composes the site's own
-		<code>widgets::Card</code> template and binds a document field to the
-		built-in verbs, no code required:
+		<code>widgets::Card</code> template and mutates a document field from a
+		two-line event script, no rust required:
 	</p>
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
 		<div class="design-row">
-			<button class="btn btn-filled" bx:click=increment{ field: @doc:count, amount: 1 }>More</button>
-			<button class="btn btn-tonal" bx:click=decrement{ field: @doc:count }>Less</button>
+			<button class="btn btn-filled" bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
+			<button class="btn btn-tonal" bx:click="await target.set_field('count', (await target.get_field('count')) - 1)">Less</button>
 		</div>
 	</widgets::Card>
 </article>

@@ -1,4 +1,4 @@
-//! Syntax tree to world: the build walk, the event/verb seam, and the resolver
+//! Syntax tree to world: the build walk, the event seam, and the resolver
 //! hooks a host installs into it.
 
 mod binding;

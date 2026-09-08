@@ -1,6 +1,5 @@
-//! HTML rendering: the [`HtmlRenderer`] and its utilities, the reactive-render
-//! injection (`reactive_html_render`), the template-serde wiring, and the
-//! thin-client `reactivity.js` runtime served to the browser.
+//! HTML rendering: the [`HtmlRenderer`] and its utilities, plus the
+//! template-serde wiring.
 //!
 //! The shared walk/serialize substrate (`node_walker`, `node_renderer`) lives
 //! one level up in `render/`, since the markdown, ANSI, and charcell targets
@@ -11,11 +10,5 @@ pub use html::*;
 mod template;
 #[cfg(feature = "template_serde")]
 pub use template::*;
-#[cfg(all(feature = "bsx", feature = "json"))]
-mod reactive_html_render;
-#[cfg(all(feature = "bsx", feature = "json"))]
-pub use reactive_html_render::InsertReactive;
-#[cfg(all(feature = "bsx", feature = "json"))]
-pub use reactive_html_render::Reactivity;
 mod html_utils;
 pub(crate) use html_utils::*;

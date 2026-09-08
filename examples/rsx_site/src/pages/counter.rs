@@ -6,8 +6,8 @@ use beet::prelude::*;
 /// State is a single typed document atom ([`TypedFieldRef`]); the display reads
 /// it in markup (`{count}`), and each button's `PointerUp` observer mutates it
 /// through [`FieldQuery`]. Document-sync fans the change back to the display
-/// binding, which repaints, the same reactive loop the BSX verbs drive, with no
-/// per-button mirror state.
+/// binding, which repaints, the same reactive loop a BSX event script drives,
+/// with no per-button mirror state.
 pub fn get() -> impl Bundle {
 	// `count` is a shared atom keyed in this page's document; the buttons mutate
 	// it and the display reads it, both resolving the same field by key.

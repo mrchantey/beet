@@ -45,7 +45,7 @@ fn nothing_typed(value: &Value) -> bool {
 impl CharcellNodeData<'_> {
 	/// The node's displayed [`Value`]: a text leaf's content, or a form
 	/// control's bound value. An element's own `Value` is otherwise binding
-	/// state (eg a `bx:click` field mirror), never painted as text.
+	/// state, never painted as text.
 	///
 	/// A **control** with nothing in it — a null, which for a control is nothing
 	/// typed rather than the word "null", or an empty string — displays nothing

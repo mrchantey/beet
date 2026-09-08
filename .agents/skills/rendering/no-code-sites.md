@@ -9,7 +9,7 @@ A `<Router>` whose middleware/server attach as component spreads, then the site 
   <PackageConfig title="Beet" description="..." version="0.0.9-dev.16"/>
   <Theme color={Srgba(Srgba{red:0.0,green:1.0,blue:0.75,alpha:1.0})}/>
   <Styles/>            <!-- templates/Styles.bsx: the site's <Rule>s -->
-  <DefaultAppRoutes/>  <!-- /app-info, /assets/*, the reactivity runtime, ... -->
+  <DefaultAppRoutes/>  <!-- /app-info, /health, /assets/*, ... -->
   <RoutesDir src="routes"/>   <!-- file-based routing, scans frontmatter -->
   <AssetsDir src="assets"/>   <!-- static file mount (favicon, images) -->
 </Router>

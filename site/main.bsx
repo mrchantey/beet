@@ -58,8 +58,8 @@ parks and starts the three long-running servers (`HttpServer`, the local live
 logging, analytics, `--help`, terminal link navigation, the layout, and the cache
 policy (`CacheHeadersMiddleware` + `CacheHeaders` mark html pages edge-cacheable,
 which the Cloudflare proxy honors and the deploy/sync purge refreshes).
-`<DefaultAppRoutes/>` adds the default app routes (`/app-info`, the reactivity
-runtime, …), `<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
+`<DefaultAppRoutes/>` adds the default app routes (`/app-info`, `/health`, …),
+`<RoutesDir/>` discovers the `routes/` pages, and `<AssetsDir
 src="assets" cache="1h"/>` mounts the assets the site and blog reference,
 browser-cacheable for an hour.
 

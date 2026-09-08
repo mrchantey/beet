@@ -2,8 +2,8 @@
 mod charcell;
 #[cfg(feature = "style")]
 pub use charcell::*;
-// the html-rendering target, its utilities, reactive-render injection and the
-// `reactivity.js` runtime; the shared `node_walker`/`node_renderer` substrate
+// the html-rendering target and its utilities; the shared
+// `node_walker`/`node_renderer` substrate
 // (also used by markdown/ansi/charcell) stays here in `render/`.
 mod html;
 pub use html::*;

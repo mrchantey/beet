@@ -93,9 +93,11 @@ template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
 # and a route only errors if it is dispatched in a build with no backend.
 # A script marshals its values as json in both directions, so the scripted
 # route surfaces ride that gate rather than half-existing without it.
-scripting = ["std", "beet_action/scripting", "serde", "json"]
+# `beet_ui?/scripting` is the `bx:<event>` installer: where beet_ui is present a
+# scripting build is one whose event directives actually run.
+scripting = ["std", "beet_action/scripting", "beet_ui?/scripting", "serde", "json"]
 # The embedded QuickJS backend for the scripting registrations above.
-quickjs = ["scripting", "beet_action/quickjs"]
+quickjs = ["scripting", "beet_action/quickjs", "beet_ui?/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.
 # The collection scan reads a content file's frontmatter (which rides `std`, not
 # the markdown *content* parser) so blob routes are emitted with the root

@@ -18,7 +18,7 @@
 //! `parse` (the cursor, the markup parser, the value grammar, the
 //! source-format registry), literal to reflected value in `reflect` (with the
 //! root declaration block and prop-schema verification), and syntax tree to
-//! world in `resolve` (the build walk, the event/verb seam, and the resolver
+//! world in `resolve` (the build walk, the event seam, and the resolver
 //! hooks a host installs into it). Alongside them sit the BSX-template registry
 //! ([`BsxTemplateRegistry`]) and the entry-document front-end.
 //!
@@ -74,19 +74,19 @@
 //! Bindings work in attribute position (`value=@res:Theme.contrast`), text
 //! position (`{@doc:name}`), and as spread-tuple items
 //! (`{(Slider{value:3}, @comp:Slider.value)}`), pairing a component insert with
-//! a binding on the same entity. Event directives are a verb call:
-//! `bx:click=increment{ field: @doc:count, amount: 3 }` runs the registered
-//! `increment` verb with its named arguments against the host entity, the verb
-//! writing the bound source directly (see [`VerbRegistry`]). No mirror is lowered onto the
-//! host: the verb mutates the real document/resource and document-sync fans the
-//! change out to display bindings.
+//! a binding on the same entity. An event directive is a script:
+//! `bx:click="await target.set_field('count', 1)"` runs its source through the
+//! registered installer (see [`EventRegistry`]), with the event target entity
+//! bound to `target`. No mirror is lowered onto the host: the script writes the
+//! real document through the same ancestor-document walk a display binding
+//! reads through, and document-sync fans the change out.
 //!
 //! ```
 //! use beet_core::prelude::*;
 //!
 //! let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 //! let nodes = BsxNode::parse_document(
-//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click=increment{ field: @doc:clicks }>+</button></section>"#,
+//!     r#"<section bx:scope="user"><p>{@doc:name="Ada"}</p><button bx:click="await target.set_field('clicks', 1)">+</button></section>"#,
 //!     &BsxParseConfig::bsx(),
 //! )
 //! .unwrap();
@@ -104,7 +104,7 @@
 //! let text = world.entity(paragraph).get::<Children>().unwrap()[0];
 //! assert!(world.entity(text).contains::<FieldRef>());
 //! assert_eq!(world.entity(text).get::<Value>().unwrap(), &Value::Str("Ada".into()));
-//! // the event host carries no mirror: the verb writes the document directly
+//! // the event host carries no mirror: the script writes the document directly
 //! let button = world.entity(section).get::<Children>().unwrap()[1];
 //! assert!(!world.entity(button).contains::<FieldRef>());
 //! ```

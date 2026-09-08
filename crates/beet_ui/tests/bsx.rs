@@ -756,25 +756,37 @@ fn fragment_forwards_children_into_slot() {
 
 // ---- events -----------------------------------------------------------------
 
+/// Fire a pointer-down on `entity` and drive the world until the event script's
+/// evaluation has settled: the script is a task, and each `world` call it makes
+/// is one more round trip through the async sync point.
+#[cfg(feature = "scripting")]
+async fn click(world: &mut World, entity: Entity) {
+	let pointer = world.spawn_empty().id();
+	world
+		.entity_mut(entity)
+		.trigger(move |target| PointerDown { target, pointer });
+	AsyncRunner::settle_async_tasks(world).await;
+}
+
+/// A `bx:click` runs its authored script against the live world, and the script
+/// is the whole vocabulary: nothing in rust knows what "increment" means.
+#[cfg(feature = "scripting")]
 #[beet_core::test]
-fn click_increments_field() {
+async fn click_runs_its_script() {
 	let mut world = world();
 	let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
 	let button = spawn_bsx_under(
 		&mut world,
 		Some(doc),
-		"<button bx:click=increment{ field: @doc:count }>+</button>",
+		r#"<button bx:click="
+			await target.set_field('count', (await target.get_field('count')) + 1);
+		">+</button>"#,
 	);
 	world.update_local();
-	// the host carries no mirror: the verb writes the document, not a local Value.
+	// the host carries no mirror: the script writes the document, not a local Value.
 	world.entity(button).contains::<FieldRef>().xpect_false();
 	world.entity(button).contains::<Value>().xpect_false();
-	// fire a pointer-down on the button: the verb writes the ancestor document.
-	let pointer = world.spawn_empty().id();
-	world
-		.entity_mut(button)
-		.trigger(move |target| PointerDown { target, pointer });
-	world.flush();
+	click(&mut world, button).await;
 	world
 		.entity(doc)
 		.get::<Document>()
@@ -784,42 +796,19 @@ fn click_increments_field() {
 		.xpect_eq(1);
 }
 
-#[beet_core::test]
-fn click_increments_by_amount() {
-	let mut world = world();
-	let doc = world.spawn(Document::new(value!({ "count": 0 }))).id();
-	let button = spawn_bsx_under(
-		&mut world,
-		Some(doc),
-		"<button bx:click=increment{ field: @doc:count, amount: 5 }>+</button>",
-	);
-	world.update_local();
-	let pointer = world.spawn_empty().id();
-	world
-		.entity_mut(button)
-		.trigger(move |target| PointerDown { target, pointer });
-	world.flush();
-	world
-		.entity(doc)
-		.get::<Document>()
-		.unwrap()
-		.get_field::<i64>(&[FieldSegment::key("count")])
-		.unwrap()
-		.xpect_eq(5);
-}
-
 /// The counter page shape: a `bx:scope`, an initializing text binding, and an
-/// event verb mutating the same scoped field, with no pre-existing document.
+/// event script mutating the same scoped field, with no pre-existing document.
 /// Regressions covered: the scoped init path corrupting the document
 /// (`{counter: 0}` instead of `{counter: {count: 0}}`), and the event host
 /// carrying no mirror that could leak into the button's rendered label. The
-/// click drives the end-to-end verb -> scoped-document -> display-binding path.
+/// click drives the end-to-end script -> scoped-document -> display-binding path.
+#[cfg(feature = "scripting")]
 #[beet_core::test]
-fn scoped_counter_page() {
+async fn scoped_counter_page() {
 	let mut world = world();
 	let root = spawn_bsx(
 		&mut world,
-		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click=increment{ field: @doc:count }>More</button></article>"#,
+		r#"<article bx:scope="counter"><p>clicked {@doc:count=0} times</p><button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button></article>"#,
 	);
 	// settle the init -> document chain
 	world.update_local();
@@ -839,7 +828,7 @@ fn scoped_counter_page() {
 		.xpect_contains("clicked 0 times")
 		.xpect_contains("<button>More</button>");
 
-	// click the button: the verb resolves the scoped field and writes the document
+	// click the button: the script resolves the scoped field and writes the document
 	let button = world
 		.entity(root)
 		.get::<Children>()
@@ -852,11 +841,7 @@ fn scoped_counter_page() {
 				.is_some_and(|el| el.tag() == "button")
 		})
 		.unwrap();
-	let pointer = world.spawn_empty().id();
-	world
-		.entity_mut(button)
-		.trigger(move |target| PointerDown { target, pointer });
-	world.flush();
+	click(&mut world, button).await;
 	world.update_local();
 
 	// the scoped field incremented, and the display binding refreshes to match
@@ -878,27 +863,26 @@ fn scoped_counter_page() {
 	render_html(&mut world, root).xpect_contains("clicked 1 times");
 }
 
-// ---- live TUI counter (the `bsx_site` reactivity example) ---------------------
+// ---- live TUI counter (the `bsx_site` no-code example) -----------------------
 
-/// The `examples/bsx_site/routes/counter.bsx` markup, the no-code reactivity
-/// example: a scoped document, a display binding, and the `increment`/`decrement`
-/// verbs (one with an explicit `amount` arg) mutating it.
-#[cfg(feature = "tui")]
+/// The `examples/bsx_site/routes/counter.bsx` markup, the no-code example: a
+/// scoped document, a display binding, and two event scripts mutating it.
+#[cfg(all(feature = "tui", feature = "scripting"))]
 const COUNTER_BSX: &str = r#"<article bx:scope="counter">
 	<widgets::Card title="Counter">
 		<p>You have clicked {@doc:count=0} times.</p>
-		<button bx:click=increment{ field: @doc:count, amount: 1 }>More</button>
-		<button bx:click=decrement{ field: @doc:count }>Less</button>
+		<button bx:click="await target.set_field('count', (await target.get_field('count')) + 1)">More</button>
+		<button bx:click="await target.set_field('count', (await target.get_field('count')) - 1)">Less</button>
 	</widgets::Card>
 </article>"#;
 
 /// Drive `counter.bsx` through the real live-charcell stack (the terminal target):
-/// a click runs the verb, document-sync fans the change to the display binding,
+/// a click runs the script, document-sync fans the change to the display binding,
 /// and the charcell renderer repaints. Asserts the *rendered frame text* changes,
 /// not just the document, exercising the click -> repaint path end to end.
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", feature = "scripting"))]
 #[beet_core::test]
-fn counter_bsx_repaints_in_live_tui() {
+async fn counter_bsx_repaints_in_live_tui() {
 	use bevy::math::UVec2;
 
 	let mut app = App::new();
@@ -929,25 +913,25 @@ fn counter_bsx_repaints_in_live_tui() {
 		.unwrap();
 
 	// step until the scoped `@doc:count=0` init reaches the rendered frame.
-	let frame = step_until(&mut app, host, "clicked 0 times");
+	let frame = step_until(&mut app, host, "clicked 0 times").await;
 	frame.xpect_contains("Counter");
 
 	// click "More": fire a `PointerDown` on the increment button, like the hit-test
 	// does for a real cursor press.
 	let more = find_button(&mut app, host, "More");
-	click(&mut app, more);
-	// the verb wrote the document; the next frames sync the binding and repaint.
-	step_until(&mut app, host, "clicked 1 times");
+	tui_click(&mut app, more);
+	// the script wrote the document; the next frames sync the binding and repaint.
+	step_until(&mut app, host, "clicked 1 times").await;
 
-	// click "Less": the decrement verb walks back to the same scoped field.
+	// click "Less": the decrement script walks back to the same scoped field.
 	let less = find_button(&mut app, host, "Less");
-	click(&mut app, less);
-	step_until(&mut app, host, "clicked 0 times");
+	tui_click(&mut app, less);
+	step_until(&mut app, host, "clicked 0 times").await;
 }
 
-/// Trigger a `PointerDown` on `entity`, then flush so the queued verb command runs.
-#[cfg(feature = "tui")]
-fn click(app: &mut App, entity: Entity) {
+/// Trigger a `PointerDown` on `entity`, then flush so the queued command runs.
+#[cfg(all(feature = "tui", feature = "scripting"))]
+fn tui_click(app: &mut App, entity: Entity) {
 	let pointer = app.world_mut().spawn_empty().id();
 	app.world_mut()
 		.entity_mut(entity)
@@ -956,7 +940,7 @@ fn click(app: &mut App, entity: Entity) {
 }
 
 /// The `<button>` entity beneath `host` whose rendered text is `label`.
-#[cfg(feature = "tui")]
+#[cfg(all(feature = "tui", feature = "scripting"))]
 fn find_button(app: &mut App, host: Entity, label: &str) -> Entity {
 	let label = label.to_string();
 	app.world_mut()
@@ -976,27 +960,26 @@ fn find_button(app: &mut App, host: Entity, label: &str) -> Entity {
 }
 
 /// Advance frames until the host's painted frame contains `needle`, returning it.
-#[cfg(feature = "tui")]
-fn step_until(app: &mut App, host: Entity, needle: &str) -> String {
-	for _ in 0..50 {
-		app.update();
-		let frame = app
-			.world()
+///
+/// Async because a click's script is a task: each frame both runs the world and
+/// lets the evaluation progress, so the paint that follows it is reached.
+#[cfg(all(feature = "tui", feature = "scripting"))]
+async fn step_until(app: &mut App, host: Entity, needle: &str) -> String {
+	let frame = |app: &App| {
+		app.world()
 			.get::<DoubleBuffer>(host)
 			.unwrap()
 			.front_buffer()
-			.render_plain();
-		if frame.contains(needle) {
-			return frame;
+			.render_plain()
+	};
+	for _ in 0..200 {
+		AsyncRunner::step(app).await;
+		let painted = frame(app);
+		if painted.contains(needle) {
+			return painted;
 		}
 	}
-	let frame = app
-		.world()
-		.get::<DoubleBuffer>(host)
-		.unwrap()
-		.front_buffer()
-		.render_plain();
-	panic!("frame never contained {needle:?}:\n{frame}");
+	panic!("frame never contained {needle:?}:\n{}", frame(app));
 }
 
 // ---- @ bindings ---------------------------------------------------------------
