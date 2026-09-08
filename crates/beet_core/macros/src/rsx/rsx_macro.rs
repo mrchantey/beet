@@ -24,9 +24,8 @@ pub(crate) fn impl_rsx(
 		.collect();
 	let bundle = lower_nodes(&nodes);
 	quote! {{
-		use #beet_core::prelude::*;
 		#(#error_tokens)*
-		Snippet::from_bundle(#bundle)
+		#beet_core::prelude::Snippet::from_bundle(#bundle)
 	}}
 	.into()
 }

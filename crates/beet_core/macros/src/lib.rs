@@ -199,6 +199,12 @@ pub fn mdx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// The lowered [`Snippet`] is both a [`Template`] and a [`Bundle`], so a helper
 /// can return the simpler `impl Bundle`.
 ///
+/// Tags and the lowered types resolve in the calling file's scope, so it needs
+/// `use beet_core::prelude::*` in scope like any other code. The expansion
+/// deliberately imports nothing: an injected glob would shadow the call site,
+/// silently binding a tag to a same-named type the caller never meant (bevy_ui's
+/// `Button` over the authored widget, say).
+///
 /// ## Example
 ///
 /// ```rust ignore

@@ -612,6 +612,7 @@ mod test {
 #[cfg(test)]
 mod conformance {
 	use crate::prelude::*;
+	use crate::prelude::Button;
 	use beet_core::prelude::*;
 
 	/// Build `template` under a root carrying `document`, settled.

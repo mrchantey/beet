@@ -395,12 +395,11 @@ fn emit(
 	// enclosing results carry).
 	let bundle = match is_fallible(item) {
 		true => quote! {
-			let bundle: #bevy::ecs::error::Result<_> =
-				{ use #beet_core::prelude::*; #body };
+			let bundle: #bevy::ecs::error::Result<_> = #body;
 			let bundle = bundle?;
 		},
 		false => quote! {
-			let bundle = { use #beet_core::prelude::*; #body };
+			let bundle = #body;
 		},
 	};
 	// the inner build: bind props, run the body verbatim (it ends in an

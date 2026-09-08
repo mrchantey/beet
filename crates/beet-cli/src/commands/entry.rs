@@ -6,7 +6,6 @@
 //! `<TemplateDir>`s registered. The entry declares its own servers and app routes;
 //! these helpers only resolve and load it.
 
-use crate::prelude::*;
 use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its

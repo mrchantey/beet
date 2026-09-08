@@ -17,6 +17,7 @@
 //! default" conversation happens, with the drafted schema still in place to be
 //! fixed — or discarded with Revert.
 use crate::prelude::*;
+use crate::prelude::Button;
 use beet_core::prelude::*;
 
 /// An editor for a *schema* document: a generated form over the meta-schema,

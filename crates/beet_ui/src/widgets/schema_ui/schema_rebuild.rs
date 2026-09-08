@@ -180,6 +180,7 @@ pub(in crate::widgets) fn rebuild_schema_widgets(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::prelude::Button;
 	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;
 
