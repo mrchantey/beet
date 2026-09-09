@@ -49,7 +49,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 ## Conventions
 
 - A rust module reads like a good book: public high level structs at the top, implementation details below. Mod files are just reexports; prefer splitting into specific sub files, but dont 'create a fresh file' because the one you're working on is messy.
-- When responding to the user, use a single numbered sequence, continuing across headings (1, 2 under the first heading, 3, 4 under the next).
+- Respond to the user with a single numbered sequence with strictly one point per number. intersperse with subheadings as required but subheadings do not get numbers. Maintain numbers in responses to numbered responses, and new points get new numbers. Open questions should have available options listed as (a), (b), (c), with (a) being selected by default if no answer
 - Functions longer than ~20 lines may have brief comments describing each step.
 - Never insert arbitrary ie 80 col manual reflow newlines in markdown documents.
 - all shared dependencies are declared in the workspace Cargo.toml; if one needs no-default-features, disable that at the workspace level and reenable as required
