@@ -588,7 +588,10 @@ mod test {
 			.insert(BypassRunningErrors(RunningError::FACET_FAILED));
 		let result = call(&mut app, entity);
 		until_logged(&mut app, log, 1).await;
-		AsyncRunner::settle_async_tasks(app.world_mut()).await;
+		// the run never goes idle, so drive a bounded stretch of frames rather
+		// than settling: long enough for the dropped facet's error to surface if
+		// it were going to
+		app_ext::update_frames(&mut app, 16).await;
 		// the survivor was never signalled, so it is still holding the run open
 		log.get().xpect_eq(vec!["held-start"]);
 		result.get().xpect_none();

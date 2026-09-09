@@ -244,7 +244,7 @@ pub static BEET_TESTS: [BeetTestCase];
 /// Collects all [`BeetTestCase`]s registered via the [`BEET_TESTS`] `linkme`
 /// slice. The embedded mirror of [`inventory_tests`].
 #[cfg(all(feature = "testing_embedded", not(target_arch = "wasm32")))]
-pub(crate) fn embedded_tests() -> Vec<TestDescAndFn> {
+pub fn embedded_tests() -> Vec<TestDescAndFn> {
 	BEET_TESTS
 		.iter()
 		.map(BeetTestCase::to_desc_and_fn)

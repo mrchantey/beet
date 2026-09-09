@@ -51,6 +51,7 @@ impl GeoIpDb {
 	///
 	/// Async so the ancestry has settled by the time the store is resolved: a
 	/// markup scene establishes `ChildOf` after the components land.
+	#[cfg(feature = "json")]
 	pub(super) fn load_on_add(ev: On<Add, GeoIpDb>, commands: AsyncCommands) {
 		let entity = ev.entity;
 		commands.run(async move |world| {

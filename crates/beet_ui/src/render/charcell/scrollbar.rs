@@ -74,6 +74,7 @@ pub(crate) fn clamp_scroll_positions<B: Component + AsBuffer>(
 /// The shared "can this container scroll, and how far" question: the wheel and
 /// keyboard routing ask it while walking for a target, and scroll-into-view asks
 /// it to clamp a focused element's rect into the scrollport.
+#[cfg(any(feature = "tui", feature = "keyboard"))]
 pub(super) fn scrollable_extent(
 	entity: Entity,
 	query: &CharcellQuery,

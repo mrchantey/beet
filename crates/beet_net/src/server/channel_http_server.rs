@@ -156,7 +156,6 @@ async fn serve_channel_http(
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_action::prelude::*;
 
 	/// Serve a real request/response over the channel transport: spawn a
 	/// `ChannelHttpServer` owning the root with its dispatch host (a mirror handler)

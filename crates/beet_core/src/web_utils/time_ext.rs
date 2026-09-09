@@ -17,22 +17,6 @@ pub fn performance_now() -> f64 {
 	window().unwrap().performance().unwrap().now()
 }
 
-/// Handle to a scheduled timeout that cancels on drop.
-///
-/// When dropped, the associated timeout is cleared via `clearTimeout`.
-pub(crate) struct TimeoutHandle {
-	_closure: Closure<dyn Fn()>,
-	handle: i32,
-}
-
-impl Drop for TimeoutHandle {
-	fn drop(&mut self) {
-		if let Some(window) = window() {
-			window.clear_timeout_with_handle(self.handle);
-		}
-	}
-}
-
 /// Schedules a callback to run after `ms` milliseconds.
 ///
 /// The closure is leaked (forgotten) so the callback remains valid.

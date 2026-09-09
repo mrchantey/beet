@@ -2,7 +2,6 @@
 
 use beet_core::prelude::*;
 
-use crate::prelude::*;
 
 /// Extends [`MediaBytes`] with `data:` URI construction and parsing.
 #[extend::ext(name = MediaBytesUrlExt)]

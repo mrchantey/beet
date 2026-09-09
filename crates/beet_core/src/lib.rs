@@ -8,7 +8,6 @@
 #![cfg_attr(
 	feature = "nightly",
 	feature(
-		fn_traits,
 		unboxed_closures,
 		never_type,
 		async_fn_track_caller,

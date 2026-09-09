@@ -3,7 +3,7 @@
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 
-/// A sentence-matching agent: a prompt [`Sentence`] plus a [`NearestSentence`] over a
+/// A sentence-matching agent: a prompt [`Sentence`] plus a [`BertHandle`] over a
 /// [`Bert`] model, eg `<NearestSentenceAgent prompt="please kill the baddies"
 /// src="ml/default-bert.ron"><SentenceOption text="heal"/><SentenceOption text="attack"/>
 /// </NearestSentenceAgent>`. The candidate sentences are children (via `<Slot/>`);
@@ -19,7 +19,7 @@ pub fn NearestSentenceAgent(
 	rsx! {
 		<span {(
 			Sentence::new(prompt),
-			NearestSentence::new(assets.load::<Bert>(src)),
+			BertHandle(assets.load::<Bert>(src)),
 			CallOnReady,
 			Action::<(), Outcome>::new_system(choose_nearest),
 		)}><Slot/></span>
@@ -58,10 +58,10 @@ pub fn ChatSentenceAgent(
 	}
 }
 
-/// The [`Bert`] handle for a [`ChatSentenceAgent`], wrapped so the asset survives
-/// on the agent (the [`Action`] reads it on each user sentence). [`NearestSentence`]
-/// cannot be reused here: it requires an `Action<(), Entity>`, but
-/// [`TriggerWithUserSentence`] calls an `Action<(), Outcome>`.
+/// The [`Bert`] handle for the agents in this module, wrapped so the asset survives
+/// on the agent (the [`Action`] reads it on each run). [`NearestSentence`] cannot
+/// carry it: it requires an `Action<(), Entity>`, and one entity holds at most one
+/// action, so it would displace the `Action<(), Outcome>` these agents run.
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
 pub struct BertHandle(pub Handle<Bert>);
@@ -108,13 +108,13 @@ fn choose_nearest(
 	mut exit: MessageWriter<AppExit>,
 	children: Query<&Children>,
 	sentences: Query<&Sentence>,
-	query: Query<(&Sentence, &NearestSentence)>,
+	query: Query<(&Sentence, &BertHandle)>,
 ) -> Result<Outcome> {
 	let agent = cx.caller.id();
-	let (prompt, near) = query.get(agent)?;
+	let (prompt, bert_handle) = query.get(agent)?;
 	// the deferred load guarantees the asset is ready by the time `CallOnReady` fires.
 	let mut bert = berts
-		.get_mut(&near.bert)
+		.get_mut(&bert_handle.0)
 		.ok_or_else(|| bevyhow!("Bert asset not loaded on CallOnReady"))?;
 	let text = closest_descendant_sentence(
 		agent, &prompt.0, &mut bert, &children, &sentences,

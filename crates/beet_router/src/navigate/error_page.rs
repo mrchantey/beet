@@ -72,6 +72,7 @@ pub fn LoadingPage() -> impl Bundle {
 /// the live host paints it until the first navigation replaces it. Mirrors
 /// [`set_error_page`]: built through `spawn_template` and marked
 /// [`DespawnAfterRender`] so the next page cleans it up.
+#[cfg(feature = "tui")]
 pub(crate) fn set_loading_page(world: &mut World, host: Entity) {
 	let page = world
 		.spawn_template(rsx! { <LoadingPage/> })

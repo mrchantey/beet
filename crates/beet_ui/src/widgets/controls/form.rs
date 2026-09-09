@@ -611,7 +611,6 @@ mod test {
 /// document and no edit is ever reconstructed by diffing.
 #[cfg(test)]
 mod conformance {
-	use crate::prelude::Button;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 

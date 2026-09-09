@@ -51,3 +51,17 @@ pub async fn update_until_timeout(
 	}
 	cond(app.world_mut())
 }
+
+/// Drives `app` for exactly `frames` frames, ticking the async runtime between
+/// each.
+///
+/// The counterpart to [`update_until`] for proving a negative: that a parked run
+/// really stays parked. Settling to idle cannot express this, because a facet
+/// holding the run open never goes idle, so
+/// [`AsyncRunner::settle_async_tasks`] would burn its whole safety cap.
+pub async fn update_frames(app: &mut App, frames: usize) {
+	for _ in 0..frames {
+		app.update();
+		AsyncRunner::tick().await;
+	}
+}

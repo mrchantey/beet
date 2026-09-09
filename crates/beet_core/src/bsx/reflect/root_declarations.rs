@@ -230,7 +230,7 @@ mod test {
 	fn scan_world() -> World {
 		let mut world = World::new();
 		world.init_resource::<AppTypeRegistry>();
-		let mut registry = world.resource_mut::<AppTypeRegistry>();
+		let registry = world.resource_mut::<AppTypeRegistry>();
 		registry.write().register::<Meta>();
 		registry.write().register::<Extra>();
 		world

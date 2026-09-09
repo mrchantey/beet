@@ -185,7 +185,6 @@ pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 #[cfg(all(test, feature = "quickjs"))]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 

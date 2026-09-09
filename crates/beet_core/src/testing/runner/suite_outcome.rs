@@ -18,11 +18,6 @@ impl SuiteOutcome {
 	pub fn num_fail(&self) -> usize { self.num_fail }
 	/// number of tests that were run (not skipped)
 	pub fn num_ran(&self) -> usize { self.num_pass + self.num_fail }
-	/// total number of tests, including those skipped
-	pub fn num_total(&self) -> usize {
-		self.num_pass + self.num_skip + self.num_fail
-	}
-
 	/// Creates a new outcome by tallying pass/skip/fail counts from the given tests.
 	pub fn new(tests: &[(&Test, &TestOutcome)]) -> Self {
 		let mut num_pass = 0;

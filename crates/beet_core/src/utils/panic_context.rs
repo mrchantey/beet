@@ -1,10 +1,18 @@
 use crate::prelude::*;
+// the async surface (`catch_async` and its future) is test-runner only
+#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 use core::future::Future;
 #[cfg(feature = "std")]
 use std::cell::Cell;
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(feature = "testing", feature = "testing_embedded")
+))]
 use std::pin::Pin;
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(feature = "testing", feature = "testing_embedded")
+))]
 use std::task;
 #[cfg(feature = "std")]
 use std::task::Poll;
@@ -65,6 +73,7 @@ impl PanicContext {
 
 	/// Awaits `fut`, mapping its result into a [`PanicResult`]. As with
 	/// [`Self::catch`], a panic aborts rather than being caught.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
 	where
 		Fut: Future<Output = Result<(), String>>,
@@ -78,6 +87,7 @@ impl PanicContext {
 	}
 
 	/// No escape buffer under `panic = abort`: the first panic ends the run.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub fn escaped_since(_start: Instant) -> Vec<String> { Vec::new() }
 }
 
@@ -105,6 +115,7 @@ impl PanicContext {
 	/// This method uses [`panic::set_hook`], calling the prev hook if
 	/// a panic occurs outside of this scope. If another hook has overridden
 	/// ours the report degrades to the unwind payload with no location.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
 	where
 		Fut: Future<Output = Result<(), String>>,
@@ -208,10 +219,14 @@ impl PanicContext {
 			Some(location) => format!("{payload} at {location}"),
 			None => payload,
 		};
+		// stamped before the lock: a panic inside the guard's scope would
+		// re-enter this hook and deadlock (panic, on a single-threaded target)
+		// on the lock it is still holding
+		let entry = (Instant::now(), text);
 		ESCAPED
 			.lock()
 			.unwrap_or_else(std::sync::PoisonError::into_inner)
-			.push((Instant::now(), text));
+			.push(entry);
 	}
 
 	/// Records a panic a task runner caught after it escaped every test catch
@@ -237,6 +252,7 @@ impl PanicContext {
 	/// Escaped panics recorded at or after `start`, ie a timeout report's
 	/// window. Cloned rather than drained: attribution is ambiguous, so
 	/// concurrent suites each report the window they observed.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
 	pub fn escaped_since(start: Instant) -> Vec<String> {
 		ESCAPED
 			.lock()
@@ -250,7 +266,7 @@ impl PanicContext {
 
 /// Result of running code that may panic.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum PanicResult {
+pub enum PanicResult {
 	/// The operation completed successfully.
 	Ok,
 	/// The operation returned an error.
@@ -263,28 +279,28 @@ pub(crate) enum PanicResult {
 		location: Option<FileSpan>,
 	},
 }
-impl PanicResult {
-	/// Returns `true` if the result is [`PanicResult::Ok`].
-	pub fn is_ok(&self) -> bool { matches!(self, PanicResult::Ok) }
-	/// Returns `true` if the result is [`PanicResult::Err`].
-	pub fn is_err(&self) -> bool { matches!(self, PanicResult::Err(_)) }
-	/// Returns `true` if the result is [`PanicResult::Panic`].
-	pub fn is_panic(&self) -> bool { matches!(self, PanicResult::Panic { .. }) }
-}
-
 /// A future that wraps each poll in [`PanicContext::catch_poll`], to ensure
 /// panics are properly handled in a cross-plaform way.
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(feature = "testing", feature = "testing_embedded")
+))]
 struct PanicContextFuture<F> {
 	inner: F,
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(feature = "testing", feature = "testing_embedded")
+))]
 impl<F> PanicContextFuture<F> {
 	pub fn new(inner: F) -> Self { Self { inner } }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(feature = "testing", feature = "testing_embedded")
+))]
 impl<F: Future<Output = Result<(), String>>> Future for PanicContextFuture<F> {
 	type Output = PanicResult;
 	fn poll(

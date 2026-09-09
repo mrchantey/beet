@@ -16,7 +16,7 @@
 //! # invoke the scripted greeter via a typed query struct
 //! cargo run --example cli -- greet --name=world
 //!
-//! # invoke the scripted greeter via the raw request parts
+//! # invoke the scripted greeter via the whole-request script input
 //! cargo run --example cli -- greet-request --name=world
 //! ```
 use beet::prelude::*;
@@ -38,36 +38,54 @@ struct GreetRequest {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn((
-		CliServer::default(),
-		children![(Router::with_defaults(), children![
-			route::exchange(
-				"",
-				Action::<(), &str>::new_pure(|_| { "hello world" })
-			),
-			route::exchange(
-				"foo",
-				Action::<(), &str>::new_pure(|_| { "hello foo" })
-			),
-			// a `Script` is pure data, so pair it with an `ExchangeScript` to
-			// make the entity a dispatchable route.
-			(
-				Script::<QueryParams<GreetRequest>, String>::new(
-					r#""hello " + input.name"#,
-				),
-				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(),
-				PathPartial::new("greet"),
-			),
-			// same idea, but the script receives the full [`RequestParts`]
-			// and digs out the `name` query parameter itself.
-			(
-				Script::<RequestParts, String>::new(
-					r#""hello " + input.url.params.name[0]"#,
-				),
-				ExchangeScript::<RequestParts, String, _, _>::default(),
-				PathPartial::new("greet-request"),
-			),
-		])],
-		CallOnReady::on_spawn(),
-	));
+	commands.spawn(
+		(
+			CliServer::default(),
+			children![
+				(
+					Router::with_defaults(),
+					children![
+						route::exchange(
+							"",
+							Action::<(), &str>::new_pure(|_| { "hello world" })
+						),
+						route::exchange(
+							"foo",
+							Action::<(), &str>::new_pure(|_| { "hello foo" })
+						),
+						// a `Script` is pure data, so pair it with an `ExchangeScript` to
+						// make the entity a dispatchable route.
+						(
+							Script::<QueryParams<GreetRequest>, String>::new(
+								r#"return "hello " + input.name"#,
+							),
+							ExchangeScript::<
+								QueryParams<GreetRequest>,
+								String,
+								_,
+								_,
+							>::default(),
+							PathPartial::new("greet"),
+						),
+						// same idea, but the script receives the whole request through the
+						// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
+						// authors) and digs out the `name` query parameter itself.
+						(
+							Script::<Value, Value>::new(
+								r#"return "hello " + input.params.name[0]"#,
+							),
+							ExchangeScript::<
+								Value,
+								Value,
+								ScriptInputMarker,
+								ScriptAnswerMarker,
+							>::default(),
+							PathPartial::new("greet-request"),
+						),
+					]
+				)
+			],
+			CallOnReady::on_spawn(),
+		),
+	);
 }

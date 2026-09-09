@@ -25,7 +25,13 @@
 mod event_source;
 #[cfg(feature = "fs")]
 mod impl_file;
-#[cfg(all(feature = "reqwest", not(target_arch = "wasm32")))]
+// `send_http` prefers ureq when both are enabled, so gating here keeps the
+// unreachable transport out of the build rather than compiling it dead.
+#[cfg(all(
+	feature = "reqwest",
+	not(feature = "ureq"),
+	not(target_arch = "wasm32")
+))]
 mod impl_reqwest;
 #[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
 mod impl_ureq;

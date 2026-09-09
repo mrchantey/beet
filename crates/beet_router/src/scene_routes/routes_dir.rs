@@ -191,11 +191,16 @@ impl RoutesDir {
 						.await
 						.xmap(|failures| match failures.is_empty() {
 							true => Ok(()),
+							// reported, never fatal: the healthy siblings are
+							// already serving, so the raise must not take the app
+							// down the way an unqualified error's default
+							// `Severity::Panic` would
 							false => Err(bevyhow!(
 								"{} discovered route(s) failed to spawn:\n{}",
 								failures.len(),
 								failures.join("\n")
-							)),
+							)
+							.with_severity(Severity::Error)),
 						})
 				},
 			);

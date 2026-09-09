@@ -226,6 +226,9 @@ pub(crate) struct SourceFieldRef {
 	pub subject: BindingTarget,
 }
 
+// the bsx prop-binding resolver is the only rust-side builder of these; a
+// markup-authored `SourceFieldRef` comes through reflect.
+#[cfg(feature = "bsx")]
 impl SourceFieldRef {
 	/// Mirror the [`DocumentPath::Ancestor`] document's field into this entity's
 	/// [`Value`].

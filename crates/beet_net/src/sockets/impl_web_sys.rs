@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::prelude::Url;
 use crate::prelude::sockets::Message;
 use crate::prelude::sockets::*;
 use beet_core::prelude::*;

@@ -286,7 +286,9 @@ pub(crate) struct CharcellTree<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
 	refs: Query<'w, 's, &'static Portal>,
 	// the upward half of the walk (see [`visual_parent`](CharcellTree::visual_parent)).
+	#[cfg(any(feature = "tui", feature = "keyboard"))]
 	parents: Query<'w, 's, &'static ChildOf>,
+	#[cfg(any(feature = "tui", feature = "keyboard"))]
 	portals: Query<'w, 's, &'static PortalOf>,
 	// transparent grouping wrappers spliced out so every traversal agrees with
 	// [`CharcellNodeData::child_nodes`] (see [`WrapperQuery`]).
@@ -383,6 +385,8 @@ impl CharcellTree<'_, '_> {
 	/// holder is the charcell parent of the entity it points at, so a walk up from
 	/// transcluded content (eg a route's page) crosses into the holder's container
 	/// (eg the page-host scrollport) rather than dead-ending at the content root.
+	// only the two input surfaces walk upward (hit testing and scroll-into-view)
+	#[cfg(any(feature = "tui", feature = "keyboard"))]
 	pub fn visual_parent(&self, entity: Entity) -> Option<Entity> {
 		self.portals
 			.get(entity)
@@ -395,6 +399,8 @@ impl CharcellTree<'_, '_> {
 	/// hop through [`visual_parent`](Self::visual_parent). The upward twin of
 	/// [`pre_order`](Self::pre_order), shared by the scroll routing and
 	/// scroll-into-view so both agree on which container owns an element.
+	// only the two input surfaces walk upward (hit testing and scroll-into-view)
+	#[cfg(any(feature = "tui", feature = "keyboard"))]
 	pub fn visual_ancestors(
 		&self,
 		entity: Entity,

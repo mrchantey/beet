@@ -21,11 +21,6 @@ pub(crate) trait CloseTo: Sized {
 
 	/// Checks if two values are approximately equal within the given epsilon.
 	fn is_close_with_delta(&self, b: &Self, epsilon: &Self) -> bool;
-
-	/// Checks if two values are approximately equal using the default delta.
-	fn is_close(&self, b: &Self) -> bool {
-		Self::is_close_with_delta(self, b, &Self::default_delta())
-	}
 }
 
 impl CloseTo for f32 {

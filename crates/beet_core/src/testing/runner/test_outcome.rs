@@ -120,33 +120,10 @@ impl TestFail {
 		}
 	}
 
-	/// Gets the end location of the failure.
-	///
-	/// Returns the panic location if available, otherwise the test location.
-	pub fn end(&self, test: &Test) -> LineCol {
-		match self {
-			TestFail::Panic {
-				location: Some(location),
-				..
-			} => location.end(),
-			_ => test.end(),
-		}
-	}
-
 	/// Returns `true` if this is a timeout failure.
+	#[cfg(test)]
 	pub fn is_timeout(&self) -> bool {
 		matches!(self, TestFail::Timeout { .. })
-	}
-
-	/// Returns `true` if this is a panic failure.
-	pub fn is_panic(&self) -> bool { matches!(self, TestFail::Panic { .. }) }
-
-	/// Returns `true` if this is an error failure.
-	pub fn is_error(&self) -> bool { matches!(self, TestFail::Err { .. }) }
-
-	/// Returns `true` if this is an expected panic failure.
-	pub fn is_expected_panic(&self) -> bool {
-		matches!(self, TestFail::ExpectedPanic { .. })
 	}
 }
 
@@ -158,9 +135,6 @@ impl Into<TestOutcome> for TestSkip {
 }
 
 impl TestOutcome {
-	/// Returns `true` if this is a pass outcome.
-	pub fn is_pass(&self) -> bool { self == &TestOutcome::Pass }
-
 	/// Returns `true` if this is a fail outcome.
 	pub fn is_fail(&self) -> bool { matches!(self, TestOutcome::Fail(_)) }
 

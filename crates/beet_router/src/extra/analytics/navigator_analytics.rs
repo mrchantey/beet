@@ -3,7 +3,6 @@
 use super::router_analytics_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 
 /// Record page-view analytics for an in-world navigation to `url`: finalize the
 /// previous page's dwell (emitting its page-view event) and start tracking the

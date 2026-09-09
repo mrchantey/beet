@@ -142,7 +142,7 @@ impl Deployment {
 	/// config-only tests never touch the fs, and the two `Project::validate`
 	/// tests that do are native-gated.
 	#[cfg(test)]
-	pub fn default_local() -> (Self, TestWorkDir) {
+	pub(crate) fn default_local() -> (Self, TestWorkDir) {
 		#[cfg(not(target_arch = "wasm32"))]
 		let (dir, path) = {
 			let dir = TempDir::new_ws().unwrap();

@@ -111,15 +111,6 @@ pub(in crate::bsx) fn registration_by_name<'a>(
 	reflect_ext::registration_by_name(registry, name)
 }
 
-/// The [`registration_by_name`] match's [`TypeInfo`], for callers that only need
-/// the type info (eg attribute field coercion).
-pub(in crate::bsx) fn type_info_by_name(
-	registry: &TypeRegistry,
-	name: &str,
-) -> Option<&'static TypeInfo> {
-	registration_by_name(registry, name).map(|reg| reg.type_info())
-}
-
 /// Resolve a `Type::Variant` spread name (eg `SteerTarget::Entity`) to the
 /// *enum's* registration, so a `{SteerTarget::Entity($cheese)}` spread builds
 /// the variant through [`enum_to_reflect`] (which reduces the qualified name to
@@ -545,16 +536,17 @@ mod test {
 	fn generic_resolves_by_base_name() {
 		let mut registry = TypeRegistry::default();
 		registry.register::<GenericMarker<u32>>();
-		type_info_by_name(&registry, "GenericMarker")
+		registration_by_name(&registry, "GenericMarker")
 			.unwrap()
+			.type_info()
 			.type_path()
 			.xpect_eq(GenericMarker::<u32>::type_info().type_path());
 		// the exact short path still resolves; an unknown name does not
-		type_info_by_name(&registry, "GenericMarker<u32>").xpect_some();
-		type_info_by_name(&registry, "Nope").xpect_none();
+		registration_by_name(&registry, "GenericMarker<u32>").xpect_some();
+		registration_by_name(&registry, "Nope").xpect_none();
 		// a second instantiation makes the bare name ambiguous
 		registry.register::<GenericMarker<bool>>();
-		type_info_by_name(&registry, "GenericMarker").xpect_none();
+		registration_by_name(&registry, "GenericMarker").xpect_none();
 	}
 
 	/// A fully-qualified type path resolves a type whose short path is ambiguous
@@ -572,14 +564,16 @@ mod test {
 		registry.register::<Dup>();
 		registry.register::<outer::Dup>();
 		// the bare short name is ambiguous, so it resolves to nothing
-		type_info_by_name(&registry, "Dup").xpect_none();
+		registration_by_name(&registry, "Dup").xpect_none();
 		// each fully-qualified path resolves unambiguously
-		type_info_by_name(&registry, Dup::type_info().type_path())
+		registration_by_name(&registry, Dup::type_info().type_path())
 			.unwrap()
+			.type_info()
 			.type_path()
 			.xpect_eq(Dup::type_info().type_path());
-		type_info_by_name(&registry, outer::Dup::type_info().type_path())
+		registration_by_name(&registry, outer::Dup::type_info().type_path())
 			.unwrap()
+			.type_info()
 			.type_path()
 			.xpect_eq(outer::Dup::type_info().type_path());
 	}

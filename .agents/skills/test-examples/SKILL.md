@@ -111,14 +111,18 @@ The `examples,ml` feature only gates windowed scene code (now scene modules in `
 
 ### 8. BSX scenes (`beet --main=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead). Every entry documents its own `beet --features=..` command in its header, and entries declare hard requirements with `<RequireCfg>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --main=..` command in its header, and declares its hard requirements with `<RequireCfg>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
+
+A documented command never carries `--features`: the entry's own `<RequireCfg>` is the check, so a binary missing the capability fails naming it. The binary still has to *link* it though, so an ml scene needs a `beet` built with the ml capability (`cargo run -p beet-cli --features=ml -- <args>` from the workspace).
 
 ```sh
 beet --main=examples/hello                                       # prints "hello world"
 beet --main=examples/action/behavior_tree.bsx                    # sequence + log
-beet --features=ml --main=examples/ml/hello_ml.bsx               # logs "NearestSentence chose: ..."
+beet --main=examples/ml/hello_ml.bsx                             # logs "NearestSentence chose: ..."
 beet --main=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # result: 7
 ```
+
+The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_running`, `repeat_while`, `state_machine`, `utility_ai`, `scripting`, `world_script`) are also self-terminating and worth a sweep.
 
 Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
 

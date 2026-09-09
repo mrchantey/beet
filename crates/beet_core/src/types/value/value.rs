@@ -39,7 +39,7 @@ impl Eq for Value {}
 
 /// The kind/type of a [`Value`], used in error reporting.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum ValueKind {
+pub enum ValueKind {
 	/// No value.
 	Null,
 	/// Boolean.

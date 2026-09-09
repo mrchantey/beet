@@ -23,7 +23,6 @@ use notify::event::CreateKind;
 use notify::event::RemoveKind;
 use notify_debouncer_full::DebouncedEvent;
 use notify_debouncer_full::new_debouncer;
-use std::num::ParseIntError;
 use std::time::Duration;
 
 /// A file watcher with glob patterns.
@@ -59,11 +58,6 @@ impl Default for FsWatcher {
 			mutated_only: true,
 		}
 	}
-}
-
-/// Parses a duration from a string of milliseconds.
-pub(crate) fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
-	s.parse().map(Duration::from_millis)
 }
 
 impl FsWatcher {
@@ -227,9 +221,6 @@ impl std::fmt::Display for PathEvent {
 		write!(f, "{:?}: {}", self.kind, self.path.display())
 	}
 }
-
-/// Result type for watch events.
-pub(crate) type WatchEventResult = Result<DirEvent, Vec<notify::Error>>;
 
 /// Collection of [`PathEvent`]s present in a debounced event result.
 #[derive(Debug, Default, Deref, EntityTargetEvent)]

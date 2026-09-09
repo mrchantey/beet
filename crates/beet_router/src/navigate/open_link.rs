@@ -18,6 +18,8 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+// only the native loopback rewrite below reads beet_net (`CanonicalPort`)
+#[cfg(not(target_arch = "wasm32"))]
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 

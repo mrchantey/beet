@@ -320,8 +320,10 @@ pub(crate) trait StringComp<M> {
 	fn to_comp_string(&self) -> String;
 }
 
-/// Marker type for [`ToTokens`] implementations of [`StringComp`].
-pub(crate) struct ToTokensStringCompMarker;
+/// Marker type for [`ToTokens`] implementations of [`StringComp`]. Never a
+/// value, so it is uninhabited.
+#[cfg(feature = "tokens")]
+pub(crate) enum ToTokensStringCompMarker {}
 
 // we dont blanket ToTokens because collision with String
 #[cfg(feature = "tokens")]

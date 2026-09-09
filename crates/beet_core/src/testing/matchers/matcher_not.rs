@@ -144,7 +144,7 @@ impl<T> MaybeNot<T> {
 /// - `MaybeNot<T>` where `T: Display` (passed through)
 ///
 /// This allows assertions to accept both raw values and negated values.
-pub(crate) trait IntoMaybeNotDisplay<T>: Sized {
+pub trait IntoMaybeNotDisplay<T>: Sized {
 	/// Converts this value into a [`MaybeNot`] wrapper.
 	fn into_maybe_not(self) -> MaybeNot<T>;
 }

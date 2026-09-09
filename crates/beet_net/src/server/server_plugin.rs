@@ -86,7 +86,6 @@ mod boot_check_test {
 	use crate::prelude::*;
 	use crate::server::http_server::tests::call_and_park;
 	use crate::server::http_server::tests::stub_server;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 
 	/// A `--server` naming nothing this entry declares must exit, not park the

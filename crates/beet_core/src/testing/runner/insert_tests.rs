@@ -157,15 +157,6 @@ impl Test {
 		}
 	}
 
-	/// Returns the test description.
-	pub fn desc(&self) -> &TestDesc { &self.desc }
-
-	/// Returns true if the test should not be run,
-	/// ie if `ignore` or `no_run` flag is set.
-	pub fn do_not_run(&self) -> bool {
-		self.desc.ignore || self.desc.no_run || self.desc.compile_fail
-	}
-
 	/// Advances the test timer by the given delta.
 	pub fn tick(&mut self, delta: Duration) { self.timer.tick(delta); }
 

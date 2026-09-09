@@ -25,7 +25,7 @@
 //! # invoke the scripted greeter via a typed query struct
 //! cargo run --example router_serde -- greet --name=world
 //!
-//! # invoke the scripted greeter via the raw request parts
+//! # invoke the scripted greeter via the whole-request script input
 //! cargo run --example router_serde -- greet-request --name=world
 //!
 //! # delete and regenerate the serde file
@@ -40,9 +40,12 @@ const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
 fn main() -> AppExit {
 	App::new()
 		.add_plugins(BeetPlugins)
-		// only the example-specific [`GreetRequest`] instantiations need
-		// registering, BeetPlugins' RouterPlugin / ActionPlugin
-		// cover the hierarchy and unit-input Script types.
+		// every `Script`/`ExchangeScript` instantiation this example names: the
+		// plugins register only the `Value`/`Value` pair `<ScriptRoute>` authors,
+		// and an unregistered component is dropped from the scene on save, which
+		// would leave the route with a path and no way to answer.
+		.register_type::<Script<(), String>>()
+		.register_type::<ExchangeScript<(), String>>()
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
 		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
 		)
@@ -113,13 +116,14 @@ fn route_bundle() -> impl Bundle {
 				),
 				PathPartial::new("greet"),
 			),
-			// same idea, but the script receives the full [`RequestParts`]
-			// and digs out the `name` query parameter itself.
+			// same idea, but the script receives the whole request through the
+			// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
+			// authors) and digs out the `name` query parameter itself.
 			(
 				Script::<RequestParts, String>::new(
 					r#""hello " + input.url.params.name[0]"#,
 				),
-				ExchangeScript::<RequestParts, String, _, _>::default(),
+				ExchangeScript::<Value, Value, ScriptInputMarker, ScriptAnswerMarker>::default(),
 				PathPartial::new("greet-request"),
 			),
 		],

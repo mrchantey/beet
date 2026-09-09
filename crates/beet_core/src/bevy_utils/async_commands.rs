@@ -270,6 +270,24 @@ pub(crate) fn tick_bridge_executor() {
 	TICK_DEPTH.with(|cell| cell.set(depth));
 }
 
+/// Unwrap a bridged closure's output, re-raising a wasm trap the world scope
+/// swallowed on its behalf (see the `catch_no_abort` wrap at every `bridge`
+/// call site).
+///
+/// `ScopedStatic::try_with` holds the world-scope mutex *across* the bridged
+/// closure, and wasm runs no destructors on a trap, so a panic escaping the
+/// closure leaves that mutex locked for the life of the process: every later
+/// sync point then panics `cannot recursively acquire mutex` and the async
+/// bridge is dead. Catching inside lets the guard release normally, and
+/// re-raising here — with the world scope closed — ends the task exactly as
+/// the native unwind does.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+fn unwrap_bridged<O>(out: Option<O>) -> O {
+	out.unwrap_or_else(|| {
+		panic!("bridged world closure panicked, see the panic reported above")
+	})
+}
+
 impl AsyncSpawner {
 	/// Build a spawner from custom spawn functions (eg `tokio` / `embassy`).
 	pub fn new(
@@ -291,12 +309,8 @@ impl AsyncSpawner {
 	where
 		Fut: 'static + MaybeSend + Future<Output = ()>,
 	{
-		self.0.in_flight.fetch_add(1, Ordering::SeqCst);
-		let this = self.clone();
-		(self.0.spawn)(Box::pin(async move {
-			fut.await;
-			this.0.in_flight.fetch_sub(1, Ordering::SeqCst);
-		}));
+		let counted = self.count(fut);
+		(self.0.spawn)(Box::pin(counted));
 	}
 
 	/// Spawns a task on the local thread, incrementing the in-flight counter
@@ -305,12 +319,32 @@ impl AsyncSpawner {
 	where
 		Fut: 'static + Future<Output = ()>,
 	{
+		let counted = self.count(fut);
+		(self.0.spawn_local)(Box::pin(counted));
+	}
+
+	/// Wraps `fut` so the in-flight counter is held for as long as it lives.
+	///
+	/// The decrement rides an RAII guard, not the end of the future: a task that
+	/// panics or is dropped mid-flight must still release its count, or the
+	/// world never reads as idle again and every
+	/// [`AsyncRunner::settle_async_tasks`] after it burns the whole frame cap.
+	fn count<Fut: Future<Output = ()>>(
+		&self,
+		fut: Fut,
+	) -> impl Future<Output = ()> + use<Fut> {
+		struct InFlight(Arc<AsyncSpawnerInner>);
+		impl Drop for InFlight {
+			fn drop(&mut self) {
+				self.0.in_flight.fetch_sub(1, Ordering::SeqCst);
+			}
+		}
 		self.0.in_flight.fetch_add(1, Ordering::SeqCst);
-		let this = self.clone();
-		(self.0.spawn_local)(Box::pin(async move {
+		let guard = InFlight(self.0.clone());
+		async move {
 			fut.await;
-			this.0.in_flight.fetch_sub(1, Ordering::SeqCst);
-		}));
+			drop(guard);
+		}
 	}
 }
 
@@ -410,9 +444,22 @@ pub impl AsyncWorld {
 		O: 'static + Send + Sync,
 	{
 		let location = Location::caller();
+		#[cfg(all(target_arch = "wasm32", feature = "std"))]
+		let fut = self.exclusive(BeetAsyncSyncPoint, move |world: &mut World| {
+			let mut out = None;
+			let _ = js_runtime::catch_no_abort(|| {
+				out = Some(func(world));
+				Ok(())
+			});
+			out
+		});
+		#[cfg(not(all(target_arch = "wasm32", feature = "std")))]
 		let fut = self.exclusive(BeetAsyncSyncPoint, func);
 		async move {
 			match fut.await {
+				#[cfg(all(target_arch = "wasm32", feature = "std"))]
+				Ok(out) => unwrap_bridged(out),
+				#[cfg(not(all(target_arch = "wasm32", feature = "std")))]
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
 					warn!(
@@ -451,7 +498,21 @@ pub impl AsyncWorld {
 		let location = Location::caller();
 		let state = self.system_state::<P>();
 		async move {
-			match state.bridge(BeetAsyncSyncPoint, func).await {
+			#[cfg(all(target_arch = "wasm32", feature = "std"))]
+			let bridged = state
+				.bridge(BeetAsyncSyncPoint, move |param| {
+					let mut out = None;
+					let _ = js_runtime::catch_no_abort(|| {
+						out = Some(func(param));
+						Ok(())
+					});
+					out
+				})
+				.await
+				.map(unwrap_bridged);
+			#[cfg(not(all(target_arch = "wasm32", feature = "std")))]
+			let bridged = state.bridge(BeetAsyncSyncPoint, func).await;
+			match bridged {
 				Ok(out) => out,
 				Err(BridgeError::WorldDropped) => {
 					warn!(

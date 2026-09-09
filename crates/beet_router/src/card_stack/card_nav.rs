@@ -8,8 +8,6 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
-#[cfg(feature = "tui")]
-use beet_net::prelude::*;
 
 /// Marker opting a router into a stack of cards: a flat list of sibling routes
 /// the user steps through like a HyperCard stack. Read by [`card_nav`] (the

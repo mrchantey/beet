@@ -12,8 +12,6 @@ use crate::prelude::*;
 /// This is also used to denote the first symbol inside an rsx macro, used by `RsxTemplate`
 /// to reconcile web nodes with templates.
 ///
-/// For the generic component version see [`FileSpanOf`].
-///
 /// # Example
 ///
 /// ```rust,ignore
@@ -164,38 +162,4 @@ pub trait GetSpan {
 impl GetSpan for FileSpan {
 	fn span(&self) -> &FileSpan { self }
 	fn span_mut(&mut self) -> &mut FileSpan { self }
-}
-
-/// File span for a specific component type, e.g., `NodeTag` or `AttributeKey`.
-///
-/// This is a wrapper around [`FileSpan`] that includes a phantom type parameter
-/// to associate the span with a specific component type.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
-#[reflect(Component)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub(crate) struct FileSpanOf<C> {
-	/// The underlying file span.
-	pub value: FileSpan,
-	/// Phantom data for the component type.
-	#[reflect(ignore)]
-	pub phantom: core::marker::PhantomData<C>,
-}
-
-impl<C> core::ops::Deref for FileSpanOf<C> {
-	type Target = FileSpan;
-	fn deref(&self) -> &Self::Target { &self.value }
-}
-
-impl<C> FileSpanOf<C> {
-	/// Creates a new [`FileSpanOf`] wrapping the given [`FileSpan`].
-	pub fn new(value: FileSpan) -> Self {
-		Self {
-			value,
-			phantom: core::marker::PhantomData,
-		}
-	}
-
-	/// Consumes self and returns the inner [`FileSpan`].
-	pub fn take(self) -> FileSpan { self.value }
 }

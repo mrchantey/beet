@@ -9,14 +9,12 @@
 use beet_core::prelude::*;
 
 /// The core [`Scheme`] an `http` uri names, `Scheme::None` when it names none.
-#[cfg(feature = "http")]
 pub(crate) fn scheme_from_http(scheme: Option<&http::uri::Scheme>) -> Scheme {
 	Scheme::from_str(scheme.map(|scheme| scheme.as_str()).unwrap_or_default())
 }
 
 /// Convert an [`http::HeaderMap`] to a [`super::HeaderMap`],
 /// with all keys normalized to kebab-case.
-#[cfg(feature = "http")]
 pub(crate) fn http_header_map_to_header_map(
 	map: &http::HeaderMap,
 ) -> super::HeaderMap {
@@ -29,7 +27,6 @@ pub(crate) fn http_header_map_to_header_map(
 }
 
 /// Convert a [`super::HeaderMap`] back to [`http::HeaderMap`].
-#[cfg(feature = "http")]
 pub(crate) fn header_map_to_http(
 	headers: &super::HeaderMap,
 ) -> Result<http::HeaderMap, http::header::InvalidHeaderValue> {

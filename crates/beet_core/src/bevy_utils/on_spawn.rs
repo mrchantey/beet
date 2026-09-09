@@ -8,13 +8,11 @@
 //!
 //! - [`OnSpawn`] - Type-erased effect that runs immediately when spawned
 //! - [`OnSpawnTyped`] - Generic version that preserves the closure type
-//! - [`OnSpawnDeferred`] - Effect that runs when explicitly flushed
 //! - [`OnSpawnClone`] - Cloneable version of [`OnSpawn`]
 
 use crate::prelude::*;
 use beet_core_macros::BundleEffect;
 use bevy::ecs::component::Mutable;
-use bevy::ecs::relationship::Relationship;
 use bevy::ecs::system::IntoObserverSystem;
 
 /// A type-erased [`BundleEffect`] that runs a function when the entity is spawned.
@@ -215,110 +213,6 @@ impl<F: Send + Sync + FnOnce(&mut EntityWorldMut)> OnSpawnTyped<F> {
 	fn effect(self, entity: &mut EntityWorldMut) { self.0(entity); }
 }
 
-/// A component that runs a deferred function when explicitly flushed.
-///
-/// Unlike [`OnSpawn`], this does not run immediately when spawned.
-/// Instead, it must be flushed by running the [`OnSpawnDeferred::flush`] system.
-#[derive(Component)]
-pub(crate) struct OnSpawnDeferred(
-	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result>,
-);
-
-impl OnSpawnDeferred {
-	/// Creates a new [`OnSpawnDeferred`] effect.
-	pub fn new(
-		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
-	) -> Self {
-		Self(Box::new(func))
-	}
-
-	/// Runs the function for the parent of this entity.
-	pub fn parent<R: Relationship>(
-		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut) -> Result,
-	) -> Self {
-		Self::new(move |entity| {
-			let Some(parent) = entity.get::<R>() else {
-				bevybail!(
-					"OnSpawnDeferred::insert_parent: Entity does not have a parent"
-				);
-			};
-			let parent = parent.get();
-			entity.world_scope(move |world| func(&mut world.entity_mut(parent)))
-		})
-	}
-
-	/// Inserts this bundle into the entity when flushed.
-	pub fn insert(bundle: impl Bundle) -> Self {
-		Self::new(move |entity| {
-			entity.insert(bundle);
-			Ok(())
-		})
-	}
-
-	/// When flushed, inserts this bundle into the parent of the entity.
-	pub fn insert_parent<R: Relationship>(bundle: impl Bundle) -> Self {
-		Self::parent::<R>(move |entity| {
-			entity.insert(bundle);
-			Ok(())
-		})
-	}
-
-	/// Triggers an entity target event when flushed.
-	pub fn trigger_target<M>(ev: impl IntoEntityTargetEvent<M>) -> Self {
-		Self::new(move |entity| {
-			entity.trigger_target(ev);
-			Ok(())
-		})
-	}
-
-	/// System that runs all [`OnSpawnDeferred`] components.
-	pub fn flush(
-		mut commands: Commands,
-		mut query: Query<(Entity, &mut Self)>,
-	) {
-		for (entity, mut on_spawn) in query.iter_mut() {
-			commands.entity(entity).remove::<Self>();
-			let func = on_spawn.take();
-			commands.queue(move |world: &mut World| {
-				let mut entity = world.entity_mut(entity);
-				func.call(&mut entity)
-			});
-		}
-	}
-
-	/// Converts this into a command for the given entity.
-	pub fn into_command(
-		self,
-		entity: Entity,
-	) -> impl FnOnce(&mut World) -> Result {
-		move |world: &mut World| {
-			let mut entity = world.entity_mut(entity);
-			self.call(&mut entity)
-		}
-	}
-
-	/// Calls the deferred function.
-	pub fn call(self, entity: &mut EntityWorldMut) -> Result {
-		(self.0)(entity)
-	}
-
-	/// Takes the method from this component.
-	///
-	/// This component should be removed when this is called.
-	///
-	/// # Panics
-	///
-	/// Panics if the method has already been taken.
-	pub fn take(&mut self) -> Self {
-		Self::new(core::mem::replace(
-			&mut self.0,
-			Box::new(|_| {
-				panic!("OnSpawnDeferred: This method has already been taken")
-			}),
-		))
-	}
-}
-
 /// A [`Clone`]able version of [`OnSpawn`].
 ///
 /// Uses a trait object that implements [`Clone`] to allow the effect to be cloned.
@@ -393,33 +287,6 @@ mod test {
 
 		numbers.get().xpect_eq(&[1, 2, 3]);
 	}
-	#[crate::test]
-	fn on_spawn_deferred() {
-		let mut world = World::new();
-
-		let numbers = Store::default();
-		world.spawn((
-			OnSpawnDeferred::new(move |entity_world_mut| {
-				numbers.push(1);
-				entity_world_mut.insert(OnSpawnTyped::new(move |_| {
-					numbers.push(2);
-				}));
-				Ok(())
-			}),
-			children![OnSpawnDeferred::new(move |_| {
-				numbers.push(3);
-				Ok(())
-			}),],
-		));
-
-		numbers.get().xpect_eq(&[] as &[u32]);
-		world.run_system_cached(OnSpawnDeferred::flush).unwrap();
-
-		// Flush visits entities in spawn order, so the parent (1, then its
-		// inserted `OnSpawnTyped` 2) resolves before the child (3).
-		numbers.get().xpect_eq(&[1, 2, 3]);
-	}
-
 	#[crate::test]
 	fn observe() {
 		#[derive(EntityEvent)]

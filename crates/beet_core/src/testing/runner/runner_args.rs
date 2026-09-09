@@ -29,11 +29,9 @@ pub(crate) struct TestRunnerConfig {
 	pub quiet: bool,
 	/// Glob pattern filter for test selection. Empty by default (every test
 	/// passes); the embedded build can populate it directly since
-	/// [`GlobFilter`] is no_std.
+	/// [`GlobFilter`] is no_std. Patterns are wrapped in wildcards, so `foo`
+	/// matches `/foo.rs`, unless `--exact` was passed.
 	pub filter: GlobFilter,
-	/// By default the glob filter wraps all patterns in wildcards,
-	/// so `*foo*` will match `/foo.rs`. Specify `--exact` to disable this.
-	pub exact: bool,
 	/// Run only ignored tests.
 	pub ignored: bool,
 	/// Run both ignored and non-ignored tests.
@@ -54,7 +52,6 @@ impl Default for TestRunnerConfig {
 			no_color: false,
 			quiet: false,
 			filter: GlobFilter::default(),
-			exact: false,
 			ignored: false,
 			include_ignored: false,
 			timeout_ms: Self::DEFAULT_TIMEOUT_MS,
@@ -117,7 +114,6 @@ impl TestRunnerConfig {
 			log_skipped,
 			no_color,
 			quiet,
-			exact,
 			ignored,
 			include_ignored,
 			filter,
@@ -125,8 +121,9 @@ impl TestRunnerConfig {
 		}
 	}
 
-	/// Creates a config by parsing a CLI-style string.
-	#[cfg(feature = "std")]
+	/// Creates a config by parsing a CLI-style string. The test-only entry
+	/// point: a real run reads the process args through [`Self::from_env`].
+	#[cfg(all(test, feature = "std"))]
 	pub fn from_cli_str(args: &str) -> Self {
 		Self::from_cli_args(CliArgs::parse(args))
 	}

@@ -186,7 +186,6 @@ async fn accept_channel_sockets(
 mod test {
 	use super::*;
 	use crate::sockets::common_handlers::echo_message;
-	use beet_action::prelude::*;
 
 	/// Echo over the channel transport, the wasm-runnable port of the tungstenite
 	/// `ecs_sockets` test: boot a `ChannelSocketServer` whose accepted sockets echo

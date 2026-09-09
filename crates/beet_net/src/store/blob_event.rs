@@ -78,7 +78,9 @@ impl Default for BlobEventBus {
 	}
 }
 
-#[cfg(feature = "std")]
+// the native directory watcher is the only publisher that pushes: the in-world
+// stores hand their provider the bus `Sender` and let it send.
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 impl BlobEventBus {
 	/// Send a [`BlobEvent`] into the bus, ignoring a dropped receiver.
 	pub fn send(&self, event: BlobEvent) { self.sender.try_send(event).ok(); }

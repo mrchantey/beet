@@ -11,7 +11,7 @@ the router is their dispatch child; `{CallOnReady}` starts them on load, reading
     # serves /add?a=3&b=4 on :8080 and stays alive
 
 Each `<ScriptRoute>` is a path plus a JavaScript script over the request, whose
-string output is the response. The query params arrive at `input.url.params`.
+string output is the response. The query params arrive at `input.params`.
 -->
 <CallOnReady {(CliServer, HttpServer{port:8080})}>
 <Router>

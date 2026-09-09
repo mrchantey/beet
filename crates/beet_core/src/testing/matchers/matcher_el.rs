@@ -6,6 +6,11 @@
 //! Polling yields to the js event loop between attempts, so these require the
 //! async wasm runner (a browser-hosted test suite); under a runner that never
 //! yields they would only ever attempt once.
+//!
+//! The generated trait's methods are `async fn`: callers are always wasm, where
+//! futures are `!Send` anyway, so the auto-trait bounds `async fn` cannot name
+//! are not ones anybody here needs.
+#![allow(async_fn_in_trait)]
 
 use crate::prelude::*;
 use web_sys::HtmlElement;

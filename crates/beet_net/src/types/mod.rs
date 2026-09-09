@@ -35,9 +35,11 @@ mod request;
 mod response;
 // http interop for the core `Url`: header-map conversions and the `http`
 // crate's scheme. The `Url` type itself lives in `beet_core::path`.
+#[cfg(feature = "http")]
 mod http_interop;
 pub use body::*;
 pub use header_map::*;
+#[cfg(feature = "http")]
 pub(crate) use http_interop::*;
 pub use media_bytes_ext::*;
 pub use response::*;
