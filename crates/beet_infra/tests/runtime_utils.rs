@@ -274,8 +274,8 @@ pub async fn verify_dead(
 /// Terraform should handle all infrastructure cleanup, we only need to clean
 /// the artifacts store which is not managed by terraform.
 pub async fn cleanup_prior_state(deploy: &TestDeploy, project: terra::Project) {
-	info!("cleanup_prior_state: calling force_destroy");
-	project.force_destroy().await;
+	info!("cleanup_prior_state: calling tofu_destroy --force");
+	project.tofu_destroy(true).await.ok();
 	info!("cleanup_prior_state: removing artifacts store");
 	deploy.artifacts_client().store().store_remove().await.ok();
 	info!("cleanup_prior_state: complete");

@@ -172,7 +172,7 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("skipped all 1 of its children")
+			.xpect_contains("skipped all 1 of its steps")
 			.xpect_contains("this binary did not register: `<TofuApply>`");
 	}
 

@@ -40,17 +40,45 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<DeployRoutes/>` — the standard IaC verb routes (validate / plan / apply /
-/// show / list / destroy / rollback / rollforward), the markup form of
-/// [`Stack::verbs`].
+/// `<DeployRoutes deploy={$up} destroy={$down}/>` — the standard IaC verb routes
+/// (deploy / destroy / validate / plan / apply / show / list / rollback /
+/// rollforward), the markup form of [`Stack::verbs`].
 ///
 /// It carries no identity of its own: each verb resolves its [`Stack`] by
-/// ancestry, so authoring it under a `<Stack>` is the whole declaration. That
-/// separation is the point — a stage or app name riding a TEMPLATE prop is
+/// ancestry, so authoring it under a `<Stack>` is nearly the whole declaration.
+/// That separation is the point — a stage or app name riding a TEMPLATE prop is
 /// absent from any binary that did not link the template, which is exactly how a
 /// `shared` scope can go missing in a lean build.
+///
+/// The two groups are the exception, and they are references rather than names:
+/// what a stack's deploy DOES is the document's to say, and both halves of it
+/// are declared beside the blocks they act on.
+///
+/// ```bsx
+/// <Group bx:ref="up">
+///     <TofuApply/>
+/// </Group>
+/// <Group bx:ref="down">
+///     <StackTeardown/>
+///     <TofuDestroy/>
+/// </Group>
+/// <DeployRoutes deploy={$up} destroy={$down}/>
+/// ```
+///
+/// Both are required and there is no compatibility mode: a stack that can be
+/// brought up and not taken down is the thing this replaced.
 #[template]
-pub fn DeployRoutes() -> impl Bundle { Stack::verbs() }
+pub fn DeployRoutes(
+	/// The group `deploy` runs, forward.
+	#[prop(required)]
+	deploy: Entity,
+	/// The group `destroy` runs, in reverse. Authored in convergence order like
+	/// every other group, so its first member is torn down last.
+	#[prop(required)]
+	destroy: Entity,
+) -> impl Bundle {
+	Stack::verbs(deploy, destroy)
+}
 
 /// `<StateBackendToggle/>` — select this launch's tofu state backend from argv:
 /// S3 when `--s3-backend` is passed, local otherwise. The markup form of
@@ -716,7 +744,9 @@ mod test {
 			r#"<Route path="shared">
 				<Stack stage="shared">
 					<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-					<DeployRoutes/>
+					<Group bx:ref="deploy_up"><TofuApply/></Group>
+					<Group bx:ref="deploy_down"><StackTeardown/><TofuDestroy/></Group>
+					<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 					<Route path="push" {ExchangeSequence}>
 						<DirSync bucket="assets" local_dir="site/assets"/>
 					</Route>
@@ -729,6 +759,9 @@ mod test {
 		let tree = world.entity(router).get::<RouteTree>().unwrap();
 		tree.find(&["shared", "validate"]).xpect_some();
 		tree.find(&["shared", "apply"]).xpect_some();
+		// the two lifecycle verbs, which run the groups declared beside them
+		tree.find(&["shared", "deploy"]).xpect_some();
+		tree.find(&["shared", "destroy"]).xpect_some();
 		tree.find(&["shared", "push"]).xpect_some();
 		tree.find(&["shared", "pull"]).xpect_some();
 		// the bucket block resolves the shared-stage stack by ancestry, while

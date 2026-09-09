@@ -241,6 +241,11 @@ impl Plugin for InfraPlugin {
 		// `deploy`, and is native-only).
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::TofuApply>()
+			// the two teardown steps: `tofu destroy`, and the state carriers it
+			// leaves behind. They converge either side of the apply, so a destroy
+			// group runs them in the opposite order to this list.
+			.register_type::<crate::prelude::TofuDestroy>()
+			.register_type::<crate::prelude::StackTeardown>()
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
@@ -265,9 +270,11 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::ComailEnroll>()
 			.register_type::<crate::prelude::ComailDeliverability>()
 			.register_type::<crate::prelude::EipReverseDns>()
+			.register_type::<crate::prelude::EipReverseDnsReset>()
 			.register_type::<crate::prelude::StalwartSnapshot>()
 			.register_type::<crate::prelude::StalwartProvision>()
 			.register_type::<crate::prelude::MtaStsPublish>()
+			.register_type::<crate::prelude::MtaStsUnpublish>()
 			.register_type::<crate::prelude::MailProbe>()
 			.register_type::<crate::prelude::MailCredentials>()
 			.register_type::<crate::prelude::MailHealth>()
@@ -276,7 +283,12 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::AllowedRecord>()
 			// the audit's scope selector, so `<ZoneAudit scope="Zone"/>`
 			// resolves the variant rather than silently keeping the default.
-			.register_type::<crate::prelude::ZoneAuditScope>();
+			.register_type::<crate::prelude::ZoneAuditScope>()
+			// the two paired declarations, each spawning its up-action and its
+			// down-action from one tag at one file position, so the deploy and
+			// teardown groups cannot drift apart.
+			.register_template::<crate::prelude::EipReverseRecord>()
+			.register_template::<crate::prelude::MtaStsPolicyHost>();
 
 		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
 		// enum a markup attribute names by variant, and the `<DirSync>` front-end

@@ -18,9 +18,14 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
 
 A one-shot `CliServer` root whose `CallOnReady` fires the CLI request on load, with
 the `Router` as its dispatch child. `<Stack app_name="lambda">` is the resource
-identity every block and verb beneath it resolves by ancestry, and `<DeployRoutes/>`
-adds the standard IaC verb routes (validate/plan/apply/...) to it. Each verb below is
-a child-sequenced `<Route path=".." {ExchangeSequence}>`: its block and actions are
+identity every block and verb beneath it resolves by ancestry, and
+`<DeployRoutes deploy=.. destroy=../>` adds the standard IaC verb routes
+(deploy/destroy/validate/plan/apply/...) to it.
+
+`deploy` and `destroy` run the two `<Group>`s below, forward and in reverse: a
+group is an ordered list of members, and a teardown is that same list read
+backwards, so the bucket that is created first is removed last. The other verbs
+are child-sequenced `<Route path=".." {ExchangeSequence}>`: their actions are
 direct children of the route and the sequence runs them in order.
 
 Live deploy needs AWS credentials in the environment, plus `tofu`,
@@ -30,8 +35,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="lambda">
-		<DeployRoutes/>
-		<Route path="deploy" {ExchangeSequence}>
+		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LambdaSiteBlock features="lambda,aws_sdk"/>
 			<S3BucketBlock label="app" deploy_versioned=false/>
@@ -42,7 +46,12 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 			<TofuApply/>
 			<!-- the rollout is quick, so tail briefly then exit -->
 			<LambdaWatch timeout="30s"/>
-		</Route>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 		<Route path="sync" {ExchangeSequence}>
 			<SiteSync/>
 		</Route>

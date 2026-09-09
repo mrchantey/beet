@@ -27,8 +27,7 @@ and a container engine.
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="fargate">
-		<DeployRoutes/>
-		<Route path="deploy" {ExchangeSequence}>
+		<Group bx:ref="deploy_up">
 			<FargateSiteBlock/>
 			<S3BucketBlock label="app" deploy_versioned=false/>
 			<BeetBinaryBuild features="aws_sdk"/>
@@ -43,7 +42,12 @@ and a container engine.
 			     bucket that is filled -->
 			<TofuApply/>
 			<FargateWatch timeout="300s"/>
-		</Route>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 		<Route path="sync" {ExchangeSequence}>
 			<SiteSync/>
 		</Route>

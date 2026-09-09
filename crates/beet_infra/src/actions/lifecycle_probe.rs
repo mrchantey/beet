@@ -6,7 +6,10 @@ use beet_net::prelude::*;
 
 /// Exercises a stack's full lifecycle for demos/smoke-tests: force-reset, validate,
 /// plan, apply, write a probe file to the bucket's [`BlobStore`] and read it back,
-/// then destroy — logging each step. Resolves the [`Stack`] via [`StackQuery`]; reads
+/// then destroy — logging each step. It exercises the terraform-owned resources
+/// only: a real teardown also removes the state carriers, which is
+/// [`StackTeardown`]'s job in a destroy group rather than this probe's.
+/// Resolves the [`Stack`] via [`StackQuery`]; reads
 /// the [`BlobStore`] from its own entity, so spawn it on the bucket block entity (eg
 /// `<S3BucketBlock label="my-bucket" {LifecycleProbe}/>`).
 #[action]
@@ -29,7 +32,7 @@ pub async fn LifecycleProbe(
 		.await??;
 
 	// reset state in case of a backend change, clearing any stale store.
-	project.force_destroy().await;
+	project.tofu_destroy(true).await.ok();
 	if store.store_exists().await.unwrap_or(false) {
 		info!("🧹 Cleaning up stale store..");
 		store.store_remove().await.ok();
@@ -70,7 +73,7 @@ pub async fn LifecycleProbe(
 	info!("📄 BlobStore File Matches: {}", bytes == content.as_bytes());
 
 	info!("🔨 Destroying..");
-	project.destroy().await?;
+	project.tofu_destroy(false).await?;
 
 	info!(
 		"📦 State file exists: {}",

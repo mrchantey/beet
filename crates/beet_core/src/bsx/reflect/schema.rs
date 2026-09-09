@@ -48,8 +48,10 @@ pub(in crate::bsx) fn verify_props(
 	// before the structural validation below, which only knows the type's
 	// STRUCTURE and would reject the very form the coercion layer was written
 	// to accept.
-	let parsed = parse_literal_props(&app_registry.read(), tag, &mut props)?;
-	validate_props(tag, &schema, props, &parsed, cx)
+	let mut settled =
+		parse_literal_props(&app_registry.read(), tag, &mut props)?;
+	settled.extend(props_resolved_elsewhere(el));
+	validate_props(tag, &schema, props, &settled, cx)
 }
 
 /// Verify a tag's props against an explicit `schema`, the shared path for both a
@@ -67,16 +69,23 @@ pub(in crate::bsx) fn verify_props_against(
 ) -> Result<()> {
 	// a BSX-authored template is typed by its `bx:schema` block alone, so there
 	// are no Rust prop types to parse an authored spelling into.
-	validate_props(tag, schema, props_value(el), &default(), cx)
+	validate_props(
+		tag,
+		schema,
+		props_value(el),
+		&props_resolved_elsewhere(el),
+		cx,
+	)
 }
 
-/// Validate `props` against `schema`, skipping the `parsed` keys a
-/// [`LiteralParser`] already accepted.
+/// Validate `props` against `schema`, skipping the keys that are already
+/// settled: one a [`LiteralParser`] accepted, and one that resolves by other
+/// means (see [`props_resolved_elsewhere`]).
 fn validate_props(
 	tag: &str,
 	schema: &ValueSchema,
 	mut props: Value,
-	parsed: &HashSet<SmolStr>,
+	settled: &HashSet<SmolStr>,
 	cx: &mut TemplateContext,
 ) -> Result<()> {
 	// resolve composable references against the schema registry snapshot.
@@ -94,10 +103,10 @@ fn validate_props(
 		// the very form the coercion layer was written for.
 		struct_schema
 			.fields
-			.retain(|field| !parsed.contains(field.key.as_str()));
+			.retain(|field| !settled.contains(field.key.as_str()));
 	}
 	if let Value::Map(map) = &mut props {
-		map.0.retain(|key, _| !parsed.contains(key.as_str()));
+		map.0.retain(|key, _| !settled.contains(key.as_str()));
 	}
 	// `validate` is async-shaped but resolves in one poll without an executor, so
 	// `try_block_on` drives it on both std and no_std.
@@ -195,6 +204,25 @@ pub(in crate::bsx) fn props_value(el: &BsxElement) -> Value {
 		}
 	}
 	Value::Map(map)
+}
+
+/// The props a tag supplied that carry no inline value to verify: an entity ref
+/// (`deploy={$up}`) or a field binding.
+///
+/// They ARE supplied, and the reflect patch resolves each through its own
+/// machinery, so validation must treat them as settled rather than as absent.
+/// Without this a `#[prop(required)]` field fed an entity ref reports as
+/// missing, which is the one failure a required prop exists to prevent and the
+/// one it cannot itself be at fault for.
+pub(in crate::bsx) fn props_resolved_elsewhere(
+	el: &BsxElement,
+) -> HashSet<SmolStr> {
+	el.attributes
+		.iter()
+		.filter(|attr| !is_directive(&attr.key) && !attr.key.is_empty())
+		.filter(|attr| attr_prop_value(&attr.value).is_none())
+		.map(|attr| SmolStr::from(attr.key.as_str()))
+		.collect()
 }
 
 /// The plain [`Value`] of a prop attribute, or `None` when it is not a literal
@@ -506,5 +534,21 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::Str("Outlined".into()));
+	}
+	/// A prop fed an entity reference is SUPPLIED, not missing: the value
+	/// carries no inline form to validate, and the reflect patch resolves it
+	/// through the entity model instead. Without this a `#[prop(required)]`
+	/// field fed a `$ref` reports as absent.
+	#[crate::test]
+	fn an_entity_ref_prop_is_settled_rather_than_missing() {
+		let el = element(&[
+			("deploy", AttrValue::Expr(ValueExpr::EntityRef("up".into()))),
+			("label", AttrValue::Str("x".into())),
+		]);
+		super::props_resolved_elsewhere(&el)
+			.into_iter()
+			.map(|key| key.to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["deploy".to_string()]);
 	}
 }

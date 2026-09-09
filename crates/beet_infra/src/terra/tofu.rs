@@ -237,8 +237,8 @@ pub async fn destroy(
 }
 
 /// Destroy infrastructure, bypassing any stale state locks.
-/// Used only by `force_destroy` recovery paths where we know
-/// no concurrent operation is active.
+/// Used only by the `force` recovery path (`Project::tofu_destroy`), where we
+/// know no concurrent operation is active.
 pub async fn destroy_force(
 	dir: &AbsPathBuf,
 	vars: &[(SmolStr, SmolStr)],

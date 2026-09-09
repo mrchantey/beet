@@ -1,6 +1,7 @@
 //! Running a request: the `Router` action, the plugin that builds its routes,
 //! and the exchange front-ends a route is authored with.
 
+mod exchange_group;
 mod exchange_overload;
 mod exchange_sequence;
 // the `<FieldRoute>` document-field route front-end. std-only: it names the
@@ -22,6 +23,7 @@ mod router;
 mod router_plugin;
 mod server_action_client;
 
+pub use exchange_group::*;
 pub use exchange_overload::*;
 #[cfg(feature = "scripting")]
 pub use exchange_script::*;

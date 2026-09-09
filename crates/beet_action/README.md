@@ -88,6 +88,14 @@ Metadata needs no declaration either. A macro cannot test a trait bound, so [`Ma
 
 Hand-written pairs remain permitted — the merge removes the *forced* two-type pattern, not the ability to write a provider. Two in the tree keep theirs and say why: `BuildArtifact`, whose type must exist in builds its action does not, and `BuildWasm`, whose fields are a patch base the request writes over through reflect rather than values bound once per call.
 
+## Groups: the same steps, forwards or backwards
+
+A [`Sequence`] runs its children. A [`RunGroup`] runs a `Group`'s `Members`, which is the same idea with the steps enrolled by reference rather than by nesting, so a step is authored where it belongs and still runs where it is needed. Nesting flattens: a member that is itself a group contributes its own members in place, under its own `BypassErrors`.
+
+Direction belongs to the RUN, never to the group. A group carries no direction flag, so "a reverse group inside a forward run" is inexpressible; `RunGroup { reverse: true }` runs the flattened list backwards, and that is the one place in the system where "a teardown is a convergence order read the other way" is written down. A group is therefore always authored in convergence order, teardown groups included.
+
+`continue_on_failure` runs every member regardless and reports the collected failures at the end. A failing member takes the threaded input with it, so a continuing run resumes from a fresh `Default` one: it is a teardown mode, where every step resolves what it needs from the world, not a mode for a run that threads meaning through its input.
+
 ## Long-running work: facets
 
 A long-running **facet** is one closure plus its selection, contributed to its entity's [`RunningSet`] from the facet component's `on_add` via `RunningSet::add(entity, label, select, func)`. `func` IS the facet: it starts the work, holds it open across a shutdown receiver, then tears it down. There is no stop action anywhere, stopping is signalling: removing the parked `Running` (interrupt, reload, despawn) signals every live facet.

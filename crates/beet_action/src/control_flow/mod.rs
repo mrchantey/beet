@@ -14,6 +14,8 @@ mod score;
 pub use score::*;
 mod repeat;
 pub use repeat::*;
+mod run_group;
+pub use run_group::*;
 mod running;
 pub use running::*;
 mod running_set;

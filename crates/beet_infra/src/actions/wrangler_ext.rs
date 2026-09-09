@@ -43,3 +43,93 @@ pub async fn deploy(
 		.await?;
 	Ok(())
 }
+
+/// The Cloudflare v4 API base. `wrangler` uploads a Worker but has no verb for
+/// removing one custom domain, so the teardown half of a Worker is REST.
+const API_BASE: &str = "https://api.cloudflare.com/client/v4";
+
+/// The account id + api token from the environment, the auth every workers call
+/// needs.
+fn account_env() -> Result<(SmolStr, SmolStr)> {
+	let account = env_ext::var("CLOUDFLARE_ACCOUNT_ID")
+		.map_err(|_| bevyhow!("CLOUDFLARE_ACCOUNT_ID is unset"))?;
+	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
+		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
+	Ok((account, token))
+}
+
+/// Delete the Worker custom domain serving `hostname`, if there is one.
+///
+/// `false` when there was none, which a teardown treats as success: it walks the
+/// declaration rather than a ledger of what was created, so it routinely
+/// addresses a resource that was never made.
+///
+/// Deleting the custom domain also removes the zone record and the certificate
+/// wrangler provisioned with it, since the upload created all three together.
+pub async fn delete_custom_domain(hostname: &str) -> Result<bool> {
+	let (account, token) = account_env()?;
+	let listed = send(
+		beet_net::prelude::Request::get(format!(
+			"{API_BASE}/accounts/{account}/workers/domains?hostname={hostname}"
+		))
+		.with_auth_bearer(&token),
+		"listing worker custom domains",
+	)
+	.await?;
+	let Some(id) = listed
+		.and_then(|body| body["result"].as_array().cloned())
+		.unwrap_or_default()
+		.first()
+		.and_then(|domain| domain["id"].as_str().map(String::from))
+	else {
+		return Ok(false);
+	};
+	send(
+		beet_net::prelude::Request::delete(format!(
+			"{API_BASE}/accounts/{account}/workers/domains/{id}"
+		))
+		.with_auth_bearer(&token),
+		"deleting a worker custom domain",
+	)
+	.await
+	.map(|found| found.is_some())
+}
+
+/// Delete the Worker script `name`, if there is one. `false` when there was
+/// none, see [`delete_custom_domain`].
+pub async fn delete_script(name: &str) -> Result<bool> {
+	let (account, token) = account_env()?;
+	send(
+		beet_net::prelude::Request::delete(format!(
+			"{API_BASE}/accounts/{account}/workers/scripts/{name}"
+		))
+		.with_auth_bearer(&token),
+		"deleting a worker script",
+	)
+	.await
+	.map(|found| found.is_some())
+}
+
+/// Send `request`, returning [`None`] when the thing it addressed is not there
+/// and failing on any other non-2xx or `success: false` envelope.
+async fn send(
+	request: beet_net::prelude::Request,
+	what: &str,
+) -> Result<Option<serde_json::Value>> {
+	let response = request.send().await?;
+	let status = response.status();
+	let body = response.text().await.unwrap_or_default();
+	if status.as_u16() == 404 {
+		return Ok(None);
+	}
+	// a `204` answers a delete with nothing at all, which is not an envelope
+	if status.is_ok() && body.trim().is_empty() {
+		return Ok(Some(serde_json::Value::Null));
+	}
+	let json: serde_json::Value =
+		serde_json::from_str(&body).unwrap_or_default();
+	if !status.is_ok() || json["success"] != true {
+		bevybail!("{what} failed: {status} - {body}");
+	}
+	Ok(Some(json))
+}

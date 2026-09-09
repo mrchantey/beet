@@ -271,7 +271,7 @@ mod tests {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("skipped all 1 of its children");
+			.xpect_contains("skipped all 1 of its steps");
 	}
 
 	/// ..unless the caller declares that running nothing is a valid outcome.

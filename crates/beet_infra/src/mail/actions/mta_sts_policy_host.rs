@@ -1,4 +1,5 @@
-//! The other half of MTA-STS: the policy a sender actually fetches.
+//! The other half of MTA-STS: the host that serves the policy a sender actually
+//! fetches, and both halves of its lifecycle.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -8,6 +9,38 @@ use std::collections::BTreeMap;
 
 
 
+
+/// `<MtaStsPolicyHost up={$attach_up} down={$attach_down}/>` — the Cloudflare
+/// Worker serving every mail domain's MTA-STS policy, declared as a thing the
+/// stack HAS rather than as a step some verb does.
+///
+/// One tag, one file position, two actions: the publish joins the deploy group
+/// and the removal joins the teardown group, so both groups' member lists are
+/// projections of the same insert order and cannot drift apart.
+///
+/// Named for the host rather than the policy because [`MtaStsPolicy`] is the
+/// policy: a value composed from each domain's declaration. This is the thing
+/// that serves it.
+///
+/// It is a declaration rather than a resource because wrangler owns it, not
+/// terraform: the script, its bindings and its custom domains are one upload,
+/// and the certificate for a custom domain is issued by that upload. Without the
+/// down half the Worker survives every destroy, and the next deploy cannot
+/// attach the same hostnames to a second one.
+#[template]
+pub fn MtaStsPolicyHost(
+	/// The group the publish joins, ie the stack's post-apply attach group.
+	#[prop(required)]
+	up: Entity,
+	/// The group the removal joins, ie the stack's teardown attach group.
+	#[prop(required)]
+	down: Entity,
+) -> impl Bundle {
+	children![
+		(MtaStsPublish::default(), MemberOf(up)),
+		(MtaStsUnpublish::default(), MemberOf(down)),
+	]
+}
 
 impl MtaStsPublish {
 	/// The wrangler `var` the policy bodies arrive in, keyed by the host each
@@ -159,6 +192,92 @@ pub async fn MtaStsPublish(
 	Pass(cx.input).xok()
 }
 
+/// Removes every custom domain the policy is served at, then the Worker itself.
+/// `<MtaStsUnpublish/>` — the teardown half of [`MtaStsPolicyHost`].
+///
+/// It runs BEFORE `tofu destroy`, because the Worker converges after the apply
+/// that published the `_mta-sts` records it answers for, and teardown order is
+/// convergence order reversed. That ordering matters in the other direction
+/// too: a hostname cannot be attached to two Workers, so a Worker that survives
+/// a destroy blocks the next deploy of the same stack, which is exactly what
+/// happened before this existed.
+///
+/// The custom domains come off one at a time and the script comes off last,
+/// because the script is per-STACK (`<app>--<stage>--mta-sts`) while the custom
+/// domains are per-domain: removing it on the first domain would strip the
+/// policy from every domain still served by it. Deleting a custom domain takes
+/// its zone record and its certificate with it, since the upload created all
+/// three together.
+///
+/// A no-op when neither exists: a teardown walks declarations rather than a
+/// ledger of what was created, so every down-action has to succeed against a
+/// resource that was never there.
+#[action]
+#[derive(Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn MtaStsUnpublish(
+	/// The Worker's name, stack-composed when left empty exactly as
+	/// [`MtaStsPublish`] composes it.
+	#[field(default = SmolStr::default())]
+	worker: SmolStr,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let worker = match worker.is_empty() {
+		true => mail.stack.resource_name(MtaStsPublish::LABEL),
+		false => worker.to_string(),
+	};
+	let hosts = mail
+		.domains
+		.iter()
+		.filter(|domain| domain.records().serves_mail())
+		.map(|domain| MtaStsPolicy::host(domain.domain()))
+		.collect::<Vec<_>>();
+
+	for removal in MtaStsUnpublish::removals(&hosts, &worker) {
+		match &removal {
+			MtaStsRemoval::CustomDomain(host) => {
+				match wrangler_ext::delete_custom_domain(host).await? {
+					true => info!("removed the custom domain at {host}"),
+					false => info!("no custom domain at {host}"),
+				}
+			}
+			MtaStsRemoval::Script(name) => {
+				match wrangler_ext::delete_script(name).await? {
+					true => info!("removed the mta-sts worker `{name}`"),
+					false => info!("no mta-sts worker `{name}`"),
+				}
+			}
+		}
+	}
+	Pass(cx.input).xok()
+}
+
+impl MtaStsUnpublish {
+	/// What a teardown removes, in order.
+	///
+	/// Split out because the ORDER is the load-bearing part and nothing about a
+	/// live api call says so: every host's custom domain first, the shared script
+	/// last.
+	fn removals(hosts: &[String], worker: &str) -> Vec<MtaStsRemoval> {
+		hosts
+			.iter()
+			.cloned()
+			.map(MtaStsRemoval::CustomDomain)
+			.chain([MtaStsRemoval::Script(worker.to_string())])
+			.collect()
+	}
+}
+
+/// One thing an [`MtaStsUnpublish`] removes.
+#[derive(Debug, PartialEq, Eq)]
+enum MtaStsRemoval {
+	/// A per-domain custom domain, with its record and its certificate.
+	CustomDomain(String),
+	/// The per-stack Worker script every custom domain pointed at.
+	Script(String),
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -201,6 +320,35 @@ mod tests {
 			.as_str()
 			.xpect_contains("MTA_STS_POLICIES")
 			.xpect_contains("version: STSv1\\\\r\\\\nmode: testing");
+	}
+
+	/// The script is per-stack and the custom domains are per-domain, so the
+	/// removal takes every domain off first and the script last: taking it off
+	/// with the first domain would strip the policy from every domain still
+	/// served by it.
+	#[beet_core::test]
+	fn the_last_domain_takes_the_script() {
+		let hosts = policies().keys().cloned().collect::<Vec<_>>();
+		MtaStsUnpublish::removals(&hosts, "beetmash--prod--mta-sts").xpect_eq(
+			vec![
+				MtaStsRemoval::CustomDomain(hosts[0].clone()),
+				MtaStsRemoval::CustomDomain(hosts[1].clone()),
+				MtaStsRemoval::Script("beetmash--prod--mta-sts".to_string()),
+			],
+		);
+	}
+
+	/// A stack whose domains publish no policy still had a worker, and a
+	/// teardown that walks the declaration removes it: the drill case, where a
+	/// down-action has to succeed against a resource that may never have
+	/// existed.
+	#[beet_core::test]
+	fn a_stack_with_no_policies_still_removes_its_worker() {
+		MtaStsUnpublish::removals(&[], "beetmash--drill--mta-sts").xpect_eq(
+			vec![MtaStsRemoval::Script(
+				"beetmash--drill--mta-sts".to_string(),
+			)],
+		);
 	}
 
 	/// The path is the rfc's and nothing else: a sender fetches exactly it, so

@@ -32,12 +32,27 @@ impl BehaviourChildren<'_, '_> {
 	/// A parent of nothing but punctuation has no steps, so it takes the same
 	/// path a childless one does rather than reporting on zero of them.
 	pub fn steps(&self, parent: Entity) -> Vec<Entity> {
-		self.children
-			.get(parent)
-			.map(Children::iter)
+		self.steps_of(
+			self.children
+				.get(parent)
+				.map(Children::iter)
+				.into_iter()
+				.flatten(),
+		)
+	}
+
+	/// The steps among `entities`, whichever relationship they arrived through.
+	///
+	/// The children of a behaviour are the usual list, but a `Group`'s members
+	/// are another, and the same rule holds for both: punctuation is a child of
+	/// the document, never a step.
+	pub fn steps_of(
+		&self,
+		entities: impl IntoIterator<Item = Entity>,
+	) -> Vec<Entity> {
+		entities
 			.into_iter()
-			.flatten()
-			.filter(|child| !self.punctuation.contains(*child))
+			.filter(|entity| !self.punctuation.contains(*entity))
 			.collect()
 	}
 
@@ -61,8 +76,54 @@ impl BehaviourChildren<'_, '_> {
 		Input: 'static,
 		Out: 'static,
 	{
-		let policy = self.policies.get(parent).copied().unwrap_or_default();
-		let steps = self.steps(parent);
+		self.valid_of::<Input, Out>(node, parent, self.steps(parent))
+	}
+
+	/// [`valid`](Self::valid) over a step list the caller assembled, for a node
+	/// whose steps are not its children (a `Group`'s members).
+	///
+	/// # Errors
+	/// The same as [`valid`](Self::valid).
+	pub fn valid_of<Input, Out>(
+		&self,
+		node: &str,
+		parent: Entity,
+		steps: Vec<Entity>,
+	) -> Result<Vec<Entity>>
+	where
+		Input: 'static,
+		Out: 'static,
+	{
+		self.valid_with::<Input, Out>(
+			node,
+			parent,
+			steps,
+			self.policy(parent).unwrap_or_default(),
+		)
+	}
+
+	/// The [`BypassErrors`] `parent` declared, if it declared one.
+	pub fn policy(&self, parent: Entity) -> Option<BypassErrors> {
+		self.policies.get(parent).copied().ok()
+	}
+
+	/// [`valid_of`](Self::valid_of) under a policy the caller resolved, for a
+	/// node that runs steps belonging to another entity: a group declares its
+	/// own policy, and the run supplies the default for one that did not.
+	///
+	/// # Errors
+	/// The same as [`valid`](Self::valid).
+	pub fn valid_with<Input, Out>(
+		&self,
+		node: &str,
+		parent: Entity,
+		steps: Vec<Entity>,
+		policy: BypassErrors,
+	) -> Result<Vec<Entity>>
+	where
+		Input: 'static,
+		Out: 'static,
+	{
 		if steps.is_empty() {
 			return Ok(Vec::new());
 		}
@@ -78,7 +139,7 @@ impl BehaviourChildren<'_, '_> {
 		}
 		if valid.is_empty() && !policy.contains(ChildError::NONE_VALID) {
 			bevybail!(
-				"{node} {parent} skipped all {} of its children, none serve Action<{}, {}>:{}",
+				"{node} {parent} skipped all {} of its steps, none serve Action<{}, {}>:{}",
 				steps.len(),
 				core::any::type_name::<Input>(),
 				core::any::type_name::<Out>(),

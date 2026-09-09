@@ -22,6 +22,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<RunningError>()
 			.register_type::<BypassRunningErrors>()
 			.register_type::<Sequence<(), ()>>()
+			.register_type::<RunGroup<(), ()>>()
 			.register_type::<InfallibleSequence<(), ()>>()
 			.register_type::<Fallback<(), ()>>()
 			.register_type::<Parallel<(), ()>>()

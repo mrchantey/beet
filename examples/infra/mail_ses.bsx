@@ -58,7 +58,21 @@ simulator address it sends to is always permitted.
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="mail-ses-example" region="us-west-2">
-		<DeployRoutes/>
+		<Group bx:ref="deploy_up">
+			<EnsureSecret secret="mail-admin-password"/>
+			<EnsureDkimKey/>
+			<StalwartSnapshot/>
+			<TofuApply/>
+			<Group bx:ref="attach_up"/>
+			<StalwartProvision/>
+			<MailProbe mailbox="probe" sender_domain="example.com"/>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+			<Group bx:ref="attach_down"/>
+		</Group>
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 
 		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
@@ -66,6 +80,14 @@ simulator address it sends to is always permitted.
 		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
 			object_versioning=true
 			expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
+
+		<!-- 💡 the box's reverse record, declared beside the box rather than
+		     inside a verb: it is a thing the stack HAS. One tag spawns both
+		     halves of its lifecycle, so the request joins the deploy group and
+		     the reset joins the teardown group and the two cannot drift. AWS
+		     refuses to release an address while a PTR is set, so without the
+		     down half this stack could not be destroyed at all. -->
+		<EipReverseRecord up={$attach_up} down={$attach_down}/>
 
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
@@ -92,15 +114,6 @@ simulator address it sends to is always permitted.
 				{localpart:"abuse", target:"hello"},
 			]}/>
 
-		<Route path="deploy" {ExchangeSequence}>
-			<EnsureSecret secret="mail-admin-password"/>
-			<EnsureDkimKey/>
-			<StalwartSnapshot/>
-			<TofuApply/>
-			<EipReverseDns/>
-			<StalwartProvision/>
-			<MailProbe mailbox="probe" sender_domain="example.com"/>
-		</Route>
 	</Stack>
 </Router>
 </CliServer>

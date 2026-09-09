@@ -24,8 +24,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="lightsail">
-		<DeployRoutes/>
-		<Route path="deploy" {ExchangeSequence}>
+		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws_sdk"/>
 			<S3BucketBlock label="app" deploy_versioned=false/>
@@ -35,7 +34,12 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<SiteSync/>
 			<TofuApply/>
 			<LightsailWatch timeout="30s"/>
-		</Route>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 		<Route path="sync" {ExchangeSequence}>
 			<SiteSync/>
 		</Route>

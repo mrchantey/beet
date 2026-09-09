@@ -2,7 +2,6 @@ use crate::prelude::terra::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::Blob;
-use beet_net::prelude::BlobStoreProvider;
 
 #[derive(Debug, Clone, Deref, Get)]
 pub struct Project {
@@ -238,44 +237,30 @@ impl Project {
 		tofu::remove(&self.dir(), &self.required_vars()?, resource).await
 	}
 
-	/// Destroy infrastructure.
-	/// - runs tofu destroy, tearing down all infrastructure
-	/// - removes the state file from the state bucket
-	/// - removes the working directory
-	pub async fn destroy(&self) -> Result {
+	/// Run `tofu destroy`, and nothing else.
+	///
+	/// What the old `destroy` swept afterwards — the state object, the native S3
+	/// lock, the artifacts bucket, the work dir — belongs to `StackTeardown`
+	/// now. Those converge BEFORE the apply, so under the one rule that teardown
+	/// order is convergence order reversed they tear down after it, which is
+	/// exactly where a destroy group puts them.
+	///
+	/// `force` is the recovery path for a state nothing holds but a lock left by
+	/// an interrupted run: it clears the stale lock and destroys lock-free, and
+	/// it destroys even from a project too partially cleaned up to `init`.
+	pub async fn tofu_destroy(&self, force: bool) -> Result<String> {
+		if force {
+			// a half-cleaned project may not init; there is still state to destroy
+			self.init().await.ok();
+			self.backend().clear_stale_locks();
+			return tofu::destroy_force(
+				&self.dir(),
+				&self.destroy_vars().await,
+			)
+			.await;
+		}
 		self.init().await?;
-		tofu::destroy(&self.dir(), &self.destroy_vars().await).await?;
-		self.destroy_common().await;
-		Ok(())
-	}
-	/// Destroys infrastructure moving forward
-	/// with each step, even if other parts fail ie dir exists but no backend state.
-	/// - clears stale state locks from interrupted runs
-	/// - runs tofu destroy (lock-free), tearing down all infrastructure
-	/// - removes the state file from the state bucket
-	/// - removes the working directory
-	pub async fn force_destroy(&self) {
-		// init so destroy can access providers and state even after partial cleanup
-		self.init().await.ok();
-		self.backend().clear_stale_locks();
-		let vars = self.destroy_vars().await;
-		tofu::destroy_force(&self.dir(), &vars).await.ok();
-		self.destroy_common().await;
-	}
-
-	async fn destroy_common(&self) {
-		// remove state file
-		self.backend()
-			.provider()
-			.remove(&self.backend_path())
-			.await
-			.ok();
-		// remove S3 native lock file left by interrupted runs
-		let lock_path =
-			SmolPath::new(format!("{}.tflock", self.backend_path()));
-		self.backend().provider().remove(&lock_path).await.ok();
-		self.artifacts.store().store_remove().await.ok();
-		fs_ext::remove_async(&self.dir()).await.ok();
+		tofu::destroy(&self.dir(), &self.destroy_vars().await).await
 	}
 }
 

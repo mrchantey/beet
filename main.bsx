@@ -71,7 +71,18 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-			<DeployRoutes/>
+			<!-- the shared assets stack has one resource and no step outside
+			     terraform, so its deploy is an apply and its teardown is that
+			     read backwards: `tofu destroy`, then the state carriers a deploy
+			     needed before it. -->
+			<Group bx:ref="deploy_up">
+				<TofuApply/>
+			</Group>
+			<Group bx:ref="deploy_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 			<Route path="push" {ExchangeSequence}>
 				<DirSync bucket="assets" local_dir="assets"/>
 			</Route>

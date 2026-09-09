@@ -15,6 +15,26 @@ The committed provider bindings (`bindings`) are generated, never hand-edited: r
 
 Every generated resource implements `terra::ToJson`, whose output is a `beet_core::Value` rather than a `serde_json::Value`, so a rendered body enters `terra::Config` in the type the config already holds and no conversion sits at that boundary.
 
+## Deploy and teardown
+
+A stack's `deploy` and `destroy` are two `Group`s, named by `<DeployRoutes deploy={$up} destroy={$down}/>` and run forward and in reverse. Both are authored in CONVERGENCE order, teardown included: what a deploy needs first is what a destroy removes last, so there is only ever one ordering to keep right and no second list to drift.
+
+`tofu` is an element of that order rather than the whole of it. A terraform-owned resource gets its lifecycle for free, but anything created outside it — a wrangler Worker, an elastic ip's reverse record, a create-if-missing parameter — has a create path and nothing else unless something declares its removal. So a teardown group reads:
+
+```bsx
+<Group bx:ref="down">
+    <StackTeardown/>              // the state carriers, converged before the apply
+    <TofuDestroy/>
+    <Group bx:ref="attach_down"/> // whatever attached after it
+</Group>
+```
+
+`<StackTeardown/>` owns the four state carriers the driver used to sweep in a hardcoded call no block could add to: the tofu state object, the native S3 lock beside it, the artifacts bucket and the work directory. They converge before the apply, so reversed they come off after it.
+
+The `attach` groups are where a declaration joins. A paired declaration (`<EipReverseRecord up={$attach_up} down={$attach_down}/>`, `<MtaStsPolicyHost .../>`) spawns its up-action and its down-action from one tag at one file position, so both groups' member lists are projections of the same insert order and cannot drift apart. Every down-action must succeed against an absent resource: a destroy walks the declarations, not a ledger of what was created, because a ledger records what WAS created rather than what SHOULD exist and a half-failed deploy leaves exactly the unrecorded resources you most want cleaned up.
+
+`--force` on `destroy` selects the continue-on-failure run mode, so every member runs and the failures are reported at the end.
+
 ## Deploy layers
 
 A deploy publishes into its stores and then rolls the service that reads them, so a deploy route applies once per phase: `<TofuApply layer="storage"/>` creates the resources the fill steps publish into (buckets, tables, the image registry), the fill steps run (image push, content sync), then a bare `<TofuApply/>` converges the whole stack and rolls the service. Blocks declare their publish-into resources with `Config::add_layer_resource`, defaulting the assignment to the `storage` layer and exposing it as a field. Naming a layer no block declares is a loud error, never a silent no-op.

@@ -1,47 +1,65 @@
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 impl Stack {
-	/// The standard IaC verb routes as children: the tofu lifecycle
-	/// (validate/plan/apply/show/list/destroy) plus the artifact ledger's
-	/// rollback/rollforward.
+	/// The standard IaC verb routes as children: the two lifecycle verbs that
+	/// run this stack's own groups (`deploy` forward, `destroy` in reverse), the
+	/// raw tofu lifecycle (validate/plan/apply/show/list) and the artifact
+	/// ledger's rollback/rollforward.
 	///
 	/// Each resolves its stack by ancestry, so the bundle carries no identity of
 	/// its own and hosting it is the whole declaration: spawn it under a
 	/// `<Stack>` and that stack has a lifecycle.
-	pub fn verbs() -> impl Bundle {
+	///
+	/// `deploy` and `destroy` name the two groups, and both are required. They
+	/// are separate declarations rather than one reversible group because a
+	/// deploy is not a teardown read backwards: a deploy provisions and probes,
+	/// a teardown removes. What IS the same list backwards is the teardown's own
+	/// order, which is why `destroy` runs its group in reverse.
+	pub fn verbs(deploy: Entity, destroy: Entity) -> impl Bundle {
 		children![
+			(
+				PathPartial::new("deploy"),
+				ExchangeGroup::default(),
+				RunGroup::<Request, Response>::new(deploy),
+			),
+			(
+				PathPartial::new("destroy"),
+				ParamsPartial::new::<DestroyParams>(),
+				ExchangeGroup::forced_by("force"),
+				RunGroup::<Request, Response>::reversed(destroy),
+			),
 			Validate,
 			Plan,
 			Apply,
 			Show,
 			List,
-			Destroy,
 			Rollback,
 			Rollforward
 		]
 	}
-
-	pub fn cli() -> impl Bundle {
-		// the infra CLI host bundle: a `CliServer` entrypoint owning the boot, with the
-		// router and IaC routes as its dispatch child (a server and a router never share
-		// an entity, they would collide on its one action). The caller boots it after
-		// spawning, so the `on_add` observers are registered before the `cli` boot lands.
-		(CliServer::default(), children![(
-			Router::with_defaults(),
-			Stack::verbs()
-		)])
-	}
 }
-/// Build a [`terra::Project`] from the nearest ancestor [`Stack`].
-async fn project(caller: &AsyncEntity) -> Result<terra::Project> {
-	caller
-		.with_world(|world, entity| {
-			RenderScope::render(world, entity)?.project()
-		})
-		.await?
+
+/// Parameters for the destroy route.
+#[derive(Reflect)]
+struct DestroyParams {
+	/// Keep going past a failing step, and destroy lock-free.
+	force: bool,
+}
+
+impl terra::Project {
+	/// Build a project from `caller`'s nearest ancestor [`Stack`], the
+	/// resolution every stack verb starts from.
+	pub async fn resolve(caller: &AsyncEntity) -> Result<Self> {
+		caller
+			.with_world(|world, entity| {
+				RenderScope::render(world, entity)?.project()
+			})
+			.await?
+	}
 }
 
 /// Build an [`ArtifactsClient`] from the nearest ancestor [`Stack`].
@@ -85,63 +103,35 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 #[action(route = "validate")]
 #[derive(Component)]
 pub async fn Validate(cx: ActionContext) -> Result<String> {
-	project(&cx.caller).await?.validate().await
+	terra::Project::resolve(&cx.caller).await?.validate().await
 }
 
 /// Show the execution plan.
 #[action(route = "plan")]
 #[derive(Component)]
 pub async fn Plan(cx: ActionContext) -> Result<String> {
-	project(&cx.caller).await?.plan().await
+	terra::Project::resolve(&cx.caller).await?.plan().await
 }
 
 /// Apply the execution plan.
 #[action(route = "apply")]
 #[derive(Component)]
 pub async fn Apply(cx: ActionContext) -> Result<String> {
-	project(&cx.caller).await?.apply().await
+	terra::Project::resolve(&cx.caller).await?.apply().await
 }
 
 /// Show the current state.
 #[action(route = "show")]
 #[derive(Component)]
 pub async fn Show(cx: ActionContext) -> Result<String> {
-	project(&cx.caller).await?.show().await
+	terra::Project::resolve(&cx.caller).await?.show().await
 }
 
 /// List all resources in the state.
 #[action(route = "list")]
 #[derive(Component)]
 pub async fn List(cx: ActionContext) -> Result<String> {
-	project(&cx.caller).await?.list().await
-}
-
-/// Parameters for the destroy action.
-#[derive(Reflect)]
-struct DestroyParams {
-	/// Skip confirmation and force destroy.
-	force: bool,
-}
-
-/// Destroy infrastructure, with optional force flag.
-#[action(route = "destroy")]
-#[derive(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<DestroyParams>())]
-pub async fn Destroy(cx: ActionContext<Request>) -> Result<String> {
-	let force = cx.has_param("force");
-	let proj = project(&cx.caller).await?;
-	if force {
-		proj.force_destroy().await;
-	} else {
-		proj.destroy().await?;
-	}
-	// tear down the artifacts bucket (not managed by terraform)
-	let client = artifacts_client(&cx.caller).await?;
-	if client.store().store_exists().await.unwrap_or(false) {
-		info!("removing artifacts bucket");
-		client.store().store_remove().await?;
-	}
-	"Destroy complete".to_string().xok()
+	terra::Project::resolve(&cx.caller).await?.list().await
 }
 
 /// Parameters for the rollback action.
@@ -191,18 +181,32 @@ mod tests {
 		(AsyncPlugin, RouterPlugin, InfraPlugin).into_world()
 	}
 
+	/// A stack with a lifecycle: two empty groups and the verbs that run them.
+	fn stack_with_verbs(world: &mut World) -> Entity {
+		let deploy = world.spawn(Group).flush();
+		let destroy = world.spawn(Group).flush();
+		world
+			.spawn((Stack::new("test-app"), CliServer::default(), children![(
+				Router::with_defaults(),
+				Stack::verbs(deploy, destroy)
+			)]))
+			.flush()
+	}
+
 	#[beet_core::test]
 	fn routes_discoverable() {
 		let mut world = cli_world();
-		let root = world.spawn((Stack::new("test-app"), Stack::cli())).flush();
+		let root = stack_with_verbs(&mut world);
 		let tree = RouteTree::of(&world, root).unwrap();
+		// the lifecycle verbs
+		tree.find(&["deploy"]).xpect_some();
+		tree.find(&["destroy"]).xpect_some();
 		// standard IaC routes
 		tree.find(&["validate"]).xpect_some();
 		tree.find(&["plan"]).xpect_some();
 		tree.find(&["apply"]).xpect_some();
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
-		tree.find(&["destroy"]).xpect_some();
 		// artifact routes
 		tree.find(&["rollback"]).xpect_some();
 		tree.find(&["rollforward"]).xpect_some();
@@ -211,7 +215,7 @@ mod tests {
 	#[beet_core::test]
 	fn destroy_has_force_param() {
 		let mut world = cli_world();
-		let root = world.spawn((Stack::new("test-app"), Stack::cli())).flush();
+		let root = stack_with_verbs(&mut world);
 		let tree = RouteTree::of(&world, root).unwrap();
 		let destroy_node = tree.find(&["destroy"]).unwrap();
 		world

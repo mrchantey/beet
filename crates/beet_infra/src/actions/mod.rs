@@ -16,9 +16,11 @@ mod lifecycle_probe;
 mod lightsail_release;
 mod ssh_connection;
 pub mod ssm_ext;
+mod stack_teardown;
 #[cfg(feature = "aws_sdk")]
 mod sync_s3_bucket;
 mod tofu_apply_action;
+mod tofu_destroy_action;
 pub mod wrangler_ext;
 pub use aws_watch::*;
 #[cfg(feature = "fargate_block")]
@@ -36,6 +38,8 @@ pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail_release::*;
 pub use ssh_connection::*;
+pub use stack_teardown::*;
 #[cfg(feature = "aws_sdk")]
 pub use sync_s3_bucket::*;
 pub use tofu_apply_action::*;
+pub use tofu_destroy_action::*;

@@ -16,10 +16,17 @@ use core::str::FromStr;
 ///    dir (the resolved entry dir for a repo store) or at `<path>` when given,
 ///    relative paths resolved against the context dir.
 /// 2. `memory`: a temporary in-memory store.
-/// 3. `s3://<bucket>[?endpoint=<url>][&region=<region>]`: an S3-compatible
-///    bucket. With an `endpoint` (eg a Cloudflare R2 account endpoint) the region
-///    defaults to `auto`; without one an unnamed region is left to the AWS SDK's
-///    own default provider chain.
+/// 3. `s3://<bucket>[/<prefix>][?endpoint=<url>][&region=<region>]`: an
+///    S3-compatible bucket, optionally rooted at a key prefix. With an
+///    `endpoint` (eg a Cloudflare R2 account endpoint) the region defaults to
+///    `auto`; without one an unnamed region is left to the AWS SDK's own default
+///    provider chain.
+///
+///    The prefix is what lets a deploy give each version of a document its own
+///    root: a binary baked with `s3://<bucket>/<deploy-id>` reads only the
+///    document it shipped with, so the window between publishing a new document
+///    and swapping the binary that serves it is not a window where the old
+///    binary reads the new document.
 /// 4. `local-storage` / `indexed-db`: browser storage (wasm).
 ///
 /// ## Example
@@ -47,6 +54,9 @@ pub enum StoreUri {
 	S3 {
 		/// The bucket name.
 		bucket: SmolStr,
+		/// A key prefix the store roots at, so one bucket holds many
+		/// independently addressed roots (a per-deploy document version).
+		prefix: Option<SmolStr>,
 		/// An S3-compatible service endpoint, eg
 		/// `https://<account>.r2.cloudflarestorage.com`. Selects region `auto`
 		/// by default, so one binary serves identically on AWS S3 and R2.
@@ -92,10 +102,20 @@ impl StoreUri {
 		.xok()
 	}
 
-	/// Parse the `<bucket>[?endpoint=<url>][&region=<region>]` tail of an `s3://`
-	/// uri.
+	/// Parse the `<bucket>[/<prefix>][?endpoint=<url>][&region=<region>]` tail of
+	/// an `s3://` uri.
 	fn parse_s3(rest: &str) -> Result<Self> {
-		let (bucket, query) = rest.split_once('?').unwrap_or((rest, ""));
+		let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
+		// the bucket is the first segment; everything after the first `/` is the
+		// prefix the store roots at, with any trailing slash trimmed so
+		// `s3://b/p` and `s3://b/p/` are the one value.
+		let (bucket, prefix) = match path.split_once('/') {
+			Some((bucket, prefix)) => {
+				let prefix = prefix.trim_matches('/');
+				(bucket, (!prefix.is_empty()).then(|| prefix.into()))
+			}
+			None => (path, None),
+		};
 		if bucket.is_empty() {
 			bevybail!("store `s3://` is missing a bucket name");
 		}
@@ -113,6 +133,7 @@ impl StoreUri {
 		}
 		Self::S3 {
 			bucket: bucket.into(),
+			prefix,
 			endpoint,
 			region,
 		}
@@ -142,10 +163,14 @@ impl fmt::Display for StoreUri {
 			Self::IndexedDb => write!(f, "indexed-db"),
 			Self::S3 {
 				bucket,
+				prefix,
 				endpoint,
 				region,
 			} => {
 				write!(f, "s3://{bucket}")?;
+				if let Some(prefix) = prefix {
+					write!(f, "/{prefix}")?;
+				}
 				// the query separator is `?` for the first param, `&` after, so
 				// the rendered uri parses back into this same value.
 				let mut sep = '?';
@@ -173,6 +198,8 @@ mod test {
 			"fs",
 			"fs:../site",
 			"fs:/abs/site",
+			"s3://my-site/01a084cb-6e31-7a53-92ae-67c282615871",
+			"s3://my-site/versions/2?region=us-east-1",
 			"memory",
 			"local-storage",
 			"indexed-db",
@@ -197,6 +224,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(StoreUri::S3 {
 				bucket: "b".into(),
+				prefix: None,
 				endpoint: Some("http://e".into()),
 				region: Some("r".into()),
 			});
@@ -242,5 +270,24 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unknown s3 store query param");
+	}
+	/// A prefix roots the store inside the bucket, which is how one bucket holds
+	/// a document per deploy. A trailing slash is not a second value.
+	#[crate::test]
+	fn a_prefix_roots_the_store() {
+		let StoreUri::S3 { bucket, prefix, .. } =
+			StoreUri::parse("s3://my-site/deploy-1/").unwrap()
+		else {
+			panic!("expected an s3 store");
+		};
+		bucket.as_str().xpect_eq("my-site");
+		prefix.unwrap().as_str().xpect_eq("deploy-1");
+		// ..and a bucket with no prefix keeps naming the bucket root
+		let StoreUri::S3 { prefix, .. } =
+			StoreUri::parse("s3://my-site?region=us-east-1").unwrap()
+		else {
+			panic!("expected an s3 store");
+		};
+		prefix.xpect_none();
 	}
 }

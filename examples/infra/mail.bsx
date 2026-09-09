@@ -108,7 +108,28 @@ route.
 	     volume), so the stack pins it rather than inheriting `AWS_REGION`: a deploy
 	     from a differently-configured machine builds the same stack. -->
 	<Stack app_name="mail-example" region="us-west-2">
-		<DeployRoutes/>
+		<Group bx:ref="deploy_up">
+			<EnsureSecret secret="mail-admin-password"/>
+			<!-- the sovereign signing key, minted before the apply that
+			     publishes its public half: the selector record reads a tofu
+			     variable, and a variable nobody supplied resolves to empty,
+			     which for `p=` is the wire form of a REVOKED selector. -->
+			<EnsureDkimKey/>
+			<StalwartSnapshot/>
+			<TofuApply/>
+			<Group bx:ref="attach_up"/>
+			<StalwartProvision/>
+			<!-- with no relay the inbound leg is submitted through the box's own
+			     port as the sending domain, so `sender` must name a mailbox that
+			     exists on it rather than the default `news`. -->
+			<MailProbe mailbox="probe" sender_domain="news.example.com" sender="replies"/>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+			<Group bx:ref="attach_down"/>
+		</Group>
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 
 		<!-- the network is DECLARED, not assumed: this stack is one public box and
 		     one EBS volume in the same zone, so it says so and emits one subnet.
@@ -131,6 +152,14 @@ route.
 		     its reverse record, its certificate and its SMTP banner stay put while
 		     the domains it serves come and go. Machine config remains replaceable;
 		     its protected data volume survives and is reattached to the next box. -->
+		<!-- 💡 the box's reverse record, declared beside the box rather than
+		     inside a verb: it is a thing the stack HAS. One tag spawns both
+		     halves of its lifecycle, so the request joins the deploy group and
+		     the reset joins the teardown group and the two cannot drift. AWS
+		     refuses to release an address while a PTR is set, so without the
+		     down half this stack could not be destroyed at all. -->
+		<EipReverseRecord up={$attach_up} down={$attach_down}/>
+
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
 			{VpcRef($net)}
@@ -165,22 +194,6 @@ route.
 			catch_all="replies"
 			mailboxes={[{localpart:"replies"}]}/>
 
-		<Route path="deploy" {ExchangeSequence}>
-			<EnsureSecret secret="mail-admin-password"/>
-			<!-- the sovereign signing key, minted before the apply that
-			     publishes its public half: the selector record reads a tofu
-			     variable, and a variable nobody supplied resolves to empty,
-			     which for `p=` is the wire form of a REVOKED selector. -->
-			<EnsureDkimKey/>
-			<StalwartSnapshot/>
-			<TofuApply/>
-			<EipReverseDns/>
-			<StalwartProvision/>
-			<!-- with no relay the inbound leg is submitted through the box's own
-			     port as the sending domain, so `sender` must name a mailbox that
-			     exists on it rather than the default `news`. -->
-			<MailProbe mailbox="probe" sender_domain="news.example.com" sender="replies"/>
-		</Route>
 	</Stack>
 </Router>
 </CliServer>

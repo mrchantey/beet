@@ -106,10 +106,12 @@ impl BlobStore {
 			StoreUri::Memory => BlobStore::temp().xok(),
 			StoreUri::S3 {
 				bucket,
+				prefix,
 				endpoint,
 				region,
 			} => Self::s3_from_uri(
 				bucket,
+				prefix.as_deref(),
 				endpoint.as_deref(),
 				region.as_deref(),
 			),
@@ -134,9 +136,14 @@ impl BlobStore {
 	/// process boundary's region convention (the deploy writes
 	/// `Environment=AWS_REGION=..` into the unit); nothing in-world reads the
 	/// environment for it.
+	///
+	/// A `prefix` roots the store inside the bucket, so a binary baked with
+	/// `s3://<bucket>/<deploy-id>` reads only the document version it shipped
+	/// with.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	fn s3_from_uri(
 		bucket: &str,
+		prefix: Option<&str>,
 		endpoint: Option<&str>,
 		region: Option<&str>,
 	) -> Result<BlobStore> {
@@ -157,6 +164,13 @@ impl BlobStore {
 				}
 			},
 		};
+		let store = match prefix {
+			Some(prefix) => {
+				info!("repo store: rooted at prefix `{prefix}`");
+				store.with_subdir(SmolPath::new(prefix))
+			}
+			None => store,
+		};
 		BlobStore::new(store).xok()
 	}
 
@@ -168,6 +182,7 @@ impl BlobStore {
 	))]
 	fn s3_from_uri(
 		_bucket: &str,
+		_prefix: Option<&str>,
 		_endpoint: Option<&str>,
 		_region: Option<&str>,
 	) -> Result<BlobStore> {

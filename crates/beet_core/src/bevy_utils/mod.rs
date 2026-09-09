@@ -13,6 +13,7 @@
 //! - [`AncestorQuery`] - Query entities through ancestor relationships
 //! - [`EntityTargetEvent`] - Events targeting specific entities
 //! - [`SubtreeTrigger`] - Fire one event across a subtree, deepest first
+//! - [`Group`] - Ordered membership beside the hierarchy, run by `RunGroup`
 //!
 //! # Systems and Plugins
 //!
@@ -46,6 +47,7 @@ mod common_systems;
 mod derived;
 mod despawn_after;
 mod entity_target_event;
+mod group;
 pub mod hook_ext;
 mod non_send_plugin;
 mod subtree_trigger;
@@ -73,6 +75,7 @@ pub use common_systems::*;
 pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
+pub use group::*;
 pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]

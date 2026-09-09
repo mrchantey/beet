@@ -83,7 +83,7 @@ pub async fn StalwartProvision(
 	ssh_key: SmolStr,
 	/// The local port the management endpoint is forwarded to. Not 8080, so a
 	/// developer running a local Stalwart is not quietly provisioned instead.
-	#[field]
+	#[field(default = Self::LOCAL_PORT)]
 	local_port: u16,
 	/// How long to wait at each gate: for ssh, for the management endpoint, and
 	/// for the restarted server to answer on 443. Generous, since a freshly
@@ -91,7 +91,7 @@ pub async fn StalwartProvision(
 	#[field(default = Duration::from_secs(600))]
 	timeout: Duration,
 	/// The gap between attempts, at every gate `timeout` bounds.
-	#[field]
+	#[field(default = Duration::from_secs(5))]
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
@@ -229,21 +229,34 @@ impl Management {
 		// the commissioned path: the real administrator account over the port
 		// the world already reaches. No tunnel, no recovery credential, and
 		// nothing on the box listening in the clear.
-		if let Some(password) = ssm_ext::get(region, &admin_secret).await?
-			&& let Ok(client) =
-				JmapClient::connect(&public_origin, &user, &password).await
-		{
-			info!(
-				"management over {public_origin} as the administrator account"
-			);
-			return Self {
-				client,
-				origin: public_origin,
-				user,
-				password,
-				tunnel: None,
+		if let Some(password) = ssm_ext::get(region, &admin_secret).await? {
+			match JmapClient::connect(&public_origin, &user, &password).await {
+				Ok(client) => {
+					info!(
+						"management over {public_origin} as the administrator account"
+					);
+					return Self {
+						client,
+						origin: public_origin,
+						user,
+						password,
+						tunnel: None,
+					}
+					.xok();
+				}
+				// worth saying out loud: the fallback below is the BOOTSTRAP
+				// channel, and a commissioned box retired that listener the
+				// first time it was provisioned. So on a box that is simply
+				// unreachable from here (a refused connection, a blocked
+				// deployer address) the next step is a wait on a port that will
+				// never open, and without this line it reports as "the
+				// management endpoint never answered" rather than as the
+				// refusal it is.
+				Err(err) => warn!(
+					"{public_origin} did not accept the administrator account, \
+					falling back to the bootstrap tunnel: {err}"
+				),
 			}
-			.xok();
 		}
 
 		// else the box is not serving its public endpoint yet, so management is

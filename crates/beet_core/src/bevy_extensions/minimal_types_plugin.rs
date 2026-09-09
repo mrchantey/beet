@@ -6,7 +6,8 @@ use crate::prelude::*;
 /// Registers the minimal Bevy types every app shares: [`Name`] (so `<Name("x")>`
 /// resolves as a BSX tag and serde round-trips entity names) and the hierarchy
 /// relationship ([`ChildOf`], [`Children`], so parent/child links survive a
-/// round-trip), without each downstream plugin re-registering them.
+/// round-trip) plus the membership one ([`Group`], [`MemberOf`], [`Members`]),
+/// without each downstream plugin re-registering them.
 ///
 /// It also marks the bevy clocks [`Derived`](ReflectDerived), the one place a
 /// foreign type can carry the mark, so no dump site has to remember to deny
@@ -22,6 +23,10 @@ impl Plugin for MinimalTypesPlugin {
 		app.register_type::<Name>()
 			.register_type::<ChildOf>()
 			.register_type::<Children>()
+			// ordered membership, the hierarchy's sibling axis
+			.register_type::<Group>()
+			.register_type::<MemberOf>()
+			.register_type::<Members>()
 			// the clocks advance every frame and are never authored content, so
 			// they are marked once here rather than denied at each dump site.
 			.register_derived::<Time>()
