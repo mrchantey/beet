@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// otherwise lingers across deploys, eg a home route converted `index.bsx` ->
 /// `index.md` leaves the stale `index.bsx`, so the served binary sees two routes
 /// for `/` and panics on boot), a source of record does not.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn SyncS3Bucket(

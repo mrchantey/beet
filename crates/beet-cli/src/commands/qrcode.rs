@@ -21,7 +21,7 @@ struct QrCodeParams {
 ///
 /// `--input` is the encoded text/url, `--output` the file (default
 /// `qrcode.png`), and `--light`/`--dark` set the colors as `r,g,b`.
-#[action(route = "qrcode", handler_only)]
+#[action(route = "qrcode")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]

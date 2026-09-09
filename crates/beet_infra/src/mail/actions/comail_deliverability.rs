@@ -5,43 +5,8 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<ComailDeliverability/>`: poll each comail domain's deliverability
-/// aggregates and publish them as CloudWatch metrics.
-///
-/// The SES arm gets its numbers for free: the configuration set publishes
-/// reputation metrics into `AWS/SES` and an alarm reads them. Comail has no
-/// such stream on our side, and the two surfaces it does have are not
-/// equivalent. Per-event webhooks carry the detail but their registration is
-/// session-cookie gated with api-key auth explicitly deferred
-/// (`internal/admin/ui/account_api_webhooks.go:6-17`), so nothing a deploy runs
-/// can subscribe to them. `GET /member/deliverability` carries aggregates and
-/// takes an api key, so it is the surface that can be automated, and aggregates
-/// are what the question "is my mail healthy" actually wants.
-///
-/// This is what makes a comail domain's alarms mean anything: they read metrics
-/// this job writes, so a comail stack without it is a stack whose first
-/// complaint arrives as an auto-pause (5% bounce or 0.08% complaint over a
-/// rolling 24h, `internal/relay/domain_pause_evaluator.go`). Declared as the
-/// route a `<ScheduledJobBlock/>` invokes, not as a deploy step: a number read
-/// once at deploy time is a number that was true once.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(ComailDeliverabilityAction)]
-pub struct ComailDeliverability {
-	/// Publish the numbers even when a poll finds a domain paused or
-	/// suspended. On by default, because a paused domain is exactly when the
-	/// metrics matter; off for a stack that would rather the alarm not
-	/// re-notify every half hour.
-	report_paused: bool,
-}
 
-impl Default for ComailDeliverability {
-	fn default() -> Self {
-		Self {
-			report_paused: true,
-		}
-	}
-}
+
 
 impl ComailDeliverability {
 	/// The member states that mean comail has stopped sending for a domain, ie
@@ -58,7 +23,7 @@ impl ComailDeliverability {
 	/// response carries `complaints_14d` as a count and comail's own pause
 	/// threshold is a rate: alarming on a count would fire on a busy fortnight
 	/// and stay silent on a small one with a terrible ratio.
-	pub fn metrics(&self, response: &Value) -> Vec<MetricDatum> {
+	pub fn metrics(report_paused: bool, response: &Value) -> Vec<MetricDatum> {
 		let number = |key: &str| response[key].as_f64().unwrap_or_default();
 		let sent = number("sent_14d");
 		let complaints = number("complaints_14d");
@@ -73,7 +38,7 @@ impl ComailDeliverability {
 				sent => complaints / sent,
 			}),
 		];
-		if self.report_paused {
+		if report_paused {
 			metrics.push(MetricDatum::count(
 				ComailRelay::PAUSED_METRIC,
 				match Self::is_stopped(response) {
@@ -98,17 +63,37 @@ impl ComailDeliverability {
 }
 
 /// Polls every comail domain and publishes what it reads.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<ComailDeliverability/>`: poll each comail domain's deliverability
+/// aggregates and publish them as CloudWatch metrics.
+///
+/// The SES arm gets its numbers for free: the configuration set publishes
+/// reputation metrics into `AWS/SES` and an alarm reads them. Comail has no
+/// such stream on our side, and the two surfaces it does have are not
+/// equivalent. Per-event webhooks carry the detail but their registration is
+/// session-cookie gated with api-key auth explicitly deferred
+/// (`internal/admin/ui/account_api_webhooks.go:6-17`), so nothing a deploy runs
+/// can subscribe to them. `GET /member/deliverability` carries aggregates and
+/// takes an api key, so it is the surface that can be automated, and aggregates
+/// are what the question "is my mail healthy" actually wants.
+///
+/// This is what makes a comail domain's alarms mean anything: they read metrics
+/// this job writes, so a comail stack without it is a stack whose first
+/// complaint arrives as an auto-pause (5% bounce or 0.08% complaint over a
+/// rolling 24h, `internal/relay/domain_pause_evaluator.go`). Declared as the
+/// route a `<ScheduledJobBlock/>` invokes, not as a deploy step: a number read
+/// once at deploy time is a number that was true once.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn ComailDeliverabilityAction(
+pub async fn ComailDeliverability(
+	/// Publish the numbers even when a poll finds a domain paused or
+	/// suspended. On by default, because a paused domain is exactly when the
+	/// metrics matter; off for a stack that would rather the alarm not
+	/// re-notify every half hour.
+	#[field(default = true)]
+	report_paused: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let poll = cx
-		.caller
-		.get_cloned::<ComailDeliverability>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 
@@ -134,7 +119,7 @@ pub async fn ComailDeliverabilityAction(
 			);
 		}
 		let response: Value = serde_json::from_str(&body)?;
-		let metrics = poll.metrics(&response);
+		let metrics = ComailDeliverability::metrics(report_paused, &response);
 		cloudwatch_ext::put_metric_data(
 			&region,
 			ComailRelay::METRIC_NAMESPACE,
@@ -194,8 +179,7 @@ mod tests {
 	/// small one with a terrible ratio.
 	#[beet_core::test]
 	fn the_response_maps_onto_the_alarmed_metrics() {
-		ComailDeliverability::default()
-			.metrics(&response("active", 1000, 2))
+		ComailDeliverability::metrics(true, &response("active", 1000, 2))
 			.into_iter()
 			.map(|datum| (datum.name, datum.value))
 			.collect::<Vec<_>>()
@@ -212,8 +196,7 @@ mod tests {
 	/// which would take the whole batch down with it.
 	#[beet_core::test]
 	fn a_domain_that_has_not_sent_publishes_zero() {
-		ComailDeliverability::default()
-			.metrics(&response("active", 0, 0))
+		ComailDeliverability::metrics(true, &response("active", 0, 0))
 			.into_iter()
 			.find(|datum| datum.name == ComailRelay::COMPLAINT_RATE_METRIC)
 			.unwrap()
@@ -227,8 +210,7 @@ mod tests {
 	#[beet_core::test]
 	fn a_stopped_domain_reports_one() {
 		let paused = |status: &str| {
-			ComailDeliverability::default()
-				.metrics(&response(status, 100, 0))
+			ComailDeliverability::metrics(true, &response(status, 100, 0))
 				.into_iter()
 				.find(|datum| datum.name == ComailRelay::PAUSED_METRIC)
 				.unwrap()

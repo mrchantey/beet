@@ -6,44 +6,8 @@ use beet_net::prelude::*;
 use serde_json::json;
 use std::collections::BTreeMap;
 
-/// `<MtaStsPublish/>` — serve every mail domain's MTA-STS policy at the
-/// well-known url a sending server looks for it, as one Cloudflare Worker.
-///
-/// The `_mta-sts` TXT record and the policy body are two halves of one
-/// statement: the record says a policy exists and carries an id, and the policy
-/// says what it is. Terraform publishes the record; nothing published the body
-/// until this, so senders found the record, failed to fetch a policy and cached
-/// none — which withholds no mail from a `testing` policy but also protects
-/// none.
-///
-/// A Worker rather than the mail box itself, for two reasons that are really
-/// one: `0.16` does not serve the well-known path at all, and a policy served
-/// by the box it authorises is a policy that goes away exactly when it matters.
-/// The edge serves it from a host with its own certificate, provisioned by the
-/// same upload as a wrangler *custom domain*, which is why this record is the
-/// one in the zone terraform does not own and the zone audit allows.
-///
-/// The bodies ride the Worker's own configuration rather than a bucket beside
-/// it: a policy is a hundred bytes and its whole content is generated from the
-/// declarations already in the stack, so a store in between would be one more
-/// thing to be stale.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(MtaStsPublishAction)]
-pub struct MtaStsPublish {
-	/// The Worker's name, which is also its `target/<name>-cf` project
-	/// directory. Stack-composed by the action when left empty, so the usual
-	/// declaration names nothing at all.
-	worker: SmolStr,
-}
 
-impl Default for MtaStsPublish {
-	fn default() -> Self {
-		Self {
-			worker: SmolStr::default(),
-		}
-	}
-}
+
 
 impl MtaStsPublish {
 	/// The wrangler `var` the policy bodies arrive in, keyed by the host each
@@ -120,17 +84,38 @@ export default {{
 
 /// Writes the project and uploads it, one Worker for every domain the stack
 /// serves mail for.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<MtaStsPublish/>` — serve every mail domain's MTA-STS policy at the
+/// well-known url a sending server looks for it, as one Cloudflare Worker.
+///
+/// The `_mta-sts` TXT record and the policy body are two halves of one
+/// statement: the record says a policy exists and carries an id, and the policy
+/// says what it is. Terraform publishes the record; nothing published the body
+/// until this, so senders found the record, failed to fetch a policy and cached
+/// none — which withholds no mail from a `testing` policy but also protects
+/// none.
+///
+/// A Worker rather than the mail box itself, for two reasons that are really
+/// one: `0.16` does not serve the well-known path at all, and a policy served
+/// by the box it authorises is a policy that goes away exactly when it matters.
+/// The edge serves it from a host with its own certificate, provisioned by the
+/// same upload as a wrangler *custom domain*, which is why this record is the
+/// one in the zone terraform does not own and the zone audit allows.
+///
+/// The bodies ride the Worker's own configuration rather than a bucket beside
+/// it: a policy is a hundred bytes and its whole content is generated from the
+/// declarations already in the stack, so a store in between would be one more
+/// thing to be stale.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn MtaStsPublishAction(
+pub async fn MtaStsPublish(
+	/// The Worker's name, which is also its `target/<name>-cf` project
+	/// directory. Stack-composed by the action when left empty, so the usual
+	/// declaration names nothing at all.
+	#[field(default = SmolStr::default())]
+	worker: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let publish = cx
-		.caller
-		.get_cloned::<MtaStsPublish>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	// only the domains this stack publishes an `_mta-sts` record for: a policy
@@ -152,9 +137,9 @@ pub async fn MtaStsPublishAction(
 		return Pass(cx.input).xok();
 	}
 
-	let worker = match publish.worker().is_empty() {
+	let worker = match worker.is_empty() {
 		true => mail.stack.resource_name(MtaStsPublish::LABEL),
-		false => publish.worker().to_string(),
+		false => worker.to_string(),
 	};
 	let dir = wrangler_ext::project_dir(&worker)?;
 	fs_ext::write_async(dir.join("worker.js"), MtaStsPublish::script()).await?;

@@ -51,6 +51,56 @@ where
 			},
 		)
 	}
+
+	/// Like [`new_system`](Self::new_system), but threading a cloned `state`
+	/// into the system as the first half of its input.
+	///
+	/// Bevy refuses to cache a non-ZST system, so a system action cannot close
+	/// over anything. State the caller wants to freeze in (a `#[field]` action's
+	/// values at `into_action` time) therefore travels as *input* instead: the
+	/// captured value lives in this action's boxed handler, and each call clones
+	/// it in beside the [`ActionContext`].
+	pub fn new_system_with<State, Func, FnMarker, RawOut>(
+		state: State,
+		func: Func,
+	) -> Self
+	where
+		State: 'static + Send + Sync + Clone,
+		Func: 'static + Send + Sync + Clone,
+		FnMarker: 'static,
+		Func: SystemParamFunction<FnMarker, Out = RawOut>,
+		Func: IntoSystem<
+				bevy::ecs::system::In<(State, ActionContext<In>)>,
+				RawOut,
+				(IsFunctionSystem, FnMarker),
+			>,
+		RawOut: 'static + Send + Sync + IntoResult<Out>,
+	{
+		Action::new(
+			ActionMeta::of::<Func, In, Out>(),
+			move |ActionCall {
+			          mut commands,
+			          caller,
+			          input,
+			          out_handler,
+			      }| {
+				let func = func.clone();
+				let state = state.clone();
+				let async_entity = commands.world().entity(caller);
+				let sys_input = ActionContext {
+					caller: async_entity,
+					input,
+				};
+				commands.commands.queue(move |world: &mut World| -> Result {
+					let raw: RawOut = world
+						.run_system_cached_with(func, (state, sys_input))?;
+					let result: Result<Out> = raw.into_result();
+					out_handler.call_world(world, result)
+				});
+				Ok(())
+			},
+		)
+	}
 }
 
 /// Marker for the system action [`IntoAction`] impl.
@@ -259,6 +309,59 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(12);
+	}
+
+	// -----------------------------------------------------------------------
+	// #[action] macro — system field actions
+	// -----------------------------------------------------------------------
+
+	#[action]
+	#[derive(Debug, Component, Reflect)]
+	#[reflect(Component, Default)]
+	fn Scale(#[field] factor: i32, val: In<i32>) -> i32 { val.0 * factor }
+
+	/// A system field action reads its factor off the caller, so a value edited
+	/// between calls is observed.
+	#[beet_core::test]
+	async fn system_fields_are_read_live() {
+		let mut world = AsyncPlugin::world();
+		let entity = world.spawn(Scale { factor: 2 }).id();
+		world
+			.entity_mut(entity)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(10);
+		world.entity_mut(entity).get_mut::<Scale>().unwrap().factor = 3;
+		world
+			.entity_mut(entity)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(15);
+	}
+
+	/// Detached, it freezes instead: bevy refuses a non-ZST cached system, so
+	/// the frozen factor rides in as system input rather than in a closure.
+	#[beet_core::test]
+	async fn system_into_action_freezes_its_fields() {
+		let mut world = AsyncPlugin::world();
+		// two detached actions of the same type, each with its own frozen value:
+		// a captured *closure* would have collapsed both onto one cached system.
+		let doubler = world.spawn(Scale { factor: 2 }.into_action()).id();
+		let tripler = world.spawn(Scale { factor: 3 }.into_action()).id();
+		world
+			.entity_mut(doubler)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(10);
+		world
+			.entity_mut(tripler)
+			.call::<i32, i32>(5)
+			.await
+			.unwrap()
+			.xpect_eq(15);
 	}
 
 	// -----------------------------------------------------------------------

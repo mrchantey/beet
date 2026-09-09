@@ -6,47 +6,8 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<ComailEnroll/>`: verify every comail-relayed domain's enrolment, and hand
-/// the records it minted to the apply.
-///
-/// Enrolment itself is NOT automated and cannot be: both endpoints are gated on
-/// an atproto OAuth session cookie whose DID must match the claim
-/// (`internal/admin/enroll_start_phases.go:64-79`), and there is no api-key path
-/// beside it. So a human enrols the domain in a browser, parks the five values
-/// the response carries in parameter store, and this verb is what turns that
-/// into something a deploy can fail on:
-///
-/// 1. every parameter exists, else it fails naming the missing one and what it
-///    holds;
-/// 2. the api key authenticates, checked with the one member-facing endpoint
-///    that takes one (`GET /member/deliverability`), which is also the endpoint
-///    the observability job polls;
-/// 3. the two selector records resolve in dns, reported rather than failed,
-///    since on a first deploy they are published by the apply that follows.
-///
-/// It runs BEFORE `<TofuApply/>`, for the same reason `<EnsureDkimKey/>` does:
-/// the selector records read their values out of tofu variables, and a variable
-/// nobody supplied resolves to its empty default, which for a DKIM record is
-/// the wire form of a REVOKED selector rather than a missing one.
-///
-/// A stack with no comail domain passes trivially, so the step is safe to leave
-/// in a route whose domains later move to another relay.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(ComailEnrollAction)]
-pub struct ComailEnroll {
-	/// The resolver the selector check asks, over DNS-over-HTTPS so the check
-	/// needs no resolver library and behaves the same on every target.
-	resolver: SmolStr,
-}
 
-impl Default for ComailEnroll {
-	fn default() -> Self {
-		Self {
-			resolver: Self::RESOLVER.into(),
-		}
-	}
-}
+
 
 impl ComailEnroll {
 	/// The DoH endpoint the record check queries.
@@ -57,14 +18,13 @@ impl ComailEnroll {
 	/// A resolver over HTTP rather than a system lookup because a `TXT` query
 	/// is not something `std` does and the deploy is target-agnostic: the same
 	/// request works from a laptop, a lambda and a browser.
-	async fn lookup_txt(&self, name: &str) -> Result<Vec<String>> {
-		let response =
-			Request::get(format!("{}?name={name}&type=TXT", self.resolver))
-				.with_header_raw("accept", "application/dns-json")
-				.send()
-				.await?;
+	async fn lookup_txt(resolver: &str, name: &str) -> Result<Vec<String>> {
+		let response = Request::get(format!("{resolver}?name={name}&type=TXT"))
+			.with_header_raw("accept", "application/dns-json")
+			.send()
+			.await?;
 		if !response.status().is_ok() {
-			bevybail!("{} answered {}", self.resolver, response.status());
+			bevybail!("{resolver} answered {}", response.status());
 		}
 		let json: Value = response.json().await?;
 		json["Answer"]
@@ -138,17 +98,41 @@ impl ComailEnroll {
 
 /// Checks every comail domain's parameters, credential and records, and passes
 /// the minted record values on to the apply as `-var`s.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<ComailEnroll/>`: verify every comail-relayed domain's enrolment, and hand
+/// the records it minted to the apply.
+///
+/// Enrolment itself is NOT automated and cannot be: both endpoints are gated on
+/// an atproto OAuth session cookie whose DID must match the claim
+/// (`internal/admin/enroll_start_phases.go:64-79`), and there is no api-key path
+/// beside it. So a human enrols the domain in a browser, parks the five values
+/// the response carries in parameter store, and this verb is what turns that
+/// into something a deploy can fail on:
+///
+/// 1. every parameter exists, else it fails naming the missing one and what it
+///    holds;
+/// 2. the api key authenticates, checked with the one member-facing endpoint
+///    that takes one (`GET /member/deliverability`), which is also the endpoint
+///    the observability job polls;
+/// 3. the two selector records resolve in dns, reported rather than failed,
+///    since on a first deploy they are published by the apply that follows.
+///
+/// It runs BEFORE `<TofuApply/>`, for the same reason `<EnsureDkimKey/>` does:
+/// the selector records read their values out of tofu variables, and a variable
+/// nobody supplied resolves to its empty default, which for a DKIM record is
+/// the wire form of a REVOKED selector rather than a missing one.
+///
+/// A stack with no comail domain passes trivially, so the step is safe to leave
+/// in a route whose domains later move to another relay.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn ComailEnrollAction(
+pub async fn ComailEnroll(
+	/// The resolver the selector check asks, over DNS-over-HTTPS so the check
+	/// needs no resolver library and behaves the same on every target.
+	#[field(default = Self::RESOLVER)]
+	resolver: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let enroll = cx
-		.caller
-		.get_cloned::<ComailEnroll>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 
@@ -205,7 +189,7 @@ pub async fn ComailEnrollAction(
 			input = input.with_param(variable.key(), value);
 		}
 
-		check_records(&enroll, domain, comail, &selector, &rsa_record).await;
+		check_records(&resolver, domain, comail, &selector, &rsa_record).await;
 	}
 	match checked {
 		0 => info!("no mail domain relays through comail"),
@@ -222,7 +206,7 @@ pub async fn ComailEnrollAction(
 /// and failing here would make the step impossible to satisfy. On every deploy
 /// after, a warning here is the thing to look at.
 async fn check_records(
-	enroll: &ComailEnroll,
+	resolver: &str,
 	domain: &MailDomainBlock,
 	comail: &ComailRelay,
 	selector: &str,
@@ -239,7 +223,7 @@ async fn check_records(
 		),
 	];
 	for (name, expected, what) in checks {
-		match enroll.lookup_txt(&name).await {
+		match ComailEnroll::lookup_txt(resolver, &name).await {
 			Ok(values) if values.iter().any(|value| value == &expected) => {
 				info!("{name} resolves: {what}")
 			}

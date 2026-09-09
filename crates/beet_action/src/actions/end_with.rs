@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(EndWith::new(Outcome::PASS));
 /// ```
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn EndWith<T = Outcome>(

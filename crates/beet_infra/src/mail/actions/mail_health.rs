@@ -4,6 +4,21 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+
+
+
+impl MailHealth {
+	/// The port a peer MTA dials, which is the one whose greeting is a
+	/// reputation input.
+	pub const SMTP_PORT: u16 = 25;
+
+	/// The SMTP reply code that opens a session. Anything else at all — a
+	/// `421`, a `554` — is a server that is listening and refusing.
+	pub const READY_CODE: &'static str = "220";
+}
+
+/// Runs both checks, reporting each and failing on the first that does not
+/// hold.
 /// `<MailHealth/>` — assert the two surfaces the box is judged on from outside
 /// it: the SMTP greeting a sending server sees, and the JMAP session a client
 /// and an agent see.
@@ -19,50 +34,20 @@ use beet_net::prelude::*;
 /// single most common cause of a domain being greylisted into oblivion, and it
 /// is invisible from the inside: the server is up, mail is queued, and
 /// deliveries simply take hours.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(MailHealthAction)]
-pub struct MailHealth {
+pub async fn MailHealth(
 	/// How long to wait on each check. Short: this is a liveness question, and
 	/// a slow answer is itself the finding.
+	#[field(default = Duration::from_secs(30))]
 	timeout: Duration,
-}
-
-impl Default for MailHealth {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(30),
-		}
-	}
-}
-
-impl MailHealth {
-	/// The port a peer MTA dials, which is the one whose greeting is a
-	/// reputation input.
-	pub const SMTP_PORT: u16 = 25;
-
-	/// The SMTP reply code that opens a session. Anything else at all — a
-	/// `421`, a `554` — is a server that is listening and refusing.
-	pub const READY_CODE: &'static str = "220";
-}
-
-/// Runs both checks, reporting each and failing on the first that does not
-/// hold.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn MailHealthAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let health = cx
-		.caller
-		.get_cloned::<MailHealth>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let hostname = mail.mail_box.hostname().to_string();
 
-	check_banner(&hostname, *health.timeout()).await?;
+	check_banner(&hostname, timeout).await?;
 	check_jmap(&hostname).await?;
 	Ok(Pass(cx.input))
 }

@@ -266,7 +266,7 @@ struct AnalyticsRollupParams {
 /// The route names its raw, rollup, and archive stores by relation. A run is
 /// idempotent: archive paths and aggregate IDs are deterministic, while event-ID
 /// deduplication makes a retry safe if a prior run archived but did not delete.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(ParamsPartial = ParamsPartial::new::<AnalyticsRollupParams>())]

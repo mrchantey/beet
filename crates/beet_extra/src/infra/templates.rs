@@ -824,7 +824,7 @@ mod test {
 		world
 			.query::<&TofuApply>()
 			.iter(&world)
-			.map(|apply| apply.layer.clone().into_inner())
+			.map(|apply| apply.layer.as_ref().cloned())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Some(SmolStr::new("storage")), None]);
 	}

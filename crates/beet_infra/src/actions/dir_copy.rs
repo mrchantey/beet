@@ -15,7 +15,7 @@ use beet_net::prelude::*;
 ///
 /// Mirror semantics per path: a destination file or directory is replaced, so a
 /// stale binary is overwritten rather than merged around.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn DirCopy(

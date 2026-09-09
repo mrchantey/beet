@@ -17,8 +17,8 @@ use bevy::reflect::Typed;
 /// as the canonical fields, whether an [`Action`] or an [`ActionOverload`]
 /// landed last. An in-place edit would be invisible to them.
 ///
-/// Created via [`ActionMeta::of`], [`ActionMeta::of_handler`], or
-/// [`ActionMeta::of_reflect`].
+/// Created via [`ActionMeta::of`], optionally enriched by
+/// [`with_type_info`](ActionMeta::with_type_info).
 #[derive(Clone, Debug, Component, Get)]
 #[component(immutable)]
 pub struct ActionMeta {
@@ -54,33 +54,25 @@ impl ActionMeta {
 		}
 	}
 
-	/// Create an [`ActionMeta`] with handler reflection data. Provides
-	/// description from doc comments but no JSON schemas for input/output.
-	/// Requires only the handler to implement [`Typed`].
-	pub fn of_handler<T, In, Out>() -> Self
-	where
-		T: 'static + Typed,
-		In: 'static,
-		Out: 'static,
-	{
-		Self {
-			type_info: Some(ActionTypeInfo::of_handler::<T>()),
-			..Self::of::<T, In, Out>()
-		}
-	}
-
-	/// Create an [`ActionMeta`] with full reflection data, so the handler's doc
-	/// description and the input/output schemas are all available.
-	pub fn of_reflect<T, In, Out>() -> Self
-	where
-		T: 'static + Typed,
-		In: 'static + Typed,
-		Out: 'static + Typed,
-	{
-		Self {
-			type_info: Some(ActionTypeInfo::of_full::<T, In, Out>()),
-			..Self::of::<T, In, Out>()
-		}
+	/// Attach whatever reflection data the three types turned out to support.
+	///
+	/// The `#[action]` macro's seam: it cannot test a trait bound, so it probes
+	/// each of `Self`, `In` and `Out` with [`MaybeTyped`] at the call site and
+	/// hands the answers here. A handler that reflects yields a doc description;
+	/// an input or output that reflects yields a schema too, independently.
+	pub fn with_type_info(
+		mut self,
+		handler: Option<&'static TypeInfo>,
+		input: Option<&'static TypeInfo>,
+		output: Option<&'static TypeInfo>,
+	) -> Self {
+		// the description hangs off the handler, so no handler info is no info
+		self.type_info = handler.map(|handler_info| ActionTypeInfo {
+			handler_info,
+			input_info: input,
+			output_info: output,
+		});
+		self
 	}
 
 	/// An [`ActionMeta`] with no canonical action yet, created by an
@@ -232,31 +224,6 @@ pub struct ActionTypeInfo {
 }
 
 impl ActionTypeInfo {
-	/// Create [`ActionTypeInfo`] with only handler reflection data.
-	/// Provides description but no JSON schemas.
-	pub fn of_handler<T: Typed>() -> Self {
-		Self {
-			handler_info: T::type_info(),
-			input_info: None,
-			output_info: None,
-		}
-	}
-
-	/// Create [`ActionTypeInfo`] with full reflection data including
-	/// input and output types.
-	pub fn of_full<T, In, Out>() -> Self
-	where
-		T: Typed,
-		In: Typed,
-		Out: Typed,
-	{
-		Self {
-			handler_info: T::type_info(),
-			input_info: Some(In::type_info()),
-			output_info: Some(Out::type_info()),
-		}
-	}
-
 	/// The handler [`TypeInfo`].
 	pub fn handler_info(&self) -> &'static TypeInfo { self.handler_info }
 	/// The input [`TypeInfo`], if available.
@@ -317,4 +284,55 @@ impl core::hash::Hash for TypeMeta {
 	fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
 		self.type_id.hash(state);
 	}
+}
+
+/// Probes whether `T` reflects, so a macro can pick the richest metadata it
+/// can without the author declaring which one applies.
+///
+/// Rust has no way to branch on a trait bound, so this branches on *method
+/// resolution* instead: the `Typed` impl sits behind one autoref and wins when
+/// its bound holds, otherwise resolution falls through to the blanket impl on
+/// the value itself. Call it through the double reference:
+///
+/// ```
+/// # use beet_action::prelude::*;
+/// # use beet_core::prelude::*;
+/// let some = (&&MaybeTyped::<u32>::new()).maybe_type_info();
+/// let none = (&&MaybeTyped::<fn()>::new()).maybe_type_info();
+/// some.xpect_some();
+/// none.xpect_none();
+/// ```
+///
+/// The answer is decided where the call is written, so a generic action whose
+/// param carries no `Typed` bound resolves to `None` for every instantiation —
+/// the honest answer, since nothing at that site knows better.
+pub struct MaybeTyped<T>(core::marker::PhantomData<fn() -> T>);
+
+impl<T> Default for MaybeTyped<T> {
+	fn default() -> Self { Self::new() }
+}
+
+impl<T> MaybeTyped<T> {
+	/// A probe for `T`.
+	pub fn new() -> Self { Self(core::marker::PhantomData) }
+}
+
+/// The reflecting arm of [`MaybeTyped`], reached through one autoref.
+pub trait MaybeTypedReflect {
+	/// `T`'s [`TypeInfo`].
+	fn maybe_type_info(&self) -> Option<&'static TypeInfo>;
+}
+impl<T: Typed> MaybeTypedReflect for &MaybeTyped<T> {
+	fn maybe_type_info(&self) -> Option<&'static TypeInfo> {
+		Some(T::type_info())
+	}
+}
+
+/// The fallback arm of [`MaybeTyped`], reached when the `Typed` bound fails.
+pub trait MaybeTypedFallback {
+	/// `None`, since `T` does not reflect here.
+	fn maybe_type_info(&self) -> Option<&'static TypeInfo>;
+}
+impl<T> MaybeTypedFallback for MaybeTyped<T> {
+	fn maybe_type_info(&self) -> Option<&'static TypeInfo> { None }
 }

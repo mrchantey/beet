@@ -11,7 +11,7 @@ pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =
 ///
 /// ## Errors
 /// Errors if no [`AnimationPlayer`] could be resolved on the agent.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Default, Component)]
 pub fn PlayAnimation(

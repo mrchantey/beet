@@ -162,7 +162,7 @@ impl IntoResponseWithRequestParts<Self> for PageRequest {
 }
 
 /// Serves bytes from the ancestor [`BlobStore`] parsed into a render tree.
-#[action(route, handler_only)]
+#[action(route)]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn BlobScene(

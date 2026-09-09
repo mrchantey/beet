@@ -6,53 +6,8 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// `<StalwartProvision/>` — after the apply, make the box that terraform built
-/// serve the mail the blocks declared.
-///
-/// A fresh `0.16` box boots in bootstrap mode: management HTTP on `8080` and
-/// nothing else, mail ports silent, authenticating against the recovery admin
-/// credential its `stalwart.env` carries. It stays that way until the
-/// configuration objects exist, so this step is not a nicety after the apply,
-/// it is the half of the install terraform cannot express.
-///
-/// `8080` is deliberately NOT in the security group. The management endpoint
-/// serves plaintext HTTP and answers to a password that provisions the whole
-/// server, so it is reached through an ssh port forward over the box's key pair
-/// and is unreachable from the internet at any point.
-///
-/// Idempotent and additive: every object is matched against what the server
-/// already has and patched rather than recreated, and nothing is ever deleted.
-/// An account the plan no longer declares is left alone, because the failure
-/// mode of the alternative is deleting somebody's mailbox on a typo.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(StalwartProvisionAction)]
-pub struct StalwartProvision {
-	/// The private half of the key pair the box imported. The box declares a
-	/// PUBLIC key and generates nothing, so the private half is the deployer's
-	/// own and is never an output of the stack; a leading `~` expands.
-	ssh_key: SmolStr,
-	/// The local port the management endpoint is forwarded to. Not 8080, so a
-	/// developer running a local Stalwart is not quietly provisioned instead.
-	local_port: u16,
-	/// How long to wait at each gate: for ssh, for the management endpoint, and
-	/// for the restarted server to answer on 443. Generous, since a freshly
-	/// replaced box is still installing the log agent when the deploy arrives.
-	timeout: Duration,
-	/// The gap between attempts, at every gate `timeout` bounds.
-	poll: Duration,
-}
 
-impl Default for StalwartProvision {
-	fn default() -> Self {
-		Self {
-			ssh_key: Self::SSH_KEY.into(),
-			local_port: Self::LOCAL_PORT,
-			timeout: Duration::from_secs(600),
-			poll: Duration::from_secs(5),
-		}
-	}
-}
+
 
 impl StalwartProvision {
 	/// The management port Stalwart serves in bootstrap mode, on loopback at
@@ -99,17 +54,47 @@ impl StalwartProvision {
 
 /// Applies the plan, restarts the unit and waits for the server to answer on
 /// its public port.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<StalwartProvision/>` — after the apply, make the box that terraform built
+/// serve the mail the blocks declared.
+///
+/// A fresh `0.16` box boots in bootstrap mode: management HTTP on `8080` and
+/// nothing else, mail ports silent, authenticating against the recovery admin
+/// credential its `stalwart.env` carries. It stays that way until the
+/// configuration objects exist, so this step is not a nicety after the apply,
+/// it is the half of the install terraform cannot express.
+///
+/// `8080` is deliberately NOT in the security group. The management endpoint
+/// serves plaintext HTTP and answers to a password that provisions the whole
+/// server, so it is reached through an ssh port forward over the box's key pair
+/// and is unreachable from the internet at any point.
+///
+/// Idempotent and additive: every object is matched against what the server
+/// already has and patched rather than recreated, and nothing is ever deleted.
+/// An account the plan no longer declares is left alone, because the failure
+/// mode of the alternative is deleting somebody's mailbox on a typo.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn StalwartProvisionAction(
+pub async fn StalwartProvision(
+	/// The private half of the key pair the box imported. The box declares a
+	/// PUBLIC key and generates nothing, so the private half is the deployer's
+	/// own and is never an output of the stack; a leading `~` expands.
+	#[field(default = Self::SSH_KEY)]
+	ssh_key: SmolStr,
+	/// The local port the management endpoint is forwarded to. Not 8080, so a
+	/// developer running a local Stalwart is not quietly provisioned instead.
+	#[field]
+	local_port: u16,
+	/// How long to wait at each gate: for ssh, for the management endpoint, and
+	/// for the restarted server to answer on 443. Generous, since a freshly
+	/// replaced box is still installing the log agent when the deploy arrives.
+	#[field(default = Duration::from_secs(600))]
+	timeout: Duration,
+	/// The gap between attempts, at every gate `timeout` bounds.
+	#[field]
+	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let provision = cx
-		.caller
-		.get_cloned::<StalwartProvision>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	// the credentials this step writes into the relay routes, read from
@@ -143,15 +128,20 @@ pub async fn StalwartProvisionAction(
 		host: mail.public_ip().await?,
 		user: StalwartProvision::SSH_USER.to_string(),
 		port: 22,
-		key_path: StalwartProvision::key_path(provision.ssh_key())?,
+		key_path: StalwartProvision::key_path(&ssh_key)?,
 	};
-	connection
-		.wait_for_ready(*provision.timeout(), *provision.poll())
-		.await?;
+	connection.wait_for_ready(timeout, poll).await?;
 
-	let mut management =
-		Management::open(&connection, &provision, &plan, &mail, &region)
-			.await?;
+	let mut management = Management::open(
+		&connection,
+		local_port,
+		timeout,
+		poll,
+		&plan,
+		&mail,
+		&region,
+	)
+	.await?;
 	let domain_ids =
 		apply_plan(management.client(), &plan, &region, &mail.stack).await?;
 
@@ -159,7 +149,7 @@ pub async fn StalwartProvisionAction(
 		"restarting {} so the mail listeners bind",
 		StalwartProvision::UNIT
 	);
-	management.restart(&connection, &provision).await?;
+	management.restart(&connection, timeout, poll).await?;
 
 	// certificates come from AcmeRenewal tasks, and a task executes only while
 	// the process that accepted it keeps running: one scheduled moments before
@@ -170,8 +160,8 @@ pub async fn StalwartProvisionAction(
 		management.client(),
 		&plan,
 		&domain_ids,
-		*provision.timeout(),
-		*provision.poll(),
+		timeout,
+		poll,
 	)
 	.await?;
 
@@ -190,8 +180,7 @@ pub async fn StalwartProvisionAction(
 		connection.run_command(&restart_command()).await?;
 	}
 
-	wait_for_health(&mail.mail_box, *provision.timeout(), *provision.poll())
-		.await?;
+	wait_for_health(&mail.mail_box, timeout, poll).await?;
 	Pass(cx.input).xok()
 }
 
@@ -226,7 +215,9 @@ impl Management {
 	/// data store first if it has never been claimed.
 	async fn open(
 		connection: &SshConnection,
-		provision: &StalwartProvision,
+		local_port: u16,
+		timeout: Duration,
+		poll: Duration,
 		plan: &StalwartPlan,
 		mail: &MailStack,
 		region: &str,
@@ -259,22 +250,16 @@ impl Management {
 		// the plaintext port the security group deliberately does not admit,
 		// reached through a forward over the box's key pair.
 		let tunnel = connection
-			.tunnel(provision.local_port(), StalwartProvision::MANAGEMENT_PORT)
+			.tunnel(local_port, StalwartProvision::MANAGEMENT_PORT)
 			.await?;
-		let tunnel_origin =
-			format!("http://127.0.0.1:{}", provision.local_port());
+		let tunnel_origin = format!("http://127.0.0.1:{local_port}");
 
 		// bootstrap mode is a property of the RUNNING process rather than of
 		// the disk, so it is decided by which credential answers. The endpoint
 		// is waited for once, unauthenticated, so that a rejected credential
 		// means "not this one" instead of "not up yet" — the difference between
 		// one failed request and a ten-minute poll against the wrong password.
-		wait_for_endpoint(
-			&tunnel_origin,
-			*provision.timeout(),
-			*provision.poll(),
-		)
-		.await?;
+		wait_for_endpoint(&tunnel_origin, timeout, poll).await?;
 		let recovery =
 			read_secret(region, &mail.mail_box.admin_secret_name(&mail.stack))
 				.await?;
@@ -311,8 +296,8 @@ impl Management {
 			&[&public_origin, &tunnel_origin],
 			&user,
 			&password,
-			*provision.timeout(),
-			*provision.poll(),
+			timeout,
+			poll,
 		)
 		.await?;
 		// the forward is held only while it is the channel: kept here, dropped
@@ -378,7 +363,8 @@ impl Management {
 	async fn restart(
 		&mut self,
 		connection: &SshConnection,
-		provision: &StalwartProvision,
+		timeout: Duration,
+		poll: Duration,
 	) -> Result {
 		connection.run_command(&restart_command()).await?;
 		let origin = self.origin.clone();
@@ -386,8 +372,8 @@ impl Management {
 			&[&origin],
 			&self.user,
 			&self.password,
-			*provision.timeout(),
-			*provision.poll(),
+			timeout,
+			poll,
 		)
 		.await?;
 		Ok(())

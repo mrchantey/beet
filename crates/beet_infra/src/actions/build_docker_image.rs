@@ -34,7 +34,7 @@ impl ContainerEngine {
 /// The image `CMD` is not configured here: it is rendered from the sibling
 /// [`FargateBlock`]'s [`BootstrapConfig`], so the deployed binary's argv and the
 /// task definition's env come from one declaration.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Component, Default)]
 pub async fn BuildDockerImage(

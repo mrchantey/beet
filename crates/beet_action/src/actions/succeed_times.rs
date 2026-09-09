@@ -16,7 +16,7 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(SucceedTimes::new(2));
 /// ```
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn SucceedTimes<T = ()>(

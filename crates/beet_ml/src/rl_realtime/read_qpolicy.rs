@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 ///
 /// The [`Handle`] lives on the action component itself rather than via a
 /// wrapper, since the action struct already derives [`Component`].
-#[action(plain_meta)]
+#[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn ReadQPolicy<P>(

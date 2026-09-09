@@ -50,7 +50,7 @@ async fn send_zone_request(request: Request) -> Result<serde_json::Value> {
 ///   https-only origin (an api gateway custom domain) answers nothing there, so
 ///   without this http://<site> is a 521. Redirecting at the edge also means the
 ///   request never reaches the origin at all.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareZoneSetup(
@@ -135,7 +135,7 @@ fn cache_rules() -> serde_json::Value {
 /// A REST call (`POST zones/{zone}/purge_cache`), not tofu: a purge is an
 /// event, not a resource. Reads `CLOUDFLARE_ZONE_ID` and authenticates with
 /// `CLOUDFLARE_API_TOKEN` (needs the `Cache Purge` permission).
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflarePurgeCache(

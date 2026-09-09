@@ -288,7 +288,7 @@ mod test {
 	async fn clamps_drive_duration() {
 		let (mut app, _image_entity, drive_entity) = run_response(
 			RespondMultiModal {
-				max_drive_duration: PropOpt(Some(Duration::from_secs(1))),
+				max_drive_duration: PropOpt::some(Duration::from_secs(1)),
 			},
 			RespondMultiModalInput {
 				image: "joy".into(),

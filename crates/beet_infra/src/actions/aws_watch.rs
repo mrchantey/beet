@@ -56,13 +56,13 @@ impl AwsWatch {
 	pub fn for_target(target: WatchTarget) -> Self {
 		Self {
 			target,
-			timeout: PropOpt(None),
+			timeout: PropOpt::none(),
 		}
 	}
 
 	/// Kill the tail after `timeout`, rather than following indefinitely.
 	pub fn with_timeout(mut self, timeout: Duration) -> Self {
-		self.timeout = PropOpt(Some(timeout));
+		self.timeout = PropOpt::some(timeout);
 		self
 	}
 }
@@ -73,7 +73,7 @@ impl AwsWatch {
 ///
 /// Tails via `aws logs tail --follow`, reading the AWS region from the nearest
 /// ancestor [`Stack`].
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn AwsWatch(

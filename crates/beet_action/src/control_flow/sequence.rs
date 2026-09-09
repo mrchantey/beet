@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 /// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn Sequence<Input = (), Output = ()>(
@@ -85,7 +85,7 @@ where
 /// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn InfallibleSequence<Input = (), Output = ()>(

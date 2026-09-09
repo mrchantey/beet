@@ -28,7 +28,7 @@ struct ScreenshotParams {
 /// beet screenshot 'http://localhost:8337/docs/design/counter?color-scheme=dark' \
 ///   --selector='#sidebar' --output=sidebar.png
 /// ```
-#[action(route = "screenshot/*url", handler_only)]
+#[action(route = "screenshot/*url")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<ScreenshotParams>())]

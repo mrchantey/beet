@@ -275,7 +275,7 @@ mod test {
 
 	/// Test handler that echoes all request params as `key=v1/v2` pairs,
 	/// sorted for deterministic output.
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn EchoParams(cx: ActionContext<RequestParts>) -> MediaBytes {
@@ -731,7 +731,7 @@ mod test {
 			index: u32,
 		}
 
-		#[action(handler_only)]
+		#[action]
 		#[derive(Default, Clone, Component, Reflect)]
 		#[reflect(Component)]
 		async fn Ticks(_cx: ActionContext<RequestParts>) -> Response {

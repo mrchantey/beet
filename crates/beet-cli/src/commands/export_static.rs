@@ -23,7 +23,7 @@ struct ExportStaticParams {
 /// beet export-static examples/bsx_site             # writes examples/bsx_site/dist
 /// beet export-static examples/bsx_site --out=public # ..or a chosen output dir (cwd-relative)
 /// ```
-#[action(route = "export-static/*entry", handler_only)]
+#[action(route = "export-static/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<(ExportStaticParams, EntryParams)>())]

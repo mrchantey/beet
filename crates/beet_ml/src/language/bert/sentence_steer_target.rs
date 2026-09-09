@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 ///
 /// The generic parameter `F` filters the candidate pool to entities
 /// matching `With<F>`.
-#[action(plain_meta)]
+#[action]
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
 pub fn SentenceSteerTarget<F>(

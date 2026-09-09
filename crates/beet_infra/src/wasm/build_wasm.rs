@@ -7,6 +7,10 @@ use beet_net::prelude::*;
 /// field-by-field, so a markup preset like `<BuildWasm package="beet-cli"
 /// features="web" out="app.wasm"/>` still yields to an explicit `--features`
 /// per call.
+///
+/// A hand-written pair rather than a `#[field]` action: these are a PATCH BASE
+/// the request writes over through reflect, not values bound once per call, so
+/// the action needs the whole struct rather than its fields.
 #[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(BuildWasmAction)]
@@ -51,7 +55,7 @@ pub struct BuildWasm {
 /// `wasm-opt -Oz`, and finally renames the `<name>_bg.wasm`/`<name>.js` pair to
 /// the exact `--out` names (patching the glue's wasm URL to match), returning the
 /// artifact size.
-#[action(route = "build-wasm", handler_only)]
+#[action(route = "build-wasm")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<BuildWasm>())]

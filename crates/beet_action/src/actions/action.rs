@@ -478,7 +478,11 @@ mod test {
 
 	#[beet_core::test]
 	fn reflect_meta_has_type_info() {
-		let meta = ActionMeta::of_reflect::<add, (u32, u32), u32>();
+		let meta = ActionMeta::of::<add, (u32, u32), u32>().with_type_info(
+			(&&MaybeTyped::<add>::new()).maybe_type_info(),
+			(&&MaybeTyped::<(u32, u32)>::new()).maybe_type_info(),
+			(&&MaybeTyped::<u32>::new()).maybe_type_info(),
+		);
 		meta.type_info().xpect_some();
 		meta.input_info().xpect_some();
 		meta.output_info().xpect_some();

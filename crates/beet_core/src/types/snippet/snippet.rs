@@ -99,7 +99,7 @@ impl Template for Snippet {
 /// `From` impl, only the [`IntoProp`] `PropOpt` wrap applies (`placeholder="hi"`,
 /// `variant=Variant::Error`), with no collision with `core`'s
 /// `From<T> for Option<T>` that a bare `Option<T>` field would suffer.
-#[derive(Debug, Clone, PartialEq, Reflect)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Reflect)]
 #[reflect(Default)]
 pub struct PropOpt<T>(pub Option<T>);
 
@@ -108,11 +108,19 @@ impl<T> Default for PropOpt<T> {
 }
 
 impl<T> PropOpt<T> {
+	/// A supplied value.
+	///
+	/// Hand-written Rust reaches for this where markup would write the
+	/// attribute; there is deliberately no `From` impl, since one would make
+	/// [`IntoProp`]'s marker ambiguous for the very fields this type exists to
+	/// disambiguate.
+	pub fn some(value: T) -> Self { Self(Some(value)) }
+
+	/// No value supplied, the same as [`Default`].
+	pub fn none() -> Self { Self(None) }
+
 	/// Take the inner [`Option`], the form the `#[template]` body binds.
 	pub fn into_inner(self) -> Option<T> { self.0 }
-
-	/// Whether no value was supplied (used by the required-prop check).
-	pub fn is_none(&self) -> bool { self.0.is_none() }
 }
 
 /// Convert a provided value into a `#[template]` prop field, the conversion the

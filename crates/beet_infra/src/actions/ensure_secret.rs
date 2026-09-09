@@ -26,7 +26,7 @@ use beet_net::prelude::*;
 ///
 /// Idempotent by construction, and cheap when there is nothing to do: an
 /// existing parameter is one read and no write.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn EnsureSecret(
@@ -98,7 +98,7 @@ impl EnsureSecret {
 	pub fn new(secret: SecretRef) -> Self {
 		Self {
 			secret,
-			variable: PropOpt(None),
+			variable: PropOpt::none(),
 			length: Self::LENGTH,
 		}
 	}
@@ -170,13 +170,12 @@ mod tests {
 			.is_none()
 			.xpect_true();
 		EnsureSecret {
-			variable: PropOpt(Some("db_password".into())),
+			variable: PropOpt::some("db_password".into()),
 			..EnsureSecret::new(SecretRef::new("db-password"))
 		}
 		.variable
-		.into_inner()
+		.as_deref()
 		.unwrap()
-		.as_str()
 		.xpect_eq("db_password");
 	}
 

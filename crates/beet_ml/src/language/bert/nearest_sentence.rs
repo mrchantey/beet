@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// nearest child (a fan-out side-effect), this action now *returns* the
 /// chosen entity, letting the caller compose. Pair it with a downstream
 /// action (eg via `chain`) to act on the chosen entity.
-#[action(plain_meta)]
+#[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn NearestSentence(

@@ -168,7 +168,7 @@ fn setup(async_commands: AsyncCommands) {
 											AttackPlayer {
 												max_damage: 15.0,
 												max_recoil: 30.0,
-												player: PropOpt(Some(player)),
+												player: PropOpt::some(player),
 											},
 										),
 										(
@@ -179,7 +179,7 @@ fn setup(async_commands: AsyncCommands) {
 											AttackPlayer {
 												max_damage: 10_000.0,
 												max_recoil: 10.0,
-												player: PropOpt(Some(player)),
+												player: PropOpt::some(player),
 											},
 										),
 									],

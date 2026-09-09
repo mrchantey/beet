@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 /// Sets the [`Text`] of all entities with the filter component `F`
 /// when this action runs, then passes.
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn SetTextOnRun<F>(

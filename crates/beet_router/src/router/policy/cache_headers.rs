@@ -155,14 +155,14 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn HelloHtml(_cx: ActionContext<RequestParts>) -> Response {
 		Response::ok_body("<p>Hello</p>", MediaType::Html)
 	}
 
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn HelloMarkdown(_cx: ActionContext<RequestParts>) -> Response {

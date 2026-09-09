@@ -77,12 +77,16 @@ The grammar, in full:
 - an `Option<T>` field — stored as `PropOpt<T>`, bound back to `Option<T>` in the body
 - `#[field(required)]` — stored as `PropOpt<T>`, validated at call time, erroring by field name
 - `#[field(mut)]` — a mutable binding, so the body edits its own config in place
+- `#[field(no_clone)]` — declared on the struct but never bound, for a value too expensive to clone per call; the body reads it through `cx.caller` instead
+- a visibility (`#[field(pub(crate))]`, `#[field(pub(in path))]`) — narrows the field, which is otherwise `pub` so a cross-module `rsx!` struct-literal patch resolves
 
-`into_action` detaches the action from any entity, so it captures the field values at conversion. Two flavors cannot: a system action, because bevy refuses to cache a non-ZST system, and a middleware action, whose component genuinely lives on the live host entity the call names as caller. Both keep the live-fetching wrapper. A `#[field(mut)]` action emits no `IntoAction` at all, since a detached action has nothing to write back to; `mut` on an `async fn` is a compile error, because mutable component access cannot cross an await (do it at a sync point with `cx.caller.get_mut`).
+`into_action` detaches the action from any entity, so it freezes the field values at conversion — including a system action, whose frozen values ride in as system *input* rather than in a closure, since bevy refuses to cache a non-ZST system. Middleware is the one exception: its component genuinely lives on the host entity the call names as caller, so it keeps the live-fetching wrapper. A `#[field(mut)]` action emits no `IntoAction` at all, since a detached action has nothing to write back to; `mut` on an `async fn` is a compile error, because mutable component access cannot cross an await (do it at a sync point with `cx.caller.get_mut`).
 
-The macro emits no constructors: where `Foo::new(..)` earns its keep, write a plain `impl` block beside the action. A generic action gains a `pub _marker: PhantomData<fn() -> T>` field and a perfect-derive `Clone`, so its type params are never spuriously bounded. Reflection metadata follows the types: a generic action whose `Self`/`In`/`Out` are not `Typed` declares `#[action(plain_meta)]`, and one whose input alone is not `Typed` declares `#[action(handler_only)]`.
+The macro emits no constructors: where `Foo::new(..)` earns its keep, write a plain `impl` block beside the action. A generic action gains a `pub _marker: PhantomData<fn() -> T>` field and a perfect-derive `Clone`, so its type params are never spuriously bounded.
 
-Hand-written pairs remain permitted — the merge removes the *forced* two-type pattern, not the ability to write a provider. [`BuildArtifact`](../beet_infra) keeps one because its type must exist in builds its action does not.
+Metadata needs no declaration either. A macro cannot test a trait bound, so [`MaybeTyped`] probes `Self`, `In` and `Out` where the call is written and [`ActionMeta`] takes whatever came back: a doc description from a reflecting handler, a schema from a reflecting input or output. An action whose input is a `Request` and a generic one whose own type is not `Typed` both simply get less, with nothing to spell.
+
+Hand-written pairs remain permitted — the merge removes the *forced* two-type pattern, not the ability to write a provider. Two in the tree keep theirs and say why: `BuildArtifact`, whose type must exist in builds its action does not, and `BuildWasm`, whose fields are a patch base the request writes over through reflect rather than values bound once per call.
 
 ## Long-running work: facets
 

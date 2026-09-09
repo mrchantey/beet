@@ -5,51 +5,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<ZoneAudit/>` — assert that the Cloudflare zone contains exactly the
-/// records this stack declares, plus the ones it was told to expect.
-///
-/// Terraform converges the records it owns and is blind to everything else, so
-/// a record created by hand during an incident, or left behind by a provider
-/// that was migrated away from, sits in the zone indefinitely. For most stacks
-/// that is untidy; for mail it is an outage waiting to happen, because a
-/// leftover `MX` or a second `SPF` record at one name is not merged by
-/// receivers, it is a permanent error.
-///
-/// The declared set is read from the config the blocks emit rather than
-/// restated here, so a block that adds a record does not also have to be added
-/// to an audit. Records whose NAME is only known after apply are matched as
-/// patterns on the part that IS known, which covers both shapes a relay
-/// produces: a SES selector, whose token is computed by the apply
-/// (`<token>._domainkey.<domain>`), and a comail selector, whose date-based
-/// stem was minted at enrolment and arrives as a variable
-/// (`atmos<YYYYMMDD>r._domainkey.<domain>`).
-///
-/// Reports by default and deletes only when asked, since the audit's own
-/// allowlist is the thing most likely to be wrong the first time it runs.
-#[derive(Debug, Default, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(ZoneAuditAction)]
-pub struct ZoneAudit {
-	/// Records the zone is expected to carry that this stack does not declare:
-	/// another stack's, a third party's, or a provider's own.
-	///
-	/// Every entry is a decision with a reason, which is why they are declared
-	/// rather than inferred. The apex mail records of a provider still serving
-	/// the domain belong here until its cutover; so does the record wrangler
-	/// creates for a worker custom domain, which terraform never sees.
-	///
-	/// The list belongs to the STACK rather than to the verb that reads it: an
-	/// audit run at the tail of a deploy and one run on its own are asking the
-	/// same question of the same zone, and a second copy of these rows is a
-	/// second thing to update when the cutover retires them. So the action
-	/// gathers every `ZoneAudit` declared under the stack, and one of them
-	/// carrying the list is enough for all of them.
-	#[set_with(skip)]
-	allowed: Vec<AllowedRecord>,
-	/// How much of the world this audit renders before diffing, see
-	/// [`ZoneAuditScope`].
-	scope: ZoneAuditScope,
-}
+
 
 /// How much of the world a [`ZoneAudit`] renders before diffing it against the
 /// zone.
@@ -119,7 +75,10 @@ impl ZoneAudit {
 	/// Diff against every stack in the world rather than this one, see
 	/// [`ZoneAuditScope::Zone`].
 	pub fn zone_scoped() -> Self {
-		Self::default().with_scope(ZoneAuditScope::Zone)
+		Self {
+			scope: ZoneAuditScope::Zone,
+			..default()
+		}
 	}
 }
 
@@ -164,11 +123,52 @@ impl ZoneAudit {
 }
 
 /// Enumerates the zone, diffs it and reports. `--fix` deletes the strays.
-#[action(handler_only)]
+/// `<ZoneAudit/>` — assert that the Cloudflare zone contains exactly the
+/// records this stack declares, plus the ones it was told to expect.
+///
+/// Terraform converges the records it owns and is blind to everything else, so
+/// a record created by hand during an incident, or left behind by a provider
+/// that was migrated away from, sits in the zone indefinitely. For most stacks
+/// that is untidy; for mail it is an outage waiting to happen, because a
+/// leftover `MX` or a second `SPF` record at one name is not merged by
+/// receivers, it is a permanent error.
+///
+/// The declared set is read from the config the blocks emit rather than
+/// restated here, so a block that adds a record does not also have to be added
+/// to an audit. Records whose NAME is only known after apply are matched as
+/// patterns on the part that IS known, which covers both shapes a relay
+/// produces: a SES selector, whose token is computed by the apply
+/// (`<token>._domainkey.<domain>`), and a comail selector, whose date-based
+/// stem was minted at enrolment and arrives as a variable
+/// (`atmos<YYYYMMDD>r._domainkey.<domain>`).
+///
+/// Reports by default and deletes only when asked, since the audit's own
+/// allowlist is the thing most likely to be wrong the first time it runs.
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(ParamsPartial = ParamsPartial::new::<ZoneAuditParams>())]
-pub async fn ZoneAuditAction(
+pub async fn ZoneAudit(
+	/// Records the zone is expected to carry that this stack does not declare:
+	/// another stack's, a third party's, or a provider's own.
+	///
+	/// Every entry is a decision with a reason, which is why they are declared
+	/// rather than inferred. The apex mail records of a provider still serving
+	/// the domain belong here until its cutover; so does the record wrangler
+	/// creates for a worker custom domain, which terraform never sees.
+	///
+	/// The list belongs to the STACK rather than to the verb that reads it: an
+	/// audit run at the tail of a deploy and one run on its own are asking the
+	/// same question of the same zone, and a second copy of these rows is a
+	/// second thing to update when the cutover retires them. So the action
+	/// gathers every `ZoneAudit` declared under the stack, and one of them
+	/// carrying the list is enough for all of them.
+	#[field(no_clone)]
+	allowed: Vec<AllowedRecord>,
+	/// How much of the world this audit renders before diffing, see
+	/// [`ZoneAuditScope`].
+	#[field(no_clone)]
+	scope: ZoneAuditScope,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let fix = cx.has_param("fix");
@@ -263,7 +263,7 @@ fn audit_inputs(
 							.declared(entity)?
 							.into_iter()
 							.filter_map(|child| audits.get(child).ok())
-							.flat_map(|audit| audit.allowed().iter().cloned())
+							.flat_map(|audit| audit.allowed.iter().cloned())
 							.collect::<Vec<_>>()
 							.xok()
 					},
@@ -286,7 +286,7 @@ fn audit_inputs(
 			let allowed = world.with_state::<Query<&ZoneAudit>, _>(|audits| {
 				audits
 					.iter()
-					.flat_map(|audit| audit.allowed().iter().cloned())
+					.flat_map(|audit| audit.allowed.iter().cloned())
 					.collect::<Vec<_>>()
 			});
 			(declared, allowed).xok()
@@ -712,7 +712,7 @@ mod tests {
 		);
 		let allows = |name: &str, kind: &str| {
 			audit
-				.allowed()
+				.allowed
 				.iter()
 				.any(|allowed| allowed.matches(name, kind))
 		};
@@ -734,7 +734,7 @@ mod tests {
 			"mta-sts.stalwart.beetmash.com",
 			"wrangler custom domain",
 		);
-		let allowed = &audit.allowed()[0];
+		let allowed = &audit.allowed[0];
 		allowed
 			.matches("mta-sts.stalwart.beetmash.com", "CNAME")
 			.xpect_true();

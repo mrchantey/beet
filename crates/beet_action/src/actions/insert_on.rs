@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(InsertOn::new(Name::new("bill")));
 /// ```
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn InsertOn<B>(

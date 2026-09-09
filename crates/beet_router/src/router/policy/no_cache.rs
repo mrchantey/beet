@@ -33,7 +33,7 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn Hello(_cx: ActionContext<RequestParts>) -> MediaBytes {

@@ -37,7 +37,7 @@ use std::marker::PhantomData;
 /// [`ScriptConfig`]; what it *returns* is discarded, since the console is the
 /// body here. The sibling of the typed [`ExchangeScript`] route (which serves a
 /// `Script`'s output instead of its console).
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn ExchangeScriptElement(

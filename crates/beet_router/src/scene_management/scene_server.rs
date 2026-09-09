@@ -51,7 +51,7 @@ pub fn SceneServer() -> impl Bundle {
 /// Wires an HTTP path to a behaviour tree. The tree is the route entity's single
 /// child; calling the route spawns a detached task that runs it, then returns at
 /// once. A scene supplies the path and the tree under it.
-#[action(route, handler_only)]
+#[action(route)]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[type_path = "scene"]
@@ -82,7 +82,7 @@ pub async fn SpawnAction(cx: ActionContext<RequestParts>) -> Response {
 /// `POST /load` — load a scene from the request body (JSON or postcard, per the
 /// `content-type`), replacing any previously loaded scene. The new roots are
 /// reparented under the server so the router serves them as routes.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component)]
 pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 	let media = match cx.input.into_media_bytes().await {
@@ -124,7 +124,7 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 
 /// `GET /clear` — despawn the loaded scene and reset the hardware. The route tree
 /// is rebuilt by [`BeetSceneRoot::despawn_all`], so the cleared routes drop out of dispatch.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component)]
 pub async fn ClearScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
@@ -136,7 +136,7 @@ pub async fn ClearScene(cx: ActionContext<RequestParts>) -> Response {
 
 /// `GET /reset` — return the hardware to its resting state (motors stopped, LEDs
 /// off), leaving any loaded scene in place.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component)]
 pub async fn Reset(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller
@@ -150,7 +150,7 @@ pub async fn Reset(cx: ActionContext<RequestParts>) -> Response {
 
 /// `GET /dump` — serialize the currently loaded scene (the [`BeetSceneRoot`]
 /// trees) back to JSON. Empty when no scene is loaded.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component)]
 pub async fn DumpScene(cx: ActionContext<RequestParts>) -> Response {
 	cx.caller

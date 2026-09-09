@@ -53,7 +53,7 @@ impl DifferentialDrive {
 /// ## Errors
 /// Errors if the agent has no [`DifferentialDrive`] (via the inner [`SetDrive`]) — declare
 /// it on the driven body at spawn.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -101,7 +101,7 @@ pub async fn DriveForDuration(
 /// ## Errors
 /// Errors if the agent has no [`DifferentialDrive`] — declare it on the driven body
 /// at spawn (the wgpu `CharacterDrive` requires it, the Alvik root spawns with it).
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn SetDrive(

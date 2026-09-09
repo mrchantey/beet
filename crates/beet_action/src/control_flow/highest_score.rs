@@ -22,7 +22,7 @@ use beet_core::prelude::*;
 ///
 /// Errors if the selector has no children to score, or a child has neither a
 /// [`ScoreProvider`] nor a [`Score`].
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn HighestScore<Input = (), Output = ()>(

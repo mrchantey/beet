@@ -451,7 +451,7 @@ mod test {
 			out: Option<String>,
 		}
 		/// Stands in for a command that errors without its required param.
-		#[action(handler_only)]
+		#[action]
 		#[derive(Default, Clone, Component, Reflect)]
 		#[reflect(Component)]
 		async fn RequiresOut(

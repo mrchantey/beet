@@ -228,16 +228,13 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflareContainerBlock>();
 
 		// the cloudflare config components + the directly-spawnable cloudflare
-		// deploy actions (`#[action(handler_only)]` + `#[reflect(Component,
+		// deploy actions (`#[action]` + `#[reflect(Component,
 		// Default)]`), all of which drive `wrangler` as a child process.
 		#[cfg(all(feature = "cloudflare_block", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::CloudflareR2Sync>()
 			.register_type::<crate::prelude::CloudflareBench>()
 			.register_type::<crate::prelude::CloudflareWatch>()
-			.register_type::<crate::prelude::CloudflareDestroy>()
-			.register_type::<crate::prelude::CloudflareWorkerBuildAction>()
-			.register_type::<crate::prelude::CloudflareWorkerDeployAction>()
-			.register_type::<crate::prelude::CloudflareContainerDeployAction>();
+			.register_type::<crate::prelude::CloudflareDestroy>();
 
 		// the tofu apply action + its layer settings (`<TofuApply layer="storage"/>`),
 		// and the zone edge setup/purge (the whole `actions` module is gated on
@@ -265,29 +262,17 @@ impl Plugin for InfraPlugin {
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::EnsureDkimKey>()
-			.register_type::<crate::prelude::EnsureDkimKeyAction>()
 			.register_type::<crate::prelude::ComailEnroll>()
-			.register_type::<crate::prelude::ComailEnrollAction>()
 			.register_type::<crate::prelude::ComailDeliverability>()
-			.register_type::<crate::prelude::ComailDeliverabilityAction>()
 			.register_type::<crate::prelude::EipReverseDns>()
-			.register_type::<crate::prelude::EipReverseDnsAction>()
 			.register_type::<crate::prelude::StalwartSnapshot>()
-			.register_type::<crate::prelude::StalwartSnapshotAction>()
 			.register_type::<crate::prelude::StalwartProvision>()
-			.register_type::<crate::prelude::StalwartProvisionAction>()
 			.register_type::<crate::prelude::MtaStsPublish>()
-			.register_type::<crate::prelude::MtaStsPublishAction>()
 			.register_type::<crate::prelude::MailProbe>()
-			.register_type::<crate::prelude::MailProbeAction>()
 			.register_type::<crate::prelude::MailCredentials>()
-			.register_type::<crate::prelude::MailCredentialsAction>()
 			.register_type::<crate::prelude::MailHealth>()
-			.register_type::<crate::prelude::MailHealthAction>()
 			.register_type::<crate::prelude::MailRestoreDrill>()
-			.register_type::<crate::prelude::MailRestoreDrillAction>()
 			.register_type::<crate::prelude::ZoneAudit>()
-			.register_type::<crate::prelude::ZoneAuditAction>()
 			.register_type::<crate::prelude::AllowedRecord>()
 			// the audit's scope selector, so `<ZoneAudit scope="Zone"/>`
 			// resolves the variant rather than silently keeping the default.
@@ -574,7 +559,7 @@ mod test {
 			.query::<&ZoneAudit>()
 			.single(&world)
 			.unwrap()
-			.scope()
+			.scope
 			.xpect_eq(ZoneAuditScope::Zone);
 	}
 
@@ -591,25 +576,15 @@ mod test {
 		);
 		let secret = world.query::<&EnsureSecret>().single(&world).unwrap();
 		secret.secret.label().as_str().xpect_eq("db-password");
-		secret
-			.variable
-			.clone()
-			.into_inner()
-			.unwrap()
-			.as_str()
-			.xpect_eq("db_password");
+		secret.variable.as_deref().unwrap().xpect_eq("db_password");
 		world
 			.query::<&MailProbe>()
 			.single(&world)
 			.unwrap()
-			.sender_domain()
+			.sender_domain
 			.as_str()
 			.xpect_eq("news.beetmash.com");
-		world
-			.query::<&ZoneAudit>()
-			.single(&world)
-			.unwrap()
-			.allowed()[0]
+		world.query::<&ZoneAudit>().single(&world).unwrap().allowed[0]
 			.reason()
 			.as_str()
 			.xpect_eq("fastmail");

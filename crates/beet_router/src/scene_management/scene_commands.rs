@@ -60,7 +60,7 @@ fn device_url(parts: &RequestParts) -> Result<SmolStr> {
 /// `<path>` is greedy so a slash-bearing path is captured whole, and is read
 /// through the nearest ancestor [`BlobStore`] (the workspace store in dev, S3 in a
 /// deployed task), never the filesystem directly, so it works on every platform.
-#[action(route = "load/*scene", handler_only)]
+#[action(route = "load/*scene")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
@@ -99,7 +99,7 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 }
 
 /// `clear --url=<device>` — despawn the device's scene and reset.
-#[action(route = "clear", handler_only)]
+#[action(route = "clear")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
@@ -109,7 +109,7 @@ pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
 }
 
 /// `reset --url=<device>` — return the device hardware to its resting state.
-#[action(route = "reset", handler_only)]
+#[action(route = "reset")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
@@ -119,7 +119,7 @@ pub async fn SceneReset(cx: ActionContext<RequestParts>) -> Result<Response> {
 }
 
 /// `dump --url=<device>` — print the device's currently loaded scene as JSON.
-#[action(route = "dump", handler_only)]
+#[action(route = "dump")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
@@ -132,7 +132,7 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// installed, eg `beet run led-script`. The original request (method, headers,
 /// query and body) is forwarded unchanged; only its destination URL is rewritten
 /// to `<device>/<route>`.
-#[action(route = "run/:route", handler_only)]
+#[action(route = "run/:route")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]

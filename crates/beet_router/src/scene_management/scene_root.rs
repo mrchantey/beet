@@ -141,7 +141,7 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn Ping(_cx: ActionContext<RequestParts>) -> MediaBytes {

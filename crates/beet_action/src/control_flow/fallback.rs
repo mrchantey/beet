@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// Errors depending on [`ChildError`] bypasses when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn Fallback<Input = (), Output = ()>(

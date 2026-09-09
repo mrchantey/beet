@@ -52,7 +52,7 @@ struct ExportPdfParams {
 /// beet export-pdf site --width=1920 --height=1080 --unit=px --zoom=1.5 \
 ///   --search-params="color-scheme=light"
 /// ```
-#[action(route = "export-pdf/*entry", handler_only)]
+#[action(route = "export-pdf/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<(ExportPdfParams, EntryParams)>())]

@@ -6,55 +6,7 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// `<MailProbe/>`: send a message out through the whole stack and receive one
-/// back through it, then assert the receiving end believes both.
-///
-/// Two half-loops rather than one round trip, because the two legs prove
-/// different things and neither can be inferred from the other:
-///
-/// - **Outbound**: authenticate to the box's own submission port as the probe
-///   mailbox and send to the sending domain's relay sink. This proves the
-///   submission listener bound, the certificate is trusted, the account exists
-///   with the credential parameter store says it has, and the queue took the
-///   route its sender domain declares.
-/// - **Inbound**: ask the relay to send from the publication domain to the probe
-///   mailbox, then read it out over JMAP. This proves the `MX` resolves to the
-///   box, that port 25 accepts, that the message reached a mailbox, and (the
-///   part no other check reaches) that a receiving server evaluating our own
-///   `SPF`, `DKIM` and `DMARC` records reaches the verdicts the sending domain's
-///   relay makes possible.
-///
-/// The `Authentication-Results` assertion is the point of the whole action. A
-/// deliverable mail stack is not one that sends, it is one whose mail
-/// authenticates, and the only honest way to test that is to be the recipient.
-///
-/// Both legs and the verdicts they demand are decided by the SENDER domain's
-/// relay, since that is what decides what a receiver can see. See
-/// [`sink`](Self::sink) and [`required_results`](Self::required_results).
-///
-/// Works inside the SES sandbox: the simulator addresses are always permitted
-/// as recipients, and the probe mailbox is verified as a recipient identity
-/// once, which needs no production access.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(MailProbeAction)]
-pub struct MailProbe {
-	/// The mailbox both legs use, by localpart. Declared as a [`Mailbox`] on
-	/// exactly one of the stack's domains, which is how the probe finds the
-	/// address without restating the domain that holds it.
-	mailbox: SmolStr,
-	/// The domain the inbound leg is sent FROM, ie the publication domain whose
-	/// deliverability this proves. Named rather than guessed: which domain
-	/// sends is a decision.
-	sender_domain: SmolStr,
-	/// The localpart on [`sender_domain`](Self::sender_domain) the inbound leg
-	/// comes from.
-	sender: SmolStr,
-	/// How long to wait for the inbound message to arrive.
-	timeout: Duration,
-	/// The gap between mailbox polls.
-	poll: Duration,
-}
+
 
 impl MailProbe {
 	/// How many times the comail send api is asked before the probe gives up,
@@ -100,9 +52,6 @@ impl SendOutcome {
 	}
 }
 
-impl Default for MailProbe {
-	fn default() -> Self { Self::new("probe", "") }
-}
 
 impl MailProbe {
 	/// The SES address that accepts anything and delivers nowhere, so an
@@ -190,25 +139,73 @@ impl MailProbe {
 }
 
 /// Runs both legs, failing on the first one that does not hold.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<MailProbe/>`: send a message out through the whole stack and receive one
+/// back through it, then assert the receiving end believes both.
+///
+/// Two half-loops rather than one round trip, because the two legs prove
+/// different things and neither can be inferred from the other:
+///
+/// - **Outbound**: authenticate to the box's own submission port as the probe
+///   mailbox and send to the sending domain's relay sink. This proves the
+///   submission listener bound, the certificate is trusted, the account exists
+///   with the credential parameter store says it has, and the queue took the
+///   route its sender domain declares.
+/// - **Inbound**: ask the relay to send from the publication domain to the probe
+///   mailbox, then read it out over JMAP. This proves the `MX` resolves to the
+///   box, that port 25 accepts, that the message reached a mailbox, and (the
+///   part no other check reaches) that a receiving server evaluating our own
+///   `SPF`, `DKIM` and `DMARC` records reaches the verdicts the sending domain's
+///   relay makes possible.
+///
+/// The `Authentication-Results` assertion is the point of the whole action. A
+/// deliverable mail stack is not one that sends, it is one whose mail
+/// authenticates, and the only honest way to test that is to be the recipient.
+///
+/// Both legs and the verdicts they demand are decided by the SENDER domain's
+/// relay, since that is what decides what a receiver can see. See
+/// [`sink`](Self::sink) and [`required_results`](Self::required_results).
+///
+/// Works inside the SES sandbox: the simulator addresses are always permitted
+/// as recipients, and the probe mailbox is verified as a recipient identity
+/// once, which needs no production access.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn MailProbeAction(
+pub async fn MailProbe(
+	/// The mailbox both legs use, by localpart. Declared as a [`Mailbox`] on
+	/// exactly one of the stack's domains, which is how the probe finds the
+	/// address without restating the domain that holds it.
+	#[field(default = "probe")]
+	mailbox: SmolStr,
+	/// The domain the inbound leg is sent FROM, ie the publication domain whose
+	/// deliverability this proves. Named rather than guessed: which domain
+	/// sends is a decision.
+	#[field]
+	sender_domain: SmolStr,
+	/// The localpart on [`sender_domain`](Self::sender_domain) the inbound leg
+	/// comes from.
+	#[field(default = "news")]
+	sender: SmolStr,
+	/// How long to wait for the inbound message to arrive.
+	#[field(default = Duration::from_secs(300))]
+	timeout: Duration,
+	/// The gap between mailbox polls.
+	#[field(default = Duration::from_secs(10))]
+	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let probe = cx.caller.get_cloned::<MailProbe>().await?;
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
-	let domain = mail.domain_holding(probe.mailbox())?;
-	let address = format!("{}@{}", probe.mailbox(), domain.domain());
-	let sender_domain = mail.domain_named(probe.sender_domain())?;
-	let from = format!("{}@{}", probe.sender(), sender_domain.domain());
+	let domain = mail.domain_holding(&mailbox)?;
+	let address = format!("{}@{}", mailbox, domain.domain());
+	let sender_domain = mail.domain_named(&sender_domain)?;
+	let from = format!("{}@{}", sender, sender_domain.domain());
 
 	// the same parameter `StalwartProvision` minted the account with, so the
 	// probe never holds a credential of its own.
 	let secret = AccountPlan::secret_ref(
 		mail.mail_box.label(),
-		probe.mailbox(),
+		&mailbox,
 		&domain.slug(),
 	);
 	let region = mail.stack.region().clone();
@@ -250,16 +247,8 @@ pub async fn MailProbeAction(
 	{
 		return Pass(cx.input).xok();
 	}
-	assert_inbound(
-		&mail,
-		&relay,
-		&address,
-		&password,
-		&token,
-		*probe.timeout(),
-		*probe.poll(),
-	)
-	.await?;
+	assert_inbound(&mail, &relay, &address, &password, &token, timeout, poll)
+		.await?;
 
 	info!(
 		"mail probe passed: {address} sends through {} and receives \

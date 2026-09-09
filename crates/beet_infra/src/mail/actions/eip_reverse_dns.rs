@@ -6,6 +6,17 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
+
+
+
+impl EipReverseDns {
+	/// The resolver the forward check asks. DNS-over-HTTPS rather than the
+	/// system resolver, so the answer comes from the public internet's view
+	/// rather than from whatever the deployer's machine caches.
+	pub const RESOLVER: &'static str = "https://cloudflare-dns.com/dns-query";
+}
+
+/// Requests the reverse record and waits for it to land.
 /// `<EipReverseDns/>` — after the apply, point the box's elastic IP back at its
 /// own hostname.
 ///
@@ -19,45 +30,19 @@ use serde_json::Value;
 /// The name is the box's, never a mail domain's: the hostname stays put across
 /// a domain cutover, which is exactly why the riskiest step does not have to
 /// touch this at all.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(EipReverseDnsAction)]
-pub struct EipReverseDns {
+pub async fn EipReverseDns(
 	/// How long to wait for the forward record to resolve, and then for AWS to
 	/// publish the reverse one.
+	#[field(default = Duration::from_secs(300))]
 	timeout: Duration,
 	/// The gap between attempts, at both gates.
+	#[field]
 	poll: Duration,
-}
-
-impl Default for EipReverseDns {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(300),
-			poll: Duration::from_secs(10),
-		}
-	}
-}
-
-impl EipReverseDns {
-	/// The resolver the forward check asks. DNS-over-HTTPS rather than the
-	/// system resolver, so the answer comes from the public internet's view
-	/// rather than from whatever the deployer's machine caches.
-	pub const RESOLVER: &'static str = "https://cloudflare-dns.com/dns-query";
-}
-
-/// Requests the reverse record and waits for it to land.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn EipReverseDnsAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let settings = cx
-		.caller
-		.get_cloned::<EipReverseDns>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
 	let region = mail.stack.region().clone();
@@ -68,13 +53,7 @@ pub async fn EipReverseDnsAction(
 	// AWS validates the forward record before it will publish the reverse one,
 	// so waiting here turns "request silently rejected hours later" into a
 	// deploy that says which record has not propagated.
-	wait_for_forward(
-		&hostname,
-		&address,
-		*settings.timeout(),
-		*settings.poll(),
-	)
-	.await?;
+	wait_for_forward(&hostname, &address, timeout, poll).await?;
 
 	info!("requesting PTR {address} -> {hostname}");
 	aws_cli_ext::ec2(&region, [
@@ -90,15 +69,7 @@ pub async fn EipReverseDnsAction(
 	// publication is asynchronous and AWS gives itself hours, so a PTR still
 	// pending is reported rather than failing the deploy: nothing downstream
 	// waits on it, and the request is already lodged.
-	match wait_for_ptr(
-		&region,
-		&allocation,
-		&hostname,
-		*settings.timeout(),
-		*settings.poll(),
-	)
-	.await?
-	{
+	match wait_for_ptr(&region, &allocation, &hostname, timeout, poll).await? {
 		true => info!("{address} resolves back to {hostname}"),
 		false => info!(
 			"the PTR for {address} is still pending at AWS; it publishes \

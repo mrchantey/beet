@@ -31,7 +31,7 @@ struct SyncS3Params {
 /// beet s3-sync --src=s3://my-bucket/assets --dst=./assets
 /// beet s3-sync --src=./assets --dst=s3://my-bucket/assets --delete
 /// ```
-#[action(route = "s3-sync", handler_only)]
+#[action(route = "s3-sync")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SyncS3Params>())]

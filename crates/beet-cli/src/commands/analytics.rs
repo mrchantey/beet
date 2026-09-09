@@ -35,7 +35,7 @@ struct AnalyticsParams {
 /// beet analytics summary --dir /data/analytics    # a specific directory
 /// beet analytics summary --remote --bucket my-site--prod--analytics
 /// ```
-#[action(route = "analytics/*args", handler_only)]
+#[action(route = "analytics/*args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<AnalyticsParams>())]

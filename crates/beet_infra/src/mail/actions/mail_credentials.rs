@@ -4,6 +4,9 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+
+
+/// Reads each parameter and prints it beside the address it belongs to.
 /// `<MailCredentials/>`: print every mailbox credential this stack holds, as
 /// the address that uses it.
 ///
@@ -26,17 +29,11 @@ use beet_net::prelude::*;
 /// credentials the stack's domains actually use and the DKIM signing keys.
 /// Separate because reading a mailbox password is setting up a mail client,
 /// while relay and signing credentials are infrastructure access.
-#[derive(Debug, Clone, Default, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(MailCredentialsAction)]
-pub struct MailCredentials;
-
-/// Reads each parameter and prints it beside the address it belongs to.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(ParamsPartial = ParamsPartial::new::<MailCredentialsParams>())]
-pub async fn MailCredentialsAction(
+pub async fn MailCredentials(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let infra = cx.has_param("infra");

@@ -40,7 +40,7 @@ Each command is spawned as a bare marker: its `#[action(route = "...")]` attribu
 A command is an `#[action(route = "...")]` async fn taking [`RequestParts`] and returning `Result<String>`. The string is the response body. Derive `Reflect` + `#[reflect(Component)]` so the route serializes into a `beet.json` scene.
 
 ```rust
-#[action(route = "qrcode", handler_only)]
+#[action(route = "qrcode")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
@@ -103,7 +103,7 @@ Rules for the params struct:
 A trailing `*name` segment captures the rest of the args greedily, eg the `run-wasm/*args` cargo runner. To rebuild a forwardable arg vector from the request use [`RequestParts::unparse_cli_args`] — it returns every path segment as a positional followed by params as `--key`/`--key=value`:
 
 ```rust
-#[action(route = "run-wasm/*args", handler_only)]
+#[action(route = "run-wasm/*args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {

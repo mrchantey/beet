@@ -30,7 +30,7 @@ use beet_net::prelude::*;
 /// from stack descendants to build the [`ArtifactLedger`], using
 /// [`BuildArtifact::compute_source_hash`] for the hash. A layered apply skips
 /// the artifacts entirely, since nothing that reads one converges in it.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn TofuApply(
@@ -171,7 +171,7 @@ impl TofuApply {
 	/// Converge only the named layer, rather than the whole stack.
 	pub fn for_layer(layer: impl Into<SmolStr>) -> Self {
 		Self {
-			layer: PropOpt(Some(layer.into())),
+			layer: PropOpt::some(layer.into()),
 		}
 	}
 }

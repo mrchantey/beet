@@ -211,7 +211,7 @@ impl RouteMatrixStep {
 }
 
 /// Run this verb across every namespace the matrix names, in order.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn RouteMatrixDispatch(

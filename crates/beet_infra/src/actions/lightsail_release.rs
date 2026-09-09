@@ -23,7 +23,7 @@ use beet_net::prelude::*;
 /// Idempotent, and cheap when there is nothing to do: a box that was just
 /// replaced already pulled this release at boot, so the script confirms and
 /// returns rather than bouncing a healthy unit.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn LightsailRelease(
@@ -62,7 +62,7 @@ pub async fn LightsailRelease(
 /// Declared under the sync sequence AFTER the `<DirSync/>` that publishes, and
 /// BEFORE the `<CloudflarePurgeCache/>`: purging while the old process still
 /// serves just re-caches the old responses for the whole edge TTL.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn LightsailRestart(

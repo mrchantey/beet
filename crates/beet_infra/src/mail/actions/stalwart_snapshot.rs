@@ -7,50 +7,8 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// `<StalwartSnapshot/>` — snapshots the mail box's persistent data volume.
-///
-/// The step belongs immediately before `<TofuApply/>`. A first deploy has no
-/// volume yet and is skipped; later deploys wait for a complete snapshot before
-/// an apply can replace the instance or otherwise change its attachment. A
-/// retry within one deploy reuses the snapshot that deploy already took, found
-/// by its own tag ([`reusable`](Self::reusable)).
-///
-/// This is an INTERLOCK, not a backup schedule. It fires when a deploy is about
-/// to do something dangerous, so its depth is how many recent deploys you can
-/// roll back through, not how far back in time you can recover: the scheduled
-/// backup is the box's own nightly `stalwart-backup.timer`, which produces a
-/// verified, restore-anywhere copy that this snapshot cannot.
-///
-/// What a *scheduled* volume snapshot would add over that timer is protection
-/// against filesystem-level corruption the online `.backup` would faithfully
-/// copy. It is deliberately not built: a verb that runs when a human deploys
-/// can never be a schedule, so if it is ever wanted it belongs in an AWS Data
-/// Lifecycle Manager policy with its own binding and block, declaring its
-/// schedule and retention, rather than in more work here.
-///
-/// A snapshot every deploy is a lineage nothing else prunes, and EBS keeps one
-/// until it is deleted, so the step prunes its own: after a snapshot completes,
-/// every older one this block took of the same volume beyond
-/// [`snapshot_retain`](Self::with_snapshot_retain) is deleted. Only snapshots
-/// carrying this block's own tags are ever considered, so a manual snapshot
-/// taken before something frightening is never swept up by the next deploy.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(StalwartSnapshotAction)]
-pub struct StalwartSnapshot {
-	/// How many of this block's own snapshots of the data volume survive a
-	/// deploy, newest first: a rollback depth in DEPLOYS, not in days.
-	#[get(copy)]
-	snapshot_retain: usize,
-}
 
-impl Default for StalwartSnapshot {
-	fn default() -> Self {
-		Self {
-			snapshot_retain: Self::SNAPSHOT_RETAIN,
-		}
-	}
-}
+
 
 impl StalwartSnapshot {
 	/// The default rollback depth. Three deploys is enough to step back past a
@@ -191,17 +149,43 @@ impl StalwartSnapshot {
 
 /// Creates and waits for the current deploy's Stalwart data snapshot, then
 /// prunes the lineage it belongs to.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<StalwartSnapshot/>` — snapshots the mail box's persistent data volume.
+///
+/// The step belongs immediately before `<TofuApply/>`. A first deploy has no
+/// volume yet and is skipped; later deploys wait for a complete snapshot before
+/// an apply can replace the instance or otherwise change its attachment. A
+/// retry within one deploy reuses the snapshot that deploy already took, found
+/// by its own tag ([`reusable`](Self::reusable)).
+///
+/// This is an INTERLOCK, not a backup schedule. It fires when a deploy is about
+/// to do something dangerous, so its depth is how many recent deploys you can
+/// roll back through, not how far back in time you can recover: the scheduled
+/// backup is the box's own nightly `stalwart-backup.timer`, which produces a
+/// verified, restore-anywhere copy that this snapshot cannot.
+///
+/// What a *scheduled* volume snapshot would add over that timer is protection
+/// against filesystem-level corruption the online `.backup` would faithfully
+/// copy. It is deliberately not built: a verb that runs when a human deploys
+/// can never be a schedule, so if it is ever wanted it belongs in an AWS Data
+/// Lifecycle Manager policy with its own binding and block, declaring its
+/// schedule and retention, rather than in more work here.
+///
+/// A snapshot every deploy is a lineage nothing else prunes, and EBS keeps one
+/// until it is deleted, so the step prunes its own: after a snapshot completes,
+/// every older one this block took of the same volume beyond
+/// [`snapshot_retain`](StalwartSnapshot::snapshot_retain) is deleted. Only snapshots
+/// carrying this block's own tags are ever considered, so a manual snapshot
+/// taken before something frightening is never swept up by the next deploy.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn StalwartSnapshotAction(
+pub async fn StalwartSnapshot(
+	/// How many of this block's own snapshots of the data volume survive a
+	/// deploy, newest first: a rollback depth in DEPLOYS, not in days.
+	#[field(default = Self::SNAPSHOT_RETAIN)]
+	snapshot_retain: usize,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let retain = cx
-		.caller
-		.get::<StalwartSnapshot, _>(|snapshot| snapshot.snapshot_retain())
-		.await
-		.unwrap_or(StalwartSnapshot::SNAPSHOT_RETAIN);
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region();
 	let filters = StalwartSnapshot::volume_filters(&mail.stack, &mail.mail_box);
@@ -300,7 +284,7 @@ pub async fn StalwartSnapshotAction(
 	.await?;
 	info!("Stalwart snapshot {snapshot_id} is complete");
 
-	prune(&mail, &snapshot_id, retain).await?;
+	prune(&mail, &snapshot_id, snapshot_retain).await?;
 	Pass(cx.input).xok()
 }
 

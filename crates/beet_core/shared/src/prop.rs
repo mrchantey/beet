@@ -12,6 +12,10 @@
 //! - `(required)` -> stored as `PropOpt<T>`, validated by the consumer
 //! - `(into)` -> call-site sugar, the body still binds the concrete type
 //! - `(mut)` -> a mutable binding, only meaningful to `#[action]`
+//! - `(no_clone)` -> declared on the struct but not bound in the body, for a
+//!   field too expensive to clone per call; only meaningful to `#[action]`
+//! - a visibility (`pub`, `pub(crate)`, `pub(in path)`) -> narrows the field
+//!   from the default `pub`
 extern crate alloc;
 use crate::prelude::*;
 use alloc::vec::Vec;
@@ -34,6 +38,11 @@ pub struct Prop {
 	pub default_expr: Option<syn::Expr>,
 	/// `(mut)`, binding the field mutably in the body
 	pub mutable: bool,
+	/// `(no_clone)`, declared on the struct but never bound in the body
+	pub no_clone: bool,
+	/// the declared visibility, defaulting to `pub` so a struct-literal patch
+	/// resolves across module boundaries
+	pub vis: syn::Visibility,
 	/// non-grammar attributes (doc comments etc) kept on the field
 	pub other_attrs: Vec<syn::Attribute>,
 }
@@ -52,6 +61,8 @@ impl Prop {
 
 		let mut required = false;
 		let mut mutable = false;
+		let mut no_clone = false;
+		let mut vis: syn::Visibility = syn::parse_quote!(pub);
 		let mut default_expr = None;
 		let mut other_attrs: Vec<syn::Attribute> = Vec::new();
 
@@ -70,13 +81,14 @@ impl Prop {
 					)
 				}
 			};
-			// `mut` is a keyword, so it can never parse as an `Expr`: lift it out
-			// before the rest of the arguments reach [`AttributeMap`].
-			let tokens = Self::take_mut(tokens, &mut mutable);
+			// `mut` and a visibility are keyword forms that can never parse as an
+			// `Expr`, so lift them out before the rest reaches [`AttributeMap`].
+			let tokens = Self::take_keywords(tokens, &mut mutable, &mut vis)?;
 			let map = AttributeMap::parse(tokens)?;
 			for key in map.keys() {
 				match key {
 					"required" => required = true,
+					"no_clone" => no_clone = true,
 					"default" => default_expr = map.get("default").cloned(),
 					// `into` is call-site sugar; the body binds the concrete type.
 					"into" => {}
@@ -103,6 +115,8 @@ impl Prop {
 			option_inner,
 			default_expr,
 			mutable,
+			no_clone,
+			vis,
 			other_attrs,
 		})
 	}
@@ -130,15 +144,19 @@ impl Prop {
 
 	/// The struct field definition with forwarded attrs.
 	///
-	/// Fields are `pub` so a `<Name field=x/>` struct-literal patch resolves
-	/// across module boundaries (the same crate, a different module).
+	/// Fields default to `pub` so a `<Name field=x/>` struct-literal patch
+	/// resolves across module boundaries: `rsx!` lowers a component tag to
+	/// `Name { field: value.into_prop(), ..Default::default() }`, and both the
+	/// named field and the functional update need to be nameable there. Declare
+	/// a narrower visibility to opt out.
 	pub fn field_def(&self, beet_core: &syn::Path) -> TokenStream {
 		let ident = &self.ident;
+		let vis = &self.vis;
 		let stored_ty = self.stored_ty(beet_core);
 		let other_attrs = &self.other_attrs;
 		quote! {
 			#(#other_attrs)*
-			pub #ident: #stored_ty
+			#vis #ident: #stored_ty
 		}
 	}
 
@@ -220,31 +238,49 @@ impl Prop {
 		}
 	}
 
-	/// Split a bare `mut` out of an attribute argument list, setting `mutable`
-	/// and returning the remaining comma-separated arguments.
-	fn take_mut(tokens: TokenStream, mutable: &mut bool) -> TokenStream {
-		let mut kept: Vec<Vec<TokenTree>> = Vec::new();
+	/// Split the keyword-shaped arguments (`mut`, a visibility) out of an
+	/// attribute argument list, returning the remainder for [`AttributeMap`].
+	///
+	/// Neither form can reach `AttributeMap`: both open with a keyword, which
+	/// never parses as an `Expr`.
+	fn take_keywords(
+		tokens: TokenStream,
+		mutable: &mut bool,
+		vis: &mut syn::Visibility,
+	) -> syn::Result<TokenStream> {
+		let mut kept: Vec<TokenStream> = Vec::new();
+		for arg in Self::split_args(tokens) {
+			let first = arg.clone().into_iter().next();
+			match &first {
+				Some(TokenTree::Ident(ident)) if ident == "mut" => {
+					*mutable = true;
+				}
+				Some(TokenTree::Ident(ident)) if ident == "pub" => {
+					*vis = syn::parse2(arg)?;
+				}
+				_ => kept.push(arg),
+			}
+		}
+		Ok(kept.into_iter().map(|arg| quote! { #arg, }).collect())
+	}
+
+	/// Split a comma-separated attribute argument list into its non-empty
+	/// top-level arguments.
+	fn split_args(tokens: TokenStream) -> Vec<TokenStream> {
+		let mut args: Vec<Vec<TokenTree>> = Vec::new();
 		let mut current: Vec<TokenTree> = Vec::new();
 		for tt in tokens {
 			match &tt {
 				TokenTree::Punct(punct) if punct.as_char() == ',' => {
-					kept.push(core::mem::take(&mut current));
+					args.push(core::mem::take(&mut current));
 				}
 				_ => current.push(tt),
 			}
 		}
-		kept.push(current);
-		kept.into_iter()
-			.filter(|arg| {
-				let is_mut = arg.len() == 1
-					&& matches!(&arg[0], TokenTree::Ident(ident) if ident == "mut");
-				*mutable |= is_mut;
-				!is_mut && !arg.is_empty()
-			})
-			.map(|arg| arg.into_iter().collect::<TokenStream>())
-			.collect::<Vec<_>>()
-			.into_iter()
-			.map(|arg| quote! { #arg, })
+		args.push(current);
+		args.into_iter()
+			.filter(|arg| !arg.is_empty())
+			.map(|arg| arg.into_iter().collect())
 			.collect()
 	}
 }
@@ -304,6 +340,23 @@ mod test {
 		.unwrap_err()
 		.to_string();
 		assert!(err.contains("unknown"));
+	}
+
+	#[test]
+	fn visibility_narrows_the_field() {
+		let prop = parse(syn::parse_quote! { #[field(pub(crate))] total: u32 });
+		assert!(matches!(prop.vis, syn::Visibility::Restricted(_)));
+		let prop = parse(syn::parse_quote! { #[field] total: u32 });
+		assert!(matches!(prop.vis, syn::Visibility::Public(_)));
+	}
+
+	#[test]
+	fn no_clone_is_unbound() {
+		let prop = parse(
+			syn::parse_quote! { #[field(no_clone, pub(super))] big: Vec<u8> },
+		);
+		assert!(prop.no_clone);
+		assert!(matches!(prop.vis, syn::Visibility::Restricted(_)));
 	}
 
 	#[test]

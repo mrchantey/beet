@@ -27,7 +27,7 @@ pub(crate) fn health_route() -> impl Bundle {
 /// ([`ChannelTerminal`](beet_ui::prelude::ChannelTerminal), one per SSH session,
 /// which excludes the local stdio terminal). No bookkeeping resource to keep in
 /// sync; without the `tui` feature no remote sessions exist, so the count is 0.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 fn HealthHandler(

@@ -116,7 +116,7 @@ impl fmt::Display for WasmHost {
 /// one intact segment, so the rejoin reproduces it leading-`/` and all. The capture
 /// is named `run-wasm-args` to distinguish the route's own path capture from the
 /// module args it forwards.
-#[action(route = "run-wasm/*run-wasm-args", handler_only)]
+#[action(route = "run-wasm/*run-wasm-args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>())]

@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn Repeat<Input = ()>(cx: ActionContext<Input>) -> Result<Outcome>
@@ -55,7 +55,7 @@ impl Repeat<()> {
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn RepeatTimes<Input = ()>(

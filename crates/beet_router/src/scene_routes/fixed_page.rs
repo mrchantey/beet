@@ -48,7 +48,7 @@ use beet_net::prelude::*;
 ///
 /// The route action hands back the route entity itself as the render root,
 /// whatever the request.
-#[action(route, handler_only)]
+#[action(route)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::entity_hook(FixedPage::insert_page_root))]

@@ -20,7 +20,7 @@ pub(crate) fn analytics_handler() -> impl Bundle {
 /// a geoip country (from the client address), and the raw ip only when the
 /// router's [`AnalyticsConfig`] opts in, then triggers it for the analytics
 /// observer to persist.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 async fn AnalyticsHandler(cx: ActionContext<Request>) -> Result<Response> {

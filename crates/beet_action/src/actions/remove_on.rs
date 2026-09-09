@@ -13,7 +13,7 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn((Name::new("bill"), RemoveOn::<Name>::default()));
 /// ```
-#[action(plain_meta)]
+#[action]
 #[derive(Component)]
 pub async fn RemoveOn<B>(
 	/// Which entity to remove the bundle from.

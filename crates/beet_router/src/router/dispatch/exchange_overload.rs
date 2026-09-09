@@ -157,7 +157,7 @@ mod test {
 	}
 
 	/// Shouts the request path back, a typed `RequestParts -> MediaBytes` handler.
-	#[action(handler_only)]
+	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
 	async fn Shout(cx: ActionContext<RequestParts>) -> MediaBytes {

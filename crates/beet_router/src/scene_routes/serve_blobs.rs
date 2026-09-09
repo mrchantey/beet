@@ -49,7 +49,7 @@ pub fn ServeBlobs(
 /// store (filesystem, S3, in-memory) backs the route. A co-located [`DirPath`] has
 /// already scoped that store to its subdir, so this just reads the resolved store;
 /// serving rules mirror a static host (see [`serve_blob`]).
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub(crate) async fn ServeBlobsHandler(

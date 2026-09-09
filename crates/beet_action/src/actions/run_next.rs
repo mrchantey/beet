@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 ///
 /// ## Errors
 /// Errors if `target` was never set.
-#[action(plain_meta)]
+#[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn RunNext<T = Outcome>(
@@ -81,16 +81,16 @@ where
 	/// Always jump to `target`, threading a `T`.
 	pub fn typed(target: Entity) -> Self {
 		Self {
-			target: PropOpt(Some(target)),
-			if_input_matches: PropOpt(None),
+			target: PropOpt::some(target),
+			if_input_matches: PropOpt::none(),
 			_marker: PhantomData,
 		}
 	}
 	/// Only jump when the input equals `value`.
 	pub fn if_input(target: Entity, value: T) -> Self {
 		Self {
-			target: PropOpt(Some(target)),
-			if_input_matches: PropOpt(Some(value)),
+			target: PropOpt::some(target),
+			if_input_matches: PropOpt::some(value),
 			_marker: PhantomData,
 		}
 	}

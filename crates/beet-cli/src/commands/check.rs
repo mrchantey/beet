@@ -26,7 +26,7 @@ struct CheckParams {
 /// beet check examples/bsx_site --manifest out.json      # also dump the manifest to a file
 /// beet check examples/bsx_site --manifest=-             # ..or to stdout (then the summary)
 /// ```
-#[action(route = "check/*entry", handler_only)]
+#[action(route = "check/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<(CheckParams, EntryParams)>())]

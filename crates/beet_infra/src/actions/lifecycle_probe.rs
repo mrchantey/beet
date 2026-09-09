@@ -9,7 +9,7 @@ use beet_net::prelude::*;
 /// then destroy — logging each step. Resolves the [`Stack`] via [`StackQuery`]; reads
 /// the [`BlobStore`] from its own entity, so spawn it on the bucket block entity (eg
 /// `<S3BucketBlock label="my-bucket" {LifecycleProbe}/>`).
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn LifecycleProbe(

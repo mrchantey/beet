@@ -6,75 +6,8 @@ use beet_net::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// `<MailRestoreDrill/>` — restore another stage's newest SQLite snapshot into
-/// THIS stage's mail box, so the mailboxes that come back can be probed.
-///
-/// A backup nobody has restored is a hypothesis. The nightly snapshot is written
-/// by a timer on the box and lands in a bucket where it is indistinguishable from
-/// a file of zeroes, and every property that matters — that it is complete,
-/// readable, internally consistent, replaceable and accepted by Stalwart — is
-/// only observable by doing it. So the drill is
-/// a route rather than a runbook, and the assertion is the ordinary
-/// [`MailProbe`] running against the restored stage: mail flows, or the backup
-/// was not one.
-///
-/// It is a whole STAGE, not a spare file: a drill deploy stands up its own box
-/// and persistent volume, restores production's snapshot into them, and is
-/// destroyed after.
-///
-/// The assertion is deliberately made HERE rather than by a [`MailProbe`]
-/// beside it. A restored store carries the SOURCE stage's domains and accounts,
-/// so the drill box now serves `probe@<source domain>` while that domain's `MX`
-/// still points at the source box: a probe's inbound leg would be answered by
-/// production and pass without the drill having restored anything. What is
-/// genuinely provable is what this asserts — that a restored account
-/// authenticates against the DRILL box and its mailbox is readable — and that
-/// is what "the backup came back" means.
-///
-/// The one thing this action will not do is run against the stage it is
-/// restoring FROM. Replacing the live stage's SQLite file is not a drill, it is
-/// the incident, so the stages are compared and a match fails before anything
-/// is downloaded.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(MailRestoreDrillAction)]
-pub struct MailRestoreDrill {
-	/// The stage whose backups are restored, ie the one being proven
-	/// recoverable.
-	source_stage: SmolStr,
-	/// The mail domain the restored account belongs to, ie one the SOURCE
-	/// stage serves.
-	///
-	/// Named rather than read off this stack, because the drill stack does not
-	/// declare it and must not: an SES identity is account-global, so a second
-	/// stack declaring `stalwart.beetmash.com` fails its apply against the
-	/// identity the live one already owns. The drill therefore serves a
-	/// domain of its own — which the restore then REPLACES with the source's,
-	/// and the account this signs in as is one of those.
-	source_domain: SmolStr,
-	/// The private half of the key pair the box imported, as
-	/// [`StalwartProvision`] takes it.
-	ssh_key: SmolStr,
-	/// The restored mailbox the assertion signs in as, by localpart. The probe
-	/// mailbox by default, since it is the one account whose credential exists
-	/// to be used by a deploy step.
-	mailbox: SmolStr,
-	/// How long to wait for the restarted server to accept a restored
-	/// credential.
-	timeout: Duration,
-}
 
-impl Default for MailRestoreDrill {
-	fn default() -> Self {
-		Self {
-			source_stage: Self::SOURCE_STAGE.into(),
-			source_domain: SmolStr::default(),
-			ssh_key: StalwartProvision::SSH_KEY.into(),
-			mailbox: "probe".into(),
-			timeout: Duration::from_secs(300),
-		}
-	}
-}
+
 
 impl MailRestoreDrill {
 	/// The stage a drill proves by default, ie the one carrying real mail.
@@ -132,32 +65,84 @@ impl MailRestoreDrill {
 
 /// Finds the newest snapshot, carries it to the box and restores it, leaving
 /// the server running against the restored store.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+/// `<MailRestoreDrill/>` — restore another stage's newest SQLite snapshot into
+/// THIS stage's mail box, so the mailboxes that come back can be probed.
+///
+/// A backup nobody has restored is a hypothesis. The nightly snapshot is written
+/// by a timer on the box and lands in a bucket where it is indistinguishable from
+/// a file of zeroes, and every property that matters — that it is complete,
+/// readable, internally consistent, replaceable and accepted by Stalwart — is
+/// only observable by doing it. So the drill is
+/// a route rather than a runbook, and the assertion is the ordinary
+/// [`MailProbe`] running against the restored stage: mail flows, or the backup
+/// was not one.
+///
+/// It is a whole STAGE, not a spare file: a drill deploy stands up its own box
+/// and persistent volume, restores production's snapshot into them, and is
+/// destroyed after.
+///
+/// The assertion is deliberately made HERE rather than by a [`MailProbe`]
+/// beside it. A restored store carries the SOURCE stage's domains and accounts,
+/// so the drill box now serves `probe@<source domain>` while that domain's `MX`
+/// still points at the source box: a probe's inbound leg would be answered by
+/// production and pass without the drill having restored anything. What is
+/// genuinely provable is what this asserts — that a restored account
+/// authenticates against the DRILL box and its mailbox is readable — and that
+/// is what "the backup came back" means.
+///
+/// The one thing this action will not do is run against the stage it is
+/// restoring FROM. Replacing the live stage's SQLite file is not a drill, it is
+/// the incident, so the stages are compared and a match fails before anything
+/// is downloaded.
+#[action]
+#[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn MailRestoreDrillAction(
+pub async fn MailRestoreDrill(
+	/// The stage whose backups are restored, ie the one being proven
+	/// recoverable.
+	#[field(default = Self::SOURCE_STAGE)]
+	source_stage: SmolStr,
+	/// The mail domain the restored account belongs to, ie one the SOURCE
+	/// stage serves.
+	///
+	/// Named rather than read off this stack, because the drill stack does not
+	/// declare it and must not: an SES identity is account-global, so a second
+	/// stack declaring `stalwart.beetmash.com` fails its apply against the
+	/// identity the live one already owns. The drill therefore serves a
+	/// domain of its own — which the restore then REPLACES with the source's,
+	/// and the account this signs in as is one of those.
+	#[field]
+	source_domain: SmolStr,
+	/// The private half of the key pair the box imported, as
+	/// [`StalwartProvision`] takes it.
+	#[field(default = StalwartProvision::SSH_KEY)]
+	ssh_key: SmolStr,
+	/// The restored mailbox the assertion signs in as, by localpart. The probe
+	/// mailbox by default, since it is the one account whose credential exists
+	/// to be used by a deploy step.
+	#[field]
+	mailbox: SmolStr,
+	/// How long to wait for the restarted server to accept a restored
+	/// credential.
+	#[field(default = Duration::from_secs(300))]
+	timeout: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let drill = cx
-		.caller
-		.get_cloned::<MailRestoreDrill>()
-		.await
-		.unwrap_or_default();
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let stage = mail.stack.stage().clone();
-	if &stage == drill.source_stage() {
+	if stage == source_stage {
 		bevybail!(
 			"this drill would restore {stage}'s own backup over {stage}'s live \
 			SQLite database. Deploy to a throwaway stage and run it there: \
 			`--stage=drill`"
 		);
 	}
-	if drill.source_domain().is_empty() {
+	if source_domain.is_empty() {
 		bevybail!(
 			"no source_domain: the drill signs in as an account the RESTORE \
 			created, which belongs to a domain the '{}' stage serves and this \
 			stack deliberately does not declare",
-			drill.source_stage()
+			source_stage
 		);
 	}
 	if mail.mail_box.backup_bucket().is_empty() {
@@ -170,7 +155,7 @@ pub async fn MailRestoreDrillAction(
 
 	// the SOURCE stage's bucket, which is the same declaration resolved against
 	// a different stage: the one place the two stacks touch.
-	let source = mail.stack.clone().with_stage(drill.source_stage().clone());
+	let source = mail.stack.clone().with_stage(source_stage.clone());
 	let bucket = source.resource_name(mail.mail_box.backup_bucket().clone());
 	let region = mail.stack.region().clone();
 	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);
@@ -195,7 +180,7 @@ pub async fn MailRestoreDrillAction(
 		host: mail.public_ip().await?,
 		user: StalwartProvision::SSH_USER.to_string(),
 		port: 22,
-		key_path: StalwartProvision::key_path(drill.ssh_key())?,
+		key_path: StalwartProvision::key_path(&ssh_key)?,
 	};
 	connection
 		.wait_for_ready(Duration::from_secs(300), Duration::from_secs(5))
@@ -235,17 +220,10 @@ pub async fn MailRestoreDrillAction(
 		))
 		.await?;
 
-	assert_restored(
-		&mail,
-		&source,
-		drill.source_domain(),
-		drill.mailbox(),
-		*drill.timeout(),
-	)
-	.await?;
+	assert_restored(&mail, &source, &source_domain, &mailbox, timeout).await?;
 	info!(
 		"the {stage} stage serves {}'s restored mail: the backup is one",
-		drill.source_stage()
+		source_stage
 	);
 	Pass(cx.input).xok()
 }

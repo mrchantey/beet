@@ -104,7 +104,7 @@ async fn sibling<T: Component + Clone>(
 /// `wrangler deploy` (which builds + pushes the image to Cloudflare's managed
 /// registry and deploys the fronting Worker). Reads the sibling
 /// [`CloudflareContainerBlock`] + [`BuildArtifact`].
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareContainerDeployAction(
@@ -321,7 +321,7 @@ fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result<Option<String>> {
 /// `deploy` and `bench` reuse; running it as its own verb makes the artifacts
 /// (and the wasm size) visible before an upload, and warms the build so a
 /// following `deploy` only uploads.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareWorkerBuildAction(
@@ -406,7 +406,7 @@ fn fmt_bytes(bytes: u64) -> String {
 /// The wasm artifact is produced from the `beet-cli` crate (`--features
 /// cloudflare`) by `worker-build` in [`build_worker_artifacts`], so this action
 /// carries no separate [`BuildArtifact`].
-#[action(handler_only)]
+#[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareWorkerDeployAction(
@@ -495,7 +495,7 @@ fn worker_wrangler_json(
 /// directory and runs `wrangler r2 object put` per file (using the API token, so
 /// no R2 S3 keys are needed for the sync itself), timing the publish (the
 /// headline the `bench` verb measures against a full redeploy).
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareR2Sync(
@@ -535,7 +535,7 @@ impl CloudflareR2Sync {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),
-			prefix: PropOpt(None),
+			prefix: PropOpt::none(),
 		}
 	}
 }
@@ -621,7 +621,7 @@ async fn sync_dir_to_r2(
 ///
 /// Times an R2 `sync` (and, with a `url`, how soon the live Worker serves it)
 /// against a full rebuild + redeploy, then prints the comparison.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareBench(
@@ -693,7 +693,7 @@ impl CloudflareBench {
 			name: name.into(),
 			bucket: bucket.into(),
 			local_dir: local_dir.into(),
-			url: PropOpt(None),
+			url: PropOpt::none(),
 		}
 	}
 }
@@ -720,7 +720,7 @@ async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
 ///
 /// Tails a deployed Worker's logs via `wrangler tail`, the Cloudflare analogue
 /// of [`AwsWatch`]. With a timeout it tails then stops; otherwise it follows.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareWatch(
@@ -753,7 +753,7 @@ impl CloudflareWatch {
 	pub fn new(name: impl Into<SmolStr>) -> Self {
 		Self {
 			name: name.into(),
-			timeout: PropOpt(None),
+			timeout: PropOpt::none(),
 		}
 	}
 }
@@ -765,7 +765,7 @@ impl CloudflareWatch {
 /// `wrangler delete <worker>`, empty the bucket (deleting *every* object), then
 /// `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
 /// already-destroyed.
-#[action(handler_only)]
+#[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflareDestroy(
