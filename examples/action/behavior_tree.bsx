@@ -2,12 +2,12 @@
 # Behavior Tree - Sequence Control Flow
 
 A `<Sequence>` runs its children in order, threading the input through each and
-stopping at the first failure. Each child here is a `<Log::Message>` leaf; both
+stopping at the first failure. Each child here is a `<Log>` leaf; both
 pass, so the sequence passes. `{CallOnReady}` runs the root on load, then exits.
 
     beet --main=examples/action/behavior_tree.bsx
 -->
 <Sequence {CallOnReady}>
-	<Log::Message("running child1")/>
-	<Log::Message("running child2")/>
+	<Log message="running child1"/>
+	<Log message="running child2"/>
 </Sequence>

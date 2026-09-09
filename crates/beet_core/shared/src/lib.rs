@@ -11,6 +11,7 @@ mod named_field;
 /// Package configuration extensions for Cargo.toml parsing.
 #[cfg(feature = "std")]
 pub mod pkg_ext;
+mod prop;
 mod synhow;
 
 pub mod prelude {
@@ -19,6 +20,7 @@ pub mod prelude {
 	pub use crate::named_field::*;
 	#[cfg(feature = "std")]
 	pub use crate::pkg_ext;
+	pub use crate::prop::*;
 	pub use crate::synbail;
 	pub use crate::synhow;
 }

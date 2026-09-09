@@ -5,14 +5,27 @@ use core::marker::PhantomData;
 
 /// Sets the [`Text`] of all entities with the filter component `F`
 /// when this action runs, then passes.
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[require(SetTextOnRunAction<F>)]
-#[reflect(Component)]
-pub struct SetTextOnRun<F: Component> {
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub fn SetTextOnRun<F>(
 	/// The text to set
-	pub value: Cow<'static, str>,
-	#[reflect(ignore)]
-	phantom: PhantomData<F>,
+	#[field]
+	value: Cow<'static, str>,
+	_cx: In<ActionContext>,
+	mut texts: Query<&mut Text, With<F>>,
+	mut text_spans: Query<&mut TextSpan, With<F>>,
+) -> Result<Outcome>
+where
+	F: Component,
+{
+	for mut text in texts.iter_mut() {
+		**text = value.to_string();
+	}
+	for mut text in text_spans.iter_mut() {
+		**text = value.to_string();
+	}
+	Outcome::PASS.xok()
 }
 
 impl<F: Component> SetTextOnRun<F> {
@@ -20,32 +33,7 @@ impl<F: Component> SetTextOnRun<F> {
 	pub fn new(value: impl Into<Cow<'static, str>>) -> Self {
 		Self {
 			value: value.into(),
-			phantom: PhantomData,
+			_marker: PhantomData,
 		}
 	}
-}
-
-/// Sets the text of all entities with the filter component `F`, then passes.
-///
-/// ## Errors
-/// Errors if the caller has no [`SetTextOnRun`] component.
-#[action(default)]
-#[derive(Component)]
-pub fn SetTextOnRunAction<F>(
-	cx: In<ActionContext>,
-	query: Query<&SetTextOnRun<F>>,
-	mut texts: Query<&mut Text, With<F>>,
-	mut text_spans: Query<&mut TextSpan, With<F>>,
-) -> Result<Outcome>
-where
-	F: Component,
-{
-	let set_text_on_run = query.get(cx.id())?;
-	for mut text in texts.iter_mut() {
-		**text = set_text_on_run.value.to_string();
-	}
-	for mut text in text_spans.iter_mut() {
-		**text = set_text_on_run.value.to_string();
-	}
-	Outcome::PASS.xok()
 }

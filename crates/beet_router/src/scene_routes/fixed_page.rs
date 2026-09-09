@@ -45,11 +45,16 @@ use beet_net::prelude::*;
 /// the same primitive a separate page file would need, and squarely what the BSN
 /// asset format will redefine. Re-open it there, or sooner if a second concurrent
 /// surface is wanted.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+///
+/// The route action hands back the route entity itself as the render root,
+/// whatever the request.
+#[action(route, handler_only)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(FixedPageAction)]
 #[component(on_add = hook_ext::entity_hook(FixedPage::insert_page_root))]
-pub struct FixedPage;
+pub async fn FixedPage(cx: ActionContext<Request>) -> Result<PageRequest> {
+	PageRequest(cx.id()).xok()
+}
 
 impl FixedPage {
 	/// Make the route its own render root with nothing to clean up after render,
@@ -62,14 +67,6 @@ impl FixedPage {
 		let id = entity.id();
 		entity.insert((PageRootOf(id), DespawnAfterRender::default()));
 	}
-}
-
-/// The `Request -> PageRequest` route action [`FixedPage`] installs: hand back
-/// the route entity itself as the render root, whatever the request.
-#[action(route)]
-#[derive(Default, Component)]
-async fn FixedPageAction(cx: ActionContext<Request>) -> Result<PageRequest> {
-	PageRequest(cx.id()).xok()
 }
 
 #[cfg(test)]

@@ -123,7 +123,7 @@ pub async fn EnsureDkimKeyAction(
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 
-	let mut input = cx.input;
+	let input = cx.input;
 	// only the domains whose records this stack publishes: a domain somebody
 	// else holds the zone for would get a key no record ever points at.
 	for domain in mail

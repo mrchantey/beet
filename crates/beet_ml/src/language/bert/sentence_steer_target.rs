@@ -9,59 +9,35 @@ use std::marker::PhantomData;
 ///
 /// The generic parameter `F` filters the candidate pool to entities
 /// matching `With<F>`.
+#[action(plain_meta)]
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(Action<(), Outcome> = Action::<(), Outcome>::new_system(sentence_steer_target::<F>))]
-pub struct SentenceSteerTarget<F: Component> {
+pub fn SentenceSteerTarget<F>(
 	/// Asset handle for the [`Bert`] encoder.
-	pub bert: Handle<Bert>,
+	#[field]
+	bert: Handle<Bert>,
 	/// Entity carrying the [`Sentence`] used as the search prompt. Most
 	/// commonly the agent itself; the indirection lets the prompt live
 	/// on a sibling entity.
-	pub target_entity: TargetEntity,
-	#[reflect(ignore)]
-	_phantom: PhantomData<F>,
-}
-
-impl<F: Component> SentenceSteerTarget<F> {
-	/// Create a [`SentenceSteerTarget`] from a [`Bert`] handle and the
-	/// entity that carries the prompt [`Sentence`].
-	pub fn new(bert: Handle<Bert>, target_entity: TargetEntity) -> Self {
-		Self {
-			bert,
-			target_entity,
-			_phantom: PhantomData,
-		}
-	}
-}
-
-impl<F: Component> Default for SentenceSteerTarget<F> {
-	fn default() -> Self {
-		Self {
-			bert: Handle::default(),
-			target_entity: TargetEntity::default(),
-			_phantom: PhantomData,
-		}
-	}
-}
-
-fn sentence_steer_target<F: Component>(
+	#[field]
+	target_entity: TargetEntity,
 	cx: In<ActionContext>,
 	mut commands: Commands,
-	query: Query<&SentenceSteerTarget<F>>,
 	sentences: Query<&Sentence>,
 	items: Query<Entity, (With<Sentence>, With<F>)>,
 	mut berts: ResMut<Assets<Bert>>,
 	agent_query: AgentQuery,
-) -> Result<Outcome> {
+) -> Result<Outcome>
+where
+	F: Component,
+{
 	let action = cx.caller.id();
-	let target_action = query.get(action)?;
-	let target_entity = target_action.target_entity.get(action, &agent_query);
+	let target_entity = target_entity.get(action, &agent_query);
 	let target_sentence = sentences.get(target_entity)?;
 	// Asset is downloaded asynchronously by [`BertLoader`]; if the user
 	// triggers this action before the load finishes, soft-fail so the
 	// sequence stops without panicking the app.
-	let Some(mut bert) = berts.get_mut(&target_action.bert) else {
+	let Some(mut bert) = berts.get_mut(&bert.clone()) else {
 		log::warn!("Bert asset not yet loaded, ignoring action call");
 		return Ok(Outcome::FAIL);
 	};
@@ -77,4 +53,16 @@ fn sentence_steer_target<F: Component>(
 	)?;
 	commands.entity(agent).insert(SteerTarget::Entity(chosen));
 	Ok(Outcome::PASS)
+}
+
+impl<F: Component> SentenceSteerTarget<F> {
+	/// Steer toward the `With<F>` entity whose [`Sentence`] best matches the
+	/// prompt on `target_entity`.
+	pub fn new(bert: Handle<Bert>, target_entity: TargetEntity) -> Self {
+		Self {
+			bert,
+			target_entity,
+			_marker: PhantomData,
+		}
+	}
 }

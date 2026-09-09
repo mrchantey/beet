@@ -46,42 +46,31 @@ impl DifferentialDrive {
 /// [`Duration`] is authored in markup and shown in the model's tool schema, so the model
 /// emits a value it reads straight from the schema.
 ///
-/// Requires [`DriveForDurationAction`], so authoring a `<DriveForDuration/>` on a behavior
-/// leaf drives the agent for the duration then stops without a separate action tag.
+/// Running the leaf resolves the driven agent through [`AgentQuery`] (as [`SetDrive`]
+/// does) and runs a `SetDrive` + [`EndInDuration`] + `SetDrive(0, 0)` sequence on it,
+/// so `<DriveForDuration/>` is self-contained.
+///
+/// ## Errors
+/// Errors if the agent has no [`DifferentialDrive`] (via the inner [`SetDrive`]) — declare
+/// it on the driven body at spawn.
+#[action(handler_only)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(DriveForDurationAction)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct DriveForDuration {
+pub async fn DriveForDuration(
 	/// The commanded velocity to hold.
-	pub drive: DifferentialDrive,
+	#[field]
+	drive: DifferentialDrive,
 	/// How long to hold the velocity before stopping, as a unit-suffixed duration
 	/// string like `"1.5s"` or `"800ms"`.
 	#[cfg_attr(
 		feature = "serde",
 		serde(with = "beet_core::prelude::duration_str")
 	)]
-	pub duration: Duration,
-}
-
-/// The action behind [`DriveForDuration`]: drive the agent at the commanded velocity for the
-/// commanded duration, then stop.
-///
-/// Reads its caller's [`DriveForDuration`], resolves the driven agent through [`AgentQuery`]
-/// (as [`SetDriveAction`] does), and runs a `SetDrive` + [`EndInDuration`] + `SetDrive(0, 0)`
-/// sequence on it — the same "drive this velocity for N seconds then halt" step the perceive-act
-/// wgpu body and the esp robot perform. Spawned automatically by [`DriveForDuration`]'s
-/// `#[require]`, so `<DriveForDuration/>` is a self-contained leaf.
-///
-/// ## Errors
-/// Errors if the agent has no [`DifferentialDrive`] (via the inner `SetDrive`) — declare it on
-/// the driven body at spawn.
-#[action(handler_only)]
-#[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn DriveForDurationAction(cx: ActionContext) -> Result<Outcome> {
-	let DriveForDuration { drive, duration } =
-		cx.caller.get_cloned::<DriveForDuration>().await?;
+	#[field]
+	duration: Duration,
+	cx: ActionContext,
+) -> Result<Outcome> {
 	let world = cx.world();
 	// the agent this action drives, resolved the same way `SetDrive` resolves its own.
 	let agent = AgentQuery::entity_async(&world, cx.id()).await;
@@ -108,14 +97,38 @@ pub async fn DriveForDurationAction(cx: ActionContext) -> Result<Outcome> {
 ///
 /// The agent must carry a [`DifferentialDrive`], declared on the body at spawn; the
 /// action errors loudly if it is missing rather than silently doing nothing.
+///
+/// ## Errors
+/// Errors if the agent has no [`DifferentialDrive`] — declare it on the driven body
+/// at spawn (the wgpu `CharacterDrive` requires it, the Alvik root spawns with it).
+#[action(handler_only)]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(SetDriveAction)]
-pub struct SetDrive {
+pub fn SetDrive(
 	/// Forward speed, mm/s (negative = reverse).
-	pub linear: LinearVelocity,
+	#[field]
+	linear: LinearVelocity,
 	/// Turn rate, deg/s (positive = left).
-	pub angular: AngularVelocity,
+	#[field]
+	angular: AngularVelocity,
+	cx: In<ActionContext>,
+	mut agents: AgentQuery<&'static mut DifferentialDrive>,
+) -> Result<Outcome> {
+	info!(
+		"SetDrive: linear={} angular={}",
+		linear.as_mm_per_sec(),
+		angular.as_deg_per_sec()
+	);
+	let mut command = agents.get_mut(cx.id()).map_err(|_| {
+		bevyhow!(
+			"SetDrive action {}: its agent has no `DifferentialDrive` component — \
+			declare it on the driven body at spawn",
+			cx.id()
+		)
+	})?;
+	command.linear = linear;
+	command.angular = angular;
+	Outcome::PASS.xok()
 }
 
 impl SetDrive {
@@ -131,44 +144,12 @@ impl SetDrive {
 	}
 }
 
-/// The action behind [`SetDrive`]: reads the caller's [`SetDrive`], logs the step, and
-/// applies it to the agent's [`DifferentialDrive`], then passes.
-///
-/// ## Errors
-/// Errors if the agent has no [`DifferentialDrive`] — declare it on the driven body
-/// at spawn (the wgpu `CharacterDrive` requires it, the Alvik root spawns with it).
-#[action(handler_only)]
-#[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub fn SetDriveAction(
-	cx: In<ActionContext>,
-	drives: Query<&SetDrive>,
-	mut agents: AgentQuery<&'static mut DifferentialDrive>,
-) -> Result<Outcome> {
-	let drive = drives.get(cx.id())?;
-	info!(
-		"SetDrive: linear={} angular={}",
-		drive.linear.as_mm_per_sec(),
-		drive.angular.as_deg_per_sec()
-	);
-	let mut command = agents.get_mut(cx.id()).map_err(|_| {
-		bevyhow!(
-			"SetDrive action {}: its agent has no `DifferentialDrive` component — \
-			declare it on the driven body at spawn",
-			cx.id()
-		)
-	})?;
-	command.linear = drive.linear;
-	command.angular = drive.angular;
-	Outcome::PASS.xok()
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// `DriveForDuration` requires `DriveForDurationAction`, so running the leaf drives the
+	/// Running the `DriveForDuration` leaf drives the
 	/// agent's `DifferentialDrive` at the commanded velocity, then zeroes it once the
 	/// duration elapses — a self-contained "drive for N then stop" step.
 	#[beet_core::test]

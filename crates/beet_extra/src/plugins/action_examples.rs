@@ -8,8 +8,8 @@
 //!
 //! ```bsx
 //! <Sequence {CallOnReady}>
-//!   <Log::Message("running child1")/>
-//!   <Log::Message("running child2")/>
+//!   <Log message="running child1"/>
+//!   <Log message="running child2"/>
 //! </Sequence>
 //! ```
 use beet_action::prelude::*;
@@ -18,22 +18,15 @@ use core::time::Duration;
 
 // ── hello_world ──────────────────────────────────────────────
 
-/// `<Greet{name:".."}/>` - on load, greets the given name and passes. The
-/// config is a component field, read by [`GreetAction`].
-#[derive(Debug, Default, Clone, Component, Reflect)]
+/// `<Greet{name:".."}/>` - on load, logs `Hello, {name}!` and passes.
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(GreetAction)]
-pub struct Greet {
+pub async fn Greet(
 	/// The name to greet.
-	pub name: String,
-}
-
-/// Reads the caller's [`Greet`], logs `Hello, {name}!`, then passes.
-#[action(default)]
-#[derive(Component, Reflect)]
-#[reflect(Component, Default)]
-async fn GreetAction(cx: ActionContext) -> Result<Outcome> {
-	let Greet { name } = cx.caller.get_cloned::<Greet>().await?;
+	#[field]
+	name: String,
+) -> Result<Outcome> {
 	info!("Hello, {name}!");
 	Outcome::PASS.xok()
 }
@@ -128,20 +121,20 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 struct AttackTarget;
 
 /// An attack: deals damage to the [`AttackTarget`] and recoil to the agent.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(AttackPlayerAction)]
-struct AttackPlayer {
-	max_damage: f32,
-	max_recoil: f32,
-}
-
+///
 /// Rolls damage and recoil, applies them, and reports the outcome of the round.
-#[action(default)]
-#[derive(Component, Reflect)]
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
-	let attack = cx.caller.get_cloned::<AttackPlayer>().await?;
+async fn AttackPlayer(
+	/// The upper bound of the damage roll.
+	#[field]
+	max_damage: f32,
+	/// The upper bound of the recoil roll.
+	#[field]
+	max_recoil: f32,
+	cx: ActionContext,
+) -> Result<Outcome> {
 	let name = cx
 		.caller
 		.get(|name: &Name| name.to_string())
@@ -159,11 +152,11 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 				.ok_or_else(|| bevyhow!("no AttackTarget entity"))?;
 			let damage: f32 = world
 				.resource_mut::<RandomSource>()
-				.random_range(0.0..attack.max_damage)
+				.random_range(0.0..max_damage)
 				.round();
 			let recoil: f32 = world
 				.resource_mut::<RandomSource>()
-				.random_range(0.0..attack.max_recoil)
+				.random_range(0.0..max_recoil)
 				.round();
 			info!("Malenia attacks with {name}");
 

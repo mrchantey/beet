@@ -9,7 +9,7 @@ into the wasm binary; build the wasm with more features to run richer examples.
     beet --main=examples/action/behavior_tree.bsx   # the same program, natively
 -->
 <Sequence {CallOnReady}>
-	<Log::Message("Hello from beet, running headless in your browser.")/>
-	<Log::Message("This program was compiled to wasm and read from a script[type=application/x-bsx].")/>
-	<Log::Message("Edit examples/wasm/hello.bsx and the page live-reloads.")/>
+	<Log message="Hello from beet, running headless in your browser."/>
+	<Log message="This program was compiled to wasm and read from a script[type=application/x-bsx]."/>
+	<Log message="Edit examples/wasm/hello.bsx and the page live-reloads."/>
 </Sequence>

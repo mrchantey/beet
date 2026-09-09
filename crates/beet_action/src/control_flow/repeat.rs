@@ -7,48 +7,10 @@ use beet_core::prelude::*;
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// loops forever otherwise.
 /// With no child, returns [`Outcome::Pass`] immediately.
+#[action(plain_meta)]
 #[derive(Debug, Component, Reflect)]
-#[require(RepeatAction<Input>)]
 #[reflect(Component, Default)]
-pub struct Repeat<Input = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> Input>,
-}
-
-impl<Input> Clone for Repeat<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	fn clone(&self) -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-impl<Input> Copy for Repeat<Input> where Input: 'static + Send + Sync + Clone {}
-
-impl<Input> Default for Repeat<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl Repeat<()> {
-	/// Create a default `Repeat<()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-#[action(default)]
-#[derive(Component)]
-pub async fn RepeatAction<Input>(cx: ActionContext<Input>) -> Result<Outcome>
+pub async fn Repeat<Input = ()>(cx: ActionContext<Input>) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
@@ -81,6 +43,11 @@ where
 	}
 }
 
+impl Repeat<()> {
+	/// Create a default `Repeat<()>`.
+	pub fn new() -> Self { Self::default() }
+}
+
 /// Repeat-N control-flow component.
 ///
 /// Calls its single child up to `total_times`, passing a clone of the
@@ -88,103 +55,18 @@ where
 /// Returns [`Outcome::Fail`] immediately if the child fails;
 /// returns [`Outcome::Pass`] after all iterations complete.
 /// With no child, returns [`Outcome::Pass`] immediately.
+#[action(plain_meta)]
 #[derive(Debug, Component, Reflect)]
-#[require(RepeatTimesAction<Input>)]
 #[reflect(Component, Default)]
-pub struct RepeatTimes<Input = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-{
+pub async fn RepeatTimes<Input = ()>(
 	/// Maximum number of iterations.
+	#[field]
 	total_times: u32,
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> Input>,
-}
-
-impl<Input> Clone for RepeatTimes<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	fn clone(&self) -> Self {
-		Self {
-			total_times: self.total_times,
-			_marker: PhantomData,
-		}
-	}
-}
-impl<Input> Copy for RepeatTimes<Input> where
-	Input: 'static + Send + Sync + Clone
-{
-}
-
-impl<Input> Default for RepeatTimes<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	fn default() -> Self {
-		Self {
-			total_times: 0,
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl<Input> RepeatTimes<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	/// Configured repeat limit.
-	pub fn total_times(&self) -> u32 { self.total_times }
-}
-
-impl RepeatTimes<()> {
-	/// Sentinel used to represent an effectively unbounded repeat count.
-	pub const FOREVER: u32 = u32::MAX;
-
-	/// Create a bounded repeat counter.
-	pub fn new(total_times: u32) -> Self {
-		Self {
-			total_times,
-			_marker: PhantomData,
-		}
-	}
-
-	/// Create an unbounded repeat counter.
-	pub fn forever() -> Self { Self::new(Self::FOREVER) }
-}
-
-impl<Input> RepeatTimes<Input>
-where
-	Input: 'static + Send + Sync + Clone,
-{
-	/// Create a bounded repeat counter with a typed input marker.
-	pub fn typed(total_times: u32) -> Self {
-		Self {
-			total_times,
-			_marker: PhantomData,
-		}
-	}
-
-	/// Create an unbounded typed repeat counter.
-	pub fn typed_forever() -> Self { Self::typed(u32::MAX) }
-}
-
-/// Action component for [`RepeatTimes`], calls the single child up to
-/// `total_times`, returning on first failure.
-#[action(default)]
-#[derive(Component)]
-pub async fn RepeatTimesAction<Input>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome>
 where
 	Input: 'static + Send + Sync + Clone,
 {
-	let total_times = cx
-		.caller
-		.get(|rt: &RepeatTimes<Input>| rt.total_times)
-		.await
-		.unwrap_or(0);
-
 	let Some(child) = BehaviourChildren::only_for(&cx.world(), cx.id()).await
 	else {
 		return Outcome::PASS.xok();
@@ -216,6 +98,33 @@ where
 	}
 
 	Outcome::PASS.xok()
+}
+
+impl RepeatTimes<()> {
+	/// Sentinel used to represent an effectively unbounded repeat count.
+	pub const FOREVER: u32 = u32::MAX;
+
+	/// Create a bounded repeat counter.
+	pub fn new(total_times: u32) -> Self { Self::typed(total_times) }
+
+	/// Create an unbounded repeat counter.
+	pub fn forever() -> Self { Self::new(Self::FOREVER) }
+}
+
+impl<Input> RepeatTimes<Input>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	/// Create a bounded repeat counter with a typed input marker.
+	pub fn typed(total_times: u32) -> Self {
+		Self {
+			total_times,
+			_marker: PhantomData,
+		}
+	}
+
+	/// Create an unbounded typed repeat counter.
+	pub fn typed_forever() -> Self { Self::typed(u32::MAX) }
 }
 
 #[cfg(test)]
@@ -326,9 +235,55 @@ mod tests {
 
 	#[beet_core::test]
 	async fn repeat_times_accessors() {
-		RepeatTimes::new(7).total_times().xpect_eq(7);
+		RepeatTimes::new(7).total_times.xpect_eq(7);
 		RepeatTimes::forever()
-			.total_times()
+			.total_times
 			.xpect_eq(RepeatTimes::FOREVER);
+	}
+
+	/// Fields are read live, so a value edited between calls is observed.
+	#[beet_core::test]
+	async fn repeat_times_reads_fields_live() {
+		let (count, child) = pass_n_then_fail(10);
+		let mut world = AsyncPlugin::world();
+		let entity = world.spawn((RepeatTimes::new(2), children![child])).id();
+		world
+			.entity_mut(entity)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::PASS);
+		count.load(Ordering::SeqCst).xpect_eq(2);
+		world
+			.entity_mut(entity)
+			.get_mut::<RepeatTimes>()
+			.unwrap()
+			.total_times = 3;
+		world
+			.entity_mut(entity)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::PASS);
+		count.load(Ordering::SeqCst).xpect_eq(5);
+	}
+
+	/// A detached action has no component to read, so `into_action` freezes the
+	/// fields at conversion.
+	#[beet_core::test]
+	async fn repeat_times_into_action_is_frozen() {
+		let (count, child) = pass_n_then_fail(10);
+		let mut world = AsyncPlugin::world();
+		let entity = world
+			.spawn((RepeatTimes::new(2).into_action(), children![child]))
+			.id();
+		// the component is absent, yet the frozen action still repeats twice
+		world
+			.entity_mut(entity)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::PASS);
+		count.load(Ordering::SeqCst).xpect_eq(2);
 	}
 }

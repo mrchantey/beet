@@ -19,25 +19,17 @@ use beet_core::prelude::*;
 /// Standing on its own entity is the point: bounding is a policy of the thread,
 /// not of whichever actor happened to capture the image, so a thread whose images
 /// arrive from a tool call or an upload bounds them the same way.
-#[derive(Debug, Clone, Component, Reflect)]
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<(), Outcome> = Action::new_async(stub_old_images_action))]
-pub struct StubOldImages {
+pub async fn StubOldImages(
 	/// How many recent images keep their bytes; older ones are stubbed to text.
-	pub keep: usize,
-}
-
-impl Default for StubOldImages {
-	fn default() -> Self {
-		// the current + previous image: images dominate request bytes, and two are
-		// enough to see what changed since the last turn.
-		Self { keep: 2 }
-	}
-}
-
-/// Stub this entity's thread window down to its configured image count.
-async fn stub_old_images_action(cx: ActionContext) -> Result<Outcome> {
-	let keep = cx.caller.get_cloned::<StubOldImages>().await?.keep;
+	/// Defaults to the current + previous image: images dominate request bytes,
+	/// and two are enough to see what changed since the last turn.
+	#[field(default = 2usize)]
+	keep: usize,
+	cx: ActionContext,
+) -> Result<Outcome> {
 	cx.caller
 		.with_state::<ThreadWindowQuery, _>(
 			move |entity, mut windows| -> Result {

@@ -59,18 +59,20 @@ async fn TryHealSelf(cx: ActionContext) -> Result<Outcome> {
 }
 
 /// An attack: deals damage to the player and recoil to Malenia.
-#[derive(Component, Clone)]
-#[require(AttackPlayerAction)]
-struct AttackPlayer {
-	max_damage: f32,
-	max_recoil: f32,
-	player: Entity,
-}
-
-#[action(default)]
+#[action]
 #[derive(Component)]
-async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
-	let attack = cx.caller.get_cloned::<AttackPlayer>().await?;
+async fn AttackPlayer(
+	/// The upper bound of the damage roll.
+	#[field]
+	max_damage: f32,
+	/// The upper bound of the recoil roll.
+	#[field]
+	max_recoil: f32,
+	/// The entity taking the damage.
+	#[field(required)]
+	player: Entity,
+	cx: ActionContext,
+) -> Result<Outcome> {
 	let name = cx
 		.caller
 		.get(|name: &Name| name.to_string())
@@ -83,17 +85,17 @@ async fn AttackPlayerAction(cx: ActionContext) -> Result<Outcome> {
 		.with(move |world: &mut World| -> Result<Outcome> {
 			let damage: f32 = world
 				.resource_mut::<RandomSource>()
-				.random_range(0.0..attack.max_damage)
+				.random_range(0.0..max_damage)
 				.round();
 			let recoil: f32 = world
 				.resource_mut::<RandomSource>()
-				.random_range(0.0..attack.max_recoil)
+				.random_range(0.0..max_recoil)
 				.round();
 			info!("Malenia attacks with {name}");
 
 			let player_hp = {
 				let mut player_health = world
-					.get_mut::<Health>(attack.player)
+					.get_mut::<Health>(player)
 					.ok_or_else(|| bevyhow!("player has no Health"))?;
 				player_health.0 -= damage;
 				player_health.0
@@ -166,7 +168,7 @@ fn setup(async_commands: AsyncCommands) {
 											AttackPlayer {
 												max_damage: 15.0,
 												max_recoil: 30.0,
-												player,
+												player: PropOpt(Some(player)),
 											},
 										),
 										(
@@ -177,7 +179,7 @@ fn setup(async_commands: AsyncCommands) {
 											AttackPlayer {
 												max_damage: 10_000.0,
 												max_recoil: 10.0,
-												player,
+												player: PropOpt(Some(player)),
 											},
 										),
 									],

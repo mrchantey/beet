@@ -15,54 +15,28 @@ use beet_net::prelude::*;
 ///
 /// Mirror semantics per path: a destination file or directory is replaced, so a
 /// stale binary is overwritten rather than merged around.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(DirCopyAction)]
-pub struct DirCopy {
+pub async fn DirCopy(
 	/// The workspace-relative source directory.
+	#[field]
 	src: SmolPath,
 	/// The workspace-relative destination directory.
+	#[field]
 	dest: SmolPath,
 	/// Comma-separated paths to copy, each relative to both ends and naming
 	/// either a file or a directory.
+	#[field]
 	paths: SmolStr,
-}
-
-impl DirCopy {
-	pub fn new(
-		src: impl Into<SmolPath>,
-		dest: impl Into<SmolPath>,
-		paths: impl Into<SmolStr>,
-	) -> Self {
-		Self {
-			src: src.into(),
-			dest: dest.into(),
-			paths: paths.into(),
-		}
-	}
-
-	/// The declared paths, skipping empty segments.
-	pub fn iter_paths(&self) -> impl Iterator<Item = &str> {
-		self.paths
-			.split(',')
-			.map(str::trim)
-			.filter(|path| !path.is_empty())
-	}
-}
-
-/// Copy each declared path from `src` to `dest`, replacing what is there.
-#[action]
-#[derive(Default, Component)]
-pub async fn DirCopyAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let copy = cx.caller.get_cloned::<DirCopy>().await?;
-	let src = WsPathBuf::new(copy.src().to_string()).into_abs();
-	let dest = WsPathBuf::new(copy.dest().to_string()).into_abs();
+	let src_dir = WsPathBuf::new(src.to_string()).into_abs();
+	let dest_dir = WsPathBuf::new(dest.to_string()).into_abs();
 	let mut copied = 0;
-	for path in copy.iter_paths() {
-		let from = src.join(path);
-		let to = dest.join(path);
+	for path in DirCopy::iter_paths(&paths) {
+		let from = src_dir.join(path);
+		let to = dest_dir.join(path);
 		if !fs_ext::exists(&from)? {
 			bevybail!(
 				"nothing to copy at {}: the borrowed path is declared but absent, so the destination would silently keep a stale copy",
@@ -83,10 +57,29 @@ pub async fn DirCopyAction(
 		debug!("copied {} -> {}", from.display(), to.display());
 		copied += 1;
 	}
-	info!(
-		"copied {copied} borrowed path(s) {} -> {}",
-		copy.src(),
-		copy.dest()
-	);
+	info!("copied {copied} borrowed path(s) {src} -> {dest}");
 	Pass(cx.input).xok()
+}
+
+impl DirCopy {
+	/// A copy of every `paths` entry from `src` to `dest`.
+	pub fn new(
+		src: impl Into<SmolPath>,
+		dest: impl Into<SmolPath>,
+		paths: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			src: src.into(),
+			dest: dest.into(),
+			paths: paths.into(),
+		}
+	}
+
+	/// The declared paths, skipping empty segments.
+	pub fn iter_paths(paths: &str) -> impl Iterator<Item = &str> {
+		paths
+			.split(',')
+			.map(str::trim)
+			.filter(|path| !path.is_empty())
+	}
 }

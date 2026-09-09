@@ -84,6 +84,9 @@ pub fn sync_site(
 			FsStore::new(WsPathBuf::new("examples/bsx_site")),
 			app_bucket().stack_store(stack, deployment),
 		),
-		SyncS3Bucket::default().with_delete(true),
+		SyncS3Bucket {
+			delete: true,
+			..default()
+		},
 	)
 }

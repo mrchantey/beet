@@ -3,7 +3,7 @@
 //! A floor robot that perceives one photo at a time and acts on what it sees.
 //! Each cycle [`PostPhoto`] (the camera actor) captures via [`TakePhoto`] and
 //! posts the photo into the thread, then the agent's single model call answers
-//! with one [`RespondMultiModalAction`] tool call, which fans out to [`ShowImage`],
+//! with one [`RespondMultiModal`] tool call, which fans out to [`ShowImage`],
 //! [`SpeakText`] and [`LogDriveForDuration`] (or a real body's `drive`) concurrently. The agent forwards each
 //! capability over a socket to the client that serves it, bound by the
 //! [`capability_socket`] handshake; run standalone, the tools' own local

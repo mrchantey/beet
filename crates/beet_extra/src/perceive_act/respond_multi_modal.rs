@@ -1,4 +1,4 @@
-//! `RespondMultiModalAction`: the single tool the perceive-act agent calls each cycle,
+//! `RespondMultiModal`: the single tool the perceive-act agent calls each cycle,
 //! fanning out to the three capability routes (`show-image`, `speak-text`, `drive`) and
 //! awaiting them all, so one model call per photo is the whole turn and the next photo
 //! waits for the body to finish moving.
@@ -18,13 +18,14 @@ use beet_router::prelude::*;
 /// input's `parallel` flag fans all three out at once instead. Face and speech failures
 /// are logged and tolerated (a missing client must not stop the robot's little life);
 /// the drive result is reported to the model so it knows whether it actually moved.
-///
-/// Reads a [`RespondMultiModal`] config off its own caller each call: its
-/// `max_drive_duration` clamps how long a single response may drive.
 #[action(route = "respond-multi-modal")]
-#[derive(Component, Reflect)]
-#[reflect(Component)]
-pub async fn RespondMultiModalAction(
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn RespondMultiModal(
+	/// The longest a single response may drive, clamping `drive.duration`;
+	/// absent for no cap, so a demo never sends the fox or robot careening.
+	#[field]
+	max_drive_duration: Option<Duration>,
 	cx: ActionContext<RespondMultiModalInput>,
 ) -> Result<String> {
 	let RespondMultiModalInput {
@@ -34,13 +35,7 @@ pub async fn RespondMultiModalAction(
 		parallel,
 	} = cx.input;
 	// clamp the commanded drive to this action's configured ceiling, if any.
-	if let Some(max) = cx
-		.caller
-		.get_cloned::<RespondMultiModal>()
-		.await
-		.ok()
-		.and_then(|config| config.max_drive_duration)
-	{
+	if let Some(max) = max_drive_duration {
 		drive.duration = drive.duration.min(max);
 	}
 	// resolve the chosen image title to a url via the active scene (its fallback url
@@ -178,19 +173,6 @@ async fn call_capability(
 	Ok(())
 }
 
-/// Per-response config read off the [`RespondMultiModalAction`]'s own caller each
-/// call: a ceiling clamping how long the agent may drive in one response, so a demo
-/// never sends the fox or robot careening.
-/// `None` means no cap. Spawn it beside the action, eg
-/// `<RespondMultiModalAction {RespondMultiModal{max_drive_duration:"2s"}}/>`.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct RespondMultiModal {
-	/// The longest a single response may drive, clamping `drive.duration`;
-	/// `None` for no cap.
-	pub max_drive_duration: Option<Duration>,
-}
-
 /// Everything the robot does with one photo: the face to wear, the line to say
 /// and how to drive next.
 #[derive(Reflect, serde::Deserialize, serde::Serialize)]
@@ -218,8 +200,8 @@ mod test {
 	use super::*;
 
 	/// Build an agent serving `show-image` + `drive` (but deliberately no `speak-text`,
-	/// so a failed capability is exercised as tolerated), spawn a `RespondMultiModalAction`
-	/// carrying `config`, run one `input` through it, and return the app plus the image
+	/// so a failed capability is exercised as tolerated), spawn the `RespondMultiModal`
+	/// tool as `config`, run one `input` through it, and return the app plus the image
 	/// and drive route entities so callers can assert what each recorded.
 	async fn run_response(
 		config: RespondMultiModal,
@@ -234,11 +216,7 @@ mod test {
 			.world_mut()
 			.spawn((LogDriveForDuration, ChildOf(agent)))
 			.id();
-		app.world_mut().spawn((
-			RespondMultiModalAction,
-			config,
-			ChildOf(agent),
-		));
+		app.world_mut().spawn((config, ChildOf(agent)));
 		app.world_mut().flush();
 
 		let body = serde_json::to_string(&input).unwrap();
@@ -304,13 +282,13 @@ mod test {
 	#[beet_core::test]
 	async fn sequences_speech_before_drive() { drive_and_assert(false).await; }
 
-	/// `RespondMultiModal.max_drive_duration` clamps an over-long command so a demo body
+	/// `RespondMultiModal`'s `max_drive_duration` clamps an over-long command so a demo body
 	/// never careens: a 5s command under a 1s cap records 1s.
 	#[beet_core::test]
 	async fn clamps_drive_duration() {
 		let (mut app, _image_entity, drive_entity) = run_response(
 			RespondMultiModal {
-				max_drive_duration: Some(Duration::from_secs(1)),
+				max_drive_duration: PropOpt(Some(Duration::from_secs(1))),
 			},
 			RespondMultiModalInput {
 				image: "joy".into(),

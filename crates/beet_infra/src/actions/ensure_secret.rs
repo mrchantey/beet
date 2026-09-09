@@ -23,83 +23,33 @@ use beet_net::prelude::*;
 /// Nothing here logs the value, and the parameter is a `SecureString`, so the
 /// only place it exists in the clear is the tofu state that the apply writes
 /// (see [`StateEncryption`], which is not optional for a stack that runs this).
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+///
+/// Idempotent by construction, and cheap when there is nothing to do: an
+/// existing parameter is one read and no write.
+#[action(handler_only)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(EnsureSecretAction)]
-pub struct EnsureSecret {
+pub async fn EnsureSecret(
 	/// Which secret, named the way the block that reads it names it.
+	#[field]
 	secret: SecretRef,
 	/// The tofu variable to hand the value to, when the resource that consumes
 	/// it is created by the same apply (an RDS master password). Absent for a
 	/// secret only a running process reads (the mail box's admin password),
 	/// which terraform never needs to see at all.
-	#[set_with(unwrap_option, into)]
+	#[field]
 	variable: Option<SmolStr>,
-	/// Generated length, in characters of [`ALPHABET`](Self::ALPHABET).
+	/// Generated length, in characters of [`ALPHABET`](EnsureSecret::ALPHABET).
+	#[field(default = EnsureSecret::LENGTH)]
 	length: usize,
-}
-
-impl Default for EnsureSecret {
-	fn default() -> Self { Self::new(SecretRef::default()) }
-}
-
-impl EnsureSecret {
-	/// Unambiguous alphanumerics: no `0`/`O` or `1`/`l`, since these values are
-	/// read aloud and typed by hand during an incident.
-	pub const ALPHABET: &'static [u8] =
-		b"abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-	/// 32 characters of [`ALPHABET`](Self::ALPHABET) is ~185 bits, which is
-	/// more than the 128 anything here needs and still fits on one line.
-	pub const LENGTH: usize = 32;
-
-	pub fn new(secret: SecretRef) -> Self {
-		Self {
-			secret,
-			variable: None,
-			length: Self::LENGTH,
-		}
-	}
-
-	/// A generated value, drawn from the platform entropy source.
-	pub fn generate(&self) -> Result<SmolStr> {
-		if self.length < 16 {
-			bevybail!(
-				"secret '{}' is {} characters: too short to be worth generating",
-				self.secret.label(),
-				self.length
-			);
-		}
-		let mut source = RandomSource::default();
-		(0..self.length)
-			.map(|_| {
-				Self::ALPHABET[source.random_range(0..Self::ALPHABET.len())]
-					as char
-			})
-			.collect::<String>()
-			.xmap(SmolStr::from)
-			.xok()
-	}
-}
-
-/// Reads the parameter, mints it if it is not there, and passes the value on to
-/// the apply as a `-var` when one was named.
-///
-/// Idempotent by construction, and cheap when there is nothing to do: an
-/// existing parameter is one read and no write.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn EnsureSecretAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let ensure = cx.caller.get_cloned::<EnsureSecret>().await?;
 	let stack = cx
 		.caller
 		.with_state::<StackQuery, _>(|entity, query| query.resolve(entity))
 		.await?;
 	let region = stack.region().clone();
-	let name = ensure.secret().name(&stack);
+	let name = secret.name(&stack);
 
 	let value = match ssm_ext::get(&region, &name).await? {
 		Some(value) => {
@@ -109,7 +59,7 @@ pub async fn EnsureSecretAction(
 		None => {
 			// the loser of a race re-reads rather than overwriting, so two
 			// deploys can never disagree about which value is in use.
-			let generated = ensure.generate()?;
+			let generated = EnsureSecret::generate(secret.label(), length)?;
 			match ssm_ext::create(&region, &name, &generated).await {
 				Ok(()) => {
 					info!("minted secret {name}");
@@ -126,11 +76,51 @@ pub async fn EnsureSecretAction(
 		}
 	};
 
-	let input = match ensure.variable() {
+	let input = match &variable {
 		Some(key) => cx.input.with_param(key, &value),
 		None => cx.input,
 	};
 	Pass(input).xok()
+}
+
+impl EnsureSecret {
+	/// Unambiguous alphanumerics: no `0`/`O` or `1`/`l`, since these values are
+	/// read aloud and typed by hand during an incident.
+	pub const ALPHABET: &'static [u8] =
+		b"abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+	/// 32 characters of [`ALPHABET`](Self::ALPHABET) is ~185 bits, which is
+	/// more than the 128 anything here needs and still fits on one line.
+	pub const LENGTH: usize = 32;
+
+	/// Ensure `secret` exists, with a default-length generated value and no tofu
+	/// variable.
+	pub fn new(secret: SecretRef) -> Self {
+		Self {
+			secret,
+			variable: PropOpt(None),
+			length: Self::LENGTH,
+		}
+	}
+
+	/// A generated value of `length` characters, drawn from the platform entropy
+	/// source.
+	pub fn generate(label: &str, length: usize) -> Result<SmolStr> {
+		if length < 16 {
+			bevybail!(
+				"secret '{label}' is {length} characters: too short to be worth generating"
+			);
+		}
+		let mut source = RandomSource::default();
+		(0..length)
+			.map(|_| {
+				Self::ALPHABET[source.random_range(0..Self::ALPHABET.len())]
+					as char
+			})
+			.collect::<String>()
+			.xmap(SmolStr::from)
+			.xok()
+	}
 }
 
 #[cfg(test)]
@@ -143,8 +133,7 @@ mod tests {
 	/// spliced into a DSN or a shell env file is a bug in a different file.
 	#[beet_core::test]
 	fn generates_alphanumerics_only() {
-		let value = EnsureSecret::new(SecretRef::new("db-password"))
-			.generate()
+		let value = EnsureSecret::generate("db-password", EnsureSecret::LENGTH)
 			.unwrap();
 		value.len().xpect_eq(EnsureSecret::LENGTH);
 		value
@@ -156,17 +145,16 @@ mod tests {
 	/// Two calls must not agree, or the entropy source is not one.
 	#[beet_core::test]
 	fn generates_a_different_value_each_time() {
-		let ensure = EnsureSecret::new(SecretRef::new("db-password"));
-		(ensure.generate().unwrap() != ensure.generate().unwrap()).xpect_true();
+		let generate =
+			|| EnsureSecret::generate("db-password", EnsureSecret::LENGTH);
+		(generate().unwrap() != generate().unwrap()).xpect_true();
 	}
 
 	/// A length that would not survive being guessed is a config-time error,
 	/// not a weak password nobody notices.
 	#[beet_core::test]
 	fn rejects_a_length_that_is_not_worth_generating() {
-		EnsureSecret::new(SecretRef::new("db-password"))
-			.with_length(8)
-			.generate()
+		EnsureSecret::generate("db-password", 8)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("too short");
@@ -178,16 +166,18 @@ mod tests {
 	#[beet_core::test]
 	fn the_tofu_variable_is_opt_in() {
 		EnsureSecret::new(SecretRef::new("mail-admin-password"))
-			.variable()
+			.variable
 			.is_none()
 			.xpect_true();
-		EnsureSecret::new(SecretRef::new("db-password"))
-			.with_variable("db_password")
-			.variable()
-			.clone()
-			.unwrap()
-			.as_str()
-			.xpect_eq("db_password");
+		EnsureSecret {
+			variable: PropOpt(Some("db_password".into())),
+			..EnsureSecret::new(SecretRef::new("db-password"))
+		}
+		.variable
+		.into_inner()
+		.unwrap()
+		.as_str()
+		.xpect_eq("db_password");
 	}
 
 	/// The name the action reads is the one the database's boot script reads,
@@ -200,7 +190,7 @@ mod tests {
 			.resolve(&PackageConfig::default());
 		let database = RdsPostgresBlock::new("db");
 		EnsureSecret::new(database.secret())
-			.secret()
+			.secret
 			.name(&stack)
 			.xpect_eq(database.secret_name(&stack));
 	}

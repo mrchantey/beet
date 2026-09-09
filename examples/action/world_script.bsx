@@ -10,7 +10,7 @@ refused call is an error the script can catch.
 The muster script spawns the squad and reads one of them straight back, so the
 world it describes is the world it just made. The round script uses real ids
 throughout, and the last beat asks for something its `<ScriptConfig>` forbids,
-catches the refusal and writes it onto the roll call, whose `<Log::Name>`
+catches the refusal and writes it onto the roll call, whose `<Log>`
 reports it.
 
     beet --main=examples/action/world_script.bsx
@@ -73,6 +73,6 @@ reports it.
 				console.log('refused: ' + err.message);
 			}
 			"/>
-		<Log::Name {Name("roll call")}/>
+		<Log {Name("roll call")}/>
 	</Sequence>
 </Fragment>

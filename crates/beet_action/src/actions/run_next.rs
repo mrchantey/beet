@@ -21,10 +21,21 @@ use beet_core::prelude::*;
 /// 	.id();
 /// world.spawn(RunNext::new(next));
 /// ```
-#[derive(Debug, Clone, Component, Reflect)]
-#[require(RunNextAction<T>)]
-#[reflect(Component)]
-pub struct RunNext<T = Outcome>
+///
+/// ## Errors
+/// Errors if `target` was never set.
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn RunNext<T = Outcome>(
+	/// The next action entity to call.
+	#[field(required)]
+	target: Entity,
+	/// If set, only jump when the input equals this value.
+	#[field]
+	if_input_matches: Option<T>,
+	cx: ActionContext<T>,
+) -> Result<T>
 where
 	T: 'static
 		+ Send
@@ -35,10 +46,12 @@ where
 		+ FromReflect
 		+ bevy::reflect::Typed,
 {
-	/// The next action entity to call.
-	pub target: Entity,
-	/// If set, only jump when the input equals this value.
-	pub if_input_matches: Option<T>,
+	if let Some(expected) = &if_input_matches
+		&& &cx.input != expected
+	{
+		return cx.input.xok();
+	}
+	cx.world().entity(target).call::<T, T>(cx.input).await
 }
 
 impl RunNext<Outcome> {
@@ -68,47 +81,19 @@ where
 	/// Always jump to `target`, threading a `T`.
 	pub fn typed(target: Entity) -> Self {
 		Self {
-			target,
-			if_input_matches: None,
+			target: PropOpt(Some(target)),
+			if_input_matches: PropOpt(None),
+			_marker: PhantomData,
 		}
 	}
 	/// Only jump when the input equals `value`.
 	pub fn if_input(target: Entity, value: T) -> Self {
 		Self {
-			target,
-			if_input_matches: Some(value),
+			target: PropOpt(Some(target)),
+			if_input_matches: PropOpt(Some(value)),
+			_marker: PhantomData,
 		}
 	}
-}
-
-/// Calls [`RunNext::target`] when the predicate matches, threading the input
-/// value and returning the target's result; otherwise returns the input.
-///
-/// ## Errors
-/// Errors if the caller has no [`RunNext`] component.
-#[action(default)]
-#[derive(Component)]
-pub async fn RunNextAction<T>(cx: ActionContext<T>) -> Result<T>
-where
-	T: 'static
-		+ Send
-		+ Sync
-		+ Clone
-		+ PartialEq
-		+ Reflect
-		+ FromReflect
-		+ bevy::reflect::Typed,
-{
-	let run_next = cx.caller.get_cloned::<RunNext<T>>().await?;
-	if let Some(expected) = &run_next.if_input_matches {
-		if &cx.input != expected {
-			return cx.input.xok();
-		}
-	}
-	cx.world()
-		.entity(run_next.target)
-		.call::<T, T>(cx.input)
-		.await
 }
 
 #[cfg(test)]
@@ -145,6 +130,19 @@ mod tests {
 			.await
 			.unwrap()
 			.xpect_eq(Outcome::FAIL);
+	}
+
+	/// A `#[field(required)]` left unset fails the call by name rather than
+	/// jumping to a placeholder entity.
+	#[beet_core::test]
+	async fn missing_target_errors() {
+		AsyncPlugin::world()
+			.spawn(RunNext::<Outcome>::default())
+			.call::<Outcome, Outcome>(Outcome::PASS)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("missing required field `target`");
 	}
 
 	#[beet_core::test]

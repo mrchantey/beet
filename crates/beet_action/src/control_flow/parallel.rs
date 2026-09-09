@@ -9,36 +9,6 @@ use beet_core::prelude::*;
 ///
 /// Children are awaited together; cancellation of in-flight siblings on
 /// the first failure is deferred to the async runtime overhaul.
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(ParallelAction<Input,Output>)]
-#[reflect(Component, Default)]
-pub struct Parallel<Input = (), Output = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> (Input, Output)>,
-}
-
-impl<Input, Output> Default for Parallel<Input, Output>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl Parallel {
-	/// Create a default `Parallel<(), ()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Runs all children concurrently, failing fast if any child fails.
 ///
 /// Child error handling is controlled by [`BypassErrors`].
 ///
@@ -47,9 +17,10 @@ impl Parallel {
 /// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(default)]
-#[derive(Component)]
-pub async fn ParallelAction<Input, Output>(
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn Parallel<Input = (), Output = ()>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
@@ -87,6 +58,11 @@ where
 	}
 
 	Ok(Outcome::Pass(input))
+}
+
+impl Parallel {
+	/// Create a default `Parallel<(), ()>`.
+	pub fn new() -> Self { Self::default() }
 }
 
 #[cfg(test)]

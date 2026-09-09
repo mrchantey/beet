@@ -15,7 +15,7 @@ Every agent reads this file, so it keeps only what every session needs and stays
 
 Situational cheatsheets, read before touching the subsystem:
 
-- Actions: one-per-entity, overloads, providers, facets: `crates/beet_action/README.md`
+- Actions: one-per-entity, overloads, providers, `#[field]`, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
 - The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`

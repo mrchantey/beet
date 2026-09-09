@@ -3,7 +3,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Syncs the nearest ancestor [`S3FsStore`]'s two ends, in either direction.
-/// Read by [`SyncS3BucketAction`], which does the work.
 ///
 /// The defaults are the conservative ones: push, additive. `delete` opts into a
 /// *mirror*, where objects absent from the source are pruned so the destination
@@ -11,22 +10,26 @@ use beet_net::prelude::*;
 /// otherwise lingers across deploys, eg a home route converted `index.bsx` ->
 /// `index.md` leaves the stale `index.bsx`, so the served binary sees two routes
 /// for `/` and panics on boot), a source of record does not.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(SyncS3BucketAction)]
-pub struct SyncS3Bucket {
+pub async fn SyncS3Bucket(
 	/// Which end is the source.
+	#[field]
 	direction: SyncDirection,
 	/// Prune destination entries absent from the source (a mirror rather than an
 	/// additive sync). Guarded on push by [`SyncS3Bucket::assert_mirrorable`].
+	#[field]
 	delete: bool,
 	/// Upload the targets of symbolic links rather than skipping them, so a
 	/// symlinked subdir is materialized into the bucket.
+	#[field]
 	follow_symlinks: bool,
 	/// Sync without credentials, for a public-read bucket.
+	#[field]
 	no_sign_request: bool,
 	/// Optional subdir of the bucket to sync against; the bucket root by default.
-	#[set_with(unwrap_option)]
+	#[field]
 	bucket_dir: Option<SmolPath>,
 	/// Comma-separated paths under the local dir to sync, each naming a file or
 	/// a directory; empty (the default) syncs the whole dir.
@@ -36,16 +39,58 @@ pub struct SyncS3Bucket {
 	/// content, `target/`), so it names what IS the site and nothing else can
 	/// leak into the bucket by appearing beside it. The filters apply to both
 	/// ends, so a mirror still prunes only within the named paths.
+	#[field]
 	paths: SmolStr,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	trace!("SyncS3Bucket: starting");
+	let s3_fs_store = cx
+		.caller
+		.with_state::<AncestorQuery<&S3FsStore>, _>(|entity, query| {
+			query.get(entity).cloned()
+		})
+		.await??;
+	let s3_uri = match &bucket_dir {
+		Some(dir) => format!("{}/{dir}", s3_fs_store.s3_store().s3_uri()),
+		None => s3_fs_store.s3_store().s3_uri(),
+	};
+	let local_dir = s3_fs_store.fs_store().effective_root();
+	// only a mirroring push can destroy remote state, so only it is guarded
+	if delete && direction == SyncDirection::Push {
+		SyncS3Bucket::assert_mirrorable(&local_dir, follow_symlinks)?;
+	}
+	let sync = match direction {
+		SyncDirection::Push => S3Sync::push(local_dir.clone(), &s3_uri),
+		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
+	}
+	.filters(SyncS3Bucket::filters(&paths));
+	trace!(
+		"SyncS3Bucket: syncing {} {} {s3_uri}",
+		local_dir.display(),
+		match direction {
+			SyncDirection::Push => "->",
+			SyncDirection::Pull => "<-",
+		}
+	);
+	sync.delete(delete)
+		.follow_symlinks(follow_symlinks)
+		.no_sign_request(no_sign_request)
+		.send()
+		.await?;
+	trace!(
+		"synced {s3_uri} (region: {:?})",
+		s3_fs_store.s3_store().region()
+	);
+	trace!("SyncS3Bucket: complete");
+	Pass(cx.input).xok()
 }
 
 impl SyncS3Bucket {
-	/// The [`paths`](Self::paths) allowlist as sync filters: exclude everything,
-	/// then include each declared path both as a file and as a directory prefix.
-	/// Empty when nothing is declared, so the whole dir syncs.
-	fn filters(&self) -> Vec<S3Filter> {
-		let paths = self
-			.paths
+	/// A `paths` allowlist as sync filters: exclude everything, then include each
+	/// declared path both as a file and as a directory prefix. Empty when nothing
+	/// is declared, so the whole dir syncs.
+	pub fn filters(paths: &str) -> Vec<S3Filter> {
+		let paths = paths
 			.split(',')
 			.map(str::trim)
 			.filter(|path| !path.is_empty())
@@ -53,7 +98,7 @@ impl SyncS3Bucket {
 		if paths.is_empty() {
 			return Vec::new();
 		}
-		std::iter::once(S3Filter::Exclude("*".into()))
+		core::iter::once(S3Filter::Exclude("*".into()))
 			.chain(paths.into_iter().flat_map(|path| {
 				[
 					S3Filter::Include(path.into()),
@@ -67,19 +112,19 @@ impl SyncS3Bucket {
 	/// empty source, or (when following symlinks) a symlinked child dir whose
 	/// target is missing or empty — the signature of an unhydrated checkout.
 	///
-	/// Only the push direction destroys remote state, so only push is guarded; a
+	/// Only the push direction destroys remote state, so only push calls this; a
 	/// pull with `delete` overwrites a local dir the caller asked for.
-	fn assert_mirrorable(&self, local_dir: &AbsPathBuf) -> Result {
-		if !self.delete || self.direction != SyncDirection::Push {
-			return Ok(());
-		}
+	pub fn assert_mirrorable(
+		local_dir: &AbsPathBuf,
+		follow_symlinks: bool,
+	) -> Result {
 		if fs_ext::is_dir_empty(local_dir)? {
 			bevybail!(
 				"refusing to mirror an empty local dir into a bucket: {}\nhydrate it first, eg `just beet-shared pull`",
 				local_dir.display()
 			);
 		}
-		if !self.follow_symlinks {
+		if !follow_symlinks {
 			return Ok(());
 		}
 		// a linked child dir is materialized into the bucket by this push, so an
@@ -99,73 +144,19 @@ impl SyncS3Bucket {
 	}
 }
 
-/// Sync the nearest ancestor [`S3FsStore`]'s local dir and bucket, per the
-/// [`SyncS3Bucket`] settings on this entity (its defaults when absent).
-#[action]
-#[derive(Default, Component)]
-pub async fn SyncS3BucketAction(
-	cx: ActionContext<Request>,
-) -> Result<Outcome<Request, Response>> {
-	trace!("SyncS3BucketAction: starting");
-	let s3_fs_store = cx
-		.caller
-		.with_state::<AncestorQuery<&S3FsStore>, _>(|entity, query| {
-			query.get(entity).cloned()
-		})
-		.await??;
-	let opts = cx
-		.caller
-		.get_cloned::<SyncS3Bucket>()
-		.await
-		.unwrap_or_default();
-	let s3_uri = match opts.bucket_dir() {
-		Some(dir) => format!("{}/{dir}", s3_fs_store.s3_store().s3_uri()),
-		None => s3_fs_store.s3_store().s3_uri(),
-	};
-	let local_dir = s3_fs_store.fs_store().effective_root();
-	opts.assert_mirrorable(&local_dir)?;
-	let sync = match opts.direction() {
-		SyncDirection::Push => S3Sync::push(local_dir.clone(), &s3_uri),
-		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
-	}
-	.filters(opts.filters());
-	trace!(
-		"SyncS3BucketAction: syncing {} {} {s3_uri}",
-		local_dir.display(),
-		match opts.direction() {
-			SyncDirection::Push => "->",
-			SyncDirection::Pull => "<-",
-		}
-	);
-	sync.delete(opts.delete())
-		.follow_symlinks(opts.follow_symlinks())
-		.no_sign_request(opts.no_sign_request())
-		.send()
-		.await?;
-	trace!(
-		"synced {s3_uri} (region: {:?})",
-		s3_fs_store.s3_store().region()
-	);
-	trace!("SyncS3BucketAction: complete");
-	Pass(cx.input).xok()
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
 
 	/// A mirroring push refuses an empty source dir, the shape that would empty
-	/// the bucket; an additive push (the default) makes no such demand, since it
-	/// can only add.
+	/// the bucket.
 	#[beet_core::test]
 	fn mirror_guard_rejects_an_empty_dir() {
 		let dir = TempDir::new().unwrap();
 		let root = (*dir).clone();
-		SyncS3Bucket::default().assert_mirrorable(&root).unwrap();
-		let mirror = SyncS3Bucket::default().with_delete(true);
-		mirror.assert_mirrorable(&root).unwrap_err();
+		SyncS3Bucket::assert_mirrorable(&root, false).unwrap_err();
 		fs_ext::write(root.join("index.html"), "<div/>").unwrap();
-		mirror.assert_mirrorable(&root).unwrap();
+		SyncS3Bucket::assert_mirrorable(&root, false).unwrap();
 	}
 
 	/// An empty `paths` syncs the whole dir; a declared one becomes an allowlist,
@@ -173,17 +164,14 @@ mod test {
 	/// directory prefix.
 	#[beet_core::test]
 	fn paths_render_an_allowlist() {
-		SyncS3Bucket::default().filters().xpect_eq(Vec::new());
-		SyncS3Bucket::default()
-			.with_paths("main.bsx, routes,")
-			.filters()
-			.xpect_eq(vec![
-				S3Filter::Exclude("*".into()),
-				S3Filter::Include("main.bsx".into()),
-				S3Filter::Include("main.bsx/*".into()),
-				S3Filter::Include("routes".into()),
-				S3Filter::Include("routes/*".into()),
-			]);
+		SyncS3Bucket::filters("").xpect_eq(Vec::new());
+		SyncS3Bucket::filters("main.bsx, routes,").xpect_eq(vec![
+			S3Filter::Exclude("*".into()),
+			S3Filter::Include("main.bsx".into()),
+			S3Filter::Include("main.bsx/*".into()),
+			S3Filter::Include("routes".into()),
+			S3Filter::Include("routes/*".into()),
+		]);
 	}
 
 	/// A symlinked child dir is materialized into the bucket by a
@@ -199,11 +187,9 @@ mod test {
 		fs_ext::create_dir_all(&target).unwrap();
 		std::os::unix::fs::symlink(&target, root.join("assets")).unwrap();
 
-		let mirror = SyncS3Bucket::default().with_delete(true);
-		mirror.assert_mirrorable(&root).unwrap();
-		let mirror = mirror.with_follow_symlinks(true);
-		mirror.assert_mirrorable(&root).unwrap_err();
+		SyncS3Bucket::assert_mirrorable(&root, false).unwrap();
+		SyncS3Bucket::assert_mirrorable(&root, true).unwrap_err();
 		fs_ext::write(target.join("logo.png"), "png").unwrap();
-		mirror.assert_mirrorable(&root).unwrap();
+		SyncS3Bucket::assert_mirrorable(&root, true).unwrap();
 	}
 }

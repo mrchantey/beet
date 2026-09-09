@@ -753,7 +753,7 @@ mod test {
 	}
 
 	/// A string coerces to a `Cow<'static, str>` field, so a tuple literal carrying
-	/// a string (eg `<Log::Message("hi")/>`, whose variant field is a `Cow`)
+	/// a string (eg `<LogLike::Message("hi")/>`, whose variant field is a `Cow`)
 	/// reflect-applies instead of panicking on the `String`->`Cow` mismatch.
 	#[crate::test]
 	fn coerces_to_cow_str() {

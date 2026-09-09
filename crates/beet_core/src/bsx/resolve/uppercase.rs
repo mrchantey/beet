@@ -131,7 +131,7 @@ pub(super) fn build_uppercase(
 			apply_resource_tag(el, patch.as_ref(), &app_registry, cx)?;
 		}
 		UppercaseKind::Component => {
-			// a tag-position literal (`<Name("x")/>`, `<Log::Message("hi")/>`)
+			// a tag-position literal (`<Name("x")/>`, `<LogLike::Message("hi")/>`)
 			// builds the component from the literal, exactly as the `{..}` spread
 			// position does, instead of patching over `Default::default()`.
 			match &el.tag_literal {

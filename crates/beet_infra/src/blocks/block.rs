@@ -58,7 +58,7 @@ pub trait EmitBlock: Block {
 /// [`on_remove`](Self::on_remove).
 ///
 /// No `dyn` and no behavior: just the common data a consumer of "a block,
-/// whichever kind" needs, ie [`TofuApplyAction`] pairing a [`BuildArtifact`]
+/// whichever kind" needs, ie [`TofuApply`] pairing a [`BuildArtifact`]
 /// with the label its block declared. Blocks are immutable components, so
 /// reinsertion is the only way a block changes and the `on_insert` edge is
 /// exactly every path by which this projection could go stale.

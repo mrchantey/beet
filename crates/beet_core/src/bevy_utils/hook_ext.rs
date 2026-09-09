@@ -27,6 +27,21 @@ use bevy::prelude::*;
 
 use crate::prelude::EntityCommandsActionEventExt as _;
 
+/// Runs two component hooks in order, so one component can declare its own
+/// `on_add` alongside a generated one (the `#[action]` provider guard).
+///
+/// Bevy keeps a single hook per lifecycle event, silently taking the last
+/// `on_add` it parses, so composing is the only way to keep both.
+pub fn chain(
+	first: impl FnOnce(DeferredWorld, HookContext),
+	second: impl FnOnce(DeferredWorld, HookContext),
+) -> impl FnOnce(DeferredWorld, HookContext) {
+	move |mut world: DeferredWorld, cx: HookContext| {
+		first(world.reborrow(), cx);
+		second(world, cx);
+	}
+}
+
 /// Creates a component hook from a function receiving the hooked entity's
 /// [`EntityCommands`].
 ///

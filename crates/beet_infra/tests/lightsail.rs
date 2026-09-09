@@ -140,8 +140,8 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
 			// that serves them boots
 			children![
 				(block, cargo),
-				TofuApply::default().with_layer("storage"),
-				SyncS3BucketAction,
+				TofuApply::for_layer("storage"),
+				SyncS3Bucket::default(),
 				TofuApply::default(),
 			],
 		))

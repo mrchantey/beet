@@ -1,11 +1,35 @@
+//! Implementation of the `#[action]` attribute macro.
+//!
+//! Turns a plain function into an action component: a struct named after the
+//! function, requiring the [`Action`] its handler implements.
+//!
+//! # Field grammar
+//!
+//! A `#[field]` parameter becomes a struct field, sharing
+//! [`beet_core_shared::prelude::Prop`] with `#[template]`'s `#[prop]`. Fields
+//! are read live off the caller entity at call time, so a value edited between
+//! calls is observed; a missing component is a loud error naming the type.
+//!
+//! - **async**: the wrapper clones `Self` off the caller before the body runs.
+//! - **system**: the wrapper gains a `Query<&Self>` (`&mut Self` when any field
+//!   is `#[field(mut)]`) and forwards the author's system params.
+//! - **pure**: lowers the wrapper to a system, since a pure body cannot reach
+//!   the world to read its own fields.
+//!
+//! `into_action` detaches from the entity, so it captures the field values at
+//! conversion instead. Two flavors cannot: a system action, because bevy
+//! refuses to cache a non-ZST system, and a middleware action, whose component
+//! genuinely lives on the host entity the call names as caller. Both keep the
+//! live-fetching wrapper. A `#[field(mut)]` action emits no `IntoAction` at
+//! all, since a detached action has nothing to write back to.
 extern crate alloc;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use quote::quote;
-use syn::FnArg;
 use syn::ItemFn;
 use syn::ReturnType;
 use syn::Type;
@@ -28,10 +52,10 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		"route",
 		"pure",
 		"local",
-		"default",
 		"no_default",
 		"no_clone",
 		"handler_only",
+		"plain_meta",
 	])?;
 	let result_out = attrs.contains_key("result_out");
 	let is_pure = attrs.contains_key("pure");
@@ -40,29 +64,82 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let no_default = attrs.contains_key("no_default");
 	let no_clone = attrs.contains_key("no_clone");
 	let handler_only = attrs.contains_key("handler_only");
+	let plain_meta = attrs.contains_key("plain_meta");
 	let route_expr: Option<&syn::Expr> = attrs.get("route");
 
 	// ── 2. Extract function data ──
 	let beet_action = pkg_ext::internal_or_beet("beet_action");
+	let beet_core = pkg_ext::internal_or_beet("beet_core");
+	let bevy = pkg_ext::bevy();
 	let vis = &item.vis;
 	let fn_name = &item.sig.ident;
 	let body = &item.block;
 	let generics = &item.sig.generics;
 	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let struct_ty = quote! { #fn_name #ty_generics };
 	let fn_attrs = &item.attrs;
 	let is_async = item.sig.asyncness.is_some();
-	let is_system = !is_async && !is_pure;
 	let action_fn_name = action_fn_name(fn_name);
+	let wrapper_fn_name = format_ident!("{}_fields", action_fn_name);
 	let turbofish = make_turbofish(generics);
 
 	if is_local && !is_async {
 		synbail!(&item.sig, "`local` is only valid on async actions");
 	}
 
-	// ── 3. Determine action kind ──
+	// ── 3. Partition parameters into `#[field]`s and the rest ──
+	let mut fields: Vec<Prop> = Vec::new();
+	let mut rest: Vec<&syn::PatType> = Vec::new();
+	for arg in &item.sig.inputs {
+		let pt = Prop::typed_arg(arg, "action")?;
+		if Prop::is_param(pt, "field") {
+			fields.push(Prop::parse(pt, "field")?);
+		} else {
+			rest.push(pt);
+		}
+	}
+	let has_fields = !fields.is_empty();
+	let has_component = has_derive(fn_attrs, "Component");
+	let has_mut = fields.iter().any(|field| field.mutable);
+
+	if has_fields && !has_component {
+		synbail!(
+			&item.sig,
+			"`#[field]` requires `#[derive(Component)]`: fields are read off the caller entity"
+		);
+	}
+	if has_mut && is_async {
+		synbail!(
+			&item.sig,
+			"`#[field(mut)]` is not valid on an async action: mutable component \
+			 access cannot cross an await. Use `cx.caller.get_mut` at a sync point"
+		);
+	}
+	if let Some(field) =
+		fields.iter().find(|field| field.mutable && field.is_opt())
+	{
+		synbail!(
+			&field.ident,
+			"`#[field(mut)]` cannot be combined with `required` or an `Option` field"
+		);
+	}
+	if has_derive(fn_attrs, "Default")
+		&& let Some(field) =
+			fields.iter().find(|field| field.default_expr.is_some())
+	{
+		synbail!(
+			&field.ident,
+			"`#[field(default = ..)]` conflicts with `#[derive(Default)]`"
+		);
+	}
+
+	// ── 4. Determine the action kind ──
 	// async → async action (local → single-threaded), pure → func action,
-	// otherwise system action
-	let action_factory = if is_async {
+	// otherwise system action. A pure action carrying fields lowers its
+	// entity-facing plumbing to a system, the only sync way to reach the world.
+	let is_system_handler = !is_async && !is_pure;
+	let provider_is_system = is_system_handler || (is_pure && has_fields);
+	let simple_factory = if is_async {
 		if is_local {
 			quote! { #beet_action::prelude::Action::new_async_local }
 		} else {
@@ -73,25 +150,44 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	} else {
 		quote! { #beet_action::prelude::Action::new_system }
 	};
+	let provider_factory = if provider_is_system {
+		quote! { #beet_action::prelude::Action::new_system }
+	} else {
+		simple_factory.clone()
+	};
 	let async_kw = if is_async {
 		quote! { async }
 	} else {
 		TokenStream::default()
 	};
 
-	// ── 4. Analyze parameters and build function parts ──
-	let (in_type, fn_params, preamble) = if is_system {
-		make_system_fn_parts(&item, &beet_action)?
+	// ── 5. Analyze the remaining parameters ──
+	let parts = if is_system_handler {
+		FnParts::system(&rest, &item, &beet_action)?
 	} else {
-		make_simple_fn_parts(&item, &beet_action)?
+		FnParts::simple(&rest, &item, &beet_action)?
 	};
+	let FnParts {
+		in_type,
+		fn_params,
+		preamble,
+		sys_params,
+	} = &parts;
 	let out_type = compute_out_type(&item, result_out);
 	let return_type = match &item.sig.output {
 		ReturnType::Default => quote! { () },
 		ReturnType::Type(_, ty) => quote! { #ty },
 	};
+	// the handler's own result shape: a `Result` return already carries the
+	// wrapper's error channel, anything else (including a `result_out` action,
+	// whose `Out` *is* the `Result`) is lifted into one.
+	let returns_result = match &item.sig.output {
+		ReturnType::Type(_, ty) => is_result_type(ty),
+		ReturnType::Default => false,
+	};
+	let lift_ok = !(returns_result && !result_out);
 
-	// ── 5. Build struct definition ──
+	// ── 6. Build the struct definition ──
 	// the meta rides on the action itself: `Action` is the sole producer of
 	// `ActionMeta`, and naming `Self` as the handler is what the provider-integrity
 	// guard checks against.
@@ -100,16 +196,27 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	// than being one, and several middleware happily share a host, so it claims no
 	// action slot: its `on_add_middleware` hook pushes `into_action()` onto the
 	// host's `MiddlewareList` instead.
-	let is_middleware = has_next_type(&in_type);
+	let is_middleware = has_next_type(in_type);
 	let handler_meta = is_middleware || handler_only;
-	let meta_expr = make_meta_expr(fn_attrs, handler_meta, &beet_action);
+	let meta_expr = make_meta_expr(
+		fn_attrs,
+		handler_meta,
+		plain_meta,
+		in_type,
+		&out_type,
+		&beet_action,
+	);
+	let provider_target = match has_fields {
+		true => quote! { #wrapper_fn_name #turbofish },
+		false => quote! { #action_fn_name #turbofish },
+	};
 	let action_expr = quote! {
-		#action_factory(#action_fn_name #turbofish).with_meta(#meta_expr)
+		#provider_factory(#provider_target).with_meta(#meta_expr)
 	};
 	let require_action = (!is_middleware).then(|| {
 		make_require_action(
 			action_expr,
-			&in_type,
+			in_type,
 			&out_type,
 			has_route,
 			&beet_action,
@@ -120,214 +227,517 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		fn_name,
 		generics,
 		fn_attrs,
+		&fields,
 		require_action,
 		route_expr,
-		&in_type,
+		in_type,
 		&out_type,
-		no_clone,
-	);
-	let default_impl = if !no_default && !has_derive(fn_attrs, "Default") {
-		make_default(fn_name, generics)
-	} else {
-		TokenStream::default()
-	};
+		&beet_core,
+	)?;
+	let clone_impl = (!no_clone && !has_derive(fn_attrs, "Clone"))
+		.then(|| make_clone(fn_name, generics, &fields));
+	let default_impl = (!no_default && !has_derive(fn_attrs, "Default"))
+		.then(|| make_default(fn_name, generics, &fields));
 
-	// ── 6. Build handler function at module level ──
+	// ── 7. Build the handler function at module level ──
 	// The handler must live at module scope so that both `IntoAction`
 	// and `#[require]` (generated by the Component derive) can
 	// reference it.
+	let field_params = fields.iter().map(|field| {
+		let ident = &field.ident;
+		let ty = &field.ty;
+		match field.mutable {
+			true => quote! { #ident: &mut #ty },
+			false => quote! { #ident: #ty },
+		}
+	});
 	let handler_fn = quote! {
 		#[allow(non_snake_case)]
-		#async_kw fn #action_fn_name #impl_generics (#fn_params) -> #return_type #where_clause {
+		#async_kw fn #action_fn_name #impl_generics (
+			#(#field_params,)* #fn_params
+		) -> #return_type #where_clause {
 			#preamble
 			#[allow(unused_braces)]
 			#body
 		}
 	};
 
-	// ── 7. Build IntoAction impl ──
-	let into_action = quote! {
-		impl #impl_generics #beet_action::prelude::IntoAction<#fn_name #ty_generics> for #fn_name #ty_generics #where_clause {
-			type In = #in_type;
-			type Out = #out_type;
-
-			fn into_action(self) -> #beet_action::prelude::Action<Self::In, Self::Out> {
-				#action_factory(#action_fn_name #turbofish)
-			}
+	// ── 8. Build the live-fetching wrapper and the `IntoAction` impl ──
+	let result_ty = quote! {
+		::core::result::Result<#out_type, #bevy::ecs::error::BevyError>
+	};
+	let field_idents: Vec<&syn::Ident> =
+		fields.iter().map(|field| &field.ident).collect();
+	let field_checks = field_checks(&fields, &struct_ty, &beet_core);
+	let call_handler = |args: TokenStream| {
+		let await_kw = is_async.then(|| quote! { .await });
+		let call = quote! { #action_fn_name #turbofish (#args) #await_kw };
+		match lift_ok {
+			true => quote! { ::core::result::Result::Ok(#call) },
+			false => call,
 		}
 	};
 
-	// ── 8. Assemble output ──
+	let wrapper_fn = has_fields.then(|| {
+		make_wrapper(WrapperArgs {
+			wrapper_fn_name: &wrapper_fn_name,
+			generics,
+			struct_ty: &struct_ty,
+			fn_name,
+			fields: &fields,
+			field_idents: &field_idents,
+			field_checks: &field_checks,
+			in_type,
+			result_ty: &result_ty,
+			sys_params,
+			provider_is_system,
+			is_system_handler,
+			call_handler: &call_handler,
+			beet_action: &beet_action,
+			bevy: &bevy,
+		})
+	});
+
+	// a detached action has no component to read, so it freezes the fields at
+	// conversion. A system cannot (bevy refuses non-ZST cached systems) and
+	// middleware must not (its component lives on the live host entity). A pure
+	// action still can: only its provider plumbing lowered to a system.
+	let capture_fields = has_fields && !is_system_handler && !is_middleware;
+	let into_action_body = if !has_fields {
+		quote! { #simple_factory(#action_fn_name #turbofish) }
+	} else if !capture_fields {
+		quote! { #simple_factory(#wrapper_fn_name #turbofish) }
+	} else {
+		let call = call_handler(quote! { #(#field_idents,)* __action_cx });
+		let inner = quote! {
+			let #fn_name { #(#field_idents,)* .. } = __action_fields.clone();
+			#(#field_checks)*
+			#call
+		};
+		let body = match is_async {
+			true => quote! {
+				let __action_fields = __action_fields.clone();
+				async move { #inner }
+			},
+			false => inner,
+		};
+		quote! {
+			let __action_fields = self;
+			#simple_factory(
+				move |__action_cx: #beet_action::prelude::ActionContext<#in_type>| {
+					#body
+				}
+			)
+		}
+	};
+	let into_action = (!has_mut).then(|| {
+		quote! {
+			impl #impl_generics #beet_action::prelude::IntoAction<#struct_ty> for #struct_ty #where_clause {
+				type In = #in_type;
+				type Out = #out_type;
+
+				fn into_action(self) -> #beet_action::prelude::Action<Self::In, Self::Out> {
+					#into_action_body
+				}
+			}
+		}
+	});
+
+	// ── 9. Assemble output ──
 	Ok(quote! {
 		#handler_fn
+		#wrapper_fn
 		#struct_def
+		#clone_impl
 		#default_impl
 		#into_action
 	})
 }
 
 // ---------------------------------------------------------------------------
-// Parameter analysis for async/func actions
+// Parameter analysis
 // ---------------------------------------------------------------------------
 
-/// Build function parts for async and func (pure) actions.
-///
-/// These actions accept at most one parameter. Returns `(in_type, fn_params, preamble)`.
-fn make_simple_fn_parts(
-	item: &ItemFn,
-	beet_action: &syn::Path,
-) -> syn::Result<(TokenStream, TokenStream, TokenStream)> {
-	let params: Vec<&syn::PatType> = item
-		.sig
-		.inputs
-		.iter()
-		.map(|arg| match arg {
-			FnArg::Typed(pt) => Ok(pt),
-			FnArg::Receiver(recv) => {
-				synbail!(
-					recv,
-					"`self` parameters are not supported in action functions"
-				)
-			}
-		})
-		.collect::<syn::Result<Vec<_>>>()?;
+/// The handler's non-`#[field]` parameters, lowered.
+struct FnParts {
+	/// the action's `In` type
+	in_type: TokenStream,
+	/// the handler's parameter list
+	fn_params: TokenStream,
+	/// binds the author's input pattern before the body
+	preamble: TokenStream,
+	/// system params a field wrapper must declare and forward, keeping the
+	/// author's attributes (a `#[cfg]` param exists in only some builds) and
+	/// binding pattern (so a `mut` binding stays mutable)
+	sys_params: Vec<SysParam>,
+}
 
-	if params.len() > 1 {
-		synbail!(
-			&item.sig,
-			"action functions accept at most one parameter; \
-			 use a tuple for multiple values: `(a, b): (A, B)`"
-		);
+/// One non-`#[field]` system parameter, as the handler declares it.
+struct SysParam {
+	/// the author's attributes, ie a `#[cfg]` gating the param
+	attrs: Vec<syn::Attribute>,
+	/// the binding pattern, preserving `mut`
+	pat: syn::PatIdent,
+	ty: Type,
+}
+
+impl SysParam {
+	/// The handler's declaration, verbatim.
+	fn declare(&self) -> TokenStream {
+		let Self { attrs, pat, ty } = self;
+		quote! { #(#attrs)* #pat: #ty }
 	}
 
-	match params.first() {
-		None => {
-			// No params → input is ()
-			let in_type = quote! { () };
-			let fn_params =
-				quote! { __action_cx: #beet_action::prelude::ActionContext };
-			let preamble = quote! { let _ = __action_cx.input; };
-			Ok((in_type, fn_params, preamble))
+	/// The wrapper's declaration: the same param bound immutably, since a
+	/// wrapper only forwards it.
+	fn declare_forwarding(&self) -> TokenStream {
+		let Self { attrs, pat, ty } = self;
+		let ident = &pat.ident;
+		quote! { #(#attrs)* #ident: #ty }
+	}
+
+	/// The wrapper's call argument, gated by the same attributes as the
+	/// declaration it forwards.
+	fn forward(&self) -> TokenStream {
+		let Self { attrs, pat, .. } = self;
+		let ident = &pat.ident;
+		quote! { #(#attrs)* #ident }
+	}
+}
+
+impl FnParts {
+	/// Build the parts for async and pure actions, which accept at most one
+	/// non-field parameter: the input.
+	fn simple(
+		params: &[&syn::PatType],
+		item: &ItemFn,
+		beet_action: &syn::Path,
+	) -> syn::Result<Self> {
+		if params.len() > 1 {
+			synbail!(
+				&item.sig,
+				"action functions accept at most one parameter; \
+				 use a tuple for multiple values: `(a, b): (A, B)`"
+			);
 		}
-		Some(pt) => {
-			let ty = pt.ty.as_ref();
-			if let Some(inner) = extract_action_context_type(ty) {
-				// Passthrough: user gets the full ActionContext
-				let param_name = pat_to_ident(&pt.pat)?;
-				let in_type = quote! { #inner };
-				let fn_params = quote! {
-					#param_name: #beet_action::prelude::ActionContext<#inner>
-				};
-				let preamble = TokenStream::default();
-				Ok((in_type, fn_params, preamble))
-			} else {
-				// Bare input: destructure from context
-				let pat = &pt.pat;
-				let in_type = quote! { #ty };
-				let fn_params = quote! {
-					__action_cx: #beet_action::prelude::ActionContext<#ty>
-				};
-				let preamble = quote! { let #pat = __action_cx.input; };
-				Ok((in_type, fn_params, preamble))
+
+		let parts = match params.first() {
+			None => {
+				// No params → input is ()
+				Self {
+					in_type: quote! { () },
+					fn_params: quote! {
+						__action_cx: #beet_action::prelude::ActionContext
+					},
+					preamble: quote! { let _ = __action_cx.input; },
+					sys_params: Vec::new(),
+				}
 			}
-		}
+			Some(pt) => {
+				let ty = pt.ty.as_ref();
+				if let Some(inner) = extract_action_context_type(ty) {
+					// Passthrough: user gets the full ActionContext
+					let param_name = pat_to_ident(&pt.pat)?;
+					Self {
+						in_type: quote! { #inner },
+						fn_params: quote! {
+							#param_name: #beet_action::prelude::ActionContext<#inner>
+						},
+						preamble: TokenStream::default(),
+						sys_params: Vec::new(),
+					}
+				} else {
+					// Bare input: destructure from context
+					let pat = &pt.pat;
+					Self {
+						in_type: quote! { #ty },
+						fn_params: quote! {
+							__action_cx: #beet_action::prelude::ActionContext<#ty>
+						},
+						preamble: quote! { let #pat = __action_cx.input; },
+						sys_params: Vec::new(),
+					}
+				}
+			}
+		};
+		Ok(parts)
+	}
+
+	/// Build the parts for system actions.
+	///
+	/// Detects input via `In<T>` or `ActionContext<T>` on the first non-field
+	/// parameter; the remainder are forwarded as system params.
+	fn system(
+		params: &[&syn::PatType],
+		_item: &ItemFn,
+		beet_action: &syn::Path,
+	) -> syn::Result<Self> {
+		let sys_params_from = |skip: usize| -> Vec<SysParam> {
+			params
+				.iter()
+				.skip(skip)
+				.enumerate()
+				.map(|(index, pt)| {
+					let pat = match pt.pat.as_ref() {
+						syn::Pat::Ident(pi) => pi.clone(),
+						_ => syn::PatIdent {
+							attrs: Vec::new(),
+							by_ref: None,
+							mutability: None,
+							ident: format_ident!("__action_sys_{}", index),
+							subpat: None,
+						},
+					};
+					SysParam {
+						attrs: pt.attrs.clone(),
+						pat,
+						ty: (*pt.ty).clone(),
+					}
+				})
+				.collect()
+		};
+
+		let (in_type, first_fn_param, preamble, sys_params) = match params
+			.first()
+		{
+			None => (
+				quote! { () },
+				quote! {
+					In(__action_cx): In<#beet_action::prelude::ActionContext>
+				},
+				quote! { let _ = __action_cx.input; },
+				Vec::new(),
+			),
+			Some(pt) => {
+				let ty = pt.ty.as_ref();
+
+				if let Some(in_inner) = extract_wrapper_type(ty, "In") {
+					if let Some(inner) = extract_action_context_type(in_inner) {
+						// In<ActionContext<T>> → system passthrough
+						let param_name = pat_to_ident(&pt.pat)?;
+						(
+							quote! { #inner },
+							quote! {
+								In(#param_name): In<#beet_action::prelude::ActionContext<#inner>>
+							},
+							TokenStream::default(),
+							sys_params_from(1),
+						)
+					} else {
+						// In<T> → system action with input T
+						let param_name = pat_to_ident(&pt.pat)?;
+						(
+							quote! { #in_inner },
+							quote! {
+								In(__action_cx): In<#beet_action::prelude::ActionContext<#in_inner>>
+							},
+							quote! { let #param_name = In(__action_cx.input); },
+							sys_params_from(1),
+						)
+					}
+				} else if let Some(inner) = extract_action_context_type(ty) {
+					// ActionContext<T> without In wrapper → system passthrough
+					let param_name = pat_to_ident(&pt.pat)?;
+					(
+						quote! { #inner },
+						quote! {
+							In(#param_name): In<#beet_action::prelude::ActionContext<#inner>>
+						},
+						TokenStream::default(),
+						sys_params_from(1),
+					)
+				} else {
+					// No input marker → all params are system params
+					(
+						quote! { () },
+						quote! {
+							In(__action_cx): In<#beet_action::prelude::ActionContext>
+						},
+						quote! { let _ = __action_cx.input; },
+						sys_params_from(0),
+					)
+				}
+			}
+		};
+
+		// re-declare the system params from the resolved patterns so a wrapper can
+		// forward them by name, keeping the two signatures in step.
+		let declared =
+			sys_params.iter().map(SysParam::declare).collect::<Vec<_>>();
+		let fn_params = quote! { #first_fn_param #(, #declared)* };
+
+		Ok(Self {
+			in_type,
+			fn_params,
+			preamble,
+			sys_params,
+		})
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Parameter analysis for system actions
+// Field wrapper
 // ---------------------------------------------------------------------------
 
-/// Build function parts for system actions.
-///
-/// Detects input via `In<T>` or `ActionContext<T>` on the first parameter.
-/// Remaining parameters are forwarded as system params.
-/// Returns `(in_type, fn_params, preamble)`.
-fn make_system_fn_parts(
-	item: &ItemFn,
-	beet_action: &syn::Path,
-) -> syn::Result<(TokenStream, TokenStream, TokenStream)> {
-	for arg in &item.sig.inputs {
-		if let FnArg::Receiver(recv) = arg {
-			synbail!(
-				recv,
-				"`self` parameters are not supported in action functions"
-			);
-		}
+/// Everything [`make_wrapper`] needs to emit the live-fetching wrapper.
+struct WrapperArgs<'a> {
+	wrapper_fn_name: &'a syn::Ident,
+	generics: &'a syn::Generics,
+	struct_ty: &'a TokenStream,
+	fn_name: &'a syn::Ident,
+	fields: &'a [Prop],
+	field_idents: &'a [&'a syn::Ident],
+	field_checks: &'a [TokenStream],
+	in_type: &'a TokenStream,
+	result_ty: &'a TokenStream,
+	sys_params: &'a [SysParam],
+	provider_is_system: bool,
+	is_system_handler: bool,
+	call_handler: &'a dyn Fn(TokenStream) -> TokenStream,
+	beet_action: &'a syn::Path,
+	bevy: &'a syn::Path,
+}
+
+/// The wrapper the `#[require]` site installs: read `Self` off the caller,
+/// bind its fields, then call the handler.
+fn make_wrapper(args: WrapperArgs) -> TokenStream {
+	let WrapperArgs {
+		wrapper_fn_name,
+		generics,
+		struct_ty,
+		fn_name,
+		fields,
+		field_idents,
+		field_checks,
+		in_type,
+		result_ty,
+		sys_params,
+		provider_is_system,
+		is_system_handler,
+		call_handler,
+		beet_action,
+		bevy,
+	} = args;
+	let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+	if !provider_is_system {
+		// async: clone `Self` off the caller before the body runs
+		let call = call_handler(quote! { #(#field_idents,)* __action_cx });
+		return quote! {
+			#[allow(non_snake_case, dead_code)]
+			async fn #wrapper_fn_name #impl_generics (
+				__action_cx: #beet_action::prelude::ActionContext<#in_type>,
+			) -> #result_ty #where_clause {
+				let #fn_name { #(#field_idents,)* .. } =
+					__action_cx.caller.get_cloned::<#struct_ty>().await?;
+				#(#field_checks)*
+				#call
+			}
+		};
 	}
 
-	let first_param = item.sig.inputs.first().and_then(|arg| match arg {
-		FnArg::Typed(pt) => Some(pt),
-		_ => None,
-	});
-
-	let system_params_from = |skip: usize| -> Vec<&FnArg> {
-		item.sig.inputs.iter().skip(skip).collect()
-	};
-
-	let (in_type, first_fn_param, preamble, sys_params) = match first_param {
-		None => {
-			// No params at all
-			let in_type = quote! { () };
-			let first = quote! {
-				In(__action_cx): In<#beet_action::prelude::ActionContext>
-			};
-			let preamble = quote! { let _ = __action_cx.input; };
-			(in_type, first, preamble, Vec::new())
-		}
-		Some(pt) => {
-			let ty = pt.ty.as_ref();
-
-			if let Some(in_inner) = extract_wrapper_type(ty, "In") {
-				// First param is In<...>
-				if let Some(inner) = extract_action_context_type(in_inner) {
-					// In<ActionContext<T>> → system passthrough
-					let param_name = pat_to_ident(&pt.pat)?;
-					let in_type = quote! { #inner };
-					let first = quote! {
-						In(#param_name): In<#beet_action::prelude::ActionContext<#inner>>
-					};
-					let preamble = TokenStream::default();
-					(in_type, first, preamble, system_params_from(1))
-				} else {
-					// In<T> → system action with input T
-					let param_name = pat_to_ident(&pt.pat)?;
-					let in_type = quote! { #in_inner };
-					let first = quote! {
-						In(__action_cx): In<#beet_action::prelude::ActionContext<#in_inner>>
-					};
-					let preamble =
-						quote! { let #param_name = In(__action_cx.input); };
-					(in_type, first, preamble, system_params_from(1))
-				}
-			} else if let Some(inner) = extract_action_context_type(ty) {
-				// ActionContext<T> without In wrapper → system passthrough
-				let param_name = pat_to_ident(&pt.pat)?;
-				let in_type = quote! { #inner };
-				let first = quote! {
-					In(#param_name): In<#beet_action::prelude::ActionContext<#inner>>
+	let has_mut = fields.iter().any(|field| field.mutable);
+	// a `mut` field needs the mutable query, and reads clone before any field is
+	// reborrowed so the two never overlap.
+	let (query_param, bindings) = if has_mut {
+		let reads = fields.iter().filter(|field| !field.mutable).map(|field| {
+			let ident = &field.ident;
+			quote! { let #ident = ::core::clone::Clone::clone(&__action_item.#ident); }
+		});
+		let writes = fields.iter().filter(|field| field.mutable).map(|field| {
+			let ident = &field.ident;
+			quote! { let #ident = &mut __action_item.#ident; }
+		});
+		(
+			quote! { mut __action_query: #bevy::ecs::system::Query<&mut #struct_ty> },
+			quote! {
+				let ::core::result::Result::Ok(__action_item) =
+					__action_query.get_mut(__action_cx.id())
+				else {
+					return ::core::result::Result::Err(
+						__action_cx.missing_component::<#struct_ty>()
+					);
 				};
-				let preamble = TokenStream::default();
-				(in_type, first, preamble, system_params_from(1))
-			} else {
-				// No input marker → all params are system params
-				let in_type = quote! { () };
-				let first = quote! {
-					In(__action_cx): In<#beet_action::prelude::ActionContext>
-				};
-				let preamble = quote! { let _ = __action_cx.input; };
-				(in_type, first, preamble, system_params_from(0))
-			}
-		}
-	};
-
-	let fn_params = if sys_params.is_empty() {
-		first_fn_param
+				let __action_item = __action_item.into_inner();
+				#(#reads)*
+				#(#writes)*
+			},
+		)
 	} else {
-		quote! { #first_fn_param #(, #sys_params)* }
+		(
+			quote! { __action_query: #bevy::ecs::system::Query<&#struct_ty> },
+			quote! {
+				let ::core::result::Result::Ok(__action_item) =
+					__action_query.get(__action_cx.id())
+				else {
+					return ::core::result::Result::Err(
+						__action_cx.missing_component::<#struct_ty>()
+					);
+				};
+				let #fn_name { #(#field_idents,)* .. } =
+					::core::clone::Clone::clone(__action_item);
+			},
+		)
 	};
 
-	Ok((in_type, fn_params, preamble))
+	// a pure handler takes the bare context, a system handler the `In`-wrapped one
+	let cx_arg = match is_system_handler {
+		true => quote! { #bevy::prelude::In(__action_cx) },
+		false => quote! { __action_cx },
+	};
+	let sys_forwarded = sys_params.iter().map(SysParam::forward);
+	// the wrapper only forwards, so it declares each param immutably
+	let sys_declared = sys_params
+		.iter()
+		.map(SysParam::declare_forwarding)
+		.collect::<Vec<_>>();
+	let call = call_handler(
+		quote! { #(#field_idents,)* #cx_arg #(, #sys_forwarded)* },
+	);
+	quote! {
+		#[allow(non_snake_case, dead_code)]
+		fn #wrapper_fn_name #impl_generics (
+			#bevy::prelude::In(__action_cx):
+				#bevy::prelude::In<#beet_action::prelude::ActionContext<#in_type>>,
+			#query_param
+			#(, #sys_declared)*
+		) -> #result_ty #where_clause {
+			#bindings
+			#(#field_checks)*
+			#call
+		}
+	}
+}
+
+/// The per-field preamble shared by every binding site: a required field is
+/// unwrapped (erroring loudly by name), a declared `Option<T>` field is rebound
+/// from its `PropOpt` storage.
+fn field_checks(
+	fields: &[Prop],
+	struct_ty: &TokenStream,
+	beet_core: &syn::Path,
+) -> Vec<TokenStream> {
+	fields
+		.iter()
+		.filter_map(|field| {
+			let ident = &field.ident;
+			if field.required {
+				let lit = syn::LitStr::new(&ident.to_string(), ident.span());
+				Some(quote! {
+					let ::core::option::Option::Some(#ident) = #ident.into_inner()
+					else {
+						return ::core::result::Result::Err(#beet_core::prelude::bevyhow!(
+							"{}: missing required field `{}`",
+							::core::any::type_name::<#struct_ty>(),
+							#lit
+						));
+					};
+				})
+			} else {
+				field.body_binding()
+			}
+		})
+		.collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -471,18 +881,24 @@ fn compute_out_type(item: &ItemFn, result_out: bool) -> TokenStream {
 /// `Reflect` (description plus input/output schemas), handler-only reflection for
 /// middleware and `handler_only` actions whose input is not `Typed`, and plain
 /// type metadata otherwise.
+///
+/// `plain_meta` forces the plain variant: a generic action's own type is rarely
+/// `Typed`, since the reflect derive bounds it on every param.
 fn make_meta_expr(
 	fn_attrs: &[syn::Attribute],
 	handler_meta: bool,
+	plain_meta: bool,
+	in_type: &TokenStream,
+	out_type: &TokenStream,
 	beet_action: &syn::Path,
 ) -> TokenStream {
 	let action_meta = quote! { #beet_action::prelude::ActionMeta };
-	if !has_derive(fn_attrs, "Reflect") {
-		quote! { #action_meta::of_action::<Self, _>() }
+	if plain_meta || !has_derive(fn_attrs, "Reflect") {
+		quote! { #action_meta::of::<Self, #in_type, #out_type>() }
 	} else if handler_meta {
-		quote! { #action_meta::of_handler::<Self, _>() }
+		quote! { #action_meta::of_handler::<Self, #in_type, #out_type>() }
 	} else {
-		quote! { #action_meta::of_reflect::<Self, _>() }
+		quote! { #action_meta::of_reflect::<Self, #in_type, #out_type>() }
 	}
 }
 
@@ -514,19 +930,20 @@ fn make_require_action(
 /// Generate a struct definition, forwarding function attributes to the
 /// struct and optionally adding `#[require(...)]` attributes when the
 /// derives include `Component`.
+#[allow(clippy::too_many_arguments)]
 fn make_struct_def(
 	vis: &syn::Visibility,
 	fn_name: &syn::Ident,
 	generics: &syn::Generics,
 	fn_attrs: &[syn::Attribute],
+	fields: &[Prop],
 	require_action: Option<TokenStream>,
 	route_expr: Option<&syn::Expr>,
 	in_type: &TokenStream,
 	out_type: &TokenStream,
-	no_clone: bool,
-) -> TokenStream {
+	beet_core: &syn::Path,
+) -> syn::Result<TokenStream> {
 	let has_component = has_derive(fn_attrs, "Component");
-	let has_reflect = has_derive(fn_attrs, "Reflect");
 
 	let require_action = if has_component {
 		if let Some(expr) = require_action {
@@ -540,14 +957,39 @@ fn make_struct_def(
 
 	// provider-integrity guard: fail loudly if a colocated explicit action takes
 	// the slot this struct's `#[require]` provides.
+	//
+	// Bevy keeps one `on_add` per component and silently takes the last it
+	// parses, so an author's own hook is chained ahead of the guard rather than
+	// emitted beside it.
 	let beet_action = pkg_ext::internal_or_beet("beet_action");
-	let assert_provider = if has_component && !require_action.is_empty() {
-		quote! {
-			#[component(on_add = #beet_action::prelude::Action::<#in_type, #out_type>::assert_provider::<Self>)]
-		}
-	} else {
-		TokenStream::default()
+	let (_, ty_generics, _) = generics.split_for_impl();
+	let struct_ty = quote! { #fn_name #ty_generics };
+	let guard = quote! {
+		#beet_action::prelude::Action::<#in_type, #out_type>::assert_provider::<#struct_ty>
 	};
+	let needs_guard = has_component && !require_action.is_empty();
+	let mut fn_attrs = fn_attrs.to_vec();
+	let assert_provider = match needs_guard {
+		false => TokenStream::default(),
+		true => match take_on_add(&mut fn_attrs) {
+			Some(author) => {
+				// bevy wraps a call-shaped hook in an inner fn, which has neither
+				// `Self` nor the action's type params in scope.
+				if generics.type_params().next().is_some() {
+					synbail!(
+						fn_name,
+						"a generic `#[action]` cannot declare its own `#[component(on_add = ..)]`: \
+						 the chained hook loses the type params"
+					);
+				}
+				quote! {
+					#[component(on_add = #beet_core::prelude::hook_ext::chain(#author, #guard))]
+				}
+			}
+			None => quote! { #[component(on_add = #guard)] },
+		},
+	};
+	let fn_attrs = &fn_attrs;
 
 	let require_path = if has_component && let Some(expr) = route_expr {
 		let beet_net = pkg_ext::internal_or_beet("beet_net");
@@ -558,83 +1000,172 @@ fn make_struct_def(
 		TokenStream::default()
 	};
 
-	// action structs are always unit structs or PhantomData structs,
-	// both trivially cloneable
-	let derive_clone = if no_clone || has_derive(fn_attrs, "Clone") {
-		TokenStream::default()
-	} else {
-		quote! { #[derive(Clone)] }
-	};
+	let field_defs: Vec<TokenStream> = fields
+		.iter()
+		.map(|field| field.field_def(beet_core))
+		.chain(marker_field(generics, fn_attrs))
+		.collect();
 
+	let (_, _, where_clause) = generics.split_for_impl();
+	let body = if field_defs.is_empty() {
+		quote! { ; }
+	} else {
+		quote! { { #(#field_defs),* } }
+	};
+	Ok(quote! {
+		#(#fn_attrs)*
+		#require_action
+		#assert_provider
+		#require_path
+		#[allow(non_camel_case_types)]
+		#vis struct #fn_name #generics #where_clause #body
+	})
+}
+
+/// Strip an `on_add = expr` out of a `#[component(..)]` attribute, returning the
+/// expression so it can be chained ahead of the generated provider guard. Other
+/// keys (`immutable`, `on_remove`, ..) stay where they are, and an attribute
+/// left empty is dropped.
+fn take_on_add(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
+	let mut taken = None;
+	attrs.retain_mut(|attr| {
+		if taken.is_some() || !attr.path().is_ident("component") {
+			return true;
+		}
+		let syn::Meta::List(list) = &attr.meta else {
+			return true;
+		};
+		let mut kept: Vec<TokenStream> = Vec::new();
+		for arg in split_args(list.tokens.clone()) {
+			match arg
+				.clone()
+				.into_iter()
+				.next()
+				.is_some_and(|tt| matches!(&tt, proc_macro2::TokenTree::Ident(ident) if ident == "on_add"))
+			{
+				true => {
+					taken = Some(
+						arg.into_iter()
+							.skip_while(|tt| {
+								!matches!(tt, proc_macro2::TokenTree::Punct(punct) if punct.as_char() == '=')
+							})
+							.skip(1)
+							.collect::<TokenStream>(),
+					);
+				}
+				false => kept.push(arg),
+			}
+		}
+		if taken.is_none() {
+			return true;
+		}
+		if kept.is_empty() {
+			return false;
+		}
+		*attr = syn::parse_quote! { #[component(#(#kept),*)] };
+		true
+	});
+	taken
+}
+
+/// Split a comma-separated attribute argument list into its top-level args.
+fn split_args(tokens: TokenStream) -> Vec<TokenStream> {
+	let mut args: Vec<Vec<proc_macro2::TokenTree>> = Vec::new();
+	let mut current: Vec<proc_macro2::TokenTree> = Vec::new();
+	for tt in tokens {
+		match &tt {
+			proc_macro2::TokenTree::Punct(punct) if punct.as_char() == ',' => {
+				args.push(core::mem::take(&mut current));
+			}
+			_ => current.push(tt),
+		}
+	}
+	args.push(current);
+	args.into_iter()
+		.filter(|arg| !arg.is_empty())
+		.map(|arg| arg.into_iter().collect())
+		.collect()
+}
+
+/// The `_marker` field pinning a generic action's type params, `None` when the
+/// action is not generic.
+///
+/// `pub` so a `<Foo field=x/>` struct-literal patch (which spreads
+/// `..Default::default()`) resolves across module boundaries.
+fn marker_field(
+	generics: &syn::Generics,
+	fn_attrs: &[syn::Attribute],
+) -> Option<TokenStream> {
 	let type_params: Vec<&syn::Ident> =
 		generics.type_params().map(|tp| &tp.ident).collect();
-
 	if type_params.is_empty() {
-		quote! {
-			#(#fn_attrs)*
-			#derive_clone
-			#require_action
-			#assert_provider
-			#require_path
-			#[allow(non_camel_case_types)]
-			#vis struct #fn_name;
-		}
+		return None;
+	}
+	let phantom = if type_params.len() == 1 {
+		let tp = type_params[0];
+		quote! { fn() -> #tp }
 	} else {
-		let (impl_generics, _, where_clause) = generics.split_for_impl();
-		let phantom = if type_params.len() == 1 {
-			let tp = type_params[0];
-			if has_reflect {
-				quote! { fn() -> #tp }
-			} else {
-				quote! { #tp }
-			}
-		} else {
-			if has_reflect {
-				quote! { fn() -> (#(#type_params),*) }
-			} else {
-				quote! { (#(#type_params),*) }
-			}
-		};
-		let reflect_ignore = if has_reflect {
-			quote! { #[reflect(ignore)] }
-		} else {
-			TokenStream::default()
-		};
-		quote! {
-			#(#fn_attrs)*
-			#derive_clone
-			#require_action
-			#assert_provider
-			#require_path
-			#[allow(non_camel_case_types)]
-			#vis struct #fn_name #impl_generics (#reflect_ignore ::core::marker::PhantomData<#phantom>) #where_clause;
+		quote! { fn() -> (#(#type_params),*) }
+	};
+	let reflect_ignore = has_derive(fn_attrs, "Reflect")
+		.then(|| quote! { #[reflect(ignore)] })
+		.unwrap_or_default();
+	Some(quote! {
+		#reflect_ignore
+		#[doc(hidden)]
+		pub _marker: ::core::marker::PhantomData<#phantom>
+	})
+}
+
+/// The struct's field initializers, given one expression per declared field.
+fn struct_init(
+	generics: &syn::Generics,
+	fields: &[Prop],
+	values: impl Iterator<Item = TokenStream>,
+) -> TokenStream {
+	let idents = fields.iter().map(|field| &field.ident);
+	let marker = (generics.type_params().count() > 0)
+		.then(|| quote! { _marker: ::core::marker::PhantomData, });
+	if fields.is_empty() && marker.is_none() {
+		quote! { Self }
+	} else {
+		quote! { Self { #(#idents: #values,)* #marker } }
+	}
+}
+
+/// A perfect-derive `Clone`: cloning every field without bounding the
+/// action's type params, which a `#[derive(Clone)]` would.
+fn make_clone(
+	fn_name: &syn::Ident,
+	generics: &syn::Generics,
+	fields: &[Prop],
+) -> TokenStream {
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let values = fields.iter().map(|field| {
+		let ident = &field.ident;
+		quote! { ::core::clone::Clone::clone(&self.#ident) }
+	});
+	let init = struct_init(generics, fields, values);
+	quote! {
+		impl #impl_generics ::core::clone::Clone for #fn_name #ty_generics #where_clause {
+			fn clone(&self) -> Self { #init }
 		}
 	}
 }
 
-fn make_default(fn_name: &syn::Ident, generics: &syn::Generics) -> TokenStream {
-	let type_params: Vec<&syn::Ident> =
-		generics.type_params().map(|tp| &tp.ident).collect();
-	let (impl_generics, _, where_clause) = generics.split_for_impl();
-
-	if type_params.is_empty() {
-		quote! {
-			impl Default for #fn_name {
-				fn default() -> Self {
-					Self
-				}
-			}
-		}
-	} else {
-		// `ty_generics` (not `impl_generics`) in the type position: bounds belong
-		// only on the `impl` header / `where` clause, never on `Foo<..>` itself.
-		let (_, ty_generics, _) = generics.split_for_impl();
-		quote! {
-			impl #impl_generics Default for #fn_name #ty_generics #where_clause {
-				fn default() -> Self {
-					Self(Default::default())
-				}
-			}
+/// A manual `Default`, honoring every `#[field(default = expr)]` and never
+/// bounding the action's type params.
+fn make_default(
+	fn_name: &syn::Ident,
+	generics: &syn::Generics,
+	fields: &[Prop],
+) -> TokenStream {
+	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let init =
+		struct_init(generics, fields, fields.iter().map(Prop::default_value));
+	quote! {
+		impl #impl_generics ::core::default::Default for #fn_name #ty_generics #where_clause {
+			fn default() -> Self { #init }
 		}
 	}
 }
@@ -677,7 +1208,6 @@ fn make_turbofish(generics: &syn::Generics) -> TokenStream {
 		quote! { ::<#(#type_params),*> }
 	}
 }
-
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -1100,7 +1630,7 @@ mod test {
 				B: Sync,
 			{}
 		});
-		assert!(result.contains("PhantomData < (A , B) >"));
+		assert!(result.contains("PhantomData < fn () -> (A , B) >"));
 	}
 
 	#[test]
@@ -1231,7 +1761,7 @@ mod test {
 			fn Add(val: i32) -> i32 { val }
 		});
 		assert!(result.contains("ActionMeta"));
-		assert!(result.contains("of_reflect :: < Self , _ > ()"));
+		assert!(result.contains("of_reflect :: < Self ,"));
 	}
 
 	#[test]
@@ -1241,7 +1771,7 @@ mod test {
 			fn Add(val: i32) -> i32 { val }
 		});
 		assert!(result.contains("ActionMeta"));
-		assert!(result.contains("of_action :: < Self , _ > ()"));
+		assert!(result.contains("ActionMeta :: of :: < Self ,"));
 	}
 
 	#[test]
@@ -1249,8 +1779,7 @@ mod test {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			fn my_action(val: In<i32>) -> i32 { val.0 }
 		});
-		assert!(!result.contains("of_action"));
-		assert!(!result.contains("of_reflect"));
+		assert!(!result.contains("ActionMeta"));
 	}
 
 	/// Middleware wraps another entity's action rather than being one, and several
@@ -1282,7 +1811,7 @@ mod test {
 			}
 		});
 		assert!(result.contains("ActionMeta"));
-		assert!(result.contains("of_handler :: < Self , _ > ()"));
+		assert!(result.contains("of_handler :: < Self ,"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -1342,7 +1871,7 @@ mod test {
 		});
 		assert!(result.contains("ExchangeOverload"));
 		assert!(result.contains("PathPartial :: new (\"validate\")"));
-		assert!(result.contains("of_reflect :: < Self , _ > ()"));
+		assert!(result.contains("of_reflect :: < Self ,"));
 	}
 
 	// -----------------------------------------------------------------------
@@ -1391,7 +1920,7 @@ mod test {
 			quote!(no_default),
 			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
 		);
-		assert!(!result.contains("impl Default"));
+		assert!(!result.contains("Default for my_action"));
 	}
 
 	#[test]
@@ -1400,7 +1929,7 @@ mod test {
 			quote!(),
 			syn::parse_quote! { async fn my_action() -> i32 { 42 } },
 		);
-		assert!(result.contains("impl Default for my_action"));
+		assert!(result.contains("Default for my_action"));
 	}
 
 	#[test]
@@ -1419,6 +1948,239 @@ mod test {
 			async fn my_action() -> i32 { 42 }
 		});
 		// derive(Default) is in the user attrs, so macro should NOT generate impl Default
-		assert!(!result.contains("impl Default for my_action"));
+		assert!(!result.contains("Default for my_action"));
+	}
+
+	// -----------------------------------------------------------------------
+	// `#[field]` actions
+	// -----------------------------------------------------------------------
+
+	#[test]
+	fn field_becomes_a_pub_struct_field() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn RepeatTimes(#[field] total_times: u32, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(result.contains("pub total_times : u32"));
+		// the handler takes the field by value, ahead of the input
+		assert!(result.contains(
+			"async fn repeat_times_action (total_times : u32 , cx :"
+		));
+		// the require site installs the live-fetching wrapper, not the handler
+		assert!(
+			result.contains("Action :: new_async (repeat_times_action_fields)")
+		);
+		assert!(result.contains("get_cloned :: < RepeatTimes > () . await ?"));
+	}
+
+	#[test]
+	fn field_requires_a_component_derive() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			async fn Bare(#[field] total: u32) -> Result<Outcome> { todo!() }
+		});
+		assert!(err.contains("requires `#[derive(Component)]`"));
+	}
+
+	#[test]
+	fn generic_field_struct_keeps_a_named_marker() {
+		let result = parse_str(quote!(plain_meta), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn RepeatTimes<Input>(
+				#[field] total_times: u32,
+				cx: ActionContext<Input>,
+			) -> Result<Outcome>
+			where
+				Input: 'static + Send + Sync + Clone,
+			{ todo!() }
+		});
+		assert!(result.contains(
+			"pub _marker : :: core :: marker :: PhantomData < fn () -> Input >"
+		));
+		assert!(result.contains("reflect (ignore)"));
+		// the perfect-derive clone, so `Input` is never spuriously bounded
+		assert!(result.contains("Clone for RepeatTimes < Input >"));
+		assert!(!result.contains("derive (Clone)"));
+	}
+
+	#[test]
+	fn optional_field_stores_prop_opt() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Log(#[field] message: Option<SmolStr>, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(result.contains("PropOpt < SmolStr >"));
+		// bound back to an `Option<SmolStr>` before the body runs
+		assert!(result.contains("let message = message . into_inner ()"));
+	}
+
+	#[test]
+	fn required_field_validates_by_name() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn RunNext(#[field(required)] target: Entity, cx: ActionContext) -> Result<Entity> {
+				todo!()
+			}
+		});
+		assert!(result.contains("PropOpt < Entity >"));
+		assert!(result.contains("missing required field"));
+		assert!(result.contains("\"target\""));
+	}
+
+	#[test]
+	fn default_expr_forces_a_manual_default() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Keep(#[field(default = 2)] keep: usize, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(result.contains("Default for Keep"));
+		assert!(result.contains("keep : (2) . into ()"));
+	}
+
+	#[test]
+	fn default_expr_conflicts_with_derived_default() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			#[derive(Default, Component, Reflect)]
+			async fn Keep(#[field(default = 2)] keep: usize, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(err.contains("conflicts with `#[derive(Default)]`"));
+	}
+
+	#[test]
+	fn mut_field_binds_mutably_through_a_mut_query() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			fn SucceedTimes(
+				#[field] max_times: u32,
+				#[field(mut)] times: u32,
+				cx: In<ActionContext>,
+			) -> Result<Outcome> { todo!() }
+		});
+		assert!(result.contains("Query < & mut SucceedTimes >"));
+		assert!(result.contains("get_mut (__action_cx . id ())"));
+		assert!(result.contains("let times = & mut __action_item . times"));
+		assert!(result.contains("times : & mut u32"));
+		// nothing to write back to in a detached action, so no `IntoAction`
+		assert!(!result.contains("fn into_action"));
+	}
+
+	#[test]
+	fn mut_field_on_async_errors() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Bad(#[field(mut)] times: u32, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(err.contains("not valid on an async action"));
+	}
+
+	#[test]
+	fn mut_field_cannot_be_optional() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			fn Bad(#[field(mut)] times: Option<u32>, cx: In<ActionContext>) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(err.contains("cannot be combined with"));
+	}
+
+	/// A pure body cannot reach the world, so a pure action carrying fields
+	/// installs a system wrapper while keeping its pure `into_action`.
+	#[test]
+	fn pure_fields_lower_to_a_system() {
+		let result = parse_str(quote!(pure), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			fn Add(#[field] rhs: i32, val: i32) -> i32 { val + rhs }
+		});
+		assert!(result.contains("Action :: new_system (add_action_fields)"));
+		assert!(result.contains("Query < & Add >"));
+		// the handler itself stays pure, and so does the detached action
+		assert!(result.contains("fn add_action (rhs : i32 , __action_cx :"));
+		assert!(result.contains("Action :: new_pure (move |"));
+	}
+
+	/// A detached action has no component to read, so an async field action
+	/// freezes its fields at conversion.
+	#[test]
+	fn into_action_captures_the_fields() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Greet(#[field] name: String, cx: ActionContext) -> Result<Outcome> {
+				todo!()
+			}
+		});
+		assert!(result.contains("let __action_fields = self"));
+		assert!(result.contains("let Greet { name , .. } = __action_fields"));
+	}
+
+	/// Middleware's component lives on the live host entity the call names as
+	/// caller, so it keeps the live-fetching wrapper rather than freezing.
+	#[test]
+	fn middleware_fields_stay_live() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Policy(
+				#[field] label: String,
+				cx: ActionContext<(Request, Next<Request, Response>)>,
+			) -> Result<Response> { todo!() }
+		});
+		assert!(result.contains("Action :: new_async (policy_action_fields)"));
+		assert!(!result.contains("let __action_fields = self"));
+	}
+
+	/// A system field action forwards the author's params, keeping a `#[cfg]`
+	/// gate on both the declaration and the call.
+	#[test]
+	fn system_fields_forward_params() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			fn Tally(
+				#[field] scale: u32,
+				cx: In<ActionContext>,
+				#[cfg(feature = "tui")] sessions: Query<&Name>,
+			) -> Result<Outcome> { todo!() }
+		});
+		assert!(
+			result.contains(
+				"cfg (feature = \"tui\")] sessions : Query < & Name >"
+			)
+		);
+		assert!(result.contains("cfg (feature = \"tui\")] sessions)"));
+	}
+
+	/// Bevy keeps one `on_add` per component and silently takes the last, so an
+	/// author's hook is chained ahead of the provider guard.
+	#[test]
+	fn author_on_add_chains_with_the_guard() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			#[component(on_add = hook_ext::entity_hook(FixedPage::insert_page_root))]
+			async fn FixedPage(cx: ActionContext<Request>) -> Result<PageRequest> {
+				todo!()
+			}
+		});
+		assert!(result.contains("hook_ext :: chain"));
+		assert!(result.contains("assert_provider :: < FixedPage >"));
+		// exactly one `on_add`, so neither hook is dropped
+		assert_eq!(result.matches("on_add").count(), 1);
+	}
+
+	#[test]
+	fn plain_meta_forces_the_plain_variant() {
+		let result = parse_str(quote!(plain_meta), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Repeat(cx: ActionContext) -> Result<Outcome> { todo!() }
+		});
+		assert!(result.contains("ActionMeta :: of :: < Self ,"));
+		assert!(!result.contains("of_reflect"));
 	}
 }

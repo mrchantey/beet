@@ -30,7 +30,9 @@
 //! - `#[prop(into)]` -> binds the concrete type (the `rsx!` call site already
 //!   `.into()`s every value)
 //!
-//! `#[prop(all)]` is removed entirely.
+//! `#[prop(all)]` is removed entirely. The grammar itself lives in
+//! [`beet_core_shared::prelude::Prop`], shared with the `#[action]` macro's
+//! `#[field]` spelling so the two cannot drift.
 extern crate alloc;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -38,7 +40,6 @@ use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
-use syn::FnArg;
 use syn::ItemFn;
 use syn::parse_macro_input;
 
@@ -62,155 +63,6 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	}
 }
 
-/// A `#[template]` parameter lowered to a data-struct field.
-struct Prop {
-	/// parameter name (also the field name)
-	ident: syn::Ident,
-	/// type as written by the author — what the body binds
-	ty: syn::Type,
-	/// stored as `PropOpt<inner>` and validated at build time
-	required: bool,
-	/// the `T` of a declared `Option<T>` prop, stored as `PropOpt<T>`
-	option_inner: Option<syn::Type>,
-	/// `#[prop(default = expr)]` default expression
-	default_expr: Option<syn::Expr>,
-	/// non-`#[prop]` attributes (doc comments etc) kept on the field
-	other_attrs: Vec<syn::Attribute>,
-}
-
-impl Prop {
-	/// Whether the prop is stored as a `PropOpt<_>` (a required prop, or a
-	/// declared `Option<T>` prop).
-	fn is_opt(&self) -> bool { self.required || self.option_inner.is_some() }
-
-	/// The field's stored type. A required prop or a declared `Option<T>` prop
-	/// stores `PropOpt<inner>` (so the call-site conversion stays unambiguous);
-	/// everything else stores its declared type.
-	fn stored_ty(&self, beet_core: &syn::Path) -> TokenStream {
-		if self.required {
-			let ty = &self.ty;
-			quote! { #beet_core::prelude::PropOpt<#ty> }
-		} else if let Some(inner) = &self.option_inner {
-			quote! { #beet_core::prelude::PropOpt<#inner> }
-		} else {
-			let ty = &self.ty;
-			quote! { #ty }
-		}
-	}
-
-	/// The struct field definition with forwarded attrs.
-	///
-	/// Fields are `pub` so a `<Name field=x/>` struct-literal patch resolves
-	/// across module boundaries (the same crate, a different module).
-	fn field_def(&self, beet_core: &syn::Path) -> TokenStream {
-		let ident = &self.ident;
-		let stored_ty = self.stored_ty(beet_core);
-		let other_attrs = &self.other_attrs;
-		quote! {
-			#(#other_attrs)*
-			pub #ident: #stored_ty
-		}
-	}
-
-	/// The field's value inside a manual `Default` impl. Only a non-`PropOpt`
-	/// field carries a `default_expr`; every other field defaults by type
-	/// (`PropOpt` to `None`).
-	fn default_value(&self) -> TokenStream {
-		match (self.is_opt(), &self.default_expr) {
-			(false, Some(expr)) => quote! { (#expr).into() },
-			_ => quote! { ::core::default::Default::default() },
-		}
-	}
-
-	/// The body binding that rebinds the stored field to the declared type:
-	/// a `PropOpt`-stored optional prop unwraps to `Option<T>`. A required prop
-	/// is unwrapped separately (after the missing check).
-	fn body_binding(&self) -> Option<TokenStream> {
-		if self.option_inner.is_some() && !self.required {
-			let ident = &self.ident;
-			Some(quote! { let #ident = #ident.into_inner(); })
-		} else {
-			None
-		}
-	}
-}
-
-/// Parse one parameter into a [`Prop`].
-fn parse_prop(pt: &syn::PatType) -> syn::Result<Prop> {
-	let ident = param_ident(pt)?;
-	let ty = (*pt.ty).clone();
-
-	let mut required = false;
-	let mut default_expr = None;
-	let mut other_attrs: Vec<syn::Attribute> = Vec::new();
-
-	for attr in &pt.attrs {
-		if !attr.path().is_ident("prop") {
-			other_attrs.push(attr.clone());
-			continue;
-		}
-		let tokens = match &attr.meta {
-			syn::Meta::List(list) => list.tokens.clone(),
-			syn::Meta::Path(_) => TokenStream::new(), // bare `#[prop]`
-			syn::Meta::NameValue(_) => {
-				synbail!(
-					attr,
-					"`#[prop = ..]` form is not supported, use #[prop(..)]"
-				)
-			}
-		};
-		let map = AttributeMap::parse(tokens)?;
-		for key in map.keys() {
-			match key {
-				"required" => required = true,
-				"default" => default_expr = map.get("default").cloned(),
-				// `into` is call-site sugar; the body binds the concrete type.
-				"into" => {}
-				"all" => synbail!(
-					attr,
-					"`#[prop(all)]` has been removed; declare each prop"
-				),
-				other => synbail!(attr, "unknown `#[prop({other})]` argument"),
-			}
-		}
-	}
-
-	// a declared `Option<T>` prop stores `PropOpt<T>` and binds `Option<T>`.
-	let option_inner = (!required).then(|| option_inner_type(&ty)).flatten();
-
-	Ok(Prop {
-		ident,
-		ty,
-		required,
-		option_inner,
-		default_expr,
-		other_attrs,
-	})
-}
-
-/// The `T` of an `Option<T>` type, or `None` if `ty` is not an `Option`.
-fn option_inner_type(ty: &syn::Type) -> Option<syn::Type> {
-	let syn::Type::Path(tp) = ty else {
-		return None;
-	};
-	let seg = tp.path.segments.last()?;
-	if seg.ident != "Option" {
-		return None;
-	}
-	let syn::PathArguments::AngleBracketed(args) = &seg.arguments else {
-		return None;
-	};
-	args.args.iter().find_map(|arg| match arg {
-		syn::GenericArgument::Type(inner) => Some(inner.clone()),
-		_ => None,
-	})
-}
-
-/// Whether a parameter is a prop (carries a `#[prop]` attribute).
-fn is_prop_param(pt: &syn::PatType) -> bool {
-	pt.attrs.iter().any(|attr| attr.path().is_ident("prop"))
-}
-
 /// Whether a system-template param is the building [`Entity`] rather than a
 /// [`SystemParam`], ie a bare `entity: Entity`.
 fn is_entity_param(pt: &syn::PatType) -> bool {
@@ -223,39 +75,11 @@ fn is_entity_param(pt: &syn::PatType) -> bool {
 		.is_some_and(|segment| segment.ident == "Entity")
 }
 
-/// Extract the identifier from a simple parameter pattern.
-fn param_ident(pt: &syn::PatType) -> syn::Result<syn::Ident> {
-	Ok(param_pat_ident(pt)?.ident)
-}
-
-/// Extract the full binding pattern (preserving `mut`) from a simple parameter.
-fn param_pat_ident(pt: &syn::PatType) -> syn::Result<syn::PatIdent> {
-	match pt.pat.as_ref() {
-		syn::Pat::Ident(pi) => Ok(pi.clone()),
-		other => {
-			synbail!(
-				other,
-				"`#[template]` parameters must be plain identifiers"
-			)
-		}
-	}
-}
-
-/// Coerce a typed function argument, rejecting `self`.
-fn typed_arg(arg: &FnArg) -> syn::Result<&syn::PatType> {
-	match arg {
-		FnArg::Typed(pt) => Ok(pt),
-		FnArg::Receiver(recv) => {
-			synbail!(recv, "`#[template]` functions cannot take `self`")
-		}
-	}
-}
-
 /// Build the data struct + `Template` impl + registration for a pure template.
 fn parse_pure(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut props: Vec<Prop> = Vec::new();
 	for arg in &item.sig.inputs {
-		props.push(parse_prop(typed_arg(arg)?)?);
+		props.push(Prop::parse(Prop::typed_arg(arg, "template")?, "prop")?);
 	}
 	emit(&item, &props, /* system */ None)
 }
@@ -270,19 +94,19 @@ fn parse_system(item: ItemFn) -> syn::Result<TokenStream> {
 	let mut sys_pats: Vec<syn::PatIdent> = Vec::new();
 	let mut entity_pat: Option<syn::PatIdent> = None;
 	for arg in &item.sig.inputs {
-		let pt = typed_arg(arg)?;
-		if is_prop_param(pt) {
-			props.push(parse_prop(pt)?);
+		let pt = Prop::typed_arg(arg, "template")?;
+		if Prop::is_param(pt, "prop") {
+			props.push(Prop::parse(pt, "prop")?);
 		} else if is_entity_param(pt) {
 			// the entity being built, so the body can read self/ancestor context
 			// (`<LightsailBeetSiteBlock/>` resolving its deploy scope by ancestry).
-			entity_pat = Some(param_pat_ident(pt)?);
+			entity_pat = Some(Prop::param_pat_ident(pt, "template")?);
 		} else {
 			let ty = &pt.ty;
 			sys_types.push(quote! { #ty });
 			// keep the full `PatIdent` so a `mut` binding (eg `mut meshes:
 			// ResMut<..>`) stays mutable in the build closure pattern.
-			sys_pats.push(param_pat_ident(pt)?);
+			sys_pats.push(Prop::param_pat_ident(pt, "template")?);
 		}
 	}
 	emit(
@@ -335,6 +159,14 @@ fn emit(
 	let name = &item.sig.ident;
 	let fn_attrs = &item.attrs;
 	let body = &item.block;
+
+	// `mut` is an action-only key: a template prop is cloned into the body.
+	if let Some(prop) = props.iter().find(|prop| prop.mutable) {
+		synbail!(
+			&prop.ident,
+			"`#[prop(mut)]` is not supported, a template prop binds by value"
+		);
+	}
 
 	let beet_core = pkg_ext::internal_or_beet("beet_core");
 	let bevy = pkg_ext::bevy();

@@ -9,5 +9,5 @@ log. `{CallOnReady}` runs the sequence on load, then exits.
 -->
 <Sequence {CallOnReady}>
 	<Patrol/>
-	<Log::Message("patrol complete")/>
+	<Log message="patrol complete"/>
 </Sequence>

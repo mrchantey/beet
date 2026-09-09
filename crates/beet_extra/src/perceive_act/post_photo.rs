@@ -17,34 +17,17 @@ use beet_router::prelude::*;
 /// image message. Bounding is [`ThreadWindow::stub_old_images`], run inline here so
 /// a captured photo is bounded in the same turn it lands; a thread whose images
 /// arrive some other way sequences the standalone [`StubOldImages`] action instead.
-#[derive(Debug, Clone, Component, Reflect)]
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<(), Outcome> = Action::new_async(post_photo_action))]
-pub struct PostPhoto {
-	/// How many recent photos to keep as real images; older ones are stubbed to text.
-	pub keep_media: usize,
-}
-
-impl Default for PostPhoto {
-	fn default() -> Self {
-		// the current + previous photo (photos dominate request bytes; two are
-		// enough to see what changed since the last turn).
-		Self { keep_media: 2 }
-	}
-}
-
-/// Marks the start of each perceive-act cycle, for the per-stage latency logs:
-/// [`PostPhoto`] stamps it, `RespondMultiModalAction` reads it to report the model latency.
-#[derive(Debug, Resource)]
-pub struct CycleClock {
-	/// The current cycle, counting from 1.
-	pub cycle: u64,
-	/// When the current cycle's photo landed in the window.
-	pub photo_at: Instant,
-}
-
-async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
-	let config = cx.caller.get_cloned::<PostPhoto>().await?;
+pub async fn PostPhoto(
+	/// How many recent photos to keep as real images; older ones are stubbed to
+	/// text. Defaults to the current + previous photo (photos dominate request
+	/// bytes; two are enough to see what changed since the last turn).
+	#[field(default = 2usize)]
+	keep_media: usize,
+	cx: ActionContext,
+) -> Result<Outcome> {
 	let started = Instant::now();
 	// capture through the router: a bound head serves it, else the local handler.
 	// The loop's heartbeat: a failed capture (eg no head connected yet, so no
@@ -82,13 +65,13 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 					None,
 					PostStatus::Completed,
 				));
-				window.stub_old_images(config.keep_media);
+				window.stub_old_images(keep_media);
 				Ok(())
 			},
 		)
 		.await??;
 
-	// stamp the cycle clock so `RespondMultiModalAction` can report the model latency
+	// stamp the cycle clock so `RespondMultiModal` can report the model latency
 	let (cycle, previous_photo_at) = cx
 		.caller
 		.world()
@@ -115,6 +98,17 @@ async fn post_photo_action(cx: ActionContext) -> Result<Outcome> {
 		),
 	}
 	Ok(Pass(()))
+}
+
+/// Marks the start of each perceive-act cycle, for the per-stage latency logs:
+/// [`PostPhoto`] stamps it, `RespondMultiModal` reads it to report the model
+/// latency.
+#[derive(Debug, Resource)]
+pub struct CycleClock {
+	/// The current cycle, counting from 1.
+	pub cycle: u64,
+	/// When the current cycle's photo landed in the window.
+	pub photo_at: Instant,
 }
 
 /// Ceiling on one capture attempt, so a wedged head (eg a half-open socket)

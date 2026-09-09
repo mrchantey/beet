@@ -258,7 +258,7 @@ fn parse_element(
 	if tag.is_empty() {
 		bevybail!("expected a tag name after `<`");
 	}
-	// a tag-position component literal (`<Name("x")/>`, `<Log::Message("hi")/>`,
+	// a tag-position component literal (`<Name("x")/>`, `<LogLike::Message("hi")/>`,
 	// `<Greet{name:"world"}/>`) parses with the same sub-parser as a `{..}` spread,
 	// building the component from the literal. The element's `tag` becomes the base
 	// segment so the registry classifies the component; the close tag matches it.
@@ -315,10 +315,10 @@ fn parse_element(
 /// Detect and parse a tag-position component literal, returning the base
 /// component name and the literal. The `tag` was already read by the cursor; a
 /// literal is present when its first char is uppercase and either the tag is
-/// `::`-qualified (an enum variant, eg `Log::Message`) or the next char opens a
+/// `::`-qualified (an enum variant, eg `LogLike::Message`) or the next char opens a
 /// tuple/struct body (`(`/`{`). The literal's fields parse via the shared
 /// [`parse_named_fields`]; the returned `tag` is the segment before `::` (so
-/// `Log::Message` classifies as `Log`, `Name` stays `Name`), and the close tag
+/// `LogLike::Message` classifies as `LogLike`, `Name` stays `Name`), and the close tag
 /// matches that base. Outside BSX mode (HTML), or for a plain tag, the tag is
 /// returned unchanged with no literal.
 fn parse_tag_literal(
@@ -595,13 +595,13 @@ mod test {
 		literal.name.as_str().xpect_eq("Name");
 		matches!(literal.fields, NamedFields::Tuple(_)).xpect_true();
 		// `::`-qualified enum variant: base tag is the segment before `::`.
-		let log = element("<Log::Message(\"hi\")/>");
-		log.tag.clone().xpect_eq("Log".to_string());
+		let log = element("<LogLike::Message(\"hi\")/>");
+		log.tag.clone().xpect_eq("LogLike".to_string());
 		log.tag_literal
 			.unwrap()
 			.name
 			.as_str()
-			.xpect_eq("Log::Message");
+			.xpect_eq("LogLike::Message");
 		// struct form.
 		let cfg = element("<Greet{name:\"world\"}/>");
 		cfg.tag.clone().xpect_eq("Greet".to_string());

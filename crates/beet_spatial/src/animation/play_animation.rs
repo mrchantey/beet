@@ -8,34 +8,46 @@ pub(super) const DEFAULT_ANIMATION_TRANSITION: Duration =
 	Duration::from_millis(250);
 
 /// Play an animation on the agent when this action runs, then pass.
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[require(PlayAnimationAction)]
+///
+/// ## Errors
+/// Errors if no [`AnimationPlayer`] could be resolved on the agent.
+#[action(handler_only)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct PlayAnimation {
+pub fn PlayAnimation(
 	/// Path to the animation clip, resolved to a graph node index against the
 	/// agent's [`AnimationGraphClips`] when the action runs.
-	pub clip: SmolStr,
+	#[field]
+	clip: SmolStr,
 	/// Trigger once again if the animation is already playing
-	pub trigger_if_playing: bool,
+	#[field]
+	trigger_if_playing: bool,
 	/// Amount of times to repeat the animation.
-	pub repeat: RepeatAnimation,
+	#[field]
+	repeat: RepeatAnimation,
 	/// The crossfade duration, ie the duration before previous animation
-	/// end to start the next one.
-	pub transition_duration: Duration,
-}
+	/// end to start the next one. Defaulted rather than derived: a zero
+	/// crossfade snaps the idle<->walk switch instead of blending it.
+	#[field(default = DEFAULT_ANIMATION_TRANSITION)]
+	transition_duration: Duration,
+	cx: In<ActionContext>,
+	graph_clips: Query<&AnimationGraphClips>,
+	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
+) -> Result<Outcome> {
+	// resolve the clip path to a node index before borrowing the player mutably
+	let agent = agents.entity(cx.id());
+	let animation = graph_clips.get(agent)
+		.map_err(|_| bevyhow!("PlayAnimation on {} has no AnimationGraphClips on its agent root {agent}; build the graph with AnimationGraphClips::build/<CreateAnimationGraph>", cx.id()))?
+		.index(&clip)
+		.ok_or_else(|| bevyhow!("clip `{clip}` is not in the agent's AnimationGraph"))?;
+	let (mut player, mut transitions) = agents.get_descendent_mut(cx.id())?;
 
-// manual `Default` so a markup/reflect-spawned `<PlayAnimation clip=.../>` keeps the
-// crossfade: a derived default leaves `transition_duration` at zero, snapping the
-// idle<->walk switch instead of blending it.
-impl Default for PlayAnimation {
-	fn default() -> Self {
-		Self {
-			clip: SmolStr::default(),
-			trigger_if_playing: false,
-			repeat: RepeatAnimation::default(),
-			transition_duration: DEFAULT_ANIMATION_TRANSITION,
-		}
+	if !player.is_playing_animation(animation) || trigger_if_playing {
+		transitions
+			.play(&mut player, animation, transition_duration)
+			.set_repeat(repeat);
 	}
+	Outcome::PASS.xok()
 }
 
 impl PlayAnimation {
@@ -66,38 +78,6 @@ impl PlayAnimation {
 		self.trigger_if_playing = true;
 		self
 	}
-}
-
-/// Plays the animation on the agent, then passes.
-///
-/// ## Errors
-/// Errors if the caller has no [`PlayAnimation`] component, or no
-/// [`AnimationPlayer`] could be resolved on the agent.
-#[action(default)]
-#[derive(Component)]
-pub fn PlayAnimationAction(
-	cx: In<ActionContext>,
-	query: Query<&PlayAnimation>,
-	graph_clips: Query<&AnimationGraphClips>,
-	mut agents: AgentQuery<(&mut AnimationPlayer, &mut AnimationTransitions)>,
-) -> Result<Outcome> {
-	let play_animation = query.get(cx.id())?;
-	// resolve the clip path to a node index before borrowing the player mutably
-	let agent = agents.entity(cx.id());
-	let animation = graph_clips.get(agent)
-		.map_err(|_| bevyhow!("PlayAnimation on {} has no AnimationGraphClips on its agent root {agent}; build the graph with AnimationGraphClips::build/<CreateAnimationGraph>", cx.id()))?
-		.index(&play_animation.clip)
-		.ok_or_else(|| bevyhow!("clip `{}` is not in the agent's AnimationGraph", play_animation.clip))?;
-	let (mut player, mut transitions) = agents.get_descendent_mut(cx.id())?;
-
-	if !player.is_playing_animation(animation)
-		|| play_animation.trigger_if_playing
-	{
-		transitions
-			.play(&mut player, animation, play_animation.transition_duration)
-			.set_repeat(play_animation.repeat);
-	}
-	Outcome::PASS.xok()
 }
 
 /// Convenience system to create an [`AnimationPlayer`] from a clip, exposing the

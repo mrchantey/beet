@@ -17,8 +17,8 @@ use bevy::reflect::Typed;
 /// as the canonical fields, whether an [`Action`] or an [`ActionOverload`]
 /// landed last. An in-place edit would be invisible to them.
 ///
-/// Created via [`ActionMeta::of`], [`ActionMeta::of_action`],
-/// [`ActionMeta::of_handler`], or [`ActionMeta::of_reflect`].
+/// Created via [`ActionMeta::of`], [`ActionMeta::of_handler`], or
+/// [`ActionMeta::of_reflect`].
 #[derive(Clone, Debug, Component, Get)]
 #[component(immutable)]
 pub struct ActionMeta {
@@ -54,43 +54,32 @@ impl ActionMeta {
 		}
 	}
 
-	/// Create an [`ActionMeta`] from a type implementing [`IntoAction`](crate::prelude::IntoAction).
-	pub fn of_action<T, M>() -> Self
-	where
-		T: 'static + crate::prelude::IntoAction<M>,
-		T::In: 'static,
-		T::Out: 'static,
-	{
-		Self::of::<T, T::In, T::Out>()
-	}
-
 	/// Create an [`ActionMeta`] with handler reflection data. Provides
 	/// description from doc comments but no JSON schemas for input/output.
 	/// Requires only the handler to implement [`Typed`].
-	pub fn of_handler<T, M>() -> Self
+	pub fn of_handler<T, In, Out>() -> Self
 	where
-		T: 'static + Typed + crate::prelude::IntoAction<M>,
-		T::In: 'static,
-		T::Out: 'static,
+		T: 'static + Typed,
+		In: 'static,
+		Out: 'static,
 	{
 		Self {
 			type_info: Some(ActionTypeInfo::of_handler::<T>()),
-			..Self::of::<T, T::In, T::Out>()
+			..Self::of::<T, In, Out>()
 		}
 	}
 
-	/// Create an [`ActionMeta`] with full reflection data from a type
-	/// implementing both [`Typed`] and [`IntoAction`](crate::prelude::IntoAction).
-	/// Provides description and JSON schemas for input/output.
-	pub fn of_reflect<T, M>() -> Self
+	/// Create an [`ActionMeta`] with full reflection data, so the handler's doc
+	/// description and the input/output schemas are all available.
+	pub fn of_reflect<T, In, Out>() -> Self
 	where
-		T: 'static + Typed + crate::prelude::IntoAction<M>,
-		T::In: 'static + Typed,
-		T::Out: 'static + Typed,
+		T: 'static + Typed,
+		In: 'static + Typed,
+		Out: 'static + Typed,
 	{
 		Self {
-			type_info: Some(ActionTypeInfo::of_full::<T, M>()),
-			..Self::of::<T, T::In, T::Out>()
+			type_info: Some(ActionTypeInfo::of_full::<T, In, Out>()),
+			..Self::of::<T, In, Out>()
 		}
 	}
 
@@ -255,16 +244,16 @@ impl ActionTypeInfo {
 
 	/// Create [`ActionTypeInfo`] with full reflection data including
 	/// input and output types.
-	pub fn of_full<T, M>() -> Self
+	pub fn of_full<T, In, Out>() -> Self
 	where
-		T: Typed + crate::prelude::IntoAction<M>,
-		T::In: Typed,
-		T::Out: Typed,
+		T: Typed,
+		In: Typed,
+		Out: Typed,
 	{
 		Self {
 			handler_info: T::type_info(),
-			input_info: Some(T::In::type_info()),
-			output_info: Some(T::Out::type_info()),
+			input_info: Some(In::type_info()),
+			output_info: Some(Out::type_info()),
 		}
 	}
 

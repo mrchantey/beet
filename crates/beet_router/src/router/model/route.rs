@@ -93,7 +93,7 @@ where
 /// Returns the first [`Pass`] response, or a 404 not-found response
 /// if no child matches. Errors are converted to a response.
 pub fn fallback() -> impl Bundle {
-	let fallback = FallbackAction::<Request, Response>::default().into_action();
+	let fallback = Fallback::<Request, Response>::default().into_action();
 	let action = Action::<Request, Response>::new_async(
 		async move |cx: ActionContext<Request>| -> Response {
 			match cx.caller.call_detached(fallback, cx.input).await {

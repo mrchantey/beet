@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 /// A build step that runs a process and produces an artifact file.
 /// Used as an ECS Component on deploy sequence entities alongside a block.
-/// The [`TofuApplyAction`] collects these to build the artifact ledger.
+/// The [`TofuApply`] collects these to build the artifact ledger.
 #[derive(Debug, Clone, Get, SetWith, Component)]
 #[cfg_attr(
 	all(feature = "deploy", not(target_arch = "wasm32")),
@@ -96,7 +96,11 @@ impl BuildArtifact {
 
 /// Runs the build process from [`BuildArtifact`].
 /// After building, the artifact file exists on disk for
-/// [`TofuApplyAction`] to upload and hash.
+/// [`TofuApply`] to upload and hash.
+///
+/// A hand-written pair rather than a `#[field]` action: [`BuildArtifact`] is a
+/// declaration a wasm consumer authors but cannot run, so the type must exist
+/// in builds this action does not.
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 #[action]
 #[derive(Default, Component)]

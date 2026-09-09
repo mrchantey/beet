@@ -885,8 +885,10 @@ async fn converge_account(
 	let password = match ssm_ext::get(region, &name).await? {
 		Some(password) => password,
 		None => {
-			let generated =
-				EnsureSecret::new(account.secret.clone()).generate()?;
+			let generated = EnsureSecret::generate(
+				account.secret.label(),
+				EnsureSecret::LENGTH,
+			)?;
 			ssm_ext::create(region, &name, &generated).await?;
 			info!("minted the {} mailbox credential", account.name);
 			generated.to_string()

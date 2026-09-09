@@ -1,5 +1,5 @@
 //! Cloudflare deploy actions, driven by the `wrangler` CLI as `ChildProcess`
-//! `#[action]`s (mirroring [`BuildDockerImageAction`]). Used by the
+//! `#[action]`s (mirroring [`BuildDockerImage`]). Used by the
 //! [`CloudflareContainerBlock`] and [`CloudflareWorkerBlock`] examples.
 //!
 //! `wrangler` is the deploy tool (not OpenTofu): it has first-class
@@ -69,7 +69,7 @@ async fn wrangler_r2_create(bucket: &str) -> Result {
 }
 
 /// Find a sibling component of type `T` by walking the action's parent's children
-/// (the same pattern [`BuildDockerImageAction`] uses for its block + artifact).
+/// (the same pattern [`BuildDockerImage`] uses for its block + artifact).
 async fn sibling<T: Component + Clone>(
 	cx: &ActionContext<Request>,
 ) -> Result<T> {
@@ -493,21 +493,37 @@ fn worker_wrangler_json(
 
 /// Publishes a local site directory to an R2 bucket, key-free: it walks the
 /// directory and runs `wrangler r2 object put` per file (using the API token, so
-/// no R2 S3 keys are needed for the sync itself). Read by
-/// [`CloudflareR2SyncAction`].
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+/// no R2 S3 keys are needed for the sync itself), timing the publish (the
+/// headline the `bench` verb measures against a full redeploy).
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(CloudflareR2SyncAction)]
-pub struct CloudflareR2Sync {
+pub async fn CloudflareR2Sync(
 	/// Local directory to publish (cwd-relative), eg `examples/bsx_site`.
+	#[field]
 	local_dir: SmolPath,
 	/// Target R2 bucket.
+	#[field]
 	bucket: SmolStr,
 	/// Optional R2 key prefix: each uploaded key becomes `<prefix>/<relpath>`
 	/// instead of `<relpath>`, mounting a local directory under a sub-path of the
-	/// bucket. `None` uploads to the bucket root.
-	#[set_with(unwrap_option)]
+	/// bucket. Absent uploads to the bucket root.
+	#[field]
 	prefix: Option<SmolPath>,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let start = Instant::now();
+	sync_dir_to_r2(
+		local_dir.as_str(),
+		&bucket,
+		prefix.as_ref().map(SmolPath::as_str),
+	)
+	.await?;
+	info!(
+		"synced site in {} (live on the next fetch)",
+		time_ext::pretty_print_duration(start.elapsed()),
+	);
+	Pass(cx.input).xok()
 }
 
 impl CloudflareR2Sync {
@@ -519,35 +535,13 @@ impl CloudflareR2Sync {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),
-			prefix: None,
+			prefix: PropOpt(None),
 		}
 	}
 }
 
-/// Walk the [`CloudflareR2Sync`] directory and upload each file to R2, timing the
-/// publish (the headline the `bench` verb measures against a full redeploy).
-#[action]
-#[derive(Default, Component)]
-pub async fn CloudflareR2SyncAction(
-	cx: ActionContext<Request>,
-) -> Result<Outcome<Request, Response>> {
-	let start = Instant::now();
-	let sync = cx.caller.get_cloned::<CloudflareR2Sync>().await?;
-	sync_dir_to_r2(
-		sync.local_dir().as_str(),
-		sync.bucket(),
-		sync.prefix().as_ref().map(SmolPath::as_str),
-	)
-	.await?;
-	info!(
-		"synced site in {} (live on the next fetch)",
-		time_ext::pretty_print_duration(start.elapsed()),
-	);
-	Pass(cx.input).xok()
-}
-
 /// Upload every file under `local_dir` to `bucket` via `wrangler r2 object put`.
-/// Shared by [`CloudflareR2SyncAction`] and [`CloudflareBenchAction`].
+/// Shared by [`CloudflareR2Sync`] and [`CloudflareBench`].
 ///
 /// `local_dir` is resolved relative to the cwd (like `--main`), not the workspace:
 /// the site is the user's, and a deploy `.bsx` may be run from a different repo
@@ -624,54 +618,35 @@ async fn sync_dir_to_r2(
 /// (publish the site, served on the next fetch via the Worker's per-request
 /// version check) versus a full Worker rebuild + redeploy. Prints a side-by-side
 /// comparison: the headline of the infra demo.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+///
+/// Times an R2 `sync` (and, with a `url`, how soon the live Worker serves it)
+/// against a full rebuild + redeploy, then prints the comparison.
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(CloudflareBenchAction)]
-pub struct CloudflareBench {
+pub async fn CloudflareBench(
 	/// Worker name, redeployed to time the full-redeploy path.
+	#[field]
 	name: SmolStr,
 	/// R2 bucket the site is published to.
+	#[field]
 	bucket: SmolStr,
 	/// Local site directory published on the sync path.
+	#[field]
 	local_dir: SmolPath,
 	/// Optional live Worker URL; when set, the sync path also polls it until it
 	/// serves a 200, timing how soon the fresh site is live.
-	#[set_with(unwrap_option)]
+	#[field]
 	url: Option<SmolStr>,
-}
-
-impl CloudflareBench {
-	/// Bench publishing `local_dir` to `bucket` against redeploying `name`.
-	pub fn new(
-		name: impl Into<SmolStr>,
-		bucket: impl Into<SmolStr>,
-		local_dir: impl Into<SmolPath>,
-	) -> Self {
-		Self {
-			name: name.into(),
-			bucket: bucket.into(),
-			local_dir: local_dir.into(),
-			url: None,
-		}
-	}
-}
-
-/// Time an R2 `sync` (and, with a `url`, how soon the live Worker serves it)
-/// against a full rebuild + redeploy, then print the comparison.
-#[action]
-#[derive(Default, Component)]
-pub async fn CloudflareBenchAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let bench = cx.caller.get_cloned::<CloudflareBench>().await?;
-
 	// sync path: publish the site to R2; the Worker serves it on the next fetch.
 	let sync_start = Instant::now();
-	sync_dir_to_r2(bench.local_dir().as_str(), bench.bucket(), None).await?;
+	sync_dir_to_r2(local_dir.as_str(), &bucket, None).await?;
 	let sync_elapsed = sync_start.elapsed();
 
 	// with a url, also time how soon the live Worker serves the fresh site.
-	let live_elapsed = match bench.url() {
+	let live_elapsed = match &url {
 		Some(url) => Some(poll_until_ok(url.as_str(), sync_start).await?),
 		None => None,
 	};
@@ -680,9 +655,9 @@ pub async fn CloudflareBenchAction(
 	// are rebuilt, then uploaded).
 	let redeploy_start = Instant::now();
 	build_worker_artifacts().await?;
-	let block = CloudflareWorkerBlock::new(bench.name().clone())
-		.with_bucket(bench.bucket().clone());
-	let dir = wrangler_ext::project_dir(bench.name())?;
+	let block =
+		CloudflareWorkerBlock::new(name.clone()).with_bucket(bucket.clone());
+	let dir = wrangler_ext::project_dir(&name)?;
 	write_worker_wrangler(&dir, &block)?;
 	wrangler_ext::deploy(&dir, None).await?;
 	let redeploy_elapsed = redeploy_start.elapsed();
@@ -707,6 +682,22 @@ pub async fn CloudflareBenchAction(
 	Pass(cx.input).xok()
 }
 
+impl CloudflareBench {
+	/// Bench publishing `local_dir` to `bucket` against redeploying `name`.
+	pub fn new(
+		name: impl Into<SmolStr>,
+		bucket: impl Into<SmolStr>,
+		local_dir: impl Into<SmolPath>,
+	) -> Self {
+		Self {
+			name: name.into(),
+			bucket: bucket.into(),
+			local_dir: local_dir.into(),
+			url: PropOpt(None),
+		}
+	}
+}
+
 /// Poll `url` until it serves a 200, returning how long after `since` that took.
 /// Bounded so an unreachable Worker fails the bench instead of hanging.
 async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
@@ -726,44 +717,30 @@ async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
 /// Polls a deployed Worker for readiness (the deploy + rollout is near-instant on
 /// Cloudflare, unlike an ECS rollout). Reads the host (`<name>.workers.dev`) it
 /// was constructed with.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+///
+/// Tails a deployed Worker's logs via `wrangler tail`, the Cloudflare analogue
+/// of [`AwsWatch`]. With a timeout it tails then stops; otherwise it follows.
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(CloudflareWatchAction)]
-pub struct CloudflareWatch {
+pub async fn CloudflareWatch(
 	/// Worker name, used to list deployments and (optionally) poll the host.
+	#[field]
 	name: SmolStr,
 	/// Optional poll timeout.
-	#[set_with(unwrap_option)]
+	#[field]
 	timeout: Option<Duration>,
-}
-
-impl CloudflareWatch {
-	/// Watch the named Worker.
-	pub fn new(name: impl Into<SmolStr>) -> Self {
-		Self {
-			name: name.into(),
-			timeout: None,
-		}
-	}
-}
-
-/// Tail a deployed Worker's logs via `wrangler tail`, the Cloudflare analogue of
-/// [`AwsWatchAction`]. With a timeout it tails then stops; otherwise it follows.
-#[action]
-#[derive(Default, Component)]
-pub async fn CloudflareWatchAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let watch = cx.caller.get_cloned::<CloudflareWatch>().await?;
-	info!("tailing worker `{}`", watch.name());
+	info!("tailing worker `{name}`");
 	// group: `wrangler` is a wrapper that spawns the real node process; a plain
 	// kill orphans it and the leaked tail holds stdio open past process exit.
 	let mut child = ChildProcess::new("wrangler")
-		.with_args(["tail", watch.name().as_str(), "--format", "pretty"])
+		.with_args(["tail", name.as_str(), "--format", "pretty"])
 		.with_group(true)
 		.spawn()?;
-	if let Some(timeout) = watch.timeout() {
-		time_ext::sleep(*timeout).await;
+	if let Some(timeout) = timeout {
+		time_ext::sleep(timeout).await;
 		child.kill().ok();
 	} else {
 		child.status().await?;
@@ -771,18 +748,58 @@ pub async fn CloudflareWatchAction(
 	Pass(cx.input).xok()
 }
 
+impl CloudflareWatch {
+	/// Watch the named Worker.
+	pub fn new(name: impl Into<SmolStr>) -> Self {
+		Self {
+			name: name.into(),
+			timeout: PropOpt(None),
+		}
+	}
+}
+
 /// Tears down a Cloudflare deploy: deletes the Worker (and any container app +
 /// image), then empties and deletes its R2 bucket. Reads the sibling block
 /// (container or worker) for the names; mandatory for the teardown gate.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
+///
+/// `wrangler delete <worker>`, empty the bucket (deleting *every* object), then
+/// `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
+/// already-destroyed.
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(CloudflareDestroyAction)]
-pub struct CloudflareDestroy {
+pub async fn CloudflareDestroy(
 	/// Worker name to delete.
+	#[field]
 	name: SmolStr,
 	/// R2 bucket to empty + delete. Every object is removed regardless of prefix, so
 	/// no local-directory hint is needed to find the synced keys.
+	#[field]
 	bucket: SmolStr,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	info!("deleting worker `{name}`");
+	ChildProcess::new("wrangler")
+		.with_args(["delete", "--name", name.as_str(), "--force"])
+		.run_async()
+		.await
+		.ok();
+	// deleting the worker leaves the container application and its pushed
+	// managed-registry image behind (they are not cascade-deleted), so remove both
+	// explicitly or they keep billing.
+	delete_container_app(&name).await;
+	delete_container_images(&name).await;
+	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty bucket
+	// and `wrangler r2 object` cannot list, so clear *every* object (any prefix,
+	// eg `site/*` and `assets/*`) through the R2 S3 endpoint before deleting.
+	empty_bucket(&bucket).await?;
+	info!("deleting r2 bucket `{bucket}`");
+	ChildProcess::new("wrangler")
+		.with_args(["r2", "bucket", "delete", bucket.as_str()])
+		.run_async()
+		.await
+		.ok();
+	Pass(cx.input).xok()
 }
 
 impl CloudflareDestroy {
@@ -793,39 +810,6 @@ impl CloudflareDestroy {
 			bucket: bucket.into(),
 		}
 	}
-}
-
-/// `wrangler delete <worker>`, empty the bucket (deleting *every* object), then
-/// `wrangler r2 bucket delete <bucket>`. Missing resources are treated as
-/// already-destroyed.
-#[action]
-#[derive(Default, Component)]
-pub async fn CloudflareDestroyAction(
-	cx: ActionContext<Request>,
-) -> Result<Outcome<Request, Response>> {
-	let destroy = cx.caller.get_cloned::<CloudflareDestroy>().await?;
-	info!("deleting worker `{}`", destroy.name());
-	ChildProcess::new("wrangler")
-		.with_args(["delete", "--name", destroy.name().as_str(), "--force"])
-		.run_async()
-		.await
-		.ok();
-	// deleting the worker leaves the container application and its pushed
-	// managed-registry image behind (they are not cascade-deleted), so remove both
-	// explicitly or they keep billing.
-	delete_container_app(destroy.name()).await;
-	delete_container_images(destroy.name()).await;
-	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty bucket
-	// and `wrangler r2 object` cannot list, so clear *every* object (any prefix,
-	// eg `site/*` and `assets/*`) through the R2 S3 endpoint before deleting.
-	empty_bucket(destroy.bucket()).await?;
-	info!("deleting r2 bucket `{}`", destroy.bucket());
-	ChildProcess::new("wrangler")
-		.with_args(["r2", "bucket", "delete", destroy.bucket().as_str()])
-		.run_async()
-		.await
-		.ok();
-	Pass(cx.input).xok()
 }
 
 /// Delete the container application Cloudflare created for `worker_name`. Lists

@@ -6,53 +6,6 @@ use beet_core::prelude::*;
 /// Runs child actions in order until one passes.
 /// Returns the first [`Outcome::Pass`] immediately, otherwise returns
 /// [`Outcome::Fail`] with the latest input after all children are tried.
-#[derive(Debug, Component, Reflect)]
-#[require(FallbackAction<Input,Output>)]
-#[reflect(Component, Default)]
-pub struct Fallback<Input = (), Output = ()>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> (Input, Output)>,
-}
-
-impl<Input, Output> Clone for Fallback<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	fn clone(&self) -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-impl<Input, Output> Copy for Fallback<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-}
-
-impl<Input, Output> Default for Fallback<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-impl Fallback<(), ()> {
-	/// Create a default `Fallback<(), ()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Try children in order, returning the first pass or final fail.
 ///
 /// Child error handling is controlled by [`BypassErrors`].
 ///
@@ -61,9 +14,10 @@ impl Fallback<(), ()> {
 /// Errors depending on [`ChildError`] bypasses when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(default)]
-#[derive(Component)]
-pub async fn FallbackAction<Input, Output>(
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn Fallback<Input = (), Output = ()>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Output, Input>>
 where
@@ -95,6 +49,11 @@ where
 	}
 
 	Ok(Outcome::Fail(input))
+}
+
+impl Fallback {
+	/// Create a default `Fallback<(), ()>`.
+	pub fn new() -> Self { Self::default() }
 }
 
 #[cfg(test)]

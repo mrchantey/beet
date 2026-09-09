@@ -154,12 +154,12 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
 				build_fargate_binary(),
 				// the stores first: the ECR repo the push targets and the bucket
 				// the sync fills
-				TofuApply::default().with_layer("storage"),
+				TofuApply::for_layer("storage"),
 				// build and push Docker image (ECR repo now exists); the config
 				// component requires the action.
 				BuildDockerImage::default(),
 				// sync assets to S3
-				SyncS3BucketAction,
+				SyncS3Bucket::default(),
 				// roll the service, onto a pushed image and a filled bucket
 				TofuApply::default(),
 			],

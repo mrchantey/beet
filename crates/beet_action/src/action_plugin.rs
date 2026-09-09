@@ -40,13 +40,7 @@ impl Plugin for ActionPlugin {
 			// writes onto a driven body (via `AgentQuery`), and the typed velocity
 			// units its markup fields coerce from.
 			.register_type::<SetDrive>()
-			.register_type::<SetDriveAction>()
 			.register_type::<DifferentialDrive>()
-			// `DriveForDuration` is registered; its required `DriveForDurationAction` is not —
-			// the require inserts it at runtime (via ComponentId, no reflect needed), so a
-			// derived companion stays out of serialized scenes, and its short type path does
-			// not collide with beet_esp's own `perceive_act::DriveForDurationAction` in a
-			// pushed body scene.
 			.register_type::<DriveForDuration>()
 			.register_type::<LinearVelocity>()
 			.register_type::<AngularVelocity>()
@@ -74,7 +68,6 @@ impl Plugin for ActionPlugin {
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in
 		// scope here via glob.
 		#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::Command>()
-			.register_type::<CommandAction>();
+		app.register_type::<crate::prelude::Command>();
 	}
 }

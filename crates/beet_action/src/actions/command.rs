@@ -5,9 +5,8 @@ use beet_core::prelude::*;
 /// Runs an external process as a behaviour-tree step, streaming its stdout/stderr
 /// live to the terminal and failing (propagating an error) on a non-zero exit.
 ///
-/// A BSX-authorable config component: `exe` is required, `args`/`cwd`/`env` are
-/// optional. Pair it with its required [`CommandAction`] (added via `#[require]`),
-/// so a bare `<Command exe=".."/>` is enough to make the entity a runnable leaf.
+/// A BSX-authorable leaf: `exe` is required, `args`/`cwd`/`env` are optional, so
+/// a bare `<Command exe=".."/>` is enough to make the entity runnable.
 ///
 /// Output streams live because the child inherits the parent's stdio (see
 /// [`ChildProcess::spawn`]), which suits multi-minute builds where you want to
@@ -17,35 +16,68 @@ use beet_core::prelude::*;
 /// ```bsx
 /// <Command exe="cargo" args={["build","--release"]} cwd="crates/foo" env={["RUST_LOG=info"]}/>
 /// ```
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+///
+/// ## Errors
+/// - Errors if `exe` is empty.
+/// - Errors if the working directory cannot be resolved to an absolute path.
+/// - Errors if the process fails to spawn or exits non-zero.
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(CommandAction)]
-pub struct Command {
+pub async fn Command(
 	/// The executable to run, eg `"cargo"` or `"sh"`. Required; an empty `exe`
 	/// errors when the action runs.
+	#[field]
 	exe: SmolStr,
 	/// Arguments passed to `exe`, authored as `args={["build","--release"]}`.
-	#[set_with(skip)]
+	#[field]
 	args: Vec<SmolStr>,
 	/// Working directory for the child. Empty inherits the current directory; a
 	/// relative path resolves against the current directory, an absolute path is
 	/// used as-is.
+	#[field]
 	cwd: SmolStr,
 	/// Environment variables to set, each `"KEY=VALUE"`, authored as
 	/// `env={["KEY=val"]}`. These are added to (not replacing) the inherited env.
-	#[set_with(skip)]
+	#[field]
 	env: Vec<SmolStr>,
-}
-
-impl Default for Command {
-	fn default() -> Self {
-		Self {
-			exe: SmolStr::default(),
-			args: Vec::new(),
-			cwd: SmolStr::default(),
-			env: Vec::new(),
-		}
+) -> Result<Outcome> {
+	if exe.is_empty() {
+		bevybail!("`Command` requires a non-empty `exe`");
 	}
+
+	// build the process, parsing each `KEY=VALUE` env entry (an entry without a
+	// `=` sets the key to an empty value).
+	let mut proc =
+		ChildProcess::new(exe.clone()).with_args(args.iter().cloned());
+	if !env.is_empty() {
+		proc = proc.with_envs(env.iter().map(
+			|entry| match entry.split_once('=') {
+				Some((key, val)) => (key.to_string(), val.to_string()),
+				None => (entry.to_string(), String::new()),
+			},
+		));
+	}
+
+	// resolve a non-empty cwd to an absolute path (relative paths resolve against
+	// the current directory).
+	if !cwd.is_empty() {
+		let abs = if std::path::Path::new(cwd.as_str()).is_absolute() {
+			AbsPathBuf::new(cwd.as_str())?
+		} else {
+			AbsPathBuf::new(std::env::current_dir()?.join(cwd.as_str()))?
+		};
+		proc = proc.with_cwd(abs);
+	}
+
+	// spawn (inherits parent stdio, so output streams live) and wait.
+	info!("running: {proc}");
+	let mut handle = proc.spawn()?;
+	let status = handle.status().await?;
+	if !status.success() {
+		bevybail!("`{exe}` exited with {status}");
+	}
+	Outcome::PASS.xok()
 }
 
 impl Command {
@@ -74,59 +106,6 @@ impl Command {
 		self.env = env.into_iter().map(Into::into).collect();
 		self
 	}
-}
-
-/// Runs the caller's [`Command`]: spawns the process (inheriting stdio so its
-/// output streams live), waits for it to finish, and passes on a zero exit /
-/// errors on a non-zero exit.
-///
-/// ## Errors
-/// - Errors if the caller has no [`Command`] component.
-/// - Errors if `exe` is empty.
-/// - Errors if the working directory cannot be resolved to an absolute path.
-/// - Errors if the process fails to spawn or exits non-zero.
-#[action(default)]
-#[derive(Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn CommandAction(cx: ActionContext<()>) -> Result<Outcome> {
-	let cmd = cx.caller.get_cloned::<Command>().await?;
-	if cmd.exe.is_empty() {
-		bevybail!("`Command` requires a non-empty `exe`");
-	}
-
-	// build the process, parsing each `KEY=VALUE` env entry (an entry without a
-	// `=` sets the key to an empty value).
-	let mut proc =
-		ChildProcess::new(cmd.exe.clone()).with_args(cmd.args.iter().cloned());
-	if !cmd.env.is_empty() {
-		proc = proc.with_envs(cmd.env.iter().map(|entry| {
-			match entry.split_once('=') {
-				Some((key, val)) => (key.to_string(), val.to_string()),
-				None => (entry.to_string(), String::new()),
-			}
-		}));
-	}
-
-	// resolve a non-empty cwd to an absolute path (relative paths resolve against
-	// the current directory).
-	if !cmd.cwd.is_empty() {
-		let cwd = cmd.cwd.as_str();
-		let abs = if std::path::Path::new(cwd).is_absolute() {
-			AbsPathBuf::new(cwd)?
-		} else {
-			AbsPathBuf::new(std::env::current_dir()?.join(cwd))?
-		};
-		proc = proc.with_cwd(abs);
-	}
-
-	// spawn (inherits parent stdio, so output streams live) and wait.
-	info!("running: {proc}");
-	let mut handle = proc.spawn()?;
-	let status = handle.status().await?;
-	if !status.success() {
-		bevybail!("`{}` exited with {status}", cmd.exe);
-	}
-	Outcome::PASS.xok()
 }
 
 #[cfg(test)]

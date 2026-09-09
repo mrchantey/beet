@@ -13,76 +13,18 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(InsertOn::new(Name::new("bill")));
 /// ```
-#[derive(Debug, Clone, Component, Reflect)]
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(InsertOnAction<B>)]
-pub struct InsertOn<
-	B: 'static
-		+ Send
-		+ Sync
-		+ Bundle
-		+ Clone
-		+ Default
-		+ Reflect
-		+ FromReflect
-		+ TypePath,
-> {
+pub async fn InsertOn<B>(
 	/// The bundle to be cloned and inserted.
-	pub bundle: B,
+	#[field]
+	bundle: B,
 	/// Which entity to insert the bundle on.
-	pub target_entity: TargetEntity,
-}
-
-impl<
-	B: 'static
-		+ Send
-		+ Sync
-		+ Bundle
-		+ Clone
-		+ Reflect
-		+ FromReflect
-		+ TypePath
-		+ Default,
-> Default for InsertOn<B>
-{
-	fn default() -> Self { Self::new(B::default()) }
-}
-
-impl<
-	B: 'static
-		+ Send
-		+ Sync
-		+ Bundle
-		+ Clone
-		+ Default
-		+ Reflect
-		+ FromReflect
-		+ TypePath,
-> InsertOn<B>
-{
-	/// Insert `bundle` on the action entity itself.
-	pub fn new(bundle: B) -> Self {
-		Self {
-			bundle,
-			target_entity: TargetEntity::Action,
-		}
-	}
-	/// Insert `bundle` on the given [`TargetEntity`].
-	pub fn new_with_target(bundle: B, target_entity: TargetEntity) -> Self {
-		Self {
-			bundle,
-			target_entity,
-		}
-	}
-}
-
-/// Resolves the target, inserts the cloned bundle, then passes.
-///
-/// ## Errors
-/// Errors if the caller has no [`InsertOn`] component.
-#[action(default)]
-#[derive(Component)]
-pub async fn InsertOnAction<B>(cx: ActionContext) -> Result<Outcome>
+	#[field]
+	target_entity: TargetEntity,
+	cx: ActionContext,
+) -> Result<Outcome>
 where
 	B: 'static
 		+ Send
@@ -96,10 +38,39 @@ where
 {
 	let action = cx.caller.id();
 	let world = cx.world();
-	let insert_on = cx.caller.get_cloned::<InsertOn<B>>().await?;
-	let target = insert_on.target_entity.get_async(&world, action).await;
-	world.entity(target).insert(insert_on.bundle).await?;
+	let target = target_entity.get_async(&world, action).await;
+	world.entity(target).insert(bundle).await?;
 	Outcome::PASS.xok()
+}
+
+impl<B> InsertOn<B>
+where
+	B: 'static
+		+ Send
+		+ Sync
+		+ Bundle
+		+ Clone
+		+ Default
+		+ Reflect
+		+ FromReflect
+		+ TypePath,
+{
+	/// Insert `bundle` on the action entity itself.
+	pub fn new(bundle: B) -> Self {
+		Self {
+			bundle,
+			target_entity: TargetEntity::Action,
+			_marker: PhantomData,
+		}
+	}
+	/// Insert `bundle` on the given [`TargetEntity`].
+	pub fn new_with_target(bundle: B, target_entity: TargetEntity) -> Self {
+		Self {
+			bundle,
+			target_entity,
+			_marker: PhantomData,
+		}
+	}
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@
 //! `every_cycles`, advances to the next scene. The chosen scene's images populate a
 //! [`StringEnumOptions`] (via [`sync_image_options`]) so the model's
 //! `respond-multi-modal` `image` field is constrained to the scene's titles, and
-//! [`RespondMultiModalAction`] maps the chosen title to its url.
+//! [`RespondMultiModal`] maps the chosen title to its url.
 use super::*;
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
@@ -69,12 +69,10 @@ pub enum SceneOrder {
 /// the configured initial scene; each [`SceneRotation::every_cycles`] boundary
 /// appends the next character as a user turn. A no-op without a
 /// [`SceneRotation`] ancestor.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(Action<(), Outcome> = Action::new_async(rotate_scene_action))]
-pub struct RotateScene;
-
-async fn rotate_scene_action(cx: ActionContext) -> Result<Outcome> {
+pub async fn RotateScene(cx: ActionContext) -> Result<Outcome> {
 	maybe_rotate_scene(&cx.caller).await?;
 	Ok(Pass(()))
 }

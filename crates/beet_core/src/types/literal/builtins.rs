@@ -101,7 +101,7 @@ fn add_strings(table: &mut Table) {
 	table
 		.add_str(|string| string.to_string())
 		.add_str(|string| SmolStr::new(string))
-		// a tuple/struct literal carrying a string (eg `<Log::Message("hi")/>`,
+		// a tuple/struct literal carrying a string (eg `<LogLike::Message("hi")/>`,
 		// whose variant field is a `Cow`) reflect-applies instead of panicking
 		// on the `String`->`Cow` mismatch.
 		.add_str(|string| {

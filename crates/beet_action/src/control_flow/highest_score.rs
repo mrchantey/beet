@@ -17,45 +17,15 @@ use beet_core::prelude::*;
 /// 	(ScoreProvider::<()>::fixed(Score::PASS), Action::<(), Outcome>::new_fixed(Outcome::PASS)),
 /// ]));
 /// ```
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(HighestScoreAction<Input,Output>)]
-#[reflect(Component, Default)]
-pub struct HighestScore<Input = (), Output = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> (Input, Output)>,
-}
-
-impl<Input, Output> Default for HighestScore<Input, Output>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl HighestScore {
-	/// Create a default `HighestScore<(), ()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Scores every child via its [`ScoreProvider`] or fixed [`Score`], then runs
-/// the highest scorer.
 ///
 /// ## Errors
 ///
 /// Errors if the selector has no children to score, or a child has neither a
 /// [`ScoreProvider`] nor a [`Score`].
-#[action(default)]
-#[derive(Component)]
-pub async fn HighestScoreAction<Input, Output>(
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn HighestScore<Input = (), Output = ()>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
@@ -106,6 +76,11 @@ where
 		.entity(winner)
 		.call::<Input, Outcome<Input, Output>>(input)
 		.await
+}
+
+impl HighestScore {
+	/// Create a default `HighestScore<(), ()>`.
+	pub fn new() -> Self { Self::default() }
 }
 
 #[cfg(test)]

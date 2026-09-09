@@ -18,7 +18,7 @@ use beet_router::prelude::*;
 /// commanded duration, then stop.
 ///
 /// Authors the agent-chosen [`DriveForDuration`] as an action of the fox, which brings the
-/// canonical [`DriveForDurationAction`] — the `SetDrive` + `EndInDuration` + `SetDrive(0, 0)`
+/// canonical [`DriveForDuration`] — the `SetDrive` + `EndInDuration` + `SetDrive(0, 0)`
 /// step that drives this fox and (v3) the real robot off the one command. Shares the `drive`
 /// route + [`DriveForDuration`] input with the mock [`LogDriveForDuration`](super::LogDriveForDuration); this
 /// is "the mock plus the actual effect".
@@ -46,7 +46,7 @@ pub async fn DriveFox(cx: ActionContext<DriveForDuration>) -> Result<()> {
 		return Ok(());
 	};
 	// author the command as an action of the fox: `DriveForDuration` brings the canonical
-	// `DriveForDurationAction`, which drives the fox for the duration then stops. Despawned
+	// `DriveForDuration`, which drives the fox for the duration then stops. Despawned
 	// after so steps never stack.
 	let step = world.spawn((ActionOf(fox), command)).await;
 	step.call::<(), Outcome>(()).await?;

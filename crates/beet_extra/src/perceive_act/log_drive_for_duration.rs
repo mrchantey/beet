@@ -2,7 +2,7 @@
 //! [`DriveForDuration`] for tests rather than moving anything. The agent's local `drive`
 //! fallback and the v1 mock body both serve `drive` with it; a real body drives instead —
 //! the wgpu body (v2) via [`DriveFox`](super::DriveFox), the esp robot via its own handler,
-//! both applying the same [`DriveForDuration`] through the canonical `DriveForDurationAction`.
+//! both applying the same [`DriveForDuration`] through the canonical [`DriveForDuration`].
 use crate::beet::prelude::*;
 use beet_core::prelude::*;
 
@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// so a test can assert the velocity and the (clamped) duration the agent chose.
 ///
 /// A record, not a command: the real [`DriveForDuration`] carries the canonical
-/// `DriveForDurationAction`, which would claim the route entity's one action slot.
+/// `DriveForDuration`, which would claim the route entity's one action slot.
 #[derive(Debug, Clone, Copy, PartialEq, Deref, Component, Reflect)]
 #[reflect(Component)]
 pub struct LoggedDrive(pub DriveForDuration);
@@ -22,7 +22,7 @@ pub struct LoggedDrive(pub DriveForDuration);
 /// tests can assert both the velocity and the (clamped) duration the agent chose. A real
 /// body applies the command instead: the wgpu body (v2) through
 /// [`DriveFox`](super::DriveFox), the esp robot through its own handler — both drive the
-/// shared [`DriveForDuration`] via the canonical `DriveForDurationAction`.
+/// shared [`DriveForDuration`] via the canonical [`DriveForDuration`].
 #[action(route = "drive")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]

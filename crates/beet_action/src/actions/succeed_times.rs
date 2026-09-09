@@ -5,8 +5,9 @@ use beet_core::prelude::*;
 /// Threads the input through as [`Outcome::Pass`] up to `max_times`, then
 /// returns [`Outcome::Fail`] with the input.
 ///
-/// A debugging utility, the run count is stored on the component. Generic
-/// over the threaded value `T`, which defaults to `()`.
+/// A debugging utility, the run count is stored on the component and bumped in
+/// place through a `#[field(mut)]` binding. Generic over the threaded value
+/// `T`, which defaults to `()`.
 ///
 /// # Example
 /// ```
@@ -15,19 +16,27 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(SucceedTimes::new(2));
 /// ```
-#[derive(Debug, Clone, Component, Reflect)]
-#[require(SucceedTimesAction<T>)]
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct SucceedTimes<T = ()>
+pub fn SucceedTimes<T = ()>(
+	/// The number of times to succeed.
+	#[field]
+	max_times: u32,
+	/// The number of times this action has been run.
+	#[field(mut)]
+	times: u32,
+	cx: In<ActionContext<T>>,
+) -> Result<Outcome<T, T>>
 where
 	T: 'static + Send + Sync + Clone,
 {
-	/// The number of times to succeed.
-	pub max_times: u32,
-	/// The number of times this action has been run.
-	pub times: u32,
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> T>,
+	if *times < max_times {
+		*times += 1;
+		Ok(Outcome::Pass(cx.input))
+	} else {
+		Ok(Outcome::Fail(cx.input))
+	}
 }
 
 impl SucceedTimes<()> {
@@ -46,44 +55,6 @@ where
 			times: 0,
 			_marker: PhantomData,
 		}
-	}
-}
-
-impl<T> Default for SucceedTimes<T>
-where
-	T: 'static + Send + Sync + Clone,
-{
-	fn default() -> Self { Self::typed(0) }
-}
-
-/// Increments the run count, threading the input as [`Outcome::Pass`] until
-/// `max_times` is reached, then [`Outcome::Fail`].
-///
-/// ## Errors
-/// Errors if the caller has no [`SucceedTimes`] component.
-#[action(default)]
-#[derive(Component)]
-pub async fn SucceedTimesAction<T>(
-	cx: ActionContext<T>,
-) -> Result<Outcome<T, T>>
-where
-	T: 'static + Send + Sync + Clone,
-{
-	let passed = cx
-		.caller
-		.get_mut::<SucceedTimes<T>, _>(|mut action| {
-			if action.times < action.max_times {
-				action.times += 1;
-				true
-			} else {
-				false
-			}
-		})
-		.await?;
-	if passed {
-		Ok(Outcome::Pass(cx.input))
-	} else {
-		Ok(Outcome::Fail(cx.input))
 	}
 }
 

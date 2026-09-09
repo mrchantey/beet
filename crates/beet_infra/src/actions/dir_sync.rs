@@ -64,7 +64,7 @@ impl DirSync {
 }
 
 /// Observer: resolve the declared bucket into the [`S3FsStore`]
-/// [`SyncS3BucketAction`] reads. Deferred through the command queue because the
+/// [`SyncS3Bucket`] reads. Deferred through the command queue because the
 /// ancestry a scope resolves against lands with the rest of the scene.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(

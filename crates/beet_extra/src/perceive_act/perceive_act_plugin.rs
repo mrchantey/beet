@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 
 /// Adds the agent-thread runtime + chat UI and the capability-binding glue, and
 /// registers the perceive-act tools and their state, so a `examples/perceive_act/*.bsx`
-/// scene runs and its `<TakePhoto/>`, `<RespondMultiModalAction/>`, `<SpeakText/>`,
+/// scene runs and its `<TakePhoto/>`, `<RespondMultiModal/>`, `<SpeakText/>`,
 /// `<LogDriveForDuration/>` and `<ShowImage/>` tags resolve from markup, and the camera
 /// turn rotates scenes via `{SceneRotation}` on the router.
 pub struct PerceiveActPlugin;
@@ -20,7 +20,6 @@ impl Plugin for PerceiveActPlugin {
 			.init_resource::<RandomSource>()
 			.register_type::<TakePhoto>()
 			.register_type::<PostPhoto>()
-			.register_type::<RespondMultiModalAction>()
 			.register_type::<RespondMultiModal>()
 			.register_type::<SpeakText>()
 			.register_type::<LogDriveForDuration>()
@@ -57,7 +56,7 @@ mod test {
 		app.add_plugins(MinimalPlugins)
 			.init_plugin::<ThreadPlugin>();
 		app.world_mut().spawn(children![
-			RespondMultiModalAction,
+			RespondMultiModal::default(),
 			SpeakText,
 			LogDriveForDuration,
 			ShowImage

@@ -2,7 +2,7 @@ use beet_core::prelude::*;
 
 /// The infra runtime + the deploy block/action type registrations, so adding
 /// `InfraPlugin` makes every compiled deploy type spawnable by tag (eg
-/// `<CloudflareWorkerBlock/>`, `<TofuApplyAction/>`) independent of the example
+/// `<CloudflareWorkerBlock/>`, `<TofuApply/>`) independent of the example
 /// wiring. Each `register_type` is gated by the same feature as the type's
 /// definition, so only the types actually compiled register.
 ///
@@ -243,16 +243,14 @@ impl Plugin for InfraPlugin {
 		// and the zone edge setup/purge (the whole `actions` module is gated on
 		// `deploy`, and is native-only).
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::TofuApplyAction>()
-			.register_type::<crate::prelude::TofuApply>()
+		app.register_type::<crate::prelude::TofuApply>()
 			.register_type::<crate::prelude::CloudflareZoneSetup>()
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
 		// the create-if-missing secret step, which every stack holding a
 		// generated credential runs before its apply.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::EnsureSecret>()
-			.register_type::<crate::prelude::EnsureSecretAction>();
+		app.register_type::<crate::prelude::EnsureSecret>();
 
 		// the mail stack's deploy verbs: the sovereign signing key minted
 		// before the apply that publishes it, the comail enrolment check that
@@ -337,9 +335,7 @@ impl Plugin for InfraPlugin {
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::LightsailRelease>()
-			.register_type::<crate::prelude::LightsailReleaseAction>()
-			.register_type::<crate::prelude::LightsailRestart>()
-			.register_type::<crate::prelude::LightsailRestartAction>();
+			.register_type::<crate::prelude::LightsailRestart>();
 
 		// the docker/podman image build action + its engine selector. It lives in
 		// the `actions` module, so it is `deploy`-gated and native-only like the
@@ -594,10 +590,11 @@ mod test {
 			</Fragment>"#,
 		);
 		let secret = world.query::<&EnsureSecret>().single(&world).unwrap();
-		secret.secret().label().as_str().xpect_eq("db-password");
+		secret.secret.label().as_str().xpect_eq("db-password");
 		secret
-			.variable()
+			.variable
 			.clone()
+			.into_inner()
 			.unwrap()
 			.as_str()
 			.xpect_eq("db_password");

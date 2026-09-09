@@ -162,18 +162,15 @@ impl IntoResponseWithRequestParts<Self> for PageRequest {
 }
 
 /// Serves bytes from the ancestor [`BlobStore`] parsed into a render tree.
+#[action(route, handler_only)]
 #[derive(Component, Reflect)]
-#[require(BlobSceneAction)]
-pub struct BlobScene {
+#[reflect(Component, Default)]
+pub async fn BlobScene(
+	/// The store-relative path of the file this route serves.
+	#[field]
 	path: SmolPath,
-}
-impl BlobScene {
-	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
-}
-
-#[action(route)]
-#[derive(Default, Component)]
-async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
+	cx: ActionContext<Request>,
+) -> Result<PageRequest> {
 	// the nearest ancestor store backs this page's bytes; absent is an error, never
 	// an implicit filesystem store (there is none on wasm).
 	let store = cx
@@ -183,7 +180,6 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 		)
 		.await??;
 
-	let path = cx.caller.get::<BlobScene, _>(|fs| fs.path.clone()).await?;
 	// the in-tree route anchor and the request being served, threaded into the
 	// render context the content builds under (below)
 	let route = cx.caller.id();
@@ -249,4 +245,9 @@ async fn BlobSceneAction(cx: ActionContext<Request>) -> Result<PageRequest> {
 			)
 		})
 		.await
+}
+
+impl BlobScene {
+	/// Serve the store file at `path`.
+	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
 }

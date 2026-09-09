@@ -211,7 +211,7 @@ pub(super) fn build_patch(
 	}
 	// only a struct target can be represented by this `DynamicStruct`. A
 	// tuple-struct/enum target (a tag-position literal like `<Name("x")/>` or
-	// `<Log::Message("hi")/>`) builds from the literal instead, so this attribute
+	// `<LogLike::Message("hi")/>`) builds from the literal instead, so this attribute
 	// patch is unused; setting its represented type to a non-struct would panic.
 	if struct_info.is_some() {
 		patch.set_represented_type(Some(type_info));

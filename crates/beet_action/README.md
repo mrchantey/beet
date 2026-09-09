@@ -6,7 +6,7 @@ An [`Action`] component turns an entity into a function: `call` runs its handler
 
 An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor (`ActionMeta` is immutable, so every change is an insert consumers can observe), and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector. `ActionOf` / `Actions` mean agent targeting and nothing else.
 
-A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
+A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. A component declaring an `on_add` of its own keeps it: bevy allows one hook per event and silently takes the last, so the macro chains the author's ahead of the guard rather than emitting a second attribute. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
 
 ```rust
 # use beet_core::prelude::*;
@@ -46,6 +46,43 @@ async fn Greet(cx: ActionContext<String>) -> String {
 	format!("Hello, {}!", cx.value())
 }
 ```
+
+## Fields: one type per action
+
+A `#[field]` parameter becomes a field on the emitted struct, sharing its grammar with `#[template]`'s `#[prop]`, so an action needing per-entity config is one type rather than a data component plus a handler twin:
+
+```rust,ignore
+#[action]
+#[derive(Component, Reflect)]
+#[reflect(Component, Default)]
+async fn RepeatTimes<Input = ()>(
+	/// Maximum number of iterations.
+	#[field]
+	total_times: u32,
+	cx: ActionContext<Input>,
+) -> Result<Outcome>
+where
+	Input: 'static + Send + Sync + Clone,
+{
+	// `total_times` is bound before the body runs
+}
+```
+
+Fields are read **live off the caller** at call time, so a value edited between calls is observed and a missing component is a loud error naming the type — never a silent default. Each flavor reads them its own way: an async action clones `Self` off the caller, a system action gains a `Query<&Self>` (`&mut Self` when any field is `#[field(mut)]`) beside the author's system params, and a pure action lowers that plumbing to a system, since a pure body cannot reach the world.
+
+The grammar, in full:
+
+- bare `#[field]` — optional, defaults by type
+- `#[field(default = expr)]` — optional, defaults to `expr`, forcing a generated `Default`
+- an `Option<T>` field — stored as `PropOpt<T>`, bound back to `Option<T>` in the body
+- `#[field(required)]` — stored as `PropOpt<T>`, validated at call time, erroring by field name
+- `#[field(mut)]` — a mutable binding, so the body edits its own config in place
+
+`into_action` detaches the action from any entity, so it captures the field values at conversion. Two flavors cannot: a system action, because bevy refuses to cache a non-ZST system, and a middleware action, whose component genuinely lives on the live host entity the call names as caller. Both keep the live-fetching wrapper. A `#[field(mut)]` action emits no `IntoAction` at all, since a detached action has nothing to write back to; `mut` on an `async fn` is a compile error, because mutable component access cannot cross an await (do it at a sync point with `cx.caller.get_mut`).
+
+The macro emits no constructors: where `Foo::new(..)` earns its keep, write a plain `impl` block beside the action. A generic action gains a `pub _marker: PhantomData<fn() -> T>` field and a perfect-derive `Clone`, so its type params are never spuriously bounded. Reflection metadata follows the types: a generic action whose `Self`/`In`/`Out` are not `Typed` declares `#[action(plain_meta)]`, and one whose input alone is not `Typed` declares `#[action(handler_only)]`.
+
+Hand-written pairs remain permitted — the merge removes the *forced* two-type pattern, not the ability to write a provider. [`BuildArtifact`](../beet_infra) keeps one because its type must exist in builds its action does not.
 
 ## Long-running work: facets
 

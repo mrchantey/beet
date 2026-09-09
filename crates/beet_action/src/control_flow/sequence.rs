@@ -10,28 +10,40 @@ use beet_core::prelude::*;
 /// Unlike [`Parallel`] or [`Repeat`], a sequence threads its input by move
 /// and so does **not** require `Input: Clone`. For a variant that always
 /// passes regardless of child results see [`InfallibleSequence`].
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(SequenceAction<Input,Output>)]
+///
+/// Child error handling is controlled by [`BypassErrors`].
+///
+/// ## Errors
+///
+/// Errors depending on [`ChildError`] flags when a child has:
+/// - no [`ActionMeta`]
+/// - incompatible [`ActionMeta`] signature
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct Sequence<Input = (), Output = ()>
+pub async fn Sequence<Input = (), Output = ()>(
+	cx: ActionContext<Input>,
+) -> Result<Outcome<Input, Output>>
 where
 	Input: 'static + Send + Sync,
 	Output: 'static + Send + Sync,
 {
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> (Input, Output)>,
-}
+	let children = valid_children::<Input, Output>(&cx).await?;
+	let world = cx.world();
+	let mut input = cx.input;
 
-impl<Input, Output> Default for Sequence<Input, Output>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
+	for child in children {
+		match world
+			.entity(child)
+			.call::<Input, Outcome<Input, Output>>(input)
+			.await?
+		{
+			Outcome::Pass(next_input) => input = next_input,
+			Outcome::Fail(output) => return Ok(Outcome::Fail(output)),
 		}
 	}
+
+	Ok(Outcome::Pass(input))
 }
 
 impl Sequence {
@@ -59,79 +71,12 @@ where
 	.await
 }
 
-/// Runs children in order, returning the first [`Outcome::Fail`] immediately.
-/// Returns [`Outcome::Pass`] only if all compatible children pass.
-///
-/// Child error handling is controlled by [`BypassErrors`].
-///
-/// ## Errors
-///
-/// Errors depending on [`ChildError`] flags when a child has:
-/// - no [`ActionMeta`]
-/// - incompatible [`ActionMeta`] signature
-#[action(default)]
-#[derive(Component)]
-pub async fn SequenceAction<Input, Output>(
-	cx: ActionContext<Input>,
-) -> Result<Outcome<Input, Output>>
-where
-	Input: 'static + Send + Sync,
-	Output: 'static + Send + Sync,
-{
-	let children = valid_children::<Input, Output>(&cx).await?;
-	let world = cx.world();
-	let mut input = cx.input;
-
-	for child in children {
-		match world
-			.entity(child)
-			.call::<Input, Outcome<Input, Output>>(input)
-			.await?
-		{
-			Outcome::Pass(next_input) => input = next_input,
-			Outcome::Fail(output) => return Ok(Outcome::Fail(output)),
-		}
-	}
-
-	Ok(Outcome::Pass(input))
-}
-
 /// Sequence variant that always [`Outcome::Pass`]es.
 ///
 /// Runs every child in order with a clone of the original input, ignoring
 /// child failures, then returns [`Outcome::Pass`] with that input. Because
 /// each child receives the same input it requires `Input: Clone`; for the
 /// threading, fail-fast variant use [`Sequence`].
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-#[require(InfallibleSequenceAction<Input,Output>)]
-#[reflect(Component, Default)]
-pub struct InfallibleSequence<Input = (), Output = ()>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	#[reflect(ignore)]
-	_marker: PhantomData<fn() -> (Input, Output)>,
-}
-
-impl<Input, Output> Default for InfallibleSequence<Input, Output>
-where
-	Input: 'static + Send + Sync + Clone,
-	Output: 'static + Send + Sync,
-{
-	fn default() -> Self {
-		Self {
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl InfallibleSequence {
-	/// Create a default `InfallibleSequence<(), ()>`.
-	pub fn new() -> Self { Self::default() }
-}
-
-/// Runs every child once, ignoring failures, then passes with the input.
 ///
 /// Child error handling is controlled by [`BypassErrors`].
 ///
@@ -140,9 +85,10 @@ impl InfallibleSequence {
 /// Errors depending on [`ChildError`] flags when a child has:
 /// - no [`ActionMeta`]
 /// - incompatible [`ActionMeta`] signature
-#[action(default)]
-#[derive(Component)]
-pub async fn InfallibleSequenceAction<Input, Output>(
+#[action(plain_meta)]
+#[derive(Debug, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn InfallibleSequence<Input = (), Output = ()>(
 	cx: ActionContext<Input>,
 ) -> Result<Outcome<Input, Output>>
 where
@@ -162,6 +108,11 @@ where
 	}
 
 	Ok(Outcome::Pass(input))
+}
+
+impl InfallibleSequence {
+	/// Create a default `InfallibleSequence<(), ()>`.
+	pub fn new() -> Self { Self::default() }
 }
 
 #[cfg(test)]

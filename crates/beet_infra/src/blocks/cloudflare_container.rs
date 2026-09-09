@@ -4,7 +4,7 @@
 //! Cloudflare is provisioned with the `wrangler` CLI (first-class
 //! `r2 bucket`/`deploy`/`delete`), not OpenTofu, so the block is a plain config
 //! component the Cloudflare deploy actions read (mirroring how
-//! [`BuildDockerImageAction`](crate::prelude::BuildDockerImageAction) reads its
+//! [`BuildDockerImage`](crate::prelude::BuildDockerImage) reads its
 //! sibling [`BuildDockerImage`](crate::prelude::BuildDockerImage)).
 //!
 //! The surface mirrors [`FargateBlock`](crate::prelude::FargateBlock) (a name,

@@ -478,7 +478,7 @@ mod test {
 
 	#[beet_core::test]
 	fn reflect_meta_has_type_info() {
-		let meta = ActionMeta::of_reflect::<add, add>();
+		let meta = ActionMeta::of_reflect::<add, (u32, u32), u32>();
 		meta.type_info().xpect_some();
 		meta.input_info().xpect_some();
 		meta.output_info().xpect_some();

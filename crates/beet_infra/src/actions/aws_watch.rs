@@ -3,21 +3,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Tails the CloudWatch logs of a [`WatchTarget`], resolved against the nearest
-/// ancestor [`Stack`] when the tail runs, so a watch verb declares WHAT it
-/// follows and never restates the app identity.
-#[derive(Debug, Clone, Default, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(AwsWatchAction)]
-pub struct AwsWatch {
-	/// Which deployed thing's logs to follow.
-	target: WatchTarget,
-	/// Optional timeout after which the tail process is killed.
-	/// When `None`, follows indefinitely until interrupted.
-	#[set_with(unwrap_option)]
-	timeout: Option<Duration>,
-}
-
 /// The log group a watch follows, named by the deploy target rather than by the
 /// provider's string, so the group is composed from the resolved [`Stack`] at
 /// tail time.
@@ -62,36 +47,50 @@ impl WatchTarget {
 }
 
 impl AwsWatch {
+	/// Follow a literal CloudWatch log group.
 	pub fn new(log_group: impl Into<SmolStr>) -> Self {
-		Self {
-			target: WatchTarget::LogGroup(log_group.into()),
-			timeout: None,
-		}
+		Self::for_target(WatchTarget::LogGroup(log_group.into()))
 	}
 
+	/// Follow the group `target` resolves to.
 	pub fn for_target(target: WatchTarget) -> Self {
 		Self {
 			target,
-			timeout: None,
+			timeout: PropOpt(None),
 		}
+	}
+
+	/// Kill the tail after `timeout`, rather than following indefinitely.
+	pub fn with_timeout(mut self, timeout: Duration) -> Self {
+		self.timeout = PropOpt(Some(timeout));
+		self
 	}
 }
 
-/// Tails CloudWatch logs via `aws logs tail --follow`.
-/// Reads the log group from the sibling [`AwsWatch`] component
-/// and the AWS region from the nearest ancestor [`Stack`].
-#[action]
-#[derive(Default, Component)]
-pub async fn AwsWatchAction(
+/// Tails the CloudWatch logs of a [`WatchTarget`], resolved against the nearest
+/// ancestor [`Stack`] when the tail runs, so a watch verb declares WHAT it
+/// follows and never restates the app identity.
+///
+/// Tails via `aws logs tail --follow`, reading the AWS region from the nearest
+/// ancestor [`Stack`].
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn AwsWatch(
+	/// Which deployed thing's logs to follow.
+	#[field]
+	target: WatchTarget,
+	/// Optional timeout after which the tail process is killed.
+	/// When absent, follows indefinitely until interrupted.
+	#[field]
+	timeout: Option<Duration>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let watch = cx.caller.get_cloned::<AwsWatch>().await?;
-	let timeout = *watch.timeout();
 	let (region, log_group) = cx
 		.caller
 		.with_state::<StackQuery, _>(move |entity, query| {
 			let stack = query.resolve(entity);
-			(stack.region().clone(), watch.target().log_group(&stack))
+			(stack.region().clone(), target.log_group(&stack))
 		})
 		.await?;
 

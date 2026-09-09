@@ -1,13 +1,12 @@
 //! Debug logging leaf action.
 use crate::prelude::*;
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 /// Logs a message when called, then returns [`Outcome::PASS`].
 ///
-/// Folds the old `LogOnRun` and `LogNameOnRun` into a single action:
-/// [`Log::Message`] logs a fixed string, [`Log::Name`] logs the caller's
-/// [`Name`]. Logs at info level via the `log` crate, visible on every platform.
+/// With a `message` it logs that string, otherwise it names the caller: its
+/// [`Name`] when it has one, else its entity id. Logs at info level via the
+/// `log` crate, visible on every platform.
 ///
 /// # Example
 /// ```
@@ -16,46 +15,32 @@ use beet_core::prelude::*;
 /// # let mut world = AsyncPlugin::world();
 /// world.spawn(Log::new("running..."));
 /// ```
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[require(LogAction)]
+#[action]
+#[derive(Debug, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub enum Log {
-	/// Log a fixed message.
-	Message(Cow<'static, str>),
-	/// Log the caller's [`Name`].
-	Name,
-}
-
-impl Default for Log {
-	fn default() -> Self { Self::Name }
+pub async fn Log(
+	/// The message to log; absent names the caller instead.
+	#[field]
+	message: Option<SmolStr>,
+	cx: ActionContext,
+) -> Result<Outcome> {
+	match message {
+		Some(message) => info!("{message}"),
+		None => match cx.caller.get(|name: &Name| name.to_string()).await {
+			Ok(name) => info!("Running: {name}"),
+			Err(_) => info!("Running: {}", cx.id()),
+		},
+	}
+	Outcome::PASS.xok()
 }
 
 impl Log {
-	/// Create a [`Log::Message`] from anything string-like.
-	pub fn new(message: impl Into<Cow<'static, str>>) -> Self {
-		Self::Message(message.into())
-	}
-}
-
-/// Logs per the [`Log`] component, then passes.
-///
-/// ## Errors
-/// Errors if the caller has no [`Log`] component.
-#[action(default)]
-#[derive(Component)]
-pub async fn LogAction(cx: ActionContext) -> Result<Outcome> {
-	match cx.caller.get_cloned::<Log>().await? {
-		Log::Message(message) => info!("{message}"),
-		Log::Name => {
-			let name = cx
-				.caller
-				.get(|name: &Name| name.to_string())
-				.await
-				.unwrap_or_else(|_| "<unnamed>".to_string());
-			info!("Running: {name}");
+	/// Log a fixed message.
+	pub fn new(message: impl Into<SmolStr>) -> Self {
+		Self {
+			message: PropOpt(Some(message.into())),
 		}
 	}
-	Outcome::PASS.xok()
 }
 
 #[cfg(test)]
@@ -72,10 +57,27 @@ mod tests {
 			.xpect_eq(Outcome::PASS);
 	}
 
+	/// Fields are read off the caller at call time, so a component removed out
+	/// from under its own action fails loudly naming the type, never silently
+	/// logging a default.
+	#[beet_core::test]
+	async fn missing_component_errors() {
+		let mut world = AsyncPlugin::world();
+		let entity = world.spawn(Log::new("hello")).id();
+		world.entity_mut(entity).remove::<Log>();
+		world
+			.entity_mut(entity)
+			.call::<(), Outcome>(())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("Log");
+	}
+
 	#[beet_core::test]
 	async fn name_passes() {
 		AsyncPlugin::world()
-			.spawn((Name::new("root"), Log::Name))
+			.spawn((Name::new("root"), Log::default()))
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()

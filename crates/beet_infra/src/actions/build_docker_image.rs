@@ -26,51 +26,23 @@ impl ContainerEngine {
 	}
 }
 
-/// Configuration for building Docker/Podman images. Builds + pushes the image as
-/// part of a deploy sequence, so it requires its [`BuildDockerImageAction`].
+/// Builds and pushes a container image to ECR for Fargate deployment.
+/// Looks for a [`BuildArtifact`] sibling to find the binary to containerize,
+/// and a [`FargateBlock`] sibling for the ECR repository name and the `CMD`
+/// bootstrap config.
 ///
 /// The image `CMD` is not configured here: it is rendered from the sibling
 /// [`FargateBlock`]'s [`BootstrapConfig`], so the deployed binary's argv and the
 /// task definition's env come from one declaration.
-#[derive(Debug, Default, Clone, Component, Serialize, Deserialize, Reflect)]
+#[action(handler_only)]
+#[derive(Debug, Default, Component, Serialize, Deserialize, Reflect)]
 #[reflect(Component, Default)]
-#[require(BuildDockerImageAction)]
-pub struct BuildDockerImage {
+pub async fn BuildDockerImage(
 	/// Container engine to use (Docker or Podman).
-	pub engine: ContainerEngine,
-}
-
-impl BuildDockerImage {
-	/// Create with Docker engine.
-	pub fn with_docker() -> Self {
-		Self {
-			engine: ContainerEngine::Docker,
-		}
-	}
-
-	/// Create with Podman engine.
-	pub fn with_podman() -> Self {
-		Self {
-			engine: ContainerEngine::Podman,
-		}
-	}
-}
-
-/// Builds and pushes a container image to ECR for Fargate deployment.
-/// Looks for a [`BuildArtifact`] sibling to find the binary to containerize,
-/// and a [`FargateBlock`] sibling for the ECR repository name and the `CMD`
-/// bootstrap config. Reads its own [`BuildDockerImage`] for the engine, so the
-/// config component requires this action (not the reverse, which would cycle),
-/// eg `<BuildDockerImage/>` spawns both.
-#[action]
-#[derive(Default, Component)]
-pub async fn BuildDockerImageAction(
+	#[field]
+	engine: ContainerEngine,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// get the container engine + run configuration
-	let docker_config = cx.caller.get_cloned::<BuildDockerImage>().await?;
-	let engine = docker_config.engine;
-
 	// the resolved stack (region, resource names) and this launch's deploy id
 	let (stack, deployment) = cx
 		.caller
@@ -292,6 +264,22 @@ async fn ensure_ecr_repository(region: &str, repo_name: &str) -> Result {
 				"ECR repository {repo_name} does not exist. Run Terraform apply \
 				 first to create infrastructure."
 			)
+		}
+	}
+}
+
+impl BuildDockerImage {
+	/// Create with Docker engine.
+	pub fn with_docker() -> Self {
+		Self {
+			engine: ContainerEngine::Docker,
+		}
+	}
+
+	/// Create with Podman engine.
+	pub fn with_podman() -> Self {
+		Self {
+			engine: ContainerEngine::Podman,
 		}
 	}
 }

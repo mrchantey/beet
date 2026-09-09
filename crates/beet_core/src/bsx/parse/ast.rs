@@ -30,12 +30,12 @@ pub enum BsxNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BsxElement {
 	/// The raw tag text, ie `div`, `MyTemplate`, `path::to::X`, `Slot`. For a
-	/// tag-position literal (`<Name("x")/>`, `<Log::Message("hi")/>`) this is the
+	/// tag-position literal (`<Name("x")/>`, `<LogLike::Message("hi")/>`) this is the
 	/// base component name (`Name`, `Log`), with the full literal in
 	/// [`tag_literal`](Self::tag_literal).
 	pub tag: String,
 	/// A tag-position component literal, ie `<Name("Malenia")/>`,
-	/// `<Log::Message("running")/>`, `<Greet{name:"world"}/>`. Resolved exactly
+	/// `<LogLike::Message("running")/>`, `<Greet{name:"world"}/>`. Resolved exactly
 	/// like the `{..}` spread position, building the component from the literal
 	/// rather than over `Default::default()`. `None` for a bare tag like
 	/// `<Sequence>`.

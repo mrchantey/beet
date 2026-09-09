@@ -12,6 +12,6 @@ exactly twice.
 <Repeat {CallOnReady}>
 	<Sequence>
 		<SucceedTimes{max_times:2}/>
-		<Log::Message("doing work")/>
+		<Log message="doing work"/>
 	</Sequence>
 </Repeat>

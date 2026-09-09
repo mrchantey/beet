@@ -22,6 +22,17 @@ impl<In> ActionContext<In> {
 
 	pub fn world(&self) -> AsyncWorld { self.caller.world().clone() }
 
+	/// The error a `#[field]` action raises when its own component is absent
+	/// from the caller: fields are read live at call time, so a missing
+	/// component is a loud failure rather than a silent default.
+	pub fn missing_component<T>(&self) -> BevyError {
+		bevyhow!(
+			"Component not found: {} on caller {}",
+			core::any::type_name::<T>(),
+			self.id()
+		)
+	}
+
 	/// Map the input to a different type, keeping the same caller.
 	pub fn map_input<NewIn>(self, input: NewIn) -> ActionContext<NewIn> {
 		ActionContext {

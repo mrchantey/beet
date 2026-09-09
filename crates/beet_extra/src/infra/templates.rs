@@ -88,7 +88,7 @@ pub fn SiteSync(
 /// An **opinionated** block for websites built with lambda.
 /// `<LambdaSiteBlock features="lambda,aws_sdk"/>` — the lambda deploy block plus
 /// its build artifact, on one entity. They share an entity because
-/// `TofuApplyAction` pairs the `BuildArtifact` with the block on the same entity
+/// `TofuApply` pairs the `BuildArtifact` with the block on the same entity
 /// to upload it under the block's label, the S3 key the lambda reads its code
 /// from. The lambda runtime offers no argv, so the site-store args
 /// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
@@ -154,7 +154,7 @@ pub fn LambdaSiteBlock(
 
 /// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
 /// — an INVOKE-ONLY lambda plus its build artifact, on one entity (paired by
-/// `TofuApplyAction`, see [`LambdaSiteBlock`]): the target a
+/// `TofuApply`, see [`LambdaSiteBlock`]): the target a
 /// `<ScheduledJobBlock/>` drives.
 ///
 /// The counterpart of [`LambdaSiteBlock`] for work rather than serving, and the
@@ -216,7 +216,7 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// `<LightsailSiteBlock features="aws_sdk"/>` — the lightsail deploy block (its
 /// systemd `ExecStart` launches the binary with the site-store config,
 /// `remote_bootstrap`) plus its build artifact, on one entity (paired by
-/// `TofuApplyAction`, see [`LambdaSiteBlock`]). The markup form of
+/// `TofuApply`, see [`LambdaSiteBlock`]). The markup form of
 /// `(block, build_beet_binary(features))`. The bucket it serves from composes
 /// from the ancestor `<Stack>`.
 #[template(system)]
@@ -280,7 +280,7 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 
 /// `<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>` —
 /// the beet website's Lightsail block plus its build artifact, on one entity
-/// (paired by `TofuApplyAction`, see [`LambdaSiteBlock`]): one `small_3_0` box
+/// (paired by `TofuApply`, see [`LambdaSiteBlock`]): one `small_3_0` box
 /// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
 /// ssh TUI on port 22, with STAGE-AWARE Cloudflare DNS at the static IP.
 /// Runtime env wired so the binary reads its one app bucket (site and assets
@@ -824,7 +824,7 @@ mod test {
 		world
 			.query::<&TofuApply>()
 			.iter(&world)
-			.map(|apply| apply.layer().clone())
+			.map(|apply| apply.layer.clone().into_inner())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![Some(SmolStr::new("storage")), None]);
 	}
@@ -851,13 +851,13 @@ mod test {
 		let pull = sync(
 			r#"<DirSync bucket="assets" local_dir="assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>"#,
 		);
-		pull.direction().xpect_eq(SyncDirection::Pull);
-		pull.no_sign_request().xpect_true();
-		pull.delete().xpect_false();
+		pull.direction.xpect_eq(SyncDirection::Pull);
+		pull.no_sign_request.xpect_true();
+		pull.delete.xpect_false();
 		let push = sync(
 			r#"<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>"#,
 		);
-		push.direction().xpect_eq(SyncDirection::Push);
-		push.delete().xpect_true();
+		push.direction.xpect_eq(SyncDirection::Push);
+		push.delete.xpect_true();
 	}
 }

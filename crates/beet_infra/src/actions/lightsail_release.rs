@@ -19,63 +19,32 @@ use beet_net::prelude::*;
 /// stack (for the deploy id and the tofu outputs) and the [`LightsailBlock`]
 /// (for the management port and the unit name) by ancestry. It runs AFTER the
 /// full apply, since the apply is what publishes the release pointer.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
-#[reflect(Component, Default)]
-#[require(LightsailReleaseAction)]
-pub struct LightsailRelease {
-	/// How long to wait at each gate: for ssh to answer, for the unit to
-	/// appear, and for it to come up serving this deploy. Generous by default:
-	/// a freshly replaced box is still installing Caddy and the CloudWatch
-	/// agent when the deploy arrives.
-	timeout: Duration,
-	/// The gap between attempts, at every gate `timeout` bounds.
-	poll: Duration,
-}
-
-impl Default for LightsailRelease {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(300),
-			poll: Duration::from_secs(5),
-		}
-	}
-}
-
-/// Rolls the deployed unit onto the current release and verifies it took.
 ///
 /// Idempotent, and cheap when there is nothing to do: a box that was just
 /// replaced already pulled this release at boot, so the script confirms and
 /// returns rather than bouncing a healthy unit.
 #[action(handler_only)]
-#[derive(Default, Component, Reflect)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn LightsailReleaseAction(
+pub async fn LightsailRelease(
+	/// How long to wait at each gate: for ssh to answer, for the unit to
+	/// appear, and for it to come up serving this deploy. Generous by default:
+	/// a freshly replaced box is still installing Caddy and the CloudWatch
+	/// agent when the deploy arrives.
+	#[field(default = Duration::from_secs(300))]
+	timeout: Duration,
+	/// The gap between attempts, at every gate `timeout` bounds.
+	#[field(default = Duration::from_secs(5))]
+	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let release = cx
-		.caller
-		.get_cloned::<LightsailRelease>()
-		.await
-		.unwrap_or_default();
 	let (project, block) = resolve_box(&cx, "LightsailRelease").await?;
 
 	let deploy_id = project.deployment().deploy_id().to_string();
-	let script = block.release_script(
-		project.stack(),
-		&deploy_id,
-		*release.timeout(),
-		*release.poll(),
-	);
+	let script =
+		block.release_script(project.stack(), &deploy_id, timeout, poll);
 	info!("releasing {deploy_id}");
-	run_gate_script(
-		&project,
-		&block,
-		"release",
-		script,
-		*release.timeout(),
-		*release.poll(),
-	)
-	.await?;
+	run_gate_script(&project, &block, "release", script, timeout, poll).await?;
 
 	Pass(cx.input).xok()
 }
@@ -93,55 +62,24 @@ pub async fn LightsailReleaseAction(
 /// Declared under the sync sequence AFTER the `<DirSync/>` that publishes, and
 /// BEFORE the `<CloudflarePurgeCache/>`: purging while the old process still
 /// serves just re-caches the old responses for the whole edge TTL.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+#[action(handler_only)]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(LightsailRestartAction)]
-pub struct LightsailRestart {
+pub async fn LightsailRestart(
 	/// How long to wait for the unit to come back serving, and for the ssh that
 	/// drives it. Shorter than [`LightsailRelease`]'s by default: a sync bounces
 	/// a box that is already up, rather than meeting one mid cloud-init.
+	#[field(default = Duration::from_secs(120))]
 	timeout: Duration,
 	/// The gap between attempts, at every gate `timeout` bounds.
+	#[field(default = Duration::from_secs(5))]
 	poll: Duration,
-}
-
-impl Default for LightsailRestart {
-	fn default() -> Self {
-		Self {
-			timeout: Duration::from_secs(120),
-			poll: Duration::from_secs(5),
-		}
-	}
-}
-
-/// Restarts the deployed unit and verifies it came back serving.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn LightsailRestartAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let restart = cx
-		.caller
-		.get_cloned::<LightsailRestart>()
-		.await
-		.unwrap_or_default();
 	let (project, block) = resolve_box(&cx, "<LightsailRestart/>").await?;
 
-	let script = block.restart_script(
-		project.stack(),
-		*restart.timeout(),
-		*restart.poll(),
-	);
-	run_gate_script(
-		&project,
-		&block,
-		"restart",
-		script,
-		*restart.timeout(),
-		*restart.poll(),
-	)
-	.await?;
+	let script = block.restart_script(project.stack(), timeout, poll);
+	run_gate_script(&project, &block, "restart", script, timeout, poll).await?;
 
 	Pass(cx.input).xok()
 }
