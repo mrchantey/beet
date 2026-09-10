@@ -29,7 +29,9 @@ and a container engine.
 	<Stack app_name="fargate">
 		<Group bx:ref="deploy_up">
 			<FargateSiteBlock/>
-			<S3BucketBlock label="app" deploy_versioned=false/>
+			<!-- deploy-versioned by default: each deploy publishes the site under
+			     its own id and ships a binary baked to read that prefix -->
+			<S3BucketBlock label="app"/>
 			<BeetBinaryBuild features="aws_sdk"/>
 			<!-- the stores the deploy publishes into: the image registry and the
 			     bucket the site is served from -->
@@ -48,7 +50,10 @@ and a container engine.
 			<TofuDestroy/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<!-- a content-only republish, into the version the running service was
+		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>
+			<AdoptCurrentDeploy/>
 			<SiteSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

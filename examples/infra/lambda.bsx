@@ -38,7 +38,9 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LambdaSiteBlock features="lambda,aws_sdk"/>
-			<S3BucketBlock label="app" deploy_versioned=false/>
+			<!-- deploy-versioned by default: each deploy publishes the site under
+			     its own id and ships a binary baked to read that prefix -->
+			<S3BucketBlock label="app"/>
 			<!-- the bucket first, so the site is in place before the function that
 			     serves it exists -->
 			<TofuApply layer="storage"/>
@@ -52,7 +54,10 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 			<TofuDestroy/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<!-- a content-only republish, into the version the running service was
+		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>
+			<AdoptCurrentDeploy/>
 			<SiteSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

@@ -56,6 +56,13 @@ impl ArtifactLedger {
 	fn version_ledger_key(uuid: &Uuid) -> SmolPath {
 		SmolPath::new(format!("versions/{uuid}/ledger.json"))
 	}
+	/// The key prefix holding everything one version owns: its ledger and each
+	/// artifact binary it published.
+	pub fn version_prefix(uuid: &Uuid) -> SmolPath {
+		SmolPath::new(format!("versions/{uuid}"))
+	}
+	/// The ledger's own key relative to [`version_prefix`](Self::version_prefix).
+	const LEDGER_NAME: &'static str = "ledger.json";
 	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> SmolPath {
 		SmolPath::new(format!("versions/{uuid}/{artifact_name}"))
 	}
@@ -264,6 +271,52 @@ impl ArtifactsClient {
 		Ok(target)
 	}
 
+	/// The versions a retention of `keep` drops: everything older than the newest
+	/// `keep`, and never the current one.
+	///
+	/// The current version is excluded even when it falls outside the window,
+	/// because "current" is where a rollback counts back FROM: pruning it would
+	/// leave the ledger pointing at a version whose artifacts are gone. In the
+	/// ordinary case it is the newest and inside the window anyway.
+	///
+	/// What is retained IS the rollback range, since [`rollback`](Self::rollback)
+	/// indexes into [`list_versions`](Self::list_versions). So this is one
+	/// decision, not a cleanup: raising `keep` lengthens how far back a rollback
+	/// can reach.
+	pub async fn prunable_versions(&self, keep: usize) -> Result<Vec<Uuid>> {
+		let versions = self.list_versions().await?;
+		let current = self.current_ledger().await?.map(|ledger| ledger.deploy_id);
+		let retained = versions.len().saturating_sub(keep);
+		versions[..retained]
+			.iter()
+			.filter(|version| Some(**version) != current)
+			.copied()
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	/// Remove one version: its ledger first, then everything else it owns.
+	///
+	/// The ledger goes first because it is what [`list_versions`] answers from,
+	/// so the version leaves the rollback range before any binary it names does.
+	/// A failure part way through therefore leaves an unreachable orphan rather
+	/// than a listed version whose binary has already gone.
+	///
+	/// [`list_versions`]: ArtifactsClient::list_versions
+	pub async fn remove_version(&self, version: &Uuid) -> Result {
+		let store = self
+			.store
+			.with_subdir(ArtifactLedger::version_prefix(version));
+		let ledger = SmolPath::new(ArtifactLedger::LEDGER_NAME);
+		if store.exists(&ledger).await? {
+			store.remove(&ledger).await?;
+		}
+		for key in store.list().await? {
+			store.remove(&key).await?;
+		}
+		Ok(())
+	}
+
 	/// Roll forward to the latest version.
 	pub async fn rollforward(&self) -> Result<Uuid> {
 		let versions = self.list_versions().await?;
@@ -414,6 +467,76 @@ mod tests {
 		// rollforward to latest
 		let forwarded = client.rollforward().await.unwrap();
 		forwarded.xpect_eq(ledger3.deploy_id);
+	}
+
+	/// Retention is by COUNT over the ledger's list, so a stack that has not
+	/// deployed in a year still has every version it kept. `keep` IS the
+	/// rollback range, since `rollback` counts back through what is retained.
+	#[beet_core::test]
+	async fn prunes_to_the_retained_count() {
+		let store = BlobStore::temp();
+		let mut ledgers = Vec::new();
+		for idx in 0..5 {
+			let ledger = test_ledger(vec![("app.zip", "key", "hash")]);
+			ArtifactsClient::new(store.clone(), ledger.clone())
+				.publish_ledger()
+				.await
+				.unwrap();
+			ledgers.push(ledger);
+			let _ = idx;
+		}
+		let client = ArtifactsClient::new(
+			store.clone(),
+			ArtifactLedger::default_test(),
+		);
+		// the oldest two, the newest three retained
+		client.prunable_versions(3).await.unwrap().xpect_eq(vec![
+			ledgers[0].deploy_id,
+			ledgers[1].deploy_id,
+		]);
+		// ..and the current one is never a candidate, even rolled back onto
+		// the oldest version of all
+		client.set_current(&ledgers[0].deploy_id).await.unwrap();
+		client
+			.prunable_versions(3)
+			.await
+			.unwrap()
+			.xpect_eq(vec![ledgers[1].deploy_id]);
+		// keeping more than exist prunes nothing
+		client.prunable_versions(10).await.unwrap().xpect_eq(Vec::<Uuid>::new());
+	}
+
+	/// A pruned version leaves the rollback range before anything else it owns
+	/// goes: the ledger is what `list_versions` answers from, so a failure part
+	/// way through strands an unreachable orphan rather than a listed version
+	/// whose binary has already gone.
+	#[beet_core::test]
+	async fn removing_a_version_takes_its_whole_prefix() {
+		let store = BlobStore::temp();
+		let mut client = ArtifactsClient::new(
+			store.clone(),
+			ArtifactLedger::default_test(),
+		);
+		let version = *client.deploy_id();
+		client
+			.upload_artifact("app.zip", b"binary".to_vec(), ArtifactEntry {
+				bucket_key: "key".into(),
+				source_hash: "hash".into(),
+			})
+			.await
+			.unwrap();
+		client.publish_ledger().await.unwrap();
+		client.list_versions().await.unwrap().len().xpect_eq(1);
+
+		client.remove_version(&version).await.unwrap();
+		client.list_versions().await.unwrap().xpect_eq(Vec::<Uuid>::new());
+		store
+			.exists(&ArtifactLedger::version_artifact_key(
+				&version, "app.zip",
+			))
+			.await
+			.unwrap()
+			.xpect_false();
 	}
 
 	#[beet_core::test]

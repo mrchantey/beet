@@ -227,6 +227,10 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     JSON-over-blob TableProvider and are re-derivable from the archive,
 		     segments are transient by design). -->
 		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
+		<!-- NOT deploy-versioned, alone among the served sites: this box's boot
+		     config renders into `user_data`, which terraform cannot update in
+		     place, so a per-deploy prefix there would replace the box on every
+		     code-only deploy. See `infra_ext::remote_bootstrap_root`. -->
 		<S3BucketBlock label="app" deploy_versioned=false/>
 		<!-- the `archive` profile: append-only cold data, the inverse of the app
 		     bucket by lifecycle. Never touched by a deploy sync, which would prune
@@ -238,7 +242,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<!-- the box is replaceable, so it owns no durable timer: the rollup runs
 		     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
 		     `jobs` verb of this same document. -->
-		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
+		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda" root_repo=true/>
 		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>

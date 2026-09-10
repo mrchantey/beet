@@ -1,3 +1,4 @@
+mod adopt_current_deploy;
 pub mod aws_cli_ext;
 mod aws_watch;
 #[cfg(feature = "fargate_block")]
@@ -14,6 +15,8 @@ mod ensure_secret;
 mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
 mod lightsail_release;
+#[cfg(feature = "aws_sdk")]
+mod prune_versions;
 mod ssh_connection;
 pub mod ssm_ext;
 mod stack_teardown;
@@ -22,6 +25,7 @@ mod sync_s3_bucket;
 mod tofu_apply_action;
 mod tofu_destroy_action;
 pub mod wrangler_ext;
+pub use adopt_current_deploy::*;
 pub use aws_watch::*;
 #[cfg(feature = "fargate_block")]
 pub use build_docker_image::*;
@@ -37,6 +41,8 @@ pub use ensure_secret::*;
 pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail_release::*;
+#[cfg(feature = "aws_sdk")]
+pub use prune_versions::*;
 pub use ssh_connection::*;
 pub use stack_teardown::*;
 #[cfg(feature = "aws_sdk")]

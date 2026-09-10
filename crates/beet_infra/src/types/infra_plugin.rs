@@ -51,12 +51,19 @@ impl Plugin for InfraPlugin {
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
+			// ..and the compute's half of the entry-document reference, whose
+			// agreement with the bucket's `deploy_versioned` is asserted in the
+			// render rather than left to convention. See `RepoBucket`.
+			.register_type::<crate::prelude::RepoBucket>()
 			.add_systems(
 				DeployRender,
 				(
 					crate::types::declare::<crate::prelude::S3BucketBlock>
 						.in_set(DeployRenderSet::Declare),
-					crate::types::render::<crate::prelude::S3BucketBlock>
+					(
+						crate::types::render::<crate::prelude::S3BucketBlock>,
+						crate::blocks::assert_repo_buckets,
+					)
 						.in_set(DeployRenderSet::Render),
 				),
 			);
@@ -240,7 +247,11 @@ impl Plugin for InfraPlugin {
 		// and the zone edge setup/purge (the whole `actions` module is gated on
 		// `deploy`, and is native-only).
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::TofuApply>()
+		app
+			// the step a content-only verb runs first, so it publishes into the
+			// live version rather than minting one nothing serves.
+			.register_type::<crate::prelude::AdoptCurrentDeploy>()
+			.register_type::<crate::prelude::TofuApply>()
 			// the two teardown steps: `tofu destroy`, and the state carriers it
 			// leaves behind. They converge either side of the apply, so a destroy
 			// group runs them in the opposite order to this list.
@@ -301,7 +312,10 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::SyncS3Bucket>()
 			.register_type::<beet_net::prelude::SyncDirection>()
 			.register_type::<crate::prelude::DirSync>()
-			.add_observer(crate::actions::attach_dir_sync_store);
+			.add_observer(crate::actions::attach_dir_sync_store)
+			// the retention window over the ledger's versions, which prunes
+			// each version's binary and its document root together.
+			.register_type::<crate::prelude::PruneVersions>();
 
 		// the borrowed-paths copy (`<DirCopy src=".." dest=".." paths=".."/>`),
 		// plain fs work so it needs no cloud backend.

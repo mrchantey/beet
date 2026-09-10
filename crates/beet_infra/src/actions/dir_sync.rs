@@ -51,7 +51,7 @@ impl DirSync {
 	/// The stack this sync addresses its bucket in: the entity's resolved stack,
 	/// with the [`stage`](Self::stage) and [`region`](Self::region) overrides
 	/// applied. Still resolved: an override replaces an answer, never unsets it.
-	fn stack(&self, resolved: ResolvedStack) -> ResolvedStack {
+	pub fn stack(&self, resolved: ResolvedStack) -> ResolvedStack {
 		let resolved = match &self.stage {
 			Some(stage) => resolved.with_stage(stage.clone()),
 			None => resolved,
@@ -63,9 +63,55 @@ impl DirSync {
 	}
 }
 
+/// The per-deploy prefix this sync publishes under, or `None` for a bucket that
+/// publishes at its root.
+///
+/// Resolved when the sync RUNS rather than when it is declared, because which
+/// deploy's prefix a sync belongs to is a property of the VERB and not of the
+/// declaration: `deploy` mints a version and fills it, while `sync` republishes
+/// into the version already being served (`<AdoptCurrentDeploy/>` is what points
+/// the launch at it). One declaration, read by both.
+///
+/// The flag comes from the bucket's own `<S3BucketBlock>` rather than from a
+/// field here, so a sync cannot disagree with the bucket it addresses. A label
+/// nothing under the stack declares is an error: the bucket name would compose
+/// fine and the sync would publish into thin air.
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+pub(crate) fn deploy_subdir(
+	entity: Entity,
+	sync: &DirSync,
+	stacks: &StackQuery,
+	buckets: &Query<&S3BucketBlock>,
+) -> Result<Option<SmolPath>> {
+	let bucket = stacks
+		.declared(entity)?
+		.into_iter()
+		.filter_map(|entity| buckets.get(entity).ok())
+		.find(|bucket| bucket.label() == sync.bucket())
+		.ok_or_else(|| {
+			bevyhow!(
+				"the sync of '{}' addresses a bucket labelled '{}', which \
+				 nothing under this stack declares",
+				sync.local_dir(),
+				sync.bucket()
+			)
+		})?;
+	match bucket.deploy_versioned() {
+		true => Some(SmolPath::new(
+			stacks.deployment().deploy_id().to_string(),
+		)),
+		false => None,
+	}
+	.xok()
+}
+
 /// Observer: resolve the declared bucket into the [`S3FsStore`]
 /// [`SyncS3Bucket`] reads. Deferred through the command queue because the
 /// ancestry a scope resolves against lands with the rest of the scene.
+///
+/// The bucket IDENTITY only (its name and region): the per-deploy prefix a
+/// versioned bucket nests under is resolved by [`deploy_subdir`] when the sync
+/// runs, since it is not yet known here.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,

@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -44,15 +45,38 @@ pub async fn SyncS3Bucket(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
-	let s3_fs_store = cx
+	// the two ends of the sync, plus the per-deploy prefix a `<DirSync>` bucket
+	// publishes under. That prefix is resolved HERE rather than at declaration,
+	// because which version a sync belongs to is the verb's answer and not the
+	// declaration's: see `dir_sync::deploy_subdir`.
+	let (s3_fs_store, deploy_subdir) = cx
 		.caller
-		.with_state::<AncestorQuery<&S3FsStore>, _>(|entity, query| {
-			query.get(entity).cloned()
+		.with_state::<(
+			AncestorQuery<&S3FsStore>,
+			AncestorQuery<&DirSync>,
+			StackQuery,
+			Query<&S3BucketBlock>,
+		), _>(|entity, (stores, syncs, stacks, buckets)| -> Result<_> {
+			let store = stores.get(entity)?.clone();
+			// a store spawned directly (rather than through `<DirSync>`) already
+			// carries whatever root it means to publish into
+			let subdir = match syncs.get(entity) {
+				Ok(sync) => crate::actions::deploy_subdir(
+					entity, sync, &stacks, &buckets,
+				)?,
+				Err(_) => None,
+			};
+			(store, subdir).xok()
 		})
 		.await??;
+	let s3_store = match deploy_subdir {
+		Some(subdir) => s3_fs_store.s3_store().clone().with_subdir(subdir),
+		None => s3_fs_store.s3_store().clone(),
+	};
+	// `s3_uri` already ends in a separator
 	let s3_uri = match &bucket_dir {
-		Some(dir) => format!("{}/{dir}", s3_fs_store.s3_store().s3_uri()),
-		None => s3_fs_store.s3_store().s3_uri(),
+		Some(dir) => format!("{}{dir}", s3_store.s3_uri()),
+		None => s3_store.s3_uri(),
 	};
 	let local_dir = s3_fs_store.fs_store().effective_root();
 	// only a mirroring push can destroy remote state, so only it is guarded
@@ -77,10 +101,7 @@ pub async fn SyncS3Bucket(
 		.no_sign_request(no_sign_request)
 		.send()
 		.await?;
-	trace!(
-		"synced {s3_uri} (region: {:?})",
-		s3_fs_store.s3_store().region()
-	);
+	trace!("synced {s3_uri} (region: {:?})", s3_store.region());
 	trace!("SyncS3Bucket: complete");
 	Pass(cx.input).xok()
 }

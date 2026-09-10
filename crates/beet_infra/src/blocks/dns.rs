@@ -293,6 +293,13 @@ impl DnsProvider {
 	/// Emit an `SRV` record. `name` is the full service name, eg
 	/// `_jmap._tcp.stalwart.beetmash.com` (matching the "Name" column the DNS
 	/// spec already writes it as); `target` is the resolving hostname.
+	///
+	/// Cloudflare carries an SRV's priority TWICE: inside `data`, where the
+	/// record's own priority belongs, and at the top level, the field MX and URI
+	/// records are configured through. Both are set here because the api returns
+	/// the top-level one for an SRV whether or not it was sent, so leaving it
+	/// unset is a config saying `null` against a state saying `0`: a diff that
+	/// re-plans identically after every apply and never converges.
 	pub fn emit_srv(
 		&self,
 		stack: &ResolvedStack,
@@ -323,6 +330,9 @@ impl DnsProvider {
 							target: Some(target.into()),
 							..default()
 						}),
+						// the same value the api returns at the top level, see
+						// above
+						priority: Some(priority as i64),
 						proxied: Some(false),
 						..default()
 					},
@@ -554,8 +564,10 @@ mod tests {
 			.xpect_contains("\"10 mail.beetmash.com\"");
 	}
 
-	/// Cloudflare structures SRV fields under `data`, never touching `content`.
-	#[cfg(feature = "cloudflare_dns")]
+	/// Both halves of a Cloudflare SRV's priority: the one inside `data`, which
+	/// is the record's, and the top-level one the api returns for an SRV
+	/// regardless. Leaving the second unset is what made the plan report
+	/// `priority = 0 -> null` on every run forever.
 	#[beet_core::test]
 	fn cloudflare_srv_uses_data_block() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
@@ -573,11 +585,13 @@ mod tests {
 			)
 			.unwrap();
 		let json = config.to_json_string().unwrap();
-		json.xpect_contains("\"type\":\"SRV\"")
-			.xpect_contains("\"priority\":0")
+		json.as_str()
+			.xpect_contains("\"type\":\"SRV\"")
 			.xpect_contains("\"weight\":1")
 			.xpect_contains("\"port\":443")
 			.xpect_contains("\"target\":\"mail.beetmash.com\"");
+		// once in `data`, once at the top level
+		json.matches("\"priority\":0").count().xpect_eq(2);
 	}
 
 	/// Route53 has no `data` block, so `priority weight port target` is folded

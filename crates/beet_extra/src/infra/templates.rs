@@ -168,7 +168,10 @@ pub fn LambdaSiteBlock(
 			)
 		});
 	let mut build = infra_ext::beet_cargo_build(features).with_bootstrap(
-		infra_ext::remote_bootstrap(infra_ext::app_bucket_name(&stack))?,
+		infra_ext::remote_bootstrap(
+			infra_ext::app_bucket_name(&stack),
+			stacks.deployment().deploy_id(),
+		)?,
 	);
 	if let Some(exec_route) = exec_route {
 		build = build.with_exec_route(exec_route);
@@ -177,7 +180,12 @@ pub fn LambdaSiteBlock(
 		build =
 			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
 	}
-	(block, build.into_lambda_build_artifact()?).xok()
+	(
+		block,
+		build.into_lambda_build_artifact()?,
+		RepoBucket::versioned(infra_ext::APP_BUCKET_LABEL),
+	)
+		.xok()
 }
 
 /// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
@@ -211,21 +219,49 @@ pub fn LambdaJobBlock(
 	/// that predates it is the longest one it will ever do.
 	#[prop(default = 900)]
 	timeout_secs: i64,
+	/// Read the entry document from the app bucket ROOT rather than from this
+	/// deploy's own prefix.
+	///
+	/// For a stack whose OTHER compute cannot carry a per-deploy prefix, which
+	/// today means one serving from a Lightsail box (see
+	/// [`remote_bootstrap_root`](infra_ext::remote_bootstrap_root)). Every reader
+	/// of one bucket has to agree on where its root is, and a job that boots a
+	/// route of the same document the box serves is one of its readers.
+	///
+	/// Off by default, because the versioned prefix is what a job wants whenever
+	/// it can have it: the job then runs against the document its own deploy
+	/// published rather than whatever the newest one did.
+	#[prop(default)]
+	root_repo: bool,
 	stacks: StackQuery,
 	entity: Entity,
 ) -> Result<impl Bundle> {
 	let stack = stacks.resolve(entity);
+	let bucket = infra_ext::app_bucket_name(&stack);
+	let label_ref = infra_ext::APP_BUCKET_LABEL;
+	let (bootstrap, repo) = match root_repo {
+		true => (
+			infra_ext::remote_bootstrap_root(bucket)?,
+			RepoBucket::root(label_ref),
+		),
+		false => (
+			infra_ext::remote_bootstrap(
+				bucket,
+				stacks.deployment().deploy_id(),
+			)?,
+			RepoBucket::versioned(label_ref),
+		),
+	};
 	(
 		LambdaBlock::default()
 			.with_label(label)
 			.with_http(false)
 			.with_timeout_secs(timeout_secs),
 		infra_ext::beet_cargo_build(features)
-			.with_bootstrap(infra_ext::remote_bootstrap(
-				infra_ext::app_bucket_name(&stack),
-			)?)
+			.with_bootstrap(bootstrap)
 			.with_exec_route(exec_route)
 			.into_lambda_build_artifact()?,
+		repo,
 	)
 		.xok()
 }
@@ -255,10 +291,13 @@ pub fn LightsailSiteBlock(
 ) -> Result<impl Bundle> {
 	let stack = stacks.resolve(entity);
 	(
-		LightsailBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
-			infra_ext::app_bucket_name(&stack),
-		)?),
+		LightsailBlock::default().with_bootstrap(
+			infra_ext::remote_bootstrap_root(infra_ext::app_bucket_name(
+				&stack,
+			))?,
+		),
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
+		RepoBucket::root(infra_ext::APP_BUCKET_LABEL),
 	)
 		.xok()
 }
@@ -284,10 +323,13 @@ pub fn FargateSiteBlock(
 	entity: Entity,
 ) -> Result<impl Bundle> {
 	let stack = stacks.resolve(entity);
-	FargateBlock::default()
-		.with_bootstrap(infra_ext::remote_bootstrap(
+	(
+		FargateBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
 			infra_ext::app_bucket_name(&stack),
-		)?)
+			stacks.deployment().deploy_id(),
+		)?),
+		RepoBucket::versioned(infra_ext::APP_BUCKET_LABEL),
+	)
 		.xok()
 }
 
@@ -343,7 +385,6 @@ pub fn LightsailBeetSiteBlock(
 	let is_production = stack.is_production();
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
-	let app_bucket = stack.resource_name("app");
 	let block = LightsailBlock::default()
 		.with_bundle_id("small_3_0")
 		.with_allow_ssh(true)
@@ -353,11 +394,16 @@ pub fn LightsailBeetSiteBlock(
 		// config the runtime reads onto its `Environment=` lines. The analytics
 		// table is NOT here: the site declares it, and the deployed process
 		// resolves the same declaration.
+		//
+		// The repo store is the bucket ROOT rather than this deploy's prefix,
+		// because everything here renders into `user_data` and a per-deploy value
+		// there replaces the box every deploy: see `remote_bootstrap_root`.
 		.with_bootstrap(BootstrapConfig {
-			repo: Some(StoreUri::parse(&format!("s3://{app_bucket}"))?),
 			server: Some(RunningSetFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
-			..default()
+			..infra_ext::remote_bootstrap_root(infra_ext::app_bucket_name(
+				&stack,
+			))?
 		})
 		// private key material: its own channel, so no renderer can ever put it
 		// on an argv line.
@@ -387,6 +433,7 @@ pub fn LightsailBeetSiteBlock(
 	(
 		block,
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
+		RepoBucket::root(infra_ext::APP_BUCKET_LABEL),
 	)
 		.xok()
 }
@@ -607,6 +654,10 @@ mod test {
 				<Stack>
 					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
+					<!-- the entry document the job boots from, deploy-versioned like
+					     every served bucket: the job dispatches a route of the same
+					     document the site serves -->
+					<S3BucketBlock label="app"/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
@@ -629,6 +680,8 @@ mod test {
 		buckets.sort();
 		buckets.xpect_eq(vec![
 			("analytics".to_string(), true, false, false),
+			// the served entry document, versioned per deploy
+			("app".to_string(), false, true, false),
 			("archive".to_string(), true, false, true),
 		]);
 		// nothing but the timer may reach analytics compaction
