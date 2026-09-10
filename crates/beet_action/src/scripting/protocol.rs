@@ -141,7 +141,7 @@ impl JsonLine for ScriptEvent {}
 ///
 /// The source arrives already wrapped in an async IIFE by `Script::async_body`,
 /// so it is one expression evaluating to a promise: `await` is legal anywhere
-/// inside it and the script answers with `return`. It runs through *indirect*
+/// inside it and the body answers as `Script::statements` shaped it. It runs through *indirect*
 /// `eval`, which evaluates it in global scope, out of reach of the runner's own
 /// bindings; the promise it yields is awaited before the output is emitted.
 const JS_RUNNER: &str = r#"
@@ -290,7 +290,7 @@ mod test {
 
 	fn request() -> ScriptRequest {
 		ScriptRequest {
-			source: "return input.name".to_string(),
+			source: "input.name".to_string(),
 			input: serde_json::json!({ "name": "ada" }),
 			limits: ScriptLimits::default(),
 			world: false,

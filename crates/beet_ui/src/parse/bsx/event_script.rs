@@ -4,48 +4,30 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 
-/// Wrap an authored event script so it runs as an *expression* where it is one,
-/// and as a statement body otherwise.
+/// Compose an authored event script into a [`Script`] body: the host's own
+/// bindings, then the authored body through [`Script::statements`].
 ///
-/// Two things are scaffolded. `target` is the event-target entity, bound as an
-/// ordinary lexical `const`: `world.entity(id)` is the JS face of an
-/// [`AsyncEntity`], so `target.get_field`/`set_field`/`with_field` resolve
-/// through the same ancestor-document walk and [`DocumentScope`] prefix a
-/// display binding reads through, which is what stops a handler ever naming a
-/// document.
+/// `target` is the event-target entity, bound as an ordinary lexical `const`:
+/// `world.entity(id)` is the JS face of an [`AsyncEntity`], so
+/// `target.get_field`/`set_field`/`with_field` resolve through the same
+/// ancestor-document walk and [`DocumentScope`] prefix a display binding reads
+/// through, which is what stops a handler ever naming a document.
 ///
-/// The second is the expression form, and it is why the counter needs no
-/// `await`. An expression becomes the arrow's *body*, so its value (the promise
-/// any `world` call returns) is what the run resolves to and the host awaits it:
-/// `bx:click="target.with_field('count', count => count + 1)"` still reports its
-/// errors rather than leaving a floating promise. Anything that is not an
-/// expression fails to parse and falls back to the statement form, where
-/// `await` is legal exactly as before. The engine makes the choice, not us, so
-/// the two forms cannot drift from what JavaScript actually accepts; a lexical
-/// heuristic (a `;` or a newline means body, the shape Vue uses) is the cheaper
-/// option if the double parse ever proves to be a problem.
+/// The prelude makes the composed source a block, so the authored body has to
+/// carry its own `return` only where its *own* shape is a block. An expression
+/// body needs neither `return` nor `await`, which is why the counter is one
+/// line: `bx:click="target.with_field('count', count => count + 1)"` becomes
+/// `return (..)` inside an async function, whose promise the run adopts, so the
+/// write is awaited and its errors reported rather than left floating.
 ///
-/// `eval` is *direct*, so the authored source sees `target` as if it had been
-/// written here, and the trailing newline before each closer keeps a source
-/// ending in a `//` comment from swallowing it.
-///
-/// # Errors
-/// Errors only when the authored source cannot be encoded as a JS string.
-fn wrap_event_script(script: &str) -> Result<String> {
-	let source = serde_json::to_string(script)?;
+/// A script is a script: this is the same [`Script::statements`] rule an
+/// `<Ecmascript>` route or a `<RunScript>` leaf gets, applied through the one
+/// implementation so the two cannot drift.
+fn event_script_body(script: &str) -> String {
 	format!(
-		r#"const target = world.entity(input.target);
-const source = {source};
-let result;
-try {{
-	result = eval("(async () => (" + source + "\n))()");
-}} catch (err) {{
-	if (!(err instanceof SyntaxError)) throw err;
-	result = eval("(async () => {{" + source + "\n}})()");
-}}
-return await result;"#
+		"{{\nconst target = world.entity(input.target);\n{}\n}}",
+		Script::<Value, Value>::statements(script)
 	)
-	.xok()
 }
 
 /// Register the `click` event installer: a [`PointerDown`] observer that, on
@@ -60,14 +42,7 @@ pub(super) fn register_event_scripts(world: &mut World) {
 	world.resource_mut::<EventRegistry>().insert(
 		"click",
 		|entity: &mut EntityWorldMut, script: &str| {
-			let wrapped = match wrap_event_script(script) {
-				Ok(wrapped) => wrapped,
-				Err(err) => {
-					error!("`bx:click`: {err}");
-					return;
-				}
-			};
-			let script = Script::<Value, Value>::new(wrapped);
+			let script = Script::<Value, Value>::new(event_script_body(script));
 			entity.observe(
 				move |ev: On<PointerDown>, mut commands: Commands| {
 					let (script, target) = (script.clone(), ev.target);
@@ -195,11 +170,11 @@ mod test {
 		count(&world, doc, "counter.count").xpect_eq(7);
 	}
 
-	/// A source that is not an expression falls back to the statement form,
-	/// where `await` is legal and needed: the pump stops the moment the script's
-	/// own promise settles, so an unawaited call in a body is a write that never
-	/// lands. A script is also the whole vocabulary, so this behavior (branch on
-	/// the current value, write a string) is one nothing in rust knows about.
+	/// A `{ .. }` body is a block, where `await` is legal and needed: the pump
+	/// stops the moment the script's own promise settles, so an unawaited call in
+	/// a block is a write that never lands. A script is also the whole
+	/// vocabulary, so this behavior (branch on the current value, write a string)
+	/// is one nothing in rust knows about.
 	#[beet_core::test]
 	async fn a_multi_statement_script_runs_as_a_body() {
 		let mut world = world_ext::ui_world();
@@ -209,10 +184,10 @@ mod test {
 		let button = click_target(
 			&mut world,
 			doc,
-			r#"<button bx:click="
+			r#"<button bx:click="{
 				const status = await target.get_field('status');
 				await target.set_field('status', status === 'done' ? 'pending' : 'done');
-			">ok</button>"#,
+			}">ok</button>"#,
 		);
 		click(&mut world, button).await;
 		world

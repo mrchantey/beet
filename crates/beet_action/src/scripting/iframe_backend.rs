@@ -299,7 +299,7 @@ mod test {
 
 	#[beet_core::test(browser)]
 	async fn transforms_its_input() {
-		run_script::<i64, i64>("return input + 1", 41)
+		run_script::<i64, i64>("input + 1", 41)
 			.await
 			.unwrap()
 			.xpect_eq(42);
@@ -308,7 +308,7 @@ mod test {
 	#[beet_core::test(browser)]
 	async fn splits_the_console_streams() {
 		let script = Script::<(), ()>::new(
-			r#"console.log("out"); console.error("err")"#,
+			r#"{ console.log("out"); console.error("err") }"#,
 		);
 		AsyncPlugin::world()
 			.run_async_local_then(move |world| async move {
@@ -324,7 +324,7 @@ mod test {
 	#[beet_core::test(browser)]
 	async fn markup_in_a_script_survives_the_crossing() {
 		run_script::<(), String>(
-			r#"return "a </script> b <!-- c " + (1 < 2)"#,
+			r#""a </script> b <!-- c " + (1 < 2)"#,
 			(),
 		)
 		.await
@@ -340,11 +340,11 @@ mod test {
 		let mut world = test_world();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const entry = await world.spawn({ "Name": "ada" });
 			const name = await world.get(entry, "Name");
 			await world.insert(entry, "Name", name + " lovelace");
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -399,7 +399,7 @@ mod test {
 	#[beet_core::test(browser)]
 	async fn a_worldless_script_has_no_world_global() {
 		run_script_with::<(), String>(
-			"return typeof world",
+			"typeof world",
 			(),
 			ScriptConfig::default().without_world(),
 		)
@@ -413,9 +413,9 @@ mod test {
 	#[beet_core::test(browser)]
 	async fn cannot_reach_the_parent_realm() {
 		for source in [
-			"return parent.document.title",
-			"return localStorage.getItem('x')",
-			"return document.cookie",
+			"parent.document.title",
+			"localStorage.getItem('x')",
+			"document.cookie",
 		] {
 			run_script::<(), ()>(source, ()).await.unwrap_err();
 		}

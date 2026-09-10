@@ -7,10 +7,16 @@ use serde_json::Value as JsonValue;
 
 /// A JavaScript program carried as data, transforming `Input` into `Output`.
 ///
-/// The [`Script::content`] is the body of an async function: the input is bound
-/// to a variable named `input`, `await` is legal anywhere, and the script
-/// answers with `return`. What it returns is deserialized into `Output`, so
-/// `Script::<(), String>::new("return 'hi'")` is a `() -> String`.
+/// The [`Script::content`] is an *arrow function body*: the input is bound to a
+/// variable named `input`, `await` is legal anywhere, and the body answers the
+/// way an arrow does. A body whose trimmed source starts with `{` is a block
+/// and answers with `return`; any other body is an expression and answers with
+/// its own value. What it answers is deserialized into `Output`, so
+/// `Script::<(), String>::new("'hi'")` is a `() -> String`.
+///
+/// Being JavaScript's own rule rather than one beet invented, it comes with
+/// JavaScript's own workaround: an object literal is parenthesised, exactly as
+/// an arrow returns one, `({ name: "ada" })`.
 ///
 /// `Script` is the program; its sibling [`ScriptConfig`] is what the host grants
 /// it: world access, console access, the components the world bridge will
@@ -157,8 +163,9 @@ where
 		config: &ScriptConfig,
 	) -> Result<Output> {
 		self.eval(input, world, config, ConsoleStream::log)
-			.await?
-			.xmap(Self::decode_output)
+			.await
+			.map_err(|err| Self::hint_body_shape(err, &self.content))?
+			.xmap(|value| Self::decode_output(value, &self.content))
 	}
 
 	/// Run the script for its console output, collecting each [`Stdout`] line into
@@ -196,7 +203,8 @@ where
 			}
 			ConsoleStream::Stderr => cross_log_error!("{line}"),
 		})
-		.await?;
+		.await
+		.map_err(|err| Self::hint_body_shape(err, &self.content))?;
 		lines
 			.read()
 			.map_err(|err| bevyhow!("script: console buffer poisoned: {err}"))?
@@ -276,19 +284,84 @@ where
 
 	/// The completion value as an [`Output`](Self).
 	///
-	/// A script that produced none is a `null` here, which `()` and
-	/// [`Value`](beet_core::prelude::Value) both accept and a typed output does
-	/// not: the error says how a script answers rather than reporting a serde
-	/// type mismatch the author cannot act on.
-	fn decode_output(value: Option<JsonValue>) -> Result<Output> {
+	/// A `()` output discards whatever the body evaluated to, the way any
+	/// language discards a statement's value: an expression body always produces
+	/// one, and a `<RunScript>` is run for its effects, not its answer.
+	///
+	/// For any other output a missing value is a `null`, which only a block body
+	/// that chose not to return can produce, so the error says that rather than
+	/// reporting a serde type mismatch the author cannot act on.
+	fn decode_output(
+		value: Option<JsonValue>,
+		content: &str,
+	) -> Result<Output> {
+		if core::any::TypeId::of::<Output>() == core::any::TypeId::of::<()>() {
+			return serde_json::from_value(JsonValue::Null)
+				.map_err(|err| bevyhow!("failed to decode output: {err}"));
+		}
 		let value = value.unwrap_or(JsonValue::Null);
 		let empty = value.is_null();
 		serde_json::from_value(value).map_err(|err| match empty {
-			true => bevyhow!(
-				"script produced no value: a script answers with `return`"
-			),
+			true => match content.trim_start().starts_with('{') {
+				true => bevyhow!(
+					"script produced no value: a block body answers with `return`"
+				),
+				false => bevyhow!(
+					"script produced no value: the expression body evaluated to `undefined`"
+				),
+			},
 			false => bevyhow!("failed to decode output: {err}"),
 		})
+	}
+
+	/// Append the likely cause to a backend syntax error, read off the shape of
+	/// the authored body.
+	///
+	/// The rule itself is strict (a leading `{` and nothing else makes a block),
+	/// so there are exactly two ways to get it wrong: statements without braces,
+	/// and a `return` an expression body has no room for. Both are cheap to spot
+	/// in the source, and spotting them only ever changes the *wording* of an
+	/// error the backend already raised. A textual heuristic that picked the
+	/// *behaviour* would be a guess at what the author meant; one that picks a
+	/// hint is just a better message.
+	fn hint_body_shape(err: BevyError, content: &str) -> BevyError {
+		let text = err.to_string();
+		// the two backends word a parse failure differently: V8 raises a
+		// `SyntaxError`, quickjs an `Error: unexpected token`
+		if !text.contains("SyntaxError") && !text.contains("unexpected token") {
+			return err;
+		}
+		let trimmed = content.trim();
+		let hint = if trimmed.starts_with('{') {
+			return err;
+		} else if trimmed.starts_with("return") {
+			"an expression body answers on its own: drop the `return`, or wrap the whole body in `{ }` to make it a block"
+		} else if trimmed.contains(';') {
+			"a body of several statements is a block: wrap it in `{ }`"
+		} else {
+			return err;
+		};
+		bevyhow!("{text}\nhint: {hint}")
+	}
+
+	/// The authored body as a JavaScript statement list.
+	///
+	/// A body whose trimmed source starts with `{` is a block and is taken
+	/// verbatim; any other body is an expression, and becomes `return (..)`.
+	/// That is an arrow function's rule, which is the point: the contract is one
+	/// every JavaScript author already holds, not a beet invention, and it needs
+	/// no second parse to apply.
+	///
+	/// Public because a host that binds names for the body to use (an event
+	/// handler's `target`) composes its own prelude around the result, and must
+	/// apply the rule through here rather than reimplementing it.
+	pub fn statements(content: &str) -> String {
+		match content.trim_start().starts_with('{') {
+			true => content.to_string(),
+			// the newline before the closer keeps a body ending in a `//`
+			// comment from swallowing it
+			false => format!("return ({content}\n);"),
+		}
 	}
 
 	/// Wrap a script body so its top-level `await` is legal.
@@ -300,11 +373,11 @@ where
 	/// it, and both receive character-identical source. Doing it per backend is
 	/// exactly the drift the one-eval-path design forbids.
 	///
-	/// A script therefore answers with `return`, not with the value of its last
-	/// expression. JavaScript has no construct that offers both, and `await` is
-	/// the half a world-bridged script cannot do without.
+	/// The async function is also what makes an expression body need no `await`
+	/// of its own: returning a promise from an async function adopts it, so the
+	/// value the host awaits is already the resolved one.
 	pub(crate) fn async_body(content: &str) -> String {
-		format!("(async () => {{\n{content}\n}})()")
+		format!("(async () => {{\n{}\n}})()", Self::statements(content))
 	}
 }
 

@@ -50,6 +50,9 @@ CLI router server, persisted router, and the codegen pipeline.
 cargo run --example router           --features=router,markdown
 cargo run --example router           --features=router,markdown -- about
 cargo run --example cli              --features=router,quickjs -- greet --name=world
+# the persisted scene caches the route scripts, so regenerate it after any change
+# to script authoring or to a registered type
+cargo run --example router_serde     --features=router,quickjs,template_serde -- --new
 cargo run --example router_serde     --features=router,quickjs,template_serde
 cargo run --example router_serde     --features=router,quickjs,template_serde -- greet --name=world
 # rsx_site is a crate, not a root example: generate its routes, then serve. It
@@ -111,9 +114,18 @@ The `examples,ml` feature only gates windowed scene code (now scene modules in `
 
 ### 8. BSX scenes (`beet --main=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --main=..` command in its header, and declares its hard requirements with `<RequireCfg>`, so a leaner binary fails fast with the missing list. The self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --main=..` command in its header, and an entry that declares its hard requirements with `<RequireCfg>` fails fast on a leaner binary, naming what is missing. The self-terminating ones render and exit:
 
-A documented command never carries `--features`: the entry's own `<RequireCfg>` is the check, so a binary missing the capability fails naming it. The binary still has to *link* it though, so an ml scene needs a `beet` built with the ml capability (`cargo run -p beet-cli --features=ml -- <args>` from the workspace).
+A documented command never carries `--features`: that is the entry's own `<RequireCfg>`'s job. The binary still has to *link* the capability though, and the demo scenes name actions from `beet_extra`, which is the `extra` cargo feature. Build the CLI once with what the set needs and run everything against it:
+
+```sh
+cargo build -p beet-cli --features=extra        # every scene below except the ml one
+cargo build -p beet-cli --features=extra,ml     # adds `hello_ml.bsx`
+```
+
+A binary without `extra` does not fail fast on these entries the way `hello_ml.bsx` does: none of them declare `<RequireCfg cfg="feature:extra"/>`, so instead of a named missing capability you get a spread warning (`skipping spread 'SayHello'`) and then `No Action<(), ()>`. Worth fixing in the entries; until then, read that pair of messages as "rebuild with `extra`".
+
+Beware the `ml` build specifically: it pulls `winit` and bevy_render, so every scene brings up a wgpu device and compiles compute pipelines whether or not it needs a GPU. On an NVIDIA host that intermittently segfaults inside `libnvidia-glcore` during `create_compute_pipeline`, on bevy's async compute thread, which has nothing to do with the scene. Use the `extra`-only binary for everything but the ml scene.
 
 ```sh
 beet --main=examples/hello                                       # prints "hello world"
@@ -126,7 +138,7 @@ The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_runni
 
 Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
 
-Known all-features-binary quirks (each exits 0 on a default/targeted binary): `scripting.bsx` completes then segfaults at process exit; `malenia.bsx` completes the fight but the winit runner keeps the resolved one-shot alive. The former calculator teardown SIGSEGV was fixed by the lazy Burn device init.
+`malenia.bsx` exits 70: its `<Repeat>` ends the fight by *failing* (the terminal outcome a `<Repeat>` always has), and `CallOnReady` maps that to an error status. Wrapping the entry to swallow it is not available here — an outer node becomes the agent `AgentQuery` resolves, so Malenia loses her `Health`. Judge it on the "You win" line, not the status.
 
 ## Not Verifiable Via CLI (skip)
 

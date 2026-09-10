@@ -101,7 +101,13 @@ async fn lightsail_lifecycle() {
 
 	// 14. destroy
 	info!("step 14: destroying");
-	build_project(&deploy_ctx).unwrap().destroy().await.unwrap();
+	// the state carriers are `StackTeardown`'s job now, and
+	// `cleanup_prior_state` sweeps them at the start of the next run
+	build_project(&deploy_ctx)
+		.unwrap()
+		.tofu_destroy(false)
+		.await
+		.unwrap();
 
 	// 15. verify dead
 	info!("step 15: verifying dead");

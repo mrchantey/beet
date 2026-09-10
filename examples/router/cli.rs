@@ -38,13 +38,9 @@ struct GreetRequest {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn(
-		(
-			CliServer::default(),
-			children![
-				(
-					Router::with_defaults(),
-					children![
+	commands.spawn((
+		CliServer::default(),
+		children![(Router::with_defaults(), children![
 						route::exchange(
 							"",
 							Action::<(), &str>::new_pure(|_| { "hello world" })
@@ -57,7 +53,7 @@ fn setup(mut commands: Commands) {
 						// make the entity a dispatchable route.
 						(
 							Script::<QueryParams<GreetRequest>, String>::new(
-								r#"return "hello " + input.name"#,
+								r#""hello " + input.name"#,
 							),
 							ExchangeScript::<
 								QueryParams<GreetRequest>,
@@ -72,7 +68,7 @@ fn setup(mut commands: Commands) {
 						// authors) and digs out the `name` query parameter itself.
 						(
 							Script::<Value, Value>::new(
-								r#"return "hello " + input.params.name[0]"#,
+								r#""hello " + input.params.name[0]"#,
 							),
 							ExchangeScript::<
 								Value,
@@ -82,10 +78,7 @@ fn setup(mut commands: Commands) {
 							>::default(),
 							PathPartial::new("greet-request"),
 						),
-					]
-				)
-			],
-			CallOnReady::on_spawn(),
-		),
-	);
+					])],
+		CallOnReady::on_spawn(),
+	));
 }

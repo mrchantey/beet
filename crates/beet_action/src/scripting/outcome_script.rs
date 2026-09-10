@@ -162,7 +162,7 @@ mod test {
 		let mut world = test_world();
 		let leaf = world
 			.spawn_template(rsx! {
-				<RunScript script={r#"await world.spawn({ "Name": "ada" });"#}/>
+				<RunScript script={r#"await world.spawn({ "Name": "ada" })"#}/>
 			})
 			.unwrap()
 			.id();
@@ -182,11 +182,11 @@ mod test {
 		let mut world = test_world();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const entry = await world.spawn({ "Name": "ada" });
 			const name = await world.get(entry, "Name");
 			await world.insert(entry, "Name", name + " lovelace");
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -206,10 +206,10 @@ mod test {
 		world.spawn(Name::new("bob"));
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const found = await world.entities("bevy_ecs::name::Name");
 			await world.spawn({ "Name": "count:" + found.length });
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -225,11 +225,11 @@ mod test {
 		let mut world = test_world();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const entry = await world.spawn({});
 			await world.insert(entry, "Name", "one");
 			await world.insert(entry, "Name", "two");
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -249,7 +249,7 @@ mod test {
 		world.spawn(Name::new("bob"));
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			for (const id of await world.entities("Name")) {
 				if ((await world.get(id, "Name")) === "ada") {
 					await world.remove(id, "Name");
@@ -257,7 +257,7 @@ mod test {
 					await world.despawn(id);
 				}
 			}
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -280,14 +280,14 @@ mod test {
 		let entity = world.spawn(Name::new("ada")).id();
 		run_leaf_with(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			try {
 				await world.insert(entry, "Name", "bob");
 			} catch (err) {
 				await world.insert(entry, "game.Refused", err.message);
 			}
-			"#,
+			}"#,
 			// everything but the name, so the catch block can still record what
 			// it was refused
 			ScriptConfig {
@@ -321,10 +321,10 @@ mod test {
 			.register::<ScriptConfig>();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const entry = await world.spawn({});
 			await world.insert(entry, "ScriptConfig", {});
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap_err()
@@ -353,7 +353,7 @@ mod test {
 			world_with([("game.Health", ValueSchema::U64(default()))]);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			await world.insert(entry, "game.Health", 3);
 			try {
@@ -361,7 +361,7 @@ mod test {
 			} catch (err) {
 				await world.insert(entry, "game.Note", err.message);
 			}
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -379,12 +379,12 @@ mod test {
 		let (mut world, entity) = world_with([("game.Loot", ValueSchema::Any)]);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			for (const value of [1, "sword", [1, 2], { held: true }, null]) {
 				await world.insert(entry, "game.Loot", value);
 			}
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -405,7 +405,7 @@ mod test {
 		world.insert_resource(registry);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			await world.insert(entry, "game.Health", 3);
 			try {
@@ -413,7 +413,7 @@ mod test {
 			} catch (err) {
 				await world.insert(entry, "game.Note", err.message);
 			}
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -431,11 +431,11 @@ mod test {
 			world_with([("game.Health", ValueSchema::U64(default()))]);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			const schema = await world.schema("game.Health");
 			await world.insert(entry, "game.Note", JSON.stringify(schema));
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -454,7 +454,7 @@ mod test {
 			world_with([("game.Number", ValueSchema::Any)]);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			const sent = [0, -1, 1.5, 9007199254740992];
 			const seen = [];
@@ -463,7 +463,7 @@ mod test {
 				seen.push(await world.get(entry, "game.Number"));
 			}
 			await world.insert(entry, "game.Note", { sent, seen });
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -492,13 +492,13 @@ mod test {
 			world_with([("game.Blob", ValueSchema::Bytes(default()))]);
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			await world.insert(entry, "game.Blob", [1, 2, 3, 255]);
 			const read = await world.get(entry, "game.Blob");
 			await world.insert(entry, "game.Blob", read);
 			await world.insert(entry, "game.Note", read);
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -521,7 +521,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_worldless_script_has_no_world_global() {
 		run_script_with::<(), String>(
-			"return typeof world",
+			"typeof world",
 			(),
 			ScriptConfig::default().without_world(),
 		)
@@ -534,7 +534,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_consoleless_script_has_no_console_global() {
 		run_script_with::<(), String>(
-			"return typeof console",
+			"typeof console",
 			(),
 			ScriptConfig::default().without_console(),
 		)
@@ -552,10 +552,10 @@ mod test {
 		world
 			.spawn((
 				Script::<(), String>::new(
-					r#"
+					r#"{
 					const [entry] = await world.entities("Name");
 					return "found " + (await world.get(entry, "Name"));
-					"#,
+					}"#,
 				),
 				ScriptAction::<(), String>::default(),
 			))
@@ -581,16 +581,23 @@ mod test {
 	/// world thread. A task on the shared pool belongs to a worker thread under
 	/// `bevy_multithreaded`, which a sync point can only wake and hope for, and
 	/// the dozen calls dribble out roughly one per frame.
+	///
+	/// This also pins the wasm bridge being *per world*: a sync point that
+	/// ticked one process-wide executor would nest through every runnable task
+	/// in the binary, hit `tick_bridge_executor`'s depth cap on load alone, and
+	/// defer these calls across frames.
 	#[cfg(feature = "quickjs")]
 	#[beet_core::test]
 	async fn a_dozen_calls_settle_in_one_update() {
 		let mut world = test_world();
+		// a dozen statements, so a block body
 		let script = (0..12)
 			.map(|index| {
 				format!(r#"await world.spawn({{"Name":"n{index}"}});"#)
 			})
 			.collect::<Vec<_>>()
-			.join("\n");
+			.join("\n")
+			.xmap(|body| format!("{{\n{body}\n}}"));
 		let entity = world
 			.spawn((
 				Script::<Value, Value>::new(script),
@@ -629,10 +636,10 @@ mod test {
 		let mut world = test_world();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			console.log("working");
 			await world.spawn({ "Name": "ada" });
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();

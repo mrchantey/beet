@@ -23,7 +23,7 @@ reports it.
 	<Sequence {CallOnReady}>
 		<RunScript
 			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
-			script="
+			script="{
 			// muster: each fighter is spawned with a registered rust component,
 			// addressed by its full type path, beside the minted one
 			await world.spawn({ 'bevy_ecs::name::Name': 'ada', 'game.Health': 3 });
@@ -33,10 +33,10 @@ reports it.
 			// the spawn resolved to a real entity, so it can be read back at once
 			const health = await world.get(cleo, 'game.Health');
 			console.log('cleo mustered with ' + health + ' health');
-			"/>
+			}"/>
 		<RunScript
 			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["bevy_ecs::name::Name","game.Health"]}}
-			script="
+			script="{
 			// the roll call is named but carries no health, so it is no fighter
 			let report = null;
 			for (const id of await world.entities('bevy_ecs::name::Name')) {
@@ -60,10 +60,10 @@ reports it.
 			}
 			await world.insert(weakest.id, 'bevy_ecs::name::Name', weakest.name + ' (wounded)');
 			await world.insert(report, 'bevy_ecs::name::Name', 'roll call ' + roster.join(', '));
-			"/>
+			}"/>
 		<RunScript
 			{ScriptConfig{read:["bevy_ecs::name::Name","game.Health"],write:["game.Health"]}}
-			script="
+			script="{
 			// this script may read a name but not write one, and the refusal
 			// arrives as an error where the call was made
 			const [named] = await world.entities('bevy_ecs::name::Name');
@@ -72,7 +72,7 @@ reports it.
 			} catch (err) {
 				console.log('refused: ' + err.message);
 			}
-			"/>
+			}"/>
 		<Log {Name("roll call")}/>
 	</Sequence>
 </Fragment>

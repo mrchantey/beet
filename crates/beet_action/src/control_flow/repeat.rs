@@ -3,9 +3,17 @@ use beet_core::prelude::*;
 
 /// Repeat control-flow component.
 ///
-/// Calls its single child in a loop with a clone of the original input.
-/// Returns [`Outcome::Fail`] immediately if the child fails;
-/// loops forever otherwise.
+/// Calls its single child in a loop with a clone of the original input, until
+/// the child fails. Always returns [`Outcome::Pass`]: the child failing is the
+/// loop's *exit condition*, not an error, exactly as a `while` loop ends when
+/// its condition goes false. A `Repeat` has no failure mode of its own, so a
+/// terminal [`Outcome::Fail`] would carry no information while making every
+/// `Repeat`-rooted entry report a successful run as a failure.
+///
+/// To stop a [`Sequence`] when the loop ends, put the condition in the loop
+/// body where it can be read; to bound the iterations use [`RepeatTimes`],
+/// which does distinguish completing its count from stopping early.
+///
 /// With no child, returns [`Outcome::Pass`] immediately.
 #[action]
 #[derive(Debug, Component, Reflect)]
@@ -38,7 +46,8 @@ where
 			.await?
 		{
 			Outcome::Pass(_) => {}
-			Outcome::Fail(_) => return Outcome::FAIL.xok(),
+			// the loop is over, which is how a `Repeat` ends, not a failure
+			Outcome::Fail(_) => return Outcome::PASS.xok(),
 		}
 	}
 }
@@ -165,6 +174,8 @@ mod tests {
 			.xpect_eq(Outcome::PASS);
 	}
 
+	/// A child that fails on its first call ends the loop straight away, and the
+	/// loop ending is a pass.
 	#[beet_core::test]
 	async fn repeat_failing_child() {
 		AsyncPlugin::world()
@@ -172,7 +183,7 @@ mod tests {
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
-			.xpect_eq(Outcome::FAIL);
+			.xpect_eq(Outcome::PASS);
 	}
 
 	#[beet_core::test]
@@ -183,7 +194,7 @@ mod tests {
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
-			.xpect_eq(Outcome::FAIL);
+			.xpect_eq(Outcome::PASS);
 		// passed 3 times, failed on 4th call
 		count.load(Ordering::SeqCst).xpect_eq(4);
 	}

@@ -139,11 +139,6 @@ impl Project {
 	/// The state backend this project's state lives in.
 	fn backend(&self) -> &StackBackend { self.deployment.backend() }
 
-	/// The key this project's state is written under.
-	fn backend_path(&self) -> SmolPath {
-		self.deployment.backend_path(&self.stack)
-	}
-
 	/// Initialize the tofu project if required,
 	/// checking if the config has changes, a lockfile exists,
 	/// and the backend type matches the current config.

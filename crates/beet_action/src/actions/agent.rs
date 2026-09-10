@@ -49,9 +49,15 @@ pub struct Actions(Vec<Entity>);
 ///
 /// # Agent Resolution
 ///
-/// The agent is resolved in this order (see [`AgentQuery::entity`]):
+/// [`entity`](AgentQuery::entity) answers who the agent *is*:
 /// 1. The first [`ActionOf`] relationship found in ancestors (inclusive)
 /// 2. The root ancestor if no [`ActionOf`] is found
+///
+/// The component accessors ([`get`](AgentQuery::get),
+/// [`get_mut`](AgentQuery::get_mut), [`contains`](AgentQuery::contains)) answer
+/// where the data *is*, which is the nearest ancestor matching `D`/`F`. The two
+/// agree in a well-formed tree; where they differ it is because something was
+/// mounted above the agent, and the data walk is the one that stays right.
 ///
 /// # Example
 ///
@@ -125,9 +131,31 @@ where
 			})
 			.unwrap_or(root)
 	}
+	/// The entity this action reads its components off: the nearest
+	/// ancestor-inclusive entity with an explicit [`ActionOf`] or a match for
+	/// the query, falling back to [`entity`](Self::entity).
+	///
+	/// [`entity`](Self::entity) answers *who the agent is*, which without an
+	/// [`ActionOf`] is the tree's root. That alone makes an agent subtree
+	/// uncomposable: put any control-flow node above a character and it becomes
+	/// the root, so every action below resolves to an entity holding none of the
+	/// components those actions operate on. Anchoring the *data* lookup on the
+	/// query keeps a subtree working wherever it is mounted, and resolves a
+	/// nested agent to the nearer one.
+	fn query_entity(&self, action: Entity) -> Entity {
+		self.parents
+			.iter_ancestors_inclusive(action)
+			.find_map(|entity| match self.actions.get(entity) {
+				// an explicit `ActionOf` always wins, whatever it points at
+				Ok(action_of) => Some(action_of.get()),
+				Err(_) => self.query.contains(entity).then_some(entity),
+			})
+			.unwrap_or_else(|| self.entity(action))
+	}
+
 	/// Returns `true` if the agent matches the query filter.
 	pub fn contains(&self, entity: Entity) -> bool {
-		let agent = self.entity(entity);
+		let agent = self.query_entity(entity);
 		self.query.contains(agent)
 	}
 
@@ -136,7 +164,7 @@ where
 		&self,
 		action: Entity,
 	) -> Result<ROQueryItem<'_, 's, D>, QueryEntityError> {
-		let agent = self.entity(action);
+		let agent = self.query_entity(action);
 		self.query.get(agent)
 	}
 
@@ -145,7 +173,7 @@ where
 		&mut self,
 		entity: Entity,
 	) -> Result<D::Item<'_, 's>, QueryEntityError> {
-		let agent = self.entity(entity);
+		let agent = self.query_entity(entity);
 		self.query.get_mut(agent)
 	}
 
@@ -154,7 +182,7 @@ where
 		&self,
 		entity: Entity,
 	) -> Result<ROQueryItem<'_, 's, D>> {
-		let agent = self.entity(entity);
+		let agent = self.query_entity(entity);
 		self.children
 			.iter_descendants_inclusive(agent)
 			.find_map(|entity| self.query.get(entity).ok())
@@ -168,7 +196,7 @@ where
 		&mut self,
 		entity: Entity,
 	) -> Result<D::Item<'_, 's>> {
-		let agent = self.entity(entity);
+		let agent = self.query_entity(entity);
 		self.children
 			.iter_descendants_inclusive(agent)
 			.find(|entity| self.query.contains(*entity))
@@ -254,6 +282,34 @@ mod test {
 		agent_query.entity(child).xpect_eq(agent);
 		// root's agent should also be the ActionOf target
 		agent_query.entity(root).xpect_eq(agent);
+		state.apply(&mut world);
+	}
+
+	/// An agent subtree keeps working when something is mounted above it: the
+	/// data lookup walks to the nearest ancestor holding the component, so a
+	/// wrapping control-flow node becoming the tree's root does not strip every
+	/// action below it of the agent it operates on.
+	#[beet_core::test]
+	fn a_mounted_agent_subtree_still_resolves() {
+		#[derive(Component, PartialEq, Debug)]
+		struct Health(u32);
+
+		let mut world = World::new();
+		// wrapper -> agent -> action, the shape a `<Fallback>` around a
+		// character produces
+		let wrapper =
+			world.spawn(children![(Health(100), children![()])]).flush();
+		let agent = world.entity(wrapper).get::<Children>().unwrap()[0];
+		let action = world.entity(agent).get::<Children>().unwrap()[0];
+
+		let mut state =
+			SystemState::<AgentQuery<&Health>>::from_world(&mut world);
+		let agent_query = state.get(&world).unwrap();
+
+		// the root is the wrapper, which holds no `Health`
+		agent_query.entity(action).xpect_eq(wrapper);
+		// the health the action reads is nonetheless the agent's
+		agent_query.get(action).unwrap().xpect_eq(Health(100));
 		state.apply(&mut world);
 	}
 }

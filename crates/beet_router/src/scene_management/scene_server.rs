@@ -215,7 +215,7 @@ mod test {
 		let mut host = server_world();
 		let root = host
 			.spawn_template(rsx! {
-				<ScriptRoute path="ping" script={r#"return "pong""#}/>
+				<ScriptRoute path="ping" script={r#""pong""#}/>
 			})
 			.unwrap()
 			.flush();

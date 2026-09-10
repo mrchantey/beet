@@ -242,7 +242,7 @@ mod route_test {
 		(AsyncPlugin, RouterPlugin)
 			.into_world()
 			.spawn((Router::with_defaults(), children![(
-				Script::<(), String>::new(r#"return "hello world""#),
+				Script::<(), String>::new(r#""hello world""#),
 				ExchangeScript::<(), String>::default(),
 				PathPartial::new("greet"),
 			)]))
@@ -262,7 +262,7 @@ mod route_test {
 		let route = world
 			.spawn_template(rsx! {
 				<ScriptRoute path="greet"
-					script={r#"return "hello " + input.params.name[0]"#}/>
+					script={r#""hello " + input.params.name[0]"#}/>
 			})
 			.unwrap()
 			.id();
@@ -282,12 +282,12 @@ mod route_test {
 			.spawn_template(rsx! {
 				<ScriptRoute path="sign"
 					{ScriptConfig::new(["Name"])}
-					script={r#"
+					script={r#"{
 						const name = (input.params.name || [""])[0];
 						if (!name) return "a name is required";
 						const entry = await world.spawn({ Name: name });
 						return "signed: " + (await world.get(entry, "Name"));
-					"#}/>
+					}"#}/>
 			})
 			.unwrap()
 			.id();
@@ -319,13 +319,13 @@ mod route_test {
 			.spawn_template(rsx! {
 				<ScriptRoute path="book"
 					{ScriptConfig::new(["Name"])}
-					script={r#"
+					script={r#"{
 						const found = [];
 						for (const id of await world.entities("Name")) {
 							found.push(await world.get(id, "Name"));
 						}
 						return { names: found };
-					"#}/>
+					}"#}/>
 			})
 			.unwrap()
 			.id();
@@ -343,7 +343,7 @@ mod route_test {
 		let route = world
 			.spawn_template(rsx! {
 				<ScriptRoute path="sign"
-					script={r#"await world.spawn({ Name: "ada" });"#}/>
+					script={r#"{ await world.spawn({ Name: "ada" }); }"#}/>
 			})
 			.unwrap()
 			.id();
@@ -364,13 +364,13 @@ mod route_test {
 			.spawn_template(rsx! {
 				<ScriptRoute path="sign"
 					{ScriptConfig::new(["Name"]).read_only()}
-					script={r#"
+					script={r#"{
 						const [entry] = await world.entities("Name");
 						try {
 							await world.insert(entry, "Name", "bob");
 							return "changed";
 						} catch (err) { return err.message; }
-					"#}/>
+					}"#}/>
 			})
 			.unwrap()
 			.id();
@@ -399,10 +399,10 @@ mod route_test {
 					route::new(
 						"sign",
 						Script::<Value, Value>::new(
-							r#"
+							r#"{
 							await world.spawn({ Name: input.params.name[0] });
 							return "signed";
-							"#,
+							}"#,
 						),
 					),
 					ExchangeScript::<
@@ -417,13 +417,13 @@ mod route_test {
 					route::new(
 						"book",
 						Script::<Value, Value>::new(
-							r#"
+							r#"{
 							const found = [];
 							for (const id of await world.entities("Name")) {
 								found.push(await world.get(id, "Name"));
 							}
 							return found.join(",");
-							"#,
+							}"#,
 						),
 					),
 					ExchangeScript::<
@@ -511,10 +511,10 @@ mod entry_test {
 				ExchangeScriptElement,
 				ScriptConfig::new(["Name"]),
 				children![Value::Str(
-					r#"
+					r#"{
 					const entry = await world.spawn({ Name: "ada" });
 					console.log(await world.get(entry, "Name"));
-					"#
+					}"#
 					.into()
 				)],
 			))

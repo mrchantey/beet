@@ -71,20 +71,21 @@ extern crate std;
 
 mod bridge_future;
 mod bridge_request;
+mod bridge_ticker;
 mod plugin;
 mod system_state;
 mod wake_signal;
-#[cfg(target_arch = "wasm32")]
-mod wasm_tick;
 
 pub use crate::bridge_future::AsyncSystemState;
 pub use crate::bridge_future::BridgeError;
 pub use crate::bridge_request::async_world_sync_point;
+#[cfg(target_arch = "wasm32")]
+pub use crate::bridge_ticker::WorldTicker;
+#[cfg(target_arch = "wasm32")]
+pub use crate::bridge_ticker::WorldTickerHook;
 pub use crate::plugin::AsyncPlugin;
 pub use crate::plugin::AsyncTickBudget;
 pub use crate::plugin::AsyncWorld;
-#[cfg(target_arch = "wasm32")]
-pub use crate::wasm_tick::WasmTickHook;
 
 /// The async prelude.
 ///

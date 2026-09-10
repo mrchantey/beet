@@ -120,8 +120,8 @@ fn route_bundle() -> impl Bundle {
 			// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
 			// authors) and digs out the `name` query parameter itself.
 			(
-				Script::<RequestParts, String>::new(
-					r#""hello " + input.url.params.name[0]"#,
+				Script::<Value, Value>::new(
+					r#""hello " + input.params.name[0]"#,
 				),
 				ExchangeScript::<Value, Value, ScriptInputMarker, ScriptAnswerMarker>::default(),
 				PathPartial::new("greet-request"),

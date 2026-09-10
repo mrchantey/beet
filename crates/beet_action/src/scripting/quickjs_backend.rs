@@ -470,7 +470,7 @@ mod test {
 	async fn increments_a_number() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<i64, i64>::new("return input + 1"),
+				Script::<i64, i64>::new("input + 1"),
 				ScriptAction::<i64, i64>::default(),
 			))
 			.call::<i64, i64>(41)
@@ -483,7 +483,7 @@ mod test {
 	async fn concatenates_strings() {
 		AsyncPlugin::world()
 			.spawn((
-				Script::<String, String>::new(r#"return "hello " + input"#),
+				Script::<String, String>::new(r#""hello " + input"#),
 				ScriptAction::<String, String>::default(),
 			))
 			.call::<String, String>("world".to_string())
@@ -503,7 +503,7 @@ mod test {
 		AsyncPlugin::world()
 			.spawn((
 				Script::<Player, Player>::new(
-					"input.score += 10; return input",
+					"{ input.score += 10; return input }",
 				),
 				ScriptAction::<Player, Player>::default(),
 			))
@@ -526,7 +526,7 @@ mod test {
 	#[beet_core::test]
 	async fn awaits_an_async_script() {
 		run_script::<(), i64>(
-			"return Promise.resolve(20).then(value => value * 2)",
+			"Promise.resolve(20).then(value => value * 2)",
 			(),
 		)
 		.await
@@ -538,14 +538,15 @@ mod test {
 	/// running dry with it still pending says so outright.
 	#[beet_core::test]
 	async fn an_unsettleable_promise_errors() {
-		run_script::<(), i64>("return new Promise(() => {})", ())
+		run_script::<(), i64>("new Promise(() => {})", ())
 			.await
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("never settle");
 	}
 
-	/// A script answers with `return`, so a typed output that never arrives is an
+	/// An expression body answers with its own value, so a typed output that
+	/// never arrives is an
 	/// error naming the one way to answer, not an opaque serde type mismatch.
 	#[beet_core::test]
 	async fn a_valueless_script_names_the_return() {
@@ -553,7 +554,7 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("a script answers with `return`");
+			.xpect_contains("the expression body evaluated to `undefined`");
 	}
 
 	/// The corollary: an output that accepts null tolerates the same script, so
@@ -569,7 +570,7 @@ mod test {
 	/// `console.log` in a pure transform must not be a `ReferenceError` here.
 	#[beet_core::test]
 	async fn a_pure_run_still_has_a_console() {
-		run_script::<(), i64>(r#"console.log("noise"); return 7"#, ())
+		run_script::<(), i64>(r#"{ console.log("noise"); return 7 }"#, ())
 			.await
 			.unwrap()
 			.xpect_eq(7);
@@ -580,7 +581,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_withheld_console_is_a_reference_error() {
 		run_script_with::<(), i64>(
-			r#"try { console.log("noise"); return 1 } catch (err) { return err instanceof ReferenceError ? 2 : 3 }"#,
+			r#"{ try { console.log("noise"); return 1 } catch (err) { return err instanceof ReferenceError ? 2 : 3 } }"#,
 			(),
 			ScriptConfig::default().without_console(),
 		)
@@ -601,12 +602,47 @@ mod test {
 			.unwrap_err();
 	}
 
+	/// The body is an arrow function body: a block answers with `return`, and an
+	/// object literal is parenthesised the way an arrow returns one. Both halves
+	/// of the rule in one place, since the rule is the whole authoring contract.
+	#[beet_core::test]
+	async fn a_block_body_answers_with_return() {
+		run_script::<i64, i64>(
+			"{ const doubled = input * 2; return doubled; }",
+			21,
+		)
+		.await
+		.unwrap()
+		.xpect_eq(42);
+		run_script::<(), Value>(r#"({ name: "ada" })"#, ())
+			.await
+			.unwrap()
+			.xpect_eq(value!({ "name": "ada" }));
+	}
+
+	/// The rule is strict about the leading brace, so the two ways to get it
+	/// wrong earn a hint rather than a bare `SyntaxError`: statements without a
+	/// block, and a `return` an expression body has no room for.
+	#[beet_core::test]
+	async fn a_misshapen_body_is_hinted() {
+		run_script::<(), i64>("return 7", ())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("drop the `return`");
+		run_script::<(), i64>("const seven = 7; seven", ())
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("wrap it in `{ }`");
+	}
+
 	/// A script has no ambient authority: the host's own globals are simply not
 	/// there to reach for.
 	#[beet_core::test]
 	async fn has_no_host_globals() {
 		run_script::<(), Vec<String>>(
-			"return [typeof fetch, typeof Deno, typeof process, typeof require]",
+			"[typeof fetch, typeof Deno, typeof process, typeof require]",
 			(),
 		)
 		.await
@@ -619,7 +655,7 @@ mod test {
 	#[beet_core::test]
 	async fn infinite_loop_stops_at_the_deadline() {
 		run_script_with::<(), ()>(
-			"while (true) {}",
+			"{ while (true) {} }",
 			(),
 			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(200),
@@ -631,7 +667,7 @@ mod test {
 		.to_string()
 		.xpect_contains("timed out");
 		// the host survived the containment
-		run_script::<i64, i64>("return input + 1", 1)
+		run_script::<i64, i64>("input + 1", 1)
 			.await
 			.unwrap()
 			.xpect_eq(2);
@@ -642,7 +678,7 @@ mod test {
 	#[beet_core::test]
 	async fn runaway_microtasks_stop_at_the_deadline() {
 		run_script_with::<(), ()>(
-			"const loop = () => Promise.resolve().then(loop); loop()",
+			"{ const loop = () => Promise.resolve().then(loop); loop() }",
 			(),
 			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(200),
@@ -659,7 +695,7 @@ mod test {
 	#[beet_core::test]
 	async fn allocation_bomb_hits_the_memory_cap() {
 		run_script_with::<(), ()>(
-			"const held = []; while (true) held.push(new Array(100000).fill(0))",
+			"{ const held = []; while (true) held.push(new Array(100000).fill(0)) }",
 			(),
 			ScriptConfig::default().with_limits(ScriptLimits {
 				memory: 8 * 1024 * 1024,
@@ -677,12 +713,12 @@ mod test {
 	#[beet_core::test]
 	async fn deep_recursion_is_a_catchable_range_error() {
 		run_script::<(), bool>(
-			r#"
+			r#"{
 			try {
 				(function recurse() { return 1 + recurse() })();
 				return false;
 			} catch (err) { return err instanceof RangeError }
-			"#,
+			}"#,
 			(),
 		)
 		.await
@@ -749,7 +785,7 @@ mod test {
 	#[beet_core::test]
 	async fn console_reads_input_and_splits_streams() {
 		let output = capture(
-			r#"console.log(input.name); console.error("oops")"#,
+			r#"{ console.log(input.name); console.error("oops") }"#,
 			serde_json::json!({ "name": "ada" }),
 		)
 		.await;

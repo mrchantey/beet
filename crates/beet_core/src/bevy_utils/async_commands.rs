@@ -93,9 +93,14 @@ pub struct AsyncPlugin;
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
 		// on wasm the bridge drives our tickable executor instead of bevy's
-		// JS-event-loop `spawn_local`.
+		// JS-event-loop `spawn_local`. Resolved from the world so a sync point
+		// only ever polls its own world's tasks (see `beet_async::WorldTicker`).
 		#[cfg(all(target_arch = "wasm32", feature = "std"))]
-		beet_async::WasmTickHook::set(tick_bridge_executor);
+		beet_async::WorldTickerHook::set(|world| {
+			world
+				.get_resource::<AsyncSpawner>()
+				.and_then(AsyncSpawner::ticker)
+		});
 
 		app.init_plugin_with(MainSchedulePlugin)
 			// drives `tick_global_task_pools_on_main_thread()` in the Last schedule
@@ -149,6 +154,25 @@ struct AsyncSpawnerInner {
 	in_flight: AtomicUsize,
 	spawn: Box<dyn Fn(SpawnFut) + Send + Sync>,
 	spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>,
+	/// This spawner's slot in [`BRIDGE_EXECUTORS`], and the closure that ticks
+	/// it. `None` for a spawner built from custom spawn functions (`tokio`,
+	/// `embassy`), which drives itself.
+	#[cfg(all(target_arch = "wasm32", feature = "std"))]
+	bridge: Option<(usize, Arc<dyn Fn() + Send + Sync>)>,
+}
+
+/// Free the executor slot, so the list stays bounded by the live worlds.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+impl Drop for AsyncSpawnerInner {
+	fn drop(&mut self) {
+		if let Some((slot, _)) = self.bridge {
+			BRIDGE_EXECUTORS.with(|executors| {
+				if let Some(entry) = executors.borrow_mut().get_mut(slot) {
+					*entry = None;
+				}
+			});
+		}
+	}
 }
 
 impl Default for AsyncSpawner {
@@ -162,11 +186,16 @@ impl Default for AsyncSpawner {
 			// the executor itself, so a no_std wasm build falls through to the
 			// manual-spawner branch.
 			if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-				spawn = Box::new(|fut| {
-					BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+				let slot = new_bridge_executor();
+				spawn = Box::new(move |fut| {
+					if let Some(executor) = bridge_executor(slot) {
+						executor.spawn(fut).detach();
+					}
 				});
-				spawn_local = Box::new(|fut| {
-					BRIDGE_EXECUTOR.with(|exec| exec.spawn(fut).detach());
+				spawn_local = Box::new(move |fut| {
+					if let Some(executor) = bridge_executor(slot) {
+						executor.spawn(fut).detach();
+					}
 				});
 			} else if #[cfg(all(feature = "std", feature = "bevy_multithreaded"))] {
 				spawn = Box::new(|fut| {
@@ -198,6 +227,11 @@ impl Default for AsyncSpawner {
 			in_flight: AtomicUsize::new(0),
 			spawn,
 			spawn_local,
+			#[cfg(all(target_arch = "wasm32", feature = "std"))]
+			bridge: Some((
+				slot,
+				Arc::new(move || tick_bridge_executor(slot)) as Arc<_>,
+			)),
 		}))
 	}
 }
@@ -206,9 +240,46 @@ impl Default for AsyncSpawner {
 // has no bridge executor and supplies its own spawner.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 thread_local! {
-	/// Tickable executor for bridged async tasks on wasm.
-	static BRIDGE_EXECUTOR: async_executor::LocalExecutor<'static> =
-		async_executor::LocalExecutor::new();
+	/// Every live bridge executor, one per [`AsyncSpawner`] and so one per
+	/// world.
+	///
+	/// Indexed rather than held by the spawner: a `LocalExecutor` is `!Send`,
+	/// while a [`Resource`] must be `Send + Sync`, so the executors live in
+	/// thread-local storage (wasm has the one thread) and a spawner carries only
+	/// its slot. A dropped spawner clears its slot, so the list is bounded by
+	/// the number of *live* worlds.
+	static BRIDGE_EXECUTORS: core::cell::RefCell<
+		Vec<Option<alloc::rc::Rc<async_executor::LocalExecutor<'static>>>>,
+	> = const { core::cell::RefCell::new(Vec::new()) };
+}
+
+/// Claim a slot for a new bridge executor, reusing one a dropped spawner left.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+fn new_bridge_executor() -> usize {
+	BRIDGE_EXECUTORS.with(|executors| {
+		let mut executors = executors.borrow_mut();
+		let executor =
+			Some(alloc::rc::Rc::new(async_executor::LocalExecutor::new()));
+		match executors.iter().position(Option::is_none) {
+			Some(slot) => {
+				executors[slot] = executor;
+				slot
+			}
+			None => {
+				executors.push(executor);
+				executors.len() - 1
+			}
+		}
+	})
+}
+
+/// The executor in `slot`, absent once its spawner has dropped.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+fn bridge_executor(
+	slot: usize,
+) -> Option<alloc::rc::Rc<async_executor::LocalExecutor<'static>>> {
+	BRIDGE_EXECUTORS
+		.with(|executors| executors.borrow().get(slot).cloned().flatten())
 }
 
 /// Ticks the wasm bridge executor so woken futures can poll while the sync-point
@@ -225,49 +296,85 @@ thread_local! {
 /// and keep the trap. Interim until wasm can unwind; see the sunset note on
 /// [`js_runtime::catch_no_abort`].
 ///
-/// ## Depth cap
+/// ## Re-entrancy
 /// Ticking is re-entrant by design: a ticked task may drive an app whose sync
-/// point fires this hook again so its bridged requests can poll while that
-/// world is published (`beet_async::wake_requests_and_wait`). But the executor
-/// is shared, so each nested tick also polls whatever *unrelated* tasks are
-/// runnable — under a loaded suite tests chain through each other's sync
-/// points and the call stack grows with the number of in-flight tasks, not
-/// with any structural nesting, until V8 overflows (`Maximum call stack size
-/// exceeded` surfacing inside arbitrary tests as opaque panics; an overflow
-/// landing in deno's lazy-global machinery permanently wedges
-/// `globalThis.setTimeout` into a `ReferenceError`, killing every later
-/// sleep). Beyond [`MAX_TICK_DEPTH`] a tick returns without polling: the
-/// skipped sync point's requests simply re-queue and are served on a later
-/// frame at shallower depth, so deep chains degrade to an extra frame of
-/// latency instead of an overflow. Structural nesting (a test driving an app
-/// driving a nested runner) is at most a handful of levels, well inside the
-/// cap.
+/// point ticks again so its bridged requests can poll while that world is
+/// published (`beet_async::wake_requests_and_wait`).
+///
+/// What must never happen is re-entering *the same* executor. Polling a task's
+/// siblings is the whole job, but doing it from inside one of their own polls
+/// is not: each sibling's runner loop re-enters the executor again, so the
+/// stack grows with the number of in-flight tasks rather than with any nesting.
+/// A test binary spawns one task per test onto the runner's executor, so that
+/// chain reaches any depth cap on load alone. The `TICKING` guard cuts it at the
+/// first level, leaving genuine structural nesting (a test driving an app
+/// driving a nested runner) to [`MAX_TICK_DEPTH`], which is a backstop against a
+/// V8 stack overflow: that surfaces inside arbitrary tests as an opaque panic
+/// and, landing in deno's lazy-global machinery, permanently wedges
+/// `globalThis.setTimeout` into a `ReferenceError` that kills every later sleep.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
-pub(crate) fn tick_bridge_executor() {
+fn tick_bridge_executor(slot: usize) {
 	/// nested tick entries permitted before deferring to a later frame; real
-	/// structural nesting is ≤5, the cap only cuts cross-task chains
+	/// structural nesting is ≤5
 	const MAX_TICK_DEPTH: usize = 16;
-	thread_local! {
-		static TICK_DEPTH: core::cell::Cell<usize> = core::cell::Cell::new(0);
-	}
-	let depth = TICK_DEPTH.with(|depth| depth.get());
+	let Some(executor) = bridge_executor(slot) else {
+		return;
+	};
+	let depth = TICK_DEPTH.with(core::cell::Cell::get);
 	if depth >= MAX_TICK_DEPTH {
 		return;
 	}
+	// already ticking this executor further up the stack: its tasks are being
+	// polled, and re-entering is the chain described above
+	if TICKING.with(|ticking| ticking.borrow().contains(&slot)) {
+		return;
+	}
 	TICK_DEPTH.with(|cell| cell.set(depth + 1));
-	BRIDGE_EXECUTOR.with(|exec| {
-		js_runtime::catch_no_abort(|| {
-			for _ in 0..100 {
-				if !exec.try_tick() {
-					break;
-				}
+	TICKING.with(|ticking| ticking.borrow_mut().push(slot));
+	js_runtime::catch_no_abort(|| {
+		for _ in 0..100 {
+			if !executor.try_tick() {
+				break;
 			}
-			Ok(())
-		})
-		.map_err(|()| PanicContext::record_swallowed(None))
-		.ok();
+		}
+		Ok(())
+	})
+	.map_err(|()| PanicContext::record_swallowed(None))
+	.ok();
+	TICKING.with(|ticking| {
+		ticking.borrow_mut().pop();
 	});
 	TICK_DEPTH.with(|cell| cell.set(depth));
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+thread_local! {
+	/// How many bridge ticks are on the stack.
+	static TICK_DEPTH: core::cell::Cell<usize> = const {
+		core::cell::Cell::new(0)
+	};
+	/// The executor slots with a tick on the stack, innermost last.
+	static TICKING: core::cell::RefCell<Vec<usize>> = const {
+		core::cell::RefCell::new(Vec::new())
+	};
+}
+
+/// The [`AsyncRunner`](crate::prelude::AsyncRunner) tick, which unlike a sync
+/// point is not handed a world.
+///
+/// The [`AsyncRunner`](crate::prelude::AsyncRunner) tick, which unlike a sync
+/// point is not handed a world, so it drives every live executor.
+///
+/// It wants all progress: a task may sit on a world nothing is updating (an app
+/// a test built and then suspended on), which no sync point will ever reach.
+/// Reached from inside a tick it still drives every *other* executor; the one
+/// it is already inside declines through the `TICKING` guard.
+#[cfg(all(target_arch = "wasm32", feature = "std"))]
+pub(crate) fn tick_bridge_executors() {
+	let slots = BRIDGE_EXECUTORS.with(|executors| executors.borrow().len());
+	for slot in 0..slots {
+		tick_bridge_executor(slot);
+	}
 }
 
 /// Unwrap a bridged closure's output, re-raising a wasm trap the world scope
@@ -298,11 +405,25 @@ impl AsyncSpawner {
 			in_flight: AtomicUsize::new(0),
 			spawn: Box::new(spawn),
 			spawn_local: Box::new(spawn_local),
+			// a custom runtime drives its own tasks
+			#[cfg(all(target_arch = "wasm32", feature = "std"))]
+			bridge: None,
 		}))
 	}
 
 	/// The number of tasks currently in flight.
 	pub fn in_flight(&self) -> usize { self.0.in_flight.load(Ordering::SeqCst) }
+
+	/// The [`WorldTicker`] for this spawner's own executor, which is how the
+	/// sync-point driver reaches the tasks of the world it is driving and no
+	/// others.
+	#[cfg(all(target_arch = "wasm32", feature = "std"))]
+	fn ticker(&self) -> Option<beet_async::WorldTicker> {
+		self.0
+			.bridge
+			.as_ref()
+			.map(|(_, tick)| beet_async::WorldTicker::new(tick.clone()))
+	}
 
 	/// Spawns a task, incrementing the in-flight counter until it completes.
 	pub fn spawn<Fut>(&self, fut: Fut)

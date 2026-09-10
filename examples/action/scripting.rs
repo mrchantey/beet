@@ -67,7 +67,7 @@ fn setup(async_commands: AsyncCommands) {
 				world
 					.spawn((
 						Script::<Player, Player>::new(
-							"input.score += 100; input",
+							"{ input.score += 100; return input }",
 						),
 						ScriptAction::<Player, Player>::default(),
 					))

@@ -216,6 +216,19 @@ fn slot_child_marker(attr: &RsxKeyedAttr) -> TokenStream {
 /// ..Default::default() }`. Caller content becomes children carrying `SlotChild`
 /// markers, matched to the template's `SlotTarget`s by the walker. Bare `{..}`
 /// attrs spread extra components/templates onto the same entity.
+/// Whether `expr` is a float literal with no type suffix, ie `0.` or `1.5` but
+/// not `1.5f32`. A suffixed literal already has a type, so it takes the ordinary
+/// [`IntoProp`] path.
+fn is_bare_float_literal(expr: &syn::Expr) -> bool {
+	matches!(
+		expr,
+		syn::Expr::Lit(syn::ExprLit {
+			lit: syn::Lit::Float(lit),
+			..
+		}) if lit.suffix().is_empty()
+	)
+}
+
 fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 	let tag_span = el.name.span();
 	let Some(tag_path) = el.name.as_path() else {
@@ -242,6 +255,15 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 				}
 				let field = syn::Ident::new(&key, attr.key.span());
 				match attr.value_expr() {
+					// a bare float literal has no type of its own, so it goes
+					// through `FloatProp` (taking a concrete `f64`) rather than
+					// `IntoProp`, whose `From` bound cannot pin it. See the
+					// trait docs.
+					Some(val) if is_bare_float_literal(val) => {
+						fields.push(
+							quote! { #field: FloatProp::float_prop(#val) },
+						);
+					}
 					Some(val) => {
 						fields.push(quote! { #field: (#val).into_prop() });
 					}

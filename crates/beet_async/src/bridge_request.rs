@@ -1,3 +1,4 @@
+use crate::bridge_ticker::BridgeTicker;
 use crate::plugin::AsyncTickBudget;
 use crate::plugin::StrongAsyncWorld;
 use crate::system_state::ErasedSystemStateCell;
@@ -50,23 +51,20 @@ pub fn async_world_sync_point<SyncPoint: 'static>(world: &mut World) {
 	// Read the configured maximum number of internal attempts we are willing to
 	// perform during this `SyncPoint`.
 	let max_ticks = world.get_resource::<AsyncTickBudget>().unwrap().0;
+	// the executor serving *this* world, resolved once and reused for every tick
+	// below (see `BridgeTicker`).
+	let ticker = BridgeTicker::resolve(world);
 	for _ in 0..max_ticks {
 		// Drive once. If no work was found, we may truly be done.
 		// but we should give external task pools one more opportunity to make newly-woken
 		// tasks runnable.
-		if async_world.0.tick_sync_point(sync_point, world)
+		if async_world.0.tick_sync_point(sync_point, world, &ticker)
 			== TickResult::NoWork
 		{
-			bevy::tasks::cfg::web! {
-				if {
-					crate::wasm_tick::WasmTickHook::tick();
-				} else {
-					bevy::tasks::tick_global_task_pools_on_main_thread();
-				}
-			}
-			// Retry once after ticking the global pool. If we are still idle,
-			// there is no more immediately available progress to make.
-			if async_world.0.tick_sync_point(sync_point, world)
+			ticker.tick();
+			// Retry once after ticking. If we are still idle, there is no more
+			// immediately available progress to make.
+			if async_world.0.tick_sync_point(sync_point, world, &ticker)
 				== TickResult::NoWork
 			{
 				return;
@@ -96,6 +94,7 @@ impl AsyncWorldInner {
 		&self,
 		sync_point: InternedSystemSet,
 		world: &mut World,
+		ticker: &BridgeTicker,
 	) -> TickResult {
 		let mut queued_requests = vec![];
 		while let Ok(queued_task_bridge) =
@@ -114,7 +113,7 @@ impl AsyncWorldInner {
 		// per call to our `.wake()`.
 		let completed_tasks = self
 			.world_scope
-			.scope(world, || wake_requests_and_wait(queued_requests));
+			.scope(world, || wake_requests_and_wait(queued_requests, ticker));
 		for task in completed_tasks {
 			task.apply(world);
 		}
@@ -175,6 +174,7 @@ impl CompletedBridgeRequest {
 #[inline]
 fn wake_requests_and_wait(
 	queued_requests: Vec<BridgeRequest>,
+	ticker: &BridgeTicker,
 ) -> Vec<CompletedBridgeRequest> {
 	let bridged_futures = queued_requests
 		.into_iter()
@@ -197,13 +197,7 @@ fn wake_requests_and_wait(
 		// we want to have all the wakers call .wake() before the first barrier calls .wait()
 		.collect::<Vec<_>>();
 
-	bevy::tasks::cfg::web! {
-		if {
-			crate::wasm_tick::WasmTickHook::tick();
-		} else {
-			bevy::tasks::tick_global_task_pools_on_main_thread();
-		}
-	}
+	ticker.tick();
 
 	bridged_futures
 		.into_iter()

@@ -214,7 +214,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn transforms_its_input() {
-		run_script::<i64, i64>("return input + 1", 41)
+		run_script::<i64, i64>("input + 1", 41)
 			.await
 			.unwrap()
 			.xpect_eq(42);
@@ -228,7 +228,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn round_trips_a_struct() {
-		run_script::<Player, Player>("input.score += 10; return input", Player {
+		run_script::<Player, Player>("{ input.score += 10; return input }", Player {
 			name: "ada".to_string(),
 			score: 5,
 		})
@@ -243,7 +243,7 @@ mod test {
 	#[beet_core::test]
 	async fn awaits_an_async_script() {
 		run_script::<(), i64>(
-			"return Promise.resolve(20).then(value => value * 2)",
+			"Promise.resolve(20).then(value => value * 2)",
 			(),
 		)
 		.await
@@ -254,7 +254,7 @@ mod test {
 	#[beet_core::test]
 	async fn splits_the_console_streams() {
 		let script = Script::<(), ()>::new(
-			r#"console.log("out"); console.error("err")"#,
+			r#"{ console.log("out"); console.error("err") }"#,
 		);
 		AsyncPlugin::world()
 			.run_async_local_then(move |world| async move {
@@ -273,11 +273,11 @@ mod test {
 		let mut world = test_world();
 		run_leaf(
 			&mut world,
-			r#"
+			r#"{
 			const entry = await world.spawn({ "Name": "ada" });
 			const name = await world.get(entry, "Name");
 			await world.insert(entry, "Name", name + " lovelace");
-			"#,
+			}"#,
 		)
 		.await
 		.unwrap();
@@ -304,14 +304,14 @@ mod test {
 		let entity = world.spawn(Name::new("ada")).id();
 		run_leaf_with(
 			&mut world,
-			r#"
+			r#"{
 			const [entry] = await world.entities("Name");
 			try {
 				await world.insert(entry, "Name", "bob");
 			} catch (err) {
 				await world.insert(entry, "game.Refused", err.message);
 			}
-			"#,
+			}"#,
 			// everything but the name, so the catch block can still record what
 			// it was refused
 			ScriptConfig {
@@ -332,7 +332,7 @@ mod test {
 	#[beet_core::test]
 	async fn a_worldless_script_has_no_world_global() {
 		run_script_with::<(), String>(
-			"return typeof world",
+			"typeof world",
 			(),
 			ScriptConfig::default().without_world(),
 		)
@@ -343,7 +343,7 @@ mod test {
 
 	#[beet_core::test]
 	async fn script_errors_propagate() {
-		run_script::<(), ()>(r#"throw new Error("boom")"#, ())
+		run_script::<(), ()>(r#"{ throw new Error("boom") }"#, ())
 			.await
 			.unwrap_err()
 			.to_string()
@@ -357,13 +357,13 @@ mod test {
 	#[beet_core::test]
 	async fn denies_every_ambient_authority() {
 		let denied = [
-			(r#"return Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
-			(r#"return Deno.env.get("HOME")"#, "--allow-env"),
+			(r#"Deno.readTextFileSync("/etc/passwd")"#, "--allow-read"),
+			(r#"Deno.env.get("HOME")"#, "--allow-env"),
 			(
-				r#"return Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
+				r#"Deno.writeTextFileSync("/tmp/beet-escape", "x")"#,
 				"--allow-write",
 			),
-			(r#"return fetch("https://example.com")"#, "--allow-net"),
+			(r#"fetch("https://example.com")"#, "--allow-net"),
 		];
 		for (source, expected) in denied {
 			run_script::<(), ()>(source, ())
@@ -381,7 +381,7 @@ mod test {
 	#[beet_core::test]
 	async fn the_runner_globals_are_absent() {
 		run_script::<(), Vec<String>>(
-			"return [typeof read_file, typeof write_file, typeof remove, \
+			"[typeof read_file, typeof write_file, typeof remove, \
 typeof set_env, typeof exit]",
 			(),
 		)
@@ -394,7 +394,7 @@ typeof set_env, typeof exit]",
 	#[beet_core::test]
 	async fn runaway_scripts_are_terminated_at_the_deadline() {
 		run_script_with::<(), ()>(
-			"while (true) {}",
+			"{ while (true) {} }",
 			(),
 			ScriptConfig::default().with_limits(ScriptLimits {
 				timeout: Duration::from_millis(500),
@@ -405,7 +405,7 @@ typeof set_env, typeof exit]",
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("timed out");
-		run_script::<i64, i64>("return input + 1", 1)
+		run_script::<i64, i64>("input + 1", 1)
 			.await
 			.unwrap()
 			.xpect_eq(2);

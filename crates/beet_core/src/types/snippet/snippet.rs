@@ -161,6 +161,45 @@ impl<T, U: Into<T>> IntoProp<PropOpt<T>, PropOptSomeMarker> for Option<U> {
 	fn into_prop(self) -> PropOpt<T> { PropOpt(self.map(Into::into)) }
 }
 
+/// Marker for the narrowing impl, a float type `f64` cannot `From` into.
+pub struct FloatPropNarrowMarker;
+/// Marker for the `From<f64>` impl.
+pub struct FloatPropFromMarker;
+/// Marker for the [`PropOpt`] wrap, carrying the inner value's own marker.
+pub struct FloatPropOptMarker<M>(core::marker::PhantomData<M>);
+
+/// Convert a bare float literal into a `#[template]` prop field, the conversion
+/// the `rsx!` component lowering uses for `<Foo field=1.5/>`.
+///
+/// [`IntoProp`] cannot serve this case. A literal's type is an inference
+/// variable, and `F: From<{float}>` never pins it: the variable takes its `f64`
+/// fallback, and `f32: From<f64>` does not exist because it is lossy, so
+/// `<Camera3dLookAt x=0./>` against an `f32` prop has no resolution (rustc used
+/// to retry such a bound as `f32`, which `float_literal_f32_fallback` is now
+/// phasing out). Taking the literal as a concrete `f64` removes the variable
+/// entirely, leaving the field's own type to pick the impl.
+pub trait FloatProp<M> {
+	/// Convert a float literal into the field type.
+	fn float_prop(value: f64) -> Self;
+}
+
+/// The only lossy target: `f32` has no `From<f64>`, which is the whole reason
+/// this trait exists.
+impl FloatProp<FloatPropNarrowMarker> for f32 {
+	fn float_prop(value: f64) -> Self { value as f32 }
+}
+
+/// Every field type that *does* accept an `f64`, `f64` itself included.
+impl<T: From<f64>> FloatProp<FloatPropFromMarker> for T {
+	fn float_prop(value: f64) -> Self { T::from(value) }
+}
+
+/// An optional or required numeric prop accepts the bare literal, mirroring
+/// [`IntoProp`]'s [`PropOpt`] impl.
+impl<M, T: FloatProp<M>> FloatProp<FloatPropOptMarker<M>> for PropOpt<T> {
+	fn float_prop(value: f64) -> Self { PropOpt(Some(T::float_prop(value))) }
+}
+
 /// Lift `self` into a [`Bundle`] for an `rsx!` markup position (text, `{expr}`,
 /// attribute value, child list). The marker `M` disambiguates the blanket impls,
 /// mirroring [`IntoBundle`](crate::prelude::IntoBundle).

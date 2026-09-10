@@ -16,8 +16,8 @@ string output is the response. The query params arrive at `input.params`.
 <CallOnReady {(CliServer, HttpServer{port:8080})}>
 <Router>
 	<ScriptRoute path="add"
-		script='"result: " + (Number(input.url.params.a[0]) + Number(input.url.params.b[0]))'/>
+		script='"result: " + (Number(input.params.a[0]) + Number(input.params.b[0]))'/>
 	<ScriptRoute path="subtract"
-		script='"result: " + (Number(input.url.params.a[0]) - Number(input.url.params.b[0]))'/>
+		script='"result: " + (Number(input.params.a[0]) - Number(input.params.b[0]))'/>
 </Router>
 </CallOnReady>

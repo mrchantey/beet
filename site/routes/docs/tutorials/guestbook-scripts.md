@@ -30,7 +30,7 @@ If you are arriving here fresh, put this in a file called `main.bsx` in an empty
 The guestbook greets nobody. Add a route that does, above the page route:
 
 ```jsx
-	<ScriptRoute path="greet" script="return 'hello ' + (input.params.name ? input.params.name[0] : 'stranger') + ', thanks for visiting'"/>
+	<ScriptRoute path="greet" script="'hello ' + (input.params.name ? input.params.name[0] : 'stranger') + ', thanks for visiting'"/>
 ```
 
 Run it:
@@ -55,7 +55,7 @@ INFO Get /greet -> 200 OK in 764 µs (#1)
 hello stranger, thanks for visiting
 ```
 
-Notice where that behavior lives. It is an attribute, in the same file as the markup, beside the routes it serves. The script runs in QuickJS with nothing of the host to reach for: no filesystem, no network, no environment. Its `input` is the request, a `{ path, params, body }` map, and it answers with `return`: every script is the body of an async function, which is what will make the `await`s below legal.
+Notice where that behavior lives. It is an attribute, in the same file as the markup, beside the routes it serves. The script runs in QuickJS with nothing of the host to reach for: no filesystem, no network, no environment. Its `input` is the request, a `{ path, params, body }` map, and it answers the way an arrow function body does: this one is an expression, so its value *is* the answer. Every script is an async function body, which is what will make the `await`s below legal.
 
 ## Mint a word the engine never shipped
 
@@ -74,12 +74,12 @@ Now a route that uses it. Add this below the greet route:
 ```jsx
 	<ScriptRoute path="visit"
 		{ScriptConfig{read:["guestbook.Visits"],write:["guestbook.Visits"]}}
-		script="
+		script="{
 		const found = await world.entities('guestbook.Visits');
 		const counter = found.length ? found[0] : await world.spawn({ 'guestbook.Visits': 0 });
 		await world.insert(counter, 'guestbook.Visits', (await world.get(counter, 'guestbook.Visits')) + 1);
 		return 'visit ' + (await world.get(counter, 'guestbook.Visits'));
-		"/>
+		}"/>
 ```
 
 The count has to outlive a single request, so start the guestbook as a server:
@@ -115,13 +115,13 @@ Notice too that the script has no `reply`. What it returns is the answer: a stri
 ```jsx
 	<ScriptRoute path="tamper"
 		{ScriptConfig{read:["guestbook.Visits"],write:["nothing.*"]}}
-		script="
+		script="{
 		const [counter] = await world.entities('guestbook.Visits');
 		try {
 			await world.insert(counter, 'guestbook.Visits', 9999);
 			return 'tampered';
 		} catch (err) { return err.message; }
-		"/>
+		}"/>
 ```
 
 Stop the server with Ctrl-C and start it again, then visit twice, tamper, and visit once more:
@@ -153,13 +153,13 @@ We told the guestbook that `guestbook.Visits` is a whole number. Add a route tha
 ```jsx
 	<ScriptRoute path="miscount"
 		{ScriptConfig{read:["guestbook.Visits"],write:["guestbook.Visits"]}}
-		script="
+		script="{
 		const [counter] = await world.entities('guestbook.Visits');
 		try {
 			await world.insert(counter, 'guestbook.Visits', 'lots');
 			return 'miscounted';
 		} catch (err) { return err.message; }
-		"/>
+		}"/>
 ```
 
 Restart the server again, then visit twice, miscount, and visit once more:
