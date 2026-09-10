@@ -28,7 +28,7 @@ pub struct RepoBucket;
 
 impl RepoBucket {
 	/// The label a stack declares its repo store under, and the one string both
-	/// ends of the agreement share. `infra_ext::REPO_BUCKET_LABEL` re-exports
+	/// ends of the agreement share. `RepoBucket::LABEL` re-exports
 	/// this rather than restating it, so the builders that hand the prefix to a
 	/// process and the assertion that checks it cannot drift.
 	pub const LABEL: &'static str = "repo";

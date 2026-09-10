@@ -9,12 +9,6 @@ use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
-/// The label a stack declares its REPO STORE under, and therefore the one
-/// [`remote_bootstrap`] names. Re-exported from [`RepoBucket`] rather than
-/// restated, because the two ends of the reference have to be the same string:
-/// the deploy publishes into this store and the shipped binary reads out of it.
-pub const REPO_BUCKET_LABEL: &str = RepoBucket::LABEL;
-
 /// The one store an app is served from: a per-stage replica of the checkout, so
 /// everything the binary reads (the entry, the routes, the assets) is one store.
 ///
@@ -23,14 +17,14 @@ pub const REPO_BUCKET_LABEL: &str = RepoBucket::LABEL;
 /// between the sync and the binary swap is not a window where the old binary
 /// parses the new document. See [`RepoBucket`].
 ///
-pub fn repo_bucket() -> S3BucketBlock { S3BucketBlock::new(REPO_BUCKET_LABEL) }
+pub fn repo_bucket() -> S3BucketBlock { S3BucketBlock::new(RepoBucket::LABEL) }
 
 /// The resolved name of `stack`'s repo store, ready to inject so the deployed
 /// binary reconstructs the same store. Deterministic for a given stack (identity
 /// only, independent of the per-deploy id), so a throwaway stack rebuilt from
 /// the same `app_name` resolves the same store.
 pub fn repo_bucket_name(stack: &ResolvedStack) -> String {
-	stack.resource_name(REPO_BUCKET_LABEL)
+	stack.resource_name(RepoBucket::LABEL)
 }
 
 /// A CloudWatch tail of `target`, with an optional timeout after which the
