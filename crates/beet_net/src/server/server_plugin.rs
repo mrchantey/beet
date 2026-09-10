@@ -133,6 +133,7 @@ mod boot_check_test {
 			.xpect_true();
 		// .. and so did the channel facet, which now serves a round trip
 		let response = AsyncRunner::poll_and_update(
+			app.world().resource::<AsyncSpawner>().clone(),
 			|| {
 				app.update();
 			},

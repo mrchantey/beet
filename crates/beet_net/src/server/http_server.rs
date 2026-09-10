@@ -374,7 +374,7 @@ pub(crate) mod tests {
 	async fn never_started(app: &mut App, log: Store<Vec<&'static str>>) {
 		for _ in 0..16 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 		}
 		log.get().xpect_eq(Vec::<&'static str>::new());
 	}

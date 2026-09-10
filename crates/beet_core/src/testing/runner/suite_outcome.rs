@@ -190,8 +190,12 @@ mod tests {
 					#[allow(unreachable_code)]
 					Ok::<(), BevyError>(())
 				});
-				// the spawned task panics while this test is suspended; hang
-				// until the runner times the test out
+				// drive this app's own runtime so the task is polled and
+				// panics: each world owns its executor, so nothing else will
+				// ever reach a task on an app nobody updates
+				AsyncRunner::tick(app.world()).await;
+				// the panic landed while this test is suspended; hang until the
+				// runner times the test out
 				core::future::pending::<()>().await;
 				#[allow(unreachable_code)]
 				Ok::<(), String>(())

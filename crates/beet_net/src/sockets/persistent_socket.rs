@@ -186,7 +186,7 @@ mod test {
 		// settle a few frames: a leaked writer would surface a duplicate echo
 		for _ in 0..10 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 		}
 		echoes.len().xpect_eq(1usize);
 	}

@@ -18,18 +18,45 @@ use core::future::Future;
 /// returns immediately without actually running the app.
 pub struct AsyncRunner;
 
-/// Ticks global task pools to progress local tasks.
+/// Progress `world`'s local tasks.
 ///
 /// This is required because `spawn_local` tasks can only be polled by the
-/// thread that owns the LocalExecutor.
+/// thread that owns the `LocalExecutor`.
+///
+/// Natively that is bevy's global task pools, which the world does not select.
+/// On wasm each world's [`AsyncSpawner`] owns its own tickable executor (bevy's
+/// `spawn_local` uses the untickable JS event loop), and driving *that* one is
+/// the point: a tick that reached every executor in the process would poll the
+/// tasks of unrelated worlds, which is how a re-entrant tick used to chain
+/// through a whole test binary.
 #[inline]
-fn tick_task_pools() {
+fn tick_task_pools(world: &World) {
 	#[cfg(not(target_arch = "wasm32"))]
-	bevy::tasks::tick_global_task_pools_on_main_thread();
-	// wasm: drive our tickable bridge executor (bevy's `spawn_local` uses the
-	// untickable JS event loop), so spawned tasks make progress between updates.
+	{
+		let _ = world;
+		bevy::tasks::tick_global_task_pools_on_main_thread();
+	}
+	#[cfg(target_arch = "wasm32")]
+	if let Some(_spawner) = world.get_resource::<AsyncSpawner>() {
+		#[cfg(feature = "std")]
+		_spawner.tick();
+	}
+}
+
+/// The [`tick_task_pools`] twin for a caller holding the spawner rather than the
+/// world, ie [`AsyncRunner::poll_and_update`], whose `update` closure has the
+/// world borrowed mutably for the length of the loop.
+#[inline]
+fn tick_spawner(spawner: &AsyncSpawner) {
+	#[cfg(not(target_arch = "wasm32"))]
+	{
+		let _ = spawner;
+		bevy::tasks::tick_global_task_pools_on_main_thread();
+	}
 	#[cfg(all(target_arch = "wasm32", feature = "std"))]
-	super::tick_bridge_executors();
+	spawner.tick();
+	#[cfg(all(target_arch = "wasm32", not(feature = "std")))]
+	let _ = spawner;
 }
 
 /// Yields control to the host executor.
@@ -62,7 +89,7 @@ impl AsyncRunner {
 			// 1. update first to process the sync point + spawned commands
 			app.update();
 			// 2. tick local tasks so spawned futures progress between updates
-			tick_task_pools();
+			tick_task_pools(app.world());
 			// 3. exit if AppExit
 			if let Some(exit) = app.should_exit() {
 				return exit;
@@ -79,7 +106,7 @@ impl AsyncRunner {
 	/// yields, so a synchronous spin would wedge the tab forever.
 	async fn init_async(app: &mut App) {
 		while app.plugins_state() == bevy::app::PluginsState::Adding {
-			tick_task_pools();
+			tick_task_pools(app.world());
 			yield_to_executor().await;
 		}
 		app.finish();
@@ -98,7 +125,7 @@ impl AsyncRunner {
 			// 1. update first to process the sync point + spawned commands
 			world.update_local();
 			// 2. tick local tasks in multi-threaded mode
-			tick_task_pools();
+			tick_task_pools(world);
 			// 3. exit if AppExit
 			if let Some(exit) = world.should_exit() {
 				return Some(exit);
@@ -117,8 +144,8 @@ impl AsyncRunner {
 	/// a frame-by-frame loop that inspects state between ticks (eg a test polling a
 	/// render buffer), where [`settle_async_tasks`](Self::settle_async_tasks) would
 	/// over-run the awaited state.
-	pub async fn tick() {
-		tick_task_pools();
+	pub async fn tick(world: &World) {
+		tick_task_pools(world);
 		yield_to_executor().await;
 	}
 
@@ -144,7 +171,7 @@ impl AsyncRunner {
 		let mut idle = 0;
 		for _ in 0..MAX_FRAMES {
 			world.update_local();
-			tick_task_pools();
+			tick_task_pools(world);
 			if world.should_exit().is_some() {
 				return;
 			}
@@ -168,7 +195,7 @@ impl AsyncRunner {
 	/// pipeline that crosses frames actually crosses them.
 	pub async fn step(app: &mut App) {
 		app.update();
-		tick_task_pools();
+		tick_task_pools(app.world());
 		yield_to_executor().await;
 	}
 
@@ -177,6 +204,7 @@ impl AsyncRunner {
 	/// Ticks task pools after yielding to ensure spawned local tasks make progress.
 	/// Runs one final update after the future resolves to process any pending commands.
 	pub async fn poll_and_update<F>(
+		spawner: AsyncSpawner,
 		mut update: impl FnMut(),
 		fut: F,
 	) -> F::Output
@@ -189,7 +217,7 @@ impl AsyncRunner {
 			update();
 			// Tick task pools BEFORE polling to ensure newly spawned
 			// local tasks are polled in the same tick.
-			tick_task_pools();
+			tick_spawner(&spawner);
 			if let Some(out) = futures_lite::future::poll_once(&mut fut).await {
 				// Run one final update to process any commands the async task
 				// produced before completing (e.g. resource modifications).
@@ -200,7 +228,7 @@ impl AsyncRunner {
 			yield_to_executor().await;
 			// Tick again after yielding to progress any tasks that were
 			// waiting on this task to yield.
-			tick_task_pools();
+			tick_spawner(&spawner);
 		}
 	}
 }

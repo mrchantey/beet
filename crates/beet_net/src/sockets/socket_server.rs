@@ -375,7 +375,7 @@ mod tests {
 		// drive a bounded number of frames; the filter miss never starts the facet.
 		for _ in 0..16 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 		}
 		log.get().xpect_eq(Vec::<&'static str>::new());
 	}

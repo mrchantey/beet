@@ -25,7 +25,7 @@ pub async fn update_until(
 			return true;
 		}
 		app.update();
-		AsyncRunner::tick().await;
+		AsyncRunner::tick(app.world()).await;
 	}
 	cond(app.world_mut())
 }
@@ -46,7 +46,7 @@ pub async fn update_until_timeout(
 			return true;
 		}
 		app.update();
-		AsyncRunner::tick().await;
+		AsyncRunner::tick(app.world()).await;
 		time_ext::sleep_millis(10).await;
 	}
 	cond(app.world_mut())
@@ -62,6 +62,6 @@ pub async fn update_until_timeout(
 pub async fn update_frames(app: &mut App, frames: usize) {
 	for _ in 0..frames {
 		app.update();
-		AsyncRunner::tick().await;
+		AsyncRunner::tick(app.world()).await;
 	}
 }

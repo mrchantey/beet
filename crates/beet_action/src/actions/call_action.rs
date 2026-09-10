@@ -103,7 +103,9 @@ where
 {
 	let recv = call_with_oneshot::<Input, Out>(&mut entity, input)?;
 	let world = entity.into_world_mut();
-	AsyncRunner::poll_and_update(|| world.update_local(), recv.wait()).await
+	let spawner = world.resource::<AsyncSpawner>().clone();
+	AsyncRunner::poll_and_update(spawner, || world.update_local(), recv.wait())
+		.await
 }
 
 /// Extension trait for calling [`Action`] components on

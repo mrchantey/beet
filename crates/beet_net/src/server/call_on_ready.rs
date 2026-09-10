@@ -263,7 +263,7 @@ mod test {
 			.id();
 		for _ in 0..16 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 		}
 		app.world()
 			.entity(entity)
@@ -416,7 +416,7 @@ mod test {
 			.unwrap();
 		for _ in 0..16 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 		}
 		nested_ran.get().xpect_false();
 	}

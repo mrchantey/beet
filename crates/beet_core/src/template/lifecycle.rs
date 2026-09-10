@@ -666,7 +666,7 @@ impl TemplatePending {
 				);
 				last_warn = Instant::now();
 			}
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(world).await;
 		}
 	}
 }

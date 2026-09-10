@@ -138,7 +138,7 @@ The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_runni
 
 Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
 
-`malenia.bsx` exits 70: its `<Repeat>` ends the fight by *failing* (the terminal outcome a `<Repeat>` always has), and `CallOnReady` maps that to an error status. Wrapping the entry to swallow it is not available here — an outer node becomes the agent `AgentQuery` resolves, so Malenia loses her `Health`. Judge it on the "You win" line, not the status.
+Every scene in `examples/action/` exits 0. `<Repeat>` answers `Outcome::PASS` when its loop ends (the child failing is the loop's exit condition, not an error), so `malenia.bsx` and `repeat_while.bsx` report a completed run rather than a failure.
 
 ## Not Verifiable Via CLI (skip)
 

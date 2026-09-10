@@ -214,6 +214,7 @@ mod test {
 
 		// drive the app until the server echoes the message back to the client
 		let echo = AsyncRunner::poll_and_update(
+			app.world().resource::<AsyncSpawner>().clone(),
 			|| {
 				app.update();
 			},

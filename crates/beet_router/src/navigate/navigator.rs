@@ -589,7 +589,7 @@ mod test {
 		async fn drive_until(app: &mut App, host: Entity, needle: &str) {
 			for _ in 0..200 {
 				app.update();
-				AsyncRunner::tick().await;
+				AsyncRunner::tick(app.world()).await;
 				let frame = app
 					.world()
 					.get::<DoubleBuffer>(host)

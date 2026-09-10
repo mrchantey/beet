@@ -185,6 +185,7 @@ mod test {
 		);
 		// drive the app until the posted request round-trips to a response
 		let response = AsyncRunner::poll_and_update(
+			app.world().resource::<AsyncSpawner>().clone(),
 			|| {
 				app.update();
 			},

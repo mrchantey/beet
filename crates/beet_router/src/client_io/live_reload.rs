@@ -597,7 +597,7 @@ mod test {
 		let mut idle_without_match = 0;
 		for _ in 0..10_000 {
 			app.update();
-			AsyncRunner::tick().await;
+			AsyncRunner::tick(app.world()).await;
 			time_ext::sleep_millis(1).await;
 			let frame = app
 				.world()
@@ -736,7 +736,7 @@ mod test {
 			});
 			for _ in 0..40 {
 				app.update();
-				AsyncRunner::tick().await;
+				AsyncRunner::tick(app.world()).await;
 				time_ext::sleep_millis(1).await;
 			}
 		}
