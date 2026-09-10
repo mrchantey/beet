@@ -257,7 +257,7 @@ async fn StateAction(cx: ActionContext) -> Result<Outcome> {
 /// to the typed script plus the call/log glue.
 #[cfg(feature = "scripting")]
 #[template]
-pub fn NumberScript(#[prop(into)] script: String) -> impl Bundle {
+pub fn NumberScript(#[prop] script: String) -> impl Bundle {
 	let action = Script::<i64, i64>::new(script).into_action();
 	Action::<(), Outcome>::new_async(move |cx: ActionContext| {
 		let action = action.clone();
@@ -274,7 +274,7 @@ pub fn NumberScript(#[prop(into)] script: String) -> impl Bundle {
 /// visible in markup. Runs over a seed string, logs the result, then passes.
 #[cfg(feature = "scripting")]
 #[template]
-pub fn TextScript(#[prop(into)] script: String) -> impl Bundle {
+pub fn TextScript(#[prop] script: String) -> impl Bundle {
 	let action = Script::<String, String>::new(script).into_action();
 	Action::<(), Outcome>::new_async(move |cx: ActionContext| {
 		let action = action.clone();

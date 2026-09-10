@@ -25,11 +25,11 @@ use beet_net::prelude::*;
 #[template]
 pub fn CodeSnippet(
 	/// The source file path, resolved through the nearest ancestor store.
-	#[prop(into)]
+	#[prop]
 	src: String,
 	/// The highlighter language (eg `jsx`, `rust`, `sh`); inferred from the file
 	/// extension when empty.
-	#[prop(into, default)]
+	#[prop(default)]
 	language: String,
 	/// Strip a leading `<!-- … -->` doc comment (and the blank lines after it),
 	/// so a documented example file renders as a lean snippet. Author it as a bare

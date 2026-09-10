@@ -171,7 +171,7 @@ impl TofuApply {
 	/// Converge only the named layer, rather than the whole stack.
 	pub fn for_layer(layer: impl Into<SmolStr>) -> Self {
 		Self {
-			layer: PropOpt::some(layer.into()),
+			layer: Some(layer.into()),
 		}
 	}
 }

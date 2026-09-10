@@ -18,7 +18,7 @@ use beet_ui::prelude::*;
 /// layout or markup site can place `<ErrorPage message=".."/>`. The document
 /// chrome is the ancestor layout's job; this widget owns only the error card.
 #[template]
-pub fn ErrorPage(#[prop(into)] message: String) -> impl Bundle {
+pub fn ErrorPage(#[prop] message: String) -> impl Bundle {
 	rsx! {
 		<div {Classes::new([classes::CARD_FILLED])}>
 			<h1 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Page failed to load"</h1>

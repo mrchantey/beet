@@ -20,7 +20,7 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 #[template]
 pub fn ServeBlobs(
 	/// The mount path the static files are served under, eg `assets`.
-	#[prop(into)]
+	#[prop]
 	prefix: String,
 	/// Mark served files cacheable with this browser TTL (eg `cache="1h"`); the
 	/// edge TTL is the [`CacheHeaders`] default, refreshed early by a deploy
@@ -120,10 +120,10 @@ fn unhydrated_hint(request: &RequestParts, err: BevyError) -> BevyError {
 #[template]
 pub fn AssetsDir(
 	/// The directory to mount, relative to the nearest ancestor store root.
-	#[prop(into)]
+	#[prop]
 	src: String,
 	/// The url prefix to serve under; defaults to `src`.
-	#[prop(into, default)]
+	#[prop(default)]
 	prefix: String,
 	/// Browser cache TTL for the served files, forwarded to [`ServeBlobs`].
 	cache: Option<Duration>,
@@ -136,11 +136,7 @@ pub fn AssetsDir(
 	// the props struct directly rather than `rsx!`: an already-`Option` prop has no
 	// call-site conversion, only the bare inner value does.
 	(
-		ServeBlobs {
-			prefix,
-			cache: PropOpt(cache),
-		}
-		.into_snippet_bundle(),
+		ServeBlobs { prefix, cache }.into_snippet_bundle(),
 		DirPath(SmolPath::from(src.as_str())),
 	)
 }

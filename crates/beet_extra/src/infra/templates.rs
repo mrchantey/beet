@@ -19,7 +19,7 @@ use beet_infra::prelude::*;
 /// form of the infra examples' `build_beet_binary`. A deploy that ships a binary (a
 /// container image, a Lambda zip) reads the produced artifact from its sibling.
 #[template]
-pub fn BeetBinaryBuild(#[prop(into)] features: String) -> impl Bundle {
+pub fn BeetBinaryBuild(#[prop] features: String) -> impl Bundle {
 	infra_ext::beet_cargo_build(features).into_build_artifact()
 }
 
@@ -29,8 +29,8 @@ pub fn BeetBinaryBuild(#[prop(into)] features: String) -> impl Bundle {
 /// example needs the workspace example feature set).
 #[template]
 pub fn ExampleBinaryBuild(
-	#[prop(into)] example: String,
-	#[prop(into)] features: String,
+	#[prop] example: String,
+	#[prop] features: String,
 ) -> impl Bundle {
 	CargoBuild::default()
 		.with_target(BuildTarget::Zigbuild)
@@ -134,20 +134,20 @@ pub fn SiteSync(
 /// takes the production apex, and it makes `--stage` meaningful.
 #[template(system)]
 pub fn LambdaSiteBlock(
-	#[prop(into)] features: String,
+	#[prop] features: String,
 	/// Comma-separated public hostnames, the first being the certificate's
 	/// primary domain, eg `beetmash.com,www.beetmash.com`. Reads the zone from
 	/// `CLOUDFLARE_ZONE_ID`.
-	#[prop(into, default)]
+	#[prop(default)]
 	authorities: String,
 	/// The route the deployed entry dispatches, for an entry that is its own CLI
 	/// and so names which of its verbs IS the site.
-	#[prop(into)]
+	#[prop]
 	exec_route: Option<String>,
 	/// The beet checkout to build the binary out of, workspace-relative. A site
 	/// repo carrying no beet crates of its own names one; a site inside the beet
 	/// workspace leaves it unset.
-	#[prop(into)]
+	#[prop]
 	workspace_dir: Option<String>,
 	stacks: StackQuery,
 	entity: Entity,
@@ -199,12 +199,12 @@ pub fn LambdaSiteBlock(
 #[template(system)]
 pub fn LambdaJobBlock(
 	/// The function's label, which the schedule's `target` names.
-	#[prop(into)]
+	#[prop]
 	label: String,
-	#[prop(into)] features: String,
+	#[prop] features: String,
 	/// The entry verb the function boots, whose router hosts the job routes an
 	/// invoke dispatches.
-	#[prop(into)]
+	#[prop]
 	exec_route: String,
 	/// Seconds one run may take, the service maximum by default: a job sweeps a
 	/// store rather than answering a request, and the first run over a history
@@ -249,7 +249,7 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// from the ancestor `<Stack>`.
 #[template(system)]
 pub fn LightsailSiteBlock(
-	#[prop(into)] features: String,
+	#[prop] features: String,
 	stacks: StackQuery,
 	entity: Entity,
 ) -> Result<impl Bundle> {
@@ -329,7 +329,7 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 /// `dev` deploy never touches production apex DNS, and it makes `--stage` meaningful.
 #[template(system)]
 pub fn LightsailBeetSiteBlock(
-	#[prop(into)] features: String,
+	#[prop] features: String,
 	/// The boot route the unit dispatches: the site entry is a `CliServer`
 	/// dispatcher, so the deployed process names which of its routes IS the site.
 	#[prop(default = String::from("serve"))]

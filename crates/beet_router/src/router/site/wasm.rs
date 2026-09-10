@@ -28,10 +28,10 @@ use beet_core::prelude::*;
 #[template]
 pub fn Wasm(
 	/// The wasm artifact url, eg `/assets/wasm/beet-min.wasm`.
-	#[prop(into)]
+	#[prop]
 	src: String,
 	/// The wasm-bindgen glue url; defaults to `src` with `.wasm` swapped for `.js`.
-	#[prop(into, default)]
+	#[prop(default)]
 	js: String,
 ) -> impl Bundle {
 	let js = if js.is_empty() {
@@ -62,7 +62,7 @@ pub fn Wasm(
 #[template]
 pub fn MainBsx(
 	/// The program url the browser fetches, eg `/examples/wasm/hello.bsx`.
-	#[prop(into)]
+	#[prop]
 	src: String,
 ) -> impl Bundle {
 	rsx! { <script type="application/x-bsx" data-src=src></script> }

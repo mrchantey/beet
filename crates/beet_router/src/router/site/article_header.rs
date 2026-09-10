@@ -78,10 +78,10 @@ pub(crate) fn article_byline(meta: &PageMeta) -> Snippet {
 #[template]
 pub fn YouTubeEmbed(
 	/// The video's watch url, eg `https://youtu.be/7koepBSRoUI`.
-	#[prop(into)]
+	#[prop]
 	url: Url,
 	/// The iframe's accessible title.
-	#[prop(into, default)]
+	#[prop(default)]
 	title: String,
 ) -> impl Bundle {
 	let embed = PageMeta::youtube_id(&url)

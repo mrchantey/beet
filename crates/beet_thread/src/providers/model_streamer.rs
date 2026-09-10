@@ -53,7 +53,7 @@ pub fn ModelStreamer(
 	#[prop(default)] api: ModelApi,
 	#[prop(default)] size: ModelSize,
 	#[prop(default)] effort: Option<ReasoningEffort>,
-	#[prop(into, default)] instructions: String,
+	#[prop(default)] instructions: String,
 ) -> impl Bundle {
 	OnSpawn::new(move |entity| -> Result {
 		let api = effective_api(provider, api);

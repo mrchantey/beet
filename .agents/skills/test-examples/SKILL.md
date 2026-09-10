@@ -138,7 +138,7 @@ The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_runni
 
 Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
 
-Every scene in `examples/action/` exits 0. `<Repeat>` answers `Outcome::PASS` when its loop ends (the child failing is the loop's exit condition, not an error), so `malenia.bsx` and `repeat_while.bsx` report a completed run rather than a failure.
+Every scene in `examples/action/` exits 0. A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeStatus}` turns a `Fail` into a nonzero exit.
 
 ## Not Verifiable Via CLI (skip)
 

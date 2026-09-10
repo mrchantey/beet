@@ -23,10 +23,10 @@ use beet_net::prelude::*;
 #[template]
 pub fn RssFeed(
 	/// The channel title. Defaults to the [`PackageConfig`] title.
-	#[prop(into)]
+	#[prop]
 	title: Option<String>,
 	/// The channel description. Defaults to the [`PackageConfig`] description.
-	#[prop(into)]
+	#[prop]
 	description: Option<String>,
 	/// How many entries the feed carries, newest first.
 	///

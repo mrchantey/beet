@@ -529,7 +529,7 @@ mod test {
 	);
 
 	/// A bare base name resolves to the sole generic instantiation, so a
-	/// `{Repeat}` spread / `<Repeat>` tag finds `Repeat<()>` despite the argument
+	/// `{Repeat}` spread / `<Repeat>` tag finds `Repeat<(), ()>` despite the argument
 	/// kept in its short path. Ambiguity (more than one) resolves to nothing
 	/// rather than guessing.
 	#[crate::test]

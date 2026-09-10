@@ -65,7 +65,7 @@ where
 pub fn RunScript(
 	/// The JavaScript source, an async function body evaluated with the `world`
 	/// API installed.
-	#[prop(into)]
+	#[prop]
 	script: String,
 ) -> impl Bundle {
 	(

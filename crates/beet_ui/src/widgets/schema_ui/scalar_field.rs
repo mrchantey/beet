@@ -14,8 +14,8 @@ pub(super) fn bool_field(field: FieldRef, label: Option<String>) -> Snippet {
 	labeled(
 		label,
 		widget(Checkbox {
-			name: PropOpt::some(field.field_path.to_string()),
-			field: PropOpt::some(field),
+			name: Some(field.field_path.to_string()),
+			field: Some(field),
 		}),
 	)
 }
@@ -27,16 +27,16 @@ pub(super) fn string_field(
 	field: FieldRef,
 	label: Option<String>,
 ) -> Snippet {
-	let name = PropOpt::some(field.field_path.to_string());
+	let name = Some(field.field_path.to_string());
 	let widget = match schema.multiline {
 		true => widget(TextArea {
 			name,
-			field: PropOpt::some(field),
+			field: Some(field),
 			..default()
 		}),
 		false => widget(TextField {
 			name,
-			field: PropOpt::some(field),
+			field: Some(field),
 			sensitive: schema.sensitive,
 			..default()
 		}),
@@ -87,11 +87,11 @@ fn number_field(
 	labeled(
 		label,
 		widget(NumberField {
-			name: PropOpt::some(field.field_path.to_string()),
-			field: PropOpt::some(field),
-			min: PropOpt(min),
-			max: PropOpt(max),
-			step: PropOpt(step),
+			name: Some(field.field_path.to_string()),
+			field: Some(field),
+			min,
+			max,
+			step,
 			..default()
 		}),
 	)

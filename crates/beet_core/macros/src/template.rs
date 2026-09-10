@@ -23,14 +23,11 @@
 //!
 //! - bare field / `#[prop(default)]` -> optional, `Default::default()`
 //! - `#[prop(default = expr)]` -> optional, defaults to `expr`
-//! - `Option<T>` field -> optional, stored as `PropOpt<T>`, defaults to `None`,
-//!   bound back to `Option<T>` in the body
-//! - `#[prop(required)]` -> required; stored as `PropOpt<T>`, validated at build
+//! - `Option<T>` field -> optional, defaults to `None`
+//! - `#[prop(required)]` -> required; stored as `Option<T>`, validated at build
 //!   time, surfacing [`MissingProps`] through the build channel (never a panic)
-//! - `#[prop(into)]` -> binds the concrete type (the `rsx!` call site already
-//!   `.into()`s every value)
 //!
-//! `#[prop(all)]` is removed entirely. The grammar itself lives in
+//! The grammar itself lives in
 //! [`beet_core_shared::prelude::Prop`], shared with the `#[action]` macro's
 //! `#[field]` spelling so the two cannot drift.
 extern crate alloc;
@@ -210,13 +207,10 @@ fn emit(
 			syn::LitStr::new(&prop.ident.to_string(), prop.ident.span())
 		})
 		.collect();
-	let data_struct = data_struct(vis, name, generics, props, &beet_core);
+	let data_struct = data_struct(vis, name, generics, props);
 
 	let required_checks = required_checks(props, &beet_core);
 	let required_unwraps = required_unwraps(props);
-	// rebind `PropOpt`-stored optional props to `Option<T>` for the body.
-	let body_bindings: Vec<TokenStream> =
-		props.iter().filter_map(Prop::body_binding).collect();
 
 	let is_system = system.is_some();
 	// a `-> Result<impl Bundle>` body unwraps with `?` into the enclosing result
@@ -253,7 +247,6 @@ fn emit(
 				>::new(move |#entity_binding, (#(#sys_pats,)*)| {
 					let Self { #(#field_idents),* } = props.clone();
 					#(#required_unwraps)*
-					#(#body_bindings)*
 					#bundle
 					::core::result::Result::Ok(
 						#beet_core::prelude::Snippet::from_bundle(bundle)
@@ -265,7 +258,6 @@ fn emit(
 		None => quote! {
 			let Self { #(#field_idents),* } = self.clone();
 			#(#required_unwraps)*
-			#(#body_bindings)*
 			#bundle
 			cx.entity.insert(bundle);
 			::core::result::Result::Ok(())
@@ -331,7 +323,7 @@ fn emit(
 		impl #impl_generics #beet_core::prelude::BuildTemplate for #name #ty_generics #build_template_where {}
 
 		// the prop schema, authored by the typed signature: starts from the
-		// reflect-derived struct schema (a `PropOpt<T>` prop is an optional inner
+		// reflect-derived struct schema (an `Option<T>` prop is an optional inner
 		// schema), then marks `#[prop(required)]` props as required, which the type
 		// alone cannot express. The loader verifies a prop set against this.
 		impl #impl_generics #beet_core::prelude::GetTemplateSchema for #name #ty_generics #schema_where {
@@ -380,10 +372,9 @@ fn data_struct(
 	name: &syn::Ident,
 	generics: &syn::Generics,
 	props: &[Prop],
-	beet_core: &syn::Path,
 ) -> TokenStream {
 	let field_defs: Vec<TokenStream> =
-		props.iter().map(|prop| prop.field_def(beet_core)).collect();
+		props.iter().map(Prop::field_def).collect();
 	let needs_manual_default =
 		props.iter().any(|prop| prop.default_expr.is_some());
 
@@ -432,16 +423,15 @@ fn required_checks(props: &[Prop], beet_core: &syn::Path) -> Vec<TokenStream> {
 		.collect()
 }
 
-/// `let <field> = <field>.into_inner().unwrap();` for each required prop —
-/// after validation each binding matches its originally declared type. The
-/// stored field is a `PropOpt<T>`, so unwrap its inner `Option`.
+/// `let <field> = <field>.unwrap();` for each required prop: after validation
+/// each binding matches its originally declared type.
 fn required_unwraps(props: &[Prop]) -> Vec<TokenStream> {
 	props
 		.iter()
 		.filter(|prop| prop.required)
 		.map(|prop| {
 			let ident = &prop.ident;
-			quote! { let #ident = #ident.into_inner().unwrap(); }
+			quote! { let #ident = #ident.unwrap(); }
 		})
 		.collect()
 }
@@ -497,14 +487,11 @@ mod test {
 				rsx! { <span/> }
 			}
 		});
-		// stored as PropOpt, validated, unwrapped
-		assert!(result.contains("PropOpt < Variant >"));
+		// stored as an `Option`, validated, unwrapped
+		assert!(result.contains("Option < Variant >"));
 		assert!(result.contains("if self . variant . is_none ()"));
 		assert!(result.contains("MissingProps"));
-		assert!(
-			result
-				.contains("let variant = variant . into_inner () . unwrap ()")
-		);
+		assert!(result.contains("let variant = variant . unwrap ()"));
 	}
 
 	#[test]

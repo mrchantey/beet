@@ -38,11 +38,11 @@ use beet_net::prelude::*;
 #[template]
 pub fn Redirect(
 	/// The route path pattern to redirect FROM, eg `post-1`.
-	#[prop(into)]
+	#[prop]
 	path: String,
 	/// Where to send the caller: a name resolved against this route's parent
 	/// scope, a rooted path taken verbatim, or another site entirely.
-	#[prop(into)]
+	#[prop]
 	redirect: Url,
 ) -> impl Bundle {
 	(

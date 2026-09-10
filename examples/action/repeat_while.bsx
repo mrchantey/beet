@@ -7,9 +7,9 @@ first node is the loop condition. `<SucceedTimes{max_times:2}>` passes twice the
 fails; when it fails the sequence fails, which stops the repeat. So the work runs
 exactly twice.
 
-The loop *ending* is not a failure, so the `<Fallback>` catches the repeat's
-terminal fail and answers `<EndWith>`'s pass: the entry exits ok rather than
-reporting the stop condition as an error.
+The loop ends by returning the sequence's fail, the `break` the condition
+raised. An outcome is a branch rather than an error, so the entry still exits
+ok; a scene whose outcome should be its status adds `{OutcomeStatus}`.
 
     beet --main=examples/action/repeat_while.bsx
 -->

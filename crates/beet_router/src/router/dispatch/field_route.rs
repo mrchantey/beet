@@ -62,10 +62,10 @@ pub enum FieldVerb {
 #[template]
 pub fn FieldRoute(
 	/// The route path, eg `sign`.
-	#[prop(into)]
+	#[prop]
 	path: String,
 	/// The document field, dotted for a nested one, eg `entries` or `user.name`.
-	#[prop(into)]
+	#[prop]
 	field: String,
 	/// Which document operation to serve, spelled as the [`FieldVerb`] variant,
 	/// ie `verb="Push"`. An unknown name fails the load listing the valid ones.

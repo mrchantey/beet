@@ -39,8 +39,7 @@ pub fn RobotStreamer(
 		} else {
 			entity.insert_template(ModelStreamer {
 				provider: Provider::OpenAi,
-				// optional template props are `PropOpt`-wrapped in a struct literal.
-				effort: beet_core::types::PropOpt(effort),
+				effort,
 				..default()
 			})?;
 		}

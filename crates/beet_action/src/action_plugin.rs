@@ -28,11 +28,12 @@ impl Plugin for ActionPlugin {
 			.register_type::<Parallel<(), ()>>()
 			.register_type::<HighestScore<(), ()>>()
 			.register_type::<Score>()
-			.register_type::<Repeat<()>>()
-			.register_type::<RepeatTimes<()>>()
+			.register_type::<Repeat<(), ()>>()
+			.register_type::<RepeatTimes<(), ()>>()
 			// agent resolution types
 			.register_type::<ActionOf>()
 			.register_type::<Actions>()
+			.register_type::<AgentRoot>()
 			.register_type::<TargetEntity>()
 			// leaf / util actions
 			.register_type::<EndWith<Outcome>>()

@@ -109,7 +109,7 @@ pub fn FrozenLakeRunAgent(
 		grid_to_world,
 		agent_grid_pos,
 		GridDirection::sample(&mut rng.0),
-		Repeat::<()>::default(),
+		Repeat::new(),
 		CallOnSpawn::<(), Outcome>::default(),
 		children![(
 			Name::new("Run Frozen Lake Agent"),

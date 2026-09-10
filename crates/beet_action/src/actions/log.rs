@@ -38,7 +38,7 @@ impl Log {
 	/// Log a fixed message.
 	pub fn new(message: impl Into<SmolStr>) -> Self {
 		Self {
-			message: PropOpt::some(message.into()),
+			message: Some(message.into()),
 		}
 	}
 }

@@ -64,7 +64,7 @@ pub async fn DriveFox(cx: ActionContext<DriveForDuration>) -> Result<()> {
 #[template(system)]
 pub fn WgpuBody(
 	/// The agent's socket url, eg `ws://127.0.0.1:8338`.
-	#[prop(into)]
+	#[prop]
 	url: String,
 	mut commands: Commands,
 ) -> impl Bundle {

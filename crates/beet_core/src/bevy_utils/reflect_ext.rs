@@ -56,7 +56,7 @@ pub fn option_some_inner(info: &TypeInfo) -> Option<&'static TypeInfo> {
 /// Look up a registered type by the name a human wrote, whether in markup or in
 /// a script.
 ///
-/// A generic type's short path keeps its arguments (eg `Repeat<()>`), so a bare
+/// A generic type's short path keeps its arguments (eg `Repeat<(), ()>`), so a bare
 /// `{Repeat}` spread, `<Repeat>` tag or `"Repeat"` script identifier misses the
 /// exact lookup; it then falls back to the unique generic instantiation whose
 /// base name matches (the `<` boundary guards against prefix collisions like

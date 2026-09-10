@@ -81,6 +81,11 @@ pub use channel_http_server::*;
 mod call_on_ready;
 #[cfg(feature = "action")]
 pub use call_on_ready::*;
+// The opt-in making a behaviour's outcome the load's status.
+#[cfg(feature = "action")]
+mod outcome_status;
+#[cfg(feature = "action")]
+pub use outcome_status::*;
 
 // The start path: the `CallOnStart` verb calls an entity's action when the run
 // above it starts, observing its own entity's swept `StartRunning<Request>`.

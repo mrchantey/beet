@@ -19,7 +19,7 @@ pub fn Error() -> impl Bundle {
 /// Reactive show/hide is the caller's responsibility: wrap the widget in an
 /// effect or conditional render.
 #[template]
-pub fn ErrorText(#[prop(into)] message: String) -> impl Bundle {
+pub fn ErrorText(#[prop] message: String) -> impl Bundle {
 	rsx! {
 		<span {Classes::new([classes::ERROR_TEXT])}>{message}</span>
 	}

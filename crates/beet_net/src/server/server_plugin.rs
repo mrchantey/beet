@@ -21,6 +21,7 @@ impl Plugin for ServerPlugin {
 			// script or behaviour scene resolves it, and its disarm marker.
 			.register_type::<CallOnReady>()
 			.register_type::<DisableCallOnReady>()
+			.register_type::<OutcomeStatus>()
 			// the markup start verb: it observes its own entity's
 			// `StartRunning<Request>`, delivered when a run root declares the
 			// start sweep. That declaration is registered here, instantiated for

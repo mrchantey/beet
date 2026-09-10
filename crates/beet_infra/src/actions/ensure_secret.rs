@@ -98,7 +98,7 @@ impl EnsureSecret {
 	pub fn new(secret: SecretRef) -> Self {
 		Self {
 			secret,
-			variable: PropOpt::none(),
+			variable: None,
 			length: Self::LENGTH,
 		}
 	}
@@ -170,7 +170,7 @@ mod tests {
 			.is_none()
 			.xpect_true();
 		EnsureSecret {
-			variable: PropOpt::some("db_password".into()),
+			variable: Some("db_password".into()),
 			..EnsureSecret::new(SecretRef::new("db-password"))
 		}
 		.variable

@@ -195,7 +195,7 @@ fn component_spread_inserts_additional() {
 
 // a `#[template]` tag builds its subtree with input props.
 #[template]
-fn Card(#[prop(into)] title: String) -> impl Bundle {
+fn Card(#[prop] title: String) -> impl Bundle {
 	rsx! { <article class="card">{title}</article> }
 }
 
@@ -225,7 +225,7 @@ fn doctype_node() {
 // `#[template]` emits its body verbatim, so an `rsx!` need not be the trailing
 // statement: it can sit in a `let` binding or a `match` arm and still expand.
 #[template]
-fn Branch(#[prop(into)] heading: bool) -> impl Bundle {
+fn Branch(#[prop] heading: bool) -> impl Bundle {
 	let header = rsx! { <h1>"title"</h1> };
 	let body = match heading {
 		true => rsx! { <section>"with heading"</section> },
@@ -266,7 +266,7 @@ fn rsx_in_non_final_position() {
 // a `-> Result<impl Bundle>` template raises through the build rather than
 // unwrapping: the `?` in its body lands on `build_template`'s own result.
 #[template]
-fn Parsed(#[prop(into)] count: String) -> Result<impl Bundle> {
+fn Parsed(#[prop] count: String) -> Result<impl Bundle> {
 	let count: u32 = count.parse()?;
 	rsx! { <span>{count * 2}</span> }.xok()
 }
@@ -306,7 +306,7 @@ struct Factor(u32);
 // is raised out of the build closure onto the build's own result.
 #[template(system)]
 fn ParsedScaled(
-	#[prop(into)] count: String,
+	#[prop] count: String,
 	factor: Res<Factor>,
 ) -> Result<impl Bundle> {
 	let count: u32 = count.parse()?;

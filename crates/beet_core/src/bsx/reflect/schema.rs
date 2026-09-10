@@ -166,27 +166,13 @@ fn parse_literal_props(
 }
 
 /// The [`TypeId`] a prop's authored value must parse into: the field's own
-/// type with the `PropOpt`/`Option` wrappers a `#[template]` signature adds
-/// peeled off, since neither changes how the value is spelled.
+/// type with any `Option` peeled off, since an optional prop is spelled exactly
+/// as its inner value.
 fn prop_target(mut info: &'static TypeInfo) -> TypeId {
-	loop {
-		let inner = match info {
-			TypeInfo::TupleStruct(tuple)
-				if tuple
-					.type_path_table()
-					.short_path()
-					.starts_with("PropOpt<")
-					&& tuple.field_len() == 1 =>
-			{
-				tuple.field_at(0).and_then(|field| field.type_info())
-			}
-			_ => reflect_ext::option_some_inner(info),
-		};
-		match inner {
-			Some(inner) => info = inner,
-			None => return info.type_id(),
-		}
+	while let Some(inner) = reflect_ext::option_some_inner(info) {
+		info = inner;
 	}
+	info.type_id()
 }
 
 /// Build a [`Value::Map`] of a tag's literal prop attributes, for schema
@@ -438,7 +424,7 @@ mod test {
 	#[derive(Reflect, Default)]
 	struct Widget {
 		home: bool,
-		expanded: PropOpt<bool>,
+		expanded: Option<bool>,
 		label: String,
 		read: GlobFilter,
 		duration: Option<core::time::Duration>,

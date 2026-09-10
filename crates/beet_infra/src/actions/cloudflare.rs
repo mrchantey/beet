@@ -535,7 +535,7 @@ impl CloudflareR2Sync {
 		Self {
 			local_dir: local_dir.into(),
 			bucket: bucket.into(),
-			prefix: PropOpt::none(),
+			prefix: None,
 		}
 	}
 }
@@ -693,7 +693,7 @@ impl CloudflareBench {
 			name: name.into(),
 			bucket: bucket.into(),
 			local_dir: local_dir.into(),
-			url: PropOpt::none(),
+			url: None,
 		}
 	}
 }
@@ -753,7 +753,7 @@ impl CloudflareWatch {
 	pub fn new(name: impl Into<SmolStr>) -> Self {
 		Self {
 			name: name.into(),
-			timeout: PropOpt::none(),
+			timeout: None,
 		}
 	}
 }

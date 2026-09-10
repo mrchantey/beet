@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// ([`PostStatus::InProgress`]); both default to a completed, OK post.
 #[template]
 pub fn CreatePost(
-	#[prop(into)] text: String,
+	#[prop] text: String,
 	#[prop(default = PostIntent::OK)] intent: PostIntent,
 	#[prop(default = PostStatus::Completed)] status: PostStatus,
 ) -> impl Bundle {

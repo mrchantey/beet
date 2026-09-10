@@ -3,113 +3,89 @@ use beet_core::prelude::*;
 
 /// Repeat control-flow component.
 ///
-/// Calls its single child in a loop with a clone of the original input, until
-/// the child fails. Always returns [`Outcome::Pass`]: the child failing is the
-/// loop's *exit condition*, not an error, exactly as a `while` loop ends when
-/// its condition goes false. A `Repeat` has no failure mode of its own, so a
-/// terminal [`Outcome::Fail`] would carry no information while making every
-/// `Repeat`-rooted entry report a successful run as a failure.
+/// Calls its single child in a loop, threading the input as a [`Sequence`]
+/// does: each [`Outcome::Pass`] carries the next iteration's input, and the
+/// first [`Outcome::Fail`] ends the loop and is returned as the loop's own
+/// outcome. The child's fail is the loop's `break`, so whatever it carried (a
+/// verdict, a response) reaches the node above unchanged. A `Repeat` never
+/// passes: an unbounded loop has no other way out. To bound the iterations use
+/// [`RepeatTimes`], which passes once its count completes.
 ///
-/// To stop a [`Sequence`] when the loop ends, put the condition in the loop
-/// body where it can be read; to bound the iterations use [`RepeatTimes`],
-/// which does distinguish completing its count from stopping early.
-///
-/// With no child, returns [`Outcome::Pass`] immediately.
+/// With no child, returns [`Outcome::Pass`] with the input immediately.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn Repeat<Input = ()>(cx: ActionContext<Input>) -> Result<Outcome>
+pub async fn Repeat<Input = (), Output = ()>(
+	cx: ActionContext<Input>,
+) -> Result<Outcome<Input, Output>>
 where
-	Input: 'static + Send + Sync + Clone,
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
 {
-	let Some(child) = BehaviourChildren::only_for(&cx.world(), cx.id()).await
-	else {
-		return Outcome::PASS.xok();
-	};
-
 	let world = cx.world();
-
-	let action_meta = world
-		.entity(child)
-		.get(|meta: &ActionMeta| meta.clone())
-		.await
-		.map_err(|err| {
-			bevyhow!("repeat child has no action: {child:?}, error: {err}")
-		})?;
-	action_meta.assert_match::<Input, Outcome>()?;
-
-	let input = cx.input;
+	let Some(child) =
+		only_child::<Input, Output>(&world, cx.id(), "repeat").await?
+	else {
+		return Outcome::Pass(cx.input).xok();
+	};
+	let mut input = cx.input;
 	loop {
 		match world
 			.entity(child)
-			.call::<Input, Outcome>(input.clone())
+			.call::<Input, Outcome<Input, Output>>(input)
 			.await?
 		{
-			Outcome::Pass(_) => {}
-			// the loop is over, which is how a `Repeat` ends, not a failure
-			Outcome::Fail(_) => return Outcome::PASS.xok(),
+			Outcome::Pass(next) => input = next,
+			Outcome::Fail(output) => return Outcome::Fail(output).xok(),
 		}
 	}
 }
 
-impl Repeat<()> {
-	/// Create a default `Repeat<()>`.
+impl Repeat {
+	/// Create a default `Repeat<(), ()>`.
 	pub fn new() -> Self { Self::default() }
 }
 
 /// Repeat-N control-flow component.
 ///
-/// Calls its single child up to `total_times`, passing a clone of the
-/// original input each iteration.
-/// Returns [`Outcome::Fail`] immediately if the child fails;
-/// returns [`Outcome::Pass`] after all iterations complete.
-/// With no child, returns [`Outcome::Pass`] immediately.
+/// Calls its single child up to `total_times`, threading the input as
+/// [`Repeat`] does. Returns the child's first [`Outcome::Fail`] immediately,
+/// else [`Outcome::Pass`] with the final input once every iteration completed.
+/// With no child, returns [`Outcome::Pass`] with the input immediately.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn RepeatTimes<Input = ()>(
+pub async fn RepeatTimes<Input = (), Output = ()>(
 	/// Maximum number of iterations.
 	#[field]
 	total_times: u32,
 	cx: ActionContext<Input>,
-) -> Result<Outcome>
+) -> Result<Outcome<Input, Output>>
 where
-	Input: 'static + Send + Sync + Clone,
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
 {
-	let Some(child) = BehaviourChildren::only_for(&cx.world(), cx.id()).await
-	else {
-		return Outcome::PASS.xok();
-	};
-
 	let world = cx.world();
-
-	let action_meta = world
-		.entity(child)
-		.get(|meta: &ActionMeta| meta.clone())
-		.await
-		.map_err(|err| {
-			bevyhow!(
-				"repeat_times child has no action: {child:?}, error: {err}"
-			)
-		})?;
-	action_meta.assert_match::<Input, Outcome>()?;
-
-	let input = cx.input;
+	let Some(child) =
+		only_child::<Input, Output>(&world, cx.id(), "repeat_times").await?
+	else {
+		return Outcome::Pass(cx.input).xok();
+	};
+	let mut input = cx.input;
 	for _ in 0..total_times {
 		match world
 			.entity(child)
-			.call::<Input, Outcome>(input.clone())
+			.call::<Input, Outcome<Input, Output>>(input)
 			.await?
 		{
-			Outcome::Pass(_) => {}
-			Outcome::Fail(_) => return Outcome::FAIL.xok(),
+			Outcome::Pass(next) => input = next,
+			Outcome::Fail(output) => return Outcome::Fail(output).xok(),
 		}
 	}
-
-	Outcome::PASS.xok()
+	Outcome::Pass(input).xok()
 }
 
-impl RepeatTimes<()> {
+impl RepeatTimes {
 	/// Sentinel used to represent an effectively unbounded repeat count.
 	pub const FOREVER: u32 = u32::MAX;
 
@@ -120,11 +96,12 @@ impl RepeatTimes<()> {
 	pub fn forever() -> Self { Self::new(Self::FOREVER) }
 }
 
-impl<Input> RepeatTimes<Input>
+impl<Input, Output> RepeatTimes<Input, Output>
 where
-	Input: 'static + Send + Sync + Clone,
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
 {
-	/// Create a bounded repeat counter with a typed input marker.
+	/// Create a bounded repeat counter with typed input and output.
 	pub fn typed(total_times: u32) -> Self {
 		Self {
 			total_times,
@@ -134,6 +111,31 @@ where
 
 	/// Create an unbounded typed repeat counter.
 	pub fn typed_forever() -> Self { Self::typed(u32::MAX) }
+}
+
+/// The single child of a loop node, checked to serve
+/// `Input -> Outcome<Input, Output>`; [`None`] for a childless node.
+async fn only_child<Input, Output>(
+	world: &AsyncWorld,
+	parent: Entity,
+	node: &str,
+) -> Result<Option<Entity>>
+where
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
+{
+	let Some(child) = BehaviourChildren::only_for(world, parent).await else {
+		return None.xok();
+	};
+	world
+		.entity(child)
+		.get(|meta: &ActionMeta| meta.clone())
+		.await
+		.map_err(|err| {
+			bevyhow!("{node} child has no action: {child:?}, error: {err}")
+		})?
+		.assert_match::<Input, Outcome<Input, Output>>()?;
+	Some(child).xok()
 }
 
 #[cfg(test)]
@@ -175,7 +177,7 @@ mod tests {
 	}
 
 	/// A child that fails on its first call ends the loop straight away, and the
-	/// loop ending is a pass.
+	/// loop returns that fail.
 	#[beet_core::test]
 	async fn repeat_failing_child() {
 		AsyncPlugin::world()
@@ -183,7 +185,7 @@ mod tests {
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
-			.xpect_eq(Outcome::PASS);
+			.xpect_eq(Outcome::FAIL);
 	}
 
 	#[beet_core::test]
@@ -194,9 +196,27 @@ mod tests {
 			.call::<(), Outcome>(())
 			.await
 			.unwrap()
-			.xpect_eq(Outcome::PASS);
+			.xpect_eq(Outcome::FAIL);
 		// passed 3 times, failed on 4th call
 		count.load(Ordering::SeqCst).xpect_eq(4);
+	}
+
+	/// The loop threads each pass into the next call and breaks with the fail
+	/// payload, so the node above reads what the body said.
+	#[beet_core::test]
+	async fn repeat_threads_input_and_breaks_with_output() {
+		let body = Action::<u32, Outcome<u32, &'static str>>::new_pure(
+			|cx: ActionContext<u32>| match cx.input {
+				n if n < 3 => Outcome::Pass(n + 1).xok(),
+				_ => Outcome::Fail("done").xok(),
+			},
+		);
+		AsyncPlugin::world()
+			.spawn((Repeat::<u32, &'static str>::default(), children![body]))
+			.call::<u32, Outcome<u32, &'static str>>(0)
+			.await
+			.unwrap()
+			.xpect_eq(Outcome::Fail("done"));
 	}
 
 	// ── RepeatTimes ─────────────────────────────────────────────

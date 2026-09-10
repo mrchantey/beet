@@ -54,7 +54,7 @@ pub fn Head(
 	/// crawler resolves every relative reference against. Defaults to the
 	/// [`PackageConfig`] homepage, ie the SITE, which is all a standalone
 	/// `<Head/>` outside a route can honestly claim.
-	#[prop(into)]
+	#[prop]
 	url: Option<Url>,
 	pkg_config: Res<PackageConfig>,
 ) -> impl Bundle {

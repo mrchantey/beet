@@ -86,7 +86,7 @@ impl ReflectTemplate {
 /// struct schema, surfacing a missing required field as a graceful error.
 ///
 /// The default schema is derived from `T`'s reflect [`TypeInfo`] via
-/// [`ValueSchema::of`]; a `PropOpt<T>` prop field unwraps to an optional inner
+/// [`ValueSchema::of`]; an `Option<T>` prop field unwraps to an optional inner
 /// schema. The `#[template]` macro overrides it with a precise schema that marks
 /// `#[prop(required)]` props as required (which the type alone cannot express).
 #[derive(Clone)]
@@ -116,7 +116,7 @@ where
 ///
 /// A `#[template]` implements this from its typed signature, marking
 /// `#[prop(required)]` props as required (which a reflect-derived schema cannot
-/// express, since a required prop is stored as an optional `PropOpt`). A
+/// express, since a required prop is stored as an `Option`). A
 /// hand-written template that wants no prop validation takes the default
 /// [`ValueSchema::Any`].
 pub trait GetTemplateSchema {

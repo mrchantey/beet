@@ -73,7 +73,7 @@ pub fn IconButton(variant: ButtonVariant) -> impl Bundle {
 
 /// An `<a>` hyperlink styled as a button; its content is the default slot.
 #[template]
-pub fn Link(#[prop(into)] href: String, variant: ButtonVariant) -> impl Bundle {
+pub fn Link(#[prop] href: String, variant: ButtonVariant) -> impl Bundle {
 	rsx! {
 		<a {Classes::new([classes::BTN, variant.class()])} href={href}>
 			<Slot/>

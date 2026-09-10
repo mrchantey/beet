@@ -124,7 +124,7 @@ where
 	/// Run `group` forward, ie in convergence order.
 	pub fn new(group: Entity) -> Self {
 		Self {
-			group: PropOpt::some(group),
+			group: Some(group),
 			..default()
 		}
 	}

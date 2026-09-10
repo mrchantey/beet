@@ -12,8 +12,8 @@ use beet_core::prelude::*;
 /// fires [`choose_nearest`] once, which logs the winning [`Sentence`] and exits.
 #[template(system)]
 pub fn NearestSentenceAgent(
-	#[prop(into)] prompt: String,
-	#[prop(into)] src: String,
+	#[prop] prompt: String,
+	#[prop] src: String,
 	mut assets: BuildAssets,
 ) -> impl Bundle {
 	rsx! {
@@ -32,7 +32,7 @@ pub fn NearestSentenceAgent(
 /// bare markup spread value (a `{Sentence("attack")}` spread reflects the string as a
 /// `String`, which `Cow<'static, str>` cannot accept via `from_reflect`).
 #[template]
-pub fn SentenceOption(#[prop(into)] text: String) -> impl Bundle {
+pub fn SentenceOption(#[prop] text: String) -> impl Bundle {
 	Sentence::new(text)
 }
 
@@ -46,7 +46,7 @@ pub fn SentenceOption(#[prop(into)] text: String) -> impl Bundle {
 /// value.
 #[template(system)]
 pub fn ChatSentenceAgent(
-	#[prop(into)] src: String,
+	#[prop] src: String,
 	mut assets: BuildAssets,
 ) -> impl Bundle {
 	rsx! {

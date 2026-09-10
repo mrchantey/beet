@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// the leading cluster and the `nav`.
 #[template(system)]
 pub fn Header(
-	#[prop(into)] home_route: String,
+	#[prop] home_route: String,
 	pkg_config: Res<PackageConfig>,
 ) -> impl Bundle {
 	let title = pkg_config.title.clone();

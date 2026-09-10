@@ -58,7 +58,7 @@ pub(crate) fn spawn_frozen_lake_episode(
 				despawn: DespawnOnEpisodeEnd,
 			},
 			Name::new("Frozen Lake Agent"),
-			Repeat::<()>::default(),
+			Repeat::new(),
 			CallOnSpawn::<(), Outcome>::default(),
 			children![(
 				Name::new("Train Frozen Lake Agent"),

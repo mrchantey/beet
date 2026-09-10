@@ -70,7 +70,7 @@ pub fn find_router(
 #[template]
 pub fn Route(
 	/// The route path pattern, eg `docs/*rest?`; defaults to the root.
-	#[prop(into)]
+	#[prop]
 	path: String,
 ) -> impl Bundle {
 	(PathPartial::new(path), children![SlotTarget::new()])

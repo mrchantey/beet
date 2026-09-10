@@ -184,11 +184,11 @@ where
 #[template]
 pub fn ScriptRoute(
 	/// The url path this route mounts at.
-	#[prop(into)]
+	#[prop]
 	path: String,
 	/// The JavaScript source, an async function body evaluated with the request
 	/// bound to `input` and the `world` API installed.
-	#[prop(into)]
+	#[prop]
 	script: String,
 ) -> impl Bundle {
 	(

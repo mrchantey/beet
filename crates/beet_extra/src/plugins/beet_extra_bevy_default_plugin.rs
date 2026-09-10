@@ -30,6 +30,7 @@ pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 		// `ServerPlugin`. A windowed scene need not carry the router stack, so
 		// register it here too (idempotent) to keep the render set self-sufficient.
 		.register_type::<CallOnReady>()
+		.register_type::<OutcomeStatus>()
 		.register_type::<Collectable>();
 }
 

@@ -39,7 +39,7 @@ fn descendant_values(world: &World, root: Entity) -> Vec<String> {
 // ---- prop grammar -----------------------------------------------------------
 
 #[template]
-fn Card(#[prop(into)] title: String) -> impl Bundle {
+fn Card(#[prop] title: String) -> impl Bundle {
 	rsx! { <div class="card">{title}</div> }
 }
 
@@ -223,7 +223,7 @@ struct Bump(Entity);
 struct Count(u32);
 
 #[template]
-fn Counter(#[prop(into)] label: String) -> impl Bundle {
+fn Counter(#[prop] label: String) -> impl Bundle {
 	rsx! {
 		<button
 			{Classes::new(["btn", "btn-counter"])}

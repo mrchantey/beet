@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// </CreateActor>`.
 #[template]
 pub fn CreateActor(
-	#[prop(into)] name: String,
+	#[prop] name: String,
 	kind: ActorKind,
 	id: Option<u64>,
 ) -> impl Bundle {

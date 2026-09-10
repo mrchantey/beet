@@ -56,13 +56,13 @@ impl AwsWatch {
 	pub fn for_target(target: WatchTarget) -> Self {
 		Self {
 			target,
-			timeout: PropOpt::none(),
+			timeout: None,
 		}
 	}
 
 	/// Kill the tail after `timeout`, rather than following indefinitely.
 	pub fn with_timeout(mut self, timeout: Duration) -> Self {
-		self.timeout = PropOpt::some(timeout);
+		self.timeout = Some(timeout);
 		self
 	}
 }

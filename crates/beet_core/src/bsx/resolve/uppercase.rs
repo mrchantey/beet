@@ -84,7 +84,7 @@ pub(super) fn build_uppercase(
 	let entity_refs = resolve_entity_refs(el, refs, cx);
 	let registration_kind = {
 		let registry = app_registry.read();
-		// resolve by base name so a generic tag (eg `<Repeat>` -> `Repeat<()>`)
+		// resolve by base name so a generic tag (eg `<Repeat>` -> `Repeat<(), ()>`)
 		// matches its sole instantiation, like a `{Repeat}` spread does.
 		registration_by_name(&registry, &el.tag)
 			.map(|registration| {

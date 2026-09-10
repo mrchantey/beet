@@ -89,116 +89,51 @@ impl Template for Snippet {
 // `IntoSnippet` bundle blanket: in a child position `children!` already spawns
 // it as a fresh child entity, and its bundle is inserted there.
 
-/// The storage type the `#[template]` derive uses for an optional or required
-/// prop, decoupling the field type from `Option` so the `rsx!` call-site
-/// conversion stays unambiguous.
+/// Convert a provided value into a prop field, the conversion the `rsx!`
+/// component lowering uses for `<Foo field=value/>`.
 ///
-/// A `#[template]` stores an `Option<T>`-declared or `#[prop(required)]` prop as
-/// a `PropOpt<T>` and binds an `Option<T>` from it in the body. The call site
-/// emits `field: value.into_prop()` ([`IntoProp`]); because `PropOpt<T>` has no
-/// `From` impl, only the [`IntoProp`] `PropOpt` wrap applies (`placeholder="hi"`,
-/// `variant=Variant::Error`), with no collision with `core`'s
-/// `From<T> for Option<T>` that a bare `Option<T>` field would suffer.
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Reflect)]
-#[reflect(Default)]
-pub struct PropOpt<T>(pub Option<T>);
-
-impl<T> Default for PropOpt<T> {
-	fn default() -> Self { Self(None) }
-}
-
-impl<T> PropOpt<T> {
-	/// A supplied value.
-	///
-	/// Hand-written Rust reaches for this where markup would write the
-	/// attribute; there is deliberately no `From` impl, since one would make
-	/// [`IntoProp`]'s marker ambiguous for the very fields this type exists to
-	/// disambiguate.
-	pub fn some(value: T) -> Self { Self(Some(value)) }
-
-	/// No value supplied, the same as [`Default`].
-	pub fn none() -> Self { Self(None) }
-
-	/// Take the inner [`Option`], the form the `#[template]` body binds.
-	pub fn into_inner(self) -> Option<T> { self.0 }
-}
-
-/// Convert a provided value into a `#[template]` prop field, the conversion the
-/// `rsx!` component lowering uses for `<Foo field=value/>`.
+/// Deliberately not `From`: the field is the value's own type, or an
+/// `Option` of it. Each impl unifies the value with the target directly, so a
+/// bare literal takes the field's type (`x=1.5` on an `f32` or `Option<f32>`
+/// prop, `n=3` on a `u32`) with no fallback, and an `Option<T>` prop accepts
+/// both a `T` and an `Option<T>`. A `From` blanket would forbid the `Option`
+/// wrap (core already has `From<T> for Option<T>`) and could never pin a float
+/// literal, since `f32: From<f64>` does not exist.
 ///
-/// A value flows directly into a non-`PropOpt` field via `From`, and into a
-/// [`PropOpt<T>`] field by `Into<T>` then `Some`. The two never overlap because
-/// `PropOpt` has no `From` impl, so inference resolves the marker `M` against the
-/// field's known type.
-pub trait IntoProp<F, M> {
+/// A string literal reaches any [`StrProp`] field, so `label="hi"` fills a
+/// [`SmolStr`], [`String`] or [`Url`] prop, or an `Option` of one; anything
+/// else is spelled as in plain Rust.
+pub trait IntoProp<F> {
 	/// Convert into the field type `F`.
 	fn into_prop(self) -> F;
 }
 
-/// Marker for the direct `From` conversion (a non-`PropOpt` field).
-pub struct PropDirectMarker;
-/// Marker for the [`PropOpt`] wrap conversion.
-pub struct PropOptMarker;
-/// Marker for the [`PropOpt`] pass-through of an already-optional value.
-pub struct PropOptSomeMarker;
-
-/// A value flows directly into a field whose type is `From` it (the common case,
-/// and the identity conversion when the field type matches).
-impl<T, F: From<T>> IntoProp<F, PropDirectMarker> for T {
-	fn into_prop(self) -> F { F::from(self) }
+impl<T> IntoProp<T> for T {
+	fn into_prop(self) -> T { self }
 }
 
-/// A value flows into a [`PropOpt<T>`] field by `Into<T>` then `Some`, so an
-/// optional or required prop accepts the bare inner value.
-impl<T, U: Into<T>> IntoProp<PropOpt<T>, PropOptMarker> for U {
-	fn into_prop(self) -> PropOpt<T> { PropOpt(Some(self.into())) }
+/// A value flows into an `Option<T>` prop as `Some`, so an optional or required
+/// prop accepts the bare inner value.
+impl<T> IntoProp<Option<T>> for T {
+	fn into_prop(self) -> Option<T> { Some(self) }
 }
 
-/// An [`Option`] flows into a [`PropOpt<T>`] field as itself, so a caller that
-/// already holds an optional value (a computed url, a looked-up label) passes
-/// it straight through instead of branching the markup around the attribute.
-impl<T, U: Into<T>> IntoProp<PropOpt<T>, PropOptSomeMarker> for Option<U> {
-	fn into_prop(self) -> PropOpt<T> { PropOpt(self.map(Into::into)) }
+impl<T: StrProp> IntoProp<T> for &str {
+	fn into_prop(self) -> T { T::from(self) }
 }
 
-/// Marker for the narrowing impl, a float type `f64` cannot `From` into.
-pub struct FloatPropNarrowMarker;
-/// Marker for the `From<f64>` impl.
-pub struct FloatPropFromMarker;
-/// Marker for the [`PropOpt`] wrap, carrying the inner value's own marker.
-pub struct FloatPropOptMarker<M>(core::marker::PhantomData<M>);
-
-/// Convert a bare float literal into a `#[template]` prop field, the conversion
-/// the `rsx!` component lowering uses for `<Foo field=1.5/>`.
-///
-/// [`IntoProp`] cannot serve this case. A literal's type is an inference
-/// variable, and `F: From<{float}>` never pins it: the variable takes its `f64`
-/// fallback, and `f32: From<f64>` does not exist because it is lossy, so
-/// `<Camera3dLookAt x=0./>` against an `f32` prop has no resolution (rustc used
-/// to retry such a bound as `f32`, which `float_literal_f32_fallback` is now
-/// phasing out). Taking the literal as a concrete `f64` removes the variable
-/// entirely, leaving the field's own type to pick the impl.
-pub trait FloatProp<M> {
-	/// Convert a float literal into the field type.
-	fn float_prop(value: f64) -> Self;
+impl<T: StrProp> IntoProp<Option<T>> for &str {
+	fn into_prop(self) -> Option<T> { Some(T::from(self)) }
 }
 
-/// The only lossy target: `f32` has no `From<f64>`, which is the whole reason
-/// this trait exists.
-impl FloatProp<FloatPropNarrowMarker> for f32 {
-	fn float_prop(value: f64) -> Self { value as f32 }
-}
+/// A prop type a string literal fills, ie `<Card title="Hi"/>` on a
+/// [`SmolStr`] prop. Implement it for an owned string-like type of your own;
+/// [`IntoProp`] then accepts a `&str` for that prop and an `Option` of it.
+pub trait StrProp: for<'a> From<&'a str> {}
 
-/// Every field type that *does* accept an `f64`, `f64` itself included.
-impl<T: From<f64>> FloatProp<FloatPropFromMarker> for T {
-	fn float_prop(value: f64) -> Self { T::from(value) }
-}
-
-/// An optional or required numeric prop accepts the bare literal, mirroring
-/// [`IntoProp`]'s [`PropOpt`] impl.
-impl<M, T: FloatProp<M>> FloatProp<FloatPropOptMarker<M>> for PropOpt<T> {
-	fn float_prop(value: f64) -> Self { PropOpt(Some(T::float_prop(value))) }
-}
+impl StrProp for SmolStr {}
+impl StrProp for String {}
+impl StrProp for Url {}
 
 /// Lift `self` into a [`Bundle`] for an `rsx!` markup position (text, `{expr}`,
 /// attribute value, child list). The marker `M` disambiguates the blanket impls,

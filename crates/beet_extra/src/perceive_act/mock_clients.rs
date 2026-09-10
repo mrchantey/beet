@@ -18,7 +18,7 @@ use beet_router::prelude::*;
 #[template(system)]
 pub fn MockHead(
 	/// The agent's socket url, eg `ws://127.0.0.1:8338`.
-	#[prop(into)]
+	#[prop]
 	url: String,
 	mut commands: Commands,
 ) {
@@ -43,7 +43,7 @@ pub fn MockHead(
 #[template(system)]
 pub fn MockBody(
 	/// The agent's socket url, eg `ws://127.0.0.1:8338`.
-	#[prop(into)]
+	#[prop]
 	url: String,
 	mut commands: Commands,
 ) {

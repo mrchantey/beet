@@ -95,7 +95,7 @@ pub(super) fn apply_spread_named(
 	let literal = DataLiteral::Enum(named.clone());
 	let (kind, patch) = {
 		let registry = app_registry.read();
-		// resolve by base name so a generic spread (eg `{Repeat}` -> `Repeat<()>`)
+		// resolve by base name so a generic spread (eg `{Repeat}` -> `Repeat<(), ()>`)
 		// matches its sole instantiation, exactly as a `<Repeat>` tag does. A
 		// `::`-qualified name may be an enum variant (`{SteerTarget::Entity($x)}`):
 		// fall back to the enum type so the variant resolves through the literal.
@@ -190,23 +190,12 @@ pub(super) fn build_patch(
 			.and_then(|field| field.type_info());
 		let literal = attr_to_literal(&attr.value)?;
 		let mut resolver = entity_ref_resolver(entity_refs);
-		// a `#[template]` stores an optional/required prop as `PropOpt<T>`; a markup
-		// value must wrap into `PropOpt(Some(value))` to apply over the default.
-		let reflected = match prop_opt_inner_info(field_info) {
-			Some(inner_info) => prop_opt_value(
-				&literal,
-				field_info,
-				inner_info,
-				registry,
-				&mut resolver,
-			)?,
-			None => DataLiteral::to_reflect(
-				&literal,
-				field_info,
-				registry,
-				&mut resolver,
-			)?,
-		};
+		let reflected = DataLiteral::to_reflect(
+			&literal,
+			field_info,
+			registry,
+			&mut resolver,
+		)?;
 		patch.insert_boxed(&attr.key, reflected);
 	}
 	// only a struct target can be represented by this `DynamicStruct`. A
@@ -217,60 +206,6 @@ pub(super) fn build_patch(
 		patch.set_represented_type(Some(type_info));
 	}
 	Ok(Box::new(patch))
-}
-
-/// If `field_info` is a `PropOpt<T>` tuple struct, the inner `Option<T>`'s
-/// [`TypeInfo`], else `None`. A `#[template]`'s optional/required props store as
-/// `PropOpt<T>`, so a markup value targeting one must wrap into the option.
-fn prop_opt_inner_info(
-	field_info: Option<&'static bevy::reflect::TypeInfo>,
-) -> Option<&'static bevy::reflect::TypeInfo> {
-	let bevy::reflect::TypeInfo::TupleStruct(info) = field_info? else {
-		return None;
-	};
-	if !info.type_path().contains("PropOpt<") {
-		return None;
-	}
-	info.field_at(0).and_then(|field| field.type_info())
-}
-
-/// Build a `PropOpt(Some(value))` reflected value for a `PropOpt<T>` field, so a
-/// markup prop value reaches a `#[template]`'s optional/required prop.
-fn prop_opt_value(
-	literal: &DataLiteral,
-	field_info: Option<&'static bevy::reflect::TypeInfo>,
-	option_info: &'static bevy::reflect::TypeInfo,
-	registry: &TypeRegistry,
-	resolver: &mut dyn FnMut(&str) -> Entity,
-) -> Result<Box<dyn bevy::reflect::PartialReflect>> {
-	use bevy::reflect::enums::DynamicEnum;
-	use bevy::reflect::enums::DynamicVariant;
-	use bevy::reflect::enums::VariantInfo;
-	use bevy::reflect::tuple::DynamicTuple;
-	use bevy::reflect::tuple_struct::DynamicTupleStruct;
-	// the `Option<T>` carried by `PropOpt<T>(Option<T>)`; resolve the inner `T`.
-	let inner_info = match option_info {
-		bevy::reflect::TypeInfo::Enum(enum_info) => enum_info
-			.variant("Some")
-			.and_then(|variant| match variant {
-				VariantInfo::Tuple(tuple) => tuple.field_at(0),
-				_ => None,
-			})
-			.and_then(|field| field.type_info()),
-		_ => None,
-	};
-	let inner =
-		DataLiteral::to_reflect(literal, inner_info, registry, resolver)?;
-	// `Some(inner)`
-	let mut some = DynamicTuple::default();
-	some.insert_boxed(inner);
-	let mut option = DynamicEnum::new("Some", DynamicVariant::Tuple(some));
-	option.set_represented_type(Some(option_info));
-	// `PropOpt(Some(inner))`
-	let mut prop_opt = DynamicTupleStruct::default();
-	prop_opt.insert_boxed(Box::new(option));
-	prop_opt.set_represented_type(field_info);
-	Ok(Box::new(prop_opt))
 }
 
 /// Insert a reflect-patched component over its default onto `entity`.

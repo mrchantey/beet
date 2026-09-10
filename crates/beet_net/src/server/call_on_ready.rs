@@ -87,8 +87,11 @@ impl CallOnReady {
 	/// adapter component:
 	///
 	/// - `Request -> Response`, the canonical one (itself resolving the entity's
-	///   canonical action then any [`ActionOverload`])
-	/// - `() -> Outcome`, a behavior: `Pass` exits zero, `Fail` nonzero
+	///   canonical action then any [`ActionOverload`]): the status is the exit
+	///   code
+	/// - `() -> Outcome`, a behavior: zero once the call resolves, whatever the
+	///   outcome, since an [`Outcome`] is a branch rather than an error; a scene
+	///   whose outcome *is* its status says so with [`OutcomeStatus`]
 	/// - `() -> ()`, a plain action, always zero
 	///
 	/// A long-running action (a parked [`RunningSet`], an endless `Repeat`)
@@ -128,11 +131,8 @@ impl CallOnReady {
 			.await
 			.unwrap_or(false)
 		{
-			match entity.call::<(), Outcome>(()).await? {
-				Pass(()) => Response::ok(),
-				Fail(()) => Response::internal_error(),
-			}
-			.xok()
+			entity.call::<(), Outcome>(()).await?;
+			Response::ok().xok()
 		} else {
 			entity.call::<(), ()>(()).await?;
 			Response::ok().xok()
@@ -322,6 +322,49 @@ mod test {
 			})
 			.unwrap()
 			.xpect_eq(0);
+	}
+
+	/// The exit an `entity`'s load ends with.
+	async fn exit_of(entity: impl Bundle) -> AppExit {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, TemplatePlugin, ActionPlugin));
+		app.world_mut()
+			.spawn_template(Snippet::from_bundle(entity))
+			.unwrap();
+		app.run_async().await
+	}
+
+	/// A behavior's outcome is a branch, not the process's result: a failing
+	/// `() -> Outcome` load still exits zero once it resolves.
+	#[beet_core::test]
+	async fn a_failing_behavior_exits_zero() {
+		exit_of((
+			CallOnReady,
+			Action::<(), Outcome>::new_pure(|_: ActionContext| {
+				Outcome::FAIL.xok()
+			}),
+		))
+		.await
+		.xpect_eq(AppExit::Success);
+	}
+
+	/// [`OutcomeStatus`] is the opt-in that makes the outcome the status, so
+	/// the same failing load exits with a `500`'s code.
+	#[beet_core::test]
+	async fn outcome_status_makes_a_fail_nonzero() {
+		exit_of((
+			CallOnReady,
+			OutcomeStatus,
+			Action::<(), Outcome>::new_pure(|_: ActionContext| {
+				Outcome::FAIL.xok()
+			}),
+		))
+		.await
+		.xpect_eq(AppExit::Error(
+			StatusCode::INTERNAL_SERVER_ERROR
+				.to_exit_code()
+				.unwrap_err(),
+		));
 	}
 
 	/// `CallOnReady` on a behavior entity converts the load call through the

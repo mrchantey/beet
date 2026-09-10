@@ -59,7 +59,7 @@ pub fn Ground3d(
 /// markers (eg `FollowCursor3d`) still spread normally.
 #[template(system)]
 pub fn WorldScene(
-	#[prop(into)] src: String,
+	#[prop] src: String,
 	#[prop(default)] x: f32,
 	#[prop(default)] y: f32,
 	#[prop(default)] z: f32,
@@ -205,7 +205,7 @@ pub fn Scene2d() -> impl Bundle {
 /// string). Other markers (eg `FollowCursor2d`, `RotateToVelocity2d`) spread normally.
 #[template(system)]
 pub fn Sprite2d(
-	#[prop(into)] src: String,
+	#[prop] src: String,
 	#[prop(default)] x: f32,
 	#[prop(default)] y: f32,
 	#[prop(default)] z: f32,
@@ -231,7 +231,7 @@ pub fn Sprite2d(
 /// `SteerTarget::Entity` variant.
 #[template(system)]
 pub fn SeekAgent2d(
-	#[prop(into)] src: String,
+	#[prop] src: String,
 	#[prop(default = 1.0_f32)] scale: f32,
 	#[prop(default = 500.0_f32)] scaled_dist: f32,
 	mut assets: BuildAssets,

@@ -81,16 +81,16 @@ where
 	/// Always jump to `target`, threading a `T`.
 	pub fn typed(target: Entity) -> Self {
 		Self {
-			target: PropOpt::some(target),
-			if_input_matches: PropOpt::none(),
+			target: Some(target),
+			if_input_matches: None,
 			_marker: PhantomData,
 		}
 	}
 	/// Only jump when the input equals `value`.
 	pub fn if_input(target: Entity, value: T) -> Self {
 		Self {
-			target: PropOpt::some(target),
-			if_input_matches: PropOpt::some(value),
+			target: Some(target),
+			if_input_matches: Some(value),
 			_marker: PhantomData,
 		}
 	}

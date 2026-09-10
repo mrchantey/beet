@@ -235,8 +235,8 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// Prop grammar: a bare field or `#[prop(default)]` is optional (type default);
 /// `#[prop(default = expr)]` defaults to `expr`; `#[prop(required)]` is required
-/// (a missing required prop is a graceful error); `#[prop(into)]` accepts
-/// `impl Into`.
+/// (a missing required prop is a graceful error). A prop takes its own type or
+/// an `Option` of it; a string prop accepts a `&str`.
 ///
 /// A template may return `Result<impl Bundle>` when its body can genuinely fail
 /// (parsing a declared uri, rendering a deploy config): the `?` lands on the
@@ -246,7 +246,7 @@ pub fn rsx(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// ```rust ignore
 /// #[template]
-/// fn Button(#[prop(into)] label: String, variant: ButtonVariant) -> impl Bundle {
+/// fn Button(label: String, variant: ButtonVariant) -> impl Bundle {
 ///     rsx! { <button>{label} <Slot/></button> }
 /// }
 /// ```

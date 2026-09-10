@@ -4,7 +4,7 @@ Functions as entities.
 
 An [`Action`] component turns an entity into a function: `call` runs its handler with an input and awaits the output. Control-flow nodes like [`Sequence`] are just actions that call their children, so behavior trees, state machines and utility AI are all built from the same primitive.
 
-An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor (`ActionMeta` is immutable, so every change is an insert consumers can observe), and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector. `ActionOf` / `Actions` mean agent targeting and nothing else.
+An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor (`ActionMeta` is immutable, so every change is an insert consumers can observe), and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector. `ActionOf` / `Actions` mean agent targeting and nothing else; `AgentRoot` marks a subtree's agent by containment, so a wrapped tree keeps resolving (see `AgentQuery`).
 
 A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. A component declaring an `on_add` of its own keeps it: bevy allows one hook per event and silently takes the last, so the macro chains the author's ahead of the guard rather than emitting a second attribute. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
 
@@ -55,14 +55,15 @@ A `#[field]` parameter becomes a field on the emitted struct, sharing its gramma
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-async fn RepeatTimes<Input = ()>(
+async fn RepeatTimes<Input = (), Output = ()>(
 	/// Maximum number of iterations.
 	#[field]
 	total_times: u32,
 	cx: ActionContext<Input>,
-) -> Result<Outcome>
+) -> Result<Outcome<Input, Output>>
 where
-	Input: 'static + Send + Sync + Clone,
+	Input: 'static + Send + Sync,
+	Output: 'static + Send + Sync,
 {
 	// `total_times` is bound before the body runs
 }
@@ -74,8 +75,8 @@ The grammar, in full:
 
 - bare `#[field]` — optional, defaults by type
 - `#[field(default = expr)]` — optional, defaults to `expr`, forcing a generated `Default`
-- an `Option<T>` field — stored as `PropOpt<T>`, bound back to `Option<T>` in the body
-- `#[field(required)]` — stored as `PropOpt<T>`, validated at call time, erroring by field name
+- an `Option<T>` field — optional, defaults to `None`
+- `#[field(required)]` — stored as `Option<T>`, validated at call time, erroring by field name, and bound as `T` in the body
 - `#[field(mut)]` — a mutable binding, so the body edits its own config in place
 - `#[field(no_clone)]` — declared on the struct but never bound, for a value too expensive to clone per call; the body reads it through `cx.caller` instead
 - a visibility (`#[field(pub(crate))]`, `#[field(pub(in path))]`) — narrows the field, which is otherwise `pub` so a cross-module `rsx!` struct-literal patch resolves

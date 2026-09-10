@@ -126,11 +126,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	}
 	if let Some(field) = fields
 		.iter()
-		.find(|field| field.mutable && (field.is_opt() || field.no_clone))
+		.find(|field| field.mutable && (field.required || field.no_clone))
 	{
 		synbail!(
 			&field.ident,
-			"`#[field(mut)]` cannot be combined with `required`, `no_clone`, or an `Option` field"
+			"`#[field(mut)]` cannot be combined with `required` or `no_clone`"
 		);
 	}
 	if has_derive(fn_attrs, "Default")
@@ -761,8 +761,7 @@ fn make_wrapper(args: WrapperArgs) -> TokenStream {
 }
 
 /// The per-field preamble shared by every binding site: a required field is
-/// unwrapped (erroring loudly by name), a declared `Option<T>` field is rebound
-/// from its `PropOpt` storage.
+/// unwrapped, erroring loudly by name.
 fn field_checks(
 	fields: &[&Prop],
 	struct_ty: &TokenStream,
@@ -770,22 +769,19 @@ fn field_checks(
 ) -> Vec<TokenStream> {
 	fields
 		.iter()
-		.filter_map(|field| {
+		.filter(|field| field.required)
+		.map(|field| {
 			let ident = &field.ident;
-			if field.required {
-				let lit = syn::LitStr::new(&ident.to_string(), ident.span());
-				Some(quote! {
-					let ::core::option::Option::Some(#ident) = #ident.into_inner()
-					else {
-						return ::core::result::Result::Err(#beet_core::prelude::bevyhow!(
-							"{}: missing required field `{}`",
-							::core::any::type_name::<#struct_ty>(),
-							#lit
-						));
-					};
-				})
-			} else {
-				field.body_binding()
+			let lit = syn::LitStr::new(&ident.to_string(), ident.span());
+			quote! {
+				let ::core::option::Option::Some(#ident) = #ident
+				else {
+					return ::core::result::Result::Err(#beet_core::prelude::bevyhow!(
+						"{}: missing required field `{}`",
+						::core::any::type_name::<#struct_ty>(),
+						#lit
+					));
+				};
 			}
 		})
 		.collect()
@@ -1059,7 +1055,7 @@ fn make_struct_def(
 
 	let field_defs: Vec<TokenStream> = fields
 		.iter()
-		.map(|field| field.field_def(beet_core))
+		.map(Prop::field_def)
 		.chain(marker_field(generics, fn_attrs))
 		.collect();
 
@@ -2060,16 +2056,14 @@ mod test {
 	}
 
 	#[test]
-	fn optional_field_stores_prop_opt() {
+	fn optional_field_stores_as_declared() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			async fn Log(#[field] message: Option<SmolStr>, cx: ActionContext) -> Result<Outcome> {
 				todo!()
 			}
 		});
-		assert!(result.contains("PropOpt < SmolStr >"));
-		// bound back to an `Option<SmolStr>` before the body runs
-		assert!(result.contains("let message = message . into_inner ()"));
+		assert!(result.contains("message : Option < SmolStr >"));
 	}
 
 	#[test]
@@ -2080,7 +2074,7 @@ mod test {
 				todo!()
 			}
 		});
-		assert!(result.contains("PropOpt < Entity >"));
+		assert!(result.contains("Option < Entity >"));
 		assert!(result.contains("missing required field"));
 		assert!(result.contains("\"target\""));
 	}
@@ -2138,10 +2132,10 @@ mod test {
 	}
 
 	#[test]
-	fn mut_field_cannot_be_optional() {
+	fn mut_field_cannot_be_required() {
 		let err = parse_err(quote!(), syn::parse_quote! {
 			#[derive(Component, Reflect)]
-			fn Bad(#[field(mut)] times: Option<u32>, cx: In<ActionContext>) -> Result<Outcome> {
+			fn Bad(#[field(mut, required)] times: u32, cx: In<ActionContext>) -> Result<Outcome> {
 				todo!()
 			}
 		});

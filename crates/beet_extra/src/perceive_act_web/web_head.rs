@@ -26,7 +26,7 @@ use beet_router::prelude::*;
 pub fn WebHead(
 	/// The agent's socket url, eg `ws://192.168.1.7:8338`. Defaults to the page's
 	/// own host on the default socket port.
-	#[prop(into, default)]
+	#[prop(default)]
 	url: Option<String>,
 	mut commands: Commands,
 ) {

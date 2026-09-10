@@ -95,7 +95,7 @@ async fn name_unregistered_members(
 		), _>(|entity, (tags, members, runs)| {
 			runs.get(entity)
 				.ok()
-				.and_then(|run| run.group.clone().into_inner())
+				.and_then(|run| run.group.clone())
 				.and_then(|group| members.get(group).ok())
 				.map(|members| {
 					members
