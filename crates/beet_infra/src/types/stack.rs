@@ -352,7 +352,7 @@ mod tests {
 			.to_string()
 			.xpect_eq("beet-site--shared--tofu-tfstate");
 		deployment
-			.artifact_bucket_name(&stage)
+			.artifact_store_name(&stage)
 			.xpect_eq("beet-site--dev--artifacts");
 	}
 }

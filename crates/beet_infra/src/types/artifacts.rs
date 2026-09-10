@@ -1,4 +1,7 @@
 //! Versioned artifact storage for deploy, rollback, and rollforward.
+//!
+//! Every read and write here goes through a [`BlobStore`], so nothing in this
+//! module knows or cares which backend holds the versions.
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bytes::Bytes;
@@ -10,6 +13,19 @@ pub struct ArtifactLedger {
 	pub deploy_id: Uuid,
 	pub timestamp: String,
 	pub artifacts: HashMap<SmolStr, ArtifactEntry>,
+	/// The repo store this version's documents were published to, rooted at this
+	/// version's own prefix.
+	///
+	/// It rides the ledger because a machine that resolves its release per start
+	/// has to resolve its DOCUMENT per start too, or a rollback would move the
+	/// binary and leave it reading a newer deploy's document. See
+	/// [`release_pointer`](Self::release_pointer).
+	///
+	/// Defaulted on read: ledgers published before this field existed are still
+	/// rollback targets, and a deploy that could not parse them could not roll
+	/// back to them.
+	#[serde(default)]
+	pub repo: Option<StoreUri>,
 }
 
 impl ArtifactLedger {
@@ -23,7 +39,15 @@ impl ArtifactLedger {
 			deploy_id,
 			timestamp,
 			artifacts: default(),
+			repo: None,
 		}
+	}
+
+	/// Record the repo store this version's documents live in, so the release
+	/// pointer can publish it. See [`repo`](Self::repo).
+	pub fn with_repo(mut self, repo: StoreUri) -> Self {
+		self.repo = Some(repo);
+		self
 	}
 	#[cfg(test)]
 	fn default_test() -> Self { Self::new(uuid_ext::now_v7(), now_timestamp()) }
@@ -85,10 +109,17 @@ impl ArtifactLedger {
 	/// The pointer body: an env file, so one file serves both readers a
 	/// deployed box needs, a shell `.` and a systemd `EnvironmentFile=`.
 	///
-	/// The deploy identity renders through [`BootstrapConfig::to_env`], the same
-	/// table the runtime parses, so the names cannot drift. The artifact key is
-	/// the pointer's own knob, not a bootstrap one: it tells the machine what to
-	/// download, not the process how to boot.
+	/// The deploy identity and the repo store render through
+	/// [`BootstrapConfig::to_env`], the same table the runtime parses, so the
+	/// names cannot drift. The artifact key is the pointer's own knob, not a
+	/// bootstrap one: it tells the machine what to download, not the process how
+	/// to boot.
+	///
+	/// The repo store is here rather than on the machine's own config because it
+	/// changes every deploy, and a machine whose config changes every deploy is
+	/// rebuilt every deploy. Publishing it here means the box resolves its
+	/// binary AND the document that binary was built against from one file, at
+	/// every start, and a rollback moves both because it rewrites this file.
 	fn release_pointer(&self, artifact_name: &str) -> Result<String> {
 		let entry = self.artifacts.get(artifact_name).ok_or_else(|| {
 			bevyhow!(
@@ -99,6 +130,7 @@ impl ArtifactLedger {
 		let mut body = BootstrapConfig {
 			deploy_id: Some(self.deploy_id.to_string().into()),
 			deploy_timestamp: Some(self.timestamp.clone().into()),
+			repo: self.repo.clone(),
 			..default()
 		}
 		.to_env()
@@ -117,7 +149,7 @@ impl ArtifactLedger {
 /// Metadata about a single artifact within a version.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtifactEntry {
-	/// S3 key where the artifact binary is stored
+	/// The artifact's key within the artifact store.
 	pub bucket_key: SmolStr,
 	/// Base64-encoded SHA256 hash for Terraform source_code_hash
 	pub source_hash: SmolStr,
@@ -151,6 +183,14 @@ impl ArtifactsClient {
 	}
 
 	pub fn deploy_id(&self) -> &Uuid { &self.ledger.deploy_id }
+
+	/// Record the repo store this deploy publishes its documents to, so the
+	/// ledger and every release pointer it writes name it. See
+	/// [`ArtifactLedger::repo`].
+	pub fn with_repo(mut self, repo: StoreUri) -> Self {
+		self.ledger.repo = Some(repo);
+		self
+	}
 
 	/// Upload a single artifact binary to the versioned path.
 	pub async fn upload_artifact(
@@ -337,6 +377,79 @@ pub(crate) fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// A machine that resolves its release per start has to resolve its DOCUMENT
+	/// per start too, or a rollback moves the binary and leaves it reading a
+	/// newer deploy's document. The pointer is the one file it reads, so the
+	/// store rides it beside the artifact key, and `set_current` rewrites both
+	/// together.
+	#[beet_core::test]
+	async fn the_pointer_carries_the_repo_store() {
+		let store = BlobStore::temp();
+		let uri = |version: &str| {
+			StoreUri::parse(&format!("s3://beet-site--prod--repo/{version}"))
+				.unwrap()
+		};
+		let first = test_ledger(vec![("app", "versions/v1/app", "h1")])
+			.with_repo(uri("v1"));
+		let second = test_ledger(vec![("app", "versions/v2/app", "h2")])
+			.with_repo(uri("v2"));
+		let client = ArtifactsClient::new(store.clone(), first.clone());
+		client.publish_ledger().await.unwrap();
+		ArtifactsClient::new(store.clone(), second.clone())
+			.publish_ledger()
+			.await
+			.unwrap();
+
+		let pointer = async || {
+			String::from_utf8(
+				store
+					.get(&ArtifactLedger::release_pointer_key("app"))
+					.await
+					.unwrap()
+					.to_vec(),
+			)
+			.unwrap()
+		};
+		pointer()
+			.await
+			.as_str()
+			.xpect_contains("BEET_REPO=s3://beet-site--prod--repo/v2");
+		// the whole point: a rollback moves the document with the binary
+		client.set_current(&first.deploy_id).await.unwrap();
+		pointer()
+			.await
+			.as_str()
+			.xpect_contains("BEET_REPO=s3://beet-site--prod--repo/v1")
+			.xpect_contains("BEET_ARTIFACT_KEY=versions/v1/app");
+	}
+
+	/// A ledger published before the store rode it is still a rollback target,
+	/// and a deploy that could not parse one could not roll back to it.
+	#[beet_core::test]
+	async fn a_ledger_without_a_repo_still_parses() {
+		let store = BlobStore::temp();
+		let ledger = test_ledger(vec![("app", "versions/v1/app", "h1")]);
+		let json = serde_json::json!({
+			"deploy_id": ledger.deploy_id,
+			"timestamp": ledger.timestamp,
+			"artifacts": ledger.artifacts,
+		});
+		store
+			.insert(
+				&SmolPath::new("current-ledger.json"),
+				serde_json::to_vec(&json).unwrap(),
+			)
+			.await
+			.unwrap();
+		ArtifactsClient::new(store, ArtifactLedger::default_test())
+			.current_ledger()
+			.await
+			.unwrap()
+			.unwrap()
+			.repo
+			.xpect_none();
+	}
 
 	fn test_ledger(artifacts: Vec<(&str, &str, &str)>) -> ArtifactLedger {
 		let mut ledger =

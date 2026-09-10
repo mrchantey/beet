@@ -40,46 +40,6 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<DeployRoutes deploy={$up} destroy={$down}/>` — the standard IaC verb routes
-/// (deploy / destroy / validate / plan / apply / show / list / rollback /
-/// rollforward), the markup form of [`Stack::verbs`].
-///
-/// It carries no identity of its own: each verb resolves its [`Stack`] by
-/// ancestry, so authoring it under a `<Stack>` is nearly the whole declaration.
-/// That separation is the point — a stage or app name riding a TEMPLATE prop is
-/// absent from any binary that did not link the template, which is exactly how a
-/// `shared` scope can go missing in a lean build.
-///
-/// The two groups are the exception, and they are references rather than names:
-/// what a stack's deploy DOES is the document's to say, and both halves of it
-/// are declared beside the blocks they act on.
-///
-/// ```bsx
-/// <Group bx:ref="up">
-///     <TofuApply/>
-/// </Group>
-/// <Group bx:ref="down">
-///     <StackTeardown/>
-///     <TofuDestroy/>
-/// </Group>
-/// <DeployRoutes deploy={$up} destroy={$down}/>
-/// ```
-///
-/// Both are required and there is no compatibility mode: a stack that can be
-/// brought up and not taken down is the thing this replaced.
-#[template]
-pub fn DeployRoutes(
-	/// The group `deploy` runs, forward.
-	#[prop(required)]
-	deploy: Entity,
-	/// The group `destroy` runs, in reverse. Authored in convergence order like
-	/// every other group, so its first member is torn down last.
-	#[prop(required)]
-	destroy: Entity,
-) -> impl Bundle {
-	Stack::verbs(deploy, destroy)
-}
-
 /// `<StateBackendToggle/>` — select this launch's tofu state backend from argv:
 /// S3 when `--s3-backend` is passed, local otherwise. The markup form of
 /// lifecycle.rs's backend toggle.
@@ -168,10 +128,7 @@ pub fn LambdaSiteBlock(
 			)
 		});
 	let mut build = infra_ext::beet_cargo_build(features).with_bootstrap(
-		infra_ext::remote_bootstrap(
-			infra_ext::app_bucket_name(&stack),
-			stacks.deployment().deploy_id(),
-		)?,
+		infra_ext::remote_bootstrap(&stack, stacks.deployment().deploy_id())?,
 	);
 	if let Some(exec_route) = exec_route {
 		build = build.with_exec_route(exec_route);
@@ -183,7 +140,7 @@ pub fn LambdaSiteBlock(
 	(
 		block,
 		build.into_lambda_build_artifact()?,
-		RepoBucket::versioned(infra_ext::APP_BUCKET_LABEL),
+		RepoBucket,
 	)
 		.xok()
 }
@@ -219,49 +176,23 @@ pub fn LambdaJobBlock(
 	/// that predates it is the longest one it will ever do.
 	#[prop(default = 900)]
 	timeout_secs: i64,
-	/// Read the entry document from the app bucket ROOT rather than from this
-	/// deploy's own prefix.
-	///
-	/// For a stack whose OTHER compute cannot carry a per-deploy prefix, which
-	/// today means one serving from a Lightsail box (see
-	/// [`remote_bootstrap_root`](infra_ext::remote_bootstrap_root)). Every reader
-	/// of one bucket has to agree on where its root is, and a job that boots a
-	/// route of the same document the box serves is one of its readers.
-	///
-	/// Off by default, because the versioned prefix is what a job wants whenever
-	/// it can have it: the job then runs against the document its own deploy
-	/// published rather than whatever the newest one did.
-	#[prop(default)]
-	root_repo: bool,
 	stacks: StackQuery,
 	entity: Entity,
 ) -> Result<impl Bundle> {
 	let stack = stacks.resolve(entity);
-	let bucket = infra_ext::app_bucket_name(&stack);
-	let label_ref = infra_ext::APP_BUCKET_LABEL;
-	let (bootstrap, repo) = match root_repo {
-		true => (
-			infra_ext::remote_bootstrap_root(bucket)?,
-			RepoBucket::root(label_ref),
-		),
-		false => (
-			infra_ext::remote_bootstrap(
-				bucket,
-				stacks.deployment().deploy_id(),
-			)?,
-			RepoBucket::versioned(label_ref),
-		),
-	};
 	(
 		LambdaBlock::default()
 			.with_label(label)
 			.with_http(false)
 			.with_timeout_secs(timeout_secs),
 		infra_ext::beet_cargo_build(features)
-			.with_bootstrap(bootstrap)
+			.with_bootstrap(infra_ext::remote_bootstrap(
+				&stack,
+				stacks.deployment().deploy_id(),
+			)?)
 			.with_exec_route(exec_route)
 			.into_lambda_build_artifact()?,
-		repo,
+		RepoBucket,
 	)
 		.xok()
 }
@@ -277,29 +208,30 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 	)
 }
 
-/// `<LightsailSiteBlock features="aws_sdk"/>` — the lightsail deploy block (its
-/// systemd `ExecStart` launches the binary with the site-store config,
-/// `remote_bootstrap`) plus its build artifact, on one entity (paired by
-/// `TofuApply`, see [`LambdaSiteBlock`]). The markup form of
-/// `(block, build_beet_binary(features))`. The bucket it serves from composes
-/// from the ancestor `<Stack>`.
-#[template(system)]
-pub fn LightsailSiteBlock(
-	#[prop] features: String,
-	stacks: StackQuery,
-	entity: Entity,
-) -> Result<impl Bundle> {
-	let stack = stacks.resolve(entity);
+/// `<LightsailSiteBlock features="aws_sdk"/>` — the lightsail deploy block plus
+/// its build artifact, on one entity (paired by `TofuApply`, see
+/// [`LambdaSiteBlock`]).
+///
+/// It names no repo store, unlike every other site block here, and the omission
+/// is the declaration. Everything a Lightsail block is given renders into
+/// `user_data`, which terraform cannot update in place, so a per-deploy value
+/// there rebuilds the box on every code-only deploy. The release pointer carries
+/// the store instead ([`ArtifactLedger::repo`]), and the unit sources that
+/// pointer immediately before `exec`, so the box resolves its binary and the
+/// document that binary was built against from one file at every start.
+///
+/// It resolves nothing from its stack for the same reason: the only per-stack
+/// value it wanted was the store name.
+#[template]
+pub fn LightsailSiteBlock(#[prop] features: String) -> impl Bundle {
 	(
-		LightsailBlock::default().with_bootstrap(
-			infra_ext::remote_bootstrap_root(infra_ext::app_bucket_name(
-				&stack,
-			))?,
-		),
+		LightsailBlock::default().with_bootstrap(BootstrapConfig {
+			server: Some(RunningSetFilter::new("http")),
+			..default()
+		}),
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
-		RepoBucket::root(infra_ext::APP_BUCKET_LABEL),
+		RepoBucket,
 	)
-		.xok()
 }
 
 /// `<LightsailWatch timeout="30s"/>` — tail the deployed instance's logs, the
@@ -325,10 +257,10 @@ pub fn FargateSiteBlock(
 	let stack = stacks.resolve(entity);
 	(
 		FargateBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
-			infra_ext::app_bucket_name(&stack),
+			&stack,
 			stacks.deployment().deploy_id(),
 		)?),
-		RepoBucket::versioned(infra_ext::APP_BUCKET_LABEL),
+		RepoBucket,
 	)
 		.xok()
 }
@@ -395,15 +327,13 @@ pub fn LightsailBeetSiteBlock(
 		// table is NOT here: the site declares it, and the deployed process
 		// resolves the same declaration.
 		//
-		// The repo store is the bucket ROOT rather than this deploy's prefix,
-		// because everything here renders into `user_data` and a per-deploy value
-		// there replaces the box every deploy: see `remote_bootstrap_root`.
+		// No `repo`: everything here renders into `user_data`, which terraform
+		// cannot update in place, so a per-deploy value would rebuild the box on
+		// every deploy. The release pointer carries it, resolved per start.
 		.with_bootstrap(BootstrapConfig {
 			server: Some(RunningSetFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
-			..infra_ext::remote_bootstrap_root(infra_ext::app_bucket_name(
-				&stack,
-			))?
+			..default()
 		})
 		// private key material: its own channel, so no renderer can ever put it
 		// on an argv line.
@@ -433,7 +363,7 @@ pub fn LightsailBeetSiteBlock(
 	(
 		block,
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
-		RepoBucket::root(infra_ext::APP_BUCKET_LABEL),
+		RepoBucket,
 	)
 		.xok()
 }
@@ -654,10 +584,10 @@ mod test {
 				<Stack>
 					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
-					<!-- the entry document the job boots from, deploy-versioned like
-					     every served bucket: the job dispatches a route of the same
+					<!-- the repo store the job boots from, deploy-versioned like
+					     every served store: the job dispatches a route of the same
 					     document the site serves -->
-					<S3BucketBlock label="app"/>
+					<S3BucketBlock label="repo"/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
@@ -680,9 +610,9 @@ mod test {
 		buckets.sort();
 		buckets.xpect_eq(vec![
 			("analytics".to_string(), true, false, false),
-			// the served entry document, versioned per deploy
-			("app".to_string(), false, true, false),
 			("archive".to_string(), true, false, true),
+			// the repo store, versioned per deploy
+			("repo".to_string(), false, true, false),
 		]);
 		// nothing but the timer may reach analytics compaction
 		world
@@ -895,6 +825,42 @@ mod test {
 		tree.find(&["audit"]).xpect_some();
 	}
 
+	/// A Lightsail site names NO repo store, and the omission is the whole
+	/// point: everything the block is given renders into `user_data`, which
+	/// terraform cannot update in place, so a per-deploy value there would
+	/// rebuild the box on every code-only deploy. The store rides the release
+	/// pointer instead, which the unit sources immediately before `exec`.
+	///
+	/// The lambda beside it is the contrast: its config is baked into an
+	/// immutable zip, so it carries the prefix directly.
+	#[beet_core::test]
+	fn a_lightsail_site_bakes_no_repo_store() {
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Stack><LightsailSiteBlock features="aws_sdk"/></Stack>"#,
+		);
+		world
+			.query::<&LightsailBlock>()
+			.single(&world)
+			.unwrap()
+			.bootstrap()
+			.repo
+			.xpect_none();
+		// ..and it still declares that it serves the repo store, so the render
+		// holds the stack to declaring one
+		world
+			.query_filtered::<Entity, With<RepoBucket>>()
+			.single(&world)
+			.unwrap();
+	}
+
 	/// The apply layer coerces from markup, so a deploy route can author its
 	/// layered applies (`layer="storage"` before the content sync, a bare full
 	/// apply after it) as the same tag.
@@ -941,7 +907,7 @@ mod test {
 		pull.no_sign_request.xpect_true();
 		pull.delete.xpect_false();
 		let push = sync(
-			r#"<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>"#,
+			r#"<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>"#,
 		);
 		push.direction.xpect_eq(SyncDirection::Push);
 		push.delete.xpect_true();

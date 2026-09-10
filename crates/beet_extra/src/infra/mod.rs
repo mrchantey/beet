@@ -26,9 +26,8 @@ impl Plugin for InfraExamplesPlugin {
 			.register_template::<BeetBinaryBuild>()
 			// an example-target binary build artifact (eg the `ssh_tui_site` server).
 			.register_template::<ExampleBinaryBuild>()
-			// the IaC verb routes a `<Stack>` hosts, and the bucket-lifecycle
-			// example's state-backend toggle.
-			.register_template::<DeployRoutes>()
+			// the bucket-lifecycle example's state-backend toggle. The IaC verb
+			// routes register upstream in `InfraPlugin`, beside the verbs.
 			.register_template::<StateBackendToggle>()
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
 			// `.bsx` lambda deployer composes them (see `templates.rs`).

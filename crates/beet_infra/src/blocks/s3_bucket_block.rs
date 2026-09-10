@@ -146,6 +146,30 @@ impl S3BucketBlock {
 		}
 	}
 
+	/// The [`StoreUri`] naming this store, as a deployed process is told to read
+	/// it: the composed name plus the per-deploy prefix a versioned store nests
+	/// under. No region, so the SDK's own default chain resolves it exactly as it
+	/// does for any other process-boundary store selection.
+	///
+	/// The ONE place the uri a deploy hands to a process is shaped, so the
+	/// argv a lambda bakes and the env a release pointer publishes cannot
+	/// describe the same store differently.
+	pub fn store_uri(
+		&self,
+		stack: &ResolvedStack,
+		deploy_id: Option<&Uuid>,
+	) -> StoreUri {
+		StoreUri::S3 {
+			bucket: self.bucket_name(stack).into(),
+			prefix: match (self.deploy_versioned, deploy_id) {
+				(true, Some(deploy_id)) => Some(deploy_id.to_string().into()),
+				_ => None,
+			},
+			endpoint: None,
+			region: None,
+		}
+	}
+
 	/// The store for this bucket as a deploy declares it, ie including the
 	/// per-deploy subdir a versioned bucket nests under.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
@@ -155,110 +179,6 @@ impl S3BucketBlock {
 		deployment: &Deployment,
 	) -> beet_net::prelude::S3Store {
 		self.store(stack, Some(deployment.deploy_id()))
-	}
-}
-
-/// The declared bucket a deployed process was baked to read its entry document
-/// out of, and WHERE in it: the per-deploy prefix, or the bucket root.
-///
-/// Recorded on the compute that baked the reference, because the reference has
-/// two ends and neither one says so alone. A compute baked with
-/// `s3://<bucket>/<deploy id>` reads a prefix that exists only because the
-/// bucket declared [`deploy_versioned`](S3BucketBlock::deploy_versioned); a
-/// compute baked with the bare bucket reads a root that only holds the site
-/// while the bucket does NOT. Either mismatch deploys clean and then serves
-/// nothing (or, worse, serves a document from some other deploy) with no error
-/// anywhere.
-///
-/// So the compute states which root it took and [`assert_repo_buckets`] holds
-/// the two declarations together at render time, before any tofu invocation.
-///
-/// Both forms exist because not every deploy target CAN carry a per-deploy
-/// value: a Lightsail box's boot config is machine config, and a value that
-/// changes per deploy replaces the box every deploy. See
-/// `infra_ext::remote_bootstrap_root`.
-#[derive(Debug, Clone, Get, Component, Reflect)]
-#[reflect(Component)]
-pub struct RepoBucket {
-	/// The bucket's declared label, ie `app`, resolved against the same
-	/// ancestor [`Stack`] the bucket itself is.
-	label: SmolStr,
-	/// Whether the baked reference names this deploy's prefix (`true`) or the
-	/// bucket root (`false`). Must match the bucket's own
-	/// [`deploy_versioned`](S3BucketBlock::deploy_versioned).
-	deploy_versioned: bool,
-}
-
-impl RepoBucket {
-	/// A compute baked to read `s3://<bucket>/<deploy id>`, the ordinary case.
-	pub fn versioned(label: impl Into<SmolStr>) -> Self {
-		Self {
-			label: label.into(),
-			deploy_versioned: true,
-		}
-	}
-
-	/// A compute baked to read the bucket root, for a target that cannot carry a
-	/// per-deploy value.
-	pub fn root(label: impl Into<SmolStr>) -> Self {
-		Self {
-			label: label.into(),
-			deploy_versioned: false,
-		}
-	}
-}
-
-/// Render-set: fail a stack whose [`RepoBucket`] names no declared bucket, or
-/// names one whose publication root is not the one the compute was baked to
-/// read. See [`RepoBucket`] for why neither declaration can be trusted alone.
-pub(crate) fn assert_repo_buckets(
-	mut scopes: AncestorQuery<&mut RenderScope>,
-	stacks: StackQuery,
-	repos: Query<(Entity, &RepoBucket)>,
-	buckets: Query<&S3BucketBlock>,
-) {
-	for (entity, repo) in repos.iter() {
-		let Ok(declared) = stacks.declared(entity) else {
-			continue;
-		};
-		let bucket = declared
-			.iter()
-			.filter_map(|entity| buckets.get(*entity).ok())
-			.find(|bucket| bucket.label() == repo.label());
-		let err = match bucket {
-			Some(bucket)
-				if bucket.deploy_versioned() == repo.deploy_versioned() =>
-			{
-				continue;
-			}
-			Some(bucket) if repo.deploy_versioned() => bevyhow!(
-				"the bucket '{}' this deploy serves its entry document from \
-				 declares `deploy_versioned=false`, but the binary it ships \
-				 reads `s3://<bucket>/<deploy id>`. The deploy would sync the \
-				 bucket root and the process would read a prefix nothing \
-				 wrote: delete the attribute, since it defaults to true.",
-				bucket.label()
-			),
-			Some(bucket) => bevyhow!(
-				"the bucket '{}' this deploy serves its entry document from is \
-				 deploy-versioned, but the binary it ships reads the bucket \
-				 ROOT. The deploy would sync this version's prefix and the \
-				 process would keep serving whatever the root last held: \
-				 declare `deploy_versioned=false` on the bucket, or bake the \
-				 prefix into the process.",
-				bucket.label()
-			),
-			None => bevyhow!(
-				"this deploy serves its entry document from a bucket labelled \
-				 '{}', which nothing under this stack declares. Add \
-				 `<S3BucketBlock label=\"{}\"/>`.",
-				repo.label(),
-				repo.label()
-			),
-		};
-		if let Ok(mut scope) = scopes.get_mut(entity) {
-			scope.error(err);
-		}
 	}
 }
 
@@ -830,73 +750,6 @@ mod tests {
 		.xpect_contains("aws_s3_bucket_versioning")
 		.xnot()
 		.xpect_contains("aws_s3_bucket_lifecycle_configuration");
-	}
-
-	/// The two halves of the entry-document reference have to agree, in BOTH
-	/// directions: a compute baked with `s3://<bucket>/<deploy id>` needs a
-	/// bucket that publishes under that prefix, and one baked with the bare
-	/// bucket needs a bucket that publishes at its root. Every failure here is
-	/// render-time, ie before any tofu invocation, because the deployed shape of
-	/// the mistake is a successful deploy that serves nothing.
-	#[beet_core::test]
-	fn a_repo_bucket_must_match_its_declaration() {
-		// a versioned reader against a bucket that publishes at its root
-		RenderScope::test_render(|parent| {
-			parent
-				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
-			parent.spawn(RepoBucket::versioned("app"));
-		})
-		.0
-		.finish()
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("deploy_versioned=false");
-		// ..and the inverse, which serves a stale document rather than none
-		RenderScope::test_render(|parent| {
-			parent.spawn(S3BucketBlock::new("app"));
-			parent.spawn(RepoBucket::root("app"));
-		})
-		.0
-		.finish()
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("reads the bucket ROOT");
-		// ..and naming a bucket nothing declares is the same silent 404
-		RenderScope::test_render(|parent| {
-			parent.spawn(RepoBucket::versioned("app"));
-		})
-		.0
-		.finish()
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("nothing under this stack declares");
-		// both matching pairs are silent
-		RenderScope::test_render(|parent| {
-			parent.spawn(S3BucketBlock::new("app"));
-			parent.spawn(RepoBucket::versioned("app"));
-		})
-		.0
-		.finish()
-		.unwrap();
-		RenderScope::test_render(|parent| {
-			parent
-				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
-			parent.spawn(RepoBucket::root("app"));
-		})
-		.0
-		.finish()
-		.unwrap();
-		// ..and a data store beside one is none of this assertion's business
-		RenderScope::test_render(|parent| {
-			parent.spawn(S3BucketBlock::new("app"));
-			parent.spawn(
-				S3BucketBlock::new("mail-blobs").with_deploy_versioned(false),
-			);
-			parent.spawn(RepoBucket::versioned("app"));
-		})
-		.0
-		.finish()
-		.unwrap();
 	}
 
 	#[beet_core::test]

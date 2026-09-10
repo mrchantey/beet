@@ -210,7 +210,7 @@ impl LightsailBlock {
 		let log_group = self.log_group(stack);
 		IamPolicy::new(region.clone(), "lightsail instance")
 			// declared by nothing, so it seeds the read set
-			.read_bucket(deployment.artifact_bucket_name(stack))
+			.read_bucket(deployment.artifact_store_name(stack))
 			.lower(access)?
 			// the block's own log group, for the CloudWatch agent
 			.statement(json!({
@@ -609,7 +609,7 @@ touch /etc/__APP__/deploy.env
 "#,
 			stack,
 			&[
-				("__BUCKET__", &deployment.artifact_bucket_name(stack)),
+				("__BUCKET__", &deployment.artifact_store_name(stack)),
 				(
 					"__POINTER__",
 					&ArtifactLedger::release_pointer_key(&self.label)
@@ -1385,7 +1385,7 @@ mod tests {
 				{
 					let (stack, deployment, _dir) =
 						ResolvedStack::default_local();
-					deployment.artifact_bucket_name(&stack)
+					deployment.artifact_store_name(&stack)
 				},
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
@@ -1585,7 +1585,7 @@ mod tests {
 			))
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
-				deployment.artifact_bucket_name(&stack)
+				deployment.artifact_store_name(&stack)
 			))
 			.xpect_contains(&format!(
 				"table/{}",

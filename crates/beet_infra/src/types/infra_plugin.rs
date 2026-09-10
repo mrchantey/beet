@@ -52,7 +52,7 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::S3BucketBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
 			// ..and the compute's half of the entry-document reference, whose
-			// agreement with the bucket's `deploy_versioned` is asserted in the
+			// agreement with the store's `deploy_versioned` is asserted in the
 			// render rather than left to convention. See `RepoBucket`.
 			.register_type::<crate::prelude::RepoBucket>()
 			.add_systems(
@@ -251,6 +251,9 @@ impl Plugin for InfraPlugin {
 			// the step a content-only verb runs first, so it publishes into the
 			// live version rather than minting one nothing serves.
 			.register_type::<crate::prelude::AdoptCurrentDeploy>()
+			// the IaC verb routes a `<Stack>` hosts, registered beside the verbs
+			// themselves rather than by whichever crate happens to author markup.
+			.register_template::<crate::prelude::DeployRoutes>()
 			.register_type::<crate::prelude::TofuApply>()
 			// the two teardown steps: `tofu destroy`, and the state carriers it
 			// leaves behind. They converge either side of the apply, so a destroy

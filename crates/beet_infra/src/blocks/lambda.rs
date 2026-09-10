@@ -168,7 +168,7 @@ impl LambdaBlock {
 			.clone()
 			.unwrap_or_else(|| stack.region().clone());
 		// artifact values computed directly from the deploy
-		let artifact_bucket = deployment.artifact_bucket_name(stack);
+		let artifact_bucket = deployment.artifact_store_name(stack);
 		let artifact_key = deployment.artifact_key(&self.label);
 
 		// CloudWatch log group for Lambda logs

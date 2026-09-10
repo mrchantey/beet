@@ -9,30 +9,28 @@ use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
-/// The label every app bucket is declared under, and therefore the one
-/// [`remote_bootstrap`] names. One constant because the two ends of the
-/// reference have to be the same string: the deploy syncs into this bucket and
-/// the shipped binary reads out of it.
-pub const APP_BUCKET_LABEL: &str = "app";
+/// The label a stack declares its REPO STORE under, and therefore the one
+/// [`remote_bootstrap`] names. Re-exported from [`RepoBucket`] rather than
+/// restated, because the two ends of the reference have to be the same string:
+/// the deploy publishes into this store and the shipped binary reads out of it.
+pub const REPO_BUCKET_LABEL: &str = RepoBucket::LABEL;
 
-/// The one bucket an app is served from: a per-stage replica of the checkout, so
+/// The one store an app is served from: a per-stage replica of the checkout, so
 /// everything the binary reads (the entry, the routes, the assets) is one store.
 ///
 /// Deploy-versioned, by taking the default: every deploy publishes the checkout
 /// under its own id and ships a binary that reads that prefix, so the window
-/// between the sync and the function swap is not a window where the old binary
+/// between the sync and the binary swap is not a window where the old binary
 /// parses the new document. See [`RepoBucket`].
 ///
-/// A Lightsail stack is the exception and declares `deploy_versioned=false`
-/// itself, for the reason [`remote_bootstrap_root`] gives.
-pub fn app_bucket() -> S3BucketBlock { S3BucketBlock::new(APP_BUCKET_LABEL) }
+pub fn repo_bucket() -> S3BucketBlock { S3BucketBlock::new(REPO_BUCKET_LABEL) }
 
-/// The resolved name of the app bucket for this stack, ready to inject so the
-/// deployed binary reconstructs the same store. Deterministic for a given stack
-/// (identity only, independent of the per-deploy id), so a throwaway stack
-/// rebuilt from the same `app_name` resolves the same bucket.
-pub fn app_bucket_name(stack: &ResolvedStack) -> String {
-	stack.resource_name(APP_BUCKET_LABEL)
+/// The resolved name of `stack`'s repo store, ready to inject so the deployed
+/// binary reconstructs the same store. Deterministic for a given stack (identity
+/// only, independent of the per-deploy id), so a throwaway stack rebuilt from
+/// the same `app_name` resolves the same store.
+pub fn repo_bucket_name(stack: &ResolvedStack) -> String {
+	stack.resource_name(REPO_BUCKET_LABEL)
 }
 
 /// A CloudWatch tail of `target`, with an optional timeout after which the
@@ -47,9 +45,14 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 }
 
 /// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
-/// from its bucket: the self-rooted `s3://<bucket>/<deploy id>` repo store (the
-/// entry document is probed at that prefix) constrained to the http transport. A
-/// deploy serving more transports overrides `server`.
+/// out of `stack`'s repo store, rooted at this deploy's own prefix
+/// (`s3://<store>/<deploy id>`, self-rooted so the entry document is probed
+/// there) and constrained to the http transport. A deploy serving more
+/// transports overrides `server`.
+///
+/// Takes the resolved stack rather than a store name because the name composes
+/// from the stack and from nothing else, so a caller that passed one would only
+/// be doing this function's job first.
 ///
 /// Each block renders it at its own platform boundary, splitting boot selection
 /// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
@@ -57,8 +60,8 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 ///
 /// ## Why the deploy id is baked in rather than resolved at run time
 ///
-/// A deploy publishes the site into the bucket and THEN swaps the binary that
-/// serves it, because the bucket has to hold the site before the function that
+/// A deploy publishes the site into the store and THEN swaps the binary that
+/// serves it, because the store has to hold the site before the process that
 /// reads it exists. At one mutable location that ordering is a window in which
 /// the OLD binary reads the NEW document, which is a hard parse failure the
 /// moment the document uses syntax that binary predates. Giving each deploy its
@@ -66,53 +69,27 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 /// shipped with.
 ///
 /// It also makes a rollback whole for free. Re-applying with an earlier deploy
-/// id swaps the function back to that version's artifact, and that artifact was
+/// id swaps the process back to that version's artifact, and that artifact was
 /// baked pointing at that version's document, so the binary and the document
 /// move together with nothing keeping them in step.
 ///
-/// Baked UNCONDITIONALLY rather than threaded from the bucket's
-/// `deploy_versioned` flag: it defaults to true, and the only buckets that want
-/// it off are runtime data stores, which are never served from. The bucket that
+/// Baked UNCONDITIONALLY rather than threaded from the store's
+/// `deploy_versioned` flag: it defaults to true, and the only stores that want
+/// it off are runtime data stores, which are never served from. The store that
 /// IS served from is held to the invariant by [`RepoBucket`], which every caller
 /// of this declares alongside the block.
+///
+/// A deploy target that cannot bake a per-deploy value into its own boot config
+/// does not call this at all. It sets no `repo`, and the release pointer it
+/// resolves per start publishes one instead: see [`ArtifactLedger::repo`].
 pub fn remote_bootstrap(
-	bucket_name: impl AsRef<str>,
+	stack: &ResolvedStack,
 	deploy_id: &Uuid,
 ) -> Result<BootstrapConfig> {
 	BootstrapConfig {
-		repo: Some(StoreUri::parse(&format!(
-			"s3://{}/{deploy_id}",
-			bucket_name.as_ref()
-		))?),
-		server: Some(RunningSetFilter::new("http")),
-		..default()
-	}
-	.xok()
-}
-
-/// [`remote_bootstrap`] without the per-deploy prefix: the bucket ROOT, one
-/// mutable location every version of the binary reads.
-///
-/// For a deploy target whose boot config is MACHINE config rather than per-deploy
-/// config, which today means [`LightsailBlock`]. Its config renders into
-/// `user_data`, and terraform cannot update `user_data` in place, so a value that
-/// changes every deploy replaces the box every deploy: a cold cache, a reset
-/// burst balance and an outage window, in exchange for a code-only change. The
-/// block says so itself, and the rule it states is the one followed here —
-/// anything per-deploy belongs on the release pointer, which is also what a
-/// rollback moves.
-///
-/// So a Lightsail site keeps the skew this module's prefix exists to remove: its
-/// box can read a document published by a deploy newer than its binary. Closing
-/// it means moving `--repo` off the unit's `ExecStart` and onto the release
-/// pointer beside `BEET_ARTIFACT_KEY`, so the prefix and the binary are resolved
-/// from one place at every start. That is a change to the boot channel, not to
-/// this function, which is why it is named rather than papered over.
-pub fn remote_bootstrap_root(
-	bucket_name: impl AsRef<str>,
-) -> Result<BootstrapConfig> {
-	BootstrapConfig {
-		repo: Some(StoreUri::parse(&format!("s3://{}", bucket_name.as_ref()))?),
+		// through the store declaration, so an argv a binary bakes and an env a
+		// release pointer publishes cannot describe the same store differently
+		repo: Some(repo_bucket().store_uri(stack, Some(deploy_id))),
 		server: Some(RunningSetFilter::new("http")),
 		..default()
 	}
@@ -140,7 +117,7 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 /// every infra example serves. A mirror, so a renamed or removed source file
 /// does not linger in the bucket across deploys.
 ///
-/// Into the launch's own deploy prefix, since [`app_bucket`] is deploy
+/// Into the launch's own deploy prefix, since [`repo_bucket`] is deploy
 /// versioned: that is the prefix the binary this same deploy ships was baked to
 /// read. A content-only `sync` verb therefore runs `<AdoptCurrentDeploy/>`
 /// first, so the launch adopts the LIVE version's id rather than minting one
@@ -152,7 +129,7 @@ pub fn sync_site(
 	(
 		S3FsStore::new(
 			FsStore::new(WsPathBuf::new("examples/bsx_site")),
-			app_bucket().stack_store(stack, deployment),
+			repo_bucket().stack_store(stack, deployment),
 		),
 		SyncS3Bucket {
 			delete: true,

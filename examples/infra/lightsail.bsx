@@ -27,7 +27,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws_sdk"/>
-			<S3BucketBlock label="app" deploy_versioned=false/>
+			<S3BucketBlock label="repo"/>
 			<!-- the bucket first, so the site is in place before the instance that
 			     serves it boots -->
 			<TofuApply layer="storage"/>
@@ -40,7 +40,10 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<TofuDestroy/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<!-- a content-only republish, into the version the running service was
+		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>
+			<AdoptCurrentDeploy/>
 			<SiteSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>

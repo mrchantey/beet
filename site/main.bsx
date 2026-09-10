@@ -227,11 +227,11 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     JSON-over-blob TableProvider and are re-derivable from the archive,
 		     segments are transient by design). -->
 		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
-		<!-- NOT deploy-versioned, alone among the served sites: this box's boot
-		     config renders into `user_data`, which terraform cannot update in
-		     place, so a per-deploy prefix there would replace the box on every
-		     code-only deploy. See `infra_ext::remote_bootstrap_root`. -->
-		<S3BucketBlock label="app" deploy_versioned=false/>
+		<!-- the REPO STORE, deploy-versioned by taking the default. The box does
+		     not bake the prefix into its `user_data` (that would rebuild it every
+		     deploy); it resolves it from the release pointer at every start, so a
+		     rollback moves the binary and its document together. -->
+		<S3BucketBlock label="repo"/>
 		<!-- the `archive` profile: append-only cold data, the inverse of the app
 		     bucket by lifecycle. Never touched by a deploy sync, which would prune
 		     it. Analytics owns the `analytics/raw/` prefix; these compact daily
@@ -242,13 +242,13 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<!-- the box is replaceable, so it owns no durable timer: the rollup runs
 		     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
 		     `jobs` verb of this same document. -->
-		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda" root_repo=true/>
+		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
 		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 		<DeployRoutes/>
 		<Route path="deploy" {ExchangeSequence}>
 			<TofuApply layer="storage"/>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>
 			<TofuApply/>
 			<LightsailRelease/>
 			<CloudflareZoneSetup/>
@@ -256,8 +256,11 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<CloudflarePurgeCache/>
 		</Route>
 		<Route path="sync" {ExchangeSequence}>
+			<!-- publish into the version the RUNNING box reads, rather than
+			     minting one of this launch's own that nothing serves -->
+			<AdoptCurrentDeploy/>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-			<DirSync bucket="app" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>
 			<!-- content is read from the store per request, so the sync above is
 			     already live; the restart is for what the box resolves ONCE at
 			     boot: `<RoutesDir/>` discovery (a page added, removed, or renamed

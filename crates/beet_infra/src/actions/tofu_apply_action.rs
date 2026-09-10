@@ -46,28 +46,37 @@ pub async fn TofuApply(
 	trace!("TofuApply: starting, layer {layer:?}");
 	// step 1: build the project and collect variables and artifact pairs
 	trace!("TofuApply: step 1 - building project and collecting artifacts");
-	let (project, stack, deployment, artifacts, variables) = cx
+	let (project, stack, deployment, artifacts, repo, variables) = cx
 		.caller
 		.with_world(|world, entity| -> Result<_> {
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
-			// each declared artifact, paired with the label its block declared
-			let artifacts =
+			// each declared artifact, paired with the label its block declared,
+			// and the stack's repo store, which the ledger records so a machine
+			// resolving its release per start resolves its document with it
+			let (artifacts, repo) =
 				world
-					.with_state::<(StackQuery, Query<(&ErasedBlock, &BuildArtifact)>), _>(
-						|(stacks, artifacts)| -> Result<_> {
-							stacks
-								.declared(entity)?
-								.into_iter()
-								.filter_map(|child| artifacts.get(child).ok())
+					.with_state::<(StackQuery, Query<(&ErasedBlock, &BuildArtifact)>, Query<&S3BucketBlock>), _>(
+						|(stacks, artifacts, stores)| -> Result<_> {
+							let declared = stacks.declared(entity)?;
+							let built = declared
+								.iter()
+								.filter_map(|child| artifacts.get(*child).ok())
 								.filter_map(|(erased, artifact)| {
 									erased
 										.artifact_label
 										.clone()
 										.map(|label| (artifact.clone(), label))
 								})
-								.collect::<Vec<_>>()
-								.xok()
+								.collect::<Vec<_>>();
+							let repo = declared
+								.iter()
+								.filter_map(|child| stores.get(*child).ok())
+								.find(|store| {
+									store.label() == RepoBucket::LABEL
+								})
+								.cloned();
+							(built, repo).xok()
 						},
 					)?;
 			let (stack, deployment, config) = scope.finish()?;
@@ -79,7 +88,7 @@ pub async fn TofuApply(
 				config,
 				variables.clone(),
 			);
-			(project, stack, deployment, artifacts, variables).xok()
+			(project, stack, deployment, artifacts, repo, variables).xok()
 		})
 		.await??;
 	trace!(
@@ -95,6 +104,10 @@ pub async fn TofuApply(
 		// step 2: build ledger, upload artifacts to S3
 		trace!("TofuApply: step 2 - ensuring artifacts bucket exists");
 		let mut client = deployment.artifacts_client(&stack);
+		if let Some(repo) = &repo {
+			client = client
+				.with_repo(repo.store_uri(&stack, Some(deployment.deploy_id())));
+		}
 		client.ensure_store().await?;
 		trace!("TofuApply: artifacts bucket ready");
 
@@ -119,7 +132,7 @@ pub async fn TofuApply(
 				.await?;
 			info!(
 				"uploaded artifact to s3://{}/{}",
-				deployment.artifact_bucket_name(&stack),
+				deployment.artifact_store_name(&stack),
 				artifact_key,
 			);
 		}

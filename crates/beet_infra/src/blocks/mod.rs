@@ -45,6 +45,13 @@ pub use failover::*;
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
 pub use s3_bucket_block::*;
+// The compute's half of a served entry document. Not a block and not an S3
+// concept; it sits here because the only store declaration to check it against
+// is the one above.
+#[cfg(feature = "bindings_aws_common")]
+mod repo_bucket;
+#[cfg(feature = "bindings_aws_common")]
+pub use repo_bucket::*;
 // The network the AWS compute blocks sit in, and the company database inside
 // it. Neither is mail-specific: the mail stack is simply their first consumer.
 #[cfg(feature = "vpc_block")]

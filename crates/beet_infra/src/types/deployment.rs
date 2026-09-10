@@ -44,9 +44,9 @@ pub struct Deployment {
 	/// A suffix appended to the state backend key, making the final key
 	/// `app-name--stage--tofu.tfstate`.
 	state_suffix: SmolStr,
-	/// A suffix appended to the artifact bucket name, making the final bucket
+	/// A suffix appended to the artifact store name, making the final name
 	/// `app-name--stage--artifacts`.
-	artifact_bucket_suffix: SmolStr,
+	artifact_store_suffix: SmolStr,
 }
 
 /// The deploy identity flows from the process [`BootstrapConfig`] (`--deploy-id`
@@ -70,7 +70,7 @@ impl Default for Deployment {
 			state_encryption: default(),
 			work_directory: None,
 			state_suffix: "tofu.tfstate".into(),
-			artifact_bucket_suffix: "artifacts".into(),
+			artifact_store_suffix: "artifacts".into(),
 		}
 	}
 }
@@ -98,23 +98,23 @@ impl Deployment {
 		SmolPath::new(stack.resource_name(self.state_suffix.clone()))
 	}
 
-	/// The S3 bucket name for `stack`'s artifacts storage.
-	pub fn artifact_bucket_name(&self, stack: &ResolvedStack) -> String {
-		stack.resource_name(self.artifact_bucket_suffix.clone())
+	/// The name of `stack`'s artifact store.
+	pub fn artifact_store_name(&self, stack: &ResolvedStack) -> String {
+		stack.resource_name(self.artifact_store_suffix.clone())
 	}
 
-	/// The S3 key for an artifact in this deployment.
+	/// The key an artifact of this deployment is stored under.
 	pub fn artifact_key(&self, label: &str) -> String {
 		format!("versions/{}/{label}", self.deploy_id)
 	}
 
-	/// Create an artifacts client for `stack`'s artifact bucket, in the same
+	/// Create an artifacts client for `stack`'s artifact store, in the same
 	/// provider family as the state backend: local state stores artifacts in a
-	/// sibling directory, S3 state in an S3 bucket in the stack's region.
+	/// sibling directory, remote state a store in the stack's region.
 	pub fn artifacts_client(&self, stack: &ResolvedStack) -> ArtifactsClient {
 		let provider = self
 			.backend
-			.bucket_provider(&self.artifact_bucket_name(stack), stack.region());
+			.bucket_provider(&self.artifact_store_name(stack), stack.region());
 		ArtifactsClient::new(
 			BlobStore::new(provider),
 			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),

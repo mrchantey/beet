@@ -4,43 +4,70 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_router::prelude::*;
 
-impl Stack {
-	/// The standard IaC verb routes as children: the two lifecycle verbs that
-	/// run this stack's own groups (`deploy` forward, `destroy` in reverse), the
-	/// raw tofu lifecycle (validate/plan/apply/show/list) and the artifact
-	/// ledger's rollback/rollforward.
-	///
-	/// Each resolves its stack by ancestry, so the bundle carries no identity of
-	/// its own and hosting it is the whole declaration: spawn it under a
-	/// `<Stack>` and that stack has a lifecycle.
-	///
-	/// `deploy` and `destroy` name the two groups, and both are required. They
-	/// are separate declarations rather than one reversible group because a
-	/// deploy is not a teardown read backwards: a deploy provisions and probes,
-	/// a teardown removes. What IS the same list backwards is the teardown's own
-	/// order, which is why `destroy` runs its group in reverse.
-	pub fn verbs(deploy: Entity, destroy: Entity) -> impl Bundle {
-		children![
-			(
-				PathPartial::new("deploy"),
-				ExchangeGroup::default(),
-				RunGroup::<Request, Response>::new(deploy),
-			),
-			(
-				PathPartial::new("destroy"),
-				ParamsPartial::new::<DestroyParams>(),
-				ExchangeGroup::forced_by("force"),
-				RunGroup::<Request, Response>::reversed(destroy),
-			),
-			Validate,
-			Plan,
-			Apply,
-			Show,
-			List,
-			Rollback,
-			Rollforward
-		]
-	}
+/// `<DeployRoutes deploy={$up} destroy={$down}/>` — the standard IaC verb routes
+/// as children: the two lifecycle verbs that run this stack's own groups
+/// (`deploy` forward, `destroy` in reverse), the raw tofu lifecycle
+/// (validate/plan/apply/show/list) and the artifact ledger's
+/// rollback/rollforward.
+///
+/// Each verb resolves its stack by ancestry, so this carries no identity of its
+/// own and hosting it is the whole declaration: author it under a `<Stack>` and
+/// that stack has a lifecycle. That separation is the point, because a stage or
+/// app name riding a TEMPLATE prop is absent from any binary that did not link
+/// the template, which is exactly how a `shared` scope can go missing in a lean
+/// build.
+///
+/// The two groups are the exception, and they are references rather than names:
+/// what a stack's deploy DOES is the document's to say, and both halves of it
+/// are declared beside the blocks they act on.
+///
+/// ```bsx
+/// <Group bx:ref="up">
+///     <TofuApply/>
+/// </Group>
+/// <Group bx:ref="down">
+///     <StackTeardown/>
+///     <TofuDestroy/>
+/// </Group>
+/// <DeployRoutes deploy={$up} destroy={$down}/>
+/// ```
+///
+/// Both are required and there is no compatibility mode: a stack that can be
+/// brought up and not taken down is the thing this replaced. They are separate
+/// declarations rather than one reversible group because a deploy is not a
+/// teardown read backwards: a deploy provisions and probes, a teardown removes.
+/// What IS the same list backwards is the teardown's own order, which is why
+/// `destroy` runs its group in reverse.
+#[template]
+pub fn DeployRoutes(
+	/// The group `deploy` runs, forward.
+	#[prop(required)]
+	deploy: Entity,
+	/// The group `destroy` runs, in reverse. Authored in convergence order like
+	/// every other group, so its first member is torn down last.
+	#[prop(required)]
+	destroy: Entity,
+) -> impl Bundle {
+	children![
+		(
+			PathPartial::new("deploy"),
+			ExchangeGroup::default(),
+			RunGroup::<Request, Response>::new(deploy),
+		),
+		(
+			PathPartial::new("destroy"),
+			ParamsPartial::new::<DestroyParams>(),
+			ExchangeGroup::forced_by("force"),
+			RunGroup::<Request, Response>::reversed(destroy),
+		),
+		Validate,
+		Plan,
+		Apply,
+		Show,
+		List,
+		Rollback,
+		Rollforward
+	]
 }
 
 /// Parameters for the destroy route.
@@ -181,16 +208,25 @@ mod tests {
 		(AsyncPlugin, RouterPlugin, InfraPlugin).into_world()
 	}
 
-	/// A stack with a lifecycle: two empty groups and the verbs that run them.
+	/// A stack with a lifecycle: two empty groups and the verbs that run them,
+	/// built through `<DeployRoutes/>` exactly as an entry authors it.
 	fn stack_with_verbs(world: &mut World) -> Entity {
 		let deploy = world.spawn(Group).flush();
 		let destroy = world.spawn(Group).flush();
+		let root = world
+			.spawn((Stack::new("test-app"), CliServer::default(), children![
+				Router::with_defaults()
+			]))
+			.flush();
+		let router = world.entity(root).get::<Children>().unwrap()[0];
 		world
-			.spawn((Stack::new("test-app"), CliServer::default(), children![(
-				Router::with_defaults(),
-				Stack::verbs(deploy, destroy)
-			)]))
-			.flush()
+			.entity_mut(router)
+			.insert_template(DeployRoutes {
+				deploy: PropOpt::some(deploy),
+				destroy: PropOpt::some(destroy),
+			});
+		world.flush();
+		root
 	}
 
 	#[beet_core::test]
