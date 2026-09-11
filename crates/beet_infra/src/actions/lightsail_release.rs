@@ -23,6 +23,10 @@ use beet_net::prelude::*;
 /// Idempotent, and cheap when there is nothing to do: a box that was just
 /// replaced already pulled this release at boot, so the script confirms and
 /// returns rather than bouncing a healthy unit.
+///
+/// A box carrying [`RepoBucket`] must also prove it reads a repo store: the
+/// prefix reaches a Lightsail box by the release pointer alone, so a pointer
+/// without one boots a process that serves nothing, with no error anywhere.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -38,11 +42,17 @@ pub async fn LightsailRelease(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (project, block) = resolve_box(&cx, "LightsailRelease").await?;
+	let (project, block, serves_repo) =
+		resolve_box(&cx, "LightsailRelease").await?;
 
 	let deploy_id = project.deployment().deploy_id().to_string();
-	let script =
-		block.release_script(project.stack(), &deploy_id, timeout, poll);
+	let script = block.release_script(
+		project.stack(),
+		&deploy_id,
+		serves_repo,
+		timeout,
+		poll,
+	);
 	info!("releasing {deploy_id}");
 	run_gate_script(&project, &block, "release", script, timeout, poll).await?;
 
@@ -76,7 +86,7 @@ pub async fn LightsailRestart(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (project, block) = resolve_box(&cx, "<LightsailRestart/>").await?;
+	let (project, block, _) = resolve_box(&cx, "<LightsailRestart/>").await?;
 
 	let script = block.restart_script(project.stack(), timeout, poll);
 	run_gate_script(&project, &block, "restart", script, timeout, poll).await?;
@@ -85,18 +95,20 @@ pub async fn LightsailRestart(
 }
 
 /// The box a step drives: the tofu project holding its address and key pair,
-/// and the one [`LightsailBlock`] declared under the same stack.
+/// the one [`LightsailBlock`] declared under the same stack, and whether that
+/// block serves a repo store ([`RepoBucket`]).
 async fn resolve_box(
 	cx: &ActionContext<Request>,
 	tag: &'static str,
-) -> Result<(terra::Project, LightsailBlock)> {
+) -> Result<(terra::Project, LightsailBlock, bool)> {
 	cx.caller
 		.with_world(move |world, entity| -> Result<_> {
 			let project = RenderScope::render(world, entity)?.project()?;
-			let block = world.with_state::<ReleaseQuery, _>(|query| {
-				query.resolve(entity, tag)
-			})?;
-			(project, block).xok()
+			let (block, serves_repo) =
+				world.with_state::<ReleaseQuery, _>(|query| {
+					query.resolve(entity, tag)
+				})?;
+			(project, block, serves_repo).xok()
 		})
 		.await?
 }
@@ -150,35 +162,37 @@ async fn run_gate_script(
 #[derive(SystemParam)]
 struct ReleaseQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
-	blocks: Query<'w, 's, &'static LightsailBlock>,
+	blocks: Query<'w, 's, (&'static LightsailBlock, Has<RepoBucket>)>,
 }
 
 impl ReleaseQuery<'_, '_> {
 	/// The box to drive (the project to read outputs from comes from a
-	/// [`RenderScope`] render). Several blocks under one stack is an error
-	/// rather than a guess: they would have different management ports and
-	/// different units. `tag` names the calling step, since both resolve here.
-	fn resolve(&self, entity: Entity, tag: &str) -> Result<LightsailBlock> {
+	/// [`RenderScope`] render) and whether it serves a repo store. Several
+	/// blocks under one stack is an error rather than a guess: they would have
+	/// different management ports and different units. `tag` names the calling
+	/// step, since both resolve here.
+	fn resolve(
+		&self,
+		entity: Entity,
+		tag: &str,
+	) -> Result<(LightsailBlock, bool)> {
 		let mut blocks = self
 			.stacks
 			.declared(entity)?
 			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok());
-		let block = blocks
-			.next()
-			.ok_or_else(|| {
-				bevyhow!(
-					"{tag} found no LightsailBlock under its stack, \
-					so there is no box to drive"
-				)
-			})?
-			.clone();
+		let (block, serves_repo) = blocks.next().ok_or_else(|| {
+			bevyhow!(
+				"{tag} found no LightsailBlock under its stack, \
+				so there is no box to drive"
+			)
+		})?;
 		if blocks.next().is_some() {
 			bevybail!(
 				"{tag} found several LightsailBlocks under its stack, \
 				so it cannot tell which box to drive"
 			);
 		}
-		block.xok()
+		(block.clone(), serves_repo).xok()
 	}
 }

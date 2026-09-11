@@ -70,7 +70,8 @@ pub async fn PruneVersions(
 	for version in &versions {
 		client.remove_version(version).await?;
 		if let Some(repo) = &repo {
-			let documents = repo.with_subdir(SmolPath::new(version.to_string()));
+			let documents =
+				repo.with_subdir(SmolPath::new(version.to_string()));
 			for key in documents.list().await? {
 				documents.remove(&key).await?;
 			}

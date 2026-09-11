@@ -55,30 +55,29 @@ pub async fn TofuApply(
 			// and the stack's repo store, which the ledger records so a machine
 			// resolving its release per start resolves its document with it
 			let (artifacts, repo) =
-				world
-					.with_state::<(StackQuery, Query<(&ErasedBlock, &BuildArtifact)>, Query<&S3BucketBlock>), _>(
-						|(stacks, artifacts, stores)| -> Result<_> {
-							let declared = stacks.declared(entity)?;
-							let built = declared
-								.iter()
-								.filter_map(|child| artifacts.get(*child).ok())
-								.filter_map(|(erased, artifact)| {
-									erased
-										.artifact_label
-										.clone()
-										.map(|label| (artifact.clone(), label))
-								})
-								.collect::<Vec<_>>();
-							let repo = declared
-								.iter()
-								.filter_map(|child| stores.get(*child).ok())
-								.find(|store| {
-									store.label() == RepoBucket::LABEL
-								})
-								.cloned();
-							(built, repo).xok()
-						},
-					)?;
+				world.with_state::<(
+					StackQuery,
+					Query<(&ErasedBlock, &BuildArtifact)>,
+					Query<&S3BucketBlock>,
+				), _>(|(stacks, artifacts, stores)| -> Result<_> {
+					let declared = stacks.declared(entity)?;
+					let built = declared
+						.iter()
+						.filter_map(|child| artifacts.get(*child).ok())
+						.filter_map(|(erased, artifact)| {
+							erased
+								.artifact_label
+								.clone()
+								.map(|label| (artifact.clone(), label))
+						})
+						.collect::<Vec<_>>();
+					let repo = declared
+						.iter()
+						.filter_map(|child| stores.get(*child).ok())
+						.find(|store| store.label() == RepoBucket::LABEL)
+						.cloned();
+					(built, repo).xok()
+				})?;
 			let (stack, deployment, config) = scope.finish()?;
 			// with the declared variables, so the apply resolves the content
 			// ones from their source rather than expecting them on the request
@@ -105,8 +104,9 @@ pub async fn TofuApply(
 		trace!("TofuApply: step 2 - ensuring artifacts bucket exists");
 		let mut client = deployment.artifacts_client(&stack);
 		if let Some(repo) = &repo {
-			client = client
-				.with_repo(repo.store_uri(&stack, Some(deployment.deploy_id())));
+			client = client.with_repo(
+				repo.store_uri(&stack, Some(deployment.deploy_id())),
+			);
 		}
 		client.ensure_store().await?;
 		trace!("TofuApply: artifacts bucket ready");

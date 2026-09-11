@@ -137,12 +137,7 @@ pub fn LambdaSiteBlock(
 		build =
 			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
 	}
-	(
-		block,
-		build.into_lambda_build_artifact()?,
-		RepoBucket,
-	)
-		.xok()
+	(block, build.into_lambda_build_artifact()?, RepoBucket).xok()
 }
 
 /// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`

@@ -18,7 +18,8 @@ pub enum LightsailNetworking {
 /// - IAM user with a least-privilege inline policy for runtime persistence
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
-/// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt
+/// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt, its
+///   certificate store saved to the artifacts bucket so a rebuild reuses it
 /// - Optional DNS records pointing each authority at the public address
 /// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
@@ -130,6 +131,20 @@ impl LightsailBlock {
 	/// today and a box built next month are the same box. Bump deliberately.
 	pub const CADDY_VERSION: &'static str = "2.11.4";
 
+	/// The prefix in the artifacts bucket Caddy's certificate store is saved
+	/// under, beside the versions and the release pointer.
+	///
+	/// A certificate is the one thing a rebuilt box cannot make for itself:
+	/// issuance is a public CA's rate-limited validation through the firewall
+	/// terraform is still applying, and it fails outright while the CA is down,
+	/// which is how a rebuild took the site out for hours. So the store
+	/// outlives the box: a timer saves it, cloud-init restores it before Caddy
+	/// starts, and a rebuilt box serves on the certificate the last one held
+	/// (good for 90 days, renewed by Caddy a month early as usual). Only the
+	/// first box of a stage ever issues at boot.
+	pub const CADDY_STORE_PREFIX: &'static str = "caddy";
+
+
 	/// Build a prefixed label for terraform resources.
 	pub fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{}", self.label, suffix)
@@ -173,6 +188,22 @@ impl LightsailBlock {
 			.collect()
 	}
 
+	/// The Caddyfile: one site block serving every hostname.
+	fn caddyfile(&self) -> String {
+		let hostnames = self
+			.caddy_hostnames()
+			.iter()
+			.map(|hostname| hostname.as_str())
+			.collect::<Vec<_>>()
+			.join(", ");
+		format!(
+			"{hostnames} {{
+    reverse_proxy localhost:{}
+}}",
+			self.app_port()
+		)
+	}
+
 	/// Publish each [`dns`](Self::with_dns) record at `address_ref`, a terra
 	/// field-ref resolving to the instance's public IP.
 	fn emit_dns(
@@ -197,9 +228,11 @@ impl LightsailBlock {
 
 	/// The inline IAM policy document for the box's runtime identity, LOWERED
 	/// from the [`AccessGrants`] the stack's blocks declared by the shared
-	/// [`IamPolicy`]. The two grants this block owns internally are added here
+	/// [`IamPolicy`]. The grants this block owns internally are added here
 	/// because nothing declares them: the artifacts bucket it pulls its binary
-	/// from at boot, and its own log group.
+	/// from at boot, its own log group, and (with hostnames) the prefix of that
+	/// bucket it saves Caddy's certificate store to, write-only so a
+	/// compromised box still cannot touch a release.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -208,10 +241,24 @@ impl LightsailBlock {
 	) -> Result<String> {
 		let region = stack.region();
 		let log_group = self.log_group(stack);
+		let artifacts_bucket = deployment.artifact_store_name(stack);
+		let certificate_store = json!({
+			"Sid": "CertificateStore",
+			"Effect": "Allow",
+			"Action": ["s3:PutObject"],
+			"Resource": format!(
+				"arn:aws:s3:::{artifacts_bucket}/{}/*",
+				Self::CADDY_STORE_PREFIX
+			)
+		});
 		IamPolicy::new(region.clone(), "lightsail instance")
 			// declared by nothing, so it seeds the read set
-			.read_bucket(deployment.artifact_store_name(stack))
+			.read_bucket(artifacts_bucket)
 			.lower(access)?
+			.xmap(|policy| match self.caddy_hostnames().is_empty() {
+				true => policy,
+				false => policy.statement(certificate_store),
+			})
 			// the block's own log group, for the CloudWatch agent
 			.statement(json!({
 				"Sid": "OwnLogGroup",
@@ -278,19 +325,20 @@ impl LightsailBlock {
 	/// changes. If it changes per deploy it belongs on the release pointer, not
 	/// in this script.
 	///
-	/// The `access_key_id_ref` and `access_key_secret_ref` are terraform
-	/// interpolation expressions (ie `${aws_iam_access_key.xxx.id}`) that
-	/// get resolved by terraform before the script runs on the instance.
+	/// `refs` are the terraform interpolation expressions the script carries
+	/// (ie `${aws_iam_access_key.xxx.id}`), resolved by terraform before the
+	/// script runs on the instance.
 	fn build_user_data(
 		&self,
 		stack: &ResolvedStack,
 		deployment: &Deployment,
-		access_key_id_ref: &str,
-		access_key_secret_ref: &str,
+		refs: &MachineRefs,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
 		let region = stack.region();
 		let app_port = self.app_port();
+		let artifacts_bucket = deployment.artifact_store_name(stack);
+		let caddy_store_prefix = Self::CADDY_STORE_PREFIX;
 		// the deployed binary's config, with the platform bindings this block owns
 		// merged in, then split onto its two channels. The deploy identity is
 		// absent by design: it is per-deploy, so it rides the release pointer.
@@ -349,20 +397,12 @@ systemctl restart sshd
 			String::new()
 		};
 
-		// build optional HTTPS setup via Caddy, one site block serving every
-		// hostname (the manual domain + the dns authorities)
-		let caddy_hostnames = self.caddy_hostnames();
-		let https_setup = if caddy_hostnames.is_empty() {
+		// build optional HTTPS setup via Caddy, serving every hostname (the
+		// manual domain + the dns authorities)
+		let https_setup = if self.caddy_hostnames().is_empty() {
 			String::new()
 		} else {
-			let hostnames = caddy_hostnames
-				.iter()
-				.map(|hostname| hostname.as_str())
-				.collect::<Vec<_>>()
-				.join(", ");
-			let caddyfile = format!(
-				"{hostnames} {{\n    reverse_proxy localhost:{app_port}\n}}"
-			);
+			let caddyfile = self.caddyfile();
 			let caddy_version = Self::CADDY_VERSION;
 			// the upstream static binary, not a distro package: Caddy publishes no
 			// `amzn` rpms, and its repo-setup script still writes an `amzn/2023`
@@ -385,6 +425,33 @@ cat > /etc/caddy/Caddyfile <<'CADDY_EOF'
 {caddyfile}
 CADDY_EOF
 
+# the certificate store outlives the box (see `CADDY_STORE_PREFIX`): restore
+# what the last box saved so this one serves without an issuance
+aws s3 sync --no-progress "s3://{artifacts_bucket}/{caddy_store_prefix}/" /var/lib/caddy/ >&2 \
+  || echo "beet: no saved certificate store, caddy will obtain one" >&2
+chown -R caddy:caddy /var/lib/caddy
+
+cat > /etc/systemd/system/caddy-backup.service <<'CADDY_BACKUP_EOF'
+[Unit]
+Description=Save Caddy's certificate store to the artifacts bucket
+After=caddy.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{artifacts_bucket}/{caddy_store_prefix}/
+CADDY_BACKUP_EOF
+
+cat > /etc/systemd/system/caddy-backup.timer <<'CADDY_TIMER_EOF'
+[Unit]
+Description=Save Caddy's certificate store every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target
+CADDY_TIMER_EOF
 cat > /etc/systemd/system/caddy.service <<'CADDY_UNIT_EOF'
 [Unit]
 Description=Caddy
@@ -408,7 +475,12 @@ WantedBy=multi-user.target
 CADDY_UNIT_EOF
 
 systemctl daemon-reload
-systemctl enable --now caddy
+systemctl enable --now caddy-backup.timer
+# enabled, not started: `<LightsailRelease/>` starts it once the apply has
+# opened the firewall. Started here it raced the ports resource on a rebuilt
+# box, and every ACME attempt against a closed 80 burned Let's Encrypt's
+# validation budget when it was scarcest
+systemctl enable caddy
 "#
 			)
 		};
@@ -546,8 +618,8 @@ systemctl enable --now {app_name}.service
 
 		// replace placeholder tokens with terraform interpolation expressions
 		let mut script = script
-			.replace("__ACCESS_KEY_ID__", access_key_id_ref)
-			.replace("__ACCESS_KEY_SECRET__", access_key_secret_ref)
+			.replace("__ACCESS_KEY_ID__", &refs.access_key_id)
+			.replace("__ACCESS_KEY_SECRET__", &refs.access_key_secret)
 			.replace("__ENV_VARS__", &env_var_lines);
 
 		// replace env_var placeholders with terraform variable references
@@ -581,7 +653,7 @@ mkdir -p /opt/__APP__ /etc/__APP__
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-if ! aws s3 cp "s3://__BUCKET__/__POINTER__" "$tmp/deploy.env" >&2; then
+if ! aws s3 cp --no-progress "s3://__BUCKET__/__POINTER__" "$tmp/deploy.env" >&2; then
 	echo "beet: no release pointer at __POINTER__, keeping the installed binary" >&2
 elif ! . "$tmp/deploy.env"; then
 	echo "beet: release pointer is unreadable, keeping the installed binary" >&2
@@ -589,7 +661,7 @@ elif [ -z "${__ARTIFACT_KEY_VAR__:-}" ]; then
 	# guarded: under `set -u` a bare expansion of a missing var would abort the
 	# whole script instead of landing here
 	echo "beet: release pointer names no __ARTIFACT_KEY_VAR__, keeping the installed binary" >&2
-elif ! aws s3 cp "s3://__BUCKET__/$__ARTIFACT_KEY_VAR__" "$tmp/app" >&2; then
+elif ! aws s3 cp --no-progress "s3://__BUCKET__/$__ARTIFACT_KEY_VAR__" "$tmp/app" >&2; then
 	echo "beet: cannot download $__ARTIFACT_KEY_VAR__, keeping the installed binary" >&2
 else
 	# staged in the destination directory then renamed, so the swap is atomic
@@ -667,6 +739,11 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	/// own port is reachable from the box alone — which is exactly "the app
 	/// itself serves", independent of Caddy, DNS and certificate state.
 	///
+	/// With `serves_repo` (the block carries [`RepoBucket`]) the identity is
+	/// also the repo store: the prefix reaches this box through the release
+	/// pointer alone, so a pointer without one boots a process reading no
+	/// document, and nothing else would notice.
+	///
 	/// Idempotent: a box that already serves this release (a freshly rebuilt
 	/// one, which pulled it at boot) is left alone rather than bounced, but it
 	/// still has to pass the gate.
@@ -682,14 +759,20 @@ exec /opt/__APP__/app__EXEC_ARGS__
 		&self,
 		stack: &ResolvedStack,
 		deploy_id: &str,
+		serves_repo: bool,
 		timeout: Duration,
 		poll: Duration,
 	) -> String {
+		let repo_check = if serves_repo {
+			" && [ -n \"$(running_env BEET_REPO)\" ]"
+		} else {
+			""
+		};
 		self.unit_gate_script(
 			stack,
 			&format!(
 				"expect={deploy_id}\n\
-				identity_ok() {{ [ \"$(running_release)\" = \"$expect\" ]; }}"
+				identity_ok() {{ [ \"$(running_env BEET_DEPLOY_ID)\" = \"$expect\" ]{repo_check}; }}"
 			),
 			r#"if identity_ok; then
 	echo "beet: already serving $expect" >&2
@@ -731,7 +814,7 @@ fi"#,
 			"identity_ok() { true; }",
 			r#"echo "beet: restarting $unit onto the published stores" >&2
 systemctl restart "$unit" >&2 || true"#,
-			"$(running_release)",
+			"$(running_env BEET_DEPLOY_ID)",
 			"after a restart",
 			timeout,
 			poll,
@@ -764,11 +847,12 @@ set -uo pipefail
 unit=__APP__.service
 __PRELUDE__
 
-running_release() {
+# a variable out of the RUNNING process's own environment
+running_env() {
 	local pid
 	pid=$(systemctl show -p MainPID --value "$unit" 2>/dev/null)
 	if [ -z "$pid" ] || [ "$pid" = 0 ]; then return 1; fi
-	tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^BEET_DEPLOY_ID=//p'
+	tr '\0' '\n' < "/proc/$pid/environ" | sed -n "s/^$1=//p"
 }
 
 restarts() {
@@ -784,6 +868,18 @@ for _ in $(seq 1 __ATTEMPTS__); do
 	systemctl cat "$unit" >/dev/null 2>&1 && break
 	sleep __POLL__
 done
+
+# the TLS terminator starts here rather than at boot, since the apply that ran
+# before this step is what opened 80/443 (see the caddy unit); a no-op on a box
+# whose terminator is already up
+tls_unit=__TLS_UNIT__
+if [ -n "$tls_unit" ]; then
+	for _ in $(seq 1 __ATTEMPTS__); do
+		systemctl cat "$tls_unit" >/dev/null 2>&1 && break
+		sleep __POLL__
+	done
+	systemctl start "$tls_unit" >&2 || true
+fi
 
 __RESTART__
 
@@ -814,6 +910,14 @@ exit 1
 				("__ATTEMPTS__", &attempts.to_string()),
 				("__POLL__", &poll_secs.to_string()),
 				("__APP_PORT__", &self.app_port().to_string()),
+				(
+					"__TLS_UNIT__",
+					if self.caddy_hostnames().is_empty() {
+						""
+					} else {
+						"caddy.service"
+					},
+				),
 			],
 		)
 	}
@@ -858,6 +962,27 @@ exit 1
 			.iter()
 			.map(|byte| format!("{byte:02x}"))
 			.collect()
+	}
+}
+
+/// The terraform interpolation expressions the machine config carries, ie
+/// `${aws_iam_access_key.xxx.id}`, resolved by terraform before the script
+/// runs on the box. Every other `${..}` in the script is escaped, see
+/// `escapes_shell_expansions_from_terraform`.
+#[derive(Debug, Clone)]
+pub(crate) struct MachineRefs {
+	access_key_id: String,
+	access_key_secret: String,
+}
+
+impl MachineRefs {
+	/// Stand-in refs, for rendering a script outside an apply.
+	#[cfg(test)]
+	fn test() -> Self {
+		Self {
+			access_key_id: "${key_id}".into(),
+			access_key_secret: "${key_secret}".into(),
+		}
 	}
 }
 
@@ -950,17 +1075,14 @@ impl LightsailBlock {
 				..default()
 			},
 		);
-		let access_key_id_ref = access_key.field_ref("id");
-		let access_key_secret_ref = access_key.field_ref("secret");
+		let refs = MachineRefs {
+			access_key_id: access_key.field_ref("id"),
+			access_key_secret: access_key.field_ref("secret"),
+		};
 
 		// the machine config, rendered once and used twice: as the instance's
 		// user data, and as the identity the key rotation keys on.
-		let user_data = self.build_user_data(
-			stack,
-			deployment,
-			&access_key_id_ref,
-			&access_key_secret_ref,
-		)?;
+		let user_data = self.build_user_data(stack, deployment, &refs)?;
 
 		// Rotate the access key with every machine-config change, bounding a
 		// leaked credential to the next rebuild rather than forever (see
@@ -1204,7 +1326,7 @@ mod tests {
 	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		let script = block
-			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, &MachineRefs::test())
 			.unwrap();
 		(script.to_string(), dir)
 	}
@@ -1289,7 +1411,7 @@ mod tests {
 		// the version it serves is resolved per start from the artifacts
 		// bucket's stable pointer, and named nowhere in the machine config
 		block
-			.build_user_data(&stack, &first, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &first, &MachineRefs::test())
 			.unwrap()
 			.as_str()
 			.xpect_contains("current/main-lightsail.env")
@@ -1381,7 +1503,7 @@ mod tests {
 					.to_string(),
 			)
 			.xpect_contains(&format!(
-				"aws s3 cp \"s3://{}/${}\"",
+				"aws s3 cp --no-progress \"s3://{}/${}\"",
 				{
 					let (stack, deployment, _dir) =
 						ResolvedStack::default_local();
@@ -1414,7 +1536,7 @@ mod tests {
 	fn escapes_shell_expansions_from_terraform() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let script = LightsailBlock::default()
-			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, &MachineRefs::test())
 			.unwrap();
 		// every unescaped `${` is one of the injected terraform refs
 		script
@@ -1451,13 +1573,14 @@ mod tests {
 			.release_script(
 				&stack,
 				"my-deploy-id",
+				false,
 				Duration::from_secs(60),
 				Duration::from_secs(5),
 			)
 			.as_str()
 			.xpect_contains("expect=my-deploy-id")
 			.xpect_contains("/proc/$pid/environ")
-			.xpect_contains("s/^BEET_DEPLOY_ID=//p")
+			.xpect_contains("$(running_env BEET_DEPLOY_ID)")
 			.xpect_contains("unit=beet_infra.service")
 			// the app's own port, on loopback: past Caddy, DNS and certs
 			.xpect_contains(&format!(
@@ -1524,6 +1647,7 @@ mod tests {
 			.release_script(
 				&stack,
 				"my-deploy-id",
+				false,
 				Duration::from_secs(60),
 				Duration::from_secs(5),
 			)
@@ -1725,7 +1849,110 @@ mod tests {
 		let (script, _dir) = build_user_data(&block);
 		script
 			.as_str()
+			// one site block per certificate source
 			.xpect_contains("example.org, app.example.org {");
+	}
+
+	/// A rebuilt box restores the certificate store the last box saved, before
+	/// Caddy starts, and the box may write that prefix alone.
+	///
+	/// REGRESSION: a rebuilt prod box needed a fresh Let's Encrypt issuance
+	/// before the strict edge would talk to it. Its first attempts raced the
+	/// firewall apply, a Let's Encrypt outage failed the rest, and the site sat
+	/// at 525 for hours with the per-hostname validation budget spent. The
+	/// certificate the previous box held was valid the whole time.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn rebuild_restores_the_certificate_store() {
+		let block = LightsailBlock::default()
+			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+		let bucket = {
+			let (stack, deployment, _dir) = ResolvedStack::default_local();
+			deployment.artifact_store_name(&stack)
+		};
+		let (script, _dir) = build_user_data(&block);
+		let restore = format!(
+			"aws s3 sync --no-progress \"s3://{bucket}/caddy/\" /var/lib/caddy/"
+		);
+		script
+			.as_str()
+			.xpect_contains(&restore)
+			.xpect_contains(&format!(
+				"ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{bucket}/caddy/"
+			))
+			.xpect_contains("systemctl enable --now caddy-backup.timer");
+		// restored before the terminator can start
+		(script.find(&restore).unwrap()
+			< script.find("systemctl enable caddy").unwrap())
+		.xpect_true();
+		// write access to the store prefix alone, never the releases
+		build_json(&block)
+			.xpect_contains(&format!(
+				"arn:aws:s3:::{bucket}/caddy/*"
+			))
+			.xnot()
+			.xpect_contains(&format!(
+				"s3:PutObject\\\",\\\"s3:DeleteObject\\\"],\\\"Resource\\\":[\\\"arn:aws:s3:::{bucket}\\\""
+			));
+		// no hostnames, no store, no grant
+		build_json(&LightsailBlock::default())
+			.xnot()
+			.xpect_contains("CertificateStore");
+	}
+
+	/// Caddy is enabled by cloud-init but STARTED by the release step, after
+	/// the apply has opened the firewall.
+	///
+	/// REGRESSION: started at boot, it raced terraform's replacement of the
+	/// ports resource on a rebuilt box, and each ACME attempt against a closed
+	/// 80 was a failed validation against Let's Encrypt's per-hostname budget.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn release_starts_the_tls_terminator() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let block = LightsailBlock::default()
+			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+		build_user_data(&block)
+			.0
+			.as_str()
+			.xpect_contains("systemctl enable caddy\n")
+			.xnot()
+			.xpect_contains("enable --now caddy\n");
+		let poll = Duration::from_secs(5);
+		block
+			.release_script(&stack, "my-deploy-id", false, poll, poll)
+			.as_str()
+			.xpect_contains("tls_unit=caddy.service")
+			.xpect_contains("systemctl start \"$tls_unit\"");
+		// the sync's restart starts it too, a no-op on a box already serving
+		block
+			.restart_script(&stack, poll, poll)
+			.as_str()
+			.xpect_contains("tls_unit=caddy.service");
+		// no hostnames, no terminator to start
+		LightsailBlock::default()
+			.release_script(&stack, "my-deploy-id", false, poll, poll)
+			.as_str()
+			.xpect_contains("tls_unit=\n");
+	}
+
+	/// A box serving a repo store must carry the prefix the release pointer
+	/// named, or it booted reading no document: the pointer is the ONLY channel
+	/// the prefix reaches a Lightsail box by, so the running process's
+	/// environment is where it is proven.
+	#[beet_core::test]
+	fn release_proves_the_repo_store_when_served() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let poll = Duration::from_secs(5);
+		LightsailBlock::default()
+			.release_script(&stack, "my-deploy-id", true, poll, poll)
+			.as_str()
+			.xpect_contains("[ -n \"$(running_env BEET_REPO)\" ]");
+		LightsailBlock::default()
+			.release_script(&stack, "my-deploy-id", false, poll, poll)
+			.as_str()
+			.xnot()
+			.xpect_contains("BEET_REPO");
 	}
 
 	/// REGRESSION: Caddy is installed from the upstream static binary, never the
@@ -1787,7 +2014,7 @@ mod tests {
 				..default()
 			})
 			.with_exec_route("serve")
-			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, &MachineRefs::test())
 			.unwrap();
 		script
 			.as_str()
@@ -1813,7 +2040,7 @@ mod tests {
 				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
-			.build_user_data(&stack, &deployment, "${key_id}", "${key_secret}")
+			.build_user_data(&stack, &deployment, &MachineRefs::test())
 			.unwrap()
 			.as_str()
 			.xpect_contains("exec /opt/beet_infra/app --server=http\n");
@@ -1829,7 +2056,7 @@ mod tests {
 				path: Some("/my page".into()),
 				..default()
 			})
-			.build_user_data(&stack, &deployment, "id", "secret")
+			.build_user_data(&stack, &deployment, &MachineRefs::test())
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot be rendered");

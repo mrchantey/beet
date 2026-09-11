@@ -97,9 +97,9 @@ pub(crate) fn deploy_subdir(
 			)
 		})?;
 	match bucket.deploy_versioned() {
-		true => Some(SmolPath::new(
-			stacks.deployment().deploy_id().to_string(),
-		)),
+		true => {
+			Some(SmolPath::new(stacks.deployment().deploy_id().to_string()))
+		}
 		false => None,
 	}
 	.xok()

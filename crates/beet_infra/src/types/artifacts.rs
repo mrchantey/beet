@@ -325,7 +325,8 @@ impl ArtifactsClient {
 	/// can reach.
 	pub async fn prunable_versions(&self, keep: usize) -> Result<Vec<Uuid>> {
 		let versions = self.list_versions().await?;
-		let current = self.current_ledger().await?.map(|ledger| ledger.deploy_id);
+		let current =
+			self.current_ledger().await?.map(|ledger| ledger.deploy_id);
 		let retained = versions.len().saturating_sub(keep);
 		versions[..retained]
 			.iter()
@@ -598,15 +599,14 @@ mod tests {
 			ledgers.push(ledger);
 			let _ = idx;
 		}
-		let client = ArtifactsClient::new(
-			store.clone(),
-			ArtifactLedger::default_test(),
-		);
+		let client =
+			ArtifactsClient::new(store.clone(), ArtifactLedger::default_test());
 		// the oldest two, the newest three retained
-		client.prunable_versions(3).await.unwrap().xpect_eq(vec![
-			ledgers[0].deploy_id,
-			ledgers[1].deploy_id,
-		]);
+		client
+			.prunable_versions(3)
+			.await
+			.unwrap()
+			.xpect_eq(vec![ledgers[0].deploy_id, ledgers[1].deploy_id]);
 		// ..and the current one is never a candidate, even rolled back onto
 		// the oldest version of all
 		client.set_current(&ledgers[0].deploy_id).await.unwrap();
@@ -616,7 +616,11 @@ mod tests {
 			.unwrap()
 			.xpect_eq(vec![ledgers[1].deploy_id]);
 		// keeping more than exist prunes nothing
-		client.prunable_versions(10).await.unwrap().xpect_eq(Vec::<Uuid>::new());
+		client
+			.prunable_versions(10)
+			.await
+			.unwrap()
+			.xpect_eq(Vec::<Uuid>::new());
 	}
 
 	/// A pruned version leaves the rollback range before anything else it owns
@@ -626,10 +630,8 @@ mod tests {
 	#[beet_core::test]
 	async fn removing_a_version_takes_its_whole_prefix() {
 		let store = BlobStore::temp();
-		let mut client = ArtifactsClient::new(
-			store.clone(),
-			ArtifactLedger::default_test(),
-		);
+		let mut client =
+			ArtifactsClient::new(store.clone(), ArtifactLedger::default_test());
 		let version = *client.deploy_id();
 		client
 			.upload_artifact("app.zip", b"binary".to_vec(), ArtifactEntry {
@@ -642,11 +644,13 @@ mod tests {
 		client.list_versions().await.unwrap().len().xpect_eq(1);
 
 		client.remove_version(&version).await.unwrap();
-		client.list_versions().await.unwrap().xpect_eq(Vec::<Uuid>::new());
+		client
+			.list_versions()
+			.await
+			.unwrap()
+			.xpect_eq(Vec::<Uuid>::new());
 		store
-			.exists(&ArtifactLedger::version_artifact_key(
-				&version, "app.zip",
-			))
+			.exists(&ArtifactLedger::version_artifact_key(&version, "app.zip"))
 			.await
 			.unwrap()
 			.xpect_false();

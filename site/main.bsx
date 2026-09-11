@@ -122,9 +122,11 @@ channel so the fingerprint never changes.
 
 Cloudflare fronts the box: http hostnames are proxied and edge-cached `A` records
 at the static IP, ssh (and future live apps) ride the DNS-only `app.beet.org` /
-`app.dev.beet.org` hostnames straight to it, `<CloudflareZoneSetup/>` converges
-the zone-level edge config, and every deploy or sync ends with a
-`<CloudflarePurgeCache/>`. On the deploy route the purge comes *after*
+`app.dev.beet.org` hostnames straight to it. Caddy's Let's Encrypt certificates
+are saved to the artifacts bucket and restored on a rebuild, so a replaced box
+serves on the certificate the last one held rather than issuing at boot.
+`<CloudflareZoneSetup/>` converges the zone-level edge config, and every deploy
+or sync ends with a `<CloudflarePurgeCache/>`. On the deploy route the purge comes *after*
 `<LightsailWatch/>`, since purging while the old instance still serves just
 re-caches the old responses for the full edge TTL.
 
