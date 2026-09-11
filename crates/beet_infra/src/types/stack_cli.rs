@@ -219,10 +219,13 @@ mod tests {
 			]))
 			.flush();
 		let router = world.entity(root).get::<Children>().unwrap()[0];
-		world.entity_mut(router).insert_template(DeployRoutes {
-			deploy: PropOpt::some(deploy),
-			destroy: PropOpt::some(destroy),
-		});
+		world
+			.entity_mut(router)
+			.insert_template(DeployRoutes {
+				deploy: Some(deploy),
+				destroy: Some(destroy),
+			})
+			.unwrap();
 		world.flush();
 		root
 	}
