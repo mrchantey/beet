@@ -55,14 +55,14 @@ pub async fn SyncS3Bucket(
 			AncestorQuery<&S3FsStore>,
 			AncestorQuery<&DirSync>,
 			StackQuery,
-			Query<&S3BucketBlock>,
-		), _>(|entity, (stores, syncs, stacks, buckets)| -> Result<_> {
+			Query<(&ErasedBlock, &ErasedStoreBlock)>,
+		), _>(|entity, (stores, syncs, stacks, declared)| -> Result<_> {
 			let store = stores.get(entity)?.clone();
 			// a store spawned directly (rather than through `<DirSync>`) already
 			// carries whatever root it means to publish into
 			let subdir = match syncs.get(entity) {
 				Ok(sync) => crate::actions::deploy_subdir(
-					entity, sync, &stacks, &buckets,
+					entity, sync, &stacks, &declared,
 				)?,
 				Err(_) => None,
 			};

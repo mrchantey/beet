@@ -588,6 +588,17 @@ mod test {
 			.xpect_eq(WsPathBuf::new("assets").into_abs());
 	}
 
+	/// A store uri string coerces to its [`StoreUri`], the one spelling the
+	/// `--repo` flag and a markup `uri="s3://.."` share, and a malformed one
+	/// errors rather than keeping the field's default.
+	#[crate::test]
+	fn coerces_to_store_uri() {
+		resolve::<StoreUri>(DataLiteral::Scalar(Value::str("s3://site/docs")))
+			.xpect_eq(StoreUri::parse("s3://site/docs").unwrap());
+		resolve::<StoreUri>(DataLiteral::Scalar(Value::str("fs:../site")))
+			.xpect_eq(StoreUri::parse("fs:../site").unwrap());
+	}
+
 	/// A unit-suffixed string coerces to its duration, so a markup `duration="1s"`
 	/// authors an `EndInDuration` delay. The unit is required: a bare number or an
 	/// unknown unit does not parse, and a malformed value targeting a `Duration`

@@ -170,18 +170,27 @@ fn managed_set(
 /// `MouseButtonInput` fires `PointerDown`/`PointerUp` on the hit entity. The
 /// events auto-propagate up the tree, so a click on text inside an `<a>` reaches
 /// the `<a>` observer.
+///
+/// A release on the cell it was pressed goes to the entity that took the press,
+/// not to whatever the cell resolves to now: the press itself can reflow the page
+/// under a still cursor (a focus ring growing a box above it, a disclosure
+/// opening), and a stationary click is one target. A release elsewhere (a drag)
+/// re-resolves under the cursor.
 pub(crate) fn pointer_input(
 	mut cursor: MessageReader<CursorMoved>,
 	mut buttons: MessageReader<MouseButtonInput>,
 	hit_test: HitTest,
 	mut commands: Commands,
-	surfaces: Query<Entity>,
+	entities: Query<Entity>,
 	mut pointers: Query<&mut Pointer>,
 	mut last_cursor: Local<HashMap<Entity, IVec2>>,
+	// the press each surface holds: its cell and the entity it landed on.
+	mut pressed: Local<HashMap<Entity, (IVec2, Entity)>>,
 ) -> Result {
 	// per-surface state outside the world outlives the surface it belongs to, so
 	// a closed session (an ssh client disconnecting) is pruned by hand.
-	last_cursor.retain(|surface, _| surfaces.contains(*surface));
+	last_cursor.retain(|surface, _| entities.contains(*surface));
+	pressed.retain(|surface, _| entities.contains(*surface));
 	// the pointer lives on the surface (window) entity, so cursor/button events
 	// route to their own surface's pointer and hit-test only that surface's buffer.
 	for moved in cursor.read() {
@@ -216,14 +225,29 @@ pub(crate) fn pointer_input(
 		let Some(&cell) = last_cursor.get(&surface) else {
 			continue;
 		};
-		let Some(target) = hit_test.entity_at_surface(surface, cell) else {
-			continue;
-		};
 		match button.state {
 			ButtonState::Pressed => {
+				let Some(target) = hit_test.entity_at_surface(surface, cell)
+				else {
+					continue;
+				};
+				pressed.insert(surface, (cell, target));
 				commands.entity(target).trigger(PointerDown::new(surface));
 			}
 			ButtonState::Released => {
+				// the held press completes on its own cell; a drag, or a pressed
+				// entity gone since, re-resolves under the cursor.
+				let held = pressed
+					.remove(&surface)
+					.filter(|(press_cell, target)| {
+						*press_cell == cell && entities.contains(*target)
+					})
+					.map(|(_, target)| target);
+				let Some(target) =
+					held.or_else(|| hit_test.entity_at_surface(surface, cell))
+				else {
+					continue;
+				};
 				commands.entity(target).trigger(PointerUp::new(surface));
 			}
 		}
@@ -411,6 +435,7 @@ mod test {
 	#[derive(Resource, Default)]
 	struct PointerLog {
 		down: Vec<Entity>,
+		up: Vec<Entity>,
 		over: Vec<Entity>,
 		out: Vec<Entity>,
 	}
@@ -493,6 +518,11 @@ mod test {
 		host.app.add_observer(
 			|ev: On<PointerDown>, mut log: ResMut<PointerLog>| {
 				log.down.push(ev.event_target());
+			},
+		);
+		host.app.add_observer(
+			|ev: On<PointerUp>, mut log: ResMut<PointerLog>| {
+				log.up.push(ev.event_target());
 			},
 		);
 		host.app.add_observer(
@@ -1179,6 +1209,93 @@ mod test {
 			.world()
 			.entity(input)
 			.contains::<Focus>()
+			.xpect_true();
+	}
+
+	/// The row (0-indexed) of the first frame line containing `needle`.
+	fn row_of(host: &TestHost, needle: &str) -> usize {
+		let frame = host.frame_plain();
+		frame
+			.lines()
+			.position(|line| line.contains(needle))
+			.unwrap_or_else(|| panic!("{needle:?} not in frame:\n{frame}"))
+	}
+
+	/// A press that reflows the page under a still cursor still delivers its
+	/// release to what was pressed. A focused button rings with a border (the
+	/// material focus ring is a `border-width`), so pressing a link below a
+	/// focused button moves the focus, drops the ring and pulls the link up two
+	/// rows before the release arrives; re-resolving the release against the new
+	/// geometry would land it two rows lower in the content.
+	///
+	/// Regression for the narrow-layout sidebar overlay: every click in it opened
+	/// the page two rows below the one clicked, the hamburger that opened it
+	/// losing its ring on the press.
+	#[beet_core::test]
+	fn release_lands_on_the_pressed_entity_after_a_reflow() {
+		let mut host = logging_host();
+		host.app
+			.world_mut()
+			.get_resource_or_init::<RuleSet>()
+			.extend_rules(vec![
+				// one control per row
+				Rule::new()
+					.with_selector(
+						Selector::tag("button").merge_any(Selector::tag("a")),
+					)
+					.with_value(common_props::DisplayProp, Display::Block),
+				// the focus ring: a border growing the focused button a row each side
+				Rule::new()
+					.with_selector(Selector::AllOf(vec![
+						Selector::tag("button"),
+						Selector::state(ElementState::Focused),
+					]))
+					.with_value(common_props::OutlineWidth, Length::Rem(1.))
+					.with_value(
+						common_props::BorderColorProp,
+						Color::srgb(1., 1., 1.),
+					),
+			]);
+		host.spawn_content(rsx! {
+			<div>
+				<button>"menu"</button>
+				<a href="/a">"A"</a>
+				<a href="/b">"B"</a>
+				<a href="/c">"C"</a>
+			</div>
+		});
+		host.step();
+		let link_b = host
+			.app
+			.world_mut()
+			.run_system_once(|elements: ElementQuery| {
+				elements
+					.iter()
+					.find(|view| view.attribute_string("href") == "/b")
+					.map(|view| view.entity)
+			})
+			.unwrap()
+			.unwrap();
+		// click the button: it takes focus and rings, pushing B down to row 4
+		host.send_input(&sgr(0, 0, 0, true));
+		host.step();
+		host.send_input(&sgr(0, 0, 0, false));
+		host.step();
+		row_of(&host, "B").xpect_eq(4);
+		// press B there: focus moves, the ring drops, B rises to row 2 (the
+		// focus state lands a frame after the press, the cascade the frame after)...
+		host.send_input(&sgr(0, 0, 4, true));
+		host.step();
+		host.step();
+		row_of(&host, "B").xpect_eq(2);
+		// ...yet the release on the pressed cell reaches B, not what now sits there
+		host.send_input(&sgr(0, 0, 4, false));
+		host.step();
+		host.app
+			.world()
+			.resource::<PointerLog>()
+			.up
+			.contains(&link_b)
 			.xpect_true();
 	}
 }

@@ -92,9 +92,14 @@ impl SiteHost {
 	}
 
 	/// The 0-indexed start cell of the first `text` occurrence in the frame.
+	///
+	/// A cell, not a byte: the column is the display width of the row before the
+	/// match, so a focus ring's box-drawing glyphs or a fullwidth title on the
+	/// same row cannot skew the click.
 	fn cell_of(&self, text: &str) -> (u32, u32) {
 		for (row, line) in self.frame().lines().enumerate() {
-			if let Some(col) = line.find(text) {
+			if let Some(idx) = line.find(text) {
+				let col = text_ext::display_width(&line[..idx]);
 				return (col as u32, row as u32);
 			}
 		}

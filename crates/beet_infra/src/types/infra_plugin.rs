@@ -37,6 +37,25 @@ impl Plugin for InfraPlugin {
 			(DeployRenderSet::Declare, DeployRenderSet::Render).chain(),
 		);
 
+		// the store declarations' shared vocabulary, feature-free so a lean
+		// binary reads the same declaration the deployer does: the marker
+		// naming which store block is the repo store (one per world, checked
+		// at render) and the block naming a store this deploy does not create.
+		app.register_type::<crate::prelude::RepoStoreBlock>()
+			.register_type::<crate::prelude::StoreUriBlock>()
+			.add_observer(crate::blocks::on_insert_repo_store_block)
+			.add_systems(
+				DeployRender,
+				crate::blocks::assert_repo_store_blocks
+					.in_set(DeployRenderSet::Render),
+			);
+		// ..and the runtime half of every store declaration: one observer on
+		// the erased half attaching the live store, so the deploy meaning (the
+		// render systems) and the runtime meaning hang off the one entity the
+		// markup declared, whatever kind of store it is.
+		#[cfg(not(target_arch = "wasm32"))]
+		app.add_observer(crate::blocks::attach_store);
+
 		// the deploy `Variable` + its value resolution, a field of the blocks'
 		// `env_vars` (always compiled, in `types/`).
 		app.register_type::<crate::types::Variable>()
@@ -51,19 +70,12 @@ impl Plugin for InfraPlugin {
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
-			// ..and the compute's half of the entry-document reference, whose
-			// agreement with the store's `deploy_versioned` is asserted in the
-			// render rather than left to convention. See `RepoBucket`.
-			.register_type::<crate::prelude::RepoBucket>()
 			.add_systems(
 				DeployRender,
 				(
 					crate::types::declare::<crate::prelude::S3BucketBlock>
 						.in_set(DeployRenderSet::Declare),
-					(
-						crate::types::render::<crate::prelude::S3BucketBlock>,
-						crate::blocks::assert_repo_buckets,
-					)
+					crate::types::render::<crate::prelude::S3BucketBlock>
 						.in_set(DeployRenderSet::Render),
 				),
 			);
@@ -79,15 +91,8 @@ impl Plugin for InfraPlugin {
 				),
 			);
 
-		// ..and the runtime half of those declarations: one observer per block
-		// type attaching the live store, so the deploy meaning (the render
-		// systems above) and the runtime meaning hang off the one entity the
-		// markup declared.
-		#[cfg(all(
-			feature = "bindings_aws_common",
-			not(target_arch = "wasm32")
-		))]
-		app.add_observer(crate::blocks::attach_s3_store);
+		// ..and the runtime half of a table declaration, whose store is not a
+		// blob store and so attaches by its own observer.
 		#[cfg(all(
 			feature = "bindings_aws_dynamo",
 			not(target_arch = "wasm32")

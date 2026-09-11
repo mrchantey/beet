@@ -104,17 +104,7 @@ impl BlobStore {
 				BlobStore::new(FsStore::new(dir.join(path.as_str()))).xok()
 			}
 			StoreUri::Memory => BlobStore::temp().xok(),
-			StoreUri::S3 {
-				bucket,
-				prefix,
-				endpoint,
-				region,
-			} => Self::s3_from_uri(
-				bucket,
-				prefix.as_deref(),
-				endpoint.as_deref(),
-				region.as_deref(),
-			),
+			StoreUri::S3 { .. } => Self::s3_from_uri(uri),
 			#[cfg(target_arch = "wasm32")]
 			StoreUri::LocalStorage => {
 				BlobStore::new(LocalStorageStore::new("beet")).xok()
@@ -128,50 +118,12 @@ impl BlobStore {
 		}
 	}
 
-	/// The [`S3Store`]-backed store for an `s3://` uri. An `endpoint` (eg
-	/// `https://<account>.r2.cloudflarestorage.com`) switches onto an
-	/// S3-compatible service such as Cloudflare R2 with region `auto`, so one
-	/// binary serves identically on AWS S3 and R2; otherwise an unnamed region
-	/// is left to the SDK's own default provider chain. That chain IS the
-	/// process boundary's region convention (the deploy writes
-	/// `Environment=AWS_REGION=..` into the unit); nothing in-world reads the
-	/// environment for it.
-	///
-	/// A `prefix` roots the store inside the bucket, so a binary baked with
-	/// `s3://<bucket>/<deploy-id>` reads only the document version it shipped
-	/// with.
+	/// The [`S3Store`]-backed store for an `s3://` uri, see
+	/// [`S3Store::from_uri`].
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	fn s3_from_uri(
-		bucket: &str,
-		prefix: Option<&str>,
-		endpoint: Option<&str>,
-		region: Option<&str>,
-	) -> Result<BlobStore> {
-		let store = match endpoint {
-			Some(endpoint) => {
-				info!("repo store: r2/s3 bucket `{bucket}` ({endpoint})");
-				S3Store::new(bucket, region.unwrap_or("auto"))
-					.with_endpoint(endpoint)
-			}
-			None => match region {
-				Some(region) => {
-					info!("repo store: s3 bucket `{bucket}` ({region})");
-					S3Store::new(bucket, region)
-				}
-				None => {
-					info!("repo store: s3 bucket `{bucket}`");
-					S3Store::new_default_region(bucket)
-				}
-			},
-		};
-		let store = match prefix {
-			Some(prefix) => {
-				info!("repo store: rooted at prefix `{prefix}`");
-				store.with_subdir(SmolPath::new(prefix))
-			}
-			None => store,
-		};
-		BlobStore::new(store).xok()
+	fn s3_from_uri(uri: &StoreUri) -> Result<BlobStore> {
+		info!("s3 store: {uri}");
+		S3Store::from_uri(uri)?.xmap(BlobStore::new).xok()
 	}
 
 	/// Without a compiled S3 backend the request errors with guidance rather than
@@ -180,12 +132,7 @@ impl BlobStore {
 		feature = "std",
 		not(all(feature = "aws_sdk", not(target_arch = "wasm32")))
 	))]
-	fn s3_from_uri(
-		_bucket: &str,
-		_prefix: Option<&str>,
-		_endpoint: Option<&str>,
-		_region: Option<&str>,
-	) -> Result<BlobStore> {
+	fn s3_from_uri(_uri: &StoreUri) -> Result<BlobStore> {
 		bevybail!(
 			"an s3:// store requires a compiled S3 backend (enable the `aws_sdk` \
 			feature, native only)"

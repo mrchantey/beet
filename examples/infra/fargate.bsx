@@ -31,7 +31,7 @@ and a container engine.
 			<FargateSiteBlock/>
 			<!-- deploy-versioned by default: each deploy publishes the site under
 			     its own id and ships a binary baked to read that prefix -->
-			<S3BucketBlock label="repo"/>
+			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<BeetBinaryBuild features="aws_sdk"/>
 			<!-- the stores the deploy publishes into: the image registry and the
 			     bucket the site is served from -->

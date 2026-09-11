@@ -146,6 +146,44 @@ impl StoreUri {
 	pub fn is_self_rooted(&self) -> bool {
 		matches!(self, Self::S3 { .. } | Self::LocalStorage | Self::IndexedDb)
 	}
+
+	/// This store rooted at `subdir` below its current root, the uri form of
+	/// `BlobStore::with_subdir`: a bucket nests the prefix, a filesystem store
+	/// joins the path. The kinds with no path in their uri (memory, browser
+	/// storage) cannot express a root and error, since a deploy that versions
+	/// one of them per deploy id has nowhere to put the id.
+	pub fn with_subdir(&self, subdir: impl AsRef<str>) -> Result<Self> {
+		let subdir = subdir.as_ref().trim_matches('/');
+		let join = |root: Option<&SmolStr>| -> SmolStr {
+			match root {
+				Some(root) => {
+					format!("{}/{subdir}", root.trim_end_matches('/'))
+				}
+				None => subdir.to_string(),
+			}
+			.into()
+		};
+		match self {
+			Self::Fs { path } => Self::Fs {
+				path: Some(join(path.as_ref())),
+			},
+			Self::S3 {
+				bucket,
+				prefix,
+				endpoint,
+				region,
+			} => Self::S3 {
+				bucket: bucket.clone(),
+				prefix: Some(join(prefix.as_ref())),
+				endpoint: endpoint.clone(),
+				region: region.clone(),
+			},
+			Self::Memory | Self::LocalStorage | Self::IndexedDb => bevybail!(
+				"store `{self}` has no path to root a subdir `{subdir}` at"
+			),
+		}
+		.xok()
+	}
 }
 
 impl FromStr for StoreUri {
@@ -273,6 +311,41 @@ mod test {
 	}
 	/// A prefix roots the store inside the bucket, which is how one bucket holds
 	/// a document per deploy. A trailing slash is not a second value.
+	/// A subdir nests below whatever root the uri already has, uniformly
+	/// across the path-carrying kinds, and the rootless ones refuse.
+	#[crate::test]
+	fn with_subdir_nests_below_the_root() {
+		StoreUri::parse("s3://site")
+			.unwrap()
+			.with_subdir("v1")
+			.unwrap()
+			.to_string()
+			.xpect_eq("s3://site/v1");
+		StoreUri::parse("s3://site/docs?region=us-east-1")
+			.unwrap()
+			.with_subdir("/v1/")
+			.unwrap()
+			.to_string()
+			.xpect_eq("s3://site/docs/v1?region=us-east-1");
+		StoreUri::parse("fs")
+			.unwrap()
+			.with_subdir("v1")
+			.unwrap()
+			.to_string()
+			.xpect_eq("fs:v1");
+		StoreUri::parse("fs:../site")
+			.unwrap()
+			.with_subdir("v1")
+			.unwrap()
+			.to_string()
+			.xpect_eq("fs:../site/v1");
+		StoreUri::Memory
+			.with_subdir("v1")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("has no path");
+	}
+
 	#[crate::test]
 	fn a_prefix_roots_the_store() {
 		let StoreUri::S3 { bucket, prefix, .. } =

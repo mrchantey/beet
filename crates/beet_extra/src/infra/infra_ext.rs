@@ -9,24 +9,6 @@ use beet_core::prelude::*;
 use beet_infra::prelude::*;
 use beet_net::prelude::*;
 
-/// The one store an app is served from: a per-stage replica of the checkout, so
-/// everything the binary reads (the entry, the routes, the assets) is one store.
-///
-/// Deploy-versioned, by taking the default: every deploy publishes the checkout
-/// under its own id and ships a binary that reads that prefix, so the window
-/// between the sync and the binary swap is not a window where the old binary
-/// parses the new document. See [`RepoBucket`].
-///
-pub fn repo_bucket() -> S3BucketBlock { S3BucketBlock::new(RepoBucket::LABEL) }
-
-/// The resolved name of `stack`'s repo store, ready to inject so the deployed
-/// binary reconstructs the same store. Deterministic for a given stack (identity
-/// only, independent of the per-deploy id), so a throwaway stack rebuilt from
-/// the same `app_name` resolves the same store.
-pub fn repo_bucket_name(stack: &ResolvedStack) -> String {
-	stack.resource_name(RepoBucket::LABEL)
-}
-
 /// A CloudWatch tail of `target`, with an optional timeout after which the
 /// follow is killed. The log group composes from the ancestor [`Stack`] when the
 /// tail runs, so a watch verb never restates the app identity.
@@ -39,14 +21,10 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 }
 
 /// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
-/// out of `stack`'s repo store, rooted at this deploy's own prefix
+/// out of `repo`, the stack's repo store rooted at this deploy's own prefix
 /// (`s3://<store>/<deploy id>`, self-rooted so the entry document is probed
-/// there) and constrained to the http transport. A deploy serving more
-/// transports overrides `server`.
-///
-/// Takes the resolved stack rather than a store name because the name composes
-/// from the stack and from nothing else, so a caller that passed one would only
-/// be doing this function's job first.
+/// there, see [`RepoStoreDecl::store_uri`]) and constrained to the http
+/// transport. A deploy serving more transports overrides `server`.
 ///
 /// Each block renders it at its own platform boundary, splitting boot selection
 /// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
@@ -67,27 +45,19 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 /// baked pointing at that version's document, so the binary and the document
 /// move together with nothing keeping them in step.
 ///
-/// Baked UNCONDITIONALLY rather than threaded from the store's
-/// `deploy_versioned` flag: it defaults to true, and the only stores that want
-/// it off are runtime data stores, which are never served from. The store that
-/// IS served from is held to the invariant by [`RepoBucket`], which every caller
-/// of this declares alongside the block.
+/// The prefix, the sync's destination and the ledger's record all derive from
+/// the store's one erased declaration, so they agree by construction; a store
+/// declaring `deploy_versioned=false` is read at its root by every one of them.
 ///
 /// A deploy target that cannot bake a per-deploy value into its own boot config
 /// does not call this at all. It sets no `repo`, and the release pointer it
 /// resolves per start publishes one instead: see [`ArtifactLedger::repo`].
-pub fn remote_bootstrap(
-	stack: &ResolvedStack,
-	deploy_id: &Uuid,
-) -> Result<BootstrapConfig> {
+pub fn remote_bootstrap(repo: StoreUri) -> BootstrapConfig {
 	BootstrapConfig {
-		// through the store declaration, so an argv a binary bakes and an env a
-		// release pointer publishes cannot describe the same store differently
-		repo: Some(repo_bucket().store_uri(stack, Some(deploy_id))),
+		repo: Some(repo),
 		server: Some(RunningSetFilter::new("http")),
 		..default()
 	}
-	.xok()
 }
 
 /// Shared `CargoBuild` for the generic `beet` binary (release, zigbuild);
@@ -107,24 +77,18 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 		.with_release(true)
 }
 
-/// Sync `examples/bsx_site` (the no-code site) to the repo store, the content
-/// every infra example serves. A mirror, so a renamed or removed source file
-/// does not linger in the store across deploys.
+/// Sync `examples/bsx_site` (the no-code site) to the stack's repo store, the
+/// content every infra example serves: a `<DirSync>` of that directory into
+/// `repo`, mirrored so a renamed or removed source file does not linger across
+/// deploys.
 ///
-/// Into the launch's own deploy prefix, since [`repo_bucket`] is deploy
-/// versioned: that is the prefix the binary this same deploy ships was baked to
-/// read. A content-only `sync` verb therefore runs `<AdoptCurrentDeploy/>`
-/// first, so the launch adopts the LIVE version's id rather than minting one
-/// nothing is serving.
-pub fn sync_site(
-	stack: &ResolvedStack,
-	deployment: &Deployment,
-) -> impl Bundle + use<> {
+/// The per-deploy prefix is the sync's to resolve when it runs, from the store's
+/// own declaration: a content-only `sync` verb therefore runs
+/// `<AdoptCurrentDeploy/>` first, so the launch adopts the LIVE version's id
+/// rather than minting one nothing is serving.
+pub fn sync_site(repo: &RepoStoreDecl) -> impl Bundle {
 	(
-		S3FsStore::new(
-			FsStore::new(WsPathBuf::new("examples/bsx_site")),
-			repo_bucket().stack_store(stack, deployment),
-		),
+		DirSync::new(repo.label().clone(), "examples/bsx_site"),
 		SyncS3Bucket {
 			delete: true,
 			..default()

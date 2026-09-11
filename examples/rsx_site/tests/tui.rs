@@ -79,7 +79,9 @@ impl SiteHost {
 	/// The 0-indexed start cell of the first `text` occurrence in the frame.
 	fn cell_of(&self, text: &str) -> (u32, u32) {
 		for (row, line) in self.frame().lines().enumerate() {
-			if let Some(col) = line.find(text) {
+			// cell-aligned: a byte offset drifts past any wide glyph before it
+			if let Some(idx) = line.find(text) {
+				let col = text_ext::display_width(&line[..idx]);
 				return (col as u32, row as u32);
 			}
 		}

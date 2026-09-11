@@ -40,7 +40,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 			<LambdaSiteBlock features="lambda,aws_sdk"/>
 			<!-- deploy-versioned by default: each deploy publishes the site under
 			     its own id and ships a binary baked to read that prefix -->
-			<S3BucketBlock label="repo"/>
+			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<!-- the bucket first, so the site is in place before the function that
 			     serves it exists -->
 			<TofuApply layer="storage"/>

@@ -54,7 +54,8 @@ async fn verifies_client() {
 		.await
 		.unwrap();
 	cross_log!("stage: counter page loaded");
-	page.find_text("You have clicked 0 times").await;
+	// the sentence, since the locator is an exact innerText match
+	page.find_text("You have clicked 0 times.").await;
 	page.find_text("More").await;
 	page.find_text("Less").await;
 

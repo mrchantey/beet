@@ -739,7 +739,7 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	/// own port is reachable from the box alone — which is exactly "the app
 	/// itself serves", independent of Caddy, DNS and certificate state.
 	///
-	/// With `serves_repo` (the block carries [`RepoBucket`]) the identity is
+	/// With `serves_repo` (the stack declares a [`RepoStoreBlock`]) the identity is
 	/// also the repo store: the prefix reaches this box through the release
 	/// pointer alone, so a pointer without one boots a process reading no
 	/// document, and nothing else would notice.

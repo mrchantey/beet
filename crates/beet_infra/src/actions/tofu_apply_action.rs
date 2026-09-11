@@ -58,8 +58,8 @@ pub async fn TofuApply(
 				world.with_state::<(
 					StackQuery,
 					Query<(&ErasedBlock, &BuildArtifact)>,
-					Query<&S3BucketBlock>,
-				), _>(|(stacks, artifacts, stores)| -> Result<_> {
+					RepoStoreQuery,
+				), _>(|(stacks, artifacts, repos)| -> Result<_> {
 					let declared = stacks.declared(entity)?;
 					let built = declared
 						.iter()
@@ -71,11 +71,10 @@ pub async fn TofuApply(
 								.map(|label| (artifact.clone(), label))
 						})
 						.collect::<Vec<_>>();
-					let repo = declared
-						.iter()
-						.filter_map(|child| stores.get(*child).ok())
-						.find(|store| store.label() == RepoBucket::LABEL)
-						.cloned();
+					let repo = repos
+						.find(entity)?
+						.map(|repo| repo.store_uri())
+						.transpose()?;
 					(built, repo).xok()
 				})?;
 			let (stack, deployment, config) = scope.finish()?;
@@ -104,9 +103,7 @@ pub async fn TofuApply(
 		trace!("TofuApply: step 2 - ensuring artifacts bucket exists");
 		let mut client = deployment.artifacts_client(&stack);
 		if let Some(repo) = &repo {
-			client = client.with_repo(
-				repo.store_uri(&stack, Some(deployment.deploy_id())),
-			);
+			client = client.with_repo(repo.clone());
 		}
 		client.ensure_store().await?;
 		trace!("TofuApply: artifacts bucket ready");

@@ -162,7 +162,8 @@ pub fn assets_s3_fs_store(
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
 		assets_bucket_block()
-			.stack_store(&deploy.resolved(), &deploy.deployment),
+			.store(&deploy.resolved(), Some(deploy.deployment.deploy_id()))
+			.unwrap(),
 	)
 }
 
@@ -170,7 +171,8 @@ pub fn assets_s3_fs_store(
 pub fn assets_store(deploy: &TestDeploy) -> BlobStore {
 	BlobStore::new(
 		assets_bucket_block()
-			.stack_store(&deploy.resolved(), &deploy.deployment),
+			.store(&deploy.resolved(), Some(deploy.deployment.deploy_id()))
+			.unwrap(),
 	)
 }
 

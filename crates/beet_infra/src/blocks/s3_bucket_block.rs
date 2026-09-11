@@ -6,20 +6,21 @@ use beet_net::prelude::*;
 use serde_json::json;
 
 /// An S3 bucket, declared once and read by both meanings of the declaration:
-/// the deploy creates it, and the runtime attaches an
-/// [`S3Store`](beet_net::prelude::S3Store) remotely or an
-/// [`FsStore`](beet_net::prelude::FsStore) locally on the same entity.
+/// the deploy creates it, and the runtime attaches the store its erased half
+/// names on the same entity (an S3 store remotely, an `FsStore` locally, see
+/// [`ErasedStoreBlock`]).
 ///
 /// Authored directly from markup, ie `<S3BucketBlock label="app"
 /// deploy_versioned=false/>`. The label alone is declared; the
 /// `<app>--<stage>--<label>` name composes at resolution through the ancestor
-/// [`Stack`], so both sides read the same string.
+/// [`Stack`], so both sides read the same string. The bucket an app is served
+/// from carries the [`RepoStoreBlock`] marker.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
-	on_remove = ErasedBlock::on_remove
+#[component(immutable, on_insert = ErasedStoreBlock::on_insert::<Self>,
+	on_remove = ErasedStoreBlock::on_remove
 )]
 pub struct S3BucketBlock {
 	label: SmolStr,
@@ -124,62 +125,37 @@ impl S3BucketBlock {
 		stack.resource_name(self.label.clone())
 	}
 
-	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket, resolved
-	/// against `stack` (the composed bucket name and the region). A
-	/// deploy-versioned bucket also nests under the deploy id, which only a
-	/// [`Deployment`] carries, so pass one through when there is one.
+	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket as a deploy
+	/// declares it, for a caller needing the S3 api rather than the erased
+	/// store: the erased root ([`StoreBlock::store_uri`]) nested under
+	/// `deploy_id` when the bucket is versioned.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 	pub fn store(
 		&self,
 		stack: &ResolvedStack,
 		deploy_id: Option<&Uuid>,
-	) -> beet_net::prelude::S3Store {
-		let store = beet_net::prelude::S3Store::new(
-			self.bucket_name(stack),
-			self.resolved_region(stack),
-		);
-		match (self.deploy_versioned, deploy_id) {
-			(true, Some(deploy_id)) => {
-				store.with_subdir(SmolPath::new(deploy_id.to_string()))
-			}
-			_ => store,
-		}
+	) -> Result<beet_net::prelude::S3Store> {
+		ErasedStoreBlock::new(self, stack)
+			.store_uri(deploy_id)?
+			.xref()
+			.xmap(beet_net::prelude::S3Store::from_uri)
 	}
+}
 
-	/// The [`StoreUri`] naming this store, as a deployed process is told to read
-	/// it: the composed name plus the per-deploy prefix a versioned store nests
-	/// under. No region, so the SDK's own default chain resolves it exactly as it
-	/// does for any other process-boundary store selection.
-	///
-	/// The ONE place the uri a deploy hands to a process is shaped, so the
-	/// argv a lambda bakes and the env a release pointer publishes cannot
-	/// describe the same store differently.
-	pub fn store_uri(
-		&self,
-		stack: &ResolvedStack,
-		deploy_id: Option<&Uuid>,
-	) -> StoreUri {
+impl StoreBlock for S3BucketBlock {
+	/// The composed bucket name pinned to the region the declaration resolved,
+	/// so every reader of the uri (the process a deploy bakes it into, the
+	/// sync, the ledger) addresses the bucket the deploy created.
+	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
 		StoreUri::S3 {
 			bucket: self.bucket_name(stack).into(),
-			prefix: match (self.deploy_versioned, deploy_id) {
-				(true, Some(deploy_id)) => Some(deploy_id.to_string().into()),
-				_ => None,
-			},
+			prefix: None,
 			endpoint: None,
-			region: None,
+			region: Some(self.resolved_region(stack)),
 		}
 	}
 
-	/// The store for this bucket as a deploy declares it, ie including the
-	/// per-deploy subdir a versioned bucket nests under.
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	pub fn stack_store(
-		&self,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-	) -> beet_net::prelude::S3Store {
-		self.store(stack, Some(deployment.deploy_id()))
-	}
+	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
 }
 
 /// An expiry scoped to one key prefix of an [`S3BucketBlock`], ie the nightly
@@ -259,53 +235,6 @@ impl PrefixExpiry {
 		})
 		.xok()
 	}
-}
-
-/// Observer: attaches the runtime meaning of a declared bucket. A remote process
-/// gets the [`S3Store`](beet_net::prelude::S3Store) the deploy names; a local
-/// process gets an [`FsStore`](beet_net::prelude::FsStore) under
-/// `target/stores/<label>`, so one declaration runs both ways.
-///
-/// Registered by [`InfraPlugin`] rather than hooked on the component, so a
-/// backend-free build still carries the declaration. Deferred through the command
-/// queue because the ancestry a scope resolves against lands after insertion.
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn attach_s3_store(
-	ev: On<Add, S3BucketBlock>,
-	mut commands: Commands,
-) {
-	commands
-		.entity(ev.entity)
-		.queue(|mut entity: EntityWorldMut| -> Result {
-			let block = entity.get_or_else::<S3BucketBlock>()?.clone();
-			let stack = entity.with_state::<StackQuery, _>(|entity, stacks| {
-				stacks.resolve(entity)
-			});
-			match BootstrapConfig::get().service_access {
-				ServiceAccess::Remote => {
-					cfg_if! {
-						if #[cfg(feature = "aws_sdk")] {
-							let store = entity.with_state::<StackQuery, _>(|_, stacks| {
-								block.store(&stack, Some(stacks.deployment().deploy_id()))
-							});
-							entity.insert(store);
-						} else {
-							bevybail!(
-								"the bucket declared as `{}` resolves to the remote `{}`, but this binary has no `aws_sdk` backend to reach it",
-								block.label(),
-								block.bucket_name(&stack)
-							);
-						}
-					}
-				}
-				ServiceAccess::Local => {
-					entity.insert(FsStore::new(
-						ServiceAccess::local_store_dir(block.label().as_str()).into_abs(),
-					));
-				}
-			}
-			Ok(())
-		});
 }
 
 impl Block for S3BucketBlock {

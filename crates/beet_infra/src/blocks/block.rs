@@ -131,12 +131,20 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// A world a block resolves in: the process identity its store half
+	/// composes a name from.
+	fn world() -> World {
+		let mut world = World::new();
+		world.init_resource::<PackageConfig>();
+		world
+	}
+
 	/// Blocks are immutable components, so reinsertion is the only mutation
 	/// path, and the `on_insert` edge refreshes the projection on exactly that
 	/// path: the erased half cannot go stale.
 	#[beet_core::test]
 	fn reinsertion_refreshes_the_erased_half() {
-		let mut world = World::new();
+		let mut world = world();
 		let entity = world.spawn(S3BucketBlock::new("app")).id();
 		world.flush();
 		world
@@ -159,7 +167,7 @@ mod test {
 	/// keep pairing artifacts for a declaration that no longer exists.
 	#[beet_core::test]
 	fn removal_takes_the_erased_half() {
-		let mut world = World::new();
+		let mut world = world();
 		let entity = world.spawn(S3BucketBlock::new("app")).id();
 		world.flush();
 		world.get::<ErasedBlock>(entity).xpect_some();
@@ -173,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	#[should_panic = "holds at most one block"]
 	fn a_second_block_type_raises() {
-		let mut world = World::new();
+		let mut world = world();
 		world.spawn((
 			S3BucketBlock::new("app"),
 			DynamoTableBlock::new("analytics"),

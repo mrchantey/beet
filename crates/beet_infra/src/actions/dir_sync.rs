@@ -72,22 +72,23 @@ impl DirSync {
 /// into the version already being served (`<AdoptCurrentDeploy/>` is what points
 /// the launch at it). One declaration, read by both.
 ///
-/// The flag comes from the bucket's own `<S3BucketBlock>` rather than from a
-/// field here, so a sync cannot disagree with the bucket it addresses. A label
-/// nothing under the stack declares is an error: the bucket name would compose
-/// fine and the sync would publish into thin air.
+/// The flag comes from the bucket's own declaration (its
+/// [`ErasedStoreBlock`]) rather than from a field here, so a sync cannot
+/// disagree with the bucket it addresses. A label nothing under the stack
+/// declares is an error: the bucket name would compose fine and the sync would
+/// publish into thin air.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn deploy_subdir(
 	entity: Entity,
 	sync: &DirSync,
 	stacks: &StackQuery,
-	buckets: &Query<&S3BucketBlock>,
+	stores: &Query<(&ErasedBlock, &ErasedStoreBlock)>,
 ) -> Result<Option<SmolPath>> {
-	let bucket = stacks
+	let (_, store) = stacks
 		.declared(entity)?
 		.into_iter()
-		.filter_map(|entity| buckets.get(entity).ok())
-		.find(|bucket| bucket.label() == sync.bucket())
+		.filter_map(|entity| stores.get(entity).ok())
+		.find(|(erased, _)| erased.label == *sync.bucket())
 		.ok_or_else(|| {
 			bevyhow!(
 				"the sync of '{}' addresses a bucket labelled '{}', which \
@@ -96,7 +97,7 @@ pub(crate) fn deploy_subdir(
 				sync.bucket()
 			)
 		})?;
-	match bucket.deploy_versioned() {
+	match store.deploy_versioned() {
 		true => {
 			Some(SmolPath::new(stacks.deployment().deploy_id().to_string()))
 		}

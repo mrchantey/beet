@@ -89,6 +89,40 @@ impl S3Store {
 		))
 	}
 
+	/// The store an `s3://` [`StoreUri`] names, erroring on any other kind. An
+	/// `endpoint` (eg `https://<account>.r2.cloudflarestorage.com`) switches
+	/// onto an S3-compatible service with region `auto`, so one binary serves
+	/// identically on AWS S3 and R2; otherwise an unnamed region is left to the
+	/// SDK's own default provider chain, the process boundary's region
+	/// convention (the deploy writes `Environment=AWS_REGION=..` into the
+	/// unit). A `prefix` roots the store inside the bucket, so a binary baked
+	/// with `s3://<bucket>/<deploy-id>` reads only the document version it
+	/// shipped with.
+	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
+		let StoreUri::S3 {
+			bucket,
+			prefix,
+			endpoint,
+			region,
+		} = uri
+		else {
+			bevybail!("store `{uri}` is not an s3:// bucket");
+		};
+		let store = match (endpoint, region) {
+			(Some(endpoint), region) => {
+				Self::new(bucket.clone(), region.as_deref().unwrap_or("auto"))
+					.with_endpoint(endpoint.clone())
+			}
+			(None, Some(region)) => Self::new(bucket.clone(), region.clone()),
+			(None, None) => Self::new_default_region(bucket.clone()),
+		};
+		match prefix {
+			Some(prefix) => store.with_subdir(SmolPath::new(prefix.as_str())),
+			None => store,
+		}
+		.xok()
+	}
+
 	/// Set the subdirectory prefix for all keys.
 	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());

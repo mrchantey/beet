@@ -58,19 +58,15 @@ pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 	deployment.set_backend(backend);
 }
 
-/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's repo store. The
-/// markup form of `sync_site(stack, deployment)`: the store is deploy-versioned,
-/// so the sync also needs this launch's id.
-///
-/// The bucket name composes from the ancestor `<Stack>`, so nothing here
-/// restates the app identity the stack already answers.
-#[template(system)]
-pub fn SiteSync(
-	stacks: StackQuery,
-	deployment: Res<Deployment>,
-	entity: Entity,
-) -> impl Bundle {
-	infra_ext::sync_site(&stacks.resolve(entity), &deployment)
+/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's repo store, the
+/// markup form of `sync_site`: whichever store block carries `{RepoStoreBlock}`,
+/// resolved on [`Ready`] ([`OnRepoStore`]) since it is a sibling declaration.
+#[template]
+pub fn SiteSync() -> impl Bundle {
+	OnRepoStore::new(|entity, repo| {
+		entity.insert(infra_ext::sync_site(&repo));
+		Ok(())
+	})
 }
 
 /// An **opinionated** block for websites built with lambda.
@@ -78,10 +74,10 @@ pub fn SiteSync(
 /// its build artifact, on one entity. They share an entity because
 /// `TofuApply` pairs the `BuildArtifact` with the block on the same entity
 /// to upload it under the block's label, the S3 key the lambda reads its code
-/// from. The lambda runtime offers no argv, so the site-store args
+/// from. The lambda runtime offers no argv, so the repo-store args
 /// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
-/// boundary). The markup form of the rust example's
-/// `(block, build_beet_lambda_binary(features))` deploy child.
+/// boundary); the artifact is built on [`Ready`] ([`OnRepoStore`]), once the
+/// stack's `{RepoStoreBlock}` declaration has settled.
 ///
 /// `authorities` publishes the site's public hostnames as api gateway custom
 /// domains behind Cloudflare's edge (proxied, so they are cached and the origin
@@ -111,11 +107,9 @@ pub fn LambdaSiteBlock(
 	workspace_dir: Option<String>,
 	stacks: StackQuery,
 	entity: Entity,
-) -> Result<impl Bundle> {
-	// the ancestor `<Stack>`'s identity: one composition behind both the code
-	// bucket and the stage-aware DNS.
-	let stack = stacks.resolve(entity);
-	let is_production = stack.is_production();
+) -> impl Bundle {
+	// the ancestor `<Stack>`'s identity, behind the stage-aware DNS
+	let is_production = stacks.resolve(entity).is_production();
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let block = authorities
 		.split(',')
@@ -127,9 +121,7 @@ pub fn LambdaSiteBlock(
 					.with_proxied(true),
 			)
 		});
-	let mut build = infra_ext::beet_cargo_build(features).with_bootstrap(
-		infra_ext::remote_bootstrap(&stack, stacks.deployment().deploy_id())?,
-	);
+	let mut build = infra_ext::beet_cargo_build(features);
 	if let Some(exec_route) = exec_route {
 		build = build.with_exec_route(exec_route);
 	}
@@ -137,7 +129,19 @@ pub fn LambdaSiteBlock(
 		build =
 			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
 	}
-	(block, build.into_lambda_build_artifact()?, RepoBucket).xok()
+	(
+		block,
+		OnRepoStore::new(move |entity, repo| {
+			entity.insert(
+				build
+					.with_bootstrap(infra_ext::remote_bootstrap(
+						repo.store_uri()?,
+					))
+					.into_lambda_build_artifact()?,
+			);
+			Ok(())
+		}),
+	)
 }
 
 /// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
@@ -171,25 +175,24 @@ pub fn LambdaJobBlock(
 	/// that predates it is the longest one it will ever do.
 	#[prop(default = 900)]
 	timeout_secs: i64,
-	stacks: StackQuery,
-	entity: Entity,
-) -> Result<impl Bundle> {
-	let stack = stacks.resolve(entity);
+) -> impl Bundle {
 	(
 		LambdaBlock::default()
 			.with_label(label)
 			.with_http(false)
 			.with_timeout_secs(timeout_secs),
-		infra_ext::beet_cargo_build(features)
-			.with_bootstrap(infra_ext::remote_bootstrap(
-				&stack,
-				stacks.deployment().deploy_id(),
-			)?)
-			.with_exec_route(exec_route)
-			.into_lambda_build_artifact()?,
-		RepoBucket,
+		OnRepoStore::new(move |entity, repo| {
+			entity.insert(
+				infra_ext::beet_cargo_build(features)
+					.with_bootstrap(infra_ext::remote_bootstrap(
+						repo.store_uri()?,
+					))
+					.with_exec_route(exec_route)
+					.into_lambda_build_artifact()?,
+			);
+			Ok(())
+		}),
 	)
-		.xok()
 }
 
 /// `<LambdaWatch timeout="30s"/>` — tail the deployed lambda's logs. The log
@@ -207,13 +210,14 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 /// its build artifact, on one entity (paired by `TofuApply`, see
 /// [`LambdaSiteBlock`]).
 ///
-/// It names no repo store, unlike every other site block here, and the omission
-/// is the declaration. Everything a Lightsail block is given renders into
-/// `user_data`, which terraform cannot update in place, so a per-deploy value
-/// there rebuilds the box on every code-only deploy. The release pointer carries
-/// the store instead ([`ArtifactLedger::repo`]), and the unit sources that
-/// pointer immediately before `exec`, so the box resolves its binary and the
-/// document that binary was built against from one file at every start.
+/// It bakes no repo store uri, unlike every other site block here, and the
+/// omission is the declaration. Everything a Lightsail block is given renders
+/// into `user_data`, which terraform cannot update in place, so a per-deploy
+/// value there rebuilds the box on every code-only deploy. The release pointer
+/// carries the stack's `{RepoStoreBlock}` store instead
+/// ([`ArtifactLedger::repo`]), and the unit sources that pointer immediately
+/// before `exec`, so the box resolves its binary and the document that binary
+/// was built against from one file at every start.
 ///
 /// It resolves nothing from its stack for the same reason: the only per-stack
 /// value it wanted was the store name.
@@ -225,7 +229,6 @@ pub fn LightsailSiteBlock(#[prop] features: String) -> impl Bundle {
 			..default()
 		}),
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
-		RepoBucket,
 	)
 }
 
@@ -241,23 +244,19 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 }
 
 /// `<FargateSiteBlock/>` — the fargate deploy block wired to serve the site from
-/// the stack's bucket: the site-store config (`remote_bootstrap`) lands in the
-/// container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid the
-/// [`FargateBlock`] it builds. The bucket composes from the ancestor `<Stack>`.
-#[template(system)]
-pub fn FargateSiteBlock(
-	stacks: StackQuery,
-	entity: Entity,
-) -> Result<impl Bundle> {
-	let stack = stacks.resolve(entity);
-	(
-		FargateBlock::default().with_bootstrap(infra_ext::remote_bootstrap(
-			&stack,
-			stacks.deployment().deploy_id(),
-		)?),
-		RepoBucket,
-	)
-		.xok()
+/// the stack's repo store: the repo-store config (`remote_bootstrap`) lands in
+/// the container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid
+/// the [`FargateBlock`] it builds, on [`Ready`] ([`OnRepoStore`]) once the
+/// stack's `{RepoStoreBlock}` declaration has settled.
+#[template]
+pub fn FargateSiteBlock() -> impl Bundle {
+	OnRepoStore::new(|entity, repo| {
+		entity
+			.insert(FargateBlock::default().with_bootstrap(
+				infra_ext::remote_bootstrap(repo.store_uri()?),
+			));
+		Ok(())
+	})
 }
 
 /// `<FargateSshBlock/>` — a [`FargateBlock`] with ssh enabled. No site-store
@@ -358,7 +357,6 @@ pub fn LightsailBeetSiteBlock(
 	(
 		block,
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
-		RepoBucket,
 	)
 		.xok()
 }
@@ -634,7 +632,7 @@ mod test {
 					<!-- the repo store the job boots from, deploy-versioned like
 					     every served store: the job dispatches a route of the same
 					     document the site serves -->
-					<S3BucketBlock label="repo"/>
+					<S3BucketBlock label="repo" {RepoStoreBlock}/>
 					<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,lambda"/>
 					<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
 				</Stack>
@@ -872,7 +870,7 @@ mod test {
 		tree.find(&["audit"]).xpect_some();
 	}
 
-	/// A Lightsail site names NO repo store, and the omission is the whole
+	/// A Lightsail site bakes NO repo store uri, and the omission is the whole
 	/// point: everything the block is given renders into `user_data`, which
 	/// terraform cannot update in place, so a per-deploy value there would
 	/// rebuild the box on every code-only deploy. The store rides the release
@@ -900,12 +898,62 @@ mod test {
 			.bootstrap()
 			.repo
 			.xpect_none();
-		// ..and it still declares that it serves the repo store, so the render
-		// holds the stack to declaring one
+	}
+
+	/// A compute that bakes the uri it boots from reads it off the stack's
+	/// `{RepoStoreBlock}` declaration once the document settles, so the
+	/// declaration may follow the compute in the document, and the uri it bakes
+	/// is the store's own composition nested under this launch's id.
+	#[beet_core::test]
+	fn a_compute_bakes_the_repo_store_it_settles_against() {
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Stack>
+				<LambdaSiteBlock features="lambda,aws_sdk"/>
+				<S3BucketBlock label="repo" {RepoStoreBlock}/>
+			</Stack>"#,
+		);
+		let deploy_id = *world.resource::<Deployment>().deploy_id();
 		world
-			.query_filtered::<Entity, With<RepoBucket>>()
+			.query_filtered::<&BuildArtifact, With<LambdaBlock>>()
 			.single(&world)
-			.unwrap();
+			.unwrap()
+			.process()
+			.to_string()
+			.xpect_contains(format!(
+				"--repo=s3://beet-site--dev--repo/{deploy_id}"
+			));
+		// the deferral leaves nothing behind
+		world
+			.query::<&OnRepoStore>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+	}
+
+	/// ..and a stack shipping such a compute without declaring a repo store is
+	/// told what to declare, where the document settles rather than at deploy.
+	#[beet_core::test]
+	#[should_panic = "no repo store declared"]
+	fn a_compute_without_a_repo_store_is_an_error() {
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Stack><LambdaSiteBlock features="lambda,aws_sdk"/></Stack>"#,
+		);
 	}
 
 	/// The apply layer coerces from markup, so a deploy route can author its

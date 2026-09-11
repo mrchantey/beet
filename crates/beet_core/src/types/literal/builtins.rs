@@ -143,6 +143,15 @@ fn add_domain(table: &mut Table) {
 				),
 			}
 		})
+		// a store uri, so `<StoreUriBlock uri="s3://my-bucket"/>` authors a
+		// store as a process is told to read it, in the one spelling `--repo`
+		// parses. A malformed uri errors with the supported kinds.
+		.add_hinted("a store uri, eg \"s3://<bucket>\"", |value: &Value| {
+			match value {
+				Value::Str(string) => StoreUri::parse(string.as_str()).map(Some),
+				_ => Ok(None),
+			}
+		})
 		// a unit-suffixed string, so `<EndInDuration duration="50ms"/>` authors
 		// a delay. The unit is required, and a malformed value (a non-string,
 		// or a missing/unknown unit) errors rather than silently falling

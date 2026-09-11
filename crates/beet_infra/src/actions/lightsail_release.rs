@@ -24,9 +24,10 @@ use beet_net::prelude::*;
 /// replaced already pulled this release at boot, so the script confirms and
 /// returns rather than bouncing a healthy unit.
 ///
-/// A box carrying [`RepoBucket`] must also prove it reads a repo store: the
-/// prefix reaches a Lightsail box by the release pointer alone, so a pointer
-/// without one boots a process that serves nothing, with no error anywhere.
+/// A box whose stack declares a repo store ([`RepoStoreBlock`]) must also prove
+/// it reads one: the prefix reaches a Lightsail box by the release pointer
+/// alone, so a pointer without one boots a process that serves nothing, with
+/// no error anywhere.
 #[action]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -96,7 +97,7 @@ pub async fn LightsailRestart(
 
 /// The box a step drives: the tofu project holding its address and key pair,
 /// the one [`LightsailBlock`] declared under the same stack, and whether that
-/// block serves a repo store ([`RepoBucket`]).
+/// stack declares a repo store ([`RepoStoreBlock`]) for it to serve.
 async fn resolve_box(
 	cx: &ActionContext<Request>,
 	tag: &'static str,
@@ -162,7 +163,8 @@ async fn run_gate_script(
 #[derive(SystemParam)]
 struct ReleaseQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
-	blocks: Query<'w, 's, (&'static LightsailBlock, Has<RepoBucket>)>,
+	blocks: Query<'w, 's, &'static LightsailBlock>,
+	repos: RepoStoreQuery<'w, 's>,
 }
 
 impl ReleaseQuery<'_, '_> {
@@ -181,7 +183,7 @@ impl ReleaseQuery<'_, '_> {
 			.declared(entity)?
 			.into_iter()
 			.filter_map(|child| self.blocks.get(child).ok());
-		let (block, serves_repo) = blocks.next().ok_or_else(|| {
+		let block = blocks.next().ok_or_else(|| {
 			bevyhow!(
 				"{tag} found no LightsailBlock under its stack, \
 				so there is no box to drive"
@@ -193,6 +195,9 @@ impl ReleaseQuery<'_, '_> {
 				so it cannot tell which box to drive"
 			);
 		}
+		// the box serves the repo store its stack declares, if any: the
+		// release pointer carries the uri, so the gate checks it arrived
+		let serves_repo = self.repos.find(entity)?.is_some();
 		(block.clone(), serves_repo).xok()
 	}
 }

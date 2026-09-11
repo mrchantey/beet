@@ -1,6 +1,16 @@
 #![allow(unused)]
 mod block;
 pub use block::*;
+// A block whose resource is a store, its erased half and the generic runtime
+// attach; the marker naming which store block is the repo store, and the
+// block naming a store this deploy does not create. Feature-free, so a lean
+// binary reads the same declarations the deployer does.
+mod store_block;
+pub use store_block::*;
+mod repo_store_block;
+pub use repo_store_block::*;
+mod store_uri_block;
+pub use store_uri_block::*;
 #[cfg(feature = "lambda_block")]
 mod lambda;
 #[cfg(feature = "lambda_block")]
@@ -45,13 +55,6 @@ pub use failover::*;
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
 pub use s3_bucket_block::*;
-// The compute's half of a served entry document. Not a block and not an S3
-// concept; it sits here because the only store declaration to check it against
-// is the one above.
-#[cfg(feature = "bindings_aws_common")]
-mod repo_bucket;
-#[cfg(feature = "bindings_aws_common")]
-pub use repo_bucket::*;
 // The network the AWS compute blocks sit in, and the company database inside
 // it. Neither is mail-specific: the mail stack is simply their first consumer.
 #[cfg(feature = "vpc_block")]

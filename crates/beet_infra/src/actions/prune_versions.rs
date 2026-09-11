@@ -48,15 +48,15 @@ pub async fn PruneVersions(
 	// than at this launch's version, since what it prunes is other versions
 	let (client, repo) = cx
 		.caller
-		.with_state::<(StackQuery, Query<&S3BucketBlock>), _>(
-			|entity, (stacks, stores)| -> Result<_> {
+		.with_state::<(StackQuery, RepoStoreQuery), _>(
+			|entity, (stacks, repos)| -> Result<_> {
 				let (_, stack) = stacks.root(entity)?;
-				let repo = stacks
-					.declared(entity)?
-					.into_iter()
-					.filter_map(|entity| stores.get(entity).ok())
-					.find(|store| store.label() == RepoBucket::LABEL)
-					.map(|store| BlobStore::new(store.store(&stack, None)));
+				let repo = repos
+					.find(entity)?
+					.map(|repo| {
+						BlobStore::from_uri(repo.root(), AbsPathBuf::new(".")?)
+					})
+					.transpose()?;
 				(stacks.deployment().artifacts_client(&stack), repo).xok()
 			},
 		)
