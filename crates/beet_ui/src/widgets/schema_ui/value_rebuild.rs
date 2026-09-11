@@ -64,7 +64,12 @@ pub(in crate::widgets) enum RebuildKey {
 	/// A row whose schema a sibling names, by its field and the schema the
 	/// sibling's value substituted: rebuilt when its type changes, reused when
 	/// only its value does.
-	Bound(SmolStr, SmolStr),
+	Bound {
+		/// The field's key.
+		field: SmolStr,
+		/// The substituted schema, as a fingerprint.
+		schema: SmolStr,
+	},
 }
 
 impl ValueRebuild {

@@ -138,10 +138,10 @@ fn bound_rows<'a>(
 			.map(|scope| named.schema.bind(scope))
 			.unwrap_or_else(|| named.schema.clone());
 		let key = match named.schema.binds_a_field() {
-			true => RebuildKey::Bound(
-				named.key.clone(),
-				format!("{bound:?}").into(),
-			),
+			true => RebuildKey::Bound {
+				field: named.key.clone(),
+				schema: format!("{bound:?}").into(),
+			},
 			false => RebuildKey::Name(named.key.clone()),
 		};
 		(key, NamedFieldSchema {
