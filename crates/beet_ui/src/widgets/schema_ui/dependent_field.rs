@@ -8,12 +8,13 @@
 //! that asked for them. The unit enum sits here as the arm the same select
 //! serves without a payload to rebuild, and the select itself is
 //! [`variant_select`](super::variant_select)'s.
-use super::composite_field::struct_rows;
+use super::composite_field::struct_row;
 use super::composite_field::struct_title;
 use super::field_layout::child_field;
 use super::field_layout::group;
 use super::field_layout::labeled;
 use super::form::schema_field;
+use super::value_rebuild::RebuildKey;
 use super::value_rebuild::ValueRebuild;
 use super::variant_select::variant_name;
 use super::variant_select::variant_options;
@@ -49,8 +50,8 @@ pub(super) fn enum_field(
 ) -> Snippet {
 	let (owned, bound_field) = (schema.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
-		|value| variant_name(value).unwrap_or_default(),
-		move |resolver, value| {
+		|value| vec![RebuildKey::Name(variant_name(value).unwrap_or_default())],
+		move |resolver, value, _key| {
 			variant_control(resolver, &owned, &bound_field, value, depth)
 		},
 	);
@@ -95,7 +96,8 @@ fn variant_control(
 /// [`ValueSchema::bind`] states for validation, here at the widget layer: the
 /// enclosing struct is the only scope that can answer an
 /// [`AtField`](SchemaRef::AtField), so it is the only place the substitution can
-/// happen.
+/// happen. Each row is keyed by its field and, for a dependent one, the schema
+/// it bound to, so a sibling's edit rebuilds the row it retyped and no other.
 pub(super) fn bound_struct_field(
 	schema: &StructSchema,
 	field: FieldRef,
@@ -103,52 +105,50 @@ pub(super) fn bound_struct_field(
 	depth: usize,
 ) -> Snippet {
 	let title = (depth > 0).then(|| struct_title(schema, &field, label));
-	let (shape_schema, owned, bound_field) =
+	let (keyed, owned, bound_field) =
 		(schema.clone(), schema.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
-		move |value| bound_shape(&shape_schema, value),
-		move |resolver, value| {
-			let bound = bind_fields(&owned, value);
-			labeled(None, struct_rows(resolver, &bound, &bound_field, depth))
+		move |value| bound_rows(&keyed, value).map(|(key, _)| key).collect(),
+		move |resolver, value, key| {
+			bound_rows(&owned, value)
+				.find(|(row, _)| row == key)
+				.map(|(_, named)| {
+					struct_row(resolver, &named, &bound_field, depth)
+				})
+				.unwrap_or_else(|| Snippet::from_bundle(()))
 		},
 	);
 	// the holder carries the struct's own value, so it must be an element
 	group(title, rsx! { <div {(field, rebuild)}/> })
 }
 
-/// Every [`SchemaRef::AtField`] in `schema`'s fields substituted with the schema
-/// the struct's own value describes, the widget twin of validation's
-/// bind-then-descend.
-fn bind_fields(schema: &StructSchema, value: &Value) -> StructSchema {
-	let Ok(scope) = value.as_map() else {
-		return schema.clone();
-	};
-	StructSchema {
-		fields: schema
-			.fields
-			.iter()
-			.map(|named| NamedFieldSchema {
-				schema: named.schema.bind(scope),
-				..named.clone()
-			})
-			.collect(),
-		..schema.clone()
-	}
-}
-
-/// The shape a bound struct's controls are decided by: what its own value says
-/// its dependent fields are. Anything else the value holds is a leaf's business.
-fn bound_shape(schema: &StructSchema, value: &Value) -> SmolStr {
-	let bound = bind_fields(schema, value);
-	schema
-		.fields
-		.iter()
-		.zip(bound.fields.iter())
-		.filter(|(named, _)| named.schema.binds_a_field())
-		.map(|(named, bound)| format!("{}={:?}", named.key, bound.schema))
-		.collect::<Vec<_>>()
-		.join(";")
-		.into()
+/// Each field of `schema` with every [`SchemaRef::AtField`] substituted for
+/// the schema the struct's own value describes (the widget twin of
+/// validation's bind-then-descend), under the key its row reconciles by: a
+/// plain field by its name, a dependent one by its name and the schema it
+/// bound to, so the row is rebuilt when its type changes and reused when only
+/// its value does.
+fn bound_rows<'a>(
+	schema: &'a StructSchema,
+	value: &'a Value,
+) -> impl Iterator<Item = (RebuildKey, NamedFieldSchema)> + 'a {
+	let scope = value.as_map().ok();
+	schema.fields.iter().map(move |named| {
+		let bound = scope
+			.map(|scope| named.schema.bind(scope))
+			.unwrap_or_else(|| named.schema.clone());
+		let key = match named.schema.binds_a_field() {
+			true => RebuildKey::Bound(
+				named.key.clone(),
+				format!("{bound:?}").into(),
+			),
+			false => RebuildKey::Name(named.key.clone()),
+		};
+		(key, NamedFieldSchema {
+			schema: bound,
+			..named.clone()
+		})
+	})
 }
 
 #[cfg(test)]
@@ -277,5 +277,31 @@ mod test {
 			.xpect_contains("type=\"text\" name=\"field.value\"");
 		html.xnot()
 			.xpect_contains("type=\"checkbox\" name=\"field.value\"");
+	}
+
+	/// ...and only the retyped row is rebuilt: the sibling that named the
+	/// schema keeps its own row, entity and all, since its key never changed
+	/// (the variant select *inside* it is that enum's own rebuild's business).
+	#[beet_core::test]
+	fn a_rebind_rebuilds_only_the_dependent_row() {
+		let (mut world, root) = test_ext::build_form(
+			pair(),
+			"field",
+			value!({ "field": { "schema": { "Bool": {} }, "value": true } }),
+		);
+		let sibling = test_ext::bound(&mut world, "field.schema");
+		let dependent = test_ext::bound(&mut world, "field.value");
+		*world
+			.entity_mut(root)
+			.get_mut::<Document>()
+			.unwrap()
+			.0
+			.get_mut("field")
+			.unwrap()
+			.get_mut("schema")
+			.unwrap() = Value::from_serde(&ValueSchema::String(default())).unwrap();
+		test_ext::settle_world(&mut world);
+		test_ext::bound(&mut world, "field.schema").xpect_eq(sibling);
+		test_ext::bound(&mut world, "field.value").xpect_not_eq(dependent);
 	}
 }

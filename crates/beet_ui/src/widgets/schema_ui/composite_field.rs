@@ -5,7 +5,7 @@
 //! A struct and a tuple are decided by the schema alone, so their rows are built
 //! once. A list and a map are not — no control types an item into existence — so
 //! their rows ride a [`ValueRebuild`](super::value_rebuild::ValueRebuild) keyed
-//! on the collection's own shape, with the structural edits themselves owned by
+//! by position or by key, with the structural edits themselves owned by
 //! [`collection_edit`](super::collection_edit).
 use super::collection_edit::CollectionEdit;
 use super::collection_edit::add_entry_row;
@@ -17,6 +17,7 @@ use super::field_layout::group;
 use super::field_layout::hinted;
 use super::field_layout::labeled;
 use super::form::schema_field;
+use super::value_rebuild::RebuildKey;
 use super::value_rebuild::ValueRebuild;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -41,7 +42,7 @@ pub(super) fn struct_field<'a>(
 }
 
 /// One control per named field, each [`FieldRef`] extending the struct's path.
-pub(super) fn struct_rows<'a>(
+fn struct_rows<'a>(
 	resolver: SchemaResolver<'a>,
 	schema: &'a StructSchema,
 	field: &FieldRef,
@@ -50,19 +51,28 @@ pub(super) fn struct_rows<'a>(
 	schema
 		.fields
 		.iter()
-		.map(|named| {
-			hinted(
-				named.description.as_deref(),
-				schema_field(
-					resolver,
-					&named.schema,
-					child_field(field, named.key.clone()),
-					Some(field_label(named)),
-					depth + 1,
-				),
-			)
-		})
+		.map(|named| struct_row(resolver, named, field, depth))
 		.collect()
+}
+
+/// One named field's control under its label and hint, its [`FieldRef`]
+/// extending the struct's path.
+pub(super) fn struct_row(
+	resolver: SchemaResolver,
+	named: &NamedFieldSchema,
+	field: &FieldRef,
+	depth: usize,
+) -> Snippet {
+	hinted(
+		named.description.as_deref(),
+		schema_field(
+			resolver,
+			&named.schema,
+			child_field(field, named.key.clone()),
+			Some(field_label(named)),
+			depth + 1,
+		),
+	)
 }
 
 /// The title a nested struct's disclosure wears: its label hint, else the name
@@ -112,9 +122,9 @@ pub(super) fn tuple_field<'a>(
 /// The list arm: one control per item with a remove button beside it, and an add
 /// button appending the item schema's zero.
 ///
-/// The rows ride a [`ValueRebuild`](super::value_rebuild::ValueRebuild) keyed on
-/// the list's *length*, so adding or removing an item regenerates them while
-/// editing one is its own control's business.
+/// The rows ride a [`ValueRebuild`](super::value_rebuild::ValueRebuild) keyed
+/// by *index*, so an append builds one row and a pop drops one while every
+/// other row keeps its entity, and editing one is its own control's business.
 pub(super) fn list_field(
 	resolver: SchemaResolver,
 	schema: &ListSchema,
@@ -124,15 +134,15 @@ pub(super) fn list_field(
 ) -> Snippet {
 	let (item, rows_field) = (schema.item.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
-		|value| item_count(value).to_string().into(),
-		move |resolver, value| match item_count(value) {
-			0 => empty_note("No items yet"),
-			count => (0..count)
-				.map(|index| {
-					list_row(resolver, &item, &rows_field, index, depth)
-				})
-				.collect::<Vec<_>>()
-				.xmap(|rows| labeled(None, rows)),
+		|value| match item_count(value) {
+			0 => vec![RebuildKey::Empty],
+			count => (0..count).map(RebuildKey::Index).collect(),
+		},
+		move |resolver, _value, key| match key {
+			RebuildKey::Index(index) => {
+				list_row(resolver, &item, &rows_field, *index, depth)
+			}
+			_ => empty_note("No items yet"),
 		},
 	);
 	let zero = schema.item.default_value_in(resolver);
@@ -218,8 +228,8 @@ fn row_card() -> impl Bundle {
 /// beside it and a key to type beside the add button.
 ///
 /// The entries ride a [`ValueRebuild`](super::value_rebuild::ValueRebuild) keyed
-/// on the map's *keys*, in sorted order so a rebuild does not reshuffle a
-/// control's neighbours.
+/// by the map's *keys*, in sorted order so an added entry slots in beside its
+/// neighbours while every other entry keeps its entity.
 pub(super) fn map_field(
 	resolver: SchemaResolver,
 	schema: &MapSchema,
@@ -229,22 +239,19 @@ pub(super) fn map_field(
 ) -> Snippet {
 	let (value_schema, entries_field) = (schema.value.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
-		|value| entry_keys(value).join(";").into(),
-		move |resolver, value| match entry_keys(value) {
-			keys if keys.is_empty() => empty_note("No entries yet"),
-			keys => keys
-				.into_iter()
-				.map(|key| {
-					map_entry(
-						resolver,
-						&value_schema,
-						&entries_field,
-						key,
-						depth,
-					)
-				})
-				.collect::<Vec<_>>()
-				.xmap(|rows| labeled(None, rows)),
+		|value| match entry_keys(value) {
+			keys if keys.is_empty() => vec![RebuildKey::Empty],
+			keys => keys.into_iter().map(RebuildKey::Name).collect(),
+		},
+		move |resolver, _value, key| match key {
+			RebuildKey::Name(key) => map_entry(
+				resolver,
+				&value_schema,
+				&entries_field,
+				key.clone(),
+				depth,
+			),
+			_ => empty_note("No entries yet"),
 		},
 	);
 	let zero = schema.value.default_value_in(resolver);
@@ -379,6 +386,25 @@ mod test {
 		test_ext::settle_world(&mut world);
 		test_ext::document_of(&mut world, root)
 			.xpect_eq(value!({ "field": ["buy milk", "walk cat"] }));
+	}
+
+	/// An append reconciles the rows by index: the existing row's control and
+	/// the add button keep their entities, so focus in either survives the
+	/// new row, and only the new row's control is built.
+	#[beet_core::test]
+	fn an_append_keeps_the_existing_rows() {
+		let (mut world, _) = test_ext::build_form(
+			ValueSchema::of::<Vec<String>>(),
+			"field",
+			value!({ "field": ["buy milk"] }),
+		);
+		let inputs = test_ext::elements_in(&mut world, "input");
+		let add = test_ext::collection_add(&mut world, "field");
+		test_ext::click_world(&mut world, add);
+		let after = test_ext::elements_in(&mut world, "input");
+		after.len().xpect_eq(2);
+		after[0].xpect_eq(inputs[0]);
+		test_ext::collection_add(&mut world, "field").xpect_eq(add);
 	}
 
 	/// A list of structs is a control per field per row, so the todo app's rows

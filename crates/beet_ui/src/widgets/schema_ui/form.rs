@@ -19,7 +19,8 @@
 //! Where a schema alone does not decide the controls, the *value* does, through
 //! a [`ValueRebuild`](super::value_rebuild::ValueRebuild): a list's rows, a
 //! map's entries, an enum's payload and a field whose schema a sibling names are
-//! all generated from the bound value and regenerated when its shape changes.
+//! all generated from the bound value and reconciled by key when its shape
+//! changes, so the rows that survive keep their entities.
 //! The schema-decided layout around them is one generation of a
 //! [`SchemaRebuild`](super::schema_rebuild::SchemaRebuild), so a committed
 //! schema edit regenerates the form while the slot's authored children stay

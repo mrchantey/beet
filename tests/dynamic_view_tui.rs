@@ -272,6 +272,66 @@ impl TodoHost {
 		);
 	}
 
+	/// The entity carrying the data document, ie the `<DocumentBlob>` the
+	/// todos were read onto.
+	fn todos(&mut self) -> Entity {
+		self.app
+			.world_mut()
+			.query::<(Entity, &DocumentBlob)>()
+			.iter(self.app.world())
+			.find(|(_, blob)| blob.path.as_str() == TODOS)
+			.map(|(entity, _)| entity)
+			.expect("no todos document")
+	}
+
+	/// How many rows the live data document holds.
+	fn row_count(&mut self) -> usize {
+		let todos = self.todos();
+		self.app
+			.world()
+			.get::<Document>(todos)
+			.unwrap()
+			.0
+			.as_list()
+			.map(Vec::len)
+			.unwrap_or_default()
+	}
+
+	/// Append a row to the data document from outside the form, the path an
+	/// edit nobody's control made takes: a script, a sync, another session.
+	fn push_row(&mut self, row: Value) {
+		let todos = self.todos();
+		self.app
+			.world_mut()
+			.run_system_once_with::<_, In<Value>, Result, _>(
+				move |row: In<Value>, mut docs: DocumentQuery| -> Result {
+					let row = row.0;
+					docs.with_field(
+						todos,
+						&FieldRef::default(),
+						move |list| {
+							list.as_list_mut_or_init()
+								.map(|list| list.push(row))
+						},
+					)??;
+					OK
+				},
+				row,
+			)
+			.unwrap()
+			.unwrap();
+		self.settle(8);
+	}
+
+	/// The element holding keyboard focus.
+	fn focused(&mut self) -> Entity {
+		self.app
+			.world_mut()
+			.query_filtered::<Entity, With<Focus>>()
+			.single(self.app.world())
+			.expect("no focused element")
+	}
+
 	/// The `row`th todo's label, read out of the seeded document.
 	///
 	/// Every needle a case aims at is derived from this rather than written
@@ -341,6 +401,64 @@ async fn an_edit_reaches_the_view_and_the_store() {
 		.get_field_mut(&[FieldSegment::index(0), "label".into()])
 		.unwrap() = Value::new(edited);
 	host.stored(TODOS).await.value.xpect_eq(expected.0);
+}
+
+/// A row's control keeps its focus and caret while an append lands beside it
+/// from outside the form: the rows are reconciled by key, so only the new row
+/// is built and the one being typed into is the same entity before and after.
+#[beet::test]
+async fn an_append_leaves_a_focused_control_alone() {
+	let mut host = TodoHost::new(UVec2::new(120, 80)).await;
+	let label = host.seeded_label(0).await;
+	host.step_until(&label);
+	// the second occurrence is the form's control; the first is the view's cell
+	let (col, row) = host.cell_of_nth(&label, 1);
+	host.click(col + 1, row);
+	host.type_text(" and");
+	// the caret paints after the typed text, in the focused control alone
+	let typed = format!("{label} and\u{258f}");
+	host.step_until(&typed);
+	let control = host.focused();
+	let rows = host.row_count();
+
+	host.push_row(value!({ "label": "feed the cat", "done": false }));
+	host.step_until("feed the cat");
+	host.row_count().xpect_eq(rows + 1);
+	// the control is the same entity, still focused, its caret untouched
+	host.focused().xpect_eq(control);
+	host.frame().xpect_contains(&typed);
+	// ...so typing carries on where it left off: the view's cell reads the
+	// whole label (the control wraps it), and the caret still trails the text
+	host.type_text(" eggs");
+	host.step_until(&format!("{label} and eggs"))
+		.xpect_contains("eggs\u{258f}");
+}
+
+/// Clicking the add button follows the normal focus rules: the click blurs the
+/// control and focuses the button, and the button survives the append it
+/// caused, so pressing Enter appends again with nothing re-focused.
+#[beet::test]
+async fn the_add_button_survives_its_own_append() {
+	let mut host = TodoHost::new(UVec2::new(120, 80)).await;
+	let label = host.seeded_label(0).await;
+	host.step_until(&label);
+	let (col, row) = host.cell_of_nth(&label, 1);
+	host.click(col + 1, row);
+	host.settle(4);
+	let control = host.focused();
+	let rows = host.row_count();
+
+	host.click_text("Add item");
+	host.settle(8);
+	host.row_count().xpect_eq(rows + 1);
+	let button = host.focused();
+	button.xpect_not_eq(control);
+
+	// Enter activates the focused button: the same one, still focused
+	host.send(b"\r");
+	host.settle(8);
+	host.row_count().xpect_eq(rows + 2);
+	host.focused().xpect_eq(button);
 }
 
 /// Edit mode is opt-in (item 11): the schema editor ships with the app but stays

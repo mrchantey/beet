@@ -21,6 +21,7 @@ use super::field_layout::empty_note;
 use super::field_layout::humanize;
 use super::schema_rebuild::SchemaRebuild;
 use super::schema_rebuild::SchemaSource;
+use super::value_rebuild::RebuildKey;
 use super::value_rebuild::ValueRebuild;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -279,11 +280,11 @@ fn item_table(cx: ViewCx<'_>, item: &StructSchema, field: FieldRef) -> Snippet {
 	// `ValueRebuild` keyed on emptiness alone, so it is built once per
 	// transition rather than once per appended item.
 	let empty = ValueRebuild::new(
-		|value| is_empty_list(value).to_string().into(),
-		|_resolver, value| match is_empty_list(value) {
-			true => empty_note("No items yet"),
-			false => Snippet::from_bundle(()),
+		|value| match is_empty_list(value) {
+			true => vec![RebuildKey::Empty],
+			false => vec![],
 		},
+		|_resolver, _value, _key| empty_note("No items yet"),
 	);
 	rsx! {
 		<table {class_set}>
