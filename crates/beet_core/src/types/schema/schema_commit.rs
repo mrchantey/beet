@@ -89,8 +89,10 @@ impl SchemaCommit {
 					}
 				}
 				(ValueSchema::Map(schema), Value::Map(map)) => {
-					for item in map.0.values_mut() {
-						Self::backfill(resolver, &schema.value, item).await?;
+					for (key, item) in map.0.iter_mut() {
+						let entry_schema =
+							schema.entry_schema(resolver, key)?;
+						Self::backfill(resolver, entry_schema, item).await?;
 					}
 				}
 				// a null satisfies an optional; anything else backfills as the inner

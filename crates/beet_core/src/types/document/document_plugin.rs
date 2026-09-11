@@ -55,8 +55,14 @@ impl Plugin for DocumentPlugin {
 			.register_type::<Value>()
 			.register_type::<Map>()
 			.register_type::<ValueSchema>()
-			// the one by-name schema namespace, seeded with the meta-schema
+			.register_type::<RelationMeta>()
+			// the one by-name schema namespace, seeded with the intrinsic schemas
 			.init_resource::<SchemaRegistry>();
+		// the hierarchy is the relation bevy keeps acyclic in the world, so a
+		// scene edit is checked against it before the world sees the write
+		RelationMeta::acyclic().register::<ChildOf>(
+			&mut app.world().resource::<AppTypeRegistry>().write(),
+		);
 
 		app
 			// Add observers and systems

@@ -246,9 +246,7 @@ mod test {
 
 	/// A map schema, whose entries are keyed by hand rather than appended.
 	fn map_schema() -> ValueSchema {
-		ValueSchema::Map(MapSchema {
-			value: Box::new(ValueSchema::Bool(default())),
-		})
+		ValueSchema::Map(MapSchema::uniform(ValueSchema::Bool(default())))
 	}
 
 	/// A map entry is added under the key typed beside the button, which is

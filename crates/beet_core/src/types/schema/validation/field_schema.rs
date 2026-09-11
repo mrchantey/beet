@@ -56,10 +56,11 @@ impl ValueSchema {
 								})?
 								.schema
 						}
+						// a keyed map's entry is whatever its key names
 						(
 							ValueSchema::Map(schema),
-							FieldSegment::ObjectKey(_),
-						) => schema.value.as_ref(),
+							FieldSegment::ObjectKey(key),
+						) => schema.entry_schema(resolver, key)?,
 						// an enum is externally tagged, so its payload sits
 						// under the variant name the value itself carries: a
 						// schema document's `Struct.fields` is this hop then a
@@ -126,16 +127,13 @@ impl ValueSchema {
 	}
 
 	/// Whether this schema is compatible with `other`, treating
-	/// [`ValueSchema::Any`] on either side as a wildcard.
+	/// [`ValueSchema::Any`] and an unresolved [`ValueSchema::Ref`] on either
+	/// side as a wildcard.
 	pub fn matches(&self, other: &ValueSchema) -> bool {
 		match (self, other) {
 			// an unresolved reference or `Any` is a wildcard on either side
-			(ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_)), _) => {
-				true
-			}
-			(_, ValueSchema::Any | ValueSchema::Ref(SchemaRef::Name(_))) => {
-				true
-			}
+			(ValueSchema::Any | ValueSchema::Ref(_), _)
+			| (_, ValueSchema::Any | ValueSchema::Ref(_)) => true,
 			// an optional matches its bare inner and another optional's inner, so a
 			// typed write of `T` validates against an `Option<T>` field
 			(ValueSchema::Optional(inner), other)
@@ -234,6 +232,37 @@ mod test {
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("Any");
+	}
+
+	/// A keyed map's entry is the schema its key names, both mid-path and as the
+	/// path's end, so a typed write into a component map is checked against
+	/// the component's own schema.
+	#[crate::test]
+	fn get_field_schema_follows_a_keyed_map_entry() {
+		let mut registry = SchemaRegistry::default();
+		registry.register_type::<UserProfile>();
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		let schema = ValueSchema::Map(MapSchema::Keyed);
+		schema
+			.get_field_schema_in(resolver, &[
+				FieldSegment::key("UserProfile"),
+				FieldSegment::key("age"),
+			])
+			.unwrap()
+			.xpect_eq(ValueSchema::U64(default()));
+		schema
+			.get_field_schema_in(resolver, &[FieldSegment::key("UserProfile")])
+			.unwrap()
+			.xpect_eq(ValueSchema::of::<UserProfile>());
+		// an unregistered key is an error naming it
+		schema
+			.get_field_schema_in(resolver, &[
+				FieldSegment::key("Nope"),
+				FieldSegment::key("age"),
+			])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Nope`");
 	}
 
 	#[crate::test]

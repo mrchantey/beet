@@ -321,4 +321,24 @@ mod test {
 			.is_map()
 			.xpect_true();
 	}
+
+	/// A keyed map's new entry starts as the zero of whatever its key names,
+	/// the value a component picker inserts; a key naming nothing is an error.
+	#[crate::test]
+	fn a_keyed_entry_starts_as_its_schema_zero() {
+		let mut registry = SchemaRegistry::default();
+		registry.insert("Count", ValueSchema::U64(default()));
+		let resolver = SchemaResolver::default().with_schemas(&registry);
+		let components = MapSchema::Keyed;
+		components
+			.entry_schema(resolver, "Count")
+			.unwrap()
+			.default_value_in(resolver)
+			.xpect_eq(value!(0u64));
+		components
+			.entry_schema(resolver, "Nope")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Nope`");
+	}
 }

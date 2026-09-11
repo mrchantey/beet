@@ -62,8 +62,11 @@ fn meta_ref() -> ValueSchema {
 	ValueSchema::reference(ValueSchema::type_path())
 }
 
-/// The [`SchemaRef`] vocabulary: the four ways a schema names another rather
-/// than writing it in place.
+/// The [`SchemaRef`] vocabulary: the ways a schema names another rather than
+/// writing it in place.
+///
+/// Adding a variant to [`SchemaRef`] means adding it here;
+/// `meta_schema.rs::describes_every_reference` is the tripwire.
 fn schema_ref_schema() -> ValueSchema {
 	enumeration("SchemaRef", vec![
 		variant("Name", string()),
@@ -101,8 +104,19 @@ fn list_schema() -> ValueSchema {
 	])
 }
 
+/// [`MapSchema`] is the one composite that is itself an enum: every entry one
+/// schema, or each entry the schema its key names.
+///
+/// Adding a variant to [`MapSchema`] means adding it here;
+/// `meta_schema.rs::describes_every_map_schema` is the tripwire.
 fn map_schema() -> ValueSchema {
-	r#struct("MapSchema", vec![field("value", meta_ref())])
+	enumeration("MapSchema", vec![
+		variant(
+			"Uniform",
+			r#struct("Uniform", vec![field("value", meta_ref())]),
+		),
+		unit_variant("Keyed"),
+	])
 }
 
 fn enum_schema() -> ValueSchema {
@@ -325,9 +339,7 @@ mod test {
 				max_items: None,
 				unique: true,
 			}),
-			ValueSchema::Map(MapSchema {
-				value: Box::new(ValueSchema::Null),
-			}),
+			ValueSchema::Map(MapSchema::uniform(ValueSchema::Null)),
 			ValueSchema::Enum(EnumSchema {
 				name: Some("Status".into()),
 				description: None,
@@ -347,21 +359,62 @@ mod test {
 		]
 	}
 
-	#[crate::test]
-	fn describes_every_variant() {
-		let ValueSchema::Enum(meta) = ValueSchema::meta() else {
-			panic!("the meta-schema is an externally tagged enum");
+	/// One reference per [`SchemaRef`] variant, in declaration order.
+	fn references() -> Vec<SchemaRef> {
+		vec![
+			SchemaRef::Name("TodoItem".into()),
+			SchemaRef::TypePath("bevy_color::color::Color".into()),
+			SchemaRef::Document("schema/todo.json".into()),
+			SchemaRef::AtField("schema".into()),
+		]
+	}
+
+	/// One map per [`MapSchema`] variant, in declaration order.
+	fn map_schemas() -> Vec<MapSchema> {
+		vec![MapSchema::uniform(ValueSchema::Any), MapSchema::Keyed]
+	}
+
+	/// The variant names an externally tagged enum schema describes.
+	fn described_variants(schema: ValueSchema) -> Vec<String> {
+		let ValueSchema::Enum(schema) = schema else {
+			panic!("an externally tagged enum");
 		};
-		let described = meta
+		schema
 			.variants
 			.iter()
-			.map(|variant| variant.name.as_str())
-			.collect::<Vec<_>>();
+			.map(|variant| variant.name.to_string())
+			.collect()
+	}
+
+	#[crate::test]
+	fn describes_every_variant() {
 		samples()
 			.iter()
-			.map(ValueSchema::variant_name)
+			.map(|schema| schema.variant_name().to_string())
 			.collect::<Vec<_>>()
-			.xpect_eq(described);
+			.xpect_eq(described_variants(ValueSchema::meta()));
+	}
+
+	/// The reference vocabulary is described in full too, so a new way of
+	/// naming a schema fails here until the meta-schema can read it.
+	#[crate::test]
+	fn describes_every_reference() {
+		references()
+			.iter()
+			.map(|schema_ref| schema_ref.variant_name().to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(described_variants(super::schema_ref_schema()));
+	}
+
+	/// And the map vocabulary, so a new kind of map fails here until the
+	/// meta-schema can read it.
+	#[crate::test]
+	fn describes_every_map_schema() {
+		map_schemas()
+			.iter()
+			.map(|map| map.variant_name().to_string())
+			.collect::<Vec<_>>()
+			.xpect_eq(described_variants(super::map_schema()));
 	}
 
 	/// The closure: every schema is a value the meta-schema accepts, and it
@@ -370,7 +423,9 @@ mod test {
 	async fn a_schema_is_a_value_of_the_meta_schema() {
 		let registry = SchemaRegistry::default();
 		let resolver = SchemaResolver::default().with_schemas(&registry);
-		for schema in samples() {
+		let referencing = references().into_iter().map(ValueSchema::Ref);
+		let maps = map_schemas().into_iter().map(ValueSchema::Map);
+		for schema in samples().into_iter().chain(referencing).chain(maps) {
 			let mut value = Value::from_serde(&schema).unwrap();
 			ValueSchema::meta()
 				.assert_valid_in(resolver, schema.variant_name(), &mut value)

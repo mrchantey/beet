@@ -299,10 +299,10 @@ fn as_bytes(items: &[Value]) -> Option<Vec<u8>> {
 		.collect()
 }
 
-/// An entity reference is a node key: the generation-stripped index the
-/// surrounding document keys its nodes by, so it reads as an unsigned integer.
-/// That the key names a live node is checked where a world is in hand (the
-/// build path's entity map), not here.
+/// An entity reference names a node by its file key, written as the bits of
+/// the generation-stripped file entity ([`EntitySchema::node_key`]), so it
+/// reads as an unsigned integer. That the key names a live node is checked
+/// where a world is in hand (the build path's entity map), not here.
 async fn validate_entity(
 	schema: &EntitySchema,
 	path: &FieldPath,
@@ -467,9 +467,14 @@ async fn validate_map(
 		return type_mismatch(path, "map", value);
 	};
 	let mut errors = Vec::new();
+	// a keyed entry is described by whatever its key names, or is an error
 	for (key, child) in map.0.iter_mut() {
 		let sub = path.with_pushed(key.clone());
-		errors.extend(schema.value.apply_in(resolver, &sub, child).await);
+		match schema.entry_schema(resolver, key) {
+			Ok(entry_schema) => errors
+				.extend(entry_schema.apply_in(resolver, &sub, child).await),
+			Err(err) => errors.push(ValidationError::new(sub, err.to_string())),
+		}
 	}
 	errors
 }

@@ -12,9 +12,11 @@
 mod construction;
 mod model;
 mod resolution;
+mod scene;
 mod schema_commit;
 mod validation;
 pub use model::*;
 pub use resolution::*;
+pub use scene::*;
 pub use schema_commit::*;
 pub use validation::*;

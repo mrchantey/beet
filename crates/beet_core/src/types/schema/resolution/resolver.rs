@@ -58,6 +58,9 @@ impl<'a> SchemaResolver<'a> {
 	/// The by-name registry, when this resolver has one.
 	pub fn registry(&self) -> Option<&'a SchemaRegistry> { self.schemas }
 
+	/// Bevy's type registry, when this resolver has one.
+	pub fn types(&self) -> Option<&'a TypeRegistry> { self.types }
+
 	/// The schema registered under `name`, following a chain of references to
 	/// the first schema that is not itself a reference.
 	///

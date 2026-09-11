@@ -54,6 +54,10 @@ use crate::prelude::*;
 /// It yields a *schema*, never a constraint. There is deliberately no way to say
 /// "if this field is set then that one is required": that is where a dependent
 /// schema stops being resolvable and starts being a rules engine.
+///
+/// A map whose *keys* name schemas is not a reference at all: that is a
+/// [`MapSchema::Keyed`] map, declared on the map rather than in value
+/// position.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -78,6 +82,19 @@ impl SchemaRef {
 			Self::TypePath(path) => path.clone(),
 			Self::Document(path) => path.as_str().into(),
 			Self::AtField(key) => key.clone(),
+		}
+	}
+
+	/// This reference's variant name, ie its externally tagged serde key.
+	///
+	/// The match is exhaustive, so adding a variant fails to compile until the
+	/// meta-schema (which round trips through these names) describes it.
+	pub fn variant_name(&self) -> &'static str {
+		match self {
+			Self::Name(_) => "Name",
+			Self::TypePath(_) => "TypePath",
+			Self::Document(_) => "Document",
+			Self::AtField(_) => "AtField",
 		}
 	}
 }

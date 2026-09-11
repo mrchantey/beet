@@ -49,7 +49,8 @@ impl JsonSchema {
 	/// A [`SchemaRef::TypePath`], [`SchemaRef::Document`] or
 	/// [`SchemaRef::AtField`] is resolved at runtime against a registry or a
 	/// sibling value and has no JSON Schema equivalent, as is a
-	/// [`SchemaRef::Name`] naming nothing in this schema. Rather than degrade
+	/// [`SchemaRef::Name`] naming nothing in this schema and a
+	/// [`MapSchema::Keyed`] map, whose entries are typed by the registry. Rather than degrade
 	/// them to an unconstrained `{}`, export says which reference it could not
 	/// write.
 	pub fn try_from_schema(schema: &ValueSchema) -> Result<Self> {
@@ -119,7 +120,7 @@ impl<'a> Exporter<'a> {
 				}
 			}
 			ValueSchema::List(schema) => self.index(&schema.item),
-			ValueSchema::Map(schema) => self.index(&schema.value),
+			ValueSchema::Map(MapSchema::Uniform { value }) => self.index(value),
 			ValueSchema::Enum(schema) => {
 				for payload in schema
 					.variants
@@ -268,8 +269,11 @@ impl<'a> Exporter<'a> {
 				}
 				map
 			}
-			ValueSchema::Map(schema) => {
-				let value = self.nested(&schema.value)?;
+			ValueSchema::Map(MapSchema::Keyed) => bevybail!(
+				"cannot export a keyed map as JSON Schema: its entries are resolved at runtime"
+			),
+			ValueSchema::Map(MapSchema::Uniform { value }) => {
+				let value = self.nested(value)?;
 				let mut map = keyword("object");
 				map.insert("additionalProperties", value);
 				map

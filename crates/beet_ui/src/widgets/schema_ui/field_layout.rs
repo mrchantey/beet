@@ -160,7 +160,8 @@ fn group_title_style() -> impl Bundle {
 /// button floating in space, which reads as a broken widget rather than an
 /// empty one. Muted and italic, because it is the absence of content and must
 /// never be mistaken for a value.
-pub(super) fn empty_note(text: &'static str) -> Snippet {
+pub(super) fn empty_note(text: impl Into<String>) -> Snippet {
+	let text = text.into();
 	rsx! { <div {empty_note_style()}>{text}</div> }.any_snippet()
 }
 

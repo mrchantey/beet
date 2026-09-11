@@ -237,24 +237,34 @@ pub(super) fn map_field(
 	label: Option<String>,
 	depth: usize,
 ) -> Snippet {
-	let (value_schema, entries_field) = (schema.value.clone(), field.clone());
+	let (map_schema, entries_field) = (schema.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
 		|value| match entry_keys(value) {
 			keys if keys.is_empty() => vec![RebuildKey::Empty],
 			keys => keys.into_iter().map(RebuildKey::Name).collect(),
 		},
+		// an entry is typed by the map, which for a keyed map means its key
 		move |resolver, _value, key| match key {
-			RebuildKey::Name(key) => map_entry(
-				resolver,
-				&value_schema,
-				&entries_field,
-				key.clone(),
-				depth,
-			),
+			RebuildKey::Name(key) => {
+				match map_schema.entry_schema(resolver, key) {
+					Ok(schema) => map_entry(
+						resolver,
+						schema,
+						&entries_field,
+						key.clone(),
+						depth,
+					),
+					Err(err) => empty_note(format!("{key}: {err}")),
+				}
+			}
 			_ => empty_note("No entries yet"),
 		},
 	);
-	let zero = schema.value.default_value_in(resolver);
+	// a keyed map's zero depends on the key the picker will choose
+	let zero = match schema {
+		MapSchema::Uniform { value } => value.default_value_in(resolver),
+		MapSchema::Keyed => Value::Null,
+	};
 	let add = add_label(label.as_deref(), "entry");
 	group(label, rsx! {
 		<div {(field.clone(), rebuild)}/>
@@ -442,9 +452,7 @@ mod test {
 	#[beet_core::test]
 	fn a_map_generates_a_control_per_entry() {
 		let (mut world, root) = test_ext::build_form(
-			ValueSchema::Map(MapSchema {
-				value: Box::new(ValueSchema::Bool(default())),
-			}),
+			ValueSchema::Map(MapSchema::uniform(ValueSchema::Bool(default()))),
 			"field",
 			value!({ "field": { "done": true, "urgent": false } }),
 		);

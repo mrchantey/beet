@@ -45,11 +45,14 @@ impl Default for SchemaRegistry {
 }
 
 impl SchemaRegistry {
-	/// A registry holding only the meta-schema.
+	/// A registry holding only the intrinsic schemas: the meta-schema and the
+	/// scene.
 	///
-	/// The meta-schema is intrinsic rather than opt-in: a schema is itself a
-	/// value with a schema, so every registry can describe its own contents and
-	/// a schema document validates wherever it is read.
+	/// Both are intrinsic rather than opt-in. A schema is itself a value with a
+	/// schema, so every registry can describe its own contents and a schema
+	/// document validates wherever it is read; and a scene is the shape every
+	/// beet page is, so a scene document validates wherever it is read too,
+	/// each component against whatever this registry holds under its key.
 	pub fn new() -> Self {
 		let mut registry = Self {
 			schemas: HashMap::default(),
@@ -57,6 +60,8 @@ impl SchemaRegistry {
 			located: HashMap::default(),
 		};
 		registry.insert(ValueSchema::type_path(), ValueSchema::meta());
+		registry.insert(ValueSchema::SCENE, ValueSchema::scene());
+		registry.insert(ValueSchema::SCENE_NODE, ValueSchema::scene_node());
 		registry
 	}
 
@@ -147,7 +152,7 @@ impl SchemaRegistry {
 	/// Whether a schema is registered under `name`.
 	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
-	/// The number of registered schemas, the meta-schema included.
+	/// The number of registered schemas, the intrinsic ones included.
 	pub fn len(&self) -> usize { self.schemas.len() }
 
 	/// Whether the registry is empty, which a registry built by
@@ -223,9 +228,9 @@ impl SchemaRegistry {
 				max_items: list.max_items,
 				unique: list.unique,
 			}),
-			ValueSchema::Map(map) => ValueSchema::Map(MapSchema {
-				value: Box::new(self.resolve_inner(&map.value, visiting)),
-			}),
+			ValueSchema::Map(MapSchema::Uniform { value }) => ValueSchema::Map(
+				MapSchema::uniform(self.resolve_inner(value, visiting)),
+			),
 			ValueSchema::Struct(struct_schema) => {
 				ValueSchema::Struct(StructSchema {
 					name: struct_schema.name.clone(),

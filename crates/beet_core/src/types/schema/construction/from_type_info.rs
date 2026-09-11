@@ -208,9 +208,7 @@ impl Builder {
 	fn map_schema(&mut self, info: &MapInfo) -> MapSchema {
 		let value =
 			self.resolve_field(info.value_info(), info.value_ty().path());
-		MapSchema {
-			value: Box::new(value),
-		}
+		MapSchema::uniform(value)
 	}
 
 	fn enum_schema(
@@ -334,9 +332,9 @@ fn type_path_schema(type_path: &str) -> ValueSchema {
 			});
 		}
 		Some(("HashMap" | "BTreeMap", args)) => {
-			return ValueSchema::Map(MapSchema {
-				value: Box::new(type_path_schema(map_value_arg(args))),
-			});
+			return ValueSchema::Map(MapSchema::uniform(type_path_schema(
+				map_value_arg(args),
+			)));
 		}
 		_ => {}
 	}
@@ -467,9 +465,9 @@ mod test {
 		);
 		// the value type is what a map validates, past the key argument
 		type_path_schema("bevy::platform::collections::HashMap<String, bool>")
-			.xpect_eq(ValueSchema::Map(MapSchema {
-				value: Box::new(ValueSchema::Bool(default())),
-			}));
+			.xpect_eq(ValueSchema::Map(MapSchema::uniform(ValueSchema::Bool(
+				default(),
+			))));
 		type_path_schema("core::option::Option<bool>").xpect_eq(
 			ValueSchema::Optional(Box::new(ValueSchema::Bool(default()))),
 		);

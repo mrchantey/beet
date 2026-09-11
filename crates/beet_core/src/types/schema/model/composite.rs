@@ -112,15 +112,53 @@ pub struct ListSchema {
 	pub unique: bool,
 }
 
-/// Schema for a map value with string keys.
-#[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
-)]
+/// Schema for a map value with string keys: either every entry satisfies one
+/// schema, or each entry satisfies the schema registered under its key.
+///
+/// A [`Keyed`](Self::Keyed) map is how a component map is described at the
+/// schema level rather than special-cased in a widget:
+/// `{ "bevy_ecs::name::Name": .., "bevy_ecs::hierarchy::ChildOf": .. }`
+/// validates each value against whatever the [`SchemaRegistry`] holds under its
+/// key, and a form's add-entry key input is a picker over the registry. A key
+/// the registry does not hold is an error
+/// ([`entry_schema`](Self::entry_schema)), as an unregistered component is to
+/// the template loader.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct MapSchema {
-	/// The schema each value in the map must satisfy.
-	pub value: Box<ValueSchema>,
+pub enum MapSchema {
+	/// Every entry satisfies `value`.
+	Uniform {
+		/// The schema each value in the map must satisfy.
+		value: Box<ValueSchema>,
+	},
+	/// Each key is a [`SchemaRegistry`] name and its entry satisfies the schema
+	/// registered under it.
+	Keyed,
+}
+
+impl Default for MapSchema {
+	fn default() -> Self { Self::uniform(ValueSchema::Any) }
+}
+
+impl MapSchema {
+	/// A map whose every entry satisfies `value`.
+	pub fn uniform(value: ValueSchema) -> Self {
+		Self::Uniform {
+			value: Box::new(value),
+		}
+	}
+
+	/// This map's variant name, ie its externally tagged serde key.
+	///
+	/// The match is exhaustive, so adding a variant fails to compile until the
+	/// meta-schema (which round trips through these names) describes it.
+	pub fn variant_name(&self) -> &'static str {
+		match self {
+			Self::Uniform { .. } => "Uniform",
+			Self::Keyed => "Keyed",
+		}
+	}
 }
 
 /// A variant within an [`EnumSchema`].

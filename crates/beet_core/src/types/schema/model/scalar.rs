@@ -296,11 +296,39 @@ pub struct BoolSchema {}
 /// entity map the surrounding document's node keys do, so it survives a save
 /// and reload, and a UI dispatching on this kind renders a node picker rather
 /// than a number input.
+///
+/// On the wire it is the bits of the generation-stripped file entity, which is
+/// how bevy writes an `Entity`, so [`node_key`](Self::node_key) and
+/// [`reference`](Self::reference) are the one place a document reads and
+/// writes the key a reference names.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct EntitySchema {}
+
+impl EntitySchema {
+	/// The node key an entity reference names, `None` when `value` is not a
+	/// reference.
+	pub fn node_key(value: &Value) -> Option<u32> {
+		let bits = match value {
+			Value::Uint(bits) => *bits,
+			Value::Int(bits) => u64::try_from(*bits).ok()?,
+			_ => return None,
+		};
+		Entity::try_from_bits(bits).map(|entity| entity.index_u32())
+	}
+
+	/// An entity reference naming the node at `key`, as the surrounding
+	/// document writes one.
+	pub fn reference(key: u32) -> Result<Value> {
+		Entity::from_raw_u32(key)
+			.ok_or_else(|| bevyhow!("`{key}` is not a valid node key"))?
+			.to_bits()
+			.xmap(Value::Uint)
+			.xok()
+	}
+}
 
 /// Schema for a bytes value.
 #[derive(
