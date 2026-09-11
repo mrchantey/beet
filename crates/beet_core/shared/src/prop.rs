@@ -37,8 +37,8 @@ pub struct Prop {
 	pub mutable: bool,
 	/// `(no_clone)`, declared on the struct but never bound in the body
 	pub no_clone: bool,
-	/// the declared visibility, defaulting to `pub` so a struct-literal patch
-	/// resolves across module boundaries
+	/// the declared visibility, defaulting to `pub` so a markup patch resolves
+	/// across module boundaries
 	pub vis: syn::Visibility,
 	/// non-grammar attributes (doc comments etc) kept on the field
 	pub other_attrs: Vec<syn::Attribute>,
@@ -128,11 +128,12 @@ impl Prop {
 
 	/// The struct field definition with forwarded attrs.
 	///
-	/// Fields default to `pub` so a `<Name field=x/>` struct-literal patch
-	/// resolves across module boundaries: `rsx!` lowers a component tag to
-	/// `Name { field: value.into_prop(), ..Default::default() }`, and both the
-	/// named field and the functional update need to be nameable there. Declare
-	/// a narrower visibility to opt out.
+	/// Fields default to `pub` so a `<Name field=x/>` patch resolves across
+	/// module boundaries: `rsx!` lowers a component tag to assignments over a
+	/// default (`props.field = value.into_prop()`), which names only the fields
+	/// written. A prop is the authoring surface, so it is public unless declared
+	/// narrower; a narrowed field costs nothing to the others, since no
+	/// functional update needs every field nameable.
 	pub fn field_def(&self) -> TokenStream {
 		let ident = &self.ident;
 		let vis = &self.vis;

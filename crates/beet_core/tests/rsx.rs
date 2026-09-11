@@ -178,6 +178,29 @@ fn component_tag_patches_over_default() {
 	comp.bar.as_str().xpect_eq("hello");
 }
 
+/// A tag assigns only the fields it writes, so a component with a private
+/// field is authorable from another module through its public ones.
+mod gated {
+	use beet_core::prelude::*;
+
+	#[derive(Component, Default)]
+	pub struct Gate {
+		pub open: bool,
+		_secret: u8,
+	}
+}
+
+#[beet_core::test]
+fn component_with_a_private_field_is_authorable() {
+	use gated::Gate;
+	let mut world = world();
+	let root = world
+		.spawn_template(rsx! { <Gate open=true/> })
+		.unwrap()
+		.id();
+	world.entity(root).get::<Gate>().unwrap().open.xpect_true();
+}
+
 #[beet_core::test]
 fn component_spread_inserts_additional() {
 	let mut world = world();

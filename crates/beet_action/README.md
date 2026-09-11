@@ -79,7 +79,7 @@ The grammar, in full:
 - `#[field(required)]` — stored as `Option<T>`, validated at call time, erroring by field name, and bound as `T` in the body
 - `#[field(mut)]` — a mutable binding, so the body edits its own config in place
 - `#[field(no_clone)]` — declared on the struct but never bound, for a value too expensive to clone per call; the body reads it through `cx.caller` instead
-- a visibility (`#[field(pub(crate))]`, `#[field(pub(in path))]`) — narrows the field, which is otherwise `pub` so a cross-module `rsx!` struct-literal patch resolves
+- a visibility (`#[field(pub(crate))]`, `#[field(pub(in path))]`) — narrows the field, which is otherwise `pub` so a cross-module `rsx!` patch can write it; an `rsx!` patch assigns only the fields it writes, so a narrowed field never blocks authoring the others
 
 `into_action` detaches the action from any entity, so it freezes the field values at conversion — including a system action, whose frozen values ride in as system *input* rather than in a closure, since bevy refuses to cache a non-ZST system. Middleware is the one exception: its component genuinely lives on the host entity the call names as caller, so it keeps the live-fetching wrapper. A `#[field(mut)]` action emits no `IntoAction` at all, since a detached action has nothing to write back to; `mut` on an `async fn` is a compile error, because mutable component access cannot cross an await (do it at a sync point with `cx.caller.get_mut`).
 

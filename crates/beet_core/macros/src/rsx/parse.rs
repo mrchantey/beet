@@ -463,8 +463,8 @@ mod test {
 	#[test]
 	fn component_arms() {
 		let out = lower(quote! { <Foo a=x b/> });
-		assert!(out.contains("Foo {"));
-		assert!(out.contains("into_prop"));
+		assert!(out.contains("__props . a = (x) . into_prop ()"));
+		assert!(out.contains("__props . b = (true) . into_prop ()"));
 		assert!(out.contains("into_snippet_bundle"));
 		// a lowercase-leading path tag stays an element (dispatch is on the first
 		// char of the whole tag).

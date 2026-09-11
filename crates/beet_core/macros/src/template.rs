@@ -15,9 +15,9 @@
 //!
 //! There is no `NameProps` struct and no marker component: the data struct *is*
 //! the props, and props are runtime-verified input values, not a compile-time
-//! call-site contract. Capitalized tags in `rsx!` lower to
-//! `Name { p1: x.into(), ..Default::default() }.into_snippet_bundle()`,
-//! dispatched to build at runtime.
+//! call-site contract. Capitalized tags in `rsx!` lower to assignments over
+//! `Name::default()` (`props.p1 = x.into_prop()`), dispatched to build at
+//! runtime.
 //!
 //! # Prop grammar
 //!

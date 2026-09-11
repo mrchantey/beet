@@ -212,10 +212,14 @@ fn slot_child_marker(attr: &RsxKeyedAttr) -> TokenStream {
 /// Tokenize a capitalized tag `<Foo a=x b/>` to a component patch / template
 /// build, dispatched at runtime by `IntoSnippetBundle`.
 ///
-/// Values lower to a static struct update `Foo { a: x.into_prop(),
-/// b: true.into_prop(), ..Default::default() }`, see `IntoProp`. Caller content becomes children carrying `SlotChild`
-/// markers, matched to the template's `SlotTarget`s by the walker. Bare `{..}`
-/// attrs spread extra components/templates onto the same entity.
+/// Values lower to assignments over a default, `let mut props = Foo::default();
+/// props.a = x.into_prop(); props.b = true.into_prop();`, see `IntoProp`. An
+/// assignment names only the fields written, so a type authorable from another
+/// module needs those fields `pub` and no others; a functional update
+/// (`..Default::default()`) would demand every field be nameable. Caller
+/// content becomes children carrying `SlotChild` markers, matched to the
+/// template's `SlotTarget`s by the walker. Bare `{..}` attrs spread extra
+/// components/templates onto the same entity.
 fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 	let tag_span = el.name.span();
 	let Some(tag_path) = el.name.as_path() else {
@@ -241,13 +245,12 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 					continue;
 				}
 				let field = syn::Ident::new(&key, attr.key.span());
-				match attr.value_expr() {
-					Some(val) => {
-						fields.push(quote! { #field: (#val).into_prop() });
-					}
-					// flag attribute -> `field: true.into_prop()`.
-					None => fields.push(quote! { #field: (true).into_prop() }),
-				}
+				// a flag attribute is `true`
+				let val = attr
+					.value_expr()
+					.map(|val| quote! { #val })
+					.unwrap_or_else(|| quote! { true });
+				fields.push(quote! { __props.#field = (#val).into_prop(); });
 			}
 			RsxAttr::Spread(block) => {
 				spreads.push(quote! { (#block).into_snippet_bundle() });
@@ -255,9 +258,15 @@ fn tokenize_component(el: &RsxElement, tag: &str) -> TokenStream {
 		}
 	}
 
-	// the patch-over-default struct update, dispatched insert-vs-build.
+	// the patch over default, dispatched insert-vs-build. The type position
+	// applies the tag's default generics, so `<Repeat/>` is `Repeat<(), ()>`.
 	let patch = quote! {
-		(#tag_path { #(#fields,)* ..Default::default() }).into_snippet_bundle()
+		{
+			let mut __props =
+				<#tag_path as ::core::default::Default>::default();
+			#(#fields)*
+			__props
+		}.into_snippet_bundle()
 	};
 
 	let mut parts: Vec<TokenStream> = Vec::new();

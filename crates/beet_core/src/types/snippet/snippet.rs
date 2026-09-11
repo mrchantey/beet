@@ -271,8 +271,8 @@ pub trait BuildTemplate:
 ///
 /// The `rsx!` macro cannot know whether `<Foo a=x/>` resolves to a
 /// [`Component`] or a build-subtree [`Template`](Template), so it lowers both as
-/// `Foo { a: x.into(), ..Default::default() }.into_snippet_bundle()` and
-/// dispatches here:
+/// assignments over `Foo::default()` (`props.a = x.into_prop()`) and
+/// dispatches the result here:
 ///
 /// - a [`Bundle`] (a patched-over-default reflect [`Component`], a tuple, or a
 ///   helper like [`attr`](crate::prelude::attr)) is inserted onto the entity;
