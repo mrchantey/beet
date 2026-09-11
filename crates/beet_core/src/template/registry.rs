@@ -4,7 +4,7 @@
 //! needs to resolve one by name (a short type path from markup or a serialized
 //! tag), so it owns [`ReflectTemplate`]: reflect type-data that builds a
 //! template from a reflected data value. [`register_template`] installs it, and
-//! [`build_template_by_name`] looks it up from the [`AppTypeRegistry`].
+//! [`ReflectTemplate::build_named`] looks it up from the [`AppTypeRegistry`].
 //!
 //! A schema attaches alongside this registration: the type-data stays a thin
 //! build bridge, and schemas register beside it rather than inside it.
@@ -73,6 +73,33 @@ impl ReflectTemplate {
 		cx: &mut TemplateContext,
 	) -> Result {
 		(self.build)(value, cx)
+	}
+
+	/// Builds the template registered under short type path `tag` from `value`
+	/// into `cx`, the build-side companion of [`ValueSchema::template_by_name`].
+	/// Errors if no template is registered under that tag, unless the tag is
+	/// [allowed unregistered](AllowedUnregistered), which builds nothing.
+	pub fn build_named(
+		registry: &AppTypeRegistry,
+		tag: &str,
+		value: &dyn PartialReflect,
+		cx: &mut TemplateContext,
+	) -> Result {
+		let guard = registry.read();
+		let Some(registration) = Self::registration_named(&guard, tag) else {
+			drop(guard);
+			// a known featured-out tag resolves to nothing instead of erroring.
+			return AllowedUnregistered::allows(cx, tag)
+				.then_some(())
+				.ok_or_else(|| {
+					bevyhow!("no type registered for template tag `{tag}`")
+				});
+		};
+		let reflect_template =
+			registration.data::<ReflectTemplate>().ok_or_else(|| {
+				bevyhow!("type `{tag}` is registered but is not a template")
+			})?;
+		reflect_template.build(value, cx)
 	}
 }
 
@@ -238,6 +265,17 @@ impl AllowedUnregistered {
 	}
 	/// Whether `tag` is allowed to be unregistered.
 	pub fn contains(&self, tag: &str) -> bool { self.names.contains(tag) }
+	/// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered)
+	/// in `cx`'s world, ie a known featured-out name the loader resolves to
+	/// nothing rather than error. Consulted by both lookup paths on a missing
+	/// registration.
+	pub fn allows(cx: &mut TemplateContext, tag: &str) -> bool {
+		cx.entity.world_scope(|world| {
+			world
+				.get_resource::<AllowedUnregistered>()
+				.is_some_and(|allowed| allowed.contains(tag))
+		})
+	}
 }
 
 /// Marks tags as known-but-featured-out on a [`World`].
@@ -264,23 +302,9 @@ pub impl App {
 	}
 }
 
-/// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered),
-/// ie a known featured-out name the loader resolves to nothing rather than error.
-/// Consulted by both lookup paths on a missing registration.
-pub(crate) fn is_allowed_unregistered(
-	cx: &mut TemplateContext,
-	tag: &str,
-) -> bool {
-	cx.entity.world_scope(|world| {
-		world
-			.get_resource::<AllowedUnregistered>()
-			.is_some_and(|allowed| allowed.contains(tag))
-	})
-}
-
 impl ValueSchema {
 	/// The prop [`ValueSchema`] registered for the template under short type path
-	/// `tag`, if any. The schema-side companion of [`build_template_by_name`].
+	/// `tag`, if any. The schema-side companion of [`ReflectTemplate::build_named`].
 	pub fn template_by_name(
 		registry: &AppTypeRegistry,
 		tag: &str,
@@ -292,32 +316,6 @@ impl ValueSchema {
 			})
 			.map(|data| data.schema.clone())
 	}
-}
-
-/// Builds a registered template by its short type path into `cx`.
-///
-/// Resolves `tag` to a [`ReflectTemplate`] from `registry`, then builds it from
-/// `value`. Errors if no template is registered under that tag.
-pub(crate) fn build_template_by_name(
-	registry: &AppTypeRegistry,
-	tag: &str,
-	value: &dyn PartialReflect,
-	cx: &mut TemplateContext,
-) -> Result {
-	let guard = registry.read();
-	let Some(registration) = ReflectTemplate::registration_named(&guard, tag)
-	else {
-		drop(guard);
-		// a known featured-out tag resolves to nothing instead of erroring.
-		return is_allowed_unregistered(cx, tag).then_some(()).ok_or_else(
-			|| bevyhow!("no type registered for template tag `{tag}`"),
-		);
-	};
-	let reflect_template =
-		registration.data::<ReflectTemplate>().ok_or_else(|| {
-			bevyhow!("type `{tag}` is registered but is not a template")
-		})?;
-	reflect_template.build(value, cx)
 }
 
 #[cfg(test)]
@@ -365,7 +363,7 @@ mod test {
 		world
 			.entity_mut(root)
 			.template_context(|cx| {
-				build_template_by_name(&registry, "Label", &patch, cx)
+				ReflectTemplate::build_named(&registry, "Label", &patch, cx)
 			})
 			.unwrap();
 
@@ -388,7 +386,7 @@ mod test {
 		other
 			.entity_mut(root)
 			.template_context(|cx| {
-				build_template_by_name(&registry, "Nope", &patch, cx)
+				ReflectTemplate::build_named(&registry, "Nope", &patch, cx)
 			})
 			.unwrap_err();
 	}
@@ -460,7 +458,7 @@ mod test {
 		other
 			.entity_mut(root)
 			.template_context(|cx| {
-				build_template_by_name(&registry, "Nope", &patch, cx)
+				ReflectTemplate::build_named(&registry, "Nope", &patch, cx)
 			})
 			.unwrap();
 	}

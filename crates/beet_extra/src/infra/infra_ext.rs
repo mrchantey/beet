@@ -7,7 +7,6 @@
 //! [`templates`](super::templates) wrap these so a `.bsx` deployer composes them.
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
-use beet_net::prelude::*;
 
 /// A CloudWatch tail of `target`, with an optional timeout after which the
 /// follow is killed. The log group composes from the ancestor [`Stack`] when the

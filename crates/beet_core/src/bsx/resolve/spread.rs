@@ -137,7 +137,7 @@ pub(super) fn apply_spread_named(
 				let mut entity_mut = world.entity_mut(id);
 				let mut cx =
 					TemplateContext::new(&mut entity_mut, &mut references);
-				build_template_by_name(
+				ReflectTemplate::build_named(
 					app_registry,
 					&named.name,
 					patch.as_ref(),

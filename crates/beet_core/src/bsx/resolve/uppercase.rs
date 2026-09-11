@@ -108,7 +108,7 @@ pub(super) fn build_uppercase(
 	let Some((kind, patch)) = registration_kind else {
 		// a known featured-out tag (eg `<LiveReloadScript/>` with `client_io`
 		// compiled out) resolves to nothing at all, children included.
-		if is_allowed_unregistered(cx, &el.tag) {
+		if AllowedUnregistered::allows(cx, &el.tag) {
 			return Ok(());
 		}
 		return build_unregistered(el, registry, refs, &entity_refs, cx);
@@ -121,7 +121,12 @@ pub(super) fn build_uppercase(
 			// missing required field or a type mismatch is a graceful error.
 			verify_props(el, &el.tag, &app_registry, cx)?;
 			// build the registered template into this entity, then route caller content.
-			build_template_by_name(&app_registry, &el.tag, patch.as_ref(), cx)?;
+			ReflectTemplate::build_named(
+				&app_registry,
+				&el.tag,
+				patch.as_ref(),
+				cx,
+			)?;
 			apply_common_directives(el, refs, cx)?;
 			apply_spreads(el, cx.entity, &entity_refs)?;
 			build_slot_children(el, registry, refs, cx)?;

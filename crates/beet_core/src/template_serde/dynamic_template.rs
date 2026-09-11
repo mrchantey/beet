@@ -219,7 +219,7 @@ fn build_entity(
 				let mut entity = world.entity_mut(entity_id);
 				let mut scoped =
 					TemplateContext::new(&mut entity, cx.entity_references);
-				build_template_by_name(
+				ReflectTemplate::build_named(
 					app_registry,
 					&deferred.name,
 					deferred.patch.as_ref(),

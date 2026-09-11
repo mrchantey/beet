@@ -473,7 +473,10 @@ mod test {
 				.contains("Element :: new (\"foo::Bar\")")
 		);
 		// an uppercase-leading path tag is a component, keeping its full path.
-		assert!(lower(quote! { <Foo::Bar a=x/> }).contains("Foo :: Bar {"));
+		assert!(
+			lower(quote! { <Foo::Bar a=x/> })
+				.contains("< Foo :: Bar as :: core :: default :: Default >")
+		);
 	}
 
 	#[test]
