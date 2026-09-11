@@ -2,6 +2,7 @@
 //! not shadow, and the two-pass `$name` resolution that lets a reference point
 //! forward.
 
+use super::build_cfg::ExcludedRefs;
 use crate::prelude::*;
 use bevy::ecs::template::SceneEntityReference;
 use bevy::ecs::template::TemplateContext;
@@ -17,9 +18,34 @@ pub(super) struct SnippetBuildRoot(pub(super) Entity);
 #[derive(Default)]
 pub(super) struct RefBindings {
 	names: HashMap<SmolStr, SceneEntityReference>,
+	/// The names a `bx:cfg` exclusion removed before collection, see
+	/// [`ExcludedRefs`].
+	excluded: ExcludedRefs,
 }
 
 impl RefBindings {
+	/// Record the names an exclusion removed, so a `$name` reaching for one is
+	/// named rather than silently dangling.
+	pub(super) fn with_excluded(mut self, excluded: ExcludedRefs) -> Self {
+		self.excluded = excluded;
+		self
+	}
+
+	/// The reference a `$name` binds to: its declared `bx:ref`, else a stable
+	/// placeholder. A name an exclusion removed warns here, since the
+	/// placeholder is an entity nothing builds and the consumer waiting on its
+	/// components (a `StoreRef`) fails far from the cause, or never.
+	fn reference_for(&self, name: &str) -> SceneEntityReference {
+		if let Some(reference) = self.get(name) {
+			return reference;
+		}
+		if let Some(condition) = self.excluded.get(name) {
+			warn!(
+				"`${name}` refers to `bx:ref=\"{name}\"`, which `bx:cfg=\"{condition}\"` excluded from this build: the reference binds to nothing"
+			);
+		}
+		stable_reference(name)
+	}
 	/// The pinned reference for `name`, allocating a stable one on first use.
 	fn reference(&mut self, name: &str) -> SceneEntityReference {
 		let next = self.names.len();
@@ -141,7 +167,7 @@ pub(super) fn resolve_ref(
 	refs: &RefBindings,
 	cx: &mut TemplateContext,
 ) -> Entity {
-	let reference = refs.get(name).unwrap_or_else(|| stable_reference(name));
+	let reference = refs.reference_for(name);
 	// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
 	let world = unsafe { cx.entity.world_mut() };
 	cx.entity_references.get(reference, world)
@@ -196,8 +222,7 @@ pub(super) fn resolve_entity_refs(
 			}
 			continue;
 		}
-		let reference =
-			refs.get(&name).unwrap_or_else(|| stable_reference(&name));
+		let reference = refs.reference_for(&name);
 		// SAFETY: only used to spawn-or-fetch the mapped placeholder entity.
 		let world = unsafe { cx.entity.world_mut() };
 		let entity = cx.entity_references.get(reference, world);

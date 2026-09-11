@@ -394,6 +394,58 @@ mod test {
 		world.flush();
 	}
 
+	/// The stores the served site reaches by `bx:ref` are declared OUTSIDE every
+	/// `bx:cfg`-excluded branch of the entry, so the lean binary still binds
+	/// them.
+	///
+	/// REGRESSION: `site/main.bsx` carried its `bx:cfg` on the `<Stack>` itself,
+	/// excluding the analytics store along with the deploy verbs. The served
+	/// binary bound `StoreRef($analytics)` to a placeholder nothing built, the
+	/// store never attached, and every analytics event on prod was dropped with
+	/// nothing but a boot-time log line to show for it.
+	#[beet_core::test]
+	fn site_stores_survive_the_lean_binary() {
+		let source =
+			fs_ext::read_to_string(WsPathBuf::new("site/main.bsx").into_abs())
+				.unwrap();
+		let nodes =
+			BsxNode::parse_document(&source, &BsxParseConfig::bsx()).unwrap();
+		// every declared `bx:ref`, and whether a `bx:cfg` ancestor guards it
+		fn declared_refs(
+			nodes: &[BsxNode],
+			under_cfg: bool,
+			out: &mut Vec<(String, bool)>,
+		) {
+			for node in nodes {
+				let BsxNode::Element(el) = node else {
+					continue;
+				};
+				let attr = |key: &str| {
+					el.attributes.iter().find(|attr| attr.key == key).and_then(
+						|attr| match &attr.value {
+							AttrValue::Str(value) => Some(value.to_string()),
+							_ => None,
+						},
+					)
+				};
+				let under_cfg = under_cfg || attr("bx:cfg").is_some();
+				if let Some(name) = attr("bx:ref") {
+					out.push((name, under_cfg));
+				}
+				declared_refs(&el.children, under_cfg, out);
+			}
+		}
+		let mut refs = Vec::new();
+		declared_refs(&nodes, false, &mut refs);
+		for name in ["analytics", "archive"] {
+			refs.iter()
+				.find(|(declared, _)| declared == name)
+				.unwrap()
+				.1
+				.xpect_false();
+		}
+	}
+
 	/// A block declared outside every `<Stack>` resolves the process default
 	/// rather than raising: it belongs to no deploy's config, but its declaration
 	/// still names the resource this process would.

@@ -91,13 +91,14 @@ impl Template for BsxTemplate {
 		} else {
 			None
 		};
-		let nodes: &[BsxNode] = match &pruned {
-			Some(nodes) => nodes,
-			None => &self.nodes,
+		let (nodes, excluded) = match &pruned {
+			Some((nodes, excluded)) => (nodes.as_slice(), excluded.clone()),
+			None => (self.nodes.as_slice(), default()),
 		};
 		// pass 1: collect every `bx:ref` name -> a pinned reference id, so a `$name`
-		// forward reference resolves to the same placeholder entity.
-		let mut refs = RefBindings::default();
+		// forward reference resolves to the same placeholder entity; a name the
+		// exclusion above removed is remembered so reaching for it warns.
+		let mut refs = RefBindings::default().with_excluded(excluded);
 		collect_refs(nodes, &mut refs)?;
 		// expose this build's root for `@entity:SnippetRoot::`, restoring any outer
 		// snippet root so nested registry-template builds nest correctly.

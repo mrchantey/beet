@@ -87,13 +87,17 @@ one declaration of what is borrowed, and runs ahead of every publish.
 ## The deploy
 
 This same file loads in the deployed binary (built `--no-default-features
---features aws_sdk,ssh,geoip`), which never compiled the deploy stack:
-`bx:cfg="feature:infra && feature:extra"` on the `<Stack>` excludes that whole
-subtree before the build walk, so none of its tags resolve and none of its
-machinery is linked or touched. What is left in its place is a tombstone, so the
-routes it hosted report the condition that excluded them rather than vanishing.
-That is what lets the application declare its own infrastructure without
-shipping the deployer.
+--features aws_sdk,ssh,geoip`), which never compiled the deploy stack: the
+`<Fragment bx:cfg="feature:infra && feature:extra">` inside the `<Stack>`
+excludes the deploy machinery before the build walk, so none of its tags resolve
+and none of it is linked or touched. What is left in its place is a tombstone
+per route it hosted, so those report the condition that excluded them rather
+than vanishing. The `<Stack>` and the store declarations stay OUTSIDE that
+fragment on purpose: the running site reaches them by `bx:ref`, and a `bx:cfg`
+on the stack itself once excluded the analytics store with them, so the served
+binary bound `StoreRef($analytics)` to nothing and dropped every event without
+an error anywhere. That is what lets the application declare its own
+infrastructure without shipping the deployer.
 
 `<Stack>` is the identity every resource beneath it composes its name from, and it
 is a registered component in every native build rather than a template prop, so the
@@ -221,9 +225,11 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
 		</Router>
 	</Route>
-	<!-- the stage stack: every resource the running site needs, the verbs that
-	     provision them, and the one `bx:cfg` guarding the whole subtree -->
-	<Stack bx:cfg="feature:infra && feature:extra">
+	<!-- the stage stack: every resource the running site needs, then the verbs
+	     that provision them behind the one `bx:cfg`. The stores stay outside
+	     it: the served binary reaches them by `bx:ref`, and an excluded
+	     declaration binds to nothing (see "The deploy" above). -->
+	<Stack>
 		<!-- Raw segments and aggregate rows share ONE writable store, under the
 		     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
 		     A bucket is this codebase's unit of IAM grant, so it earns its place
@@ -243,6 +249,8 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     it. Analytics owns the `analytics/raw/` prefix; these compact daily
 		     objects are the primary raw history, so nothing here expires. -->
 		<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
+		<!-- everything from here down is the deployer, absent from the lean binary -->
+		<Fragment bx:cfg="feature:infra && feature:extra">
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
 		<!-- the box is replaceable, so it owns no durable timer: the rollup runs
@@ -292,6 +300,7 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		<Route path="assets" {ExchangeSequence}>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 		</Route>
+		</Fragment>
 	</Stack>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every

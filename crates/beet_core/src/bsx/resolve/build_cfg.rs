@@ -413,7 +413,7 @@ pub(super) fn contains_build_cfg(nodes: &[BsxNode]) -> bool {
 pub(super) fn prune_build_cfg(
 	nodes: &[BsxNode],
 	world: &mut World,
-) -> Result<Vec<BsxNode>> {
+) -> Result<(Vec<BsxNode>, ExcludedRefs)> {
 	// clone the seam out of the resource so the handlers may borrow the world.
 	let conditions = world.get_resource_or_init::<BsxConditions>().clone_seam();
 	let registrations =
@@ -424,13 +424,24 @@ pub(super) fn prune_build_cfg(
 		world,
 		registrations: &registrations,
 	};
-	prune_nodes(nodes, &conditions, &cx)
+	let mut excluded = ExcludedRefs::default();
+	let pruned = prune_nodes(nodes, &conditions, &cx, &mut excluded)?;
+	Ok((pruned, excluded))
 }
+
+/// The `bx:ref` names an exclusion took with it, each to the condition that
+/// excluded it. A `$name` reaching for one binds to a placeholder nothing
+/// builds, which is the one SILENT outcome of exclusion: the site's analytics
+/// store was declared under an excluded `<Stack>`, so the served binary bound
+/// `StoreRef($analytics)` to nothing and dropped every event with no error
+/// anywhere. The reference pass names it instead (`RefBindings::reference_for`).
+pub(super) type ExcludedRefs = HashMap<SmolStr, SmolStr>;
 
 fn prune_nodes(
 	nodes: &[BsxNode],
 	conditions: &BsxConditions,
 	cx: &ConditionCx,
+	excluded: &mut ExcludedRefs,
 ) -> Result<Vec<BsxNode>> {
 	let mut kept = Vec::with_capacity(nodes.len());
 	for node in nodes {
@@ -446,15 +457,37 @@ fn prune_nodes(
 					"`bx:cfg` excluded `<{}>`: `{source}` is false in this build",
 					el.tag
 				);
+				collect_excluded_refs(el, source, excluded);
 				kept.extend(tombstones(el, source));
 				continue;
 			}
 		}
 		let mut el = el.clone();
-		el.children = prune_nodes(&el.children, conditions, cx)?;
+		el.children = prune_nodes(&el.children, conditions, cx, excluded)?;
 		kept.push(BsxNode::Element(el));
 	}
 	Ok(kept)
+}
+
+/// Every `bx:ref` declared on or under an excluded element, recorded against
+/// the condition that excluded it (see [`ExcludedRefs`]).
+fn collect_excluded_refs(
+	el: &BsxElement,
+	condition: &str,
+	out: &mut ExcludedRefs,
+) {
+	let name = el.attributes.iter().find_map(|attr| match &attr.value {
+		AttrValue::Str(name) if attr.key == "bx:ref" => Some(name.as_str()),
+		_ => None,
+	});
+	if let Some(name) = name {
+		out.insert(name.into(), condition.into());
+	}
+	for child in &el.children {
+		if let BsxNode::Element(child) = child {
+			collect_excluded_refs(child, condition, out);
+		}
+	}
 }
 
 /// The nodes an excluded element is replaced by: one childless
@@ -732,6 +765,7 @@ fn parse_atom(word: &str) -> Result<BuildCondition> {
 
 #[cfg(test)]
 mod test {
+	use super::prune_build_cfg;
 	use crate::prelude::*;
 
 	fn parse(source: &str) -> BuildCondition {
@@ -743,6 +777,30 @@ mod test {
 			namespace: namespace.into(),
 			argument: argument.into(),
 		}
+	}
+
+	/// An exclusion reports the `bx:ref` names it removed, so a `$name` that
+	/// reaches for one can be named rather than silently binding to nothing.
+	#[crate::test]
+	fn prune_records_the_refs_it_excludes() {
+		let mut world = World::new();
+		world.init_resource::<BsxConditions>();
+		let nodes = BsxNode::parse_document(
+			r#"<div>
+				<Stack bx:cfg="feature:nope">
+					<Store bx:ref="analytics"/>
+				</Stack>
+				<Store bx:ref="kept"/>
+			</div>"#,
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		let (_pruned, excluded) = prune_build_cfg(&nodes, &mut world).unwrap();
+		excluded
+			.get("analytics")
+			.map(|condition| condition.as_str())
+			.xpect_eq(Some("feature:nope"));
+		excluded.contains_key("kept").xpect_false();
 	}
 
 	#[crate::test]
