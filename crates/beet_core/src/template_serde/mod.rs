@@ -21,12 +21,12 @@
 //! # Building blocks
 //!
 //! - [`DynamicTemplate`] - The intermediate representation: ordered resources and
-//!   nodes, each node's component slots a resolved value or a deferred template.
+//!   entities, each entity's component slots a resolved value or a deferred template.
 //! - [`TemplateBuilder`] - Extracts a resolved-value [`DynamicTemplate`] from a
 //!   [`World`](bevy::prelude::World).
 //! - [`TemplateFilter`] - Allow/deny lists controlling which types are extracted.
 //! - [`TemplateEntityMap`] - The file-key to world-entity map a loaded document
-//!   retains, so a re-save writes every node back under the key it loaded from.
+//!   retains, so a re-save writes every entity back under the key it loaded from.
 //! - [`DynamicTemplateSerializer`] / [`DynamicTemplateDeserializer`] - The serde
 //!   implementations for the resolved-value form.
 

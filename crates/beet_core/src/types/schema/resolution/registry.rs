@@ -61,7 +61,7 @@ impl SchemaRegistry {
 		};
 		registry.insert(ValueSchema::type_path(), ValueSchema::meta());
 		registry.insert(ValueSchema::SCENE, ValueSchema::scene());
-		registry.insert(ValueSchema::SCENE_NODE, ValueSchema::scene_node());
+		registry.insert(ValueSchema::SCENE_ENTITY, ValueSchema::scene_entity());
 		registry
 	}
 

@@ -299,9 +299,9 @@ fn as_bytes(items: &[Value]) -> Option<Vec<u8>> {
 		.collect()
 }
 
-/// An entity reference names a node by its file key, written as the bits of
-/// the generation-stripped file entity ([`EntitySchema::node_key`]), so it
-/// reads as an unsigned integer. That the key names a live node is checked
+/// An entity reference names an entity by its file key, written as the bits of
+/// the generation-stripped file entity ([`EntitySchema::file_key`]), so it
+/// reads as an unsigned integer. That the key names a live entity is checked
 /// where a world is in hand (the build path's entity map), not here.
 async fn validate_entity(
 	schema: &EntitySchema,
@@ -677,12 +677,12 @@ mod test {
 	}
 
 	/// An [`Entity`] field is its own schema kind, not a number: a UI dispatches
-	/// a node picker on it, and the serde layer routes it through the entity map.
+	/// an entity picker on it, and the serde layer routes it through the entity map.
 	#[crate::test]
 	async fn entity_is_its_own_kind() {
 		let schema = ValueSchema::of::<Entity>();
 		schema.clone().xpect_eq(ValueSchema::Entity(default()));
-		// a node key validates, and a signed json number coerces to one
+		// a file key validates, and a signed json number coerces to one
 		schema
 			.validate(&mut value!(3u64))
 			.await

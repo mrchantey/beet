@@ -2,7 +2,7 @@
 //!
 //! [`TemplateBuilder`] is the save side: it snapshots some entities and
 //! resources by reflection into a [`DynamicTemplate`] whose component slots are
-//! all [`ComponentSlot::Value`]. This is the save-game form, where every node is
+//! all [`ComponentSlot::Value`]. This is the save-game form, where every entity is
 //! already a resolved value. The deferred-template slot is produced by the
 //! authoring front-ends (the parser and macros), not by extraction.
 
@@ -41,9 +41,9 @@ use core::any::TypeId;
 /// filters say: derived state is not content. The filters are for scoping a
 /// particular dump, never for excluding state that is derived by nature.
 ///
-/// # Node Order
+/// # File Order
 ///
-/// Extracted nodes are stored in extraction order, not entity-index order, so the
+/// Extracted entities are stored in extraction order, not entity-index order, so the
 /// order a parent's children are walked into the template (eg by
 /// [`with_entity_tree`](super::TemplateSaver::with_entity_tree)) is the order the
 /// build path applies their `ChildOf`, rebuilding `Children` in the same order.
@@ -70,8 +70,8 @@ use core::any::TypeId;
 pub struct TemplateBuilder<'w> {
 	/// The resources that have been extracted so far.
 	extracted_resources: BTreeMap<ComponentId, Box<dyn PartialReflect>>,
-	/// The nodes that have been extracted so far, in extraction order.
-	extracted_nodes: Vec<DynamicTemplateNode>,
+	/// The entities that have been extracted so far, in extraction order.
+	extracted_entities: Vec<DynamicTemplateEntity>,
 	/// The set of already-extracted entities, for deduplication.
 	extracted_entity_ids: HashSet<Entity>,
 	/// The filter determining which components to extract.
@@ -82,7 +82,7 @@ pub struct TemplateBuilder<'w> {
 	original_world: &'w World,
 	/// The type registry used to extract items through reflection.
 	type_registry: &'w TypeRegistry,
-	/// The file keys every node and every entity reference is written under.
+	/// The file keys every entity and every entity reference is written under.
 	entity_map: TemplateEntityMap,
 }
 
@@ -97,7 +97,7 @@ impl<'w> TemplateBuilder<'w> {
 	) -> Self {
 		Self {
 			extracted_resources: default(),
-			extracted_nodes: default(),
+			extracted_entities: default(),
 			extracted_entity_ids: default(),
 			component_filter: TemplateFilter::default(),
 			resource_filter: TemplateFilter::default(),
@@ -108,10 +108,10 @@ impl<'w> TemplateBuilder<'w> {
 	}
 
 	/// Seed the builder with a loaded document's retained [`TemplateEntityMap`],
-	/// so every node it loaded is written back under its original file key and
-	/// only a genuinely new node mints one.
+	/// so every entity it loaded is written back under its original file key and
+	/// only a genuinely new entity mints one.
 	///
-	/// Without it every node mints a fresh key, which is what a first save wants
+	/// Without it every entity mints a fresh key, which is what a first save wants
 	/// and the only case where that is correct.
 	#[must_use]
 	pub fn with_entity_map(mut self, entity_map: TemplateEntityMap) -> Self {
@@ -205,7 +205,7 @@ impl<'w> TemplateBuilder<'w> {
 
 	/// Consume the builder, producing a [`DynamicTemplate`].
 	///
-	/// To avoid nodes without any components, call [`Self::remove_empty_nodes`]
+	/// To avoid entities without any components, call [`Self::remove_empty_entities`]
 	/// first.
 	#[must_use]
 	pub fn build(self) -> DynamicTemplate { self.build_mapped().0 }
@@ -217,7 +217,7 @@ impl<'w> TemplateBuilder<'w> {
 		(
 			DynamicTemplate {
 				resources: self.extracted_resources.into_values().collect(),
-				nodes: self.extracted_nodes,
+				entities: self.extracted_entities,
 			},
 			self.entity_map,
 		)
@@ -229,14 +229,14 @@ impl<'w> TemplateBuilder<'w> {
 		self.extract_entities(core::iter::once(entity))
 	}
 
-	/// Drop nodes that have no components.
+	/// Drop entities that have no components.
 	///
 	/// These were likely created because none of their components were present in
 	/// the type registry upon extraction.
 	#[must_use]
-	pub fn remove_empty_nodes(mut self) -> Self {
-		self.extracted_nodes
-			.retain(|node| !node.components.is_empty());
+	pub fn remove_empty_entities(mut self) -> Self {
+		self.extracted_entities
+			.retain(|entity| !entity.components.is_empty());
 		self
 	}
 
@@ -249,12 +249,13 @@ impl<'w> TemplateBuilder<'w> {
 		mut self,
 		entities: impl Iterator<Item = Entity>,
 	) -> Self {
-		// a resource entity is not a node, so it must never take a node key.
+		// a resource entity is not a serialized entity, so it must never take a
+		// file key.
 		let world = self.original_world;
 		let entities = entities
 			.filter(|entity| !world.entity(*entity).contains_id(IS_RESOURCE))
 			.collect::<Vec<_>>();
-		// key every node first, in extraction order, so an entity reference
+		// key every entity first, in extraction order, so an entity reference
 		// resolves to the same file key whether it points back or forward.
 		let entities = entities
 			.into_iter()
@@ -265,7 +266,7 @@ impl<'w> TemplateBuilder<'w> {
 		}
 
 		for entity in entities {
-			let mut node = DynamicTemplateNode {
+			let mut extracted = DynamicTemplateEntity {
 				entity: self.entity_map.file_entity(entity),
 				components: Vec::new(),
 			};
@@ -312,7 +313,7 @@ impl<'w> TemplateBuilder<'w> {
 						component.as_partial_reflect(),
 						type_registration,
 					);
-					// an `Entity`-typed field is a node reference, so it is
+					// an `Entity`-typed field is an entity reference, so it is
 					// written as the target's file key, never its live bits.
 					if let Some(reflect) = value.try_as_reflect_mut() {
 						type_registration
@@ -322,12 +323,12 @@ impl<'w> TemplateBuilder<'w> {
 								&mut FileEntityMapper(&mut self.entity_map),
 							);
 					}
-					node.components.push(ComponentSlot::Value(value));
+					extracted.components.push(ComponentSlot::Value(value));
 					Some(())
 				};
 				extract_and_push();
 			}
-			self.extracted_nodes.push(node);
+			self.extracted_entities.push(extracted);
 		}
 
 		self
@@ -410,8 +411,8 @@ mod test {
 	#[reflect(Resource)]
 	struct ResourceB;
 
-	/// The file key a node was written under.
-	fn key(node: &DynamicTemplateNode) -> u32 { node.entity.index_u32() }
+	/// The file key an entity was written under.
+	fn key(entity: &DynamicTemplateEntity) -> u32 { entity.entity.index_u32() }
 
 	/// True if the slot is a value that represents `T`.
 	fn slot_represents<T: bevy_reflect::Typed>(slot: &ComponentSlot) -> bool {
@@ -432,12 +433,12 @@ mod test {
 			.extract_entity(entity)
 			.build();
 
-		template.nodes.len().xpect_eq(1);
+		template.entities.len().xpect_eq(1);
 		// keys are minted from zero in extraction order, never derived from the
 		// live entity's bits
-		key(&template.nodes[0]).xpect_eq(0);
-		template.nodes[0].components.len().xpect_eq(1);
-		slot_represents::<ComponentA>(&template.nodes[0].components[0])
+		key(&template.entities[0]).xpect_eq(0);
+		template.entities[0].components.len().xpect_eq(1);
+		slot_represents::<ComponentA>(&template.entities[0].components[0])
 			.xpect_true();
 	}
 
@@ -453,15 +454,15 @@ mod test {
 			.extract_entity(entity)
 			.build();
 
-		template.nodes.len().xpect_eq(1);
-		template.nodes[0].components.len().xpect_eq(2);
+		template.entities.len().xpect_eq(1);
+		template.entities[0].components.len().xpect_eq(2);
 	}
 
-	/// Nodes are stored in extraction order, not entity-index order, the
+	/// Entities are stored in extraction order, not entity-index order, the
 	/// children-order contract. A first save mints keys along that same order,
 	/// so the file reads `0`, `1`, `2`, `3`.
 	#[crate::test]
-	fn extract_node_order() {
+	fn extract_entity_order() {
 		let mut world = World::default();
 		let entity_a = world.spawn_empty().id();
 		let entity_b = world.spawn_empty().id();
@@ -477,7 +478,7 @@ mod test {
 				.build_mapped();
 
 		template
-			.nodes
+			.entities
 			.iter()
 			.map(key)
 			.collect::<Vec<_>>()
@@ -504,14 +505,14 @@ mod test {
 			.extract_entities(query.iter(&world))
 			.build();
 
-		template.nodes.len().xpect_eq(2);
-		let mut keys = template.nodes.iter().map(key).collect::<Vec<_>>();
+		template.entities.len().xpect_eq(2);
+		let mut keys = template.entities.iter().map(key).collect::<Vec<_>>();
 		keys.sort();
 		keys.xpect_eq(vec![0, 1]);
 	}
 
 	#[crate::test]
-	fn remove_empty_node() {
+	fn remove_empty_entity() {
 		let mut world = World::default();
 		let mut type_registry = TypeRegistry::default();
 		type_registry.register::<ComponentA>();
@@ -521,11 +522,11 @@ mod test {
 
 		let template = TemplateBuilder::from_world(&world, &type_registry)
 			.extract_entities([entity_a, entity_b].into_iter())
-			.remove_empty_nodes()
+			.remove_empty_entities()
 			.build();
 
-		template.nodes.len().xpect_eq(1);
-		key(&template.nodes[0]).xpect_eq(0);
+		template.entities.len().xpect_eq(1);
+		key(&template.entities[0]).xpect_eq(0);
 	}
 
 	#[crate::test]
@@ -560,12 +561,12 @@ mod test {
 			.build();
 
 		// extraction order: a_b, a, b. b has no allowed component.
-		template.nodes.len().xpect_eq(3);
-		slot_represents::<ComponentA>(&template.nodes[0].components[0])
+		template.entities.len().xpect_eq(3);
+		slot_represents::<ComponentA>(&template.entities[0].components[0])
 			.xpect_true();
-		slot_represents::<ComponentA>(&template.nodes[1].components[0])
+		slot_represents::<ComponentA>(&template.entities[1].components[0])
 			.xpect_true();
-		template.nodes[2].components.len().xpect_eq(0);
+		template.entities[2].components.len().xpect_eq(0);
 	}
 
 	#[crate::test]
@@ -585,11 +586,11 @@ mod test {
 			.build();
 
 		// extraction order: a_b, a, b. a has only the denied component.
-		template.nodes.len().xpect_eq(3);
-		slot_represents::<ComponentB>(&template.nodes[0].components[0])
+		template.entities.len().xpect_eq(3);
+		slot_represents::<ComponentB>(&template.entities[0].components[0])
 			.xpect_true();
-		template.nodes[1].components.len().xpect_eq(0);
-		slot_represents::<ComponentB>(&template.nodes[2].components[0])
+		template.entities[1].components.len().xpect_eq(0);
+		slot_represents::<ComponentB>(&template.entities[2].components[0])
 			.xpect_true();
 	}
 
@@ -634,7 +635,7 @@ mod test {
 			.extract_entities(vec![entity].into_iter())
 			.build();
 
-		match &template.nodes[0].components[0] {
+		match &template.entities[0].components[0] {
 			ComponentSlot::Value(value) => {
 				value
 					.try_as_reflect()

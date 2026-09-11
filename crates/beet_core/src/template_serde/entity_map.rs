@@ -5,11 +5,11 @@ use bevy::ecs::entity::EntityMapper;
 /// The map between a document's **file keys** and the world entities they built
 /// into, retained on the loaded root for the document's lifetime.
 ///
-/// A serialized node is keyed by its in-file [`Entity`], generation stripped, so
+/// A serialized entity is keyed by its in-file [`Entity`], generation stripped, so
 /// a file reads `0`, `1`, `2`. Stability across an edit comes from this map, not
 /// from the encoding: it is built during the load and every save goes back
-/// through it, so a node that was loaded writes its **original** key and only a
-/// genuinely new node mints a fresh one. A save therefore never derives keys
+/// through it, so an entity that was loaded writes its **original** key and only a
+/// genuinely new entity mints a fresh one. A save therefore never derives keys
 /// from live entity bits, which is what stops a reopen from silently rewriting
 /// every reference in the file.
 ///
@@ -22,8 +22,8 @@ pub struct TemplateEntityMap {
 	to_world: HashMap<u32, Entity>,
 	/// World entity back to the file key it was loaded from.
 	to_file: HashMap<Entity, u32>,
-	/// The lowest key never yet handed out, so a new node cannot collide with a
-	/// key some other node still holds.
+	/// The lowest key never yet handed out, so a new entity cannot collide with a
+	/// key some other entity still holds.
 	next_key: u32,
 }
 
@@ -55,7 +55,7 @@ impl TemplateEntityMap {
 	}
 
 	/// The file key to save `entity` under: the one it loaded from, else a
-	/// freshly minted key that no node in this document has ever held.
+	/// freshly minted key that no entity in this document has ever held.
 	pub fn file_key(&mut self, entity: Entity) -> u32 {
 		if let Some(key) = self.get_file_key(entity) {
 			return key;
@@ -65,16 +65,16 @@ impl TemplateEntityMap {
 		key
 	}
 
-	/// The number of mapped nodes.
+	/// The number of mapped entities.
 	pub fn len(&self) -> usize { self.to_file.len() }
 
-	/// Whether no node is mapped.
+	/// Whether no entity is mapped.
 	pub fn is_empty(&self) -> bool { self.to_file.is_empty() }
 
 	/// The file-side [`Entity`] to save `entity` under, ie its
 	/// [`file_key`](Self::file_key) with no generation.
 	pub fn file_entity(&mut self, entity: Entity) -> Entity {
-		// a placeholder names no node, so it must not mint a key for one.
+		// a placeholder names no entity, so it must not mint a key for one.
 		if entity == Entity::PLACEHOLDER {
 			return Entity::PLACEHOLDER;
 		}
@@ -86,9 +86,9 @@ impl TemplateEntityMap {
 /// Maps live world entities to their file entities, the save-side counterpart of
 /// the build path's reference mapper.
 ///
-/// An `Entity`-typed component field (a [`ChildOf`], a cross-node reference) is
-/// a node reference, so it is written as the target's file key exactly like the
-/// node keys are, rather than as whatever bits the target happens to hold this
+/// An `Entity`-typed component field (a [`ChildOf`], a cross-entity reference) is
+/// an entity reference, so it is written as the target's file key exactly like the
+/// file keys are, rather than as whatever bits the target happens to hold this
 /// run.
 pub(super) struct FileEntityMapper<'a>(pub &'a mut TemplateEntityMap);
 
@@ -110,13 +110,13 @@ mod test {
 			(world.spawn_empty().id(), world.spawn_empty().id());
 		let mut map = TemplateEntityMap::from_pairs([(0, first), (1, second)]);
 
-		// a loaded node saves back under the key it came from, whatever its
+		// a loaded entity saves back under the key it came from, whatever its
 		// live entity bits are
 		map.file_key(second).xpect_eq(1);
 		map.file_key(first).xpect_eq(0);
 		map.world(1).unwrap().xpect_eq(second);
 
-		// a node this document has never seen mints the next unused key, and
+		// an entity this document has never seen mints the next unused key, and
 		// keeps it on every later save
 		let fresh = world.spawn_empty().id();
 		map.file_key(fresh).xpect_eq(2);
@@ -124,7 +124,7 @@ mod test {
 	}
 
 	/// A sparse file (keys `0` and `7`) mints above every key in use, so a new
-	/// node can never collide with one a live node still holds.
+	/// entity can never collide with one a live entity still holds.
 	#[crate::test]
 	fn minting_never_collides() {
 		let mut world = World::new();
@@ -155,7 +155,7 @@ mod conformance {
 	fn world() -> World { <(TemplatePlugin, MinimalTypesPlugin)>::world() }
 
 	/// A parent with two named children, the smallest tree with hierarchy,
-	/// order and a cross-node reference.
+	/// order and a cross-entity reference.
 	fn spawn_tree(world: &mut World) -> Entity {
 		world
 			.spawn((Name::new("parent"), children![
@@ -174,14 +174,14 @@ mod conformance {
 			.to_string()
 	}
 
-	/// The node keys in **file order**, read back through the real
+	/// The file keys in **file order**, read back through the real
 	/// deserializer.
 	///
 	/// A `serde_json::Value` would lose that order (its map sorts keys as
 	/// strings, so `"10"` lands before `"2"`), and order is the children-order
 	/// contract: the build path applies each `ChildOf` in file order, so file
 	/// order *is* child order.
-	fn node_keys(world: &World, json: &str) -> Vec<u32> {
+	fn entity_keys(world: &World, json: &str) -> Vec<u32> {
 		use serde::de::DeserializeSeed;
 		let registry = world.resource::<AppTypeRegistry>().read();
 		DynamicTemplateDeserializer {
@@ -189,13 +189,13 @@ mod conformance {
 		}
 		.deserialize(&mut serde_json::Deserializer::from_str(json))
 		.unwrap()
-		.nodes
+		.entities
 		.iter()
-		.map(|node| node.entity.index_u32())
+		.map(|entity| entity.entity.index_u32())
 		.collect()
 	}
 
-	/// The observed encoding, straight off the saver: node keys are the
+	/// The observed encoding, straight off the saver: file keys are the
 	/// generation-stripped file keys `0`, `1`, `2`, and a `ChildOf` holds the
 	/// *parent's file key*, not whatever bits it happens to hold this run.
 	#[crate::test]
@@ -205,13 +205,13 @@ mod conformance {
 		let text = save(&mut world, root);
 		let json: serde_json::Value = serde_json::from_str(&text).unwrap();
 
-		let nodes = json["nodes"].as_object().unwrap();
-		nodes.len().xpect_eq(3);
+		let entities = json["entities"].as_object().unwrap();
+		entities.len().xpect_eq(3);
 		for key in ["0", "1", "2"] {
-			nodes.contains_key(key).xpect_true();
+			entities.contains_key(key).xpect_true();
 		}
 		// the root carries no parent, each child points at file key 0
-		nodes["0"]["components"]
+		entities["0"]["components"]
 			.get("bevy_ecs::hierarchy::ChildOf")
 			.xpect_none();
 		// an `Entity`-typed field is serialized by bevy as `Entity::to_bits`,
@@ -222,7 +222,7 @@ mod conformance {
 		let parent_ref = Entity::from_raw_u32(0).unwrap().to_bits();
 		parent_ref.xpect_eq(4294967295);
 		for child in ["1", "2"] {
-			nodes[child]["components"]["bevy_ecs::hierarchy::ChildOf"]
+			entities[child]["components"]["bevy_ecs::hierarchy::ChildOf"]
 				.as_u64()
 				.unwrap()
 				.xpect_eq(parent_ref);
@@ -247,11 +247,11 @@ mod conformance {
 		save(&mut reopened, loaded[0]).xpect_eq(first);
 	}
 
-	/// A node added after the load keeps every existing key where it was and
-	/// mints a fresh one for itself, so an edit never renumbers the nodes it did
-	/// not touch, and the new node lands in file order at its child position.
+	/// An entity added after the load keeps every existing key where it was and
+	/// mints a fresh one for itself, so an edit never renumbers the entities it did
+	/// not touch, and the new entity lands in file order at its child position.
 	#[crate::test]
-	fn added_node_mints_a_fresh_key() {
+	fn added_entity_mints_a_fresh_key() {
 		let mut source = world();
 		let root = spawn_tree(&mut source);
 		let first = save(&mut source, root);
@@ -265,11 +265,11 @@ mod conformance {
 		edited.entity_mut(loaded[0]).insert_children(0, &[added]);
 
 		let text = save(&mut edited, loaded[0]);
-		// the loaded nodes keep their keys, the new one takes the next unused
+		// the loaded entities keep their keys, the new one takes the next unused
 		// key, and file order still carries child order
-		node_keys(&edited, &text).xpect_eq(vec![0, 3, 1, 2]);
+		entity_keys(&edited, &text).xpect_eq(vec![0, 3, 1, 2]);
 		let json: serde_json::Value = serde_json::from_str(&text).unwrap();
-		json["nodes"]["3"]["components"]["bevy_ecs::name::Name"]
+		json["entities"]["3"]["components"]["bevy_ecs::name::Name"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("new");

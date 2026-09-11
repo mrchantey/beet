@@ -13,7 +13,7 @@ use bevy_reflect::TypeRegistry;
 /// panicking. A relation registering no meta stays free to cycle and
 /// self-reference.
 ///
-/// Consumed by [`SceneNodes::assert_acyclic`], whose exhaustive destructure is
+/// Consumed by [`SceneEntities::assert_acyclic`], whose exhaustive destructure is
 /// the tripwire: a new fact fails to compile there until the check says what it
 /// means.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Reflect)]

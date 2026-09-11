@@ -112,7 +112,7 @@ impl TemplateSaver {
 			self = self.with_entity_tree(world, *root);
 		}
 		// the document's retained keys, so a re-save is a rewrite of the same
-		// nodes rather than a fresh file that happens to look similar. One file
+		// entities rather than a fresh file that happens to look similar. One file
 		// is one keyspace however many roots it holds, so the map lives on the
 		// first root, which is also where a load lands it.
 		let entity_map = roots
@@ -243,11 +243,11 @@ mod test {
 			.unwrap()
 			.xmap(serde_json::from_str::<serde_json::Value>)
 			.unwrap();
-		let mut dumped = json["nodes"]
+		let mut dumped = json["entities"]
 			.as_object()
 			.unwrap()
 			.values()
-			.flat_map(|node| node["components"].as_object().unwrap().keys())
+			.flat_map(|entity| entity["components"].as_object().unwrap().keys())
 			.cloned()
 			.collect::<Vec<_>>();
 		dumped.sort();

@@ -77,7 +77,7 @@ impl<'a> TemplateLoader<'a> {
 			.map(|sink| sink.0)
 			.unwrap_or_default();
 		// the document retains its file keys for its lifetime, so a later save
-		// writes every node back under the key it loaded from. A markup build
+		// writes every entity back under the key it loaded from. A markup build
 		// feeds no pairs: a `.bsx` file is authored original state, never a
 		// document the editor rewrites.
 		if !pairs.is_empty() {

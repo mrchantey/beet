@@ -1,49 +1,50 @@
-//! [`SceneNodes`]: a scene document's nodes read as a relation graph.
+//! [`SceneEntities`]: a scene document's entities read as a relation graph.
 use crate::prelude::*;
 use bevy_reflect::TypeRegistry;
 
-/// The `nodes` of a scene document (a value of [`ValueSchema::scene`]), read
+/// The `entities` of a scene document (a value of [`ValueSchema::scene`]), read
 /// straight off the value as the graph each relation component draws.
 ///
 /// The whole-document twin of the schema walk, which validates one component
-/// at a time and so cannot see that a `ChildOf` leads back to its own node.
+/// at a time and so cannot see that a `ChildOf` leads back to its own entity.
 /// Consumed twice: the document layer rejects a violating write
 /// ([`assert_acyclic`](Self::assert_acyclic)) and an entity picker filters
 /// the candidates that would violate it ([`would_cycle`](Self::would_cycle)).
 #[derive(Debug, Clone, Copy)]
-pub struct SceneNodes<'a> {
-	nodes: &'a Map,
+pub struct SceneEntities<'a> {
+	entities: &'a Map,
 }
 
-impl<'a> SceneNodes<'a> {
-	/// The nodes of `scene`.
+impl<'a> SceneEntities<'a> {
+	/// The entities of `scene`.
 	pub fn of(scene: &'a Value) -> Result<Self> {
 		scene
 			.as_map()?
-			.get("nodes")?
+			.get("entities")?
 			.as_map()?
-			.xmap(|nodes| Self { nodes })
+			.xmap(|entities| Self { entities })
 			.xok()
 	}
 
-	/// The file key of every node, in ascending order.
+	/// The file key of every entity, in ascending order.
 	pub fn keys(&self) -> Result<Vec<u32>> {
 		let mut keys = self
-			.nodes
+			.entities
 			.0
 			.keys()
 			.map(|key| {
-				key.parse::<u32>()
-					.map_err(|_| bevyhow!("node key `{key}` is not a file key"))
+				key.parse::<u32>().map_err(|_| {
+					bevyhow!("entity key `{key}` is not a file key")
+				})
 			})
 			.collect::<Result<Vec<_>>>()?;
 		keys.sort_unstable();
 		keys.xok()
 	}
 
-	/// The components of the node at `key`, if the scene holds one.
+	/// The components of the entity at `key`, if the scene holds one.
 	pub fn components(&self, key: u32) -> Option<&'a Map> {
-		self.nodes
+		self.entities
 			.0
 			.get(SmolStr::from(key.to_string()).as_str())?
 			.get("components")?
@@ -51,20 +52,20 @@ impl<'a> SceneNodes<'a> {
 			.ok()
 	}
 
-	/// The node `key`'s target under `relation` (a component type path), when
+	/// The entity `key`'s target under `relation` (a component type path), when
 	/// it holds one.
 	pub fn target(&self, key: u32, relation: &str) -> Option<u32> {
 		self.components(key)?
 			.0
 			.get(relation)
-			.and_then(EntitySchema::node_key)
+			.and_then(EntitySchema::file_key)
 	}
 
 	/// Whether pointing `source`'s `relation` at `target` would form a cycle:
 	/// the target is the source, or reaches it through the same relation.
 	///
 	/// What an entity picker filters its candidates by, so a `ChildOf` dropdown
-	/// never offers the node's own descendants.
+	/// never offers the entity's own descendants.
 	pub fn would_cycle(
 		&self,
 		relation: &str,
@@ -72,8 +73,8 @@ impl<'a> SceneNodes<'a> {
 		target: u32,
 	) -> bool {
 		let mut current = target;
-		// a chain longer than the node count is already a cycle elsewhere
-		for _ in 0..=self.nodes.0.len() {
+		// a chain longer than the entity count is already a cycle elsewhere
+		for _ in 0..=self.entities.0.len() {
 			if current == source {
 				return true;
 			}
@@ -104,16 +105,16 @@ impl<'a> SceneNodes<'a> {
 				else {
 					continue;
 				};
-				let Some(target) = EntitySchema::node_key(value) else {
+				let Some(target) = EntitySchema::file_key(value) else {
 					continue;
 				};
 				if acyclic && self.would_cycle(relation, key, target) {
 					match target == key {
 						true => bevybail!(
-							"relation `{relation}` on node #{key} targets itself"
+							"relation `{relation}` on entity #{key} targets itself"
 						),
 						false => bevybail!(
-							"relation `{relation}` from node #{key} to #{target} \
+							"relation `{relation}` from entity #{key} to #{target} \
 							would cycle: #{target} already leads back to #{key}"
 						),
 					}
@@ -148,7 +149,7 @@ mod test {
 	fn scene() -> Value {
 		value!({
 			"resources": {},
-			"nodes": {
+			"entities": {
 				"0": { "components": {} },
 				"1": (child(0)),
 				"2": (child(1))
@@ -156,10 +157,10 @@ mod test {
 		})
 	}
 
-	/// Set node `key`'s parent, the write an editor's `ChildOf` picker lands.
+	/// Set entity `key`'s parent, the write an editor's `ChildOf` picker lands.
 	fn reparent(scene: &mut Value, key: u32, parent: u32) {
 		scene
-			.get_mut("nodes")
+			.get_mut("entities")
 			.unwrap()
 			.insert(key.to_string(), child(parent))
 			.unwrap();
@@ -168,11 +169,11 @@ mod test {
 	#[crate::test]
 	fn a_tree_is_acyclic() {
 		let scene = scene();
-		let nodes = SceneNodes::of(&scene).unwrap();
-		nodes.assert_acyclic(&types()).unwrap();
-		nodes.keys().unwrap().xpect_eq(vec![0, 1, 2]);
-		nodes.target(2, CHILD_OF).unwrap().xpect_eq(1);
-		nodes.target(0, CHILD_OF).xpect_none();
+		let entities = SceneEntities::of(&scene).unwrap();
+		entities.assert_acyclic(&types()).unwrap();
+		entities.keys().unwrap().xpect_eq(vec![0, 1, 2]);
+		entities.target(2, CHILD_OF).unwrap().xpect_eq(1);
+		entities.target(0, CHILD_OF).xpect_none();
 	}
 
 	/// Reparenting the root under its grandchild is rejected naming the
@@ -181,7 +182,7 @@ mod test {
 	fn a_cyclic_write_is_rejected() {
 		let mut scene = scene();
 		reparent(&mut scene, 0, 2);
-		SceneNodes::of(&scene)
+		SceneEntities::of(&scene)
 			.unwrap()
 			.assert_acyclic(&types())
 			.unwrap_err()
@@ -195,7 +196,7 @@ mod test {
 	fn a_self_reference_is_rejected() {
 		let mut scene = scene();
 		reparent(&mut scene, 1, 1);
-		SceneNodes::of(&scene)
+		SceneEntities::of(&scene)
 			.unwrap()
 			.assert_acyclic(&types())
 			.unwrap_err()
@@ -210,15 +211,15 @@ mod test {
 	fn a_picker_filters_the_subtree() {
 		let mut scene = scene();
 		scene
-			.get_mut("nodes")
+			.get_mut("entities")
 			.unwrap()
 			.insert("3", child(0))
 			.unwrap();
-		let nodes = SceneNodes::of(&scene).unwrap();
-		nodes.would_cycle(CHILD_OF, 1, 1).xpect_true();
-		nodes.would_cycle(CHILD_OF, 1, 2).xpect_true();
-		nodes.would_cycle(CHILD_OF, 1, 0).xpect_false();
-		nodes.would_cycle(CHILD_OF, 1, 3).xpect_false();
+		let entities = SceneEntities::of(&scene).unwrap();
+		entities.would_cycle(CHILD_OF, 1, 1).xpect_true();
+		entities.would_cycle(CHILD_OF, 1, 2).xpect_true();
+		entities.would_cycle(CHILD_OF, 1, 0).xpect_false();
+		entities.would_cycle(CHILD_OF, 1, 3).xpect_false();
 	}
 
 	/// An unmarked relation stays free to cycle: the meta is opt-in.
@@ -226,7 +227,7 @@ mod test {
 	fn an_unmarked_relation_may_cycle() {
 		let mut scene = scene();
 		reparent(&mut scene, 0, 2);
-		SceneNodes::of(&scene)
+		SceneEntities::of(&scene)
 			.unwrap()
 			.assert_acyclic(&TypeRegistry::default())
 			.unwrap();
