@@ -27,6 +27,8 @@
 //! - [`TemplateFilter`] - Allow/deny lists controlling which types are extracted.
 //! - [`TemplateEntityMap`] - The file-key to world-entity map a loaded document
 //!   retains, so a re-save writes every entity back under the key it loaded from.
+//! - [`SceneDocument`] - A loaded scene as an editable [`Document`] the world
+//!   follows per component, forked from an authored original on first boot.
 //! - [`DynamicTemplateSerializer`] / [`DynamicTemplateDeserializer`] - The serde
 //!   implementations for the resolved-value form.
 
@@ -36,6 +38,7 @@ mod dynamic_template;
 mod entity_map;
 mod loader;
 mod saver;
+mod scene_document;
 mod template_builder;
 mod template_filter;
 // kept private so the `serde` name does not shadow the `serde` crate when this
@@ -48,6 +51,7 @@ pub use dynamic_template::*;
 pub use entity_map::*;
 pub use loader::*;
 pub use saver::*;
+pub use scene_document::*;
 pub use serde::DynamicTemplateDeserializer;
 pub use serde::DynamicTemplateSerializer;
 pub use template_builder::*;

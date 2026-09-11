@@ -227,6 +227,8 @@ extend = "1"
 libc = "0.2"
 bytes = { version = "1", default-features = false }
 smol_str = { version = "0.2", default-features = false }
+# insertion-ordered map, no_std (alloc); `Map` keys a scene's entities in child order.
+indexmap = { version = "2", default-features = false }
 # no_std by default; std consumers re-enable `serde/std` (eg via `beet_core/std`).
 serde = { version = "1", default-features = false, features = ["derive"] }
 # no_std by default (alloc only); std consumers re-enable `serde_json/std`.

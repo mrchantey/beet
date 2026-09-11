@@ -4,8 +4,9 @@
 //! [`TemplateLoader`] dispatches by [`MediaType`] to the right serde format,
 //! producing a [`DynamicTemplate`], then builds it. Every spawned entity is
 //! collected through the build sink, never a second remapping model. When a
-//! target entity is given, the spawned roots are tracked as [`TemplateNodeOf`] of it
-//! rather than reparented, so its existing children survive.
+//! target entity is given, the spawned roots become its children, after any it
+//! already has and before the batch signal fires, so a listener sees the whole
+//! hierarchy.
 
 #[cfg(feature = "bsx")]
 use crate::prelude::BsxTemplate;
@@ -16,11 +17,11 @@ use bevy::ecs::template::TemplateContext;
 /// Deserializes template bytes into the world and builds the result.
 ///
 /// With a target entity (via [`TemplateLoader::with_entity`] or
-/// [`TemplateLoader::new_entity`]) the spawned roots are tracked as
-/// [`TemplateNodes`] of that entity.
+/// [`TemplateLoader::new_entity`]) the spawned roots become children of that
+/// entity.
 pub struct TemplateLoader<'a> {
 	world: &'a mut World,
-	/// If set, spawned roots are tracked as [`TemplateNodeOf`] of this entity.
+	/// If set, spawned roots are parented under this entity.
 	entity: Option<Entity>,
 }
 
@@ -33,8 +34,8 @@ impl<'a> TemplateLoader<'a> {
 		}
 	}
 
-	/// Creates a loader for the world containing the given entity, tracking
-	/// spawned roots as [`TemplateNodeOf`] of it.
+	/// Creates a loader for the world containing the given entity, parenting
+	/// spawned roots under it.
 	pub fn new_entity(entity: EntityWorldMut<'a>) -> Self {
 		let id = entity.id();
 		Self {
@@ -43,7 +44,7 @@ impl<'a> TemplateLoader<'a> {
 		}
 	}
 
-	/// Tracks spawned roots as [`TemplateNodeOf`] of the given entity.
+	/// Parents spawned roots under the given entity.
 	pub fn with_entity(mut self, entity: Entity) -> Self {
 		self.entity = Some(entity);
 		self
@@ -55,36 +56,41 @@ impl<'a> TemplateLoader<'a> {
 	/// one [`spawn_template`](WorldTemplateExt::spawn_template) path.
 	pub fn load(self, bytes: &MediaBytes) -> Result<Vec<Entity>> {
 		let entry = EntryTemplate::from_bytes(self.world, bytes)?;
-		let is_serde = entry.is_serde();
-		self.build(entry, is_serde)
+		self.load_entry(entry)
+	}
+
+	/// Builds a parsed [`EntryTemplate`], retaining a serde document's file keys
+	/// on its first spawned root, so a later save writes every entity back under
+	/// the key it loaded from.
+	pub fn load_entry(self, entry: EntryTemplate) -> Result<Vec<Entity>> {
+		let Self { world, entity } = self;
+		let (spawned, entity_map) = Self::build(world, entity, entry)?;
+		// a markup build feeds no keys: a `.bsx` file is authored original state,
+		// never a document the editor rewrites.
+		if !entity_map.is_empty() {
+			world.entity_mut(spawned[0]).insert(entity_map);
+		}
+		Ok(spawned)
 	}
 
 	/// Builds an [`EntryTemplate`] through
 	/// [`spawn_template`](WorldTemplateExt::spawn_template), returning every
-	/// spawned entity. `is_serde` gates the [`LoadTemplateSerde`] batch signal.
-	fn build(
-		self,
+	/// spawned entity and the file keys they built from (empty for markup), for
+	/// the caller to retain wherever its document lives.
+	pub(super) fn build(
+		world: &mut World,
+		target: Option<Entity>,
 		entry: EntryTemplate,
-		is_serde: bool,
-	) -> Result<Vec<Entity>> {
-		let target = self.entity;
+	) -> Result<(Vec<Entity>, TemplateEntityMap)> {
+		let is_serde = entry.is_serde();
 		// install the sink so a serde build records every real entity it maps to.
-		self.world.insert_resource(TemplateBuildSink::default());
-		let root = self.world.spawn_template(entry)?.id();
-		let pairs = self
-			.world
+		world.insert_resource(TemplateBuildSink::default());
+		let root = world.spawn_template(entry)?.id();
+		let pairs = world
 			.remove_resource::<TemplateBuildSink>()
 			.map(|sink| sink.0)
 			.unwrap_or_default();
-		// the document retains its file keys for its lifetime, so a later save
-		// writes every entity back under the key it loaded from. A markup build
-		// feeds no pairs: a `.bsx` file is authored original state, never a
-		// document the editor rewrites.
-		if !pairs.is_empty() {
-			self.world
-				.entity_mut(root)
-				.insert(TemplateEntityMap::from_pairs(pairs.iter().copied()));
-		}
+		let entity_map = TemplateEntityMap::from_pairs(pairs.iter().copied());
 		let mut spawned = pairs
 			.into_iter()
 			.map(|(_, entity)| entity)
@@ -95,15 +101,14 @@ impl<'a> TemplateLoader<'a> {
 			spawned.push(root);
 		}
 
-		// in entity mode the spawned roots (no `ChildOf`) are tracked as
-		// `TemplateNodeOf` of the target rather than reparented, preserving its
-		// existing children.
+		// in entity mode the spawned roots (no `ChildOf`) join the target's
+		// children, after any it already has, and before the batch signal so a
+		// listener resolving by ancestry (a route tree's namespace) sees them
+		// under their parent.
 		if let Some(parent) = target {
 			for spawned_entity in spawned.iter() {
-				if !self.world.entity(*spawned_entity).contains::<ChildOf>() {
-					self.world
-						.entity_mut(*spawned_entity)
-						.insert(TemplateNodeOf(parent));
+				if !world.entity(*spawned_entity).contains::<ChildOf>() {
+					world.entity_mut(*spawned_entity).insert(ChildOf(parent));
 				}
 			}
 		}
@@ -114,12 +119,12 @@ impl<'a> TemplateLoader<'a> {
 		// markup build inserts in tree order and rebuilds incrementally, so it needs
 		// no batch signal.
 		if is_serde {
-			self.world.trigger(LoadTemplateSerde {
+			world.trigger(LoadTemplateSerde {
 				entities: spawned.clone(),
 			});
 		}
 
-		Ok(spawned)
+		Ok((spawned, entity_map))
 	}
 }
 
@@ -268,40 +273,6 @@ pub struct LoadTemplateSerde {
 	pub entities: Vec<Entity>,
 }
 
-/// Added to entities spawned by the loader to track their target entity.
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[relationship(relationship_target = TemplateNodes)]
-pub struct TemplateNodeOf(pub Entity);
-
-/// Tracks the entities spawned into a target via [`TemplateLoader::with_entity`].
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-#[relationship_target(relationship = TemplateNodeOf, linked_spawn)]
-pub struct TemplateNodes(Vec<Entity>);
-
 #[cfg(all(test, feature = "bsx", feature = "json"))]
 mod entry_test {
 	use crate::prelude::*;
@@ -401,38 +372,10 @@ mod test {
 		text.xref().xpect_contains("Child");
 	}
 
+	/// A targeted load parents the spawned root under the target, after the
+	/// children it already had.
 	#[crate::test]
-	fn loads_into_entity_adds_template_of() {
-		let mut app = serde_world();
-		let child = app.world_mut().spawn(Name::new("TemplateChild")).id();
-		let bytes = TemplateSaver::new()
-			.with_entities([child])
-			.save(app.world(), MediaType::Ron)
-			.unwrap();
-
-		let target = app.world_mut().spawn(Name::new("Target")).id();
-		let spawned = TemplateLoader::new(app.world_mut())
-			.with_entity(target)
-			.load(&bytes)
-			.unwrap();
-
-		spawned.len().xpect_eq(1);
-		app.world()
-			.entity(spawned[0])
-			.get::<TemplateNodeOf>()
-			.unwrap()
-			.0
-			.xpect_eq(target);
-		app.world()
-			.entity(spawned[0])
-			.get::<Name>()
-			.unwrap()
-			.as_str()
-			.xpect_eq("TemplateChild");
-	}
-
-	#[crate::test]
-	fn loads_into_entity_preserves_existing_children() {
+	fn loads_into_entity_as_a_child() {
 		let mut app = serde_world();
 		let child = app.world_mut().spawn(Name::new("TemplateChild")).id();
 		let bytes = TemplateSaver::new()
@@ -444,42 +387,29 @@ mod test {
 			.world_mut()
 			.spawn((Name::new("Target"), children![Name::new("OldChild")]))
 			.id();
-		app.world()
-			.entity(target)
-			.get::<Children>()
-			.unwrap()
-			.len()
-			.xpect_eq(1);
-
 		let spawned = TemplateLoader::new(app.world_mut())
 			.with_entity(target)
 			.load(&bytes)
 			.unwrap();
 
-		// existing children are preserved.
-		let children: Vec<Entity> = app
+		spawned.len().xpect_eq(1);
+		app.world()
+			.entity(spawned[0])
+			.get::<Name>()
+			.unwrap()
+			.as_str()
+			.xpect_eq("TemplateChild");
+		let names = app
 			.world()
 			.entity(target)
 			.get::<Children>()
 			.unwrap()
 			.iter()
-			.collect();
-		children.len().xpect_eq(1);
-		app.world()
-			.entity(children[0])
-			.get::<Name>()
-			.unwrap()
-			.as_str()
-			.xpect_eq("OldChild");
-
-		// spawned entities carry `TemplateNodeOf`, not `ChildOf`.
-		spawned.len().xpect_eq(1);
-		app.world()
-			.entity(spawned[0])
-			.get::<TemplateNodeOf>()
-			.unwrap()
-			.0
-			.xpect_eq(target);
+			.map(|child| {
+				app.world().entity(child).get::<Name>().unwrap().to_string()
+			})
+			.collect::<Vec<_>>();
+		names.xpect_eq(vec!["OldChild".to_string(), "TemplateChild".into()]);
 	}
 
 	/// Children order survives a full save then load round-trip: a parent with

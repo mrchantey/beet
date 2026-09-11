@@ -58,6 +58,9 @@ impl Plugin for DocumentPlugin {
 			.register_type::<RelationMeta>()
 			// the one by-name schema namespace, seeded with the intrinsic schemas
 			.init_resource::<SchemaRegistry>();
+		// the fork relation a scene records on its first entity
+		#[cfg(feature = "template_serde")]
+		app.register_type::<SceneFork>();
 		// the hierarchy is the relation bevy keeps acyclic in the world, so a
 		// scene edit is checked against it before the world sees the write
 		RelationMeta::acyclic().register::<ChildOf>(
@@ -86,6 +89,13 @@ impl Plugin for DocumentPlugin {
 			(sync_resource_field_bindings, sync_reflect_field_bindings).chain();
 		#[cfg(not(feature = "json"))]
 		let reflect_sync = || {};
+		// a scene document drives its world after the write-back, so an
+		// inspector's edit reaches the live entity in the pass it reaches the
+		// document, and a refused edit is reverted before anything reads it
+		#[cfg(feature = "template_serde")]
+		let scene_sync = sync_scene_documents;
+		#[cfg(not(feature = "template_serde"))]
+		let scene_sync = || {};
 
 		// the chain lives in its own on-demand schedule so a one-shot render can
 		// run it to settlement ([`DocumentSync::settle`]) without driving the
@@ -109,6 +119,7 @@ impl Plugin for DocumentPlugin {
 				// reaches the document, both within one pass.
 				reflect_sync,
 				sync_local_to_document,
+				scene_sync,
 				update_reactive_children,
 			)
 				.chain(),

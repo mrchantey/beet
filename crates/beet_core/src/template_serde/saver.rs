@@ -80,19 +80,52 @@ impl TemplateSaver {
 		self
 	}
 
-	/// Serialize `roots` and their descendants as one template.
+	/// Serialize `roots` and their descendants as one template, through the
+	/// document's retained keys.
 	///
-	/// A root may sit under a parent (eg a loaded template reparented under a
-	/// server); that [`ChildOf`] is detached before serializing and restored
-	/// after, so the saved template carries no dangling parent reference (which
-	/// would fail to build on load).
+	/// A re-save is a rewrite of the same entities rather than a fresh file that
+	/// happens to look similar. One file is one keyspace however many roots it
+	/// holds, so the [`TemplateEntityMap`] lives on the first root, which is also
+	/// where a load lands it; a first save mints the keys and retains them there,
+	/// so the next save is a rewrite like any other. A document anchored elsewhere
+	/// (a scene, whose host holds the map) saves through
+	/// [`save_roots_mapped`](Self::save_roots_mapped).
 	pub fn save_roots(
-		mut self,
+		self,
 		world: &mut World,
 		media_type: MediaType,
 		roots: impl IntoIterator<Item = Entity>,
 	) -> Result<MediaBytes> {
 		let roots = roots.into_iter().collect::<Vec<_>>();
+		let entity_map = roots
+			.first()
+			.and_then(|root| {
+				world.entity(*root).get::<TemplateEntityMap>().cloned()
+			})
+			.unwrap_or_default();
+		let (bytes, entity_map) =
+			self.save_roots_mapped(world, media_type, &roots, entity_map)?;
+		if let Some(root) = roots.first() {
+			world.entity_mut(*root).insert(entity_map);
+		}
+		Ok(bytes)
+	}
+
+	/// Serialize `roots` and their descendants as one template, `entity_map`
+	/// seeding the file keys, returning the map the save wrote for the caller to
+	/// retain wherever its document lives.
+	///
+	/// A root may sit under a parent (eg a loaded template reparented under a
+	/// server); that [`ChildOf`] is detached before serializing and restored
+	/// after, so the saved template carries no dangling parent reference (which
+	/// would fail to build on load).
+	pub fn save_roots_mapped(
+		mut self,
+		world: &mut World,
+		media_type: MediaType,
+		roots: &[Entity],
+		entity_map: TemplateEntityMap,
+	) -> Result<(MediaBytes, TemplateEntityMap)> {
 		// detach each root from its parent, remembering them to re-attach once
 		// serialized.
 		let roots_with_parents = roots
@@ -108,30 +141,15 @@ impl TemplateSaver {
 			world.entity_mut(*root).remove::<ChildOf>();
 		});
 
-		for root in &roots {
+		for root in roots {
 			self = self.with_entity_tree(world, *root);
 		}
-		// the document's retained keys, so a re-save is a rewrite of the same
-		// entities rather than a fresh file that happens to look similar. One file
-		// is one keyspace however many roots it holds, so the map lives on the
-		// first root, which is also where a load lands it.
-		let entity_map = roots
-			.first()
-			.and_then(|root| {
-				world.entity(*root).get::<TemplateEntityMap>().cloned()
-			})
-			.unwrap_or_default();
 		let result = self.save_mapped(world, media_type, default(), entity_map);
-		// a first save mints the document's keys, so it retains them too: the
-		// next save is then a rewrite like any other.
-		if let (Some(root), Ok((_, entity_map))) = (roots.first(), &result) {
-			world.entity_mut(*root).insert(entity_map.clone());
-		}
 
 		roots_with_parents.into_iter().for_each(|(root, parent)| {
 			world.entity_mut(root).insert(ChildOf(parent));
 		});
-		result.map(|(bytes, _)| bytes)
+		result
 	}
 
 	/// Like [`save_roots`](Self::save_roots) but collects the roots from a query

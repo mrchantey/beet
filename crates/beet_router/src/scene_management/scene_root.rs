@@ -29,10 +29,9 @@ pub struct ResetScene;
 /// Runs under one exclusive world lock so no frame observes a half-swapped scene:
 /// the old [`BeetSceneRoot`] trees are despawned (after a [`ResetScene`] trigger,
 /// so hardware returns to rest), the new scene is deserialized and its roots
-/// marked. When `parent` is given the roots are reparented under it and the
-/// [`RouteTree`] is rebuilt explicitly, since reparenting does not retrigger
-/// route-tree construction; without a parent the roots stay where loaded and the
-/// [`rebuild_route_trees_on_load`] observer recomputes the tree.
+/// marked. When `parent` is given the loader parents the roots under it before
+/// the load signal fires, so the [`rebuild_route_trees_on_load`] observer sees
+/// each route in its final url space either way.
 pub(crate) fn set_scene(
 	world: &mut World,
 	media: &MediaBytes,
@@ -40,28 +39,24 @@ pub(crate) fn set_scene(
 ) -> Result<Vec<Entity>> {
 	BeetSceneRoot::despawn_all(world);
 
-	// roots are the spawned entities with no parent; mark them so the whole
-	// scene can be despawned together on the next swap.
-	let roots = TemplateLoader::new(world)
+	let mut loader = TemplateLoader::new(world);
+	if let Some(parent) = parent {
+		loader = loader.with_entity(parent);
+	}
+	// roots are the spawned entities sitting directly under `parent` (none, for
+	// an unparented load); mark them so the whole scene can be despawned
+	// together on the next swap.
+	let roots = loader
 		.load(media)?
 		.into_iter()
-		.filter(|entity| !world.entity(*entity).contains::<ChildOf>())
+		.filter(|entity| {
+			world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
+				== parent
+		})
 		.collect::<Vec<_>>();
 	roots.iter().for_each(|root| {
 		world.entity_mut(*root).insert(BeetSceneRoot);
 	});
-
-	if let Some(parent) = parent {
-		roots.iter().for_each(|root| {
-			world.entity_mut(*root).insert(ChildOf(parent));
-		});
-		// reparenting does not retrigger route-tree construction, so rebuild it
-		// explicitly from the parent's (now larger) descendant set.
-		world
-			.run_system_cached_with(RouteTree::rebuild, parent)
-			.ok()
-			.transpose()?;
-	}
 	Ok(roots)
 }
 
@@ -190,8 +185,9 @@ mod test {
 			.xpect_some();
 		// and it lands there ALONE: the phantom-tree class this guards against
 		// left "ping" split across two `RouteTree`s (one on the pre-reparent
-		// element, one on the real url space), dispatching from neither. Only
-		// `set_scene`'s own explicit rebuild ran here, no manual poke beyond it.
+		// element, one on the real url space), dispatching from neither. The
+		// loader parents the roots before the load signal, so the observer's
+		// rebuild is the only one and sees the final hierarchy.
 		world
 			.query::<(Entity, &RouteTree)>()
 			.iter(&world)

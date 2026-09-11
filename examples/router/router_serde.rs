@@ -1,10 +1,11 @@
 //! # Router Serde Example
 //!
-//! Mirrors [`cli`](./cli.rs), but persists the entire route world to
-//! disk via [`TemplateStore`]. On first run the world is written to
-//! `examples/router/router_serde.json`, and is loaded from that file
-//! on subsequent runs. Pass `--new` to overwrite the file with a
-//! fresh copy.
+//! Mirrors [`cli`](./cli.rs), but forks the route world into a scene document
+//! on disk ([`SceneDocument`]). On first run the hand-spawned bundle is the
+//! authored original: it is built, forked to
+//! `examples/router/router_serde.json` and stays live; every later run boots
+//! from that fork instead, so an edit to the file is what runs. Pass `--new` to
+//! discard the fork and re-fork the bundle.
 //!
 //! Every runtime component — the [`CliServer`] child, the [`router`] bundle, the
 //! middleware and the [`ExchangeScript`] markers — is `Reflect`, so the whole
@@ -16,7 +17,7 @@
 //! ## Running the Example
 //!
 //! ```sh
-//! # visit the home route (first run also writes the serde file)
+//! # visit the home route (first run also writes the scene file)
 //! cargo run --example router_serde
 //!
 //! # visit the /foo route
@@ -28,7 +29,7 @@
 //! # invoke the scripted greeter via the whole-request script input
 //! cargo run --example router_serde -- greet-request --name=world
 //!
-//! # delete and regenerate the serde file
+//! # delete and regenerate the scene file
 //! cargo run --example router_serde -- --new
 //! ```
 use beet::prelude::*;
@@ -42,8 +43,8 @@ fn main() -> AppExit {
 		.add_plugins(BeetPlugins)
 		// every `Script`/`ExchangeScript` instantiation this example names: the
 		// plugins register only the `Value`/`Value` pair `<ScriptRoute>` authors,
-		// and an unregistered component is dropped from the scene on save, which
-		// would leave the route with a path and no way to answer.
+		// and an unregistered component is skipped by the fork, so a route whose
+		// script type is missing here would vanish on the second run.
 		.register_type::<Script<(), String>>()
 		.register_type::<ExchangeScript<(), String>>()
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
@@ -61,28 +62,48 @@ struct GreetRequest {
 }
 
 fn setup(async_commands: AsyncCommands) {
-	let blob = FsStore::new(WsPathBuf::default())
-		.blob(SmolPath::new(WORLD_SERDE_FILE));
+	let store = BlobStore::new(FsStore::new(WsPathBuf::default()));
+	let path = SmolPath::new(WORLD_SERDE_FILE);
 	let new_world = CliArgs::parse_env().params.contains_key("new");
 
 	async_commands.run(async move |world: AsyncWorld| {
 		if new_world {
-			blob.remove().await.ok();
+			store.remove(&path).await.ok();
 		}
-		// the bundle stays serializable (`CliServer` root + router child, both
-		// reflect components), so the file *is* the app.
-		let spawned =
-			TemplateStore::load_or_create(world.clone(), blob, async |_| {
-				route_bundle().xok()
+		// the host the scene builds under, and carries the scene document of
+		let host = world.spawn(()).await;
+		if store.exists(&path).await? {
+			let fork = store.get_media(&path).await?;
+			host.with(move |mut host| -> Result {
+				let entity = host.id();
+				host.world_scope(|world| {
+					SceneDocument::load_bytes(world, entity, &fork)
+				})?;
+				OK
 			})
-			.await?;
+			.await??;
+		} else {
+			// the bundle stays serializable (`CliServer` root + router child,
+			// both reflect components), so the fork *is* the app.
+			let fork = host
+				.with(move |mut host| -> Result<MediaBytes> {
+					let entity = host.id();
+					host.world_scope(|world| {
+						world.spawn((route_bundle(), ChildOf(entity)));
+						SceneDocument::fork(world, entity, MediaType::Json)
+					})
+				})
+				.await??;
+			store.insert(&path, fork.take().1).await?;
+		}
 		// the restored server root, booted with the process request: the load
 		// rebuilt the tree, this runs it.
 		let root = world
-			.with(move |world: &mut World| {
-				spawned.into_iter().find(|entity| {
-					world.entity(*entity).contains::<CliServer>()
-				})
+			.with(|world: &mut World| {
+				world
+					.query_filtered::<Entity, With<CliServer>>()
+					.single(world)
+					.ok()
 			})
 			.await
 			.ok_or_else(|| bevyhow!("no `CliServer` in the loaded scene"))?;

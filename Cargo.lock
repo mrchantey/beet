@@ -1320,6 +1320,7 @@ dependencies = [
  "getrandom 0.4.2",
  "heck",
  "http 1.4.0",
+ "indexmap 2.14.0",
  "inventory",
  "itertools 0.14.0",
  "js-sys",

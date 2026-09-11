@@ -300,7 +300,18 @@ impl<'w> TemplateBuilder<'w> {
 						return None;
 					}
 
-					let type_registration = self.type_registry.get(type_id)?;
+					// an unregistered component cannot be dumped, so it is
+					// silently absent from the file; say so where a missing route
+					// on the next boot can be traced back
+					let Some(type_registration) =
+						self.type_registry.get(type_id)
+					else {
+						debug!(
+							"skipping unregistered component `{}` on {entity}",
+							info.name()
+						);
+						return None;
+					};
 					// derived state is never authored content, so it never dumps
 					if type_registration.data::<ReflectDerived>().is_some() {
 						return None;

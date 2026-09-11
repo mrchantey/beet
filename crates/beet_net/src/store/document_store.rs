@@ -39,6 +39,18 @@ impl BlobStore {
 	}
 }
 
+/// The nearest ancestor [`BlobStore`] of `entity`, or `None` while none has
+/// arrived: a store legitimately lands frames after the tree that reads it.
+pub(crate) async fn ancestor_store(
+	entity: &AsyncEntity,
+) -> Result<Option<BlobStore>> {
+	entity
+		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
+			query.get(entity).cloned().ok()
+		})
+		.await
+}
+
 /// Marks a document whose located schema is being read, so a store churning
 /// while the read is in flight does not issue a second one.
 #[derive(Component)]
@@ -101,12 +113,7 @@ async fn read_located_schema(
 	snapshot: SchemaRegistry,
 	path: SmolPath,
 ) -> Result {
-	let store = entity
-		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
-			query.get(entity).cloned().ok()
-		})
-		.await?;
-	let Some(store) = store else {
+	let Some(store) = ancestor_store(entity).await? else {
 		return OK;
 	};
 	let schema = store

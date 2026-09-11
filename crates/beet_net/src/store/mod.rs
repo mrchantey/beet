@@ -71,8 +71,10 @@ mod document_store;
 mod store_ref;
 #[cfg(feature = "std")]
 mod table;
-#[cfg(feature = "template_serde")]
-mod template_store;
+// the scene fork: a `template_serde` document in a store, the serde form
+// gating with the json format it is written in.
+#[cfg(all(feature = "template_serde", feature = "json"))]
+mod scene_blob;
 #[cfg(feature = "std")]
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
@@ -81,12 +83,12 @@ pub use aws_cli::*;
 pub use document_blob::*;
 #[cfg(feature = "json")]
 pub(crate) use document_store::*;
+#[cfg(all(feature = "template_serde", feature = "json"))]
+pub use scene_blob::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
 #[cfg(feature = "std")]
 pub use table::*;
-#[cfg(feature = "template_serde")]
-pub use template_store::*;
 // the `WatchDir` registration component (any `std` target) and the notify-based
 // directory watcher backing it. The watcher itself is native+fs only for now (deno
 // directory watching is unimplemented), so a wasm `FsStore` works without live
@@ -177,8 +179,15 @@ impl Plugin for StorePlugin {
 			.add_observer(add_watch_dir)
 			.add_observer(remove_watch_dir);
 
-		#[cfg(feature = "template_serde")]
-		app.add_systems(PostUpdate, load_template_on_insert);
+		// the scene fork: booted from the store (the fork, else the original
+		// forked) and written back on every edit to its scene document.
+		#[cfg(all(feature = "template_serde", feature = "json"))]
+		app.register_type::<SceneBlob>()
+			.add_systems(
+				PreUpdate,
+				read_scene_blobs.run_if(scene_blobs_may_be_readable),
+			)
+			.add_systems(PostUpdate, write_scene_blobs);
 
 		// the by-location half of schema resolution: a document naming its
 		// schema by path has that schema read out of its own store.

@@ -174,13 +174,10 @@ impl DynamicTemplate {
 		// resources last, so they are available for any reference resolution.
 		// SAFETY: only used to write resources into the world.
 		let world = unsafe { cx.entity.world_mut() };
+		let (world, mut mapper) =
+			ReferenceMapper::split(world, cx.entity_references);
 		for resource in &self.resources {
-			write_resource(
-				world,
-				resource.as_ref(),
-				cx.entity_references,
-				registry,
-			)?;
+			write_resource(world, resource.as_ref(), &mut mapper, registry)?;
 		}
 		OK
 	}
@@ -204,11 +201,13 @@ fn build_entity(
 			ComponentSlot::Value(value) => {
 				// SAFETY: only used to apply a component onto the mapped entity.
 				let world = unsafe { cx.entity.world_mut() };
+				let (world, mut mapper) =
+					ReferenceMapper::split(world, cx.entity_references);
 				apply_value(
 					world,
 					entity_id,
 					value.as_ref(),
-					cx.entity_references,
+					&mut mapper,
 					registry,
 				)?;
 			}
@@ -250,6 +249,24 @@ struct ReferenceMapper<'a> {
 	world: &'a mut World,
 }
 
+impl<'a> ReferenceMapper<'a> {
+	/// The world to apply into and a mapper spawning placeholders in that same
+	/// world for any `Entity`-typed field met on the way.
+	///
+	/// SAFETY: the mapper only spawns/looks up entities and never touches the
+	/// component being applied, so the two borrows do not alias the same data.
+	fn split(
+		world: &'a mut World,
+		references: &'a mut SceneEntityReferences,
+	) -> (&'a mut World, Self) {
+		let mapper_world = unsafe { &mut *(world as *mut World) };
+		(world, Self {
+			references,
+			world: mapper_world,
+		})
+	}
+}
+
 impl EntityMapper for ReferenceMapper<'_> {
 	fn get_mapped(&mut self, source: Entity) -> Entity {
 		self.references.get(scene_reference(source), self.world)
@@ -261,13 +278,17 @@ impl EntityMapper for ReferenceMapper<'_> {
 }
 
 /// Applies a reflected component value onto `entity`, remapping `Entity`-typed
-/// fields through `references` and running relationship hooks so `Children` and
+/// fields through `mapper` and running relationship hooks so `Children` and
 /// other relationship mirrors rebuild in order.
-fn apply_value(
+///
+/// In place: a mutable component is patched where it sits, so the entity, its
+/// other components and any runtime state they hold survive; an immutable one
+/// (a relationship) is reinserted, which is what reparents.
+pub(super) fn apply_value(
 	world: &mut World,
 	entity: Entity,
 	value: &dyn PartialReflect,
-	references: &mut SceneEntityReferences,
+	mapper: &mut dyn EntityMapper,
 	registry: &TypeRegistry,
 ) -> Result<()> {
 	let reflect_component = reflect_component(registry, value)?;
@@ -289,33 +310,24 @@ fn apply_value(
 		return Ok(());
 	}
 
-	// the mapper reborrows the world to spawn placeholder entities for any
-	// `Entity`-typed field, while `apply_or_insert_mapped` writes the component.
-	// SAFETY: the mapper only spawns/looks up entities and never touches the
-	// component being applied, so the two borrows do not alias the same data.
-	let mapper_world = unsafe { &mut *(world as *mut World) };
-	let mut mapper = ReferenceMapper {
-		references,
-		world: mapper_world,
-	};
 	// `RelationshipHookMode::Run` so applying `ChildOf` rebuilds the parent's
 	// ordered `Children`, the children-order contract.
 	reflect_component.apply_or_insert_mapped(
 		&mut world.entity_mut(entity),
 		value,
 		registry,
-		&mut mapper,
+		mapper,
 		RelationshipHookMode::Run,
 	);
 	Ok(())
 }
 
 /// Writes a reflected resource value into the world, remapping `Entity`-typed
-/// fields through `references`.
-fn write_resource(
+/// fields through `mapper`.
+pub(super) fn write_resource(
 	world: &mut World,
 	value: &dyn PartialReflect,
-	references: &mut SceneEntityReferences,
+	mapper: &mut dyn EntityMapper,
 	registry: &TypeRegistry,
 ) -> Result<()> {
 	let reflect_resource = reflect_resource(registry, value)?;
@@ -324,17 +336,11 @@ fn write_resource(
 		.resource_entities()
 		.get(resource_id)
 		.unwrap_or_else(|| world.spawn_empty().id());
-
-	let mapper_world = unsafe { &mut *(world as *mut World) };
-	let mut mapper = ReferenceMapper {
-		references,
-		world: mapper_world,
-	};
 	reflect_resource.apply_or_insert_mapped(
 		&mut world.entity_mut(entity),
 		value,
 		registry,
-		&mut mapper,
+		mapper,
 		RelationshipHookMode::Run,
 	);
 	Ok(())
@@ -342,7 +348,7 @@ fn write_resource(
 
 /// Resolve the [`ReflectComponent`] for a reflected component value, erroring if
 /// its type is missing a represented type, unregistered, or not a component.
-fn reflect_component<'a>(
+pub(super) fn reflect_component<'a>(
 	registry: &'a TypeRegistry,
 	value: &dyn PartialReflect,
 ) -> Result<&'a ReflectComponent> {
@@ -356,7 +362,7 @@ fn reflect_component<'a>(
 }
 
 /// Resolve the [`ReflectComponent`] backing a reflected resource value.
-fn reflect_resource<'a>(
+pub(super) fn reflect_resource<'a>(
 	registry: &'a TypeRegistry,
 	value: &dyn PartialReflect,
 ) -> Result<&'a ReflectComponent> {

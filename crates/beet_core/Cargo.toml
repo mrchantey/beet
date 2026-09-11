@@ -229,6 +229,7 @@ tracing.workspace = true
 itertools = { workspace = true, features = ["use_alloc"] }
 send_wrapper = { workspace = true, optional = true }
 smol_str = { workspace = true }
+indexmap = { workspace = true }
 heck.workspace = true
 bitflags = { workspace = true }
 

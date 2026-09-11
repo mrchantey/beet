@@ -3,7 +3,8 @@ use crate::prelude::*;
 use bevy::ecs::entity::EntityMapper;
 
 /// The map between a document's **file keys** and the world entities they built
-/// into, retained on the loaded root for the document's lifetime.
+/// into, retained for the document's lifetime on the loaded root, or on the host
+/// of a [`SceneDocument`](super::SceneDocument).
 ///
 /// A serialized entity is keyed by its in-file [`Entity`], generation stripped, so
 /// a file reads `0`, `1`, `2`. Stability across an edit comes from this map, not
@@ -42,6 +43,15 @@ impl TemplateEntityMap {
 		self.to_world.insert(file_key, entity);
 		self.to_file.insert(entity, file_key);
 		self.next_key = self.next_key.max(file_key + 1);
+	}
+
+	/// Forget `file_key` and the entity it built into, ie an entity the document
+	/// removed. The key is never reused: [`file_key`](Self::file_key) keeps
+	/// minting above it, so a later reference to it can only be a dangling one.
+	pub fn remove(&mut self, file_key: u32) -> Option<Entity> {
+		let entity = self.to_world.remove(&file_key)?;
+		self.to_file.remove(&entity);
+		Some(entity)
 	}
 
 	/// The world entity a file key built into, if this document loaded one.

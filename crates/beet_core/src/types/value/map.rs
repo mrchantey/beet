@@ -1,20 +1,27 @@
-//! Newtype wrapper around [`HashMap<SmolStr, Value>`] providing ergonomic
-//! key access and a deterministic [`Hash`] implementation.
+//! Newtype wrapper around an insertion-ordered [`IndexMap`] of [`Value`]s,
+//! providing ergonomic key access and a deterministic [`Hash`] implementation.
 use crate::prelude::*;
+use indexmap::IndexMap;
 
 /// A map of string keys to [`Value`]s.
 ///
 /// Provides ergonomic access with `&str` keys and fallible getters for
 /// use in fallible functions via `?`.
+///
+/// Entries keep their **insertion order**, so a map read from a file iterates
+/// as the file did. A scene's `entities` map relies on that: its order is child
+/// order (`template_serde`), a fact a hashed map would silently drop. Equality
+/// and [`Hash`] ignore order, and the generic serde form still sorts keys, so
+/// two maps holding the same entries stay equal however they were built.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deref, DerefMut, Reflect)]
 #[reflect(opaque)]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", derive(::serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
-pub struct Map(pub HashMap<SmolStr, Value>);
+pub struct Map(pub IndexMap<SmolStr, Value, FixedHasher>);
 
 /// Serializes entries sorted by key, matching the deterministic
-/// [`Hash`], [`Ord`] and [`Display`] impls rather than hash-iteration order.
+/// [`Hash`], [`Ord`] and [`Display`] impls rather than insertion order.
 #[cfg(feature = "serde")]
 impl ::serde::Serialize for Map {
 	fn serialize<S: ::serde::Serializer>(
@@ -76,7 +83,8 @@ impl Map {
 	/// Returns `true` if the map contains the given key.
 	pub fn contains(&self, key: &str) -> bool { self.0.contains_key(key) }
 
-	/// Inserts a key-value pair, overwriting any existing value.
+	/// Inserts a key-value pair, overwriting any existing value. A new key lands
+	/// last, an existing one keeps its position.
 	///
 	/// Returns the previous value if the key existed.
 	pub fn insert(
@@ -85,6 +93,13 @@ impl Map {
 		value: impl Into<Value>,
 	) -> Option<Value> {
 		self.0.insert(key.into(), value.into())
+	}
+
+	/// Removes a key, keeping the order of the remaining entries.
+	///
+	/// Returns the removed value if the key existed.
+	pub fn remove(&mut self, key: &str) -> Option<Value> {
+		self.0.shift_remove(key)
 	}
 
 	/// Inserts a key-value pair.
@@ -122,28 +137,28 @@ impl core::fmt::Display for Map {
 }
 
 impl From<HashMap<SmolStr, Value>> for Map {
-	fn from(map: HashMap<SmolStr, Value>) -> Self { Self(map) }
+	fn from(map: HashMap<SmolStr, Value>) -> Self { map.into_iter().collect() }
 }
 
 impl From<Map> for HashMap<SmolStr, Value> {
-	fn from(map: Map) -> Self { map.0 }
+	fn from(map: Map) -> Self { map.0.into_iter().collect() }
 }
 
 impl IntoIterator for Map {
 	type Item = (SmolStr, Value);
-	type IntoIter = <HashMap<SmolStr, Value> as IntoIterator>::IntoIter;
+	type IntoIter = indexmap::map::IntoIter<SmolStr, Value>;
 	fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
 }
 
 impl<'a> IntoIterator for &'a Map {
 	type Item = (&'a SmolStr, &'a Value);
-	type IntoIter = <&'a HashMap<SmolStr, Value> as IntoIterator>::IntoIter;
+	type IntoIter = indexmap::map::Iter<'a, SmolStr, Value>;
 	fn into_iter(self) -> Self::IntoIter { self.0.iter() }
 }
 
 impl<'a> IntoIterator for &'a mut Map {
 	type Item = (&'a SmolStr, &'a mut Value);
-	type IntoIter = <&'a mut HashMap<SmolStr, Value> as IntoIterator>::IntoIter;
+	type IntoIter = indexmap::map::IterMut<'a, SmolStr, Value>;
 	fn into_iter(self) -> Self::IntoIter { self.0.iter_mut() }
 }
 

@@ -19,6 +19,7 @@ use super::DynamicTemplateEntity;
 use crate::prelude::*;
 use bevy_reflect::PartialReflect;
 use bevy_reflect::ReflectFromReflect;
+use bevy_reflect::TypeRegistration;
 use bevy_reflect::TypeRegistry;
 use bevy_reflect::serde::ReflectDeserializer;
 use bevy_reflect::serde::TypeRegistrationDeserializer;
@@ -596,28 +597,50 @@ impl<'de> Visitor<'de> for ValueMapVisitor<'_> {
 				)));
 			}
 
-			let value = map.next_value_seed(TypedReflectDeserializer::new(
+			let value = map.next_value_seed(TypedValueDeserializer {
 				registration,
-				self.registry,
-			))?;
-
-			// attempt to convert using FromReflect to retain the concrete type.
-			let value = self
-				.registry
-				.get(registration.type_id())
-				.and_then(|registration| {
-					registration.data::<ReflectFromReflect>()
-				})
-				.and_then(|from_reflect| {
-					from_reflect.from_reflect(value.as_partial_reflect())
-				})
-				.map(PartialReflect::into_partial_reflect)
-				.unwrap_or(value);
-
+				registry: self.registry,
+			})?;
 			values.push(value);
 		}
 
 		Ok(values)
+	}
+}
+
+/// Deserializes one component or resource value of a known registered type,
+/// converting through [`ReflectFromReflect`] so the value carries its concrete
+/// type rather than staying a dynamic. The one reader of a value slot, shared
+/// by the file's component map and a scene document's per-component apply.
+pub(super) struct TypedValueDeserializer<'a> {
+	/// The registration of the type the value must be.
+	pub registration: &'a TypeRegistration,
+	/// The registry the type's fields resolve through.
+	pub registry: &'a TypeRegistry,
+}
+
+impl<'a, 'de> DeserializeSeed<'de> for TypedValueDeserializer<'a> {
+	type Value = Box<dyn PartialReflect>;
+
+	fn deserialize<D>(
+		self,
+		deserializer: D,
+	) -> core::result::Result<Self::Value, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let value =
+			TypedReflectDeserializer::new(self.registration, self.registry)
+				.deserialize(deserializer)?;
+		// attempt to convert using FromReflect to retain the concrete type.
+		self.registration
+			.data::<ReflectFromReflect>()
+			.and_then(|from_reflect| {
+				from_reflect.from_reflect(value.as_partial_reflect())
+			})
+			.map(PartialReflect::into_partial_reflect)
+			.unwrap_or(value)
+			.xok()
 	}
 }
 

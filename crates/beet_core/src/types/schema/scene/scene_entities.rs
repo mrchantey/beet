@@ -26,10 +26,11 @@ impl<'a> SceneEntities<'a> {
 			.xok()
 	}
 
-	/// The file key of every entity, in ascending order.
+	/// The file key of every entity, in **document order**, which is child
+	/// order: the build path applies each `ChildOf` in this order, so a parent's
+	/// `Children` come out in it.
 	pub fn keys(&self) -> Result<Vec<u32>> {
-		let mut keys = self
-			.entities
+		self.entities
 			.0
 			.keys()
 			.map(|key| {
@@ -37,16 +38,29 @@ impl<'a> SceneEntities<'a> {
 					bevyhow!("entity key `{key}` is not a file key")
 				})
 			})
-			.collect::<Result<Vec<_>>>()?;
-		keys.sort_unstable();
-		keys.xok()
+			.collect()
+	}
+
+	/// The file keys of the entities whose `relation` targets `parent`, in
+	/// document order: for `ChildOf`, the `Children` the document describes.
+	pub fn related(&self, relation: &str, parent: u32) -> Result<Vec<u32>> {
+		self.keys()?
+			.into_iter()
+			.filter(|key| self.target(*key, relation) == Some(parent))
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	/// Whether the scene holds an entity at `key`.
+	pub fn contains(&self, key: u32) -> bool {
+		self.entities.contains(&key.to_string())
 	}
 
 	/// The components of the entity at `key`, if the scene holds one.
 	pub fn components(&self, key: u32) -> Option<&'a Map> {
 		self.entities
 			.0
-			.get(SmolStr::from(key.to_string()).as_str())?
+			.get(key.to_string().as_str())?
 			.get("components")?
 			.as_map()
 			.ok()

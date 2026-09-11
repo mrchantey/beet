@@ -197,15 +197,6 @@ async fn write_document_blob(entity: &AsyncEntity, path: SmolPath) -> Result {
 	store.insert_document(&path, &document).await
 }
 
-/// The nearest ancestor [`BlobStore`], or `None` while none has arrived.
-async fn ancestor_store(entity: &AsyncEntity) -> Result<Option<BlobStore>> {
-	entity
-		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
-			query.get(entity).cloned().ok()
-		})
-		.await
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

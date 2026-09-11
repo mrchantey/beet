@@ -147,7 +147,7 @@ impl<'de> de::MapAccess<'de> for MapAccess {
 		match self.iter.next() {
 			Some((key, value)) => {
 				self.value = Some(value);
-				seed.deserialize(key.as_str().into_deserializer()).map(Some)
+				seed.deserialize(MapKeyDeserializer(key)).map(Some)
 			}
 			None => Ok(None),
 		}
@@ -160,6 +160,87 @@ impl<'de> de::MapAccess<'de> for MapAccess {
 			DeError("next_value called before next_key".into())
 		})?;
 		seed.deserialize(ValueDeserializer::new(value))
+	}
+}
+
+/// A map key: a string, or the number or bool it spells when the target asks
+/// for one, as a json object key does. A `Value` map keyed by file keys (`"0"`,
+/// `"1"`) therefore reads back into a `u32`-keyed map.
+struct MapKeyDeserializer(SmolStr);
+
+/// Parse the key as `$ty` for each integer `deserialize_*`, visiting the
+/// widened value so every serde integer visitor accepts it.
+macro_rules! deserialize_parsed_key {
+	($($method:ident => $ty:ty => $visit:ident),* $(,)?) => {
+		$(
+			fn $method<V: de::Visitor<'de>>(self, visitor: V) -> DeResult<V::Value> {
+				match self.0.parse::<$ty>() {
+					Ok(number) => visitor.$visit(number.into()),
+					Err(_) => visitor.visit_str(self.0.as_str()),
+				}
+			}
+		)*
+	};
+}
+
+impl<'de> de::Deserializer<'de> for MapKeyDeserializer {
+	type Error = DeError;
+
+	fn deserialize_any<V: de::Visitor<'de>>(
+		self,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		visitor.visit_str(self.0.as_str())
+	}
+
+	deserialize_parsed_key! {
+		deserialize_i8 => i8 => visit_i64,
+		deserialize_i16 => i16 => visit_i64,
+		deserialize_i32 => i32 => visit_i64,
+		deserialize_i64 => i64 => visit_i64,
+		deserialize_u8 => u8 => visit_u64,
+		deserialize_u16 => u16 => visit_u64,
+		deserialize_u32 => u32 => visit_u64,
+		deserialize_u64 => u64 => visit_u64,
+	}
+
+	fn deserialize_bool<V: de::Visitor<'de>>(
+		self,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		match self.0.parse::<bool>() {
+			Ok(bool) => visitor.visit_bool(bool),
+			Err(_) => visitor.visit_str(self.0.as_str()),
+		}
+	}
+
+	fn deserialize_option<V: de::Visitor<'de>>(
+		self,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		visitor.visit_some(self)
+	}
+
+	fn deserialize_newtype_struct<V: de::Visitor<'de>>(
+		self,
+		_name: &'static str,
+		visitor: V,
+	) -> DeResult<V::Value> {
+		visitor.visit_newtype_struct(self)
+	}
+
+	fn deserialize_enum<V: de::Visitor<'de>>(
+		self,
+		_name: &'static str,
+		_variants: &'static [&'static str],
+		visitor: V,
+	) -> DeResult<V::Value> {
+		visitor.visit_enum(self.0.as_str().into_deserializer())
+	}
+
+	::serde::forward_to_deserialize_any! {
+		i128 u128 f32 f64 char str string bytes byte_buf unit unit_struct
+		seq tuple tuple_struct map struct identifier ignored_any
 	}
 }
 

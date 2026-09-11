@@ -342,7 +342,8 @@ web-sys = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
-beet_core = { workspace = true, features = ["testing"] }
+# `bsx` so the scene fork test can build a markup original
+beet_core = { workspace = true, features = ["testing", "bsx"] }
 beet_net = {path = ".", features = ["template_serde"] }
 # beet_net = {path = ".", features = ["ureq", "tungstenite", "native-tls", "flow"] }
 
