@@ -2,7 +2,9 @@
 The single canonical entry for the beet website, and the one place its cloud
 resources are declared. Discovery loads it locally when the `beet` binary runs
 from the `site/` directory (`cd site && beet serve --server=http`), and the
-deployed Lightsail box loads the same entry directly from the app bucket root.
+deployed Lightsail box loads the same entry out of the repo store, under the
+prefix its own deploy published, which it resolves from the release pointer at
+every start.
 The workspace commands that take an entry as an argument (`beet check site`,
 `beet export-static site`) load it from the repo root.
 
@@ -39,7 +41,7 @@ Two buckets rather than three: the rollup rows are a different dataset from the 
 
 `<Route path="jobs">` hosts that job and the deployed `rollup` lambda is the only
 thing that boots it: the schedule invokes the function, the function's `bootstrap`
-loads THIS document out of the app bucket and dispatches `rollup` into the `jobs`
+loads THIS document out of the repo store and dispatches `rollup` into the `jobs`
 router. The function publishes no url, no gateway and no hostname, so a sweep
 that compacts the analytics stores is reachable by nothing but its timer, and
 the site's own router is a different url space entirely.
@@ -96,11 +98,13 @@ shipping the deployer.
 `<Stack>` is the identity every resource beneath it composes its name from, and it
 is a registered component in every native build rather than a template prop, so the
 lean binary reads the same stage and the same `shared` override off the same tree.
-`<DeployRoutes/>` (a beet_extra template, absent from the lean binary along with the
-verbs it hosts) adds the tofu lifecycle routes `validate`/`plan`/`apply`/`show`/
-`list`/`destroy`/`rollback`/`rollforward` to whichever stack hosts it.
+`<DeployRoutes deploy={$up} destroy={$down}/>` (absent from the lean binary along
+with the verbs it hosts) adds the tofu lifecycle routes
+`validate`/`plan`/`apply`/`show`/`list`/`rollback`/`rollforward` to whichever
+stack hosts it, plus the two lifecycle verbs that run the `<Group>`s it names:
+`deploy` forward and `destroy` in reverse.
 
-The deploy route applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the app, analytics, rollup, and archive buckets. `<DirSync/>` fills the app bucket, and a bare `<TofuApply/>` converges the whole stack:
+The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<DirSync/>` fills the repo store, and a bare `<TofuApply/>` converges the whole stack:
 it uploads the built binary under the deploy id, publishes the release pointer
 naming it, and converges the instance against a bucket that already holds the
 site. One apply boots the new instance first, so it finds an empty bucket and no
@@ -244,17 +248,28 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     `jobs` verb of this same document. -->
 		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
 		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
-		<DeployRoutes/>
-		<Route path="deploy" {ExchangeSequence}>
+		<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
+		     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
+		<Group bx:ref="site_up">
 			<TofuApply layer="storage"/>
 			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 			<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>
 			<TofuApply/>
+			<PruneVersions/>
 			<LightsailRelease/>
 			<CloudflareZoneSetup/>
 			<LightsailWatch timeout="300s"/>
 			<CloudflarePurgeCache/>
-		</Route>
+		</Group>
+		<!-- 💡 ..and the teardown, authored in the same CONVERGENCE order so
+		     `destroy` running it backwards takes the state carriers off last.
+		     This stack owns nothing outside terraform, so there is nothing
+		     between the two. -->
+		<Group bx:ref="site_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+		<DeployRoutes deploy={$site_up} destroy={$site_down}/>
 		<Route path="sync" {ExchangeSequence}>
 			<!-- publish into the version the RUNNING box reads, rather than
 			     minting one of this launch's own that nothing serves -->
@@ -281,7 +296,18 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
-			<DeployRoutes/>
+			<!-- one resource and no step outside terraform, so the deploy is an
+			     apply and the teardown is that read backwards. `force_destroy` is
+			     off, so `destroy` REFUSES while the bucket holds anything: that
+			     is the guard working, since these assets are a source of record. -->
+			<Group bx:ref="shared_up">
+				<TofuApply/>
+			</Group>
+			<Group bx:ref="shared_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$shared_up} destroy={$shared_down}/>
 			<Route path="push" {ExchangeSequence}>
 				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
 				<DirSync bucket="assets" local_dir="site/assets"/>

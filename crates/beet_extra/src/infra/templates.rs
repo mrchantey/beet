@@ -58,8 +58,8 @@ pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 	deployment.set_backend(backend);
 }
 
-/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's app bucket. The
-/// markup form of `sync_site(stack, deployment)`: the bucket is deploy-versioned,
+/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's repo store. The
+/// markup form of `sync_site(stack, deployment)`: the store is deploy-versioned,
 /// so the sync also needs this launch's id.
 ///
 /// The bucket name composes from the ancestor `<Stack>`, so nothing here
@@ -285,9 +285,9 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 /// (paired by `TofuApply`, see [`LambdaSiteBlock`]): one `small_3_0` box
 /// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
 /// ssh TUI on port 22, with STAGE-AWARE Cloudflare DNS at the static IP.
-/// Runtime env wired so the binary reads its one app bucket (site and assets
-/// alike) and presents one stable ssh fingerprint. Bucket names derived from
-/// the stack (declared once).
+/// Runtime env wired so the binary reads its one repo store (site and assets
+/// alike) and presents one stable ssh fingerprint. Store names derived from the
+/// stack (declared once).
 ///
 /// Every http hostname is PROXIED and edge-cached (an `A` record at the static
 /// IP): Cloudflare's edge caches per the origin's `CacheHeaders` and the zone

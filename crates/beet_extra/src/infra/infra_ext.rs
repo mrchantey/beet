@@ -107,9 +107,9 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 		.with_release(true)
 }
 
-/// Sync `examples/bsx_site` (the no-code site) to the app bucket, the content
+/// Sync `examples/bsx_site` (the no-code site) to the repo store, the content
 /// every infra example serves. A mirror, so a renamed or removed source file
-/// does not linger in the bucket across deploys.
+/// does not linger in the store across deploys.
 ///
 /// Into the launch's own deploy prefix, since [`repo_bucket`] is deploy
 /// versioned: that is the prefix the binary this same deploy ships was baked to
