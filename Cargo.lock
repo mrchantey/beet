@@ -1249,6 +1249,7 @@ name = "beet-cli"
 version = "0.0.9-dev.16"
 dependencies = [
  "beet",
+ "beet_atproto",
  "console_error_panic_hook",
  "image",
  "lopdf",
@@ -1287,6 +1288,42 @@ dependencies = [
  "keyed_concurrent_queue",
  "scoped_static_storage",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "beet_atproto"
+version = "0.1.0"
+dependencies = [
+ "beet_atproto_client",
+ "beet_atproto_infra",
+ "beet_atproto_shared",
+]
+
+[[package]]
+name = "beet_atproto_client"
+version = "0.1.0"
+dependencies = [
+ "beet",
+ "beet_atproto_shared",
+ "serde",
+]
+
+[[package]]
+name = "beet_atproto_infra"
+version = "0.1.0"
+dependencies = [
+ "beet",
+ "beet_atproto_client",
+ "beet_atproto_shared",
+ "serde",
+]
+
+[[package]]
+name = "beet_atproto_shared"
+version = "0.1.0"
+dependencies = [
+ "beet",
+ "serde",
 ]
 
 [[package]]

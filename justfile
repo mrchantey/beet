@@ -99,6 +99,17 @@ beet-shared *args:
 # ./site/assets: `just site-shared plan|apply|pull|push|..`.
 site-shared *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
+# The atproto handles under beet.org (the site entry's `social` stack):
+# `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
+# block's `dns_stage` publishes nothing from any other stage. `atproto` links
+# the block from the sibling `../beet_atproto` workspace.
+site-social *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site social {{ args }}
+# Diff the beet.org zone against every stack the site entry declares, reporting
+# the strays; `--fix` deletes them. Built with `atproto` so the handle records
+# are declarations rather than strays.
+site-audit *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

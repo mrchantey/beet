@@ -138,6 +138,40 @@ The assets bucket lives on its own `shared` stage under the `shared/` route
 prefix, provisioned as its own step since a source shared by developers is a
 different process from a stage deploy. No stage deploy or destroy touches it.
 
+## The handles, and the zone
+
+`beet.org` and `pete.beet.org` are atproto (Bluesky) handles because
+`_atproto.<handle>` holds a `did=` TXT record, and that record is the WHOLE of
+a handle's infrastructure: the accounts live on bsky.social and keep their dids
+across every rename. `<Route path="social">` holds them as their own
+`<Stack app_name="beet-social">`, since they share nothing with the site but the
+zone: no compute, no region, two records and the probe that asks Bluesky's own
+resolver whether each answers with its declared did. `dns_stage="prod"` guards
+the names exactly as the mail blocks do, so only `--stage=prod` publishes them.
+`<AtprotoHandleBlock/>` is defined in the sibling `beet_atproto` workspace, which
+`beet-cli` links behind its `atproto` feature, so the route is gated on that
+feature too: a binary that never linked the block must exclude the stack rather
+than spawn its tag as nothing.
+
+The record is half the job. A resolver verifies a handle BOTH ways, against the
+record and against the account's did document, so a published record resolves
+to nothing until the account claims the name, manually and once: Settings ->
+Handle -> "I have my own domain" -> `pete.beet.org` -> Verify DNS Record. That
+is why the probe is its own verb rather than the deploy's tail: run it after
+the claim, and whenever the question is "is the handle still wired up".
+
+The zone is one namespace that the site stack, the social stack and a few
+hand-created records all publish into, so its audit belongs to no stack.
+`<ZoneAudit scope="Zone"/>` diffs the zone against EVERY `<Stack>` in this
+entry, so a sibling's records are declarations rather than strays and the
+allowlist below holds only what NOTHING here declares, each row a decision with
+a reason. `--fix` deletes the strays rather than reporting them. The audit is
+run from the `atproto` build too, so the handle records count as declared.
+
+    just site-social deploy --stage=prod   # publish the handle records
+    just site-social probe --stage=prod    # after the claim: does each handle resolve
+    just site-audit --stage=prod           # the zone holds exactly what we declare
+
     just beet-deploy [--stage=prod]        # build -> stores -> sync -> release -> watch -> purge
     just beet-sync                         # re-publish the site + restart (no redeploy)
     just beet-watch                        # tail the instance logs
@@ -146,7 +180,9 @@ different process from a stage deploy. No stage deploy or destroy touches it.
     just site-shared push                  # publish site/assets to it
 
 Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
-`CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`.
+`CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`. The social
+stack and the audit need only the Cloudflare pair (plus AWS for the social
+stack's state bucket).
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
@@ -328,6 +364,53 @@ Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
 				<DirSync bucket="assets" local_dir="site/assets" {SyncS3Bucket{direction:Pull, no_sign_request:true}}/>
 			</Route>
 		</Stack>
+	</Route>
+	<!-- the atproto handles: their own stack because they share nothing with
+	     the site but the zone, see "The handles, and the zone" above. The
+	     block is defined out of tree, so the route needs the binary that
+	     links it: an infra build without `atproto` would spawn the tag as
+	     nothing and deploy an empty stack green. -->
+	<Route path="social" bx:cfg="feature:infra && feature:extra && feature:atproto">
+		<Stack app_name="beet-social">
+			<!-- a deploy is the apply alone, and the teardown that read
+			     backwards, since this stack owns nothing outside terraform. The
+			     probe is NOT in the tail: a resolver verifies a handle against
+			     the account's did document, so it can only pass once the account
+			     has claimed the name, which is a human in the app. -->
+			<Group bx:ref="social_up">
+				<TofuApply/>
+			</Group>
+			<Group bx:ref="social_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$social_up} destroy={$social_down}/>
+			<!-- one TXT record per handle at `_atproto.<name>.beet.org`,
+			     holding `did=<did>`. The entry with no `name` is the APEX
+			     handle, `beet.org` itself. No `dns` attribute: which zone a
+			     launch writes into is a property of the launch, read from
+			     `CLOUDFLARE_ZONE_ID`. -->
+			<AtprotoHandleBlock domain="beet.org" dns_stage="prod"
+				handles={[
+					{did:"did:plc:vgxy56shhs3t3b2mu2avizjf"},
+					{name:"pete", did:"did:plc:hnv7bd4gtxrf7iigjo22qukp"},
+				]}/>
+			<!-- the post-claim check: cheap, read-only, and the honest answer
+			     to "does the handle work", which nothing about a converged
+			     record can tell you. -->
+			<Route path="probe" {ExchangeSequence}>
+				<AtprotoHandleProbe/>
+			</Route>
+		</Stack>
+	</Route>
+	<!-- the zone is the unit, so its audit belongs to no stack: every record
+	     the stacks above declare is accounted for under `Zone` scope, and what
+	     remains below is only what NOTHING in this entry declares. -->
+	<Route path="audit" bx:cfg="feature:infra && feature:extra" {ExchangeSequence}>
+		<ZoneAudit scope="Zone" allowed={[
+			{name:"beet.org", record_type:"TXT",
+				reason:"google search console domain verification, hand-created"},
+		]}/>
 	</Route>
 </Router>
 </CliServer>

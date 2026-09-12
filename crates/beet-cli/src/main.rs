@@ -73,6 +73,10 @@ fn cli_plugins(app: &mut App) {
 	#[cfg(not(target_arch = "wasm32"))]
 	app.add_plugins(CliCommandsPlugin)
 		.insert_resource(ArgvPassthrough::new([RunWasm::COMMAND]));
+	// the atproto deploy blocks, defined out of tree and registered into the
+	// same deploy render as beet's own
+	#[cfg(all(not(target_arch = "wasm32"), feature = "atproto"))]
+	app.add_plugins(beet_atproto::prelude::AtprotoInfraPlugin);
 	// the wasm binary is a module a runner HOSTS, never the runner itself
 	#[cfg(target_arch = "wasm32")]
 	let _ = app;

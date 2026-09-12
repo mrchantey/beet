@@ -52,6 +52,13 @@ thread = ["beet/thread", "beet/ui"]
 # declaring `<VpcBlock/>`/`<StalwartBlock/>`/`<MailDomainBlock/>` resolves those
 # tags from the same build rather than needing a feature of its own.
 infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail"]
+# The atproto deploy blocks from the sibling `beet_atproto` workspace
+# (`<AtprotoHandleBlock/>`, `<AtprotoHandleProbe/>`), so the site entry's
+# `social` stack resolves its tags from this one binary. The block is defined
+# out of tree, so the binary that runs it links it: `infra` for the block
+# machinery it registers into. Run with:
+# `cargo run -p beet-cli --features infra,extra,atproto -- --main=site social deploy --stage=prod`.
+atproto = ["infra", "dep:beet_atproto"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial + `extra`), so `BeetPlugins` adds
@@ -208,6 +215,10 @@ beet = { workspace = true, features = [
 	# entry action and the `ExchangeScript` route backend a `main.bsx` wires.
 	"quickjs",
 ] }
+# the atproto deploy blocks, pulled only by the `atproto` feature.
+# default-features off: the feed generator and its socket stack are no part of
+# a deployer, `infra` is the handle block and its probe.
+beet_atproto = { path = "../../../beet_atproto", optional = true, default-features = false, features = ["infra"] }
 # `export-pdf` merges the per-page PDFs a headless browser prints into one
 # document; pulled only by the `pdf` feature.
 # default-features off: the merge only needs the document model, not lopdf's
