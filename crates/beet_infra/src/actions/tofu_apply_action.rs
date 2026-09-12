@@ -73,7 +73,7 @@ pub async fn TofuApply(
 						.collect::<Vec<_>>();
 					let repo = repos
 						.find(entity)?
-						.map(|repo| repo.store_uri())
+						.map(|_| repos.store_uri(entity))
 						.transpose()?;
 					(built, repo).xok()
 				})?;

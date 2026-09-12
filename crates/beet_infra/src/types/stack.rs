@@ -170,6 +170,17 @@ impl<'w, 's> StackQuery<'w, 's> {
 			.unwrap_or_else(Deployment::default)
 	}
 
+	/// This launch's deploy id, the version every artifact it publishes is
+	/// keyed by, read from the [`Deployment`] resource. A world without
+	/// [`InfraPlugin`] has no resource, so unless the launch names one
+	/// (`--deploy-id`) each call mints a fresh id: a caller reads it once.
+	pub fn deploy_id(&self) -> Uuid {
+		self.deployment
+			.as_deref()
+			.map(|deployment| *deployment.deploy_id())
+			.unwrap_or_else(|| *Deployment::default().deploy_id())
+	}
+
 	/// The entity carrying the nearest ancestor [`Stack`], and that stack
 	/// resolved: the root every block, artifact and verb under one deploy
 	/// resolves against.

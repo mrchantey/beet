@@ -128,11 +128,11 @@ pub(crate) fn attach_store(
 			let label = entity.get_or_else::<ErasedBlock>()?.label.clone();
 			match BootstrapConfig::get().service_access {
 				ServiceAccess::Remote => {
-					let deployment =
+					let deploy_id =
 						entity.with_state::<StackQuery, _>(|_, stacks| {
-							stacks.deployment()
+							stacks.deploy_id()
 						});
-					let uri = store.store_uri(Some(deployment.deploy_id()))?;
+					let uri = store.store_uri(Some(&deploy_id))?;
 					entity.insert(BlobStore::from_uri(
 						&uri,
 						AbsPathBuf::new(".")?,

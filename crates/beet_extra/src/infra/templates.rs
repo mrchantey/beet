@@ -60,13 +60,21 @@ pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 
 /// `<SiteSync/>` — publish `examples/bsx_site` to the stack's repo store, the
 /// markup form of `sync_site`: whichever store block carries `{RepoStoreBlock}`,
-/// resolved on [`Ready`] ([`OnRepoStore`]) since it is a sibling declaration.
+/// resolved on [`Ready`] through [`RepoStoreQuery`] since it is a sibling
+/// declaration, possibly a forward one.
 #[template]
 pub fn SiteSync() -> impl Bundle {
-	OnRepoStore::new(|entity, repo| {
-		entity.insert(infra_ext::sync_site(&repo));
-		Ok(())
-	})
+	OnSpawn::observe(
+		|ev: On<Ready>,
+		 repos: RepoStoreQuery,
+		 mut commands: Commands|
+		 -> Result {
+			commands
+				.entity(ev.entity)
+				.insert(infra_ext::sync_site(&repos.get(ev.entity)?));
+			Ok(())
+		},
+	)
 }
 
 /// An **opinionated** block for websites built with lambda.
@@ -75,9 +83,9 @@ pub fn SiteSync() -> impl Bundle {
 /// `TofuApply` pairs the `BuildArtifact` with the block on the same entity
 /// to upload it under the block's label, the S3 key the lambda reads its code
 /// from. The lambda runtime offers no argv, so the repo-store args
-/// (`remote_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
-/// boundary); the artifact is built on [`Ready`] ([`OnRepoStore`]), once the
-/// stack's `{RepoStoreBlock}` declaration has settled.
+/// (`http_bootstrap`) bake into the zip's `bootstrap` script (the env-to-args
+/// boundary); the artifact is built on [`Ready`] ([`infra_ext::lambda_artifact`])
+/// once the stack's `{RepoStoreBlock}` declaration has settled.
 ///
 /// `authorities` publishes the site's public hostnames as api gateway custom
 /// domains behind Cloudflare's edge (proxied, so they are cached and the origin
@@ -129,19 +137,7 @@ pub fn LambdaSiteBlock(
 		build =
 			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
 	}
-	(
-		block,
-		OnRepoStore::new(move |entity, repo| {
-			entity.insert(
-				build
-					.with_bootstrap(infra_ext::remote_bootstrap(
-						repo.store_uri()?,
-					))
-					.into_lambda_build_artifact()?,
-			);
-			Ok(())
-		}),
-	)
+	(block, infra_ext::lambda_artifact(build))
 }
 
 /// `<LambdaJobBlock label="rollup" features="aws_sdk,lambda" exec_route="jobs"/>`
@@ -156,7 +152,7 @@ pub fn LambdaSiteBlock(
 /// endpoint whose authorization is `NONE`.
 ///
 /// Otherwise it boots exactly as a served lambda does: the runtime offers no
-/// argv, so the entry-store config (`remote_bootstrap`) bakes into the zip's
+/// argv, so the entry-store config (`http_bootstrap`) bakes into the zip's
 /// `bootstrap` script and `exec_route` names the verb it launches. That verb
 /// hosts the router the schedule's invoke is dispatched into, so what runs is a
 /// route of the same entry document the site serves from.
@@ -181,17 +177,9 @@ pub fn LambdaJobBlock(
 			.with_label(label)
 			.with_http(false)
 			.with_timeout_secs(timeout_secs),
-		OnRepoStore::new(move |entity, repo| {
-			entity.insert(
-				infra_ext::beet_cargo_build(features)
-					.with_bootstrap(infra_ext::remote_bootstrap(
-						repo.store_uri()?,
-					))
-					.with_exec_route(exec_route)
-					.into_lambda_build_artifact()?,
-			);
-			Ok(())
-		}),
+		infra_ext::lambda_artifact(
+			infra_ext::beet_cargo_build(features).with_exec_route(exec_route),
+		),
 	)
 }
 
@@ -244,19 +232,25 @@ pub fn LightsailWatch(timeout: Option<Duration>) -> impl Bundle {
 }
 
 /// `<FargateSiteBlock/>` — the fargate deploy block wired to serve the site from
-/// the stack's repo store: the repo-store config (`remote_bootstrap`) lands in
+/// the stack's repo store: the repo-store config (`http_bootstrap`) lands in
 /// the container `CMD` via the sibling `<BuildDockerImage/>`. Named to avoid
-/// the [`FargateBlock`] it builds, on [`Ready`] ([`OnRepoStore`]) once the
-/// stack's `{RepoStoreBlock}` declaration has settled.
+/// the [`FargateBlock`] it builds, on [`Ready`] through [`RepoStoreQuery`]
+/// once the stack's `{RepoStoreBlock}` declaration has settled.
 #[template]
 pub fn FargateSiteBlock() -> impl Bundle {
-	OnRepoStore::new(|entity, repo| {
-		entity
-			.insert(FargateBlock::default().with_bootstrap(
-				infra_ext::remote_bootstrap(repo.store_uri()?),
-			));
-		Ok(())
-	})
+	OnSpawn::observe(
+		|ev: On<Ready>,
+		 repos: RepoStoreQuery,
+		 mut commands: Commands|
+		 -> Result {
+			commands.entity(ev.entity).insert(
+				FargateBlock::default().with_bootstrap(
+					infra_ext::http_bootstrap(&repos, ev.entity)?,
+				),
+			);
+			Ok(())
+		},
+	)
 }
 
 /// `<FargateSshBlock/>` — a [`FargateBlock`] with ssh enabled. No site-store
@@ -930,12 +924,6 @@ mod test {
 			.xpect_contains(format!(
 				"--repo=s3://beet-site--dev--repo/{deploy_id}"
 			));
-		// the deferral leaves nothing behind
-		world
-			.query::<&OnRepoStore>()
-			.iter(&world)
-			.count()
-			.xpect_eq(0);
 	}
 
 	/// ..and a stack shipping such a compute without declaring a repo store is

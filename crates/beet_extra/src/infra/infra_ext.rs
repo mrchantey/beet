@@ -19,44 +19,38 @@ pub fn watch(target: WatchTarget, timeout: Option<Duration>) -> AwsWatch {
 	}
 }
 
-/// The deployed generic `beet` binary's [`BootstrapConfig`] for serving the site
-/// out of `repo`, the stack's repo store rooted at this deploy's own prefix
-/// (`s3://<store>/<deploy id>`, self-rooted so the entry document is probed
-/// there, see [`RepoStoreDecl::store_uri`]) and constrained to the http
-/// transport. A deploy serving more transports overrides `server`.
-///
-/// Each block renders it at its own platform boundary, splitting boot selection
-/// onto argv (the Dockerfile `CMD`, the systemd `ExecStart`, the lambda
-/// `bootstrap` script) and service config onto env.
-///
-/// ## Why the deploy id is baked in rather than resolved at run time
-///
-/// A deploy publishes the site into the store and THEN swaps the binary that
-/// serves it, because the store has to hold the site before the process that
-/// reads it exists. At one mutable location that ordering is a window in which
-/// the OLD binary reads the NEW document, which is a hard parse failure the
-/// moment the document uses syntax that binary predates. Giving each deploy its
-/// own prefix closes the window: a binary only ever reads the document it
-/// shipped with.
-///
-/// It also makes a rollback whole for free. Re-applying with an earlier deploy
-/// id swaps the process back to that version's artifact, and that artifact was
-/// baked pointing at that version's document, so the binary and the document
-/// move together with nothing keeping them in step.
-///
-/// The prefix, the sync's destination and the ledger's record all derive from
-/// the store's one erased declaration, so they agree by construction; a store
-/// declaring `deploy_versioned=false` is read at its root by every one of them.
-///
-/// A deploy target that cannot bake a per-deploy value into its own boot config
-/// does not call this at all. It sets no `repo`, and the release pointer it
-/// resolves per start publishes one instead: see [`ArtifactLedger::repo`].
-pub fn remote_bootstrap(repo: StoreUri) -> BootstrapConfig {
+/// The stack's repo store ([`RepoStoreQuery::bootstrap`]) constrained to the
+/// http transport; a deploy serving more transports overrides `server`.
+pub fn http_bootstrap(
+	repos: &RepoStoreQuery,
+	entity: Entity,
+) -> Result<BootstrapConfig> {
 	BootstrapConfig {
-		repo: Some(repo),
 		server: Some(RunningSetFilter::new("http")),
-		..default()
+		..repos.bootstrap(entity)?
 	}
+	.xok()
+}
+
+/// Bakes `build` into a lambda's [`BuildArtifact`] booting from the stack's
+/// repo store ([`http_bootstrap`]), on [`Ready`] once the `{RepoStoreBlock}`
+/// declaration has settled: the lambda runtime offers no argv, so the boot
+/// config rides the zip's `bootstrap` script.
+pub fn lambda_artifact(build: CargoBuild) -> impl Bundle {
+	OnSpawn::observe(
+		move |ev: On<Ready>,
+		      repos: RepoStoreQuery,
+		      mut commands: Commands|
+		      -> Result {
+			commands.entity(ev.entity).insert(
+				build
+					.clone()
+					.with_bootstrap(http_bootstrap(&repos, ev.entity)?)
+					.into_lambda_build_artifact()?,
+			);
+			Ok(())
+		},
+	)
 }
 
 /// Shared `CargoBuild` for the generic `beet` binary (release, zigbuild);

@@ -64,31 +64,29 @@ pub(crate) fn assert_repo_store_blocks(
 	}
 }
 
-/// The repo store a consumer resolved: the declaration entity, its label, and
-/// the store as this launch reads or publishes it.
+/// The declaration a consumer resolved: the entity carrying
+/// [`RepoStoreBlock`], its label and its erased store half. No launch state
+/// lives here; the uri this launch publishes at is read through
+/// [`RepoStoreQuery::store_uri`] as it is needed.
 #[derive(Debug, Clone, Get)]
 pub struct RepoStoreDecl {
 	entity: Entity,
 	/// The declaration's [`label`](Block::label).
 	label: SmolStr,
 	store: ErasedStoreBlock,
-	/// This launch's deploy id, the version a versioned store nests under.
-	deploy_id: Uuid,
 }
 
 impl RepoStoreDecl {
 	/// The store's root, every version of the document below it.
 	pub fn root(&self) -> &StoreUri { self.store.root() }
-
-	/// The uri a process this launch deploys boots from: the root nested under
-	/// this launch's deploy id when the store is versioned, see
-	/// [`ErasedStoreBlock::store_uri`].
-	pub fn store_uri(&self) -> Result<StoreUri> {
-		self.store.store_uri(Some(&self.deploy_id))
-	}
 }
 
 /// Resolves the [`RepoStoreBlock`] a consumer reads.
+///
+/// A template needing the store at build (a compute baking the uri it boots
+/// from) resolves it in an `On<Ready>` observer rather than at spawn: a sibling
+/// declaration, possibly a forward one, lands its erased half through the
+/// command queue, and by [`Ready`] every declaration in the document has.
 #[derive(SystemParam)]
 pub struct RepoStoreQuery<'w, 's> {
 	stacks: StackQuery<'w, 's>,
@@ -127,7 +125,6 @@ impl RepoStoreQuery<'_, '_> {
 			entity: marker,
 			label: erased.label.clone(),
 			store: store.clone(),
-			deploy_id: *self.stacks.deployment().deploy_id(),
 		})
 		.xok()
 	}
@@ -152,60 +149,51 @@ impl RepoStoreQuery<'_, '_> {
 			})
 	}
 
-	/// The uri a process this launch deploys boots from, see
-	/// [`RepoStoreDecl::store_uri`].
+	/// The uri a process this launch deploys boots from: the root nested under
+	/// this launch's deploy id when the store is versioned, see
+	/// [`ErasedStoreBlock::store_uri`]. The id is read as this is called, so a
+	/// launch that adopts or rolls back to another version
+	/// ([`Deployment::update_from_ledger`]) bakes that version's uri.
 	pub fn store_uri(&self, entity: Entity) -> Result<StoreUri> {
-		self.get(entity)?.store_uri()
-	}
-}
-
-/// Defers an entity's bundle to [`Ready`], when the repo store has settled and
-/// [`RepoStoreQuery`] can resolve it. A template reading the store at spawn
-/// would race a sibling declaration (possibly a forward one) whose erased half
-/// lands through the command queue; by `Ready` every declaration in the
-/// document has. `func` receives the resolved store and inserts whatever the
-/// entity finally carries, ie a lambda's build artifact baked with the uri it
-/// boots from, and the component removes itself once it has run.
-#[derive(Component)]
-#[component(on_add = hook_ext::observe(OnRepoStore::on_ready))]
-pub struct OnRepoStore(
-	Option<
-		Box<
-			dyn 'static
-				+ Send
-				+ Sync
-				+ FnOnce(&mut EntityCommands, RepoStoreDecl) -> Result,
-		>,
-	>,
-);
-
-impl OnRepoStore {
-	pub fn new(
-		func: impl 'static
-		+ Send
-		+ Sync
-		+ FnOnce(&mut EntityCommands, RepoStoreDecl) -> Result,
-	) -> Self {
-		Self(Some(Box::new(func)))
+		self.get(entity)?
+			.store
+			.store_uri(Some(&self.stacks.deploy_id()))
 	}
 
-	fn on_ready(
-		ev: On<Ready>,
-		mut deferred: Query<&mut OnRepoStore>,
-		repos: RepoStoreQuery,
-		mut commands: Commands,
-	) -> Result {
-		let Ok(mut deferred) = deferred.get_mut(ev.entity) else {
-			return Ok(());
-		};
-		let Some(func) = deferred.0.take() else {
-			return Ok(());
-		};
-		let repo = repos.get(ev.entity)?;
-		let mut entity = commands.entity(ev.entity);
-		func(&mut entity, repo)?;
-		entity.remove::<OnRepoStore>();
-		Ok(())
+	/// The [`BootstrapConfig`] a process this launch deploys boots with: the
+	/// repo store at [`store_uri`](Self::store_uri) and nothing else, a deploy
+	/// target adding only what its transport needs.
+	///
+	/// ## Why the deploy id is baked in rather than resolved at run time
+	///
+	/// A deploy publishes the site into the store and THEN swaps the binary that
+	/// serves it, because the store has to hold the site before the process
+	/// that reads it exists. At one mutable location that ordering is a window
+	/// in which the OLD binary reads the NEW document, which is a hard parse
+	/// failure the moment the document uses syntax that binary predates. Giving
+	/// each deploy its own prefix closes the window: a binary only ever reads
+	/// the document it shipped with.
+	///
+	/// It also makes a rollback whole for free. Re-applying with an earlier
+	/// deploy id swaps the process back to that version's artifact, and that
+	/// artifact was baked pointing at that version's document, so the binary
+	/// and the document move together with nothing keeping them in step.
+	///
+	/// The prefix, the sync's destination and the ledger's record all derive
+	/// from the store's one erased declaration, so they agree by construction;
+	/// a store declaring `deploy_versioned=false` is read at its root by every
+	/// one of them.
+	///
+	/// A deploy target that cannot bake a per-deploy value into its own boot
+	/// config does not call this at all. It sets no `repo`, and the release
+	/// pointer it resolves per start publishes one instead: see
+	/// [`ArtifactLedger::repo`].
+	pub fn bootstrap(&self, entity: Entity) -> Result<BootstrapConfig> {
+		BootstrapConfig {
+			repo: Some(self.store_uri(entity)?),
+			..default()
+		}
+		.xok()
 	}
 }
 
@@ -244,6 +232,14 @@ mod test {
 			.unwrap()
 	}
 
+	/// The uri a consumer under `world`'s one stack boots from.
+	fn store_uri(world: &mut World, consumer: Entity) -> String {
+		world
+			.with_state::<RepoStoreQuery, _>(|repos| repos.store_uri(consumer))
+			.unwrap()
+			.to_string()
+	}
+
 	/// A consumer under the stack finds the marked store by type and reads the
 	/// uri this launch publishes it at.
 	#[beet_core::test]
@@ -256,10 +252,25 @@ mod test {
 			.unwrap();
 		repo.label().as_str().xpect_eq("repo");
 		repo.root().to_string().xpect_eq("s3://bucket");
-		repo.store_uri()
-			.unwrap()
-			.to_string()
+		store_uri(&mut world, consumer)
 			.xpect_eq(format!("s3://bucket/{deploy_id}"));
+	}
+
+	/// The uri nests under the id the launch holds WHEN it is read, so a launch
+	/// that adopts or rolls back to another version bakes that version.
+	#[beet_core::test]
+	fn reads_the_deploy_id_when_called() {
+		let mut world = world();
+		let consumer = stack_with(&mut world, (repo_block(), RepoStoreBlock));
+		let first = *world.resource::<Deployment>().deploy_id();
+		store_uri(&mut world, consumer)
+			.xpect_eq(format!("s3://bucket/{first}"));
+		let ledger = ArtifactLedger::new(uuid_ext::now_v7(), "later".into());
+		world
+			.resource_mut::<Deployment>()
+			.update_from_ledger(&ledger);
+		store_uri(&mut world, consumer)
+			.xpect_eq(format!("s3://bucket/{}", ledger.deploy_id));
 	}
 
 	/// A stack declaring no repo store finds none, and a consumer that cannot
