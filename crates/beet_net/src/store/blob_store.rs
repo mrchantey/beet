@@ -100,8 +100,10 @@ impl BlobStore {
 			StoreUri::Fs { path: None } => {
 				BlobStore::new(FsStore::new(dir)).xok()
 			}
+			// an absolute path stands alone, a relative one roots at `dir`
 			StoreUri::Fs { path: Some(path) } => {
-				BlobStore::new(FsStore::new(dir.join(path.as_str()))).xok()
+				BlobStore::new(FsStore::new(dir.join_checked(path.as_str())?))
+					.xok()
 			}
 			StoreUri::Memory => BlobStore::temp().xok(),
 			StoreUri::S3 { .. } => Self::s3_from_uri(uri),
@@ -381,6 +383,23 @@ mod test {
 			.await
 			.unwrap();
 		store
+	}
+
+	/// An `fs:<path>` uri roots at `path` when absolute, else at `path` under
+	/// the context dir.
+	#[beet_core::test]
+	fn fs_uri_honours_an_absolute_path() {
+		let dir = AbsPathBuf::new("/srv").unwrap();
+		let base_dir = |uri: &str| {
+			BlobStore::from_uri(&StoreUri::parse(uri).unwrap(), dir.clone())
+				.unwrap()
+				.base_dir()
+				.unwrap()
+				.to_string()
+		};
+		base_dir("fs:/data").xpect_eq("/data");
+		base_dir("fs:data").xpect_eq("/srv/data");
+		base_dir("fs").xpect_eq("/srv");
 	}
 
 	/// A nested entry declaring a root at an ancestor key takes a key-prefix

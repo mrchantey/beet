@@ -94,16 +94,17 @@ impl DynamoTableBlock {
 /// Observer: attach the runtime meaning of a declared table, a store provider
 /// materializing the [`TableStore`] a consumer reaches through
 /// [`StoreRef`]. Registered by [`InfraPlugin`] rather than hooked on the
-/// component, so a build without a backend carries the declaration and nothing
-/// else.
+/// component, on every target: a build without a backend for the table's kind
+/// errors with guidance here rather than carrying no store.
 ///
 /// [`ServiceAccess::Remote`] (a deployed process) resolves the DynamoDB table
 /// the deploy created; [`ServiceAccess::Local`] backs the same declaration with
-/// a workspace directory, so one markup declaration runs both ways.
+/// the host's local store ([`ServiceAccess::local_store_uri`]), so one markup
+/// declaration runs both ways. The concrete provider is inserted rather than an
+/// erased `BlobStore`, since its own hook lands the `TableStore`.
 ///
 /// Deferred through the command queue because the ancestry a scope resolves
 /// against lands with the rest of the scene, after this insertion.
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn attach_table_store(
 	ev: On<Add, DynamoTableBlock>,
 	mut commands: Commands,
@@ -118,7 +119,7 @@ pub(crate) fn attach_table_store(
 			match BootstrapConfig::get().service_access {
 				ServiceAccess::Remote => {
 					cfg_if! {
-						if #[cfg(feature = "aws_sdk")] {
+						if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 							entity.insert(beet_net::prelude::DynamoStore::new(
 								block.table_name(&stack),
 								block.resolved_region(&stack),
@@ -133,10 +134,23 @@ pub(crate) fn attach_table_store(
 					}
 				}
 				ServiceAccess::Local => {
-					entity.insert(FsStore::new(
-						ServiceAccess::local_store_dir(block.label().as_str())
-							.into_abs(),
-					));
+					match ServiceAccess::local_store_uri(block.label()) {
+						StoreUri::Fs { path: Some(path) } => {
+							entity.insert(FsStore::new(AbsPathBuf::new(path.as_str())?));
+						}
+						// browser storage is one database for every declaration
+						#[cfg(target_arch = "wasm32")]
+						StoreUri::IndexedDb => {
+							entity.insert(
+								IndexedDbStore::new("beet")
+									.with_subdir(block.label().clone()),
+							);
+						}
+						other => bevybail!(
+							"the table declared as `{}` has no local backend for `{other}`",
+							block.label()
+						),
+					}
 				}
 			}
 			Ok(())

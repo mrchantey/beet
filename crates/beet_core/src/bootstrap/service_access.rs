@@ -59,4 +59,32 @@ impl ServiceAccess {
 	pub fn local_store_dir(label: impl AsRef<std::path::Path>) -> WsPathBuf {
 		WsPathBuf::new("target/stores").join(label)
 	}
+
+	/// The store a [`Local`](Self::Local) declaration under `label` attaches,
+	/// in the spelling `BlobStore::from_uri` constructs: the absolute
+	/// [`local_store_dir`](Self::local_store_dir) on any host with a filesystem
+	/// (native, deno, node), else (a browser) IndexedDB, one database every
+	/// declaration shares and so scopes by label.
+	pub fn local_store_uri(label: &str) -> StoreUri {
+		match Self::host_has_fs() {
+			true => StoreUri::Fs {
+				path: Some(
+					Self::local_store_dir(label).into_abs().to_string().into(),
+				),
+			},
+			false => StoreUri::IndexedDb,
+		}
+	}
+
+	/// Whether this host reaches a filesystem: every native target, and a js
+	/// runtime that has one (deno, node).
+	fn host_has_fs() -> bool {
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				js_runtime::environment().has_fs()
+			} else {
+				true
+			}
+		}
+	}
 }

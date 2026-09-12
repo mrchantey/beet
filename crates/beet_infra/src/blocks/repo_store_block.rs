@@ -12,8 +12,8 @@ use beet_net::prelude::*;
 /// because the store may be any [`StoreBlock`]: a bucket the deploy creates, a
 /// [`StoreUriBlock`] naming one it does not. The only thing left to say is
 /// WHICH, and consumers find it by this type ([`RepoStoreQuery`]) rather than
-/// by a label convention. One per world, enforced on insert exactly as the
-/// runtime `RepoStore` is.
+/// by a label convention. One per world, enforced by its own insert hook
+/// exactly as the runtime `RepoStore` is.
 ///
 /// Distinct from `RepoStore`, which marks the live `BlobStore` a process
 /// actually booted from. That store exists before any document is read (the
@@ -22,6 +22,7 @@ use beet_net::prelude::*;
 /// it reads as "the block that is the repo store", which is what it marks.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_insert = hook_ext::exclusive::<RepoStoreBlock>())]
 pub struct RepoStoreBlock;
 
 impl RepoStoreBlock {
@@ -33,21 +34,6 @@ impl RepoStoreBlock {
 			 block: the marker goes on the store's own declaration, ie \
 			 `<S3BucketBlock label=\"repo\" {{RepoStoreBlock}}/>`"
 		)
-	}
-}
-
-/// Observer: enforce the [`RepoStoreBlock`] singleton.
-pub(crate) fn on_insert_repo_store_block(
-	ev: On<Insert, RepoStoreBlock>,
-	repos: Query<Entity, With<RepoStoreBlock>>,
-) -> Result {
-	match repos.iter().find(|entity| *entity != ev.entity) {
-		Some(other) => bevybail!(
-			"an app has exactly one repo store, but entity {other} already \
-			 declares one, so entity {} cannot",
-			ev.entity
-		),
-		None => Ok(()),
 	}
 }
 
@@ -331,7 +317,7 @@ mod test {
 
 	/// One repo store per world, whatever the stacks.
 	#[beet_core::test]
-	#[should_panic = "exactly one repo store"]
+	#[should_panic = "exactly one `RepoStoreBlock`"]
 	fn rejects_a_second_marker() {
 		let mut world = world();
 		world.spawn((repo_block(), RepoStoreBlock));

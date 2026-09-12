@@ -105,18 +105,18 @@ impl ErasedStoreBlock {
 }
 
 /// Observer: attach the runtime meaning of a declared store. A remote process
-/// gets the store the erased uri names ([`BlobStore::from_uri`]), rooted at
-/// this launch's deploy version when the store is versioned, which is exactly
-/// the uri a deploy bakes for it; a local process gets an [`FsStore`] under
-/// `target/stores/<label>`, so one declaration runs both ways whatever its
-/// kind.
+/// gets the store the erased uri names, rooted at this launch's deploy version
+/// when the store is versioned, which is exactly the uri a deploy bakes for
+/// it; a local process gets the host's local stand-in
+/// ([`ServiceAccess::local_store_uri`]), so one declaration runs both ways
+/// whatever its kind. Both go through [`BlobStore::from_uri`], on every
+/// target: a store kind this build has no backend for errors with guidance
+/// here rather than silently carrying no store.
 ///
-/// Registered by [`InfraPlugin`] rather than hooked on the component, so a
-/// backend-free build still carries the declaration. On the erased half rather
-/// than a block type, so a store block defined anywhere attaches without being
-/// named here. Deferred through the command queue because the erased half
-/// itself lands through it.
-#[cfg(not(target_arch = "wasm32"))]
+/// Registered by [`InfraPlugin`] rather than hooked on the component, and on
+/// the erased half rather than a block type, so a store block defined anywhere
+/// attaches without being named here. Deferred through the command queue
+/// because the erased half itself lands through it.
 pub(crate) fn attach_store(
 	ev: On<Insert, ErasedStoreBlock>,
 	mut commands: Commands,
@@ -126,25 +126,25 @@ pub(crate) fn attach_store(
 		.queue(|mut entity: EntityWorldMut| -> Result {
 			let store = entity.get_or_else::<ErasedStoreBlock>()?.clone();
 			let label = entity.get_or_else::<ErasedBlock>()?.label.clone();
-			match BootstrapConfig::get().service_access {
+			let uri = match BootstrapConfig::get().service_access {
 				ServiceAccess::Remote => {
 					let deploy_id =
 						entity.with_state::<StackQuery, _>(|_, stacks| {
 							stacks.deploy_id()
 						});
-					let uri = store.store_uri(Some(&deploy_id))?;
-					entity.insert(BlobStore::from_uri(
-						&uri,
-						AbsPathBuf::new(".")?,
-					)?);
+					store.store_uri(Some(&deploy_id))?
 				}
 				ServiceAccess::Local => {
-					entity.insert(FsStore::new(
-						ServiceAccess::local_store_dir(label.as_str())
-							.into_abs(),
-					));
+					ServiceAccess::local_store_uri(label.as_str())
 				}
-			}
+			};
+			let store = BlobStore::from_uri(&uri, AbsPathBuf::new(".")?)?;
+			// browser storage is one database for every declaration
+			let store = match uri {
+				StoreUri::IndexedDb => store.with_subdir(label.as_str().into()),
+				_ => store,
+			};
+			entity.insert(store);
 			Ok(())
 		});
 }
@@ -153,6 +153,7 @@ pub(crate) fn attach_store(
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// A world a store block resolves in: the process identity its stack
 	/// composes from, and nothing else.
@@ -168,6 +169,21 @@ mod test {
 			.id();
 		world.flush();
 		world.entity(stack).get::<Children>().unwrap()[0]
+	}
+
+	/// The runtime half attaches on every target: under the default
+	/// [`ServiceAccess::Local`] the declaration lands the host's local store,
+	/// whatever kind the deploy names.
+	#[beet_core::test]
+	fn attaches_a_local_store() {
+		let mut world = InfraPlugin.into_world();
+		world.init_resource::<PackageConfig>();
+		let entity = spawn_store(
+			&mut world,
+			StoreUriBlock::new("docs", StoreUri::Memory),
+		);
+		world.flush();
+		world.get::<BlobStore>(entity).xpect_some();
 	}
 
 	/// The erased half is the store's ROOT; the per-deploy prefix is applied by

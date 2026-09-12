@@ -39,11 +39,11 @@ impl Plugin for InfraPlugin {
 
 		// the store declarations' shared vocabulary, feature-free so a lean
 		// binary reads the same declaration the deployer does: the marker
-		// naming which store block is the repo store (one per world, checked
-		// at render) and the block naming a store this deploy does not create.
+		// naming which store block is the repo store (one per world by its own
+		// insert hook, storeless markers checked at render) and the block
+		// naming a store this deploy does not create.
 		app.register_type::<crate::prelude::RepoStoreBlock>()
 			.register_type::<crate::prelude::StoreUriBlock>()
-			.add_observer(crate::blocks::on_insert_repo_store_block)
 			.add_systems(
 				DeployRender,
 				crate::blocks::assert_repo_store_blocks
@@ -52,8 +52,8 @@ impl Plugin for InfraPlugin {
 		// ..and the runtime half of every store declaration: one observer on
 		// the erased half attaching the live store, so the deploy meaning (the
 		// render systems) and the runtime meaning hang off the one entity the
-		// markup declared, whatever kind of store it is.
-		#[cfg(not(target_arch = "wasm32"))]
+		// markup declared, whatever kind of store it is. On every target: a
+		// kind this build has no backend for errors at attach, with guidance.
 		app.add_observer(crate::blocks::attach_store);
 
 		// the deploy `Variable` + its value resolution, a field of the blocks'
@@ -93,10 +93,7 @@ impl Plugin for InfraPlugin {
 
 		// ..and the runtime half of a table declaration, whose store is not a
 		// blob store and so attaches by its own observer.
-		#[cfg(all(
-			feature = "bindings_aws_dynamo",
-			not(target_arch = "wasm32")
-		))]
+		#[cfg(feature = "bindings_aws_dynamo")]
 		app.add_observer(crate::blocks::attach_table_store);
 
 		// the serverless function, so a stack authors `<LambdaBlock

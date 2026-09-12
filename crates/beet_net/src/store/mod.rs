@@ -152,10 +152,9 @@ impl Plugin for StorePlugin {
 			// consumer to a declaration (`{StoreRef($analytics)}`).
 			.register_type::<StoreRef>()
 			.register_type::<StoreConsumers>()
-			// the repo store marker and its singleton enforcement: one canonical
-			// store per app, the one an entry loads through.
+			// the repo store marker: one canonical store per app, the one an
+			// entry loads through, enforced by its own insert hook.
 			.register_type::<RepoStore>()
-			.add_observer(on_insert_repo_store)
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_store)

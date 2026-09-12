@@ -2,6 +2,8 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 
 /// Marks the entity carrying the app's **repo store**, the single canonical
 /// [`BlobStore`] an entry loads through: the entry document, its templates,
@@ -26,8 +28,17 @@ use beet_core::prelude::*;
 /// process's own entry) claims it, so a command loading a foreign entry into the
 /// same world roots that sub-app's store unmarked, reachable by its own
 /// ancestry.
+///
+/// Both invariants are enforced by its own insert hook, at the next flush: one
+/// per world ([`hook_ext::exclusive_with`]) and a [`BlobStore`] beside it.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_insert = hook_ext::chain(
+	hook_ext::exclusive_with::<RepoStore>(
+		"tear the previous entry scene down before building the next"
+	),
+	RepoStore::assert_store
+))]
 pub struct RepoStore;
 
 impl RepoStore {
@@ -52,32 +63,29 @@ impl RepoStore {
 			),
 		}
 	}
-}
 
-/// Enforce the repo store singleton: one entity in a world carries [`RepoStore`],
-/// and it carries the [`BlobStore`] the marker claims.
-pub(crate) fn on_insert_repo_store(
-	ev: On<Insert, RepoStore>,
-	repo_stores: Query<Entity, With<RepoStore>>,
-	stores: Query<&BlobStore>,
-) -> Result {
-	if let Some(other) = repo_stores.iter().find(|entity| *entity != ev.entity)
-	{
-		bevybail!(
-			"an app has exactly one repo store, but entity {other} already \
-			carries one, so entity {} cannot: tear the previous entry scene \
-			down before building the next",
-			ev.entity
-		);
+	/// Insert hook: the marker claims a [`BlobStore`] on the same entity,
+	/// checked at the next flush so a bundle's other components have landed.
+	fn assert_store(mut world: DeferredWorld, cx: HookContext) {
+		let entity = cx.entity;
+		world.commands().queue(move |world: &mut World| -> Result {
+			// removed or despawned before the flush: nothing left to claim
+			let Ok(entity_ref) = world.get_entity(entity) else {
+				return Ok(());
+			};
+			match (
+				entity_ref.contains::<RepoStore>(),
+				entity_ref.contains::<BlobStore>(),
+			) {
+				(true, false) => bevybail!(
+					"entity {entity} is marked `RepoStore` but carries no \
+					 `BlobStore`: insert the store in the same bundle, ie \
+					 `(store, RepoStore)`"
+				),
+				_ => Ok(()),
+			}
+		});
 	}
-	if !stores.contains(ev.entity) {
-		bevybail!(
-			"entity {} is marked `RepoStore` but carries no `BlobStore`: insert \
-			the store in the same bundle, ie `(store, RepoStore)`",
-			ev.entity
-		);
-	}
-	Ok(())
 }
 
 #[cfg(test)]
@@ -106,10 +114,15 @@ mod test {
 		let mut world = store_world();
 		world.spawn((BlobStore::temp(), RepoStore));
 		world.spawn((BlobStore::temp(), RepoStore));
+		world.flush();
 	}
 
 	/// The marker without the store it claims is an error.
 	#[beet_core::test]
 	#[should_panic = "carries no `BlobStore`"]
-	fn rejects_storeless_marker() { store_world().spawn(RepoStore); }
+	fn rejects_storeless_marker() {
+		let mut world = store_world();
+		world.spawn(RepoStore);
+		world.flush();
+	}
 }

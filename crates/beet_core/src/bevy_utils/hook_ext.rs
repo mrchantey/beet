@@ -5,6 +5,13 @@
 //! every hook invocation. These constructors exploit that to express common
 //! hooks inline, and apply to any of the five:
 //!
+//! - [`chain`]: run two hooks in order, since bevy keeps one per event.
+//! - [`entity_hook`]: queue work on the hooked entity's [`EntityCommands`].
+//! - [`component_hook`]: read the hooked component, then queue work using it.
+//! - [`observe`]: register observers watching the hooked entity.
+//! - [`exclusive`] / [`exclusive_with`]: one entity per world carries the
+//!   component, a second insert erroring at the next flush.
+//!
 //! ```
 //! # use beet_core::prelude::*;
 //! #[derive(EntityTargetEvent)]
@@ -19,13 +26,15 @@
 //! #[derive(Component)]
 //! #[component(on_add = hook_ext::entity_hook(|entity| { entity.insert(Name::new("hooked")); }))]
 //! struct Named;
+//!
+//! #[derive(Component)]
+//! #[component(on_insert = hook_ext::exclusive::<Singleton>())]
+//! struct Singleton;
 //! ```
+use crate::prelude::*;
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::world::DeferredWorld;
-use bevy::prelude::*;
-
-use crate::prelude::EntityCommandsActionEventExt as _;
 
 /// Runs two component hooks in order, so one component can declare its own
 /// `on_add` alongside a generated one (the `#[action]` provider guard).
@@ -94,6 +103,48 @@ pub fn observe<M>(
 	entity_hook(move |entity| observers.add_observers(entity))
 }
 
+/// Creates an `on_insert` hook enforcing one `C` per world: inserting it on a
+/// second entity is an error naming both. Re-inserting on the entity that
+/// already carries it is not a conflict.
+///
+/// Detected at the next flush rather than in the hook, since a hook cannot
+/// build the query state the check needs, so a test spawning twice flushes
+/// before asserting.
+pub fn exclusive<C: Component>() -> impl FnOnce(DeferredWorld, HookContext) {
+	exclusive_with::<C>("")
+}
+
+/// [`exclusive`] with `hint` appended to the error, ie what to do about it.
+pub fn exclusive_with<C: Component>(
+	hint: &'static str,
+) -> impl FnOnce(DeferredWorld, HookContext) {
+	move |mut world: DeferredWorld, cx: HookContext| {
+		let entity = cx.entity;
+		world.commands().queue(move |world: &mut World| -> Result {
+			// removed or despawned before the flush: nothing left to conflict
+			if world.get::<C>(entity).is_none() {
+				return Ok(());
+			}
+			let Some(other) = world
+				.query_filtered::<Entity, With<C>>()
+				.iter(world)
+				.find(|other| *other != entity)
+			else {
+				return Ok(());
+			};
+			let hint = match hint.is_empty() {
+				true => String::new(),
+				false => format!(": {hint}"),
+			};
+			bevybail!(
+				"an app has exactly one `{}`, but entity {other} already carries \
+				 one, so entity {entity} cannot{hint}",
+				type_ext::short_name::<C>()
+			)
+		});
+	}
+}
+
 /// An observer, or tuple of observers, registrable by the [`observe`] hook.
 pub trait HookObservers<M> {
 	/// Register each observer, watching `entity`.
@@ -158,6 +209,14 @@ mod test {
 	}))]
 	struct Configured(&'static str);
 
+	#[derive(Component)]
+	#[component(on_insert = hook_ext::exclusive::<Solo>())]
+	struct Solo;
+
+	#[derive(Component)]
+	#[component(on_insert = hook_ext::exclusive_with::<Hinted>("remove the first"))]
+	struct Hinted;
+
 	#[crate::test]
 	fn observe_single() {
 		let mut world = World::new();
@@ -204,5 +263,38 @@ mod test {
 			.unwrap()
 			.as_str()
 			.xpect_eq("declared");
+	}
+
+	/// A second carrier anywhere in the world is an error at the next flush.
+	#[crate::test]
+	#[should_panic = "exactly one `Solo`"]
+	fn exclusive_rejects_a_second() {
+		let mut world = World::new();
+		world.spawn(Solo);
+		world.spawn(Solo);
+		world.flush();
+	}
+
+	/// The hint reaches the message.
+	#[crate::test]
+	#[should_panic = "cannot: remove the first"]
+	fn exclusive_with_appends_the_hint() {
+		let mut world = World::new();
+		world.spawn(Hinted);
+		world.spawn(Hinted);
+		world.flush();
+	}
+
+	/// Re-inserting on the carrier is not a conflict, nor is a second carrier
+	/// once the first is gone.
+	#[crate::test]
+	fn exclusive_tolerates_the_same_entity() {
+		let mut world = World::new();
+		let first = world.spawn(Solo).id();
+		world.entity_mut(first).insert(Solo);
+		world.flush();
+		world.entity_mut(first).despawn();
+		world.spawn(Solo);
+		world.flush();
 	}
 }

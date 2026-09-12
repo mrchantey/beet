@@ -386,6 +386,17 @@ mod test {
 		world.flush();
 	}
 
+	/// The directory the one declared bucket attached under local service
+	/// access, so one declaration runs both ways.
+	fn attached_local_dir(world: &mut World) -> AbsPathBuf {
+		world
+			.query_filtered::<&BlobStore, With<S3BucketBlock>>()
+			.single(world)
+			.unwrap()
+			.base_dir()
+			.unwrap()
+	}
+
 	/// The stores the served site reaches by `bx:ref` are declared OUTSIDE every
 	/// `bx:cfg`-excluded branch of the entry, so the lean binary still binds
 	/// them.
@@ -471,11 +482,7 @@ mod test {
 				..default()
 			}))
 			.xpect_eq("bucket-example--dev--my-bucket");
-		world
-			.query::<&FsStore>()
-			.single(&world)
-			.unwrap()
-			.path()
+		attached_local_dir(&mut world)
 			.xpect_eq(ServiceAccess::local_store_dir("my-bucket").into_abs());
 	}
 
@@ -586,8 +593,9 @@ mod test {
 			.bucket_name(&scope)
 			.xpect_eq(expected);
 		// ..which locally is backed by a workspace directory rather than the
-		// remote bucket, so one declaration runs both ways
-		world.query::<&FsStore>().single(&world).xpect_ok();
+		// remote bucket
+		attached_local_dir(&mut world)
+			.xpect_eq(ServiceAccess::local_store_dir("analytics").into_abs());
 	}
 
 	/// The analytics compaction stack the site entry declares end to end: the
@@ -798,7 +806,8 @@ mod test {
 					.resolve(&PackageConfig::default()),
 			)
 			.xpect_eq("beet-site--shared--assets");
-		world.query::<&FsStore>().single(&world).unwrap();
+		attached_local_dir(&mut world)
+			.xpect_eq(ServiceAccess::local_store_dir("assets").into_abs());
 		// ..and so did the syncs, which name the bucket by label alone
 		world
 			.query::<&S3FsStore>()
