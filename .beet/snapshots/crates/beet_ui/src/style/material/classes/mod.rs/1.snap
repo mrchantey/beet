@@ -32,7 +32,7 @@
   border-width: var(--material-geometry-outline-width-thin);
 }
 
-.input:focus {
+.input:focus-visible {
   border-color: var(--material-colors-primary);
 }
 

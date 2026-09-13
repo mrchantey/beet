@@ -262,9 +262,13 @@ mod tests {
 				&RuleSet::new(Rule::new()).with_rules(all_rules()),
 			)
 			.unwrap();
-		// compound `.input:focus` exercises Selector::AllOf serialization
+		// compound `.input:focus-visible` exercises Selector::AllOf serialization
 		css.as_str()
-			.xpect_contains(".input:focus")
+			.xpect_contains(".input:focus-visible")
+			// a nested AnyOf distributes: `button, .btn:focus-visible` would ring
+			// every button
+			.xpect_contains("button:focus-visible, .btn:focus-visible")
+			.xpect_contains("button:hover, a:hover")
 			.xpect_contains(".btn")
 			.xpect_contains(".btn-error")
 			.xpect_contains(".error-text")

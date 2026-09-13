@@ -116,27 +116,11 @@ fn interactive_fallback() -> Selector {
 	])
 }
 
-/// Gates a selector on the [`Hovered`](ElementState::Hovered) state.
+/// Gates a selector on the [`Hovered`](ElementState::Hovered) state. An
+/// `AnyOf` distributes on serialization (`button:hover, a:hover`), so a whole
+/// group gates at once.
 fn hovered(selector: Selector) -> Selector {
 	Selector::AllOf(vec![selector, Selector::state(ElementState::Hovered)])
-}
-
-/// `:hover` over an interactive element: the [`interactive`] tags, each gated
-/// on the [`Hovered`](ElementState::Hovered) state.
-fn interactive_hover() -> Selector {
-	Selector::AnyOf(vec![
-		hovered(Selector::tag("button")),
-		hovered(Selector::tag("a")),
-	])
-}
-
-/// `:hover` over a terminal link fallback: the [`interactive_fallback`] tags,
-/// each gated on the [`Hovered`](ElementState::Hovered) state.
-fn interactive_fallback_hover() -> Selector {
-	Selector::AnyOf(vec![
-		hovered(Selector::tag("img")),
-		hovered(Selector::tag("iframe")),
-	])
 }
 
 /// Eases the [hover dim](hover_dim) in and out on every interactive element.
@@ -163,7 +147,7 @@ pub fn interactive_fallback_transition() -> Rule {
 /// light scheme it is invisible, so [`hover_state_layer`] adds a fill there.
 pub fn hover_dim() -> Rule {
 	Rule::new()
-		.with_selector(interactive_hover())
+		.with_selector(hovered(interactive()))
 		.with_value(common_props::OpacityProp, 0.8_f32)
 }
 
@@ -171,7 +155,7 @@ pub fn hover_dim() -> Rule {
 /// fallbacks, so a hovered alt/title placeholder dims like an `<a>`.
 pub fn hover_dim_fallback() -> Rule {
 	Rule::new()
-		.with_selector(interactive_fallback_hover())
+		.with_selector(hovered(interactive_fallback()))
 		.with_media(MediaQuery::Terminal)
 		.with_value(common_props::OpacityProp, 0.8_f32)
 }
@@ -181,13 +165,13 @@ pub fn hover_dim_fallback() -> Rule {
 /// rows, and disclosure summaries/carets — the latter so a `<details>` arrow
 /// hovers like a text button.
 fn container_less_hover() -> Selector {
-	Selector::AnyOf(vec![
-		hovered(Selector::class(super::BTN_TEXT)),
-		hovered(Selector::class(super::BTN_OUTLINED)),
-		hovered(Selector::class(super::SIDEBAR_LINK)),
-		hovered(Selector::class(super::SIDEBAR_CARET)),
-		hovered(Selector::tag("summary")),
-	])
+	hovered(Selector::AnyOf(vec![
+		Selector::class(super::BTN_TEXT),
+		Selector::class(super::BTN_OUTLINED),
+		Selector::class(super::SIDEBAR_LINK),
+		Selector::class(super::SIDEBAR_CARET),
+		Selector::tag("summary"),
+	]))
 }
 
 /// Hover state layer for container-less interactives - a faint surface fill on

@@ -117,70 +117,94 @@ impl CssRule {
 
 	/// Serialize this rule's selector to CSS.
 	///
+	/// A css selector list (`a, b`) is only valid at the top level, so a nested
+	/// [`Selector::AnyOf`] is distributed rather than emitted inline:
+	/// `AllOf([AnyOf([button, .btn]), :hover])` is `button:hover, .btn:hover`,
+	/// never `button, .btn:hover`, which would match every button.
+	///
 	/// ## Panics
 	///
 	/// Panics on a selector containing [`Selector::Entity`], which is resolved
 	/// at runtime against the entity and has no CSS text form. Callers filter
 	/// those out with [`Selector::has_entity`] before serializing.
 	pub fn selector_to_css(&self) -> String {
-		Self::selector_to_css_inner(&self.selector)
+		Self::selector_alternatives(&self.selector).join(", ")
 	}
 
-	fn selector_to_css_inner(rule: &Selector) -> String {
+	/// The selector's disjunctive normal form: a list of alternatives with no
+	/// inner `AnyOf`. `AllOf` and the combinators take the cartesian product of
+	/// their parts' alternatives, `Not` applies De Morgan (`:not(a):not(b)`).
+	fn selector_alternatives(rule: &Selector) -> Vec<String> {
 		match rule {
-			Selector::Any => "*".to_string(),
-			Selector::Root => ":root".to_string(),
+			Selector::Any => vec!["*".to_string()],
+			Selector::Root => vec![":root".to_string()],
 			Selector::Entity(_) => unimplemented!(
 				"`Selector::Entity` has no CSS form, it is applied at runtime to the entity. Filter with `Selector::has_entity` before serializing"
 			),
-			Selector::AnyOf(rules) => rules
-				.iter()
-				.map(|rule| Self::selector_to_css_inner(rule))
-				.collect::<Vec<_>>()
-				.join(", "),
+			Selector::AnyOf(rules) => {
+				rules.iter().flat_map(Self::selector_alternatives).collect()
+			}
 			// concatenated with no separator, ie `.input:focus` or `div.btn`
-			Selector::AllOf(rules) => rules
-				.iter()
-				.map(|rule| Self::selector_to_css_inner(rule))
-				.collect::<Vec<_>>()
-				.join(""),
-			Selector::Tag(tag) => tag.to_string(),
-			Selector::Class(class) => format!(".{}", class),
-			Selector::State(ElementState::Hovered) => ":hover".to_string(),
-			Selector::State(ElementState::Focused) => ":focus".to_string(),
-			Selector::State(ElementState::Pressed) => ":active".to_string(),
-			Selector::State(ElementState::Selected) => {
-				"[aria-selected=\"true\"]".to_string()
+			Selector::AllOf(rules) => {
+				rules.iter().fold(vec![String::new()], |acc, rule| {
+					Self::product(&acc, &Self::selector_alternatives(rule), "")
+				})
 			}
-			Selector::State(ElementState::Dragged) => {
-				"[data-dragging=\"true\"]".to_string()
-			}
-			Selector::State(ElementState::Disabled) => ":disabled".to_string(),
-			Selector::State(ElementState::Custom(val)) => {
-				format!("[data-state-{}]", val)
-			}
-			Selector::Attribute { key, value } => match value {
+			Selector::Tag(tag) => vec![tag.to_string()],
+			Selector::Class(class) => vec![format!(".{}", class)],
+			Selector::State(state) => vec![Self::state_to_css(state)],
+			Selector::Attribute { key, value } => vec![match value {
 				Some(value) => format!("[{}=\"{}\"]", key, value),
 				None => format!("[{}]", key),
-			},
-			Selector::Not(inner) => {
-				format!(":not({})", Self::selector_to_css_inner(inner))
-			}
+			}],
+			// not (a or b) is not(a) and not(b)
+			Selector::Not(inner) => Self::selector_alternatives(inner)
+				.iter()
+				.map(|alt| format!(":not({alt})"))
+				.collect::<String>()
+				.xvec(),
 			// the descendant combinator, ie `ancestor descendant` (space-joined).
 			Selector::Descendant {
 				ancestor,
 				descendant,
-			} => format!(
-				"{} {}",
-				Self::selector_to_css_inner(ancestor),
-				Self::selector_to_css_inner(descendant)
+			} => Self::product(
+				&Self::selector_alternatives(ancestor),
+				&Self::selector_alternatives(descendant),
+				" ",
 			),
 			// the direct-child combinator, ie `parent > child`.
-			Selector::Child { parent, child } => format!(
-				"{} > {}",
-				Self::selector_to_css_inner(parent),
-				Self::selector_to_css_inner(child)
+			Selector::Child { parent, child } => Self::product(
+				&Self::selector_alternatives(parent),
+				&Self::selector_alternatives(child),
+				" > ",
 			),
+		}
+	}
+
+	/// Every `left` alternative joined to every `right` alternative.
+	fn product(left: &[String], right: &[String], joiner: &str) -> Vec<String> {
+		left.iter()
+			.flat_map(|left| {
+				right
+					.iter()
+					.map(move |right| format!("{left}{joiner}{right}"))
+			})
+			.collect()
+	}
+
+	/// `Focused` is `:focus-visible`, not `:focus`: a click leaves a button
+	/// focused until the next click, so `:focus` would ring the hamburger for as
+	/// long as the drawer stays open. `:focus-visible` rings on Tab (the case the
+	/// ring exists for) and, per the browser's heuristic, always on a text field.
+	fn state_to_css(state: &ElementState) -> String {
+		match state {
+			ElementState::Hovered => ":hover".to_string(),
+			ElementState::Focused => ":focus-visible".to_string(),
+			ElementState::Pressed => ":active".to_string(),
+			ElementState::Selected => "[aria-selected=\"true\"]".to_string(),
+			ElementState::Dragged => "[data-dragging=\"true\"]".to_string(),
+			ElementState::Disabled => ":disabled".to_string(),
+			ElementState::Custom(val) => format!("[data-state-{}]", val),
 		}
 	}
 }
@@ -377,5 +401,47 @@ mod tests {
 			))
 			.selector_to_css()
 			.xpect_eq("main .prose");
+	}
+
+	// a nested `AnyOf` distributes into a top-level list: `button, .btn:focus-visible`
+	// would ring every button.
+	#[beet_core::test]
+	fn nested_any_of_distributes() {
+		let buttons = Selector::tag("button").merge_any(Selector::class("btn"));
+		let focused = Selector::state(ElementState::Focused);
+		CssRule::default()
+			.with_selector(Selector::AllOf(vec![
+				buttons.clone(),
+				focused.clone(),
+			]))
+			.selector_to_css()
+			.xpect_eq("button:focus-visible, .btn:focus-visible");
+		// both sides of a compound: the cartesian product
+		CssRule::default()
+			.with_selector(Selector::AllOf(vec![
+				buttons.clone(),
+				Selector::class("a").merge_any(Selector::class("b")),
+			]))
+			.selector_to_css()
+			.xpect_eq("button.a, button.b, .btn.a, .btn.b");
+		CssRule::default()
+			.with_selector(Selector::child(buttons.clone(), Selector::Any))
+			.selector_to_css()
+			.xpect_eq("button > *, .btn > *");
+		CssRule::default()
+			.with_selector(Selector::descendant(
+				Selector::tag("main"),
+				buttons.clone(),
+			))
+			.selector_to_css()
+			.xpect_eq("main button, main .btn");
+		// de morgan: not (a or b) is not(a) and not(b)
+		CssRule::default()
+			.with_selector(Selector::AllOf(vec![
+				Selector::class("x"),
+				Selector::not(buttons),
+			]))
+			.selector_to_css()
+			.xpect_eq(".x:not(button):not(.btn)");
 	}
 }
