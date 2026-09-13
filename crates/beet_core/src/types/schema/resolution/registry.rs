@@ -76,7 +76,11 @@ impl SchemaRegistry {
 	///
 	/// Re-registering a key replaces it, which is how a reloaded template dir or
 	/// an edited schema document updates in place.
-	pub fn insert(&mut self, name: impl Into<SmolStr>, schema: ValueSchema)-> &mut Self {
+	pub fn insert(
+		&mut self,
+		name: impl Into<SmolStr>,
+		schema: ValueSchema,
+	) -> &mut Self {
 		let name = name.into();
 		let short = Self::short_name(&name);
 		if short != name {

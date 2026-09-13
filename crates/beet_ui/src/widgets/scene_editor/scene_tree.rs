@@ -19,7 +19,7 @@ use beet_core::prelude::*;
 /// The rows ride a [`ValueRebuild`] over the whole document keyed by each
 /// entity's key, place and label, so an entity added, moved, renamed or
 /// removed rebuilds its own row alone and every other row keeps its entity
-/// and focus. The editor's furniture never appears: it is [`Derived`], so it
+/// and focus. The editor ui never appears: it is [`Derived`], so it
 /// is not in the document the tree reads.
 ///
 /// [`EntityInspector`]: super::EntityInspector

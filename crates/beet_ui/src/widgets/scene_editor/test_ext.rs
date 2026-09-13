@@ -1,5 +1,5 @@
 //! Harness for the scene editor tests: a page authored with the editor tag,
-//! forked into a scene document, its furniture bound and settled.
+//! forked into a scene document, its editor ui bound and settled.
 //!
 //! Layered on the widget harnesses ([`test_ext`](crate::widgets::test_ext),
 //! [`schema_ui::test_ext`](crate::widgets::schema_ui::test_ext)), which it

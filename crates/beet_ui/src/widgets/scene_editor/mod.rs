@@ -12,7 +12,7 @@
 //! The editor lives *inside* the scene it edits: [`ToggleSceneEditor`] is
 //! authored as a tag in the scene, stays in the scene document (so removing
 //! your editor is an ordinary edit) and spawns its widgets as [`Derived`]
-//! furniture the fork never dumps. Selection is a [`SceneSelection`] on the
+//! editor ui the fork never dumps. Selection is a [`SceneSelection`] on the
 //! scene document's host, per document rather than global.
 mod entity_inspector;
 mod scene_editor;

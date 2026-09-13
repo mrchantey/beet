@@ -38,8 +38,8 @@ impl<T> FromType<T> for ReflectDerived {
 /// The entity-level twin of [`ReflectDerived`]. A type is derived when no
 /// authored content ever holds it; an entity is derived when something that
 /// *is* content generated it, ie the widgets a scene editor spawns under the
-/// tag that asked for them. The tag is saved and rebuilds its furniture on the
-/// next boot; the furniture itself would only duplicate on reload.
+/// tag that asked for them. The tag is saved and rebuilds its editor ui on the
+/// next boot; the editor ui itself would only duplicate on reload.
 ///
 /// Every saver honours it by construction: a subtree walk stops here, and an
 /// entity carrying it, or under one that does, is never extracted.

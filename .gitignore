@@ -14,6 +14,7 @@ site/dist
 examples/thread/persistent_chat.json
 examples/router/router_serde.json
 examples/todo/todos.json
+examples/ui/scene_editor/scene.json
 
 !examples/assets
 Cargo.toml.full

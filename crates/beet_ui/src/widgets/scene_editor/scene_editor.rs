@@ -12,7 +12,7 @@ use beet_core::prelude::*;
 /// among the page's, where an inspector can select it and removing it is an
 /// ordinary edit, and every boot from the fork rebuilds the editor from it.
 /// The widgets themselves are spawned under it on add as [`Derived`]
-/// furniture, which no dump ever includes, so a fork holds the tag and never
+/// editor ui, which no dump ever includes, so a fork holds the tag and never
 /// the tree it generated.
 ///
 /// ```html
@@ -23,7 +23,7 @@ use beet_core::prelude::*;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = hook_ext::component_hook(spawn_furniture))]
+#[component(on_add = hook_ext::component_hook(spawn_editor_ui))]
 pub struct ToggleSceneEditor {
 	/// The disclosure's label.
 	pub label: SmolStr,
@@ -37,9 +37,9 @@ impl Default for ToggleSceneEditor {
 	}
 }
 
-/// The furniture a [`ToggleSceneEditor`] spawns: the disclosure and the
+/// The editor ui a [`ToggleSceneEditor`] spawns: the disclosure and the
 /// editor, derived from the tag and rebuilt from it on every boot.
-fn spawn_furniture(
+fn spawn_editor_ui(
 	toggle: &ToggleSceneEditor,
 ) -> impl FnOnce(&mut EntityCommands) + use<> {
 	let label = toggle.label.to_string();
@@ -154,7 +154,7 @@ pub(super) fn clear_stale_selections(
 
 /// The scene an editor widget edits: the host its editor's [`DocRef`] names.
 ///
-/// Shared by the tree and the inspector, which are both furniture under one
+/// Shared by the tree and the inspector, which are both editor ui under one
 /// [`SceneEditorRoot`] and address the scene through it rather than through
 /// their own bindings' ancestor walk, so a document nearer than the scene (a
 /// form's draft, say) never captures them. The selection is queried beside

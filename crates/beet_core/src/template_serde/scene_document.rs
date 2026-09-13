@@ -494,7 +494,7 @@ impl ScenePlan {
 }
 
 /// Put the document's children of `parent` in `ordered` order, leaving any
-/// child the document does not describe (an editor's furniture, a form's rows)
+/// child the document does not describe (editor ui, a form's rows)
 /// exactly where it sits.
 fn order_children(world: &mut World, parent: Entity, ordered: &[Entity]) {
 	let children = world
@@ -858,18 +858,18 @@ mod test {
 	}
 
 	/// Moving an entity within the document reorders its parent's children,
-	/// around any child the document does not describe: runtime furniture (an
-	/// editor's widgets, a form's rows) keeps its slot and its parent.
+	/// around any child the document does not describe: a generated entity
+	/// (editor ui, a form's rows) keeps its slot and its parent.
 	#[crate::test]
 	fn a_reorder_follows_the_document() {
 		let (mut world, host, _) = forked();
 		let root = entity(&world, host, 0);
-		let furniture =
-			world.spawn((Name::new("furniture"), ChildOf(root))).id();
-		world.entity_mut(root).insert_children(1, &[furniture]);
+		let editor_ui =
+			world.spawn((Name::new("editor_ui"), ChildOf(root))).id();
+		world.entity_mut(root).insert_children(1, &[editor_ui]);
 		names(&world, root).xpect_eq(vec![
 			"a".to_string(),
-			"furniture".into(),
+			"editor_ui".into(),
 			"b".into(),
 		]);
 		edit(&mut world, host, |scene| {
@@ -879,7 +879,7 @@ mod test {
 		});
 		names(&world, root).xpect_eq(vec![
 			"b".to_string(),
-			"furniture".into(),
+			"editor_ui".into(),
 			"a".into(),
 		]);
 	}
@@ -1181,15 +1181,15 @@ mod conformance {
 			.xpect_eq(1);
 	}
 
-	/// Derived furniture under a scene entity (the widgets an editor tag
+	/// Derived editor ui under a scene entity (the widgets an editor tag
 	/// spawns) never enters the fork: the tag is content and rebuilds it.
 	#[crate::test]
-	fn derived_furniture_is_not_forked() {
+	fn derived_editor_ui_is_not_forked() {
 		let mut world = new_world();
 		let host = world
 			.spawn(children![(Name::new("tag"), children![(
 				Derived,
-				Name::new("furniture"),
+				Name::new("editor_ui"),
 				children![Name::new("deep")]
 			)])])
 			.flush();
@@ -1199,7 +1199,7 @@ mod conformance {
 			.unwrap()
 			.to_string();
 		json.clone().xpect_contains("\"tag\"");
-		json.clone().xnot().xpect_contains("furniture");
+		json.clone().xnot().xpect_contains("editor_ui");
 		json.xnot().xpect_contains("deep");
 	}
 
