@@ -25,7 +25,7 @@ use beet_core::prelude::*;
 pub enum StoreProvider {
 	/// `fs` / `fs:<path>`.
 	Fs(FsStore),
-	/// `memory`.
+	/// `memory://<name>`.
 	Memory(InMemoryStore),
 	/// `s3://<bucket>`.
 	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
@@ -72,7 +72,14 @@ impl StoreProvider {
 				.xmap(AbsPathBuf::new)?
 				.xmap(FsStore::new)
 				.xmap(Self::Fs),
-			StoreUri::Memory => Self::Memory(InMemoryStore::new()),
+			StoreUri::Memory { name, prefix } => {
+				InMemoryStore::named(name.clone())
+					.xmap(|store| match prefix {
+						Some(prefix) => store.with_subdir(prefix.as_str()),
+						None => store,
+					})
+					.xmap(Self::Memory)
+			}
 			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 			StoreUri::S3 { .. } => Self::S3(S3Store::from_uri(uri)?),
 			#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
@@ -137,11 +144,26 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_eq("/data");
-		StoreProvider::from_uri(&StoreUri::Memory)
+		StoreProvider::from_uri(&StoreUri::parse("memory://m/docs").unwrap())
 			.unwrap()
 			.into_blob_store()
-			.id()
-			.xpect_eq("memory");
+			.xmap(|store| (store.root_key(), store.subdir()))
+			.xpect_eq(("memory:m".into(), SmolPath::new("docs")));
+	}
+
+	/// A memory uri names one backing: every build of it reads the same data,
+	/// so a store a test seeds by name is the store the uri names.
+	#[beet_core::test]
+	async fn a_memory_uri_names_one_backing() {
+		let uri = StoreUri::parse("memory://provider-shared").unwrap();
+		let build = || StoreProvider::from_uri(&uri).unwrap().into_blob_store();
+		let seeded = build();
+		seeded.insert(&SmolPath::new("a.txt"), "hi").await.unwrap();
+		build()
+			.get(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_eq(bytes::Bytes::from_static(b"hi"));
 	}
 
 	/// The concrete component lands, and its hook derives the erased store
@@ -150,7 +172,7 @@ mod test {
 	fn inserting_derives_the_erased_store() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		StoreProvider::from_uri(&StoreUri::Memory)
+		StoreProvider::from_uri(&StoreUri::parse("memory://m").unwrap())
 			.unwrap()
 			.insert(&mut world.entity_mut(entity));
 		world.flush();

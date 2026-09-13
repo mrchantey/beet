@@ -610,7 +610,7 @@ mod test {
 				.filter(|other| {
 					other.is_required() && other.name() != meta.name()
 				})
-				.map(|other| format!("--{}=memory", other.name()))
+				.map(|other| format!("--{}=memory://m", other.name()))
 				.collect::<Vec<_>>()
 				.join(" ");
 			let parsed = Request::from_cli_str(&args).parse_params::<Params>();

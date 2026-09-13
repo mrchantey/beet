@@ -1,9 +1,11 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
-#[cfg(feature = "std")]
+use bevy::platform::sync::LazyLock;
 use bevy::platform::sync::Mutex;
 use bevy::platform::sync::RwLock;
+use bevy::platform::sync::Weak;
+use bevy::reflect::ReflectRef;
 use bytes::Bytes;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
@@ -13,36 +15,51 @@ impl BlobStore {
 	pub fn new_test() -> Self { Self::new(InMemoryStore::new()) }
 }
 
-/// Process-global counter assigning a unique `instance_id` per backing store.
+/// Process-global counter minting a unique name per unnamed backing.
 static INSTANCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// A store provider using an in-memory hashmap.
+/// Process-global registry of live backings by name, so every handle opened on
+/// one name shares one backing. `Weak`, so a store with no live handle is freed
+/// and the registry never pins data.
+static REGISTRY: LazyLock<Mutex<HashMap<SmolStr, Weak<InMemoryInner>>>> =
+	LazyLock::new(default);
+
+/// A store provider using an in-memory hashmap, `memory://<name>[/<prefix>]`.
+///
+/// Every backing has a name: [`named`](Self::named) joins the backing of that
+/// name, creating it on the first call, so a store a test seeds by name is the
+/// store a uri names, and a scene round-trips a memory store onto its data.
+/// [`new`](Self::new) mints a name nobody else knows, so the default stays
+/// isolated. The backing lives as long as any handle does.
 ///
 /// Inner state is `None` when the store has not been created, and `Some(map)`
 /// when it exists. An optional `subdir` scopes all operations to a key prefix.
 ///
 /// Spawned as a [`Component`] (its `on_insert` inserts a [`BlobStore`]), it becomes
 /// reactive: `insert` / `remove` emit a [`BlobEvent`] on the subscribed bus, and
-/// every clone (including [`with_subdir`](BlobStoreProvider::with_subdir)) shares
-/// one backing `Arc`, so the `instance_id` and bus subscription are shared.
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
+/// every handle on one name (including [`with_subdir`](BlobStoreProvider::with_subdir))
+/// shares one backing `Arc`, so the bus subscription is shared.
+#[derive(Debug, Clone, Get, Component, Reflect)]
+// `inner` is rebuilt from the registry by name, see the manual `FromReflect`.
+#[reflect(Component, from_reflect = false, FromReflect)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct InMemoryStore {
+	/// The backing's name, the `<name>` in `memory://<name>`.
+	name: SmolStr,
 	/// Shared backing state, opaque to reflection.
 	#[reflect(ignore)]
+	#[get(skip)]
 	inner: Arc<InMemoryInner>,
 	/// Optional subdirectory prefix for all keys.
+	#[get(skip)]
 	subdir: Option<SmolPath>,
 }
 
-/// Backing state shared across all clones of an [`InMemoryStore`].
+/// Backing state shared across every handle on one name.
 #[derive(Debug)]
 struct InMemoryInner {
 	/// Shared storage state, `None` until the store is created.
 	map: RwLock<Option<HashMap<SmolPath, Bytes>>>,
-	/// Stable identity used by `root_key`, unique per `new` / `new_empty`.
-	instance_id: usize,
 	/// Bus to emit [`BlobEvent`]s on, set while at least one watcher subscribes.
 	#[cfg(feature = "std")]
 	bus: Mutex<Option<async_channel::Sender<BlobEvent>>>,
@@ -52,18 +69,10 @@ struct InMemoryInner {
 	subscribers: AtomicUsize,
 }
 
-impl Default for InMemoryStore {
-	fn default() -> Self { Self::new() }
-}
-
-impl Default for InMemoryInner {
-	/// A fresh empty backing with a new `instance_id`, ie for reflection's
-	/// ignored field. Constructing a store this way is never reactive until
-	/// `subscribe` runs.
-	fn default() -> Self {
-		InMemoryInner {
-			map: RwLock::new(None),
-			instance_id: INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed),
+impl InMemoryInner {
+	fn new(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
+		Self {
+			map: RwLock::new(map),
 			#[cfg(feature = "std")]
 			bus: Mutex::new(None),
 			#[cfg(feature = "std")]
@@ -72,12 +81,49 @@ impl Default for InMemoryInner {
 	}
 }
 
-impl InMemoryStore {
-	/// Creates a new already-created (empty) in-memory provider.
-	pub fn new() -> Self { Self::with_map(Some(HashMap::new())) }
+impl Drop for InMemoryInner {
+	/// The last handle dropped: prune the registry so a dead name is freed
+	/// and a later [`InMemoryStore::named`] starts fresh.
+	fn drop(&mut self) {
+		if let Ok(mut registry) = REGISTRY.lock() {
+			registry.retain(|_, weak| weak.strong_count() > 0);
+		}
+	}
+}
 
-	/// Creates a new uncreated in-memory provider.
-	pub fn new_empty() -> Self { Self::with_map(None) }
+impl Default for InMemoryStore {
+	fn default() -> Self { Self::new() }
+}
+
+/// Rebuild from the registry by name, so a scene round-trips a memory store
+/// onto its data: the derived impl would default the ignored `inner` to a
+/// fresh backing. A concrete value (a reflect clone) downcasts directly.
+impl FromReflect for InMemoryStore {
+	fn from_reflect(reflect: &dyn PartialReflect) -> Option<Self> {
+		if let Some(value) = reflect.try_downcast_ref::<Self>() {
+			return Some(value.clone());
+		}
+		let ReflectRef::Struct(dyn_struct) = reflect.reflect_ref() else {
+			return None;
+		};
+		let name = SmolStr::from_reflect(dyn_struct.field("name")?)?;
+		let subdir = dyn_struct
+			.field("subdir")
+			.and_then(Option::<SmolPath>::from_reflect)
+			.flatten();
+		let mut store = Self::named(name);
+		store.subdir = subdir;
+		Some(store)
+	}
+}
+
+impl InMemoryStore {
+	/// Creates a new already-created (empty) in-memory provider under a minted
+	/// name, isolated because nobody else knows it.
+	pub fn new() -> Self { Self::minted(Some(HashMap::new())) }
+
+	/// Creates a new uncreated in-memory provider under a minted name.
+	pub fn new_empty() -> Self { Self::minted(None) }
 
 	/// Creates a new already-created provider seeded with `entries`, so a crate
 	/// can ship compile-time bytes (eg `include_str!`) into a store synchronously
@@ -86,20 +132,61 @@ impl InMemoryStore {
 	pub fn new_seeded(
 		entries: impl IntoIterator<Item = (SmolPath, Bytes)>,
 	) -> Self {
-		Self::with_map(Some(entries.into_iter().collect()))
+		Self::minted(Some(entries.into_iter().collect()))
 	}
 
-	/// Build a store with the given initial map and a fresh `instance_id`.
-	fn with_map(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
+	/// The store named `name`: joins the live backing of that name, else creates
+	/// an already-created (empty) one. Two handles on one name see each other's
+	/// writes for as long as either lives.
+	pub fn named(name: impl Into<SmolStr>) -> Self {
+		let name = name.into();
+		let mut registry = REGISTRY.lock().unwrap();
+		match registry.get(&name).and_then(Weak::upgrade) {
+			Some(inner) => Self {
+				name,
+				inner,
+				subdir: None,
+			},
+			None => Self::register(&mut registry, name, Some(HashMap::new())),
+		}
+	}
+
+	/// Set the subdirectory prefix for all keys.
+	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+		self.subdir = Some(subdir.into());
+		self
+	}
+
+	/// A fresh backing with initial state `map`, registered under a minted
+	/// name no live backing holds (a hand-chosen name may share the spelling).
+	fn minted(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
+		let mut registry = REGISTRY.lock().unwrap();
+		let name = loop {
+			let name = SmolStr::from(format!(
+				"mem-{}",
+				INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed)
+			));
+			if registry
+				.get(&name)
+				.is_none_or(|weak| weak.strong_count() == 0)
+			{
+				break name;
+			}
+		};
+		Self::register(&mut registry, name, map)
+	}
+
+	/// A fresh backing with initial state `map`, registered under `name`.
+	fn register(
+		registry: &mut HashMap<SmolStr, Weak<InMemoryInner>>,
+		name: SmolStr,
+		map: Option<HashMap<SmolPath, Bytes>>,
+	) -> Self {
+		let inner = Arc::new(InMemoryInner::new(map));
+		registry.insert(name.clone(), Arc::downgrade(&inner));
 		Self {
-			inner: Arc::new(InMemoryInner {
-				map: RwLock::new(map),
-				instance_id: INSTANCE_COUNTER.fetch_add(1, Ordering::Relaxed),
-				#[cfg(feature = "std")]
-				bus: Mutex::new(None),
-				#[cfg(feature = "std")]
-				subscribers: AtomicUsize::new(0),
-			}),
+			name,
+			inner,
 			subdir: None,
 		}
 	}
@@ -147,6 +234,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(InMemoryStore {
+			name: self.name.clone(),
 			inner: self.inner.clone(),
 			subdir: Some(match &self.subdir {
 				Some(existing) => existing.join(&path),
@@ -157,9 +245,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn id(&self) -> &'static str { "memory" }
 
-	fn root_key(&self) -> SmolStr {
-		format!("memory:{}", self.inner.instance_id).into()
-	}
+	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }
 
 	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
 
@@ -329,8 +415,10 @@ pub(crate) fn remove_memory_store_watcher(
 
 #[cfg(test)]
 mod test {
+	use super::REGISTRY;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use bytes::Bytes;
 
 	#[beet_core::test]
 	async fn works() {
@@ -338,14 +426,85 @@ mod test {
 		store_test::run(provider).await;
 	}
 
+	/// Two handles on one name are one store, and a subdir view keeps the
+	/// backing.
 	#[beet_core::test]
-	fn distinct_instances_have_distinct_root_keys() {
-		let a = InMemoryStore::new();
-		let b = InMemoryStore::new();
-		(a.root_key() != b.root_key()).xpect_true();
-		// a subdir clone shares the backing instance
-		a.with_subdir(SmolPath::new("sub"))
+	async fn handles_by_name_share_a_backing() {
+		let first = InMemoryStore::named("shared-backing");
+		let second = InMemoryStore::named("shared-backing");
+		first.root_key().xpect_eq(second.root_key());
+		first.root_key().xpect_eq("memory:shared-backing");
+		first
+			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.await
+			.unwrap();
+		second
+			.get(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_eq(Bytes::from_static(b"hi"));
+		first
+			.clone()
+			.with_subdir("sub")
 			.root_key()
-			.xpect_eq(a.root_key());
+			.xpect_eq(first.root_key());
+	}
+
+	/// A minted name is nobody else's: two `new` stores never see each other.
+	#[beet_core::test]
+	async fn minted_stores_are_isolated() {
+		let first = InMemoryStore::new();
+		let second = InMemoryStore::new();
+		(first.root_key() != second.root_key()).xpect_true();
+		first
+			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.await
+			.unwrap();
+		second
+			.exists(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_false();
+	}
+
+	/// The registry pins nothing: the entry is gone once the last handle
+	/// drops, and the name then starts fresh.
+	#[beet_core::test]
+	async fn a_dead_name_leaves_the_registry() {
+		let registered =
+			|name: &str| REGISTRY.lock().unwrap().contains_key(name);
+		let store = InMemoryStore::named("ephemeral");
+		store
+			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.await
+			.unwrap();
+		registered("ephemeral").xpect_true();
+		drop(store);
+		registered("ephemeral").xpect_false();
+		InMemoryStore::named("ephemeral")
+			.exists(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_false();
+	}
+
+	/// The reflected fields rebuild the store onto its live backing, so a
+	/// scene round-trips a memory store onto its data.
+	#[beet_core::test]
+	async fn from_reflect_joins_the_backing() {
+		let store = InMemoryStore::named("reflected").with_subdir("docs");
+		store
+			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.await
+			.unwrap();
+		let dynamic = store.to_dynamic();
+		let rebuilt = InMemoryStore::from_reflect(dynamic.as_ref()).unwrap();
+		rebuilt.name().xpect_eq("reflected");
+		rebuilt.subdir().xpect_eq(SmolPath::new("docs"));
+		rebuilt
+			.get(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_eq(Bytes::from_static(b"hi"));
 	}
 }

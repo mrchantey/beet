@@ -64,12 +64,12 @@ impl ErasedStoreBlock {
 	/// when the store is versioned. The ONE place that uri is shaped, so the
 	/// argv a lambda bakes, the env a release pointer publishes and the prefix a
 	/// sync writes to cannot describe the same store differently.
-	pub fn store_uri(&self, deploy_id: Option<&Uuid>) -> Result<StoreUri> {
+	pub fn store_uri(&self, deploy_id: Option<&Uuid>) -> StoreUri {
 		match (self.deploy_versioned, deploy_id) {
 			(true, Some(deploy_id)) => {
 				self.root.with_subdir(deploy_id.to_string())
 			}
-			_ => self.root.clone().xok(),
+			_ => self.root.clone(),
 		}
 	}
 
@@ -83,10 +83,10 @@ impl ErasedStoreBlock {
 		&self,
 		access: ServiceAccess,
 		deploy_id: Option<&Uuid>,
-	) -> Result<StoreUri> {
+	) -> StoreUri {
 		match access {
 			ServiceAccess::Remote => self.store_uri(deploy_id),
-			ServiceAccess::Local => self.local.clone().xok(),
+			ServiceAccess::Local => self.local.clone(),
 		}
 	}
 
@@ -155,7 +155,7 @@ pub(crate) fn attach_store(
 			let uri = store.runtime_uri(
 				BootstrapConfig::get().service_access,
 				Some(&deploy_id),
-			)?;
+			);
 			StoreProvider::from_uri(&uri)?.insert(&mut entity);
 			Ok(())
 		});
@@ -194,7 +194,7 @@ mod test {
 		world.init_resource::<PackageConfig>();
 		let entity = spawn_store(
 			&mut world,
-			StoreUriBlock::new("docs", StoreUri::Memory),
+			StoreUriBlock::new("docs", StoreUri::parse("memory://m").unwrap()),
 		);
 		world.flush();
 		world.get::<FsStore>(entity).unwrap().path().xpect_eq(
@@ -217,13 +217,41 @@ mod test {
 		let deploy_id = uuid_ext::now_v7();
 		erased
 			.runtime_uri(ServiceAccess::Remote, Some(&deploy_id))
-			.unwrap()
 			.to_string()
 			.xpect_eq(format!("s3://bucket/{deploy_id}"));
 		erased
 			.runtime_uri(ServiceAccess::Local, Some(&deploy_id))
-			.unwrap()
 			.xpect_eq(ServiceAccess::local_store_uri("app--prod--repo"));
+	}
+
+	/// A declaration naming a memory store names ONE store: every remote read
+	/// of it lands on the same backing, so a fixture seeded by name is what
+	/// the document reads.
+	#[beet_core::test]
+	async fn a_memory_declaration_is_one_store() {
+		let mut world = world();
+		let entity = spawn_store(
+			&mut world,
+			StoreUriBlock::new(
+				"fixtures",
+				StoreUri::parse("memory://declared-fixtures").unwrap(),
+			),
+		);
+		let erased = world.get::<ErasedStoreBlock>(entity).unwrap();
+		let read = || {
+			StoreProvider::from_uri(
+				&erased.runtime_uri(ServiceAccess::Remote, None),
+			)
+			.unwrap()
+			.into_blob_store()
+		};
+		let seeded = read();
+		seeded.insert(&SmolPath::new("a.txt"), "hi").await.unwrap();
+		read()
+			.get(&SmolPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_eq(bytes::Bytes::from_static(b"hi"));
 	}
 
 	/// The erased half is the store's ROOT; the per-deploy prefix is applied by
@@ -242,14 +270,9 @@ mod test {
 		let deploy_id = uuid_ext::now_v7();
 		erased
 			.store_uri(Some(&deploy_id))
-			.unwrap()
 			.to_string()
 			.xpect_eq(format!("s3://bucket/{deploy_id}"));
-		erased
-			.store_uri(None)
-			.unwrap()
-			.to_string()
-			.xpect_eq("s3://bucket");
+		erased.store_uri(None).to_string().xpect_eq("s3://bucket");
 	}
 
 	/// An unversioned store publishes at its root whatever id the consumer
@@ -268,7 +291,6 @@ mod test {
 			.get::<ErasedStoreBlock>(entity)
 			.unwrap()
 			.store_uri(Some(&uuid_ext::now_v7()))
-			.unwrap()
 			.to_string()
 			.xpect_eq("fs:/srv/data");
 		world.entity_mut(entity).remove::<StoreUriBlock>();

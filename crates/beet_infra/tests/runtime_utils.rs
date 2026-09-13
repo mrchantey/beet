@@ -158,7 +158,6 @@ pub fn render_test_project(
 pub fn assets_uri(deploy: &TestDeploy) -> StoreUri {
 	ErasedStoreBlock::new(&assets_bucket_block(), &deploy.resolved())
 		.store_uri(Some(deploy.deployment.deploy_id()))
-		.unwrap()
 }
 
 /// Create the S3FsStore for syncing local assets to S3.

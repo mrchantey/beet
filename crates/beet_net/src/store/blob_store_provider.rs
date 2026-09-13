@@ -66,7 +66,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// [`id`](Self::id) plus the backing-instance identity, *without* the subdir.
 	/// Two stores with the same `root_key` are the same effective store:
 	/// - fs:           `"fs:{path}"`             (the base store directory)
-	/// - memory:       `"memory:{instance_id}"`  (incrementing id per `new`)
+	/// - memory:       `"memory:{name}"`         (the backing's name)
 	/// - localstorage: `"localstorage:{store_name}"`
 	/// - s3:           `"s3:{bucket}"`           (unwatchable)
 	fn root_key(&self) -> SmolStr;

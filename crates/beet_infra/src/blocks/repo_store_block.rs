@@ -144,6 +144,7 @@ impl RepoStoreQuery<'_, '_> {
 		self.get(entity)?
 			.store
 			.store_uri(Some(&self.stacks.deploy_id()))
+			.xok()
 	}
 
 	/// The [`BootstrapConfig`] a process this launch deploys boots with: the
