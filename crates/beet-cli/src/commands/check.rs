@@ -2,8 +2,7 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 /// Request params for the [`Check`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct CheckParams {
 	/// Also write a JSON diagnostics manifest (the tags/classes/routes/style-props
 	/// a future editor would autocomplete against) to this path, or `-` for stdout.
@@ -32,7 +31,7 @@ struct CheckParams {
 #[require(ParamsPartial = ParamsPartial::new::<(CheckParams, EntryParams)>())]
 pub async fn Check(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let parts = &cx.input;
-	let params = parts.params().parse_reflect::<CheckParams>()?;
+	let params = parts.parse_params::<CheckParams>()?;
 	let root = build_entry(
 		&cx.caller,
 		EntryParams::repo(parts)?.as_ref(),

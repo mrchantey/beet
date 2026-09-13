@@ -1,14 +1,11 @@
 use beet::prelude::*;
 
 /// Request params for the [`SyncS3`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct SyncS3Params {
 	/// Source path, a local directory or an `s3://` URI.
-	#[reflect(@RequiredField)]
 	src: String,
 	/// Destination path, a local directory or an `s3://` URI.
-	#[reflect(@RequiredField)]
 	dst: String,
 	/// Delete destination files not present in the source.
 	delete: bool,
@@ -36,7 +33,7 @@ struct SyncS3Params {
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<SyncS3Params>())]
 pub async fn SyncS3(parts: RequestParts) -> Result<String> {
-	let params = parts.params().parse_reflect::<SyncS3Params>()?;
+	let params = parts.parse_params::<SyncS3Params>()?;
 	if !AwsCli::is_s3_uri(&params.src) && !AwsCli::is_s3_uri(&params.dst) {
 		bevybail!(
 			"expected one of --src/--dst to be an s3:// URI, got {} and {}",

@@ -28,6 +28,8 @@
 use super::*;
 use alloc::borrow::Cow;
 use beet_core::prelude::*;
+use bevy::reflect::FromReflect;
+use bevy::reflect::Typed;
 
 /// The default HTTP version string.
 const DEFAULT_HTTP_VERSION: &str = "1.1";
@@ -196,6 +198,42 @@ impl RequestParts {
 
 	/// Checks if a parameter exists (useful for CLI flags).
 	pub fn has_param(&self, key: &str) -> bool { self.url.has_param(key) }
+
+	/// The params this request carries, read into `T` through its reflected
+	/// fields: the typed read every route makes, so a flag is spelled once,
+	/// on the params type whose [`ParamsPartial`] documents it in `--help`.
+	///
+	/// A field name is its kebab-case flag, an `Option` is optional, a `Vec`
+	/// repeats, a `bool` is a flag present or absent, anything else is
+	/// required and named in the error when absent, and each value parses
+	/// through its type's [`LiteralParser`] exactly as markup does. The full
+	/// contract is [`MultiMapReflectExt::parse_reflect`].
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// #[derive(Reflect)]
+	/// struct Params {
+	/// 	store: Option<StoreUri>,
+	/// 	raw_only: bool,
+	/// }
+	/// let params = Request::from_cli_str("--store=s3://bucket --raw-only")
+	/// 	.parse_params::<Params>()
+	/// 	.unwrap();
+	/// params.raw_only.xpect_true();
+	/// params.store.unwrap().to_string().xpect_eq("s3://bucket");
+	/// ```
+	pub fn parse_params<T: FromReflect + Typed>(&self) -> Result<T> {
+		self.params().parse_reflect()
+	}
+
+	/// Apply the params this request carries over `base` field by field,
+	/// leaving absent ones as `base` declares them: the read for a
+	/// markup-authored preset that request params override. The contract is
+	/// [`MultiMapReflectExt::apply_reflect`].
+	pub fn apply_params<T: Reflect + Typed>(&self, base: &mut T) -> Result {
+		self.params().apply_reflect(base)
+	}
 
 	/// Check if this request indicates a body is present based on headers.
 	pub fn has_body(&self) -> bool {

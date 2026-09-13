@@ -70,11 +70,12 @@ pub fn DeployRoutes(
 	]
 }
 
-/// Parameters for the destroy route.
+/// Request params for the destroy route, surfaced in `--help` and read by
+/// each step that honours `--force`.
 #[derive(Reflect)]
-struct DestroyParams {
+pub(crate) struct DestroyParams {
 	/// Keep going past a failing step, and destroy lock-free.
-	force: bool,
+	pub force: bool,
 }
 
 impl terra::Project {
@@ -161,11 +162,11 @@ pub async fn List(cx: ActionContext) -> Result<String> {
 	terra::Project::resolve(&cx.caller).await?.list().await
 }
 
-/// Parameters for the rollback action.
+/// Request params for [`Rollback`], surfaced in `--help`.
 #[derive(Reflect)]
 struct RollbackParams {
 	/// Number of versions to roll back, defaults to 1.
-	count: Option<u32>,
+	count: Option<usize>,
 }
 
 /// Roll back to a previous artifact version, then re-apply infrastructure
@@ -175,8 +176,9 @@ struct RollbackParams {
 #[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
 pub async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
 	let count = cx
-		.get_param("count")
-		.and_then(|val| val.parse::<usize>().ok())
+		.input
+		.parse_params::<RollbackParams>()?
+		.count
 		.unwrap_or(1);
 	let client = artifacts_client(&cx.caller).await?;
 	let version = client.rollback(count).await?;

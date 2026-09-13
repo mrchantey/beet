@@ -33,8 +33,7 @@ impl Plugin for SceneCommandsPlugin {
 }
 
 /// The params every scene-push command shares, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct SceneTargetParams {
 	/// The device to drive, eg `--url=http://device`. Falls back to the
 	/// `BEET_REMOTE_URL` environment variable.
@@ -47,8 +46,7 @@ struct SceneTargetParams {
 /// set, since these commands only drive a remote device.
 fn device_url(parts: &RequestParts) -> Result<SmolStr> {
 	parts
-		.params()
-		.parse_reflect::<SceneTargetParams>()?
+		.parse_params::<SceneTargetParams>()?
 		.url
 		.or_else(|| env_ext::var("BEET_REMOTE_URL").ok())
 		.ok_or_else(|| {

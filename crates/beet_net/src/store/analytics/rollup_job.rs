@@ -253,12 +253,11 @@ impl core::fmt::Display for AnalyticsRollupReport {
 	}
 }
 
-/// Defines request parameters for [`AnalyticsRollupJob`].
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+/// Request params for [`AnalyticsRollupJob`], surfaced in `--help`.
+#[derive(Reflect)]
 struct AnalyticsRollupParams {
 	/// Rebuilds every complete archived day, not only new or uncovered days.
-	full: Option<bool>,
+	full: bool,
 }
 
 /// Compacts raw analytics segments into daily archives and aggregates.
@@ -275,7 +274,7 @@ pub async fn AnalyticsRollupJob(
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let world = caller.world().clone();
-	let full = cx.input.request_parts().has_param("full");
+	let full = cx.input.parse_params::<AnalyticsRollupParams>()?.full;
 	let declared = async |name: &str, target: Result<Entity>| match target {
 		Ok(target) => Ok(target),
 		Err(_) => bevybail!(

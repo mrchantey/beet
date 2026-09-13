@@ -2,21 +2,19 @@ use beet::net::prelude::Table;
 use beet::prelude::*;
 
 /// Request params for the [`AnalyticsReport`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct AnalyticsParams {
-	/// The analytics store as a store uri, ie
-	/// `fs:target/stores/my-app--dev--analytics` or
+	/// The analytics store, ie `fs:target/stores/my-app--dev--analytics` or
 	/// `s3://my-app--prod--analytics`, for a report over a store no entry
 	/// declares. Absent, the report reads the store the entry's
 	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
-	store: Option<String>,
-	/// A separate store holding the daily aggregates, as a store uri. Absent,
-	/// the raw store itself.
-	rollup: Option<String>,
+	store: Option<StoreUri>,
+	/// A separate store holding the daily aggregates. Absent, the raw store
+	/// itself.
+	rollup: Option<StoreUri>,
 	/// Report only the raw events, skipping the aggregates the long history
 	/// lives in.
-	raw_only: Option<bool>,
+	raw_only: bool,
 }
 
 /// Summarize collected analytics: what kinds of clients connected, the pages they
@@ -45,7 +43,7 @@ struct AnalyticsParams {
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<AnalyticsParams>())]
 pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
-	let parts = cx.input.request_parts();
+	let params = cx.input.parse_params::<AnalyticsParams>()?;
 	let world = cx.caller.world().clone();
 
 	// the raw segments and the aggregate rows, both json over blobs and both in
@@ -53,8 +51,8 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	// `analytics/rollup/`, so the single `<S3BucketBlock label="analytics"/>`
 	// the deploy provisions holds them both. `--rollup` names a store keeping
 	// the aggregates apart.
-	let store = match parts.get_param("store") {
-		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
+	let store = match &params.store {
+		Some(uri) => BlobStore::from_uri(uri)?,
 		None => {
 			let config = one_config(&world).await?;
 			StoreRef::resolve::<AnalyticsStore>(&world, config)
@@ -62,8 +60,8 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 				.store
 		}
 	};
-	let rollups = match parts.get_param("rollup") {
-		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
+	let rollups = match &params.rollup {
+		Some(uri) => BlobStore::from_uri(uri)?,
 		None => store.clone(),
 	};
 	let store = AnalyticsStore::new(store);
@@ -74,7 +72,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	// lossy read skips (and warns on) legacy-schema or corrupt rows rather than
 	// failing the whole summary.
 	let events = store.read_all_lossy().await?;
-	let rollups = match parts.has_param("raw-only") {
+	let rollups = match params.raw_only {
 		true => Vec::new(),
 		false => read_table(&rollups).await?,
 	};

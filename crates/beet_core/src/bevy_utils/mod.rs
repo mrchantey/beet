@@ -53,6 +53,7 @@ mod entity_target_event;
 mod group;
 pub mod hook_ext;
 mod non_send_plugin;
+mod required_field;
 mod subtree_trigger;
 
 pub use bevyhow::*;
@@ -87,5 +88,6 @@ pub use on_spawn::*;
 pub use perf_log::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
+pub use required_field::*;
 pub use subtree_trigger::*;
 pub use when::*;

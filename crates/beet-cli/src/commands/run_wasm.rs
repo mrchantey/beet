@@ -11,8 +11,7 @@ const DENO_TS: &str = include_str!("deno.ts");
 /// The runner's own params, distinct from the [`BootstrapConfig`] it hands the
 /// module: these configure *this* process's hosting of the module, so the module
 /// never sees them.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct RunWasmParams {
 	/// The host to execute the module in: `deno` (default) or `browser`. Also
 	/// read from `BEET_WASM_HOST`, the only channel cargo leaves open to a
@@ -122,6 +121,7 @@ impl fmt::Display for WasmHost {
 #[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>())]
 pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let parts = &cx.input;
+	let params = parts.parse_params::<RunWasmParams>()?;
 	let mut cli = parts.to_cli_args();
 	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
 	// are the absolute binary path (split on `/`) followed by any positional module
@@ -148,7 +148,6 @@ pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 	// flags) flattens to `--key[=value]` flags plus the trailing positionals (eg
 	// the filter) the module reads via `Deno.args`.
 	cli.params.remove("run-wasm-args");
-	let params = cli.params.parse_reflect::<RunWasmParams>()?;
 	let host = params.host()?;
 	let chrome_args = params.chrome_args();
 	cli.params.remove("wasm-host");

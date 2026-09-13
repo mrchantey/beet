@@ -66,7 +66,7 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 		.get_cloned::<BuildWasm>()
 		.await
 		.unwrap_or_default();
-	cx.input.params().apply_reflect(&mut params)?;
+	cx.input.apply_params(&mut params)?;
 
 	// the cargo build, fully driven by the resolved params.
 	let mut cargo = CargoBuild::default()

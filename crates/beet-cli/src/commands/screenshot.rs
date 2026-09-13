@@ -2,13 +2,12 @@ use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
 /// Request params for the [`CaptureScreenshot`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct ScreenshotParams {
 	/// Viewport width in px (default 1280).
-	width: u32,
+	width: Option<u32>,
 	/// Viewport height in px (default 800).
-	height: u32,
+	height: Option<u32>,
 	/// Capture the full document instead of the viewport.
 	full_page: bool,
 	/// Clip to the first element matching this css selector (auto-waits for
@@ -39,7 +38,7 @@ pub async fn CaptureScreenshot(
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	let parts = &cx.input;
-	let params = parts.params().parse_reflect::<ScreenshotParams>()?;
+	let params = parts.parse_params::<ScreenshotParams>()?;
 	// like `run-wasm`, the greedy capture keeps the url as intact trailing
 	// segments; rejoin and drop the command segment
 	let mut cli = parts.to_cli_args();
@@ -50,14 +49,8 @@ pub async fn CaptureScreenshot(
 	segments.remove(0);
 	let url = segments.join("/");
 
-	let width = match params.width {
-		0 => 1280,
-		width => width,
-	};
-	let height = match params.height {
-		0 => 800,
-		height => height,
-	};
+	let width = params.width.unwrap_or(1280);
+	let height = params.height.unwrap_or(800);
 	let output = params
 		.output
 		.clone()

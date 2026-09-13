@@ -5,8 +5,7 @@ use beet::prelude::*;
 const DIST_DIR: &str = "dist";
 
 /// Request params for the [`ExportStatic`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct ExportStaticParams {
 	/// Output directory for the rendered entry (default `<entry>/dist`).
 	out: Option<String>,
@@ -29,7 +28,7 @@ struct ExportStaticParams {
 #[require(ParamsPartial = ParamsPartial::new::<(ExportStaticParams, EntryParams)>())]
 pub async fn ExportStatic(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let parts = &cx.input;
-	let params = parts.params().parse_reflect::<ExportStaticParams>()?;
+	let params = parts.parse_params::<ExportStaticParams>()?;
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,

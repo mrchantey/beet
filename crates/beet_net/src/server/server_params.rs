@@ -14,7 +14,6 @@ use core::net::IpAddr;
 /// its names to the flags a deploy renders, which is the drift the process config
 /// exists to prevent.
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
-#[reflect(Default)]
 pub struct ServerParams {
 	/// The address to bind, overriding the declared host.
 	pub host: Option<String>,
@@ -36,7 +35,7 @@ impl ServerParams {
 	/// The bind knobs `parts` carry, for a facet that kept the start request's
 	/// parts rather than the request itself.
 	pub fn from_parts(parts: &RequestParts) -> Result<Self> {
-		parts.params().parse_reflect()
+		parts.parse_params()
 	}
 
 	/// The `--host` override as IPv4 octets, the form the server components hold.

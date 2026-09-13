@@ -31,7 +31,7 @@ impl<T: Clone + Component> ParamQuery<'_, '_, T> {
 	where
 		T: Sized + Clone + FromReflect + Typed + Component,
 	{
-		self.get_custom(agent, |request| request.params().parse_reflect::<T>())
+		self.get_custom(agent, |request| request.parse_params::<T>())
 	}
 
 	/// Attempts to extract the param from the request using a custom function.

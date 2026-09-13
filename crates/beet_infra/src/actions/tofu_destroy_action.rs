@@ -32,7 +32,7 @@ pub async fn TofuDestroy(
 	force: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let force = force || cx.input.has_param("force");
+	let force = force || cx.input.parse_params::<DestroyParams>()?.force;
 	let result = terra::Project::resolve(&cx.caller)
 		.await?
 		.tofu_destroy(force)

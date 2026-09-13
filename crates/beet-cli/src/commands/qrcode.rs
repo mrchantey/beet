@@ -3,11 +3,9 @@ use image::Rgb;
 use qrcode::QrCode as QrCodeGenerator;
 
 /// Request params for the [`QrCode`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct QrCodeParams {
 	/// The text/url to encode.
-	#[reflect(@RequiredField)]
 	input: String,
 	/// The output file path, defaults to `qrcode.png`.
 	output: Option<String>,
@@ -26,7 +24,7 @@ struct QrCodeParams {
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
 pub async fn QrCode(parts: RequestParts) -> Result<String> {
-	let params = parts.params().parse_reflect::<QrCodeParams>()?;
+	let params = parts.parse_params::<QrCodeParams>()?;
 	let output = params.output.as_deref().unwrap_or("qrcode.png");
 	let light = parse_rgb(params.light.as_deref().unwrap_or("255,255,255"))?;
 	let dark = parse_rgb(params.dark.as_deref().unwrap_or("0,0,0"))?;

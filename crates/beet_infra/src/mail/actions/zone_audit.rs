@@ -171,7 +171,7 @@ pub async fn ZoneAudit(
 	scope: ZoneAuditScope,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let fix = cx.has_param("fix");
+	let fix = cx.input.parse_params::<ZoneAuditParams>()?.fix;
 	// resolved first: a zone-scoped render filters the declarations it unions by
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.

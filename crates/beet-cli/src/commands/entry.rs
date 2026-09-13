@@ -95,24 +95,18 @@ pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPathBuf> {
 /// A command loads an entry into *this* process rather than launching one, so
 /// it reads its own `--repo` param (documented in its `--help`) rather than
 /// parsing a whole [`BootstrapConfig`] out of the request to reach one field.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 pub(crate) struct EntryParams {
 	/// The repo store the entry loads through, eg `--repo=s3://my-bucket`.
 	/// Defaults to the filesystem, rooted at the entry directory.
-	repo: Option<String>,
+	repo: Option<StoreUri>,
 }
 
 impl EntryParams {
 	/// The repo store `parts` select, `None` for the default filesystem store
 	/// rooted at the entry dir.
 	pub fn repo(parts: &RequestParts) -> Result<Option<StoreUri>> {
-		parts
-			.params()
-			.parse_reflect::<Self>()?
-			.repo
-			.map(|uri| StoreUri::parse(&uri))
-			.transpose()
+		parts.parse_params::<Self>()?.repo.xok()
 	}
 }
 

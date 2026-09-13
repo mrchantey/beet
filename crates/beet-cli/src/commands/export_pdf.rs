@@ -5,18 +5,17 @@ use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
 /// Request params for the [`ExportPdf`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct ExportPdfParams {
 	/// Page width in `--unit`s (default A4 width).
-	width: f64,
+	width: Option<f64>,
 	/// Page height in `--unit`s (default A4 height).
-	height: f64,
+	height: Option<f64>,
 	/// Unit for `--width`/`--height`: `mm` (default) or `px` (96 dpi).
 	unit: Option<String>,
 	/// Zoom factor for the content, `0.1` to `2.0` (default `1.0`). Raise it when
 	/// a large `--width`/`--height` renders the text too small.
-	zoom: f64,
+	zoom: Option<f64>,
 	/// Limit each route's printed pages, ie `--page-ranges=1` for a single page,
 	/// or `--page-ranges=1-3,5`.
 	page_ranges: Option<String>,
@@ -58,7 +57,7 @@ struct ExportPdfParams {
 #[require(ParamsPartial = ParamsPartial::new::<(ExportPdfParams, EntryParams)>())]
 pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let parts = &cx.input;
-	let params = parts.params().parse_reflect::<ExportPdfParams>()?;
+	let params = parts.parse_params::<ExportPdfParams>()?;
 	let entry_path = entry_arg(parts)?;
 	let root = build_entry(
 		&cx.caller,
@@ -102,11 +101,11 @@ pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
 			.collect();
 	}
 	// `--zoom` scales the content, eg to enlarge text on a large page.
-	if params.zoom > 0.0 {
-		if !(0.1..=2.0).contains(&params.zoom) {
+	if let Some(zoom) = params.zoom {
+		if !(0.1..=2.0).contains(&zoom) {
 			bevybail!("--zoom must be between 0.1 and 2.0");
 		}
-		options.scale = params.zoom;
+		options.scale = zoom;
 	}
 
 	// the entry's static pages, glob-filtered by `--include`/`--exclude`.
@@ -252,18 +251,18 @@ async fn write_concat(
 /// Resolves the `(page_size_cm, viewport_px)` pair from the `--width`/`--height`
 /// params (`0` = unset), defaulting each dimension to A4.
 fn resolve_size(
-	width: f64,
-	height: f64,
+	width: Option<f64>,
+	height: Option<f64>,
 	unit: PdfUnit,
 ) -> (PdfPageSize, (u32, u32)) {
 	let a4 = PdfPageSize::a4();
 	let (width_cm, viewport_w) = match width {
-		width if width > 0.0 => (unit.to_cm(width), unit.to_px(width)),
-		_ => (a4.width, PdfUnit::cm_to_px(a4.width)),
+		Some(width) => (unit.to_cm(width), unit.to_px(width)),
+		None => (a4.width, PdfUnit::cm_to_px(a4.width)),
 	};
 	let (height_cm, viewport_h) = match height {
-		height if height > 0.0 => (unit.to_cm(height), unit.to_px(height)),
-		_ => (a4.height, PdfUnit::cm_to_px(a4.height)),
+		Some(height) => (unit.to_cm(height), unit.to_px(height)),
+		None => (a4.height, PdfUnit::cm_to_px(a4.height)),
 	};
 	(
 		PdfPageSize::custom(width_cm, height_cm),
@@ -332,7 +331,8 @@ mod test {
 	fn px_size_round_trips_to_viewport() {
 		// 1920x1080 px → the viewport is exactly that, and the cm page size
 		// converts back to the same px (the print width matches the measured width).
-		let (page_size, viewport) = resolve_size(1920.0, 1080.0, PdfUnit::Px);
+		let (page_size, viewport) =
+			resolve_size(Some(1920.0), Some(1080.0), PdfUnit::Px);
 		viewport.xpect_eq((1920, 1080));
 		PdfUnit::cm_to_px(page_size.width).xpect_close(1920.0);
 		PdfUnit::cm_to_px(page_size.height).xpect_close(1080.0);
@@ -340,7 +340,7 @@ mod test {
 
 	#[beet::test]
 	fn unset_size_defaults_to_a4() {
-		let (page_size, _) = resolve_size(0.0, 0.0, PdfUnit::Mm);
+		let (page_size, _) = resolve_size(None, None, PdfUnit::Mm);
 		page_size.width.xpect_close(21.0);
 		page_size.height.xpect_close(29.7);
 	}

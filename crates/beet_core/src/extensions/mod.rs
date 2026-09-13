@@ -9,7 +9,8 @@
 //! - [`ExitStatusExt`] - Convert exit status to [`Result`]
 //! - [`OptionExt`] - Additional option operations
 //! - [`ResultXExt`] - Additional result operations
-//! - [`Multimap`] - Multi-value map operations
+//! - [`MultiMap`] - Multi-value map operations
+//! - [`MultiMapReflectExt`] - Parse a [`MultiMap`] into a reflected type
 
 mod duration;
 #[cfg(feature = "std")]
@@ -17,6 +18,7 @@ mod exit_status;
 #[cfg(feature = "json")]
 mod json_value;
 mod multimap;
+mod multimap_reflect;
 mod option;
 #[cfg(feature = "std")]
 mod path;
@@ -29,6 +31,7 @@ pub use exit_status::*;
 #[cfg(feature = "json")]
 pub use json_value::*;
 pub use multimap::*;
+pub use multimap_reflect::*;
 pub use option::*;
 #[cfg(feature = "std")]
 pub use path::*;

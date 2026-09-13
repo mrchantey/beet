@@ -1,6 +1,7 @@
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
+use core::any::TypeId;
 use heck::ToKebabCase;
 
 /// The param equivelent of a [`PathPartial`], denoting
@@ -210,24 +211,23 @@ impl ParamMeta {
 		}
 	}
 
-	/// Creates a `ParamMeta` from a reflected struct field.
+	/// Creates a `ParamMeta` from a reflected struct field, reading the field
+	/// type exactly as [`RequestParts::parse_params`] does: an `Option<T>` is
+	/// documented as its `T` and never required, a `bool` is a flag, a list
+	/// repeats, and anything else must be supplied.
 	pub fn from_field(field: &bevy::reflect::NamedField) -> Self {
-		let type_path = field.type_path();
-		let value = ParamValue::from_type_path(type_path);
-		let required = match value {
-			ParamValue::Single => {
-				!type_path.starts_with("core::option::Option<")
-			}
-			_ => false,
-		};
+		let info = field.type_info();
+		let some_inner = info.and_then(reflect_ext::option_some_inner);
+		let leaf_id = some_inner.map_or(field.type_id(), TypeInfo::type_id);
+		let value = ParamValue::of_leaf(leaf_id, some_inner.or(info));
 
 		Self {
 			key: field.name().to_kebab_case(),
+			required: value == ParamValue::Single && some_inner.is_none(),
 			value,
-			type_path: authored_kind(field)
-				.unwrap_or_else(|| kind_from_type_path(type_path)),
+			type_path: authored_kind(leaf_id)
+				.unwrap_or_else(|| kind_from_type_path(field.type_path())),
 			options: ParamOptions::from_reflect(field),
-			required,
 		}
 	}
 
@@ -299,10 +299,12 @@ impl core::fmt::Display for ParamValue {
 }
 
 impl ParamValue {
-	fn from_type_path(type_path: &str) -> Self {
-		match type_path {
-			"bool" => Self::Flag,
-			val if val.starts_with("alloc::vec::Vec") => Self::Multiple,
+	/// The arity of a leaf type (any `Option` wrapper already seen through):
+	/// a `bool` is a flag, a list repeats, anything else takes one value.
+	fn of_leaf(type_id: TypeId, info: Option<&TypeInfo>) -> Self {
+		match info {
+			_ if type_id == TypeId::of::<bool>() => Self::Flag,
+			Some(TypeInfo::List(_)) => Self::Multiple,
 			_ => Self::Single,
 		}
 	}
@@ -318,19 +320,13 @@ impl ParamValue {
 	}
 }
 
-/// How `field`'s type is WRITTEN, when its [`LiteralParser`] says, so a
-/// `--created` flag documents itself as `a YYYY-MM-DD date` rather than as
-/// `beet_core::utils::timestamp::Timestamp`.
+/// How a param's leaf type (any `Option` wrapper seen through) is WRITTEN,
+/// when its [`LiteralParser`] says, so a `--created` flag documents itself as
+/// `a YYYY-MM-DD date` rather than as `beet_core::utils::timestamp::Timestamp`.
 ///
 /// `None` for a type with no parser or no hint, which falls back to the type
 /// path: for a structural type that path is the only clue to what to write.
-fn authored_kind(field: &bevy::reflect::NamedField) -> Option<String> {
-	// an `Option<T>` param is written exactly as its `T`, its optionality being
-	// whether the flag is there at all.
-	let type_id = field
-		.type_info()
-		.and_then(reflect_ext::option_some_inner)
-		.map_or_else(|| field.type_id(), TypeInfo::type_id);
+fn authored_kind(type_id: TypeId) -> Option<String> {
 	LiteralParser::get(type_id)?.hint().map(str::to_string)
 }
 
@@ -404,6 +400,7 @@ impl ParamOptions {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::prelude::*;
 
 	/// A reflected field's concrete type is captured as the param `kind`, with an
 	/// `Option<..>` wrapper stripped (the option drives `required`, not `kind`).
@@ -582,6 +579,54 @@ mod test {
 				ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
 			],
 		});
+	}
+
+	/// What `--help` says a flag is, the typed read enforces: over a params
+	/// type with every kind, a param is required exactly when leaving it out
+	/// fails [`RequestParts::parse_params`], and the failure names it.
+	#[beet_core::test]
+	fn help_and_parse_agree_on_required() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Params {
+			name: String,
+			store: StoreUri,
+			out: Option<String>,
+			release: bool,
+			verbose: Option<bool>,
+			tags: Vec<String>,
+		}
+		let partial = ParamsPartial::new::<Params>();
+		partial
+			.iter()
+			.filter(|meta| meta.is_required())
+			.map(ParamMeta::name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["name", "store"]);
+		for meta in partial.iter() {
+			// every required param but `meta` supplied
+			let args = partial
+				.iter()
+				.filter(|other| {
+					other.is_required() && other.name() != meta.name()
+				})
+				.map(|other| format!("--{}=memory", other.name()))
+				.collect::<Vec<_>>()
+				.join(" ");
+			let parsed = Request::from_cli_str(&args).parse_params::<Params>();
+			match meta.is_required() {
+				true => {
+					parsed
+						.err()
+						.unwrap()
+						.to_string()
+						.xpect_contains(format!("`--{}`", meta.name()));
+				}
+				false => {
+					parsed.ok().unwrap();
+				}
+			}
+		}
 	}
 
 	#[beet_core::test]

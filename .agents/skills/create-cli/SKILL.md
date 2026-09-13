@@ -45,7 +45,7 @@ A command is an `#[action(route = "...")]` async fn taking [`RequestParts`] and 
 #[reflect(Component)]
 #[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
 pub async fn QrCode(parts: RequestParts) -> Result<String> {
-	let params = parts.params().parse_reflect::<QrCodeParams>()?;
+	let params = parts.parse_params::<QrCodeParams>()?;
 	let output = params.output.as_deref().unwrap_or("qrcode.png");
 	// ..
 	Ok(format!("wrote qr code to {output}"))
@@ -54,15 +54,13 @@ pub async fn QrCode(parts: RequestParts) -> Result<String> {
 
 ## 3. Params: parse, never hand-roll
 
-Define a `Reflect` struct for the flags. Do NOT pull values out one by one with `parts.get_param("..")` — that skips validation, defaults, and the help listing. Instead parse the whole struct in one call:
+Define a `Reflect` struct for the flags. Do NOT pull values out one by one with `parts.get_param("..")` — that skips validation and drifts from the help listing. Instead read the whole struct in one call, `RequestParts::parse_params`, which walks the struct exactly as `ParamsPartial` does for `--help`, so what the help says a flag is, the parse enforces:
 
 ```rust
 /// Request params for the [`QrCode`] command, surfaced in `--help`.
-#[derive(Reflect, Default)]
-#[reflect(Default)]
+#[derive(Reflect)]
 struct QrCodeParams {
 	/// The text/url to encode.
-	#[reflect(@RequiredField)]
 	input: String,
 	/// The output file path, defaults to `qrcode.png`.
 	output: Option<String>,
@@ -73,26 +71,18 @@ struct QrCodeParams {
 // BAD — manual, unvalidated, invisible to --help
 let input = parts.get_param("input").ok_or_else(|| bevyhow!(".."))?;
 
-// GOOD — one typed parse
-let params = parts.params().parse_reflect::<QrCodeParams>()?;
+// GOOD — one typed read
+let params = parts.parse_params::<QrCodeParams>()?;
 ```
 
 Rules for the params struct:
 
-- Always derive `Default` and add `#[reflect(Default)]`. Missing flags fall back to the struct's `Default`, so parsing partial args just works. Without it `parse_reflect` cannot build the struct from an incomplete arg set.
 - Field names are snake_case; the CLI flag is the kebab-case form, ie `out_dir` ↔ `--out-dir`. The normalisation is automatic.
-- `bool` → a flag (`--release`). `Option<T>` → optional. A bare field → uses the struct `Default` when absent.
-- Mark a field required with `#[reflect(@RequiredField)]`; parsing errors if it is missing. Prefer this over a manual presence check.
-- For a default that is not the type's own default (ie `a` defaults to `2`), give the struct a custom `Default` impl and keep the field bare:
-  ```rust
-  #[derive(Reflect)]
-  #[reflect(Default)]
-  struct CallAddParams { a: i32, b: i32 }
-  impl Default for CallAddParams {
-  	fn default() -> Self { Self { a: 2, b: 3 } }
-  }
-  ```
-- Supported field types: `bool`, `String`, `Option<String>`, `Vec<String>`, the numeric primitives, and nested/newtype structs. `Option<numeric>` is not supported — use a bare numeric with a custom `Default` instead.
+- `bool` → a flag (`--release`), `false` when absent. `Option<T>` → optional, `None` when absent. `Vec<T>` → repeatable (`--tag=a --tag=b`), empty when absent. Any other field is required: parsing errors naming the flag when it is missing, and `--help` lists it as required.
+- A default that is not "absent" is the handler's, not the struct's: declare `width: Option<u32>` and read `params.width.unwrap_or(1280)`. A bare `width: u32` would make the flag required.
+- A value parses through its type's `LiteralParser`, the same table markup attributes use, so a field is typed as what it is: `store: Option<StoreUri>`, `timeout: Duration`, `created: Timestamp`, a numeric primitive, `String`/`SmolStr`. Nested and newtype structs flatten into the parent's flags.
+- No `Default` or `#[reflect(Default)]` is needed, the read supplies every field.
+- A markup-authored preset that flags override field-by-field reads through `parts.apply_params(&mut preset)` instead, which touches only the flags present (see `BuildWasm`).
 
 ## 4. `--help` is free
 
@@ -100,7 +90,7 @@ Rules for the params struct:
 
 ## 5. Greedy routes and forwarding args
 
-A trailing `*name` segment captures the rest of the args greedily, eg the `run-wasm/*args` cargo runner. To rebuild a forwardable arg vector from the request use [`RequestParts::unparse_cli_args`] — it returns every path segment as a positional followed by params as `--key`/`--key=value`:
+A trailing `*name` segment captures the rest of the args greedily, eg the `run-wasm/*args` cargo runner. To rebuild a forwardable arg vector from the request use [`RequestParts::to_cli_args`] then [`CliArgs::into_args`] — every path segment as a positional followed by params as `--key`/`--key=value`:
 
 ```rust
 #[action(route = "run-wasm/*args")]
@@ -109,7 +99,7 @@ A trailing `*name` segment captures the rest of the args greedily, eg the `run-w
 pub async fn RunWasm(parts: RequestParts) -> Result<String> {
 	// rebuilds `[run-wasm, <binary>, ..forwarded]`; skip the command segment
 	// consumed by the route, pop the binary, forward the rest to the module.
-	let mut args = parts.unparse_cli_args().into_iter().skip(1);
+	let mut args = parts.to_cli_args().into_args().into_iter().skip(1);
 	let exe_path = args
 		.next()
 		.ok_or_else(|| bevyhow!("usage: beet run-wasm <binary-path> [args..]"))?;
@@ -131,6 +121,6 @@ The `beet` binary is a scene runner: on startup it loads `beet.json` from the cw
 - `crates/beet-cli/src/main.rs` — the scene runner
 - `crates/beet-cli/examples/default_cli.rs` — build + serialize the CLI scene
 - `crates/beet-cli/src/scene_management` — load/watch/reload `beet.json`
-- `crates/beet-cli/src/commands/qrcode.rs` — params + `parse_reflect`
-- `crates/beet-cli/src/commands/run_wasm.rs` — greedy route + `unparse_cli_args`
+- `crates/beet-cli/src/commands/qrcode.rs` — params + `parse_params`
+- `crates/beet-cli/src/commands/run_wasm.rs` — greedy route + `to_cli_args`
 - `examples/rsx_site/src/server.rs` — a router serving typed pages, markdown content and a server action, with the backend selected by build feature

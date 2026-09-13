@@ -36,7 +36,7 @@ use beet_net::prelude::*;
 pub async fn MailCredentials(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let infra = cx.has_param("infra");
+	let infra = cx.input.parse_params::<MailCredentialsParams>()?.infra;
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let region = mail.stack.region().clone();
 	let label = mail.mail_box.label();
