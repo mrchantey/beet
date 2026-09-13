@@ -7,12 +7,12 @@ use beet::prelude::*;
 struct AnalyticsParams {
 	/// The analytics store as a store uri, ie
 	/// `fs:target/stores/my-app--dev--analytics` or
-	/// `s3://my-app--prod--analytics`, for a report over a store no declaration
-	/// binds. Absent, the report reads the declaration its `StoreRef` names,
-	/// local or remote by `--service-access`.
+	/// `s3://my-app--prod--analytics`, for a report over a store no entry
+	/// declares. Absent, the report reads the store the entry's
+	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
 	store: Option<String>,
 	/// A separate store holding the daily aggregates, as a store uri. Absent,
-	/// the `RollupStoreRef` declaration, else the raw store itself.
+	/// the raw store itself.
 	rollup: Option<String>,
 	/// Report only the raw events, skipping the aggregates the long history
 	/// lives in.
@@ -22,11 +22,13 @@ struct AnalyticsParams {
 /// Summarize collected analytics: what kinds of clients connected, the pages they
 /// viewed, and for how long.
 ///
-/// Reads the stores its `StoreRef` / `RollupStoreRef` relations bind, exactly
-/// as the middleware that writes them and the job that compacts them do, so
-/// the one declaration answers every reader and `--service-access=remote`
-/// turns the same report onto the cloud store. A store uri names one directly,
-/// for a tool with no declaration in reach.
+/// Reads exactly the store the entry's [`AnalyticsConfig`] writes to: a
+/// document loads whole in every binary, so the serving router's config and
+/// its `StoreRef` are in the world when this route dispatches, and the
+/// declaration under the `<Stack>` has already resolved the stage and service
+/// access of the launch. The one declaration answers writer and reader, and
+/// `--service-access=remote` turns the same report onto the cloud store. A
+/// store uri names one directly, for a tool with no config in reach.
 ///
 /// Two keyspaces form one report: daily [`AnalyticsRollup`] rows carry the
 /// compacted history, while uncompacted segments carry the live tail. A date is
@@ -49,37 +51,20 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	// the raw segments and the aggregate rows, both json over blobs and both in
 	// ONE store by default: segments own `analytics/raw/`, aggregates own
 	// `analytics/rollup/`, so the single `<S3BucketBlock label="analytics"/>`
-	// the deploy provisions holds them both. `--rollup` or a `RollupStoreRef`
-	// names a store keeping the aggregates apart.
+	// the deploy provisions holds them both. `--rollup` names a store keeping
+	// the aggregates apart.
 	let store = match parts.get_param("store") {
 		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
-		None => match cx
-			.caller
-			.get::<StoreRef, _>(|store_ref| store_ref.store())
-			.await
-		{
-			Ok(target) => {
-				StoreRef::resolve::<BlobStore>(&world, target).await?
-			}
-			Err(_) => bevybail!(
-				"no analytics store: pass `--store <uri>` (`fs:<dir>`, \
-				 `s3://<bucket>`), or mount the report beside its declaration, \
-				 ie `<AnalyticsReport {{StoreRef($analytics)}}/>`"
-			),
-		},
+		None => {
+			let config = one_config(&world).await?;
+			StoreRef::resolve::<AnalyticsStore>(&world, config)
+				.await?
+				.store
+		}
 	};
 	let rollups = match parts.get_param("rollup") {
 		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
-		None => match cx
-			.caller
-			.get::<RollupStoreRef, _>(|store_ref| store_ref.0)
-			.await
-		{
-			Ok(target) => {
-				StoreRef::resolve::<BlobStore>(&world, target).await?
-			}
-			Err(_) => store.clone(),
-		},
+		None => store.clone(),
 	};
 	let store = AnalyticsStore::new(store);
 	let rollups = AnalyticsRollup::table(rollups);
@@ -95,6 +80,42 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	};
 	Response::ok_text(AnalyticsSummary::compose(&rollups, &events).to_string())
 		.xok()
+}
+
+/// The one [`AnalyticsConfig`] in the world, whose writer the report reads.
+/// Several are ambiguous, so the error lists each with the store it has
+/// landed, for `--store` to pick from.
+async fn one_config(world: &AsyncWorld) -> Result<Entity> {
+	let configs = world
+		.with_state::<Query<(Entity, Option<&AnalyticsStore>), With<AnalyticsConfig>>, _>(
+			|query| {
+				query
+					.iter()
+					.map(|(entity, store)| match store {
+						Some(store) => (entity, format!("{entity} ({})", store.describe())),
+						None => (entity, entity.to_string()),
+					})
+					.collect::<Vec<_>>()
+			},
+		)
+		.await;
+	match configs.as_slice() {
+		[(config, _)] => Ok(*config),
+		[] => bevybail!(
+			"no analytics store: pass `--store <uri>` (`fs:<dir>`, \
+			 `s3://<bucket>`), or load an entry that records analytics, ie \
+			 `<Router {{(AnalyticsConfig, StoreRef($analytics))}}>`"
+		),
+		configs => bevybail!(
+			"several `AnalyticsConfig` entities, pass `--store <uri>` to pick \
+			 one: {}",
+			configs
+				.iter()
+				.map(|(_, described)| described.as_str())
+				.collect::<Vec<_>>()
+				.join(", ")
+		),
+	}
 }
 
 /// Reads every valid row from a table whose blob store may not exist yet.
@@ -115,22 +136,37 @@ async fn read_table<T: TableStoreRow>(table: &Table<T>) -> Result<Vec<T>> {
 mod test {
 	use super::*;
 
-	/// Run the report mounted with `extra` beside it, asserting success.
-	async fn report(extra: impl Bundle, args: &str) -> String {
-		let mut world = crate::commands::render_world();
-		let host = world
-			.spawn((Router, children![(AnalyticsReport, extra)]))
-			.id();
-		let response = world
+	/// Dispatch the report into `world` with `args`.
+	async fn exchange(world: &mut World, args: &str) -> Response {
+		let host = world.spawn((Router, children![AnalyticsReport])).id();
+		world
 			.entity_mut(host)
 			.call::<Request, Response>(
 				Request::from_cli_args(CliArgs::parse(args))
 					.with_header::<header::Accept>(vec![MediaType::Text]),
 			)
 			.await
-			.unwrap();
+			.unwrap()
+	}
+
+	/// Run the report in a fresh world, asserting success.
+	async fn report(args: &str) -> String {
+		let response =
+			exchange(&mut crate::commands::render_world(), args).await;
 		response.status().is_success().xpect_true();
 		response.unwrap_str().await
+	}
+
+	/// A world recording analytics to a fresh temp store, as a served entry
+	/// spawns it: the config and its `StoreRef` on one entity, the declaration
+	/// on another, the report nowhere near either.
+	fn recording_world(temp: &TempDir) -> World {
+		let mut world = crate::commands::render_world();
+		let declared = world
+			.spawn(FsStore::new(AbsPathBuf::new(temp.path()).unwrap()))
+			.id();
+		world.spawn((AnalyticsConfig::default(), StoreRef(declared)));
+		world
 	}
 
 	/// Summarizing an empty store reports zero events rather than erroring, so
@@ -139,35 +175,53 @@ mod test {
 	async fn summarizes_empty_store() {
 		let temp = TempDir::new().unwrap();
 		let dir = AbsPathBuf::new(temp.path()).unwrap();
-		report((), &format!("analytics summary --store fs:{dir}"))
+		report(&format!("analytics summary --store fs:{dir}"))
 			.await
 			.as_str()
 			.xpect_contains("0 events");
 	}
 
-	/// Mounted beside a declaration, the report reads the store the
-	/// declaration attached, with nothing named on the command line.
+	/// With an `AnalyticsConfig` anywhere in the world, the report reads the
+	/// writer that config landed, with nothing named on the command line.
 	#[beet::test]
-	async fn reads_the_declared_store() {
+	async fn reads_the_configs_store() {
 		let temp = TempDir::new().unwrap();
-		let dir = AbsPathBuf::new(temp.path()).unwrap();
-		let mut world = crate::commands::render_world();
-		let declared = world.spawn(FsStore::new(dir)).id();
-		let host = world
-			.spawn((Router, children![(AnalyticsReport, StoreRef(declared))]))
-			.id();
-		world
-			.entity_mut(host)
-			.call::<Request, Response>(
-				Request::from_cli_args(CliArgs::parse("analytics summary"))
-					.with_header::<header::Accept>(vec![MediaType::Text]),
-			)
+		exchange(&mut recording_world(&temp), "analytics summary")
 			.await
-			.unwrap()
 			.unwrap_str()
 			.await
 			.as_str()
 			.xpect_contains("0 events");
+	}
+
+	/// Two configs are ambiguous: the error lists them and names `--store`.
+	#[beet::test]
+	async fn several_configs_need_a_store() {
+		let temp = TempDir::new().unwrap();
+		let mut world = recording_world(&temp);
+		let other = world.spawn(InMemoryStore::new()).id();
+		world.spawn((AnalyticsConfig::default(), StoreRef(other)));
+		exchange(&mut world, "analytics summary")
+			.await
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("several `AnalyticsConfig`")
+			.xpect_contains("--store");
+	}
+
+	/// No config and no `--store` is guidance, not a panic.
+	#[beet::test]
+	async fn no_config_needs_a_store() {
+		exchange(&mut crate::commands::render_world(), "analytics summary")
+			.await
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no analytics store")
+			.xpect_contains("AnalyticsConfig");
 	}
 
 	/// One report over the two keyspaces of ONE store, and a date is read from
@@ -203,7 +257,7 @@ mod test {
 			rollups.push(row).await.unwrap();
 		}
 
-		report((), &format!("analytics summary --store fs:{dir}"))
+		report(&format!("analytics summary --store fs:{dir}"))
 			.await
 			.as_str()
 			.xpect_contains("2 events: 2 page views");

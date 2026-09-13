@@ -30,9 +30,11 @@ impl StoreRef {
 	/// The store entity this consumer is bound to.
 	pub fn store(&self) -> Entity { self.0 }
 
-	/// Read the erased store component a declaration entity materializes, ie a
-	/// [`TableStore`](crate::prelude::TableStore) or a
-	/// [`BlobStore`](crate::prelude::BlobStore).
+	/// Read a store component an entity materializes asynchronously: the erased
+	/// [`TableStore`](crate::prelude::TableStore) or
+	/// [`BlobStore`](crate::prelude::BlobStore) a declaration lands, or the
+	/// writer a consumer derives from one, ie the `AnalyticsStore` beside an
+	/// `AnalyticsConfig`.
 	///
 	/// A declaration's runtime half lands through the command queue (the
 	/// ancestry a stack scope resolves against arrives with the rest of the
@@ -54,8 +56,8 @@ impl StoreRef {
 			}
 			if backoff.next().await.is_none() {
 				bevybail!(
-					"store entity {target} has no `{}`: give the declaration a store \
-					 provider component, ie `<FsStore/>`",
+					"entity {target} has no `{}`: give the declaration it names a \
+					 store provider component, ie `<FsStore/>`",
 					core::any::type_name::<T>()
 				);
 			}
