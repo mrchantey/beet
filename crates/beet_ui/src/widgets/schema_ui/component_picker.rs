@@ -124,8 +124,10 @@ mod test {
 	#[reflect(Component, Default)]
 	struct Health(u32);
 
-	/// A form over a keyed map holding a `Name`, in a world registering one
-	/// more component.
+	const NAME: &str = "bevy_ecs::name::Name";
+
+	/// A form over a scene entity holding a `Name`, as the inspector binds
+	/// one, in a world registering one more component.
 	fn build() -> (World, Entity) {
 		let mut world = test_ext::form_world();
 		world
@@ -136,16 +138,19 @@ mod test {
 			.spawn_template(rsx! {
 				<div>
 					<DynamicForm
-						schema={ValueSchema::Map(MapSchema::Keyed)}
-						field={FieldRef::new("components")}
+						schema={ValueSchema::reference(ValueSchema::SCENE_ENTITY)}
+						field={FieldRef::new(SceneEntities::entity_path(0))}
 					/>
 				</div>
 			})
 			.unwrap()
 			.id();
-		world.entity_mut(root).insert(Document::new(value!({
-			"components": { "bevy_ecs::name::Name": "a" }
-		})));
+		world
+			.entity_mut(root)
+			.insert(Document::new(SceneEntities::scene([(
+				0,
+				Map::new([(NAME, "a")]),
+			)])));
 		test_ext::settle_world(&mut world);
 		(world, root)
 	}
@@ -174,16 +179,17 @@ mod test {
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::str(Health::type_path()));
-		let add = test_ext::collection_add(&mut world, "components");
+		let add = test_ext::collection_add(&mut world, "entities.0.components");
 		test_ext::click_world(&mut world, add);
-		let mut components = Value::map();
-		components.insert("bevy_ecs::name::Name", "a").unwrap();
-		components.insert(Health::type_path(), 0u64).unwrap();
-		test_ext::document_of(&mut world, root)
-			.get("components")
+		SceneEntities::of(&test_ext::document_of(&mut world, root))
+			.unwrap()
+			.components(0)
 			.unwrap()
 			.clone()
-			.xpect_eq(components);
+			.xpect_eq(Map::new([
+				(NAME, Value::str("a")),
+				(Health::type_path(), Value::Uint(0)),
+			]));
 		test_ext::render_world(&mut world, root)
 			.xnot()
 			.xpect_contains(">Health</option>");

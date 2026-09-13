@@ -1,4 +1,5 @@
-//! [`SceneEntities`]: a scene document's entities read as a relation graph.
+//! [`SceneEntities`]: a scene document's entities read as a relation graph,
+//! and [`SceneEntitiesMut`], the vocabulary an edit to them needs.
 use crate::prelude::*;
 use bevy_reflect::TypeRegistry;
 
@@ -10,12 +11,18 @@ use bevy_reflect::TypeRegistry;
 /// Consumed twice: the document layer rejects a violating write
 /// ([`assert_acyclic`](Self::assert_acyclic)) and an entity picker filters
 /// the candidates that would violate it ([`would_cycle`](Self::would_cycle)).
+///
+/// The one place the entity shape is spelled: every reader goes through this
+/// view and every writer through [`SceneEntitiesMut`], so the format can
+/// change under them.
 #[derive(Debug, Clone, Copy)]
 pub struct SceneEntities<'a> {
 	entities: &'a Map,
 }
 
 impl<'a> SceneEntities<'a> {
+	/// The scene's `resources` field.
+	pub const RESOURCES: &'static str = "resources";
 	/// The scene's `entities` field.
 	pub const ENTITIES: &'static str = "entities";
 	/// An entity's `components` field.
@@ -31,17 +38,51 @@ impl<'a> SceneEntities<'a> {
 			.xok()
 	}
 
-	/// The path of the entity at `key` within its scene document.
+	/// The entities of `scene`, to edit.
+	pub fn of_mut(scene: &'a mut Value) -> Result<SceneEntitiesMut<'a>> {
+		scene
+			.as_map_mut()?
+			.0
+			.get_mut(Self::ENTITIES)
+			.ok_or_else(|| bevyhow!("the scene holds no entities"))?
+			.as_map_mut()?
+			.xmap(|entities| SceneEntitiesMut { entities })
+			.xok()
+	}
+
+	/// A scene document holding `entities`, each its component map, in the
+	/// given order, and no resources: the fixture every scene test starts
+	/// from.
+	pub fn scene(entities: impl IntoIterator<Item = (u32, Map)>) -> Value {
+		let mut scene = Value::map();
+		scene.insert(Self::RESOURCES, Map::default()).unwrap();
+		scene.insert(Self::ENTITIES, Map::default()).unwrap();
+		let mut view = SceneEntities::of_mut(&mut scene).unwrap();
+		for (key, components) in entities {
+			view.insert_entity(key, components);
+		}
+		scene
+	}
+
+	/// The raw json of the entity at `key` in a serialized scene: what a
+	/// conformance probe indexes, straight off the bytes rather than through
+	/// this view, so the format is pinned independently of how it is read.
+	/// `Null` where there is none, as json indexing reads.
+	#[cfg(feature = "json")]
+	pub fn entity_json(
+		scene: &serde_json::Value,
+		key: u32,
+	) -> &serde_json::Value {
+		&scene[Self::ENTITIES][key.to_string()][Self::COMPONENTS]
+	}
+
+	/// The path of the entity at `key` within its scene document: what a form
+	/// over it binds.
 	pub fn entity_path(key: u32) -> FieldPath {
 		FieldPath::new([
 			FieldSegment::key(Self::ENTITIES),
 			FieldSegment::key(key.to_string()),
 		])
-	}
-
-	/// The path of the component map of the entity at `key`.
-	pub fn components_path(key: u32) -> FieldPath {
-		Self::entity_path(key).with_pushed(Self::COMPONENTS)
 	}
 
 	/// The scene position a field path names: the file key of the entity and
@@ -106,12 +147,15 @@ impl<'a> SceneEntities<'a> {
 			.ok()
 	}
 
+	/// The component at `type_path` of the entity at `key`, if it holds one.
+	pub fn component(&self, key: u32, type_path: &str) -> Option<&'a Value> {
+		self.components(key)?.0.get(type_path)
+	}
+
 	/// The entity `key`'s target under `relation` (a component type path), when
 	/// it holds one.
 	pub fn target(&self, key: u32, relation: &str) -> Option<u32> {
-		self.components(key)?
-			.0
-			.get(relation)
+		self.component(key, relation)
 			.and_then(EntitySchema::file_key)
 	}
 
@@ -256,12 +300,94 @@ impl<'a> SceneEntities<'a> {
 	}
 }
 
+/// The writing twin of [`SceneEntities`]: the edits a scene document takes,
+/// each landing in the shape the view reads, so no editor spells it.
+#[derive(Debug)]
+pub struct SceneEntitiesMut<'a> {
+	entities: &'a mut Map,
+}
+
+impl<'a> SceneEntitiesMut<'a> {
+	/// Insert an entity holding `components` at `key`, last in document order
+	/// (so last among its siblings), replacing any entity there.
+	pub fn insert_entity(&mut self, key: u32, components: Map) {
+		let mut entity = Map::default();
+		entity.insert(SceneEntities::COMPONENTS, components);
+		self.entities.insert(key.to_string(), entity);
+	}
+
+	/// Remove the entity at `key`, answering whether the scene held one. What
+	/// it owned stays: an editor removes a subtree by walking the view first.
+	pub fn remove_entity(&mut self, key: u32) -> bool {
+		self.entities.remove(&key.to_string()).is_some()
+	}
+
+	/// Move the entity at `key` to document position `index`, the edit a
+	/// reorder makes: document order is child order.
+	pub fn move_entity(&mut self, key: u32, index: usize) -> Result {
+		let from = self
+			.entities
+			.0
+			.get_index_of(key.to_string().as_str())
+			.ok_or_else(|| bevyhow!("the scene holds no entity #{key}"))?;
+		self.entities.0.move_index(from, index);
+		OK
+	}
+
+	/// The components of the entity at `key`, to edit.
+	pub fn components_mut(&mut self, key: u32) -> Option<&mut Map> {
+		self.entities
+			.0
+			.get_mut(key.to_string().as_str())?
+			.get_mut(SceneEntities::COMPONENTS)?
+			.as_map_mut()
+			.ok()
+	}
+
+	/// The component at `type_path` of the entity at `key`, to edit.
+	pub fn component_mut(
+		&mut self,
+		key: u32,
+		type_path: &str,
+	) -> Option<&mut Value> {
+		self.components_mut(key)?.0.get_mut(type_path)
+	}
+
+	/// Set the component at `type_path` of the entity at `key`, adding it last
+	/// if the entity lacks one; an error for an entity the scene lacks.
+	pub fn insert_component(
+		&mut self,
+		key: u32,
+		type_path: impl Into<SmolStr>,
+		value: impl Into<Value>,
+	) -> Result {
+		self.components_mut(key)
+			.ok_or_else(|| bevyhow!("the scene holds no entity #{key}"))?
+			.insert(type_path, value);
+		OK
+	}
+
+	/// Remove the component at `type_path` from the entity at `key`, answering
+	/// it if there was one.
+	pub fn remove_component(
+		&mut self,
+		key: u32,
+		type_path: &str,
+	) -> Option<Value> {
+		self.components_mut(key)?.remove(type_path)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use bevy_reflect::TypeRegistry;
 
 	const CHILD_OF: &str = "bevy_ecs::hierarchy::ChildOf";
+	const NAME: &str = "bevy_ecs::name::Name";
+	const ELEMENT: &str = "beet_core::types::element::element::Element";
+	const ATTRIBUTE: &str = "beet_core::types::snippet::attribute::Attribute";
+	const VALUE: &str = "beet_core::types::value::value::Value";
 
 	fn types() -> TypeRegistry {
 		let mut types = TypeRegistry::default();
@@ -269,31 +395,29 @@ mod test {
 		types
 	}
 
-	/// `{ components: { ChildOf: parent } }`
-	fn child(parent: u32) -> Value {
-		value!({ "components": {
-			"bevy_ecs::hierarchy::ChildOf": (EntitySchema::reference(parent).unwrap())
-		} })
+	/// The components of a child of `parent`.
+	fn child(parent: u32) -> Map {
+		Map::new([(CHILD_OF, EntitySchema::reference(parent).unwrap())])
 	}
 
 	/// A root with a chain of two children: `0 <- 1 <- 2`.
 	fn scene() -> Value {
-		value!({
-			"resources": {},
-			"entities": {
-				"0": { "components": {} },
-				"1": (child(0)),
-				"2": (child(1))
-			}
-		})
+		SceneEntities::scene([
+			(0, Map::default()),
+			(1, child(0)),
+			(2, child(1)),
+		])
 	}
 
 	/// Set entity `key`'s parent, the write an editor's `ChildOf` picker lands.
 	fn reparent(scene: &mut Value, key: u32, parent: u32) {
-		scene
-			.get_mut("entities")
+		SceneEntities::of_mut(scene)
 			.unwrap()
-			.insert(key.to_string(), child(parent))
+			.insert_component(
+				key,
+				CHILD_OF,
+				EntitySchema::reference(parent).unwrap(),
+			)
 			.unwrap();
 	}
 
@@ -305,6 +429,36 @@ mod test {
 		entities.keys().unwrap().xpect_eq(vec![0, 1, 2]);
 		entities.target(2, CHILD_OF).unwrap().xpect_eq(1);
 		entities.target(0, CHILD_OF).xpect_none();
+	}
+
+	/// The edits land in the shape the view reads, and in document order: an
+	/// inserted entity comes last, a moved one where it was put, a removed
+	/// component is gone and a removed entity with it.
+	#[crate::test]
+	fn edits_round_trip_through_the_view() {
+		let mut scene = scene();
+		let mut entities = SceneEntities::of_mut(&mut scene).unwrap();
+		entities.insert_entity(3, child(0));
+		entities.insert_component(3, NAME, "c").unwrap();
+		entities.insert_component(9, NAME, "nobody").unwrap_err();
+		*entities.component_mut(3, NAME).unwrap() = Value::str("d");
+		entities.move_entity(3, 1).unwrap();
+		entities.move_entity(9, 0).unwrap_err();
+		entities.remove_component(1, CHILD_OF).unwrap();
+		entities.remove_entity(2).xpect_true();
+		entities.remove_entity(2).xpect_false();
+		let entities = SceneEntities::of(&scene).unwrap();
+		entities.keys().unwrap().xpect_eq(vec![0, 3, 1]);
+		entities
+			.component(3, NAME)
+			.unwrap()
+			.as_str()
+			.unwrap()
+			.xpect_eq("d");
+		entities.target(3, CHILD_OF).unwrap().xpect_eq(0);
+		entities.target(1, CHILD_OF).xpect_none();
+		entities.components(1).unwrap().0.len().xpect_eq(0);
+		entities.related(CHILD_OF, 0).unwrap().xpect_eq(vec![3]);
 	}
 
 	/// Reparenting the root under its grandchild is rejected naming the
@@ -341,11 +495,9 @@ mod test {
 	#[crate::test]
 	fn a_picker_filters_the_subtree() {
 		let mut scene = scene();
-		scene
-			.get_mut("entities")
+		SceneEntities::of_mut(&mut scene)
 			.unwrap()
-			.insert("3", child(0))
-			.unwrap();
+			.insert_entity(3, child(0));
 		let entities = SceneEntities::of(&scene).unwrap();
 		entities.would_cycle(CHILD_OF, 1, 1).xpect_true();
 		entities.would_cycle(CHILD_OF, 1, 2).xpect_true();
@@ -359,11 +511,9 @@ mod test {
 	#[crate::test]
 	fn candidates_honour_the_relation_meta() {
 		let mut scene = scene();
-		scene
-			.get_mut("entities")
+		SceneEntities::of_mut(&mut scene)
 			.unwrap()
-			.insert("3", child(0))
-			.unwrap();
+			.insert_entity(3, child(0));
 		let entities = SceneEntities::of(&scene).unwrap();
 		entities
 			.candidates(&types(), CHILD_OF, 1)
@@ -378,43 +528,34 @@ mod test {
 	/// An entity is called by its name, else by its key and what it most is.
 	#[crate::test]
 	fn labels_say_what_an_entity_is() {
-		let scene = value!({
-			"resources": {},
-			"entities": {
-				"0": { "components": { "bevy_ecs::name::Name": "root" } },
-				"1": { "components": {
-					"beet_core::types::element::element::Element": "div",
-					"bevy_ecs::hierarchy::ChildOf": (EntitySchema::reference(0).unwrap())
-				} },
-				"2": { "components": {
-					"beet_core::types::snippet::attribute::Attribute": "class",
-					"beet_core::types::value::value::Value": "card"
-				} },
-				"3": { "components": {
-					"beet_core::types::value::value::Value": "hello"
-				} },
-				"6": { "components": {
-					"beet_core::types::value::value::Value": "a paragraph long enough to cut"
-				} },
-				"4": { "components": {
-					"bevy_ecs::hierarchy::ChildOf": (EntitySchema::reference(0).unwrap()),
-					"my_crate::widgets::Toggle": {}
-				} },
-				"5": { "components": {} }
-			}
-		});
+		let scene = SceneEntities::scene([
+			(0, Map::new([(NAME, "root")])),
+			(
+				1,
+				Map::new([
+					(ELEMENT, Value::str("div")),
+					(CHILD_OF, EntitySchema::reference(0).unwrap()),
+				]),
+			),
+			(2, Map::new([(ATTRIBUTE, "class"), (VALUE, "card")])),
+			(3, Map::new([(VALUE, "hello")])),
+			(6, Map::new([(VALUE, "a paragraph long enough to cut")])),
+			(
+				4,
+				Map::new([
+					(CHILD_OF, EntitySchema::reference(0).unwrap()),
+					("my_crate::widgets::Toggle", Value::map()),
+				]),
+			),
+			(5, Map::default()),
+		]);
 		let entities = SceneEntities::of(&scene).unwrap();
 		entities.label(0).xpect_eq("root");
 		entities.label(1).xpect_eq("#1 div");
 		let mut unnamed = scene.clone();
-		unnamed
-			.get_mut("entities")
+		SceneEntities::of_mut(&mut unnamed)
 			.unwrap()
-			.get_mut("1")
-			.unwrap()
-			.get_mut("components")
-			.unwrap()
-			.insert("bevy_ecs::name::Name", "")
+			.insert_component(1, NAME, "")
 			.unwrap();
 		SceneEntities::of(&unnamed)
 			.unwrap()

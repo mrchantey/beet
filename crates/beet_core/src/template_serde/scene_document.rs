@@ -314,7 +314,7 @@ impl ScenePlan {
 		let mut entities = Vec::new();
 		for key in new.keys()? {
 			let components = new.components(key).ok_or_else(|| {
-				bevyhow!("entity #{key} holds no `components` map")
+				bevyhow!("entity #{key} holds no component map")
 			})?;
 			let previous = old.components(key);
 			let mut plan = EntityPlan {
@@ -728,23 +728,28 @@ mod test {
 		world.run_schedule(DocumentSync);
 	}
 
-	/// A component's document slot.
-	fn component<'a>(
-		scene: &'a mut Value,
-		key: u32,
-		type_path: &str,
-	) -> &'a mut Value {
-		scene
-			.get_mut("entities")
-			.unwrap()
-			.get_mut(&key.to_string())
-			.unwrap()
-			.get_mut("components")
-			.unwrap()
-			.as_map_mut()
-			.unwrap()
-			.entry(type_path.into())
-			.or_insert(Value::Null)
+	/// The document's entities, to edit as an inspector would.
+	fn entities(scene: &mut Value) -> SceneEntitiesMut<'_> {
+		SceneEntities::of_mut(scene).unwrap()
+	}
+
+	/// The components of a named child of the root: `name` and `ChildOf`.
+	fn child(name: &str, parent: u32) -> Map {
+		Map::new([
+			(NAME, Value::str(name)),
+			(CHILD_OF, EntitySchema::reference(parent).unwrap()),
+		])
+	}
+
+	/// Point entity `key`'s `ChildOf` at `parent`, the write a reparent lands.
+	fn reparent(scene: &mut Value, key: u32, parent: u32) {
+		entities(scene)
+			.insert_component(
+				key,
+				CHILD_OF,
+				EntitySchema::reference(parent).unwrap(),
+			)
+			.unwrap();
 	}
 
 	#[crate::test]
@@ -780,7 +785,7 @@ mod test {
 		let (mut world, host, _) = forked();
 		let (a, b) = (entity(&world, host, 1), entity(&world, host, 2));
 		edit(&mut world, host, |scene| {
-			*component(scene, 2, HEALTH) = Value::Uint(9);
+			entities(scene).insert_component(2, HEALTH, 9u64).unwrap();
 		});
 		world.get::<Health>(b).unwrap().xpect_eq(Health(9));
 		world.get::<Health>(a).unwrap().xpect_eq(Health(1));
@@ -795,21 +800,11 @@ mod test {
 		let (mut world, host, _) = forked();
 		let root = entity(&world, host, 0);
 		edit(&mut world, host, |scene| {
-			*component(scene, 0, HEALTH) = Value::Uint(3);
+			entities(scene).insert_component(0, HEALTH, 3u64).unwrap();
 		});
 		world.get::<Health>(root).unwrap().xpect_eq(Health(3));
 		edit(&mut world, host, |scene| {
-			component(scene, 0, HEALTH);
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.get_mut("0")
-				.unwrap()
-				.get_mut("components")
-				.unwrap()
-				.as_map_mut()
-				.unwrap()
-				.remove(HEALTH);
+			entities(scene).remove_component(0, HEALTH);
 		});
 		world.get::<Health>(root).xpect_none();
 		world.get::<Name>(root).unwrap().as_str().xpect_eq("root");
@@ -826,32 +821,17 @@ mod test {
 			entity(&world, host, 2),
 		);
 		// `b` under `a`
-		edit(&mut world, host, |scene| {
-			*component(scene, 2, CHILD_OF) =
-				EntitySchema::reference(1).unwrap();
-		});
+		edit(&mut world, host, |scene| reparent(scene, 2, 1));
 		names(&world, root).xpect_eq(vec!["a".to_string()]);
 		names(&world, a).xpect_eq(vec!["b".to_string()]);
 		world.get::<ChildOf>(b).unwrap().parent().xpect_eq(a);
 		// back under the root: `b` precedes `a` in the world only if the
 		// document says so, and the document says `a` first
-		edit(&mut world, host, |scene| {
-			*component(scene, 2, CHILD_OF) =
-				EntitySchema::reference(0).unwrap();
-		});
+		edit(&mut world, host, |scene| reparent(scene, 2, 0));
 		names(&world, root).xpect_eq(vec!["a".to_string(), "b".into()]);
 		// dropping the `ChildOf` makes it a root under the host
 		edit(&mut world, host, |scene| {
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.get_mut("2")
-				.unwrap()
-				.get_mut("components")
-				.unwrap()
-				.as_map_mut()
-				.unwrap()
-				.remove(CHILD_OF);
+			entities(scene).remove_component(2, CHILD_OF);
 		});
 		world.get::<ChildOf>(b).unwrap().parent().xpect_eq(host);
 		names(&world, root).xpect_eq(vec!["a".to_string()]);
@@ -873,9 +853,7 @@ mod test {
 			"b".into(),
 		]);
 		edit(&mut world, host, |scene| {
-			let entities =
-				scene.get_mut("entities").unwrap().as_map_mut().unwrap();
-			entities.0.move_index(2, 1);
+			entities(scene).move_entity(2, 1).unwrap();
 		});
 		names(&world, root).xpect_eq(vec![
 			"b".to_string(),
@@ -892,16 +870,11 @@ mod test {
 			entity(&world, host, 1),
 			entity(&world, host, 2),
 		);
-		edit(&mut world, host, |scene| {
-			*component(scene, 2, CHILD_OF) =
-				EntitySchema::reference(1).unwrap();
-		});
+		edit(&mut world, host, |scene| reparent(scene, 2, 1));
 		// removing `a` takes `b` with it, so the document drops both
 		edit(&mut world, host, |scene| {
-			let entities =
-				scene.get_mut("entities").unwrap().as_map_mut().unwrap();
-			entities.remove("1");
-			entities.remove("2");
+			entities(scene).remove_entity(1);
+			entities(scene).remove_entity(2);
 		});
 		world.get_entity(a).is_err().xpect_true();
 		world.get_entity(b).is_err().xpect_true();
@@ -920,28 +893,14 @@ mod test {
 		let (mut world, host, _) = forked();
 		let a = entity(&world, host, 1);
 		edit(&mut world, host, |scene| {
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.insert(
-					"3",
-					value!({ "components": {
-					(NAME): "c",
-					(CHILD_OF): (EntitySchema::reference(1).unwrap())
-				} }),
-				)
-				.unwrap();
+			entities(scene).insert_entity(3, child("c", 1));
 		});
 		let c = entity(&world, host, 3);
 		world.get::<Name>(c).unwrap().as_str().xpect_eq("c");
 		world.get::<ChildOf>(c).unwrap().parent().xpect_eq(a);
 		// a root without a parent lands under the host
 		edit(&mut world, host, |scene| {
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.insert("4", value!({ "components": { (NAME): "d" } }))
-				.unwrap();
+			entities(scene).insert_entity(4, Map::new([(NAME, "d")]));
 		});
 		let d = entity(&world, host, 4);
 		world.get::<ChildOf>(d).unwrap().parent().xpect_eq(host);
@@ -952,7 +911,7 @@ mod test {
 		let (mut world, host, _) = forked();
 		edit(&mut world, host, |scene| {
 			scene
-				.get_mut("resources")
+				.get_mut(SceneEntities::RESOURCES)
 				.unwrap()
 				.insert(SCORE, Value::Uint(5))
 				.unwrap();
@@ -960,7 +919,7 @@ mod test {
 		world.resource::<Score>().xpect_eq(Score(5));
 		edit(&mut world, host, |scene| {
 			scene
-				.get_mut("resources")
+				.get_mut(SceneEntities::RESOURCES)
 				.unwrap()
 				.as_map_mut()
 				.unwrap()
@@ -991,28 +950,24 @@ mod test {
 			err
 		};
 		// the root under its own child cycles
-		refuse(&mut world, |scene| {
-			*component(scene, 0, CHILD_OF) =
-				EntitySchema::reference(2).unwrap();
-		})
-		.xpect_contains("would cycle")
-		.xpect_contains("#0")
-		.xpect_contains("#2");
+		refuse(&mut world, |scene| reparent(scene, 0, 2))
+			.xpect_contains("would cycle")
+			.xpect_contains("#0")
+			.xpect_contains("#2");
 		// a parent the scene does not hold dangles
-		refuse(&mut world, |scene| {
-			*component(scene, 2, CHILD_OF) =
-				EntitySchema::reference(9).unwrap();
-		})
-		.xpect_contains("#2 references #9");
+		refuse(&mut world, |scene| reparent(scene, 2, 9))
+			.xpect_contains("#2 references #9");
 		// a component this binary has not registered, and a value its type
 		// rejects, both fail before anything is applied
 		refuse(&mut world, |scene| {
-			*component(scene, 2, "made::Up") = Value::Uint(1);
+			entities(scene)
+				.insert_component(2, "made::Up", 1u64)
+				.unwrap();
 		})
 		.xpect_contains("made::Up")
 		.xpect_contains("not a registered type");
 		refuse(&mut world, |scene| {
-			*component(scene, 1, HEALTH) = Value::Str("full".into());
+			entities(scene).insert_component(1, HEALTH, "full").unwrap();
 		})
 		.xpect_contains("#1")
 		.xpect_contains(HEALTH);
@@ -1033,20 +988,9 @@ mod test {
 	fn a_reboot_reproduces_the_edited_world() {
 		let (mut world, host, _) = forked();
 		edit(&mut world, host, |scene| {
-			*component(scene, 2, HEALTH) = Value::Uint(9);
-			*component(scene, 2, CHILD_OF) =
-				EntitySchema::reference(1).unwrap();
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.insert(
-					"3",
-					value!({ "components": {
-					(NAME): "c",
-					(CHILD_OF): (EntitySchema::reference(0).unwrap())
-				} }),
-				)
-				.unwrap();
+			entities(scene).insert_component(2, HEALTH, 9u64).unwrap();
+			reparent(scene, 2, 1);
+			entities(scene).insert_entity(3, child("c", 0));
 		});
 		let registry = world.resource::<AppTypeRegistry>().read();
 		let bytes = SceneDocument::to_bytes(
@@ -1216,12 +1160,10 @@ mod conformance {
 			.unwrap()
 			.xmap(serde_json::from_str::<serde_json::Value>)
 			.unwrap();
-		let entities = json["entities"].as_object().unwrap();
-		entities.len().xpect_eq(3);
-		entities["0"]["components"]
-			.get("bevy_ecs::hierarchy::ChildOf")
-			.xpect_none();
-		entities["0"]["components"]["bevy_ecs::name::Name"]
+		json["entities"].as_object().unwrap().len().xpect_eq(3);
+		let root = SceneEntities::entity_json(&json, 0);
+		root.get("bevy_ecs::hierarchy::ChildOf").xpect_none();
+		root["bevy_ecs::name::Name"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("parent");

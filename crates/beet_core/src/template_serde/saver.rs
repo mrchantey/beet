@@ -279,8 +279,9 @@ mod test {
 		let mut dumped = json["entities"]
 			.as_object()
 			.unwrap()
-			.values()
-			.flat_map(|entity| entity["components"].as_object().unwrap().keys())
+			.keys()
+			.map(|key| SceneEntities::entity_json(&json, key.parse().unwrap()))
+			.flat_map(|entity| entity.as_object().unwrap().keys())
 			.cloned()
 			.collect::<Vec<_>>();
 		dumped.sort();

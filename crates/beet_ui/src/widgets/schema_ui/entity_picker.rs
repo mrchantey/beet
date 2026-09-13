@@ -182,22 +182,30 @@ mod test {
 	use beet_core::prelude::*;
 
 	const CHILD_OF: &str = "bevy_ecs::hierarchy::ChildOf";
+	const NAME: &str = "bevy_ecs::name::Name";
 
 	/// `root { a, b }` as a scene document, with `b` the entity under edit.
 	fn scene() -> Value {
 		let child = |parent: u32| {
-			value!({ "components": {
-				"bevy_ecs::hierarchy::ChildOf": (EntitySchema::reference(parent).unwrap())
-			} })
+			Map::new([(CHILD_OF, EntitySchema::reference(parent).unwrap())])
 		};
-		value!({
-			"resources": {},
-			"entities": {
-				"0": { "components": { "bevy_ecs::name::Name": "root" } },
-				"1": (child(0)),
-				"2": (child(0))
-			}
-		})
+		SceneEntities::scene([
+			(0, Map::new([(NAME, "root")])),
+			(1, child(0)),
+			(2, child(0)),
+		])
+	}
+
+	/// Point entity `key`'s `ChildOf` at `parent` from outside the picker.
+	fn reparent(world: &mut World, root: Entity, key: u32, parent: u32) {
+		SceneEntities::of_mut(&mut world.get_mut::<Document>(root).unwrap().0)
+			.unwrap()
+			.insert_component(
+				key,
+				CHILD_OF,
+				EntitySchema::reference(parent).unwrap(),
+			)
+			.unwrap();
 	}
 
 	/// A form over entity `2`'s `ChildOf`, the reparent control.
@@ -271,29 +279,10 @@ mod test {
 	#[beet_core::test]
 	fn follows_the_document() {
 		let (mut world, root) = build();
-		{
-			let mut document = world.entity_mut(root);
-			let mut document = document.get_mut::<Document>().unwrap();
-			document
-				.0
-				.get_mut("entities")
-				.unwrap()
-				.insert(
-					"3",
-					value!({ "components": { "bevy_ecs::name::Name": "c" } }),
-				)
-				.unwrap();
-			*document
-				.0
-				.get_mut("entities")
-				.unwrap()
-				.get_mut("2")
-				.unwrap()
-				.get_mut("components")
-				.unwrap()
-				.get_mut(CHILD_OF)
-				.unwrap() = EntitySchema::reference(1).unwrap();
-		}
+		SceneEntities::of_mut(&mut world.get_mut::<Document>(root).unwrap().0)
+			.unwrap()
+			.insert_entity(3, Map::new([(NAME, "c")]));
+		reparent(&mut world, root, 2, 1);
 		test_ext::settle_world(&mut world);
 		test_ext::render_world(&mut world, root)
 			.xpect_contains("<option value=\"3\">c</option>");
@@ -308,19 +297,7 @@ mod test {
 			.xpect_eq(Value::str("1"));
 
 		// a target changed alone leaves the select in place and moves its choice
-		*world
-			.entity_mut(root)
-			.get_mut::<Document>()
-			.unwrap()
-			.0
-			.get_mut("entities")
-			.unwrap()
-			.get_mut("2")
-			.unwrap()
-			.get_mut("components")
-			.unwrap()
-			.get_mut(CHILD_OF)
-			.unwrap() = EntitySchema::reference(3).unwrap();
+		reparent(&mut world, root, 2, 3);
 		test_ext::settle_world(&mut world);
 		test_ext::element_in(&mut world, "select").xpect_eq(select);
 		world

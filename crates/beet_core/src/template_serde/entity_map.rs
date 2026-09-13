@@ -221,7 +221,7 @@ mod conformance {
 			entities.contains_key(key).xpect_true();
 		}
 		// the root carries no parent, each child points at file key 0
-		entities["0"]["components"]
+		SceneEntities::entity_json(&json, 0)
 			.get("bevy_ecs::hierarchy::ChildOf")
 			.xpect_none();
 		// an `Entity`-typed field is serialized by bevy as `Entity::to_bits`,
@@ -231,8 +231,9 @@ mod conformance {
 		// failure rather than a silent break of every saved document.
 		let parent_ref = Entity::from_raw_u32(0).unwrap().to_bits();
 		parent_ref.xpect_eq(4294967295);
-		for child in ["1", "2"] {
-			entities[child]["components"]["bevy_ecs::hierarchy::ChildOf"]
+		for child in [1, 2] {
+			SceneEntities::entity_json(&json, child)
+				["bevy_ecs::hierarchy::ChildOf"]
 				.as_u64()
 				.unwrap()
 				.xpect_eq(parent_ref);
@@ -279,7 +280,7 @@ mod conformance {
 		// key, and file order still carries child order
 		entity_keys(&edited, &text).xpect_eq(vec![0, 3, 1, 2]);
 		let json: serde_json::Value = serde_json::from_str(&text).unwrap();
-		json["entities"]["3"]["components"]["bevy_ecs::name::Name"]
+		SceneEntities::entity_json(&json, 3)["bevy_ecs::name::Name"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("new");

@@ -25,10 +25,13 @@ impl ValueSchema {
 			),
 			allow_additional: false,
 			fields: vec![
-				NamedFieldSchema::new("resources", Self::keyed_map())
-					.with_label("Resources"),
 				NamedFieldSchema::new(
-					"entities",
+					SceneEntities::RESOURCES,
+					Self::keyed_map(),
+				)
+				.with_label("Resources"),
+				NamedFieldSchema::new(
+					SceneEntities::ENTITIES,
 					ValueSchema::Map(MapSchema::uniform(
 						ValueSchema::reference(Self::SCENE_ENTITY),
 					)),
@@ -51,8 +54,11 @@ impl ValueSchema {
 			description: Some("An entity: the components it holds".into()),
 			allow_additional: false,
 			fields: vec![
-				NamedFieldSchema::new("components", Self::keyed_map())
-					.with_label("Components"),
+				NamedFieldSchema::new(
+					SceneEntities::COMPONENTS,
+					Self::keyed_map(),
+				)
+				.with_label("Components"),
 			],
 		})
 	}
@@ -70,6 +76,10 @@ mod test {
 	#[allow(dead_code)]
 	struct Health(u32);
 
+	const HEALTH: &str =
+		"beet_core::types::schema::scene::scene_schema::test::Health";
+	const CHILD_OF: &str = "bevy_ecs::hierarchy::ChildOf";
+
 	fn registry() -> SchemaRegistry {
 		let mut registry = SchemaRegistry::default();
 		registry.register_type::<Name>();
@@ -81,18 +91,19 @@ mod test {
 	/// A root with a name and one child, as the saver writes it: entity keys are
 	/// file keys and a `ChildOf` holds the parent's file entity bits.
 	fn scene() -> Value {
-		value!({
-			"resources": {},
-			"entities": {
-				"0": { "components": {
-					"bevy_ecs::name::Name": "root",
-					"beet_core::types::schema::scene::scene_schema::test::Health": 3
-				} },
-				"1": { "components": {
-					"bevy_ecs::hierarchy::ChildOf": (EntitySchema::reference(0).unwrap())
-				} }
-			}
-		})
+		SceneEntities::scene([
+			(
+				0,
+				Map::new([
+					("bevy_ecs::name::Name", Value::str("root")),
+					(HEALTH, Value::Uint(3)),
+				]),
+			),
+			(
+				1,
+				Map::new([(CHILD_OF, EntitySchema::reference(0).unwrap())]),
+			),
+		])
 	}
 
 	/// The scene is intrinsic to a registry, so a scene document validates
@@ -109,13 +120,8 @@ mod test {
 			.await
 			.unwrap();
 
-		let mut wrong = scene();
-		wrong.as_map_mut().unwrap().insert(
-			"entities",
-			value!({ "0": { "components": {
-				"beet_core::types::schema::scene::scene_schema::test::Health": "full"
-			} } }),
-		);
+		let mut wrong =
+			SceneEntities::scene([(0, Map::new([(HEALTH, "full")]))]);
 		ValueSchema::reference(ValueSchema::SCENE)
 			.assert_valid_in(resolver, "scene.json", &mut wrong)
 			.await
@@ -136,9 +142,7 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains(
-				"entities.0.components.beet_core::types::schema::scene::scene_schema::test::Health",
-			)
+			.xpect_contains(format!("entities.0.components.{HEALTH}"))
 			.xpect_contains("no schema is registered");
 	}
 
@@ -167,12 +171,12 @@ mod test {
 		let registry = registry();
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		ValueSchema::reference(ValueSchema::SCENE)
-			.get_field_schema_in(resolver, &[
-				FieldSegment::key("entities"),
-				FieldSegment::key("1"),
-				FieldSegment::key("components"),
-				FieldSegment::key("bevy_ecs::hierarchy::ChildOf"),
-			])
+			.get_field_schema_in(
+				resolver,
+				&SceneEntities::entity_path(1)
+					.with_pushed(SceneEntities::COMPONENTS)
+					.with_pushed(CHILD_OF),
+			)
 			.unwrap()
 			.into_owned()
 			.xpect_eq(ValueSchema::Entity(default()));

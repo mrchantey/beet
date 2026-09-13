@@ -182,22 +182,16 @@ fn apply_inspector_action(
 /// Add an entity under `parent`, keyed above every key the scene holds, and
 /// answer its key for selection.
 fn add_child(scene: &mut Value, parent: u32) -> Result<Option<u32>> {
-	let entities = SceneEntities::of(scene)?;
-	let key = entities
+	let key = SceneEntities::of(scene)?
 		.keys()?
 		.into_iter()
 		.max()
 		.map(|key| key + 1)
 		.unwrap_or_default();
-	let mut components = Value::map();
-	components
-		.insert(ChildOf::type_path(), EntitySchema::reference(parent)?)?;
-	let mut entity = Value::map();
-	entity.insert(SceneEntities::COMPONENTS, components)?;
-	scene
-		.get_mut(SceneEntities::ENTITIES)
-		.ok_or_else(|| bevyhow!("the scene holds no entities"))?
-		.insert(key.to_string(), entity)?;
+	SceneEntities::of_mut(scene)?.insert_entity(
+		key,
+		Map::new([(ChildOf::type_path(), EntitySchema::reference(parent)?)]),
+	);
 	Some(key).xok()
 }
 
@@ -224,12 +218,9 @@ fn remove(scene: &mut Value, key: u32) -> Result<Option<u32>> {
 			frontier.push(owned);
 		}
 	}
-	let map = scene
-		.get_mut(SceneEntities::ENTITIES)
-		.ok_or_else(|| bevyhow!("the scene holds no entities"))?
-		.as_map_mut()?;
+	let mut entities = SceneEntities::of_mut(scene)?;
 	for key in removed {
-		map.remove(&key.to_string());
+		entities.remove_entity(key);
 	}
 	Ok(parent)
 }

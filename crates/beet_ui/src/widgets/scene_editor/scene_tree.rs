@@ -274,12 +274,7 @@ mod test {
 		let (mut world, host) = test_ext::editor();
 		test_ext::select(&mut world, 4);
 		test_ext::edit(&mut world, host, |scene| {
-			scene
-				.get_mut("entities")
-				.unwrap()
-				.as_map_mut()
-				.unwrap()
-				.remove("4");
+			SceneEntities::of_mut(scene).unwrap().remove_entity(4);
 		});
 		world
 			.get::<SceneSelection>(host)
@@ -299,14 +294,9 @@ mod test {
 		let (heading, paragraph) =
 			(test_ext::row(&mut world, 1), test_ext::row(&mut world, 3));
 		test_ext::edit(&mut world, host, |scene| {
-			scene
-				.get_mut("entities")
+			SceneEntities::of_mut(scene)
 				.unwrap()
-				.get_mut("1")
-				.unwrap()
-				.get_mut("components")
-				.unwrap()
-				.insert(Name::type_path(), "Heading")
+				.insert_component(1, Name::type_path(), "Heading")
 				.unwrap();
 		});
 		test_ext::row(&mut world, 3).xpect_eq(paragraph);

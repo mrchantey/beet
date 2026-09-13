@@ -5,9 +5,10 @@
 //! registry entry rather than a widget's special case: each component value is
 //! described by its key ([`MapSchema::Keyed`](crate::prelude::MapSchema)), so
 //! the keystone closure holds for scenes exactly as it does for the
-//! meta-schema. What the
-//! schema cannot say, a relation's acyclicity, is registered type data
-//! ([`RelationMeta`]) checked over the whole document ([`SceneEntities`]).
+//! meta-schema. What the schema cannot say, a relation's acyclicity, is
+//! registered type data ([`RelationMeta`]) checked over the whole document
+//! ([`SceneEntities`]), which with its writing twin ([`SceneEntitiesMut`]) is
+//! the one place the entity shape is spelled.
 
 mod relation_meta;
 mod scene_entities;

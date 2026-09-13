@@ -266,7 +266,7 @@ mod test {
 		let fork = store.get_media(&SmolPath::from("app.json")).await.unwrap();
 		let json: serde_json::Value =
 			serde_json::from_slice(fork.bytes()).unwrap();
-		json["entities"]["0"]["components"]
+		SceneEntities::entity_json(&json, 0)
 			.get("beet_core::template_serde::scene_document::SceneFork")
 			.xpect_some();
 	}
@@ -287,27 +287,18 @@ mod test {
 				.unwrap()
 				.into_iter()
 				.find(|key| {
-					entities
-						.components(*key)
-						.and_then(|components| components.get(VALUE).ok())
-						.is_some_and(|value| {
-							value.as_str().ok() == Some("Todos")
-						})
+					entities.component(*key, VALUE).is_some_and(|value| {
+						value.as_str().ok() == Some("Todos")
+					})
 				})
 				.unwrap()
 		};
-		app.world_mut()
-			.get_mut::<Document>(host)
-			.unwrap()
-			.0
-			.get_mut("entities")
-			.unwrap()
-			.get_mut(&key.to_string())
-			.unwrap()
-			.get_mut("components")
-			.unwrap()
-			.insert(VALUE, "Groceries")
-			.unwrap();
+		SceneEntities::of_mut(
+			&mut app.world_mut().get_mut::<Document>(host).unwrap().0,
+		)
+		.unwrap()
+		.insert_component(key, VALUE, "Groceries")
+		.unwrap();
 		app.update_async().await;
 		app.update_async().await;
 		// the live world followed

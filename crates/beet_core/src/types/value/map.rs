@@ -70,6 +70,17 @@ impl PartialOrd for Map {
 }
 
 impl Map {
+	/// A map of `entries`, in order: `Map::new([("name", "ada")])`; values of
+	/// mixed types go in as [`Value`].
+	pub fn new<K: Into<SmolStr>, V: Into<Value>>(
+		entries: impl IntoIterator<Item = (K, V)>,
+	) -> Self {
+		entries
+			.into_iter()
+			.map(|(key, value)| (key.into(), value.into()))
+			.collect()
+	}
+
 	/// Gets a value by key.
 	///
 	/// ## Errors
