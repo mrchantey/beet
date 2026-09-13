@@ -8,8 +8,14 @@
 //! becomes a focusable row, so Tab cycles rows and Enter or a click chooses
 //! one, writing the select's [`Value`] (the form submission value). Escape or
 //! a click away dismisses the panel.
+//!
+//! Typing refines it: a character typed on a focused select opens the panel
+//! (if it is closed) and narrows its rows to the options whose label contains
+//! what was typed, shown as a filter line at the panel's top; Backspace widens
+//! it again. The browser's type-to-jump, made visible, and what makes a
+//! select over hundreds of options (a scene's component picker) usable on a
+//! screen of rows.
 
-use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::input::ButtonState;
@@ -23,11 +29,19 @@ pub struct SelectOpen {
 	pub dropdown: Entity,
 }
 
-/// A spawned dropdown panel, pointing back at its owning `<select>`.
-#[derive(Debug, Clone, Copy, Component)]
+/// A spawned dropdown panel, pointing back at its owning `<select>` and
+/// carrying the text its rows are refined by.
+#[derive(Debug, Clone, Component)]
 pub struct SelectDropdown {
 	pub select: Entity,
+	/// What has been typed since the panel opened: only options whose label
+	/// contains it (case-insensitively) have a row.
+	pub filter: String,
 }
+
+/// Marks the panel's filter line, showing what its rows are refined by.
+#[derive(Debug, Clone, Copy, Component)]
+pub struct SelectFilterLine;
 
 /// A dropdown row for one `<option>`, carrying the submission value it writes
 /// into its select's [`Value`] when chosen.
@@ -47,7 +61,7 @@ impl Plugin for SelectPlugin {
 		app.add_observer(toggle_select_on_click)
 			.add_observer(choose_option_on_click)
 			.add_observer(close_on_press_away)
-			.add_systems(Update, close_on_escape);
+			.add_systems(Update, (close_on_escape, refine_on_type));
 	}
 }
 
@@ -146,6 +160,99 @@ fn close_on_escape(
 	}
 }
 
+/// System: a character typed on a focused `<select>` opens it, refined to the
+/// options whose label contains what was typed; Backspace widens the filter
+/// again. A key reaches the select whose surface it came from.
+fn refine_on_type(
+	mut keys: MessageReader<KeyboardInput>,
+	focused: Query<Entity, With<Focus>>,
+	elements: ElementQuery,
+	values: Query<&Value>,
+	open: Query<&SelectOpen>,
+	mut dropdowns: Query<&mut SelectDropdown>,
+	parents: Query<&ChildOf>,
+	surfaces: SurfaceQuery,
+	mut commands: Commands,
+) {
+	// the typed edits, grouped by the surface they came from
+	let mut edits = HashMap::<Entity, Vec<Option<String>>>::default();
+	for key in keys.read().filter(|key| key.state == ButtonState::Pressed) {
+		let edit = match &key.logical_key {
+			Key::Character(chars) => Some(Some(chars.to_string())),
+			Key::Space => Some(Some(" ".to_string())),
+			Key::Backspace => Some(None),
+			_ => None,
+		};
+		if let Some(edit) = edit {
+			edits.entry(key.window).or_default().push(edit);
+		}
+	}
+	if edits.is_empty() {
+		return;
+	}
+	// the select the focus is on or in: the control itself, or a row of its
+	// open panel
+	let selects = focused
+		.iter()
+		.filter_map(|entity| {
+			ancestors_inclusive(entity, &parents).find(|entity| {
+				elements
+					.get(*entity)
+					.is_ok_and(|view| view.tag() == "select")
+			})
+		})
+		.collect::<HashSet<_>>();
+	for select in selects {
+		let edits = edits
+			.iter()
+			.filter(|(window, _)| surfaces.matches(select, **window))
+			.flat_map(|(_, edits)| edits.iter().cloned())
+			.collect::<Vec<_>>();
+		if edits.is_empty() {
+			continue;
+		}
+		let mut filter = open
+			.get(select)
+			.ok()
+			.and_then(|open| dropdowns.get(open.dropdown).ok())
+			.map(|dropdown| dropdown.filter.clone())
+			.unwrap_or_default();
+		for edit in edits {
+			match edit {
+				Some(chars) => filter.push_str(&chars),
+				None => {
+					filter.pop();
+				}
+			}
+		}
+		match open.get(select) {
+			Ok(open) => {
+				if let Ok(mut dropdown) = dropdowns.get_mut(open.dropdown) {
+					dropdown.filter = filter.clone();
+				}
+				commands.entity(open.dropdown).despawn_children();
+				spawn_rows(
+					&mut commands,
+					&elements,
+					&values,
+					select,
+					open.dropdown,
+					&filter,
+				);
+			}
+			Err(_) => {
+				open_select_filtered(
+					&mut commands,
+					&elements,
+					&values,
+					select,
+					filter,
+				);
+			}
+		}
+	}
+}
+
 /// Spawn the dropdown panel under `select`: one focusable row per `<option>`,
 /// the row matching the current selection carrying the `Selected` state.
 fn open_select(
@@ -154,19 +261,63 @@ fn open_select(
 	values: &Query<&Value>,
 	select: Entity,
 ) {
-	let selected = selected_value(elements, values, select);
+	open_select_filtered(commands, elements, values, select, String::new())
+}
+
+/// [`open_select`], refined to the options whose label contains `filter`.
+fn open_select_filtered(
+	commands: &mut Commands,
+	elements: &ElementQuery,
+	values: &Query<&Value>,
+	select: Entity,
+	filter: String,
+) {
 	let panel = commands
 		.spawn((
 			Element::new("div"),
 			Classes::new([classes::SELECT_DROPDOWN]),
-			SelectDropdown { select },
+			SelectDropdown {
+				select,
+				filter: filter.clone(),
+			},
 			ChildOf(select),
 		))
 		.id();
+	spawn_rows(commands, elements, values, select, panel, &filter);
+	commands
+		.entity(select)
+		.insert(SelectOpen { dropdown: panel });
+}
+
+/// The panel's rows: the filter line when there is a filter, then one
+/// focusable row per option whose label contains it, the row matching the
+/// current selection carrying the `Selected` state.
+fn spawn_rows(
+	commands: &mut Commands,
+	elements: &ElementQuery,
+	values: &Query<&Value>,
+	select: Entity,
+	panel: Entity,
+	filter: &str,
+) {
+	if !filter.is_empty() {
+		commands.spawn((
+			Element::new("div").with_inner_text(&format!("/{filter}")),
+			Classes::new([classes::SELECT_FILTER]),
+			SelectFilterLine,
+			ChildOf(panel),
+		));
+	}
+	let selected = selected_value(elements, values, select);
+	let needle = filter.to_lowercase();
 	for option in select_options(elements, select) {
-		let value = option_value(&option);
+		let label = option.option_label();
+		if !label.to_lowercase().contains(&needle) {
+			continue;
+		}
+		let value = option.option_value();
 		let mut row = commands.spawn((
-			Element::new("div").with_inner_text(&option_label(&option)),
+			Element::new("div").with_inner_text(&label),
 			Classes::new([classes::SELECT_OPTION]),
 			SelectOptionRow {
 				select,
@@ -179,9 +330,6 @@ fn open_select(
 			row.insert(ElementStateMap::with(ElementState::Selected));
 		}
 	}
-	commands
-		.entity(select)
-		.insert(SelectOpen { dropdown: panel });
 }
 
 /// Despawn the panel; `refocus` returns keyboard focus to the select (chosen
@@ -215,7 +363,7 @@ fn selected_value(
 		.or_else(|| {
 			select_options(elements, select)
 				.next()
-				.map(|option| option_value(&option))
+				.map(|option| option.option_value())
 		})
 }
 
@@ -524,6 +672,58 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::str("designer"));
+	}
+
+	/// Typing on a focused select opens it refined to the matching options,
+	/// shown under a filter line; Backspace widens the rows again, and the
+	/// select's own value is never typed into.
+	#[beet_core::test]
+	fn typing_opens_and_refines() {
+		let mut host = select_host();
+		let surface = host.host;
+		let select = select_entity(&mut host);
+		host.app
+			.world_mut()
+			.entity_mut(select)
+			.insert((Focus, RenderSurface(surface)));
+		host.step();
+		host.send_input(b"des");
+		host.step();
+		host.step();
+		dropdown(&mut host).xpect_some();
+		rows(&mut host)
+			.into_iter()
+			.map(|(_, row)| row.value)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["designer".to_string()]);
+		host.frame_plain().xpect_contains("/des");
+		host.app
+			.world()
+			.get::<Value>(select)
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::str(""));
+
+		// backspacing the filter away widens the panel to every option
+		host.send_input(b"\x7f\x7f\x7f");
+		host.step();
+		host.step();
+		rows(&mut host).len().xpect_eq(2);
+		host.frame_plain().xnot().xpect_contains("/");
+
+		// choosing from the refined rows works as it always did
+		host.send_input(b"eng");
+		host.step();
+		host.step();
+		let (engineer, _) = rows(&mut host).remove(0);
+		activate(&mut host, engineer);
+		host.step();
+		host.app
+			.world()
+			.get::<Value>(select)
+			.unwrap()
+			.clone()
+			.xpect_eq(Value::str("engineer"));
 	}
 
 	/// Escape dismisses the open panel without changing the value.

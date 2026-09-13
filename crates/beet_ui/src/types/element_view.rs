@@ -117,6 +117,25 @@ impl<'a> ElementView<'a> {
 			.map(|attr| attr.value.to_string())
 			.unwrap_or_default()
 	}
+
+	/// An `<option>`'s submission value: its `value` attribute, falling back
+	/// to its label text like a browser.
+	pub fn option_value(&self) -> String {
+		let value = self.attribute_string("value");
+		match value.is_empty() {
+			true => self.option_label(),
+			false => value,
+		}
+	}
+
+	/// An `<option>`'s visible label: its inner text, falling back to its
+	/// `value` attribute.
+	pub fn option_label(&self) -> String {
+		self.inner_text
+			.and_then(|(_, value)| value.as_str().ok())
+			.map(|label| label.to_string())
+			.unwrap_or_else(|| self.attribute_string("value"))
+	}
 }
 
 pub trait TypedElementView<'a>: Sized {

@@ -8,10 +8,11 @@
 //! the same DOM + rule machinery as parsed HTML.
 //!
 //! Grouped by what a widget *is*: [`controls`] the authored form controls,
-//! [`schema_ui`] the ones a schema generates, [`chrome`] the page frame,
-//! [`browser`] the web-target `<style>`/`<script>` emitters, and [`debug`] the
-//! ones that surface the running app to whoever is working on it. Everything
-//! is re-exported flat, so an author names a widget, not its domain.
+//! [`schema_ui`] the ones a schema generates, [`scene_editor`] the ones that
+//! edit the scene a page is, [`chrome`] the page frame, [`browser`] the
+//! web-target `<style>`/`<script>` emitters, and [`debug`] the ones that
+//! surface the running app to whoever is working on it. Everything is
+//! re-exported flat, so an author names a widget, not its domain.
 //!
 //! **Reactive substrate.** State lives in documents:
 //! [`TypedFieldRef`](beet_core::prelude::TypedFieldRef) for a single typed atom and
@@ -59,6 +60,8 @@ mod chrome;
 mod code_snippet;
 mod controls;
 mod debug;
+#[cfg(feature = "template_serde")]
+mod scene_editor;
 mod schema_ui;
 /// Shared harness for the widget tests.
 #[cfg(test)]
@@ -76,6 +79,8 @@ pub use chrome::*;
 pub use code_snippet::*;
 pub use controls::*;
 pub use debug::*;
+#[cfg(feature = "template_serde")]
+pub use scene_editor::*;
 pub use schema_ui::*;
 pub use toast::*;
 pub(crate) use widget_plugin::widget_plugin;

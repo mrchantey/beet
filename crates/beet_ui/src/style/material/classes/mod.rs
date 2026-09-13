@@ -135,6 +135,7 @@ pub fn all_rules() -> Vec<Rule> {
 		control_terminal(),
 		// the dropdown state rules trail their base so they win the cascade
 		select_dropdown(),
+		select_filter(),
 		select_option(),
 		select_option_active(),
 		select_option_selected(),

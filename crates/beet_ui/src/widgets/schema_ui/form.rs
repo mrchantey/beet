@@ -30,6 +30,7 @@
 //! form paints in a terminal and serves as HTML.
 use super::composite_field;
 use super::dependent_field;
+use super::entity_picker;
 use super::field_layout::labeled;
 use super::scalar_field;
 use super::schema_rebuild::SchemaRebuild;
@@ -61,12 +62,16 @@ const MAX_DEPTH: usize = 8;
 ///   an add button after them, appending the item schema's
 ///   [`default_value_in`](ValueSchema::default_value_in)
 /// - `Map` -> the same over its entries, each labelled by its key, added under a
-///   key typed beside the add button
+///   key typed beside the add button; a [`MapSchema::Keyed`] map's entries are
+///   typed by the schema registered under each key and added through a
+///   component picker over the type registry
 /// - `Enum` -> a [`Select`] of variant names; a payload-carrying variant renders
 ///   its payload's own controls beside it, regenerated when the variant changes
-/// - anything else (`Entity`/`Bytes`/`Any`/an unresolved `Reference`) -> a
-///   read-only [`UneditableField`], since no control can produce a valid value
-///   for it. An `Entity` reference wants the picker item 18 names.
+/// - `Entity` -> an entity picker, a [`Select`] over the entities of the scene
+///   document the field binds into, filtered by the relation's
+///   [`RelationMeta`]
+/// - anything else (`Bytes`/`Any`/an unresolved `Reference`) -> a read-only
+///   [`UneditableField`], since no control can produce a valid value for it.
 ///
 /// The default slot lands inside the `<form>` after the generated controls, ie
 /// where a submit [`Button`] goes.
@@ -91,11 +96,11 @@ pub fn DynamicForm(
 	/// absent until [`DocumentPlugin`] has initialized it, which defers every
 	/// reference to an [`UneditableField`] exactly as an unregistered name does.
 	schemas: Option<Res<SchemaRegistry>>,
+	/// The reflect fallback a keyed map's entry resolves through.
+	types: Option<Res<AppTypeRegistry>>,
 ) -> impl Bundle {
-	let resolver = schemas
-		.as_deref()
-		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
-		.unwrap_or_default();
+	let types = types.as_ref().map(|types| types.read());
+	let resolver = super::resolver(schemas.as_deref(), types.as_deref());
 	// the controls are one generation, respawned when a committed schema edit
 	// changes what this schema resolves to; the slot's children are its siblings
 	let controls = {
@@ -117,7 +122,7 @@ pub fn DynamicForm(
 }
 
 /// Marks a [`DynamicForm`] leaf whose schema has no editing widget, naming the
-/// kind that found none (`"Entity"`, an unresolved `"Ref"`).
+/// kind that found none (`"Bytes"`, an unresolved `"Ref"`).
 ///
 /// The leaf still renders, read-only, so a form keeps its shape with only the
 /// editing missing — the same bargain an unregistered tag strikes. The mark sits
@@ -218,6 +223,7 @@ pub(super) fn schema_field<'a>(
 		ValueSchema::Map(schema) => {
 			composite_field::map_field(resolver, schema, field, label, depth)
 		}
+		ValueSchema::Entity(_) => entity_picker::entity_field(field, label),
 		_ => uneditable(schema, field, label),
 	}
 }
@@ -266,7 +272,7 @@ mod test {
 	#[beet_core::test]
 	fn unreachable_shapes_are_uneditable() {
 		for schema in [
-			ValueSchema::Entity(default()),
+			ValueSchema::Bytes(default()),
 			ValueSchema::Any,
 			ValueSchema::reference("NotRegistered"),
 		] {

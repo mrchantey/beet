@@ -214,14 +214,29 @@ impl TemplateSaver {
 			.map(|bytes| (bytes, entity_map))
 	}
 
-	/// Collects an entity and all its descendants into the entity set.
+	/// Collects an entity, its attribute entities and all its descendants into
+	/// the entity set, stopping at a [`Derived`] subtree, which is never content.
 	fn collect_descendants(&mut self, world: &World, entity: Entity) {
+		let entity_ref = world.entity(entity);
+		if entity_ref.contains::<Derived>() {
+			return;
+		}
 		self.entities.push(entity);
-		if let Some(children) = world.entity(entity).get::<Children>() {
-			let children = children.iter().collect::<Vec<_>>();
-			for child in children {
-				self.collect_descendants(world, child);
-			}
+		// an element's attributes are its own entities, owned through
+		// `AttributeOf` rather than `ChildOf`, and part of it all the same
+		let owned = entity_ref
+			.get::<Attributes>()
+			.into_iter()
+			.flat_map(|attributes| attributes.iter())
+			.chain(
+				entity_ref
+					.get::<Children>()
+					.into_iter()
+					.flat_map(|children| children.iter()),
+			)
+			.collect::<Vec<_>>();
+		for child in owned {
+			self.collect_descendants(world, child);
 		}
 	}
 }

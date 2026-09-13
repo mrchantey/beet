@@ -299,10 +299,10 @@ pub(super) fn sync_schema(
 		};
 		match local {
 			Some(local) => {
-				local.assert_matches(field_schema, &resolved.field_path)?
+				local.assert_matches(&field_schema, &resolved.field_path)?
 			}
 			None => {
-				commands.entity(entity).insert(field_schema.clone());
+				commands.entity(entity).insert(field_schema.into_owned());
 			}
 		}
 	}

@@ -92,7 +92,7 @@ impl SchemaCommit {
 					for (key, item) in map.0.iter_mut() {
 						let entry_schema =
 							schema.entry_schema(resolver, key)?;
-						Self::backfill(resolver, entry_schema, item).await?;
+						Self::backfill(resolver, &entry_schema, item).await?;
 					}
 				}
 				// a null satisfies an optional; anything else backfills as the inner

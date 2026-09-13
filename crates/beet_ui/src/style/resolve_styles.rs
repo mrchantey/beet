@@ -31,6 +31,8 @@ pub(crate) fn resolve_styles(
 	// the box model (margin/border/padding/background) is element-level; text and
 	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
 	elements: Query<(), With<Element>>,
+	// the nodes the cascade owns: what the change filters above watch
+	owned: Query<(), Or<(With<Element>, With<Classes>, With<ElementStateMap>)>>,
 	mut styles: Query<(
 		Option<&mut VisualStyle>,
 		Option<&mut LayoutStyle>,
@@ -44,11 +46,28 @@ pub(crate) fn resolve_styles(
 		.iter()
 		.map(|entity| ancestors.root_ancestor(entity))
 		.collect::<HashSet<_>>();
-	// a resized surface seeds the traversal directly (its whole tree, portals
-	// included, re-resolves below) — only worth it when a width-gated rule
-	// exists to change the outcome.
+	// a resized surface seeds the traversal (its whole tree, portals included,
+	// re-resolves below) — only worth it when a width-gated rule exists to
+	// change the outcome. The seeds are the nearest nodes the cascade owns:
+	// a bare buffer host, or a text node carrying an authored style, is walked
+	// through rather than resolved, so a resize never touches a node nothing
+	// in the cascade would otherwise reach.
 	if !resized.is_empty() && ruleset_query.has_width_media() {
-		roots.extend(resized.iter());
+		let mut pending = resized.iter().collect::<Vec<_>>();
+		while let Some(entity) = pending.pop() {
+			if owned.contains(entity) {
+				roots.insert(entity);
+				continue;
+			}
+			pending.extend(
+				children
+					.get(entity)
+					.into_iter()
+					.flat_map(|children| children.iter()),
+			);
+			pending
+				.extend(render_refs.get(entity).map(|portal| portal.target()));
+		}
 	}
 
 	// within-pass cascade memo, keyed by `(entity, token)`. Resolving the page

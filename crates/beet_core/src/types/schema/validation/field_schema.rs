@@ -1,5 +1,6 @@
 //! Field schema traversal and compatibility checking.
 use crate::prelude::*;
+use alloc::borrow::Cow;
 
 impl ValueSchema {
 	/// Resolve the schema of a nested field by `path`.
@@ -12,30 +13,33 @@ impl ValueSchema {
 	pub fn get_field_schema(
 		&self,
 		path: &[FieldSegment],
-	) -> Result<&ValueSchema> {
+	) -> Result<Cow<'_, ValueSchema>> {
 		self.get_field_schema_in(SchemaResolver::default(), path)
 	}
 
 	/// [`get_field_schema`](Self::get_field_schema), descending through a
 	/// [`ValueSchema::Ref`] that `resolver` can resolve, so a field of a
 	/// composed authored schema is reachable.
+	///
+	/// Borrowed from this schema or a registry, except past a keyed map entry
+	/// reflection derived ([`MapSchema::entry_schema`]), which is owned.
 	pub fn get_field_schema_in<'a>(
 		&'a self,
 		resolver: SchemaResolver<'a>,
 		path: &[FieldSegment],
-	) -> Result<&'a ValueSchema> {
+	) -> Result<Cow<'a, ValueSchema>> {
 		let mut current = self;
 		let mut remaining = path;
 		while let Some(segment) = remaining.first() {
 			current = match current {
 				// `Any` matches the rest of the path
-				ValueSchema::Any => return Ok(current),
+				ValueSchema::Any => return Ok(Cow::Borrowed(current)),
 				// a reference descends into its target, or swallows the rest of
 				// the path like `Any` while it is still arriving
 				ValueSchema::Ref(SchemaRef::Name(name)) => {
 					match resolver.schema(name) {
 						Some(target) => target,
-						None => return Ok(current),
+						None => return Ok(Cow::Borrowed(current)),
 					}
 				}
 				// an optional descends into its inner schema for the same segment
@@ -56,11 +60,22 @@ impl ValueSchema {
 								})?
 								.schema
 						}
-						// a keyed map's entry is whatever its key names
+						// a keyed map's entry is whatever its key names; one
+						// reflection derived is owned, so the rest of the path
+						// walks it recursively and the result is owned too
 						(
 							ValueSchema::Map(schema),
 							FieldSegment::ObjectKey(key),
-						) => schema.entry_schema(resolver, key)?,
+						) => match schema.entry_schema(resolver, key)? {
+							Cow::Borrowed(entry) => entry,
+							Cow::Owned(entry) => {
+								return entry
+									.get_field_schema_in(resolver, remaining)
+									.map(|schema| {
+										Cow::Owned(schema.into_owned())
+									});
+							}
+						},
 						// an enum is externally tagged, so its payload sits
 						// under the variant name the value itself carries: a
 						// schema document's `Struct.fields` is this hop then a
@@ -103,7 +118,7 @@ impl ValueSchema {
 				}
 			};
 		}
-		Ok(current)
+		Ok(Cow::Borrowed(current))
 	}
 
 	/// Assert this schema is exactly `other`, naming both on mismatch.
@@ -179,14 +194,14 @@ mod test {
 	fn get_field_schema_walks_struct() {
 		let schema = ValueSchema::of::<UserProfile>();
 		matches!(
-			schema
+			*schema
 				.get_field_schema(&[FieldSegment::key("name")])
 				.unwrap(),
 			ValueSchema::String(_)
 		)
 		.xpect_true();
 		matches!(
-			schema
+			*schema
 				.get_field_schema(&[FieldSegment::key("age")])
 				.unwrap(),
 			ValueSchema::U64(_)
@@ -202,7 +217,7 @@ mod test {
 	fn get_field_schema_walks_list() {
 		let schema = ValueSchema::of::<Vec<i64>>();
 		matches!(
-			schema.get_field_schema(&[FieldSegment::index(0)]).unwrap(),
+			*schema.get_field_schema(&[FieldSegment::index(0)]).unwrap(),
 			ValueSchema::I64(_)
 		)
 		.xpect_true();
@@ -216,11 +231,12 @@ mod test {
 	fn get_field_schema_walks_an_enum_payload() {
 		let meta = ValueSchema::meta();
 		matches!(
-			meta.get_field_schema(&[
-				FieldSegment::key("Struct"),
-				FieldSegment::key("fields")
-			])
-			.unwrap(),
+			*meta
+				.get_field_schema(&[
+					FieldSegment::key("Struct"),
+					FieldSegment::key("fields")
+				])
+				.unwrap(),
 			ValueSchema::List(_)
 		)
 		.xpect_true();
@@ -249,10 +265,12 @@ mod test {
 				FieldSegment::key("age"),
 			])
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::U64(default()));
 		schema
 			.get_field_schema_in(resolver, &[FieldSegment::key("UserProfile")])
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::of::<UserProfile>());
 		// an unregistered key is an error naming it
 		schema
@@ -269,7 +287,7 @@ mod test {
 	fn get_field_schema_any_swallows_path() {
 		let schema = ValueSchema::Any;
 		matches!(
-			schema
+			*schema
 				.get_field_schema(&[
 					FieldSegment::key("a"),
 					FieldSegment::index(2)

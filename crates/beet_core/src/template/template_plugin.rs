@@ -3,8 +3,9 @@
 use crate::prelude::*;
 
 /// Registers the template lifecycle events, slot and pending markers, the
-/// [`TemplateError`], the [`UnregisteredTag`] marker, and the
-/// [`ReflectTemplate`] registry bridge.
+/// [`TemplateError`], the [`UnregisteredTag`] marker, the
+/// [`ReflectTemplate`] registry bridge, and the markup node types
+/// ([`Element`], [`Attribute`], ..) so a built page dumps and reloads whole.
 ///
 /// A minimal world built from this plugin can `spawn_template`. Mirrors
 /// [`DocumentPlugin`] in style; the build walker and slot resolution are
@@ -28,6 +29,15 @@ impl Plugin for TemplatePlugin {
 			.register_type::<TemplatesLoaded>()
 			// the inert marker an unresolvable tag leaves behind.
 			.register_type::<UnregisteredTag>()
+			// the markup nodes every front-end authors: registered here rather
+			// than by a renderer, so a page forked into a scene keeps its
+			// elements and attributes whichever binary dumps it
+			.register_type::<Element>()
+			.register_type::<Comment>()
+			.register_type::<Doctype>()
+			.register_type::<Attribute>()
+			.register_type::<AttributeOf>()
+			.register_type::<Attributes>()
 			.add_systems(Update, sweep_dropped_pending);
 	}
 }

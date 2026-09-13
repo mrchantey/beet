@@ -383,6 +383,7 @@ mod test {
 			.unwrap()
 			.get_field_schema(&[FieldSegment::key("is_really_difficult")])
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::Bool(default()));
 		data.schema.xpect_eq(ValueSchema::document("schema.json"));
 	}

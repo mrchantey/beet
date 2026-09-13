@@ -136,7 +136,9 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("entities.0.components.bevy_ecs::name::Name")
+			.xpect_contains(
+				"entities.0.components.beet_core::types::schema::scene::scene_schema::test::Health",
+			)
 			.xpect_contains("no schema is registered");
 	}
 
@@ -172,6 +174,7 @@ mod test {
 				FieldSegment::key("bevy_ecs::hierarchy::ChildOf"),
 			])
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::Entity(default()));
 	}
 }

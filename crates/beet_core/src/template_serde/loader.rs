@@ -101,13 +101,17 @@ impl<'a> TemplateLoader<'a> {
 			spawned.push(root);
 		}
 
-		// in entity mode the spawned roots (no `ChildOf`) join the target's
-		// children, after any it already has, and before the batch signal so a
-		// listener resolving by ancestry (a route tree's namespace) sees them
-		// under their parent.
+		// in entity mode the spawned roots join the target's children, after any
+		// it already has, and before the batch signal so a listener resolving by
+		// ancestry (a route tree's namespace) sees them under their parent. A
+		// root is an entity nothing in the file owns: neither a parent nor, for
+		// an attribute entity, the element it belongs to.
 		if let Some(parent) = target {
 			for spawned_entity in spawned.iter() {
-				if !world.entity(*spawned_entity).contains::<ChildOf>() {
+				let entity = world.entity(*spawned_entity);
+				if !entity.contains::<ChildOf>()
+					&& !entity.contains::<AttributeOf>()
+				{
 					world.entity_mut(*spawned_entity).insert(ChildOf(parent));
 				}
 			}

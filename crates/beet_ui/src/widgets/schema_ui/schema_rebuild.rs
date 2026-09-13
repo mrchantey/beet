@@ -143,14 +143,13 @@ pub(in crate::widgets) fn schema_widgets_may_rebuild(
 /// leaving the rest (and every holder's siblings) alone.
 pub(in crate::widgets) fn rebuild_schema_widgets(
 	registry: Option<Res<SchemaRegistry>>,
+	types: Option<Res<AppTypeRegistry>>,
 	documents: DocumentQuery,
 	mut holders: Populated<(Entity, &mut SchemaRebuild, Option<&Children>)>,
 	mut commands: Commands,
 ) {
-	let resolver = match registry.as_deref() {
-		Some(registry) => SchemaResolver::default().with_schemas(registry),
-		None => SchemaResolver::default(),
-	};
+	let types = types.as_ref().map(|types| types.read());
+	let resolver = super::resolver(registry.as_deref(), types.as_deref());
 	for (entity, mut rebuild, children) in holders.iter_mut() {
 		// the source is re-read rather than remembered: a document's schema is
 		// its own, and may arrive, change or be committed long after this holder
@@ -173,7 +172,10 @@ pub(in crate::widgets) fn rebuild_schema_widgets(
 				commands.entity(child).despawn();
 			}
 		}
-		commands.spawn((ChildOf(entity), (rebuild.build)(resolver, &schema)));
+		// built as a template root, so the slots inside the generation resolve
+		commands
+			.spawn(ChildOf(entity))
+			.insert_template((rebuild.build)(resolver, &schema));
 	}
 }
 

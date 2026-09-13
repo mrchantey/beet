@@ -231,7 +231,7 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		schema
 			.get_field_schema_in(resolver, &field_path)
 			.ok()
-			.cloned()
+			.map(|schema| schema.into_owned())
 	}
 
 	/// The resolver a document schema resolves its indirections through.

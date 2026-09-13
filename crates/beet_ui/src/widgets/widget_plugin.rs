@@ -67,6 +67,11 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// a schema editor's draft forks the document its `DocRef` names, a relation
 	// derived from the tree rather than authored twice.
 	app.add_systems(Update, super::schema_ui::editor::link_schema_drafts);
+	// the scene editor: its tag survives a fork as a reflected component, its
+	// frame binds the scene it sits in, and its tree and inspector follow the
+	// scene's selection
+	#[cfg(feature = "template_serde")]
+	super::scene_editor::scene_editor_plugin(app);
 	// `Toast` is target-neutral, so its tag registration and expiry timer belong
 	// to the widget set rather than to the one renderer that pops toasts today
 	// (the charcell clipboard). `init_plugin` is idempotent, so a charcell app

@@ -70,6 +70,10 @@ impl SceneFork {
 impl SceneDocument {
 	/// The registered `ChildOf`, the relation the sync keeps in document order.
 	const CHILD_OF: &'static str = "bevy_ecs::hierarchy::ChildOf";
+	/// The registered `AttributeOf`, the other relation that owns an entity: an
+	/// attribute belongs to its element, so it is never a root under the host.
+	const ATTRIBUTE_OF: &'static str =
+		"beet_core::types::snippet::attribute::AttributeOf";
 
 	/// Build `template` as `host`'s children and land its document on `host`.
 	///
@@ -277,8 +281,9 @@ struct ScenePlan {
 /// One entity's share of a [`ScenePlan`].
 struct EntityPlan {
 	key: u32,
-	/// Whether the document holds a `ChildOf` for it; without one it is a root
-	/// and sits under the host.
+	/// Whether the document holds an owner for it (a `ChildOf`, or the
+	/// `AttributeOf` of an attribute entity); without one it is a root and sits
+	/// under the host.
 	has_parent: bool,
 	/// Component values to apply, in document order.
 	apply: Vec<Box<dyn PartialReflect>>,
@@ -314,7 +319,8 @@ impl ScenePlan {
 			let previous = old.components(key);
 			let mut plan = EntityPlan {
 				key,
-				has_parent: components.contains(SceneDocument::CHILD_OF),
+				has_parent: components.contains(SceneDocument::CHILD_OF)
+					|| components.contains(SceneDocument::ATTRIBUTE_OF),
 				apply: Vec::new(),
 				remove: Vec::new(),
 			};
@@ -1078,7 +1084,9 @@ mod test {
 mod conformance {
 	use crate::prelude::*;
 
-	fn new_world() -> World { <(DocumentPlugin, MinimalTypesPlugin)>::world() }
+	fn new_world() -> World {
+		<(TemplatePlugin, DocumentPlugin, MinimalTypesPlugin)>::world()
+	}
 
 	/// A host whose children are a named tree.
 	fn spawn_host(world: &mut World) -> Entity {
@@ -1125,6 +1133,74 @@ mod conformance {
 		)
 		.unwrap();
 		to_bytes(&rebooted, host).xpect_eq(fork);
+	}
+
+	/// A page forks whole: its elements, their attribute entities (owned
+	/// through `AttributeOf`, not `ChildOf`) and their text all dump, and a boot
+	/// from the fork rebuilds them with the attribute still on its element
+	/// rather than as a root under the host.
+	#[cfg(feature = "bsx")]
+	#[crate::test]
+	fn a_page_forks_whole() {
+		let mut world = new_world();
+		let host = world.spawn_empty().id();
+		TemplateLoader::new(&mut world)
+			.with_entity(host)
+			.load(&MediaBytes::new_bsx(
+				"<div class=\"card\"><span>hi</span></div>",
+			))
+			.unwrap();
+		let fork =
+			SceneDocument::fork(&mut world, host, MediaType::Json).unwrap();
+		let json = fork
+			.as_utf8()
+			.unwrap()
+			.xmap(serde_json::from_str::<serde_json::Value>)
+			.unwrap();
+		// the element, its attribute and the text under it
+		json["entities"].as_object().unwrap().len().xpect_eq(4);
+
+		let mut rebooted = new_world();
+		let host = rebooted.spawn_empty().id();
+		SceneDocument::load_bytes(&mut rebooted, host, &fork).unwrap();
+		let div = rebooted.entity(host).get::<Children>().unwrap()[0];
+		rebooted.get::<Element>(div).unwrap().tag().xpect_eq("div");
+		let attribute = rebooted.entity(div).get::<Attributes>().unwrap()[0];
+		rebooted
+			.get::<Attribute>(attribute)
+			.unwrap()
+			.to_string()
+			.xpect_eq("class");
+		rebooted.get::<ChildOf>(attribute).xpect_none();
+		// the host's only child is the element: an attribute is owned, not a root
+		rebooted
+			.entity(host)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+	}
+
+	/// Derived furniture under a scene entity (the widgets an editor tag
+	/// spawns) never enters the fork: the tag is content and rebuilds it.
+	#[crate::test]
+	fn derived_furniture_is_not_forked() {
+		let mut world = new_world();
+		let host = world
+			.spawn(children![(Name::new("tag"), children![(
+				Derived,
+				Name::new("furniture"),
+				children![Name::new("deep")]
+			)])])
+			.flush();
+		let json = SceneDocument::fork(&mut world, host, MediaType::Json)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.to_string();
+		json.clone().xpect_contains("\"tag\"");
+		json.clone().xnot().xpect_contains("furniture");
+		json.xnot().xpect_contains("deep");
 	}
 
 	/// The fork carries no host: the host's own components never enter the

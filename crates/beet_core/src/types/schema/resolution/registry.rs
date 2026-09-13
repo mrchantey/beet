@@ -45,23 +45,30 @@ impl Default for SchemaRegistry {
 }
 
 impl SchemaRegistry {
-	/// A registry holding only the intrinsic schemas: the meta-schema and the
-	/// scene.
+	/// A registry holding only the intrinsic schemas: the meta-schema, the
+	/// scene, and the text schema of the two opaque components every scene
+	/// carries.
 	///
-	/// Both are intrinsic rather than opt-in. A schema is itself a value with a
+	/// All are intrinsic rather than opt-in. A schema is itself a value with a
 	/// schema, so every registry can describe its own contents and a schema
 	/// document validates wherever it is read; and a scene is the shape every
 	/// beet page is, so a scene document validates wherever it is read too,
 	/// each component against whatever this registry holds under its key.
+	/// [`Name`] and [`Value`] reflect opaque (`Any`, which nothing can edit)
+	/// while serializing as text, so the by-name entry that wins over
+	/// reflection says so and an inspector edits both in a text field.
 	pub fn new() -> Self {
 		let mut registry = Self {
 			schemas: HashMap::default(),
 			aliases: HashMap::default(),
 			located: HashMap::default(),
 		};
-		registry.insert(ValueSchema::type_path(), ValueSchema::meta());
-		registry.insert(ValueSchema::SCENE, ValueSchema::scene());
-		registry.insert(ValueSchema::SCENE_ENTITY, ValueSchema::scene_entity());
+		registry
+			.insert(ValueSchema::type_path(), ValueSchema::meta())
+			.insert(ValueSchema::SCENE, ValueSchema::scene())
+			.insert(ValueSchema::SCENE_ENTITY, ValueSchema::scene_entity())
+			.insert(Name::type_path(), ValueSchema::String(default()))
+			.insert(Value::type_path(), ValueSchema::String(default()));
 		registry
 	}
 
@@ -69,7 +76,7 @@ impl SchemaRegistry {
 	///
 	/// Re-registering a key replaces it, which is how a reloaded template dir or
 	/// an edited schema document updates in place.
-	pub fn insert(&mut self, name: impl Into<SmolStr>, schema: ValueSchema) {
+	pub fn insert(&mut self, name: impl Into<SmolStr>, schema: ValueSchema)-> &mut Self {
 		let name = name.into();
 		let short = Self::short_name(&name);
 		if short != name {
@@ -86,6 +93,7 @@ impl SchemaRegistry {
 			}
 		}
 		self.schemas.insert(name, schema);
+		self
 	}
 
 	/// Register the reflect-derived schema of `T` under its full type path.
@@ -189,7 +197,7 @@ impl SchemaRegistry {
 	}
 
 	/// The trailing `::` segment of `name`, its display and authoring sugar.
-	fn short_name(name: &str) -> SmolStr {
+	pub fn short_name(name: &str) -> SmolStr {
 		name.rsplit("::").next().unwrap_or(name).into()
 	}
 
@@ -301,6 +309,23 @@ mod test {
 				ValueSchema::String(default()),
 			)],
 		})
+	}
+
+	/// The opaque components every scene carries resolve as text out of the
+	/// box, ahead of the `Any` reflection would derive for them.
+	#[crate::test]
+	fn a_name_and_a_value_are_text() {
+		let registry = SchemaRegistry::default();
+		let mut types = bevy_reflect::TypeRegistry::default();
+		types.register::<Name>();
+		let resolver = SchemaResolver::new(&registry, &types);
+		for path in [Name::type_path(), Value::type_path()] {
+			resolver
+				.type_schema(path)
+				.unwrap()
+				.into_owned()
+				.xpect_eq(ValueSchema::String(default()));
+		}
 	}
 
 	#[crate::test]

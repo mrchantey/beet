@@ -428,9 +428,11 @@ fn select_marker(
 		.collect::<Vec<_>>();
 	let label = options
 		.iter()
-		.find(|option| !selected.is_empty() && option_value(option) == selected)
+		.find(|option| {
+			!selected.is_empty() && option.option_value() == selected
+		})
 		.or_else(|| options.first())
-		.map(option_label)
+		.map(ElementView::option_label)
 		.unwrap_or_default();
 	format!("{label} ▾").into()
 }
@@ -449,26 +451,6 @@ fn checkbox_marker(
 		Ok(Value::Bool(true)) => Some("[x]".into()),
 		_ => Some("[ ]".into()),
 	}
-}
-
-/// An `<option>`'s submission value: its `value` attribute, falling back to its
-/// label text like a browser.
-pub(crate) fn option_value(view: &ElementView) -> String {
-	let value = view.attribute_string("value");
-	if value.is_empty() {
-		option_label(view)
-	} else {
-		value
-	}
-}
-
-/// An `<option>`'s visible label: its inner text, falling back to its `value`
-/// attribute.
-pub(crate) fn option_label(view: &ElementView) -> String {
-	view.inner_text
-		.and_then(|(_, value)| value.as_str().ok())
-		.map(|label| label.to_string())
-		.unwrap_or_else(|| view.attribute_string("value"))
 }
 
 /// The `[image]:`-prefixed placeholder text for an image, using the alt text and

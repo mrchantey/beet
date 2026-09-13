@@ -86,11 +86,11 @@ pub fn DynamicView(
 	/// absent until [`DocumentPlugin`] has initialized it, which leaves every
 	/// reference unresolved and reads its value raw.
 	schemas: Option<Res<SchemaRegistry>>,
+	/// The reflect fallback a keyed map's entry resolves through.
+	types: Option<Res<AppTypeRegistry>>,
 ) -> impl Bundle {
-	let resolver = schemas
-		.as_deref()
-		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
-		.unwrap_or_default();
+	let types = types.as_ref().map(|types| types.read());
+	let resolver = super::resolver(schemas.as_deref(), types.as_deref());
 	// the laid-out value is one generation, respawned when a committed schema
 	// edit changes what this schema resolves to (a table gaining a column)
 	let rows = {

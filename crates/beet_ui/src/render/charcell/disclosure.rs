@@ -12,9 +12,6 @@
 //! `toggle_details_on_click`. Helpers take raw queries rather than
 //! [`ElementQuery`]/`AttributeQuery` so callers can hold `&mut Value` without a
 //! query conflict.
-// the ungated `attr_entity` only needs the beet_core attribute types; the
-// crate prelude (Portal, ElementStateMap, ..) serves the tui-gated observer
-#[cfg(feature = "tui")]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -114,7 +111,6 @@ pub(crate) fn attr_string(
 /// and dirty the element's [`ElementStateMap`] so the cascade re-resolves its
 /// subtree the same frame (attribute values live on attribute entities, which
 /// the cascade's change filters cannot see).
-#[cfg(feature = "tui")]
 pub(crate) fn set_attr_str(
 	commands: &mut Commands,
 	values: &mut Query<&mut Value>,

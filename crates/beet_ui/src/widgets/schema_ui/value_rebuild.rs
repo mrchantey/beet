@@ -93,6 +93,7 @@ impl ValueRebuild {
 /// despawn each child whose key vanished, and order them as the value asks.
 pub(in crate::widgets) fn rebuild_value_widgets(
 	schemas: Option<Res<SchemaRegistry>>,
+	types: Option<Res<AppTypeRegistry>>,
 	holders: Populated<
 		(Entity, &ValueRebuild, &Value, Option<&Children>),
 		Changed<Value>,
@@ -100,10 +101,8 @@ pub(in crate::widgets) fn rebuild_value_widgets(
 	keys: Query<&RebuildKey>,
 	mut commands: Commands,
 ) {
-	let resolver = schemas
-		.as_deref()
-		.map(|schemas| SchemaResolver::default().with_schemas(schemas))
-		.unwrap_or_default();
+	let types = types.as_ref().map(|types| types.read());
+	let resolver = super::resolver(schemas.as_deref(), types.as_deref());
 	for (entity, rebuild, value, children) in holders.iter() {
 		let next = (rebuild.keys)(value);
 		let children = children
@@ -126,16 +125,16 @@ pub(in crate::widgets) fn rebuild_value_widgets(
 		{
 			continue;
 		}
+		// a new child is built as a template root rather than spawned as a
+		// bundle, so the slots inside it (a `<Button>`'s label) resolve as they
+		// do for any authored tree
 		let generation = next
 			.into_iter()
 			.map(|key| match current.remove(&key) {
 				Some(child) => child,
 				None => commands
-					.spawn((
-						ChildOf(entity),
-						(rebuild.build)(resolver, value, &key),
-						key,
-					))
+					.spawn((ChildOf(entity), key.clone()))
+					.insert_template((rebuild.build)(resolver, value, &key))
 					.id(),
 			})
 			.collect::<Vec<_>>();

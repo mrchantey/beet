@@ -204,10 +204,16 @@ impl Plugin for FormPlugin {
 				),
 			)
 			// the payload-enum control's select edits which variant its field
-			// carries, which is a write no ordinary binding makes for it
+			// carries, and the entity picker's which entity its field
+			// references: writes no ordinary binding makes for them
 			.add_systems(
 				Update,
-				crate::widgets::schema_ui::variant_select::write_selected_variant,
+				(
+					crate::widgets::schema_ui::variant_select::write_selected_variant,
+					crate::widgets::schema_ui::entity_picker::write_picked_entity,
+					crate::widgets::schema_ui::entity_picker::follow_picked_entity,
+				)
+					.chain(),
 			)
 			// a `Submit` handler doing real work is async by nature (the
 			// `SchemaEditor`'s commit evolves data through a js seam), so the
@@ -388,7 +394,7 @@ fn field_value(
 	elements
 		.iter_descendants_inclusive(view.entity)
 		.find(|child| child.tag() == "option")
-		.map(|option| option_value(&option))
+		.map(|option| option.option_value())
 		.unwrap_or_default()
 		.xmap(Value::str)
 }

@@ -1,0 +1,17 @@
+<!--
+The authored original of the scene editor example's page. Read on the first
+boot only: `scene_editor.bsx` forks what this builds into `scene.json` beside
+it, and every later boot is the fork. Edit this file to change what a fresh
+fork starts from; edit the running page to change the fork.
+-->
+<main>
+	<h1>Garden</h1>
+	<p>Every entity on this page is in a scene document, and the editor below edits that document: the world follows, one component at a time.</p>
+	<h2>Beds</h2>
+	<ul>
+		<li>carrots</li>
+		<li>beets</li>
+		<li>kale</li>
+	</ul>
+	<ToggleSceneEditor/>
+</main>

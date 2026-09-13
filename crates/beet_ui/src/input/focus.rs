@@ -385,7 +385,7 @@ fn sync_focus_state(
 /// chars land before its Enter gathers them).
 pub(crate) fn write_focus_input(
 	mut keys: MessageReader<KeyboardInput>,
-	mut focused: Query<(Entity, &mut Value), With<Focus>>,
+	mut focused: Query<(Entity, &mut Value, Option<&Element>), With<Focus>>,
 	surfaces: SurfaceQuery,
 ) {
 	// collect editing keys grouped by their source surface (window).
@@ -410,8 +410,13 @@ pub(crate) fn write_focus_input(
 		return;
 	}
 
-	// apply each surface's edits to its own focused element.
-	for (entity, value) in focused.iter_mut() {
+	// apply each surface's edits to its own focused element. A `<select>`'s
+	// value is a chosen option, never typed text: typing on one refines its
+	// dropdown instead (the charcell `SelectPlugin`).
+	for (entity, value, element) in focused.iter_mut() {
+		if element.is_some_and(|element| element.tag() == "select") {
+			continue;
+		}
 		let edits = edits_by_window
 			.iter()
 			.filter(|(window, _)| surfaces.matches(entity, **window))

@@ -2,6 +2,7 @@
 //! [`AtField`](SchemaRef::AtField) from the nearest struct value, a
 //! [`MapSchema::Keyed`] entry from the registry under its key.
 use crate::prelude::*;
+use alloc::borrow::Cow;
 
 impl ValueSchema {
 	/// Whether this schema, or any schema within it up to the next struct
@@ -109,25 +110,28 @@ impl ValueSchema {
 impl MapSchema {
 	/// The schema of the entry at `key`: a [`Uniform`](Self::Uniform) map's
 	/// `value`, or the schema `resolver` holds under the key of a
-	/// [`Keyed`](Self::Keyed) map.
+	/// [`Keyed`](Self::Keyed) map, by name first and by reflection second
+	/// ([`SchemaResolver::type_schema`]), so a component map resolves every
+	/// registered component whether or not a schema was authored for it.
 	///
 	/// The one place a keyed map is resolved, shared by validation, the field
 	/// walk, the backfill and a form's map arm, so a map's entries are described
-	/// at the schema level and never special-cased in a widget.
+	/// at the schema level and never special-cased in a widget. Borrowed where
+	/// a registry holds the schema, owned where reflection derives it.
 	///
 	/// # Errors
 	///
-	/// A keyed entry whose key the registry does not hold: this binary cannot
-	/// say what the entry is, exactly as the template loader rejects a component
-	/// it has not registered.
+	/// A keyed entry whose key neither registry holds: this binary cannot say
+	/// what the entry is, exactly as the template loader rejects a component it
+	/// has not registered.
 	pub fn entry_schema<'a>(
 		&'a self,
 		resolver: SchemaResolver<'a>,
 		key: &str,
-	) -> Result<&'a ValueSchema> {
+	) -> Result<Cow<'a, ValueSchema>> {
 		match self {
-			Self::Uniform { value } => Ok(value),
-			Self::Keyed => resolver.schema(key).ok_or_else(|| {
+			Self::Uniform { value } => Cow::Borrowed(value.as_ref()).xok(),
+			Self::Keyed => resolver.type_schema(key).map_err(|_| {
 				bevyhow!("no schema is registered under the key `{key}`")
 			}),
 		}
@@ -137,6 +141,7 @@ impl MapSchema {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use alloc::borrow::Cow;
 
 	/// The self-describing pair, now written in the schema language rather than
 	/// hardcoded at the document root: `value` is whatever `schema` says.
@@ -307,6 +312,41 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("Count");
+	}
+
+	/// A key no schema was authored for still resolves when it is a registered
+	/// Rust type: the entry is what reflection derives, so a component map
+	/// describes every component this binary registered, not only the ones
+	/// with a hand-written schema.
+	#[crate::test]
+	async fn an_entry_key_falls_back_to_reflection() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Health(u32);
+		let mut types = bevy_reflect::TypeRegistry::default();
+		types.register::<Health>();
+		let registry = count_registry();
+		let resolver = SchemaResolver::new(&registry, &types);
+		let map = MapSchema::Keyed;
+		// the authored schema is borrowed, the reflected one owned
+		matches!(
+			map.entry_schema(resolver, "Count").unwrap(),
+			Cow::Borrowed(ValueSchema::U64(_))
+		)
+		.xpect_true();
+		matches!(
+			map.entry_schema(resolver, Health::type_path()).unwrap(),
+			Cow::Owned(ValueSchema::U64(_))
+		)
+		.xpect_true();
+		let mut wrong = Value::map();
+		wrong.insert(Health::type_path(), "full").unwrap();
+		keyed_map()
+			.assert_valid_in(resolver, "map", &mut wrong)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("expected u64");
 	}
 
 	/// A key the registry does not hold is an error naming the key: this

@@ -363,7 +363,7 @@ winit = ["bevy_default", "beet_core/bevy_window"]
 # wasm render artifacts (beet-cli `web_render`/`web_full`); inert natively (bevy
 # guards every `webgpu` cfg behind `target_arch = "wasm32"`).
 webgpu = ["bevy/webgpu"]
-template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde"]
+template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde", "beet_ui?/template_serde"]
 bevy_reflect_documentation = ["beet_core/bevy_reflect_documentation", "beet_action?/reflect", "beet_net?/bevy_reflect_documentation"]
 bevy_keyboard = ["beet_core/bevy_keyboard"]
 bevy_mouse = ["beet_core/bevy_mouse"]

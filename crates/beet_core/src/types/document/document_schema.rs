@@ -85,7 +85,7 @@ impl DocumentSchema {
 		let Ok(schema) = self.0.resolve(resolver) else {
 			return Ok(());
 		};
-		match schema.get_field_schema_in(resolver, path)? {
+		match &*schema.get_field_schema_in(resolver, path)? {
 			ValueSchema::Any => Ok(()),
 			ValueSchema::List(list) => {
 				list.item.assert_matches(&ValueSchema::of::<T>(), path)

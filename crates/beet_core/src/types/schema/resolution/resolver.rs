@@ -1,5 +1,6 @@
 //! [`SchemaResolver`]: the registries a schema resolves its indirections against.
 use crate::prelude::*;
+use alloc::borrow::Cow;
 use bevy_reflect::TypeRegistry;
 
 /// The registries a [`ValueSchema`] or [`SchemaRef`] resolves against,
@@ -108,16 +109,18 @@ impl<'a> SchemaResolver<'a> {
 		self.schemas?.located(path)
 	}
 
-	/// The schema of the registered Rust type at `path`.
-	pub fn type_schema(&self, path: &str) -> Result<ValueSchema> {
+	/// The schema of the registered Rust type at `path`: the by-name registry's,
+	/// borrowed, else the one reflection derives, owned.
+	pub fn type_schema(&self, path: &str) -> Result<Cow<'a, ValueSchema>> {
 		if let Some(schema) = self.schema(path) {
-			return schema.clone().xok();
+			return Cow::Borrowed(schema).xok();
 		}
 		self.types
 			.and_then(|types| types.get_with_type_path(path))
 			.ok_or_else(|| bevyhow!("type `{path}` is not registered"))?
 			.type_info()
 			.xmap(ValueSchema::from_type_info)
+			.xmap(Cow::<'a, ValueSchema>::Owned)
 			.xok()
 	}
 }
@@ -146,7 +149,9 @@ impl ValueSchema {
 				.cloned()
 				.unwrap_or(ValueSchema::Any)
 				.xok(),
-			Self::Ref(SchemaRef::TypePath(path)) => resolver.type_schema(path),
+			Self::Ref(SchemaRef::TypePath(path)) => {
+				resolver.type_schema(path).map(Cow::into_owned)
+			}
 			Self::Ref(SchemaRef::AtField(_)) => ValueSchema::Any.xok(),
 			schema => schema.clone().xok(),
 		}
@@ -195,6 +200,7 @@ mod test {
 		SchemaResolver::new(&registry, &types)
 			.type_schema(Count::type_path())
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::of::<i64>());
 	}
 

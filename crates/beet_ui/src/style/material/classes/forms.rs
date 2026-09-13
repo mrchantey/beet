@@ -16,6 +16,8 @@ pub const SELECT_FILLED: ClassName = ClassName::new_static("select-filled");
 pub const SELECT_TEXT: ClassName = ClassName::new_static("select-text");
 pub const SELECT_DROPDOWN: ClassName = ClassName::new_static("select-dropdown");
 pub const SELECT_OPTION: ClassName = ClassName::new_static("select-option");
+/// The open panel's filter line, what its rows are refined by.
+pub const SELECT_FILTER: ClassName = ClassName::new_static("select-filter");
 pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
 pub const ERROR: ClassName = ClassName::new_static("error");
 
@@ -249,6 +251,21 @@ pub fn select_option_active() -> Rule {
 			active(ElementState::Hovered),
 		]))
 		.with_token(ColorRoleProps,colors::PrimaryRole).unwrap()
+}
+
+/// The panel's filter line: the muted voice of a hint, so it reads as what the
+/// rows are refined by rather than as a row to choose.
+pub fn select_filter() -> Rule {
+	Rule::new()
+		.with_selector(Selector::class(SELECT_FILTER))
+		.with_value(common_props::DisplayProp, Display::Block)
+		.with_value(common_props::Padding, Spacing {
+			left: Length::Rem(1.),
+			right: Length::Rem(1.),
+			..Spacing::DEFAULT
+		})
+		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
+		.with_value(common_props::FontStyleProp, FontStyle::Italic)
 }
 
 /// The currently selected dropdown row, bold so it reads at a glance.

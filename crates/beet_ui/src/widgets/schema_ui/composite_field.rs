@@ -8,6 +8,7 @@
 //! by position or by key, with the structural edits themselves owned by
 //! [`collection_edit`](super::collection_edit).
 use super::collection_edit::CollectionEdit;
+use super::collection_edit::add_component_row;
 use super::collection_edit::add_entry_row;
 use super::collection_edit::edit_button;
 use super::field_layout::child_field;
@@ -230,6 +231,10 @@ fn row_card() -> impl Bundle {
 /// The entries ride a [`ValueRebuild`](super::value_rebuild::ValueRebuild) keyed
 /// by the map's *keys*, in sorted order so an added entry slots in beside its
 /// neighbours while every other entry keeps its entity.
+///
+/// A keyed map is a component map: each entry is typed by the schema its key
+/// names, labelled by the key's short name, and added through a component
+/// picker over the registry rather than a key typed by hand.
 pub(super) fn map_field(
 	resolver: SchemaResolver,
 	schema: &MapSchema,
@@ -249,9 +254,10 @@ pub(super) fn map_field(
 				match map_schema.entry_schema(resolver, key) {
 					Ok(schema) => map_entry(
 						resolver,
-						schema,
+						&schema,
 						&entries_field,
 						key.clone(),
+						entry_label(&map_schema, key),
 						depth,
 					),
 					Err(err) => empty_note(format!("{key}: {err}")),
@@ -260,16 +266,30 @@ pub(super) fn map_field(
 			_ => empty_note("No entries yet"),
 		},
 	);
-	// a keyed map's zero depends on the key the picker will choose
-	let zero = match schema {
-		MapSchema::Uniform { value } => value.default_value_in(resolver),
-		MapSchema::Keyed => Value::Null,
+	let add_row = match schema {
+		MapSchema::Uniform { value } => add_entry_row(
+			field.clone(),
+			value.default_value_in(resolver),
+			add_label(label.as_deref(), "entry"),
+		),
+		MapSchema::Keyed => add_component_row(
+			field.clone(),
+			add_label(label.as_deref(), "component"),
+		),
 	};
-	let add = add_label(label.as_deref(), "entry");
 	group(label, rsx! {
-		<div {(field.clone(), rebuild)}/>
-		{add_entry_row(field, zero, add)}
+		<div {(field, rebuild)}/>
+		{add_row}
 	})
+}
+
+/// What an entry's row is titled: its key, which for a keyed map is a type
+/// path and reads by its short name.
+fn entry_label(schema: &MapSchema, key: &str) -> String {
+	match schema {
+		MapSchema::Uniform { .. } => key.to_string(),
+		MapSchema::Keyed => SchemaRegistry::short_name(key).to_string(),
+	}
 }
 
 /// One map entry: the value's own controls under the key's label, and the button
@@ -279,6 +299,7 @@ fn map_entry(
 	schema: &ValueSchema,
 	field: &FieldRef,
 	key: SmolStr,
+	label: String,
 	depth: usize,
 ) -> Snippet {
 	rsx! {
@@ -287,7 +308,7 @@ fn map_entry(
 				resolver,
 				schema,
 				child_field(field, key.clone()),
-				Some(key.to_string()),
+				Some(label),
 				depth + 1,
 			)}
 			{edit_button(

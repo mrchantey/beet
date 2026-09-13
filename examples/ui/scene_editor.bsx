@@ -1,0 +1,41 @@
+<!--
+A page that edits itself. Run it through the one binary:
+
+    beet --main=examples/ui/scene_editor.bsx
+
+The page is a scene: `<SceneBlob>` boots `scene_editor/scene.bsx` on the first
+run, forks what it built into `scene_editor/scene.json` and boots from that
+fork on every later run, so the fork is the living page and the `.bsx` stays
+the authored original. Nothing here says what the page contains; it is a shell
+around the scene document.
+
+The scene carries its own editor: `<ToggleSceneEditor/>` is one entity among
+the page's, kept in the scene document like any other, so removing your editor
+is an ordinary edit. Open it and the tree on the left lists every entity the
+document holds, by name else by key and kind (`#2 h1`, `#3 "Garden"`); select
+one and the inspector on the right is a form over its components, each typed by
+the schema registered under its key. Every control edits the document, never
+the world: the world follows per component, in place, so typing into a text
+node's `Value` repaints the heading mid-keystroke while the focus stays put.
+
+So the demonstration is item 3's loop: select the heading's text, retype it,
+add a `Name` through the component picker, reparent the paragraph under the
+heading through its `ChildOf` picker, remove a component through its card, then
+quit and run again: every edit came back from the fork.
+
+`git diff examples/ui/scene_editor` is the record of a session and
+`git checkout` is the reset; deleting `scene.json` re-forks the original.
+-->
+<CallOnReady {(TuiServer, SweepDescendants)}>
+	<RequireCfg cfg="feature:tui"/>
+	<Router {Layout{template:"AppShell"}}>
+		<Route path="/" {FixedPage}>
+			<SceneBlob path="scene_editor/scene.json" from="scene_editor/scene.bsx"/>
+			<!-- every key here works on any beet terminal surface; the page
+			     says so because nothing else can. -->
+			<footer class="text-body-small" bx:style="color=@token:OnSurfaceVariant">
+				Tab moves · Enter activates · ↑↓ scrolls · Ctrl+C quits
+			</footer>
+		</Route>
+	</Router>
+</CallOnReady>

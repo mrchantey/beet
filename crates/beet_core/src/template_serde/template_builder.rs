@@ -37,9 +37,10 @@ use core::any::TypeId;
 ///
 /// # Derived State
 ///
-/// A type marked [`Derived`](ReflectDerived) is skipped everywhere, whatever the
-/// filters say: derived state is not content. The filters are for scoping a
-/// particular dump, never for excluding state that is derived by nature.
+/// A type marked [`Derived`](ReflectDerived), and an entity under a [`Derived`]
+/// mark, is skipped everywhere, whatever the filters say: derived state is not
+/// content. The filters are for scoping a particular dump, never for excluding
+/// state that is derived by nature.
 ///
 /// # File Order
 ///
@@ -250,10 +251,11 @@ impl<'w> TemplateBuilder<'w> {
 		entities: impl Iterator<Item = Entity>,
 	) -> Self {
 		// a resource entity is not a serialized entity, so it must never take a
-		// file key.
+		// file key; nor is derived state, which is rebuilt from what is
 		let world = self.original_world;
 		let entities = entities
 			.filter(|entity| !world.entity(*entity).contains_id(IS_RESOURCE))
+			.filter(|entity| !Derived::contains(world, *entity))
 			.collect::<Vec<_>>();
 		// key every entity first, in extraction order, so an entity reference
 		// resolves to the same file key whether it points back or forward.

@@ -527,6 +527,7 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 		.unwrap()
 		.get_field_schema(&FieldPath::new(["is_really_difficult"]))
 		.unwrap()
+		.into_owned()
 		.xpect_eq(ValueSchema::Bool(default()));
 	// an optional field needs no backfill, so the rows are untouched
 	host.stored(TODOS).await.value.xpect_eq(rows);

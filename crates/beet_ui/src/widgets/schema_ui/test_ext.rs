@@ -4,7 +4,7 @@
 //! Layered on the shared widget harness ([`test_ext`](crate::widgets::test_ext))
 //! rather than restating it — which it re-exports, so a schema test names one
 //! harness and every generic renderer, driver and world still has one home.
-pub(super) use crate::widgets::test_ext::*;
+pub(in crate::widgets) use crate::widgets::test_ext::*;
 
 use super::collection_edit::CollectionButton;
 use super::collection_edit::CollectionEdit;
@@ -13,7 +13,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Render a [`DynamicForm`] for `schema`, bound to a `"field"` key, to HTML.
-pub(super) fn form_html(schema: ValueSchema) -> String {
+pub(in crate::widgets) fn form_html(schema: ValueSchema) -> String {
 	render_html(rsx! {
 		<DynamicForm schema={schema} field={FieldRef::new("field")}/>
 	})
@@ -21,7 +21,7 @@ pub(super) fn form_html(schema: ValueSchema) -> String {
 
 /// Build a form over `schema` bound to `field` of `document`, settled, returning
 /// `(world, document root)`.
-pub(super) fn build_form(
+pub(in crate::widgets) fn build_form(
 	schema: ValueSchema,
 	field: &str,
 	document: Value,
@@ -43,14 +43,17 @@ pub(super) fn build_form(
 
 /// The value a document entity holds, ie what an edit through the generated
 /// controls landed as.
-pub(super) fn document_of(world: &mut World, entity: Entity) -> Value {
+pub(in crate::widgets) fn document_of(
+	world: &mut World,
+	entity: Entity,
+) -> Value {
 	world.entity(entity).get::<Document>().unwrap().0.clone()
 }
 
 /// The one button that submits the form it sits in, ie the only one no
 /// `type="button"` excludes ([`Button`]'s `action`) — which is every generated
 /// collection button.
-pub(super) fn submit_button(world: &mut World) -> Entity {
+pub(in crate::widgets) fn submit_button(world: &mut World) -> Entity {
 	let actions = world
 		.query_once::<(&Attribute, &Value, &AttributeOf)>()
 		.into_iter()
@@ -70,7 +73,7 @@ pub(super) fn submit_button(world: &mut World) -> Entity {
 }
 
 /// The generated control bound to `path`, ie the leaf a form emitted for it.
-pub(super) fn bound(world: &mut World, path: &str) -> Entity {
+pub(in crate::widgets) fn bound(world: &mut World, path: &str) -> Entity {
 	world
 		.query_once::<(Entity, &ResolvedFieldPath)>()
 		.into_iter()
@@ -81,7 +84,10 @@ pub(super) fn bound(world: &mut World, path: &str) -> Entity {
 
 /// The generated variant `<select>` choosing the enum at `path`, which binds no
 /// field of its own (its value is the variant name).
-pub(super) fn variant_select(world: &mut World, path: &str) -> Entity {
+pub(in crate::widgets) fn variant_select(
+	world: &mut World,
+	path: &str,
+) -> Entity {
 	world
 		.query_once::<(Entity, &VariantSelect)>()
 		.into_iter()
@@ -91,7 +97,10 @@ pub(super) fn variant_select(world: &mut World, path: &str) -> Entity {
 }
 
 /// The generated add button of the collection control bound to `path`.
-pub(super) fn collection_add(world: &mut World, path: &str) -> Entity {
+pub(in crate::widgets) fn collection_add(
+	world: &mut World,
+	path: &str,
+) -> Entity {
 	world
 		.query_once::<(Entity, &CollectionButton)>()
 		.into_iter()
@@ -99,7 +108,9 @@ pub(super) fn collection_add(world: &mut World, path: &str) -> Entity {
 			button.field.field_path.to_string() == path
 				&& matches!(
 					button.edit,
-					CollectionEdit::Push(_) | CollectionEdit::Insert(_)
+					CollectionEdit::Push(_)
+						| CollectionEdit::Insert(_)
+						| CollectionEdit::InsertKeyed
 				)
 		})
 		.map(|(entity, _)| entity)

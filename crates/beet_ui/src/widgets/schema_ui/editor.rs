@@ -510,6 +510,7 @@ mod test {
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["is_really_difficult"]))
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::Bool(default()));
 		// every existing row was backfilled
 		test_ext::document_of(&mut world, data_doc).xpect_eq(
@@ -559,6 +560,7 @@ mod test {
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["note"]))
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::String(default()));
 		test_ext::render_world(&mut world, data_doc)
 			.xpect_contains("<th>Note</th>");
@@ -626,6 +628,7 @@ mod test {
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["count"]))
 			.unwrap()
+			.into_owned()
 			.xpect_eq(ValueSchema::U64(default()));
 	}
 

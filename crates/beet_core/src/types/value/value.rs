@@ -332,6 +332,16 @@ impl Value {
 		}
 	}
 
+	/// The value at `path`, descending maps by key and lists by index; `None`
+	/// where the path leaves the value.
+	pub fn get_path(&self, path: &[FieldSegment]) -> Option<&Value> {
+		path.iter()
+			.try_fold(self, |current, segment| match segment {
+				FieldSegment::ObjectKey(key) => current.get(key),
+				FieldSegment::ArrayIndex(index) => current.get_index(*index),
+			})
+	}
+
 	/// Pushes a value onto this list.
 	pub fn push(&mut self, value: impl Into<Value>) -> Result {
 		self.as_list_mut()?.push(value.into()).xok()

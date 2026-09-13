@@ -10,6 +10,7 @@
 //! Every button is a `<button type="button">`: the browser's rule that an action
 //! button is not a submit, which is what lets a list live inside a form without
 //! committing it on every row (`fire_form_submit`).
+use super::component_picker::ComponentPicker;
 use super::field_layout::labeled;
 use crate::prelude::Button;
 use crate::prelude::*;
@@ -23,12 +24,18 @@ use beet_core::prelude::*;
 /// layer already calls a position. Adding is the arm that genuinely differs:
 /// appending needs nothing, and an entry needs a name first.
 #[derive(Debug, Clone)]
-pub(super) enum CollectionEdit {
+pub(in crate::widgets) enum CollectionEdit {
 	/// Append the item schema's zero to the list.
 	Push(Value),
 	/// Insert the value schema's zero under the key typed into the sibling
 	/// [`NewEntryKey`] input, the one edit with a precondition.
 	Insert(Value),
+	/// Insert, under the key the sibling [`NewEntryKey`] picker chose, the zero
+	/// of the schema that key names ([`MapSchema::entry_schema`]), resolved at
+	/// the press since the key decides it. An entity reference inside it
+	/// starts at the first entity the relation may target, so an added
+	/// `ChildOf` is valid before its target is chosen.
+	InsertKeyed,
 	/// Drop the item or entry at this position.
 	Remove(FieldSegment),
 }
@@ -39,18 +46,19 @@ pub(super) enum CollectionEdit {
 /// position is resolved against the whole collection in one write.
 #[derive(Component)]
 #[component(on_add = hook_ext::observe(apply_collection_edit))]
-pub(super) struct CollectionButton {
-	pub(super) field: FieldRef,
-	pub(super) edit: CollectionEdit,
+pub(in crate::widgets) struct CollectionButton {
+	pub(in crate::widgets) field: FieldRef,
+	pub(in crate::widgets) edit: CollectionEdit,
 }
 
-/// Marks the key input of a map control's add-entry row: an unbound text field
-/// whose local [`Value`] is the key its sibling button inserts under.
+/// Marks the key control of a map control's add-entry row: an unbound text
+/// field (or, for a keyed map, the [`ComponentPicker`] select) whose local
+/// [`Value`] is the key its sibling button inserts under.
 ///
 /// Deliberately unnamed, so a key still being typed is not gathered into the
 /// form's submission alongside the entries it has yet to create.
 #[derive(Component)]
-pub(super) struct NewEntryKey;
+pub(in crate::widgets) struct NewEntryKey;
 
 /// A `<button type="button">` applying `edit` to `field` on activation.
 ///
@@ -98,51 +106,88 @@ pub(super) fn add_entry_row(
 	.any_snippet()
 }
 
+/// The add-entry row of a keyed map: a [`ComponentPicker`] over the registry
+/// and the button that inserts the chosen component's zero.
+pub(super) fn add_component_row(field: FieldRef, label: String) -> Snippet {
+	rsx! {
+		<div>
+			{labeled(
+				Some("Component".into()),
+				rsx! { <ComponentPicker field={field.clone()}/> },
+			)}
+			{edit_button(label, field, CollectionEdit::InsertKeyed)}
+		</div>
+	}
+	.any_snippet()
+}
+
 /// Observer: activating a collection button applies its edit to the bound
 /// field, which the document sync then carries into every generated control.
 fn apply_collection_edit(
 	ev: On<PointerUp>,
 	buttons: Query<&CollectionButton>,
+	elements: ElementQuery,
 	children: Query<&Children>,
 	parents: Query<&ChildOf>,
 	new_keys: Query<(), With<NewEntryKey>>,
-	mut values: Query<&mut Value>,
+	values: Query<&Value>,
+	schemas: Option<Res<SchemaRegistry>>,
+	types: Option<Res<AppTypeRegistry>>,
 	mut docs: DocumentQuery,
+	mut commands: Commands,
 ) -> Result {
 	// the event bubbles; act only at the button carrying the edit
 	let entity = ev.event_target();
 	let Ok(button) = buttons.get(entity) else {
 		return OK;
 	};
-	// an insert is keyed by the input beside it, and nothing typed is nothing to
-	// do, exactly as an empty form field is
+	// an insert is keyed by the control beside it, and nothing chosen is nothing
+	// to do, exactly as an empty form field is
 	let key_input = new_entry_key(entity, &children, &parents, &new_keys);
 	let key = key_input
-		.and_then(|input| values.get(input).ok())
-		.and_then(|value| value.as_str().ok())
-		.map(|key| SmolStr::from(key.trim()))
+		.and_then(|input| entry_key(&elements, &values, input))
 		.filter(|key| !key.is_empty());
-	if matches!(button.edit, CollectionEdit::Insert(_)) && key.is_none() {
-		return OK;
-	}
-	let edit = button.edit.clone();
+	let edit = match (&button.edit, key) {
+		(CollectionEdit::Insert(_) | CollectionEdit::InsertKeyed, None) => {
+			return OK;
+		}
+		(CollectionEdit::Insert(zero), Some(key)) => {
+			ResolvedEdit::Insert(key, zero.clone())
+		}
+		(CollectionEdit::InsertKeyed, Some(key)) => {
+			let types = types.as_ref().map(|types| types.read());
+			let resolver =
+				super::resolver(schemas.as_deref(), types.as_deref());
+			let scene =
+				docs.field_value(entity, &whole_document(&button.field))?;
+			ResolvedEdit::Insert(
+				key.clone(),
+				keyed_zero(resolver, &scene, &button.field, &key)?,
+			)
+		}
+		(CollectionEdit::Push(item), _) => ResolvedEdit::Push(item.clone()),
+		(CollectionEdit::Remove(segment), _) => {
+			ResolvedEdit::Remove(segment.clone())
+		}
+	};
 	docs.with_field(entity, &button.field, move |value| -> Result {
 		match edit {
-			CollectionEdit::Push(item) => {
-				value.as_list_mut_or_init()?.push(item)
+			ResolvedEdit::Push(item) => value.as_list_mut_or_init()?.push(item),
+			// a key already present is left alone: the picker offers what is
+			// missing, and re-inserting would reset the entry to its zero
+			ResolvedEdit::Insert(key, zero) => {
+				let map = as_map_mut_or_init(value)?;
+				if !map.contains(&key) {
+					map.insert(key, zero);
+				}
 			}
-			CollectionEdit::Insert(zero) => {
-				let key =
-					key.ok_or_else(|| bevyhow!("a map entry needs a key"))?;
-				as_map_mut_or_init(value)?.insert(key, zero);
-			}
-			CollectionEdit::Remove(FieldSegment::ArrayIndex(index)) => {
+			ResolvedEdit::Remove(FieldSegment::ArrayIndex(index)) => {
 				let list = value.as_list_mut_or_init()?;
 				if index < list.len() {
 					list.remove(index);
 				}
 			}
-			CollectionEdit::Remove(FieldSegment::ObjectKey(key)) => {
+			ResolvedEdit::Remove(FieldSegment::ObjectKey(key)) => {
 				as_map_mut_or_init(value)?.remove(key.as_str());
 			}
 		}
@@ -150,9 +195,113 @@ fn apply_collection_edit(
 	})??;
 	// the key is spent, so the next entry starts empty
 	if let Some(input) = key_input {
-		values.get_mut(input)?.set_if_neq(Value::str(""));
+		commands.entity(input).insert(Value::str(""));
 	}
 	OK
+}
+
+/// A [`CollectionEdit`] with its key and zero resolved, ready to apply.
+enum ResolvedEdit {
+	Push(Value),
+	Insert(SmolStr, Value),
+	Remove(FieldSegment),
+}
+
+/// The key the add row's control holds: a text field's trimmed text, or for a
+/// picker `<select>` its chosen option, falling back to its first one as a
+/// browser does for an untouched select.
+fn entry_key(
+	elements: &ElementQuery,
+	values: &Query<&Value>,
+	input: Entity,
+) -> Option<SmolStr> {
+	let chosen = values
+		.get(input)
+		.ok()
+		.and_then(|value| value.as_str().ok())
+		.map(|key| SmolStr::from(key.trim()))
+		.filter(|key| !key.is_empty());
+	let view = elements.get(input).ok()?;
+	match (view.tag(), chosen) {
+		("select", None) => elements
+			.iter_descendants_inclusive(input)
+			.find(|child| child.tag() == "option")
+			.map(|option| SmolStr::from(option.option_value())),
+		(_, chosen) => chosen,
+	}
+}
+
+/// The whole document `field` binds into, ie the scene an added reference is
+/// seeded from.
+fn whole_document(field: &FieldRef) -> FieldRef {
+	FieldRef {
+		document: field.document.clone(),
+		field_path: FieldPath::default(),
+		on_missing: default(),
+	}
+}
+
+/// The zero a keyed entry starts as: the schema `key` names, with every entity
+/// reference in it pointing at the first entity the relation may target, so
+/// the document layer accepts the add before a picker chooses.
+fn keyed_zero(
+	resolver: SchemaResolver,
+	scene: &Value,
+	field: &FieldRef,
+	key: &str,
+) -> Result<Value> {
+	let schema = MapSchema::Keyed.entry_schema(resolver, key)?;
+	let mut zero = schema.default_value_in(resolver);
+	let candidate = match (
+		SceneEntities::of(scene),
+		resolver.types(),
+		SceneEntities::position(&field.field_path.with_pushed(key)),
+	) {
+		(Ok(entities), Some(types), Some((source, relation))) => entities
+			.candidates(types, relation, source)?
+			.first()
+			.map(|target| EntitySchema::reference(*target))
+			.transpose()?,
+		_ => None,
+	};
+	if let Some(reference) = candidate {
+		seed_references(resolver, &schema, &mut zero, &reference);
+	}
+	Ok(zero)
+}
+
+/// Point every `Entity` leaf of `value`, as `schema` describes it, at
+/// `reference`: a zero's null references made valid.
+fn seed_references(
+	resolver: SchemaResolver,
+	schema: &ValueSchema,
+	value: &mut Value,
+	reference: &Value,
+) {
+	match (schema, value) {
+		(ValueSchema::Entity(_), value) => *value = reference.clone(),
+		(ValueSchema::Optional(inner), value) => {
+			seed_references(resolver, inner, value, reference)
+		}
+		(ValueSchema::Struct(schema), Value::Map(map)) => {
+			for field in &schema.fields {
+				if let Some(value) = map.0.get_mut(field.key.as_str()) {
+					seed_references(resolver, &field.schema, value, reference);
+				}
+			}
+		}
+		(ValueSchema::Tuple(schema), Value::List(items)) => {
+			for (field, value) in schema.fields.iter().zip(items.iter_mut()) {
+				seed_references(resolver, &field.schema, value, reference);
+			}
+		}
+		(ValueSchema::Ref(schema_ref), value) => {
+			if let Some(schema) = resolver.follow(schema_ref) {
+				seed_references(resolver, schema, value, reference);
+			}
+		}
+		_ => {}
+	}
 }
 
 /// The [`NewEntryKey`] input sharing a parent with `button`, ie the key half of
