@@ -6,7 +6,7 @@ use bytes::Bytes;
 /// Uses [`ServiceAccess`] at runtime to determine which backing
 /// store to delegate to.
 #[derive(Debug, Clone, Get, SetWith, Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct S3FsStore {
 	/// Local filesystem store.
 	#[set_with(skip)]

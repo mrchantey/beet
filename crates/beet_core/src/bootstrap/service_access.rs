@@ -52,27 +52,33 @@ impl fmt::Display for ServiceAccess {
 
 #[cfg(feature = "std")]
 impl ServiceAccess {
-	/// The workspace directory backing a [`Local`](Self::Local) store declared
-	/// under `label`, ie `target/stores/analytics`. The local stand-in for the
-	/// cloud resource the same declaration names when [`Remote`](Self::Remote),
-	/// so one markup declaration runs both ways.
-	pub fn local_store_dir(label: impl AsRef<std::path::Path>) -> WsPathBuf {
-		WsPathBuf::new("target/stores").join(label)
+	/// The workspace directory backing the [`Local`](Self::Local) stand-in for
+	/// the resource named `name`, ie `target/stores/beet-site--dev--analytics`.
+	/// Keyed by the composed resource name rather than the bare label, so two
+	/// apps or two stages in one workspace never share a directory, exactly as
+	/// they never share a bucket.
+	pub fn local_store_dir(name: impl AsRef<std::path::Path>) -> WsPathBuf {
+		WsPathBuf::new("target/stores").join(name)
 	}
 
-	/// The store a [`Local`](Self::Local) declaration under `label` attaches,
-	/// in the spelling `BlobStore::from_uri` constructs: the absolute
-	/// [`local_store_dir`](Self::local_store_dir) on any host with a filesystem
-	/// (native, deno, node), else (a browser) IndexedDB, one database every
-	/// declaration shares and so scopes by label.
-	pub fn local_store_uri(label: &str) -> StoreUri {
+	/// The store a [`Local`](Self::Local) process attaches for the resource
+	/// named `name`: the absolute [`local_store_dir`](Self::local_store_dir)
+	/// on any host with a filesystem (native, deno, node), else (a browser)
+	/// one IndexedDB database of that name. The local stand-in for the cloud
+	/// resource the same declaration names when [`Remote`](Self::Remote), so
+	/// one markup declaration runs both ways, and one directory or database
+	/// per declaration either way.
+	pub fn local_store_uri(name: &str) -> StoreUri {
 		match Self::host_has_fs() {
 			true => StoreUri::Fs {
 				path: Some(
-					Self::local_store_dir(label).into_abs().to_string().into(),
+					Self::local_store_dir(name).into_abs().to_string().into(),
 				),
 			},
-			false => StoreUri::IndexedDb,
+			false => StoreUri::IndexedDb {
+				db: name.into(),
+				prefix: None,
+			},
 		}
 	}
 

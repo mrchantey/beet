@@ -47,98 +47,12 @@ impl BlobStore {
 	/// The returned store is pre-created and ready for immediate use.
 	pub fn temp() -> BlobStore { BlobStore::new(InMemoryStore::new()) }
 
-	/// Create local store with platform-specific provider.
-	/// - wasm: [`LocalStorageStore`]
-	/// - native: [`FsStore`] at `.cache/stores/<name>`
+	/// The erased store a [`StoreUri`] names, for a caller with no entity to
+	/// land the concrete component on (entry resolution, a prune). See
+	/// [`StoreProvider::from_uri`], the one seam this rides.
 	#[cfg(feature = "std")]
-	pub fn new_local(name: impl Into<String>) -> BlobStore {
-		let name = name.into();
-		cfg_if! {
-			if #[cfg(target_arch = "wasm32")] {
-				BlobStore::new(LocalStorageStore::new(name))
-			} else {
-				BlobStore::new(FsStore::new(
-					AbsPathBuf::new_workspace_rel(format!(".cache/stores/{name}"))
-						.unwrap(),
-				))
-			}
-		}
-	}
-
-	/// The remote S3 store for `bucket_name`, using the SDK's default region
-	/// provider chain.
-	///
-	/// For a tool that names a bucket directly and has no `<S3BucketBlock/>`
-	/// declaration to resolve a region from; a store reached through its
-	/// declaration is handed the region that block resolved. Errors without the
-	/// native `aws_sdk` backend rather than degrading.
-	pub fn remote(bucket_name: &str) -> Result<BlobStore> {
-		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				BlobStore::new(S3Store::new_default_region(bucket_name)).xok()
-			} else {
-				let _ = bucket_name;
-				bevybail!(
-					"a remote blob store requires the `aws_sdk` feature (native only)"
-				)
-			}
-		}
-	}
-
-	/// Build the store a [`StoreUri`] names, `dir` rooting the dir-rooted kinds
-	/// (the resolved entry directory for a repo store) and ignored by the
-	/// self-rooted ones.
-	///
-	/// The single construction seam for store selection, shared by the binary's
-	/// entry resolution and the `check`/`serve`/`export-static` commands, so every
-	/// entry load is store-driven rather than filesystem-bound. A kind whose
-	/// backend this build did not compile errors with guidance rather than
-	/// degrading: the store concept is target-agnostic, only the backend is gated.
-	#[cfg(feature = "std")]
-	pub fn from_uri(uri: &StoreUri, dir: AbsPathBuf) -> Result<BlobStore> {
-		match uri {
-			StoreUri::Fs { path: None } => {
-				BlobStore::new(FsStore::new(dir)).xok()
-			}
-			// an absolute path stands alone, a relative one roots at `dir`
-			StoreUri::Fs { path: Some(path) } => {
-				BlobStore::new(FsStore::new(dir.join_checked(path.as_str())?))
-					.xok()
-			}
-			StoreUri::Memory => BlobStore::temp().xok(),
-			StoreUri::S3 { .. } => Self::s3_from_uri(uri),
-			#[cfg(target_arch = "wasm32")]
-			StoreUri::LocalStorage => {
-				BlobStore::new(LocalStorageStore::new("beet")).xok()
-			}
-			#[cfg(target_arch = "wasm32")]
-			StoreUri::IndexedDb => BlobStore::new(IndexedDbStore::new("beet")).xok(),
-			#[cfg(not(target_arch = "wasm32"))]
-			StoreUri::LocalStorage | StoreUri::IndexedDb => bevybail!(
-				"store `{uri}` is browser storage, only available on wasm"
-			),
-		}
-	}
-
-	/// The [`S3Store`]-backed store for an `s3://` uri, see
-	/// [`S3Store::from_uri`].
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	fn s3_from_uri(uri: &StoreUri) -> Result<BlobStore> {
-		info!("s3 store: {uri}");
-		S3Store::from_uri(uri)?.xmap(BlobStore::new).xok()
-	}
-
-	/// Without a compiled S3 backend the request errors with guidance rather than
-	/// degrading.
-	#[cfg(all(
-		feature = "std",
-		not(all(feature = "aws_sdk", not(target_arch = "wasm32")))
-	))]
-	fn s3_from_uri(_uri: &StoreUri) -> Result<BlobStore> {
-		bevybail!(
-			"an s3:// store requires a compiled S3 backend (enable the `aws_sdk` \
-			feature, native only)"
-		)
+	pub fn from_uri(uri: &StoreUri) -> Result<BlobStore> {
+		StoreProvider::from_uri(uri)?.into_blob_store().xok()
 	}
 
 	/// Returns a new store scoped to the given subdirectory.
@@ -203,8 +117,8 @@ impl BlobStore {
 
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
-	/// Use with `#[component(on_add = BlobStore::on_add::<MyStore>)]`.
-	pub fn on_add<T: Component + Clone + BlobStoreProvider>(
+	/// Use with `#[component(on_insert = BlobStore::on_insert::<MyStore>)]`.
+	pub fn on_insert<T: Component + Clone + BlobStoreProvider>(
 		mut world: DeferredWorld,
 		cx: HookContext,
 	) {
@@ -213,7 +127,7 @@ impl BlobStore {
 				let store = BlobStore::new(provider);
 				// any blob store backs a table (json rows keyed by id), so the
 				// erased [`TableStore`] currency lands on every store entity; a
-				// table-native provider's own [`TableStore::on_add`] runs after
+				// table-native provider's own [`TableStore::on_insert`] runs after
 				// and overrides it.
 				#[cfg(all(feature = "json", feature = "std"))]
 				world
@@ -224,8 +138,10 @@ impl BlobStore {
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {
-					name: core::any::type_name_of_val(&BlobStore::on_add::<T>)
-						.into(),
+					name: core::any::type_name_of_val(
+						&BlobStore::on_insert::<T>,
+					)
+					.into(),
 				});
 			}
 		}
@@ -383,23 +299,6 @@ mod test {
 			.await
 			.unwrap();
 		store
-	}
-
-	/// An `fs:<path>` uri roots at `path` when absolute, else at `path` under
-	/// the context dir.
-	#[beet_core::test]
-	fn fs_uri_honours_an_absolute_path() {
-		let dir = AbsPathBuf::new("/srv").unwrap();
-		let base_dir = |uri: &str| {
-			BlobStore::from_uri(&StoreUri::parse(uri).unwrap(), dir.clone())
-				.unwrap()
-				.base_dir()
-				.unwrap()
-				.to_string()
-		};
-		base_dir("fs:/data").xpect_eq("/data");
-		base_dir("fs:data").xpect_eq("/srv/data");
-		base_dir("fs").xpect_eq("/srv");
 	}
 
 	/// A nested entry declaring a root at an ancestor key takes a key-prefix

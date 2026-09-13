@@ -12,7 +12,7 @@ use bytes::Bytes;
 /// The S3 client is lazily constructed and cached by region using a [`LazyPool`].
 #[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct S3Store {
 	/// The S3 bucket name.
 	bucket_name: SmolStr,

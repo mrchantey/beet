@@ -193,7 +193,7 @@ async fn build_entry(
 /// local root, ie a self-rooted store).
 ///
 /// Resolution order:
-/// 1. a self-rooted `--repo` (`s3://<bucket>`, `local-storage`, `indexed-db`):
+/// 1. a self-rooted `--repo` (`s3://<bucket>`, `indexed-db://<db>`):
 ///    the store roots itself, so `--main` names the entry document *within* it,
 ///    defaulting to an [`entry_build::ENTRY_NAMES`] probe. A deployed task passes
 ///    `--repo=s3://<bucket>` (deploy config as args, not env).
@@ -227,9 +227,8 @@ async fn resolve_entry(
 
 	// a self-rooted store: no local dir and no ancestor walk, so `--main` is a
 	// key within the store, defaulting to the entry-name probe.
-	if repo_uri.is_some_and(StoreUri::is_self_rooted) {
-		let repo_store =
-			entry_build::resolve_repo_store(repo_uri, AbsPathBuf::new(".")?)?;
+	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
+		let repo_store = BlobStore::from_uri(uri)?;
 		let entry_name = match main {
 			Some(main) => main.to_string(),
 			None => entry_build::probe_entry_names(&repo_store)
@@ -253,7 +252,7 @@ async fn resolve_entry(
 	if !js_runtime::environment().has_fs() {
 		bevybail!(
 			"this runtime has no filesystem: pass a self-rooted `--repo` \
-			(s3://<bucket>, local-storage, indexed-db)"
+			(s3://<bucket>, indexed-db://<db>)"
 		);
 	}
 	match main {

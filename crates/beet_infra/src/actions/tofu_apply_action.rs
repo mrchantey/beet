@@ -85,7 +85,7 @@ pub async fn TofuApply(
 				deployment.clone(),
 				config,
 				variables.clone(),
-			);
+			)?;
 			(project, stack, deployment, artifacts, repo, variables).xok()
 		})
 		.await??;
@@ -101,7 +101,7 @@ pub async fn TofuApply(
 	if layer.is_none() {
 		// step 2: build ledger, upload artifacts to S3
 		trace!("TofuApply: step 2 - ensuring artifacts bucket exists");
-		let mut client = deployment.artifacts_client(&stack);
+		let mut client = deployment.artifacts_client(&stack)?;
 		if let Some(repo) = &repo {
 			client = client.with_repo(repo.clone());
 		}

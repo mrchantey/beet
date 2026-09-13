@@ -124,22 +124,6 @@ impl S3BucketBlock {
 	pub fn bucket_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.label.clone())
 	}
-
-	/// The [`S3Store`](beet_net::prelude::S3Store) for this bucket as a deploy
-	/// declares it, for a caller needing the S3 api rather than the erased
-	/// store: the erased root ([`StoreBlock::store_uri`]) nested under
-	/// `deploy_id` when the bucket is versioned.
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	pub fn store(
-		&self,
-		stack: &ResolvedStack,
-		deploy_id: Option<&Uuid>,
-	) -> Result<beet_net::prelude::S3Store> {
-		ErasedStoreBlock::new(self, stack)
-			.store_uri(deploy_id)?
-			.xref()
-			.xmap(beet_net::prelude::S3Store::from_uri)
-	}
 }
 
 impl StoreBlock for S3BucketBlock {

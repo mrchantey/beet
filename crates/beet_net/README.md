@@ -23,7 +23,7 @@ Two verbs bind the entity lifecycle to those actions, one per edge:
 
 ## Stores and the repo store
 
-A `BlobStore` is the erased handle every backend (`FsStore`, `S3Store`, `InMemoryStore`, the browser stores) materializes on its entity, so a consumer never names a backend. Exactly one store in an app is the **repo store**: the canonical store an entry loads through, marked `RepoStore` and rooted on the entry root, holding the entry document, its templates, routes and assets. A relative path anywhere in the app means a path in it, and a second one anywhere in the world is an error.
+A `BlobStore` is the erased handle every backend (`FsStore`, `S3Store`, `InMemoryStore`, the browser stores) materializes on its entity, so a consumer never names a backend. A backend is selected by a `StoreUri` (`fs:<path>`, `s3://<bucket>`, `dynamo://<table>`, `indexed-db://<db>`, each carrying its own root) and built by `StoreProvider::from_uri`, the one place a uri becomes a concrete store component. Exactly one store in an app is the **repo store**: the canonical store an entry loads through, marked `RepoStore` and rooted on the entry root, holding the entry document, its templates, routes and assets. A relative path anywhere in the app means a path in it, and a second one anywhere in the world is an error.
 
 Consumers usually resolve it by ancestry (the `AncestorQuery<&BlobStore>` idiom, which honours any intervening `DirPath` scope); `RepoStore::get` is the direct lookup. Every other store is a plain store, declared for a purpose and reached by name through a `StoreRef`. See `src/store/mod.rs` for the backends and the reactive `BlobEvent` substrate.
 

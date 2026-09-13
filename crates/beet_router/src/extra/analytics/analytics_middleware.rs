@@ -174,7 +174,7 @@ mod stalled_store_test {
 	/// empty rather than delegating: nothing in this test reads the store, and a
 	/// write that never returns is the whole point.
 	#[derive(Clone, Component)]
-	#[component(on_add = BlobStore::on_add::<Self>)]
+	#[component(on_insert = BlobStore::on_insert::<Self>)]
 	struct StalledStore {
 		/// Writes started, ie the count of parked pushes. Non-zero is what proves
 		/// the request actually reached the store rather than passing it by.

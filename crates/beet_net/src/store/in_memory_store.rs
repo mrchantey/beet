@@ -21,13 +21,13 @@ static INSTANCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 /// Inner state is `None` when the store has not been created, and `Some(map)`
 /// when it exists. An optional `subdir` scopes all operations to a key prefix.
 ///
-/// Spawned as a [`Component`] (its `on_add` inserts a [`BlobStore`]), it becomes
+/// Spawned as a [`Component`] (its `on_insert` inserts a [`BlobStore`]), it becomes
 /// reactive: `insert` / `remove` emit a [`BlobEvent`] on the subscribed bus, and
 /// every clone (including [`with_subdir`](BlobStoreProvider::with_subdir)) shares
 /// one backing `Arc`, so the `instance_id` and bus subscription are shared.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct InMemoryStore {
 	/// Shared backing state, opaque to reflection.
 	#[reflect(ignore)]

@@ -1,20 +1,24 @@
-//! The store-selection grammar behind `--repo` / `BEET_REPO`.
+//! The store-selection grammar behind `--repo` / `BEET_REPO` and every store
+//! declaration.
 
 use crate::prelude::*;
 use core::fmt;
 use core::str::FromStr;
 
-/// Which blob store an entry loads through: a value type with a grammar rather
-/// than a string predicate, so selection is parsed once and every consumer asks
-/// the type instead of re-matching a prefix.
+/// Which store a process reads: a value type with a grammar rather than a
+/// string predicate, so selection is parsed once and every consumer asks the
+/// type instead of re-matching a prefix.
 ///
 /// Parse, display and predicates only, so it needs no store backend and no
-/// features; `BlobStore::from_uri` in beet_net constructs the backend it names.
-/// The grammar round-trips through [`Display`]:
+/// features; `StoreProvider::from_uri` in beet_net constructs the backend it
+/// names. Every kind is TOTAL: a uri carries everything its backend needs (a
+/// bucket, a table, a browser database) plus the key prefix it roots at, so
+/// the one uri is the whole answer and nothing downstream patches it. The
+/// grammar round-trips through [`Display`]:
 ///
-/// 1. `fs` / `fs:<path>`: a filesystem store, rooted at the resolution context
-///    dir (the resolved entry dir for a repo store) or at `<path>` when given,
-///    relative paths resolved against the context dir.
+/// 1. `fs` / `fs:<path>`: a filesystem store, rooted at the context dir (the
+///    cwd, or the dir [`rooted_at`](Self::rooted_at) pins) or at `<path>` when
+///    given, relative paths resolved against the context dir.
 /// 2. `memory`: a temporary in-memory store.
 /// 3. `s3://<bucket>[/<prefix>][?endpoint=<url>][&region=<region>]`: an
 ///    S3-compatible bucket, optionally rooted at a key prefix. With an
@@ -27,7 +31,10 @@ use core::str::FromStr;
 ///    document it shipped with, so the window between publishing a new document
 ///    and swapping the binary that serves it is not a window where the old
 ///    binary reads the new document.
-/// 4. `local-storage` / `indexed-db`: browser storage (wasm).
+/// 4. `dynamo://<table>[/<prefix>][?region=<region>]`: a DynamoDB table, the
+///    table-native store a declaration wanting indexed queries names.
+/// 5. `local-storage://<store>[/<prefix>]` / `indexed-db://<db>[/<prefix>]`:
+///    browser storage (wasm), one named store or database per uri.
 ///
 /// ## Example
 ///
@@ -41,10 +48,10 @@ use core::str::FromStr;
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StoreUri {
-	/// A filesystem store. `path` overrides the resolution context dir, else the
-	/// store roots at the context dir itself.
+	/// A filesystem store. `path` overrides the context dir, else the store
+	/// roots at the context dir itself.
 	Fs {
-		/// The store root, absolute or relative to the resolution context dir.
+		/// The store root, absolute or relative to the context dir.
 		path: Option<SmolStr>,
 	},
 	/// A temporary in-memory store, only meaningful with an explicit entry since
@@ -64,22 +71,48 @@ pub enum StoreUri {
 		/// The bucket region, resolved at construction when absent.
 		region: Option<SmolStr>,
 	},
+	/// A DynamoDB table.
+	Dynamo {
+		/// The table name.
+		table: SmolStr,
+		/// A key prefix the store roots at.
+		prefix: Option<SmolStr>,
+		/// The table region, resolved at construction when absent.
+		region: Option<SmolStr>,
+	},
 	/// Browser `localStorage` (wasm).
-	LocalStorage,
+	LocalStorage {
+		/// The store name every key is prefixed with, so one origin holds many
+		/// stores.
+		store: SmolStr,
+		/// A key prefix the store roots at.
+		prefix: Option<SmolStr>,
+	},
 	/// Browser IndexedDB (wasm).
-	IndexedDb,
+	IndexedDb {
+		/// The database name, one database per store.
+		db: SmolStr,
+		/// A key prefix the store roots at.
+		prefix: Option<SmolStr>,
+	},
 }
 
 impl Default for StoreUri {
 	fn default() -> Self { Self::Fs { path: None } }
 }
 
+/// The scheme of every scoped kind, ie `s3` in `s3://<bucket>`.
+const S3_SCHEME: &str = "s3";
+const DYNAMO_SCHEME: &str = "dynamo";
+const LOCAL_STORAGE_SCHEME: &str = "local-storage";
+const INDEXED_DB_SCHEME: &str = "indexed-db";
+
 impl StoreUri {
 	/// Parse a store uri, erroring with the supported list on an unknown kind.
 	pub fn parse(value: &str) -> Result<Self> {
 		let value = value.trim();
-		if let Some(rest) = value.strip_prefix("s3://") {
-			return Self::parse_s3(rest);
+		if let Some((scheme, rest)) = value.split_once("://") {
+			return Self::parse_scoped(scheme, rest);
 		}
 		if let Some(path) = value.strip_prefix("fs:") {
 			let path = path.trim();
@@ -91,81 +124,89 @@ impl StoreUri {
 		match value {
 			"fs" => Self::Fs { path: None },
 			"memory" => Self::Memory,
-			"local-storage" => Self::LocalStorage,
-			"indexed-db" => Self::IndexedDb,
 			other => bevybail!(
 				"unknown store `{other}`, supported kinds: fs, fs:<path>, \
-				memory, s3://<bucket>[?endpoint=..][&region=..], local-storage \
-				(wasm), indexed-db (wasm)"
+				memory, s3://<bucket>[/<prefix>][?endpoint=..][&region=..], \
+				dynamo://<table>[/<prefix>][?region=..], \
+				local-storage://<store>[/<prefix>] (wasm), \
+				indexed-db://<db>[/<prefix>] (wasm)"
 			),
 		}
 		.xok()
 	}
 
-	/// Parse the `<bucket>[/<prefix>][?endpoint=<url>][&region=<region>]` tail of
-	/// an `s3://` uri.
-	fn parse_s3(rest: &str) -> Result<Self> {
-		let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
-		// the bucket is the first segment; everything after the first `/` is the
-		// prefix the store roots at, with any trailing slash trimmed so
-		// `s3://b/p` and `s3://b/p/` are the one value.
-		let (bucket, prefix) = match path.split_once('/') {
-			Some((bucket, prefix)) => {
-				let prefix = prefix.trim_matches('/');
-				(bucket, (!prefix.is_empty()).then(|| prefix.into()))
+	/// Parse a `<scheme>://<name>[/<prefix>][?<params>]` uri, the shape every
+	/// self-rooted kind shares.
+	fn parse_scoped(scheme: &str, rest: &str) -> Result<Self> {
+		match scheme {
+			S3_SCHEME => {
+				let tail =
+					ScopedTail::parse(scheme, rest, &["endpoint", "region"])?;
+				Self::S3 {
+					endpoint: tail.param("endpoint"),
+					region: tail.param("region"),
+					bucket: tail.name,
+					prefix: tail.prefix,
+				}
 			}
-			None => (path, None),
-		};
-		if bucket.is_empty() {
-			bevybail!("store `s3://` is missing a bucket name");
-		}
-		let mut endpoint = None;
-		let mut region = None;
-		for pair in query.split('&').filter(|pair| !pair.is_empty()) {
-			match pair.split_once('=') {
-				Some(("endpoint", value)) => endpoint = Some(value.into()),
-				Some(("region", value)) => region = Some(value.into()),
-				_ => bevybail!(
-					"unknown s3 store query param `{pair}`, supported: \
-					endpoint, region"
-				),
+			DYNAMO_SCHEME => {
+				let tail = ScopedTail::parse(scheme, rest, &["region"])?;
+				Self::Dynamo {
+					region: tail.param("region"),
+					table: tail.name,
+					prefix: tail.prefix,
+				}
 			}
-		}
-		Self::S3 {
-			bucket: bucket.into(),
-			prefix,
-			endpoint,
-			region,
+			LOCAL_STORAGE_SCHEME => {
+				let tail = ScopedTail::parse(scheme, rest, &[])?;
+				Self::LocalStorage {
+					store: tail.name,
+					prefix: tail.prefix,
+				}
+			}
+			INDEXED_DB_SCHEME => {
+				let tail = ScopedTail::parse(scheme, rest, &[])?;
+				Self::IndexedDb {
+					db: tail.name,
+					prefix: tail.prefix,
+				}
+			}
+			other => bevybail!(
+				"unknown store scheme `{other}://`, supported: s3, dynamo, \
+				local-storage, indexed-db"
+			),
 		}
 		.xok()
 	}
 
-	/// Whether this store roots itself (a bucket or browser storage), needing no
-	/// local directory or filesystem walk. For these an entry name addresses the
-	/// document *within* the store and there is no live-reload watch dir.
+	/// Whether this store roots itself (a bucket, a table or browser storage),
+	/// needing no local directory or filesystem walk. For these an entry name
+	/// addresses the document *within* the store and there is no live-reload
+	/// watch dir.
 	pub fn is_self_rooted(&self) -> bool {
-		matches!(self, Self::S3 { .. } | Self::LocalStorage | Self::IndexedDb)
+		!matches!(self, Self::Fs { .. } | Self::Memory)
 	}
 
 	/// This store rooted at `subdir` below its current root, the uri form of
-	/// `BlobStore::with_subdir`: a bucket nests the prefix, a filesystem store
-	/// joins the path. The kinds with no path in their uri (memory, browser
-	/// storage) cannot express a root and error, since a deploy that versions
-	/// one of them per deploy id has nowhere to put the id.
+	/// `BlobStore::with_subdir`: a filesystem store joins the path, every
+	/// other kind nests its key prefix. A memory store has no path in its uri
+	/// and errors, since a deploy that versions one per deploy id has nowhere
+	/// to put the id.
 	pub fn with_subdir(&self, subdir: impl AsRef<str>) -> Result<Self> {
 		let subdir = subdir.as_ref().trim_matches('/');
-		let join = |root: Option<&SmolStr>| -> SmolStr {
+		let join = |root: Option<&SmolStr>| -> Option<SmolStr> {
 			match root {
 				Some(root) => {
 					format!("{}/{subdir}", root.trim_end_matches('/'))
 				}
 				None => subdir.to_string(),
 			}
-			.into()
+			.xmap(SmolStr::from)
+			.xsome()
 		};
 		match self {
 			Self::Fs { path } => Self::Fs {
-				path: Some(join(path.as_ref())),
+				path: join(path.as_ref()),
 			},
 			Self::S3 {
 				bucket,
@@ -174,15 +215,107 @@ impl StoreUri {
 				region,
 			} => Self::S3 {
 				bucket: bucket.clone(),
-				prefix: Some(join(prefix.as_ref())),
+				prefix: join(prefix.as_ref()),
 				endpoint: endpoint.clone(),
 				region: region.clone(),
 			},
-			Self::Memory | Self::LocalStorage | Self::IndexedDb => bevybail!(
+			Self::Dynamo {
+				table,
+				prefix,
+				region,
+			} => Self::Dynamo {
+				table: table.clone(),
+				prefix: join(prefix.as_ref()),
+				region: region.clone(),
+			},
+			Self::LocalStorage { store, prefix } => Self::LocalStorage {
+				store: store.clone(),
+				prefix: join(prefix.as_ref()),
+			},
+			Self::IndexedDb { db, prefix } => Self::IndexedDb {
+				db: db.clone(),
+				prefix: join(prefix.as_ref()),
+			},
+			Self::Memory => bevybail!(
 				"store `{self}` has no path to root a subdir `{subdir}` at"
 			),
 		}
 		.xok()
+	}
+
+	/// This uri with its filesystem root pinned to `dir`: a bare `fs` roots at
+	/// `dir`, a relative `fs:<path>` at `<path>` under it, an absolute one
+	/// stands alone, and every self-rooted kind is untouched. The entry
+	/// resolver calls this with the resolved entry directory, so a `--repo=fs`
+	/// means "the entry's own directory" rather than the cwd.
+	#[cfg(feature = "std")]
+	pub fn rooted_at(&self, dir: &AbsPathBuf) -> Result<Self> {
+		match self {
+			Self::Fs { path: None } => Self::Fs {
+				path: Some(dir.to_string().into()),
+			},
+			Self::Fs { path: Some(path) } => Self::Fs {
+				path: Some(dir.join_checked(path.as_str())?.to_string().into()),
+			},
+			other => other.clone(),
+		}
+		.xok()
+	}
+}
+
+/// The parsed `<name>[/<prefix>][?<key>=<value>[&..]]` tail of a scoped uri.
+struct ScopedTail {
+	name: SmolStr,
+	prefix: Option<SmolStr>,
+	params: Vec<(SmolStr, SmolStr)>,
+}
+
+impl ScopedTail {
+	/// Parse `rest`, accepting only the query `params` the kind declares. The
+	/// name is the first segment; everything after the first `/` is the prefix
+	/// the store roots at, with any trailing slash trimmed so `s3://b/p` and
+	/// `s3://b/p/` are the one value.
+	fn parse(scheme: &str, rest: &str, allowed: &[&str]) -> Result<Self> {
+		let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
+		let (name, prefix) = match path.split_once('/') {
+			Some((name, prefix)) => {
+				let prefix = prefix.trim_matches('/');
+				(name, (!prefix.is_empty()).then(|| prefix.into()))
+			}
+			None => (path, None),
+		};
+		if name.is_empty() {
+			bevybail!("store `{scheme}://` is missing a name");
+		}
+		let mut params = Vec::new();
+		for pair in query.split('&').filter(|pair| !pair.is_empty()) {
+			match pair.split_once('=') {
+				Some((key, value)) if allowed.contains(&key) => {
+					params.push((key.into(), value.into()));
+				}
+				_ => bevybail!(
+					"unknown {scheme} store query param `{pair}`, supported: {}",
+					match allowed.is_empty() {
+						true => "none".to_string(),
+						false => allowed.join(", "),
+					}
+				),
+			}
+		}
+		Self {
+			name: name.into(),
+			prefix,
+			params,
+		}
+		.xok()
+	}
+
+	/// The value of query param `key`, if given.
+	fn param(&self, key: &str) -> Option<SmolStr> {
+		self.params
+			.iter()
+			.find(|(name, _)| name == key)
+			.map(|(_, value)| value.clone())
 	}
 }
 
@@ -197,32 +330,54 @@ impl fmt::Display for StoreUri {
 			Self::Fs { path: None } => write!(f, "fs"),
 			Self::Fs { path: Some(path) } => write!(f, "fs:{path}"),
 			Self::Memory => write!(f, "memory"),
-			Self::LocalStorage => write!(f, "local-storage"),
-			Self::IndexedDb => write!(f, "indexed-db"),
 			Self::S3 {
 				bucket,
 				prefix,
 				endpoint,
 				region,
-			} => {
-				write!(f, "s3://{bucket}")?;
-				if let Some(prefix) = prefix {
-					write!(f, "/{prefix}")?;
-				}
-				// the query separator is `?` for the first param, `&` after, so
-				// the rendered uri parses back into this same value.
-				let mut sep = '?';
-				if let Some(endpoint) = endpoint {
-					write!(f, "{sep}endpoint={endpoint}")?;
-					sep = '&';
-				}
-				if let Some(region) = region {
-					write!(f, "{sep}region={region}")?;
-				}
-				Ok(())
+			} => fmt_scoped(f, S3_SCHEME, bucket, prefix, &[
+				("endpoint", endpoint),
+				("region", region),
+			]),
+			Self::Dynamo {
+				table,
+				prefix,
+				region,
+			} => fmt_scoped(f, DYNAMO_SCHEME, table, prefix, &[(
+				"region", region,
+			)]),
+			Self::LocalStorage { store, prefix } => {
+				fmt_scoped(f, LOCAL_STORAGE_SCHEME, store, prefix, &[])
+			}
+			Self::IndexedDb { db, prefix } => {
+				fmt_scoped(f, INDEXED_DB_SCHEME, db, prefix, &[])
 			}
 		}
 	}
+}
+
+/// Render `<scheme>://<name>[/<prefix>][?<key>=<value>[&..]]`, the query
+/// separator `?` for the first present param and `&` after, so the rendered
+/// uri parses back into the same value.
+fn fmt_scoped(
+	f: &mut fmt::Formatter<'_>,
+	scheme: &str,
+	name: &str,
+	prefix: &Option<SmolStr>,
+	params: &[(&str, &Option<SmolStr>)],
+) -> fmt::Result {
+	write!(f, "{scheme}://{name}")?;
+	if let Some(prefix) = prefix {
+		write!(f, "/{prefix}")?;
+	}
+	let mut sep = '?';
+	for (key, value) in params {
+		if let Some(value) = value {
+			write!(f, "{sep}{key}={value}")?;
+			sep = '&';
+		}
+	}
+	Ok(())
 }
 
 #[cfg(test)]
@@ -239,8 +394,12 @@ mod test {
 			"s3://my-site/01a084cb-6e31-7a53-92ae-67c282615871",
 			"s3://my-site/versions/2?region=us-east-1",
 			"memory",
-			"local-storage",
-			"indexed-db",
+			"local-storage://beet",
+			"local-storage://beet/analytics",
+			"indexed-db://beet",
+			"indexed-db://beet-site--dev--analytics/v1",
+			"dynamo://beet-site--prod--analytics",
+			"dynamo://beet-site--prod--analytics/v1?region=us-west-2",
 			"s3://my-bucket",
 			"s3://my-bucket?region=us-east-1",
 			"s3://my-bucket?endpoint=https://acc.r2.cloudflarestorage.com",
@@ -266,32 +425,43 @@ mod test {
 				endpoint: Some("http://e".into()),
 				region: Some("r".into()),
 			});
+		StoreUri::parse("dynamo://t/p?region=r").unwrap().xpect_eq(
+			StoreUri::Dynamo {
+				table: "t".into(),
+				prefix: Some("p".into()),
+				region: Some("r".into()),
+			},
+		);
+		StoreUri::parse("indexed-db://d/p").unwrap().xpect_eq(
+			StoreUri::IndexedDb {
+				db: "d".into(),
+				prefix: Some("p".into()),
+			},
+		);
+		StoreUri::parse("local-storage://s").unwrap().xpect_eq(
+			StoreUri::LocalStorage {
+				store: "s".into(),
+				prefix: None,
+			},
+		);
 	}
 
-	/// Only a bucket or browser storage is self-rooted; a filesystem store needs
-	/// its resolution context dir.
+	/// Only a filesystem store needs its context dir; a bucket, a table and
+	/// browser storage root themselves. Memory has nothing to walk either, but
+	/// is not self-rooted: it has no seeded entry to address within it.
 	#[crate::test]
 	fn self_rooted_kinds() {
-		StoreUri::parse("s3://b")
-			.unwrap()
-			.is_self_rooted()
-			.xpect_true();
-		StoreUri::parse("local-storage")
-			.unwrap()
-			.is_self_rooted()
-			.xpect_true();
-		StoreUri::parse("indexed-db")
-			.unwrap()
-			.is_self_rooted()
-			.xpect_true();
-		StoreUri::parse("fs")
-			.unwrap()
-			.is_self_rooted()
-			.xpect_false();
-		StoreUri::parse("memory")
-			.unwrap()
-			.is_self_rooted()
-			.xpect_false();
+		for uri in [
+			"s3://b",
+			"dynamo://t",
+			"local-storage://s",
+			"indexed-db://d",
+		] {
+			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_true();
+		}
+		for uri in ["fs", "fs:site", "memory"] {
+			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_false();
+		}
 	}
 
 	#[crate::test]
@@ -300,50 +470,73 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unknown store");
+		StoreUri::parse("nope://x")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("unknown store scheme");
 		StoreUri::parse("s3://")
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("missing a bucket name");
+			.xpect_contains("missing a name");
+		StoreUri::parse("indexed-db://")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("missing a name");
 		StoreUri::parse("s3://b?nope=1")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("unknown s3 store query param");
+		// a kind with no params refuses every one
+		StoreUri::parse("indexed-db://d?region=r")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("supported: none");
 	}
-	/// A prefix roots the store inside the bucket, which is how one bucket holds
-	/// a document per deploy. A trailing slash is not a second value.
+
 	/// A subdir nests below whatever root the uri already has, uniformly
-	/// across the path-carrying kinds, and the rootless ones refuse.
+	/// across every kind with a key space, and the memory store refuses.
 	#[crate::test]
 	fn with_subdir_nests_below_the_root() {
-		StoreUri::parse("s3://site")
-			.unwrap()
-			.with_subdir("v1")
-			.unwrap()
-			.to_string()
-			.xpect_eq("s3://site/v1");
-		StoreUri::parse("s3://site/docs?region=us-east-1")
-			.unwrap()
-			.with_subdir("/v1/")
-			.unwrap()
-			.to_string()
+		let nested = |uri: &str, subdir: &str| {
+			StoreUri::parse(uri)
+				.unwrap()
+				.with_subdir(subdir)
+				.unwrap()
+				.to_string()
+		};
+		nested("s3://site", "v1").xpect_eq("s3://site/v1");
+		nested("s3://site/docs?region=us-east-1", "/v1/")
 			.xpect_eq("s3://site/docs/v1?region=us-east-1");
-		StoreUri::parse("fs")
-			.unwrap()
-			.with_subdir("v1")
-			.unwrap()
-			.to_string()
-			.xpect_eq("fs:v1");
-		StoreUri::parse("fs:../site")
-			.unwrap()
-			.with_subdir("v1")
-			.unwrap()
-			.to_string()
-			.xpect_eq("fs:../site/v1");
+		nested("fs", "v1").xpect_eq("fs:v1");
+		nested("fs:../site", "v1").xpect_eq("fs:../site/v1");
+		nested("dynamo://t?region=r", "v1").xpect_eq("dynamo://t/v1?region=r");
+		nested("indexed-db://d", "analytics")
+			.xpect_eq("indexed-db://d/analytics");
+		nested("local-storage://s/a", "b").xpect_eq("local-storage://s/a/b");
 		StoreUri::Memory
 			.with_subdir("v1")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("has no path");
+	}
+
+	/// Pinning a context dir resolves the filesystem kinds and leaves every
+	/// self-rooted kind alone.
+	#[crate::test]
+	fn rooted_at_pins_the_filesystem_root() {
+		let dir = AbsPathBuf::new("/srv").unwrap();
+		let rooted = |uri: &str| {
+			StoreUri::parse(uri)
+				.unwrap()
+				.rooted_at(&dir)
+				.unwrap()
+				.to_string()
+		};
+		rooted("fs").xpect_eq("fs:/srv");
+		rooted("fs:site").xpect_eq("fs:/srv/site");
+		rooted("fs:/data").xpect_eq("fs:/data");
+		rooted("s3://b").xpect_eq("s3://b");
+		rooted("memory").xpect_eq("memory");
 	}
 
 	#[crate::test]

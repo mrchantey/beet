@@ -12,9 +12,9 @@ use uuid::Uuid;
 ///
 /// The table twin of [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is
 /// materialized onto every store entity by the provider component hooks
-/// ([`BlobStore::on_add`] inserts the json-over-blobs form under `json`, a
+/// ([`BlobStore::on_insert`] inserts the json-over-blobs form under `json`, a
 /// table-native provider like [`DynamoStore`] overrides it with its own via
-/// [`TableStore::on_add`]), so a consumer resolves `TableStore` from an entity
+/// [`TableStore::on_insert`]), so a consumer resolves `TableStore` from an entity
 /// and never names a backend. Typed access goes through [`Self::table`],
 /// mirroring [`BlobStore::blob`].
 #[derive(Clone, Component)]
@@ -63,10 +63,10 @@ impl TableStore {
 
 	/// Component hook that reads a concrete table provider component from the
 	/// entity and inserts a [`TableStore`] wrapping it.
-	/// Use with `#[component(on_add = TableStore::on_add::<MyStore>)]`; run
-	/// after [`BlobStore::on_add`] it overrides the json-over-blobs table that
+	/// Use with `#[component(on_insert = TableStore::on_insert::<MyStore>)]`; run
+	/// after [`BlobStore::on_insert`] it overrides the json-over-blobs table that
 	/// hook materializes.
-	pub fn on_add<T: Component + Clone + TableProvider>(
+	pub fn on_insert<T: Component + Clone + TableProvider>(
 		mut world: DeferredWorld,
 		cx: HookContext,
 	) {
@@ -79,8 +79,10 @@ impl TableStore {
 			}
 			Err(err) => {
 				world.fallback_error_handler()(err, ErrorContext::Command {
-					name: core::any::type_name_of_val(&TableStore::on_add::<T>)
-						.into(),
+					name: core::any::type_name_of_val(
+						&TableStore::on_insert::<T>,
+					)
+					.into(),
 				});
 			}
 		}
@@ -133,48 +135,6 @@ impl<T: TableStoreRow> Table<T> {
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn temp() -> Self { TableStore::temp().table() }
-
-	/// The table backed by the local directory `dir`, the same store a dev
-	/// server derives for a declaration resolving
-	/// [`ServiceAccess::Local`](beet_core::prelude::ServiceAccess). For a tool
-	/// querying a store without a scene to resolve the declaration through.
-	#[cfg(all(feature = "json", feature = "fs"))]
-	pub fn local(dir: AbsPathBuf) -> Self {
-		Self::new(BlobStore::new(FsStore::new(dir)))
-	}
-
-	/// The json-over-blobs table in the remote S3 bucket named `bucket_name`.
-	///
-	/// Two remote constructors rather than one `remote`, because two remote
-	/// backends implement [`TableProvider`] and which one a caller means is not
-	/// inferable: blobs are the portable substrate every target shares,
-	/// [`Self::remote_dynamo`] is the table-native one. A call site naming
-	/// neither is a call site that will silently mean the other after a
-	/// refactor.
-	///
-	/// The region is the SDK's default provider chain, ie the process
-	/// environment, because there is no resource declaration here to resolve one
-	/// from; a store resolved through its `<S3BucketBlock/>` is handed the
-	/// region that block resolved. Errors without the `aws_sdk` backend.
-	#[cfg(feature = "json")]
-	pub fn remote_blob(bucket_name: &str) -> Result<Self> {
-		Self::new(BlobStore::remote(bucket_name)?).xok()
-	}
-
-	/// The table-native DynamoDB table named `table_name`, for a workload that
-	/// wants indexed queries, conditional writes or native TTL rather than the
-	/// portability [`Self::remote_blob`] buys. Region as above; errors without
-	/// the `aws_sdk` backend.
-	pub fn remote_dynamo(table_name: &str) -> Result<Self> {
-		cfg_if! {
-			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-				Self::new(DynamoStore::new_default_region(table_name)).xok()
-			} else {
-				let _ = table_name;
-				bevybail!("a remote dynamo table requires the `aws_sdk` feature")
-			}
-		}
-	}
 
 	/// Create store (may take 10+ seconds for cloud providers).
 	///
@@ -509,7 +469,7 @@ mod test {
 	use beet_core::prelude::*;
 
 	/// Any provider component materializes the erased [`TableStore`] alongside
-	/// [`BlobStore`] via its `on_add` hooks.
+	/// [`BlobStore`] via its `on_insert` hooks.
 	#[beet_core::test]
 	fn provider_component_materializes_table_store() {
 		let mut world = World::new();

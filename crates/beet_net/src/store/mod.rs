@@ -22,10 +22,12 @@
 //!
 //! Use [`StorePlugin`] to register store types for world serialization.
 //! Concrete store types (like [`FsStore`], [`S3Store`]) are Components whose
-//! on_add hooks auto-insert the type-erased currencies: a [`BlobStore`], and a
+//! insert hooks derive the type-erased currencies: a [`BlobStore`], and a
 //! `TableStore` (through the `json` blob adapter, or natively for a table
 //! backend like DynamoDB), so a consumer resolves either from the entity
-//! without naming a backend.
+//! without naming a backend. Every store is selected by a `StoreUri` and
+//! built through `StoreProvider::from_uri`, the one place a uri becomes a
+//! backend.
 //!
 //! # Example
 //!
@@ -69,6 +71,9 @@ mod document_blob;
 mod document_store;
 #[cfg(feature = "std")]
 mod store_ref;
+// the uri -> concrete component seam every store construction goes through.
+#[cfg(feature = "std")]
+mod store_provider;
 #[cfg(feature = "std")]
 mod table;
 // the scene fork: a `template_serde` document in a store, the serde form
@@ -85,6 +90,8 @@ pub use document_blob::*;
 pub(crate) use document_store::*;
 #[cfg(all(feature = "template_serde", feature = "json"))]
 pub use scene_blob::*;
+#[cfg(feature = "std")]
+pub use store_provider::*;
 #[cfg(feature = "std")]
 pub use store_ref::*;
 #[cfg(feature = "std")]

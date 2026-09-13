@@ -15,7 +15,7 @@ use web_sys::IdbTransactionMode;
 /// with a single object store keyed by [`SmolPath`] strings.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct IndexedDbStore {
 	/// The IndexedDB database name.
 	db_name: SmolStr,

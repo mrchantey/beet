@@ -53,11 +53,9 @@ pub async fn PruneVersions(
 				let (_, stack) = stacks.root(entity)?;
 				let repo = repos
 					.find(entity)?
-					.map(|repo| {
-						BlobStore::from_uri(repo.root(), AbsPathBuf::new(".")?)
-					})
+					.map(|repo| BlobStore::from_uri(repo.root()))
 					.transpose()?;
-				(stacks.deployment().artifacts_client(&stack), repo).xok()
+				(stacks.deployment().artifacts_client(&stack)?, repo).xok()
 			},
 		)
 		.await??;

@@ -9,7 +9,7 @@ use js_sys::wasm_bindgen::JsCast;
 /// Uses `store:<store_name>:<path>` as the localStorage key prefix.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct LocalStorageStore {
 	/// The store name used as part of the localStorage key prefix.
 	store_name: SmolStr,

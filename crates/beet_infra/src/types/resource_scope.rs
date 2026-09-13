@@ -152,7 +152,6 @@ impl RenderScope {
 		let variables = self.variables.clone();
 		let (stack, deployment, config) = self.finish()?;
 		terra::Project::new_with_variables(stack, deployment, config, variables)
-			.xok()
 	}
 
 	/// The resolved identity every rendered name composes from.

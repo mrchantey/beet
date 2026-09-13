@@ -1,7 +1,7 @@
 //! Cross-platform model fetch with on-device caching.
 //!
-//! Web targets cache in IndexedDB; native targets cache to disk under
-//! the OS temp directory. The single public entry point is [`fetch_bytes`].
+//! Browsers cache in IndexedDB; every host with a filesystem caches under
+//! `target/stores`. The single public entry point is [`fetch_bytes`].
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// Cache lookups happen first; on a miss the bytes are downloaded over
 /// HTTP and written back to the cache before returning.
 pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
-	let store = cache_store();
+	let store = cache_store()?;
 	let key = cache_key(url);
 
 	if store.exists(&key).await.unwrap_or(false) {
@@ -36,14 +36,10 @@ pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>> {
 
 const STORE_NAME: &str = "beet_ml_cache";
 
-fn cache_store() -> BlobStore {
-	cfg_if! {
-		if #[cfg(not(target_arch = "wasm32"))] {
-			BlobStore::new(FsStore::new(AbsPathBuf::new_workspace_rel(format!("target/{STORE_NAME}")).unwrap()))
-		} else if #[cfg(target_arch = "wasm32")] {
-			BlobStore::new(IndexedDbStore::new(STORE_NAME))
-		}
-	}
+/// The cache is the host's local store named [`STORE_NAME`]: a workspace
+/// directory where there is a filesystem, IndexedDB in a browser.
+fn cache_store() -> Result<BlobStore> {
+	BlobStore::from_uri(&ServiceAccess::local_store_uri(STORE_NAME))
 }
 
 /// Hash the URL to keep cache keys short and filesystem-safe.

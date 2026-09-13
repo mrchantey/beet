@@ -41,13 +41,13 @@ pub async fn StackTeardown(
 	let state_path = deployment.backend_path(&project);
 	let [state, lock, artifacts, work_dir] = StackTeardown::CARRIERS;
 
+	let store = backend.store()?;
 	// the tofu state object
-	report(state, backend.provider().remove(&state_path).await);
+	report(state, store.remove(&state_path).await);
 	// the native S3 lock beside it, left by an interrupted run
 	report(
 		lock,
-		backend
-			.provider()
+		store
 			.remove(&SmolPath::new(format!("{state_path}.tflock")))
 			.await,
 	);

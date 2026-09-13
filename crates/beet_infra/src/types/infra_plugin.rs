@@ -52,8 +52,9 @@ impl Plugin for InfraPlugin {
 		// ..and the runtime half of every store declaration: one observer on
 		// the erased half attaching the live store, so the deploy meaning (the
 		// render systems) and the runtime meaning hang off the one entity the
-		// markup declared, whatever kind of store it is. On every target: a
-		// kind this build has no backend for errors at attach, with guidance.
+		// markup declared, whatever kind of store it is (a bucket, a table, a
+		// bare uri). On every target: a kind this build has no backend for
+		// errors at attach, with guidance.
 		app.add_observer(crate::blocks::attach_store);
 
 		// the deploy `Variable` + its value resolution, a field of the blocks'
@@ -90,11 +91,6 @@ impl Plugin for InfraPlugin {
 						.in_set(DeployRenderSet::Render),
 				),
 			);
-
-		// ..and the runtime half of a table declaration, whose store is not a
-		// blob store and so attaches by its own observer.
-		#[cfg(feature = "bindings_aws_dynamo")]
-		app.add_observer(crate::blocks::attach_table_store);
 
 		// the serverless function, so a stack authors `<LambdaBlock
 		// label="rollup"/>` from markup rather than only from Rust.

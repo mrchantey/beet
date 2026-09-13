@@ -23,20 +23,21 @@ impl Project {
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
-	) -> Self {
+	) -> Result<Self> {
 		Self::new_with_variables(stack, deployment, config, Vec::new())
 	}
 
 	/// A project that also knows the variables its blocks declared, which is
 	/// what lets `plan` and `apply` be truthful about content values rather than
-	/// falling through to a default.
+	/// falling through to a default. Errors when this build has no backend for
+	/// the deployment's artifact store.
 	pub fn new_with_variables(
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
 		variables: Vec<crate::types::Variable>,
-	) -> Self {
-		let artifacts = deployment.artifacts_client(&stack);
+	) -> Result<Self> {
+		let artifacts = deployment.artifacts_client(&stack)?;
 		Self {
 			config,
 			stack,
@@ -44,6 +45,7 @@ impl Project {
 			artifacts,
 			variables,
 		}
+		.xok()
 	}
 
 	/// Resolve every declared variable that is resource CONTENT, ie one whose
@@ -134,7 +136,9 @@ impl Project {
 	fn dir(&self) -> AbsPathBuf { self.work_dir() }
 
 	/// The blob holding this project's tofu state.
-	pub fn state_file(&self) -> Blob { self.deployment.state_file(&self.stack) }
+	pub fn state_file(&self) -> Result<Blob> {
+		self.deployment.state_file(&self.stack)
+	}
 
 	/// The state backend this project's state lives in.
 	fn backend(&self) -> &StackBackend { self.deployment.backend() }

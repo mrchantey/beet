@@ -11,7 +11,7 @@ use bytes::Bytes;
 /// The default store is relative to the workspace root.
 #[derive(Debug, Clone, Component, Reflect, Get)]
 #[reflect(Component, Default)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct FsStore {
 	/// The full path to the store directory. Coerces from a workspace-relative
 	/// string attribute in markup, ie `<FsStore path="assets"/>`.

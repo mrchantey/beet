@@ -12,7 +12,7 @@ use bytes::Bytes;
 /// The DynamoDB client is lazily constructed and cached by region using a [`LazyPool`].
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = on_add_dynamo)]
+#[component(on_insert = on_insert_dynamo)]
 pub struct DynamoStore {
 	/// The DynamoDB table name (maps to "store name" in the storage abstraction).
 	table_name: SmolStr,
@@ -60,6 +60,28 @@ impl DynamoStore {
 	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
+	}
+
+	/// The store a `dynamo://<table>[/<prefix>][?region=..]` uri names, see
+	/// [`StoreUri::Dynamo`].
+	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
+		let StoreUri::Dynamo {
+			table,
+			prefix,
+			region,
+		} = uri
+		else {
+			bevybail!("store `{uri}` is not a dynamo:// table");
+		};
+		let store = match region {
+			Some(region) => Self::new(table.clone(), region.clone()),
+			None => Self::new_default_region(table.clone()),
+		};
+		match prefix {
+			Some(prefix) => store.with_subdir(SmolPath::new(prefix.as_str())),
+			None => store,
+		}
+		.xok()
 	}
 
 	/// Get or create a DynamoDB client for this provider's region.
@@ -161,9 +183,9 @@ impl DynamoStore {
 /// then the [`TableStore`] wrapping this provider directly, so its native
 /// document form wins over the json-over-blobs table the blob hook
 /// materializes under `json`.
-fn on_add_dynamo(mut world: DeferredWorld, cx: HookContext) {
-	BlobStore::on_add::<DynamoStore>(world.reborrow(), cx);
-	TableStore::on_add::<DynamoStore>(world, cx);
+fn on_insert_dynamo(mut world: DeferredWorld, cx: HookContext) {
+	BlobStore::on_insert::<DynamoStore>(world.reborrow(), cx);
+	TableStore::on_insert::<DynamoStore>(world, cx);
 }
 
 /// Convert an SDK error to a [`BevyError`] carrying the full error chain.

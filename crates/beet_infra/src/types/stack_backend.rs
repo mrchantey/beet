@@ -41,49 +41,50 @@ impl StackBackend {
 		}
 	}
 
-	pub fn provider(&self) -> Box<dyn BlobStoreProvider> {
+	/// The uri of the state store itself: the local state directory, or the
+	/// state bucket in its region.
+	pub fn uri(&self) -> StoreUri {
 		match self {
-			#[allow(unused)]
-			Self::S3(s3) => {
-				cfg_if! {
-					if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-						s3.provider().box_clone()
-					} else {
-						panic!("aws feature is required for S3 backend provider usage")
-					}
-				}
-			}
-			Self::Local(local) => local.provider().box_clone(),
+			Self::Local(local) => local.uri(),
+			Self::S3(s3) => s3.uri(),
 		}
 	}
 
-	/// A provider for a named bucket in this backend's provider family: a
-	/// sibling directory of the local state for [`Self::Local`], an S3 bucket
-	/// in `region` for [`Self::S3`].
-	pub fn bucket_provider(
+	/// The uri of a named bucket in this backend's provider family: a sibling
+	/// directory of the local state for [`Self::Local`], an S3 bucket in
+	/// `region` for [`Self::S3`].
+	pub fn bucket_uri(&self, bucket: &str, region: &SmolStr) -> StoreUri {
+		match self {
+			Self::Local(local) => StoreUri::Fs {
+				path: Some(local.path.join(bucket).to_string().into()),
+			},
+			Self::S3(_) => StoreUri::S3 {
+				bucket: bucket.into(),
+				prefix: None,
+				endpoint: None,
+				region: Some(region.clone()),
+			},
+		}
+	}
+
+	/// The state store, see [`uri`](Self::uri). Errors without a compiled
+	/// backend for it, ie an S3 state backend in an `aws_sdk`-free build.
+	pub fn store(&self) -> Result<BlobStore> {
+		BlobStore::from_uri(&self.uri())
+	}
+
+	/// The store of a named bucket, see [`bucket_uri`](Self::bucket_uri).
+	pub fn bucket_store(
 		&self,
 		bucket: &str,
-		#[allow(unused)] region: &SmolStr,
-	) -> Box<dyn BlobStoreProvider> {
-		match self {
-			Self::S3(_) => {
-				cfg_if! {
-					if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-						Box::new(beet_net::prelude::S3Store::new(bucket, region.clone()))
-					} else {
-						panic!("the `aws_sdk` feature is required for an S3 bucket provider")
-					}
-				}
-			}
-			Self::Local(local) => {
-				Box::new(FsStore::new(local.path.join(bucket)))
-			}
-		}
+		region: &SmolStr,
+	) -> Result<BlobStore> {
+		BlobStore::from_uri(&self.bucket_uri(bucket, region))
 	}
 
 	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
 	pub async fn ensure_exists(&self) -> Result {
-		self.provider().store_try_create().await
+		self.store()?.store_try_create().await
 	}
 
 	/// Clear stale lock files if the backend supports it.
@@ -98,9 +99,9 @@ impl StackBackend {
 
 	/// Remove this backend bucket if its empty
 	pub async fn remove_if_empty(&self) -> Result {
-		let provider = self.provider();
-		if provider.store_is_empty().await? {
-			provider.store_remove().await?;
+		let store = self.store()?;
+		if store.store_is_empty().await? {
+			store.store_remove().await?;
 		}
 		Ok(())
 	}
@@ -130,7 +131,12 @@ impl LocalBackend {
 		let state_path = self.path.join(key).to_string();
 		value!({ "local": { "path": state_path } })
 	}
-	pub fn provider(&self) -> FsStore { FsStore::new(self.path.clone()) }
+	/// The state directory as a store uri.
+	pub fn uri(&self) -> StoreUri {
+		StoreUri::Fs {
+			path: Some(self.path.to_string().into()),
+		}
+	}
 	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
 	pub fn clear_stale_locks(&self) {
 		if let Ok(entries) =
@@ -162,12 +168,14 @@ pub struct S3Backend {
 }
 
 impl S3Backend {
-	#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-	pub fn provider(&self) -> beet_net::prelude::S3Store {
-		beet_net::prelude::S3Store::new(
-			self.bucket.clone(),
-			self.region.clone(),
-		)
+	/// The state bucket, pinned to its region, as a store uri.
+	pub fn uri(&self) -> StoreUri {
+		StoreUri::S3 {
+			bucket: self.bucket.clone(),
+			prefix: None,
+			endpoint: None,
+			region: Some(self.region.clone()),
+		}
 	}
 }
 

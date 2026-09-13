@@ -12,8 +12,10 @@ use beet_net::prelude::*;
 /// Mirrors [`S3BucketBlock`](crate::prelude::S3BucketBlock): the declaration
 /// carries only its `label`, and the `<app>--<stage>--<label>` name composes at
 /// resolution through the ancestor [`Stack`]. The deploy creates the table from
-/// that name and the runtime attaches a store for the same name off the same
-/// entity, so there is one declaration and nothing to keep in agreement.
+/// that name, and as a [`StoreBlock`] its erased root is the `dynamo://` uri
+/// of the same name, so the one runtime attach lands a [`DynamoStore`] (its
+/// hook a table-native `TableStore`) remotely and the host's local stand-in
+/// locally: one declaration and nothing to keep in agreement.
 ///
 /// Authored directly from markup, ie
 /// `<DynamoTableBlock bx:ref="analytics" label="analytics"/>`.
@@ -21,8 +23,8 @@ use beet_net::prelude::*;
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
 #[reflect(Component, Default)]
-#[component(immutable, on_insert = ErasedBlock::on_insert::<Self>,
-	on_remove = ErasedBlock::on_remove
+#[component(immutable, on_insert = ErasedStoreBlock::on_insert::<Self>,
+	on_remove = ErasedStoreBlock::on_remove
 )]
 pub struct DynamoTableBlock {
 	/// The unprefixed table label (eg `analytics`).
@@ -91,71 +93,17 @@ impl DynamoTableBlock {
 	}
 }
 
-/// Observer: attach the runtime meaning of a declared table, a store provider
-/// materializing the [`TableStore`] a consumer reaches through
-/// [`StoreRef`]. Registered by [`InfraPlugin`] rather than hooked on the
-/// component, on every target: a build without a backend for the table's kind
-/// errors with guidance here rather than carrying no store.
-///
-/// [`ServiceAccess::Remote`] (a deployed process) resolves the DynamoDB table
-/// the deploy created; [`ServiceAccess::Local`] backs the same declaration with
-/// the host's local store ([`ServiceAccess::local_store_uri`]), so one markup
-/// declaration runs both ways. The concrete provider is inserted rather than an
-/// erased `BlobStore`, since its own hook lands the `TableStore`.
-///
-/// Deferred through the command queue because the ancestry a scope resolves
-/// against lands with the rest of the scene, after this insertion.
-pub(crate) fn attach_table_store(
-	ev: On<Add, DynamoTableBlock>,
-	mut commands: Commands,
-) {
-	commands.entity(ev.entity).queue(
-		|mut entity: EntityWorldMut| -> Result {
-			let block = entity.get_or_else::<DynamoTableBlock>()?.clone();
-			let stack = entity
-				.with_state::<StackQuery, _>(|entity, stacks| {
-					stacks.resolve(entity)
-				});
-			match BootstrapConfig::get().service_access {
-				ServiceAccess::Remote => {
-					cfg_if! {
-						if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
-							entity.insert(beet_net::prelude::DynamoStore::new(
-								block.table_name(&stack),
-								block.resolved_region(&stack),
-							));
-						} else {
-							bevybail!(
-								"the table declared as `{}` resolves to the remote `{}`, but this binary has no `aws_sdk` backend to reach it",
-								block.label(),
-								block.table_name(&stack)
-							);
-						}
-					}
-				}
-				ServiceAccess::Local => {
-					match ServiceAccess::local_store_uri(block.label()) {
-						StoreUri::Fs { path: Some(path) } => {
-							entity.insert(FsStore::new(AbsPathBuf::new(path.as_str())?));
-						}
-						// browser storage is one database for every declaration
-						#[cfg(target_arch = "wasm32")]
-						StoreUri::IndexedDb => {
-							entity.insert(
-								IndexedDbStore::new("beet")
-									.with_subdir(block.label().clone()),
-							);
-						}
-						other => bevybail!(
-							"the table declared as `{}` has no local backend for `{other}`",
-							block.label()
-						),
-					}
-				}
-			}
-			Ok(())
-		},
-	);
+impl StoreBlock for DynamoTableBlock {
+	/// The composed table name pinned to the region the declaration resolved,
+	/// so the process a deploy hands it to reaches the table the deploy
+	/// created.
+	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
+		StoreUri::Dynamo {
+			table: self.table_name(stack).into(),
+			prefix: None,
+			region: Some(self.resolved_region(stack)),
+		}
+	}
 }
 
 impl Block for DynamoTableBlock {
@@ -271,6 +219,28 @@ mod test {
 				DynamoTableBlock::ACCESS_KIND,
 				stack.resource_name("analytics"),
 			)]);
+	}
+
+	/// The declaration's erased root is the table uri a remote process
+	/// attaches, the composed name pinned to the resolved region, so the
+	/// generic store attach serves a table exactly as it serves a bucket.
+	#[beet_core::test]
+	fn projects_a_dynamo_root() {
+		let mut world = World::new();
+		world.init_resource::<PackageConfig>();
+		let stack = world
+			.spawn((Stack::new("app").with_stage("prod"), children![
+				DynamoTableBlock::new("analytics")
+			]))
+			.id();
+		world.flush();
+		let entity = world.entity(stack).get::<Children>().unwrap()[0];
+		world
+			.get::<ErasedStoreBlock>(entity)
+			.unwrap()
+			.root()
+			.to_string()
+			.xpect_contains("dynamo://app--prod--analytics?region=");
 	}
 
 	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`

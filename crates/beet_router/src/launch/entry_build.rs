@@ -131,16 +131,22 @@ pub async fn probe_entry_names(
 	Ok(None)
 }
 
-/// Build the [`BlobStore`] a `--repo` [`StoreUri`] names, defaulting to a
-/// filesystem store rooted at `dir` (the resolved entry directory). Shared by
-/// the binary's entry resolution (the launch config's `--repo`) and the
+/// Build the [`BlobStore`] a `--repo` [`StoreUri`] names, its filesystem root
+/// pinned to `dir` (the resolved entry directory, see [`StoreUri::rooted_at`])
+/// and defaulting to a filesystem store there. Shared by the binary's entry
+/// resolution (the launch config's `--repo`) and the
 /// `check`/`serve`/`export-static` commands (each command's own `--repo`
 /// param) so every entry load is store-driven rather than filesystem-bound.
 pub fn resolve_repo_store(
 	repo_uri: Option<&StoreUri>,
 	dir: AbsPathBuf,
 ) -> Result<BlobStore> {
-	BlobStore::from_uri(repo_uri.unwrap_or(&StoreUri::default()), dir)
+	repo_uri
+		.cloned()
+		.unwrap_or_default()
+		.rooted_at(&dir)?
+		.xref()
+		.xmap(BlobStore::from_uri)
 }
 
 /// The entry sources read from a store: the entry document bytes + name, its

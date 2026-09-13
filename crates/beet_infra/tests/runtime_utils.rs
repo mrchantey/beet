@@ -125,7 +125,7 @@ impl TestDeploy {
 	}
 
 	pub fn artifacts_client(&self) -> ArtifactsClient {
-		self.deployment.artifacts_client(&self.resolved())
+		self.deployment.artifacts_client(&self.resolved()).unwrap()
 	}
 }
 
@@ -153,6 +153,14 @@ pub fn render_test_project(
 	RenderScope::render(&mut world, root)?.project()
 }
 
+/// The deploy-versioned uri of the assets bucket, exactly as its declaration
+/// projects it.
+pub fn assets_uri(deploy: &TestDeploy) -> StoreUri {
+	ErasedStoreBlock::new(&assets_bucket_block(), &deploy.resolved())
+		.store_uri(Some(deploy.deployment.deploy_id()))
+		.unwrap()
+}
+
 /// Create the S3FsStore for syncing local assets to S3.
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
 pub fn assets_s3_fs_store(
@@ -161,19 +169,13 @@ pub fn assets_s3_fs_store(
 ) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
-		assets_bucket_block()
-			.store(&deploy.resolved(), Some(deploy.deployment.deploy_id()))
-			.unwrap(),
+		S3Store::from_uri(&assets_uri(deploy)).unwrap(),
 	)
 }
 
 /// Get the deploy-versioned assets store for verification.
 pub fn assets_store(deploy: &TestDeploy) -> BlobStore {
-	BlobStore::new(
-		assets_bucket_block()
-			.store(&deploy.resolved(), Some(deploy.deployment.deploy_id()))
-			.unwrap(),
-	)
+	BlobStore::from_uri(&assets_uri(deploy)).unwrap()
 }
 
 /// Re-apply terraform with the current ledger deploy_id.

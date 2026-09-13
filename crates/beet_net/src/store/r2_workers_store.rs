@@ -20,7 +20,7 @@ use std::cell::RefCell;
 /// so this never actually crosses a thread.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = BlobStore::on_add::<Self>)]
+#[component(on_insert = BlobStore::on_insert::<Self>)]
 pub struct R2WorkersStore {
 	/// The R2 binding name, as declared in `wrangler.toml`.
 	binding: SmolStr,

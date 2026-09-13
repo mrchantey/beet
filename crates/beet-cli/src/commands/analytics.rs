@@ -5,14 +5,14 @@ use beet::prelude::*;
 #[derive(Reflect, Default)]
 #[reflect(Default)]
 struct AnalyticsParams {
-	/// Directory of a local analytics store (default: `target/stores/analytics`).
-	dir: Option<String>,
-	/// Query the remote (cloud) analytics store instead of a local directory.
-	remote: Option<bool>,
-	/// The remote raw-segment bucket name, used with `--remote`.
-	bucket: Option<String>,
-	/// A separate bucket or directory holding the daily aggregates, which
-	/// otherwise share the raw store.
+	/// The analytics store as a store uri, ie
+	/// `fs:target/stores/my-app--dev--analytics` or
+	/// `s3://my-app--prod--analytics`, for a report over a store no declaration
+	/// binds. Absent, the report reads the declaration its `StoreRef` names,
+	/// local or remote by `--service-access`.
+	store: Option<String>,
+	/// A separate store holding the daily aggregates, as a store uri. Absent,
+	/// the `RollupStoreRef` declaration, else the raw store itself.
 	rollup: Option<String>,
 	/// Report only the raw events, skipping the aggregates the long history
 	/// lives in.
@@ -22,18 +22,21 @@ struct AnalyticsParams {
 /// Summarize collected analytics: what kinds of clients connected, the pages they
 /// viewed, and for how long.
 ///
-/// Reads a local analytics directory (an [`FsStore`], the same one a dev server
-/// writes) by default, or the live cloud store with `--remote`. The one query
-/// surface over both stores.
+/// Reads the stores its `StoreRef` / `RollupStoreRef` relations bind, exactly
+/// as the middleware that writes them and the job that compacts them do, so
+/// the one declaration answers every reader and `--service-access=remote`
+/// turns the same report onto the cloud store. A store uri names one directly,
+/// for a tool with no declaration in reach.
 ///
 /// Two keyspaces form one report: daily [`AnalyticsRollup`] rows carry the
 /// compacted history, while uncompacted segments carry the live tail. A date is
 /// read from exactly one source.
 ///
 /// ```sh
-/// beet analytics summary                          # local target/stores/analytics
-/// beet analytics summary --dir /data/analytics    # a specific directory
-/// beet analytics summary --remote --bucket my-site--prod--analytics
+/// beet --main=site analytics summary                          # the site's declared store
+/// beet --main=site --service-access=remote analytics summary  # the same declaration, deployed
+/// beet analytics summary --store fs:target/stores/beet-site--dev--analytics
+/// beet analytics summary --store s3://beet-site--prod--analytics
 /// ```
 #[action(route = "analytics/*args")]
 #[derive(Component, Reflect)]
@@ -41,37 +44,44 @@ struct AnalyticsParams {
 #[require(ParamsPartial = ParamsPartial::new::<AnalyticsParams>())]
 pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	let parts = cx.input.request_parts();
+	let world = cx.caller.world().clone();
 
 	// the raw segments and the aggregate rows, both json over blobs and both in
 	// ONE store by default: segments own `analytics/raw/`, aggregates own
 	// `analytics/rollup/`, so the single `<S3BucketBlock label="analytics"/>`
-	// the deploy provisions holds them both. `--rollup` names a store keeping
-	// the aggregates apart, for a deployment whose refs point at two
-	// declarations.
-	let (store, rollups) = if parts.has_param("remote") {
-		let Some(bucket) = parts.get_param("bucket") else {
-			bevybail!(
-				"`--remote` requires `--bucket <bucket-name>`, ie `my-app--prod--analytics`"
-			);
-		};
-		(
-			AnalyticsStore::remote(bucket)?,
-			BlobStore::remote(parts.get_param("rollup").unwrap_or(bucket))?,
-		)
-	} else {
-		let dir = match parts.get_param("dir") {
-			Some(dir) => AbsPathBuf::new(dir)?,
-			None => ServiceAccess::local_store_dir("analytics").into_abs(),
-		};
-		let rollup_dir = match parts.get_param("rollup") {
-			Some(rollup) => AbsPathBuf::new(rollup)?,
-			None => dir.clone(),
-		};
-		(
-			AnalyticsStore::local(dir),
-			BlobStore::new(FsStore::new(rollup_dir)),
-		)
+	// the deploy provisions holds them both. `--rollup` or a `RollupStoreRef`
+	// names a store keeping the aggregates apart.
+	let store = match parts.get_param("store") {
+		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
+		None => match cx
+			.caller
+			.get::<StoreRef, _>(|store_ref| store_ref.store())
+			.await
+		{
+			Ok(target) => {
+				StoreRef::resolve::<BlobStore>(&world, target).await?
+			}
+			Err(_) => bevybail!(
+				"no analytics store: pass `--store <uri>` (`fs:<dir>`, \
+				 `s3://<bucket>`), or mount the report beside its declaration, \
+				 ie `<AnalyticsReport {{StoreRef($analytics)}}/>`"
+			),
+		},
 	};
+	let rollups = match parts.get_param("rollup") {
+		Some(uri) => BlobStore::from_uri(&StoreUri::parse(uri)?)?,
+		None => match cx
+			.caller
+			.get::<RollupStoreRef, _>(|store_ref| store_ref.0)
+			.await
+		{
+			Ok(target) => {
+				StoreRef::resolve::<BlobStore>(&world, target).await?
+			}
+			Err(_) => store.clone(),
+		},
+	};
+	let store = AnalyticsStore::new(store);
 	let rollups = AnalyticsRollup::table(rollups);
 
 	// a store that was never written to (no analytics collected yet) reads as
@@ -105,9 +115,12 @@ async fn read_table<T: TableStoreRow>(table: &Table<T>) -> Result<Vec<T>> {
 mod test {
 	use super::*;
 
-	async fn report(args: &str) -> String {
+	/// Run the report mounted with `extra` beside it, asserting success.
+	async fn report(extra: impl Bundle, args: &str) -> String {
 		let mut world = crate::commands::render_world();
-		let host = world.spawn((Router, children![AnalyticsReport])).id();
+		let host = world
+			.spawn((Router, children![(AnalyticsReport, extra)]))
+			.id();
 		let response = world
 			.entity_mut(host)
 			.call::<Request, Response>(
@@ -126,7 +139,32 @@ mod test {
 	async fn summarizes_empty_store() {
 		let temp = TempDir::new().unwrap();
 		let dir = AbsPathBuf::new(temp.path()).unwrap();
-		report(&format!("analytics summary --dir {dir}"))
+		report((), &format!("analytics summary --store fs:{dir}"))
+			.await
+			.as_str()
+			.xpect_contains("0 events");
+	}
+
+	/// Mounted beside a declaration, the report reads the store the
+	/// declaration attached, with nothing named on the command line.
+	#[beet::test]
+	async fn reads_the_declared_store() {
+		let temp = TempDir::new().unwrap();
+		let dir = AbsPathBuf::new(temp.path()).unwrap();
+		let mut world = crate::commands::render_world();
+		let declared = world.spawn(FsStore::new(dir)).id();
+		let host = world
+			.spawn((Router, children![(AnalyticsReport, StoreRef(declared))]))
+			.id();
+		world
+			.entity_mut(host)
+			.call::<Request, Response>(
+				Request::from_cli_args(CliArgs::parse("analytics summary"))
+					.with_header::<header::Accept>(vec![MediaType::Text]),
+			)
+			.await
+			.unwrap()
+			.unwrap_str()
 			.await
 			.as_str()
 			.xpect_contains("0 events");
@@ -140,7 +178,8 @@ mod test {
 	async fn reads_segments_and_rollups_from_one_store() {
 		let temp = TempDir::new().unwrap();
 		let dir = AbsPathBuf::new(temp.path()).unwrap();
-		let raw = AnalyticsStore::local(dir.clone());
+		let store = BlobStore::new(FsStore::new(dir.clone()));
+		let raw = AnalyticsStore::new(store.clone());
 		let recent =
 			AnalyticsEvent::new("/recent", AnalyticsEventData::PageView {
 				duration_ms: 1_000,
@@ -159,13 +198,12 @@ mod test {
 				client: default(),
 			});
 		old.timestamp -= 2 * 86_400_000;
-		let rollups =
-			AnalyticsRollup::table(BlobStore::new(FsStore::new(dir.clone())));
+		let rollups = AnalyticsRollup::table(store);
 		for row in AnalyticsRollup::from_events(&[old]) {
 			rollups.push(row).await.unwrap();
 		}
 
-		report(&format!("analytics summary --dir {dir}"))
+		report((), &format!("analytics summary --store fs:{dir}"))
 			.await
 			.as_str()
 			.xpect_contains("2 events: 2 page views");

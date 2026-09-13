@@ -482,8 +482,10 @@ mod test {
 				..default()
 			}))
 			.xpect_eq("bucket-example--dev--my-bucket");
-		attached_local_dir(&mut world)
-			.xpect_eq(ServiceAccess::local_store_dir("my-bucket").into_abs());
+		attached_local_dir(&mut world).xpect_eq(
+			ServiceAccess::local_store_dir("bucket-example--dev--my-bucket")
+				.into_abs(),
+		);
 	}
 
 	/// A block declared under an explicit `<Stack>` resolves THAT stack, through
@@ -591,11 +593,11 @@ mod test {
 			.single(&world)
 			.unwrap()
 			.bucket_name(&scope)
-			.xpect_eq(expected);
+			.xpect_eq(expected.as_str());
 		// ..which locally is backed by a workspace directory rather than the
 		// remote bucket
 		attached_local_dir(&mut world)
-			.xpect_eq(ServiceAccess::local_store_dir("analytics").into_abs());
+			.xpect_eq(ServiceAccess::local_store_dir(&expected).into_abs());
 	}
 
 	/// The analytics compaction stack the site entry declares end to end: the
@@ -806,8 +808,10 @@ mod test {
 					.resolve(&PackageConfig::default()),
 			)
 			.xpect_eq("beet-site--shared--assets");
-		attached_local_dir(&mut world)
-			.xpect_eq(ServiceAccess::local_store_dir("assets").into_abs());
+		attached_local_dir(&mut world).xpect_eq(
+			ServiceAccess::local_store_dir("beet-site--shared--assets")
+				.into_abs(),
+		);
 		// ..and so did the syncs, which name the bucket by label alone
 		world
 			.query::<&S3FsStore>()

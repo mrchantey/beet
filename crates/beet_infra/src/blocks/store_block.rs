@@ -26,18 +26,24 @@ pub trait StoreBlock: Block {
 }
 
 /// The erased half of any [`StoreBlock`], beside its [`ErasedBlock`]: the root
-/// uri resolved against the declaration's stack and the versioning flag,
-/// inserted by [`on_insert`](Self::on_insert) and removed with the block.
+/// uri resolved against the declaration's stack, the local stand-in for the
+/// same declaration, and the versioning flag, inserted by
+/// [`on_insert`](Self::on_insert) and removed with the block.
 ///
 /// The ROOT rather than a per-deploy uri, because the deploy id is a property
 /// of the launch and may change within it (`<AdoptCurrentDeploy/>` points a
 /// content sync at the live version): a consumer applies the id it holds
-/// through [`store_uri`](Self::store_uri).
+/// through [`store_uri`](Self::store_uri). Both uris are total, so the store
+/// a process attaches is nothing but [`runtime_uri`](Self::runtime_uri) built.
 #[derive(Debug, Clone, PartialEq, Get, Component)]
 #[component(immutable)]
 pub struct ErasedStoreBlock {
 	/// The store's root, see [`StoreBlock::store_uri`].
 	root: StoreUri,
+	/// The local stand-in for the same declaration
+	/// ([`ServiceAccess::local_store_uri`]), keyed by the composed resource
+	/// name so it is exactly as distinct per app and stage as the root.
+	local: StoreUri,
 	/// See [`StoreBlock::deploy_versioned`].
 	deploy_versioned: bool,
 }
@@ -47,6 +53,9 @@ impl ErasedStoreBlock {
 	pub fn new(block: &impl StoreBlock, stack: &ResolvedStack) -> Self {
 		Self {
 			root: block.store_uri(stack),
+			local: ServiceAccess::local_store_uri(
+				&stack.resource_name(block.label().clone()),
+			),
 			deploy_versioned: block.deploy_versioned(),
 		}
 	}
@@ -61,6 +70,23 @@ impl ErasedStoreBlock {
 				self.root.with_subdir(deploy_id.to_string())
 			}
 			_ => self.root.clone().xok(),
+		}
+	}
+
+	/// The store a process running under `access` attaches for this
+	/// declaration: [`Remote`](ServiceAccess::Remote) reads
+	/// [`store_uri`](Self::store_uri), exactly the uri a deploy bakes;
+	/// [`Local`](ServiceAccess::Local) reads the host's stand-in. The ONE place
+	/// the two-way choice is made, so a declaration runs both ways without any
+	/// consumer knowing there are two.
+	pub fn runtime_uri(
+		&self,
+		access: ServiceAccess,
+		deploy_id: Option<&Uuid>,
+	) -> Result<StoreUri> {
+		match access {
+			ServiceAccess::Remote => self.store_uri(deploy_id),
+			ServiceAccess::Local => self.local.clone().xok(),
 		}
 	}
 
@@ -104,19 +130,18 @@ impl ErasedStoreBlock {
 	}
 }
 
-/// Observer: attach the runtime meaning of a declared store. A remote process
-/// gets the store the erased uri names, rooted at this launch's deploy version
-/// when the store is versioned, which is exactly the uri a deploy bakes for
-/// it; a local process gets the host's local stand-in
-/// ([`ServiceAccess::local_store_uri`]), so one declaration runs both ways
-/// whatever its kind. Both go through [`BlobStore::from_uri`], on every
-/// target: a store kind this build has no backend for errors with guidance
-/// here rather than silently carrying no store.
+/// Observer: attach the runtime meaning of a declared store, the concrete
+/// provider the declaration's [`ErasedStoreBlock::runtime_uri`] names under
+/// this launch's [`ServiceAccess`], built through [`StoreProvider::from_uri`]
+/// on every target: a store kind this build has no backend for errors with
+/// guidance here rather than silently carrying no store. The provider's own
+/// hook lands the erased [`BlobStore`] (and table) beside it.
 ///
 /// Registered by [`InfraPlugin`] rather than hooked on the component, and on
 /// the erased half rather than a block type, so a store block defined anywhere
-/// attaches without being named here. Deferred through the command queue
-/// because the erased half itself lands through it.
+/// (a bucket, a table, a bare uri) attaches without being named here.
+/// Deferred through the command queue because the erased half itself lands
+/// through it.
 pub(crate) fn attach_store(
 	ev: On<Insert, ErasedStoreBlock>,
 	mut commands: Commands,
@@ -125,26 +150,13 @@ pub(crate) fn attach_store(
 		.entity(ev.entity)
 		.queue(|mut entity: EntityWorldMut| -> Result {
 			let store = entity.get_or_else::<ErasedStoreBlock>()?.clone();
-			let label = entity.get_or_else::<ErasedBlock>()?.label.clone();
-			let uri = match BootstrapConfig::get().service_access {
-				ServiceAccess::Remote => {
-					let deploy_id =
-						entity.with_state::<StackQuery, _>(|_, stacks| {
-							stacks.deploy_id()
-						});
-					store.store_uri(Some(&deploy_id))?
-				}
-				ServiceAccess::Local => {
-					ServiceAccess::local_store_uri(label.as_str())
-				}
-			};
-			let store = BlobStore::from_uri(&uri, AbsPathBuf::new(".")?)?;
-			// browser storage is one database for every declaration
-			let store = match uri {
-				StoreUri::IndexedDb => store.with_subdir(label.as_str().into()),
-				_ => store,
-			};
-			entity.insert(store);
+			let deploy_id = entity
+				.with_state::<StackQuery, _>(|_, stacks| stacks.deploy_id());
+			let uri = store.runtime_uri(
+				BootstrapConfig::get().service_access,
+				Some(&deploy_id),
+			)?;
+			StoreProvider::from_uri(&uri)?.insert(&mut entity);
 			Ok(())
 		});
 }
@@ -172,8 +184,10 @@ mod test {
 	}
 
 	/// The runtime half attaches on every target: under the default
-	/// [`ServiceAccess::Local`] the declaration lands the host's local store,
-	/// whatever kind the deploy names.
+	/// [`ServiceAccess::Local`] the declaration lands the host's local
+	/// stand-in as a concrete provider, whatever kind the deploy names, keyed
+	/// by the composed resource name, and the provider's hook derives the
+	/// erased store beside it.
 	#[beet_core::test]
 	fn attaches_a_local_store() {
 		let mut world = InfraPlugin.into_world();
@@ -183,7 +197,33 @@ mod test {
 			StoreUriBlock::new("docs", StoreUri::Memory),
 		);
 		world.flush();
+		world.get::<FsStore>(entity).unwrap().path().xpect_eq(
+			ServiceAccess::local_store_dir("app--prod--docs").into_abs(),
+		);
 		world.get::<BlobStore>(entity).xpect_some();
+	}
+
+	/// The two-way choice lives on the erased half: remote is the declared
+	/// root (versioned when the store is), local is the stand-in.
+	#[beet_core::test]
+	fn runtime_uri_picks_by_service_access() {
+		let mut world = world();
+		let entity = spawn_store(
+			&mut world,
+			StoreUriBlock::new("repo", StoreUri::parse("s3://bucket").unwrap())
+				.with_deploy_versioned(true),
+		);
+		let erased = world.get::<ErasedStoreBlock>(entity).unwrap();
+		let deploy_id = uuid_ext::now_v7();
+		erased
+			.runtime_uri(ServiceAccess::Remote, Some(&deploy_id))
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("s3://bucket/{deploy_id}"));
+		erased
+			.runtime_uri(ServiceAccess::Local, Some(&deploy_id))
+			.unwrap()
+			.xpect_eq(ServiceAccess::local_store_uri("app--prod--repo"));
 	}
 
 	/// The erased half is the store's ROOT; the per-deploy prefix is applied by

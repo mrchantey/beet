@@ -47,8 +47,8 @@ that compacts the analytics stores is reachable by nothing but its timer, and
 the site's own router is a different url space entirely.
 
     beet --main=site jobs                        # the job host, over http
-    beet analytics summary                       # aggregates + the recent raws
-    beet analytics summary --remote --bucket beet-site--prod--analytics
+    beet --main=site analytics summary           # aggregates + the recent raws, from the declared store
+    beet --main=site --stage=prod --service-access=remote analytics summary
 
 ## The served site
 
@@ -261,6 +261,10 @@ stack's state bucket).
 			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
 		</Router>
 	</Route>
+	<!-- the report over the declared analytics store, so `beet --main=site
+	     analytics summary` reads exactly what the served site wrote, locally
+	     or (`--service-access=remote`) deployed. -->
+	<AnalyticsReport {StoreRef($analytics)}/>
 	<!-- the stage stack: every resource the running site needs, then the verbs
 	     that provision them behind the one `bx:cfg`. The stores stay outside
 	     it: the served binary reaches them by `bx:ref`, and an excluded

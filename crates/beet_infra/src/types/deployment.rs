@@ -110,15 +110,20 @@ impl Deployment {
 
 	/// Create an artifacts client for `stack`'s artifact store, in the same
 	/// provider family as the state backend: local state stores artifacts in a
-	/// sibling directory, remote state a store in the stack's region.
-	pub fn artifacts_client(&self, stack: &ResolvedStack) -> ArtifactsClient {
-		let provider = self
-			.backend
-			.bucket_provider(&self.artifact_store_name(stack), stack.region());
+	/// sibling directory, remote state a store in the stack's region. Errors
+	/// when this build has no backend for that family.
+	pub fn artifacts_client(
+		&self,
+		stack: &ResolvedStack,
+	) -> Result<ArtifactsClient> {
 		ArtifactsClient::new(
-			BlobStore::new(provider),
+			self.backend.bucket_store(
+				&self.artifact_store_name(stack),
+				stack.region(),
+			)?,
 			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),
 		)
+		.xok()
 	}
 
 	/// Initialize `stack`'s config with the corresponding backend and state
@@ -131,10 +136,8 @@ impl Deployment {
 	}
 
 	/// The blob holding `stack`'s tofu state.
-	pub fn state_file(&self, stack: &ResolvedStack) -> Blob {
-		self.backend
-			.provider()
-			.erased_blob(self.backend_path(stack))
+	pub fn state_file(&self, stack: &ResolvedStack) -> Result<Blob> {
+		self.backend.store()?.blob(self.backend_path(stack)).xok()
 	}
 
 	/// A deploy with a local backend and a temporary work directory for testing.

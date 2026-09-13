@@ -210,7 +210,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Create an artifacts client for the stack at the given entity.
 	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
 		let (_, stack) = self.root(entity)?;
-		self.deployment().artifacts_client(&stack).xok()
+		self.deployment().artifacts_client(&stack)
 	}
 
 	/// Get the [`BlobStore`] component from this entity.

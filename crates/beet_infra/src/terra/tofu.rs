@@ -9,7 +9,6 @@
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;
-#[cfg(feature = "aws_sdk")]
 use beet_net::prelude::*;
 
 /// Irreversibly remove the backend, destroying the tofu state for **all applications**.
@@ -18,16 +17,8 @@ pub async fn dangerously_destroy_backend(backend: &StackBackend) -> Result {
 		StackBackend::Local(local) => {
 			fs_ext::remove_async(local.path()).await?;
 		}
-		#[allow(unused)]
-		StackBackend::S3(s3) => {
-			cfg_if! {
-				if #[cfg(feature = "aws_sdk")] {
-					s3.provider()
-						.store_remove().await?;
-				} else {
-					bevybail!("S3 backend support requires the `aws` feature flag")
-				}
-			}
+		StackBackend::S3(_) => {
+			backend.store()?.store_remove().await?;
 		}
 	}
 	Ok(())

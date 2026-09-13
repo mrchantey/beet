@@ -47,7 +47,7 @@ pub async fn LifecycleProbe(
 	// state file and bucket dont exist yet, we are pre-apply.
 	info!(
 		"📦 State file exists: {}",
-		project.state_file().exists().await?
+		project.state_file()?.exists().await?
 	);
 	info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
@@ -56,7 +56,7 @@ pub async fn LifecycleProbe(
 
 	info!(
 		"📦 State File exists: {}",
-		project.state_file().exists().await?
+		project.state_file()?.exists().await?
 	);
 	info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 
@@ -77,7 +77,7 @@ pub async fn LifecycleProbe(
 
 	info!(
 		"📦 State file exists: {}",
-		project.state_file().exists().await?
+		project.state_file()?.exists().await?
 	);
 	info!("🪣 BlobStore Exists: {}", store.store_exists().await?);
 

@@ -37,18 +37,6 @@ impl AnalyticsStore {
 		}
 	}
 
-	/// The local analytics store at `dir`, as used by `beet analytics`.
-	#[cfg(feature = "fs")]
-	pub fn local(dir: AbsPathBuf) -> Self {
-		Self::new(BlobStore::new(FsStore::new(dir)))
-	}
-
-	/// The remote S3 analytics store at `bucket_name`, using the SDK's default
-	/// region provider chain. Errors without the native `aws_sdk` backend.
-	pub fn remote(bucket_name: &str) -> Result<Self> {
-		Self::new(BlobStore::remote(bucket_name)?).xok()
-	}
-
 	/// Buffers an event, flushing when the configured size is reached.
 	///
 	/// A failed write restores every unwritten event to the buffer so a later age,
@@ -518,7 +506,7 @@ mod test {
 	}
 
 	#[derive(Clone, Component)]
-	#[component(on_add = BlobStore::on_add::<Self>)]
+	#[component(on_insert = BlobStore::on_insert::<Self>)]
 	struct FailingStore {
 		attempts: Arc<AtomicUsize>,
 	}
