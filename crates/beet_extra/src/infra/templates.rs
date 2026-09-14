@@ -396,6 +396,34 @@ mod test {
 			.unwrap()
 	}
 
+	/// The Worker example declares its repo store on the Worker block itself:
+	/// the deploy action beside it bakes `BEET_REPO=r2://<binding>` into the
+	/// wrangler `vars`, so the Worker boots from the binding wrangler bound with
+	/// no binding name in Rust.
+	#[beet_core::test]
+	fn the_worker_example_bakes_its_repo_store() {
+		let source = fs_ext::read_to_string(
+			WsPath::new("examples/infra/cloudflare_workers.bsx").into_abs(),
+		)
+		.unwrap();
+		let mut world = test_world();
+		world.init_resource::<PackageConfig>();
+		let router = world.spawn(Router::with_defaults()).id();
+		spawn_markup(&mut world, router, &source);
+		let action = world
+			.query_filtered::<Entity, With<CloudflareWorkerDeployAction>>()
+			.single(&world)
+			.unwrap();
+		world
+			.with_state::<RepoStoreQuery, _>(|repos| repos.bootstrap(action))
+			.unwrap()
+			.to_env()
+			.xpect_eq(vec![(
+				SmolStr::new("BEET_REPO"),
+				SmolStr::new("r2://SITE_BUCKET"),
+			)]);
+	}
+
 	/// The stores the served site reaches by `bx:ref` are declared OUTSIDE every
 	/// `bx:cfg`-excluded branch of the entry, so the lean binary still binds
 	/// them.

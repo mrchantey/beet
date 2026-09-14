@@ -108,9 +108,12 @@ pub(crate) fn deploy_subdir(
 /// [`SyncS3Bucket`] reads. Deferred through the command queue because the
 /// ancestry a scope resolves against lands with the rest of the scene.
 ///
-/// The bucket IDENTITY only (its name and region): the per-deploy prefix a
-/// versioned bucket nests under is resolved by [`deploy_subdir`] when the sync
-/// runs, since it is not yet known here.
+/// The bucket IDENTITY only (its name and region), spelled by the declaration
+/// ([`S3BucketBlock::store_uri`]) rather than recomposed here: a throwaway
+/// block under the sync's own stack, since an overridden `stage`/`region`
+/// addresses a bucket under another stack, which no label lookup here can
+/// reach. The per-deploy prefix a versioned bucket nests under is resolved by
+/// [`deploy_subdir`] when the sync runs, since it is not yet known here.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,
@@ -125,13 +128,86 @@ pub(crate) fn attach_dir_sync_store(
 					stacks.resolve(entity)
 				})
 				.xmap(|stack| sync.stack(stack));
+			let uri =
+				S3BucketBlock::new(sync.bucket().clone()).store_uri(&stack);
 			entity.insert(S3FsStore::new(
-				FsStore::new(WsPath::new(sync.local_dir().to_string())),
-				S3Store::new(
-					stack.resource_name(sync.bucket().clone()),
-					stack.region().clone(),
-				),
+				FsStore::new(sync.local_dir()),
+				S3Store::from_uri(&uri)?,
 			));
 			Ok(())
 		});
+}
+
+#[cfg(all(test, feature = "aws_sdk", not(target_arch = "wasm32")))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// A stack declaring `bucket` beside a sync of it, returning the sync's
+	/// entity and the declaration's root uri.
+	fn declared_sync(
+		stack: Stack,
+		bucket: S3BucketBlock,
+		sync: DirSync,
+	) -> (World, Entity, StoreUri) {
+		let mut world = InfraPlugin.into_world();
+		world.init_resource::<PackageConfig>();
+		let stack = world.spawn((stack, children![bucket, sync])).id();
+		world.flush();
+		let children = world.entity(stack).get::<Children>().unwrap();
+		let (bucket, sync) = (children[0], children[1]);
+		let root = world
+			.get::<ErasedStoreBlock>(bucket)
+			.unwrap()
+			.root()
+			.clone();
+		(world, sync, root)
+	}
+
+	/// The attached S3 end is the bucket the declaration names, spelled by the
+	/// same [`StoreBlock::store_uri`], so the sync cannot address a bucket the
+	/// deploy did not create.
+	#[beet_core::test]
+	fn attaches_the_declared_bucket() {
+		let (world, sync, root) = declared_sync(
+			Stack::new("app")
+				.with_stage("prod")
+				.with_region("eu-west-1"),
+			S3BucketBlock::new("assets"),
+			DirSync::new("assets", "site"),
+		);
+		let attached = world.get::<S3FsStore>(sync).unwrap().s3_store();
+		root.name().xpect_eq(Some("app--prod--assets"));
+		attached
+			.bucket_name()
+			.as_str()
+			.xpect_eq(root.name().unwrap());
+		attached
+			.region()
+			.clone()
+			.xpect_eq(Some(SmolStr::new("eu-west-1")));
+	}
+
+	/// A `stage`/`region` override addresses the same label under another
+	/// stack, composed through the same declaration.
+	#[beet_core::test]
+	fn overrides_address_another_stack() {
+		let (world, sync, _) = declared_sync(
+			Stack::new("app").with_stage("prod"),
+			S3BucketBlock::new("assets"),
+			DirSync::new("assets", "site")
+				.with_stage("shared")
+				.with_region("ap-southeast-2"),
+		);
+		let attached = world.get::<S3FsStore>(sync).unwrap().s3_store();
+		attached
+			.bucket_name()
+			.as_str()
+			.xpect_eq("app--shared--assets");
+		attached
+			.region()
+			.clone()
+			.xpect_eq(Some(SmolStr::new("ap-southeast-2")));
+	}
 }

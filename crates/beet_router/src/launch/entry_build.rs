@@ -83,6 +83,101 @@ pub async fn resolve_in_repo_store(
 	})
 }
 
+/// Resolve the entry [`BlobStore`], the entry document name within it, and the
+/// local directory to watch for dev live reload (`None` when the store has no
+/// local root, ie a self-rooted store). The one launch resolution every
+/// world-owning driver runs: the binary's `Startup` loader and the wasm
+/// Worker, each handing in the `--repo`/`--main` its process config carries.
+///
+/// Resolution order:
+/// 1. a self-rooted `repo_uri` (`s3://<bucket>`, `r2://<binding>`,
+///    `indexed-db://<db>`): the store roots itself, so `main` names the entry
+///    document *within* it, defaulting to an [`ENTRY_NAMES`] probe. A deployed
+///    task passes `--repo=s3://<bucket>` (deploy config as args, not env).
+/// 2. `main=<path>`: the entry file itself (a recognized extension) or a
+///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
+/// 3. otherwise: discovery walks the cwd and its ancestors through an `fs`
+///    store for the first [`ENTRY_NAMES`] match.
+///
+/// Every path then resolves through [`resolve_in_repo_store`], so an entry's
+/// `<RepoRoot src>` declaration rebases any store kind uniformly (an fs store
+/// re-roots, a self-rooted store takes a key-prefix view or fails loudly on a
+/// mis-publish). The [`StoreUri`] selects the backend (default `fs`).
+///
+/// Target-agnostic: wasm runs the same walk wherever the runtime has a
+/// filesystem (deno/node through the runner's fs globals); a fs-less runtime
+/// errors with guidance (the browser never reaches here, reading its DOM
+/// program instead).
+pub async fn resolve_entry(
+	repo_uri: Option<&StoreUri>,
+	main: Option<&str>,
+) -> Result<ResolvedEntry> {
+	// a self-rooted store: no local dir and no ancestor walk, so `main` is a
+	// key within the store, defaulting to the entry-name probe.
+	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
+		let repo_store = BlobStore::from_uri(uri)?;
+		let entry_name = self_rooted_entry_name(&repo_store, main).await?;
+		return resolve_in_repo_store(repo_store, entry_name).await;
+	}
+
+	// dir-rooted: an explicit `main`, else the ancestor walk. On wasm the `fs`
+	// store reads through the runner's fs globals, so a fs-less runtime cannot
+	// resolve a dir-rooted entry at all.
+	#[cfg(target_arch = "wasm32")]
+	if !js_runtime::environment().has_fs() {
+		bevybail!(
+			"this runtime has no filesystem: pass a self-rooted `--repo` \
+			(s3://<bucket>, r2://<binding>, indexed-db://<db>)"
+		);
+	}
+	match main {
+		Some(main) => resolve_main(repo_uri, main).await,
+		None => discover_entry(repo_uri).await,
+	}
+}
+
+/// The entry document a self-rooted store serves: `main` when the launch names
+/// one, else the first [`ENTRY_NAMES`] match at the store's root, erroring with
+/// guidance on none. Shared by [`resolve_entry`] and a driver that heads the
+/// document between builds (the Worker's version check).
+pub async fn self_rooted_entry_name(
+	repo_store: &BlobStore,
+	main: Option<&str>,
+) -> Result<String> {
+	match main {
+		Some(main) => main.to_string(),
+		None => probe_entry_names(repo_store).await?.ok_or_else(|| {
+			bevyhow!(
+				"no entry document found in the `--repo` backend: looked \
+				for {ENTRY_NAMES:?}. Seed one, or pass `--main=<name>`."
+			)
+		})?,
+	}
+	.xok()
+}
+
+/// Walk the cwd and its ancestors for the first [`ENTRY_NAMES`] match, resolving
+/// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
+/// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
+/// a filesystem walk makes sense; the matched entry may still rebase its own
+/// root ([`resolve_in_repo_store`]), and no match errors with guidance.
+async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
+	let start = AbsPath::new(".")?;
+	let mut dir = Some(start.clone());
+	while let Some(current) = dir {
+		let repo_store = BlobStore::new(FsStore::new(current.clone()));
+		if let Some(entry_name) = probe_entry_names(&repo_store).await? {
+			let repo_store = resolve_repo_store(repo_uri, current)?;
+			return resolve_in_repo_store(repo_store, entry_name).await;
+		}
+		dir = current.parent();
+	}
+	bevybail!(
+		"no entry document found: looked for {ENTRY_NAMES:?} in `{start}` and \
+		its ancestors. Create a `main.bsx` or pass `--main=<path>`."
+	)
+}
+
 /// Resolve an explicit entry path (the binary's `--main`, a command's `<entry>`
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
@@ -284,9 +379,9 @@ pub fn build_root(
 	Ok(root)
 }
 
-/// Build an entry into an owned world and settle it to readiness: read the
-/// sources through `store`, build the root, then drive the async runtime until
-/// every pending set drains ([`TemplatePending::settle_owned`]), so
+/// Build a resolved entry into an owned world and settle it to readiness: read
+/// the sources through its store, build the root, then drive the async runtime
+/// until every pending set drains ([`TemplatePending::settle_owned`]), so
 /// `<RoutesDir>`/`<TemplateDir>` scans land before the caller serves. The
 /// world-owning driver path (the wasm Worker, a one-shot build); an in-app caller
 /// settles via [`TemplatePending::settle`] instead. Returns the entry root.
@@ -296,17 +391,14 @@ pub fn build_root(
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub async fn build_entry_owned(
 	world: &mut World,
-	repo_store: BlobStore,
-	entry_name: String,
+	resolved: ResolvedEntry,
 ) -> Result<Entity> {
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	// the shared resolution: the entry's `<RepoRoot>` rebases the bucket view
-	// exactly as it does every other store kind.
 	let ResolvedEntry {
 		repo_store,
 		entry_name,
 		prescan,
-	} = resolve_in_repo_store(repo_store, entry_name).await?;
+	} = resolved;
 	let sources =
 		read_sources(&repo_store, formats, entry_name, prescan).await?;
 	let root = build_root(

@@ -18,7 +18,9 @@ repository.workspace = true
 default = ["bindings_aws_common", "bindings_aws_dynamo"]
 bindings_generator = ["tokens","prettyplease","beet_core/tokens"]
 tokens = ["proc-macro2", "quote", "syn"]
-aws_sdk = ["beet_net/aws_sdk"]
+# The S3/Dynamo runtime backends. Pulls the bucket declaration: a `<DirSync>`
+# spells its S3 end through `S3BucketBlock::store_uri`.
+aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
 deploy = ["beet_router", "dep:base64"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
 # it for dispatch.

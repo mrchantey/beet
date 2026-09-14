@@ -239,7 +239,10 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::CloudflareR2Sync>()
 			.register_type::<crate::prelude::CloudflareBench>()
 			.register_type::<crate::prelude::CloudflareWatch>()
-			.register_type::<crate::prelude::CloudflareDestroy>();
+			.register_type::<crate::prelude::CloudflareDestroy>()
+			.register_type::<crate::prelude::CloudflareWorkerBuildAction>()
+			.register_type::<crate::prelude::CloudflareWorkerDeployAction>()
+			.register_type::<crate::prelude::CloudflareContainerDeployAction>();
 
 		// the tofu apply action + its layer settings (`<TofuApply layer="storage"/>`),
 		// and the zone edge setup/purge (the whole `actions` module is gated on

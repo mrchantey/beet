@@ -19,8 +19,7 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-
-/// Default Workers compatibility date stamped into generated `wrangler.jsonc`.
+use std::collections::BTreeMap;
 
 /// Where the `build` verb publishes the deployable wasm Worker artifacts
 /// (`index.js`, `index_bg.wasm`, `package.json`), workspace-relative. `deploy`
@@ -415,7 +414,7 @@ pub async fn CloudflareWorkerDeployAction(
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
 	ensure_worker_artifacts().await?;
 	let dir = wrangler_ext::project_dir(block.name())?;
-	write_worker_wrangler(&dir, &block)?;
+	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
 
 	wrangler_r2_create(block.bucket()).await?;
 	wrangler_ext::deploy(&dir, None).await?;
@@ -427,10 +426,35 @@ pub async fn CloudflareWorkerDeployAction(
 	Pass(cx.input).xok()
 }
 
+/// The Worker's `vars`: the boot config the deploy bakes, ie the stack's repo
+/// store ([`RepoStoreQuery::bootstrap`], the block itself) under the names the
+/// runtime parses, exactly as the lambda and lightsail blocks bake theirs; then
+/// the block's own, resolved against the request.
+async fn worker_vars(
+	cx: &ActionContext<Request>,
+	block: &CloudflareWorkerBlock,
+) -> Result<BTreeMap<SmolStr, SmolStr>> {
+	let mut vars = cx
+		.caller
+		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+			repos.bootstrap(entity)
+		})
+		.await??
+		.to_env()
+		.into_iter()
+		.collect::<BTreeMap<_, _>>();
+	let parts = cx.input.parts();
+	for var in block.env_vars() {
+		vars.insert(var.key().clone(), var.resolve_value(parts)?);
+	}
+	vars.xok()
+}
+
 /// Write [`worker_wrangler_json`] into the wrangler project directory.
 fn write_worker_wrangler(
 	dir: &AbsPath,
 	block: &CloudflareWorkerBlock,
+	vars: &BTreeMap<SmolStr, SmolStr>,
 ) -> Result {
 	// `main` is the prebuilt `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
 	// sibling resolves by relative import). An absolute path outside this wrangler
@@ -439,23 +463,20 @@ fn write_worker_wrangler(
 		AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
 	fs_ext::write(
 		dir.join("wrangler.jsonc"),
-		worker_wrangler_json(block, &main_js.to_string())?,
+		worker_wrangler_json(block, &main_js.to_string(), vars)?,
 	)?;
 	Ok(())
 }
 
 /// `wrangler.jsonc` for the wasm Worker: `main` points at the prebuilt artifacts
 /// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
-/// bound by [`WORKER_R2_BINDING`] and any custom domains the block declares.
+/// bound by the block's [`binding`](CloudflareWorkerBlock::binding), the
+/// `vars` ([`worker_vars`]) and any custom domains the block declares.
 fn worker_wrangler_json(
 	block: &CloudflareWorkerBlock,
 	main_js: &str,
+	vars: &BTreeMap<SmolStr, SmolStr>,
 ) -> Result<String> {
-	let vars = block
-		.env_vars()
-		.iter()
-		.map(|var| (var.key().to_string(), var.key().to_string()))
-		.collect::<std::collections::BTreeMap<_, _>>();
 	// `custom_domain` rather than a route pattern: wrangler then provisions the
 	// zone record and the certificate, so a declared host is reachable over
 	// https with nothing else to publish.
@@ -475,7 +496,7 @@ fn worker_wrangler_json(
 		"compatibility_date": wrangler_ext::COMPATIBILITY_DATE,
 		"compatibility_flags": ["nodejs_compat"],
 		"r2_buckets": [{
-			"binding": WORKER_R2_BINDING,
+			"binding": block.binding(),
 			"bucket_name": block.bucket(),
 		}],
 		"vars": vars,
@@ -657,7 +678,7 @@ pub async fn CloudflareBench(
 	let block =
 		CloudflareWorkerBlock::new(name.clone()).with_bucket(bucket.clone());
 	let dir = wrangler_ext::project_dir(&name)?;
-	write_worker_wrangler(&dir, &block)?;
+	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
 	wrangler_ext::deploy(&dir, None).await?;
 	let redeploy_elapsed = redeploy_start.elapsed();
 
@@ -962,7 +983,7 @@ mod test {
 	#[beet_core::test]
 	fn routes_render_as_custom_domains() {
 		let block = CloudflareWorkerBlock::new("mta-sts");
-		worker_wrangler_json(&block, "index.js")
+		worker_wrangler_json(&block, "index.js", &default())
 			.unwrap()
 			.as_str()
 			.xnot()
@@ -970,11 +991,35 @@ mod test {
 		worker_wrangler_json(
 			&block.with_route("mta-sts.stalwart.beetmash.com"),
 			"index.js",
+			&default(),
 		)
 		.unwrap()
 		.as_str()
 		.xpect_contains("\"pattern\": \"mta-sts.stalwart.beetmash.com\"")
 		.xpect_contains("\"custom_domain\": true");
+	}
+
+	/// The bucket is bound under the block's binding, and the `vars` carry the
+	/// repo store as `BEET_REPO=r2://<binding>`, so the Worker boots from the
+	/// same binding wrangler bound.
+	#[beet_core::test]
+	fn binds_the_bucket_and_bakes_the_repo_store() {
+		let block = CloudflareWorkerBlock::new("hello")
+			.with_bucket("hello-site")
+			.with_binding("SITE");
+		let vars = BootstrapConfig {
+			repo: Some(block.store_uri(&Stack::default().resolve(&default()))),
+			..default()
+		}
+		.to_env()
+		.into_iter()
+		.collect();
+		worker_wrangler_json(&block, "index.js", &vars)
+			.unwrap()
+			.as_str()
+			.xpect_contains("\"binding\": \"SITE\"")
+			.xpect_contains("\"bucket_name\": \"hello-site\"")
+			.xpect_contains("\"BEET_REPO\": \"r2://SITE\"");
 	}
 
 	#[beet_core::test]

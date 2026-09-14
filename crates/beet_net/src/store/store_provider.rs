@@ -39,6 +39,9 @@ pub enum StoreProvider {
 	/// `indexed-db://<db>`.
 	#[cfg(target_arch = "wasm32")]
 	IndexedDb(IndexedDbStore),
+	/// `r2://<binding>`.
+	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+	R2(R2WorkersStore),
 }
 
 /// Apply `$body` to every variant's store, the one match `insert` and
@@ -56,6 +59,8 @@ macro_rules! each_store {
 			StoreProvider::LocalStorage($store) => $body,
 			#[cfg(target_arch = "wasm32")]
 			StoreProvider::IndexedDb($store) => $body,
+			#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+			StoreProvider::R2($store) => $body,
 		}
 	};
 }
@@ -114,6 +119,9 @@ impl StoreProvider {
 					"store `{uri}` is browser storage, only available on wasm"
 				)
 			}
+			#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
+			StoreUri::R2 { .. } => Self::R2(R2WorkersStore::from_uri(uri)?),
+			#[cfg(not(all(target_arch = "wasm32", feature = "cloudflare")))]
 			StoreUri::R2 { .. } => bevybail!(
 				"store `{uri}` is an R2 binding, reachable only from a \
 				 Cloudflare Worker (a wasm build with the `cloudflare` feature)"

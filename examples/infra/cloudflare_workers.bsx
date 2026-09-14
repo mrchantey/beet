@@ -7,12 +7,14 @@ Fargate/Lightsail/Lambda/Containers, wasm here. The Worker reads the site from R
 through the native `worker::Bucket` binding (no S3 credentials at runtime), renders
 per request, and serves on `<name>.workers.dev`.
 
-The two resources are the Worker and the R2 bucket holding the site. The Worker is
-generic: it loads `main.bsx`, `routes/` and `templates/` from R2 and version-checks
-the entry on every request, so a `sync` updates the entire site behavior with no
-redeploy, live on the very next fetch. `build` compiles the wasm once; `deploy`
-uploads that prebuilt artifact (no recompile); `bench` times a `sync` against a
-full rebuild + redeploy.
+The two resources are the Worker and the R2 bucket holding the site, one
+declaration: `<CloudflareWorkerBlock>` is the stack's repo store, so `deploy` bakes
+`BEET_REPO=r2://<binding>` into the Worker's `vars` and the Worker boots from it
+exactly as a native binary boots from `--repo`. The Worker is generic: it loads
+`main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
+request, so a `sync` updates the entire site behavior with no redeploy, live on the
+very next fetch. `build` compiles the wasm once; `deploy` uploads that prebuilt
+artifact (no recompile); `bench` times a `sync` against a full rebuild + redeploy.
 
 ## Usage
 

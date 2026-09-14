@@ -61,7 +61,7 @@ impl ArgvPassthrough {
 /// The app then stays alive until something writes `AppExit`, so nothing is held by
 /// hand here. A failed resolve/build logs and exits with an error rather than
 /// panicking. Target-agnostic: every runtime builds the same way, differing only
-/// in how [`resolve_entry`] finds the store.
+/// in how [`entry_build::resolve_entry`] finds the store.
 ///
 /// The binary's own [`CrateRegistration`] is NOT spawned here: it names the
 /// binary's cargo features, which only the binary knows, so it spawns its own
@@ -102,8 +102,16 @@ fn load_entry(world: &mut World) {
 			}
 			return;
 		}
+		// the wasm runner forwards the *module's* flags on this same argv, so a
+		// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
+		// carries a `--main`/`--repo` meant for the wasm module, not this native
+		// runner. When acting as the runner (first positional `run-wasm`), drop
+		// them and discover the workspace command entry; the `<RunWasm/>` route
+		// forwards the module's own config on via `ChildProcess::with_bootstrap`.
+		let repo_uri = (!forwards_argv).then(|| config.repo.as_ref()).flatten();
+		let main = (!forwards_argv).then(|| config.main.as_deref()).flatten();
 		// resolve on the runtime, since discovery now awaits the store.
-		let resolved = match resolve_entry(&config, forwards_argv).await {
+		let resolved = match entry_build::resolve_entry(repo_uri, main).await {
 			Ok(resolved) => resolved,
 			Err(err) => {
 				error!("{err}");
@@ -188,79 +196,6 @@ async fn build_entry(
 		.await
 }
 
-/// Resolve the entry [`BlobStore`], the entry document name within it, and the
-/// local directory to watch for dev live reload (`None` when the store has no
-/// local root, ie a self-rooted store).
-///
-/// Resolution order:
-/// 1. a self-rooted `--repo` (`s3://<bucket>`, `indexed-db://<db>`):
-///    the store roots itself, so `--main` names the entry document *within* it,
-///    defaulting to an [`entry_build::ENTRY_NAMES`] probe. A deployed task passes
-///    `--repo=s3://<bucket>` (deploy config as args, not env).
-/// 2. `--main=<path>`: the entry file itself (a recognized extension) or a
-///    directory probed for [`entry_build::ENTRY_NAMES`]; see [`entry_build::resolve_main`].
-/// 3. otherwise: discovery walks the cwd and its ancestors through an `fs` store
-///    for the first [`entry_build::ENTRY_NAMES`] match.
-///
-/// Every path then resolves through [`entry_build::resolve_in_repo_store`], so an
-/// entry's `<RepoRoot src>` declaration rebases any store kind uniformly (an
-/// fs store re-roots, a self-rooted store takes a key-prefix view or fails
-/// loudly on a mis-publish). The config's [`StoreUri`] selects the backend
-/// (default `fs`).
-///
-/// Target-agnostic: wasm runs the same walk wherever the runtime has a
-/// filesystem (deno/node through the runner's fs globals); a fs-less runtime
-/// errors with guidance (the browser never reaches here, reading its DOM program
-/// instead).
-async fn resolve_entry(
-	config: &BootstrapConfig,
-	forwards_argv: bool,
-) -> Result<ResolvedEntry> {
-	// the wasm runner forwards the *module's* flags on this same argv, so a
-	// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
-	// carries a `--main`/`--repo` meant for the wasm module, not this native
-	// runner. When acting as the runner (first positional `run-wasm`), drop them
-	// and discover the workspace command entry; the `<RunWasm/>` route forwards the
-	// module's own config on via `ChildProcess::with_bootstrap`.
-	let repo_uri = (!forwards_argv).then(|| config.repo.as_ref()).flatten();
-	let main = (!forwards_argv).then(|| config.main.as_ref()).flatten();
-
-	// a self-rooted store: no local dir and no ancestor walk, so `--main` is a
-	// key within the store, defaulting to the entry-name probe.
-	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
-		let repo_store = BlobStore::from_uri(uri)?;
-		let entry_name = match main {
-			Some(main) => main.to_string(),
-			None => entry_build::probe_entry_names(&repo_store)
-				.await?
-				.ok_or_else(|| {
-					bevyhow!(
-						"no entry document found in the `--repo` backend: looked \
-					for {:?}. Seed one, or pass `--main=<name>`.",
-						entry_build::ENTRY_NAMES
-					)
-				})?,
-		};
-		return entry_build::resolve_in_repo_store(repo_store, entry_name)
-			.await;
-	}
-
-	// dir-rooted: an explicit `--main`, else the ancestor walk. On wasm the `fs`
-	// store reads through the runner's fs globals, so a fs-less runtime cannot
-	// resolve a dir-rooted entry at all.
-	#[cfg(target_arch = "wasm32")]
-	if !js_runtime::environment().has_fs() {
-		bevybail!(
-			"this runtime has no filesystem: pass a self-rooted `--repo` \
-			(s3://<bucket>, indexed-db://<db>)"
-		);
-	}
-	match main {
-		Some(main) => entry_build::resolve_main(repo_uri, main.as_str()).await,
-		None => discover_entry(repo_uri).await,
-	}
-}
-
 /// The `--features` flag as a [`RequireCfg`]: verify this binary was compiled
 /// with the named cargo features, failing with the full missing list rather
 /// than degrading into unresolved tags. Applies when running an entry (an
@@ -287,31 +222,4 @@ fn features_self_check(
 			.collect::<Vec<_>>()
 			.join(" && "),
 	))
-}
-
-/// Walk the cwd and its ancestors for the first [`entry_build::ENTRY_NAMES`] match, resolving
-/// through an `fs` [`BlobStore`] at each candidate dir (consistent with the store
-/// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
-/// a filesystem walk makes sense; the matched entry may still rebase its own
-/// root ([`entry_build::resolve_in_repo_store`]), and no match errors with guidance.
-async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
-	let start = AbsPath::new(".")?;
-	let mut dir = Some(start.clone());
-	while let Some(current) = dir {
-		let repo_store = BlobStore::new(FsStore::new(current.clone()));
-		if let Some(entry_name) =
-			entry_build::probe_entry_names(&repo_store).await?
-		{
-			let repo_store =
-				entry_build::resolve_repo_store(repo_uri, current)?;
-			return entry_build::resolve_in_repo_store(repo_store, entry_name)
-				.await;
-		}
-		dir = current.parent();
-	}
-	bevybail!(
-		"no entry document found: looked for {:?} in `{start}` and its \
-		ancestors. Create a `main.bsx` or pass `--main=<path>`.",
-		entry_build::ENTRY_NAMES
-	)
 }

@@ -2,7 +2,9 @@
 //!
 //! The wasm branches go through [`js_runtime`], which is a `std` surface, so each
 //! switch names both; a `std`-less wasm build takes the same inert branch a bare
-//! no_std target does.
+//! no_std target does. A js host with no env globals (a browser tab, a Worker)
+//! reads and writes an in-memory map, so config flows through here on every
+//! target that has `std`.
 
 use crate::prelude::*;
 use thiserror::Error;
@@ -13,8 +15,7 @@ pub enum EnvError {
 	/// The requested environment variable was not found.
 	#[error("Environment variable not found: {0}")]
 	NotFound(SmolStr),
-	/// The platform has no process environment to mutate: a no_std target, or a
-	/// js host that defines no env global (a browser, a Cloudflare Worker).
+	/// The platform has no process environment to mutate, ie a no_std target.
 	/// Returned instead of silently succeeding, so a caller that depends on the
 	/// mutation landing can say so.
 	#[error("This platform has no process environment to mutate")]
@@ -31,8 +32,7 @@ pub enum EnvError {
 /// process resolve the same file the same way.
 ///
 /// Errors with [`EnvError::Unsupported`] where there is no environment to load
-/// into: a no_std target, or a js host without env globals (a browser takes its
-/// configuration from the host page, a Worker from its bindings).
+/// into, ie a no_std target; a js host without a filesystem finds no `.env`.
 pub fn load_dotenv() -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(feature = "std")] {
@@ -117,11 +117,9 @@ pub fn args() -> Vec<SmolStr> {
 pub unsafe fn set_var(key: &str, value: &str) -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// presence-checked + safe, so the absent-global case is an error
-			// rather than a trap.
-			return js_runtime::set_env(key, value)
-				.then_some(())
-				.ok_or(EnvError::Unsupported);
+			// the host's env global, else the in-memory fallback
+			js_runtime::set_env(key, value);
+			return Ok(());
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::set_var(key, value); }
 			return Ok(());
@@ -141,11 +139,9 @@ pub unsafe fn set_var(key: &str, value: &str) -> Result<(), EnvError> {
 pub unsafe fn remove_var(key: &str) -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			// presence-checked + safe, so the absent-global case is an error
-			// rather than a trap.
-			return js_runtime::remove_env(key)
-				.then_some(())
-				.ok_or(EnvError::Unsupported);
+			// the host's env global, and the in-memory fallback either way
+			js_runtime::remove_env(key);
+			return Ok(());
 		} else if #[cfg(feature = "std")] {
 			unsafe { std::env::remove_var(key); }
 			return Ok(());
@@ -251,7 +247,7 @@ pub fn vars() -> Vec<(SmolStr, SmolStr)> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
 			// `env_all` already marshals `Object.entries(Deno.env.toObject())`
-			// into native pairs.
+			// (plus the in-memory fallback) into native pairs.
 			return js_runtime::env_all();
 		} else if #[cfg(feature = "std")] {
 			return std::env::vars()

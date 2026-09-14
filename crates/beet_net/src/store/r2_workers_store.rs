@@ -51,6 +51,22 @@ impl R2WorkersStore {
 		}
 	}
 
+	/// The store an `r2://` [`StoreUri`] names, erroring on any other kind: the
+	/// binding is the uri's name, a `path_prefix` roots the store inside the
+	/// bucket.
+	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
+		let StoreUri::R2 { name, path_prefix } = uri else {
+			bevybail!("store `{uri}` is not an r2:// binding");
+		};
+		match path_prefix {
+			Some(path_prefix) => {
+				Self::new(name.clone()).with_subdir(path_prefix.clone())
+			}
+			None => Self::new(name.clone()),
+		}
+		.xok()
+	}
+
 	/// Set the subdirectory prefix for all keys.
 	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());

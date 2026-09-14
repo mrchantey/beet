@@ -246,9 +246,9 @@ impl BootstrapConfig {
 	/// still surfaced through the app's error handler.
 	///
 	/// In a browser [`env_ext::args`] yields the location query, so `?server=http`
-	/// still selects; in a Cloudflare Worker both sources are empty and every field
-	/// resolves to `None`, which is correct (the Worker resolves its repo store from
-	/// bindings).
+	/// still selects; in a Cloudflare Worker argv is empty and the environment
+	/// is the Worker's `vars`, seeded into [`env_ext`] by its entry before this
+	/// first reads, so `BEET_REPO` selects the store exactly as `--repo` does.
 	pub fn from_env() -> Result<Self> {
 		Self::parse(&CliArgs::parse_env().params, &Self::env_var)
 	}

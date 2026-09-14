@@ -23,7 +23,6 @@
 //! build. The handler instead settles the build to readiness
 //! ([`TemplatePending::settle_owned`]) the first time it takes the world.
 
-use crate::prelude::*;
 use beet::prelude::*;
 use std::cell::RefCell;
 

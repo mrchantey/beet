@@ -10,11 +10,16 @@
 //! the host does not define the global the wrapper returns a safe default
 //! (`None`, empty, a no-op) instead of throwing a `ReferenceError`, which on wasm
 //! traps the module and hangs the caller. So a served wasm Worker degrades to
-//! "no process env / no fs" rather than crashing, while the Deno runner keeps its
-//! full surface.
+//! "no fs" rather than crashing, while the Deno runner keeps its full surface.
+//!
+//! The environment is the one surface that never degrades: a host defining no
+//! env globals reads and writes an in-memory map (`FALLBACK_ENV`), so
+//! `env_ext` works in a browser tab and a Worker exactly as on deno, and a
+//! Worker seeds its bindings into it before its first read.
 
 use crate::prelude::*;
 use bevy::platform::sync::OnceLock;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 
 // The raw host globals. Names are load-bearing: `beet_core` dev-depends on itself
@@ -365,48 +370,71 @@ pub fn args() -> Vec<SmolStr> {
 	Vec::new()
 }
 
-/// A single environment variable, ie `Deno.env.get(key)`. `None` where the env
-/// global is absent (a Worker's config is its `worker::Env` bindings, not a
-/// process environment).
+thread_local! {
+	/// The environment of a host defining no env globals (a browser tab, a
+	/// Worker): consulted after the host on a read, written on a set when the
+	/// host has no `set_env`, so a var a caller sets is the var it reads back on
+	/// every js host. The runtime is single-threaded, so a thread-local is the
+	/// isolate-global slot.
+	static FALLBACK_ENV: RefCell<HashMap<SmolStr, SmolStr>> =
+		RefCell::new(HashMap::default());
+}
+
+/// A single environment variable: the host's (`Deno.env.get(key)`) when it
+/// defines one, else the in-memory `FALLBACK_ENV`.
 pub fn env_var(key: &str) -> Option<SmolStr> {
-	if has_global("env_var") {
-		raw::env_var(key).map(SmolStr::from)
+	has_global("env_var")
+		.then(|| raw::env_var(key).map(SmolStr::from))
+		.flatten()
+		.or_else(|| FALLBACK_ENV.with(|env| env.borrow().get(key).cloned()))
+}
+
+/// Set an environment variable, ie `Deno.env.set(key, value)`, into the
+/// in-memory `FALLBACK_ENV` where the host has no environment to mutate.
+pub fn set_env(key: &str, value: &str) {
+	if has_global("set_env") {
+		raw::set_env(key, value);
 	} else {
-		None
+		FALLBACK_ENV.with(|env| {
+			env.borrow_mut().insert(key.into(), value.into());
+		});
 	}
 }
 
-/// Set an environment variable, ie `Deno.env.set(key, value)`, returning whether
-/// the host has an environment to mutate.
-pub fn set_env(key: &str, value: &str) -> bool {
-	has_global("set_env")
-		.then(|| raw::set_env(key, value))
-		.is_some()
-}
-
-/// Remove an environment variable, ie `Deno.env.delete(key)`, returning whether
-/// the host has an environment to mutate.
-pub fn remove_env(key: &str) -> bool {
-	has_global("remove_env")
-		.then(|| raw::remove_env(key))
-		.is_some()
+/// Remove an environment variable, ie `Deno.env.delete(key)`, and from the
+/// in-memory `FALLBACK_ENV` either way.
+pub fn remove_env(key: &str) {
+	if has_global("remove_env") {
+		raw::remove_env(key);
+	}
+	FALLBACK_ENV.with(|env| {
+		env.borrow_mut().remove(key);
+	});
 }
 
 // There is deliberately no `load_dotenv` twin here: `env_ext::load_dotenv` reads
 // through `fs_ext` (ie the fs globals above) and writes through `set_env`, so one
 // implementation and one parser serve every platform.
 
-/// All environment variables as native `(key, value)` pairs, ie
-/// `Object.entries(Deno.env.toObject())`. Empty where unavailable.
+/// All environment variables as native `(key, value)` pairs: the host's
+/// (`Object.entries(Deno.env.toObject())`) followed by the in-memory
+/// `FALLBACK_ENV`, the map's spelling winning on a shared key, as it does on
+/// a single read.
 ///
 /// Parses the host's 2D JS entries array here (skipping any malformed pair), so
 /// callers receive native types rather than a `js_sys::Array` to walk.
 pub fn env_all() -> Vec<(SmolStr, SmolStr)> {
+	let fallback = FALLBACK_ENV.with(|env| {
+		env.borrow()
+			.iter()
+			.map(|(key, value)| (key.clone(), value.clone()))
+			.collect::<Vec<_>>()
+	});
 	if !has_global("env_all") {
-		return Vec::new();
+		return fallback;
 	}
 	let entries = raw::env_all();
-	(0..entries.length())
+	let mut vars = (0..entries.length())
 		.filter_map(|i| {
 			let pair = js_sys::Array::from(&entries.get(i));
 			Some((
@@ -414,7 +442,12 @@ pub fn env_all() -> Vec<(SmolStr, SmolStr)> {
 				SmolStr::from(pair.get(1).as_string()?),
 			))
 		})
-		.collect()
+		.filter(|(key, _)| {
+			!fallback.iter().any(|(fallback_key, _)| fallback_key == key)
+		})
+		.collect::<Vec<_>>();
+	vars.extend(fallback);
+	vars
 }
 
 /// Collect a JS array of strings into native [`SmolStr`]s, skipping any element
@@ -515,5 +548,23 @@ mod test {
 	#[crate::test]
 	fn detects_the_deno_runner() {
 		environment().xpect_eq(JsEnvironment::Deno);
+	}
+
+	// the in-memory env a global-less host reads: a var lands, reads back
+	// through every surface, and leaves on removal. Seeded directly since the
+	// deno runner defines the host globals, which the map sits behind.
+	#[crate::test]
+	fn fallback_env_round_trips() {
+		let key = "BEET_FALLBACK_ENV_TEST";
+		FALLBACK_ENV.with(|env| {
+			env.borrow_mut().insert(key.into(), "1".into());
+		});
+		env_var(key).xpect_eq(Some(SmolStr::new("1")));
+		env_all()
+			.iter()
+			.any(|(name, value)| name == key && value == "1")
+			.xpect_true();
+		remove_env(key);
+		env_var(key).xpect_none();
 	}
 }

@@ -1,15 +1,20 @@
 //! The Cloudflare Worker entry: a wasm `#[event(fetch)]` that serves the no-code
 //! BSX entry from an R2 bucket through the beet render router.
 //!
-//! On each `fetch` the request's [`worker::Env`] is stashed so an
-//! [`R2WorkersStore`] can resolve its live bucket binding, then the per-isolate
-//! [`WorkerWorld`] is built (or reused) and the request is routed through it.
-//! Building is the shared core end to end: the same [`build_app`]
-//! ([`BeetPlugins`] + [`WorkersPlugin`]), the same [`entry_build::probe_entry_names`]
-//! discovery, and the same [`entry_build::build_entry_owned`] build+settle every world-owning
-//! driver uses. The glue that remains here is genuinely platform-specific: the
-//! env binding to store, the worker request/response conversion, and the
-//! per-isolate world cache with version invalidation.
+//! The Worker boots exactly as the native binary does: its process config is
+//! [`BootstrapConfig::get`], read off the environment, which is the Worker's
+//! `vars` seeded into the agnostic env on each `fetch` ([`seed_env`]). The
+//! deploy bakes `BEET_REPO=r2://<binding>` in there
+//! (`RepoStoreQuery::bootstrap` on the `CloudflareWorkerBlock`), so the repo
+//! store is a declaration on the deploy side and a uri on this side, with no
+//! binding name in between. The per-isolate [`WorkerWorld`] is built (or
+//! reused) through the shared core end to end: the same [`build_app`]
+//! ([`BeetPlugins`] + [`WorkersPlugin`]), the same
+//! [`entry_build::resolve_entry`] resolution and the same
+//! [`entry_build::build_entry_owned`] build+settle every world-owning driver
+//! uses. The glue that remains here is genuinely platform-specific: the env
+//! seed, the worker request/response conversion, and the per-isolate world
+//! cache with version invalidation.
 //!
 //! The entry builds into a root carrying the repo store, disarmed via
 //! `DisableCallOnReady` (so its declared servers stay down; the Worker itself
@@ -23,9 +28,8 @@ use worker::Env;
 use worker::Request as WorkerRequest;
 use worker::Response as WorkerResponse;
 use worker::event;
-
-/// The R2 binding name the site bucket is bound to in `wrangler.toml`.
-const SITE_BUCKET_BINDING: &str = "SITE_BUCKET";
+use worker::js_sys;
+use worker::wasm_bindgen::JsCast;
 
 /// The Worker `fetch` handler: route an incoming request through the site world.
 #[event(fetch)]
@@ -36,16 +40,18 @@ async fn fetch(
 ) -> worker::Result<WorkerResponse> {
 	console_error_panic_hook::set_once();
 
-	// stash the env so any `R2WorkersStore` resolves its live bucket binding for
-	// the duration of this invocation.
-	let store = R2WorkersStore::new(SITE_BUCKET_BINDING);
+	// the Worker's config is its `vars`: seed them before the first
+	// `BootstrapConfig::get()` memoizes, then stash the env so any
+	// `R2WorkersStore` resolves its live bucket binding for the duration of this
+	// invocation.
+	seed_env(&env);
 	R2WorkersStore::set_env(env);
 
 	// convert, route, convert back; map any beet error to a 500. `error!` reaches
 	// `wrangler tail`: the site's `LogPlugin` installs a JS-console tracing
 	// subscriber on wasm (see `PrettyTracing`), so the whole stack's diagnostics
 	// surface, not just this entry.
-	match handle(req, store).await {
+	match handle(req).await {
 		Ok(response) => Ok(response),
 		Err(err) => {
 			error!("worker fetch failed: {err}");
@@ -54,25 +60,51 @@ async fn fetch(
 	}
 }
 
+/// Copy every string-valued var off the Worker's [`Env`] into the agnostic
+/// environment, so `env_ext::var("BEET_REPO")` answers in a Worker exactly as
+/// it does natively. Every var, not only `BEET_*`: the env is the process's,
+/// and a site's own actions read theirs through the same surface. A binding
+/// (a bucket, a namespace) is an object and is skipped.
+fn seed_env(env: &Env) {
+	let keys = js_sys::Object::keys(env.unchecked_ref::<js_sys::Object>());
+	for key in (0..keys.length()).filter_map(|i| keys.get(i).as_string()) {
+		if let Some(value) = js_sys::Reflect::get(env, &key.as_str().into())
+			.ok()
+			.and_then(|value| value.as_string())
+		{
+			// SAFETY: the Worker runtime is single-threaded, so nothing reads
+			// the environment concurrently.
+			unsafe { env_ext::set_var(&key, &value) }.ok();
+		}
+	}
+}
+
 /// Convert the request, route it through the (lazily built, version-checked)
 /// entry world, and convert the response back.
-async fn handle(
-	req: WorkerRequest,
-	store: R2WorkersStore,
-) -> Result<WorkerResponse> {
+async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 	let request = worker_to_request(req).await?;
+	let config = BootstrapConfig::get();
 
-	// resolve the entry document through the shared discovery: the first
-	// `entry_build::ENTRY_NAMES` match present in the bucket.
-	let repo_store = BlobStore::new(store.clone());
-	let entry_name = entry_build::probe_entry_names(&repo_store)
-		.await?
-		.ok_or_else(|| {
-			bevyhow!(
-				"no entry document {:?} in the site bucket",
-				entry_build::ENTRY_NAMES
-			)
-		})?;
+	// the store the deploy baked in, the one kind a Worker serves from: its
+	// concrete provider heads the entry for the version check, its erased form
+	// is what the entry resolves through.
+	let repo_uri = config.repo.as_ref().ok_or_else(|| {
+		bevyhow!(
+			"no `BEET_REPO` var: the deploy bakes `r2://<binding>` into the \
+			 Worker's vars"
+		)
+	})?;
+	let StoreProvider::R2(store) = StoreProvider::from_uri(repo_uri)? else {
+		bevybail!(
+			"`BEET_REPO={repo_uri}` is not an `r2://<binding>` uri, the one \
+			 store a Worker serves from"
+		);
+	};
+	let entry_name = entry_build::self_rooted_entry_name(
+		&BlobStore::new(store.clone()),
+		config.main.as_deref(),
+	)
+	.await?;
 
 	// take the per-isolate world out so the exchange can borrow it mutably across
 	// the await.
@@ -86,9 +118,11 @@ async fn handle(
 		.map(|loaded| loaded.version != current_version)
 		.unwrap_or(true);
 	if stale {
-		worker_world = Some(
-			build_worker_world(repo_store, entry_name, current_version).await?,
-		);
+		let resolved =
+			entry_build::resolve_entry(Some(repo_uri), config.main.as_deref())
+				.await?;
+		worker_world =
+			Some(build_worker_world(resolved, current_version).await?);
 	}
 	let mut worker_world = worker_world.expect("world built above");
 
@@ -117,8 +151,7 @@ async fn handle(
 /// start would hit the (wasm-absent) backend and panic. Same disarmed build
 /// `export-static`/`check` use.
 async fn build_worker_world(
-	repo_store: BlobStore,
-	entry_name: String,
+	resolved: ResolvedEntry,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
 	// the same app the native binary builds, plus `WorkersPlugin`'s no-op runner
@@ -128,7 +161,7 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
-	entry_build::build_entry_owned(&mut world, repo_store, entry_name).await?;
+	entry_build::build_entry_owned(&mut world, resolved).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.
 	let host = world
