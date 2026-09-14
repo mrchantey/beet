@@ -3,8 +3,8 @@
 //! [`render_diagnostics`] over it, and aggregate the results.
 //!
 //! Each scene route's own `Action<Request, PageRequest>` builds its content
-//! through the template substrate, so the built tree — incl any [`TemplateError`]
-//! the build rode — is there to scan. Cleanup then mirrors [`PageRoot::render`]:
+//! through the template substrate, so the built tree, incl any [`TemplateError`]
+//! the build rode, is there to scan. Cleanup then mirrors [`PageRoot::render`]:
 //! only the route's [`DespawnAfterRender`] ephemerals are despawned, never the
 //! `content` entity, which for a `BlobScene`/`RoutesDir` route is the persistent
 //! [`RouteTree`] node that every later request reuses.
@@ -54,55 +54,20 @@ impl CheckReport {
 	}
 }
 
-/// A [`CheckReport::check_routes`] pass narrowed for the dev loop, where a
-/// reload may supersede the pass before it finishes.
-///
-/// [`routes`](Self::routes) limits the scan to those route entities: a content
-/// reload knows which files changed, so a markdown edit re-checks its one page
-/// rather than the whole site. [`live`](Self::live) is polled between routes,
-/// ending the pass early once a follow-up reload has respawned the routes under
-/// it, so the half-built routes of a superseded pass are never reported as
-/// errors.
-#[derive(Clone, Default)]
-pub struct CheckScope {
-	/// The route entities to check, every static route when `None`.
-	pub routes: Option<HashSet<Entity>>,
-	/// Whether the pass is still current, polled between routes; a `false`
-	/// ends the pass with no report.
-	pub live: Option<Arc<dyn Fn(&mut World) -> bool + Send + Sync>>,
-}
-
-impl CheckScope {
-	/// Whether the pass is still current, ie its `live` predicate (if any)
-	/// still holds.
-	fn is_live(&self, world: &mut World) -> bool {
-		self.live.as_ref().is_none_or(|live| live(world))
-	}
-
-	/// Whether `route` is within the scope.
-	fn covers(&self, route: Entity) -> bool {
-		self.routes
-			.as_ref()
-			.is_none_or(|routes| routes.contains(&route))
-	}
-}
-
-/// Run [`CheckReport::check_routes_scoped`] over every router in the world and
+/// Run [`CheckReport::check_routes_in`] over every router in the world and
 /// log each [`Diagnostic`] loudly, the dev-serve surfacing path: after a build
 /// (or a `--watch` reload) every render problem prints to the console at its
-/// severity.
+/// severity. `routes` narrows the pass as [`CheckReport::check_routes_in`] does.
 ///
 /// A best-effort console pass: a router that fails to scan is logged and skipped
-/// rather than aborting, so a transient build error never kills the dev loop; a
-/// pass the `scope` reports superseded ends quietly. Returns whether any
-/// error-level diagnostic fired across all routers.
+/// rather than aborting, so a transient build error never kills the dev loop.
 ///
 /// Rides `client_io`'s native-only gate: the live reload loop is its only caller.
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 pub(crate) async fn log_all_render_diagnostics(
 	world: &AsyncWorld,
-	scope: CheckScope,
-) -> bool {
+	routes: Option<HashSet<Entity>>,
+) {
 	let routers = world
 		.with(|world: &mut World| {
 			world
@@ -111,27 +76,17 @@ pub(crate) async fn log_all_render_diagnostics(
 				.collect::<Vec<_>>()
 		})
 		.await;
-	let mut had_error = false;
 	for router in routers {
-		match CheckReport::check_routes_scoped(world, router, scope.clone())
-			.await
+		match CheckReport::check_routes_in(world, router, routes.clone()).await
 		{
-			Ok(Some(report)) => {
-				report.log();
-				had_error |= report.has_errors();
-			}
-			Ok(None) => {
-				debug!("render diagnostics superseded by a newer reload");
-				return had_error;
-			}
+			Ok(report) => report.log(),
 			Err(error) => error!("render-diagnostics scan failed: {error}"),
 		}
 	}
-	had_error
 }
 
 impl CheckReport {
-	/// Render every static route under `root`, run [`render_diagnostics`] over each
+	/// Render every static route under `root`, run `render_diagnostics` over each
 	/// built content tree, and return the aggregated [`CheckReport`].
 	///
 	/// `root` is whatever the caller holds: `beet check` and the exports pass the
@@ -146,29 +101,31 @@ impl CheckReport {
 	/// rather than flagged unknown.
 	///
 	/// The pass opens on `root`'s own structure: an unresolvable tag loads as an
-	/// inert [`UnregisteredTag`] entity in every binary, so this — run by a
-	/// binary that registers everything — is where the typo it might be surfaces
+	/// inert [`UnregisteredTag`] entity in every binary, so this, run by a
+	/// binary that registers everything, is where the typo it might be surfaces
 	/// as an error.
 	pub async fn check_routes(
 		world: &AsyncWorld,
 		root: Entity,
 	) -> Result<CheckReport> {
-		Self::check_routes_scoped(world, root, CheckScope::default())
-			.await
-			.map(Option::unwrap_or_default)
+		Self::check_routes_in(world, root, None).await
 	}
 
-	/// [`Self::check_routes`] narrowed by a [`CheckScope`]: only its routes are
-	/// checked, and `None` is returned when its `live` predicate fails between
-	/// routes (a superseded dev-loop pass).
-	pub async fn check_routes_scoped(
+	/// [`Self::check_routes`] narrowed to the `routes` entities, every static
+	/// route when `None`: a content reload knows which files changed, so a
+	/// markdown edit re-checks its one page rather than the whole site.
+	///
+	/// Each route is checked by its own world task (see `check_route`), so a
+	/// caller cancelled mid-pass (a reload tail superseded by the next reload)
+	/// never orphans a build: the route in flight finishes and cleans up on its
+	/// own, and the cancellation lands between routes.
+	pub async fn check_routes_in(
 		world: &AsyncWorld,
 		root: Entity,
-		scope: CheckScope,
-	) -> Result<Option<CheckReport>> {
+		routes: Option<HashSet<Entity>>,
+	) -> Result<CheckReport> {
 		// the static GET routes worth checking, plus the route tree + config snapshot
 		// every per-route scan validates against, and the document's own inert tags.
-		let entities_scope = scope.clone();
 		let (route_entities, route_tree, config, unregistered) = world
 			.with(move |world: &mut World| -> Result<_> {
 				let route_tree = RouteTree::of(world, root)?.clone();
@@ -180,34 +137,30 @@ impl CheckReport {
 					.flatten_nodes()
 					.into_iter()
 					.filter(|node| {
-						checkable(node) && entities_scope.covers(node.entity)
+						checkable(node)
+							&& routes.as_ref().is_none_or(|routes| {
+								routes.contains(&node.entity)
+							})
 					})
 					.map(|node| (node.entity, node.path.annotated_path()))
 					.collect::<Vec<_>>();
 				let unregistered = unregistered_tags(world, root, &config);
-				Ok((route_entities, route_tree, config, unregistered))
+				Ok((route_entities, Arc::new(route_tree), config, unregistered))
 			})
 			.await?;
 
 		let mut report = CheckReport::default();
 		report.diagnostics.extend(unregistered);
 		for (entity, path) in route_entities {
-			let live_scope = scope.clone();
-			if !world
-				.with(move |world: &mut World| live_scope.is_live(world))
-				.await
-			{
-				return Ok(None);
-			}
-			check_route(
+			let diagnostics = check_route(
 				world,
 				entity,
-				&path,
-				&route_tree,
-				&config,
-				&mut report,
+				path.clone(),
+				route_tree.clone(),
+				config.clone(),
 			)
-			.await?;
+			.await;
+			report.diagnostics.extend(diagnostics);
 			report.checked.push(path);
 		}
 		// a persistent route's content is reachable from both the document scan
@@ -221,7 +174,7 @@ impl CheckReport {
 		report.diagnostics.retain(|diagnostic| {
 			diagnostic.route.is_some() || !routed.contains(&diagnostic.message)
 		});
-		Ok(Some(report))
+		Ok(report)
 	}
 }
 
@@ -262,33 +215,57 @@ fn checkable(node: &ActionNode) -> bool {
 		&& node.is_scene()
 }
 
-/// Build one route's content into a persistent tree, scan it, then despawn it.
+/// Build one route's content into a persistent tree, scan it, then despawn its
+/// ephemerals, returning the route's diagnostics.
 ///
-/// The route's own `Action<Request, PageRequest>` builds the content without
-/// despawning (unlike the full render), so the tree — with any build
-/// [`TemplateError`] — is present to walk. A build failure that surfaces as an
-/// `Err` (rather than riding `TemplateError`) folds in as an unknown-tag error so
-/// it is never silently dropped.
+/// Runs as a world task, cancellation-proof by ownership rather than by a
+/// guard: the build is the route entity's own action task and completes
+/// whatever becomes of this caller, and its [`DespawnAfterRender`] ephemerals
+/// are only known once it resolves, so a caller cancelled mid-build (a reload
+/// tail superseded by the next reload) would orphan them and no drop guard
+/// could release them. The world task always reaches its cleanup instead and
+/// hands the diagnostics back over a oneshot: a cancelled caller drops the
+/// receiver, the route finishes and cleans up on its own, and its result goes
+/// nowhere.
 async fn check_route(
 	world: &AsyncWorld,
 	entity: Entity,
-	path: &RelPath,
-	route_tree: &RouteTree,
-	config: &RenderDiagnostics,
-	report: &mut CheckReport,
-) -> Result {
+	path: RelPath,
+	route_tree: Arc<RouteTree>,
+	config: RenderDiagnostics,
+) -> Vec<Diagnostic> {
+	let (send, recv) = OnceValue::oneshot();
+	world
+		.run_async(move |world| async move {
+			send.signal(
+				build_and_scan(&world, entity, path, route_tree, config).await,
+			);
+		})
+		.await;
+	recv.wait().await
+}
+
+/// The body of [`check_route`]. The route's own `Action<Request, PageRequest>`
+/// builds the content without despawning (unlike the full render), so the
+/// tree, with any build [`TemplateError`], is present to walk; the scan and the
+/// ephemeral cleanup share one world access. A build failure that surfaces as
+/// an `Err` (rather than riding `TemplateError`) folds in as an unknown-tag
+/// error so it is never silently dropped.
+async fn build_and_scan(
+	world: &AsyncWorld,
+	entity: Entity,
+	path: RelPath,
+	route_tree: Arc<RouteTree>,
+	config: RenderDiagnostics,
+) -> Vec<Diagnostic> {
 	let request = Request::get(path.with_leading_slash());
-	let built = world
+	match world
 		.entity(entity)
 		.call::<Request, PageRequest>(request)
-		.await;
-	match built {
+		.await
+	{
 		Ok(PageRequest(content)) => {
-			// the `world.with` closure must be `'static`, so own the snapshots the
-			// scan reads (cloned once per route, not per element).
-			let (route_tree, config) = (route_tree.clone(), config.clone());
-			let route = path.clone();
-			let diagnostics = world
+			world
 				.with(move |world: &mut World| {
 					// re-read the rule set *after* the build, so a `bx:style`/inline
 					// rule this route registered is present and not flagged unknown.
@@ -296,7 +273,7 @@ async fn check_route(
 						.get_resource::<RuleSet>()
 						.cloned()
 						.unwrap_or_default();
-					let out = render_diagnostics(
+					let diagnostics = render_diagnostics(
 						world,
 						content,
 						&route_tree,
@@ -304,50 +281,50 @@ async fn check_route(
 						&config,
 					)
 					.into_iter()
-					.map(|diagnostic| diagnostic.with_route(route.clone()))
+					.map(|diagnostic| diagnostic.with_route(path.clone()))
 					.collect::<Vec<_>>();
-					// clean up exactly what a real render would: the route's
-					// `DespawnAfterRender` ephemerals (a per-request route's whole
-					// tree, a scene route's parsed children), never `content` itself.
-					// For a `BlobScene`/`RoutesDir` route `content` is the *persistent*
-					// route-tree node, so despawning it leaves every `RouteTree` entry
-					// dangling and 500s the next serve/export.
-					let ephemerals = world
-						.get_entity(content)
-						.ok()
-						.and_then(|entity| {
-							entity
-								.get::<DespawnAfterRender>()
-								.map(|despawn| despawn.0.clone())
-						})
-						.unwrap_or_default();
-					for entity in ephemerals {
-						if let Ok(entity) = world.get_entity_mut(entity) {
-							entity.despawn();
-						}
-					}
-					out
+					despawn_ephemerals(world, content);
+					diagnostics
 				})
-				.await;
-			report.diagnostics.extend(diagnostics);
+				.await
 		}
 		// a build that bailed with an `Err` (not riding `TemplateError`) is still a
 		// loud, route-attached unknown-tag error rather than a silent skip.
-		Err(error) => {
-			let severity = config.severity(DiagnosticKind::UnknownTag);
-			if severity != DiagnosticSeverity::Off {
-				report.diagnostics.push(
-					Diagnostic::new(
-						DiagnosticKind::UnknownTag,
-						severity,
-						format!("failed to build route: {error}"),
-					)
-					.with_route(path.clone()),
-				);
-			}
+		Err(error) => match config.severity(DiagnosticKind::UnknownTag) {
+			DiagnosticSeverity::Off => Vec::new(),
+			severity => vec![
+				Diagnostic::new(
+					DiagnosticKind::UnknownTag,
+					severity,
+					format!("failed to build route: {error}"),
+				)
+				.with_route(path),
+			],
+		},
+	}
+}
+
+/// Clean up exactly what a real render would: the route's
+/// [`DespawnAfterRender`] ephemerals (a per-request route's whole tree, a scene
+/// route's parsed children), never `content` itself. For a
+/// `BlobScene`/`RoutesDir` route `content` is the *persistent* route-tree node,
+/// so despawning it leaves every [`RouteTree`] entry dangling and 500s the next
+/// serve/export.
+fn despawn_ephemerals(world: &mut World, content: Entity) {
+	let ephemerals = world
+		.get_entity(content)
+		.ok()
+		.and_then(|entity| {
+			entity
+				.get::<DespawnAfterRender>()
+				.map(|despawn| despawn.0.clone())
+		})
+		.unwrap_or_default();
+	for entity in ephemerals {
+		if let Ok(entity) = world.get_entity_mut(entity) {
+			entity.despawn();
 		}
 	}
-	Ok(())
 }
 
 #[cfg(test)]
@@ -381,6 +358,15 @@ mod test {
 			.unwrap()
 	}
 
+	/// The number of render ephemerals still alive, zero once every checked
+	/// route has been cleaned up.
+	fn ephemerals(world: &mut World) -> usize {
+		world
+			.query_filtered::<(), With<DespawnAfterRender>>()
+			.iter(world)
+			.count()
+	}
+
 	#[beet_core::test]
 	async fn clean_site_has_no_errors() {
 		let mut world = check_world();
@@ -398,12 +384,12 @@ mod test {
 		report.has_errors().xpect_false();
 		// both static scene routes were scanned.
 		report.checked.len().xpect_eq(2);
+		ephemerals(&mut world).xpect_eq(0);
 	}
 
-	/// A scoped pass checks only its routes, and ends with no report once its
-	/// `live` predicate fails (a superseded dev-loop pass).
+	/// A narrowed pass checks only its routes.
 	#[beet_core::test]
-	async fn scope_narrows_and_cancels() {
+	async fn narrows_to_the_given_routes() {
 		let mut world = check_world();
 		let router = world
 			.spawn((Router, children![
@@ -420,33 +406,68 @@ mod test {
 			.find(&["about"])
 			.unwrap()
 			.entity;
-		async fn scoped(
-			world: &mut World,
-			router: Entity,
-			scope: CheckScope,
-		) -> Option<CheckReport> {
-			world
-				.run_async_then(async move |world| {
-					CheckReport::check_routes_scoped(&world, router, scope)
-						.await
-				})
+		world
+			.run_async_then(async move |world| {
+				CheckReport::check_routes_in(
+					&world,
+					router,
+					Some([about].into_iter().collect()),
+				)
 				.await
-				.unwrap()
+			})
+			.await
+			.unwrap()
+			.checked
+			.xpect_eq(vec![RelPath::from("about")]);
+	}
+
+	/// A caller cancelled while a route check is in flight (the reload tail
+	/// superseded by the next reload) leaves nothing behind: the build finishes
+	/// on the route, its ephemerals despawn, and its diagnostics reach nobody.
+	#[beet_core::test]
+	async fn cancelled_mid_route_leaves_no_ephemerals() {
+		let mut world = check_world();
+		// a route whose build parks on a gate the test opens after the cancel,
+		// logging each side of it
+		let (open, gate) = OnceValue::<()>::oneshot();
+		let gate = Store::new(Some(gate));
+		let log = Store::<Vec<&'static str>>::default();
+		let router = world
+			.spawn((Router, children![render_action::async_route(
+				"",
+				move |_cx: ActionContext<Request>| async move {
+					log.push("parked");
+					if let Some(gate) = gate.take() {
+						gate.wait().await;
+					}
+					log.push("built");
+					rsx! { <a href="/does-not-exist">"x"</a> }
+				}
+			)]))
+			.flush();
+		let report = Store::<Option<CheckReport>>::default();
+		let task = world.run_task(move |world| async move {
+			let out = CheckReport::check_routes(&world, router).await.unwrap();
+			report.set(Some(out));
+		});
+		// drive until the pass is parked on the route's build, then cancel it
+		// and open the gate
+		for _ in 0..100 {
+			if log.get() == vec!["parked"] {
+				break;
+			}
+			world.update_local();
+			AsyncRunner::tick(&world).await;
 		}
-		scoped(&mut world, router, CheckScope {
-			routes: Some([about].into_iter().collect()),
-			live: None,
-		})
-		.await
-		.unwrap()
-		.checked
-		.xpect_eq(vec![RelPath::from("about")]);
-		scoped(&mut world, router, CheckScope {
-			routes: None,
-			live: Some(Arc::new(|_| false)),
-		})
-		.await
-		.xpect_none();
+		log.get().xpect_eq(vec!["parked"]);
+		task.cancel();
+		open.signal(());
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		// the build ran to completion, cleaned up, and reported nothing
+		log.get().xpect_eq(vec!["parked", "built"]);
+		report.get().xpect_none();
+		ephemerals(&mut world).xpect_eq(0);
+		world.resource::<AsyncSpawner>().in_flight().xpect_eq(0);
 	}
 
 	#[beet_core::test]
@@ -482,8 +503,8 @@ mod test {
 		report.warn_count().xpect_eq(1);
 	}
 
-	/// An unresolvable tag loads as an inert entity in every binary, so this pass
-	/// — run by a binary that registers everything — is where it surfaces as the
+	/// An unresolvable tag loads as an inert entity in every binary, so this pass,
+	/// run by a binary that registers everything, is where it surfaces as the
 	/// typo it is, even though it sits in the document rather than in any route's
 	/// rendered content.
 	#[beet_core::test]

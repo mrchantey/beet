@@ -89,7 +89,7 @@ impl SiteFixture {
 	/// `--watch` driver path, so its declared `<HttpServer>` boots on
 	/// [`Self::port`] and a structural edit rebuilds the whole scene.
 	async fn serve(&self) -> PageHarness {
-		let dir = self.dir.to_string_lossy().to_string();
+		let dir = self.dir.to_string();
 		let mut page = PageHarness::serve_app(
 			format!("http://127.0.0.1:{}", self.port),
 			move |app| {

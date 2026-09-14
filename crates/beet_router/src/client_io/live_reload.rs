@@ -13,7 +13,6 @@ use beet_net::prelude::*;
 use beet_net::sockets::Message;
 #[cfg(test)]
 use beet_net::sockets::MessageSend;
-use std::sync::Arc;
 
 /// The [`ClientIoBroadcast`] payload instructing clients to reload the page.
 pub(crate) const RELOAD_MESSAGE: &str = "reload";
@@ -22,7 +21,7 @@ pub(crate) const RELOAD_MESSAGE: &str = "reload";
 /// the site [`BlobStore`]). Any change to that store surfaces as a [`BlobEvent`]
 /// (emitted by the store's watcher), which re-registers the site's `templates/`
 /// through the store, respawns every [`RoutesDir`]'s routes, and broadcasts
-/// [`RELOAD_MESSAGE`] over the world's [`ClientIo`] channel (spawned as a child if
+/// `RELOAD_MESSAGE` over the world's [`ClientIo`] channel (spawned as a child if
 /// none exists). The [`LiveReloadScript`](super::LiveReloadScript) widget turns the
 /// broadcast into a browser reload.
 ///
@@ -75,29 +74,15 @@ pub(crate) struct NeedsReload {
 	pub changed: HashSet<RelPath>,
 }
 
-/// Counts the reloads dispatched on a [`LiveReload`] root, so the async tail of
-/// a reload (its render diagnostics) can tell it has been superseded by a newer
-/// one and stop, rather than reporting the routes the newer reload respawned
-/// under it as build errors.
-#[derive(Debug, Default, Component)]
-pub(crate) struct ReloadGeneration(u64);
-
-impl ReloadGeneration {
-	/// Bump `root`'s generation, returning the new value.
-	fn next(world: &mut World, root: Entity) -> u64 {
-		let mut entity = world.entity_mut(root);
-		let mut generation = entity.entry::<ReloadGeneration>().or_default();
-		generation.get_mut().0 += 1;
-		generation.get().0
-	}
-
-	/// Whether `root` is still on `generation`, ie no newer reload has run.
-	fn is_current(world: &mut World, root: Entity, generation: u64) -> bool {
-		world
-			.get::<ReloadGeneration>(root)
-			.is_some_and(|current| current.0 == generation)
-	}
-}
+/// The async tail of the latest reload on a [`LiveReload`] root: settle the
+/// rescan, broadcast, run the render diagnostics, repaint the in-world
+/// navigators. Inserted per reload, so the next reload's insert drops the
+/// previous tail and cancels it at its next await: a burst of saves never
+/// reports the routes a later reload respawned as errors, and a route check
+/// in flight finishes and cleans up on its own (see
+/// [`CheckReport::check_routes_in`]).
+#[derive(Component)]
+struct ReloadTail(#[allow(dead_code)] AsyncTask);
 
 /// Observer: a spawned [`LiveReload`] gets a child [`ClientIo`] channel if the
 /// world has none (its store's watcher already emits the change events, so no
@@ -216,9 +201,9 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 ///
 /// The render diagnostics that follow are scoped to the pages the changed files
 /// back where every change maps to one (a markdown edit re-checks its page, not
-/// the site), and end early if a newer reload supersedes them (see
-/// [`ReloadGeneration`]), so a burst of saves never reports the routes it
-/// respawned as errors.
+/// the site). The tail runs as the root's [`ReloadTail`], so the next reload
+/// cancels it and a burst of saves never reports the routes it respawned as
+/// errors.
 pub(crate) fn reload_site(
 	world: &mut World,
 	root: Entity,
@@ -228,7 +213,6 @@ pub(crate) fn reload_site(
 		warn!("live reload root {root} has no BlobStore");
 		return;
 	}
-	let generation = ReloadGeneration::next(world, root);
 	// the in-world TUI navigators (no `ClientIo` client) to repaint directly.
 	let navigators = in_world_navigators(world);
 	// re-fire the template/route observers (re-reading their dirs through the store
@@ -238,7 +222,8 @@ pub(crate) fn reload_site(
 	// ("Entity despawned") for a route mid-rescan.
 	respawn_template_dirs(world);
 	respawn_routes_dirs(world);
-	world.run_async(move |world| async move {
+	let mut entity = world.entity_mut(root);
+	let tail = entity.run_task(move |entity| async move {
 		// the dev loop: settle the async rescan (rendering a half-scanned tree would
 		// paint stale content), then broadcast so web clients reload into a ready
 		// route tree, surface render diagnostics (an unknown tag, dead link or unknown
@@ -246,19 +231,15 @@ pub(crate) fn reload_site(
 		// *after* the diagnostics so its freshly-built page is the last render of each
 		// shared node (else the diagnostics' ephemeral cleanup races the repaint and
 		// blanks the live TUI).
-		TemplatePending::settle(&world).await;
-		let scope = world
+		let world = entity.world();
+		TemplatePending::settle(world).await;
+		let routes = world
 			.with(move |world: &mut World| {
 				broadcast_reload(world);
-				CheckScope {
-					routes: changed_routes(world, &changed),
-					live: Some(Arc::new(move |world: &mut World| {
-						ReloadGeneration::is_current(world, root, generation)
-					})),
-				}
+				changed_routes(world, &changed)
 			})
 			.await;
-		log_all_render_diagnostics(&world, scope).await;
+		log_all_render_diagnostics(world, routes).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
 				error!("live reload repaint failed: {err}");
@@ -266,6 +247,7 @@ pub(crate) fn reload_site(
 		}
 		Ok(())
 	});
+	entity.insert(ReloadTail(tail));
 }
 
 /// Re-register every [`TemplateDir`]'s templates: re-inserting the `TemplateDir`
