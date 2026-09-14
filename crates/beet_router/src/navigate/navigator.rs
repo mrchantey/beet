@@ -295,7 +295,7 @@ impl Navigator {
 	/// browser's refresh.
 	///
 	/// Dev-mode live reload drives this on the in-world TUI navigator after a
-	/// watched edit respawns the routes: re-running the current URL through
+	/// watched edit swaps the routes: re-running the current URL through
 	/// [`build_live_page`] rebuilds the page from the fresh route tree and the
 	/// page host repaints, so the terminal updates live (the web client reloads via
 	/// its own [`ClientIo`](crate::prelude::ClientIo) broadcast instead).

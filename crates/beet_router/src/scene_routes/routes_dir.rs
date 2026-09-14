@@ -84,7 +84,15 @@ impl RoutesDir {
 	/// store composed on the loaded root) is resolved *inside* that task, where the
 	/// whole tree is already built, so the ancestor link is reliably present; a
 	/// store-less app is an error (never an implicit filesystem store, which has none
-	/// on wasm).
+	/// on wasm). Exclusive of this entity, whose own store is the scoped one a
+	/// previous scan composed (a rescan must not compound it).
+	///
+	/// A rescan (re-inserting the dir, as a live reload does) is a swap, never a
+	/// respawn: the new routes spawn hidden beside the old ones and one world
+	/// access retires the old set and unhides the new
+	/// ([`swap_routes`](Self::swap_routes)), so the tree never holds both, a
+	/// request in flight keeps its route until it answers, and no window serves
+	/// nothing.
 	///
 	/// The route children appear a few async ticks after the insert, so the scan
 	/// parks a [`PendingGuard`] on the build root (or on this entity outside a
@@ -144,7 +152,7 @@ impl RoutesDir {
 						), Result<(BlobStore, FrontmatterType)>>(
 							|entity, (stores, types)| {
 								Ok((
-									stores.get(entity).cloned()?,
+									stores.get_exclusive(entity).cloned()?,
 									types
 										.get(entity)
 										.cloned()
@@ -174,14 +182,18 @@ impl RoutesDir {
 							// not take the site down with it; the failures are
 							// reported together once the guard has resolved.
 							let mut failures = Vec::new();
+							let mut spawned = Vec::new();
 							for spec in specs {
 								let path = spec.store_path.clone();
-								if let Err(err) =
-									Self::spawn_route_spec(world, entity, spec)
-								{
-									failures.push(format!("`{path}`: {err}"));
+								match Self::spawn_route_spec(
+									world, entity, spec,
+								) {
+									Ok(route) => spawned.push(route),
+									Err(err) => failures
+										.push(format!("`{path}`: {err}")),
 								}
 							}
+							Self::swap_routes(world, entity, &spawned);
 							world.flush();
 							// routes are spawned: resolve, draining the root's set so
 							// the deferred `Ready` fires.
@@ -209,17 +221,20 @@ impl RoutesDir {
 	}
 
 	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`,
-	/// hoisting the components its root declared onto the route entity.
+	/// hoisting the components its root declared onto the route entity. Spawned
+	/// [`RouteHidden`] for [`swap_routes`](Self::swap_routes) to unhide.
 	///
 	/// The declarations resolve here rather than in the scan because
 	/// reflect-building them needs the world's type registry, and the router reads
 	/// [`PageMeta`] out of them first because a `slug` has the last word on the
-	/// url — before the route entity it would live on exists.
+	/// url — before the route entity it would live on exists. A declaration that
+	/// will not insert takes its route with it, so the page gets no route rather
+	/// than serving with the declaration defaulted away.
 	fn spawn_route_spec(
 		world: &mut World,
 		parent: Entity,
 		spec: RouteSpec,
-	) -> Result {
+	) -> Result<Entity> {
 		let mut declarations = spec.declarations?;
 		PageMeta::declare_file_defaults(&mut declarations, &spec.store_path);
 		let meta = declarations.get::<PageMeta>(
@@ -239,9 +254,45 @@ impl RoutesDir {
 			// a discovered content file is a user-facing page, so it carries
 			// `PageRoute` and appears in the nav, like its codegen blob equivalent.
 			PageRoute,
+			RouteHidden,
 		));
 		// scan-time page metadata, so navigation knows titles/order up front
-		declarations.insert(&mut route_entity)
+		if let Err(err) = declarations.insert(&mut route_entity) {
+			route_entity.despawn();
+			return Err(err);
+		}
+		Ok(route_entity.id())
+	}
+
+	/// Swap `dir`'s routes for the ones this scan `spawned`: every route a
+	/// previous scan left (a child carrying a [`PathPattern`] this scan did not
+	/// spawn) is retired first, then the new set is unhidden, so at no flush do
+	/// old and new paths coexist in the tree (a duplicate fails the rebuild).
+	/// Runs in the scan's one world access, so no request observes the window
+	/// between; a route already [`Retired`] by an earlier swap is left to its
+	/// sweep.
+	fn swap_routes(world: &mut World, dir: Entity, spawned: &[Entity]) {
+		let previous = world
+			.entity(dir)
+			.get::<Children>()
+			.map(|children| {
+				children
+					.iter()
+					.filter(|child| !spawned.contains(child))
+					.filter(|child| {
+						let child = world.entity(*child);
+						child.contains::<PathPattern>()
+							&& !child.contains::<Retired>()
+					})
+					.collect::<Vec<_>>()
+			})
+			.unwrap_or_default();
+		for route in previous {
+			Retired::retire(world, route);
+		}
+		for route in spawned {
+			world.entity_mut(*route).remove::<RouteHidden>();
+		}
 	}
 
 	/// List the store's content files and read each one's declared metadata,
@@ -515,6 +566,48 @@ mod test {
 			.map(|seg| seg.name().to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["01-alpha", "02-beta", "03-gamma"]);
+	}
+
+	/// Re-inserting a [`RoutesDir`] rescans it as a swap: the tree serves
+	/// exactly the rescanned set, every route it holds is a fresh, unhidden
+	/// entity, and the routes the first scan spawned are gone rather than
+	/// lingering beside them.
+	#[beet_core::test]
+	async fn rescan_swaps_the_routes() {
+		let mut world = router_world();
+		let store = memory_fixture(&[("index.md", "# Home")]).await;
+		let root = spawn_routes(
+			&mut world,
+			store.clone(),
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+		let dir = world.entity(root).get::<Children>().unwrap()[0];
+		let first = RouteTree::of(&world, root)
+			.unwrap()
+			.find(&[] as &[&str])
+			.unwrap()
+			.entity;
+
+		store
+			.insert(&RelPath::from("about.md"), "# About")
+			.await
+			.unwrap();
+		world.entity_mut(dir).insert(RoutesDir::default());
+		AsyncRunner::settle_async_tasks(&mut world).await;
+
+		let tree = RouteTree::of(&world, root).unwrap().clone();
+		let home = tree.find(&[] as &[&str]).unwrap().entity;
+		home.xpect_not_eq(first);
+		world.get_entity(first).is_err().xpect_true();
+		tree.find(&["about"]).xpect_some();
+		// the dir holds the rescanned set and nothing else, none of it hidden
+		let routes = world.entity(dir).get::<Children>().unwrap();
+		routes.len().xpect_eq(2);
+		routes
+			.iter()
+			.any(|route| world.entity(route).contains::<RouteHidden>())
+			.xpect_false();
 	}
 
 	/// A numbered file declaring a `slug` serves at the slug, not at its

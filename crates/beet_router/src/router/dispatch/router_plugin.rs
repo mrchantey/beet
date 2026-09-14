@@ -41,7 +41,9 @@ impl Plugin for RouterPlugin {
 			// `CfgExcluded` (a beet_core component) is reported here, where
 			// dispatch lives: an unmet declaration fails any call at or under
 			// it naming the missing features.
-			.add_observer(report_cfg_excluded);
+			.add_observer(report_cfg_excluded)
+			// a replaced route outlives the swap while a request holds it
+			.add_systems(Update, despawn_idle_retired);
 
 		// no_std-core reflect registrations: these types are shared across std
 		// and no_std and reflection works on bare metal, so register them

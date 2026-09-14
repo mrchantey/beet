@@ -3,7 +3,7 @@
 //!
 //! A markdown or per-request template edit is a *content* change: the light
 //! re-fire in [`reload_site`](super::reload_site) re-registers the templates and
-//! respawns the routes in place, leaving the servers and their sockets up. A
+//! swaps the routes in place, leaving the servers and their sockets up. A
 //! change to the entry document itself, an included `<Template src>` or a
 //! template the entry instantiates once at build (a `<Styles/>`) is *structural*
 //! (a route added, a server reconfigured, a rule changed), which the in-place

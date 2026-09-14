@@ -3,6 +3,7 @@
 
 mod action_node;
 mod request_context;
+mod retired;
 /// The Rust route constructors: `route::new`, `route::exchange`, `route::fallback`.
 pub mod route;
 mod route_tree;
@@ -10,5 +11,6 @@ mod route_tree_builder;
 
 pub use action_node::*;
 pub use request_context::*;
+pub(crate) use retired::*;
 pub use route_tree::*;
 pub use route_tree_builder::*;

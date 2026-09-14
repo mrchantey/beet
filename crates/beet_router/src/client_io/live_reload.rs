@@ -20,10 +20,11 @@ pub(crate) const RELOAD_MESSAGE: &str = "reload";
 /// Dev-mode live reload for a no-code site, placed on the site root (which carries
 /// the site [`BlobStore`]). Any change to that store surfaces as a [`BlobEvent`]
 /// (emitted by the store's watcher), which re-registers the site's `templates/`
-/// through the store, respawns every [`RoutesDir`]'s routes, and broadcasts
-/// `RELOAD_MESSAGE` over the world's [`ClientIo`] channel (spawned as a child if
-/// none exists). The [`LiveReloadScript`](super::LiveReloadScript) widget turns the
-/// broadcast into a browser reload.
+/// through the store, rescans every [`RoutesDir`] (swapping its routes for the
+/// new set), and broadcasts `RELOAD_MESSAGE` over the world's [`ClientIo`]
+/// channel (spawned as a child if none exists). The
+/// [`LiveReloadScript`](super::LiveReloadScript) widget turns the broadcast into
+/// a browser reload.
 ///
 /// Store-agnostic: the reload reads the site content through the resolved store, so
 /// a filesystem, in-memory, or remote backing all reload identically.
@@ -59,7 +60,7 @@ impl LiveReload {
 ///
 /// This is the only bespoke reload state: "a reload is in flight" is not a
 /// second marker but the pending/settle primitive itself. The reload parks
-/// [`TemplatePending`] dependencies under the root (each respawned
+/// [`TemplatePending`] dependencies under the root (each re-fired
 /// `TemplateDir`/`RoutesDir` holds a [`PendingGuard`]), and
 /// [`process_live_reloads`] defers dispatch while any set under the root is
 /// non-empty, so a change landing mid-reload only re-latches here and drives
@@ -78,7 +79,7 @@ pub(crate) struct NeedsReload {
 /// rescan, broadcast, run the render diagnostics, repaint the in-world
 /// navigators. Inserted per reload, so the next reload's insert drops the
 /// previous tail and cancels it at its next await: a burst of saves never
-/// reports the routes a later reload respawned as errors, and a route check
+/// reports the routes a later reload swapped out as errors, and a route check
 /// in flight finishes and cleans up on its own (see
 /// [`CheckReport::check_routes_in`]).
 #[derive(Component)]
@@ -141,20 +142,16 @@ pub(crate) fn reload_site_on_change(
 /// Drive the latched reloads once per tick: dispatch each [`NeedsReload`] site
 /// whose subtree has settled (no [`TemplatePending`] set under the root is
 /// outstanding), so an in-flight reload's own parked dependencies defer the
-/// follow-up rather than a bespoke in-flight marker, and only once no request
-/// is being served (a respawn under a request in flight answers it with a 500
-/// for a route that no longer exists, and a page reloaded into an error has no
-/// live-reload client left to recover it). A structural change (the entry
-/// document or an included `<Template src>`) takes the full teardown+rebuild; a
-/// content change re-fires in place.
+/// follow-up rather than a bespoke in-flight marker. A request being served
+/// defers nothing: a content reload swaps routes under it and the route it
+/// holds answers before it retires (see [`Retired`]). A structural change (the
+/// entry document or an included `<Template src>`) takes the full
+/// teardown+rebuild; a content change re-fires in place.
 pub(crate) fn process_live_reloads(world: &mut World) {
 	let latched = world
 		.with_state::<Query<Entity, (With<NeedsReload>, With<LiveReload>)>, _>(
 			|query| query.iter().collect::<Vec<_>>(),
 		);
-	if latched.is_empty() || requests_in_flight(world) {
-		return;
-	}
 	for root in latched {
 		if subtree_pending(world, root) {
 			continue;
@@ -168,13 +165,6 @@ pub(crate) fn process_live_reloads(world: &mut World) {
 			reload_site(world, root, needs.changed);
 		}
 	}
-}
-
-/// Whether any server is mid-request, per its [`ExchangeStats`].
-fn requests_in_flight(world: &mut World) -> bool {
-	world.with_state::<Query<&ExchangeStats>, _>(|stats| {
-		stats.iter().any(|stats| stats.in_flight() > 0)
-	})
 }
 
 /// Whether any [`TemplatePending`] set on `root` or a descendant is outstanding,
@@ -192,17 +182,18 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 }
 
 /// Refresh the world from the site's [`BlobStore`]: re-fire every [`TemplateDir`]
-/// (re-registering its edited templates) and every [`RoutesDir`] (respawning its
-/// route children and rebuilding the route trees), then broadcast [`RELOAD_MESSAGE`]
-/// to connected clients. `root` is the [`LiveReload`] entity carrying the store,
-/// `changed` the store paths that drove the reload (empty for an unconditional
-/// one). The respawned dirs park [`TemplatePending`] guards, so
-/// [`process_live_reloads`] defers a follow-up until this reload settles.
+/// (re-registering its edited templates) and every [`RoutesDir`] (swapping its
+/// route children for the rescanned set and rebuilding the route trees), then
+/// broadcast [`RELOAD_MESSAGE`] to connected clients. `root` is the
+/// [`LiveReload`] entity carrying the store, `changed` the store paths that
+/// drove the reload (empty for an unconditional one). The re-fired dirs park
+/// [`TemplatePending`] guards, so [`process_live_reloads`] defers a follow-up
+/// until this reload settles.
 ///
 /// The render diagnostics that follow are scoped to the pages the changed files
 /// back where every change maps to one (a markdown edit re-checks its page, not
 /// the site). The tail runs as the root's [`ReloadTail`], so the next reload
-/// cancels it and a burst of saves never reports the routes it respawned as
+/// cancels it and a burst of saves never reports the routes it swapped out as
 /// errors.
 pub(crate) fn reload_site(
 	world: &mut World,
@@ -218,10 +209,10 @@ pub(crate) fn reload_site(
 	// re-fire the template/route observers (re-reading their dirs through the store
 	// by ancestry, store-agnostic). The async rescan settles below, and only then do
 	// we broadcast: a web client reloads on the broadcast and immediately re-requests
-	// its routes, so broadcasting before the despawn/respawn settled returns a 500
-	// ("Entity despawned") for a route mid-rescan.
+	// its routes, which must be the rescanned set rather than the one about to be
+	// swapped out.
 	respawn_template_dirs(world);
-	respawn_routes_dirs(world);
+	rescan_routes_dirs(world);
 	let mut entity = world.entity_mut(root);
 	let tail = entity.run_task(move |entity| async move {
 		// the dev loop: settle the async rescan (rendering a half-scanned tree would
@@ -270,11 +261,13 @@ fn respawn_template_dirs(world: &mut World) {
 	world.flush();
 }
 
-/// Respawn every [`RoutesDir`]'s route children: re-inserting the `RoutesDir`
-/// re-fires the async discovery observer, which respawns the routes and rebuilds the
-/// tree, parking a pending dependency observable via [`TemplatePending::settle`].
-/// The scoped [`BlobStore`] is dropped too, so the rescan re-composes it fresh.
-fn respawn_routes_dirs(world: &mut World) {
+/// Rescan every [`RoutesDir`]: re-inserting the `RoutesDir` re-fires the async
+/// discovery observer, which spawns the rescanned routes beside the current
+/// ones and swaps the sets in one world access (see
+/// [`RoutesDir::spawn_on_insert`]), parking a pending dependency observable via
+/// [`TemplatePending::settle`]. The current routes keep serving through the
+/// dir's scoped [`BlobStore`] until the swap lands.
+fn rescan_routes_dirs(world: &mut World) {
 	let dirs = world.with_state::<Query<(Entity, &RoutesDir)>, _>(|query| {
 		query
 			.iter()
@@ -282,11 +275,7 @@ fn respawn_routes_dirs(world: &mut World) {
 			.collect::<Vec<_>>()
 	});
 	for (entity, dir) in dirs {
-		world
-			.entity_mut(entity)
-			.despawn_related::<Children>()
-			.remove::<BlobStore>()
-			.insert(dir);
+		world.entity_mut(entity).insert(dir);
 	}
 	world.flush();
 }
@@ -302,20 +291,21 @@ fn changed_routes(
 	if changed.is_empty() {
 		return None;
 	}
-	// each route's store path: its scoped store's subdir joined with the blob path
-	let by_path = world
-		.with_state::<(Query<(Entity, &BlobScene)>, AncestorQuery<&BlobStore>), _>(
-			|(scenes, stores)| {
-				scenes
-					.iter()
-					.filter_map(|(entity, scene)| {
-						stores.get(entity).ok().map(|store| {
-							(store.subdir().join(scene.path.as_str()), entity)
-						})
-					})
-					.collect::<HashMap<_, _>>()
-			},
-		);
+	// each live route's store path: its scoped store's subdir joined with the
+	// blob path (a retired route still answering a request backs no page now)
+	let by_path = world.with_state::<(
+		Query<(Entity, &BlobScene), Without<Retired>>,
+		AncestorQuery<&BlobStore>,
+	), _>(|(scenes, stores)| {
+		scenes
+			.iter()
+			.filter_map(|(entity, scene)| {
+				stores.get(entity).ok().map(|store| {
+					(store.subdir().join(scene.path.as_str()), entity)
+				})
+			})
+			.collect::<HashMap<_, _>>()
+	});
 	changed
 		.iter()
 		.map(|path| by_path.get(path).copied())
@@ -355,6 +345,7 @@ fn in_world_navigators(world: &mut World) -> Vec<Entity> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_action::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// A router world with the live-reload observers + reload system, plus the
@@ -405,12 +396,12 @@ mod test {
 	}
 
 	/// Editing templates and adding a route, then reloading, re-registers the site's
-	/// `templates/` through the store and respawns the routes. Reads the edits back
+	/// `templates/` through the store and swaps the routes. Reads the edits back
 	/// through the `FsStore`, so nothing here touches the filesystem after the writes.
 	#[beet_core::test]
-	async fn reload_reregisters_templates_and_respawns_routes() {
+	async fn reload_reregisters_templates_and_swaps_routes() {
 		let mut world = reload_world();
-		let site_dir = site_fixture("respawns");
+		let site_dir = site_fixture("swaps");
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		// the RoutesDir scan is async, so settle it before reading the tree
 		AsyncRunner::settle_async_tasks(&mut world).await;
@@ -459,13 +450,14 @@ mod test {
 			.unwrap()
 			.find(&["docs", "intro"])
 			.xpect_some();
-		// the old routes respawned exactly once
+		// the old routes swapped out exactly once, none lingering retired
 		world
 			.entity(routes_dir)
 			.get::<Children>()
 			.unwrap()
 			.len()
 			.xpect_eq(2);
+		world.query_once::<&Retired>().len().xpect_eq(0);
 		// the registry serves the edited and the new template sources, and the
 		// deleted one unregistered (the owner diff, not an additive re-register)
 		let registry = world.resource::<BsxTemplateRegistry>();
@@ -478,6 +470,103 @@ mod test {
 			.xref()
 			.xmap(|nodes| format!("{nodes:?}"))
 			.xpect_contains("second card");
+	}
+
+	/// Drive the world frame by frame until `done` answers true, panicking if
+	/// it never does.
+	async fn tick_until(world: &mut World, done: impl Fn(&World) -> bool) {
+		for _ in 0..1000 {
+			if done(world) {
+				return;
+			}
+			world.update_local();
+			AsyncRunner::tick(world).await;
+		}
+		panic!("condition never met");
+	}
+
+	/// A request in flight when a content reload lands keeps its route: the
+	/// swap retires the old route rather than despawning it, the parked
+	/// handler answers from it, and only then does it despawn, leaving the
+	/// tree serving the rescanned set with no [`Retired`] entity behind.
+	#[beet_core::test]
+	async fn request_in_flight_survives_the_swap() {
+		let mut world = reload_world();
+		let site_dir = site_fixture("in_flight");
+		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		let home_of = |world: &World| {
+			RouteTree::of(world, root)
+				.unwrap()
+				.find(&[] as &[&str])
+				.unwrap()
+				.entity
+		};
+		let home = home_of(&world);
+		// a gate every dispatch parks on, holding its route, opened once the
+		// swap has landed
+		let (open, gate) = OnceValue::<()>::oneshot();
+		let gate = Store::new(Some(gate));
+		let parked = Store::new(false);
+		world
+			.entity_mut(root)
+			.get_mut_or_default::<MiddlewareList<Request, Response>>()
+			.add({
+				let (gate, parked) = (gate.clone(), parked.clone());
+				move |request: Request, next: Next<Request, Response>| {
+					let (gate, parked) = (gate.clone(), parked.clone());
+					async move {
+						parked.set(true);
+						if let Some(gate) = gate.take() {
+							gate.wait().await;
+						}
+						next.call(request).await
+					}
+				}
+			});
+		let response = Store::<Option<Response>>::default();
+		let task = world.entity_mut(root).run_task({
+			let response = response.clone();
+			move |entity| async move {
+				let res = entity.exchange(Request::get("")).await;
+				response.set(Some(res));
+			}
+		});
+		tick_until(&mut world, |_| parked.get()).await;
+
+		// reload under the parked request: the swap retires its route
+		fs_ext::write(site_dir.join("routes/index.md"), "# Home\n\nedited")
+			.unwrap();
+		reload_site(&mut world, root, default());
+		tick_until(&mut world, |world| {
+			world.entity(home).contains::<Retired>()
+		})
+		.await;
+		// hidden from dispatch, alive for the request holding it
+		world.entity(home).contains::<RouteHidden>().xpect_true();
+		home_of(&world).xpect_not_eq(home);
+		world
+			.get::<RouteInFlight>(home)
+			.unwrap()
+			.is_idle()
+			.xpect_false();
+
+		// released: the request answers from the retired route (a page, not
+		// the 500 a despawned route answers), which then despawns, leaving
+		// only the rescanned set
+		open.signal(());
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		task.is_finished().xpect_true();
+		let response = response.take().unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response.unwrap_str().await.xpect_contains("Home");
+		world.get_entity(home).is_err().xpect_true();
+		world.query_once::<&Retired>().len().xpect_eq(0);
+		world
+			.entity_mut(root)
+			.exchange_str(Request::get(""))
+			.await
+			.xpect_contains("edited");
 	}
 
 	/// The store drives reloads, not the filesystem: an [`InMemoryStore`]'s own

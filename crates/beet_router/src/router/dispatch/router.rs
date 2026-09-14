@@ -93,14 +93,11 @@ impl Router {
 				let mut request = cx.input;
 				let path = request.path().clone();
 
-				// find the matching route in the tree
-				let node = world
-				.with_state::<AncestorQuery<&RouteTree>, _>(move |query| {
-					query.get(caller.id()).map(|tree| tree.find(&path).cloned()).map_err(|_|{
-						bevyhow!("Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?")
-					})
-				})
-				.await;
+				// find the matching route in the tree, holding it in flight in
+				// the same access so a swap landing before the handler answers
+				// retires the route rather than despawning it mid-call
+				let (node, _in_flight) =
+					find_route(&world, caller.id(), path).await;
 
 				// a draft page never reaches production, live-served as well as
 				// exported: it is answered exactly as an unknown url, so a 404
@@ -175,6 +172,38 @@ impl Router {
 		)
 	}
 }
+
+/// The route matching `path` in the tree above `router`, with its
+/// [`InFlightGuard`] taken in the same world access (`None` for no match or
+/// no tree), so the route is held from the moment it is resolved.
+async fn find_route(
+	world: &AsyncWorld,
+	router: Entity,
+	path: Vec<SmolStr>,
+) -> (Result<Option<ActionNode>>, Option<InFlightGuard>) {
+	world
+		.with_state::<(AncestorQuery<&RouteTree>, Query<&RouteInFlight>), _>(
+			move |(trees, in_flight)| {
+				let Ok(tree) = trees.get(router) else {
+					return (
+						Err(bevyhow!(
+							"Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?"
+						)),
+						None,
+					);
+				};
+				match tree.find(&path) {
+					Some(node) => (
+						Ok(Some(node.clone())),
+						in_flight.get(node.entity).ok().map(RouteInFlight::begin),
+					),
+					None => (Ok(None), None),
+				}
+			},
+		)
+		.await
+}
+
 /// Whether the matched route is a page this process must not serve: a
 /// [`PageMeta`](beet_ui::prelude::PageMeta) marked
 /// [`Draft`](beet_ui::prelude::PageVisibility::Draft), in a production process.

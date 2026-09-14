@@ -1,4 +1,5 @@
 //! Pattern matching features loosely based on the [URL Pattern API](https://developer.mozilla.org/en-US/docs/Web/API/URL_Pattern_API)
+use crate::prelude::*;
 use alloc::collections::VecDeque;
 use beet_core::prelude::*;
 use thiserror::Error;
@@ -99,6 +100,9 @@ impl PathPartial {
 }
 
 /// A completed sequence of [`PathPatternSegment`] for some point in the route tree.
+///
+/// Marks its entity a route, so it requires the [`RouteInFlight`] count a
+/// dispatch holds while the route answers.
 #[derive(
 	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
 )]
@@ -106,6 +110,7 @@ impl PathPartial {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[cfg_attr(feature = "tokens", to_tokens(PathPatternSegments::_from_raw))]
 #[reflect(Component)]
+#[require(RouteInFlight)]
 pub struct PathPattern {
 	/// The complete sequence of segments
 	segments: Vec<PathPatternSegment>,
@@ -593,7 +598,6 @@ impl core::fmt::Display for PathPatternSegment {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	/// match segments against a route path
 	fn parse(

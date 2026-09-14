@@ -7,7 +7,9 @@ use beet_net::prelude::*;
 ///
 /// Internal actions like fallback chain handlers should not appear
 /// as routable endpoints. Adding this component prevents them from
-/// being collected during route tree construction.
+/// being collected during route tree construction. A route swap stages
+/// its new routes under it and [`Retired`] requires it, so the tree never
+/// holds a route's old and new paths together.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct RouteHidden;
