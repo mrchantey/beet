@@ -14,9 +14,11 @@ use core::marker::PhantomData;
 /// call with the collapsed errors; a start no facet selected fails it loudly. Both
 /// failures are opt-out (see [`BypassRunningErrors`]): bypassing
 /// [`RunningError::FACET_FAILED`] keeps the survivors serving a broken facet's
-/// run. Removing that `Running` (an interrupt, a reload, a
-/// despawn) signals every live facet, which is the only way a facet is ever
-/// stopped: there is no stop action, stopping is signalling.
+/// run. Removing that `Running` (an interrupt, a reload) signals every live
+/// facet, which is the only way a facet is ever stopped: there is no stop
+/// action, stopping is signalling. A despawn ends the run's task with the
+/// entity (see `EntityWorldMut::run_async`), dropping the facets outright, so
+/// what a facet must release on despawn it releases in a destructor.
 ///
 /// A server is the reference facet, so `<Route path="serve" {(HttpServer,
 /// TuiServer)}>` is one entity holding one action and two facets. A facet joins
@@ -150,9 +152,9 @@ where
 					.entity(caller)
 					.insert(Running::new(out_handler))
 					.trigger(move |_| start);
-				commands
-					.entity(caller)
-					.run_local(move |entity| drive::<In, Out>(entity, driven));
+				commands.entity(caller).queue_async_local(move |entity| {
+					drive::<In, Out>(entity, driven)
+				});
 				Ok(())
 			},
 		)
@@ -334,7 +336,8 @@ where
 /// Signals every live stop signal when the set's parked [`Running`] is removed.
 ///
 /// Directly in the observer rather than through a queued command: a signal is a
-/// world-free value, so a despawn tears down exactly like an interrupt does.
+/// world-free value, so a co-resident facet's failure and an interrupt tear
+/// down alike.
 fn stop_running<In, Out>(
 	ev: On<Remove, Running<Out>>,
 	mut sets: Query<&mut RunningSet<In, Out>>,
@@ -644,20 +647,43 @@ mod test {
 			.xpect_eq(vec!["a-start", "b-start", "a-stop", "b-stop"]);
 	}
 
-	/// A facet closing a live listener must still tear down when the removal is a
-	/// despawn.
+	/// A despawn drops the run's task, and the facets with it: a facet closing
+	/// a live listener releases it through its destructor, never reaching the
+	/// code after its signal.
 	#[beet_core::test]
-	async fn despawn_stops_every_facet() {
+	async fn despawn_drops_every_facet() {
 		let log = Store::<Vec<String>>::default();
 		let mut app = app();
-		let entity =
-			spawn_set(&mut app, vec![("a", always(), facet(log, "a", None))]);
+		let dropped = Store::<bool>::default();
+		let guard = DropFlag(dropped.clone());
+		let facet: Facet = Box::new(move |_entity, _input, shutdown| {
+			let log = log.clone();
+			let guard = guard.clone();
+			Box::pin(async move {
+				let _guard = guard;
+				log.push("a-start".into());
+				shutdown.wait().await;
+				log.push("a-stop".into());
+				Ok(())
+			})
+		});
+		let entity = spawn_set(&mut app, vec![("a", always(), facet)]);
 		call(&mut app, entity);
 		until_logged(&mut app, log, 1).await;
 		app.world_mut().entity_mut(entity).despawn();
-		app.world_mut().flush();
-		until_logged(&mut app, log, 2).await;
-		log.get().xpect_eq(vec!["a-start", "a-stop"]);
+		app_ext::update_until(&mut app, |_| dropped.get())
+			.await
+			.xpect_true();
+		log.get().xpect_eq(vec!["a-start"]);
+	}
+
+	/// Sets its flag when dropped, so a test can observe a facet future being
+	/// dropped rather than run to its end.
+	#[derive(Clone)]
+	struct DropFlag(Store<bool>);
+
+	impl Drop for DropFlag {
+		fn drop(&mut self) { self.0.set(true); }
 	}
 
 	/// A stopped set starts again: the facets are reusable, not consumed by a run.

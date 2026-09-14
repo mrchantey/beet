@@ -77,13 +77,46 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
+	let (out_handler, recv) = oneshot_out_handler();
+	call_world::<Input, Out>(entity, input, out_handler)?;
+	Ok(recv)
+}
+
+/// A oneshot-backed [`OutHandler`] and the receiver awaiting it.
+///
+/// A handler dropped unresolved fails the receiver with
+/// [`ControlFlowError::Interrupted`] rather than parking it forever: the action
+/// task holding it was cancelled (its entity despawned), or the [`Running`]
+/// parking it was removed.
+fn oneshot_out_handler<Out>() -> (OutHandler<Out>, OnceValueRx<Result<Out>>)
+where
+	Out: 'static + Send + Sync,
+{
 	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
+	let mut send = InterruptOnDrop(Some(send));
 	let out_handler = OutHandler::new(move |_commands, result: Result<Out>| {
 		send.signal(result);
 		Ok(())
 	});
-	call_world::<Input, Out>(entity, input, out_handler)?;
-	Ok(recv)
+	(out_handler, recv)
+}
+
+/// The sending half of a call's oneshot, resolving the receiver as interrupted
+/// if dropped unsignalled.
+struct InterruptOnDrop<Out>(Option<OnceValue<Result<Out>>>);
+
+impl<Out> InterruptOnDrop<Out> {
+	fn signal(&mut self, result: Result<Out>) {
+		if let Some(send) = self.0.take() {
+			send.signal(result);
+		}
+	}
+}
+
+impl<Out> Drop for InterruptOnDrop<Out> {
+	fn drop(&mut self) {
+		self.signal(Err(ControlFlowError::Interrupted.into()));
+	}
 }
 
 /// Drives an action call to completion from an owned [`EntityWorldMut`],
@@ -157,11 +190,7 @@ where
 	Input: 'static + Send + Sync,
 	Out: 'static + Send + Sync,
 {
-	let (send, recv) = OnceValue::<Result<Out>>::oneshot();
-	let out_handler = OutHandler::new(move |_, result: Result<Out>| {
-		send.signal(result);
-		Ok(())
-	});
+	let (out_handler, recv) = oneshot_out_handler();
 	action.call_world(entity, input, out_handler)?;
 	Ok(recv)
 }

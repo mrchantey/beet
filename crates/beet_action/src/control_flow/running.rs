@@ -72,10 +72,19 @@ where
 /// than completing normally.
 #[derive(Debug, thiserror::Error)]
 pub enum ControlFlowError {
-	/// A running action was interrupted before it could resolve, ie a sibling
-	/// failed or a parent was re-run.
+	/// A running action was interrupted before it could resolve: a sibling
+	/// failed, a parent was re-run, its [`Running`] was removed, or the task
+	/// driving it was cancelled by its entity's despawn.
 	#[error("the running action was interrupted")]
 	Interrupted,
+}
+
+impl ControlFlowError {
+	/// Whether `err` is an interruption, so a caller can treat a run ended by
+	/// control flow as neither a result nor a fault.
+	pub fn is_interrupted(err: &BevyError) -> bool {
+		matches!(err.downcast_ref::<Self>(), Some(Self::Interrupted))
+	}
 }
 
 /// Entity event carrying an action's input to its observers behind a shared

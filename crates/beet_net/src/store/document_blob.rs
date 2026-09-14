@@ -81,7 +81,7 @@ pub(crate) fn document_blobs_may_be_readable(
 /// entity.
 pub(crate) fn read_document_blobs(
 	mut commands: Commands,
-	async_commands: AsyncCommands,
+	mut async_commands: AsyncCommands,
 	registry: Res<SchemaRegistry>,
 	blobs: Populated<
 		(Entity, &DocumentBlob),
@@ -93,17 +93,19 @@ pub(crate) fn read_document_blobs(
 		// its own snapshot, which is what validates the arriving document.
 		let (path, snapshot) = (blob.path.clone(), registry.clone());
 		commands.entity(entity).insert(ReadingDocumentBlob);
-		async_commands.entity(entity).run(async move |entity| {
-			let outcome = read_document_blob(&entity, snapshot, path).await;
-			// always released, so a transient failure is retried when the next
-			// blob or store arrives rather than wedging this one
-			entity
-				.with(|mut entity| {
-					entity.remove::<ReadingDocumentBlob>();
-				})
-				.await?;
-			outcome
-		});
+		async_commands
+			.entity(entity)
+			.queue_async(async move |entity| {
+				let outcome = read_document_blob(&entity, snapshot, path).await;
+				// always released, so a transient failure is retried when the next
+				// blob or store arrives rather than wedging this one
+				entity
+					.with(|mut entity| {
+						entity.remove::<ReadingDocumentBlob>();
+					})
+					.await?;
+				outcome
+			});
 	}
 }
 
@@ -144,7 +146,7 @@ async fn read_document_blob(
 
 /// Write each edited [`DocumentBlob`] back to its store.
 pub(crate) fn write_document_blobs(
-	async_commands: AsyncCommands,
+	mut async_commands: AsyncCommands,
 	edited: Populated<
 		(Entity, &DocumentBlob),
 		(With<DocumentBlobLoaded>, Changed<Document>),
@@ -158,13 +160,15 @@ pub(crate) fn write_document_blobs(
 			continue;
 		}
 		let (path, trigger) = (blob.path.clone(), blob.trigger.clone());
-		async_commands.entity(entity).run(async move |entity| {
-			trigger
-				.run_flush(async move || {
-					write_document_blob(&entity, path.clone()).await
-				})
-				.await
-		});
+		async_commands
+			.entity(entity)
+			.queue_async(async move |entity| {
+				trigger
+					.run_flush(async move || {
+						write_document_blob(&entity, path.clone()).await
+					})
+					.await
+			});
 	}
 }
 

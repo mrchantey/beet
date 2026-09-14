@@ -77,41 +77,32 @@ impl HttpServer {
 		.await
 	}
 }
-/// The hyper accept loop: serve each connection on its own spawned task. Diverges
-/// (only the shutdown race in [`HttpServer::start_hyper_with_tcp`] ends it).
+/// The hyper accept loop: serve each connection on its own task, spawned on
+/// the server entity. Diverges (only the shutdown race in
+/// [`HttpServer::start_hyper_with_tcp`] ends it).
 ///
-/// Every connection task ends with the loop, racing its work against the
-/// `alive` channel that closes when the loop's sender drops on shutdown (see
-/// the mini server's accept loop): no connection outlives its server to be
-/// answered by a torn-down entity.
+/// A connection task is entity-scoped (see the mini server's accept loop): it
+/// is cancelled when the server entity despawns, so no connection outlives its
+/// server to be answered by a torn-down entity.
 async fn hyper_accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
 ) -> Result {
-	// never sent to: dropping the sender is the signal
-	let (_alive_tx, alive_rx) = async_channel::bounded::<()>(1);
 	loop {
-		let (tcp, addr) = listener
-			.accept()
-			.await
-			.map_err(|err| bevyhow!("Failed to accept connection: {}", err))
-			.unwrap();
+		let (tcp, addr) = match listener.accept().await {
+			Ok(pair) => pair,
+			Err(err) => {
+				error!("Failed to accept connection: {err}");
+				continue;
+			}
+		};
 		trace!("New connection from: {}", addr);
 
 		let tls = tls.clone();
-		let alive = alive_rx.clone();
 		entity
 			.run_async_local(async move |entity| {
-				let served = beet_core::exports::futures_lite::future::or(
-					serve_sniffed(entity, tcp, addr, tls),
-					async move {
-						alive.recv().await.ok();
-						Ok(())
-					},
-				)
-				.await;
-				if let Err(err) = served {
+				if let Err(err) = serve_sniffed(entity, tcp, addr, tls).await {
 					error!("Error handling connection from {addr}: {err}");
 				}
 			})

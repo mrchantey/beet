@@ -96,10 +96,9 @@ pub(crate) fn rebuild_entry(world: &mut World, root: Entity) {
 		return;
 	};
 	// close the live client sockets so the browser sees the teardown and reconnects
-	// to the rebuilt server, reloading on reconnect. The socket's reader/writer tasks
-	// outlive the entity despawn (an entity-scoped task ends on its own, not on
-	// despawn), so despawning alone leaves the connection open; an explicit close is
-	// what the browser observes.
+	// to the rebuilt server, reloading on reconnect. The despawn alone drops the
+	// connection (the socket's tasks are entity-scoped), but a close frame ahead of
+	// it is the clean handshake rather than an abnormal closure.
 	disconnect_clients(world);
 	// drive the rebuild on the local pool (as the initial load runs), so the
 	// despawn+respawn and the fresh root's `CallOnReady` boot land on the runtime.
@@ -113,9 +112,9 @@ pub(crate) fn rebuild_entry(world: &mut World, root: Entity) {
 
 /// Send a websocket close to every [`ClientIo`] client, so a browser detects the
 /// teardown and reconnects to the rebuilt server (reloading on reconnect via
-/// [`live_reload.js`]). The close frame rides the writer channel, which the writer
-/// task drains even after the socket entity is despawned, so the browser sees it
-/// regardless of despawn ordering.
+/// [`live_reload.js`]). The close frame rides the writer channel, drained by the
+/// writer task before the async teardown's despawn cancels it; a despawn that
+/// wins the race still closes the connection, just without the frame.
 fn disconnect_clients(world: &mut World) {
 	let channels = world
 		.with_state::<Query<(Entity, Option<&Children>), With<ClientIo>>, _>(

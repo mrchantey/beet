@@ -46,20 +46,22 @@ pub(super) fn refresh_blob_store_list(
 		(Entity, &BlobStore),
 		(Changed<BlobStore>, With<FieldRef>),
 	>,
-	commands: AsyncCommands,
+	mut commands: AsyncCommands,
 ) {
 	for (entity, store) in stores.iter() {
 		let store = store.clone();
-		commands.entity(entity).run_local(async move |entity| {
-			// graceful empty, like ListBlobs
-			let paths = store.list().await.unwrap_or_default();
-			// the store entity is the self-bound field: write its local Value
-			entity
-				.with_state::<FieldQuery, _>(move |subject, mut fields| {
-					fields.set_local::<Vec<SmolPath>>(subject, paths)
-				})
-				.await?
-		});
+		commands
+			.entity(entity)
+			.queue_async_local(async move |entity| {
+				// graceful empty, like ListBlobs
+				let paths = store.list().await.unwrap_or_default();
+				// the store entity is the self-bound field: write its local Value
+				entity
+					.with_state::<FieldQuery, _>(move |subject, mut fields| {
+						fields.set_local::<Vec<SmolPath>>(subject, paths)
+					})
+					.await?
+			});
 	}
 }
 

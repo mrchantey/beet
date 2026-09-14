@@ -76,23 +76,24 @@ fn run_test(
 			commands.entity(entity).insert(outcome);
 		}
 		MaybeAsync::Async(panic_result_fut) => {
-			async_commands
-				.entity(entity)
-				.run_local(async move |entity| {
-					let result = panic_result_fut.await;
-					let outcome =
-						TestOutcome::from_panic_result(result, should_panic);
-					// Don't clobber a `TestOutcome` already set this frame (eg a
-					// timeout); a test that finishes after timing out stays a timeout.
-					entity
-						.with(move |mut entity| {
-							if !entity.contains::<TestOutcome>() {
-								entity.insert(outcome);
-							}
-						})
-						.await
-						.ok();
-				});
+			// a world task: the test future is `!Send`, so it cannot ride a
+			// queued (entity-scoped) command, and a test entity never despawns.
+			async_commands.run_local(async move |world| {
+				let result = panic_result_fut.await;
+				let outcome =
+					TestOutcome::from_panic_result(result, should_panic);
+				// Don't clobber a `TestOutcome` already set this frame (eg a
+				// timeout); a test that finishes after timing out stays a timeout.
+				world
+					.entity(entity)
+					.with(move |mut entity| {
+						if !entity.contains::<TestOutcome>() {
+							entity.insert(outcome);
+						}
+					})
+					.await
+					.ok();
+			});
 		}
 	}
 

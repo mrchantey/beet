@@ -41,23 +41,17 @@ pub(crate) fn register_template_include(world: &mut World) {
 					supported; use a local path"
 				);
 			}
-			let target = entity.id();
 			// park a structural dependency on the build root and spawn the async
-			// read + build, so slot resolution and `Ready` wait for the
-			// include and the runtime is never blocked. The ancestor store is
-			// resolved inside the task, where the whole tree is built, so it is
-			// reachable by ancestry.
-			entity.world_scope(|world| -> Result {
-				let (async_world, spawner, guard) =
-					TemplatePending::register_fetch(
-						world,
-						target,
-						PendingKind::Structural,
-						format!("<Template src=\"{src}\">"),
-					)?;
-				spawner.spawn(resolve_include(async_world, src, target, guard));
-				Ok(())
-			})
+			// read + build as a task of the include site, so slot resolution and
+			// `Ready` wait for the include and the runtime is never blocked. The
+			// ancestor store is resolved inside the task, where the whole tree is
+			// built, so it is reachable by ancestry.
+			TemplatePending::register_fetch(
+				entity,
+				PendingKind::Structural,
+				format!("<Template src=\"{src}\">"),
+				move |entity, guard| resolve_include(entity, src, guard),
+			)
 		},
 	);
 }
@@ -67,18 +61,18 @@ pub(crate) fn register_template_include(world: &mut World) {
 /// panics) on failure, leaving the include site empty, mirroring the
 /// remote-template resolver.
 async fn resolve_include(
-	async_world: AsyncWorld,
+	target: AsyncEntity,
 	src: SmolStr,
-	target: Entity,
 	guard: PendingGuard,
 ) {
 	let root = guard.root();
-	if let Err(err) = read_and_build(&async_world, &src, target, root).await {
+	if let Err(err) = read_and_build(&target, &src, root).await {
 		error!("`<Template src=\"{src}\">` include failed: {err}");
 	}
 	// resolve the dependency and drain the set: once the last structural
 	// dependency lands, the deferred slot resolution runs over the settled tree.
-	async_world
+	target
+		.world()
 		.with(move |world: &mut World| guard.resolve(world))
 		.await;
 }
@@ -93,23 +87,23 @@ async fn resolve_include(
 /// dependency on the same root: the root settles (and its slots resolve) only
 /// once every level has built.
 async fn read_and_build(
-	async_world: &AsyncWorld,
+	target: &AsyncEntity,
 	src: &str,
-	target: Entity,
 	root: Entity,
 ) -> Result {
-	let store = async_world
-		.entity(target)
+	let store = target
 		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
 			|entity, stores| stores.get(entity).cloned(),
 		)
 		.await??;
 	let media = store.get_media(&SmolPath::from(src)).await?;
-	async_world
+	let id = target.id();
+	target
+		.world()
 		.with(move |world: &mut World| -> Result {
 			TemplateBuildRoot::scoped(world, root, |world| {
 				let entry = EntryTemplate::from_bytes(world, &media)?;
-				world.entity_mut(target).build_template(&entry)?;
+				world.entity_mut(id).build_template(&entry)?;
 				Ok(())
 			})
 		})

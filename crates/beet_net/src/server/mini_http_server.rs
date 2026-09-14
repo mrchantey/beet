@@ -85,22 +85,20 @@ impl HttpServer {
 		served
 	}
 }
-/// The accept loop: dispatch each connection on its own spawned task. Diverges
-/// (only [`HttpServer::start_mini_with_tcp`]'s shutdown race ends it).
+/// The accept loop: dispatch each connection on its own task, spawned on the
+/// server entity. Diverges (only [`HttpServer::start_mini_with_tcp`]'s
+/// shutdown race ends it).
 ///
-/// Every connection task ends with the loop: each races its work against the
-/// `alive` channel, which closes when the loop's sender drops on shutdown.
-/// Without that an accepted connection outlives its server, and a browser's
-/// idle preconnect, reused for the request after a live-reload rebuild, is
-/// answered by the torn-down entity with a 500 rather than closed so the
-/// browser retries on the rebuilt listener.
+/// A connection task is entity-scoped, so it is cancelled when the server
+/// entity despawns and its stream closes with it: a browser's idle
+/// preconnect, reused for the request after a live-reload rebuild, sees EOF
+/// and retries on the rebuilt listener rather than being answered by the
+/// torn-down entity with a 500.
 async fn accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
 ) -> Result {
-	// never sent to: dropping the sender is the signal
-	let (_alive_tx, alive_rx) = async_channel::bounded::<()>(1);
 	loop {
 		let accept_result = listener.accept().await;
 		let (stream, peer_addr) = match accept_result {
@@ -112,18 +110,11 @@ async fn accept_loop(
 		};
 
 		let tls = tls.clone();
-		let alive = alive_rx.clone();
 		entity
 			.run_async(async move |entity| {
-				let served = beet_core::exports::futures_lite::future::or(
-					serve_sniffed(entity, stream, peer_addr, tls),
-					async move {
-						alive.recv().await.ok();
-						Ok(())
-					},
-				)
-				.await;
-				if let Err(err) = served {
+				if let Err(err) =
+					serve_sniffed(entity, stream, peer_addr, tls).await
+				{
 					error!("Error handling connection from {peer_addr}: {err}");
 				}
 			})
@@ -395,14 +386,55 @@ mod secure_test {
 
 #[cfg(test)]
 mod test {
-	// both the `ureq` roundtrip and the `tungstenite` upgrade test below read the
-	// parent module's items (and its glob imports, eg StreamExt and the matchers).
-	#[cfg(any(feature = "ureq", feature = "tungstenite"))]
 	use super::*;
 
 	// -- integration test via shared suite --
 	// (pure parse/serialise unit tests live with the shared helpers in
 	// `crate::types::http_ext`.)
+
+	/// A connection ends with its server entity: an idle keep-alive (a browser's
+	/// preconnect) is cancelled by the despawn and its stream dropped, so the
+	/// client's next read sees EOF and it retries on the rebuilt listener, rather
+	/// than being answered by the torn-down entity with a 500.
+	#[beet_core::test]
+	async fn despawn_closes_connections() {
+		use futures_lite::AsyncReadExt;
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let (server, on_spawn) =
+			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let addr: SocketAddr = ([127, 0, 0, 1], server.port.unwrap()).into();
+		let entity = app
+			.world_mut()
+			.spawn((server, on_spawn, children![exchange_ext::handler(|_| {
+				Response::ok()
+			})]))
+			.id();
+		// an idle connection: accepted, its task parked on the first read. The
+		// accept loop is the one task in flight until the connection's joins it.
+		let mut client = async_io::Async::<std::net::TcpStream>::connect(addr)
+			.await
+			.unwrap();
+		app_ext::update_until_timeout(
+			&mut app,
+			|world| world.resource::<AsyncSpawner>().in_flight() == 2,
+			Duration::from_secs(5),
+		)
+		.await
+		.xpect_true();
+		app.world_mut().entity_mut(entity).despawn();
+		// the cancelled task drops its stream, so the client reads EOF
+		let mut buf = [0u8; 1];
+		let spawner = app.world().resource::<AsyncSpawner>().clone();
+		AsyncRunner::poll_and_update(
+			spawner,
+			|| app.update(),
+			client.read(&mut buf),
+		)
+		.await
+		.unwrap()
+		.xpect_eq(0);
+	}
 
 	#[cfg(feature = "ureq")]
 	#[beet_core::test]

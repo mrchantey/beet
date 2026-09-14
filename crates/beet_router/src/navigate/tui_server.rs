@@ -93,8 +93,9 @@ async fn serve_tui(
 	entity
 		.world()
 		.with(move |world: &mut World| {
-			// already gone when the whole scene tore down, which is a teardown just
-			// the same
+			// a despawned server takes its host child with it (and cancels this
+			// facet before it gets here); an interrupt or reload keeps the server
+			// and drops the host alone.
 			world.try_despawn(host).ok();
 		})
 		.await;
@@ -126,9 +127,12 @@ async fn start_tui(
 	// `CardStackPlugin`) may patch a more specific opening route after boot.
 	let home = entity.get(|route: &OpeningRoute| route.0.clone()).await?;
 	// the live host: a stdio terminal paired with the page-host buffer (rendered
-	// together by `render_terminal`). Spawned with a "Loading…" placeholder and
-	// *without* the navigator yet, so the first frames paint loading rather than a
-	// blank screen. `--color-scheme` pins the session scheme app-wide.
+	// together by `render_terminal`), a child of the server so it goes with it
+	// (as an ssh session's surface goes with its connection). Spawned with a
+	// "Loading…" placeholder and *without* the navigator yet, so the first frames
+	// paint loading rather than a blank screen. `--color-scheme` pins the session
+	// scheme app-wide.
+	let server = entity.id();
 	let host = entity
 		.world()
 		.with(move |world: &mut World| {
@@ -139,6 +143,7 @@ async fn start_tui(
 				.spawn((
 					StdioTerminal::default(),
 					PageHost::bundle(terminal_ext::size()),
+					ChildOf(server),
 				))
 				.id();
 			set_loading_page(world, host);

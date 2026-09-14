@@ -96,6 +96,23 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 		});
 }
 
+/// Bind `page` to `navigator`'s surface (its [`PageHost`], resolved
+/// structurally), reclaiming the page if it has none.
+fn bind_or_reclaim(world: &mut World, navigator: Entity, page: Entity) {
+	match PageHost::of(world, navigator) {
+		Some(host) => bind_surface_page(world, host, page),
+		None => {
+			// a *despawned* navigator is an ssh client that disconnected while
+			// its page was building, not a misconfiguration; either way the
+			// finished page has nowhere to paint, so reclaim it.
+			if world.get_entity(navigator).is_ok() {
+				error!("navigator {navigator} has no page host to render into");
+			}
+			despawn_page_ephemerals(world, page, None);
+		}
+	}
+}
+
 impl Default for Navigator {
 	fn default() -> Self {
 		let home = Url::coerce(DEFAULT_HOME);
@@ -312,19 +329,21 @@ impl Navigator {
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
+		let navigator = entity.id();
 		// `about:` urls (eg the default `about:blank` home) are empty documents:
 		// render nothing without touching the network or router.
 		if url.scheme() == &Scheme::About {
-			let page = entity
+			entity
 				.world()
-				.with(|world| {
-					parse_page(
+				.with(move |world| -> Result {
+					let page = parse_page(
 						world,
 						MediaBytes::new(MediaType::Text, Vec::new()),
-					)
+					)?;
+					bind_or_reclaim(world, navigator, page);
+					Ok(())
 				})
 				.await?;
-			Self::bind_page(&entity, page).await;
 			return entity
 				.get_mut(|mut nav: Mut<Navigator>| nav.loading = false)
 				.await;
@@ -334,27 +353,30 @@ impl Navigator {
 		// the http branch consumes `url`.
 		let record_url = url.clone();
 
-		let page = match transport {
+		match transport {
 			NavigatorTransport::Http => {
-				// a real network fetch, then parse the bytes into a living tree
+				// a real network fetch, then parse the bytes into a living tree and
+				// bind it under one access, so nothing is orphaned if this task is
+				// cancelled between the two
 				let bytes = Self::http_fetch(user_agent, url, accepts).await?;
 				entity
 					.world()
-					.with(move |world| parse_page(world, bytes))
-					.await?
+					.with(move |world| -> Result {
+						let page = parse_page(world, bytes)?;
+						bind_or_reclaim(world, navigator, page);
+						Ok(())
+					})
+					.await?;
 			}
 			NavigatorTransport::InWorld { router } => {
 				// dispatch in-world to the local router, keeping the built tree
 				let request = Request::get(&url)
 					.with_header::<header::UserAgent>(user_agent)
 					.with_header::<header::Accept>(accepts);
-				build_live_page(&entity.world().entity(router), request).await?
+				Self::build_and_bind(&entity, router, request).await?;
 			}
-		};
+		}
 
-		// bind the new tree to this navigator's surface (the host repaints) and
-		// clear loading
-		Self::bind_page(&entity, page).await;
 		// record the page-view analytics: finalize the previous page's dwell and
 		// open the new one. A no-op for network browsing and without an observer.
 		record_page_view(&entity, &record_url).await?;
@@ -364,27 +386,38 @@ impl Navigator {
 		Ok(())
 	}
 
-	/// Bind `page` to this navigator's surface (its [`PageHost`], resolved
-	/// structurally from the navigator entity), reclaiming the page if it has none.
-	async fn bind_page(entity: &AsyncEntity, page: Entity) {
+	/// Build the page in-world and bind it to this navigator's surface, as a
+	/// world task.
+	///
+	/// The build spawns entities across several awaits, and this navigator's
+	/// own task is cancelled if it despawns mid-flight (an ssh client
+	/// disconnecting), which would orphan them; the world task always reaches
+	/// the bind, which reclaims the page when its host is gone.
+	async fn build_and_bind(
+		entity: &AsyncEntity,
+		router: Entity,
+		request: Request,
+	) -> Result {
 		let navigator = entity.id();
-		entity
-			.world()
-			.with(move |world| match PageHost::of(world, navigator) {
-				Some(host) => bind_surface_page(world, host, page),
-				None => {
-					// a *despawned* navigator is an ssh client that disconnected
-					// while its page was building, not a misconfiguration; either
-					// way the finished page has nowhere to paint, so reclaim it.
-					if world.get_entity(navigator).is_ok() {
-						error!(
-							"navigator {navigator} has no page host to render into"
-						);
-					}
-					despawn_page_ephemerals(world, page, None);
-				}
+		let world = entity.world().clone();
+		let (send, recv) = OnceValue::oneshot();
+		world
+			.run_async_local(move |world| async move {
+				let bound =
+					match build_live_page(&world.entity(router), request).await
+					{
+						Ok(page) => world
+							.with(move |world| {
+								bind_or_reclaim(world, navigator, page)
+							})
+							.await
+							.xok(),
+						Err(err) => Err(err),
+					};
+				send.signal(bound);
 			})
 			.await;
+		recv.wait().await
 	}
 
 	/// Fetch the page at `url` over the network, returning its bytes.

@@ -74,7 +74,7 @@ pub(crate) fn located_schemas_may_be_readable(
 /// the read backstop tightens the invariant on the document that named it.
 pub(crate) fn read_located_schemas(
 	mut commands: Commands,
-	async_commands: AsyncCommands,
+	mut async_commands: AsyncCommands,
 	registry: Res<SchemaRegistry>,
 	documents: Populated<
 		(Entity, &DocumentSchema),
@@ -92,17 +92,20 @@ pub(crate) fn read_located_schemas(
 		// its own snapshot, which is what validates the arriving document.
 		let (path, snapshot) = (path.clone(), registry.clone());
 		commands.entity(entity).insert(ReadingLocatedSchema);
-		async_commands.entity(entity).run(async move |entity| {
-			let outcome = read_located_schema(&entity, snapshot, path).await;
-			// always released, so a transient failure is retried when the next
-			// document or store arrives rather than wedging this one
-			entity
-				.with(|mut entity| {
-					entity.remove::<ReadingLocatedSchema>();
-				})
-				.await?;
-			outcome
-		});
+		async_commands
+			.entity(entity)
+			.queue_async(async move |entity| {
+				let outcome =
+					read_located_schema(&entity, snapshot, path).await;
+				// always released, so a transient failure is retried when the next
+				// document or store arrives rather than wedging this one
+				entity
+					.with(|mut entity| {
+						entity.remove::<ReadingLocatedSchema>();
+					})
+					.await?;
+				outcome
+			});
 	}
 }
 

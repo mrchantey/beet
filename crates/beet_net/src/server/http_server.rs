@@ -18,9 +18,10 @@ use bevy::platform::sync::OnceLock;
 /// and returns a boxed future. The backend reads the [`HttpServer`] config off the entity, opens its
 /// own listener, and dispatches each request through `entity.exchange(req)`,
 /// which resolves the dispatch host (usually the server's parent). It owns
-/// its teardown: on the shutdown signal it stops accepting and drops its listener
-/// (and may abort tasks it spawned), since only the backend knows how it spawned its
-/// own work.
+/// its teardown: on the shutdown signal it stops accepting and drops its listener,
+/// since only the backend knows how it spawned its own work. A despawn skips the
+/// signal and drops the future outright, so the listener must be released by
+/// its destructor; tasks spawned on the entity are cancelled with it.
 ///
 /// The future is a [`LocalBoxedFuture`] (never `Send`): the facet always drives it
 /// as a local task, so it stays on the thread it was created on. This lets a backend hold a thread-bound resource across an await, eg the
@@ -337,8 +338,10 @@ mod std_impl {
 pub(crate) mod tests {
 	use super::*;
 
-	/// A server whose backend records its two observable ends in `log`: `"start"`
-	/// in place of binding a port, `"stop"` in place of dropping the listener.
+	/// A server whose backend records its observable ends in `log`: `"start"`
+	/// in place of binding a port, `"stop"` once its shutdown signal resolves,
+	/// and `"drop"` when the facet future itself is dropped, which is how a
+	/// despawn ends it (cancelling the run before the signal is ever awaited).
 	///
 	/// Per-entity rather than the process-global install, so concurrently-driven
 	/// cases never observe each other's servers.
@@ -347,13 +350,22 @@ pub(crate) mod tests {
 		log: Store<Vec<&'static str>>,
 	) -> HttpServer {
 		HttpServer::new(port).with_backend(move |_entity, shutdown| {
+			let log = log.clone();
 			Box::pin(async move {
+				let _dropped = DropLog(log.clone());
 				log.push("start");
 				shutdown.wait().await;
 				log.push("stop");
 				Ok(())
 			})
 		})
+	}
+
+	/// Logs `"drop"` when the facet future holding it is dropped.
+	struct DropLog(Store<Vec<&'static str>>);
+
+	impl Drop for DropLog {
+		fn drop(&mut self) { self.0.push("drop"); }
 	}
 
 	fn app() -> App {
@@ -423,27 +435,30 @@ pub(crate) mod tests {
 	}
 
 	/// Removing the host's `Running<Response>` fires the facet's shutdown signal,
-	/// and a despawn is a teardown just the same: bevy runs remove hooks on
-	/// despawn, so the signal still reaches the live listener rather than
-	/// orphaning it.
+	/// which it tears down on before returning.
 	#[beet_core::test]
 	async fn teardown_on_running_removed() {
-		for despawn in [false, true] {
-			let mut app = app();
-			let (entity, log) = boot(&mut app, 0, Request::get("/"));
-			until_logged(&mut app, log, 1).await.xpect_true();
-			// end the run either way: the removal signals the facet's shutdown.
-			match despawn {
-				true => app.world_mut().entity_mut(entity).despawn(),
-				false => {
-					app.world_mut()
-						.entity_mut(entity)
-						.remove::<Running<Response>>();
-				}
-			}
-			until_logged(&mut app, log, 2).await.xpect_true();
-			log.get().xpect_eq(vec!["start", "stop"]);
-		}
+		let mut app = app();
+		let (entity, log) = boot(&mut app, 0, Request::get("/"));
+		until_logged(&mut app, log, 1).await.xpect_true();
+		app.world_mut()
+			.entity_mut(entity)
+			.remove::<Running<Response>>();
+		until_logged(&mut app, log, 3).await.xpect_true();
+		log.get().xpect_eq(vec!["start", "stop", "drop"]);
+	}
+
+	/// A despawn is a teardown of a different kind: the run's task is entity
+	/// scoped, so the facet future is dropped outright, its listener released by
+	/// its destructors rather than by code after the signal.
+	#[beet_core::test]
+	async fn teardown_on_despawn() {
+		let mut app = app();
+		let (entity, log) = boot(&mut app, 0, Request::get("/"));
+		until_logged(&mut app, log, 1).await.xpect_true();
+		app.world_mut().entity_mut(entity).despawn();
+		until_logged(&mut app, log, 2).await.xpect_true();
+		log.get().xpect_eq(vec!["start", "drop"]);
 	}
 
 	/// A serve loop that never opens (a port already bound) fails the run it was

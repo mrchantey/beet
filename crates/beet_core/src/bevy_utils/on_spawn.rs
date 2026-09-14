@@ -157,7 +157,8 @@ impl OnSpawn {
 
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
-	/// Creates a new [`OnSpawn`] effect that runs an async function.
+	/// Creates a new [`OnSpawn`] effect that runs an async function as a task
+	/// of the entity, cancelled when it despawns.
 	#[cfg(feature = "std")]
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
@@ -167,18 +168,15 @@ impl OnSpawn {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
-			let id = entity.id();
-			entity.world_scope(move |world| {
-				world
-					.run_async(async move |world| func(world.entity(id)).await);
-			});
+			entity.run_async(func);
 		}))
 	}
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function on the local
-	/// thread. Rides `bevy_async` (not `std`): the local runtime is
-	/// single-threaded, so unlike the `Send` [`new_async`](Self::new_async) it
-	/// works on no_std targets too (eg an esp firmware).
+	/// thread, as a task of the entity. Rides `bevy_async` (not `std`): the
+	/// local runtime is single-threaded, so unlike the `Send`
+	/// [`new_async`](Self::new_async) it works on no_std targets too (eg an esp
+	/// firmware).
 	#[cfg(feature = "bevy_async")]
 	pub fn new_async_local<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
@@ -188,12 +186,7 @@ impl OnSpawn {
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {
-			let id = entity.id();
-			entity.world_scope(move |world| {
-				world.run_async_local(async move |world| {
-					func(world.entity(id)).await
-				});
-			});
+			entity.run_async_local(func);
 		}))
 	}
 }

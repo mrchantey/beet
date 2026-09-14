@@ -105,10 +105,9 @@ pub impl EntityCommands<'_> {
 
 	/// Queues an asynchronous task for this entity.
 	///
-	/// The task receives an [`AsyncEntity`] handle and, being entity-scoped, ends
-	/// cleanly if the entity is despawned while it runs (a long-lived reconnect or
-	/// accept loop outliving a scene swap) rather than routing the resulting error
-	/// to the panicking handler. If the entity is already gone by the time the
+	/// The task receives an [`AsyncEntity`] handle and is entity-scoped: it is
+	/// cancelled if the entity is despawned while it runs (a reconnect or accept
+	/// loop ends with its scene). If the entity is already gone by the time the
 	/// command applies, the task is never spawned and the drop is logged at
 	/// `debug` against the queueing call site.
 	#[cfg(feature = "bevy_async")]
@@ -135,9 +134,9 @@ pub impl EntityCommands<'_> {
 
 	/// Queues a local asynchronous task for this entity, the `_local` (thread-bound
 	/// `Fut`) sibling of [`queue_async`](Self::queue_async) with the same
-	/// entity-scoped semantics: it ends cleanly if the entity is despawned while it
-	/// runs, and is never spawned (a `debug` log against the queueing call site) if
-	/// the entity is already gone when the command applies.
+	/// entity-scoped semantics: it is cancelled if the entity is despawned while
+	/// it runs, and is never spawned (a `debug` log against the queueing call
+	/// site) if the entity is already gone when the command applies.
 	#[cfg(feature = "bevy_async")]
 	#[track_caller]
 	fn queue_async_local<Func, Fut, Out>(&mut self, func: Func)

@@ -197,10 +197,6 @@ impl BlobStoreProvider for LocalStorageStore {
 	}
 }
 
-use core::sync::atomic::AtomicBool;
-use core::sync::atomic::Ordering;
-use std::rc::Rc;
-
 /// A single global `storage` event listener forwarding cross-tab localStorage
 /// mutations into the [`BlobEventBus`], refcounted across all
 /// [`LocalStorageStore`]s.
@@ -213,8 +209,9 @@ use std::rc::Rc;
 /// resource.
 #[derive(Default)]
 pub(crate) struct LocalStorageBlobWatcher {
-	/// Cleared on the last unsubscribe to stop the forwarding task.
-	alive: Option<Rc<AtomicBool>>,
+	/// The forwarding task, cancelled (dropping its JS listener) on the last
+	/// unsubscribe.
+	task: Option<TaskHandle>,
 	/// Number of active [`LocalStorageStore`]s.
 	subscribers: usize,
 }
@@ -230,21 +227,16 @@ pub(crate) fn add_local_storage_store_watcher(
 	if watcher.subscribers > 1 {
 		return;
 	}
-	let alive = Rc::new(AtomicBool::new(true));
-	watcher.alive = Some(alive.clone());
 	let sender = bus.sender.clone();
-	spawner.spawn_local(async move {
+	watcher.task = Some(spawner.spawn_local(async move {
 		let mut listener =
 			HtmlEventListener::<web_sys::StorageEvent>::new("storage");
-		while alive.load(Ordering::Relaxed) {
-			let Some(ev) = listener.next_event().await else {
-				break;
-			};
+		while let Some(ev) = listener.next_event().await {
 			if let Some(event) = storage_event_to_blob(&ev) {
 				sender.try_send(event).ok();
 			}
 		}
-	});
+	}));
 }
 
 /// Drop the refcount, tearing down the listener on the last
@@ -255,9 +247,7 @@ pub(crate) fn remove_local_storage_store_watcher(
 ) {
 	watcher.subscribers = watcher.subscribers.saturating_sub(1);
 	if watcher.subscribers == 0 {
-		if let Some(alive) = watcher.alive.take() {
-			alive.store(false, Ordering::Relaxed);
-		}
+		watcher.task = None;
 	}
 }
 

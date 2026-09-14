@@ -75,7 +75,7 @@ pub(crate) fn scene_blobs_may_be_readable(
 /// exists, else the original, forked.
 pub(crate) fn read_scene_blobs(
 	mut commands: Commands,
-	async_commands: AsyncCommands,
+	mut async_commands: AsyncCommands,
 	blobs: Populated<
 		(Entity, &SceneBlob),
 		(Without<ReadingSceneBlob>, Without<SceneDocument>),
@@ -84,17 +84,19 @@ pub(crate) fn read_scene_blobs(
 	for (entity, blob) in blobs.iter() {
 		let blob = blob.clone();
 		commands.entity(entity).insert(ReadingSceneBlob);
-		async_commands.entity(entity).run(async move |entity| {
-			let outcome = read_scene_blob(&entity, blob).await;
-			// always released, so a transient failure is retried when the next
-			// blob or store arrives rather than wedging this one
-			entity
-				.with(|mut entity| {
-					entity.remove::<ReadingSceneBlob>();
-				})
-				.await?;
-			outcome
-		});
+		async_commands
+			.entity(entity)
+			.queue_async(async move |entity| {
+				let outcome = read_scene_blob(&entity, blob).await;
+				// always released, so a transient failure is retried when the next
+				// blob or store arrives rather than wedging this one
+				entity
+					.with(|mut entity| {
+						entity.remove::<ReadingSceneBlob>();
+					})
+					.await?;
+				outcome
+			});
 	}
 }
 
@@ -138,7 +140,7 @@ async fn read_scene_blob(entity: &AsyncEntity, blob: SceneBlob) -> Result {
 
 /// Write each edited scene document back to its store.
 pub(crate) fn write_scene_blobs(
-	async_commands: AsyncCommands,
+	mut async_commands: AsyncCommands,
 	edited: Populated<
 		(Entity, &SceneBlob),
 		(With<SceneDocument>, Changed<Document>),
@@ -153,14 +155,20 @@ pub(crate) fn write_scene_blobs(
 		}
 		let (path, media_type, trigger) =
 			(blob.path.clone(), blob.media_type(), blob.trigger.clone());
-		async_commands.entity(entity).run(async move |entity| {
-			trigger
-				.run_flush(async move || {
-					write_scene_blob(&entity, path.clone(), media_type.clone())
+		async_commands
+			.entity(entity)
+			.queue_async(async move |entity| {
+				trigger
+					.run_flush(async move || {
+						write_scene_blob(
+							&entity,
+							path.clone(),
+							media_type.clone(),
+						)
 						.await
-				})
-				.await
-		});
+					})
+					.await
+			});
 	}
 }
 

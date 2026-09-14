@@ -19,7 +19,7 @@ where
 		Action::new(
 			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
-			          commands,
+			          mut commands,
 			          caller,
 			          input,
 			          out_handler,
@@ -31,10 +31,9 @@ where
 				};
 				let func = func.clone();
 				// entity-scoped: if `caller` despawns while the handler future is in
-				// flight (a scene swap, an episode ending), the resulting despawn error
-				// is that entity's lifecycle ending — logged, not routed to the panicking
-				// error handler that would otherwise brick the whole schedule.
-				commands.entity(caller).run(
+				// flight (a scene swap, an episode ending), the task is cancelled with
+				// it rather than erroring into the panicking handler.
+				commands.entity(caller).queue_async(
 					async move |entity: AsyncEntity| -> Result {
 						let result: Result<Out> = func(arg).await.into_result();
 						out_handler
@@ -62,7 +61,7 @@ where
 		Action::new(
 			ActionMeta::of::<Func, In, Out>(),
 			move |ActionCall {
-			          commands,
+			          mut commands,
 			          caller,
 			          input,
 			          out_handler,
@@ -73,9 +72,9 @@ where
 					input,
 				};
 				let func = func.clone();
-				// entity-scoped (see `new_async`): a caller despawned mid-flight ends the
-				// task cleanly rather than panicking the schedule.
-				commands.entity(caller).run_local(
+				// entity-scoped (see `new_async`): a caller despawned mid-flight cancels
+				// the task rather than panicking the schedule.
+				commands.entity(caller).queue_async_local(
 					async move |entity: AsyncEntity| -> Result {
 						let result: Result<Out> = func(arg).await.into_result();
 						out_handler

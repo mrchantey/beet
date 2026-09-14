@@ -143,11 +143,10 @@ impl Socket {
 			.run_async_local(async move |_| {
 				while let Some(message) = message_recv.recv().await {
 					// a close message ends the connection: close the sink (flushing the
-					// close frame and shutting the write half) and stop the writer, so a
-					// despawn-time close (eg a live-reload teardown broadcasting a close)
-					// actually drops the connection rather than leaving the peer joined to
-					// a dead task. The writer task otherwise outlives the entity, so a bare
-					// despawn never closes the connection on its own.
+					// close frame and shutting the write half) and stop the writer, the
+					// clean handshake a teardown broadcasts ahead of its despawn. A bare
+					// despawn cancels this task instead, dropping the sink and with it the
+					// connection, without the frame.
 					if let Message::Close(frame) = message {
 						send.close(frame).await.ok();
 						break;

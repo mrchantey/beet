@@ -49,7 +49,7 @@ fn bind_on_connection_ready(
 	ev: On<SocketReady>,
 	parents: Query<&ChildOf>,
 	servers: Query<(), With<CapabilityServer>>,
-	commands: AsyncCommands,
+	mut commands: AsyncCommands,
 ) {
 	let connection = ev.target();
 	// only the agent server's own accepted connections, not other ready sockets.
@@ -63,7 +63,7 @@ fn bind_on_connection_ready(
 	};
 	commands
 		.entity(connection)
-		.run_local(async move |connection| {
+		.queue_async_local(async move |connection| {
 			if let Err(err) = bind_connection(connection, server).await {
 				warn!("failed to bind capability connection: {err}");
 			}

@@ -104,6 +104,9 @@ impl CallOnReady {
 	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
 		let response = match Self::response(&entity, request).await {
 			Ok(response) => response,
+			// a run ended by whoever removed its `Running` (a driver stopping the
+			// server it booted) is neither a result nor a fault: the exit is theirs
+			Err(err) if ControlFlowError::is_interrupted(&err) => return Ok(()),
 			Err(err) => {
 				error!("{err}");
 				entity.world().write_message(AppExit::error()).await;

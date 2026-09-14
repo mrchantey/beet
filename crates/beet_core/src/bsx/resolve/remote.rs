@@ -31,52 +31,54 @@ pub(super) fn register_remote_schema(
 	url: SmolStr,
 	cx: &mut TemplateContext,
 ) -> Result {
-	let entity_id = cx.entity.id();
-	// SAFETY: only used to register the pending dependency and read the spawner.
-	let world = unsafe { cx.entity.world_mut() };
 	// a schema gates validation, not tree content: passive.
-	let (async_world, spawner, guard) = TemplatePending::register_fetch(
-		world,
-		entity_id,
+	TemplatePending::register_fetch(
+		cx.entity,
 		PendingKind::Passive,
 		format!("remote schema `{name}` at `{url}`"),
-	)?;
-	spawner.spawn(resolve_remote_schema(async_world, name, url, guard));
-	Ok(())
+		move |entity, guard| resolve_remote_schema(entity, name, url, guard),
+	)
 }
 
 impl TemplatePending {
-	/// Park a [`PendingGuard`] on the build root's pending set and read the async
-	/// runtime handles, erroring gracefully if the async runtime is absent.
+	/// Park a [`PendingGuard`] on the build root's pending set and spawn `fetch`
+	/// as a task of `entity`, handing it the guard to resolve once the
+	/// dependency lands. Errors gracefully if the async runtime is absent.
 	///
-	/// Returns the [`AsyncWorld`] + [`AsyncSpawner`] to drive the fetch and the
-	/// guard to resolve once the dependency lands; a guard dropped by a dead task
-	/// resolves through the sweep, so the fetch can never hang the load. Public so
-	/// a higher layer can build its own store-backed front-end on the same wiring
-	/// (eg `beet_router`'s `<Template src>` include reads the bytes through a
-	/// `BlobStore` it alone can reference).
-	pub fn register_fetch(
-		world: &mut World,
-		entity: Entity,
+	/// The task ends with the entity, and a guard dropped by a cancelled or dead
+	/// task resolves through the sweep, so the fetch can never hang the load.
+	/// Public so a higher layer can build its own store-backed front-end on the
+	/// same wiring (eg `beet_router`'s `<Template src>` include reads the bytes
+	/// through a `BlobStore` it alone can reference).
+	pub fn register_fetch<Func, Fut>(
+		entity: &mut EntityWorldMut,
 		kind: PendingKind,
 		label: impl Into<SmolStr>,
-	) -> Result<(AsyncWorld, AsyncSpawner, PendingGuard)> {
-		let (Some(async_world), Some(spawner)) = (
-			world.get_resource::<AsyncWorld>().cloned(),
-			world.get_resource::<AsyncSpawner>().cloned(),
-		) else {
-			bevybail!(
-				"a remote schema/template needs the async runtime (add `AsyncPlugin`)"
-			);
-		};
-		let guard = TemplatePending::park(world, entity, kind, label);
-		Ok((async_world, spawner, guard))
+		fetch: Func,
+	) -> Result
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity, PendingGuard) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = ()>,
+	{
+		let id = entity.id();
+		let guard = entity.world_scope(|world| -> Result<PendingGuard> {
+			if !world.contains_resource::<AsyncWorld>()
+				|| !world.contains_resource::<AsyncSpawner>()
+			{
+				bevybail!(
+					"a remote schema/template needs the async runtime (add `AsyncPlugin`)"
+				);
+			}
+			TemplatePending::park(world, id, kind, label).xok()
+		})?;
+		entity.run_async(move |entity| fetch(entity, guard));
+		Ok(())
 	}
 }
 
 /// Fetch (stubbed), register, then resolve a remote schema's pending dependency.
 async fn resolve_remote_schema(
-	async_world: AsyncWorld,
+	entity: AsyncEntity,
 	name: SmolStr,
 	url: SmolStr,
 	guard: PendingGuard,
@@ -85,7 +87,8 @@ async fn resolve_remote_schema(
 	// the wiring is live.
 	let schema = fetch_remote_schema(&url).await;
 
-	async_world
+	entity
+		.world()
 		.with(move |world: &mut World| {
 			world
 				.get_resource_or_init::<SchemaRegistry>()
@@ -112,32 +115,27 @@ pub(super) fn register_remote_template(
 	src: SmolStr,
 	cx: &mut TemplateContext,
 ) -> Result {
-	let entity_id = cx.entity.id();
-	// SAFETY: only used to register the pending dependency and read the spawner.
-	let world = unsafe { cx.entity.world_mut() };
 	// a remote template builds content at the include site: structural.
-	let (async_world, spawner, guard) = TemplatePending::register_fetch(
-		world,
-		entity_id,
+	TemplatePending::register_fetch(
+		cx.entity,
 		PendingKind::Structural,
 		format!("remote template `{src}`"),
-	)?;
-	spawner.spawn(resolve_remote_template(async_world, src, entity_id, guard));
-	Ok(())
+		move |entity, guard| resolve_remote_template(entity, src, guard),
+	)
 }
 
 /// Fetch (stubbed), build, then resolve a remote template's pending dependency.
 async fn resolve_remote_template(
-	async_world: AsyncWorld,
+	entity: AsyncEntity,
 	src: SmolStr,
-	target: Entity,
 	guard: PendingGuard,
 ) {
 	// no transport (see the module doc): the include site stays empty. Fetching
 	// and building the remote `.bsx` is deferred to the BSN transition.
-	let _ = (&src, target);
+	let _ = &src;
 
-	async_world
+	entity
+		.world()
 		.with(move |world: &mut World| {
 			guard.resolve(world);
 		})

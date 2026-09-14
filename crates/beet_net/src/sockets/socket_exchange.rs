@@ -215,7 +215,7 @@ fn on_remove(mut world: DeferredWorld, cx: HookContext) {
 fn on_exchange_recv(
 	ev: On<MessageRecv>,
 	mut sockets: Query<&mut ExchangeSocket>,
-	commands: AsyncCommands,
+	mut commands: AsyncCommands,
 ) -> Result {
 	let connection = ev.target();
 	let Ok(mut socket) = sockets.get_mut(connection) else {
@@ -251,14 +251,14 @@ fn on_exchange_recv(
 			body,
 		} => {
 			let codec = socket.codec.clone();
-			commands
-				.entity(connection)
-				.run_local(async move |connection| {
+			commands.entity(connection).queue_async_local(
+				async move |connection| {
 					serve_request(
 						connection, codec, id, method, url, headers, body,
 					)
 					.await
-				});
+				},
+			);
 		}
 	}
 	Ok(())
