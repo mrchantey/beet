@@ -14,6 +14,12 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// Returns a new provider scoped to the given subdirectory.
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider>;
 
+	/// The unscoped store at this store's root: the same backing with no subdir,
+	/// the one [`root_key`](Self::root_key) names. A watcher keys its events to it
+	/// so they route through [`did_change`](Self::did_change) whichever scope
+	/// registered the watch.
+	fn base(&self) -> Box<dyn BlobStoreProvider>;
+
 	/// A view of this store rooted at `root` (a cleaned path relative to the
 	/// store, which may climb above it with a leading `..`), plus `entry_name`
 	/// re-expressed relative to that root. The seam behind
@@ -284,6 +290,7 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
 	}
+	fn base(&self) -> Box<dyn BlobStoreProvider> { self.as_ref().base() }
 	fn rebase(
 		&self,
 		entry_name: &RelPath,

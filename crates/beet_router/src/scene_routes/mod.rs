@@ -28,8 +28,8 @@ pub use default_renderer::*;
 mod route_query;
 pub use route_query::*;
 // reactive template registration: a `<TemplateDir src="templates"/>` reads its
-// dir through the nearest ancestor [`BlobStore`] and registers each template,
-// resolved by `AncestorQuery<&BlobStore>` like `RoutesDir`.
+// dir through the store its derived `DirPath` scoped and registers each
+// template, like `RoutesDir`.
 #[cfg(feature = "bsx")]
 mod template_dir;
 #[cfg(feature = "bsx")]
@@ -54,3 +54,23 @@ pub use routes_dir::*;
 // nearest `BlobStore`. cross-platform: the wasm Worker serves a site's assets too.
 mod serve_blobs;
 pub use serve_blobs::*;
+
+use beet_core::prelude::*;
+use beet_net::prelude::*;
+
+/// The scoped [`BlobStore`] a dir's derived [`DirPath`] produced on `entity`,
+/// the store its async scan reads through; an error naming the tag when no
+/// ancestor store backs it (the dir must be a child of its store's entity).
+pub(crate) fn scoped_store(
+	stores: &Query<&BlobStore>,
+	entity: Entity,
+	tag: &str,
+	src: &RelPath,
+) -> Result<BlobStore> {
+	stores.get(entity).cloned().ok().ok_or_else(|| {
+		bevyhow!(
+			"`<{tag} src=\"{src}\">` has no store: it scopes the nearest \
+			ancestor `BlobStore`, which is missing"
+		)
+	})
+}

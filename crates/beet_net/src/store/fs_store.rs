@@ -72,6 +72,10 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(FsStore::new(self.path.clone()))
+	}
+
 	/// The filesystem has a parent universe above the store's root, so a
 	/// `../..` root re-roots the store at the absolute resolved directory
 	/// rather than erroring — walking above the entry's directory is the

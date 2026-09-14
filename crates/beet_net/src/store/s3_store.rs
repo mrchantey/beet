@@ -219,6 +219,13 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(S3Store {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "s3" }
 
 	fn root_key(&self) -> SmolStr { format!("s3:{}", self.bucket_name).into() }

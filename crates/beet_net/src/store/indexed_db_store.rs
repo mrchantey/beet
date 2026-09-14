@@ -173,6 +173,13 @@ impl BlobStoreProvider for IndexedDbStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(IndexedDbStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "indexeddb" }
 
 	fn root_key(&self) -> SmolStr {

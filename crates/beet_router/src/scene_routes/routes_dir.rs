@@ -2,13 +2,14 @@
 //! spawn time, no codegen.
 //!
 //! Inserting a [`RoutesDir`] (eg from a `main.bsx` entry via
-//! `<RoutesDir src="routes"/>`) triggers [`RoutesDir::spawn_on_insert`]: the
-//! nearest ancestor [`BlobStore`] (the repo store composed on the loaded root) is
-//! scoped to `src` and listed, and each content file
-//! (`.md`/`.mdx`/`.bsx`/`.html`) spawns a [`BlobScene`] route child served through
-//! the shared media-parse pipeline. The scoped [`BlobStore`] is composed onto the
-//! [`RoutesDir`] entity so the routes read their bytes from it, and each file's
-//! ROOT declarations ([`RootDeclarations`]: markdown frontmatter or a BSX root
+//! `<RoutesDir src="routes"/>`) derives a [`DirPath`] scoping the nearest
+//! ancestor [`BlobStore`] (the repo store composed on the loaded root) to `src`
+//! onto the dir entity, which also registers the dir's [`WatchDir`] for live
+//! reload, and triggers [`RoutesDir::spawn_on_insert`]: the scoped store is
+//! listed, and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
+//! [`BlobScene`] route child served through the shared media-parse pipeline,
+//! reading its bytes through that store. Each file's ROOT declarations
+//! ([`RootDeclarations`]: markdown frontmatter or a BSX root
 //! spread) are read at scan time and hoisted onto the route entity, so navigation
 //! (eg [`RouteSidebar`](crate::prelude::RouteSidebar)) knows every page's
 //! title/order without visiting it. The scan knows no metadata type: it hoists
@@ -45,6 +46,7 @@ use beet_ui::prelude::*;
 /// ```
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_insert = hook_ext::component_hook(|dir: &RoutesDir| DirPath::derive(&dir.src)))]
 pub struct RoutesDir {
 	/// The content directory, relative to the nearest ancestor [`BlobStore`].
 	pub src: RelPath,
@@ -80,12 +82,11 @@ impl RoutesDir {
 	///
 	/// The scan is store I/O (the filesystem in dev, S3 in a deployed task, R2 in a
 	/// Worker), so it runs as an [`AsyncEntity`] task rather than blocking the runtime
-	/// (which is single-threaded on wasm). The nearest ancestor [`BlobStore`] (the site
-	/// store composed on the loaded root) is resolved *inside* that task, where the
-	/// whole tree is already built, so the ancestor link is reliably present; a
-	/// store-less app is an error (never an implicit filesystem store, which has none
-	/// on wasm). Exclusive of this entity, whose own store is the scoped one a
-	/// previous scan composed (a rescan must not compound it).
+	/// (which is single-threaded on wasm). The dir's scoped [`BlobStore`] (its
+	/// derived [`DirPath`]'s output, resolved from the nearest ancestor store) is
+	/// read *inside* that task, where the whole tree is already built, so it is
+	/// reliably present; a store-less app is an error (never an implicit
+	/// filesystem store, which has none on wasm).
 	///
 	/// A rescan (re-inserting the dir, as a live reload does) is a swap, never a
 	/// respawn: the new routes spawn hidden beside the old ones and one world
@@ -135,10 +136,9 @@ impl RoutesDir {
 				// resolves through the sweep.
 				return;
 			};
-			// off the async runtime: resolve the nearest ancestor store + scope it
-			// to `src`, await the content scan, then compose the scoped store onto
-			// the entity, spawn the route children, and flush so the route-tree
-			// observers settle against the whole hierarchy.
+			// off the async runtime: read the dir's scoped store, await the
+			// content scan, then spawn the route children and flush so the
+			// route-tree observers settle against the whole hierarchy.
 			entity_mut.run_async_local(
 				async move |dir: AsyncEntity| -> Result {
 					// resolved together, inside the task where the whole tree is
@@ -147,12 +147,14 @@ impl RoutesDir {
 					// frontmatter keys declare.
 					let (store, frontmatter_type) = dir
 						.with_state::<(
-							AncestorQuery<&BlobStore>,
+							Query<&BlobStore>,
 							AncestorQuery<&FrontmatterType>,
 						), Result<(BlobStore, FrontmatterType)>>(
-							|entity, (stores, types)| {
+							move |entity, (stores, types)| {
 								Ok((
-									stores.get_exclusive(entity).cloned()?,
+									scoped_store(
+										&stores, entity, "RoutesDir", &src,
+									)?,
 									types
 										.get(entity)
 										.cloned()
@@ -161,7 +163,6 @@ impl RoutesDir {
 							},
 						)
 						.await??;
-					let store = store.with_subdir(src);
 					let specs = Self::discover_routes(
 						&store,
 						&filter,
@@ -170,14 +171,6 @@ impl RoutesDir {
 					.await?;
 					dir.world()
 						.with(move |world| {
-							// watch the discovered routes dir for live reload (keyed to
-							// its base store); inert on a non-fs store / on wasm.
-							let watch = WatchDir::from_store(&store);
-							let mut entity_mut = world.entity_mut(entity);
-							entity_mut.insert(store);
-							if let Some(watch) = watch {
-								entity_mut.insert(watch);
-							}
 							// every valid route still spawns, so one bad slug does
 							// not take the site down with it; the failures are
 							// reported together once the guard has resolved.
@@ -521,6 +514,35 @@ mod test {
 		)
 		.await;
 		assert_serves(&mut world, root).await;
+	}
+
+	/// A dir's derived [`DirPath`] scopes its store and registers its
+	/// [`WatchDir`], the one registration site every mount shares.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	async fn scopes_and_watches_its_dir() {
+		let mut world = router_world();
+		let store = fs_fixture("watches", SERVES_FILES);
+		let root = spawn_routes(
+			&mut world,
+			store.clone(),
+			(Router, children![RoutesDir::new("docs")]),
+		)
+		.await;
+		let dir = world.entity(root).get::<Children>().unwrap()[0];
+		let scoped = store.with_subdir(RelPath::new("docs"));
+		world
+			.entity(dir)
+			.get::<BlobStore>()
+			.unwrap()
+			.same_scope(&scoped)
+			.xpect_true();
+		world
+			.entity(dir)
+			.get::<WatchDir>()
+			.unwrap()
+			.dir
+			.xpect_eq(scoped.watch_dir().unwrap());
 	}
 
 	/// The same site loads identically from a non-filesystem store: discovery,

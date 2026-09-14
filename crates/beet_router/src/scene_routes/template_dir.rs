@@ -2,9 +2,10 @@
 //! resolvable `<path::to::X>` tags at spawn time, no codegen.
 //!
 //! Inserting a [`TemplateDir`] (eg from a `main.bsx` entry via
-//! `<TemplateDir src="templates"/>`) triggers [`TemplateDir::register_on_insert`]:
-//! the nearest ancestor [`BlobStore`] is scoped to `src`, every recognized
-//! template source under it is read and registered into the
+//! `<TemplateDir src="templates"/>`) derives a [`DirPath`] scoping the nearest
+//! ancestor [`BlobStore`] to `src` (which also registers the dir's [`WatchDir`])
+//! and triggers [`TemplateDir::register_on_insert`]: every recognized template
+//! source under the scoped store is read and registered into the
 //! [`BsxTemplateRegistry`] by its module path (`templates/widgets/Card.bsx` ->
 //! `widgets::Card`), and the BSX schemas are refreshed. Store-backed, so it reads
 //! identically from the local filesystem in dev, S3 in a deployed task, R2 in a
@@ -17,6 +18,7 @@
 //! covers everything that resolves later (route pages, library widgets, live
 //! reload).
 
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -25,6 +27,7 @@ use beet_net::prelude::*;
 /// module docs).
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_insert = hook_ext::component_hook(|dir: &TemplateDir| DirPath::derive(&dir.src)))]
 pub struct TemplateDir {
 	/// The template directory, relative to the nearest ancestor [`BlobStore`].
 	pub src: RelPath,
@@ -73,12 +76,12 @@ impl TemplateDir {
 	///
 	/// The read is store I/O (the filesystem in dev, S3/R2 when deployed), so it
 	/// runs as an [`AsyncEntity`] task rather than blocking the runtime (which is
-	/// single-threaded on wasm). The nearest ancestor [`BlobStore`] is resolved
-	/// *inside* that task, where the whole tree is built, so the ancestor link is
-	/// present; a store-less app is an error. The registration parks a
-	/// [`PendingGuard`] on the build root (or this entity outside a build), so a
-	/// load or settle ([`TemplatePending::settle`]) waits for it; on completion
-	/// the entity is also marked [`TemplatesLoaded`].
+	/// single-threaded on wasm). The dir's scoped [`BlobStore`] (its derived
+	/// [`DirPath`]'s output) is resolved *inside* that task, where the whole tree
+	/// is built, so it is present; a store-less app is an error. The registration
+	/// parks a [`PendingGuard`] on the build root (or this entity outside a
+	/// build), so a load or settle ([`TemplatePending::settle`]) waits for it; on
+	/// completion the entity is also marked [`TemplatesLoaded`].
 	pub fn register_on_insert(
 		ev: On<Insert, TemplateDir>,
 		dirs: Query<&TemplateDir>,
@@ -116,31 +119,24 @@ impl TemplateDir {
 			entity_mut.run_async_local(
 				async move |dir: AsyncEntity| -> Result {
 					let store = dir
-						.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-							|entity, stores| {
-								stores.get(entity).map(BlobStore::clone)
+						.with_state::<Query<&BlobStore>, Result<BlobStore>>(
+							move |entity, stores| {
+								scoped_store(
+									&stores,
+									entity,
+									"TemplateDir",
+									&src,
+								)
 							},
 						)
 						.await??;
-					let sources =
-						Self::read_sources(&store, &src, &formats).await?;
+					let sources = Self::read_sources(&store, &formats).await?;
 					dir.world()
 						.with(move |world| -> Result {
 							Self::register_sources(
 								world, entity, &formats, sources,
 							)?;
-							// watch the templates dir for live reload (keyed to its base
-							// store); inert on a non-fs store / on wasm.
-							let scoped = store.with_subdir(src);
-							{
-								let mut entity_mut = world.entity_mut(entity);
-								entity_mut.insert(TemplatesLoaded);
-								if let Some(watch) =
-									WatchDir::from_store(&scoped)
-								{
-									entity_mut.insert(watch);
-								}
-							}
+							world.entity_mut(entity).insert(TemplatesLoaded);
 							world.flush();
 							guard.resolve(world);
 							Ok(())
@@ -153,17 +149,16 @@ impl TemplateDir {
 		Ok(())
 	}
 
-	/// Read every recognized template source under the store's `src` subdirectory
-	/// as `(path, source)` pairs (each path relative to `src`), keeping only files
-	/// whose [`MediaType`] `formats` recognizes (`.bsx`, `.js`). Async (store I/O),
-	/// so a load path awaits it off the runtime. A missing directory yields no
-	/// pairs, so an entry can declare a dir it does not ship.
+	/// Read every recognized template source under `store` (a template dir's
+	/// scoped store) as `(path, source)` pairs (each path relative to it),
+	/// keeping only files whose [`MediaType`] `formats` recognizes (`.bsx`,
+	/// `.js`). Async (store I/O), so a load path awaits it off the runtime. A
+	/// missing directory yields no pairs, so an entry can declare a dir it does
+	/// not ship.
 	pub async fn read_sources(
 		store: &BlobStore,
-		src: &RelPath,
 		formats: &TemplateFormats,
 	) -> Result<Vec<(RelPath, String)>> {
-		let store = store.with_subdir(src.clone());
 		if !store.store_exists().await? {
 			return Ok(Vec::new());
 		}
@@ -251,7 +246,7 @@ mod test {
 		store
 	}
 
-	/// Inserting a [`TemplateDir`] over a store registers its templates so a
+	/// Inserting a [`TemplateDir`] under a store registers its templates so a
 	/// `<widgets::Card>` tag resolves, store-agnostic (wasm too).
 	#[beet_core::test]
 	async fn registers_templates_from_store() {
@@ -261,7 +256,7 @@ mod test {
 			"<section class=\"card\"><Slot/></section>",
 		)])
 		.await;
-		world.spawn((store, TemplateDir::new("templates")));
+		world.spawn((store, children![TemplateDir::new("templates")]));
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world
 			.resource::<BsxTemplateRegistry>()

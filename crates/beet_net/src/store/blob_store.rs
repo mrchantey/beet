@@ -60,6 +60,12 @@ impl BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
+	/// The unscoped store at this store's root (see
+	/// [`BlobStoreProvider::base`]): the same backing, no subdir.
+	pub fn base(&self) -> BlobStore {
+		BlobStore::from_arc(Arc::from(self.provider.base()))
+	}
+
 	/// Rebase this store and `entry_name` through the entry's declared
 	/// `<RepoRoot src>`: `src` names a position relative to the entry
 	/// document's own location *in this store*, so the new root is
@@ -236,6 +242,7 @@ impl BlobStoreProvider for BlobStore {
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.provider.with_subdir(path)
 	}
+	fn base(&self) -> Box<dyn BlobStoreProvider> { self.provider.base() }
 	fn rebase(
 		&self,
 		entry_name: &RelPath,

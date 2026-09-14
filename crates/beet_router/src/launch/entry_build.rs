@@ -308,14 +308,17 @@ pub async fn read_sources(
 	let mut template_sources = Vec::new();
 	for dir in &prescan.template_dirs {
 		template_sources.extend(
-			TemplateDir::read_sources(repo_store, dir, &formats)
-				.await?
-				.into_iter()
-				.map(|(rel, source)| TemplateSource {
-					dir: dir.clone(),
-					rel,
-					source,
-				}),
+			TemplateDir::read_sources(
+				&repo_store.with_subdir(dir.clone()),
+				&formats,
+			)
+			.await?
+			.into_iter()
+			.map(|(rel, source)| TemplateSource {
+				dir: dir.clone(),
+				rel,
+				source,
+			}),
 		);
 	}
 	EntrySources {

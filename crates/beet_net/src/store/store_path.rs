@@ -31,6 +31,20 @@ use beet_core::prelude::*;
 #[reflect(Component)]
 pub struct DirPath(pub RelPath);
 
+impl DirPath {
+	/// The `on_insert` hook body for a component declaring a `src` dir
+	/// (`<RoutesDir src="routes"/>`): derive this scope onto its entity, so the
+	/// component's store and [`WatchDir`] resolve like any other [`DirPath`].
+	///
+	/// `#[component(on_insert = hook_ext::component_hook(|dir: &RoutesDir| DirPath::derive(&dir.src)))]`
+	pub fn derive(src: &RelPath) -> impl FnOnce(&mut EntityCommands) + use<> {
+		let src = src.clone();
+		move |entity| {
+			entity.insert(DirPath(src));
+		}
+	}
+}
+
 /// Resolves a single [`Blob`] in the nearest ancestor [`BlobStore`], inserting it on
 /// the same entity: the "this one file in the store" surface.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
@@ -71,10 +85,10 @@ fn resolve_dir_path(
 	{
 		return;
 	}
-	// watch the scoped subdir for live reload (keyed to its base store), so an
-	// `AssetsDir`/`ServeBlobs` mount's dir reloads; inert on a non-fs store / on wasm.
-	// `WatchDir` is notify-backed and std-only, so a no_std target just mounts the
-	// scoped store with no live-reload watcher.
+	// watch the scoped subdir for live reload (keyed to its base store), so a
+	// `RoutesDir`/`TemplateDir`/`AssetsDir` mount's dir reloads; inert on a non-fs
+	// store / on wasm. `WatchDir` is notify-backed and std-only, so a no_std target
+	// just mounts the scoped store with no live-reload watcher.
 	#[cfg(feature = "std")]
 	let watch = WatchDir::from_store(&scoped);
 	let mut entity_commands = commands.entity(entity);

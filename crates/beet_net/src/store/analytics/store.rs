@@ -518,6 +518,7 @@ mod test {
 		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
 		}
+		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 		fn id(&self) -> &'static str { "failing" }
 		fn root_key(&self) -> SmolStr { "no-such-store".into() }
 		fn region(&self) -> Option<String> { None }

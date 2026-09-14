@@ -71,6 +71,13 @@ impl BlobStoreProvider for LocalStorageStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(LocalStorageStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "localstorage" }
 
 	fn root_key(&self) -> SmolStr {

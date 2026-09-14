@@ -43,6 +43,7 @@ impl BlobStoreProvider for S3FsStore {
 	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.active().with_subdir(path)
 	}
+	fn base(&self) -> Box<dyn BlobStoreProvider> { self.active().base() }
 	fn rebase(
 		&self,
 		entry_name: &RelPath,

@@ -209,6 +209,13 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(DynamoStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "dynamo" }
 
 	fn root_key(&self) -> SmolStr {

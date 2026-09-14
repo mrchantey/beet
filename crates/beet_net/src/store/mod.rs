@@ -176,10 +176,11 @@ impl Plugin for StorePlugin {
 			.add_observer(add_memory_store_watcher)
 			.add_observer(remove_memory_store_watcher);
 
-		// fs watcher lifecycle, one notify debouncer per watched `WatchDir`. Native-only:
-		// deno directory watching is unimplemented, so a wasm `FsStore` serves reads
-		// through `fs_ext` with no live reload (the `WatchDir` component is inert there).
-		// A future wasm watcher wires the same `add_watch_dir`/`remove_watch_dir` seam.
+		// fs watcher lifecycle, one notify debouncer per minimal root of the live
+		// `WatchDir` set. Native-only: deno directory watching is unimplemented, so a
+		// wasm `FsStore` serves reads through `fs_ext` with no live reload (the
+		// `WatchDir` component is inert there). A future wasm watcher wires the same
+		// `add_watch_dir`/`remove_watch_dir` seam.
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		app.init_resource::<FsBlobWatchers>()
 			.add_observer(add_watch_dir)

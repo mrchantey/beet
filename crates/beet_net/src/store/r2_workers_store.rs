@@ -127,6 +127,13 @@ impl BlobStoreProvider for R2WorkersStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(R2WorkersStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "r2_workers" }
 
 	fn root_key(&self) -> SmolStr {

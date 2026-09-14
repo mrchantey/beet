@@ -243,6 +243,13 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
+	fn base(&self) -> Box<dyn BlobStoreProvider> {
+		Box::new(InMemoryStore {
+			subdir: None,
+			..self.clone()
+		})
+	}
+
 	fn id(&self) -> &'static str { "memory" }
 
 	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }

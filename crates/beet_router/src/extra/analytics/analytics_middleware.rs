@@ -189,6 +189,7 @@ mod stalled_store_test {
 		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
 		}
+		fn base(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 		fn id(&self) -> &'static str { "stalled" }
 		fn root_key(&self) -> SmolStr { "stalled".into() }
 		fn region(&self) -> Option<String> { None }
