@@ -54,7 +54,7 @@ pub struct BuildWasm {
 /// plus the selected features), then `wasm-bindgen --target web`, then in release
 /// `wasm-opt -Oz`, and finally renames the `<name>_bg.wasm`/`<name>.js` pair to
 /// the exact `--out` names (patching the glue's wasm URL to match), returning the
-/// artifact size.
+/// artifact size raw and brotli-compressed, the latter what a static host sends.
 #[action(route = "build-wasm")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
@@ -168,17 +168,42 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 		fs_ext::write(&out_js, glue)?;
 	}
 
-	let size_kb = fs_ext::file_size(&out_wasm)
-		.map(|len| len as usize / 1024)
-		.unwrap_or(0);
-	let report = format!("🌱 wasm size: {size_kb} KB ({wasm_name})");
+	// 5. the report: the artifact raw and as the wire carries it. Compressing
+	// the larger artifacts takes seconds, so it runs off the executor.
+	let raw = fs_ext::read(&out_wasm)?;
+	let raw_kb = raw.len() / 1024;
+	let brotli_kb = blocking::unblock(move || brotli_size(&raw)).await? / 1024;
+	let report = format!(
+		"🌱 wasm size: {raw_kb} KB raw, {brotli_kb} KB brotli ({wasm_name})"
+	);
 	info!("{report}");
 	Ok(report)
+}
+
+/// The size of `bytes` brotli-compressed at the quality and window a static
+/// host precompresses with (`brotli -q 11`, a 4 MB window), so the number is
+/// the one a browser downloads.
+fn brotli_size(bytes: &[u8]) -> Result<usize> {
+	let params = brotli::enc::BrotliEncoderParams {
+		quality: 11,
+		lgwin: 22,
+		..Default::default()
+	};
+	let mut compressed = Vec::new();
+	brotli::BrotliCompress(&mut &bytes[..], &mut compressed, &params)?;
+	compressed.len().xok()
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[beet_core::test]
+	fn brotli_size_shrinks_redundant_bytes() {
+		let bytes = vec![0u8; 1 << 20];
+		brotli_size(&bytes).unwrap().xpect_less_than(1024);
+		brotli_size(&[]).unwrap().xpect_less_than(8);
+	}
 
 	/// REGRESSION: required components yield to explicit ones and nothing
 	/// asserts a provider on [`PathPartial`], so an explicit spread overrides

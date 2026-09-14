@@ -354,6 +354,13 @@ test-scripting-fallback *args:
 build-wasm-min:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=assets/wasm/beet-min.wasm
 
+# The editor middle (assets/wasm/beet-ui.wasm): the browser binary plus the
+# scripting seam, so a page edits its own scene and its `bx:<event>` scripts run
+# through the iframe backend, with no JavaScript engine compiled in; see the
+# `web_ui` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
+build-wasm-ui:
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_ui --out=assets/wasm/beet-ui.wasm
+
 # The render middle (assets/wasm/beet-render.wasm): the browser binary plus the
 # windowed render stack (wgpu via WebGPU, the spatial + example scenes), so a
 # render scene `.bsx` boots in a tab without the full binary's weight; see the

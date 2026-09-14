@@ -23,8 +23,9 @@ tokens = ["proc-macro2", "quote", "syn"]
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
 deploy = ["beet_router", "dep:base64"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
-# it for dispatch.
-beet_router = ["dep:beet_router"]
+# it for dispatch. `brotli` and `blocking` serve the `build-wasm` report: the
+# artifact is compressed off the executor to size what the wire carries.
+beet_router = ["dep:beet_router", "dep:brotli", "dep:blocking"]
 lambda_block = ["bindings_aws_common","bindings_aws_lambda","bindings_aws_acm","bindings_aws_dns"]
 # The recurring timer (`ScheduledJobBlock`) and the lambda it invokes: the
 # schedule names its target through a relation to a `LambdaBlock` entity, so the
@@ -129,6 +130,8 @@ prettyplease = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true }
+blocking = { workspace = true, optional = true }
+brotli = { workspace = true, optional = true }
 
 [dev-dependencies]
 beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "ureq", "rustls-tls", "server", "russh_client"] }

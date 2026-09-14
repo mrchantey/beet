@@ -16,7 +16,7 @@ name = "beet"
 path = "src/main.rs"
 
 [features]
-## All features added/removed here must be reflected in `crates/beet-cli/src/entry_build.rs crate_registration!`
+## All features added/removed here must be reflected in `crates/beet-cli/src/registration.rs crate_registration!`
 default = ["qrcode", "net", "tui", "ssh", "thread", "pdf"]
 qrcode = ["dep:qrcode", "dep:image"]
 # Offline geoip country lookup for analytics, so a served/deployed site derives a
@@ -142,6 +142,20 @@ web_head = ["web", "beet/perceive_act_web"]
 # (`<Sequence>`, `<Log>`, `CallOnReady`) mounts this. Anything a program names beyond
 # that needs a larger set. Build with: `just build-wasm-min`.
 web_min = ["web"]
+# `beet-ui.wasm`, the editor middle: the browser binary plus the scripting seam
+# (`beet/scripting`: the engine-agnostic `Script` and the `bx:<event>` installer),
+# so a page edits its own scene and its event scripts run in the tab. The editor
+# itself (`beet_ui`'s `template`/`style`/`template_serde` widgets, `beet_net`'s
+# `SceneBlob`) already rides `web`, since the base `beet` dep below carries those
+# features on every target; what `web_min` lacks is behaviour behind a `bx:click`.
+# No engine: scripts run through the iframe backend, the sandbox the browser
+# already has, and the embedded engine stays `web_full`'s.
+# Excluded, each for its reason: `winit`/`ml` (a page is not a wgpu scene), `tui`
+# (charcell paints a terminal; the DOM paints itself), `thread` (the agent runtime
+# is a native process), `infra` (deploy definitions are authored in a deployer),
+# `web_examples`/`web_head` (example vocabularies a page names on its own
+# artifact). Build with: `just build-wasm-ui`.
+web_ui = ["web", "beet/scripting"]
 # `beet-render.wasm`, the render middle: the browser binary plus the windowed
 # render stack (`winit` pulls `beet/examples`: bevy_default + spatial + extra), so
 # a wgpu scene `.bsx` boots in a tab without hauling the full binary's thread/tui/
@@ -162,10 +176,11 @@ web_render = ["web", "winit", "beet/webgpu"]
 #   away in beet_net on wasm) and `qrcode`/`pdf` (whose deps sit in this manifest's
 #   own `not(wasm32)` table): all compile, and all add exactly zero packages to the
 #   wasm graph, so naming them would claim a capability the artifact does not have.
-# Between the ends is where narrower sets belong (`web_render`, a head-only build);
-# add them as artifacts of their own rather than widening `min`.
+# Between the ends is where narrower sets belong (`web_ui`, `web_render`, a
+# head-only build); add them as artifacts of their own rather than widening `min`.
 web_full = [
 	"web_min",
+	"web_ui",
 	"web_render",
 	"ml",
 	"web_examples",

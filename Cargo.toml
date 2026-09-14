@@ -245,6 +245,10 @@ sha2 = "0.11"
 # gzip for the cold analytics archive: pure rust (`miniz_oxide`) rather than a
 # zlib link, so it cross-compiles and builds for wasm like the rest of the tree.
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+# brotli, the encoding a static host serves a wasm artifact under, so `build-wasm`
+# reports the size the wire carries. Pure rust; default-features off drops the
+# C FFI exports, `std` is the `Write`-based encoder.
+brotli = { version = "9", default-features = false, features = ["std"] }
 # SHA-1 for the websocket `Sec-WebSocket-Accept` handshake (RFC 6455). no_std by
 # default; the digest API works on alloc, so consumers need not re-enable `std`.
 sha1 = { version = "0.11", default-features = false }
