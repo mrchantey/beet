@@ -162,7 +162,7 @@ impl PageMeta {
 	/// # Errors
 	/// Errors when the slug contains a `/`. A slug names ONE segment; a slug
 	/// quietly re-parenting a page is worse than a loud entry.
-	pub fn apply_slug(&self, route_path: &SmolPath) -> Result<SmolPath> {
+	pub fn apply_slug(&self, route_path: &RelPath) -> Result<RelPath> {
 		let Some(slug) = &self.slug else {
 			return Ok(route_path.clone());
 		};
@@ -176,7 +176,7 @@ impl PageMeta {
 			Some(last) => *last = slug,
 			None => segments.push(slug),
 		}
-		SmolPath::from_segments(&segments).xok()
+		RelPath::from_segments(&segments).xok()
 	}
 
 	/// Declare onto `declarations` the defaults a content file's NAME implies: a
@@ -194,7 +194,7 @@ impl PageMeta {
 	#[cfg(feature = "bsx")]
 	pub fn declare_file_defaults(
 		declarations: &mut RootDeclarations,
-		file: &SmolPath,
+		file: &RelPath,
 	) {
 		let Some(order) = file
 			.file_stem()
@@ -332,20 +332,20 @@ mod test {
 			slug: Some("full-stack-bevy".into()),
 			..default()
 		};
-		meta.apply_slug(&SmolPath::new("blog/1-full-stack-bevy"))
+		meta.apply_slug(&RelPath::new("blog/1-full-stack-bevy"))
 			.unwrap()
-			.xpect_eq(SmolPath::new("blog/full-stack-bevy"));
+			.xpect_eq(RelPath::new("blog/full-stack-bevy"));
 		// no slug declared, the filename-derived path stands
 		PageMeta::default()
-			.apply_slug(&SmolPath::new("blog/post-1"))
+			.apply_slug(&RelPath::new("blog/post-1"))
 			.unwrap()
-			.xpect_eq(SmolPath::new("blog/post-1"));
+			.xpect_eq(RelPath::new("blog/post-1"));
 		// a nested slug is a loud error, never a silent re-parent
 		PageMeta {
 			slug: Some("blog/nested".into()),
 			..default()
 		}
-		.apply_slug(&SmolPath::new("blog/post-1"))
+		.apply_slug(&RelPath::new("blog/post-1"))
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("single path segment");
@@ -362,7 +362,7 @@ mod test {
 					.declarations(&type_ext::short_name::<PageMeta>());
 			PageMeta::declare_file_defaults(
 				&mut declarations,
-				&SmolPath::new(file),
+				&RelPath::new(file),
 			);
 			declarations.get::<PageMeta>(&registry).unwrap()?.order
 		};

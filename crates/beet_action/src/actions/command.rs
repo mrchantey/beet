@@ -63,9 +63,9 @@ pub async fn Command(
 	// the current directory).
 	if !cwd.is_empty() {
 		let abs = if std::path::Path::new(cwd.as_str()).is_absolute() {
-			AbsPathBuf::new(cwd.as_str())?
+			AbsPath::new(cwd.as_str())?
 		} else {
-			AbsPathBuf::new(std::env::current_dir()?.join(cwd.as_str()))?
+			AbsPath::new(std::env::current_dir()?.join(cwd.as_str()))?
 		};
 		proc = proc.with_cwd(abs);
 	}

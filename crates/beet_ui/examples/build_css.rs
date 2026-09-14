@@ -15,13 +15,13 @@ fn main() {
 
 fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 	let ruleset_path =
-		AbsPathBuf::new_workspace_rel("target/examples/style/ruleset.json")
+		AbsPath::new_workspace_rel("target/examples/style/ruleset.json")
 			.unwrap();
 
 	// write the store for inspection
 	let json = serde_json::to_string_pretty(&*ruleset).unwrap();
 	fs_ext::write(&ruleset_path, json).unwrap();
-	info!("Ruleset written to: {}", ruleset_path.display());
+	info!("Ruleset written to: {}", ruleset_path);
 
 	let css = query.build_css(
 		&CssBuilder::default()
@@ -50,12 +50,11 @@ fn setup(ruleset: Res<RuleSet>, query: StyleQuery) -> Result {
 	);
 
 	let html_path =
-		AbsPathBuf::new_workspace_rel("target/examples/style/index.html")
-			.unwrap();
+		AbsPath::new_workspace_rel("target/examples/style/index.html").unwrap();
 
 	// write the html for inspection
 	fs_ext::write(&html_path, &html)?;
 
-	info!("HTML written to: {}", html_path.display());
+	info!("HTML written to: {}", html_path);
 	Ok(())
 }

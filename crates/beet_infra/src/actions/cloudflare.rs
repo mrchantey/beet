@@ -113,9 +113,9 @@ pub async fn CloudflareContainerDeployAction(
 	let block = sibling::<CloudflareContainerBlock>(&cx).await?;
 	let artifact = sibling::<BuildArtifact>(&cx).await?;
 
-	let binary = AbsPathBuf::new(artifact.artifact_path())?;
-	if !binary.exists() {
-		bevybail!("binary not found at: {}", binary.display());
+	let binary = AbsPath::new(artifact.artifact_path())?;
+	if !fs_ext::exists(&binary)? {
+		bevybail!("binary not found at: {}", binary);
 	}
 
 	// the R2 endpoint the container's `S3Store::r2` reads through; the account id
@@ -151,7 +151,7 @@ pub async fn CloudflareContainerDeployAction(
 /// binary as argv; only the R2 credentials stay env (SDK convention, injected by
 /// the fronting Worker).
 fn write_container_dockerfile(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	binary_name: &str,
 	block: &CloudflareContainerBlock,
 	endpoint: &str,
@@ -179,7 +179,7 @@ fn write_container_dockerfile(
 /// the R2 credentials (the SDK convention, read from the Worker's secrets) and
 /// the host bind.
 fn write_container_worker_js(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	block: &CloudflareContainerBlock,
 ) -> Result {
 	let port = block.port();
@@ -238,7 +238,7 @@ const CONTAINERS_PKG_VERSION: &str = "^0.3.7";
 /// generated `worker.js` imports. Wrangler's bundler resolves this from
 /// `node_modules` on `deploy`, so without it the deploy fails with
 /// `Could not resolve "@cloudflare/containers"`.
-fn write_container_package_json(dir: &AbsPathBuf) -> Result {
+fn write_container_package_json(dir: &AbsPath) -> Result {
 	let json = serde_json::to_string_pretty(&serde_json::json!({
 		"name": "beet-container-worker",
 		"private": true,
@@ -250,8 +250,8 @@ fn write_container_package_json(dir: &AbsPathBuf) -> Result {
 
 /// `npm install` in the project dir, populating `node_modules` so wrangler can
 /// bundle the worker's npm imports. Quiet + no audit/fund noise.
-async fn npm_install(dir: &AbsPathBuf) -> Result {
-	info!("npm install ({})", dir.display());
+async fn npm_install(dir: &AbsPath) -> Result {
+	info!("npm install ({})", dir);
 	ChildProcess::new("npm")
 		.with_args(["install", "--no-audit", "--no-fund", "--loglevel=error"])
 		.with_cwd(dir.clone())
@@ -262,7 +262,7 @@ async fn npm_install(dir: &AbsPathBuf) -> Result {
 
 /// `wrangler.jsonc` binding the container Durable Object + the R2 bucket.
 fn write_container_wrangler(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	block: &CloudflareContainerBlock,
 ) -> Result {
 	let json = serde_json::to_string_pretty(&serde_json::json!({
@@ -289,7 +289,7 @@ fn write_container_wrangler(
 /// the deploy uploads as real Worker secrets (`wrangler deploy --secrets-file`).
 /// Returns the file name (relative to the project dir, which is the deploy cwd),
 /// or `None` when the keys are absent so a dry run still works.
-fn write_r2_secrets_file(dir: &AbsPathBuf) -> Result<Option<String>> {
+fn write_r2_secrets_file(dir: &AbsPath) -> Result<Option<String>> {
 	match (
 		env_ext::var("R2_ACCESS_KEY_ID"),
 		env_ext::var("R2_SECRET_ACCESS_KEY"),
@@ -343,7 +343,7 @@ pub async fn CloudflareWorkerBuildAction(
 /// `index_bg.wasm` under `<crate>/build/`; the copy makes them inspectable and
 /// lets `deploy` upload them without a rebuild.
 async fn build_worker_artifacts() -> Result<u64> {
-	let cli_dir = AbsPathBuf::new_workspace_rel("crates/beet-cli")?;
+	let cli_dir = AbsPath::new_workspace_rel("crates/beet-cli")?;
 	let cli_arg = cli_dir.to_string();
 	info!("building wasm worker (worker-build --release)");
 	ChildProcess::new("worker-build")
@@ -361,7 +361,7 @@ async fn build_worker_artifacts() -> Result<u64> {
 	// the `worker/shim.mjs` it also writes is a backwards-compat re-export of
 	// `index.js`, so these three files are the whole deployable set.
 	let build_dir = cli_dir.join("build");
-	let assets_dir = AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?;
+	let assets_dir = AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?;
 	let mut wasm_size = 0;
 	for name in ["index.js", "index_bg.wasm", "package.json"] {
 		let bytes = fs_ext::copy(build_dir.join(name), assets_dir.join(name))?;
@@ -375,9 +375,8 @@ async fn build_worker_artifacts() -> Result<u64> {
 /// Ensure the prebuilt Worker artifacts exist, building them first if the `build`
 /// verb has not run, so a bare `deploy` still works.
 async fn ensure_worker_artifacts() -> Result {
-	let index =
-		AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
-	if !index.exists() {
+	let index = AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
+	if !fs_ext::exists(&index)? {
 		info!("no prebuilt worker at {WORKER_ASSETS_DIR}/, building first");
 		build_worker_artifacts().await?;
 	}
@@ -430,14 +429,14 @@ pub async fn CloudflareWorkerDeployAction(
 
 /// Write [`worker_wrangler_json`] into the wrangler project directory.
 fn write_worker_wrangler(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	block: &CloudflareWorkerBlock,
 ) -> Result {
 	// `main` is the prebuilt `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
 	// sibling resolves by relative import). An absolute path outside this wrangler
 	// project dir is fine: wrangler bundles `main` and follows its wasm import.
 	let main_js =
-		AbsPathBuf::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
+		AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
 	fs_ext::write(
 		dir.join("wrangler.jsonc"),
 		worker_wrangler_json(block, &main_js.to_string())?,
@@ -509,14 +508,14 @@ pub async fn CloudflareR2Sync(
 	/// instead of `<relpath>`, mounting a local directory under a sub-path of the
 	/// bucket. Absent uploads to the bucket root.
 	#[field]
-	prefix: Option<SmolPath>,
+	prefix: Option<RelPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let start = Instant::now();
 	sync_dir_to_r2(
 		local_dir.as_str(),
 		&bucket,
-		prefix.as_ref().map(SmolPath::as_str),
+		prefix.as_ref().map(|prefix| prefix.as_str()),
 	)
 	.await?;
 	info!(
@@ -555,12 +554,12 @@ async fn sync_dir_to_r2(
 	bucket: &str,
 	prefix: Option<&str>,
 ) -> Result {
-	let root = AbsPathBuf::new(local_dir)?;
+	let root = AbsPath::new(local_dir)?;
 	let files = ReadDir::files_recursive(&root)?;
 	info!(
 		"syncing {} files from {} to r2://{bucket}{}",
 		files.len(),
-		root.display(),
+		root,
 		prefix
 			.map(|prefix| format!("/{prefix}"))
 			.unwrap_or_default(),
@@ -631,7 +630,7 @@ pub async fn CloudflareBench(
 	/// R2 bucket the site is published to.
 	#[field]
 	bucket: SmolStr,
-	/// Local site directory published on the sync path.
+	/// Local site directory published on the sync path (cwd-relative).
 	#[field]
 	local_dir: SmolPath,
 	/// Optional live Worker URL; when set, the sync path also polls it until it

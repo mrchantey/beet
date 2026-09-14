@@ -355,7 +355,7 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn fs_segments_are_multi_writer_safe() {
-		let dir = AbsPathBuf::new_workspace_rel(
+		let dir = AbsPath::new_workspace_rel(
 			"target/tests/beet_net/analytics-multi-writer",
 		)
 		.unwrap();
@@ -515,7 +515,7 @@ mod test {
 		fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
 		}
-		fn with_subdir(&self, _path: SmolPath) -> Box<dyn BlobStoreProvider> {
+		fn with_subdir(&self, _path: RelPath) -> Box<dyn BlobStoreProvider> {
 			Box::new(self.clone())
 		}
 		fn id(&self) -> &'static str { "failing" }
@@ -532,28 +532,28 @@ mod test {
 		}
 		fn insert(
 			&self,
-			_path: &SmolPath,
+			_path: &RelPath,
 			_body: Bytes,
 		) -> SendBoxedFuture<Result> {
 			self.attempts.fetch_add(1, Ordering::SeqCst);
 			Box::pin(async { bevybail!("store unavailable") })
 		}
-		fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+		fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 			Box::pin(async { Vec::new().xok() })
 		}
-		fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+		fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 			let path = path.clone();
 			Box::pin(async move { bevybail!("no object at {path}") })
 		}
-		fn exists(&self, _path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+		fn exists(&self, _path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 			Box::pin(async { false.xok() })
 		}
-		fn remove(&self, _path: &SmolPath) -> SendBoxedFuture<Result> {
+		fn remove(&self, _path: &RelPath) -> SendBoxedFuture<Result> {
 			Box::pin(async { Ok(()) })
 		}
 		fn public_url(
 			&self,
-			_path: &SmolPath,
+			_path: &RelPath,
 		) -> SendBoxedFuture<Result<Option<String>>> {
 			Box::pin(async { None.xok() })
 		}

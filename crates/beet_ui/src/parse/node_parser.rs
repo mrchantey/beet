@@ -24,7 +24,7 @@ pub struct ParseContext<'a, 'w> {
 	/// The typed bytes to parse.
 	pub bytes: &'a MediaBytes,
 	/// Optional source path for [`FileSpan`] tracking.
-	pub path: Option<WsPathBuf>,
+	pub path: Option<WsPath>,
 }
 
 impl<'a, 'w> ParseContext<'a, 'w> {
@@ -41,7 +41,7 @@ impl<'a, 'w> ParseContext<'a, 'w> {
 	}
 
 	/// Set the optional source path.
-	pub fn with_path(mut self, path: WsPathBuf) -> Self {
+	pub fn with_path(mut self, path: WsPath) -> Self {
 		self.path = Some(path);
 		self
 	}
@@ -130,7 +130,7 @@ mod test {
 			.spawn_empty()
 			.xtap(|entity| {
 				let cx = ParseContext::new(entity, &bytes)
-					.with_path(WsPathBuf::new("foo.txt"));
+					.with_path(WsPath::new("foo.txt"));
 				PlainTextParser::default().parse(cx).unwrap();
 			})
 			.child(0)
@@ -139,6 +139,6 @@ mod test {
 			.cloned()
 			.unwrap()
 			.path()
-			.xpect_eq(SmolPath::new("foo.txt"));
+			.xpect_eq(WsPath::new("foo.txt"));
 	}
 }

@@ -90,8 +90,8 @@ async fn write_manifest(world: &AsyncWorld, root: Entity, out: &str) -> Result {
 mod test {
 	use super::*;
 
-	fn site_path() -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap()
+	fn site_path() -> AbsPath {
+		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
 	/// Render `req` through a host carrying only the [`Check`] route, returning the

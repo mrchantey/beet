@@ -28,12 +28,12 @@ pub struct EntryPrescan {
 	/// document's directory.
 	pub repo_root: Option<SmolStr>,
 	/// Every `<TemplateDir src>` the entry declares, in document order.
-	pub template_dirs: Vec<SmolStr>,
+	pub template_dirs: Vec<RelPath>,
 	/// Every unconditional `<RequireCfg/>` the entry declares.
 	pub requirements: Vec<RequireCfg>,
 	/// Every local `<Template src>` include. Remote includes are skipped: they are
 	/// not local files a watcher sees.
-	pub includes: Vec<SmolStr>,
+	pub includes: Vec<RelPath>,
 	/// Every uppercase tag the document uses, conditional subtrees included: the
 	/// watch path promotes a `<TemplateDir>` template the entry instantiates to a
 	/// structural source, and a tag inside an excluded branch costs at most an
@@ -84,7 +84,9 @@ impl EntryPrescan {
 					}
 				}
 				"TemplateDir" => {
-					self.template_dirs.extend(Self::str_attr(element, "src"));
+					self.template_dirs.extend(
+						Self::str_attr(element, "src").map(RelPath::new),
+					);
 				}
 				"RequireCfg" => {
 					self.requirements.extend(
@@ -94,7 +96,8 @@ impl EntryPrescan {
 				"Template" => {
 					self.includes.extend(
 						Self::str_attr(element, "src")
-							.filter(|src| !Self::is_remote(src)),
+							.filter(|src| !Self::is_remote(src))
+							.map(RelPath::new),
 					);
 				}
 				_ => {}
@@ -170,15 +173,15 @@ mod test {
 		prescan.repo_root.xpect_eq(Some(SmolStr::from("../..")));
 		prescan
 			.template_dirs
-			.xpect_eq(vec![SmolStr::from("templates"), SmolStr::from("more")]);
+			.xpect_eq(vec![RelPath::from("templates"), RelPath::from("more")]);
 		prescan.requirements.xpect_eq(vec![
 			RequireCfg::new("feature:sockets && version:0.1.0"),
 			RequireCfg::new("feature:ssh"),
 		]);
 		// the remote include is skipped: it is not a local file a watcher sees
 		prescan.includes.xpect_eq(vec![
-			SmolStr::from("header.bsx"),
-			SmolStr::from("footer.bsx"),
+			RelPath::from("header.bsx"),
+			RelPath::from("footer.bsx"),
 		]);
 		prescan.tags.contains("Router").xpect_true();
 		prescan.tags.contains("TemplateDir").xpect_true();

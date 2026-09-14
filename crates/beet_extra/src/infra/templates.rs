@@ -134,8 +134,7 @@ pub fn LambdaSiteBlock(
 		build = build.with_exec_route(exec_route);
 	}
 	if let Some(workspace_dir) = workspace_dir {
-		build =
-			build.with_workspace_dir(WsPathBuf::new(workspace_dir).into_abs());
+		build = build.with_workspace_dir(WsPath::new(workspace_dir).into_abs());
 	}
 	(block, infra_ext::lambda_artifact(build))
 }
@@ -388,7 +387,7 @@ mod test {
 
 	/// The directory the one declared bucket attached under local service
 	/// access, so one declaration runs both ways.
-	fn attached_local_dir(world: &mut World) -> AbsPathBuf {
+	fn attached_local_dir(world: &mut World) -> AbsPath {
 		world
 			.query_filtered::<&BlobStore, With<S3BucketBlock>>()
 			.single(world)
@@ -409,7 +408,7 @@ mod test {
 	#[beet_core::test]
 	fn site_stores_survive_the_lean_binary() {
 		let source =
-			fs_ext::read_to_string(WsPathBuf::new("site/main.bsx").into_abs())
+			fs_ext::read_to_string(WsPath::new("site/main.bsx").into_abs())
 				.unwrap();
 		let nodes =
 			BsxNode::parse_document(&source, &BsxParseConfig::bsx()).unwrap();

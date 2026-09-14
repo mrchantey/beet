@@ -342,7 +342,7 @@ pub(crate) fn trait_bounds_tokens(ty: &Type) -> Option<TokenStream> {
 
 /// Returns true if the type should automatically use `impl Into<T>`.
 /// Covers the common string-like owned types: `String`, `Cow<'_, …>`, `SmolStr`
-/// and `SmolPath`.
+/// and the path types (`SmolPath`, `RelPath`, `AbsPath`, `WsPath`).
 pub(crate) fn is_auto_into_type(ty: &syn::Type) -> bool {
 	let syn::Type::Path(path) = ty else {
 		return false;
@@ -352,7 +352,12 @@ pub(crate) fn is_auto_into_type(ty: &syn::Type) -> bool {
 	};
 	matches!(
 		seg.ident.to_string().as_str(),
-		"String" | "Cow" | "SmolStr" | "SmolPath"
+		"String"
+			| "Cow" | "SmolStr"
+			| "SmolPath"
+			| "RelPath"
+			| "AbsPath"
+			| "WsPath"
 	)
 }
 

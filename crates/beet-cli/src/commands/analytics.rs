@@ -161,7 +161,7 @@ mod test {
 	fn recording_world(temp: &TempDir) -> World {
 		let mut world = crate::commands::render_world();
 		let declared = world
-			.spawn(FsStore::new(AbsPathBuf::new(temp.path()).unwrap()))
+			.spawn(FsStore::new(AbsPath::new(temp.path()).unwrap()))
 			.id();
 		world.spawn((AnalyticsConfig::default(), StoreRef(declared)));
 		world
@@ -172,7 +172,7 @@ mod test {
 	#[beet::test]
 	async fn summarizes_empty_store() {
 		let temp = TempDir::new().unwrap();
-		let dir = AbsPathBuf::new(temp.path()).unwrap();
+		let dir = AbsPath::new(temp.path()).unwrap();
 		report(&format!("analytics summary --store fs:{dir}"))
 			.await
 			.as_str()
@@ -229,7 +229,7 @@ mod test {
 	#[beet::test]
 	async fn reads_segments_and_rollups_from_one_store() {
 		let temp = TempDir::new().unwrap();
-		let dir = AbsPathBuf::new(temp.path()).unwrap();
+		let dir = AbsPath::new(temp.path()).unwrap();
 		let store = BlobStore::new(FsStore::new(dir.clone()));
 		let raw = AnalyticsStore::new(store.clone());
 		let recent =

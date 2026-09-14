@@ -87,15 +87,15 @@ where
 struct SnapMap;
 
 impl SnapMap {
-	fn cache() -> &'static Mutex<MultiMap<WsPathBuf, (LineCol, String)>> {
-		static CACHE: LazyLock<Mutex<MultiMap<WsPathBuf, (LineCol, String)>>> =
+	fn cache() -> &'static Mutex<MultiMap<WsPath, (LineCol, String)>> {
+		static CACHE: LazyLock<Mutex<MultiMap<WsPath, (LineCol, String)>>> =
 			LazyLock::new(|| Mutex::new(MultiMap::default()));
 		&CACHE
 	}
 
 	/// Get the snapshot for a given source file and line/column position.
 	/// Returns the snapshot string if found, or an error listing available locations.
-	fn get(file_path: &WsPathBuf, loc: LineCol) -> Result<String> {
+	fn get(file_path: &WsPath, loc: LineCol) -> Result<String> {
 		// load file data if not cached
 		Self::init_key(file_path)?;
 		let cache = Self::cache().lock().unwrap();
@@ -126,7 +126,7 @@ impl SnapMap {
 	}
 
 	/// Set the snapshot for a given source file and line/column position.
-	fn set(file_path: &WsPathBuf, loc: LineCol, value: String) -> Result<()> {
+	fn set(file_path: &WsPath, loc: LineCol, value: String) -> Result<()> {
 		Self::init_key(file_path)?;
 
 		// find entry with matching location
@@ -160,7 +160,7 @@ impl SnapMap {
 		Ok(())
 	}
 
-	fn init_key(file_path: &WsPathBuf) -> Result {
+	fn init_key(file_path: &WsPath) -> Result {
 		let mut cache = Self::cache().lock().unwrap();
 		// load file data if not cached
 		if !cache.contains_key(file_path) {
@@ -171,7 +171,7 @@ impl SnapMap {
 	}
 
 	/// Load file data: parse source for snapshot locations and load existing snapshots.
-	fn load_file_data(file_path: &WsPathBuf) -> Result<Vec<(LineCol, String)>> {
+	fn load_file_data(file_path: &WsPath) -> Result<Vec<(LineCol, String)>> {
 		// parse source file to find all .xpect_snapshot() locations
 		let locs = Self::parse_snapshot_locations(file_path)?;
 
@@ -195,7 +195,7 @@ impl SnapMap {
 	/// Returns a vec of LineCol in order of appearance.
 	/// Note: col points to the 'x' in 'xpect_snapshot', matching track_caller behavior.
 	/// Location::caller() uses tab width of 4 for column calculation.
-	fn parse_snapshot_locations(file_path: &WsPathBuf) -> Result<Vec<LineCol>> {
+	fn parse_snapshot_locations(file_path: &WsPath) -> Result<Vec<LineCol>> {
 		let abs_path = file_path.into_abs();
 		let source = fs_ext::read_to_string(&abs_path).map_err(|err| {
 			bevyhow!("Failed to read source file {}: {}", abs_path, err)
@@ -240,15 +240,15 @@ impl SnapMap {
 	}
 
 	/// Get the directory path where snapshots for a source file are stored.
-	fn snapshot_path(file_path: &WsPathBuf) -> AbsPathBuf {
+	fn snapshot_path(file_path: &WsPath) -> AbsPath {
 		let dir_name = format!(".beet/snapshots/{}", file_path);
-		AbsPathBuf::new_workspace_rel(dir_name)
+		AbsPath::new_workspace_rel(dir_name)
 			.expect("Failed to create snapshot path")
 	}
 
 	/// Save snapshots to individual files.
 	fn save_snapshots(
-		file_path: &WsPathBuf,
+		file_path: &WsPath,
 		snapshots: &[(LineCol, String)],
 	) -> Result<()> {
 		let snap_dir = Self::snapshot_path(file_path);
@@ -290,7 +290,7 @@ fn parse_snapshot(
 	received: &str,
 	caller_loc: &Location,
 ) -> Result<Option<String>> {
-	let file_path = WsPathBuf::new(caller_loc.file());
+	let file_path = WsPath::new(caller_loc.file());
 	// Location::caller() returns 1-indexed line and column, but LineCol stores 0-indexed column
 	let loc = LineCol::from_location(&caller_loc);
 

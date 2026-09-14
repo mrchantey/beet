@@ -80,7 +80,7 @@ pub struct CargoBuild {
 	/// holds the output, so the artifact path resolves there too. `None` builds
 	/// in the current workspace.
 	#[set_with(unwrap_option)]
-	pub workspace_dir: Option<AbsPathBuf>,
+	pub workspace_dir: Option<AbsPath>,
 }
 
 impl CargoBuild {
@@ -407,7 +407,7 @@ mod test {
 		let build = CargoBuild::default()
 			.with_target(BuildTarget::Zigbuild)
 			.with_binary("beet")
-			.with_workspace_dir(AbsPathBuf::new("/tmp/beet").unwrap());
+			.with_workspace_dir(AbsPath::new("/tmp/beet").unwrap());
 		build.exe_path().xpect_eq(std::path::PathBuf::from(
 			"/tmp/beet/target/x86_64-unknown-linux-gnu/debug/beet",
 		));

@@ -136,9 +136,7 @@ async fn run_gate_script(
 	// the ssh user's home dir, not /tmp: a predictable world-writable path is
 	// a symlink-planting target, and root runs this script
 	let remote_path = format!("beet-{name}.sh");
-	connection
-		.scp_to(local_path.as_path(), &remote_path)
-		.await?;
+	connection.scp_to(&local_path, &remote_path).await?;
 
 	// `-n`: the ssh side is `BatchMode`, so a sudo that wanted a password would
 	// hang the deploy on a prompt nobody can answer

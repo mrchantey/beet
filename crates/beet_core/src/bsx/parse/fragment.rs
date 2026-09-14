@@ -280,7 +280,7 @@ fn parse_fragment_attribute(cursor: &mut Cursor) -> Result<BsxAttribute> {
 			value: AttrValue::Style {
 				source: source.into(),
 				span: FileSpan::new(
-					SmolPath::new("bsx"),
+					"bsx",
 					cursor.line_col(key_offset),
 					cursor.line_col(cursor.offset()),
 				),

@@ -280,11 +280,11 @@ impl Response {
 	}
 
 	/// Create a response with the given body, inferring the content type
-	/// from the path's extension via [`SmolPath::media_type`].
+	/// from the path's extension via [`RelPath::media_type`].
 	/// Defaults to `application/octet-stream` for unrecognized extensions.
 	pub fn ok_from_path(
 		body: impl Into<Body>,
-		path: impl Into<SmolPath>,
+		path: impl Into<RelPath>,
 	) -> Self {
 		let media_type = path.into().media_type().unwrap_or(MediaType::Bytes);
 		Self::ok_body(body, media_type)

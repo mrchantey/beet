@@ -129,7 +129,7 @@ impl AnalyticsRollup {
 	/// by both.
 	#[cfg(feature = "json")]
 	pub fn table(store: BlobStore) -> Table<Self> {
-		Table::new(store.with_subdir(SmolPath::new(Self::PREFIX)))
+		Table::new(store.with_subdir(RelPath::new(Self::PREFIX)))
 	}
 
 	/// A zeroed row for `date` and `scope`.

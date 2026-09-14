@@ -70,7 +70,7 @@ impl AnalyticsRollupRun {
 		// segments (the bulk of the keyspace) are never fetched to be discarded
 		let dates = self.dates().await?;
 		let mut segments =
-			HashMap::<SmolStr, Vec<(SmolPath, Vec<AnalyticsEvent>)>>::default();
+			HashMap::<SmolStr, Vec<(RelPath, Vec<AnalyticsEvent>)>>::default();
 		for (path, events) in
 			AnalyticsSegment::read_dates(&self.raw, |date| dates.contains(date))
 				.await?
@@ -213,7 +213,7 @@ impl AnalyticsRollupRun {
 struct AnalyticsDay {
 	date: SmolStr,
 	events: Vec<AnalyticsEvent>,
-	segments: Vec<SmolPath>,
+	segments: Vec<RelPath>,
 }
 
 /// Reports the verified work completed by one [`AnalyticsRollupRun`].
@@ -364,7 +364,7 @@ mod test {
 		store: &BlobStore,
 		events: &[AnalyticsEvent],
 		sequence: u64,
-	) -> SmolPath {
+	) -> RelPath {
 		let path = AnalyticsSegment::object_path(
 			&events[0].date(),
 			Uuid::from_u128(sequence as u128 + 1),

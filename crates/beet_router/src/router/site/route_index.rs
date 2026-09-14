@@ -44,8 +44,8 @@ pub fn RouteIndex(
 ) -> impl Bundle {
 	let cx = stack.current();
 	let is_prod = BootstrapConfig::get().is_prod();
-	let current = SmolPath::new(cx.current_path());
-	let mut entries: Vec<(SmolPath, PageMeta)> = trees
+	let current = RelPath::new(cx.current_path());
+	let mut entries: Vec<(RelPath, PageMeta)> = trees
 		.get(cx.router())
 		.ok()
 		.and_then(|tree| tree.find_subtree(&current.segments()))
@@ -71,7 +71,7 @@ pub fn RouteIndex(
 	});
 	// numbered in ascending order, then flipped for display, so `reverse`
 	// renumbers nothing
-	let mut items: Vec<(usize, SmolPath, PageMeta)> = entries
+	let mut items: Vec<(usize, RelPath, PageMeta)> = entries
 		.into_iter()
 		.enumerate()
 		.map(|(idx, (path, meta))| (idx + 1, path, meta))
@@ -106,7 +106,7 @@ fn lists(meta: &PageMeta, is_prod: bool) -> bool {
 /// the byline, thumbnail and description the frontmatter supplied.
 fn index_entry(
 	number: usize,
-	path: &SmolPath,
+	path: &RelPath,
 	meta: &PageMeta,
 	separator: bool,
 ) -> Snippet {
@@ -248,7 +248,7 @@ mod test {
 				"+++\ntitle = \"ECS Router\"\nslug = \"ecs-router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthor = \"Pete Hayman\"\n+++\n\n# Two",
 			),
 		] {
-			store.insert(&SmolPath::from(path), content).await.unwrap();
+			store.insert(&RelPath::from(path), content).await.unwrap();
 		}
 		let root = world
 			.spawn((store, Router, children![RoutesDir::default()]))

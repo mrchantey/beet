@@ -295,7 +295,7 @@ fn features_self_check(
 /// a filesystem walk makes sense; the matched entry may still rebase its own
 /// root ([`entry_build::resolve_in_repo_store`]), and no match errors with guidance.
 async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
-	let start = AbsPathBuf::new(".")?;
+	let start = AbsPath::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let repo_store = BlobStore::new(FsStore::new(current.clone()));

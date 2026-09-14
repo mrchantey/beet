@@ -259,18 +259,19 @@ impl StoreUri {
 	/// stands alone, and every self-rooted kind is untouched. The entry
 	/// resolver calls this with the resolved entry directory, so a `--repo=fs`
 	/// means "the entry's own directory" rather than the cwd.
-	#[cfg(feature = "std")]
-	pub fn rooted_at(&self, dir: &AbsPathBuf) -> Result<Self> {
+	pub fn rooted_at(&self, dir: &AbsPath) -> Self {
 		match self {
 			Self::Fs { path: None } => Self::Fs {
 				path: Some(dir.to_string().into()),
 			},
 			Self::Fs { path: Some(path) } => Self::Fs {
-				path: Some(dir.join_checked(path.as_str())?.to_string().into()),
+				path: Some(match path.starts_with('/') {
+					true => path.clone(),
+					false => dir.join(path).to_string().into(),
+				}),
 			},
 			other => other.clone(),
 		}
-		.xok()
 	}
 }
 
@@ -548,13 +549,9 @@ mod test {
 	/// self-rooted kind alone.
 	#[crate::test]
 	fn rooted_at_pins_the_filesystem_root() {
-		let dir = AbsPathBuf::new("/srv").unwrap();
+		let dir = AbsPath::new_unchecked("/srv");
 		let rooted = |uri: &str| {
-			StoreUri::parse(uri)
-				.unwrap()
-				.rooted_at(&dir)
-				.unwrap()
-				.to_string()
+			StoreUri::parse(uri).unwrap().rooted_at(&dir).to_string()
 		};
 		rooted("fs").xpect_eq("fs:/srv");
 		rooted("fs:site").xpect_eq("fs:/srv/site");

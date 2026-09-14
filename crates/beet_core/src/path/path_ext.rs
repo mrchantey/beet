@@ -10,9 +10,9 @@ use crate::prelude::*;
 /// - drop `..` at the root, but keep leading `..` on relative paths
 /// - preserve a leading `/` on rooted paths
 ///
-/// Returns `"."` for an empty result, matching current-directory semantics.
-/// For the logically-relative [`SmolPath`] the leading `/` and `.` placeholder
-/// are stripped by [`SmolPath::new`].
+/// Returns `"."` for an empty result, matching current-directory semantics;
+/// [`SmolPath::new`] maps that placeholder to the empty path and keeps
+/// everything else verbatim.
 pub fn clean(input: &str) -> String {
 	let rooted = input.starts_with('/');
 	let mut out: Vec<&str> = Vec::new();

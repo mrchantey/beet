@@ -743,10 +743,15 @@ impl From<&Url> for Url {
 	fn from(value: &Url) -> Self { value.clone() }
 }
 
-/// A logical path is a RELATIVE url: [`SmolPath`] strips leading slashes by
-/// design, so rooting one here would invent a distinction it never carried.
+/// A path url, rooted exactly when the [`SmolPath`] is.
 impl From<SmolPath> for Url {
-	fn from(value: SmolPath) -> Url {
+	fn from(value: SmolPath) -> Url { Url::coerce(value.as_str()) }
+}
+
+/// A key is a RELATIVE url: a [`RelPath`] has no root by design, so rooting
+/// one here would invent a distinction it never carried.
+impl From<RelPath> for Url {
+	fn from(value: RelPath) -> Url {
 		Url::coerce(value.as_str()).with_rooted(false)
 	}
 }

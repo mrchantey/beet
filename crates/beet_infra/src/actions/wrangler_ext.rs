@@ -14,8 +14,8 @@ pub const COMPATIBILITY_DATE: &str = "2025-06-01";
 
 /// The build directory for a Cloudflare project (`target/<name>-cf/`), created
 /// if it is not there.
-pub fn project_dir(name: &str) -> Result<AbsPathBuf> {
-	let dir = AbsPathBuf::new_workspace_rel(".")?
+pub fn project_dir(name: &str) -> Result<AbsPath> {
+	let dir = AbsPath::new_workspace_rel(".")?
 		.join("target")
 		.join(format!("{name}-cf"));
 	fs_ext::create_dir_all(&dir)?;
@@ -27,10 +27,10 @@ pub fn project_dir(name: &str) -> Result<AbsPathBuf> {
 /// (`--secrets-file`), which is the only way a deploy publishes secrets: a
 /// `.dev.vars` file is a local-development input and never leaves the machine.
 pub async fn deploy(
-	project_dir: &AbsPathBuf,
+	project_dir: &AbsPath,
 	secrets_file: Option<&str>,
 ) -> Result {
-	info!("wrangler deploy ({})", project_dir.display());
+	info!("wrangler deploy ({})", project_dir);
 	let mut args = vec!["deploy".to_string()];
 	if let Some(secrets_file) = secrets_file {
 		args.push("--secrets-file".to_string());

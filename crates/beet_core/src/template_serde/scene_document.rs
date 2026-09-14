@@ -60,12 +60,12 @@ pub struct SceneDocument {
 #[reflect(Component)]
 pub struct SceneFork {
 	/// The store path of the authored original.
-	pub from: SmolPath,
+	pub from: RelPath,
 }
 
 impl SceneFork {
 	/// A scene forked from the authored original at `from`.
-	pub fn new(from: impl Into<SmolPath>) -> Self { Self { from: from.into() } }
+	pub fn new(from: impl Into<RelPath>) -> Self { Self { from: from.into() } }
 }
 
 impl SceneDocument {

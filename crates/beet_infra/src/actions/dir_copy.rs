@@ -21,18 +21,18 @@ use beet_net::prelude::*;
 pub async fn DirCopy(
 	/// The workspace-relative source directory.
 	#[field]
-	src: SmolPath,
+	src: WsPath,
 	/// The workspace-relative destination directory.
 	#[field]
-	dest: SmolPath,
+	dest: WsPath,
 	/// Comma-separated paths to copy, each relative to both ends and naming
 	/// either a file or a directory.
 	#[field]
 	paths: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let src_dir = WsPathBuf::new(src.to_string()).into_abs();
-	let dest_dir = WsPathBuf::new(dest.to_string()).into_abs();
+	let src_dir = src.into_abs();
+	let dest_dir = dest.into_abs();
 	let mut copied = 0;
 	for path in DirCopy::iter_paths(&paths) {
 		let from = src_dir.join(path);
@@ -40,7 +40,7 @@ pub async fn DirCopy(
 		if !fs_ext::exists(&from)? {
 			bevybail!(
 				"nothing to copy at {}: the borrowed path is declared but absent, so the destination would silently keep a stale copy",
-				from.display()
+				from
 			);
 		}
 		if let Some(parent) = to.parent() {
@@ -54,7 +54,7 @@ pub async fn DirCopy(
 				fs_ext::copy(&from, &to)?;
 			}
 		}
-		debug!("copied {} -> {}", from.display(), to.display());
+		debug!("copied {} -> {}", from, to);
 		copied += 1;
 	}
 	info!("copied {copied} borrowed path(s) {src} -> {dest}");
@@ -64,8 +64,8 @@ pub async fn DirCopy(
 impl DirCopy {
 	/// A copy of every `paths` entry from `src` to `dest`.
 	pub fn new(
-		src: impl Into<SmolPath>,
-		dest: impl Into<SmolPath>,
+		src: impl Into<WsPath>,
+		dest: impl Into<WsPath>,
 		paths: impl Into<SmolStr>,
 	) -> Self {
 		Self {

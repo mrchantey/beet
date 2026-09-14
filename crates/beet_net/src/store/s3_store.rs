@@ -22,7 +22,7 @@ pub struct S3Store {
 	/// declaration carries the region that declaration resolved.
 	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 	/// Optional S3 endpoint override. Unset uses the default AWS endpoint;
 	/// set (with path-style addressing) targets an S3-compatible service such as
 	/// Cloudflare R2. See [`S3Store::r2`].
@@ -117,14 +117,14 @@ impl S3Store {
 			(None, None) => Self::new_default_region(bucket.clone()),
 		};
 		match prefix {
-			Some(prefix) => store.with_subdir(SmolPath::new(prefix.as_str())),
+			Some(prefix) => store.with_subdir(RelPath::new(prefix.as_str())),
 			None => store,
 		}
 		.xok()
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -189,8 +189,8 @@ impl S3Store {
 			.await
 	}
 
-	/// Resolve the S3 object key from a [`SmolPath`].
-	fn resolve_key(&self, path: &SmolPath) -> String {
+	/// Resolve the S3 object key from a [`RelPath`].
+	fn resolve_key(&self, path: &RelPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -198,7 +198,7 @@ impl S3Store {
 	}
 
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -206,7 +206,7 @@ impl S3Store {
 impl BlobStoreProvider for S3Store {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(S3Store {
 			bucket_name: self.bucket_name.clone(),
 			region: self.region.clone(),
@@ -330,7 +330,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -346,7 +346,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -371,7 +371,7 @@ impl BlobStoreProvider for S3Store {
 						Some(p) => key.strip_prefix(p.as_str())?,
 						None => &key,
 					};
-					Some(SmolPath::new(rel))
+					Some(RelPath::new(rel))
 				}));
 
 				if list_result.is_truncated == Some(true) {
@@ -388,7 +388,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -418,7 +418,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -441,7 +441,7 @@ impl BlobStoreProvider for S3Store {
 		})
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -466,7 +466,7 @@ impl BlobStoreProvider for S3Store {
 
 	fn public_url(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		if !self.public {
 			// a private bucket has no anonymous url, so the caller streams the
@@ -519,7 +519,7 @@ mod test {
 		store.store_exists().await.xpect_ok();
 
 		store
-			.get(&SmolPath::new("index.html"))
+			.get(&RelPath::new("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -538,7 +538,7 @@ mod test {
 			.as_str()
 			.xpect_eq("https://abc123.r2.cloudflarestorage.com");
 		BlobStore::new(store.with_public(true))
-			.public_url(&SmolPath::from("index.html"))
+			.public_url(&RelPath::from("index.html"))
 			.await
 			.unwrap()
 			.unwrap()
@@ -552,7 +552,7 @@ mod test {
 	#[beet_core::test]
 	async fn private_bucket_has_no_public_url() {
 		BlobStore::new(S3Store::new("beet-test", "us-west-2"))
-			.public_url(&SmolPath::from("test-file.txt"))
+			.public_url(&RelPath::from("test-file.txt"))
 			.await
 			.unwrap()
 			.xpect_none();
@@ -562,7 +562,7 @@ mod test {
 	#[ignore = "hits remote s3"]
 	async fn s3_public_url() {
 		let provider = S3Store::new("beet-test", "us-west-2").with_public(true);
-		let test_key = SmolPath::from("test-file.txt");
+		let test_key = RelPath::from("test-file.txt");
 		BlobStore::new(provider)
 			.public_url(&test_key)
 			.await

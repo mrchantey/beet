@@ -101,7 +101,7 @@ pub struct Diagnostic {
 	/// A concise, author-facing description of the problem.
 	pub message: String,
 	/// The route path this was found on, set by the per-route drivers.
-	pub route: Option<SmolPath>,
+	pub route: Option<RelPath>,
 }
 
 impl Diagnostic {
@@ -141,7 +141,7 @@ impl Diagnostic {
 	}
 
 	/// Tag this diagnostic with the route it was found on.
-	pub fn with_route(mut self, route: SmolPath) -> Self {
+	pub fn with_route(mut self, route: RelPath) -> Self {
 		self.route = Some(route);
 		self
 	}

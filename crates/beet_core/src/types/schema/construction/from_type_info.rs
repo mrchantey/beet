@@ -347,9 +347,8 @@ fn type_path_schema(type_path: &str) -> ValueSchema {
 		// `Duration` reflects as opaque but is authored as a unit-suffixed string
 		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string.
 		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
-		| "SmolStr" | "SmolPath" | "Duration" => {
-			ValueSchema::String(StringSchema::default())
-		}
+		| "SmolStr" | "SmolPath" | "RelPath" | "AbsPath" | "WsPath"
+		| "Duration" => ValueSchema::String(StringSchema::default()),
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())
 		}

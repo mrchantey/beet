@@ -62,7 +62,7 @@ fn serve_showcase(world: &mut World) -> Result {
 
 	// write to disk for offline inspection
 	let path =
-		AbsPathBuf::new_workspace_rel("target/examples/showcase/index.html")?;
+		AbsPath::new_workspace_rel("target/examples/showcase/index.html")?;
 	fs_ext::write(&path, &html)?;
 
 	// serve the pre-rendered page on every route
@@ -77,7 +77,7 @@ fn serve_showcase(world: &mut World) -> Result {
 
 	info!(
 		"Showcase served at http://localhost:{port} (also written to {})",
-		path.display()
+		path
 	);
 	Ok(())
 }
@@ -180,7 +180,7 @@ fn sidebar_nodes() -> Vec<SidebarNode> {
 	vec![
 		SidebarNode {
 			display_name: "Home".into(),
-			path: Some(SmolPath::new("/")),
+			path: Some(RelPath::new("/")),
 			..default()
 		},
 		SidebarNode {
@@ -190,12 +190,12 @@ fn sidebar_nodes() -> Vec<SidebarNode> {
 			children: vec![
 				SidebarNode {
 					display_name: "Intro".into(),
-					path: Some(SmolPath::new("docs/intro")),
+					path: Some(RelPath::new("docs/intro")),
 					..default()
 				},
 				SidebarNode {
 					display_name: "API".into(),
-					path: Some(SmolPath::new("docs/api")),
+					path: Some(RelPath::new("docs/api")),
 					..default()
 				},
 			],

@@ -69,7 +69,7 @@ impl StoreProvider {
 			StoreUri::Fs { path } => path
 				.as_deref()
 				.unwrap_or(".")
-				.xmap(AbsPathBuf::new)?
+				.xmap(AbsPath::new)?
 				.xmap(FsStore::new)
 				.xmap(Self::Fs),
 			StoreUri::Memory { name, prefix } => {
@@ -148,7 +148,7 @@ mod test {
 			.unwrap()
 			.into_blob_store()
 			.xmap(|store| (store.root_key(), store.subdir()))
-			.xpect_eq(("memory:m".into(), SmolPath::new("docs")));
+			.xpect_eq(("memory:m".into(), RelPath::new("docs")));
 	}
 
 	/// A memory uri names one backing: every build of it reads the same data,
@@ -158,9 +158,9 @@ mod test {
 		let uri = StoreUri::parse("memory://provider-shared").unwrap();
 		let build = || StoreProvider::from_uri(&uri).unwrap().into_blob_store();
 		let seeded = build();
-		seeded.insert(&SmolPath::new("a.txt"), "hi").await.unwrap();
+		seeded.insert(&RelPath::new("a.txt"), "hi").await.unwrap();
 		build()
-			.get(&SmolPath::new("a.txt"))
+			.get(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"hi"));

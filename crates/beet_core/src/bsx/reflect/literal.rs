@@ -578,14 +578,14 @@ mod test {
 			.xpect_eq(outer::Dup::type_info().type_path());
 	}
 
-	/// A string attribute targeting an `AbsPathBuf` field coerces workspace-relative,
+	/// A string attribute targeting an `AbsPath` field coerces workspace-relative,
 	/// so `<FsStore path="assets"/>` resolves under the workspace root (the seam that
 	/// replaced the `MountFsStore` string-prop adapter).
 	#[cfg(feature = "std")]
 	#[crate::test]
 	fn coerces_string_to_abs_path() {
-		resolve::<AbsPathBuf>(DataLiteral::Scalar(Value::str("assets")))
-			.xpect_eq(WsPathBuf::new("assets").into_abs());
+		resolve::<AbsPath>(DataLiteral::Scalar(Value::str("assets")))
+			.xpect_eq(WsPath::new("assets").into_abs());
 	}
 
 	/// A store uri string coerces to its [`StoreUri`], the one spelling the

@@ -246,9 +246,9 @@ mod test {
 			.into_blob_store()
 		};
 		let seeded = read();
-		seeded.insert(&SmolPath::new("a.txt"), "hi").await.unwrap();
+		seeded.insert(&RelPath::new("a.txt"), "hi").await.unwrap();
 		read()
-			.get(&SmolPath::new("a.txt"))
+			.get(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(bytes::Bytes::from_static(b"hi"));

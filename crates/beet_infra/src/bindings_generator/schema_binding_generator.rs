@@ -77,7 +77,7 @@ pub struct SchemaBindingGenerator {
 	files: Vec<BindingFile>,
 	/// Working directory for tofu operations.  Defaults to
 	/// `target/terra-bindings-generator`.
-	work_dir: AbsPathBuf,
+	work_dir: AbsPath,
 	/// The binding generator used for each target.  Users can pre-configure
 	/// this to control code-generation options; per-target filter and preamble
 	/// are applied automatically on top.
@@ -117,8 +117,7 @@ impl Default for SchemaBindingGenerator {
 	fn default() -> Self {
 		Self {
 			files: Vec::new(),
-			work_dir: WsPathBuf::new("target/terra-bindings-generator")
-				.into_abs(),
+			work_dir: WsPath::new("target/terra-bindings-generator").into_abs(),
 			binding_generator: BindingGenerator::new()
 				.with_title_case(true)
 				.with_trait_impls(true)
@@ -135,7 +134,7 @@ impl SchemaBindingGenerator {
 	}
 
 	/// Override the working directory used for `tofu init` / schema export.
-	pub fn with_work_dir(mut self, dir: AbsPathBuf) -> Self {
+	pub fn with_work_dir(mut self, dir: AbsPath) -> Self {
 		self.work_dir = dir;
 		self
 	}
@@ -175,8 +174,8 @@ impl SchemaBindingGenerator {
 		let providers_path = self.work_dir.join("providers.tf.json");
 		let schema_path = self.work_dir.join("schema.json");
 
-		let can_reuse = providers_path.exists()
-			&& schema_path.exists()
+		let can_reuse = fs_ext::exists(&providers_path)?
+			&& fs_ext::exists(&schema_path)?
 			&& fs_ext::read(&providers_path)
 				.map(|existing| existing == new_content)
 				.unwrap_or(false);
@@ -200,7 +199,7 @@ impl SchemaBindingGenerator {
 		}
 
 		// 5. For each provider target, generate bindings with appropriate filter.
-		self.generate_bindings(&schema_path)?;
+		self.generate_bindings(schema_path.as_ref())?;
 
 		Ok(())
 	}
@@ -220,7 +219,7 @@ impl SchemaBindingGenerator {
 	// ------------------------------------------------------------------
 
 	fn prepare_work_dir(&self) -> Result {
-		if self.work_dir.exists() {
+		if fs_ext::exists(&self.work_dir)? {
 			fs_ext::remove(&self.work_dir)?;
 		}
 		fs_ext::create_dir_all(&self.work_dir)?;
@@ -270,14 +269,14 @@ impl SchemaBindingGenerator {
 	fn write_providers_tf_bytes(&self, content: &[u8]) -> Result {
 		let path = self.work_dir.join("providers.tf.json");
 		fs_ext::write(&path, content)?;
-		info!("[schema_binding_generator] wrote {}", path.display());
+		info!("[schema_binding_generator] wrote {}", path);
 		Ok(())
 	}
 
 	async fn run_tofu_init(&self) -> Result {
 		info!(
 			"[schema_binding_generator] running tofu init in {}",
-			self.work_dir.display()
+			self.work_dir
 		);
 		tofu::init(&self.work_dir).await?;
 
@@ -285,7 +284,7 @@ impl SchemaBindingGenerator {
 		Ok(())
 	}
 
-	async fn run_tofu_schema(&self) -> Result<AbsPathBuf> {
+	async fn run_tofu_schema(&self) -> Result<AbsPath> {
 		let schema_path = self.work_dir.join("schema.json");
 		info!(
 			"[schema_binding_generator] running tofu providers schema → {}",

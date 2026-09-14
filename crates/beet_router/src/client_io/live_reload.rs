@@ -72,7 +72,7 @@ pub(crate) struct NeedsReload {
 	pub structural: bool,
 	/// Every store path the burst changed, narrowing the content reload's
 	/// render diagnostics to the pages those files back.
-	pub changed: HashSet<SmolPath>,
+	pub changed: HashSet<RelPath>,
 }
 
 /// Counts the reloads dispatched on a [`LiveReload`] root, so the async tail of
@@ -222,7 +222,7 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 pub(crate) fn reload_site(
 	world: &mut World,
 	root: Entity,
-	changed: HashSet<SmolPath>,
+	changed: HashSet<RelPath>,
 ) {
 	if !world.entity(root).contains::<BlobStore>() {
 		warn!("live reload root {root} has no BlobStore");
@@ -315,7 +315,7 @@ fn respawn_routes_dirs(world: &mut World) {
 /// nothing specific changed.
 fn changed_routes(
 	world: &mut World,
-	changed: &HashSet<SmolPath>,
+	changed: &HashSet<RelPath>,
 ) -> Option<HashSet<Entity>> {
 	if changed.is_empty() {
 		return None;
@@ -386,8 +386,8 @@ mod test {
 
 	/// Write a site fixture (`templates/` + `routes/`) under `target/tests` and
 	/// return its root dir.
-	fn site_fixture(name: &str) -> AbsPathBuf {
-		let root = AbsPathBuf::new(
+	fn site_fixture(name: &str) -> AbsPath {
+		let root = AbsPath::new(
 			fs_ext::workspace_root()
 				.join("target/tests/live_reload")
 				.join(name),
@@ -509,7 +509,7 @@ mod test {
 		// seed an initial route, then spawn the site over the same backing
 		let handle = BlobStore::new(store.clone());
 		handle
-			.insert(&SmolPath::from("routes/index.md"), "# Home")
+			.insert(&RelPath::from("routes/index.md"), "# Home")
 			.await
 			.unwrap();
 		let root = spawn_site(&mut world, store);
@@ -526,7 +526,7 @@ mod test {
 		// add a route through the store: the in-memory watcher emits a `BlobEvent`,
 		// drained next update into the reload-on-change observer.
 		handle
-			.insert(&SmolPath::from("routes/about.md"), "# About")
+			.insert(&RelPath::from("routes/about.md"), "# About")
 			.await
 			.unwrap();
 		// drain the event (PreUpdate) -> mark NeedsReload -> reload (Update), then
@@ -559,7 +559,7 @@ mod test {
 			.unwrap()
 			.entity;
 		let changed = |paths: &[&str]| {
-			paths.iter().map(|path| SmolPath::from(*path)).collect()
+			paths.iter().map(|path| RelPath::from(*path)).collect()
 		};
 		changed_routes(&mut world, &changed(&["routes/index.md"]))
 			.xpect_eq(Some([home].into_iter().collect()));
@@ -624,8 +624,8 @@ mod test {
 
 	/// A deck fixture: zero-padded card files under `slides/` (deliberately
 	/// out-of-order on disk) backing a [`CardDeck`] router. Returns the site dir.
-	fn deck_fixture(name: &str) -> AbsPathBuf {
-		let root = AbsPathBuf::new(
+	fn deck_fixture(name: &str) -> AbsPath {
+		let root = AbsPath::new(
 			fs_ext::workspace_root()
 				.join("target/tests/live_reload")
 				.join(name),

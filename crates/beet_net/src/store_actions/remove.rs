@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
 pub struct RemoveBlobParams {
 	/// Path to the blob to remove.
-	pub path: SmolPath,
+	pub path: RelPath,
 }
 
 /// Remove a blob from the nearest ancestor [`BlobStore`].
@@ -37,7 +37,7 @@ mod test {
 	#[beet_core::test]
 	async fn removes_existing_blob() {
 		let store = BlobStore::temp();
-		let path = SmolPath::from("file.txt");
+		let path = RelPath::from("file.txt");
 		store.insert(&path, "hello").await.unwrap();
 		store.exists(&path).await.unwrap().xpect_true();
 		store.remove(&path).await.unwrap();

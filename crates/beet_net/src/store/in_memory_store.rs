@@ -52,14 +52,14 @@ pub struct InMemoryStore {
 	inner: Arc<InMemoryInner>,
 	/// Optional subdirectory prefix for all keys.
 	#[get(skip)]
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 }
 
 /// Backing state shared across every handle on one name.
 #[derive(Debug)]
 struct InMemoryInner {
 	/// Shared storage state, `None` until the store is created.
-	map: RwLock<Option<HashMap<SmolPath, Bytes>>>,
+	map: RwLock<Option<HashMap<RelPath, Bytes>>>,
 	/// Bus to emit [`BlobEvent`]s on, set while at least one watcher subscribes.
 	#[cfg(feature = "std")]
 	bus: Mutex<Option<async_channel::Sender<BlobEvent>>>,
@@ -70,7 +70,7 @@ struct InMemoryInner {
 }
 
 impl InMemoryInner {
-	fn new(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
+	fn new(map: Option<HashMap<RelPath, Bytes>>) -> Self {
 		Self {
 			map: RwLock::new(map),
 			#[cfg(feature = "std")]
@@ -109,7 +109,7 @@ impl FromReflect for InMemoryStore {
 		let name = SmolStr::from_reflect(dyn_struct.field("name")?)?;
 		let subdir = dyn_struct
 			.field("subdir")
-			.and_then(Option::<SmolPath>::from_reflect)
+			.and_then(Option::<RelPath>::from_reflect)
 			.flatten();
 		let mut store = Self::named(name);
 		store.subdir = subdir;
@@ -130,7 +130,7 @@ impl InMemoryStore {
 	/// without an async `insert`. The store is then read like any other (eg a
 	/// [`TemplateDir`](beet_core::prelude::TemplateDir) over it).
 	pub fn new_seeded(
-		entries: impl IntoIterator<Item = (SmolPath, Bytes)>,
+		entries: impl IntoIterator<Item = (RelPath, Bytes)>,
 	) -> Self {
 		Self::minted(Some(entries.into_iter().collect()))
 	}
@@ -152,14 +152,14 @@ impl InMemoryStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
 	/// A fresh backing with initial state `map`, registered under a minted
 	/// name no live backing holds (a hand-chosen name may share the spelling).
-	fn minted(map: Option<HashMap<SmolPath, Bytes>>) -> Self {
+	fn minted(map: Option<HashMap<RelPath, Bytes>>) -> Self {
 		let mut registry = REGISTRY.lock().unwrap();
 		let name = loop {
 			let name = SmolStr::from(format!(
@@ -180,7 +180,7 @@ impl InMemoryStore {
 	fn register(
 		registry: &mut HashMap<SmolStr, Weak<InMemoryInner>>,
 		name: SmolStr,
-		map: Option<HashMap<SmolPath, Bytes>>,
+		map: Option<HashMap<RelPath, Bytes>>,
 	) -> Self {
 		let inner = Arc::new(InMemoryInner::new(map));
 		registry.insert(name.clone(), Arc::downgrade(&inner));
@@ -192,7 +192,7 @@ impl InMemoryStore {
 	}
 
 	/// Resolve an external path to the internal key by prepending the subdir.
-	fn resolve_key(&self, path: &SmolPath) -> SmolPath {
+	fn resolve_key(&self, path: &RelPath) -> RelPath {
 		match &self.subdir {
 			Some(sub) => sub.join(path),
 			None => path.clone(),
@@ -217,7 +217,7 @@ impl InMemoryStore {
 
 	/// Emit a [`BlobEvent`] built from `self` if a bus is subscribed.
 	#[cfg(feature = "std")]
-	fn emit(&self, path: &SmolPath, kind: BlobEventKind) {
+	fn emit(&self, path: &RelPath, kind: BlobEventKind) {
 		if let Some(sender) = self.inner.bus.lock().unwrap().as_ref() {
 			let event = BlobEvent::new(
 				BlobStore::new(self.clone()),
@@ -232,7 +232,7 @@ impl InMemoryStore {
 impl BlobStoreProvider for InMemoryStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(InMemoryStore {
 			name: self.name.clone(),
 			inner: self.inner.clone(),
@@ -247,7 +247,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn root_key(&self) -> SmolStr { format!("memory:{}", self.name).into() }
 
-	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -280,7 +280,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		#[cfg(feature = "std")]
@@ -303,7 +303,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -315,7 +315,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		Box::pin(async move {
 			let guard = this.inner.map.read().unwrap();
@@ -329,7 +329,7 @@ impl BlobStoreProvider for InMemoryStore {
 						.filter_map(|key| {
 							key.as_str()
 								.strip_prefix(sub.as_str())
-								.map(SmolPath::new)
+								.map(RelPath::new)
 						})
 						.collect::<Vec<_>>()
 						.xok()
@@ -339,7 +339,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		Box::pin(async move {
@@ -359,7 +359,7 @@ impl BlobStoreProvider for InMemoryStore {
 		})
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		let path = path.clone();
@@ -381,7 +381,7 @@ impl BlobStoreProvider for InMemoryStore {
 
 	fn public_url(
 		&self,
-		_path: &SmolPath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { None.xok() })
 	}
@@ -435,11 +435,11 @@ mod test {
 		first.root_key().xpect_eq(second.root_key());
 		first.root_key().xpect_eq("memory:shared-backing");
 		first
-			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		second
-			.get(&SmolPath::new("a.txt"))
+			.get(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"hi"));
@@ -457,11 +457,11 @@ mod test {
 		let second = InMemoryStore::new();
 		(first.root_key() != second.root_key()).xpect_true();
 		first
-			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		second
-			.exists(&SmolPath::new("a.txt"))
+			.exists(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -475,14 +475,14 @@ mod test {
 			|name: &str| REGISTRY.lock().unwrap().contains_key(name);
 		let store = InMemoryStore::named("ephemeral");
 		store
-			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		registered("ephemeral").xpect_true();
 		drop(store);
 		registered("ephemeral").xpect_false();
 		InMemoryStore::named("ephemeral")
-			.exists(&SmolPath::new("a.txt"))
+			.exists(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -494,15 +494,15 @@ mod test {
 	async fn from_reflect_joins_the_backing() {
 		let store = InMemoryStore::named("reflected").with_subdir("docs");
 		store
-			.insert(&SmolPath::new("a.txt"), Bytes::from_static(b"hi"))
+			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
 		let dynamic = store.to_dynamic();
 		let rebuilt = InMemoryStore::from_reflect(dynamic.as_ref()).unwrap();
 		rebuilt.name().xpect_eq("reflected");
-		rebuilt.subdir().xpect_eq(SmolPath::new("docs"));
+		rebuilt.subdir().xpect_eq(RelPath::new("docs"));
 		rebuilt
-			.get(&SmolPath::new("a.txt"))
+			.get(&RelPath::new("a.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"hi"));

@@ -23,15 +23,15 @@ impl AnalyticsSegment {
 		writer: Uuid,
 		timestamp: u64,
 		sequence: u64,
-	) -> SmolPath {
-		SmolPath::new(format!(
+	) -> RelPath {
+		RelPath::new(format!(
 			"{}/{date}/{writer}/{timestamp}-{sequence}.ndjson.gz",
 			Self::PREFIX
 		))
 	}
 
 	/// Returns the UTC date encoded in a segment path.
-	pub(crate) fn date(path: &SmolPath) -> Option<SmolStr> {
+	pub(crate) fn date(path: &RelPath) -> Option<SmolStr> {
 		let remainder = path
 			.as_str()
 			.strip_prefix(Self::PREFIX)?
@@ -53,9 +53,9 @@ impl AnalyticsSegment {
 	/// Writes and read-verifies one segment object.
 	pub(crate) async fn write(
 		store: &BlobStore,
-		path: SmolPath,
+		path: RelPath,
 		events: &[AnalyticsEvent],
-	) -> Result<SmolPath> {
+	) -> Result<RelPath> {
 		let bytes = AnalyticsArchive::encode(events)?;
 		store.insert(&path, bytes.clone()).await?;
 		let actual = store.get(&path).await?;
@@ -79,7 +79,7 @@ impl AnalyticsSegment {
 	pub(crate) async fn read_dates(
 		store: &BlobStore,
 		wanted: impl Fn(&SmolStr) -> bool,
-	) -> Result<Vec<(SmolPath, Vec<AnalyticsEvent>)>> {
+	) -> Result<Vec<(RelPath, Vec<AnalyticsEvent>)>> {
 		Self::dated_paths(store)
 			.await?
 			.into_iter()
@@ -116,7 +116,7 @@ impl AnalyticsSegment {
 	/// Reads every valid segment, warning and skipping unreadable objects.
 	pub(crate) async fn read_all_lossy(
 		store: &BlobStore,
-	) -> Result<Vec<(SmolPath, Vec<AnalyticsEvent>)>> {
+	) -> Result<Vec<(RelPath, Vec<AnalyticsEvent>)>> {
 		Self::dated_paths(store)
 			.await?
 			.into_iter()
@@ -148,7 +148,7 @@ impl AnalyticsSegment {
 	/// Reads and validates one segment against the date encoded in its path.
 	async fn read(
 		store: &BlobStore,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> Result<Vec<AnalyticsEvent>> {
 		let Some(date) = Self::date(path) else {
 			bevybail!("invalid analytics segment path `{path}`");
@@ -169,9 +169,7 @@ impl AnalyticsSegment {
 	/// Returns every segment path beside the date it encodes, in deterministic
 	/// order. Anything else in the store belongs to another writer and is left
 	/// alone rather than treated as a malformed segment.
-	async fn dated_paths(
-		store: &BlobStore,
-	) -> Result<Vec<(SmolPath, SmolStr)>> {
+	async fn dated_paths(store: &BlobStore) -> Result<Vec<(RelPath, SmolStr)>> {
 		if !store.store_exists().await? {
 			return Vec::new().xok();
 		}

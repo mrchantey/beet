@@ -40,7 +40,7 @@ use beet_core::prelude::*;
 #[reflect(Component, Default)]
 pub struct DocumentBlob {
 	/// The document's path within the nearest ancestor store.
-	pub path: SmolPath,
+	pub path: RelPath,
 	/// Coalesces the write-backs: a burst of edits is at most one write in
 	/// flight plus one queued behind it, rather than a queue per keystroke, and
 	/// the queued one re-reads the document so it persists the latest state.
@@ -50,7 +50,7 @@ pub struct DocumentBlob {
 
 impl DocumentBlob {
 	/// The document at `path` in the nearest ancestor store.
-	pub fn new(path: impl Into<SmolPath>) -> Self {
+	pub fn new(path: impl Into<RelPath>) -> Self {
 		Self {
 			path: path.into(),
 			trigger: default(),
@@ -114,7 +114,7 @@ pub(crate) fn read_document_blobs(
 async fn read_document_blob(
 	entity: &AsyncEntity,
 	snapshot: SchemaRegistry,
-	path: SmolPath,
+	path: RelPath,
 ) -> Result {
 	let Some(store) = ancestor_store(entity).await? else {
 		return OK;
@@ -174,7 +174,7 @@ pub(crate) fn write_document_blobs(
 
 /// One write: the document as it stands *now*, so the retry queued behind an
 /// in-flight write persists the latest edit rather than the one that queued it.
-async fn write_document_blob(entity: &AsyncEntity, path: SmolPath) -> Result {
+async fn write_document_blob(entity: &AsyncEntity, path: RelPath) -> Result {
 	let Some(store) = ancestor_store(entity).await? else {
 		return OK;
 	};
@@ -236,14 +236,14 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert_document(
-				&SmolPath::from("schema.json"),
+				&RelPath::from("schema.json"),
 				&TypedDocument::schema_document(&todo_schema()).unwrap(),
 			)
 			.await
 			.unwrap();
 		store
 			.insert_document(
-				&SmolPath::from("todos.json"),
+				&RelPath::from("todos.json"),
 				&TypedDocument::new(
 					rows_schema(),
 					value!([{ "label": "buy milk", "done": false }]),
@@ -330,7 +330,7 @@ mod test {
 		store
 			.get_document(
 				SchemaResolver::default(),
-				&SmolPath::from("todos.json"),
+				&RelPath::from("todos.json"),
 			)
 			.await
 			.unwrap()

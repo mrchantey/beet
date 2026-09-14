@@ -42,14 +42,14 @@ type EntryRebuildFn =
 /// the watcher emits.
 #[derive(Clone, Resource)]
 pub struct EntryReloader {
-	sources: HashSet<SmolPath>,
+	sources: HashSet<RelPath>,
 	rebuild: EntryRebuildFn,
 }
 
 impl EntryReloader {
 	/// A reloader over the given structural `sources`, rebuilding through `rebuild`.
 	pub fn new(
-		sources: HashSet<SmolPath>,
+		sources: HashSet<RelPath>,
 		rebuild: impl 'static
 		+ Send
 		+ Sync
@@ -64,7 +64,7 @@ impl EntryReloader {
 	/// Whether a change to `path` is structural (the entry document, a
 	/// `<Template src>` include or an entry-instantiated template), so it drives
 	/// a full rebuild rather than the light content re-fire.
-	pub fn is_structural(&self, path: &SmolPath) -> bool {
+	pub fn is_structural(&self, path: &RelPath) -> bool {
 		self.sources.contains(path)
 	}
 
@@ -72,7 +72,7 @@ impl EntryReloader {
 	/// rebuild (the entry, its includes and the templates it instantiates may
 	/// have changed), so a newly added include or tag becomes structural without
 	/// a restart.
-	pub fn set_sources(&mut self, sources: HashSet<SmolPath>) {
+	pub fn set_sources(&mut self, sources: HashSet<RelPath>) {
 		self.sources = sources;
 	}
 }
@@ -170,7 +170,7 @@ mod test {
 		// the driver's rebuild callback: spawn a fresh entry root under a world lock.
 		let rebuild_store = store.clone();
 		world.insert_resource(EntryReloader::new(
-			[SmolPath::from("main.bsx")].into_iter().collect(),
+			[RelPath::from("main.bsx")].into_iter().collect(),
 			move |world: AsyncWorld| {
 				let store = rebuild_store.clone();
 				Box::pin(async move {

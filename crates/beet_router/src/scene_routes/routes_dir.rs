@@ -47,7 +47,7 @@ use beet_ui::prelude::*;
 #[reflect(Component, Default)]
 pub struct RoutesDir {
 	/// The content directory, relative to the nearest ancestor [`BlobStore`].
-	pub src: String,
+	pub src: RelPath,
 	/// Which of `src`'s content files to serve, matched against each file's
 	/// path relative to `src` (eg `blog/1-post.md`). Open by default.
 	///
@@ -62,7 +62,7 @@ const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
 impl RoutesDir {
 	/// Discover routes under `src`, relative to the nearest ancestor [`BlobStore`].
-	pub fn new(src: impl Into<String>) -> Self {
+	pub fn new(src: impl Into<RelPath>) -> Self {
 		Self {
 			src: src.into(),
 			..default()
@@ -101,7 +101,7 @@ impl RoutesDir {
 	) -> Result {
 		let entity = ev.entity;
 		let dir = dirs.get(entity)?;
-		let src = SmolPath::from(dir.src.as_str());
+		let src = dir.src.clone();
 		let filter = dir.filter.clone();
 		let root = build_root.map(|root| **root);
 		// one queued command parks the guard (ahead of the build's synchronous
@@ -280,7 +280,7 @@ impl RoutesDir {
 	}
 
 	/// Whether `path`'s extension marks it as a servable content file.
-	fn is_content(path: &SmolPath) -> bool {
+	fn is_content(path: &RelPath) -> bool {
 		path.extension()
 			.is_some_and(|ext| CONTENT_EXTENSIONS.contains(&ext))
 	}
@@ -293,7 +293,7 @@ impl RoutesDir {
 	/// so a route path never depends on which scan found the file. The
 	/// frontmatter `slug` override is applied on top by the caller, which holds
 	/// the resolved [`PageMeta`] (see [`PageMeta::apply_slug`]).
-	pub(crate) fn route_path_of(rel: &SmolPath) -> SmolPath {
+	pub(crate) fn route_path_of(rel: &RelPath) -> RelPath {
 		let mut segments = rel.segments();
 		if let (Some(stem), Some(last)) = (rel.file_stem(), segments.last_mut())
 		{
@@ -302,7 +302,7 @@ impl RoutesDir {
 		if segments.last() == Some(&"index") {
 			segments.pop();
 		}
-		SmolPath::from_segments(&segments)
+		RelPath::from_segments(&segments)
 	}
 
 	/// The url a content file serves at: its filename-derived path
@@ -315,9 +315,9 @@ impl RoutesDir {
 	/// DIRECTORY, not the page: `blog/index.md` with `slug = "journal"` would
 	/// serve at `/journal` while every sibling post stayed under `/blog`.
 	fn route_path_for(
-		store_path: &SmolPath,
+		store_path: &RelPath,
 		meta: Option<&PageMeta>,
-	) -> Result<SmolPath> {
+	) -> Result<RelPath> {
 		let route_path = Self::route_path_of(store_path);
 		let Some(meta) = meta.filter(|meta| meta.slug.is_some()) else {
 			return Ok(route_path);
@@ -338,7 +338,7 @@ impl RoutesDir {
 	/// of silently serving with no title, order or slug.
 	async fn scan_declarations(
 		store: &BlobStore,
-		path: &SmolPath,
+		path: &RelPath,
 		frontmatter_type: &str,
 	) -> Result<RootDeclarations> {
 		let source = store.get(path).await?.to_vec().xmap(String::from_utf8)?;
@@ -359,7 +359,7 @@ impl RoutesDir {
 /// read, carried per file so it is reported by name with the other spawn
 /// failures rather than aborting the scan.
 struct RouteSpec {
-	store_path: SmolPath,
+	store_path: RelPath,
 	declarations: Result<RootDeclarations>,
 }
 
@@ -401,7 +401,7 @@ mod test {
 		for (rel, content) in files {
 			fs_ext::write(root.join(rel), content).unwrap();
 		}
-		BlobStore::new(FsStore::new(AbsPathBuf::new(root).unwrap()))
+		BlobStore::new(FsStore::new(AbsPath::new(root).unwrap()))
 	}
 
 	/// An in-memory [`BlobStore`] seeded with `files`, proving discovery is
@@ -410,7 +410,7 @@ mod test {
 		let store = BlobStore::temp();
 		for (rel, content) in files {
 			store
-				.insert(&SmolPath::from(*rel), content.to_string())
+				.insert(&RelPath::from(*rel), content.to_string())
 				.await
 				.unwrap();
 		}
@@ -419,14 +419,14 @@ mod test {
 
 	#[beet_core::test]
 	fn route_path_of() {
-		RoutesDir::route_path_of(&SmolPath::from("docs/intro.md"))
-			.xpect_eq(SmolPath::new("docs/intro"));
-		RoutesDir::route_path_of(&SmolPath::from("index.md"))
-			.xpect_eq(SmolPath::default());
-		RoutesDir::route_path_of(&SmolPath::from("docs/index.md"))
-			.xpect_eq(SmolPath::new("docs"));
-		RoutesDir::route_path_of(&SmolPath::from("about.bsx"))
-			.xpect_eq(SmolPath::new("about"));
+		RoutesDir::route_path_of(&RelPath::from("docs/intro.md"))
+			.xpect_eq(RelPath::new("docs/intro"));
+		RoutesDir::route_path_of(&RelPath::from("index.md"))
+			.xpect_eq(RelPath::default());
+		RoutesDir::route_path_of(&RelPath::from("docs/index.md"))
+			.xpect_eq(RelPath::new("docs"));
+		RoutesDir::route_path_of(&RelPath::from("about.bsx"))
+			.xpect_eq(RelPath::new("about"));
 	}
 
 	/// Assert the three fixture routes render their content, shared by the
@@ -556,17 +556,17 @@ mod test {
 			..default()
 		};
 		RoutesDir::route_path_for(
-			&SmolPath::from("blog/1-full-stack-bevy.md"),
+			&RelPath::from("blog/1-full-stack-bevy.md"),
 			Some(&slugged),
 		)
 		.unwrap()
-		.xpect_eq(SmolPath::new("blog/full-stack-bevy"));
+		.xpect_eq(RelPath::new("blog/full-stack-bevy"));
 		// no slug declared, the filename stands
-		RoutesDir::route_path_for(&SmolPath::from("blog/index.bsx"), None)
+		RoutesDir::route_path_for(&RelPath::from("blog/index.bsx"), None)
 			.unwrap()
-			.xpect_eq(SmolPath::new("blog"));
+			.xpect_eq(RelPath::new("blog"));
 		RoutesDir::route_path_for(
-			&SmolPath::from("blog/index.bsx"),
+			&RelPath::from("blog/index.bsx"),
 			Some(&slugged),
 		)
 		.unwrap_err()

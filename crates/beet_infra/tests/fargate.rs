@@ -141,7 +141,7 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 }
 
 /// Build, upload artifacts, sync assets, build/push Docker image, and apply terraform.
-async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
+async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 	info!("deploy: starting fargate deployment");
 	let block = FargateBlock::default();
 

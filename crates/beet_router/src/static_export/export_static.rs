@@ -23,7 +23,7 @@ impl StaticExport {
 	pub async fn collect_paths(
 		world: &AsyncWorld,
 		router: Entity,
-	) -> Result<Vec<SmolPath>> {
+	) -> Result<Vec<RelPath>> {
 		// drafts are excluded only in production; the process stage defaults to
 		// dev (keep drafts) when neither transport named one.
 		let is_prod = BootstrapConfig::get().is_prod();
@@ -40,7 +40,7 @@ impl StaticExport {
 		world: &World,
 		router: Entity,
 		is_prod: bool,
-	) -> Result<Vec<SmolPath>> {
+	) -> Result<Vec<RelPath>> {
 		RouteTree::of(world, router)?
 			.clone()
 			.flatten_nodes()
@@ -83,7 +83,7 @@ impl StaticExport {
 async fn collect_static_html(
 	world: &AsyncWorld,
 	router: Entity,
-) -> Result<Vec<(SmolPath, String)>> {
+) -> Result<Vec<(RelPath, String)>> {
 	let paths = StaticExport::collect_paths(world, router).await?;
 	// the tree lives on the entry root, the dispatch on the router beneath it
 	let entity = world
@@ -117,7 +117,7 @@ impl StaticExport {
 		world: &AsyncWorld,
 		router: Entity,
 		out: &BlobStore,
-	) -> Result<Vec<SmolPath>> {
+	) -> Result<Vec<RelPath>> {
 		let mut pages = collect_static_html(world, router).await?;
 		pages.extend(
 			world
@@ -127,7 +127,7 @@ impl StaticExport {
 		let mut written = Vec::new();
 		for (path, html) in pages {
 			let out_path = if path.segments().is_empty() {
-				SmolPath::new("index.html")
+				RelPath::new("index.html")
 			} else if path.extension().is_some() {
 				path
 			} else {
@@ -151,7 +151,7 @@ impl StaticExport {
 	fn redirects(
 		world: &mut World,
 		router: Entity,
-	) -> Result<Vec<(SmolPath, String)>> {
+	) -> Result<Vec<(RelPath, String)>> {
 		let package = world.get_resource::<PackageConfig>().cloned();
 		RouteTree::of(world, router)?
 			.clone()
@@ -245,17 +245,17 @@ mod test {
 		// the two user scene routes plus the `app-info` scene, wired by
 		// `Router::with_defaults`.
 		written.len().xpect_eq(3);
-		out.get(&SmolPath::new("index.html"))
+		out.get(&RelPath::new("index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("Home");
-		out.get(&SmolPath::new("about/index.html"))
+		out.get(&RelPath::new("about/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
 			.xpect_contains("About");
-		out.get(&SmolPath::new("app-info/index.html"))
+		out.get(&RelPath::new("app-info/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -302,7 +302,7 @@ mod test {
 		exported(&written, "sitemap.xml").xpect_true();
 
 		let read = async |path: &str| {
-			out.get(&SmolPath::new(path))
+			out.get(&RelPath::new(path))
 				.await
 				.unwrap()
 				.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -342,7 +342,7 @@ mod test {
 			})
 			.await
 			.unwrap();
-		out.get(&SmolPath::new("blog/post-1/index.html"))
+		out.get(&RelPath::new("blog/post-1/index.html"))
 			.await
 			.unwrap()
 			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
@@ -361,7 +361,7 @@ mod test {
 	/// Exports `router` to a temp store, returning the written paths. The process
 	/// stage decides the draft gate, so this is always the dev path; the prod
 	/// path is asserted against [`StaticExport::exports`] directly.
-	async fn export(world: &mut World, router: Entity) -> Vec<SmolPath> {
+	async fn export(world: &mut World, router: Entity) -> Vec<RelPath> {
 		let out = BlobStore::temp();
 		world
 			.run_async_then(async move |world| {
@@ -380,7 +380,7 @@ mod test {
 	}
 
 	/// Whether a route under `prefix` is in the exported set.
-	fn exported(paths: &[SmolPath], prefix: &str) -> bool {
+	fn exported(paths: &[RelPath], prefix: &str) -> bool {
 		paths.iter().any(|path| path.starts_with(prefix))
 	}
 
@@ -438,7 +438,7 @@ mod test {
 	/// its root.
 	// `RoutesDir` scans the filesystem store, so this is native-only.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
-	fn draft_content_dir(name: &str) -> AbsPathBuf {
+	fn draft_content_dir(name: &str) -> AbsPath {
 		let root = fs_ext::workspace_root()
 			.join("target/tests/export_static/drafts")
 			.join(name);
@@ -449,13 +449,13 @@ mod test {
 			"+++\nvisibility = \"draft\"\n+++\n\n# Secret",
 		)
 		.unwrap();
-		AbsPathBuf::new(root).unwrap()
+		AbsPath::new(root).unwrap()
 	}
 
 	/// Spawn a `RoutesDir` router over `root`, settling the async runtime so the
 	/// discovery scan (an async task) completes before the export walks the routes.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
-	async fn spawn_routes_dir(world: &mut World, root: AbsPathBuf) -> Entity {
+	async fn spawn_routes_dir(world: &mut World, root: AbsPath) -> Entity {
 		// compose the repo store on the router root so `RoutesDir` resolves it by
 		// ancestry, then settle the discovery scan before the export walks the routes.
 		let router = world

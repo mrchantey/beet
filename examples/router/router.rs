@@ -54,7 +54,7 @@ fn setup(mut commands: Commands) { commands.spawn(router_scene()); }
 pub fn router_scene() -> impl Bundle {
 	(
 		// the store the blob scenes read their content from
-		FsStore::new(WsPathBuf::new("examples/assets")),
+		FsStore::new(WsPath::new("examples/assets")),
 		servers(),
 		CallOnReady::on_spawn(),
 		// the batteries-included router: route lookup + the default app routes,

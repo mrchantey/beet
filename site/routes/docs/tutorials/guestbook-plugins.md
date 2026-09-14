@@ -77,7 +77,7 @@ fn book_field() -> FieldRef {
 async fn save_book(store: &BlobStore, book: &Document) -> Result {
 	let bytes = MediaType::Json
 		.serialize_with_options(&book.0, SerializeOptions { pretty: true })?;
-	store.insert(&SmolPath::from(BOOK_PATH), bytes).await?;
+	store.insert(&RelPath::from(BOOK_PATH), bytes).await?;
 	Ok(())
 }
 ```
@@ -117,9 +117,9 @@ fn load_entry(world: &mut World) {
 /// Read `main.bsx` and the saved book through the store, then build the scene
 /// onto a root carrying both.
 async fn build_entry(world: &AsyncWorld) -> Result {
-	let store = BlobStore::new(FsStore::new(AbsPathBuf::new(".")?));
+	let store = BlobStore::new(FsStore::new(AbsPath::new(".")?));
 	let source = store
-		.get_media(&SmolPath::from("main.bsx"))
+		.get_media(&RelPath::from("main.bsx"))
 		.await?
 		.as_utf8()?
 		.to_string();
@@ -136,7 +136,7 @@ async fn build_entry(world: &AsyncWorld) -> Result {
 
 /// The saved book, empty when nothing was ever signed.
 async fn load_book(store: &BlobStore) -> Result<Document> {
-	let path = SmolPath::from(BOOK_PATH);
+	let path = RelPath::from(BOOK_PATH);
 	match store.exists(&path).await? {
 		true => store
 			.get(&path)

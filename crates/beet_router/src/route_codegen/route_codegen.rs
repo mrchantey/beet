@@ -112,8 +112,8 @@ mod test {
 	use beet_core::prelude::*;
 	use quote::ToTokens;
 
-	fn site_dir(sub: &str) -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel(format!(
+	fn site_dir(sub: &str) -> AbsPath {
+		AbsPath::new_workspace_rel(format!(
 			"examples/rsx_site/tests/fixtures/codegen_site/{sub}"
 		))
 		.unwrap()

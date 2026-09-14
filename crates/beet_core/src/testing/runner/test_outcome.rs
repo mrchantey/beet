@@ -97,7 +97,7 @@ impl TestFail {
 	/// Gets the file path of the failure location.
 	///
 	/// Returns the panic location if available, otherwise the test file path.
-	pub fn path(&self, test: &Test) -> SmolPath {
+	pub fn path(&self, test: &Test) -> WsPath {
 		match self {
 			TestFail::Panic {
 				location: Some(location),

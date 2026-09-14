@@ -12,11 +12,12 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider>;
 
 	/// Returns a new provider scoped to the given subdirectory.
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider>;
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider>;
 
-	/// A view of this store rooted at `root` (a normalized store-relative key
-	/// path), plus `entry_name` re-expressed relative to that root. The seam
-	/// behind [`BlobStore::rebase_repo`].
+	/// A view of this store rooted at `root` (a cleaned path relative to the
+	/// store, which may climb above it with a leading `..`), plus `entry_name`
+	/// re-expressed relative to that root. The seam behind
+	/// [`BlobStore::rebase_repo`].
 	///
 	/// The default is the key-prefix view every provider supports
 	/// ([`with_subdir`](Self::with_subdir)), erroring loudly when `root` walks
@@ -27,9 +28,9 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// overrides this to re-root above.
 	fn rebase(
 		&self,
-		entry_name: &SmolPath,
+		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		if root.first_segment() == Some("..") {
 			bevybail!(
 				"entry `{entry_name}` declares a `<RepoRoot>` above the store \
@@ -39,15 +40,16 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 				self.id()
 			);
 		}
-		let entry_name = entry_name.strip_prefix(root).ok_or_else(|| {
+		let root = RelPath::new(root);
+		let entry_name = entry_name.strip_prefix(&root).ok_or_else(|| {
 			bevyhow!(
 				"entry `{entry_name}` is not under its declared store root \
 				`{root}`"
 			)
 		})?;
-		let provider = match root.as_str().is_empty() {
+		let provider = match root.is_empty() {
 			true => self.box_clone(),
-			false => self.with_subdir(root.clone()),
+			false => self.with_subdir(root),
 		};
 		(provider, entry_name).xok()
 	}
@@ -55,7 +57,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// Create a type-erased [`Blob`] handle for a single object managed by
 	/// this provider. Prefer the typed [`FsStore::blob`], [`S3Store::blob`]
 	/// etc. when you need world serialization.
-	fn erased_blob(&self, path: SmolPath) -> Blob {
+	fn erased_blob(&self, path: RelPath) -> Blob {
 		Blob::new(BlobStore::new(self.box_clone()), path)
 	}
 
@@ -73,20 +75,18 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 
 	/// This store's `subdir` within its [`root_key`](Self::root_key), empty for
 	/// the root. Used for per-event routing.
-	fn subdir(&self) -> SmolPath { SmolPath::default() }
+	fn subdir(&self) -> RelPath { RelPath::default() }
 
 	/// The precise directory a native watcher should observe for this store, ie an
 	/// [`FsStore`]'s `effective_root` (base joined with subdir). `None` for a store
 	/// with no watchable directory (memory, S3). Drives [`WatchDir`](crate::prelude::WatchDir),
 	/// so only the mounted subtree is watched, never the whole store root.
-	#[cfg(feature = "std")]
-	fn watch_dir(&self) -> Option<AbsPathBuf> { None }
+	fn watch_dir(&self) -> Option<AbsPath> { None }
 
 	/// The store's base path, ie the directory its [`root_key`](Self::root_key) keys
 	/// to, used to strip a watched path back to a base-relative [`BlobEvent`] so it
 	/// routes via [`did_change`](Self::did_change). `None` for a non-fs store.
-	#[cfg(feature = "std")]
-	fn base_dir(&self) -> Option<AbsPathBuf> { None }
+	fn base_dir(&self) -> Option<AbsPath> { None }
 
 	/// True if `event` concerns an object inside this store's scope: same
 	/// backing, and the event's root-relative location is this scope or a child
@@ -195,11 +195,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&SmolPath::from("file.txt"), "content").await?;
+	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result>;
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result>;
 
 	/// List all objects in store.
 	///
@@ -213,7 +213,7 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>>;
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>>;
 
 	/// Get object from store.
 	///
@@ -223,11 +223,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let data = store.get(&SmolPath::from("file.txt")).await?;
+	/// let data = store.get(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>>;
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>>;
 
 	/// Check if object exists in store.
 	///
@@ -237,11 +237,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let exists = store.exists(&SmolPath::from("file.txt")).await?;
+	/// let exists = store.exists(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>>;
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>>;
 
 	/// Remove object from store.
 	///
@@ -251,11 +251,11 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.remove(&SmolPath::from("file.txt")).await?;
+	/// store.remove(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result>;
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
 
 	/// Get public URL of object.
 	/// - fs: `file:///data/stores/my-store/key`
@@ -267,13 +267,13 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// let url = store.public_url(&SmolPath::from("file.txt")).await?;
+	/// let url = store.public_url(&RelPath::from("file.txt")).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	fn public_url(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>>;
 }
 
@@ -281,23 +281,21 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().box_clone()
 	}
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.as_ref().with_subdir(path)
 	}
 	fn rebase(
 		&self,
-		entry_name: &SmolPath,
+		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		self.as_ref().rebase(entry_name, root)
 	}
 	fn id(&self) -> &'static str { self.as_ref().id() }
 	fn root_key(&self) -> SmolStr { self.as_ref().root_key() }
-	fn subdir(&self) -> SmolPath { self.as_ref().subdir() }
-	#[cfg(feature = "std")]
-	fn watch_dir(&self) -> Option<AbsPathBuf> { self.as_ref().watch_dir() }
-	#[cfg(feature = "std")]
-	fn base_dir(&self) -> Option<AbsPathBuf> { self.as_ref().base_dir() }
+	fn subdir(&self) -> RelPath { self.as_ref().subdir() }
+	fn watch_dir(&self) -> Option<AbsPath> { self.as_ref().watch_dir() }
+	fn base_dir(&self) -> Option<AbsPath> { self.as_ref().base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.as_ref().did_change(event)
 	}
@@ -311,24 +309,24 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.as_ref().store_remove()
 	}
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.as_ref().list()
 	}
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.as_ref().get(path)
 	}
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		self.as_ref().exists(path)
 	}
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.as_ref().public_url(path)
 	}

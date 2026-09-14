@@ -20,14 +20,12 @@ pub fn init_logger() { pretty_env_logger::try_init().ok(); }
 
 /// Guard that reverts source file changes on drop.
 pub struct SourceRevert {
-	pub path: AbsPathBuf,
+	pub path: AbsPath,
 	pub original: String,
 }
 
 impl Drop for SourceRevert {
-	fn drop(&mut self) {
-		std::fs::write(self.path.as_path(), &self.original).ok();
-	}
+	fn drop(&mut self) { fs_ext::write(&self.path, &self.original).ok(); }
 }
 
 /// Owns isolated temp assets so tests can run in parallel without
@@ -36,11 +34,11 @@ impl Drop for SourceRevert {
 /// then the temp dir is removed.
 pub struct IsolatedTestGuards {
 	/// Path to the real source file (eg `examples/fargate_test.rs`).
-	pub source: AbsPathBuf,
+	pub source: AbsPath,
 	/// Path to `index.html` inside the isolated temp assets dir.
-	pub assets_file: AbsPathBuf,
+	pub assets_file: AbsPath,
 	/// Isolated temp assets directory used by `assets_s3_fs_store`.
-	pub assets_dir: AbsPathBuf,
+	pub assets_dir: AbsPath,
 	// reverts first
 	_source_guard: SourceRevert,
 	// reverts second (temp file still alive)
@@ -55,8 +53,8 @@ pub fn setup_isolated_test_guards(
 	source_path: &str,
 ) -> Result<IsolatedTestGuards> {
 	// real source file guard
-	let source = AbsPathBuf::new_workspace_rel(source_path)?;
-	let original_source = std::fs::read_to_string(source.as_path())?;
+	let source = AbsPath::new_workspace_rel(source_path)?;
+	let original_source = fs_ext::read_to_string(&source)?;
 	let source_guard = SourceRevert {
 		path: source.clone(),
 		original: original_source,
@@ -64,19 +62,18 @@ pub fn setup_isolated_test_guards(
 
 	// isolated temp assets dir
 	let temp_dir = TempDir::new_workspace()?;
-	let src_assets = AbsPathBuf::new_workspace_rel(ASSETS_PATH)?;
-	for entry in std::fs::read_dir(src_assets.as_path())? {
-		let entry = entry?;
-		if entry.file_type()?.is_file() {
-			std::fs::copy(
-				entry.path(),
-				temp_dir.path().as_path().join(entry.file_name()),
-			)?;
-		}
+	let src_assets = AbsPath::new_workspace_rel(ASSETS_PATH)?;
+	for entry in ReadDir::files(&src_assets)? {
+		fs_ext::copy(
+			&entry,
+			temp_dir
+				.path()
+				.join(path_ext::file_name(&entry)?.to_string_lossy()),
+		)?;
 	}
 	let assets_dir = temp_dir.path().clone();
-	let assets_file = AbsPathBuf::new(assets_dir.join("index.html"))?;
-	let original_assets = std::fs::read_to_string(&assets_file.as_path())?;
+	let assets_file = assets_dir.join("index.html");
+	let original_assets = fs_ext::read_to_string(&assets_file)?;
 	let assets_guard = SourceRevert {
 		path: assets_file.clone(),
 		original: original_assets,
@@ -164,7 +161,7 @@ pub fn assets_uri(deploy: &TestDeploy) -> StoreUri {
 /// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
 pub fn assets_s3_fs_store(
 	deploy: &TestDeploy,
-	assets_dir: &AbsPathBuf,
+	assets_dir: &AbsPath,
 ) -> S3FsStore {
 	S3FsStore::new(
 		FsStore::new(assets_dir.clone()),
@@ -205,7 +202,7 @@ pub async fn verify_assets(deploy: &TestDeploy, expected: &str) -> Result {
 		.iter()
 		.any(|path| path.contains("index.html"))
 		.xpect_true();
-	let bytes = store.get(&SmolPath::new("index.html")).await?;
+	let bytes = store.get(&RelPath::new("index.html")).await?;
 	let content = String::from_utf8(bytes.to_vec())?;
 	content.contains(expected).xpect_true();
 	info!("verified assets contain '{expected}' at deploy {deploy_id}");
@@ -213,13 +210,13 @@ pub async fn verify_assets(deploy: &TestDeploy, expected: &str) -> Result {
 }
 
 /// Modify a file to use a different version marker.
-pub fn swap_version(path: &AbsPathBuf, from: &str, to: &str) -> Result {
-	let content = std::fs::read_to_string(path.as_path())?;
+pub fn swap_version(path: &AbsPath, from: &str, to: &str) -> Result {
+	let content = fs_ext::read_to_string(path)?;
 	let updated = content.replacen(from, to, 1);
 	if content == updated {
-		bevybail!("marker '{from}' not found in {}", path.display());
+		bevybail!("marker '{from}' not found in {path}");
 	}
-	std::fs::write(path.as_path(), &updated)?;
+	fs_ext::write(path, &updated)?;
 	Ok(())
 }
 

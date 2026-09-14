@@ -30,7 +30,7 @@ impl BlobStoreList {
 	pub fn new(
 		build_item: impl 'static + Send + Sync + Fn(usize, &Value) -> OnSpawn,
 	) -> impl Bundle {
-		let field = TypedFieldRef::<Vec<SmolPath>>::inline();
+		let field = TypedFieldRef::<Vec<RelPath>>::inline();
 		(field.field(), ReactiveChildren::new(build_item))
 	}
 }
@@ -58,7 +58,7 @@ pub(super) fn refresh_blob_store_list(
 				// the store entity is the self-bound field: write its local Value
 				entity
 					.with_state::<FieldQuery, _>(move |subject, mut fields| {
-						fields.set_local::<Vec<SmolPath>>(subject, paths)
+						fields.set_local::<Vec<RelPath>>(subject, paths)
 					})
 					.await?
 			});
@@ -109,13 +109,13 @@ mod test {
 			.id();
 
 		// seed two objects, drive async until the refresh converges
-		store.insert(&SmolPath::new("a.txt"), "a").await.unwrap();
-		store.insert(&SmolPath::new("b.txt"), "b").await.unwrap();
+		store.insert(&RelPath::new("a.txt"), "a").await.unwrap();
+		store.insert(&RelPath::new("b.txt"), "b").await.unwrap();
 		app.update_async().await;
 		row_count(app.world_mut(), entity).xpect_eq(2);
 
 		// remove one, the Removed event marks the store Changed and re-lists
-		store.remove(&SmolPath::new("a.txt")).await.unwrap();
+		store.remove(&RelPath::new("a.txt")).await.unwrap();
 		app.update_async().await;
 		row_count(app.world_mut(), entity).xpect_eq(1);
 	}

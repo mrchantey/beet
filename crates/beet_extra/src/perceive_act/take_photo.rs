@@ -37,7 +37,7 @@ pub(crate) async fn capture(caller: &AsyncEntity) -> Result<MediaBytes> {
 #[derive(Debug, Clone, Resource)]
 pub struct PhotoStream {
 	/// The store-relative directory the photos live in.
-	pub dir: SmolPath,
+	pub dir: RelPath,
 	/// The index of the next photo to return.
 	pub cursor: usize,
 }
@@ -45,7 +45,7 @@ pub struct PhotoStream {
 impl Default for PhotoStream {
 	fn default() -> Self {
 		Self {
-			dir: SmolPath::from("assets/floor-photos"),
+			dir: RelPath::from("assets/floor-photos"),
 			cursor: 0,
 		}
 	}
@@ -83,13 +83,13 @@ mod test {
 		let store = BlobStore::temp();
 		for index in 0..count {
 			store
-				.insert(&SmolPath::from(format!("{dir}/{index}.jpg")), vec![
+				.insert(&RelPath::from(format!("{dir}/{index}.jpg")), vec![
 					index as u8,
 				])
 				.await
 				.unwrap();
 		}
-		store.with_subdir(SmolPath::from(dir))
+		store.with_subdir(RelPath::from(dir))
 	}
 
 	#[beet_core::test]
@@ -118,7 +118,7 @@ mod test {
 	async fn resolves_photos_from_ancestor_store() {
 		let mut world = World::new();
 		world.insert_resource(PhotoStream {
-			dir: SmolPath::from("photos"),
+			dir: RelPath::from("photos"),
 			cursor: 0,
 		});
 		// store on an ancestor, the camera reads it via self-or-ancestor lookup.
@@ -126,7 +126,7 @@ mod test {
 		let store = BlobStore::temp();
 		for index in 0..3usize {
 			store
-				.insert(&SmolPath::from(format!("photos/{index}.jpg")), vec![
+				.insert(&RelPath::from(format!("photos/{index}.jpg")), vec![
 					index as u8,
 				])
 				.await

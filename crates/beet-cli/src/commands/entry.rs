@@ -79,8 +79,8 @@ pub(crate) const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
 /// The entry's own directory (an entry file's parent, or the dir itself), the
 /// default home for command outputs like `dist/` and `site.pdf`. Deliberately
 /// not the `<RepoRoot>`-widened root, so outputs land beside the entry.
-pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPathBuf> {
-	let path = AbsPathBuf::new(entry_path)?;
+pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPath> {
+	let path = AbsPath::new(entry_path)?;
 	if path.extension().is_some() {
 		path.parent()
 			.ok_or_else(|| bevyhow!("entry `{path}` has no parent directory"))
@@ -147,8 +147,8 @@ pub(crate) fn render_world() -> World {
 mod test {
 	use super::*;
 
-	fn entry_path() -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap()
+	fn entry_path() -> AbsPath {
+		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
 	/// The shared [`entry_build::resolve_main`] serves the commands' positional: a dir resolves
@@ -157,17 +157,14 @@ mod test {
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
-		let dir = entry_build::resolve_main(
-			None,
-			entry_path().to_string_lossy().as_ref(),
-		)
-		.await
-		.unwrap();
+		let dir = entry_build::resolve_main(None, entry_path().as_str())
+			.await
+			.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
 		let file = entry_build::resolve_main(
 			None,
-			entry_path().join("main.bsx").to_string_lossy().as_ref(),
+			entry_path().join("main.bsx").as_str(),
 		)
 		.await
 		.unwrap();
@@ -176,22 +173,19 @@ mod test {
 		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		entry_build::resolve_main(None, tmp.path().to_string_lossy().as_ref())
+		entry_build::resolve_main(None, tmp.path().as_str())
 			.await
 			.unwrap()
 			.entry_name
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(
-			None,
-			empty.path().to_string_lossy().as_ref(),
-		)
-		.await
-		.err()
-		.unwrap()
-		.to_string()
-		.xpect_contains("no entry document");
+		entry_build::resolve_main(None, empty.path().as_str())
+			.await
+			.err()
+			.unwrap()
+			.to_string()
+			.xpect_contains("no entry document");
 	}
 
 	/// The entry declares its own servers and app routes: loading its entry document
@@ -206,12 +200,9 @@ mod test {
 			entry_name,
 			prescan,
 			..
-		} = entry_build::resolve_main(
-			None,
-			entry_path().to_string_lossy().as_ref(),
-		)
-		.await
-		.unwrap();
+		} = entry_build::resolve_main(None, entry_path().as_str())
+			.await
+			.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 		let sources = entry_build::read_sources(
 			&repo_store,

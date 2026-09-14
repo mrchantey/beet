@@ -110,8 +110,10 @@ fn add_strings(table: &mut Table) {
 		// a `Name`'s hashed inner field cannot be built field-by-field from a
 		// plain string, so `<Name("Malenia")/>` builds via `Name::new`.
 		.add_str(|string| Name::new(string.to_string()))
-		// a logical path, so a markup `src="assets"` resolves to a `SmolPath`
-		.add_str(|string| SmolPath::new(string));
+		// a logical path, so a markup `src="assets"` resolves to a `SmolPath`,
+		// and a store key to a `RelPath`
+		.add_str(|string| SmolPath::new(string))
+		.add_str(|string| RelPath::new(string));
 
 	// a url is authored as the string it displays as, and the strict
 	// `Url::parse` is what makes a control character in a frontmatter
@@ -216,17 +218,17 @@ fn add_domain(table: &mut Table) {
 		_ => Ok(None),
 	});
 
-	// a string targeting an `AbsPathBuf` is workspace-relative, mirroring
-	// `AbsPathBuf`'s workspace-relative serde, so `<FsStore path="assets"/>`
-	// takes a string attribute directly. `AbsPathBuf`/`WsPathBuf` live in the
-	// std-only `path_utils`: a no_std (embedded) build has no filesystem paths
-	// to resolve.
+	// a string targeting an `AbsPath` is workspace-relative, mirroring
+	// `AbsPath`'s workspace-relative serde, so `<FsStore path="assets"/>`
+	// takes a string attribute directly. Resolving needs the workspace root,
+	// so a no_std (embedded) build authors a `WsPath` instead.
+	table.add_str(|string| WsPath::new(string));
 	#[cfg(feature = "std")]
 	table.add_hinted(
 		"a workspace-relative path",
 		|value: &Value| match value {
 			Value::Str(string) => {
-				Ok(Some(WsPathBuf::new(string.as_str()).into_abs()))
+				Ok(Some(WsPath::new(string.as_str()).into_abs()))
 			}
 			_ => Ok(None),
 		},
@@ -349,6 +351,13 @@ mod test {
 		parse::<SmolPath>(Value::str("assets/x"))
 			.unwrap()
 			.xpect_eq(Some(SmolPath::new("assets/x")));
+		// a store key drops its leading slash on coercion
+		parse::<RelPath>(Value::str("/assets/x"))
+			.unwrap()
+			.xpect_eq(Some(RelPath::new("assets/x")));
+		parse::<WsPath>(Value::str("/assets/x"))
+			.unwrap()
+			.xpect_eq(Some(WsPath::new("assets/x")));
 		parse::<Duration>(Value::str("50ms"))
 			.unwrap()
 			.xpect_eq(Some(Duration::from_millis(50)));
@@ -456,8 +465,8 @@ mod test {
 	#[cfg(feature = "std")]
 	#[crate::test]
 	fn parses_a_workspace_relative_path() {
-		parse::<AbsPathBuf>(Value::str("assets"))
+		parse::<AbsPath>(Value::str("assets"))
 			.unwrap()
-			.xpect_eq(Some(WsPathBuf::new("assets").into_abs()));
+			.xpect_eq(Some(WsPath::new("assets").into_abs()));
 	}
 }

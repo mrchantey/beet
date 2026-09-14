@@ -41,7 +41,7 @@ pub trait TestDescExt {
 	}
 
 	/// Returns the source file path as a workspace-relative path.
-	fn path(&self) -> SmolPath { SmolPath::new(self.desc().source_file) }
+	fn path(&self) -> WsPath { WsPath::new(self.desc().source_file) }
 
 	/// Returns the start location (line and column) of the test.
 	fn start(&self) -> LineCol {

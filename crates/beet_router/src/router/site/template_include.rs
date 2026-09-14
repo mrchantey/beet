@@ -96,7 +96,7 @@ async fn read_and_build(
 			|entity, stores| stores.get(entity).cloned(),
 		)
 		.await??;
-	let media = store.get_media(&SmolPath::from(src)).await?;
+	let media = store.get_media(&RelPath::from(src)).await?;
 	let id = target.id();
 	target
 		.world()
@@ -149,11 +149,11 @@ mod test {
 		// the include base: an in-memory store seeded with the two entries.
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("first.bsx"), "<section class=\"card\"/>")
+			.insert(&RelPath::from("first.bsx"), "<section class=\"card\"/>")
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("second.bsx"), "<article/>")
+			.insert(&RelPath::from("second.bsx"), "<article/>")
 			.await
 			.unwrap();
 
@@ -221,7 +221,7 @@ mod test {
 		// deliberately EMPTY of `gated.bsx`: only the met include is shippable.
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("shipped.bsx"), "<article/>")
+			.insert(&RelPath::from("shipped.bsx"), "<article/>")
 			.await
 			.unwrap();
 
@@ -283,7 +283,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&SmolPath::from("card.bsx"),
+				&RelPath::from("card.bsx"),
 				"<main><Slot name=\"x\"/><Fragment slot=\"x\"><b/></Fragment></main>",
 			)
 			.await
@@ -336,13 +336,13 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&SmolPath::from("first.bsx"),
+				&RelPath::from("first.bsx"),
 				"<div><Template src=\"second.bsx\"/></div>",
 			)
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("second.bsx"), "<span/>")
+			.insert(&RelPath::from("second.bsx"), "<span/>")
 			.await
 			.unwrap();
 

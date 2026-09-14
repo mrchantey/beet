@@ -131,7 +131,7 @@ mod test {
 		BuildArtifact::new(
 			ChildProcess::new("sh").with_args([
 				"-c".to_string(),
-				format!("printf built > {}", artifact.display()),
+				format!("printf built > {artifact}"),
 			]),
 			artifact.clone(),
 		)

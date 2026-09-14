@@ -33,7 +33,7 @@ impl PageContent {
 	pub async fn render(
 		world: &AsyncWorld,
 		router: Entity,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> Option<Self> {
 		let entity = world
 			.run_system_cached_with::<_, Result<Entity>, _, _>(

@@ -165,7 +165,7 @@ pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
 	// file (which needs the `pdf` feature). The default lands in the entry's own
 	// dir (not a `<RepoRoot>`-widened root).
 	let output = match params.output {
-		Some(output) => AbsPathBuf::new(output)?,
+		Some(output) => AbsPath::new(output)?,
 		None => entry_dir(&entry_path)?.join(if params.separate {
 			"pdf"
 		} else {
@@ -184,12 +184,12 @@ pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// with its printed PDF. Reusing the session (navigating between routes) avoids a
 /// browser process per page.
 async fn export_pages(
-	paths: &[SmolPath],
+	paths: &[RelPath],
 	base: &str,
 	query: &str,
 	viewport: (u32, u32),
 	options: &PdfOptions,
-) -> Result<Vec<(SmolPath, Vec<u8>)>> {
+) -> Result<Vec<(RelPath, Vec<u8>)>> {
 	let mut page = Browser::new().await?;
 	page.set_viewport(viewport.0, viewport.1).await?;
 
@@ -206,8 +206,8 @@ async fn export_pages(
 /// Writes one PDF per route under `dir` as `<route>.pdf` (the home route as
 /// `index.pdf`), returning the count.
 async fn write_separate(
-	pages: Vec<(SmolPath, Vec<u8>)>,
-	dir: &AbsPathBuf,
+	pages: Vec<(RelPath, Vec<u8>)>,
+	dir: &AbsPath,
 ) -> Result<usize> {
 	let count = pages.len();
 	for (path, bytes) in pages {
@@ -223,8 +223,8 @@ async fn write_separate(
 /// Merges the per-route PDFs into one document at `output`, in route order.
 #[cfg(feature = "pdf")]
 async fn write_concat(
-	pages: Vec<(SmolPath, Vec<u8>)>,
-	output: &AbsPathBuf,
+	pages: Vec<(RelPath, Vec<u8>)>,
+	output: &AbsPath,
 ) -> Result<usize> {
 	let count = pages.len();
 	let merged =
@@ -237,8 +237,8 @@ async fn write_concat(
 /// with guidance toward `--separate` or a `pdf`-enabled build.
 #[cfg(not(feature = "pdf"))]
 async fn write_concat(
-	_pages: Vec<(SmolPath, Vec<u8>)>,
-	_output: &AbsPathBuf,
+	_pages: Vec<(RelPath, Vec<u8>)>,
+	_output: &AbsPath,
 ) -> Result<usize> {
 	bevybail!(
 		"merging into one PDF needs the `pdf` feature; rebuild with \

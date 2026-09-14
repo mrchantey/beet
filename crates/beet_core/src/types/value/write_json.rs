@@ -77,7 +77,9 @@ fn write_seq(out: &mut String, values: impl IntoIterator<Item = Value>) {
 /// A float as JSON, which has no integer/float distinction but does require a
 /// digit on each side of the point.
 fn format_float(float: f64) -> String {
-	match float == float.trunc() && float.abs() < 1e15 {
+	// `f64::trunc` is std-only; below 1e15 an integral value round-trips
+	// exactly through `i64`
+	match float.abs() < 1e15 && float == (float as i64) as f64 {
 		true => format!("{float:.1}"),
 		false => format!("{float}"),
 	}

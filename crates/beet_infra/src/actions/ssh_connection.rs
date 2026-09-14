@@ -16,7 +16,7 @@ pub struct SshConnection {
 	/// its own ssh there, see [`LightsailBlock::management_ssh_port`].
 	pub port: u16,
 	/// Path to the private key file on disk.
-	pub key_path: AbsPathBuf,
+	pub key_path: AbsPath,
 }
 
 impl SshConnection {
@@ -49,7 +49,7 @@ impl SshConnection {
 		let mut args: Vec<SmolStr> =
 			Self::OPTS.iter().map(|opt| SmolStr::from(*opt)).collect();
 		args.push("-i".into());
-		args.push(self.key_path.display().to_string().into());
+		args.push(self.key_path.to_string().into());
 		args
 	}
 
@@ -67,13 +67,13 @@ impl SshConnection {
 	/// Copy a local file to the remote instance via SCP.
 	pub async fn scp_to(
 		&self,
-		local_path: &std::path::Path,
+		local_path: &AbsPath,
 		remote_path: &str,
 	) -> Result {
 		let mut args = self.ssh_args();
 		args.push("-P".into());
 		args.push(self.port.to_string().into());
-		args.push(local_path.display().to_string().into());
+		args.push(local_path.to_string().into());
 		args.push(format!("{}:{}", self.remote_user(), remote_path).into());
 		ChildProcess::new("scp").with_args(args).run_async().await?;
 		Ok(())
@@ -163,7 +163,7 @@ impl SshConnection {
 		{
 			use std::os::unix::fs::PermissionsExt;
 			std::fs::set_permissions(
-				key_path.as_path(),
+				&key_path,
 				std::fs::Permissions::from_mode(0o600),
 			)?;
 		}
@@ -172,7 +172,7 @@ impl SshConnection {
 			host,
 			user,
 			port,
-			key_path: AbsPathBuf::new(key_path)?,
+			key_path,
 		}
 		.xok()
 	}

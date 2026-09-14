@@ -44,7 +44,7 @@ pub(crate) async fn run(
 	// serve the runner dir through the standard stack: an ephemeral
 	// `HttpServer`, an `FsStore` and a root `ServeBlobs` mount, whose
 	// extensionless rule resolves `/` to `index.html`
-	let store = FsStore::new(AbsPathBuf::new(runner_dir.to_path_buf())?);
+	let store = FsStore::new(AbsPath::new(runner_dir.to_path_buf())?);
 	let root = cx
 		.world()
 		.with(move |world: &mut World| {

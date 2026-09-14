@@ -183,12 +183,12 @@ impl<T: TableStoreRow> Table<T> {
 
 	/// Check if object exists at path.
 	pub async fn exists(&self, id: Uuid) -> Result<bool> {
-		let path = SmolPath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		BlobStoreProvider::exists(self.provider.as_ref(), &path).await
 	}
 
 	/// List all object paths in table.
-	pub async fn list(&self) -> Result<Vec<SmolPath>> {
+	pub async fn list(&self) -> Result<Vec<RelPath>> {
 		BlobStoreProvider::list(self.provider.as_ref()).await
 	}
 
@@ -204,7 +204,7 @@ impl<T: TableStoreRow> Table<T> {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`Self::list`] + [`Self::get`] for large tables.
-	pub async fn get_all(&self) -> Result<Vec<(SmolPath, T)>> {
+	pub async fn get_all(&self) -> Result<Vec<(RelPath, T)>> {
 		self.provider
 			.get_all_rows()
 			.await?
@@ -223,7 +223,7 @@ impl<T: TableStoreRow> Table<T> {
 	/// A skipped row is silently missing from the result, so a caller reporting
 	/// aggregates over this should not present the count as the table's true
 	/// total.
-	pub async fn get_all_lossy(&self) -> Result<Vec<(SmolPath, T)>> {
+	pub async fn get_all_lossy(&self) -> Result<Vec<(RelPath, T)>> {
 		self.provider
 			.get_all_rows()
 			.await?
@@ -246,14 +246,14 @@ impl<T: TableStoreRow> Table<T> {
 	/// # Errors
 	/// Returns error if object doesn't exist.
 	pub async fn remove(&self, id: Uuid) -> Result {
-		let path = SmolPath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		BlobStoreProvider::remove(self.provider.as_ref(), &path).await
 	}
 
 	/// Get public URL for object (if supported by provider).
 	///
 	/// Returns `None` if provider doesn't support public URLs.
-	pub async fn public_url(&self, path: &SmolPath) -> Result<Option<String>> {
+	pub async fn public_url(&self, path: &RelPath) -> Result<Option<String>> {
 		BlobStoreProvider::public_url(self.provider.as_ref(), path).await
 	}
 
@@ -357,7 +357,7 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	/// carries row bodies should override this to avoid an N+1 over the network.
 	fn get_all_rows(
 		&self,
-	) -> SendBoxedFuture<Result<Vec<(SmolPath, Result<Value>)>>> {
+	) -> SendBoxedFuture<Result<Vec<(RelPath, Result<Value>)>>> {
 		let this = self.box_clone_table();
 		Box::pin(async move {
 			this.list()
@@ -396,7 +396,7 @@ impl TableProvider for BlobStore {
 	}
 
 	fn insert_row(&self, id: Uuid, row: Value) -> SendBoxedFuture<Result> {
-		let path = SmolPath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		match serde_json::to_vec(&row) {
 			Ok(bytes) => BlobStoreProvider::insert(self, &path, bytes.into()),
 			Err(e) => {
@@ -406,7 +406,7 @@ impl TableProvider for BlobStore {
 	}
 
 	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>> {
-		let path = SmolPath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		let fut = BlobStoreProvider::get(self, &path);
 		Box::pin(async move {
 			let bytes = fut.await?;
@@ -442,7 +442,7 @@ pub mod table_test {
 			}],
 		});
 		let id = body.id();
-		let path = SmolPath::new(id.to_string());
+		let path = RelPath::new(id.to_string());
 		table.store_remove().await.ok();
 		table.store_exists().await.unwrap().xpect_false();
 		table.store_try_create().await.unwrap();
@@ -493,7 +493,7 @@ mod test {
 		// a legacy-schema row: a valid uuid path with an undecodable body.
 		BlobStoreProvider::insert(
 			&provider,
-			&SmolPath::new(uuid_ext::now_v7().to_string()),
+			&RelPath::new(uuid_ext::now_v7().to_string()),
 			r#"{"schema":"legacy"}"#.into(),
 		)
 		.await
@@ -501,7 +501,7 @@ mod test {
 		// a non-uuid path.
 		BlobStoreProvider::insert(
 			&provider,
-			&SmolPath::new("junk"),
+			&RelPath::new("junk"),
 			"{}".into(),
 		)
 		.await

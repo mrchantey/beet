@@ -37,13 +37,13 @@ impl RouteCollectionCategory {
 #[derive(Debug, Clone, Component)]
 pub struct RouteCollection {
 	/// Source directory containing the route files.
-	pub src: AbsPathBuf,
+	pub src: AbsPath,
 	/// Include/exclude filters for the files in [`Self::src`].
 	pub filter: GlobFilter,
 	/// Whether this is a pages or actions collection.
 	pub category: RouteCollectionCategory,
 	/// Route prefix prepended to every route in this collection, ie `docs`.
-	pub base_route: SmolPath,
+	pub base_route: RelPath,
 	/// Cargo feature gating server-only handlers (actions collections).
 	///
 	/// Defaults to `Some("server")`, matching the convention that server
@@ -58,14 +58,14 @@ impl RouteCollection {
 	/// Creates a new collection from a source directory and its codegen target.
 	///
 	/// The default filter excludes `mod.rs` and any `codegen` directory.
-	pub fn new(src: AbsPathBuf, codegen: CodegenFile) -> Self {
+	pub fn new(src: AbsPath, codegen: CodegenFile) -> Self {
 		Self {
 			src,
 			filter: GlobFilter::default()
 				.with_exclude("*mod.rs")
 				.with_exclude("*/codegen/*"),
 			category: RouteCollectionCategory::default(),
-			base_route: SmolPath::default(),
+			base_route: RelPath::default(),
 			server_feature: Some("server".into()),
 			codegen,
 		}
@@ -94,7 +94,7 @@ impl RouteCollection {
 	}
 
 	/// Sets the base route prepended to every route in this collection.
-	pub fn with_base_route(mut self, base_route: impl Into<SmolPath>) -> Self {
+	pub fn with_base_route(mut self, base_route: impl Into<RelPath>) -> Self {
 		self.base_route = base_route.into();
 		self
 	}
@@ -191,7 +191,7 @@ impl RouteCollection {
 
 	/// The `#[path = ..]` value for a source file, relative to the codegen
 	/// output directory, using forward slashes.
-	fn mod_path(&self, store_path: &SmolPath) -> Result<String> {
+	fn mod_path(&self, store_path: &RelPath) -> Result<String> {
 		let abs = self.src.join(store_path.to_string());
 		let rel = path_ext::create_relative(self.codegen.output_dir()?, &abs)?;
 		Ok(path_ext::to_forward_slash(rel)
@@ -204,7 +204,7 @@ impl RouteCollection {
 #[derive(Debug, Clone)]
 pub struct RouteFile {
 	/// The full route path (including the collection base route).
-	pub route_path: SmolPath,
+	pub route_path: RelPath,
 	/// The kind of route file.
 	pub kind: RouteFileKind,
 }
@@ -224,7 +224,7 @@ pub enum RouteFileKind {
 	/// A content file (markdown/html) served via [`BlobScene`].
 	Blob {
 		/// Path of the content file relative to the store root.
-		store_path: SmolPath,
+		store_path: RelPath,
 		/// The components the file declares at its root, emitted as literals and
 		/// hoisted when the route spawns.
 		declarations: RootDeclarations,
@@ -251,7 +251,7 @@ pub struct RouteMethod {
 }
 
 /// Derives a unique module identifier from a source file path.
-fn mod_ident_from_file(store_path: &SmolPath) -> Ident {
+fn mod_ident_from_file(store_path: &RelPath) -> Ident {
 	let mut segments: Vec<String> = store_path
 		.segments()
 		.iter()

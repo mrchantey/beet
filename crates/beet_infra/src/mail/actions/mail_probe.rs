@@ -270,7 +270,7 @@ async fn send_outbound(
 	address: &str,
 	password: &str,
 	token: &str,
-	work_dir: &AbsPathBuf,
+	work_dir: &AbsPath,
 ) -> Result {
 	let host = mail.mail_box.hostname();
 	let sink = MailProbe::sink(relay);
@@ -299,7 +299,7 @@ async fn send_outbound(
 			"--user".to_string(),
 			format!("{address}:{password}"),
 			"--upload-file".to_string(),
-			message.display().to_string(),
+			message.to_string(),
 		])
 		.with_secret(password)
 		.run_async()
@@ -530,7 +530,7 @@ async fn send_inbound_local(
 			"--user".to_string(),
 			format!("{from}:{password}"),
 			"--upload-file".to_string(),
-			message.display().to_string(),
+			message.to_string(),
 		])
 		.with_secret(&password)
 		.run_async()

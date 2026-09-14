@@ -199,7 +199,7 @@ mod test {
 	/// The stored thread count, read through a fresh store so the on-disk file is
 	/// re-read rather than served from an in-memory snapshot.
 	async fn stored_threads(path: &str) -> usize {
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(path))))
+		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPath::new(path))))
 			.threads()
 			.await
 			.unwrap()
@@ -208,12 +208,10 @@ mod test {
 
 	/// Clear whatever a previous run left at `path`.
 	async fn clear(path: &str) {
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPathBuf::new(
-			path,
-		))))
-		.store_remove()
-		.await
-		.ok();
+		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPath::new(path))))
+			.store_remove()
+			.await
+			.ok();
 	}
 
 	/// A `{MountThreadStore}` thread, run twice against the same store, adopts the

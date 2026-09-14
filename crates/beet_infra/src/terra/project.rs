@@ -128,12 +128,12 @@ impl Project {
 
 	/// The absolute working directory for the tofu project, where its rendered
 	/// config, its lockfile and the deploy's scratch files live.
-	pub fn work_dir(&self) -> AbsPathBuf {
+	pub fn work_dir(&self) -> AbsPath {
 		self.deployment.work_directory(&self.stack).into_abs()
 	}
 
 	/// Short alias for [`Self::work_dir`], the tofu driver's `-chdir`.
-	fn dir(&self) -> AbsPathBuf { self.work_dir() }
+	fn dir(&self) -> AbsPath { self.work_dir() }
 
 	/// The blob holding this project's tofu state.
 	pub fn state_file(&self) -> Result<Blob> {

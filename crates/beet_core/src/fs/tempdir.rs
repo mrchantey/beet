@@ -22,17 +22,17 @@ use crate::prelude::*;
 #[derive(Debug)]
 pub struct TempDir {
 	/// The path to the temporary directory
-	path: AbsPathBuf,
+	path: AbsPath,
 	/// Do not remove the directory on drop
 	keep: bool,
 }
 
 impl AsRef<Path> for TempDir {
-	fn as_ref(&self) -> &Path { &self.path }
+	fn as_ref(&self) -> &Path { self.path.as_ref() }
 }
 
 impl std::ops::Deref for TempDir {
-	type Target = AbsPathBuf;
+	type Target = AbsPath;
 	fn deref(&self) -> &Self::Target { &self.path }
 }
 
@@ -97,13 +97,13 @@ impl TempDir {
 
 		fs_ext::create_dir_all(&path)?;
 		Ok(Self {
-			path: AbsPathBuf::new(path)?,
+			path: AbsPath::new(path)?,
 			keep: false,
 		})
 	}
 
 	/// Returns the path to the temporary directory.
-	pub fn path(&self) -> &AbsPathBuf { &self.path }
+	pub fn path(&self) -> &AbsPath { &self.path }
 
 	/// Marks this temporary directory to be kept on drop.
 	///
@@ -141,12 +141,12 @@ mod tests {
 			dir_path = temp.path.clone();
 
 			// Verify it exists
-			dir_path.exists().xpect_true();
-			dir_path.is_dir().xpect_true();
+			fs_ext::exists(&dir_path).unwrap().xpect_true();
+			fs_ext::is_dir(&dir_path).xpect_true();
 		} // temp is dropped here
 
 		// Verify it was cleaned up
-		dir_path.exists().xpect_false();
+		fs_ext::exists(&dir_path).unwrap().xpect_false();
 	}
 
 	#[crate::test]
@@ -159,16 +159,15 @@ mod tests {
 			dir_path = temp.path.clone();
 
 			// Verify it exists
-			dir_path.exists().xpect_true();
-			dir_path.is_dir().xpect_true();
+			fs_ext::exists(&dir_path).unwrap().xpect_true();
+			fs_ext::is_dir(&dir_path).xpect_true();
 
 			// Verify it's in the workspace
-			let path_str = dir_path.to_string();
-			path_str.contains("target/tmp/beet_tmp_").xpect_true();
+			dir_path.contains("target/tmp/beet_tmp_").xpect_true();
 		} // temp is dropped here
 
 		// Verify it was cleaned up
-		dir_path.exists().xpect_false();
+		fs_ext::exists(&dir_path).unwrap().xpect_false();
 	}
 
 	#[crate::test]
@@ -193,11 +192,11 @@ mod tests {
 			dir_path = temp.path().clone();
 
 			// Verify it exists
-			dir_path.exists().xpect_true();
+			fs_ext::exists(&dir_path).unwrap().xpect_true();
 		} // temp is dropped here
 
 		// Verify it was NOT cleaned up because we called keep()
-		dir_path.exists().xpect_true();
+		fs_ext::exists(&dir_path).unwrap().xpect_true();
 
 		// Manual cleanup for this test
 		fs_ext::remove(&dir_path).ok();

@@ -84,9 +84,9 @@ fn render_page() -> Result<String> {
 /// on an ephemeral in-process `HttpServer` (its own app thread, mirroring
 /// `run_wasm_browser`'s server shape), returning the bound port.
 async fn serve(page: String) -> Result<u16> {
-	let check_dir = AbsPathBuf::new_workspace_rel("target/wasm-render-check")?;
+	let check_dir = AbsPath::new_workspace_rel("target/wasm-render-check")?;
 	fs_ext::write(check_dir.join("index.html"), &page)?;
-	let workspace = FsStore::new(AbsPathBuf::new_workspace_rel("")?);
+	let workspace = FsStore::new(AbsPath::new_workspace_rel("")?);
 	let page_store = FsStore::new(check_dir);
 	std::thread::spawn(move || {
 		let mut app = App::new();
@@ -164,8 +164,8 @@ fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
 #[beet::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-render` + chromedriver"]
 async fn browser_render_boot() {
-	if !AbsPathBuf::new_workspace_rel("assets/wasm/beet-render.wasm")
-		.map(|path| path.exists())
+	if !AbsPath::new_workspace_rel("assets/wasm/beet-render.wasm")
+		.and_then(fs_ext::exists)
 		.unwrap_or_default()
 	{
 		panic!("missing artifact, run `just build-wasm-render`");

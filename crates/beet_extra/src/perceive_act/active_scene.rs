@@ -28,7 +28,7 @@ use beet_net::prelude::*;
 #[require(ActiveScene, SceneCatalog)]
 pub struct SceneRotation {
 	/// The scenes directory in the blob store.
-	pub dir: SmolPath,
+	pub dir: RelPath,
 	/// Perceive-act cycles between rotations.
 	pub every_cycles: u32,
 	/// Sequential vs random (shuffle-bag) order.
@@ -36,17 +36,17 @@ pub struct SceneRotation {
 	/// The scene to start on; falls back to the first discovered if absent/unknown.
 	pub initial: Option<SmolStr>,
 	/// Shown when a scene has no `images/` and when the model picks an unknown title.
-	pub fallback_image: SmolPath,
+	pub fallback_image: RelPath,
 }
 
 impl Default for SceneRotation {
 	fn default() -> Self {
 		Self {
-			dir: SmolPath::from("assets/extra/perceive-act"),
+			dir: RelPath::from("assets/extra/perceive-act"),
 			every_cycles: 8,
 			order: SceneOrder::default(),
 			initial: Some(SmolStr::new("explorer")),
-			fallback_image: SmolPath::from(
+			fallback_image: RelPath::from(
 				"assets/extra/perceive-act/explorer/images/joy.png",
 			),
 		}
@@ -316,7 +316,7 @@ async fn apply_scene(
 		..
 	} = &gathered.rotation;
 	// read the scene's `main.bsx` and extract its `<ScenePrompt>` text.
-	let main_path = SmolPath::from(format!("{dir}/{}/main.bsx", plan.name));
+	let main_path = RelPath::from(format!("{dir}/{}/main.bsx", plan.name));
 	let source =
 		String::from_utf8(gathered.store.get(&main_path).await?.to_vec())?;
 	let prompt = caller
@@ -396,7 +396,7 @@ fn extract_scene_prompt(world: &mut World, source: &str) -> Result<String> {
 /// that has a `main.bsx`.
 async fn discover_scenes(
 	store: &BlobStore,
-	dir: &SmolPath,
+	dir: &RelPath,
 ) -> Result<Vec<SmolStr>> {
 	let mut scenes: Vec<SmolStr> = store
 		.with_subdir(dir.clone())
@@ -419,11 +419,11 @@ async fn discover_scenes(
 /// missing dir yields a single option from the configured fallback image.
 async fn list_scene_images(
 	store: &BlobStore,
-	dir: &SmolPath,
+	dir: &RelPath,
 	name: &str,
-	fallback_image: &SmolPath,
+	fallback_image: &RelPath,
 ) -> Result<Vec<SceneImage>> {
-	let images_dir = SmolPath::from(format!("{dir}/{name}/images"));
+	let images_dir = RelPath::from(format!("{dir}/{name}/images"));
 	let mut files = store
 		.with_subdir(images_dir)
 		.list()
@@ -436,7 +436,7 @@ async fn list_scene_images(
 		.filter(|file| is_image_file(file))
 		.map(|file| SceneImage {
 			title: SmolStr::from(image_title(&file)),
-			url: to_url(&SmolPath::from(format!("{dir}/{name}/images/{file}"))),
+			url: to_url(&RelPath::from(format!("{dir}/{name}/images/{file}"))),
 		})
 		.collect();
 	if images.is_empty() {
@@ -486,7 +486,7 @@ fn image_title(file: &str) -> &str {
 
 /// A store-relative path to a served url (a leading slash), eg
 /// `assets/x/joy.png` -> `/assets/x/joy.png`.
-fn to_url(path: &SmolPath) -> SmolStr { SmolStr::from(format!("/{path}")) }
+fn to_url(path: &RelPath) -> SmolStr { SmolStr::from(format!("/{path}")) }
 
 #[cfg(test)]
 mod test {
@@ -591,29 +591,29 @@ mod test {
 	async fn discovers_scenes_and_images() {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("scenes/foo/main.bsx"), "<ScenePrompt/>")
+			.insert(&RelPath::from("scenes/foo/main.bsx"), "<ScenePrompt/>")
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("scenes/foo/images/happy.png"), vec![1u8])
+			.insert(&RelPath::from("scenes/foo/images/happy.png"), vec![1u8])
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("scenes/foo/images/sad.png"), vec![2u8])
+			.insert(&RelPath::from("scenes/foo/images/sad.png"), vec![2u8])
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("scenes/bar/main.bsx"), "<ScenePrompt/>")
+			.insert(&RelPath::from("scenes/bar/main.bsx"), "<ScenePrompt/>")
 			.await
 			.unwrap();
-		let dir = SmolPath::from("scenes");
+		let dir = RelPath::from("scenes");
 		// only dirs with a main.bsx, sorted.
 		discover_scenes(&store, &dir)
 			.await
 			.unwrap()
 			.xpect_eq(vec![SmolStr::new("bar"), SmolStr::new("foo")]);
 		// images mapped to title (stem) + served url.
-		let fallback = SmolPath::from("scenes/foo/images/happy.png");
+		let fallback = RelPath::from("scenes/foo/images/happy.png");
 		let images = list_scene_images(&store, &dir, "foo", &fallback)
 			.await
 			.unwrap();

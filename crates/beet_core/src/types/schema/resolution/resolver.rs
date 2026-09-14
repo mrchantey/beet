@@ -105,7 +105,7 @@ impl<'a> SchemaResolver<'a> {
 	///
 	/// Resolution by *location*: a second way in to the one stored schema, not
 	/// a second copy of it.
-	pub fn located(&self, path: &SmolPath) -> Option<&'a ValueSchema> {
+	pub fn located(&self, path: &RelPath) -> Option<&'a ValueSchema> {
 		self.schemas?.located(path)
 	}
 

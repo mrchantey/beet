@@ -25,7 +25,7 @@ pub struct R2WorkersStore {
 	/// The R2 binding name, as declared in `wrangler.toml`.
 	binding: SmolStr,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 }
 
 thread_local! {
@@ -52,13 +52,13 @@ impl R2WorkersStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
 	/// Prefix `path` with this store's subdir, yielding the full object key.
-	fn effective_key(&self, path: &SmolPath) -> String {
+	fn effective_key(&self, path: &RelPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -68,10 +68,7 @@ impl R2WorkersStore {
 	/// The R2 object version of `path` (its `head` metadata), or `None` if the
 	/// object is absent. Used as a cheap rebuild marker: a re-synced object gets a
 	/// new version, so a deployed Worker can rebuild its world on the next request.
-	pub async fn head_version(
-		&self,
-		path: &SmolPath,
-	) -> Result<Option<String>> {
+	pub async fn head_version(&self, path: &RelPath) -> Result<Option<String>> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		SendWrapper::new(async move {
@@ -104,7 +101,7 @@ impl R2WorkersStore {
 impl BlobStoreProvider for R2WorkersStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(R2WorkersStore {
 			binding: self.binding.clone(),
 			subdir: Some(match &self.subdir {
@@ -120,7 +117,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		format!("r2_workers:{}", self.binding).into()
 	}
 
-	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -142,7 +139,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -151,7 +148,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -159,7 +156,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let bucket = self.bucket();
 		let prefix = self.subdir.as_ref().map(|sub| format!("{sub}/"));
 		Box::pin(SendWrapper::new(async move {
@@ -185,7 +182,7 @@ impl BlobStoreProvider for R2WorkersStore {
 							}
 							None => &key,
 						};
-						Some(SmolPath::new(rel))
+						Some(RelPath::new(rel))
 					},
 				));
 				match objects.truncated() {
@@ -200,7 +197,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -216,7 +213,7 @@ impl BlobStoreProvider for R2WorkersStore {
 		}))
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let bucket = self.bucket();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -227,7 +224,7 @@ impl BlobStoreProvider for R2WorkersStore {
 
 	fn public_url(
 		&self,
-		_path: &SmolPath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		// no public URL: the Worker streams the object through the binding rather
 		// than handing out a bucket URL.

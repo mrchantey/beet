@@ -66,8 +66,8 @@ pub(crate) async fn ServeBlobsHandler(
 	let path = cx
 		.input
 		.get_params(STORE_PATH_PARAM)
-		.map(|segments| SmolPath::from_segments(segments))
-		.unwrap_or_else(|| SmolPath::from(cx.input.path()));
+		.map(|segments| RelPath::from_segments(segments))
+		.unwrap_or_else(|| RelPath::from(cx.input.path()));
 	serve_blob(&store, &path)
 		.await
 		.map_err(|err| unhydrated_hint(&cx.input, err))
@@ -121,7 +121,7 @@ fn unhydrated_hint(request: &RequestParts, err: BevyError) -> BevyError {
 pub fn AssetsDir(
 	/// The directory to mount, relative to the nearest ancestor store root.
 	#[prop]
-	src: String,
+	src: RelPath,
 	/// The url prefix to serve under; defaults to `src`.
 	#[prop(default)]
 	prefix: String,
@@ -129,7 +129,7 @@ pub fn AssetsDir(
 	cache: Option<Duration>,
 ) -> impl Bundle {
 	let prefix = if prefix.is_empty() {
-		src.clone()
+		src.to_string()
 	} else {
 		prefix
 	};
@@ -137,7 +137,7 @@ pub fn AssetsDir(
 	// call-site conversion, only the bare inner value does.
 	(
 		ServeBlobs { prefix, cache }.into_snippet_bundle(),
-		DirPath(SmolPath::from(src.as_str())),
+		DirPath(src),
 	)
 }
 
@@ -155,7 +155,7 @@ mod test {
 	async fn css_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("style.css"), "body { color: red; }")
+			.insert(&RelPath::from("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
 		store
@@ -210,10 +210,12 @@ mod test {
 	/// `just site-shared pull`).
 	#[beet_core::test]
 	async fn site_assets_dir_serves_blog_image() {
-		let Ok(site) = AbsPathBuf::new_workspace_rel("site") else {
+		let Ok(site) = AbsPath::new_workspace_rel("site") else {
 			return;
 		};
-		if !site.join("assets/blog/kiama-sea-shanty-club.jpg").exists() {
+		if !fs_ext::exists(site.join("assets/blog/kiama-sea-shanty-club.jpg"))
+			.unwrap_or(false)
+		{
 			return;
 		}
 		router_world()
@@ -266,7 +268,7 @@ mod test {
 	async fn serves_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("bar/index.html"), "<div>fallback</div>")
+			.insert(&RelPath::from("bar/index.html"), "<div>fallback</div>")
 			.await
 			.unwrap();
 		router_world()

@@ -79,7 +79,7 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 			|entity, stores| stores.get(entity).cloned(),
 		)
 		.await??;
-	let media = store.get_media(&SmolPath::from(path.as_str())).await?;
+	let media = store.get_media(&RelPath::from(path.as_str())).await?;
 	let res = Request::post(format!("{url}/load"))
 		.with_content_type(media.media_type().clone())
 		.with_body(media.bytes())

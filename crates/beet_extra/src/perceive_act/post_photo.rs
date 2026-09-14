@@ -145,7 +145,7 @@ mod test {
 		for index in 0..2u8 {
 			store
 				.insert(
-					&SmolPath::from(format!("assets/floor-photos/{index}.jpg")),
+					&RelPath::from(format!("assets/floor-photos/{index}.jpg")),
 					vec![index],
 				)
 				.await

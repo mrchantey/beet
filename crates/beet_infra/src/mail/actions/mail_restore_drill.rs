@@ -169,7 +169,7 @@ pub async fn MailRestoreDrill(
 			"s3".to_string(),
 			"cp".to_string(),
 			format!("s3://{bucket}/{key}"),
-			local.display().to_string(),
+			local.to_string(),
 			"--region".to_string(),
 			region.to_string(),
 		])
@@ -186,7 +186,7 @@ pub async fn MailRestoreDrill(
 		.wait_for_ready(Duration::from_secs(300), Duration::from_secs(5))
 		.await?;
 	connection
-		.scp_to(local.as_ref(), &MailRestoreDrill::upload_path())
+		.scp_to(&local, &MailRestoreDrill::upload_path())
 		.await?;
 	fs_ext::remove(&local).ok();
 	connection

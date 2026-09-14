@@ -27,7 +27,7 @@ use beet_net::prelude::*;
 #[reflect(Component, Default)]
 pub struct TemplateDir {
 	/// The template directory, relative to the nearest ancestor [`BlobStore`].
-	pub src: String,
+	pub src: RelPath,
 }
 
 /// The template names an owner (a [`TemplateDir`] entity, or the entry root for
@@ -66,7 +66,7 @@ impl RegisteredTemplates {
 
 impl TemplateDir {
 	/// Register templates under `src`, relative to the nearest ancestor [`BlobStore`].
-	pub fn new(src: impl Into<String>) -> Self { Self { src: src.into() } }
+	pub fn new(src: impl Into<RelPath>) -> Self { Self { src: src.into() } }
 
 	/// Observer: read the [`TemplateDir`]'s store and register its templates (see
 	/// the module docs).
@@ -131,8 +131,7 @@ impl TemplateDir {
 							)?;
 							// watch the templates dir for live reload (keyed to its base
 							// store); inert on a non-fs store / on wasm.
-							let scoped =
-								store.with_subdir(SmolPath::from(src.as_str()));
+							let scoped = store.with_subdir(src);
 							{
 								let mut entity_mut = world.entity_mut(entity);
 								entity_mut.insert(TemplatesLoaded);
@@ -161,10 +160,10 @@ impl TemplateDir {
 	/// pairs, so an entry can declare a dir it does not ship.
 	pub async fn read_sources(
 		store: &BlobStore,
-		src: &str,
+		src: &RelPath,
 		formats: &TemplateFormats,
-	) -> Result<Vec<(SmolPath, String)>> {
-		let store = store.with_subdir(SmolPath::from(src));
+	) -> Result<Vec<(RelPath, String)>> {
+		let store = store.with_subdir(src.clone());
 		if !store.store_exists().await? {
 			return Ok(Vec::new());
 		}
@@ -175,7 +174,7 @@ impl TemplateDir {
 			.filter(|path| {
 				path.media_type().and_then(|ty| formats.get(&ty)).is_some()
 			})
-			.map(async |path| -> Result<(SmolPath, String)> {
+			.map(async |path| -> Result<(RelPath, String)> {
 				let bytes = store.get(&path).await?;
 				Ok((path, String::from_utf8(bytes.to_vec())?))
 			})
@@ -199,7 +198,7 @@ impl TemplateDir {
 		world: &mut World,
 		owner: Entity,
 		formats: &TemplateFormats,
-		sources: Vec<(SmolPath, String)>,
+		sources: Vec<(RelPath, String)>,
 	) -> Result {
 		let mut registry = world
 			.remove_resource::<BsxTemplateRegistry>()
@@ -245,7 +244,7 @@ mod test {
 		let store = BlobStore::temp();
 		for (rel, content) in files {
 			store
-				.insert(&SmolPath::from(*rel), content.to_string())
+				.insert(&RelPath::from(*rel), content.to_string())
 				.await
 				.unwrap();
 		}

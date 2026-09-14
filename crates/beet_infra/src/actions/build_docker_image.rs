@@ -99,18 +99,15 @@ pub async fn BuildDockerImage(
 		)
 		.await??;
 
-	let binary_path = AbsPathBuf::new(artifact.artifact_path())?;
-	if !binary_path.exists() {
-		bevybail!("binary not found at: {}", binary_path.display());
+	let binary_path = AbsPath::new(artifact.artifact_path())?;
+	if !fs_ext::exists(&binary_path)? {
+		bevybail!("binary not found at: {}", binary_path);
 	}
 
-	info!(
-		"building docker image for binary: {}",
-		binary_path.display()
-	);
+	info!("building docker image for binary: {}", binary_path);
 
 	// setup dockerfile directory
-	let workspace_root = AbsPathBuf::new_workspace_rel(".")?;
+	let workspace_root = AbsPath::new_workspace_rel(".")?;
 	let dockerfile_dir = workspace_root
 		.join("target")
 		.join(format!("{}-docker", artifact.label()));
@@ -148,11 +145,7 @@ pub async fn BuildDockerImage(
 	let cmd_json = block.cmd_bootstrap().to_cmd_json("/app")?;
 	let dockerfile_content = format!(
 		"FROM {}\n{}COPY {} /app\nRUN chmod +x /app\n{}CMD {}\n",
-		base_image,
-		setup_commands,
-		binary_filename.to_string_lossy(),
-		expose,
-		cmd_json,
+		base_image, setup_commands, binary_filename, expose, cmd_json,
 	);
 	std::fs::write(dockerfile_dir.join("Dockerfile"), dockerfile_content)?;
 
@@ -195,7 +188,7 @@ pub async fn BuildDockerImage(
 		&image_tag,
 		"--platform",
 		"linux/amd64",
-		dockerfile_dir.to_str().unwrap(),
+		dockerfile_dir.as_str(),
 	]);
 	build_cmd
 		.run_async()

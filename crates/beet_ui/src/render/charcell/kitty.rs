@@ -1335,7 +1335,7 @@ mod test {
 	#[cfg(all(feature = "tui", feature = "net", not(target_arch = "wasm32")))]
 	fn shanty_jpeg() -> Option<Vec<u8>> {
 		fs_ext::read(
-			AbsPathBuf::new_workspace_rel(
+			AbsPath::new_workspace_rel(
 				"site/assets/blog/kiama-sea-shanty-club.jpg",
 			)
 			.unwrap(),

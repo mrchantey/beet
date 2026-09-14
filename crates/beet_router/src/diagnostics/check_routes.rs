@@ -23,7 +23,7 @@ pub struct CheckReport {
 	/// Every diagnostic found, route context attached.
 	pub diagnostics: Vec<Diagnostic>,
 	/// The static route paths that were rendered and scanned.
-	pub checked: Vec<SmolPath>,
+	pub checked: Vec<RelPath>,
 }
 
 impl CheckReport {
@@ -272,7 +272,7 @@ fn checkable(node: &ActionNode) -> bool {
 async fn check_route(
 	world: &AsyncWorld,
 	entity: Entity,
-	path: &SmolPath,
+	path: &RelPath,
 	route_tree: &RouteTree,
 	config: &RenderDiagnostics,
 	report: &mut CheckReport,
@@ -440,7 +440,7 @@ mod test {
 		.await
 		.unwrap()
 		.checked
-		.xpect_eq(vec![SmolPath::from("about")]);
+		.xpect_eq(vec![RelPath::from("about")]);
 		scoped(&mut world, router, CheckScope {
 			routes: None,
 			live: Some(Arc::new(|_| false)),

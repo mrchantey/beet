@@ -17,7 +17,7 @@ impl BlobStore {
 	pub async fn get_document(
 		&self,
 		resolver: SchemaResolver<'_>,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> Result<TypedDocument> {
 		let bytes = self.get(path).await?;
 		TypedDocument::read(
@@ -32,7 +32,7 @@ impl BlobStore {
 	/// re-saves identically.
 	pub async fn insert_document(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 		document: &TypedDocument,
 	) -> Result {
 		self.insert(path, document.to_json()?).await
@@ -114,7 +114,7 @@ pub(crate) fn read_located_schemas(
 async fn read_located_schema(
 	entity: &AsyncEntity,
 	snapshot: SchemaRegistry,
-	path: SmolPath,
+	path: RelPath,
 ) -> Result {
 	let Some(store) = ancestor_store(entity).await? else {
 		return OK;
@@ -158,14 +158,14 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert_document(
-				&SmolPath::from("schema.json"),
+				&RelPath::from("schema.json"),
 				&TypedDocument::schema_document(&todo_schema()).unwrap(),
 			)
 			.await
 			.unwrap();
 		store
 			.insert_document(
-				&SmolPath::from("todos.json"),
+				&RelPath::from("todos.json"),
 				&TypedDocument::new(
 					ValueSchema::document("schema.json"),
 					value!({ "label": "buy milk" }),
@@ -182,7 +182,7 @@ mod test {
 		let resolver = SchemaResolver::default().with_schemas(&registry);
 		let store = todo_store().await;
 		store
-			.get_document(resolver, &SmolPath::from("schema.json"))
+			.get_document(resolver, &RelPath::from("schema.json"))
 			.await
 			.unwrap()
 			.to_schema()
@@ -196,12 +196,12 @@ mod test {
 	async fn a_located_schema_resolves_after_it_arrives() {
 		let mut registry = SchemaRegistry::default();
 		let store = todo_store().await;
-		let path = SmolPath::from("schema.json");
+		let path = RelPath::from("schema.json");
 
 		let mut document = store
 			.get_document(
 				SchemaResolver::default().with_schemas(&registry),
-				&SmolPath::from("todos.json"),
+				&RelPath::from("todos.json"),
 			)
 			.await
 			.unwrap();
@@ -252,7 +252,7 @@ mod test {
 		app.update_async().await;
 		app.world()
 			.resource::<SchemaRegistry>()
-			.located(&SmolPath::from("schema.json"))
+			.located(&RelPath::from("schema.json"))
 			.unwrap()
 			.xpect_eq(todo_schema());
 	}

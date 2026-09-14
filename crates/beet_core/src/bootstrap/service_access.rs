@@ -57,8 +57,8 @@ impl ServiceAccess {
 	/// Keyed by the composed resource name rather than the bare label, so two
 	/// apps or two stages in one workspace never share a directory, exactly as
 	/// they never share a bucket.
-	pub fn local_store_dir(name: impl AsRef<std::path::Path>) -> WsPathBuf {
-		WsPathBuf::new("target/stores").join(name)
+	pub fn local_store_dir(name: impl AsRef<str>) -> WsPath {
+		WsPath::new("target/stores").join(name)
 	}
 
 	/// The store a [`Local`](Self::Local) process attaches for the resource

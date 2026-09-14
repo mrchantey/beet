@@ -112,19 +112,19 @@ impl StackBackend {
 #[derive(Debug, Clone, PartialEq, Eq, Get)]
 pub struct LocalBackend {
 	/// The path on the local filesystem where the state file will be stored, defaults to `.beet/infra`.
-	path: AbsPathBuf,
+	path: AbsPath,
 }
 
 impl Default for LocalBackend {
 	fn default() -> Self {
 		Self {
-			path: WsPathBuf::new(".beet/infra").into(),
+			path: WsPath::new(".beet/infra").into(),
 		}
 	}
 }
 impl LocalBackend {
 	fn to_json(&self, key: &str) -> Value {
-		// Use the absolute path string directly. AbsPathBuf's Serialize impl
+		// Use the absolute path string directly. AbsPath's Serialize impl
 		// converts to a workspace-relative path, but terraform's local backend
 		// resolves relative paths from the tofu working directory, not the
 		// workspace root.

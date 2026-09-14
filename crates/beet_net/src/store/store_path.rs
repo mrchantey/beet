@@ -29,13 +29,13 @@ use beet_core::prelude::*;
 /// `assets/` subdir.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct DirPath(pub SmolPath);
+pub struct DirPath(pub RelPath);
 
 /// Resolves a single [`Blob`] in the nearest ancestor [`BlobStore`], inserting it on
 /// the same entity: the "this one file in the store" surface.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
-pub struct BlobPath(pub SmolPath);
+pub struct BlobPath(pub RelPath);
 
 /// The nearest *ancestor* [`BlobStore`] (exclusive of `entity`) and the entity that
 /// holds it: the parent store a [`DirPath`]/[`BlobPath`] resolves against. Exclusive
@@ -240,14 +240,12 @@ mod test {
 		let store = BlobStore::temp();
 		let root = app
 			.world_mut()
-			.spawn((store.clone(), children![DirPath(SmolPath::from(
-				"assets"
-			))]))
+			.spawn((store.clone(), children![DirPath(RelPath::from("assets"))]))
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
 		let scoped = app.world().entity(child).get::<BlobStore>().unwrap();
-		scoped.subdir().xpect_eq(SmolPath::from("assets"));
+		scoped.subdir().xpect_eq(RelPath::from("assets"));
 		// same backing store, just scoped
 		scoped.root_key().xpect_eq(store.root_key());
 	}
@@ -258,7 +256,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![BlobPath(SmolPath::from(
+			.spawn((BlobStore::temp(), children![BlobPath(RelPath::from(
 				"notes.md"
 			))]))
 			.id();
@@ -275,7 +273,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn(children![DirPath(SmolPath::from("assets"))])
+			.spawn(children![DirPath(RelPath::from("assets"))])
 			.id();
 		app.update();
 		let child = child_of(app.world(), root);
@@ -289,7 +287,7 @@ mod test {
 			.get::<BlobStore>()
 			.unwrap()
 			.subdir()
-			.xpect_eq(SmolPath::from("assets"));
+			.xpect_eq(RelPath::from("assets"));
 	}
 
 	/// Nested [`DirPath`]s compose: the inner store is the ancestor scoped by both
@@ -300,8 +298,8 @@ mod test {
 		let root = app
 			.world_mut()
 			.spawn((BlobStore::temp(), children![(
-				DirPath(SmolPath::from("a")),
-				children![DirPath(SmolPath::from("b"))]
+				DirPath(RelPath::from("a")),
+				children![DirPath(RelPath::from("b"))]
 			)]))
 			.id();
 		app.update();
@@ -312,7 +310,7 @@ mod test {
 			.get::<BlobStore>()
 			.unwrap()
 			.subdir()
-			.xpect_eq(SmolPath::from("a/b"));
+			.xpect_eq(RelPath::from("a/b"));
 	}
 
 	/// Removing the backing store drops the scoped store a [`DirPath`] produced.
@@ -321,7 +319,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(SmolPath::from(
+			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
 				"assets"
 			))]))
 			.id();
@@ -339,7 +337,7 @@ mod test {
 		let mut app = store_app();
 		let root = app
 			.world_mut()
-			.spawn((BlobStore::temp(), children![DirPath(SmolPath::from(
+			.spawn((BlobStore::temp(), children![DirPath(RelPath::from(
 				"assets"
 			))]))
 			.id();

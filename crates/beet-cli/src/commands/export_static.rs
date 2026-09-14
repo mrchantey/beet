@@ -58,7 +58,7 @@ pub async fn ExportStatic(cx: ActionContext<RequestParts>) -> Result<Response> {
 	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
 	// dir, not a `<RepoRoot>`-widened root).
 	let out_dir = match params.out {
-		Some(out) => AbsPathBuf::new(out)?,
+		Some(out) => AbsPath::new(out)?,
 		None => entry_dir(&entry_path)?.join(DIST_DIR),
 	};
 	let out = BlobStore::new(FsStore::new(out_dir.clone()));
@@ -74,8 +74,8 @@ pub async fn ExportStatic(cx: ActionContext<RequestParts>) -> Result<Response> {
 mod test {
 	use super::*;
 
-	fn site_path() -> AbsPathBuf {
-		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap()
+	fn site_path() -> AbsPath {
+		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
 	/// Run `export-static <args>` through a host carrying only the route, the way the
@@ -108,7 +108,7 @@ mod test {
 			.await
 			.as_str()
 			.xpect_contains("exported")
-			.xpect_contains(dist.to_string_lossy().as_ref());
+			.xpect_contains(dist.as_str());
 		// the home route landed as the dist index, wrapped in the layout
 		fs_ext::read_to_string(dist.join("index.html"))
 			.unwrap()
@@ -125,8 +125,10 @@ mod test {
 		run(&format!("{} --out={}", site_path(), out.path()))
 			.await
 			.as_str()
-			.xpect_contains(out.path().to_string_lossy().as_ref());
+			.xpect_contains(out.path().as_str());
 		// the index rendered into the chosen dir
-		out.path().join("index.html").exists().xpect_true();
+		fs_ext::exists(out.path().join("index.html"))
+			.unwrap()
+			.xpect_true();
 	}
 }

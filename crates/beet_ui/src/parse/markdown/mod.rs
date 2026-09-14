@@ -114,7 +114,7 @@ impl MarkdownParser {
 		world: &mut World,
 		entity: Entity,
 		text: &str,
-		path: Option<&WsPathBuf>,
+		path: Option<&WsPath>,
 	) -> Result {
 		let span_lookup = path.map(|path| SpanLookup::new(text, path.clone()));
 
@@ -198,8 +198,7 @@ mod test {
 		let bytes = MediaBytes::new_markdown(md);
 		MarkdownParser::new()
 			.parse(
-				ParseContext::new(entity, &bytes)
-					.with_path(WsPathBuf::new(path)),
+				ParseContext::new(entity, &bytes).with_path(WsPath::new(path)),
 			)
 			.unwrap();
 	}
@@ -324,7 +323,7 @@ mod test {
 			.cloned()
 			.unwrap()
 			.path()
-			.xpect_eq(SmolPath::new("test.md"));
+			.xpect_eq(WsPath::new("test.md"));
 	}
 
 	#[beet_core::test]
@@ -578,7 +577,7 @@ mod test {
 			.unwrap();
 		// root span should cover entire input
 		span.start().xpect_eq(LineCol::new(1, 0));
-		span.path().xpect_eq(SmolPath::new("test.md"));
+		span.path().xpect_eq(WsPath::new("test.md"));
 	}
 
 	/// Root entity must not receive any content components — only metadata

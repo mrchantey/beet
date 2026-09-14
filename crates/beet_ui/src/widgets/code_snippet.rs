@@ -51,7 +51,7 @@ pub fn CodeSnippet(
 				|entity, stores| stores.get(entity).cloned(),
 			)
 			.await??;
-		let bytes = store.get(&SmolPath::from(src.as_str())).await?;
+		let bytes = store.get(&RelPath::from(src.as_str())).await?;
 		let source = String::from_utf8(bytes.to_vec())?;
 		let source = if strip_doc {
 			strip_leading_doc(&source)

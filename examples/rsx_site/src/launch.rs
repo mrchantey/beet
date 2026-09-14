@@ -35,8 +35,8 @@ fn route_codegen() -> RouteCodegen {
 }
 
 /// An absolute path to a file relative to the `rsx_site` crate root.
-fn site_rel(path: &str) -> AbsPathBuf {
-	AbsPathBuf::new_workspace_rel(format!("examples/rsx_site/{path}")).unwrap()
+fn site_rel(path: &str) -> AbsPath {
+	AbsPath::new_workspace_rel(format!("examples/rsx_site/{path}")).unwrap()
 }
 
 /// A [`CodegenFile`] targeting `src/codegen/<name>`.

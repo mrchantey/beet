@@ -124,7 +124,7 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 
 /// Build, upload artifacts, sync assets, and apply terraform
 /// using the deploy action sequence.
-async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPathBuf) -> Result {
+async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 	let block = LambdaBlock::default();
 	let cargo = CargoBuild::default()
 		.with_target(BuildTarget::Zigbuild)

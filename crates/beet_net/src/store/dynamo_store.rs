@@ -22,7 +22,7 @@ pub struct DynamoStore {
 	/// process happens to carry.
 	region: Option<SmolStr>,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 }
 
 impl DynamoStore {
@@ -57,7 +57,7 @@ impl DynamoStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
@@ -78,7 +78,7 @@ impl DynamoStore {
 			None => Self::new_default_region(table.clone()),
 		};
 		match prefix {
-			Some(prefix) => store.with_subdir(SmolPath::new(prefix.as_str())),
+			Some(prefix) => store.with_subdir(RelPath::new(prefix.as_str())),
 			None => store,
 		}
 		.xok()
@@ -102,8 +102,8 @@ impl DynamoStore {
 		POOL.get(&self.region).await
 	}
 
-	/// Resolve a [`SmolPath`] to a DynamoDB-friendly attribute value.
-	fn resolve_key(&self, path: &SmolPath) -> AttributeValue {
+	/// Resolve a [`RelPath`] to a DynamoDB-friendly attribute value.
+	fn resolve_key(&self, path: &RelPath) -> AttributeValue {
 		let key = match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -174,7 +174,7 @@ impl DynamoStore {
 	}
 
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -198,7 +198,7 @@ fn sdk_err<E: 'static + std::error::Error>(err: E) -> BevyError {
 impl BlobStoreProvider for DynamoStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(DynamoStore {
 			table_name: self.table_name.clone(),
 			region: self.region.clone(),
@@ -285,7 +285,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -310,7 +310,7 @@ impl BlobStoreProvider for DynamoStore {
 	/// caller cannot tell a truncated page from a small table. Projects to the
 	/// `id` attribute so pages carry keys rather than row bodies, which is both
 	/// cheaper and far more keys per page.
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -335,7 +335,7 @@ impl BlobStoreProvider for DynamoStore {
 							},
 							None => id.as_str(),
 						};
-						paths.push(SmolPath::new(rel));
+						paths.push(RelPath::new(rel));
 					}
 				}
 				// an absent (or empty) last evaluated key ends the scan
@@ -353,7 +353,7 @@ impl BlobStoreProvider for DynamoStore {
 	///
 	/// Assumes a two-field schema: `id` (path) and `data` (binary).
 	/// For typed tables, see [`TableProvider`].
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -375,7 +375,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -401,7 +401,7 @@ impl BlobStoreProvider for DynamoStore {
 		})
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let this = self.clone();
 		let key = self.resolve_key(path);
 		async_ext::pin_tokio(async move {
@@ -423,7 +423,7 @@ impl BlobStoreProvider for DynamoStore {
 
 	fn public_url(
 		&self,
-		_path: &SmolPath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
@@ -486,7 +486,7 @@ impl TableProvider for DynamoStore {
 	/// scan carries the bodies.
 	fn get_all_rows(
 		&self,
-	) -> SendBoxedFuture<Result<Vec<(SmolPath, Result<Value>)>>> {
+	) -> SendBoxedFuture<Result<Vec<(RelPath, Result<Value>)>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
@@ -508,11 +508,11 @@ impl TableProvider for DynamoStore {
 					let path = match &prefix {
 						Some(prefix) => {
 							match id.strip_prefix(prefix.as_str()) {
-								Some(stripped) => SmolPath::new(stripped),
+								Some(stripped) => RelPath::new(stripped),
 								None => continue,
 							}
 						}
-						None => SmolPath::new(id.as_str()),
+						None => RelPath::new(id.as_str()),
 					};
 					rows.push((
 						path,

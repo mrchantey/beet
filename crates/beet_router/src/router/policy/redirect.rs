@@ -97,7 +97,7 @@ impl RedirectTo {
 	pub fn new(path: &str, target: impl Into<Url>) -> Self {
 		Self {
 			target: target.into(),
-			depth: SmolPath::new(path).segments().len(),
+			depth: RelPath::new(path).segments().len(),
 		}
 	}
 
@@ -115,7 +115,7 @@ impl RedirectTo {
 		let path = pattern.annotated_path();
 		let mut segments = path.segments();
 		segments.truncate(segments.len().saturating_sub(self.depth));
-		SmolPath::from_segments(&segments)
+		RelPath::from_segments(&segments)
 			.xmap(Url::from)
 			.with_rooted(true)
 			// the scope is a directory, so the reference resolves beside a

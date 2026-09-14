@@ -116,8 +116,8 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 		.parent()
 		.map(|dir| dir.to_string_lossy().to_string())
 		.unwrap_or_default();
-	let out_dir = AbsPathBuf::new(&dir_raw)
-		.unwrap_or_else(|_| AbsPathBuf::new_unchecked(&dir_raw));
+	let out_dir = AbsPath::new(&dir_raw)
+		.unwrap_or_else(|_| AbsPath::new_unchecked(&dir_raw));
 	let bindgen_wasm = out_dir.join(format!("{stem}_bg.wasm"));
 	let out_wasm = out_dir.join(&wasm_name);
 	let out_js = out_dir.join(format!("{stem}.js"));
@@ -133,7 +133,7 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 	ChildProcess::new("wasm-bindgen")
 		.with_args([
 			"--out-dir".to_string(),
-			out_dir.to_string_lossy().to_string(),
+			out_dir.as_str().to_string(),
 			"--out-name".to_string(),
 			stem.clone(),
 			"--target".to_string(),
@@ -150,8 +150,8 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 			.with_args([
 				"-Oz".to_string(),
 				"--output".to_string(),
-				bindgen_wasm.to_string_lossy().to_string(),
-				bindgen_wasm.to_string_lossy().to_string(),
+				bindgen_wasm.as_str().to_string(),
+				bindgen_wasm.as_str().to_string(),
 			])
 			.run_async()
 			.await?;

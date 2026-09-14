@@ -40,19 +40,19 @@ impl S3FsStore {
 
 impl BlobStoreProvider for S3FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.active().with_subdir(path)
 	}
 	fn rebase(
 		&self,
-		entry_name: &SmolPath,
+		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		self.active().rebase(entry_name, root)
 	}
 	fn id(&self) -> &'static str { self.active().id() }
 	fn root_key(&self) -> SmolStr { self.active().root_key() }
-	fn subdir(&self) -> SmolPath { self.active().subdir() }
+	fn subdir(&self) -> RelPath { self.active().subdir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.active().did_change(event)
 	}
@@ -66,24 +66,24 @@ impl BlobStoreProvider for S3FsStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.active().store_remove()
 	}
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.active().insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.active().list()
 	}
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.active().get(path)
 	}
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		self.active().exists(path)
 	}
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.active().remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.active().public_url(path)
 	}

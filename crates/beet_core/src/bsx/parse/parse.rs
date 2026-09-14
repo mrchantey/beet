@@ -402,7 +402,7 @@ fn parse_attribute(
 			value: AttrValue::Style {
 				source: source.into(),
 				span: FileSpan::new(
-					SmolPath::new("bsx"),
+					"bsx",
 					cursor.line_col(key_offset),
 					cursor.line_col(cursor.offset()),
 				),

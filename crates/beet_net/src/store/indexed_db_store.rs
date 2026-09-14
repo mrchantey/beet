@@ -12,7 +12,7 @@ use web_sys::IdbTransactionMode;
 ///
 /// Suited to large binary payloads (ie ML model weights) that exceed the
 /// per-origin `localStorage` quota. Each store uses a dedicated database
-/// with a single object store keyed by [`SmolPath`] strings.
+/// with a single object store keyed by [`RelPath`] strings.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[component(on_insert = BlobStore::on_insert::<Self>)]
@@ -20,7 +20,7 @@ pub struct IndexedDbStore {
 	/// The IndexedDB database name.
 	db_name: SmolStr,
 	/// Optional subdirectory prefix for all keys.
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 }
 
 const STORE_NAME: &str = "blobs";
@@ -35,12 +35,12 @@ impl IndexedDbStore {
 	}
 
 	/// Set the subdirectory prefix for all keys.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 
-	fn effective_key(&self, path: &SmolPath) -> String {
+	fn effective_key(&self, path: &RelPath) -> String {
 		match &self.subdir {
 			Some(sub) => format!("{}/{}", sub, path),
 			None => path.to_string(),
@@ -163,7 +163,7 @@ async fn db_exists(db_name: &str) -> Result<bool> {
 impl BlobStoreProvider for IndexedDbStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(IndexedDbStore {
 			db_name: self.db_name.clone(),
 			subdir: Some(match &self.subdir {
@@ -179,7 +179,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		format!("indexeddb:{}", self.db_name).into()
 	}
 
-	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -205,7 +205,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -227,7 +227,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -245,7 +245,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let db_name = self.db_name.clone();
 		let subdir_prefix = self.subdir.as_ref().map(|s| format!("{}/", s));
 		Box::pin(SendWrapper::new(async move {
@@ -265,15 +265,15 @@ impl BlobStoreProvider for IndexedDbStore {
 				.filter_map(|key| match &subdir_prefix {
 					Some(p) => key
 						.strip_prefix(p.as_str())
-						.map(|rest| SmolPath::new(rest)),
-					None => Some(SmolPath::new(&key)),
+						.map(|rest| RelPath::new(rest)),
+					None => Some(RelPath::new(&key)),
 				})
 				.collect::<Vec<_>>();
 			paths.xok()
 		}))
 	}
 
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		Box::pin(SendWrapper::new(async move {
@@ -294,7 +294,7 @@ impl BlobStoreProvider for IndexedDbStore {
 		}))
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let db_name = self.db_name.clone();
 		let key = self.effective_key(path);
 		let path = path.clone();
@@ -327,7 +327,7 @@ impl BlobStoreProvider for IndexedDbStore {
 
 	fn public_url(
 		&self,
-		_path: &SmolPath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(SendWrapper::new(async move { None.xok() }))
 	}

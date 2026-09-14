@@ -19,14 +19,14 @@ struct TreeNode {
 	/// Sanitized segment name, used as the module/function identifier.
 	ident: String,
 	/// The full route path of a route at this exact node, if any.
-	route: Option<SmolPath>,
+	route: Option<RelPath>,
 	/// Child nodes by segment.
 	children: Vec<TreeNode>,
 }
 
 impl TreeNode {
 	/// Inserts a route path into the tree, creating nodes as needed.
-	fn insert(&mut self, path: &SmolPath) {
+	fn insert(&mut self, path: &RelPath) {
 		let mut node = self;
 		for seg in path.segments() {
 			let ident = PathPatternSegment::new(seg).name().to_snake_case();
@@ -45,7 +45,7 @@ impl TreeNode {
 }
 
 /// Builds the `routes` module item from a list of route paths.
-pub(crate) fn emit_route_tree(route_paths: &[SmolPath]) -> Result<Item> {
+pub(crate) fn emit_route_tree(route_paths: &[RelPath]) -> Result<Item> {
 	let mut root = TreeNode {
 		ident: "routes".into(),
 		..default()
@@ -91,7 +91,7 @@ fn mod_tree(node: &TreeNode, is_root: bool) -> Result<Item> {
 /// Nodes with children expose their own route as `index`, leaf nodes use the
 /// last path segment. Static paths return `&'static str`; dynamic paths take a
 /// `&str` per dynamic segment and return a `String`.
-fn path_fn(node: &TreeNode, path: &SmolPath) -> Result<ItemFn> {
+fn path_fn(node: &TreeNode, path: &RelPath) -> Result<ItemFn> {
 	let ident = if node.children.is_empty() {
 		Ident::new(&node.ident, Span::call_site())
 	} else {

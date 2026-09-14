@@ -10,7 +10,7 @@ use beet_ui::prelude::*;
 #[derive(Debug, Clone)]
 pub(crate) struct SyndicationPage {
 	/// The route path within the router's url space, ie `blog/ecs-router`.
-	pub path: SmolPath,
+	pub path: RelPath,
 	/// The page's authored metadata. Defaulted for a page that declared none,
 	/// which is public like any other.
 	pub meta: PageMeta,
@@ -28,7 +28,7 @@ pub(crate) struct SyndicationScope {
 	pub pages: Vec<SyndicationPage>,
 	/// The path this route is declared at, ie the url a feed names as its own
 	/// scope root.
-	pub root: SmolPath,
+	pub root: RelPath,
 	/// The site identity: the fallback title and description, and the origin
 	/// every absolute url is joined onto.
 	pub package: PackageConfig,
@@ -40,7 +40,7 @@ pub(crate) struct SyndicationScope {
 impl SyndicationScope {
 	/// A page path as an absolute url, ie
 	/// [`PackageConfig::absolute_url`] against this site's origin.
-	pub fn url(&self, path: &SmolPath) -> Result<Url> {
+	pub fn url(&self, path: &RelPath) -> Result<Url> {
 		self.package.absolute_url(path.as_str())
 	}
 }

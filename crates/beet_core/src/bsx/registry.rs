@@ -97,7 +97,7 @@ impl BsxTemplateRegistry {
 	pub fn insert_source_from_path(
 		&mut self,
 		formats: &TemplateFormats,
-		path: &SmolPath,
+		path: &RelPath,
 		source: &str,
 	) -> Result<Option<SmolStr>> {
 		// a type with no registered format is skipped.
@@ -115,7 +115,7 @@ impl BsxTemplateRegistry {
 	/// The name a template source at `path` (relative to its template-dir root)
 	/// registers under, which is also the tag that instantiates it:
 	/// `widgets/Card.bsx` -> `widgets::Card`.
-	pub fn module_path(path: &SmolPath) -> Option<SmolStr> {
+	pub fn module_path(path: &RelPath) -> Option<SmolStr> {
 		module_path_from_rel(path).map(SmolStr::from)
 	}
 
@@ -176,8 +176,8 @@ impl BsxTemplateRegistry {
 
 /// The `::`-joined module path of a `.bsx` template at `path`, relative to a
 /// template-dir root: `path/to/X.bsx` -> `path::to::X`. Store-backed (operates on
-/// a store-relative [`SmolPath`], no filesystem).
-fn module_path_from_rel(path: &SmolPath) -> Option<String> {
+/// a store-relative [`RelPath`], no filesystem).
+fn module_path_from_rel(path: &RelPath) -> Option<String> {
 	let mut segments = path.segments();
 	let stem = path.file_stem()?;
 	*segments.last_mut()? = stem;
@@ -190,10 +190,10 @@ mod test {
 
 	#[crate::test]
 	fn module_path_from_rel_derives_module() {
-		module_path_from_rel(&SmolPath::from("path/to/X.bsx"))
+		module_path_from_rel(&RelPath::from("path/to/X.bsx"))
 			.unwrap()
 			.xpect_eq("path::to::X".to_string());
-		module_path_from_rel(&SmolPath::from("Todo.bsx"))
+		module_path_from_rel(&RelPath::from("Todo.bsx"))
 			.unwrap()
 			.xpect_eq("Todo".to_string());
 	}

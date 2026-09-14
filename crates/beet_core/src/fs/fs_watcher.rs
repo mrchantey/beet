@@ -41,7 +41,7 @@ use std::time::Duration;
 #[component(on_add = start_fs_watcher, on_remove = stop_fs_watcher)]
 pub struct FsWatcher {
 	/// The path to watch.
-	pub path: AbsPathBuf,
+	pub path: AbsPath,
 	/// Glob filter for paths to include/exclude, matched against each path
 	/// relative to [`path`](Self::path), so an exclude like `*target*` skips a
 	/// `target/` inside the watched dir without silently disabling a watched dir
@@ -55,7 +55,7 @@ pub struct FsWatcher {
 impl Default for FsWatcher {
 	fn default() -> Self {
 		Self {
-			path: AbsPathBuf::default(),
+			path: AbsPath::default(),
 			filter: GlobFilter::default(),
 			debounce: Duration::from_millis(50),
 			mutated_only: true,
@@ -65,7 +65,7 @@ impl Default for FsWatcher {
 
 impl FsWatcher {
 	/// Creates a new [`FsWatcher`] for the given path.
-	pub fn new(path: AbsPathBuf) -> Self { Self { path, ..default() } }
+	pub fn new(path: AbsPath) -> Self { Self { path, ..default() } }
 
 	/// Returns a default configuration suitable for watching Cargo projects:
 	/// the build, vcs and generated dirs are excluded by segment (see
@@ -86,7 +86,7 @@ impl FsWatcher {
 	}
 
 	/// Sets the path for the watcher.
-	pub fn with_path(mut self, path: AbsPathBuf) -> Self {
+	pub fn with_path(mut self, path: AbsPath) -> Self {
 		self.path = path;
 		self
 	}
@@ -107,10 +107,10 @@ impl FsWatcher {
 	///
 	/// It is not valid to watch a non-existent path; it will never be triggered.
 	pub fn assert_path_exists(&self) -> Result {
-		if self.path.exists() == false {
+		if !fs_ext::exists(&self.path)? {
 			bevybail!(
 				"Path does not exist: {}\nOnly existing paths can be watched",
-				self.path.display()
+				self.path
 			)
 		} else {
 			Ok(())
@@ -161,9 +161,8 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 				let Some(ev) = DirEvent::new(ev)?.apply_filter(|ev| {
 					ev.path
 						.strip_prefix(&watcher.path)
-						.unwrap_or(&ev.path)
-						.to_string_lossy()
-						.xmap(|rel| watcher.filter.passes(rel))
+						.map(|rel| watcher.filter.passes(rel))
+						.unwrap_or_else(|| watcher.filter.passes(&ev.path))
 				}) else {
 					// empty after filter
 					continue;
@@ -207,14 +206,12 @@ pub struct PathEvent {
 	/// The kind of file system event that occurred.
 	pub kind: EventKind,
 	/// The path that the event occurred on.
-	pub path: AbsPathBuf,
+	pub path: AbsPath,
 }
 
 impl PathEvent {
 	/// Creates a new [`PathEvent`].
-	pub fn new(kind: EventKind, path: AbsPathBuf) -> Self {
-		Self { kind, path }
-	}
+	pub fn new(kind: EventKind, path: AbsPath) -> Self { Self { kind, path } }
 
 	/// Returns `true` if this is a mutation event (create, modify, or remove).
 	pub fn mutated(&self) -> bool {
@@ -227,7 +224,7 @@ impl PathEvent {
 
 impl std::fmt::Display for PathEvent {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{:?}: {}", self.kind, self.path.display())
+		write!(f, "{:?}: {}", self.kind, self.path)
 	}
 }
 
@@ -257,7 +254,7 @@ impl DirEvent {
 					e.paths
 						.iter()
 						.map(move |path| {
-							let path = AbsPathBuf::new(path)?;
+							let path = AbsPath::new(path)?;
 							PathEvent::new(kind.clone(), path).xok()
 						})
 						.collect::<Vec<_>>()
@@ -398,14 +395,14 @@ mod test {
 
 	/// Run `watcher` over `dir` until a write to `dir/foobar.txt` surfaces as a
 	/// [`DirEvent`] under `dir`, then exit.
-	async fn watch_until_write_lands(watcher: FsWatcher, dir: AbsPathBuf) {
+	async fn watch_until_write_lands(watcher: FsWatcher, dir: AbsPath) {
 		let mut app = App::new();
 		let path = dir.clone();
 		app.add_plugins(AsyncPlugin)
 			.spawn(watcher.with_path(dir.clone()))
 			.add_observer(move |ev: On<DirEvent>, mut commands: Commands| {
 				for ev in ev.iter() {
-					if ev.path.starts_with(&path) {
+					if ev.path.strip_prefix(&path).is_some() {
 						commands.write_message(AppExit::Success);
 					}
 				}
@@ -451,11 +448,7 @@ mod test {
 		let tempdir = TempDir::new().unwrap();
 		let dir = tempdir.path().join("target/site");
 		fs_ext::create_dir_all(&dir).unwrap();
-		watch_until_write_lands(
-			FsWatcher::default_cargo(),
-			AbsPathBuf::new(dir).unwrap(),
-		)
-		.await;
+		watch_until_write_lands(FsWatcher::default_cargo(), dir).await;
 		drop(tempdir);
 	}
 

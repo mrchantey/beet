@@ -29,7 +29,7 @@ pub struct ChildProcess {
 	env_removals: Vec<SmolStr>,
 	/// Optional working directory for the command. If `None`, uses the current directory.
 	#[set_with(unwrap_option)]
-	cwd: Option<AbsPathBuf>,
+	cwd: Option<AbsPath>,
 	/// Optional error message to use if the command is not found. If `None`, uses the default error.
 	#[set_with(unwrap_option)]
 	not_found: Option<SmolStr>,
@@ -46,8 +46,8 @@ pub struct ChildProcess {
 	secrets: Vec<SmolStr>,
 }
 
-impl std::fmt::Display for ChildProcess {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for ChildProcess {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "{}", self.redact(&self.command))?;
 		for arg in &self.args {
 			write!(f, " {}", self.redact(arg))?;

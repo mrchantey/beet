@@ -146,7 +146,7 @@ fn module_path_resolution_from_path() {
 	registry
 		.insert_source_from_path(
 			&formats,
-			&SmolPath::from("path/to/X.bsx"),
+			&RelPath::from("path/to/X.bsx"),
 			"<strong>indexed</strong>",
 		)
 		.unwrap();

@@ -222,15 +222,15 @@ impl PathPattern {
 	/// Returns true if all segments are static
 	pub fn is_static(&self) -> bool { self.is_static }
 
-	/// Convert the segments to a [`SmolPath`] using annotations for dynamic segments,
+	/// Convert the segments to a [`RelPath`] using annotations for dynamic segments,
 	/// ie `foo/:bar/*bazz`
-	pub fn annotated_path(&self) -> SmolPath {
+	pub fn annotated_path(&self) -> RelPath {
 		self.segments
 			.iter()
 			.map(|segment| segment.to_string_annotated())
 			.collect::<Vec<_>>()
 			.join("/")
-			.xmap(SmolPath::new)
+			.xmap(RelPath::new)
 	}
 	/// Consume a segment of the path for each segment in [`Self::segments`],
 	/// returning the remaining path if all segments match.
@@ -308,7 +308,7 @@ pub type RouteMatchResult = Result<PathMatch, RouteMatchError>;
 /// Errors that can occur when matching a route pattern against a path.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum RouteMatchError {
-	/// A static segment did not match its corresponding [`SmolPath`] part.
+	/// A static segment did not match its corresponding [`RelPath`] part.
 	#[error(
 		"a static segment '{segment}' did not match its corresponding path part '{path}'"
 	)]

@@ -21,7 +21,7 @@ pub struct DirSync {
 	/// The bucket's declared label, ie `app` or `assets`.
 	bucket: SmolStr,
 	/// The workspace-relative local directory.
-	local_dir: SmolPath,
+	local_dir: WsPath,
 	/// Override the resolved stage, for a bucket outside the deploy's own stage.
 	#[set_with(unwrap_option, into)]
 	stage: Option<SmolStr>,
@@ -38,7 +38,7 @@ impl Default for DirSync {
 impl DirSync {
 	pub fn new(
 		bucket: impl Into<SmolStr>,
-		local_dir: impl Into<SmolPath>,
+		local_dir: impl Into<WsPath>,
 	) -> Self {
 		Self {
 			bucket: bucket.into(),
@@ -83,7 +83,7 @@ pub(crate) fn deploy_subdir(
 	sync: &DirSync,
 	stacks: &StackQuery,
 	stores: &Query<(&ErasedBlock, &ErasedStoreBlock)>,
-) -> Result<Option<SmolPath>> {
+) -> Result<Option<RelPath>> {
 	let (_, store) = stacks
 		.declared(entity)?
 		.into_iter()
@@ -98,7 +98,7 @@ pub(crate) fn deploy_subdir(
 			)
 		})?;
 	match store.deploy_versioned() {
-		true => Some(SmolPath::new(stacks.deploy_id().to_string())),
+		true => Some(RelPath::new(stacks.deploy_id().to_string())),
 		false => None,
 	}
 	.xok()
@@ -126,7 +126,7 @@ pub(crate) fn attach_dir_sync_store(
 				})
 				.xmap(|stack| sync.stack(stack));
 			entity.insert(S3FsStore::new(
-				FsStore::new(WsPathBuf::new(sync.local_dir().to_string())),
+				FsStore::new(WsPath::new(sync.local_dir().to_string())),
 				S3Store::new(
 					stack.resource_name(sync.bucket().clone()),
 					stack.region().clone(),

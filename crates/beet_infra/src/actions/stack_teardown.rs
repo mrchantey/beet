@@ -48,7 +48,7 @@ pub async fn StackTeardown(
 	report(
 		lock,
 		store
-			.remove(&SmolPath::new(format!("{state_path}.tflock")))
+			.remove(&RelPath::new(format!("{state_path}.tflock")))
 			.await,
 	);
 	// the artifacts bucket, which terraform does not own

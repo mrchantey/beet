@@ -74,8 +74,7 @@ fn Handler(
 
 	// write the html for inspection
 	fs_ext::write(
-		AbsPathBuf::new_workspace_rel("target/examples/style/index.html")
-			.unwrap(),
+		AbsPath::new_workspace_rel("target/examples/style/index.html").unwrap(),
 		&html,
 	)?;
 

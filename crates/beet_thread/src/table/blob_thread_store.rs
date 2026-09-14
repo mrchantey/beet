@@ -58,7 +58,7 @@ impl BlobThreadStore {
 		ensure_loaded(&self.store, &mut guard).await?;
 		mutate(guard.as_mut().unwrap());
 		let bytes = serde_json::to_vec(guard.as_ref().unwrap())?;
-		self.store.insert(&SmolPath::new(STORE_PATH), bytes).await
+		self.store.insert(&RelPath::new(STORE_PATH), bytes).await
 	}
 }
 
@@ -69,7 +69,7 @@ async fn ensure_loaded(
 	guard: &mut Option<ThreadData>,
 ) -> Result {
 	if guard.is_none() {
-		let path = SmolPath::new(STORE_PATH);
+		let path = RelPath::new(STORE_PATH);
 		let data = match store.exists(&path).await? {
 			true => serde_json::from_slice(&store.get(&path).await?)?,
 			false => ThreadData::default(),
@@ -126,7 +126,7 @@ impl ThreadStoreProvider for BlobThreadStore {
 	fn store_remove(&self) -> BoxedFuture<'_, Result> {
 		Box::pin(async move {
 			// drop the one object and reset the in-memory snapshot to empty
-			self.store.remove(&SmolPath::new(STORE_PATH)).await.ok();
+			self.store.remove(&RelPath::new(STORE_PATH)).await.ok();
 			*self.snapshot.lock().await = Some(ThreadData::default());
 			Ok(())
 		})

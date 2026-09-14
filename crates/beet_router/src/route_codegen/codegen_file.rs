@@ -18,7 +18,7 @@ use syn::Item;
 #[reflect(Default, Component)]
 pub struct CodegenFile {
 	/// The output codegen file location.
-	output: AbsPathBuf,
+	output: AbsPath,
 	/// Package name alias for the current crate.
 	///
 	/// Since [`std::any::type_name`] resolves to a named crate (used with
@@ -43,7 +43,7 @@ pub struct CodegenFile {
 impl Default for CodegenFile {
 	fn default() -> Self {
 		Self {
-			output: WsPathBuf::new("src/codegen/mod.rs").into_abs(),
+			output: WsPath::new("src/codegen/mod.rs").into_abs(),
 			pkg_name: None,
 			imports: default(),
 			items: default(),
@@ -61,7 +61,7 @@ impl Default for CodegenFile {
 
 impl CodegenFile {
 	/// Creates a new [`CodegenFile`] with the most common options.
-	pub fn new(output: AbsPathBuf) -> Self {
+	pub fn new(output: AbsPath) -> Self {
 		Self {
 			output,
 			..Default::default()
@@ -69,7 +69,7 @@ impl CodegenFile {
 	}
 
 	/// Returns the output path for this codegen file.
-	pub fn output(&self) -> &AbsPathBuf { &self.output }
+	pub fn output(&self) -> &AbsPath { &self.output }
 
 	/// Returns the package name alias, if set.
 	pub fn pkg_name(&self) -> Option<&SmolStr> { self.pkg_name.as_ref() }
@@ -78,16 +78,9 @@ impl CodegenFile {
 	///
 	/// If the file is a `mod.rs`, returns the parent directory name instead.
 	pub fn name(&self) -> Result<String> {
-		let stem = self
-			.output
-			.file_stem()
-			.and_then(|stem| stem.to_str())
-			.ok_or_else(|| {
-				bevyhow!(
-					"codegen output must have a file stem: {}",
-					self.output
-				)
-			})?;
+		let stem = self.output.file_stem().ok_or_else(|| {
+			bevyhow!("codegen output must have a file stem: {}", self.output)
+		})?;
 		if stem != "mod" {
 			return Ok(stem.to_snake_case());
 		}
@@ -97,7 +90,6 @@ impl CodegenFile {
 		})?;
 		parent
 			.file_name()
-			.and_then(|name| name.to_str())
 			.ok_or_else(|| {
 				bevyhow!("mod files must have a named parent: {}", self.output)
 			})?
@@ -108,7 +100,7 @@ impl CodegenFile {
 	/// Clones the metadata of this codegen file with a new output path.
 	///
 	/// The items list is cleared in the clone.
-	pub fn clone_info(&self, output: AbsPathBuf) -> Self {
+	pub fn clone_info(&self, output: AbsPath) -> Self {
 		Self {
 			output,
 			imports: self.imports.clone(),
@@ -141,7 +133,7 @@ impl CodegenFile {
 	}
 
 	/// Returns the output directory path.
-	pub fn output_dir(&self) -> Result<AbsPathBuf> {
+	pub fn output_dir(&self) -> Result<AbsPath> {
 		self.output
 			.parent()
 			.ok_or_else(|| bevyhow!("Output path must have a parent directory"))
@@ -192,7 +184,7 @@ impl CodegenFile {
 		let output_tokens = self.build_output()?;
 		// ideally we'd use rustfmt instead
 		let output_str = prettyplease::unparse(&output_tokens);
-		trace!("Exporting codegen file:\n{}", self.output.to_string_lossy());
+		trace!("Exporting codegen file:\n{}", self.output);
 
 		fs_ext::write_if_diff(&self.output, &output_str)?;
 		Ok(())

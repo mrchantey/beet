@@ -353,6 +353,7 @@ impl TemplatePending {
 
 	/// Every dependency still outstanding anywhere in the world, as
 	/// `(root, label, kind)` triples: what a settle is actually waiting on.
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
 	fn outstanding(world: &mut World) -> Vec<(Entity, SmolStr, PendingKind)> {
 		world
 			.query::<(Entity, &TemplatePending)>()
@@ -369,6 +370,7 @@ impl TemplatePending {
 	/// The message a bounded settle fails with: every outstanding dependency
 	/// named alongside the entity carrying it, so the report identifies what
 	/// wedged rather than just how many did.
+	#[cfg(all(feature = "bevy_async", feature = "std"))]
 	fn timeout_report(
 		deadline: Duration,
 		outstanding: &[(Entity, SmolStr, PendingKind)],

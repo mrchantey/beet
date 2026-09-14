@@ -35,7 +35,7 @@ impl StalwartProvision {
 	/// private half is the deployer's own: there is no `ssh_private_key` output
 	/// to read it from the way a Lightsail release does. Every mail step that
 	/// reaches the box reads it through here.
-	pub fn key_path(key: &str) -> Result<AbsPathBuf> {
+	pub fn key_path(key: &str) -> Result<AbsPath> {
 		let expanded = match key.strip_prefix("~/") {
 			Some(rest) => {
 				let home = env_ext::var("HOME").map_err(|_| {
@@ -48,7 +48,7 @@ impl StalwartProvision {
 			}
 			None => key.to_string(),
 		};
-		AbsPathBuf::new(expanded).map_err(Into::into)
+		AbsPath::new(expanded).map_err(Into::into)
 	}
 }
 

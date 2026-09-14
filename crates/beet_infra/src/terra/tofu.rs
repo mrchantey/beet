@@ -42,10 +42,10 @@ fn tofu_process() -> ChildProcess {
 /// each pay it. Honours an explicitly-set `TF_PLUGIN_CACHE_DIR`, else picks the
 /// conventional one and creates it, since tofu will not create it itself and
 /// silently skips caching when it is missing.
-fn plugin_cache_dir() -> Option<AbsPathBuf> {
+fn plugin_cache_dir() -> Option<AbsPath> {
 	let dir = match env_ext::var("TF_PLUGIN_CACHE_DIR") {
-		Ok(dir) if !dir.is_empty() => AbsPathBuf::new(dir.as_str()).ok()?,
-		_ => AbsPathBuf::new(env_ext::var("HOME").ok()?.as_str())
+		Ok(dir) if !dir.is_empty() => AbsPath::new(dir.as_str()).ok()?,
+		_ => AbsPath::new(env_ext::var("HOME").ok()?.as_str())
 			.ok()?
 			.join(".cache/tofu-plugins"),
 	};
@@ -67,7 +67,7 @@ fn var_args(vars: &[(SmolStr, SmolStr)]) -> Vec<SmolStr> {
 }
 
 /// Export the provider schema based on `./providers.tf.json`
-pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
+pub async fn export_schema(dir: &AbsPath) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir.clone())
 		.with_args(["providers", "schema", "-json"])
@@ -79,13 +79,12 @@ pub async fn export_schema(dir: &AbsPathBuf) -> Result<String> {
 /// Always passes `-reconfigure` so the shared per-app work directory can
 /// re-point at a different backend key when switching stages (eg `dev` ->
 /// `prod`), which each own an independent remote state and so need no migration.
-pub async fn init(dir: &AbsPathBuf) -> Result {
+pub async fn init(dir: &AbsPath) -> Result {
 	let mut process = tofu_process()
 		.with_cwd(dir.clone())
 		.with_args(["init", "-reconfigure"]);
 	if let Some(cache) = plugin_cache_dir() {
-		process = process
-			.with_envs([("TF_PLUGIN_CACHE_DIR", cache.to_string_lossy())]);
+		process = process.with_envs([("TF_PLUGIN_CACHE_DIR", cache.as_str())]);
 	}
 	process.run_async().await?;
 	Ok(())
@@ -93,7 +92,7 @@ pub async fn init(dir: &AbsPathBuf) -> Result {
 
 /// Validates the opentofu file, ie the `main.tf.json`. Never needs `-var`:
 /// validation is static and does not evaluate resource or encryption values.
-pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
+pub async fn validate(dir: &AbsPath) -> Result<String> {
 	tofu_process()
 		.with_cwd(dir.clone())
 		.with_args(["validate", "-json"])
@@ -104,7 +103,7 @@ pub async fn validate(dir: &AbsPathBuf) -> Result<String> {
 /// Show execution plan. `vars` carries anything required to read existing
 /// state, eg a [`StateEncryption`] passphrase.
 pub async fn plan(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["plan".into()];
@@ -119,7 +118,7 @@ pub async fn plan(
 /// Apply the execution plan. `vars` carries anything required to read/write
 /// state, eg a [`StateEncryption`] passphrase.
 pub async fn apply(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	apply_with_vars(dir, vars, &[]).await
@@ -128,7 +127,7 @@ pub async fn apply(
 /// Apply the execution plan with Terraform variables, narrowed to `targets`
 /// (resource addresses) and their dependencies when non-empty.
 pub async fn apply_with_vars(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 	targets: &[String],
 ) -> Result<String> {
@@ -150,7 +149,7 @@ pub async fn apply_with_vars(
 /// Show the current state. `vars` carries anything required to read it, eg a
 /// [`StateEncryption`] passphrase.
 pub async fn show(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["show".into()];
@@ -165,7 +164,7 @@ pub async fn show(
 /// Read a specific output value from the tofu state. `vars` carries anything
 /// required to read it, eg a [`StateEncryption`] passphrase.
 pub async fn output(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 	name: &str,
 ) -> Result<String> {
@@ -183,7 +182,7 @@ pub async fn output(
 /// List all resources in the state. `vars` carries anything required to read
 /// it, eg a [`StateEncryption`] passphrase.
 pub async fn list(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["state".into(), "list".into()];
@@ -198,7 +197,7 @@ pub async fn list(
 /// Remove a resource from the state. `vars` carries anything required to
 /// read/write it, eg a [`StateEncryption`] passphrase.
 pub async fn remove(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 	resource: &str,
 ) -> Result<String> {
@@ -215,7 +214,7 @@ pub async fn remove(
 /// Destroy infrastructure. `vars` carries anything required to read/write
 /// state, eg a [`StateEncryption`] passphrase.
 pub async fn destroy(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec!["destroy".into(), "-auto-approve".into()];
@@ -231,7 +230,7 @@ pub async fn destroy(
 /// Used only by the `force` recovery path (`Project::tofu_destroy`), where we
 /// know no concurrent operation is active.
 pub async fn destroy_force(
-	dir: &AbsPathBuf,
+	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],
 ) -> Result<String> {
 	let mut args: Vec<SmolStr> = vec![

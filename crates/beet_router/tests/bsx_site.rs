@@ -69,7 +69,7 @@ async fn site_store() -> BlobStore {
 			r#"<Fragment {PageMeta{title: "The Spread", order: 2}}><p>spread body</p></Fragment>"#,
 		),
 	] {
-		store.insert(&SmolPath::from(path), content).await.unwrap();
+		store.insert(&RelPath::from(path), content).await.unwrap();
 	}
 	store
 }
@@ -86,7 +86,7 @@ async fn spawn_site(world: &mut World) -> Entity {
 	// ancestry. None of the entry's own tags are dir-loaded templates, so the
 	// reactive `<TemplateDir>` registration settles below before any route renders.
 	let store = site_store().await;
-	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(world, entry.as_utf8().unwrap()).unwrap();
 	let root = world.spawn(store).id();
@@ -440,17 +440,17 @@ async fn include_carries_boot() {
 	let store = BlobStore::temp();
 	store
 		.insert(
-			&SmolPath::from("serve.bsx"),
+			&RelPath::from("serve.bsx"),
 			"<CliServer {CallOnReady}><Router/></CliServer>",
 		)
 		.await
 		.unwrap();
 	store
-		.insert(&SmolPath::from("main.bsx"), "<Template src=\"serve.bsx\"/>")
+		.insert(&RelPath::from("main.bsx"), "<Template src=\"serve.bsx\"/>")
 		.await
 		.unwrap();
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
 	let template =
 		BsxTemplate::parse_entry(&world, entry.as_utf8().unwrap()).unwrap();
 	// the binary spawns the root with no load verb of its own (`build_root`'s

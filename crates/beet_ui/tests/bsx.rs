@@ -481,7 +481,7 @@ fn js_file_registers_as_script_template() {
 	registry
 		.insert_source_from_path(
 			&formats,
-			&SmolPath::from("PresentationControls.js"),
+			&RelPath::from("PresentationControls.js"),
 			"console.log(1 < 2);",
 		)
 		.unwrap();

@@ -2,7 +2,7 @@
 //! `http` crate's scheme, which cannot live in `beet_core` (it has no `http`
 //! dependency) and cannot be a `From` impl here (both types would be foreign).
 //!
-//! The [`Url`] itself lives in [`beet_core::path`], beside [`SmolPath`]: it is
+//! The [`Url`] itself lives in [`beet_core::path`], beside [`RelPath`]: it is
 //! a logical path type, not an HTTP one, and every layer above the transport
 //! speaks it.
 

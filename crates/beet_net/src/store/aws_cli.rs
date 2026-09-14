@@ -7,7 +7,7 @@
 //!
 //! Key points
 //! - Uses async-process for non-blocking process execution.
-//! - Uses AbsPathBuf for local filesystem paths in helpers and never shells out.
+//! - Uses AbsPath for local filesystem paths in helpers and never shells out.
 //! - Configurable via S3Sync, which holds an AwsCli and sync flags.
 //! - Preserves include/exclude ordering (important for AWS CLI filter evaluation).
 //!
@@ -228,7 +228,7 @@ impl S3Sync {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result{
 	/// S3Sync::push(
-	/// 	AbsPathBuf::new_workspace_rel("assets").unwrap(),
+	/// 	AbsPath::new_workspace_rel("assets").unwrap(),
 	/// 	"s3://my-bucket/subdir"
 	/// 	)
 	/// 	.delete(true)
@@ -239,13 +239,13 @@ impl S3Sync {
 	///
 	/// ## Panics
 	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
-	pub fn push(local_dir: AbsPathBuf, s3_uri: impl AsRef<str>) -> Self {
+	pub fn push(local_dir: AbsPath, s3_uri: impl AsRef<str>) -> Self {
 		let s3_uri = s3_uri.as_ref();
 		if !AwsCli::is_s3_uri(&s3_uri) {
 			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
 		}
 		Self {
-			src: local_dir.to_string_lossy().to_string(),
+			src: local_dir.to_string(),
 			dst: s3_uri.to_string(),
 			..Default::default()
 		}
@@ -260,7 +260,7 @@ impl S3Sync {
 	/// # async fn run() -> Result{
 	/// S3Sync::pull(
 	/// 	"s3://my-bucket/subdir",
-	/// 	AbsPathBuf::new_workspace_rel("out").unwrap()
+	/// 	AbsPath::new_workspace_rel("out").unwrap()
 	/// 	)
 	/// 	.delete(true)
 	/// 	.send()
@@ -269,14 +269,14 @@ impl S3Sync {
 	/// ```
 	/// ## Panics
 	/// Panics if `s3_uri` is not a valid S3 URI (does not start with `s3://`).
-	pub fn pull(s3_uri: impl AsRef<str>, local_dir: AbsPathBuf) -> Self {
+	pub fn pull(s3_uri: impl AsRef<str>, local_dir: AbsPath) -> Self {
 		let s3_uri = s3_uri.as_ref();
 		if !AwsCli::is_s3_uri(&s3_uri) {
 			panic!("expected S3 URI (s3://...), got: {}", &s3_uri);
 		}
 		Self {
 			src: s3_uri.to_string(),
-			dst: local_dir.to_string_lossy().to_string(),
+			dst: local_dir.to_string(),
 			..Default::default()
 		}
 	}
@@ -406,7 +406,7 @@ mod test {
 			.with_region("us-west-2")
 			.with_no_sign_request(true);
 
-		let local = AbsPathBuf::new("foo/bar").unwrap();
+		let local = AbsPath::new("foo/bar").unwrap();
 
 		let opts = S3Sync::default()
 			.delete(true)
@@ -422,7 +422,7 @@ mod test {
 			.arg("STANDARD_IA");
 
 		let argv = aws.build_s3_sync_args(
-			&local.to_string_lossy(),
+			local.as_str(),
 			"s3://my-bucket/site",
 			&opts,
 		);
@@ -456,7 +456,7 @@ mod test {
 	#[beet_core::test]
 	fn preserves_filter_order() {
 		let aws = AwsCli::new();
-		let local = AbsPathBuf::new("some/dir").unwrap();
+		let local = AbsPath::new("some/dir").unwrap();
 
 		let opts = S3Sync::default()
 			.exclude("node_modules/**")
@@ -464,11 +464,8 @@ mod test {
 			.exclude("**/*.map")
 			.include("assets/**");
 
-		let argv = aws.build_s3_sync_args(
-			&local.to_string_lossy(),
-			"s3://bucket/prefix",
-			&opts,
-		);
+		let argv =
+			aws.build_s3_sync_args(local.as_str(), "s3://bucket/prefix", &opts);
 
 		// Extract only the filter flags/patterns in order
 		let mut filter_pairs = Vec::<(String, String)>::new();
@@ -494,7 +491,7 @@ mod test {
 	#[beet_core::test]
 	#[should_panic]
 	async fn rejects_non_s3_uri() {
-		S3Sync::push(AbsPathBuf::new("out").unwrap(), "not-an-s3-uri")
+		S3Sync::push(AbsPath::new("out").unwrap(), "not-an-s3-uri")
 			.send()
 			.await
 			.unwrap_err()

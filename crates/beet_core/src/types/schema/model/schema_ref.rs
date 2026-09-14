@@ -68,7 +68,7 @@ pub enum SchemaRef {
 	/// A registered Rust type, ie `bevy_color::color::Color`.
 	TypePath(SmolStr),
 	/// A schema document in this document's own store, resolved by location.
-	Document(SmolPath),
+	Document(RelPath),
 	/// The schema described by the value at this key of the nearest enclosing
 	/// struct.
 	AtField(SmolStr),
@@ -123,7 +123,7 @@ impl ValueSchema {
 
 	/// The schema held by the schema document at `path`, resolved by location in
 	/// this document's own store.
-	pub fn document(path: impl Into<SmolPath>) -> Self {
+	pub fn document(path: impl Into<RelPath>) -> Self {
 		Self::Ref(SchemaRef::Document(path.into()))
 	}
 

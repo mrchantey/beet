@@ -116,8 +116,8 @@ pub async fn TofuApply(
 			// disk is how a stale binary ships while the deploy reports success.
 			artifact.build().await?;
 			trace!("TofuApply: uploading artifact '{}'", label);
-			let artifact_path = AbsPathBuf::new(artifact.artifact_path())?;
-			let bytes = fs_ext::read_async(artifact_path.as_path()).await?;
+			let artifact_path = AbsPath::new(artifact.artifact_path())?;
+			let bytes = fs_ext::read_async(artifact_path).await?;
 			let source_hash = artifact.compute_source_hash()?;
 			let artifact_key = deployment.artifact_key(label);
 

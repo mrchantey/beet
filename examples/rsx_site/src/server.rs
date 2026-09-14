@@ -40,7 +40,7 @@ pub fn server_plugin(app: &mut App) {
 /// The store backing the markdown `content` routes, read at request time by each
 /// route's [`BlobScene`].
 fn content_store() -> FsStore {
-	FsStore::new(WsPathBuf::new("examples/rsx_site/content"))
+	FsStore::new(WsPath::new("examples/rsx_site/content"))
 }
 
 /// The site router: the typed `pages`, the markdown `content`, and the `add`

@@ -40,7 +40,7 @@ pub struct Deployment {
 	/// [`Self::work_directory`]). A test points it at a temp dir.
 	#[get(skip)]
 	#[set_with(unwrap_option)]
-	work_directory: Option<WsPathBuf>,
+	work_directory: Option<WsPath>,
 	/// A suffix appended to the state backend key, making the final key
 	/// `app-name--stage--tofu.tfstate`.
 	state_suffix: SmolStr,
@@ -85,17 +85,17 @@ impl Deployment {
 
 	/// The opentofu working directory for `stack`, ie `target/infra/beet-site`.
 	/// Per app rather than per stage, since one app's stacks share a checkout.
-	pub fn work_directory(&self, stack: &ResolvedStack) -> WsPathBuf {
+	pub fn work_directory(&self, stack: &ResolvedStack) -> WsPath {
 		self.work_directory.clone().unwrap_or_else(|| {
-			WsPathBuf::new(format!("target/infra/{}", stack.app_name()))
+			WsPath::new(format!("target/infra/{}", stack.app_name()))
 		})
 	}
 
 	/// The state backend path for `stack`, ie `my-app--prod--tofu.tfstate`. It
 	/// composes through the stack's identity, so two stacks sharing this launch
 	/// still write distinct state.
-	pub fn backend_path(&self, stack: &ResolvedStack) -> SmolPath {
-		SmolPath::new(stack.resource_name(self.state_suffix.clone()))
+	pub fn backend_path(&self, stack: &ResolvedStack) -> RelPath {
+		RelPath::new(stack.resource_name(self.state_suffix.clone()))
 	}
 
 	/// The name of `stack`'s artifact store.
@@ -153,7 +153,7 @@ impl Deployment {
 			(dir, path)
 		};
 		#[cfg(target_arch = "wasm32")]
-		let (dir, path) = (TestWorkDir, WsPathBuf::new("target/infra/test"));
+		let (dir, path) = (TestWorkDir, WsPath::new("target/infra/test"));
 
 		(
 			Self {

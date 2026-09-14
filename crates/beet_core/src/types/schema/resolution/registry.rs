@@ -37,7 +37,7 @@ pub struct SchemaRegistry {
 	/// A schema document's store path, to the key its schema is stored under.
 	/// A pointer into `schemas` rather than a second copy, so the by-name and
 	/// by-location views of one schema can never disagree.
-	located: HashMap<SmolPath, SmolStr>,
+	located: HashMap<RelPath, SmolStr>,
 }
 
 impl Default for SchemaRegistry {
@@ -115,7 +115,7 @@ impl SchemaRegistry {
 	/// it by either route is what the other route then reads.
 	pub fn insert_located(
 		&mut self,
-		path: impl Into<SmolPath>,
+		path: impl Into<RelPath>,
 		schema: ValueSchema,
 	) {
 		let path = path.into();
@@ -128,7 +128,7 @@ impl SchemaRegistry {
 	}
 
 	/// The schema of the schema document at `path`, if it has arrived.
-	pub fn located(&self, path: &SmolPath) -> Option<&ValueSchema> {
+	pub fn located(&self, path: &RelPath) -> Option<&ValueSchema> {
 		self.located.get(path).and_then(|key| self.schemas.get(key))
 	}
 
@@ -457,7 +457,7 @@ mod test {
 	#[crate::test]
 	fn a_located_schema_is_stored_once() {
 		let mut registry = SchemaRegistry::default();
-		let path = SmolPath::from("schema/todo.json");
+		let path = RelPath::from("schema/todo.json");
 		registry.insert_located(path.clone(), todo_item());
 		registry.insert("TodoItem", ValueSchema::of::<i64>());
 		registry

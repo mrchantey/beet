@@ -10,7 +10,7 @@ use beet_net::prelude::*;
 /// - extensionless path → serve `<path>/index.html` as HTML
 pub(crate) async fn serve_blob(
 	store: &BlobStore,
-	path: &SmolPath,
+	path: &RelPath,
 ) -> Result<Response> {
 	if path.extension().is_some() {
 		if let Some(url) = store.public_url(path).await? {
@@ -39,10 +39,10 @@ mod test {
 	async fn serve_blob_streams_file() {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("style.css"), "body { color: red; }")
+			.insert(&RelPath::from("style.css"), "body { color: red; }")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &SmolPath::from("style.css"))
+		super::serve_blob(&store, &RelPath::from("style.css"))
 			.await
 			.unwrap()
 			.text()
@@ -55,10 +55,10 @@ mod test {
 	async fn serve_blob_appends_index_html() {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("docs/index.html"), "<h1>Hello</h1>")
+			.insert(&RelPath::from("docs/index.html"), "<h1>Hello</h1>")
 			.await
 			.unwrap();
-		super::serve_blob(&store, &SmolPath::from("docs"))
+		super::serve_blob(&store, &RelPath::from("docs"))
 			.await
 			.unwrap()
 			.text()

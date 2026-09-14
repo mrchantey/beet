@@ -71,24 +71,24 @@ impl ArtifactLedger {
 		Ok(())
 	}
 
-	fn current_ledger_key(&self) -> SmolPath {
+	fn current_ledger_key(&self) -> RelPath {
 		Self::version_ledger_key(&self.deploy_id)
 	}
-	fn current_artifact_key(&self, artifact_name: &str) -> SmolPath {
+	fn current_artifact_key(&self, artifact_name: &str) -> RelPath {
 		Self::version_artifact_key(&self.deploy_id, artifact_name)
 	}
-	fn version_ledger_key(uuid: &Uuid) -> SmolPath {
-		SmolPath::new(format!("versions/{uuid}/ledger.json"))
+	fn version_ledger_key(uuid: &Uuid) -> RelPath {
+		RelPath::new(format!("versions/{uuid}/ledger.json"))
 	}
 	/// The key prefix holding everything one version owns: its ledger and each
 	/// artifact binary it published.
-	pub fn version_prefix(uuid: &Uuid) -> SmolPath {
-		SmolPath::new(format!("versions/{uuid}"))
+	pub fn version_prefix(uuid: &Uuid) -> RelPath {
+		RelPath::new(format!("versions/{uuid}"))
 	}
 	/// The ledger's own key relative to [`version_prefix`](Self::version_prefix).
 	const LEDGER_NAME: &'static str = "ledger.json";
-	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> SmolPath {
-		SmolPath::new(format!("versions/{uuid}/{artifact_name}"))
+	fn version_artifact_key(uuid: &Uuid, artifact_name: &str) -> RelPath {
+		RelPath::new(format!("versions/{uuid}/{artifact_name}"))
 	}
 
 	/// The stable key naming the current release of one artifact, ie
@@ -102,8 +102,8 @@ impl ArtifactLedger {
 	///
 	/// [`publish_ledger`]: ArtifactsClient::publish_ledger
 	/// [`set_current`]: ArtifactsClient::set_current
-	pub fn release_pointer_key(artifact_name: &str) -> SmolPath {
-		SmolPath::new(format!("current/{artifact_name}.env"))
+	pub fn release_pointer_key(artifact_name: &str) -> RelPath {
+		RelPath::new(format!("current/{artifact_name}.env"))
 	}
 
 	/// The pointer body: an env file, so one file serves both readers a
@@ -348,7 +348,7 @@ impl ArtifactsClient {
 		let store = self
 			.store
 			.with_subdir(ArtifactLedger::version_prefix(version));
-		let ledger = SmolPath::new(ArtifactLedger::LEDGER_NAME);
+		let ledger = RelPath::new(ArtifactLedger::LEDGER_NAME);
 		if store.exists(&ledger).await? {
 			store.remove(&ledger).await?;
 		}
@@ -369,7 +369,7 @@ impl ArtifactsClient {
 	}
 }
 
-fn current_ledger_key() -> SmolPath { SmolPath::new("current-ledger.json") }
+fn current_ledger_key() -> RelPath { RelPath::new("current-ledger.json") }
 
 pub(crate) fn now_timestamp() -> String {
 	format!("{}s", time_ext::now().as_secs())
@@ -438,7 +438,7 @@ mod tests {
 		});
 		store
 			.insert(
-				&SmolPath::new("current-ledger.json"),
+				&RelPath::new("current-ledger.json"),
 				serde_json::to_vec(&json).unwrap(),
 			)
 			.await

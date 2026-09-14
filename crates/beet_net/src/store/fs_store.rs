@@ -15,15 +15,15 @@ use bytes::Bytes;
 pub struct FsStore {
 	/// The full path to the store directory. Coerces from a workspace-relative
 	/// string attribute in markup, ie `<FsStore path="assets"/>`.
-	path: AbsPathBuf,
+	path: AbsPath,
 	/// Optional subdirectory from which all paths are resolved.
-	subdir: Option<SmolPath>,
+	subdir: Option<RelPath>,
 }
 
 impl Default for FsStore {
 	fn default() -> Self {
 		Self {
-			path: WsPathBuf::default().into(),
+			path: WsPath::default().into(),
 			subdir: None,
 		}
 	}
@@ -31,30 +31,30 @@ impl Default for FsStore {
 
 impl FsStore {
 	/// Create a new filesystem store with the given store path.
-	pub fn new(path: impl Into<AbsPathBuf>) -> Self {
+	pub fn new(path: impl Into<AbsPath>) -> Self {
 		Self {
 			path: path.into(),
 			subdir: None,
 		}
 	}
 	/// Set the subdirectory from which all paths are resolved.
-	pub fn with_subdir(mut self, subdir: impl Into<SmolPath>) -> Self {
+	pub fn with_subdir(mut self, subdir: impl Into<RelPath>) -> Self {
 		self.subdir = Some(subdir.into());
 		self
 	}
 	/// Resolve the effective root directory, including subdir if set.
-	pub fn effective_root(&self) -> AbsPathBuf {
+	pub fn effective_root(&self) -> AbsPath {
 		match &self.subdir {
-			Some(sub) => self.path.join(sub.to_string()),
+			Some(sub) => self.path.join(sub),
 			None => self.path.clone(),
 		}
 	}
 	/// Resolve the full path for an object key.
-	fn resolve_path(&self, route: &SmolPath) -> AbsPathBuf {
-		self.effective_root().join(route.to_string())
+	fn resolve_path(&self, route: &RelPath) -> AbsPath {
+		self.effective_root().join(route)
 	}
 	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: SmolPath) -> TypedBlob<Self> {
+	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
 		TypedBlob::new(self.clone(), path)
 	}
 }
@@ -62,7 +62,7 @@ impl FsStore {
 impl BlobStoreProvider for FsStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		Box::new(FsStore {
 			path: self.path.clone(),
 			subdir: Some(match &self.subdir {
@@ -78,16 +78,14 @@ impl BlobStoreProvider for FsStore {
 	/// point of an fs `<RepoRoot>`.
 	fn rebase(
 		&self,
-		entry_name: &SmolPath,
+		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
-		let abs_root = self.effective_root().join(root.as_str());
+	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
+		let abs_root = self.effective_root().join(root);
 		let entry_name = self
 			.effective_root()
-			.join(entry_name.as_str())
+			.join(entry_name)
 			.strip_prefix(&abs_root)
-			.ok()
-			.map(SmolPath::from)
 			.ok_or_else(|| {
 				bevyhow!(
 					"entry `{entry_name}` is not under its declared store root \
@@ -105,11 +103,11 @@ impl BlobStoreProvider for FsStore {
 
 	fn root_key(&self) -> SmolStr { format!("fs:{}", self.path).into() }
 
-	fn subdir(&self) -> SmolPath { self.subdir.clone().unwrap_or_default() }
+	fn subdir(&self) -> RelPath { self.subdir.clone().unwrap_or_default() }
 
-	fn watch_dir(&self) -> Option<AbsPathBuf> { Some(self.effective_root()) }
+	fn watch_dir(&self) -> Option<AbsPath> { Some(self.effective_root()) }
 
-	fn base_dir(&self) -> Option<AbsPathBuf> { Some(self.path.clone()) }
+	fn base_dir(&self) -> Option<AbsPath> { Some(self.path.clone()) }
 
 	fn region(&self) -> Option<String> { None }
 
@@ -134,7 +132,7 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::write_async(path, body).await?;
@@ -142,24 +140,23 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let root = self.effective_root();
 		Box::pin(async move {
 			ReadDir::files_recursive_async(&root)
 				.await?
 				.into_iter()
 				.map(|path| {
-					let path = path
-						.strip_prefix(&root)
-						.unwrap_or_else(|_| path.as_path());
-					SmolPath::from(path)
+					let path = AbsPath::new_unchecked(path.to_string_lossy());
+					path.strip_prefix(&root)
+						.unwrap_or_else(|| RelPath::new(path))
 				})
 				.collect::<Vec<_>>()
 				.xok()
 		})
 	}
 
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {
 			fs_ext::read_async(&path)
@@ -170,19 +167,19 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
 	}
 
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
 	}
 
 	fn public_url(
 		&self,
-		_path: &SmolPath,
+		_path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		Box::pin(async move { Ok(None) })
 	}
@@ -200,8 +197,7 @@ mod test {
 	#[beet_core::test]
 	async fn works() {
 		let dir = "target/tests/beet_net/test-store-001";
-		let provider =
-			FsStore::new(AbsPathBuf::new_workspace_rel(dir).unwrap());
+		let provider = FsStore::new(AbsPath::new_workspace_rel(dir).unwrap());
 		store_test::run(provider).await;
 	}
 
@@ -211,9 +207,8 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn rebases_above_the_repo_root() {
-		let tmp =
-			AbsPathBuf::new_workspace_rel("target/tests/beet_net/rebase-fs")
-				.unwrap();
+		let tmp = AbsPath::new_workspace_rel("target/tests/beet_net/rebase-fs")
+			.unwrap();
 		let entry_dir = tmp.join("a/b");
 		fs_ext::create_dir_all(&entry_dir).unwrap();
 		fs_ext::write(entry_dir.join("main.bsx"), "<Router/>").unwrap();
@@ -223,14 +218,14 @@ mod test {
 			store.rebase_repo("main.bsx", "../..").unwrap();
 		entry_name.xpect_eq("a/b/main.bsx");
 		rebased
-			.get_media(&SmolPath::from("a/b/main.bsx"))
+			.get_media(&RelPath::from("a/b/main.bsx"))
 			.await
 			.unwrap()
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("<Router/>");
 		rebased
-			.get_media(&SmolPath::from("shared.txt"))
+			.get_media(&RelPath::from("shared.txt"))
 			.await
 			.unwrap()
 			.as_utf8()

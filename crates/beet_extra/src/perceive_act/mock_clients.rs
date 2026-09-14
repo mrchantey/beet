@@ -31,7 +31,7 @@ pub fn MockHead(
 		// rooting the CLI uses), so `take-photo` reads the floor-photo fixtures through
 		// its own `AncestorQuery<&BlobStore>`. Becomes the webcam in v3.
 		BlobStore::new(FsStore::new(
-			AbsPathBuf::new(fs_ext::workspace_root())
+			AbsPath::new(fs_ext::workspace_root())
 				.expect("workspace root resolves"),
 		)),
 		children![WhoAmI, TakePhoto, SpeakText, ShowImage],

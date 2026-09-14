@@ -30,10 +30,10 @@ use beet_core::prelude::*;
 pub struct SceneBlob {
 	/// The fork's path within the nearest ancestor store, the boot source once
 	/// it exists. Its extension picks the format, json by default.
-	pub path: SmolPath,
+	pub path: RelPath,
 	/// The authored original's path within the same store, read on first boot
 	/// only.
-	pub from: SmolPath,
+	pub from: RelPath,
 	/// Coalesces the write-backs: a burst of edits is at most one write in
 	/// flight plus one queued behind it, and the queued one re-reads the
 	/// document so it persists the latest state.
@@ -43,7 +43,7 @@ pub struct SceneBlob {
 
 impl SceneBlob {
 	/// The scene at `path`, forked from the original at `from`.
-	pub fn new(path: impl Into<SmolPath>, from: impl Into<SmolPath>) -> Self {
+	pub fn new(path: impl Into<RelPath>, from: impl Into<RelPath>) -> Self {
 		Self {
 			path: path.into(),
 			from: from.into(),
@@ -176,7 +176,7 @@ pub(crate) fn write_scene_blobs(
 /// serializer so entity order and the sorted component maps match the fork.
 async fn write_scene_blob(
 	entity: &AsyncEntity,
-	path: SmolPath,
+	path: RelPath,
 	media_type: MediaType,
 ) -> Result {
 	let Some(store) = ancestor_store(entity).await? else {
@@ -208,7 +208,7 @@ mod test {
 		let store = BlobStore::temp();
 		store
 			.insert(
-				&SmolPath::from("app.bsx"),
+				&RelPath::from("app.bsx"),
 				"<main><h1>Todos</h1><span>milk</span></main>",
 			)
 			.await
@@ -244,7 +244,7 @@ mod test {
 		let store = store().await;
 		let (app, host) = boot(store.clone()).await;
 		store
-			.exists(&SmolPath::from("app.json"))
+			.exists(&RelPath::from("app.json"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -263,7 +263,7 @@ mod test {
 			.xpect_eq("app.bsx");
 		world.get::<ChildOf>(root).unwrap().parent().xpect_eq(host);
 		// the fork carries the record, and reads back as the document
-		let fork = store.get_media(&SmolPath::from("app.json")).await.unwrap();
+		let fork = store.get_media(&RelPath::from("app.json")).await.unwrap();
 		let json: serde_json::Value =
 			serde_json::from_slice(fork.bytes()).unwrap();
 		SceneEntities::entity_json(&json, 0)

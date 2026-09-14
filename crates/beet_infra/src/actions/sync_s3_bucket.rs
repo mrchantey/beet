@@ -31,7 +31,7 @@ pub async fn SyncS3Bucket(
 	no_sign_request: bool,
 	/// Optional subdir of the bucket to sync against; the bucket root by default.
 	#[field]
-	bucket_dir: Option<SmolPath>,
+	bucket_dir: Option<RelPath>,
 	/// Comma-separated paths under the local dir to sync, each naming a file or
 	/// a directory; empty (the default) syncs the whole dir.
 	///
@@ -90,7 +90,7 @@ pub async fn SyncS3Bucket(
 	.filters(SyncS3Bucket::filters(&paths));
 	trace!(
 		"SyncS3Bucket: syncing {} {} {s3_uri}",
-		local_dir.display(),
+		local_dir,
 		match direction {
 			SyncDirection::Push => "->",
 			SyncDirection::Pull => "<-",
@@ -136,13 +136,13 @@ impl SyncS3Bucket {
 	/// Only the push direction destroys remote state, so only push calls this; a
 	/// pull with `delete` overwrites a local dir the caller asked for.
 	pub fn assert_mirrorable(
-		local_dir: &AbsPathBuf,
+		local_dir: &AbsPath,
 		follow_symlinks: bool,
 	) -> Result {
 		if fs_ext::is_dir_empty(local_dir)? {
 			bevybail!(
 				"refusing to mirror an empty local dir into a bucket: {}\nhydrate it first, eg `just beet-shared pull`",
-				local_dir.display()
+				local_dir
 			);
 		}
 		if !follow_symlinks {

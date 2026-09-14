@@ -31,7 +31,7 @@ pub async fn read_prescan(
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
 	repo_store
-		.get_media(&SmolPath::from(entry_name))
+		.get_media(&RelPath::from(entry_name))
 		.await?
 		.xmap(|entry| EntryPrescan::parse(&entry))
 }
@@ -48,7 +48,7 @@ pub struct ResolvedEntry {
 	/// store, so the load never re-parses it.
 	pub prescan: EntryPrescan,
 	#[cfg(not(target_arch = "wasm32"))]
-	pub watch_dir: Option<AbsPathBuf>,
+	pub watch_dir: Option<AbsPath>,
 }
 
 /// Resolve an entry within its store: read the prescan once, and rebase the
@@ -92,7 +92,7 @@ pub async fn resolve_main(
 	repo_uri: Option<&StoreUri>,
 	main: &str,
 ) -> Result<ResolvedEntry> {
-	let path = AbsPathBuf::new(main)?;
+	let path = AbsPath::new(main)?;
 	let (repo_store, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
 		let dir = path.parent().ok_or_else(|| {
@@ -100,7 +100,6 @@ pub async fn resolve_main(
 		})?;
 		let entry_name = path
 			.file_name()
-			.and_then(|name| name.to_str())
 			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
 			.to_string();
 		(resolve_repo_store(repo_uri, dir)?, entry_name)
@@ -124,7 +123,7 @@ pub async fn probe_entry_names(
 	repo_store: &BlobStore,
 ) -> Result<Option<String>> {
 	for name in ENTRY_NAMES {
-		if repo_store.exists(&SmolPath::from(*name)).await? {
+		if repo_store.exists(&RelPath::from(*name)).await? {
 			return Ok(Some(name.to_string()));
 		}
 	}
@@ -139,12 +138,12 @@ pub async fn probe_entry_names(
 /// param) so every entry load is store-driven rather than filesystem-bound.
 pub fn resolve_repo_store(
 	repo_uri: Option<&StoreUri>,
-	dir: AbsPathBuf,
+	dir: AbsPath,
 ) -> Result<BlobStore> {
 	repo_uri
 		.cloned()
 		.unwrap_or_default()
-		.rooted_at(&dir)?
+		.rooted_at(&dir)
 		.xref()
 		.xmap(BlobStore::from_uri)
 }
@@ -164,19 +163,17 @@ pub struct EntrySources {
 /// A template read from an entry's `<TemplateDir>`.
 pub struct TemplateSource {
 	/// The `<TemplateDir src>` it was read from, store-root-relative.
-	dir: SmolStr,
+	dir: RelPath,
 	/// Its path relative to `dir`, naming the module it registers as
 	/// (`widgets/Card.bsx` -> `widgets::Card`).
-	rel: SmolPath,
+	rel: RelPath,
 	source: String,
 }
 
 impl TemplateSource {
 	/// The store-root-relative path, matching the [`BlobEvent`] paths the
 	/// watcher emits.
-	fn store_path(&self) -> SmolPath {
-		SmolPath::from(self.dir.as_str()).join(self.rel.as_str())
-	}
+	fn store_path(&self) -> RelPath { self.dir.join(&self.rel) }
 }
 
 /// Read the entry document and the templates under its declared `<TemplateDir>`s
@@ -192,7 +189,7 @@ pub async fn read_sources(
 ) -> Result<EntrySources> {
 	let entry_name = entry_name.into();
 	let entry = repo_store
-		.get_media(&SmolPath::from(entry_name.as_str()))
+		.get_media(&RelPath::from(entry_name.as_str()))
 		.await?;
 	// a markup entry may declare `<TemplateDir>`s naming template directories; read
 	// each so they register before the entry parses (so entry-level tags resolve). A
@@ -435,7 +432,7 @@ pub async fn rebuild_watched(
 async fn entry_source_paths(
 	repo_store: &BlobStore,
 	sources: &EntrySources,
-) -> HashSet<SmolPath> {
+) -> HashSet<RelPath> {
 	// the entry's templates by the tag that instantiates them, with the source
 	// already read beside the entry (so only the entry and its includes hit the
 	// store below)
@@ -452,7 +449,7 @@ async fn entry_source_paths(
 		.map(|template| (template.store_path(), template.source.as_str()))
 		.collect::<HashMap<_, _>>();
 	let mut seen = HashSet::default();
-	let mut stack = vec![SmolPath::from(sources.entry_name.as_str())];
+	let mut stack = vec![RelPath::from(sources.entry_name.as_str())];
 	while let Some(path) = stack.pop() {
 		if !seen.insert(path.clone()) {
 			continue;
@@ -467,12 +464,7 @@ async fn entry_source_paths(
 				Err(_) => continue,
 			},
 		};
-		stack.extend(
-			prescan
-				.includes
-				.iter()
-				.map(|src| SmolPath::from(src.as_str())),
-		);
+		stack.extend(prescan.includes);
 		stack.extend(
 			prescan
 				.tags
@@ -518,7 +510,7 @@ mod test {
 		let repo_store = BlobStore::temp();
 		repo_store
 			.insert(
-				&SmolPath::from("main.bsx"),
+				&RelPath::from("main.bsx"),
 				"<Router><DefaultAppRoutes/></Router>",
 			)
 			.await
@@ -547,7 +539,7 @@ mod test {
 	async fn gate_settles_when_ready() {
 		let repo_store = BlobStore::temp();
 		repo_store
-			.insert(&SmolPath::from("main.bsx"), "<Router/>")
+			.insert(&RelPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -579,14 +571,12 @@ mod test {
 			"<Router><RepoRoot src=\"..\"/></Router>",
 		)
 		.unwrap();
-		let resolved = resolve_main(None, entry_dir.to_string_lossy().as_ref())
-			.await
-			.unwrap();
+		let resolved = resolve_main(None, entry_dir.as_str()).await.unwrap();
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
 			.repo_store
-			.exists(&SmolPath::from("app/main.bsx"))
+			.exists(&RelPath::from("app/main.bsx"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -601,7 +591,7 @@ mod test {
 		let repo_store = BlobStore::temp();
 		repo_store
 			.insert(
-				&SmolPath::from("apps/site/main.bsx"),
+				&RelPath::from("apps/site/main.bsx"),
 				"<Router><RepoRoot src=\"..\"/></Router>",
 			)
 			.await
@@ -615,7 +605,7 @@ mod test {
 		resolved.watch_dir.xpect_none();
 		resolved
 			.repo_store
-			.exists(&SmolPath::from("site/main.bsx"))
+			.exists(&RelPath::from("site/main.bsx"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -628,7 +618,7 @@ mod test {
 		let repo_store = BlobStore::temp();
 		repo_store
 			.insert(
-				&SmolPath::from("main.bsx"),
+				&RelPath::from("main.bsx"),
 				"<Router><RepoRoot src=\"../..\"/></Router>",
 			)
 			.await
@@ -653,9 +643,7 @@ mod test {
 			"<Router><RepoRoot src=\".\"/></Router>",
 		)
 		.unwrap();
-		let by_path = resolve_main(None, tmp.path().to_string_lossy().as_ref())
-			.await
-			.unwrap();
+		let by_path = resolve_main(None, tmp.path().as_str()).await.unwrap();
 		let by_store = resolve_in_repo_store(
 			resolve_repo_store(None, tmp.path().clone()).unwrap(),
 			"main.bsx".to_string(),
@@ -678,7 +666,7 @@ mod test {
 	async fn rebuild_fires_ready_every_time() {
 		let repo_store = BlobStore::temp();
 		repo_store
-			.insert(&SmolPath::from("main.bsx"), "<Router/>")
+			.insert(&RelPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -732,7 +720,7 @@ mod test {
 			("templates/Layout.bsx", "<html><Slot/></html>"),
 		] {
 			repo_store
-				.insert(&SmolPath::from(path), source)
+				.insert(&RelPath::from(path), source)
 				.await
 				.unwrap();
 		}
@@ -748,7 +736,7 @@ mod test {
 				"templates/widgets/Swatch.bsx",
 			]
 			.into_iter()
-			.map(SmolPath::from)
+			.map(RelPath::from)
 			.collect::<HashSet<_>>(),
 		);
 	}

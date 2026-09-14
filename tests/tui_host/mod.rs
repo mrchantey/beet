@@ -42,11 +42,11 @@ impl TuiHost {
 	/// in-memory store.
 	pub async fn seeded_store(paths: &[&str]) -> BlobStore {
 		let disk = BlobStore::new(FsStore::new(
-			AbsPathBuf::new_workspace_rel(ENTRY_DIR).unwrap(),
+			AbsPath::new_workspace_rel(ENTRY_DIR).unwrap(),
 		));
 		let store = BlobStore::temp();
 		for path in paths {
-			let path = SmolPath::from(*path);
+			let path = RelPath::from(*path);
 			let bytes = disk.get(&path).await.unwrap();
 			store.insert(&path, bytes).await.unwrap();
 		}
@@ -69,7 +69,7 @@ impl TuiHost {
 		))
 		.insert_resource(pkg_config!());
 
-		let entry = store.get_media(&SmolPath::from(entry)).await.unwrap();
+		let entry = store.get_media(&RelPath::from(entry)).await.unwrap();
 		let source = entry.as_utf8().unwrap();
 		// the entry is built to be *driven*, not to boot: its `<CallOnReady>`
 		// would start the real stdio `TuiServer` inside the test process, giving
@@ -316,7 +316,7 @@ impl TuiHost {
 		self.store
 			.get_document(
 				SchemaResolver::default().with_schemas(&registry),
-				&SmolPath::from(path),
+				&RelPath::from(path),
 			)
 			.await
 			.unwrap()

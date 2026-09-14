@@ -1,30 +1,22 @@
-//! Path manipulation utilities and cross-platform filesystem abstractions.
-//!
-//! This module provides types and utilities for working with filesystem paths
-//! in a cross-platform manner, including workspace-relative paths, absolute
-//! paths, and environment variable access.
+//! Cross-platform filesystem abstractions: the std surface beneath the
+//! `no_std` path types ([`SmolPath`], [`AbsPath`], [`WsPath`]).
 //!
 //! # Key Types
 //!
-//! - [`WsPathBuf`] - Workspace-relative path with easy conversion to absolute
-//! - [`AbsPathBuf`] - Guaranteed absolute path
-//! - [`WorkspaceRoot`] - Bevy resource holding the workspace root directory
-//! - [`FsError`] - Filesystem operation error type
+//! - [`FsError`] - Filesystem operation error type, always naming the path
+//! - [`ReadDir`] - Directory listing
+//! - [`EnvVar`] - Serde and reflect-friendly environment variable
 //!
 //! # Modules
 //!
 //! - [`fs_ext`] - Cross-platform filesystem operations
 //! - [`path_ext`](crate::path::path_ext) - Path cleaning and [`Path`](std::path::Path) helpers
 
-mod abs_path_buf;
 mod env_var;
 mod fs_error;
 pub mod fs_ext;
 mod read_dir;
-mod ws_path_buf;
 
-pub use abs_path_buf::*;
 pub use env_var::*;
 pub use fs_error::*;
 pub use read_dir::*;
-pub use ws_path_buf::*;

@@ -25,7 +25,7 @@ impl MountThreadStore {
 	/// [`BlobThreadStore`] over an [`FsStore`] at the workspace-relative `path`.
 	pub fn build(&self) -> ThreadStore {
 		ThreadStore::new(BlobThreadStore::new(BlobStore::new(FsStore::new(
-			WsPathBuf::new(self.path.clone()),
+			WsPath::new(self.path.clone()),
 		))))
 	}
 }

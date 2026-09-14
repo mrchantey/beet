@@ -21,12 +21,12 @@ impl AnalyticsArchive {
 	pub const PREFIX: &'static str = "analytics/raw";
 
 	/// Returns the object path for one UTC date.
-	pub fn object_path(date: &str) -> SmolPath {
-		SmolPath::new(format!("{}/{date}.ndjson.gz", Self::PREFIX))
+	pub fn object_path(date: &str) -> RelPath {
+		RelPath::new(format!("{}/{date}.ndjson.gz", Self::PREFIX))
 	}
 
 	/// Returns the UTC date encoded in a daily archive path.
-	pub(crate) fn date(path: &SmolPath) -> Option<SmolStr> {
+	pub(crate) fn date(path: &RelPath) -> Option<SmolStr> {
 		let date = path
 			.as_str()
 			.strip_prefix(Self::PREFIX)?
@@ -101,7 +101,7 @@ impl AnalyticsArchive {
 		store: &BlobStore,
 		date: &str,
 		events: &[AnalyticsEvent],
-	) -> Result<SmolPath> {
+	) -> Result<RelPath> {
 		let path = Self::object_path(date);
 		let expected = Self::encode(events)?;
 		store.insert(&path, expected.clone()).await?;

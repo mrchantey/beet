@@ -93,13 +93,13 @@ Previously the cli would load the config file into an tree of entities, now thes
 fn pages_collection() -> impl Bundle {
 	(
 		RouteFileCollection {
-			src: AbsPathBuf::new_workspace_rel("crates/beet_site/src/pages").unwrap(),
+			src: AbsPath::new_workspace_rel("crates/beet_site/src/pages").unwrap(),
 			..default()
 		},
 		ModifyRoutePath::default().base_route("/docs"),
 		MetaType::new(syn::parse_quote!(beet::prelude::PageMeta)),
 		CodegenFile::new(
-			AbsPathBuf::new_workspace_rel("crates/beet_site/src/codegen/pages.rs").unwrap(),
+			AbsPath::new_workspace_rel("crates/beet_site/src/codegen/pages.rs").unwrap(),
 		),
 	)
 }

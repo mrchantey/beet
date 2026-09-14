@@ -54,12 +54,6 @@ impl TokenizeSelf for syn::Expr {
 	}
 }
 
-impl TokenizeSelf for WsPathBuf {
-	fn self_tokens(&self, tokens: &mut TokenStream) {
-		let path = self.to_string_lossy();
-		tokens.extend(quote! { WsPathBuf::new(#path) });
-	}
-}
 impl TokenizeSelf for PathBuf {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		let path = self.to_string_lossy();

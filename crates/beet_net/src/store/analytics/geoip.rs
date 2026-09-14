@@ -34,13 +34,13 @@ const COUNTRY_DB_PATH: &str = "assets/databases/country.mmdb";
 #[reflect(Component, Default)]
 pub struct GeoIpDb {
 	/// The database path, relative to the nearest ancestor [`BlobStore`] root.
-	pub src: SmolPath,
+	pub src: RelPath,
 }
 
 impl Default for GeoIpDb {
 	fn default() -> Self {
 		Self {
-			src: SmolPath::new(COUNTRY_DB_PATH),
+			src: RelPath::new(COUNTRY_DB_PATH),
 		}
 	}
 }
@@ -94,7 +94,7 @@ impl GeoIp {
 	/// A declared-but-missing blob is a `warn!` yielding an empty [`GeoIp`] whose
 	/// lookups return `None`; a blob that is present but unparseable is an error,
 	/// since a corrupt database is a shipping mistake rather than a degraded mode.
-	pub async fn load(assets: &BlobStore, path: &SmolPath) -> Result<Self> {
+	pub async fn load(assets: &BlobStore, path: &RelPath) -> Result<Self> {
 		cfg_if! {
 			if #[cfg(feature = "geoip")] {
 				let Ok(bytes) = assets.get(path).await else {
@@ -194,7 +194,7 @@ mod test {
 	#[beet_core::test]
 	async fn missing_db_yields_empty_lookups() {
 		let assets = BlobStore::new(InMemoryStore::new());
-		GeoIp::load(&assets, &SmolPath::new(COUNTRY_DB_PATH))
+		GeoIp::load(&assets, &RelPath::new(COUNTRY_DB_PATH))
 			.await
 			.unwrap()
 			.country_str("8.8.8.8")
@@ -207,7 +207,7 @@ mod test {
 	#[beet_core::test]
 	async fn corrupt_db_is_loud() {
 		let assets = BlobStore::new(InMemoryStore::new());
-		let path = SmolPath::new(COUNTRY_DB_PATH);
+		let path = RelPath::new(COUNTRY_DB_PATH);
 		assets.insert(&path, "not an mmdb").await.unwrap();
 		GeoIp::load(&assets, &path)
 			.await
@@ -224,9 +224,9 @@ mod test {
 	#[beet_core::test]
 	async fn resolves_known_ip_from_the_real_db() {
 		let assets = BlobStore::new(FsStore::new(
-			AbsPathBuf::new_workspace_rel(".").unwrap(),
+			AbsPath::new_workspace_rel(".").unwrap(),
 		));
-		let path = SmolPath::new(COUNTRY_DB_PATH);
+		let path = RelPath::new(COUNTRY_DB_PATH);
 		if !assets.exists(&path).await.unwrap() {
 			warn!(
 				"skipping: no {path} in this checkout, run `just site-shared pull` to hydrate it"

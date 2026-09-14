@@ -271,7 +271,7 @@ pub mod thread_store_test {
 	async fn fs() {
 		use beet_net::prelude::*;
 		let blob = BlobStore::new(FsStore::new(
-			AbsPathBuf::new_workspace_rel(
+			AbsPath::new_workspace_rel(
 				"target/tests/beet_thread/thread-store-fs",
 			)
 			.unwrap(),

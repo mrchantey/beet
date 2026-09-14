@@ -168,7 +168,7 @@ impl IntoResponseWithRequestParts<Self> for PageRequest {
 pub async fn BlobScene(
 	/// The store-relative path of the file this route serves.
 	#[field]
-	path: SmolPath,
+	path: RelPath,
 	cx: ActionContext<Request>,
 ) -> Result<PageRequest> {
 	// the nearest ancestor store backs this page's bytes; absent is an error, never
@@ -249,5 +249,5 @@ pub async fn BlobScene(
 
 impl BlobScene {
 	/// Serve the store file at `path`.
-	pub fn new(path: impl Into<SmolPath>) -> Self { Self { path: path.into() } }
+	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
 }

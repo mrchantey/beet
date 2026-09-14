@@ -21,10 +21,10 @@ use beet::prelude::*;
 pub async fn build_site(world: &mut World) -> Entity {
 	world.insert_resource(pkg_config!());
 	let store = BlobStore::new(FsStore::new(
-		AbsPathBuf::new_workspace_rel("examples/bsx_site").unwrap(),
+		AbsPath::new_workspace_rel("examples/bsx_site").unwrap(),
 	));
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-	let entry = store.get_media(&SmolPath::from("main.bsx")).await.unwrap();
+	let entry = store.get_media(&RelPath::from("main.bsx")).await.unwrap();
 	// the entry is always `.bsx`, so parse it through the core BSX engine (the
 	// `.bsx` arm of the binary's format-dispatching `EntryTemplate::from_bytes`).
 	let source = entry.as_utf8().unwrap();

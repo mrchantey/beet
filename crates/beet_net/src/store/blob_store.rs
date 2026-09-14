@@ -56,7 +56,7 @@ impl BlobStore {
 	}
 
 	/// Returns a new store scoped to the given subdirectory.
-	pub fn with_subdir(&self, path: SmolPath) -> BlobStore {
+	pub fn with_subdir(&self, path: RelPath) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
 	}
 
@@ -79,8 +79,13 @@ impl BlobStore {
 		entry_name: &str,
 		src: &str,
 	) -> Result<(BlobStore, String)> {
-		let entry_name = SmolPath::new(entry_name);
-		let root = entry_name.parent().unwrap_or_default().join(src);
+		let entry_name = RelPath::new(entry_name);
+		// the root is a plain path: `..` may climb above the store
+		let root = entry_name
+			.as_smol_path()
+			.parent()
+			.unwrap_or_default()
+			.join(src);
 		let (provider, entry_name) =
 			self.provider.rebase(&entry_name, &root)?;
 		(
@@ -98,7 +103,7 @@ impl BlobStore {
 	}
 
 	/// Get an object and infer the [`MediaType`] from its path extension.
-	pub async fn get_media(&self, path: &SmolPath) -> Result<MediaBytes> {
+	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);
 		let bytes = self.get(path).await?;
 		Ok(MediaBytes::new(media_type, bytes.to_vec()))
@@ -111,9 +116,9 @@ impl BlobStore {
 	/// # use beet_core::prelude::*;
 	/// # use beet_net::prelude::*;
 	/// let store = BlobStore::temp();
-	/// let blob = store.blob(SmolPath::new("my-file.txt"));
+	/// let blob = store.blob(RelPath::new("my-file.txt"));
 	/// ```
-	pub fn blob(&self, path: SmolPath) -> Blob { Blob::new(self.clone(), path) }
+	pub fn blob(&self, path: RelPath) -> Blob { Blob::new(self.clone(), path) }
 
 	/// Component hook that reads a concrete store component from
 	/// the entity and inserts a [`BlobStore`] wrapping it.
@@ -157,13 +162,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.insert(&SmolPath::from("file.txt"), "content").await?;
+	/// store.insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn insert(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		self.provider.insert(path, body.into()).await
@@ -177,13 +182,13 @@ impl BlobStore {
 	/// # use beet_net::prelude::*;
 	/// # async fn run() -> Result<()> {
 	/// let store = BlobStore::temp();
-	/// store.try_insert(&SmolPath::from("file.txt"), "content").await?;
+	/// store.try_insert(&RelPath::from("file.txt"), "content").await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	pub async fn try_insert(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 		body: impl Into<Bytes>,
 	) -> Result {
 		if self.exists(path).await? {
@@ -208,7 +213,7 @@ impl BlobStore {
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`BlobStoreProvider::list`] + [`BlobStoreProvider::get`]
-	pub async fn get_all(&self) -> Result<Vec<(SmolPath, Bytes)>> {
+	pub async fn get_all(&self) -> Result<Vec<(RelPath, Bytes)>> {
 		self.list()
 			.await?
 			.into_iter()
@@ -228,23 +233,21 @@ impl BlobStore {
 
 impl BlobStoreProvider for BlobStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
-	fn with_subdir(&self, path: SmolPath) -> Box<dyn BlobStoreProvider> {
+	fn with_subdir(&self, path: RelPath) -> Box<dyn BlobStoreProvider> {
 		self.provider.with_subdir(path)
 	}
 	fn rebase(
 		&self,
-		entry_name: &SmolPath,
+		entry_name: &RelPath,
 		root: &SmolPath,
-	) -> Result<(Box<dyn BlobStoreProvider>, SmolPath)> {
+	) -> Result<(Box<dyn BlobStoreProvider>, RelPath)> {
 		self.provider.rebase(entry_name, root)
 	}
 	fn id(&self) -> &'static str { self.provider.id() }
 	fn root_key(&self) -> SmolStr { self.provider.root_key() }
-	fn subdir(&self) -> SmolPath { self.provider.subdir() }
-	#[cfg(feature = "std")]
-	fn watch_dir(&self) -> Option<AbsPathBuf> { self.provider.watch_dir() }
-	#[cfg(feature = "std")]
-	fn base_dir(&self) -> Option<AbsPathBuf> { self.provider.base_dir() }
+	fn subdir(&self) -> RelPath { self.provider.subdir() }
+	fn watch_dir(&self) -> Option<AbsPath> { self.provider.watch_dir() }
+	fn base_dir(&self) -> Option<AbsPath> { self.provider.base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.provider.did_change(event)
 	}
@@ -258,24 +261,24 @@ impl BlobStoreProvider for BlobStore {
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		self.provider.store_remove()
 	}
-	fn insert(&self, path: &SmolPath, body: Bytes) -> SendBoxedFuture<Result> {
+	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.provider.insert(path, body)
 	}
-	fn list(&self) -> SendBoxedFuture<Result<Vec<SmolPath>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.provider.list()
 	}
-	fn get(&self, path: &SmolPath) -> SendBoxedFuture<Result<Bytes>> {
+	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
 	}
-	fn exists(&self, path: &SmolPath) -> SendBoxedFuture<Result<bool>> {
+	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		self.provider.exists(path)
 	}
-	fn remove(&self, path: &SmolPath) -> SendBoxedFuture<Result> {
+	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
 	fn public_url(
 		&self,
-		path: &SmolPath,
+		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		self.provider.public_url(path)
 	}
@@ -291,11 +294,11 @@ mod test {
 	async fn nested_store() -> BlobStore {
 		let store = BlobStore::temp();
 		store
-			.insert(&SmolPath::from("a/b/main.bsx"), "<Router/>")
+			.insert(&RelPath::from("a/b/main.bsx"), "<Router/>")
 			.await
 			.unwrap();
 		store
-			.insert(&SmolPath::from("a/shared.txt"), "shared")
+			.insert(&RelPath::from("a/shared.txt"), "shared")
 			.await
 			.unwrap();
 		store
@@ -311,14 +314,14 @@ mod test {
 			store.rebase_repo("a/b/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("b/main.bsx");
 		rebased
-			.get_media(&SmolPath::from("b/main.bsx"))
+			.get_media(&RelPath::from("b/main.bsx"))
 			.await
 			.unwrap()
 			.as_utf8()
 			.unwrap()
 			.xpect_eq("<Router/>");
 		rebased
-			.get_media(&SmolPath::from("shared.txt"))
+			.get_media(&RelPath::from("shared.txt"))
 			.await
 			.unwrap()
 			.as_utf8()
@@ -369,7 +372,7 @@ pub mod store_test {
 	/// Runs the standard store provider test suite.
 	pub async fn run(provider: impl BlobStoreProvider) {
 		let store = BlobStore::new(provider);
-		let path = SmolPath::from("test_path");
+		let path = RelPath::from("test_path");
 		let body = bytes::Bytes::from("test_body");
 		store.store_remove().await.ok();
 		store.store_exists().await.unwrap().xpect_false();
