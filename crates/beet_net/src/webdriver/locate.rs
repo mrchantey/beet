@@ -1,11 +1,11 @@
-//! Element location via `browsingContext.locateNodes`.
+//! WebElement location via `browsingContext.locateNodes`.
 //!
 //! [`Page::find`] and friends poll until a match appears (the playwright and
 //! cypress auto-wait shape), bounded by [`Page::timeout`];
 //! [`Page::query_selector`] in `page.rs` remains the immediate probe.
 
-use super::Element;
 use super::Page;
+use super::WebElement;
 use super::*;
 use beet_core::prelude::*;
 use core::time::Duration;
@@ -32,15 +32,15 @@ impl Locator<'_> {
 	}
 }
 
-/// Issue a single `browsingContext.locateNodes`, returning an [`Element`]
+/// Issue a single `browsingContext.locateNodes`, returning an [`WebElement`]
 /// per matched node.
 pub(crate) async fn locate_nodes(
 	session: &Session,
 	context_id: &str,
 	locator: &Locator<'_>,
-	start_node: Option<&Element>,
+	start_node: Option<&WebElement>,
 	max_count: Option<u64>,
-) -> Result<Vec<Element>> {
+) -> Result<Vec<WebElement>> {
 	let mut params = json!({
 		"context": context_id,
 		"locator": locator.to_json(),
@@ -58,17 +58,18 @@ pub(crate) async fn locate_nodes(
 		.and_then(|nodes| nodes.as_array())
 		.ok_or_else(|| bevyhow!("locateNodes: missing nodes array"))?
 		.iter()
-		.map(|node| Element::from_node_value(session, context_id, node))
+		.map(|node| WebElement::from_node_value(session, context_id, node))
 		.collect::<Result<Vec<_>>>()
 }
 
 /// Poll [`locate_nodes`] until at least one node matches, bounded by
 /// `timeout`, returning the first match.
 ///
-/// A failed locate is retried like a miss until the deadline: a page reloading
-/// itself under the locator (a live reload, a form submit) briefly has no
-/// document to search, and the driver answers that with an error rather than
-/// an empty match. Only at the deadline is the last error surfaced.
+/// A transient refusal ([`BiDiError::is_transient`]) is retried like a miss
+/// until the deadline: a page reloading itself under the locator (a live
+/// reload, a form submit) briefly has no document to search, and the driver
+/// answers that with an error rather than an empty match. Any other error (a
+/// bad selector) fails at once.
 ///
 /// Open-coded rather than through `poll_ext`: the async-closure's
 /// higher-ranked environment lifetime breaks `Send` inference for callers
@@ -78,9 +79,9 @@ pub(crate) async fn find_polling(
 	session: &Session,
 	context_id: &str,
 	locator: &Locator<'_>,
-	start_node: Option<&Element>,
+	start_node: Option<&WebElement>,
 	timeout: Duration,
-) -> Result<Element> {
+) -> Result<WebElement> {
 	let start = Instant::now();
 	loop {
 		let expired = start.elapsed() >= timeout;
@@ -96,6 +97,13 @@ pub(crate) async fn find_polling(
 			Err(err) if expired => {
 				bevybail!("no node matching {locator:?}: {err}")
 			}
+			Err(err)
+				if !err
+					.downcast_ref::<BiDiError>()
+					.is_some_and(BiDiError::is_transient) =>
+			{
+				return Err(err);
+			}
 			_ => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
 		}
 	}
@@ -104,7 +112,7 @@ pub(crate) async fn find_polling(
 impl Page {
 	/// Find the first element matching the css `selector`, polling until one
 	/// appears, bounded by [`Page::timeout`].
-	pub async fn try_find(&self, selector: &str) -> Result<Element> {
+	pub async fn try_find(&self, selector: &str) -> Result<WebElement> {
 		find_polling(
 			&self.session,
 			&self.context_id,
@@ -117,7 +125,7 @@ impl Page {
 
 	/// Find the first element whose rendered text is exactly `text`, polling
 	/// until one appears, bounded by [`Page::timeout`].
-	pub async fn try_find_text(&self, text: &str) -> Result<Element> {
+	pub async fn try_find_text(&self, text: &str) -> Result<WebElement> {
 		find_polling(
 			&self.session,
 			&self.context_id,
@@ -129,7 +137,10 @@ impl Page {
 	}
 
 	/// All elements currently matching the css `selector`, without waiting.
-	pub async fn try_find_all(&self, selector: &str) -> Result<Vec<Element>> {
+	pub async fn try_find_all(
+		&self,
+		selector: &str,
+	) -> Result<Vec<WebElement>> {
 		locate_nodes(
 			&self.session,
 			&self.context_id,
@@ -141,10 +152,10 @@ impl Page {
 	}
 }
 
-impl Element {
+impl WebElement {
 	/// Find the first descendant matching the css `selector`, polling until
 	/// one appears (the page-default timeout).
-	pub async fn try_find(&self, selector: &str) -> Result<Element> {
+	pub async fn try_find(&self, selector: &str) -> Result<WebElement> {
 		find_polling(
 			self.session(),
 			self.context_id(),
@@ -157,7 +168,10 @@ impl Element {
 
 	/// All descendants currently matching the css `selector`, without
 	/// waiting.
-	pub async fn try_find_all(&self, selector: &str) -> Result<Vec<Element>> {
+	pub async fn try_find_all(
+		&self,
+		selector: &str,
+	) -> Result<Vec<WebElement>> {
 		locate_nodes(
 			self.session(),
 			self.context_id(),
@@ -173,7 +187,7 @@ impl Page {
 	/// [`Self::try_find`], panicking on timeout: the test-and-script shape,
 	/// so chains read without unwraps.
 	#[cfg_attr(feature = "nightly", track_caller)]
-	pub async fn find(&self, selector: &str) -> Element {
+	pub async fn find(&self, selector: &str) -> WebElement {
 		self.try_find(selector)
 			.await
 			.unwrap_or_else(|err| panic!("{err}"))
@@ -181,7 +195,7 @@ impl Page {
 
 	/// [`Self::try_find_text`], panicking on timeout.
 	#[cfg_attr(feature = "nightly", track_caller)]
-	pub async fn find_text(&self, text: &str) -> Element {
+	pub async fn find_text(&self, text: &str) -> WebElement {
 		self.try_find_text(text)
 			.await
 			.unwrap_or_else(|err| panic!("{err}"))
@@ -190,17 +204,17 @@ impl Page {
 	/// [`Self::try_find_all`], panicking on error (an empty match is `[]`,
 	/// not a panic).
 	#[cfg_attr(feature = "nightly", track_caller)]
-	pub async fn find_all(&self, selector: &str) -> Vec<Element> {
+	pub async fn find_all(&self, selector: &str) -> Vec<WebElement> {
 		self.try_find_all(selector)
 			.await
 			.unwrap_or_else(|err| panic!("{err}"))
 	}
 }
 
-impl Element {
+impl WebElement {
 	/// [`Self::try_find`], panicking on timeout.
 	#[cfg_attr(feature = "nightly", track_caller)]
-	pub async fn find(&self, selector: &str) -> Element {
+	pub async fn find(&self, selector: &str) -> WebElement {
 		self.try_find(selector)
 			.await
 			.unwrap_or_else(|err| panic!("{err}"))
@@ -208,7 +222,7 @@ impl Element {
 
 	/// [`Self::try_find_all`], panicking on error.
 	#[cfg_attr(feature = "nightly", track_caller)]
-	pub async fn find_all(&self, selector: &str) -> Vec<Element> {
+	pub async fn find_all(&self, selector: &str) -> Vec<WebElement> {
 		self.try_find_all(selector)
 			.await
 			.unwrap_or_else(|err| panic!("{err}"))

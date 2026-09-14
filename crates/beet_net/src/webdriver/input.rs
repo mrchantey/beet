@@ -5,8 +5,8 @@
 //! pointer, exactly like a user. To poke the DOM regardless of visibility use
 //! [`Page::evaluate`] instead.
 
-use super::Element;
 use super::Page;
+use super::WebElement;
 use super::*;
 use beet_core::prelude::*;
 use bevy::input::keyboard::Key;
@@ -72,7 +72,7 @@ async fn perform(
 	Ok(())
 }
 
-impl Element {
+impl WebElement {
 	/// Click the element center with a trusted pointer action. Hit-testing
 	/// applies: a covered or invisible element does not receive the click.
 	pub async fn click(&self) -> Result<()> {

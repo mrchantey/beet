@@ -3,7 +3,7 @@
 //! This module provides the [`Page`] type which wraps a browser session
 //! and provides high-level methods for navigation and interaction.
 
-use super::Element;
+use super::WebElement;
 use super::*;
 use beet_core::prelude::*;
 use bevy::prelude::Result;
@@ -20,7 +20,7 @@ use serde_json::json;
 ///    navigate, return `(ClientProcess, Page)` so the caller can clean up
 /// * `Page::visit_with_client(client, url)` – same but with a custom client
 ///
-/// Element querying comes in two speeds: [`Page::find`] (and friends, see
+/// WebElement querying comes in two speeds: [`Page::find`] (and friends, see
 /// `locate.rs`) auto-waits for a match bounded by [`Page::timeout`], while
 /// [`Page::query_selector`] probes exactly once.
 #[derive(Debug, Clone)]
@@ -204,7 +204,7 @@ impl Page {
 	pub async fn query_selector(
 		&self,
 		selector: &str,
-	) -> Result<Option<Element>> {
+	) -> Result<Option<WebElement>> {
 		let expr = format!("document.querySelector({selector:?})");
 		let resp = self.evaluate(&expr).await?;
 		let ty = resp
@@ -214,9 +214,11 @@ impl Page {
 		if ty == "null" || ty == "undefined" {
 			return Ok(None);
 		}
-		if let Some(el) =
-			Element::from_bidi_response(&self.session, &self.context_id, &resp)
-		{
+		if let Some(el) = WebElement::from_bidi_response(
+			&self.session,
+			&self.context_id,
+			&resp,
+		) {
 			Ok(Some(el))
 		} else {
 			bevybail!(

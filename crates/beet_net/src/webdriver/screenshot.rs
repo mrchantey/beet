@@ -1,11 +1,11 @@
 //! Screenshot capture via `browsingContext.captureScreenshot`.
 //!
-//! [`Page::screenshot`] captures the viewport, [`Element::screenshot`] clips
+//! [`Page::screenshot`] captures the viewport, [`WebElement::screenshot`] clips
 //! to one element, and [`ScreenshotOptions`] selects full-page or box clips,
 //! mirroring the [`PdfOptions`] shape.
 
-use super::Element;
 use super::Page;
+use super::WebElement;
 use super::*;
 use base64::prelude::*;
 use beet_core::prelude::*;
@@ -66,7 +66,7 @@ impl Page {
 	}
 }
 
-impl Element {
+impl WebElement {
 	/// Capture just this element as png bytes.
 	pub async fn screenshot(&self) -> Result<Vec<u8>> {
 		let clip = json!({"type": "element", "element": self.shared_ref()?});

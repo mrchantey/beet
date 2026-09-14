@@ -12,4 +12,5 @@ mod prop_name;
 mod rule_markup;
 pub(crate) use inline_style::*;
 pub use prop_name::*;
-pub use rule_markup::*;
+pub use rule_markup::DeclaredRule;
+pub(crate) use rule_markup::*;

@@ -4,7 +4,7 @@ use serde_json::json;
 
 use super::Session;
 
-/// A DOM `Element` backed by a WebDriver BiDi remote reference.
+/// A DOM element backed by a WebDriver BiDi remote reference.
 ///
 /// A node value can carry two reference kinds and we retain both:
 /// * `shared_id`, the navigable-scoped stable node id. Required wherever the
@@ -18,14 +18,14 @@ use super::Session;
 /// If the node is removed from the DOM the reference goes stale and helpers
 /// surface the driver error.
 #[derive(Debug, Clone)]
-pub struct Element {
+pub struct WebElement {
 	session: Session,
 	context_id: String,
 	handle: Option<String>,
 	shared_id: Option<String>,
 }
 
-impl Element {
+impl WebElement {
 	/// Create directly; at least one of `handle` / `shared_id` must be set.
 	fn new(
 		session: &Session,

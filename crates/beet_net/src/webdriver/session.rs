@@ -35,6 +35,36 @@ struct SessionInner {
 	subscribers: Mutex<Vec<(String, async_channel::Sender<Value>)>>,
 }
 
+/// A BiDi command the driver refused, parsed from the response's `error`
+/// object: the spec's error code (`no such node`, `invalid selector`, ..) and
+/// its human message. Typed so a caller can tell a transient miss from a real
+/// fault, see [`Self::is_transient`].
+#[derive(Debug, Clone, thiserror::Error)]
+#[error("BiDi error for `{method}`: {code}: {message}")]
+pub struct BiDiError {
+	/// The command that failed, eg `browsingContext.locateNodes`.
+	pub method: String,
+	/// The spec error code, eg `no such node`.
+	pub code: String,
+	/// The driver's message for this failure.
+	pub message: String,
+}
+
+impl BiDiError {
+	/// Whether the failure is one a poll retries rather than surfaces: there
+	/// was no document to act on (a stale node or frame, the state a page
+	/// briefly holds while reloading itself), or chromedriver's `unknown error`
+	/// catch-all, its answer to a context mid-navigation (`Cannot find context
+	/// with specified id`, `execution contexts cleared`). A typed fault (an
+	/// `invalid selector`) is never transient.
+	pub fn is_transient(&self) -> bool {
+		matches!(
+			self.code.as_str(),
+			"no such node" | "no such frame" | "unknown error"
+		)
+	}
+}
+
 /// A BiDi WebDriver session (cross platform, wasm friendly).
 ///
 /// Channel / Task Pattern Overview
@@ -84,7 +114,7 @@ struct SessionInner {
 ///
 /// High‑Level Extensions
 /// ---------------------
-/// Higher constructs (e.g. `Page`, `Element`) compose over `Session` by
+/// Higher constructs (e.g. `Page`, `WebElement`) compose over `Session` by
 /// calling `command` with BiDi methods, interpreting the returned JSON,
 /// and introducing richer ergonomics / state tracking.
 ///
@@ -163,7 +193,8 @@ impl Session {
 	}
 
 	/// Send a BiDi command and await the full JSON response (the full object
-	/// containing at least "id" and usually "result" or "error").
+	/// containing at least "id" and usually "result"). A refused command errors
+	/// with a [`BiDiError`].
 	pub async fn command(&self, method: &str, params: Value) -> Result<Value> {
 		let id = self.inner.next_id.fetch_add(1, Ordering::SeqCst) as u64;
 
@@ -192,12 +223,17 @@ impl Session {
 			.await
 			.map_err(|_| bevyhow!("Response channel closed"))?;
 
-		if let Some(err_obj) = resp.get("error") {
-			return Err(bevyhow!(
-				"BiDi error for method '{}': {}",
-				method,
-				err_obj
-			));
+		if let Some(code) = resp.get("error") {
+			return Err(BiDiError {
+				method: method.to_string(),
+				code: code.as_str().unwrap_or_default().to_string(),
+				message: resp
+					.get("message")
+					.and_then(|message| message.as_str())
+					.unwrap_or_default()
+					.to_string(),
+			}
+			.into());
 		}
 		Ok(resp)
 	}

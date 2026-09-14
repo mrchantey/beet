@@ -16,6 +16,7 @@ impl Plugin for ServerPlugin {
 		app.init_plugin::<AsyncPlugin>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
+			.register_type::<Listening>()
 			.register_type::<Tls>()
 			// the markup load verb, so an `<HttpServer>` entry, a `{CallOnReady}`
 			// script or behaviour scene resolves it, and its disarm marker.

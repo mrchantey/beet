@@ -144,14 +144,6 @@ async fn serve(page: String) -> Result<u16> {
 	super::wait_for_port().await
 }
 
-/// A uniquely-ported chromium driver, so the check never fights another suite's.
-fn driver() -> Result<Client> {
-	Client::default()
-		.with_driver_port(HttpServer::free_port()?)
-		.with_websocket_port(HttpServer::free_port()?)
-		.xok()
-}
-
 /// Drain the console into `log`, streaming each entry for the person watching.
 fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
 	for entry in console.drain() {
@@ -176,7 +168,7 @@ async fn browser_render_boot() {
 
 	// -- the WebGPU boot claims a canvas and draws --
 	let mut browser = Browser::new_with_opts(
-		driver().unwrap(),
+		Client::unique(),
 		NewSessionOptions::default()
 			.with_disable_gpu(false)
 			// `--use-angle=gl` is load-bearing: chrome's headless Vulkan path
@@ -227,7 +219,7 @@ async fn browser_render_boot() {
 	browser.kill().await.unwrap();
 
 	// -- the GPU-less boot runs but stays surfaceless --
-	let mut browser = Browser::new_with_opts(driver().unwrap(), default())
+	let mut browser = Browser::new_with_opts(Client::unique(), default())
 		.await
 		.unwrap();
 	let console = browser.console().await.unwrap();

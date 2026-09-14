@@ -34,13 +34,14 @@
 //! [`Client::unique`], so harnesses stack freely within one test binary.
 //!
 //! A tree that boots its own listener (a no-code entry declaring
-//! `<HttpServer>`) goes through [`PageHarness::serve_app`] instead, naming the
-//! url its setup will bind.
+//! `<HttpServer>`) goes through [`PageHarness::serve_app`] instead: the harness
+//! learns the url from the first [`Listening`] the served app records.
 
 use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::app::Plugins;
+use core::net::SocketAddr;
 
 /// How long [`PageHarness::serve_app`] waits for the served app's listener,
 /// generous for a debug-build entry that scans its routes before binding.
@@ -74,8 +75,7 @@ impl PageHarness {
 		// leave the process-global loopback port to the app under test: several
 		// harnesses may serve concurrently in one test binary.
 		server.canonical = false;
-		let url = server.local_url();
-		Self::serve_app(url, move |app| {
+		Self::serve_app(move |app| {
 			app.add_plugins(plugins);
 			// the server owns the boot, its dispatch host is the child
 			app.world_mut().spawn((server, on_spawn, children![host]));
@@ -85,39 +85,51 @@ impl PageHarness {
 
 	/// Serve an app of the caller's own making: `setup` runs on the harness
 	/// thread against the baked-in app (`MinimalPlugins` paced + [`ServerPlugin`])
-	/// and must boot a listener at `url`, which is awaited before the browser
-	/// opens. The shape behind [`Self::serve`]; reach for it when the served
-	/// tree boots its own server, eg a no-code entry whose `<HttpServer>`
-	/// declares its port (see [`HttpServer::free_port`]).
+	/// and boots a listener however it likes; the harness reads the url off the
+	/// first [`Listening`] the app records, awaited before the browser opens.
+	/// The shape behind [`Self::serve`]; reach for it when the served tree boots
+	/// its own server, eg a no-code entry declaring `<HttpServer port=0>`.
 	pub async fn serve_app(
-		url: impl Into<String>,
 		setup: impl 'static + Send + FnOnce(&mut App),
 	) -> Result<Self> {
-		let url = url.into();
 		let exit = Store::new(false);
-		let thread = std::thread::spawn(move || {
-			let mut app = App::new();
-			app.add_plugins(MinimalPlugins.set(
-				// a paced loop rather than the default spin: the app only relays
-				// requests, so a millisecond cadence costs latency nobody notices
-				// and spares a test-suite of harnesses burning cores.
-				bevy::app::ScheduleRunnerPlugin::run_loop(
-					Duration::from_millis(1),
-				),
-			))
-			.add_plugins(ServerPlugin)
-			.add_systems(
-				bevy::app::Update,
-				move |mut writer: MessageWriter<AppExit>| {
-					if exit.get() {
-						writer.write(AppExit::Success);
-					}
-				},
-			);
-			setup(&mut app);
-			app.run()
+		let listening = Store::<Option<SocketAddr>>::default();
+		let thread = std::thread::spawn({
+			let listening = listening.clone();
+			move || {
+				let mut app = App::new();
+				app.add_plugins(MinimalPlugins.set(
+					// a paced loop rather than the default spin: the app only relays
+					// requests, so a millisecond cadence costs latency nobody notices
+					// and spares a test-suite of harnesses burning cores.
+					bevy::app::ScheduleRunnerPlugin::run_loop(
+						Duration::from_millis(1),
+					),
+				))
+				.add_plugins(ServerPlugin)
+				.add_systems(
+					bevy::app::Update,
+					move |mut writer: MessageWriter<AppExit>| {
+						if exit.get() {
+							writer.write(AppExit::Success);
+						}
+					},
+				)
+				// the first bind is the harness url; a rebind (a live reload
+				// rebuild on a declared port) lands on the same address.
+				.add_systems(
+					bevy::app::Update,
+					move |bound: Populated<&Listening, Added<Listening>>| {
+						if listening.get().is_none() {
+							listening.set(Some(bound.iter().next().unwrap().0));
+						}
+					},
+				);
+				setup(&mut app);
+				app.run()
+			}
 		});
-		Self::await_listener(&url).await?;
+		let url = Self::await_listening(&listening).await?.local_url();
 		let browser = Browser::new_with(Client::unique()).await?;
 		Self {
 			browser,
@@ -128,19 +140,18 @@ impl PageHarness {
 		.xok()
 	}
 
-	/// Wait for `url`'s listener to accept a connection: a pre-bound listener
-	/// answers at once, a tree booting its own server on its `Ready` a little
-	/// later (its whole entry build first).
-	async fn await_listener(url: &str) -> Result<()> {
-		let addr = Url::parse(url)?
-			.authority()
-			.ok_or_else(|| bevyhow!("harness url `{url}` has no authority"))?
-			.to_string();
+	/// Wait for the served app to record its first [`Listening`]: a pre-bound
+	/// listener answers at once, a tree booting its own server on its `Ready` a
+	/// little later (its whole entry build first).
+	async fn await_listening(
+		listening: &Store<Option<SocketAddr>>,
+	) -> Result<Listening> {
 		poll_ext::poll_async_with(
 			async || {
-				std::net::TcpStream::connect(&addr)
-					.map(|_| ())
-					.map_err(|err| bevyhow!("`{addr}` not listening: {err}"))
+				listening
+					.get()
+					.map(Listening)
+					.ok_or_else(|| bevyhow!("the served app has not bound yet"))
 			},
 			LISTENER_DEADLINE,
 			poll_ext::DEFAULT_INTERVAL,

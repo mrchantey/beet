@@ -28,9 +28,15 @@ pub struct RuleSet {
 /// by its element, so tearing the scene down removes its rules
 /// ([`RuleSet::remove_owned`]) rather than leaving a stale copy behind on every
 /// rebuild; a plugin-registered rule has no owner and lives as long as the world.
+///
+/// The owner is world-local state, skipped by serde and reflect: an entity id
+/// means nothing in another world, and a deserialized rule set is plugin-like,
+/// unowned and living as long as the world.
 #[derive(Debug, Clone, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct RuleEntry {
+	#[reflect(ignore)]
+	#[cfg_attr(feature = "serde", serde(skip))]
 	owner: Option<Entity>,
 	rule: Rule,
 }
@@ -61,28 +67,15 @@ impl RuleSet {
 		true
 	}
 
-	/// Add a new unowned rule, merging with the last added when both its
-	/// selector and `@media` gate match. The media check keeps a
-	/// screen/terminal-gated rule from folding its declarations into an adjacent
-	/// ungated rule with the same selector (eg `.sidebar` + a screen-only
-	/// `.sidebar` width), which would strip the gate and leak the value to every
-	/// target.
+	/// Add a new unowned rule, appended after every rule so far. Rules are
+	/// never merged: cascade order is the semantic, so two rules with one
+	/// selector stay two rules and the later wins a tie, like CSS source order.
 	pub fn insert_rule(&mut self, rule: Rule) { self.insert_owned(None, rule); }
 
 	/// Add a rule declared by `owner` (a markup `<Rule>` element), removed again
-	/// by [`Self::remove_owned`] when that entity goes. Merges like
-	/// [`Self::insert_rule`], but only into a rule of the same owner, so a
-	/// removal never strips declarations another owner contributed.
+	/// by [`Self::remove_owned`] when that entity goes.
 	pub fn insert_owned(&mut self, owner: Option<Entity>, rule: Rule) {
-		if let Some(last) = self.rules.back_mut()
-			&& last.owner == owner
-			&& last.rule.selector() == rule.selector()
-			&& last.rule.media() == rule.media()
-		{
-			last.rule.push_declarations(rule);
-		} else {
-			self.rules.push_back(RuleEntry { owner, rule });
-		}
+		self.rules.push_back(RuleEntry { owner, rule });
 	}
 
 	/// Remove every rule `owner` declared, ie a despawned `<Rule>` element's.
@@ -174,7 +167,7 @@ impl RuleSet {
 		self.with(key, TypedValue::new(value)?)
 	}
 
-	/// Extend with multiple rules, inserting each (merging when selectors match).
+	/// Extend with multiple rules, inserting each in order.
 	pub fn extend_rules(
 		&mut self,
 		rules: impl IntoIterator<Item = Rule>,

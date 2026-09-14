@@ -61,6 +61,10 @@ fn index_md(body: &str) -> String {
 /// A site fixture in a fresh system temp dir. Not under `target/`:
 /// [`LiveReload`]'s default filter excludes that churn, so a fixture there
 /// never reloads.
+///
+/// The entry declares a fixed port rather than `port=0`: a structural edit
+/// rebuilds the scene and its server rebinds, and the browser's origin must
+/// survive that to reconnect.
 struct SiteFixture {
 	dir: TempDir,
 	port: u16,
@@ -90,30 +94,27 @@ impl SiteFixture {
 	/// [`Self::port`] and a structural edit rebuilds the whole scene.
 	async fn serve(&self) -> PageHarness {
 		let dir = self.dir.to_string();
-		let mut page = PageHarness::serve_app(
-			format!("http://127.0.0.1:{}", self.port),
-			move |app| {
-				app.add_plugins((
-					RouterPlugin,
-					material::MaterialStylePlugin::default(),
-				));
-				let formats = app
-					.world_mut()
-					.get_resource_or_init::<TemplateFormats>()
-					.clone();
-				app.world_mut().run_async_local(async move |world| {
-					let ResolvedEntry {
-						repo_store,
-						entry_name,
-						..
-					} = entry_build::resolve_main(None, &dir).await?;
-					entry_build::build_watched(
-						&world, repo_store, entry_name, formats,
-					)
-					.await
-				});
-			},
-		)
+		let mut page = PageHarness::serve_app(move |app| {
+			app.add_plugins((
+				RouterPlugin,
+				material::MaterialStylePlugin::default(),
+			));
+			let formats = app
+				.world_mut()
+				.get_resource_or_init::<TemplateFormats>()
+				.clone();
+			app.world_mut().run_async_local(async move |world| {
+				let ResolvedEntry {
+					repo_store,
+					entry_name,
+					..
+				} = entry_build::resolve_main(None, &dir).await?;
+				entry_build::build_watched(
+					&world, repo_store, entry_name, formats,
+				)
+				.await
+			});
+		})
 		.await
 		.unwrap();
 		// pin the scheme so the theme's tones resolve the same on every host

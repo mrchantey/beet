@@ -54,16 +54,9 @@ impl HttpServer {
 		// build the TLS acceptor (if any) before logging so the printed scheme is real
 		let tls = MaybeTls::resolve(&entity).await?;
 		info!("Server listening on {}://{}", tls.http_scheme(), addr);
-		// register the resolved port as the process loopback port when canonical (the
-		// mini server does the same), so an authority-less request loops back here. An
-		// entity with no `HttpServer` still claims it, matching the `canonical` default.
-		if entity
-			.get::<HttpServer, bool>(|server| server.canonical)
-			.await
-			.unwrap_or(true)
-		{
-			CanonicalPort::set(addr.port());
-		}
+		// the bound address as data on the entity, and the process loopback port
+		// when canonical
+		Listening::register(&entity, addr).await?;
 
 		// race the accept loop against the shutdown signal: signalling drops the loop
 		// future, releasing the listener so the port closes (the mini server pattern).

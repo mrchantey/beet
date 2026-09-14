@@ -56,17 +56,9 @@ impl HttpServer {
 			"Mini HTTP server listening on {}://{addr}",
 			tls.http_scheme()
 		);
-		// register the resolved port as the process loopback port when canonical, so an
-		// authority-less request loops back here (the real port even for `port: 0`). A
-		// listener bound on an entity with no `HttpServer` (eg a bare test router) still
-		// claims it, matching the `canonical` default of `true`.
-		if entity
-			.get::<HttpServer, bool>(|server| server.canonical)
-			.await
-			.unwrap_or(true)
-		{
-			CanonicalPort::set(addr.port());
-		}
+		// the bound address as data on the entity, and the process loopback port
+		// when canonical
+		Listening::register(&entity, addr).await?;
 
 		// race the accept loop against the shutdown signal: when teardown signals,
 		// the loop future is dropped, releasing the listener so the port closes. The
@@ -391,6 +383,45 @@ mod test {
 	// -- integration test via shared suite --
 	// (pure parse/serialise unit tests live with the shared helpers in
 	// `crate::types::http_ext`.)
+
+	/// A bound listener is data on its entity: a `port: 0` server records the
+	/// OS-assigned address as [`Listening`], which is where a harness reads its
+	/// url rather than being told it.
+	#[beet_core::test]
+	async fn records_listening() {
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app
+			.world_mut()
+			.spawn(
+				HttpServer {
+					port: Some(0),
+					canonical: false,
+					..default()
+				}
+				.with_backend(|entity, shutdown| {
+					Box::pin(HttpServer::start_mini(entity, shutdown))
+				}),
+			)
+			.id();
+		super::super::http_server::tests::call_and_park(
+			&mut app,
+			entity,
+			Request::get("/"),
+		);
+		app_ext::update_until_timeout(
+			&mut app,
+			|world| world.entity(entity).contains::<Listening>(),
+			Duration::from_secs(5),
+		)
+		.await
+		.xpect_true();
+		let listening = *app.world().entity(entity).get::<Listening>().unwrap();
+		listening.port().xpect_not_eq(0);
+		listening
+			.local_url()
+			.xpect_eq(format!("http://127.0.0.1:{}", listening.port()));
+	}
 
 	/// A connection ends with its server entity: an idle keep-alive (a browser's
 	/// preconnect) is cancelled by the despawn and its stream dropped, so the

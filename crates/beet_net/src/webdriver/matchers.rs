@@ -1,4 +1,4 @@
-//! Async auto-retrying matchers on [`Page`] and [`Element`].
+//! Async auto-retrying matchers on [`Page`] and [`WebElement`].
 //!
 //! The same `xpect_*` vocabulary and panic semantics as the sync matchers in
 //! `beet_core::testing`, but async and auto-waiting (and, under the `nightly`
@@ -26,8 +26,8 @@
 //! for* absence or mismatch, the `should('not.exist')` shape. Available in
 //! test builds and behind the `testing` feature.
 
-use super::Element;
 use super::Page;
+use super::WebElement;
 use super::locate;
 use beet_core::prelude::*;
 use core::fmt::Display;
@@ -178,7 +178,7 @@ impl Page {
 	}
 }
 
-impl Element {
+impl WebElement {
 	/// The trimmed `textContent`, the value [`Self::xpect_text`] asserts on.
 	async fn text_trimmed(&self) -> Result<String> {
 		self.text_content()
@@ -269,7 +269,7 @@ impl Element {
 	}
 }
 
-impl Element {
+impl WebElement {
 	/// Assert the trimmed `textContent` does not equal `expected`, waiting
 	/// for it to change.
 	#[cfg_attr(feature = "nightly", track_caller)]

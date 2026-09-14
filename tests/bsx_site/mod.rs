@@ -35,9 +35,12 @@ pub async fn build_site(world: &mut World) -> Entity {
 	// binary's entry build does.
 	let root = world.spawn_empty().id();
 	for dir in &prescan.template_dirs {
-		let sources = TemplateDir::read_sources(&store, dir, &formats)
-			.await
-			.unwrap();
+		let sources = TemplateDir::read_sources(
+			&store.with_subdir(dir.clone()),
+			&formats,
+		)
+		.await
+		.unwrap();
 		TemplateDir::register_sources(world, root, &formats, sources).unwrap();
 	}
 	let template = BsxTemplate::parse_entry(world, source).unwrap();

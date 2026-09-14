@@ -4,6 +4,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use bevy::platform::sync::Arc;
 use bevy::platform::sync::OnceLock;
+use core::net::SocketAddr;
 
 /// Boxed server-start function: the no_std-friendly server hook, mirroring
 /// [`HttpSendFn`] on the client side.
@@ -42,6 +43,37 @@ pub type HttpServerBackend = Arc<
 >;
 
 static HTTP_SERVER: OnceLock<HttpServerFn> = OnceLock::new();
+
+/// The address an [`HttpServer`] backend bound, inserted on the server entity
+/// the instant its listener opens and gone with the entity. The bound address
+/// as data: a `port: 0` config resolves here to the OS-assigned port, so a
+/// harness reads the url off the entity rather than being told it.
+#[derive(Debug, Clone, Copy, Deref, Component, Reflect)]
+#[reflect(Component)]
+pub struct Listening(pub SocketAddr);
+
+impl Listening {
+	/// Record a bound listener on its server entity: insert this component and,
+	/// when the server is canonical, claim the process [`CanonicalPort`] (the
+	/// real port even for `port: 0`). An entity with no [`HttpServer`] (eg a bare
+	/// test router) still claims it, matching the `canonical` default of `true`.
+	pub async fn register(entity: &AsyncEntity, addr: SocketAddr) -> Result {
+		if entity
+			.get::<HttpServer, bool>(|server| server.canonical)
+			.await
+			.unwrap_or(true)
+		{
+			CanonicalPort::set(addr.port());
+		}
+		entity.insert(Self(addr)).await
+	}
+
+	/// The loopback url, `http://127.0.0.1:{port}`: a `0.0.0.0` bind answers
+	/// there too, and a `Tls` listener serves loopback plaintext as well.
+	pub fn local_url(&self) -> String {
+		format!("http://127.0.0.1:{}", self.0.port())
+	}
+}
 
 /// HTTP server that listens for incoming requests, dispatching each through its
 /// host's `Request -> Response` action via `entity.exchange`.
@@ -177,7 +209,9 @@ impl HttpServer {
 		self
 	}
 
-	/// Returns the local URL for connecting to this server.
+	/// The loopback url of the *declared* port, `http://127.0.0.1:{port}`. A
+	/// `port: 0` config has no url until it binds: read the entity's
+	/// [`Listening`] for the OS-assigned one.
 	pub fn local_url(&self) -> String {
 		let port = self.port.unwrap_or(0);
 		format!("http://127.0.0.1:{}", port)
@@ -187,7 +221,7 @@ impl HttpServer {
 	/// localhost the default host). The facet applies any `--port` / `--host`
 	/// from the start request onto these fields before the backend reads them, so
 	/// a `--port=8080` overrides a declared `port`.
-	pub fn socket_addr(&self) -> core::net::SocketAddr {
+	pub fn socket_addr(&self) -> SocketAddr {
 		(self.host, self.port.unwrap_or(0)).into()
 	}
 
@@ -274,11 +308,14 @@ mod std_impl {
 
 	impl HttpServer {
 		/// An OS-assigned free port (bind, read, drop), for a server that must
-		/// be told its port up front, eg a markup entry's `<HttpServer port=..>`
-		/// under test, or a driver process. Racy in principle (another process
-		/// may take it before the bind), fine for a runner that owns the
-		/// machine's test run; prefer [`Self::new_test`]'s pre-bound listener
-		/// where the caller can hand one over.
+		/// be told its port up front: a markup entry under test whose
+		/// `<HttpServer port=..>` rebinds on a live-reload rebuild, where a
+		/// `port=0` would move the origin out from under the browser. Racy in
+		/// principle (another process may take it before the bind), fine for a
+		/// runner that owns the machine's test run; prefer [`Self::new_test`]'s
+		/// pre-bound listener where the caller can hand one over, and a plain
+		/// `port: 0` read back through [`Listening`] where the port never
+		/// rebinds.
 		pub fn free_port() -> Result<u16> {
 			std::net::TcpListener::bind("127.0.0.1:0")?
 				.local_addr()?
