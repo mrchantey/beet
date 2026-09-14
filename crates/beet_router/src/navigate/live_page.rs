@@ -17,21 +17,23 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 use bevy::math::UVec2;
 
-/// A live-render host (a "surface"): a [`DoubleBuffer`] plus the [`Portal`] slot
-/// that transcludes the page currently bound to this surface.
+/// A live-render host (a "surface"): the [`Portal`] slot that transcludes the
+/// page currently bound to this surface, plus whatever paints it.
 ///
-/// Spawn one with [`PageHost::bundle`]. A [`Navigator`] co-located on this host calls
-/// [`bind_surface_page`] to point the slot at a built page, so the charcell
-/// pipeline paints it into the buffer. Navigating rebinds the slot and
-/// repaints. Each surface is independent, so many can coexist (one per SSH
-/// session) and show different pages at once.
-#[derive(Component)]
+/// A charcell surface is [`PageHost::bundle`], the slot under a
+/// [`DoubleBuffer`] the charcell pipeline paints into; the browser's
+/// [`DomHost`](crate::prelude::DomHost) is the slot alone, the document being
+/// its paint target. A [`Navigator`] co-located on the host calls
+/// [`bind_surface_page`] to point the slot at a built page; navigating rebinds
+/// the slot and repaints. Each surface is independent, so many can coexist
+/// (one per SSH session) and show different pages at once.
+#[derive(Debug, Default, Clone, Component)]
 pub struct PageHost;
 
-/// The slot entity (a child of the host) whose [`Portal`] transcludes the
+/// The slot entity (a descendant of the host) whose [`Portal`] transcludes the
 /// surface's bound page. Kept distinct from the host so the host's buffer renders
 /// the slot, and the slot's reference can be retargeted without touching the buffer.
-#[derive(Component)]
+#[derive(Debug, Default, Clone, Component)]
 pub struct PageSlot;
 
 impl PageHost {

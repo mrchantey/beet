@@ -26,6 +26,12 @@ pub use live_page::*;
 mod open_link;
 #[cfg(feature = "std")]
 pub use open_link::*;
+// std: the browser's server facet, registered on every target so an entry
+// keeps its shape, booting only in a browser tab.
+#[cfg(feature = "std")]
+mod dom_server;
+#[cfg(feature = "std")]
+pub use dom_server::*;
 // terminal-only: the live-TUI server entry (needs beet_ui StdioTerminal).
 #[cfg(feature = "tui")]
 mod tui_server;

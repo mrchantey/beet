@@ -523,16 +523,22 @@ impl Url {
 		pairs
 			.into_iter()
 			.flat_map(|(key, values)| {
-				values.iter().map(move |value| {
-					let key = percent::encode(key, percent::QUERY_SAFE);
-					match value.is_empty() {
-						true => key,
-						false => format!(
-							"{key}={}",
-							percent::encode(value, percent::QUERY_SAFE)
-						),
-					}
-				})
+				let key = percent::encode(key, percent::QUERY_SAFE);
+				// a key with no value at all (`with_flag`) is the bare flag,
+				// exactly as a key with one empty value renders
+				match values.is_empty() {
+					true => vec![key],
+					false => values
+						.iter()
+						.map(|value| match value.is_empty() {
+							true => key.clone(),
+							false => format!(
+								"{key}={}",
+								percent::encode(value, percent::QUERY_SAFE)
+							),
+						})
+						.collect(),
+				}
 			})
 			.collect::<Vec<_>>()
 			.join("&")
@@ -1171,8 +1177,11 @@ mod test {
 			.with_fragment("top")
 			.to_string()
 			.xpect_eq("https://example.com/api?key=val#top");
-		Url::default()
-			.with_flag("verbose")
+		// a flag renders bare and parses back as one, so it survives the wire
+		let flagged = Url::coerce("/repo").with_flag("verbose");
+		flagged.has_param("verbose").xpect_true();
+		flagged.to_string().xpect_eq("/repo?verbose");
+		Url::coerce(flagged.to_string())
 			.has_param("verbose")
 			.xpect_true();
 		let url: Url = "https://example.com/path".into();

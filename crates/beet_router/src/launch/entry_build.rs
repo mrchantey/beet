@@ -86,14 +86,16 @@ pub async fn resolve_in_repo_store(
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
 /// local directory to watch for dev live reload (`None` when the store has no
 /// local root, ie a self-rooted store). The one launch resolution every
-/// world-owning driver runs: the binary's `Startup` loader and the wasm
-/// Worker, each handing in the `--repo`/`--main` its process config carries.
+/// world-owning driver runs: the binary's `Startup` loader (native, and the
+/// browser the served page boots) and the wasm Worker, each handing in the
+/// `--repo`/`--overlay`/`--main` its process config carries.
 ///
 /// Resolution order:
 /// 1. a self-rooted `repo_uri` (`s3://<bucket>`, `r2://<binding>`,
-///    `indexed-db://<db>`): the store roots itself, so `main` names the entry
-///    document *within* it, defaulting to an [`ENTRY_NAMES`] probe. A deployed
-///    task passes `--repo=s3://<bucket>` (deploy config as args, not env).
+///    `indexed-db://<db>`, `http:<prefix>`): the store roots itself, so `main`
+///    names the entry document *within* it, defaulting to an [`ENTRY_NAMES`]
+///    probe. A deployed task passes `--repo=s3://<bucket>` (deploy config as
+///    args, not env); a served page's bootstrap passes `--repo=http:repo`.
 /// 2. `main=<path>`: the entry file itself (a recognized extension) or a
 ///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs`
@@ -102,20 +104,21 @@ pub async fn resolve_in_repo_store(
 /// Every path then resolves through [`resolve_in_repo_store`], so an entry's
 /// `<RepoRoot src>` declaration rebases any store kind uniformly (an fs store
 /// re-roots, a self-rooted store takes a key-prefix view or fails loudly on a
-/// mis-publish). The [`StoreUri`] selects the backend (default `fs`).
+/// mis-publish). The [`StoreUri`] selects the backend (default `fs`), and an
+/// `overlay` (else [`default_overlay`]) layers a local store over it.
 ///
 /// Target-agnostic: wasm runs the same walk wherever the runtime has a
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
-/// errors with guidance (the browser never reaches here, reading its DOM
-/// program instead).
+/// (a browser tab) errors with guidance when handed a dir-rooted repo.
 pub async fn resolve_entry(
 	repo_uri: Option<&StoreUri>,
+	overlay: Option<&StoreUri>,
 	main: Option<&str>,
 ) -> Result<ResolvedEntry> {
 	// a self-rooted store: no local dir and no ancestor walk, so `main` is a
 	// key within the store, defaulting to the entry-name probe.
 	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
-		let repo_store = BlobStore::from_uri(uri)?;
+		let repo_store = compose_repo_store(uri, overlay)?;
 		let entry_name = self_rooted_entry_name(&repo_store, main).await?;
 		return resolve_in_repo_store(repo_store, entry_name).await;
 	}
@@ -127,13 +130,43 @@ pub async fn resolve_entry(
 	if !js_runtime::environment().has_fs() {
 		bevybail!(
 			"this runtime has no filesystem: pass a self-rooted `--repo` \
-			(s3://<bucket>, r2://<binding>, indexed-db://<db>)"
+			(http:<prefix>, s3://<bucket>, r2://<binding>, indexed-db://<db>)"
 		);
 	}
 	match main {
-		Some(main) => resolve_main(repo_uri, main).await,
-		None => discover_entry(repo_uri).await,
+		Some(main) => resolve_main(repo_uri, overlay, main).await,
+		None => discover_entry(repo_uri, overlay).await,
 	}
+}
+
+/// The overlay a launch naming none gets: a browser reading a remote repo
+/// forks into IndexedDB (`indexed-db://beet/<repo prefix>`, one database per
+/// origin with the repo's own prefix telling its forks apart), so a visitor's
+/// first edit lands locally and every later boot reads it. Every other launch
+/// reads its repo directly: a native process names its fork dir with
+/// `--overlay=fs:<dir>` when it wants one.
+pub fn default_overlay(repo_uri: &StoreUri) -> Option<StoreUri> {
+	#[cfg(target_arch = "wasm32")]
+	if repo_uri.is_remote()
+		&& js_runtime::environment() == js_runtime::JsEnvironment::Browser
+	{
+		return Some(StoreUri::IndexedDb {
+			name: "beet".into(),
+			path_prefix: repo_uri.path_prefix().map(RelPath::new),
+		});
+	}
+	let _ = repo_uri;
+	None
+}
+
+/// The repo store `uri` names with `overlay` (else [`default_overlay`])
+/// layered over it, see [`StoreProvider::compose`].
+fn compose_repo_store(
+	uri: &StoreUri,
+	overlay: Option<&StoreUri>,
+) -> Result<BlobStore> {
+	let default = overlay.is_none().then(|| default_overlay(uri)).flatten();
+	StoreProvider::compose(uri, overlay.or(default.as_ref()))
 }
 
 /// The entry document a self-rooted store serves: `main` when the launch names
@@ -161,13 +194,16 @@ pub async fn self_rooted_entry_name(
 /// API and async, rather than a raw `fs_ext` probe). Discovery is the only place
 /// a filesystem walk makes sense; the matched entry may still rebase its own
 /// root ([`resolve_in_repo_store`]), and no match errors with guidance.
-async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
+async fn discover_entry(
+	repo_uri: Option<&StoreUri>,
+	overlay: Option<&StoreUri>,
+) -> Result<ResolvedEntry> {
 	let start = AbsPath::new(".")?;
 	let mut dir = Some(start.clone());
 	while let Some(current) = dir {
 		let repo_store = BlobStore::new(FsStore::new(current.clone()));
 		if let Some(entry_name) = probe_entry_names(&repo_store).await? {
-			let repo_store = resolve_repo_store(repo_uri, current)?;
+			let repo_store = resolve_repo_store(repo_uri, overlay, current)?;
 			return resolve_in_repo_store(repo_store, entry_name).await;
 		}
 		dir = current.parent();
@@ -182,9 +218,11 @@ async fn discover_entry(repo_uri: Option<&StoreUri>) -> Result<ResolvedEntry> {
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
 /// the entry may rebase its own store root with a `<RepoRoot src>` declaration
-/// (see [`resolve_in_repo_store`]), and the `--repo` param picks the backend.
+/// (see [`resolve_in_repo_store`]), the `--repo` param picks the backend and
+/// `--overlay` layers a local store over it.
 pub async fn resolve_main(
 	repo_uri: Option<&StoreUri>,
+	overlay: Option<&StoreUri>,
 	main: &str,
 ) -> Result<ResolvedEntry> {
 	let path = AbsPath::new(main)?;
@@ -197,10 +235,10 @@ pub async fn resolve_main(
 			.file_name()
 			.ok_or_else(|| bevyhow!("entry `{path}` has no file name"))?
 			.to_string();
-		(resolve_repo_store(repo_uri, dir)?, entry_name)
+		(resolve_repo_store(repo_uri, overlay, dir)?, entry_name)
 	} else {
 		// a directory: probe it for an entry document
-		let repo_store = resolve_repo_store(repo_uri, path.clone())?;
+		let repo_store = resolve_repo_store(repo_uri, overlay, path.clone())?;
 		let entry_name =
 			probe_entry_names(&repo_store).await?.ok_or_else(|| {
 				bevyhow!(
@@ -227,20 +265,19 @@ pub async fn probe_entry_names(
 
 /// Build the [`BlobStore`] a `--repo` [`StoreUri`] names, its filesystem root
 /// pinned to `dir` (the resolved entry directory, see [`StoreUri::rooted_at`])
-/// and defaulting to a filesystem store there. Shared by the binary's entry
-/// resolution (the launch config's `--repo`) and the
-/// `check`/`serve`/`export-static` commands (each command's own `--repo`
-/// param) so every entry load is store-driven rather than filesystem-bound.
+/// and defaulting to a filesystem store there, with the `--overlay` store
+/// (likewise pinned) layered over it. Shared by the binary's entry resolution
+/// (the launch config's `--repo`) and the `check`/`serve`/`export-static`
+/// commands (each command's own `--repo` param) so every entry load is
+/// store-driven rather than filesystem-bound.
 pub fn resolve_repo_store(
 	repo_uri: Option<&StoreUri>,
+	overlay: Option<&StoreUri>,
 	dir: AbsPath,
 ) -> Result<BlobStore> {
-	repo_uri
-		.cloned()
-		.unwrap_or_default()
-		.rooted_at(&dir)
-		.xref()
-		.xmap(BlobStore::from_uri)
+	let repo = repo_uri.cloned().unwrap_or_default().rooted_at(&dir);
+	let overlay = overlay.map(|overlay| overlay.rooted_at(&dir));
+	compose_repo_store(&repo, overlay.as_ref())
 }
 
 /// The entry sources read from a store: the entry document bytes + name, its
@@ -625,28 +662,6 @@ fn entry_source_paths(
 	includes.into_iter().chain(instantiated).collect()
 }
 
-/// Build an entry from in-memory BSX text rather than a store read: the browser
-/// path, where the program is inlined in a `<script type="application/x-bsx">`, not
-/// resolved from `--main`/a filesystem. Constructs [`EntrySources`] directly and
-/// builds onto an in-memory ([`BlobStore::temp`]) repo store, so the same
-/// [`build_root`] core runs as the store-backed native path.
-pub fn build_from_bsx(
-	world: &mut World,
-	formats: TemplateFormats,
-	entry_name: impl Into<String>,
-	bsx: impl Into<String>,
-) -> Result<Entity> {
-	let entry = MediaBytes::new_bsx(bsx.into());
-	let sources = EntrySources {
-		entry_name: entry_name.into(),
-		prescan: EntryPrescan::parse(&entry)?,
-		entry,
-		template_sources: Vec::new(),
-		formats,
-	};
-	build_root(world, BlobStore::temp(), sources, RepoStore)
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -720,7 +735,8 @@ mod test {
 			"<Router><RepoRoot src=\"..\"/></Router>",
 		)
 		.unwrap();
-		let resolved = resolve_main(None, entry_dir.as_str()).await.unwrap();
+		let resolved =
+			resolve_main(None, None, entry_dir.as_str()).await.unwrap();
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
@@ -792,9 +808,10 @@ mod test {
 			"<Router><RepoRoot src=\".\"/></Router>",
 		)
 		.unwrap();
-		let by_path = resolve_main(None, tmp.path().as_str()).await.unwrap();
+		let by_path =
+			resolve_main(None, None, tmp.path().as_str()).await.unwrap();
 		let by_store = resolve_in_repo_store(
-			resolve_repo_store(None, tmp.path().clone()).unwrap(),
+			resolve_repo_store(None, None, tmp.path().clone()).unwrap(),
 			"main.bsx".to_string(),
 		)
 		.await
@@ -807,10 +824,53 @@ mod test {
 		by_path.watch_dir.xpect_eq(by_store.watch_dir);
 	}
 
+	/// An overlay layers over the resolved repo: a launch on a remote repo
+	/// with `--overlay` composes the pair, reading the entry through the
+	/// upstream and holding the fork locally, on a self-rooted repo and on a
+	/// dir-rooted one alike.
+	#[beet_core::test]
+	async fn an_overlay_composes_over_the_repo() {
+		let upstream = StoreUri::parse("memory://overlay-upstream").unwrap();
+		let local = StoreUri::parse("memory://overlay-local").unwrap();
+		let seeded = BlobStore::from_uri(&upstream).unwrap();
+		seeded
+			.insert(&RelPath::from("main.bsx"), "<Router/>")
+			.await
+			.unwrap();
+		let resolved = resolve_entry(Some(&upstream), Some(&local), None)
+			.await
+			.unwrap();
+		resolved.entry_name.xpect_eq("main.bsx");
+		resolved.repo_store.id().xpect_eq("overlay");
+		resolved
+			.repo_store
+			.insert(&RelPath::from("fork.json"), "{}")
+			.await
+			.unwrap();
+		BlobStore::from_uri(&local)
+			.unwrap()
+			.exists(&RelPath::from("fork.json"))
+			.await
+			.unwrap()
+			.xpect_true();
+		seeded
+			.exists(&RelPath::from("fork.json"))
+			.await
+			.unwrap()
+			.xpect_false();
+		// no overlay natively: the repo is read directly
+		resolve_entry(Some(&upstream), None, None)
+			.await
+			.unwrap()
+			.repo_store
+			.id()
+			.xpect_eq("memory");
+	}
+
 	/// Every `--watch` rebuild fires a fresh [`Ready`] on its fresh entry root,
 	/// so a rebuilt tree boots exactly as the first one did: nothing is retained
 	/// between builds.
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn rebuild_fires_ready_every_time() {
 		let repo_store = BlobStore::temp();

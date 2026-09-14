@@ -17,6 +17,12 @@ pub(crate) const STORE_PATH_PARAM: &str = "store_path";
 /// [`DirPath`] scoping the inherited store (which is exactly [`AssetsDir`]), or
 /// co-locate a store of its own. The greedy trailing capture and the
 /// request/response adapter are private details ServeBlobs inserts for itself.
+///
+/// The mount is also a store another process reads: `<ServeBlobs prefix="repo"/>`
+/// publishes a site's repo store, and an `HttpStore` at `/repo` (a browser the
+/// site's page boots, a terminal pulling the site) reads it key for key. Its
+/// listing rides the same route under `json`: `GET /repo/docs?list` answers the
+/// keys under `docs` as a JSON array, relative to it.
 #[template]
 pub fn ServeBlobs(
 	/// The mount path the static files are served under, eg `assets`.
@@ -68,9 +74,30 @@ pub(crate) async fn ServeBlobsHandler(
 		.get_params(STORE_PATH_PARAM)
 		.map(|segments| RelPath::from_segments(segments))
 		.unwrap_or_else(|| RelPath::from(cx.input.path()));
+	// the listing endpoint an `HttpStore` reads the mount's keys through
+	#[cfg(feature = "json")]
+	if cx.input.has_param(HttpStore::LIST_PARAM) {
+		return list_blobs(&store, &path).await;
+	}
 	serve_blob(&store, &path)
 		.await
 		.map_err(|err| unhydrated_hint(&cx.input, err))
+}
+
+/// The keys under `path` as a JSON array, relative to it: the mount's root
+/// lists every key, a subdir the keys beneath it.
+#[cfg(feature = "json")]
+async fn list_blobs(store: &BlobStore, path: &RelPath) -> Result<Response> {
+	match path.as_str().is_empty() {
+		true => store.list().await?,
+		false => store.with_subdir(path.clone()).list().await?,
+	}
+	.xmap(|mut keys| {
+		keys.sort();
+		keys
+	})
+	.xref()
+	.xmap(Response::ok_json)
 }
 
 /// The request path segment whose misses earn the unhydrated-store hint.
@@ -261,6 +288,109 @@ mod test {
 			.unwrap()
 			.xnot()
 			.xpect_contains("may need a pull");
+	}
+
+	/// `?list` answers the keys under the requested path as json, relative to
+	/// it, so an `HttpStore` on the mount lists the store it publishes.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn lists_keys_as_json() {
+		let store = BlobStore::temp();
+		for path in ["main.bsx", "docs/a.md", "docs/b/c.md"] {
+			store.insert(&RelPath::from(path), "x").await.unwrap();
+		}
+		let mut world = router_world();
+		let root = world
+			.spawn((Router::with_defaults(), store, children![serve_route(
+				"repo"
+			)]))
+			.flush();
+		let mut list = async |path: &str| -> Vec<RelPath> {
+			world
+				.entity_mut(root)
+				.exchange(
+					Request::get(path).with_param(HttpStore::LIST_PARAM, ""),
+				)
+				.await
+				.json()
+				.await
+				.unwrap()
+		};
+		list("repo").await.xpect_eq(vec![
+			RelPath::new("docs/a.md"),
+			RelPath::new("docs/b/c.md"),
+			RelPath::new("main.bsx"),
+		]);
+		list("repo/docs")
+			.await
+			.xpect_eq(vec![RelPath::new("a.md"), RelPath::new("b/c.md")]);
+	}
+
+	/// The mount read back through an [`HttpStore`] over a real listener: a
+	/// key reads, a listing lists (the root and a subdir), and a missing key is
+	/// absent rather than an error, the miss `SceneBlob` decides a first boot
+	/// on.
+	#[cfg(all(
+		feature = "json",
+		feature = "http",
+		not(target_arch = "wasm32")
+	))]
+	#[beet_core::test]
+	async fn an_http_store_reads_the_mount() {
+		let store = BlobStore::temp();
+		for (path, body) in [
+			("main.bsx", "<Router/>"),
+			("docs/a.md", "# a"),
+			("docs/b/c.md", "# c"),
+		] {
+			store.insert(&RelPath::from(path), body).await.unwrap();
+		}
+		let (mut server, on_spawn) =
+			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		// leave the process-global loopback port to whoever owns it
+		server.canonical = false;
+		let url = server.local_url();
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, RouterPlugin))
+				.spawn((server, on_spawn, store, children![(
+					Router::default(),
+					children![serve_route("repo")]
+				)]))
+				.run();
+		});
+		let http = BlobStore::new(HttpStore::new(format!("{url}/repo")));
+		http.get_media(&RelPath::from("main.bsx"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xpect_eq("<Router/>");
+		http.exists(&RelPath::from("docs/a.md"))
+			.await
+			.unwrap()
+			.xpect_true();
+		http.exists(&RelPath::from("missing.md"))
+			.await
+			.unwrap()
+			.xpect_false();
+		http.get(&RelPath::from("missing.md"))
+			.await
+			.unwrap_err()
+			.downcast_ref::<HttpError>()
+			.unwrap()
+			.status_code
+			.xpect_eq(StatusCode::NOT_FOUND);
+		http.list().await.unwrap().xpect_eq(vec![
+			RelPath::new("docs/a.md"),
+			RelPath::new("docs/b/c.md"),
+			RelPath::new("main.bsx"),
+		]);
+		http.with_subdir(RelPath::new("docs"))
+			.list()
+			.await
+			.unwrap()
+			.xpect_eq(vec![RelPath::new("a.md"), RelPath::new("b/c.md")]);
 	}
 
 	/// An extensionless path serves `<path>/index.html`, the static-host fallback.

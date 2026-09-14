@@ -6,8 +6,8 @@ console - that lives on `/debug`.
 
 The `<video id="webcam">` is declared here (not created in wasm) so `take-photo` just
 reads it; it is kept live but visually hidden (a 2px transparent element, not
-`display:none`, so it keeps decoding frames). `<MainBsx>` references the head program
-(`head.bsx`, which spawns `<WebHead>`); `<Wasm>` boots the `web_head` binary that runs it.
+`display:none`, so it keeps decoding frames). `<Wasm repo main>` boots the `web_head`
+binary with the head entry (`head.bsx`, which spawns `<WebHead>`) as its launch.
 -->
 <HtmlDocument>
 	<Fragment slot="head">
@@ -21,6 +21,5 @@ reads it; it is kept live but visually hidden (a 2px transparent element, not
 	</Fragment>
 	<img id="face" src="/assets/extra/perceive-act/explorer/images/calm.png" alt="the robot's face"/>
 	<video id="webcam" autoplay muted playsinline/>
-	<MainBsx src="/examples/perceive_act/head/head.bsx"/>
-	<Wasm src="/assets/wasm/beet-full.wasm"/>
+	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/perceive_act/head" main="head.bsx"/>
 </HtmlDocument>

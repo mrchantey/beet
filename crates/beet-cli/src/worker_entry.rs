@@ -118,9 +118,12 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 		.map(|loaded| loaded.version != current_version)
 		.unwrap_or(true);
 	if stale {
-		let resolved =
-			entry_build::resolve_entry(Some(repo_uri), config.main.as_deref())
-				.await?;
+		let resolved = entry_build::resolve_entry(
+			Some(repo_uri),
+			config.overlay.as_ref(),
+			config.main.as_deref(),
+		)
+		.await?;
 		worker_world =
 			Some(build_worker_world(resolved, current_version).await?);
 	}

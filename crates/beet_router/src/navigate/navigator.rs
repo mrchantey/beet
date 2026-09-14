@@ -174,6 +174,13 @@ impl Navigator {
 		}
 	}
 
+	/// The media types this navigator accepts, in preference order: the web
+	/// surface negotiates html where the terminal's default asks for text.
+	pub fn with_accepts(mut self, accepts: Vec<MediaType>) -> Self {
+		self.accepts = accepts;
+		self
+	}
+
 	/// The transport this navigator uses to reach pages.
 	pub fn transport(&self) -> &NavigatorTransport { &self.transport }
 

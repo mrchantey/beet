@@ -42,6 +42,12 @@ use core::str::FromStr;
 /// 6. `r2://<binding>[/<path_prefix>]`: a Cloudflare R2 bucket reached through the
 ///    Worker's binding of that name (a Worker), not the S3-compatible API,
 ///    which is an `s3://<bucket>?endpoint=..` uri.
+/// 7. `http://<host>[:port][/<path_prefix>]` / `https://..` / `http:[<path_prefix>]`:
+///    a store published over http (a site's `<ServeBlobs prefix="repo"/>`),
+///    read-only. The scheme-only form is origin-relative, the `fs:<path>` of
+///    the web: a browser reads it against `location.origin`, a native process
+///    against its canonical loopback server. A process forks a remote repo
+///    into a local `--overlay` store rather than writing to it.
 ///
 /// ## Example
 ///
@@ -115,6 +121,15 @@ pub enum StoreUri {
 		/// The key prefix the store roots at.
 		path_prefix: Option<RelPath>,
 	},
+	/// A store published over http, read-only.
+	Http {
+		/// The origin it is served from, ie `https://beet.org`; `None` for the
+		/// page's own origin in a browser, the canonical loopback server
+		/// natively.
+		origin: Option<SmolStr>,
+		/// The url path prefix the store roots at.
+		path_prefix: Option<RelPath>,
+	},
 }
 
 impl Default for StoreUri {
@@ -128,6 +143,8 @@ const DYNAMO_SCHEME: &str = "dynamo";
 const LOCAL_STORAGE_SCHEME: &str = "local-storage";
 const INDEXED_DB_SCHEME: &str = "indexed-db";
 const R2_SCHEME: &str = "r2";
+const HTTP_SCHEME: &str = "http";
+const HTTPS_SCHEME: &str = "https";
 
 impl StoreUri {
 	/// Parse a store uri, erroring with the supported list on an unknown kind.
@@ -143,8 +160,20 @@ impl StoreUri {
 			}
 			.xok();
 		}
+		// `http:` and `http:/` are the origin itself, ie a bare `http`
+		if let Some(path) = value.strip_prefix("http:") {
+			return Self::Http {
+				origin: None,
+				path_prefix: RelPath::new(path.trim()).xmap(non_empty),
+			}
+			.xok();
+		}
 		match value {
 			"fs" => Self::Fs { path_prefix: None },
+			"http" => Self::Http {
+				origin: None,
+				path_prefix: None,
+			},
 			other => bevybail!(
 				"unknown store `{other}`, supported kinds: fs, fs:<path>, \
 				memory://<name>[/<path_prefix>], \
@@ -152,10 +181,28 @@ impl StoreUri {
 				dynamo://<table>[/<path_prefix>][?region=..], \
 				local-storage://<store>[/<path_prefix>] (wasm), \
 				indexed-db://<db>[/<path_prefix>] (wasm), \
-				r2://<binding>[/<path_prefix>] (cloudflare worker)"
+				r2://<binding>[/<path_prefix>] (cloudflare worker), \
+				http://<host>[/<path_prefix>], https://.., http:<path_prefix>"
 			),
 		}
 		.xok()
+	}
+
+	/// The http store `url` names: its authority is the origin (absent, the
+	/// page's own) and its path the prefix. How a page spells the repo its
+	/// browser process reads, `<Wasm repo="/repo"/>`.
+	pub fn http(url: &Url) -> Self {
+		Self::Http {
+			origin: url.authority().map(|authority| {
+				let scheme = match url.scheme() {
+					Scheme::None => HTTP_SCHEME,
+					Scheme::Https => HTTPS_SCHEME,
+					_ => HTTP_SCHEME,
+				};
+				format!("{scheme}://{authority}").into()
+			}),
+			path_prefix: RelPath::from_segments(url.path()).xmap(non_empty),
+		}
 	}
 
 	/// Parse a `<scheme>://<name>[/<path_prefix>][?<params>]` uri, the shape every
@@ -208,17 +255,25 @@ impl StoreUri {
 					path_prefix: tail.path_prefix,
 				}
 			}
+			HTTP_SCHEME | HTTPS_SCHEME => {
+				let tail = ScopedTail::parse(scheme, rest, &[])?;
+				Self::Http {
+					origin: Some(format!("{scheme}://{}", tail.name).into()),
+					path_prefix: tail.path_prefix,
+				}
+			}
 			other => bevybail!(
 				"unknown store scheme `{other}://`, supported: memory, s3, \
-				dynamo, local-storage, indexed-db, r2"
+				dynamo, local-storage, indexed-db, r2, http, https"
 			),
 		}
 		.xok()
 	}
 
 	/// The backing this uri names: a memory backing, a bucket, a table, a
-	/// browser database, a Worker binding. `None` for a filesystem store,
-	/// whose root is its [`path_prefix`](Self::path_prefix).
+	/// browser database, a Worker binding, an http origin. `None` for a
+	/// filesystem store, whose root is its [`path_prefix`](Self::path_prefix),
+	/// and for an origin-relative http store, whose origin is the context's.
 	pub fn name(&self) -> Option<&str> {
 		match self {
 			Self::Fs { .. } => None,
@@ -228,6 +283,7 @@ impl StoreUri {
 			| Self::LocalStorage { name, .. }
 			| Self::IndexedDb { name, .. }
 			| Self::R2 { name, .. } => Some(name.as_str()),
+			Self::Http { origin, .. } => origin.as_deref(),
 		}
 	}
 
@@ -242,15 +298,21 @@ impl StoreUri {
 			| Self::Dynamo { path_prefix, .. }
 			| Self::LocalStorage { path_prefix, .. }
 			| Self::IndexedDb { path_prefix, .. }
-			| Self::R2 { path_prefix, .. } => path_prefix.as_deref(),
+			| Self::R2 { path_prefix, .. }
+			| Self::Http { path_prefix, .. } => path_prefix.as_deref(),
 		}
 	}
 
-	/// Whether this store roots itself (a named memory store, a bucket, a table
-	/// or browser storage), needing no local directory or filesystem walk. For
-	/// these an entry name addresses the document *within* the store and there
-	/// is no live-reload watch dir.
+	/// Whether this store roots itself (a named memory store, a bucket, a table,
+	/// browser storage or an http origin), needing no local directory or
+	/// filesystem walk. For these an entry name addresses the document *within*
+	/// the store and there is no live-reload watch dir.
 	pub fn is_self_rooted(&self) -> bool { !matches!(self, Self::Fs { .. }) }
+
+	/// Whether this store is read through the network rather than owned by the
+	/// process: a process on such a repo forks its edits into an overlay store
+	/// (`--overlay`) rather than writing back.
+	pub fn is_remote(&self) -> bool { matches!(self, Self::Http { .. }) }
 
 	/// This store rooted at `subdir` below its current root, the uri form of
 	/// `BlobStore::with_subdir`: every kind nests `subdir` under its path
@@ -307,6 +369,13 @@ impl StoreUri {
 			},
 			Self::R2 { name, path_prefix } => Self::R2 {
 				name: name.clone(),
+				path_prefix: nest(path_prefix),
+			},
+			Self::Http {
+				origin,
+				path_prefix,
+			} => Self::Http {
+				origin: origin.clone(),
 				path_prefix: nest(path_prefix),
 			},
 		}
@@ -437,6 +506,21 @@ impl fmt::Display for StoreUri {
 			Self::R2 { name, path_prefix } => {
 				fmt_scoped(f, R2_SCHEME, name, path_prefix, &[])
 			}
+			// an origin carries its own scheme, `https://beet.org`
+			Self::Http {
+				origin: Some(origin),
+				path_prefix,
+			} => match path_prefix {
+				Some(path_prefix) => write!(f, "{origin}/{path_prefix}"),
+				None => write!(f, "{origin}"),
+			},
+			Self::Http {
+				origin: None,
+				path_prefix,
+			} => match path_prefix {
+				Some(path_prefix) => write!(f, "http:{path_prefix}"),
+				None => write!(f, "http"),
+			},
 		}
 	}
 }
@@ -492,6 +576,12 @@ mod test {
 			"s3://my-bucket?region=us-east-1",
 			"s3://my-bucket?endpoint=https://acc.r2.cloudflarestorage.com",
 			"s3://my-bucket?endpoint=https://acc.r2.cloudflarestorage.com&region=auto",
+			"http",
+			"http:repo",
+			"http:examples/wasm",
+			"http://127.0.0.1:8337/repo",
+			"https://beet.org",
+			"https://beet.org/repo",
 		] {
 			StoreUri::parse(uri).unwrap().to_string().xpect_eq(uri);
 		}
@@ -544,6 +634,40 @@ mod test {
 				name: "SITE_BUCKET".into(),
 				path_prefix: Some("p".into()),
 			});
+		StoreUri::parse("https://beet.org/repo").unwrap().xpect_eq(
+			StoreUri::Http {
+				origin: Some("https://beet.org".into()),
+				path_prefix: Some("repo".into()),
+			},
+		);
+		// the origin-relative spellings all root at the page's own origin
+		for uri in ["http", "http:", "http:/"] {
+			StoreUri::parse(uri).unwrap().xpect_eq(StoreUri::Http {
+				origin: None,
+				path_prefix: None,
+			});
+		}
+		StoreUri::parse("http:/repo")
+			.unwrap()
+			.xpect_eq(StoreUri::Http {
+				origin: None,
+				path_prefix: Some("repo".into()),
+			});
+	}
+
+	/// A page names its repo as a url: an authority is the origin, a bare
+	/// path the page's own.
+	#[crate::test]
+	fn http_from_url() {
+		StoreUri::http(&Url::coerce("/examples/wasm"))
+			.to_string()
+			.xpect_eq("http:examples/wasm");
+		StoreUri::http(&Url::coerce("https://beet.org/repo/"))
+			.to_string()
+			.xpect_eq("https://beet.org/repo");
+		StoreUri::http(&Url::coerce("/"))
+			.to_string()
+			.xpect_eq("http");
 	}
 
 	/// Every kind answers `name()`/`path_prefix()` uniformly: a filesystem
@@ -570,6 +694,9 @@ mod test {
 			.xpect_eq((Some("s".into()), Some("p".into())));
 		parts("indexed-db://d").xpect_eq((Some("d".into()), None));
 		parts("r2://B/p").xpect_eq((Some("B".into()), Some("p".into())));
+		parts("https://beet.org/repo")
+			.xpect_eq((Some("https://beet.org".into()), Some("repo".into())));
+		parts("http:repo").xpect_eq((None, Some("repo".into())));
 	}
 
 	/// A scoped path prefix is a key: the text is cleaned, a leading or
@@ -604,12 +731,20 @@ mod test {
 			"local-storage://s",
 			"indexed-db://d",
 			"r2://B",
+			"http:repo",
+			"https://beet.org/repo",
 		] {
 			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_true();
 		}
 		for uri in ["fs", "fs:site"] {
 			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_false();
 		}
+		// only the http kinds are remote
+		StoreUri::parse("http:repo")
+			.unwrap()
+			.is_remote()
+			.xpect_true();
+		StoreUri::parse("s3://b").unwrap().is_remote().xpect_false();
 	}
 
 	#[crate::test]
@@ -674,6 +809,9 @@ mod test {
 			.xpect_eq("indexed-db://d/analytics");
 		nested("local-storage://s/a", "b").xpect_eq("local-storage://s/a/b");
 		nested("r2://B", "v1").xpect_eq("r2://B/v1");
+		nested("http", "repo").xpect_eq("http:repo");
+		nested("https://beet.org/repo", "v1")
+			.xpect_eq("https://beet.org/repo/v1");
 	}
 
 	/// Pinning a context dir resolves the filesystem kinds and leaves every
@@ -691,5 +829,6 @@ mod test {
 		rooted("s3://b").xpect_eq("s3://b");
 		rooted("memory://m").xpect_eq("memory://m");
 		rooted("r2://B/p").xpect_eq("r2://B/p");
+		rooted("http:repo").xpect_eq("http:repo");
 	}
 }

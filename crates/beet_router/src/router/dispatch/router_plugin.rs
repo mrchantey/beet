@@ -208,10 +208,9 @@ impl Plugin for RouterPlugin {
 				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
 				// `ServeBlobs` scoped to a subdir of the inherited store.
 				.register_template::<AssetsDir>()
-				// the browser-wasm page templates: the module loader and the program
-				// reference a served page boots a wasm `beet` binary with.
-				.register_template::<Wasm>()
-				.register_template::<MainBsx>();
+				// the browser-wasm page template: the module loader plus the launch
+				// a served page boots a wasm `beet` binary with.
+				.register_template::<Wasm>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `Router::with_defaults` wires the
@@ -252,6 +251,11 @@ impl Plugin for RouterPlugin {
 			// against the nearest ancestor `BlobStore`), into the BSX tag seam.
 			#[cfg(all(feature = "bsx", feature = "template_serde"))]
 			register_template_include(app.world_mut());
+			// the browser's server, declarable beside the others
+			// (`<CallOnReady {(HttpServer, TuiServer, DomServer, ..)}>`) on every
+			// target so an entry keeps its shape; its facet boots the DOM host
+			// when the start walk selects `dom`, in a browser tab only.
+			app.register_type::<DomServer>();
 			// the live-TUI server, declarable in a router markup spread
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
 			// terminal app when the start walk selects `tui`.

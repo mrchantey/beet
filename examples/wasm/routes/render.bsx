@@ -15,7 +15,7 @@ below proves.
 
 Structurally identical to `/` (a full `<HtmlDocument>`, `<RenderConsole>` before
 `<Wasm>` so the console wrap installs first), differing only in which artifact and
-which program it names.
+which entry it names.
 -->
 <HtmlDocument>
 	<Fragment slot="head">
@@ -41,6 +41,5 @@ which program it names.
 	     otherwise create one appended to `body`. -->
 	<canvas id="beet-canvas"></canvas>
 	<RenderConsole/>
-	<MainBsx src="/examples/spatial/scene_3d.bsx"/>
-	<Wasm src="/assets/wasm/beet-render.wasm"/>
+	<Wasm src="/assets/wasm/beet-render.wasm" repo="/examples/spatial" main="scene_3d.bsx"/>
 </HtmlDocument>

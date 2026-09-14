@@ -10,6 +10,7 @@
 //! neither `hyper` nor `lambda` features are active.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bytes::Bytes;
 use std::io::Write;
 use std::net::SocketAddr;
 
@@ -207,6 +208,7 @@ where
 	// address so a router middleware (eg analytics) can read the client address.
 	let request = http_ext::parse_http_request(&buf)?
 		.with_header_raw(PEER_ADDR_HEADER, &peer_addr.to_string());
+	let is_head = request.method() == &HttpMethod::Head;
 
 	// Dispatch through the router child
 	let response: Response = entity.exchange_child(request).await;
@@ -220,6 +222,12 @@ where
 	}
 
 	let (parts, body) = response.into_parts();
+	// a HEAD is a GET whose body is dropped: the route answered as for a GET,
+	// and a body on the wire would corrupt the client's parse
+	let body = match is_head {
+		true => Body::Bytes(Bytes::new()),
+		false => body,
+	};
 
 	match body {
 		Body::Bytes(bytes) => {

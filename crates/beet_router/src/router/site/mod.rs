@@ -29,10 +29,10 @@ mod syndication;
 // async runtime that `bsx` (→ `std`) pulls in (the same one `RoutesDir` uses).
 #[cfg(all(feature = "bsx", feature = "template_serde"))]
 mod template_include;
-// the browser-wasm page templates `<Wasm>` + `<MainBsx>`: serve-side, building a
-// page that boots a wasm `beet` binary and references its `.bsx` program. Plain
-// synchronous templates, so they render inside a route's content (std-gated like
-// the rest of the render pipeline).
+// the browser-wasm page template `<Wasm>`: serve-side, building a page that
+// boots a wasm `beet` binary with the launch it names. A plain synchronous
+// template, so it renders inside a route's content (std-gated like the rest of
+// the render pipeline).
 #[cfg(feature = "std")]
 mod wasm;
 

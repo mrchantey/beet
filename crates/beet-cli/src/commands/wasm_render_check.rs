@@ -1,8 +1,8 @@
 //! The committed page-driving check for the browser render boot, the durable
 //! form of the throwaway script that verified the wasm render work: serves the
-//! built `beet-render.wasm` at a page generated through the real `<Wasm>` /
-//! `<MainBsx>` templates, boots it in headless chromium through the in-house
-//! webdriver, and asserts both sides of the canvas design:
+//! built `beet-render.wasm` at a page generated through the real `<Wasm>`
+//! template, boots it in headless chromium through the in-house webdriver, and
+//! asserts both sides of the canvas design:
 //!
 //! - the WebGPU boot (chrome granted an adapter via `--enable-unsafe-webgpu
 //!   --use-angle=gl`, a SwiftShader device in headless CI) claims a canvas,
@@ -17,11 +17,14 @@
 //! just check-wasm-render   # this check (needs chromedriver + a chromium)
 //! ```
 
+use super::browser_check::*;
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
-/// The program the page runs: the smallest windowed wgpu scene.
-const SCENE_SRC: &str = "/examples/spatial/scene_3d.bsx";
+/// The entry the page boots: the smallest windowed wgpu scene, within the
+/// served examples tree.
+const SCENE_REPO: &str = "/examples/spatial";
+const SCENE_MAIN: &str = "scene_3d.bsx";
 /// The artifact under test, built by `just build-wasm-render`.
 const WASM_SRC: &str = "/assets/wasm/beet-render.wasm";
 
@@ -53,118 +56,19 @@ const PIXEL_PROBE: &str = r#"(() => {
 	});
 })()"#;
 
-/// The check page, rendered through the real templates so the loader contract
+/// The check page, rendered through the real template so the loader contract
 /// under test is the one the served `/render` page uses. No canvas is supplied,
 /// exercising the created-and-appended path (`/render` covers page-supplied).
 fn render_page() -> Result<String> {
-	let mut world = (AsyncPlugin, RouterPlugin).into_world();
-	let root = world
-		.spawn(children![
-			MainBsx {
-				src: SCENE_SRC.into(),
-			}
-			.into_snippet_bundle(),
-			Wasm {
-				src: WASM_SRC.into(),
-				js: default(),
-			}
-			.into_snippet_bundle(),
-		])
-		.flush();
-	let body = HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, &mut world))?
-		.to_string();
-	format!(
-		"<!doctype html>\n<html><head><meta charset=\"utf-8\"/></head><body>{body}</body></html>"
-	)
-	.xok()
-}
-
-/// Serve the check page at `/` plus the workspace's `assets/` and `examples/`
-/// on an ephemeral in-process `HttpServer` (its own app thread, mirroring
-/// `run_wasm_browser`'s server shape), returning the bound port.
-async fn serve(page: String) -> Result<u16> {
-	let check_dir = AbsPath::new_workspace_rel("target/wasm-render-check")?;
-	fs_ext::write(check_dir.join("index.html"), &page)?;
-	let workspace = FsStore::new(AbsPath::new_workspace_rel("")?);
-	let page_store = FsStore::new(check_dir);
-	std::thread::spawn(move || {
-		let mut app = App::new();
-		// RouterPlugin pulls ServerPlugin itself
-		app.add_plugins((MinimalPlugins, AsyncPlugin, RouterPlugin));
-		let root = app
-			.world_mut()
-			.spawn((
-				HttpServer {
-					port: Some(0),
-					..default()
-				},
-				workspace,
-				children![(Router::default(), children![
-					// the page rides its own static mount (a root greedy mount
-					// cannot mix with the static `assets`/`examples` prefixes);
-					// the extensionless rule resolves `/page` to `index.html`
-					(
-						ServeBlobs {
-							prefix: "page".into(),
-							cache: default(),
-						}
-						.into_snippet_bundle(),
-						page_store
-					),
-					// the artifact and the scene program, from the ancestor
-					// workspace store
-					AssetsDir {
-						src: "assets".into(),
-						prefix: default(),
-						cache: default(),
-					}
-					.into_snippet_bundle(),
-					AssetsDir {
-						src: "examples".into(),
-						prefix: default(),
-						cache: default(),
-					}
-					.into_snippet_bundle(),
-				],)],
-			))
-			.id();
-		app.world_mut().entity_mut(root).run_async_local(
-			move |server| async move {
-				server
-					.call::<Request, Response>(Request::from_cli_str(
-						"--server=http",
-					))
-					.await?;
-				Ok(())
-			},
-		);
-		app.run();
-	});
-	super::wait_for_port().await
-}
-
-/// Drain the console into `log`, streaming each entry for the person watching.
-fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
-	for entry in console.drain() {
-		cross_log!("{}", entry.text);
-		log.push_str(&entry.text);
-		log.push('\n');
-	}
+	wasm_page(rsx! { <Wasm src=WASM_SRC repo=SCENE_REPO main=SCENE_MAIN/> })
 }
 
 #[beet::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-render` + chromedriver"]
 async fn browser_render_boot() {
-	if !AbsPath::new_workspace_rel("assets/wasm/beet-render.wasm")
-		.and_then(fs_ext::exists)
-		.unwrap_or_default()
-	{
-		panic!("missing artifact, run `just build-wasm-render`");
-	}
-
-	let port = serve(render_page().unwrap()).await.unwrap();
-	let url = format!("http://127.0.0.1:{port}/page");
+	require_artifact("assets/wasm/beet-render.wasm", "just build-wasm-render");
+	let port = serve_wasm_page(render_page().unwrap()).await.unwrap();
+	let url = format!("http://127.0.0.1:{port}/");
 
 	// -- the WebGPU boot claims a canvas and draws --
 	let mut browser = Browser::new_with_opts(

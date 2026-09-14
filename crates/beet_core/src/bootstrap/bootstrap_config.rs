@@ -20,7 +20,7 @@ use core::str::FromStr;
 ///
 /// It is **not** a params parser. A route reading one flag off its request reads
 /// that flag (a `ParamsPartial` params type, so `--help` documents it), because a
-/// request is not a process launch: pulling a whole 19-knob config out of one to
+/// request is not a process launch: pulling a whole config out of one to
 /// reach a single field silently drags the `BEET_*` environment in behind it and
 /// hides the flag from the route's own help. The single request-shaped
 /// constructor, [`take_params`](Self::take_params), exists only for beet spawning
@@ -74,6 +74,13 @@ pub struct BootstrapConfig {
 	pub main: Option<SmolStr>,
 	/// The repo store the entry loads through. `--repo` / `BEET_REPO`.
 	pub repo: Option<StoreUri>,
+	/// A local store layered over the repo store: reads fall through to the
+	/// repo, writes land here, so a process on a remote repo forks rather than
+	/// writes back (a visitor's local edits over a site's published store).
+	/// `--overlay` / `BEET_OVERLAY`. Absent, a browser whose repo is remote
+	/// overlays IndexedDB (see `entry_build::default_overlay`); every other
+	/// launch reads its repo directly.
+	pub overlay: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
 	pub watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
@@ -127,6 +134,7 @@ impl Default for BootstrapConfig {
 		Self {
 			main: None,
 			repo: None,
+			overlay: None,
 			watch: false,
 			features: default(),
 			server: None,
@@ -164,6 +172,9 @@ impl BootstrapConfig {
 	/// The stage that turns on production behaviour, ie dropping draft routes
 	/// from a static export.
 	pub const PROD_STAGE: &'static str = "prod";
+	/// The `type` of the `<script>` a served page carries its browser launch
+	/// in, see [`to_script`](Self::to_script).
+	pub const SCRIPT_TYPE: &'static str = "application/x-beet-bootstrap";
 
 	const MAIN: Knob = Knob {
 		arg: "main",
@@ -172,6 +183,10 @@ impl BootstrapConfig {
 	const REPO: Knob = Knob {
 		arg: "repo",
 		env: "BEET_REPO",
+	};
+	const OVERLAY: Knob = Knob {
+		arg: "overlay",
+		env: "BEET_OVERLAY",
 	};
 	const WATCH: Knob = Knob {
 		arg: "watch",
@@ -245,10 +260,12 @@ impl BootstrapConfig {
 	/// is what [`BootstrapPlugin`] runs at [`PreStartup`] so a malformed value is
 	/// still surfaced through the app's error handler.
 	///
-	/// In a browser [`env_ext::args`] yields the location query, so `?server=http`
-	/// still selects; in a Cloudflare Worker argv is empty and the environment
-	/// is the Worker's `vars`, seeded into [`env_ext`] by its entry before this
-	/// first reads, so `BEET_REPO` selects the store exactly as `--repo` does.
+	/// In a browser [`env_ext::args`] yields the location query plus the page's
+	/// bootstrap script ([`to_script`](Self::to_script)), so a served page names
+	/// the launch and `?server=http` still selects; in a Cloudflare Worker argv
+	/// is empty and the environment is the Worker's `vars`, seeded into
+	/// [`env_ext`] by its entry before this first reads, so `BEET_REPO` selects
+	/// the store exactly as `--repo` does.
 	pub fn from_env() -> Result<Self> {
 		Self::parse(&CliArgs::parse_env().params, &Self::env_var)
 	}
@@ -299,9 +316,10 @@ impl BootstrapConfig {
 
 	/// Every knob, in field order. The one enumeration of the table, so a new
 	/// field is either listed here or is not a knob at all.
-	const KNOBS: [Knob; 18] = [
+	const KNOBS: [Knob; 19] = [
 		Self::MAIN,
 		Self::REPO,
+		Self::OVERLAY,
 		Self::WATCH,
 		Self::FEATURES,
 		Self::SERVER,
@@ -353,6 +371,7 @@ impl BootstrapConfig {
 		Self {
 			main: reader.value(Self::MAIN),
 			repo: reader.parsed(Self::REPO)?,
+			overlay: reader.parsed(Self::OVERLAY)?,
 			watch: reader.flag(Self::WATCH),
 			features: reader.list(Self::FEATURES),
 			server: reader.filter(Self::SERVER),
@@ -409,40 +428,7 @@ impl BootstrapConfig {
 				argv.push(SmolStr::from(format!("--{}={value}", knob.arg)));
 			}
 		};
-		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
-		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
-		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
-		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
-		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
-		push(Self::HTTP_PORT, self.http_port.map(|port| port.to_string()));
-		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
-		push(Self::STAGE, self.rendered_stage());
-		push(Self::SERVICE_ACCESS, self.rendered_service_access());
-		push(
-			Self::DEPLOY_ID,
-			self.deploy_id.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::DEPLOY_TIMESTAMP,
-			self.deploy_timestamp.as_ref().map(ToString::to_string),
-		);
-		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
-		push(
-			Self::TLS_DIR,
-			self.tls_dir.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::SCREENSHOT,
-			self.screenshot.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::SCREENSHOT_FRAME,
-			self.screenshot_frame.map(|frame| frame.to_string()),
-		);
-		push(
-			Self::FEATURES,
-			(!self.features.is_empty()).then(|| self.features.join(",")),
-		);
+		self.render(&mut push);
 		// bare flags: `--watch` parses back as a flag, so no value is rendered.
 		if self.watch {
 			argv.push(SmolStr::from(format!("--{}", Self::WATCH.arg)));
@@ -456,18 +442,32 @@ impl BootstrapConfig {
 		argv.xok()
 	}
 
-	/// Every set field as `BEET_*` environment pairs, the exact names the parse
-	/// reads back. Consumed by a task definition, a systemd unit's
-	/// `Environment=` lines, a lambda function env and a Worker's env object.
-	pub fn to_env(&self) -> Vec<(SmolStr, SmolStr)> {
-		let mut pairs: Vec<(SmolStr, SmolStr)> = Vec::new();
-		let mut push = |knob: Knob, value: Option<String>| {
-			if let Some(value) = value {
-				pairs.push((knob.env.into(), value.into()));
-			}
-		};
+	/// This launch as the text of a served page's bootstrap script, the
+	/// [`to_argv`](Self::to_argv) tokens space-joined (each is whitespace-free
+	/// by construction), read back by [`script_argv`](Self::script_argv). A
+	/// page renders it in a `<script type="application/x-beet-bootstrap">`
+	/// ([`SCRIPT_TYPE`](Self::SCRIPT_TYPE)) beside its module loader, and the
+	/// browser process appends it to the location's own argv.
+	pub fn to_script(&self) -> Result<String> {
+		self.to_argv()?.join(" ").xok()
+	}
+
+	/// The argv a bootstrap script's text carries, the inverse of
+	/// [`to_script`](Self::to_script).
+	pub fn script_argv(text: &str) -> Vec<SmolStr> {
+		text.split_whitespace().map(SmolStr::from).collect()
+	}
+
+	/// Every valued knob in render order, handed to `push` as
+	/// `(knob, value)`, the one enumeration [`to_argv`](Self::to_argv) and
+	/// [`to_env`](Self::to_env) share so the two channels cannot drift.
+	fn render(&self, push: &mut impl FnMut(Knob, Option<String>)) {
 		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
 		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
+		push(
+			Self::OVERLAY,
+			self.overlay.as_ref().map(ToString::to_string),
+		);
 		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
 		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
 		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
@@ -500,6 +500,19 @@ impl BootstrapConfig {
 			Self::FEATURES,
 			(!self.features.is_empty()).then(|| self.features.join(",")),
 		);
+	}
+
+	/// Every set field as `BEET_*` environment pairs, the exact names the parse
+	/// reads back. Consumed by a task definition, a systemd unit's
+	/// `Environment=` lines, a lambda function env and a Worker's env object.
+	pub fn to_env(&self) -> Vec<(SmolStr, SmolStr)> {
+		let mut pairs: Vec<(SmolStr, SmolStr)> = Vec::new();
+		let mut push = |knob: Knob, value: Option<String>| {
+			if let Some(value) = value {
+				pairs.push((knob.env.into(), value.into()));
+			}
+		};
+		self.render(&mut push);
 		// presence is the signal for a flag, so any value parses back as `true`.
 		push(Self::WATCH, self.watch.then(|| "1".to_string()));
 		push(Self::HEADLESS, self.headless.then(|| "1".to_string()));
@@ -527,13 +540,14 @@ impl BootstrapConfig {
 	/// selection, the opening path) is visible on argv, ambient service config
 	/// (the bind address, the ports, the stage, the deploy identity) rides env.
 	///
-	/// The dev-harness fields (`main`, `watch`, `features`, `remote_url`,
-	/// `tls_dir`, `headless`, `screenshot*`) belong to neither deploy channel and
+	/// The dev-harness fields (`main`, `watch`, `features`, `tls_dir`,
+	/// `headless`, `screenshot*`) belong to neither deploy channel and
 	/// are dropped: a deploy has no use for them, and a deployed process probes
 	/// its repo store for the entry rather than being told.
 	pub fn split_channels(self) -> (Self, Self) {
 		let argv = Self {
 			repo: self.repo,
+			overlay: self.overlay,
 			server: self.server,
 			path: self.path,
 			..default()
@@ -771,6 +785,7 @@ mod test {
 		BootstrapConfig {
 			main: Some("main.bsx".into()),
 			repo: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
+			overlay: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
 			watch: true,
 			features: vec!["thread".into(), "sockets".into()],
 			server: Some(RunningSetFilter::new("http,ssh")),
@@ -901,7 +916,8 @@ mod test {
 	fn splits_channels() {
 		let (argv, env) = full().split_channels();
 		argv.to_argv().unwrap().join(" ").xpect_eq(
-			"--repo=s3://site?region=us-west-2 --server=http,ssh --path=/docs",
+			"--repo=s3://site?region=us-west-2 --overlay=fs:/tmp/fork \
+			 --server=http,ssh --path=/docs",
 		);
 		env.to_env()
 			.iter()
@@ -956,6 +972,38 @@ mod test {
 			.passes("http")
 			.xpect_true();
 		parse_argv("").unwrap().server.xpect_none();
+	}
+
+	/// The browser channel: a page's bootstrap script appended to the
+	/// location's own argv parses back to the launch, with the location's
+	/// path and query still positionals and flags of the same request, and the
+	/// `--server` it carries selects the facet by name.
+	#[crate::test]
+	fn script_appends_to_the_location_argv() {
+		let launch = BootstrapConfig {
+			main: Some("scene_editor.bsx".into()),
+			repo: Some(StoreUri::parse("http:examples/ui").unwrap()),
+			server: Some(RunningSetFilter::new("dom")),
+			..default()
+		};
+		let script = launch.to_script().unwrap();
+		script.xpect_eq(
+			"--main=scene_editor.bsx --repo=http:examples/ui --server=dom",
+		);
+		// the page at `/docs?color-scheme=dark` booting through the script
+		let mut argv = vec![SmolStr::new("docs"), "--color-scheme=dark".into()];
+		argv.extend(BootstrapConfig::script_argv(&script));
+		let args = CliArgs::parse_tokens(argv);
+		args.path.xpect_eq(vec![SmolStr::new("docs")]);
+		args.params
+			.get("color-scheme")
+			.xpect_eq(Some(&"dark".into()));
+		BootstrapConfig::parse(&args.params, &|_| None)
+			.unwrap()
+			.xpect_eq(launch);
+		let filter = RunningSetFilter::from_params(&args.params).unwrap();
+		filter.passes("dom").xpect_true();
+		filter.passes("tui").xpect_false();
 	}
 
 	/// Beet spawning beet: the launch knobs leave the params (delivered on the

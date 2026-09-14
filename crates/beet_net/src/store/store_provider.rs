@@ -42,6 +42,9 @@ pub enum StoreProvider {
 	/// `r2://<binding>`.
 	#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 	R2(R2WorkersStore),
+	/// `http://<host>/<prefix>` / `http:<prefix>`.
+	#[cfg(feature = "json")]
+	Http(HttpStore),
 }
 
 /// Apply `$body` to every variant's store, the one match `insert` and
@@ -61,6 +64,8 @@ macro_rules! each_store {
 			StoreProvider::IndexedDb($store) => $body,
 			#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 			StoreProvider::R2($store) => $body,
+			#[cfg(feature = "json")]
+			StoreProvider::Http($store) => $body,
 		}
 	};
 }
@@ -126,6 +131,31 @@ impl StoreProvider {
 				"store `{uri}` is an R2 binding, reachable only from a \
 				 Cloudflare Worker (a wasm build with the `cloudflare` feature)"
 			),
+			#[cfg(feature = "json")]
+			StoreUri::Http { .. } => Self::Http(HttpStore::from_uri(uri)?),
+			#[cfg(not(feature = "json"))]
+			StoreUri::Http { .. } => bevybail!(
+				"store `{uri}` is served over http, whose listing is json \
+				 (enable the `json` feature)"
+			),
+		}
+		.xok()
+	}
+
+	/// The store `uri` names with `overlay` layered over it
+	/// ([`OverlayStore`]), or the store alone. The composition behind
+	/// `--repo` + `--overlay`, erased since the pair has no single component.
+	pub fn compose(
+		uri: &StoreUri,
+		overlay: Option<&StoreUri>,
+	) -> Result<BlobStore> {
+		let upstream = Self::from_uri(uri)?.into_blob_store();
+		match overlay {
+			Some(overlay) => Self::from_uri(overlay)?
+				.into_blob_store()
+				.xmap(|local| OverlayStore::new(local, upstream))
+				.xmap(BlobStore::new),
+			None => upstream,
 		}
 		.xok()
 	}
@@ -203,5 +233,34 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("only available on wasm");
+	}
+
+	/// An overlay composes over the repo: the pair reads through and writes
+	/// local, by name so a test reaches each half.
+	#[beet_core::test]
+	async fn composes_an_overlay() {
+		let upstream = StoreUri::parse("memory://compose-upstream").unwrap();
+		let local = StoreUri::parse("memory://compose-local").unwrap();
+		// a memory backing lives as long as a handle does
+		let seeded = BlobStore::from_uri(&upstream).unwrap();
+		seeded.insert(&RelPath::new("a.txt"), "up").await.unwrap();
+		let store = StoreProvider::compose(&upstream, Some(&local)).unwrap();
+		store.id().xpect_eq("overlay");
+		store
+			.get(&RelPath::new("a.txt"))
+			.await
+			.unwrap()
+			.xpect_eq(bytes::Bytes::from_static(b"up"));
+		store.insert(&RelPath::new("b.txt"), "local").await.unwrap();
+		BlobStore::from_uri(&local)
+			.unwrap()
+			.exists(&RelPath::new("b.txt"))
+			.await
+			.unwrap()
+			.xpect_true();
+		StoreProvider::compose(&upstream, None)
+			.unwrap()
+			.id()
+			.xpect_eq("memory");
 	}
 }

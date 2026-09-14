@@ -37,7 +37,7 @@ pub(crate) async fn build_entry(
 		entry_name,
 		prescan,
 		..
-	} = entry_build::resolve_main(repo_uri, entry_path).await?;
+	} = entry_build::resolve_main(repo_uri, None, entry_path).await?;
 	let formats = caller
 		.with_world(|world, _| {
 			world.get_resource_or_init::<TemplateFormats>().clone()
@@ -157,12 +157,13 @@ mod test {
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
-		let dir = entry_build::resolve_main(None, entry_path().as_str())
+		let dir = entry_build::resolve_main(None, None, entry_path().as_str())
 			.await
 			.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
 		let file = entry_build::resolve_main(
+			None,
 			None,
 			entry_path().join("main.bsx").as_str(),
 		)
@@ -173,14 +174,14 @@ mod test {
 		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		entry_build::resolve_main(None, tmp.path().as_str())
+		entry_build::resolve_main(None, None, tmp.path().as_str())
 			.await
 			.unwrap()
 			.entry_name
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(None, empty.path().as_str())
+		entry_build::resolve_main(None, None, empty.path().as_str())
 			.await
 			.err()
 			.unwrap()
@@ -200,7 +201,7 @@ mod test {
 			entry_name,
 			prescan,
 			..
-		} = entry_build::resolve_main(None, entry_path().as_str())
+		} = entry_build::resolve_main(None, None, entry_path().as_str())
 			.await
 			.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();

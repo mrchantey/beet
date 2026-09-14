@@ -9,6 +9,10 @@
 //! - [`LocalStorageStore`]: Browser localStorage (WASM only)
 //! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
+//! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
+//!   (requires `json`; reads need a transport, wasm's fetch or `ureq`/`reqwest`)
+//! - [`OverlayStore`]: a local store layered over an upstream one, the fork a
+//!   process keeps of a repo it reads but does not own
 //!
 //! ## The repo store
 //!
@@ -52,6 +56,8 @@ mod blob_store;
 // the store-agnostic mirror, over the provider trait's `list_stats`.
 mod blob_sync;
 mod in_memory_store;
+// a local store over an upstream one: pure composition, so it rides the core.
+mod overlay_store;
 // the one canonical store an app runs from, and the singleton it enforces.
 mod repo_store;
 mod store_path;
@@ -59,6 +65,7 @@ pub use blob::*;
 pub use blob_store::*;
 pub use blob_sync::*;
 pub use in_memory_store::*;
+pub use overlay_store::*;
 pub use repo_store::*;
 pub use store_path::*;
 
@@ -72,6 +79,9 @@ mod aws_cli;
 mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
+// the http-served store: its listing endpoint answers json.
+#[cfg(all(feature = "std", feature = "json"))]
+mod http_store;
 #[cfg(feature = "std")]
 mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
@@ -91,6 +101,8 @@ pub use aws_cli::*;
 pub use document_blob::*;
 #[cfg(feature = "json")]
 pub(crate) use document_store::*;
+#[cfg(all(feature = "std", feature = "json"))]
+pub use http_store::*;
 #[cfg(all(feature = "template_serde", feature = "json"))]
 pub use scene_blob::*;
 #[cfg(feature = "std")]
@@ -228,5 +240,9 @@ impl Plugin for StorePlugin {
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Store>()
 			.register_type::<DynamoStore>();
+
+		// the http-served store, so a scene declares a remote repo it reads.
+		#[cfg(feature = "json")]
+		app.register_type::<HttpStore>();
 	}
 }

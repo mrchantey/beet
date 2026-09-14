@@ -9,7 +9,7 @@ then the page loads and the module fetch 404s.
 
 Structurally identical to `/` (a full `<HtmlDocument>`, `<RenderConsole>` before
 `<Wasm>` so the console wrap installs first), differing only in which artifact and
-which program it names.
+which entry it names.
 -->
 <HtmlDocument>
 	<Fragment slot="head">
@@ -30,6 +30,5 @@ which program it names.
 		more.
 	</p>
 	<RenderConsole/>
-	<MainBsx src="/examples/action/scripting.bsx"/>
-	<Wasm src="/assets/wasm/beet-full.wasm"/>
+	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/action" main="scripting.bsx"/>
 </HtmlDocument>

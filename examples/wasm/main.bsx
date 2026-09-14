@@ -1,9 +1,11 @@
 <!--
 # Wasm: a beet program running in the browser
 
-Serves a page that boots the wasm `beet` binary, which reads its program from a
-`<script type="application/x-bsx" data-src=..>`, fetches and runs it headless, and
-renders its console output via `<RenderConsole>`. Honors `?color-scheme=dark`.
+Serves a page that boots the wasm `beet` binary with a launch of its own: the
+page's `<Wasm src repo main>` names the served repo store and the entry within
+it, the browser process resolves and builds that entry exactly as the native
+binary does its `--main`, runs it headless, and `<RenderConsole>` renders its
+console output. Honors `?color-scheme=dark`.
 
 Install a wasm binary once, then serve:
 
@@ -12,19 +14,21 @@ Install a wasm binary once, then serve:
 
 The pages walk the artifact range, which is the whole point of the split: `/`
 boots `beet-min.wasm` (`web_min`, the smallest binary that is still a beet
-runtime, so its program sticks to the core vocabulary), `/render` boots
+runtime, so its entry sticks to the core vocabulary), `/render` boots
 `beet-render.wasm` (`web_render`, the render middle: a wgpu scene in the tab, so
 `just build-wasm-render` first), and `/scripting` boots `beet-full.wasm`
 (`web_full`, the kitchen sink, so `just build-wasm-full` first). Any
-`examples/action/*.bsx` runs off the full binary: point a page's `<MainBsx src>`
-at eg `/examples/action/malenia.bsx`. The entry roots at the workspace
-(`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser fetches and
-`--watch` live-reloads the browser on any edit under them.
+`examples/action/*.bsx` runs off the full binary: point a page's `<Wasm repo
+main>` at eg `repo="/examples/action" main="malenia.bsx"`. The entry roots at
+the workspace (`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser
+reads as its repo and `--watch` live-reloads the browser on any edit under them.
 
 `<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
 workspace assets (the wasm binaries) at /assets and the examples tree at /examples.
+The server owns the boot (`CallOnReady` calls it with the process request the
+moment the entry loads) and the router is its dispatch child.
 -->
-<HttpServer>
+<HttpServer {CallOnReady}>
 <Router>
 	<RepoRoot src="../.."/>
 	<PackageConfig title="Beet Wasm" description="A headless beet program running in the browser"/>
@@ -36,8 +40,8 @@ workspace assets (the wasm binaries) at /assets and the examples tree at /exampl
 	<DefaultAppRoutes/>
 	<RoutesDir src="examples/wasm/routes"/>
 	<!-- the workspace assets at /assets (the wasm/js binary the page boots), and the
-	     examples tree at /examples so the browser can fetch any
-	     `<MainBsx src="/examples/..">` program over http. -->
+	     examples tree at /examples, the repo store a page's `<Wasm repo="/examples/..">`
+	     names, read over http. -->
 	<AssetsDir src="assets" prefix="assets"/>
 	<AssetsDir src="examples" prefix="examples"/>
 </Router>

@@ -114,9 +114,10 @@ fn has_global(name: &str) -> bool {
 /// Unlike the `#[cfg(target_arch = "wasm32")]` split (which is compile-time:
 /// "am I wasm bytecode?"), this is a runtime decision: the same wasm binary boots
 /// under the Deno test runner, in a browser tab, or under another JS host, and
-/// branches here. The standalone `beet` binary uses it to choose its entry: a host
-/// with a filesystem (Deno/Node) loads `--main` through `fs_ext`, a `Browser` reads
-/// its program from the DOM instead.
+/// branches here. The standalone `beet` binary uses it to decide what a launch
+/// may do: a host with a filesystem (Deno/Node) resolves a dir-rooted `--repo`
+/// through `fs_ext`, a `Browser` needs a self-rooted one (the http repo its
+/// page names) and is the one host the DOM server boots on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JsEnvironment {
 	/// The Deno runtime, ie the beet wasm test runner. Has fs/env globals.
@@ -354,9 +355,10 @@ pub fn remove(path: &str) -> FsResult {
 
 /// The wasm equivalent of process argv (excluding the program name): the deno
 /// runner's `Deno.args` when present, else the browser location's path + query as
-/// CLI args ([`search_params_ext::location_args`]), else empty (a Worker has
-/// neither). The global check comes first since deno also polyfills a `window`, so a
-/// deno run must not fall to the browser path.
+/// CLI args ([`search_params_ext::location_args`]) followed by the page's
+/// bootstrap script ([`bootstrap_args`]), else empty (a Worker has neither). The
+/// global check comes first since deno also polyfills a `window`, so a deno run
+/// must not fall to the browser path.
 ///
 /// This is the single wasm arg decision; [`env_ext::args`](crate::prelude::env_ext)
 /// delegates here rather than branching itself.
@@ -365,9 +367,34 @@ pub fn args() -> Vec<SmolStr> {
 		return js_strings(&raw::env_args());
 	}
 	if environment() == JsEnvironment::Browser {
-		return search_params_ext::location_args();
+		let mut args = search_params_ext::location_args();
+		args.extend(bootstrap_args());
+		return args;
 	}
 	Vec::new()
+}
+
+/// The launch the served page describes: the argv of its
+/// `<script type="application/x-beet-bootstrap">`
+/// ([`BootstrapConfig::to_script`]), empty for a page carrying none. Appended
+/// after the location's own args, so the page's `--main`/`--repo`/`--server`
+/// reach [`BootstrapConfig::get`] and the entry's start request through the
+/// one channel every target reads, while the location keeps naming the page.
+fn bootstrap_args() -> Vec<SmolStr> {
+	web_sys::window()
+		.and_then(|window| window.document())
+		.and_then(|document| {
+			document
+				.query_selector(&format!(
+					"script[type={:?}]",
+					BootstrapConfig::SCRIPT_TYPE
+				))
+				.ok()
+				.flatten()
+		})
+		.and_then(|script| script.text_content())
+		.map(|text| BootstrapConfig::script_argv(&text))
+		.unwrap_or_default()
 }
 
 thread_local! {

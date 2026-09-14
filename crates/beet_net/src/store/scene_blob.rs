@@ -262,37 +262,76 @@ mod test {
 			.xpect_some();
 	}
 
-	/// An edit reaches the store, and a reboot from the store reproduces the
-	/// edited world rather than the original.
+	/// The published page: a first boot over an overlay finds the fork
+	/// upstream and reads it, writing nothing; the first edit lands in the
+	/// local half, and a reboot reads the local fork over the published one.
 	#[beet_core::test]
-	async fn an_edit_persists_across_a_reboot() {
-		let store = store().await;
-		let (mut app, host) = boot(store.clone()).await;
-		// the element entities carry `Element`, and a text node its `Value`;
-		// rename the heading by editing the text
-		let key = {
-			let scene = &app.world().get::<Document>(host).unwrap().0;
-			let entities = SceneEntities::of(scene).unwrap();
-			entities
-				.keys()
-				.unwrap()
-				.into_iter()
-				.find(|key| {
-					entities.component(*key, VALUE).is_some_and(|value| {
-						value.as_str().ok() == Some("Todos")
-					})
-				})
-				.unwrap()
-		};
+	async fn a_first_boot_over_an_overlay_reads_upstream() {
+		// the server's own boot publishes the fork upstream
+		let upstream = store().await;
+		let (app, host) = boot(upstream.clone()).await;
+		let key = heading_key(&app, host);
+		drop(app);
+		let local = BlobStore::temp();
+		let overlay =
+			BlobStore::new(OverlayStore::new(local.clone(), upstream.clone()));
+		let (mut app, host) = boot(overlay.clone()).await;
+		app.world().get::<SceneDocument>(host).xpect_some();
+		local
+			.exists(&RelPath::from("app.json"))
+			.await
+			.unwrap()
+			.xpect_false();
+		// the first edit is the visitor's fork
+		edit_heading(&mut app, host, key, "Groceries").await;
+		local
+			.exists(&RelPath::from("app.json"))
+			.await
+			.unwrap()
+			.xpect_true();
+		upstream
+			.get_media(&RelPath::from("app.json"))
+			.await
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xnot()
+			.xpect_contains("Groceries");
+		let (rebooted, host) = boot(overlay).await;
+		heading(&rebooted, host, key).xpect_eq("Groceries");
+	}
+
+	/// The file key of the entity whose text is the heading.
+	fn heading_key(app: &App, host: Entity) -> u32 {
+		let scene = &app.world().get::<Document>(host).unwrap().0;
+		let entities = SceneEntities::of(scene).unwrap();
+		entities
+			.keys()
+			.unwrap()
+			.into_iter()
+			.find(|key| {
+				entities
+					.component(*key, VALUE)
+					.is_some_and(|value| value.as_str().ok() == Some("Todos"))
+			})
+			.unwrap()
+	}
+
+	/// Retype the heading through the document, settled so the world followed
+	/// and the write landed.
+	async fn edit_heading(app: &mut App, host: Entity, key: u32, text: &str) {
 		SceneEntities::of_mut(
 			&mut app.world_mut().get_mut::<Document>(host).unwrap().0,
 		)
 		.unwrap()
-		.insert_component(key, VALUE, "Groceries")
+		.insert_component(key, VALUE, text)
 		.unwrap();
 		app.update_async().await;
 		app.update_async().await;
-		// the live world followed
+	}
+
+	/// The heading's live text.
+	fn heading(app: &App, host: Entity, key: u32) -> String {
 		let entity = app
 			.world()
 			.get::<TemplateEntityMap>(host)
@@ -304,22 +343,24 @@ mod test {
 			.unwrap()
 			.as_str()
 			.unwrap()
-			.xpect_eq("Groceries");
+			.to_string()
+	}
+
+	/// An edit reaches the store, and a reboot from the store reproduces the
+	/// edited world rather than the original.
+	#[beet_core::test]
+	async fn an_edit_persists_across_a_reboot() {
+		let store = store().await;
+		let (mut app, host) = boot(store.clone()).await;
+		// the element entities carry `Element`, and a text node its `Value`;
+		// rename the heading by editing the text
+		let key = heading_key(&app, host);
+		edit_heading(&mut app, host, key, "Groceries").await;
+		// the live world followed
+		heading(&app, host, key).xpect_eq("Groceries");
 
 		// a fresh process over the same store boots from the fork
 		let (rebooted, host) = boot(store).await;
-		let entity = rebooted
-			.world()
-			.get::<TemplateEntityMap>(host)
-			.unwrap()
-			.world(key)
-			.unwrap();
-		rebooted
-			.world()
-			.get::<Value>(entity)
-			.unwrap()
-			.as_str()
-			.unwrap()
-			.xpect_eq("Groceries");
+		heading(&rebooted, host, key).xpect_eq("Groceries");
 	}
 }

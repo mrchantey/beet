@@ -1,5 +1,5 @@
 <!--
-The program the wasm head binary runs in the browser: spawn the `<WebHead>` socket
+The entry the wasm head binary runs in the browser: spawn the `<WebHead>` socket
 client, which connects back to the perceive-act agent's socket server as the `head`
 client and serves the head capabilities from this tab: `take-photo` (the real webcam),
 `speak-text` (the Web Speech API) and `show-image` (the `<img id="face">` on the page).

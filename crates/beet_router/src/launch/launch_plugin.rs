@@ -27,9 +27,9 @@ impl Plugin for LaunchPlugin {
 	fn build(&self, app: &mut App) { app.add_systems(Startup, load_entry); }
 }
 
-/// Positional commands that run ANOTHER program, so the `--main` and `--repo`
-/// on this process's argv belong to that program and are forwarded untouched
-/// rather than read as this launch's own.
+/// Positional commands that run ANOTHER program, so the `--main`, `--repo` and
+/// `--overlay` on this process's argv belong to that program and are forwarded
+/// untouched rather than read as this launch's own.
 ///
 /// Absent by default: a binary whose commands all run in-process has nothing to
 /// forward. `beet run-wasm <module>` is the one beet ships, and the crate that
@@ -43,8 +43,8 @@ impl ArgvPassthrough {
 		Self(commands.into_iter().map(Into::into).collect())
 	}
 
-	/// Whether `args` names one of them, ie whether this launch's `--main` and
-	/// `--repo` are somebody else's.
+	/// Whether `args` names one of them, ie whether this launch's `--main`,
+	/// `--repo` and `--overlay` are somebody else's.
 	pub fn forwards(&self, args: &CliArgs) -> bool {
 		args.path
 			.first()
@@ -91,55 +91,38 @@ fn load_entry(world: &mut World) {
 	// build can both filter the `templates/` read and lower each source by format.
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
-		// browser: there is no filesystem and no `--main`; the program is inlined in a
-		// `<script type="application/x-bsx">`. Read it from the DOM and build it onto a
-		// storeless root through the same core as native, rather than resolving a store.
-		#[cfg(target_arch = "wasm32")]
-		if js_runtime::environment() == js_runtime::JsEnvironment::Browser {
-			if let Err(err) = browser_entry(&world, formats).await {
-				error!("{err}");
-				world.write_message(AppExit::error()).await;
-			}
-			return;
-		}
 		// the wasm runner forwards the *module's* flags on this same argv, so a
 		// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
 		// carries a `--main`/`--repo` meant for the wasm module, not this native
 		// runner. When acting as the runner (first positional `run-wasm`), drop
 		// them and discover the workspace command entry; the `<RunWasm/>` route
 		// forwards the module's own config on via `ChildProcess::with_bootstrap`.
-		let repo_uri = (!forwards_argv).then(|| config.repo.as_ref()).flatten();
-		let main = (!forwards_argv).then(|| config.main.as_deref()).flatten();
-		// resolve on the runtime, since discovery now awaits the store.
-		let resolved = match entry_build::resolve_entry(repo_uri, main).await {
-			Ok(resolved) => resolved,
-			Err(err) => {
-				error!("{err}");
-				world.write_message(AppExit::error()).await;
-				return;
-			}
+		let (repo_uri, overlay, main) = match forwards_argv {
+			true => (None, None, None),
+			false => (
+				config.repo.as_ref(),
+				config.overlay.as_ref(),
+				config.main.as_deref(),
+			),
 		};
+		// resolve on the runtime, since discovery now awaits the store. A
+		// browser resolves exactly as every other runtime: its served page's
+		// bootstrap named an http repo, which forks into IndexedDB.
+		let resolved =
+			match entry_build::resolve_entry(repo_uri, overlay, main).await {
+				Ok(resolved) => resolved,
+				Err(err) => {
+					error!("{err}");
+					world.write_message(AppExit::error()).await;
+					return;
+				}
+			};
 		if let Err(err) = build_entry(&world, &config, resolved, formats).await
 		{
 			error!("{err}");
 			world.write_message(AppExit::error()).await;
 		}
 	});
-}
-
-/// Build the browser entry: read the program from the DOM via
-/// [`MainBsx::read_dom_program`] and build it onto a storeless root (see
-/// [`entry_build::build_from_bsx`]). The wasm `Browser` branch of
-/// [`load_entry`]; the program's own `CallOnReady` verb then drives it.
-#[cfg(target_arch = "wasm32")]
-async fn browser_entry(world: &AsyncWorld, formats: TemplateFormats) -> Result {
-	let bsx = MainBsx::read_dom_program().await?;
-	world
-		.with(move |world: &mut World| {
-			entry_build::build_from_bsx(world, formats, "main.bsx", bsx)
-		})
-		.await?;
-	Ok(())
 }
 
 /// Build the resolved entry on the async runtime: register the entry's `templates/`

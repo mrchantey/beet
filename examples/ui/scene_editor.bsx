@@ -3,6 +3,10 @@ A page that edits itself. Run it through the one binary:
 
     beet --main=examples/ui/scene_editor.bsx
 
+The same entry boots in a browser tab: a served page carrying
+`<Wasm src="/assets/wasm/beet-ui.wasm" repo="/examples/ui" main="scene_editor.bsx" server="dom"/>`
+resolves it through the http repo and boots its `DomServer` (`just check-wasm-boot`).
+
 The page is a scene: `<SceneBlob>` boots `scene_editor/scene.bsx` on the first
 run, forks what it built into `scene_editor/scene.json` and boots from that
 fork on every later run, so the fork is the living page and the `.bsx` stays
@@ -26,8 +30,10 @@ quit and run again: every edit came back from the fork.
 `git diff examples/ui/scene_editor` is the record of a session and
 `git checkout` is the reset; deleting `scene.json` re-forks the original.
 -->
-<CallOnReady {(TuiServer, SweepDescendants)}>
-	<RequireCfg cfg="feature:tui"/>
+<CallOnReady {(TuiServer, DomServer, SweepDescendants)}>
+	<!-- the terminal launch needs the tui host, the browser launch the web
+	     runtime: each names the one it has, and the entry keeps its shape on both. -->
+	<RequireCfg cfg="feature:tui || feature:web"/>
 	<Router {Layout{template:"AppShell"}}>
 		<Route path="/" {FixedPage}>
 			<SceneBlob path="scene_editor/scene.json" from="scene_editor/scene.bsx"/>

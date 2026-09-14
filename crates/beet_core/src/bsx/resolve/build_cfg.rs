@@ -228,9 +228,15 @@ impl BuildCondition {
 			Self::Not(inner) => {
 				inner.collect_failures(conditions, cx, !negated, failures)?
 			}
-			// `All` under no negation (and `Any` under one) fails member by
-			// member, so only the members that actually failed are reported.
+			// a group that holds has nothing at fault, whichever members are
+			// false (an `||` satisfied by one member is satisfied); a group that
+			// fails is walked member by member, so an `&&` names only the
+			// members that failed and an `||` names every member, since any
+			// one would have done.
 			Self::All(members) | Self::Any(members) => {
+				if self.evaluate(conditions, cx)? != negated {
+					return Ok(());
+				}
 				for member in members {
 					member
 						.collect_failures(conditions, cx, negated, failures)?;
@@ -1101,12 +1107,24 @@ mod test {
 			.explain(conditions, &cx)
 			.unwrap()
 			.xpect_eq(vec!["feature:a".to_string(), "feature:b".to_string()]);
-		// a satisfied condition explains nothing
+		// a satisfied condition explains nothing, an `||` one member satisfies
+		// included: the false member is not at fault
 		BuildCondition::parse("feature:infra")
 			.unwrap()
 			.explain(conditions, &cx)
 			.unwrap()
 			.xpect_empty();
+		BuildCondition::parse("feature:a || feature:infra")
+			.unwrap()
+			.explain(conditions, &cx)
+			.unwrap()
+			.xpect_empty();
+		// an `||` nobody satisfies names every member
+		BuildCondition::parse("feature:a || feature:b")
+			.unwrap()
+			.explain(conditions, &cx)
+			.unwrap()
+			.xpect_eq(vec!["feature:a".to_string(), "feature:b".to_string()]);
 		// under a `!`, the atom at fault is the one that was TRUE
 		BuildCondition::parse("!feature:infra")
 			.unwrap()

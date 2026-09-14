@@ -119,9 +119,11 @@ lambda = ["beet/lambda", "beet/aws_sdk"]
 # uses it too), so it is not a `dep:` activation here.
 cloudflare = ["beet/cloudflare", "dep:worker"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
-# the browser, which boots, reads its program from a `<script type="application/x-bsx">`
-# in the DOM (`js_runtime::environment() == Browser`), runs it headless and logs to
-# the console. The wasm-safe render base, no Worker SDK. `BuildWasm` defaults to this.
+# the browser, which boots the launch its page's `<Wasm repo main server>`
+# describes (an http repo forked into IndexedDB, resolved through the one
+# `LaunchPlugin` path) and paints the DOM under `--server=dom`, else runs headless
+# and logs to the console. The wasm-safe render base, no Worker SDK. `BuildWasm`
+# defaults to this.
 # Build with: `cargo build --target wasm32-unknown-unknown -p beet-cli --bin beet \
 # --no-default-features --features web --profile wasm-release`.
 web = ["beet/web"]
@@ -137,9 +139,9 @@ web_examples = ["web", "extra"]
 # `beet build-wasm --package=beet-cli --bin=beet --features=web_head --out=<path>.wasm`.
 web_head = ["web", "beet/perceive_act_web"]
 # `beet-min.wasm`, the floor: the smallest binary that is still a beet runtime in
-# the browser, ie the `web` base and nothing else. It boots, reads its program from
-# the DOM and runs it, so a page whose program sticks to the core vocabulary
-# (`<Sequence>`, `<Log>`, `CallOnReady`) mounts this. Anything a program names beyond
+# the browser, ie the `web` base and nothing else. It boots the entry its page
+# names and runs it, so a page whose entry sticks to the core vocabulary
+# (`<Sequence>`, `<Log>`, `CallOnReady`) mounts this. Anything an entry names beyond
 # that needs a larger set. Build with: `just build-wasm-min`.
 web_min = ["web"]
 # `beet-ui.wasm`, the editor middle: the browser binary plus the scripting seam

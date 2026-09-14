@@ -15,8 +15,13 @@ mod run_wasm_browser;
 mod s3_sync;
 #[cfg(not(target_arch = "wasm32"))]
 mod screenshot;
-// the committed page-driving check for the browser render boot, run via
-// `just check-wasm-render`.
+// the committed page-driving browser checks and what they share: the
+// bootstrap (`just check-wasm-boot`) and the render boot
+// (`just check-wasm-render`).
+#[cfg(test)]
+mod browser_check;
+#[cfg(test)]
+mod wasm_boot_check;
 #[cfg(test)]
 mod wasm_render_check;
 

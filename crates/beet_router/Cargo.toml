@@ -155,6 +155,10 @@ webbrowser = { workspace = true, optional = true }
 # asserting.
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
 
+# `ureq` + `server`: the http store test reads a `<ServeBlobs>` mount over a
+# real listener, which needs a client transport beside the mini server.
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+beet_net = { workspace = true, features = ["ureq", "server"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 

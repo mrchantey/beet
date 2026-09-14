@@ -38,7 +38,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 	     browser fetches. Its own root, so its route tree is isolated from the agent.
 	     `Tls` serves it https (loopback http stays served), the secure context a LAN
 	     device's webcam needs; the agent socket declares the same. -->
-	<HttpServer{host:[0,0,0,0]} {Tls}>
+	<HttpServer{host:[0,0,0,0]} {(Tls, CallOnReady)}>
 	<Router>
 		<PackageConfig title="Perceive-act head" description="The robot's browser head"/>
 		<DefaultAppRoutes/>
@@ -46,7 +46,7 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<!-- the workspace assets tree at /assets: the wasm binary the pages boot
 		     (/assets/wasm/beet-full.wasm) and the scene face images the head renders
 		     (/assets/extra/perceive-act/explorer/images/joy.png). The examples tree at
-		     /examples serves the head program the browser fetches. -->
+		     /examples is the repo the head page names, read over http. -->
 		<AssetsDir src="assets" prefix="assets"/>
 		<AssetsDir src="examples" prefix="examples"/>
 	</Router>
