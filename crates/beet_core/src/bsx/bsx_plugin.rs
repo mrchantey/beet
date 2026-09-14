@@ -19,6 +19,8 @@ impl Plugin for BsxPlugin {
 			.init_resource::<BsxTagResolvers>()
 			.init_resource::<StyleResolver>()
 			.init_resource::<TemplateFormats>()
-			.init_resource::<BsxTemplateRegistry>();
+			.init_resource::<BsxTemplateRegistry>()
+			// the marker a registry template leaves on the entity it built into.
+			.register_type::<TemplateInstance>();
 	}
 }

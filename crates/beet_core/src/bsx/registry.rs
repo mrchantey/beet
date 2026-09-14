@@ -174,6 +174,36 @@ impl BsxTemplateRegistry {
 	}
 }
 
+/// The registry keys of the `.bsx` templates an entity was instantiated from,
+/// recorded on the tag's entity as the build resolves it: `<widgets::Card/>`
+/// leaves `TemplateInstance(["widgets::Card"])`. Outermost first: a template's
+/// single body root builds into the tag's own entity, so a body that is itself
+/// a registry tag (`Styles.bsx` reading `<widgets::Swatch/>`) makes one entity
+/// the instance of both.
+///
+/// The positive twin of [`UnregisteredTag`]: that marks a tag nothing resolved,
+/// this marks one the [`BsxTemplateRegistry`] did. A built tree so names every
+/// template it instantiated, which is what promotes an edit to one of them to a
+/// structural rebuild of that tree (the live-reload driver) and lets a devtool
+/// trace an entity back to its document. Only the registry branch records it: a
+/// Rust `#[template]` has no source file to point at.
+#[derive(Debug, Default, Clone, Deref, Component, Reflect)]
+#[reflect(Component)]
+pub struct TemplateInstance(pub Vec<SmolStr>);
+
+impl TemplateInstance {
+	/// Record `name` on `entity`, after any template it is already an instance
+	/// of.
+	pub fn record(entity: &mut EntityWorldMut, name: impl Into<SmolStr>) {
+		entity
+			.entry::<Self>()
+			.or_default()
+			.get_mut()
+			.0
+			.push(name.into());
+	}
+}
+
 /// The `::`-joined module path of a `.bsx` template at `path`, relative to a
 /// template-dir root: `path/to/X.bsx` -> `path::to::X`. Store-backed (operates on
 /// a store-relative [`RelPath`], no filesystem).
@@ -184,7 +214,7 @@ fn module_path_from_rel(path: &RelPath) -> Option<String> {
 	(!segments.is_empty()).then(|| segments.join("::"))
 }
 
-#[cfg(all(test, feature = "fs", not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod test {
 	use super::*;
 
@@ -196,5 +226,62 @@ mod test {
 		module_path_from_rel(&RelPath::from("Todo.bsx"))
 			.unwrap()
 			.xpect_eq("Todo".to_string());
+	}
+
+	/// The keys recorded on `entity`.
+	fn instances(world: &World, entity: Entity) -> Vec<SmolStr> {
+		world
+			.entity(entity)
+			.get::<TemplateInstance>()
+			.map(|instance| instance.0.clone())
+			.unwrap_or_default()
+	}
+
+	/// A registry tag leaves its key on the entity it built into, at every
+	/// level: the outer `<Card>` (its `<section>` body builds into the tag's
+	/// own entity) and the `<widgets::Swatch>` that body instantiates each
+	/// carry their own [`TemplateInstance`], a plain element carries none, and
+	/// a body that is itself a registry tag (`<Badge>` reading
+	/// `<widgets::Swatch/>`) stacks both keys on the one entity, outermost
+	/// first.
+	#[crate::test]
+	fn registry_tag_marks_its_instance() {
+		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
+		let mut registry = BsxTemplateRegistry::default();
+		registry
+			.insert_source(
+				"Card",
+				"<section><p/><widgets::Swatch/><Badge/></section>",
+			)
+			.unwrap();
+		registry
+			.insert_source("Badge", "<widgets::Swatch/>")
+			.unwrap();
+		registry.insert_source("widgets::Swatch", "<i/>").unwrap();
+		let nodes =
+			BsxNode::parse_document("<Card/>", &BsxParseConfig::bsx()).unwrap();
+		let root = world
+			.spawn_template(BsxTemplate::container(nodes, registry))
+			.unwrap()
+			.id();
+		world.flush();
+		let card = world.entity(root).get::<Children>().unwrap()[0];
+		instances(&world, card).xpect_eq(vec![SmolStr::from("Card")]);
+		world
+			.entity(card)
+			.get::<Element>()
+			.unwrap()
+			.tag()
+			.xpect_eq("section");
+		let children = world.entity(card).get::<Children>().unwrap();
+		let (paragraph, swatch, badge) =
+			(children[0], children[1], children[2]);
+		instances(&world, paragraph).xpect_empty();
+		instances(&world, swatch)
+			.xpect_eq(vec![SmolStr::from("widgets::Swatch")]);
+		instances(&world, badge).xpect_eq(vec![
+			SmolStr::from("Badge"),
+			SmolStr::from("widgets::Swatch"),
+		]);
 	}
 }

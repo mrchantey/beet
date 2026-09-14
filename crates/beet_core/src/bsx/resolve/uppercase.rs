@@ -60,6 +60,9 @@ pub(super) fn build_uppercase(
 		// materialize the props store before the body builds, so the body's
 		// `DocumentPath::Props` bindings link against it on insert.
 		apply_props_store(el, cx.entity, &entity_refs)?;
+		// name the template on its entity, so a built tree knows every registry
+		// template it instantiated.
+		TemplateInstance::record(cx.entity, el.tag.as_str());
 		let nested = BsxTemplate::new(def.nodes.clone(), registry.clone());
 		// build the template's subtree into this entity, carrying its slot targets.
 		cx.entity.build_template(&nested)?;

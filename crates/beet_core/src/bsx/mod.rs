@@ -116,7 +116,8 @@
 //! patches the live resource's named fields, producing no markup), or a
 //! `<path::to::X>` `.bsx` template from the [`BsxTemplateRegistry`]. A `.bsx`
 //! template's tag attributes materialize into its props store (bound in the
-//! body via `@prop:`), and caller content composes through its `<Slot/>`:
+//! body via `@prop:`), caller content composes through its `<Slot/>`, and the
+//! entity it builds into records its key as a [`TemplateInstance`]:
 //!
 //! ```
 //! use beet_core::prelude::*;
@@ -140,6 +141,7 @@
 //! // routed into the slot, and `@prop:title` synced the caller's prop
 //! let card = world.entity(root).get::<Children>().unwrap()[0];
 //! assert_eq!(world.entity(card).get::<Element>().unwrap().tag(), "section");
+//! assert_eq!(world.entity(card).get::<TemplateInstance>().unwrap().0, vec![SmolStr::from("Card")]);
 //! let heading = world.entity(card).get::<Children>().unwrap()[0];
 //! let title = world.entity(heading).get::<Children>().unwrap()[0];
 //! assert_eq!(world.entity(title).get::<Value>().unwrap(), &Value::Str("Intro".into()));
