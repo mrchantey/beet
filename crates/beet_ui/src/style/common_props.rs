@@ -65,6 +65,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(InsetBottom)
 		.insert(InsetLeft)
 		.insert(ZIndexProp)
+		.insert(PositionTryProp)
 		.insert(ScrollbarWidthProp)
 		.insert(ScrollbarColorProp)
 		.insert(BorderColorProp)
@@ -158,6 +159,7 @@ css_property!(InsetRight, Length, TokenInheritance::NotInherited, "right");
 css_property!(InsetBottom, Length, TokenInheritance::NotInherited, "bottom");
 css_property!(InsetLeft, Length, TokenInheritance::NotInherited, "left");
 css_property!(ZIndexProp, i32, TokenInheritance::NotInherited, "z-index");
+canonical_property!(PositionTryProp, PositionTry, TokenInheritance::NotInherited, "position-try-fallbacks");
 canonical_property!(ScrollbarWidthProp, ScrollbarWidth, TokenInheritance::NotInherited, "scrollbar-width");
 canonical_property!(ScrollbarColorProp, ScrollbarColor, TokenInheritance::NotInherited, "scrollbar-color");
 css_property!(MarginProp, Spacing, TokenInheritance::NotInherited, "margin");

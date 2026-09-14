@@ -11,10 +11,16 @@
 //!
 //! Typing refines it: a character typed on a focused select opens the panel
 //! (if it is closed) and narrows its rows to the options whose label contains
-//! what was typed, shown as a filter line at the panel's top; Backspace widens
-//! it again. The browser's type-to-jump, made visible, and what makes a
-//! select over hundreds of options (a scene's component picker) usable on a
-//! screen of rows.
+//! what was typed, shown as a filter line at the panel's top, with the first
+//! matching row focused so Enter chooses it; Backspace widens it again. The
+//! browser's type-to-jump, made visible, and what makes a select over hundreds
+//! of options (a scene's component picker) usable on a screen of rows.
+//!
+//! The panel fits where it opens: the `.select-dropdown` rule flips it above
+//! the control when it does not fit below (`position-try-fallbacks`, resolved
+//! by the layout pass against the nearest scroll port) and caps it to the room
+//! on its side, where it scrolls its rows, the focused row kept in view and
+//! the filter line pinned at its top.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -162,7 +168,9 @@ fn close_on_escape(
 
 /// System: a character typed on a focused `<select>` opens it, refined to the
 /// options whose label contains what was typed; Backspace widens the filter
-/// again. A key reaches the select whose surface it came from.
+/// again. The first matching row takes focus, the listbox highlight that
+/// follows typing, so Enter chooses it and the panel scrolls it into view. A
+/// key reaches the select whose surface it came from.
 fn refine_on_type(
 	mut keys: MessageReader<KeyboardInput>,
 	focused: Query<Entity, With<Focus>>,
@@ -225,7 +233,7 @@ fn refine_on_type(
 				}
 			}
 		}
-		match open.get(select) {
+		let first_row = match open.get(select) {
 			Ok(open) => {
 				if let Ok(mut dropdown) = dropdowns.get_mut(open.dropdown) {
 					dropdown.filter = filter.clone();
@@ -238,40 +246,43 @@ fn refine_on_type(
 					select,
 					open.dropdown,
 					&filter,
-				);
+				)
 			}
-			Err(_) => {
-				open_select_filtered(
-					&mut commands,
-					&elements,
-					&values,
-					select,
-					filter,
-				);
-			}
-		}
+			Err(_) => open_select_filtered(
+				&mut commands,
+				&elements,
+				&values,
+				select,
+				filter,
+			),
+		};
+		// no match leaves an empty panel: focus returns to the control so the
+		// next Backspace still reaches it
+		commands.entity(first_row.unwrap_or(select)).insert(Focus);
 	}
 }
 
 /// Spawn the dropdown panel under `select`: one focusable row per `<option>`,
 /// the row matching the current selection carrying the `Selected` state.
+/// Focus stays on the control, so Tab walks into the rows as it always has.
 fn open_select(
 	commands: &mut Commands,
 	elements: &ElementQuery,
 	values: &Query<&Value>,
 	select: Entity,
 ) {
-	open_select_filtered(commands, elements, values, select, String::new())
+	open_select_filtered(commands, elements, values, select, String::new());
 }
 
 /// [`open_select`], refined to the options whose label contains `filter`.
+/// Returns the panel's first row, if any option matched.
 fn open_select_filtered(
 	commands: &mut Commands,
 	elements: &ElementQuery,
 	values: &Query<&Value>,
 	select: Entity,
 	filter: String,
-) {
+) -> Option<Entity> {
 	let panel = commands
 		.spawn((
 			Element::new("div"),
@@ -283,15 +294,18 @@ fn open_select_filtered(
 			ChildOf(select),
 		))
 		.id();
-	spawn_rows(commands, elements, values, select, panel, &filter);
+	let first_row =
+		spawn_rows(commands, elements, values, select, panel, &filter);
 	commands
 		.entity(select)
 		.insert(SelectOpen { dropdown: panel });
+	first_row
 }
 
 /// The panel's rows: the filter line when there is a filter, then one
 /// focusable row per option whose label contains it, the row matching the
-/// current selection carrying the `Selected` state.
+/// current selection carrying the `Selected` state. Returns the first row, if
+/// any option matched.
 fn spawn_rows(
 	commands: &mut Commands,
 	elements: &ElementQuery,
@@ -299,7 +313,7 @@ fn spawn_rows(
 	select: Entity,
 	panel: Entity,
 	filter: &str,
-) {
+) -> Option<Entity> {
 	if !filter.is_empty() {
 		commands.spawn((
 			Element::new("div").with_inner_text(&format!("/{filter}")),
@@ -310,6 +324,7 @@ fn spawn_rows(
 	}
 	let selected = selected_value(elements, values, select);
 	let needle = filter.to_lowercase();
+	let mut first_row = None;
 	for option in select_options(elements, select) {
 		let label = option.option_label();
 		if !label.to_lowercase().contains(&needle) {
@@ -329,7 +344,9 @@ fn spawn_rows(
 		if Some(value) == selected {
 			row.insert(ElementStateMap::with(ElementState::Selected));
 		}
+		first_row.get_or_insert(row.id());
 	}
+	first_row
 }
 
 /// Despawn the panel; `refocus` returns keyboard focus to the select (chosen
@@ -458,6 +475,15 @@ mod test {
 			.iter(host.app.world())
 			.map(|(entity, row)| (entity, row.clone()))
 			.collect()
+	}
+
+	/// The entity holding keyboard focus, if any.
+	fn focused(host: &mut TestHost) -> Option<Entity> {
+		host.app
+			.world_mut()
+			.query_filtered::<Entity, With<Focus>>()
+			.iter(host.app.world())
+			.next()
 	}
 
 	/// Activate `entity` the way the hit-test/keyboard path does.
@@ -649,18 +675,12 @@ mod test {
 		host.step();
 		host.send_input(b"\t");
 		host.step();
-		let focused = host
-			.app
-			.world_mut()
-			.query_filtered::<Entity, With<Focus>>()
-			.single(host.app.world())
-			.unwrap();
 		let second = rows(&mut host)
 			.into_iter()
 			.find(|(_, row)| row.value == "designer")
 			.map(|(entity, _)| entity)
 			.unwrap();
-		focused.xpect_eq(second);
+		focused(&mut host).xpect_eq(Some(second));
 		// Enter chooses the focused row
 		host.send_input(b"\r");
 		host.step();
@@ -675,8 +695,8 @@ mod test {
 	}
 
 	/// Typing on a focused select opens it refined to the matching options,
-	/// shown under a filter line; Backspace widens the rows again, and the
-	/// select's own value is never typed into.
+	/// shown under a filter line with the first match focused; Backspace widens
+	/// the rows again, and the select's own value is never typed into.
 	#[beet_core::test]
 	fn typing_opens_and_refines() {
 		let mut host = select_host();
@@ -697,6 +717,9 @@ mod test {
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["designer".to_string()]);
 		host.frame_plain().xpect_contains("/des");
+		// the match is highlighted, so Enter would choose it
+		let (designer, _) = rows(&mut host).remove(0);
+		focused(&mut host).xpect_eq(Some(designer));
 		host.app
 			.world()
 			.get::<Value>(select)
@@ -704,8 +727,15 @@ mod test {
 			.clone()
 			.xpect_eq(Value::str(""));
 
-		// backspacing the filter away widens the panel to every option
-		host.send_input(b"\x7f\x7f\x7f");
+		// a filter matching nothing empties the panel and hands focus back to
+		// the control, so backspacing the filter away still widens the panel
+		// to every option
+		host.send_input(b"x");
+		host.step();
+		host.step();
+		rows(&mut host).len().xpect_eq(0);
+		focused(&mut host).xpect_eq(Some(select));
+		host.send_input(b"\x7f\x7f\x7f\x7f");
 		host.step();
 		host.step();
 		rows(&mut host).len().xpect_eq(2);
@@ -755,6 +785,126 @@ mod test {
 		host.frame_plain().xpect_snapshot();
 	}
 
+	/// A select on the last rows of a short viewport opens upward, every option
+	/// visible: the panel's `top: 100%` would run off the screen, so the layout
+	/// flips it to `bottom: 100%` and it hangs from the control's top edge.
+	#[beet_core::test]
+	fn opens_upward_when_below_does_not_fit() {
+		let mut host = TestHost::sized(UVec2::new(30, 10));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		// six one-row fillers push the three-row control to the bottom rows
+		host.spawn_content(rsx! {
+			<div>
+				{(0..6).map(|i| rsx! { <div>{format!("filler {i}")}</div> }).collect::<Vec<_>>()}
+				<Select name="role">
+					<option value="engineer">"Engineer"</option>
+					<option value="designer">"Designer"</option>
+				</Select>
+			</div>
+		});
+		host.step();
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		host.step();
+		let frame = host.frame_plain();
+		frame.as_str().xpect_snapshot();
+		// both rows paint, above the control's caret row
+		let row_of = |needle: &str| {
+			frame
+				.lines()
+				.position(|line| line.contains(needle))
+				.unwrap()
+		};
+		(row_of("Designer") < row_of("▾")).xpect_true();
+	}
+
+	/// Thirty options on a twelve-row host: the panel is capped to the room
+	/// below the control and scrolls its rows, Tab past the visible rows
+	/// scrolls the focused one into view, and a typed filter keeps its line
+	/// pinned at the panel's top while the rows scroll beneath it.
+	#[beet_core::test]
+	fn tall_dropdown_is_capped_and_scrolls() {
+		let mut host = TestHost::sized(UVec2::new(30, 12));
+		host.app
+			.add_plugins(crate::style::material::MaterialStylePlugin::default());
+		host.spawn_content(rsx! {
+			<div>
+				<Select name="n">
+					{(1..=30)
+						.map(|i| rsx! { <option value=i.to_string()>{format!("Option {i}")}</option> })
+						.collect::<Vec<_>>()}
+				</Select>
+			</div>
+		});
+		host.step();
+		let surface = host.host;
+		let select = select_entity(&mut host);
+		host.app
+			.world_mut()
+			.entity_mut(select)
+			.insert((Focus, RenderSurface(surface)));
+		host.step();
+		host.send_input(b"\r");
+		host.step();
+		host.step();
+		// capped: the panel ends at the viewport, the tail rows are not painted,
+		// and the panel reserves a scrollbar for them
+		let frame = host.frame_plain();
+		frame.as_str().xpect_snapshot();
+		frame
+			.as_str()
+			.xpect_contains("Option 1")
+			.xnot()
+			.xpect_contains("Option 30");
+		frame.as_str().xpect_contains("█");
+		// Tab to the twentieth row scrolls it into view
+		for _ in 0..20 {
+			host.send_input(b"\t");
+			host.step();
+		}
+		let twentieth = rows(&mut host)
+			.into_iter()
+			.find(|(_, row)| row.value == "20")
+			.map(|(entity, _)| entity)
+			.unwrap();
+		focused(&mut host).xpect_eq(Some(twentieth));
+		// the minimum scroll: the focused row sits one row of context above the
+		// panel's bottom edge
+		host.frame_plain()
+			.as_str()
+			.xpect_contains("Option 20")
+			.xpect_contains("Option 21")
+			.xnot()
+			.xpect_contains("Option 22");
+		// a filter narrows the rows to the twelve containing "2", the first of
+		// them focused; Tab down them scrolls the panel with the filter line
+		// still on its first row
+		host.send_input(b"2");
+		host.step();
+		host.step();
+		let frame = host.frame_plain();
+		frame.as_str().xpect_contains("/2");
+		rows(&mut host).len().xpect_eq(12);
+		for _ in 0..8 {
+			host.send_input(b"\t");
+			host.step();
+		}
+		// the sticky line pins against the offset the focus scroll wrote after
+		// this frame's layout, so it settles a frame later
+		host.step();
+		let frame = host.frame_plain();
+		frame.as_str().xpect_snapshot();
+		let row_of = |needle: &str| {
+			frame
+				.lines()
+				.position(|line| line.contains(needle))
+				.unwrap()
+		};
+		(row_of("/2") < row_of("Option 2")).xpect_true();
+		frame.as_str().xpect_contains("Option 25");
+	}
+
 	/// The panel overlays a following `<select>` too, not just in-flow content:
 	/// a select is `position: relative` with no `z-index`, which forms no
 	/// stacking context, so the panel's `z-index` sorts against that sibling
@@ -784,6 +934,35 @@ mod test {
 			.xpect_contains("Designer")
 			.xnot()
 			.xpect_contains("Alpha");
+	}
+
+	/// Choosing an option whose *value* is wider than the control (a component
+	/// picker's type path) keeps the control at one row: its marker label is
+	/// what is measured, in layout as in measure, never the raw value.
+	///
+	/// Regression: `resolve_height` read the value before the marker, so the
+	/// closed control reserved the rows the wrapped type path would take.
+	#[beet_core::test]
+	fn choosing_a_wide_value_keeps_the_row() {
+		let mut host = host_showing(rsx! {
+			<div>
+				<Select name="component">
+					<optgroup label="Components">
+						<option value="bevy_ecs::name::Name">"Name"</option>
+						<option value="bevy_ecs::hierarchy::ChildOf">"ChildOf"</option>
+					</optgroup>
+				</Select>
+			</div>
+		});
+		let select = select_entity(&mut host);
+		activate(&mut host, select);
+		let (child_of, _) = rows(&mut host).remove(1);
+		activate(&mut host, child_of);
+		host.step();
+		host.step();
+		host.frame_plain().trim_lines().xpect_eq(
+			"┌───────────────────┐\n│  ChildOf ▾        │\n└───────────────────┘",
+		);
 	}
 
 	/// A press outside the select and its panel dismisses the panel.

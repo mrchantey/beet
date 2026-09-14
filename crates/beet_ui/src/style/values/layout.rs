@@ -214,6 +214,35 @@ impl AsCssValue for Position {
 	}
 }
 
+/// CSS `position-try-fallbacks`: what an out-of-flow box does when the
+/// placement its insets give it overflows the scroll port it is shown in.
+///
+/// `None` (default) leaves it where the insets put it. `FlipBlock` tries the
+/// insets mirrored across the block axis (a `top` becoming the same `bottom`),
+/// keeping the first placement that fits, else the one with more room; the
+/// charcell layout then caps the box to that room, so a dropdown never opens
+/// off the screen and a scrolling one scrolls its rows instead.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum PositionTry {
+	/// The insets are final.
+	#[default]
+	None,
+	/// Mirror `top`/`bottom` when the box would overflow its port.
+	FlipBlock,
+}
+
+impl AsCssValue for PositionTry {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::None => "none",
+			Self::FlipBlock => "flip-block",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 /// Resolved positioning for a node: its [`Position`] and the four inset
 /// (`top`/`right`/`bottom`/`left`) lengths, each `None` for CSS `auto`.
 ///
@@ -228,6 +257,9 @@ pub struct PositionStyle {
 	/// CSS `z-index`: stacking order within the parent stacking context. `None`
 	/// is `auto` (does not form a stacking context on its own).
 	pub z_index: Option<i32>,
+	/// CSS `position-try-fallbacks`: the placement to try when the insets
+	/// overflow the box's scroll port.
+	pub try_fallbacks: PositionTry,
 }
 
 impl PositionStyle {
@@ -243,6 +275,20 @@ impl PositionStyle {
 
 	/// Whether this style places the box anywhere but normal static flow.
 	pub fn is_positioned(&self) -> bool { self.position.is_positioned() }
+
+	/// Whether the box hangs from its `bottom` inset, growing upward: only a
+	/// `bottom` with no `top` anchors that way (with both it stretches, with
+	/// neither it sits at the block start).
+	pub fn hangs_from_bottom(&self) -> bool {
+		self.top().is_none() && self.bottom().is_some()
+	}
+
+	/// The insets mirrored across the block axis, `top` and `bottom` swapped:
+	/// the placement [`PositionTry::FlipBlock`] tries.
+	pub fn flipped_block(mut self) -> Self {
+		self.inset.swap(Self::TOP, Self::BOTTOM);
+		self
+	}
 }
 
 /// CSS `scrollbar-width`: the thickness of a scroll container's scrollbar.

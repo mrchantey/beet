@@ -7,6 +7,7 @@ use crate::style::Display;
 use crate::style::Length;
 use crate::style::Position;
 use crate::style::PositionStyle;
+use crate::style::PositionTry;
 use beet_core::prelude::*;
 use bevy::math::IRect;
 use bevy::math::IVec2;
@@ -36,16 +37,15 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 		let ordered = tree.pre_order(root);
 
 		// Root gets the full viewport rect
+		let viewport_rect =
+			IRect::new(0, 0, viewport_size.x as i32, viewport_size.y as i32);
 		let mut layout_rects = HashMap::<Entity, IRect>::new();
-		layout_rects.insert(
-			root,
-			IRect::new(0, 0, viewport_size.x as i32, viewport_size.y as i32),
-		);
+		layout_rects.insert(root, viewport_rect);
 		// The scroll port bounding each node's own box, narrowed as the walk
-		// descends into clipping containers (see `child_port_rows`). Nothing clips
+		// descends into clipping containers (see `child_port`). Nothing clips
 		// above the root, so its port is the whole screen.
-		let mut port_rows = HashMap::<Entity, u32>::new();
-		port_rows.insert(root, viewport_size.y);
+		let mut ports = HashMap::<Entity, IRect>::new();
+		ports.insert(root, viewport_rect);
 
 		// Read phase: use CharcellQuery to distribute rects to children.
 		// `managed` holds the structural rows/wrappers a table laid out itself, so
@@ -85,12 +85,14 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 				// shifts (carrying its content), an absolute/fixed box is placed
 				// against its containing block (its in-flow parent skipped it), so its
 				// subtree then lays out within the positioned rect.
+				let port = ports.get(&entity).copied().unwrap_or(viewport_rect);
 				position_node(
 					entity,
 					&node,
 					&charcell,
 					&parents,
 					viewport_size,
+					port,
 					&mut layout_rects,
 				);
 
@@ -100,16 +102,17 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 
 				// this node's children are bounded by its own scrollport when it
 				// clips, else by whatever port bounds the node itself.
-				let child_port_rows = child_port_rows(
+				let child_port = child_port(
 					&node,
 					&charcell,
 					node_rect,
 					viewport_size,
-					port_rows.get(&entity).copied().unwrap_or(viewport_size.y),
+					port,
 				);
 				for child in tree.children_of(entity) {
-					port_rows.insert(child, child_port_rows);
+					ports.insert(child, child_port);
 				}
+				let child_port_rows = child_port.height().max(0) as u32;
 
 				match node.layout_style().display {
 					Display::Flex => flex_layout_rects(
@@ -176,27 +179,32 @@ pub(crate) fn layout_nodes<B: Component + AsBuffer>(
 	Ok(())
 }
 
-/// The scroll port height bounding a node's children: its own scrollport when it
-/// clips its overflow (nothing inside a scroll port can ever be shown taller
-/// than the port), else the port it inherited.
+/// The scroll port bounding a node's children, in their layout space: the
+/// window its own scrollport currently shows when it clips its overflow
+/// (nothing inside a scroll port can ever be shown outside the port), else the
+/// port it inherited.
 ///
-/// Read by the sizing of any raster laid out below, so a picture is contained by
-/// the port it scrolls in — a nested pane or sidebar just as much as the window
-/// — rather than by a bound derived from the screen minus known chrome.
-fn child_port_rows(
+/// Layout is unscrolled and paint translates a scroll container's descendants
+/// by `-offset`, so the window is the scrollport shifted by the offset. Its
+/// rows bound the sizing of any raster laid out below, so a picture is
+/// contained by the port it scrolls in — a nested pane or sidebar just as much
+/// as the window — and its rect is what a flipping box ([`PositionTry`]) must
+/// fit in.
+fn child_port(
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	node_rect: IRect,
 	viewport: UVec2,
-	inherited: u32,
-) -> u32 {
+	inherited: IRect,
+) -> IRect {
 	if !(node.is_scroll_container() || node.layout_style().clips()) {
 		return inherited;
 	}
 	let box_model = BoxModel::from_node(node, viewport);
-	scrollport_of(node, query, box_model.content_rect(node_rect))
-		.height()
-		.max(0) as u32
+	translate_rect(
+		scrollport_of(node, query, box_model.content_rect(node_rect)),
+		node.scroll_offset(),
+	)
 }
 
 /// Block flow: stack children top-to-bottom, each taking full parent width.
@@ -367,13 +375,15 @@ fn parent_map(
 /// Place a positioned node, mutating its rect in `layout_rects`. A static node is
 /// left in its flow rect. Called in pre-order before the node's children lay out,
 /// so an absolute box (skipped by its in-flow parent) is positioned first and its
-/// subtree then flows within the new rect.
+/// subtree then flows within the new rect. `port` is the scroll port the node is
+/// shown in (see [`child_port`]), what a `position-try-fallbacks` box must fit.
 fn position_node(
 	entity: Entity,
 	node: &CharcellNodeData,
 	query: &CharcellQuery,
 	parents: &HashMap<Entity, Entity>,
 	viewport: UVec2,
+	port: IRect,
 	layout_rects: &mut HashMap<Entity, IRect>,
 ) {
 	let style = node.position_style();
@@ -417,8 +427,14 @@ fn position_node(
 					viewport,
 				),
 			};
-			layout_rects
-				.insert(entity, absolute_rect(node, &style, block, viewport));
+			let rect = absolute_rect(node, &style, block, viewport);
+			let rect = match style.try_fallbacks {
+				PositionTry::None => rect,
+				PositionTry::FlipBlock => {
+					flip_block_to_fit(node, &style, block, viewport, port, rect)
+				}
+			};
+			layout_rects.insert(entity, rect);
 		}
 		Position::Sticky => {
 			sticky_clamp(entity, node, query, parents, viewport, layout_rects);
@@ -529,6 +545,65 @@ fn absolute_rect(
 		},
 	);
 	IRect::new(x0, y0, x1, y1)
+}
+
+/// `position-try-fallbacks: flip-block`: keep the box's `natural` rect when its
+/// rows fit the `port`, else the rect its insets mirrored across the block axis
+/// give (a `top: 100%` dropdown reopening above its control as `bottom: 100%`)
+/// when that fits, else whichever of the two has more room, capped to that
+/// room. The cap trims the edge away from the anchor, so the box stays attached
+/// to it and a scroll container scrolls what was trimmed.
+///
+/// The flip-and-size rule every native select and completion popup follows,
+/// decided here because only the layout pass knows both the anchor's rect and
+/// the port's, the same resolution a raster's sizing makes against its port.
+fn flip_block_to_fit(
+	node: &CharcellNodeData,
+	style: &PositionStyle,
+	block: IRect,
+	viewport: UVec2,
+	port: IRect,
+	natural: IRect,
+) -> IRect {
+	let fits =
+		|rect: IRect| rect.min.y >= port.min.y && rect.max.y <= port.max.y;
+	if fits(natural) {
+		return natural;
+	}
+	let flipped_style = style.flipped_block();
+	let flipped = absolute_rect(node, &flipped_style, block, viewport);
+	if fits(flipped) {
+		return flipped;
+	}
+	// neither fits: the side with more room between the anchor and the port edge
+	let room = |rect: IRect, from_bottom: bool| {
+		if from_bottom {
+			rect.max.y - port.min.y
+		} else {
+			port.max.y - rect.min.y
+		}
+	};
+	let (natural_room, flipped_room) = (
+		room(natural, style.hangs_from_bottom()),
+		room(flipped, flipped_style.hangs_from_bottom()),
+	);
+	if flipped_room > natural_room {
+		cap_to_port(flipped, port, flipped_style.hangs_from_bottom())
+	} else {
+		cap_to_port(natural, port, style.hangs_from_bottom())
+	}
+}
+
+/// Trim `rect`'s rows to `port` on the edge away from its anchor: a box hanging
+/// from its `bottom` loses rows at the top, any other loses them at the bottom.
+/// Never inverts, so an anchor already past the port leaves an empty box.
+fn cap_to_port(mut rect: IRect, port: IRect, hangs_from_bottom: bool) -> IRect {
+	if hangs_from_bottom {
+		rect.min.y = rect.min.y.max(port.min.y).min(rect.max.y);
+	} else {
+		rect.max.y = rect.max.y.min(port.max.y).max(rect.min.y);
+	}
+	rect
 }
 
 /// Clamp an outer (border-box) `len` into content-box `min`/`max` bounds
@@ -1198,6 +1273,77 @@ mod tests {
 		let (col, row) = cell_of(&frame, 'F');
 		col.xpect_eq(0);
 		row.xpect_eq(5);
+	}
+
+	/// Lay out `content` in a `size` buffer with `rules`, returning each tag's
+	/// rect, for asserting a placement the frame alone cannot show (a cap at
+	/// the port's edge reads the same as a clip).
+	fn positioned_rects(
+		size: UVec2,
+		rules: Vec<Rule>,
+		content: impl Bundle,
+	) -> HashMap<String, IRect> {
+		let mut world = CharcellPlugin::world();
+		world.get_resource_or_init::<RuleSet>().extend_rules(rules);
+		world.spawn((Buffer::new(size).into_double_buffer(), content));
+		world.run_schedule(PostParseTree);
+		world
+			.run_system_once(|query: Query<(&Element, &LayoutRect)>| {
+				query
+					.iter()
+					.map(|(element, rect)| (element.tag().to_string(), rect.0))
+					.collect::<HashMap<_, _>>()
+			})
+			.unwrap()
+	}
+
+	/// `position-try-fallbacks: flip-block`: a `top: 100%` box stays below its
+	/// anchor while it fits the port, hangs from the anchor's top when only
+	/// above fits, and is capped to the roomier side when neither does.
+	#[beet_core::test]
+	fn flip_block_fits_the_port() {
+		let rules = || {
+			vec![
+				Rule::class("anchor")
+					.with_value(common_props::PositionProp, Position::Relative),
+				Rule::class("panel")
+					.with_value(common_props::PositionProp, Position::Absolute)
+					.with_value(common_props::InsetTop, Length::Percent(100.))
+					.with_value(common_props::InsetLeft, Length::Rem(0.))
+					.with_value(
+						common_props::PositionTryProp,
+						PositionTry::FlipBlock,
+					),
+			]
+		};
+		// a one-row anchor `fillers` rows down, a panel of `rows` hanging from it
+		let page = |fillers: usize, rows: &str| {
+			let rows = rows.to_string();
+			rsx! {
+				<div>
+					{(0..fillers).map(|_| rsx! { <div>"x"</div> }).collect::<Vec<_>>()}
+					<section class="anchor">"A"
+						<aside class="panel"><pre>{rows}</pre></aside>
+					</section>
+				</div>
+			}
+		};
+		// the panel's rows as `(top, bottom)`
+		let panel_rows = |size: UVec2, fillers: usize, rows: &str| {
+			positioned_rects(size, rules(), page(fillers, rows))["aside"]
+				.xmap(|rect| (rect.min.y, rect.max.y))
+		};
+		// fits below the anchor on row 4 of 8
+		panel_rows(UVec2::new(10, 8), 4, "1\n2\n3").xpect_eq((5, 8));
+		// only above fits: hangs from the top of the anchor on row 6
+		panel_rows(UVec2::new(10, 8), 6, "1\n2\n3").xpect_eq((3, 6));
+		// neither fits: two rows of room below the anchor on row 1 of 4 beat the
+		// one above, so it stays below, capped to the port
+		panel_rows(UVec2::new(10, 4), 1, "1\n2\n3\n4\n5").xpect_eq((2, 4));
+		// neither fits: six rows above the anchor on row 6 of 8 beat the one
+		// below, so it flips, capped to the port's top
+		panel_rows(UVec2::new(10, 8), 6, "1\n2\n3\n4\n5\n6\n7")
+			.xpect_eq((0, 6));
 	}
 
 	/// `position: sticky` `top: 0` inside a scroll container pins its laid-out rect

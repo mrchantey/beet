@@ -325,6 +325,9 @@ fn resolve_position(
 			query.resolve(entity, InsetLeft, memo).ok(),
 		],
 		z_index: query.resolve(entity, ZIndexProp, memo).ok(),
+		try_fallbacks: query
+			.resolve(entity, PositionTryProp, memo)
+			.unwrap_or_default(),
 	}
 	.xok()
 }

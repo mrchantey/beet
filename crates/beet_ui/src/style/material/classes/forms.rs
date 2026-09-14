@@ -211,6 +211,12 @@ pub fn select_focus() -> Rule {
 /// The open select's floating option panel: absolutely positioned just below
 /// the control (its positioned `.select` is the containing block), stretched
 /// to its width, and lifted above subsequent content.
+///
+/// It never opens off the screen: `position-try-fallbacks: flip-block` reopens
+/// it above the control when it does not fit below, and the layout caps it to
+/// the room on its side, where `overflow-y: auto` scrolls the rows that were
+/// trimmed. The rule every native select and completion popup follows, so it
+/// belongs here rather than to any picker that happens to sit low on a page.
 pub fn select_dropdown() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SELECT_DROPDOWN))
@@ -219,6 +225,8 @@ pub fn select_dropdown() -> Rule {
 		.with_value(common_props::InsetLeft, Length::Rem(0.))
 		.with_value(common_props::InsetRight, Length::Rem(0.))
 		.with_value(common_props::ZIndexProp, 1000)
+		.with_value(common_props::PositionTryProp, PositionTry::FlipBlock)
+		.with_value(common_props::OverflowYProp, Overflow::Auto)
 		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHigh).unwrap()
 		.with_token(common_props::BorderColorProp,colors::Outline).unwrap()
 		.with_token(common_props::OutlineWidth,geometry::OutlineWidthThin).unwrap()
@@ -254,16 +262,21 @@ pub fn select_option_active() -> Rule {
 }
 
 /// The panel's filter line: the muted voice of a hint, so it reads as what the
-/// rows are refined by rather than as a row to choose.
+/// rows are refined by rather than as a row to choose. Sticky at the panel's
+/// top, on the panel's own surface, so it stays in view (and covers the row
+/// beneath) as a capped panel scrolls its rows.
 pub fn select_filter() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SELECT_FILTER))
 		.with_value(common_props::DisplayProp, Display::Block)
+		.with_value(common_props::PositionProp, Position::Sticky)
+		.with_value(common_props::InsetTop, Length::Rem(0.))
 		.with_value(common_props::Padding, Spacing {
 			left: Length::Rem(1.),
 			right: Length::Rem(1.),
 			..Spacing::DEFAULT
 		})
+		.with_token(common_props::BackgroundColor,colors::SurfaceContainerHigh).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnSurfaceVariant).unwrap()
 		.with_value(common_props::FontStyleProp, FontStyle::Italic)
 }

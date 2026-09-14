@@ -130,6 +130,7 @@ impl PropResolver {
 			("bottom", prop::<InsetBottom>()),
 			("left", prop::<InsetLeft>()),
 			("z-index", prop::<ZIndexProp>()),
+			("position-try-fallbacks", prop::<PositionTryProp>()),
 			("cursor", prop::<CursorProp>()),
 			("transform", prop::<TransformProp>()),
 			("font-size", prop::<FontSize>()),
