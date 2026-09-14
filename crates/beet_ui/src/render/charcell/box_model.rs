@@ -560,10 +560,12 @@ pub(super) fn inset_cells(
 }
 
 /// Translate a signed rect by `offset` (both corners), the scroll/paint shift.
+/// Saturating: layout runs before the clamp pass, so the offset may still be
+/// a [`ScrollPosition::END`] jump.
 pub(super) fn translate_rect(rect: IRect, offset: IVec2) -> IRect {
 	IRect {
-		min: rect.min + offset,
-		max: rect.max + offset,
+		min: rect.min.saturating_add(offset),
+		max: rect.max.saturating_add(offset),
 	}
 }
 

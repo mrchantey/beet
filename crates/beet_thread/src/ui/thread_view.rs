@@ -377,7 +377,7 @@ pub(crate) fn follow_thread_scroll(
 		// `clamp_scroll_positions` settles each of these to its own bottom
 		for entity in path {
 			if let Ok(mut scroll) = scrolls.get_mut(entity) {
-				scroll.offset.y = i32::MAX;
+				scroll.offset.y = ScrollPosition::END;
 			}
 		}
 	}

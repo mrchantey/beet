@@ -477,6 +477,16 @@ mod test {
 			.collect()
 	}
 
+	/// The row for `value`. By value, never by query index: iteration order is
+	/// archetype order, which differs across targets.
+	fn row_by_value(host: &mut TestHost, value: &str) -> Entity {
+		rows(host)
+			.into_iter()
+			.find(|(_, row)| row.value == value)
+			.map(|(entity, _)| entity)
+			.unwrap()
+	}
+
 	/// The entity holding keyboard focus, if any.
 	fn focused(host: &mut TestHost) -> Option<Entity> {
 		host.app
@@ -630,11 +640,7 @@ mod test {
 		let mut host = select_host();
 		let select = select_entity(&mut host);
 		activate(&mut host, select);
-		let designer = rows(&mut host)
-			.into_iter()
-			.find(|(_, row)| row.value == "designer")
-			.map(|(entity, _)| entity)
-			.unwrap();
+		let designer = row_by_value(&mut host, "designer");
 		activate(&mut host, designer);
 		host.step();
 		dropdown(&mut host).xpect_none();
@@ -675,11 +681,7 @@ mod test {
 		host.step();
 		host.send_input(b"\t");
 		host.step();
-		let second = rows(&mut host)
-			.into_iter()
-			.find(|(_, row)| row.value == "designer")
-			.map(|(entity, _)| entity)
-			.unwrap();
+		let second = row_by_value(&mut host, "designer");
 		focused(&mut host).xpect_eq(Some(second));
 		// Enter chooses the focused row
 		host.send_input(b"\r");
@@ -863,11 +865,7 @@ mod test {
 			host.send_input(b"\t");
 			host.step();
 		}
-		let twentieth = rows(&mut host)
-			.into_iter()
-			.find(|(_, row)| row.value == "20")
-			.map(|(entity, _)| entity)
-			.unwrap();
+		let twentieth = row_by_value(&mut host, "20");
 		focused(&mut host).xpect_eq(Some(twentieth));
 		// the minimum scroll: the focused row sits one row of context above the
 		// panel's bottom edge
@@ -956,7 +954,7 @@ mod test {
 		});
 		let select = select_entity(&mut host);
 		activate(&mut host, select);
-		let (child_of, _) = rows(&mut host).remove(1);
+		let child_of = row_by_value(&mut host, "bevy_ecs::hierarchy::ChildOf");
 		activate(&mut host, child_of);
 		host.step();
 		host.step();

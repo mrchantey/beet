@@ -33,6 +33,13 @@ pub struct ScrollPosition {
 }
 
 impl ScrollPosition {
+	/// An offset past any content on an axis, the "jump to the end" a follow or
+	/// an `End` key writes; the clamp pass settles it to the real maximum. Half
+	/// the range, so layout (which runs before the clamp) can translate by it.
+	pub const END: i32 = i32::MAX / 2;
+	/// The [`END`](Self::END) twin for the start, settled to zero.
+	pub const START: i32 = i32::MIN / 2;
+
 	/// A scroll position at the given cell offset.
 	pub fn new(offset: IVec2) -> Self {
 		Self {

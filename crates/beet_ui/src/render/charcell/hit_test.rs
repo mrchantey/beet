@@ -337,8 +337,8 @@ pub(crate) fn scroll_input(
 				KeyCode::PageDown => delta.y += PAGE_SCROLL_LINES,
 				KeyCode::PageUp => delta.y -= PAGE_SCROLL_LINES,
 				// Home/End jump to the top/bottom; the clamp settles the huge offset.
-				KeyCode::Home => delta.y = i32::MIN / 2,
-				KeyCode::End => delta.y = i32::MAX / 2,
+				KeyCode::Home => delta.y = ScrollPosition::START,
+				KeyCode::End => delta.y = ScrollPosition::END,
 				_ => {}
 			}
 		}
