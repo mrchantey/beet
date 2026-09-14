@@ -160,6 +160,15 @@ impl GlobFilter {
 		self
 	}
 
+	/// Excludes everything inside a directory named `dir` at any depth
+	/// (`dir/*` and `*/dir/*`): the churn dirs (`target`, `dist`, `.git`) by
+	/// segment, where a bare `*dir*` would also swallow a `targets.md` or a
+	/// `distributed/` beside them.
+	pub fn with_exclude_dir(self, dir: &str) -> Self {
+		self.with_exclude(&format!("{dir}/*"))
+			.with_exclude(&format!("*/{dir}/*"))
+	}
+
 	/// Returns `true` if there are no include or exclude patterns.
 	pub fn is_empty(&self) -> bool {
 		self.include.is_empty() && self.exclude.is_empty()
@@ -395,6 +404,17 @@ mod test {
 		pat.matches("foo").xpect_false();
 		pat.matches("target").xpect_true();
 		pat.matches("foo/target/foo").xpect_true();
+	}
+
+	/// `with_exclude_dir` excludes a directory by segment at any depth, and
+	/// nothing merely containing its name.
+	#[crate::test]
+	fn exclude_dir_matches_segments_only() {
+		let filter = GlobFilter::default().with_exclude_dir("target");
+		filter.passes("target/debug/foo").xpect_false();
+		filter.passes("site/target/foo").xpect_false();
+		filter.passes("routes/targets.md").xpect_true();
+		filter.passes("target").xpect_true();
 	}
 
 	#[crate::test]

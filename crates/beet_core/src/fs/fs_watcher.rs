@@ -42,7 +42,10 @@ use std::time::Duration;
 pub struct FsWatcher {
 	/// The path to watch.
 	pub path: AbsPathBuf,
-	/// Glob filter for paths to include/exclude.
+	/// Glob filter for paths to include/exclude, matched against each path
+	/// relative to [`path`](Self::path), so an exclude like `*target*` skips a
+	/// `target/` inside the watched dir without silently disabling a watched dir
+	/// that merely sits under one.
 	pub filter: GlobFilter,
 	/// Debounce time in milliseconds.
 	pub debounce: Duration,
@@ -64,16 +67,18 @@ impl FsWatcher {
 	/// Creates a new [`FsWatcher`] for the given path.
 	pub fn new(path: AbsPathBuf) -> Self { Self { path, ..default() } }
 
-	/// Returns a default configuration suitable for watching Cargo projects.
+	/// Returns a default configuration suitable for watching Cargo projects:
+	/// the build, vcs and generated dirs are excluded by segment (see
+	/// [`GlobFilter::with_exclude_dir`]).
 	pub fn default_cargo() -> Self {
 		Self {
 			filter: GlobFilter::default()
-				.with_exclude("*.git*")
+				.with_exclude_dir(".git")
 				// temp until we get fine grained codegen control
-				.with_exclude("*codegen*")
-				.with_exclude("*.beet*")
+				.with_exclude_dir("codegen")
+				.with_exclude_dir(".beet")
 				.with_exclude("*rustc-ice-*")
-				.with_exclude("*target*"),
+				.with_exclude_dir("target"),
 			// avoid short burst refreshing
 			debounce: Duration::from_millis(100),
 			..default()
@@ -154,7 +159,11 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 					}
 				};
 				let Some(ev) = DirEvent::new(ev)?.apply_filter(|ev| {
-					watcher.filter.passes(ev.path.to_string())
+					ev.path
+						.strip_prefix(&watcher.path)
+						.unwrap_or(&ev.path)
+						.to_string_lossy()
+						.xmap(|rel| watcher.filter.passes(rel))
 				}) else {
 					// empty after filter
 					continue;
@@ -383,22 +392,20 @@ impl DirEvent {
 #[cfg(feature = "rand")]
 mod test {
 	use crate::prelude::*;
+	use std::sync::Arc;
+	use std::sync::atomic::AtomicBool;
+	use std::sync::atomic::Ordering;
 
-	#[crate::test]
-	async fn works() {
-		use std::sync::Arc;
-		use std::sync::atomic::AtomicBool;
-		use std::sync::atomic::Ordering;
-
+	/// Run `watcher` over `dir` until a write to `dir/foobar.txt` surfaces as a
+	/// [`DirEvent`] under `dir`, then exit.
+	async fn watch_until_write_lands(watcher: FsWatcher, dir: AbsPathBuf) {
 		let mut app = App::new();
-		let tempdir = TempDir::new().unwrap();
-		let path = tempdir.path().clone();
-		let path2 = path.clone();
+		let path = dir.clone();
 		app.add_plugins(AsyncPlugin)
-			.spawn(FsWatcher::default().with_path(path.clone()))
+			.spawn(watcher.with_path(dir.clone()))
 			.add_observer(move |ev: On<DirEvent>, mut commands: Commands| {
 				for ev in ev.iter() {
-					if ev.path.starts_with(&path2) {
+					if ev.path.starts_with(&path) {
 						commands.write_message(AppExit::Success);
 					}
 				}
@@ -416,7 +423,7 @@ mod test {
 			while !done2.load(Ordering::Relaxed) {
 				std::thread::sleep(Duration::from_millis(50));
 				let _ = fs_ext::write(
-					path.join("foobar.txt"),
+					dir.join("foobar.txt"),
 					format!("foobar {i}"),
 				);
 				i += 1;
@@ -424,7 +431,31 @@ mod test {
 		});
 		app.run_async().await.xpect_eq(AppExit::Success);
 		done.store(true, Ordering::Relaxed);
+	}
+
+	#[crate::test]
+	async fn works() {
+		let tempdir = TempDir::new().unwrap();
+		watch_until_write_lands(FsWatcher::default(), tempdir.path().clone())
+			.await;
 		// tempdir kept alive until here to prevent cleanup race
+		drop(tempdir);
+	}
+
+	/// The filter matches paths relative to the watched dir: the cargo
+	/// excludes skip a `target/` inside it, not a watched dir that happens to
+	/// live under one (a site fixture under `target/`, a project named
+	/// `distributed`), which used to silence live reload with no error.
+	#[crate::test]
+	async fn filter_is_relative_to_the_watched_dir() {
+		let tempdir = TempDir::new().unwrap();
+		let dir = tempdir.path().join("target/site");
+		fs_ext::create_dir_all(&dir).unwrap();
+		watch_until_write_lands(
+			FsWatcher::default_cargo(),
+			AbsPathBuf::new(dir).unwrap(),
+		)
+		.await;
 		drop(tempdir);
 	}
 

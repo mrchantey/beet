@@ -17,7 +17,6 @@
 //! just check-wasm-render   # this check (needs chromedriver + a chromium)
 //! ```
 
-use crate::commands::run_wasm_browser::free_port;
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
@@ -148,8 +147,8 @@ async fn serve(page: String) -> Result<u16> {
 /// A uniquely-ported chromium driver, so the check never fights another suite's.
 fn driver() -> Result<Client> {
 	Client::default()
-		.with_driver_port(free_port()?)
-		.with_websocket_port(free_port()?)
+		.with_driver_port(HttpServer::free_port()?)
+		.with_websocket_port(HttpServer::free_port()?)
 		.xok()
 }
 

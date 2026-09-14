@@ -79,11 +79,18 @@ impl HttpServer {
 }
 /// The hyper accept loop: serve each connection on its own spawned task. Diverges
 /// (only the shutdown race in [`HttpServer::start_hyper_with_tcp`] ends it).
+///
+/// Every connection task ends with the loop, racing its work against the
+/// `alive` channel that closes when the loop's sender drops on shutdown (see
+/// the mini server's accept loop): no connection outlives its server to be
+/// answered by a torn-down entity.
 async fn hyper_accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
 ) -> Result {
+	// never sent to: dropping the sender is the signal
+	let (_alive_tx, alive_rx) = async_channel::bounded::<()>(1);
 	loop {
 		let (tcp, addr) = listener
 			.accept()
@@ -93,9 +100,18 @@ async fn hyper_accept_loop(
 		trace!("New connection from: {}", addr);
 
 		let tls = tls.clone();
+		let alive = alive_rx.clone();
 		entity
 			.run_async_local(async move |entity| {
-				if let Err(err) = serve_sniffed(entity, tcp, addr, tls).await {
+				let served = beet_core::exports::futures_lite::future::or(
+					serve_sniffed(entity, tcp, addr, tls),
+					async move {
+						alive.recv().await.ok();
+						Ok(())
+					},
+				)
+				.await;
+				if let Err(err) = served {
 					error!("Error handling connection from {addr}: {err}");
 				}
 			})

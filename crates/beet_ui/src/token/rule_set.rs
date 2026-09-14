@@ -9,19 +9,30 @@ use bevy::reflect::Typed;
 /// The default rule is the **lowest-priority fallback**: the cascade only
 /// consults it (via [`RuleSetQuery`]) once the matching rules and the ancestor
 /// walk find nothing, so a matching rule like `.dark-scheme` always overrides a
-/// value baked into `:root`. Among the matching rules, earlier entries win ties
-/// (they're ordered most-specific first).
+/// value baked into `:root`. Among the matching rules the most specific selector
+/// wins, and ties go to the later rule, mirroring CSS source order.
 #[derive(Debug, Clone, Reflect, Resource)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RuleSet {
 	/// The `:root` rule — the lowest-priority fallback, kept out of `rules` so
 	/// it never shadows a matching rule.
 	default_rule: Rule,
-	/// Ordered matching rules; earlier rules win ties.
-	rules: VecDeque<Rule>,
+	/// Ordered matching rules; later rules win ties.
+	rules: VecDeque<RuleEntry>,
 	/// Inline rules are only declared once. Calling [`Self::try_insert_inline`]
 	/// with a rule whose selector matches one of these does nothing.
 	registered_inline: HashSet<Selector>,
+}
+
+/// A matching rule and the entity that declared it. A markup `<Rule>` is owned
+/// by its element, so tearing the scene down removes its rules
+/// ([`RuleSet::remove_owned`]) rather than leaving a stale copy behind on every
+/// rebuild; a plugin-registered rule has no owner and lives as long as the world.
+#[derive(Debug, Clone, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+struct RuleEntry {
+	owner: Option<Entity>,
+	rule: Rule,
 }
 
 /// By default, the rule set is initialized with an empty `:root` rule.
@@ -50,20 +61,33 @@ impl RuleSet {
 		true
 	}
 
-	/// Add a new rule, merging with the last added when both its selector and
-	/// `@media` gate match. The media check keeps a screen/terminal-gated rule
-	/// from folding its declarations into an adjacent ungated rule with the same
-	/// selector (eg `.sidebar` + a screen-only `.sidebar` width), which would
-	/// strip the gate and leak the value to every target.
-	pub fn insert_rule(&mut self, rule: Rule) {
+	/// Add a new unowned rule, merging with the last added when both its
+	/// selector and `@media` gate match. The media check keeps a
+	/// screen/terminal-gated rule from folding its declarations into an adjacent
+	/// ungated rule with the same selector (eg `.sidebar` + a screen-only
+	/// `.sidebar` width), which would strip the gate and leak the value to every
+	/// target.
+	pub fn insert_rule(&mut self, rule: Rule) { self.insert_owned(None, rule); }
+
+	/// Add a rule declared by `owner` (a markup `<Rule>` element), removed again
+	/// by [`Self::remove_owned`] when that entity goes. Merges like
+	/// [`Self::insert_rule`], but only into a rule of the same owner, so a
+	/// removal never strips declarations another owner contributed.
+	pub fn insert_owned(&mut self, owner: Option<Entity>, rule: Rule) {
 		if let Some(last) = self.rules.back_mut()
-			&& last.selector() == rule.selector()
-			&& last.media() == rule.media()
+			&& last.owner == owner
+			&& last.rule.selector() == rule.selector()
+			&& last.rule.media() == rule.media()
 		{
-			last.push_declarations(rule);
+			last.rule.push_declarations(rule);
 		} else {
-			self.rules.push_back(rule);
+			self.rules.push_back(RuleEntry { owner, rule });
 		}
+	}
+
+	/// Remove every rule `owner` declared, ie a despawned `<Rule>` element's.
+	pub fn remove_owned(&mut self, owner: Entity) {
+		self.rules.retain(|entry| entry.owner != Some(owner));
 	}
 	pub fn with_rule(mut self, rule: Rule) -> Self {
 		self.insert_rule(rule);
@@ -83,19 +107,25 @@ impl RuleSet {
 		entity: Entity,
 		key: &TokenKey,
 	) -> Option<&mut Rule> {
-		self.rules.iter_mut().find(|r| {
-			r.selector() == &Selector::Entity(entity) && r.contains_key(key)
-		})
+		self.rules
+			.iter_mut()
+			.map(|entry| &mut entry.rule)
+			.find(|rule| {
+				rule.selector() == &Selector::Entity(entity)
+					&& rule.contains_key(key)
+			})
 	}
 
 	/// Iterates the matching rules in insertion order, excluding the `:root`
 	/// default rule.
-	pub fn rules(&self) -> impl Iterator<Item = &Rule> { self.rules.iter() }
+	pub fn rules(&self) -> impl Iterator<Item = &Rule> {
+		self.rules.iter().map(|entry| &entry.rule)
+	}
 
 	/// Iterates every rule for serialization — the `:root` default first, then
 	/// the matching rules.
 	pub fn iter(&self) -> impl Iterator<Item = &Rule> {
-		core::iter::once(&self.default_rule).chain(self.rules.iter())
+		core::iter::once(&self.default_rule).chain(self.rules())
 	}
 
 	/// The `:root` default rule — the lowest-priority cascade fallback.
@@ -171,8 +201,7 @@ impl RuleSet {
 		ancestors: &[ElementView],
 		viewport: Option<MediaViewport>,
 	) -> Vec<usize> {
-		self.rules
-			.iter()
+		self.rules()
 			.enumerate()
 			.filter(|(_, rule)| {
 				rule.media()
@@ -189,8 +218,7 @@ impl RuleSet {
 	/// common case) skip that walk, and `resolve_styles` only re-cascades on a
 	/// surface resize when this holds.
 	pub fn has_width_media(&self) -> bool {
-		self.rules
-			.iter()
+		self.rules()
 			.any(|rule| matches!(rule.media(), Some(MediaQuery::MaxWidth(_))))
 	}
 
@@ -198,8 +226,7 @@ impl RuleSet {
 	/// descendant), ie whether the cascade must build the ancestor element chain
 	/// to match. Combinator-free rule sets (the common case) skip that work.
 	fn has_combinator_rules(&self) -> bool {
-		self.rules
-			.iter()
+		self.rules()
 			.any(|rule| rule.selector().is_combinator_deep())
 	}
 
@@ -218,7 +245,7 @@ impl RuleSet {
 		matched
 			.iter()
 			.filter_map(|&index| {
-				let rule = &self.rules[index];
+				let rule = &self.rules[index].rule;
 				rule.get(key)
 					.ok()
 					.map(|value| (rule.selector().specificity(), value))

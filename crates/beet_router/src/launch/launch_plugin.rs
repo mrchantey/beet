@@ -161,8 +161,10 @@ async fn build_entry(
 	// binary without `client_io` has no reload channel to serve.
 	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	if watch_dir.is_some() && config.watch {
-		return build_watched_entry(world, repo_store, entry_name, formats)
-			.await;
+		return entry_build::build_watched(
+			world, repo_store, entry_name, formats,
+		)
+		.await;
 	}
 	// otherwise the plain one-shot build. The binary stays unopinionated: it
 	// simply loads, and the entry's own markup decides how it runs by carrying
@@ -184,49 +186,6 @@ async fn build_entry(
 			Ok(())
 		})
 		.await
-}
-
-/// The `--watch` entry build (native-only): install the live-reload driver
-/// ([`EntryReloader`]), then do the first build through the same
-/// [`entry_build::rebuild_watched`] path a structural change re-runs (which also
-/// recomputes the structural source set — the entry document and its transitive
-/// `<Template src>` includes — per build).
-///
-/// So editing the entry document or an included `<Template src>` tears the old
-/// scene down and rebuilds it with no leaked entities (servers rebind, sockets
-/// reconnect), while a markdown/template edit keeps the light content re-fire.
-#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
-async fn build_watched_entry(
-	world: &AsyncWorld,
-	repo_store: BlobStore,
-	entry_name: String,
-	formats: TemplateFormats,
-) -> Result {
-	// the driver's rebuild callback, re-cloning the store/name/formats per build
-	// (it is an `Fn`, re-run on every structural change). The structural source
-	// set starts empty; the first build below populates it.
-	let rebuild = {
-		let repo_store = repo_store.clone();
-		let entry_name = entry_name.clone();
-		let formats = formats.clone();
-		move |world: AsyncWorld| -> LocalBoxedFuture<'static, Result> {
-			let (repo_store, entry_name, formats) =
-				(repo_store.clone(), entry_name.clone(), formats.clone());
-			Box::pin(async move {
-				entry_build::rebuild_watched(
-					&world, repo_store, entry_name, formats,
-				)
-				.await
-			})
-		}
-	};
-	world
-		.with(move |world: &mut World| {
-			world.insert_resource(EntryReloader::new(default(), rebuild));
-		})
-		.await;
-	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
-	entry_build::rebuild_watched(world, repo_store, entry_name, formats).await
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the

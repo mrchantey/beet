@@ -116,12 +116,15 @@ impl Socket {
 				let read_feed = feed.clone();
 				let target = entity.id();
 				entity.world_scope(move |world| {
-					// parent the observer to the socket so it is despawned with the
-					// socket: it holds a clone of the writer channel's sender, so a
-					// leaked observer would keep the channel open forever and the writer
-					// task would never end, leaving a despawned socket's connection open
-					// (a browser watching a torn-down server would never see the close).
-					world.spawn((
+					// watching the socket alone (no `ChildOf`) is what despawns the
+					// observer with it: bevy despawns an observer once every entity it
+					// watches is gone, and parenting it too would queue a second despawn
+					// onto the already-gone observer. It must go with the socket: it
+					// holds a clone of the writer channel's sender, so a leaked observer
+					// would keep the channel open forever and the writer task would never
+					// end, leaving a despawned socket's connection open (a browser
+					// watching a torn-down server would never see the close).
+					world.spawn(
 						Observer::new(move |ev: On<MessageSend>| -> Result {
 							read_feed
 								.lock()
@@ -130,8 +133,7 @@ impl Socket {
 							Ok(())
 						})
 						.with_entity(target),
-						ChildOf(target),
-					));
+					);
 				});
 				entity.insert(WriterFeed(feed));
 			}
@@ -567,6 +569,33 @@ mod tests {
 		};
 		send.close(Some(frame.clone())).await.unwrap();
 		writer.closed.get().unwrap().xpect_eq(frame);
+	}
+
+	/// Despawning a socket despawns its `MessageSend` writer observer exactly
+	/// once, through the watched-entity link alone: a parent link too would
+	/// queue a second despawn onto the gone observer (bevy's `despawn` command
+	/// warns on a missing entity), and no observer may outlive the socket, since
+	/// it holds the writer channel open.
+	#[beet_core::test]
+	async fn despawn_takes_the_writer_observer() {
+		let mut world = (MinimalPlugins, AsyncPlugin).into_world();
+		let reader = stream::empty::<Result<Message>>();
+		let socket = world
+			.spawn(Socket::new(reader, DummyWriter::default()))
+			.flush();
+		world
+			.with_state::<Query<(), With<Observer>>, _>(|query| {
+				query.iter().count()
+			})
+			.xpect_eq(1);
+		world.entity(socket).contains::<Children>().xpect_false();
+		world.entity_mut(socket).despawn();
+		world.flush();
+		world
+			.with_state::<Query<(), With<Observer>>, _>(|query| {
+				query.iter().count()
+			})
+			.xpect_eq(0);
 	}
 
 	#[beet_core::test]

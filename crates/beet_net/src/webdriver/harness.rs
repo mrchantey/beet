@@ -32,11 +32,19 @@
 //! `|app: &mut App|` closure seeding resources). The listener is pre-bound to
 //! port 0 (no port race, parallel-test safe) and the driver rides
 //! [`Client::unique`], so harnesses stack freely within one test binary.
+//!
+//! A tree that boots its own listener (a no-code entry declaring
+//! `<HttpServer>`) goes through [`PageHarness::serve_app`] instead, naming the
+//! url its setup will bind.
 
 use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::app::Plugins;
+
+/// How long [`PageHarness::serve_app`] waits for the served app's listener,
+/// generous for a debug-build entry that scans its routes before binding.
+const LISTENER_DEADLINE: Duration = Duration::from_secs(30);
 
 /// One served beet app plus one driven browser: serve a bundle, visit it,
 /// assert on the live page. See the [module docs](self).
@@ -67,6 +75,25 @@ impl PageHarness {
 		// harnesses may serve concurrently in one test binary.
 		server.canonical = false;
 		let url = server.local_url();
+		Self::serve_app(url, move |app| {
+			app.add_plugins(plugins);
+			// the server owns the boot, its dispatch host is the child
+			app.world_mut().spawn((server, on_spawn, children![host]));
+		})
+		.await
+	}
+
+	/// Serve an app of the caller's own making: `setup` runs on the harness
+	/// thread against the baked-in app (`MinimalPlugins` paced + [`ServerPlugin`])
+	/// and must boot a listener at `url`, which is awaited before the browser
+	/// opens. The shape behind [`Self::serve`]; reach for it when the served
+	/// tree boots its own server, eg a no-code entry whose `<HttpServer>`
+	/// declares its port (see [`HttpServer::free_port`]).
+	pub async fn serve_app(
+		url: impl Into<String>,
+		setup: impl 'static + Send + FnOnce(&mut App),
+	) -> Result<Self> {
+		let url = url.into();
 		let exit = Store::new(false);
 		let thread = std::thread::spawn(move || {
 			let mut app = App::new();
@@ -79,7 +106,6 @@ impl PageHarness {
 				),
 			))
 			.add_plugins(ServerPlugin)
-			.add_plugins(plugins)
 			.add_systems(
 				bevy::app::Update,
 				move |mut writer: MessageWriter<AppExit>| {
@@ -88,10 +114,10 @@ impl PageHarness {
 					}
 				},
 			);
-			// the server owns the boot, its dispatch host is the child
-			app.world_mut().spawn((server, on_spawn, children![host]));
+			setup(&mut app);
 			app.run()
 		});
+		Self::await_listener(&url).await?;
 		let browser = Browser::new_with(Client::unique()).await?;
 		Self {
 			browser,
@@ -100,6 +126,26 @@ impl PageHarness {
 			thread,
 		}
 		.xok()
+	}
+
+	/// Wait for `url`'s listener to accept a connection: a pre-bound listener
+	/// answers at once, a tree booting its own server on its `Ready` a little
+	/// later (its whole entry build first).
+	async fn await_listener(url: &str) -> Result<()> {
+		let addr = Url::parse(url)?
+			.authority()
+			.ok_or_else(|| bevyhow!("harness url `{url}` has no authority"))?
+			.to_string();
+		poll_ext::poll_async_with(
+			async || {
+				std::net::TcpStream::connect(&addr)
+					.map(|_| ())
+					.map_err(|err| bevyhow!("`{addr}` not listening: {err}"))
+			},
+			LISTENER_DEADLINE,
+			poll_ext::DEFAULT_INTERVAL,
+		)
+		.await
 	}
 
 	/// [`Self::serve`] then [`Self::goto`] `path`: the one-line entry for tests

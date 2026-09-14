@@ -34,6 +34,11 @@ pub struct EntryPrescan {
 	/// Every local `<Template src>` include. Remote includes are skipped: they are
 	/// not local files a watcher sees.
 	pub includes: Vec<SmolStr>,
+	/// Every uppercase tag the document uses, conditional subtrees included: the
+	/// watch path promotes a `<TemplateDir>` template the entry instantiates to a
+	/// structural source, and a tag inside an excluded branch costs at most an
+	/// extra rebuild.
+	pub tags: HashSet<SmolStr>,
 }
 
 impl EntryPrescan {
@@ -64,8 +69,10 @@ impl EntryPrescan {
 			let BsxNode::Element(element) = node else {
 				continue;
 			};
+			Self::collect_tag(element, &mut self.tags);
 			// a conditional subtree is the build's to answer, see the type docs
 			if element.attributes.iter().any(|attr| attr.key == "bx:cfg") {
+				Self::collect_tags(&element.children, &mut self.tags);
 				continue;
 			}
 			match element.tag.as_str() {
@@ -93,6 +100,27 @@ impl EntryPrescan {
 				_ => {}
 			}
 			self.collect(&element.children);
+		}
+	}
+
+	/// Record `element`'s tag if it names a template/component: uppercase, or a
+	/// module path ending in an uppercase segment (`widgets::Card`).
+	fn collect_tag(element: &BsxElement, tags: &mut HashSet<SmolStr>) {
+		if element.tag.rsplit("::").next().is_some_and(|name| {
+			name.starts_with(|first: char| first.is_ascii_uppercase())
+		}) {
+			tags.insert(element.tag.as_str().into());
+		}
+	}
+
+	/// Recursively collect only the uppercase tags under `nodes`, the walk a
+	/// conditional subtree still gets.
+	fn collect_tags(nodes: &[BsxNode], tags: &mut HashSet<SmolStr>) {
+		for node in nodes {
+			if let BsxNode::Element(element) = node {
+				Self::collect_tag(element, tags);
+				Self::collect_tags(&element.children, tags);
+			}
 		}
 	}
 
@@ -152,6 +180,28 @@ mod test {
 			SmolStr::from("header.bsx"),
 			SmolStr::from("footer.bsx"),
 		]);
+		prescan.tags.contains("Router").xpect_true();
+		prescan.tags.contains("TemplateDir").xpect_true();
+		prescan.tags.contains("div").xpect_false();
+	}
+
+	/// A `bx:cfg` subtree declares nothing (the build answers the condition),
+	/// but its tags are still recorded: a template it instantiates is
+	/// structural either way.
+	#[beet_core::test]
+	fn conditional_subtree_yields_only_tags() {
+		let prescan = EntryPrescan::parse(&MediaBytes::new_bsx(
+			r#"<Router>
+				<Fragment bx:cfg="feature:infra">
+					<TemplateDir src="templates"/>
+					<widgets::Styles/>
+				</Fragment>
+			</Router>"#,
+		))
+		.unwrap();
+		prescan.template_dirs.xpect_empty();
+		prescan.tags.contains("Fragment").xpect_true();
+		prescan.tags.contains("widgets::Styles").xpect_true();
 	}
 
 	/// The first `<RepoRoot>` wins, and a document declaring nothing yields the
@@ -166,7 +216,10 @@ mod test {
 		.xpect_eq(Some(SmolStr::from("../..")));
 		EntryPrescan::parse(&MediaBytes::new_bsx("<Router/>"))
 			.unwrap()
-			.xpect_eq(EntryPrescan::default());
+			.xpect_eq(EntryPrescan {
+				tags: [SmolStr::from("Router")].into_iter().collect(),
+				..default()
+			});
 	}
 
 	/// A serde entry declares none of these, so it pre-scans to the default

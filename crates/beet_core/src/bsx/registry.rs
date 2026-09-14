@@ -105,13 +105,18 @@ impl BsxTemplateRegistry {
 		else {
 			return Ok(None);
 		};
-		let module = module_path_from_rel(path)
-			.ok_or_else(|| {
-				bevyhow!("could not derive a module path from `{path}`")
-			})?
-			.xmap(SmolStr::from);
+		let module = Self::module_path(path).ok_or_else(|| {
+			bevyhow!("could not derive a module path from `{path}`")
+		})?;
 		self.insert(module.clone(), parse(source)?)?;
 		Ok(Some(module))
+	}
+
+	/// The name a template source at `path` (relative to its template-dir root)
+	/// registers under, which is also the tag that instantiates it:
+	/// `widgets/Card.bsx` -> `widgets::Card`.
+	pub fn module_path(path: &SmolPath) -> Option<SmolStr> {
+		module_path_from_rel(path).map(SmolStr::from)
 	}
 
 	/// Unregister the template under `name`, returning whether it was present.

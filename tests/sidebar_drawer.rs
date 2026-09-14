@@ -15,7 +15,8 @@
 //! ```
 beet::test_main!();
 
-use beet::net::prelude::webdriver::*;
+use beet::net::prelude::webdriver::Page;
+use beet::net::prelude::webdriver::PageHarness;
 use beet::prelude::*;
 
 /// The served site: the real [`SiteLayout`] chrome (app bar + [`MenuButton`],

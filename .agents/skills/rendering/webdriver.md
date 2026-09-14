@@ -18,6 +18,10 @@ beet screenshot http://localhost:8337/docs --full-page --output=full.png
 
 Color schemes ride the url (`?color-scheme=light|dark`), applied server-side. `--selector` auto-waits for the element and crops to it, saving context when reading the png.
 
+## Live reload
+
+Serving with `--watch` (`beet --main=site serve --server=http --watch`) makes every `SiteLayout` page reload itself on a save. Editing colours: a `<Theme>` in `main.bsx` or a `<Rule>` in `templates/Styles.bsx` is a structural edit (scene rebuild, ~2s on the site), a `Layout.bsx` or markdown edit re-fires in place (~150ms). `tests/live_reload_browser.rs` is the reference round trip: a `PageHarness::serve_app` over a fixture entry booted through the exact `--watch` path, edited on disk, asserted through `find_text` and `getComputedStyle` in a real browser. Fixtures must not live under `target/` (the `LiveReload` filter excludes it).
+
 ## Probe + interact (functional)
 
 Root causes and behavior checks without eyeballing: write a scratch `#[ignore = "smoketest"]` test (or extend an existing browser smoketest) driving `Page`/`Element` from `beet_net::prelude::webdriver`. `page.evaluate_value("getComputedStyle(...)")` dumps computed style or `getBoundingClientRect` as plain JSON; `page.click("summary")` (re-queries on staleness) then read back state with the auto-waiting matchers (`page.find("#caret").await.xpect_attr(..)`). The site smoketest at `tests/site_browser.rs` (`verifies_client`) is the reference for the full pattern: collectors for console/network, trusted clicks, `evaluate_value` for state. Capture the live reference and the local page and judge them side by side.

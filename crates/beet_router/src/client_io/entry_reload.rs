@@ -1,15 +1,16 @@
 //! Full entry rebuild on a structural change, the heavy half of [live
 //! reload](super::LiveReload).
 //!
-//! A markdown or template edit is a *content* change: the light re-fire in
-//! [`reload_site`](super::reload_site) re-registers the templates and respawns the
-//! routes in place, leaving the servers and their sockets up. A change to the entry
-//! document itself or an included `<Template src>` is *structural* (a route added,
-//! a server reconfigured, a capability rewired), which the in-place re-fire cannot
-//! express. Such a change instead drives a full teardown+rebuild: the whole entry
-//! scene is despawned (servers close, sockets drop) and rebuilt from the current
-//! source (servers rebind, the browser reconnects and reloads), leaving no entity
-//! behind.
+//! A markdown or per-request template edit is a *content* change: the light
+//! re-fire in [`reload_site`](super::reload_site) re-registers the templates and
+//! respawns the routes in place, leaving the servers and their sockets up. A
+//! change to the entry document itself, an included `<Template src>` or a
+//! template the entry instantiates once at build (a `<Styles/>`) is *structural*
+//! (a route added, a server reconfigured, a rule changed), which the in-place
+//! re-fire cannot express. Such a change instead drives a full teardown+rebuild:
+//! the whole entry scene is despawned (servers close, sockets drop) and rebuilt
+//! from the current source (servers rebind, the browser reconnects and reloads),
+//! leaving no entity behind.
 //!
 //! The entry-build logic lives above `beet_router` (in the entry driver, ie the
 //! `beet` cli), so it is carried down as a boxed callback on the [`EntryReloader`]
@@ -35,9 +36,10 @@ type EntryRebuildFn =
 /// re-fire a markdown/template edit gets.
 ///
 /// Carries the driver's [rebuild callback](EntryRebuildFn) plus the set of source
-/// paths whose change is structural: the entry document and every transitive
-/// `<Template src>` include, each store-root-relative so it matches the
-/// [`BlobEvent`] paths the watcher emits.
+/// paths whose change is structural: the entry document, every transitive
+/// `<Template src>` include and every `<TemplateDir>` template the entry tree
+/// instantiates, each store-root-relative so it matches the [`BlobEvent`] paths
+/// the watcher emits.
 #[derive(Clone, Resource)]
 pub struct EntryReloader {
 	sources: HashSet<SmolPath>,
@@ -59,16 +61,17 @@ impl EntryReloader {
 		}
 	}
 
-	/// Whether a change to `path` is structural (the entry document or a
-	/// `<Template src>` include), so it drives a full rebuild rather than the light
-	/// content re-fire.
+	/// Whether a change to `path` is structural (the entry document, a
+	/// `<Template src>` include or an entry-instantiated template), so it drives
+	/// a full rebuild rather than the light content re-fire.
 	pub fn is_structural(&self, path: &SmolPath) -> bool {
 		self.sources.contains(path)
 	}
 
 	/// Replace the structural source set. The driver recomputes it on every
-	/// rebuild (the entry and its transitive `<Template src>` includes may have
-	/// changed), so a newly added include becomes structural without a restart.
+	/// rebuild (the entry, its includes and the templates it instantiates may
+	/// have changed), so a newly added include or tag becomes structural without
+	/// a restart.
 	pub fn set_sources(&mut self, sources: HashSet<SmolPath>) {
 		self.sources = sources;
 	}
@@ -89,7 +92,7 @@ pub(crate) fn rebuild_entry(world: &mut World, root: Entity) {
 		warn!(
 			"structural change with no entry reloader installed; re-firing content"
 		);
-		reload_site(world, root);
+		reload_site(world, root, default());
 		return;
 	};
 	// close the live client sockets so the browser sees the teardown and reconnects
@@ -188,9 +191,10 @@ mod test {
 			let root = world.with_state::<Query<Entity, With<LiveReload>>, _>(
 				|query| query.single().unwrap(),
 			);
-			world
-				.entity_mut(root)
-				.insert(NeedsReload { structural: true });
+			world.entity_mut(root).insert(NeedsReload {
+				structural: true,
+				changed: default(),
+			});
 			process_live_reloads(&mut world);
 			AsyncRunner::settle_async_tasks(&mut world).await;
 		}

@@ -65,6 +65,11 @@ pub(crate) async fn locate_nodes(
 /// Poll [`locate_nodes`] until at least one node matches, bounded by
 /// `timeout`, returning the first match.
 ///
+/// A failed locate is retried like a miss until the deadline: a page reloading
+/// itself under the locator (a live reload, a form submit) briefly has no
+/// document to search, and the driver answers that with an error rather than
+/// an empty match. Only at the deadline is the last error surfaced.
+///
 /// Open-coded rather than through `poll_ext`: the async-closure's
 /// higher-ranked environment lifetime breaks `Send` inference for callers
 /// whose action futures must be `Send` (rustc's "implementation of `Send` is
@@ -79,16 +84,19 @@ pub(crate) async fn find_polling(
 	let start = Instant::now();
 	loop {
 		let expired = start.elapsed() >= timeout;
-		match locate_nodes(session, context_id, locator, start_node, Some(1))
-			.await?
-			.into_iter()
-			.next()
-		{
-			Some(element) => return Ok(element),
-			None if expired => {
+		let located =
+			locate_nodes(session, context_id, locator, start_node, Some(1))
+				.await
+				.map(|nodes| nodes.into_iter().next());
+		match located {
+			Ok(Some(element)) => return Ok(element),
+			Ok(None) if expired => {
 				bevybail!("no node matching {locator:?}")
 			}
-			None => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
+			Err(err) if expired => {
+				bevybail!("no node matching {locator:?}: {err}")
+			}
+			_ => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
 		}
 	}
 }

@@ -45,6 +45,8 @@ An entry loads through its **repo store**, the app's one canonical store (`--rep
 
 An entry that mounts paths outside its own directory declares `<RepoRoot src="../.."/>` (there is no `--root` flag): `src` names a position relative to the entry's location *in its repo store*, not a filesystem directory, so an fs store re-roots at the resolved ancestor while a self-rooted store (a bucket, browser storage) takes a key-prefix view and fails loudly when the root escapes the store. Live reload watches the store's local root when it has one (a self-rooted store watches nothing), and command outputs (`dist/`, `site.pdf`) land beside the entry deliberately.
 
+`--watch` is the dev loop: the entry's local dirs are watched and a browser on any `SiteLayout` page reloads itself on a save. A markdown or per-request template (`Layout.bsx`) edit re-fires the routes in place; an edit to `main.bsx`, a `<Template src>` include or a template the entry instantiates once (`<Styles/>`, so its `<Rule>` colours) tears the scene down and rebuilds it, the browser reconnecting and reloading. The round trip is proven in a real browser by `tests/live_reload_browser.rs`.
+
 An entry declares its build requirements with `<RequireCfg cfg="feature:thread && feature:sockets"/>`, which errors when the running binary does not satisfy them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --main=..`, never carrying `--features`: the entry's own `<RequireCfg>` is the verification mechanism.
 
 ## Downstream binaries

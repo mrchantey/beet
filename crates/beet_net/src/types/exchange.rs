@@ -113,11 +113,15 @@ pub impl AsyncEntity {
 /// Dispatch `request` through this entity's `Request -> Response` action, then
 /// fire [`EndExchange`] so [`exchange_stats`] can log the request. The shared
 /// body of both `exchange` extension traits. A missing action or a handler error
-/// maps to [`Response::internal_error`].
+/// maps to [`Response::internal_error`]. The nearest ancestor [`ExchangeStats`]
+/// counts the request as in flight for the duration.
 async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 	let start_time = Instant::now();
 	let method = *request.method();
 	let path = request.path_string();
+	// held across the call and released by drop, so a cancelled dispatch
+	// releases it too
+	let _in_flight = begin_request(&entity).await;
 	let res = entity
 		.call::<Request, Response>(request)
 		.await
@@ -125,6 +129,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 			error!("Exchange failed on {:?}: {err}", entity.id());
 			Response::internal_error()
 		});
+	drop(_in_flight);
 	let status = res.status();
 	entity
 		.trigger(move |entity| EndExchange {
@@ -137,6 +142,19 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 		.await
 		.ok();
 	res
+}
+
+/// Count a request as in flight on the [`ExchangeStats`] nearest above
+/// `entity` (a server's, with the router beneath it dispatching) until the
+/// guard drops; `None` where no stats exist or the entity is gone.
+async fn begin_request(entity: &AsyncEntity) -> Option<InFlightGuard> {
+	entity
+		.with_state::<AncestorQuery<&ExchangeStats>, _>(|entity, stats| {
+			stats.get(entity).ok().map(ExchangeStats::begin_request)
+		})
+		.await
+		.ok()
+		.flatten()
 }
 
 /// Event triggered when an exchange completes.

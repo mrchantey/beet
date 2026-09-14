@@ -4,8 +4,9 @@
 //! declares its named rules in markup (eg a `styles.bsx` it includes) and they
 //! land in the live [`RuleSet`] at build time, resolving on both the web and
 //! terminal targets like any other rule. The tag renders nothing: it is a
-//! build-time effect (a [`BsxTagResolvers`] handler), the style analogue of how
-//! `<PackageConfig>`/`<Theme>` patch a resource.
+//! build-time effect (a [`BsxTagResolvers`] handler) that leaves a
+//! [`DeclaredRule`] on its element, so the rule lives exactly as long as the
+//! scene declaring it.
 //!
 //! ```html
 //! <Rule class="design-row"
@@ -25,17 +26,57 @@ use crate::prelude::*;
 use crate::style::PropResolver;
 use crate::style::color_role_map;
 use beet_core::prelude::*;
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
+
+/// A style rule declared by a markup `<Rule>` element and owned by that entity:
+/// inserting it adds the rule to the [`RuleSet`] keyed by owner, and replacing or
+/// despawning it removes the rule again. So a torn-down scene (a live-reload
+/// rebuild) or a despawned per-request layout takes its rules with it, rather
+/// than appending a stale copy on every build.
+#[derive(Debug, Clone, Component)]
+#[component(on_insert = DeclaredRule::on_insert(), on_discard = DeclaredRule::on_discard())]
+pub struct DeclaredRule(pub Rule);
+
+impl DeclaredRule {
+	fn on_insert() -> impl FnOnce(DeferredWorld, HookContext) {
+		|mut world, cx| {
+			let Some(rule) = world
+				.get::<DeclaredRule>(cx.entity)
+				.map(|rule| rule.0.clone())
+			else {
+				return;
+			};
+			// the rule must land synchronously: a `<Stylesheet/>` baked later in the
+			// same build reads the rule set before any command flush.
+			match world.get_resource_mut::<RuleSet>() {
+				Some(mut rules) => rules.insert_owned(Some(cx.entity), rule),
+				None => world.commands().queue(move |world: &mut World| {
+					world
+						.get_resource_or_init::<RuleSet>()
+						.insert_owned(Some(cx.entity), rule);
+				}),
+			}
+		}
+	}
+
+	fn on_discard() -> impl FnOnce(DeferredWorld, HookContext) {
+		|mut world, cx| {
+			if let Some(mut rules) = world.get_resource_mut::<RuleSet>() {
+				rules.remove_owned(cx.entity);
+			}
+		}
+	}
+}
 
 /// Register the `<Rule>` custom-tag handler into the [`BsxTagResolvers`] seam, so
-/// a `<Rule>` element declares a named rule into the [`RuleSet`] at build time.
+/// a `<Rule>` element declares a named rule into the [`RuleSet`] at build time,
+/// owned by the element via [`DeclaredRule`].
 pub(crate) fn register_rule_tag(world: &mut World) {
 	world.get_resource_or_init::<BsxTagResolvers>().insert(
 		"Rule",
 		|el, entity| {
-			let rule = parse_rule(el)?;
-			entity.world_scope(|world| {
-				world.get_resource_or_init::<RuleSet>().insert_rule(rule);
-			});
+			entity.insert(DeclaredRule(parse_rule(el)?));
 			Ok(())
 		},
 	);
@@ -284,6 +325,44 @@ mod test {
 			.nth(before)
 			.cloned()
 			.unwrap()
+	}
+
+	/// A `<Rule>` lives exactly as long as the scene declaring it: rebuilding the
+	/// same document (a live-reload teardown + rebuild) replaces its rules
+	/// rather than appending a second copy, and despawning it removes them.
+	#[beet_core::test]
+	fn rules_follow_their_declaring_scene() {
+		let mut world = MaterialStylePlugin::world();
+		let before = world.resource::<RuleSet>().rules().count();
+		let markup = r#"<Rule class="probe" display=Flex/>"#;
+		let spawn = |world: &mut World| {
+			let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())
+				.unwrap();
+			world
+				.spawn_template(BsxTemplate::container(
+					nodes,
+					BsxTemplateRegistry::default(),
+				))
+				.unwrap()
+				.id()
+		};
+		let first = spawn(&mut world);
+		world
+			.resource::<RuleSet>()
+			.rules()
+			.count()
+			.xpect_eq(before + 1);
+		// a rebuild: the old scene goes, the new one declares the rule again
+		world.entity_mut(first).despawn();
+		world.resource::<RuleSet>().rules().count().xpect_eq(before);
+		let second = spawn(&mut world);
+		world
+			.resource::<RuleSet>()
+			.rules()
+			.count()
+			.xpect_eq(before + 1);
+		world.entity_mut(second).despawn();
+		world.resource::<RuleSet>().rules().count().xpect_eq(before);
 	}
 
 	#[beet_core::test]

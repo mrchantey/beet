@@ -13,6 +13,7 @@ use beet_net::prelude::*;
 use beet_net::sockets::Message;
 #[cfg(test)]
 use beet_net::sockets::MessageSend;
+use std::sync::Arc;
 
 /// The [`ClientIoBroadcast`] payload instructing clients to reload the page.
 pub(crate) const RELOAD_MESSAGE: &str = "reload";
@@ -30,7 +31,8 @@ pub(crate) const RELOAD_MESSAGE: &str = "reload";
 #[derive(Debug, Clone, Component)]
 pub struct LiveReload {
 	/// Store paths matching an exclude never trigger a reload; defaults to the
-	/// `.git`/`dist`/`target` churn a served site never edits.
+	/// `.git`/`dist`/`target` dirs, the churn a served site never edits, matched
+	/// by segment so a `targets.md` page still reloads.
 	pub filter: GlobFilter,
 }
 
@@ -38,9 +40,9 @@ impl Default for LiveReload {
 	fn default() -> Self {
 		Self {
 			filter: GlobFilter::default()
-				.with_exclude("*.git*")
-				.with_exclude("*dist*")
-				.with_exclude("*target*"),
+				.with_exclude_dir(".git")
+				.with_exclude_dir("dist")
+				.with_exclude_dir("target"),
 		}
 	}
 }
@@ -52,9 +54,9 @@ impl LiveReload {
 
 /// Marks a [`LiveReload`] root with a change pending: the debounce latch (a
 /// burst of `BlobEvent`s folds into one reload), carrying whether any change was
-/// *structural* (the entry document or a `<Template src>` include per the
-/// installed [`EntryReloader`]), which upgrades the reload to a full
-/// teardown+rebuild.
+/// *structural* (the entry document, a `<Template src>` include or an
+/// entry-instantiated template per the installed [`EntryReloader`]), which
+/// upgrades the reload to a full teardown+rebuild.
 ///
 /// This is the only bespoke reload state: "a reload is in flight" is not a
 /// second marker but the pending/settle primitive itself. The reload parks
@@ -68,6 +70,33 @@ pub(crate) struct NeedsReload {
 	/// Whether any latched change was structural, driving the full
 	/// teardown+rebuild rather than the light content re-fire.
 	pub structural: bool,
+	/// Every store path the burst changed, narrowing the content reload's
+	/// render diagnostics to the pages those files back.
+	pub changed: HashSet<SmolPath>,
+}
+
+/// Counts the reloads dispatched on a [`LiveReload`] root, so the async tail of
+/// a reload (its render diagnostics) can tell it has been superseded by a newer
+/// one and stop, rather than reporting the routes the newer reload respawned
+/// under it as build errors.
+#[derive(Debug, Default, Component)]
+pub(crate) struct ReloadGeneration(u64);
+
+impl ReloadGeneration {
+	/// Bump `root`'s generation, returning the new value.
+	fn next(world: &mut World, root: Entity) -> u64 {
+		let mut entity = world.entity_mut(root);
+		let mut generation = entity.entry::<ReloadGeneration>().or_default();
+		generation.get_mut().0 += 1;
+		generation.get().0
+	}
+
+	/// Whether `root` is still on `generation`, ie no newer reload has run.
+	fn is_current(world: &mut World, root: Entity, generation: u64) -> bool {
+		world
+			.get::<ReloadGeneration>(root)
+			.is_some_and(|current| current.0 == generation)
+	}
 }
 
 /// Observer: a spawned [`LiveReload`] gets a child [`ClientIo`] channel if the
@@ -110,9 +139,15 @@ pub(crate) fn reload_site_on_change(
 		.for_each(|(entity, _, _, needs)| {
 			debug!("repo store changed, reloading: {}", ev.path);
 			match needs {
-				Some(mut needs) => needs.structural |= structural,
+				Some(mut needs) => {
+					needs.structural |= structural;
+					needs.changed.insert(ev.path.clone());
+				}
 				None => {
-					commands.entity(entity).insert(NeedsReload { structural });
+					commands.entity(entity).insert(NeedsReload {
+						structural,
+						changed: [ev.path.clone()].into_iter().collect(),
+					});
 				}
 			}
 		});
@@ -121,30 +156,40 @@ pub(crate) fn reload_site_on_change(
 /// Drive the latched reloads once per tick: dispatch each [`NeedsReload`] site
 /// whose subtree has settled (no [`TemplatePending`] set under the root is
 /// outstanding), so an in-flight reload's own parked dependencies defer the
-/// follow-up rather than a bespoke in-flight marker. A structural change (the
-/// entry document or an included `<Template src>`) takes the full
-/// teardown+rebuild; a content change re-fires in place.
+/// follow-up rather than a bespoke in-flight marker, and only once no request
+/// is being served (a respawn under a request in flight answers it with a 500
+/// for a route that no longer exists, and a page reloaded into an error has no
+/// live-reload client left to recover it). A structural change (the entry
+/// document or an included `<Template src>`) takes the full teardown+rebuild; a
+/// content change re-fires in place.
 pub(crate) fn process_live_reloads(world: &mut World) {
 	let latched = world
-		.with_state::<Query<(Entity, &NeedsReload), With<LiveReload>>, _>(
-			|query| {
-				query
-					.iter()
-					.map(|(entity, needs)| (entity, needs.structural))
-					.collect::<Vec<_>>()
-			},
+		.with_state::<Query<Entity, (With<NeedsReload>, With<LiveReload>)>, _>(
+			|query| query.iter().collect::<Vec<_>>(),
 		);
-	for (root, structural) in latched {
+	if latched.is_empty() || requests_in_flight(world) {
+		return;
+	}
+	for root in latched {
 		if subtree_pending(world, root) {
 			continue;
 		}
-		world.entity_mut(root).remove::<NeedsReload>();
-		if structural {
+		let Some(needs) = world.entity_mut(root).take::<NeedsReload>() else {
+			continue;
+		};
+		if needs.structural {
 			rebuild_entry(world, root);
 		} else {
-			reload_site(world, root);
+			reload_site(world, root, needs.changed);
 		}
 	}
+}
+
+/// Whether any server is mid-request, per its [`ExchangeStats`].
+fn requests_in_flight(world: &mut World) -> bool {
+	world.with_state::<Query<&ExchangeStats>, _>(|stats| {
+		stats.iter().any(|stats| stats.in_flight() > 0)
+	})
 }
 
 /// Whether any [`TemplatePending`] set on `root` or a descendant is outstanding,
@@ -164,14 +209,26 @@ fn subtree_pending(world: &mut World, root: Entity) -> bool {
 /// Refresh the world from the site's [`BlobStore`]: re-fire every [`TemplateDir`]
 /// (re-registering its edited templates) and every [`RoutesDir`] (respawning its
 /// route children and rebuilding the route trees), then broadcast [`RELOAD_MESSAGE`]
-/// to connected clients. `root` is the [`LiveReload`] entity carrying the store.
-/// The respawned dirs park [`TemplatePending`] guards, so
+/// to connected clients. `root` is the [`LiveReload`] entity carrying the store,
+/// `changed` the store paths that drove the reload (empty for an unconditional
+/// one). The respawned dirs park [`TemplatePending`] guards, so
 /// [`process_live_reloads`] defers a follow-up until this reload settles.
-pub(crate) fn reload_site(world: &mut World, root: Entity) {
+///
+/// The render diagnostics that follow are scoped to the pages the changed files
+/// back where every change maps to one (a markdown edit re-checks its page, not
+/// the site), and end early if a newer reload supersedes them (see
+/// [`ReloadGeneration`]), so a burst of saves never reports the routes it
+/// respawned as errors.
+pub(crate) fn reload_site(
+	world: &mut World,
+	root: Entity,
+	changed: HashSet<SmolPath>,
+) {
 	if !world.entity(root).contains::<BlobStore>() {
 		warn!("live reload root {root} has no BlobStore");
 		return;
 	}
+	let generation = ReloadGeneration::next(world, root);
 	// the in-world TUI navigators (no `ClientIo` client) to repaint directly.
 	let navigators = in_world_navigators(world);
 	// re-fire the template/route observers (re-reading their dirs through the store
@@ -190,10 +247,18 @@ pub(crate) fn reload_site(world: &mut World, root: Entity) {
 		// shared node (else the diagnostics' ephemeral cleanup races the repaint and
 		// blanks the live TUI).
 		TemplatePending::settle(&world).await;
-		world
-			.with(|world: &mut World| broadcast_reload(world))
+		let scope = world
+			.with(move |world: &mut World| {
+				broadcast_reload(world);
+				CheckScope {
+					routes: changed_routes(world, &changed),
+					live: Some(Arc::new(move |world: &mut World| {
+						ReloadGeneration::is_current(world, root, generation)
+					})),
+				}
+			})
 			.await;
-		log_all_render_diagnostics(&world).await;
+		log_all_render_diagnostics(&world, scope).await;
 		for navigator in navigators {
 			if let Err(err) = Navigator::reload(world.entity(navigator)).await {
 				error!("live reload repaint failed: {err}");
@@ -242,6 +307,37 @@ fn respawn_routes_dirs(world: &mut World) {
 			.insert(dir);
 	}
 	world.flush();
+}
+
+/// The [`BlobScene`] routes serving exactly the `changed` store paths, ie the
+/// pages a content reload needs to re-check; `None` (check everything) when any
+/// change backs no page directly, eg a template every page may use, or when
+/// nothing specific changed.
+fn changed_routes(
+	world: &mut World,
+	changed: &HashSet<SmolPath>,
+) -> Option<HashSet<Entity>> {
+	if changed.is_empty() {
+		return None;
+	}
+	// each route's store path: its scoped store's subdir joined with the blob path
+	let by_path = world
+		.with_state::<(Query<(Entity, &BlobScene)>, AncestorQuery<&BlobStore>), _>(
+			|(scenes, stores)| {
+				scenes
+					.iter()
+					.filter_map(|(entity, scene)| {
+						stores.get(entity).ok().map(|store| {
+							(store.subdir().join(scene.path.as_str()), entity)
+						})
+					})
+					.collect::<HashMap<_, _>>()
+			},
+		);
+	changed
+		.iter()
+		.map(|path| by_path.get(path).copied())
+		.collect::<Option<HashSet<_>>>()
 }
 
 /// Broadcast [`RELOAD_MESSAGE`] to every connected [`ClientIo`] client.
@@ -350,7 +446,7 @@ mod test {
 		// seed a template the mutation below deletes, registered by the first load
 		fs_ext::write(site_dir.join("templates/Gone.bsx"), "<i>gone</i>")
 			.unwrap();
-		reload_site(&mut world, root);
+		reload_site(&mut world, root, default());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world
 			.resource::<BsxTemplateRegistry>()
@@ -371,7 +467,7 @@ mod test {
 		fs_ext::remove(site_dir.join("templates/Gone.bsx")).unwrap();
 		// reload the site (the store read picks up the edits); the async reload then
 		// re-registers templates and respawns the routes, so settle it.
-		reload_site(&mut world, root);
+		reload_site(&mut world, root, default());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		// the new route landed in the rebuilt tree
@@ -446,6 +542,37 @@ mod test {
 			.xpect_some();
 	}
 
+	/// A content reload narrows its diagnostics to the pages the changed files
+	/// back: a markdown edit maps to its one route, while a template (which any
+	/// page may use) or an unknown file widens the pass to every route.
+	#[beet_core::test]
+	async fn changed_routes_narrow_to_the_edited_pages() {
+		let mut world = reload_world();
+		let site_dir = site_fixture("changed_routes");
+		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
+		AsyncRunner::settle_async_tasks(&mut world).await;
+		let home = world
+			.entity(root)
+			.get::<RouteTree>()
+			.unwrap()
+			.find(&[] as &[&str])
+			.unwrap()
+			.entity;
+		let changed = |paths: &[&str]| {
+			paths.iter().map(|path| SmolPath::from(*path)).collect()
+		};
+		changed_routes(&mut world, &changed(&["routes/index.md"]))
+			.xpect_eq(Some([home].into_iter().collect()));
+		changed_routes(&mut world, &changed(&["templates/Card.bsx"]))
+			.xpect_none();
+		changed_routes(
+			&mut world,
+			&changed(&["routes/index.md", "routes/missing.md"]),
+		)
+		.xpect_none();
+		changed_routes(&mut world, &default()).xpect_none();
+	}
+
 	#[beet_core::test]
 	async fn broadcasts_reload_to_clients() {
 		let mut world = reload_world();
@@ -465,7 +592,7 @@ mod test {
 			},
 		);
 
-		reload_site(&mut world, root);
+		reload_site(&mut world, root, default());
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
 		received.get().xpect_eq(vec![Message::text(RELOAD_MESSAGE)]);
@@ -551,7 +678,7 @@ mod test {
 
 		// a new card, then a live reload (the store-change path).
 		fs_ext::write(site_dir.join("slides/03-gamma.md"), "# Gamma").unwrap();
-		reload_site(&mut world, router);
+		reload_site(&mut world, router, default());
 		// the respawn re-scans each RoutesDir asynchronously, so settle again
 		AsyncRunner::settle_async_tasks(&mut world).await;
 
@@ -661,9 +788,9 @@ mod test {
 		// edit the current card on disk, then drive the store-change reload.
 		fs_ext::write(site_dir.join("slides/01-alpha.md"), "# Alpha edited")
 			.unwrap();
-		app.world_mut()
-			.commands()
-			.queue(move |world: &mut World| reload_site(world, router));
+		app.world_mut().commands().queue(move |world: &mut World| {
+			reload_site(world, router, default())
+		});
 		// the navigator re-fetches the current card and the host repaints it.
 		drive_until(&mut app, host, "Alpha edited")
 			.await

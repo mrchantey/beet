@@ -196,16 +196,18 @@ pub(crate) fn on_remove_store(
 		if !backed_by_removed {
 			continue;
 		}
+		// `try_`: the removal is usually a teardown despawning the whole subtree,
+		// so the descendant is routinely gone by the time this command lands.
 		if dirs.contains(descendant) {
 			// drop the scoped store *and* its watcher registration, so a re-resolve
 			// re-registers a `WatchDir` cleanly rather than leaving a stale one.
 			// `WatchDir` is std-only; nothing to drop on no_std.
 			let mut entity_commands = commands.entity(descendant);
-			entity_commands.remove::<BlobStore>();
+			entity_commands.try_remove::<BlobStore>();
 			#[cfg(feature = "std")]
-			entity_commands.remove::<WatchDir>();
+			entity_commands.try_remove::<WatchDir>();
 		} else if blob_paths.contains(descendant) {
-			commands.entity(descendant).remove::<Blob>();
+			commands.entity(descendant).try_remove::<Blob>();
 		}
 	}
 }

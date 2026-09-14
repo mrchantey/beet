@@ -10,11 +10,13 @@ use beet_core::prelude::*;
 /// (a recursive watch over the workspace exceeds the inotify limit and dies silently).
 ///
 /// `dir` is the precise directory to watch (a store's `effective_root`); `store` is
-/// the owning store, so emitted [`BlobEvent`]s are keyed to ITS base path
-/// ([`root_key`](BlobStoreProvider::root_key)) and base-relative, routing through
-/// the root live reload via [`did_change`](BlobStoreProvider::did_change).
-/// Cross-platform; the native watcher observers back it (inert on wasm, where there
-/// is no fs watcher).
+/// the owning store, so emitted [`BlobEvent`]s are keyed to ITS base
+/// ([`base_dir`](BlobStoreProvider::base_dir), unscoped) and base-relative,
+/// routing through the root live reload via
+/// [`did_change`](BlobStoreProvider::did_change). A dir inside an already
+/// watched one shares that watcher (see [`FsBlobWatchers`]). Cross-platform; the
+/// native watcher observers back it (inert on wasm, where there is no fs
+/// watcher).
 #[derive(Debug, Clone, Component)]
 pub struct WatchDir {
 	/// The precise absolute directory to watch.
@@ -63,27 +65,36 @@ mod native {
 
 	/// Native filesystem watchers backing reactive [`WatchDir`] mounts.
 	///
-	/// One [`FsWatcher`] entity per watched `dir`, refcounted by the [`WatchDir`]s
-	/// sharing that dir (so a re-resolve that re-registers the same dir reuses its
-	/// watcher). Each watcher emits events **relative to its store's base path**
-	/// into the [`BlobEventBus`], so a subdir watcher's events still route through
-	/// the base-keyed [`did_change`](BlobStoreProvider::did_change).
+	/// One recursive [`FsWatcher`] entity per watched dir, refcounted by the
+	/// [`WatchDir`]s it covers: those naming the dir itself (a re-resolve that
+	/// re-registers the same dir reuses its watcher) and those naming a dir
+	/// *inside* it (a `routes/` under a watched entry dir), so one edit never
+	/// surfaces twice. Registering an ancestor of watched dirs absorbs them the
+	/// same way. Every watcher emits events keyed to its store's **base**
+	/// ([`base_dir`](BlobStoreProvider::base_dir)) and base-relative, so whichever
+	/// watcher saw the change, it routes identically through
+	/// [`did_change`](BlobStoreProvider::did_change) and
+	/// [`Blob::matches_event`].
 	#[derive(Default, Resource)]
 	pub struct FsBlobWatchers {
-		/// Per watched dir: the watcher entity and its subscriber refcount.
+		/// Per watcher dir: the watcher entity and its subscriber refcount.
 		watchers: HashMap<AbsPathBuf, FsWatcherEntry>,
+		/// Per registered [`WatchDir`] dir: the watcher dir covering it (itself
+		/// or an ancestor), so a removal decrements the right entry.
+		covered_by: HashMap<AbsPathBuf, AbsPathBuf>,
 	}
 
 	/// A single watched-dir watcher and its refcount.
 	struct FsWatcherEntry {
 		/// The internal [`FsWatcher`] entity, despawned at zero refcount.
 		entity: Entity,
-		/// Number of [`WatchDir`]s sharing this dir.
+		/// Number of [`WatchDir`]s this watcher covers.
 		count: usize,
 	}
 
-	/// Ensure the added [`WatchDir`]'s dir is covered by exactly one watcher,
-	/// bumping the refcount if it already exists.
+	/// Ensure the added [`WatchDir`]'s dir is covered by exactly one watcher:
+	/// the one already watching it or an ancestor of it (bumping its refcount),
+	/// else a fresh one, which absorbs any watchers on dirs inside it.
 	pub fn add_watch_dir(
 		ev: On<Add, WatchDir>,
 		mut commands: Commands,
@@ -94,8 +105,9 @@ mod native {
 			return;
 		};
 		let dir = watch.dir.clone();
-		if let Some(entry) = watchers.watchers.get_mut(&dir) {
-			entry.count += 1;
+		if let Some(cover) = watchers.cover_of(&dir) {
+			watchers.watchers.get_mut(&cover).unwrap().count += 1;
+			watchers.covered_by.insert(dir, cover);
 			return;
 		}
 		// the dir may not exist yet (eg an `assets/` an entry declares but has not
@@ -104,17 +116,39 @@ mod native {
 		// spawn an internal FsWatcher on the dir (the cargo-project filter excludes
 		// target/.git/.beet/codegen/rustc-ice churn), forwarding DirEvents to the bus
 		// relative to (and keyed to) the store's base, so they route via `did_change`.
-		let base = watch.store.base_dir();
-		let store = watch.store.clone();
+		let Some(base) = watch.store.base_dir() else {
+			return;
+		};
+		let base_store = BlobStore::new(FsStore::new(base.clone()));
 		let entity = commands
 			.spawn(FsWatcher::default_cargo().with_path(dir.clone()))
 			.observe_any(move |ev: On<DirEvent>, bus: Res<BlobEventBus>| {
-				forward_dir_event_for(&ev, base.as_ref(), &store, &bus);
+				forward_dir_event_for(&ev, &base, &base_store, &bus);
 			})
 			.id();
+		// absorb the watchers this one covers: their dirs re-point here and
+		// their subscribers carry over.
+		let absorbed = watchers
+			.watchers
+			.keys()
+			.filter(|watched| watched.starts_with(&dir))
+			.cloned()
+			.collect::<Vec<_>>();
+		let mut count = 1;
+		for watched in absorbed {
+			let entry = watchers.watchers.remove(&watched).unwrap();
+			commands.entity(entry.entity).despawn();
+			count += entry.count;
+			watchers
+				.covered_by
+				.values_mut()
+				.filter(|cover| **cover == watched)
+				.for_each(|cover| *cover = dir.clone());
+		}
+		watchers.covered_by.insert(dir.clone(), dir.clone());
 		watchers
 			.watchers
-			.insert(dir, FsWatcherEntry { entity, count: 1 });
+			.insert(dir, FsWatcherEntry { entity, count });
 	}
 
 	/// Drop the watcher refcount for the removed [`WatchDir`], despawning the
@@ -128,17 +162,28 @@ mod native {
 		let Ok(watch) = watch_dirs.get(ev.entity) else {
 			return;
 		};
-		let dir = watch.dir.clone();
-		if let Some(entry) = watchers.watchers.get_mut(&dir) {
+		let Some(cover) = watchers.covered_by.get(&watch.dir).cloned() else {
+			return;
+		};
+		if let Some(entry) = watchers.watchers.get_mut(&cover) {
 			entry.count -= 1;
 			if entry.count == 0 {
 				commands.entity(entry.entity).despawn();
-				watchers.watchers.remove(&dir);
+				watchers.watchers.remove(&cover);
+				watchers.covered_by.retain(|_, covering| *covering != cover);
 			}
 		}
 	}
 
 	impl FsBlobWatchers {
+		/// The watcher dir already covering `dir`: itself or an ancestor.
+		fn cover_of(&self, dir: &AbsPathBuf) -> Option<AbsPathBuf> {
+			self.watchers
+				.keys()
+				.find(|watched| dir.starts_with(watched))
+				.cloned()
+		}
+
 		/// Number of distinct watched-dir watchers, for tests.
 		pub fn len(&self) -> usize { self.watchers.len() }
 
@@ -146,17 +191,16 @@ mod native {
 		pub fn is_empty(&self) -> bool { self.watchers.is_empty() }
 	}
 
-	/// Convert a [`DirEvent`] into per-object [`BlobEvent`]s for `store`, each path
-	/// stripped to `base` (so it is base-relative) and sent keyed to `store` (so
-	/// `store.root_key()` is the base, routing via `did_change`). A `None` `base`
-	/// or a path outside it is skipped.
+	/// Convert a [`DirEvent`] into per-object [`BlobEvent`]s keyed to
+	/// `base_store` (the unscoped store at `base`), each path stripped to `base`
+	/// so the event's `path` and `root_relative_path` agree. A path outside the
+	/// base is skipped.
 	pub(crate) fn forward_dir_event_for(
 		event: &DirEvent,
-		base: Option<&AbsPathBuf>,
-		store: &BlobStore,
+		base: &AbsPathBuf,
+		base_store: &BlobStore,
 		bus: &BlobEventBus,
 	) {
-		let Some(base) = base else { return };
 		event.iter().for_each(|path_event| {
 			// base-relative path, skipping events outside the base
 			let Ok(rel) = path_event.path.strip_prefix(base.as_ref()) else {
@@ -171,7 +215,11 @@ mod native {
 				EventKind::Remove(_) => BlobEventKind::Removed,
 				_ => BlobEventKind::Changed,
 			};
-			bus.send(BlobEvent::new(store.clone(), SmolPath::from(rel), kind));
+			bus.send(BlobEvent::new(
+				base_store.clone(),
+				SmolPath::from(rel),
+				kind,
+			));
 		});
 	}
 
@@ -212,16 +260,59 @@ mod native {
 			world.resource::<FsBlobWatchers>().is_empty().xpect_true();
 		}
 
+		/// A watched dir inside an already-watched one shares that watcher, and
+		/// an ancestor registered later absorbs the watchers inside it, so an
+		/// edit under both never surfaces twice (two reloads for one save).
+		#[beet_core::test]
+		fn ancestor_watcher_covers_descendants() {
+			let mut world =
+				(MinimalPlugins, AsyncPlugin, StorePlugin).into_world();
+			let path = AbsPathBuf::new_workspace_rel(
+				"target/tests/beet_net/fs_blob_watchers_cover",
+			)
+			.unwrap();
+			let store = BlobStore::new(FsStore::new(path.clone()));
+			let routes = store.with_subdir(SmolPath::from("routes"));
+			let templates = store.with_subdir(SmolPath::from("templates"));
+
+			// descendants first: two watchers ...
+			let routes_watch =
+				world.spawn(WatchDir::from_store(&routes).unwrap()).id();
+			world.spawn(WatchDir::from_store(&templates).unwrap());
+			world.flush();
+			world.resource::<FsBlobWatchers>().len().xpect_eq(2);
+			// ... absorbed by their ancestor
+			let root_watch =
+				world.spawn(WatchDir::from_store(&store).unwrap()).id();
+			world.flush();
+			world.resource::<FsBlobWatchers>().len().xpect_eq(1);
+			// a further descendant rides the ancestor
+			world.spawn(
+				WatchDir::from_store(
+					&store.with_subdir(SmolPath::from("routes/blog")),
+				)
+				.unwrap(),
+			);
+			world.flush();
+			world.resource::<FsBlobWatchers>().len().xpect_eq(1);
+
+			// removals decrement the shared watcher, which outlives the ancestor's
+			// own registration while any covered dir remains
+			world.entity_mut(root_watch).despawn();
+			world.entity_mut(routes_watch).despawn();
+			world.flush();
+			world.resource::<FsBlobWatchers>().len().xpect_eq(1);
+		}
+
 		/// A [`WatchDir`] over a subdir emits a BASE-relative, base-keyed
 		/// [`BlobEvent`] when a file in the subdir changes, so it routes through the
-		/// base store's [`did_change`](BlobStoreProvider::did_change).
+		/// base store's [`did_change`](BlobStoreProvider::did_change) and matches
+		/// a [`Blob`] of the scoped store.
 		#[beet_core::test]
 		async fn subdir_watcher_emits_base_relative_event() {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, AsyncPlugin, StorePlugin));
-			// a clean base dir with a `sub/` subdir the watcher covers. Under the
-			// system temp dir, NOT `target/`: the watcher's `default_cargo` filter
-			// excludes `*target*`, so a `target/`-rooted fixture's events never fire.
+			// a clean base dir with a `sub/` subdir the watcher covers
 			let base = AbsPathBuf::new(
 				std::env::temp_dir().join("beet_net_watch_subdir"),
 			)
@@ -269,9 +360,18 @@ mod native {
 			let event = captured.first().unwrap();
 			// base-relative path (NOT watcher-relative): `sub/style.css`
 			event.path.to_string().xpect_eq("sub/style.css");
-			// keyed to the base store, so `did_change` routes it from the root
+			// keyed to the base store, so `did_change` routes it from the root and
+			// the scoped store's blob recognizes its own object
 			event.store.root_key().xpect_eq(store.root_key());
+			event
+				.root_relative_path()
+				.to_string()
+				.xpect_eq("sub/style.css");
 			store.did_change(event).xpect_true();
+			scoped
+				.blob(SmolPath::from("style.css"))
+				.matches_event(event)
+				.xpect_true();
 		}
 	}
 }

@@ -73,23 +73,34 @@ impl HttpServer {
 		// per-connection tasks are spawned, so this is a minimal drain — in-flight
 		// requests finish on their own (or are cut by process exit when nothing else
 		// holds the process up).
-		beet_core::exports::futures_lite::future::or(
+		let served = beet_core::exports::futures_lite::future::or(
 			accept_loop(entity, listener, tls),
 			async move {
 				shutdown.wait().await;
 				Result::Ok(())
 			},
 		)
-		.await
+		.await;
+		debug!("Mini HTTP server on {addr} shut down");
+		served
 	}
 }
 /// The accept loop: dispatch each connection on its own spawned task. Diverges
 /// (only [`HttpServer::start_mini_with_tcp`]'s shutdown race ends it).
+///
+/// Every connection task ends with the loop: each races its work against the
+/// `alive` channel, which closes when the loop's sender drops on shutdown.
+/// Without that an accepted connection outlives its server, and a browser's
+/// idle preconnect, reused for the request after a live-reload rebuild, is
+/// answered by the torn-down entity with a 500 rather than closed so the
+/// browser retries on the rebuilt listener.
 async fn accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
 ) -> Result {
+	// never sent to: dropping the sender is the signal
+	let (_alive_tx, alive_rx) = async_channel::bounded::<()>(1);
 	loop {
 		let accept_result = listener.accept().await;
 		let (stream, peer_addr) = match accept_result {
@@ -101,11 +112,18 @@ async fn accept_loop(
 		};
 
 		let tls = tls.clone();
+		let alive = alive_rx.clone();
 		entity
 			.run_async(async move |entity| {
-				if let Err(err) =
-					serve_sniffed(entity, stream, peer_addr, tls).await
-				{
+				let served = beet_core::exports::futures_lite::future::or(
+					serve_sniffed(entity, stream, peer_addr, tls),
+					async move {
+						alive.recv().await.ok();
+						Ok(())
+					},
+				)
+				.await;
+				if let Err(err) = served {
 					error!("Error handling connection from {peer_addr}: {err}");
 				}
 			})

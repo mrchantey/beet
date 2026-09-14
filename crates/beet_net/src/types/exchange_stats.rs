@@ -6,7 +6,10 @@
 // which needs the `action` feature.
 #[cfg(feature = "action")]
 use super::*;
+use alloc::sync::Arc;
 use beet_core::prelude::*;
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering;
 
 /// Observer that logs each exchanged request and bumps the server's request
 /// counter, registered by [`ServerPlugin`](crate::prelude::ServerPlugin).
@@ -44,21 +47,36 @@ pub(crate) fn exchange_stats(
 
 /// Component for tracking exchange statistics on a server entity.
 ///
-/// Add this to server entities to track the number of requests processed.
-/// The [`exchange_stats`] observer will automatically update these stats
-/// when [`EndExchange`] events are triggered.
+/// Add this to server entities to track the number of requests processed and
+/// the number currently being served. The [`exchange_stats`] observer bumps the
+/// processed count on [`EndExchange`]; the dispatch itself
+/// ([`exchange`](crate::prelude::AsyncExchangeExt::exchange)) brackets each
+/// request in [`in_flight`](Self::in_flight), so a teardown (a live reload's
+/// route respawn) can wait for the requests it would otherwise cut off.
 #[derive(Default, Component)]
 pub struct ExchangeStats {
 	request_count: u128,
+	/// Shared with each in-flight request's [`InFlightGuard`], which releases
+	/// it on drop, so a request cancelled mid-dispatch (its connection torn
+	/// down with the server) never leaves a phantom count behind.
+	in_flight: Arc<AtomicUsize>,
 }
 
 impl ExchangeStats {
 	/// A counter seeded with `request_count` already processed, for tests and
 	/// diagnostics that need a non-zero starting count.
-	pub fn new(request_count: u128) -> Self { Self { request_count } }
+	pub fn new(request_count: u128) -> Self {
+		Self {
+			request_count,
+			in_flight: default(),
+		}
+	}
 
 	/// Returns the total number of requests processed.
 	pub fn request_count(&self) -> u128 { self.request_count }
+
+	/// The number of requests dispatched and not yet answered.
+	pub fn in_flight(&self) -> usize { self.in_flight.load(Ordering::SeqCst) }
 
 	/// Increments the request counter.
 	// only the `action`-gated logging observer bumps it today; a backend may too.
@@ -67,11 +85,25 @@ impl ExchangeStats {
 		self.request_count += 1;
 		self
 	}
+
+	/// Count a request as in flight until the returned guard drops.
+	pub(super) fn begin_request(&self) -> InFlightGuard {
+		self.in_flight.fetch_add(1, Ordering::SeqCst);
+		InFlightGuard(self.in_flight.clone())
+	}
+}
+
+/// Holds one in-flight request on an [`ExchangeStats`], released on drop.
+pub(super) struct InFlightGuard(Arc<AtomicUsize>);
+
+impl Drop for InFlightGuard {
+	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
 }
 
 #[cfg(all(test, feature = "std"))]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]
@@ -94,12 +126,43 @@ mod test {
 			.await
 			.xpect_ok();
 
-		world
-			.query_once::<&ExchangeStats>()
-			.iter()
-			.next()
-			.unwrap()
-			.request_count()
-			.xpect_eq(1);
+		let stats = world.query_once::<&ExchangeStats>()[0];
+		stats.request_count().xpect_eq(1);
+		// answered, so nothing is left in flight
+		stats.in_flight().xpect_eq(0);
+	}
+
+	/// A request counts as in flight from dispatch until its handler answers:
+	/// the handler here observes the count it is part of.
+	#[beet_core::test]
+	async fn counts_requests_in_flight() {
+		let mut world = AsyncPlugin::world();
+		let seen = Store::new(0);
+		let recorder = seen.clone();
+		let entity = world
+			.spawn((
+				ExchangeStats::default(),
+				Action::<Request, Response>::new_async(
+					move |cx: ActionContext<Request>| {
+						let recorder = recorder.clone();
+						let caller = cx.caller.clone();
+						async move {
+							let in_flight = caller
+								.get::<ExchangeStats, usize>(|stats| {
+									stats.in_flight()
+								})
+								.await?;
+							recorder.set(in_flight);
+							Result::<Response>::Ok(Response::ok())
+						}
+					},
+				),
+			))
+			.id();
+		world.entity_mut(entity).exchange(Request::get("/")).await;
+		seen.get().xpect_eq(1);
+		world.query_once::<&ExchangeStats>()[0]
+			.in_flight()
+			.xpect_eq(0);
 	}
 }

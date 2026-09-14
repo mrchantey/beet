@@ -272,6 +272,19 @@ mod std_impl {
 	use std::future::Future;
 
 	impl HttpServer {
+		/// An OS-assigned free port (bind, read, drop), for a server that must
+		/// be told its port up front, eg a markup entry's `<HttpServer port=..>`
+		/// under test, or a driver process. Racy in principle (another process
+		/// may take it before the bind), fine for a runner that owns the
+		/// machine's test run; prefer [`Self::new_test`]'s pre-bound listener
+		/// where the caller can hand one over.
+		pub fn free_port() -> Result<u16> {
+			std::net::TcpListener::bind("127.0.0.1:0")?
+				.local_addr()?
+				.port()
+				.xok()
+		}
+
 		/// Creates a test server bound to an OS-assigned port.
 		///
 		/// Binds to port `0` so the OS picks a free port, avoiding

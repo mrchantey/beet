@@ -144,15 +144,33 @@ pub fn resolve_repo_store(
 }
 
 /// The entry sources read from a store: the entry document bytes + name, its
-/// [`EntryPrescan`], the template `(path, source)` pairs from its declared
-/// `<TemplateDir>`s, and the formats they register through. The world-free async
-/// read [`build_root`] consumes.
+/// [`EntryPrescan`], the templates from its declared `<TemplateDir>`s, and the
+/// formats they register through. The world-free async read [`build_root`]
+/// consumes.
 pub struct EntrySources {
 	entry_name: String,
 	entry: MediaBytes,
 	prescan: EntryPrescan,
-	template_sources: Vec<(SmolPath, String)>,
+	template_sources: Vec<TemplateSource>,
 	formats: TemplateFormats,
+}
+
+/// A template read from an entry's `<TemplateDir>`.
+pub struct TemplateSource {
+	/// The `<TemplateDir src>` it was read from, store-root-relative.
+	dir: SmolStr,
+	/// Its path relative to `dir`, naming the module it registers as
+	/// (`widgets/Card.bsx` -> `widgets::Card`).
+	rel: SmolPath,
+	source: String,
+}
+
+impl TemplateSource {
+	/// The store-root-relative path, matching the [`BlobEvent`] paths the
+	/// watcher emits.
+	fn store_path(&self) -> SmolPath {
+		SmolPath::from(self.dir.as_str()).join(self.rel.as_str())
+	}
 }
 
 /// Read the entry document and the templates under its declared `<TemplateDir>`s
@@ -176,7 +194,14 @@ pub async fn read_sources(
 	let mut template_sources = Vec::new();
 	for dir in &prescan.template_dirs {
 		template_sources.extend(
-			TemplateDir::read_sources(repo_store, dir, &formats).await?,
+			TemplateDir::read_sources(repo_store, dir, &formats)
+				.await?
+				.into_iter()
+				.map(|(rel, source)| TemplateSource {
+					dir: dir.clone(),
+					rel,
+					source,
+				}),
 		);
 	}
 	EntrySources {
@@ -228,7 +253,15 @@ pub fn build_root(
 	// the entry's own template dirs, registered before the entry parses so its
 	// entry-level tags (eg `<Styles/>`) resolve. The reactive `<TemplateDir>` observer
 	// re-registers them (plus any crate/route dirs) once the tree is built.
-	TemplateDir::register_sources(world, root, &formats, template_sources)?;
+	TemplateDir::register_sources(
+		world,
+		root,
+		&formats,
+		template_sources
+			.into_iter()
+			.map(|template| (template.rel, template.source))
+			.collect(),
+	)?;
 	let template = EntryTemplate::from_bytes(world, &entry).map_err(|err| {
 		bevyhow!("failed to parse entry `{entry_name}`: {err}")
 	})?;
@@ -283,6 +316,48 @@ pub async fn build_entry_owned(
 	Ok(root)
 }
 
+/// The `--watch` entry build (native-only): install the live-reload driver
+/// ([`EntryReloader`]), then do the first build through the same
+/// [`rebuild_watched`] path a structural change re-runs (which also recomputes
+/// the structural source set per build).
+///
+/// So editing the entry document, an included `<Template src>` or a template
+/// the entry instantiates tears the old scene down and rebuilds it with no
+/// leaked entities (servers rebind, sockets reconnect), while a markdown or
+/// per-request template edit keeps the light content re-fire. The whole of what
+/// `beet --watch` runs after resolving its entry, so a test boots the exact
+/// driver path.
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+pub async fn build_watched(
+	world: &AsyncWorld,
+	repo_store: BlobStore,
+	entry_name: String,
+	formats: TemplateFormats,
+) -> Result {
+	// the driver's rebuild callback, re-cloning the store/name/formats per build
+	// (it is an `Fn`, re-run on every structural change). The structural source
+	// set starts empty; the first build below populates it.
+	let rebuild = {
+		let repo_store = repo_store.clone();
+		let entry_name = entry_name.clone();
+		let formats = formats.clone();
+		move |world: AsyncWorld| -> LocalBoxedFuture<'static, Result> {
+			let (repo_store, entry_name, formats) =
+				(repo_store.clone(), entry_name.clone(), formats.clone());
+			Box::pin(async move {
+				rebuild_watched(&world, repo_store, entry_name, formats).await
+			})
+		}
+	};
+	world
+		.with(move |world: &mut World| {
+			world.insert_resource(EntryReloader::new(default(), rebuild));
+		})
+		.await;
+	// the first build: a no-op teardown, then the fresh `BeetSceneRoot`.
+	rebuild_watched(world, repo_store, entry_name, formats).await
+}
+
 /// Rebuild the `--watch` entry into a fresh [`BeetSceneRoot`], the shared path the
 /// initial build and every structural reload run: tear down the previous entry
 /// scene via [`BeetSceneRoot::despawn_all`] (servers close, sockets drop; a no-op on the first
@@ -307,9 +382,9 @@ pub async fn rebuild_watched(
 	let sources =
 		read_sources(&repo_store, formats, entry_name.clone(), prescan).await?;
 	// recompute the structural source set from the current content, so a
-	// `<Template src>` include added by this very edit is structural on the next
-	// one without a restart.
-	let structural = entry_source_paths(&repo_store, &entry_name).await;
+	// `<Template src>` include or a template tag added by this very edit is
+	// structural on the next one without a restart.
+	let structural = entry_source_paths(&repo_store, &sources).await;
 	world
 		.with(move |world: &mut World| -> Result {
 			if let Some(mut reloader) =
@@ -341,32 +416,63 @@ pub async fn rebuild_watched(
 }
 
 /// The structural entry sources whose change triggers a full rebuild (versus the
-/// light content re-fire a markdown/template edit gets): the entry document plus
-/// every `<Template src>` include, resolved transitively through the store. Every
-/// path is store-root-relative, matching the [`BlobEvent`] paths the watcher emits.
+/// light content re-fire a markdown or per-request template edit gets): the entry
+/// document, every `<Template src>` include, and every `<TemplateDir>` template
+/// the entry tree instantiates by tag (a `<Styles/>` expanded once at build, whose
+/// rules the in-place re-fire cannot refresh), each resolved transitively. Every
+/// path is store-root-relative, matching the [`BlobEvent`] paths the watcher
+/// emits.
 ///
 /// A missing / unreadable / non-markup source is skipped rather than erroring, so a
 /// broken include never blocks watch startup.
-#[cfg(not(target_arch = "wasm32"))]
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 async fn entry_source_paths(
 	repo_store: &BlobStore,
-	entry_name: &str,
+	sources: &EntrySources,
 ) -> HashSet<SmolPath> {
+	// the entry's templates by the tag that instantiates them, with the source
+	// already read beside the entry (so only the entry and its includes hit the
+	// store below)
+	let templates = sources
+		.template_sources
+		.iter()
+		.filter_map(|template| {
+			BsxTemplateRegistry::module_path(&template.rel)
+				.map(|tag| (tag, template))
+		})
+		.collect::<HashMap<_, _>>();
+	let by_path = templates
+		.values()
+		.map(|template| (template.store_path(), template.source.as_str()))
+		.collect::<HashMap<_, _>>();
 	let mut seen = HashSet::default();
-	let mut stack = vec![SmolPath::from(entry_name)];
+	let mut stack = vec![SmolPath::from(sources.entry_name.as_str())];
 	while let Some(path) = stack.pop() {
 		if !seen.insert(path.clone()) {
 			continue;
 		}
-		let Ok(media) = repo_store.get_media(&path).await else {
-			continue;
+		let prescan = match by_path.get(&path) {
+			Some(source) => EntryPrescan::parse_lossy(&MediaBytes::new_str(
+				path.media_type().unwrap_or(MediaType::Bsx),
+				source,
+			)),
+			None => match repo_store.get_media(&path).await {
+				Ok(media) => EntryPrescan::parse_lossy(&media),
+				Err(_) => continue,
+			},
 		};
 		stack.extend(
-			EntryPrescan::parse_lossy(&media)
+			prescan
 				.includes
-				.into_iter()
+				.iter()
 				.map(|src| SmolPath::from(src.as_str())),
+		);
+		stack.extend(
+			prescan
+				.tags
+				.iter()
+				.filter_map(|tag| templates.get(tag))
+				.map(|template| template.store_path()),
 		);
 	}
 	seen
@@ -596,5 +702,48 @@ mod test {
 			})
 			.await;
 		readies.get().xpect_eq(2);
+	}
+
+	/// The structural set is the entry, its includes, and the `<TemplateDir>`
+	/// templates the entry tree instantiates (transitively through the templates
+	/// themselves), each store-root-relative. A template only a route or a
+	/// per-request layout uses stays a content source.
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn structural_sources_include_entry_templates() {
+		let repo_store = BlobStore::temp();
+		for (path, source) in [
+			(
+				"main.bsx",
+				r#"<Router><TemplateDir src="templates"/><Styles/><Template src="inc.bsx"/></Router>"#,
+			),
+			("inc.bsx", "<div/>"),
+			("templates/Styles.bsx", "<widgets::Swatch/>"),
+			(
+				"templates/widgets/Swatch.bsx",
+				"<Rule class=\"a\" display=Flex/>",
+			),
+			("templates/Layout.bsx", "<html><Slot/></html>"),
+		] {
+			repo_store
+				.insert(&SmolPath::from(path), source)
+				.await
+				.unwrap();
+		}
+		let prescan = read_prescan(&repo_store, "main.bsx").await.unwrap();
+		let sources = read_sources(&repo_store, default(), "main.bsx", prescan)
+			.await
+			.unwrap();
+		entry_source_paths(&repo_store, &sources).await.xpect_eq(
+			[
+				"main.bsx",
+				"inc.bsx",
+				"templates/Styles.bsx",
+				"templates/widgets/Swatch.bsx",
+			]
+			.into_iter()
+			.map(SmolPath::from)
+			.collect::<HashSet<_>>(),
+		);
 	}
 }

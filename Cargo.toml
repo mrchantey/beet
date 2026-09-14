@@ -811,6 +811,14 @@ path = "tests/sidebar_drawer.rs"
 harness = false
 required-features = ["router", "style", "http_server", "testing", "webdriver"]
 
+# live reload round-tripped through a real browser: a `PageHarness`-served
+# watched site, edited on disk, reloads the open page into the new content.
+[[test]]
+name = "live_reload_browser"
+path = "tests/live_reload_browser.rs"
+harness = false
+required-features = ["router", "markdown", "fs", "rand", "client_io", "template_serde", "testing", "webdriver"]
+
 [[bench]]
 name = "bevy_coldstart"
 path = "tests/benches/bevy_coldstart.rs"

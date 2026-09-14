@@ -16,7 +16,6 @@
 
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
-use std::net::TcpListener;
 use std::path::Path;
 use std::time::Duration;
 
@@ -109,8 +108,8 @@ pub(crate) async fn run(
 		.with_extra_args(chrome_args);
 	let mut browser = Browser::new_with_opts(
 		Client::default()
-			.with_driver_port(free_port()?)
-			.with_websocket_port(free_port()?),
+			.with_driver_port(HttpServer::free_port()?)
+			.with_websocket_port(HttpServer::free_port()?),
 		session_opts,
 	)
 	.await?;
@@ -181,11 +180,4 @@ fn args_to_query(args: &[String]) -> String {
 		true => String::new(),
 		false => format!("?{}", pairs.join("&")),
 	}
-}
-
-/// An OS-assigned free port for the driver process (bind, read, drop). Racy
-/// in principle, fine for a runner that owns the machine's test run. Shared
-/// with the `wasm_render_check` smoketest's driver.
-pub(crate) fn free_port() -> Result<u16> {
-	TcpListener::bind("127.0.0.1:0")?.local_addr()?.port().xok()
 }

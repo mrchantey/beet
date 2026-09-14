@@ -14,6 +14,7 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::RuleSet;
+use std::sync::Arc;
 
 /// The outcome of a [`CheckReport::check_routes`] pass: every [`Diagnostic`] collected across
 /// the site's routes, with convenience accessors for the gated entry points.
@@ -53,17 +54,55 @@ impl CheckReport {
 	}
 }
 
-/// Run [`CheckReport::check_routes`] over every router in the world and log each
-/// [`Diagnostic`] loudly, the dev-serve surfacing path: after a build (or a
-/// `--watch` reload) every render problem prints to the console at its severity.
+/// A [`CheckReport::check_routes`] pass narrowed for the dev loop, where a
+/// reload may supersede the pass before it finishes.
+///
+/// [`routes`](Self::routes) limits the scan to those route entities: a content
+/// reload knows which files changed, so a markdown edit re-checks its one page
+/// rather than the whole site. [`live`](Self::live) is polled between routes,
+/// ending the pass early once a follow-up reload has respawned the routes under
+/// it, so the half-built routes of a superseded pass are never reported as
+/// errors.
+#[derive(Clone, Default)]
+pub struct CheckScope {
+	/// The route entities to check, every static route when `None`.
+	pub routes: Option<HashSet<Entity>>,
+	/// Whether the pass is still current, polled between routes; a `false`
+	/// ends the pass with no report.
+	pub live: Option<Arc<dyn Fn(&mut World) -> bool + Send + Sync>>,
+}
+
+impl CheckScope {
+	/// Whether the pass is still current, ie its `live` predicate (if any)
+	/// still holds.
+	fn is_live(&self, world: &mut World) -> bool {
+		self.live.as_ref().is_none_or(|live| live(world))
+	}
+
+	/// Whether `route` is within the scope.
+	fn covers(&self, route: Entity) -> bool {
+		self.routes
+			.as_ref()
+			.is_none_or(|routes| routes.contains(&route))
+	}
+}
+
+/// Run [`CheckReport::check_routes_scoped`] over every router in the world and
+/// log each [`Diagnostic`] loudly, the dev-serve surfacing path: after a build
+/// (or a `--watch` reload) every render problem prints to the console at its
+/// severity.
 ///
 /// A best-effort console pass: a router that fails to scan is logged and skipped
-/// rather than aborting, so a transient build error never kills the dev loop.
-/// Returns whether any error-level diagnostic fired across all routers.
+/// rather than aborting, so a transient build error never kills the dev loop; a
+/// pass the `scope` reports superseded ends quietly. Returns whether any
+/// error-level diagnostic fired across all routers.
 ///
 /// Rides `client_io`'s native-only gate: the live reload loop is its only caller.
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
-pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
+pub(crate) async fn log_all_render_diagnostics(
+	world: &AsyncWorld,
+	scope: CheckScope,
+) -> bool {
 	let routers = world
 		.with(|world: &mut World| {
 			world
@@ -74,10 +113,16 @@ pub(crate) async fn log_all_render_diagnostics(world: &AsyncWorld) -> bool {
 		.await;
 	let mut had_error = false;
 	for router in routers {
-		match CheckReport::check_routes(world, router).await {
-			Ok(report) => {
+		match CheckReport::check_routes_scoped(world, router, scope.clone())
+			.await
+		{
+			Ok(Some(report)) => {
 				report.log();
 				had_error |= report.has_errors();
+			}
+			Ok(None) => {
+				debug!("render diagnostics superseded by a newer reload");
+				return had_error;
 			}
 			Err(error) => error!("render-diagnostics scan failed: {error}"),
 		}
@@ -108,8 +153,22 @@ impl CheckReport {
 		world: &AsyncWorld,
 		root: Entity,
 	) -> Result<CheckReport> {
+		Self::check_routes_scoped(world, root, CheckScope::default())
+			.await
+			.map(Option::unwrap_or_default)
+	}
+
+	/// [`Self::check_routes`] narrowed by a [`CheckScope`]: only its routes are
+	/// checked, and `None` is returned when its `live` predicate fails between
+	/// routes (a superseded dev-loop pass).
+	pub async fn check_routes_scoped(
+		world: &AsyncWorld,
+		root: Entity,
+		scope: CheckScope,
+	) -> Result<Option<CheckReport>> {
 		// the static GET routes worth checking, plus the route tree + config snapshot
 		// every per-route scan validates against, and the document's own inert tags.
+		let entities_scope = scope.clone();
 		let (route_entities, route_tree, config, unregistered) = world
 			.with(move |world: &mut World| -> Result<_> {
 				let route_tree = RouteTree::of(world, root)?.clone();
@@ -120,7 +179,9 @@ impl CheckReport {
 				let route_entities = route_tree
 					.flatten_nodes()
 					.into_iter()
-					.filter(|node| checkable(node))
+					.filter(|node| {
+						checkable(node) && entities_scope.covers(node.entity)
+					})
 					.map(|node| (node.entity, node.path.annotated_path()))
 					.collect::<Vec<_>>();
 				let unregistered = unregistered_tags(world, root, &config);
@@ -131,6 +192,13 @@ impl CheckReport {
 		let mut report = CheckReport::default();
 		report.diagnostics.extend(unregistered);
 		for (entity, path) in route_entities {
+			let live_scope = scope.clone();
+			if !world
+				.with(move |world: &mut World| live_scope.is_live(world))
+				.await
+			{
+				return Ok(None);
+			}
 			check_route(
 				world,
 				entity,
@@ -153,7 +221,7 @@ impl CheckReport {
 		report.diagnostics.retain(|diagnostic| {
 			diagnostic.route.is_some() || !routed.contains(&diagnostic.message)
 		});
-		Ok(report)
+		Ok(Some(report))
 	}
 }
 
@@ -330,6 +398,55 @@ mod test {
 		report.has_errors().xpect_false();
 		// both static scene routes were scanned.
 		report.checked.len().xpect_eq(2);
+	}
+
+	/// A scoped pass checks only its routes, and ends with no report once its
+	/// `live` predicate fails (a superseded dev-loop pass).
+	#[beet_core::test]
+	async fn scope_narrows_and_cancels() {
+		let mut world = check_world();
+		let router = world
+			.spawn((Router, children![
+				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
+				render_action::fixed_func_route("about", || {
+					rsx! { <p>"about"</p> }
+				}),
+			]))
+			.flush();
+		let about = world
+			.entity(router)
+			.get::<RouteTree>()
+			.unwrap()
+			.find(&["about"])
+			.unwrap()
+			.entity;
+		async fn scoped(
+			world: &mut World,
+			router: Entity,
+			scope: CheckScope,
+		) -> Option<CheckReport> {
+			world
+				.run_async_then(async move |world| {
+					CheckReport::check_routes_scoped(&world, router, scope)
+						.await
+				})
+				.await
+				.unwrap()
+		}
+		scoped(&mut world, router, CheckScope {
+			routes: Some([about].into_iter().collect()),
+			live: None,
+		})
+		.await
+		.unwrap()
+		.checked
+		.xpect_eq(vec![SmolPath::from("about")]);
+		scoped(&mut world, router, CheckScope {
+			routes: None,
+			live: Some(Arc::new(|_| false)),
+		})
+		.await
+		.xpect_none();
 	}
 
 	#[beet_core::test]
