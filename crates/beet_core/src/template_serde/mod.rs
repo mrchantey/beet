@@ -11,6 +11,11 @@
 //! The module is no_std at its core: the representation, walker, and value-slot
 //! serde never reference an asset type. Assets are an additive feature.
 //!
+//! The serialized document is `{ resources, entities }`, flat at every level:
+//! the resources are a map of type path to value and so is each entity, keyed
+//! by file key (see the [serde](DynamicTemplateSerializer) module's wire
+//! shape).
+//!
 //! # High-level API
 //!
 //! - [`TemplateSaver`] - Serialize a world or entity subtree to RON, JSON, or

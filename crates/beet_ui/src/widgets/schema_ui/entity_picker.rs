@@ -217,7 +217,7 @@ mod test {
 					<DynamicForm
 						schema={ValueSchema::Entity(default())}
 						field={FieldRef::new(FieldPath::parse(
-							"entities.2.components.bevy_ecs::hierarchy::ChildOf"
+							"entities.2.bevy_ecs::hierarchy::ChildOf"
 						))}
 					/>
 				</div>

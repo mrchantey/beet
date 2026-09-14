@@ -2,8 +2,9 @@
 //! follows.
 //!
 //! **Edit the document, never the world.** A scene document is the
-//! `template_serde` shape (`{ resources, entities }`) held as a [`Value`] on the
-//! entity whose children the scene built into. An inspector reads and writes
+//! `template_serde` shape (`{ resources, entities }`, each entity exactly its
+//! component map) held as a [`Value`] on the entity whose children the scene
+//! built into. An inspector reads and writes
 //! that document; [`sync_scene_documents`] diffs each change against what the
 //! world reflects and applies it per component, in place: a changed value
 //! reflect-applies into the live component, an added key inserts one, a removed
@@ -314,7 +315,7 @@ impl ScenePlan {
 		let mut entities = Vec::new();
 		for key in new.keys()? {
 			let components = new.components(key).ok_or_else(|| {
-				bevyhow!("entity #{key} holds no component map")
+				bevyhow!("entity #{key} is not a component map")
 			})?;
 			let previous = old.components(key);
 			let mut plan = EntityPlan {

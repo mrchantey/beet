@@ -12,6 +12,18 @@
 //!
 //! Deserialization is symmetric: every component is read back as a value slot.
 //! No asset type is referenced, keeping this module no_std.
+//!
+//! # Wire shape
+//!
+//! The document is flat at every level: a map of type path to value is a
+//! resource set or an entity, and nothing wraps either.
+//!
+//! ```json
+//! {
+//!   "resources": { "bevy_ecs::Time": 393933892 },
+//!   "entities": { "0": { "bevy_ecs::Name": "Bob" } }
+//! }
+//! ```
 
 use super::ComponentSlot;
 use super::DynamicTemplate;
@@ -44,11 +56,6 @@ pub(crate) const TEMPLATE_STRUCT: &str = "Template";
 pub(crate) const TEMPLATE_RESOURCES: &str = "resources";
 /// Name of the serialized entities field in a template struct.
 pub(crate) const TEMPLATE_ENTITIES: &str = "entities";
-
-/// Name of the serialized entity struct type.
-pub(crate) const ENTITY_STRUCT: &str = "Entity";
-/// Name of the serialized components field in an entity struct.
-pub(crate) const ENTITY_FIELD_COMPONENTS: &str = "components";
 
 /// Serializer for a [`DynamicTemplate`] of resolved values.
 ///
@@ -93,7 +100,8 @@ impl Serialize for DynamicTemplateSerializer<'_> {
 	}
 }
 
-/// Serializes entities as a map of file key to serialized entity.
+/// Serializes entities as a map of file key to component map: an entity is
+/// exactly the components it holds, keyed by type path, and nothing wraps them.
 ///
 /// A file key is its in-template [`Entity`] with the generation stripped, so a
 /// file reads `0`, `1`, `2` rather than raw 64-bit entity bits. Which key an entity
@@ -116,35 +124,12 @@ impl Serialize for EntitiesSerializer<'_> {
 		for entity in self.entities {
 			state.serialize_entry(
 				&entity.entity.index_u32(),
-				&EntitySerializer {
-					entity,
+				&SlotMapSerializer {
+					slots: &entity.components,
 					registry: self.registry,
 				},
 			)?;
 		}
-		state.end()
-	}
-}
-
-/// Serializes an entity as a struct holding its component map.
-struct EntitySerializer<'a> {
-	entity: &'a DynamicTemplateEntity,
-	registry: &'a TypeRegistry,
-}
-
-impl Serialize for EntitySerializer<'_> {
-	fn serialize<S>(
-		&self,
-		serializer: S,
-	) -> core::result::Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		let mut state = serializer.serialize_struct(ENTITY_STRUCT, 1)?;
-		state.serialize_field(ENTITY_FIELD_COMPONENTS, &SlotMapSerializer {
-			slots: &self.entity.components,
-			registry: self.registry,
-		})?;
 		state.end()
 	}
 }
@@ -244,12 +229,6 @@ impl Serialize for ValueMapSerializer<'_> {
 enum TemplateField {
 	Resources,
 	Entities,
-}
-
-#[derive(Deserialize)]
-#[serde(field_identifier, rename_all = "lowercase")]
-enum EntityField {
-	Components,
 }
 
 /// Deserializes a [`DynamicTemplate`] whose component slots are resolved values.
@@ -359,7 +338,7 @@ impl<'de> Visitor<'de> for TemplateVisitor<'_> {
 	}
 }
 
-/// Deserializes a map of file key to entity.
+/// Deserializes a map of file key to component map.
 struct EntitiesDeserializer<'a> {
 	type_registry: &'a TypeRegistry,
 }
@@ -405,103 +384,12 @@ impl<'de> Visitor<'de> for EntitiesVisitor<'_> {
 			let entity = Entity::from_raw_u32(key).ok_or_else(|| {
 				Error::custom(format_args!("`{key}` is not a valid entity key"))
 			})?;
-			entities.push(map.next_value_seed(EntityDeserializer {
-				entity,
-				type_registry: self.type_registry,
-			})?);
+			let components = map.next_value_seed(SlotMapDeserializer {
+				registry: self.type_registry,
+			})?;
+			entities.push(DynamicTemplateEntity { entity, components });
 		}
 		Ok(entities)
-	}
-}
-
-/// Deserializes an entity and its component slots.
-struct EntityDeserializer<'a> {
-	entity: Entity,
-	type_registry: &'a TypeRegistry,
-}
-
-impl<'a, 'de> DeserializeSeed<'de> for EntityDeserializer<'a> {
-	type Value = DynamicTemplateEntity;
-
-	fn deserialize<D>(
-		self,
-		deserializer: D,
-	) -> core::result::Result<Self::Value, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		deserializer.deserialize_struct(
-			ENTITY_STRUCT,
-			&[ENTITY_FIELD_COMPONENTS],
-			EntityVisitor {
-				entity: self.entity,
-				registry: self.type_registry,
-			},
-		)
-	}
-}
-
-struct EntityVisitor<'a> {
-	entity: Entity,
-	registry: &'a TypeRegistry,
-}
-
-impl<'de> Visitor<'de> for EntityVisitor<'_> {
-	type Value = DynamicTemplateEntity;
-
-	fn expecting(&self, formatter: &mut Formatter) -> core::fmt::Result {
-		formatter.write_str("entity struct")
-	}
-
-	fn visit_seq<A>(
-		self,
-		mut seq: A,
-	) -> core::result::Result<Self::Value, A::Error>
-	where
-		A: SeqAccess<'de>,
-	{
-		let components = seq
-			.next_element_seed(SlotMapDeserializer {
-				registry: self.registry,
-			})?
-			.ok_or_else(|| Error::missing_field(ENTITY_FIELD_COMPONENTS))?;
-
-		Ok(DynamicTemplateEntity {
-			entity: self.entity,
-			components,
-		})
-	}
-
-	fn visit_map<A>(
-		self,
-		mut map: A,
-	) -> core::result::Result<Self::Value, A::Error>
-	where
-		A: MapAccess<'de>,
-	{
-		let mut components = None;
-		while let Some(key) = map.next_key()? {
-			match key {
-				EntityField::Components => {
-					if components.is_some() {
-						return Err(Error::duplicate_field(
-							ENTITY_FIELD_COMPONENTS,
-						));
-					}
-					components =
-						Some(map.next_value_seed(SlotMapDeserializer {
-							registry: self.registry,
-						})?);
-				}
-			}
-		}
-
-		let components = components
-			.ok_or_else(|| Error::missing_field(ENTITY_FIELD_COMPONENTS))?;
-		Ok(DynamicTemplateEntity {
-			entity: self.entity,
-			components,
-		})
 	}
 }
 

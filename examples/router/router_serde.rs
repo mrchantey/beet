@@ -66,7 +66,7 @@ fn setup(async_commands: AsyncCommands) {
 	let path = SmolPath::new(WORLD_SERDE_FILE);
 	let new_world = CliArgs::parse_env().params.contains_key("new");
 
-	async_commands.run(async move |world: AsyncWorld| {
+	async_commands.detach_async(async move |world: AsyncWorld| {
 		if new_world {
 			store.remove(&path).await.ok();
 		}

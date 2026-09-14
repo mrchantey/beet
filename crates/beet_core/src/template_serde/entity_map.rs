@@ -240,6 +240,34 @@ mod conformance {
 		}
 	}
 
+	/// A resource set is a map of type path to value with nothing wrapping it,
+	/// exactly as an entity is.
+	#[crate::test]
+	fn resources_are_flat() {
+		#[derive(Resource, Reflect)]
+		#[reflect(Resource)]
+		struct Score(u32);
+
+		let mut world = world();
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<Score>();
+		world.insert_resource(Score(7));
+		let json = TemplateSaver::new()
+			.extract_resources()
+			.save(&world, MediaType::Json)
+			.unwrap()
+			.as_utf8()
+			.unwrap()
+			.xmap(serde_json::from_str::<serde_json::Value>)
+			.unwrap();
+		json["resources"][Score::type_path()]
+			.as_u64()
+			.unwrap()
+			.xpect_eq(7);
+	}
+
 	/// Save, load, save: the second save is byte-identical to the first.
 	///
 	/// This is the whole point of the retained map. Without it the reload's

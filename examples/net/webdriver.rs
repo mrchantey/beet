@@ -30,7 +30,7 @@ fn main() {
 }
 
 fn run_webdriver(async_commands: AsyncCommands) {
-	async_commands.run_local(|world| async move {
+	async_commands.detach_async_local(|world| async move {
 		ClientProcess::check_installed(Provider::Chromedriver).await?;
 
 		let page = Browser::visit("https://example.com").await?;

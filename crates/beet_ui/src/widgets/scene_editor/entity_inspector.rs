@@ -9,8 +9,8 @@ use crate::widgets::schema_ui::value_rebuild::RebuildKey;
 use crate::widgets::schema_ui::value_rebuild::ValueRebuild;
 use beet_core::prelude::*;
 
-/// The entity the scene's [`SceneSelection`] names, as a form over the
-/// registered [`ValueSchema::scene_entity`] schema at its document path.
+/// The entity the scene's [`SceneSelection`] names, as a form over the keyed
+/// map it is ([`MapSchema::Keyed`]) at its document path.
 ///
 /// An entity is a list of components, never a struct of a million optionals,
 /// so the inspector is the form's map arm specialized twice: each component
@@ -117,7 +117,7 @@ fn generation(shown: Shown) -> Snippet {
 					</div>
 				</div>
 				<DynamicForm
-					schema={ValueSchema::reference(ValueSchema::SCENE_ENTITY)}
+					schema={ValueSchema::Map(MapSchema::Keyed)}
 					field={field}
 				/>
 			}
@@ -245,9 +245,13 @@ mod test {
 		html.clone()
 			.xpect_contains(">#1 h1</span>")
 			// the element's tag is a text control, its parent an entity picker
-			.xpect_contains("name=\"entities.1.components.beet_core::types::element::element::Element\"")
-			.xpect_contains("<select name=\"entities.1.components.bevy_ecs::hierarchy::ChildOf\"")
-			.xpect_contains("Add to Components");
+			.xpect_contains(
+				"name=\"entities.1.beet_core::types::element::element::Element\"",
+			)
+			.xpect_contains(
+				"<select name=\"entities.1.bevy_ecs::hierarchy::ChildOf\"",
+			)
+			.xpect_contains("Add component");
 		html.xpect_contains("<label>Element<input");
 	}
 
@@ -259,7 +263,7 @@ mod test {
 		test_ext::select(&mut world, 2);
 		let control = schema_test_ext::bound(
 			&mut world,
-			"entities.2.components.beet_core::types::value::value::Value",
+			"entities.2.beet_core::types::value::value::Value",
 		);
 		world
 			.entity_mut(control)
@@ -291,10 +295,7 @@ mod test {
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::str(Name::type_path()));
-		let add = schema_test_ext::collection_add(
-			&mut world,
-			"entities.3.components",
-		);
+		let add = schema_test_ext::collection_add(&mut world, "entities.3");
 		test_ext::click_world(&mut world, add);
 		world.get::<Name>(paragraph).unwrap().as_str().xpect_eq("");
 		test_ext::render_world(&mut world, host)

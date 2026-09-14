@@ -138,7 +138,7 @@ mod test {
 			.spawn_template(rsx! {
 				<div>
 					<DynamicForm
-						schema={ValueSchema::reference(ValueSchema::SCENE_ENTITY)}
+						schema={ValueSchema::Map(MapSchema::Keyed)}
 						field={FieldRef::new(SceneEntities::entity_path(0))}
 					/>
 				</div>
@@ -179,7 +179,7 @@ mod test {
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::str(Health::type_path()));
-		let add = test_ext::collection_add(&mut world, "entities.0.components");
+		let add = test_ext::collection_add(&mut world, "entities.0");
 		test_ext::click_world(&mut world, add);
 		SceneEntities::of(&test_ext::document_of(&mut world, root))
 			.unwrap()

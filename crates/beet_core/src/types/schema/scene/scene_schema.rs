@@ -4,16 +4,16 @@ use crate::prelude::*;
 impl ValueSchema {
 	/// The registry name of the scene schema, [`scene`](Self::scene).
 	pub const SCENE: &'static str = "Scene";
-	/// The registry name of the entity schema,
-	/// [`scene_entity`](Self::scene_entity).
-	pub const SCENE_ENTITY: &'static str = "SceneEntity";
 
 	/// The schema describing a scene document as data, the `template_serde`
-	/// shape: `{ resources: { type path: value }, entities: { key: entity } }`.
+	/// shape, flat at every level:
+	/// `{ resources: { type path: value }, entities: { key: { type path: value } } }`.
 	///
-	/// A resource is described by its key, and an entity names
-	/// [`scene_entity`](Self::scene_entity) by reference so the one entity schema
-	/// is what an inspector over a single entity binds. Registered under
+	/// A resource set and an entity are the same kind of map, each value
+	/// described by its key ([`MapSchema::Keyed`]), so an entity is the list of
+	/// components it holds and never a struct of optionals: an inspector over
+	/// one binds a keyed map at its path, the form's map arm with the add-entry
+	/// key input specialized to a component picker. Registered under
 	/// [`SCENE`](Self::SCENE) by every [`SchemaRegistry`], where a scene
 	/// validates wherever it is read.
 	pub fn scene() -> ValueSchema {
@@ -32,33 +32,9 @@ impl ValueSchema {
 				.with_label("Resources"),
 				NamedFieldSchema::new(
 					SceneEntities::ENTITIES,
-					ValueSchema::Map(MapSchema::uniform(
-						ValueSchema::reference(Self::SCENE_ENTITY),
-					)),
+					ValueSchema::Map(MapSchema::uniform(Self::keyed_map())),
 				)
 				.with_label("Entities"),
-			],
-		})
-	}
-
-	/// The schema of one scene entity: the list of components it
-	/// holds, `{ components: { type path: value } }`, never a struct of
-	/// optionals.
-	///
-	/// Each component value is described by its key, so an entity inspector is
-	/// the form's map arm with the add-entry key input specialized to a
-	/// component picker.
-	pub fn scene_entity() -> ValueSchema {
-		ValueSchema::Struct(StructSchema {
-			name: Some(Self::SCENE_ENTITY.into()),
-			description: Some("An entity: the components it holds".into()),
-			allow_additional: false,
-			fields: vec![
-				NamedFieldSchema::new(
-					SceneEntities::COMPONENTS,
-					Self::keyed_map(),
-				)
-				.with_label("Components"),
 			],
 		})
 	}
@@ -142,26 +118,8 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains(format!("entities.0.components.{HEALTH}"))
+			.xpect_contains(format!("entities.0.{HEALTH}"))
 			.xpect_contains("no schema is registered");
-	}
-
-	/// An entity's shape is still enforced: the scene is a struct of maps, not
-	/// `Any`.
-	#[crate::test]
-	async fn an_entity_must_hold_components() {
-		let registry = registry();
-		let resolver = SchemaResolver::default().with_schemas(&registry);
-		ValueSchema::reference(ValueSchema::SCENE)
-			.assert_valid_in(
-				resolver,
-				"scene.json",
-				&mut value!({ "resources": {}, "entities": { "0": {} } }),
-			)
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("entities.0.components");
 	}
 
 	/// A component's field is addressable through the scene, so a typed write
@@ -173,9 +131,7 @@ mod test {
 		ValueSchema::reference(ValueSchema::SCENE)
 			.get_field_schema_in(
 				resolver,
-				&SceneEntities::entity_path(1)
-					.with_pushed(SceneEntities::COMPONENTS)
-					.with_pushed(CHILD_OF),
+				&SceneEntities::entity_path(1).with_pushed(CHILD_OF),
 			)
 			.unwrap()
 			.into_owned()

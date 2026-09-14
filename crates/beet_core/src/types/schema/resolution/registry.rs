@@ -66,7 +66,6 @@ impl SchemaRegistry {
 		registry
 			.insert(ValueSchema::type_path(), ValueSchema::meta())
 			.insert(ValueSchema::SCENE, ValueSchema::scene())
-			.insert(ValueSchema::SCENE_ENTITY, ValueSchema::scene_entity())
 			.insert(Name::type_path(), ValueSchema::String(default()))
 			.insert(Value::type_path(), ValueSchema::String(default()));
 		registry

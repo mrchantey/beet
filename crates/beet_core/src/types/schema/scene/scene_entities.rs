@@ -25,8 +25,6 @@ impl<'a> SceneEntities<'a> {
 	pub const RESOURCES: &'static str = "resources";
 	/// The scene's `entities` field.
 	pub const ENTITIES: &'static str = "entities";
-	/// An entity's `components` field.
-	pub const COMPONENTS: &'static str = "components";
 
 	/// The entities of `scene`.
 	pub fn of(scene: &'a Value) -> Result<Self> {
@@ -50,8 +48,8 @@ impl<'a> SceneEntities<'a> {
 			.xok()
 	}
 
-	/// A scene document holding `entities`, each its component map, in the
-	/// given order, and no resources: the fixture every scene test starts
+	/// A scene document holding `entities`, each exactly its component map, in
+	/// the given order, and no resources: the fixture every scene test starts
 	/// from.
 	pub fn scene(entities: impl IntoIterator<Item = (u32, Map)>) -> Value {
 		let mut scene = Value::map();
@@ -73,11 +71,11 @@ impl<'a> SceneEntities<'a> {
 		scene: &serde_json::Value,
 		key: u32,
 	) -> &serde_json::Value {
-		&scene[Self::ENTITIES][key.to_string()][Self::COMPONENTS]
+		&scene[Self::ENTITIES][key.to_string()]
 	}
 
-	/// The path of the entity at `key` within its scene document: what a form
-	/// over it binds.
+	/// The path of the entity at `key` within its scene document: its
+	/// component map, what a form over it binds.
 	pub fn entity_path(key: u32) -> FieldPath {
 		FieldPath::new([
 			FieldSegment::key(Self::ENTITIES),
@@ -87,20 +85,17 @@ impl<'a> SceneEntities<'a> {
 
 	/// The scene position a field path names: the file key of the entity and
 	/// the type path of the component it descends into, ie
-	/// `entities.3.components.bevy_ecs::hierarchy::ChildOf[.target]`. `None`
-	/// for a path into anything else, which an entity picker takes to mean no
-	/// relation to filter by.
+	/// `entities.3.bevy_ecs::hierarchy::ChildOf[.target]`. `None` for a path
+	/// into anything else, which an entity picker takes to mean no relation to
+	/// filter by.
 	pub fn position(path: &[FieldSegment]) -> Option<(u32, &str)> {
 		match path {
 			[
 				FieldSegment::ObjectKey(entities),
 				FieldSegment::ObjectKey(key),
-				FieldSegment::ObjectKey(components),
 				FieldSegment::ObjectKey(type_path),
 				..,
-			] if entities == Self::ENTITIES
-				&& components == Self::COMPONENTS =>
-			{
+			] if entities == Self::ENTITIES => {
 				Some((key.parse().ok()?, type_path.as_str()))
 			}
 			_ => None,
@@ -137,14 +132,10 @@ impl<'a> SceneEntities<'a> {
 		self.entities.contains(&key.to_string())
 	}
 
-	/// The components of the entity at `key`, if the scene holds one.
+	/// The components of the entity at `key`, which is the entity itself, if
+	/// the scene holds one.
 	pub fn components(&self, key: u32) -> Option<&'a Map> {
-		self.entities
-			.0
-			.get(key.to_string().as_str())?
-			.get(Self::COMPONENTS)?
-			.as_map()
-			.ok()
+		self.entities.0.get(key.to_string().as_str())?.as_map().ok()
 	}
 
 	/// The component at `type_path` of the entity at `key`, if it holds one.
@@ -311,9 +302,7 @@ impl<'a> SceneEntitiesMut<'a> {
 	/// Insert an entity holding `components` at `key`, last in document order
 	/// (so last among its siblings), replacing any entity there.
 	pub fn insert_entity(&mut self, key: u32, components: Map) {
-		let mut entity = Map::default();
-		entity.insert(SceneEntities::COMPONENTS, components);
-		self.entities.insert(key.to_string(), entity);
+		self.entities.insert(key.to_string(), components);
 	}
 
 	/// Remove the entity at `key`, answering whether the scene held one. What
@@ -339,7 +328,6 @@ impl<'a> SceneEntitiesMut<'a> {
 		self.entities
 			.0
 			.get_mut(key.to_string().as_str())?
-			.get_mut(SceneEntities::COMPONENTS)?
 			.as_map_mut()
 			.ok()
 	}

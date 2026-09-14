@@ -4,10 +4,10 @@
 //! the [`SceneDocument`] of the scene it lives in, and the world follows per
 //! component; nothing reaches into a live entity. The editor is therefore the
 //! same generated machinery as any other document editor: the
-//! [`EntityInspector`] is a [`DynamicForm`](super::DynamicForm) over the
-//! registered [`ValueSchema::scene_entity`] schema at the selected entity's
-//! path, the [`SceneTree`] a generation over the document's entities, and a
-//! reparent is the `ChildOf` entry's entity picker.
+//! [`EntityInspector`] is a [`DynamicForm`](super::DynamicForm) over the keyed
+//! component map the selected entity is, at its path, the [`SceneTree`] a
+//! generation over the document's entities, and a reparent is the `ChildOf`
+//! entry's entity picker.
 //!
 //! The editor lives *inside* the scene it edits: [`ToggleSceneEditor`] is
 //! authored as a tag in the scene, stays in the scene document (so removing
