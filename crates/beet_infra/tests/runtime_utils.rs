@@ -121,18 +121,42 @@ impl TestDeploy {
 		self.stack.resolve(&PackageConfig::default())
 	}
 
+	/// The client of the stack's repo store, exactly as
+	/// `RepoStoreQuery::artifacts_client` builds it in a deploy.
 	pub fn artifacts_client(&self) -> ArtifactsClient {
-		self.deployment.artifacts_client(&self.resolved()).unwrap()
+		ArtifactsClient::new(
+			BlobStore::from_uri(repo_store(self).root()).unwrap(),
+			ArtifactLedger::new(
+				*self.deployment.deploy_id(),
+				self.deployment.deploy_timestamp().to_string(),
+			),
+		)
 	}
 }
 
-/// Create the assets store block used across all tests.
-pub fn assets_bucket_block() -> S3BucketBlock {
-	S3BucketBlock::new("assets").with_deploy_versioned(true)
+/// The repo store declaration every test stack carries: the bucket the site
+/// is published into and the ledger lives in, deploy-versioned by default.
+pub fn repo_store_block() -> impl Bundle {
+	(S3BucketBlock::new("repo"), RepoStoreBlock)
 }
 
-/// Build the terraform project for `block` deployed beside the shared assets
-/// bucket, rendered through the same [`DeployRender`] schedule the deploy runs.
+/// The erased half of [`repo_store_block`] under `deploy`'s stack.
+fn repo_store(deploy: &TestDeploy) -> ErasedStoreBlock {
+	ErasedStoreBlock::new(&S3BucketBlock::new("repo"), &deploy.resolved())
+}
+
+/// The publish steps of a deploy: stage `site_dir` and mirror it into the
+/// repo store, so the test's isolated copy of the site is what gets served.
+pub fn publish_site(site_dir: &AbsPath) -> Result<impl Bundle> {
+	(
+		RepoStage::new(site_dir.into_ws_path()?),
+		RepoSync::default(),
+	)
+		.xok()
+}
+
+/// Build the terraform project for `block` deployed beside the repo store,
+/// rendered through the same [`DeployRender`] schedule the deploy runs.
 pub fn render_test_project(
 	deploy: &TestDeploy,
 	block: impl Bundle,
@@ -144,34 +168,21 @@ pub fn render_test_project(
 		.spawn(deploy.stack.clone())
 		.with_children(|parent| {
 			parent.spawn(block);
-			parent.spawn(assets_bucket_block());
+			parent.spawn(repo_store_block());
 		})
 		.id();
 	RenderScope::render(&mut world, root)?.project()
 }
 
-/// The deploy-versioned uri of the assets bucket, exactly as its declaration
-/// projects it.
-pub fn assets_uri(deploy: &TestDeploy) -> StoreUri {
-	ErasedStoreBlock::new(&assets_bucket_block(), &deploy.resolved())
-		.store_uri(Some(deploy.deployment.deploy_id()))
+/// The document root of `deploy`'s version in the repo store, exactly as the
+/// declaration projects it.
+pub fn repo_uri(deploy: &TestDeploy) -> StoreUri {
+	repo_store(deploy).store_uri(Some(deploy.deployment.deploy_id()))
 }
 
-/// Create the S3FsStore for syncing local assets to S3.
-/// `assets_dir` is typically the isolated temp dir from [`IsolatedTestGuards`].
-pub fn assets_s3_fs_store(
-	deploy: &TestDeploy,
-	assets_dir: &AbsPath,
-) -> S3FsStore {
-	S3FsStore::new(
-		FsStore::new(assets_dir.clone()),
-		S3Store::from_uri(&assets_uri(deploy)).unwrap(),
-	)
-}
-
-/// Get the deploy-versioned assets store for verification.
-pub fn assets_store(deploy: &TestDeploy) -> BlobStore {
-	BlobStore::from_uri(&assets_uri(deploy)).unwrap()
+/// The published document of `deploy`'s version, for verification.
+pub fn repo_document(deploy: &TestDeploy) -> BlobStore {
+	BlobStore::from_uri(&repo_uri(deploy)).unwrap()
 }
 
 /// Re-apply terraform with the current ledger deploy_id.
@@ -192,12 +203,13 @@ where
 	build_project(deploy)?.apply().await
 }
 
-/// Verify the assets store contains the expected version marker.
+/// Verify the published document of `deploy`'s version carries the expected
+/// version marker.
 pub async fn verify_assets(deploy: &TestDeploy, expected: &str) -> Result {
-	let store = assets_store(deploy);
+	let store = repo_document(deploy);
 	let files = store.list().await?;
 	let deploy_id = deploy.deployment.deploy_id();
-	info!("assets at deploy {deploy_id}: {files:?}");
+	info!("document at deploy {deploy_id}: {files:?}");
 	files
 		.iter()
 		.any(|path| path.contains("index.html"))
@@ -270,13 +282,13 @@ pub async fn verify_dead(
 	bevybail!("endpoint still reachable after destroy")
 }
 
-/// Clean up any prior state before test starts.
-/// Terraform should handle all infrastructure cleanup, we only need to clean
-/// the artifacts store which is not managed by terraform.
+/// Clean up any prior state before test starts. Terraform owns every
+/// resource including the repo store, so this is the forced destroy plus a
+/// best-effort sweep of a repo bucket an interrupted run left behind.
 pub async fn cleanup_prior_state(deploy: &TestDeploy, project: terra::Project) {
 	info!("cleanup_prior_state: calling tofu_destroy --force");
 	project.tofu_destroy(true).await.ok();
-	info!("cleanup_prior_state: removing artifacts store");
+	info!("cleanup_prior_state: removing the repo store");
 	deploy.artifacts_client().store().store_remove().await.ok();
 	info!("cleanup_prior_state: complete");
 }

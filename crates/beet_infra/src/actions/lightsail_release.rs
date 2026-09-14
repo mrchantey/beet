@@ -13,7 +13,7 @@ use beet_net::prelude::*;
 /// has no reason to replace the instance on a code-only deploy, and nothing in
 /// the apply moves the running process onto the new binary either. This step
 /// closes that gap: it reaches the box over the management sshd and rolls the
-/// unit onto the release the artifacts bucket now points at.
+/// unit onto the release the repo bucket now points at.
 ///
 /// Declared as a sibling of the deploy's `<TofuApply/>`, so it resolves the
 /// stack (for the deploy id and the tofu outputs) and the [`LightsailBlock`]

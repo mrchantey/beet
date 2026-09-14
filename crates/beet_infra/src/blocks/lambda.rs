@@ -133,18 +133,36 @@ impl LambdaBlock {
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
+		repos: RepoStoreQuery,
 	) {
 		for (entity, block, artifact) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
+			// the function's code is read from the stack's repo store
+			let repo_bucket =
+				match repos.get(entity).and_then(|repo| repo.bucket_name()) {
+					Ok(bucket) => bucket,
+					Err(err) => {
+						scope.error(bevyhow!(
+							"LambdaBlock '{}': {err}",
+							block.label()
+						));
+						continue;
+					}
+				};
 			let source_hash = artifact
 				.and_then(|artifact| artifact.compute_source_hash().ok());
 			let access = scope.access();
 			let (stack, deployment, config) = scope.ctx();
-			if let Err(err) =
-				block.emit(source_hash, stack, deployment, &access, config)
-			{
+			if let Err(err) = block.emit(
+				source_hash,
+				stack,
+				&repo_bucket,
+				deployment,
+				&access,
+				config,
+			) {
 				scope.error(bevyhow!("LambdaBlock '{}': {err}", block.label()));
 			}
 		}
@@ -158,6 +176,7 @@ impl LambdaBlock {
 		&self,
 		source_hash: Option<String>,
 		stack: &ResolvedStack,
+		repo_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -167,9 +186,11 @@ impl LambdaBlock {
 			.region
 			.clone()
 			.unwrap_or_else(|| stack.region().clone());
-		// artifact values computed directly from the deploy
-		let artifact_bucket = deployment.artifact_store_name(stack);
-		let artifact_key = deployment.artifact_key(&self.label);
+		// the function's code, under this launch's version in the repo store
+		let artifact_key = ArtifactLedger::version_artifact_key(
+			deployment.deploy_id(),
+			&self.label,
+		);
 
 		// CloudWatch log group for Lambda logs
 		// Must be created before the Lambda function to ensure proper cleanup
@@ -224,7 +245,7 @@ impl LambdaBlock {
 		// ie every bucket in the account.
 		//
 		// Nothing is seeded: the Lambda service loads the function's code from
-		// the artifacts bucket under its own identity, and the basic execution
+		// the repo bucket under its own identity, and the basic execution
 		// role above carries the log writes. A stack declaring nothing therefore
 		// grants the function nothing, and no policy resource is emitted at all.
 		// Grant ARNs take the STACK's region, not this block's override, since
@@ -260,8 +281,8 @@ impl LambdaBlock {
 				runtime: Some("provided.al2023".into()),
 				handler: Some("bootstrap".into()),
 				filename: None,
-				s3_bucket: Some(artifact_bucket.into()),
-				s3_key: Some(artifact_key.into()),
+				s3_bucket: Some(repo_bucket.into()),
+				s3_key: Some(artifact_key.to_string().into()),
 				region: Some(region.clone()),
 				role: lambda_role.field_ref("arn").into(),
 				timeout: Some(self.timeout_secs),
@@ -611,6 +632,7 @@ mod tests {
 	/// The terraform json for `block` rendered alone.
 	fn build_json(block: LambdaBlock) -> String {
 		RenderScope::test_json(move |parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(block);
 		})
 	}
@@ -626,6 +648,7 @@ mod tests {
 	fn an_invoke_only_lambda_publishes_no_endpoint() {
 		let block = LambdaBlock::default().with_http(false);
 		RenderScope::test_json(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(block.clone());
 			parent
 				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
@@ -663,6 +686,7 @@ mod tests {
 	#[beet_core::test]
 	fn grants_only_least_privilege_policies() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent
 				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
@@ -692,6 +716,7 @@ mod tests {
 	#[beet_core::test]
 	fn lowers_permissions_per_grant() {
 		RenderScope::test_json(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(S3BucketBlock::new("assets").with_runtime_write(true));
 			parent.spawn(DynamoTableBlock::new("analytics"));
@@ -700,6 +725,7 @@ mod tests {
 		.xpect_contains("s3:PutObject")
 		.xpect_contains("dynamodb:PutItem");
 		RenderScope::test_json(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 			parent.spawn(S3BucketBlock::new("assets"));
 		})
@@ -734,6 +760,7 @@ mod tests {
 			.emit(
 				None,
 				&stack,
+				RepoStoreBlock::TEST_BUCKET,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
 					"r2_bucket",
@@ -756,6 +783,7 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render_stack(
 			Stack::new("beet_infra").with_stage("prod"),
 			|parent| {
+				parent.spawn(RepoStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
 			},
 		);
@@ -847,6 +875,7 @@ mod tests {
 	#[ignore = "very slow"]
 	async fn validate() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
 		scope.project().unwrap().validate().await.unwrap();

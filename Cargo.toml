@@ -248,6 +248,9 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 # SHA-1 for the websocket `Sec-WebSocket-Accept` handshake (RFC 6455). no_std by
 # default; the digest API works on alloc, so consumers need not re-enable `std`.
 sha1 = { version = "0.11", default-features = false }
+# MD5 for the store mirror's change detection: S3 answers an object's etag as
+# its MD5, so the local side digests the same way and a sync skips what matches.
+md-5 = { version = "0.11", default-features = false }
 # 0.12 is the version `bevy_asset` pulls. no_std by default; std consumers
 # re-enable `ron/std` (eg via `beet_core/std`).
 ron = { version = "0.12", default-features = false }

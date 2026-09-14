@@ -60,15 +60,18 @@ impl ErasedStoreBlock {
 		}
 	}
 
-	/// The uri a deploy hands a process: the root, nested under `deploy_id`
-	/// when the store is versioned. The ONE place that uri is shaped, so the
-	/// argv a lambda bakes, the env a release pointer publishes and the prefix a
-	/// sync writes to cannot describe the same store differently.
+	/// The uri a deploy hands a process: the root, nested under the version's
+	/// document dir (`<id>/repo`, [`ArtifactLedger::version_repo_dir`]) when
+	/// the store is versioned, so the binary and ledger beside the document
+	/// are never inside the root a process reads or a sync mirrors. The ONE
+	/// place that uri is shaped, so the argv a lambda bakes, the env a release
+	/// pointer publishes and the prefix a sync writes to cannot describe the
+	/// same store differently.
 	pub fn store_uri(&self, deploy_id: Option<&Uuid>) -> StoreUri {
 		match (self.deploy_versioned, deploy_id) {
-			(true, Some(deploy_id)) => {
-				self.root.with_subdir(deploy_id.to_string())
-			}
+			(true, Some(deploy_id)) => self.root.with_subdir(
+				ArtifactLedger::version_repo_dir(deploy_id).to_string(),
+			),
 			_ => self.root.clone(),
 		}
 	}
@@ -218,7 +221,7 @@ mod test {
 		erased
 			.runtime_uri(ServiceAccess::Remote, Some(&deploy_id))
 			.to_string()
-			.xpect_eq(format!("s3://bucket/{deploy_id}"));
+			.xpect_eq(format!("s3://bucket/{deploy_id}/repo"));
 		erased
 			.runtime_uri(ServiceAccess::Local, Some(&deploy_id))
 			.xpect_eq(ServiceAccess::local_store_uri("app--prod--repo"));
@@ -271,7 +274,7 @@ mod test {
 		erased
 			.store_uri(Some(&deploy_id))
 			.to_string()
-			.xpect_eq(format!("s3://bucket/{deploy_id}"));
+			.xpect_eq(format!("s3://bucket/{deploy_id}/repo"));
 		erased.store_uri(None).to_string().xpect_eq("s3://bucket");
 	}
 

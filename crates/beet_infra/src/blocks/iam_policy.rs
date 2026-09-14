@@ -71,9 +71,10 @@ impl IamPolicy {
 		self
 	}
 
-	/// Seed a bucket this compute reads on its own account, ie the artifacts
-	/// bucket it pulls its binary from at boot, which nothing declares. Call
-	/// before [`lower`](Self::lower), which renders the read statement.
+	/// Seed a bucket this compute reads on its own account, ie the repo bucket
+	/// a box pulls its binary from at boot, whose declaration may grant
+	/// nothing (a `StoreUriBlock`). Call before [`lower`](Self::lower), which
+	/// renders the read statement, deduplicated against the declared grants.
 	pub fn read_bucket(mut self, name: impl Into<String>) -> Self {
 		self.read_buckets.push(name.into());
 		self
@@ -157,6 +158,9 @@ impl IamPolicy {
 
 		// every read-only bucket: the deploy publishes them, the process serves
 		// them. Absent entirely when nothing is read, rather than a wildcard.
+		// A seeded bucket the stack also declares renders once.
+		self.read_buckets.sort();
+		self.read_buckets.dedup();
 		if !self.read_buckets.is_empty() {
 			let resource = Self::bucket_arns(&self.read_buckets);
 			self.statements.push(json!({

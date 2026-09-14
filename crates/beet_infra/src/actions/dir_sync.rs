@@ -97,11 +97,10 @@ pub(crate) fn deploy_subdir(
 				sync.bucket()
 			)
 		})?;
-	match store.deploy_versioned() {
-		true => Some(RelPath::new(stacks.deploy_id().to_string())),
-		false => None,
-	}
-	.xok()
+	store
+		.deploy_versioned()
+		.then(|| ArtifactLedger::version_repo_dir(&stacks.deploy_id()))
+		.xok()
 }
 
 /// Observer: resolve the declared bucket into the [`S3FsStore`]

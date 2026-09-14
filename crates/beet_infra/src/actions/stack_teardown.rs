@@ -2,12 +2,10 @@
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::BlobStoreProvider;
 use beet_net::prelude::*;
 
 /// The teardown step that removes a stack's state carriers: the tofu state
-/// object, the native S3 lock file beside it, the artifacts bucket, and the
-/// working directory.
+/// object, the native S3 lock file beside it, and the working directory.
 ///
 /// These are the things a deploy needs in place BEFORE terraform runs, so under
 /// the one rule — teardown order is convergence order reversed — they come off
@@ -24,11 +22,9 @@ use beet_net::prelude::*;
 /// a state object that has already gone must not strand the work directory, and
 /// half a teardown is worse than a noisy whole one.
 ///
-/// One asymmetry is deliberate and worth naming: the artifacts bucket's *ensure*
-/// stays fused inside [`TofuApply`], which creates it and uploads into it in one
-/// step, while its *removal* lives here. Splitting the apply to move the ensure
-/// into the deploy group would separate the bucket from the upload that is the
-/// only reason it exists.
+/// The repo store is not here: it is terraform's, declared as a store block,
+/// so [`TofuDestroy`] removes it with every other resource and `force_destroy`
+/// takes the versions and release pointers with the bucket.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -39,7 +35,7 @@ pub async fn StackTeardown(
 	let deployment = project.deployment();
 	let backend = deployment.backend();
 	let state_path = deployment.backend_path(&project);
-	let [state, lock, artifacts, work_dir] = StackTeardown::CARRIERS;
+	let [state, lock, work_dir] = StackTeardown::CARRIERS;
 
 	let store = backend.store()?;
 	// the tofu state object
@@ -51,8 +47,6 @@ pub async fn StackTeardown(
 			.remove(&RelPath::new(format!("{state_path}.tflock")))
 			.await,
 	);
-	// the artifacts bucket, which terraform does not own
-	report(artifacts, project.artifacts().store().store_remove().await);
 	// the rendered config, lockfile and scratch files
 	report(work_dir, fs_ext::remove_async(&project.work_dir()).await);
 
@@ -63,16 +57,12 @@ impl StackTeardown {
 	/// Everything a stack carries its state in, and the whole of what this
 	/// action removes.
 	///
-	/// A list rather than four unrelated calls because it IS an inventory: these
-	/// are the four the driver used to sweep in a hardcoded `destroy_common` no
-	/// block could add to, and the point of moving them here is that the set is
-	/// now visible and orderable rather than buried.
-	pub const CARRIERS: [&'static str; 4] = [
-		"state object",
-		"state lock",
-		"artifacts bucket",
-		"work directory",
-	];
+	/// A list rather than three unrelated calls because it IS an inventory:
+	/// these are what the driver used to sweep in a hardcoded `destroy_common`
+	/// no block could add to, and the point of moving them here is that the
+	/// set is now visible and orderable rather than buried.
+	pub const CARRIERS: [&'static str; 3] =
+		["state object", "state lock", "work directory"];
 }
 
 /// Log one removal's outcome, so a carrier that had already gone (or refuses to
@@ -144,13 +134,13 @@ mod test {
 		]);
 	}
 
-	/// The inventory this action took over from the driver's hardcoded sweep.
+	/// The inventory this action took over from the driver's hardcoded sweep,
+	/// less the artifacts bucket, which became the terraform-owned repo store.
 	#[beet_core::test]
 	fn the_carriers_are_the_ones_the_driver_used_to_sweep() {
 		StackTeardown::CARRIERS.xpect_eq([
 			"state object",
 			"state lock",
-			"artifacts bucket",
 			"work directory",
 		]);
 	}

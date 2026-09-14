@@ -58,25 +58,6 @@ pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 	deployment.set_backend(backend);
 }
 
-/// `<SiteSync/>` — publish `examples/bsx_site` to the stack's repo store, the
-/// markup form of `sync_site`: whichever store block carries `{RepoStoreBlock}`,
-/// resolved on [`Ready`] through [`RepoStoreQuery`] since it is a sibling
-/// declaration, possibly a forward one.
-#[template]
-pub fn SiteSync() -> impl Bundle {
-	OnSpawn::observe(
-		|ev: On<Ready>,
-		 repos: RepoStoreQuery,
-		 mut commands: Commands|
-		 -> Result {
-			commands
-				.entity(ev.entity)
-				.insert(infra_ext::sync_site(&repos.get(ev.entity)?));
-			Ok(())
-		},
-	)
-}
-
 /// An **opinionated** block for websites built with lambda.
 /// `<LambdaSiteBlock features="lambda,aws_sdk"/>` — the lambda deploy block plus
 /// its build artifact, on one entity. They share an entity because
@@ -962,7 +943,7 @@ mod test {
 			.process()
 			.to_string()
 			.xpect_contains(format!(
-				"--repo=s3://beet-site--dev--repo/{deploy_id}"
+				"--repo=s3://beet-site--dev--repo/{deploy_id}/repo"
 			));
 	}
 

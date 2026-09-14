@@ -122,7 +122,7 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 	render_test_project(deploy, LambdaBlock::default())
 }
 
-/// Build, upload artifacts, sync assets, and apply terraform
+/// Build, upload artifacts, publish the site, and apply terraform
 /// using the deploy action sequence.
 async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 	let block = LambdaBlock::default();
@@ -136,20 +136,19 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 		])
 		.into_lambda_build_artifact()?;
 
-	let _response = (AsyncPlugin, BootstrapPlugin)
+	let _response = (AsyncPlugin, BootstrapPlugin, InfraPlugin)
 		.into_world()
 		.xtap(|world| world.insert_resource(deploy.deployment.clone()))
 		.spawn((
 			deploy.stack.clone(),
-			assets_s3_fs_store(deploy, assets_dir),
-			assets_bucket_block(),
+			repo_store_block(),
 			ExchangeSequence,
-			// the bucket first, so the assets are in place before the function
-			// that serves them exists
+			// the bucket first, so the site is in place before the function
+			// that serves it exists
 			children![
 				(block, cargo),
 				TofuApply::for_layer("storage"),
-				SyncS3Bucket::default(),
+				publish_site(assets_dir)?,
 				TofuApply::default(),
 			],
 		))

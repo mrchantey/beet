@@ -11,9 +11,6 @@ pub struct Project {
 	/// This launch's mechanics: the state backend the project drives and the
 	/// work directory it drives it in.
 	deployment: Deployment,
-	/// The stack's artifacts client, built once at construction so teardown
-	/// does not rebuild it.
-	artifacts: ArtifactsClient,
 	/// The variables the stack's blocks declared, so a verb that renders can
 	/// resolve the ones that are resource CONTENT before invoking tofu.
 	variables: Vec<crate::types::Variable>,
@@ -23,29 +20,25 @@ impl Project {
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
-	) -> Result<Self> {
+	) -> Self {
 		Self::new_with_variables(stack, deployment, config, Vec::new())
 	}
 
 	/// A project that also knows the variables its blocks declared, which is
 	/// what lets `plan` and `apply` be truthful about content values rather than
-	/// falling through to a default. Errors when this build has no backend for
-	/// the deployment's artifact store.
+	/// falling through to a default.
 	pub fn new_with_variables(
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
 		variables: Vec<crate::types::Variable>,
-	) -> Result<Self> {
-		let artifacts = deployment.artifacts_client(&stack)?;
+	) -> Self {
 		Self {
 			config,
 			stack,
 			deployment,
-			artifacts,
 			variables,
 		}
-		.xok()
 	}
 
 	/// Resolve every declared variable that is resource CONTENT, ie one whose
@@ -238,11 +231,11 @@ impl Project {
 
 	/// Run `tofu destroy`, and nothing else.
 	///
-	/// What the old `destroy` swept afterwards — the state object, the native S3
-	/// lock, the artifacts bucket, the work dir — belongs to `StackTeardown`
-	/// now. Those converge BEFORE the apply, so under the one rule that teardown
-	/// order is convergence order reversed they tear down after it, which is
-	/// exactly where a destroy group puts them.
+	/// What the old `destroy` swept afterwards, the state object, the native S3
+	/// lock and the work dir, belongs to `StackTeardown` now. Those converge
+	/// BEFORE the apply, so under the one rule that teardown order is
+	/// convergence order reversed they tear down after it, which is exactly
+	/// where a destroy group puts them.
 	///
 	/// `force` is the recovery path for a state nothing holds but a lock left by
 	/// an interrupted run: it clears the stale lock and destroys lock-free, and

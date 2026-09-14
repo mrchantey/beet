@@ -2,6 +2,43 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
+/// What a store knows about an object without handing over its bytes: its
+/// size and, where the backend can answer one, its MD5 hex digest. MD5 because
+/// that is the etag S3 reports for a single-part object, so a local file and
+/// a stored object compare by the same number and a mirror
+/// ([`BlobSync`](crate::prelude::BlobSync)) skips what already matches.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlobStat {
+	/// The object's size in bytes.
+	pub size: u64,
+	/// The MD5 hex digest, `None` where the backend cannot answer one (an S3
+	/// multipart upload's etag is not an MD5).
+	pub md5: Option<SmolStr>,
+}
+
+impl BlobStat {
+	/// The stat of `bytes`, digested here.
+	pub fn of(bytes: &[u8]) -> Self {
+		use md5::Digest;
+		let digest = md5::Md5::digest(bytes)
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
+			.collect::<String>();
+		Self {
+			size: bytes.len() as u64,
+			md5: Some(digest.into()),
+		}
+	}
+
+	/// Whether an object with this stat is the same content as `other`: equal
+	/// sizes and equal digests. A side that cannot answer a digest never
+	/// matches, so a mirror copies rather than guesses.
+	pub fn matches(&self, other: &Self) -> bool {
+		self.size == other.size
+			&& matches!((&self.md5, &other.md5), (Some(a), Some(b)) if a == b)
+	}
+}
+
 /// Trait for store storage backends (S3, filesystem, memory, etc.).
 ///
 /// Implementations provide the actual storage operations for [`BlobStore`].
@@ -263,6 +300,50 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// ```
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result>;
 
+	/// The object's [`BlobStat`], `None` when it does not exist. The default
+	/// reads the object and digests it; a backend that answers from metadata
+	/// (S3's `HeadObject`) overrides it.
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		let this = self.box_clone();
+		let path = path.clone();
+		Box::pin(async move {
+			if !this.exists(&path).await? {
+				return Ok(None);
+			}
+			this.get(&path)
+				.await
+				.map(|bytes| Some(BlobStat::of(&bytes)))
+		})
+	}
+
+	/// Every object with its [`BlobStat`], what a mirror diffs. The default
+	/// lists then stats each object; S3 answers it from the listing alone.
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+		let this = self.box_clone();
+		Box::pin(async move {
+			let paths = this.list().await?;
+			async_ext::try_join_all_bounded(
+				16,
+				paths.into_iter().map(|path| {
+					let this = this.box_clone();
+					async move {
+						let stat =
+							this.stat(&path).await?.ok_or_else(|| {
+								bevyhow!(
+									"object {path} vanished between list and stat"
+								)
+							})?;
+						Ok((path, stat))
+					}
+				}),
+			)
+			.await
+		})
+	}
+
 	/// Get public URL of object.
 	/// - fs: `file:///data/stores/my-store/key`
 	/// - s3: `https://my-store.s3.us-west-2.amazonaws.com/key`
@@ -330,6 +411,15 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.as_ref().remove(path)
+	}
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		self.as_ref().stat(path)
+	}
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+		self.as_ref().list_stats()
 	}
 	fn public_url(
 		&self,

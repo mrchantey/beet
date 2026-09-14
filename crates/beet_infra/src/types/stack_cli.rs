@@ -90,11 +90,12 @@ impl terra::Project {
 	}
 }
 
-/// Build an [`ArtifactsClient`] from the nearest ancestor [`Stack`].
+/// The [`ArtifactsClient`] of the stack's repo store, see
+/// [`RepoStoreQuery::artifacts_client`].
 async fn artifacts_client(caller: &AsyncEntity) -> Result<ArtifactsClient> {
 	caller
-		.with_state::<StackQuery, _>(|entity, query| {
-			query.artifacts_client(entity)
+		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+			repos.artifacts_client(entity)
 		})
 		.await?
 }

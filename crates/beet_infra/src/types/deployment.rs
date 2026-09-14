@@ -44,9 +44,6 @@ pub struct Deployment {
 	/// A suffix appended to the state backend key, making the final key
 	/// `app-name--stage--tofu.tfstate`.
 	state_suffix: SmolStr,
-	/// A suffix appended to the artifact store name, making the final name
-	/// `app-name--stage--artifacts`.
-	artifact_store_suffix: SmolStr,
 }
 
 /// The deploy identity flows from the process [`BootstrapConfig`] (`--deploy-id`
@@ -70,7 +67,6 @@ impl Default for Deployment {
 			state_encryption: default(),
 			work_directory: None,
 			state_suffix: "tofu.tfstate".into(),
-			artifact_store_suffix: "artifacts".into(),
 		}
 	}
 }
@@ -96,34 +92,6 @@ impl Deployment {
 	/// still write distinct state.
 	pub fn backend_path(&self, stack: &ResolvedStack) -> RelPath {
 		RelPath::new(stack.resource_name(self.state_suffix.clone()))
-	}
-
-	/// The name of `stack`'s artifact store.
-	pub fn artifact_store_name(&self, stack: &ResolvedStack) -> String {
-		stack.resource_name(self.artifact_store_suffix.clone())
-	}
-
-	/// The key an artifact of this deployment is stored under.
-	pub fn artifact_key(&self, label: &str) -> String {
-		format!("versions/{}/{label}", self.deploy_id)
-	}
-
-	/// Create an artifacts client for `stack`'s artifact store, in the same
-	/// provider family as the state backend: local state stores artifacts in a
-	/// sibling directory, remote state a store in the stack's region. Errors
-	/// when this build has no backend for that family.
-	pub fn artifacts_client(
-		&self,
-		stack: &ResolvedStack,
-	) -> Result<ArtifactsClient> {
-		ArtifactsClient::new(
-			self.backend.bucket_store(
-				&self.artifact_store_name(stack),
-				stack.region(),
-			)?,
-			ArtifactLedger::new(self.deploy_id, self.deploy_timestamp.clone()),
-		)
-		.xok()
 	}
 
 	/// Initialize `stack`'s config with the corresponding backend and state

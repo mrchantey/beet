@@ -28,6 +28,10 @@ engine.
 		<Group bx:ref="deploy_up">
 			<FargateSshBlock/>
 			<ExampleBinaryBuild example="ssh_tui_site" features="ssh_tui,http_server,markdown"/>
+			<!-- the image carries the binary, but the ledger a rollback indexes
+			     lives in the stack's repo store, so the stack declares one it
+			     never serves from -->
+			<S3BucketBlock label="repo" {RepoStoreBlock}/>
 			<!-- the image registry first, so the push has somewhere to go -->
 			<TofuApply layer="storage"/>
 			<BuildDockerImage/>

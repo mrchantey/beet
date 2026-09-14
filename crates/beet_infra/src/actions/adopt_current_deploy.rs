@@ -39,8 +39,8 @@ pub async fn AdoptCurrentDeploy(
 ) -> Result<Outcome<Request, Response>> {
 	let client = cx
 		.caller
-		.with_state::<StackQuery, _>(|entity, stacks| {
-			stacks.artifacts_client(entity)
+		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+			repos.artifacts_client(entity)
 		})
 		.await??;
 	let ledger = client.current_ledger().await?.ok_or_else(|| {

@@ -140,19 +140,18 @@ fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
 	render_test_project(deploy, FargateBlock::default())
 }
 
-/// Build, upload artifacts, sync assets, build/push Docker image, and apply terraform.
+/// Build, upload artifacts, publish the site, build/push Docker image, and apply terraform.
 async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 	info!("deploy: starting fargate deployment");
 	let block = FargateBlock::default();
 
 	// spawn entity with action sequence, similar to fargate example
-	let response = (AsyncPlugin, BootstrapPlugin)
+	let response = (AsyncPlugin, BootstrapPlugin, InfraPlugin)
 		.into_world()
 		.xtap(|world| world.insert_resource(deploy.deployment.clone()))
 		.spawn((
 			deploy.stack.clone(),
-			assets_s3_fs_store(deploy, assets_dir),
-			assets_bucket_block(),
+			repo_store_block(),
 			ExchangeSequence,
 			children![
 				block,
@@ -164,8 +163,8 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 				// build and push Docker image (ECR repo now exists); the config
 				// component requires the action.
 				BuildDockerImage::default(),
-				// sync assets to S3
-				SyncS3Bucket::default(),
+				// publish the site into this deploy's version
+				publish_site(assets_dir)?,
 				// roll the service, onto a pushed image and a filled bucket
 				TofuApply::default(),
 			],

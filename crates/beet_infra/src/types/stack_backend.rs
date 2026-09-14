@@ -50,36 +50,10 @@ impl StackBackend {
 		}
 	}
 
-	/// The uri of a named bucket in this backend's provider family: a sibling
-	/// directory of the local state for [`Self::Local`], an S3 bucket in
-	/// `region` for [`Self::S3`].
-	pub fn bucket_uri(&self, bucket: &str, region: &SmolStr) -> StoreUri {
-		match self {
-			Self::Local(local) => StoreUri::Fs {
-				path_prefix: Some(local.path.join(bucket).into()),
-			},
-			Self::S3(_) => StoreUri::S3 {
-				name: bucket.into(),
-				path_prefix: None,
-				endpoint: None,
-				region: Some(region.clone()),
-			},
-		}
-	}
-
 	/// The state store, see [`uri`](Self::uri). Errors without a compiled
 	/// backend for it, ie an S3 state backend in an `aws_sdk`-free build.
 	pub fn store(&self) -> Result<BlobStore> {
 		BlobStore::from_uri(&self.uri())
-	}
-
-	/// The store of a named bucket, see [`bucket_uri`](Self::bucket_uri).
-	pub fn bucket_store(
-		&self,
-		bucket: &str,
-		region: &SmolStr,
-	) -> Result<BlobStore> {
-		BlobStore::from_uri(&self.bucket_uri(bucket, region))
 	}
 
 	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.

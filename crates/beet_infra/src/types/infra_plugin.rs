@@ -316,15 +316,18 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::SyncS3Bucket>()
 			.register_type::<beet_net::prelude::SyncDirection>()
 			.register_type::<crate::prelude::DirSync>()
-			.add_observer(crate::actions::attach_dir_sync_store)
-			// the retention window over the ledger's versions, which prunes
-			// each version's binary and its document root together.
-			.register_type::<crate::prelude::PruneVersions>();
+			.add_observer(crate::actions::attach_dir_sync_store);
 
-		// the borrowed-paths copy (`<DirCopy src=".." dest=".." paths=".."/>`),
-		// plain fs work so it needs no cloud backend.
+		// publishing the document: the stage assembling it, the mirror of
+		// that stage into the repo store, the borrowed-paths copy
+		// (`<DirCopy src=".." dest=".." paths=".."/>`) the stage hosts, and
+		// the retention window over the versions the store holds. Plain fs
+		// and `BlobStore` work, so none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::DirCopy>();
+		app.register_type::<crate::prelude::RepoStage>()
+			.register_type::<crate::prelude::RepoSync>()
+			.register_type::<crate::prelude::DirCopy>()
+			.register_type::<crate::prelude::PruneVersions>();
 
 		// the CloudWatch tail and the target it composes its log group from.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

@@ -29,7 +29,7 @@ A stack's `deploy` and `destroy` are two `Group`s, named by `<DeployRoutes deplo
 </Group>
 ```
 
-`<StackTeardown/>` owns the four state carriers the driver used to sweep in a hardcoded call no block could add to: the tofu state object, the native S3 lock beside it, the artifacts bucket and the work directory. They converge before the apply, so reversed they come off after it.
+`<StackTeardown/>` owns the three state carriers the driver used to sweep in a hardcoded call no block could add to: the tofu state object, the native S3 lock beside it and the work directory. They converge before the apply, so reversed they come off after it. The repo store is not a carrier: it is a declared block, so `tofu destroy` removes it with everything else.
 
 The `attach` groups are where a declaration joins. A paired declaration (`<EipReverseRecord up={$attach_up} down={$attach_down}/>`, `<MtaStsPolicyHost .../>`) spawns its up-action and its down-action from one tag at one file position, so both groups' member lists are projections of the same insert order and cannot drift apart. Every down-action must succeed against an absent resource: a destroy walks the declarations, not a ledger of what was created, because a ledger records what WAS created rather than what SHOULD exist and a half-failed deploy leaves exactly the unrecorded resources you most want cleaned up.
 
@@ -37,7 +37,9 @@ The `attach` groups are where a declaration joins. A paired declaration (`<EipRe
 
 ## Deploy layers
 
-A deploy publishes into its stores and then rolls the service that reads them, so a deploy route applies once per phase: `<TofuApply layer="storage"/>` creates the resources the fill steps publish into (buckets, tables, the image registry), the fill steps run (image push, content sync), then a bare `<TofuApply/>` converges the whole stack and rolls the service. Blocks declare their publish-into resources with `Config::add_layer_resource`, defaulting the assignment to the `storage` layer and exposing it as a field. Naming a layer no block declares is a loud error, never a silent no-op.
+A deploy publishes into its stores and then rolls the service that reads them, so a deploy route applies once per phase: `<TofuApply layer="storage"/>` creates the resources the fill steps publish into (buckets, tables, the image registry), the fill steps run (image push, content publish), then a bare `<TofuApply/>` converges the whole stack and rolls the service. Blocks declare their publish-into resources with `Config::add_layer_resource`, defaulting the assignment to the `storage` layer and exposing it as a field. Naming a layer no block declares is a loud error, never a silent no-op.
+
+The content publish is two steps: `<RepoStage src="site">` assembles the document in a staging dir under the deploy work directory (its `<DirCopy/>` children borrow workspace-built files into it, so nothing is written into the checkout), and `<RepoSync/>` mirrors that dir into this launch's version of the repo store through `BlobSync`, a store-agnostic mirror that skips objects already matching by size and digest and removes what the stage lacks. A content-only `sync` verb runs `<AdoptCurrentDeploy/>` first, so the same pair publishes into the version being served.
 
 Two footguns the markup cannot yet make unrepresentable:
 
@@ -51,6 +53,8 @@ A cloud resource is declared ONCE, in markup, as its provider block (`<S3BucketB
 Retiring a *protected* resource is two applies, and removing the declaration first is the wrong order: with the block gone there is nothing left to turn `deletion_protection` off with, so the destroy fails at the provider. Clear the flag while the block is still declared, apply, then delete the block and apply again.
 
 A block is a declaration, not a sequence step, so nothing dispatches it during a deploy. Anything a block must *do* belongs to whichever step consumes its output, never to the block being run: an artifact is built by the apply that uploads it (`TofuApply` -> `BuildArtifact::build`), because a build wired as its own step is a build some other entry forgets, and an artifact uploaded but never built is a stale binary shipping under a green deploy.
+
+A version is one prefix in the repo store, laid out by `ArtifactLedger`: the document under `<id>/repo/` (the uri a compute bakes and the mirror root a sync writes), each binary under `<id>/bin/`, the ledger beside them, and `current/` holding the served ledger and the per-artifact release pointers. The apply's upload, the sync's destination and `PruneVersions` all compose through that one type, so a document can never outlive its binary or the reverse. A stack shipping a `BuildArtifact` must therefore declare a deploy-versioned repo store, and `TofuApply` names what to declare when it does not; the Lightsail and Lambda blocks read the bucket they boot from off the same declaration (`RepoStoreDecl::bucket_name`), never by a second composition.
 
 Blocks are immutable components (reinsertion is the only mutation path). `ErasedBlock` is the data projection of any block (its label and artifact label), derived by a generic `on_insert` hook so it can never go stale, removed with its block, and one per entity: a second block type on the same entity raises a clobber error rather than silently retagging it, mirroring `beet_action`'s one-action-per-entity rule.
 
@@ -78,7 +82,7 @@ A deploy-time reference from one block to another rides the same relation model 
 
 ## Grants
 
-Permissions are declared by the resource (`Block::grants` -> `AccessGrant`) and **lowered** by the compute block, which for the AWS computes is the shared `IamPolicy`: it seeds the statements the compute needs on its own account (an artifacts bucket, a log group) and lowers the stack's grants into read/write bucket and per-table statements. A compute whose lowering yields nothing emits no policy resource at all, never a managed `FullAccess` one; per-compute needs ride knobs on the shared core, never forks. A resource block never writes an ARN; a compute block never names a sibling resource.
+Permissions are declared by the resource (`Block::grants` -> `AccessGrant`) and **lowered** by the compute block, which for the AWS computes is the shared `IamPolicy`: it seeds the statements the compute needs on its own account (the repo bucket it boots from, a log group) and lowers the stack's grants into read/write bucket and per-table statements. A compute whose lowering yields nothing emits no policy resource at all, never a managed `FullAccess` one; per-compute needs ride knobs on the shared core, never forks. A resource block never writes an ARN; a compute block never names a sibling resource.
 
 An `AccessGrant` is `{kind, name, permissions}`: `kind` is a plain string constant the declaring block owns (`S3BucketBlock::ACCESS_KIND`), so a new provider mints `"r2_bucket"` without touching shared code, and the ARN region comes from the compute's own resolved stack. Lowering is **loud on unknown**: a kind the compute cannot lower fails the deploy naming both the kind and the compute, and there are no `_ =>` catch-alls in grant handling (a silently dropped grant is a box that serves until the first request touching that resource).
 
@@ -86,7 +90,7 @@ An `AccessGrant` is `{kind, name, permissions}`: `kind` is a plain string consta
 
 A bucket is one of three profiles, and the label names the profile:
 
-- `app` is deploy-mirrored content: the sync owns that tree (and prunes what it did not put there) and the runtime holds a read-only grant on it. The `assets` buckets (public, stage-shared) are a public variant of this profile.
+- `repo` is deploy-mirrored content: the sync owns each version's `repo/` tree (and prunes what it did not put there), the apply publishes the binaries and ledger beside it, and the runtime holds a read-only grant on the bucket. The `assets` buckets (public, stage-shared) are a public variant of this profile with no versioning.
 - `archive` is its inverse (`<S3BucketBlock label="archive" runtime_write=true object_versioning=true deploy_versioned=false/>`): append-only cold data no deploy sync ever touches. It holds backup dumps AND primary archives such as compacted analytics days, which is why it is not called `backups`: a bucket named for backups invites treating a sole copy as expendable.
 - Workload-named buckets such as `analytics` hold runtime-written primary data. They set `runtime_write=true` and `deploy_versioned=false`; analytics segments delete only after the archive and JSON-over-blob rollups verify. A bucket is the unit of IAM grant, so it earns its place by a different writer or a different durability grade rather than by holding a different dataset: raw segments and aggregate rows share one bucket under disjoint prefixes, while the sole-copy archive is its own.
 

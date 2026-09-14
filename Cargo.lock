@@ -1517,6 +1517,7 @@ dependencies = [
  "lambda_http",
  "log",
  "maxminddb",
+ "md-5 0.11.0",
  "pin-project",
  "postcard",
  "rand 0.10.2",

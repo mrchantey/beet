@@ -87,6 +87,9 @@ impl RenderScope {
 		world: &mut World,
 		roots: Vec<Entity>,
 	) -> Result<Vec<Self>> {
+		// a declaration's erased half lands through the command queue, and a
+		// render reads it (the repo store a compute names)
+		world.flush();
 		for root in roots.iter() {
 			let scope = world.with_state::<StackQuery, _>(|stacks| {
 				Self::new(stacks.resolve(*root), stacks.deployment())
@@ -152,12 +155,13 @@ impl RenderScope {
 		let variables = self.variables.clone();
 		let (stack, deployment, config) = self.finish()?;
 		terra::Project::new_with_variables(stack, deployment, config, variables)
+			.xok()
 	}
 
 	/// The resolved identity every rendered name composes from.
 	pub fn stack(&self) -> &ResolvedStack { &self.stack }
 
-	/// This launch's deploy mechanics (its id, its artifacts bucket).
+	/// This launch's deploy mechanics (its id, its state backend).
 	pub fn deployment(&self) -> &Deployment { &self.deployment }
 
 	/// Split borrows for a block body: the identity, the launch, and the config

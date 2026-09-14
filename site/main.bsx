@@ -82,7 +82,9 @@ its ancestors' paths either way.
 bucket (`beet-site--shared--assets`), hydrated with `just site-shared pull`. A
 few files it serves are BUILT in the workspace tree (the wasm binary the tutorial
 embeds, the geoip database, the perceive-act robot faces); `<DirCopy/>` is the
-one declaration of what is borrowed, and runs ahead of every publish.
+one declaration of what is borrowed. Under the deploy's `<RepoStage>` it borrows
+into the staging dir the mirror publishes, so nothing is written into the
+checkout; the `assets` verb borrows into `site/assets` for a local `serve`.
 
 ## The deploy
 
@@ -108,12 +110,13 @@ with the verbs it hosts) adds the tofu lifecycle routes
 stack hosts it, plus the two lifecycle verbs that run the `<Group>`s it names:
 `deploy` forward and `destroy` in reverse.
 
-The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<DirSync/>` fills the repo store, and a bare `<TofuApply/>` converges the whole stack:
-it uploads the built binary under the deploy id, publishes the release pointer
-naming it, and converges the instance against a bucket that already holds the
-site. One apply boots the new instance first, so it finds an empty bucket and no
-entry document. Naming a layer no block declares is a loud error, never a silent
-skip.
+The deploy group applies once per layer, and the order is the point: `<TofuApply layer="storage"/>` brings up the repo, analytics, rollup, and archive stores. `<RepoStage>` assembles the site and its borrowed files in `target/infra/beet-site/repo`, `<RepoSync/>` mirrors that dir into this deploy's version of the repo store (`<id>/repo/`), and a bare `<TofuApply/>` converges the whole stack:
+it builds and uploads the binary beside that document (`<id>/bin/`), publishes
+the release pointer naming both, and converges the instance against a bucket
+that already holds the site. One apply boots the new instance first, so it finds
+an empty bucket and no entry document. Naming a layer no block declares is a
+loud error, never a silent skip. `<PruneVersions/>` then drops every version
+prefix outside the retention window, document and binary together.
 
 Most deploys do NOT replace the box. The instance's cloud-init renders machine
 config only (Caddy, the sshd relocation, the CloudWatch agent, the unit), never a
@@ -127,7 +130,7 @@ channel so the fingerprint never changes.
 Cloudflare fronts the box: http hostnames are proxied and edge-cached `A` records
 at the static IP, ssh (and future live apps) ride the DNS-only `app.beet.org` /
 `app.dev.beet.org` hostnames straight to it. Caddy's Let's Encrypt certificates
-are saved to the artifacts bucket and restored on a rebuild, so a replaced box
+are saved to the repo bucket's `caddy/` prefix and restored on a rebuild, so a replaced box
 serves on the certificate the last one held rather than issuing at boot.
 `<CloudflareZoneSetup/>` converges the zone-level edge config, and every deploy
 or sync ends with a `<CloudflarePurgeCache/>`. On the deploy route the purge comes *after*
@@ -304,8 +307,12 @@ stack's state bucket).
 		     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
 		<Group bx:ref="site_up">
 			<TofuApply layer="storage"/>
-			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-			<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<!-- the published document: the site plus what it borrows from the
+			     workspace, staged outside the checkout and mirrored whole -->
+			<RepoStage src="site">
+				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			</RepoStage>
+			<RepoSync/>
 			<TofuApply/>
 			<PruneVersions/>
 			<LightsailRelease/>
@@ -326,8 +333,10 @@ stack's state bucket).
 			<!-- publish into the version the RUNNING box reads, rather than
 			     minting one of this launch's own that nothing serves -->
 			<AdoptCurrentDeploy/>
-			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
-			<DirSync bucket="repo" local_dir="site" {SyncS3Bucket{delete:true}}/>
+			<RepoStage src="site">
+				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			</RepoStage>
+			<RepoSync/>
 			<!-- content is read from the store per request, so the sync above is
 			     already live; the restart is for what the box resolves ONCE at
 			     boot: `<RoutesDir/>` discovery (a page added, removed, or renamed

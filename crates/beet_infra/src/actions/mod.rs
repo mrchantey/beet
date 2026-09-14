@@ -15,8 +15,9 @@ mod ensure_secret;
 mod lifecycle_probe;
 #[cfg(feature = "lightsail_block")]
 mod lightsail_release;
-#[cfg(feature = "aws_sdk")]
 mod prune_versions;
+mod repo_stage;
+mod repo_sync;
 mod ssh_connection;
 pub mod ssm_ext;
 mod stack_teardown;
@@ -41,8 +42,9 @@ pub use ensure_secret::*;
 pub use lifecycle_probe::*;
 #[cfg(feature = "lightsail_block")]
 pub use lightsail_release::*;
-#[cfg(feature = "aws_sdk")]
 pub use prune_versions::*;
+pub use repo_stage::*;
+pub use repo_sync::*;
 pub use ssh_connection::*;
 pub use stack_teardown::*;
 #[cfg(feature = "aws_sdk")]

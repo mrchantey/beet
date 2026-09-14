@@ -49,12 +49,15 @@ mod blob_store_provider;
 pub use blob_event::*;
 pub use blob_store_provider::*;
 mod blob_store;
+// the store-agnostic mirror, over the provider trait's `list_stats`.
+mod blob_sync;
 mod in_memory_store;
 // the one canonical store an app runs from, and the singleton it enforces.
 mod repo_store;
 mod store_path;
 pub use blob::*;
 pub use blob_store::*;
+pub use blob_sync::*;
 pub use in_memory_store::*;
 pub use repo_store::*;
 pub use store_path::*;

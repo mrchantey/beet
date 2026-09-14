@@ -30,9 +30,8 @@ impl Plugin for InfraExamplesPlugin {
 			// routes register upstream in `InfraPlugin`, beside the verbs.
 			.register_template::<StateBackendToggle>()
 			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
-			// `.bsx` lambda deployer composes them (see `templates.rs`).
-			.register_template::<SiteSync>()
-			// the beet-site deployer's lightsail block, stage-aware through the
+			// `.bsx` lambda deployer composes them (see `templates.rs`): the
+			// beet-site deployer's lightsail block, stage-aware through the
 			// `<Stack>` it resolves by ancestry. The resource declarations
 			// themselves are authored as their blocks (`<S3BucketBlock/>`,
 			// `<DynamoTableBlock/>`), registered upstream.

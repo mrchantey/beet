@@ -32,16 +32,6 @@ pub async fn SyncS3Bucket(
 	/// Optional subdir of the bucket to sync against; the bucket root by default.
 	#[field]
 	bucket_dir: Option<RelPath>,
-	/// Comma-separated paths under the local dir to sync, each naming a file or
-	/// a directory; empty (the default) syncs the whole dir.
-	///
-	/// An ALLOWLIST, not a set of exclusions: a site whose entry sits at a repo
-	/// root shares that dir with everything else in the checkout (crates,
-	/// content, `target/`), so it names what IS the site and nothing else can
-	/// leak into the bucket by appearing beside it. The filters apply to both
-	/// ends, so a mirror still prunes only within the named paths.
-	#[field]
-	paths: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
@@ -86,8 +76,7 @@ pub async fn SyncS3Bucket(
 	let sync = match direction {
 		SyncDirection::Push => S3Sync::push(local_dir.clone(), &s3_uri),
 		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
-	}
-	.filters(SyncS3Bucket::filters(&paths));
+	};
 	trace!(
 		"SyncS3Bucket: syncing {} {} {s3_uri}",
 		local_dir,
@@ -107,28 +96,6 @@ pub async fn SyncS3Bucket(
 }
 
 impl SyncS3Bucket {
-	/// A `paths` allowlist as sync filters: exclude everything, then include each
-	/// declared path both as a file and as a directory prefix. Empty when nothing
-	/// is declared, so the whole dir syncs.
-	pub fn filters(paths: &str) -> Vec<S3Filter> {
-		let paths = paths
-			.split(',')
-			.map(str::trim)
-			.filter(|path| !path.is_empty())
-			.collect::<Vec<_>>();
-		if paths.is_empty() {
-			return Vec::new();
-		}
-		core::iter::once(S3Filter::Exclude("*".into()))
-			.chain(paths.into_iter().flat_map(|path| {
-				[
-					S3Filter::Include(path.into()),
-					S3Filter::Include(format!("{path}/*")),
-				]
-			}))
-			.collect()
-	}
-
 	/// Refuse to mirror a local dir that would empty the bucket: a missing or
 	/// empty source, or (when following symlinks) a symlinked child dir whose
 	/// target is missing or empty — the signature of an unhydrated checkout.
@@ -178,21 +145,6 @@ mod test {
 		SyncS3Bucket::assert_mirrorable(&root, false).unwrap_err();
 		fs_ext::write(root.join("index.html"), "<div/>").unwrap();
 		SyncS3Bucket::assert_mirrorable(&root, false).unwrap();
-	}
-
-	/// An empty `paths` syncs the whole dir; a declared one becomes an allowlist,
-	/// excluding everything before including each path as both a file and a
-	/// directory prefix.
-	#[beet_core::test]
-	fn paths_render_an_allowlist() {
-		SyncS3Bucket::filters("").xpect_eq(Vec::new());
-		SyncS3Bucket::filters("main.bsx, routes,").xpect_eq(vec![
-			S3Filter::Exclude("*".into()),
-			S3Filter::Include("main.bsx".into()),
-			S3Filter::Include("main.bsx/*".into()),
-			S3Filter::Include("routes".into()),
-			S3Filter::Include("routes/*".into()),
-		]);
 	}
 
 	/// A symlinked child dir is materialized into the bucket by a

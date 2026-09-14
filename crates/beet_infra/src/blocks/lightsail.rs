@@ -19,7 +19,7 @@ pub enum LightsailNetworking {
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
 /// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt, its
-///   certificate store saved to the artifacts bucket so a rebuild reuses it
+///   certificate store saved to the repo bucket so a rebuild reuses it
 /// - Optional DNS records pointing each authority at the public address
 /// - Optional beet ssh on 22, relocating the management sshd
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Component)]
@@ -131,7 +131,7 @@ impl LightsailBlock {
 	/// today and a box built next month are the same box. Bump deliberately.
 	pub const CADDY_VERSION: &'static str = "2.11.4";
 
-	/// The prefix in the artifacts bucket Caddy's certificate store is saved
+	/// The prefix in the repo bucket Caddy's certificate store is saved
 	/// under, beside the versions and the release pointer.
 	///
 	/// A certificate is the one thing a rebuilt box cannot make for itself:
@@ -229,31 +229,30 @@ impl LightsailBlock {
 	/// The inline IAM policy document for the box's runtime identity, LOWERED
 	/// from the [`AccessGrants`] the stack's blocks declared by the shared
 	/// [`IamPolicy`]. The grants this block owns internally are added here
-	/// because nothing declares them: the artifacts bucket it pulls its binary
-	/// from at boot, its own log group, and (with hostnames) the prefix of that
-	/// bucket it saves Caddy's certificate store to, write-only so a
+	/// because its declaration may grant nothing: the repo bucket it pulls its
+	/// binary from at boot, its own log group, and (with hostnames) the prefix
+	/// of that bucket it saves Caddy's certificate store to, write-only so a
 	/// compromised box still cannot touch a release.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
-		deployment: &Deployment,
+		repo_bucket: &str,
 		access: &AccessGrants,
 	) -> Result<String> {
 		let region = stack.region();
 		let log_group = self.log_group(stack);
-		let artifacts_bucket = deployment.artifact_store_name(stack);
 		let certificate_store = json!({
 			"Sid": "CertificateStore",
 			"Effect": "Allow",
 			"Action": ["s3:PutObject"],
 			"Resource": format!(
-				"arn:aws:s3:::{artifacts_bucket}/{}/*",
+				"arn:aws:s3:::{repo_bucket}/{}/*",
 				Self::CADDY_STORE_PREFIX
 			)
 		});
 		IamPolicy::new(region.clone(), "lightsail instance")
-			// declared by nothing, so it seeds the read set
-			.read_bucket(artifacts_bucket)
+			// seeded, since a bare `StoreUriBlock` repo store declares no grant
+			.read_bucket(repo_bucket)
 			.lower(access)?
 			.xmap(|policy| match self.caddy_hostnames().is_empty() {
 				true => policy,
@@ -314,7 +313,7 @@ impl LightsailBlock {
 	/// answer for a change to what it *runs*.
 	///
 	/// So APP config is deliberately absent. The versioned artifact key and the
-	/// deploy identity live in the artifacts bucket behind
+	/// deploy identity live in the repo bucket behind
 	/// [`ArtifactLedger::release_pointer_key`], and the unit resolves them at
 	/// every start through the fetch/run script pair below. A code-only deploy
 	/// therefore renders a byte-identical script, terraform plans no change to
@@ -331,13 +330,12 @@ impl LightsailBlock {
 	fn build_user_data(
 		&self,
 		stack: &ResolvedStack,
-		deployment: &Deployment,
+		repo_bucket: &str,
 		refs: &MachineRefs,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
 		let region = stack.region();
 		let app_port = self.app_port();
-		let artifacts_bucket = deployment.artifact_store_name(stack);
 		let caddy_store_prefix = Self::CADDY_STORE_PREFIX;
 		// the deployed binary's config, with the platform bindings this block owns
 		// merged in, then split onto its two channels. The deploy identity is
@@ -427,18 +425,18 @@ CADDY_EOF
 
 # the certificate store outlives the box (see `CADDY_STORE_PREFIX`): restore
 # what the last box saved so this one serves without an issuance
-aws s3 sync --no-progress "s3://{artifacts_bucket}/{caddy_store_prefix}/" /var/lib/caddy/ >&2 \
+aws s3 sync --no-progress "s3://{repo_bucket}/{caddy_store_prefix}/" /var/lib/caddy/ >&2 \
   || echo "beet: no saved certificate store, caddy will obtain one" >&2
 chown -R caddy:caddy /var/lib/caddy
 
 cat > /etc/systemd/system/caddy-backup.service <<'CADDY_BACKUP_EOF'
 [Unit]
-Description=Save Caddy's certificate store to the artifacts bucket
+Description=Save Caddy's certificate store to the repo bucket
 After=caddy.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{artifacts_bucket}/{caddy_store_prefix}/
+ExecStart=/usr/bin/aws s3 sync --no-progress /var/lib/caddy/ s3://{repo_bucket}/{caddy_store_prefix}/
 CADDY_BACKUP_EOF
 
 cat > /etc/systemd/system/caddy-backup.timer <<'CADDY_TIMER_EOF'
@@ -535,7 +533,7 @@ CWEOF
 
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
-		let fetch_script = self.fetch_script(stack, deployment);
+		let fetch_script = self.fetch_script(stack, repo_bucket);
 		let run_script = self.run_script(stack, &exec_args);
 
 		// uses __PLACEHOLDER__ tokens for terraform refs that contain ${}
@@ -634,20 +632,16 @@ systemctl enable --now {app_name}.service
 	}
 
 	/// The release fetcher installed at `/usr/local/bin/<app>-fetch`: read the
-	/// artifacts bucket's release pointer, install the binary it names and the
+	/// repo bucket's release pointer, install the binary it names and the
 	/// deploy identity it carries.
 	///
 	/// A fetch failure is not fatal while a binary is already installed. A
 	/// restart after a crash must not be blocked by a transient S3 error, and
 	/// the box keeps serving what it has rather than serving nothing.
-	fn fetch_script(
-		&self,
-		stack: &ResolvedStack,
-		deployment: &Deployment,
-	) -> String {
+	fn fetch_script(&self, stack: &ResolvedStack, repo_bucket: &str) -> String {
 		Self::render_script(
 			r#"#!/bin/bash
-# Install the release the artifacts bucket currently points at.
+# Install the release the repo bucket currently points at.
 set -uo pipefail
 mkdir -p /opt/__APP__ /etc/__APP__
 tmp=$(mktemp -d)
@@ -681,7 +675,7 @@ touch /etc/__APP__/deploy.env
 "#,
 			stack,
 			&[
-				("__BUCKET__", &deployment.artifact_store_name(stack)),
+				("__BUCKET__", repo_bucket),
 				(
 					"__POINTER__",
 					&ArtifactLedger::release_pointer_key(&self.label)
@@ -717,7 +711,7 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	}
 
 	/// The script [`LightsailRelease`] runs on the box: roll the unit onto the
-	/// release the artifacts bucket currently points at, and prove it serves.
+	/// release the repo bucket currently points at, and prove it serves.
 	///
 	/// The proof is three things at once, because each alone has read as
 	/// success on a box that was not serving:
@@ -1006,14 +1000,29 @@ impl LightsailBlock {
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		blocks: Query<(Entity, &LightsailBlock)>,
+		repos: RepoStoreQuery,
 	) {
 		for (entity, block) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
+			// the box pulls its release from the stack's repo store
+			let repo_bucket =
+				match repos.get(entity).and_then(|repo| repo.bucket_name()) {
+					Ok(bucket) => bucket,
+					Err(err) => {
+						scope.error(bevyhow!(
+							"LightsailBlock '{}': {err}",
+							block.label()
+						));
+						continue;
+					}
+				};
 			let access = scope.access();
 			let (stack, deployment, config) = scope.ctx();
-			if let Err(err) = block.emit(stack, deployment, &access, config) {
+			if let Err(err) =
+				block.emit(stack, &repo_bucket, deployment, &access, config)
+			{
 				scope.error(bevyhow!(
 					"LightsailBlock '{}': {err}",
 					block.label()
@@ -1027,6 +1036,7 @@ impl LightsailBlock {
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
+		repo_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
 		config: &mut terra::Config,
@@ -1061,7 +1071,7 @@ impl LightsailBlock {
 			AwsIamUserPolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
-				policy: self.runtime_policy(stack, deployment, access)?.into(),
+				policy: self.runtime_policy(stack, repo_bucket, access)?.into(),
 				..default()
 			},
 		);
@@ -1082,7 +1092,7 @@ impl LightsailBlock {
 
 		// the machine config, rendered once and used twice: as the instance's
 		// user data, and as the identity the key rotation keys on.
-		let user_data = self.build_user_data(stack, deployment, &refs)?;
+		let user_data = self.build_user_data(stack, repo_bucket, &refs)?;
 
 		// Rotate the access key with every machine-config change, bounding a
 		// leaked credential to the next rebuild rather than forever (see
@@ -1324,9 +1334,13 @@ mod tests {
 	/// The rendered cloud-init user-data script for a block, ie the systemd unit
 	/// the instance provisions itself with.
 	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
-		let (stack, deployment, dir) = ResolvedStack::default_local();
+		let (stack, _deployment, dir) = ResolvedStack::default_local();
 		let script = block
-			.build_user_data(&stack, &deployment, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap();
 		(script.to_string(), dir)
 	}
@@ -1337,6 +1351,7 @@ mod tests {
 		let block = block.clone();
 		RenderScope::test_render(move |parent| {
 			parent.spawn(block);
+			parent.spawn(RepoStoreBlock::test_store());
 		})
 	}
 
@@ -1411,7 +1426,11 @@ mod tests {
 		// the version it serves is resolved per start from the artifacts
 		// bucket's stable pointer, and named nowhere in the machine config
 		block
-			.build_user_data(&stack, &first, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap()
 			.as_str()
 			.xpect_contains("current/main-lightsail.env")
@@ -1504,11 +1523,7 @@ mod tests {
 			)
 			.xpect_contains(&format!(
 				"aws s3 cp --no-progress \"s3://{}/${}\"",
-				{
-					let (stack, deployment, _dir) =
-						ResolvedStack::default_local();
-					deployment.artifact_store_name(&stack)
-				},
+				RepoStoreBlock::TEST_BUCKET,
 				ArtifactLedger::ARTIFACT_KEY_VAR
 			))
 			// a pointer missing the key lands in the narrated keep-serving
@@ -1536,7 +1551,11 @@ mod tests {
 	fn escapes_shell_expansions_from_terraform() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
 		let script = LightsailBlock::default()
-			.build_user_data(&stack, &deployment, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap();
 		// every unescaped `${` is one of the injected terraform refs
 		script
@@ -1691,6 +1710,7 @@ mod tests {
 			let block = block.clone();
 			move |parent| {
 				parent.spawn(block);
+				parent.spawn(RepoStoreBlock::test_store());
 				parent.spawn(
 					S3BucketBlock::new("app").with_deploy_versioned(false),
 				);
@@ -1709,7 +1729,7 @@ mod tests {
 			))
 			.xpect_contains(&format!(
 				"arn:aws:s3:::{}/*",
-				deployment.artifact_store_name(&stack)
+				RepoStoreBlock::TEST_BUCKET
 			))
 			.xpect_contains(&format!(
 				"table/{}",
@@ -1739,7 +1759,7 @@ mod tests {
 		let policy = LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				&deployment,
+				RepoStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(vec![
 					AccessGrant::read_write(
 						S3BucketBlock::ACCESS_KIND,
@@ -1762,7 +1782,7 @@ mod tests {
 			// a read-only table never reaches the mutating actions
 			.xnot()
 			.xpect_contains("dynamodb:PutItem");
-		// ..and the read-only statement stays the artifacts bucket alone, never
+		// ..and the read-only statement stays the repo bucket alone, never
 		// widened by the writable one
 		serde_json::from_str::<serde_json::Value>(&policy).unwrap()["Statement"]
 			[0]["Resource"]
@@ -1783,7 +1803,7 @@ mod tests {
 		LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				&deployment,
+				RepoStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(vec![AccessGrant::read(
 					"r2_bucket",
 					"some-bucket",
@@ -1805,7 +1825,7 @@ mod tests {
 		LightsailBlock::default()
 			.runtime_policy(
 				&stack,
-				&deployment,
+				RepoStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(Block::grants(
 					&DynamoTableBlock::new("analytics"),
 					&stack,
@@ -1866,10 +1886,7 @@ mod tests {
 	fn rebuild_restores_the_certificate_store() {
 		let block = LightsailBlock::default()
 			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
-		let bucket = {
-			let (stack, deployment, _dir) = ResolvedStack::default_local();
-			deployment.artifact_store_name(&stack)
-		};
+		let bucket = RepoStoreBlock::TEST_BUCKET;
 		let (script, _dir) = build_user_data(&block);
 		let restore = format!(
 			"aws s3 sync --no-progress \"s3://{bucket}/caddy/\" /var/lib/caddy/"
@@ -2014,7 +2031,11 @@ mod tests {
 				..default()
 			})
 			.with_exec_route("serve")
-			.build_user_data(&stack, &deployment, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap();
 		script
 			.as_str()
@@ -2040,7 +2061,11 @@ mod tests {
 				server: Some(RunningSetFilter::new("http")),
 				..default()
 			})
-			.build_user_data(&stack, &deployment, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap()
 			.as_str()
 			.xpect_contains("exec /opt/beet_infra/app --server=http\n");
@@ -2056,7 +2081,11 @@ mod tests {
 				path: Some("/my page".into()),
 				..default()
 			})
-			.build_user_data(&stack, &deployment, &MachineRefs::test())
+			.build_user_data(
+				&stack,
+				RepoStoreBlock::TEST_BUCKET,
+				&MachineRefs::test(),
+			)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot be rendered");

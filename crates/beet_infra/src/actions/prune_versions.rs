@@ -5,20 +5,18 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// `<PruneVersions keep=10/>` — drop every deployed version outside the
-/// retention window, artifact and document together.
+/// retention window.
 ///
 /// ## What a version is
 ///
-/// Two things, in two places: the artifact the deploy built, keyed by deploy id
-/// in the artifact store, and the entry document it published, under the same
-/// deploy id in the stack's repo store. Prune them on separate policies and you
-/// get a version whose artifact exists and whose document does not, which a
-/// rollback fails on. So this is ONE policy over the ledger's version list, and
-/// each version's halves go together.
+/// One prefix in the stack's repo store: the document under `repo/`, the
+/// binaries under `bin/` and the ledger beside them (see [`ArtifactLedger`]).
+/// So a prune is one removal per version, and a document can never outlive
+/// its binary or the reverse, which is the shape a rollback relies on.
 ///
 /// The order within a version is deliberate: the ledger goes first (see
 /// [`ArtifactsClient::remove_version`]), so the version leaves the rollback
-/// range before any document it names does.
+/// range before anything it names does.
 ///
 /// ## Retention is by count
 ///
@@ -44,20 +42,11 @@ pub async fn PruneVersions(
 	keep: usize,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	// the ledger's client, and the stack's repo store rooted at the top rather
-	// than at this launch's version, since what it prunes is other versions
-	let (client, repo) = cx
+	let client = cx
 		.caller
-		.with_state::<(StackQuery, RepoStoreQuery), _>(
-			|entity, (stacks, repos)| -> Result<_> {
-				let (_, stack) = stacks.root(entity)?;
-				let repo = repos
-					.find(entity)?
-					.map(|repo| BlobStore::from_uri(repo.root()))
-					.transpose()?;
-				(stacks.deployment().artifacts_client(&stack)?, repo).xok()
-			},
-		)
+		.with_state::<RepoStoreQuery, _>(|entity, repos| {
+			repos.artifacts_client(entity)
+		})
 		.await??;
 
 	let versions = client.prunable_versions(keep).await?;
@@ -67,12 +56,6 @@ pub async fn PruneVersions(
 	}
 	for version in &versions {
 		client.remove_version(version).await?;
-		if let Some(repo) = &repo {
-			let documents = repo.with_subdir(RelPath::new(version.to_string()));
-			for key in documents.list().await? {
-				documents.remove(&key).await?;
-			}
-		}
 		info!("pruned version {version}");
 	}
 	info!(

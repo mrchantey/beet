@@ -207,12 +207,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 			.xok()
 	}
 
-	/// Create an artifacts client for the stack at the given entity.
-	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
-		let (_, stack) = self.root(entity)?;
-		self.deployment().artifacts_client(&stack)
-	}
-
 	/// Get the [`BlobStore`] component from this entity.
 	pub fn store(&self, entity: Entity) -> Result<&BlobStore> {
 		self.stores.get(entity)?.xok()
@@ -241,8 +235,8 @@ mod tests {
 			.xpect_eq("beet-site--prod--analytics");
 		prod.resource_name("app").xpect_eq("beet-site--prod--app");
 		resolved(Stack::default().with_stage("dev"))
-			.resource_name("artifacts")
-			.xpect_eq("beet-site--dev--artifacts");
+			.resource_name("repo")
+			.xpect_eq("beet-site--dev--repo");
 		resolved(Stack::default().with_stage("shared"))
 			.resource_name("assets")
 			.xpect_eq("beet-site--shared--assets");
@@ -362,8 +356,5 @@ mod tests {
 			.backend_path(&shared)
 			.to_string()
 			.xpect_eq("beet-site--shared--tofu-tfstate");
-		deployment
-			.artifact_store_name(&stage)
-			.xpect_eq("beet-site--dev--artifacts");
 	}
 }

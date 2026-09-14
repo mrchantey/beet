@@ -283,6 +283,15 @@ impl BlobStoreProvider for BlobStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.provider.remove(path)
 	}
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		self.provider.stat(path)
+	}
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+		self.provider.list_stats()
+	}
 	fn public_url(
 		&self,
 		path: &RelPath,
@@ -391,10 +400,23 @@ pub mod store_test {
 		store.exists(&path).await.unwrap().xpect_true();
 		store.list().await.unwrap().xpect_eq(vec![path.clone()]);
 		store.get(&path).await.unwrap().xpect_eq(body.clone());
-		store.get(&path).await.unwrap().xpect_eq(body);
+		store.get(&path).await.unwrap().xpect_eq(body.clone());
+		// the stat matches a local digest of the same bytes, whichever backend
+		let stat = BlobStat::of(&body);
+		store
+			.stat(&path)
+			.await
+			.unwrap()
+			.xpect_eq(Some(stat.clone()));
+		store
+			.list_stats()
+			.await
+			.unwrap()
+			.xpect_eq(vec![(path.clone(), stat)]);
 
 		store.remove(&path).await.unwrap();
 		store.get(&path).await.xpect_err();
+		store.stat(&path).await.unwrap().xpect_none();
 
 		store.store_remove().await.unwrap();
 		store.store_exists().await.unwrap().xpect_false();

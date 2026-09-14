@@ -65,6 +65,45 @@ pub struct RepoStoreDecl {
 impl RepoStoreDecl {
 	/// The store's root, every version of the document below it.
 	pub fn root(&self) -> &StoreUri { self.store.root() }
+
+	/// Whether each deploy publishes under its own id, see
+	/// [`StoreBlock::deploy_versioned`].
+	pub fn deploy_versioned(&self) -> bool { self.store.deploy_versioned() }
+
+	/// The bucket the store is, for a consumer that can only address S3: the
+	/// box's `aws s3 cp`, a function's `s3_bucket`. Any other kind is an error
+	/// naming it, since such a consumer cannot boot from it.
+	pub fn bucket_name(&self) -> Result<SmolStr> {
+		match self.root() {
+			StoreUri::S3 { name, .. } => name.clone().xok(),
+			other => bevybail!(
+				"the repo store `{}` is `{other}`, but this compute reads its \
+				 binary from an s3:// bucket: declare it as one, ie \
+				 `<S3BucketBlock label=\"repo\" {{RepoStoreBlock}}/>`",
+				self.label
+			),
+		}
+	}
+}
+
+#[cfg(test)]
+impl RepoStoreBlock {
+	/// The bucket [`test_store`](Self::test_store) names.
+	pub(crate) const TEST_BUCKET: &'static str = "test-repo";
+
+	/// A versioned S3 repo store for a render test, declared as a bare uri so
+	/// it emits no resource and no grant of its own.
+	pub(crate) fn test_store() -> impl Bundle {
+		(
+			StoreUriBlock::new(
+				"repo",
+				StoreUri::parse(&format!("s3://{}", Self::TEST_BUCKET))
+					.unwrap(),
+			)
+			.with_deploy_versioned(true),
+			RepoStoreBlock,
+		)
+	}
 }
 
 /// Resolves the [`RepoStoreBlock`] a consumer reads.
@@ -136,7 +175,7 @@ impl RepoStoreQuery<'_, '_> {
 	}
 
 	/// The uri a process this launch deploys boots from: the root nested under
-	/// this launch's deploy id when the store is versioned, see
+	/// this launch's version when the store is versioned, see
 	/// [`ErasedStoreBlock::store_uri`]. The id is read as this is called, so a
 	/// launch that adopts or rolls back to another version
 	/// ([`Deployment::update_from_ledger`]) bakes that version's uri.
@@ -145,6 +184,48 @@ impl RepoStoreQuery<'_, '_> {
 			.store
 			.store_uri(Some(&self.stacks.deploy_id()))
 			.xok()
+	}
+
+	/// The client publishing this launch's version into the repo store, `None`
+	/// for a stack declaring no repo store or an unversioned one: a store read
+	/// at its root has no version prefix to hold a ledger. Its ledger records
+	/// the document at [`store_uri`](Self::store_uri), so the release pointer
+	/// publishes the same uri a compute bakes.
+	pub fn find_artifacts_client(
+		&self,
+		entity: Entity,
+	) -> Result<Option<ArtifactsClient>> {
+		let Some(repo) =
+			self.find(entity)?.filter(|repo| repo.deploy_versioned())
+		else {
+			return Ok(None);
+		};
+		let deployment = self.stacks.deployment();
+		let ledger = ArtifactLedger::new(
+			*deployment.deploy_id(),
+			deployment.deploy_timestamp().to_string(),
+		)
+		.with_repo(repo.store.store_uri(Some(deployment.deploy_id())));
+		ArtifactsClient::new(BlobStore::from_uri(repo.root())?, ledger)
+			.xmap(Some)
+			.xok()
+	}
+
+	/// [`find_artifacts_client`](Self::find_artifacts_client) for a verb that
+	/// cannot do without one (an artifact upload, an adopt, a rollback): an
+	/// undeclared or unversioned repo store is an error naming what to declare.
+	pub fn artifacts_client(&self, entity: Entity) -> Result<ArtifactsClient> {
+		self.find_artifacts_client(entity)?.ok_or_else(|| {
+			match self.get(entity) {
+				Ok(repo) => bevyhow!(
+					"the repo store `{}` is not deploy-versioned, so it has no \
+					 version prefix to hold a ledger or a binary: declare it \
+					 `deploy_versioned=true`",
+					repo.label()
+				),
+				Err(err) => err,
+			}
+		})
 	}
 
 	/// The [`BootstrapConfig`] a process this launch deploys boots with: the
@@ -188,6 +269,7 @@ impl RepoStoreQuery<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	fn world() -> World {
 		let mut world = InfraPlugin.into_world();
@@ -239,8 +321,68 @@ mod test {
 			.unwrap();
 		repo.label().as_str().xpect_eq("repo");
 		repo.root().to_string().xpect_eq("s3://bucket");
+		repo.bucket_name().unwrap().as_str().xpect_eq("bucket");
 		store_uri(&mut world, consumer)
-			.xpect_eq(format!("s3://bucket/{deploy_id}"));
+			.xpect_eq(format!("s3://bucket/{deploy_id}/repo"));
+	}
+
+	/// The client publishes into the declared store, and its ledger names the
+	/// same document uri a compute bakes. An unversioned store has no version
+	/// prefix to publish into, so a verb needing the client is told why.
+	#[beet_core::test]
+	fn artifacts_client_publishes_into_the_repo_store() {
+		let mut world = world();
+		let memory = StoreUri::parse("memory://repo-client").unwrap();
+		let consumer = stack_with(
+			&mut world,
+			(
+				StoreUriBlock::new("repo", memory.clone())
+					.with_deploy_versioned(true),
+				RepoStoreBlock,
+			),
+		);
+		let deploy_id = *world.resource::<Deployment>().deploy_id();
+		let client = world
+			.with_state::<RepoStoreQuery, _>(|repos| {
+				repos.artifacts_client(consumer)
+			})
+			.unwrap();
+		client
+			.store()
+			.root_key()
+			.xpect_eq(BlobStore::from_uri(&memory).unwrap().root_key());
+		client
+			.ledger()
+			.repo
+			.as_ref()
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("memory://repo-client/{deploy_id}/repo"));
+	}
+
+	/// An unversioned store has no version prefix to publish into, so a verb
+	/// needing the client is told why rather than writing beside the document.
+	#[beet_core::test]
+	fn an_unversioned_store_has_no_client() {
+		let mut world = world();
+		let consumer = stack_with(
+			&mut world,
+			(
+				StoreUriBlock::new(
+					"repo",
+					StoreUri::parse("memory://repo-unversioned").unwrap(),
+				),
+				RepoStoreBlock,
+			),
+		);
+		world.with_state::<RepoStoreQuery, _>(|repos| {
+			repos.find_artifacts_client(consumer).unwrap().xpect_none();
+			repos
+				.artifacts_client(consumer)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("not deploy-versioned");
+		});
 	}
 
 	/// The uri nests under the id the launch holds WHEN it is read, so a launch
@@ -251,13 +393,13 @@ mod test {
 		let consumer = stack_with(&mut world, (repo_block(), RepoStoreBlock));
 		let first = *world.resource::<Deployment>().deploy_id();
 		store_uri(&mut world, consumer)
-			.xpect_eq(format!("s3://bucket/{first}"));
+			.xpect_eq(format!("s3://bucket/{first}/repo"));
 		let ledger = ArtifactLedger::new(uuid_ext::now_v7(), "later".into());
 		world
 			.resource_mut::<Deployment>()
 			.update_from_ledger(&ledger);
 		store_uri(&mut world, consumer)
-			.xpect_eq(format!("s3://bucket/{}", ledger.deploy_id));
+			.xpect_eq(format!("s3://bucket/{}/repo", ledger.deploy_id));
 	}
 
 	/// A stack declaring no repo store finds none, and a consumer that cannot

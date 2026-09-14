@@ -553,7 +553,7 @@ impl FargateBlock {
 		//
 		// Nothing is seeded: pulling the image and shipping the container's logs
 		// are the EXEC role's job, and the task reads its artifact from the image
-		// rather than the artifacts bucket. A stack declaring nothing therefore
+		// rather than the repo bucket. A stack declaring nothing therefore
 		// grants the task nothing, and no policy resource is emitted at all.
 		let task_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("task-role")),

@@ -82,6 +82,15 @@ impl BlobStoreProvider for S3FsStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		self.active().remove(path)
 	}
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		self.active().stat(path)
+	}
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+		self.active().list_stats()
+	}
 	fn public_url(
 		&self,
 		path: &RelPath,

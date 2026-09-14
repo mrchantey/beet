@@ -24,12 +24,19 @@ use beet_net::prelude::*;
 /// assignment as a field, so a route can declare more layers and order them
 /// freely.
 ///
-/// A full apply builds the terraform config, uploads the artifacts, publishes
-/// the ledger and applies. It collects each [`BuildArtifact`] paired with the
+/// A full apply builds the terraform config, builds and uploads the artifacts
+/// into the stack's repo store, publishes the ledger and applies. It collects
+/// each [`BuildArtifact`] paired with the
 /// [`artifact_label`](ErasedBlock::artifact_label) its [`ErasedBlock`] carries
 /// from stack descendants to build the [`ArtifactLedger`], using
 /// [`BuildArtifact::compute_source_hash`] for the hash. A layered apply skips
 /// the artifacts entirely, since nothing that reads one converges in it.
+///
+/// The ledger lives in the repo store ([`RepoStoreQuery::artifacts_client`]),
+/// so a stack shipping an artifact must declare a versioned one and is told
+/// what to declare when it does not; a stack with a repo store and no
+/// artifact still publishes its ledger, since that is what a content sync
+/// adopts and a rollback indexes.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -46,15 +53,14 @@ pub async fn TofuApply(
 	trace!("TofuApply: starting, layer {layer:?}");
 	// step 1: build the project and collect variables and artifact pairs
 	trace!("TofuApply: step 1 - building project and collecting artifacts");
-	let (project, stack, deployment, artifacts, repo, variables) = cx
+	let (project, artifacts, client, variables) = cx
 		.caller
 		.with_world(|world, entity| -> Result<_> {
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
 			// each declared artifact, paired with the label its block declared,
-			// and the stack's repo store, which the ledger records so a machine
-			// resolving its release per start resolves its document with it
-			let (artifacts, repo) =
+			// and the client publishing them into the stack's repo store
+			let (artifacts, client) =
 				world.with_state::<(
 					StackQuery,
 					Query<(&ErasedBlock, &BuildArtifact)>,
@@ -71,22 +77,25 @@ pub async fn TofuApply(
 								.map(|label| (artifact.clone(), label))
 						})
 						.collect::<Vec<_>>();
-					let repo = repos
-						.find(entity)?
-						.map(|_| repos.store_uri(entity))
-						.transpose()?;
-					(built, repo).xok()
+					// a binary needs a versioned repo store to publish into,
+					// and a stack shipping one without it is told what to
+					// declare here rather than after the build
+					let client = match built.is_empty() {
+						true => repos.find_artifacts_client(entity)?,
+						false => Some(repos.artifacts_client(entity)?),
+					};
+					(built, client).xok()
 				})?;
 			let (stack, deployment, config) = scope.finish()?;
 			// with the declared variables, so the apply resolves the content
 			// ones from their source rather than expecting them on the request
 			let project = terra::Project::new_with_variables(
-				stack.clone(),
-				deployment.clone(),
+				stack,
+				deployment,
 				config,
 				variables.clone(),
-			)?;
-			(project, stack, deployment, artifacts, repo, variables).xok()
+			);
+			(project, artifacts, client, variables).xok()
 		})
 		.await??;
 	trace!(
@@ -98,17 +107,12 @@ pub async fn TofuApply(
 	// steps 2 and 3 belong to the full apply: a layered apply converges no
 	// resource that reads an artifact, and publishing the ledger before the
 	// service rolls would mark an undeployed version current.
-	if layer.is_none() {
-		// step 2: build ledger, upload artifacts to S3
-		trace!("TofuApply: step 2 - ensuring artifacts bucket exists");
-		let mut client = deployment.artifacts_client(&stack)?;
-		if let Some(repo) = &repo {
-			client = client.with_repo(repo.clone());
-		}
-		client.ensure_store().await?;
-		trace!("TofuApply: artifacts bucket ready");
-
-		trace!("TofuApply: uploading {} artifacts", artifacts.len());
+	if let (None, Some(mut client)) = (&layer, client) {
+		// step 2: build and upload each artifact under this launch's version
+		trace!(
+			"TofuApply: step 2 - uploading {} artifacts",
+			artifacts.len()
+		);
 		for (artifact, label) in &artifacts {
 			// build before reading: a block is declared under its `<Stack>`
 			// rather than as a sequence step, so this is the only thing that
@@ -119,18 +123,17 @@ pub async fn TofuApply(
 			let artifact_path = AbsPath::new(artifact.artifact_path())?;
 			let bytes = fs_ext::read_async(artifact_path).await?;
 			let source_hash = artifact.compute_source_hash()?;
-			let artifact_key = deployment.artifact_key(label);
+			let artifact_key = client.ledger().artifact_key(label);
 
 			client
 				.upload_artifact(label, bytes, ArtifactEntry {
-					bucket_key: artifact_key.clone().into(),
+					bucket_key: artifact_key.to_string().into(),
 					source_hash: source_hash.into(),
 				})
 				.await?;
 			info!(
-				"uploaded artifact to s3://{}/{}",
-				deployment.artifact_store_name(&stack),
-				artifact_key,
+				"uploaded artifact {label} to {}/{artifact_key}",
+				client.store().describe()
 			);
 		}
 

@@ -145,6 +145,60 @@ impl S3Store {
 		self
 	}
 
+	/// The MD5 an S3 etag carries: the quoted hex digest of a single-part
+	/// object, and nothing for a multipart upload, whose etag is a digest of
+	/// digests no local file can reproduce.
+	fn etag_md5(etag: Option<&str>) -> Option<SmolStr> {
+		etag.map(|etag| etag.trim_matches('"'))
+			.filter(|etag| !etag.contains('-'))
+			.map(SmolStr::new)
+	}
+
+	/// Every object under this store's prefix with its size and etag, paged
+	/// through `ListObjectsV2`.
+	async fn list_objects(&self) -> Result<Vec<(RelPath, BlobStat)>> {
+		let client = self.client().await;
+		let bucket_name = self.bucket_name.as_str();
+		let prefix = self.subdir.as_ref().map(|subdir| format!("{subdir}/"));
+		let mut objects = Vec::new();
+		let mut continuation_token = None;
+
+		loop {
+			let mut req = client.list_objects_v2().bucket(bucket_name);
+			if let Some(ref prefix) = prefix {
+				req = req.prefix(prefix);
+			}
+			if let Some(token) = &continuation_token {
+				req = req.continuation_token(token);
+			}
+			let list_result = req.send().await?;
+			let contents = list_result.contents.unwrap_or_default();
+			objects.extend(contents.into_iter().filter_map(|obj| {
+				let key = obj.key?;
+				let rel = match &prefix {
+					Some(prefix) => key.strip_prefix(prefix.as_str())?,
+					None => &key,
+				};
+				let stat = BlobStat {
+					size: obj.size.unwrap_or_default() as u64,
+					md5: Self::etag_md5(obj.e_tag.as_deref()),
+				};
+				Some((RelPath::new(rel), stat))
+			}));
+
+			if list_result.is_truncated == Some(true) {
+				continuation_token = list_result.next_continuation_token;
+				if continuation_token.is_none() {
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+
+		objects.xok()
+	}
+
 	/// Construct the full S3 URI including optional subdir.
 	pub fn s3_uri(&self) -> String {
 		match &self.subdir {
@@ -356,42 +410,51 @@ impl BlobStoreProvider for S3Store {
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let this = self.clone();
 		async_ext::pin_tokio(async move {
+			this.list_objects()
+				.await?
+				.into_iter()
+				.map(|(path, _)| path)
+				.collect::<Vec<_>>()
+				.xok()
+		})
+	}
+
+	/// One listing answers every stat: `ListObjectsV2` carries each object's
+	/// size and etag, so a mirror of a whole prefix costs one round trip per
+	/// page rather than one `HeadObject` per key.
+	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
+		let this = self.clone();
+		async_ext::pin_tokio(async move { this.list_objects().await })
+	}
+
+	/// `HeadObject`: the size and etag without the body.
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		let this = self.clone();
+		let key = self.resolve_key(path);
+		async_ext::pin_tokio(async move {
 			let client = this.client().await;
-			let bucket_name = this.bucket_name.as_str();
-			let prefix = this.subdir.as_ref().map(|s| format!("{}/", s));
-			let mut paths = Vec::new();
-			let mut continuation_token = None;
-
-			loop {
-				let mut req = client.list_objects_v2().bucket(bucket_name);
-				if let Some(ref prefix) = prefix {
-					req = req.prefix(prefix);
+			match client
+				.head_object()
+				.bucket(this.bucket_name.as_str())
+				.key(&key)
+				.send()
+				.await
+			{
+				Ok(head) => Some(BlobStat {
+					size: head.content_length.unwrap_or_default() as u64,
+					md5: Self::etag_md5(head.e_tag.as_deref()),
+				})
+				.xok(),
+				Err(SdkError::ServiceError(service_err))
+					if let HeadObjectError::NotFound(_) = service_err.err() =>
+				{
+					None.xok()
 				}
-				if let Some(token) = &continuation_token {
-					req = req.continuation_token(token);
-				}
-				let list_result = req.send().await?;
-				let contents = list_result.contents.unwrap_or_default();
-				paths.extend(contents.into_iter().filter_map(|obj| {
-					let key = obj.key?;
-					let rel = match &prefix {
-						Some(p) => key.strip_prefix(p.as_str())?,
-						None => &key,
-					};
-					Some(RelPath::new(rel))
-				}));
-
-				if list_result.is_truncated == Some(true) {
-					continuation_token = list_result.next_continuation_token;
-					if continuation_token.is_none() {
-						break;
-					}
-				} else {
-					break;
-				}
+				Err(err) => Err(err.into()),
 			}
-
-			paths.xok()
 		})
 	}
 

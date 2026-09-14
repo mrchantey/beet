@@ -1,5 +1,6 @@
 //! Copy declared paths between two workspace directories.
 
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -10,8 +11,10 @@ use beet_net::prelude::*;
 /// Two directories can share files without either owning the other: the site's
 /// assets are its own, but a few workspace-built artifacts (a wasm binary, a
 /// geoip database) are produced in the workspace tree and served from the site.
-/// This names exactly those, and runs ahead of every publish so a rebuilt
-/// artifact cannot go stale on the far side.
+/// This names exactly those. Under a [`RepoStage`] it borrows into the staging
+/// dir the deploy publishes, so a rebuilt artifact cannot go stale on the far
+/// side and nothing is written into the checkout; elsewhere (the local
+/// `assets` verb) `dest` is workspace-relative.
 ///
 /// Mirror semantics per path: a destination file or directory is replaced, so a
 /// stale binary is overwritten rather than merged around.
@@ -22,7 +25,8 @@ pub async fn DirCopy(
 	/// The workspace-relative source directory.
 	#[field]
 	src: WsPath,
-	/// The workspace-relative destination directory.
+	/// The destination directory: inside the staging dir under a
+	/// [`RepoStage`] ancestor, else workspace-relative.
 	#[field]
 	dest: WsPath,
 	/// Comma-separated paths to copy, each relative to both ends and naming
@@ -32,7 +36,21 @@ pub async fn DirCopy(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let src_dir = src.into_abs();
-	let dest_dir = dest.into_abs();
+	// under a stage the destination is the staging dir's, so the borrow lands
+	// where the mirror reads rather than in the checkout
+	let dest_dir = cx
+		.caller
+		.with_state::<(AncestorQuery<&RepoStage>, StackQuery), _>(
+			move |entity, (stages, stacks)| -> Result<AbsPath> {
+				match stages.get(entity) {
+					Ok(_) => RepoStage::dir(&stacks, entity)?
+						.join(dest.to_string())
+						.xok(),
+					Err(_) => dest.into_abs().xok(),
+				}
+			},
+		)
+		.await??;
 	let mut copied = 0;
 	for path in DirCopy::iter_paths(&paths) {
 		let from = src_dir.join(path);
@@ -57,7 +75,7 @@ pub async fn DirCopy(
 		debug!("copied {} -> {}", from, to);
 		copied += 1;
 	}
-	info!("copied {copied} borrowed path(s) {src} -> {dest}");
+	info!("copied {copied} borrowed path(s) {src_dir} -> {dest_dir}");
 	Pass(cx.input).xok()
 }
 

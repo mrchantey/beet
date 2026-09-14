@@ -69,22 +69,3 @@ pub fn beet_cargo_build(features: impl Into<SmolStr>) -> CargoBuild {
 		])
 		.with_release(true)
 }
-
-/// Sync `examples/bsx_site` (the no-code site) to the stack's repo store, the
-/// content every infra example serves: a `<DirSync>` of that directory into
-/// `repo`, mirrored so a renamed or removed source file does not linger across
-/// deploys.
-///
-/// The per-deploy prefix is the sync's to resolve when it runs, from the store's
-/// own declaration: a content-only `sync` verb therefore runs
-/// `<AdoptCurrentDeploy/>` first, so the launch adopts the LIVE version's id
-/// rather than minting one nothing is serving.
-pub fn sync_site(repo: &RepoStoreDecl) -> impl Bundle {
-	(
-		DirSync::new(repo.label().clone(), "examples/bsx_site"),
-		SyncS3Bucket {
-			delete: true,
-			..default()
-		},
-	)
-}

@@ -31,7 +31,10 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 			<!-- the bucket first, so the site is in place before the instance that
 			     serves it boots -->
 			<TofuApply layer="storage"/>
-			<SiteSync/>
+			<!-- publish the site: stage it, then one mirror into this deploy's
+			     version of the repo store -->
+			<RepoStage src="examples/bsx_site"/>
+			<RepoSync/>
 			<TofuApply/>
 			<LightsailWatch timeout="30s"/>
 		</Group>
@@ -44,7 +47,8 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
-			<SiteSync/>
+			<RepoStage src="examples/bsx_site"/>
+			<RepoSync/>
 		</Route>
 		<Route path="watch" {ExchangeSequence}>
 			<LightsailWatch/>
