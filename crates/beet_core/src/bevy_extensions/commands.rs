@@ -118,17 +118,8 @@ pub impl EntityCommands<'_> {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		let id = self.id();
-		let location = Location::caller();
-		self.commands().queue(move |world: &mut World| {
-			match world.get_entity_mut(id) {
-				Ok(mut entity) => {
-					entity.run_async(func);
-				}
-				Err(_) => debug!(
-					"entity {id} despawned before its queued async task ran (at {location})"
-				),
-			}
+		queue_if_alive(self, Location::caller(), move |mut entity| {
+			entity.run_async(func);
 		});
 	}
 
@@ -145,17 +136,76 @@ pub impl EntityCommands<'_> {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		let id = self.id();
-		let location = Location::caller();
-		self.commands().queue(move |world: &mut World| {
-			match world.get_entity_mut(id) {
-				Ok(mut entity) => {
-					entity.run_async_local(func);
-				}
-				Err(_) => debug!(
-					"entity {id} despawned before its queued async task ran (at {location})"
-				),
-			}
+		queue_if_alive(self, Location::caller(), move |mut entity| {
+			entity.run_async_local(func);
 		});
 	}
+
+	/// Queues an asynchronous task for this entity that one of its components
+	/// owns. The spawn happens when the command applies, so the [`AsyncTask`]
+	/// is handed to `own` then and the bundle it returns is inserted on the
+	/// entity: a tuple-struct constructor is the usual `own`
+	/// (`queue_task(ReloadTail, func)`), and the task is cancelled when that
+	/// component is removed, replaced by a later insert, or despawned with the
+	/// entity.
+	///
+	/// Never spawned (a `debug` log against the queueing call site) if the
+	/// entity is already gone when the command applies, as
+	/// [`queue_async`](Self::queue_async) is.
+	#[cfg(feature = "bevy_async")]
+	#[track_caller]
+	fn queue_task<B, Func, Fut, Out>(
+		&mut self,
+		own: impl 'static + Send + FnOnce(AsyncTask) -> B,
+		func: Func,
+	) where
+		B: Bundle,
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		queue_if_alive(self, Location::caller(), move |mut entity| {
+			let task = entity.run_task(func);
+			entity.insert(own(task));
+		});
+	}
+
+	/// Queues a local asynchronous task for this entity that one of its
+	/// components owns, the `_local` sibling of [`queue_task`](Self::queue_task).
+	#[cfg(feature = "bevy_async")]
+	#[track_caller]
+	fn queue_task_local<B, Func, Fut, Out>(
+		&mut self,
+		own: impl 'static + Send + FnOnce(AsyncTask) -> B,
+		func: Func,
+	) where
+		B: Bundle,
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		queue_if_alive(self, Location::caller(), move |mut entity| {
+			let task = entity.run_task_local(func);
+			entity.insert(own(task));
+		});
+	}
+}
+
+/// Queue `func` against the entity, skipping it with a `debug` log against
+/// `location` if the entity has been despawned by the time the command applies.
+#[cfg(feature = "bevy_async")]
+fn queue_if_alive(
+	commands: &mut EntityCommands,
+	location: &'static Location<'static>,
+	func: impl 'static + Send + FnOnce(EntityWorldMut),
+) {
+	let id = commands.id();
+	commands.commands().queue(move |world: &mut World| {
+		match world.get_entity_mut(id) {
+			Ok(entity) => func(entity),
+			Err(_) => debug!(
+				"entity {id} despawned before its queued async task ran (at {location})"
+			),
+		}
+	});
 }

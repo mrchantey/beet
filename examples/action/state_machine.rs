@@ -29,7 +29,7 @@ fn main() -> AppExit {
 }
 
 fn setup(async_commands: AsyncCommands) {
-	async_commands.detach_async(async |world: AsyncWorld| -> Result {
+	async_commands.run(async |world: AsyncWorld| -> Result {
 		let state1 = world
 			.with(|world: &mut World| {
 				// state2 is the terminal state: it just returns its input.

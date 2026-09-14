@@ -6,6 +6,7 @@
 //! # Async Utilities
 //!
 //! - [`AsyncCommands`] - Execute commands from async contexts
+//! - [`AsyncTask`] - A spawned task, cancelled on drop
 //! - [`AsyncRunner`] - Run apps asynchronously to completion
 //!
 //! # Entity Utilities
@@ -38,6 +39,8 @@ mod ancestor_query;
 pub mod app_ext;
 #[cfg(feature = "bevy_async")]
 mod async_commands;
+#[cfg(feature = "bevy_async")]
+mod async_task;
 // the app runner needs a sleep/yield + task pool, so it is std-only
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 mod async_runner;
@@ -70,6 +73,8 @@ pub use ancestor_query::*;
 pub use async_commands::*;
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 pub use async_runner::*;
+#[cfg(feature = "bevy_async")]
+pub use async_task::*;
 #[cfg(feature = "bevy_keyboard")]
 pub use common_systems::*;
 pub use derived::*;

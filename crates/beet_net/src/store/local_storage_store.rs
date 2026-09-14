@@ -211,7 +211,7 @@ impl BlobStoreProvider for LocalStorageStore {
 pub(crate) struct LocalStorageBlobWatcher {
 	/// The forwarding task, cancelled (dropping its JS listener) on the last
 	/// unsubscribe.
-	task: Option<TaskHandle>,
+	task: Option<AsyncTask>,
 	/// Number of active [`LocalStorageStore`]s.
 	subscribers: usize,
 }

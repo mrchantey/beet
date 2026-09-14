@@ -13,14 +13,17 @@
 //! - [`AsyncEntity`] - handle for operating on a specific entity
 //! - [`AsyncCommands`] - system parameter for spawning async tasks from a system
 //! - [`AsyncSpawner`] - runtime-agnostic task spawner + in-flight counter
-//! - [`TaskHandle`] - a spawned task, cancelled on drop
+//! - [`AsyncTask`] - a spawned task, cancelled on drop
 //!
 //! # Task scope
 //!
 //! A task spawned through an entity (`entity.run_async`, the queued
 //! `EntityCommands::queue_async`) is scoped to it: despawning the entity
 //! cancels the task. A task spawned through the world (`world.run_async`,
-//! [`AsyncCommands::run`]) is unscoped and runs to completion.
+//! [`AsyncCommands::run`]) is unscoped and runs to completion. The `run_task`
+//! twins (`queue_task` from commands) return the [`AsyncTask`] instead, for a
+//! caller that owns the task itself: a component holding it cancels the task
+//! when removed or replaced, and `detach` releases it.
 //!
 //! # Example
 //!
@@ -135,7 +138,9 @@ type SpawnLocalFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
 ///
 /// Spawning is pluggable so a future `tokio` / `embassy` backend can be selected;
 /// the default uses [`IoTaskPool`](bevy::tasks::IoTaskPool). The in-flight
-/// counter is the idle signal used by [`AsyncRunner`].
+/// counter is the idle signal used by [`AsyncRunner`]. Every future is wrapped
+/// for cancellation before it reaches the backend, so the [`AsyncTask`] a
+/// spawn returns works the same on every runtime.
 ///
 /// ## Every task shares the world thread unless `bevy_multithreaded` is on
 ///
@@ -158,8 +163,8 @@ pub struct AsyncSpawner(Arc<AsyncSpawnerInner>);
 
 struct AsyncSpawnerInner {
 	in_flight: AtomicUsize,
-	spawn: Box<dyn Fn(SpawnFut) -> TaskHandle + Send + Sync>,
-	spawn_local: Box<dyn Fn(SpawnLocalFut) -> TaskHandle + Send + Sync>,
+	spawn: Box<dyn Fn(SpawnFut) + Send + Sync>,
+	spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>,
 	/// Ticks this spawner's own [`BridgeExecutor`], which it shares with the
 	/// spawn functions above. `None` for a spawner built from custom spawn
 	/// functions (`tokio`, `embassy`), which drives itself.
@@ -173,10 +178,10 @@ struct AsyncSpawnerInner {
 
 impl Default for AsyncSpawner {
 	fn default() -> Self {
-		let spawn: Box<dyn Fn(SpawnFut) -> TaskHandle + Send + Sync>;
-		let spawn_local: Box<
-			dyn Fn(SpawnLocalFut) -> TaskHandle + Send + Sync,
-		>;
+		// each backend detaches its own handle: cancellation is the `AsyncTask`
+		// wrapper `spawn` applies, not the runtime's
+		let spawn: Box<dyn Fn(SpawnFut) + Send + Sync>;
+		let spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>;
 		cfg_if! {
 			// wasm: bevy `spawn_local` uses the JS event loop, which the
 			// synchronous bridge driver cannot tick. Use our own tickable
@@ -191,34 +196,28 @@ impl Default for AsyncSpawner {
 				));
 				let spawn_executor = executor.clone();
 				spawn = Box::new(move |fut| {
-					TaskHandle::new(spawn_executor.spawn(fut))
+					spawn_executor.spawn(fut).detach();
 				});
 				let local_executor = executor.clone();
 				spawn_local = Box::new(move |fut| {
-					TaskHandle::new(local_executor.spawn(fut))
+					local_executor.spawn(fut).detach();
 				});
 			} else if #[cfg(all(feature = "std", feature = "bevy_multithreaded"))] {
 				spawn = Box::new(|fut| {
-					TaskHandle::new(bevy::tasks::IoTaskPool::get().spawn(fut))
+					bevy::tasks::IoTaskPool::get().spawn(fut).detach();
 				});
 				spawn_local = Box::new(|fut| {
-					TaskHandle::new(
-						bevy::tasks::IoTaskPool::get().spawn_local(fut),
-					)
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
 				});
 			} else if #[cfg(feature = "std")] {
 				// `SpawnFut` is not `Send` here, so it cannot go through `spawn`
 				// (which requires `Send` whenever bevy's `multi_threaded` feature
 				// is active); spawn it locally instead.
 				spawn = Box::new(|fut| {
-					TaskHandle::new(
-						bevy::tasks::IoTaskPool::get().spawn_local(fut),
-					)
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
 				});
 				spawn_local = Box::new(|fut| {
-					TaskHandle::new(
-						bevy::tasks::IoTaskPool::get().spawn_local(fut),
-					)
+					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
 				});
 			} else {
 				spawn = Box::new(|_| {
@@ -346,11 +345,12 @@ fn unwrap_bridged<O>(out: Option<O>) -> O {
 }
 
 impl AsyncSpawner {
-	/// Build a spawner from custom spawn functions (eg `tokio` / `embassy`),
-	/// each returning the [`TaskHandle`] that cancels its task on drop.
+	/// Build a spawner from custom spawn functions (eg `tokio` / `embassy`).
+	/// Cancellation is applied before a future reaches them (see
+	/// [`AsyncTask`]), so they need none of their own.
 	pub fn new(
-		spawn: impl 'static + Send + Sync + Fn(SpawnFut) -> TaskHandle,
-		spawn_local: impl 'static + Send + Sync + Fn(SpawnLocalFut) -> TaskHandle,
+		spawn: impl 'static + Send + Sync + Fn(SpawnFut),
+		spawn_local: impl 'static + Send + Sync + Fn(SpawnLocalFut),
 	) -> Self {
 		Self(Arc::new(AsyncSpawnerInner {
 			in_flight: AtomicUsize::new(0),
@@ -385,31 +385,29 @@ impl AsyncSpawner {
 		}
 	}
 
-	/// Spawns a task, incrementing the in-flight counter until it completes.
-	///
-	/// Dropping the returned [`TaskHandle`] cancels the task; `detach` it to let
-	/// it run unowned.
-	#[must_use = "dropping the handle cancels the task, `detach` it to let it run"]
-	pub fn spawn<Fut>(&self, fut: Fut) -> TaskHandle
+	/// Spawns a task, counted in flight until it ends. Dropping the returned
+	/// [`AsyncTask`] cancels it; `detach` lets it run unowned.
+	pub fn spawn<Fut>(&self, fut: Fut) -> AsyncTask
 	where
 		Fut: 'static + MaybeSend + Future<Output = ()>,
 	{
-		let counted = self.count(fut);
-		(self.0.spawn)(Box::pin(counted))
+		let task = AsyncTask::new();
+		let counted = self.count(task.wrap(fut));
+		(self.0.spawn)(Box::pin(counted));
+		task
 	}
 
-	/// Spawns a task on the local thread, incrementing the in-flight counter
-	/// until it completes.
-	///
-	/// Dropping the returned [`TaskHandle`] cancels the task; `detach` it to let
-	/// it run unowned.
-	#[must_use = "dropping the handle cancels the task, `detach` it to let it run"]
-	pub fn spawn_local<Fut>(&self, fut: Fut) -> TaskHandle
+	/// Spawns a task on the local thread, counted in flight until it ends.
+	/// Dropping the returned [`AsyncTask`] cancels it; `detach` lets it run
+	/// unowned.
+	pub fn spawn_local<Fut>(&self, fut: Fut) -> AsyncTask
 	where
 		Fut: 'static + Future<Output = ()>,
 	{
-		let counted = self.count(fut);
-		(self.0.spawn_local)(Box::pin(counted))
+		let task = AsyncTask::new();
+		let counted = self.count(task.wrap(fut));
+		(self.0.spawn_local)(Box::pin(counted));
+		task
 	}
 
 	/// Wraps `fut` so the in-flight counter is held for as long as it lives.
@@ -437,74 +435,22 @@ impl AsyncSpawner {
 	}
 }
 
-/// A spawned task, cancelled when this handle drops.
-///
-/// [`AsyncSpawner::spawn`] returns one; an entity's tasks live on it (see
-/// [`EntityWorldMut::run_async`](EntityWorldMutAsyncCommandsExt::run_async))
-/// so they end with it, and a world task
-/// ([`World::run_async`](WorldAsyncCommandsExt::run_async)) is
-/// [`detach`](Self::detach)ed to run unowned.
-///
-/// Cancellation lands at the task's next pending await: the runtime drops the
-/// future the next time it would poll it, running its destructors (a
-/// [`PendingGuard`] resolves, a socket closes). A task that despawns its own
-/// entity keeps running to the end of its current poll, so a bridged call it
-/// makes there against the gone entity still errors, the window the entity
-/// task runner suppresses rather than raising.
-pub struct TaskHandle(Box<dyn TaskHandleInner>);
-
-/// The runtime half of a [`TaskHandle`]: cancellation is its `Drop`.
-///
-/// Implemented for the [`Task`](bevy::tasks::Task) both default spawners
-/// return; a custom [`AsyncSpawner`] wraps its own runtime's handle (a tokio
-/// `JoinHandle` aborting on drop).
-pub trait TaskHandleInner: 'static + Send + Sync {
-	/// Whether the task has completed or been cancelled.
-	fn is_finished(&self) -> bool;
-	/// Release the task to run to completion without a handle.
-	fn detach(self: Box<Self>);
-}
-
-impl TaskHandleInner for bevy::tasks::Task<()> {
-	fn is_finished(&self) -> bool { Self::is_finished(self) }
-	fn detach(self: Box<Self>) { Self::detach(*self) }
-}
-
-impl TaskHandle {
-	/// Wrap a runtime's task handle.
-	pub fn new(inner: impl TaskHandleInner) -> Self { Self(Box::new(inner)) }
-
-	/// Whether the task has completed or been cancelled.
-	pub fn is_finished(&self) -> bool { self.0.is_finished() }
-
-	/// Let the task run to completion, releasing this handle without
-	/// cancelling it.
-	pub fn detach(self) { self.0.detach() }
-}
-
-impl core::fmt::Debug for TaskHandle {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		f.debug_struct("TaskHandle")
-			.field("is_finished", &self.is_finished())
-			.finish()
-	}
-}
-
 /// The tasks spawned through an entity, cancelled with it.
 ///
 /// Every entity-scoped spawn ([`EntityWorldMut::run_async`](EntityWorldMutAsyncCommandsExt::run_async),
 /// [`AsyncEntity::run_async`], the queued [`EntityCommands`](crate::prelude::EntityCommandsExt::queue_async)
-/// variants) pushes here, so despawning the entity drops the handles and the
-/// runtime drops the futures: a server's connections close with it, a
-/// reconnect loop ends with its scene. Finished handles are pruned on each
-/// push, so a long-lived entity never accumulates one per task it ran.
+/// variants) pushes here, so despawning the entity drops the handles and
+/// cancels the tasks: a server's connections close with it, a reconnect loop
+/// ends with its scene. Finished handles are pruned on each push, so a
+/// long-lived entity never accumulates one per task it ran. A `run_task` spawn
+/// bypasses this: its caller owns the handle.
 #[derive(Default, Component)]
 #[component(clone_behavior = Ignore)]
-struct EntityTasks(Vec<TaskHandle>);
+struct EntityTasks(Vec<AsyncTask>);
 
 impl EntityTasks {
 	/// Own `handle` for the life of `entity`.
-	fn push(entity: &mut EntityWorldMut, handle: TaskHandle) {
+	fn push(entity: &mut EntityWorldMut, handle: AsyncTask) {
 		match entity.get_mut::<Self>() {
 			Some(mut tasks) => {
 				tasks.0.retain(|task| !task.is_finished());
@@ -538,7 +484,7 @@ where
 /// logged at `debug` rather than routed to the handler — which panics by default
 /// (`Severity::Panic`), and a panic mid-schedule would brick eg robot firmware.
 /// An entity-scoped task is cancelled by the despawn, but only at its next
-/// pending await (see [`TaskHandle`]): a task despawning its own entity runs
+/// pending await (see [`AsyncTask`]): a task despawning its own entity runs
 /// out its current poll, and a bridged call it makes there is this path.
 #[cfg_attr(feature = "nightly", track_caller)]
 async fn run_async_task_inner<Func, Fut, Out>(
@@ -841,7 +787,7 @@ pub impl AsyncWorld {
 		self.with(move |world| world.run_system_once_with(system, input))
 	}
 
-	/// Spawns an async task.
+	/// Spawns a detached async task.
 	fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -856,7 +802,7 @@ pub impl AsyncWorld {
 		})
 	}
 
-	/// Spawns an async task on the local thread.
+	/// Spawns a detached async task on the local thread.
 	fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -869,6 +815,34 @@ pub impl AsyncWorld {
 		self.with(move |world| {
 			world.run_async_local(func);
 		})
+	}
+
+	/// Spawns an async task, resolving to its [`AsyncTask`] for the caller to
+	/// own; [`run_async`](Self::run_async) detaches instead.
+	fn run_task<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = AsyncTask> + Send
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Send + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with(move |world| world.run_task(func))
+	}
+
+	/// Spawns an async task on the local thread, resolving to its
+	/// [`AsyncTask`] for the caller to own.
+	fn run_task_local<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = AsyncTask> + Send
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with(move |world| world.run_task_local(func))
 	}
 
 	/// Registers an observer.
@@ -1101,7 +1075,8 @@ impl AsyncEntity {
 		self.with(|mut entity| entity.with_state(func))
 	}
 
-	/// Spawns an async task for this entity, erroring if the entity has been despawned.
+	/// Spawns an async task owned by this entity (cancelled when it despawns),
+	/// erroring if the entity has already been despawned.
 	pub fn run_async<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -1116,7 +1091,8 @@ impl AsyncEntity {
 		})
 	}
 
-	/// Spawns an async task on the local thread for this entity, erroring if the entity has been despawned.
+	/// Spawns an async task on the local thread owned by this entity, erroring
+	/// if the entity has already been despawned.
 	pub fn run_async_local<Func, Fut, Out>(
 		&self,
 		func: Func,
@@ -1129,6 +1105,36 @@ impl AsyncEntity {
 		self.with(move |mut entity| {
 			entity.run_async_local(func);
 		})
+	}
+
+	/// Spawns an async task for this entity, resolving to its [`AsyncTask`]
+	/// for the caller to own (where [`run_async`](Self::run_async) hands it to
+	/// the entity), or erroring if the entity has been despawned.
+	pub fn run_task<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = Result<AsyncTask>> + Send
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Send + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with(move |mut entity| entity.run_task(func))
+	}
+
+	/// Spawns an async task on the local thread for this entity, resolving to
+	/// its [`AsyncTask`] for the caller to own, or erroring if the entity has
+	/// been despawned.
+	pub fn run_task_local<Func, Fut, Out>(
+		&self,
+		func: Func,
+	) -> impl Future<Output = Result<AsyncTask>> + Send
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.with(move |mut entity| entity.run_task_local(func))
 	}
 
 	/// Gets a component and runs a function with it.
@@ -1380,7 +1386,9 @@ impl AsyncCommands<'_, '_> {
 
 	/// The [`EntityCommands`] for `entity`, whose
 	/// [`queue_async`](crate::prelude::EntityCommandsExt::queue_async) variants
-	/// spawn a task scoped to it once the command applies.
+	/// spawn a task scoped to it once the command applies, and whose
+	/// [`queue_task`](crate::prelude::EntityCommandsExt::queue_task) variants
+	/// hand the task to a component of its own.
 	pub fn entity(&mut self, entity: Entity) -> EntityCommands<'_> {
 		self.commands.entity(entity)
 	}
@@ -1392,9 +1400,7 @@ impl AsyncCommands<'_, '_> {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.spawner
-			.spawn(run_async_task(self.world(), func))
-			.detach();
+		self.run_task(func).detach();
 	}
 
 	/// Spawns a world task on the local thread, unscoped.
@@ -1404,18 +1410,67 @@ impl AsyncCommands<'_, '_> {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		self.spawner
-			.spawn_local(run_async_task(self.world(), func))
-			.detach();
+		self.run_task_local(func).detach();
+	}
+
+	/// Spawns a world task, returning its [`AsyncTask`] for the caller to own;
+	/// [`run`](Self::run) detaches instead.
+	pub fn run_task<Func, Fut, Out>(&self, func: Func) -> AsyncTask
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner.spawn(run_async_task(self.world(), func))
+	}
+
+	/// Spawns a world task on the local thread, returning its [`AsyncTask`]
+	/// for the caller to own.
+	pub fn run_task_local<Func, Fut, Out>(&self, func: Func) -> AsyncTask
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.spawner.spawn_local(run_async_task(self.world(), func))
 	}
 }
 
 /// Extension trait adding async command methods to [`World`].
+///
+/// A world task is unscoped: `run_async` detaches it to run to completion
+/// whatever despawns, `run_task` returns its [`AsyncTask`] for the caller to
+/// own.
 #[extend::ext(name=WorldAsyncCommandsExt)]
 pub impl World {
-	/// Spawns an async task.
+	/// Spawns a detached async task.
 	#[track_caller]
 	fn run_async<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.run_task(func).detach();
+		self
+	}
+
+	/// Spawns a detached async task on the local thread.
+	#[track_caller]
+	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	where
+		Func: 'static + FnOnce(AsyncWorld) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		self.run_task_local(func).detach();
+		self
+	}
+
+	/// Spawns an async task, returning its [`AsyncTask`] for the caller to
+	/// own; [`run_async`](Self::run_async) detaches instead.
+	#[track_caller]
+	fn run_task<Func, Fut, Out>(&mut self, func: Func) -> AsyncTask
 	where
 		Func: 'static + Send + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + MaybeSend + Future<Output = Out>,
@@ -1425,13 +1480,12 @@ pub impl World {
 		self.resource::<AsyncSpawner>()
 			.clone()
 			.spawn(run_async_task(world, func))
-			.detach();
-		self
 	}
 
-	/// Spawns an async task on the local thread.
+	/// Spawns an async task on the local thread, returning its [`AsyncTask`]
+	/// for the caller to own.
 	#[track_caller]
-	fn run_async_local<Func, Fut, Out>(&mut self, func: Func) -> &mut Self
+	fn run_task_local<Func, Fut, Out>(&mut self, func: Func) -> AsyncTask
 	where
 		Func: 'static + FnOnce(AsyncWorld) -> Fut,
 		Fut: 'static + Future<Output = Out>,
@@ -1441,8 +1495,6 @@ pub impl World {
 		self.resource::<AsyncSpawner>()
 			.clone()
 			.spawn_local(run_async_task(world, func))
-			.detach();
-		self
 	}
 
 	/// Spawns an async task, drives the app to completion, and returns the output.
@@ -1460,16 +1512,19 @@ pub impl World {
 		let world = self.resource::<AsyncWorld>().clone();
 		let (send, recv) = OnceValue::oneshot();
 		let spawner = self.resource::<AsyncSpawner>().clone();
-		spawner
-			.spawn(async move {
-				send.signal(func(world).await);
-			})
-			.detach();
-		AsyncRunner::poll_and_update(
-			spawner.clone(),
-			|| self.update_local(),
-			recv.wait(),
-		)
+		let task = spawner.spawn(async move {
+			send.signal(func(world).await);
+		});
+		async move {
+			// held across the drive, so dropping this future cancels the task
+			let _task = task;
+			AsyncRunner::poll_and_update(
+				spawner.clone(),
+				|| self.update_local(),
+				recv.wait(),
+			)
+			.await
+		}
 	}
 
 	/// Spawns a local async task, drives the app to completion, returns the output.
@@ -1487,25 +1542,30 @@ pub impl World {
 		let world = self.resource::<AsyncWorld>().clone();
 		let (send, recv) = OnceValue::oneshot();
 		let spawner = self.resource::<AsyncSpawner>().clone();
-		spawner
-			.spawn_local(async move {
-				send.signal(func(world).await);
-			})
-			.detach();
-		AsyncRunner::poll_and_update(
-			spawner.clone(),
-			|| self.update_local(),
-			recv.wait(),
-		)
+		let task = spawner.spawn_local(async move {
+			send.signal(func(world).await);
+		});
+		async move {
+			// held across the drive, so dropping this future cancels the task
+			let _task = task;
+			AsyncRunner::poll_and_update(
+				spawner.clone(),
+				|| self.update_local(),
+				recv.wait(),
+			)
+			.await
+		}
 	}
 }
 
 /// Extension trait adding async command methods to [`EntityWorldMut`].
 ///
-/// The `run_async` variants are entity-scoped: the task's [`TaskHandle`] is
+/// The `run_async` variants are entity-scoped: the task's [`AsyncTask`] is
 /// owned by the entity and dropped, cancelling it, when the entity despawns.
-/// A task that must outlive its entity is a world task,
-/// [`World::run_async`](WorldAsyncCommandsExt::run_async).
+/// The `run_task` variants return it for the caller to own instead, usually
+/// in the component naming the work (`ReloadTail(task)`), so that component's
+/// removal or replacement cancels it too. A task that must outlive its entity
+/// is a world task, [`World::run_async`](WorldAsyncCommandsExt::run_async).
 #[extend::ext(name=EntityWorldMutAsyncCommandsExt)]
 pub impl EntityWorldMut<'_> {
 	/// Spawns an async task for this entity, cancelled when it despawns.
@@ -1520,16 +1580,8 @@ pub impl EntityWorldMut<'_> {
 		Fut: 'static + MaybeSend + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
-		let id = self.id();
-		let handle = self.world_scope(move |world| {
-			let async_world = world.resource::<AsyncWorld>().clone();
-			let entity = async_world.entity(id);
-			world
-				.resource::<AsyncSpawner>()
-				.clone()
-				.spawn(run_async_task_entity(entity, func))
-		});
-		EntityTasks::push(self, handle);
+		let task = self.run_task(func);
+		EntityTasks::push(self, task);
 		self
 	}
 
@@ -1542,17 +1594,51 @@ pub impl EntityWorldMut<'_> {
 		Fut: 'static + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
+		let task = self.run_task_local(func);
+		EntityTasks::push(self, task);
+		self
+	}
+
+	/// Spawns an async task for this entity, returning its [`AsyncTask`] for
+	/// the caller to own; [`run_async`](Self::run_async) hands it to the entity
+	/// instead. The task still receives this entity's [`AsyncEntity`] and ends
+	/// quietly if it finds the entity gone.
+	#[track_caller]
+	fn run_task<Func, Fut, Out>(&mut self, func: Func) -> AsyncTask
+	where
+		Func: 'static + Send + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + MaybeSend + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
 		let id = self.id();
-		let handle = self.world_scope(move |world| {
+		self.world_scope(move |world| {
+			let async_world = world.resource::<AsyncWorld>().clone();
+			let entity = async_world.entity(id);
+			world
+				.resource::<AsyncSpawner>()
+				.clone()
+				.spawn(run_async_task_entity(entity, func))
+		})
+	}
+
+	/// Spawns an async task on the local thread for this entity, returning
+	/// its [`AsyncTask`] for the caller to own.
+	#[track_caller]
+	fn run_task_local<Func, Fut, Out>(&mut self, func: Func) -> AsyncTask
+	where
+		Func: 'static + FnOnce(AsyncEntity) -> Fut,
+		Fut: 'static + Future<Output = Out>,
+		Out: 'static + Send + Sync + IntoResult,
+	{
+		let id = self.id();
+		self.world_scope(move |world| {
 			let async_world = world.resource::<AsyncWorld>().clone();
 			let entity = async_world.entity(id);
 			world
 				.resource::<AsyncSpawner>()
 				.clone()
 				.spawn_local(run_async_task_entity(entity, func))
-		});
-		EntityTasks::push(self, handle);
-		self
+		})
 	}
 
 	/// Spawns an async task, drives the app to completion, and returns the output.
@@ -1576,16 +1662,19 @@ pub impl EntityWorldMut<'_> {
 			)
 		});
 		let entity = async_world.entity(id);
-		spawner
-			.spawn(async move {
-				send.signal(func(entity).await);
-			})
-			.detach();
-		AsyncRunner::poll_and_update(
-			spawner.clone(),
-			|| self.world_scope(World::update_local),
-			recv.wait(),
-		)
+		let task = spawner.spawn(async move {
+			send.signal(func(entity).await);
+		});
+		async move {
+			// held across the drive, so dropping this future cancels the task
+			let _task = task;
+			AsyncRunner::poll_and_update(
+				spawner.clone(),
+				|| self.world_scope(World::update_local),
+				recv.wait(),
+			)
+			.await
+		}
 	}
 
 	/// Spawns a local async task, drives the app to completion, returns the output.
@@ -1609,16 +1698,19 @@ pub impl EntityWorldMut<'_> {
 			)
 		});
 		let entity = async_world.entity(id);
-		spawner
-			.spawn_local(async move {
-				send.signal(func(entity).await);
-			})
-			.detach();
-		AsyncRunner::poll_and_update(
-			spawner.clone(),
-			|| self.world_scope(World::update_local),
-			recv.wait(),
-		)
+		let task = spawner.spawn_local(async move {
+			send.signal(func(entity).await);
+		});
+		async move {
+			// held across the drive, so dropping this future cancels the task
+			let _task = task;
+			AsyncRunner::poll_and_update(
+				spawner.clone(),
+				|| self.world_scope(World::update_local),
+				recv.wait(),
+			)
+			.await
+		}
 	}
 }
 

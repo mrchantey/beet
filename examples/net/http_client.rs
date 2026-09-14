@@ -23,7 +23,7 @@ fn main() {
 }
 
 fn ping_example(async_commands: AsyncCommands) {
-	async_commands.detach_async(|world| async move {
+	async_commands.run(|world| async move {
 		let response = Request::get("http://example.com")
 			.send()
 			.await

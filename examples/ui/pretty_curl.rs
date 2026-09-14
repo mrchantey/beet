@@ -29,7 +29,7 @@ fn main() {
 }
 
 fn fetch_and_render(async_commands: AsyncCommands) {
-	async_commands.detach_async(|world| async move {
+	async_commands.run(|world| async move {
 		let args = CliArgs::parse_env();
 		let url = args
 			.path

@@ -28,7 +28,7 @@ fn main() -> AppExit {
 }
 
 fn setup(async_commands: AsyncCommands) {
-	async_commands.detach_async(async |world: AsyncWorld| -> Result {
+	async_commands.run(async |world: AsyncWorld| -> Result {
 		// numeric transform: increment the input. `Script` is pure data, so pair
 		// it with a `ScriptAction` to make the entity a callable action.
 		let entity = world
