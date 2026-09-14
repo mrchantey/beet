@@ -8,6 +8,8 @@
 //! — wrapping at the content width and breaking on `\n` — and paints each
 //! run's characters with that run's style. This is what lets a paragraph mix
 //! plain text, emphasis, links and inline code on the same wrapped line.
+use super::text::NO_BREAK_SPACE;
+use super::text::collapsible;
 use super::*;
 use crate::style::DecorationLine;
 use crate::style::Display;
@@ -354,7 +356,7 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 		let (ch, idx) = chars[i];
 		// in normal flow all whitespace (including newlines) collapses to a
 		// single inter-word gap; only `white-space: pre` preserves newlines.
-		if ch.is_whitespace() {
+		if collapsible(ch) {
 			if !cur.is_empty() {
 				let space = if ch == FULLWIDTH_SPACE { ch } else { ' ' };
 				pending_space = Some((space, idx));
@@ -362,14 +364,18 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 			i += 1;
 			continue;
 		}
-		// gather a word: a maximal run of non-whitespace characters
+		// gather a word: a maximal run of non-collapsible characters, a
+		// no-break space among them painting as the plain space it stands for
 		let start = i;
 		let mut word_w = 0usize;
-		while i < chars.len() && !chars[i].0.is_whitespace() {
+		while i < chars.len() && !collapsible(chars[i].0) {
 			word_w += unicode_width(chars[i].0) as usize;
 			i += 1;
 		}
-		let word = &chars[start..i];
+		let word = chars[start..i].iter().map(|&(ch, idx)| match ch {
+			NO_BREAK_SPACE => (' ', idx),
+			_ => (ch, idx),
+		});
 		let space_w =
 			pending_space.map_or(0, |(c, _)| unicode_width(c) as usize);
 
@@ -387,7 +393,7 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 		}
 		if word_w > max_w {
 			// hard-break a word longer than the whole column
-			for &(c, ci) in word {
+			for (c, ci) in word {
 				let cw = unicode_width(c) as usize;
 				if !cur.is_empty() && cur_w + cw > max_w {
 					lines.push(core::mem::take(&mut cur));
@@ -397,7 +403,7 @@ fn wrap_lines(chars: &[(char, usize)], max_w: u32) -> Vec<Vec<(char, usize)>> {
 				cur_w += cw;
 			}
 		} else {
-			cur.extend_from_slice(word);
+			cur.extend(word);
 			cur_w += word_w;
 		}
 	}
@@ -505,6 +511,19 @@ mod tests {
 		let runs = [run("foo   "), run("   bar")];
 		lines_text(&flow_inline(&runs, 40, false))
 			.xpect_eq(vec!["foo bar".to_string()]);
+	}
+
+	/// A no-break space is a character, not a gap: a leading run of them
+	/// indents rather than collapsing away, and the pair it joins never wraps
+	/// apart; each paints as the plain space it stands for.
+	#[beet_core::test]
+	fn no_break_spaces_neither_collapse_nor_break() {
+		let runs = [run("\u{a0}\u{a0}└\u{a0}leaf")];
+		lines_text(&flow_inline(&runs, 40, false))
+			.xpect_eq(vec!["  └ leaf".to_string()]);
+		let runs = [run("one two\u{a0}three")];
+		lines_text(&flow_inline(&runs, 9, false))
+			.xpect_eq(vec!["one".to_string(), "two three".to_string()]);
 	}
 
 	#[beet_core::test]

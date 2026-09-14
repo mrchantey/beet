@@ -254,6 +254,19 @@ fn split_at_display_width(text: &str, max_cols: usize) -> (&str, &str) {
 	(&text[..byte_idx], &text[byte_idx..])
 }
 
+/// The no-break space, a character rather than a gap: it neither collapses
+/// nor breaks in normal flow, so a run of them indents (a tree's guides) where
+/// plain spaces would collapse to one.
+pub(super) const NO_BREAK_SPACE: char = '\u{a0}';
+
+/// Whether `ch` collapses into an inter-word gap in normal flow: CSS's
+/// document white space (a space, a tab, a segment break) and the
+/// [`FULLWIDTH_SPACE`] the scaled path substitutes for a space. Every other
+/// character, the [`NO_BREAK_SPACE`] included, is part of a word.
+pub(super) fn collapsible(ch: char) -> bool {
+	matches!(ch, ' ' | '\t' | '\n' | '\r' | '\u{c}' | FULLWIDTH_SPACE)
+}
+
 /// Wrap `text` to `max_w` columns on word boundaries, joining words with
 /// `space`: a plain space normally, the 2-cell [`FULLWIDTH_SPACE`] for fullwidth
 /// text so the inter-word gap scales with the glyphs.
@@ -267,7 +280,7 @@ pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 
 	for para in text.split('\n') {
 		let mut current = String::new();
-		for word in para.split_whitespace() {
+		for word in para.split(collapsible).filter(|word| !word.is_empty()) {
 			if current.is_empty() {
 				// hard-break words longer than the column
 				let mut w = word;
@@ -289,7 +302,7 @@ pub(super) fn word_wrap(text: &str, max_w: u32, space: char) -> Vec<String> {
 			}
 		}
 		// Preserve trailing whitespace from original paragraph
-		if para.ends_with(|c: char| c.is_whitespace()) && !current.is_empty() {
+		if para.ends_with(collapsible) && !current.is_empty() {
 			current.push(space);
 		}
 		lines.push(current);
@@ -363,26 +376,33 @@ mod tests {
 
 	/// An empty form control is still a target: a field with nothing typed is
 	/// what the user clicks into, and a zero-sized box can be neither hit nor
-	/// focused. Regression for the live TUI, where the blank `<input>` a
+	/// focused, so it measures the one caret cell a value would fill, whether
+	/// it holds no value or an empty one, and a one-line value is the same
+	/// single row. Regression for the live TUI, where the blank `<input>` a
 	/// generated form emits for a freshly appended row could not be reached at
 	/// all, so a new list item could never be named.
 	#[beet_core::test]
 	fn an_empty_control_keeps_a_caret() {
-		let mut world = CharcellPlugin::world();
-		world.spawn((
-			Buffer::new(UVec2::new(20, 4)).into_double_buffer(),
-			rsx! { <input/> },
-		));
-		world.run_schedule(PostParseTree);
-		world
-			.query_once::<(&Element, &LayoutRect)>()
-			.into_iter()
-			.find(|(element, _)| element.tag() == "input")
-			.unwrap()
-			.1
-			.0
-			.width()
-			.xpect_greater_than(0);
+		// the input's intrinsic size with the given value, or `None` for none
+		let size = |value: Option<&'static str>| {
+			let mut world = CharcellPlugin::world();
+			world.spawn((FlexBuffer::new(20), rsx! { <input type="text"/> }));
+			world.run_schedule(PostParseTree);
+			let input = world
+				.query::<(Entity, &Element)>()
+				.iter(&world)
+				.find(|(_, element)| element.tag() == "input")
+				.map(|(entity, _)| entity)
+				.unwrap();
+			if let Some(value) = value {
+				world.entity_mut(input).insert(Value::str(value));
+			}
+			world.run_schedule(PostParseTree);
+			world.entity(input).get::<IntrinsicSize>().unwrap().0
+		};
+		size(None).xpect_eq(UVec2::ONE);
+		size(Some("")).xpect_eq(UVec2::ONE);
+		size(Some("hi")).xpect_eq(UVec2::new(2, 1));
 	}
 
 	/// A **control**'s null is nothing typed rather than the word "null", while a
@@ -456,37 +476,6 @@ mod tests {
 		text_ext::display_width("ＡＢＣ").xpect_eq(6);
 		// ASCII is 1 column each
 		text_ext::display_width("abc").xpect_eq(3);
-	}
-
-	/// An empty bound value reserves no content row, so a value-leaf with an empty
-	/// [`Value`] (eg a blank `<input>` after `FormPlugin` seeds `Value::str("")`)
-	/// measures the same height as one with no value at all. A non-empty value adds
-	/// its wrapped line count back. This was the parity gap where the editable serve
-	/// path drew form-control boxes one row taller than the static render, which
-	/// never seeds the empty value.
-	#[beet_core::test]
-	fn empty_value_reserves_no_content_row() {
-		// the input's intrinsic height with the given value, or `None` for no value.
-		let height = |value: Option<&'static str>| {
-			let mut world = CharcellPlugin::world();
-			world.spawn((FlexBuffer::new(20), rsx! { <input type="text"/> }));
-			world.run_schedule(crate::parse::PostParseTree);
-			let input = world
-				.query::<(Entity, &Element)>()
-				.iter(&world)
-				.find(|(_, element)| element.tag() == "input")
-				.map(|(entity, _)| entity)
-				.unwrap();
-			if let Some(value) = value {
-				world.entity_mut(input).insert(Value::str(value));
-			}
-			world.run_schedule(crate::parse::PostParseTree);
-			world.entity(input).get::<IntrinsicSize>().unwrap().0.y
-		};
-		// an empty value measures exactly like no value (no phantom content row).
-		height(Some("")).xpect_eq(height(None));
-		// a one-line value adds exactly one content row over the empty case.
-		height(Some("hi")).xpect_eq(height(Some("")) + 1);
 	}
 
 	/// A wide glyph (width-2 emoji) in a 1-cell column hard-breaks without

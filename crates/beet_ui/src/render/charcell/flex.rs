@@ -242,8 +242,8 @@ pub(super) fn resolve_height(
 		{
 			measure_scaled(node.visual_style(), marker, content_width).y
 		}
-		// text leaf (eg a paragraph's text node)
-		_ if node.value().is_some() => measure_text(node, content_width).y,
+		// text leaf (eg a paragraph's text node) or a control
+		_ if node.has_own_text() => measure_text(node, content_width).y,
 		// container of inline content: flow descendants as wrapped text
 		_ if establishes_inline_flow(node, query) => {
 			measure_inline_flow(node, query, content_width).y

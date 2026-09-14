@@ -267,6 +267,33 @@ mod test {
 			.xpect_eq(SceneSelection(Some(1)));
 	}
 
+	/// A child of the last sibling indents under it: its guides open with
+	/// no-break spaces where an ancestor's rail is closed, and the terminal
+	/// keeps them rather than collapsing them away.
+	#[beet_core::test]
+	fn a_child_of_the_last_sibling_indents() {
+		let (mut world, host) = test_ext::editor();
+		test_ext::edit(&mut world, host, |scene| {
+			SceneEntities::of_mut(scene).unwrap().insert_entity(
+				6,
+				Map::new([(
+					ChildOf::type_path(),
+					EntitySchema::reference(5).unwrap(),
+				)]),
+			);
+		});
+		let frame = test_ext::render_charcell(&mut world);
+		// the column each row's corner glyph paints at
+		let corner = |label: &str| {
+			frame
+				.lines()
+				.find(|line| line.contains(label))
+				.and_then(|line| line.chars().position(|ch| ch == '└'))
+				.unwrap_or_else(|| panic!("no row {label:?} in:\n{frame}"))
+		};
+		corner("#6").xpect_eq(corner("#5 ToggleSceneEditor") + 2);
+	}
+
 	/// A selected entity removed from outside the editor clears the selection,
 	/// so the inspector shows nothing rather than a form over a missing entity.
 	#[beet_core::test]

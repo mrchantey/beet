@@ -74,6 +74,14 @@ impl CharcellNodeData<'_> {
 			.is_some_and(|element| is_value_element(element.tag()))
 	}
 
+	/// Whether this node's content is text of its own to measure and paint: a
+	/// bound [`value`](Self::value), or a control, which with nothing typed
+	/// displays no value yet still reserves its caret cell. The one rule the
+	/// measure and the layout dispatch on, so they agree on a control's rows.
+	pub fn has_own_text(&self) -> bool {
+		self.value().is_some() || self.is_control()
+	}
+
 	/// Whether this node holds keyboard focus, ie the next keystroke edits it.
 	/// Read straight off the marker rather than the
 	/// [`Focused`](crate::prelude::ElementState) style state, so the caret paints

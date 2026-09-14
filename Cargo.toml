@@ -785,6 +785,14 @@ path = "tests/dynamic_view_tui.rs"
 harness = false
 required-features = ["router", "style", "json", "fs", "tui_server", "testing"]
 
+# the scene editor's embodiment gate: the on-disk `examples/ui/scene_editor.bsx`
+# page forked into a scene document, and the scene-edit loop through the terminal.
+[[test]]
+name = "scene_editor_tui"
+path = "tests/scene_editor_tui.rs"
+harness = false
+required-features = ["router", "style", "json", "fs", "tui_server", "template_serde", "testing"]
+
 # The cross-transport analytics flow: an http request + web beacon persist to the
 # store (with prior data retained), the web half of the deploy skill's check `e`.
 [[test]]
