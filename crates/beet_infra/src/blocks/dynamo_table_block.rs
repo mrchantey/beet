@@ -99,8 +99,8 @@ impl StoreBlock for DynamoTableBlock {
 	/// created.
 	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
 		StoreUri::Dynamo {
-			table: self.table_name(stack).into(),
-			prefix: None,
+			name: self.table_name(stack).into(),
+			path_prefix: None,
 			region: Some(self.resolved_region(stack)),
 		}
 	}

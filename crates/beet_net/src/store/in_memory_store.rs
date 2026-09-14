@@ -24,7 +24,7 @@ static INSTANCE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static REGISTRY: LazyLock<Mutex<HashMap<SmolStr, Weak<InMemoryInner>>>> =
 	LazyLock::new(default);
 
-/// A store provider using an in-memory hashmap, `memory://<name>[/<prefix>]`.
+/// A store provider using an in-memory hashmap, `memory://<name>[/<path_prefix>]`.
 ///
 /// Every backing has a name: [`named`](Self::named) joins the backing of that
 /// name, creating it on the first call, so a store a test seeds by name is the

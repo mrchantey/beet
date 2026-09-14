@@ -71,13 +71,13 @@ impl ServiceAccess {
 	pub fn local_store_uri(name: &str) -> StoreUri {
 		match Self::host_has_fs() {
 			true => StoreUri::Fs {
-				path: Some(
-					Self::local_store_dir(name).into_abs().to_string().into(),
+				path_prefix: Some(
+					Self::local_store_dir(name).into_abs().into(),
 				),
 			},
 			false => StoreUri::IndexedDb {
-				db: name.into(),
-				prefix: None,
+				name: name.into(),
+				path_prefix: None,
 			},
 		}
 	}

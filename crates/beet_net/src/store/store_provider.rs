@@ -41,8 +41,8 @@ pub enum StoreProvider {
 	IndexedDb(IndexedDbStore),
 }
 
-/// Apply `func` to every variant's store, the one match the three accessors
-/// share.
+/// Apply `$body` to every variant's store, the one match `insert` and
+/// `into_blob_store` share.
 macro_rules! each_store {
 	($this:expr, |$store:ident| $body:expr) => {
 		match $this {
@@ -66,16 +66,17 @@ impl StoreProvider {
 	/// ([`StoreUri::rooted_at`]).
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
 		match uri {
-			StoreUri::Fs { path } => path
-				.as_deref()
+			StoreUri::Fs { path_prefix } => path_prefix
+				.as_ref()
+				.map(SmolPath::as_str)
 				.unwrap_or(".")
 				.xmap(AbsPath::new)?
 				.xmap(FsStore::new)
 				.xmap(Self::Fs),
-			StoreUri::Memory { name, prefix } => {
+			StoreUri::Memory { name, path_prefix } => {
 				InMemoryStore::named(name.clone())
-					.xmap(|store| match prefix {
-						Some(prefix) => store.with_subdir(prefix.as_str()),
+					.xmap(|store| match path_prefix {
+						Some(prefix) => store.with_subdir(prefix.clone()),
 						None => store,
 					})
 					.xmap(Self::Memory)
@@ -90,27 +91,33 @@ impl StoreProvider {
 				 `aws_sdk` feature, native only)"
 			),
 			#[cfg(target_arch = "wasm32")]
-			StoreUri::LocalStorage { store, prefix } => {
-				LocalStorageStore::new(store.clone())
-					.xmap(|store| match prefix {
-						Some(prefix) => store.with_subdir(prefix.as_str()),
+			StoreUri::LocalStorage { name, path_prefix } => {
+				LocalStorageStore::new(name.clone())
+					.xmap(|store| match path_prefix {
+						Some(prefix) => store.with_subdir(prefix.clone()),
 						None => store,
 					})
 					.xmap(Self::LocalStorage)
 			}
 			#[cfg(target_arch = "wasm32")]
-			StoreUri::IndexedDb { db, prefix } => IndexedDbStore::new(db.clone())
-				.xmap(|store| match prefix {
-					Some(prefix) => store.with_subdir(prefix.as_str()),
-					None => store,
-				})
-				.xmap(Self::IndexedDb),
+			StoreUri::IndexedDb { name, path_prefix } => {
+				IndexedDbStore::new(name.clone())
+					.xmap(|store| match path_prefix {
+						Some(prefix) => store.with_subdir(prefix.clone()),
+						None => store,
+					})
+					.xmap(Self::IndexedDb)
+			}
 			#[cfg(not(target_arch = "wasm32"))]
 			StoreUri::LocalStorage { .. } | StoreUri::IndexedDb { .. } => {
 				bevybail!(
 					"store `{uri}` is browser storage, only available on wasm"
 				)
 			}
+			StoreUri::R2 { .. } => bevybail!(
+				"store `{uri}` is an R2 binding, reachable only from a \
+				 Cloudflare Worker (a wasm build with the `cloudflare` feature)"
+			),
 		}
 		.xok()
 	}

@@ -62,23 +62,23 @@ impl DynamoStore {
 		self
 	}
 
-	/// The store a `dynamo://<table>[/<prefix>][?region=..]` uri names, see
-	/// [`StoreUri::Dynamo`].
+	/// The store a `dynamo://<table>[/<path_prefix>][?region=..]` uri names,
+	/// see [`StoreUri::Dynamo`].
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
 		let StoreUri::Dynamo {
-			table,
-			prefix,
+			name,
+			path_prefix,
 			region,
 		} = uri
 		else {
 			bevybail!("store `{uri}` is not a dynamo:// table");
 		};
 		let store = match region {
-			Some(region) => Self::new(table.clone(), region.clone()),
-			None => Self::new_default_region(table.clone()),
+			Some(region) => Self::new(name.clone(), region.clone()),
+			None => Self::new_default_region(name.clone()),
 		};
-		match prefix {
-			Some(prefix) => store.with_subdir(RelPath::new(prefix.as_str())),
+		match path_prefix {
+			Some(path_prefix) => store.with_subdir(path_prefix.clone()),
 			None => store,
 		}
 		.xok()

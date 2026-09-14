@@ -95,13 +95,13 @@ impl S3Store {
 	/// identically on AWS S3 and R2; otherwise an unnamed region is left to the
 	/// SDK's own default provider chain, the process boundary's region
 	/// convention (the deploy writes `Environment=AWS_REGION=..` into the
-	/// unit). A `prefix` roots the store inside the bucket, so a binary baked
-	/// with `s3://<bucket>/<deploy-id>` reads only the document version it
-	/// shipped with.
+	/// unit). A `path_prefix` roots the store inside the bucket, so a binary
+	/// baked with `s3://<bucket>/<deploy-id>` reads only the document version
+	/// it shipped with.
 	pub fn from_uri(uri: &StoreUri) -> Result<Self> {
 		let StoreUri::S3 {
-			bucket,
-			prefix,
+			name,
+			path_prefix,
 			endpoint,
 			region,
 		} = uri
@@ -110,14 +110,14 @@ impl S3Store {
 		};
 		let store = match (endpoint, region) {
 			(Some(endpoint), region) => {
-				Self::new(bucket.clone(), region.as_deref().unwrap_or("auto"))
+				Self::new(name.clone(), region.as_deref().unwrap_or("auto"))
 					.with_endpoint(endpoint.clone())
 			}
-			(None, Some(region)) => Self::new(bucket.clone(), region.clone()),
-			(None, None) => Self::new_default_region(bucket.clone()),
+			(None, Some(region)) => Self::new(name.clone(), region.clone()),
+			(None, None) => Self::new_default_region(name.clone()),
 		};
-		match prefix {
-			Some(prefix) => store.with_subdir(RelPath::new(prefix.as_str())),
+		match path_prefix {
+			Some(path_prefix) => store.with_subdir(path_prefix.clone()),
 			None => store,
 		}
 		.xok()

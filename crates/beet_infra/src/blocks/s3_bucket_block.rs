@@ -132,8 +132,8 @@ impl StoreBlock for S3BucketBlock {
 	/// sync, the ledger) addresses the bucket the deploy created.
 	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
 		StoreUri::S3 {
-			bucket: self.bucket_name(stack).into(),
-			prefix: None,
+			name: self.bucket_name(stack).into(),
+			path_prefix: None,
 			endpoint: None,
 			region: Some(self.resolved_region(stack)),
 		}

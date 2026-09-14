@@ -56,11 +56,11 @@ impl StackBackend {
 	pub fn bucket_uri(&self, bucket: &str, region: &SmolStr) -> StoreUri {
 		match self {
 			Self::Local(local) => StoreUri::Fs {
-				path: Some(local.path.join(bucket).to_string().into()),
+				path_prefix: Some(local.path.join(bucket).into()),
 			},
 			Self::S3(_) => StoreUri::S3 {
-				bucket: bucket.into(),
-				prefix: None,
+				name: bucket.into(),
+				path_prefix: None,
 				endpoint: None,
 				region: Some(region.clone()),
 			},
@@ -134,7 +134,7 @@ impl LocalBackend {
 	/// The state directory as a store uri.
 	pub fn uri(&self) -> StoreUri {
 		StoreUri::Fs {
-			path: Some(self.path.to_string().into()),
+			path_prefix: Some(self.path.clone().into()),
 		}
 	}
 	/// Remove stale `.*.lock.info` files left by interrupted tofu processes.
@@ -171,8 +171,8 @@ impl S3Backend {
 	/// The state bucket, pinned to its region, as a store uri.
 	pub fn uri(&self) -> StoreUri {
 		StoreUri::S3 {
-			bucket: self.bucket.clone(),
-			prefix: None,
+			name: self.bucket.clone(),
+			path_prefix: None,
 			endpoint: None,
 			region: Some(self.region.clone()),
 		}

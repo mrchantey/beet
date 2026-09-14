@@ -160,7 +160,7 @@ fn write_container_dockerfile(
 	// the port is driven by the served site's markup `HttpServer{port}` (the
 	// binary loads it from R2 at boot), so the container only needs to EXPOSE it.
 	// A real JSON array, so the encoding is correct by construction.
-	let cmd = block.cmd_bootstrap(endpoint)?.to_cmd_json("/app")?;
+	let cmd = block.cmd_bootstrap(endpoint).to_cmd_json("/app")?;
 	let dockerfile = format!(
 		"FROM debian:bookworm-slim\n\
 		 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*\n\

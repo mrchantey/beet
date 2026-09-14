@@ -75,16 +75,17 @@ impl CloudflareContainerBlock {
 	/// The deployed binary's argv config, baked into the image `CMD`: the R2
 	/// store uri (bucket + account `endpoint`, both known only at deploy time)
 	/// constrained to the http transport.
-	pub fn cmd_bootstrap(&self, endpoint: &str) -> Result<BootstrapConfig> {
+	pub fn cmd_bootstrap(&self, endpoint: &str) -> BootstrapConfig {
 		BootstrapConfig {
-			repo: Some(StoreUri::parse(&format!(
-				"s3://{}?endpoint={endpoint}",
-				self.bucket
-			))?),
+			repo: Some(StoreUri::S3 {
+				name: self.bucket.clone(),
+				path_prefix: None,
+				endpoint: Some(endpoint.into()),
+				region: None,
+			}),
 			server: Some(RunningSetFilter::new("http")),
 			..default()
 		}
-		.xok()
 	}
 
 	/// The deployed binary's env config, rendered into the fronting Worker's
@@ -110,7 +111,6 @@ mod test {
 	fn renders_cmd_json() {
 		CloudflareContainerBlock::new("beet-hello")
 			.cmd_bootstrap("https://acc.r2.cloudflarestorage.com")
-			.unwrap()
 			.to_cmd_json("/app")
 			.unwrap()
 			.xpect_eq(
