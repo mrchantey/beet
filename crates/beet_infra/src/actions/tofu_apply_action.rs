@@ -177,6 +177,14 @@ pub async fn TofuApply(
 	let result = project.apply_with_vars(&resolved_vars, targets).await?;
 	trace!("TofuApply: terraform apply complete");
 	trace!("{result}");
+	// the summary alone at info: a deploy log must show what each apply did
+	// without carrying tofu's full narration, which repeats the plan
+	let scope = layer.as_deref().unwrap_or("stack");
+	for line in result.lines().filter(|line| {
+		line.starts_with("Apply complete!") || line.starts_with("No changes.")
+	}) {
+		info!("tofu apply ({scope}): {line}");
+	}
 	Pass(cx.input).xok()
 }
 
