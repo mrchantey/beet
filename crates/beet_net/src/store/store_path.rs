@@ -9,9 +9,11 @@
 //!   resolve through it.
 //! - [`BlobPath`] resolves a single [`Blob`] in the nearest ancestor store.
 //!
-//! Resolution is always against the nearest *ancestor* store (exclusive of self): a
-//! [`DirPath`] produces a store on its own entity, so resolving inclusively would
-//! re-scope its own output. A change-detection pair keeps the produced components
+//! A [`DirPath`] resolves against the nearest *ancestor* store (exclusive of
+//! self): it produces a store on its own entity, so resolving inclusively would
+//! re-scope its own output. A [`BlobPath`] resolves inclusively, so a file
+//! declared beside its store (`<DocumentBlob path=".." {FsStore{..}}>`) reads
+//! from it. A change-detection pair keeps the produced components
 //! correct as [`BlobStore`]s are inserted/removed above them: [`on_insert_store`]
 //! re-resolves descendants when an ancestor store appears, and [`on_remove_store`]
 //! drops the produced component when its backing store goes away. Both touch
@@ -117,8 +119,8 @@ fn resolve_dir_path(
 	}
 }
 
-/// (Re)compute a [`BlobPath`] entity's [`Blob`] from its nearest ancestor store,
-/// inserting it only when the target changes.
+/// (Re)compute a [`BlobPath`] entity's [`Blob`] from its own or nearest ancestor
+/// store, inserting it only when the target changes.
 fn resolve_blob_path(
 	entity: Entity,
 	blob_paths: &Query<&BlobPath>,
@@ -130,7 +132,9 @@ fn resolve_blob_path(
 	let Ok(blob_path) = blob_paths.get(entity) else {
 		return;
 	};
-	let Some((_, store)) = nearest_store(entity, parents, stores) else {
+	let Some(store) = stores.get(entity).ok().or_else(|| {
+		nearest_store(entity, parents, stores).map(|(_, store)| store)
+	}) else {
 		return;
 	};
 	let blob = store.blob(blob_path.0.clone());
@@ -196,9 +200,10 @@ fn resolve_paths(
 }
 
 /// On [`BlobStore`] insert, re-resolve every descendant [`DirPath`]/[`BlobPath`]
-/// against its nearest ancestor store (this entity, or a nearer scoped store).
-/// Descendants only, never self: the scoped store this fired on is a [`DirPath`]'s
-/// own output, so re-resolving self would compound it.
+/// against its nearest ancestor store (this entity, or a nearer scoped store),
+/// and a [`BlobPath`] on this entity itself. Never a [`DirPath`] on self: the
+/// scoped store this fired on is its own output, so re-resolving would compound
+/// it.
 pub(crate) fn on_insert_store(
 	ev: On<Insert, BlobStore>,
 	children: Query<&Children>,
@@ -209,6 +214,16 @@ pub(crate) fn on_insert_store(
 	blobs: Query<&Blob>,
 	mut commands: Commands,
 ) {
+	if blob_paths.contains(ev.entity) {
+		resolve_blob_path(
+			ev.entity,
+			&blob_paths,
+			&parents,
+			&stores,
+			&blobs,
+			&mut commands,
+		);
+	}
 	resolve_paths(
 		children.iter_descendants(ev.entity),
 		&dirs,
@@ -257,6 +272,10 @@ pub(crate) fn on_remove_store(
 	stores: Query<&BlobStore>,
 	mut commands: Commands,
 ) {
+	// a blob beside the removed store read from it
+	if blob_paths.contains(ev.entity) {
+		commands.entity(ev.entity).try_remove::<Blob>();
+	}
 	for descendant in children.iter_descendants(ev.entity) {
 		let backed_by_removed = nearest_store(descendant, &parents, &stores)
 			.is_some_and(|(holder, _)| holder == ev.entity);
@@ -356,6 +375,27 @@ mod test {
 			.unwrap()
 			.subdir()
 			.xpect_eq(RelPath::from("assets"));
+	}
+
+	/// A [`BlobPath`] beside its store resolves from that store, whether the
+	/// store spawned with it or arrived on the entity later.
+	#[beet_core::test]
+	fn blob_path_reads_a_co_located_store() {
+		let mut app = store_app();
+		let with = app
+			.world_mut()
+			.spawn((BlobStore::temp(), BlobPath(RelPath::from("a.md"))))
+			.id();
+		let later = app.world_mut().spawn(BlobPath(RelPath::from("b.md"))).id();
+		app.update();
+		app.world().entity(with).get::<Blob>().xpect_some();
+		app.world().entity(later).get::<Blob>().xpect_none();
+		app.world_mut().entity_mut(later).insert(BlobStore::temp());
+		app.update();
+		app.world().entity(later).get::<Blob>().xpect_some();
+		app.world_mut().entity_mut(later).remove::<BlobStore>();
+		app.update();
+		app.world().entity(later).get::<Blob>().xpect_none();
 	}
 
 	/// A [`BlobPath`] spawned on its own and parented under a store afterwards

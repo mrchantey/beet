@@ -51,11 +51,6 @@ pub(crate) async fn ancestor_store(
 		.await
 }
 
-/// Marks a document whose located schema is being read, so a store churning
-/// while the read is in flight does not issue a second one.
-#[derive(Component)]
-pub(crate) struct ReadingLocatedSchema;
-
 /// Run condition for [`read_located_schemas`]: a document or a store arrived,
 /// the two orders in which a located schema becomes readable.
 pub(crate) fn located_schemas_may_be_readable(
@@ -76,35 +71,29 @@ pub(crate) fn read_located_schemas(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	registry: Res<SchemaRegistry>,
-	documents: Populated<
-		(Entity, &DocumentSchema),
-		Without<ReadingLocatedSchema>,
-	>,
+	documents: Populated<(Entity, &DocumentSchema, Option<&Loading>)>,
 ) {
-	for (entity, schema) in documents.iter() {
+	for (entity, schema, loading) in documents.iter() {
 		let ValueSchema::Ref(SchemaRef::Document(path)) = &schema.0 else {
 			continue;
 		};
-		if registry.located(path).is_some() {
+		if registry.located(path).is_some() || !Loading::may_read(loading) {
 			continue;
 		}
 		// the resolver cannot hold a `Res` across an await, so the task carries
 		// its own snapshot, which is what validates the arriving document.
 		let (path, snapshot) = (path.clone(), registry.clone());
-		commands.entity(entity).insert(ReadingLocatedSchema);
+		commands.entity(entity).insert(Loading::InFlight);
 		async_commands
 			.entity(entity)
 			.queue_async(async move |entity| {
 				let outcome =
 					read_located_schema(&entity, snapshot, path).await;
-				// always released, so a transient failure is retried when the next
-				// document or store arrives rather than wedging this one
-				entity
-					.with(|mut entity| {
-						entity.remove::<ReadingLocatedSchema>();
-					})
-					.await?;
-				outcome
+				// settled whatever the outcome, so a transient failure is retried
+				// when the next document or store arrives rather than wedging
+				// this one
+				Loading::settle(&entity, &outcome).await?;
+				outcome.map(|_| ())
 			});
 	}
 }
@@ -115,9 +104,9 @@ async fn read_located_schema(
 	entity: &AsyncEntity,
 	snapshot: SchemaRegistry,
 	path: RelPath,
-) -> Result {
+) -> Result<Read> {
 	let Some(store) = ancestor_store(entity).await? else {
-		return OK;
+		return Ok(Read::NoStore);
 	};
 	let schema = store
 		.get_document(SchemaResolver::default().with_schemas(&snapshot), &path)
@@ -131,7 +120,7 @@ async fn read_located_schema(
 				.insert_located(path, schema);
 		})
 		.await;
-	OK
+	Ok(Read::Landed)
 }
 
 #[cfg(test)]

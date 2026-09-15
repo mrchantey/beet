@@ -43,10 +43,12 @@ use bevy::platform::sync::Mutex;
 /// generates itself the moment it does. An edit made elsewhere (another
 /// process, another tab on the same store) lands the same way, replacing the
 /// document; the entity's own write-back is recognized by its stat and never
-/// re-read.
+/// re-read. [`Loading`] marks the entity from spawn until the document lands,
+/// so a surface knows the content is still on its way.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_insert = hook_ext::component_hook(|doc: &DocumentBlob| BlobPath::derive(&doc.path)))]
+#[require(Loading)]
 pub struct DocumentBlob {
 	/// The document's path within the nearest ancestor store.
 	pub path: RelPath,
@@ -101,8 +103,11 @@ impl DocumentBlob {
 pub struct DocumentBlobLoaded;
 
 /// Read each [`DocumentBlob`] whose [`Blob`] changed out of its store onto its
-/// own entity: the blob arriving, re-resolving, or the object changing.
+/// own entity: the blob arriving, re-resolving, or the object changing. The
+/// entity is [`Loading`] from its spawn until the first read lands, and again
+/// while a later read runs.
 pub(crate) fn read_document_blobs(
+	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	registry: Res<SchemaRegistry>,
 	blobs: Populated<(Entity, &DocumentBlob, &Blob), Changed<Blob>>,
@@ -113,20 +118,31 @@ pub(crate) fn read_document_blobs(
 		let (snapshot, blob) = (registry.clone(), blob.clone());
 		let (trigger, last_written) =
 			(doc.read_trigger.clone(), doc.last_written.clone());
+		// marked the frame the read is issued, so a surface sees it coming
+		commands.entity(entity).insert(Loading::InFlight);
 		async_commands
 			.entity(entity)
 			.queue_async(async move |entity| {
-				trigger
-					.run_flush(async || {
+				// `move`: the closure owns what each run borrows, the shape a
+				// `Send` task accepts (a borrowing async closure is not)
+				let reader = entity.clone();
+				let outcome = trigger
+					.try_run_flush(async move || {
 						read_document_blob(
-							&entity,
+							&reader,
 							snapshot.clone(),
 							&blob,
 							&last_written,
 						)
 						.await
 					})
-					.await
+					.await;
+				// only the task that ran the read clears the mark: a deferred one
+				// left it to the read in flight, which re-runs for it
+				if !matches!(outcome, Ok(false)) {
+					Loading::clear(&entity).await?;
+				}
+				outcome.map(|_| ())
 			});
 	}
 }
@@ -200,7 +216,7 @@ pub(crate) fn write_document_blobs(
 			.entity(entity)
 			.queue_async(async move |entity| {
 				trigger
-					.run_flush(async || {
+					.run_flush(async move || {
 						write_document_blob(&entity, &blob, &last_written).await
 					})
 					.await
@@ -334,6 +350,10 @@ mod test {
 				loads.0 += loaded.iter().count();
 			},
 		);
+		// a fresh system sees every existing marker as added on its first
+		// run: absorb that, so the count starts at the documents landing next
+		app.update();
+		app.world_mut().resource_mut::<Loads>().0 = 0;
 	}
 
 	/// Both documents land as the pair every binding resolves against, and the

@@ -18,6 +18,11 @@ pub struct ElementView<'a> {
 	/// The [`Value`] of the sole child entity when present, ie the text
 	/// content of an element whose only child is a text node.
 	pub inner_text: Option<(Entity, &'a Value)>,
+	/// A form control's own [`Value`] when it has something in it: the text
+	/// an `<input>`, `<textarea>` or `<select>` displays. Any other element's
+	/// own `Value` is binding state, never content, and a control's null is
+	/// nothing typed rather than the word "null".
+	pub value: Option<&'a Value>,
 }
 
 pub enum TypedElementViewEnum<'a, Custom = ElementView<'a>> {
@@ -35,6 +40,7 @@ impl<'a> ElementView<'a> {
 		state: Option<&'a ElementStateMap>,
 		classes: Option<&'a Classes>,
 		inner_text: Option<(Entity, &'a Value)>,
+		value: Option<&'a Value>,
 	) -> Self {
 		Self {
 			entity,
@@ -43,6 +49,7 @@ impl<'a> ElementView<'a> {
 			state,
 			classes,
 			inner_text,
+			value,
 		}
 	}
 
@@ -96,6 +103,24 @@ impl<'a> ElementView<'a> {
 			.map(|c| c.iter().map(|n| n.as_selector()).collect::<Vec<_>>())
 			.unwrap_or_default();
 		attr_classes.into_iter().chain(entity_classes)
+	}
+
+	/// The one `class` attribute a sink writes: every visible class name
+	/// ([`Self::iter_classes`]) sorted and deduplicated, or `None` when there
+	/// are none, so the served page and the painted one agree.
+	pub fn class_attribute(&self) -> Option<String> {
+		Self::join_classes(self.iter_classes())
+	}
+
+	/// Join class `names` into one attribute value, sorted and deduplicated,
+	/// or `None` when there are none.
+	pub fn join_classes(
+		names: impl IntoIterator<Item = SmolStr>,
+	) -> Option<String> {
+		let mut classes: Vec<SmolStr> = names.into_iter().collect();
+		classes.sort();
+		classes.dedup();
+		(!classes.is_empty()).then(|| classes.join(" "))
 	}
 
 	/// Look up the first attribute matching `key` and return its

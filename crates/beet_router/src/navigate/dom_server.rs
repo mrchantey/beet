@@ -5,7 +5,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use beet_ui::prelude::*;
 
 /// The browser's server, the twin of [`TuiServer`](crate::prelude::TuiServer):
 /// a facet on its entity's [`RunningSet`] whose `--server=dom` boots the page
@@ -16,9 +15,10 @@ use beet_ui::prelude::*;
 /// server, and this facet spawns the [`DomHost`], the browser's page host,
 /// with an in-world [`Navigator`] at the request path, so the browser
 /// dispatches the url through the entry's own `RouteTree` exactly as the
-/// terminal does. A launch naming no `--server=dom` boots the entry headless:
-/// no host, nothing written to the document, the shape of a sensor or worker
-/// process. Painting is a launch decision, never a build one.
+/// terminal does; the host paints the page into the body once it settles.
+/// A launch naming no `--server=dom` boots the entry headless: no host,
+/// nothing written to the document, the shape of a sensor or worker process.
+/// Painting is a launch decision, never a build one.
 ///
 /// Registered on every target so an entry keeps its shape wherever it loads,
 /// but it boots only in a browser tab and refuses anywhere else, and
@@ -72,31 +72,6 @@ impl DomServer {
 				},
 			);
 		}
-	}
-}
-
-/// The browser surface: the page bound to it is what the document shows.
-///
-/// A [`PageHost`] with its [`PageSlot`] and no buffer of its own, since its
-/// paint target is the document body rather than a cell grid; the DOM
-/// renderer walks the bound page into the body. Spawned as the [`DomServer`]'s
-/// child so it goes with it, carrying the in-world [`Navigator`] that binds
-/// the page.
-#[derive(Debug, Default, Clone, Component)]
-#[require(PageHost)]
-#[component(on_add = hook_ext::observe(log_landing))]
-pub struct DomHost;
-
-impl DomHost {
-	/// The host with its page slot, ready for a co-located [`Navigator`].
-	pub fn bundle() -> impl Bundle { (DomHost, children![PageSlot]) }
-}
-
-/// Observer: the host's page landed, so the tab's console says which url the
-/// world dispatched. The one line a boot check reads.
-fn log_landing(ev: On<Insert, RenderSurfaceOf>, navigators: Query<&Navigator>) {
-	if let Ok(navigator) = navigators.get(ev.entity) {
-		info!("dom host landed {}", navigator.current_url());
 	}
 }
 

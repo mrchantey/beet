@@ -166,10 +166,28 @@ beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "server
 beet_net = { workspace = true, features = ["webdriver", "testing"] }
 serde_json = { workspace = true }
 
-# the wasm/deno reactivity-runtime test evaluates `REACTIVITY_JS` and drives it
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+# the DOM render target (`render/dom`): the browser's document as a sink over
+# the same walk the string sink reads, painted and patched through `web_sys`.
+# Target-gated rather than featured, since there is nothing to paint into
+# anywhere else; the wasm/deno reactivity-runtime test drives `REACTIVITY_JS`
+# through the same bindings.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = { workspace = true }
 wasm-bindgen = { workspace = true }
+web-sys = { workspace = true, features = [
+	"CharacterData",
+	"Comment",
+	"Document",
+	"Element",
+	"HtmlElement",
+	"HtmlInputElement",
+	"HtmlSelectElement",
+	"HtmlTextAreaElement",
+	"Node",
+	"NodeList",
+	"Text",
+	"Window",
+] }
 
 [lib]
 harness = false

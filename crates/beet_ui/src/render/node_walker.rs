@@ -41,7 +41,7 @@ impl NodeWalker<'_, '_> {
 			return;
 		};
 
-		if visitor.skip_node(&node) {
+		if visitor.skip_node(&cx, &node) {
 			return;
 		}
 
@@ -82,15 +82,14 @@ impl NodeWalker<'_, '_> {
 			visitor.visit_element(&cx, view);
 		}
 		// 4. Value
-		// an element's own Value is binding state,
-		// not markup content: text content lives on dedicated text-node children.
-		// Form controls are the exception, displaying their bound value — except
-		// a null, which for a *control* is nothing typed rather than the word
-		// "null". A bound text node still reads its null as the value it is,
-		// since a view is total where an editor is empty.
+		// a text node: an entity whose Value is its content. An element's own
+		// Value is binding state, not markup content, reaching the visitor only
+		// on a form control, as the [`ElementView::value`] its `visit_element`
+		// received (a null there is nothing typed rather than the word "null").
+		// A bound text node still reads its null as the value it is, since a
+		// view is total where an editor is empty.
 		if let Some(value) = value
-			&& element.is_none_or(|element| is_value_element(element.tag()))
-			&& !(element.is_some() && value.is_null())
+			&& element.is_none()
 		{
 			visitor.visit_value(&cx, value);
 		}
@@ -145,8 +144,9 @@ pub(crate) fn is_non_visual(tag: &str) -> bool {
 }
 
 /// Form-control tags whose own [`Value`] is their displayed content (eg the
-/// charcell editable textbox). Every other element treats a co-located
-/// [`Value`] as binding state, never rendered as text.
+/// charcell editable textbox, a served `<input>`'s `value`). Every other
+/// element treats a co-located [`Value`] as binding state, never rendered as
+/// text.
 pub(crate) const VALUE_ELEMENT_TAGS: &[&str] = &["input", "textarea", "select"];
 
 /// Whether a tag displays its own [`Value`], ie [`VALUE_ELEMENT_TAGS`].
@@ -157,7 +157,11 @@ pub(crate) fn is_value_element(tag: &str) -> bool {
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.
 	/// By default skips all non-visual html tags, ie `head, style, ..`
-	fn skip_node(&mut self, (_, _, element, ..): &NodeView) -> bool {
+	fn skip_node(
+		&mut self,
+		_cx: &VisitContext,
+		(_, _, element, ..): &NodeView,
+	) -> bool {
 		element.is_some_and(|element| is_non_visual(element.tag()))
 	}
 

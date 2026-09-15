@@ -335,7 +335,7 @@ check-wasm-render *args:
 # artifacts at pages naming an entry through `<Wasm repo main>` and reads from
 # the console that the entry resolved through the http repo and ran, headless
 # (beet-min.wasm on the `serve-wasm` hello entry) and under `--server=dom`
-# (beet-ui.wasm on the scene editor entry, its DOM host landing on `/`). Needs
+# (beet-ui.wasm on the scene editor entry, its DOM host painting `/`). Needs
 # `just build-wasm-min build-wasm-ui` first, plus the test-browser PATH deps.
 check-wasm-boot *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*wasm_boot_check*'

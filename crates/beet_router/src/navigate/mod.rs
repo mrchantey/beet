@@ -32,6 +32,11 @@ pub use open_link::*;
 mod dom_server;
 #[cfg(feature = "std")]
 pub use dom_server::*;
+// std: the browser surface the facet boots, painted by the DOM sink on wasm.
+#[cfg(feature = "std")]
+mod dom_host;
+#[cfg(feature = "std")]
+pub use dom_host::*;
 // terminal-only: the live-TUI server entry (needs beet_ui StdioTerminal).
 #[cfg(feature = "tui")]
 mod tui_server;

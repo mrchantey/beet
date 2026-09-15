@@ -1659,6 +1659,7 @@ dependencies = [
  "variadics_please",
  "vte",
  "wasm-bindgen",
+ "web-sys",
  "webbrowser",
 ]
 

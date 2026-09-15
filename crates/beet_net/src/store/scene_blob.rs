@@ -24,10 +24,13 @@ use beet_core::prelude::*;
 ///
 /// Lazy in the shape [`DocumentBlob`] settled on: the fork is reached through
 /// the [`Blob`] its derived [`BlobPath`] resolves, so a store that has not
-/// arrived is not an error, only a boot that has not happened yet.
+/// arrived is not an error, only a boot that has not happened yet. [`Loading`]
+/// marks the entity from spawn until the boot lands, so a surface knows the
+/// scene is still on its way.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_insert = hook_ext::component_hook(|blob: &SceneBlob| BlobPath::derive(&blob.path)))]
+#[require(Loading)]
 pub struct SceneBlob {
 	/// The fork's path within the nearest ancestor store, the boot source once
 	/// it exists. Its extension picks the format, json by default.
@@ -58,11 +61,6 @@ impl SceneBlob {
 	}
 }
 
-/// Marks a [`SceneBlob`] whose boot is in flight, so a store churning while it
-/// runs does not issue a second one.
-#[derive(Component)]
-pub(crate) struct ReadingSceneBlob;
-
 /// Boot each unbooted [`SceneBlob`] whose [`Blob`] arrived from its store: the
 /// fork when it exists, else the original, forked. Boot-once: a fork edited
 /// elsewhere while this world runs is not reloaded over the live scene.
@@ -70,28 +68,23 @@ pub(crate) fn read_scene_blobs(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	blobs: Populated<
-		(Entity, &SceneBlob, &Blob),
-		(
-			Changed<Blob>,
-			Without<ReadingSceneBlob>,
-			Without<SceneDocument>,
-		),
+		(Entity, &SceneBlob, &Blob, Option<&Loading>),
+		(Changed<Blob>, Without<SceneDocument>),
 	>,
 ) {
-	for (entity, blob, handle) in blobs.iter() {
+	for (entity, blob, handle, loading) in blobs.iter() {
+		if !Loading::may_read(loading) {
+			continue;
+		}
 		let (blob, store) = (blob.clone(), handle.store().clone());
-		commands.entity(entity).insert(ReadingSceneBlob);
+		commands.entity(entity).insert(Loading::InFlight);
 		async_commands
 			.entity(entity)
 			.queue_async(async move |entity| {
 				let outcome = read_scene_blob(&entity, blob, store).await;
-				// always released, so a transient failure is retried when the next
-				// blob or store arrives rather than wedging this one
-				entity
-					.with(|mut entity| {
-						entity.remove::<ReadingSceneBlob>();
-					})
-					.await?;
+				// cleared whatever the outcome, so a transient failure is retried
+				// when the blob next changes rather than wedging this one
+				Loading::clear(&entity).await?;
 				outcome
 			});
 	}
@@ -157,7 +150,7 @@ pub(crate) fn write_scene_blobs(
 			.entity(entity)
 			.queue_async(async move |entity| {
 				trigger
-					.run_flush(async || {
+					.run_flush(async move || {
 						write_scene_blob(&entity, &handle, media_type.clone())
 							.await
 					})
@@ -228,8 +221,40 @@ mod test {
 		(app, host)
 	}
 
+	/// The mark a surface waits on: a blob with no store to read from stays
+	/// pending rather than in flight, so nothing paints a scene that has not
+	/// arrived, and a store arriving later boots it.
+	#[beet_core::test]
+	async fn a_blob_without_a_store_stays_pending() {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			AsyncPlugin,
+			TemplatePlugin,
+			DocumentPlugin,
+			StorePlugin,
+		));
+		app.init_plugin::<MinimalTypesPlugin>();
+		let host = app
+			.world_mut()
+			.spawn(SceneBlob::new("app.json", "app.bsx"))
+			.id();
+		app.update_async().await;
+		app.update_async().await;
+		app.world()
+			.get::<Loading>(host)
+			.copied()
+			.xpect_eq(Some(Loading::Pending));
+		app.world_mut().entity_mut(host).insert(store().await);
+		app.update_async().await;
+		app.update_async().await;
+		app.world().get::<Loading>(host).xpect_none();
+		app.world().get::<SceneDocument>(host).xpect_some();
+	}
+
 	/// First boot builds the original, forks it into the store with the fork
-	/// relation recorded, and lands the scene document on the host.
+	/// relation recorded, and lands the scene document on the host, which is
+	/// no longer loading.
 	#[beet_core::test]
 	async fn a_first_boot_forks_the_original() {
 		let store = store().await;
@@ -241,6 +266,7 @@ mod test {
 			.xpect_true();
 		let world = app.world();
 		world.get::<SceneDocument>(host).xpect_some();
+		world.get::<Loading>(host).xpect_none();
 		let root = world
 			.get::<TemplateEntityMap>(host)
 			.unwrap()

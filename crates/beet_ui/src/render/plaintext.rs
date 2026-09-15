@@ -40,8 +40,11 @@ impl Default for PlainTextRenderer {
 }
 
 impl NodeVisitor for PlainTextRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, _view: ElementView) {
-		// plaintext, ignore elements
+	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
+		// plaintext ignores markup, but a control's typed value is text
+		if let Some(value) = view.value {
+			self.visit_value(cx, value);
+		}
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {

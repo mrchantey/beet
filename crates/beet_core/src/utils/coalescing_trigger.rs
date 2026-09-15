@@ -80,44 +80,74 @@ impl CoalescingTrigger {
 	///
 	/// Only one call runs in-flight at a time. If called while a call is already
 	/// in-flight, the dirty flag is set and the in-flight call will re-run once
-	/// after it finishes — regardless of how many extra calls arrive.
+	/// after it finishes, regardless of how many extra calls arrive.
 	///
-	/// If the function returns an error, the trigger will be left in a consistent state
-	/// and subsequent calls will still trigger retries as expected.
+	/// An error releases the trigger (the queued re-run is dropped with it), so
+	/// the next call runs rather than deferring to a run that ended.
 	pub async fn run_flush(&self, func: impl AsyncFn() -> Result) -> Result {
-		// If a write is already in-flight, the dirty flag is set for a retry
+		self.try_run_flush(func).await.map(|_| ())
+	}
+
+	/// [`run_flush`](Self::run_flush), reporting whether this call ran the
+	/// operation: `false` when one was in flight, which re-runs for this call.
+	pub async fn try_run_flush(
+		&self,
+		func: impl AsyncFn() -> Result,
+	) -> Result<bool> {
+		if !self.start() {
+			return Ok(false);
+		}
+		// drive until no pending dirty requests remain
+		loop {
+			if let Err(err) = func().await {
+				self.reset();
+				return Err(err);
+			}
+			if !self.finish() {
+				break;
+			}
+		}
+		Ok(true)
+	}
+
+	/// Blocking version of [`run_flush`].
+	pub fn run_flush_blocking(&self, func: impl Fn() -> Result) -> Result {
 		if !self.start() {
 			return Ok(());
 		}
-		// Drive until no pending dirty requests remain
 		loop {
-			func().await?;
+			if let Err(err) = func() {
+				self.reset();
+				return Err(err);
+			}
 			if !self.finish() {
 				break;
 			}
 		}
 		Ok(())
 	}
-	/// Blocking version of [`run_flush`].
-	pub fn run_flush_blocking(&self, func: impl Fn() -> Result) -> Result {
-		// If a write is already in-flight, the dirty flag is set for a retry
-		if !self.start() {
-			return Ok(());
-		}
-		// Drive until no pending dirty requests remain
-		loop {
-			func()?;
-			if !self.finish() {
-				break;
-			}
-		}
-		Ok(())
+
+	/// Release the trigger after a failed operation: nothing in flight, nothing
+	/// queued.
+	fn reset(&self) {
+		let mut inner = self.0.lock().unwrap();
+		inner.dirty = false;
+		inner.in_progress = false;
 	}
 }
 
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
+
+	/// A failed run releases the trigger, so the next call runs instead of
+	/// deferring to a run that already ended.
+	#[crate::test]
+	fn an_error_releases_the_trigger() {
+		let trigger = CoalescingTrigger::default();
+		trigger.run_flush_blocking(|| bevybail!("nope")).xpect_err();
+		trigger.start().xpect_true();
+	}
 
 	#[crate::test]
 	fn starts_when_idle() {

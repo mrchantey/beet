@@ -38,6 +38,9 @@ pub struct HtmlRenderer {
 	raw_text_elements: Vec<Cow<'static, str>>,
 	/// Tracks whether we are currently inside a raw text element.
 	in_raw_text_element: bool,
+	/// The value of the `<select>` being written, so the `<option>` it names
+	/// is marked `selected`.
+	select_value: Option<String>,
 }
 
 /// Indentation style for pretty-printing.
@@ -78,6 +81,7 @@ impl HtmlRenderer {
 			strip_comments: true,
 			raw_text_elements: default_raw_text_elements(),
 			in_raw_text_element: false,
+			select_value: None,
 		}
 	}
 
@@ -149,6 +153,20 @@ impl HtmlRenderer {
 
 	fn is_pretty(&self) -> bool { self.indent.is_some() }
 
+	/// Write ` key="value"`, or the bare ` key` of a boolean attribute.
+	fn write_attribute(&mut self, key: &str, value: Option<&str>) {
+		self.buffer.push(' ');
+		self.buffer.push_str(key);
+		if let Some(value) = value {
+			self.buffer.push_str("=\"");
+			match self.escape_html {
+				true => self.buffer.push_str(&escape_html_attribute(value)),
+				false => self.buffer.push_str(value),
+			}
+			self.buffer.push('"');
+		}
+	}
+
 	/// Write indentation for the current depth (only in pretty mode).
 	fn write_indent(&mut self) {
 		if let Some(ref indent) = self.indent {
@@ -180,7 +198,9 @@ impl HtmlRenderer {
 
 impl NodeVisitor for HtmlRenderer {
 	// html renderer visits every node
-	fn skip_node(&mut self, _node: &NodeView) -> bool { false }
+	fn skip_node(&mut self, _cx: &VisitContext, _node: &NodeView) -> bool {
+		false
+	}
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, doctype: &Doctype) {
 		self.write_indent();
@@ -207,7 +227,7 @@ impl NodeVisitor for HtmlRenderer {
 		self.write_newline();
 	}
 
-	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
+	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		self.write_indent();
 		self.buffer.push('<');
 		self.buffer.push_str(view.tag());
@@ -215,43 +235,41 @@ impl NodeVisitor for HtmlRenderer {
 		for attr in &view.attributes {
 			// the `class` attribute is merged with the `Classes` component and
 			// emitted once below, so skip the raw attribute here
-			if attr.attribute.as_str() == "class" {
+			if attr.key() == "class" {
 				continue;
 			}
-			self.buffer.push(' ');
-			self.buffer.push_str(attr.attribute.as_str());
-			match attr.value {
-				Value::Null => {
-					// boolean attribute, no value
-				}
-				_ => {
-					self.buffer.push_str("=\"");
-					let raw = attr.value.to_string();
-					if self.escape_html {
-						self.buffer.push_str(&escape_html_attribute(&raw));
-					} else {
-						self.buffer.push_str(&raw);
-					}
-					self.buffer.push('"');
-				}
-			}
+			// a null is a boolean attribute, present with no value
+			let value = (!attr.value.is_null()).then(|| attr.value.to_string());
+			self.write_attribute(attr.key(), value.as_deref());
 		}
 
-		// merge the `Classes` component with any `class` attribute into a single
+		// a control's value is markup state, never a stray text node: an
+		// `<input>` carries it as its default value (a bool is a checkbox's,
+		// mirrored by its own `checked` attribute), a `<select>` marks the
+		// `<option>` it names, and a `<textarea>` holds it as content, below.
+		// The DOM sink writes the same, so the served page and the painted one
+		// agree.
+		match (view.tag(), view.value) {
+			("input", Some(value)) if !matches!(value, Value::Bool(_)) => {
+				self.write_attribute("value", Some(&value.to_string()));
+			}
+			("select", value) => {
+				self.select_value = value.map(ToString::to_string);
+			}
+			("option", _)
+				if self.select_value.as_deref()
+					== Some(view.option_value().as_str()) =>
+			{
+				self.write_attribute("selected", None);
+			}
+			_ => {}
+		}
+
+		// the `Classes` component merged with any `class` attribute into one
 		// deterministic `class="…"`, so widget-emitted semantic classes reach the
 		// rendered HTML (and the stylesheet that targets them)
-		let mut classes: Vec<SmolStr> = view.iter_classes().collect();
-		if !classes.is_empty() {
-			classes.sort();
-			classes.dedup();
-			let joined = classes.join(" ");
-			self.buffer.push_str(" class=\"");
-			if self.escape_html {
-				self.buffer.push_str(&escape_html_attribute(&joined));
-			} else {
-				self.buffer.push_str(&joined);
-			}
-			self.buffer.push('"');
+		if let Some(class) = view.class_attribute() {
+			self.write_attribute("class", Some(&class));
 		}
 
 		let is_void = self.is_void_element(view.tag());
@@ -271,6 +289,10 @@ impl NodeVisitor for HtmlRenderer {
 			self.buffer.push('\n');
 			self.current_depth += 1;
 		}
+
+		if let ("textarea", Some(value)) = (view.tag(), view.value) {
+			self.visit_value(cx, value);
+		}
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
@@ -281,6 +303,9 @@ impl NodeVisitor for HtmlRenderer {
 
 		if self.is_raw_text_element(element.tag()) {
 			self.in_raw_text_element = false;
+		}
+		if element.tag() == "select" {
+			self.select_value = None;
 		}
 
 		// inject any hoisted head fragments inside `<head>`, before its close tag.
@@ -536,6 +561,40 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_contains("class=\"btn btn-error\"");
+	}
+
+	/// A control's own value is markup state, never a stray text node after
+	/// the tag: an `<input>`'s default value, a `<select>`'s marked option, a
+	/// `<textarea>`'s content, and nothing for a checkbox, whose `checked`
+	/// attribute mirrors it.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn a_control_value_is_markup() {
+		let mut world = world_ext::ui_world();
+		let root = world
+			.spawn_template(rsx! {
+				<div>
+					<input type="text" {Value::str("typed")}/>
+					<input type="checkbox" {Value::Bool(true)}/>
+					<textarea {Value::str("lines")}/>
+					<select {Value::str("b")}>
+						<option value="a">"A"</option>
+						<option value="b">"B"</option>
+					</select>
+				</div>
+			})
+			.unwrap()
+			.id();
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("<input type=\"text\" value=\"typed\" />")
+			.xpect_contains("<input type=\"checkbox\" />")
+			.xpect_contains("<textarea>lines</textarea>")
+			.xpect_contains("<option value=\"b\" selected>B</option>")
+			.xnot()
+			.xpect_contains("<option value=\"a\" selected>");
 	}
 
 	#[beet_core::test]

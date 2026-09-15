@@ -7,8 +7,8 @@
 //! - the headless boot: `beet-min.wasm` on `examples/wasm/hello.bsx`, the
 //!   `just serve-wasm` page's launch, logs the greeting and exits;
 //! - the DOM boot: `beet-ui.wasm` on `examples/ui/scene_editor.bsx` with
-//!   `--server=dom` boots its `DomServer` and lands its navigator on `/`, the
-//!   page's own url, with nothing painted yet.
+//!   `--server=dom` boots its `DomServer`, lands its navigator on `/`, the
+//!   page's own url, and paints the scene into the body once it settles.
 //!
 //! Ignored by default since they need the artifacts and a browser on PATH:
 //!
@@ -22,9 +22,9 @@ use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
 /// Serve `page`, open it, and drain the console until `needle` appears,
-/// failing on a panic or the deadline; the log so far is returned for further
-/// assertions.
-async fn boot_until(page: String, needle: &str) -> String {
+/// failing on a panic or the deadline; the log so far and the still-open
+/// browser are returned for further assertions.
+async fn boot_until(page: String, needle: &str) -> (String, Browser) {
 	let port = serve_wasm_page(page).await.unwrap();
 	let url = format!("http://127.0.0.1:{port}/");
 	let mut browser = Browser::new_with_opts(driver().unwrap(), default())
@@ -48,8 +48,7 @@ async fn boot_until(page: String, needle: &str) -> String {
 	// whatever follows the landing lands too
 	time_ext::sleep(Duration::from_secs(2)).await;
 	drain(&console, &mut log);
-	browser.kill().await.unwrap();
-	log
+	(log, browser)
 }
 
 #[beet::test(timeout_ms = 300_000)]
@@ -60,11 +59,12 @@ async fn browser_headless_boot() {
 		<Wasm src="/assets/wasm/beet-min.wasm" repo="/examples/wasm" main="hello.bsx"/>
 	})
 	.unwrap();
-	let log = boot_until(
+	let (log, browser) = boot_until(
 		page,
 		"Edit examples/wasm/hello.bsx and the page live-reloads.",
 	)
 	.await;
+	browser.kill().await.unwrap();
 	log.as_str()
 		.xpect_contains("Hello from beet, running headless in your browser.")
 		.xnot()
@@ -80,7 +80,23 @@ async fn browser_dom_boot() {
 	})
 	.unwrap();
 	// what the DOM host logs once its navigator binds the page at the request
-	// path, see `DomHost`; the run then parks on the server, still up and quiet
-	let log = boot_until(page, "dom host landed /").await;
-	log.as_str().xnot().xpect_contains("ERROR");
+	// path and, the scene having landed, paints it (see `DomHost`); the run
+	// then parks on the server, still up and quiet
+	let (log, browser) = boot_until(page, "dom host painted /").await;
+	// the world's paint replaced the loader page: the scene's heading is in
+	// the document, bound to its entity
+	let heading = browser
+		.evaluate_value(
+			"[document.querySelector('h1')?.textContent, \
+			 typeof document.querySelector('h1')?.beetEntity].join(':')",
+		)
+		.await
+		.unwrap()
+		.to_string();
+	browser.kill().await.unwrap();
+	log.as_str()
+		.xpect_contains("dom host landed /")
+		.xnot()
+		.xpect_contains("ERROR");
+	heading.xpect_contains("Garden:bigint");
 }

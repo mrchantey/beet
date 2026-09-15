@@ -39,7 +39,7 @@ Parsers accept a stream of bytes and diff them against an entity.
 
 ### Renderers
 
-Renderers walk a tree of nodes and perform some action like appending a html buffer or initializing a persistent ui. The same tree can target HTML or the charcell terminal renderer.
+Renderers walk a tree of nodes and perform some action like appending a html buffer or initializing a persistent ui. The same tree can target HTML, the charcell terminal renderer, or (on wasm) the browser's DOM, painted once and patched in place as the world changes.
 
 ## Authoring
 

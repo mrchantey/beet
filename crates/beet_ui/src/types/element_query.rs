@@ -19,6 +19,8 @@ pub struct ElementQuery<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	attributes: Query<'w, 's, (Entity, &'static Attribute, &'static Value)>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
+	/// An element's own value, read for the form controls that display it.
+	control_values: Query<'w, 's, &'static Value, With<Element>>,
 	/// Used by descendant traversal — picks up `Children` regardless of whether
 	/// the entity is an [`Element`] (value/text entities can carry children
 	/// too in principle, and we want the same walker to work for both).
@@ -60,13 +62,29 @@ impl ElementQuery<'_, '_> {
 		self.values.get(only_child).ok().map(|v| (only_child, v))
 	}
 
+	/// A form control's own [`Value`] with something in it (see
+	/// [`ElementView::value`]): the one rule for which element values are
+	/// content, shared with the charcell queries through [`is_value_element`].
+	fn control_value(
+		&self,
+		entity: Entity,
+		element: &Element,
+	) -> Option<&Value> {
+		is_value_element(element.tag())
+			.then(|| self.control_values.get(entity).ok())
+			.flatten()
+			.filter(|value| !value.is_null())
+	}
+
 	pub fn iter(&self) -> impl Iterator<Item = ElementView<'_>> {
 		self.elements.iter().map(
 			|(entity, element, attrs, state, classes, children)| {
 				let attributes = self.collect_attributes(attrs);
 				let inner_text = self.collect_inner_text(children);
+				let value = self.control_value(entity, element);
 				ElementView::new(
 					entity, element, attributes, state, classes, inner_text,
+					value,
 				)
 			},
 		)
@@ -80,8 +98,10 @@ impl ElementQuery<'_, '_> {
 			|(entity, element, attrs, state, classes, children)| {
 				let attributes = self.collect_attributes(attrs);
 				let inner_text = self.collect_inner_text(children);
+				let value = self.control_value(entity, element);
 				ElementView::new(
 					entity, element, attributes, state, classes, inner_text,
+					value,
 				)
 			},
 		)

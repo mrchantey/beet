@@ -230,13 +230,14 @@ mod test {
 	}
 
 	/// The picker offers every entity but the one being reparented, labelled
-	/// by name or key and tag, and shows the current parent.
+	/// by name or key and tag, and shows the current parent, in the markup
+	/// as the selected option.
 	#[beet_core::test]
 	fn offers_the_candidates_and_shows_the_target() {
 		let (mut world, root) = build();
 		let html = test_ext::render_world(&mut world, root);
 		html.clone()
-			.xpect_contains("<option value=\"0\">root</option>")
+			.xpect_contains("<option value=\"0\" selected>root</option>")
 			.xpect_contains("<option value=\"1\">#1</option>");
 		html.xnot().xpect_contains("<option value=\"2\"");
 		let select = test_ext::element_in(&mut world, "select");

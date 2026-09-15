@@ -72,8 +72,9 @@ impl MarkdownRenderer {
 }
 
 impl NodeVisitor for MarkdownRenderer {
-	fn visit_element(&mut self, _cx: &VisitContext, view: ElementView) {
+	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
+		let value = view.value;
 
 		match name {
 			// ── Headings ──
@@ -206,6 +207,10 @@ impl NodeVisitor for MarkdownRenderer {
 					self.state.ensure_block_separator();
 				}
 			}
+		}
+		// a control's typed value is its text
+		if let Some(value) = value {
+			self.visit_value(cx, value);
 		}
 	}
 

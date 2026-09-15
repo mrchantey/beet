@@ -7,6 +7,13 @@ pub use charcell::*;
 // (also used by markdown/ansi/charcell) stays here in `render/`.
 mod html;
 pub use html::*;
+// the DOM render target: the browser's document as a sink over the same walk,
+// painted once and patched each frame; there is nothing to paint into
+// anywhere else, so it is target-gated rather than featured.
+#[cfg(target_arch = "wasm32")]
+mod dom;
+#[cfg(target_arch = "wasm32")]
+pub use dom::*;
 mod style_map;
 pub use style_map::*;
 mod media;

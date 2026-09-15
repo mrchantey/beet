@@ -56,6 +56,10 @@ mod blob_store;
 // the store-agnostic mirror, over the provider trait's `list_stats`.
 mod blob_sync;
 mod in_memory_store;
+// the mark every store reader carries while its content is arriving, the one
+// signal a surface waits on before its first paint.
+mod loading;
+pub use loading::*;
 // a local store forked off an upstream one: pure composition, so it rides the
 // core.
 mod store_fork;
