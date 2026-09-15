@@ -1322,8 +1322,9 @@ BACKUP_TIMER_EOF
 	/// `/usr/local/bin/stalwart-cold-backup`.
 	///
 	/// Two remotes in one process: the live side answers to the instance
-	/// profile and the cold side to the parked token, which is read out of
-	/// parameter store into the environment and never reaches argv or a file.
+	/// profile and the cold side to the token the apply minted and parked,
+	/// which is read out of parameter store into the environment and never
+	/// reaches argv or a file.
 	/// The newest snapshot is copied, read back from BOTH sides and compared
 	/// byte for byte (a hash a store reports is a claim, a byte it serves is a
 	/// fact, and egress from the cold side is free), then integrity-checked
@@ -1341,8 +1342,8 @@ BACKUP_TIMER_EOF
 set -euo pipefail
 umask 077
 get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
-# the live side answers to the instance profile; the cold side to the parked
-# token, which is read into the environment and never reaches argv or a file
+# the live side answers to the instance profile; the cold side to the token
+# the apply minted, read into the environment and never onto argv or a file
 export RCLONE_CONFIG=/dev/null
 export RCLONE_CONFIG_LIVE_TYPE=s3
 export RCLONE_CONFIG_LIVE_PROVIDER=AWS
@@ -1353,11 +1354,11 @@ export RCLONE_CONFIG_COLD_PROVIDER=Cloudflare
 export RCLONE_CONFIG_COLD_ENDPOINT='__ENDPOINT__'
 export RCLONE_CONFIG_COLD_NO_CHECK_BUCKET=true
 RCLONE_CONFIG_COLD_ACCESS_KEY_ID="$(get '__ACCESS_KEY_SECRET__')" || {
-	echo "no cold credential at __ACCESS_KEY_SECRET__: __MINT__" >&2
+	echo "no cold credential at __ACCESS_KEY_SECRET__: __MISSING__" >&2
 	exit 1
 }
 RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY="$(get '__SECRET_KEY_SECRET__')" || {
-	echo "no cold credential at __SECRET_KEY_SECRET__: __MINT__" >&2
+	echo "no cold credential at __SECRET_KEY_SECRET__: __MISSING__" >&2
 	exit 1
 }
 export RCLONE_CONFIG_COLD_ACCESS_KEY_ID RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY
@@ -1394,13 +1395,13 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let endpoint = cold.endpoint();
 		let access_key = cold.access_key_secret().name(stack);
 		let secret_key = cold.secret_key_secret().name(stack);
-		let mint = cold.mint_instructions(stack);
+		let missing = cold.missing_credential(stack);
 		[
 			("__REGION__", stack.region().as_str()),
 			("__ENDPOINT__", endpoint.as_str()),
 			("__ACCESS_KEY_SECRET__", access_key.as_str()),
 			("__SECRET_KEY_SECRET__", secret_key.as_str()),
-			("__MINT__", mint.as_str()),
+			("__MISSING__", missing.as_str()),
 			("__BACKUP_BUCKET__", backup_bucket.as_str()),
 			("__BLOB_BUCKET__", blob_bucket.as_str()),
 			("__COLD_BUCKET__", cold_bucket.as_str()),
@@ -2462,17 +2463,17 @@ mod tests {
 	}
 
 	/// The token is read with the same parameter-store call the secrets
-	/// script makes, and the script names the hand step when it is missing:
-	/// a cold copy that silently skipped would be the bucket sitting empty
-	/// with every check green, which is the failure this whole phase exists
-	/// to close.
+	/// script makes, and the script names the apply that parks it when it is
+	/// missing: a cold copy that silently skipped would be the bucket sitting
+	/// empty with every check green, which is the failure this whole phase
+	/// exists to close.
 	#[beet_core::test]
 	fn a_missing_cold_credential_is_loud() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		cold_box()
 			.cold_script(&stack, &cold_store())
 			.xpect_contains("no cold credential at")
-			.xpect_contains("Manage API tokens")
+			.xpect_contains("run deploy")
 			.xpect_contains("exit 1");
 	}
 

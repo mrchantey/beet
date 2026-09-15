@@ -647,8 +647,8 @@ mod test {
 	/// The cold copy authors as one bucket tag beside the box that names it,
 	/// and its verbs as tags naming what they carry: the drill's copy
 	/// selector by variant (a misspelling errors at build rather than
-	/// restoring the archive it was told not to), the export's recipient, and
-	/// the probe's window as a duration string.
+	/// restoring the archive it was told not to), the export's recipients,
+	/// and the probe's window as a duration string.
 	#[beet_core::test]
 	fn the_cold_copy_spawns_by_tag() {
 		let mut world = spawn(
@@ -661,7 +661,7 @@ mod test {
 					ssh_public_key="ssh-ed25519 AAAA pete"/>
 				<MailRestoreDrill source_domain="beetmash.com" mailbox="probe"
 					source_snapshot="Cold"/>
-				<MailSecretsExport recipient="age1example"/>
+				<MailSecretsExport recipients={["age1example"]}/>
 				<MailColdProbe max_age="12h"/>
 			</Fragment>"#,
 		);
@@ -688,7 +688,7 @@ mod test {
 			.query::<&MailSecretsExport>()
 			.single(&world)
 			.unwrap()
-			.recipient
+			.recipients[0]
 			.as_str()
 			.xpect_eq("age1example");
 		world

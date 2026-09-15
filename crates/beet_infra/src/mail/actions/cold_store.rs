@@ -112,9 +112,9 @@ impl ColdStore {
 	/// the stage whose token it is, which for a drill is the SOURCE stage
 	/// rather than the drill's own.
 	///
-	/// Missing is an error naming the hand step, never a skip: a verb that
-	/// quietly did nothing against an empty cold bucket is the failure the
-	/// cold copy exists to close.
+	/// Missing is an error naming the apply that parks it, never a skip: a
+	/// verb that quietly did nothing against an empty cold bucket is the
+	/// failure the cold copy exists to close.
 	pub async fn resolve(
 		block: &R2BucketBlock,
 		stack: &ResolvedStack,
@@ -133,7 +133,7 @@ impl ColdStore {
 			}),
 			_ => bevybail!(
 				"no cold credential at {access_name} and {secret_name}: {}",
-				block.mint_instructions(stack)
+				block.missing_credential(stack)
 			),
 		}
 	}

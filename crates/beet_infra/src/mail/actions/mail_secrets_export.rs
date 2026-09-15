@@ -64,6 +64,18 @@ impl MailSecretsExport {
 		})
 	}
 
+	/// The `age` invocation: one `--recipient` per human, ciphertext to
+	/// `output`, plaintext on stdin.
+	pub fn age_args(recipients: &[SmolStr], output: &str) -> Vec<String> {
+		["--encrypt".to_string()]
+			.into_iter()
+			.chain(recipients.iter().flat_map(|recipient| {
+				["--recipient".to_string(), recipient.to_string()]
+			}))
+			.chain(["--output".to_string(), output.to_string()])
+			.collect()
+	}
+
 	const AGE_NOT_FOUND: &'static str = "age is not installed, and the secrets export is encrypted with it (pacman -S age, apt install age, brew install age)";
 }
 
@@ -90,26 +102,36 @@ impl MailSecretsExport {
 /// export from the box would need.
 ///
 /// The document never touches the disk in plaintext: it is piped into `age`
-/// and only the ciphertext is written and uploaded. The recipient is a public
-/// key, safe in the entry; the identity that decrypts it lives with a human,
-/// off both clouds, which is the last rung of the ladder this phase does not
-/// automate. Decrypt with `age -d -i <identity> <file>`.
+/// and only the ciphertext is written and uploaded. The recipients are public
+/// keys, safe in the entry, one per human who may restore; each identity
+/// lives with its human, off both clouds, which is the last rung of the
+/// ladder this phase does not automate. No shared secret exists anywhere.
+/// Decrypt with `age -d -i <identity> <file>`.
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn MailSecretsExport(
-	/// The age recipient (`age1..`) the export is encrypted to. Its identity
-	/// must never be parked in either cloud: an export the cloud can decrypt
-	/// is a copy of the secrets, not an encrypted one.
+	/// The age recipients (`age1..`) the export is encrypted to, any one of
+	/// which decrypts it. An identity must never be parked in either cloud:
+	/// an export the cloud can decrypt is a copy of the secrets, not an
+	/// encrypted one.
 	#[field]
-	recipient: SmolStr,
+	recipients: Vec<SmolStr>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	if !recipient.starts_with("age1") {
+	if recipients.is_empty() {
 		bevybail!(
-			"'{recipient}' is not an age recipient: `age-keygen` prints one \
-			starting `age1`, and the identity it prints beside it stays with you"
+			"no recipients: `age-keygen` prints one starting `age1` per human \
+			who may restore, and the identity it prints beside it stays with them"
 		);
+	}
+	for recipient in &recipients {
+		if !recipient.starts_with("age1") {
+			bevybail!(
+				"'{recipient}' is not an age recipient: `age-keygen` prints one \
+				starting `age1`, and the identity it prints beside it stays with you"
+			);
+		}
 	}
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 	let cold = ColdStore::resolve(mail.cold_store()?, &mail.stack).await?;
@@ -144,13 +166,7 @@ pub async fn MailSecretsExport(
 	let local = mail.project.work_dir().join("secrets-export.json.age");
 	ChildProcess::new("age")
 		.with_not_found(MailSecretsExport::AGE_NOT_FOUND)
-		.with_args([
-			"--encrypt",
-			"--recipient",
-			recipient.as_str(),
-			"--output",
-			local.as_str(),
-		])
+		.with_args(MailSecretsExport::age_args(&recipients, local.as_str()))
 		.run_async_stdin(document.to_string())
 		.await?;
 	let upload = cold.upload(&local, &key).await;
@@ -158,8 +174,9 @@ pub async fn MailSecretsExport(
 	upload?;
 	info!(
 		"{count} parameters under {prefix} exported to s3://{}/{key}, \
-		encrypted to {recipient}",
-		cold.bucket
+		encrypted to {} recipient(s)",
+		cold.bucket,
+		recipients.len()
 	);
 	Pass(cx.input).xok()
 }
@@ -178,6 +195,20 @@ mod tests {
 			Timestamp::parse_date("2026-09-15").unwrap().secs() + 3661,
 		))
 		.xpect_eq("secrets/2026/09/15/010101Z.json.age");
+	}
+
+	/// Every recipient is named, so any one human's identity decrypts the
+	/// export and no identity is ever shared.
+	#[beet_core::test]
+	fn every_recipient_is_named() {
+		MailSecretsExport::age_args(
+			&["age1aaa".into(), "age1bbb".into()],
+			"/tmp/x.age",
+		)
+		.join(" ")
+		.xpect_eq(
+			"--encrypt --recipient age1aaa --recipient age1bbb --output /tmp/x.age",
+		);
 	}
 
 	/// The document carries what a restore into a fresh account needs: the

@@ -108,9 +108,9 @@ pub async fn MailCredentials(
 				));
 			}
 		}
-		// the cold store's parked token, minted by hand and read by the box
-		// and every cold verb: the one credential here that can delete a
-		// backup, which is why it is listed under `--infra` and not above.
+		// the cold store's token, minted by the apply and read by the box and
+		// every cold verb: the one credential here that can delete a backup,
+		// which is why it is listed under `--infra` and not above.
 		if let Some(cold) = &mail.cold {
 			for (secret, note) in [
 				(cold.access_key_secret(), "r2 token, s3 access key id"),
