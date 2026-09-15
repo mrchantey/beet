@@ -161,6 +161,17 @@ async fn main() -> Result {
 			BindingFile::new("crates/beet_infra/src/bindings/aws_ssm.rs")
 				.with_resources(terra::Provider::AWS, ["aws_ssm_parameter"]),
 		)
+		// SNS, the account-wide topic an `SnsTopicBlock` declares (or adopts)
+		// and the access policy that lets a service publish into it. No
+		// subscription binding: an email subscription's confirmation is a human
+		// click whatever owns it, so it stays hand-made.
+		.with_file(
+			BindingFile::new("crates/beet_infra/src/bindings/aws_sns.rs")
+				.with_resources(terra::Provider::AWS, [
+					"aws_sns_topic",
+					"aws_sns_topic_policy",
+				]),
+		)
 		// EventBridge Scheduler, the timer a `ScheduledJobBlock` declares. The
 		// invoke role it needs is an `aws_iam_role` + `aws_iam_role_policy`
 		// from `aws_common`, so nothing else belongs here.

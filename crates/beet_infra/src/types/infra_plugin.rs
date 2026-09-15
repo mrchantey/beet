@@ -176,6 +176,15 @@ impl Plugin for InfraPlugin {
 				crate::types::render::<crate::prelude::VpcBlock>
 					.in_set(DeployRenderSet::Render),
 			);
+		// the account-wide topic, spawned by tag (`<SnsTopicBlock
+		// label="ses-events" name="beetmash-ses-events"/>`).
+		#[cfg(feature = "sns_topic_block")]
+		app.register_type::<crate::prelude::SnsTopicBlock>()
+			.add_systems(
+				DeployRender,
+				crate::types::render::<crate::prelude::SnsTopicBlock>
+					.in_set(DeployRenderSet::Render),
+			);
 		#[cfg(feature = "rds_postgres_block")]
 		app.register_type::<crate::prelude::RdsPostgresBlock>()
 			.register_type::<crate::prelude::DatabaseRef>()
@@ -217,7 +226,11 @@ impl Plugin for InfraPlugin {
 		app.add_systems(
 			DeployRender,
 			(
-				crate::prelude::MailDomainBlock::declare
+				(
+					crate::prelude::MailDomainBlock::declare,
+					// the box declares one variable of its own, the DANE pin
+					crate::types::declare::<crate::prelude::StalwartBlock>,
+				)
 					.in_set(DeployRenderSet::Declare),
 				(
 					crate::prelude::MailDomainBlock::render,
@@ -301,7 +314,12 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::EipReverseDns>()
 			.register_type::<crate::prelude::EipReverseDnsReset>()
 			.register_type::<crate::prelude::StalwartSnapshot>()
+			// the opt-in teardown half of the snapshot, for a disposable stage
+			.register_type::<crate::prelude::StalwartSnapshotPrune>()
 			.register_type::<crate::prelude::StalwartProvision>()
+			// the DANE pin, read after provision and published by the apply
+			// that follows it
+			.register_type::<crate::prelude::MailDane>()
 			.register_type::<crate::prelude::MtaStsPublish>()
 			.register_type::<crate::prelude::MtaStsUnpublish>()
 			.register_type::<crate::prelude::MailProbe>()

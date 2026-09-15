@@ -366,6 +366,78 @@ impl DnsProvider {
 		Ok(address)
 	}
 
+	/// Emit a `TLSA` record, ie a DANE pin at `name` (`_25._tcp.<host>`) on
+	/// whatever `certificate` is: the hex digest (or full data) the
+	/// `usage`/`selector`/`matching_type` triple describes, so `3 1 1` pins
+	/// the SHA-256 of the served leaf's public key. May be an interpolation.
+	///
+	/// Cloudflare carries the four fields in `data`; Route53 folds them into
+	/// the one content string as the presentation format writes them.
+	pub fn emit_tlsa(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		label: &str,
+		name: &str,
+		usage: u8,
+		selector: u8,
+		matching_type: u8,
+		certificate: &str,
+	) -> Result<String> {
+		let ident = stack.resource_ident(label);
+		let address = match self {
+			#[cfg(feature = "cloudflare_dns")]
+			Self::Cloudflare { zone_id, .. } => {
+				ensure_cloudflare_provider(config)?;
+				let record = ResourceDef::new_secondary(
+					ident,
+					CloudflareDnsRecordDetails {
+						name: name.into(),
+						ttl: 1,
+						r#type: "TLSA".into(),
+						zone_id: zone_id.clone(),
+						data: Some(CloudflareDnsRecordData {
+							usage: Some(usage as i64),
+							selector: Some(selector as i64),
+							matching_type: Some(matching_type as i64),
+							certificate: Some(certificate.into()),
+							..default()
+						}),
+						proxied: Some(false),
+						..default()
+					},
+				);
+				let address =
+					format!("cloudflare_dns_record.{}", record.ident().label());
+				config.add_resource(&record)?;
+				address
+			}
+			Self::Route53 { zone_id, .. } => {
+				let record = ResourceDef::new_secondary(
+					ident,
+					AwsRoute53RecordDetails {
+						name: name.into(),
+						r#type: "TLSA".into(),
+						zone_id: zone_id.clone(),
+						ttl: Some(60),
+						records: Some(vec![
+							format!(
+								"{usage} {selector} {matching_type} {certificate}"
+							)
+							.into(),
+						]),
+						..default()
+					},
+				);
+				let address =
+					format!("aws_route53_record.{}", record.ident().label());
+				config.add_resource(&record)?;
+				address
+			}
+		};
+		Ok(address)
+	}
+
 	/// Emit one record of `record_type` into this provider's zone, returning its
 	/// terraform resource address (eg `cloudflare_dns_record.<label>`).
 	fn emit_record(
@@ -592,6 +664,57 @@ mod tests {
 			.xpect_contains("\"target\":\"mail.beetmash.com\"");
 		// once in `data`, once at the top level
 		json.matches("\"priority\":0").count().xpect_eq(2);
+	}
+
+	/// A Cloudflare TLSA carries its four fields in `data`, and the pin may be
+	/// an interpolation: the value is parked by a deploy step and read as a
+	/// variable, never typed.
+	#[beet_core::test]
+	fn cloudflare_tlsa_uses_data_block() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("zone.example", "zone123")
+			.emit_tlsa(
+				&stack,
+				&mut config,
+				"tlsa",
+				"_25._tcp.mail.beetmash.com",
+				3,
+				1,
+				1,
+				"${var.mail_tlsa}",
+			)
+			.unwrap();
+		let json = config.to_json_string().unwrap();
+		json.as_str()
+			.xpect_contains("\"type\":\"TLSA\"")
+			.xpect_contains("\"usage\":3")
+			.xpect_contains("\"selector\":1")
+			.xpect_contains("\"matching_type\":1")
+			.xpect_contains("\"certificate\":\"${var.mail_tlsa}\"");
+	}
+
+	/// Route53 folds the same four fields into presentation format.
+	#[beet_core::test]
+	fn route53_tlsa_folds_fields_into_content() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::route53("zone.example", "zone123")
+			.emit_tlsa(
+				&stack,
+				&mut config,
+				"tlsa",
+				"_25._tcp.mail.beetmash.com",
+				3,
+				1,
+				1,
+				"abcd",
+			)
+			.unwrap();
+		config
+			.to_json_string()
+			.unwrap()
+			.xpect_contains("\"3 1 1 abcd\"");
 	}
 
 	/// Route53 has no `data` block, so `priority weight port target` is folded

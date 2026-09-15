@@ -22,6 +22,13 @@ use beet_core::prelude::*;
 /// A private workload that genuinely needs egress wants a vpc endpoint for the
 /// one service it calls, not a gateway to the whole internet.
 ///
+/// `ipv6=true` makes the PUBLIC side dual-stack: an Amazon-provided `/56` on
+/// the vpc, a `/64` per public subnet at the same index its `/24` takes, and a
+/// `::/0` route to the gateway. The private tier stays v4-only, because v6 has
+/// no private addresses to give it: every v6 address is globally routable, so a
+/// private subnet with one has a path off the vpc, which is exactly what the
+/// tier promises it does not have.
+///
 /// Authored directly from markup, ie `<VpcBlock bx:ref="net" label="net"/>`. A
 /// consumer names the declaration entity through a [`VpcRef`] relation
 /// (`{VpcRef($net)}`), and its render system reads this block off the target to
@@ -49,6 +56,11 @@ pub struct VpcBlock {
 	/// consume this network mostly want one; a stack whose only workload is a
 	/// public box declares `false` and emits half as many subnets.
 	private_tier: bool,
+	/// Whether the public subnets are dual-stack, see the type docs. Off by
+	/// default, since a consumer has to opt its own records and listeners in
+	/// too: a `/64` nothing publishes an `AAAA` into is a subnet somebody will
+	/// later wonder about.
+	ipv6: bool,
 }
 
 impl Default for VpcBlock {
@@ -75,6 +87,7 @@ impl VpcBlock {
 	pub const GATEWAY: &'static str = "gateway";
 	pub const PUBLIC_ROUTES: &'static str = "public-routes";
 	pub const DEFAULT_ROUTE: &'static str = "default-route";
+	pub const DEFAULT_ROUTE_V6: &'static str = "default-route-v6";
 
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
@@ -82,6 +95,7 @@ impl VpcBlock {
 			cidr: Self::CIDR.into(),
 			zones: Self::ZONES.iter().copied().map(SmolStr::from).collect(),
 			private_tier: true,
+			ipv6: false,
 		}
 	}
 
@@ -250,6 +264,23 @@ impl VpcBlock {
 			.xok()
 	}
 
+	/// The `/64` a public subnet in the `index`th availability zone takes out
+	/// of the vpc's Amazon-provided `/56`, as the interpolation that carves it
+	/// at apply (the `/56` is only known then). The same index as the `/24`,
+	/// so the two numberings can never disagree.
+	pub fn subnet_ipv6_cidr(
+		&self,
+		stack: &ResolvedStack,
+		index: usize,
+	) -> String {
+		// a bare reference: inside an interpolation nothing is re-wrapped
+		format!(
+			"${{cidrsubnet(aws_vpc.{}.ipv6_cidr_block, 8, {})}}",
+			self.ident(stack, Self::VPC).label(),
+			SubnetTier::Public.octet() + index
+		)
+	}
+
 	/// The `Name`/`Project`/`Stage` tags every resource here carries, so the
 	/// console reads as the stack does.
 	fn tags(
@@ -298,6 +329,8 @@ impl VpcBlock {
 				// anything else in the vpc (which is how it reaches the db).
 				enable_dns_hostnames: Some(true),
 				enable_dns_support: Some(true),
+				// an Amazon-provided /56, associated in place on an existing vpc
+				assign_generated_ipv6_cidr_block: self.ipv6.then_some(true),
 				tags: Some(self.tags(stack, Self::VPC)),
 				..default()
 			},
@@ -321,6 +354,8 @@ impl VpcBlock {
 		for tier in self.tiers() {
 			for (index, zone) in self.zones.iter().enumerate() {
 				let kind = tier.kind(zone);
+				// dual-stack on the public side only, see the type docs
+				let dual_stack = self.ipv6 && tier.is_public();
 				config.add_resource(&ResourceDef::new_secondary(
 					self.ident(stack, &kind),
 					AwsSubnetDetails {
@@ -332,6 +367,11 @@ impl VpcBlock {
 						// a public subnet's instance gets a public address at
 						// launch; a private one must never.
 						map_public_ip_on_launch: Some(tier.is_public()),
+						ipv6_cidr_block: dual_stack.then(|| {
+							self.subnet_ipv6_cidr(stack, index).into()
+						}),
+						assign_ipv6_address_on_creation: dual_stack
+							.then_some(true),
 						tags: Some(self.tags(stack, &kind)),
 						..default()
 					},
@@ -380,6 +420,17 @@ impl VpcBlock {
 			.add_resource(&gateway)?
 			.add_resource(&table)?
 			.add_resource(&default_route)?;
+		if self.ipv6 {
+			config.add_resource(&ResourceDef::new_secondary(
+				self.ident(stack, Self::DEFAULT_ROUTE_V6),
+				AwsRouteDetails {
+					route_table_id: table.field_ref("id").into(),
+					destination_ipv6_cidr_block: Some("::/0".into()),
+					gateway_id: Some(gateway.field_ref("id").into()),
+					..default()
+				},
+			))?;
+		}
 		for zone in &self.zones {
 			let subnet = SubnetTier::Public.kind(zone);
 			config.add_resource(&ResourceDef::new_secondary(
@@ -642,6 +693,62 @@ mod tests {
 			block.subnet_id(&stack, SubnetTier::Public, "a"),
 			block.subnet_id(&stack, SubnetTier::Public, "b"),
 		]);
+	}
+
+	/// Dual-stack is the public side alone: the vpc takes an Amazon `/56`,
+	/// each public subnet carves its `/64` at the index its `/24` already has,
+	/// and `::/0` routes to the same gateway, while the private subnets carry
+	/// no v6 at all (a v6 address is globally routable, so one there would be
+	/// the egress the tier promises not to have). Off by default, and off
+	/// emits the config exactly as it was.
+	#[beet_core::test]
+	fn ipv6_is_public_side_and_opt_in() {
+		let (stack, config) =
+			build_config(&VpcBlock::new("net").with_ipv6(true));
+		let block = VpcBlock::new("net").with_ipv6(true);
+		config
+			.to_json()
+			.into_json()["resource"]["aws_vpc"]["beet_infra__dev__net_vpc"]
+			["assign_generated_ipv6_cidr_block"]
+			.xpect_eq(Value::Bool(true));
+		let mut subnets = resources(&config, "aws_subnet")
+			.values()
+			.map(|subnet| {
+				format!(
+					"{} {} {}",
+					subnet["tags"]["Name"].as_str().unwrap(),
+					subnet["ipv6_cidr_block"].as_str().unwrap_or("-"),
+					subnet["assign_ipv6_address_on_creation"]
+						.as_bool()
+						.map(|it| it.to_string())
+						.unwrap_or("-".into()),
+				)
+			})
+			.collect::<Vec<_>>();
+		subnets.sort();
+		subnets.xpect_eq(vec![
+			"net--private-a - -".to_string(),
+			"net--private-b - -".to_string(),
+			format!("net--public-a {} true", block.subnet_ipv6_cidr(&stack, 0)),
+			format!("net--public-b {} true", block.subnet_ipv6_cidr(&stack, 1)),
+		]);
+		block.subnet_ipv6_cidr(&stack, 1).as_str().xpect_eq(
+			"${cidrsubnet(aws_vpc.beet_infra__dev__net_vpc.ipv6_cidr_block, 8, 1)}",
+		);
+		let routes = resources(&config, "aws_route");
+		routes["beet_infra__dev__net_default_route_v6"]
+			["destination_ipv6_cidr_block"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("::/0");
+		// off: no v6 anywhere, and the default is off
+		let (_stack, config) = build_config(&VpcBlock::new("net"));
+		config
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("ipv6");
 	}
 
 	/// The block's address compositions are the only way a consumer reaches

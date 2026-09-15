@@ -40,6 +40,18 @@ pub enum VariableValue {
 	/// Hence: no default, resolved by every verb that renders, and a hard error
 	/// when the parameter is absent.
 	Ssm(SmolStr),
+	/// [`Ssm`](Self::Ssm) for a resource whose ABSENCE is a legal state: the
+	/// parameter not existing resolves to empty rather than refusing, and the
+	/// block reading it emits nothing for empty (a `count` on the value).
+	///
+	/// The case: a `TLSA` pinning the certificate a server serves. Nothing
+	/// has been issued on a fresh stack, so there is nothing to pin and no
+	/// record is the right record; the value is parked once the server serves
+	/// one, and the next render publishes it. Still content (every verb that
+	/// renders reads it, so a `plan` is truthful) and still no terraform
+	/// default, so a bare invocation outside these verbs refuses rather than
+	/// withdrawing the record.
+	SsmOptional(SmolStr),
 }
 
 impl Variable {
@@ -89,15 +101,38 @@ impl Variable {
 		}
 	}
 
+	/// Create a variable read from AWS parameter store whose absence resolves
+	/// to empty, see [`VariableValue::SsmOptional`].
+	pub fn ssm_optional(
+		key: impl Into<SmolStr>,
+		parameter: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			key: key.into(),
+			value: VariableValue::SsmOptional(parameter.into()),
+			sensitive: false,
+		}
+	}
+
 	/// Whether this variable's value is the CONTENT of a resource rather than an
 	/// ambient runtime attribute, so it carries no default and must resolve
 	/// before any render.
 	pub fn is_content(&self) -> bool {
-		matches!(self.value, VariableValue::Ssm(_))
+		matches!(
+			self.value,
+			VariableValue::Ssm(_) | VariableValue::SsmOptional(_)
+		)
+	}
+
+	/// Whether an absent parameter resolves to empty rather than refusing,
+	/// see [`VariableValue::SsmOptional`].
+	pub fn absent_is_empty(&self) -> bool {
+		matches!(self.value, VariableValue::SsmOptional(_))
 	}
 
 	/// The parameter store name this variable reads, if it is an
-	/// [`Ssm`](VariableValue::Ssm) one.
+	/// [`Ssm`](VariableValue::Ssm) or [`SsmOptional`](VariableValue::SsmOptional)
+	/// one.
 	///
 	/// The READ itself belongs to the deploy side (`terra::Project`), not here:
 	/// this type is compiled into every build that describes infrastructure,
@@ -105,7 +140,8 @@ impl Variable {
 	/// declaration should not drag in the machinery that acts on it.
 	pub fn ssm_parameter(&self) -> Option<&str> {
 		match &self.value {
-			VariableValue::Ssm(parameter) => Some(parameter.as_str()),
+			VariableValue::Ssm(parameter)
+			| VariableValue::SsmOptional(parameter) => Some(parameter.as_str()),
 			_ => None,
 		}
 	}
@@ -129,7 +165,8 @@ impl Variable {
 	pub fn resolve_value(&self, request: &RequestParts) -> Result<SmolStr> {
 		match &self.value {
 			VariableValue::Fixed(value) => Ok(value.clone()),
-			VariableValue::Ssm(parameter) => bevybail!(
+			VariableValue::Ssm(parameter)
+			| VariableValue::SsmOptional(parameter) => bevybail!(
 				"variable `{}` reads parameter store `{parameter}` and is not \
 				resolvable from a request",
 				self.key
@@ -244,6 +281,21 @@ mod test {
 			.tf_declaration()
 			.default
 			.xpect_eq(Some("".into()));
+	}
+
+	/// Both parameter store flavours are content, so every verb that renders
+	/// resolves them and neither carries a terraform default; only the
+	/// optional one lets an absent parameter through as empty.
+	#[beet_core::test]
+	fn optional_ssm_is_content_without_a_default() {
+		let optional = Variable::ssm_optional("mail_tlsa", "/app/stage/tlsa");
+		optional.is_content().xpect_true();
+		optional.absent_is_empty().xpect_true();
+		optional.tf_declaration().default.xpect_eq(None);
+		optional.ssm_parameter().xpect_eq(Some("/app/stage/tlsa"));
+		Variable::ssm("dkim", "/app/stage/dkim")
+			.absent_is_empty()
+			.xpect_false();
 	}
 
 	// `sensitive` is omitted rather than declared false, so the emitted json is

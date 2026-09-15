@@ -392,21 +392,33 @@ impl MailDomainBlock {
 		metric.replace('.', "-").to_lowercase()
 	}
 
-	/// The ARN of `topic` in `stack`'s region, composed against the account the
-	/// apply is running in.
-	fn topic_arn(stack: &ResolvedStack, topic: &SmolStr) -> String {
-		format!(
-			"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{topic}",
-			stack.region()
-		)
+	/// The ARN of the topic named `topic`: a reference to the
+	/// [`SnsTopicBlock`] declaring it when one is in scope (which is also the
+	/// dependency edge a fresh account needs, since a destination created
+	/// before its topic fails), else composed against the account the apply
+	/// runs in, for a topic another stack owns.
+	fn topic_arn(
+		stack: &ResolvedStack,
+		topic: &SmolStr,
+		declared: &[SnsTopicBlock],
+	) -> String {
+		declared
+			.iter()
+			.find(|block| block.topic_name(stack) == topic.as_str())
+			.map(|block| block.arn_ref(stack))
+			.unwrap_or_else(|| SnsTopicBlock::composed_arn(stack, topic))
 	}
 
 	/// The ARN of [`alarms_topic`](Self::alarms_topic), ie where every arm's
 	/// reputation alarms fire.
-	fn alarms_topic_arn(&self, stack: &ResolvedStack) -> Option<String> {
+	fn alarms_topic_arn(
+		&self,
+		stack: &ResolvedStack,
+		declared: &[SnsTopicBlock],
+	) -> Option<String> {
 		self.alarms_topic
 			.as_ref()
-			.map(|topic| Self::topic_arn(stack, topic))
+			.map(|topic| Self::topic_arn(stack, topic, declared))
 	}
 
 	/// A terraform label for this domain's `suffix` resource, distinct from
@@ -537,11 +549,21 @@ impl MailDomainBlock {
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		blocks: Query<(Entity, &MailDomainBlock)>,
 		relays: RelayQuery,
+		topics: Query<(Entity, &SnsTopicBlock)>,
 	) {
 		for (entity, block) in blocks.iter() {
-			if scopes.get_entity(entity).is_err() {
+			let Ok(root) = scopes.get_entity(entity) else {
 				continue;
-			}
+			};
+			// the topics declared in this scope, so a domain firing into one
+			// of them references the resource rather than composing its arn
+			let declared = topics
+				.iter()
+				.filter(|(topic, _)| {
+					scopes.get_entity(*topic).is_ok_and(|it| it == root)
+				})
+				.map(|(_, topic)| topic.clone())
+				.collect::<Vec<_>>();
 			let relay = relays.resolve(entity, Block::label(block));
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
@@ -551,7 +573,7 @@ impl MailDomainBlock {
 				Ok(relay) => {
 					let (stack, deployment, config) = scope.ctx();
 					if let Err(err) =
-						block.emit(stack, deployment, config, &relay)
+						block.emit(stack, deployment, config, &relay, &declared)
 					{
 						scope.error(bevyhow!(
 							"MailDomainBlock '{}': {err}",
@@ -606,6 +628,7 @@ impl MailDomainBlock {
 		deployment: &Deployment,
 		config: &mut terra::Config,
 		relay: &RelayMode,
+		topics: &[SnsTopicBlock],
 	) -> Result {
 		self.validate()?;
 		// only the SES arm has resources at all: a comail domain is five
@@ -613,12 +636,12 @@ impl MailDomainBlock {
 		let identity = match relay {
 			RelayMode::Ses(ses) => {
 				let identity = self.emit_ses(stack, config)?;
-				self.emit_ses_events(stack, config, ses)?;
-				self.emit_ses_alarms(stack, config)?;
+				self.emit_ses_events(stack, config, ses, topics)?;
+				self.emit_ses_alarms(stack, config, topics)?;
 				Some(identity)
 			}
 			RelayMode::Comail(_) => {
-				self.emit_comail_alarms(stack, config)?;
+				self.emit_comail_alarms(stack, config, topics)?;
 				None
 			}
 			RelayMode::None => None,
@@ -768,11 +791,12 @@ impl MailDomainBlock {
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 		ses: &SesRelay,
+		topics: &[SnsTopicBlock],
 	) -> Result {
 		let Some(topic) = ses
 			.events_topic()
 			.as_ref()
-			.map(|topic| Self::topic_arn(stack, topic))
+			.map(|topic| Self::topic_arn(stack, topic, topics))
 		else {
 			return Ok(());
 		};
@@ -830,10 +854,12 @@ impl MailDomainBlock {
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		topics: &[SnsTopicBlock],
 	) -> Result {
 		self.emit_alarms(
 			stack,
 			config,
+			topics,
 			SesRelay::METRIC_NAMESPACE,
 			"ses:configuration-set",
 			&self.configuration_set_name(),
@@ -864,10 +890,12 @@ impl MailDomainBlock {
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		topics: &[SnsTopicBlock],
 	) -> Result {
 		self.emit_alarms(
 			stack,
 			config,
+			topics,
 			ComailRelay::METRIC_NAMESPACE,
 			ComailRelay::METRIC_DIMENSION,
 			&self.domain,
@@ -897,12 +925,13 @@ impl MailDomainBlock {
 		&self,
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
+		topics: &[SnsTopicBlock],
 		namespace: &str,
 		dimension: &str,
 		dimension_value: &str,
 		alarms: &[(&str, f64, &str)],
 	) -> Result {
-		let Some(topic) = self.alarms_topic_arn(stack) else {
+		let Some(topic) = self.alarms_topic_arn(stack, topics) else {
 			return Ok(());
 		};
 		// the account the apply runs in, since a topic name is not an address
@@ -1394,6 +1423,57 @@ mod tests {
 			.unwrap()
 			.len()
 			.xpect_eq(SesRelay::EVENT_TYPES.len());
+	}
+
+	/// A topic declared in the same scope is referenced by resource, which is
+	/// the dependency edge a fresh account needs: an event destination created
+	/// before its topic fails the apply. A topic nobody in scope declares (a
+	/// drill firing into production's) stays a composed arn.
+	#[beet_core::test]
+	fn a_declared_topic_is_referenced_not_composed() {
+		let domain = staging().with_alarms_topic("beetmash-ses-events");
+		let mode = RelayMode::Ses(
+			SesRelay::default().with_events_topic("beetmash-ses-events"),
+		);
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				mode.insert(&mut parent.spawn(domain.clone()));
+				parent.spawn(
+					SnsTopicBlock::new("ses-events")
+						.with_name("beetmash-ses-events"),
+				);
+			});
+		let json = scope.finish().unwrap().2.to_json().into_json();
+		let expected = "${aws_sns_topic.beet_infra__dev__ses_events.arn}";
+		json["resource"]["aws_sesv2_configuration_set_event_destination"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["event_destination"][0]["sns_destination"][0]["topic_arn"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(expected);
+		for alarm in json["resource"]["aws_cloudwatch_metric_alarm"]
+			.as_object()
+			.unwrap()
+			.values()
+		{
+			alarm["alarm_actions"][0]
+				.as_str()
+				.unwrap()
+				.xpect_eq(expected);
+		}
+		// undeclared: composed against the account, as before
+		build_config(&[(domain, mode)])
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xpect_contains(
+				"arn:aws:sns:ap-southeast-2:${data.aws_caller_identity.current.account_id}:beetmash-ses-events",
+			)
+			.xnot()
+			.xpect_contains("${aws_sns_topic.");
 	}
 
 	/// Exactly one SPF record per NAME, which is the invariant that makes the

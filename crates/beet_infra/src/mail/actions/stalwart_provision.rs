@@ -164,6 +164,7 @@ pub async fn StalwartProvision(
 		poll,
 	)
 	.await?;
+	converge_default_certificate(management.client(), &plan).await?;
 
 	// only now, with a certificate on 443, may the plaintext management port go
 	// away: it is the channel everything above ran on when the box was fresh.
@@ -646,13 +647,8 @@ async fn apply_plan(
 	}
 	info!("aggregate reports daily, per-message failure reports off");
 
-	converge(
-		client,
-		"x:Tracer",
-		&["prefix"],
-		&StalwartPlan::log_tracer(),
-	)
-	.await?;
+	converge(client, "x:Tracer", &["prefix"], &StalwartPlan::log_tracer())
+		.await?;
 	info!(
 		"server log is {}/{}.<date>, plain text, rotated daily",
 		StalwartBlock::LOG_DIR,
@@ -725,6 +721,79 @@ async fn apply_plan(
 		.await?;
 	info!("hostname is {}", plan.hostname);
 	Ok(domain_ids)
+}
+
+/// Point the server's DEFAULT certificate at the one covering the box's own
+/// hostname, ie the primary domain's.
+///
+/// The default is what a client that sends no SNI gets. A server holding one
+/// certificate per domain and no default answers such a client with whichever
+/// entry its hash map yields first (`common/src/network/tls.rs` in the pinned
+/// tag), which is random per process: found live serving the newsletter
+/// domain's certificate on port 25 to a peer without SNI, a name that covers
+/// neither the MX nor the pin. Not every MTA sends SNI, and under MTA-STS
+/// `enforce` or a DANE pin the wrong certificate is a deferral.
+///
+/// Converged on every provision because a fresh store has no certificate when
+/// the settings are first written, and because the server repoints it only
+/// across a renewal of the same SAN set.
+async fn converge_default_certificate(
+	client: &JmapClient,
+	plan: &StalwartPlan,
+) -> Result {
+	let certificates = client.list("x:Certificate").await?;
+	let names = &plan.domains[0].certificate_names;
+	let Some(id) = default_certificate(&certificates, names) else {
+		bevybail!(
+			"no stored certificate covers {}, so none can be the default",
+			names.join(", ")
+		);
+	};
+	// a singleton: addressed by its literal id, never queried
+	let settings = client.try_get_singleton("x:SystemSettings").await?;
+	let current = settings
+		.as_ref()
+		.and_then(|settings| settings["defaultCertificateId"].as_str());
+	if current == Some(id.as_str()) {
+		return Ok(());
+	}
+	client
+		.update_singleton(
+			"x:SystemSettings",
+			&json!({ "defaultCertificateId": id }),
+		)
+		.await?;
+	// a settings change reloads the core config and NOT the served
+	// certificate map (`common/src/cache/reload.rs` rebuilds it only for a
+	// certificate change), so the server keeps answering a peer without SNI
+	// from the old map until asked to reload
+	client
+		.create("x:Action", &json!({ "@type": "ReloadTlsCertificates" }))
+		.await?;
+	info!("default certificate is the one covering {}", plan.hostname);
+	Ok(())
+}
+
+/// The id of the stored certificate covering every one of `names` that expires
+/// LAST: the one the server serves for those names, since a renewal inserts a
+/// new object beside the old one until the old one expires.
+fn default_certificate(
+	certificates: &[Value],
+	names: &[String],
+) -> Option<String> {
+	certificates
+		.iter()
+		.filter(|certificate| {
+			certificate_covers(core::slice::from_ref(*certificate), names)
+		})
+		.max_by_key(|certificate| {
+			certificate["notValidAfter"]
+				.as_str()
+				.unwrap_or_default()
+				.to_string()
+		})
+		.and_then(|certificate| certificate["id"].as_str())
+		.map(String::from)
 }
 
 /// Whether any stored certificate covers every one of `names`.
@@ -1252,5 +1321,32 @@ mod tests {
 		)
 		.unwrap()
 		.xpect_eq(Converge::Create);
+	}
+
+	/// The default certificate is the one covering the box's names that
+	/// expires last, ie the renewed one while its predecessor still exists;
+	/// a certificate for another domain's names is never a candidate, however
+	/// fresh. REGRESSION: with no default the server answered a peer without
+	/// SNI with whichever certificate its hash map yielded first.
+	#[beet_core::test]
+	fn the_default_certificate_covers_the_box_and_expires_last() {
+		let names = vec!["mail.beetmash.com".to_string()];
+		let certificates = vec![
+			serde_json::json!({
+				"id": "old", "notValidAfter": "2026-12-07T00:00:00Z",
+				"subjectAlternativeNames": { "mail.beetmash.com": true }
+			}),
+			serde_json::json!({
+				"id": "news", "notValidAfter": "2027-06-01T00:00:00Z",
+				"subjectAlternativeNames": { "autoconfig.news.beetmash.com": true }
+			}),
+			serde_json::json!({
+				"id": "renewed", "notValidAfter": "2027-02-05T00:00:00Z",
+				"subjectAlternativeNames": { "mail.beetmash.com": true }
+			}),
+		];
+		default_certificate(&certificates, &names)
+			.xpect_eq(Some("renewed".to_string()));
+		default_certificate(&certificates[1..2], &names).xpect_eq(None);
 	}
 }

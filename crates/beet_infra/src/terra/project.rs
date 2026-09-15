@@ -78,6 +78,16 @@ impl Project {
 		};
 		match read_parameter(self.stack.region(), parameter).await? {
 			Some(value) => Ok(Some(SmolStr::new(value))),
+			// the resource this variable is the content of does not exist yet,
+			// and the block reading it emits nothing for empty
+			None if variable.absent_is_empty() => {
+				info!(
+					"no value at parameter store `{parameter}` yet, so \
+					variable `{}` resolves empty and publishes nothing",
+					variable.key()
+				);
+				Ok(Some(SmolStr::default()))
+			}
 			None => bevybail!(
 				"no value at parameter store `{parameter}`, which variable \
 				`{}` is the content of. It is minted by the stack's `deploy` \

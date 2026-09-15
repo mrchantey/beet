@@ -297,11 +297,20 @@ impl StalwartPlan {
 	/// `TlsAlpn01` and no port 80: the challenge is answered on the 443 the box
 	/// already serves, so the security group needs no extra hole and the mail
 	/// stack holds no dns credential.
+	///
+	/// `reuseKey` is what makes a DANE pin a one-time publish. The pinned
+	/// tag's renewal (`common/src/network/acme/renew.rs`) mints a fresh P-256
+	/// pair by default and reuses the stored certificate's only when this is
+	/// set, so without it every sixty days the served key changes under a
+	/// `3 1 1` record and validating senders defer until the next deploy.
+	/// The key still changes on a fresh data store, which is why `MailDane`
+	/// re-reads it after every provision rather than trusting this flag.
 	pub fn acme_provider(&self) -> Value {
 		json!({
 			"directory": Self::ACME_DIRECTORY,
 			"challengeType": "TlsAlpn01",
 			"contact": set_map([&self.acme_contact]),
+			"reuseKey": true,
 		})
 	}
 
@@ -1253,6 +1262,9 @@ mod tests {
 			.as_bool()
 			.unwrap()
 			.xpect_true();
+		// REGRESSION: the pinned tag defaults `reuseKey` to false, so a
+		// renewal minted a fresh key under any published DANE pin
+		provider["reuseKey"].as_bool().unwrap().xpect_true();
 	}
 
 	/// Outbound mail is signed by SES Easy DKIM, whose selectors the domain

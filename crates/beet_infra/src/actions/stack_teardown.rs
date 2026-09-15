@@ -79,8 +79,12 @@ impl StackTeardown {
 	/// set is now visible and orderable rather than buried. The order is the
 	/// removal order, ie convergence reversed: the secrets are minted before
 	/// anything else a deploy does, so they are the last thing to go.
-	pub const CARRIERS: [&'static str; 4] =
-		["state object", "state lock", "work directory", "secret prefix"];
+	pub const CARRIERS: [&'static str; 4] = [
+		"state object",
+		"state lock",
+		"work directory",
+		"secret prefix",
+	];
 }
 
 /// Delete every parameter under the stack's secret prefix, naming each one.

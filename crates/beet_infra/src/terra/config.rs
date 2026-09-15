@@ -101,6 +101,9 @@ pub struct Config {
 	/// [`add_layer_resource`](Self::add_layer_resource). Config-only, never
 	/// serialized.
 	layers: HashMap<SmolStr, Vec<String>>,
+	/// `import` blocks, see [`add_import`](Self::add_import): `(to, id)` pairs
+	/// in insertion order.
+	imports: Vec<(String, String)>,
 }
 
 impl Config {
@@ -581,20 +584,70 @@ impl Config {
 		label: &str,
 		lifecycle: impl Serialize,
 	) -> Result<&mut Self> {
-		let map = self
-			.resources
+		self.resource_mut(resource_type, label)?
+			.insert("lifecycle", Value::from_serde(lifecycle)?);
+		Ok(self)
+	}
+
+	/// Inject a `count` meta-argument into an already-added resource, ie
+	/// `${var.pin == "" ? 0 : 1}` for a record that exists exactly when its
+	/// content does. The resource's state address gains an index (`[0]`).
+	pub fn set_count(
+		&mut self,
+		resource_type: &str,
+		label: &str,
+		count: impl Into<String>,
+	) -> Result<&mut Self> {
+		self.resource_mut(resource_type, label)?
+			.insert("count", Value::from(count.into()));
+		Ok(self)
+	}
+
+	/// An already-added resource's body, for a meta-argument injection.
+	fn resource_mut(
+		&mut self,
+		resource_type: &str,
+		label: &str,
+	) -> Result<&mut Map> {
+		self.resources
 			.get_mut(resource_type)
 			.and_then(|v| v.as_map_mut().ok())
 			.ok_or_else(|| {
 				bevyhow!("resource type `{resource_type}` not found")
-			})?;
-		let resource = map
+			})?
 			.get_mut(label)
 			.and_then(|v| v.as_map_mut().ok())
 			.ok_or_else(|| {
 				bevyhow!("resource `{resource_type}.{label}` not found")
-			})?;
-		resource.insert("lifecycle", Value::from_serde(lifecycle)?);
+			})
+	}
+
+	/// Declare that the resource at address `to` already exists as `id` and is
+	/// to be adopted rather than created: an `import` block, which the first
+	/// apply consumes (`1 to import`) and which is a no-op once the resource is
+	/// in state.
+	///
+	/// This is how a hand-made resource joins a stack without a hand-run
+	/// `tofu import`: the block that declares it emits the stanza beside its
+	/// resource, so the adoption is a plan-time declaration like everything
+	/// else. `id` may be an expression (an arn composed from
+	/// `data.aws_caller_identity`), which OpenTofu resolves at plan.
+	///
+	/// The one thing an import block cannot do is tolerate an ABSENT remote
+	/// object: after a `destroy` has taken the resource, a config still
+	/// carrying its import refuses to apply. A block therefore emits one only
+	/// under an explicit adoption flag, which comes off once the plan reads
+	/// `0 to import`.
+	pub fn add_import(
+		&mut self,
+		to: impl Into<String>,
+		id: impl Into<String>,
+	) -> Result<&mut Self> {
+		let to = to.into();
+		if self.imports.iter().any(|(existing, _)| existing == &to) {
+			bevybail!("duplicate import: `{to}` is already imported");
+		}
+		self.imports.push((to, id.into()));
 		Ok(self)
 	}
 
@@ -642,6 +695,17 @@ impl Config {
 		}
 		if !self.outputs.is_empty() {
 			root.insert("output", self.outputs.clone());
+		}
+		if !self.imports.is_empty() {
+			root.insert(
+				"import",
+				Value::List(
+					self.imports
+						.iter()
+						.map(|(to, id)| value!({ "to": to, "id": id }))
+						.collect(),
+				),
+			);
 		}
 
 		Value::Map(root)
@@ -741,5 +805,36 @@ impl Config {
 		}
 		self.outputs.insert(name, obj);
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// An import block serializes as OpenTofu's JSON `import` list, and only
+	/// when one was declared: a config with none carries no key, so every
+	/// existing rendered config is byte-identical.
+	#[beet_core::test]
+	fn imports_render_as_a_list_or_not_at_all() {
+		let mut config = Config::new();
+		config
+			.to_json()
+			.into_json()
+			.get("import")
+			.is_none()
+			.xpect_true();
+		config
+			.add_import("aws_sns_topic.events", "arn:aws:sns:r:1:events")
+			.unwrap();
+		config.to_json().into_json()["import"].xpect_eq(serde_json::json!([
+			{ "to": "aws_sns_topic.events", "id": "arn:aws:sns:r:1:events" }
+		]));
+		// twice at one address is a declaration error, not a second stanza
+		config
+			.add_import("aws_sns_topic.events", "arn:other")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("duplicate import");
 	}
 }

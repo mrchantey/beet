@@ -123,6 +123,25 @@ pub struct StalwartBlock {
 	#[get(skip)]
 	#[set_with(unwrap_option)]
 	data_volume_protected: Option<bool>,
+	/// Publish a DANE pin for the box: a `TLSA` at `_25._tcp.<hostname>`
+	/// naming the SHA-256 of the public key its port 25 serves (`3 1 1`), so a
+	/// validating sender refuses any other certificate for this name. Needs
+	/// DNSSEC on the zone, since an unsigned pin is ignored.
+	///
+	/// The pin is derived, never typed: `MailDane` reads the served key off
+	/// the box after every provision and parks it at
+	/// [`tlsa_secret`](Self::tlsa_secret), and the record reads that parameter
+	/// as a content variable whose ABSENCE publishes nothing (a fresh stack
+	/// has no certificate to pin yet). The key survives renewal because
+	/// provision sets the ACME provider to reuse it; a fresh data store mints
+	/// a new one, which is why the pin is re-read after provision rather than
+	/// before the apply, and published by a second apply in the same deploy.
+	///
+	/// The hazard, stated: a pin that stops matching the served key has
+	/// DANE-validating senders (a minority, mostly European) DEFER delivery
+	/// until it is fixed, and the fix is one deploy. That is the same bound as
+	/// an MTA-STS `enforce` failure, and the same way back.
+	dane: bool,
 }
 
 impl Default for StalwartBlock {
@@ -131,6 +150,15 @@ impl Default for StalwartBlock {
 
 impl Block for StalwartBlock {
 	fn label(&self) -> &SmolStr { &self.label }
+
+	/// The DANE pin, when declared: read from parameter store by every render,
+	/// empty until `MailDane` has parked one.
+	fn variables(&self, stack: &ResolvedStack) -> Vec<Variable> {
+		match self.dane {
+			true => vec![self.tlsa_variable(stack)],
+			false => Vec::new(),
+		}
+	}
 }
 
 impl StalwartBlock {
@@ -252,6 +280,7 @@ impl StalwartBlock {
 			volume_gb: 30,
 			data_volume_gb: 20,
 			data_volume_protected: None,
+			dane: false,
 		}
 	}
 
@@ -342,6 +371,37 @@ impl StalwartBlock {
 	pub fn admin_secret_name(&self, stack: &ResolvedStack) -> String {
 		self.admin_secret().name(stack)
 	}
+
+	/// Where `MailDane` parks the served key's SHA-256, ie
+	/// `/beetmash-mail/prod/mail-tlsa`: the content of the `TLSA` record, hex.
+	pub fn tlsa_secret(&self) -> SecretRef { self.secret("tlsa") }
+
+	/// The tofu variable the pin arrives as, ie `tlsa_mail`. Optional content:
+	/// absent publishes nothing, see [`dane`](Self::dane).
+	pub fn tlsa_variable(&self, stack: &ResolvedStack) -> Variable {
+		Variable::ssm_optional(
+			self.tlsa_variable_key(),
+			self.tlsa_secret().name(stack),
+		)
+	}
+
+	fn tlsa_variable_key(&self) -> String {
+		format!("tlsa_{}", self.label.replace('-', "_"))
+	}
+
+	/// The record the pin is published at: the port a peer MTA dials, under
+	/// the box's own name. RFC 7672 puts it at the MX target, not at the mail
+	/// domain, which is why it is this block's and not a domain's.
+	pub fn tlsa_record_name(&self) -> String {
+		format!("_{}._tcp.{}", MailHealth::SMTP_PORT, self.hostname)
+	}
+
+	/// The `usage selector matching-type` triple the pin is published under:
+	/// `3 1 1`, ie DANE-EE on the leaf's SubjectPublicKeyInfo by SHA-256. The
+	/// leaf rather than the issuer, because Let's Encrypt rotates
+	/// intermediates unannounced; the key rather than the certificate,
+	/// because the key survives a renewal and the certificate does not.
+	pub const TLSA_PARAMS: (u8, u8, u8) = (3, 1, 1);
 
 	/// Where terraform puts the SES SMTP username (the sending user's access
 	/// key id). Read by `StalwartProvision` when it writes the SES relay route,
@@ -943,6 +1003,9 @@ impl StalwartBlock {
 				]),
 				key_name: Some(keypair.field_ref("key_name").into()),
 				iam_instance_profile: Some(profile.field_ref("name").into()),
+				// one address out of the subnet's /64; the listeners already
+				// bind `::`, so this is the whole of the box's side of v6
+				ipv6_address_count: vpc.ipv6().then_some(1),
 				user_data: Some(user_data),
 				// the rebuild rule: an edited machine is a new machine.
 				user_data_replace_on_change: Some(true),
@@ -1046,6 +1109,30 @@ impl StalwartBlock {
 			&eip.field_ref("public_ip"),
 			false,
 		)?;
+		// the AAAA beside it, when the network is dual-stack: the address is
+		// the subnet's to assign, so the record reads it off the instance
+		if vpc.ipv6() {
+			dns.emit_address(
+				stack,
+				config,
+				&self.build_label("dns6"),
+				&instance.field_ref("ipv6_addresses[0]"),
+				true,
+			)?;
+			config.add_output(
+				format!("{}_public_ipv6", self.label),
+				terra::Output {
+					value: instance.field_ref("ipv6_addresses[0]").into(),
+					description: Some(
+						"The mail box public IPv6 address".into(),
+					),
+					sensitive: None,
+				},
+			)?;
+		}
+		if self.dane {
+			self.emit_tlsa(stack, config, &dns)?;
+		}
 
 		config
 			.add_output(format!("{}_public_ip", self.label), terra::Output {
@@ -1069,6 +1156,45 @@ impl StalwartBlock {
 				description: Some("The mail box instance id".into()),
 				sensitive: None,
 			})?;
+		Ok(())
+	}
+}
+
+impl StalwartBlock {
+	/// The DANE pin, see [`dane`](Self::dane): a `TLSA` whose content is the
+	/// parked variable and which exists exactly when that variable is
+	/// non-empty, so a fresh stack renders no record and a pinned one renders
+	/// exactly one.
+	fn emit_tlsa(
+		&self,
+		stack: &ResolvedStack,
+		config: &mut terra::Config,
+		dns: &DnsProvider,
+	) -> Result {
+		let variable = self.tlsa_variable(stack);
+		config.ensure_variable(
+			variable.key().to_string(),
+			variable.tf_declaration(),
+		);
+		let (usage, selector, matching) = Self::TLSA_PARAMS;
+		let address = dns.emit_tlsa(
+			stack,
+			config,
+			&self.build_label("tlsa"),
+			&self.tlsa_record_name(),
+			usage,
+			selector,
+			matching,
+			&variable.tf_var_ref(),
+		)?;
+		let (resource_type, label) = address
+			.split_once('.')
+			.ok_or_else(|| bevyhow!("malformed record address {address}"))?;
+		config.set_count(
+			resource_type,
+			label,
+			format!("${{var.{} == \"\" ? 0 : 1}}", variable.key()),
+		)?;
 		Ok(())
 	}
 }
@@ -2432,7 +2558,10 @@ mod tests {
 			})
 			.collect::<Vec<_>>();
 		tails.xpect_eq(vec![
-			("/var/log/stalwart/stalwart.log".to_string(), "unit".to_string()),
+			(
+				"/var/log/stalwart/stalwart.log".to_string(),
+				"unit".to_string(),
+			),
 			(
 				"/var/log/stalwart/stalwart.????-??-??".to_string(),
 				"server".to_string(),
@@ -2444,10 +2573,9 @@ mod tests {
 		let matches = |path: &str| {
 			let glob = StalwartBlock::server_log_glob();
 			glob.len() == path.len()
-				&& glob
-					.chars()
-					.zip(path.chars())
-					.all(|(pattern, actual)| pattern == '?' || pattern == actual)
+				&& glob.chars().zip(path.chars()).all(|(pattern, actual)| {
+					pattern == '?' || pattern == actual
+				})
 		};
 		matches("/var/log/stalwart/stalwart.2026-09-15").xpect_true();
 		matches(StalwartBlock::UNIT_LOG).xpect_false();
@@ -2707,6 +2835,133 @@ mod tests {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("must not be Cloudflare-proxied");
+	}
+
+	/// The DANE pin is a `TLSA` at the box's own `_25._tcp` name whose content
+	/// is the parked variable, present exactly when that variable is: the
+	/// record carries a `count` on the value, the variable is optional content
+	/// (every render reads it, absence is empty), and a box that does not
+	/// declare `dane` renders neither. REGRESSION-shaped on purpose: a pin
+	/// typed into the entry, or defaulted, is a refused session at every
+	/// validating sender.
+	#[beet_core::test]
+	fn the_dane_pin_is_read_never_typed() {
+		let (stack, _deployment, config) =
+			build_config(&mail_box().with_dane(true));
+		let json = config.to_json().into_json();
+		let (label, record) = json["resource"]["cloudflare_dns_record"]
+			.as_object()
+			.unwrap()
+			.iter()
+			.find(|(_, record)| record["type"] == "TLSA")
+			.unwrap();
+		label.as_str().xpect_eq("beet_infra__dev__mail_tlsa");
+		record["name"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("_25._tcp.mail.beetmash.com");
+		record["data"]["usage"].xpect_eq(serde_json::json!(3));
+		record["data"]["selector"].xpect_eq(serde_json::json!(1));
+		record["data"]["matching_type"].xpect_eq(serde_json::json!(1));
+		record["data"]["certificate"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("${var.tlsa_mail}");
+		record["count"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("${var.tlsa_mail == \"\" ? 0 : 1}");
+		// declared as optional content, with no terraform default
+		let variables = mail_box().with_dane(true).variables(&stack);
+		variables.len().xpect_eq(1);
+		variables[0].absent_is_empty().xpect_true();
+		json["variable"]["tlsa_mail"]
+			.as_object()
+			.unwrap()
+			.contains_key("default")
+			.xpect_false();
+		mail_box()
+			.with_dane(true)
+			.tlsa_secret()
+			.name(&stack)
+			.as_str()
+			.xpect_eq("/beet-infra/dev/mail-tlsa");
+		// off: nothing
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		config
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xnot()
+			.xpect_contains("TLSA")
+			.xnot()
+			.xpect_contains("tlsa_mail");
+		mail_box().variables(&stack).is_empty().xpect_true();
+	}
+
+	/// A dual-stack network gives the box one address out of the subnet's
+	/// `/64` and an `AAAA` beside the `A`, both read off the instance; a v4
+	/// network renders neither, so nothing existing changes.
+	#[beet_core::test]
+	fn ipv6_follows_the_network() {
+		let render = |ipv6: bool| {
+			let block = mail_box();
+			let (scope, _dir) =
+				RenderScope::test_render_stack(sydney_stack(), |parent| {
+					let (network, blobs) = siblings();
+					let vpc = parent.spawn(network.with_ipv6(ipv6)).id();
+					parent.spawn((block, VpcRef(vpc)));
+					parent.spawn(blobs);
+					RelayMode::Ses(SesRelay::default()).insert(
+						&mut parent.spawn(
+							MailDomainBlock::new(
+								"stalwart.beetmash.com",
+								"mail.beetmash.com",
+							)
+							.with_records(MailRecords::None),
+						),
+					);
+				});
+			scope.finish().unwrap().2.to_json().into_json()
+		};
+		let json = render(true);
+		json["resource"]["aws_instance"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["ipv6_address_count"]
+			.xpect_eq(serde_json::json!(1));
+		let aaaa = json["resource"]["cloudflare_dns_record"]
+			.as_object()
+			.unwrap()
+			.values()
+			.find(|record| record["type"] == "AAAA")
+			.unwrap();
+		aaaa["name"].as_str().unwrap().xpect_eq("mail.beetmash.com");
+		aaaa["proxied"].as_bool().unwrap().xpect_false();
+		aaaa["content"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("aws_instance.")
+			.xpect_contains(".ipv6_addresses[0]}");
+		json["output"]["mail_public_ipv6"].is_object().xpect_true();
+		let json = render(false);
+		json["resource"]["aws_instance"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["ipv6_address_count"]
+			.is_null()
+			.xpect_true();
+		json["resource"]["cloudflare_dns_record"]
+			.as_object()
+			.unwrap()
+			.values()
+			.any(|record| record["type"] == "AAAA")
+			.xpect_false();
+		json["output"]["mail_public_ipv6"].is_null().xpect_true();
 	}
 
 	/// A declaration that cannot serve mail fails before any resource exists,

@@ -324,6 +324,75 @@ async fn prune(mail: &MailStack, keep: &str, retain: usize) -> Result {
 	Ok(())
 }
 
+/// Deletes every snapshot this block's lineage holds for the stage, once the
+/// volume they were taken of is gone.
+/// `<StalwartSnapshotPrune/>` — the teardown half of [`StalwartSnapshot`], for
+/// a stage whose data is disposable.
+///
+/// A snapshot every deploy is a lineage nothing else prunes, and a destroyed
+/// stage's lineage outlives its volume: two `Stage=drill` snapshots after every
+/// drill that deployed twice, deleted by hand each time. This is the sweep,
+/// and it is declared in a teardown group rather than run by [`StackTeardown`]
+/// because it must be OPT-IN: a production stack's last snapshots are the last
+/// copies of its mail, and a destroy that took them would be the incident.
+/// It refuses on a protected volume for that reason, so a tag copied into the
+/// wrong entry fails rather than prunes.
+///
+/// After `<TofuDestroy/>` in convergence order, since the snapshot is taken
+/// before the apply: the destroy takes the volume, then this takes its
+/// history. Every snapshot carrying the lineage tags goes, whatever its state,
+/// and a snapshot taken by hand (which carries none of them) never does.
+#[action]
+#[derive(Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn StalwartSnapshotPrune(
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	if mail.mail_box.data_volume_protected(&mail.stack) {
+		bevybail!(
+			"stage '{}' protects its data volume, so its snapshots are the \
+			last copies of its data and are never pruned by a destroy",
+			mail.stack.stage()
+		);
+	}
+	let region = mail.stack.region();
+	let filters =
+		StalwartSnapshot::snapshot_filters(&mail.stack, &mail.mail_box);
+	let listing = aws_cli_ext::ec2(region, [
+		"describe-snapshots",
+		"--owner-ids",
+		"self",
+		"--filters",
+		&filters[0],
+		&filters[1],
+		&filters[2],
+		"--query",
+		"Snapshots[].SnapshotId",
+		"--output",
+		"json",
+	])
+	.run_async_stdout()
+	.await?;
+	let ids: Vec<String> = serde_json::from_str(&listing)?;
+	if ids.is_empty() {
+		info!("no snapshots in the {} lineage", mail.stack.stage());
+		return Pass(cx.input).xok();
+	}
+	for id in &ids {
+		aws_cli_ext::ec2(region, ["delete-snapshot", "--snapshot-id", id])
+			.run_async()
+			.await?;
+		info!("deleted snapshot {id}");
+	}
+	info!(
+		"pruned the {} lineage: {} snapshot(s)",
+		mail.stack.stage(),
+		ids.len()
+	);
+	Pass(cx.input).xok()
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

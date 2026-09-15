@@ -199,7 +199,9 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 <Stack app_name="acme" region="ap-southeast-2">
 	<DeployRoutes/>
 
-	<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
+	<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false ipv6=true/>
+	<SnsTopicBlock label="ses-events" name="acme-ses-events"
+		publishers={["ses.amazonaws.com"]}/>
 	<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 		runtime_write=true object_versioning=true/>
 	<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
@@ -231,13 +233,13 @@ Now the automated part. One `.bsx` file declares the whole system, and the bound
 
 A domain is one `MailDomainBlock` plus the relay spread beside it, and everything else composes from the pair: the SES identity, every record that makes the domain deliverable and discoverable, and the mailboxes it holds. A second domain is a second tag rather than an edit, which is exactly what makes the cutover in section 8 one more tag beside the others.
 
-The two topics are two different things and are named separately for that reason. `alarms_topic` on the domain is where a reputation alarm fires, and every relay has one. `events_topic` on the `SesRelay` is where the raw stream of bounce, complaint, rejection and delay *objects* is published, and only SES emits that. In practice they are the same topic, as here; one of them survives a change of relay.
+The two topics are two different things and are named separately for that reason. `alarms_topic` on the domain is where a reputation alarm fires, and every relay has one. `events_topic` on the `SesRelay` is where the raw stream of bounce, complaint, rejection and delay *objects* is published, and only SES emits that. In practice they are the same topic, as here; one of them survives a change of relay. The topic itself is the `SnsTopicBlock`: account-wide, so declared once and named by its bare name everywhere else, with a policy that lets SES publish under an `AWS:SourceAccount` condition (the default policy grants a service nothing, and SES drops events it cannot publish without a word). If you made the topic by hand in section 5, `adopt=true` on the block has the first apply import it and its policy rather than fail on the duplicate name; take the flag off after that deploy, since an import of a topic a later destroy has removed refuses to apply. What stays by hand is the subscription that pages you: its endpoint is your address, and its confirmation is a click in your inbox whatever owns the resource.
 
 Some notes on the declarations that are not obvious from reading them:
 
 **The order of the `MailDomainBlock` tags is load-bearing, and nothing at the tag says so.** The first one declared becomes the server's *primary* domain, which settles two things you would not go looking for in a list of domains. It is what `system('domain')` resolves to, so it is the domain every outbound report is addressed from (`noreply-dmarc@<primary>`, section 7). And it is the only domain whose ACME order carries the *box's* own hostname, since that name belongs to no mail domain and has to ride along on one. Reordering the tags therefore moves the server's identity and reissues a certificate, and deleting the first tag hands both to whichever domain happens to be next. Put the domain you intend to keep second, directly behind the staging domain it will replace, so that retiring staging promotes the right one rather than the newsletter domain.
 
-**The VPC declares one public subnet in zone `a`.** The stack is one public EC2 box and one EBS volume that must share its availability zone, so `zones={["a"]} private_tier=false` says exactly that and emits one subnet. The topology is a declaration rather than a default because nothing in the block can infer it: leave those attributes off and you get two zones with a public and a private subnet in each, which is what an `<RdsPostgresBlock/>` subnet group requires and what a multi-zone workload wants. Subnets are free either way; the reason to declare the small one is that a private tier nothing sits in is a tier somebody will later wonder about.
+**The VPC declares one public subnet in zone `a`.** The stack is one public EC2 box and one EBS volume that must share its availability zone, so `zones={["a"]} private_tier=false` says exactly that and emits one subnet. The topology is a declaration rather than a default because nothing in the block can infer it: leave those attributes off and you get two zones with a public and a private subnet in each, which is what an `<RdsPostgresBlock/>` subnet group requires and what a multi-zone workload wants. Subnets are free either way; the reason to declare the small one is that a private tier nothing sits in is a tier somebody will later wonder about. `ipv6=true` makes that public subnet dual-stack and the box takes one address out of its `/64` and publishes an `AAAA` beside its `A`; section 10 has what that changes.
 
 **The box is cattle; its data volume is not.** Machine config is cloud-init user data, and any change to that user data replaces the instance. Inbound SMTP during a rebuild is covered by sender retries, which run for days. What must survive that replacement is the mail itself, so Stalwart's SQLite database sits on its own encrypted gp3 volume at `/var/lib/stalwart`, a separate resource in the subnet's availability zone that is detached from the old box and reattached to the new one. Production defaults to `prevent_destroy` with a final snapshot; non-production defaults to disposable, so the same declaration can run a restore drill and then be destroyed. Set `data_volume_protected` explicitly only to override that stage-derived data grade.
 
@@ -260,6 +262,8 @@ The deploy route is a sequence, and its order is the design:
 	<EipReverseDns/>
 	<StalwartProvision ssh_key="~/.ssh/id_ed25519_mail"/>
 	<MtaStsPublish/>
+	<MailDane ssh_key="~/.ssh/id_ed25519_mail"/>
+	<TofuApply/>
 	<MailProbe mailbox="probe" sender_domain="news.example.com"/>
 	<ZoneAudit/>
 </Route>
@@ -267,7 +271,7 @@ The deploy route is a sequence, and its order is the design:
 
 The bootstrap admin secret is minted before the box starts. `EnsureDkimKey` is create-if-missing for a sharper reason than the password: a rotated key under an already-published selector is a fortnight of unverifiable mail. The key is minted before the apply and the apply publishes its public half, so the selector the world resolves and the key the server signs with are one parameter read twice. Letting the server generate its own key would mean reading it back and publishing in a second apply, with a window in between where mail is signed by a selector nothing answers for. `StalwartSnapshot` then finds the persistent volume by its `Name`, `Project` and `Stage` tags and waits for its snapshot to complete. No volume exists on the first deploy, so that case is an intentional skip; retries within one deploy use its UUID as EC2's idempotency token.
 
-The apply starts only after the snapshot completes. Reverse DNS comes after the apply because AWS validates the forward record before publishing the reverse one. Provisioning comes after that, because Stalwart 0.16 keeps listeners, routing, domains and accounts as objects *inside* its data store rather than in any file terraform writes. The MTA-STS policy body is published after the apply that published the record pointing at it. The probe proves a message goes out and a message comes back authenticated. And the audit runs last, because it is the only check that can see what the deploy did *not* do: a record left behind by a block that stopped declaring it.
+The apply starts only after the snapshot completes. Reverse DNS comes after the apply because AWS validates the forward record before publishing the reverse one. Provisioning comes after that, because Stalwart 0.16 keeps listeners, routing, domains and accounts as objects *inside* its data store rather than in any file terraform writes. The MTA-STS policy body is published after the apply that published the record pointing at it. The DANE pin is read off the box after provision and published by a second apply, for the reason section 10 gives. The probe proves a message goes out and a message comes back authenticated. And the audit runs last, because it is the only check that can see what the deploy did *not* do: a record left behind by a block that stopped declaring it.
 
 Two things about running these verbs:
 
@@ -519,15 +523,39 @@ Smaller things the drill taught:
 - The staged file is integrity-checked *before* the healthy server is stopped. A damaged download that took the service down first would have turned a bad backup into an outage, which is the one failure mode a drill must not rehearse into the real procedure.
 - The replaced database's `-wal` and `-shm` sidecars are deleted rather than left. They belong to the file that was just overwritten, and SQLite opening a fresh database beside another database's write-ahead log is corruption with a green exit code.
 - `scp` cannot write into `/var/lib/stalwart`, which is `0700 stalwart:stalwart` and correctly so for a directory holding mail. The snapshot lands in the login user's home and is `install -o stalwart -g stalwart -m 0600`'d across. Generally: anything delivered into a hardened service directory is installed, not copied.
-- Teardown leaves behind the drill's SSM parameters, which actions create rather than terraform. Delete them, or the next drill signs in with a stale credential.
+- A drill deployed twice leaves its pre-deploy snapshots behind, since nothing prunes a destroyed stage's lineage. `<StalwartSnapshotPrune/>` in the drill's teardown group takes them after `tofu destroy` takes the volume; it refuses on a protected volume, so the tag cannot be copied into production by accident.
 - While a drill stage is up, an audit of the production stage reports the drill's records as strays. That is by design and it resolves on teardown. Run the production audit after, not during.
 - The drill does not prove the blob store. Message bodies are in S3 and only their metadata is in SQLite, so a drill with its own empty blob bucket proves the database came back and says nothing about the bodies. Versioning plus the public access block is the blob story, and it is a different rehearsal.
+
+## 10. The box's identity on the wire: IPv6 and DANE
+
+Two things the free checker at `internet.nl` will fail a fresh mail domain on, both of which are one attribute once the pieces beneath them exist. Neither carries mail on its own: outbound rides the relay, and inbound works without either. They are about what a *careful* sender sees, and they are also where a mistake costs delivery rather than a score, so both are built to be derived rather than typed.
+
+### IPv6
+
+`ipv6=true` on the `VpcBlock` gives the vpc an Amazon-provided `/56`, each public subnet a `/64` at the same index as its `/24`, and the public route table a `::/0` to the gateway. The private tier stays v4-only, on purpose: a v6 address is globally routable, so a private subnet with one has exactly the path off the vpc the tier promises not to have. The box then takes one address out of its subnet's `/64` (an in-place change on a running instance, no rebuild) and publishes an `AAAA` beside its `A`, read off the instance. Stalwart already binds `[::]`, so that is the whole of the box's side.
+
+What it changes: senders that prefer v6 reach you over it, which is inbound only in practice since outbound leaves through the relay, and a broken v6 path degrades to a sender's v4 fallback rather than to loss. Two things to know. Let's Encrypt validates over v6 *first* when an `AAAA` exists and falls back to v4 only on a network error, so the first renewal after publishing the record is the first real test of the v6 path; the restore drill, deployed dual-stack, rehearses a fresh issuance with an `AAAA` present every time it runs. And your deploy machine probably has no v6 (residential connections mostly do not), so verify the address from the box (`ip -6 addr`, `curl -6` against its own 443) and the reachability from outside with internet.nl, not from your desk.
+
+### DANE
+
+DANE is a `TLSA` record beside the MX target, at `_25._tcp.<hostname>`, naming the key the box serves on port 25. A validating sender (a minority, mostly European: Posteo, mail.de, the Dutch and German public sectors, Comcast) refuses any other certificate for that name outright, and unlike MTA-STS there is no `testing` mode and no report stream. That is the whole hazard: a pin that stops matching the served key is refused sessions, kept up until the record or the key changes. Everything below follows from refusing to let those two drift.
+
+The precondition is DNSSEC on the zone, active at the parent: an unsigned pin is ignored by every validator (section 7 has the fortnight the DS took to reach the parent). The record is `3 1 1`, the SHA-256 of the leaf's public key: the leaf rather than the issuer, because Let's Encrypt rotates intermediates unannounced; the key rather than the certificate, because a key can survive a renewal and a certificate cannot.
+
+*Can* survive. Read your server's ACME code before publishing a pin, because whether the key is reused across renewals is the whole design question. Stalwart 0.16 mints a fresh P-256 pair per renewal by default and reuses the stored certificate's key only when the ACME provider's `reuseKey` is set; provision sets it, so from then on the pin is a one-time publish per key. The key still changes on a fresh data store (a destroy and redeploy, a migration), and provision is where a fresh store gets its first certificate.
+
+So the pin is read after provision, never before it, and never typed. `<MailDane/>` runs on the box, reads the digest port 25 presents to a peer that sends SNI and to one that does not, parks it in parameter store, and the second `<TofuApply/>` publishes it; the record reads that parameter as content whose *absence* publishes nothing, so a fresh stack renders no `TLSA` at its first apply and exactly one at its second, and a stack whose key did not change applies a no-op. `dane=true` on the `StalwartBlock` is the whole declaration. The standing check is in `watch`: the published pin over DNS-over-HTTPS with the `AD` flag, against the key 443 serves for the hostname (25 is unreachable from most deploy machines, and the two ports serve one certificate for one name).
+
+The finding that made the "with SNI and without" part necessary: a server holding one certificate per domain and no default answers a peer that sends no SNI with whichever certificate its hash map yields first, which is random per process. This box was serving the newsletter domain's certificate on port 25 to any peer that named nothing, a name that covers neither the MX nor the pin, and the phase that flipped MTA-STS to `enforce` had checked with SNI and, by luck of the seed, without. Not every MTA sends SNI. Provision now sets the server's default certificate to the one covering the box's own hostname, and the pin step refuses to publish while the two handshakes disagree. If you run more than one domain on a box, check the no-SNI handshake yourself before you trust either MTA-STS `enforce` or a pin: `openssl s_client -connect 127.0.0.1:25 -starttls smtp -noservername` on the box.
+
+The way back from a wrong pin is the way back from everything else here: one deploy, which re-reads the served key and republishes. What you cannot do is turn the failures into a report, so a pin is a promise you make with the monitoring you already have. internet.nl will note the absence of a rollover scheme (a second `TLSA` for the key you will move to next); there is none because the key does not move under `reuseKey`, and when it does move, on a fresh store, the deploy that moved it publishes the new pin before it ends. Ours went from the two failures in section 7 to 100% on the deploy that added both, with the DANE record shown as `3 1 1` and valid.
 
 ## What is automated, and what is not
 
 The honest summary, because a tutorial that blurs this line strands its reader at the first step with no command.
 
-**Fully declared and applied by beet:** the network, the persistent SQLite data volume, both buckets, the box and its machine config, every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export, the restore drill, and the off-account cold copy: its bucket, the scoped token that reaches it, its timer, the encrypted secrets export, the read-back probe and the cold restore.
+**Fully declared and applied by beet:** the network (dual-stack if asked), the persistent SQLite data volume, both buckets, the box and its machine config, the events topic and its publish policy (adopted from a hand-made one with a flag), every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the box's `A`, `AAAA` and DANE pin, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates, the default certificate, key reuse across renewals), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export, the restore drill and its snapshot pruning, and the off-account cold copy: its bucket, the scoped token that reaches it, its timer, the encrypted secrets export, the read-back probe and the cold restore.
 
 **Genuinely not automatable, and labelled as such:**
 
@@ -544,10 +572,10 @@ The honest summary, because a tutorial that blurs this line strands its reader a
 - A `Preflight` action doing the read-only permission sweep in section 3.
 - An action to fetch a release asset, hash it and emit the version and digest constants, so that a version bump is one command.
 - A native SMTP client, which would retire `curl` from the prerequisites and from the probe.
-- Something that subscribes to the SES events topic. The events and the alarms both arrive there and, until you run `aws sns subscribe --protocol email`, nobody is paged.
-- Adoption of the SNS topic itself, which is account-wide rather than stack-scoped and currently hand-made.
+- Something that subscribes to the SES events topic. The events and the alarms both arrive there and, until you run `aws sns subscribe --protocol email` and click the confirmation, nobody is paged. Deliberately not a declaration: the endpoint is a person's address and the confirmation is that person's click.
 - A scheduled pull from the cold bucket to hardware you control, initiated from outside both clouds. The cold copy closes one account being lost, not every credential at once.
-- Compaction of the cold `blobs/` prefix: copy-never-sync means a message deleted upstream is a blob kept cold forever, which is the point until it is the bill.
+- Compaction of the cold `blobs/` prefix: copy-never-sync means a message deleted upstream is a blob kept cold forever, which is the point until it is the bill. Designed (a compaction of blobs no retained snapshot references) and unbuilt at eight blobs.
+- Retiring one domain from a stack you keep. Provision is additive by design, so a domain removed from the entry keeps its accounts, aliases, credentials and parameters live on the server; the verb that converges with deletions is designed and unbuilt, because the only retirement so far was a destroy-and-redeploy that sidestepped it.
 - Regenerating provider bindings is a manual command rather than a route.
 
 ## Where to go next

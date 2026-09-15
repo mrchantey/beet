@@ -23,6 +23,8 @@ mod mail_cold_push;
 pub use mail_cold_push::*;
 mod mail_credentials;
 pub use mail_credentials::*;
+mod mail_dane;
+pub use mail_dane::*;
 mod mail_health;
 pub use mail_health::*;
 mod mail_probe;

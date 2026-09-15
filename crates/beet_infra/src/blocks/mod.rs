@@ -71,6 +71,11 @@ pub use vpc_block::*;
 mod rds_postgres_block;
 #[cfg(feature = "rds_postgres_block")]
 pub use rds_postgres_block::*;
+// The account-wide SNS topic a stack's alarms and event streams fire into.
+#[cfg(feature = "sns_topic_block")]
+mod sns_topic_block;
+#[cfg(feature = "sns_topic_block")]
+pub use sns_topic_block::*;
 #[cfg(feature = "bindings_aws_dynamo")]
 mod dynamo_table_block;
 #[cfg(feature = "bindings_aws_dynamo")]

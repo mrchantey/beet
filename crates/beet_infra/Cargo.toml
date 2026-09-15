@@ -38,6 +38,9 @@ fargate_block = ["bindings_aws_common","bindings_aws_dynamo","bindings_aws_farga
 vpc_block = ["bindings_aws_vpc"]
 # The company Postgres instance, in the private subnets of a `vpc_block` vpc.
 rds_postgres_block = ["vpc_block", "bindings_aws_rds"]
+# An account-wide SNS topic and its publish policy, declared or adopted by the
+# stack whose alarms and event streams fire into it.
+sns_topic_block = ["bindings_aws_sns", "bindings_aws_common"]
 # Opt-in Cloudflare DNS + load-balancer failover paths for the AWS blocks. Pulls
 # the cloudflare terraform bindings; without it the AWS blocks are Route53-only.
 # Also pulls `bindings_aws_dns`: enabling this compiles the shared `dns` module
@@ -60,6 +63,7 @@ mail = [
 	"bindings_aws_common",
 	"cloudflare_dns",
 	"vpc_block",
+	"sns_topic_block",
 ]
 bindings_aws_common = []
 bindings_aws_dynamo = []
@@ -85,6 +89,9 @@ bindings_aws_ses = []
 bindings_aws_ssm = []
 # EventBridge Scheduler: the recurring timer a `ScheduledJobBlock` declares.
 bindings_aws_scheduler = []
+# SNS: the account-wide topic an `SnsTopicBlock` declares and the policy that
+# lets a service publish into it.
+bindings_aws_sns = []
 bindings_aws_all = [
 	"bindings_aws_common",
 	"bindings_aws_dynamo",
@@ -98,6 +105,7 @@ bindings_aws_all = [
 	"bindings_aws_ses",
 	"bindings_aws_ssm",
 	"bindings_aws_scheduler",
+	"bindings_aws_sns",
 	"bindings_aws_vpc",
 ]
 bindings_cloudflare_common = []
