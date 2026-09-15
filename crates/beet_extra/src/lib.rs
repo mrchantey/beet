@@ -96,14 +96,14 @@ pub(crate) mod beet {
 		// spatial prelude.
 		#[cfg(feature = "bevy_default")]
 		pub use beet_spatial::prelude::*;
-		// the render scenes' `CallOnReady` load verb and its `OutcomeStatus` opt-in
+		// the render scenes' `CallOnReady` load verb and its `OutcomeOverload` adapter
 		// live in `beet_net` with the rest of the family; pull just those in (not the
 		// whole net prelude) so the render set resolves them without depending on the
 		// `thread` example wiring.
 		#[cfg(feature = "bevy_default")]
 		pub use beet_net::prelude::CallOnReady;
 		#[cfg(feature = "bevy_default")]
-		pub use beet_net::prelude::OutcomeStatus;
+		pub use beet_net::prelude::OutcomeOverload;
 		#[cfg(feature = "thread")]
 		pub use beet_thread::prelude::*;
 	}

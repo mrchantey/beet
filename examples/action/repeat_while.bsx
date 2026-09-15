@@ -9,7 +9,7 @@ exactly twice.
 
 The loop ends by returning the sequence's fail, the `break` the condition
 raised. An outcome is a branch rather than an error, so the entry still exits
-ok; a scene whose outcome should be its status adds `{OutcomeStatus}`.
+ok; a scene whose outcome should be its status adds `{OutcomeOverload{error_on_fail:true}}`.
 
     beet --main=examples/action/repeat_while.bsx
 -->

@@ -19,8 +19,8 @@ use beet_net::prelude::*;
 /// required [`ExchangeOverload`], mapping `Pass` to `200` and `Fail` to the failing
 /// step's response. The request threads child to child, and children with no
 /// action at all (config blocks) or a differently-shaped one are skipped via
-/// [`BypassErrors`]; a step that is natively another shape carries its own
-/// [`ActionOverload`].
+/// [`BypassErrors`]; a `() -> Outcome` leaf serves as a step through
+/// [`OutcomeOverload`].
 ///
 /// [`NONE_VALID`](ChildError::NONE_VALID) is deliberately NOT bypassed: a route
 /// that skipped every child ran nothing, and a `200` for work that never
@@ -176,41 +176,28 @@ mod test {
 			.xpect_contains("this binary did not register: `<TofuApply>`");
 	}
 
-	/// A `() -> Outcome` behavior step serves the sequence through its own
-	/// [`ActionOverload`], threading the request onward: the old
-	/// `BehaviorSequence` semantics with no registry and no dedicated marker.
+	/// A `() -> Outcome` leaf serves as a step through [`OutcomeOverload`],
+	/// threading the request on to the next step.
 	#[beet_core::test]
-	async fn overloaded_step_runs() {
+	async fn outcome_leaf_serves_as_a_step() {
 		let ran = Store::new(false);
 		let recorder = ran.clone();
 		router_world()
 			.spawn((Router::with_defaults(), children![(
 				PathPartial::new("run"),
 				ExchangeSequence,
-				children![(
-					Action::<(), Outcome>::new_pure(move |_: ActionContext| {
-						recorder.set(true);
-						Outcome::PASS.xok()
-					}),
-					ActionOverload::<Request, Outcome<Request, Response>>::new(
-						Action::new_async(
-						async |cx: ActionContext<Request>| -> Result<
-							Outcome<Request, Response>,
-						> {
-							let behavior = cx
-								.caller
-								.get(|action: &Action<(), Outcome>| action.clone())
-								.await?;
-							match cx.caller.call_detached(behavior, ()).await? {
-								Pass(()) => Outcome::Pass(cx.input),
-								Fail(()) => {
-									Outcome::Fail(Response::internal_error())
-								}
+				children![
+					(
+						OutcomeOverload::default(),
+						Action::<(), Outcome>::new_pure(
+							move |_: ActionContext| {
+								recorder.set(true);
+								Outcome::PASS.xok()
 							}
-							.xok()
-						},
-					)),
-				)],
+						),
+					),
+					passing_step()
+				],
 			)]))
 			.exchange(Request::get("run"))
 			.await

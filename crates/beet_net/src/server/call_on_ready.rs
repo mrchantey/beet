@@ -91,7 +91,8 @@ impl CallOnReady {
 	///   code
 	/// - `() -> Outcome`, a behavior: zero once the call resolves, whatever the
 	///   outcome, since an [`Outcome`] is a branch rather than an error; a scene
-	///   whose outcome *is* its status says so with [`OutcomeStatus`]
+	///   whose outcome *is* its status says so with [`OutcomeOverload`]'s
+	///   `error_on_fail`
 	/// - `() -> ()`, a plain action, always zero
 	///
 	/// A long-running action (a parked [`RunningSet`], an endless `Repeat`)
@@ -351,23 +352,19 @@ mod test {
 		.xpect_eq(AppExit::Success);
 	}
 
-	/// [`OutcomeStatus`] is the opt-in that makes the outcome the status, so
-	/// the same failing load exits with a `500`'s code.
+	/// [`OutcomeOverload::error_on_fail`] is the opt-in that makes the outcome
+	/// the status, so the same failing load exits nonzero.
 	#[beet_core::test]
-	async fn outcome_status_makes_a_fail_nonzero() {
+	async fn error_on_fail_makes_a_fail_nonzero() {
 		exit_of((
 			CallOnReady,
-			OutcomeStatus,
+			OutcomeOverload::error_on_fail(),
 			Action::<(), Outcome>::new_pure(|_: ActionContext| {
 				Outcome::FAIL.xok()
 			}),
 		))
 		.await
-		.xpect_eq(AppExit::Error(
-			StatusCode::INTERNAL_SERVER_ERROR
-				.to_exit_code()
-				.unwrap_err(),
-		));
+		.xpect_eq(AppExit::error());
 	}
 
 	/// `CallOnReady` on a behavior entity converts the load call through the

@@ -81,11 +81,11 @@ pub use channel_http_server::*;
 mod call_on_ready;
 #[cfg(feature = "action")]
 pub use call_on_ready::*;
-// The opt-in making a behaviour's outcome the load's status.
+// A `() -> Outcome` behaviour served through the request shapes.
 #[cfg(feature = "action")]
-mod outcome_status;
+mod outcome_overload;
 #[cfg(feature = "action")]
-pub use outcome_status::*;
+pub use outcome_overload::*;
 
 // The start path: the `CallOnStart` verb calls an entity's action when the run
 // above it starts, observing its own entity's swept `StartRunning<Request>`.
