@@ -22,6 +22,13 @@ use bytes::Bytes;
 ///
 /// Erased on construction rather than a reflected component: its two halves
 /// are already erased stores, composed by whichever driver resolved them.
+///
+/// A change routes to the fork from three keys: its own base (what its
+/// [`WatchDir`] keys the watcher's events to), the local half's and the
+/// upstream's (a half spawned as its own store emits keyed to itself). Every
+/// other store compares one key, so the fork answers
+/// [`did_change`](BlobStoreProvider::did_change) and
+/// [`matches_object`](BlobStoreProvider::matches_object) for all three.
 #[derive(Clone)]
 pub struct StoreFork {
 	/// The store writes land in and reads try first.
@@ -115,9 +122,20 @@ impl BlobStoreProvider for StoreFork {
 		self.upstream.base_dir().or_else(|| self.local.base_dir())
 	}
 
-	/// A change to either half is a change to this store.
+	/// A change keyed to this fork, or to either half, is a change to it.
 	fn did_change(&self, event: &BlobEvent) -> bool {
-		self.local.did_change(event) || self.upstream.did_change(event)
+		(self.root_key() == event.store.root_key()
+			&& key_covers(&self.subdir(), &event.root_relative_path()))
+			|| self.local.did_change(event)
+			|| self.upstream.did_change(event)
+	}
+
+	/// The object at `path`, keyed to this fork or to either half.
+	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+		(self.root_key() == event.store.root_key()
+			&& self.subdir().join(path) == event.root_relative_path())
+			|| self.local.matches_object(event, path)
+			|| self.upstream.matches_object(event, path)
 	}
 
 	fn region(&self) -> Option<String> { self.upstream.region() }
@@ -296,6 +314,38 @@ mod test {
 
 	/// Both halves rebase together through an entry's `<RepoRoot>`, so a key
 	/// keeps naming the same file on each side.
+	/// An event keyed to either half or to the fork's own base (what its
+	/// watcher keys to) is a change to a scoped fork and to its blob, so a
+	/// fork-backed repo store reloads and its documents re-read; a sibling
+	/// object or an unrelated store is neither.
+	#[beet_core::test]
+	fn routes_events_from_either_half_and_its_base() {
+		let (local, upstream) = (BlobStore::temp(), BlobStore::temp());
+		let fork =
+			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
+		let scoped = fork.with_subdir(RelPath::from("docs"));
+		let blob = scoped.blob(RelPath::from("a.md"));
+		let event = |store: &BlobStore, path: &str| {
+			BlobEvent::new(
+				store.clone(),
+				RelPath::from(path),
+				BlobEventKind::Changed,
+			)
+		};
+		for source in [&local, &upstream, &fork.base()] {
+			scoped.did_change(&event(source, "docs/a.md")).xpect_true();
+			blob.matches_event(&event(source, "docs/a.md")).xpect_true();
+			blob.matches_event(&event(source, "docs/b.md"))
+				.xpect_false();
+		}
+		let unrelated = BlobStore::temp();
+		scoped
+			.did_change(&event(&unrelated, "docs/a.md"))
+			.xpect_false();
+		blob.matches_event(&event(&unrelated, "docs/a.md"))
+			.xpect_false();
+	}
+
 	#[beet_core::test]
 	async fn rebases_both_halves() {
 		let local = BlobStore::temp();

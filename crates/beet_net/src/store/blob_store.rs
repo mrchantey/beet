@@ -258,6 +258,9 @@ impl BlobStoreProvider for BlobStore {
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.provider.did_change(event)
 	}
+	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+		self.provider.matches_object(event, path)
+	}
 	fn region(&self) -> Option<String> { self.provider.region() }
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		self.provider.store_exists()

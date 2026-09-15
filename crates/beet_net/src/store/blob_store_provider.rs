@@ -132,6 +132,16 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 			&& key_covers(&self.subdir(), &event.root_relative_path())
 	}
 
+	/// True if `event` is exactly the object at `path` in this store: same
+	/// backing, and the root-relative locations are equal (object-exact, where
+	/// [`did_change`](Self::did_change) is scope-covering). The test behind
+	/// [`Blob::matches_event`]; a composite store overrides it to answer for
+	/// its parts.
+	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+		self.root_key() == event.store.root_key()
+			&& self.subdir().join(path) == event.root_relative_path()
+	}
+
 	/// Returns the provider's region, if applicable.
 	fn region(&self) -> Option<String>;
 
@@ -379,6 +389,9 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn base_dir(&self) -> Option<AbsPath> { self.as_ref().base_dir() }
 	fn did_change(&self, event: &BlobEvent) -> bool {
 		self.as_ref().did_change(event)
+	}
+	fn matches_object(&self, event: &BlobEvent, path: &RelPath) -> bool {
+		self.as_ref().matches_object(event, path)
 	}
 	fn region(&self) -> Option<String> { self.as_ref().region() }
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {

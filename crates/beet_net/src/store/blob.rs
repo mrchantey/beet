@@ -41,12 +41,11 @@ impl Blob {
 		self.path == other.path && self.store.same_scope(&other.store)
 	}
 
-	/// True if `event` is this exact object: same backing and the
-	/// root-relative locations are equal (object-exact, not scope-covering).
+	/// True if `event` is this exact object (object-exact, not
+	/// scope-covering), as the store answers it
+	/// ([`BlobStoreProvider::matches_object`]).
 	pub fn matches_event(&self, event: &BlobEvent) -> bool {
-		self.store.root_key() == event.store.root_key()
-			&& self.store.subdir().join(&self.path)
-				== event.root_relative_path()
+		self.store.matches_object(event, &self.path)
 	}
 
 	/// Insert (or overwrite) the blob's content.
