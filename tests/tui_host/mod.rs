@@ -16,6 +16,9 @@
 #![allow(dead_code)]
 use beet::prelude::*;
 
+#[path = "../example_store/mod.rs"]
+mod example_store;
+
 /// The examples directory in the repo, the store every suite seeds itself
 /// from.
 pub const ENTRY_DIR: &str = "examples/ui";
@@ -41,16 +44,7 @@ impl TuiHost {
 	/// The files at `paths` within [`ENTRY_DIR`], copied off disk into an
 	/// in-memory store.
 	pub async fn seeded_store(paths: &[&str]) -> BlobStore {
-		let disk = BlobStore::new(FsStore::new(
-			AbsPath::new_workspace_rel(ENTRY_DIR).unwrap(),
-		));
-		let store = BlobStore::temp();
-		for path in paths {
-			let path = RelPath::from(*path);
-			let bytes = disk.get(&path).await.unwrap();
-			store.insert(&path, bytes).await.unwrap();
-		}
-		store
+		example_store::seeded_store(ENTRY_DIR, paths).await
 	}
 
 	/// Boot the entry at `entry` within `store` at a `size`-cell viewport:

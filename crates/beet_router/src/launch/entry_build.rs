@@ -299,19 +299,22 @@ pub struct EntrySources {
 /// A template read from an entry's `<TemplateDir>`.
 pub struct TemplateSource {
 	/// The `<TemplateDir src>` it was read from, store-root-relative.
-	dir: RelPath,
+	pub dir: RelPath,
 	/// Its path relative to `dir`, naming the module it registers as
 	/// (`widgets/Card.bsx` -> `widgets::Card`).
-	rel: RelPath,
-	source: String,
+	pub rel: RelPath,
+	pub source: String,
 }
 
+// the watcher's half: live reload alone maps a template back to its path
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 impl TemplateSource {
 	/// The store-root-relative path, matching the [`BlobEvent`] paths the
 	/// watcher emits.
 	fn store_path(&self) -> RelPath { self.dir.join(&self.rel) }
 }
 
+#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 impl EntrySources {
 	/// The entry-level templates by the registry key that instantiates them
 	/// (`widgets/Card.bsx` -> `widgets::Card`), each resolved to its store path,

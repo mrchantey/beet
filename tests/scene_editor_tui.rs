@@ -135,6 +135,10 @@ async fn a_first_boot_forks_the_page() {
 	host.folded_frame()
 		.xpect_contains("Garden")
 		.xpect_contains("carrots")
+		// the footer's line for this surface, and not the browser's
+		.xpect_contains("Ctrl+C quits")
+		.xnot()
+		.xpect_contains("edits stay in this browser")
 		// closed: the tree is not on the page
 		.xnot()
 		.xpect_contains("#0 main");

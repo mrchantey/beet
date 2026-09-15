@@ -360,10 +360,15 @@ test-bsx-site-browser *args:
 _test-bsx-site-browser *args:
 	cargo test --test bsx_site_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
 
-# The scene editor example in a real browser: build `beet-ui.wasm`, serve the
-# example as the binary does and prove the boot is invisible: the served page
-# adopted untouched, a pre-boot click landing after it, a returning editor never
-# shown the published text. Needs chromedriver + a chromium on PATH.
+# The scene editor example in a real browser, the terminal suite's twin: build
+# `beet-ui.wasm`, serve the example as the binary does and drive the editor in
+# the tab through trusted input: the published page painted and booted with the
+# browser's store untouched, the edit loop (retype, add, reparent, remove)
+# surviving a reload from the fork in IndexedDB, an added child indenting under
+# its parent, the editor removed as an ordinary edit; and the boot invisible:
+# the served page adopted untouched, a pre-boot click landing after it, a
+# returning editor never shown the published text. Needs chromedriver + a
+# chromium on PATH.
 test-scene-editor-browser *args:
 	just build-wasm-ui
 	just _test-scene-editor-browser {{ args }}

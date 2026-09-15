@@ -34,8 +34,10 @@ quit and run again: every edit came back from the fork.
 `git checkout` is the reset; deleting `scene.json` re-forks the original.
 -->
 <CallOnReady {(HttpServer, TuiServer, DomServer, SweepDescendants)}>
-	<!-- the terminal launch needs the tui host, the browser launch the web
-	     runtime: each names the one it has, and the entry keeps its shape on both. -->
+	<!-- one entry, three launches: the site and the terminal run from the
+	     native binary, which carries the tui host, and the browser from the web
+	     runtime. Each launch names the one it has, so the entry keeps its shape
+	     on all three and refuses a binary that could paint on none. -->
 	<RequireCfg cfg="feature:tui || feature:web"/>
 	<Router {Layout{template:"EditorShell"}}>
 		<TemplateDir src="templates"/>
@@ -45,10 +47,13 @@ quit and run again: every edit came back from the fork.
 		<AssetsDir src="assets" prefix="assets"/>
 		<Route path="/" {FixedPage}>
 			<SceneBlob path="scene_editor/scene.json" from="scene_editor/scene.bsx"/>
-			<!-- every key here works on any beet terminal surface; the page
-			     says so because nothing else can. -->
+			<!-- what the keys do on each surface, one line per surface forked by
+			     the `terminal-only`/`terminal-hidden` utilities: the terminal's
+			     bindings are the page's own and the browser's are the browser's,
+			     and the page says so because nothing else can. -->
 			<footer class="text-body-small" bx:style="color=@token:OnSurfaceVariant">
-				Tab moves · Enter activates · ↑↓ scrolls · Ctrl+C quits
+				<span class="terminal-only">Tab moves · Enter activates · ↑↓ scrolls · Ctrl+C quits</span>
+				<span class="terminal-hidden">Tab moves · Enter activates · ↑↓ scrolls · edits stay in this browser</span>
 			</footer>
 		</Route>
 	</Router>
