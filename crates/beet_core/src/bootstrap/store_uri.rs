@@ -20,7 +20,9 @@ use core::str::FromStr;
 ///
 /// 1. `fs` / `fs:<path>`: a filesystem store, rooted at the context dir (the
 ///    cwd, or the dir [`rooted_at`](Self::rooted_at) pins) or at `<path>` when
-///    given, relative paths resolved against the context dir.
+///    given, relative paths resolved against the context dir. A leading `~`
+///    (`fs:~`, `fs:~/<path>`) expands to the home directory at parse, so the
+///    rendered uri is the absolute path.
 /// 2. `memory://<name>[/<path_prefix>]`: an in-memory store, every handle on one
 ///    name sharing one backing for as long as any handle lives, so a store a
 ///    test seeds by name is the store the uri names.
@@ -156,7 +158,9 @@ impl StoreUri {
 		// `fs:` and `fs:.` are the context dir itself, ie a bare `fs`
 		if let Some(path) = value.strip_prefix("fs:") {
 			return Self::Fs {
-				path_prefix: SmolPath::new(path.trim()).xmap(non_empty),
+				path_prefix: Self::expand_home(path.trim())?
+					.xmap(SmolPath::new)
+					.xmap(non_empty),
 			}
 			.xok();
 		}
@@ -186,6 +190,22 @@ impl StoreUri {
 			),
 		}
 		.xok()
+	}
+
+	/// Expand a leading `~` (exactly `~`, or `~/..`) to the home directory, so
+	/// a uri never spells a user's home; any other `~foo` is a literal segment.
+	fn expand_home(path: &str) -> Result<SmolStr> {
+		let rest = match path {
+			"~" => "",
+			path if path.starts_with("~/") => &path[1..],
+			path => return SmolStr::new(path).xok(),
+		};
+		match env_ext::var("HOME") {
+			Ok(home) => SmolStr::from(format!("{home}{rest}")).xok(),
+			Err(_) => bevybail!(
+				"`~` in `fs:{path}` needs a HOME environment variable"
+			),
+		}
 	}
 
 	/// The http store `url` names: its authority is the origin (absent, the
@@ -653,6 +673,26 @@ mod test {
 				origin: None,
 				path_prefix: Some("repo".into()),
 			});
+	}
+
+	/// A leading `~` is the home directory, expanded at parse so the rendered
+	/// uri is absolute; `~foo` is a literal dir name.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[crate::test]
+	fn expands_home_in_fs_paths() {
+		let home = env_ext::var("HOME").unwrap();
+		StoreUri::parse("fs:~/site")
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("fs:{home}/site"));
+		StoreUri::parse("fs:~")
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("fs:{home}"));
+		StoreUri::parse("fs:~foo")
+			.unwrap()
+			.to_string()
+			.xpect_eq("fs:~foo");
 	}
 
 	/// A page names its repo as a url: an authority is the origin, a bare

@@ -53,9 +53,13 @@ impl BlobSync {
 		for (path, stat) in &source {
 			match dest.get(path) {
 				Some(existing) if existing.matches(stat) => {
-					report.unchanged.push(path.clone())
+					report.unchanged.push(path.clone());
+					report.unchanged_bytes += stat.size;
 				}
-				_ => report.copied.push(path.clone()),
+				_ => {
+					report.copied.push(path.clone());
+					report.copied_bytes += stat.size;
+				}
 			}
 		}
 		async_ext::try_join_all_bounded(
@@ -99,6 +103,10 @@ pub struct BlobSyncReport {
 	pub unchanged: Vec<RelPath>,
 	/// Objects removed from the destination, only under `delete`.
 	pub removed: Vec<RelPath>,
+	/// Total size of the copied objects.
+	pub copied_bytes: u64,
+	/// Total size of the unchanged objects.
+	pub unchanged_bytes: u64,
 }
 
 impl BlobSyncReport {
@@ -107,15 +115,22 @@ impl BlobSyncReport {
 		self.unchanged.sort();
 		self.removed.sort();
 	}
+
+	/// A byte total as MiB with one decimal, ie `34.5 MiB`.
+	fn mib(bytes: u64) -> String {
+		format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+	}
 }
 
 impl core::fmt::Display for BlobSyncReport {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(
 			f,
-			"copied {}, unchanged {}, removed {}",
+			"copied {} ({}), unchanged {} ({}), removed {}",
 			self.copied.len(),
+			Self::mib(self.copied_bytes),
 			self.unchanged.len(),
+			Self::mib(self.unchanged_bytes),
 			self.removed.len()
 		)
 	}
@@ -151,6 +166,9 @@ mod test {
 		let report = sync.run().await.unwrap();
 		report.copied.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
 		report.unchanged.xpect_eq(Vec::<RelPath>::new());
+		// one byte per seeded body, so the totals are the counts
+		report.copied_bytes.xpect_eq(2);
+		report.unchanged_bytes.xpect_eq(0);
 		dest.get(&RelPath::new("dir/b.txt"))
 			.await
 			.unwrap()
@@ -159,6 +177,8 @@ mod test {
 		let report = sync.run().await.unwrap();
 		report.copied.xpect_eq(Vec::<RelPath>::new());
 		report.unchanged.xpect_eq(paths(&["a.txt", "dir/b.txt"]));
+		report.copied_bytes.xpect_eq(0);
+		report.unchanged_bytes.xpect_eq(2);
 	}
 
 	/// A changed object is re-sent even at the same size: the digest decides,

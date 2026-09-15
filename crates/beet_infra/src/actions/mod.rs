@@ -21,6 +21,7 @@ mod repo_sync;
 mod ssh_connection;
 pub mod ssm_ext;
 mod stack_teardown;
+mod store_sync;
 #[cfg(feature = "aws_sdk")]
 mod sync_s3_bucket;
 mod tofu_apply_action;
@@ -47,6 +48,7 @@ pub use repo_stage::*;
 pub use repo_sync::*;
 pub use ssh_connection::*;
 pub use stack_teardown::*;
+pub use store_sync::*;
 #[cfg(feature = "aws_sdk")]
 pub use sync_s3_bucket::*;
 pub use tofu_apply_action::*;

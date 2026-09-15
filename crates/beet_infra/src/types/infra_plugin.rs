@@ -320,13 +320,15 @@ impl Plugin for InfraPlugin {
 
 		// publishing the document: the stage assembling it, the mirror of
 		// that stage into the repo store, the borrowed-paths copy
-		// (`<DirCopy src=".." dest=".." paths=".."/>`) the stage hosts, and
+		// (`<DirCopy src=".." dest=".." paths=".."/>`) the stage hosts, the
+		// store-to-store mirror (`<StoreSync src=".." dest=".."/>`), and
 		// the retention window over the versions the store holds. Plain fs
 		// and `BlobStore` work, so none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::RepoStage>()
 			.register_type::<crate::prelude::RepoSync>()
 			.register_type::<crate::prelude::DirCopy>()
+			.register_type::<crate::prelude::StoreSync>()
 			.register_type::<crate::prelude::PruneVersions>();
 
 		// the CloudWatch tail and the target it composes its log group from.
@@ -594,6 +596,29 @@ mod test {
 			.unwrap()
 			.scope
 			.xpect_eq(ZoneAuditScope::Zone);
+	}
+
+	/// A store mirror authors both ends as strings coerced to `StoreUri`, and
+	/// both are required, so a half-written tag errors at call rather than
+	/// syncing the cwd onto itself; a `~` end is the home directory at parse.
+	#[beet_core::test]
+	fn the_store_sync_spawns_by_tag() {
+		let mut world = spawn(
+			r#"<StoreSync src="fs:~/.claude/projects" dest="fs:store/claude-code"/>"#,
+		);
+		let sync = world.query::<&StoreSync>().single(&world).unwrap();
+		let home = env_ext::var("HOME").unwrap();
+		sync.src
+			.as_ref()
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("fs:{home}/.claude/projects"));
+		sync.dest
+			.as_ref()
+			.unwrap()
+			.to_string()
+			.xpect_eq("fs:store/claude-code");
+		sync.delete.xpect_false();
 	}
 
 	/// The post-apply verbs author as tags too, each naming what it works on
