@@ -14,7 +14,9 @@
 //! edits: written through as a reference by [`write_picked_entity`], exactly
 //! as the variant select writes its variant, and read back from the document
 //! by [`follow_picked_entity`], so a target changed from outside shows without
-//! the select being rebuilt under the focus that chose it.
+//! the select being rebuilt under the focus that chose it. A reference writes
+//! on [`Blur`](WritePolicy::Blur) unless its field says otherwise: a pick
+//! refined key by key would reparent once per refinement.
 use super::field_layout::empty_note;
 use super::field_layout::labeled;
 use super::value_rebuild::RebuildKey;
@@ -35,7 +37,11 @@ pub(in crate::widgets) struct EntityPicker {
 
 /// The entity arm: the picker under its label, riding a rebuild over the
 /// scene it picks from.
-pub(super) fn entity_field(field: FieldRef, label: Option<String>) -> Snippet {
+pub(super) fn entity_field(
+	field: FieldRef,
+	label: Option<String>,
+	write: WritePolicy,
+) -> Snippet {
 	// the holder binds the whole document, since the candidates are every
 	// entity the scene holds, not the field
 	let scene_field = FieldRef {
@@ -46,7 +52,7 @@ pub(super) fn entity_field(field: FieldRef, label: Option<String>) -> Snippet {
 	let (keyed, built) = (field.clone(), field);
 	let rebuild = ValueRebuild::new(
 		move |scene| vec![RebuildKey::Name(fingerprint(scene, &keyed))],
-		move |resolver, scene, _key| picker(resolver, scene, &built),
+		move |resolver, scene, _key| picker(resolver, scene, &built, write),
 	);
 	labeled(label, rsx! { <div {(scene_field, rebuild)}/> })
 }
@@ -86,6 +92,7 @@ fn picker(
 	resolver: SchemaResolver,
 	scene: &Value,
 	field: &FieldRef,
+	write: WritePolicy,
 ) -> Snippet {
 	let Ok(entities) = SceneEntities::of(scene) else {
 		return empty_note("No scene to pick an entity from");
@@ -121,18 +128,47 @@ fn picker(
 			.into(),
 	);
 	rsx! {
-		<Select name={name} {(picker, value)}>{options}</Select>
+		<Select name={name} write={write} {(picker, value)}>{options}</Select>
 	}
 	.any_snippet()
+}
+
+impl EntityPicker {
+	/// Land the key `value` names as a reference in the field, unless the
+	/// field already references it: a picker showing what the field holds is
+	/// reporting, not asking.
+	pub(in crate::widgets) fn write(
+		&self,
+		entity: Entity,
+		value: &Value,
+		docs: &mut DocumentQuery,
+	) -> Result {
+		let Some(key) =
+			value.as_str().ok().and_then(|key| key.parse::<u32>().ok())
+		else {
+			return OK;
+		};
+		let current = docs
+			.field_value(entity, &self.field)
+			.ok()
+			.and_then(|value| EntitySchema::file_key(&value));
+		if current == Some(key) {
+			return OK;
+		}
+		let reference = EntitySchema::reference(key)?;
+		docs.with_field(entity, &self.field, move |slot| *slot = reference)?;
+		OK
+	}
 }
 
 /// System: a picker shows the entity its field references, however the field
 /// came to reference it: the read direction of the pair, run after
 /// [`write_picked_entity`] so a choice just written reads back as itself and
 /// an edit refused by the document layer (a cycle the picker could not see)
-/// snaps the select back.
+/// snaps the select back. A picker holding a pick for its blur is left
+/// showing the pick.
 pub(in crate::widgets) fn follow_picked_entity(
-	mut pickers: Query<(Entity, &EntityPicker, &mut Value)>,
+	mut pickers: Query<(Entity, &EntityPicker, &mut Value), Without<WriteHeld>>,
 	mut docs: DocumentQuery,
 ) {
 	for (entity, picker, mut value) in pickers.iter_mut() {
@@ -147,30 +183,22 @@ pub(in crate::widgets) fn follow_picked_entity(
 	}
 }
 
-/// System: a chosen entity becomes a reference to it in the bound field.
-///
-/// Equality-guarded like every other sync: a picker showing what the field
-/// already references is reporting, not asking, so only a *changed* key
-/// writes. Registered by [`FormPlugin`](crate::prelude::FormPlugin).
+/// System: a chosen entity becomes a reference to it in the bound field,
+/// under the picker's [`WritePolicy`] exactly as the field write-back: a held
+/// pick waits for its blur, an `Action` picker is read by its action.
+/// Registered by [`FormPlugin`](crate::prelude::FormPlugin).
 pub(in crate::widgets) fn write_picked_entity(
-	pickers: Populated<(Entity, &EntityPicker, &Value), Changed<Value>>,
+	pickers: Populated<
+		(Entity, &EntityPicker, &Value, Option<&WritePolicy>),
+		(Changed<Value>, Without<WriteHeld>),
+	>,
 	mut docs: DocumentQuery,
 ) -> Result {
-	for (entity, picker, value) in pickers.iter() {
-		let Some(key) =
-			value.as_str().ok().and_then(|key| key.parse::<u32>().ok())
-		else {
-			continue;
-		};
-		let current = docs
-			.field_value(entity, &picker.field)
-			.ok()
-			.and_then(|value| EntitySchema::file_key(&value));
-		if current == Some(key) {
+	for (entity, picker, value, policy) in pickers.iter() {
+		if policy == Some(&WritePolicy::Action) {
 			continue;
 		}
-		let reference = EntitySchema::reference(key)?;
-		docs.with_field(entity, &picker.field, move |slot| *slot = reference)?;
+		picker.write(entity, value, &mut docs)?;
 	}
 	OK
 }

@@ -26,7 +26,11 @@ use beet_core::prelude::*;
 ///
 /// `<Checkbox field={FieldRef::new("done")}/>`
 #[template]
-pub fn Checkbox(name: Option<String>, field: Option<FieldRef>) -> impl Bundle {
+pub fn Checkbox(
+	name: Option<String>,
+	field: Option<FieldRef>,
+	write: Option<WritePolicy>,
+) -> impl Bundle {
 	// the default policy seeds an absent field null; a checkbox's resting state
 	// is `false`. An author-provided policy is kept.
 	let field = field.map(|field| match &field.on_missing {
@@ -39,6 +43,7 @@ pub fn Checkbox(name: Option<String>, field: Option<FieldRef>) -> impl Bundle {
 			{Classes::new([classes::CHECKBOX])}
 			{CheckboxInput}
 			{field}
+			{write}
 			{Attribute::bundle_option("name", name)}
 		/>
 	}

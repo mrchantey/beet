@@ -12,9 +12,12 @@
 //! It owns no state and performs no writes: every leaf binds one
 //! `(document, field path)` through its own [`FieldRef`] and writes only its
 //! local [`Value`], so the bidirectional syncs carry the edit and nothing here
-//! ever holds a copy of a document. Each control also carries the leaf's path
-//! as its `name`, so the whole form gathers as a typed [`Value`] map on
-//! [`Submit`] — the commit boundary a transactional edit rides.
+//! ever holds a copy of a document. *When* the sync carries it is the leaf's
+//! [`WritePolicy`], the field's own hint else its kind's default, so a text
+//! field lands every keystroke and a number or an entity reference lands on
+//! blur. Each control also carries the leaf's path as its `name`, so the
+//! whole form gathers as a typed [`Value`] map on [`Submit`] — the commit
+//! boundary a transactional edit rides.
 //!
 //! Where a schema alone does not decide the controls, the *value* does, through
 //! a [`ValueRebuild`](super::value_rebuild::ValueRebuild): a list's rows, a
@@ -106,7 +109,7 @@ pub fn DynamicForm(
 	let controls = {
 		let field = field.clone();
 		move |resolver: SchemaResolver, schema: &ValueSchema| {
-			schema_field(resolver, schema, field.clone(), None, 0)
+			schema_field(resolver, schema, field.clone(), None, None, 0)
 		}
 	};
 	let source = match schema {
@@ -144,41 +147,45 @@ pub struct UneditableField(pub SmolStr);
 /// One dispatched leaf. Returns a [`Snippet`] because each arm builds a
 /// differently-shaped tree, which is also what lets the composite arms recurse.
 ///
-/// `depth` counts *composite nesting* — a struct, tuple, list, map or enum
-/// payload, the positions the walk can descend through — so a reference hop or
-/// an `Optional` unwrap is the same leaf seen more precisely and neither
+/// `write` is the policy a field above declared, if any, reaching every leaf
+/// under it; a leaf declaring none writes under its kind's default. `depth`
+/// counts *composite nesting* — a struct, tuple, list, map or enum payload,
+/// the positions the walk can descend through — so a reference hop or an
+/// `Optional` unwrap is the same leaf seen more precisely and neither
 /// consumes budget, and depth `0` stays "the form's own top level".
 pub(super) fn schema_field<'a>(
 	resolver: SchemaResolver<'a>,
 	schema: &'a ValueSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
+	let policy = write.unwrap_or_else(|| schema.write_policy());
 	match schema {
-		ValueSchema::Bool(_) => scalar_field::bool_field(field, label),
+		ValueSchema::Bool(_) => scalar_field::bool_field(field, label, policy),
 		ValueSchema::I64(schema) => {
-			scalar_field::i64_field(schema, field, label)
+			scalar_field::i64_field(schema, field, label, policy)
 		}
 		ValueSchema::U64(schema) => {
-			scalar_field::u64_field(schema, field, label)
+			scalar_field::u64_field(schema, field, label, policy)
 		}
 		ValueSchema::F64(schema) => {
-			scalar_field::f64_field(schema, field, label)
+			scalar_field::f64_field(schema, field, label, policy)
 		}
 		ValueSchema::String(schema) => {
-			scalar_field::string_field(schema, field, label)
+			scalar_field::string_field(schema, field, label, policy)
 		}
 		// null is one of the values, which a control's empty state already is
 		ValueSchema::Optional(inner) => {
-			schema_field(resolver, inner, field, label, depth)
+			schema_field(resolver, inner, field, label, write, depth)
 		}
 		// the registry's schema is borrowed, never copied out: a reference hop
 		// dispatches on the schema in place
 		ValueSchema::Ref(SchemaRef::Name(name)) => {
 			match resolver.schema(name) {
 				Some(resolved) => {
-					schema_field(resolver, resolved, field, label, depth)
+					schema_field(resolver, resolved, field, label, write, depth)
 				}
 				// still arriving, or never coming: loud, not silently empty
 				None => uneditable(schema, field, label),
@@ -196,10 +203,10 @@ pub(super) fn schema_field<'a>(
 				.iter()
 				.all(|variant| variant.payload.is_none()) =>
 		{
-			dependent_field::unit_enum_field(schema, field, label)
+			dependent_field::unit_enum_field(schema, field, label, policy)
 		}
 		ValueSchema::Enum(schema) => {
-			dependent_field::enum_field(schema, field, label, depth)
+			dependent_field::enum_field(schema, field, label, write, depth)
 		}
 		// a field naming a sibling cannot be dispatched until that sibling's
 		// value is in hand, so the container binds before it descends
@@ -209,21 +216,25 @@ pub(super) fn schema_field<'a>(
 				.iter()
 				.any(|named| named.schema.binds_a_field()) =>
 		{
-			dependent_field::bound_struct_field(schema, field, label, depth)
+			dependent_field::bound_struct_field(
+				schema, field, label, write, depth,
+			)
 		}
-		ValueSchema::Struct(schema) => {
-			composite_field::struct_field(resolver, schema, field, label, depth)
+		ValueSchema::Struct(schema) => composite_field::struct_field(
+			resolver, schema, field, label, write, depth,
+		),
+		ValueSchema::Tuple(schema) => composite_field::tuple_field(
+			resolver, schema, field, label, write, depth,
+		),
+		ValueSchema::List(schema) => composite_field::list_field(
+			resolver, schema, field, label, write, depth,
+		),
+		ValueSchema::Map(schema) => composite_field::map_field(
+			resolver, schema, field, label, write, depth,
+		),
+		ValueSchema::Entity(_) => {
+			entity_picker::entity_field(field, label, policy)
 		}
-		ValueSchema::Tuple(schema) => {
-			composite_field::tuple_field(resolver, schema, field, label, depth)
-		}
-		ValueSchema::List(schema) => {
-			composite_field::list_field(resolver, schema, field, label, depth)
-		}
-		ValueSchema::Map(schema) => {
-			composite_field::map_field(resolver, schema, field, label, depth)
-		}
-		ValueSchema::Entity(_) => entity_picker::entity_field(field, label),
 		_ => uneditable(schema, field, label),
 	}
 }

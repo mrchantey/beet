@@ -189,8 +189,10 @@ async fn a_first_boot_forks_the_page() {
 /// Item 3's loop, through the terminal: select the heading's text, retype it
 /// and watch the heading repaint mid-keystroke with the caret untouched, add a
 /// `Name` through the component picker, reparent the paragraph under the
-/// heading through its `ChildOf` picker, remove the `Name` through its card,
-/// then reboot from the store and find every edit came back from the fork.
+/// heading through its `ChildOf` picker (a reference lands on blur, so the
+/// pick waits for the Tab that leaves the picker), remove the `Name` through
+/// its card, then reboot from the store and find every edit came back from
+/// the fork.
 #[beet::test]
 async fn the_edit_loop_survives_a_reboot() {
 	let mut host = SceneHost::new().await;
@@ -235,10 +237,18 @@ async fn the_edit_loop_survives_a_reboot() {
 		.as_str()
 		.xpect_eq("Heading");
 
-	// a reparent through the `ChildOf` picker: the paragraph moves under the
-	// heading on the page and in the tree
+	// a reparent through the `ChildOf` picker: a reference writes on blur,
+	// so the pick alone moves nothing, and leaving the picker moves the
+	// paragraph under the heading on the page and in the tree
 	host.select("#3 p");
 	host.pick("ChildOf", "h1");
+	host.settle(8);
+	host.frame().xpect_contains("├ #3 p");
+	SceneEntities::of(&host.document())
+		.unwrap()
+		.target(3, ChildOf::type_path())
+		.xpect_eq(Some(0));
+	host.press_tab();
 	host.step_until("│ └ #3 p")
 		.xpect_contains("│ ├ Heading")
 		.xpect_contains("│   └ #4 \"Every entity on th…\"");

@@ -2,20 +2,26 @@
 //! bind one value and need no walk of their own.
 //!
 //! Each is one control from [`controls`](crate::widgets::controls) carrying the
-//! leaf's path as its `name`, so a schema's hints and constraints arrive as the
-//! widget's own bounds rather than as a second validation pass.
+//! leaf's path as its `name` and its resolved [`WritePolicy`] as its `write`,
+//! so a schema's hints and constraints arrive as the widget's own bounds
+//! rather than as a second validation pass.
 use super::field_layout::labeled;
 use super::field_layout::widget;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The boolean arm: the [`Checkbox`], the one control that produces a `Bool`.
-pub(super) fn bool_field(field: FieldRef, label: Option<String>) -> Snippet {
+pub(super) fn bool_field(
+	field: FieldRef,
+	label: Option<String>,
+	write: WritePolicy,
+) -> Snippet {
 	labeled(
 		label,
 		widget(Checkbox {
 			name: Some(field.field_path.to_string()),
 			field: Some(field),
+			write: Some(write),
 		}),
 	)
 }
@@ -26,17 +32,20 @@ pub(super) fn string_field(
 	schema: &StringSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: WritePolicy,
 ) -> Snippet {
 	let name = Some(field.field_path.to_string());
 	let widget = match schema.multiline {
 		true => widget(TextArea {
 			name,
 			field: Some(field),
+			write: Some(write),
 			..default()
 		}),
 		false => widget(TextField {
 			name,
 			field: Some(field),
+			write: Some(write),
 			sensitive: schema.sensitive,
 			..default()
 		}),
@@ -56,6 +65,7 @@ macro_rules! number_arm {
 			schema: &$schema,
 			field: FieldRef,
 			label: Option<String>,
+			write: WritePolicy,
 		) -> Snippet {
 			let mut bounds: (Option<f64>, Option<f64>, Option<f64>) =
 				(None, None, None);
@@ -68,7 +78,7 @@ macro_rules! number_arm {
 					}
 				}
 			}
-			number_field(bounds, field, label)
+			number_field(bounds, field, label, write)
 		}
 	};
 }
@@ -83,12 +93,14 @@ fn number_field(
 	(min, max, step): (Option<f64>, Option<f64>, Option<f64>),
 	field: FieldRef,
 	label: Option<String>,
+	write: WritePolicy,
 ) -> Snippet {
 	labeled(
 		label,
 		widget(NumberField {
 			name: Some(field.field_path.to_string()),
 			field: Some(field),
+			write: Some(write),
 			min,
 			max,
 			step,

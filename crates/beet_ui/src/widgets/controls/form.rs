@@ -14,6 +14,10 @@
 //! editable by default, and activating the submit button fires a [`Submit`]
 //! event on the `<form>` carrying its named fields as a [`Value`] map, the
 //! native analogue of a web form's `submit` event + `FormData`.
+//!
+//! *When* a bound control's edit reaches its document is the control's
+//! [`WritePolicy`], carried as its `write` prop and enforced by the plugin
+//! ([`write_policy`](super::write_policy)).
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -46,13 +50,16 @@ impl TextFieldVariant {
 ///
 /// `name` and `placeholder` are optional — when unset their attributes are
 /// omitted rather than rendered empty. `sensitive` renders a masked
-/// `type="password"`, the widget side of [`StringSchema::sensitive`].
+/// `type="password"`, the widget side of [`StringSchema::sensitive`]. `write`
+/// is when an edit lands in the bound field, [`Input`](WritePolicy::Input)
+/// when unset.
 #[template]
 pub fn TextField(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	placeholder: Option<String>,
 	field: Option<FieldRef>,
+	write: Option<WritePolicy>,
 	#[prop] sensitive: bool,
 ) -> impl Bundle {
 	let class = variant.class();
@@ -61,6 +68,7 @@ pub fn TextField(
 		<input
 			{Classes::new([classes::INPUT, class])}
 			{field}
+			{write}
 			type={input_type}
 			{Attribute::bundle_option("name", name)}
 			{Attribute::bundle_option("placeholder", placeholder)}
@@ -74,12 +82,15 @@ pub fn TextField(
 ///
 /// Typing preserves the bound value's numeric kind: [`Value::edit_text`]
 /// stringifies, edits and re-parses into the same variant, so an `i64` field
-/// never degrades into a string.
+/// never degrades into a string. A generated one writes on
+/// [`Blur`](WritePolicy::Blur), a number mid-edit not yet being the number;
+/// an authored one with no `write` writes as typed.
 #[template]
 pub fn NumberField(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	field: Option<FieldRef>,
+	write: Option<WritePolicy>,
 	min: Option<f64>,
 	max: Option<f64>,
 	step: Option<f64>,
@@ -90,6 +101,7 @@ pub fn NumberField(
 		<input
 			{Classes::new([classes::INPUT, class])}
 			{field}
+			{write}
 			type="number"
 			{Attribute::bundle_option("name", name)}
 			{Attribute::bundle_option("min", number(min))}
@@ -99,20 +111,23 @@ pub fn NumberField(
 	}
 }
 
-/// A styled `<textarea>`. Same variant set and optional `field` binding as
-/// [`TextField`]; `name` and `placeholder` are likewise optional.
+/// A styled `<textarea>`. Same variant set, optional `field` binding and
+/// `write` policy as [`TextField`]; `name` and `placeholder` are likewise
+/// optional.
 #[template]
 pub fn TextArea(
 	variant: TextFieldVariant,
 	name: Option<String>,
 	placeholder: Option<String>,
 	field: Option<FieldRef>,
+	write: Option<WritePolicy>,
 ) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
 		<textarea
 			{Classes::new([classes::INPUT, class])}
 			{field}
+			{write}
 			{Attribute::bundle_option("name", name)}
 			{Attribute::bundle_option("placeholder", placeholder)}
 		/>
@@ -140,16 +155,17 @@ impl SelectVariant {
 
 /// A styled `<select>` element. The options are supplied via the default
 /// slot (typically `<option>` children). Optionally binds to a document field
-/// via `field`; `name` is omitted when unset.
+/// via `field`, writing per `write`; `name` is omitted when unset.
 #[template]
 pub fn Select(
 	variant: SelectVariant,
 	name: Option<String>,
 	field: Option<FieldRef>,
+	write: Option<WritePolicy>,
 ) -> impl Bundle {
 	let class = variant.class();
 	rsx! {
-		<select {Classes::new([classes::SELECT, class])} {field} {Attribute::bundle_option("name", name)}>
+		<select {Classes::new([classes::SELECT, class])} {field} {write} {Attribute::bundle_option("name", name)}>
 			<Slot/>
 		</select>
 	}
@@ -196,6 +212,12 @@ impl Plugin for FormPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(fire_form_submit)
 			.add_observer(super::checkbox::toggle_checkbox_on_activate)
+			// a `Blur` control's write is held while it has the focus and
+			// released, at once, by the blur that ends it: the policy rides
+			// the focus model, so the plugin gating writes by it declares it
+			.init_plugin::<FocusPlugin>()
+			.add_observer(super::write_policy::hold_write_on_focus)
+			.add_observer(super::write_policy::release_write_on_blur)
 			.add_systems(
 				Update,
 				(

@@ -129,11 +129,14 @@ fn enum_schema() -> ValueSchema {
 
 fn named_field_schema() -> ValueSchema {
 	r#struct("NamedFieldSchema", vec![
-		field("key", string()),
+		// a key is an identifier: half of one is a rename of every row's
+		// column, so it lands whole, on blur
+		field("key", string()).with_write(WritePolicy::Blur),
 		field("required", boolean()),
 		optional("label", string()),
 		optional("description", string()),
 		optional("on_missing", on_missing()),
+		optional("write", write_policy()),
 		field("schema", meta_ref()),
 	])
 }
@@ -150,6 +153,18 @@ fn variant_schema() -> ValueSchema {
 	r#struct("VariantSchema", vec![
 		field("name", string()),
 		optional("payload", meta_ref()),
+	])
+}
+
+/// The one per-field write policy, as the field's own control edits it.
+///
+/// Adding a variant to [`WritePolicy`] means adding it here;
+/// `meta_schema.rs::describes_every_write_policy` is the tripwire.
+fn write_policy() -> ValueSchema {
+	enumeration("WritePolicy", vec![
+		unit_variant("Input"),
+		unit_variant("Blur"),
+		unit_variant("Action"),
 	])
 }
 
@@ -321,7 +336,8 @@ mod test {
 					),
 					NamedFieldSchema::new("done", ValueSchema::Bool(default()))
 						.optional()
-						.with_on_missing(OnMissing::Default(value!(false))),
+						.with_on_missing(OnMissing::Default(value!(false)))
+						.with_write(WritePolicy::Blur),
 				],
 			}),
 			ValueSchema::Tuple(TupleSchema {
@@ -374,6 +390,11 @@ mod test {
 		vec![MapSchema::uniform(ValueSchema::Any), MapSchema::Keyed]
 	}
 
+	/// Every [`WritePolicy`], in declaration order.
+	fn write_policies() -> Vec<WritePolicy> {
+		vec![WritePolicy::Input, WritePolicy::Blur, WritePolicy::Action]
+	}
+
 	/// The variant names an externally tagged enum schema describes.
 	fn described_variants(schema: ValueSchema) -> Vec<String> {
 		let ValueSchema::Enum(schema) = schema else {
@@ -415,6 +436,17 @@ mod test {
 			.map(|map| map.variant_name().to_string())
 			.collect::<Vec<_>>()
 			.xpect_eq(described_variants(super::map_schema()));
+	}
+
+	/// And the write policies, so a new one fails here until the meta-schema
+	/// can read it.
+	#[crate::test]
+	fn describes_every_write_policy() {
+		write_policies()
+			.iter()
+			.map(|policy| format!("{policy:?}"))
+			.collect::<Vec<_>>()
+			.xpect_eq(described_variants(super::write_policy()));
 	}
 
 	/// The closure: every schema is a value the meta-schema accepts, and it

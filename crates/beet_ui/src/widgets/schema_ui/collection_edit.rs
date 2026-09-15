@@ -53,11 +53,13 @@ pub(in crate::widgets) struct CollectionButton {
 
 /// Marks the key control of a map control's add-entry row: an unbound text
 /// field (or, for a keyed map, the [`ComponentPicker`] select) whose local
-/// [`Value`] is the key its sibling button inserts under.
+/// [`Value`] is the key its sibling button inserts under, the
+/// [`Action`](WritePolicy::Action) it writes by.
 ///
 /// Deliberately unnamed, so a key still being typed is not gathered into the
 /// form's submission alongside the entries it has yet to create.
 #[derive(Component)]
+#[require(WritePolicy = WritePolicy::Action)]
 pub(in crate::widgets) struct NewEntryKey;
 
 /// A `<button type="button">` applying `edit` to `field` on activation.

@@ -17,6 +17,10 @@ pub struct NamedFieldSchema {
 	/// value for it. `None` declares no resolution, so a commit that would
 	/// leave the field required-but-absent is rejected.
 	pub on_missing: Option<OnMissing>,
+	/// When a control's edit of this field lands in the document. `None`
+	/// takes the kind's default ([`ValueSchema::write_policy`]); a declared
+	/// policy also reaches every leaf under a composite field.
+	pub write: Option<WritePolicy>,
 	/// The field's value schema.
 	pub schema: ValueSchema,
 }
@@ -30,6 +34,7 @@ impl NamedFieldSchema {
 			label: None,
 			description: None,
 			on_missing: None,
+			write: None,
 			schema,
 		}
 	}
@@ -49,6 +54,12 @@ impl NamedFieldSchema {
 	/// Declare how a schema commit resolves an absent value.
 	pub fn with_on_missing(mut self, on_missing: OnMissing) -> Self {
 		self.on_missing = Some(on_missing);
+		self
+	}
+
+	/// Declare when a control's edit of this field lands in the document.
+	pub fn with_write(mut self, write: WritePolicy) -> Self {
+		self.write = Some(write);
 		self
 	}
 }

@@ -256,6 +256,7 @@ impl SchemaRegistry {
 							label: field.label.clone(),
 							description: field.description.clone(),
 							on_missing: field.on_missing.clone(),
+							write: field.write,
 							schema: self.resolve_inner(&field.schema, visiting),
 						})
 						.collect(),

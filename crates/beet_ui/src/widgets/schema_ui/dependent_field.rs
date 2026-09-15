@@ -28,10 +28,13 @@ pub(super) fn unit_enum_field(
 	schema: &EnumSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: WritePolicy,
 ) -> Snippet {
 	let name = field.field_path.to_string();
 	labeled(label, rsx! {
-		<Select field={field} name={name}>{variant_options(schema)}</Select>
+		<Select field={field} name={name} write={write}>
+			{variant_options(schema)}
+		</Select>
 	})
 }
 
@@ -46,13 +49,14 @@ pub(super) fn enum_field(
 	schema: &EnumSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let (owned, bound_field) = (schema.clone(), field.clone());
 	let rebuild = ValueRebuild::new(
 		|value| vec![RebuildKey::Name(variant_name(value).unwrap_or_default())],
 		move |resolver, value, _key| {
-			variant_control(resolver, &owned, &bound_field, value, depth)
+			variant_control(resolver, &owned, &bound_field, value, write, depth)
 		},
 	);
 	// the holder carries the enum's own value, so it must be an element
@@ -66,11 +70,19 @@ fn variant_control(
 	schema: &EnumSchema,
 	field: &FieldRef,
 	value: &Value,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let current = variant_name(value);
-	let mut rows =
-		vec![variant_select(resolver, schema, field, current.clone())];
+	// the select picks a variant, which lands as the enum's kind writes
+	let policy = write.unwrap_or(WritePolicy::Input);
+	let mut rows = vec![variant_select(
+		resolver,
+		schema,
+		field,
+		current.clone(),
+		policy,
+	)];
 	let payload = current.as_ref().and_then(|name| {
 		schema
 			.variants
@@ -82,7 +94,14 @@ fn variant_control(
 	if let Some((name, payload)) = payload {
 		// the payload sits under the variant name, the externally tagged form
 		let inner = child_field(field, name);
-		rows.push(schema_field(resolver, payload, inner, None, depth + 1));
+		rows.push(schema_field(
+			resolver,
+			payload,
+			inner,
+			None,
+			write,
+			depth + 1,
+		));
 	}
 	labeled(None, rows)
 }
@@ -102,6 +121,7 @@ pub(super) fn bound_struct_field(
 	schema: &StructSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let title = (depth > 0).then(|| struct_title(schema, &field, label));
@@ -113,7 +133,7 @@ pub(super) fn bound_struct_field(
 			bound_rows(&owned, value)
 				.find(|(row, _)| row == key)
 				.map(|(_, named)| {
-					struct_row(resolver, &named, &bound_field, depth)
+					struct_row(resolver, &named, &bound_field, write, depth)
 				})
 				.unwrap_or_else(|| Snippet::from_bundle(()))
 		},

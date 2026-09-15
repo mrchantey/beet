@@ -8,6 +8,8 @@ mod field_path;
 pub use field_path::*;
 mod on_missing;
 pub use on_missing::*;
+mod write_policy;
+pub use write_policy::*;
 pub mod schema;
 pub use schema::*;
 pub mod json_schema;

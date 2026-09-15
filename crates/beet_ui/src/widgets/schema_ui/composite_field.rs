@@ -32,9 +32,10 @@ pub(super) fn struct_field<'a>(
 	schema: &'a StructSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
-	let rows = struct_rows(resolver, schema, &field, depth);
+	let rows = struct_rows(resolver, schema, &field, write, depth);
 	// the form's own top level is already the group
 	match depth {
 		0 => labeled(None, rows),
@@ -47,21 +48,24 @@ fn struct_rows<'a>(
 	resolver: SchemaResolver<'a>,
 	schema: &'a StructSchema,
 	field: &FieldRef,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Vec<Snippet> {
 	schema
 		.fields
 		.iter()
-		.map(|named| struct_row(resolver, named, field, depth))
+		.map(|named| struct_row(resolver, named, field, write, depth))
 		.collect()
 }
 
 /// One named field's control under its label and hint, its [`FieldRef`]
-/// extending the struct's path.
+/// extending the struct's path and its own write policy, if declared,
+/// winning over the one inherited from above.
 pub(super) fn struct_row(
 	resolver: SchemaResolver,
 	named: &NamedFieldSchema,
 	field: &FieldRef,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	hinted(
@@ -71,6 +75,7 @@ pub(super) fn struct_row(
 			&named.schema,
 			child_field(field, named.key.clone()),
 			Some(field_label(named)),
+			named.write.or(write),
 			depth + 1,
 		),
 	)
@@ -96,6 +101,7 @@ pub(super) fn tuple_field<'a>(
 	schema: &'a TupleSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let rows = schema
@@ -113,6 +119,7 @@ pub(super) fn tuple_field<'a>(
 				&unnamed.schema,
 				child_field(&field, index),
 				Some(label),
+				write,
 				depth + 1,
 			)
 		})
@@ -131,6 +138,7 @@ pub(super) fn list_field(
 	schema: &ListSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let (item, rows_field) = (schema.item.clone(), field.clone());
@@ -141,7 +149,7 @@ pub(super) fn list_field(
 		},
 		move |resolver, _value, key| match key {
 			RebuildKey::Index(index) => {
-				list_row(resolver, &item, &rows_field, *index, depth)
+				list_row(resolver, &item, &rows_field, *index, write, depth)
 			}
 			_ => empty_note("No items yet"),
 		},
@@ -179,6 +187,7 @@ fn list_row(
 	item: &ValueSchema,
 	field: &FieldRef,
 	index: usize,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	rsx! {
@@ -188,6 +197,7 @@ fn list_row(
 				item,
 				child_field(field, index),
 				Some(format!("Item {}", index + 1)),
+				write,
 				depth + 1,
 			)}
 			{edit_button(
@@ -240,6 +250,7 @@ pub(super) fn map_field(
 	schema: &MapSchema,
 	field: FieldRef,
 	label: Option<String>,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	let (map_schema, entries_field) = (schema.clone(), field.clone());
@@ -258,6 +269,7 @@ pub(super) fn map_field(
 						&entries_field,
 						key.clone(),
 						entry_label(&map_schema, key),
+						write,
 						depth,
 					),
 					Err(err) => empty_note(format!("{key}: {err}")),
@@ -300,6 +312,7 @@ fn map_entry(
 	field: &FieldRef,
 	key: SmolStr,
 	label: String,
+	write: Option<WritePolicy>,
 	depth: usize,
 ) -> Snippet {
 	rsx! {
@@ -309,6 +322,7 @@ fn map_entry(
 				schema,
 				child_field(field, key.clone()),
 				Some(label),
+				write,
 				depth + 1,
 			)}
 			{edit_button(

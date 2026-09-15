@@ -223,8 +223,13 @@ fn dispatch(world: &mut World, root: Entity, ev: &web_sys::Event) {
 
 /// The pointer pair on `target`: a click, or Enter/Space on a focusable the
 /// browser does not activate.
+///
+/// What the press queued (a focus moving, the blur that releases a held
+/// write) is flushed before the release, as the terminal's queued pair is
+/// applied, so a release's handler on either surface reads the same world.
 fn activate(world: &mut World, root: Entity, target: Entity) {
 	world.entity_mut(target).trigger(PointerDown::new(root));
+	world.flush();
 	// the press may have taken the target with it
 	if world.get_entity(target).is_ok() {
 		world.entity_mut(target).trigger(PointerUp::new(root));
@@ -427,6 +432,56 @@ mod test {
 		html_element(app.world(), input).blur().unwrap();
 		app.update();
 		app.world().entity(input).contains::<Focus>().xpect_false();
+	}
+
+	/// A `Blur` control holds what is typed into it and lands it on
+	/// `focusout`, and the browser's ordering puts that `focusout` before the
+	/// `click` that took the focus: a real click on a button reads the
+	/// document with the blurred edit already in it.
+	#[beet_core::test(browser)]
+	fn a_focusout_lands_the_held_edit_before_the_click() {
+		let mut app = dom_app();
+		let host = build(&mut app, rsx! {
+			<NumberField field={FieldRef::new("count")} write={WritePolicy::Blur}/>
+			<button>"act"</button>
+		});
+		set_document(&mut app, host, value!({ "count": 1 }));
+		app.update();
+		paint(&mut app, host);
+		let button = element(app.world_mut(), "button");
+		let seen = Store::new(Value::Null);
+		let read = seen.clone();
+		app.world_mut().entity_mut(button).observe(
+			move |ev: On<PointerUp>, mut docs: DocumentQuery| -> Result {
+				read.set(
+					docs.field_value(ev.event_target(), &FieldRef::default())?,
+				);
+				OK
+			},
+		);
+		let input = element(app.world_mut(), "input");
+		let node = html_element(app.world(), input)
+			.dyn_into::<web_sys::HtmlInputElement>()
+			.unwrap();
+		node.focus().unwrap();
+		node.set_value("2");
+		fire(&node, &bubbling("input"));
+		app.update();
+		// held: the world's control has it, the document does not
+		app.world()
+			.entity(input)
+			.get::<Value>()
+			.cloned()
+			.xpect_eq(Some(Value::Int(2)));
+		field(app.world(), host, "count").xpect_eq(Value::Int(1));
+		// a pointer's press moves the focus before its click; a synthetic
+		// `click()` moves nothing, so the focus is moved as the press would
+		let button_node = html_element(app.world(), button);
+		button_node.focus().unwrap();
+		button_node.click();
+		app.update();
+		seen.get().xpect_eq(value!({ "count": 2 }));
+		field(app.world(), host, "count").xpect_eq(Value::Int(2));
 	}
 
 	/// Enter or Space on a focusable the browser does not activate fires the

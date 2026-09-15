@@ -34,6 +34,7 @@ use browser_host::*;
 
 use beet::net::prelude::webdriver::*;
 use beet::prelude::*;
+use bevy::input::keyboard::Key;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
@@ -397,9 +398,10 @@ async fn a_first_boot_paints_the_published_page() {
 /// Item 3's loop, through trusted input in the tab: select the heading's
 /// text, retype it and watch the heading repaint mid-keystroke with the
 /// caret untouched, add a `Name` through the component picker, reparent the
-/// paragraph under the heading through its `ChildOf` picker, remove the
-/// `Name` through its card, then reload the page and find every edit came
-/// back from the fork in the browser's own store.
+/// paragraph under the heading through its `ChildOf` picker (a reference
+/// lands on blur, so the pick waits for the Tab that leaves the picker),
+/// remove the `Name` through its card, then reload the page and find every
+/// edit came back from the fork in the browser's own store.
 #[beet_core::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-ui` + chromedriver"]
 async fn the_edit_loop_survives_a_reload() {
@@ -447,10 +449,18 @@ async fn the_edit_loop_survives_a_reload() {
 	name_control.type_text("Heading").await.unwrap();
 	host.find_row("│ └ Heading").await;
 
-	// a reparent through the `ChildOf` picker: the paragraph moves under the
-	// heading on the page and in the tree
+	// a reparent through the `ChildOf` picker: a reference writes on blur,
+	// so the pick alone moves nothing, and leaving the picker moves the
+	// paragraph under the heading on the page and in the tree
 	host.select("#3 p").await;
 	host.pick(&SceneHost::control("ChildOf"), "#1").await;
+	host.find(&SceneHost::control("ChildOf"))
+		.await
+		.xpect_value("1")
+		.await;
+	host.find_row("├ #3 p").await;
+	host.xpect_no_selector("h1 > p").await;
+	host.press(Key::Tab).await.unwrap();
 	host.find_row("│ └ #3 p").await;
 	host.find_row("│ ├ Heading").await;
 	host.find_row("│   └ #4 \"Every entity on th…\"").await;

@@ -7,7 +7,10 @@
 //! [`EntityInspector`] is a [`DynamicForm`](super::DynamicForm) over the keyed
 //! component map the selected entity is, at its path, the [`SceneTree`] a
 //! generation over the document's entities, and a reparent is the `ChildOf`
-//! entry's entity picker.
+//! entry's entity picker. *When* a control's edit lands is its
+//! [`WritePolicy`](beet_core::prelude::WritePolicy): text as typed, so the page
+//! follows each key; a reference or a number on blur, so a pick refined key
+//! by key restructures the scene once.
 //!
 //! The editor lives *inside* the scene it edits: [`ToggleSceneEditor`] is
 //! authored as a tag in the scene, stays in the scene document (so removing

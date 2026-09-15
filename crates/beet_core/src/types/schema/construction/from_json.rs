@@ -120,6 +120,7 @@ mod enabled {
 					label: None,
 					description: None,
 					on_missing: on_missing(descriptor)?,
+					write: write_policy(descriptor)?,
 					schema: ValueSchema::from_json_value(descriptor)?,
 				})
 			})
@@ -167,6 +168,7 @@ mod enabled {
 					label: None,
 					description: None,
 					on_missing: on_missing(descriptor)?,
+					write: write_policy(descriptor)?,
 					schema: ValueSchema::from_json_value(descriptor)?,
 				})
 			})
@@ -209,6 +211,18 @@ mod enabled {
 			.transpose()
 	}
 
+	/// A field's `"write"` keyword: the [`WritePolicy`] its controls write
+	/// under, by variant name (`"Blur"`), absent for the kind's default.
+	fn write_policy(descriptor: &Json) -> Result<Option<WritePolicy>> {
+		descriptor
+			.as_object()
+			.and_then(|map| map.get("write"))
+			.map(|policy| {
+				Value::from_serde(policy)?.into_serde::<WritePolicy>()
+			})
+			.transpose()
+	}
+
 	/// Strip the `#/$defs/` (or `#/definitions/`) prefix off a `$ref`, leaving the
 	/// referenced schema name.
 	fn strip_ref(reference: &str) -> &str {
@@ -247,6 +261,20 @@ mod enabled {
 				.unwrap();
 			count.required.xpect_true();
 			matches!(count.schema, ValueSchema::I64(_)).xpect_true();
+		}
+
+		/// A `write` keyword declares the field's policy; absent, the kind's
+		/// default applies at the control.
+		#[crate::test]
+		fn write_keyword() {
+			let ValueSchema::Struct(schema) = ValueSchema::from_json_schema(
+				r#"{ "label": { "type": "string", "write": "Blur" }, "note": "string" }"#,
+			)
+			.unwrap() else {
+				panic!("expected struct");
+			};
+			schema.fields[0].write.xpect_eq(Some(WritePolicy::Blur));
+			schema.fields[1].write.xpect_none();
 		}
 
 		#[crate::test]

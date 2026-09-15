@@ -396,7 +396,8 @@ fn default_of(field: &NamedFieldSchema) -> Option<&Value> {
 
 /// A field's annotations written onto its schema. A `$ref` may carry no sibling
 /// keywords in strict mode, so an annotated reference is wrapped in a one-arm
-/// `anyOf`.
+/// `anyOf`. A field's `write` policy is a control hint with no JSON Schema
+/// equivalent and is not written, as `multiline` is not.
 fn annotated(
 	mut schema: Value,
 	description: Option<&SmolStr>,

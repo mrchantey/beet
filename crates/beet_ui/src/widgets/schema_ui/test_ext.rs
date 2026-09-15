@@ -50,28 +50,6 @@ pub(in crate::widgets) fn document_of(
 	world.entity(entity).get::<Document>().unwrap().0.clone()
 }
 
-/// The one button that submits the form it sits in, ie the only one no
-/// `type="button"` excludes ([`Button`]'s `action`) — which is every generated
-/// collection button.
-pub(in crate::widgets) fn submit_button(world: &mut World) -> Entity {
-	let actions = world
-		.query_once::<(&Attribute, &Value, &AttributeOf)>()
-		.into_iter()
-		.filter(|(attribute, value, _)| {
-			attribute.as_str() == "type"
-				&& value
-					.as_str()
-					.map(|value| value == "button")
-					.unwrap_or_default()
-		})
-		.map(|(_, _, attribute_of)| **attribute_of)
-		.collect::<HashSet<_>>();
-	elements_in(world, "button")
-		.into_iter()
-		.find(|button| !actions.contains(button))
-		.expect("no submit button")
-}
-
 /// The generated control bound to `path`, ie the leaf a form emitted for it.
 pub(in crate::widgets) fn bound(world: &mut World, path: &str) -> Entity {
 	world

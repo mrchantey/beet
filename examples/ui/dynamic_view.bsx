@@ -17,16 +17,17 @@ terminal has nowhere else to advertise them.
   button beside each row and an add button that appends the row schema's zero.
 - `<ToggleSchemaEditor/>` is edit mode, closed by default. Open it and the form
   inside edits the *schema* document, generated from the schema of schemas, and
-  Apply commits the new schema and backfills every existing row in one
-  transaction (or refuses and touches neither document).
+  every edit commits the new schema and backfills every existing row in one
+  transaction (or refuses, reverts the edit and touches neither document).
 
-So the demonstration is the loop: open edit mode, add a field named
-`is_really_difficult`, choose `Bool` for its schema, press Apply, close edit mode
-— and the table has a new column and the form a new control, because both are
-generated from the schema that just changed. A commit must leave the rows that
-already exist valid, so a *required* field also needs an `on_missing` of
-`Default`; leaving the new field optional is the other way to say the same
-thing, and a commit with neither is refused in the error line under the form.
+So the demonstration is the loop: open edit mode, add a field, name it
+`is_really_difficult` (a key lands when its control is left), choose `Bool`
+for its schema, close edit mode — and the table has a new column and the form
+a new control, because both are generated from the schema that just changed.
+A commit must leave the rows that already exist valid, so a *required* field
+also needs an `on_missing` of `Default`; leaving the new field optional is the
+other way to say the same thing, and a commit with neither is refused in the
+error line under the form, the edit that asked snapping back.
 
 Naming which document is which is the whole wiring. `<DocumentBlob>` is a
 document that lives in the store (here the entry's own directory), so the schema

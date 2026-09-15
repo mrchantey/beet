@@ -31,9 +31,8 @@
 //! [`ValueSchema`](beet_core::prelude::ValueSchema) rather than authored
 //! children: [`DynamicForm`] generates one control per editable leaf,
 //! [`DynamicView`] the read side of the same walk, and [`SchemaEditor`] edits
-//! the *schema* itself — a `DynamicForm` over the meta-schema, bound to a
-//! [`DraftOf`](beet_core::prelude::DraftOf) the schema document and committing
-//! through
+//! the *schema* itself — a `DynamicForm` over the meta-schema, bound to the
+//! schema document and committing every change through
 //! [`TypedDocument::commit_schema`](beet_core::prelude::TypedDocument).
 //! [`ToggleSchemaEditor`] is the last of those behind a closed disclosure, which
 //! is how an app opts into editing its own shape.

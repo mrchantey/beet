@@ -64,9 +64,12 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		Update,
 		super::schema_ui::value_rebuild::rebuild_value_widgets,
 	);
-	// a schema editor's draft forks the document its `DocRef` names, a relation
-	// derived from the tree rather than authored twice.
-	app.add_systems(Update, super::schema_ui::editor::link_schema_drafts);
+	// a schema editor commits every change of the schema document it names
+	// against the data document it sits in, the one transaction an edit rides;
+	// the commit evolves data off a task, so the plugin that registers it
+	// declares the bridge that carries it
+	app.init_plugin::<AsyncPlugin>()
+		.add_systems(Update, super::schema_ui::editor::commit_schema_edits);
 	// the scene editor: its tag survives a fork as a reflected component, its
 	// frame binds the scene it sits in, and its tree and inspector follow the
 	// scene's selection

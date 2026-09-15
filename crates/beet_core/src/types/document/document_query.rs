@@ -201,6 +201,58 @@ impl<'w, 's> DocumentQuery<'w, 's> {
 		}
 	}
 
+	/// Land a bound entity's local `value` in the field it binds, unless the
+	/// document already holds it: the write-back for one entity, the body
+	/// `sync_local_to_document` runs per changed local and what a released
+	/// [`WritePolicy::Blur`] edit runs at once, before whatever took the focus
+	/// reads the document.
+	///
+	/// `synced` is the entity's [`SyncedValue`]: a local equal to it is the read
+	/// path's own write echoing back, which propagated would push a stale value
+	/// over whatever the document has since gained. A field the document lacks
+	/// is created per [`FieldRef::on_missing`], and a document that does not
+	/// exist only when the ref initializes on missing.
+	pub fn write_back(
+		&mut self,
+		entity: Entity,
+		field: &FieldRef,
+		value: &Value,
+		synced: Option<&SyncedValue>,
+	) -> Result {
+		if synced.is_some_and(|synced| synced.0 == *value) {
+			return OK;
+		}
+		let doc_entity = self.entity(entity, &field.document);
+		let field_path = self.scopes.resolved_path(
+			entity,
+			&field.field_path,
+			Some(doc_entity),
+		);
+		// equality guard + policy, computed while the read borrow is live;
+		// the guard reads the scope-resolved path, the write scopes internally
+		let should_write = match self.doc_query.get(doc_entity) {
+			Ok(doc) => match doc.get_field_ref(&field_path) {
+				// field exists: write only when the value differs
+				Ok(field_val) => *field_val != *value,
+				// field missing: create it unless the ref opts out
+				Err(_) => !matches!(field.on_missing, OnMissing::Error),
+			},
+			// no document: create one only when the ref initializes on missing
+			Err(_) => matches!(field.on_missing, OnMissing::Default(_)),
+		};
+		if should_write {
+			let new = value.clone();
+			self.with_field(entity, field, move |slot| *slot = new)?;
+			// record what the document now holds, so the next read path can tell
+			// this write apart from a neighbour's; tolerant, since a released
+			// `Blur` write may be the last act of a despawning control
+			self.commands
+				.entity(entity)
+				.try_insert(super::document_sync::SyncedValue(value.clone()));
+		}
+		OK
+	}
+
 	/// The schema the document declares at `field`, or `None` when it declares
 	/// none, cannot resolve it yet, or does not describe that path.
 	///

@@ -52,6 +52,7 @@ pub(super) fn variant_select(
 	schema: &EnumSchema,
 	field: &FieldRef,
 	current: Option<SmolStr>,
+	write: WritePolicy,
 ) -> Snippet {
 	let variants = schema
 		.variants
@@ -69,11 +70,44 @@ pub(super) fn variant_select(
 	// a select rendered for a value never asks to change it
 	let value = Value::Str(current.unwrap_or_default());
 	rsx! {
-		<Select name={name} {(select, value)}>
+		<Select name={name} write={write} {(select, value)}>
 			{variant_options(schema)}
 		</Select>
 	}
 	.any_snippet()
+}
+
+impl VariantSelect {
+	/// Land the variant `value` names as that variant's zero in the field,
+	/// unless the field already carries it: a select showing what the field
+	/// holds is reporting, not asking.
+	pub(in crate::widgets) fn write(
+		&self,
+		entity: Entity,
+		value: &Value,
+		docs: &mut DocumentQuery,
+	) -> Result {
+		let Ok(chosen) = value.as_str() else {
+			return OK;
+		};
+		let Some((_, next)) = self
+			.variants
+			.iter()
+			.find(|(name, _)| name.as_str() == chosen)
+		else {
+			return OK;
+		};
+		let current = docs
+			.field_value(entity, &self.field)
+			.unwrap_or_default()
+			.xmap(|value| variant_name(&value));
+		if current.as_deref() == Some(chosen) {
+			return OK;
+		}
+		let next = next.clone();
+		docs.with_field(entity, &self.field, move |slot| *slot = next)?;
+		OK
+	}
 }
 
 /// The variant an enum value carries: a unit variant is its own bare name, a
@@ -86,36 +120,23 @@ pub(super) fn variant_name(value: &Value) -> Option<SmolStr> {
 	}
 }
 
-/// System: a chosen variant becomes that variant's zero in the bound field.
-///
-/// Equality-guarded like every other sync: a select showing what the field
-/// already carries is reporting, not asking, so only a *changed* variant writes.
-/// Registered by [`FormPlugin`](crate::prelude::FormPlugin), the plugin that owns control
-/// behavior.
+/// System: a chosen variant becomes that variant's zero in the bound field,
+/// under the select's [`WritePolicy`] exactly as the field write-back: a
+/// held choice waits for its blur, an `Action` select is read by its action.
+/// Registered by [`FormPlugin`](crate::prelude::FormPlugin), the plugin that
+/// owns control behavior.
 pub(in crate::widgets) fn write_selected_variant(
-	selects: Populated<(Entity, &VariantSelect, &Value), Changed<Value>>,
+	selects: Populated<
+		(Entity, &VariantSelect, &Value, Option<&WritePolicy>),
+		(Changed<Value>, Without<WriteHeld>),
+	>,
 	mut docs: DocumentQuery,
 ) -> Result {
-	for (entity, select, value) in selects.iter() {
-		let Ok(chosen) = value.as_str() else {
-			continue;
-		};
-		let Some((_, next)) = select
-			.variants
-			.iter()
-			.find(|(name, _)| name.as_str() == chosen)
-		else {
-			continue;
-		};
-		let current = docs
-			.field_value(entity, &select.field)
-			.unwrap_or_default()
-			.xmap(|value| variant_name(&value));
-		if current.as_deref() == Some(chosen) {
+	for (entity, select, value, policy) in selects.iter() {
+		if policy == Some(&WritePolicy::Action) {
 			continue;
 		}
-		let next = next.clone();
-		docs.with_field(entity, &select.field, move |slot| *slot = next)?;
+		select.write(entity, value, &mut docs)?;
 	}
 	OK
 }

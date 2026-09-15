@@ -74,14 +74,15 @@ pub struct Fields(Vec<Entity>);
 /// Runtime bookkeeping, deliberately not [`Reflect`](bevy::reflect::Reflect): it
 /// is derived from the document and must not ride a scene round trip. Public
 /// only because it appears in [`sync_document_to_local`]'s signature, which
-/// external systems order against; nothing outside this module inserts it.
+/// external systems order against; nothing outside this module and the
+/// write-back seam ([`DocumentQuery::write_back`]) inserts it.
 ///
 /// Without it the read path cannot distinguish "the document changed *this*
 /// field" from "the document changed *some* field", and a self-bound action's
 /// write is discarded whenever any neighbour dirtied the document in the same
 /// window.
 #[derive(Component)]
-pub struct SyncedValue(Value);
+pub struct SyncedValue(pub(in crate::types::document) Value);
 
 /// Attached to a [`FieldRef`] to track its associated [`Document`] entity.
 ///
@@ -313,56 +314,36 @@ pub(super) fn sync_schema(
 /// into the resolved document field. The symmetric counterpart of
 /// [`sync_document_to_local`]; the equality guard on both directions is what
 /// breaks the otherwise-infinite sync loop.
+///
+/// Gated by the control's [`WritePolicy`]: an [`Action`](WritePolicy::Action)
+/// control is written by its action and never here, and a
+/// [`Blur`](WritePolicy::Blur) control is left alone while its write is
+/// [held](WriteHeld), the blur that releases it writing at once through
+/// [`DocumentQuery::write_back`].
 pub(super) fn sync_local_to_document(
-	mut commands: Commands,
 	changed: Populated<
 		(
 			Entity,
 			&FieldRef,
-			&ResolvedFieldPath,
 			Ref<Value>,
 			Option<&SyncedValue>,
+			Option<&WritePolicy>,
 		),
-		Changed<Value>,
+		(Changed<Value>, Without<WriteHeld>),
 	>,
 	mut docs: DocumentQuery,
 ) -> Result {
-	for (entity, field, resolved, value, synced) in changed.iter() {
+	for (entity, field, value, synced, policy) in changed.iter() {
 		// a freshly added Null carries no signal: it must neither clobber a
 		// field another binding wrote this pass, nor race a sibling's deferred
 		// document creation (the write-back is iteration-order independent).
 		if value.is_added() && value.is_null() {
 			continue;
 		}
-		// the local holds exactly what the last sync put there, so this `Changed`
-		// is the read path's own write echoing back. Propagating it would push a
-		// stale value over whatever the document has since gained.
-		if let Some(synced) = synced
-			&& synced.0 == *value
-		{
+		if policy == Some(&WritePolicy::Action) {
 			continue;
 		}
-		// equality guard + policy, computed while the read borrow is live;
-		// the guard reads the scope-resolved path, the write scopes internally
-		let should_write = match docs.get(entity, &field.document) {
-			Ok(doc) => match doc.get_field_ref(&resolved.field_path) {
-				// field exists: write only when the value differs
-				Ok(field_val) => *field_val != *value,
-				// field missing: create it unless the ref opts out
-				Err(_) => !matches!(field.on_missing, OnMissing::Error),
-			},
-			// no document: create one only when the ref initializes on missing
-			Err(_) => matches!(field.on_missing, OnMissing::Default(_)),
-		};
-		if should_write {
-			let new = (*value).clone();
-			docs.with_field(entity, field, move |slot| *slot = new)?;
-			// record what the document now holds, so the next read path can tell
-			// this write apart from a neighbour's.
-			commands
-				.entity(entity)
-				.insert(SyncedValue((*value).clone()));
-		}
+		docs.write_back(entity, field, &value, synced)?;
 	}
 	Ok(())
 }
@@ -1097,5 +1078,79 @@ mod test {
 			.map(|schema| (*schema).clone())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![ValueSchema::of::<i64>()]);
+	}
+
+	/// The write-back gates on the control's [`WritePolicy`]: a held `Blur`
+	/// edit stays local until released, when `write_back` lands it at once;
+	/// an `Action` control is never written by the sync at all.
+	#[crate::test]
+	fn the_policy_gates_the_write_back() {
+		let mut world = DocumentPlugin::world();
+		let doc = world
+			.spawn(Document::new(value!({ "count": 1, "key": "a" })))
+			.id();
+		let held = world
+			.spawn((
+				ChildOf(doc),
+				Value::default(),
+				FieldRef::new("count"),
+				WritePolicy::Blur,
+				WriteHeld,
+			))
+			.id();
+		let action = world
+			.spawn((
+				ChildOf(doc),
+				Value::default(),
+				FieldRef::new("key"),
+				WritePolicy::Action,
+			))
+			.id();
+		world.update_local();
+
+		*world.entity_mut(held).get_mut::<Value>().unwrap() = Value::Int(2);
+		*world.entity_mut(action).get_mut::<Value>().unwrap() = Value::str("b");
+		world.update_local();
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "count": 1, "key": "a" }));
+
+		// the release: what the blur runs, landing the held edit at once
+		world.entity_mut(held).remove::<WriteHeld>();
+		world
+			.run_system_once::<_, Result, _>(
+				move |mut docs: DocumentQuery,
+				      fields: Query<(
+					&FieldRef,
+					&Value,
+					Option<&SyncedValue>,
+				)>|
+				      -> Result {
+					let (field, value, synced) = fields.get(held)?;
+					docs.write_back(held, field, value, synced)
+				},
+			)
+			.unwrap()
+			.unwrap();
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "count": 2, "key": "a" }));
+		// ...and the next pass has nothing more to say about it
+		world.update_local();
+		world
+			.entity(doc)
+			.get::<Document>()
+			.unwrap()
+			.0
+			.clone()
+			.xpect_eq(value!({ "count": 2, "key": "a" }));
 	}
 }

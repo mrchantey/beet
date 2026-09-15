@@ -218,17 +218,20 @@ async fn edit_mode_is_opt_in() {
 	let mut host = TodoHost::new(UVec2::new(120, 220)).await;
 	let label = host.seeded_label(0).await;
 	host.step_until(&label);
-	// closed: the editor's commit button is not on the page
-	host.frame().xnot().xpect_contains("Apply");
+	// closed: the meta-schema form's own controls are not on the page
+	host.frame().xnot().xpect_contains("Add to Fields");
 	host.click_text("Edit schema");
-	// open: the meta-schema form and its commit are
-	host.step_until("Apply").xpect_contains("StructSchema");
+	// open: the meta-schema form is
+	host.step_until("Add to Fields")
+		.xpect_contains("StructSchema");
 }
 
 /// Item 3's acceptance loop, through the terminal: open edit mode, add a bool
-/// field to the *row schema*, apply, and the table has an extra column and the
-/// form an extra control — both because they are generated from the schema that
+/// field to the *row schema*, and the table has an extra column and the form
+/// an extra control — both because they are generated from the schema that
 /// just changed, and neither because anything here knows what a todo is.
+/// There is nothing to apply: each edit is its own commit, the key landing
+/// when its control is left and the kind as it is picked.
 #[beet::test]
 async fn adding_a_field_grows_the_table_and_the_form() {
 	let mut host = TodoHost::new(UVec2::new(120, 260)).await;
@@ -239,31 +242,32 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 		(host.seeded_label(0).await, host.seeded_label(1).await);
 	host.step_until(&first);
 	host.click_text("Edit schema");
-	host.step_until("Apply");
+	host.step_until("Add to Fields");
 
 	// each collection's add button names it, so the row schema's `fields` list is
 	// addressed by name rather than by being the last one on the page; it appends
-	// the field schema's own zero
+	// the field schema's own zero, an optional `Any` field the rows already
+	// satisfy, so the commit accepts it as it lands
 	host.click_text("Add to Fields");
 	host.settle(8);
 	// name the field, in the empty control the appended row generated. `Key` is
-	// the humanised label the generated form shows for the `key` field.
+	// the humanised label the generated form shows for the `key` field. A key
+	// lands on blur, so the column is not there while it is typed...
 	host.click_control_of("Key", 2);
 	host.type_text("is_really_difficult");
+	host.frame().xnot().xpect_contains("Is really difficult");
 	// ...and type it, through the variant select the meta-schema's own enum
-	// generated for the field's `schema`
+	// generated for the field's `schema`: the click that opens the select is
+	// the blur that lands the key, and the pick lands as it is made
 	host.click_text("Any \u{25be}");
 	host.settle(8);
 	host.click_last("Bool");
 	host.settle(8);
-	// the drafted field is optional, which is one of item 21's resolutions: the
-	// rows that already exist stay valid without a backfill
-	host.click_text("Apply");
 
 	// the table generated from the committed schema grew the column. The header
 	// is the key made readable, so it is a *different* string from the one still
-	// sitting in the draft's `key` control, which is what makes it evidence the
-	// column exists rather than a second sighting of what was typed.
+	// sitting in the `key` control, which is what makes it evidence the column
+	// exists rather than a second sighting of what was typed.
 	host.step_until("Is really difficult");
 	// ...and every row survived it. The regenerated rows bind their values a
 	// frame after the layout they sit in, so this is a second wait, not the
@@ -279,6 +283,16 @@ async fn adding_a_field_grows_the_table_and_the_form() {
 		.unwrap()
 		.into_owned()
 		.xpect_eq(ValueSchema::Bool(default()));
-	// an optional field needs no backfill, so the rows are untouched
-	host.stored(TODOS).await.value.xpect_eq(rows);
+	// an optional field needs no backfill, so the commit leaves every row as
+	// it was; the form generated from the new schema then rests each row's
+	// new checkbox at `false`, the boolean an untouched box is
+	let mut stored = host.stored(TODOS).await.value;
+	for row in stored.as_list_mut().unwrap() {
+		if let Some(rested) =
+			row.as_map_mut().unwrap().remove("is_really_difficult")
+		{
+			rested.xpect_eq(Value::Bool(false));
+		}
+	}
+	stored.xpect_eq(rows);
 }

@@ -234,6 +234,13 @@ impl TuiHost {
 		self.settle(8);
 	}
 
+	/// Press Tab, moving the focus to the next focusable: the blur of
+	/// whatever held it.
+	pub fn press_tab(&mut self) {
+		self.send(b"\t");
+		self.settle(8);
+	}
+
 	/// The painted frame as plain text.
 	pub fn frame(&self) -> String {
 		self.app

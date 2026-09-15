@@ -124,6 +124,7 @@ impl Builder {
 			label: None,
 			description,
 			on_missing: None,
+			write: None,
 			schema,
 		}
 	}
