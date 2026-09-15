@@ -385,7 +385,7 @@ mod test {
 	}
 
 	/// A `published` page plus a `secret` one eagerly marked
-	/// `PageMeta { visibility: Draft }` (the codegen `BlobScene` shape).
+	/// `PageMeta { visibility: Draft }` (the codegen `BlobPage` shape).
 	fn spawn_draft_router(world: &mut World) -> Entity {
 		world
 			.spawn((Router::with_defaults(), children![

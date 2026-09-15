@@ -5,4 +5,4 @@ order = 3
 
 # Hello
 
-Some markdown content served via `BlobScene`.
+Some markdown content served via `BlobPage`.

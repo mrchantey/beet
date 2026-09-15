@@ -53,10 +53,6 @@ impl FsStore {
 	fn resolve_path(&self, route: &RelPath) -> AbsPath {
 		self.effective_root().join(route)
 	}
-	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(self.clone(), path)
-	}
 }
 
 impl BlobStoreProvider for FsStore {

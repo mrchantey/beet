@@ -6,7 +6,8 @@
 //! navigation from the test.
 //!
 //! Two reload paths are covered. A *content* edit (a markdown route, the
-//! per-request `Layout.bsx`) re-fires the routes in place. A *structural* edit
+//! per-request `Layout.bsx`) refreshes just that file's route or template in
+//! place. A *structural* edit
 //! (the entry's `<Theme>`, the `Styles.bsx` the entry instantiates once) tears
 //! the entry scene down and rebuilds it through the exact `beet --watch` driver
 //! path ([`entry_build::build_watched`]): the server rebinds and the browser

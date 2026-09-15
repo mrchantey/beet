@@ -58,6 +58,28 @@ pub use serve_blobs::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
+/// The systems reacting to a changed [`Blob`] or [`BlobStore`] under a
+/// [`RoutesDir`]/[`TemplateDir`]: a route or template file re-read, a dir
+/// rescan. A reload dispatcher orders after this set, so the pending guards
+/// the reactions park are seen before it decides the subtree has settled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, SystemSet)]
+pub struct BlobReactions;
+
+/// Rescan each `D` dir whose scoped store changed, ie a file was created or
+/// removed under it: re-inserting the dir re-fires its scan (a swap for a
+/// [`RoutesDir`], a child diff for a [`TemplateDir`]). The store's own arrival
+/// is skipped, the dir's insert having fired the first scan.
+pub(crate) fn rescan_changed_dirs<D: Component + Clone>(
+	dirs: Query<(Entity, &D, Ref<BlobStore>), Changed<BlobStore>>,
+	mut commands: Commands,
+) {
+	for (entity, dir, _) in
+		dirs.iter().filter(|(_, _, store)| !store.is_added())
+	{
+		commands.entity(entity).insert(dir.clone());
+	}
+}
+
 /// The scoped [`BlobStore`] a dir's derived [`DirPath`] produced on `entity`,
 /// the store its async scan reads through; an error naming the tag when no
 /// ancestor store backs it (the dir must be a child of its store's entity).

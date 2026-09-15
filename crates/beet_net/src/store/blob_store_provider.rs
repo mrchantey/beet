@@ -97,13 +97,6 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 		(provider, entry_name).xok()
 	}
 
-	/// Create a type-erased [`Blob`] handle for a single object managed by
-	/// this provider. Prefer the typed [`FsStore::blob`], [`S3Store::blob`]
-	/// etc. when you need world serialization.
-	fn erased_blob(&self, path: RelPath) -> Blob {
-		Blob::new(BlobStore::new(self.box_clone()), path)
-	}
-
 	/// Stable family discriminator, ie `"fs"`, `"memory"`, `"localstorage"`,
 	/// `"s3"`.
 	fn id(&self) -> &'static str;

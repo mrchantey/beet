@@ -7,9 +7,14 @@
 //! and triggers [`TemplateDir::register_on_insert`]: every recognized template
 //! source under the scoped store is read and registered into the
 //! [`BsxTemplateRegistry`] by its module path (`templates/widgets/Card.bsx` ->
-//! `widgets::Card`), and the BSX schemas are refreshed. Store-backed, so it reads
-//! identically from the local filesystem in dev, S3 in a deployed task, R2 in a
-//! Worker, or an embedded in-memory store a library crate ships.
+//! `widgets::Card`), the BSX schemas are refreshed, and each source gets a
+//! [`TemplateFile`] child entity. That child is the file: its [`Blob`] changing
+//! re-registers exactly that source ([`register_changed_template_files`]) and
+//! its despawn unregisters what it registered, while a file created or removed
+//! under the dir marks the dir's store changed and re-runs the scan
+//! ([`rescan_changed_dirs`]). Store-backed, so it reads identically from the
+//! local filesystem in dev, S3 in a deployed task, R2 in a Worker, or an
+//! embedded in-memory store a library crate ships.
 //!
 //! An entry's *own* markup may reference a template at parse time (eg `<Styles/>`),
 //! which must resolve before the entry builds. That case is handled by reading the
@@ -33,14 +38,87 @@ pub struct TemplateDir {
 	pub src: RelPath,
 }
 
-/// The template names an owner (a [`TemplateDir`] entity, or the entry root for
-/// the entry-level pre-registration) registered into the
-/// [`BsxTemplateRegistry`]. Re-registering diffs against it so deleted sources
-/// unregister; despawning the owner unregisters everything it owned (via the
-/// `on_remove` hook), so a torn-down entry scene leaves no stale templates.
+/// The template names an owner (a [`TemplateFile`] entity, or the entry root
+/// for the entry-level pre-registration) registered into the
+/// [`BsxTemplateRegistry`]. Re-registering diffs against it so a name the
+/// source no longer defines unregisters; despawning the owner unregisters
+/// everything it owned (via the `on_remove` hook), so a deleted source or a
+/// torn-down entry scene leaves no stale templates.
 #[derive(Debug, Default, Clone, Deref, Component)]
 #[component(on_remove = RegisteredTemplates::on_remove())]
 struct RegisteredTemplates(Vec<SmolStr>);
+
+/// One template source under a [`TemplateDir`], spawned by its scan: the entity
+/// whose [`Blob`] (derived from `rel` against the dir's scoped store) changing
+/// re-registers exactly this source, and whose despawn unregisters what it
+/// registered.
+#[derive(Debug, Clone, Component)]
+#[component(on_insert = hook_ext::component_hook(|file: &TemplateFile| BlobPath::derive(&file.rel)))]
+pub(crate) struct TemplateFile {
+	/// The source's path relative to its dir, naming the module it registers
+	/// as (`widgets/Card.bsx` -> `widgets::Card`).
+	rel: RelPath,
+}
+
+impl TemplateFile {
+	/// Read `blob` and re-register it as `file`'s source, parking a pending guard
+	/// on the build root (or the file outside a build) so a settle waits on it.
+	fn refresh(
+		world: &mut World,
+		file: Entity,
+		rel: RelPath,
+		blob: Blob,
+		formats: TemplateFormats,
+	) {
+		let guard = TemplatePending::park_on(
+			world,
+			TemplateBuildRoot::resolve(world, file),
+			PendingKind::Passive,
+			format!("`{rel}` re-register"),
+		);
+		let Ok(mut entity_mut) = world.get_entity_mut(file) else {
+			return;
+		};
+		// local for the same reason the scan is: the bridge poll is only
+		// guaranteed on the runtime's local executor.
+		entity_mut.run_async_local(async move |file: AsyncEntity| -> Result {
+			let source = blob.get().await?.to_vec().xmap(String::from_utf8)?;
+			let entity = file.id();
+			file.world()
+				.with(move |world| -> Result {
+					let outcome = TemplateDir::register_sources(
+						world,
+						entity,
+						&formats,
+						vec![(rel, source)],
+					);
+					world.flush();
+					guard.resolve(world);
+					outcome
+				})
+				.await
+		});
+	}
+}
+
+/// Re-register each template source whose file changed, through its own
+/// [`TemplateFile`]. A file the scan just spawned is skipped: that scan
+/// registered its source.
+pub(crate) fn register_changed_template_files(
+	files: Query<(Entity, &TemplateFile, Ref<Blob>), Changed<Blob>>,
+	formats: Res<TemplateFormats>,
+	mut commands: Commands,
+) {
+	for (entity, file, blob) in
+		files.iter().filter(|(_, _, blob)| !blob.is_added())
+	{
+		let (rel, blob, formats) =
+			(file.rel.clone(), Blob::clone(&blob), formats.clone());
+		commands.queue(move |world: &mut World| {
+			TemplateFile::refresh(world, entity, rel, blob, formats)
+		});
+	}
+}
 
 impl RegisteredTemplates {
 	/// The `on_remove` hook: snapshot the owned names (still present during the
@@ -71,8 +149,10 @@ impl TemplateDir {
 	/// Register templates under `src`, relative to the nearest ancestor [`BlobStore`].
 	pub fn new(src: impl Into<RelPath>) -> Self { Self { src: src.into() } }
 
-	/// Observer: read the [`TemplateDir`]'s store and register its templates (see
-	/// the module docs).
+	/// Observer: read the [`TemplateDir`]'s store and register its templates,
+	/// one [`TemplateFile`] child per source (see the module docs). A re-insert
+	/// (a file created or removed under the dir) re-reads the dir and diffs the
+	/// children against it.
 	///
 	/// The read is store I/O (the filesystem in dev, S3/R2 when deployed), so it
 	/// runs as an [`AsyncEntity`] task rather than blocking the runtime (which is
@@ -80,8 +160,7 @@ impl TemplateDir {
 	/// [`DirPath`]'s output) is resolved *inside* that task, where the whole tree
 	/// is built, so it is present; a store-less app is an error. The registration
 	/// parks a [`PendingGuard`] on the build root (or this entity outside a
-	/// build), so a load or settle ([`TemplatePending::settle`]) waits for it; on
-	/// completion the entity is also marked [`TemplatesLoaded`].
+	/// build), so a load or settle ([`TemplatePending::settle`]) waits for it.
 	pub fn register_on_insert(
 		ev: On<Insert, TemplateDir>,
 		dirs: Query<&TemplateDir>,
@@ -133,10 +212,7 @@ impl TemplateDir {
 					let sources = Self::read_sources(&store, &formats).await?;
 					dir.world()
 						.with(move |world| -> Result {
-							Self::register_sources(
-								world, entity, &formats, sources,
-							)?;
-							world.entity_mut(entity).insert(TemplatesLoaded);
+							Self::sync_files(world, entity, &formats, sources)?;
 							world.flush();
 							guard.resolve(world);
 							Ok(())
@@ -177,50 +253,106 @@ impl TemplateDir {
 			.await
 	}
 
+	/// Register every `(rel, source)` pair `dir` ships, each on its own
+	/// [`TemplateFile`] child: a source with a child already is re-registered on
+	/// it, a new source gets a child, and a child whose source is gone despawns,
+	/// which unregisters its names. One schema refresh for the whole set.
+	fn sync_files(
+		world: &mut World,
+		dir: Entity,
+		formats: &TemplateFormats,
+		sources: Vec<(RelPath, String)>,
+	) -> Result {
+		// the files the last scan left, by source path
+		let mut existing = world
+			.get::<Children>(dir)
+			.map(|children| {
+				children
+					.iter()
+					.filter_map(|child| {
+						world
+							.get::<TemplateFile>(child)
+							.map(|file| (file.rel.clone(), child))
+					})
+					.collect::<HashMap<_, _>>()
+			})
+			.unwrap_or_default();
+		for (rel, source) in sources {
+			let file = existing.remove(&rel).unwrap_or_else(|| {
+				world
+					.spawn((ChildOf(dir), TemplateFile { rel: rel.clone() }))
+					.id()
+			});
+			Self::register_owned(world, file, formats, [(rel, source)])?;
+		}
+		// the sources the dir no longer ships
+		for (_, file) in existing {
+			world.entity_mut(file).despawn();
+		}
+		BsxTemplateRegistry::refresh_schemas(world);
+		Ok(())
+	}
+
 	/// Register each `(path, source)` pair into the world's [`BsxTemplateRegistry`]
 	/// by its module path, lowering each through the format its [`MediaType`]
-	/// selects, then refresh the BSX schemas. The synchronous world-mutating tail of
-	/// a template-dir load, applied once [`read_sources`](Self::read_sources)
-	/// resolves.
+	/// selects, then refresh the BSX schemas: the entry-level pre-registration,
+	/// which owns every entry template on the entry root, and a
+	/// [`TemplateFile`]'s re-register.
 	///
-	/// Registrations are *owned* by `owner` (the `TemplateDir` entity, or the entry
-	/// root for the entry-level pre-registration): the owner's previous set is
-	/// diffed so a source it no longer ships unregisters (a deleted template on
-	/// live reload), and despawning the owner unregisters everything it owned (the
-	/// structural teardown+rebuild path). Distinct owners still accumulate, so
-	/// multiple dirs compose.
+	/// Registrations are *owned* by `owner`: the owner's previous set is diffed
+	/// so a name it no longer defines unregisters, and despawning the owner
+	/// unregisters everything it owned (a deleted source, the structural
+	/// teardown+rebuild path). Distinct owners still accumulate, so multiple
+	/// dirs compose.
 	pub fn register_sources(
 		world: &mut World,
 		owner: Entity,
 		formats: &TemplateFormats,
 		sources: Vec<(RelPath, String)>,
 	) -> Result {
+		Self::register_owned(world, owner, formats, sources)?;
+		BsxTemplateRegistry::refresh_schemas(world);
+		Ok(())
+	}
+
+	/// [`register_sources`](Self::register_sources) without the schema refresh,
+	/// so a batch of owners refreshes once.
+	fn register_owned(
+		world: &mut World,
+		owner: Entity,
+		formats: &TemplateFormats,
+		sources: impl IntoIterator<Item = (RelPath, String)>,
+	) -> Result {
 		let mut registry = world
 			.remove_resource::<BsxTemplateRegistry>()
 			.unwrap_or_default();
-		let mut names = Vec::new();
-		for (path, source) in sources {
-			names.extend(
-				registry.insert_source_from_path(formats, &path, &source)?,
-			);
-		}
-		// unregister sources this owner previously registered but no longer ships.
+		let names = sources
+			.into_iter()
+			.map(|(path, source)| {
+				registry.insert_source_from_path(formats, &path, &source)
+			})
+			.collect::<Result<Vec<_>>>();
+		// the registry goes back before a bad source's error, never lost with it
+		let names = match names {
+			Ok(names) => names.into_iter().flatten().collect::<Vec<_>>(),
+			Err(err) => {
+				world.insert_resource(registry);
+				return Err(err);
+			}
+		};
+		// unregister the names this owner previously registered but no longer defines
 		if let Some(previous) = world.get::<RegisteredTemplates>(owner) {
 			previous
 				.iter()
 				.filter(|name| !names.contains(name))
-				.cloned()
-				.collect::<Vec<_>>()
-				.into_iter()
 				.for_each(|stale| {
-					registry.remove(&stale);
+					registry.remove(stale);
 				});
 		}
 		world.insert_resource(registry);
 		if let Ok(mut owner) = world.get_entity_mut(owner) {
 			owner.insert(RegisteredTemplates(names));
 		}
-		BsxTemplateRegistry::refresh_schemas(world);
 		Ok(())
 	}
 }
@@ -247,7 +379,8 @@ mod test {
 	}
 
 	/// Inserting a [`TemplateDir`] under a store registers its templates so a
-	/// `<widgets::Card>` tag resolves, store-agnostic (wasm too).
+	/// `<widgets::Card>` tag resolves, store-agnostic (wasm too), each source
+	/// on its own [`TemplateFile`] child.
 	#[beet_core::test]
 	async fn registers_templates_from_store() {
 		let mut world = router_world();
@@ -256,11 +389,117 @@ mod test {
 			"<section class=\"card\"><Slot/></section>",
 		)])
 		.await;
-		world.spawn((store, children![TemplateDir::new("templates")]));
+		let root = world
+			.spawn((store, children![TemplateDir::new("templates")]))
+			.id();
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		world
 			.resource::<BsxTemplateRegistry>()
 			.contains("widgets::Card")
 			.xpect_true();
+		let dir = world.entity(root).get::<Children>().unwrap()[0];
+		let files = world.entity(dir).get::<Children>().unwrap();
+		files.len().xpect_eq(1);
+		world
+			.entity(files[0])
+			.get::<TemplateFile>()
+			.unwrap()
+			.rel
+			.to_string()
+			.xpect_eq("widgets/Card.bsx");
+	}
+
+	/// A router world with the main schedule, so the blob reactions run on
+	/// [`react`].
+	fn reactive_world() -> World {
+		(MinimalPlugins, AsyncPlugin, RouterPlugin).into_world()
+	}
+
+	/// Run one frame (draining the store's events into the reactions) and settle
+	/// the tasks they spawned.
+	async fn react(world: &mut World) {
+		world.update_local();
+		AsyncRunner::settle_async_tasks(world).await;
+	}
+
+	/// An in-memory store holding one `Card` template, spawned as its concrete
+	/// component (so its watcher subscribes) under a `templates` dir, plus a
+	/// handle for writing beside the world. Returns the dir entity too.
+	async fn card_site(world: &mut World) -> (BlobStore, Entity) {
+		let inner = InMemoryStore::new();
+		let handle = BlobStore::new(inner.clone());
+		handle
+			.insert(
+				&RelPath::from("templates/Card.bsx"),
+				"<section>first</section>",
+			)
+			.await
+			.unwrap();
+		let root = world
+			.spawn((inner, children![TemplateDir::new("templates")]))
+			.id();
+		react(world).await;
+		(handle, world.entity(root).get::<Children>().unwrap()[0])
+	}
+
+	/// The registered `Card` template's nodes, debug-printed.
+	fn card_nodes(world: &World) -> String {
+		format!(
+			"{:?}",
+			world
+				.resource::<BsxTemplateRegistry>()
+				.get("Card")
+				.unwrap()
+				.nodes
+		)
+	}
+
+	/// An edited source re-registers through its own file entity, which keeps
+	/// its id: no rescan, no respawn.
+	#[beet_core::test]
+	async fn edited_source_re_registers_itself() {
+		let mut world = reactive_world();
+		let (handle, dir) = card_site(&mut world).await;
+		card_nodes(&world).xpect_contains("first");
+		let file = world.entity(dir).get::<Children>().unwrap()[0];
+
+		handle
+			.insert(
+				&RelPath::from("templates/Card.bsx"),
+				"<section>second</section>",
+			)
+			.await
+			.unwrap();
+		react(&mut world).await;
+		card_nodes(&world).xpect_contains("second");
+		world.entity(dir).get::<Children>().unwrap()[0].xpect_eq(file);
+	}
+
+	/// A source created or removed under the dir marks its store changed: the
+	/// rescan spawns a file for the new source and despawns the gone one, whose
+	/// removal unregisters its names.
+	#[beet_core::test]
+	async fn created_and_removed_sources_follow_the_dir() {
+		let mut world = reactive_world();
+		let (handle, dir) = card_site(&mut world).await;
+
+		handle
+			.insert(&RelPath::from("templates/Hero.bsx"), "<h1>hero</h1>")
+			.await
+			.unwrap();
+		handle
+			.remove(&RelPath::from("templates/Card.bsx"))
+			.await
+			.unwrap();
+		react(&mut world).await;
+		let registry = world.resource::<BsxTemplateRegistry>();
+		registry.contains("Hero").xpect_true();
+		registry.contains("Card").xpect_false();
+		world
+			.entity(dir)
+			.get::<Children>()
+			.unwrap()
+			.len()
+			.xpect_eq(1);
 	}
 }

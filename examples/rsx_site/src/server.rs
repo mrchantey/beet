@@ -38,7 +38,7 @@ pub fn server_plugin(app: &mut App) {
 }
 
 /// The store backing the markdown `content` routes, read at request time by each
-/// route's [`BlobScene`].
+/// route's [`BlobPage`].
 fn content_store() -> FsStore {
 	FsStore::new(WsPath::new("examples/rsx_site/content"))
 }

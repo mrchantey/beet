@@ -87,8 +87,8 @@ fn routes() -> impl Bundle {
 		// `RouterLayout` document, transcluded in place at its `<Slot/>`
 		Layout::of::<RouterLayout>(),
 		children![
-			route::new("", BlobScene::new("content/home.md")),
-			route::new("about", BlobScene::new("content/about.md")),
+			route::new("", BlobPage::new("content/home.md")),
+			route::new("about", BlobPage::new("content/about.md")),
 			counter(),
 			sequence()
 		],

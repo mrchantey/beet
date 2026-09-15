@@ -250,11 +250,6 @@ impl S3Store {
 			None => path.to_string(),
 		}
 	}
-
-	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(self.clone(), path)
-	}
 }
 
 impl BlobStoreProvider for S3Store {

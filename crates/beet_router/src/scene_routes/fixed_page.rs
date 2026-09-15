@@ -7,7 +7,7 @@ use beet_net::prelude::*;
 /// Marks a [`Route`] whose declared children *are* the page: one live tree,
 /// built once and served by every request, rather than rebuilt per request.
 ///
-/// Every other page route ([`render_action`], [`BlobScene`]) spawns a fresh tree
+/// Every other page route ([`render_action`], [`BlobPage`]) spawns a fresh tree
 /// per request and despawns it after render. A `FixedPage` instead makes the
 /// route entity its own [`PageRoot`] with no [`DespawnAfterRender`], so the tree
 /// its children form outlives the response:
@@ -31,7 +31,7 @@ use beet_net::prelude::*;
 /// `FixedPage` routes over three threads each own their own) but **shared by
 /// every surface viewing it**, widget state included: two terminals on one route
 /// share the same `<input>`, scroll offset and focus. A per-request route avoids
-/// this by construction — [`BlobScene`] reparses its document per request for
+/// this by construction — [`BlobPage`] reparses its document per request for
 /// exactly that reason.
 ///
 /// It earns its keep for the single local terminal, where the surface repaints

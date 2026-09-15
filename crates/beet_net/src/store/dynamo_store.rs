@@ -172,11 +172,6 @@ impl DynamoStore {
 		}
 		bevybail!("Table did not delete in time");
 	}
-
-	/// Create a [`TypedBlob`] handle for a single object in this store.
-	pub fn blob(&self, path: RelPath) -> TypedBlob<Self> {
-		TypedBlob::new(self.clone(), path)
-	}
 }
 
 /// Insert both erased store currencies: the [`BlobStore`] every provider gets,

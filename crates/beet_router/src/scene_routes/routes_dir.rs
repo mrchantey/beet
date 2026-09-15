@@ -7,7 +7,7 @@
 //! onto the dir entity, which also registers the dir's [`WatchDir`] for live
 //! reload, and triggers [`RoutesDir::spawn_on_insert`]: the scoped store is
 //! listed, and each content file (`.md`/`.mdx`/`.bsx`/`.html`) spawns a
-//! [`BlobScene`] route child served through the shared media-parse pipeline,
+//! [`BlobPage`] route child served through the shared media-parse pipeline,
 //! reading its bytes through that store. Each file's ROOT declarations
 //! ([`RootDeclarations`]: markdown frontmatter or a BSX root
 //! spread) are read at scan time and hoisted onto the route entity, so navigation
@@ -16,13 +16,19 @@
 //! whatever components a document declares, and [`PageMeta`] is one consumer of
 //! that set like any other. Discovery is store-backed, so it reads identically
 //! from the local filesystem in dev and from S3 in a deployed task.
+//!
+//! The routes stay true to their files through change detection: each route's
+//! [`Blob`] (derived from its [`BlobPage`] path) changing re-reads that file's
+//! declarations in place ([`refresh_changed_routes`]), and a file created or
+//! removed under the dir marks its scoped store changed, which rescans the dir
+//! ([`rescan_changed_dirs`]).
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// Spawns one [`BlobScene`] route child per content file under `src`,
+/// Spawns one [`BlobPage`] route child per content file under `src`,
 /// discovered at spawn time (see the module docs).
 ///
 /// Route paths mirror the file tree: `docs/intro.md` serves at `docs/intro`,
@@ -59,7 +65,7 @@ pub struct RoutesDir {
 	pub filter: GlobFilter,
 }
 
-/// The content file extensions served as [`BlobScene`] routes.
+/// The content file extensions served as [`BlobPage`] routes.
 const CONTENT_EXTENSIONS: &[&str] = &["md", "mdx", "markdown", "html", "bsx"];
 
 impl RoutesDir {
@@ -213,35 +219,21 @@ impl RoutesDir {
 		Ok(())
 	}
 
-	/// Spawn one discovered content file as a [`BlobScene`] route child of `parent`,
+	/// Spawn one discovered content file as a [`BlobPage`] route child of `parent`,
 	/// hoisting the components its root declared onto the route entity. Spawned
-	/// [`RouteHidden`] for [`swap_routes`](Self::swap_routes) to unhide.
-	///
-	/// The declarations resolve here rather than in the scan because
-	/// reflect-building them needs the world's type registry, and the router reads
-	/// [`PageMeta`] out of them first because a `slug` has the last word on the
-	/// url — before the route entity it would live on exists. A declaration that
-	/// will not insert takes its route with it, so the page gets no route rather
-	/// than serving with the declaration defaulted away.
+	/// [`RouteHidden`] for [`swap_routes`](Self::swap_routes) to unhide. A
+	/// declaration that will not insert takes its route with it, so the page
+	/// gets no route rather than serving with the declaration defaulted away.
 	fn spawn_route_spec(
 		world: &mut World,
 		parent: Entity,
 		spec: RouteSpec,
 	) -> Result<Entity> {
-		let mut declarations = spec.declarations?;
-		PageMeta::declare_file_defaults(&mut declarations, &spec.store_path);
-		let meta = declarations.get::<PageMeta>(
-			&world
-				.get_resource::<AppTypeRegistry>()
-				.ok_or_else(|| {
-					bevyhow!("route discovery requires an `AppTypeRegistry`")
-				})?
-				.read(),
-		)?;
-		let route_path = Self::route_path_for(&spec.store_path, meta.as_ref())?;
+		let store_path = spec.store_path.clone();
+		let (declarations, route_path) = Self::resolve_spec(world, spec)?;
 		let mut route_entity = world.spawn((
 			ChildOf(parent),
-			route::new(route_path.as_str(), BlobScene::new(spec.store_path)),
+			route::new(route_path.as_str(), BlobPage::new(store_path)),
 			HttpMethod::Get,
 			ExportStrategy::Static,
 			// a discovered content file is a user-facing page, so it carries
@@ -255,6 +247,107 @@ impl RoutesDir {
 			return Err(err);
 		}
 		Ok(route_entity.id())
+	}
+
+	/// A discovered file's declarations with the filename defaults applied
+	/// ([`PageMeta::declare_file_defaults`]), and the url it serves at once its
+	/// `slug` has had its say.
+	///
+	/// Resolved here rather than in the scan because reflect-building the
+	/// declarations needs the world's type registry, and the router reads
+	/// [`PageMeta`] out of them first because a `slug` has the last word on the
+	/// url, before the route entity it would live on exists.
+	fn resolve_spec(
+		world: &World,
+		spec: RouteSpec,
+	) -> Result<(RootDeclarations, RelPath)> {
+		let mut declarations = spec.declarations?;
+		PageMeta::declare_file_defaults(&mut declarations, &spec.store_path);
+		let meta = declarations.get::<PageMeta>(
+			&world
+				.get_resource::<AppTypeRegistry>()
+				.ok_or_else(|| {
+					bevyhow!("route discovery requires an `AppTypeRegistry`")
+				})?
+				.read(),
+		)?;
+		let route_path = Self::route_path_for(&spec.store_path, meta.as_ref())?;
+		Ok((declarations, route_path))
+	}
+
+	/// Re-read `route`'s root declarations through its `blob` and apply them
+	/// ([`apply_refresh`](Self::apply_refresh)), parking a pending guard on
+	/// the build root (or the route outside a build) so a settle waits on it.
+	fn refresh_route(world: &mut World, route: Entity, blob: Blob) {
+		let guard = TemplatePending::park_on(
+			world,
+			TemplateBuildRoot::resolve(world, route),
+			PendingKind::Passive,
+			format!("`{}` refresh", blob.path()),
+		);
+		let Ok(mut entity_mut) = world.get_entity_mut(route) else {
+			return;
+		};
+		// local for the same reason the scan is: the bridge poll is only
+		// guaranteed on the runtime's local executor.
+		entity_mut.run_async_local(async move |route: AsyncEntity| -> Result {
+			let frontmatter_type = route
+				.with_state::<AncestorQuery<&FrontmatterType>, _>(
+					|entity, types| {
+						types.get(entity).cloned().unwrap_or_default()
+					},
+				)
+				.await?;
+			let spec = RouteSpec {
+				declarations: Self::scan_declarations(
+					blob.store(),
+					blob.path(),
+					&frontmatter_type.component,
+				)
+				.await,
+				store_path: blob.path().clone(),
+			};
+			let entity = route.id();
+			route
+				.world()
+				.with(move |world| -> Result {
+					let outcome = Self::apply_refresh(world, entity, spec);
+					world.flush();
+					guard.resolve(world);
+					outcome
+				})
+				.await
+		});
+	}
+
+	/// Hoist a refreshed `spec` onto `route` in place when its url is
+	/// unchanged, else rescan the owning [`RoutesDir`]: the swap is the one way
+	/// a route's path changes. A route with no dir (a codegen blob route) has a
+	/// fixed url and refreshes in place regardless.
+	fn apply_refresh(
+		world: &mut World,
+		route: Entity,
+		spec: RouteSpec,
+	) -> Result {
+		let (declarations, route_path) = Self::resolve_spec(world, spec)?;
+		let moved = world.get::<PathPartial>(route).is_some_and(|current| {
+			*current != PathPartial::new(route_path.as_str())
+		});
+		let dir = world.get::<ChildOf>(route).map(ChildOf::parent).and_then(
+			|parent| {
+				world
+					.get::<RoutesDir>(parent)
+					.cloned()
+					.map(|dir| (parent, dir))
+			},
+		);
+		match (moved, dir) {
+			(true, Some((dir, rescan))) => {
+				world.entity_mut(dir).insert(rescan);
+				Ok(())
+			}
+			_ => declarations.insert(&mut world.entity_mut(route)),
+		}
 	}
 
 	/// Swap `dir`'s routes for the ones this scan `spawned`: every route a
@@ -407,6 +500,27 @@ struct RouteSpec {
 	declarations: Result<RootDeclarations>,
 }
 
+/// Refresh each discovered route whose file changed: its root declarations are
+/// read again and hoisted in place, the route entity and its url untouched, so
+/// an edited title or order reaches the nav without a rescan and a request in
+/// flight keeps its route. An edit that moves the url (a `slug`) rescans the
+/// owning [`RoutesDir`] instead. A route the scan just spawned is skipped: that
+/// scan read its declarations.
+pub(crate) fn refresh_changed_routes(
+	routes: Query<
+		(Entity, Ref<Blob>),
+		(Changed<Blob>, With<BlobPage>, Without<RouteHidden>),
+	>,
+	mut commands: Commands,
+) {
+	for (route, blob) in routes.iter().filter(|(_, blob)| !blob.is_added()) {
+		let blob = Blob::clone(&blob);
+		commands.queue(move |world: &mut World| {
+			RoutesDir::refresh_route(world, route, blob)
+		});
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -416,21 +530,147 @@ mod test {
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// Spawn `bundle` and settle the async runtime so the [`RoutesDir`] discovery
-	/// task (an async store scan) completes, returning the root entity. Mirrors a
-	/// boot path settling before it serves.
 	/// Compose `store` on the root (the repo store an entry carries) so the
 	/// [`RoutesDir`] resolves it by ancestry, then settle the async runtime so the
 	/// discovery task (an async store scan) completes. Mirrors a boot path settling
 	/// before it serves.
 	async fn spawn_routes(
 		world: &mut World,
-		store: BlobStore,
+		store: impl Bundle,
 		bundle: impl Bundle,
 	) -> Entity {
 		let root = world.spawn((store, bundle)).flush();
 		AsyncRunner::settle_async_tasks(world).await;
 		root
+	}
+
+	/// A router world with the main schedule, so the blob reactions run on
+	/// [`react`].
+	fn reactive_world() -> World {
+		(MinimalPlugins, AsyncPlugin, RouterPlugin).into_world()
+	}
+
+	/// Run one frame (draining the store's events into the reactions) and settle
+	/// the tasks they spawned.
+	async fn react(world: &mut World) {
+		world.update_local();
+		AsyncRunner::settle_async_tasks(world).await;
+	}
+
+	/// An in-memory store seeded with `files`, as its concrete component (so
+	/// spawning it subscribes its watcher) plus a handle for writing beside the
+	/// world.
+	async fn reactive_fixture(
+		files: &[(&str, &str)],
+	) -> (InMemoryStore, BlobStore) {
+		let inner = InMemoryStore::new();
+		let handle = BlobStore::new(inner.clone());
+		for (rel, content) in files {
+			handle
+				.insert(&RelPath::from(*rel), content.to_string())
+				.await
+				.unwrap();
+		}
+		(inner, handle)
+	}
+
+	/// The title a route's hoisted [`PageMeta`] declares.
+	fn title_of(world: &World, route: Entity) -> String {
+		world.get::<PageMeta>(route).unwrap().title.clone().unwrap()
+	}
+
+	/// A byte change to a content file refreshes its route in place: the edited
+	/// title reaches the route entity, which keeps its id, so nothing retires
+	/// and a request in flight keeps its route.
+	#[beet_core::test]
+	async fn edit_refreshes_the_route_in_place() {
+		let mut world = reactive_world();
+		let (inner, handle) = reactive_fixture(&[(
+			"post.md",
+			"+++\ntitle = \"First\"\n+++\n\n# Post",
+		)])
+		.await;
+		let root = spawn_routes(
+			&mut world,
+			inner,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+		let post = RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["post"])
+			.unwrap()
+			.entity;
+		title_of(&world, post).xpect_eq("First");
+
+		handle
+			.insert(
+				&RelPath::from("post.md"),
+				"+++\ntitle = \"Second\"\n+++\n\n# Post",
+			)
+			.await
+			.unwrap();
+		react(&mut world).await;
+		title_of(&world, post).xpect_eq("Second");
+		world.query_once::<&Retired>().len().xpect_eq(0);
+	}
+
+	/// A `slug` edit moves the url, which no in-place refresh can express: the
+	/// owning dir rescans and swaps the route.
+	#[beet_core::test]
+	async fn slug_edit_rescans_the_dir() {
+		let mut world = reactive_world();
+		let (inner, handle) = reactive_fixture(&[(
+			"post.md",
+			"+++\nslug = \"first\"\n+++\n\n# Post",
+		)])
+		.await;
+		let root = spawn_routes(
+			&mut world,
+			inner,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+		let first = RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["first"])
+			.unwrap()
+			.entity;
+
+		handle
+			.insert(
+				&RelPath::from("post.md"),
+				"+++\nslug = \"second\"\n+++\n\n# Post",
+			)
+			.await
+			.unwrap();
+		react(&mut world).await;
+		let tree = RouteTree::of(&world, root).unwrap().clone();
+		tree.find(&["first"]).xpect_none();
+		tree.find(&["second"]).xpect_some();
+		world.get_entity(first).is_err().xpect_true();
+	}
+
+	/// A created file marks the dir's store changed, which rescans it.
+	#[beet_core::test]
+	async fn created_file_rescans_the_dir() {
+		let mut world = reactive_world();
+		let (inner, handle) = reactive_fixture(&[("index.md", "# Home")]).await;
+		let root = spawn_routes(
+			&mut world,
+			inner,
+			(Router, children![RoutesDir::default()]),
+		)
+		.await;
+		handle
+			.insert(&RelPath::from("about.md"), "# About")
+			.await
+			.unwrap();
+		react(&mut world).await;
+		RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["about"])
+			.xpect_some();
 	}
 
 	/// Write a routes dir fixture under `target/tests` and return a [`BlobStore`]

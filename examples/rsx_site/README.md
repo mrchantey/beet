@@ -14,7 +14,7 @@ collections (`src/pages`, `content`, `actions`) by the codegen pass:
   (`design_row_rule`).
 - **`/about`** — a dynamic page: `async fn get(ActionContext<Request>)`, built
   per request (the `async_route` codegen branch).
-- **`/guide`** — markdown `content`: a `BlobScene` reading `content/guide.md` and
+- **`/guide`** — markdown `content`: a `BlobPage` reading `content/guide.md` and
   its frontmatter at request time (the no-codegen content path).
 - **`POST /add`** — a server `action` (`Json<AddArgs>` -> `i32`) plus a generated,
   typed client caller in `codegen/client_actions.rs`.

@@ -3,7 +3,7 @@
 //! A [`RouteCollection`] points at a source directory of route files and is
 //! scanned via a [`BlobStore`] into a list of [`RouteFile`]. The same scan is
 //! used at codegen time (to emit bundles + typed links) and could be reused at
-//! runtime (to spawn `route::new(path, BlobScene::new(path))` for content files).
+//! runtime (to spawn `route::new(path, BlobPage::new(path))` for content files).
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -221,7 +221,7 @@ pub enum RouteFileKind {
 		/// The HTTP handlers in this file.
 		methods: Vec<RouteMethod>,
 	},
-	/// A content file (markdown/html) served via [`BlobScene`].
+	/// A content file (markdown/html) served via [`BlobPage`].
 	Blob {
 		/// Path of the content file relative to the store root.
 		store_path: RelPath,

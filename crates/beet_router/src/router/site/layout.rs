@@ -459,7 +459,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn wraps_blob_scene_markdown() {
+	async fn wraps_blob_page_markdown() {
 		let store = BlobStore::temp();
 		store
 			.insert(&"post.md".into(), "# Hello\n\nmarkdown body".to_owned())
@@ -469,7 +469,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((store, Router, Layout::of::<PageShell>(), children![
-				route::new("post", BlobScene::new("post.md"))
+				route::new("post", BlobPage::new("post.md"))
 			]))
 			.flush();
 
@@ -501,7 +501,7 @@ mod test {
 		let mut world = router_world();
 		let root = world
 			.spawn((store, Router, Layout::of::<PageShell>(), children![
-				route::new("post", BlobScene::new("post.md"))
+				route::new("post", BlobPage::new("post.md"))
 			]))
 			.flush();
 

@@ -65,28 +65,22 @@ mod native {
 	///
 	/// The watcher set is derived from the live registrations: one recursive
 	/// [`FsWatcher`] per *minimal root*, a registered dir with no registered
-	/// strict ancestor keyed to the same base, so a `routes/` under a watched
-	/// entry dir rides the entry's watcher and one edit never surfaces twice.
-	/// Every registration change re-derives the set and diffs it against the
-	/// live watchers ([`sync`](Self::sync)); nothing is refcounted. A watcher
-	/// emits events keyed to its base and base-relative, so whichever watcher
-	/// saw the change, it routes identically through
+	/// strict ancestor, so a `routes/` under a watched entry dir rides the
+	/// entry's watcher and one edit never surfaces twice. Every registration
+	/// change re-derives the set and diffs it against the live watchers
+	/// ([`sync`](Self::sync)); nothing is refcounted.
+	///
+	/// A watcher knows no base: it forwards each path to every base with a
+	/// registered dir covering it ([`bases_covering`](Self::bases_covering)),
+	/// keyed to that base and base-relative, so two stores over one directory
+	/// share one OS watcher and each still routes its own events through
 	/// [`did_change`](BlobStoreProvider::did_change) and [`Blob::matches_event`].
 	#[derive(Default, Resource)]
 	pub struct FsBlobWatchers {
-		/// Per live [`WatchDir`] entity: the root it registers and its base store.
-		registrations: HashMap<Entity, (WatchRoot, BlobStore)>,
-		/// Per minimal root: the [`FsWatcher`] entity observing it.
-		roots: HashMap<WatchRoot, Entity>,
-	}
-
-	/// A watched directory and the base dir its events are stripped to. Two
-	/// stores with different bases over one dir are two roots: each keys its
-	/// events to its own base.
-	#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-	struct WatchRoot {
-		base: AbsPath,
-		dir: AbsPath,
+		/// Per live [`WatchDir`] entity: the dir it registers and its base store.
+		registrations: HashMap<Entity, (AbsPath, BlobStore)>,
+		/// Per minimal root dir: the [`FsWatcher`] entity observing it.
+		roots: HashMap<AbsPath, Entity>,
 	}
 
 	/// Register the inserted [`WatchDir`] (a replaced one re-registers under the
@@ -101,16 +95,12 @@ mod native {
 			return;
 		};
 		// a base with no local directory (memory, S3) has nothing to watch
-		let Some(base) = watch.base.base_dir() else {
+		if watch.base.base_dir().is_none() {
 			return;
-		};
-		let root = WatchRoot {
-			base,
-			dir: watch.dir.clone(),
-		};
+		}
 		watchers
 			.registrations
-			.insert(ev.entity, (root, watch.base.clone()));
+			.insert(ev.entity, (watch.dir.clone(), watch.base.clone()));
 		watchers.sync(&mut commands);
 	}
 
@@ -129,22 +119,39 @@ mod native {
 	impl FsBlobWatchers {
 		/// The dirs currently watched, one per minimal root.
 		pub fn dirs(&self) -> impl Iterator<Item = &AbsPath> {
-			self.roots.keys().map(|root| &root.dir)
+			self.roots.keys()
 		}
 
-		/// The minimal root set: every registered root with no registered strict
-		/// ancestor keyed to the same base, each with its base store.
-		fn minimal_roots(&self) -> HashMap<WatchRoot, BlobStore> {
+		/// The minimal root set: every registered dir with no registered strict
+		/// ancestor dir.
+		fn minimal_roots(&self) -> HashSet<AbsPath> {
 			self.registrations
 				.values()
-				.filter(|(root, _)| {
+				.map(|(dir, _)| dir)
+				.filter(|dir| {
 					!self.registrations.values().any(|(other, _)| {
-						other.base == root.base
-							&& other.dir != root.dir
-							&& root.dir.strip_prefix(&other.dir).is_some()
+						other != *dir && dir.strip_prefix(other).is_some()
 					})
 				})
-				.map(|(root, base)| (root.clone(), base.clone()))
+				.cloned()
+				.collect()
+		}
+
+		/// Every base with a registered dir covering `path`, once each (two
+		/// registrations of one base emit once), with the base dir its events
+		/// strip to. A base whose registered dirs do not cover `path` is left
+		/// out, so sharing a watcher never over-delivers to it.
+		fn bases_covering(&self, path: &AbsPath) -> Vec<(AbsPath, BlobStore)> {
+			self.registrations
+				.values()
+				.filter(|(dir, _)| path.strip_prefix(dir).is_some())
+				.filter_map(|(_, base)| {
+					base.base_dir().map(|base_dir| {
+						(base.root_key(), (base_dir, base.clone()))
+					})
+				})
+				.collect::<HashMap<_, _>>()
+				.into_values()
 				.collect()
 		}
 
@@ -153,67 +160,59 @@ mod native {
 		fn sync(&mut self, commands: &mut Commands) {
 			let wanted = self.minimal_roots();
 			for (_, entity) in
-				self.roots.extract_if(|root, _| !wanted.contains_key(root))
+				self.roots.extract_if(|root, _| !wanted.contains(root))
 			{
 				commands.entity(entity).despawn();
 			}
-			for (root, base) in wanted {
+			for root in wanted {
 				if !self.roots.contains_key(&root) {
-					let entity = Self::spawn_watcher(commands, &root, base);
+					let entity = Self::spawn_watcher(commands, &root);
 					self.roots.insert(root, entity);
 				}
 			}
 		}
 
-		/// Spawn an internal [`FsWatcher`] on `root`'s dir (the cargo-project
-		/// filter excludes target/.git/.beet/codegen/rustc-ice churn), forwarding
-		/// its [`DirEvent`]s to the bus relative to (and keyed to) `base`, so they
-		/// route via [`did_change`](BlobStoreProvider::did_change).
-		fn spawn_watcher(
-			commands: &mut Commands,
-			root: &WatchRoot,
-			base: BlobStore,
-		) -> Entity {
+		/// Spawn an internal [`FsWatcher`] on `dir` (the cargo-project filter
+		/// excludes target/.git/.beet/codegen/rustc-ice churn), forwarding its
+		/// [`DirEvent`]s to the bus through [`forward_dir_events`].
+		fn spawn_watcher(commands: &mut Commands, dir: &AbsPath) -> Entity {
 			// the dir may not exist yet (eg an `assets/` an entry declares but has
 			// not created), but an `FsWatcher` cannot watch a path that does not
 			// exist.
-			fs_ext::create_dir_all(&root.dir).ok();
-			let base_dir = root.base.clone();
+			fs_ext::create_dir_all(dir).ok();
 			commands
-				.spawn(FsWatcher::default_cargo().with_path(root.dir.clone()))
-				.observe_any(move |ev: On<DirEvent>, bus: Res<BlobEventBus>| {
-					forward_dir_event_for(&ev, &base_dir, &base, &bus);
-				})
+				.spawn(FsWatcher::default_cargo().with_path(dir.clone()))
+				.observe_any(forward_dir_events)
 				.id()
 		}
 	}
 
-	/// Convert a [`DirEvent`] into per-object [`BlobEvent`]s keyed to `base`
-	/// (the unscoped store at `base_dir`), each path stripped to `base_dir` so
-	/// the event's `path` and `root_relative_path` agree. A path outside the base
-	/// is skipped.
-	fn forward_dir_event_for(
-		event: &DirEvent,
-		base_dir: &AbsPath,
-		base: &BlobStore,
-		bus: &BlobEventBus,
+	/// Forward a watcher's [`DirEvent`] as per-object [`BlobEvent`]s: one per
+	/// base whose registered dirs cover the path, keyed to that base and
+	/// stripped to its base dir, so the event's `path` and `root_relative_path`
+	/// agree.
+	fn forward_dir_events(
+		ev: On<DirEvent>,
+		watchers: Res<FsBlobWatchers>,
+		bus: Res<BlobEventBus>,
 	) {
-		event.iter().for_each(|path_event| {
-			// base-relative path, skipping events outside the base
-			let Some(rel) = path_event.path.strip_prefix(base_dir) else {
-				return;
-			};
+		for path_event in ev.iter() {
 			// directories are not objects
 			if fs_ext::is_dir(&path_event.path) {
-				return;
+				continue;
 			}
 			let kind = match path_event.kind {
 				EventKind::Create(_) => BlobEventKind::Created,
 				EventKind::Remove(_) => BlobEventKind::Removed,
 				_ => BlobEventKind::Changed,
 			};
-			bus.send(BlobEvent::new(base.clone(), rel, kind));
-		});
+			for (base_dir, base) in watchers.bases_covering(&path_event.path) {
+				let Some(rel) = path_event.path.strip_prefix(&base_dir) else {
+					continue;
+				};
+				bus.send(BlobEvent::new(base, rel, kind));
+			}
+		}
 	}
 
 	#[cfg(test)]
@@ -320,10 +319,11 @@ mod native {
 			watched(&world).xpect_eq(Vec::<String>::new());
 		}
 
-		/// Two stores with different bases over one dir are two roots: an
-		/// ancestor watcher keyed to another base cannot serve a store's events.
+		/// Two stores with different bases over one dir share one watcher: a
+		/// path under both registered dirs forwards once per base, and a path
+		/// the inner base never registered is not forwarded to it.
 		#[beet_core::test]
-		fn roots_are_per_base() {
+		fn shared_dir_forwards_per_base() {
 			let mut world = watcher_world();
 			let outer = fs_store("fs_blob_watchers_bases");
 			let scoped = outer.with_subdir(RelPath::from("inner"));
@@ -331,7 +331,22 @@ mod native {
 			watch(&mut world, &outer);
 			watch(&mut world, &scoped);
 			watch(&mut world, &inner);
-			watched(&world).xpect_eq(vec![dir_of(&outer), dir_of(&inner)]);
+			watched(&world).xpect_eq(vec![dir_of(&outer)]);
+
+			let bases = |path: &str| {
+				world
+					.resource::<FsBlobWatchers>()
+					.bases_covering(&outer.watch_dir().unwrap().join(path))
+					.into_iter()
+					.map(|(_, base)| base.root_key())
+					.collect::<Vec<_>>()
+					.xtap(|keys| keys.sort())
+			};
+			bases("inner/x.txt").xpect_eq(
+				vec![outer.root_key(), inner.root_key()]
+					.xtap(|keys| keys.sort()),
+			);
+			bases("other.txt").xpect_eq(vec![outer.root_key()]);
 		}
 
 		/// A [`WatchDir`] over a subdir emits a BASE-relative, base-keyed

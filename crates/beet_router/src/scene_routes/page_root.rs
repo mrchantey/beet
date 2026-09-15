@@ -1,7 +1,7 @@
 //! The render root: what a request serializes, and the per-request tree a
 //! content file parses into.
 //!
-//! [`PageRoot`] names the entity the [`NodeRenderer`] walks; [`BlobScene`] serves
+//! [`PageRoot`] names the entity the [`NodeRenderer`] walks; [`BlobPage`] serves
 //! a store file as one, parsing its bytes into a fresh tree per request and
 //! seeding that tree with the components the document declares at its root (see
 //! [`RootDeclarations`]), so a widget reading the render root finds the page's
@@ -161,34 +161,43 @@ impl IntoResponseWithRequestParts<Self> for PageRequest {
 	}
 }
 
-/// Serves bytes from the ancestor [`BlobStore`] parsed into a render tree.
+/// Serves the file at `path` in the nearest ancestor [`BlobStore`], parsed
+/// into a render tree per request. The file is the route's [`Blob`], derived
+/// from `path` like any [`BlobPath`], so an edit to it marks the route changed
+/// (see [`refresh_changed_routes`]).
 #[action(route)]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn BlobScene(
+#[component(on_insert = hook_ext::component_hook(|page: &BlobPage| BlobPath::derive(&page.path)))]
+pub async fn BlobPage(
 	/// The store-relative path of the file this route serves.
 	#[field]
 	path: RelPath,
 	cx: ActionContext<Request>,
 ) -> Result<PageRequest> {
-	// the nearest ancestor store backs this page's bytes; absent is an error, never
-	// an implicit filesystem store (there is none on wasm).
-	let store = cx
+	// the route's blob, resolved from the nearest ancestor store; absent is an
+	// error, never an implicit filesystem store (there is none on wasm).
+	let blob = cx
 		.caller
-		.with_state::<AncestorQuery<&BlobStore>, Result<BlobStore>>(
-			|entity, query| query.get(entity).cloned(),
-		)
-		.await??;
+		.get::<Blob, _>(Blob::clone)
+		.await
+		.ok()
+		.ok_or_else(|| {
+			bevyhow!(
+				"`{path}` has no store: `BlobPage` reads through the nearest \
+				 ancestor `BlobStore`, which is missing"
+			)
+		})?;
 
 	// the in-tree route anchor and the request being served, threaded into the
 	// render context the content builds under (below)
 	let route = cx.caller.id();
 	let parts = cx.input.parts().clone();
-	let bytes = store.get_media(&path).await?;
+	let bytes = blob.get_media().await?;
 	// carry the store onto the render root: the per-request tree is a detached root
 	// (below), so a render-time widget that reads a file (eg `<CodeSnippet src>`)
 	// resolves it by self-or-ancestor lookup rather than walking to the router.
-	let render_store = store.clone();
+	let render_store = blob.store().clone();
 
 	// parse into a fresh entity per request, never the route node itself. The route
 	// node is persistent and shared: it serves http alongside many live TUI surfaces
@@ -247,7 +256,7 @@ pub async fn BlobScene(
 		.await
 }
 
-impl BlobScene {
+impl BlobPage {
 	/// Serve the store file at `path`.
 	pub fn new(path: impl Into<RelPath>) -> Self { Self { path: path.into() } }
 }

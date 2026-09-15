@@ -151,9 +151,7 @@ pub struct StorePlugin;
 impl Plugin for StorePlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<FsStore>()
-			.register_type::<TypedBlob<FsStore>>()
 			.register_type::<InMemoryStore>()
-			.register_type::<TypedBlob<InMemoryStore>>()
 			// store-path components: resolve a scoped store / blob from the nearest
 			// ancestor store, kept correct as stores churn above them.
 			.register_type::<DirPath>()
@@ -167,6 +165,7 @@ impl Plugin for StorePlugin {
 			.register_type::<RepoStore>()
 			.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
+			.add_observer(on_insert_child_of)
 			.add_observer(on_insert_store)
 			.add_observer(on_remove_store);
 
@@ -193,10 +192,7 @@ impl Plugin for StorePlugin {
 		// forked) and written back on every edit to its scene document.
 		#[cfg(all(feature = "template_serde", feature = "json"))]
 		app.register_type::<SceneBlob>()
-			.add_systems(
-				PreUpdate,
-				read_scene_blobs.run_if(scene_blobs_may_be_readable),
-			)
+			.add_systems(PreUpdate, read_scene_blobs)
 			.add_systems(PostUpdate, write_scene_blobs);
 
 		// the by-location half of schema resolution: a document naming its
@@ -211,7 +207,7 @@ impl Plugin for StorePlugin {
 						.run_if(located_schemas_may_be_readable),
 					// the documents an app edits: read out of the store onto
 					// their own entities, and written back on every edit.
-					read_document_blobs.run_if(document_blobs_may_be_readable),
+					read_document_blobs,
 				),
 			)
 			.add_systems(PostUpdate, write_document_blobs);
@@ -219,9 +215,7 @@ impl Plugin for StorePlugin {
 		// wasm localStorage watcher lifecycle (NonSend, owns the JS closure)
 		#[cfg(target_arch = "wasm32")]
 		app.register_type::<LocalStorageStore>()
-			.register_type::<TypedBlob<LocalStorageStore>>()
 			.register_type::<IndexedDbStore>()
-			.register_type::<TypedBlob<IndexedDbStore>>()
 			.init_non_send::<LocalStorageBlobWatcher>()
 			.add_observer(add_local_storage_store_watcher)
 			.add_observer(remove_local_storage_store_watcher);
@@ -229,13 +223,10 @@ impl Plugin for StorePlugin {
 		// the Cloudflare R2 binding store, registered so a deployed Worker can
 		// resolve `<.. R2WorkersStore>` from markup and serialize it.
 		#[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
-		app.register_type::<R2WorkersStore>()
-			.register_type::<TypedBlob<R2WorkersStore>>();
+		app.register_type::<R2WorkersStore>();
 
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		app.register_type::<S3Store>()
-			.register_type::<DynamoStore>()
-			.register_type::<TypedBlob<S3Store>>()
-			.register_type::<TypedBlob<DynamoStore>>();
+			.register_type::<DynamoStore>();
 	}
 }

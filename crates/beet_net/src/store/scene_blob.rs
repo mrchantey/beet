@@ -6,7 +6,6 @@
 //! the store. One mechanism for every surface: a terminal forks into its store
 //! exactly as a browser forks into its local one, and the [`SceneDocument`] the
 //! fork lands as is what an inspector edits, the world following per component.
-use super::ancestor_store;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -23,10 +22,12 @@ use beet_core::prelude::*;
 /// <SceneBlob path="app.json" from="app.bsx"/>
 /// ```
 ///
-/// Lazy in the shape [`DocumentBlob`] settled on: a store that has not arrived
-/// is not an error, only a boot that has not happened yet.
+/// Lazy in the shape [`DocumentBlob`] settled on: the fork is reached through
+/// the [`Blob`] its derived [`BlobPath`] resolves, so a store that has not
+/// arrived is not an error, only a boot that has not happened yet.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
+#[component(on_insert = hook_ext::component_hook(|blob: &SceneBlob| BlobPath::derive(&blob.path)))]
 pub struct SceneBlob {
 	/// The fork's path within the nearest ancestor store, the boot source once
 	/// it exists. Its extension picks the format, json by default.
@@ -62,32 +63,28 @@ impl SceneBlob {
 #[derive(Component)]
 pub(crate) struct ReadingSceneBlob;
 
-/// Run condition for [`read_scene_blobs`]: a blob or a store arrived, the two
-/// orders in which a stored scene becomes bootable.
-pub(crate) fn scene_blobs_may_be_readable(
-	blobs: Query<(), Added<SceneBlob>>,
-	stores: Query<(), Added<BlobStore>>,
-) -> bool {
-	!blobs.is_empty() || !stores.is_empty()
-}
-
-/// Boot each [`SceneBlob`] from its nearest ancestor store: the fork when it
-/// exists, else the original, forked.
+/// Boot each unbooted [`SceneBlob`] whose [`Blob`] arrived from its store: the
+/// fork when it exists, else the original, forked. Boot-once: a fork edited
+/// elsewhere while this world runs is not reloaded over the live scene.
 pub(crate) fn read_scene_blobs(
 	mut commands: Commands,
 	mut async_commands: AsyncCommands,
 	blobs: Populated<
-		(Entity, &SceneBlob),
-		(Without<ReadingSceneBlob>, Without<SceneDocument>),
+		(Entity, &SceneBlob, &Blob),
+		(
+			Changed<Blob>,
+			Without<ReadingSceneBlob>,
+			Without<SceneDocument>,
+		),
 	>,
 ) {
-	for (entity, blob) in blobs.iter() {
-		let blob = blob.clone();
+	for (entity, blob, handle) in blobs.iter() {
+		let (blob, store) = (blob.clone(), handle.store().clone());
 		commands.entity(entity).insert(ReadingSceneBlob);
 		async_commands
 			.entity(entity)
 			.queue_async(async move |entity| {
-				let outcome = read_scene_blob(&entity, blob).await;
+				let outcome = read_scene_blob(&entity, blob, store).await;
 				// always released, so a transient failure is retried when the next
 				// blob or store arrives rather than wedging this one
 				entity
@@ -101,10 +98,11 @@ pub(crate) fn read_scene_blobs(
 }
 
 /// The boot itself: load the fork, or build the original and fork it.
-async fn read_scene_blob(entity: &AsyncEntity, blob: SceneBlob) -> Result {
-	let Some(store) = ancestor_store(entity).await? else {
-		return OK;
-	};
+async fn read_scene_blob(
+	entity: &AsyncEntity,
+	blob: SceneBlob,
+	store: BlobStore,
+) -> Result {
 	if store.exists(&blob.path).await? {
 		let fork = store.get_media(&blob.path).await?;
 		entity
@@ -142,30 +140,26 @@ async fn read_scene_blob(entity: &AsyncEntity, blob: SceneBlob) -> Result {
 pub(crate) fn write_scene_blobs(
 	mut async_commands: AsyncCommands,
 	edited: Populated<
-		(Entity, &SceneBlob),
+		(Entity, &SceneBlob, &Blob),
 		(With<SceneDocument>, Changed<Document>),
 	>,
 	just_loaded: Query<(), Added<SceneDocument>>,
 ) {
-	for (entity, blob) in edited.iter() {
+	for (entity, blob, handle) in edited.iter() {
 		// the frame the boot landed is not an edit: writing it back would echo
 		// the file at itself
 		if just_loaded.contains(entity) {
 			continue;
 		}
-		let (path, media_type, trigger) =
-			(blob.path.clone(), blob.media_type(), blob.trigger.clone());
+		let (handle, media_type, trigger) =
+			(handle.clone(), blob.media_type(), blob.trigger.clone());
 		async_commands
 			.entity(entity)
 			.queue_async(async move |entity| {
 				trigger
-					.run_flush(async move || {
-						write_scene_blob(
-							&entity,
-							path.clone(),
-							media_type.clone(),
-						)
-						.await
+					.run_flush(async || {
+						write_scene_blob(&entity, &handle, media_type.clone())
+							.await
 					})
 					.await
 			});
@@ -176,13 +170,10 @@ pub(crate) fn write_scene_blobs(
 /// serializer so entity order and the sorted component maps match the fork.
 async fn write_scene_blob(
 	entity: &AsyncEntity,
-	path: RelPath,
+	blob: &Blob,
 	media_type: MediaType,
 ) -> Result {
-	let Some(store) = ancestor_store(entity).await? else {
-		return OK;
-	};
-	let subject = path.clone();
+	let subject = blob.path().clone();
 	let bytes = entity
 		.with(move |entity| -> Result<MediaBytes> {
 			let document = entity.get::<Document>().ok_or_else(|| {
@@ -192,7 +183,7 @@ async fn write_scene_blob(
 			SceneDocument::to_bytes(&registry, &document.0, media_type)
 		})
 		.await??;
-	store.insert(&path, bytes.take().1).await
+	blob.insert(bytes.take().1).await
 }
 
 #[cfg(test)]

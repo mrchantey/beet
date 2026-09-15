@@ -783,13 +783,13 @@ mod test {
 			.xpect_contains("Beta page");
 	}
 
-	/// Regression: the real beet-site path — a [`Layout`]-wrapped [`BlobScene`]
+	/// Regression: the real beet-site path — a [`Layout`]-wrapped [`BlobPage`]
 	/// route (`RoutesDir` `.bsx` page + `Layout{template:"Layout"}`) — must render
 	/// once per SSH session. The route's content lives on the shared route entity,
 	/// transcluded into each session's layout; a second session must not double it.
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
-	async fn bsx_layout_blob_scene_renders_once_per_session() {
+	async fn bsx_layout_blob_page_renders_once_per_session() {
 		let mut app = ssh_tui_app();
 		let store = BlobStore::temp();
 		store
@@ -813,7 +813,7 @@ mod test {
 				SshTuiServer::default(),
 				OpeningRoute(Url::coerce("")),
 				children![(store, Router, Layout::default(), children![
-					route::new("", BlobScene::new("index.html"))
+					route::new("", BlobPage::new("index.html"))
 				])],
 			))
 			.flush();
@@ -1145,7 +1145,7 @@ mod test {
 				SshTuiServer::default(),
 				OpeningRoute(Url::coerce("counter")),
 				children![(store, Router, Layout::default(), children![
-					route::new("counter", BlobScene::new("counter.bsx"))
+					route::new("counter", BlobPage::new("counter.bsx"))
 				])],
 			))
 			.flush();

@@ -16,7 +16,8 @@
 //! re-resolves descendants when an ancestor store appears, and [`on_remove_store`]
 //! drops the produced component when its backing store goes away. Both touch
 //! descendants only, never the store entity itself, so the cascade is re-entrancy
-//! safe.
+//! safe. [`on_insert_child_of`] covers the third way an ancestor store changes,
+//! the entity (or a subtree) being parented under one after it spawned.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -46,10 +47,27 @@ impl DirPath {
 }
 
 /// Resolves a single [`Blob`] in the nearest ancestor [`BlobStore`], inserting it on
-/// the same entity: the "this one file in the store" surface.
+/// the same entity: the "this one file in the store" surface. The produced
+/// [`Blob`] is marked `Changed` whenever the object changes, so a consumer keyed
+/// on `Changed<Blob>` reads the file on arrival, on re-resolution and on every
+/// external edit alike.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 pub struct BlobPath(pub RelPath);
+
+impl BlobPath {
+	/// The `on_insert` hook body for a component declaring a file `path`
+	/// (`<DocumentBlob path="todos.json"/>`): derive this blob onto its entity,
+	/// so the component reads through a [`Blob`] like any other [`BlobPath`].
+	///
+	/// `#[component(on_insert = hook_ext::component_hook(|doc: &DocumentBlob| BlobPath::derive(&doc.path)))]`
+	pub fn derive(path: &RelPath) -> impl FnOnce(&mut EntityCommands) + use<> {
+		let path = path.clone();
+		move |entity| {
+			entity.insert(BlobPath(path));
+		}
+	}
+}
 
 /// The nearest *ancestor* [`BlobStore`] (exclusive of `entity`) and the entity that
 /// holds it: the parent store a [`DirPath`]/[`BlobPath`] resolves against. Exclusive
@@ -155,6 +173,28 @@ pub(crate) fn on_insert_blob_path(
 	);
 }
 
+/// (Re)compute every [`DirPath`]/[`BlobPath`] in `entities` against its nearest
+/// ancestor store, inserting only where the scope or target changed.
+fn resolve_paths(
+	entities: impl IntoIterator<Item = Entity>,
+	dirs: &Query<&DirPath>,
+	blob_paths: &Query<&BlobPath>,
+	parents: &Query<&ChildOf>,
+	stores: &Query<&BlobStore>,
+	blobs: &Query<&Blob>,
+	commands: &mut Commands,
+) {
+	for entity in entities {
+		if dirs.contains(entity) {
+			resolve_dir_path(entity, dirs, parents, stores, commands);
+		} else if blob_paths.contains(entity) {
+			resolve_blob_path(
+				entity, blob_paths, parents, stores, blobs, commands,
+			);
+		}
+	}
+}
+
 /// On [`BlobStore`] insert, re-resolve every descendant [`DirPath`]/[`BlobPath`]
 /// against its nearest ancestor store (this entity, or a nearer scoped store).
 /// Descendants only, never self: the scoped store this fired on is a [`DirPath`]'s
@@ -169,26 +209,39 @@ pub(crate) fn on_insert_store(
 	blobs: Query<&Blob>,
 	mut commands: Commands,
 ) {
-	for descendant in children.iter_descendants(ev.entity) {
-		if dirs.contains(descendant) {
-			resolve_dir_path(
-				descendant,
-				&dirs,
-				&parents,
-				&stores,
-				&mut commands,
-			);
-		} else if blob_paths.contains(descendant) {
-			resolve_blob_path(
-				descendant,
-				&blob_paths,
-				&parents,
-				&stores,
-				&blobs,
-				&mut commands,
-			);
-		}
-	}
+	resolve_paths(
+		children.iter_descendants(ev.entity),
+		&dirs,
+		&blob_paths,
+		&parents,
+		&stores,
+		&blobs,
+		&mut commands,
+	);
+}
+
+/// On [`ChildOf`] insert, re-resolve the parented entity and its subtree: a
+/// [`DirPath`]/[`BlobPath`] spawned first and parented under a store after
+/// (`add_children`, a reparent) resolves like one spawned in place.
+pub(crate) fn on_insert_child_of(
+	ev: On<Insert, ChildOf>,
+	children: Query<&Children>,
+	dirs: Query<&DirPath>,
+	blob_paths: Query<&BlobPath>,
+	parents: Query<&ChildOf>,
+	stores: Query<&BlobStore>,
+	blobs: Query<&Blob>,
+	mut commands: Commands,
+) {
+	resolve_paths(
+		children.iter_descendants_inclusive(ev.entity),
+		&dirs,
+		&blob_paths,
+		&parents,
+		&stores,
+		&blobs,
+		&mut commands,
+	);
 }
 
 /// On [`BlobStore`] removal, drop the scoped store / blob it backed on descendants
@@ -236,6 +289,7 @@ mod test {
 		let mut app = App::new();
 		app.add_observer(on_insert_dir_path)
 			.add_observer(on_insert_blob_path)
+			.add_observer(on_insert_child_of)
 			.add_observer(on_insert_store)
 			.add_observer(on_remove_store);
 		app
@@ -302,6 +356,30 @@ mod test {
 			.unwrap()
 			.subdir()
 			.xpect_eq(RelPath::from("assets"));
+	}
+
+	/// A [`BlobPath`] spawned on its own and parented under a store afterwards
+	/// resolves through the reparent.
+	#[beet_core::test]
+	fn resolves_when_parented_later() {
+		let mut app = store_app();
+		let child = app
+			.world_mut()
+			.spawn(BlobPath(RelPath::from("notes.md")))
+			.id();
+		app.update();
+		app.world().entity(child).get::<Blob>().xpect_none();
+		app.world_mut()
+			.spawn(BlobStore::temp())
+			.add_children(&[child]);
+		app.update();
+		app.world()
+			.entity(child)
+			.get::<Blob>()
+			.unwrap()
+			.path()
+			.to_string()
+			.xpect_eq("notes.md");
 	}
 
 	/// Nested [`DirPath`]s compose: the inner store is the ancestor scoped by both

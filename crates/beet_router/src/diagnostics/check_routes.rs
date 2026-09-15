@@ -6,7 +6,7 @@
 //! through the template substrate, so the built tree, incl any [`TemplateError`]
 //! the build rode, is there to scan. Cleanup then mirrors [`PageRoot::render`]:
 //! only the route's [`DespawnAfterRender`] ephemerals are despawned, never the
-//! `content` entity, which for a `BlobScene`/`RoutesDir` route is the persistent
+//! `content` entity, which for a `BlobPage`/`RoutesDir` route is the persistent
 //! [`RouteTree`] node that every later request reuses.
 
 use crate::prelude::*;
@@ -307,7 +307,7 @@ async fn build_and_scan(
 /// Clean up exactly what a real render would: the route's
 /// [`DespawnAfterRender`] ephemerals (a per-request route's whole tree, a scene
 /// route's parsed children), never `content` itself. For a
-/// `BlobScene`/`RoutesDir` route `content` is the *persistent* route-tree node,
+/// `BlobPage`/`RoutesDir` route `content` is the *persistent* route-tree node,
 /// so despawning it leaves every [`RouteTree`] entry dangling and 500s the next
 /// serve/export.
 fn despawn_ephemerals(world: &mut World, content: Entity) {
@@ -528,7 +528,7 @@ mod test {
 			.xpect_true();
 	}
 
-	/// A persistent scene route (a `BlobScene`, as `RoutesDir` spawns) survives a
+	/// A persistent scene route (a `BlobPage`, as `RoutesDir` spawns) survives a
 	/// `check_routes` pass and still renders afterwards. The route's `PageRequest`
 	/// content entity *is* its persistent `RouteTree` node, so the scan must despawn
 	/// only its parsed children, never the node itself. Regression for a boot-time
@@ -545,7 +545,7 @@ mod test {
 		let router = world
 			.spawn((store, Router, children![route::new(
 				"post",
-				BlobScene::new("post.md")
+				BlobPage::new("post.md")
 			)]))
 			.flush();
 		// the boot-time diagnostics pass, the despawn hazard.

@@ -158,7 +158,12 @@ impl Plugin for RouterPlugin {
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it
 			// runs on wasm too rather than needing a separate blocking/async split.
 			app.register_type::<RoutesDir>()
-				.add_observer(RoutesDir::spawn_on_insert);
+				.add_observer(RoutesDir::spawn_on_insert)
+				.add_systems(
+					Update,
+					(refresh_changed_routes, rescan_changed_dirs::<RoutesDir>)
+						.in_set(BlobReactions),
+				);
 			// the markup-resolved `<TemplateDir src="templates"/>`: its insert
 			// observer reads the dir through the nearest ancestor `BlobStore` and
 			// registers each `.bsx`/`.js` template by module path, off the runtime
@@ -166,7 +171,15 @@ impl Plugin for RouterPlugin {
 			// pre-scanned synchronously by the cli before the entry parses, so
 			// entry-level tags like `<Styles/>` resolve.
 			app.register_type::<TemplateDir>()
-				.add_observer(TemplateDir::register_on_insert);
+				.add_observer(TemplateDir::register_on_insert)
+				.add_systems(
+					Update,
+					(
+						register_changed_template_files,
+						rescan_changed_dirs::<TemplateDir>,
+					)
+						.in_set(BlobReactions),
+				);
 			// the entry-declared store root (`<RepoRoot src="../.."/>`), read by
 			// entry resolution before the store builds; inert in the built tree.
 			app.register_type::<RepoRoot>();
@@ -209,10 +222,13 @@ impl Plugin for RouterPlugin {
 				.add_observer(broadcast_to_clients)
 				.add_observer(start_live_reload)
 				.add_observer(reload_site_on_change)
+				// after the reactions, so the guards a change parked defer the
+				// dispatch until its re-reads and rescans settle
 				.add_systems(
 					Update,
 					process_live_reloads
-						.run_if(any_with_component::<NeedsReload>),
+						.run_if(any_with_component::<NeedsReload>)
+						.after(BlobReactions),
 				)
 				.register_template::<LiveReloadScript>();
 			// where client_io is compiled out (wasm Worker, no-dev-reload builds)

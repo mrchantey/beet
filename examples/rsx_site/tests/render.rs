@@ -38,7 +38,7 @@ async fn home_in_document_layout() {
 
 #[beet::test]
 async fn markdown_content_route_renders_in_layout() {
-	// the `content` collection serves `guide.md` through a `BlobScene`, parsed per
+	// the `content` collection serves `guide.md` through a `BlobPage`, parsed per
 	// request, wrapped in the same document layout as the typed pages.
 	site_world()
 		.spawn(rsx_site_router())

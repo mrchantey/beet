@@ -375,7 +375,7 @@ async fn counter_page_renders_its_bindings() {
 /// matched route — so it renders the served tree, never an arbitrary world
 /// `RouteTree`.
 ///
-/// Both route content shapes are covered: a `BlobScene` page (`docs/intro`,
+/// Both route content shapes are covered: a `BlobPage` page (`docs/intro`,
 /// whose rendered content is the in-tree route entity) and a per-request page
 /// whose rendered content is *detached* from the tree (`page`, the
 /// `fixed_func_route` shape the home page uses). The detached case is why the
@@ -405,7 +405,7 @@ async fn sidebar_excludes_foreign_host_command_tree() {
 	));
 	world.flush();
 
-	// the in-tree `BlobScene` page: its content is the route entity itself.
+	// the in-tree `BlobPage` page: its content is the route entity itself.
 	let docs = get(&mut world, root, "docs/intro").await;
 	docs.as_str().xpect_contains(">The Intro<");
 	// the detached per-request page: its content is spawned outside the tree, so
