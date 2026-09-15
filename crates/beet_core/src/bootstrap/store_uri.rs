@@ -47,7 +47,7 @@ use core::str::FromStr;
 ///    read-only. The scheme-only form is origin-relative, the `fs:<path>` of
 ///    the web: a browser reads it against `location.origin`, a native process
 ///    against its canonical loopback server. A process forks a remote repo
-///    into a local `--overlay` store rather than writing to it.
+///    into a local store (`--store-fork`) rather than writing to it.
 ///
 /// ## Example
 ///
@@ -310,8 +310,8 @@ impl StoreUri {
 	pub fn is_self_rooted(&self) -> bool { !matches!(self, Self::Fs { .. }) }
 
 	/// Whether this store is read through the network rather than owned by the
-	/// process: a process on such a repo forks its edits into an overlay store
-	/// (`--overlay`) rather than writing back.
+	/// process: a process on such a repo forks its edits into a store fork
+	/// (`--store-fork`) rather than writing back.
 	pub fn is_remote(&self) -> bool { matches!(self, Self::Http { .. }) }
 
 	/// This store rooted at `subdir` below its current root, the uri form of

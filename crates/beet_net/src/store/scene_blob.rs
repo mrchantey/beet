@@ -262,20 +262,20 @@ mod test {
 			.xpect_some();
 	}
 
-	/// The published page: a first boot over an overlay finds the fork
-	/// upstream and reads it, writing nothing; the first edit lands in the
-	/// local half, and a reboot reads the local fork over the published one.
+	/// The published page: a first boot through a store fork finds the scene
+	/// fork upstream and reads it, writing nothing; the first edit lands in the
+	/// local half, and a reboot reads the local copy over the published one.
 	#[beet_core::test]
-	async fn a_first_boot_over_an_overlay_reads_upstream() {
+	async fn a_first_boot_through_a_store_fork_reads_upstream() {
 		// the server's own boot publishes the fork upstream
 		let upstream = store().await;
 		let (app, host) = boot(upstream.clone()).await;
 		let key = heading_key(&app, host);
 		drop(app);
 		let local = BlobStore::temp();
-		let overlay =
-			BlobStore::new(OverlayStore::new(local.clone(), upstream.clone()));
-		let (mut app, host) = boot(overlay.clone()).await;
+		let fork =
+			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
+		let (mut app, host) = boot(fork.clone()).await;
 		app.world().get::<SceneDocument>(host).xpect_some();
 		local
 			.exists(&RelPath::from("app.json"))
@@ -297,7 +297,7 @@ mod test {
 			.unwrap()
 			.xnot()
 			.xpect_contains("Groceries");
-		let (rebooted, host) = boot(overlay).await;
+		let (rebooted, host) = boot(fork).await;
 		heading(&rebooted, host, key).xpect_eq("Groceries");
 	}
 

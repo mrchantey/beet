@@ -28,7 +28,7 @@ impl Plugin for LaunchPlugin {
 }
 
 /// Positional commands that run ANOTHER program, so the `--main`, `--repo` and
-/// `--overlay` on this process's argv belong to that program and are forwarded
+/// `--store-fork` on this process's argv belong to that program and are forwarded
 /// untouched rather than read as this launch's own.
 ///
 /// Absent by default: a binary whose commands all run in-process has nothing to
@@ -44,7 +44,7 @@ impl ArgvPassthrough {
 	}
 
 	/// Whether `args` names one of them, ie whether this launch's `--main`,
-	/// `--repo` and `--overlay` are somebody else's.
+	/// `--repo` and `--store-fork` are somebody else's.
 	pub fn forwards(&self, args: &CliArgs) -> bool {
 		args.path
 			.first()
@@ -97,26 +97,29 @@ fn load_entry(world: &mut World) {
 		// runner. When acting as the runner (first positional `run-wasm`), drop
 		// them and discover the workspace command entry; the `<RunWasm/>` route
 		// forwards the module's own config on via `ChildProcess::with_bootstrap`.
-		let (repo_uri, overlay, main) = match forwards_argv {
+		let (repo_uri, store_fork, main) = match forwards_argv {
 			true => (None, None, None),
 			false => (
 				config.repo.as_ref(),
-				config.overlay.as_ref(),
+				config.store_fork.as_ref(),
 				config.main.as_deref(),
 			),
 		};
 		// resolve on the runtime, since discovery now awaits the store. A
 		// browser resolves exactly as every other runtime: its served page's
 		// bootstrap named an http repo, which forks into IndexedDB.
-		let resolved =
-			match entry_build::resolve_entry(repo_uri, overlay, main).await {
-				Ok(resolved) => resolved,
-				Err(err) => {
-					error!("{err}");
-					world.write_message(AppExit::error()).await;
-					return;
-				}
-			};
+		let resolved = match entry_build::resolve_entry(
+			repo_uri, store_fork, main,
+		)
+		.await
+		{
+			Ok(resolved) => resolved,
+			Err(err) => {
+				error!("{err}");
+				world.write_message(AppExit::error()).await;
+				return;
+			}
+		};
 		if let Err(err) = build_entry(&world, &config, resolved, formats).await
 		{
 			error!("{err}");

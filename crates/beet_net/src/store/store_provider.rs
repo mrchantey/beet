@@ -142,18 +142,18 @@ impl StoreProvider {
 		.xok()
 	}
 
-	/// The store `uri` names with `overlay` layered over it
-	/// ([`OverlayStore`]), or the store alone. The composition behind
-	/// `--repo` + `--overlay`, erased since the pair has no single component.
+	/// The store `uri` names forked into `store_fork` ([`StoreFork`]), or the
+	/// store alone. The composition behind `--repo` + `--store-fork`, erased
+	/// since the pair has no single component.
 	pub fn compose(
 		uri: &StoreUri,
-		overlay: Option<&StoreUri>,
+		store_fork: Option<&StoreUri>,
 	) -> Result<BlobStore> {
 		let upstream = Self::from_uri(uri)?.into_blob_store();
-		match overlay {
-			Some(overlay) => Self::from_uri(overlay)?
+		match store_fork {
+			Some(store_fork) => Self::from_uri(store_fork)?
 				.into_blob_store()
-				.xmap(|local| OverlayStore::new(local, upstream))
+				.xmap(|local| StoreFork::new(local, upstream))
 				.xmap(BlobStore::new),
 			None => upstream,
 		}
@@ -235,17 +235,17 @@ mod test {
 			.xpect_contains("only available on wasm");
 	}
 
-	/// An overlay composes over the repo: the pair reads through and writes
+	/// A store fork composes over the repo: the pair reads through and writes
 	/// local, by name so a test reaches each half.
 	#[beet_core::test]
-	async fn composes_an_overlay() {
+	async fn composes_a_store_fork() {
 		let upstream = StoreUri::parse("memory://compose-upstream").unwrap();
 		let local = StoreUri::parse("memory://compose-local").unwrap();
 		// a memory backing lives as long as a handle does
 		let seeded = BlobStore::from_uri(&upstream).unwrap();
 		seeded.insert(&RelPath::new("a.txt"), "up").await.unwrap();
 		let store = StoreProvider::compose(&upstream, Some(&local)).unwrap();
-		store.id().xpect_eq("overlay");
+		store.id().xpect_eq("fork");
 		store
 			.get(&RelPath::new("a.txt"))
 			.await

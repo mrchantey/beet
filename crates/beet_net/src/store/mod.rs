@@ -11,7 +11,7 @@
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
 //!   (requires `json`; reads need a transport, wasm's fetch or `ureq`/`reqwest`)
-//! - [`OverlayStore`]: a local store layered over an upstream one, the fork a
+//! - [`StoreFork`]: a local store forked off an upstream one, the fork a
 //!   process keeps of a repo it reads but does not own
 //!
 //! ## The repo store
@@ -56,8 +56,9 @@ mod blob_store;
 // the store-agnostic mirror, over the provider trait's `list_stats`.
 mod blob_sync;
 mod in_memory_store;
-// a local store over an upstream one: pure composition, so it rides the core.
-mod overlay_store;
+// a local store forked off an upstream one: pure composition, so it rides the
+// core.
+mod store_fork;
 // the one canonical store an app runs from, and the singleton it enforces.
 mod repo_store;
 mod store_path;
@@ -65,8 +66,8 @@ pub use blob::*;
 pub use blob_store::*;
 pub use blob_sync::*;
 pub use in_memory_store::*;
-pub use overlay_store::*;
 pub use repo_store::*;
+pub use store_fork::*;
 pub use store_path::*;
 
 // the analytics types + emission need only serde (which `std` pulls); the store

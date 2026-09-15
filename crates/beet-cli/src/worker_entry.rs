@@ -120,7 +120,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 	if stale {
 		let resolved = entry_build::resolve_entry(
 			Some(repo_uri),
-			config.overlay.as_ref(),
+			config.store_fork.as_ref(),
 			config.main.as_deref(),
 		)
 		.await?;

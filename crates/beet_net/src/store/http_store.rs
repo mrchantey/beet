@@ -18,8 +18,8 @@ use bytes::Bytes;
 /// ([`LIST_PARAM`](Self::LIST_PARAM)), which answers the keys under the
 /// requested prefix as a JSON array.
 ///
-/// A write is an error: a process on a remote repo forks its edits into an
-/// [`OverlayStore`] rather than writing back.
+/// A write is an error: a process on a remote repo forks its edits into a
+/// [`StoreFork`] rather than writing back.
 ///
 /// Compiles wherever `json` does, so the mount's listing contract is one
 /// declaration; a read needs a transport (wasm's fetch api, or `ureq`/`reqwest`
@@ -89,8 +89,8 @@ impl HttpStore {
 	/// A read-only store: every write is this error.
 	fn read_only(&self) -> BevyError {
 		bevyhow!(
-			"`http:{}` is served over http and read-only: compose a local store \
-			 over it (`--overlay`) to write",
+			"`http:{}` is served over http and read-only: fork it into a local \
+			 store (`--store-fork`) to write",
 			self.base
 		)
 	}
@@ -276,7 +276,7 @@ mod test {
 			.xpect_eq("/main.bsx");
 	}
 
-	/// The store is read-only: a write names the overlay as the way to write.
+	/// The store is read-only: a write names the store fork as the way to write.
 	#[beet_core::test]
 	async fn writes_are_refused() {
 		HttpStore::new("https://beet.org/repo")

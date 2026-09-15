@@ -1,35 +1,37 @@
-//! [`OverlayStore`]: a local store layered over an upstream one, the fork a
-//! process keeps of a repo it does not own.
+//! [`StoreFork`]: a local store forked off an upstream one, the fork a process
+//! keeps of a repo it does not own.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 
-/// A local store layered over an upstream one: reads are local-first, falling
+/// A local store forked off an upstream one: reads are local-first, falling
 /// through to the upstream for a key the local does not hold; writes land
-/// local; a listing is the union.
+/// local; a listing is the union. The store-grain twin of
+/// [`SceneFork`](beet_core::prelude::SceneFork), which forks one document
+/// within a store.
 ///
-/// The composition behind `--overlay`: a browser lays IndexedDB over the
-/// site's http repo, a terminal pulling a remote site lays an `fs` dir over
-/// it, and a headless process on a remote repo composes the same pair and
-/// never writes. It is a store composition with no surface dependency, so the
-/// first edit to a published scene lands in the local store and every later
-/// boot reads the fork from there while everything unedited still comes from
-/// upstream. A key only the upstream holds cannot be removed: the overlay
-/// keeps no tombstones, so a removal reaches only the local copy.
+/// The composition behind `--store-fork`: a browser forks the site's http repo
+/// into IndexedDB, a terminal pulling a remote site forks it into an `fs` dir,
+/// and a headless process on a remote repo composes the same pair and never
+/// writes. It is a store composition with no surface dependency, so the first
+/// edit to a published scene lands in the local store and every later boot
+/// reads the fork from there while everything unedited still comes from
+/// upstream. A key only the upstream holds cannot be removed: the fork keeps
+/// no tombstones, so a removal reaches only the local copy.
 ///
 /// Erased on construction rather than a reflected component: its two halves
 /// are already erased stores, composed by whichever driver resolved them.
 #[derive(Clone)]
-pub struct OverlayStore {
+pub struct StoreFork {
 	/// The store writes land in and reads try first.
 	local: BlobStore,
 	/// The store reads fall through to, never written.
 	upstream: BlobStore,
 }
 
-impl OverlayStore {
-	/// `local` layered over `upstream`.
+impl StoreFork {
+	/// `local` forked off `upstream`.
 	pub fn new(local: BlobStore, upstream: BlobStore) -> Self {
 		Self { local, upstream }
 	}
@@ -41,7 +43,7 @@ impl OverlayStore {
 	pub fn upstream(&self) -> &BlobStore { &self.upstream }
 }
 
-impl BlobStoreProvider for OverlayStore {
+impl BlobStoreProvider for StoreFork {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
 
 	/// Both halves scope together, so keys keep corresponding.
@@ -74,7 +76,7 @@ impl BlobStoreProvider for OverlayStore {
 		let (local, local_entry) = self.local.rebase(entry_name, root)?;
 		if local_entry != upstream_entry {
 			bevybail!(
-				"overlay `{}` and its upstream `{}` disagree on the entry after \
+				"store fork `{}` and its upstream `{}` disagree on the entry after \
 				 rebasing to `{root}` (`{local_entry}` vs `{upstream_entry}`)",
 				self.local.root_key(),
 				self.upstream.root_key()
@@ -90,11 +92,11 @@ impl BlobStoreProvider for OverlayStore {
 			.xok()
 	}
 
-	fn id(&self) -> &'static str { "overlay" }
+	fn id(&self) -> &'static str { "fork" }
 
 	fn root_key(&self) -> SmolStr {
 		format!(
-			"overlay:{}+{}",
+			"fork:{}+{}",
 			self.local.root_key(),
 			self.upstream.root_key()
 		)
@@ -200,9 +202,9 @@ mod test {
 	use beet_core::prelude::*;
 	use bytes::Bytes;
 
-	/// An overlay of two seeded memory stores: `shared.txt` in both (the local
+	/// A fork of two seeded memory stores: `shared.txt` in both (the local
 	/// copy edited), `upstream.txt` only upstream, `local.txt` only local.
-	async fn overlay() -> (BlobStore, BlobStore, BlobStore) {
+	async fn fork() -> (BlobStore, BlobStore, BlobStore) {
 		let local = BlobStore::temp();
 		let upstream = BlobStore::temp();
 		for (store, path, body) in [
@@ -213,19 +215,18 @@ mod test {
 		] {
 			store.insert(&RelPath::new(path), body).await.unwrap();
 		}
-		let overlay =
-			BlobStore::new(OverlayStore::new(local.clone(), upstream.clone()));
-		(overlay, local, upstream)
+		let fork =
+			BlobStore::new(StoreFork::new(local.clone(), upstream.clone()));
+		(fork, local, upstream)
 	}
 
 	/// A read is local-first: a key both hold reads the local copy, a key
 	/// only the upstream holds falls through, a key neither holds is a miss.
 	#[beet_core::test]
 	async fn reads_local_first() {
-		let (overlay, ..) = overlay().await;
+		let (fork, ..) = fork().await;
 		let read = async |path: &str| {
-			overlay
-				.get(&RelPath::new(path))
+			fork.get(&RelPath::new(path))
 				.await
 				.map(|bytes| String::from_utf8_lossy(&bytes).to_string())
 		};
@@ -233,13 +234,11 @@ mod test {
 		read("upstream.txt").await.unwrap().xpect_eq("upstream");
 		read("local.txt").await.unwrap().xpect_eq("local");
 		read("missing.txt").await.xpect_err();
-		overlay
-			.exists(&RelPath::new("upstream.txt"))
+		fork.exists(&RelPath::new("upstream.txt"))
 			.await
 			.unwrap()
 			.xpect_true();
-		overlay
-			.exists(&RelPath::new("missing.txt"))
+		fork.exists(&RelPath::new("missing.txt"))
 			.await
 			.unwrap()
 			.xpect_false();
@@ -249,9 +248,8 @@ mod test {
 	/// reaches only the local copy so the upstream's shows through again.
 	#[beet_core::test]
 	async fn writes_land_local() {
-		let (overlay, local, upstream) = overlay().await;
-		overlay
-			.insert(&RelPath::new("new.txt"), Bytes::from_static(b"new"))
+		let (fork, local, upstream) = fork().await;
+		fork.insert(&RelPath::new("new.txt"), Bytes::from_static(b"new"))
 			.await
 			.unwrap();
 		local
@@ -264,9 +262,8 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_false();
-		overlay.remove(&RelPath::new("shared.txt")).await.unwrap();
-		overlay
-			.get(&RelPath::new("shared.txt"))
+		fork.remove(&RelPath::new("shared.txt")).await.unwrap();
+		fork.get(&RelPath::new("shared.txt"))
 			.await
 			.unwrap()
 			.xpect_eq(Bytes::from_static(b"published"));
@@ -275,19 +272,18 @@ mod test {
 	/// A listing is the union, each key once, and a subdir scopes both halves.
 	#[beet_core::test]
 	async fn lists_the_union() {
-		let (overlay, ..) = overlay().await;
-		overlay.list().await.unwrap().xpect_eq(vec![
+		let (fork, ..) = fork().await;
+		fork.list().await.unwrap().xpect_eq(vec![
 			RelPath::new("local.txt"),
 			RelPath::new("shared.txt"),
 			RelPath::new("upstream.txt"),
 		]);
-		let scoped = overlay.with_subdir(RelPath::new("docs"));
+		let scoped = fork.with_subdir(RelPath::new("docs"));
 		scoped
 			.insert(&RelPath::new("a.md"), Bytes::from_static(b"a"))
 			.await
 			.unwrap();
-		overlay
-			.exists(&RelPath::new("docs/a.md"))
+		fork.exists(&RelPath::new("docs/a.md"))
 			.await
 			.unwrap()
 			.xpect_true();
@@ -308,9 +304,9 @@ mod test {
 			.insert(&RelPath::new("site/app/main.bsx"), "<Router/>")
 			.await
 			.unwrap();
-		let overlay = BlobStore::new(OverlayStore::new(local, upstream));
+		let fork = BlobStore::new(StoreFork::new(local, upstream));
 		let (rebased, entry_name) =
-			overlay.rebase_repo("site/app/main.bsx", "..").unwrap();
+			fork.rebase_repo("site/app/main.bsx", "..").unwrap();
 		entry_name.xpect_eq("app/main.bsx");
 		rebased
 			.exists(&RelPath::new("app/main.bsx"))
@@ -321,8 +317,7 @@ mod test {
 			.insert(&RelPath::new("app/fork.json"), Bytes::from_static(b"{}"))
 			.await
 			.unwrap();
-		overlay
-			.exists(&RelPath::new("site/app/fork.json"))
+		fork.exists(&RelPath::new("site/app/fork.json"))
 			.await
 			.unwrap()
 			.xpect_true();

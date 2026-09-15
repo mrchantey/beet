@@ -74,13 +74,13 @@ pub struct BootstrapConfig {
 	pub main: Option<SmolStr>,
 	/// The repo store the entry loads through. `--repo` / `BEET_REPO`.
 	pub repo: Option<StoreUri>,
-	/// A local store layered over the repo store: reads fall through to the
-	/// repo, writes land here, so a process on a remote repo forks rather than
-	/// writes back (a visitor's local edits over a site's published store).
-	/// `--overlay` / `BEET_OVERLAY`. Absent, a browser whose repo is remote
-	/// overlays IndexedDB (see `entry_build::default_overlay`); every other
-	/// launch reads its repo directly.
-	pub overlay: Option<StoreUri>,
+	/// The local store the repo store is forked into: reads fall through to
+	/// the repo, writes land here, so a process on a remote repo forks rather
+	/// than writes back (a visitor's local edits over a site's published
+	/// store). `--store-fork` / `BEET_STORE_FORK`. Absent, a browser whose repo
+	/// is remote forks into IndexedDB (see `entry_build::default_store_fork`);
+	/// every other launch reads its repo directly.
+	pub store_fork: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
 	pub watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
@@ -134,7 +134,7 @@ impl Default for BootstrapConfig {
 		Self {
 			main: None,
 			repo: None,
-			overlay: None,
+			store_fork: None,
 			watch: false,
 			features: default(),
 			server: None,
@@ -184,9 +184,9 @@ impl BootstrapConfig {
 		arg: "repo",
 		env: "BEET_REPO",
 	};
-	const OVERLAY: Knob = Knob {
-		arg: "overlay",
-		env: "BEET_OVERLAY",
+	const STORE_FORK: Knob = Knob {
+		arg: "store-fork",
+		env: "BEET_STORE_FORK",
 	};
 	const WATCH: Knob = Knob {
 		arg: "watch",
@@ -319,7 +319,7 @@ impl BootstrapConfig {
 	const KNOBS: [Knob; 19] = [
 		Self::MAIN,
 		Self::REPO,
-		Self::OVERLAY,
+		Self::STORE_FORK,
 		Self::WATCH,
 		Self::FEATURES,
 		Self::SERVER,
@@ -371,7 +371,7 @@ impl BootstrapConfig {
 		Self {
 			main: reader.value(Self::MAIN),
 			repo: reader.parsed(Self::REPO)?,
-			overlay: reader.parsed(Self::OVERLAY)?,
+			store_fork: reader.parsed(Self::STORE_FORK)?,
 			watch: reader.flag(Self::WATCH),
 			features: reader.list(Self::FEATURES),
 			server: reader.filter(Self::SERVER),
@@ -465,8 +465,8 @@ impl BootstrapConfig {
 		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
 		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
 		push(
-			Self::OVERLAY,
-			self.overlay.as_ref().map(ToString::to_string),
+			Self::STORE_FORK,
+			self.store_fork.as_ref().map(ToString::to_string),
 		);
 		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
 		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
@@ -547,7 +547,7 @@ impl BootstrapConfig {
 	pub fn split_channels(self) -> (Self, Self) {
 		let argv = Self {
 			repo: self.repo,
-			overlay: self.overlay,
+			store_fork: self.store_fork,
 			server: self.server,
 			path: self.path,
 			..default()
@@ -785,7 +785,7 @@ mod test {
 		BootstrapConfig {
 			main: Some("main.bsx".into()),
 			repo: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
-			overlay: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
+			store_fork: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
 			watch: true,
 			features: vec!["thread".into(), "sockets".into()],
 			server: Some(RunningSetFilter::new("http,ssh")),
@@ -916,7 +916,7 @@ mod test {
 	fn splits_channels() {
 		let (argv, env) = full().split_channels();
 		argv.to_argv().unwrap().join(" ").xpect_eq(
-			"--repo=s3://site?region=us-west-2 --overlay=fs:/tmp/fork \
+			"--repo=s3://site?region=us-west-2 --store-fork=fs:/tmp/fork \
 			 --server=http,ssh --path=/docs",
 		);
 		env.to_env()
