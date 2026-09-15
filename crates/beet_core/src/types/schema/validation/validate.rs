@@ -486,15 +486,26 @@ async fn validate_enum(
 	value: &mut Value,
 ) -> Vec<ValidationError> {
 	// Unit variant as bare string. A qualified `EnumName::Variant` (the Rust
-	// path form authors reach for) is accepted by its trailing segment and
-	// normalized to the bare variant name, so reflect deserialization downstream
-	// (which expects the bare name) succeeds.
+	// path form authors reach for) is accepted by its trailing segment, and a
+	// markup spelling (`boot="intent"`) by case as the literal coercion does;
+	// either is normalized to the bare variant name, so reflect
+	// deserialization downstream (which expects it) succeeds.
 	if let Value::Str(name) = value {
-		let variant = name.rsplit("::").next().unwrap_or(name.as_str());
-		if schema.variants.iter().any(|variant_schema| {
-			variant_schema.payload.is_none()
-				&& variant_schema.name.as_str() == variant
-		}) {
+		let spelled = name.rsplit("::").next().unwrap_or(name.as_str());
+		let units = schema
+			.variants
+			.iter()
+			.filter(|variant| variant.payload.is_none())
+			.map(|variant| variant.name.as_str());
+		let variant = units
+			.clone()
+			.find(|variant| *variant == spelled)
+			.or_else(|| {
+				let mut matches = units
+					.filter(|variant| variant.eq_ignore_ascii_case(spelled));
+				matches.next().filter(|_| matches.next().is_none())
+			});
+		if let Some(variant) = variant {
 			if variant != name.as_str() {
 				*value = Value::Str(variant.into());
 			}
@@ -630,6 +641,16 @@ mod test {
 	async fn validate_enum_qualified_unit() {
 		let schema = ValueSchema::of::<Status>();
 		let mut value = value!("Status::Active");
+		schema.validate(&mut value).await.is_empty().xpect_true();
+		value.xpect_eq(value!("Active"));
+	}
+
+	/// A unit variant spelled as markup does (`boot="intent"`) validates by
+	/// case and is normalized to the variant's own name.
+	#[crate::test]
+	async fn validate_enum_unit_by_case() {
+		let schema = ValueSchema::of::<Status>();
+		let mut value = value!("active");
 		schema.validate(&mut value).await.is_empty().xpect_true();
 		value.xpect_eq(value!("Active"));
 	}

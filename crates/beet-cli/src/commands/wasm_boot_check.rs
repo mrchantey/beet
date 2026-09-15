@@ -8,8 +8,11 @@
 //!   `just serve-wasm` page's launch, logs the greeting and exits;
 //! - the DOM boot: `beet-ui.wasm` on `examples/ui/scene_editor.bsx` with
 //!   `--server=dom` boots its `DomServer`, lands its navigator on `/`, the
-//!   page's own url, paints the scene into the body once it settles, and
-//!   takes input: a click on a tree row selects it and the inspector appears.
+//!   page's own url, paints the scene into the body once it settles (a
+//!   loader page holds no served scene to adopt, so this one paint replaces
+//!   it), and takes input: a click on a tree row selects it and the inspector
+//!   appears. The served entry's own page adopts instead, which
+//!   `tests/scene_editor_browser.rs` proves.
 //!
 //! Ignored by default since they need the artifacts and a browser on PATH:
 //!
@@ -84,8 +87,8 @@ async fn browser_dom_boot() {
 	// path and, the scene having landed, paints it (see `DomHost`); the run
 	// then parks on the server, still up and quiet
 	let (log, browser) = boot_until(page, "dom host painted /").await;
-	// the world's paint replaced the loader page: the scene's heading is in
-	// the document, bound to its entity
+	// the world's paint replaced the loader page's body (nothing served to
+	// adopt): the scene's heading is in the document, bound to its entity
 	let heading = browser
 		.evaluate_value(
 			"[document.querySelector('h1')?.textContent, \

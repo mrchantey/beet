@@ -15,10 +15,14 @@ use beet_ui::prelude::*;
 ///
 /// The first paint waits for the page to settle ([`Self::settled`]): the
 /// served page stays visible and inert until the world matches it, then the
-/// body's children are swapped for the world's render in one task
-/// ([`DomRenderer::mount`]) and the incremental pass keeps them following it.
-/// Painted means bound: the host carries the [`DomNode`] of the body it
-/// painted into, so a change under it reconciles against the body.
+/// world adopts the body's children where they agree and replaces them where
+/// they do not ([`DomRenderer::mount`]), reveals what a returning editor's
+/// page hid ([`PreBoot::reveal`]) and the incremental pass keeps them
+/// following it. Painted means bound: the host carries the [`DomNode`] of the
+/// body it painted into, so a change under it reconciles against the body.
+/// The paint's log line carries its [`Adoption`], the conformance measure a
+/// browser suite reads: a page served by the same entry adopts with nothing
+/// replaced.
 #[derive(Debug, Default, Clone, Component)]
 #[require(PageHost)]
 #[component(on_add = hook_ext::observe(log_landing))]
@@ -80,12 +84,14 @@ pub(crate) fn mount_dom_hosts(world: &mut World) {
 		if !DomHost::settled(world, host) {
 			continue;
 		}
-		DomRenderer::mount(world, host, document_ext::body().into());
+		let adoption =
+			DomRenderer::mount(world, host, document_ext::body().into());
+		PreBoot::reveal();
 		let url = world
 			.get::<Navigator>(host)
 			.map(|navigator| navigator.current_url().to_string())
 			.unwrap_or_default();
-		info!("dom host painted {url}");
+		info!("dom host painted {url} ({adoption})");
 	}
 }
 

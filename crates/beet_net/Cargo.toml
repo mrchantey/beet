@@ -325,6 +325,7 @@ web-sys = { workspace = true, features = [
 	# localstorage
 	"Storage",
 	"StorageEvent",
+	"Window",
 	# indexeddb
 	"IdbFactory",
 	"IdbOpenDbRequest",

@@ -34,6 +34,11 @@ use wasm_bindgen::JsCast;
 ///   world values when no button submitted it (Enter in a lone field); a
 ///   submitting button's own activation has already fired it through the click.
 ///
+/// A mount root also takes what the page did before the world existed: the
+/// element the document had focused takes [`Focus`], and the `click`s and
+/// `submit`s the page's pre-boot script queued ([`PreBoot`]) are dispatched
+/// through the same table against the nodes the mount just bound.
+///
 /// Composes the focus model, the hover state and the form behaviour the
 /// terminal composes, so the same observers serve both.
 #[derive(Default)]
@@ -119,7 +124,9 @@ fn activates_without_native(ev: &web_sys::Event) -> bool {
 }
 
 /// Observer: a mount root, bound to a document element it did not paint (a
-/// `<body>` entity paints as its own), listens for the page's input there.
+/// `<body>` entity paints as its own), listens for the page's input there,
+/// then takes what happened before it could: the document's focus, and the
+/// page's pre-boot queue.
 fn listen_on_mount(
 	ev: On<Insert, DomNode>,
 	roots: Query<&DomNode, (Without<Element>, Without<DomListeners>)>,
@@ -128,9 +135,39 @@ fn listen_on_mount(
 	let Ok(DomNode::Document(element)) = roots.get(ev.entity) else {
 		return;
 	};
+	let root = ev.entity;
 	commands
-		.entity(ev.entity)
+		.entity(root)
 		.insert(DomListeners::listen((**element).clone()));
+	commands.queue(move |world: &mut World| replay_pre_boot(world, root));
+}
+
+/// What the page did before the world existed, now that the mount has bound
+/// its nodes: the focused element's entity takes [`Focus`], since its
+/// `focusin` fired with nobody listening, and every queued `click` and
+/// `submit` ([`PreBoot`]) is dispatched as if it had just fired. A click on
+/// a control that toggles on click is not replayed: its `checked` already
+/// changed, and adoption read it.
+fn replay_pre_boot(world: &mut World, root: Entity) {
+	if let Some(focused) = document_ext::document()
+		.active_element()
+		.and_then(|element| DomNode::entity_of(&element))
+		&& world.get_entity(focused).is_ok()
+	{
+		world.entity_mut(focused).insert(Focus);
+	}
+	for ev in PreBoot::take_queue() {
+		let toggled = ev.type_() == "click"
+			&& ev
+				.target()
+				.and_then(|target| {
+					target.dyn_into::<web_sys::HtmlInputElement>().ok()
+				})
+				.is_some_and(|input| LiveValue::toggles_on_click(&input));
+		if !toggled {
+			dispatch(world, root, &ev);
+		}
+	}
 }
 
 /// System: every event the mount roots queued since the last frame, dispatched
@@ -194,61 +231,11 @@ fn activate(world: &mut World, root: Entity, target: Entity) {
 	}
 }
 
-/// What a control holds, read off the DOM.
-enum LiveValue {
-	/// A checkbox's `checked`.
-	Checked(bool),
-	/// The text of an input, textarea or select.
-	Text(String),
-}
-
-impl LiveValue {
-	fn read(target: &web_sys::EventTarget) -> Option<Self> {
-		if let Some(input) = target.dyn_ref::<web_sys::HtmlInputElement>() {
-			match input.type_().as_str() {
-				"checkbox" | "radio" => Self::Checked(input.checked()),
-				_ => Self::Text(input.value()),
-			}
-			.xsome()
-		} else if let Some(area) =
-			target.dyn_ref::<web_sys::HtmlTextAreaElement>()
-		{
-			Self::Text(area.value()).xsome()
-		} else if let Some(select) =
-			target.dyn_ref::<web_sys::HtmlSelectElement>()
-		{
-			Self::Text(select.value()).xsome()
-		} else {
-			None
-		}
-	}
-}
-
 /// An `input`/`change`: the control's live value into its entity's [`Value`].
-/// Text re-parses into the value's own kind ([`Value::edit_text`]), so a
-/// number field mid-edit (`-`, `1e`) leaves the world's number and is flagged
-/// nothing, exactly as a rejected keystroke is on the terminal.
 fn write_control_value(world: &mut World, target: Entity, ev: &web_sys::Event) {
-	let Some(live) = ev.target().and_then(|target| LiveValue::read(&target))
-	else {
-		return;
-	};
-	let Some(mut value) = world.get_mut::<Value>(target) else {
-		return;
-	};
-	match live {
-		LiveValue::Checked(checked) => {
-			value.set_if_neq(Value::Bool(checked));
-		}
-		LiveValue::Text(text) => {
-			if value
-				.bypass_change_detection()
-				.edit_text(|current| *current = text)
-				.unwrap_or(false)
-			{
-				value.set_changed();
-			}
-		}
+	if let Some(live) = ev.target().and_then(|target| LiveValue::read(&target))
+	{
+		live.write(world, target);
 	}
 }
 
@@ -496,6 +483,79 @@ mod test {
 		hovered(&app, div).xpect_false();
 	}
 
+	/// A click before the world existed replays onto the entity the mount
+	/// bound its target to, through the same table; a checkbox the browser
+	/// ticked itself is read rather than replayed, so it toggles once; and
+	/// the queue is gone once the world's own listeners have taken over.
+	#[beet_core::test(browser)]
+	fn a_pre_boot_click_replays_after_adoption() {
+		let mut app = dom_app();
+		let host = build(&mut app, rsx! {
+			<button><span>"go"</span></button>
+			<Checkbox field={FieldRef::new("done")}/>
+		});
+		set_document(&mut app, host, value!({ "done": false }));
+		app.update();
+		app.update();
+		let target = serve(&mut app, host);
+		install_pre_boot();
+		let span = target
+			.query_selector("span")
+			.unwrap()
+			.unwrap()
+			.dyn_into::<web_sys::HtmlElement>()
+			.unwrap();
+		let checkbox = target
+			.query_selector("input")
+			.unwrap()
+			.unwrap()
+			.dyn_into::<web_sys::HtmlInputElement>()
+			.unwrap();
+		span.click();
+		checkbox.click();
+		checkbox.checked().xpect_true();
+		let button = element(app.world_mut(), "button");
+		record_hits(&mut app, button);
+		adopt(&mut app, host, &target);
+		let span_entity = element(app.world_mut(), "span");
+		hits(&app).xpect_eq(vec![
+			("down", span_entity, host),
+			("up", span_entity, host),
+		]);
+		field(app.world(), host, "done").xpect_eq(Value::Bool(true));
+		checkbox.checked().xpect_true();
+		js_sys::Reflect::has(&js_sys::global(), &PreBoot::GLOBAL.into())
+			.unwrap()
+			.xpect_false();
+		// the world's listeners from here: one click, one pair
+		span.click();
+		app.update();
+		hits(&app).len().xpect_eq(4);
+	}
+
+	/// The element the document focused before the world existed carries
+	/// [`Focus`] once the mount has bound it.
+	#[beet_core::test(browser)]
+	fn a_pre_boot_focus_is_mirrored() {
+		let mut app = dom_app();
+		let host = build(&mut app, rsx! { <div tabindex="0">"row"</div> });
+		let target = serve(&mut app, host);
+		let row = target
+			.query_selector("div")
+			.unwrap()
+			.unwrap()
+			.dyn_into::<web_sys::HtmlElement>()
+			.unwrap();
+		row.focus().unwrap();
+		adopt(&mut app, host, &target);
+		let row_entity = element(app.world_mut(), "div");
+		app.world()
+			.entity(row_entity)
+			.contains::<Focus>()
+			.xpect_true();
+		row.blur().unwrap();
+	}
+
 	/// The [`Submit`]s an observer saw, each with the form's values.
 	#[derive(Default, Resource)]
 	struct Submits(Vec<Value>);
@@ -543,5 +603,35 @@ mod test {
 		button.click();
 		app.update();
 		app.world().resource::<Submits>().0.len().xpect_eq(2);
+	}
+
+	/// A submit before the world existed is prevented by the pre-boot script
+	/// and lands [`Submit`] on replay, the page still here.
+	#[beet_core::test(browser)]
+	fn a_pre_boot_submit_is_prevented_and_replayed() {
+		let mut app = dom_app();
+		let host = build(&mut app, rsx! {
+			<Form>
+				<TextField name="who" field={FieldRef::new("who")}/>
+			</Form>
+		});
+		set_document(&mut app, host, value!({ "who": "pete" }));
+		app.update();
+		let target = serve(&mut app, host);
+		install_pre_boot();
+		let form = target.query_selector("form").unwrap().unwrap();
+		fire(&form, &submit(None)).xpect_false();
+		app.init_resource::<Submits>();
+		app.world_mut().add_observer(
+			|ev: On<Submit>, mut submits: ResMut<Submits>| {
+				submits.0.push(ev.values.clone());
+			},
+		);
+		adopt(&mut app, host, &target);
+		app.world()
+			.resource::<Submits>()
+			.0
+			.clone()
+			.xpect_eq(vec![value!({ "who": "pete" })]);
 	}
 }

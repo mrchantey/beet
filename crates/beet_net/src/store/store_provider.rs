@@ -144,7 +144,9 @@ impl StoreProvider {
 
 	/// The store `uri` names forked into `store_fork` ([`StoreFork`]), or the
 	/// store alone. The composition behind `--repo` + `--store-fork`, erased
-	/// since the pair has no single component.
+	/// since the pair has no single component. The fork is marked for the
+	/// repo it forks ([`StoreUri::fork_mark`]), so a browser's first edit
+	/// says so to the next served page.
 	pub fn compose(
 		uri: &StoreUri,
 		store_fork: Option<&StoreUri>,
@@ -153,7 +155,9 @@ impl StoreProvider {
 		match store_fork {
 			Some(store_fork) => Self::from_uri(store_fork)?
 				.into_blob_store()
-				.xmap(|local| StoreFork::new(local, upstream))
+				.xmap(|local| {
+					StoreFork::new(local, upstream).with_mark(uri.fork_mark())
+				})
 				.xmap(BlobStore::new),
 			None => upstream,
 		}

@@ -341,18 +341,35 @@ check-wasm-boot *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*wasm_boot_check*'
 
 # The native browser-driving smoketests: the beet_net webdriver suite against
-# local fixtures, and the bsx_site page booting the wasm binary in the tab (which
-# builds it first). Same PATH deps.
+# local fixtures, and the example pages booting the wasm binary in the tab (which
+# build it first). Same PATH deps.
 test-browser *args:
 	cargo test -p beet_net --features webdriver,testing --lib {{ args }} -- --include-ignored --include '*webdriver*'
-	just test-bsx-site-browser {{ args }}
+	just build-wasm-ui
+	just _test-bsx-site-browser {{ args }}
+	just _test-scene-editor-browser {{ args }}
 
 # The bsx_site example in a real browser: build `beet-ui.wasm` (what its page
-# boots), serve the example as the binary does and prove the counter counts in
-# the tab. Needs chromedriver + a chromium on PATH.
+# boots), serve the example as the binary does, prove every route's served page
+# is adopted untouched and the counter counts in the tab. Needs chromedriver + a
+# chromium on PATH.
 test-bsx-site-browser *args:
 	just build-wasm-ui
+	just _test-bsx-site-browser {{ args }}
+
+_test-bsx-site-browser *args:
 	cargo test --test bsx_site_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
+
+# The scene editor example in a real browser: build `beet-ui.wasm`, serve the
+# example as the binary does and prove the boot is invisible: the served page
+# adopted untouched, a pre-boot click landing after it, a returning editor never
+# shown the published text. Needs chromedriver + a chromium on PATH.
+test-scene-editor-browser *args:
+	just build-wasm-ui
+	just _test-scene-editor-browser {{ args }}
+
+_test-scene-editor-browser *args:
+	cargo test --test scene_editor_browser --features "router style json fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
 
 # The `Script` backends are mutually exclusive at compile time, so the host-realm
 # fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate

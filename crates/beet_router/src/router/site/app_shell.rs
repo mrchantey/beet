@@ -24,6 +24,9 @@ use beet_ui::prelude::Reset;
 /// A page wanting the padded, measure-capped content column authors its own
 /// `<main>`, which the shipped rules style.
 ///
+/// One slot, `head`: extra head content appended to the chrome (a page's
+/// `<Wasm>` launch), for a layout wrapping this shell to fill.
+///
 /// # Scrolling
 ///
 /// The body is a *fixed* `100vh` column, so the content region is what scrolls
@@ -44,8 +47,12 @@ pub fn AppShell(
 	let cx = stack.current();
 	let mut body_classes = PageClasses::resolve(cx.parts(), &theme);
 	body_classes.insert_class(APP_SHELL);
+	// the charset first: the response names none, and a browser reading utf-8
+	// as latin-1 renders every box-drawing guide and arrow as mojibake
 	let html_head = cx.parts().accepts(MediaType::Html).then(|| {
 		rsx! {
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<Preflight/>
 			<Reset/>
 			<Stylesheet/>
@@ -54,7 +61,10 @@ pub fn AppShell(
 	});
 	rsx! {
 		<html lang="en">
-			<head>{html_head}</head>
+			<head>
+				{html_head}
+				<Slot name="head"/>
+			</head>
 			<body {(body_classes, page_column())}>
 				<Slot/>
 			</body>
@@ -124,4 +134,64 @@ pub(crate) fn app_shell_rules() -> Vec<Rule> {
 				style::Overflow::Auto,
 			),
 	]
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
+
+	/// A router world seeded with the request-scoped facts the shell reads.
+	fn shell_world(accept: MediaType) -> World {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.init_resource::<PackageConfig>();
+		let route = world
+			.spawn((
+				render_action::fixed_func_route("", || rsx! { <p>"body"</p> }),
+				PageRoute,
+			))
+			.flush();
+		let mut parts = RequestParts::get("");
+		parts.headers_mut().set::<header::Accept>(vec![accept]);
+		world
+			.resource_mut::<RequestContextStack>()
+			.push(RequestContext::new(parts, route, route, route));
+		world
+	}
+
+	/// Render `<AppShell>` with a page body and a head-slot fill.
+	fn render(accept: MediaType) -> String {
+		let mut world = shell_world(accept);
+		let entity = world
+			.spawn_template(rsx! {
+				<AppShell>
+					<meta name="page-launch" slot="head"/>
+					<p>"page body"</p>
+				</AppShell>
+			})
+			.unwrap()
+			.id();
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
+			.unwrap()
+			.to_string()
+	}
+
+	/// The web head declares its charset before anything else, so a served
+	/// page's box-drawing guides never read as latin-1, and a wrapping
+	/// layout's head-slot content lands in it; the terminal's head is bare.
+	#[beet_core::test]
+	fn the_web_head_names_its_charset_and_takes_the_slot() {
+		let html = render(MediaType::Html);
+		html.as_str()
+			.xpect_contains("<head><meta charset=\"utf-8\" />")
+			.xpect_contains("<meta name=\"page-launch\" />")
+			.xpect_contains("<p>page body</p>");
+		render(MediaType::Text)
+			.xnot()
+			.xpect_contains("charset")
+			.xpect_contains("<meta name=\"page-launch\" />");
+	}
 }

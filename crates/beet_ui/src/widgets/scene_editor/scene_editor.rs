@@ -38,7 +38,9 @@ impl Default for ToggleSceneEditor {
 }
 
 /// The editor ui a [`ToggleSceneEditor`] spawns: the disclosure and the
-/// editor, derived from the tag and rebuilt from it on every boot.
+/// editor, derived from the tag and rebuilt from it on every boot. Opening
+/// the disclosure is reaching for edit mode, so it carries the mark a served
+/// page booting on intent loads its wasm on ([`PreBoot::INTENT`]).
 fn spawn_editor_ui(
 	toggle: &ToggleSceneEditor,
 ) -> impl FnOnce(&mut EntityCommands) + use<> {
@@ -49,7 +51,10 @@ fn spawn_editor_ui(
 			.commands()
 			.spawn((Derived, ChildOf(tag)))
 			.insert_template(rsx! {
-				<details {Classes::new([SCENE_EDITOR_TOGGLE])}>
+				<details {(
+					Classes::new([SCENE_EDITOR_TOGGLE]),
+					Attribute::bundle(PreBoot::INTENT, Value::Null),
+				)}>
 					<summary>{label}</summary>
 					<SceneEditor/>
 				</details>

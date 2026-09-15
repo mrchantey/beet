@@ -12,9 +12,16 @@
 //! target uses, and the browser resolves its entry through the same launch
 //! path as the terminal and the server.
 //!
+//! Before either, a classic inline script ([`PreBoot`]) does what must
+//! happen before the first paint: it queues the clicks and submits the world
+//! will replay once it has adopted the page, hides the body for a returning
+//! editor, and, on a page booting on intent, injects the loader when someone
+//! reaches for edit mode.
+//!
 //! A plain synchronous template, so it renders inside a route's content (where
 //! only registered templates resolve, not the build-time BSX tag seam).
 use beet_core::prelude::*;
+use beet_ui::prelude::*;
 
 /// Emits the loader that boots a wasm `beet` binary in the browser, and the
 /// launch it boots with.
@@ -40,8 +47,17 @@ use beet_core::prelude::*;
 /// `js` defaults to `src` with its `.wasm` extension swapped for `.js` (the
 /// wasm-bindgen pair `build-wasm` emits), so a page need only name the `.wasm`.
 ///
+/// `boot` is the page's [`BootPolicy`]: `immediate` (the default) puts the
+/// loader in the page, `intent` holds it until the first click or toggle of
+/// an element marked `data-beet-boot` ([`PreBoot::INTENT`], which the scene
+/// editor's disclosure carries), so a static page costs nothing until someone
+/// reaches for edit mode; a returning editor, whose fork the served page does
+/// not show, boots at once either way. The pre-boot script precedes the
+/// loader so it is in place before anything can be clicked. Belongs in the
+/// head, before the body parses.
+///
 /// ```bsx
-/// <Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom"/>
+/// <Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot="intent"/>
 /// ```
 #[template]
 pub fn Wasm(
@@ -58,6 +74,9 @@ pub fn Wasm(
 	main: Option<SmolStr>,
 	/// The `--server` selection the entry boots with, eg `dom`.
 	server: Option<SmolStr>,
+	/// When the wasm loads: at once, or on intent.
+	#[prop(default)]
+	boot: BootPolicy,
 ) -> Result<impl Bundle> {
 	let js = if js.is_empty() {
 		src.strip_suffix(".wasm")
@@ -66,8 +85,10 @@ pub fn Wasm(
 	} else {
 		js
 	};
+	let repo = repo.as_ref().map(StoreUri::http);
+	let fork_mark = repo.as_ref().map(StoreUri::fork_mark);
 	let launch = BootstrapConfig {
-		repo: repo.as_ref().map(StoreUri::http),
+		repo,
 		main,
 		server: server.as_deref().map(RunningSetFilter::new),
 		..default()
@@ -85,11 +106,24 @@ pub fn Wasm(
 	let body = format!(
 		"const mod = await import({js:?});\nawait mod.default({{ module_or_path: {src:?} }});\nawait mod.start?.();"
 	);
+	// on intent the pre-boot script holds the loader and injects it; at once
+	// the loader is in the page
+	let (pre_boot, loader) = match boot {
+		BootPolicy::Immediate => {
+			(PreBoot::script(fork_mark.as_deref(), None), Some(body))
+		}
+		BootPolicy::Intent => {
+			(PreBoot::script(fork_mark.as_deref(), Some(&body)), None)
+		}
+	};
 	rsx! {
+		<script>{pre_boot}</script>
 		{bootstrap.map(|bootstrap| rsx! {
 			<script type=BootstrapConfig::SCRIPT_TYPE>{bootstrap}</script>
 		})}
-		<script type="module">{body}</script>
+		{loader.map(|body| rsx! {
+			<script type="module">{body}</script>
+		})}
 	}
 	.xok()
 }
@@ -111,7 +145,8 @@ mod test {
 	// `.wasm` name, calling the glue's default export (`init`) with an explicit
 	// `module_or_path`, then optionally awaiting `start`. The import is dynamic and
 	// the `start` call optional, so a module without that export still mounts. A
-	// page naming no launch carries no bootstrap script.
+	// page naming no launch carries no bootstrap script, and no repo no
+	// pre-paint bit; the pre-boot queue precedes the loader either way.
 	#[beet_core::test]
 	fn wasm_emits_module_loader() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
@@ -119,13 +154,41 @@ mod test {
 			.spawn_template(rsx! { <Wasm src="/assets/min.wasm"/> })
 			.unwrap()
 			.id();
-		render(&mut world, root)
+		let html = render(&mut world, root);
+		html.as_str()
 			.xpect_contains("<script type=\"module\"")
 			.xpect_contains("await import(\"/assets/min.js\")")
 			.xpect_contains("module_or_path: \"/assets/min.wasm\"")
 			.xpect_contains("await mod.start?.();")
+			.xpect_contains("globalThis.beetPreBoot=")
 			.xnot()
-			.xpect_contains(BootstrapConfig::SCRIPT_TYPE);
+			.xpect_contains(BootstrapConfig::SCRIPT_TYPE)
+			.xnot()
+			.xpect_contains("localStorage");
+		let pre_boot = html.find(PreBoot::GLOBAL).unwrap();
+		let loader = html.find("type=\"module\"").unwrap();
+		pre_boot.xpect_less_than(loader);
+	}
+
+	// `<Wasm repo boot="intent">` renders no loader: the pre-boot script holds
+	// it, injecting it on a marked click or toggle, or at once for a browser
+	// marked as holding a fork of the repo.
+	#[beet_core::test]
+	fn wasm_boots_on_intent() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
+			})
+			.unwrap()
+			.id();
+		render(&mut world, root)
+			.xpect_contains("localStorage.getItem(\"beet:fork:http:repo\")")
+			.xpect_contains("[data-beet-boot]")
+			.xpect_contains("m.textContent=\"const mod = await import(")
+			.xpect_contains("--server=dom")
+			.xnot()
+			.xpect_contains("<script type=\"module\"");
 	}
 
 	// `<Wasm src js>` honours an explicit `js` glue url over the derived default.

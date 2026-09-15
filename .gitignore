@@ -17,8 +17,9 @@ examples/todo/todos.json
 examples/ui/scene_editor/scene.json
 
 !examples/assets
-# a link to the workspace tree: the wasm binary the bsx_site page boots
+# links to the workspace tree: the wasm binary the bsx_site and scene editor pages boot
 !examples/bsx_site/assets
+!examples/ui/assets
 Cargo.toml.full
 Cargo.toml.basic
 target

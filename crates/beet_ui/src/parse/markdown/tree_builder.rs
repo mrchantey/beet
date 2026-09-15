@@ -477,9 +477,19 @@ impl<'a> MdTreeBuilder<'a> {
 				self.push(StackFrame::new("table", source));
 			}
 			Tag::TableHead => {
+				// the head's cells come without a row; a browser parsing the
+				// served table gives them one, so the tree carries it too
 				self.push(StackFrame::new("thead", source));
+				self.push(StackFrame::new("tr", source));
 			}
 			Tag::TableRow => {
+				// a body row lands in a `<tbody>` the parser never emits: a
+				// browser parsing the served table inserts one, and a page
+				// the world adopts must agree with it node for node
+				if self.stack.last().is_some_and(|frame| frame.name == "table")
+				{
+					self.push(StackFrame::new("tbody", source));
+				}
 				self.push(StackFrame::new("tr", source));
 			}
 			Tag::TableCell => {
@@ -602,6 +612,17 @@ impl<'a> MdTreeBuilder<'a> {
 				// a fenced code block pushes `pre > code`; one `End(CodeBlock)`
 				// closes both, else the trailing `pre` would swallow every
 				// following block as a child.
+				self.pop();
+				self.pop();
+			}
+			"tbody" => {
+				// the implicit body opened by the first body row closes with
+				// its table: one `End(Table)` pops both
+				self.pop();
+				self.pop();
+			}
+			"tr" if self.stack[self.stack.len() - 2].name == "thead" => {
+				// the head's implicit row closes with the head
 				self.pop();
 				self.pop();
 			}
@@ -978,11 +999,26 @@ mod test {
 			.xpect_true();
 	}
 
+	/// A table is `thead` then `tbody`, the shape a browser parses a served
+	/// table into, so the world's tree and the parsed DOM agree.
 	#[beet_core::test]
 	fn table() {
-		let nodes = build("| A | B |\n|---|---|\n| 1 | 2 |");
-		nodes.len().xpect_eq(1);
+		let nodes =
+			build("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\nafter");
+		nodes.len().xpect_eq(2);
 		node_name(&nodes[0]).xpect_eq("table");
+		let sections = node_children(&nodes[0]);
+		sections
+			.iter()
+			.map(node_name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["thead", "tbody"]);
+		let head_rows = node_children(&sections[0]);
+		head_rows.len().xpect_eq(1);
+		node_name(&head_rows[0]).xpect_eq("tr");
+		node_children(&head_rows[0]).len().xpect_eq(2);
+		node_children(&sections[1]).len().xpect_eq(2);
+		node_name(&nodes[1]).xpect_eq("p");
 	}
 
 	#[beet_core::test]

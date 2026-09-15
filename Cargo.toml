@@ -786,13 +786,24 @@ path = "tests/bsx_site_tui.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "tui_server", "quickjs", "testing"]
 
-# the browser half: the served page boots the wasm binary on the same entry and
-# the counter counts in the tab. Needs the built artifact, `just test-bsx-site-browser`.
+# the browser half: the served page boots the wasm binary on the same entry,
+# every route adopts untouched and the counter counts in the tab. Needs the built
+# artifact, `just test-bsx-site-browser`.
 [[test]]
 name = "bsx_site_browser"
 path = "tests/bsx_site_browser.rs"
 harness = false
 required-features = ["router", "style", "markdown", "fs", "http_server", "template_serde", "testing", "webdriver"]
+
+# the scene editor's browser half: the served page boots the wasm binary on intent,
+# adopts the served page invisibly, replays what was clicked while it loaded and
+# hides the published page from a returning editor. Needs the built artifact,
+# `just test-scene-editor-browser`.
+[[test]]
+name = "scene_editor_browser"
+path = "tests/scene_editor_browser.rs"
+harness = false
+required-features = ["router", "style", "json", "fs", "http_server", "template_serde", "testing", "webdriver"]
 
 # the embodiment gate: the on-disk `examples/ui/dynamic_view.bsx` todo app, its
 # schema and data documents, and item 3's schema-edit loop through the terminal.

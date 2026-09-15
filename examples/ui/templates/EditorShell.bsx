@@ -1,0 +1,12 @@
+<!--
+The scene editor's document shell: the chrome-free <AppShell> with the page's
+browser launch in its head. <Wasm/> boots this same entry in the tab
+(`scene_editor.bsx` read through the `/repo` store the entry publishes) under
+`--server=dom`, on intent: the wasm loads the first time someone opens the
+editor's disclosure, which carries the `data-beet-boot` mark, so a visitor who
+only reads the page loads nothing. A returning editor, whose local fork the
+served page cannot show, boots at once behind a hidden body until it paints.
+-->
+<AppShell>
+	<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot="intent" slot="head"/>
+</AppShell>

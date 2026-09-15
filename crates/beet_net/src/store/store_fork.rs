@@ -23,6 +23,11 @@ use bytes::Bytes;
 /// Erased on construction rather than a reflected component: its two halves
 /// are already erased stores, composed by whichever driver resolved them.
 ///
+/// A fork may carry a mark ([`with_mark`](Self::with_mark)): a local-storage
+/// key a browser sets on the fork's first write, the one synchronous bit a
+/// served page's pre-boot script reads to know a returning editor from a
+/// first visitor. Every other runtime carries it inert.
+///
 /// A change routes to the fork from three keys: its own base (what its
 /// [`WatchDir`] keys the watcher's events to), the local half's and the
 /// upstream's (a half spawned as its own store emits keyed to itself). Every
@@ -35,12 +40,38 @@ pub struct StoreFork {
 	local: BlobStore,
 	/// The store reads fall through to, never written.
 	upstream: BlobStore,
+	/// The key a browser marks the fork's first write under, see
+	/// [`StoreUri::fork_mark`].
+	mark: Option<SmolStr>,
 }
 
 impl StoreFork {
 	/// `local` forked off `upstream`.
 	pub fn new(local: BlobStore, upstream: BlobStore) -> Self {
-		Self { local, upstream }
+		Self {
+			local,
+			upstream,
+			mark: None,
+		}
+	}
+
+	/// Mark the fork's first write under `mark` in a browser's local storage,
+	/// the bit a served page reads before its world exists
+	/// ([`StoreUri::fork_mark`]).
+	pub fn with_mark(mut self, mark: impl Into<SmolStr>) -> Self {
+		self.mark = Some(mark.into());
+		self
+	}
+
+	/// A write landed local: in a browser, say so under the mark.
+	fn mark_written(&self) {
+		#[cfg(all(target_arch = "wasm32", feature = "std"))]
+		if let Some(mark) = &self.mark
+			&& let Some(storage) = web_sys::window()
+				.and_then(|window| window.local_storage().ok().flatten())
+		{
+			storage.set_item(mark, "1").ok();
+		}
 	}
 
 	/// The local half, where writes land.
@@ -58,6 +89,7 @@ impl BlobStoreProvider for StoreFork {
 		Box::new(Self {
 			local: self.local.with_subdir(path.clone()),
 			upstream: self.upstream.with_subdir(path),
+			mark: self.mark.clone(),
 		})
 	}
 
@@ -66,6 +98,7 @@ impl BlobStoreProvider for StoreFork {
 		Box::new(Self {
 			local: self.local.base(),
 			upstream: self.upstream.base(),
+			mark: self.mark.clone(),
 		})
 	}
 
@@ -93,6 +126,7 @@ impl BlobStoreProvider for StoreFork {
 			Box::new(Self {
 				local: BlobStore::from_arc(local.into()),
 				upstream: BlobStore::from_arc(upstream.into()),
+				mark: self.mark.clone(),
 			}) as Box<dyn BlobStoreProvider>,
 			upstream_entry,
 		)
@@ -154,7 +188,13 @@ impl BlobStoreProvider for StoreFork {
 	}
 
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
-		BlobStoreProvider::insert(&self.local, path, body)
+		let write = BlobStoreProvider::insert(&self.local, path, body);
+		let fork = self.clone();
+		Box::pin(async move {
+			write.await?;
+			fork.mark_written();
+			OK
+		})
 	}
 
 	/// The union, each key once, in order.
@@ -196,7 +236,13 @@ impl BlobStoreProvider for StoreFork {
 	}
 
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
-		self.local.remove(path)
+		let write = self.local.remove(path);
+		let fork = self.clone();
+		Box::pin(async move {
+			write.await?;
+			fork.mark_written();
+			OK
+		})
 	}
 
 	fn public_url(

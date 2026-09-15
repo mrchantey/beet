@@ -4,8 +4,8 @@
 //! column takes the width of its widest cell (scaled down to fit the table), and
 //! every row is as tall as its tallest cell. Rows and row groups carry no
 //! display of their own — a *row* is found structurally as any node whose direct
-//! children are [`Display::TableCell`], which covers both a `<tr>` and a markdown
-//! `<thead>` that holds its header cells directly. The intermediate wrappers
+//! children are [`Display::TableCell`], which covers a `<tr>` wherever it sits
+//! and a `<thead>` holding its header cells directly. The intermediate wrappers
 //! (`<thead>`/`<tbody>`/`<tr>`) are recorded as table-managed so the main layout
 //! loop leaves them alone rather than re-stacking the grid as plain blocks.
 use super::*;

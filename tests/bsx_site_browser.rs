@@ -1,6 +1,7 @@
 //! The browser half of the no-code `examples/bsx_site` example: the served
-//! page boots the wasm `beet` binary on the same entry it was rendered by, and
-//! the counter counts again through the world running in the tab.
+//! page boots the wasm `beet` binary on the same entry it was rendered by, the
+//! world adopts every route's served page as it stands, and the counter counts
+//! again through the world running in the tab.
 //!
 //! The site is served exactly as `beet --main=examples/bsx_site` serves it
 //! (the entry resolved through its own fs repo store, built through the plain
@@ -17,91 +18,47 @@
 //! ```
 beet::test_main!();
 
+mod browser_host;
+use browser_host::*;
+
 use beet::net::prelude::webdriver::*;
 use beet::prelude::*;
 
-/// What the `DomHost` logs once it has painted the counter page.
-const PAINTED: &str = "dom host painted /counter";
+/// The example's directory, the entry's repo root.
+const ENTRY_DIR: &str = "examples/bsx_site";
 
 /// Serve the on-disk example the way the binary does, on an OS-assigned port.
 async fn serve_site() -> PageHarness {
-	PageHarness::serve_app(|app| {
-		app.add_plugins((
-			RouterPlugin,
-			material::MaterialStylePlugin::default(),
-		));
-		let formats = app
-			.world_mut()
-			.get_resource_or_init::<TemplateFormats>()
-			.clone();
-		app.world_mut().run_async_local(async move |world| {
-			let dir = AbsPath::new_workspace_rel("examples/bsx_site")?;
-			let ResolvedEntry {
-				repo_store,
-				entry_name,
-				prescan,
-				..
-			} = entry_build::resolve_main(None, None, dir.as_str()).await?;
-			let sources = entry_build::read_sources(
-				&repo_store,
-				formats,
-				entry_name,
-				prescan,
-			)
-			.await?;
-			world
-				.with(move |world: &mut World| {
-					entry_build::build_root(
-						world, repo_store, sources, RepoStore,
-					)
-					.map(|_| ())
-				})
-				.await
-		});
-	})
-	.await
-	.unwrap()
+	require_artifact();
+	let store = BlobStore::new(FsStore::new(
+		AbsPath::new_workspace_rel(ENTRY_DIR).unwrap(),
+	));
+	serve_entry(store, "main.bsx").await
 }
 
-/// Drain the console into `log` until `needle` appears, failing on a panic or
-/// the deadline.
-async fn console_until(
-	console: &Collector<ConsoleEntry>,
-	log: &mut String,
-	needle: &str,
-) {
-	let deadline = Instant::now() + Duration::from_secs(120);
-	while !log.contains(needle) {
-		for entry in console.drain() {
-			cross_log!("{}", entry.text);
-			log.push_str(&entry.text);
-			log.push('\n');
-		}
-		if log.contains("panicked") {
-			panic!("the browser process panicked. console:\n{log}");
-		}
-		if Instant::now() > deadline {
-			panic!("the console never said `{needle}`. console:\n{log}");
-		}
-		time_ext::sleep(Duration::from_millis(250)).await;
-	}
+/// Every route under the example's `routes/` directory, by url path.
+async fn routes() -> Vec<String> {
+	let dir = AbsPath::new_workspace_rel(ENTRY_DIR)
+		.unwrap()
+		.join("routes");
+	let mut routes: Vec<String> = BlobStore::new(FsStore::new(dir))
+		.list()
+		.await
+		.unwrap()
+		.into_iter()
+		.map(|path| {
+			let stem = path.with_extension("").to_string();
+			let stem = stem.strip_suffix("index").unwrap_or(&stem);
+			format!("/{}", stem.trim_end_matches('/'))
+		})
+		.collect();
+	routes.sort();
+	routes
 }
 
 #[beet_core::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-ui` + chromedriver"]
 async fn the_counter_counts_in_the_browser() {
-	let artifact =
-		AbsPath::new_workspace_rel("assets/wasm/beet-ui.wasm").unwrap();
-	if !fs_ext::exists(&artifact).unwrap_or_default() {
-		panic!("missing artifact `{artifact}`, run `just build-wasm-ui`");
-	}
-	// the launch, read once the first server spawns: only the http server boots
-	// (the cli render would exit the app), on an OS port rather than the default
-	// so the suite never fights a running dev server
-	unsafe {
-		env_ext::set_var("BEET_SERVER", "http").unwrap();
-		env_ext::set_var("BEET_HTTP_PORT", "0").unwrap();
-	}
 	let mut page = serve_site().await;
 	let console = page.console().await.unwrap();
 	let responses = page.responses().await.unwrap();
@@ -109,9 +66,10 @@ async fn the_counter_counts_in_the_browser() {
 	// the first paint is the served page
 	page.find_text("You have clicked 0 times.").await;
 	// the boot: the entry resolves through `/repo`, its `DomServer` lands the
-	// navigator on this page and paints it
+	// navigator on this page and adopts it as it stands
 	let mut log = String::new();
-	console_until(&console, &mut log, PAINTED).await;
+	console_until(&console, &mut log, "dom host painted /counter").await;
+	assert_adopted_clean(&log, "/counter");
 	// the loop: a trusted click reaches the world, the script runs, the count
 	// repaints in place
 	page.click_text("More").await.unwrap();
@@ -120,17 +78,46 @@ async fn the_counter_counts_in_the_browser() {
 	page.find_text("You have clicked 2 times.").await;
 	page.click_text("Less").await.unwrap();
 	page.find_text("You have clicked 1 times.").await;
-	for entry in console.drain() {
-		log.push_str(&entry.text);
-		log.push('\n');
+	drain(&console, &mut log);
+	assert_no_errors(&log, &responses);
+	page.kill().await.unwrap();
+}
+
+/// The conformance probe over the whole site: every route's served page is
+/// adopted by the world that boots on it with nothing replaced or patched,
+/// and the served chrome keeps working through the boot (the sidebar's menu
+/// button binds its own script to the served node, which adoption keeps).
+#[beet_core::test(timeout_ms = 600_000)]
+#[ignore = "smoketest: needs `just build-wasm-ui` + chromedriver"]
+async fn every_route_adopts_untouched() {
+	let mut page = serve_site().await;
+	let console = page.console().await.unwrap();
+	let responses = page.responses().await.unwrap();
+	let routes = routes().await;
+	routes.len().xpect_greater_than(3);
+	let mut log = String::new();
+	for route in &routes {
+		log.clear();
+		page.goto(route).await.unwrap();
+		console_until(
+			&console,
+			&mut log,
+			&format!("dom host painted {route} ("),
+		)
+		.await;
+		assert_adopted_clean(&log, route);
 	}
-	log.as_str().xnot().xpect_contains("ERROR");
-	responses
-		.drain()
-		.into_iter()
-		.filter(|response| response.is_error())
-		.map(|response| format!("{} {}", response.status, response.url))
-		.collect::<Vec<_>>()
-		.xpect_empty();
+	// the served menu button's own script survives the boot: a click still
+	// flips the rail
+	let rail = page.find("#sidebar").await;
+	let hidden = rail.get_attribute("aria-hidden").await.unwrap();
+	page.click("#menu-button").await.unwrap();
+	let flipped = match hidden.as_deref() {
+		Some("true") => "false",
+		_ => "true",
+	};
+	rail.xpect_attr("aria-hidden", flipped).await;
+	drain(&console, &mut log);
+	assert_no_errors(&log, &responses);
 	page.kill().await.unwrap();
 }

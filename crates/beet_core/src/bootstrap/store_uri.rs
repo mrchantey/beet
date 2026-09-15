@@ -334,6 +334,14 @@ impl StoreUri {
 	/// (`--store-fork`) rather than writing back.
 	pub fn is_remote(&self) -> bool { matches!(self, Self::Http { .. }) }
 
+	/// The local-storage key under which a browser holding a fork of this
+	/// store says so: one bit the fork writes on its first write and a served
+	/// page's pre-boot script reads before the world exists, hiding the
+	/// published page from a returning editor until their fork paints. Both
+	/// sides spell the store as the launch does (`--repo`), so they agree by
+	/// construction.
+	pub fn fork_mark(&self) -> String { format!("beet:fork:{self}") }
+
 	/// This store rooted at `subdir` below its current root, the uri form of
 	/// `BlobStore::with_subdir`: every kind nests `subdir` under its path
 	/// prefix. A `subdir` is a key, so a leading `/` or an escaping `..`

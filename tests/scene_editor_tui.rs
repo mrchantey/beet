@@ -26,6 +26,8 @@ use tui_host::TuiHost;
 const ENTRY: &str = "scene_editor.bsx";
 /// The authored original of the scene, as the entry names it.
 const SCENE: &str = "scene_editor/scene.bsx";
+/// The document shell the entry wraps its page in, under its `<TemplateDir>`.
+const SHELL: &str = "templates/EditorShell.bsx";
 /// The fork, as the entry names it: absent until the first boot writes it.
 const FORK: &str = "scene_editor/scene.json";
 /// A viewport tall enough for the page and the open editor, so no case
@@ -49,7 +51,7 @@ impl SceneHost {
 	/// Boot the page over a store holding the entry and the authored original
 	/// alone, so the boot is a first boot, and wait for the page to paint.
 	async fn new() -> Self {
-		let store = TuiHost::seeded_store(&[ENTRY, SCENE]).await;
+		let store = TuiHost::seeded_store(&[ENTRY, SCENE, SHELL]).await;
 		Self::boot(store).await
 	}
 

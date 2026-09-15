@@ -14,6 +14,10 @@ pub use html::*;
 mod dom;
 #[cfg(target_arch = "wasm32")]
 pub use dom::*;
+// the served page's pre-boot pieces: rendered natively into the page, read
+// back by the browser world once it has adopted it.
+mod pre_boot;
+pub use pre_boot::*;
 mod style_map;
 pub use style_map::*;
 mod media;

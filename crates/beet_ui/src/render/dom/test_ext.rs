@@ -51,21 +51,49 @@ pub(super) fn container() -> web_sys::Element {
 /// container.
 pub(super) fn paint(app: &mut App, host: Entity) -> web_sys::Element {
 	let target = container();
-	DomRenderer::mount(app.world_mut(), host, target.clone());
-	app.update();
+	adopt(app, host, &target);
 	target
+}
+
+/// A container showing `host`'s served page: the string sink's html parsed
+/// by the browser, what a mount adopts.
+pub(super) fn serve(app: &mut App, host: Entity) -> web_sys::Element {
+	let target = container();
+	target.set_inner_html(&ssr(app.world_mut(), host));
+	target
+}
+
+/// Mount `host` into `target` and run a frame, returning what was adopted.
+pub(super) fn adopt(
+	app: &mut App,
+	host: Entity,
+	target: &web_sys::Element,
+) -> Adoption {
+	let adoption = DomRenderer::mount(app.world_mut(), host, target.clone());
+	app.update();
+	adoption
+}
+
+/// Run the page's pre-boot script, as a served head does before the wasm
+/// arrives.
+pub(super) fn install_pre_boot() {
+	js_sys::eval(&PreBoot::script(None, None)).unwrap();
+}
+
+/// The html the string sink writes for `root`.
+pub(super) fn ssr(world: &mut World, root: Entity) -> String {
+	HtmlRenderer::new()
+		.render(&mut RenderContext::new(root, world))
+		.unwrap()
+		.to_string()
 }
 
 /// The html the string sink writes for `root`, as the browser serializes it:
 /// the normalizing half of the parity probe, so a void tag's slash or a bare
 /// boolean attribute compares by meaning rather than spelling.
 pub(super) fn ssr_html(world: &mut World, root: Entity) -> String {
-	let html = HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))
-		.unwrap()
-		.to_string();
 	let div = document_ext::create_div();
-	div.set_inner_html(&html);
+	div.set_inner_html(&ssr(world, root));
 	div.inner_html()
 }
 
