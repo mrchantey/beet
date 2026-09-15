@@ -1121,14 +1121,14 @@ mod tests {
 				&stack,
 				&deployment,
 				&AccessGrants::new(vec![AccessGrant::read(
-					"r2_bucket",
+					"gcs_bucket",
 					"some-bucket",
 				)]),
 				&mut config,
 			)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`r2_bucket`")
+			.xpect_contains("`gcs_bucket`")
 			.xpect_contains("no IAM lowering")
 			.xpect_contains("fargate task");
 	}

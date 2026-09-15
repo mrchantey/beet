@@ -22,6 +22,11 @@ pub struct MailStack {
 	/// render used. Resolved once here so a probe, a plan and a credential
 	/// listing cannot disagree about which provider carries a domain.
 	pub relays: RelayModes,
+	/// The off-account cold store the box copies into, if the box names one:
+	/// the [`R2BucketBlock`] its `cold_bucket` label resolves to under this
+	/// stack. Resolved by the same lookup the render used, so the push, the
+	/// probe and the drill read the bucket the box actually writes.
+	pub cold: Option<R2BucketBlock>,
 }
 
 impl MailStack {
@@ -101,6 +106,18 @@ impl MailStack {
 		Ok(domain)
 	}
 
+	/// The cold store, or the error a verb that needs one reports: a stack
+	/// whose box names none has no cold copy to push, probe or restore from.
+	pub fn cold_store(&self) -> Result<&R2BucketBlock> {
+		self.cold.as_ref().ok_or_else(|| {
+			bevyhow!(
+				"mail box '{}' names no cold bucket, so this stack keeps no \
+				off-account copy: `cold_bucket` an R2BucketBlock's label on it",
+				self.mail_box.label()
+			)
+		})
+	}
+
 	/// The domain named, ie the sending domain a probe's inbound leg comes
 	/// from. Named rather than guessed: which domain sends is a deliberate
 	/// choice, not the first one declared.
@@ -129,6 +146,7 @@ pub struct MailQuery<'w, 's> {
 	boxes: Query<'w, 's, &'static StalwartBlock>,
 	domains: Query<'w, 's, &'static MailDomainBlock>,
 	relays: RelayQuery<'w, 's>,
+	cold_stores: Query<'w, 's, &'static R2BucketBlock>,
 }
 
 impl MailQuery<'_, '_> {
@@ -184,12 +202,20 @@ impl MailQuery<'_, '_> {
 				would serve no domain at all"
 			);
 		}
+		let cold = mail_box
+			.cold_store(
+				declared
+					.iter()
+					.filter_map(|child| self.cold_stores.get(*child).ok()),
+			)?
+			.cloned();
 		Ok(MailStack {
 			project,
 			stack,
 			mail_box,
 			domains,
 			relays,
+			cold,
 		})
 	}
 }

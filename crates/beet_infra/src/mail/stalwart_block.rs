@@ -73,6 +73,18 @@ pub struct StalwartBlock {
 	/// bucket: the same archive holds prefixes whose contents are the only copy
 	/// of what is in them and expire never.
 	backup_bucket: SmolStr,
+	/// The [`R2BucketBlock`] the cold copy is pushed to, by label. Empty
+	/// installs no cold timer, which is the same deliberate declaration as an
+	/// empty [`backup_bucket`](Self::backup_bucket): a stack whose every copy
+	/// lives in the one AWS account should have said so.
+	///
+	/// The cold copy is what survives losing that account. Nightly, after the
+	/// snapshot lands, the box copies the newest snapshot and every message
+	/// blob into the other vendor's bucket: COPY, never sync, so a deletion
+	/// upstream never propagates. Needs a [`backup_bucket`](Self::backup_bucket)
+	/// to copy from, and the box reads the bucket's parked credential rather
+	/// than holding one of its own.
+	cold_bucket: SmolStr,
 	/// The zone the box's `A` record is published into. Must be DNS-only: SMTP,
 	/// IMAP and ACME TLS-ALPN-01 all need the origin reached directly, so a
 	/// proxied record is a config-time error rather than a mystery outage.
@@ -180,7 +192,35 @@ impl StalwartBlock {
 
 	/// The prefix every database snapshot is written under, so the bucket's
 	/// lifecycle rule and an off-site `rclone` pull both have one path to name.
+	/// The cold copy keeps the same prefix, so one key names a snapshot in
+	/// either bucket.
 	pub const BACKUP_PREFIX: &'static str = "sqlite";
+
+	/// When the cold copy runs, in UTC: an hour after the snapshot's own
+	/// window closes, so the snapshot it copies is tonight's rather than last
+	/// night's.
+	pub const COLD_SCHEDULE: &'static str = "*-*-* 15:30:00";
+
+	/// The prefix the blob bucket is mirrored under in the cold bucket, beside
+	/// the snapshots. Blobs are hash-keyed and never rewritten, so the copy is
+	/// append-only by construction.
+	pub const COLD_BLOBS_PREFIX: &'static str = "blobs";
+
+	/// The unit the cold copy runs as, which is also what a deploy starts by
+	/// hand to prove the path before the timer ever fires.
+	pub const COLD_UNIT: &'static str = "stalwart-cold-backup";
+
+	/// The pinned `rclone` release the box copies with, the one tool that
+	/// speaks to two S3-compatible stores under two credentials in one
+	/// process. The `aws` cli cannot: its endpoint flag is per invocation,
+	/// not per side.
+	pub const RCLONE_VERSION: &'static str = "1.75.1";
+	/// sha256 of [`RCLONE_RPM`](Self::RCLONE_RPM), checked against the
+	/// published `SHA256SUMS` at pin time.
+	pub const RCLONE_SHA256: &'static str =
+		"ce1cdfcf8083b9f6c6ff14457db3c7d3d365bb0a5d071cf6e2780310fe640514";
+	/// The release asset for the Graviton box, as a package so `dnf` owns it.
+	pub const RCLONE_RPM: &'static str = "rclone-v1.75.1-linux-arm64.rpm";
 
 	pub fn new(
 		label: impl Into<SmolStr>,
@@ -192,6 +232,7 @@ impl StalwartBlock {
 
 			blob_bucket: SmolStr::default(),
 			backup_bucket: SmolStr::default(),
+			cold_bucket: SmolStr::default(),
 			dns: None,
 			dns_stage: None,
 			ssh_public_key: SmolStr::default(),
@@ -368,6 +409,12 @@ impl StalwartBlock {
 				self.label
 			);
 		}
+		if !self.cold_bucket.is_empty() && self.backup_bucket.is_empty() {
+			bevybail!(
+				"mail box '{}' names a cold bucket but no backup bucket: the cold copy carries the newest snapshot, and nothing writes one",
+				self.label
+			);
+		}
 		for label in self.hostname.split('.') {
 			DnsProvider::validate_label(label, "mail box hostname")?;
 		}
@@ -398,11 +445,23 @@ impl StalwartBlock {
 		vpcs: Query<&VpcBlock>,
 		domains: Query<(Entity, &MailDomainBlock)>,
 		relays: RelayQuery,
+		cold_stores: Query<(Entity, &R2BucketBlock)>,
 	) {
 		for (entity, block, vpc_ref) in blocks.iter() {
 			let Ok(root) = scopes.get_entity(entity) else {
 				continue;
 			};
+			// the cold store by label, in this scope: the box renders its
+			// endpoint into the copy script, and the block owns that
+			// composition
+			let cold = block.cold_store(
+				cold_stores
+					.iter()
+					.filter(|(store, _)| {
+						scopes.get_entity(*store).is_ok_and(|it| it == root)
+					})
+					.map(|(_, store)| store),
+			);
 			// every domain rendering into the same scope, ie the box's own
 			// stack and no other
 			let relayed = domains
@@ -427,8 +486,8 @@ impl StalwartBlock {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
-			match (vpc, relayed) {
-				(Ok(vpc), Ok(relayed)) => {
+			match (vpc, relayed, cold) {
+				(Ok(vpc), Ok(relayed), Ok(cold)) => {
 					let relays = relayed.into_iter().fold(
 						RelayModes::default(),
 						|mut relays, (domain, relay)| {
@@ -439,13 +498,15 @@ impl StalwartBlock {
 					let access = scope.access();
 					let (stack, _deployment, config) = scope.ctx();
 					if let Err(err) =
-						block.emit(stack, vpc, &access, &relays, config)
+						block.emit(stack, vpc, &access, &relays, cold, config)
 					{
 						scope.error(err);
 					}
 				}
-				(vpc, relayed) => {
-					for err in [vpc.err(), relayed.err()].into_iter().flatten()
+				(vpc, relayed, cold) => {
+					for err in [vpc.err(), relayed.err(), cold.err()]
+						.into_iter()
+						.flatten()
 					{
 						scope.error(err);
 					}
@@ -463,6 +524,7 @@ impl StalwartBlock {
 		vpc: &VpcBlock,
 		access: &AccessGrants,
 		relays: &RelayModes,
+		cold: Option<&R2BucketBlock>,
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
@@ -474,8 +536,35 @@ impl StalwartBlock {
 		if relays.any_ses() {
 			self.emit_ses_sender(stack, config)?;
 		}
-		self.emit_instance(stack, config, vpc, &group, &role)?;
+		self.emit_instance(stack, config, vpc, &group, &role, cold)?;
 		Ok(())
+	}
+
+	/// The cold store this box copies into, out of the [`R2BucketBlock`]s
+	/// declared beside it: the one whose label is
+	/// [`cold_bucket`](Self::cold_bucket), `None` when none is declared, and
+	/// an error when the label names nothing. Missing would otherwise render
+	/// a box with a cold timer pointed at a bucket that does not exist, and
+	/// the timer's first failure is the first anybody hears of it.
+	pub fn cold_store<'a>(
+		&self,
+		stores: impl Iterator<Item = &'a R2BucketBlock>,
+	) -> Result<Option<&'a R2BucketBlock>> {
+		if self.cold_bucket.is_empty() {
+			return Ok(None);
+		}
+		stores
+			.into_iter()
+			.find(|store| store.label() == &self.cold_bucket)
+			.map(Some)
+			.ok_or_else(|| {
+				bevyhow!(
+					"mail box '{}' names cold bucket '{}', but no R2BucketBlock \
+					with that label is declared under its stack",
+					self.label,
+					self.cold_bucket
+				)
+			})
 	}
 }
 
@@ -768,6 +857,7 @@ impl StalwartBlock {
 		vpc: &VpcBlock,
 		group: &ResourceDef<AwsSecurityGroupDetails>,
 		profile: &ResourceDef<AwsIamInstanceProfileDetails>,
+		cold: Option<&R2BucketBlock>,
 	) -> Result {
 		let ami_label = stack
 			.resource_ident(self.build_label("ami"))
@@ -806,7 +896,7 @@ impl StalwartBlock {
 		);
 
 		let data_volume = self.data_volume(stack, vpc);
-		let user_data = self.build_user_data(stack)?;
+		let user_data = self.build_user_data(stack, cold)?;
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
 		let instance = ResourceDef::new_secondary(
 			instance_ident.clone(),
@@ -1228,13 +1318,211 @@ BACKUP_TIMER_EOF
 		}
 	}
 
+	/// Returns the nightly cold-copy script at
+	/// `/usr/local/bin/stalwart-cold-backup`.
+	///
+	/// Two remotes in one process: the live side answers to the instance
+	/// profile and the cold side to the parked token, which is read out of
+	/// parameter store into the environment and never reaches argv or a file.
+	/// The newest snapshot is copied, read back from BOTH sides and compared
+	/// byte for byte (a hash a store reports is a claim, a byte it serves is a
+	/// fact, and egress from the cold side is free), then integrity-checked
+	/// as a database; then every blob not already in the cold bucket is
+	/// copied across. Nothing here overwrites and nothing here deletes.
+	fn cold_script(
+		&self,
+		stack: &ResolvedStack,
+		cold: &R2BucketBlock,
+	) -> String {
+		let template = r#"#!/bin/bash
+# Nightly copy of the newest database snapshot and every message blob into the
+# off-account cold store. Copy, never sync: nothing here deletes, so a mistake
+# upstream stops at the archive instead of reaching it.
+set -euo pipefail
+umask 077
+get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
+# the live side answers to the instance profile; the cold side to the parked
+# token, which is read into the environment and never reaches argv or a file
+export RCLONE_CONFIG=/dev/null
+export RCLONE_CONFIG_LIVE_TYPE=s3
+export RCLONE_CONFIG_LIVE_PROVIDER=AWS
+export RCLONE_CONFIG_LIVE_ENV_AUTH=true
+export RCLONE_CONFIG_LIVE_REGION='__REGION__'
+export RCLONE_CONFIG_COLD_TYPE=s3
+export RCLONE_CONFIG_COLD_PROVIDER=Cloudflare
+export RCLONE_CONFIG_COLD_ENDPOINT='__ENDPOINT__'
+export RCLONE_CONFIG_COLD_NO_CHECK_BUCKET=true
+RCLONE_CONFIG_COLD_ACCESS_KEY_ID="$(get '__ACCESS_KEY_SECRET__')" || {
+	echo "no cold credential at __ACCESS_KEY_SECRET__: __MINT__" >&2
+	exit 1
+}
+RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY="$(get '__SECRET_KEY_SECRET__')" || {
+	echo "no cold credential at __SECRET_KEY_SECRET__: __MINT__" >&2
+	exit 1
+}
+export RCLONE_CONFIG_COLD_ACCESS_KEY_ID RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY
+expected="$(mktemp /var/lib/stalwart/cold-expected.XXXXXX.db)"
+readback="$(mktemp /var/lib/stalwart/cold-readback.XXXXXX.db)"
+trap 'rm -f "$expected" "$readback"' EXIT
+# the newest snapshot by name: the keys are date-ordered and only the backup
+# timer writes them
+newest="$(rclone lsf --files-only --recursive --include '*.db' 'live:__BACKUP_BUCKET__/__PREFIX__' | sort | tail -n 1)"
+[ -n "$newest" ] || {
+	echo "no snapshot under s3://__BACKUP_BUCKET__/__PREFIX__ to copy: the backup timer is what writes one" >&2
+	exit 1
+}
+rclone copyto "live:__BACKUP_BUCKET__/__PREFIX__/$newest" "cold:__COLD_BUCKET__/__PREFIX__/$newest"
+rclone copyto "live:__BACKUP_BUCKET__/__PREFIX__/$newest" "$expected"
+rclone copyto "cold:__COLD_BUCKET__/__PREFIX__/$newest" "$readback"
+cmp --silent "$expected" "$readback" || {
+	echo "cold read verification differed from the live snapshot __PREFIX__/$newest" >&2
+	exit 1
+}
+result="$(sqlite3 "$readback" 'PRAGMA integrity_check;')"
+[ "$result" = "ok" ] || {
+	echo "SQLite integrity check failed for the cold copy of __PREFIX__/$newest: $result" >&2
+	exit 1
+}
+# every blob not already there, and never an overwrite or a delete: blobs are
+# hash-keyed, so an object that exists at a key IS the object
+rclone copy --ignore-existing --fast-list --transfers 8 --checkers 16 'live:__BLOB_BUCKET__' 'cold:__COLD_BUCKET__/__BLOBS_PREFIX__'
+echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c %s "$readback") bytes), blobs $(rclone size 'cold:__COLD_BUCKET__/__BLOBS_PREFIX__' | tr '\n' ' ')"
+"#;
+		let backup_bucket = stack.resource_name(self.backup_bucket.clone());
+		let blob_bucket = stack.resource_name(self.blob_bucket.clone());
+		let cold_bucket = cold.bucket_name(stack);
+		let endpoint = cold.endpoint();
+		let access_key = cold.access_key_secret().name(stack);
+		let secret_key = cold.secret_key_secret().name(stack);
+		let mint = cold.mint_instructions(stack);
+		[
+			("__REGION__", stack.region().as_str()),
+			("__ENDPOINT__", endpoint.as_str()),
+			("__ACCESS_KEY_SECRET__", access_key.as_str()),
+			("__SECRET_KEY_SECRET__", secret_key.as_str()),
+			("__MINT__", mint.as_str()),
+			("__BACKUP_BUCKET__", backup_bucket.as_str()),
+			("__BLOB_BUCKET__", blob_bucket.as_str()),
+			("__COLD_BUCKET__", cold_bucket.as_str()),
+			("__PREFIX__", Self::BACKUP_PREFIX),
+			("__BLOBS_PREFIX__", Self::COLD_BLOBS_PREFIX),
+		]
+		.iter()
+		.fold(template.to_string(), |script, (token, value)| {
+			script.replace(token, value)
+		})
+		.trim_end()
+		.to_string()
+	}
+
+	/// The cold-copy unit and its timer, in the backup pair's shape, ordered
+	/// after the backup unit so a night where both fire runs them in turn.
+	fn cold_units(&self) -> (String, String) {
+		let service = format!(
+			r#"[Unit]
+Description=Nightly cold copy of the mail snapshot and blobs into the off-account store
+After=network-online.target stalwart-backup.service
+RequiresMountsFor=/var/lib/stalwart
+
+[Service]
+Type=oneshot
+User=stalwart
+Group=stalwart
+ExecStart=/usr/local/bin/{unit}
+StandardOutput=append:/var/log/stalwart/stalwart.log
+StandardError=append:/var/log/stalwart/stalwart.log"#,
+			unit = Self::COLD_UNIT
+		);
+		let timer = format!(
+			r#"[Unit]
+Description=Nightly cold copy of the mail backups
+
+[Timer]
+OnCalendar={}
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target"#,
+			Self::COLD_SCHEDULE
+		);
+		(service, timer)
+	}
+
+	/// The cloud-init lines that install the pinned copier, or nothing when
+	/// no cold store is declared. Checksummed like the server tarball: a
+	/// package GitHub did not serve at pin time never reaches `dnf`.
+	fn cold_install(&self, cold: Option<&R2BucketBlock>) -> String {
+		if cold.is_none() {
+			return String::new();
+		}
+		format!(
+			r#"# the copier for the cold store, pinned and checksummed like the server
+curl -sSLf --retry 5 --retry-all-errors --retry-delay 5 'https://github.com/rclone/rclone/releases/download/v{version}/{rpm}' -o /tmp/rclone.rpm
+echo '{sha256}  /tmp/rclone.rpm' | sha256sum -c -
+dnf install -y /tmp/rclone.rpm
+rm /tmp/rclone.rpm
+"#,
+			version = Self::RCLONE_VERSION,
+			rpm = Self::RCLONE_RPM,
+			sha256 = Self::RCLONE_SHA256,
+		)
+	}
+
+	/// The cloud-init stanza that installs the cold-copy script and its
+	/// units, or nothing at all when no cold store is declared.
+	fn cold_stanza(
+		&self,
+		stack: &ResolvedStack,
+		cold: Option<&R2BucketBlock>,
+	) -> Result<String> {
+		let Some(cold) = cold else {
+			return Ok(String::new());
+		};
+		let script = self.cold_script(stack, cold);
+		let (service, timer) = self.cold_units();
+		let unit = Self::COLD_UNIT;
+		format!(
+			r#"# the cold copy: the box already holds the live credential and the
+# network path, so the off-account push runs here beside the snapshot
+cat > /usr/local/bin/{unit} <<'COLD_EOF'
+{script}
+COLD_EOF
+chmod 0755 /usr/local/bin/{unit}
+
+cat > /etc/systemd/system/{unit}.service <<'COLD_UNIT_EOF'
+{service}
+COLD_UNIT_EOF
+
+cat > /etc/systemd/system/{unit}.timer <<'COLD_TIMER_EOF'
+{timer}
+COLD_TIMER_EOF
+"#
+		)
+		.xok()
+	}
+
+	/// The line that starts the cold timer, or nothing when there is none.
+	fn cold_enable(&self, cold: Option<&R2BucketBlock>) -> String {
+		match cold {
+			None => String::new(),
+			Some(_) => {
+				format!("systemctl enable --now {}.timer", Self::COLD_UNIT)
+			}
+		}
+	}
+
 	/// The cloud-init script, ie the machine's identity. Installs the pinned
 	/// release (refusing a tarball that fails the pinned checksum), the store
 	/// config template, the secrets renderer, the unit and the log agent; then
 	/// renders secrets once and starts the service. The first boot comes up in
 	/// Stalwart's bootstrap mode, serving management only, until
 	/// `StalwartProvision` applies the declarative config.
-	fn build_user_data(&self, stack: &ResolvedStack) -> Result<SmolStr> {
+	fn build_user_data(
+		&self,
+		stack: &ResolvedStack,
+		cold: Option<&R2BucketBlock>,
+	) -> Result<SmolStr> {
 		let hostname = &self.hostname;
 		let version = Self::STALWART_VERSION;
 		let tarball = Self::STALWART_TARBALL;
@@ -1247,6 +1535,9 @@ BACKUP_TIMER_EOF
 			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
 		let backup = self.backup_stanza(stack);
 		let backup_enable = self.backup_enable();
+		let cold_install = self.cold_install(cold);
+		let cold_stanza = self.cold_stanza(stack, cold)?;
+		let cold_enable = self.cold_enable(cold);
 		let data_mount = Self::DATA_MOUNT;
 
 		let script = format!(
@@ -1354,12 +1645,15 @@ CW_EOF
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 
 {backup}
+{cold_install}
+{cold_stanza}
 # secrets rendered before the first start, and by ExecStartPre on every later
 # one, so rotation is a restart rather than a rebuild
 sudo -u stalwart /usr/local/bin/stalwart-secrets
 systemctl daemon-reload
 systemctl enable --now stalwart
 {backup_enable}
+{cold_enable}
 "#
 		);
 
@@ -1462,11 +1756,34 @@ mod tests {
 		build_config_at(block, sydney_stack())
 	}
 
-	/// The rendered user_data, ie the machine identity.
+	/// The rendered user_data, ie the machine identity, with no cold store.
 	fn user_data(block: &StalwartBlock) -> String {
+		user_data_cold(block, None)
+	}
+
+	/// The rendered user_data beside the cold store it copies into.
+	fn user_data_cold(
+		block: &StalwartBlock,
+		cold: Option<&R2BucketBlock>,
+	) -> String {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		block.build_user_data(&stack).unwrap().to_string()
+		block.build_user_data(&stack, cold).unwrap().to_string()
+	}
+
+	/// The cold store the plan declares beside the box.
+	fn cold_store() -> R2BucketBlock {
+		R2BucketBlock::new("cold-backups")
+			.with_account_id("acct123")
+			.with_location("weur")
+	}
+
+	/// The box with both copies declared: a snapshot archive and the cold
+	/// store the snapshot and the blobs are pushed to.
+	fn cold_box() -> StalwartBlock {
+		mail_box()
+			.with_backup_bucket("archive")
+			.with_cold_bucket("cold-backups")
 	}
 
 	/// The sole resource of `resource_type` in the rendered config.
@@ -2083,6 +2400,146 @@ mod tests {
 				StalwartBlock::BACKUP_PREFIX
 			))
 			.xpect_contains(".db");
+	}
+
+	/// The cold copy is the second timer, in the first one's shape: pinned
+	/// copier, two remotes under two credentials, the parked token read into
+	/// the environment rather than onto argv, and a unit that logs where the
+	/// server does. Absent entirely when no cold store is declared, so a stack
+	/// that keeps every copy in one account has said so rather than defaulted
+	/// to it.
+	#[beet_core::test]
+	fn the_cold_timer_is_declared_or_absent() {
+		user_data(&mail_box().with_backup_bucket("archive"))
+			.xnot()
+			.xpect_contains("stalwart-cold-backup")
+			.xnot()
+			.xpect_contains("rclone");
+		user_data_cold(&cold_box(), Some(&cold_store()))
+			.xpect_contains("/usr/local/bin/stalwart-cold-backup")
+			.xpect_contains("stalwart-cold-backup.timer")
+			.xpect_contains(
+				"After=network-online.target stalwart-backup.service",
+			)
+			.xpect_contains(&format!(
+				"rclone-v{}-linux-arm64.rpm",
+				StalwartBlock::RCLONE_VERSION
+			))
+			.xpect_contains(StalwartBlock::RCLONE_SHA256)
+			.xpect_contains("OnCalendar=*-*-* 15:30:00")
+			.xpect_contains(
+				"systemctl enable --now stalwart-cold-backup.timer",
+			);
+	}
+
+	/// Copy, never sync. The script names both buckets by their composed
+	/// names, dials the cold store at the account's endpoint, reads the token
+	/// out of the two parked parameters, verifies the snapshot from BOTH
+	/// sides byte for byte before checking it as a database, and copies blobs
+	/// with `--ignore-existing`: never an overwrite, and no flag anywhere that
+	/// deletes.
+	#[beet_core::test]
+	fn cold_copy_never_syncs() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		cold_box()
+			.cold_script(&stack, &cold_store())
+			.xpect_contains("live:beet-infra--dev--archive/sqlite")
+			.xpect_contains("live:beet-infra--dev--mail-blobs")
+			.xpect_contains("cold:beet-infra--dev--cold-backups/sqlite")
+			.xpect_contains("cold:beet-infra--dev--cold-backups/blobs")
+			.xpect_contains("https://acct123.r2.cloudflarestorage.com")
+			.xpect_contains("/beet-infra/dev/cold-backups-access-key-id")
+			.xpect_contains("/beet-infra/dev/cold-backups-secret-access-key")
+			.xpect_contains("RCLONE_CONFIG_LIVE_ENV_AUTH=true")
+			.xpect_contains("cmp --silent \"$expected\" \"$readback\"")
+			.xpect_contains("PRAGMA integrity_check;")
+			.xpect_contains("rclone copy --ignore-existing")
+			.xnot()
+			.xpect_contains("rclone sync")
+			.xnot()
+			.xpect_contains("--delete");
+	}
+
+	/// The token is read with the same parameter-store call the secrets
+	/// script makes, and the script names the hand step when it is missing:
+	/// a cold copy that silently skipped would be the bucket sitting empty
+	/// with every check green, which is the failure this whole phase exists
+	/// to close.
+	#[beet_core::test]
+	fn a_missing_cold_credential_is_loud() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		cold_box()
+			.cold_script(&stack, &cold_store())
+			.xpect_contains("no cold credential at")
+			.xpect_contains("Manage API tokens")
+			.xpect_contains("exit 1");
+	}
+
+	/// A cold bucket with nothing to copy from is a declaration error, and a
+	/// cold label naming no declared store fails at render rather than
+	/// arming a timer pointed at nothing.
+	#[beet_core::test]
+	fn the_cold_store_must_exist() {
+		mail_box()
+			.with_cold_bucket("cold-backups")
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no backup bucket");
+		cold_box()
+			.cold_store(std::iter::empty())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cold-backups");
+		let store = cold_store();
+		cold_box()
+			.cold_store([&store].into_iter())
+			.unwrap()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("cold-backups");
+		mail_box()
+			.cold_store(std::iter::empty())
+			.unwrap()
+			.xpect_none();
+	}
+
+	/// The box's policy grants the parked pair and nothing else new: R2
+	/// answers to the token, so the cold store contributes exactly two
+	/// parameter reads through the shared lowering.
+	#[beet_core::test]
+	fn the_cold_credential_is_granted_through_the_policy() {
+		let block = cold_box();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				spawn_stack(block, parent);
+				parent.spawn(
+					S3BucketBlock::new("archive")
+						.with_deploy_versioned(false)
+						.with_runtime_write(true),
+				);
+				parent.spawn(cold_store());
+			});
+		let (_stack, _deployment, config) = scope.finish().unwrap();
+		let policy = resource(&config, "aws_iam_role_policy")["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
+		policy
+			.xpect_contains("DeclaredParameters")
+			.xpect_contains(
+				"parameter/beet-infra/dev/cold-backups-access-key-id",
+			)
+			.xpect_contains(
+				"parameter/beet-infra/dev/cold-backups-secret-access-key",
+			);
+		// ..and the rendered box carries the copier
+		instance(&config)["user_data"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("stalwart-cold-backup");
 	}
 
 	/// The blob store the `Bootstrap` claim declares: the stack's bucket with

@@ -1490,3 +1490,309 @@ pub struct CloudflareLoadBalancerSessionAffinityAttributes {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub zero_downtime_failover: Option<SmolStr>,
 }
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketDetails {
+	/// Account ID.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub account_id: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// Creation timestamp.
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub creation_date: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// Name of the bucket.
+	/// ## Attribute
+	/// `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub id: Option<SmolStr>,
+	/// Jurisdiction where objects in this bucket are guaranteed to be stored.
+	/// Available values: "default", "eu", "fedramp", "us".
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub jurisdiction: Option<SmolStr>,
+	/// Location of the bucket.
+	/// Available values: "apac", "eeur", "enam", "weur", "wnam", "oc".  Note: `location` is only honored the first time a bucket with a given name is created. If you delete and recreate a bucket with the same name, the original bucket location will be used. It is also a best-effort, not a guarantee, of bucket location.
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub location: Option<SmolStr>,
+	/// Name of the bucket.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// Storage class for newly uploaded objects, unless specified otherwise.
+	/// Available values: "Standard", "InfrequentAccess".
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub storage_class: Option<SmolStr>,
+}
+impl terra::ToJson for CloudflareR2BucketDetails {
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for CloudflareR2BucketDetails {
+	fn resource_type(&self) -> &'static str { "cloudflare_r2_bucket" }
+	fn provider(&self) -> &'static terra::Provider {
+		&terra::Provider::CLOUDFLARE
+	}
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.account_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "account_id",
+			});
+		}
+		if self.creation_date.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "creation_date",
+				},
+			);
+		}
+		if self.id.is_some() {
+			return Err(
+				terra::ResourceValidationError::NonEmptyComputedField {
+					resource_type: self.resource_type(),
+					field_name: "id",
+				},
+			);
+		}
+		if self.name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "name",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleDetails {
+	/// Account ID.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub account_id: SmolStr,
+	/// Name of the bucket.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub bucket_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// Jurisdiction of the bucket
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub jurisdiction: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rules: Option<Vec<CloudflareR2BucketLifecycleRules>>,
+}
+impl terra::ToJson for CloudflareR2BucketLifecycleDetails {
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for CloudflareR2BucketLifecycleDetails {
+	fn resource_type(&self) -> &'static str { "cloudflare_r2_bucket_lifecycle" }
+	fn provider(&self) -> &'static terra::Provider {
+		&terra::Provider::CLOUDFLARE
+	}
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.account_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "account_id",
+			});
+		}
+		if self.bucket_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "bucket_name",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRules {
+	/// Transition to abort ongoing multipart uploads.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub abort_multipart_uploads_transition:
+		Option<CloudflareR2BucketLifecycleRulesAbortMultipartUploadsTransition>,
+	/// Conditions that apply to all transitions of this rule.
+	/// ## Attribute
+	/// `required`
+	pub conditions: CloudflareR2BucketLifecycleRulesConditions,
+	/// Transition to delete objects.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub delete_objects_transition:
+		Option<CloudflareR2BucketLifecycleRulesDeleteObjectsTransition>,
+	/// Whether or not this rule is in effect.
+	/// ## Attribute
+	/// `required`
+	pub enabled: bool,
+	/// Unique identifier for this rule.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub id: SmolStr,
+	/// Transitions to change the storage class of objects.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub storage_class_transitions:
+		Option<Vec<CloudflareR2BucketLifecycleRulesStorageClassTransitions>>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesAbortMultipartUploadsTransition {
+    /// Condition for lifecycle transitions to apply after an object reaches an age in seconds.
+    /// ## Attribute
+    /// `optional`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<
+        CloudflareR2BucketLifecycleRulesAbortMultipartUploadsTransitionCondition,
+    >,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesAbortMultipartUploadsTransitionCondition
+{
+	/// ## Attribute
+	/// `required`
+	pub max_age: i64,
+	/// Available values: "Age".
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub r#type: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesConditions {
+	/// Transitions will only apply to objects/uploads in the bucket that start with the given prefix, an empty prefix can be provided to scope rule to all objects/uploads.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub prefix: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesDeleteObjectsTransition {
+	/// Condition for lifecycle transitions to apply after an object reaches an age in seconds.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub condition: Option<
+		CloudflareR2BucketLifecycleRulesDeleteObjectsTransitionCondition,
+	>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesDeleteObjectsTransitionCondition {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub max_age: Option<i64>,
+	/// Available values: "Age", "Date".
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub r#type: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesStorageClassTransitions {
+	/// Condition for lifecycle transitions to apply after an object reaches an age in seconds.
+	/// ## Attribute
+	/// `required`
+	pub condition:
+		CloudflareR2BucketLifecycleRulesStorageClassTransitionsCondition,
+	/// Available values: "InfrequentAccess".
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub storage_class: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLifecycleRulesStorageClassTransitionsCondition {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub max_age: Option<i64>,
+	/// Available values: "Age", "Date".
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub r#type: SmolStr,
+}

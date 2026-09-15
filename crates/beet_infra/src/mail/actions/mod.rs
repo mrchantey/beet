@@ -5,6 +5,8 @@
 //! their own state: the mail server's data store, AWS's PTR service and live DNS.
 //! These are verbs rather than resources: idempotent, safe to re-run, and
 //! reporting what they converged.
+mod cold_store;
+pub use cold_store::*;
 mod comail_deliverability;
 pub use comail_deliverability::*;
 mod comail_enroll;
@@ -15,6 +17,10 @@ mod eip_reverse_record;
 pub use eip_reverse_record::*;
 mod jmap_client;
 pub use jmap_client::*;
+mod mail_cold_probe;
+pub use mail_cold_probe::*;
+mod mail_cold_push;
+pub use mail_cold_push::*;
 mod mail_credentials;
 pub use mail_credentials::*;
 mod mail_health;
@@ -23,6 +29,8 @@ mod mail_probe;
 pub use mail_probe::*;
 mod mail_restore_drill;
 pub use mail_restore_drill::*;
+mod mail_secrets_export;
+pub use mail_secrets_export::*;
 mod mail_stack;
 pub use mail_stack::*;
 mod mta_sts_policy_host;

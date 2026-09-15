@@ -94,7 +94,7 @@ impl IamPolicy {
 	pub fn lower(mut self, access: &AccessGrants) -> Result<Self> {
 		let compute = self.compute.clone();
 		let mut write_buckets = Vec::<String>::new();
-		#[cfg(feature = "rds_postgres_block")]
+		#[cfg(any(feature = "rds_postgres_block", feature = "cloudflare_dns"))]
 		let mut parameters = Vec::<String>::new();
 		#[cfg(feature = "bindings_aws_dynamo")]
 		let mut read_tables = Vec::<String>::new();
@@ -114,6 +114,11 @@ impl IamPolicy {
 				},
 				#[cfg(feature = "rds_postgres_block")]
 				RdsPostgresBlock::ACCESS_KIND => parameters.push(grant.name.clone()),
+				// an R2 bucket answers to a token, not to this identity: what
+				// the process needs is to read the parked pair the token lives
+				// in, which the block names as its grants.
+				#[cfg(feature = "cloudflare_dns")]
+				R2BucketBlock::ACCESS_KIND => parameters.push(grant.name.clone()),
 				#[cfg(feature = "bindings_aws_dynamo")]
 				DynamoTableBlock::ACCESS_KIND => match grant.permissions {
 					AccessPermissions::Read => {
@@ -140,7 +145,7 @@ impl IamPolicy {
 		// overridden secret name); usually redundant with a prefix statement
 		// the compute seeds and harmlessly so. ONE statement for all of them:
 		// a `Sid` must be unique within an identity policy.
-		#[cfg(feature = "rds_postgres_block")]
+		#[cfg(any(feature = "rds_postgres_block", feature = "cloudflare_dns"))]
 		if !parameters.is_empty() {
 			let region = &self.region;
 			self.statements.push(json!({
@@ -394,12 +399,12 @@ mod tests {
 	fn unknown_kind_names_the_compute() {
 		IamPolicy::new("us-west-2", "test compute")
 			.lower(&AccessGrants::new(vec![AccessGrant::read(
-				"r2_bucket",
+				"gcs_bucket",
 				"some-bucket",
 			)]))
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`r2_bucket`")
+			.xpect_contains("`gcs_bucket`")
 			.xpect_contains("no IAM lowering")
 			.xpect_contains("test compute");
 	}

@@ -1805,13 +1805,13 @@ mod tests {
 				&stack,
 				RepoStoreBlock::TEST_BUCKET,
 				&AccessGrants::new(vec![AccessGrant::read(
-					"r2_bucket",
+					"gcs_bucket",
 					"some-bucket",
 				)]),
 			)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`r2_bucket`")
+			.xpect_contains("`gcs_bucket`")
 			.xpect_contains("no IAM lowering");
 	}
 

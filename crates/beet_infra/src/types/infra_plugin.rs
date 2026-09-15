@@ -44,6 +44,7 @@ impl Plugin for InfraPlugin {
 		// naming a store this deploy does not create.
 		app.register_type::<crate::prelude::RepoStoreBlock>()
 			.register_type::<crate::prelude::StoreUriBlock>()
+			.register_type::<crate::prelude::PrefixExpiry>()
 			.add_systems(
 				DeployRender,
 				crate::blocks::assert_repo_store_blocks
@@ -70,7 +71,6 @@ impl Plugin for InfraPlugin {
 		// indexed queries declares the table instead.
 		#[cfg(feature = "bindings_aws_common")]
 		app.register_type::<crate::prelude::S3BucketBlock>()
-			.register_type::<crate::prelude::PrefixExpiry>()
 			.add_systems(
 				DeployRender,
 				(
@@ -134,6 +134,20 @@ impl Plugin for InfraPlugin {
 			crate::types::render::<crate::prelude::CloudflareFailoverBlock>
 				.in_set(DeployRenderSet::Render),
 		);
+		// the off-account cold store, spawned by tag (`<R2BucketBlock
+		// label="cold-backups" location="weur"/>`); its grants name the parked
+		// credential an AWS compute lowers to a parameter read.
+		#[cfg(feature = "cloudflare_dns")]
+		app.register_type::<crate::prelude::R2BucketBlock>()
+			.add_systems(
+				DeployRender,
+				(
+					crate::types::declare::<crate::prelude::R2BucketBlock>
+						.in_set(DeployRenderSet::Declare),
+					crate::types::render::<crate::prelude::R2BucketBlock>
+						.in_set(DeployRenderSet::Render),
+				),
+			);
 
 		// the recurring timer and the relation naming the lambda it invokes, ie
 		// `<ScheduledJobBlock {InvokeTarget($rollup)}
@@ -294,6 +308,15 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::MailCredentials>()
 			.register_type::<crate::prelude::MailHealth>()
 			.register_type::<crate::prelude::MailRestoreDrill>()
+			// the drill's copy selector, so `source_snapshot="Cold"` resolves
+			// the variant rather than silently keeping the archive default.
+			.register_type::<crate::prelude::SnapshotSource>()
+			// the cold copy's three verbs: the export that encrypts the
+			// secrets into it, the push that runs the box's timer now, and the
+			// probe that reads all three prefixes back.
+			.register_type::<crate::prelude::MailSecretsExport>()
+			.register_type::<crate::prelude::MailColdPush>()
+			.register_type::<crate::prelude::MailColdProbe>()
 			.register_type::<crate::prelude::ZoneAudit>()
 			.register_type::<crate::prelude::AllowedRecord>()
 			// the audit's scope selector, so `<ZoneAudit scope="Zone"/>`
@@ -619,6 +642,61 @@ mod test {
 			.to_string()
 			.xpect_eq("fs:store/claude-code");
 		sync.delete.xpect_false();
+	}
+
+	/// The cold copy authors as one bucket tag beside the box that names it,
+	/// and its verbs as tags naming what they carry: the drill's copy
+	/// selector by variant (a misspelling errors at build rather than
+	/// restoring the archive it was told not to), the export's recipient, and
+	/// the probe's window as a duration string.
+	#[beet_core::test]
+	fn the_cold_copy_spawns_by_tag() {
+		let mut world = spawn(
+			r#"<Fragment>
+				<R2BucketBlock label="cold-backups" location="weur"
+					expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
+				<StalwartBlock label="mail" hostname="mail.beetmash.com"
+					blob_bucket="mail-blobs" backup_bucket="mail-backups"
+					cold_bucket="cold-backups"
+					ssh_public_key="ssh-ed25519 AAAA pete"/>
+				<MailRestoreDrill source_domain="beetmash.com" mailbox="probe"
+					source_snapshot="Cold"/>
+				<MailSecretsExport recipient="age1example"/>
+				<MailColdProbe max_age="12h"/>
+			</Fragment>"#,
+		);
+		let cold = world
+			.query::<&R2BucketBlock>()
+			.single(&world)
+			.unwrap()
+			.clone();
+		cold.location().as_str().xpect_eq("weur");
+		cold.expire_prefixes()[0].expire_days().xpect_eq(180);
+		let mail_box = world.query::<&StalwartBlock>().single(&world).unwrap();
+		mail_box.cold_bucket().as_str().xpect_eq("cold-backups");
+		mail_box
+			.cold_store([&cold].into_iter())
+			.unwrap()
+			.xpect_some();
+		world
+			.query::<&MailRestoreDrill>()
+			.single(&world)
+			.unwrap()
+			.source_snapshot
+			.xpect_eq(SnapshotSource::Cold);
+		world
+			.query::<&MailSecretsExport>()
+			.single(&world)
+			.unwrap()
+			.recipient
+			.as_str()
+			.xpect_eq("age1example");
+		world
+			.query::<&MailColdProbe>()
+			.single(&world)
+			.unwrap()
+			.max_age
+			.xpect_eq(Duration::from_secs(12 * 3600));
 	}
 
 	/// The post-apply verbs author as tags too, each naming what it works on

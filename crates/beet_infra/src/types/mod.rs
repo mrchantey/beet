@@ -4,6 +4,8 @@ mod artifacts;
 mod build_artifact;
 mod deployment;
 mod infra_plugin;
+// a bucket's per-prefix retention, shared by every provider's bucket block.
+mod prefix_expiry;
 mod resource_scope;
 mod secret_ref;
 mod stack;
@@ -17,6 +19,7 @@ pub use artifacts::*;
 pub use build_artifact::*;
 pub use deployment::*;
 pub use infra_plugin::*;
+pub use prefix_expiry::*;
 pub use resource_scope::*;
 pub use secret_ref::*;
 pub use stack::*;

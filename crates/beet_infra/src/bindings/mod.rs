@@ -1,6 +1,7 @@
 pub mod aws;
 #[cfg(feature = "bindings_aws_common")]
 mod aws_common;
+pub mod cloudflare;
 #[cfg(feature = "bindings_aws_common")]
 pub use aws_common::*;
 #[cfg(feature = "bindings_aws_dynamo")]

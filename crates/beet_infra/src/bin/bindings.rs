@@ -179,6 +179,11 @@ async fn main() -> Result {
 				"cloudflare_load_balancer",
 				"cloudflare_load_balancer_pool",
 				"cloudflare_load_balancer_monitor",
+				// the off-account cold store an `R2BucketBlock` declares, and
+				// the lifecycle that keeps it a rolling window: R2 has no object
+				// versioning, so expiry is the whole retention story.
+				"cloudflare_r2_bucket",
+				"cloudflare_r2_bucket_lifecycle",
 			]),
 		)
 		// NOTE the cloudflare zone-level edge config (cache ruleset, zone settings)

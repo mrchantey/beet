@@ -3,11 +3,23 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 use serde_json::json;
 
-
-
+/// Which copy a drill restores from: the live archive the box snapshots into,
+/// or the cold copy in the other vendor's account. A restore proves exactly
+/// the copy it read, so a stack keeping two proves each in turn.
+#[derive(
+	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Default)]
+pub enum SnapshotSource {
+	/// The archive bucket the nightly snapshot lands in.
+	#[default]
+	Backups,
+	/// The [`R2BucketBlock`] the box copies that snapshot into, read with
+	/// the SOURCE stage's parked token: the copy a lost AWS account leaves.
+	Cold,
+}
 
 impl MailRestoreDrill {
 	/// The stage a drill proves by default, ie the one carrying real mail.
@@ -122,6 +134,11 @@ pub async fn MailRestoreDrill(
 	/// to be used by a deploy step.
 	#[field]
 	mailbox: SmolStr,
+	/// Which copy to restore from, see [`SnapshotSource`]. `Cold` pulls the
+	/// snapshot back OUT of the other vendor's bucket, which is the only
+	/// thing that makes the cold copy a backup rather than an upload.
+	#[field]
+	source_snapshot: SnapshotSource,
 	/// How long to wait for the restarted server to accept a restored
 	/// credential.
 	#[field(default = Duration::from_secs(300))]
@@ -154,27 +171,39 @@ pub async fn MailRestoreDrill(
 	}
 
 	// the SOURCE stage's bucket, which is the same declaration resolved against
-	// a different stage: the one place the two stacks touch.
+	// a different stage: the one place the two stacks touch. For the cold copy
+	// that includes the credential, since the token is the source's too.
 	let source = mail.stack.clone().with_stage(source_stage.clone());
-	let bucket = source.resource_name(mail.mail_box.backup_bucket().clone());
-	let region = mail.stack.region().clone();
 	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);
-	let key = newest_snapshot(&region, &bucket, &prefix).await?;
-	info!("restoring s3://{bucket}/{key} into the {stage} stage");
-
 	let local = mail.project.work_dir().join("mail-restore.db");
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args([
-			"s3".to_string(),
-			"cp".to_string(),
-			format!("s3://{bucket}/{key}"),
-			local.to_string(),
-			"--region".to_string(),
-			region.to_string(),
-		])
-		.run_async()
-		.await?;
+	let key = match source_snapshot {
+		SnapshotSource::Backups => {
+			let live = LiveStore {
+				region: mail.stack.region().to_string(),
+				bucket: source
+					.resource_name(mail.mail_box.backup_bucket().clone()),
+			};
+			let key =
+				newest_key(live.list(&prefix).await?, &live.bucket, &prefix)?;
+			info!(
+				"restoring s3://{}/{key} into the {stage} stage",
+				live.bucket
+			);
+			live.download(&key, &local).await?;
+			key
+		}
+		SnapshotSource::Cold => {
+			let cold = ColdStore::resolve(mail.cold_store()?, &source).await?;
+			let key =
+				newest_key(cold.list(&prefix).await?, &cold.bucket, &prefix)?;
+			info!(
+				"restoring the COLD copy s3://{}/{key} into the {stage} stage",
+				cold.bucket
+			);
+			cold.download(&key, &local).await?;
+			key
+		}
+	};
 
 	let connection = SshConnection {
 		host: mail.public_ip().await?,
@@ -222,10 +251,31 @@ pub async fn MailRestoreDrill(
 
 	assert_restored(&mail, &source, &source_domain, &mailbox, timeout).await?;
 	info!(
-		"the {stage} stage serves {}'s restored mail: the backup is one",
-		source_stage
+		"the {stage} stage serves {}'s restored mail from its {}: the backup \
+		is one",
+		source_stage,
+		match source_snapshot {
+			SnapshotSource::Backups => "archive",
+			SnapshotSource::Cold => "cold copy",
+		}
 	);
 	Pass(cx.input).xok()
+}
+
+/// The newest `.db` under `prefix`, or the error that says which timer fills
+/// the bucket.
+fn newest_key(listing: Listing, bucket: &str, prefix: &str) -> Result<String> {
+	listing
+		.newest(".db")
+		.map(|object| object.key.clone())
+		.ok_or_else(|| {
+			bevyhow!(
+				"s3://{bucket}/{prefix} holds no SQLite .db snapshot, so there \
+				is nothing to restore: the box's backup timer is what fills it \
+				(and the cold timer what copies it), and `systemctl \
+				list-timers` on the box is where to look"
+			)
+		})
 }
 
 /// Sign in to the DRILL box as an account that only exists because the restore
@@ -404,70 +454,6 @@ async fn jmap_curl(
 		.await
 }
 
-/// The newest `.db` object under `prefix`, by last-modified rather than name.
-///
-/// The keys are date-ordered, so sorting by name would agree today — and stop
-/// agreeing the moment a snapshot is copied, re-uploaded or restored from an
-/// archive tier, which are exactly the circumstances a drill runs in. Filtering
-/// first prevents a marker or unrelated object under `sqlite/` winning.
-async fn newest_snapshot(
-	region: &str,
-	bucket: &str,
-	prefix: &str,
-) -> Result<String> {
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args([
-			"s3api",
-			"list-objects-v2",
-			"--bucket",
-			bucket,
-			"--prefix",
-			prefix,
-			"--output",
-			"json",
-			"--region",
-			region,
-		])
-		.run_async_stdout()
-		.await?
-		.xmap(|body| newest_snapshot_key(&body, bucket, prefix))
-}
-
-/// Select the newest valid snapshot from an S3 listing.
-fn newest_snapshot_key(
-	body: &str,
-	bucket: &str,
-	prefix: &str,
-) -> Result<String> {
-	let listing: Value = serde_json::from_str(body)?;
-	let mut snapshots = listing["Contents"]
-		.as_array()
-		.into_iter()
-		.flatten()
-		.filter_map(|object| {
-			let key = object["Key"].as_str()?;
-			let modified = object["LastModified"].as_str()?;
-			(key.starts_with(prefix) && key.ends_with(".db"))
-				.then(|| (modified, key))
-		});
-	let Some(first) = snapshots.next() else {
-		bevybail!(
-			"s3://{bucket}/{prefix} holds no SQLite .db snapshot, so there is \
-			nothing to restore: the box's backup timer is what fills it, and \
-			`systemctl list-timers` on the box is where to look"
-		);
-	};
-	snapshots
-		.fold(first, |newest, candidate| match candidate.0 > newest.0 {
-			true => candidate,
-			false => newest,
-		})
-		.1
-		.to_string()
-		.xok()
-}
-
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -506,27 +492,6 @@ mod tests {
 			.as_str()
 			.xpect_contains("-o stalwart -g stalwart")
 			.xpect_contains(MailRestoreDrill::REMOTE_PATH);
-	}
-
-	#[beet_core::test]
-	fn newest_snapshot_selects_only_db_files() {
-		newest_snapshot_key(
-			r#"{"Contents":[
-				{"Key":"sqlite/2026/09/05/old.db","LastModified":"2026-09-05T14:30:00Z"},
-				{"Key":"sqlite/notes.txt","LastModified":"2026-09-07T14:30:00Z"},
-				{"Key":"sqlite/2026/09/06/new.db","LastModified":"2026-09-06T14:30:00Z"},
-				{"Key":"other/wrong.db","LastModified":"2026-09-08T14:30:00Z"}
-			]}"#,
-			"archive",
-			"sqlite/",
-		)
-		.unwrap()
-		.as_str()
-		.xpect_eq("sqlite/2026/09/06/new.db");
-		newest_snapshot_key(r#"{"Contents":[]}"#, "archive", "sqlite/")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("no SQLite .db snapshot");
 	}
 
 	#[beet_core::test]

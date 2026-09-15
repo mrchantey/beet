@@ -461,9 +461,25 @@ The layers, ordered by how much losing them would hurt:
 2. **The pre-apply snapshot.** `<StalwartSnapshot/>` sits immediately before the full `<TofuApply/>`, finds the volume by its `Name`/`Project`/`Stage` tags, and waits for a complete EBS snapshot before an apply is allowed to replace the box. A retry within one deploy finds that deploy's own snapshot by its `DeployId` tag rather than taking a second, because `CreateSnapshot` offers no idempotency token to use instead (only the multi-volume `CreateSnapshots` has one). Nothing else prunes a snapshot lineage, so the step prunes its own: the newest `snapshot_retain` (3 by default) of the snapshots *it* tagged survive, and a snapshot you took by hand before something frightening is never one of them.
 3. **Off-box.** A systemd timer on the box runs SQLite's online `.backup`, checks `PRAGMA integrity_check` on the result, uploads it under `sqlite/` in the `archive` bucket, downloads it again, compares the bytes and re-verifies the copy that came back. The backup runs *on the box* rather than from a deploy machine, because a backup that only happens while somebody is deploying is not a backup. The `sqlite/` prefix expires at 180 days, which is only safe because the live database is on the volume and not in that bucket.
 4. **Blobs.** S3 versioning, a lifecycle expiring noncurrent versions, a public access block and server-side encryption. Message bodies were never in the database and are not in these snapshots.
-5. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exception is the DKIM private key once its selector is published, so include it in the export.
+5. **Off-account.** Everything above lives in the one AWS account, so a compromised credential or a closed account takes the record and every copy of it in the same afternoon. `<R2BucketBlock label="cold-backups" location="weur"/>` is a bucket in Cloudflare's account, declared by the same apply; the box's `cold_bucket` names it and gains a second nightly timer that copies the newest snapshot and every blob across with `rclone`, reading both sides back and comparing bytes before it calls the snapshot copied. Copy, never sync: nothing in that script deletes, so a deletion upstream stops at the archive instead of reaching it. The section below is about this layer, since it is the one with a human step in it.
+6. **Everything else regenerates:** config from git, the box from user data, secrets re-mintable. The exceptions are the DKIM private key once its selector is published and any relay credential a human minted by hand, so every deploy and provision ends by exporting the whole parameter prefix into the cold bucket, `age`-encrypted to a recipient declared in the entry (`<MailSecretsExport recipient="age1.."/>`). The identity that decrypts it lives on the deploy machine and in a password manager, and in neither cloud.
 
-The off-cloud pull is `rclone sync :s3:<archive-bucket>/sqlite <local>` against a read-only key. *Gap:* ours is documented and not scheduled, so until something runs it the sovereignty claim honestly stops at "in another AWS service".
+The last rung is still manual: `rclone copy :s3:<cold-bucket> <local>` from hardware you control, initiated from outside both clouds. The cold copy closes "AWS account lost"; it does not close "every cloud credential lost at once", and the token that writes it can also delete it (R2 tokens are read or read-and-write, and R2 has no versioning to soften a delete). Say that plainly in your own runbook rather than letting the bucket's existence imply more than it holds.
+
+### The cold copy's one hand step
+
+The bucket answers to an R2 api token, and nothing in the stack can mint one: the api token a deploy holds cannot create tokens, and a deploy token that could would be a bigger hazard than the one it closes. So the first deploy after declaring the bucket stops at the export, naming two parameters. Mint the token in the dashboard (R2, Manage API tokens, Object Read & Write, scoped to the one bucket, no expiry; the bucket must already exist, which is why this is after the apply and not before), park its S3 pair, and run the deploy again:
+
+```sh
+aws ssm put-parameter --type SecureString --name /<app>/<stage>/cold-backups-access-key-id --value <access key id>
+aws ssm put-parameter --type SecureString --name /<app>/<stage>/cold-backups-secret-access-key --value <secret access key>
+```
+
+Every cold verb reads that pair: the box's timer through its instance role (the bucket block's grants are exactly those two parameter reads, since no IAM policy can grant an R2 bucket), and the deploy machine's export, push, probe and drill through the same names. Until it exists they all fail naming it, which is the design: a cold copy that quietly skipped is the empty bucket from the top of this section, one vendor over.
+
+Generate the recipient once with `age-keygen -o <somewhere private>`; the public half goes in the entry and the identity does not go anywhere a cloud can read. Decrypting an export is `age -d -i <identity> <file>`, and the document inside is every parameter's name, type and value plus a one-line restore instruction.
+
+Then the deploy tail runs three steps after the mail probe, every time: `<MailSecretsExport/>`, `<MailColdPush/>` (which starts the box's nightly unit right now over ssh and waits for it, so the path is exercised before the timer ever fires) and `<MailColdProbe/>`, which reads the newest snapshot back from the cold side and the live side and compares digests, does the same for one blob, checks the snapshot was *taken* within 36 hours by the clock in its own key (its last-modified in the cold bucket would only say when it was copied), and requires an export to exist. `mail/cold-probe` is the same check on any other day.
 
 ### The bug, because it generalises
 
@@ -480,6 +496,8 @@ aws s3 ls s3://<archive-bucket>/sqlite/ --recursive
 ### The drill
 
 The drill is a whole parallel stage, not a spare database file. `deploy` it, `restore-drill` into it, `destroy` it. A non-production Stalwart volume is disposable by default precisely so this works: the drill tears down the same declaration production protects, without either stage knowing about the other.
+
+Run it twice if you keep a cold copy: `restore-drill` restores the archive's newest snapshot and `restore-drill-cold` (`<MailRestoreDrill source_snapshot="Cold"/>`) pulls the same key back out of the other vendor's bucket with the source stage's parked token, and everything after the download is identical. Until the cold one has passed, the cold bucket is an upload rather than a backup.
 
 Three things about building one over a shared zone, each of which is a consequence rather than a preference:
 
@@ -512,7 +530,7 @@ Smaller things the drill taught:
 
 The honest summary, because a tutorial that blurs this line strands its reader at the first step with no command.
 
-**Fully declared and applied by beet:** the network, the persistent SQLite data volume, both buckets, the box and its machine config, every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export and the restore drill.
+**Fully declared and applied by beet:** the network, the persistent SQLite data volume, both buckets, the box and its machine config, every SES identity and its DKIM and MAIL FROM records, the configuration sets with their suppression and their event destinations, the reputation alarms, every DNS record the mail domains need, the mail server's entire configuration (listeners, routing, domains, accounts, aliases, certificates), reverse DNS, the MTA-STS policy host and body, the delivery probe, the zone audit, the backup timer, the credential export, the restore drill, and the off-account cold copy: its bucket, its timer, the encrypted secrets export, the read-back probe and the cold restore.
 
 **Genuinely not automatable, and labelled as such:**
 
@@ -520,6 +538,8 @@ The honest summary, because a tutorial that blurs this line strands its reader a
 - A DS record at a registrar that is not your DNS provider.
 - The judgement call about when to flip MTA-STS from `testing` to `enforce`.
 - Deciding whether to publish apex DKIM early.
+- Minting the R2 token the cold copy writes with. The deploy's api token cannot create tokens, and one that could would be the larger hazard, so this is one dashboard visit per stack, after the first apply and before the second deploy.
+- Keeping the `age` identity somewhere that is neither cloud. An export nobody can decrypt is a very safe way to lose the DKIM key.
 
 **Hand steps that are hand steps only because of ordering:** everything in section 5. The blocks declare all of it; you do it by hand the first time because the support reply needs it to be true before the stack exists.
 
@@ -530,7 +550,8 @@ The honest summary, because a tutorial that blurs this line strands its reader a
 - A native SMTP client, which would retire `curl` from the prerequisites and from the probe.
 - Something that subscribes to the SES events topic. The events and the alarms both arrive there and, until you run `aws sns subscribe --protocol email`, nobody is paged.
 - Adoption of the SNS topic itself, which is account-wide rather than stack-scoped and currently hand-made.
-- A scheduled off-cloud `rclone` pull.
+- A scheduled pull from the cold bucket to hardware you control, initiated from outside both clouds. The cold copy closes one account being lost, not every credential at once.
+- Compaction of the cold `blobs/` prefix: copy-never-sync means a message deleted upstream is a blob kept cold forever, which is the point until it is the bill.
 - Regenerating provider bindings is a manual command rather than a route.
 
 ## Where to go next

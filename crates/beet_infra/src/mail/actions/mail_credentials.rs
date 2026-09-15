@@ -108,6 +108,21 @@ pub async fn MailCredentials(
 				));
 			}
 		}
+		// the cold store's parked token, minted by hand and read by the box
+		// and every cold verb: the one credential here that can delete a
+		// backup, which is why it is listed under `--infra` and not above.
+		if let Some(cold) = &mail.cold {
+			for (secret, note) in [
+				(cold.access_key_secret(), "r2 token, s3 access key id"),
+				(cold.secret_key_secret(), "r2 token, s3 secret access key"),
+			] {
+				entries.push((
+					format!("{} cold store", cold.label()),
+					secret,
+					note.to_string(),
+				));
+			}
+		}
 		// keys exist exactly where `EnsureDkimKey` mints them, ie wherever the
 		// records prove the identity, which includes a cutover-staged domain.
 		for domain in mail

@@ -142,85 +142,6 @@ impl StoreBlock for S3BucketBlock {
 	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
 }
 
-/// An expiry scoped to one key prefix of an [`S3BucketBlock`], ie the nightly
-/// SQLite snapshots under `sqlite/` in an archive bucket whose other prefixes
-/// hold the only copy of what is in them and expire never.
-///
-/// Authored inline on the bucket, ie
-/// `expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}`. The prefix is a
-/// writer convention rather than a boundary (a grant is whole-bucket), so this
-/// is where a bucket says which of its conventions are disposable.
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	Get,
-	SetWith,
-	Serialize,
-	Deserialize,
-	Reflect,
-)]
-#[reflect(Default)]
-pub struct PrefixExpiry {
-	/// The literal S3 key prefix the rule filters on, ie `sqlite/`. The
-	/// trailing slash is load-bearing: `sqlite` also matches `sqlite-old/`,
-	/// so a prefix naming a directory should say so.
-	prefix: SmolStr,
-	/// Days an object under [`prefix`](Self::prefix) is kept. Must be positive,
-	/// since a rule expiring in zero days says nothing and AWS rejects it.
-	expire_days: i64,
-}
-
-impl PrefixExpiry {
-	pub fn new(prefix: impl Into<SmolStr>, expire_days: i64) -> Self {
-		Self {
-			prefix: prefix.into(),
-			expire_days,
-		}
-	}
-
-	/// The rule id, ie `expire-sqlite`. A function of the prefix rather than
-	/// of the declaration order, so reordering declarations never diffs a
-	/// rendered configuration.
-	pub fn rule_id(&self) -> String {
-		self.prefix
-			.chars()
-			.map(|char| match char.is_ascii_alphanumeric() {
-				true => char,
-				false => '-',
-			})
-			.collect::<String>()
-			.trim_matches('-')
-			.xmap(|prefix| format!("expire-{prefix}"))
-	}
-
-	/// The lifecycle rule this expiry renders as, failing the render on a
-	/// declaration AWS would reject.
-	fn rule(&self) -> Result<serde_json::Value> {
-		if self.prefix.is_empty() {
-			bevybail!(
-				"a prefix expiry declares no prefix; the whole bucket is `expire_days`"
-			);
-		}
-		if self.expire_days <= 0 {
-			bevybail!(
-				"prefix expiry '{}' declares {} days; a prefix that expires nothing is simply not declared",
-				self.prefix,
-				self.expire_days
-			);
-		}
-		json!({
-			"id": self.rule_id(),
-			"status": "Enabled",
-			"filter": { "prefix": self.prefix },
-			"expiration": { "days": self.expire_days },
-		})
-		.xok()
-	}
-}
-
 impl Block for S3BucketBlock {
 	fn label(&self) -> &SmolStr { &self.label }
 
@@ -342,7 +263,7 @@ impl S3BucketBlock {
 			}));
 		}
 		for prefix in &self.expire_prefixes {
-			rules.push(prefix.rule()?);
+			rules.push(Self::prefix_rule(prefix)?);
 		}
 		// versions only accumulate on a bucket that keeps them, so the sweep is
 		// meaningless (and the `depends_on` below unsatisfiable) without it
@@ -384,20 +305,25 @@ impl S3BucketBlock {
 		Ok(())
 	}
 
-	/// Fail the render when two rules would share an id, which AWS rejects and
-	/// which two prefixes sanitizing to the same id (`logs/` and `logs-`) would
-	/// otherwise produce at apply time.
+	/// The S3 lifecycle rule a [`PrefixExpiry`] renders as, failing the render
+	/// on a declaration AWS would reject.
+	fn prefix_rule(expiry: &PrefixExpiry) -> Result<serde_json::Value> {
+		expiry.validate()?;
+		json!({
+			"id": expiry.rule_id(),
+			"status": "Enabled",
+			"filter": { "prefix": expiry.prefix() },
+			"expiration": { "days": expiry.expire_days() },
+		})
+		.xok()
+	}
+
+	/// See [`PrefixExpiry::assert_unique_ids`].
 	fn assert_unique_rule_ids(&self, rules: &[serde_json::Value]) -> Result {
-		let mut seen = HashSet::<&str>::default();
-		for id in rules.iter().filter_map(|rule| rule["id"].as_str()) {
-			if !seen.insert(id) {
-				bevybail!(
-					"bucket '{}' declares two lifecycle rules with id '{id}'",
-					self.label
-				);
-			}
-		}
-		Ok(())
+		PrefixExpiry::assert_unique_ids(
+			&self.label,
+			rules.iter().filter_map(|rule| rule["id"].as_str()),
+		)
 	}
 }
 

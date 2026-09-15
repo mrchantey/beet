@@ -51,6 +51,12 @@ pub use dns::*;
 mod failover;
 #[cfg(feature = "cloudflare_dns")]
 pub use failover::*;
+// The terraform-created R2 bucket: the off-account cold store. Gated with the
+// failover since both ride the cloudflare provider config the dns module owns.
+#[cfg(feature = "cloudflare_dns")]
+mod r2_bucket_block;
+#[cfg(feature = "cloudflare_dns")]
+pub use r2_bucket_block::*;
 #[cfg(feature = "bindings_aws_common")]
 mod s3_bucket_block;
 #[cfg(feature = "bindings_aws_common")]
