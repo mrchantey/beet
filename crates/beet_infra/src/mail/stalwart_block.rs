@@ -171,6 +171,18 @@ impl StalwartBlock {
 	/// The embedded SQLite database on the persistent data volume.
 	pub const DATABASE_PATH: &'static str = "/var/lib/stalwart/stalwart.db";
 
+	/// Where the box logs, which is two files rather than one. The unit's
+	/// stdout and stderr are appended to [`UNIT_LOG`](Self::UNIT_LOG): the
+	/// bootstrap-mode process, the backup and cold-copy scripts, a panic. A
+	/// CLAIMED server writes nothing there; it logs through the tracer seeded
+	/// in its data store, a daily-rotated `<prefix>.<date>` file in the same
+	/// directory (`StalwartPlan::log_tracer`), so the agent tails both.
+	pub const LOG_DIR: &'static str = "/var/log/stalwart";
+	/// The unit's own log: whatever the process writes to stdout or stderr.
+	pub const UNIT_LOG: &'static str = "/var/log/stalwart/stalwart.log";
+	/// The prefix the server's tracer rotates under, ie `stalwart.2026-09-15`.
+	pub const SERVER_LOG_PREFIX: &'static str = "stalwart";
+
 	/// The SSM public parameter naming the current AL2023 arm64 AMI. Resolved
 	/// per apply, so an AMI release replaces the box on the next deploy: the
 	/// cattle answer, and the patched-kernel answer.
@@ -292,10 +304,27 @@ impl StalwartBlock {
 		)
 	}
 
-	/// The CloudWatch log group the box's agent forwards `stalwart.log` to,
+	/// The CloudWatch log group the box's agent forwards both log files to,
 	/// shared with `WatchTarget::Instance` so `watch` tails the same group.
 	pub fn log_group(&self, stack: &ResolvedStack) -> String {
 		format!("/{}/{}/{}", stack.app_name(), self.label, stack.stage())
+	}
+
+	/// The glob the agent tails the server's own log through.
+	///
+	/// The agent follows only the NEWEST file matching a pattern, by
+	/// modification time, which is exactly right for a daily-rotated series
+	/// and exactly wrong for a pattern that also matched
+	/// [`UNIT_LOG`](Self::UNIT_LOG): the two files would take turns and each
+	/// would lose the lines written while the other was newer. Ten characters
+	/// of date, so `stalwart.log` cannot match.
+	///
+	/// REGRESSION: the agent tailed `stalwart.log` alone, which a claimed
+	/// server never writes to. The log group held the bootstrap lines and the
+	/// backup scripts' summaries, no session ever reached it, and each rebuild
+	/// deleted the only copy of the server's log with the root volume.
+	pub fn server_log_glob() -> String {
+		format!("{}/{}.????-??-??", Self::LOG_DIR, Self::SERVER_LOG_PREFIX)
 	}
 
 	/// One of this box's secrets, under the stack's secret prefix, ie
@@ -1194,7 +1223,8 @@ echo "mail database backed up and read-verified at $object ($(stat -c %s "$snaps
 	/// the mail server does, so a failed dump reaches the same CloudWatch group
 	/// `watch` tails rather than only the box's journal.
 	fn backup_units(&self) -> (String, String) {
-		let service = r#"[Unit]
+		let service = format!(
+			r#"[Unit]
 Description=Nightly SQLite snapshot of the mail database into S3
 After=network-online.target
 RequiresMountsFor=/var/lib/stalwart
@@ -1204,9 +1234,10 @@ Type=oneshot
 User=stalwart
 Group=stalwart
 ExecStart=/usr/local/bin/stalwart-backup
-StandardOutput=append:/var/log/stalwart/stalwart.log
-StandardError=append:/var/log/stalwart/stalwart.log"#
-			.to_string();
+StandardOutput=append:{log}
+StandardError=append:{log}"#,
+			log = Self::UNIT_LOG
+		);
 		let timer = format!(
 			r#"[Unit]
 Description=Nightly mail database backup
@@ -1228,7 +1259,8 @@ WantedBy=timers.target"#,
 	/// clean queue shutdown, secrets re-rendered on every start, and the log
 	/// appended where the CloudWatch agent tails it.
 	fn systemd_unit(&self) -> String {
-		r#"[Unit]
+		format!(
+			r#"[Unit]
 Description=Stalwart Server
 Conflicts=postfix.service sendmail.service exim4.service
 After=network-online.target
@@ -1247,34 +1279,44 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStartPre=/usr/local/bin/stalwart-secrets
 EnvironmentFile=/etc/stalwart/stalwart.env
 ExecStart=/usr/local/bin/stalwart --config=/etc/stalwart/config.json
-StandardOutput=append:/var/log/stalwart/stalwart.log
-StandardError=append:/var/log/stalwart/stalwart.log
+StandardOutput=append:{log}
+StandardError=append:{log}
 
 [Install]
-WantedBy=multi-user.target"#
-			.to_string()
+WantedBy=multi-user.target"#,
+			log = Self::UNIT_LOG
+		)
 	}
 
-	/// The CloudWatch agent config: tail the unit's log file into the block's
-	/// group. `-m ec2` credentials come from the instance role; no config file
-	/// of secrets exists. `timestamp_format` matches Stalwart's RFC3339 line
-	/// prefix so events carry write time, and the same prefix keeps a
-	/// multi-line backtrace one event.
+	/// The CloudWatch agent config: tail both log files into the block's
+	/// group, the unit's on the `unit` stream and the server's rotated series
+	/// on `server`. `-m ec2` credentials come from the instance role; no
+	/// config file of secrets exists. `timestamp_format` matches Stalwart's
+	/// RFC3339 line prefix so events carry write time (which is why the
+	/// tracer is declared without colour: an escape sequence ahead of the
+	/// timestamp is a line the agent dates at ingestion), and the same prefix
+	/// keeps a multi-line backtrace one event.
 	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Value {
+		let tail = |file_path: String, stream: &str| {
+			json!({
+				"file_path": file_path,
+				"log_group_name": self.log_group(stack),
+				"log_stream_name": stream,
+				"retention_in_days": 30,
+				"timestamp_format": "%Y-%m-%dT%H:%M:%S",
+				"timezone": "UTC",
+				"multi_line_start_pattern": "{timestamp_format}"
+			})
+		};
 		json!({
 			"agent": { "run_as_user": "root", "region": stack.region() },
 			"logs": {
 				"logs_collected": {
 					"files": {
-						"collect_list": [{
-							"file_path": "/var/log/stalwart/stalwart.log",
-							"log_group_name": self.log_group(stack),
-							"log_stream_name": "stalwart",
-							"retention_in_days": 30,
-							"timestamp_format": "%Y-%m-%dT%H:%M:%S",
-							"timezone": "UTC",
-							"multi_line_start_pattern": "{timestamp_format}"
-						}]
+						"collect_list": [
+							tail(Self::UNIT_LOG.to_string(), "unit"),
+							tail(Self::server_log_glob(), "server"),
+						]
 					}
 				}
 			}
@@ -1430,9 +1472,10 @@ Type=oneshot
 User=stalwart
 Group=stalwart
 ExecStart=/usr/local/bin/{unit}
-StandardOutput=append:/var/log/stalwart/stalwart.log
-StandardError=append:/var/log/stalwart/stalwart.log"#,
-			unit = Self::COLD_UNIT
+StandardOutput=append:{log}
+StandardError=append:{log}"#,
+			unit = Self::COLD_UNIT,
+			log = Self::UNIT_LOG
 		);
 		let timer = format!(
 			r#"[Unit]
@@ -1540,6 +1583,7 @@ COLD_TIMER_EOF
 		let cold_stanza = self.cold_stanza(stack, cold)?;
 		let cold_enable = self.cold_enable(cold);
 		let data_mount = Self::DATA_MOUNT;
+		let log_dir = Self::LOG_DIR;
 
 		let script = format!(
 			r#"#!/bin/bash
@@ -1605,8 +1649,8 @@ findmnt -rn -S "UUID=$data_uuid" -T '{data_mount}' >/dev/null || {{
 
 # the service account and Stalwart's FHS layout
 id stalwart >/dev/null 2>&1 || useradd --system --home {data_mount} --no-create-home --shell /usr/sbin/nologin stalwart
-mkdir -p /etc/stalwart {data_mount} /var/log/stalwart
-chown -R stalwart:stalwart /etc/stalwart {data_mount} /var/log/stalwart
+mkdir -p /etc/stalwart {data_mount} {log_dir}
+chown -R stalwart:stalwart /etc/stalwart {data_mount} {log_dir}
 
 
 # the pinned release: a tarball that does not hash to the pinned digest never
@@ -2360,6 +2404,68 @@ mod tests {
 			.secrets_script(&stack)
 			.as_str()
 			.xpect_contains("render-store");
+	}
+
+	/// The agent tails BOTH files the box logs to: the unit's stdout, and the
+	/// daily-rotated series the claimed server's own tracer writes, through a
+	/// glob that cannot match the first.
+	///
+	/// REGRESSION: only `stalwart.log` was tailed, and a claimed server never
+	/// writes to it. The log group held the bootstrap lines and the backup
+	/// scripts' one-line summaries for the stack's whole first week, `watch`
+	/// tailed nothing a session wrote, and every rebuild took the only copy of
+	/// the server's log with the root volume.
+	#[beet_core::test]
+	fn the_agent_tails_the_unit_log_and_the_servers_rotated_log() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let config = mail_box().cloudwatch_config(&stack);
+		let tails = config["logs"]["logs_collected"]["files"]["collect_list"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.map(|tail| {
+				(
+					tail["file_path"].as_str().unwrap().to_string(),
+					tail["log_stream_name"].as_str().unwrap().to_string(),
+				)
+			})
+			.collect::<Vec<_>>();
+		tails.xpect_eq(vec![
+			("/var/log/stalwart/stalwart.log".to_string(), "unit".to_string()),
+			(
+				"/var/log/stalwart/stalwart.????-??-??".to_string(),
+				"server".to_string(),
+			),
+		]);
+		// the glob is the one file shape the tracer writes and never the
+		// unit's, since the agent follows only the newest match. `?` is the
+		// only wildcard in it, so the check is a character walk.
+		let matches = |path: &str| {
+			let glob = StalwartBlock::server_log_glob();
+			glob.len() == path.len()
+				&& glob
+					.chars()
+					.zip(path.chars())
+					.all(|(pattern, actual)| pattern == '?' || pattern == actual)
+		};
+		matches("/var/log/stalwart/stalwart.2026-09-15").xpect_true();
+		matches(StalwartBlock::UNIT_LOG).xpect_false();
+		// both land in the one group `watch` tails
+		for tail in config["logs"]["logs_collected"]["files"]["collect_list"]
+			.as_array()
+			.unwrap()
+		{
+			tail["log_group_name"]
+				.as_str()
+				.unwrap()
+				.xpect_eq(&mail_box().log_group(&stack));
+		}
+		// and every unit appends its stdout to the same unit log
+		user_data(&mail_box().with_backup_bucket("archive"))
+			.matches("StandardOutput=append:/var/log/stalwart/stalwart.log")
+			.count()
+			.xpect_eq(2);
 	}
 
 	/// The nightly dump is opt-in and complete: no bucket, no timer, and no

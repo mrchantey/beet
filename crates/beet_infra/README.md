@@ -29,7 +29,7 @@ A stack's `deploy` and `destroy` are two `Group`s, named by `<DeployRoutes deplo
 </Group>
 ```
 
-`<StackTeardown/>` owns the three state carriers the driver used to sweep in a hardcoded call no block could add to: the tofu state object, the native S3 lock beside it and the work directory. They converge before the apply, so reversed they come off after it. The repo store is not a carrier: it is a declared block, so `tofu destroy` removes it with everything else.
+`<StackTeardown/>` owns the four state carriers: the three the driver used to sweep in a hardcoded call no block could add to (the tofu state object, the native S3 lock beside it and the work directory) and the stack's parameter store prefix, which holds every secret an action minted outside terraform (`<EnsureSecret/>`, a DKIM key, a mailbox credential) and which the driver never swept. They converge before the apply, so reversed they come off after it, the secrets last of all since they are minted first; the sweep names each parameter it deletes and never a value. The repo store is not a carrier: it is a declared block, so `tofu destroy` removes it with everything else.
 
 The `attach` groups are where a declaration joins. A paired declaration (`<EipReverseRecord up={$attach_up} down={$attach_down}/>`, `<MtaStsPolicyHost .../>`) spawns its up-action and its down-action from one tag at one file position, so both groups' member lists are projections of the same insert order and cannot drift apart. Every down-action must succeed against an absent resource: a destroy walks the declarations, not a ledger of what was created, because a ledger records what WAS created rather than what SHOULD exist and a half-failed deploy leaves exactly the unrecorded resources you most want cleaned up.
 

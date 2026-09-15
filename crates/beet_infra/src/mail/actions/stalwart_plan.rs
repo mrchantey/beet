@@ -268,6 +268,30 @@ impl StalwartPlan {
 			.unwrap_or_else(|| Self::MX_ROUTE.to_string())
 	}
 
+	/// The server's own log: the `Log` tracer a claimed store ships, declared
+	/// so that its one wrong default is corrected.
+	///
+	/// The seeded tracer writes a daily-rotated `stalwart.<date>` under
+	/// `/var/log/stalwart/` with ANSI colour ON, which puts an escape sequence
+	/// ahead of every timestamp and leaves the CloudWatch agent dating each
+	/// line at ingestion rather than at write. Everything else about it is
+	/// right and is restated here so a fresh store and a claimed one converge
+	/// to the same object. Converged on `prefix` (the way listeners converge
+	/// on `name`), so this patches the seeded tracer rather than adding a
+	/// second writer to the same directory. Verified against the pinned tag's
+	/// `x:TracerLog` schema per decision 18.
+	pub fn log_tracer() -> Value {
+		json!({
+			"@type": "Log",
+			"path": format!("{}/", StalwartBlock::LOG_DIR),
+			"prefix": StalwartBlock::SERVER_LOG_PREFIX,
+			"rotate": "daily",
+			"ansi": false,
+			"enable": true,
+			"level": "info",
+		})
+	}
+
 	/// The ACME provider object, ie how every certificate is obtained.
 	///
 	/// `TlsAlpn01` and no port 80: the challenge is answered on the 443 the box
@@ -1321,6 +1345,29 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("disable");
+	}
+
+	/// The server logs to the file the agent tails, without colour.
+	///
+	/// REGRESSION: nothing declared a tracer, so the seeded one ran with
+	/// `ansi: true`; the agent tailed a different file anyway (the unit's
+	/// stdout, which a claimed server never writes to), and the log group
+	/// carried no session for the whole of the stack's first week.
+	#[beet_core::test]
+	fn the_server_log_is_plain_text_where_the_agent_tails_it() {
+		let tracer = StalwartPlan::log_tracer();
+		tracer["@type"].as_str().unwrap().xpect_eq("Log");
+		tracer["ansi"].as_bool().unwrap().xpect_false();
+		tracer["rotate"].as_str().unwrap().xpect_eq("daily");
+		// the file it writes is the one the agent's glob matches
+		format!(
+			"{}{}.2026-09-15",
+			tracer["path"].as_str().unwrap(),
+			tracer["prefix"].as_str().unwrap()
+		)
+		.xpect_eq("/var/log/stalwart/stalwart.2026-09-15");
+		StalwartBlock::server_log_glob()
+			.xpect_eq("/var/log/stalwart/stalwart.????-??-??");
 	}
 
 	/// The pre-DMARC per-message reports go off the same way, and share one

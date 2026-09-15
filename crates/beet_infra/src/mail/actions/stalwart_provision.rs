@@ -646,6 +646,19 @@ async fn apply_plan(
 	}
 	info!("aggregate reports daily, per-message failure reports off");
 
+	converge(
+		client,
+		"x:Tracer",
+		&["prefix"],
+		&StalwartPlan::log_tracer(),
+	)
+	.await?;
+	info!(
+		"server log is {}/{}.<date>, plain text, rotated daily",
+		StalwartBlock::LOG_DIR,
+		StalwartBlock::SERVER_LOG_PREFIX
+	);
+
 	let acme = converge(
 		client,
 		"x:AcmeProvider",

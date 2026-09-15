@@ -2,7 +2,7 @@
 //!
 //! The cli rather than the SDK because a deploy already depends on it (the log
 //! tail, the reverse-dns request, the SES probe) and because parameter store is
-//! four verbs: adding an SDK client for them would be more surface than the
+//! five verbs: adding an SDK client for them would be more surface than the
 //! feature it buys.
 //!
 //! Nothing here logs a value. A `SecureString` that reaches a terminal is a
@@ -96,4 +96,53 @@ pub async fn overwrite(region: &str, name: &str, value: &str) -> Result {
 	.run_async()
 	.await?;
 	Ok(())
+}
+
+/// Every parameter NAME under `prefix`, recursively, ie the inventory of what a
+/// stack's actions minted. Names only: neither a sweep nor a listing has any
+/// business decrypting a value.
+///
+/// `prefix` is a directory (`/beetmash-mail/drill`) and the api treats it as
+/// one, but the names are filtered against `prefix/` here as well so a stage
+/// whose name is a prefix of another's (`drill`, `drill-two`) can never sweep
+/// its neighbour on an api subtlety.
+pub async fn list(region: &str, prefix: &str) -> Result<Vec<String>> {
+	let names = aws_cli_ext::ssm(region, [
+		"get-parameters-by-path",
+		"--path",
+		prefix,
+		"--recursive",
+		"--query",
+		"Parameters[].Name",
+		"--output",
+		"json",
+	])
+	.run_async_stdout()
+	.await?;
+	let under = format!("{}/", prefix.trim_end_matches('/'));
+	serde_json::from_str::<Vec<String>>(&names)?
+		.into_iter()
+		.filter(|name| name.starts_with(&under))
+		.collect::<Vec<_>>()
+		.xok()
+}
+
+/// Delete parameters by name, in the api's batches of ten. A name that has
+/// already gone is not an error: the api reports it under `InvalidParameters`
+/// and this returns only what it actually deleted.
+pub async fn delete(region: &str, names: &[String]) -> Result<Vec<String>> {
+	let mut deleted = Vec::new();
+	for batch in names.chunks(10) {
+		let output = aws_cli_ext::ssm(
+			region,
+			["delete-parameters", "--names"]
+				.into_iter()
+				.chain(batch.iter().map(String::as_str))
+				.chain(["--query", "DeletedParameters", "--output", "json"]),
+		)
+		.run_async_stdout()
+		.await?;
+		deleted.extend(serde_json::from_str::<Vec<String>>(&output)?);
+	}
+	Ok(deleted)
 }
