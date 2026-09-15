@@ -1,0 +1,4 @@
+<figure class="diagram"><pre class="diagram-text">┌───────┐     ┌───────┐     ┌───────┐
+│ Parse │────▸│ Style │────▸│ Paint │
+└───────┘     └───────┘     └───────┘
+</pre></figure>

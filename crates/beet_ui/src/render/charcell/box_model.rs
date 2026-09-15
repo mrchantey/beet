@@ -596,7 +596,7 @@ pub(super) fn inset_rect(outer: IRect, insets: URect) -> IRect {
 ///
 /// Doubles the x-axis values so rem units are visually consistent with
 /// terminal fonts (which are roughly twice as tall as they are wide).
-pub(super) fn tui_inset(spacing: &Spacing, viewport: Vec2) -> URect {
+pub(crate) fn tui_inset(spacing: &Spacing, viewport: Vec2) -> URect {
 	let mut val = spacing.rem_urect(viewport);
 	val.min.x *= 2;
 	val.max.x *= 2;

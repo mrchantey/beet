@@ -12,6 +12,7 @@ use crate::style::AlignContent;
 use crate::style::FlexWrap;
 use crate::style::Visibility;
 use crate::style::Overflow;
+use crate::style::DiagramRender;
 use crate::style::*;
 use beet_core::prelude::*;
 
@@ -80,6 +81,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(AnimationDurationProp)
 		.insert(TransformProp)
 		.insert(OpacityProp)
+		.insert(DiagramRenderProp)
 }
 
 
@@ -145,6 +147,11 @@ css_property!(TransitionEaseProp, EaseFunction, TokenInheritance::NotInherited, 
 // We may need to revisit this in the future with bevy native ui etc
 css_property!(OpacityProp, f32, TokenInheritance::Inherited, "opacity");
 css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "animation-duration");
+// The form a diagram takes (see `DiagramRender`), read by the diagram pass
+// rather than a layout engine. Inherited so an app rule or a page root sets it
+// for every diagram below; serialized as a custom property, inert in the
+// stylesheet and readable from JS.
+canonical_property!(DiagramRenderProp, DiagramRender, TokenInheritance::Inherited, "--diagram-render");
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(WordBreakProp, WordBreak, "word-break");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");

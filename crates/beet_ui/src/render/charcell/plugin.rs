@@ -201,6 +201,16 @@ impl Plugin for CharcellPlugin {
 /// columns; every px breakpoint shifts consistently.
 const MEDIA_PX_PER_CELL: f32 = 1024.0 / 90.0;
 
+/// The cell size of a surface's [`MediaViewport`], the inverse of
+/// [`sync_media_viewport`]: what a pass sizing content to a terminal before
+/// layout (a text diagram's column budget) reads.
+pub(crate) fn viewport_cells(viewport: &MediaViewport) -> UVec2 {
+	UVec2::new(
+		(viewport.width_px() / MEDIA_PX_PER_CELL).round() as u32,
+		(viewport.height_px() / MEDIA_PX_PER_CELL).round() as u32,
+	)
+}
+
 /// Mirror each surface buffer's size onto its required [`MediaViewport`]
 /// ([`MEDIA_PX_PER_CELL`] px per cell), the context width-gated media rules
 /// resolve against. `set_if_neq`, so paint's per-frame buffer writes never

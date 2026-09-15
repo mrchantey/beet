@@ -14,6 +14,10 @@ mod markdown;
 #[cfg(feature = "markdown_parser")]
 pub use markdown::*;
 mod media;
+#[cfg(feature = "mermaid")]
+mod mermaid;
+#[cfg(feature = "mermaid")]
+pub use mermaid::*;
 mod node_parser;
 mod parse_plugin;
 mod plaintext;

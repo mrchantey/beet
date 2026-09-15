@@ -104,6 +104,11 @@ syntax_highlighting = [
 	"dep:streaming-iterator"
 ]
 
+# Mermaid diagrams: a ```mermaid fence renders as box-drawing text on every
+# sink through `mermaid-text` (pure Rust, wasm-safe). The form a diagram takes
+# is the `diagram-render` cascade property; see `parse/mermaid`.
+mermaid = ["style", "dep:mermaid-text"]
+
 template_serde = ["beet_core/template_serde", "serde"]
 
 [dependencies]
@@ -143,6 +148,9 @@ thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true
 material-colors = {version = "0.4.2", optional = true }
+# unicode box-drawing text for mermaid diagrams: full quality for flowcharts,
+# name-only boxes for the other types, reflowable to a column budget.
+mermaid-text = { version = "0.57", optional = true }
 
 
 # tree-sitter grammars are C parsers that don't cross-compile to wasm

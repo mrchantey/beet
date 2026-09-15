@@ -140,6 +140,7 @@ impl PropResolver {
 			("text-align", prop::<TextAlignProp>()),
 			("white-space", prop::<WhiteSpaceProp>()),
 			("list-style-type", prop::<ListStyleProp>()),
+			("diagram-render", prop::<DiagramRenderProp>()),
 		]
 		.into_iter()
 		.map(|(name, resolver)| (SmolStr::new_static(name), resolver))

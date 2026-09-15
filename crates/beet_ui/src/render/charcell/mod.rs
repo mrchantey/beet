@@ -7,6 +7,7 @@
 //! - **Paint** (per node): draws box model and text into the [`DoubleBuffer`]
 mod backend;
 mod box_model;
+pub(crate) use box_model::tui_inset;
 mod buffer;
 #[cfg(feature = "tui")]
 mod clipboard;

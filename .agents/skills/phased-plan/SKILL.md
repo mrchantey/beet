@@ -9,6 +9,8 @@ Write a phase plan to the plans directory with the provided name, defaulting to 
 - `.agents/plans/write-todos.md`
 - `.agents/plans/master-plan.md`
 
+Use your own discretion as to whether the plan is to be executed in a single pass by one model or each phase individually by model with checks by the user in between.
+
 Use a format something like this. It doesn't have to be strictly in this shape, but roughly like this.
 
 ```

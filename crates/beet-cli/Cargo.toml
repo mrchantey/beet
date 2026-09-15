@@ -192,6 +192,9 @@ web_full = [
 	"infra",
 	"geoip",
 	"beet/quickjs",
+	# ```mermaid fences as box-drawing text: pure Rust, wasm-clean; kept out of
+	# `web_min` so the smallest browser binary stays small.
+	"beet/mermaid",
 ]
 
 # the portable cross-platform base: the render router stack, media negotiation and
@@ -228,6 +231,8 @@ beet = { workspace = true, features = [
 	"client_io",
 	# fenced code blocks in served/presented decks render highlighted
 	"syntax_highlighting",
+	# ```mermaid fences render as diagrams
+	"mermaid",
 	# the embedded QuickJS engine: the `ExchangeScriptElement` console-capturing
 	# entry action and the `ExchangeScript` route backend a `main.bsx` wires.
 	"quickjs",

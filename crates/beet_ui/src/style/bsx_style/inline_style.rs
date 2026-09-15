@@ -27,15 +27,25 @@ use beet_core::prelude::*;
 pub(crate) fn register_inline_style(world: &mut World) {
 	world.get_resource_or_init::<StyleResolver>().set(
 		|entity, source, _span| {
-			// key the class on the declaration content, not the BSX span: a
-			// markdown fragment's span is relative to its own HTML block, so two
-			// `bx:style` directives on different file lines can collide on one
-			// span-derived class and clobber each other's rule.
-			let class = ClassName::from_inline_source(source);
-			let rule = parse_inline_style(class.clone(), source)?;
+			let (class, rule) = inline_style_rule(source)?;
 			register_inline_rule(entity, class, rule)
 		},
 	);
+}
+
+/// The one-off [`Rule`] a `bx:style` `source` declares and the class that keys
+/// it, for any pass that makes a declaration on an element's behalf (a fence
+/// info word) to register through [`register_inline_rule`] exactly as the
+/// directive would, so identical declarations share one class and one rule.
+///
+/// The class is keyed on the declaration content, not the BSX span: a markdown
+/// fragment's span is relative to its own HTML block, so two `bx:style`
+/// directives on different file lines can collide on one span-derived class
+/// and clobber each other's rule.
+pub(crate) fn inline_style_rule(source: &str) -> Result<(ClassName, Rule)> {
+	let class = ClassName::from_inline_source(source);
+	let rule = parse_inline_style(class.clone(), source)?;
+	Ok((class, rule))
 }
 
 /// Build the one-off [`Rule`] of a `bx:style` directive: seed it with the

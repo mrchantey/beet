@@ -405,22 +405,30 @@ impl<'a> MdTreeBuilder<'a> {
 			Tag::CodeBlock(kind) => {
 				// <pre><code class="{lang}"> — class is the bare language
 				// name (borrowed from source) rather than "language-X",
-				// since attributes must be zero-copy slices.
+				// since attributes must be zero-copy slices. An info string
+				// carrying more than the language (```mermaid text) is kept
+				// whole as `data-info`, so a consumer reads its extra words.
 				self.push(StackFrame::new("pre", source));
 				let attrs = match kind {
 					pulldown_cmark::CodeBlockKind::Fenced(info) => {
-						let info_str = info.as_ref();
-						let lang =
-							info_str.split_whitespace().next().unwrap_or("");
+						let info_str = info.as_ref().trim();
+						let mut words = info_str.split_whitespace();
+						let lang = words.next().unwrap_or("");
+						let mut attrs = Vec::new();
 						if !lang.is_empty() {
 							// Find the language string within source for borrowing
 							let class_val = self
 								.find_substring(source, lang)
 								.unwrap_or(source);
-							vec![str_attr("class", class_val)]
-						} else {
-							vec![]
+							attrs.push(str_attr("class", class_val));
 						}
+						if words.next().is_some() {
+							let info_val = self
+								.find_substring(source, info_str)
+								.unwrap_or(info_str);
+							attrs.push(str_attr("data-info", info_val));
+						}
+						attrs
 					}
 					pulldown_cmark::CodeBlockKind::Indented => vec![],
 				};
@@ -877,6 +885,33 @@ mod test {
 		let pre_children = node_children(&nodes[0]);
 		pre_children.len().xpect_eq(1);
 		node_name(&pre_children[0]).xpect_eq("code");
+	}
+
+	#[beet_core::test]
+	fn code_block_info_string() {
+		let attrs_of = |md: &str| {
+			let nodes = build(md);
+			match &node_children(&nodes[0])[0] {
+				HtmlNode::Element { attributes, .. } => attributes
+					.iter()
+					.map(|attr| {
+						(attr.key.clone(), match &attr.value {
+							AttrValue::Str(value) => value.clone(),
+							other => format!("{other:?}"),
+						})
+					})
+					.collect::<Vec<_>>(),
+				_ => panic!("expected the code element"),
+			}
+		};
+		// a bare language is the class alone
+		attrs_of("```rust\nfn main() {}\n```")
+			.xpect_eq(vec![("class".to_string(), "rust".to_string())]);
+		// extra info words ride along whole as `data-info`
+		attrs_of("```mermaid text\ngraph LR; A-->B\n```").xpect_eq(vec![
+			("class".to_string(), "mermaid".to_string()),
+			("data-info".to_string(), "mermaid text".to_string()),
+		]);
 	}
 
 	#[beet_core::test]

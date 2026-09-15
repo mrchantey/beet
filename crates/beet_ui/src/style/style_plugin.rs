@@ -38,6 +38,32 @@ impl Plugin for StylePlugin {
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(default_element_rules());
 
+		// the cascade, with the fence passes ahead of it: a mermaid fence becomes
+		// a figure before the highlighter could tokenize it (`DiagramSet`), and
+		// the spans and figures both get styled by the one pass
+		app.configure_sets(PostParseTree, DiagramSet.before(ResolveStylesSet))
+			.add_systems(
+				PostParseTree,
+				resolve_styles.in_set(ResolveStylesSet),
+			);
+
+		#[cfg(feature = "mermaid")]
+		{
+			app.register_type::<MermaidDiagram>().add_systems(
+				PostParseTree,
+				(collect_mermaid_blocks, materialize_diagrams)
+					.chain()
+					.in_set(DiagramSet),
+			);
+			// the `:root` default, so the stylesheet states `--diagram-render:
+			// auto` for a script to read and the cascade always resolves a mode
+			let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
+			rules.default_rule_mut().push_declarations(
+				Rule::new().with_canonical(DiagramRender::Auto),
+			);
+			rules.extend_rules(diagram_rules());
+		}
+
 		#[cfg(all(
 			feature = "syntax_highlighting",
 			not(target_arch = "wasm32")
@@ -46,11 +72,9 @@ impl Plugin for StylePlugin {
 			// highlight code blocks into styled spans, then resolve styles
 			app.init_resource::<SyntaxHighlighting>().add_systems(
 				PostParseTree,
-				(
-					apply_syntax_highlighting,
-					resolve_styles.in_set(ResolveStylesSet),
-				)
-					.chain(),
+				apply_syntax_highlighting
+					.after(DiagramSet)
+					.before(ResolveStylesSet),
 			);
 			// register the default theme so `.hl-<capture>` classes emitted by
 			// `apply_syntax_highlighting` resolve to a foreground colour with no
@@ -75,13 +99,14 @@ impl Plugin for StylePlugin {
 				.get_resource_or_init::<CssTokenMap>()
 				.extend(syntax::token_map());
 		}
-		#[cfg(any(
-			not(feature = "syntax_highlighting"),
-			target_arch = "wasm32"
-		))]
-		app.add_systems(PostParseTree, resolve_styles.in_set(ResolveStylesSet));
 	}
 }
+
+/// The [`PostParseTree`] set the diagram passes run in, ahead of the syntax
+/// highlighter and [`ResolveStylesSet`]: a fence becomes a figure before the
+/// highlighter could tokenize it. Empty without the `mermaid` feature.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct DiagramSet;
 
 /// The [`PostParseTree`] set that resolves [`VisualStyle`](crate::style::VisualStyle),
 /// [`LayoutStyle`](crate::style::LayoutStyle), and [`BoxStyle`](crate::style::BoxStyle)
