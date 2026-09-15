@@ -8,7 +8,8 @@
 //!   `just serve-wasm` page's launch, logs the greeting and exits;
 //! - the DOM boot: `beet-ui.wasm` on `examples/ui/scene_editor.bsx` with
 //!   `--server=dom` boots its `DomServer`, lands its navigator on `/`, the
-//!   page's own url, and paints the scene into the body once it settles.
+//!   page's own url, paints the scene into the body once it settles, and
+//!   takes input: a click on a tree row selects it and the inspector appears.
 //!
 //! Ignored by default since they need the artifacts and a browser on PATH:
 //!
@@ -93,6 +94,17 @@ async fn browser_dom_boot() {
 		.await
 		.unwrap()
 		.to_string();
+	// the input path: open the editor (the disclosure is the browser's), then
+	// a trusted click on a tree row reaches its entity, selects it, and the
+	// inspector generates for it
+	browser.click("summary").await.unwrap();
+	browser.click(".scene-tree-row").await.unwrap();
+	browser.find(".scene-inspector-title").await;
+	browser
+		.find(".scene-tree-row")
+		.await
+		.xpect_attr("aria-selected", "true")
+		.await;
 	browser.kill().await.unwrap();
 	log.as_str()
 		.xpect_contains("dom host landed /")

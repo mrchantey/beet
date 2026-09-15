@@ -109,7 +109,7 @@ impl SiteFixture {
 					repo_store,
 					entry_name,
 					..
-				} = entry_build::resolve_main(None, &dir).await?;
+				} = entry_build::resolve_main(None, None, &dir).await?;
 				entry_build::build_watched(
 					&world, repo_store, entry_name, formats,
 				)

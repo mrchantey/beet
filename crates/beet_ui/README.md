@@ -41,6 +41,10 @@ Parsers accept a stream of bytes and diff them against an entity.
 
 Renderers walk a tree of nodes and perform some action like appending a html buffer or initializing a persistent ui. The same tree can target HTML, the charcell terminal renderer, or (on wasm) the browser's DOM, painted once and patched in place as the world changes.
 
+### Input
+
+Each interactive renderer delivers its input as the same renderer-agnostic events (`PointerDown`/`PointerUp`, `Focus`, a control's `Value`, `Submit`), so a widget never knows which surface it is on: the terminal bridges its bytes through bevy's input messages and a hit test, the browser delegates the document's events to the painted entities (`DomInputPlugin`).
+
 ## Authoring
 
 Trees are written with the `rsx!` macro, and reusable widgets with `#[template]` function components used as capitalized tags. Styling uses semantic `Classes` resolved by a rule set rather than stringly-typed class names.

@@ -4,9 +4,10 @@
 //! prove the counter page's first paint, in-page navigability, asset store
 //! topology and mobile layout.
 //!
-//! Client-side interactivity is not asserted here: the thin client is gone and
-//! the wasm tier that replaces it is phase 8, so a served page is first paint
-//! plus whatever bespoke page script it ships.
+//! Client-side interactivity is not asserted here: the deployed site does not
+//! yet boot the wasm runtime its pages could carry (`<Wasm/>`, see
+//! `tests/bsx_site_browser.rs` for the example that does), so a served page is
+//! first paint plus whatever bespoke page script it ships.
 //!
 //! Three collectors gate the whole run, attached before the first navigation
 //! so nothing slips past: console errors (which include uncaught exceptions,

@@ -1,7 +1,9 @@
-#[cfg(feature = "keyboard")]
 mod focus;
-#[cfg(feature = "keyboard")]
 pub use focus::*;
+#[cfg(feature = "keyboard")]
+mod keyboard;
+#[cfg(feature = "keyboard")]
+pub(crate) use keyboard::*;
 mod pointer;
 pub use pointer::*;
 mod scroll;

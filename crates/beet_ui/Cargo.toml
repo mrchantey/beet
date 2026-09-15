@@ -49,9 +49,11 @@ harness = false
 [features]
 default = ["std","rsx", "style", "template", "bsx"]
 std = []
-# Backend-agnostic keyboard input: the `FocusPlugin` reads bevy `KeyboardInput`
-# messages and routes them to the focused entity's `Value`. Opt-in so a plain
-# `beet_ui` build does not pull `bevy/keyboard`. Terminal renderers enable it.
+# Backend-agnostic keyboard input: the keyboard half of the focus model
+# (`input/keyboard.rs`) reads bevy `KeyboardInput` messages and routes them to
+# the focused entity (Tab traversal, Enter activation, text entry into its
+# `Value`). Opt-in so a plain `beet_ui` build does not pull `bevy/keyboard`.
+# Terminal renderers enable it; the browser's native controls own their keys.
 keyboard = ["std", "beet_core/bevy_keyboard"]
 action = ["dep:beet_action", "net"]
 # The `beet_net` integration beet_ui needs: the std `BlobStore` + serde. wasm-safe
@@ -175,10 +177,11 @@ beet_net = { workspace = true, features = ["webdriver", "testing"] }
 serde_json = { workspace = true }
 
 # the DOM render target (`render/dom`): the browser's document as a sink over
-# the same walk the string sink reads, painted and patched through `web_sys`.
-# Target-gated rather than featured, since there is nothing to paint into
-# anywhere else; the wasm/deno reactivity-runtime test drives `REACTIVITY_JS`
-# through the same bindings.
+# the same walk the string sink reads, painted and patched through `web_sys`,
+# and its input path, the document's events delivered to the world as the
+# events the terminal bridge emits. Target-gated rather than featured, since
+# there is nothing to paint into anywhere else; the wasm/deno
+# reactivity-runtime test drives `REACTIVITY_JS` through the same bindings.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = { workspace = true }
 wasm-bindgen = { workspace = true }
@@ -187,12 +190,23 @@ web-sys = { workspace = true, features = [
 	"Comment",
 	"Document",
 	"Element",
+	"Event",
+	"EventInit",
+	"EventTarget",
+	"FocusEvent",
+	"FocusEventInit",
 	"HtmlElement",
 	"HtmlInputElement",
 	"HtmlSelectElement",
 	"HtmlTextAreaElement",
+	"KeyboardEvent",
+	"KeyboardEventInit",
+	"MouseEvent",
+	"MouseEventInit",
 	"Node",
 	"NodeList",
+	"SubmitEvent",
+	"SubmitEventInit",
 	"Text",
 	"Window",
 ] }

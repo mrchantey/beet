@@ -78,8 +78,9 @@ fn page_viewport_style() -> impl Bundle {
 /// no per-frame sync system; what this plugin owns is the other end of that
 /// binding, the page lifecycle: a page outlives each render but never its surface.
 ///
-/// In a browser it also paints: the DOM sink's incremental pass, and the
-/// [`DomHost`] mount that first paints a settled page after it.
+/// In a browser it also paints and listens: the DOM sink's incremental pass,
+/// the [`DomHost`] mount that first paints a settled page after it, and the
+/// input path delivering the document's events to the painted entities.
 #[derive(Default)]
 pub struct LivePagePlugin;
 
@@ -88,6 +89,7 @@ impl Plugin for LivePagePlugin {
 		app.add_observer(despawn_page_with_surface);
 		#[cfg(target_arch = "wasm32")]
 		app.init_plugin::<DomRenderPlugin>()
+			.init_plugin::<DomInputPlugin>()
 			.add_systems(PostUpdate, mount_dom_hosts.after(DomRenderSet));
 	}
 }

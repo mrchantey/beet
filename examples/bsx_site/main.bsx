@@ -3,8 +3,10 @@ The whole site: a router serving the `routes/` directory, every page wrapped
 in the `templates/Layout.bsx` document. The servers own the boot and the router is
 their dispatch child; the router's middleware attaches beside it as component
 spreads (request logging, `--help`, terminal link navigation, the layout). It
-declares four servers, so `--server` picks one on load: the default `HttpServer`,
-`--server=tui` the live `TuiServer`, or `--server=cli` a one-shot render:
+declares five servers, so `--server` picks one on load: the default `HttpServer`,
+`--server=tui` the live `TuiServer`, `--server=cli` a one-shot render, and
+`--server=dom` the browser, which is how the served page boots this same entry
+in the tab (see `templates/Layout.bsx`):
 
     beet --main=examples/bsx_site/main.bsx --server=http
     cd examples/bsx_site && beet --server=tui   # or rely on discovery
@@ -15,8 +17,13 @@ the servers the site declares the moment the entry loads. `<DefaultAppRoutes/>`
 adds the default app routes (eg `/app-info`) as child routes. The `<PackageConfig/>` declaration patches the named
 fields of the resource, creating it from defaults if absent, so the title and
 description are set in markup with no compile-time host config.
+
+`<ServeBlobs prefix="repo"/>` publishes this directory read-only at `/repo`, the
+store the browser process reads the entry through, and `<AssetsDir>` mounts the
+assets the chrome references and the wasm binary the page boots: `assets` links
+to the workspace tree, so `just build-wasm-ui` is what installs the binary.
 -->
-<CallOnReady {(HttpServer{port:8337}, TuiServer, SshTuiServer, CliServer)}>
+<CallOnReady {(HttpServer, TuiServer, SshTuiServer, DomServer, CliServer)}>
 <Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<Theme color={Srgba(Srgba{red:0.5, green:0.2, blue:0.9, alpha:1.0})}/>
@@ -24,5 +31,7 @@ description are set in markup with no compile-time host config.
 	<Styles/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
+	<ServeBlobs prefix="repo"/>
+	<AssetsDir src="assets" prefix="assets"/>
 </Router>
 </CallOnReady>

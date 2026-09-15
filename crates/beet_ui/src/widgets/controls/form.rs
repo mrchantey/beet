@@ -349,7 +349,7 @@ fn submit_form_on_enter(
 /// Gather a form's named controls in document order and fire [`Submit`] on it,
 /// each control carrying its typed [`Value`] (an untouched `<select>` falls back
 /// to its first option, like a browser). Shared by the button and Enter paths.
-fn trigger_form_submit(
+pub(crate) fn trigger_form_submit(
 	form: Entity,
 	elements: &ElementQuery,
 	values: &Query<&Value>,

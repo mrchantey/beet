@@ -8,6 +8,11 @@
 //! - Unsubscribes automatically on `Drop`.
 //! - Uses a channel to forward events from the browser to Rust async tasks.
 //! - `new` listens on `window` by default; use `new_with_target` to listen on a specific element.
+//! - One listener may [`listen`](HtmlEventListener::listen) for several events
+//!   on several targets: every subscription feeds the one queue, so a
+//!   frame-driven consumer draining it with
+//!   [`try_next_event`](HtmlEventListener::try_next_event) sees events of every kind in
+//!   the order they fired.
 //!
 //! Examples
 //! Create a stream of `click` events and await the next one:
@@ -48,7 +53,6 @@ use futures_lite::Stream;
 use js_sys::Function;
 
 use std::pin::Pin;
-use std::rc::Rc;
 use std::task::Context;
 use std::task::Poll;
 use wasm_bindgen::JsCast;
@@ -59,7 +63,7 @@ use wasm_bindgen::prelude::Closure;
 use web_sys::EventTarget;
 use web_sys::Window;
 
-/// Inner listener that owns the JS closure and unsubscribes on drop.
+/// One subscription: owns the JS closure and unsubscribes on drop.
 struct HtmlEventListenerInner<T> {
 	pub name: &'static str,
 	pub target: EventTarget,
@@ -80,8 +84,10 @@ impl<T> Drop for HtmlEventListenerInner<T> {
 /// Use `.next().await` to wait for a single event or iterate to process multiple.
 pub struct HtmlEventListener<T = web_sys::Event> {
 	receiver: super::RecvStream<T>,
-	// Keep the listener alive and ensure cleanup on drop.
-	_inner: Rc<HtmlEventListenerInner<T>>,
+	/// The queue's send half, cloned into each subscription's closure.
+	sender: Sender<T>,
+	// Every subscription feeding the queue, kept alive and cleaned up on drop.
+	listeners: Vec<HtmlEventListenerInner<T>>,
 }
 impl<T> Unpin for HtmlEventListener<T> {}
 
@@ -100,31 +106,60 @@ where
 		name: &'static str,
 		target: impl Into<EventTarget>,
 	) -> Self {
-		let (sender, receiver): (Sender<T>, Receiver<T>) = unbounded();
-		let target = target.into();
+		Self::queue().listen(name, target)
+	}
 
+	/// An empty queue with no subscription yet: [`listen`](Self::listen) adds
+	/// them, and events from every one drain through it in the order they
+	/// fired.
+	pub fn queue() -> Self {
+		let (sender, receiver): (Sender<T>, Receiver<T>) = unbounded();
+		Self {
+			receiver: super::RecvStream::new(receiver),
+			sender,
+			listeners: Vec::new(),
+		}
+	}
+
+	/// Also deliver `name` events from `target` into this queue.
+	pub fn listen(
+		self,
+		name: &'static str,
+		target: impl Into<EventTarget>,
+	) -> Self {
+		self.listen_filtered(name, target, |_| true)
+	}
+
+	/// Also deliver the `name` events from `target` that `filter` accepts.
+	///
+	/// The filter runs inside the browser's dispatch, the one place a
+	/// `preventDefault` counts; a `false` drops the event before it is queued.
+	pub fn listen_filtered(
+		mut self,
+		name: &'static str,
+		target: impl Into<EventTarget>,
+		mut filter: impl 'static + FnMut(&T) -> bool,
+	) -> Self {
+		let target = target.into();
+		let sender = self.sender.clone();
 		let closure = Closure::wrap(Box::new(move |value: T| {
 			// Ignore send errors if receiver was dropped.
-			let _ = sender.try_send(value);
+			if filter(&value) {
+				let _ = sender.try_send(value);
+			}
 		}) as Box<dyn FnMut(T)>);
-
 		target
 			.add_event_listener_with_callback(
 				name,
 				closure.as_ref().unchecked_ref(),
 			)
 			.unwrap();
-
-		let inner = Rc::new(HtmlEventListenerInner {
+		self.listeners.push(HtmlEventListenerInner {
 			name,
 			target,
 			closure,
 		});
-
-		Self {
-			receiver: super::RecvStream::new(receiver),
-			_inner: inner,
-		}
+		self
 	}
 
 	/// Leak the listener (do not unsubscribe). Useful for long-lived global listeners.
@@ -135,6 +170,10 @@ where
 	pub async fn next_event(&mut self) -> Option<T> {
 		self.receiver.recv().await
 	}
+
+	/// The next event already delivered, without waiting: how a frame-driven
+	/// consumer drains the queue.
+	pub fn try_next_event(&mut self) -> Option<T> { self.receiver.try_recv() }
 }
 
 impl<T: 'static> Stream for HtmlEventListener<T> {
@@ -185,5 +224,31 @@ mod tests {
 
 		let ev = clicks.next_event().await.unwrap();
 		ev.type_().xpect_eq("click");
+	}
+
+	/// Several subscriptions feed one queue in firing order, a filter drops
+	/// what it refuses, and `try_next_event` drains without waiting.
+	#[crate::test(browser)]
+	fn a_queue_drains_in_firing_order() {
+		let button: HtmlButtonElement = doc::create_button();
+		doc::append_child(&button);
+		let mut queue = HtmlEventListener::<web_sys::Event>::queue()
+			.listen("click", button.clone())
+			.listen_filtered("focusin", button.clone(), |ev| {
+				ev.prevent_default();
+				false
+			})
+			.listen("custom", button.clone());
+		queue.try_next_event().xpect_none();
+		button.click();
+		button
+			.dispatch_event(&web_sys::Event::new("focusin").unwrap())
+			.unwrap();
+		button
+			.dispatch_event(&web_sys::Event::new("custom").unwrap())
+			.unwrap();
+		queue.try_next_event().unwrap().type_().xpect_eq("click");
+		queue.try_next_event().unwrap().type_().xpect_eq("custom");
+		queue.try_next_event().xpect_none();
 	}
 }

@@ -82,13 +82,16 @@ impl Plugin for OpenLinkPlugin {
 ///
 /// The navigator is resolved from the clicked link's own surface (the
 /// [`RenderSurface`] ancestor, on which the [`Navigator`] is co-located), so a
-/// click acts only on that session when many surfaces coexist.
+/// click acts only on that session when many surfaces coexist. A browser
+/// surface ([`DomHost`]) owns its links: the anchor's default action is the
+/// navigation, a full page load, so the world dispatches no second one.
 fn on_link_click(
 	ev: On<PointerUp>,
 	mut commands: Commands,
 	elements: ElementQuery,
 	surfaces: SurfaceQuery,
 	navigators: Query<Option<&OnOpenLink>, With<Navigator>>,
+	dom_hosts: Query<(), With<DomHost>>,
 	// an `<img>`/`<iframe>` collapsed to its alt/title link carries a `Hyperlink`
 	// (its src/alt-src), so the fallback follows its link exactly like an anchor.
 	hyperlinks: Query<&Hyperlink>,
@@ -128,6 +131,9 @@ fn on_link_click(
 	let Some(navigator) = surfaces.surface_of(link_entity) else {
 		return Ok(());
 	};
+	if dom_hosts.contains(navigator) {
+		return Ok(());
+	}
 	let Ok(on_open) = navigators.get(navigator) else {
 		return Ok(());
 	};
@@ -410,6 +416,26 @@ mod test {
 		let opens = &app.world().resource::<ExternalOpens>().0;
 		opens.len().xpect_eq(1);
 		opens[0].authority().xpect_eq(Some("example.com"));
+	}
+
+	/// A browser surface owns its links: a click on a [`DomHost`]'s page hands
+	/// nothing off, the anchor's own default action being the page load.
+	#[beet_core::test]
+	fn a_dom_host_leaves_links_to_the_browser() {
+		let mut app = link_app();
+		let link = spawn_link(&mut app, None, false, "https://example.com");
+		let navigator = app
+			.world_mut()
+			.query_filtered::<Entity, With<Navigator>>()
+			.single(app.world())
+			.unwrap();
+		app.world_mut().entity_mut(navigator).insert(DomHost);
+		click(&mut app, link);
+		app.world()
+			.resource::<ExternalOpens>()
+			.0
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// A remote (SSH) surface copies an external link to the client clipboard

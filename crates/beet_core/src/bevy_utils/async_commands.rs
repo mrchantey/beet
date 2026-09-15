@@ -1883,11 +1883,16 @@ mod test {
 	async fn finished_handles_are_pruned() {
 		let mut app = test_app();
 		let entity = app.world_mut().spawn_empty().id();
-		for _ in 0..3 {
-			app.world_mut()
-				.entity_mut(entity)
-				.run_async_local(|_| async {});
-		}
+		// gated, so a threaded runtime cannot finish them before they are counted
+		let gates = (0..3)
+			.map(|_| {
+				let (gate_send, gate_recv) = OnceValue::<()>::oneshot();
+				app.world_mut().entity_mut(entity).run_async_local(
+					move |_| async move { gate_recv.wait().await },
+				);
+				gate_send
+			})
+			.collect::<Vec<_>>();
 		app.world()
 			.get::<EntityTasks>(entity)
 			.unwrap()
@@ -1895,6 +1900,9 @@ mod test {
 			.len()
 			.xpect_eq(3);
 		// run them to completion, then push once more: only the live handle stays
+		for gate in gates {
+			gate.signal(());
+		}
 		AsyncRunner::tick(app.world()).await;
 		let (_gate_send, gate_recv) = OnceValue::<()>::oneshot();
 		app.world_mut()

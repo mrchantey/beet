@@ -341,10 +341,18 @@ check-wasm-boot *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*wasm_boot_check*'
 
 # The native browser-driving smoketests: the beet_net webdriver suite against
-# local fixtures, and beet_ui's reactivity-runtime proof. Same PATH deps.
+# local fixtures, and the bsx_site page booting the wasm binary in the tab (which
+# builds it first). Same PATH deps.
 test-browser *args:
 	cargo test -p beet_net --features webdriver,testing --lib {{ args }} -- --include-ignored --include '*webdriver*'
-	cargo test -p beet_ui --lib {{ args }} -- --include-ignored --include '*reactivity_in_browser*'
+	just test-bsx-site-browser {{ args }}
+
+# The bsx_site example in a real browser: build `beet-ui.wasm` (what its page
+# boots), serve the example as the binary does and prove the counter counts in
+# the tab. Needs chromedriver + a chromium on PATH.
+test-bsx-site-browser *args:
+	just build-wasm-ui
+	cargo test --test bsx_site_browser --features "router style markdown fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
 
 # The `Script` backends are mutually exclusive at compile time, so the host-realm
 # fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate

@@ -13,11 +13,17 @@
 //! painting only what is new. Entity identity is the key throughout; there is
 //! no positional index.
 //!
+//! [`DomInputPlugin`] is the other direction: the document's events, resolved
+//! to their entities through the same binding and delivered as the events the
+//! terminal bridge emits, so the widgets never know which surface they are on.
+//!
 //! [`NodeWalker`]: crate::prelude::NodeWalker
 //! [`Value`]: beet_core::prelude::Value
+mod dom_input;
 mod dom_node;
 mod dom_renderer;
 mod dom_sync;
+pub use dom_input::*;
 pub use dom_node::*;
 pub use dom_renderer::*;
 pub use dom_sync::*;

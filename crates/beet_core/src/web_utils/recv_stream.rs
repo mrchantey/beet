@@ -36,6 +36,9 @@ impl<T> RecvStream<T> {
 	/// Await the next item directly; the future is held by the caller, so
 	/// waker registration is sound without the stored pending slot.
 	pub async fn recv(&self) -> Option<T> { self.receiver.recv().await.ok() }
+
+	/// The next item already delivered, without waiting.
+	pub fn try_recv(&self) -> Option<T> { self.receiver.try_recv().ok() }
 }
 
 impl<T: 'static> Stream for RecvStream<T> {

@@ -3,9 +3,11 @@
 use super::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use wasm_bindgen::JsCast;
 
-/// An app with the template substrate, the widget set, the form controls and
-/// the DOM sink's incremental pass.
+/// An app with the template substrate, the widget set, the DOM sink's
+/// incremental pass and the input path (which composes the form controls and
+/// the focus model).
 pub(super) fn dom_app() -> App {
 	let mut app = App::new();
 	app.add_plugins((
@@ -13,8 +15,8 @@ pub(super) fn dom_app() -> App {
 		TemplatePlugin,
 		DocumentPlugin,
 		BsxDefaultsPlugin,
-		FormPlugin,
 		DomRenderPlugin,
+		DomInputPlugin,
 	));
 	app
 }
@@ -97,4 +99,61 @@ pub(super) fn attribute_of(
 				.is_some_and(|attribute| attribute.as_str() == key)
 		})
 		.unwrap_or_else(|| panic!("no `{key}` attribute"))
+}
+
+/// A bubbling `name` event that may be cancelled, so a test can see what the
+/// input path prevented.
+pub(super) fn bubbling(name: &str) -> web_sys::Event {
+	let init = web_sys::EventInit::new();
+	init.set_bubbles(true);
+	init.set_cancelable(true);
+	web_sys::Event::new_with_event_init_dict(name, &init).unwrap()
+}
+
+/// A bubbling, cancellable `keydown` for `key`.
+pub(super) fn keydown(key: &str) -> web_sys::Event {
+	let init = web_sys::KeyboardEventInit::new();
+	init.set_key(key);
+	init.set_bubbles(true);
+	init.set_cancelable(true);
+	web_sys::KeyboardEvent::new_with_keyboard_event_init_dict("keydown", &init)
+		.unwrap()
+		.into()
+}
+
+/// A bubbling, cancellable `submit`, by `submitter` when a button submitted.
+pub(super) fn submit(
+	submitter: Option<&web_sys::HtmlElement>,
+) -> web_sys::Event {
+	let init = web_sys::SubmitEventInit::new();
+	init.set_bubbles(true);
+	init.set_cancelable(true);
+	init.set_submitter(submitter);
+	web_sys::SubmitEvent::new_with_event_init_dict("submit", &init)
+		.unwrap()
+		.into()
+}
+
+/// Dispatch `ev` on `node`, returning whether its default survived.
+pub(super) fn fire(node: &web_sys::Node, ev: &web_sys::Event) -> bool {
+	node.dispatch_event(ev).unwrap()
+}
+
+/// The element `entity` paints as.
+pub(super) fn html_element(
+	world: &World,
+	entity: Entity,
+) -> web_sys::HtmlElement {
+	node_of(world, entity)
+		.dyn_into::<web_sys::HtmlElement>()
+		.expect("the entity paints as an html element")
+}
+
+/// The field at `path` of the document on `host`.
+pub(super) fn field(world: &World, host: Entity, path: &str) -> Value {
+	world
+		.get::<Document>(host)
+		.expect("the host holds the document")
+		.get_field::<Value>(&FieldPath::parse(path))
+		.unwrap_or_default()
 }

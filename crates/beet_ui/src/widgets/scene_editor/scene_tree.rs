@@ -77,7 +77,7 @@ impl TreeRow {
 		let Self { key, guides, label } = self;
 		rsx! {
 			<div
-				{(SceneTreeRow { key }, focusable(), Classes::new([SCENE_TREE_ROW]))}
+				{(SceneTreeRow { key }, Focusable, Classes::new([SCENE_TREE_ROW]))}
 				tabindex="0"
 			>
 				<span {Classes::new([SCENE_TREE_GUIDES])}>{guides}</span>
@@ -87,13 +87,6 @@ impl TreeRow {
 		.any_snippet()
 	}
 }
-
-/// What makes a row reachable by Tab where the focus model exists; the web
-/// reaches it through the row's `tabindex`.
-#[cfg(feature = "keyboard")]
-fn focusable() -> impl Bundle { Focusable }
-#[cfg(not(feature = "keyboard"))]
-fn focusable() -> impl Bundle {}
 
 /// The tree's rows in display order: every entity of `scene`, depth first
 /// under the entity that owns it, each with the guides that draw its place.
