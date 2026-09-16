@@ -243,6 +243,36 @@ pub(super) fn node_gutters(
 	)
 }
 
+/// The rows a scroll container's horizontal bar adds below content laid out at
+/// `content_width`: one when the bar is reserved (`scroll`, or `auto` with a
+/// child wider than the width), else none. An auto-height box grows by its
+/// bar as a css box does, so the bar never covers the last content row; an
+/// explicit `height` clamps the total as it clamps everything else.
+pub(super) fn horizontal_gutter_rows(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	content_width: u32,
+) -> u32 {
+	if !node.is_scroll_container()
+		|| !node.scrollbar_style().width.reserves_gutter()
+	{
+		return 0;
+	}
+	let layout = node.layout_style();
+	let widest = node
+		.child_nodes(query)
+		.map(|child| child.intrinsic_size().x)
+		.max()
+		.unwrap_or(0);
+	ScrollGutters::resolve(
+		layout.overflow_x,
+		layout.overflow_y,
+		UVec2::new(widest, 0),
+		UVec2::new(content_width, 0),
+	)
+	.horizontal as u32
+}
+
 /// The scrollport: the node's content rect inset by any reserved scrollbar
 /// gutter. Children lay out within this, and the bar paints in the gutter just
 /// past it. For a non-scroll node this is the content rect unchanged.
@@ -600,6 +630,55 @@ mod test {
 		// the leading "ABC" scrolled out of view; "D" is now at the left edge
 		frame.as_str().xnot().xpect_contains("ABC");
 		frame.xpect_contains("D");
+	}
+
+	/// An auto-height container whose content overflows horizontally grows by
+	/// the bar's row, so the bar sits below the last content row rather than
+	/// covering it; a container whose content fits reserves nothing.
+	#[beet_core::test]
+	fn horizontal_bar_adds_a_row_below_auto_height_content() {
+		let render = |body: &str| {
+			let mut world = CharcellPlugin::world();
+			world.get_resource_or_init::<RuleSet>().extend_rules(vec![
+				Rule::class("scroller")
+					.with_value(common_props::OverflowXProp, Overflow::Auto),
+			]);
+			let body = body.to_string();
+			let root = world
+				.spawn((
+					Buffer::new(UVec2::new(10, 6)).into_double_buffer(),
+					rsx! {
+						<div>
+							<div class="scroller"><pre>{body}</pre></div>
+							<p>"after"</p>
+						</div>
+					},
+				))
+				.id();
+			world.run_schedule(PostParseTree);
+			world
+				.entity_mut(root)
+				.take::<DoubleBuffer>()
+				.unwrap()
+				.into_buffer()
+				.render_plain()
+		};
+		// wide: both content rows show, then the bar, then the next block
+		let wide = render("ABCDEFGHIJKLMNOP\nQRSTUVWXYZ012345");
+		let rows: Vec<&str> = wide.lines().map(str::trim_end).collect();
+		rows[0].xpect_starts_with("ABCDEFGHIJ");
+		rows[1].xpect_starts_with("QRSTUVWXYZ");
+		rows[2]
+			.chars()
+			.all(|ch| matches!(ch, '─' | '█' | '┄' | '▄'))
+			.xpect_true();
+		rows[3].xpect_eq("after");
+		// narrow: no bar, the next block follows the content directly
+		let narrow = render("AB\nCD");
+		let rows: Vec<&str> = narrow.lines().map(str::trim_end).collect();
+		rows[0].xpect_eq("AB");
+		rows[1].xpect_eq("CD");
+		rows[2].xpect_eq("after");
 	}
 
 	// ── Styling (Task 07) ──

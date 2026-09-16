@@ -20,6 +20,8 @@ pub fn get() -> impl Bundle {
 }
 ```
 
+A ```` ```mermaid ```` fence (or `<Mermaid src=".."/>`, `<Mermaid>graph LR; A --> B</Mermaid>`) is a diagram on every sink, token-painted: inline svg on the web, box art or a kitty raster on the terminal, the mode the `diagram-render` cascade property (a fence info word, `bx:style`, a `<Rule>`). Cheatsheet: `crates/beet_ui/src/parse/mermaid/mod.rs`; showcase `site/routes/docs/design/diagrams.md`.
+
 ## Classes and tokens
 
 Classes are the contract between widgets (emit them) and the rule set (styles them). Never `class="..."` strings; emit semantic classes via the `Classes` block attribute. Constants live in `beet_ui::prelude::classes` (full list: `crates/beet_ui/src/token/classes.rs`); rules mapping them to tokens live in `crates/beet_ui/src/style/material/classes/*.rs`; design tokens (`material::colors::Primary`, `Surface*`, `Outline`, …) in `style/material/colors.rs`, reached downstream through the `material::` prefix (Material is one styling system among potentially many, so `colors` is not re-exported bare).

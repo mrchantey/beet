@@ -94,6 +94,8 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		not(target_arch = "wasm32")
 	))]
 	app.register_template::<super::code_snippet::CodeSnippet>();
+	#[cfg(all(feature = "net", feature = "mermaid"))]
+	app.register_template::<super::mermaid::Mermaid>();
 	#[cfg(feature = "style")]
 	app.register_template::<Stylesheet>();
 }

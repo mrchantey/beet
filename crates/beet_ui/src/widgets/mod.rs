@@ -59,6 +59,9 @@ mod chrome;
 mod code_snippet;
 mod controls;
 mod debug;
+// `<Mermaid src>` reads through `beet_net`'s `BlobStore`.
+#[cfg(all(feature = "net", feature = "mermaid"))]
+mod mermaid;
 #[cfg(feature = "template_serde")]
 mod scene_editor;
 mod schema_ui;
@@ -78,6 +81,8 @@ pub use chrome::*;
 pub use code_snippet::*;
 pub use controls::*;
 pub use debug::*;
+#[cfg(all(feature = "net", feature = "mermaid"))]
+pub use mermaid::*;
 #[cfg(feature = "template_serde")]
 pub use scene_editor::*;
 pub use schema_ui::*;

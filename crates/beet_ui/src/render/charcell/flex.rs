@@ -14,6 +14,7 @@ use bevy::math::UVec2;
 
 use super::establishes_inline_flow;
 use super::explicit_box_size;
+use super::horizontal_gutter_rows;
 use super::marker_gutter;
 use super::measure_grid;
 use super::measure_inline_flow;
@@ -257,6 +258,9 @@ pub(super) fn resolve_height(
 			child_port_rows,
 		),
 	};
+	// a horizontal scrollbar takes a row below the content it scrolls
+	let content_height =
+		content_height + horizontal_gutter_rows(node, query, content_width);
 	// an explicit `height` overrides the resolved content height; `min-height`
 	// floors it (eg `100vh` to fill the terminal window) and `max-height` caps it.
 	// A raster already folded its explicit height into the aspect-contained value

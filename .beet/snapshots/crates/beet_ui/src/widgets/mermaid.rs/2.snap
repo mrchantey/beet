@@ -1,0 +1,137 @@
+Diagrams
+A mermaid code fence renders as a diagram on every sink, painted by the material tokens so it
+follows the color scheme: a picture on the web, box-drawing text or a kitty raster on the terminal.
+Flowchart
+                                                                ┌────────────┐
+   ╭─Parse──────────────────────────────╮                      ▸│ Inline svg │
+   │                                    │                   web│└────────────┘
+   │ ┌──────────┐       ┌─────────────┐ │       ╱───────╲──────┘
+   │ │ Markdown │──────▸│ Entity tree │─┼──────▸│ Sink? │   terminal
+   │ └──────────┘       └─────────────┘ │       ╲───────╱──────┐
+   │                                    │                      │┌─────────┐
+   ╰────────────────────────────────────╯                      ▸│ Box art │
+                                                                └─────────┘
+Sequence
+   ┌───────────┐                          ┌──────────┐
+   │  Browser  │                          │  Server  │
+   └───────────┘                          └──────────┘
+         ┆ GET /docs/design/diagrams            ┆
+         ───────────────────────────────────────▸
+         ┆                                      ┆
+         ┆                                      ┆ ╭──────────────────────╮
+         ┆                                      ┆ │ parse, style, render │
+         ┆                                      ┆ ╰──────────────────────╯
+         ┆ text/html                            ██
+         ◂┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄█
+         ┆                                      ┆
+   ┌───────────┐                          ┌──────────┐
+   │  Browser  │                          │  Server  │
+   └───────────┘                          └──────────┘
+Class
+  ┌─────────────────────┐
+  │   MermaidDiagram    │
+  ├─────────────────────┤
+  │  +source String     │
+  │  +kind DiagramKind  │
+  └──────────┼──────────┘
+             │
+           builds
+             │
+             │
+  ┌───────▴──┼────┐
+  │  DiagramForm  │
+  ├───────────────┤
+  │   Svg         │
+  │   Text        │
+  │   Raster      │
+  └───────────────┘
+State
+                                    ╭─────╮
+                                   ▸│ Svg │
+                                web│╰─────╯
+  ╭─────╮       ╭───────────╮──────┘
+  (  ●  )──────▸│ Collected │   terminal
+  ╰─────╯       ╰───────────╯──────┐
+                                   │╭──────╮          graphics    ╭────────╮
+                                   ▸│ Text │─────────────────────▸│ Raster │
+                                    ╰───▴──╯                      ╰────────╯
+                                        └──────────────────────────────┘
+                                                                 lost graphics
+Entity relationship
+                serves               renders              reads
+  ┌──────────┐          ┌─────────┐           ┌────────┐         ┌─────────┐
+  │  ROUTER  ┤1────────*├  ROUTE  ┤1─────────1├  PAGE  ┤*───────1├  STORE  │
+  └──────────┘          └─────────┘           └────────┘         └─────────┘
+Pie
+                                      Where a page's bytes go
+  Markup      ██████████████████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   55.0%
+  Stylesheet  ███████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   30.0%
+  Script      ███████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   15.0%
+Gantt
+  Gantt: A release (2026-09-01 → 2026-09-07, 7 days)
+                    09-01         09-03          09-05          09-07
+  Build
+    Compile         ░░░░░░░████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  [09-01 → 09-03, 3d]
+    Test            ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░░░░░░░░░░░░░░░░░  [09-04 → 09-05, 2d]
+  Ship
+    Deploy          ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  [09-06 → 09-06, 1d]
+    Announce        ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  [09-07 → 09-07, 1d]
+Git graph
+  *    c0
+  ╭─╮
+  │ *  c1
+  │ *  c2
+  ╰─╯
+  M │  c3
+  * │  c4
+  main feature
+Text form
+The info word after the language pins one fence, here to the box-drawing form on every sink:
+  ┌────────┐     ┌────────┐     ┌──────┐
+  │ Author │────▸│ Render │────▸│ Read │
+  └────────┘     └────────┘     └──────┘
+Markup
+The <Mermaid> widget authors a diagram outside a fence: its source is the default slot's text, or a
+file read through the page's store, and render pins the form as the info word does.
+             ┌───────────────┐   ┌────────────────┐
+             │ mermaid fence │   │ Mermaid widget │
+             └───────────────┘   └────────────────┘
+                     └─────┐              │
+                           │              │
+                           │              │
+                           │              │
+                           │              │
+              ┌────────────▾───────────┐  │
+              │ collect_mermaid_blocks │  │
+              └────────────────────────┘  │
+                           └─────┐        │
+                                 │        │
+                                 │        │
+                                 │        │
+                               ┌─┼────────┘
+                       ┌───────▾─▾──────┐
+                       │ figure.diagram │
+                       └────────────────┘
+                                │
+                                │
+                                │
+                                │
+                                │
+                    ┌───────────▾──────────┐
+                    │ materialize_diagrams │
+                    └──────────────────────┘
+           ┌──────────────────┘ │ └─────────────────┐
+           │                    │                   │
+           │                    │                   │
+           │                    │                   │
+           │                   ┌┘                   │
+    ┌──────▾─────┐   ┌─────────▾────────┐   ┌───────▾──────┐
+    │ inline svg │   │ box-drawing text │   │ kitty raster │
+    └────────────┘   └──────────────────┘   └──────────────┘
+Choosing the form
+The form is the diagram-render cascade property, Auto, Svg or Text, inherited like a text property,
+so it is set at three grains: an app-wide <Rule> in the rule set, a page root's
+bx:style="diagram-render=Text", or one diagram's fence info word (mermaid text) and <Mermaid
+render="Text"> prop. Auto is the picture on the web; on a terminal a flowchart is text, since it
+reflows to the columns and selects, and every other type a raster where the session's terminal draws
+kitty graphics, else text. A build without the svg renderer shows the text form for every mode.

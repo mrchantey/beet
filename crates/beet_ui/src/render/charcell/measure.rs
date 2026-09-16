@@ -102,6 +102,12 @@ pub(super) fn measure_node(
 		// block container: stack children vertically
 		_ => measure_block(node, query, content_available, viewport, sizes),
 	};
+	// a horizontal scrollbar takes a row below the content it scrolls
+	let content_size = content_size
+		+ UVec2::new(
+			0,
+			horizontal_gutter_rows(node, query, content_available.x),
+		);
 	// an explicit `width`/`height` overrides the measured content size, so a
 	// fixed-size control keeps its footprint instead of hugging its content; a
 	// `max-width` caps it and a `min-height` floors it (eg `100vh` to fill the

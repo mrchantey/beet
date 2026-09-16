@@ -1,6 +1,21 @@
 //! Mermaid diagrams: a ```` ```mermaid ```` fence renders as a diagram on every
 //! sink, styled by the material token cascade.
 //!
+//! ## Authoring
+//!
+//! - A fence in markdown, its info word the mode: ```` ```mermaid text ````.
+//! - The `<Mermaid>` widget (`widgets/mermaid.rs`, `net` + `mermaid`) in BSX
+//!   or markdown: the default slot's text as the source
+//!   (`<Mermaid render="Text">graph LR; A --> B</Mermaid>`) or a file read
+//!   through the nearest `BlobStore` (`<Mermaid src="docs/pipeline.mmd"/>`,
+//!   the path relative to the store, ie the routes dir). It builds the same
+//!   figure a fence does and materialises inline when its source lands, so it
+//!   renders where no post-parse pass runs (a BSX page on the string sink).
+//!   A brace in BSX text opens an expression, so a `{Decision}` node needs
+//!   `src` or a fence.
+//! - Per page or app: `bx:style="diagram-render=Text"` on the page root, or a
+//!   `<Rule>`; the paint roles the same way (`diagram-node-fill=@token:..`).
+//!
 //! ## Modes
 //!
 //! The form a diagram takes is the `diagram-render` cascade property
@@ -8,8 +23,9 @@
 //! (a `<Rule>`), per page (`bx:style="diagram-render=Text"` on the page root) or
 //! per diagram (the fence info word, ```` ```mermaid text ````).
 //!
-//! - `Text` is unicode box-drawing art through `mermaid-text` on every sink;
-//!   flowcharts are full quality, the other types name-only boxes.
+//! - `Text` is unicode box-drawing art through `mermaid-text` on every sink,
+//!   every family it lays out (flowchart, sequence, class, state, ER, pie,
+//!   gantt, git, ..) reflowed to the column budget.
 //! - `Svg` is the picture through `mermaid-rs-renderer` (the `mermaid_svg`
 //!   feature, native only): inline on the web, a kitty raster on a graphics
 //!   terminal (the `tui` feature), text on a terminal without graphics. A
@@ -44,20 +60,31 @@
 //! ## Theme
 //!
 //! The svg is painted by role (`DiagramPaint`), each a `--diagram-*` custom
-//! property the cascade declares for the figure: the `:root` defaults
-//! ([`diagram_paint_defaults`]) put node fills and text on
-//! `PrimaryContainer`/`OnPrimaryContainer`, borders on `Outline`, edges on
-//! `OnSurfaceVariant`, labels on `OnSurface`, clusters on `SurfaceContainer`,
-//! the pie and git ramp over the accent containers and fixed tones, and the
-//! plain typeface; a page or a rule re-paints with
+//! property the cascade declares for the figure, the `:root` defaults
+//! ([`diagram_paint_defaults`]) being the material table:
+//!
+//! | Role (`--diagram-*`) | Paints | Token |
+//! |---|---|---|
+//! | `surface` | background, edge label mask | the `pre` fill, `SurfaceContainerHighest` |
+//! | `node-fill`, `node-text` | nodes, actors | `PrimaryContainer`, `OnPrimaryContainer` |
+//! | `outline` | node, actor and note borders | `Outline` |
+//! | `line` | edges, arrowheads | `OnSurfaceVariant` |
+//! | `text` | titles, edge labels, legends | `OnSurface` |
+//! | `secondary-fill` | activations | `SecondaryContainer` |
+//! | `tertiary-fill`, `tertiary-text` | notes, tags | `TertiaryContainer`, `OnTertiaryContainer` |
+//! | `cluster-fill`, `cluster-outline` | subgraphs, lifelines | `SurfaceContainer`, `OutlineVariant` |
+//! | `ramp` | pie slices, git branches | the accent containers, fixed tones, accents |
+//! | `font` | every label | `TypefacePlain` |
+//!
+//! Font sizes, the corner radius (`ShapeCornerSmall`) and stroke width
+//! (`OutlineWidthThin`) are numbers the crate lays out with, resolved for the
+//! figure in px (`theme.rs`). A page or a rule re-paints with
 //! `bx:style="diagram-node-fill=@token:TertiaryContainer"`. On the web the
 //! svg carries `var(--diagram-node-fill)` (a custom property survives the
 //! stylesheet builder's variable renaming, a token variable does not), so the
 //! picture follows the `.light-scheme`/`.dark-scheme` class with no
 //! re-render; a terminal raster resolves the same roles for the figure to
-//! `#rrggbb`, so a dark page rasterises in its dark tones. The font size,
-//! corner radius and stroke width are numbers the crate lays out with,
-//! resolved through the cascade on both (`theme.rs`).
+//! `#rrggbb`, so a dark page rasterises in its dark tones.
 //!
 //! ## Styling
 //!

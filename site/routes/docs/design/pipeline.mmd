@@ -1,0 +1,8 @@
+flowchart TD
+    fence[mermaid fence] --> collect[collect_mermaid_blocks]
+    widget[Mermaid widget] --> figure
+    collect --> figure[figure.diagram]
+    figure --> materialize[materialize_diagrams]
+    materialize --> svg[inline svg]
+    materialize --> text[box-drawing text]
+    materialize --> raster[kitty raster]

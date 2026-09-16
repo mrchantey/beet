@@ -20,6 +20,7 @@ tokens, never raw CSS.
 
 - [Typography](/docs/design/typography)
 - [Code Elements](/docs/design/code)
+- [Diagrams](/docs/design/diagrams)
 
 ## Layout
 

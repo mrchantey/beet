@@ -218,9 +218,21 @@ impl DiagnosticsQuery<'_, '_> {
 		// `UnregisteredTag`; fold every one reachable from the root in as an
 		// unknown-tag error so neither is silently dropped.
 		self.collect_build_errors(root, config, &mut out);
-		// then the per-element href/class/literal-uppercase-tag checks.
-		for el in self.elements.iter_descendants_inclusive(root) {
-			self.check_element(&el, route_tree, rule_set, config, &mut out);
+		// then the per-element href/class/literal-uppercase-tag checks, in
+		// document order. An inline `<svg>` (a rendered diagram) is skipped
+		// whole: a picture's classes are its renderer's, styled by nothing
+		// beet declares.
+		let mut stack = vec![root];
+		while let Some(entity) = stack.pop() {
+			if let Ok(el) = self.elements.get(entity) {
+				if el.tag() == "svg" {
+					continue;
+				}
+				self.check_element(&el, route_tree, rule_set, config, &mut out);
+			}
+			if let Ok(children) = self.children.get(entity) {
+				stack.extend(children.iter().rev());
+			}
 		}
 		out
 	}
@@ -564,6 +576,23 @@ mod test {
 		of_kind(&diagnostics, DiagnosticKind::UnknownClass)
 			.len()
 			.xpect_eq(0);
+	}
+
+	/// An inline `<svg>` is a picture: its renderer's classes never warn.
+	#[beet_core::test]
+	fn svg_content_skipped() {
+		let diagnostics = run(
+			rsx! {
+				<figure>
+					<svg class="root"><g class="edgePath"><path class="arrow"/></g></svg>
+					<p class="stray"/>
+				</figure>
+			},
+			&RenderDiagnostics::default(),
+		);
+		of_kind(&diagnostics, DiagnosticKind::UnknownClass)
+			.len()
+			.xpect_eq(1);
 	}
 
 	#[beet_core::test]

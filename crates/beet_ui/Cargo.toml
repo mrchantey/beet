@@ -154,8 +154,9 @@ thiserror.workspace = true
 variadics_please.workspace = true
 webbrowser.workspace = true
 material-colors = {version = "0.4.2", optional = true }
-# unicode box-drawing text for mermaid diagrams: full quality for flowcharts,
-# name-only boxes for the other types, reflowable to a column budget.
+# unicode box-drawing text for mermaid diagrams, every family the crate lays
+# out (flowchart, sequence, class, state, ER, pie, gantt, git, ..), reflowable
+# to a column budget.
 mermaid-text = { version = "0.57", optional = true }
 
 

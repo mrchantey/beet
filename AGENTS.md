@@ -22,6 +22,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
 - Rendering (web + charcell): `.agents/skills/rendering`
+- Mermaid diagrams (fences, `<Mermaid>`, modes, the Auto rule, the paint tokens): `crates/beet_ui/src/parse/mermaid/mod.rs`
 
 ## Workflow
 
