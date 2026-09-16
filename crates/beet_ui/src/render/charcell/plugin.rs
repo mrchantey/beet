@@ -108,7 +108,7 @@ impl Plugin for CharcellPlugin {
 			))
 			// surface size → `MediaViewport`, before the cascade reads it (and
 			// before `resolve_styles`'s `Changed` trigger scans it this frame),
-			// and before the diagram passes size their text to the columns
+			// and before the diagram passes read the surface for their sink
 			.add_systems(
 				PostParseTree,
 				(
@@ -204,17 +204,6 @@ impl Plugin for CharcellPlugin {
 /// columns; every px breakpoint shifts consistently.
 const MEDIA_PX_PER_CELL: f32 = 1024.0 / 90.0;
 
-/// The cell size of a surface's [`MediaViewport`], the inverse of
-/// [`sync_media_viewport`]: what a pass sizing content to a terminal before
-/// layout (a text diagram's column budget) reads.
-#[cfg(feature = "mermaid")]
-pub(crate) fn viewport_cells(viewport: &MediaViewport) -> UVec2 {
-	UVec2::new(
-		(viewport.width_px() / MEDIA_PX_PER_CELL).round() as u32,
-		(viewport.height_px() / MEDIA_PX_PER_CELL).round() as u32,
-	)
-}
-
 /// Mirror each surface buffer's size onto its required [`MediaViewport`]
 /// ([`MEDIA_PX_PER_CELL`] px per cell), the context width-gated media rules
 /// resolve against. `set_if_neq`, so paint's per-frame buffer writes never
@@ -241,6 +230,10 @@ fn buffer_plugin<B: Component<Mutability = Mutable> + AsBuffer>(app: &mut App) {
 			prepare_charcell_tree::<B>,
 			measure_nodes::<B>,
 			layout_nodes::<B>,
+			// a text diagram's art fits the columns layout gave it, the rects
+			// settling again beneath its new rows
+			#[cfg(feature = "mermaid")]
+			reflow_diagrams::<B>,
 			// re-clamp scroll offsets against the freshly laid-out geometry before
 			// paint reads them to translate descendants.
 			clamp_scroll_positions::<B>,

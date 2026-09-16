@@ -7,9 +7,6 @@
 //! - **Paint** (per node): draws box model and text into the [`DoubleBuffer`]
 mod backend;
 mod box_model;
-// the diagram pass sizes its text to the figure's inset
-#[cfg(feature = "mermaid")]
-pub(crate) use box_model::tui_inset;
 mod buffer;
 #[cfg(feature = "tui")]
 mod clipboard;
@@ -41,6 +38,11 @@ mod plugin;
 mod prepare;
 mod query;
 pub(self) use query::*;
+// a text diagram's art fits the columns layout gives it
+#[cfg(feature = "mermaid")]
+mod reflow;
+#[cfg(feature = "mermaid")]
+pub(self) use reflow::*;
 mod renderer;
 mod scrollbar;
 pub(self) use scrollbar::*;

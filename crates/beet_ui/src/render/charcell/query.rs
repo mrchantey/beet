@@ -138,6 +138,16 @@ impl CharcellNodeData<'_> {
 
 	/// The kitty-graphics raster backing this `<img>`, if attached.
 	pub fn kitty_image(&self) -> Option<&KittyImage> { self.kitty }
+
+	/// Whether this node is a raster with no explicit `width`: a replaced box
+	/// layout contains within its column and its scroll port, so it is never
+	/// overflow of the rect it is given (its measured [`IntrinsicSize`] is the
+	/// raster bounded only by the viewport), and a scroll container around it
+	/// reserves no gutter for it.
+	pub fn is_auto_width_raster(&self) -> bool {
+		self.kitty.is_some()
+			&& self.box_style.is_none_or(|style| style.width.is_none())
+	}
 	/// Flexbox config from the layout style.
 	pub fn flexbox(&self) -> &FlexBox { &self.layout_style().flex_box }
 

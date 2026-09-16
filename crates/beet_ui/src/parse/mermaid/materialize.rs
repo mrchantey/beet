@@ -1,9 +1,6 @@
 use crate::prelude::*;
-use crate::render::tui_inset;
-use crate::render::viewport_cells;
 use crate::style::DiagramRender;
 use crate::style::common_props::DiagramRenderProp;
-use crate::style::common_props::Padding;
 use beet_core::prelude::*;
 
 /// Whether this build renders the svg form: the `mermaid_svg` feature, native
@@ -17,18 +14,20 @@ const RASTER: bool = SVG && cfg!(feature = "tui");
 /// The form built beneath a [`MermaidDiagram`] figure, recorded so a later pass
 /// whose target differs rebuilds it: a served page is built with no surface
 /// (the web's picture) and then painted for a terminal by the one-shot ansi
-/// renderer, which runs the passes again under its buffer; a live terminal
-/// resize changes the text's column budget; a session's graphics support
-/// arrives with its terminal.
+/// renderer, which runs the passes again under its buffer; a session's
+/// graphics support arrives with its terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
 pub(crate) enum DiagramForm {
 	/// The crate's picture as an inline `<svg>`, the web.
 	Svg,
-	/// Box-drawing text in a `<pre class="diagram-text">`, reflowed to a
-	/// terminal's column budget, unbounded on the web.
+	/// Box-drawing text in a `<pre class="diagram-text">`. `columns` is the
+	/// width the art was last fitted to by the charcell reflow after layout
+	/// (`render/charcell/reflow.rs`), `None` unbounded: the web, or a terminal
+	/// figure not yet laid out. A change of width refits the art in place
+	/// rather than rebuilding the figure, so the target never names columns.
 	Text { columns: Option<usize> },
-	/// The picture rasterised onto the figure itself as a [`KittyImage`], a
-	/// graphics terminal.
+	/// The picture rasterised as a [`KittyImage`] on an `<img>` beneath the
+	/// figure, a graphics terminal.
 	Raster,
 }
 
@@ -41,39 +40,34 @@ impl DiagramForm {
 	/// a renderer never targets its form, so `Svg` and `Raster` are only ever
 	/// built where they can be.
 	fn target(render: DiagramRender, kind: DiagramKind, sink: Sink) -> Self {
+		const TEXT: DiagramForm = DiagramForm::Text { columns: None };
 		match (render, sink) {
-			(DiagramRender::Text, Sink::Web) => Self::Text { columns: None },
+			(DiagramRender::Text, _) => TEXT,
 			(_, Sink::Web) if SVG => Self::Svg,
-			(_, Sink::Web) => Self::Text { columns: None },
-			(DiagramRender::Text, Sink::Terminal { columns, .. }) => {
-				Self::Text {
-					columns: Some(columns),
-				}
-			}
-			(DiagramRender::Auto, Sink::Terminal { columns, .. })
+			(_, Sink::Web) => TEXT,
+			(DiagramRender::Auto, Sink::Terminal { .. })
 				if kind == DiagramKind::Flowchart =>
 			{
-				Self::Text {
-					columns: Some(columns),
-				}
+				TEXT
 			}
-			(_, Sink::Terminal { graphics: true, .. }) if RASTER => {
-				Self::Raster
-			}
-			(_, Sink::Terminal { columns, .. }) => Self::Text {
-				columns: Some(columns),
-			},
+			(_, Sink::Terminal { graphics: true }) if RASTER => Self::Raster,
+			(_, Sink::Terminal { .. }) => TEXT,
 		}
+	}
+
+	/// Whether `self` and `other` are the same form, whatever width the text
+	/// was fitted to.
+	fn same_form(&self, other: &Self) -> bool {
+		std::mem::discriminant(self) == std::mem::discriminant(other)
 	}
 }
 
 /// Where a figure renders: the web (no surface viewport above it), or a
-/// terminal surface with its column budget and whether its terminal draws
-/// kitty graphics.
+/// terminal surface and whether its terminal draws kitty graphics.
 #[derive(Debug, Clone, Copy)]
 enum Sink {
 	Web,
-	Terminal { columns: usize, graphics: bool },
+	Terminal { graphics: bool },
 }
 
 /// Give every [`MermaidDiagram`] figure its form, rebuilding one whose target
@@ -86,10 +80,11 @@ enum Sink {
 ///   (`svg.rs`). A build without `mermaid_svg` warns that `Svg` degraded,
 ///   never errors.
 /// - A graphics terminal: `Auto` for a flowchart is text (it reflows to the
-///   columns), `Auto` for every other type and `Svg` a raster on the figure.
+///   columns), `Auto` for every other type and `Svg` a raster on an `<img>`
+///   beneath the figure.
 /// - Everywhere else, and for `Text`, a `<pre class="diagram-text">` of
-///   box-drawing glyphs, reflowed to the surface's column budget on a terminal
-///   and unbounded on the web.
+///   box-drawing glyphs, built unbounded here and fitted to the columns layout
+///   gives it by the charcell reflow on a terminal.
 ///
 /// A render error keeps the source visible in a `<pre>` under a material error
 /// box, and warns.
@@ -97,6 +92,8 @@ pub(crate) fn materialize_diagrams(
 	mut commands: Commands,
 	diagrams: Populated<(Entity, &MermaidDiagram, Option<&DiagramForm>)>,
 	rules: RuleSetQuery,
+	#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
+	mut cache: ResMut<DiagramSvgCache>,
 	#[cfg(all(
 		feature = "tui",
 		feature = "mermaid_svg",
@@ -120,8 +117,7 @@ pub(crate) fn materialize_diagrams(
 		let sink = match rules.surface_viewport(figure) {
 			None => Sink::Web,
 			#[allow(unused_variables)]
-			Some((surface, viewport)) => Sink::Terminal {
-				columns: column_budget(&rules, figure, &viewport, &mut memo),
+			Some((surface, _)) => Sink::Terminal {
 				#[cfg(all(
 					feature = "tui",
 					feature = "mermaid_svg",
@@ -140,15 +136,12 @@ pub(crate) fn materialize_diagrams(
 			},
 		};
 		let form = DiagramForm::target(render, diagram.kind, sink);
-		if built == Some(&form) {
+		if built.is_some_and(|built| built.same_form(&form)) {
 			continue;
 		}
-		// a form built for another sink, width or mode goes, this one replaces it
+		// a form built for another sink or mode goes, this one replaces it
 		if built.is_some() {
-			commands
-				.entity(figure)
-				.despawn_related::<Children>()
-				.queue(|mut entity: EntityWorldMut| detach_image(&mut entity));
+			commands.entity(figure).despawn_related::<Children>();
 		}
 		commands.entity(figure).insert(form);
 		if render == DiagramRender::Svg && !SVG {
@@ -174,6 +167,7 @@ pub(crate) fn materialize_diagrams(
 				diagram,
 				&rules,
 				&mut memo,
+				&mut cache,
 			),
 			#[cfg(all(
 				feature = "tui",
@@ -186,6 +180,7 @@ pub(crate) fn materialize_diagrams(
 				diagram,
 				&rules,
 				&mut memo,
+				&mut cache,
 				placements.as_mut().unwrap().alloc_id(),
 			),
 			// a form this build has no renderer for is never targeted
@@ -193,22 +188,6 @@ pub(crate) fn materialize_diagrams(
 			_ => {}
 		}
 	}
-}
-
-/// The columns a text diagram may take on a terminal: the surface's width less
-/// the figure's own horizontal inset, so the art fits inside its padded box.
-fn column_budget(
-	rules: &RuleSetQuery,
-	figure: Entity,
-	viewport: &MediaViewport,
-	memo: &mut CascadeMemo,
-) -> usize {
-	let cells = viewport_cells(viewport);
-	let inset = rules
-		.resolve(figure, Padding, memo)
-		.map(|padding| tui_inset(&padding, cells.as_vec2()))
-		.unwrap_or_default();
-	cells.x.saturating_sub(inset.min.x + inset.max.x) as usize
 }
 
 /// `<pre class="diagram-text">` holding the rendered art.
@@ -322,8 +301,9 @@ mod test {
 				.unwrap()
 				.render_plain()
 		};
-		#[cfg(feature = "mermaid_svg")]
-		first_form(&mut world).xpect_eq(Some("svg".to_string()));
+		if SVG {
+			first_form(&mut world).xpect_eq(Some("svg".to_string()));
+		}
 		let wide = rendered(&mut world, 80);
 		first_form(&mut world).xpect_eq(Some("pre".to_string()));
 		wide.xref().xpect_contains("│ Parse │────");
@@ -339,6 +319,30 @@ mod test {
 			.unwrap()
 			.to_vec()
 			.xpect_eq(art);
+	}
+
+	/// A reparse into the same tree (a watched file, an editor) diffs the
+	/// changed fence back onto its figure, and the form is built again from
+	/// the new source.
+	#[beet_core::test]
+	fn reparse_rebuilds_the_form() {
+		let mut app = App::new();
+		app.add_plugins(StylePlugin);
+		let root = app.world_mut().spawn_empty().id();
+		let html = |app: &mut App| {
+			HtmlRenderer::new()
+				.render(&mut RenderContext::new(root, app.world_mut()))
+				.unwrap()
+				.to_string()
+		};
+		parse_md(app.world_mut(), root, FLOWCHART);
+		html(&mut app).xpect_contains("Paint");
+		parse_md(app.world_mut(), root, &FLOWCHART.replace("Paint", "Draw"));
+		html(&mut app)
+			.xpect_contains("<figure class=\"diagram\">")
+			.xpect_contains("Draw")
+			.xnot()
+			.xpect_contains("Paint");
 	}
 
 	#[beet_core::test]
@@ -357,40 +361,35 @@ mod test {
 			.xpect_contains("diagram-text");
 	}
 
-	/// A build with no renderer for a form never targets it.
+	/// A build with no renderer for a form never targets it, and the text
+	/// target never names columns: the reflow fits them after layout.
 	#[beet_core::test]
 	fn target_names_only_renderable_forms() {
-		let terminal = |graphics| Sink::Terminal {
-			columns: 60,
-			graphics,
-		};
-		let text = |columns| DiagramForm::Text { columns };
+		let terminal = |graphics| Sink::Terminal { graphics };
+		const TEXT: DiagramForm = DiagramForm::Text { columns: None };
 		let target = DiagramForm::target;
 		// the web: the picture where the build renders one, else text
 		target(DiagramRender::Auto, DiagramKind::Other, Sink::Web)
-			.xpect_eq(if SVG { DiagramForm::Svg } else { text(None) });
+			.xpect_eq(if SVG { DiagramForm::Svg } else { TEXT });
 		target(DiagramRender::Text, DiagramKind::Other, Sink::Web)
-			.xpect_eq(text(None));
+			.xpect_eq(TEXT);
 		// a graphics terminal: a flowchart reflows, the rest rasterise
 		target(DiagramRender::Auto, DiagramKind::Flowchart, terminal(true))
-			.xpect_eq(text(Some(60)));
+			.xpect_eq(TEXT);
 		target(DiagramRender::Auto, DiagramKind::Other, terminal(true))
-			.xpect_eq(if RASTER {
-				DiagramForm::Raster
-			} else {
-				text(Some(60))
-			});
+			.xpect_eq(if RASTER { DiagramForm::Raster } else { TEXT });
 		target(DiagramRender::Svg, DiagramKind::Flowchart, terminal(true))
-			.xpect_eq(if RASTER {
-				DiagramForm::Raster
-			} else {
-				text(Some(60))
-			});
+			.xpect_eq(if RASTER { DiagramForm::Raster } else { TEXT });
 		// no graphics: text, whatever was asked
 		target(DiagramRender::Svg, DiagramKind::Other, terminal(false))
-			.xpect_eq(text(Some(60)));
+			.xpect_eq(TEXT);
 		target(DiagramRender::Text, DiagramKind::Other, terminal(true))
-			.xpect_eq(text(Some(60)));
+			.xpect_eq(TEXT);
+		// a fitted text form is the text form, whatever its width
+		DiagramForm::Text { columns: Some(60) }
+			.same_form(&TEXT)
+			.xpect_true();
+		DiagramForm::Raster.same_form(&TEXT).xpect_false();
 	}
 }
 
@@ -400,7 +399,8 @@ mod test {
 	test,
 	feature = "markdown_parser",
 	feature = "tui",
-	feature = "mermaid_svg"
+	feature = "mermaid_svg",
+	not(target_arch = "wasm32")
 ))]
 mod raster_test {
 	use super::*;
@@ -413,11 +413,20 @@ mod raster_test {
 	/// An 80x24 host whose terminal reports `support`, showing [`PAGE`]: a
 	/// flowchart then a sequence diagram, both `Auto`.
 	fn diagram_host(support: KittyGraphicsSupport) -> TestHost {
-		let mut host = TestHost::sized(UVec2::new(80, 24));
+		page_host(support, PAGE, UVec2::new(80, 24))
+	}
+
+	/// A `size` host whose terminal reports `support`, showing `page`.
+	fn page_host(
+		support: KittyGraphicsSupport,
+		page: &str,
+		size: UVec2,
+	) -> TestHost {
+		let mut host = TestHost::sized(size);
 		// the raster attaches from an async task
 		host.app.init_plugin::<AsyncPlugin>();
 		host.app.world_mut().entity_mut(host.host).insert(support);
-		parse_md(host.app.world_mut(), host.host, PAGE);
+		parse_md(host.app.world_mut(), host.host, page);
 		host.step();
 		host
 	}
@@ -432,8 +441,7 @@ mod raster_test {
 			.to_vec()
 	}
 
-	/// The tag of `figure`'s first child, `None` when it has no children (a
-	/// raster form carries the picture on the figure itself).
+	/// The tag of `figure`'s first child, the form it was given.
 	fn first_child_tag(host: &mut TestHost, figure: Entity) -> Option<String> {
 		host.app
 			.world_mut()
@@ -445,23 +453,34 @@ mod raster_test {
 			})
 	}
 
-	/// Drive the host until the sequence figure carries its raster.
-	async fn settle_raster(host: &mut TestHost) -> Entity {
-		let sequence = figures(host)[1];
+	/// The raster beneath `figure`: the [`KittyImage`] on its `<img>`.
+	fn raster(world: &World, figure: Entity) -> Option<KittyImage> {
+		world
+			.entity(figure)
+			.get::<Children>()
+			.into_iter()
+			.flat_map(|children| children.iter())
+			.find_map(|child| world.entity(child).get::<KittyImage>().cloned())
+	}
+
+	/// Drive the host until the figure at `index` carries its raster.
+	async fn settle_raster(host: &mut TestHost, index: usize) -> Entity {
+		let figure = figures(host)[index];
 		app_ext::update_until_timeout(
 			&mut host.app,
-			|world| world.entity(sequence).contains::<KittyImage>(),
+			|world| raster(world, figure).is_some(),
 			Duration::from_secs(60),
 		)
 		.await
 		.xpect_true();
 		host.step();
-		sequence
+		figure
 	}
 
 	/// On a graphics terminal `Auto` reflows the flowchart as text and
-	/// rasterises the sequence diagram onto its figure, transmitted as a kitty
-	/// image; a `from_pty` session detecting the same support behaves alike.
+	/// rasterises the sequence diagram onto an `<img>` beneath its figure,
+	/// transmitted as a kitty image; a `from_pty` session detecting the same
+	/// support behaves alike.
 	#[beet_core::test]
 	async fn graphics_terminal_rasterizes_all_but_flowcharts() {
 		for support in [
@@ -481,15 +500,9 @@ mod raster_test {
 				.get::<DiagramForm>()
 				.unwrap()
 				.xpect_eq(DiagramForm::Raster);
-			settle_raster(&mut host).await;
-			first_child_tag(&mut host, sequence).xpect_eq(None);
-			let image = host
-				.app
-				.world()
-				.entity(sequence)
-				.get::<KittyImage>()
-				.unwrap()
-				.clone();
+			settle_raster(&mut host, 1).await;
+			first_child_tag(&mut host, sequence).xpect_eq(Some("img".into()));
+			let image = raster(host.app.world(), sequence).unwrap();
 			image.px.x.xpect_greater_than(100);
 			String::from_utf8_lossy(&host.frame_ansi())
 				.into_owned()
@@ -502,17 +515,124 @@ mod raster_test {
 		}
 	}
 
+	/// The picture is a replaced box at the raster's natural cell size,
+	/// contained by the figure: a `width: 100%` figure (the docs column's rule
+	/// for every block) does not stretch a small diagram across the column,
+	/// so a tall narrow diagram keeps its rows, while a wide one fills the
+	/// figure and no wider.
+	#[beet_core::test]
+	async fn raster_keeps_its_natural_size() {
+		use crate::style::Length;
+		use crate::style::common_props::Width;
+
+		// tall enough that no scroll port shrinks the wide picture's measure
+		let mut host = page_host(
+			KittyGraphicsSupport { enabled: true },
+			"```mermaid\nstateDiagram-v2\n[*] --> A\nA --> [*]\n```\n\n```mermaid\nsequenceDiagram\nAlice->>Bob: hello there Bob\n```",
+			UVec2::new(80, 80),
+		);
+		for figure in figures(&host) {
+			host.app
+				.world_mut()
+				.entity_mut(figure)
+				.insert(inline_class![(Width, Length::Percent(100.))]);
+		}
+		let narrow = settle_raster(&mut host, 0).await;
+		let wide = settle_raster(&mut host, 1).await;
+		let world = host.app.world();
+		let rect = |entity: Entity| {
+			world.entity(entity).get::<LayoutRect>().unwrap().0.width() as u32
+		};
+		let picture =
+			|figure: Entity| world.entity(figure).get::<Children>().unwrap()[0];
+		let natural = |figure: Entity| {
+			raster(world, figure)
+				.unwrap()
+				.cell_size(CellBounds::new(1000, 1000))
+				.x
+		};
+		// both figures span the host; the narrow picture keeps its natural
+		// columns, the wide one is contained to the figure's content width
+		rect(narrow).xpect_eq(80);
+		natural(narrow).xpect_less_than(76);
+		rect(picture(narrow)).xpect_eq(natural(narrow));
+		rect(wide).xpect_eq(80);
+		natural(wide).xpect_greater_than(76);
+		rect(picture(wide)).xpect_eq(76);
+		// a contained picture is no overflow: the figure draws no scrollbar
+		host.frame_plain().xnot().xpect_contains("─");
+	}
+
+	/// In a flex column (the docs `<main>`) a figure holding a contained
+	/// raster is as tall as its picture and padding, not the rows the measure
+	/// guessed for the picture at the terminal's full width.
+	#[beet_core::test]
+	async fn column_figure_hugs_its_raster() {
+		use crate::style::AlignItems;
+		use crate::style::Direction;
+		use crate::style::Display;
+		use crate::style::Length;
+		use crate::style::common_props::AlignItemsProp;
+		use crate::style::common_props::DisplayProp;
+		use crate::style::common_props::FlexDirectionProp;
+		use crate::style::common_props::Width;
+
+		let mut host = TestHost::sized(UVec2::new(80, 80));
+		host.app.init_plugin::<AsyncPlugin>();
+		host.app
+			.world_mut()
+			.entity_mut(host.host)
+			.insert(KittyGraphicsSupport { enabled: true });
+		let column = host
+			.app
+			.world_mut()
+			.spawn((
+				Element::new("div"),
+				inline_class![
+					(DisplayProp, Display::Flex),
+					(FlexDirectionProp, Direction::Vertical),
+					(AlignItemsProp, AlignItems::Center)
+				],
+				ChildOf(host.host),
+			))
+			.id();
+		parse_md(
+			host.app.world_mut(),
+			column,
+			"```mermaid\nsequenceDiagram\nAlice->>Bob: hello there Bob\n```",
+		);
+		let figure =
+			host.app.world().entity(column).get::<Children>().unwrap()[0];
+		host.app
+			.world_mut()
+			.entity_mut(figure)
+			.insert(inline_class![(Width, Length::Percent(100.))]);
+		host.step();
+		app_ext::update_until_timeout(
+			&mut host.app,
+			|world| raster(world, figure).is_some(),
+			Duration::from_secs(60),
+		)
+		.await
+		.xpect_true();
+		host.step();
+		let world = host.app.world();
+		let rect = |entity: Entity| {
+			world.entity(entity).get::<LayoutRect>().unwrap().0
+		};
+		let picture = world.entity(figure).get::<Children>().unwrap()[0];
+		// a row of padding above and below, a row of margin beneath
+		rect(picture).width().xpect_eq(76);
+		rect(figure).height().xpect_eq(rect(picture).height() + 3);
+	}
+
 	/// Without graphics every diagram is text.
 	#[beet_core::test]
 	fn plain_terminal_renders_text() {
 		let mut host = diagram_host(KittyGraphicsSupport { enabled: false });
 		for figure in figures(&host) {
 			first_child_tag(&mut host, figure).xpect_eq(Some("pre".into()));
-			host.app
-				.world()
-				.entity(figure)
-				.contains::<KittyImage>()
-				.xpect_false();
+			raster(host.app.world(), figure).is_none().xpect_true();
 		}
 		host.frame_plain()
 			.as_str()
@@ -525,17 +645,13 @@ mod raster_test {
 	#[beet_core::test]
 	async fn losing_graphics_rebuilds_as_text() {
 		let mut host = diagram_host(KittyGraphicsSupport { enabled: true });
-		let sequence = settle_raster(&mut host).await;
+		let sequence = settle_raster(&mut host, 1).await;
 		host.app
 			.world_mut()
 			.entity_mut(host.host)
 			.insert(KittyGraphicsSupport { enabled: false });
 		host.step();
-		host.app
-			.world()
-			.entity(sequence)
-			.contains::<KittyImage>()
-			.xpect_false();
+		raster(host.app.world(), sequence).is_none().xpect_true();
 		first_child_tag(&mut host, sequence).xpect_eq(Some("pre".into()));
 		host.frame_plain().xpect_contains("Alice");
 	}

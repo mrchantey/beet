@@ -9,7 +9,7 @@ use beet_core::prelude::*;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum DiagramRender {
 	/// Resolved by sink: svg on the web; on a terminal, text for a flowchart
-	/// (it reflows to the column budget) and a raster for every other type
+	/// (it reflows to the columns it is given) and a raster for every other type
 	/// where the session's terminal has kitty graphics, else text.
 	#[default]
 	Auto,

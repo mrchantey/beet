@@ -1,7 +1,8 @@
 //! The picture forms: the crate's svg, themed by `var()` tokens so it follows
 //! the colour scheme live and parsed into the figure as an inline `<svg>` on
-//! the web, or themed by resolved hex and rasterised onto the figure for a
-//! graphics terminal.
+//! the web, or themed by resolved hex and rasterised onto an `<img>` beneath
+//! the figure for a graphics terminal; either way rendered once per source
+//! and theme through [`DiagramSvgCache`].
 use super::materialize::spawn_error;
 #[cfg(feature = "tui")]
 use super::theme::terminal_theme;
@@ -11,6 +12,64 @@ use crate::style::*;
 use beet_core::prelude::*;
 use mermaid_rs_renderer::LayoutConfig;
 use mermaid_rs_renderer::Theme;
+use std::hash::BuildHasher;
+use std::sync::Arc;
+
+/// Rendered svg by source and resolved theme, so a page built again (a live
+/// reload, the next request for it) lays out only the diagrams whose source or
+/// paint changed. The web theme is one per page (`var()` strings and the
+/// figure's metrics) and the terminal theme one per scheme, so a repainted
+/// page or a dark session is its own entry. Bounded at [`Self::CAP`] entries
+/// by starting over, a generation rather than an eviction order: a server's
+/// hits are the pages it serves and a dev session's the diagram under edit,
+/// neither helped by ordering.
+#[derive(Default, Resource)]
+pub(crate) struct DiagramSvgCache(HashMap<u64, Picture>);
+
+/// A rendered svg and its natural width.
+#[derive(Clone)]
+struct Picture {
+	svg: Arc<str>,
+	width: f32,
+}
+
+impl DiagramSvgCache {
+	/// The entries kept before the cache starts over.
+	const CAP: usize = 512;
+
+	/// The picture for `source` under `theme` and `layout`: cached, or laid
+	/// out now and kept. A source the crate rejects is never kept, so it
+	/// reports its error on every build.
+	fn render(
+		&mut self,
+		source: &str,
+		theme: &Theme,
+		layout: &LayoutConfig,
+	) -> Result<Picture> {
+		let key = FixedHasher.hash_one((
+			source,
+			format!("{theme:?}"),
+			format!("{layout:?}"),
+		));
+		if let Some(picture) = self.0.get(&key) {
+			return picture.clone().xok();
+		}
+		let (svg, width) = render(source, theme, layout)?;
+		let picture = Picture {
+			svg: svg.into(),
+			width,
+		};
+		if self.0.len() >= Self::CAP {
+			self.0.clear();
+		}
+		self.0.insert(key, picture.clone());
+		picture.xok()
+	}
+
+	/// The pictures kept.
+	#[cfg(test)]
+	fn len(&self) -> usize { self.0.len() }
+}
 
 /// Render `diagram` as web-themed svg and spawn it beneath `figure` as an
 /// inline `<svg>`, sized responsively: the root's `width` and `height` go, the
@@ -24,10 +83,11 @@ pub(super) fn spawn_svg(
 	diagram: &MermaidDiagram,
 	rules: &RuleSetQuery,
 	memo: &mut CascadeMemo,
+	cache: &mut DiagramSvgCache,
 ) {
 	let (theme, layout) = web_theme(rules, figure, memo);
-	match render(&diagram.source, &theme, &layout) {
-		Ok((svg, width)) => {
+	match cache.render(&diagram.source, &theme, &layout) {
+		Ok(Picture { svg, width }) => {
 			commands
 				.entity(figure)
 				.queue(move |mut entity: EntityWorldMut| {
@@ -38,14 +98,16 @@ pub(super) fn spawn_svg(
 	}
 }
 
-/// Render `diagram` as terminal-themed svg and rasterise it onto `figure` as
-/// kitty image `id`: the figure itself carries the [`KittyImage`], so the
-/// measure pass sizes it as a replaced box and `place_kitty_images` draws it;
-/// the svg string is never spawned as entities on a terminal. The raster lands
-/// asynchronously (resvg runs on the blocking pool), the figure empty until
-/// then; a raster failure marks it [`KittyImageUnavailable`], the material
-/// error box under the figure. A parse error keeps the source visible under
-/// the error box, and warns.
+/// Render `diagram` as terminal-themed svg and rasterise it as kitty image
+/// `id` onto an `<img>` beneath `figure`, alt-texted with the diagram's title:
+/// the picture is a replaced box sized by the raster and contained by the
+/// figure, so a small diagram stays small as the web pins its natural width,
+/// and a wide one shrinks to the column. The raster lands asynchronously
+/// (resvg runs on the blocking pool), the `<img>` showing its alt marker until
+/// then, and on a raster failure the marker beside the material error box, as
+/// any `<img>` does. The svg string is never spawned as entities on a
+/// terminal. A parse error keeps the source visible under the error box, and
+/// warns.
 #[cfg(feature = "tui")]
 pub(super) fn spawn_raster(
 	commands: &mut Commands,
@@ -53,23 +115,32 @@ pub(super) fn spawn_raster(
 	diagram: &MermaidDiagram,
 	rules: &RuleSetQuery,
 	memo: &mut CascadeMemo,
+	cache: &mut DiagramSvgCache,
 	id: u32,
 ) {
 	let (theme, layout) = terminal_theme(rules, figure, memo);
-	match render(&diagram.source, &theme, &layout) {
-		Ok((svg, _)) => {
-			let subject: SmolStr =
-				format!("mermaid diagram `{}`", diagram.title()).into();
-			commands.entity(figure).queue_async(move |entity| {
-				attach_raster(entity, Ok(svg.into_bytes()), id, subject)
-			});
+	match cache.render(&diagram.source, &theme, &layout) {
+		Ok(Picture { svg, .. }) => {
+			let title = diagram.title().to_string();
+			let subject: SmolStr = format!("mermaid diagram `{title}`").into();
+			commands
+				.spawn((rsx! { <img alt=title/> }, ChildOf(figure)))
+				.queue_async(move |entity| {
+					attach_raster(
+						entity,
+						Ok(svg.as_bytes().to_vec()),
+						id,
+						subject,
+					)
+				});
 		}
 		Err(err) => spawn_error(commands, figure, &diagram.source, err),
 	}
 }
 
-/// The svg string and its natural width, in one parse and layout.
-pub(super) fn render(
+/// The svg string and its natural width, in one parse and layout; the cache
+/// above is the way in for a build.
+fn render(
 	source: &str,
 	theme: &Theme,
 	layout: &LayoutConfig,
@@ -218,6 +289,43 @@ mod test {
 			.xpect_contains("diagram-text")
 			.xnot()
 			.xpect_contains("<svg");
+	}
+
+	/// A page built again lays out only the diagrams that changed: one source
+	/// under one theme is one picture however many figures show it, a changed
+	/// source or a page whose metrics resolve differently another.
+	#[beet_core::test]
+	fn caches_by_source_and_theme() {
+		use crate::style::material::typography::FontSizeBodyMedium;
+
+		let mut world = StylePlugin.into_world();
+		// a fresh page each time, as a reload or a request builds one
+		let build = |world: &mut World, page: Entity, md: &str| {
+			parse_md(world, page, md);
+			world.resource::<DiagramSvgCache>().len()
+		};
+		let page = |world: &mut World| world.spawn_empty().id();
+		let fresh = page(&mut world);
+		build(&mut world, fresh, FLOWCHART).xpect_eq(1);
+		// the same fence twice on another page: the one picture
+		let fresh = page(&mut world);
+		build(&mut world, fresh, &format!("{FLOWCHART}\n\n{FLOWCHART}"))
+			.xpect_eq(1);
+		let fresh = page(&mut world);
+		build(&mut world, fresh, &FLOWCHART.replace("Paint", "Draw"))
+			.xpect_eq(2);
+		// a page whose labels resolve to another size lays out afresh
+		let larger = world
+			.spawn((Element::new("div"), inline_class![(
+				FontSizeBodyMedium,
+				Length::Px(20.)
+			)]))
+			.id();
+		build(&mut world, larger, FLOWCHART).xpect_eq(3);
+		// a parse error is never kept
+		let fresh = page(&mut world);
+		build(&mut world, fresh, "```mermaid\ngraph LR\n--> A\n```")
+			.xpect_eq(3);
 	}
 
 	/// A diagram the crate rejects keeps its source under the error box.

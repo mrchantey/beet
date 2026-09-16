@@ -132,7 +132,6 @@ pub fn Wasm(
 mod test {
 	use super::*;
 	use crate::prelude::*;
-	use beet_ui::prelude::*;
 
 	fn render(world: &mut World, root: Entity) -> String {
 		HtmlRenderer::new()

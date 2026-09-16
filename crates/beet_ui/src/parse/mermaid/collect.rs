@@ -11,7 +11,10 @@ use beet_core::prelude::*;
 /// figure, the same one-off rule `bx:style` registers; any other word warns and
 /// is ignored.
 ///
-/// Idempotent: a figure has no `<code>` child, so a later run skips it.
+/// Idempotent: a figure has no `<code>` child, so a later run skips it. A
+/// reparse into the same tree diffs the fence back onto its figure, `<code>`
+/// and all, so collecting drops any form built before and the materializer
+/// builds the new source afresh.
 pub(crate) fn collect_mermaid_blocks(
 	mut commands: Commands,
 	elements: ElementQuery,
@@ -35,11 +38,14 @@ pub(crate) fn collect_mermaid_blocks(
 			continue;
 		};
 		commands.entity(code.entity).despawn();
-		commands.entity(figure).insert((
-			Element::new("figure"),
-			Classes::new([DIAGRAM]),
-			MermaidDiagram::new(source),
-		));
+		commands
+			.entity(figure)
+			.insert((
+				Element::new("figure"),
+				Classes::new([DIAGRAM]),
+				MermaidDiagram::new(source),
+			))
+			.remove::<DiagramForm>();
 		// the info word after the language is this diagram's own mode
 		let info = code.attribute_string("data-info");
 		let Some(word) = info.split_whitespace().nth(1) else {

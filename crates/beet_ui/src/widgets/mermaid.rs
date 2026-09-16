@@ -230,7 +230,7 @@ mod test {
 		resolve_render(&mut world, figure).xpect_eq(DiagramRender::Auto);
 		let html = html(&mut world, root);
 		html.xref().xpect_contains("<figure class=\"diagram\">");
-		#[cfg(feature = "mermaid_svg")]
+		#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 		html.xref().xpect_contains("<svg ");
 		html.xpect_contains("Alice");
 	}
@@ -238,7 +238,9 @@ mod test {
 	/// The docs page, `site/routes/docs/design/diagrams.md`: every fence and
 	/// the `<Mermaid src>` include take a form on both sinks, none an error
 	/// box. The web snapshot is each figure's form, the terminal snapshot the
-	/// page's cells at 100 columns.
+	/// page's cells at 100 columns. The web forms are the svg renderer's, so
+	/// native only.
+	#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn docs_page_renders_on_both_sinks() {
 		let Ok(routes) = AbsPath::new_workspace_rel("site/routes") else {
@@ -279,6 +281,7 @@ mod test {
 	/// One line per `<figure>` under `root`, in document order: its classes,
 	/// then each child's tag and classes, an svg's `viewBox` and an error's
 	/// text, so a snapshot names every diagram's form without its markup.
+	#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 	fn figure_forms(world: &mut World, root: Entity) -> String {
 		world.with_state::<(ElementQuery, Query<&Children>), _>(
 			|(elements, children)| {

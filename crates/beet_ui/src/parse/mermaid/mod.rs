@@ -25,7 +25,8 @@
 //!
 //! - `Text` is unicode box-drawing art through `mermaid-text` on every sink,
 //!   every family it lays out (flowchart, sequence, class, state, ER, pie,
-//!   gantt, git, ..) reflowed to the column budget.
+//!   gantt, git, ..) reflowed on a terminal to the columns its figure is
+//!   laid out at.
 //! - `Svg` is the picture through `mermaid-rs-renderer` (the `mermaid_svg`
 //!   feature, native only): inline on the web, a kitty raster on a graphics
 //!   terminal (the `tui` feature), text on a terminal without graphics. A
@@ -44,18 +45,29 @@
 //!   word (`text | svg | auto`) as the inline rule `bx:style` would.
 //! - [`materialize_diagrams`] resolves the figure's mode and builds its form:
 //!   an inline `<svg>` beneath it, sized by its `viewBox` and pinned to its
-//!   natural width; a `<pre class="diagram-text">` reflowed to the terminal's
-//!   column budget, unbounded on the web; or a `KittyImage` on the figure
-//!   itself, rasterised on the blocking pool through the same attach an
-//!   `<img>` uses, so the figure is a replaced box the placement pass draws.
+//!   natural width; a `<pre class="diagram-text">` of art, built unbounded;
+//!   or an `<img>` beneath it carrying a `KittyImage`, rasterised on the
+//!   blocking pool through the same attach an `<img src>` uses, so the
+//!   picture is a replaced box at the raster's natural cell size, contained
+//!   by the figure (a `width: 100%` figure never stretches a small diagram).
 //!   The sink is the surface viewport above the figure (a terminal buffer
 //!   carries one, the web none), its entity carrying the terminal's
 //!   `KittyGraphicsSupport`. The form built is recorded (`DiagramForm`) so a
 //!   tree built for the web and later painted for a terminal (a served page
-//!   under the one-shot ansi renderer, which has no graphics and gets text),
-//!   a resized terminal, or a session gaining or losing graphics rebuilds it.
-//!   A render error keeps the source visible under a material error box, and
-//!   warns; a raster failure is the error box alone.
+//!   under the one-shot ansi renderer, which has no graphics and gets text)
+//!   or a session gaining or losing graphics rebuilds it, and a reparse of
+//!   the fence (the collector drops the form) builds the new source. A
+//!   render error keeps the source visible under a material error box, and
+//!   warns; a raster failure is the `<img>`'s alt marker beside the error box.
+//! - The charcell pipeline fits the art after layout
+//!   (`render/charcell/reflow.rs`): nothing before layout knows the columns
+//!   the figure ends up with (the docs column, a sidebar rail), so once the
+//!   rects are known each `<pre>`'s art is re-rendered in place to its
+//!   assigned width and the rects settle again beneath the new rows. A
+//!   resize refits the same entities; the web stays unbounded and scrolls.
+//! - Rendered svg is cached by source and resolved theme (`DiagramSvgCache`,
+//!   `svg.rs`), so a page built again (a live reload, the next request) lays
+//!   out only the diagrams whose source or paint changed.
 //!
 //! ## Theme
 //!
@@ -105,3 +117,5 @@ pub(crate) use collect::*;
 pub use diagram::*;
 pub(crate) use materialize::*;
 pub use style::*;
+#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
+pub(crate) use svg::DiagramSvgCache;

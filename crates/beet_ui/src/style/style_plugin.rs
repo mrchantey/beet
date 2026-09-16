@@ -63,6 +63,9 @@ impl Plugin for StylePlugin {
 				diagram_paint_defaults().with_canonical(DiagramRender::Auto),
 			);
 			rules.extend_rules(diagram_rules());
+			// a page built again lays out only the diagrams that changed
+			#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
+			app.init_resource::<DiagramSvgCache>();
 		}
 
 		#[cfg(all(

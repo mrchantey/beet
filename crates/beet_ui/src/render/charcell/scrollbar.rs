@@ -115,7 +115,10 @@ pub(super) fn scroll_state(
 
 /// The natural size of a scroll container's content, in cells: the union of its
 /// children's extents measured from `origin`'s top-left, each child's extent its
-/// laid-out rect grown to its unconstrained [`IntrinsicSize`].
+/// laid-out rect grown to its unconstrained [`IntrinsicSize`]. A raster layout
+/// contains within the port on both axes is never overflow, and is skipped:
+/// its rect here is last frame's, which on the frame it attaches is its alt
+/// text's and would reserve a gutter for one frame.
 ///
 /// This is the *content* a scrollbar measures against, not the container's own
 /// [`IntrinsicSize`], which an explicit `height` clamps to the box (defeating the
@@ -129,7 +132,10 @@ pub(super) fn scroll_content_size(
 ) -> UVec2 {
 	let mut content =
 		UVec2::new(origin.width().max(0) as u32, origin.height().max(0) as u32);
-	for child in node.child_nodes(query) {
+	for child in node
+		.child_nodes(query)
+		.filter(|child| !child.is_auto_width_raster())
+	{
 		let rect = child.layout_rect();
 		let offset = rect.min - origin.min;
 		let intrinsic = child.intrinsic_size();
@@ -261,6 +267,7 @@ pub(super) fn horizontal_gutter_rows(
 	let layout = node.layout_style();
 	let widest = node
 		.child_nodes(query)
+		.filter(|child| !child.is_auto_width_raster())
 		.map(|child| child.intrinsic_size().x)
 		.max()
 		.unwrap_or(0);

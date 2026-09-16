@@ -398,21 +398,25 @@ fn resolve_line_sizes(
 	apply_flex_grow(flexbox, line, query, container_main, viewport)
 		.into_iter()
 		.zip(line.iter())
-		.map(|(size, (entity, _))| {
+		.map(|(size, (entity, base))| {
 			// clamp the column cross size (width) to the container, then resolve
-			// height at that assigned width so wrapped rows are fully reserved.
+			// height at that assigned width so wrapped rows are fully reserved; a
+			// column item's base already is that height (`flex_layout_rects`).
 			let width = if vertical {
 				size.x.min(container_cross)
 			} else {
 				size.x
 			};
 			let node = query.unresolved_node(*entity).ok();
-			let content_height = node
-				.as_ref()
-				.map(|child| {
-					resolve_height(child, query, width, viewport, port_rows)
-				})
-				.unwrap_or(size.y);
+			let content_height = match vertical {
+				true => base.y,
+				false => node
+					.as_ref()
+					.map(|child| {
+						resolve_height(child, query, width, viewport, port_rows)
+					})
+					.unwrap_or(size.y),
+			};
 			// A scroll container (overflow clipped on the main axis) keeps its
 			// flex-grown size, so it clips and scrolls its own content instead of
 			// growing the line and pushing later items (eg a chat composer) off
@@ -476,6 +480,8 @@ pub(crate) fn flex_layout_rects(
 		content_rect.height().max(0) as u32,
 	);
 
+	let direction = resolve_direction(flexbox.direction, viewport);
+	let vertical = direction == Direction::Vertical;
 	// Get child sizes directly from child_nodes (already computed by measure phase),
 	// overriding either axis a child sizes explicitly (eg a percent `width`, which
 	// the measure pass left content-sized) with that resolved size as its base.
@@ -496,10 +502,23 @@ pub(crate) fn flex_layout_rects(
 				)
 			} else {
 				let intrinsic = child.intrinsic_size();
-				UVec2::new(
-					explicit_w.unwrap_or(intrinsic.x),
-					explicit_h.unwrap_or(intrinsic.y),
-				)
+				let width = explicit_w.unwrap_or(intrinsic.x);
+				// a column item's base is its content height at its assigned
+				// width, as a row item's cross size resolves (`resolve_line_sizes`):
+				// the measure's viewport-wide guess is too tall for a block holding
+				// a raster the column contains, and too short for text that wraps
+				let height = match (vertical, explicit_h) {
+					(_, Some(height)) => height,
+					(true, None) => resolve_height(
+						&child,
+						query,
+						width.min(available.x),
+						viewport,
+						port_rows,
+					),
+					(false, None) => intrinsic.y,
+				};
+				UVec2::new(width, height)
 			};
 			(child.entity, size)
 		})
@@ -508,7 +527,6 @@ pub(crate) fn flex_layout_rects(
 	child_sizes.sort_by_key(|(e, _)| flex_order(*e, query));
 	let lines = form_lines(&child_sizes, flexbox, available, viewport);
 
-	let direction = resolve_direction(flexbox.direction, viewport);
 	let container_main = match direction {
 		Direction::Horizontal => available.x,
 		Direction::Vertical => available.y,

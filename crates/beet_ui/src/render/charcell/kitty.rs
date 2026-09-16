@@ -36,7 +36,7 @@ use bevy::math::UVec2;
 #[cfg(feature = "tui")]
 use std::io::Write;
 
-/// A raster attached to an element (an `<img>`, a diagram figure): its kitty
+/// A raster attached to an element (an `<img>`, a diagram's picture): its kitty
 /// image id, base64-encoded PNG payload, and pixel dimensions. The element is
 /// a replaced box sized by the raster, its own children never laid out.
 ///
@@ -342,22 +342,6 @@ pub(crate) fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 		None => {
 			entity.insert(ElementStateMap::with(graphics_state()));
 		}
-	}
-}
-
-/// The inverse of [`attach_image`]: drop the raster and its `graphics` state,
-/// so the element lays out from its children again (a diagram figure rebuilt
-/// as text), and any failure the raster reported so a later attach reports
-/// afresh. A no-op on an element carrying neither.
-#[cfg(feature = "mermaid")]
-pub(crate) fn detach_image(entity: &mut EntityWorldMut) {
-	#[cfg(feature = "tui")]
-	entity.remove::<(KittyImageUnavailable, KittyErrorShown)>();
-	if entity.take::<KittyImage>().is_none() {
-		return;
-	}
-	if let Some(mut map) = entity.get_mut::<ElementStateMap>() {
-		map.remove(&graphics_state());
 	}
 }
 
