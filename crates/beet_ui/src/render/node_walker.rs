@@ -116,15 +116,18 @@ impl NodeWalker<'_, '_> {
 	}
 }
 
-/// HTML tags that carry no visual content: document metadata, scripting, and
-/// embedded resources. This is the single source of truth for "non-visual",
+/// HTML tags that carry no text content: document metadata, scripting,
+/// embedded resources and vector graphics (an `<svg>`'s `<text>` is part of a
+/// picture, not prose). This is the single source of truth for "non-visual",
 /// consumed in two places that must agree:
 /// - the user-agent style layer ([`default_element_rules`]) maps these to
 ///   [`Display::None`] so the style-resolved visual renderer (charcell) omits
-///   them via its `display: none` filter, and
+///   them via its `display: none` filter (the metadata tags everywhere, the
+///   embedded and vector tags on the terminal only, where they have no
+///   picture), and
 /// - [`NodeVisitor::skip_node`] skips them for the markup/text renderers
-///   (markdown, plaintext, tui) that walk the raw node tree without resolving
-///   CSS, so `display: none` is unavailable to them.
+///   (markdown, plaintext) that walk the raw node tree without resolving CSS,
+///   so `display: none` is unavailable to them.
 ///
 /// A markup serializer ([`HtmlRenderer`]) is the exception: it overrides
 /// `skip_node` to emit every tag, since `<head>`/`<style>`/`<script>` are valid,
@@ -135,7 +138,7 @@ impl NodeWalker<'_, '_> {
 /// [`HtmlRenderer`]: crate::prelude::HtmlRenderer
 pub(crate) const NON_VISUAL_TAGS: &[&str] = &[
 	"head", "script", "style", "template", "noscript", "meta", "link", "title",
-	"base", "iframe", "object", "embed",
+	"base", "iframe", "object", "embed", "svg",
 ];
 
 /// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].

@@ -110,6 +110,12 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 		Rule::tags(&["option", "optgroup"])
 			.with_media(MediaQuery::Terminal)
 			.with_canonical(Display::None),
+		// an inline `<svg>` is a picture the web paints and a char grid cannot;
+		// its `<text>` would otherwise flow as prose. A diagram figure replaces
+		// its svg with text or a raster before this is reached (`parse/mermaid`).
+		Rule::tags(&["svg"])
+			.with_media(MediaQuery::Terminal)
+			.with_canonical(Display::None),
 		// an `<img>` backed by a kitty-graphics raster (the attach system sets
 		// the `graphics` state) gets its own block box sized by the raster;
 		// the inline alt-text presentation applies everywhere else.
@@ -126,10 +132,11 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 /// User-agent rule removing metadata and scripting tags from layout via
 /// `display: none`, so visual renderers omit them.
 ///
-/// Note this is a strict subset of [`NON_VISUAL_TAGS`]: the embedded-media tags
-/// (`iframe`/`object`/`embed`) are visual on the web, so they are *not* hidden
-/// here. The charcell walker still skips them via [`is_non_visual`], so they
-/// render on the web but not the terminal.
+/// Note this is a strict subset of [`NON_VISUAL_TAGS`]: the embedded-media and
+/// vector tags (`iframe`/`object`/`embed`/`svg`) are visual on the web, so they
+/// are *not* hidden here; the terminal collapses an `<iframe>` to a link
+/// ([`default_element_rules`]) and hides an `<svg>` through its own
+/// terminal-gated rule, so they render on the web but not the terminal.
 ///
 /// Kept separate from the prose [`default_element_rules`] so theme rule sets (eg
 /// Material) can include it without pulling in prose props that need their own

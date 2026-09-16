@@ -368,22 +368,23 @@ impl RuleSetQuery<'_, '_> {
 		Portal::visual_parent(&self.ancestors, &self.render_refs, entity)
 	}
 
-	/// The [`MediaViewport`] of the surface `entity` renders into: the nearest
+	/// The surface `entity` renders into and its [`MediaViewport`]: the nearest
 	/// self-or-ancestor carrying one, walking the same Portal-aware
 	/// [`parent`](Self::parent) chain inheritance uses, so transcluded content
 	/// (eg a live page under a buffer host's slot) resolves the surface that
 	/// renders it. `None` when no surface exists (eg building static HTML
 	/// server-side), which skips width-gated rules; a terminal buffer always
 	/// carries one, so this is also the "am I on a terminal" fact a pass sizing
-	/// content to columns reads.
+	/// content to columns reads, and the entity is where the surface's other
+	/// facts live (a terminal's graphics support).
 	pub(crate) fn surface_viewport(
 		&self,
 		entity: Entity,
-	) -> Option<MediaViewport> {
+	) -> Option<(Entity, MediaViewport)> {
 		let mut current = entity;
 		loop {
 			if let Ok(viewport) = self.viewports.get(current) {
-				return Some(*viewport);
+				return Some((current, *viewport));
 			}
 			match self.parent(current) {
 				// a self-referential edge would loop; a malformed graph is a clean stop.
@@ -467,7 +468,8 @@ impl RuleSetQuery<'_, '_> {
 					.unwrap_or_default();
 				let viewport = needs_viewport
 					.then(|| self.surface_viewport(el.entity))
-					.flatten();
+					.flatten()
+					.map(|(_, viewport)| viewport);
 				self.rule_set
 					.matching_rule_indices(&el, &ancestors, viewport)
 			});

@@ -7,6 +7,8 @@
 //! - **Paint** (per node): draws box model and text into the [`DoubleBuffer`]
 mod backend;
 mod box_model;
+// the diagram pass sizes its text to the figure's inset
+#[cfg(feature = "mermaid")]
 pub(crate) use box_model::tui_inset;
 mod buffer;
 #[cfg(feature = "tui")]

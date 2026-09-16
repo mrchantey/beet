@@ -25,6 +25,7 @@ pub impl Color {
 pub(crate) fn light_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::LIGHT_SCHEME))
+		.with_extend(fixed_roles())
 		.with_token(colors::Primary, tones::Primary40).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary100).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary90).unwrap()
@@ -68,6 +69,7 @@ pub(crate) fn light_scheme() -> Rule {
 pub(crate) fn dark_scheme() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(classes::DARK_SCHEME))
+		.with_extend(fixed_roles())
 		.with_token(colors::Primary, tones::Primary80).unwrap()
 		.with_token(colors::OnPrimary, tones::Primary20).unwrap()
 		.with_token(colors::PrimaryContainer, tones::Primary30).unwrap()
@@ -105,6 +107,26 @@ pub(crate) fn dark_scheme() -> Rule {
 		.with_token(colors::Scrim, tones::NeutralDark0).unwrap()
 		.with_token(colors::InverseSurface, tones::NeutralLight90).unwrap()
 		.with_token(colors::InverseOnSurface, tones::NeutralLight20).unwrap()
+}
+
+/// The fixed accent roles, the same tones in both schemes: a fill that keeps
+/// its colour when the scheme flips (a chip, a diagram's ramp), `Dim` its
+/// stronger sibling, `OnFixed` the text on either and `OnFixedVariant` its
+/// lower-emphasis variant.
+fn fixed_roles() -> Rule {
+	Rule::new()
+		.with_token(colors::PrimaryFixed, tones::Primary90).unwrap()
+		.with_token(colors::PrimaryFixedDim, tones::Primary80).unwrap()
+		.with_token(colors::OnPrimaryFixed, tones::Primary10).unwrap()
+		.with_token(colors::OnPrimaryFixedVariant, tones::Primary30).unwrap()
+		.with_token(colors::SecondaryFixed, tones::Secondary90).unwrap()
+		.with_token(colors::SecondaryFixedDim, tones::Secondary80).unwrap()
+		.with_token(colors::OnSecondaryFixed, tones::Secondary10).unwrap()
+		.with_token(colors::OnSecondaryFixedVariant, tones::Secondary30).unwrap()
+		.with_token(colors::TertiaryFixed, tones::Tertiary90).unwrap()
+		.with_token(colors::TertiaryFixedDim, tones::Tertiary80).unwrap()
+		.with_token(colors::OnTertiaryFixed, tones::Tertiary10).unwrap()
+		.with_token(colors::OnTertiaryFixedVariant, tones::Tertiary30).unwrap()
 }
 
 /// Returns color values for every palette tone in a [`Theme`].

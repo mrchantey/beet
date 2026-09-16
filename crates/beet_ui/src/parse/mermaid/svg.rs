@@ -1,6 +1,10 @@
-//! The svg form: the crate's picture, themed by `var()` tokens so it follows
-//! the colour scheme live, parsed into the figure as an inline `<svg>`.
+//! The picture forms: the crate's svg, themed by `var()` tokens so it follows
+//! the colour scheme live and parsed into the figure as an inline `<svg>` on
+//! the web, or themed by resolved hex and rasterised onto the figure for a
+//! graphics terminal.
 use super::materialize::spawn_error;
+#[cfg(feature = "tui")]
+use super::theme::terminal_theme;
 use super::theme::web_theme;
 use crate::prelude::*;
 use crate::style::*;
@@ -34,8 +38,38 @@ pub(super) fn spawn_svg(
 	}
 }
 
+/// Render `diagram` as terminal-themed svg and rasterise it onto `figure` as
+/// kitty image `id`: the figure itself carries the [`KittyImage`], so the
+/// measure pass sizes it as a replaced box and `place_kitty_images` draws it;
+/// the svg string is never spawned as entities on a terminal. The raster lands
+/// asynchronously (resvg runs on the blocking pool), the figure empty until
+/// then; a raster failure marks it [`KittyImageUnavailable`], the material
+/// error box under the figure. A parse error keeps the source visible under
+/// the error box, and warns.
+#[cfg(feature = "tui")]
+pub(super) fn spawn_raster(
+	commands: &mut Commands,
+	figure: Entity,
+	diagram: &MermaidDiagram,
+	rules: &RuleSetQuery,
+	memo: &mut CascadeMemo,
+	id: u32,
+) {
+	let (theme, layout) = terminal_theme(rules, figure, memo);
+	match render(&diagram.source, &theme, &layout) {
+		Ok((svg, _)) => {
+			let subject: SmolStr =
+				format!("mermaid diagram `{}`", diagram.title()).into();
+			commands.entity(figure).queue_async(move |entity| {
+				attach_raster(entity, Ok(svg.into_bytes()), id, subject)
+			});
+		}
+		Err(err) => spawn_error(commands, figure, &diagram.source, err),
+	}
+}
+
 /// The svg string and its natural width, in one parse and layout.
-fn render(
+pub(super) fn render(
 	source: &str,
 	theme: &Theme,
 	layout: &LayoutConfig,
@@ -194,5 +228,39 @@ mod test {
 			.xpect_contains("<pre>graph LR")
 			.xnot()
 			.xpect_contains("<svg");
+	}
+
+	/// The terminal-themed svg of a sequence diagram rasterises through the
+	/// kitty path to a valid PNG at 2x its natural size, its colours the
+	/// resolved hex.
+	#[cfg(feature = "tui")]
+	#[beet_core::test]
+	fn rasterizes_a_sequence_diagram() {
+		use crate::render::encode_png;
+		use crate::render::to_png_bytes;
+		use crate::style::material::MaterialStylePlugin;
+
+		let mut world = (StylePlugin, MaterialStylePlugin).into_world();
+		let figure = world.spawn(rsx! { <figure/> }).id();
+		let (theme, layout) = world.with_state::<RuleSetQuery, _>(|rules| {
+			terminal_theme(&rules, figure, &mut CascadeMemo::default())
+		});
+		let (svg, width) =
+			render("sequenceDiagram\nAlice->>Bob: hi", &theme, &layout)
+				.unwrap();
+		// the material palette, not the crate's default
+		(theme.sequence_actor_fill
+			!= Theme::mermaid_default().sequence_actor_fill)
+			.xpect_true();
+		svg.as_str()
+			.xpect_contains(&theme.sequence_actor_fill)
+			.xnot()
+			.xpect_contains("var(");
+		let px = to_png_bytes(svg.into_bytes())
+			.and_then(encode_png)
+			.unwrap()
+			.1;
+		px.x.xpect_eq((width * 2.).ceil() as u32);
+		px.y.xpect_greater_than(100);
 	}
 }

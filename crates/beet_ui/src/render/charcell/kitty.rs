@@ -5,13 +5,15 @@
 //! `src` over HTTP — an absolute `http(s)://` directly, a site-rooted
 //! `/assets/…` looped back to our own canonical server (which maps it to its
 //! blob store), exactly as a browser resolves it against the document origin, so
-//! there is no filesystem dependency on the render host (Lambda/Fargate). PNG
-//! bytes transmit directly, an `<img src=*.svg>` is rasterised to PNG (resvg),
-//! any other raster format decodes and re-encodes to PNG, then a [`KittyImage`]
-//! and the `graphics` element state attach so the terminal-gated user-agent rule
-//! gives it a block box. The measure and layout phases size that box from the
-//! pixel dimensions, contained within its [`CellBounds`] so no raster wants a
-//! box its scroll port could never show; paint reserves its cells; and
+//! there is no filesystem dependency on the render host (Lambda/Fargate). The
+//! bytes then go through [`attach_raster`], shared with the diagram raster
+//! (`parse/mermaid`): PNG bytes transmit directly, an svg (an `<img src=*.svg>`,
+//! a rendered diagram) is rasterised to PNG (resvg), any other raster format
+//! decodes and re-encodes to PNG, then a [`KittyImage`] and the `graphics`
+//! element state attach so the terminal-gated user-agent rule gives an `<img>`
+//! a block box. The measure and layout phases size that box from the pixel
+//! dimensions, contained within its [`CellBounds`] so no raster wants a box its
+//! scroll port could never show; paint reserves its cells; and
 //! `place_kitty_images` transmits the bytes once and (re)places the picture
 //! whenever its on-screen rect changes — scroll, reflow, or resize — cropping
 //! to the visible part of a box the port only partly shows.
@@ -34,8 +36,9 @@ use bevy::math::UVec2;
 #[cfg(feature = "tui")]
 use std::io::Write;
 
-/// A raster attached to an `<img>` element: its kitty image id, base64-encoded
-/// PNG payload, and pixel dimensions.
+/// A raster attached to an element (an `<img>`, a diagram figure): its kitty
+/// image id, base64-encoded PNG payload, and pixel dimensions. The element is
+/// a replaced box sized by the raster, its own children never laid out.
 ///
 /// Data-only and platform-neutral (measure/paint read it on every target);
 /// the systems that attach and emit it are `tui`-gated.
@@ -323,10 +326,14 @@ pub(crate) fn attach_kitty_images(
 
 /// Insert the raster and the `graphics` element state driving its block box,
 /// merging into any states the element already carries (eg hover).
-// the attach path is reached only by the `net` fetch (and the test harness that
-// attaches a raster directly); without either there is nothing to attach.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
-fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
+// the attach path is reached only by the `net` fetch, the diagram raster (and
+// the test harness that attaches a raster directly); without any there is
+// nothing to attach.
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+pub(crate) fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 	entity.insert(image);
 	match entity.get_mut::<ElementStateMap>() {
 		Some(mut map) => {
@@ -336,6 +343,74 @@ fn attach_image(mut entity: EntityWorldMut, image: KittyImage) {
 			entity.insert(ElementStateMap::with(graphics_state()));
 		}
 	}
+}
+
+/// The inverse of [`attach_image`]: drop the raster and its `graphics` state,
+/// so the element lays out from its children again (a diagram figure rebuilt
+/// as text), and any failure the raster reported so a later attach reports
+/// afresh. A no-op on an element carrying neither.
+#[cfg(feature = "mermaid")]
+pub(crate) fn detach_image(entity: &mut EntityWorldMut) {
+	#[cfg(feature = "tui")]
+	entity.remove::<(KittyImageUnavailable, KittyErrorShown)>();
+	if entity.take::<KittyImage>().is_none() {
+		return;
+	}
+	if let Some(mut map) = entity.get_mut::<ElementStateMap>() {
+		map.remove(&graphics_state());
+	}
+}
+
+/// The bytes for a raster have arrived (`bytes`), or the fetch for them failed:
+/// decode them to PNG on the blocking pool, then attach the [`KittyImage`] as
+/// `id`, or mark the element [`KittyImageUnavailable`] carrying the failure so
+/// [`render_image_errors`] shows it. `subject` names the raster in the warning
+/// (`img src "x.png"`, `mermaid diagram sequenceDiagram`), so a no-port error
+/// reads differently from a refused connection, a non-2xx, or a decode error,
+/// instead of a silent blank.
+///
+/// Never decodes inline: beet runs bevy single-threaded, so every detached task
+/// shares the one world thread, and an inline `image::load_from_memory`, a
+/// `resvg::render` of up to 4096², or the one-time `fontdb::load_system_fonts()`
+/// directory walk freezes every other connection for as long as it runs. On a
+/// throttled 2-vCPU box that is a multi-second stall of the whole server per
+/// raster.
+#[cfg(all(feature = "tui", any(feature = "net", feature = "mermaid_svg")))]
+pub(crate) async fn attach_raster(
+	entity: AsyncEntity,
+	bytes: Result<Vec<u8>>,
+	id: u32,
+	subject: SmolStr,
+) -> Result {
+	let loaded = match bytes {
+		Ok(bytes) => {
+			blocking::unblock(move || {
+				to_png_bytes(bytes)
+					.and_then(encode_png)
+					.ok_or_else(|| bevyhow!("not a decodable image"))
+			})
+			.await
+		}
+		Err(err) => Err(err),
+	};
+	if let Err(err) = &loaded {
+		warn!("{subject}: {err}");
+	}
+	entity
+		.with(move |mut entity| {
+			entity.remove::<KittyImageLoading>();
+			match loaded {
+				Ok((data, px)) => {
+					attach_image(entity, KittyImage { id, data, px });
+				}
+				Err(err) => {
+					entity.insert(KittyImageUnavailable {
+						error: err.to_string().into(),
+					});
+				}
+			}
+		})
+		.await
 }
 
 /// System: render an unavailable `<img>`'s error once, alongside its existing
@@ -366,8 +441,11 @@ pub(crate) fn render_image_errors(
 /// PNG ([`svg_to_png`]); any other format the `image` decoder understands (eg
 /// JPEG) is decoded to RGBA and re-encoded to PNG. `None` when the bytes are
 /// not a decodable image.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
-fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 	if png_dimensions(&bytes).is_some() {
 		return Some(bytes);
 	}
@@ -386,7 +464,10 @@ fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
 /// byte opens a tag and which contains an `<svg` within the sniffed head. PNGs
 /// are returned before this is reached, and the other raster formats are binary
 /// (JPEG `\xff\xd8`, GIF `GIF8`, WebP `RIFF`), so none of them misfire here.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
 fn is_svg(bytes: &[u8]) -> bool {
 	let head = &bytes[..bytes.len().min(1024)];
 	let text = String::from_utf8_lossy(head);
@@ -397,7 +478,10 @@ fn is_svg(bytes: &[u8]) -> bool {
 /// System fonts for SVG `<text>`, loaded once. `load_system_fonts` walks the
 /// platform font directories, so the database is cached behind a `OnceLock`
 /// rather than rebuilt for every rasterised image.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
 fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 	use std::sync::Arc;
 	use std::sync::OnceLock;
@@ -418,7 +502,10 @@ fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 /// allocate an unbounded pixmap. The figure's own colours are honoured verbatim
 /// — a deck SVG authored in the site palette therefore rasterises on-theme (the
 /// palette lives in the SVG, the single surface a re-theme would touch).
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
 fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 	use resvg::tiny_skia;
 	use resvg::usvg;
@@ -444,48 +531,13 @@ fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 	pixmap.encode_png().ok()
 }
 
-/// Background fetch for an image `src` over HTTP: attach the raster on arrival,
-/// or mark the element unavailable carrying the failure so [`render_image_errors`]
-/// shows the alt marker plus the styled error.
+/// Background fetch for an image `src` over HTTP, attached through
+/// [`attach_raster`] on arrival: the raster, or the alt marker plus the styled
+/// failure.
 #[cfg(all(feature = "tui", feature = "net"))]
 async fn fetch_remote(entity: AsyncEntity, src: String, id: u32) -> Result {
-	// decode + rasterise + encode on the blocking pool, never inline. Beet runs
-	// bevy single-threaded, so every detached task shares the one world thread:
-	// an inline `image::load_from_memory`, a `resvg::render` of up to 4096², or
-	// the one-time `fontdb::load_system_fonts()` directory walk freezes every
-	// other connection for as long as it runs. On a throttled 2-vCPU box that is
-	// a multi-second stall of the whole server per `<img>`.
-	let loaded = match fetch_image_bytes(&src).await {
-		Ok(bytes) => {
-			blocking::unblock(move || {
-				to_png_bytes(bytes).and_then(encode_png).ok_or_else(|| {
-					bevyhow!("response is not a decodable image")
-				})
-			})
-			.await
-		}
-		Err(err) => Err(err),
-	};
-	// each failure mode warns the src so a no-port error reads differently from a
-	// refused connection, a non-2xx, or a decode error, instead of a silent blank.
-	if let Err(err) = &loaded {
-		warn!("img src {src:?}: {err}");
-	}
-	entity
-		.with(move |mut entity| {
-			entity.remove::<KittyImageLoading>();
-			match loaded {
-				Ok((data, px)) => {
-					attach_image(entity, KittyImage { id, data, px });
-				}
-				Err(err) => {
-					entity.insert(KittyImageUnavailable {
-						error: err.to_string().into(),
-					});
-				}
-			}
-		})
-		.await
+	let bytes = fetch_image_bytes(&src).await;
+	attach_raster(entity, bytes, id, format!("img src {src:?}").into()).await
 }
 
 /// The raw response bytes for an image `src`, fetched over HTTP, or the precise
@@ -507,8 +559,11 @@ async fn fetch_image_bytes(src: &str) -> Result<Vec<u8>> {
 }
 
 /// Validate and base64-encode PNG bytes, with their parsed dimensions.
-#[cfg(all(feature = "tui", any(feature = "net", test)))]
-fn encode_png(bytes: Vec<u8>) -> Option<(String, UVec2)> {
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+pub(crate) fn encode_png(bytes: Vec<u8>) -> Option<(String, UVec2)> {
 	use base64::Engine;
 	let px = png_dimensions(&bytes)?;
 	let data = base64::engine::general_purpose::STANDARD.encode(&bytes);

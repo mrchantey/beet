@@ -17,16 +17,26 @@ pub const DIAGRAM_TEXT: ClassName = ClassName::new_static("diagram-text");
 /// background both read it.
 pub(crate) fn diagram_surface() -> Token { colors::SurfaceContainerHighest.into() }
 
-/// The rules styling [`DIAGRAM`], its svg and [`DIAGRAM_TEXT`] on both sinks.
+/// The rules styling [`DIAGRAM`], its svg and [`DIAGRAM_TEXT`] on both sinks,
+/// and the paint roles on each scheme class.
 pub(crate) fn diagram_rules() -> Vec<Rule> {
-	vec![diagram_figure(), diagram_svg(), diagram_text()]
+	vec![
+		diagram_figure(),
+		diagram_svg(),
+		diagram_text(),
+		scheme_paint(classes::LIGHT_SCHEME),
+		scheme_paint(classes::DARK_SCHEME),
+	]
 }
 
 /// The material defaults of every [`DiagramPaint`] role, declared on `:root`
 /// so a page root's `bx:style="diagram-node-fill=@token:TertiaryContainer"`
 /// still wins for the diagrams below it (an inherited value beats nothing, a
-/// `.diagram` declaration would beat the page). The svg theme reads these by
-/// `var()` on the web and by resolved hex on a terminal.
+/// `.diagram` declaration would beat the page), and again on each scheme
+/// class ([`diagram_rules`]): a redirect resolves where it is declared, as a
+/// css custom property does, so the `:root` declaration alone pins the light
+/// tones under a `.dark-scheme` body. The svg theme reads these by `var()` on
+/// the web and by resolved hex on a terminal.
 pub(crate) fn diagram_paint_defaults() -> Rule {
 	Rule::new()
 		.with_token(common_props::DiagramSurfaceProp, diagram_surface()).unwrap()
@@ -65,6 +75,12 @@ fn material_ramp() -> DiagramRamp {
 	.map(|(background, foreground)| ColorRole { background, foreground })
 	.collect::<Vec<_>>()
 	.xmap(DiagramRamp)
+}
+
+/// The paint defaults on a scheme class, where `PrimaryContainer` and the
+/// rest resolve to that scheme's tones.
+fn scheme_paint(scheme: ClassName) -> Rule {
+	diagram_paint_defaults().with_selector(Selector::class(scheme))
 }
 
 /// `.diagram` - the `pre` surface (fill, padding, corner), so a diagram and a
@@ -136,6 +152,16 @@ mod test {
 			.xpect_contains("--diagram-ramp-12-text: var(--material-colors-on-tertiary);")
 			.xpect_contains("--diagram-render: auto;")
 			.xpect_contains(".diagram > svg {");
+		// declared again on each scheme class, where the redirect resolves to
+		// that scheme's tones
+		css.as_str()
+			.split(".dark-scheme {")
+			.nth(1)
+			.unwrap()
+			.split('}')
+			.next()
+			.unwrap()
+			.xpect_contains("--diagram-node-fill: var(--material-colors-primary-container);");
 	}
 
 	/// A page root re-paints its diagrams with the same declaration surface

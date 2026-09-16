@@ -146,6 +146,21 @@ mod tests {
 			.xpect_contains("color: red");
 	}
 
+	/// An inline `<svg>` is a picture the char grid cannot paint: its `<text>`
+	/// never flows as prose, the html twin serializes it whole.
+	#[beet_core::test]
+	fn inline_svg_is_hidden_on_the_terminal() {
+		Buffer::render_oneshot_plain_sized(UVec2::new(40, 6), rsx! {
+			<div>
+				<svg viewBox="0 0 10 10"><text>"Picture"</text></svg>
+				<p>"Visible"</p>
+			</div>
+		})
+		.xpect_contains("Visible")
+		.xnot()
+		.xpect_contains("Picture");
+	}
+
 	#[beet_core::test]
 	fn material_headings_scale_with_font_size() {
 		// the MD3 type scale drives charcell glyph scaling: h1 (HeadlineLarge,

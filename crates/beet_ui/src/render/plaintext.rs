@@ -84,3 +84,34 @@ impl NodeRenderer for PlainTextRenderer {
 		.xok()
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The non-visual tags hold no prose: a `<script>` body and an `<svg>`'s
+	/// `<text>` never reach the plain text.
+	#[beet_core::test]
+	fn skips_non_visual_tags() {
+		let mut world = World::new();
+		let root = world
+			.spawn(rsx! {
+				<div>
+					<script>"alert(1)"</script>
+					<svg viewBox="0 0 10 10"><text>"Picture"</text></svg>
+					<p>"Visible"</p>
+				</div>
+			})
+			.id();
+		PlainTextRenderer::default()
+			.render(&mut RenderContext::new(root, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_contains("Visible")
+			.xnot()
+			.xpect_contains("Picture")
+			.xnot()
+			.xpect_contains("alert");
+	}
+}

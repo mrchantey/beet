@@ -207,6 +207,7 @@ const MEDIA_PX_PER_CELL: f32 = 1024.0 / 90.0;
 /// The cell size of a surface's [`MediaViewport`], the inverse of
 /// [`sync_media_viewport`]: what a pass sizing content to a terminal before
 /// layout (a text diagram's column budget) reads.
+#[cfg(feature = "mermaid")]
 pub(crate) fn viewport_cells(viewport: &MediaViewport) -> UVec2 {
 	UVec2::new(
 		(viewport.width_px() / MEDIA_PX_PER_CELL).round() as u32,
