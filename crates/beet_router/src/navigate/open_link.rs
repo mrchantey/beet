@@ -549,6 +549,7 @@ mod test {
 			id: 1,
 			data: String::new(),
 			px: UVec2::ONE,
+			scale: 1,
 		});
 		click(&mut app, img);
 		app.world()

@@ -169,6 +169,9 @@ impl NodeRenderer for MediaRenderer {
 		// `@` bindings built with the tree have not synced yet: settle the
 		// document sync chain so every binding renders its current value.
 		DocumentSync::settle(cx.world);
+		// likewise a rule registered after the page's `<Stylesheet/>` baked
+		#[cfg(feature = "template")]
+		crate::widgets::settle_stylesheets(cx.world);
 
 		// Resolve the list of types to try: accepts list, or fallback to default.
 		// Collect into an owned Vec to avoid holding a borrow on `self` during

@@ -214,9 +214,12 @@ pub(crate) fn register_inline_rule(
 	rule: Rule,
 ) -> Result {
 	entity.world_scope(move |world| {
-		world
-			.get_resource_or_init::<RuleSet>()
-			.try_insert_inline(rule);
+		let mut rule_set = world.get_resource_or_init::<RuleSet>();
+		// read before writing: a mutable touch marks the set changed, and a
+		// baked stylesheet re-bakes on that change
+		if !rule_set.has_inline(rule.selector()) {
+			rule_set.try_insert_inline(rule);
+		}
 	});
 	if let Some(mut classes) = entity.get_mut::<Classes>() {
 		classes.insert_class(class);

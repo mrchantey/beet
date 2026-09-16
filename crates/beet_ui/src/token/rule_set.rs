@@ -55,11 +55,16 @@ impl RuleSet {
 		}
 	}
 
+	/// Whether an inline rule with `selector` is registered.
+	pub fn has_inline(&self, selector: &Selector) -> bool {
+		self.registered_inline.contains(selector)
+	}
+
 	/// Attempt to register an inline rule. If a rule with the same selector
 	/// has already been registered this does nothing and returns `false`,
 	/// otherwise the rule is inserted and `true` is returned.
 	pub fn try_insert_inline(&mut self, rule: Rule) -> bool {
-		if self.registered_inline.contains(rule.selector()) {
+		if self.has_inline(rule.selector()) {
 			return false;
 		}
 		self.registered_inline.insert(rule.selector().clone());

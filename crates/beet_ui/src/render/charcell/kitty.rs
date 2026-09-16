@@ -11,9 +11,10 @@
 //! a rendered diagram) is rasterised to PNG (resvg), any other raster format
 //! decodes and re-encodes to PNG, then a [`KittyImage`] and the `graphics`
 //! element state attach so the terminal-gated user-agent rule gives an `<img>`
-//! a block box. The measure and layout phases size that box from the pixel
-//! dimensions, contained within its [`CellBounds`] so no raster wants a box its
-//! scroll port could never show; paint reserves its cells; and
+//! a block box. The measure and layout phases size that box from the picture's
+//! css size (the pixels over the [`KittyImage::scale`] an svg rasterised at),
+//! contained within its [`CellBounds`] so no raster wants a box its scroll
+//! port could never show; paint reserves its cells; and
 //! `place_kitty_images` transmits the bytes once and (re)places the picture
 //! whenever its on-screen rect changes — scroll, reflow, or resize — cropping
 //! to the visible part of a box the port only partly shows.
@@ -37,8 +38,9 @@ use bevy::math::UVec2;
 use std::io::Write;
 
 /// A raster attached to an element (an `<img>`, a diagram's picture): its kitty
-/// image id, base64-encoded PNG payload, and pixel dimensions. The element is
-/// a replaced box sized by the raster, its own children never laid out.
+/// image id, base64-encoded PNG payload, pixel dimensions and scale. The
+/// element is a replaced box sized by the raster, its own children never laid
+/// out.
 ///
 /// Data-only and platform-neutral (measure/paint read it on every target);
 /// the systems that attach and emit it are `tui`-gated.
@@ -50,6 +52,11 @@ pub struct KittyImage {
 	pub data: String,
 	/// Pixel dimensions, parsed from the PNG header.
 	pub px: UVec2,
+	/// Raster pixels per css pixel: 1 for a decoded raster, 2 for an svg
+	/// rasterised at 2x so its text and strokes stay crisp ([`svg_to_png`]),
+	/// so the cell box is the picture's css size, as the web shows it, and
+	/// the terminal downscales the payload into it.
+	pub scale: u32,
 }
 
 /// The cell box a raster may occupy: the columns available on its line, and the
@@ -78,12 +85,14 @@ impl CellBounds {
 }
 
 impl KittyImage {
-	/// The cell footprint within `bounds`: a nominal 10px column and the ~2:1
-	/// cell aspect, preserving the raster's aspect ratio. The terminal scales the
-	/// image to exactly this rect (`c=`/`r=`).
+	/// The cell footprint within `bounds`: a nominal 10px column of the
+	/// picture's css width (the raster's over its [`scale`](Self::scale)) and
+	/// the ~2:1 cell aspect, preserving the raster's aspect ratio. The terminal
+	/// scales the image to exactly this rect (`c=`/`r=`).
 	pub fn cell_size(&self, bounds: CellBounds) -> UVec2 {
 		const CELL_PX_WIDTH: u32 = 10;
-		self.contain(self.px.x.div_ceil(CELL_PX_WIDTH).min(bounds.cols), bounds)
+		let css_width = self.px.x.div_ceil(self.scale.max(1));
+		self.contain(css_width.div_ceil(CELL_PX_WIDTH).min(bounds.cols), bounds)
 	}
 
 	/// The cell footprint honoring explicit box dimensions: a missing axis
@@ -369,8 +378,7 @@ pub(crate) async fn attach_raster(
 	let loaded = match bytes {
 		Ok(bytes) => {
 			blocking::unblock(move || {
-				to_png_bytes(bytes)
-					.and_then(encode_png)
+				decode_image(bytes, id)
 					.ok_or_else(|| bevyhow!("not a decodable image"))
 			})
 			.await
@@ -384,8 +392,8 @@ pub(crate) async fn attach_raster(
 		.with(move |mut entity| {
 			entity.remove::<KittyImageLoading>();
 			match loaded {
-				Ok((data, px)) => {
-					attach_image(entity, KittyImage { id, data, px });
+				Ok(image) => {
+					attach_image(entity, image);
 				}
 				Err(err) => {
 					entity.insert(KittyImageUnavailable {
@@ -421,27 +429,62 @@ pub(crate) fn render_image_errors(
 	}
 }
 
-/// PNG bytes for an image: PNG input passes through; an SVG is rasterised to
-/// PNG ([`svg_to_png`]); any other format the `image` decoder understands (eg
-/// JPEG) is decoded to RGBA and re-encoded to PNG. `None` when the bytes are
-/// not a decodable image.
+/// The raster an element carries as kitty image `id`, decoded from `bytes`
+/// ([`to_png_bytes`]) and encoded for transmission ([`encode_png`]). `None`
+/// when the bytes are not a decodable image.
 #[cfg(all(
 	feature = "tui",
 	any(feature = "net", feature = "mermaid_svg", test)
 ))]
-pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Vec<u8>> {
+pub(crate) fn decode_image(bytes: Vec<u8>, id: u32) -> Option<KittyImage> {
+	let Png { bytes, scale } = to_png_bytes(bytes)?;
+	let (data, px) = encode_png(bytes)?;
+	Some(KittyImage {
+		id,
+		data,
+		px,
+		scale,
+	})
+}
+
+/// PNG bytes for an image and the raster pixels each of its css pixels took.
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+pub(crate) struct Png {
+	pub bytes: Vec<u8>,
+	/// See [`KittyImage::scale`].
+	pub scale: u32,
+}
+
+/// PNG bytes for an image: PNG input passes through; an SVG is rasterised to
+/// PNG ([`svg_to_png`], at its scale); any other format the `image` decoder
+/// understands (eg JPEG) is decoded to RGBA and re-encoded to PNG. `None`
+/// when the bytes are not a decodable image.
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+pub(crate) fn to_png_bytes(bytes: Vec<u8>) -> Option<Png> {
 	if png_dimensions(&bytes).is_some() {
-		return Some(bytes);
+		return Some(Png { bytes, scale: 1 });
 	}
 	if is_svg(&bytes) {
-		return svg_to_png(&bytes);
+		return svg_to_png(&bytes).map(|bytes| Png {
+			bytes,
+			scale: SVG_SCALE,
+		});
 	}
 	let image = image::load_from_memory(&bytes).ok()?;
 	let mut png = std::io::Cursor::new(Vec::new());
 	image
 		.write_to(&mut png, image::ImageFormat::Png)
 		.ok()
-		.map(|_| png.into_inner())
+		.map(|_| Png {
+			bytes: png.into_inner(),
+			scale: 1,
+		})
 }
 
 /// Whether `bytes` look like an SVG: valid-ish UTF-8 text whose first non-blank
@@ -480,12 +523,21 @@ fn svg_fontdb() -> std::sync::Arc<resvg::usvg::fontdb::Database> {
 		.clone()
 }
 
+/// Raster pixels per css pixel an svg rasterises at ([`svg_to_png`]).
+#[cfg(all(
+	feature = "tui",
+	any(feature = "net", feature = "mermaid_svg", test)
+))]
+const SVG_SCALE: u32 = 2;
+
 /// Rasterise an SVG to PNG bytes, or `None` when the bytes do not parse as an
-/// SVG. Rendered at 2× and left for the terminal to downscale, so text and thin
-/// strokes stay crisp; the target is clamped so a pathological `viewBox` cannot
-/// allocate an unbounded pixmap. The figure's own colours are honoured verbatim
-/// — a deck SVG authored in the site palette therefore rasterises on-theme (the
-/// palette lives in the SVG, the single surface a re-theme would touch).
+/// SVG. Rendered at [`SVG_SCALE`] and left for the terminal to downscale into
+/// the picture's css-sized box ([`KittyImage::scale`]), so text and thin
+/// strokes stay crisp; the target is clamped so a pathological `viewBox`
+/// cannot allocate an unbounded pixmap. The figure's own colours are honoured
+/// verbatim — a deck SVG authored in the site palette therefore rasterises
+/// on-theme (the palette lives in the SVG, the single surface a re-theme would
+/// touch).
 #[cfg(all(
 	feature = "tui",
 	any(feature = "net", feature = "mermaid_svg", test)
@@ -500,7 +552,7 @@ fn svg_to_png(bytes: &[u8]) -> Option<Vec<u8>> {
 	};
 	let tree = usvg::Tree::from_data(bytes, &options).ok()?;
 
-	const SCALE: f32 = 2.0;
+	const SCALE: f32 = SVG_SCALE as f32;
 	const MAX_PX: u32 = 4096;
 	let size = tree.size();
 	let width = ((size.width() * SCALE).ceil() as u32).clamp(1, MAX_PX);
@@ -889,13 +941,29 @@ mod test {
 		png_dimensions(b"not a png").xpect_eq(None);
 	}
 
-	/// A raster of the given pixel size, the only field the sizing math reads.
+	/// A raster of the given pixel size at scale 1, the fields the sizing
+	/// math reads.
 	fn sized_image(px: UVec2) -> KittyImage {
 		KittyImage {
 			id: 1,
 			data: String::new(),
 			px,
+			scale: 1,
 		}
+	}
+
+	/// An svg's raster is twice its css size, and its cell box the css size:
+	/// the same 200 css px picture takes the same 20 columns as a 200px photo.
+	#[beet_core::test]
+	fn cell_size_is_the_css_size() {
+		let svg = KittyImage {
+			scale: 2,
+			..sized_image(UVec2::new(400, 200))
+		};
+		svg.cell_size(CellBounds::new(80, 24)).xpect_eq(
+			sized_image(UVec2::new(200, 100))
+				.cell_size(CellBounds::new(80, 24)),
+		);
 	}
 
 	/// The cell box preserves aspect through the ~2:1 cell shape and clamps to
@@ -992,7 +1060,7 @@ mod test {
 			.get_resource_or_init::<RuleSet>()
 			.extend_rules(rules);
 		host.spawn_content(content);
-		let (data, px) = encode_png(png_bytes(px.x, px.y)).expect("valid png");
+		let image = decode_image(png_bytes(px.x, px.y), 1).expect("valid png");
 		let world = host.app.world_mut();
 		let img = world
 			.query_filtered::<(Entity, &Element), With<Element>>()
@@ -1000,7 +1068,7 @@ mod test {
 			.find(|(_, element)| element.tag() == "img")
 			.map(|(entity, _)| entity)
 			.expect("img element");
-		attach_image(world.entity_mut(img), KittyImage { id: 1, data, px });
+		attach_image(world.entity_mut(img), image);
 		host.step();
 		host
 	}
@@ -1209,11 +1277,7 @@ mod test {
 			buf.into_inner()
 		};
 		// decoded + re-encoded to a valid PNG of the same dimensions
-		to_png_bytes(jpeg)
-			.and_then(encode_png)
-			.unwrap()
-			.1
-			.xpect_eq(UVec2::new(8, 6));
+		decode_image(jpeg, 1).unwrap().px.xpect_eq(UVec2::new(8, 6));
 	}
 
 	/// Removing the image deletes its placement; a resize deletes all visible
@@ -1290,7 +1354,8 @@ mod test {
 </svg>"##;
 
 	/// An `<img src=*.svg>` is rasterised to a valid PNG at 2× the `viewBox`,
-	/// covering the gradient/style/text surface the deck figures rely on.
+	/// carrying that scale so it sizes at the `viewBox`, covering the
+	/// gradient/style/text surface the deck figures rely on.
 	#[cfg(all(feature = "tui", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	fn rasterizes_svg_to_png() {
@@ -1298,11 +1363,12 @@ mod test {
 		is_svg(SAMPLE_SVG.as_bytes()).xpect_true();
 		is_svg(&png_bytes(8, 6)).xpect_false();
 		// rasterised to a valid PNG at 2x the 100x60 viewBox
-		to_png_bytes(SAMPLE_SVG.as_bytes().to_vec())
-			.and_then(encode_png)
-			.unwrap()
-			.1
-			.xpect_eq(UVec2::new(200, 120));
+		let image = decode_image(SAMPLE_SVG.as_bytes().to_vec(), 1).unwrap();
+		image.px.xpect_eq(UVec2::new(200, 120));
+		image.scale.xpect_eq(2);
+		image
+			.cell_size(CellBounds::new(80, 24))
+			.xpect_eq(UVec2::new(10, 3));
 	}
 
 	/// Dev aid (no assertions): with `BEET_SVG_DUMP_OUT` set, rasterise the file
@@ -1318,7 +1384,7 @@ mod test {
 			Ok(path) => fs_ext::read(path.as_str()).unwrap(),
 			Err(_) => SAMPLE_SVG.as_bytes().to_vec(),
 		};
-		fs_ext::write(out.as_str(), to_png_bytes(svg).unwrap()).unwrap();
+		fs_ext::write(out.as_str(), to_png_bytes(svg).unwrap().bytes).unwrap();
 	}
 
 	/// SSH detection: a flattened `TERM` plus a non-zero pixel window (eg ghostty
@@ -1390,10 +1456,9 @@ mod test {
 		let Some(jpeg) = shanty_jpeg() else {
 			return; // no local assets/ (fresh checkout); covered by `decodes_jpeg_image`
 		};
-		to_png_bytes(jpeg)
-			.and_then(encode_png)
+		decode_image(jpeg, 1)
 			.unwrap()
-			.1
+			.px
 			.xpect_eq(UVec2::new(1280, 960));
 	}
 

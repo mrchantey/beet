@@ -410,6 +410,10 @@ mod raster_test {
 
 	const PAGE: &str = "```mermaid\ngraph LR; A[Parse] --> B[Paint]\n```\n\n```mermaid\nsequenceDiagram\nAlice->>Bob: hi\n```";
 
+	/// A sequence diagram wider than an 80-column host's figure at its css
+	/// size (five actors, ~1000px).
+	const WIDE_SEQUENCE: &str = "```mermaid\nsequenceDiagram\nAlice->>Bob: hello there Bob\nBob->>Carol: hello there Carol\nCarol->>Dave: hello there Dave\nDave->>Eve: hello there Eve\n```";
+
 	/// An 80x24 host whose terminal reports `support`, showing [`PAGE`]: a
 	/// flowchart then a sequence diagram, both `Auto`.
 	fn diagram_host(support: KittyGraphicsSupport) -> TestHost {
@@ -528,7 +532,9 @@ mod raster_test {
 		// tall enough that no scroll port shrinks the wide picture's measure
 		let mut host = page_host(
 			KittyGraphicsSupport { enabled: true },
-			"```mermaid\nstateDiagram-v2\n[*] --> A\nA --> [*]\n```\n\n```mermaid\nsequenceDiagram\nAlice->>Bob: hello there Bob\n```",
+			&format!(
+				"```mermaid\nstateDiagram-v2\n[*] --> A\nA --> [*]\n```\n\n{WIDE_SEQUENCE}"
+			),
 			UVec2::new(80, 80),
 		);
 		for figure in figures(&host) {
@@ -596,11 +602,7 @@ mod raster_test {
 				ChildOf(host.host),
 			))
 			.id();
-		parse_md(
-			host.app.world_mut(),
-			column,
-			"```mermaid\nsequenceDiagram\nAlice->>Bob: hello there Bob\n```",
-		);
+		parse_md(host.app.world_mut(), column, WIDE_SEQUENCE);
 		let figure =
 			host.app.world().entity(column).get::<Children>().unwrap()[0];
 		host.app

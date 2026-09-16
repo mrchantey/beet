@@ -344,8 +344,7 @@ mod test {
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
 	fn rasterizes_a_sequence_diagram() {
-		use crate::render::encode_png;
-		use crate::render::to_png_bytes;
+		use crate::render::decode_image;
 		use crate::style::material::MaterialStylePlugin;
 
 		let mut world = (StylePlugin, MaterialStylePlugin).into_world();
@@ -364,11 +363,13 @@ mod test {
 			.xpect_contains(&theme.sequence_actor_fill)
 			.xnot()
 			.xpect_contains("var(");
-		let px = to_png_bytes(svg.into_bytes())
-			.and_then(encode_png)
-			.unwrap()
-			.1;
-		px.x.xpect_eq((width * 2.).ceil() as u32);
-		px.y.xpect_greater_than(100);
+		let image = decode_image(svg.into_bytes(), 1).unwrap();
+		image.px.x.xpect_eq((width * 2.).ceil() as u32);
+		image.px.y.xpect_greater_than(100);
+		// sized at its css width, as the web pins it
+		image
+			.cell_size(CellBounds::new(1000, 1000))
+			.x
+			.xpect_eq((width.ceil() as u32).div_ceil(10));
 	}
 }
