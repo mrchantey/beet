@@ -3,7 +3,8 @@ use beet_core::prelude::*;
 /// A mermaid diagram awaiting its form: the fence body and the family its first
 /// line names. Carried by the `<figure class="diagram">` the collector spawns
 /// (or a `<Mermaid>` template), read by `materialize_diagrams`, which builds the
-/// diagram's form beneath a figure that has no children yet.
+/// diagram's form beneath the figure for the sink it is on, and rebuilds it when
+/// the sink changes.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]
 pub struct MermaidDiagram {

@@ -110,6 +110,10 @@ syntax_highlighting = [
 # sink through `mermaid-text` (pure Rust, wasm-safe). The form a diagram takes
 # is the `diagram-render` cascade property; see `parse/mermaid`.
 mermaid = ["style", "dep:mermaid-text"]
+# The svg form of a diagram through `mermaid-rs-renderer` (pure Rust, 23
+# diagram types), themed by the token cascade. Native only: the crate reads a
+# clock on its layout path, so a wasm build keeps the text form.
+mermaid_svg = ["mermaid", "dep:mermaid-rs-renderer"]
 
 template_serde = ["beet_core/template_serde", "serde"]
 
@@ -165,6 +169,10 @@ tree-sitter-json = { version = "0.24", optional = true }
 tree-sitter-html = { version = "0.23", optional = true }
 tree-sitter-bash = { version = "0.25", optional = true }
 streaming-iterator = { version = "0.1", optional = true }
+# mermaid svg: `default-features = false` drops its own resvg (beet's kitty
+# path already carries one) and the cli; `fast_text_metrics` keeps it off the
+# font database, so a render is deterministic and touches no cache file.
+mermaid-rs-renderer = { version = "0.3", optional = true, default-features = false }
 
 
 [dev-dependencies]

@@ -82,6 +82,19 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(TransformProp)
 		.insert(OpacityProp)
 		.insert(DiagramRenderProp)
+		.insert(DiagramSurfaceProp)
+		.insert(DiagramNodeFillProp)
+		.insert(DiagramNodeTextProp)
+		.insert(DiagramOutlineProp)
+		.insert(DiagramLineProp)
+		.insert(DiagramTextProp)
+		.insert(DiagramSecondaryFillProp)
+		.insert(DiagramTertiaryFillProp)
+		.insert(DiagramTertiaryTextProp)
+		.insert(DiagramClusterFillProp)
+		.insert(DiagramClusterOutlineProp)
+		.insert(DiagramFontProp)
+		.insert(DiagramRampProp)
 }
 
 
@@ -152,6 +165,31 @@ css_property!(AnimationDurationProp, Duration, TokenInheritance::NotInherited, "
 // for every diagram below; serialized as a custom property, inert in the
 // stylesheet and readable from JS.
 canonical_property!(DiagramRenderProp, DiagramRender, TokenInheritance::Inherited, "--diagram-render");
+// The colours and typeface a diagram is drawn with, one per `DiagramPaint`
+// role: custom properties on the figure, which the stylesheet builder never
+// renames as it does a token variable, so an inline svg's
+// `fill="var(--diagram-node-fill)"` resolves against whatever the cascade
+// declares for its figure: the material `:root` defaults (`parse/mermaid`), a
+// page root's `bx:style`, or a `<Rule>`. Inherited, like every text prop.
+css_property!(DiagramSurfaceProp, Color, TokenInheritance::Inherited, "--diagram-surface");
+css_property!(DiagramNodeFillProp, Color, TokenInheritance::Inherited, "--diagram-node-fill");
+css_property!(DiagramNodeTextProp, Color, TokenInheritance::Inherited, "--diagram-node-text");
+css_property!(DiagramOutlineProp, Color, TokenInheritance::Inherited, "--diagram-outline");
+css_property!(DiagramLineProp, Color, TokenInheritance::Inherited, "--diagram-line");
+css_property!(DiagramTextProp, Color, TokenInheritance::Inherited, "--diagram-text");
+css_property!(DiagramSecondaryFillProp, Color, TokenInheritance::Inherited, "--diagram-secondary-fill");
+css_property!(DiagramTertiaryFillProp, Color, TokenInheritance::Inherited, "--diagram-tertiary-fill");
+css_property!(DiagramTertiaryTextProp, Color, TokenInheritance::Inherited, "--diagram-tertiary-text");
+css_property!(DiagramClusterFillProp, Color, TokenInheritance::Inherited, "--diagram-cluster-fill");
+css_property!(DiagramClusterOutlineProp, Color, TokenInheritance::Inherited, "--diagram-cluster-outline");
+css_property!(DiagramFontProp, Typeface, TokenInheritance::Inherited, "--diagram-font");
+// the ramp writes one fill/text pair per step, named by the value type
+token!(DiagramRampProp, DiagramRamp, TokenInheritance::Inherited);
+impl AsCssRule for DiagramRampProp {
+	fn as_css_rule(&self, value: &TokenValue) -> Result<CssRule> {
+		CssRule::from_props_value::<DiagramRamp>(DiagramRamp::suffixes(), value)
+	}
+}
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(WordBreakProp, WordBreak, "word-break");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");

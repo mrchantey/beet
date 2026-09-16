@@ -6,37 +6,79 @@ use crate::style::common_props::DiagramRenderProp;
 use crate::style::common_props::Padding;
 use beet_core::prelude::*;
 
-/// Give every fresh [`MermaidDiagram`] figure (one with no children yet) its
-/// form. The mode is `diagram-render` resolved through the cascade for the
-/// figure; in this build every mode is text: a `<pre class="diagram-text">` of
-/// box-drawing glyphs, reflowed to the surface's column budget on a terminal and
-/// unbounded on the web. `Svg` warns that it degraded, never errors. A render
-/// error keeps the source visible in a `<pre>` under a material error box, and
-/// warns.
+/// The sink and width a figure's form was built for, so a later pass on
+/// another sink rebuilds it: a served page is built with no surface (the web's
+/// picture) and then painted for a terminal by the one-shot ansi renderer,
+/// which runs the passes again under its buffer; a live terminal resize
+/// changes the column budget.
+#[derive(Debug, Clone, PartialEq, Component)]
+pub(crate) struct DiagramForm {
+	/// The mode the cascade resolved for the figure.
+	render: DiagramRender,
+	/// The terminal's column budget, `None` on the web.
+	columns: Option<usize>,
+}
+
+/// Give every [`MermaidDiagram`] figure its form, rebuilding one whose sink,
+/// width or mode ([`DiagramForm`]) changed since it was built. The mode is
+/// `diagram-render` resolved through the cascade for the figure:
+///
+/// - On the web (no surface viewport above the figure) `Auto` and `Svg` are
+///   the crate's picture, spawned inline (`svg.rs`). A build without
+///   `mermaid_svg` warns that `Svg` degraded, never errors.
+/// - Everywhere else, and for `Text`, a `<pre class="diagram-text">` of
+///   box-drawing glyphs, reflowed to the surface's column budget on a terminal
+///   and unbounded on the web.
+///
+/// A render error keeps the source visible in a `<pre>` under a material error
+/// box, and warns.
 pub(crate) fn materialize_diagrams(
 	mut commands: Commands,
-	diagrams: Populated<(Entity, &MermaidDiagram), Without<Children>>,
+	diagrams: Populated<(Entity, &MermaidDiagram, Option<&DiagramForm>)>,
 	rules: RuleSetQuery,
-	surfaces: SurfaceQuery,
-	viewports: Query<&MediaViewport>,
 ) {
 	let mut memo = CascadeMemo::default();
-	for (figure, diagram) in diagrams.iter() {
+	for (figure, diagram, built) in diagrams.iter() {
 		let render = rules
 			.resolve(figure, DiagramRenderProp, &mut memo)
 			.unwrap_or_default();
-		if render == DiagramRender::Svg {
-			warn!(
-				"`diagram-render=Svg` needs the `mermaid_svg` feature, rendering `{}` as text",
-				diagram.title()
-			);
+		// a viewport above the figure is a terminal; the web has none
+		let columns = rules.surface_viewport(figure).map(|viewport| {
+			column_budget(&rules, figure, &viewport, &mut memo)
+		});
+		let form = DiagramForm { render, columns };
+		if built == Some(&form) {
+			continue;
 		}
-		// a surface is a terminal: reflow to its columns. The web has none.
-		let budget = surfaces
-			.surface_of(figure)
-			.and_then(|surface| viewports.get(surface).ok())
-			.map(|viewport| column_budget(&rules, figure, viewport, &mut memo));
-		match mermaid_text::render_with_width(&diagram.source, budget) {
+		// a form built for another sink or width goes, this one replaces it
+		if built.is_some() {
+			commands.entity(figure).despawn_related::<Children>();
+		}
+		commands.entity(figure).insert(form);
+		if columns.is_none() && render != DiagramRender::Text {
+			#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
+			{
+				super::svg::spawn_svg(
+					&mut commands,
+					figure,
+					diagram,
+					&rules,
+					&mut memo,
+				);
+				continue;
+			}
+			#[cfg(not(all(
+				feature = "mermaid_svg",
+				not(target_arch = "wasm32")
+			)))]
+			if render == DiagramRender::Svg {
+				warn!(
+					"`diagram-render=Svg` needs the `mermaid_svg` feature, rendering `{}` as text",
+					diagram.title()
+				);
+			}
+		}
+		match mermaid_text::render_with_width(&diagram.source, columns) {
 			Ok(text) => spawn_text(&mut commands, figure, text),
 			Err(err) => {
 				spawn_error(&mut commands, figure, &diagram.source, err)
@@ -73,11 +115,11 @@ fn spawn_text(commands: &mut Commands, figure: Entity, text: String) {
 
 /// The material error box naming the failure, then the source in a `<pre>` so
 /// the author still sees what they wrote.
-fn spawn_error(
+pub(super) fn spawn_error(
 	commands: &mut Commands,
 	figure: Entity,
 	source: &str,
-	err: mermaid_text::Error,
+	err: impl std::fmt::Display,
 ) {
 	warn!("mermaid diagram failed to render: {err}\n{source}");
 	commands.spawn((
@@ -101,17 +143,22 @@ mod test {
 	const FLOWCHART: &str =
 		"```mermaid\ngraph LR; A[Parse] --> B[Style]; B --> C[Paint]\n```";
 
+	/// The `text` info word is the box art on the web too.
 	#[beet_core::test]
 	fn renders_text_on_the_string_sink() {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
-		parse_md(app.world_mut(), root, FLOWCHART);
+		parse_md(
+			app.world_mut(),
+			root,
+			&FLOWCHART.replace("mermaid", "mermaid text"),
+		);
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(root, app.world_mut()))
 			.unwrap()
 			.to_string()
-			.xpect_contains("<figure class=\"diagram\">")
+			.xpect_contains("<figure class=\"diagram inline-style-")
 			.xpect_contains("<pre class=\"diagram-text\">")
 			.xpect_contains("Paint")
 			.xpect_snapshot();
@@ -140,6 +187,50 @@ mod test {
 					.join("\n")
 			})
 			.xpect_snapshot();
+	}
+
+	/// A served page is built with no surface, then the one-shot ansi renderer
+	/// paints it under a buffer: the form built for the web is rebuilt as text
+	/// for the terminal, and a narrower buffer reflows it.
+	#[beet_core::test]
+	fn rebuilds_the_form_for_the_sink() {
+		let mut world = CharcellPlugin::world();
+		let root = world.spawn_empty().id();
+		parse_md(&mut world, root, FLOWCHART);
+		let first_form = |world: &mut World| {
+			world.with_state::<ElementQuery, _>(|elements| {
+				elements
+					.iter_descendants_inclusive(root)
+					.nth(1)
+					.map(|view| view.tag().to_string())
+			})
+		};
+		let rendered = |world: &mut World, width: u32| {
+			world.entity_mut(root).insert(FlexBuffer::new(width));
+			world.run_schedule(PostParseTree);
+			world
+				.entity_mut(root)
+				.take::<FlexBuffer>()
+				.unwrap()
+				.render_plain()
+		};
+		#[cfg(feature = "mermaid_svg")]
+		first_form(&mut world).xpect_eq(Some("svg".to_string()));
+		let wide = rendered(&mut world, 80);
+		first_form(&mut world).xpect_eq(Some("pre".to_string()));
+		wide.xref().xpect_contains("│ Parse │────");
+		// a narrower terminal reflows the art, a repeat at the same width keeps it
+		let narrow = rendered(&mut world, 40);
+		narrow.xref().xnot().xpect_contains("│ Parse │────");
+		let figure = world.entity(root).get::<Children>().unwrap()[0];
+		let art = world.entity(figure).get::<Children>().unwrap().to_vec();
+		rendered(&mut world, 40).xpect_eq(narrow);
+		world
+			.entity(figure)
+			.get::<Children>()
+			.unwrap()
+			.to_vec()
+			.xpect_eq(art);
 	}
 
 	#[beet_core::test]

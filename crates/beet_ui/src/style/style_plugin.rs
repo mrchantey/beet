@@ -55,11 +55,12 @@ impl Plugin for StylePlugin {
 					.chain()
 					.in_set(DiagramSet),
 			);
-			// the `:root` default, so the stylesheet states `--diagram-render:
-			// auto` for a script to read and the cascade always resolves a mode
+			// the `:root` defaults, so the stylesheet states `--diagram-render:
+			// auto` for a script to read, the cascade always resolves a mode, and
+			// every paint role has its material colour for the svg's `var()`s
 			let mut rules = app.world_mut().get_resource_or_init::<RuleSet>();
 			rules.default_rule_mut().push_declarations(
-				Rule::new().with_canonical(DiagramRender::Auto),
+				diagram_paint_defaults().with_canonical(DiagramRender::Auto),
 			);
 			rules.extend_rules(diagram_rules());
 		}

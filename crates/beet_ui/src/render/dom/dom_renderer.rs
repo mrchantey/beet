@@ -930,6 +930,39 @@ mod test {
 		field(app.world(), host, "name").xpect_eq(Value::str("pete"));
 	}
 
+	/// An inline svg paints in its own namespace with `viewBox` in its case
+	/// (a namespaced attribute is case-sensitive, and a lowercased one is
+	/// ignored by the browser), matching the served page, which adopts
+	/// untouched.
+	#[beet_core::test(browser)]
+	fn an_inline_svg_keeps_its_case() {
+		let svg_page = |app: &mut App| {
+			build(app, rsx! {
+				<figure class="diagram">
+					<svg viewBox="0 0 10 10">
+						<rect width="10" height="10" fill="var(--diagram-node-fill)"/>
+					</svg>
+				</figure>
+			})
+		};
+		let mut app = dom_app();
+		let host = svg_page(&mut app);
+		let target = paint(&mut app, host);
+		let svg = target.query_selector("svg").unwrap().unwrap();
+		svg.namespace_uri()
+			.xpect_eq(Some("http://www.w3.org/2000/svg".to_string()));
+		svg.get_attribute("viewBox")
+			.xpect_eq(Some("0 0 10 10".to_string()));
+		target
+			.inner_html()
+			.xpect_eq(ssr_html(app.world_mut(), host));
+		// the served picture adopts untouched
+		let mut app = dom_app();
+		let host = svg_page(&mut app);
+		let served = serve(&mut app, host);
+		adopt(&mut app, host, &served).is_clean().xpect_true();
+	}
+
 	/// The conformance probe over prose: a markdown page with a table, a
 	/// fenced block and inline code, the shapes a browser's parser is most
 	/// tempted to reshape, adopts untouched.

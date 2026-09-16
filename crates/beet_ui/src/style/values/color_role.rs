@@ -4,7 +4,9 @@ use beet_core::prelude::*;
 
 css_property!(ColorRoleProps, ColorRole, "background-color", "color");
 
-#[derive(Reflect)]
+/// A background and foreground token pair, ie a material `*Container` and
+/// its `On*Container`.
+#[derive(Debug, Clone, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ColorRole {
 	pub background: Token,

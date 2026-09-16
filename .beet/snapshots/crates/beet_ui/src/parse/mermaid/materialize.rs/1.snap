@@ -1,4 +1,4 @@
-<figure class="diagram"><pre class="diagram-text">┌───────┐     ┌───────┐     ┌───────┐
+<figure class="diagram inline-style-4291406854-1715699002"><pre class="diagram-text">┌───────┐     ┌───────┐     ┌───────┐
 │ Parse │────▸│ Style │────▸│ Paint │
 └───────┘     └───────┘     └───────┘
 </pre></figure>

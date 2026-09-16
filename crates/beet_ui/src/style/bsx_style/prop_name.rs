@@ -141,6 +141,21 @@ impl PropResolver {
 			("white-space", prop::<WhiteSpaceProp>()),
 			("list-style-type", prop::<ListStyleProp>()),
 			("diagram-render", prop::<DiagramRenderProp>()),
+			("diagram-surface", prop::<DiagramSurfaceProp>()),
+			("diagram-node-fill", prop::<DiagramNodeFillProp>()),
+			("diagram-node-text", prop::<DiagramNodeTextProp>()),
+			("diagram-outline", prop::<DiagramOutlineProp>()),
+			("diagram-line", prop::<DiagramLineProp>()),
+			("diagram-text", prop::<DiagramTextProp>()),
+			("diagram-secondary-fill", prop::<DiagramSecondaryFillProp>()),
+			("diagram-tertiary-fill", prop::<DiagramTertiaryFillProp>()),
+			("diagram-tertiary-text", prop::<DiagramTertiaryTextProp>()),
+			("diagram-cluster-fill", prop::<DiagramClusterFillProp>()),
+			(
+				"diagram-cluster-outline",
+				prop::<DiagramClusterOutlineProp>(),
+			),
+			("diagram-font", prop::<DiagramFontProp>()),
 		]
 		.into_iter()
 		.map(|(name, resolver)| (SmolStr::new_static(name), resolver))

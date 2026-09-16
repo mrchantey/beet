@@ -3,6 +3,7 @@ use crate::parse::PostParseTree;
 #[cfg(feature = "tui")]
 use crate::parse::RealtimeParsePlugin;
 use crate::prelude::MediaViewport;
+use crate::style::DiagramSet;
 use crate::style::ResolveStylesSet;
 use crate::style::StylePlugin;
 use beet_core::prelude::*;
@@ -106,13 +107,15 @@ impl Plugin for CharcellPlugin {
 				buffer_plugin::<FlexBuffer>,
 			))
 			// surface size → `MediaViewport`, before the cascade reads it (and
-			// before `resolve_styles`'s `Changed` trigger scans it this frame)
+			// before `resolve_styles`'s `Changed` trigger scans it this frame),
+			// and before the diagram passes size their text to the columns
 			.add_systems(
 				PostParseTree,
 				(
 					sync_media_viewport::<DoubleBuffer>,
 					sync_media_viewport::<FlexBuffer>,
 				)
+					.before(DiagramSet)
 					.before(ResolveStylesSet),
 			)
 			// decorations run after styles resolve, the paint pipeline after both

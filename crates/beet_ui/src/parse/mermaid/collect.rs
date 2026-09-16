@@ -128,9 +128,11 @@ pub(super) mod test {
 		parse_md(app.world_mut(), root, FLOWCHART);
 		let world = app.world_mut();
 		let figure = world.entity(root).get::<Children>().unwrap()[0];
-		// the pre is now the figure, its code gone, the art beneath it
-		tags(world, root)
-			.xpect_eq(vec!["figure".to_string(), "pre".to_string()]);
+		// the pre is now the figure, its code gone, the form beneath it
+		let built = tags(world, root);
+		built[0].as_str().xpect_eq("figure");
+		built.iter().any(|tag| tag == "code").xpect_false();
+		built.len().xpect_greater_than(1);
 		let diagram = world.entity(figure).get::<MermaidDiagram>().unwrap();
 		diagram.kind.xpect_eq(DiagramKind::Flowchart);
 		diagram.source.as_str().xpect_contains("A[Start]");
@@ -142,8 +144,7 @@ pub(super) mod test {
 			.xpect_true();
 		// running the passes again leaves the figure alone
 		world.run_schedule(PostParseTree);
-		tags(world, root)
-			.xpect_eq(vec!["figure".to_string(), "pre".to_string()]);
+		tags(world, root).xpect_eq(built);
 	}
 
 	#[beet_core::test]
@@ -197,7 +198,7 @@ pub(super) mod test {
 		);
 		let world = app.world_mut();
 		let figure = world.entity(root).get::<Children>().unwrap()[0];
-		// no inline rule was declared, the mode is the default and the art still renders
+		// no inline rule was declared, the mode is the default and the form still builds
 		resolve_render(world, figure).xpect_eq(DiagramRender::Auto);
 		world
 			.entity(figure)
@@ -205,7 +206,6 @@ pub(super) mod test {
 			.unwrap()
 			.len()
 			.xpect_eq(1);
-		tags(world, root)
-			.xpect_eq(vec!["figure".to_string(), "pre".to_string()]);
+		tags(world, root).len().xpect_greater_than(1);
 	}
 }

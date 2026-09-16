@@ -373,8 +373,13 @@ impl RuleSetQuery<'_, '_> {
 	/// [`parent`](Self::parent) chain inheritance uses, so transcluded content
 	/// (eg a live page under a buffer host's slot) resolves the surface that
 	/// renders it. `None` when no surface exists (eg building static HTML
-	/// server-side), which skips width-gated rules.
-	fn surface_viewport(&self, entity: Entity) -> Option<MediaViewport> {
+	/// server-side), which skips width-gated rules; a terminal buffer always
+	/// carries one, so this is also the "am I on a terminal" fact a pass sizing
+	/// content to columns reads.
+	pub(crate) fn surface_viewport(
+		&self,
+		entity: Entity,
+	) -> Option<MediaViewport> {
 		let mut current = entity;
 		loop {
 			if let Ok(viewport) = self.viewports.get(current) {

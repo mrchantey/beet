@@ -231,8 +231,8 @@ beet = { workspace = true, features = [
 	"client_io",
 	# fenced code blocks in served/presented decks render highlighted
 	"syntax_highlighting",
-	# ```mermaid fences render as diagrams
-	"mermaid",
+	# ```mermaid fences render as diagrams, inline svg on the web
+	"mermaid_svg",
 	# the embedded QuickJS engine: the `ExchangeScriptElement` console-capturing
 	# entry action and the `ExchangeScript` route backend a `main.bsx` wires.
 	"quickjs",
