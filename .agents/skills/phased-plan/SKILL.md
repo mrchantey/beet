@@ -9,7 +9,17 @@ Write a phase plan to the plans directory with the provided name, defaulting to 
 - `.agents/plans/write-todos.md`
 - `.agents/plans/master-plan.md`
 
-Use your own discretion as to whether the plan is to be executed in a single pass by one model or each phase individually by model with checks by the user in between.
+## Verbs
+
+Every phase heading carries exactly one verb, usually `build`:
+
+- `settle`: define words, rules and principles. The deliverable is documentation (site docs, READMEs, module docs) and this plan edited.
+- `investigate`: find out. The deliverable is a report under `.agents/reports/` and this plan edited. An investigation that spans many crates or systems is fanned out: the phase's agent spawns one sub-agent per crate or system against one rubric and merges their findings itself.
+- `build`: code, tests and deletions.
+
+A `settle` or `investigate` phase ends by editing the plan: insert sub-phases (`11.1`, `11.2`, ..) under the phases its outcome changes, each with its own verb and a spec a fresh agent can execute, and no more than necessary. It never spawns a separate plan unless the plan says so.
+
+## Format
 
 Use a format something like this. It doesn't have to be strictly in this shape, but roughly like this.
 
@@ -28,9 +38,13 @@ Phase: 2
 ### Some subheading
 ## Phases
 
-### Phase 1
+### Phase 1 (settle)
 ...
-### Phase 2
+### Phase 2 (build)
+...
+#### Phase 2.1 (build)
+inserted by phase 1, the rename its glossary decided
+### Phase 3 (investigate)
 ...
 
 ## Completed
