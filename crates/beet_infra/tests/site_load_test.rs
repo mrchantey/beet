@@ -3,7 +3,7 @@
 //! scale-in once the load drops. `#[ignore]`d: it hits the live `beet-site--dev`
 //! deployment, costs money, and runs ~25 minutes.
 //!
-//! ## Background (`.agents/reports/load-test.md`, reconciled to the v3 topology)
+//! ## Background (the v1 load test, reconciled to the v3 topology)
 //!
 //! The service autoscales on the predefined target-tracking metric
 //! `ECSServiceAverageCPUUtilization`, target 50%, min 1 / max 5. The v1 load test

@@ -48,7 +48,7 @@ Walk each hit through these in order, first match wins:
 4. **Proc-macro entry point** (`#[proc_macro]`, `#[proc_macro_derive]`, `#[proc_macro_attribute]`, ie `beet_core/macros`): exempt, the proc-macro ABI mandates a free fn.
 5. **Bevy system, observer or plugin fn** (SystemParam or `On`/`Trigger` parameters, registered via `add_systems`/`add_observer`/`observe`; or `fn(&mut App)` passed to `add_plugins`): exempt from relocation, the fn shape is the bevy idiom. Visibility-only: private by default, its plugin registers it. Keep `pub` only when another crate registers or pipes it.
 6. **Sanctioned namespace module** (allowlist above): exempt.
-7. **`crates/beet_ui/src/style/material/classes/`**: untouched entirely, parked pending BSN (master plan item 15).
+7. **`crates/beet_ui/src/style/material/classes/`**: untouched entirely, parked pending BSN.
 8. **Everything else**: relocate to an associated fn/const on the type it mainly relates to (a `DEFAULT_FOO` const almost always belongs on `Foo`); if genuinely typeless, into an existing or new `*_ext` module, or nominate a namespace module. Independently, drop visibility to `pub(crate)` or private unless consumed cross-crate, part of the authoring vocabulary (below), or obviously public API.
 
 ## Sweep discipline

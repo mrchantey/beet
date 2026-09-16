@@ -369,8 +369,7 @@ mod std_impl {
 // driving to a bounded log rather than settling a parked server. The
 // real-listener cases (eg `shutdown_ends_accept_loop`) bind real TCP and stay
 // native; everything else runs on wasm too, where the stub pins the facet
-// machinery itself. See `.agents/reports/wasm-server-test-reentrancy.md` for
-// the re-entrancy class that once kept these native-only.
+// machinery itself.
 #[cfg(test)]
 pub(crate) mod tests {
 	use super::*;
