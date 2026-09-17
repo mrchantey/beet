@@ -342,6 +342,20 @@ impl Value {
 			})
 	}
 
+	/// The mutable value at `path`, the twin of [`get_path`](Self::get_path).
+	pub fn get_path_mut(
+		&mut self,
+		path: &[FieldSegment],
+	) -> Option<&mut Value> {
+		path.iter()
+			.try_fold(self, |current, segment| match segment {
+				FieldSegment::ObjectKey(key) => current.get_mut(key),
+				FieldSegment::ArrayIndex(index) => {
+					current.get_index_mut(*index)
+				}
+			})
+	}
+
 	/// Pushes a value onto this list.
 	pub fn push(&mut self, value: impl Into<Value>) -> Result {
 		self.as_list_mut()?.push(value.into()).xok()

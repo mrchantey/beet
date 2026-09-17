@@ -78,8 +78,12 @@ postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # `.mmdb` in its store.
 geoip = ["std", "dep:maxminddb"]
 # age vault I/O over stores and the `secrets` verbs, on the primitives in
-# `beet_core/secrets`.
-secrets = ["std", "beet_core/secrets"]
+# `beet_core/secrets`. `beet_core/rsx` is the `#[template]` attribute
+# `<SecretsRoutes/>` is authored with.
+secrets = ["std", "beet_core/secrets", "beet_core/rsx"]
+# QR rendering in the terminal (unicode half-blocks), so `secrets backup
+# --qr` prints an identity's backup for paper. Pure rust, wasm-clean.
+qrcode = ["dep:qrcode"]
 # for conditional compilation in hooks; pulls reactive store effects that use
 # the std-only spawn_local runtime driver
 client = ["std"]
@@ -234,6 +238,8 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 postcard = { workspace = true, optional = true }
+# the terminal qr print behind `secrets backup --qr`
+qrcode = { workspace = true, optional = true }
 
 
 # http

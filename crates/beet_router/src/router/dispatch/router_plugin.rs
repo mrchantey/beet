@@ -81,10 +81,11 @@ impl Plugin for RouterPlugin {
 		#[cfg(feature = "std")]
 		{
 			app
-				// store types + the store-path resolution observers (`DirPath` /
-				// `BlobPath` -> scoped `BlobStore` / `Blob`), which `RoutesDir` and
-				// `ServeBlobs` resolve by ancestry.
-				.init_plugin::<StorePlugin>()
+				// every beet_net registration: the store types + the store-path
+				// resolution observers (`DirPath` / `BlobPath` -> scoped
+				// `BlobStore` / `Blob`), which `RoutesDir` and `ServeBlobs`
+				// resolve by ancestry, and the vault declarations.
+				.init_plugin::<NetPlugin>()
 				// the server model: routers and servers go together, so a server
 				// spread on a router starts when its entity's start walk reaches it.
 				// `ServerPlugin` installs the `HttpServer` backend and registers the

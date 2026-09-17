@@ -28,6 +28,10 @@ mod store;
 mod actions;
 #[cfg(feature = "std")]
 mod net_plugin;
+// the vault declarations register under `std`; vault I/O and the `secrets`
+// verbs ride the `secrets` feature inside the module.
+#[cfg(feature = "std")]
+mod secrets;
 #[cfg(feature = "std")]
 mod store_actions;
 // The server module is no_std-capable, but not action-free: a server dispatches
@@ -96,6 +100,8 @@ pub mod prelude {
 	pub use crate::mdns::*;
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
+	#[cfg(feature = "std")]
+	pub use crate::secrets::*;
 	pub use crate::server::*;
 	#[cfg(feature = "sockets")]
 	pub use crate::sockets;

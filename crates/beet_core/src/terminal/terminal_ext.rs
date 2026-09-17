@@ -62,6 +62,50 @@ pub fn redirect_std_to_file(_path: impl AsRef<Path>) -> Result {
 	bevybail!("redirecting std is not supported on wasm")
 }
 
+/// Prompt on the controlling terminal and read one line with echo off, the
+/// way a passphrase is typed: the prompt and a newline after the entry go to
+/// the tty, the line never reaches stdout or the scrollback. Errors when
+/// there is no tty (a pipe, a headless runner), so a caller can say what to
+/// pass instead.
+#[cfg(all(unix, feature = "secrets"))]
+pub fn read_secret_line(prompt: &str) -> Result<String> {
+	use std::io::BufRead;
+	use std::os::unix::io::AsRawFd;
+	let mut tty = tty_writer().map_err(|err| {
+		bevyhow!(
+			"no terminal to prompt on ({err}): a secret is typed, not piped"
+		)
+	})?;
+	tty.write_all(prompt.as_bytes())?;
+	tty.flush()?;
+	let input = std::fs::File::open("/dev/tty")?;
+	let fd = input.as_raw_fd();
+	// SAFETY: a zeroed termios is a valid out-param for tcgetattr, and the
+	// restored attributes are the ones just read.
+	let mut original: libc::termios = unsafe { core::mem::zeroed() };
+	if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
+		bevybail!("tcgetattr: {}", std::io::Error::last_os_error());
+	}
+	let mut quiet = original;
+	quiet.c_lflag &= !libc::ECHO;
+	if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &quiet) } != 0 {
+		bevybail!("tcsetattr: {}", std::io::Error::last_os_error());
+	}
+	let mut line = String::new();
+	let read = std::io::BufReader::new(&input).read_line(&mut line);
+	// echo comes back whatever the read did
+	unsafe { libc::tcsetattr(fd, libc::TCSANOW, &original) };
+	tty.write_all(b"\n")?;
+	read?;
+	line.trim_end_matches(['\r', '\n']).to_string().xok()
+}
+
+/// A platform with no controlling terminal to read from.
+#[cfg(all(not(unix), feature = "secrets"))]
+pub fn read_secret_line(_prompt: &str) -> Result<String> {
+	bevybail!("no terminal to prompt on: a secret is typed, not piped")
+}
+
 /// Adds this handler to both the panic and ctrl+c hooks
 pub fn on_force_exit(
 	func: impl 'static + Send + Sync + Clone + Fn(),

@@ -3,10 +3,14 @@ use beet_core::prelude::*;
 
 /// Plugin that registers all beet_net types for world serialization.
 ///
-/// Includes [`StorePlugin`] for typed store and blob registration.
+/// Includes [`StorePlugin`] for typed store and blob registration and
+/// [`SecretsPlugin`] for the vault declarations.
 #[derive(Default)]
 pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
-	fn build(&self, app: &mut App) { app.init_plugin::<StorePlugin>(); }
+	fn build(&self, app: &mut App) {
+		app.init_plugin::<StorePlugin>()
+			.init_plugin::<SecretsPlugin>();
+	}
 }

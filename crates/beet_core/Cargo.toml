@@ -107,6 +107,9 @@ std = [
 	"rand?/std",
 	"rand?/thread_rng",
 	"uuid?/std",
+	# the `age1..` recipient grammar, so a `<Vault>` declaration (data every
+	# std build loads) validates its recipients without the age crate
+	"dep:bech32",
 ]
 # vendored bevy_async bridge + beet's high-level AsyncWorld/AsyncEntity layer.
 # std-independent: only the default task spawner differs by target.
@@ -173,17 +176,20 @@ serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
 # age file encryption (`src/secrets`): the identity a human holds, the
-# recipient a vault is encrypted to, the identity file in the OS config and the
-# passphrase envelope an identity is backed up in, plus `toml` for the tree
-# vault format and `json` for the `Value` a tree vault parses into. std: the
-# identity file and `.env.age` live on a filesystem. `getrandom_02` and
-# `rust-embed` are named only to switch a feature on for `age`'s wasm build,
-# see the workspace manifest.
+# identity file in the OS config, the passphrase envelope an identity is backed
+# up in, the vault document formats and the `.env.age` loader, plus `toml` for
+# the tree vault format and `json` for the `Value` a tree vault parses into.
+# The declarations (`Vault`, `AgeRecipients`, `AgeRecipient`) are data and ride
+# `std`. std: the identity file and `.env.age` live on a filesystem. `libc` is
+# the no-echo passphrase prompt (termios). `getrandom_02` and `rust-embed` are
+# named only to switch a feature on for `age`'s wasm build, see the workspace
+# manifest.
 secrets = [
 	"std",
 	"json",
 	"dep:age",
 	"dep:toml",
+	"dep:libc",
 	"dep:getrandom_02",
 	"dep:rust-embed",
 ]
@@ -277,6 +283,8 @@ async-lock = { workspace = true, optional = true }
 #💡 secrets
 age = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
+# the recipient grammar alone, on in every std build (see the `std` feature)
+bech32 = { workspace = true, optional = true }
 # age embeds its message catalogue through rust-embed; named here so its
 # `debug-embed` feature is on and a debug wasm build has the catalogue too.
 rust-embed = { workspace = true, optional = true }
@@ -311,9 +319,9 @@ futures = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 ## async
 crossterm = { workspace = true, optional = true }
-# stdout/stderr fd redirection for `terminal_ext::redirect_std_to_file`, used by
-# the live TUI to keep logs off the alternate screen. Tied to `crossterm` since
-# both are terminal concerns enabled together by tui targets.
+# stdout/stderr fd redirection for `terminal_ext::redirect_std_to_file` (the
+# live TUI keeping logs off the alternate screen, with `crossterm`) and the
+# no-echo tty prompt `terminal_ext::read_secret_line` (`secrets`).
 libc = { workspace = true, optional = true }
 async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }

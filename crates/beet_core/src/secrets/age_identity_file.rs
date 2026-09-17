@@ -172,6 +172,23 @@ impl AgeIdentityFile {
 		None.xok()
 	}
 
+	/// [`discover`](Self::discover) for a caller that cannot do without an
+	/// identity: absence is an error naming how one is made or restored, the
+	/// one message every vault verb shares.
+	pub fn require() -> Result<Self> {
+		Self::discover()?.ok_or_else(|| {
+			bevyhow!(
+				"no age identity: `beet secrets/keygen` makes one at `{}`, \
+				`secrets/restore-identity --file=<backup>` restores a backup, \
+				and a CI runner passes one through `{}`",
+				Self::default_path()
+					.map(|path| path.display().to_string())
+					.unwrap_or_else(|_| Self::CONFIG_PATH.to_string()),
+				Self::ENV_VAR
+			)
+		})
+	}
+
 	/// The files [`discover`](Self::discover) checks after the environment,
 	/// in order, the beet file before sops' in each config directory.
 	fn candidate_paths() -> Vec<PathBuf> {

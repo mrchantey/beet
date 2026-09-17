@@ -298,6 +298,14 @@ rust-embed = { version = "8", features = ["debug-embed"] }
 # `preserve_order` (beet's `Value` map is ordered already) and no `toml_edit`
 # comment preservation.
 toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
+# The `age1..` recipient grammar (bech32, hrp `age`, a 32 byte key), so
+# `AgeRecipient` validates in every std build (a `<Vault>` is data a lean
+# binary must still load) without linking the age crate. 0.9 is the major
+# `age` itself reads through, so the two never disagree.
+bech32 = { version = "0.9", default-features = false }
+# QR rendering, shared by the cli's png command (`image` on) and the secrets
+# `backup --qr` terminal print (`beet_net/qrcode`, unicode only).
+qrcode = { version = "0.14", default-features = false }
 
 #💡 http
 http = "1"
@@ -395,6 +403,9 @@ serde_plain = ["serde", "beet_core/serde_plain"]
 # and revoke (`beet_infra`). Opt-in: a binary that never touches a vault links
 # no crypto.
 secrets = ["beet_core/secrets", "beet_net?/secrets", "beet_infra?/secrets"]
+# QR rendering in the terminal, so `secrets backup --qr` prints an identity's
+# backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
+qrcode = ["beet_net?/qrcode"]
 testing = ["beet_core/testing", "beet_net?/testing"]
 # no_std test runner for bare-metal consumers (eg the esp32 firmware): the beet
 # harness registering via `linkme` instead of `inventory`. See `beet_core`.

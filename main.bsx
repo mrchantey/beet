@@ -56,6 +56,12 @@ addressable, so `--help` still lists it and dispatching a shared verb reports
 the condition that excluded it rather than 404ing.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
+
+The `secrets` verbs (`beet secrets/keygen`, `check`, `set`, `get`, `ls`, ..)
+manage this workspace's age identity and vaults: the entry's `.env.age` by
+default, any declared `<Vault>` by label, or a file by path. Compiled in by the
+`secrets` feature (on by default natively, off in the lean browser builds), so
+the route is excluded where the verbs are not.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
@@ -68,6 +74,7 @@ The shared verbs need AWS credentials in `.env`, plus `tofu`.
 	<ExportPdf/>
 	<CaptureScreenshot/>
 	<SyncS3/>
+	<Route path="secrets" bx:cfg="feature:secrets"><SecretsRoutes/></Route>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>

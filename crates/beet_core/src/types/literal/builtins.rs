@@ -234,6 +234,18 @@ fn add_domain(table: &mut Table) {
 		},
 	);
 
+	// an `age1..` string, so `<Vault recipients={["age1..", "age1.."]}/>`
+	// validates each recipient where it is authored: a typo is an error naming
+	// `age-keygen` rather than a `from_reflect` miss that keeps the list empty.
+	#[cfg(feature = "std")]
+	table.add_hinted(
+		"an age recipient, `age1..`",
+		|value: &Value| match value {
+			Value::Str(string) => AgeRecipient::new(string.as_str()).map(Some),
+			_ => Ok(None),
+		},
+	);
+
 	// a hex string, so a markup `<Theme primary="#006c4f"/>` spells a colour the
 	// way every design tool does rather than as a four-float struct literal. A
 	// malformed value errors rather than silently keeping the default.
