@@ -10,6 +10,9 @@ use crate::style::Overflow;
 use beet_core::prelude::*;
 use crate::style::material::*;
 use crate::style::*;
+// explicit: bevy's ui prelude names both under `bevy_default`
+use crate::style::Display;
+use crate::style::Overflow;
 
 /// The figure a diagram renders into, on the code-block surface.
 pub const DIAGRAM: ClassName = ClassName::new_static("diagram");

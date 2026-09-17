@@ -23,6 +23,7 @@ pub fn cli() -> CrateRegistration {
 			"net",
 			"pdf",
 			"qrcode",
+			"secrets",
 			"secure",
 			"sockets",
 			"ssh",

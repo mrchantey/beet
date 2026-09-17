@@ -162,6 +162,9 @@ impl Block for StalwartBlock {
 }
 
 impl StalwartBlock {
+	/// The port a peer MTA dials, the one whose greeting is a reputation
+	/// input and the one the DANE pin is published under.
+	pub const SMTP_PORT: u16 = 25;
 	/// The pinned Stalwart release. Bump deliberately with a changelog read:
 	/// minors have carried config migrations, and `0.16` replaced the entire
 	/// configuration model.
@@ -393,7 +396,7 @@ impl StalwartBlock {
 	/// the box's own name. RFC 7672 puts it at the MX target, not at the mail
 	/// domain, which is why it is this block's and not a domain's.
 	pub fn tlsa_record_name(&self) -> String {
-		format!("_{}._tcp.{}", MailHealth::SMTP_PORT, self.hostname)
+		format!("_{}._tcp.{}", Self::SMTP_PORT, self.hostname)
 	}
 
 	/// The `usage selector matching-type` triple the pin is published under:

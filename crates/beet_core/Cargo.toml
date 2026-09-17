@@ -172,6 +172,21 @@ ron = ["serde", "dep:ron"]
 serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
+# age file encryption (`src/secrets`): the identity a human holds, the
+# recipient a vault is encrypted to, the identity file in the OS config and the
+# passphrase envelope an identity is backed up in, plus `toml` for the tree
+# vault format and `json` for the `Value` a tree vault parses into. std: the
+# identity file and `.env.age` live on a filesystem. `getrandom_02` and
+# `rust-embed` are named only to switch a feature on for `age`'s wasm build,
+# see the workspace manifest.
+secrets = [
+	"std",
+	"json",
+	"dep:age",
+	"dep:toml",
+	"dep:getrandom_02",
+	"dep:rust-embed",
+]
 # no_std-capable RNG: `sys_rng` seeds `rand::make_rng()` from the platform
 # entropy source via getrandom (a bare target installs a getrandom backend at
 # boot), `chacha` supplies the `ChaCha8Rng` beet seeds from it, and `std` adds
@@ -259,6 +274,13 @@ futures-lite = { workspace = true }
 async-channel = { workspace = true, optional = true }
 async-lock = { workspace = true, optional = true }
 
+#💡 secrets
+age = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+# age embeds its message catalogue through rust-embed; named here so its
+# `debug-embed` feature is on and a debug wasm build has the catalogue too.
+rust-embed = { workspace = true, optional = true }
+
 # tokens dependencies
 syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
@@ -317,6 +339,10 @@ ctrlc = { version = "3", optional = true }
 # rather than per-crate since every beet crate depends on beet_core. 0.4 is the
 # major beet's own `rand` feature rides, declared alongside it above.
 getrandom_03 = { workspace = true }
+# age's `rand 0.8` reaches getrandom 0.2, whose wasm backend is its `js` feature
+# (the `getrandom_backend` cfg only reaches 0.3 and 0.4); named here under
+# `secrets` so a wasm vault build links.
+getrandom_02 = { workspace = true, optional = true }
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 js-sys.workspace = true

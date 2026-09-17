@@ -9,10 +9,6 @@ use serde_json::Value;
 
 
 impl MailHealth {
-	/// The port a peer MTA dials, which is the one whose greeting is a
-	/// reputation input.
-	pub const SMTP_PORT: u16 = 25;
-
 	/// The SMTP reply code that opens a session. Anything else at all — a
 	/// `421`, a `554` — is a server that is listening and refusing.
 	pub const READY_CODE: &'static str = "220";
@@ -167,7 +163,7 @@ async fn check_banner(hostname: &str, timeout: Duration) -> Result {
 			"--verbose".to_string(),
 			"--max-time".to_string(),
 			timeout.as_secs().to_string(),
-			format!("smtp://{hostname}:{}", MailHealth::SMTP_PORT),
+			format!("smtp://{hostname}:{}", StalwartBlock::SMTP_PORT),
 		])
 		.run_async()
 		.await
@@ -175,7 +171,7 @@ async fn check_banner(hostname: &str, timeout: Duration) -> Result {
 			bevyhow!(
 				"{hostname}:{} did not open an SMTP session, so no mail is \
 				arriving at all. {err}",
-				MailHealth::SMTP_PORT
+				StalwartBlock::SMTP_PORT
 			)
 		})?;
 	// the greeting arrives on the trace stream, prefixed `< ` like every other
@@ -190,7 +186,7 @@ async fn check_banner(hostname: &str, timeout: Duration) -> Result {
 		.ok_or_else(|| {
 			bevyhow!(
 				"{hostname}:{} answered without a {} greeting",
-				MailHealth::SMTP_PORT,
+				StalwartBlock::SMTP_PORT,
 				MailHealth::READY_CODE
 			)
 		})?;

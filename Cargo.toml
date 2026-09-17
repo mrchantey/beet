@@ -157,11 +157,11 @@ uuid = { version = "1", default-features = false }
 # it re-exports the ChaCha rngs under its `chacha` feature, so no separate
 # `rand_chacha` rides the graph.
 rand = { version = "0.10", default-features = false }
-# Two getrandom majors are in the graph at once, reached by different crates, and
-# neither has a wasm backend unless `wasm_js` is on (the wasm rustflags select that
-# backend unconditionally, see `.cargo/config.toml`). `wasm_js` is ignored natively.
-# The current major is the plain key; the older one is aliased, so a crate opts in
-# to whichever its own dependencies actually pull.
+# Three getrandom majors are in the graph at once, reached by different crates, and
+# none has a wasm backend unless its js feature is on (for 0.3 and 0.4 the wasm
+# rustflags also select that backend, see `.cargo/config.toml`). The feature is
+# ignored natively. The current major is the plain key; the older ones are
+# aliased, so a crate opts in to whichever its own dependencies actually pull.
 # 0.4: reached through `rand` 0.10 — beet's own `rand` feature, and `bevy_math`
 # under `bevy/default`.
 getrandom = { version = "0.4", features = ["wasm_js"] }
@@ -170,6 +170,10 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 # wasm purely to switch that backend on. uuid stays on its own `js` backend rather
 # than either of these.
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+# 0.2: reached through `age`'s `rand 0.8`. This line selects its wasm backend by
+# feature (`js`), not by the `getrandom_backend` cfg the newer majors read, so
+# beet_core declares it on wasm under `secrets` purely to switch that on.
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 variadics_please = "1"
 webbrowser = "1"
 
@@ -273,6 +277,28 @@ digest = { version = "0.11", default-features = false }
 # re-enable `ron/std` (eg via `beet_core/std`).
 ron = { version = "0.12", default-features = false }
 
+#💡 secrets
+# age file encryption (`beet_core/secrets`): pure rust, the same format the
+# `age` cli reads. default-features off drops the cli-shaped surface: `ssh`
+# (ssh keys as recipients, which hardware and agent-held keys cannot decrypt),
+# `plugin` (the external plugin protocol) and `cli-common` (prompts, pinentry);
+# `armor` is the text output every vault is written in. 0.11, not 0.12: 0.12
+# adds post-quantum recipients through `ml-kem 0.2`, which pins `kem
+# 0.3.0-pre.0`, and russh's `ml-kem 0.3` needs `kem 0.3.0`; cargo unifies the
+# two into one `kem 0.3`, so they cannot share a graph. beet only ever encrypts
+# to x25519 recipients, whose format both versions write identically.
+age = { version = "0.11", default-features = false, features = ["armor"] }
+# `age` embeds its message catalogue through rust-embed, which in a debug build
+# reads the files off the crate source dir at runtime, a path a wasm test has
+# no filesystem for. `debug-embed` compiles them in unconditionally; beet_core
+# names the crate under `secrets` purely to switch that on.
+rust-embed = { version = "8", features = ["debug-embed"] }
+# TOML values only (`beet_core/secrets`, the tree vault format): `parse` and
+# `display` are the two directions, `serde` the bridge to `Value`; no
+# `preserve_order` (beet's `Value` map is ordered already) and no `toml_edit`
+# comment preservation.
+toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
+
 #💡 http
 http = "1"
 http-body-util = "0.1"
@@ -363,6 +389,12 @@ postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
+# The secrets system: age identities, recipients and the identity file, vault
+# documents and `.env.age` at bootstrap (`beet_core`), vault I/O over stores and
+# the `secrets` verbs (`beet_net`), the stack secret store seam, export, restore
+# and revoke (`beet_infra`). Opt-in: a binary that never touches a vault links
+# no crypto.
+secrets = ["beet_core/secrets", "beet_net?/secrets", "beet_infra?/secrets"]
 testing = ["beet_core/testing", "beet_net?/testing"]
 # no_std test runner for bare-metal consumers (eg the esp32 firmware): the beet
 # harness registering via `linkme` instead of `inventory`. See `beet_core`.

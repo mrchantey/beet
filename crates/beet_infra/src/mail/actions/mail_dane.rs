@@ -33,7 +33,7 @@ impl MailDane {
 			format!(
 				"echo | openssl s_client -connect 127.0.0.1:{} -starttls \
 					smtp {sni} 2>/dev/null | {}",
-				MailHealth::SMTP_PORT,
+				StalwartBlock::SMTP_PORT,
 				Self::SPKI_SHA256
 			)
 		})

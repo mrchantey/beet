@@ -77,6 +77,9 @@ postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # stays `None` until enabled and a document declares a `<GeoIpDb/>` resolving to a
 # `.mmdb` in its store.
 geoip = ["std", "dep:maxminddb"]
+# age vault I/O over stores and the `secrets` verbs, on the primitives in
+# `beet_core/secrets`.
+secrets = ["std", "beet_core/secrets"]
 # for conditional compilation in hooks; pulls reactive store effects that use
 # the std-only spawn_local runtime driver
 client = ["std"]

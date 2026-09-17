@@ -210,19 +210,23 @@ impl StoreUri {
 		.xok()
 	}
 
-	/// Expand a leading `~` (exactly `~`, or `~/..`) to the home directory, so
-	/// a uri never spells a user's home; any other `~foo` is a literal segment.
+	/// Expand a leading `~` (exactly `~`, or `~/..`) to [`fs_ext::home_dir`],
+	/// so a uri never spells a user's home; any other `~foo` is a literal
+	/// segment. A no_std target has no home, so `~` is an error there.
 	fn expand_home(path: &str) -> Result<SmolStr> {
 		let rest = match path {
 			"~" => "",
 			path if path.starts_with("~/") => &path[1..],
 			path => return SmolStr::new(path).xok(),
 		};
-		match env_ext::var("HOME") {
-			Ok(home) => SmolStr::from(format!("{home}{rest}")).xok(),
-			Err(_) => bevybail!(
-				"`~` in store path `{path}` needs a HOME environment variable"
-			),
+		cfg_if! {
+			if #[cfg(feature = "std")] {
+				let home = fs_ext::home_dir()?;
+				SmolStr::from(format!("{}{rest}", home.to_string_lossy())).xok()
+			} else {
+				let _ = rest;
+				bevybail!("`~` in `fs:{path}` needs a home directory, which this target has none of")
+			}
 		}
 	}
 

@@ -37,6 +37,31 @@ pub fn current_dir() -> FsResult<PathBuf> {
 	}
 }
 
+/// The current user's home directory: `HOME`, or `USERPROFILE` on windows.
+/// Errors naming both when neither is set, ie a container or a browser tab.
+///
+/// The one reading of "home" in beet: the `~` a store uri expands and the
+/// config directory an identity file lives in both come through here.
+pub fn home_dir() -> Result<PathBuf> {
+	env_ext::var("HOME")
+		.or_else(|_| env_ext::var("USERPROFILE"))
+		.map(|home| PathBuf::from(home.as_str()))
+		.map_err(|_| {
+			bevyhow!(
+				"no home directory: neither `HOME` nor `USERPROFILE` is set"
+			)
+		})
+}
+
+/// The user's config directory: `XDG_CONFIG_HOME` when set, else
+/// `~/.config` under [`home_dir`].
+pub fn config_dir() -> Result<PathBuf> {
+	match env_ext::var("XDG_CONFIG_HOME") {
+		Ok(dir) if !dir.is_empty() => PathBuf::from(dir.as_str()).xok(),
+		_ => home_dir().map(|home| home.join(".config")),
+	}
+}
+
 /// Copy a directory recursively, creating it if it doesnt exist
 /// This also provides consistent behavior with the `cp` command:
 /// -
@@ -461,21 +486,39 @@ pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 	}
 }
 
-/// [`write`] for a secret (a token, a private key): the file readable by
-/// its owner alone (`0600` on unix), its parent directories created.
+/// Write a file only its owner may read, creating its directory: the shape a
+/// private key needs, since `ssh` refuses a group- or world-readable one and
+/// an age identity must never be one. On unix the file is created `0600` (and
+/// an existing one tightened to it), so there is no moment it is readable by
+/// anyone else; elsewhere this is a plain [`write`].
 pub fn write_private(
 	path: impl AsRef<Path>,
 	data: impl AsRef<[u8]>,
 ) -> FsResult {
 	let path = path.as_ref();
-	fs_ext::write(path, data)?;
-	#[cfg(all(unix, not(target_arch = "wasm32")))]
-	{
-		use std::os::unix::fs::PermissionsExt;
-		fs::set_permissions(path, fs::Permissions::from_mode(0o600))
-			.map_err(|err| FsError::io(path, err))?;
+	cfg_if! {
+		if #[cfg(unix)] {
+			use std::io::Write;
+			use std::os::unix::fs::OpenOptionsExt;
+			use std::os::unix::fs::PermissionsExt;
+			if let Some(parent) = path.parent() {
+				fs_ext::create_dir_all(parent)?;
+			}
+			fs::OpenOptions::new()
+				.write(true)
+				.create(true)
+				.truncate(true)
+				.mode(0o600)
+				.open(path)
+				.and_then(|mut file| file.write_all(data.as_ref()))
+				.and_then(|_| {
+					fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+				})
+				.map_err(|err| FsError::io(path, err))
+		} else {
+			fs_ext::write(path, data)
+		}
 	}
-	Ok(())
 }
 
 /// Async version of write: Write a file, ensuring the path exists.

@@ -28,4 +28,5 @@ assert_eq!(total, 6);
 | `fs` | File system watching and utilities (native only) |
 | `tokens` | Proc-macro token utilities |
 | `rand` | Random number generation |
+| `secrets` | age identities, recipients, the identity file and the passphrase envelope (`secrets`) |
 | `nightly` | Nightly-only features like `Fn` trait impls |

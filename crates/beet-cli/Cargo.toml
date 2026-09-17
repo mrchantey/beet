@@ -17,7 +17,7 @@ path = "src/main.rs"
 
 [features]
 ## All features added/removed here must be reflected in `crates/beet-cli/src/registration.rs crate_registration!`
-default = ["qrcode", "net", "tui", "ssh", "thread", "pdf"]
+default = ["qrcode", "net", "tui", "ssh", "thread", "pdf", "secrets"]
 qrcode = ["dep:qrcode", "dep:image"]
 # Offline geoip country lookup for analytics, so a served/deployed site derives a
 # visitor country (needs a `country.mmdb` in `assets/databases/`). Opt-in, so a
@@ -92,6 +92,12 @@ sockets = ["beet/tungstenite"]
 # TLS serving (the `Tls` component): https/wss with a generated self-signed
 # dev cert, so LAN devices get a secure context (webcam, mic).
 secure = ["beet/secure"]
+# The secrets system: age identities, vaults, `.env.age` at bootstrap and the
+# `secrets` verbs. In the default set, so the native binary reads a deployer's
+# credentials from a vault; the browser builds (`--no-default-features`) name it
+# through `web_full` only. A feature of its own rather than a dep-table entry
+# so the registration reports it and `bx:cfg="feature:secrets"` resolves.
+secrets = ["beet/secrets"]
 # The live terminal target for `beet present`: the navigable charcell host and
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.
@@ -156,7 +162,8 @@ web_min = ["web"]
 # (charcell paints a terminal; the DOM paints itself), `thread` (the agent runtime
 # is a native process), `infra` (deploy definitions are authored in a deployer),
 # `web_examples`/`web_head` (example vocabularies a page names on its own
-# artifact). Build with: `just build-wasm-ui`.
+# artifact), `secrets` (a page holds no identity, so it opens no vault). Build
+# with: `just build-wasm-ui`.
 web_ui = ["web", "beet/scripting"]
 # `beet-render.wasm`, the render middle: the browser binary plus the windowed
 # render stack (`winit` pulls `beet/examples`: bevy_default + spatial + extra), so
@@ -195,6 +202,10 @@ web_full = [
 	# ```mermaid fences as box-drawing text: pure Rust, wasm-clean; kept out of
 	# `web_min` so the smallest browser binary stays small.
 	"beet/mermaid",
+	# age vaults: pure Rust and wasm-clean, so the ceiling carries it to keep
+	# the target-agnostic claim honest; `web_min`/`web_ui`/`web_render` leave
+	# it out since a page holds no identity.
+	"secrets",
 ]
 
 # the portable cross-platform base: the render router stack, media negotiation and
