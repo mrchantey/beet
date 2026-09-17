@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A malleable engine for sovereign software</strong>
+    <strong>An Atmospheric OS for homegrown tech</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -16,9 +16,9 @@
   </h3>
 </div>
 
-Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
+Beet is an operating system that lets you access your data and tools wherever you like, however you like.
 
-Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component System architecture. See [the beet website](https://beet.org/docs) for more info.
+Beet is built on the [Bevy Engine](https://bevy.org) and its Entity Component System, and user data stores are designed around the [ATProto](https://atproto.com) PDS. A repo's entry point is `main.bsx`, the data driven entry point to the program, and a runtime does nothing until given one. See [the website documentation](https://beet.org/docs) for more info.
 
 > 🚧 Mind your step! 🚧
 >

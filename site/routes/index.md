@@ -5,7 +5,7 @@ title = "Beet"
 <div bx:style="display=Flex flex-direction=Vertical align-items=Center text-align=Center row-gap=Rem(1.5)">
 	<h1 class="text-wordmark">Beet</h1>
 	<p class="text-title-large">
-		<b>A malleable engine for sovereign software</b>
+		<b>An Atmospheric OS for homegrown tech</b>
 	</p>
 	<div bx:style="max-width=Rem(34.0)">
 		<div class="card-filled">
@@ -23,8 +23,28 @@ title = "Beet"
 </div>
 <br/>
 
-Beet is a malleable engine built on interoperable standards, with apps driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
 
-Beet is also advocating for the standardization of a [scene format](/docs/scene-format) for describing tools as data, and published so any engine can implement it.
+Traditionally an operating system is built around a machine with siloed opinions about identity, data and behavior. Beet is oriented around people, not hardware, and lets you access your data and tools wherever you like, however you like.
 
-Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) demonstrates a static site, web app, TUI, server, robot, infra deploy and agent harness all running on a single beet binary, driven entirely by scenes.
+## Malleable
+
+Beet software grows with your needs, offering a gentle slope from user to tinkerer to systems engineer through three layers of malleability:
+
+1. **Plugins** extend the engine itself in compiled Rust.
+2. **Scripts** define composable behaviors in sandboxed JavaScript with fine-grained capabilities.
+3. **Scenes** describe structure and behavior as data, edited via text editor, gui or agent.
+
+## Agnostic
+
+- One repo runs the same in a browser tab, a terminal, over ssh, in a window and on a microcontroller.
+- The same capabilities serve web sites, games, robots, infra deploys and agent harnesses.
+- Every layer of the stack is swappable, the renderer, the http server, the blob store, the filesystem. Keep what you love and swap out the rest.
+
+## Decentralized
+
+- Your software is records and blobs in a repo that belongs to your account, with your atproto PDS as its home.
+- Local-first by design, so the repo works with no network and syncs when one appears.
+- The [scene format](/docs/scene-format) is built for standardization, so other software can read what you made.
+- Use a git repo as the source of truth if that is how you like to work.
+
+Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) shows a static site, a web app, a terminal ui, a server, a robot, an infra deploy and an agent harness all running on one beet binary, driven entirely by scenes.
