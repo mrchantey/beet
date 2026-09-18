@@ -47,9 +47,9 @@ A repo belongs to an account and runs the same everywhere. Identity and sync sit
 
 - [Tutorials](/docs/tutorials) build one guestbook three times over, once at each layer of malleability. Start here if you are new.
 - [Scenes](/docs/scenes), [Scripts](/docs/scripts) and [Plugins](/docs/plugins) explain the three layers, and the scenes page carries the draft standard beet implements.
-- [Principles](/docs/principles) are the three rules above and the working rules under each, [Stories](/docs/stories) are the people they serve, and the [Glossary](/docs/glossary) is one meaning per word.
+- [Glossary](/docs/glossary) contains a list of terms from the perspective of beet.
 - [Crates](/docs/crates) explain what each piece of beet does and how they fit together.
 - [Design](/docs/design) covers the target-agnostic design system.
-- [About](/docs/about) tells the story behind the project and collects the reading that shapes its direction.
+- [About](/docs/about) argues the three principles, tells the story behind the project and collects the reading that shapes its direction.
 
 The [blog](/blog) follows the project's month-to-month development, and the per-crate [API docs](https://docs.rs/beet) cover the details.

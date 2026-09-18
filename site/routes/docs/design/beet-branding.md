@@ -8,7 +8,7 @@ The deliberately small single reference for the beet brand.
 
 ## Mission
 
-Beet is an Atmospheric OS for homegrown tech, an operating system built around a person rather than a machine. Software is a repo of scenes, records and blobs that belongs to an account, runs on every surface the account touches and is grown in place by the person who uses it. Beet is malleable, agnostic and decentralized, and the atproto integration is what those three principles were always pointing at, which is what Atmospheric means. The [principles](/docs/principles) page argues each, the [glossary](/docs/glossary) fixes the words.
+To make homegrown tech ordinary, so that growing your own software in place, on any surface, in your own account, is as unremarkable as tending the garden in your back yard. The [home page](/) says what beet is, the [about page](/docs/about) argues its principles and the [glossary](/docs/glossary) fixes its words, so this page keeps only what makes an asset look and sound like beet.
 
 ## Audience
 
@@ -18,17 +18,19 @@ Alex is an intermediate level software engineer working at a consultancy. She is
 
 Alex is skeptical of new frameworks with snake-oil cross-domain claims, but pays attention when open standards are discussed because credible exit is very important to her.
 
-Alex should have understood the three principles upon viewing the home page:
-1. Malleable:
-	- ATProto being swappable doesn't make it malleable, adding a button means forking and redeploying a whole client.
-	- Code-first solutions are a sledgehammer, OpenClaw is brittle because it lacks fine-grained malleability.
-	- Scenes, scripts and plugins are a gentle slope, and each stays open while the software runs.
-2. Agnostic:
-	- One repo runs in a tab, a terminal, over ssh and on a robot, and serves sites, games and deploys alike.
-	- Every layer of the stack is swappable, so nothing beet stands on is a lock-in.
-3. Decentralized:
-	- Different clients operate on the same data (ATProto), and the software is data in the same account.
-	- The scene format is separate from the beet runtime, so credible exit reaches the software as well as the data.
+Alex should have understood the three principles on the [home page](/) within her first minute.
+
+## Stories
+
+The people beet is built for, each as a short story of a day with it. They all matter, they are consistent with each other and no single one is primary. Some run ahead of what is built today, and the construction sign on the front page covers the gap.
+
+- **The publication maintainer** opens their site on a phone, signs in, edits a post's prose in a markdown-shaped editor and publishes. They write a new post from the site, add a docs page and reorder the sidebar, and they can change how a post is shown, because the post and the site are the same kind of thing.
+- **The git diehard** keeps a directory full of markdown and BSX and refuses the browser. One command imports the tree into a repo as scenes and blobs and the site serves from the repo. Markdown comes back where markdown went in, with a warning where honesty runs out, and beet's records stay opaque to them, which is fine.
+- **The visitor who tinkers** reads someone's page, opens the editor, changes the title and keeps browsing with it. A reload keeps it, a reset button discards it and nothing reaches the author. Later a button offers to upload the change into their own repo.
+- **The homegrown builder** starts from an empty repo and grows a todo list in place, a schema, a form, a table, a rule. It runs in their tab, over ssh on a friend's terminal and on a robot, from the one repo.
+- **The agent**, asked to add a dark mode toggle, edits scenes through beet's own interface or through a markdown or BSX view in and out. The result is an ordinary scene edit, reviewable as a diff of the view and undoable. Files on disk are not the agent's medium either, though native tools exist for it.
+- **The atproto blogger** has a PDS and no git and wants a page. One action makes them a repo, their handle resolves to it, their posts are records in their own account, and beet.org is the first host that renders it.
+- **The operator on a terminal** has the same repo, no wasm and a binary lacking some capability. What it cannot run stays inert, and prose and structure are still editable from the tty.
 
 ## Brand Archetype
 
@@ -58,14 +60,6 @@ The voice is playful, folk, warm, humble, peer and movement, all six sliders at 
 - No marketing claims inside docs, the reader is already here. State what a thing does and show it doing it.
 - Humor is welcome at the edges and never in load-bearing explanations.
 
-## Words
-
-- Owned: Atmospheric, homegrown, repo, scene, record, blob, runtime, action, malleable, agnostic, decentralized, swappable stack, standard, interoperable, sovereign, locked open, harvest, ecosystem.
-- A runtime is a binary that runs repos. The thing a person creates and shares with beet is a scene, a script, a plugin or a runtime, and never an app or a tool: the [glossary](/docs/glossary) is the source of truth for every defined word and its retired predecessors.
-- Malleable and sovereign are qualities beet has, never the noun it is. "Malleable engine" is retired as a self-description.
-- Reserved for beetmash: mash, remix, DJ and breaking red-tape language.
-- Banned: app, platform and framework as self-description, revolutionize, blazingly, superlatives and hype generally.
-
 ## Analogies
 
 Analogies come from lived experience and are lightly indicated, never worked to death. The Harvest names the blog and seasons the sign-offs while the content never becomes about farming, and the same restraint holds for the DJ theme, the escarpment and the festival circuit. The Bluesky and ATProto analogy, beet as one implementation of an open standard the way Bluesky is one view of ATProto, is a body text explainer used where a reader needs it and never headline material.
@@ -79,7 +73,7 @@ Headline copy, ie the hero text, taglines and page-opening sentences, is written
 Each entrypoint has one job and its own register: 
 - `site/routes/index.md` The home page is the poster, the broadest audience and the fewest words, hero plus invitation plus proof. 
 - `site/routes/docs/index.md` The docs index is the orientation, where a curious builder forms the mental model. 
-- `site/routes/docs/principles.md`, `stories.md` and `glossary.md` are the source of truth for the framing: every other page cites them rather than restating them.
+- `site/routes/docs/glossary.md` fixes every defined word, `site/routes/docs/about.md` argues the principles and this page holds the stories. Every other page cites them rather than restating them.
 - `site/routes/docs/scenes.md`, `scripts.md` and `plugins.md` explain one layer of malleability each and pair with the tutorial of the same layer.
 - `site/routes/docs/about.md` The about page is the story, lineage, name and the beetmash relationship. 
 - `README.md` The README is the workshop door, developer-facing install and run with a link back to the site for the vision.

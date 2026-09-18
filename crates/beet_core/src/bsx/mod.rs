@@ -158,6 +158,42 @@
 //! [`ResourceFieldRef`]: crate::prelude::ResourceFieldRef
 //! [`UnregisteredTag`]: crate::prelude::UnregisteredTag
 //! [`Value`]: crate::prelude::Value
+//!
+//! # Authoring
+//!
+//! Every entity is authored under the tag of the type it most *is*. `<div>` and
+//! `<span>` mean "this paints as a box of text" and are never a carrier for the
+//! real type: a behavior loop is `<Repeat>`, a thread is `<Thread>`, a route is
+//! `<Route>`, and whatever is left over rides a `{spread}` on that same entity.
+//! Bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>`; good:
+//! `<Route path="deploy" {ExchangeSequence}>`. Between co-located types the
+//! entity's action wins (one action per entity, see `beet_action`):
+//! `<Repeat {RunThread}>`, not `<RunThread {Repeat}>`; absent an action, the
+//! noun the entity names wins: `<Thread {(Sequence, FsStore{path:".."})}>`.
+//!
+//! A generic type resolves by base name to its sole registered instantiation,
+//! as a tag exactly as in a spread, so `<Repeat>`, `<Sequence>` and
+//! `<RepeatTimes total_times=2>` all author directly. For a plain grouping use
+//! `<Fragment>`, not `<div>`: it carries spreads, directives and children but
+//! emits no element (`<Template>` is the *include* front-end,
+//! `<Template src="..">`; with no `src` a directives-only no-op).
+//!
+//! `<Tag/>` resolves a component or template by short type path and spawns its
+//! own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity.
+//! String attributes coerce to the field type (`SmolStr`, `Duration` from
+//! `"30s"`, `Option<T>`, enum unit variants), so a reflect component is usually
+//! authorable without a template. A `<Tag>`'s children land as its direct
+//! children (slots are transparent), so a child-reading handler like
+//! `{ExchangeSequence}` reads them:
+//! `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
+//!
+//! A sequence route that skipped every child fails naming its unregistered
+//! tags, and `beet check` elevates [`UnregisteredTag`] to an error;
+//! `allow_unregistered` opts out a tag whose whole content is the missing
+//! behavior (`<LiveReloadScript/>`). `bx:cfg` atoms are `namespace:argument`
+//! resolved through the `BsxConditions` seam (`feature:`, `version:`, `env:` in
+//! core, downstream registers its own) with Rust's `#[cfg]` operators and
+//! precedence, and an unknown namespace is a hard error, never a silent false.
 
 mod bsx_plugin;
 mod entry;

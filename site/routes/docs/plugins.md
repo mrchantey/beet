@@ -41,7 +41,7 @@ Where the action lives in the url space is the scene's decision rather than the 
 
 ## The layer with authority
 
-[Scripts](/docs/scripts) hold no authority by design. Durable storage, the network and the hardware are authority, so the words for them are compiled. Beet's own stores, servers and renderers are plugins of this kind, and the swappable stack in the [principles](/docs/principles) is what it looks like when every one of them has more than one implementation.
+[Scripts](/docs/scripts) hold no authority by design. Durable storage, the network and the hardware are authority, so the words for them are compiled. Beet's own stores, servers and renderers are plugins of this kind, and the swappable stack in the [principles](/docs/about) is what it looks like when every one of them has more than one implementation.
 
 ## Runtimes
 
