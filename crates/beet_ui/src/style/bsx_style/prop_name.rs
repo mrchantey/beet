@@ -139,6 +139,8 @@ impl PropResolver {
 			("letter-spacing", prop::<Tracking>()),
 			("text-align", prop::<TextAlignProp>()),
 			("white-space", prop::<WhiteSpaceProp>()),
+			("word-break", prop::<WordBreakProp>()),
+			("overflow-wrap", prop::<OverflowWrapProp>()),
 			("list-style-type", prop::<ListStyleProp>()),
 			("diagram-render", prop::<DiagramRenderProp>()),
 			("diagram-surface", prop::<DiagramSurfaceProp>()),

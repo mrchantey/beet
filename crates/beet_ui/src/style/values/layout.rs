@@ -484,6 +484,38 @@ impl AsCssValue for WordBreak {
 	}
 }
 
+/// Whether a word too long for its line may break mid-word, mapping to CSS
+/// `overflow-wrap`. Inherited, so a page sets it once for all its prose.
+///
+/// Unlike [`WordBreak::BreakWord`], `BreakWord` here leaves intrinsic sizing
+/// alone: a long code chip in a paragraph wraps, while the same chip in a table
+/// cell keeps the cell at its width so the table scrolls rather than shattering
+/// its identifiers.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum OverflowWrap {
+	/// Break only at normal word boundaries.
+	#[default]
+	Normal,
+	/// Break an unbreakable word only when it would overflow its line, without
+	/// counting the break toward min-content sizing.
+	BreakWord,
+	/// As `BreakWord`, but the break also counts toward min-content sizing.
+	Anywhere,
+}
+
+impl AsCssValue for OverflowWrap {
+	fn as_css_value(&self) -> Result<CssValue> {
+		match self {
+			Self::Normal => "normal",
+			Self::BreakWord => "break-word",
+			Self::Anywhere => "anywhere",
+		}
+		.xmap(CssValue::expression)
+		.xok()
+	}
+}
+
 /// Marker style for list items, mapping to CSS `list-style-type`.
 ///
 /// Inherited (like CSS), so setting `None` on an ancestor (eg a `<nav>`) strips

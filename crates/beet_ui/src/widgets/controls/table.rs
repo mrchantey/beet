@@ -1,4 +1,5 @@
-//! `Table` widget — a `<table>` with `head`, default, and `foot` slots.
+//! `Table` widget — a `<table>` with `head`, default, and `foot` slots, in the
+//! [`classes::TABLE_SCROLL`] wrapper every table sits in.
 //!
 //! Slot content is supplied as `<tr>` rows; the head/foot slots wrap their
 //! content in `<thead>`/`<tfoot>` automatically.
@@ -6,7 +7,8 @@ use crate::style::material::classes;
 use crate::token::Classes;
 use beet_core::prelude::*;
 
-/// A styled `<table>` with semantic head/body/foot sections.
+/// A styled `<table>` with semantic head/body/foot sections, wrapped in the
+/// block that scrolls it horizontally on a narrow screen.
 ///
 /// Slots: `head` (one or more `<tr>` for `<thead>`), default (rows for
 /// `<tbody>`), `foot` (rows for `<tfoot>`).
@@ -20,17 +22,19 @@ pub fn Table(#[prop] vertical_lines: bool) -> impl Bundle {
 		class_set.insert_class(classes::TABLE_VERTICAL_BORDERS);
 	}
 	rsx! {
-		<table {class_set}>
-			<thead>
-				<Slot name="head"/>
-			</thead>
-			<tbody>
-				<Slot/>
-			</tbody>
-			<tfoot>
-				<Slot name="foot"/>
-			</tfoot>
-		</table>
+		<div {Classes::new([classes::TABLE_SCROLL])}>
+			<table {class_set}>
+				<thead>
+					<Slot name="head"/>
+				</thead>
+				<tbody>
+					<Slot/>
+				</tbody>
+				<tfoot>
+					<Slot name="foot"/>
+				</tfoot>
+			</table>
+		</div>
 	}
 }
 
@@ -67,4 +71,9 @@ mod test {
 	fn default_table_has_no_column_dividers() {
 		render_charcell(false).xnot().xpect_contains("│");
 	}
+
+	/// The scroll wrapper is inert on the terminal, where the columns scale to
+	/// fit: the table renders as a bare one does, no gutter row or column.
+	#[beet_core::test]
+	fn wrapper_adds_no_gutter() { render_charcell(true).xpect_snapshot(); }
 }

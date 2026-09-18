@@ -44,6 +44,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(DecorationLineProp)
 		.insert(WhiteSpaceProp)
 		.insert(WordBreakProp)
+		.insert(OverflowWrapProp)
 		.insert(MarginProp)
 		.insert(FlexGrowProp)
 		.insert(AlignItemsProp)
@@ -192,6 +193,7 @@ impl AsCssRule for DiagramRampProp {
 }
 canonical_property!(WhiteSpaceProp, WhiteSpace, "white-space");
 canonical_property!(WordBreakProp, WordBreak, "word-break");
+canonical_property!(OverflowWrapProp, OverflowWrap, "overflow-wrap");
 canonical_property!(ListStyleProp, ListStyle, "list-style-type");
 // overflow-x/-y share the `Overflow` value type, so neither can be the single
 // canonical token for it; author rules with `with_value(OverflowXProp, ..)`.

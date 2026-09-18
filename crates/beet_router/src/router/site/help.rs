@@ -12,6 +12,8 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+// the widget, not the `beet_net` store table
+use beet_ui::prelude::Table;
 use beet_ui::prelude::*;
 
 /// Middleware that intercepts `--help`/`?help` and renders the scoped
@@ -229,17 +231,15 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 		.collect();
 	let desc_header = with_desc.then(|| rsx! { <th>"description"</th> });
 	rsx! {
-		<table>
-			<thead>
-				<tr>
-					<th>"name"</th>
-					<th>"kind"</th>
-					<th>"required"</th>
-					{desc_header}
-				</tr>
-			</thead>
-			<tbody>{rows}</tbody>
-		</table>
+		<Table>
+			<tr slot="head">
+				<th>"name"</th>
+				<th>"kind"</th>
+				<th>"required"</th>
+				{desc_header}
+			</tr>
+			{rows}
+		</Table>
 	}
 }
 

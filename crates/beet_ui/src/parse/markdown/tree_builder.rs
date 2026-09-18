@@ -474,6 +474,13 @@ impl<'a> MdTreeBuilder<'a> {
 				self.push(StackFrame::new("dd", source));
 			}
 			Tag::Table(_alignments) => {
+				// every table sits in its scroll wrapper (`classes::TABLE_SCROLL`),
+				// the block that scrolls it sideways on a narrow screen
+				let attrs = vec![str_attr(
+					"class",
+					&classes::TABLE_SCROLL.as_selector(),
+				)];
+				self.push(StackFrame::with_attributes("div", source, attrs));
 				self.push(StackFrame::new("table", source));
 			}
 			Tag::TableHead => {
@@ -617,9 +624,13 @@ impl<'a> MdTreeBuilder<'a> {
 			}
 			"tbody" => {
 				// the implicit body opened by the first body row closes with
-				// its table: one `End(Table)` pops both
+				// its table: one `End(Table)` pops it, the table and its wrapper
 				self.pop();
-				self.pop();
+				self.pop_table();
+			}
+			"table" => {
+				// a head-only table: `End(Table)` pops it and its wrapper
+				self.pop_table();
 			}
 			"tr" if self.stack[self.stack.len() - 2].name == "thead" => {
 				// the head's implicit row closes with the head
@@ -688,6 +699,12 @@ impl<'a> MdTreeBuilder<'a> {
 				}
 			}
 		}
+	}
+
+	/// Pop a `table` frame and the scroll wrapper `Tag::Table` pushed under it.
+	fn pop_table(&mut self) {
+		self.pop();
+		self.pop();
 	}
 
 	/// Pop the top frame only when its tag matches `name`, building its element
@@ -1000,14 +1017,15 @@ mod test {
 	}
 
 	/// A table is `thead` then `tbody`, the shape a browser parses a served
-	/// table into, so the world's tree and the parsed DOM agree.
+	/// table into, so the world's tree and the parsed DOM agree, in the scroll
+	/// wrapper every table sits in.
 	#[beet_core::test]
 	fn table() {
 		let nodes =
 			build("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n\nafter");
 		nodes.len().xpect_eq(2);
-		node_name(&nodes[0]).xpect_eq("table");
-		let sections = node_children(&nodes[0]);
+		let table = table_in_wrapper(&nodes[0]);
+		let sections = node_children(table);
 		sections
 			.iter()
 			.map(node_name)
@@ -1019,6 +1037,29 @@ mod test {
 		node_children(&head_rows[0]).len().xpect_eq(2);
 		node_children(&sections[1]).len().xpect_eq(2);
 		node_name(&nodes[1]).xpect_eq("p");
+	}
+
+	/// A head-only table closes its wrapper too, so the block after it is a
+	/// sibling rather than a child of the wrapper.
+	#[beet_core::test]
+	fn head_only_table() {
+		let nodes = build("| A | B |\n|---|---|\n\nafter");
+		nodes.len().xpect_eq(2);
+		let table = table_in_wrapper(&nodes[0]);
+		node_children(table)
+			.iter()
+			.map(node_name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["thead"]);
+		node_name(&nodes[1]).xpect_eq("p");
+	}
+
+	/// The `<table>` inside a `div.table-scroll` wrapper node.
+	fn table_in_wrapper<'a>(wrapper: &'a HtmlNode<'a>) -> &'a HtmlNode<'a> {
+		node_name(wrapper).xpect_eq("div");
+		let table = &node_children(wrapper)[0];
+		node_name(table).xpect_eq("table");
+		table
 	}
 
 	#[beet_core::test]

@@ -287,13 +287,15 @@ fn item_table(cx: ViewCx<'_>, item: &StructSchema, field: FieldRef) -> Snippet {
 		|_resolver, _value, _key| empty_note("No items yet"),
 	);
 	rsx! {
-		<table {class_set}>
-			<thead><tr>{headers}</tr></thead>
-			<tbody {(
-				field.clone(),
-				ReactiveChildren::new(move |_index, item| row(&columns, item)),
-			)}/>
-		</table>
+		<div {Classes::new([classes::TABLE_SCROLL])}>
+			<table {class_set}>
+				<thead><tr>{headers}</tr></thead>
+				<tbody {(
+					field.clone(),
+					ReactiveChildren::new(move |_index, item| row(&columns, item)),
+				)}/>
+			</table>
+		</div>
 		<div {(field, empty)}/>
 	}
 }

@@ -144,6 +144,7 @@ pub fn all_rules() -> Vec<Rule> {
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `browser_overrides.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)
+		table_scroll(),
 		table(),
 		table_vertical_borders(),
 		table_th(),
@@ -241,6 +242,7 @@ mod tests {
 			input_base(),
 			input_outlined(),
 			input_focus(),
+			table_scroll(),
 			table_th(),
 			sidebar_summary(),
 			hidden(),

@@ -389,9 +389,12 @@ mod test {
 
 	#[beet_core::test]
 	fn parse_table() {
+		// root -> div.table-scroll -> table
 		World::new()
 			.spawn_empty()
 			.xtap(|entity| parse_md(entity, "| A | B |\n|---|---|\n| 1 | 2 |"))
+			.child(0)
+			.unwrap()
 			.child(0)
 			.unwrap()
 			.get::<Element>()

@@ -36,6 +36,13 @@
   border-color: var(--material-colors-primary);
 }
 
+.table-scroll {
+  display: block;
+  margin: 0px 0px 1rem 0px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 th {
   border-bottom-width: var(--material-geometry-outline-width-thin);
   border-color: var(--material-colors-outline);

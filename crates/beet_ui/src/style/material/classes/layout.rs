@@ -267,12 +267,18 @@ pub fn main_content_measure() -> Rule {
 /// `Surface`, so the page paints the same neutral base on both the web and the
 /// terminal — a card or app bar layered on top is what reads as a distinct
 /// surface.
+///
+/// `overflow-wrap: break-word` (inherited) wraps a word wider than a phone
+/// screen, ie a long path in inline code, that would otherwise push the page
+/// wider than the viewport; a `<pre>` never wraps, a table scrolls instead (see
+/// [`OverflowWrap`]).
 pub fn page() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(PAGE))
 		.with_token(common_props::BackgroundColor,colors::Background).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnBackground).unwrap()
 		.with_token(TypographyProps,typography::BodyLarge).unwrap()
+		.with_canonical(OverflowWrap::BreakWord)
 }
 
 // ── Web-only overrides ────────────────────────────────────────────────────────

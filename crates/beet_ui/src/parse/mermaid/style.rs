@@ -3,6 +3,10 @@
 //! passes that emit them.
 use crate::prelude::*;
 use crate::style::common_props;
+// explicit imports shadow the bevy_ui twins `beet_core::prelude` re-exports
+// under `bevy_default`
+use crate::style::Display;
+use crate::style::Overflow;
 use beet_core::prelude::*;
 use crate::style::material::*;
 use crate::style::*;

@@ -48,10 +48,14 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.register_template::<SidebarScript>()
 		.register_template::<MenuButton>()
 		.register_template::<Table>();
-	// a baked `<Stylesheet/>` follows rules registered after it baked
+	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
+	// a sheet existing, as a sheet only bakes where the style resources are
+	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)
 	app.add_systems(
 		crate::parse::PostParseTree,
-		super::refresh_stylesheets.after(crate::style::ResolveStylesSet),
+		super::refresh_stylesheets
+			.run_if(any_with_component::<super::BakedStylesheet>)
+			.after(crate::style::ResolveStylesSet),
 	);
 	// a schema-driven widget regenerates its subtree when the schema it renders
 	// changes, so a committed schema edit reaches every form and view of it —

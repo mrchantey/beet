@@ -481,17 +481,23 @@ fn error_text_carries_class() {
 	});
 }
 
+/// A `<Table>` is its scroll wrapper around a `<table>` with every section.
 #[beet_core::test]
 fn table_has_head_body_foot_sections() {
 	let mut world = world_ext::ui_world();
 	let root = world.spawn_template(rsx! { <Table/> }).unwrap().id();
 
 	world.with_state::<ElementQuery, _>(|query| {
-		query.get(root).unwrap().tag().xpect_eq("table");
+		let wrapper = query.get(root).unwrap();
+		wrapper.tag().xpect_eq("div");
+		wrapper
+			.contains_class_name(&classes::TABLE_SCROLL)
+			.xpect_true();
 		let tags: Vec<_> = query
 			.iter_descendants_inclusive(root)
 			.map(|el| el.tag().to_string())
 			.collect();
+		tags.contains(&"table".to_string()).xpect_true();
 		tags.contains(&"thead".to_string()).xpect_true();
 		tags.contains(&"tbody".to_string()).xpect_true();
 		tags.contains(&"tfoot".to_string()).xpect_true();
