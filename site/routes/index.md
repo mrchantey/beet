@@ -26,7 +26,7 @@ title = "Beet"
 
 Traditionally an operating system is built around a machine with siloed opinions about identity, data and behavior. Beet is oriented around people, not hardware, and lets you access your data and tools wherever you like, however you like.
 
-## Malleable
+## **Malleable** at every layer
 
 Beet software grows with your needs, offering a gentle slope from user to tinkerer to systems engineer through three layers of malleability:
 
@@ -34,13 +34,13 @@ Beet software grows with your needs, offering a gentle slope from user to tinker
 2. **Scripts** define composable behaviors in sandboxed JavaScript with fine-grained capabilities.
 3. **Plugins** extend the engine itself in compiled Rust.
 
-## Agnostic
+## **Agnostic** to platforms and domains
 
 - One repo runs the same in a browser tab, a terminal, over ssh, in a window and on a microcontroller.
 - The same capabilities serve web sites, games, robots, infra deploys and agent harnesses.
 - Every layer of the stack is swappable, the renderer, the http server, the blob store, the filesystem. Keep what you love and swap out the rest.
 
-## Decentralized
+## **Decentralized** with DWeb and Local-first integrations
 
 - Your software is records and blobs in a repo that belongs to your account, with your atproto PDS as its home.
 - Local-first by design, so the repo works with no network and syncs when one appears.
