@@ -172,7 +172,7 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 # 0.2: reached through `age`'s `rand 0.8`. This line selects its wasm backend by
 # feature (`js`), not by the `getrandom_backend` cfg the newer majors read, so
-# beet_core declares it on wasm under `secrets` purely to switch that on.
+# beet_core declares it on wasm under `vault` purely to switch that on.
 getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
 variadics_please = "1"
 webbrowser = "1"
@@ -277,8 +277,8 @@ digest = { version = "0.11", default-features = false }
 # re-enable `ron/std` (eg via `beet_core/std`).
 ron = { version = "0.12", default-features = false }
 
-#💡 secrets
-# age file encryption (`beet_core/secrets`): pure rust, the same format the
+#💡 vault
+# age file encryption (`beet_core/vault`): pure rust, the same format the
 # `age` cli reads. default-features off drops the cli-shaped surface: `ssh`
 # (ssh keys as recipients, which hardware and agent-held keys cannot decrypt),
 # `plugin` (the external plugin protocol) and `cli-common` (prompts, pinentry);
@@ -291,14 +291,14 @@ age = { version = "0.11", default-features = false, features = ["armor"] }
 # `age` embeds its message catalogue through rust-embed, which in a debug build
 # reads the files off the crate source dir at runtime, a path a wasm test has
 # no filesystem for. `debug-embed` compiles them in unconditionally; beet_core
-# names the crate under `secrets` purely to switch that on.
+# names the crate under `vault` purely to switch that on.
 rust-embed = { version = "8", features = ["debug-embed"] }
 # TOML values only (`beet_core/toml`, `MediaType::Toml`): `parse` and
 # `display` are the two directions, `serde` the bridge to `Value`; no
 # `preserve_order` (beet's `Value` map is ordered already) and no `toml_edit`
 # comment preservation.
 toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
-# QR rendering, shared by the cli's png command (`image` on) and the secrets
+# QR rendering, shared by the cli's png command (`image` on) and the vault
 # `backup --qr` terminal print (`beet_net/qrcode`, unicode only).
 qrcode = { version = "0.14", default-features = false }
 
@@ -392,13 +392,14 @@ postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
-# The secrets system: age identities, recipients and the identity file, the
-# secrets document and the test runner's load of it (`beet_core`), the
-# `<Secrets>` load, vault I/O over stores and the `secrets` verbs (`beet_net`),
-# the stack secret store seam, export, restore and revoke (`beet_infra`).
-# Opt-in: a binary that never touches a secret links no crypto.
-secrets = ["beet_core/secrets", "beet_net?/secrets", "beet_infra?/secrets"]
-# QR rendering in the terminal, so `secrets backup --qr` prints an identity's
+# The vault layer and the secrets document on it: age identities, recipients
+# and the identity file, the secrets document and the test runner's load of it
+# (`beet_core`); age files over stores, the `<Secrets>` load and the `vault`
+# and `secrets` verbs (`beet_net`); the stack secret store seam, export,
+# restore and revoke (`beet_infra`). Opt-in: a binary that never touches a
+# secret links no crypto.
+vault = ["beet_core/vault", "beet_net?/vault", "beet_infra?/vault"]
+# QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]
 testing = ["beet_core/testing", "beet_net?/testing"]

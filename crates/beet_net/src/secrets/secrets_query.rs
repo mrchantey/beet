@@ -4,12 +4,12 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 
-/// Resolves the document a verb names (`--vault=<label or path>`) into a
-/// [`VaultHandle`]: a declared `<Secrets>` by label, with its store (the
-/// `StoreRef` target's, else the nearest ancestor `BlobStore`, else the repo
-/// store); or an undeclared file by path or store uri. Omitted, it is the
-/// one declared document, an error naming the labels when several are
-/// declared, or the undeclared `secrets.toml.age` beside the entry when none
+/// Resolves the document a verb names (`--document=<label or path>`) into
+/// a [`SecretsHandle`]: a declared `<Secrets>` by label, with its store
+/// (the `StoreRef` target's, else the nearest ancestor `BlobStore`, else the
+/// repo store); or an undeclared file by path or store uri. Omitted, it is
+/// the one declared document, an error naming the labels when several are
+/// declared, or the undeclared `secrets.toml` beside the entry when none
 /// is.
 #[derive(SystemParam)]
 pub struct SecretsQuery<'w, 's> {
@@ -20,31 +20,31 @@ pub struct SecretsQuery<'w, 's> {
 	repo: Query<'w, 's, &'static BlobStore, With<RepoStore>>,
 }
 
-/// What `--vault` names: the default, a declared label, or a file by path
-/// or uri.
+/// What `--document` names: the default, a declared label, or a file by
+/// path or uri.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DocumentSelector {
-	/// No `--vault`: the one declared document, or the conventional file.
+	/// No `--document`: the one declared document, or the conventional file.
 	Default,
 	/// A `<Secrets label>`.
 	Label(SmolStr),
-	/// An undeclared file: a filesystem path (`~/personal.toml.age`,
-	/// `dir/x.toml.age`) or a store uri ending in the file
-	/// (`s3://bucket/secrets/x.toml.age`).
+	/// An undeclared file: a filesystem path (`~/personal.toml`,
+	/// `dir/x.toml`) or a store uri ending in the file
+	/// (`s3://bucket/secrets/x.toml`).
 	Path(String),
 }
 
 impl DocumentSelector {
-	/// A value is a path when it ends in `.age`, has a `/`, or names a
-	/// scheme; anything else is a label. `None` is the default.
+	/// A value is a path when it has an extension dot, a `/`, or names a
+	/// scheme; anything else is a label, so a label carries none of the
+	/// three. `None` is the default.
 	pub fn parse(value: Option<&str>) -> Self {
 		let Some(value) =
 			value.map(str::trim).filter(|value| !value.is_empty())
 		else {
 			return Self::Default;
 		};
-		match value.ends_with(VaultHandle::SUFFIX) || value.contains(['/', ':'])
-		{
+		match value.contains(['.', '/', ':']) {
 			true => Self::Path(value.to_string()),
 			false => Self::Label(SmolStr::new(value)),
 		}
@@ -57,18 +57,18 @@ impl SecretsQuery<'_, '_> {
 		&self,
 		caller: Entity,
 		selector: Option<&str>,
-	) -> Result<VaultHandle> {
+	) -> Result<SecretsHandle> {
 		match DocumentSelector::parse(selector) {
 			DocumentSelector::Default => self.resolve_default(caller),
 			DocumentSelector::Label(label) => self.resolve_label(&label),
-			DocumentSelector::Path(path) => VaultHandle::from_uri(&path),
+			DocumentSelector::Path(path) => SecretsHandle::from_uri(&path),
 		}
 	}
 
 	/// The default document: the one declared, an error naming the labels
 	/// when several are, or the undeclared conventional file in `caller`'s
 	/// entry store when none is.
-	pub fn resolve_default(&self, caller: Entity) -> Result<VaultHandle> {
+	pub fn resolve_default(&self, caller: Entity) -> Result<SecretsHandle> {
 		let mut declared = self.declared.iter();
 		match (declared.next(), declared.next()) {
 			(Some((entity, secrets, store_ref)), None) => {
@@ -76,10 +76,10 @@ impl SecretsQuery<'_, '_> {
 			}
 			(Some(_), Some(_)) => bevybail!(
 				"several documents are declared ({}): name one with \
-				`--vault=<label>`",
+				`--document=<label>`",
 				self.labels()
 			),
-			(None, _) => VaultHandle::new(
+			(None, _) => SecretsHandle::new(
 				self.entry_store(caller)?,
 				SecretsDocument::DEFAULT_PATH,
 			)?
@@ -90,7 +90,7 @@ impl SecretsQuery<'_, '_> {
 
 	/// The declared document labelled `label`, an error naming the declared
 	/// labels otherwise.
-	pub fn resolve_label(&self, label: &str) -> Result<VaultHandle> {
+	pub fn resolve_label(&self, label: &str) -> Result<SecretsHandle> {
 		self.declared
 			.iter()
 			.find(|(_, secrets, _)| secrets.label == label)
@@ -100,7 +100,7 @@ impl SecretsQuery<'_, '_> {
 			.unwrap_or_else(|| {
 				bevybail!(
 					"no `<Secrets label=\"{label}\">` is declared{}; a file is \
-					named by its path instead, ie `--vault=dir/{label}.toml.age`",
+					named by its path instead, ie `--document=dir/{label}.toml`",
 					match self.declared.is_empty() {
 						true => String::new(),
 						false => format!(" (declared: {})", self.labels()),
@@ -111,7 +111,7 @@ impl SecretsQuery<'_, '_> {
 
 	/// Every declared document, resolved, with its label; one that fails to
 	/// resolve reports why in its place, so `check` can list it.
-	pub fn declared(&self) -> Vec<(SmolStr, Result<VaultHandle>)> {
+	pub fn declared(&self) -> Vec<(SmolStr, Result<SecretsHandle>)> {
 		self.declared
 			.iter()
 			.map(|(entity, secrets, store_ref)| {
@@ -124,7 +124,7 @@ impl SecretsQuery<'_, '_> {
 	}
 
 	/// The handle of the declaration on `entity`.
-	pub fn handle_of(&self, entity: Entity) -> Result<VaultHandle> {
+	pub fn handle_of(&self, entity: Entity) -> Result<SecretsHandle> {
 		let (entity, secrets, store_ref) = self.declared.get(entity)?;
 		self.handle(entity, secrets, store_ref)
 	}
@@ -144,7 +144,7 @@ impl SecretsQuery<'_, '_> {
 		entity: Entity,
 		secrets: &Secrets,
 		store_ref: Option<&StoreRef>,
-	) -> Result<VaultHandle> {
+	) -> Result<SecretsHandle> {
 		let store = match store_ref {
 			Some(store_ref) => {
 				self.stores.get(store_ref.store()).cloned().map_err(|_| {
@@ -159,7 +159,7 @@ impl SecretsQuery<'_, '_> {
 			}
 			None => self.entry_store(entity)?,
 		};
-		VaultHandle::new(store, secrets.path.as_str())?
+		SecretsHandle::new(store, secrets.path.as_str())?
 			.with_label(secrets.label.clone())
 			.xok()
 	}
@@ -181,10 +181,10 @@ impl SecretsQuery<'_, '_> {
 	}
 }
 
-impl VaultHandle {
+impl SecretsHandle {
 	/// The document `selector` names from `caller`'s position, the
 	/// resolution every document verb starts from.
-	pub async fn resolve_document(
+	pub async fn resolve(
 		caller: &AsyncEntity,
 		selector: Option<&str>,
 	) -> Result<Self> {
@@ -241,10 +241,9 @@ mod test {
 		let storeless = world.spawn_empty().id();
 		let root = world
 			.spawn((BlobStore::temp(), RepoStore, children![
-				Secrets::new("infra/secrets/mail.toml.age")
-					.with_label("mail-prod"),
+				Secrets::new("infra/secrets/mail.toml").with_label("mail-prod"),
 				(
-					Secrets::new("secrets").with_label("cold"),
+					Secrets::new("secrets.toml").with_label("cold"),
 					StoreRef(storeless)
 				),
 			]))
@@ -258,10 +257,10 @@ mod test {
 		let (mut world, root) = world_with_documents();
 		world.with_state::<SecretsQuery, _>(|query| {
 			let mail = query.resolve(root, Some("mail-prod")).unwrap();
-			mail.path.as_str().xpect_eq("infra/secrets/mail.toml.age");
+			mail.path.as_str().xpect_eq("infra/secrets/mail.toml");
 			mail.label.clone().unwrap().as_str().xpect_eq("mail-prod");
 			mail.describe()
-				.xpect_eq("`mail-prod` (infra/secrets/mail.toml.age)");
+				.xpect_eq("`mail-prod` (infra/secrets/mail.toml)");
 			// several declared: the default needs a label
 			query
 				.resolve(root, None)
@@ -291,13 +290,10 @@ mod test {
 		world.flush();
 		world.with_state::<SecretsQuery, _>(|query| {
 			let handle = query.resolve(root, None).unwrap();
-			handle.path.as_str().xpect_eq("secrets.toml.age");
+			handle.path.as_str().xpect_eq("secrets.toml");
 			handle.label.unwrap().as_str().xpect_eq("secrets");
 		});
-		world.spawn((
-			Secrets::new("x.json.age").with_label("only"),
-			ChildOf(root),
-		));
+		world.spawn((Secrets::new("x.json").with_label("only"), ChildOf(root)));
 		world.flush();
 		world.with_state::<SecretsQuery, _>(|query| {
 			query
@@ -305,7 +301,7 @@ mod test {
 				.unwrap()
 				.path
 				.as_str()
-				.xpect_eq("x.json.age");
+				.xpect_eq("x.json");
 		});
 	}
 
@@ -315,9 +311,9 @@ mod test {
 		DocumentSelector::parse(Some("")).xpect_eq(DocumentSelector::Default);
 		DocumentSelector::parse(Some("mail-prod"))
 			.xpect_eq(DocumentSelector::Label("mail-prod".into()));
-		DocumentSelector::parse(Some("secrets.toml.age"))
-			.xpect_eq(DocumentSelector::Path("secrets.toml.age".into()));
-		DocumentSelector::parse(Some("~/p.toml.age"))
-			.xpect_eq(DocumentSelector::Path("~/p.toml.age".into()));
+		DocumentSelector::parse(Some("secrets.toml"))
+			.xpect_eq(DocumentSelector::Path("secrets.toml".into()));
+		DocumentSelector::parse(Some("~/p.toml"))
+			.xpect_eq(DocumentSelector::Path("~/p.toml".into()));
 	}
 }

@@ -464,7 +464,7 @@ impl StalwartBlock {
 		&self,
 		stack: &ResolvedStack,
 		kind: &str,
-	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
+	) -> BTreeMap<SmolStr, SmolStr> {
 		[
 			(
 				SmolStr::from("Name"),

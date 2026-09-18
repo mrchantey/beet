@@ -11,9 +11,9 @@ use core::fmt::Write;
 /// ever printed.
 ///
 /// ```sh
-/// beet secrets/ls                      # the declared document
-/// beet secrets/ls --vault=mail-prod    # a declared label
-/// beet secrets/ls --vault=~/personal.toml.age
+/// beet secrets/ls                         # the declared document
+/// beet secrets/ls --document=mail-prod    # a declared label
+/// beet secrets/ls --document=~/personal.toml
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -23,14 +23,14 @@ use core::fmt::Write;
 	ParamsPartial = ParamsPartial::new::<DocumentParams>()
 )]
 pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
-	let vault = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let document = vault.read_document().await?;
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let document = handle.read().await?;
 	// no identity is fine: every group is then locked
 	let identities = AgeIdentityFile::discover()?.unwrap_or_default();
 	let opened = document.open(&identities)?;
 	let mut out = format!(
 		"{}: {} group(s), {} record(s)\n",
-		vault.describe(),
+		handle.describe(),
 		document.groups.len(),
 		document.secrets.len()
 	);
@@ -140,8 +140,8 @@ fn width(cell: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	/// A record with a fixed `modified`, so the listing snapshots.
@@ -193,8 +193,8 @@ mod test {
 			)
 			.unwrap();
 		fixture
-			.vault("secrets.toml.age")
-			.write_document(&document)
+			.secrets("secrets.toml")
+			.write(&document)
 			.await
 			.unwrap();
 		let mut fixture = fixture;
@@ -216,6 +216,6 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("secrets.toml.age");
+			.xpect_contains("secrets.toml");
 	}
 }

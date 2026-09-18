@@ -8,7 +8,6 @@
 
 use super::entity_map::FileEntityMapper;
 use crate::prelude::*;
-use alloc::collections::BTreeMap;
 use bevy::ecs::component::ComponentId;
 use bevy::ecs::entity_disabling::DefaultQueryFilters;
 use bevy::ecs::reflect::ReflectComponent;

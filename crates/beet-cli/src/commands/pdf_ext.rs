@@ -6,7 +6,6 @@ use lopdf::Document;
 use lopdf::Object;
 use lopdf::ObjectId;
 use lopdf::dictionary;
-use std::collections::BTreeMap;
 
 /// Merge `pdfs` into a single document, preserving their order as the page
 /// sequence. Each input is a self-contained PDF (one chromium print), so the

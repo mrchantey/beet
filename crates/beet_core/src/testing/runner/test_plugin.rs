@@ -88,7 +88,7 @@ impl Plugin for TestPlugin {
 		// than relying on the caller (`just`, a js host) to have done it, and
 		// the secrets document beside it by the same convention.
 		env_ext::load_dotenv().ok();
-		#[cfg(feature = "secrets")]
+		#[cfg(feature = "vault")]
 		Secrets::load_env_vars_beside_dotenv();
 
 		app.init_plugin::<AsyncPlugin>()

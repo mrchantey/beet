@@ -28,10 +28,12 @@ mod store;
 mod actions;
 #[cfg(feature = "std")]
 mod net_plugin;
-#[cfg(feature = "secrets")]
+#[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "std")]
 mod store_actions;
+#[cfg(feature = "vault")]
+mod vault;
 // The server module is no_std-capable, but not action-free: a server dispatches
 // through an `Action<Request, Response>`, so everything but the process-global
 // `CanonicalPort` rides the (no_std-capable) `action` feature. The concrete
@@ -98,7 +100,7 @@ pub mod prelude {
 	pub use crate::mdns::*;
 	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
-	#[cfg(feature = "secrets")]
+	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;
 	pub use crate::server::*;
 	#[cfg(feature = "sockets")]
@@ -112,6 +114,8 @@ pub mod prelude {
 	pub use crate::tls::*;
 	pub use crate::types::*;
 	pub use crate::udp::*;
+	#[cfg(feature = "vault")]
+	pub use crate::vault::*;
 	#[cfg(all(feature = "webdriver", not(target_arch = "wasm32")))]
 	pub use crate::webdriver;
 	// Re-export core types used in beet_net's public API

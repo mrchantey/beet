@@ -178,8 +178,8 @@ impl AgeIdentityFile {
 	pub fn require() -> Result<Self> {
 		Self::discover()?.ok_or_else(|| {
 			bevyhow!(
-				"no age identity: `beet secrets/keygen` makes one at `{}`, \
-				`secrets/restore-identity --file=<backup>` restores a backup, \
+				"no age identity: `beet vault/keygen` makes one at `{}`, \
+				`vault/restore-identity --file=<backup>` restores a backup, \
 				and a CI runner passes one through `{}`",
 				Self::default_path()
 					.map(|path| path.display().to_string())

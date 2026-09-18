@@ -1,10 +1,10 @@
-//! `secrets/decrypt`: an age file's plaintext, printed.
+//! `vault/decrypt`: an age file's plaintext, printed.
 
 use super::VaultParams;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`SecretsDecrypt`], surfaced in `--help`.
+/// Request params for [`VaultDecrypt`], surfaced in `--help`.
 #[derive(Reflect)]
 struct DecryptParams {
 	/// Write the plaintext to this file, owner-only, instead of printing it:
@@ -13,13 +13,13 @@ struct DecryptParams {
 }
 
 /// Print an age file's plaintext. This is the deliberate print: the
-/// plaintext is the response, so `beet secrets/decrypt --vault=x.age > x`
+/// plaintext is the response, so `beet vault/decrypt --vault=x.age > x`
 /// lands it wherever a shell sends stdout, and `--out` writes it to an
 /// owner-only file instead. Mind what is recording your session.
 ///
 /// ```sh
-/// beet secrets/decrypt --vault=infra/cert.pem.age
-/// beet secrets/decrypt --vault=~/keys/id_ed25519.age --out=/tmp/id_ed25519
+/// beet vault/decrypt --vault=infra/cert.pem.age
+/// beet vault/decrypt --vault=~/keys/id_ed25519.age --out=/tmp/id_ed25519
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -28,7 +28,7 @@ struct DecryptParams {
 	PathPartial = PathPartial::new("decrypt"),
 	ParamsPartial = ParamsPartial::new::<(VaultParams, DecryptParams)>()
 )]
-pub async fn SecretsDecrypt(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn VaultDecrypt(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<DecryptParams>()?;
 	let vault = VaultParams::resolve(&cx.input)?;
 	let plaintext = vault.read(&AgeIdentityFile::require()?).await?;
@@ -55,7 +55,7 @@ pub async fn SecretsDecrypt(cx: ActionContext<Request>) -> Result<Response> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
+	use super::super::super::test_support::VerbWorld;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -65,7 +65,7 @@ mod test {
 		fixture.write("a.txt.age", "TOKEN=x\n").await;
 		fixture
 			.call_str(
-				SecretsDecrypt,
+				VaultDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={}",
 					fixture.uri("a.txt.age")
@@ -81,7 +81,7 @@ mod test {
 			.unwrap();
 		fixture
 			.call(
-				SecretsDecrypt,
+				VaultDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={}",
 					fixture.uri("b.age")
@@ -104,7 +104,7 @@ mod test {
 		fixture.write("mail.toml.age", "a = 1\n").await;
 		fixture
 			.call_str(
-				SecretsDecrypt,
+				VaultDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={} --out={}",
 					fixture.uri("mail.toml.age"),

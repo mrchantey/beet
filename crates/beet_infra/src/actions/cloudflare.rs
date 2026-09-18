@@ -19,7 +19,6 @@ use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use std::collections::BTreeMap;
 
 /// Where the `build` verb publishes the deployable wasm Worker artifacts
 /// (`index.js`, `index_bg.wasm`, `package.json`), workspace-relative. `deploy`

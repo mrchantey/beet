@@ -1,0 +1,137 @@
+//! The fixture every `vault` and `secrets` verb test runs against.
+
+use crate::prelude::*;
+use beet_action::prelude::*;
+use beet_core::prelude::*;
+use bevy::platform::sync::LazyLock;
+use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::Ordering;
+
+/// The one identity every verb test runs as, set inline through
+/// `BEET_AGE_IDENTITY` exactly once per process (one human per machine): a
+/// per-test value would race the shared environment.
+static IDENTITY: LazyLock<AgeIdentity> = LazyLock::new(|| {
+	let identity = AgeIdentity::generate();
+	// SAFETY: test-only, set once before any verb test reads it
+	unsafe {
+		env_ext::set_var(AgeIdentityFile::ENV_VAR, &identity.to_string())
+			.unwrap();
+	}
+	identity
+});
+
+/// One memory store per fixture, so tests never share a file.
+static STORES: AtomicUsize = AtomicUsize::new(0);
+
+/// A world to call verbs in, the process identity, and a memory store of
+/// its own as the repo store, addressable by uri too. The store handle is
+/// held here because a memory backing lives only as long as a handle does,
+/// and a verb given a uri resolves it afresh. With nothing declared the
+/// document verbs land on `secrets.toml` in the repo store.
+pub struct VerbWorld {
+	pub world: World,
+	pub root: Entity,
+	pub identity: AgeIdentity,
+	store: BlobStore,
+	uri: String,
+}
+
+impl VerbWorld {
+	/// Build the fixture, forcing the process identity into place.
+	pub fn new() -> Self {
+		let identity = IDENTITY.clone();
+		let mut world = (AsyncPlugin, SecretsPlugin).into_world();
+		let uri = format!(
+			"memory://verbs-{}",
+			STORES.fetch_add(1, Ordering::Relaxed)
+		);
+		let store = StoreProvider::from_uri(&StoreUri::parse(&uri).unwrap())
+			.unwrap()
+			.into_blob_store();
+		let root = world.spawn((store.clone(), RepoStore)).id();
+		world.flush();
+		Self {
+			world,
+			root,
+			identity,
+			store,
+			uri,
+		}
+	}
+
+	/// The identity file holding the fixture's identity alone.
+	pub fn identities(&self) -> AgeIdentityFile {
+		let mut file = AgeIdentityFile::default();
+		file.push(self.identity.clone());
+		file
+	}
+
+	/// The uri of `name` in this fixture's store: what `--vault` or
+	/// `--document` takes as a path.
+	pub fn uri(&self, name: &str) -> String { format!("{}/{name}", self.uri) }
+
+	/// The age file `name` in this fixture's store.
+	pub fn vault(&self, name: &str) -> VaultHandle {
+		VaultHandle::new(self.store.clone(), name).unwrap()
+	}
+
+	/// Write `plaintext` to the age file `name`, encrypted to the fixture's
+	/// identity: the state most vault tests start from.
+	pub async fn write(&self, name: &str, plaintext: &str) {
+		self.vault(name)
+			.write(plaintext.as_bytes(), &[self.identity.to_recipient()])
+			.await
+			.unwrap();
+	}
+
+	/// The secrets document `name` in this fixture's store.
+	pub fn secrets(&self, name: &str) -> SecretsHandle {
+		SecretsHandle::new(self.store.clone(), name).unwrap()
+	}
+
+	/// The default document, `secrets.toml` in the repo store, empty until
+	/// written.
+	pub async fn document(&self) -> SecretsDocument {
+		self.secrets(SecretsDocument::DEFAULT_PATH)
+			.read_or_new()
+			.await
+			.unwrap()
+	}
+
+	/// Write `record` with `value` into the default document as the
+	/// fixture's identity: the state most record tests start from.
+	pub async fn set(&self, name: &str, value: &str, record: SecretRecord) {
+		let mut document = self.document().await;
+		document
+			.set(&self.identities(), name, value, record)
+			.unwrap();
+		self.secrets(SecretsDocument::DEFAULT_PATH)
+			.write(&document)
+			.await
+			.unwrap();
+	}
+
+	/// Call `verb` spawned under the root with `request`.
+	pub async fn call(
+		&mut self,
+		verb: impl Bundle,
+		request: Request,
+	) -> Result<Response> {
+		let root = self.root;
+		self.world
+			.spawn((verb, ChildOf(root)))
+			.run_async_then(move |entity| async move {
+				entity.call::<Request, Response>(request).await
+			})
+			.await
+	}
+
+	/// [`call`](Self::call) and read the response body as text.
+	pub async fn call_str(
+		&mut self,
+		verb: impl Bundle,
+		request: Request,
+	) -> Result<String> {
+		self.call(verb, request).await?.unwrap_str().await.xok()
+	}
+}

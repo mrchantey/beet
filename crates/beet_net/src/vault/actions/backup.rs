@@ -1,10 +1,10 @@
-//! `secrets/backup`: the identity file, passphrase-encrypted for a stick or
+//! `vault/backup`: the identity file, passphrase-encrypted for a stick or
 //! paper.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`SecretsBackup`], surfaced in `--help`.
+/// Request params for [`VaultBackup`], surfaced in `--help`.
 #[derive(Reflect)]
 struct BackupParams {
 	/// The file to write; defaults to `beet-identity-<date>.age` in the
@@ -20,12 +20,12 @@ struct BackupParams {
 /// (never echoed, never on argv) and write the file passphrase-encrypted as
 /// armored age text, for a USB stick in a drawer; `--qr` also prints it as
 /// a QR code for paper. Anyone with the passphrase and the file has the
-/// identity, so the passphrase lives in a head. `secrets/restore-identity`
+/// identity, so the passphrase lives in a head. `vault/restore-identity`
 /// is the inverse; `age -d <file>` on any laptop is the escape hatch.
 ///
 /// ```sh
-/// beet secrets/backup --qr
-/// beet secrets/backup --out=/media/stick/keys.txt.age
+/// beet vault/backup --qr
+/// beet vault/backup --out=/media/stick/keys.txt.age
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -34,7 +34,7 @@ struct BackupParams {
 	PathPartial = PathPartial::new("backup"),
 	ParamsPartial = ParamsPartial::new::<BackupParams>()
 )]
-pub async fn SecretsBackup(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn VaultBackup(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<BackupParams>()?;
 	let identities = AgeIdentityFile::require()?;
 	if params.headless {

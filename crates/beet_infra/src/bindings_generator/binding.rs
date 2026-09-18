@@ -11,7 +11,6 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
 use std::path::Path;
 
 const RESERVED_WORDS: [&str; 32] = [

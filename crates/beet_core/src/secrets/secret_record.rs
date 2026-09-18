@@ -2,7 +2,6 @@
 //! opened form a reader holds.
 
 use crate::prelude::*;
-use alloc::collections::BTreeMap;
 use core::fmt;
 use core::str::FromStr;
 

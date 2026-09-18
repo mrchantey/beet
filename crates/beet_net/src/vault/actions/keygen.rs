@@ -1,10 +1,10 @@
-//! `secrets/keygen`: a new identity into the identity file.
+//! `vault/keygen`: a new identity into the identity file.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Request params for [`SecretsKeygen`], surfaced in `--help`.
+/// Request params for [`VaultKeygen`], surfaced in `--help`.
 #[derive(Reflect)]
 struct KeygenParams {
 	/// The identity file to append to; defaults to the OS config,
@@ -15,11 +15,11 @@ struct KeygenParams {
 /// Make a new age identity and append it to the identity file, created
 /// owner-only when missing, printing its recipient and the next steps. Never
 /// overwrites: a second call appends a second identity. The identity itself
-/// is never printed; `secrets/backup` is how it leaves the machine.
+/// is never printed; `vault/backup` is how it leaves the machine.
 ///
 /// ```sh
-/// beet secrets/keygen
-/// beet secrets/keygen --out=/tmp/keys.txt
+/// beet vault/keygen
+/// beet vault/keygen --out=/tmp/keys.txt
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -28,7 +28,7 @@ struct KeygenParams {
 	PathPartial = PathPartial::new("keygen"),
 	ParamsPartial = ParamsPartial::new::<KeygenParams>()
 )]
-pub async fn SecretsKeygen(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn VaultKeygen(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<KeygenParams>()?;
 	let path = match params.out {
 		Some(out) => PathBuf::from(out),
@@ -52,10 +52,10 @@ pub async fn SecretsKeygen(cx: ActionContext<Request>) -> Result<Response> {
 		identity file: {} ({} identities)\n\
 		\n\
 		Next:\n\
-		1. back it up: `beet secrets/backup --qr` onto a stick, and remember \
+		1. back it up: `beet vault/backup --qr` onto a stick, and remember \
 		the passphrase\n\
 		2. add the recipient wherever it should read: a secrets document's \
-		groups, or `--recipients` on `secrets/encrypt` and `secrets/rekey`\n\
+		groups, or `--recipients` on `vault/encrypt` and `vault/rekey`\n\
 		3. `beet secrets/check`\n",
 		path.display(),
 		file.len()
@@ -66,7 +66,7 @@ pub async fn SecretsKeygen(cx: ActionContext<Request>) -> Result<Response> {
 // native only: the file lands in the system temp dir
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod test {
-	use super::super::test_support::VerbWorld;
+	use super::super::super::test_support::VerbWorld;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -80,7 +80,7 @@ mod test {
 		for count in 1..=2 {
 			let text = fixture
 				.call_str(
-					SecretsKeygen,
+					VaultKeygen,
 					Request::from_cli_str(&format!(
 						"--out={}",
 						path.to_string_lossy()

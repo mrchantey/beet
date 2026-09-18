@@ -1,13 +1,13 @@
-//! `secrets/restore-identity`: a backup's identities into the identity file.
+//! `vault/restore-identity`: a backup's identities into the identity file.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Request params for [`SecretsRestoreIdentity`], surfaced in `--help`.
+/// Request params for [`VaultRestoreIdentity`], surfaced in `--help`.
 #[derive(Reflect)]
 struct RestoreIdentityParams {
-	/// The backup `secrets/backup` wrote.
+	/// The backup `vault/backup` wrote.
 	file: String,
 	/// The identity file to append to; defaults to the OS config,
 	/// `~/.config/beet/age/keys.txt`.
@@ -22,7 +22,7 @@ struct RestoreIdentityParams {
 /// second identity that could read nothing.
 ///
 /// ```sh
-/// beet secrets/restore-identity --file=/media/stick/beet-identity-2026-09-17.age
+/// beet vault/restore-identity --file=/media/stick/beet-identity-2026-09-17.age
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -31,7 +31,7 @@ struct RestoreIdentityParams {
 	PathPartial = PathPartial::new("restore-identity"),
 	ParamsPartial = ParamsPartial::new::<RestoreIdentityParams>()
 )]
-pub async fn SecretsRestoreIdentity(
+pub async fn VaultRestoreIdentity(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let params = cx.input.parse_params::<RestoreIdentityParams>()?;

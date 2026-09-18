@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::collections::BTreeMap;
+use beet_core::prelude::*;
 
 /// Code generation options meant to be supported by all languages.
 #[derive(Clone, Debug)]
@@ -35,16 +35,12 @@ pub struct CodeGeneratorConfig {
 }
 
 /// Track types definitions provided by external modules.
-pub type ExternalDefinitions = std::collections::BTreeMap<
-	/* module */ String,
-	/* type names */ Vec<String>,
->;
+pub type ExternalDefinitions =
+	BTreeMap</* module */ String, /* type names */ Vec<String>>;
 
 /// Track documentation to be attached to particular definitions.
-pub type DocComments = std::collections::BTreeMap<
-	/* qualified name */ Vec<String>,
-	/* comment */ String,
->;
+pub type DocComments =
+	BTreeMap</* qualified name */ Vec<String>, /* comment */ String>;
 
 impl Default for CodeGeneratorConfig {
 	fn default() -> Self { Self::new() }

@@ -5,30 +5,30 @@ use crate::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// A secrets document an entry declares, `<Secrets path="secrets.toml.age"/>`:
+/// A secrets document an entry declares, `<Secrets path="secrets.toml"/>`:
 /// the file at `path` in the nearest ancestor store (the repo store, or a
 /// `StoreRef` target's beside it), named by `label` on every document verb's
-/// `--vault`. When the entity is ready its document is read, every group the
-/// discovered identity opens is verified, its `EnvVar` records land in the
-/// process environment (existing wins) and the opened document is inserted
-/// as [`OpenSecrets`] on the same entity. A document with no identity on the
-/// machine is one warning and nothing loaded, never an error: a cloud box's
-/// repo store never carries one, and a contributor without it still builds.
+/// `--document`. When the entity is ready its document is read, every group
+/// the discovered identity opens is verified, its `EnvVar` records land in
+/// the process environment (existing wins) and the opened document is
+/// inserted as [`OpenSecrets`] on the same entity. A document with no
+/// identity on the machine is one warning and nothing loaded, never an
+/// error: a cloud box's repo store never carries one, and a contributor
+/// without it still builds.
 ///
 /// The load itself lives beside the store I/O in `beet_net`; this is the
 /// declaration a lean build keeps as an inert tag.
 ///
 /// ```rsx
 /// <Secrets/>
-/// <Secrets label="mail-prod" path="infra/secrets/mail--prod.toml.age"/>
+/// <Secrets label="mail-prod" path="infra/secrets/mail--prod.toml"/>
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct Secrets {
 	/// How a verb names this document, `secrets` by default.
 	pub label: SmolStr,
-	/// The file within its store, its format named by the extension before
-	/// `.age`.
+	/// The file within its store, its format named by its extension.
 	pub path: RelPath,
 }
 
@@ -78,7 +78,7 @@ impl Secrets {
 		}
 	}
 
-	/// Load the `EnvVar` records of the one `secrets.*.age` in `dir` into
+	/// Load the `EnvVar` records of the one `secrets.<format>` in `dir` into
 	/// the process environment (existing wins), answering how many landed:
 	/// none when there is no such file, an error naming both when there are
 	/// two, and an error naming the identity path and the file when there is
@@ -96,8 +96,8 @@ impl Secrets {
 		let Some(identities) = AgeIdentityFile::discover()? else {
 			bevybail!(
 				"no age identity at `{}` to open `{file}` with: its {} record(s) \
-				were not loaded (`beet secrets/keygen` makes one, \
-				`secrets/restore-identity` restores one)",
+				were not loaded (`beet vault/keygen` makes one, \
+				`vault/restore-identity` restores one)",
 				AgeIdentityFile::default_path()?.display(),
 				document.secrets.len()
 			);
@@ -115,8 +115,9 @@ impl Secrets {
 		opened.set_env_vars()
 	}
 
-	/// The one `secrets.*.age` in `dir`, `None` when there is none, an error
-	/// naming both when there are two.
+	/// The one `secrets.<format>` in `dir` (`secrets.toml`, `secrets.json`,
+	/// `secrets.ron`), `None` when there is none, an error naming both when
+	/// there are two.
 	pub fn find_in_dir(dir: &Path) -> Result<Option<PathBuf>> {
 		if !fs_ext::exists(dir)? {
 			return None.xok();
@@ -124,12 +125,10 @@ impl Secrets {
 		let mut found = ReadDir::files(dir)?
 			.into_iter()
 			.filter(|path| {
-				path.file_name().and_then(|name| name.to_str()).is_some_and(
-					|name| {
-						name.starts_with(SecretsDocument::FILE_PREFIX)
-							&& name.ends_with(SecretsDocument::SUFFIX)
-					},
-				)
+				path.file_stem().and_then(|stem| stem.to_str())
+					== Some(SecretsDocument::FILE_STEM)
+					&& SecretsDocument::media_type_of(&path.to_string_lossy())
+						.is_ok()
 			})
 			.collect::<Vec<_>>();
 		found.sort();
@@ -138,7 +137,7 @@ impl Secrets {
 			[one] => Some(one.clone()).xok(),
 			many => bevybail!(
 				"{} holds {} secrets documents ({}): the runner loads one by \
-				convention, so keep one `secrets.*.age` beside `.env`",
+				convention, so keep one `secrets.<format>` beside `.env`",
 				dir.display(),
 				many.len(),
 				many.iter()
@@ -174,9 +173,9 @@ mod test {
 	fn defaults_and_media_type() {
 		let secrets = Secrets::default();
 		secrets.label.as_str().xpect_eq("secrets");
-		secrets.path.as_str().xpect_eq("secrets.toml.age");
+		secrets.path.as_str().xpect_eq("secrets.toml");
 		secrets.media_type().unwrap().xpect_eq(MediaType::Toml);
-		Secrets::new("infra/x.json.age")
+		Secrets::new("infra/x.json")
 			.with_label("mail")
 			.media_type()
 			.unwrap()
@@ -209,11 +208,10 @@ mod test {
 		document
 			.set(&identities, "BEET_TEST_CONVENTION_NOTE", "kept", default())
 			.unwrap();
-		fs_ext::write(
-			dir.join("secrets.toml.age"),
-			document.to_bytes().unwrap(),
-		)
-		.unwrap();
+		fs_ext::write(dir.join("secrets.toml"), document.to_bytes().unwrap())
+			.unwrap();
+		// a stray file with the stem is not a document
+		fs_ext::write(dir.join("secrets.md"), "# notes").unwrap();
 
 		// no identity anywhere discovery looks: the error names the file and
 		// the path
@@ -229,7 +227,7 @@ mod test {
 		}
 		let err = Secrets::load_env_vars_from(&dir).unwrap_err().to_string();
 		err.as_str()
-			.xpect_contains("secrets.toml.age")
+			.xpect_contains("secrets.toml")
 			.xpect_contains("no age identity")
 			.xpect_contains("2 record(s)");
 
@@ -261,12 +259,12 @@ mod test {
 		Secrets::load_env_vars_from(&dir).unwrap().xpect_eq(0);
 
 		// two documents is an error naming both
-		fs_ext::write(dir.join("secrets.json.age"), b"{}").unwrap();
+		fs_ext::write(dir.join("secrets.json"), b"{}").unwrap();
 		Secrets::load_env_vars_from(&dir)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("secrets.json.age")
-			.xpect_contains("secrets.toml.age");
+			.xpect_contains("secrets.json")
+			.xpect_contains("secrets.toml");
 
 		unsafe {
 			match previous {

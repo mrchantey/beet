@@ -1,7 +1,6 @@
 //! The opened side of a document: what this identity could read.
 
 use crate::prelude::*;
-use alloc::collections::BTreeMap;
 
 /// What [`SecretsDocument::open`] yielded for one identity file: every
 /// record of every group it could open, in one map, and each group named by

@@ -35,7 +35,7 @@ struct SetParams {
 /// beet secrets/set OPENAI_API_KEY --role=env_var       # prompts, no echo
 /// beet secrets/set OPENAI_API_KEY --from-env --role=env_var --note="billing"
 /// echo -n "$TOKEN" | beet secrets/set CF_API_TOKEN --group=agents
-/// beet secrets/set dkim-example-com --vault=mail-prod --value=..
+/// beet secrets/set dkim-example-com --document=mail-prod --value=..
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -73,14 +73,14 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 			.as_deref()
 			.unwrap_or(SecretRecord::DEFAULT_GROUP),
 	);
-	let vault = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let mut document = vault.read_or_new_document().await?;
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let mut document = handle.read_or_new().await?;
 	document.set(&AgeIdentityFile::require()?, &name, &value, record)?;
-	vault.write_document(&document).await?;
+	handle.write(&document).await?;
 	let group = document.secrets[&name].group().to_string();
 	Response::ok_text(format!(
 		"set `{name}` in group `{group}` of {} ({} recipient(s))\n",
-		vault.describe(),
+		handle.describe(),
 		document.groups[group.as_str()].recipients.len()
 	))
 	.xok()
@@ -112,8 +112,8 @@ fn read_stdin_value() -> Result<String> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	/// The first `set` creates the document and `default`; a second with

@@ -67,7 +67,7 @@ pub fn redirect_std_to_file(_path: impl AsRef<Path>) -> Result {
 /// the tty, the line never reaches stdout or the scrollback. Errors when
 /// there is no tty (a pipe, a headless runner), so a caller can say what to
 /// pass instead.
-#[cfg(all(unix, feature = "secrets"))]
+#[cfg(all(unix, feature = "vault"))]
 pub fn read_secret_line(prompt: &str) -> Result<String> {
 	use std::io::BufRead;
 	use std::os::unix::io::AsRawFd;
@@ -101,7 +101,7 @@ pub fn read_secret_line(prompt: &str) -> Result<String> {
 }
 
 /// A platform with no controlling terminal to read from.
-#[cfg(all(not(unix), feature = "secrets"))]
+#[cfg(all(not(unix), feature = "vault"))]
 pub fn read_secret_line(_prompt: &str) -> Result<String> {
 	bevybail!("no terminal to prompt on: a secret is typed, not piped")
 }

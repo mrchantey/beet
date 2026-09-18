@@ -291,7 +291,7 @@ impl LambdaBlock {
 				environment: Some(vec![
 					AwsLambdaFunctionResourceBlockTypeEnvironment {
 						variables: Some({
-							let mut vars = std::collections::BTreeMap::new();
+							let mut vars = BTreeMap::new();
 							// the deploy identity, named by the same table the
 							// runtime parses.
 							let runtime = BootstrapConfig {

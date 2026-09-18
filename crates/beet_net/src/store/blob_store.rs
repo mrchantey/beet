@@ -55,6 +55,45 @@ impl BlobStore {
 		StoreProvider::from_uri(uri)?.into_blob_store().xok()
 	}
 
+	/// The store and file name a path or uri ending in a file names: the
+	/// store is the file's directory (or the uri without its last segment),
+	/// the file its last segment. `~/a/b.toml` is `fs:~/a` + `b.toml`,
+	/// `s3://bucket/dir/b.toml?region=x` is `s3://bucket/dir?region=x` +
+	/// `b.toml`, and a bare `b.toml` is the cwd.
+	#[cfg(feature = "std")]
+	pub fn from_file_uri(path: &str) -> Result<(BlobStore, SmolStr)> {
+		let path = path.trim();
+		let (base, query) = path
+			.split_once('?')
+			.map(|(base, query)| (base, format!("?{query}")))
+			.unwrap_or((path, String::new()));
+		let is_uri = base.contains("://") || base.starts_with("fs:");
+		let (dir, file) = match base.rsplit_once('/') {
+			// `fs:` alone is the cwd
+			Some((dir, file))
+				if !dir.ends_with(':') && !dir.ends_with(":/") =>
+			{
+				(dir.to_string(), file)
+			}
+			Some(_) => bevybail!(
+				"`{path}` names no file: a file uri is a store followed by the \
+				file within it, ie `s3://bucket/secrets/x.toml`"
+			),
+			None => match is_uri {
+				true => ("fs".to_string(), base.trim_start_matches("fs:")),
+				false => (".".to_string(), base),
+			},
+		};
+		if file.is_empty() {
+			bevybail!("`{path}` names no file");
+		}
+		let uri = match is_uri {
+			true => StoreUri::parse(&format!("{dir}{query}"))?,
+			false => StoreUri::parse(&format!("fs:{dir}"))?,
+		};
+		(Self::from_uri(&uri)?, SmolStr::new(file)).xok()
+	}
+
 	/// Returns a new store scoped to the given subdirectory.
 	pub fn with_subdir(&self, path: RelPath) -> BlobStore {
 		BlobStore::from_arc(Arc::from(self.provider.with_subdir(path)))
@@ -388,6 +427,25 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("not under its declared store root");
+	}
+
+	#[beet_core::test]
+	fn splits_a_file_uri() {
+		let (store, file) =
+			BlobStore::from_file_uri("memory://files/dir/x.toml").unwrap();
+		file.as_str().xpect_eq("x.toml");
+		store.subdir().as_str().xpect_eq("dir");
+		let (store, file) =
+			BlobStore::from_file_uri("/tmp/beet/personal.toml").unwrap();
+		file.as_str().xpect_eq("personal.toml");
+		store.base_dir().unwrap().to_string().xpect_eq("/tmp/beet");
+		BlobStore::from_file_uri("x.json")
+			.unwrap()
+			.0
+			.id()
+			.xpect_eq("fs");
+		BlobStore::from_file_uri("memory://").unwrap_err();
+		BlobStore::from_file_uri("dir/").unwrap_err();
 	}
 }
 

@@ -601,7 +601,7 @@ impl FargateBlock {
 			deploy_timestamp: Some(deploy_timestamp.into()),
 			..self.bootstrap.clone()
 		};
-		let mut env_vars = std::collections::BTreeMap::new();
+		let mut env_vars = BTreeMap::new();
 		for (key, value) in runtime.split_channels().1.to_env() {
 			env_vars.insert(key, value.to_string());
 		}
@@ -841,7 +841,7 @@ impl FargateBlock {
 		&self,
 		stack: &ResolvedStack,
 		suffix: &str,
-	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
+	) -> BTreeMap<SmolStr, SmolStr> {
 		[
 			(SmolStr::from("Name"), self.build_label(suffix).into()),
 			(SmolStr::from("Project"), stack.app_name().clone()),

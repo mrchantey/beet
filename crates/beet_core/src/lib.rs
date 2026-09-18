@@ -69,9 +69,11 @@ pub mod fs;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
-#[cfg(feature = "secrets")]
+#[cfg(feature = "vault")]
 pub mod secrets;
 pub mod template;
+#[cfg(feature = "vault")]
+pub mod vault;
 // `term_style` (colours) is no_std and feeds the test logger, so the embedded
 // test runner needs `terminal` too; the io/tty control parts stay std-gated
 // inside the module.
@@ -188,7 +190,7 @@ pub mod prelude {
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
-	#[cfg(feature = "secrets")]
+	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;
@@ -202,6 +204,8 @@ pub mod prelude {
 	pub use crate::tokens_utils::*;
 	pub use crate::types::*;
 	pub use crate::utils::*;
+	#[cfg(feature = "vault")]
+	pub use crate::vault::*;
 	pub use either::Either;
 	#[cfg(feature = "serde")]
 	pub use serde::Deserialize;
@@ -229,6 +233,11 @@ pub mod prelude {
 	// (`ScheduleRunnerPlugin::run_loop`) instead of busy-spinning; not in
 	// `bevy::prelude`.
 	pub use bevy::app::ScheduleRunnerPlugin;
+	// the blessed maps: hash for lookup (bevy's hashbrown family over the
+	// fast non-crypto `FixedHasher`), B-tree when iteration order must be
+	// deterministic, ie anything serialized, snapshotted or diffed
+	pub use alloc::collections::BTreeMap;
+	pub use alloc::collections::BTreeSet;
 	pub use bevy::platform::collections::HashMap;
 	pub use bevy::platform::collections::HashSet;
 	pub use bevy::platform::hash::FixedHasher;

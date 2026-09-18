@@ -2,15 +2,15 @@
 //! group.
 
 use crate::prelude::*;
-use alloc::collections::BTreeMap;
 
-/// A secrets document, `secrets.toml.age` by convention: a plaintext index
-/// of records (name, role, group, note, modified) and one armored age blob
-/// per group, sealed to that group's recipients. Everyone sees which records
+/// A secrets document, `secrets.toml` by convention: a plaintext index of
+/// records (name, role, group, note, modified) and one armored age blob per
+/// group, sealed to that group's recipients. Everyone sees which records
 /// exist and who may read them; only a group's members read its values;
 /// `ls` needs no identity at all. The only cipher is age and the only
-/// composition a payload in the document's own format, so a blob pasted out
-/// of the file opens with `age -d` on any laptop.
+/// composition a payload in the document's own format, so the file is a
+/// plain toml (or json, or ron) whose sealed values are age files: a blob
+/// pasted out of it opens with `age -d` on any laptop.
 ///
 /// Every record belongs to exactly one group, `default` when none is named,
 /// created on first use with the identity file's own recipients. Humans sit
@@ -50,7 +50,7 @@ use alloc::collections::BTreeMap;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SecretsDocument {
 	/// The format the file and every sealed payload are written in, named
-	/// by the extension before `.age`.
+	/// by the file's extension.
 	#[serde(skip, default = "SecretsDocument::default_media_type")]
 	media_type: MediaType,
 	/// Where an export came from, absent on a hand-kept document.
@@ -126,12 +126,10 @@ impl Default for SecretsDocument {
 
 impl SecretsDocument {
 	/// The file a document lives in by convention, beside an entry.
-	pub const DEFAULT_PATH: &'static str = "secrets.toml.age";
-	/// What every document path ends in.
-	pub const SUFFIX: &'static str = ".age";
-	/// What a conventional document file starts with, so the test runner
-	/// finds `secrets.*.age` beside a `.env`.
-	pub const FILE_PREFIX: &'static str = "secrets.";
+	pub const DEFAULT_PATH: &'static str = "secrets.toml";
+	/// The conventional file's stem, so the test runner finds
+	/// `secrets.<format>` beside a `.env`.
+	pub const FILE_STEM: &'static str = "secrets";
 
 	/// An empty document in `media_type`.
 	pub fn new(media_type: MediaType) -> Self {
@@ -149,28 +147,18 @@ impl SecretsDocument {
 	/// The format the file and its sealed payloads are written in.
 	pub fn media_type(&self) -> MediaType { self.media_type.clone() }
 
-	/// The format `path` names: its extension before `.age`, so
-	/// `secrets.toml.age` is toml and `x.json.age` json. Errors on a path
-	/// naming no serializable format, or not ending in `.age`.
+	/// The format `path` names by its extension: `secrets.toml` is toml,
+	/// `x.json` json, `x.ron` ron. Errors on any other extension.
 	pub fn media_type_of(path: &str) -> Result<MediaType> {
-		let stem = path.strip_suffix(Self::SUFFIX).ok_or_else(|| {
-			bevyhow!(
-				"`{path}` is not a secrets document: one ends in `{}`, ie \
-				`{}`",
-				Self::SUFFIX,
-				Self::DEFAULT_PATH
-			)
-		})?;
-		match SmolPath::new(stem).media_type() {
+		match SmolPath::new(path).media_type() {
 			Some(
 				media_type @ (MediaType::Toml
 				| MediaType::Json
 				| MediaType::Ron),
 			) => media_type.xok(),
 			_ => bevybail!(
-				"`{path}` names no document format: the extension before \
-				`{}` picks it, ie `{}` or `secrets.json.age`",
-				Self::SUFFIX,
+				"`{path}` is not a secrets document: its extension names the \
+				format, `toml`, `json` or `ron`, ie `{}`",
 				Self::DEFAULT_PATH
 			),
 		}
@@ -665,17 +653,13 @@ mod test {
 
 	#[crate::test]
 	fn media_type_of_path() {
-		SecretsDocument::media_type_of("secrets.toml.age")
+		SecretsDocument::media_type_of("secrets.toml")
 			.unwrap()
 			.xpect_eq(MediaType::Toml);
-		SecretsDocument::media_type_of("infra/x.json.age")
+		SecretsDocument::media_type_of("infra/x.json")
 			.unwrap()
 			.xpect_eq(MediaType::Json);
-		SecretsDocument::media_type_of("secrets.toml")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains(".age");
-		SecretsDocument::media_type_of("cert.age")
+		SecretsDocument::media_type_of("cert.pem.age")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("format");

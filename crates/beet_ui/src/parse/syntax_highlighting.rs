@@ -14,7 +14,6 @@
 //! Only enabled with the `syntax_highlighting` feature.
 
 use crate::prelude::*;
-use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
 use streaming_iterator::StreamingIterator;

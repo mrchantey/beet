@@ -23,8 +23,8 @@ tokens = ["proc-macro2", "quote", "syn"]
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
 deploy = ["beet_router", "dep:base64"]
 # The stack secret store seam and its export, restore and revoke verbs, on the
-# vaults in `beet_net/secrets`.
-secrets = ["beet_net/secrets"]
+# secrets document in `beet_net/secrets`.
+vault = ["beet_net/vault"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
 # it for dispatch. `brotli` and `blocking` serve the `build-wasm` report: the
 # artifact is compressed off the executor to size what the wire carries.

@@ -1,11 +1,11 @@
-//! `secrets/encrypt`: a plaintext file into an age file.
+//! `vault/encrypt`: a plaintext file into an age file.
 
 use super::VaultParams;
 use super::write_recipients;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`SecretsEncrypt`], surfaced in `--help`.
+/// Request params for [`VaultEncrypt`], surfaced in `--help`.
 #[derive(Reflect)]
 struct EncryptParams {
 	/// The plaintext file to encrypt; absent, stdin is read to its end.
@@ -24,13 +24,14 @@ struct EncryptParams {
 /// Encrypt a plaintext file (or piped stdin) into the age file `--vault`
 /// names, replacing what it held: a key, a certificate, any bytes. A secret
 /// with a name and a role belongs in the secrets document instead. The
-/// recipients are `--group`'s as a document lists them, else
+/// recipients are `--group`'s as a secrets document lists them (the one
+/// reviewed recipient list in a repo, borrowed rather than retyped), else
 /// `--recipients`, else this identity file's own. Editing is `decrypt` to a
 /// file, edit, `encrypt` it back, delete the file.
 ///
 /// ```sh
-/// beet secrets/encrypt --vault=infra/cert.pem.age --file=cert.pem --group=default
-/// cat id_ed25519 | beet secrets/encrypt --vault=~/keys/id_ed25519.age --recipients=age1..
+/// beet vault/encrypt --vault=infra/cert.pem.age --file=cert.pem --group=default
+/// cat id_ed25519 | beet vault/encrypt --vault=~/keys/id_ed25519.age --recipients=age1..
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -39,7 +40,7 @@ struct EncryptParams {
 	PathPartial = PathPartial::new("encrypt"),
 	ParamsPartial = ParamsPartial::new::<(VaultParams, EncryptParams)>()
 )]
-pub async fn SecretsEncrypt(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn VaultEncrypt(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<EncryptParams>()?;
 	let plaintext = match &params.file {
 		Some(file) => fs_ext::read(file)?,
@@ -75,8 +76,8 @@ async fn group_recipients(
 	selector: Option<&str>,
 	group: &str,
 ) -> Result<Vec<AgeRecipient>> {
-	let vault = VaultHandle::resolve_document(caller, selector).await?;
-	let document = vault.read_document().await?;
+	let handle = SecretsHandle::resolve(caller, selector).await?;
+	let document = handle.read().await?;
 	document
 		.groups
 		.get(group)
@@ -84,7 +85,7 @@ async fn group_recipients(
 		.ok_or_else(|| {
 			bevyhow!(
 				"no group `{group}` in {} (groups: {})",
-				vault.describe(),
+				handle.describe(),
 				document
 					.group_names()
 					.map(|name| format!("`{name}`"))
@@ -106,7 +107,7 @@ fn read_stdin() -> Result<Vec<u8>> {
 			if std::io::stdin().is_terminal() {
 				bevybail!(
 					"pass the plaintext with `--file=<path>` or pipe it in, ie \
-					`cat cert.pem | beet secrets/encrypt --vault=cert.pem.age`"
+					`cat cert.pem | beet vault/encrypt --vault=cert.pem.age`"
 				);
 			}
 			let mut plaintext = Vec::new();
@@ -119,7 +120,7 @@ fn read_stdin() -> Result<Vec<u8>> {
 // native only: the plaintext is read off the filesystem
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod test {
-	use super::super::test_support::VerbWorld;
+	use super::super::super::test_support::VerbWorld;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -134,7 +135,7 @@ mod test {
 		let uri = fixture.uri("cert.pem.age");
 		fixture
 			.call_str(
-				SecretsEncrypt,
+				VaultEncrypt,
 				Request::from_cli_str(&format!(
 					"--vault={uri} --file={}",
 					file.to_string_lossy()
@@ -145,7 +146,7 @@ mod test {
 			.xpect_contains("encrypted 7 bytes into `cert.pem.age`");
 		fixture
 			.call_str(
-				SecretsDecrypt,
+				VaultDecrypt,
 				Request::from_cli_str(&format!("--vault={uri}")),
 			)
 			.await
@@ -163,13 +164,13 @@ mod test {
 			SecretsGroup::new(vec![stranger.to_recipient()]),
 		);
 		fixture
-			.vault("secrets.toml.age")
-			.write_document(&document)
+			.secrets("secrets.toml")
+			.write(&document)
 			.await
 			.unwrap();
 		fixture
 			.call_str(
-				SecretsEncrypt,
+				VaultEncrypt,
 				Request::from_cli_str(&format!(
 					"--vault={uri} --file={} --group=theirs",
 					file.to_string_lossy()
@@ -186,7 +187,7 @@ mod test {
 			.xpect_eq(b"A=file\n".to_vec());
 		fixture
 			.call(
-				SecretsEncrypt,
+				VaultEncrypt,
 				Request::from_cli_str(&format!(
 					"--vault={uri} --file={} --group=nope",
 					file.to_string_lossy()

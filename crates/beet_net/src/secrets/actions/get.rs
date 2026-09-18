@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 ///
 /// ```sh
 /// beet secrets/get OPENAI_API_KEY
-/// beet secrets/get dkim-example-com --vault=mail-prod
+/// beet secrets/get dkim-example-com --document=mail-prod
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -22,8 +22,8 @@ use beet_core::prelude::*;
 )]
 pub async fn SecretsGet(cx: ActionContext<Request>) -> Result<Response> {
 	let name = name_param(&cx.input)?;
-	let vault = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let document = vault.read_document().await?;
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let document = handle.read().await?;
 	let opened = document.open(&AgeIdentityFile::require()?)?;
 	match opened.get(&name) {
 		Some(secret) => Response::ok_text(secret.value.to_string()).xok(),
@@ -32,17 +32,17 @@ pub async fn SecretsGet(cx: ActionContext<Request>) -> Result<Response> {
 				"`{name}` is in group `{}` of {}, which this identity cannot \
 				open",
 				record.group(),
-				vault.describe()
+				handle.describe()
 			),
-			None => bevybail!("no record `{name}` in {}", vault.describe()),
+			None => bevybail!("no record `{name}` in {}", handle.describe()),
 		},
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]

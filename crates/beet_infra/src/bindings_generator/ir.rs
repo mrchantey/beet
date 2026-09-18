@@ -1,6 +1,6 @@
 //! Intermediate representation for Terraform schema → Rust codegen.
 
-use std::collections::BTreeMap;
+use beet_core::prelude::*;
 
 /// A qualified name: `(Option<namespace>, name)`.
 ///

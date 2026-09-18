@@ -52,7 +52,7 @@ pub(crate) fn load_on_insert(
 
 /// The load itself.
 async fn load(entity: &AsyncEntity) -> Result {
-	let handle = VaultHandle::of_declaration(entity).await?;
+	let handle = SecretsHandle::of_declaration(entity).await?;
 	if !handle.exists().await? {
 		// every entry's state before its first `set`; `check` names it
 		debug!(
@@ -61,12 +61,12 @@ async fn load(entity: &AsyncEntity) -> Result {
 		);
 		return OK;
 	}
-	let document = handle.read_document().await?;
+	let document = handle.read().await?;
 	let Some(identities) = AgeIdentityFile::discover()? else {
 		warn!(
 			"no age identity at `{}` to open document {} with: its {} record(s) \
-			are not loaded (`beet secrets/keygen` makes one, \
-			`secrets/restore-identity` restores one)",
+			are not loaded (`beet vault/keygen` makes one, \
+			`vault/restore-identity` restores one)",
 			AgeIdentityFile::default_path()?.display(),
 			handle.describe(),
 			document.secrets.len()
@@ -121,7 +121,7 @@ async fn load(entity: &AsyncEntity) -> Result {
 
 #[cfg(test)]
 mod test {
-	use super::super::actions::test_support::VerbWorld;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	/// A declared document loads on insert: the env var lands, the opened
@@ -146,8 +146,8 @@ mod test {
 			.set(&identities, "BEET_TEST_SECRETS_KEPT", "kept", default())
 			.unwrap();
 		fixture
-			.vault("secrets.toml.age")
-			.write_document(&document)
+			.secrets("secrets.toml")
+			.write(&document)
 			.await
 			.unwrap();
 		let entity = fixture
@@ -187,7 +187,7 @@ mod test {
 		let mut fixture = VerbWorld::new();
 		let entity = fixture
 			.world
-			.spawn((Secrets::new("missing.toml.age"), ChildOf(fixture.root)))
+			.spawn((Secrets::new("missing.toml"), ChildOf(fixture.root)))
 			.id();
 		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
 		fixture.world.get::<OpenSecrets>(entity).xpect_none();

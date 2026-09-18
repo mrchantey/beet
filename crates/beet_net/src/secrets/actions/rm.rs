@@ -11,7 +11,7 @@ use beet_core::prelude::*;
 ///
 /// ```sh
 /// beet secrets/rm OPENAI_API_KEY
-/// beet secrets/rm dkim-example-com --vault=mail-prod
+/// beet secrets/rm dkim-example-com --document=mail-prod
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -22,14 +22,14 @@ use beet_core::prelude::*;
 )]
 pub async fn SecretsRm(cx: ActionContext<Request>) -> Result<Response> {
 	let name = name_param(&cx.input)?;
-	let vault = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let mut document = vault.read_document().await?;
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let mut document = handle.read().await?;
 	let record = document.remove(&AgeIdentityFile::require()?, &name)?;
-	vault.write_document(&document).await?;
+	handle.write(&document).await?;
 	Response::ok_text(format!(
 		"removed `{name}` from group `{}` of {} ({} record(s) remain)\n",
 		record.group(),
-		vault.describe(),
+		handle.describe(),
 		document.secrets.len()
 	))
 	.xok()
@@ -37,8 +37,8 @@ pub async fn SecretsRm(cx: ActionContext<Request>) -> Result<Response> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	#[beet_core::test]

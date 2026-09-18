@@ -19,7 +19,7 @@ struct ExecParams {
 ///
 /// ```sh
 /// beet secrets/exec -- tofu plan
-/// beet secrets/exec --vault=mail-prod -- aws sts get-caller-identity
+/// beet secrets/exec --document=mail-prod -- aws sts get-caller-identity
 /// ```
 #[action]
 #[derive(Component, Reflect)]
@@ -35,16 +35,16 @@ pub async fn SecretsExec(cx: ActionContext<Request>) -> Result<Response> {
 			"a command is required after `--`, ie `secrets/exec -- tofu plan`"
 		);
 	};
-	let vault = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let pairs = vault
-		.read_document()
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let pairs = handle
+		.read()
 		.await?
 		.open(&AgeIdentityFile::require()?)?
 		.env_vars();
 	info!(
 		"running `{command}` with {} variable(s) from {}",
 		pairs.len(),
-		vault.describe()
+		handle.describe()
 	);
 	let process = pairs
 		.iter()
@@ -65,8 +65,8 @@ pub async fn SecretsExec(cx: ActionContext<Request>) -> Result<Response> {
 
 #[cfg(test)]
 mod test {
-	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
+	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
 	/// The child sees the document's env vars and nothing roleless; a

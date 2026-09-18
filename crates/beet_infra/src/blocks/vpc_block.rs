@@ -287,7 +287,7 @@ impl VpcBlock {
 		&self,
 		stack: &ResolvedStack,
 		kind: &str,
-	) -> std::collections::BTreeMap<SmolStr, SmolStr> {
+	) -> BTreeMap<SmolStr, SmolStr> {
 		[
 			(SmolStr::from("Name"), self.suffix(kind).as_str().into()),
 			(SmolStr::from("Project"), stack.app_name().clone()),

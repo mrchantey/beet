@@ -5,32 +5,24 @@ use beet_core::prelude::*;
 
 /// `<SecretsRoutes/>`: every `secrets` verb as children, authored under
 /// `<Route path="secrets">` beside an entry's other commands, with a
-/// `<Secrets/>` declaration beside it naming the document the record verbs
-/// default to. The tty verbs (`backup`, `restore-identity`) and `exec` are
-/// native; the rest run wherever a store does.
+/// `<Secrets/>` declaration beside it naming the document the verbs default
+/// to. `exec` is native; the rest run wherever a store does. The identity
+/// and age file verbs are `<VaultRoutes/>`.
 ///
 /// ```bsx
-/// <Secrets bx:cfg="feature:secrets"/>
-/// <Route path="secrets" bx:cfg="feature:secrets"><SecretsRoutes/></Route>
+/// <Secrets bx:cfg="feature:vault"/>
+/// <Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 /// ```
 #[template]
 pub fn SecretsRoutes() -> impl Bundle {
 	Children::spawn((
-		Spawn(SecretsKeygen),
 		Spawn(SecretsCheck),
 		Spawn(SecretsLs),
 		Spawn(SecretsGet),
 		Spawn(SecretsSet),
 		Spawn(SecretsRm),
 		Spawn(SecretsRekey),
-		Spawn(SecretsEncrypt),
-		Spawn(SecretsDecrypt),
 		SpawnWith(|spawner: &mut ChildSpawner| {
-			#[cfg(not(target_arch = "wasm32"))]
-			{
-				spawner.spawn(SecretsBackup);
-				spawner.spawn(SecretsRestoreIdentity);
-			}
 			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 			spawner.spawn(SecretsExec);
 			// nothing native to mount in this build
@@ -64,12 +56,8 @@ mod test {
 			.collect::<Vec<_>>();
 		paths.sort();
 		// a `:name` segment displays bare
-		let mut expected = vec![
-			"check", "decrypt", "encrypt", "get/name", "keygen", "ls", "rekey",
-			"rm/name", "set/name",
-		];
-		#[cfg(not(target_arch = "wasm32"))]
-		expected.extend(["backup", "restore-identity"]);
+		let mut expected =
+			vec!["check", "get/name", "ls", "rekey", "rm/name", "set/name"];
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		expected.push("exec");
 		expected.sort();

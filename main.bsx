@@ -57,12 +57,13 @@ the condition that excluded it rather than 404ing.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 
-The `secrets` verbs (`beet secrets/keygen`, `check`, `ls`, `set`, `get`, ..)
-manage this workspace's age identity, its secrets document (`<Secrets/>`,
-`secrets.toml.age` in the repo store, loaded into the process environment as
-the scene builds) and any age file named by path or store uri. Compiled in by
-the `secrets` feature (on by default natively, off in the lean browser
-builds), so the declaration and the route are excluded where the verbs are not.
+The `vault` verbs (`beet vault/keygen`, `backup`, `encrypt`, `decrypt`, ..)
+manage this workspace's age identity and any age file named by path or store
+uri; the `secrets` verbs (`beet secrets/ls`, `set`, `get`, `check`, ..) its
+secrets document (`<Secrets/>`, `secrets.toml` in the repo store, loaded into
+the process environment as the scene builds). Compiled in by the `vault`
+feature (on by default natively, off in the lean browser builds), so the
+declaration and both routes are excluded where the verbs are not.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
@@ -75,8 +76,9 @@ builds), so the declaration and the route are excluded where the verbs are not.
 	<ExportPdf/>
 	<CaptureScreenshot/>
 	<SyncS3/>
-	<Secrets bx:cfg="feature:secrets"/>
-	<Route path="secrets" bx:cfg="feature:secrets"><SecretsRoutes/></Route>
+	<Secrets bx:cfg="feature:vault"/>
+	<Route path="vault" bx:cfg="feature:vault"><VaultRoutes/></Route>
+	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<Stack stage="shared">
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
