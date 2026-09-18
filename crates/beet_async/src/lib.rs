@@ -31,7 +31,11 @@
 //!
 //!  -> Success: acquire both locks, do work, complete
 //!
-//!  -> Failure: signal driver (Drop signal guard), re-enqueue later
+//!  -> Failure: signal driver (Drop signal guard); re-poll while the scope is
+//!  open (a lock merely contended), re-enqueue once it has closed. A request
+//!  queued under an open scope drains only after it ends, and a driver ticking
+//!  nested work (one world's future driving another) can hold a scope open for
+//!  seconds.
 //!
 //!  -> Direct access: non-queued future polled during scope,
 //!  bypasses queue, acquires locks, completes (no signal)
@@ -326,6 +330,144 @@ mod tests {
 			}
 		}
 		assert_eq!(COMPLETED.load(Ordering::Relaxed), total);
+	}
+
+	/// Regression test: a request finding the world published but its scope
+	/// lock contended re-polls rather than queueing. A queued request only
+	/// drains once the scope ends, and the driver's in-scope tick holds the
+	/// scope open for as long as the local tasks it polls take (a test suite's
+	/// sibling futures, each driving its own world), starving the request.
+	///
+	/// Two worker futures woken together each hold the scope lock long enough
+	/// for the other to be polled against it, so one contends; a local task
+	/// polled by the in-scope tick sleeps the driver thread well past both.
+	/// Both closures must run before that sleep ends.
+	#[test]
+	fn contended_request_runs_under_open_scope() {
+		use bevy::ecs::schedule::IntoSystemSet;
+		use core::time::Duration;
+
+		struct MySyncPoint;
+		static SCOPE_CLOSING: AtomicBool = AtomicBool::new(false);
+		static RAN_UNDER_SCOPE: AtomicI32 = AtomicI32::new(0);
+		static COMPLETED: AtomicI32 = AtomicI32::new(0);
+
+		let mut app = App::new();
+		app.add_plugins((
+			AsyncPlugin::default(),
+			ScheduleRunnerPlugin::default(),
+			TaskPoolPlugin::default(),
+		));
+		app.add_systems(Update, async_world_sync_point::<MySyncPoint>);
+
+		let world = app.world().resource::<AsyncWorld>().clone();
+		for _ in 0..2 {
+			let world = world.clone();
+			AsyncComputeTaskPool::get()
+				.spawn(async move {
+					world
+						.exclusive(MySyncPoint, |_world: &mut World| {
+							std::thread::sleep(Duration::from_millis(50));
+							if !SCOPE_CLOSING.load(Ordering::Relaxed) {
+								RAN_UNDER_SCOPE.fetch_add(1, Ordering::Relaxed);
+							}
+						})
+						.await
+						.unwrap();
+					COMPLETED.fetch_add(1, Ordering::Relaxed);
+				})
+				.detach();
+		}
+		// both must be queued before the driver runs, or it finds no work and
+		// ticks (sleeping the local task) with the world unpublished instead
+		let queue = world.0.upgrade().unwrap().bridge_requests.get_or_create(
+			&async_world_sync_point::<MySyncPoint>
+				.into_system_set()
+				.intern(),
+		);
+		while queue.len() < 2 {
+			std::thread::yield_now();
+		}
+		AsyncComputeTaskPool::get()
+			.spawn_local(async {
+				std::thread::sleep(Duration::from_millis(300));
+				SCOPE_CLOSING.store(true, Ordering::Relaxed);
+			})
+			.detach();
+
+		for _ in 0..1000 {
+			app.update();
+			if COMPLETED.load(Ordering::Relaxed) == 2 {
+				break;
+			}
+		}
+		assert_eq!(COMPLETED.load(Ordering::Relaxed), 2);
+		assert_eq!(RAN_UNDER_SCOPE.load(Ordering::Relaxed), 2);
+	}
+
+	/// A request contending for a world from inside that world's own closure on
+	/// the same thread (the closure spawning, the spawn draining the local
+	/// executor, the drain polling a sibling) queues rather than re-polls: the
+	/// holder is up its own stack, so a re-poll can never find it released and
+	/// a drain running until idle would never return.
+	#[test]
+	fn nested_contention_queues() {
+		struct MySyncPoint;
+		static SIBLING_POLLS: AtomicI32 = AtomicI32::new(0);
+		static COMPLETED: AtomicI32 = AtomicI32::new(0);
+
+		let mut app = App::new();
+		app.add_plugins((
+			AsyncPlugin::default(),
+			ScheduleRunnerPlugin::default(),
+			TaskPoolPlugin::default(),
+		));
+		app.add_systems(Update, async_world_sync_point::<MySyncPoint>);
+
+		let world = app.world().resource::<AsyncWorld>().clone();
+		let pool = AsyncComputeTaskPool::get();
+		// local, so the closure runs on the driver thread
+		pool.spawn_local(async move {
+			let sibling = world.clone();
+			world
+				.exclusive(MySyncPoint, move |_world: &mut World| {
+					pool.spawn_local(async move {
+						let mut fut = std::boxed::Box::pin(
+							sibling.exclusive(MySyncPoint, |_| {}),
+						);
+						core::future::poll_fn(move |cx| {
+							SIBLING_POLLS.fetch_add(1, Ordering::Relaxed);
+							fut.as_mut().poll(cx)
+						})
+						.await
+						.unwrap();
+						COMPLETED.fetch_add(1, Ordering::Relaxed);
+					})
+					.detach();
+					// the single-threaded pool's `spawn` drains until idle; a
+					// sibling re-polling itself would never let it
+					pool.with_local_executor(|executor| {
+						for _ in 0..1000 {
+							if !executor.try_tick() {
+								break;
+							}
+						}
+					});
+				})
+				.await
+				.unwrap();
+		})
+		.detach();
+
+		for _ in 0..1000 {
+			app.update();
+			if COMPLETED.load(Ordering::Relaxed) == 1 {
+				break;
+			}
+		}
+		assert_eq!(COMPLETED.load(Ordering::Relaxed), 1);
+		// once inside the closure (queued), once woken by the driver
+		assert_eq!(SIBLING_POLLS.load(Ordering::Relaxed), 2);
 	}
 
 	#[test]

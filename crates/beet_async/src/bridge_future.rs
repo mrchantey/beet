@@ -1,10 +1,8 @@
 use crate::bridge_request;
-use crate::bridge_request::BridgeRequest;
 use crate::plugin::AsyncWorld;
 use crate::system_state::ErasedSystemStateCell;
 use crate::system_state::NoopSystemStateCell;
 use crate::system_state::SystemStateCell;
-use crate::wake_signal;
 use crate::wake_signal::WakeSignaler;
 use bevy::ecs::schedule::InternedSystemSet;
 use bevy::ecs::schedule::IntoSystemSet;
@@ -201,78 +199,61 @@ where
 		let Some(strong_world) = self.world.0.upgrade() else {
 			return Poll::Ready(Err(BridgeError::WorldDropped));
 		};
-		match strong_world
-			.world_scope
-			.try_with(|world| {
-				let Self {
-					ref system_state,
-					ref mut bridge_fn,
-					..
-				} = *self;
-				// Attempt to acquire the typed `SystemState<P>`.
-				//
-				// We deliberately use `try_lock` rather than blocking. If
-				// another bridge request is currently using the same system
-				// state, we simply yield and let the sync-point driver try again
-				// on a later internal tick.
-				let Some(mut system_state) = system_state.try_lock::<P>(world)
-				else {
-					return Poll::Pending;
-				};
+		match strong_world.try_with(|world| {
+			let Self {
+				ref system_state,
+				ref mut bridge_fn,
+				..
+			} = *self;
+			// Attempt to acquire the typed `SystemState<P>`.
+			//
+			// We deliberately use `try_lock` rather than blocking. If
+			// another bridge request is currently using the same system
+			// state, we simply yield and re-poll once it has released it.
+			let Some(mut system_state) = system_state.try_lock::<P>(world)
+			else {
+				return Poll::Pending;
+			};
 
-				if !system_state.meta().is_send() {
-					return Poll::Ready(Err(BridgeError::SystemParamValidation(
-						bevy::ecs::system::SystemParamValidationError::invalid::<
-							bevy::ecs::prelude::NonSend<()>,
-						>(
-							"Cannot have your system be non-send / exclusive",
+			if !system_state.meta().is_send() {
+				return Poll::Ready(Err(BridgeError::SystemParamValidation(
+					bevy::ecs::system::SystemParamValidationError::invalid::<
+						bevy::ecs::prelude::NonSend<()>,
+					>("Cannot have your system be non-send / exclusive"),
+				)));
+			}
+
+			let param = match system_state.get_mut(world) {
+				Ok(param) => param,
+				Err(system_param_validation_error) => {
+					return Poll::Ready(Err(
+						BridgeError::SystemParamValidation(
+							system_param_validation_error,
 						),
-					)));
+					));
 				}
-
-				let param = match system_state.get_mut(world) {
-					Ok(param) => param,
-					Err(system_param_validation_error) => {
-						return Poll::Ready(Err(
-							BridgeError::SystemParamValidation(
-								system_param_validation_error,
-							),
-						));
-					}
-				};
-				// We finally have `P::Item<'w, 's>`, yay!, so consume the stored `FnOnce`, run it,
-				// and complete the future.
-				Poll::Ready(Ok(bridge_fn.take().unwrap()(param)))
-			})
-			.ok()
-		{
-			Some(out) => out,
+			};
+			// We finally have `P::Item<'w, 's>`, yay!, so consume the stored `FnOnce`, run it,
+			// and complete the future.
+			Poll::Ready(Ok(bridge_fn.take().unwrap()(param)))
+		}) {
+			Some(Poll::Ready(out)) => Poll::Ready(out),
+			// the typed state is held by a sibling request: re-poll rather than
+			// wait on a driver wake that never comes for an unqueued future
+			Some(Poll::Pending) => {
+				cx.waker().wake_by_ref();
+				Poll::Pending
+			}
+			// no world in reach: queue for the sync point, or re-poll while the
+			// world is published and its lock merely contended. The signal is
+			// held so dropping it at the end of the next poll acknowledges the
+			// driver's wake.
 			None => {
-				// No world is currently exposed. That means we are being polled
-				// outside the `async_world_sync_point`, so we cannot access ECS yet.
-				//
-				// Instead, enqueue ourselves to be revisited when the matching
-				// sync-point system runs.
-				let (wake_signal, wake_waiter) = wake_signal::pair();
-				// Store the wake_signal locally so dropping it at the end of the next
-				// poll acknowledges the wake.
-				self.wake_signal.replace(wake_signal);
-				// Queue the request under this future's target sync point.
-				//
-				// The queued payload carries the following!
-				// 1. The task's waker, so the sync-point driver can wake it.
-				// 2. The wake handshake signal, so the driver can wait until the wake has actually
-				// been processed.
-				// 3. The erased `SystemState` storage itself.
-				strong_world
-					.bridge_requests
-					.try_send(&self.system_set, BridgeRequest {
-						waker: cx.waker().clone(),
-						wake_waiter,
-						system_state: self.system_state.clone(),
-					})
-					.ok()
-					.unwrap();
+				self.wake_signal = strong_world.park(
+					self.system_set,
+					self.system_state.clone(),
+					cx,
+				);
 				Poll::Pending
 			}
 		}
@@ -315,31 +296,22 @@ where
 		};
 		// `try_with` hands us a real `&mut World` while the driver has published it.
 		// On success we run the closure and complete; otherwise the closure is
-		// returned and `.ok()` drops it, releasing the borrow on `self`.
-		match strong_world
-			.world_scope
-			.try_with(|world| {
-				let Self {
-					ref mut bridge_fn, ..
-				} = *self;
-				bridge_fn.take().unwrap()(world)
-			})
-			.ok()
-		{
+		// dropped, releasing the borrow on `self`.
+		match strong_world.try_with(|world| {
+			let Self {
+				ref mut bridge_fn, ..
+			} = *self;
+			bridge_fn.take().unwrap()(world)
+		}) {
 			Some(out) => Poll::Ready(Ok(out)),
+			// no world in reach: queue for the sync point, or re-poll while the
+			// world is published and its lock merely contended (see `park`)
 			None => {
-				// World is not published yet: enqueue and wait for the sync point.
-				let (wake_signal, wake_waiter) = wake_signal::pair();
-				self.wake_signal.replace(wake_signal);
-				strong_world
-					.bridge_requests
-					.try_send(&self.system_set, BridgeRequest {
-						waker: cx.waker().clone(),
-						wake_waiter,
-						system_state: self.system_state.clone(),
-					})
-					.ok()
-					.unwrap();
+				self.wake_signal = strong_world.park(
+					self.system_set,
+					self.system_state.clone(),
+					cx,
+				);
 				Poll::Pending
 			}
 		}
