@@ -30,9 +30,9 @@ Traditionally an operating system is built around a machine with siloed opinions
 
 Beet software grows with your needs, offering a gentle slope from user to tinkerer to systems engineer through three layers of malleability:
 
-1. **Plugins** extend the engine itself in compiled Rust.
+1. **Scenes** describe structure and behavior as data, edited via text editor, gui or agent.
 2. **Scripts** define composable behaviors in sandboxed JavaScript with fine-grained capabilities.
-3. **Scenes** describe structure and behavior as data, edited via text editor, gui or agent.
+3. **Plugins** extend the engine itself in compiled Rust.
 
 ## Agnostic
 
@@ -47,4 +47,4 @@ Beet software grows with your needs, offering a gentle slope from user to tinker
 - The [scene format](/docs/scenes) is built for standardization, so other software can read what you made.
 - Use a git repo as the source of truth if that is how you like to work.
 
-Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) shows a static site, a web app, a terminal ui, a server, a robot, an infra deploy and an agent harness all running on one beet binary, driven entirely by scenes.
+Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) demonstrates a static site, a web app, a terminal ui, a server, a robot, an infra deploy and an agent harness all running on one beet binary, driven entirely by scenes.
