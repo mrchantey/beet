@@ -392,11 +392,11 @@ postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 ron = ["serde", "beet_core/ron"]
 # Plaintext (de)serialization for `MediaType::Text`.
 serde_plain = ["serde", "beet_core/serde_plain"]
-# The secrets system: age identities, recipients and the identity file, vault
-# documents and `.env.age` at bootstrap (`beet_core`), vault I/O over stores and
-# the `secrets` verbs (`beet_net`), the stack secret store seam, export, restore
-# and revoke (`beet_infra`). Opt-in: a binary that never touches a vault links
-# no crypto.
+# The secrets system: age identities, recipients and the identity file, the
+# secrets document and the test runner's load of it (`beet_core`), the
+# `<Secrets>` load, vault I/O over stores and the `secrets` verbs (`beet_net`),
+# the stack secret store seam, export, restore and revoke (`beet_infra`).
+# Opt-in: a binary that never touches a secret links no crypto.
 secrets = ["beet_core/secrets", "beet_net?/secrets", "beet_infra?/secrets"]
 # QR rendering in the terminal, so `secrets backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.

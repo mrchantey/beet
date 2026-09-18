@@ -37,7 +37,7 @@ pub fn load_dotenv() -> Result<(), EnvError> {
 	cfg_if! {
 		if #[cfg(feature = "std")] {
 			// a missing `.env` is the common case, not a failure.
-			return match find_dotenv_dir() {
+			return match dotenv_dir() {
 				Some(dir) => load_dotenv_from(&dir),
 				None => Ok(()),
 			};
@@ -62,7 +62,7 @@ const DOTENV: &str = ".env";
 /// directory holding one. `None` when no ancestor does (or the host has no
 /// filesystem).
 #[cfg(feature = "std")]
-fn find_dotenv_dir() -> Option<std::path::PathBuf> {
+pub fn dotenv_dir() -> Option<std::path::PathBuf> {
 	let cwd = fs_ext::current_dir().ok()?;
 	cwd.ancestors()
 		.find(|dir| fs_ext::exists(dir.join(DOTENV)).unwrap_or(false))
@@ -70,9 +70,10 @@ fn find_dotenv_dir() -> Option<std::path::PathBuf> {
 }
 
 /// Set every pair whose key is not already set, in order, so the first
-/// source of a key wins.
+/// source of a key wins: the rule `.env` loads by, and a secrets document
+/// after it.
 #[cfg(feature = "std")]
-fn set_missing(
+pub fn set_missing(
 	pairs: impl IntoIterator<Item = (SmolStr, SmolStr)>,
 ) -> Result<(), EnvError> {
 	pairs

@@ -61,30 +61,30 @@ mod test {
 
 	#[beet_core::test]
 	async fn prints_text_and_refuses_bytes() {
-		let mut world = VerbWorld::new();
-		world.write("a.txt.age", "TOKEN=x\n").await;
-		world
+		let mut fixture = VerbWorld::new();
+		fixture.write("a.txt.age", "TOKEN=x\n").await;
+		fixture
 			.call_str(
 				SecretsDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={}",
-					world.uri("a.txt.age")
+					fixture.uri("a.txt.age")
 				)),
 			)
 			.await
 			.unwrap()
 			.xpect_eq("TOKEN=x\n");
-		world
+		fixture
 			.vault("b.age")
-			.write(&[0xff, 0xfe], &[world.identity.to_recipient()])
+			.write(&[0xff, 0xfe], &[fixture.identity.to_recipient()])
 			.await
 			.unwrap();
-		world
+		fixture
 			.call(
 				SecretsDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={}",
-					world.uri("b.age")
+					fixture.uri("b.age")
 				)),
 			)
 			.await
@@ -100,14 +100,14 @@ mod test {
 		let dir = std::env::temp_dir()
 			.join(format!("beet-decrypt-{}", Timestamp::now().millis()));
 		let out = dir.join("mail.toml");
-		let mut world = VerbWorld::new();
-		world.write("mail.toml.age", "a = 1\n").await;
-		world
+		let mut fixture = VerbWorld::new();
+		fixture.write("mail.toml.age", "a = 1\n").await;
+		fixture
 			.call_str(
 				SecretsDecrypt,
 				Request::from_cli_str(&format!(
 					"--vault={} --out={}",
-					world.uri("mail.toml.age"),
+					fixture.uri("mail.toml.age"),
 					out.to_string_lossy()
 				)),
 			)

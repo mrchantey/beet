@@ -175,15 +175,16 @@ postcard = ["serde", "dep:postcard"]
 # TOML through `MediaType::Toml`'s serde dispatch, values only.
 toml = ["serde", "dep:toml"]
 # age file encryption (`src/secrets`): the identity a human holds, the
-# recipients a file is encrypted to, the identity file in the OS config and
-# the passphrase envelope an identity is backed up in. std: the identity file
-# lives on a filesystem; `serde` is the recipient's string form. `libc` is the
-# no-echo passphrase prompt (termios). `getrandom_02` and `rust-embed` are
-# named only to switch a feature on for `age`'s wasm build, see the workspace
-# manifest.
+# recipients a file is encrypted to, the identity file in the OS config, the
+# passphrase envelope an identity is backed up in and the secrets document
+# (a plaintext index plus one age blob per group). std: the identity file
+# lives on a filesystem; `toml` is the document's default format, and the
+# recipient's string form rides `serde`. `libc` is the no-echo passphrase
+# prompt (termios). `getrandom_02` and `rust-embed` are named only to switch
+# a feature on for `age`'s wasm build, see the workspace manifest.
 secrets = [
 	"std",
-	"serde",
+	"toml",
 	"dep:age",
 	"dep:libc",
 	"dep:getrandom_02",

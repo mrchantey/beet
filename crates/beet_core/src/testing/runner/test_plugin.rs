@@ -85,8 +85,11 @@ impl Plugin for TestPlugin {
 		console_error_panic_hook::set_once();
 
 		// tests read credentials and paths from `.env`, so load it here rather
-		// than relying on the caller (`just`, a js host) to have done it.
+		// than relying on the caller (`just`, a js host) to have done it, and
+		// the secrets document beside it by the same convention.
 		env_ext::load_dotenv().ok();
+		#[cfg(feature = "secrets")]
+		Secrets::load_env_vars_beside_dotenv();
 
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<TimePlugin>()

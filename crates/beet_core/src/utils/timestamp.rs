@@ -136,6 +136,44 @@ impl Timestamp {
 		}
 	}
 
+	/// Parse an ISO 8601 / RFC 3339 UTC timestamp, the inverse of
+	/// [`format_iso8601`](Self::format_iso8601): a [`parse_date`](Self::parse_date)
+	/// date, `T`, `HH:MM:SS` with optional fractional seconds, and a `Z`.
+	/// `None` on any other shape, an offset included: a stored instant is UTC.
+	pub fn parse_iso8601(text: &str) -> Option<Self> {
+		let (date, time) = text.trim().split_once('T')?;
+		let time = time.strip_suffix('Z')?;
+		let (clock, fraction) = time
+			.split_once('.')
+			.map(|(clock, fraction)| (clock, Some(fraction)))
+			.unwrap_or((time, None));
+		let mut parts = clock.split(':');
+		let (hour, min, sec) = (
+			parts.next()?.parse::<i64>().ok()?,
+			parts.next()?.parse::<i64>().ok()?,
+			parts.next()?.parse::<i64>().ok()?,
+		);
+		if parts.next().is_some() || hour > 23 || min > 59 || sec > 60 {
+			return None;
+		}
+		// a fraction of any length, read at millisecond precision
+		let millis = match fraction {
+			Some(fraction) if !fraction.is_empty() => {
+				let digits = fraction
+					.chars()
+					.all(|char| char.is_ascii_digit())
+					.then_some(fraction)?;
+				format!("{digits:0<3}")[..3].parse::<i64>().ok()?
+			}
+			Some(_) => return None,
+			None => 0,
+		};
+		Self::parse_date(date)?
+			.0
+			.checked_add(((hour * 60 + min) * 60 + sec) * 1_000 + millis)
+			.map(Self)
+	}
+
 	/// This instant as an ISO 8601 / RFC 3339 UTC timestamp with millisecond
 	/// precision, eg `2024-09-09T19:46:02.102Z`.
 	pub fn format_iso8601(&self) -> String {
@@ -270,6 +308,33 @@ mod test {
 		Timestamp::from_secs(1_709_164_800)
 			.format_iso8601()
 			.xpect_eq("2024-02-29T00:00:00.000Z");
+	}
+
+	/// The instant round-trips through its ISO 8601 text, and anything short
+	/// of a full UTC timestamp is refused.
+	#[crate::test]
+	fn parses_iso8601() {
+		for millis in [0, 1_725_911_162_102, -1, 1_709_164_800_000] {
+			let timestamp = Timestamp::from_millis(millis);
+			Timestamp::parse_iso8601(&timestamp.format_iso8601())
+				.unwrap()
+				.xpect_eq(timestamp);
+		}
+		Timestamp::parse_iso8601("2024-09-09T19:46:02Z")
+			.unwrap()
+			.xpect_eq(Timestamp::from_secs(1_725_911_162));
+		Timestamp::parse_iso8601("2024-09-09T19:46:02.1Z")
+			.unwrap()
+			.xpect_eq(Timestamp::from_millis(1_725_911_162_100));
+		for text in [
+			"2024-09-09",
+			"2024-09-09T19:46:02",
+			"2024-09-09T19:46:02+10:00",
+			"2024-09-09T25:00:00Z",
+			"2024-09-09T19:46:02.Z",
+		] {
+			Timestamp::parse_iso8601(text).xpect_none();
+		}
 	}
 
 	/// The feed date format: an RFC 2822 date-time with the weekday its epoch

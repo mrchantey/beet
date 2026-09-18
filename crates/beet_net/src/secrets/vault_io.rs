@@ -7,7 +7,10 @@ use beet_core::prelude::*;
 /// and `rekey`, and the bytes a secrets document is read from and written
 /// to. A read decrypts with an identity file, a write encrypts plaintext to
 /// a recipient list and lands the armored age file through the store; the
-/// plaintext is bytes in memory, never on disk.
+/// plaintext is bytes in memory, never on disk. A [`SecretsDocument`] rides
+/// the same handle typed: its index is plaintext and each group's blob is
+/// the age file, read by [`read_document`](Self::read_document) and written
+/// by [`write_document`](Self::write_document) in the format the path names.
 ///
 /// ## Example
 ///
@@ -31,6 +34,8 @@ pub struct VaultHandle {
 	pub store: BlobStore,
 	/// The file within the store, ending in `.age`.
 	pub path: RelPath,
+	/// The `<Secrets label>` this handle resolved from, for messages.
+	pub label: Option<SmolStr>,
 }
 
 impl VaultHandle {
@@ -44,8 +49,15 @@ impl VaultHandle {
 		Self {
 			store,
 			path: RelPath::new(path),
+			label: None,
 		}
 		.xok()
+	}
+
+	/// The handle with the label it was declared under.
+	pub fn with_label(mut self, label: impl Into<SmolStr>) -> Self {
+		self.label = Some(label.into());
+		self
 	}
 
 	/// The file a filesystem path or store uri names: the store is the file's
@@ -72,8 +84,71 @@ impl VaultHandle {
 		}
 	}
 
-	/// How a log or an error names this vault.
-	pub fn describe(&self) -> String { format!("`{}`", self.path) }
+	/// How a log or an error names this vault: its label and path when
+	/// declared, its path otherwise.
+	pub fn describe(&self) -> String {
+		match &self.label {
+			Some(label) => format!("`{label}` ({})", self.path),
+			None => format!("`{}`", self.path),
+		}
+	}
+
+	/// The document format the path names, see
+	/// [`SecretsDocument::media_type_of`].
+	pub fn media_type(&self) -> Result<MediaType> {
+		SecretsDocument::media_type_of(self.path.as_str())
+	}
+
+	/// Whether `bytes` are an age file, armored or binary, rather than a
+	/// secrets document whose index is plaintext: how a verb given a path
+	/// tells the two apart.
+	pub fn is_age_file(bytes: &[u8]) -> bool {
+		bytes.starts_with(b"-----BEGIN AGE ENCRYPTED FILE-----")
+			|| bytes.starts_with(b"age-encryption.org/v1")
+	}
+
+	/// The file's bytes as stored, an age file or a document.
+	pub async fn read_bytes(&self) -> Result<Vec<u8>> {
+		self.store
+			.get(&self.path)
+			.await
+			.map(|bytes| bytes.to_vec())
+			.map_err(|err| {
+				bevyhow!("vault {} cannot be read: {err}", self.describe())
+			})
+	}
+
+	/// Read and parse the secrets document at this path. Errors when the
+	/// file is missing or is an age file rather than a document.
+	pub async fn read_document(&self) -> Result<SecretsDocument> {
+		let bytes = self.read_bytes().await?;
+		if Self::is_age_file(&bytes) {
+			bevybail!(
+				"{} is an age file, not a secrets document: `secrets/decrypt` \
+				reads it",
+				self.describe()
+			);
+		}
+		SecretsDocument::parse(self.media_type()?, &bytes)
+			.map_err(|err| bevyhow!("document {}: {err}", self.describe()))
+	}
+
+	/// [`read_document`](Self::read_document), or an empty document when the
+	/// file does not exist yet: the state a first `set` starts from.
+	pub async fn read_or_new_document(&self) -> Result<SecretsDocument> {
+		match self.exists().await? {
+			true => self.read_document().await,
+			false => SecretsDocument::new(self.media_type()?).xok(),
+		}
+	}
+
+	/// Write `document` to this path in its format.
+	pub async fn write_document(
+		&self,
+		document: &SecretsDocument,
+	) -> Result<()> {
+		self.store.insert(&self.path, document.to_bytes()?).await
+	}
 
 	/// Whether the file exists in its store.
 	pub async fn exists(&self) -> Result<bool> {
@@ -193,6 +268,40 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("other recipients");
+	}
+
+	#[beet_core::test]
+	async fn reads_and_writes_a_document() {
+		let (identity, identities) = new_identity();
+		let vault =
+			VaultHandle::new(BlobStore::temp(), "secrets.toml.age").unwrap();
+		let mut document = vault.read_or_new_document().await.unwrap();
+		document.media_type().xpect_eq(MediaType::Toml);
+		document.set(&identities, "A", "1", default()).unwrap();
+		vault.write_document(&document).await.unwrap();
+		vault
+			.read_document()
+			.await
+			.unwrap()
+			.open(&identities)
+			.unwrap()
+			.get("A")
+			.unwrap()
+			.value
+			.as_str()
+			.xpect_eq("1");
+		// an age file at the path is not a document
+		vault
+			.write(b"bytes", &[identity.to_recipient()])
+			.await
+			.unwrap();
+		vault
+			.read_document()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("not a secrets document");
+		VaultHandle::is_age_file(b"age-encryption.org/v1\n").xpect_true();
 	}
 
 	#[beet_core::test]

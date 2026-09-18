@@ -63,23 +63,22 @@ pub async fn SecretsKeygen(cx: ActionContext<Request>) -> Result<Response> {
 	.xok()
 }
 
-#[cfg(test)]
+// native only: the file lands in the system temp dir
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod test {
 	use super::super::test_support::VerbWorld;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Two calls append two identities, neither printed. Native only: the
-	/// file lands in the system temp dir.
-	#[cfg(not(target_arch = "wasm32"))]
+	/// Two calls append two identities, neither printed.
 	#[beet_core::test]
 	async fn appends_and_never_overwrites() {
 		let dir = std::env::temp_dir()
 			.join(format!("beet-keygen-{}", Timestamp::now().millis()));
 		let path = dir.join("keys.txt");
-		let mut world = VerbWorld::new();
+		let mut fixture = VerbWorld::new();
 		for count in 1..=2 {
-			let text = world
+			let text = fixture
 				.call_str(
 					SecretsKeygen,
 					Request::from_cli_str(&format!(
