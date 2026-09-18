@@ -1,23 +1,31 @@
-//! `secrets/check`: the identity and every vault, verified.
+//! `secrets/check`: the identity, and a file, verified.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use core::fmt::Write;
 
-/// Verify the secrets setup: the identity resolves, every declared vault
-/// (and the entry's `.env.age` when present) opens with it, and each list
-/// of recipients includes this identity's own. One line per item with a
-/// tick or the reason, and a non-zero exit on any failure; a list missing
-/// your own recipient is a warning, since the next write would lock you
-/// out.
+/// Request params for [`SecretsCheck`], surfaced in `--help`.
+#[derive(Reflect)]
+struct CheckParams {
+	/// An age file to open with the identity: a path or store uri.
+	vault: Option<String>,
+}
+
+/// Verify the secrets setup: the identity resolves and, with `--vault`, the
+/// file opens with it. One line per item with a tick or the reason, and a
+/// non-zero exit on any failure.
 ///
 /// ```sh
 /// beet secrets/check
+/// beet secrets/check --vault=infra/cert.pem.age
 /// ```
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("check"))]
+#[require(
+	PathPartial = PathPartial::new("check"),
+	ParamsPartial = ParamsPartial::new::<CheckParams>()
+)]
 pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
 	let mut report = Report::default();
 	let identities = match AgeIdentityFile::require() {
@@ -43,69 +51,8 @@ pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
 			None
 		}
 	};
-	let own = identities
-		.as_ref()
-		.map(AgeIdentityFile::recipients)
-		.unwrap_or_default();
-
-	// every declared vault, plus the undeclared `.env.age` beside the entry
-	let mut vaults = VaultHandle::declared(&cx.caller).await?;
-	if !vaults.iter().any(|(label, _)| label == Vault::ENV_LABEL)
-		&& let Ok(env) = VaultHandle::resolve(&cx.caller, None).await
-		&& env.exists().await?
-	{
-		vaults.push((SmolStr::new(Vault::ENV_LABEL), Ok(env)));
-	}
-	if vaults.is_empty() {
-		report.pass("vaults: none declared and no `.env.age` beside the entry");
-	}
-	for (label, vault) in vaults {
-		let vault = match vault {
-			Ok(vault) => vault,
-			Err(err) => {
-				report.fail(format!("vault `{label}`: {err}"));
-				continue;
-			}
-		};
-		let name = vault.describe();
-		if !vault.exists().await? {
-			report.fail(format!(
-				"vault {name}: not written yet (`secrets/set` or \
-				`secrets/import` writes it)"
-			));
-			continue;
-		}
-		let Some(identities) = &identities else {
-			report.fail(format!("vault {name}: no identity to open it with"));
-			continue;
-		};
-		match vault.read(identities).await {
-			Ok(doc) => report
-				.pass(format!("vault {name}: {} key(s)", doc.keys().len())),
-			Err(err) => {
-				report.fail(format!("vault {name}: {err}"));
-				continue;
-			}
-		}
-		match &vault.recipients {
-			Some(recipients) if recipients.is_empty() => report.fail(format!(
-				"vault {name}: declares no recipients, so nothing can write it: \
-				name them on the `<Vault>` or an ancestor `{{AgeRecipients}}`"
-			)),
-			Some(recipients)
-				if !own.iter().any(|mine| recipients.contains(mine)) =>
-			{
-				report.warn(format!(
-					"vault {name}: none of your recipients is in its list, so \
-					the next write locks you out"
-				))
-			}
-			Some(_) => {}
-			None => report.warn(format!(
-				"vault {name}: undeclared, so a write encrypts it to this \
-				machine's identity alone"
-			)),
-		}
+	if let Some(vault) = cx.input.parse_params::<CheckParams>()?.vault {
+		report.vault(&vault, identities.as_ref()).await?;
 	}
 	report.into_response()
 }
@@ -122,13 +69,45 @@ impl Report {
 		writeln!(self.lines, "✓ {}", line.as_ref()).ok();
 	}
 
-	fn warn(&mut self, line: impl AsRef<str>) {
-		writeln!(self.lines, "! {}", line.as_ref()).ok();
-	}
-
 	fn fail(&mut self, line: impl AsRef<str>) {
 		writeln!(self.lines, "✗ {}", line.as_ref()).ok();
 		self.failed = true;
+	}
+
+	/// One line for the file `selector` names: whether it resolves, exists
+	/// and opens with `identities`.
+	async fn vault(
+		&mut self,
+		selector: &str,
+		identities: Option<&AgeIdentityFile>,
+	) -> Result<()> {
+		let vault = match VaultHandle::from_uri(selector) {
+			Ok(vault) => vault,
+			Err(err) => {
+				return self.fail(format!("vault `{selector}`: {err}")).xok();
+			}
+		};
+		let name = vault.describe();
+		if !vault.exists().await? {
+			return self
+				.fail(format!(
+					"vault {name}: not written yet (`secrets/encrypt` writes it)"
+				))
+				.xok();
+		}
+		let Some(identities) = identities else {
+			return self
+				.fail(format!("vault {name}: no identity to open it with"))
+				.xok();
+		};
+		match vault.read(identities).await {
+			Ok(plaintext) => self.pass(format!(
+				"vault {name}: opens, {} bytes",
+				plaintext.len()
+			)),
+			Err(err) => self.fail(format!("vault {name}: {err}")),
+		}
+		Ok(())
 	}
 
 	/// The report, with a failing status (a non-zero exit) on any failure.
@@ -151,36 +130,25 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// A vault the identity cannot open fails the check, and passes once
-	/// rekeyed to it.
+	/// A file the identity cannot open fails the check, and passes once it is
+	/// encrypted to it.
 	#[beet_core::test]
-	async fn fails_on_a_locked_vault_and_passes_after_rekey() {
+	async fn fails_on_a_locked_file_and_passes_when_opened() {
 		let mut world = VerbWorld::new();
-		world.set("mail", "a", "1").await;
-		world.set("notes", "b", "2").await;
 		let response =
 			world.call(SecretsCheck, Request::get("/")).await.unwrap();
 		response.status().xpect_eq(StatusCode::OK);
-		response
-			.unwrap_str()
-			.await
-			.xpect_contains("✓ identity")
-			.xpect_contains("✓ vault `mail`")
-			.xpect_contains("✓ vault `notes`");
+		response.unwrap_str().await.xpect_contains("✓ identity");
 
-		// `mail` re-encrypted to a stranger
 		let stranger = AgeIdentity::generate().to_recipient();
 		world
-			.call_str(
-				SecretsRekey,
-				Request::from_cli_str(&format!(
-					"--vault=mail --recipients={stranger}"
-				)),
-			)
+			.vault("cert.pem.age")
+			.write(b"a = 1\n", &[stranger])
 			.await
 			.unwrap();
-		let response =
-			world.call(SecretsCheck, Request::get("/")).await.unwrap();
+		let uri = world.uri("cert.pem.age");
+		let request = || Request::from_cli_str(&format!("--vault={uri}"));
+		let response = world.call(SecretsCheck, request()).await.unwrap();
 		response
 			.status()
 			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
@@ -188,21 +156,12 @@ mod test {
 			.text()
 			.await
 			.unwrap()
-			.xpect_contains("✗ vault `mail`")
-			.xpect_contains("✓ vault `notes`");
+			.xpect_contains("✓ identity")
+			.xpect_contains("✗ vault `cert.pem.age`");
 
-		// the other human rekeys it back to the declared list
-		let vault =
-			VaultHandle::new(world.store.clone(), "secrets/mail.toml.age")
-				.unwrap();
-		let mut doc = VaultDocument::new(VaultFormat::Toml);
-		doc.set("a", "1").unwrap();
-		vault
-			.write(&doc, &[world.identity.to_recipient()])
-			.await
-			.unwrap();
+		world.write("cert.pem.age", "a = 1\n").await;
 		world
-			.call(SecretsCheck, Request::get("/"))
+			.call(SecretsCheck, request())
 			.await
 			.unwrap()
 			.status()

@@ -87,6 +87,7 @@ impl MediaType {
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
+	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
@@ -162,6 +163,24 @@ impl MediaType {
 					}
 				}
 			}
+			MediaType::Toml => {
+				cfg_if! {
+					if #[cfg(feature = "toml")] {
+						// toml has one layout, tables after scalars
+						let _ = options;
+						toml::to_string_pretty(value)
+							.map(|text| text.into_bytes())
+							.map_err(|err| {
+								bevyhow!("Failed to serialize TOML: {err}")
+							})
+					} else {
+						let _ = (value, options);
+						bevybail!(
+							"The `toml` feature is required for TOML serialization"
+						)
+					}
+				}
+			}
 			MediaType::Postcard | MediaType::Bytes => {
 				cfg_if! {
 					if #[cfg(feature = "postcard")] {
@@ -199,6 +218,7 @@ impl MediaType {
 	/// | `Text`               | plain    | `serde_plain`   |
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
+	/// | `Toml`               | TOML     | `toml`          |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn deserialize<T: serde::de::DeserializeOwned>(
@@ -249,6 +269,23 @@ impl MediaType {
 						let _ = bytes;
 						bevybail!(
 							"The `ron` feature is required for RON deserialization"
+						)
+					}
+				}
+			}
+			MediaType::Toml => {
+				cfg_if! {
+					if #[cfg(feature = "toml")] {
+						let string = core::str::from_utf8(bytes).map_err(|err| {
+							bevyhow!("TOML data is not valid UTF-8: {err}")
+						})?;
+						toml::from_str(string).map_err(|err| {
+							bevyhow!("Failed to deserialize TOML body: {err}")
+						})
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `toml` feature is required for TOML deserialization"
 						)
 					}
 				}

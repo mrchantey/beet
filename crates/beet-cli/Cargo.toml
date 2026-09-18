@@ -92,10 +92,10 @@ sockets = ["beet/tungstenite"]
 # TLS serving (the `Tls` component): https/wss with a generated self-signed
 # dev cert, so LAN devices get a secure context (webcam, mic).
 secure = ["beet/secure"]
-# The secrets system: age identities, vaults, `.env.age` at bootstrap and the
-# `secrets` verbs. In the default set, so the native binary reads a deployer's
-# credentials from a vault; the browser builds (`--no-default-features`) name it
-# through `web_full` only. A feature of its own rather than a dep-table entry
+# The secrets system: age identities, age files and the `secrets` verbs. In
+# the default set, so the native binary reads a deployer's credentials from an
+# age file; the browser builds (`--no-default-features`) name it through
+# `web_full` only. A feature of its own rather than a dep-table entry
 # so the registration reports it and `bx:cfg="feature:secrets"` resolves.
 secrets = ["beet/secrets"]
 # The live terminal target for `beet present`: the navigable charcell host and

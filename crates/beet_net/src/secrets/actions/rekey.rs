@@ -1,96 +1,47 @@
-//! `secrets/rekey`: vaults re-encrypted to their current recipient lists.
+//! `secrets/rekey`: an age file re-encrypted to a new recipient list.
 
+use super::VaultParams;
+use super::write_recipients;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use core::fmt::Write;
 
 /// Request params for [`SecretsRekey`], surfaced in `--help`.
 #[derive(Reflect)]
 struct RekeyParams {
-	/// The vault to re-encrypt: a declared label, or the path or store uri
-	/// of an undeclared file. Absent, every declared vault.
-	vault: Option<String>,
-	/// The recipients to encrypt to, comma separated `age1..,age1..`, for an
-	/// undeclared vault (which otherwise takes this machine's own identity)
-	/// or to override a declared list.
+	/// Who may read the file from now on, comma separated `age1..,age1..`;
+	/// absent, this identity file's own recipients.
 	recipients: Option<String>,
 }
 
-/// Re-encrypt one vault (`--vault`) or every declared vault to its current
-/// recipient list, the second half of adding a human (their recipient into
-/// the declarations first) and the first half of removing one. A declared
-/// vault with an empty list is refused; an undeclared one takes
-/// `--recipients`.
+/// Re-encrypt an age file to a recipient list: the second half of adding a
+/// reader. Removing one is a rekey plus rotating what they could read, since
+/// git history keeps the old ciphertext; the secrets document's `revoke`
+/// does both.
 ///
 /// ```sh
-/// beet secrets/rekey                                     # every declared vault
-/// beet secrets/rekey --vault=mail-prod
-/// beet secrets/rekey --vault=~/p.toml.age --recipients=age1..,age1..
+/// beet secrets/rekey --vault=infra/cert.pem.age --recipients=age1..,age1..
 /// ```
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(
 	PathPartial = PathPartial::new("rekey"),
-	ParamsPartial = ParamsPartial::new::<RekeyParams>()
+	ParamsPartial = ParamsPartial::new::<(VaultParams, RekeyParams)>()
 )]
 pub async fn SecretsRekey(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<RekeyParams>()?;
+	let vault = VaultParams::resolve(&cx.input)?;
 	let identities = AgeIdentityFile::require()?;
-	let overrides = params
-		.recipients
-		.as_deref()
-		.map(parse_recipients)
-		.transpose()?;
-	let vaults = match params.vault.as_deref() {
-		Some(selector) => {
-			vec![VaultHandle::resolve(&cx.caller, Some(selector)).await?]
-		}
-		None => VaultHandle::declared(&cx.caller)
-			.await?
-			.into_iter()
-			.map(|(_, vault)| vault)
-			.collect::<Result<Vec<_>>>()?,
-	};
-	if vaults.is_empty() {
-		bevybail!(
-			"no vault is declared: name one with `--vault=<label or path>`"
-		);
-	}
-	let mut out = String::new();
-	for vault in vaults {
-		if !vault.exists().await? {
-			writeln!(out, "skipped {}: not written yet", vault.describe())?;
-			continue;
-		}
-		let recipients = match &overrides {
-			Some(recipients) => recipients.clone(),
-			None => vault.write_recipients(&identities)?,
-		};
-		let doc = vault.read(&identities).await?;
-		vault.write(&doc, &recipients).await?;
-		writeln!(
-			out,
-			"rekeyed {} to {} recipient(s)",
-			vault.describe(),
-			recipients.len()
-		)?;
-	}
-	Response::ok_text(out).xok()
-}
-
-/// A comma separated recipient list, each validated.
-fn parse_recipients(list: &str) -> Result<Vec<AgeRecipient>> {
-	let recipients = list
-		.split(',')
-		.map(str::trim)
-		.filter(|item| !item.is_empty())
-		.map(AgeRecipient::new)
-		.collect::<Result<Vec<_>>>()?;
-	if recipients.is_empty() {
-		bevybail!("`--recipients` names no recipient");
-	}
-	recipients.xok()
+	let recipients =
+		write_recipients(params.recipients.as_deref(), &identities)?;
+	let plaintext = vault.read(&identities).await?;
+	vault.write(&plaintext, &recipients).await?;
+	Response::ok_text(format!(
+		"rekeyed {} to {} recipient(s)\n",
+		vault.describe(),
+		recipients.len()
+	))
+	.xok()
 }
 
 #[cfg(test)]
@@ -99,23 +50,23 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// A rekey to a second recipient lets a second identity read the vault.
+	/// A rekey to a second recipient lets a second identity read the file,
+	/// and a rekey back to this identity alone locks it out again.
 	#[beet_core::test]
 	async fn rekeys_to_a_second_recipient() {
 		let mut world = VerbWorld::new();
-		world.set("mail", "a", "1").await;
+		world.write("cert.pem.age", "a = 1\n").await;
 		let other = AgeIdentity::generate();
 		let mut others = AgeIdentityFile::default();
 		others.push(other.clone());
-		let vault =
-			VaultHandle::new(world.store.clone(), "secrets/mail.toml.age")
-				.unwrap();
+		let vault = world.vault("cert.pem.age");
+		let uri = world.uri("cert.pem.age");
 		vault.read(&others).await.unwrap_err();
 		world
 			.call_str(
 				SecretsRekey,
 				Request::from_cli_str(&format!(
-					"--vault=mail --recipients={},{}",
+					"--vault={uri} --recipients={},{}",
 					world.identity.to_recipient(),
 					other.to_recipient()
 				)),
@@ -127,16 +78,15 @@ mod test {
 			.read(&others)
 			.await
 			.unwrap()
-			.get("a")
-			.xpect_eq(Some(Value::str("1")));
-		// every declared vault: `mail` again, `notes` skipped as unwritten
+			.xpect_eq(b"a = 1\n".to_vec());
 		world
-			.call_str(SecretsRekey, Request::get("/"))
+			.call_str(
+				SecretsRekey,
+				Request::from_cli_str(&format!("--vault={uri}")),
+			)
 			.await
 			.unwrap()
-			.xpect_contains("rekeyed `mail`")
-			.xpect_contains("skipped `notes`");
-		// and back to the declared list alone locks the other out
+			.xpect_contains("to 1 recipient(s)");
 		vault.read(&others).await.unwrap_err();
 	}
 }

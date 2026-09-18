@@ -107,9 +107,6 @@ std = [
 	"rand?/std",
 	"rand?/thread_rng",
 	"uuid?/std",
-	# the `age1..` recipient grammar, so a `<Vault>` declaration (data every
-	# std build loads) validates its recipients without the age crate
-	"dep:bech32",
 ]
 # vendored bevy_async bridge + beet's high-level AsyncWorld/AsyncEntity layer.
 # std-independent: only the default task spawner differs by target.
@@ -175,20 +172,19 @@ ron = ["serde", "dep:ron"]
 serde_plain = ["serde", "dep:serde_plain"]
 json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
+# TOML through `MediaType::Toml`'s serde dispatch, values only.
+toml = ["serde", "dep:toml"]
 # age file encryption (`src/secrets`): the identity a human holds, the
-# identity file in the OS config, the passphrase envelope an identity is backed
-# up in, the vault document formats and the `.env.age` loader, plus `toml` for
-# the tree vault format and `json` for the `Value` a tree vault parses into.
-# The declarations (`Vault`, `AgeRecipients`, `AgeRecipient`) are data and ride
-# `std`. std: the identity file and `.env.age` live on a filesystem. `libc` is
-# the no-echo passphrase prompt (termios). `getrandom_02` and `rust-embed` are
+# recipients a file is encrypted to, the identity file in the OS config and
+# the passphrase envelope an identity is backed up in. std: the identity file
+# lives on a filesystem; `serde` is the recipient's string form. `libc` is the
+# no-echo passphrase prompt (termios). `getrandom_02` and `rust-embed` are
 # named only to switch a feature on for `age`'s wasm build, see the workspace
 # manifest.
 secrets = [
 	"std",
-	"json",
+	"serde",
 	"dep:age",
-	"dep:toml",
 	"dep:libc",
 	"dep:getrandom_02",
 	"dep:rust-embed",
@@ -273,6 +269,7 @@ serde_plain = {workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
 
 
 #💡 async
@@ -282,9 +279,6 @@ async-lock = { workspace = true, optional = true }
 
 #💡 secrets
 age = { workspace = true, optional = true }
-toml = { workspace = true, optional = true }
-# the recipient grammar alone, on in every std build (see the `std` feature)
-bech32 = { workspace = true, optional = true }
 # age embeds its message catalogue through rust-embed; named here so its
 # `debug-embed` feature is on and a debug wasm build has the catalogue too.
 rust-embed = { workspace = true, optional = true }

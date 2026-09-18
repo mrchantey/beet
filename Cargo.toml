@@ -293,16 +293,11 @@ age = { version = "0.11", default-features = false, features = ["armor"] }
 # no filesystem for. `debug-embed` compiles them in unconditionally; beet_core
 # names the crate under `secrets` purely to switch that on.
 rust-embed = { version = "8", features = ["debug-embed"] }
-# TOML values only (`beet_core/secrets`, the tree vault format): `parse` and
+# TOML values only (`beet_core/toml`, `MediaType::Toml`): `parse` and
 # `display` are the two directions, `serde` the bridge to `Value`; no
 # `preserve_order` (beet's `Value` map is ordered already) and no `toml_edit`
 # comment preservation.
 toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
-# The `age1..` recipient grammar (bech32, hrp `age`, a 32 byte key), so
-# `AgeRecipient` validates in every std build (a `<Vault>` is data a lean
-# binary must still load) without linking the age crate. 0.9 is the major
-# `age` itself reads through, so the two never disagree.
-bech32 = { version = "0.9", default-features = false }
 # QR rendering, shared by the cli's png command (`image` on) and the secrets
 # `backup --qr` terminal print (`beet_net/qrcode`, unicode only).
 qrcode = { version = "0.14", default-features = false }

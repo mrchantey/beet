@@ -1436,7 +1436,6 @@ dependencies = [
  "async-lock",
  "async-process",
  "async-task",
- "bech32",
  "beet_async",
  "beet_core",
  "beet_core_macros",

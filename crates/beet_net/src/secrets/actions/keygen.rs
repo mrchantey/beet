@@ -54,9 +54,8 @@ pub async fn SecretsKeygen(cx: ActionContext<Request>) -> Result<Response> {
 		Next:\n\
 		1. back it up: `beet secrets/backup --qr` onto a stick, and remember \
 		the passphrase\n\
-		2. add the recipient to the declarations that should open for you: \
-		`<Vault recipients={{[\"{recipient}\"]}}>` or `{{AgeRecipients([..])}}` \
-		on the stack, then `beet secrets/rekey`\n\
+		2. add the recipient wherever it should read: a secrets document's \
+		groups, or `--recipients` on `secrets/encrypt` and `secrets/rekey`\n\
 		3. `beet secrets/check`\n",
 		path.display(),
 		file.len()

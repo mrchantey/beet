@@ -4,15 +4,9 @@ use crate::prelude::*;
 use core::fmt;
 use core::str::FromStr;
 
-/// The public half of an [`AgeIdentity`](crate::prelude::AgeIdentity),
-/// `age1..`: what a vault is encrypted to, safe in markup and git. Validated
-/// on construction (bech32, the `age` prefix, a 32 byte key, the grammar the
-/// age crate reads), so a value that exists is one age accepts, and
-/// serialized as its string.
-///
-/// The type rides every std build, since a `<Vault>` naming its recipients is
-/// data a lean binary still loads; [`encrypt`](Self::encrypt) rides the
-/// `secrets` feature.
+/// The public half of an [`AgeIdentity`], `age1..`: what a vault is
+/// encrypted to, safe in markup and git. Validated on construction, so a
+/// value that exists is one age accepts, and serialized as its string.
 ///
 /// ## Example
 ///
@@ -28,29 +22,32 @@ use core::str::FromStr;
 /// ciphertext.as_str().xpect_starts_with("-----BEGIN AGE ENCRYPTED FILE-----");
 /// bob.decrypt(ciphertext.as_bytes()).unwrap().xpect_eq(b"for both".to_vec());
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize,
+)]
 // a dynamic value is validated on the way in, see the `FromReflect` impl
-#[reflect(from_reflect = false, FromReflect, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
+#[reflect(
+	from_reflect = false,
+	FromReflect,
+	Serialize,
+	Deserialize,
+	PartialEq,
+	Hash
+)]
+#[serde(try_from = "SmolStr", into = "SmolStr")]
 pub struct AgeRecipient(SmolStr);
 
 impl AgeRecipient {
-	/// What every recipient string starts with: the bech32 human-readable
-	/// part and its separator.
+	/// What every recipient string starts with.
 	pub const PREFIX: &'static str = "age1";
-	/// The bech32 human-readable part of a recipient.
-	const HRP: &'static str = "age";
-	/// An x25519 public key.
-	const KEY_LEN: usize = 32;
 
 	/// Validate `value` as an age recipient, erroring with where one comes
-	/// from when it is not. Stored lowercase, the form age prints.
+	/// from when it is not.
 	pub fn new(value: impl AsRef<str>) -> Result<Self> {
 		let value = value.as_ref().trim();
-		Self::validate(value)
-			.map(|_| Self::new_unchecked(value.to_lowercase()))
+		value
+			.parse::<age::x25519::Recipient>()
+			.map(|recipient| Self::new_unchecked(recipient.to_string()))
 			.map_err(|err| {
 				bevyhow!(
 					"`{value}` is not an age recipient ({err}): `age-keygen` \
@@ -61,23 +58,6 @@ impl AgeRecipient {
 			})
 	}
 
-	/// The grammar age's own parser applies: bech32 (not bech32m), the `age`
-	/// prefix, and a 32 byte payload.
-	fn validate(value: &str) -> Result<(), &'static str> {
-		use bech32::FromBase32;
-		let (hrp, data, variant) =
-			bech32::decode(value).map_err(|_| "invalid bech32 encoding")?;
-		if hrp != Self::HRP || variant != bech32::Variant::Bech32 {
-			return Err("incorrect prefix");
-		}
-		let bytes = Vec::<u8>::from_base32(&data)
-			.map_err(|_| "invalid bech32 encoding")?;
-		match bytes.len() == Self::KEY_LEN {
-			true => Ok(()),
-			false => Err("incorrect key length"),
-		}
-	}
-
 	/// A recipient already known to be valid, ie one derived from an identity.
 	pub(crate) fn new_unchecked(value: impl Into<SmolStr>) -> Self {
 		Self(value.into())
@@ -85,10 +65,7 @@ impl AgeRecipient {
 
 	/// The `age1..` string.
 	pub fn as_str(&self) -> &str { &self.0 }
-}
 
-#[cfg(feature = "secrets")]
-impl AgeRecipient {
 	/// Encrypt `plaintext` to every recipient, as armored text
 	/// (`-----BEGIN AGE ENCRYPTED FILE-----`), the form that survives git,
 	/// line-ending tooling and paper. Any one listed identity decrypts it.
@@ -176,90 +153,7 @@ impl FromReflect for AgeRecipient {
 mod test {
 	use crate::prelude::*;
 
-	/// A recipient with no identity behind it, for the grammar tests that
-	/// need none.
-	const RECIPIENT: &str =
-		"age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p";
-
-	#[crate::test]
-	fn accepts_the_age_grammar() {
-		AgeRecipient::new(RECIPIENT)
-			.unwrap()
-			.as_str()
-			.xpect_eq(RECIPIENT);
-		// uppercase bech32 is the same key, stored the way age prints it
-		AgeRecipient::new(RECIPIENT.to_uppercase())
-			.unwrap()
-			.as_str()
-			.xpect_eq(RECIPIENT);
-		AgeRecipient::new(format!("  {RECIPIENT}\n"))
-			.unwrap()
-			.as_str()
-			.xpect_eq(RECIPIENT);
-	}
-
-	#[crate::test]
-	fn rejects_a_non_age1_string() {
-		AgeRecipient::new("ssh-ed25519 AAAAC3Nza")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("age-keygen");
-		// a typo fails the checksum
-		let mut typo = RECIPIENT.to_string();
-		typo.replace_range(10..11, "x");
-		AgeRecipient::new(&typo)
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("bech32");
-		// the right encoding under the wrong prefix
-		AgeRecipient::new("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("prefix");
-	}
-
-	#[cfg(feature = "json")]
-	#[crate::test]
-	fn serde_is_the_string() {
-		let recipient = AgeRecipient::new(RECIPIENT).unwrap();
-		let json = serde_json::to_string(&recipient).unwrap();
-		json.xpect_eq(format!("\"{recipient}\""));
-		serde_json::from_str::<AgeRecipient>(&json)
-			.unwrap()
-			.xpect_eq(recipient);
-		serde_json::from_str::<AgeRecipient>("\"age1nope\"").unwrap_err();
-	}
-
-	#[crate::test]
-	fn from_reflect_validates() {
-		let recipient = AgeRecipient::new(RECIPIENT).unwrap();
-		let mut dynamic =
-			bevy_reflect::tuple_struct::DynamicTupleStruct::default();
-		dynamic.insert(SmolStr::new(recipient.as_str()));
-		<AgeRecipient as FromReflect>::from_reflect(&dynamic)
-			.unwrap()
-			.xpect_eq(recipient);
-		let mut dynamic =
-			bevy_reflect::tuple_struct::DynamicTupleStruct::default();
-		dynamic.insert(SmolStr::new("age1nope"));
-		<AgeRecipient as FromReflect>::from_reflect(&dynamic).xpect_none();
-	}
-}
-
-#[cfg(all(test, feature = "secrets"))]
-mod encrypt_test {
-	use crate::prelude::*;
-
 	const ARMOR_HEADER: &str = "-----BEGIN AGE ENCRYPTED FILE-----";
-
-	/// The grammar validator agrees with the age crate on a generated key.
-	#[crate::test]
-	fn a_generated_recipient_validates() {
-		let recipient = AgeIdentity::generate().to_recipient();
-		AgeRecipient::new(recipient.as_str())
-			.unwrap()
-			.xpect_eq(recipient);
-	}
 
 	#[crate::test]
 	fn single_recipient_roundtrip() {
@@ -307,10 +201,45 @@ mod encrypt_test {
 	}
 
 	#[crate::test]
+	fn rejects_a_non_age1_string() {
+		AgeRecipient::new("ssh-ed25519 AAAAC3Nza")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("age-keygen");
+	}
+
+	#[crate::test]
 	fn refuses_an_empty_list() {
 		AgeRecipient::encrypt(&[], b"nobody")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("age-keygen");
+	}
+
+	#[cfg(feature = "json")]
+	#[crate::test]
+	fn serde_is_the_string() {
+		let recipient = AgeIdentity::generate().to_recipient();
+		let json = serde_json::to_string(&recipient).unwrap();
+		json.xpect_eq(format!("\"{recipient}\""));
+		serde_json::from_str::<AgeRecipient>(&json)
+			.unwrap()
+			.xpect_eq(recipient);
+		serde_json::from_str::<AgeRecipient>("\"age1nope\"").unwrap_err();
+	}
+
+	#[crate::test]
+	fn from_reflect_validates() {
+		let recipient = AgeIdentity::generate().to_recipient();
+		let mut dynamic =
+			bevy_reflect::tuple_struct::DynamicTupleStruct::default();
+		dynamic.insert(SmolStr::new(recipient.as_str()));
+		<AgeRecipient as FromReflect>::from_reflect(&dynamic)
+			.unwrap()
+			.xpect_eq(recipient);
+		let mut dynamic =
+			bevy_reflect::tuple_struct::DynamicTupleStruct::default();
+		dynamic.insert(SmolStr::new("age1nope"));
+		<AgeRecipient as FromReflect>::from_reflect(&dynamic).xpect_none();
 	}
 }

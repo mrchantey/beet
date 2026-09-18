@@ -57,11 +57,10 @@ the condition that excluded it rather than 404ing.
 
 The shared verbs need AWS credentials in `.env`, plus `tofu`.
 
-The `secrets` verbs (`beet secrets/keygen`, `check`, `set`, `get`, `ls`, ..)
-manage this workspace's age identity and vaults: the entry's `.env.age` by
-default, any declared `<Vault>` by label, or a file by path. Compiled in by the
-`secrets` feature (on by default natively, off in the lean browser builds), so
-the route is excluded where the verbs are not.
+The `secrets` verbs (`beet secrets/keygen`, `check`, `encrypt`, `decrypt`, ..)
+manage this workspace's age identity and age files, each named by path or
+store uri. Compiled in by the `secrets` feature (on by default natively, off
+in the lean browser builds), so the route is excluded where the verbs are not.
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>

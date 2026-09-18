@@ -69,9 +69,7 @@ pub mod fs;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
-// the vault declarations are data every std build loads and the `.env`
-// grammar is no_std; the age machinery behind them rides `secrets` inside
-// the module.
+#[cfg(feature = "secrets")]
 pub mod secrets;
 pub mod template;
 // `term_style` (colours) is no_std and feeds the test logger, so the embedded
@@ -190,6 +188,7 @@ pub mod prelude {
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
+	#[cfg(feature = "secrets")]
 	pub use crate::secrets::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;
