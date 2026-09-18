@@ -138,6 +138,51 @@ impl R2BucketBlock {
 		)
 	}
 
+	/// The S3 pair the apply parked for this bucket, read from the stack's
+	/// secret store: what a deploy-machine process reaches the bucket with,
+	/// since its own credentials are the other vendor's. Missing is an error
+	/// naming the apply that parks it, never a skip: a verb that quietly did
+	/// nothing against an empty bucket is the failure a cold copy exists to
+	/// close.
+	#[cfg(feature = "vault")]
+	pub async fn parked_pair(
+		&self,
+		secrets: &SecretStore,
+		stack: &ResolvedStack,
+	) -> Result<(String, String)> {
+		let access_key = secrets.get(stack, &self.access_key_secret()).await?;
+		let secret_key = secrets.get(stack, &self.secret_key_secret()).await?;
+		match (access_key, secret_key) {
+			(Some(access_key), Some(secret_key)) => {
+				(access_key, secret_key).xok()
+			}
+			_ => bevybail!(
+				"no cold credential at {} and {}: {}",
+				secrets.address(stack, &self.access_key_secret()),
+				secrets.address(stack, &self.secret_key_secret()),
+				self.missing_credential(stack)
+			),
+		}
+	}
+
+	/// The bucket over the S3 api under the parked pair
+	/// ([`parked_pair`](Self::parked_pair)): the store a deploy-machine
+	/// process reads and writes the bucket through. The runtime attach lands
+	/// a store under the process's ambient credentials, which are AWS's, so
+	/// a verb targeting this bucket resolves this instead.
+	#[cfg(all(feature = "vault", feature = "aws_sdk"))]
+	pub async fn parked_store(
+		&self,
+		secrets: &SecretStore,
+		stack: &ResolvedStack,
+	) -> Result<BlobStore> {
+		let (access_key, secret_key) = self.parked_pair(secrets, stack).await?;
+		S3Store::from_uri(&self.store_uri(stack))?
+			.with_credentials(S3Credentials::new(access_key, secret_key))
+			.xmap(BlobStore::new)
+			.xok()
+	}
+
 	/// The token's resource scope: this bucket, in the default jurisdiction.
 	fn token_resources(&self, stack: &ResolvedStack) -> String {
 		serde_json::json!({
@@ -185,22 +230,29 @@ impl R2BucketBlock {
 		);
 		config.add_resource(&token)?;
 		// the S3 pair, derived in-config so the secret exists nowhere but the
-		// state (encrypted) and the parameter (SecureString)
-		for (secret, value) in [
-			(self.access_key_secret(), token.field_ref("id")),
+		// state (encrypted) and the parameter (SecureString); rotated by
+		// replacing the token, which the same apply re-parks
+		for (secret, value, note) in [
+			(
+				self.access_key_secret(),
+				token.field_ref("id"),
+				"r2 token, s3 access key id",
+			),
 			(
 				self.secret_key_secret(),
 				format!("${{sha256({})}}", token.field("value")),
+				"r2 token, s3 secret access key",
 			),
 		] {
 			config.add_untyped_resource(
 				"aws_ssm_parameter",
 				stack.resource_ident(secret.label().clone()).label(),
-				&serde_json::json!({
-					"name": secret.name(stack),
-					"type": "SecureString",
-					"value": value,
-				}),
+				&secret.parameter_resource(
+					stack,
+					value,
+					note,
+					Rotation::replace(token.address()),
+				),
 			)?;
 		}
 		Ok(())
@@ -391,7 +443,8 @@ mod tests {
 	/// The apply mints the credential: an account-owned token scoped to this
 	/// bucket's objects and nothing else, created after the bucket it names,
 	/// its id and the sha256 of its value parked as the S3 pair under the
-	/// stack's secret prefix. No hand step anywhere in the path.
+	/// stack's secret prefix, each described as a replacement of the token
+	/// so a listing says how it rotates. No hand step anywhere in the path.
 	#[beet_core::test]
 	fn the_token_is_minted_and_parked_by_the_apply() {
 		let rendered = render(cold());
@@ -409,6 +462,9 @@ mod tests {
 			.xpect_contains("\"name\":\"/beet-infra/dev/cold-backups-secret-access-key\"")
 			.xpect_contains("\"type\":\"SecureString\"")
 			.xpect_contains("${sha256(cloudflare_account_token.")
+			.xpect_contains(
+				"\"description\":\"replace:cloudflare_account_token.beet_infra__dev__cold_backups_token :: r2 token, s3 access key id\"",
+			)
 			// the resource scope is one bucket, never the account
 			.xnot()
 			.xpect_contains("com.cloudflare.api.account");

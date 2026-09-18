@@ -31,8 +31,6 @@ mod mail_probe;
 pub use mail_probe::*;
 mod mail_restore_drill;
 pub use mail_restore_drill::*;
-mod mail_secrets_export;
-pub use mail_secrets_export::*;
 mod mail_stack;
 pub use mail_stack::*;
 mod mta_sts_policy_host;

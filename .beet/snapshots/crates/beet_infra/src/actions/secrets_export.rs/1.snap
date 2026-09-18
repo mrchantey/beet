@@ -1,0 +1,17 @@
+[origin]
+app = "mail"
+stage = "prod"
+provider = "document"
+
+[groups.default]
+sealed = """
+"""
+
+[secrets.dkim-example-com]
+note = "the signing key"
+address = "store.toml#dkim-example-com"
+rotation = "manual:a new selector"
+
+[secrets.mail-tlsa]
+address = "store.toml#mail-tlsa"
+rotation = "remint"

@@ -33,6 +33,54 @@ pub struct S3Store {
 	/// so this is `false` by default: claiming a url the bucket will not serve
 	/// turns every static file into a redirect to a 403.
 	public: bool,
+	/// An explicit key pair, else the SDK's own default chain (the
+	/// environment, the profile, the instance metadata). Set for a bucket at
+	/// another vendor (an R2 bucket under the token pair an apply parked)
+	/// reached from a process whose ambient credentials are AWS's. Never
+	/// reflected or printed.
+	#[reflect(ignore)]
+	credentials: Option<S3Credentials>,
+}
+
+/// A static access key pair for an [`S3Store`]. [`Debug`] prints the key id
+/// and redacts the secret.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct S3Credentials {
+	access_key_id: SmolStr,
+	secret_access_key: SmolStr,
+}
+
+impl S3Credentials {
+	/// A pair as the S3 api takes it.
+	pub fn new(
+		access_key_id: impl Into<SmolStr>,
+		secret_access_key: impl Into<SmolStr>,
+	) -> Self {
+		Self {
+			access_key_id: access_key_id.into(),
+			secret_access_key: secret_access_key.into(),
+		}
+	}
+
+	/// The SDK's form of the pair.
+	fn to_sdk(&self) -> aws_sdk_s3::config::Credentials {
+		aws_sdk_s3::config::Credentials::new(
+			self.access_key_id.to_string(),
+			self.secret_access_key.to_string(),
+			None,
+			None,
+			"beet",
+		)
+	}
+}
+
+impl core::fmt::Debug for S3Credentials {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("S3Credentials")
+			.field("access_key_id", &self.access_key_id)
+			.field("secret_access_key", &"<redacted>")
+			.finish()
+	}
 }
 
 impl S3Store {
@@ -66,6 +114,7 @@ impl S3Store {
 			subdir: None,
 			endpoint: None,
 			public: false,
+			credentials: None,
 		}
 	}
 
@@ -133,6 +182,13 @@ impl S3Store {
 	/// an S3-compatible service (eg Cloudflare R2, MinIO).
 	pub fn with_endpoint(mut self, endpoint: impl Into<SmolStr>) -> Self {
 		self.endpoint = Some(endpoint.into());
+		self
+	}
+
+	/// Sign every request with `credentials` rather than the SDK's default
+	/// chain, see [`S3Store::credentials`].
+	pub fn with_credentials(mut self, credentials: S3Credentials) -> Self {
+		self.credentials = Some(credentials);
 		self
 	}
 
@@ -207,22 +263,27 @@ impl S3Store {
 		}
 	}
 
-	/// Get or create an S3 client for this store's region (and endpoint, if set).
-	/// Cached by `(region, endpoint)` so an R2 store and an AWS store in the same
-	/// region get distinct clients.
+	/// Get or create an S3 client for this store's region, endpoint and
+	/// credentials. Cached by the three so an R2 store and an AWS store in
+	/// the same region get distinct clients, as do two stores at one endpoint
+	/// under different key pairs.
 	async fn client(&self) -> Client {
 		static POOL: LazyPool<
-			(Option<SmolStr>, Option<SmolStr>),
+			(Option<SmolStr>, Option<SmolStr>, Option<S3Credentials>),
 			Client,
 			Client,
 		> = LazyPool::new(|key| {
-			let (region, endpoint) = (key.0.clone(), key.1.clone());
+			let (region, endpoint, credentials) =
+				(key.0.clone(), key.1.clone(), key.2.clone());
 			Box::pin(async move {
 				// a configured region wins; an unset one leaves the SDK's own
-				// default chain in place.
+				// default chain in place, and so does an unset key pair.
 				let mut loader = aws_config::from_env();
 				if let Some(region) = region {
 					loader = loader.region(Region::new(region.to_string()));
+				}
+				if let Some(credentials) = credentials {
+					loader = loader.credentials_provider(credentials.to_sdk());
 				}
 				let config = loader.load().await;
 				match endpoint {
@@ -239,8 +300,12 @@ impl S3Store {
 				}
 			})
 		});
-		POOL.get(&(self.region.clone(), self.endpoint.clone()))
-			.await
+		POOL.get(&(
+			self.region.clone(),
+			self.endpoint.clone(),
+			self.credentials.clone(),
+		))
+		.await
 	}
 
 	/// Resolve the S3 object key from a [`RelPath`].
@@ -265,6 +330,7 @@ impl BlobStoreProvider for S3Store {
 			}),
 			endpoint: self.endpoint.clone(),
 			public: self.public,
+			credentials: self.credentials.clone(),
 		})
 	}
 
@@ -567,6 +633,18 @@ impl BlobStoreProvider for S3Store {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A key pair is never printed, by the store or on its own.
+	#[beet_core::test]
+	fn credentials_debug_redacts() {
+		let store = S3Store::r2("acct", "bucket")
+			.with_credentials(S3Credentials::new("AKIA", "hunter2"));
+		format!("{store:?}")
+			.xpect_contains("AKIA")
+			.xpect_contains("<redacted>")
+			.xnot()
+			.xpect_contains("hunter2");
+	}
 
 	#[beet_core::test]
 	#[ignore = "hits remote s3"]

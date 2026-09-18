@@ -1,6 +1,5 @@
 //! The DANE pin: the key port 25 serves, read off the box and parked for the
 //! apply that publishes it.
-use crate::actions::ssm_ext;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -115,7 +114,6 @@ pub async fn MailDane(
 			mail.mail_box.label()
 		);
 	}
-	let region = mail.stack.region().clone();
 	let hostname = mail.mail_box.hostname().to_string();
 	let connection = SshConnection {
 		host: mail.public_ip().await?,
@@ -132,15 +130,27 @@ pub async fn MailDane(
 	let pin =
 		MailDane::pin_from_output(&String::from_utf8_lossy(&output.stdout))?;
 
-	let name = mail.mail_box.tlsa_secret().name(&mail.stack);
+	let secret = mail.mail_box.tlsa_secret();
 	let (usage, selector, matching) = StalwartBlock::TLSA_PARAMS;
-	match ssm_ext::get(&region, &name).await?.as_deref() {
+	match mail.secrets.get(&mail.stack, &secret).await?.as_deref() {
 		Some(parked) if parked == pin => info!(
 			"{} pins {usage} {selector} {matching} {pin}, unchanged",
 			mail.mail_box.tlsa_record_name()
 		),
 		parked => {
-			ssm_ext::overwrite(&region, &name, &pin).await?;
+			mail.secrets
+				.overwrite(
+					&mail.stack,
+					&secret,
+					&pin,
+					Some(&format!(
+						"dane pin, the {usage} {selector} {matching} digest of {}",
+						mail.mail_box.tlsa_record_name()
+					)),
+					// the next deploy reads the served key and parks it again
+					Some(Rotation::Remint),
+				)
+				.await?;
 			info!(
 				"{} pins {usage} {selector} {matching} {pin} ({}); the apply \
 				after this publishes it",

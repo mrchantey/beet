@@ -1,5 +1,4 @@
 //! Removing what carries a stack's state, once its resources are gone.
-use crate::actions::ssm_ext;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -7,7 +6,7 @@ use beet_net::prelude::*;
 
 /// The teardown step that removes a stack's state carriers: the tofu state
 /// object, the native S3 lock file beside it, the working directory, and every
-/// secret the stack's actions minted under its parameter store prefix.
+/// secret the stack's actions minted in its secret store.
 ///
 /// These are the things a deploy needs in place BEFORE terraform runs, so under
 /// the one rule — teardown order is convergence order reversed — they come off
@@ -24,17 +23,17 @@ use beet_net::prelude::*;
 /// a state object that has already gone must not strand the work directory, and
 /// half a teardown is worse than a noisy whole one.
 ///
-/// The secret prefix is the newest carrier and the one with teeth. Terraform's
-/// own parameters go with `tofu destroy`, but the ones an action minted
+/// The secret store is the newest carrier and the one with teeth. Terraform's
+/// own secrets go with `tofu destroy`, but the ones an action minted
 /// ([`EnsureSecret`], [`EnsureDkimKey`], a mailbox credential) are unknown to
-/// it and outlived every destroy, which left a restore drill's five parameters
+/// it and outlived every destroy, which left a restore drill's five secrets
 /// to be deleted by hand each time and, on a real stack, a DKIM private key
-/// and every mailbox password lying under a prefix nothing declared any more.
-/// The sweep is unconditional and logs each NAME it removes, never a value. It
-/// must run after the destroy rather than before it, since a destroy renders
-/// the config and a content variable (the DKIM public key) reads parameter
-/// store to do so; a stack whose secrets must outlive its destroy exports them
-/// first, which is what the mail stack's cold copy is for.
+/// and every mailbox password lying in a store nothing declared any more.
+/// The sweep is unconditional and logs each LABEL it removes, never a value.
+/// It must run after the destroy rather than before it, since a destroy
+/// renders the config and a content variable (the DKIM public key) reads the
+/// store to do so; a stack whose secrets must outlive its destroy exports
+/// them first, which is what `<SecretsExport/>` is for.
 ///
 /// The repo store is not here: it is terraform's, declared as a store block,
 /// so [`TofuDestroy`] removes it with every other resource and `force_destroy`
@@ -64,7 +63,10 @@ pub async fn StackTeardown(
 	// the rendered config, lockfile and scratch files
 	report(work_dir, fs_ext::remove_async(&project.work_dir()).await);
 	// what the actions minted outside terraform, which nothing else removes
-	report(secrets, sweep_secrets(project.stack()).await);
+	report(
+		secrets,
+		sweep_secrets(project.secret_store()?, project.stack()).await,
+	);
 
 	Pass(cx.input).xok()
 }
@@ -83,33 +85,41 @@ impl StackTeardown {
 		"state object",
 		"state lock",
 		"work directory",
-		"secret prefix",
+		"secret store",
 	];
 }
 
-/// Delete every parameter under the stack's secret prefix, naming each one.
-async fn sweep_secrets(stack: &ResolvedStack) -> Result<usize> {
-	let region = stack.region();
-	let prefix = SecretRef::prefix(stack);
-	let names = ssm_ext::list(region, &prefix).await?;
-	if names.is_empty() {
-		info!("no secrets under {prefix}");
+/// Delete every secret of the stack in its store, naming each label.
+async fn sweep_secrets(
+	store: &SecretStore,
+	stack: &ResolvedStack,
+) -> Result<usize> {
+	let labels = store
+		.list(stack)
+		.await?
+		.into_iter()
+		.map(|entry| entry.secret)
+		.collect::<Vec<_>>();
+	if labels.is_empty() {
+		info!("no secrets in {}", store.describe());
 		return Ok(0);
 	}
-	let deleted = ssm_ext::delete(region, &names).await?;
-	for name in &deleted {
-		info!("deleted secret {name}");
+	let deleted = store.delete(stack, &labels).await?;
+	for secret in &deleted {
+		info!("deleted secret {}", secret.label());
 	}
-	let missed = names
+	let missed = labels
 		.iter()
-		.filter(|name| !deleted.contains(name))
+		.filter(|secret| !deleted.contains(secret))
+		.map(|secret| secret.label().to_string())
 		.collect::<Vec<_>>();
 	match missed.is_empty() {
 		true => Ok(deleted.len()),
 		false => Err(bevyhow!(
-			"{} of {} secrets under {prefix} were not deleted: {missed:?}",
+			"{} of {} secrets in {} were not deleted: {missed:?}",
 			missed.len(),
-			names.len()
+			labels.len(),
+			store.describe()
 		)),
 	}
 }
@@ -185,29 +195,47 @@ mod test {
 
 	/// The inventory this action took over from the driver's hardcoded sweep,
 	/// less the artifacts bucket, which became the terraform-owned repo store,
-	/// plus the secret prefix, which the driver never swept and which is why a
-	/// destroyed stage's parameters used to be deleted by hand.
+	/// plus the secret store, which the driver never swept and which is why a
+	/// destroyed stage's secrets used to be deleted by hand.
 	#[beet_core::test]
 	fn the_carriers_are_the_ones_the_driver_used_to_sweep() {
 		StackTeardown::CARRIERS.xpect_eq([
 			"state object",
 			"state lock",
 			"work directory",
-			"secret prefix",
+			"secret store",
 		]);
 	}
 
-	/// The prefix a teardown sweeps is exactly the one [`EnsureSecret`] mints
-	/// under, composed by the same type, so a stack can neither miss its own
-	/// secrets nor reach a neighbouring stage's.
+	/// The sweep takes every label the store lists for the stack and nothing
+	/// else: a neighbouring stage's store is untouched, and a label the store
+	/// could not delete fails the sweep by name.
 	#[beet_core::test]
-	fn the_sweep_is_scoped_to_the_stacks_own_prefix() {
+	async fn the_sweep_is_scoped_to_the_stacks_own_labels() {
 		let stack = Stack::new("beetmash-mail")
 			.with_stage("drill")
 			.resolve(&PackageConfig::default());
-		SecretRef::prefix(&stack).xpect_eq("/beetmash-mail/drill");
-		SecretRef::new("mail-admin-password")
-			.name(&stack)
-			.xpect_eq("/beetmash-mail/drill/mail-admin-password");
+		let store = crate::types::test_support::memory_secret_store(&stack);
+		for label in ["mail-admin-password", "dkim-example-com"] {
+			store
+				.create(
+					&stack,
+					&SecretRef::new(label),
+					"x",
+					None,
+					Rotation::Remint,
+				)
+				.await
+				.unwrap();
+		}
+		super::sweep_secrets(&store, &stack)
+			.await
+			.unwrap()
+			.xpect_eq(2);
+		store.list(&stack).await.unwrap().len().xpect_eq(0);
+		super::sweep_secrets(&store, &stack)
+			.await
+			.unwrap()
+			.xpect_eq(0);
 	}
 }

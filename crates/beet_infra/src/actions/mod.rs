@@ -18,8 +18,11 @@ mod lightsail_release;
 mod prune_versions;
 mod repo_stage;
 mod repo_sync;
+mod secrets_export;
+mod secrets_restore;
+mod secrets_revoke;
 mod ssh_connection;
-pub mod ssm_ext;
+mod ssm_secret_store;
 mod stack_teardown;
 mod store_sync;
 #[cfg(feature = "aws_sdk")]
@@ -46,7 +49,11 @@ pub use lightsail_release::*;
 pub use prune_versions::*;
 pub use repo_stage::*;
 pub use repo_sync::*;
+pub use secrets_export::*;
+pub use secrets_restore::*;
+pub use secrets_revoke::*;
 pub use ssh_connection::*;
+pub use ssm_secret_store::*;
 pub use stack_teardown::*;
 pub use store_sync::*;
 #[cfg(feature = "aws_sdk")]

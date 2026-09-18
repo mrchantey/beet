@@ -21,7 +21,7 @@ tokens = ["proc-macro2", "quote", "syn"]
 # The S3/Dynamo runtime backends. Pulls the bucket declaration: a `<DirSync>`
 # spells its S3 end through `S3BucketBlock::store_uri`.
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
-deploy = ["beet_router", "dep:base64"]
+deploy = ["beet_router", "dep:base64", "vault"]
 # The stack secret store seam and its export, restore and revoke verbs, on the
 # secrets document in `beet_net/secrets`.
 vault = ["beet_net/vault"]

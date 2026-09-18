@@ -141,6 +141,14 @@ pub struct StackQuery<'w, 's> {
 	/// and [`InfraPlugin`] therefore guarantees, so resolution is total.
 	package: Res<'w, PackageConfig>,
 	deployment: Option<Res<'w, Deployment>>,
+	/// The secret store a declaration landed, see
+	/// [`secret_store`](Self::secret_store).
+	#[cfg(feature = "vault")]
+	secret_stores: Query<'w, 's, &'static SecretStore>,
+	/// The entry's declared secrets document, which seeds the local
+	/// stand-in's recipients.
+	#[cfg(feature = "vault")]
+	documents: SecretsQuery<'w, 's>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -210,6 +218,74 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// Get the [`BlobStore`] component from this entity.
 	pub fn store(&self, entity: Entity) -> Result<&BlobStore> {
 		self.stores.get(entity)?.xok()
+	}
+
+	/// The [`SecretStore`] `entity`'s stack keeps its secrets in: the one
+	/// declared on or under its `<Stack>` (`<SsmSecrets/>`,
+	/// `<DocumentSecrets path=".."/>`), else the default this launch's
+	/// [`ServiceAccess`] implies: parameter store in the stack's region when
+	/// `Remote`, the document at `target/secrets/<app>--<stage>.toml` when
+	/// `Local`. Two declarations under one stack is an error naming both,
+	/// never a guess.
+	#[cfg(feature = "vault")]
+	pub fn secret_store(&self, entity: Entity) -> Result<SecretStore> {
+		let root = self
+			.stacks
+			.get(entity)
+			.map(|(root, _)| root)
+			.unwrap_or(entity);
+		let stack = self.resolve(entity);
+		let mut declared = self
+			.children
+			.iter_descendants_inclusive(root)
+			.filter_map(|child| self.secret_stores.get(child).ok());
+		match (declared.next(), declared.next()) {
+			(Some(store), None) => store.clone().xok(),
+			(Some(first), Some(second)) => bevybail!(
+				"stack `{}--{}` declares two secret stores ({} and {}): a stack \
+				keeps its secrets in exactly one",
+				stack.app_name(),
+				stack.stage(),
+				first.describe(),
+				second.describe()
+			),
+			(None, _) => self.default_secret_store(
+				BootstrapConfig::get().service_access,
+				entity,
+				stack,
+			),
+		}
+	}
+
+	/// The store a stack with no declaration resolves under `access`.
+	#[cfg(feature = "vault")]
+	pub(crate) fn default_secret_store(
+		&self,
+		access: ServiceAccess,
+		entity: Entity,
+		stack: ResolvedStack,
+	) -> Result<SecretStore> {
+		match access {
+			ServiceAccess::Local => DocumentSecretStore::local(stack)?
+				.with_seed(self.documents.resolve_default(entity).ok())
+				.xmap(SecretStore::new)
+				.xok(),
+			ServiceAccess::Remote => {
+				cfg_if! {
+					if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+						SecretStore::new(crate::prelude::SsmSecretStore::for_stack(&stack)).xok()
+					} else {
+						bevybail!(
+							"stack `{}--{}` declares no secret store and this build has no \
+							parameter store provider (the `deploy` feature, native): declare \
+							`<DocumentSecrets path=\"..\"/>` under the stack",
+							stack.app_name(),
+							stack.stage()
+						)
+					}
+				}
+			}
+		}
 	}
 }
 

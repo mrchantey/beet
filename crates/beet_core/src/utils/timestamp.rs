@@ -174,6 +174,30 @@ impl Timestamp {
 			.map(Self)
 	}
 
+	/// [`parse_iso8601`](Self::parse_iso8601) also accepting a numeric
+	/// offset (`2026-09-15T10:00:00.5+10:00`, the form an api reports a
+	/// modified date in), read as the UTC instant it names.
+	pub fn parse_rfc3339(text: &str) -> Option<Self> {
+		let text = text.trim();
+		if text.ends_with('Z') {
+			return Self::parse_iso8601(text);
+		}
+		// the offset sign is the last `+` or `-` after the `T`
+		let time_at = text.find('T')?;
+		let sign_at = text.rfind(['+', '-']).filter(|at| *at > time_at)?;
+		let (hours, minutes) = text[sign_at + 1..].split_once(':')?;
+		let offset = hours.parse::<i64>().ok()? * 3600
+			+ minutes.parse::<i64>().ok()? * 60;
+		let offset = match &text[sign_at..=sign_at] {
+			"+" => offset,
+			_ => -offset,
+		};
+		Self::parse_iso8601(&format!("{}Z", &text[..sign_at]))?
+			.0
+			.checked_sub(offset * 1_000)
+			.map(Self)
+	}
+
 	/// This instant as an ISO 8601 / RFC 3339 UTC timestamp with millisecond
 	/// precision, eg `2024-09-09T19:46:02.102Z`.
 	pub fn format_iso8601(&self) -> String {
@@ -335,6 +359,25 @@ mod test {
 		] {
 			Timestamp::parse_iso8601(text).xpect_none();
 		}
+	}
+
+	/// An offset lands on the UTC instant it names, whichever side of zero
+	/// it sits, and `Z` still reads.
+	#[crate::test]
+	fn parses_rfc3339_offsets() {
+		Timestamp::parse_rfc3339("2026-09-15T10:00:00.000000+10:00")
+			.unwrap()
+			.format_iso8601()
+			.xpect_eq("2026-09-15T00:00:00.000Z");
+		Timestamp::parse_rfc3339("2026-09-15T00:00:00-01:30")
+			.unwrap()
+			.format_iso8601()
+			.xpect_eq("2026-09-15T01:30:00.000Z");
+		Timestamp::parse_rfc3339("2024-09-09T19:46:02Z")
+			.unwrap()
+			.xpect_eq(Timestamp::from_secs(1_725_911_162));
+		Timestamp::parse_rfc3339("2024-09-09T19:46:02").xpect_none();
+		Timestamp::parse_rfc3339("yesterday").xpect_none();
 	}
 
 	/// The feed date format: an RFC 2822 date-time with the weekday its epoch

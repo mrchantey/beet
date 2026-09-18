@@ -11,19 +11,19 @@ use beet_net::prelude::*;
 /// the address that uses it.
 ///
 /// Nothing in this stack ever shows a password: `StalwartProvision` mints each
-/// mailbox credential, parks it in parameter store and moves on, and the
-/// server mints its own administrator's. That is the right default, and it
-/// leaves one real gap: a human setting up a mail client needs the value, and
-/// the honest alternative to this verb is a hand-composed `aws ssm
-/// get-parameter` per mailbox with the parameter name typed from memory. The
-/// name is composed by [`AccountPlan::secret_ref`], so a verb that reads it
-/// back cannot disagree with the step that wrote it, and a mailbox added to the
-/// declaration appears here without anything else being updated.
+/// mailbox credential, parks it in the stack's secret store and moves on, and
+/// the server mints its own administrator's. That is the right default, and
+/// it leaves one real gap: a human setting up a mail client needs the value,
+/// and the honest alternative to this verb is a hand-composed read per
+/// mailbox with the address typed from memory. The label is composed by
+/// [`AccountPlan::secret_ref`], so a verb that reads it back cannot disagree
+/// with the step that wrote it, and a mailbox added to the declaration
+/// appears here without anything else being updated.
 ///
 /// This DELIBERATELY prints secrets to stdout, which is the one place in the
 /// mail stack that does. Everything else redacts, so treat the output the way
-/// the parameter store treats the value: it reaches a terminal, a scrollback
-/// buffer and whatever is recording the session.
+/// the store treats the value: it reaches a terminal, a scrollback buffer and
+/// whatever is recording the session.
 ///
 /// `--infra` adds the credentials no human signs in with: whichever relay
 /// credentials the stack's domains actually use and the DKIM signing keys.
@@ -38,7 +38,6 @@ pub async fn MailCredentials(
 ) -> Result<Outcome<Request, Response>> {
 	let infra = cx.input.parse_params::<MailCredentialsParams>()?.infra;
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
-	let region = mail.stack.region().clone();
 	let label = mail.mail_box.label();
 
 	// the server's own administrator first, since it is the one account no
@@ -53,7 +52,7 @@ pub async fn MailCredentials(
 				StalwartBlock::ADMIN_USER,
 				&domain.slug(),
 			),
-			format!("administers {}", mail.mail_box.hostname()),
+			AccountPlan::admin_note(mail.mail_box.hostname()),
 		));
 	}
 	// only the served domains: provision mints a credential per mailbox it
@@ -67,10 +66,7 @@ pub async fn MailCredentials(
 					mailbox.localpart(),
 					&domain.slug(),
 				),
-				match mailbox.admin() {
-					true => "mailbox, administrator".to_string(),
-					false => "mailbox".to_string(),
-				},
+				AccountPlan::mailbox_note(mailbox.admin()),
 			));
 		}
 	}
@@ -143,16 +139,16 @@ pub async fn MailCredentials(
 
 	cross_log!("");
 	for (name, secret, note) in entries {
-		let parameter = secret.name(&mail.stack);
-		match ssm_ext::get(&region, &parameter).await? {
+		let address = mail.secrets.address(&mail.stack, &secret);
+		match mail.secrets.get(&mail.stack, &secret).await? {
 			Some(value) => {
-				cross_log!("{name}\n  {value}\n  {parameter} ({note})\n")
+				cross_log!("{name}\n  {value}\n  {address} ({note})\n")
 			}
 			// a mailbox declared but never provisioned, which is a real and
 			// readable state rather than a failure: the next deploy mints it.
-			None => cross_log!(
-				"{name}\n  (not minted yet)\n  {parameter} ({note})\n"
-			),
+			None => {
+				cross_log!("{name}\n  (not minted yet)\n  {address} ({note})\n")
+			}
 		}
 	}
 	if !infra {

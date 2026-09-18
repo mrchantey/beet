@@ -97,12 +97,11 @@ pub async fn StalwartProvision(
 ) -> Result<Outcome<Request, Response>> {
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
 
-	// the credentials this step writes into the relay routes, read from
-	// parameter store rather than passed in: the box reads the same values, so
+	// the credentials this step writes into the relay routes, read from the
+	// secret store rather than passed in: the box reads the same values, so
 	// the two cannot drift. Exactly the routes in use, so an all-comail stack
 	// never asks for a SES pair terraform did not park.
-	let region = mail.stack.region().clone();
-	let credentials = read_credentials(&mail, &region).await?;
+	let credentials = read_credentials(&mail).await?;
 
 	// the ACME contact and the reports address are the same human, ie whoever
 	// answers `postmaster@` on the first domain served.
@@ -132,18 +131,10 @@ pub async fn StalwartProvision(
 	};
 	connection.wait_for_ready(timeout, poll).await?;
 
-	let mut management = Management::open(
-		&connection,
-		local_port,
-		timeout,
-		poll,
-		&plan,
-		&mail,
-		&region,
-	)
-	.await?;
-	let domain_ids =
-		apply_plan(management.client(), &plan, &region, &mail.stack).await?;
+	let mut management =
+		Management::open(&connection, local_port, timeout, poll, &plan, &mail)
+			.await?;
+	let domain_ids = apply_plan(management.client(), &plan, &mail).await?;
 
 	info!(
 		"restarting {} so the mail listeners bind",
@@ -221,16 +212,17 @@ impl Management {
 		poll: Duration,
 		plan: &StalwartPlan,
 		mail: &MailStack,
-		region: &str,
 	) -> Result<Self> {
 		let user = StalwartBlock::ADMIN_USER.to_string();
-		let admin_secret = admin_secret_name(mail)?;
+		let admin_secret = admin_secret(mail)?;
 		let public_origin = format!("https://{}", mail.mail_box.hostname());
 
 		// the commissioned path: the real administrator account over the port
 		// the world already reaches. No tunnel, no recovery credential, and
 		// nothing on the box listening in the clear.
-		if let Some(password) = ssm_ext::get(region, &admin_secret).await? {
+		if let Some(password) =
+			mail.secrets.get(&mail.stack, &admin_secret).await?
+		{
 			match JmapClient::connect(&public_origin, &user, &password).await {
 				Ok(client) => {
 					info!(
@@ -274,13 +266,10 @@ impl Management {
 		// means "not this one" instead of "not up yet" — the difference between
 		// one failed request and a ten-minute poll against the wrong password.
 		wait_for_endpoint(&tunnel_origin, timeout, poll).await?;
-		let recovery =
-			read_secret(region, &mail.mail_box.admin_secret_name(&mail.stack))
-				.await?;
+		let recovery = read_secret(mail, &mail.mail_box.admin_secret()).await?;
 		match JmapClient::connect(&tunnel_origin, &user, &recovery).await {
 			Ok(client) => {
-				Self::commission(&client, connection, plan, mail, region)
-					.await?
+				Self::commission(&client, connection, plan, mail).await?
 			}
 			// the recovery credential is gone, which the box only does once the
 			// store is claimed: this is a claimed server that simply is not
@@ -296,7 +285,7 @@ impl Management {
 			StalwartProvision::UNIT
 		);
 		connection.run_command(&restart_command()).await?;
-		let password = read_secret(region, &admin_secret).await?;
+		let password = read_secret(mail, &admin_secret).await?;
 		// which port the server comes back on depends on how far the store it
 		// is about to load had already been commissioned, and the two cases
 		// cannot be told apart before the restart. A FRESH claim boots into a
@@ -340,7 +329,6 @@ impl Management {
 		connection: &SshConnection,
 		plan: &StalwartPlan,
 		mail: &MailStack,
-		region: &str,
 	) -> Result {
 		// the file is the truth of whether a claim already happened, which is
 		// the state a crash between the claim and its restart leaves behind.
@@ -355,7 +343,7 @@ impl Management {
 			info!("the data store is already claimed; a restart finishes it");
 			return Ok(());
 		}
-		if let Err(err) = bootstrap(client, plan, mail, region).await {
+		if let Err(err) = bootstrap(client, plan, mail).await {
 			warn!(
 				"the claim was refused, so this box is being treated as a \
 				rebuild onto an existing data store: {err}"
@@ -394,9 +382,9 @@ impl Management {
 	}
 }
 
-/// The parameter the server's own administrator credential is parked at, ie
+/// The secret the server's own administrator credential is parked at, ie
 /// the one the `Bootstrap` claim minted and every later run authenticates with.
-fn admin_secret_name(mail: &MailStack) -> Result<String> {
+fn admin_secret(mail: &MailStack) -> Result<SecretRef> {
 	mail.serving()
 		.next()
 		.map(|domain| {
@@ -405,7 +393,6 @@ fn admin_secret_name(mail: &MailStack) -> Result<String> {
 				StalwartBlock::ADMIN_USER,
 				&domain.slug(),
 			)
-			.name(&mail.stack)
 		})
 		.ok_or_else(|| bevyhow!("no mail domain to name an administrator on"))
 }
@@ -524,7 +511,7 @@ async fn converge_certificates(
 /// the database is a file on the persistent data volume.
 ///
 /// The server MINTS the admin account's password and returns it in the set
-/// response, this one time; it is parked at the same parameter composition
+/// response, this one time; it is parked at the same secret composition
 /// every other account's credential uses, overwriting any stale value from a
 /// previous deployment's store (a claim only ever succeeds on a blank one).
 ///
@@ -535,7 +522,6 @@ async fn bootstrap(
 	client: &JmapClient,
 	plan: &StalwartPlan,
 	mail: &MailStack,
-	region: &str,
 ) -> Result {
 	let stack = &mail.stack;
 	let data_store = mail.mail_box.data_store_config();
@@ -569,16 +555,26 @@ async fn bootstrap(
 		.await;
 	let updated = claim?;
 
-	let secret_name = AccountPlan::secret_ref(
+	let secret_ref = AccountPlan::secret_ref(
 		mail.mail_box.label(),
 		StalwartBlock::ADMIN_USER,
 		&domain.slug(),
-	)
-	.name(stack);
+	);
 	match updated["secret"].as_str() {
 		Some(secret) => {
-			ssm_ext::overwrite(region, &secret_name, secret).await?;
-			info!("parked the bootstrap admin credential at {secret_name}");
+			mail.secrets
+				.overwrite(
+					stack,
+					&secret_ref,
+					secret,
+					Some(&AccountPlan::admin_note(mail.mail_box.hostname())),
+					Some(AccountPlan::admin_rotation()),
+				)
+				.await?;
+			info!(
+				"parked the bootstrap admin credential at {}",
+				mail.secrets.address(stack, &secret_ref)
+			);
 		}
 		None => warn!(
 			"the bootstrap claim returned no admin credential; expected one at \
@@ -623,8 +619,7 @@ async fn wait_for_endpoint(
 async fn apply_plan(
 	client: &JmapClient,
 	plan: &StalwartPlan,
-	region: &str,
-	stack: &ResolvedStack,
+	mail: &MailStack,
 ) -> Result<Vec<String>> {
 	client
 		.update_singleton("x:SpamSettings", &plan.spam_settings())
@@ -693,10 +688,9 @@ async fn apply_plan(
 		let domain_id =
 			converge(client, "x:Domain", &["name"], &domain.object(&acme))
 				.await?;
-		converge_dkim(client, domain, &domain_id, region, stack).await?;
+		converge_dkim(client, domain, &domain_id, mail).await?;
 		for account in &domain.accounts {
-			converge_account(client, account, &domain_id, region, stack)
-				.await?;
+			converge_account(client, account, &domain_id, mail).await?;
 		}
 		// after the accounts, since it names one of them
 		if let Some(patch) = domain.catch_all_patch() {
@@ -890,9 +884,9 @@ fn plan_converge(
 /// Hand the domain the sovereign signing key whose public half its selector
 /// record already carries.
 ///
-/// The key comes from parameter store rather than from the server, which is the
+/// The key comes from the secret store rather than from the server, which is the
 /// whole point of the arrangement: the record was published by the apply that
-/// read the same parameter, so the selector the world resolves and the key the
+/// read the same secret, so the selector the world resolves and the key the
 /// server signs with cannot disagree. A server-generated key would have to be
 /// read back and published in a second apply, with a window in between where
 /// mail is signed by a selector nothing answers for.
@@ -904,16 +898,16 @@ async fn converge_dkim(
 	client: &JmapClient,
 	domain: &DomainPlan,
 	domain_id: &str,
-	region: &str,
-	stack: &ResolvedStack,
+	mail: &MailStack,
 ) -> Result {
-	let name = domain.dkim_secret.name(stack);
-	let private_key = ssm_ext::get(region, &name).await?.ok_or_else(|| {
-		bevyhow!(
-			"no dkim key at {name}: <EnsureDkimKey/> mints it and the apply \
-			publishes its public half, so both run before this step"
-		)
-	})?;
+	let private_key = mail
+		.secrets
+		.require(&mail.stack, &domain.dkim_secret, || {
+			"<EnsureDkimKey/> mints it and the apply publishes its public \
+			half, so both run before this step"
+				.to_string()
+		})
+		.await?;
 	// matched WITHOUT the key, so an existing signature never shows a diff on
 	// the one property that must not be patched
 	let existing = client.list("x:DkimSignature").await?;
@@ -946,37 +940,47 @@ async fn converge_dkim(
 /// Create the account if it is not there, minting and parking its password on
 /// the way; else patch it, leaving the credential it already has alone.
 ///
-/// A rotation would lock out every client configured against the mailbox, so
-/// the password is generated exactly once and everything that needs it (a
-/// probe, a human setting up a mail client) reads it back from parameter store.
+/// An unasked rotation would lock out every client configured against the
+/// mailbox, so the password is generated only while the secret is absent and
+/// everything that needs it (a probe, a human setting up a mail client)
+/// reads it back from the secret store.
 ///
-/// The parameter and the account are two independent pieces of state, so which
-/// one exists decides a different question: the PARAMETER decides whether to
-/// generate, and the ACCOUNT decides whether to write the credential. Reading
-/// one to answer the other is how a box rebuilt on a fresh data store gets a
-/// mailbox nobody can sign in to.
+/// The secret and the account are two independent pieces of state, so which
+/// one exists decides a different question: the SECRET decides whether to
+/// generate, and the ACCOUNT decides whether to create. Reading one to answer
+/// the other is how a box rebuilt on a fresh data store gets a mailbox
+/// nobody can sign in to. The one crossing is deliberate and is the
+/// credential's [`Rotation::Remint`]: a secret minted here while the account
+/// already exists (`secrets/revoke` deleted it) is set on the account, so
+/// the store and the server agree again.
 async fn converge_account(
 	client: &JmapClient,
 	account: &AccountPlan,
 	domain_id: &str,
-	region: &str,
-	stack: &ResolvedStack,
+	mail: &MailStack,
 ) -> Result<String> {
-	let name = account.secret.name(stack);
-	let password = match ssm_ext::get(region, &name).await? {
-		Some(password) => password,
-		None => {
-			let generated = EnsureSecret::generate(
-				account.secret.label(),
-				EnsureSecret::LENGTH,
-			)?;
-			ssm_ext::create(region, &name, &generated).await?;
-			info!("minted the {} mailbox credential", account.name);
-			generated.to_string()
-		}
-	};
+	let (password, minted) = mail
+		.secrets
+		.ensure(
+			&mail.stack,
+			&account.secret,
+			Some(&account.note()),
+			AccountPlan::rotation(),
+			async || {
+				EnsureSecret::generate(
+					account.secret.label(),
+					EnsureSecret::LENGTH,
+				)
+				.map(|value| value.to_string())
+			},
+		)
+		.await?;
+	if minted {
+		info!("minted the {} mailbox credential", account.name);
+	}
 	// matched WITHOUT the credential, so an account that already exists never
-	// shows a password diff and never has one patched onto it
+	// shows a password diff and never has one patched onto it, unless the
+	// credential was just re-minted
 	let existing = client.list("x:Account").await?;
 	let declared = account.object(domain_id, None);
 	match plan_converge(&existing, &["name", "domainId"], &declared)? {
@@ -988,6 +992,29 @@ async fn converge_account(
 				)
 				.await
 		}
+		Converge::Unchanged(id) | Converge::Patch(id, _) if minted => {
+			let mut patch = match plan_converge(
+				&existing,
+				&["name", "domainId"],
+				&declared,
+			)? {
+				Converge::Patch(_, patch) => patch,
+				_ => json!({}),
+			};
+			patch
+				.as_object_mut()
+				.ok_or_else(|| bevyhow!("an account patch is an object"))?
+				.extend(
+					AccountPlan::credentials_patch(&password)
+						.as_object()
+						.into_iter()
+						.flatten()
+						.map(|(key, value)| (key.clone(), value.clone())),
+				);
+			client.update("x:Account", &id, &patch).await?;
+			info!("rotated the {} mailbox credential", account.name);
+			Ok(id)
+		}
 		Converge::Unchanged(id) => Ok(id),
 		Converge::Patch(id, patch) => {
 			client.update("x:Account", &id, &patch).await?;
@@ -996,15 +1023,16 @@ async fn converge_account(
 	}
 }
 
-/// The one place a secret is read, so a missing parameter names the step that
+/// The one place a secret is read, so a missing one names the step that
 /// should have created it rather than failing as an authentication error later.
-async fn read_secret(region: &str, name: &str) -> Result<String> {
-	ssm_ext::get(region, name).await?.ok_or_else(|| {
-		bevyhow!(
-			"secret {name} does not exist: the deploy runs <EnsureSecret/> and \
-			the apply before this step for exactly this reason"
-		)
-	})
+async fn read_secret(mail: &MailStack, secret: &SecretRef) -> Result<String> {
+	mail.secrets
+		.require(&mail.stack, secret, || {
+			"the deploy runs <EnsureSecret/> and the apply before this step for \
+			exactly this reason"
+				.to_string()
+		})
+		.await
 }
 
 /// One credential per relay route the served domains resolve, keyed by route
@@ -1017,7 +1045,6 @@ async fn read_secret(region: &str, name: &str) -> Result<String> {
 /// is what lets a direct-delivery stack deploy without a single mail secret.
 async fn read_credentials(
 	mail: &MailStack,
-	region: &str,
 ) -> Result<HashMap<String, RelayCredential>> {
 	let mut credentials = HashMap::<String, RelayCredential>::default();
 	for (domain, relay) in mail.relayed() {
@@ -1030,13 +1057,13 @@ async fn read_credentials(
 		let credential = match relay {
 			RelayMode::Ses(_) => RelayCredential {
 				username: read_secret(
-					region,
-					&mail.mail_box.ses_smtp_user_secret_name(&mail.stack),
+					mail,
+					&mail.mail_box.ses_smtp_user_secret(),
 				)
 				.await?,
 				password: read_secret(
-					region,
-					&mail.mail_box.ses_smtp_password_secret_name(&mail.stack),
+					mail,
+					&mail.mail_box.ses_smtp_password_secret(),
 				)
 				.await?,
 			},
@@ -1047,14 +1074,12 @@ async fn read_credentials(
 				let slug = domain.slug();
 				RelayCredential {
 					username: read_comail_secret(
-						region,
 						mail,
 						&ComailRelay::did_secret(&slug),
 						domain.domain(),
 					)
 					.await?,
 					password: read_comail_secret(
-						region,
 						mail,
 						&ComailRelay::api_key_secret(&slug),
 						domain.domain(),
@@ -1069,23 +1094,23 @@ async fn read_credentials(
 	Ok(credentials)
 }
 
-/// One of the parameters a comail enrolment is parked in, failing with the step
+/// One of the secrets a comail enrolment is parked in, failing with the step
 /// that fills it rather than with a 535 three minutes later.
 async fn read_comail_secret(
-	region: &str,
 	mail: &MailStack,
 	secret: &SecretRef,
 	domain: &str,
 ) -> Result<String> {
-	let name = secret.name(&mail.stack);
-	ssm_ext::get(region, &name).await?.ok_or_else(|| {
-		bevyhow!(
-			"'{domain}' relays through comail but {name} does not exist: \
-			enrol the domain at https://comail.at and park the response, then \
-			run <ComailEnroll/>, which checks all five parameters and says \
-			what each one holds"
-		)
-	})
+	mail.secrets
+		.require(&mail.stack, secret, || {
+			format!(
+				"'{domain}' relays through comail; enrol the domain at \
+				https://comail.at and park the response, then run \
+				<ComailEnroll/>, which checks all five secrets and says what \
+				each one holds"
+			)
+		})
+		.await
 }
 
 

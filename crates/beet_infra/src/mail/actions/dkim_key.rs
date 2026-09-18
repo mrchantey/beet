@@ -58,15 +58,40 @@ impl EnsureDkimKey {
 			.xmap(|pem| Self::public_key_from_pem(&pem))
 	}
 
+	/// The note the private key is stored with: the selector it signs under.
+	pub fn note(domain: &str) -> String {
+		format!(
+			"dkim private key, {}._domainkey.{domain}",
+			MailDomainBlock::DKIM_SELECTOR
+		)
+	}
+
+	/// How the key rotates: by hand, as a new selector beside the published
+	/// one, since a key rotated under a published selector is a fortnight of
+	/// mail no verifier can check.
+	pub fn rotation() -> Rotation {
+		Rotation::manual(
+			"a new selector beside the published one; never overwrite in place",
+		)
+	}
+
+	/// The note the derived public half is stored with.
+	pub fn public_note(domain: &str) -> String {
+		format!(
+			"dkim public key, the p= of {}._domainkey.{domain}",
+			MailDomainBlock::DKIM_SELECTOR
+		)
+	}
+
 	const OPENSSL_NOT_FOUND: &'static str = "openssl is not installed, and the sovereign DKIM key is generated with it";
 }
 
 /// Mints whatever is missing, and publishes each domain's PUBLIC half beside its
-/// private key in parameter store.
+/// private key in the stack's secret store.
 ///
 /// It does not hand the public key to the apply. The selector record's content
 /// is not a pipeline value that happens to be in flight, it is a fact about the
-/// domain, so the variable that carries it reads parameter store directly and
+/// domain, so the variable that carries it reads the secret store directly and
 /// every verb that renders resolves it the same way. That is what makes a bare
 /// `plan` truthful about DKIM instead of showing (and an `apply` publishing) the
 /// empty `p=` that means "revoked".
@@ -75,9 +100,9 @@ impl EnsureDkimKey {
 /// sharp reason to run only on a deploy: a rotated key under a published
 /// selector is a fortnight of unverifiable mail.
 /// `<EnsureDkimKey/>` — mint the signing key each mail domain publishes its own
-/// `stalwart` selector for, park the private half in parameter store, and hand
-/// the public half to the apply as the variable that selector's `TXT` record
-/// reads.
+/// `stalwart` selector for, park the private half in the stack's secret
+/// store, and hand the public half to the apply as the variable that
+/// selector's `TXT` record reads.
 ///
 /// Outbound mail is signed twice from here on: SES Easy DKIM signs with a key
 /// Amazon holds and rotates, and Stalwart signs with this one. Two signatures
@@ -109,7 +134,6 @@ pub async fn EnsureDkimKey(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
-	let region = mail.stack.region().clone();
 
 	let input = cx.input;
 	// only the domains whose records this stack publishes: a domain somebody
@@ -119,39 +143,41 @@ pub async fn EnsureDkimKey(
 		.iter()
 		.filter(|domain| domain.records().proves_identity())
 	{
-		let name = domain.dkim_secret().name(&mail.stack);
-		let private = match ssm_ext::get(&region, &name).await? {
-			Some(private) => private,
-			None => {
-				let generated = EnsureDkimKey::generate(bits).await?;
-				match ssm_ext::create(&region, &name, &generated).await {
-					Ok(()) => {
-						info!("minted the {} signing key", domain.domain());
-						generated
-					}
-					// the loser of a race re-reads rather than overwriting: two
-					// deploys must not disagree about which key is published.
-					Err(err) if ssm_ext::is_already_exists(&err) => {
-						ssm_ext::get(&region, &name).await?.ok_or_else(
-							|| {
-								bevyhow!(
-									"dkim key {name} vanished between writes"
-								)
-							},
-						)?
-					}
-					Err(err) => return Err(err),
-				}
-			}
-		};
+		// the loser of a race re-reads rather than overwriting: two deploys
+		// must not disagree about which key is published.
+		let (private, minted) = mail
+			.secrets
+			.ensure(
+				&mail.stack,
+				&domain.dkim_secret(),
+				Some(&EnsureDkimKey::note(domain.domain())),
+				EnsureDkimKey::rotation(),
+				async || EnsureDkimKey::generate(bits).await,
+			)
+			.await?;
+		if minted {
+			info!("minted the {} signing key", domain.domain());
+		}
 		// publish the derived public half beside the private key, so a render
 		// reads what it needs without also reading the secret that produced it.
 		// Rewritten every deploy rather than created once: it is derived, so a
 		// missing or stale copy should heal rather than need intervention.
 		let public = EnsureDkimKey::public_key(&private).await?;
-		let public_name = domain.dkim_public_secret().name(&mail.stack);
-		if ssm_ext::get(&region, &public_name).await? != Some(public.clone()) {
-			ssm_ext::overwrite(&region, &public_name, &public).await?;
+		let public_secret = domain.dkim_public_secret();
+		if mail.secrets.get(&mail.stack, &public_secret).await?
+			!= Some(public.clone())
+		{
+			mail.secrets
+				.overwrite(
+					&mail.stack,
+					&public_secret,
+					&public,
+					Some(&EnsureDkimKey::public_note(domain.domain())),
+					Some(Rotation::manual(
+						"derived from the private key: rotate that",
+					)),
+				)
+				.await?;
 			info!("published the {} public selector", domain.domain());
 		}
 	}

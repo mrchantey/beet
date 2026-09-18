@@ -69,7 +69,8 @@ pub mod fs;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
-#[cfg(feature = "vault")]
+// `Rotation` is plain data every build describing a stack needs; the document
+// and its declaration behind it ride `vault`
 pub mod secrets;
 pub mod template;
 #[cfg(feature = "vault")]
@@ -190,7 +191,6 @@ pub mod prelude {
 	pub use crate::path::*;
 	#[cfg(feature = "std")]
 	pub use crate::path_utils::*;
-	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;
 	pub use crate::subtree_template;
 	pub use crate::template::*;

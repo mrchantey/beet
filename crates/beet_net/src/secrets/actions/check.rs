@@ -9,8 +9,10 @@ use core::fmt::Write;
 /// (or the one `--document` names) reads and every group this identity
 /// opens verifies against its index; every group's sealed recipient list
 /// matches its list (else "run `secrets/rekey`"); and which groups this
-/// identity is not in. One line per item with a tick or the reason; the
-/// whole ledger prints, then a non-zero exit on any failure.
+/// identity is not in. A declared path that is unwritten but has a dated
+/// series beside it (an export with `dated=true`) checks the newest of the
+/// series. One line per item with a tick or the reason; the whole ledger
+/// prints, then a non-zero exit on any failure.
 ///
 /// ```sh
 /// beet secrets/check
@@ -109,13 +111,29 @@ impl Report {
 		identities: Option<&AgeIdentityFile>,
 	) -> Result<()> {
 		let name = handle.describe();
-		if !handle.exists().await? {
-			return self
-				.fail(format!(
-					"document {name}: not written yet (`secrets/set` writes it)"
-				))
-				.xok();
-		}
+		// a dated series stands in for its unwritten declared path
+		let newest = match handle.exists().await? {
+			true => None,
+			false => handle.newest_dated().await?,
+		};
+		let handle = match &newest {
+			Some(newest) => {
+				self.note(format!(
+					"document {name}: a dated series, checking the newest ({})",
+					newest.path
+				));
+				newest
+			}
+			None if !handle.exists().await? => {
+				return self
+					.fail(format!(
+						"document {name}: not written yet (`secrets/set` writes it)"
+					))
+					.xok();
+			}
+			None => handle,
+		};
+		let name = handle.describe();
 		let document = match handle.read().await {
 			Ok(document) => document,
 			Err(err) => return self.fail(format!("{err}")).xok(),
@@ -279,6 +297,40 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("`A`: the index entry differs");
+
+		// a dated series beside an unwritten declared path checks its newest
+		let series = fixture.secrets("exports/cold.toml");
+		let mut document = SecretsDocument::default();
+		document
+			.set(&fixture.identities(), "X", "1", default())
+			.unwrap();
+		series
+			.dated(Timestamp::parse_date("2026-09-15").unwrap())
+			.unwrap()
+			.write(&document)
+			.await
+			.unwrap();
+		let response = fixture
+			.call(
+				SecretsCheck,
+				Request::from_cli_str(&format!(
+					"--document={}",
+					fixture.uri("exports/cold.toml")
+				)),
+			)
+			.await
+			.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response
+			.unwrap_str()
+			.await
+			// the uri's store is the file's directory, so the series is bare
+			.xpect_contains(
+				"a dated series, checking the newest (2026/09/15/000000Z.toml)",
+			)
+			.xpect_contains(
+				"✓ document `2026/09/15/000000Z.toml`: 1 group(s), 1 record(s)",
+			);
 
 		// a named document that does not exist
 		let response = fixture

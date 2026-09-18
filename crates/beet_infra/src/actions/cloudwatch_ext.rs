@@ -1,6 +1,6 @@
 //! Publishing custom metrics, over the `aws` cli.
 //!
-//! The cli for the same reason [`ssm_ext`](super::ssm_ext) uses it: every step
+//! The cli for the same reason [`SsmSecretStore`](super::SsmSecretStore) uses it: every step
 //! that would call this already shells out to `aws` for the parameters it reads
 //! first, so an SDK client here would be a dependency bought for one verb.
 use crate::actions::aws_cli_ext;

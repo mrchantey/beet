@@ -341,6 +341,48 @@ impl SecretsDocument {
 		removed.xok()
 	}
 
+	/// Replace `group` wholesale: its list becomes `recipients` and its blob
+	/// holds exactly `records`, sealed once. A fresh seal opens nothing, so
+	/// no identity is needed: an export or a restore writes a document it
+	/// may not itself be able to read. Every index entry that was in the
+	/// group goes with it; a record of the same name in another group is an
+	/// error, since a name lives in one group.
+	pub fn seal_records(
+		&mut self,
+		group: &str,
+		recipients: Vec<AgeRecipient>,
+		records: impl IntoIterator<Item = (SmolStr, SmolStr, SecretRecord)>,
+	) -> Result<()> {
+		if group.is_empty() {
+			bevybail!("a group has no name");
+		}
+		if recipients.is_empty() {
+			bevybail!(
+				"group `{group}` lists no recipients: every group names who \
+				may read it"
+			);
+		}
+		self.secrets.retain(|_, record| record.group() != group);
+		let mut payload = SealedGroup::default();
+		for (name, value, record) in records {
+			Self::validate_name(&name)?;
+			if let Some(existing) = self.secrets.get(&name) {
+				bevybail!(
+					"record `{name}` is already in group `{}`: a name lives in \
+					one group",
+					existing.group()
+				);
+			}
+			payload.secrets.insert(name, SealedRecord {
+				value,
+				record: record.without_group(),
+			});
+		}
+		self.groups
+			.insert(SmolStr::new(group), SecretsGroup::new(recipients));
+		self.seal_group(group, payload)
+	}
+
 	/// Re-seal every group `identities` can open to its current recipient
 	/// list, naming the ones it cannot. A group with nothing sealed needs
 	/// no rekey and is neither.
@@ -879,6 +921,74 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no identity");
+	}
+
+	/// A group sealed in one go needs no identity, reads back for a listed
+	/// recipient with every record and its metadata, and replaces what the
+	/// group held before.
+	#[crate::test]
+	fn seals_records_in_one_go() {
+		let (mut document, pete, agent) = two_groups();
+		let (alice, alice_file) = human();
+		document
+			.seal_records("default", vec![alice.to_recipient()], [
+				(
+					"dkim-example-com".into(),
+					"-----BEGIN PRIVATE KEY-----".into(),
+					record(None, "the signing key"),
+				),
+				("mail-tlsa".into(), "abc".into(), record(None, "the pin")),
+			])
+			.unwrap();
+		// the old `default` record is gone, `agents` untouched
+		document
+			.secrets
+			.contains_key("OPENAI_API_KEY")
+			.xpect_false();
+		document.secrets.len().xpect_eq(3);
+		let opened = document.open(&alice_file).unwrap();
+		opened.opened.xpect_eq(names(&["default"]));
+		opened
+			.get("mail-tlsa")
+			.unwrap()
+			.value
+			.as_str()
+			.xpect_eq("abc");
+		opened
+			.get("dkim-example-com")
+			.unwrap()
+			.record
+			.note
+			.clone()
+			.unwrap()
+			.as_str()
+			.xpect_eq("the signing key");
+		// pete is no longer listed in `default`
+		document
+			.open(&pete)
+			.unwrap()
+			.locked
+			.xpect_eq(names(&["default"]));
+		document
+			.open(&agent)
+			.unwrap()
+			.get("CF_API_TOKEN")
+			.xpect_some();
+		// a name already in another group is refused
+		document
+			.seal_records("other", vec![alice.to_recipient()], [(
+				"CF_API_TOKEN".into(),
+				"x".into(),
+				default(),
+			)])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("already in group `agents`");
+		document
+			.seal_records("other", vec![], [])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no recipients");
 	}
 
 	/// With no identity at all every sealed group is locked and the index

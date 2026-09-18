@@ -38,6 +38,52 @@ impl MailColdProbe {
 			.strip_prefix(StalwartBlock::COLD_BLOBS_PREFIX)?
 			.strip_prefix('/')
 	}
+
+	/// Whether an export is this stack's: its `origin` names the app and
+	/// stage, so a document copied from another stage (a drill's, another
+	/// account's) cannot pass as the one a restore would read.
+	pub fn check_origin(
+		document: &SecretsDocument,
+		stack: &ResolvedStack,
+	) -> Result {
+		let Some(origin) = &document.origin else {
+			bevybail!(
+				"the export carries no origin, so it is not a stack export"
+			);
+		};
+		if origin.app != *stack.app_name() || origin.stage != *stack.stage() {
+			bevybail!(
+				"the export came from `{}--{}`, not this stack `{}--{}`",
+				origin.app,
+				origin.stage,
+				stack.app_name(),
+				stack.stage()
+			);
+		}
+		Ok(())
+	}
+}
+
+/// The `<Secrets>` declaration targeting the stack's cold bucket
+/// (`{StoreRef($cold_backups)}`), which the dated exports are written
+/// beside: its path names the series dir and format.
+#[derive(SystemParam)]
+struct ColdExportQuery<'w, 's> {
+	declared: Query<'w, 's, (&'static Secrets, &'static StoreRef)>,
+	buckets: Query<'w, 's, &'static R2BucketBlock>,
+}
+
+impl ColdExportQuery<'_, '_> {
+	fn find(&self, cold: &R2BucketBlock) -> Option<Secrets> {
+		self.declared
+			.iter()
+			.find(|(_, store_ref)| {
+				self.buckets
+					.get(store_ref.store())
+					.is_ok_and(|bucket| bucket.label() == cold.label())
+			})
+			.map(|(secrets, _)| secrets.clone())
+	}
 }
 
 /// Lists the cold bucket and reads a sample of each prefix back against the
@@ -70,7 +116,9 @@ pub async fn MailColdProbe(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
-	let cold = ColdStore::resolve(mail.cold_store()?, &mail.stack).await?;
+	let cold =
+		ColdStore::resolve(mail.cold_store()?, &mail.secrets, &mail.stack)
+			.await?;
 	let region = mail.stack.region().to_string();
 	let archive = LiveStore {
 		region: region.clone(),
@@ -171,19 +219,74 @@ pub async fn MailColdProbe(
 		}
 	}
 
-	// the export: present, since a restore into a fresh account reads it first
-	let secrets_prefix = format!("{}/", MailSecretsExport::PREFIX);
-	let exports = cold.list(&secrets_prefix).await?;
-	let Some(export) = exports.newest(MailSecretsExport::SUFFIX) else {
+	// the export: the newest of the dated series is this stack's and opens
+	// with this identity, since a restore into a fresh account starts there
+	let cold_block = mail.cold_store()?.clone();
+	let Some(declared) = cx
+		.caller
+		.with_state::<ColdExportQuery, _>(move |_, query| {
+			query.find(&cold_block)
+		})
+		.await?
+	else {
 		bevybail!(
-			"s3://{}/{secrets_prefix} holds no export, so a restore into a \
-			fresh account would have no DKIM key to sign with: `deploy` or \
-			`provision` writes one through `MailSecretsExport`",
+			"no `<Secrets>` targets the cold bucket, so no export is written \
+			into it: declare `<Secrets label=\"mail-cold\" path=\"secrets/export.toml\" \
+			{{StoreRef($cold_backups)}}/>` and `<SecretsExport document={{$mail_cold}} \
+			dated=true/>`"
+		);
+	};
+	let handle = SecretsHandle::new(BlobStore::temp(), declared.path.as_str())?;
+	let extension = declared.media_type()?.extension().unwrap_or_default();
+	let series = declared
+		.path
+		.as_str()
+		.rsplit_once('/')
+		.map(|(dir, _)| format!("{dir}/"))
+		.unwrap_or_default();
+	let exports = cold.list(&series).await?;
+	let Some(export) = exports
+		.0
+		.iter()
+		.filter(|object| {
+			object
+				.key
+				.strip_prefix(&series)
+				.is_some_and(|key| SecretsHandle::is_dated(key, extension))
+		})
+		.max_by(|left, right| left.key.cmp(&right.key))
+	else {
+		bevybail!(
+			"s3://{}/{series} holds no export, so a restore into a fresh \
+			account would have no DKIM key to sign with: `deploy` or \
+			`provision` writes one through `<SecretsExport dated=true/>`",
 			cold.bucket
 		);
 	};
+	let local = work_dir.join("cold-probe-export.toml");
+	let checked = async {
+		cold.download(&export.key, &local).await?;
+		let document = SecretsDocument::parse(
+			handle.media_type()?,
+			&fs_ext::read(&local)?,
+		)?;
+		MailColdProbe::check_origin(&document, &mail.stack)?;
+		let opened = document.open(&AgeIdentityFile::require()?)?;
+		if opened.secrets.is_empty() {
+			bevybail!(
+				"this identity opens no group of the export (locked: {}): a \
+				restore from it would find nothing",
+				opened.locked.join(", ")
+			);
+		}
+		opened.secrets.len().xok()
+	}
+	.await;
+	fs_ext::remove(&local).ok();
+	let count = checked?;
 	info!(
-		"newest secrets export {} ({} bytes, uploaded {})",
+		"newest secrets export {} ({} bytes, uploaded {}) is this stack's and \
+		opens {count} record(s)",
 		export.key, export.size, export.last_modified
 	);
 	Pass(cx.input).xok()
@@ -247,5 +350,37 @@ mod tests {
 			.unwrap()
 			.xpect_eq("ab/cdef");
 		MailColdProbe::live_blob_key("sqlite/x.db").xpect_none();
+	}
+
+	/// An export from another stage, or with no origin, is not this stack's.
+	#[beet_core::test]
+	fn the_export_must_name_this_stack() {
+		let stack = Stack::new("beetmash-mail")
+			.with_stage("prod")
+			.resolve(&PackageConfig::default());
+		let mut document = SecretsDocument::default();
+		MailColdProbe::check_origin(&document, &stack)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no origin");
+		let origin = SecretsOrigin {
+			app: "beetmash-mail".into(),
+			stage: "drill".into(),
+			region: None,
+			provider: "ssm".into(),
+			exported: Timestamp::UNIX_EPOCH,
+		};
+		document.origin = Some(origin.clone());
+		MailColdProbe::check_origin(&document, &stack)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains(
+				"`beetmash-mail--drill`, not this stack `beetmash-mail--prod`",
+			);
+		document.origin = Some(SecretsOrigin {
+			stage: "prod".into(),
+			..origin
+		});
+		MailColdProbe::check_origin(&document, &stack).unwrap();
 	}
 }

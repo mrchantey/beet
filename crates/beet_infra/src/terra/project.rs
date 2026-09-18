@@ -14,6 +14,11 @@ pub struct Project {
 	/// The variables the stack's blocks declared, so a verb that renders can
 	/// resolve the ones that are resource CONTENT before invoking tofu.
 	variables: Vec<crate::types::Variable>,
+	/// The stack's secret store, which the content variables read through;
+	/// absent on a project built without one, where a content variable is an
+	/// error at render.
+	#[cfg(feature = "vault")]
+	secrets: Option<crate::types::SecretStore>,
 }
 impl Project {
 	pub fn new(
@@ -38,7 +43,34 @@ impl Project {
 			stack,
 			deployment,
 			variables,
+			#[cfg(feature = "vault")]
+			secrets: None,
 		}
+	}
+
+	/// The project with the secret store its content variables read through.
+	#[cfg(feature = "vault")]
+	pub fn with_secret_store(
+		mut self,
+		secrets: crate::types::SecretStore,
+	) -> Self {
+		self.secrets = Some(secrets);
+		self
+	}
+
+	/// The stack's secret store, an error naming the resolution when the
+	/// project was built without one.
+	#[cfg(feature = "vault")]
+	pub fn secret_store(&self) -> Result<&crate::types::SecretStore> {
+		self.secrets.as_ref().ok_or_else(|| {
+			bevyhow!(
+				"project `{}--{}` was built without a secret store: resolve it \
+				through `Project::resolve` (which reads the stack's declaration) \
+				rather than `RenderScope::project`",
+				self.stack.app_name(),
+				self.stack.stage()
+			)
+		})
 	}
 
 	/// Resolve every declared variable that is resource CONTENT, ie one whose
@@ -63,7 +95,7 @@ impl Project {
 	/// Read one content variable's value, or `None` if it is ambient and so
 	/// falls through to its declared default.
 	///
-	/// An absent parameter is a hard error: a content variable has no default,
+	/// An absent secret is a hard error: a content variable has no default,
 	/// so there is nothing to fall back to, and inventing one is how a `p=`
 	/// revocation gets published.
 	async fn resolve_content(
@@ -73,28 +105,50 @@ impl Project {
 		if let Some(value) = variable.fixed_value() {
 			return Ok(Some(value.clone()));
 		}
-		let Some(parameter) = variable.ssm_parameter() else {
+		let Some(secret) = variable.secret_ref() else {
 			return Ok(None);
 		};
-		match read_parameter(self.stack.region(), parameter).await? {
+		match self.read_secret(secret).await? {
 			Some(value) => Ok(Some(SmolStr::new(value))),
 			// the resource this variable is the content of does not exist yet,
 			// and the block reading it emits nothing for empty
 			None if variable.absent_is_empty() => {
 				info!(
-					"no value at parameter store `{parameter}` yet, so \
-					variable `{}` resolves empty and publishes nothing",
+					"no value at secret `{}` yet, so variable `{}` resolves \
+					empty and publishes nothing",
+					secret.label(),
 					variable.key()
 				);
 				Ok(Some(SmolStr::default()))
 			}
 			None => bevybail!(
-				"no value at parameter store `{parameter}`, which variable \
-				`{}` is the content of. It is minted by the stack's `deploy` \
-				verb; run that rather than a bare apply, which would publish an \
-				empty value.",
+				"no value at secret `{}`, which variable `{}` is the content \
+				of. It is minted by the stack's `deploy` verb; run that rather \
+				than a bare apply, which would publish an empty value.",
+				secret.label(),
 				variable.key()
 			),
+		}
+	}
+
+	/// Read a secret through the stack's store, the one deploy-side
+	/// capability a [`Project`] reaches for beyond the tofu CLI.
+	///
+	/// A build without the `vault` feature links no provider, and also runs
+	/// no `plan`/`apply` that would need one, so the unresolvable case says so
+	/// rather than pretending the secret was empty, which is the failure mode
+	/// this whole path exists to prevent.
+	async fn read_secret(&self, secret: &SecretRef) -> Result<Option<String>> {
+		cfg_if! {
+			if #[cfg(feature = "vault")] {
+				self.secret_store()?.get(&self.stack, secret).await
+			} else {
+				bevybail!(
+					"cannot read secret `{}`: this binary was built without the \
+					`vault` feature, so it has no secret store to read it from",
+					secret.label()
+				)
+			}
 		}
 	}
 
@@ -215,6 +269,22 @@ impl Project {
 		tofu::apply_with_vars(&self.dir(), &all_vars, targets).await
 	}
 
+	/// Apply with `resources` (addresses) replaced, see
+	/// [`tofu::apply_replacing`]: the rotation of every secret an apply
+	/// derives.
+	pub async fn apply_replacing(
+		&self,
+		resources: &[String],
+	) -> Result<String> {
+		self.init().await?;
+		tofu::apply_replacing(
+			&self.dir(),
+			&self.render_vars().await?,
+			resources,
+		)
+		.await
+	}
+
 	/// Show the current state.
 	pub async fn show(&self) -> Result<String> {
 		self.init().await?;
@@ -266,23 +336,73 @@ impl Project {
 	}
 }
 
-/// Read a parameter store value, the one deploy-side capability a
-/// [`Project`] reaches for beyond the tofu CLI.
-///
-/// Gated because parameter store is an `actions`-side binding and `actions` is
-/// the deploy feature. A build without it links no aws cli, and also runs no
-/// `plan`/`apply`, so the unresolvable case is unreachable rather than
-/// degraded: it says so rather than pretending the parameter was empty, which
-/// is the failure mode this whole path exists to prevent.
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-async fn read_parameter(region: &str, name: &str) -> Result<Option<String>> {
-	crate::prelude::ssm_ext::get(region, name).await
-}
+#[cfg(all(test, feature = "vault"))]
+mod test {
+	use super::*;
+	use crate::types::Variable;
+	use crate::types::test_support::*;
 
-#[cfg(not(all(feature = "deploy", not(target_arch = "wasm32"))))]
-async fn read_parameter(_region: &str, name: &str) -> Result<Option<String>> {
-	bevybail!(
-		"cannot read parameter store `{name}`: this binary was built without the \
-		`deploy` feature, so it has no aws cli to read it with"
-	)
+	/// A content variable resolves through the stack's store before any
+	/// render: a present secret is its value, an absent optional one is
+	/// empty, an absent required one refuses, and a project built without
+	/// a store says so rather than inventing a value.
+	#[beet_core::test]
+	async fn content_variables_read_the_secret_store() {
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let config = deployment.create_config(&stack);
+		let variables = vec![
+			Variable::secret("dkim", SecretRef::new("dkim-example-com")),
+			Variable::secret_optional("tlsa", SecretRef::new("mail-tlsa")),
+			Variable::param("ambient"),
+		];
+		let store = memory_secret_store(&stack);
+		store
+			.create(
+				&stack,
+				&SecretRef::new("dkim-example-com"),
+				"MIIB",
+				None,
+				Rotation::Remint,
+			)
+			.await
+			.unwrap();
+		let project = Project::new_with_variables(
+			stack.clone(),
+			deployment.clone(),
+			config.clone(),
+			variables.clone(),
+		);
+		project
+			.content_vars()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("without a secret store");
+		let project = project.with_secret_store(store.clone());
+		project.content_vars().await.unwrap().xpect_eq(vec![
+			("dkim".into(), "MIIB".into()),
+			("tlsa".into(), SmolStr::default()),
+		]);
+		// a required secret that is absent refuses, naming the deploy verb
+		let project = Project::new_with_variables(
+			stack.clone(),
+			deployment,
+			config,
+			vec![Variable::secret("other", SecretRef::new("absent"))],
+		)
+		.with_secret_store(store);
+		project
+			.content_vars()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("secret `absent`")
+			.xpect_contains("`deploy` verb");
+		// a teardown falls back to empty rather than refusing
+		project
+			.destroy_vars()
+			.await
+			.contains(&("other".into(), SmolStr::default()))
+			.xpect_true();
+	}
 }

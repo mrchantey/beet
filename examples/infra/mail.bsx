@@ -123,6 +123,11 @@ route.
 			     port as the sending domain, so `sender` must name a mailbox that
 			     exists on it rather than the default `news`. -->
 			<MailProbe mailbox="probe" sender_domain="news.example.com" sender="replies"/>
+			<!-- every secret the deploy minted, written into the committed
+			     document below and sealed to the humans listed in the entry's
+			     own `secrets.toml`: the DKIM key is the one thing no redeploy
+			     can re-mint. `beet secrets/restore` is the inverse. -->
+			<SecretsExport document={$secrets_export} bx:cfg="feature:vault"/>
 		</Group>
 		<Group bx:ref="deploy_down">
 			<StackTeardown/>
@@ -130,6 +135,8 @@ route.
 			<Group bx:ref="attach_down"/>
 		</Group>
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
+		<Secrets bx:ref="secrets_export" label="mail-export"
+			path="infra/secrets/mail-example.toml" bx:cfg="feature:vault"/>
 
 		<!-- the network is DECLARED, not assumed: this stack is one public box and
 		     one EBS volume in the same zone, so it says so and emits one subnet.

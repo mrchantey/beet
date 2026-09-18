@@ -2,7 +2,6 @@
 //! archive over the instance's own cloud, and the cold store over the S3 api
 //! at the other vendor's endpoint under the parked token.
 use crate::actions::aws_cli_ext;
-use crate::actions::ssm_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde_json::Value;
@@ -117,25 +116,18 @@ impl ColdStore {
 	/// failure the cold copy exists to close.
 	pub async fn resolve(
 		block: &R2BucketBlock,
+		secrets: &SecretStore,
 		stack: &ResolvedStack,
 	) -> Result<Self> {
-		let region = stack.region();
-		let access_name = block.access_key_secret().name(stack);
-		let secret_name = block.secret_key_secret().name(stack);
-		let access_key = ssm_ext::get(region, &access_name).await?;
-		let secret_key = ssm_ext::get(region, &secret_name).await?;
-		match (access_key, secret_key) {
-			(Some(access_key), Some(secret_key)) => Ok(Self {
-				bucket: block.bucket_name(stack),
-				endpoint: block.endpoint(),
-				access_key,
-				secret_key,
-			}),
-			_ => bevybail!(
-				"no cold credential at {access_name} and {secret_name}: {}",
-				block.missing_credential(stack)
-			),
+		let (access_key, secret_key) =
+			block.parked_pair(secrets, stack).await?;
+		Self {
+			bucket: block.bucket_name(stack),
+			endpoint: block.endpoint(),
+			access_key,
+			secret_key,
 		}
+		.xok()
 	}
 
 	/// An `aws <service>` invocation against the cold endpoint. Region `auto`

@@ -82,11 +82,19 @@ impl terra::Project {
 	/// Build a project from `caller`'s nearest ancestor [`Stack`], the
 	/// resolution every stack verb starts from.
 	pub async fn resolve(caller: &AsyncEntity) -> Result<Self> {
-		caller
-			.with_world(|world, entity| {
-				RenderScope::render(world, entity)?.project()
-			})
-			.await?
+		caller.with_world(Self::resolve_in).await?
+	}
+
+	/// [`resolve`](Self::resolve) with the world in hand: the stack rendered,
+	/// and its secret store attached so a content variable resolves.
+	pub fn resolve_in(world: &mut World, entity: Entity) -> Result<Self> {
+		let secrets = world.with_state::<StackQuery, _>(|stacks| {
+			stacks.secret_store(entity)
+		})?;
+		RenderScope::render(world, entity)?
+			.project()?
+			.with_secret_store(secrets)
+			.xok()
 	}
 }
 
@@ -119,11 +127,7 @@ async fn apply_with_current_ledger(caller: &AsyncEntity) -> Result<String> {
 		.await;
 
 	// rebuild and re-apply with the updated deploy_id
-	let proj = caller
-		.with_world(|world, entity| {
-			RenderScope::render(world, entity)?.project()
-		})
-		.await??;
+	let proj = terra::Project::resolve(caller).await?;
 	info!("re-applying with deploy_id: {target_id}");
 	proj.apply().await
 }

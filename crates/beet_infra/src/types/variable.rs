@@ -1,4 +1,5 @@
 //! Variables for passing values to tofu commands.
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -26,7 +27,7 @@ pub enum VariableValue {
 	Header,
 	/// Collected from the request params, see [`RequestParts::params`].
 	Param,
-	/// Read from AWS parameter store at the named parameter, every time the
+	/// Read from the stack's secret store at the named secret, every time the
 	/// config is rendered.
 	///
 	/// The others are AMBIENT: a pipeline step supplies them and an empty
@@ -38,10 +39,10 @@ pub enum VariableValue {
 	/// "this key is revoked", so every message the domain signs fails.
 	///
 	/// Hence: no default, resolved by every verb that renders, and a hard error
-	/// when the parameter is absent.
-	Ssm(SmolStr),
-	/// [`Ssm`](Self::Ssm) for a resource whose ABSENCE is a legal state: the
-	/// parameter not existing resolves to empty rather than refusing, and the
+	/// when the secret is absent.
+	Secret(SecretRef),
+	/// [`Secret`](Self::Secret) for a resource whose ABSENCE is a legal state:
+	/// the secret not existing resolves to empty rather than refusing, and the
 	/// block reading it emits nothing for empty (a `count` on the value).
 	///
 	/// The case: a `TLSA` pinning the certificate a server serves. Nothing
@@ -51,7 +52,7 @@ pub enum VariableValue {
 	/// renders reads it, so a `plan` is truthful) and still no terraform
 	/// default, so a bare invocation outside these verbs refuses rather than
 	/// withdrawing the record.
-	SsmOptional(SmolStr),
+	SecretOptional(SecretRef),
 }
 
 impl Variable {
@@ -91,25 +92,22 @@ impl Variable {
 		}
 	}
 
-	/// Create a variable read from AWS parameter store, see
-	/// [`VariableValue::Ssm`]. `parameter` is the full parameter name.
-	pub fn ssm(key: impl Into<SmolStr>, parameter: impl Into<SmolStr>) -> Self {
+	/// Create a variable read from the stack's secret store, see
+	/// [`VariableValue::Secret`].
+	pub fn secret(key: impl Into<SmolStr>, secret: SecretRef) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::Ssm(parameter.into()),
+			value: VariableValue::Secret(secret),
 			sensitive: false,
 		}
 	}
 
-	/// Create a variable read from AWS parameter store whose absence resolves
-	/// to empty, see [`VariableValue::SsmOptional`].
-	pub fn ssm_optional(
-		key: impl Into<SmolStr>,
-		parameter: impl Into<SmolStr>,
-	) -> Self {
+	/// Create a variable read from the stack's secret store whose absence
+	/// resolves to empty, see [`VariableValue::SecretOptional`].
+	pub fn secret_optional(key: impl Into<SmolStr>, secret: SecretRef) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::SsmOptional(parameter.into()),
+			value: VariableValue::SecretOptional(secret),
 			sensitive: false,
 		}
 	}
@@ -120,28 +118,30 @@ impl Variable {
 	pub fn is_content(&self) -> bool {
 		matches!(
 			self.value,
-			VariableValue::Ssm(_) | VariableValue::SsmOptional(_)
+			VariableValue::Secret(_) | VariableValue::SecretOptional(_)
 		)
 	}
 
-	/// Whether an absent parameter resolves to empty rather than refusing,
-	/// see [`VariableValue::SsmOptional`].
+	/// Whether an absent secret resolves to empty rather than refusing,
+	/// see [`VariableValue::SecretOptional`].
 	pub fn absent_is_empty(&self) -> bool {
-		matches!(self.value, VariableValue::SsmOptional(_))
+		matches!(self.value, VariableValue::SecretOptional(_))
 	}
 
-	/// The parameter store name this variable reads, if it is an
-	/// [`Ssm`](VariableValue::Ssm) or [`SsmOptional`](VariableValue::SsmOptional)
-	/// one.
+	/// The secret this variable reads, if it is a
+	/// [`Secret`](VariableValue::Secret) or
+	/// [`SecretOptional`](VariableValue::SecretOptional) one.
 	///
-	/// The READ itself belongs to the deploy side (`terra::Project`), not here:
-	/// this type is compiled into every build that describes infrastructure,
-	/// including the deployed binary, which links no aws bindings at all. A
-	/// declaration should not drag in the machinery that acts on it.
-	pub fn ssm_parameter(&self) -> Option<&str> {
+	/// The READ itself belongs to the deploy side (`terra::Project`, through
+	/// the stack's [`SecretStore`](crate::prelude::StackQuery::secret_store)),
+	/// not here: this type is compiled into every build that describes
+	/// infrastructure, including the deployed binary, which links no
+	/// provider at all. A declaration should not drag in the machinery that
+	/// acts on it.
+	pub fn secret_ref(&self) -> Option<&SecretRef> {
 		match &self.value {
-			VariableValue::Ssm(parameter)
-			| VariableValue::SsmOptional(parameter) => Some(parameter.as_str()),
+			VariableValue::Secret(secret)
+			| VariableValue::SecretOptional(secret) => Some(secret),
 			_ => None,
 		}
 	}
@@ -159,17 +159,18 @@ impl Variable {
 	///
 	/// The request-bound counterpart of [`resolve_for_render`](Self::resolve_for_render),
 	/// used by a deploy pipeline where an earlier step has supplied the ambient
-	/// values as params. An [`Ssm`](VariableValue::Ssm) variable is not
-	/// resolvable from a request and is skipped here; the caller resolves it
-	/// through `resolve_for_render`.
+	/// values as params. A [`Secret`](VariableValue::Secret) variable is not
+	/// resolvable from a request and is an error here; the render resolves it
+	/// through the stack's secret store.
 	pub fn resolve_value(&self, request: &RequestParts) -> Result<SmolStr> {
 		match &self.value {
 			VariableValue::Fixed(value) => Ok(value.clone()),
-			VariableValue::Ssm(parameter)
-			| VariableValue::SsmOptional(parameter) => bevybail!(
-				"variable `{}` reads parameter store `{parameter}` and is not \
-				resolvable from a request",
-				self.key
+			VariableValue::Secret(secret)
+			| VariableValue::SecretOptional(secret) => bevybail!(
+				"variable `{}` reads secret `{}` and is not resolvable from a \
+				request",
+				self.key,
+				secret.label()
 			),
 			VariableValue::ProcessEnv => env_ext::var(self.key.as_str())
 				.map(SmolStr::new)
@@ -283,19 +284,30 @@ mod test {
 			.xpect_eq(Some("".into()));
 	}
 
-	/// Both parameter store flavours are content, so every verb that renders
-	/// resolves them and neither carries a terraform default; only the
-	/// optional one lets an absent parameter through as empty.
+	/// Both secret flavours are content, so every verb that renders resolves
+	/// them and neither carries a terraform default; only the optional one
+	/// lets an absent secret through as empty.
 	#[beet_core::test]
-	fn optional_ssm_is_content_without_a_default() {
-		let optional = Variable::ssm_optional("mail_tlsa", "/app/stage/tlsa");
+	fn optional_secret_is_content_without_a_default() {
+		let optional =
+			Variable::secret_optional("mail_tlsa", SecretRef::new("tlsa"));
 		optional.is_content().xpect_true();
 		optional.absent_is_empty().xpect_true();
 		optional.tf_declaration().default.xpect_eq(None);
-		optional.ssm_parameter().xpect_eq(Some("/app/stage/tlsa"));
-		Variable::ssm("dkim", "/app/stage/dkim")
+		optional
+			.secret_ref()
+			.unwrap()
+			.label()
+			.as_str()
+			.xpect_eq("tlsa");
+		Variable::secret("dkim", SecretRef::new("dkim"))
 			.absent_is_empty()
 			.xpect_false();
+		optional
+			.resolve_value(&RequestParts::default())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("secret `tlsa`");
 	}
 
 	// `sensitive` is omitted rather than declared false, so the emitted json is

@@ -151,11 +151,11 @@ impl Default for StalwartBlock {
 impl Block for StalwartBlock {
 	fn label(&self) -> &SmolStr { &self.label }
 
-	/// The DANE pin, when declared: read from parameter store by every render,
-	/// empty until `MailDane` has parked one.
-	fn variables(&self, stack: &ResolvedStack) -> Vec<Variable> {
+	/// The DANE pin, when declared: read from the secret store by every
+	/// render, empty until `MailDane` has parked one.
+	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
 		match self.dane {
-			true => vec![self.tlsa_variable(stack)],
+			true => vec![self.tlsa_variable()],
 			false => Vec::new(),
 		}
 	}
@@ -381,11 +381,8 @@ impl StalwartBlock {
 
 	/// The tofu variable the pin arrives as, ie `tlsa_mail`. Optional content:
 	/// absent publishes nothing, see [`dane`](Self::dane).
-	pub fn tlsa_variable(&self, stack: &ResolvedStack) -> Variable {
-		Variable::ssm_optional(
-			self.tlsa_variable_key(),
-			self.tlsa_secret().name(stack),
-		)
+	pub fn tlsa_variable(&self) -> Variable {
+		Variable::secret_optional(self.tlsa_variable_key(), self.tlsa_secret())
 	}
 
 	fn tlsa_variable_key(&self) -> String {
@@ -866,12 +863,24 @@ impl StalwartBlock {
 				..default()
 			},
 		);
+		// the pair, parked as the apply derives it and rotated by replacing
+		// the access key, which the same apply re-parks
+		let rotation = Rotation::replace(key.address());
 		let user_param = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("ses-smtp-user")),
 			AwsSsmParameterDetails {
 				name: self.ses_smtp_user_secret_name(stack).into(),
 				r#type: "SecureString".into(),
 				value: Some(key.field_ref("id").into()),
+				description: Some(
+					SecretRef::description(
+						Some(
+							"ses smtp username, ie the sending user's access key id",
+						),
+						Some(&rotation),
+					)
+					.into(),
+				),
 				..default()
 			},
 		);
@@ -881,6 +890,13 @@ impl StalwartBlock {
 				name: self.ses_smtp_password_secret_name(stack).into(),
 				r#type: "SecureString".into(),
 				value: Some(key.field_ref("ses_smtp_password_v4").into()),
+				description: Some(
+					SecretRef::description(
+						Some("ses smtp password, derived from it by terraform"),
+						Some(&rotation),
+					)
+					.into(),
+				),
 				..default()
 			},
 		);
@@ -1174,7 +1190,7 @@ impl StalwartBlock {
 		config: &mut terra::Config,
 		dns: &DnsProvider,
 	) -> Result {
-		let variable = self.tlsa_variable(stack);
+		let variable = self.tlsa_variable();
 		config.ensure_variable(
 			variable.key().to_string(),
 			variable.tf_declaration(),
@@ -2140,6 +2156,16 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains(".ses_smtp_password_v4}");
+		// both rotate by replacing the access key, and say so
+		for param in [&user, &password] {
+			SecretRef::parse_description(
+				param["description"].as_str().unwrap(),
+			)
+			.1
+			.unwrap()
+			.to_string()
+			.xpect_starts_with("replace:aws_iam_access_key.");
+		}
 		// the sending user may send raw mail, and do nothing else
 		let policy =
 			config.to_json().into_json()["resource"]["aws_iam_user_policy"]

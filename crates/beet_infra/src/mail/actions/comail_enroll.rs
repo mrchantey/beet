@@ -42,27 +42,27 @@ impl ComailEnroll {
 			.xok()
 	}
 
-	/// What to do about a domain whose parameters are not all parked: the
-	/// missing names, what each holds, and the step that fills them.
+	/// What to do about a domain whose secrets are not all parked: the
+	/// missing addresses, what each holds, and the step that fills them.
 	///
 	/// Composed here rather than inline so the instructions and the names they
 	/// print come off [`ComailRelay::secrets`], which is also what the
-	/// credential read uses: a hand-written second copy of a parameter name is
+	/// credential read uses: a hand-written second copy of a secret label is
 	/// the drift this exists to prevent, and its failure mode is a `535` three
 	/// minutes into a provision.
 	pub fn missing_message(
 		domain: &str,
 		host: &str,
-		region: &str,
+		store: &str,
 		missing: &[String],
 	) -> String {
 		format!(
-			"'{domain}' relays through comail but {} of its 5 parameters are \
-			not parked:\n{}\n\nEnrol the domain at https://{host}, signing in \
-			with the atproto account it belongs to, then park each value from \
-			the response with `aws ssm put-parameter --type SecureString \
-			--name <name> --value <value> --region {region}`. One domain per \
-			DID, and a subdomain is a separate domain.",
+			"'{domain}' relays through comail but {} of its 5 secrets are not \
+			parked in the stack's secret store ({store}):\n{}\n\nEnrol the \
+			domain at https://{host}, signing in with the atproto account it \
+			belongs to, then park each value from the response at the address \
+			named above. One domain per DID, and a subdomain is a separate \
+			domain.",
 			missing.len(),
 			missing.join("\n")
 		)
@@ -134,7 +134,6 @@ pub async fn ComailEnroll(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
-	let region = mail.stack.region().clone();
 
 	let mut input = cx.input;
 	let mut checked = 0usize;
@@ -149,10 +148,10 @@ pub async fn ComailEnroll(
 		let mut values = Vec::new();
 		let mut missing = Vec::new();
 		for (secret, holds) in ComailRelay::secrets(&slug) {
-			let name = secret.name(&mail.stack);
-			match ssm_ext::get(&region, &name).await? {
+			let address = mail.secrets.address(&mail.stack, &secret);
+			match mail.secrets.get(&mail.stack, &secret).await? {
 				Some(value) if !value.is_empty() => values.push(value),
-				_ => missing.push(format!("  {name}  ({holds})")),
+				_ => missing.push(format!("  {address}  ({holds})")),
 			}
 		}
 		if !missing.is_empty() {
@@ -161,7 +160,7 @@ pub async fn ComailEnroll(
 				ComailEnroll::missing_message(
 					domain.domain(),
 					comail.host(),
-					&region,
+					&mail.secrets.describe(),
 					&missing
 				)
 			);
@@ -282,7 +281,7 @@ mod tests {
 		ComailEnroll::missing_message(
 			"news.example.com",
 			ComailRelay::HOST,
-			"us-west-2",
+			"ssm (us-west-2)",
 			&missing[..2],
 		)
 		.as_str()
@@ -290,8 +289,7 @@ mod tests {
 		.xpect_contains("/beetmash/prod/comail-did-news-example-com")
 		.xpect_contains("the enrolled DID")
 		.xpect_contains("Enrol the domain at https://smtp.atmos.email")
-		.xpect_contains("aws ssm put-parameter")
-		.xpect_contains("--region us-west-2")
+		.xpect_contains("secret store (ssm (us-west-2))")
 		.xpect_contains("a subdomain is a separate domain");
 	}
 

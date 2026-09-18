@@ -201,7 +201,7 @@ pub async fn MailProbe(
 	let sender_domain = mail.domain_named(&sender_domain)?;
 	let from = format!("{}@{}", sender, sender_domain.domain());
 
-	// the same parameter `StalwartProvision` minted the account with, so the
+	// the same secret `StalwartProvision` minted the account with, so the
 	// probe never holds a credential of its own.
 	let secret = AccountPlan::secret_ref(
 		mail.mail_box.label(),
@@ -209,14 +209,15 @@ pub async fn MailProbe(
 		&domain.slug(),
 	);
 	let region = mail.stack.region().clone();
-	let password = ssm_ext::get(&region, &secret.name(&mail.stack))
-		.await?
-		.ok_or_else(|| {
-			bevyhow!(
+	let password = mail
+		.secrets
+		.require(&mail.stack, &secret, || {
+			format!(
 				"no credential for {address}: <StalwartProvision/> mints it, so \
 				run the provision before the probe"
 			)
-		})?;
+		})
+		.await?;
 
 	// one token per run, so both legs and the mailbox poll agree on which
 	// message this is.
@@ -340,7 +341,6 @@ async fn send_inbound(
 			send_inbound_comail(
 				mail,
 				comail,
-				region,
 				sender_domain,
 				from,
 				address,
@@ -361,7 +361,7 @@ async fn send_inbound(
 				and its authentication verdicts are this box judging itself",
 				sender_domain.domain()
 			);
-			send_inbound_local(mail, region, from, address, token).await?;
+			send_inbound_local(mail, from, address, token).await?;
 			Ok(true)
 		}
 	}
@@ -416,24 +416,21 @@ async fn send_inbound_ses(
 async fn send_inbound_comail(
 	mail: &MailStack,
 	comail: &ComailRelay,
-	region: &str,
 	sender_domain: &MailDomainBlock,
 	from: &str,
 	address: &str,
 	token: &str,
 ) -> Result<bool> {
 	let slug = sender_domain.slug();
-	let credential = |secret: SecretRef| {
-		let name = secret.name(&mail.stack);
-		async move {
-			ssm_ext::get(region, &name).await?.ok_or_else(|| {
-				bevyhow!(
-					"{name} does not exist, so the probe cannot send as \
-					'{}': run <ComailEnroll/>",
+	let credential = |secret: SecretRef| async move {
+		mail.secrets
+			.require(&mail.stack, &secret, || {
+				format!(
+					"the probe cannot send as '{}': run <ComailEnroll/>",
 					sender_domain.domain()
 				)
 			})
-		}
+			.await
 	};
 	let did = credential(ComailRelay::did_secret(&slug)).await?;
 	let api_key = credential(ComailRelay::api_key_secret(&slug)).await?;
@@ -486,7 +483,6 @@ async fn send_inbound_comail(
 /// which is the only send path a stack with no relay has.
 async fn send_inbound_local(
 	mail: &MailStack,
-	region: &str,
 	from: &str,
 	address: &str,
 	token: &str,
@@ -498,14 +494,16 @@ async fn send_inbound_local(
 		localpart,
 		&MailDomainBlock::slug_of(sender_domain),
 	);
-	let name = secret.name(&mail.stack);
-	let password = ssm_ext::get(region, &name).await?.ok_or_else(|| {
-		bevyhow!(
-			"no credential for {from}: a direct-delivering stack sends its \
-			own inbound leg, so '{localpart}' must be a declared mailbox on \
-			'{sender_domain}' that <StalwartProvision/> has minted"
-		)
-	})?;
+	let password = mail
+		.secrets
+		.require(&mail.stack, &secret, || {
+			format!(
+				"no credential for {from}: a direct-delivering stack sends its \
+				own inbound leg, so '{localpart}' must be a declared mailbox on \
+				'{sender_domain}' that <StalwartProvision/> has minted"
+			)
+		})
+		.await?;
 	let host = mail.mail_box.hostname();
 	let body = format!(
 		"From: <{from}>\r\n\

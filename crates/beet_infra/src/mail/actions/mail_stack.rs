@@ -27,6 +27,10 @@ pub struct MailStack {
 	/// stack. Resolved by the same lookup the render used, so the push, the
 	/// probe and the drill read the bucket the box actually writes.
 	pub cold: Option<R2BucketBlock>,
+	/// The store every secret of this stack lives in, resolved once so the
+	/// provision that mints a credential and the probe that signs in with
+	/// it read the same place.
+	pub secrets: SecretStore,
 }
 
 impl MailStack {
@@ -34,7 +38,7 @@ impl MailStack {
 	/// from it: the one entry every mail verb reaches the stack through, shaped
 	/// to pass directly to [`AsyncEntity::with_world`].
 	pub fn resolve(world: &mut World, entity: Entity) -> Result<MailStack> {
-		let project = RenderScope::render(world, entity)?.project()?;
+		let project = terra::Project::resolve_in(world, entity)?;
 		world.with_state::<MailQuery, _>(|query| query.resolve(entity, project))
 	}
 
@@ -210,6 +214,7 @@ impl MailQuery<'_, '_> {
 			)?
 			.cloned();
 		Ok(MailStack {
+			secrets: project.secret_store()?.clone(),
 			project,
 			stack,
 			mail_box,

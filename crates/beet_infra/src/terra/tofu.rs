@@ -146,6 +146,26 @@ pub async fn apply_with_vars(
 		.await
 }
 
+/// Apply with every resource in `replaces` (addresses) forced to be
+/// destroyed and recreated: how a terraform-derived secret rotates, since
+/// the same apply re-parks what the new resource derives.
+pub async fn apply_replacing(
+	dir: &AbsPath,
+	vars: &[(SmolStr, SmolStr)],
+	replaces: &[String],
+) -> Result<String> {
+	let mut args: Vec<SmolStr> = vec!["apply".into(), "-auto-approve".into()];
+	args.extend(var_args(vars));
+	for resource in replaces {
+		args.push(format!("-replace={resource}").into());
+	}
+	tofu_process()
+		.with_cwd(dir.clone())
+		.with_args(args)
+		.run_async_stdout()
+		.await
+}
+
 /// Show the current state. `vars` carries anything required to read it, eg a
 /// [`StateEncryption`] passphrase.
 pub async fn show(

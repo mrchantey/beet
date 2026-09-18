@@ -200,9 +200,20 @@ impl Plugin for InfraPlugin {
 				),
 			);
 
-		// the parameter-store composition every generated credential is named
-		// by, ie the `<EnsureSecret secret="db-password"/>` attribute.
+		// the secret label every generated credential is named by, ie the
+		// `<EnsureSecret secret="db-password"/>` attribute.
 		app.register_type::<crate::prelude::SecretRef>();
+
+		// the secrets document surface (`<Secrets/>`, the verbs), the secret
+		// store declarations (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`)
+		// and the document provider's attach, on every target the seam
+		// compiles; parameter store's attach drives the aws cli and is
+		// registered with the deploy actions below.
+		#[cfg(feature = "vault")]
+		app.init_plugin::<beet_net::prelude::SecretsPlugin>()
+			.register_type::<crate::prelude::SsmSecrets>()
+			.register_type::<crate::prelude::DocumentSecrets>()
+			.add_observer(crate::types::attach_document_secrets);
 
 		// the zone a block publishes into, a field of every block that names a
 		// hostname. Registered wherever the module compiles, since a block
@@ -293,9 +304,17 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
 		// the create-if-missing secret step, which every stack holding a
-		// generated credential runs before its apply.
+		// generated credential runs before its apply, and the parameter store
+		// provider an `<SsmSecrets/>` declaration attaches.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::EnsureSecret>();
+		app.register_type::<crate::prelude::EnsureSecret>()
+			.add_observer(crate::actions::attach_ssm_secrets);
+		// the store's export into a secrets document, the restore back out
+		// of one, and a human's removal, in every deploy build
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::SecretsExport>()
+			.register_type::<crate::prelude::SecretsRestore>()
+			.register_type::<crate::prelude::SecretsRevoke>();
 
 		// the mail stack's deploy verbs: the sovereign signing key minted
 		// before the apply that publishes it, the comail enrolment check that
@@ -330,10 +349,9 @@ impl Plugin for InfraPlugin {
 			// the drill's copy selector, so `source_snapshot="Cold"` resolves
 			// the variant rather than silently keeping the archive default.
 			.register_type::<crate::prelude::SnapshotSource>()
-			// the cold copy's three verbs: the export that encrypts the
-			// secrets into it, the push that runs the box's timer now, and the
-			// probe that reads all three prefixes back.
-			.register_type::<crate::prelude::MailSecretsExport>()
+			// the cold copy's two verbs: the push that runs the box's timer
+			// now, and the probe that reads all three prefixes back (the
+			// export into it is the generic `<SecretsExport/>`).
 			.register_type::<crate::prelude::MailColdPush>()
 			.register_type::<crate::prelude::MailColdProbe>()
 			.register_type::<crate::prelude::ZoneAudit>()
@@ -666,8 +684,8 @@ mod test {
 	/// The cold copy authors as one bucket tag beside the box that names it,
 	/// and its verbs as tags naming what they carry: the drill's copy
 	/// selector by variant (a misspelling errors at build rather than
-	/// restoring the archive it was told not to), the export's recipients,
-	/// and the probe's window as a duration string.
+	/// restoring the archive it was told not to), the export's target and
+	/// series flag, and the probe's window as a duration string.
 	#[beet_core::test]
 	fn the_cold_copy_spawns_by_tag() {
 		let mut world = spawn(
@@ -680,7 +698,8 @@ mod test {
 					ssh_public_key="ssh-ed25519 AAAA pete"/>
 				<MailRestoreDrill source_domain="beetmash.com" mailbox="probe"
 					source_snapshot="Cold"/>
-				<MailSecretsExport recipients={["age1example"]}/>
+				<Secrets bx:ref="cold_export" label="mail-cold" path="secrets/export.toml"/>
+				<SecretsExport document={$cold_export} dated=true/>
 				<MailColdProbe max_age="12h"/>
 			</Fragment>"#,
 		);
@@ -703,13 +722,13 @@ mod test {
 			.unwrap()
 			.source_snapshot
 			.xpect_eq(SnapshotSource::Cold);
-		world
-			.query::<&MailSecretsExport>()
-			.single(&world)
-			.unwrap()
-			.recipients[0]
-			.as_str()
-			.xpect_eq("age1example");
+		let export = world.query::<&SecretsExport>().single(&world).unwrap();
+		export.dated.xpect_true();
+		export.group.as_str().xpect_eq("default");
+		// the target resolves to the declaration entity
+		let declared = world.entity(export.document).get::<Secrets>().unwrap();
+		declared.label.as_str().xpect_eq("mail-cold");
+		declared.path.as_str().xpect_eq("secrets/export.toml");
 		world
 			.query::<&MailColdProbe>()
 			.single(&world)

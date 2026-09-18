@@ -11,6 +11,12 @@ mod prefix_expiry;
 mod resource_scope;
 mod s3_storage_class;
 mod secret_ref;
+// the provider-agnostic seam a stack's secrets live behind, and the document
+// provider that serves it on every target
+#[cfg(feature = "vault")]
+mod document_secret_store;
+#[cfg(feature = "vault")]
+mod secret_store;
 mod stack;
 mod stack_backend;
 mod state_encryption;
@@ -21,11 +27,15 @@ pub use access_grant::*;
 pub use artifacts::*;
 pub use build_artifact::*;
 pub use deployment::*;
+#[cfg(feature = "vault")]
+pub use document_secret_store::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;
 pub use resource_scope::*;
 pub use s3_storage_class::*;
 pub use secret_ref::*;
+#[cfg(feature = "vault")]
+pub use secret_store::*;
 pub use stack::*;
 pub use stack_backend::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

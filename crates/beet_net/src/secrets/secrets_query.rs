@@ -88,6 +88,15 @@ impl SecretsQuery<'_, '_> {
 		}
 	}
 
+	/// The entry's own document, where its humans are listed: the
+	/// declaration labelled [`Secrets::DEFAULT_LABEL`], else the default
+	/// ([`resolve_default`](Self::resolve_default)). An export copies its
+	/// recipients from here.
+	pub fn resolve_entry(&self, caller: Entity) -> Result<SecretsHandle> {
+		self.resolve_label(Secrets::DEFAULT_LABEL)
+			.or_else(|_| self.resolve_default(caller))
+	}
+
 	/// The declared document labelled `label`, an error naming the declared
 	/// labels otherwise.
 	pub fn resolve_label(&self, label: &str) -> Result<SecretsHandle> {
@@ -166,7 +175,7 @@ impl SecretsQuery<'_, '_> {
 
 	/// The store a relative document path resolves in: the nearest ancestor
 	/// `BlobStore` of `entity`, else the repo store wherever it sits.
-	fn entry_store(&self, entity: Entity) -> Result<BlobStore> {
+	pub fn entry_store(&self, entity: Entity) -> Result<BlobStore> {
 		self.ancestor_stores
 			.get(entity)
 			.ok()
@@ -192,6 +201,15 @@ impl SecretsHandle {
 		caller
 			.with_state::<SecretsQuery, _>(move |entity, query| {
 				query.resolve(entity, selector.as_deref())
+			})
+			.await?
+	}
+
+	/// The entry's own document, see [`SecretsQuery::resolve_entry`].
+	pub async fn resolve_entry(caller: &AsyncEntity) -> Result<Self> {
+		caller
+			.with_state::<SecretsQuery, _>(|entity, query| {
+				query.resolve_entry(entity)
 			})
 			.await?
 	}

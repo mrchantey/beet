@@ -75,6 +75,10 @@ pub struct SecretRecord {
 	/// The provider address the value was exported from, on an export.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
+	/// How the secret is rotated, declared by whatever minted it; absent on
+	/// a hand-kept record.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub rotation: Option<Rotation>,
 }
 
 impl SecretRecord {

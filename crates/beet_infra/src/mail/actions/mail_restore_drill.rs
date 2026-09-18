@@ -193,7 +193,9 @@ pub async fn MailRestoreDrill(
 			key
 		}
 		SnapshotSource::Cold => {
-			let cold = ColdStore::resolve(mail.cold_store()?, &source).await?;
+			let cold =
+				ColdStore::resolve(mail.cold_store()?, &mail.secrets, &source)
+					.await?;
 			let key =
 				newest_key(cold.list(&prefix).await?, &cold.bucket, &prefix)?;
 			info!(
@@ -321,16 +323,17 @@ async fn assert_restored(
 		mail.mail_box.label(),
 		localpart,
 		&MailDomainBlock::slug_of(source_domain),
-	)
-	.name(source);
-	let password = ssm_ext::get(&mail.stack.region(), &secret)
-		.await?
-		.ok_or_else(|| {
-			bevyhow!(
-				"no credential at {secret}: the drill authenticates as one of \
-				the SOURCE stage's accounts, so its parameters must still exist"
-			)
-		})?;
+	);
+	// the SOURCE stage's secret through this stack's store, which serves
+	// every stack of its region
+	let password = mail
+		.secrets
+		.require(source, &secret, || {
+			"the drill authenticates as one of the SOURCE stage's accounts, so \
+			its secrets must still exist"
+				.to_string()
+		})
+		.await?;
 
 	let host =
 		format!("{}.{source_domain}", MailDomainBlock::AUTOCONFIG_LABELS[0]);

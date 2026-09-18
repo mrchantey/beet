@@ -686,6 +686,49 @@ impl AccountPlan {
 		))
 	}
 
+	/// The note a mailbox credential is stored with, so a listing or an
+	/// export says what it opens: composed here and read back by
+	/// `MailCredentials`.
+	pub fn mailbox_note(admin: bool) -> String {
+		match admin {
+			true => "mailbox, administrator".to_string(),
+			false => "mailbox".to_string(),
+		}
+	}
+
+	/// The note the server's own administrator credential is stored with.
+	pub fn admin_note(hostname: &str) -> String {
+		format!("administers {hostname}")
+	}
+
+	/// The note this account's credential is stored with.
+	pub fn note(&self) -> String { Self::mailbox_note(self.admin) }
+
+	/// How a mailbox credential rotates: delete the secret and the next
+	/// provision mints a fresh one and sets it on the account
+	/// (`converge_account`), so every client configured against the mailbox
+	/// re-enters it.
+	pub fn rotation() -> Rotation { Rotation::Remint }
+
+	/// How the server's own administrator credential rotates: by hand, since
+	/// provision signs in with it to do anything at all.
+	pub fn admin_rotation() -> Rotation {
+		Rotation::manual(
+			"set a new password on the administrator through the management \
+			api as another admin, then overwrite the entry",
+		)
+	}
+
+	/// The credential half of the account object alone, for setting a
+	/// re-minted password on an account that exists.
+	pub fn credentials_patch(password: &str) -> Value {
+		json!({
+			"credentials": {
+				"0": { "@type": "Password", "secret": password }
+			}
+		})
+	}
+
 	fn new(
 		mailbox: &Mailbox,
 		domain: &MailDomainBlock,
@@ -738,9 +781,8 @@ impl AccountPlan {
 				.collect::<serde_json::Map<_, _>>(),
 		});
 		if let Some(password) = password {
-			object["credentials"] = json!({
-				"0": { "@type": "Password", "secret": password }
-			});
+			object["credentials"] =
+				Self::credentials_patch(password)["credentials"].clone();
 		}
 		object
 	}

@@ -346,16 +346,14 @@ impl MailDomainBlock {
 	/// `dkim_stalwart_beetmash_com`. Underscores rather than the slug's
 	/// hyphens: `${var.a-b}` is a subtraction in HCL, not a name.
 	///
-	/// Reads parameter store directly rather than waiting for a pipeline step to
-	/// hand it over. This value is the CONTENT of the selector record, and the
-	/// empty string is not a neutral placeholder for it: `p=` is DKIM's spelling
-	/// of "revoked", so a bare `plan` or `apply` that fell back to a default
-	/// would print, and then publish, the revocation of a live signing key.
-	pub fn dkim_public_key_variable(&self, stack: &ResolvedStack) -> Variable {
-		Variable::ssm(
-			self.dkim_variable_key(),
-			self.dkim_public_secret().name(stack),
-		)
+	/// Reads the stack's secret store directly rather than waiting for a
+	/// pipeline step to hand it over. This value is the CONTENT of the
+	/// selector record, and the empty string is not a neutral placeholder for
+	/// it: `p=` is DKIM's spelling of "revoked", so a bare `plan` or `apply`
+	/// that fell back to a default would print, and then publish, the
+	/// revocation of a live signing key.
+	pub fn dkim_public_key_variable(&self) -> Variable {
+		Variable::secret(self.dkim_variable_key(), self.dkim_public_secret())
 	}
 
 	/// The record `DKIM_SELECTOR` publishes at, ie
@@ -492,9 +490,9 @@ impl Block for MailDomainBlock {
 	///
 	/// The relay-supplied variables are NOT here, because a block cannot see
 	/// the component composed beside it: [`declare`](Self::declare) adds them.
-	fn variables(&self, stack: &ResolvedStack) -> Vec<Variable> {
+	fn variables(&self, _stack: &ResolvedStack) -> Vec<Variable> {
 		match self.records.proves_identity() {
-			true => vec![self.dkim_public_key_variable(stack)],
+			true => vec![self.dkim_public_key_variable()],
 			false => Vec::new(),
 		}
 	}

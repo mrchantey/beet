@@ -102,9 +102,8 @@ pub async fn ComailDeliverability(
 			continue;
 		};
 		let slug = domain.slug();
-		let did = read(&mail, &region, ComailRelay::did_secret(&slug)).await?;
-		let api_key =
-			read(&mail, &region, ComailRelay::api_key_secret(&slug)).await?;
+		let did = read(&mail, ComailRelay::did_secret(&slug)).await?;
+		let api_key = read(&mail, ComailRelay::api_key_secret(&slug)).await?;
 
 		let response = Request::get(comail.deliverability_url(&did))
 			.with_auth_bearer(&api_key)
@@ -139,16 +138,13 @@ pub async fn ComailDeliverability(
 	Pass(cx.input).xok()
 }
 
-/// One of the enrolment parameters, failing with the step that fills it.
-async fn read(
-	mail: &MailStack,
-	region: &str,
-	secret: SecretRef,
-) -> Result<String> {
-	let name = secret.name(&mail.stack);
-	ssm_ext::get(region, &name).await?.ok_or_else(|| {
-		bevyhow!("{name} does not exist: run <ComailEnroll/>, which checks it")
-	})
+/// One of the enrolment secrets, failing with the step that fills it.
+async fn read(mail: &MailStack, secret: SecretRef) -> Result<String> {
+	mail.secrets
+		.require(&mail.stack, &secret, || {
+			"run <ComailEnroll/>, which checks it".to_string()
+		})
+		.await
 }
 
 #[cfg(test)]
