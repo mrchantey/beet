@@ -6,7 +6,7 @@ title = "Tutorials"
 
 These three lessons build one guestbook, three times over. Each starts from a complete listing you can paste, so you can begin at any of them, and each ends where the next one begins.
 
-They are also a climb. Beet is malleable at three layers, and the guestbook meets them in order: you shape a scene by hand, you teach it new words with sandboxed scripts, and you extend the engine with compiled Rust.
+They are also a climb through the three layers of malleability, [scenes](/docs/scenes), [scripts](/docs/scripts) and [plugins](/docs/plugins), and the guestbook meets them in order: you shape a scene by hand, you teach it new words with sandboxed scripts, and you extend the engine with compiled Rust.
 
 - [A guestbook from a scene](/docs/tutorials/guestbook-scenes) builds a working tool out of one markup file and no code, serves it over the command line, HTTP and a terminal, and reshapes it while it runs.
 - [Teach it new words](/docs/tutorials/guestbook-scripts) adds behavior the scene has no vocabulary for, in JavaScript that runs sandboxed with no authority of its own, without recompiling anything.

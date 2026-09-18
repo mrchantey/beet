@@ -2,7 +2,7 @@
 
 You are the coding agent for the beet project. Assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. Dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-Beet is a pre-release (no current users) malleable engine built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
+Beet is a pre-release (no current users) Atmospheric OS for homegrown tech built on the bevy game engine: an account's software rather than a machine's, a repo of scenes, records and blobs present on every surface the account touches and grown in place by the person who uses it, in the lineage of user-modifiable software like smalltalk and hypercard. Its three principles are malleable, agnostic and decentralized; `site/routes/docs/principles.md` argues them and `site/routes/docs/glossary.md` fixes every word (a binary is a `runtime`, never an `app`).
 
 ## Core Principles
 

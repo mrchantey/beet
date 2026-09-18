@@ -1,6 +1,6 @@
 # beet-cli
 
-The `beet` command-line interface: a game engine for tools.
+The `beet` command-line interface: a beet runtime, the binary that runs a repo.
 
 Like a game engine, the binary is unopinionated. It links a library of
 capabilities (registered reflect types) but ships zero behaviour, so opening it

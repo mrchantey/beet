@@ -122,7 +122,7 @@ pub(crate) mod test_fixtures {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		world.insert_resource(PackageConfig {
 			title: "Beet".into(),
-			description: "A malleable engine for sovereign software".into(),
+			description: "An Atmospheric OS for homegrown tech".into(),
 			homepage: homepage.map(Url::coerce),
 			..default()
 		});

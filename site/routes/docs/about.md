@@ -1,6 +1,6 @@
 +++
 title = "About"
-order = 2
+order = 7
 +++
 
 # About
@@ -22,6 +22,7 @@ The ideas behind beet are not new, and it stands in a long line of tools and thi
 - **Seymour Papert and constructionism**: learning is itself an act of creation, we come to understand the world by making things in it. Logo, Lego Mindstorms and [Scratch](https://scratch.mit.edu) brought this to students, and their spirit runs through beet.
 - **Smalltalk and HyperCard**: software as something people reshape, not just run. A beet tool keeps its structure and behavior open as data for the same reason.
 - **[Malleable software](https://www.inkandswitch.com/essay/malleable-software/)**: Ink & Switch's essay names the qualities beet is built around, above all the gentle slope from user to creator.
+- **Identity-native systems**: Urbit and Solid put a person's software and data under their own identity. Beet takes the same aim on an open protocol and a mainstream engine, and runs with neither present.
 - **Game engines**: the tradition of separating capability from behavior, an executable driven entirely by scene files. Beet is built on [Bevy](https://bevy.org), the engine that carries this tradition from microcontrollers to the web.
 
 The reading behind these ideas is collected below, and the [blog](/blog) follows the journey month by month.

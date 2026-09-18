@@ -4,7 +4,7 @@ title = "Crates"
 
 # Crates
 
-Beet is a workspace of small crates, each usable on its own. The top-level `beet` crate simply re-exports them behind feature flags, so an app pulls in only the parts it needs. They layer cleanly: the agent and tooling crates are built from the core ones, not bolted onto them.
+Beet is a workspace of small crates, each usable on its own. The top-level `beet` crate simply re-exports them behind feature flags, so a runtime pulls in only the parts it needs. They layer cleanly: the agent and tooling crates are built from the core ones, not bolted onto them.
 
 A readiness meter marks how settled each crate is:
 
@@ -21,8 +21,8 @@ The foundations every other crate shares.
 | [beet_core](/docs/crates/beet_core) | 🦢 | Cross-platform types, extension traits and the test runner |
 | [beet_net](/docs/crates/beet_net) | 🐣 | Transport-agnostic request/response networking |
 | [beet_action](/docs/crates/beet_action) | 🐣 | Entities as callable async functions |
-| [beet_ui](/docs/crates/beet_ui) | 🐉 | XML-like UI trees rendered to HTML or the terminal |
-| [beet_router](/docs/crates/beet_router) | 🐉 | Transport-agnostic routing for Bevy apps |
+| [beet_ui](/docs/crates/beet_ui) | 🐉 | Interface agnostic ui trees |
+| [beet_router](/docs/crates/beet_router) | 🐉 | Transport-agnostic routing |
 | [beet_infra](/docs/crates/beet_infra) | 🐉 | Infrastructure as code, built on OpenTofu |
 | [beet_async](/docs/crates/beet_async) | 🐉 | Vendored async-world bridge for wasm and exclusive world access |
 
@@ -36,11 +36,11 @@ Behaviors built on `beet_action`: behavior trees, utility AI and agentic systems
 | [beet_spatial](/docs/crates/beet_spatial) | 🐉 | Spatial actions: movement, steering and robotics |
 | [beet_ml](/docs/crates/beet_ml) | 🐉 | Machine learning actions: embeddings and reinforcement learning |
 
-## Apps and tooling
+## Runtimes and tooling
 
 | Crate | Status | What it does |
 |---|---|---|
-| [beet-cli](/docs/crates/beet-cli) | 🐉 | Build, serve and run-wasm helpers for beet apps |
+| [beet-cli](/docs/crates/beet-cli) | 🐉 | The beet runtime and its build, serve and run-wasm commands |
 
 `beet_extra` (extra components and systems for high-level examples and workflows) rounds out the workspace. It is built with beet but is not meant to be depended on directly.
 

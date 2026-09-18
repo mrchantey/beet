@@ -243,4 +243,4 @@ You have extended the engine. The guestbook now has a compiled action beside its
 
 Look back at what stayed still. The guestbook you have at the end of these three lessons is the guestbook you started with: one scene, describing a tool. You shaped it by hand, you taught it new words with scripts, and you extended it with compiled Rust, and at no point did you throw the previous version away and start again. That is the slope these three layers exist to make gentle.
 
-The [Scene Format](/docs/scene-format) page is where that idea goes next: the file you have been editing is a draft of a standard, and it is meant to outgrow beet.
+The [Scene Format](/docs/scenes) page is where that idea goes next: the file you have been editing is a draft of a standard, and it is meant to outgrow beet.

@@ -2,7 +2,7 @@
 name = "beet_ui"
 version.workspace = true
 edition.workspace = true
-description = "Agnostic structured data representations in Bevy ECS"
+description = "Interface agnostic ui trees"
 documentation.workspace = true
 readme = "README.md"
 homepage.workspace = true
@@ -249,4 +249,3 @@ name = "schema"
 path = "tests/schema.rs"
 harness = false
 required-features = ["bsx", "json"]
-

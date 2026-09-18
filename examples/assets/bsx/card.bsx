@@ -1,5 +1,5 @@
 <article class="card">
 	<h1>Beet</h1>
-	<p>A malleable engine for sovereign software.</p>
+	<p>An Atmospheric OS for homegrown tech.</p>
 	<input type="text" name="email" placeholder="you@example.com"/>
 </article>

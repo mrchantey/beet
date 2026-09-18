@@ -194,7 +194,7 @@ stack's state bucket).
 	<PackageConfig
 		title="Beet"
 		app_name="beet-site"
-		description="A malleable engine for sovereign software"
+		description="An Atmospheric OS for homegrown tech"
 		version="0.0.9-dev.16"
 		homepage="https://beet.org"
 		social_image="https://beet.org/assets/branding/social-card.png"

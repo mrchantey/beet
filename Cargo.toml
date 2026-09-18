@@ -41,18 +41,18 @@ strip = true
 version = "0.0.9-dev.16"
 authors = ["Pete Hayman"]
 edition = "2024"
-description = "A malleable engine for sovereign software"
+description = "An Atmospheric OS for homegrown tech"
 documentation = "https://docs.rs/beet"
 readme = "README.md"
 homepage = "https://beet.org"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["malleable-software", "local-first", "cross-platform", "framework", "robotics"]
+keywords = ["atproto", "local-first", "malleable-software", "cross-platform", "operating-system"]
 categories = [
-	"science::robotics",
-	"game-development",
-	"simulation",
 	"wasm",
+	"web-programming",
+	"game-development",
+	"science::robotics",
 	"embedded",
 ]
 publish = false

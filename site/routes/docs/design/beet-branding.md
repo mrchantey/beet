@@ -8,7 +8,7 @@ The deliberately small single reference for the beet brand.
 
 ## Mission
 
-Beet is making all software malleable by establishing fine-grained interoperable malleability standards, and building an engine with them. Apps have capabilities but are driven by json scene files that users own and edit. Beet operates at the application layer of the sovereign stack, complementing DWeb and local-first technologies with standardized malleable software.
+Beet is an Atmospheric OS for homegrown tech, an operating system built around a person rather than a machine. Software is a repo of scenes, records and blobs that belongs to an account, runs on every surface the account touches and is grown in place by the person who uses it. Beet is malleable, agnostic and decentralized, and the atproto integration is what those three principles were always pointing at, which is what Atmospheric means. The [principles](/docs/principles) page argues each, the [glossary](/docs/glossary) fixes the words.
 
 ## Audience
 
@@ -18,19 +18,21 @@ Alex is an intermediate level software engineer working at a consultancy. She is
 
 Alex is skeptical of new frameworks with snake-oil cross-domain claims, but pays attention when open standards are discussed because credible exit is very important to her.
 
-Alex should have understood the importance of the following principles upon viewing the home page:
-1. Fine-grained malleability: 
+Alex should have understood the three principles upon viewing the home page:
+1. Malleable:
 	- ATProto being swappable doesn't make it malleable, adding a button means forking and redeploying a whole client.
-	- Code-first solutions are a sledgehammer, OpenClaw is brittle because it lacks fine-grained malleability
-	- Data-driven software unlocks fine-grained composability
-2. Interoperability:
-	- Different clients operate on the same data (ATProto)
-	- Tools are also defined as data
-	- The Beet engine is seperate from the scene format
+	- Code-first solutions are a sledgehammer, OpenClaw is brittle because it lacks fine-grained malleability.
+	- Scenes, scripts and plugins are a gentle slope, and each stays open while the software runs.
+2. Agnostic:
+	- One repo runs in a tab, a terminal, over ssh and on a robot, and serves sites, games and deploys alike.
+	- Every layer of the stack is swappable, so nothing beet stands on is a lock-in.
+3. Decentralized:
+	- Different clients operate on the same data (ATProto), and the software is data in the same account.
+	- The scene format is separate from the beet runtime, so credible exit reaches the software as well as the data.
 
 ## Brand Archetype
 
-The primary archetype is Creator and the secondary is Everyman, with more edgy Outlaw and Jester energy reserved for beetmash. Peer brands are Raspberry Pi, Scratch and Arduino, not Vercel and Deno. The test for any asset is whether it would look at home next to a Raspberry Pi zine.
+The primary archetype is Creator and the secondary is Everyman. Peer brands are Raspberry Pi, Scratch and Arduino, not Vercel and Deno. The test for any asset is whether it would look at home next to a Raspberry Pi zine.
 
 ## Voice
 
@@ -58,10 +60,11 @@ The voice is playful, folk, warm, humble, peer and movement, all six sliders at 
 
 ## Words
 
-- Owned: malleable, engine, scene, tool, standard, interoperable, sovereign, locked open, harvest, ecosystem.
-- An app is a single binary, which happens to be composed entirely of malleable scenes. The thing a user creates and edits with beet is a scene. A tool is a scene containing definitions for actions to perform on data
+- Owned: Atmospheric, homegrown, repo, scene, record, blob, runtime, action, malleable, agnostic, decentralized, swappable stack, standard, interoperable, sovereign, locked open, harvest, ecosystem.
+- A runtime is a binary that runs repos. The thing a person creates and shares with beet is a scene, a script, a plugin or a runtime, and never an app or a tool: the [glossary](/docs/glossary) is the source of truth for every defined word and its retired predecessors.
+- Malleable and sovereign are qualities beet has, never the noun it is. "Malleable engine" is retired as a self-description.
 - Reserved for beetmash: mash, remix, DJ and breaking red-tape language.
-- Banned: platform and framework as self-description, revolutionize, blazingly, superlatives and hype generally.
+- Banned: app, platform and framework as self-description, revolutionize, blazingly, superlatives and hype generally.
 
 ## Analogies
 
@@ -76,6 +79,8 @@ Headline copy, ie the hero text, taglines and page-opening sentences, is written
 Each entrypoint has one job and its own register: 
 - `site/routes/index.md` The home page is the poster, the broadest audience and the fewest words, hero plus invitation plus proof. 
 - `site/routes/docs/index.md` The docs index is the orientation, where a curious builder forms the mental model. 
+- `site/routes/docs/principles.md`, `stories.md` and `glossary.md` are the source of truth for the framing: every other page cites them rather than restating them.
+- `site/routes/docs/scenes.md`, `scripts.md` and `plugins.md` explain one layer of malleability each and pair with the tutorial of the same layer.
 - `site/routes/docs/about.md` The about page is the story, lineage, name and the beetmash relationship. 
 - `README.md` The README is the workshop door, developer-facing install and run with a link back to the site for the vision.
 

@@ -44,7 +44,7 @@ Beet software grows with your needs, offering a gentle slope from user to tinker
 
 - Your software is records and blobs in a repo that belongs to your account, with your atproto PDS as its home.
 - Local-first by design, so the repo works with no network and syncs when one appears.
-- The [scene format](/docs/scene-format) is built for standardization, so other software can read what you made.
+- The [scene format](/docs/scenes) is built for standardization, so other software can read what you made.
 - Use a git repo as the source of truth if that is how you like to work.
 
 Pete's [Local-First Conf '26 talk](https://youtu.be/eRpMQhOR93U) shows a static site, a web app, a terminal ui, a server, a robot, an infra deploy and an agent harness all running on one beet binary, driven entirely by scenes.
