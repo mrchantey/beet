@@ -7,7 +7,8 @@ order = 6
 
 Below is a list of definitions from the perspective of the beet project.
 
-- **Action.** An entity that behaves like a function, with one action per entity. How behavior is spelled in a scene, from a route handler to a behavior tree node to a deploy step.
+- **Action.** An entity that behaves like a function, with one action per entity. How behavior is spelled in a scene, from a route handler to a behavior tree node to a deploy step. A **provider** is a component whose requirements supply the entity's action, and an **overload** is an extra signature on the same action, which is how one entity answers a request, a behavior tree and a script without a second action.
+- **Actor.** A participant in a thread, a person, a prompt or a model agent on equal footing, an entity whose turn is an action.
 - **Atmosphere.** The ecosystem of people, developers, applications and tools built around the [AT Protocol](https://atproto.com/). Beet is designed for it and runs without it, so a repo on a plain directory today is the same repo on a PDS later.
 - **Blob.** Bytes with a mime type and a path, opaque to beet, replaced whole and never edited in place. A binary or a wasm build is a blob like an image is.
 - **Deploy version.** The versioned copy a deploy publishes, recorded in the ledger. Which blobs are versioned per deploy is per-blob or per-directory metadata.
@@ -29,5 +30,6 @@ Below is a list of definitions from the perspective of the beet project.
 - **Stage.** The environment a deploy targets, `dev` or `prod` for one.
 - **Swappable stack.** Every layer beet stands on, the renderer, the http server, the blob store and the filesystem among them, is an interface with more than one implementation and none privileged. In the spirit of Bevy's plugins and atproto's credible exit.
 - **Template.** Runtime only. The trait and its `#[template]` constructors, compiled Rust that expands into entities when a scene builds. Never a file.
+- **Thread.** A conversation as a scene of actors with a transcript, one shared shape for human conversations and agent harnesses.
 - **Upstream.** A repo's canonical location, a served mount today, a bucket or a PDS later.
 - **App.** Short for application software, a legacy mindset that software is a fixed thing that must be designed for a specific purpose, see [Tools, not apps](https://www.inkandswitch.com/essay/malleable-software/#tools-not-apps).
