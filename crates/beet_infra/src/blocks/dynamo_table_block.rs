@@ -64,8 +64,8 @@ impl Default for DynamoTableBlock {
 }
 
 impl DynamoTableBlock {
-	/// A table `label` keyed by a string `id` hash key (the [`TableStoreRow`]
-	/// primary key the analytics store writes).
+	/// A table `label` keyed by a string `id` hash key, the attribute a
+	/// `DynamoStore` keys every item by, blob and [`TableStoreRow`] alike.
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),

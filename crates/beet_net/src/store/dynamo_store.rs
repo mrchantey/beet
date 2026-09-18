@@ -102,13 +102,27 @@ impl DynamoStore {
 		POOL.get(&self.region).await
 	}
 
+	/// The `id` attribute `path` keys to: the path under this store's subdir.
+	fn qualify(&self, path: &RelPath) -> String {
+		match &self.subdir {
+			Some(sub) => format!("{sub}/{path}"),
+			None => path.to_string(),
+		}
+	}
+
 	/// Resolve a [`RelPath`] to a DynamoDB-friendly attribute value.
 	fn resolve_key(&self, path: &RelPath) -> AttributeValue {
-		let key = match &self.subdir {
-			Some(sub) => format!("{}/{}", sub, path),
-			None => path.to_string(),
+		AttributeValue::S(self.qualify(path))
+	}
+
+	/// The document a table item carries under `row`.
+	fn row_of(
+		mut item: std::collections::HashMap<String, AttributeValue>,
+	) -> Result<Value> {
+		let Some(row) = item.remove("row") else {
+			bevybail!("item carries no row document");
 		};
-		AttributeValue::S(key)
+		serde_dynamo::from_attribute_value::<_, Value>(row)?.xok()
 	}
 
 	/// Get the table status, returning `None` if the table does not exist.
@@ -431,29 +445,36 @@ impl BlobStoreProvider for DynamoStore {
 	}
 }
 
-/// Native document form: rows land as structured DynamoDB items (queryable
+/// Native document form: a row lands as a structured DynamoDB item (queryable
 /// attributes), never json bytes, so this backend needs no `json` codec at
-/// all. The row document carries its own `id` attribute (the [`TableStoreRow`]
-/// contract), which is the primary key retrieval uses, so the `id` parameter
-/// is redundant on insert.
+/// all. The item is keyed by [`TableKey::path`] in its `id` attribute, under
+/// this store's subdir exactly as a blob is, and carries the document under
+/// `row`, so a row's own `id` field never collides with the hash key.
 impl TableProvider for DynamoStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(&self, _id: Uuid, row: Value) -> SendBoxedFuture<Result> {
+	fn insert_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+		row: Value,
+	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		let Ok(item) = serde_dynamo::to_item(row) else {
-			return Box::pin(async move {
-				bevybail!("Failed to serialize item for dynamo");
-			});
-		};
+		let id = self.resolve_key(&key.path(table));
+		let row =
+			match serde_dynamo::to_attribute_value::<_, AttributeValue>(row) {
+				Ok(row) => row,
+				Err(err) => return Box::pin(async move { Err(err.into()) }),
+			};
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
 			client
 				.put_item()
 				.table_name(this.table_name.as_str())
-				.set_item(Some(item))
+				.item("id", id)
+				.item("row", row)
 				.send()
 				.await
 				.map_err(sdk_err)?;
@@ -461,44 +482,54 @@ impl TableProvider for DynamoStore {
 		})
 	}
 
-	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>> {
+	fn get_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+	) -> SendBoxedFuture<Result<Value>> {
 		let this = self.clone();
+		let id = self.resolve_key(&key.path(table));
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
 			let out = client
 				.get_item()
 				.table_name(this.table_name.as_str())
-				.key("id", AttributeValue::S(id.to_string()))
+				.key("id", id)
 				.send()
 				.await
 				.map_err(sdk_err)?;
 			let Some(item) = out.item else {
 				bevybail!("Item not found");
 			};
-			let row: Value = serde_dynamo::from_item(item)?;
-			row.xok()
+			Self::row_of(item)
 		})
 	}
 
-	/// Read every row with a paginated `Scan`, deserializing the items the scan
-	/// already returned.
+	/// Read every row of `table` with a paginated `Scan` filtered to the
+	/// table's `id` prefix, deserializing the items the scan already returned.
 	///
-	/// The [`TableProvider::get_all_rows`] default would list the ids and then
+	/// The [`TableProvider::get_all_rows`] default would list the keys and then
 	/// issue one `GetItem` per row, an N+1 that a scan makes unnecessary: the
 	/// scan carries the bodies.
 	fn get_all_rows(
 		&self,
-	) -> SendBoxedFuture<Result<Vec<(RelPath, Result<Value>)>>> {
+		table: &str,
+	) -> SendBoxedFuture<Result<Vec<(TableKey, Result<Value>)>>> {
 		let this = self.clone();
+		let prefix = format!("{}/", self.qualify(&RelPath::new(table)));
 		async_ext::pin_tokio(async move {
 			let client = this.client().await;
-			let prefix = this.subdir.as_ref().map(|sub| format!("{}/", sub));
 			let mut rows = Vec::new();
 			let mut start_key = None;
 			loop {
 				let out = client
 					.scan()
 					.table_name(this.table_name.as_str())
+					.filter_expression("begins_with(id, :prefix)")
+					.expression_attribute_values(
+						":prefix",
+						AttributeValue::S(prefix.clone()),
+					)
 					.set_exclusive_start_key(start_key)
 					.send()
 					.await
@@ -507,20 +538,11 @@ impl TableProvider for DynamoStore {
 					let Some(AttributeValue::S(id)) = item.get("id") else {
 						continue;
 					};
-					let path = match &prefix {
-						Some(prefix) => {
-							match id.strip_prefix(prefix.as_str()) {
-								Some(stripped) => RelPath::new(stripped),
-								None => continue,
-							}
-						}
-						None => RelPath::new(id.as_str()),
+					let Some(key) = id.strip_prefix(prefix.as_str()) else {
+						continue;
 					};
-					rows.push((
-						path,
-						serde_dynamo::from_item::<_, Value>(item)
-							.map_err(Into::into),
-					));
+					let key = TableKey::from(key);
+					rows.push((key, Self::row_of(item)));
 				}
 				// an absent (or empty) last evaluated key ends the scan
 				start_key =

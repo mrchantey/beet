@@ -102,12 +102,14 @@ impl AnalyticsRollup {
 	/// field changes, never when one is added.
 	pub const VERSION: u32 = 1;
 
-	/// The prefix aggregate rows own in a rollup store.
+	/// The prefix analytics owns in a rollup store; aggregate rows sit under
+	/// it in their [`table_name`](TableStoreRow::table_name), at
+	/// `analytics/rollup/`.
 	///
-	/// A sibling of [`AnalyticsSegment::PREFIX`] rather than a nesting of it:
-	/// the two are disjoint by construction, so one store holds both and the
-	/// rollup rows never look like a segment day to compaction.
-	pub const PREFIX: &'static str = "analytics/rollup";
+	/// That keyspace is a sibling of [`AnalyticsArchive::PREFIX`] rather than a
+	/// nesting of it: the two are disjoint by construction, so one store holds
+	/// both and the rollup rows never look like a segment day to compaction.
+	pub const PREFIX: &'static str = "analytics";
 
 	/// The namespace every aggregate row id derives from, so an id is a pure
 	/// function of what it summarizes and re-running a day overwrites it.
@@ -197,9 +199,10 @@ impl AnalyticsRollup {
 /// [`timestamp`](TableStoreRow::timestamp) reads the covered day off the row
 /// rather than decoding an id that embeds no clock.
 impl TableStoreRow for AnalyticsRollup {
-	fn id(&self) -> Uuid { self.id }
-	fn timestamp(&self) -> Timestamp {
-		Timestamp::parse_date(&self.date).unwrap_or_default()
+	fn table_name() -> SmolStr { "rollup".into() }
+	fn key(&self) -> TableKey { self.id.into() }
+	fn timestamp(&self) -> Option<Timestamp> {
+		Timestamp::parse_date(&self.date)
 	}
 }
 
@@ -628,5 +631,25 @@ mod test {
 			("50-75%", 0),
 			("75-100%", 2),
 		]);
+	}
+
+	/// A row lands at `analytics/rollup/<id>`, the keyspace every deployed
+	/// rollup store already holds, and reads back by its uuid.
+	#[cfg(feature = "json")]
+	#[beet_core::test]
+	async fn rows_keep_the_rollup_keyspace() {
+		let store = BlobStore::temp();
+		let row = AnalyticsRollup::new("2026-08-01", AnalyticsScope::Site);
+		let table = AnalyticsRollup::table(store.clone());
+		table.push(row.clone()).await.unwrap();
+		store
+			.list()
+			.await
+			.unwrap()
+			.xpect_eq(vec![RelPath::new(format!(
+				"analytics/rollup/{}",
+				row.id
+			))]);
+		table.get(row.id).await.unwrap().xpect_eq(row);
 	}
 }

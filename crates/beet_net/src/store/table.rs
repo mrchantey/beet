@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_core::prelude::bevy_ecs::error::ErrorContext;
 use beet_core::prelude::*;
+use heck::ToSnakeCase;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -8,7 +9,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Type-erased table store: rows stored as [`Value`] documents keyed by [`Uuid`].
+/// Type-erased table store: rows stored as [`Value`] documents, keyed by a
+/// [`TableKey`] within their [`table_name`](TableStoreRow::table_name).
 ///
 /// The table twin of [`BlobStore`]: wraps an [`Arc<dyn TableProvider>`] and is
 /// materialized onto every store entity by the provider component hooks
@@ -53,10 +55,12 @@ impl TableStore {
 	#[cfg(feature = "json")]
 	pub fn temp() -> Self { Self::new(BlobStore::temp()) }
 
-	/// A typed view over this store, rows serialized at the edge via [`Value`].
+	/// A typed view over one table of this store, rows serialized at the edge
+	/// via [`Value`].
 	pub fn table<T: TableStoreRow>(&self) -> Table<T> {
 		Table {
 			provider: Arc::clone(&self.provider),
+			name: T::table_name(),
 			_marker: PhantomData,
 		}
 	}
@@ -89,10 +93,12 @@ impl TableStore {
 	}
 }
 
-/// Typed view over a [`TableStore`], rows serialized to [`Value`] documents at
-/// this edge. The table twin of [`Blob`].
+/// Typed view over one table of a [`TableStore`], rows serialized to [`Value`]
+/// documents at this edge. The table twin of [`Blob`].
 pub struct Table<T: TableStoreRow> {
 	provider: Arc<dyn TableProvider>,
+	/// [`TableStoreRow::table_name`], resolved once.
+	name: SmolStr,
 	_marker: PhantomData<T>,
 }
 
@@ -100,6 +106,7 @@ impl<T: TableStoreRow> Clone for Table<T> {
 	fn clone(&self) -> Self {
 		Self {
 			provider: Arc::clone(&self.provider),
+			name: self.name.clone(),
 			_marker: PhantomData,
 		}
 	}
@@ -123,18 +130,21 @@ impl<T: TableStoreRow> Table<T> {
 	/// table.store_try_create().await?;
 	///
 	/// let item = TableItem::new("Hello, world!".to_string());
-	/// let id = item.id();
+	/// let key = item.key();
 	///
 	/// // insert, retrieve, remove typed objects
 	/// table.push(item.clone()).await?;
-	/// let retrieved = table.get(id).await?;
+	/// let retrieved = table.get(key.clone()).await?;
 	/// assert_eq!(item.data, retrieved.data);
-	/// table.remove(id).await?;
+	/// table.remove(key).await?;
 	/// # Ok(())
 	/// # }
 	/// ```
 	#[cfg(feature = "json")]
 	pub fn temp() -> Self { TableStore::temp().table() }
+
+	/// The table's name, [`TableStoreRow::table_name`].
+	pub fn name(&self) -> &str { &self.name }
 
 	/// Create store (may take 10+ seconds for cloud providers).
 	///
@@ -162,54 +172,64 @@ impl<T: TableStoreRow> Table<T> {
 		BlobStoreProvider::store_remove(self.provider.as_ref()).await
 	}
 
-	/// Insert typed object into table.
-	pub async fn push(&self, body: T) -> Result {
-		let id = body.id();
-		self.provider.insert_row(id, Value::from_serde(body)?).await
-	}
-
-	/// Insert typed object, failing if it already exists.
+	/// Insert typed row, replacing any row at its key.
 	///
 	/// # Errors
-	/// Returns error if object already exists at path.
+	/// Fails on an empty key: a row must know what it is called.
+	pub async fn push(&self, body: T) -> Result {
+		let key = body.key();
+		if key.is_empty() {
+			bevybail!("empty key for a `{}` row", self.name)
+		}
+		self.provider
+			.insert_row(&self.name, &key, Value::from_serde(body)?)
+			.await
+	}
+
+	/// Insert typed row, failing if one already exists at its key.
+	///
+	/// # Errors
+	/// Returns error if row already exists.
 	pub async fn try_push(&self, body: T) -> Result {
-		let id = body.id();
-		if self.exists(id).await? {
-			bevybail!("Row already exists: {}", id)
+		let key = body.key();
+		if self.exists(key.clone()).await? {
+			bevybail!("row already exists: {}/{key}", self.name)
 		} else {
 			self.push(body).await
 		}
 	}
 
-	/// Check if object exists at path.
-	pub async fn exists(&self, id: Uuid) -> Result<bool> {
-		let path = RelPath::new(id.to_string());
-		BlobStoreProvider::exists(self.provider.as_ref(), &path).await
+	/// Check if a row exists at `key`.
+	pub async fn exists(&self, key: impl Into<TableKey>) -> Result<bool> {
+		self.provider.row_exists(&self.name, &key.into()).await
 	}
 
-	/// List all object paths in table.
-	pub async fn list(&self) -> Result<Vec<RelPath>> {
-		BlobStoreProvider::list(self.provider.as_ref()).await
+	/// Every key in the table.
+	pub async fn list(&self) -> Result<Vec<TableKey>> {
+		self.provider.list_keys(&self.name).await
 	}
 
-	/// Get typed object data by id.
+	/// Get typed row by key.
 	///
 	/// # Errors
-	/// Returns error if object doesn't exist or fails to deserialize.
-	pub async fn get(&self, id: Uuid) -> Result<T> {
-		self.provider.get_row(id).await?.into_serde()
+	/// Returns error if row doesn't exist or fails to deserialize.
+	pub async fn get(&self, key: impl Into<TableKey>) -> Result<T> {
+		self.provider
+			.get_row(&self.name, &key.into())
+			.await?
+			.into_serde()
 	}
 
-	/// Get all objects and their typed data.
+	/// Get all rows and their typed data.
 	///
 	/// # Caution
 	/// Expensive operation - prefer [`Self::list`] + [`Self::get`] for large tables.
-	pub async fn get_all(&self) -> Result<Vec<(RelPath, T)>> {
+	pub async fn get_all(&self) -> Result<Vec<(TableKey, T)>> {
 		self.provider
-			.get_all_rows()
+			.get_all_rows(&self.name)
 			.await?
 			.into_iter()
-			.map(|(path, row)| Ok((path, row?.into_serde()?)))
+			.map(|(key, row)| Ok((key, row?.into_serde()?)))
 			.collect()
 	}
 
@@ -223,16 +243,19 @@ impl<T: TableStoreRow> Table<T> {
 	/// A skipped row is silently missing from the result, so a caller reporting
 	/// aggregates over this should not present the count as the table's true
 	/// total.
-	pub async fn get_all_lossy(&self) -> Result<Vec<(RelPath, T)>> {
+	pub async fn get_all_lossy(&self) -> Result<Vec<(TableKey, T)>> {
 		self.provider
-			.get_all_rows()
+			.get_all_rows(&self.name)
 			.await?
 			.into_iter()
-			.filter_map(|(path, row)| {
+			.filter_map(|(key, row)| {
 				match row.and_then(|row| row.into_serde::<T>()) {
-					Ok(row) => Some((path, row)),
+					Ok(row) => Some((key, row)),
 					Err(err) => {
-						warn!("skipping unreadable row {path}: {err}");
+						warn!(
+							"skipping unreadable row {}/{key}: {err}",
+							self.name
+						);
 						None
 					}
 				}
@@ -241,20 +264,23 @@ impl<T: TableStoreRow> Table<T> {
 			.xok()
 	}
 
-	/// Remove object from table by id.
+	/// Remove the row at `key`.
 	///
 	/// # Errors
-	/// Returns error if object doesn't exist.
-	pub async fn remove(&self, id: Uuid) -> Result {
-		let path = RelPath::new(id.to_string());
-		BlobStoreProvider::remove(self.provider.as_ref(), &path).await
+	/// Returns error if row doesn't exist.
+	pub async fn remove(&self, key: impl Into<TableKey>) -> Result {
+		self.provider.remove_row(&self.name, &key.into()).await
 	}
 
-	/// Get public URL for object (if supported by provider).
+	/// Get public URL for the row at `key` (if supported by provider).
 	///
 	/// Returns `None` if provider doesn't support public URLs.
-	pub async fn public_url(&self, path: &RelPath) -> Result<Option<String>> {
-		BlobStoreProvider::public_url(self.provider.as_ref(), path).await
+	pub async fn public_url(
+		&self,
+		key: impl Into<TableKey>,
+	) -> Result<Option<String>> {
+		let path = key.into().path(&self.name);
+		BlobStoreProvider::public_url(self.provider.as_ref(), &path).await
 	}
 
 	/// Get provider region.
@@ -270,26 +296,81 @@ impl<T: TableStoreRow> Table<T> {
 	}
 }
 
+/// A row's primary key within its table: any non-empty string, the source's
+/// natural id where it has one. Slashes are allowed, and the blob adapters
+/// store them as nested paths.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Hash,
+	PartialOrd,
+	Ord,
+	Serialize,
+	Deserialize,
+	Reflect,
+)]
+#[serde(transparent)]
+pub struct TableKey(SmolStr);
+
+impl TableKey {
+	/// Where the blob adapters keep this key's row: `{table}/{key}`.
+	pub fn path(&self, table: &str) -> RelPath {
+		RelPath::new(table).join(&self.0)
+	}
+}
+
+impl core::ops::Deref for TableKey {
+	type Target = str;
+	fn deref(&self) -> &str { &self.0 }
+}
+
+impl core::fmt::Display for TableKey {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		self.0.fmt(f)
+	}
+}
+
+impl From<&str> for TableKey {
+	fn from(key: &str) -> Self { Self(key.into()) }
+}
+impl From<String> for TableKey {
+	fn from(key: String) -> Self { Self(key.into()) }
+}
+impl From<SmolStr> for TableKey {
+	fn from(key: SmolStr) -> Self { Self(key) }
+}
+/// The hyphenated form, ie `0192f8a0-beef-7a11-9a11-a11a7ce50011`.
+impl From<Uuid> for TableKey {
+	fn from(id: Uuid) -> Self { Self(id.to_string().into()) }
+}
+
 /// Types that can be stored in a [`Table`].
 ///
-/// This trait is automatically implemented for any type that implements the required bounds:
+/// This trait is implemented for any type that implements the required bounds:
 /// - [`Serialize`] - For encoding objects into bytes
 /// - [`DeserializeOwned`] - For decoding objects from bytes
 /// - [`Clone`] - For copying objects
 /// - `'static` - For type safety across async boundaries
 ///
-/// The serialized row is stored under its [`id`](Self::id).
+/// The serialized row is stored under its [`key`](Self::key) in its
+/// [`table_name`](Self::table_name).
 pub trait TableStoreRow: TableContent {
-	/// Unique identifier for the object, used as the primary key in the table.
-	fn id(&self) -> Uuid;
-	/// Decodes the uuid's embedded wall-clock time.
-	/// ## Panics
-	/// Panics if uuid is not v1, v6 or v7.
-	fn timestamp(&self) -> Timestamp {
-		let timestamp = self.id().get_timestamp().unwrap();
-		let (secs, nanos) = timestamp.to_unix();
-		Timestamp::from_millis(secs as i64 * 1_000 + nanos as i64 / 1_000_000)
+	/// The table this row type lives in, ie `youtube_likes`: by default the
+	/// snake case of the short type name, generics dropped, so `TableItem<u32>`
+	/// lives in `table_item`.
+	fn table_name() -> SmolStr {
+		let name = type_ext::short_name::<Self>();
+		name.split_once('<')
+			.map_or(name.as_str(), |(base, _generics)| base)
+			.to_snake_case()
+			.into()
 	}
+	/// The row's primary key.
+	fn key(&self) -> TableKey;
+	/// When the row was created, where the row knows.
+	fn timestamp(&self) -> Option<Timestamp> { None }
 }
 /// Helper blanket trait constraining types which may be included in a table.
 pub trait TableContent:
@@ -328,7 +409,8 @@ impl<T> TableItem<T> {
 	}
 }
 impl<T: TableContent> TableStoreRow for TableItem<T> {
-	fn id(&self) -> Uuid { self.id }
+	fn key(&self) -> TableKey { self.id.into() }
+	fn timestamp(&self) -> Option<Timestamp> { Some(self.created) }
 }
 
 /// Storage provider for table operations over untyped [`Value`] rows.
@@ -337,40 +419,82 @@ impl<T: TableContent> TableStoreRow for TableItem<T> {
 /// encoding-agnostic: only the [`BlobStore`] impl (under `json`) knows about
 /// bytes, encoding rows as JSON so any blob store backs a table; a table-native
 /// backend like [`DynamoStore`] stores structured documents directly.
+///
+/// Every operation names its `table` ([`TableStoreRow::table_name`]) and
+/// `key`; the defaults answer through the blob side at [`TableKey::path`],
+/// which a table-native backend overrides wholesale.
 pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 	/// Returns a boxed clone of this provider for type erasure.
 	fn box_clone_table(&self) -> Box<dyn TableProvider>;
-	/// Insert the row document at `id`.
-	fn insert_row(&self, id: Uuid, row: Value) -> SendBoxedFuture<Result>;
-	/// Get the row document at `id`.
-	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>>;
+	/// Insert the row document at `key` in `table`, replacing any there.
+	fn insert_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+		row: Value,
+	) -> SendBoxedFuture<Result>;
+	/// Get the row document at `key` in `table`.
+	fn get_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+	) -> SendBoxedFuture<Result<Value>>;
 
-	/// Every row in the table, each paired with the document it read or the
+	/// Whether a row exists at `key` in `table`.
+	fn row_exists(
+		&self,
+		table: &str,
+		key: &TableKey,
+	) -> SendBoxedFuture<Result<bool>> {
+		BlobStoreProvider::exists(self, &key.path(table))
+	}
+
+	/// Remove the row at `key` in `table`, erroring if there is none.
+	fn remove_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+	) -> SendBoxedFuture<Result> {
+		BlobStoreProvider::remove(self, &key.path(table))
+	}
+
+	/// Every key in `table`.
+	fn list_keys(&self, table: &str) -> SendBoxedFuture<Result<Vec<TableKey>>> {
+		let scoped = self.with_subdir(RelPath::new(table));
+		Box::pin(async move {
+			scoped
+				.list()
+				.await?
+				.into_iter()
+				.map(|path| TableKey::from(path.as_str()))
+				.collect::<Vec<_>>()
+				.xok()
+		})
+	}
+
+	/// Every row in `table`, each paired with the document it read or the
 	/// error that row failed with.
 	///
 	/// Row-level errors are carried rather than raised so the caller picks the
 	/// policy: [`Table::get_all`] fails on the first, [`Table::get_all_lossy`]
 	/// skips it.
 	///
-	/// The default lists ids and fetches each row, bounded by
+	/// The default lists keys and fetches each row, bounded by
 	/// [`BlobStore::GET_ALL_CONCURRENCY`]. A provider whose listing already
 	/// carries row bodies should override this to avoid an N+1 over the network.
 	fn get_all_rows(
 		&self,
-	) -> SendBoxedFuture<Result<Vec<(RelPath, Result<Value>)>>> {
+		table: &str,
+	) -> SendBoxedFuture<Result<Vec<(TableKey, Result<Value>)>>> {
 		let this = self.box_clone_table();
+		let table = SmolStr::from(table);
 		Box::pin(async move {
-			this.list()
+			this.list_keys(&table)
 				.await?
 				.into_iter()
-				.map(async |path| {
-					let row = match path.to_string().parse::<Uuid>() {
-						Ok(id) => this.get_row(id).await,
-						Err(err) => {
-							Err(bevyhow!("invalid uuid in path {path}: {err}"))
-						}
-					};
-					(path, row)
+				.map(async |key| {
+					let row = this.get_row(&table, &key).await;
+					(key, row)
 				})
 				.xmap(|rows| {
 					async_ext::join_all_bounded(
@@ -385,34 +509,38 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 }
 
 /// The [`BlobStore`] wrapper is a [`TableProvider`] for free, encoding rows as
-/// JSON bytes at their id: this is what lets any blob store back a table, and a
-/// single [`BlobStore`] back many typed [`Table`]s, one per record-type subdir.
-/// The one impl that knows about bytes; a native beet [`Value`] codec would
-/// swap in here.
+/// JSON bytes at [`TableKey::path`]: this is what lets any blob store back a
+/// table, and a single [`BlobStore`] back many typed [`Table`]s, one per
+/// table subdir. The one impl that knows about bytes; a native beet [`Value`]
+/// codec would swap in here.
 #[cfg(feature = "json")]
 impl TableProvider for BlobStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
 		Box::new(self.clone())
 	}
 
-	fn insert_row(&self, id: Uuid, row: Value) -> SendBoxedFuture<Result> {
-		let path = RelPath::new(id.to_string());
+	fn insert_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+		row: Value,
+	) -> SendBoxedFuture<Result> {
+		let path = key.path(table);
 		match serde_json::to_vec(&row) {
 			Ok(bytes) => BlobStoreProvider::insert(self, &path, bytes.into()),
-			Err(e) => {
-				Box::pin(async move { bevybail!("Failed to serialize: {}", e) })
-			}
+			Err(err) => Box::pin(async move { Err(err.into()) }),
 		}
 	}
 
-	fn get_row(&self, id: Uuid) -> SendBoxedFuture<Result<Value>> {
-		let path = RelPath::new(id.to_string());
-		let fut = BlobStoreProvider::get(self, &path);
-		Box::pin(async move {
-			let bytes = fut.await?;
-			serde_json::from_slice(&bytes)
-				.map_err(|e| bevyhow!("Failed to deserialize: {}", e))
-		})
+	fn get_row(
+		&self,
+		table: &str,
+		key: &TableKey,
+	) -> SendBoxedFuture<Result<Value>> {
+		let fut = BlobStoreProvider::get(self, &key.path(table));
+		Box::pin(
+			async move { serde_json::from_slice::<Value>(&fut.await?)?.xok() },
+		)
 	}
 }
 
@@ -431,9 +559,25 @@ pub mod table_test {
 		some_vec: Vec<MyObject>,
 	}
 
-	/// Runs the standard table provider test suite.
+	/// A row keyed by a string it carries, in a table it names itself.
+	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+	pub struct NamedRow {
+		key: String,
+		value: u32,
+	}
+
+	impl TableStoreRow for NamedRow {
+		fn table_name() -> SmolStr { "custom_rows".into() }
+		fn key(&self) -> TableKey { self.key.as_str().into() }
+	}
+
+	/// Runs the standard table provider test suite: the uuid-keyed
+	/// [`TableItem`] in its default table, then a string key containing a
+	/// slash in a custom-named table, the two disjoint.
 	pub async fn run(provider: impl TableProvider) {
-		let table = Table::<TableItem<MyObject>>::new(provider);
+		let store = TableStore::new(provider);
+		let items = store.table::<TableItem<MyObject>>();
+		items.name().xpect_eq("table_item");
 		let body = TableItem::new(MyObject {
 			some_key: "some_value".into(),
 			some_vec: vec![MyObject {
@@ -441,25 +585,54 @@ pub mod table_test {
 				some_vec: vec![],
 			}],
 		});
-		let id = body.id();
-		let path = RelPath::new(id.to_string());
-		table.store_remove().await.ok();
-		table.store_exists().await.unwrap().xpect_false();
-		table.store_try_create().await.unwrap();
-		table.exists(id).await.unwrap().xpect_false();
-		table.remove(id).await.xpect_err();
-		table.push(body.clone()).await.unwrap();
-		table.store_exists().await.unwrap().xpect_true();
-		table.exists(id).await.unwrap().xpect_true();
-		table.list().await.unwrap().xpect_eq(vec![path.clone()]);
-		table.get(id).await.unwrap().xpect_eq(body.clone());
-		table.get(id).await.unwrap().xpect_eq(body);
+		let key = body.key();
+		items.store_remove().await.ok();
+		items.store_exists().await.unwrap().xpect_false();
+		items.store_try_create().await.unwrap();
+		items.exists(key.clone()).await.unwrap().xpect_false();
+		items.remove(key.clone()).await.xpect_err();
+		items.push(body.clone()).await.unwrap();
+		items.store_exists().await.unwrap().xpect_true();
+		items.exists(key.clone()).await.unwrap().xpect_true();
+		items.list().await.unwrap().xpect_eq(vec![key.clone()]);
+		items.get(key.clone()).await.unwrap().xpect_eq(body.clone());
+		items
+			.get_all()
+			.await
+			.unwrap()
+			.xpect_eq(vec![(key.clone(), body)]);
+		items.remove(key.clone()).await.unwrap();
+		items.get(key).await.xpect_err();
 
-		table.remove(id).await.unwrap();
-		table.get(id).await.xpect_err();
+		// a slash in the key nests, in the row type's own table
+		let rows = store.table::<NamedRow>();
+		rows.name().xpect_eq("custom_rows");
+		let row = NamedRow {
+			key: "2026/09/18".into(),
+			value: 7,
+		};
+		rows.push(row.clone()).await.unwrap();
+		rows.list().await.unwrap().xpect_eq(vec![row.key()]);
+		rows.get("2026/09/18").await.unwrap().xpect_eq(row.clone());
+		rows.get_all()
+			.await
+			.unwrap()
+			.xpect_eq(vec![(row.key(), row.clone())]);
+		// tables are disjoint
+		items.list().await.unwrap().xpect_eq(Vec::new());
+		// the same key with new content is an update
+		let updated = NamedRow {
+			value: 8,
+			..row.clone()
+		};
+		rows.push(updated.clone()).await.unwrap();
+		rows.get(row.key()).await.unwrap().xpect_eq(updated);
+		rows.try_push(row.clone()).await.xpect_err();
+		rows.remove(row.key()).await.unwrap();
+		rows.list().await.unwrap().xpect_eq(Vec::new());
 
-		table.store_remove().await.unwrap();
-		table.store_exists().await.unwrap().xpect_false();
+		items.store_remove().await.unwrap();
+		items.store_exists().await.unwrap().xpect_false();
 	}
 }
 
@@ -479,8 +652,28 @@ mod test {
 		world.entity(entity).contains::<TableStore>().xpect_true();
 	}
 
-	/// A row that fails to deserialize (eg a legacy schema) or has a non-uuid
-	/// path is skipped by the lossy read instead of failing the whole scan.
+	/// The json-over-blobs adapter passes the shared suite.
+	#[beet_core::test]
+	async fn blob_adapter() { table_test::run(BlobStore::temp()).await }
+
+	/// A row's default table is the snake case of its type, generics dropped,
+	/// and its rows land under it.
+	#[beet_core::test]
+	async fn default_table_name() {
+		TableItem::<Vec<u32>>::table_name().xpect_eq("table_item");
+		let store = BlobStore::temp();
+		let table = Table::<TableItem<u32>>::new(store.clone());
+		let item = TableItem::new(7u32);
+		table.push(item.clone()).await.unwrap();
+		BlobStoreProvider::list(&store)
+			.await
+			.unwrap()
+			.xpect_eq(vec![RelPath::new(format!("table_item/{}", item.id))]);
+	}
+
+	/// A row that fails to deserialize (eg a legacy schema) is skipped by the
+	/// lossy read instead of failing the whole scan, and another table's rows
+	/// are never read at all.
 	#[beet_core::test]
 	async fn get_all_lossy_skips_unreadable_rows() {
 		let provider = InMemoryStore::new();
@@ -488,20 +681,20 @@ mod test {
 			Table::<TableItem<u32>>::new(BlobStore::new(provider.clone()));
 		table.store_try_create().await.unwrap();
 		let valid = TableItem::new(7u32);
-		let valid_id = valid.id();
+		let valid_key = valid.key();
 		table.push(valid).await.unwrap();
-		// a legacy-schema row: a valid uuid path with an undecodable body.
+		// a legacy-schema row: a valid key with an undecodable body.
 		BlobStoreProvider::insert(
 			&provider,
-			&RelPath::new(uuid_ext::now_v7().to_string()),
+			&TableKey::from(uuid_ext::now_v7()).path(table.name()),
 			r#"{"schema":"legacy"}"#.into(),
 		)
 		.await
 		.unwrap();
-		// a non-uuid path.
+		// another table's row.
 		BlobStoreProvider::insert(
 			&provider,
-			&RelPath::new("junk"),
+			&RelPath::new("other/junk"),
 			"{}".into(),
 		)
 		.await
@@ -511,7 +704,7 @@ mod test {
 		table.get_all().await.xpect_err();
 		let rows = table.get_all_lossy().await.unwrap();
 		rows.len().xpect_eq(1);
-		rows[0].1.id.xpect_eq(valid_id);
+		rows[0].0.xpect_eq(valid_key);
 	}
 
 	/// A whole-table read spanning more rows than [`BlobStore::GET_ALL_CONCURRENCY`]
