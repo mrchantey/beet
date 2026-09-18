@@ -22,14 +22,13 @@ pub async fn RequestLogger(
 		response.status(),
 		time_ext::pretty_print_duration(now.elapsed())
 	);
+	// dump both sides only for a non-ok response
 	if !response.status.is_ok() {
-		// status only if ok
 		debug!(
 			"RequestLogger: Non-ok response:\n Request: {:#?}\n Response: {:#?}",
 			request_parts,
 			response.parts(),
 		);
-	} else {
 	}
 
 	Ok(response)

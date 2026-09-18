@@ -1128,7 +1128,11 @@ impl LightsailBlock {
 
 		// log group the instance's CloudWatch agent forwards to; declared here so
 		// `tofu destroy` removes it (the agent reuses the existing group rather
-		// than auto-creating an unmanaged one that would leak on teardown)
+		// than auto-creating an unmanaged one that would leak on teardown). The
+		// instance depends on it below: `user_data` names the group as a literal,
+		// so without the edge tofu destroys both at once, the group vanishes
+		// instantly while the box takes a while to terminate, and the agent's
+		// next batch recreates it unmanaged.
 		let log_group_ident = stack.resource_ident(self.build_label("logs"));
 		let log_group = terra::ResourceDef::new_secondary(
 			log_group_ident,
@@ -1159,6 +1163,8 @@ impl LightsailBlock {
 			name: instance_ident.primary_identifier().clone(),
 			key_pair_name: Some(keypair.field_ref("name").into()),
 			user_data: Some(user_data),
+			// the group outlives the box on teardown, see above
+			depends_on: Some(vec![log_group.address().into()]),
 			tags: Some(
 				[
 					(SmolStr::from("Project"), stack.app_name().clone()),
@@ -1504,6 +1510,33 @@ mod tests {
 			.collect::<Vec<_>>()
 			.xtap(|ports| ports.sort())
 			.xpect_eq(vec![22, 80, 443, u64::from(block.management_ssh_port)]);
+	}
+
+	/// The log group is destroyed only after the box: `user_data` names it as
+	/// a literal, so the edge has to be explicit. Without it a teardown deleted
+	/// the group while the terminating box's agent was still shipping, which
+	/// recreated it unmanaged (`/beet-site/main-lightsail/dev` survived a
+	/// `beet-destroy` that removed everything else).
+	#[beet_core::test]
+	fn teardown_removes_the_log_group_after_the_box() {
+		let block = LightsailBlock::default();
+		let (scope, _dir) = render_block(&block);
+		let stack = scope.stack().clone();
+		let instance_label = stack
+			.resource_ident(block.build_label("instance"))
+			.label()
+			.to_string();
+		let logs_label = stack
+			.resource_ident(block.build_label("logs"))
+			.label()
+			.to_string();
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		config["resource"]["aws_lightsail_instance"][&instance_label]
+			["depends_on"][0]
+			.as_str()
+			.unwrap()
+			.xpect_eq(&format!("aws_cloudwatch_log_group.{logs_label}"));
 	}
 
 	/// The box's fetch script and the artifacts client name the SAME pointer,

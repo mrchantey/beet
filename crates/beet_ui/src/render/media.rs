@@ -116,14 +116,13 @@ impl MediaRenderer {
 	///
 	/// Sub-renderers are called with an empty `accepts` list so they
 	/// skip their own accept negotiation — `MediaRenderer` has already
-	/// selected the correct renderer.
+	/// selected the correct renderer. The [`TemplateRenderer`] alone receives
+	/// the selected type, since it serializes more than one format.
 	fn try_render_media_type(
 		&mut self,
 		cx: &mut RenderContext,
 		media_type: &MediaType,
 	) -> Result<Option<MediaBytes>, RenderError> {
-		// Build a context with empty accepts so sub-renderers don't
-		// reject based on the original accepts list.
 		let mut inner_cx = RenderContext::new(cx.entity, cx.world);
 		match media_type {
 			MediaType::Html => {
@@ -136,12 +135,12 @@ impl MediaRenderer {
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
-			#[cfg(all(feature = "template_serde", feature = "postcard"))]
-			MediaType::Postcard => {
-				self.template_renderer.render(&mut inner_cx).map(Some)
+			#[cfg(feature = "template_serde")]
+			serialized if TemplateRenderer::available().contains(serialized) => {
+				self.template_renderer
+					.render(&mut inner_cx.with_accepts(vec![serialized.clone()]))
+					.map(Some)
 			}
-			#[cfg(all(feature = "template_serde", feature = "json"))]
-			MediaType::Json => self.template_renderer.render(&mut inner_cx).map(Some),
 			_ => Ok(None),
 		}
 	}
@@ -152,10 +151,8 @@ impl MediaRenderer {
 			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
 		#[cfg(feature = "style")]
 		available.push(MediaType::AnsiTerm);
-		#[cfg(all(feature = "template_serde", feature = "json"))]
-		available.push(MediaType::Json);
-		#[cfg(all(feature = "template_serde", feature = "postcard"))]
-		available.push(MediaType::Postcard);
+		#[cfg(feature = "template_serde")]
+		available.extend(TemplateRenderer::available());
 		available
 	}
 }
@@ -325,6 +322,28 @@ mod test {
 			"*/*",
 		)])
 		.xpect_eq("<div>hi</div>".to_string());
+	}
+
+	/// `Accept: application/json` serializes the page rather than failing: the
+	/// selected format reaches the [`TemplateRenderer`], which used to receive an
+	/// empty accepts list and report a mismatch against nothing, a 500 on every
+	/// page for any client asking for json.
+	#[cfg(all(feature = "bsx", feature = "template_serde", feature = "json"))]
+	#[beet_core::test]
+	fn accepts_json_serializes() {
+		let mut world = world_ext::ui_world();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::new_html("<div>hi</div>");
+		BsxParser::html()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		let mut cx = RenderContext::new(entity, &mut world)
+			.with_accepts(vec![MediaType::Json]);
+		MediaRenderer::new(MediaType::Html)
+			.render(&mut cx)
+			.unwrap()
+			.media_type()
+			.xpect_eq(MediaType::Json);
 	}
 
 	/// When no type in `accepts` matches and fallback is disabled, errors
