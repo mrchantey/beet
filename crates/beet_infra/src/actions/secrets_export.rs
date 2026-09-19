@@ -53,9 +53,9 @@ pub async fn SecretsExport(
 	group: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (stack, store) = stack_and_store(&cx.caller).await?;
-	let target = export_target(&cx.caller, document, &store, &stack).await?;
-	let entries = store.read_all(&stack).await?;
+	let store = secret_store(&cx.caller).await?;
+	let target = export_target(&cx.caller, document, &store).await?;
+	let entries = store.read_all().await?;
 	if entries.is_empty() {
 		bevybail!(
 			"nothing in {} to export: the stack has not been deployed, or its \
@@ -67,7 +67,6 @@ pub async fn SecretsExport(
 	let now = Timestamp::now();
 	let export = SecretsExport::document(
 		target.media_type()?,
-		&stack,
 		&store,
 		&group,
 		recipients,
@@ -142,7 +141,6 @@ impl SecretsExport {
 	/// store, and one record per label in `group`, sealed once.
 	pub fn document(
 		media_type: MediaType,
-		stack: &ResolvedStack,
 		store: &SecretStore,
 		group: &str,
 		recipients: Vec<AgeRecipient>,
@@ -151,8 +149,8 @@ impl SecretsExport {
 	) -> Result<SecretsDocument> {
 		let mut document = SecretsDocument::new(media_type);
 		document.origin = Some(SecretsOrigin {
-			app: stack.app_name().clone(),
-			stage: stack.stage().clone(),
+			app: store.stack().app_name().clone(),
+			stage: store.stack().stage().clone(),
 			region: store.region(),
 			provider: store.id().into(),
 			exported,
@@ -208,15 +206,11 @@ impl SecretsExport {
 	}
 }
 
-/// The stack `caller` sits under and its secret store.
-pub(crate) async fn stack_and_store(
-	caller: &AsyncEntity,
-) -> Result<(ResolvedStack, SecretStore)> {
+/// The secret store of the stack `caller` sits under.
+pub(crate) async fn secret_store(caller: &AsyncEntity) -> Result<SecretStore> {
 	caller
 		.with_state::<StackQuery, _>(|entity, stacks| {
-			stacks
-				.secret_store(entity)
-				.map(|store| (stacks.resolve(entity), store))
+			stacks.secret_store(entity)
 		})
 		.await?
 }
@@ -234,7 +228,6 @@ pub(crate) async fn export_target(
 	caller: &AsyncEntity,
 	declaration: Entity,
 	store: &SecretStore,
-	stack: &ResolvedStack,
 ) -> Result<SecretsHandle> {
 	if declaration == Entity::PLACEHOLDER {
 		bevybail!(
@@ -254,13 +247,13 @@ pub(crate) async fn export_target(
 			})
 			.await
 	{
-		let cold = block.parked_store(store, stack).await?;
+		let cold = block.parked_store(store).await?;
 		return SecretsHandle::new(cold, handle.path.as_str())?
 			.with_label(handle.label.clone().unwrap_or_default())
 			.xok();
 	}
 	#[cfg(not(all(feature = "cloudflare_dns", feature = "aws_sdk")))]
-	let _ = (store, stack);
+	let _ = store;
 	handle.xok()
 }
 
@@ -273,7 +266,7 @@ pub(crate) mod tests {
 	/// declaration in the repo store.
 	pub(crate) async fn exported_stack(
 		world: &mut World,
-	) -> (Entity, Entity, SecretStore, ResolvedStack) {
+	) -> (Entity, Entity, SecretStore) {
 		let export = world.spawn_empty().id();
 		let root = world
 			.spawn((
@@ -289,34 +282,28 @@ pub(crate) mod tests {
 			ChildOf(root),
 		));
 		world.flush();
-		let (stack, store) = world
-			.with_state::<StackQuery, _>(|stacks| {
-				stacks
-					.secret_store(root)
-					.map(|store| (stacks.resolve(root), store))
-			})
+		let store = world
+			.with_state::<StackQuery, _>(|stacks| stacks.secret_store(root))
 			.unwrap();
 		store
 			.create(
-				&stack,
 				&SecretRef::new("dkim-example-com"),
 				"-----BEGIN PRIVATE KEY-----",
 				Some("the signing key"),
-				Rotation::manual("a new selector"),
+				SecretRotation::manual("a new selector"),
 			)
 			.await
 			.unwrap();
 		store
 			.create(
-				&stack,
 				&SecretRef::new("mail-tlsa"),
 				"abc",
 				None,
-				Rotation::Remint,
+				SecretRotation::Remint,
 			)
 			.await
 			.unwrap();
-		(root, export, store, stack)
+		(root, export, store)
 	}
 
 	/// Run one export step under `root`.
@@ -358,7 +345,7 @@ pub(crate) mod tests {
 	#[beet_core::test]
 	async fn exports_the_store_into_a_document() {
 		let mut world = infra_world();
-		let (root, export, _, _) = exported_stack(&mut world).await;
+		let (root, export, _) = exported_stack(&mut world).await;
 		// the declared entry document lists alice in `default`
 		let alice = AgeIdentity::generate();
 		let mut alice_file = AgeIdentityFile::default();
@@ -427,7 +414,7 @@ pub(crate) mod tests {
 	#[beet_core::test]
 	async fn an_unchanged_export_is_not_rewritten() {
 		let mut world = infra_world();
-		let (root, export, store, stack) = exported_stack(&mut world).await;
+		let (root, export, store) = exported_stack(&mut world).await;
 		let repo = world.get::<BlobStore>(root).unwrap().clone();
 		let written =
 			SecretsHandle::new(repo, "infra/secrets/mail--prod.toml").unwrap();
@@ -436,7 +423,7 @@ pub(crate) mod tests {
 		run_export(&mut world, root, export, false).await.unwrap();
 		written.read().await.unwrap().xpect_eq(first.clone());
 		store
-			.overwrite(&stack, &SecretRef::new("mail-tlsa"), "def", None, None)
+			.overwrite(&SecretRef::new("mail-tlsa"), "def", None, None)
 			.await
 			.unwrap();
 		run_export(&mut world, root, export, false).await.unwrap();
@@ -451,7 +438,7 @@ pub(crate) mod tests {
 	#[beet_core::test]
 	async fn dated_exports_form_a_series() {
 		let mut world = infra_world();
-		let (root, export, _, _) = exported_stack(&mut world).await;
+		let (root, export, _) = exported_stack(&mut world).await;
 		let repo = world.get::<BlobStore>(root).unwrap().clone();
 		run_export(&mut world, root, export, true).await.unwrap();
 		let declared =

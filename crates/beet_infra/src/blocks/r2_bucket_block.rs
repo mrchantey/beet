@@ -25,7 +25,7 @@ use beet_net::prelude::*;
 /// `SecureString` parameters under the stack's secret prefix, exactly as the
 /// mail box parks its SES relay pair, and this block's [grants](Block::grants)
 /// name those two parameters rather than the bucket, so an AWS compute lowers
-/// them to `ssm:GetParameter` on exactly those. Rotation is replacing the
+/// them to `ssm:GetParameter` on exactly those. SecretRotation is replacing the
 /// token resource; the parameters follow it in the same apply.
 ///
 /// That asks one thing of the deployer's own Cloudflare token: `Account API
@@ -139,28 +139,27 @@ impl R2BucketBlock {
 	}
 
 	/// The S3 pair the apply parked for this bucket, read from the stack's
-	/// secret store: what a deploy-machine process reaches the bucket with,
-	/// since its own credentials are the other vendor's. Missing is an error
-	/// naming the apply that parks it, never a skip: a verb that quietly did
-	/// nothing against an empty bucket is the failure a cold copy exists to
-	/// close.
+	/// secret store (the stack being the store's): what a deploy-machine
+	/// process reaches the bucket with, since its own credentials are the
+	/// other vendor's. Missing is an error naming the apply that parks it,
+	/// never a skip: a verb that quietly did nothing against an empty bucket
+	/// is the failure a cold copy exists to close.
 	#[cfg(feature = "vault")]
 	pub async fn parked_pair(
 		&self,
 		secrets: &SecretStore,
-		stack: &ResolvedStack,
 	) -> Result<(String, String)> {
-		let access_key = secrets.get(stack, &self.access_key_secret()).await?;
-		let secret_key = secrets.get(stack, &self.secret_key_secret()).await?;
+		let access_key = secrets.get(&self.access_key_secret()).await?;
+		let secret_key = secrets.get(&self.secret_key_secret()).await?;
 		match (access_key, secret_key) {
 			(Some(access_key), Some(secret_key)) => {
 				(access_key, secret_key).xok()
 			}
 			_ => bevybail!(
 				"no cold credential at {} and {}: {}",
-				secrets.address(stack, &self.access_key_secret()),
-				secrets.address(stack, &self.secret_key_secret()),
-				self.missing_credential(stack)
+				secrets.address(&self.access_key_secret()),
+				secrets.address(&self.secret_key_secret()),
+				self.missing_credential(secrets.stack())
 			),
 		}
 	}
@@ -174,10 +173,9 @@ impl R2BucketBlock {
 	pub async fn parked_store(
 		&self,
 		secrets: &SecretStore,
-		stack: &ResolvedStack,
 	) -> Result<BlobStore> {
-		let (access_key, secret_key) = self.parked_pair(secrets, stack).await?;
-		S3Store::from_uri(&self.store_uri(stack))?
+		let (access_key, secret_key) = self.parked_pair(secrets).await?;
+		S3Store::from_uri(&self.store_uri(secrets.stack()))?
 			.with_credentials(S3Credentials::new(access_key, secret_key))
 			.xmap(BlobStore::new)
 			.xok()
@@ -251,7 +249,7 @@ impl R2BucketBlock {
 					stack,
 					value,
 					note,
-					Rotation::replace(token.address()),
+					SecretRotation::replace(token.address()),
 				),
 			)?;
 		}

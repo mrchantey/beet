@@ -11,12 +11,13 @@ use beet_net::prelude::*;
 /// same naming as `target/stores/<app>--<stage>--<label>`) and the
 /// human-side store a `<DocumentSecrets path=".."/>` declares in the repo.
 ///
-/// One document holds one stack's secrets, so the store is bound to the
-/// stack it was resolved for and refuses another by name rather than reading
-/// the wrong file. The identity is the discovered one, allowed to be absent
-/// at construction so a `validate` with no identity still resolves a store:
-/// a read of a sealed group or any write then fails with the `keygen`
-/// guidance.
+/// One document holds one stack's secrets, so [`for_stack`] to any other
+/// stack refuses by name rather than reading the wrong file. The identity is
+/// the discovered one, allowed to be absent at construction so a `validate`
+/// with no identity still resolves a store: a read of a sealed group or any
+/// write then fails with the `keygen` guidance.
+///
+/// [`for_stack`]: SecretStoreProvider::for_stack
 ///
 /// The `default` group is seeded on the first write from `seed`'s own
 /// `default` list when a seed document is given (the entry's declared
@@ -83,25 +84,6 @@ impl DocumentSecretStore {
 	/// The document this store reads and writes.
 	pub fn handle(&self) -> &SecretsHandle { &self.handle }
 
-	/// The stack the document holds.
-	pub fn stack(&self) -> &ResolvedStack { &self.stack }
-
-	/// The one document holds one stack: another is an error naming both.
-	fn check_stack(&self, stack: &ResolvedStack) -> Result<()> {
-		match stack == &self.stack {
-			true => Ok(()),
-			false => bevybail!(
-				"document {} holds the secrets of `{}--{}`, not `{}--{}`: a \
-				document store serves one stack",
-				self.handle.describe(),
-				self.stack.app_name(),
-				self.stack.stage(),
-				stack.app_name(),
-				stack.stage()
-			),
-		}
-	}
-
 	/// The document, or a new one seeded from the seed's `default` group.
 	async fn read_or_seed(&self) -> Result<SecretsDocument> {
 		if self.handle.exists().await? {
@@ -162,7 +144,7 @@ impl DocumentSecretStore {
 		let mut document = self.read_or_seed().await?;
 		if create_only && document.secrets.contains_key(secret.label()) {
 			return Err(SecretStoreError::AlreadyExists {
-				address: self.address(&self.stack, secret),
+				address: self.address(secret),
 			}
 			.into());
 		}
@@ -182,7 +164,7 @@ impl DocumentSecretStore {
 	fn entry(&self, name: &SmolStr, record: &SecretRecord) -> SecretEntry {
 		let secret = SecretRef::new(name.clone());
 		SecretEntry {
-			address: self.address(&self.stack, &secret),
+			address: self.address(&secret),
 			secret,
 			note: record.note.clone(),
 			modified: record.modified,
@@ -204,20 +186,39 @@ impl SecretStoreProvider for DocumentSecretStore {
 		format!("{} {}", Self::ID, self.handle.describe())
 	}
 
+	fn stack(&self) -> &ResolvedStack { &self.stack }
+
+	/// The one document holds one stack: another is an error naming both.
+	fn for_stack(
+		&self,
+		stack: &ResolvedStack,
+	) -> Result<Box<dyn SecretStoreProvider>> {
+		match stack == &self.stack {
+			true => Ok(self.box_clone()),
+			false => bevybail!(
+				"document {} holds the secrets of `{}--{}`, not `{}--{}`: a \
+				document store serves one stack",
+				self.handle.describe(),
+				self.stack.app_name(),
+				self.stack.stage(),
+				stack.app_name(),
+				stack.stage()
+			),
+		}
+	}
+
 	/// The document's path and the record's name, ie
 	/// `target/secrets/app--dev.toml#dkim-example-com`.
-	fn address(&self, _stack: &ResolvedStack, secret: &SecretRef) -> SmolStr {
+	fn address(&self, secret: &SecretRef) -> SmolStr {
 		format!("{}#{}", self.handle.path, secret.label()).into()
 	}
 
 	fn get(
 		&self,
-		stack: ResolvedStack,
 		secret: SecretRef,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			this.check_stack(&stack)?;
 			if !this.handle.exists().await? {
 				return None.xok();
 			}
@@ -235,40 +236,28 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 	fn create(
 		&self,
-		stack: ResolvedStack,
 		secret: SecretRef,
 		value: SmolStr,
 		meta: SecretMeta,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
-			this.check_stack(&stack)?;
-			this.write(&secret, &value, meta, true).await
-		})
+		Box::pin(async move { this.write(&secret, &value, meta, true).await })
 	}
 
 	fn overwrite(
 		&self,
-		stack: ResolvedStack,
 		secret: SecretRef,
 		value: SmolStr,
 		meta: SecretMeta,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
-			this.check_stack(&stack)?;
-			this.write(&secret, &value, meta, false).await
-		})
+		Box::pin(async move { this.write(&secret, &value, meta, false).await })
 	}
 
 	/// The index, which needs no identity.
-	fn list(
-		&self,
-		stack: ResolvedStack,
-	) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			this.check_stack(&stack)?;
 			if !this.handle.exists().await? {
 				return Vec::new().xok();
 			}
@@ -284,13 +273,9 @@ impl SecretStoreProvider for DocumentSecretStore {
 	}
 
 	/// One open of the document rather than one per record.
-	fn read_all(
-		&self,
-		stack: ResolvedStack,
-	) -> SendBoxedFuture<Result<Vec<(SecretEntry, String)>>> {
+	fn read_all(&self) -> SendBoxedFuture<Result<Vec<(SecretEntry, String)>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			this.check_stack(&stack)?;
 			if !this.handle.exists().await? {
 				return Vec::new().xok();
 			}
@@ -318,12 +303,10 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 	fn delete(
 		&self,
-		stack: ResolvedStack,
 		secrets: Vec<SecretRef>,
 	) -> SendBoxedFuture<Result<Vec<SecretRef>>> {
 		let this = self.clone();
 		Box::pin(async move {
-			this.check_stack(&stack)?;
 			if !this.handle.exists().await? {
 				return Vec::new().xok();
 			}
@@ -451,40 +434,38 @@ mod test {
 		let stack = stack();
 		let store = memory_secret_store(&stack);
 		let secret = SecretRef::new("db-password");
-		store.get(&stack, &secret).await.unwrap().xpect_none();
-		store.list(&stack).await.unwrap().len().xpect_eq(0);
+		store.get(&secret).await.unwrap().xpect_none();
+		store.list().await.unwrap().len().xpect_eq(0);
 		store
 			.create(
-				&stack,
 				&secret,
 				"hunter2",
 				Some("the database"),
-				Rotation::Remint,
+				SecretRotation::Remint,
 			)
 			.await
 			.unwrap();
 		store
-			.get(&stack, &secret)
+			.get(&secret)
 			.await
 			.unwrap()
 			.unwrap()
 			.xpect_eq("hunter2");
 		let err = store
-			.create(&stack, &secret, "other", None, Rotation::Remint)
+			.create(&secret, "other", None, SecretRotation::Remint)
 			.await
 			.unwrap_err();
 		SecretStoreError::is_already_exists(&err).xpect_true();
 		store
 			.overwrite(
-				&stack,
 				&secret,
 				"hunter3",
 				Some("rotated"),
-				Some(Rotation::manual("by hand")),
+				Some(SecretRotation::manual("by hand")),
 			)
 			.await
 			.unwrap();
-		let entries = store.list(&stack).await.unwrap();
+		let entries = store.list().await.unwrap();
 		entries.len().xpect_eq(1);
 		entries[0].secret.label().as_str().xpect_eq("db-password");
 		entries[0]
@@ -501,15 +482,15 @@ mod test {
 		entries[0]
 			.rotation
 			.clone()
-			.xpect_eq(Some(Rotation::manual("by hand")));
-		let all = store.read_all(&stack).await.unwrap();
+			.xpect_eq(Some(SecretRotation::manual("by hand")));
+		let all = store.read_all().await.unwrap();
 		all[0].1.as_str().xpect_eq("hunter3");
 		store
-			.delete(&stack, &[secret.clone(), SecretRef::new("nope")])
+			.delete(&[secret.clone(), SecretRef::new("nope")])
 			.await
 			.unwrap()
 			.xpect_eq(vec![secret.clone()]);
-		store.get(&stack, &secret).await.unwrap().xpect_none();
+		store.get(&secret).await.unwrap().xpect_none();
 	}
 
 	/// The race path: the loser re-reads the winner's value.
@@ -519,7 +500,7 @@ mod test {
 		let store = memory_secret_store(&stack);
 		let secret = SecretRef::new("db-password");
 		let (value, minted) = store
-			.ensure(&stack, &secret, Some("db"), Rotation::Remint, async || {
+			.ensure(&secret, Some("db"), SecretRotation::Remint, async || {
 				"first".to_string().xok()
 			})
 			.await
@@ -527,7 +508,7 @@ mod test {
 		value.as_str().xpect_eq("first");
 		minted.xpect_true();
 		let (value, minted) = store
-			.ensure(&stack, &secret, None, Rotation::Remint, async || {
+			.ensure(&secret, None, SecretRotation::Remint, async || {
 				"second".to_string().xok()
 			})
 			.await
@@ -536,21 +517,27 @@ mod test {
 		minted.xpect_false();
 	}
 
-	/// One document, one stack: another stage is refused by name.
+	/// One document, one stack: rescoping to another stage is refused by
+	/// name, and to the same stage is the same store.
 	#[beet_core::test]
-	async fn serves_one_stack() {
+	fn serves_one_stack() {
 		let stack = stack();
 		let store = memory_secret_store(&stack);
 		let other = Stack::new("beet_infra")
 			.with_stage("prod")
 			.resolve(&PackageConfig::default());
 		store
-			.get(&other, &SecretRef::new("x"))
-			.await
+			.for_stack(&other)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("`beet_infra--dev`")
 			.xpect_contains("`beet_infra--prod`");
+		store
+			.for_stack(&stack)
+			.unwrap()
+			.stack()
+			.clone()
+			.xpect_eq(stack);
 	}
 
 	/// A store with no identity lists the index and refuses to open a
@@ -562,21 +549,21 @@ mod test {
 		let secret = SecretRef::new("x");
 		let store = SecretStore::new(seeded.clone());
 		store
-			.create(&stack, &secret, "1", None, Rotation::Remint)
+			.create(&secret, "1", None, SecretRotation::Remint)
 			.await
 			.unwrap();
 		let blind = SecretStore::new(
 			seeded.with_identities(AgeIdentityFile::default()),
 		);
-		blind.list(&stack).await.unwrap().len().xpect_eq(1);
+		blind.list().await.unwrap().len().xpect_eq(1);
 		blind
-			.get(&stack, &secret)
+			.get(&secret)
 			.await
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no age identity");
 		blind
-			.get(&stack, &SecretRef::new("absent"))
+			.get(&SecretRef::new("absent"))
 			.await
 			.unwrap()
 			.xpect_none();
@@ -600,7 +587,7 @@ mod test {
 		let store = store.with_seed(Some(seed));
 		let bound = SecretStore::new(store.clone());
 		bound
-			.create(&stack, &SecretRef::new("x"), "1", None, Rotation::Remint)
+			.create(&SecretRef::new("x"), "1", None, SecretRotation::Remint)
 			.await
 			.unwrap();
 		let written = store.handle().read().await.unwrap();

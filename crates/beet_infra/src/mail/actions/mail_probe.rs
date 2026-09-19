@@ -211,7 +211,7 @@ pub async fn MailProbe(
 	let region = mail.stack.region().clone();
 	let password = mail
 		.secrets
-		.require(&mail.stack, &secret, || {
+		.require(&secret, || {
 			format!(
 				"no credential for {address}: <StalwartProvision/> mints it, so \
 				run the provision before the probe"
@@ -424,7 +424,7 @@ async fn send_inbound_comail(
 	let slug = sender_domain.slug();
 	let credential = |secret: SecretRef| async move {
 		mail.secrets
-			.require(&mail.stack, &secret, || {
+			.require(&secret, || {
 				format!(
 					"the probe cannot send as '{}': run <ComailEnroll/>",
 					sender_domain.domain()
@@ -496,7 +496,7 @@ async fn send_inbound_local(
 	);
 	let password = mail
 		.secrets
-		.require(&mail.stack, &secret, || {
+		.require(&secret, || {
 			format!(
 				"no credential for {from}: a direct-delivering stack sends its \
 				own inbound leg, so '{localpart}' must be a declared mailbox on \

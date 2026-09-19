@@ -2,20 +2,24 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use core::fmt;
 use std::sync::Arc;
 
-/// A stack's secret store: parameter store on AWS, a secrets document
-/// locally, 1Password or anything else downstream. Every secret is addressed
-/// by `(stack, SecretRef)` and every provider composes its own address from
-/// the pair, so a label (`dkim-example-com`) never couples to a provider and
-/// an export restores into a different provider or region unchanged.
+/// One stack's secret store: parameter store on AWS, a secrets document
+/// locally, 1Password or anything else downstream. A handle is scoped to
+/// the stack it was resolved for, exactly as a [`BlobStore`] is scoped to a
+/// bucket and prefix, so every method takes a [`SecretRef`] label alone and
+/// the provider composes its own address from the pair; a label
+/// (`dkim-example-com`) never couples to a provider and an export restores
+/// into a different provider or region unchanged. Another stack's store is
+/// [`for_stack`](Self::for_stack), the `with_subdir` of the seam.
 ///
-/// Erased like [`BlobStore`]: an `Arc<dyn SecretStoreProvider>`, cloned by
-/// every consumer, landed on the declaring entity by the attach observer of
-/// its declaration (`<SsmSecrets/>`, `<DocumentSecrets/>`) and resolved by
-/// [`StackQuery::secret_store`]. [`Debug`] prints the provider id and never
-/// a value.
+/// The erased-provider pattern (`AGENTS.md`): an `Arc<dyn SecretStoreProvider>`
+/// cloned by every consumer, landed on the declaring entity by the attach
+/// observer of its declaration (`<SsmSecrets/>`, `<DocumentSecrets/>`) and
+/// resolved by [`StackQuery::secret_store`]. [`Debug`] prints the provider
+/// id and never a value.
 ///
 /// Values never reach a log: a consumer that prints one (`MailCredentials`)
 /// says so in its own docs.
@@ -28,6 +32,7 @@ impl fmt::Debug for SecretStore {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("SecretStore")
 			.field("provider", &self.provider.id())
+			.field("stack", &self.provider.stack().resource_name(""))
 			.finish()
 	}
 }
@@ -49,25 +54,29 @@ impl SecretStore {
 	/// How a log names this store: its id and region.
 	pub fn describe(&self) -> String { self.provider.describe() }
 
-	/// The provider's address for `secret` in `stack`, ie
-	/// `/app/stage/label` on SSM.
-	pub fn address(
-		&self,
-		stack: &ResolvedStack,
-		secret: &SecretRef,
-	) -> SmolStr {
-		self.provider.address(stack, secret)
+	/// The stack this handle is scoped to.
+	pub fn stack(&self) -> &ResolvedStack { self.provider.stack() }
+
+	/// The same provider scoped to `stack`: how a drill reads its source
+	/// stage's credential through its own store. A provider that cannot
+	/// serve another stack (a document holds one) errors naming both.
+	pub fn for_stack(&self, stack: &ResolvedStack) -> Result<Self> {
+		Self {
+			provider: Arc::from(self.provider.for_stack(stack)?),
+		}
+		.xok()
+	}
+
+	/// The provider's address for `secret`, ie `/app/stage/label` on SSM.
+	pub fn address(&self, secret: &SecretRef) -> SmolStr {
+		self.provider.address(secret)
 	}
 
 	/// The value, `None` when the secret does not exist. Any other failure
 	/// (no credentials, no identity, no permission) is an error rather than a
 	/// silent mint of a second secret.
-	pub async fn get(
-		&self,
-		stack: &ResolvedStack,
-		secret: &SecretRef,
-	) -> Result<Option<String>> {
-		self.provider.get(stack.clone(), secret.clone()).await
+	pub async fn get(&self, secret: &SecretRef) -> Result<Option<String>> {
+		self.provider.get(secret.clone()).await
 	}
 
 	/// [`get`](Self::get) for a caller that cannot proceed without the value:
@@ -75,12 +84,11 @@ impl SecretStore {
 	/// mints it.
 	pub async fn require(
 		&self,
-		stack: &ResolvedStack,
 		secret: &SecretRef,
 		hint: impl FnOnce() -> String,
 	) -> Result<String> {
-		self.get(stack, secret).await?.ok_or_else(|| {
-			bevyhow!("no secret at {}: {}", self.address(stack, secret), hint())
+		self.get(secret).await?.ok_or_else(|| {
+			bevyhow!("no secret at {}: {}", self.address(secret), hint())
 		})
 	}
 
@@ -94,14 +102,13 @@ impl SecretStore {
 	/// un-rotatable.
 	pub async fn create(
 		&self,
-		stack: &ResolvedStack,
 		secret: &SecretRef,
 		value: &str,
 		note: Option<&str>,
-		rotation: Rotation,
+		rotation: SecretRotation,
 	) -> Result {
 		self.provider
-			.create(stack.clone(), secret.clone(), value.into(), SecretMeta {
+			.create(secret.clone(), value.into(), SecretMeta {
 				note: note.map(SmolStr::new),
 				rotation: Some(rotation),
 			})
@@ -115,22 +122,16 @@ impl SecretStore {
 	/// box), where an existing value is by definition stale.
 	pub async fn overwrite(
 		&self,
-		stack: &ResolvedStack,
 		secret: &SecretRef,
 		value: &str,
 		note: Option<&str>,
-		rotation: Option<Rotation>,
+		rotation: Option<SecretRotation>,
 	) -> Result {
 		self.provider
-			.overwrite(
-				stack.clone(),
-				secret.clone(),
-				value.into(),
-				SecretMeta {
-					note: note.map(SmolStr::new),
-					rotation,
-				},
-			)
+			.overwrite(secret.clone(), value.into(), SecretMeta {
+				note: note.map(SmolStr::new),
+				rotation,
+			})
 			.await
 	}
 
@@ -141,22 +142,21 @@ impl SecretStore {
 	/// rotate one by accident.
 	pub async fn ensure(
 		&self,
-		stack: &ResolvedStack,
 		secret: &SecretRef,
 		note: Option<&str>,
-		rotation: Rotation,
+		rotation: SecretRotation,
 		generate: impl AsyncFnOnce() -> Result<String>,
 	) -> Result<(String, bool)> {
-		let address = self.address(stack, secret);
-		if let Some(value) = self.get(stack, secret).await? {
+		let address = self.address(secret);
+		if let Some(value) = self.get(secret).await? {
 			return (value, false).xok();
 		}
 		let generated = generate().await?;
-		match self.create(stack, secret, &generated, note, rotation).await {
+		match self.create(secret, &generated, note, rotation).await {
 			Ok(()) => (generated, true).xok(),
 			Err(err) if SecretStoreError::is_already_exists(&err) => {
 				info!("secret {address} was minted concurrently, re-reading");
-				self.get(stack, secret)
+				self.get(secret)
 					.await?
 					.map(|value| (value, false))
 					.ok_or_else(|| {
@@ -167,36 +167,27 @@ impl SecretStore {
 		}
 	}
 
-	/// Every secret of `stack`, with its metadata and never a value.
-	pub async fn list(
-		&self,
-		stack: &ResolvedStack,
-	) -> Result<Vec<SecretEntry>> {
-		self.provider.list(stack.clone()).await
+	/// Every secret of the stack, with its metadata and never a value.
+	pub async fn list(&self) -> Result<Vec<SecretEntry>> {
+		self.provider.list().await
 	}
 
-	/// Every secret of `stack` with its value: what an export reads.
-	pub async fn read_all(
-		&self,
-		stack: &ResolvedStack,
-	) -> Result<Vec<(SecretEntry, String)>> {
-		self.provider.read_all(stack.clone()).await
+	/// Every secret of the stack with its value: what an export reads.
+	pub async fn read_all(&self) -> Result<Vec<(SecretEntry, String)>> {
+		self.provider.read_all().await
 	}
 
 	/// Delete `secrets`, answering the ones actually deleted; one already
 	/// gone is not an error.
 	pub async fn delete(
 		&self,
-		stack: &ResolvedStack,
 		secrets: &[SecretRef],
 	) -> Result<Vec<SecretRef>> {
-		self.provider.delete(stack.clone(), secrets.to_vec()).await
+		self.provider.delete(secrets.to_vec()).await
 	}
 }
 
-/// A secret store backend, see [`SecretStore`]. Every method takes the stack
-/// the secret belongs to, since one provider (a region's parameter store)
-/// serves many stacks and a drill reads its source stage's.
+/// A secret store backend scoped to one stack, see [`SecretStore`].
 pub trait SecretStoreProvider: 'static + Send + Sync {
 	/// A boxed clone, so a default method can own the provider across an
 	/// await.
@@ -216,20 +207,25 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 		}
 	}
 
-	/// The provider's address for `secret` in `stack`.
-	fn address(&self, stack: &ResolvedStack, secret: &SecretRef) -> SmolStr;
+	/// The stack this provider is scoped to.
+	fn stack(&self) -> &ResolvedStack;
+
+	/// See [`SecretStore::for_stack`].
+	fn for_stack(
+		&self,
+		stack: &ResolvedStack,
+	) -> Result<Box<dyn SecretStoreProvider>>;
+
+	/// The provider's address for `secret`.
+	fn address(&self, secret: &SecretRef) -> SmolStr;
 
 	/// See [`SecretStore::get`].
-	fn get(
-		&self,
-		stack: ResolvedStack,
-		secret: SecretRef,
-	) -> SendBoxedFuture<Result<Option<String>>>;
+	fn get(&self, secret: SecretRef)
+	-> SendBoxedFuture<Result<Option<String>>>;
 
 	/// See [`SecretStore::create`].
 	fn create(
 		&self,
-		stack: ResolvedStack,
 		secret: SecretRef,
 		value: SmolStr,
 		meta: SecretMeta,
@@ -238,32 +234,23 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 	/// See [`SecretStore::overwrite`].
 	fn overwrite(
 		&self,
-		stack: ResolvedStack,
 		secret: SecretRef,
 		value: SmolStr,
 		meta: SecretMeta,
 	) -> SendBoxedFuture<Result>;
 
 	/// See [`SecretStore::list`].
-	fn list(
-		&self,
-		stack: ResolvedStack,
-	) -> SendBoxedFuture<Result<Vec<SecretEntry>>>;
+	fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>>;
 
 	/// See [`SecretStore::read_all`]: a listing then a read per entry, which
 	/// a provider with a bulk read overrides.
-	fn read_all(
-		&self,
-		stack: ResolvedStack,
-	) -> SendBoxedFuture<Result<Vec<(SecretEntry, String)>>> {
+	fn read_all(&self) -> SendBoxedFuture<Result<Vec<(SecretEntry, String)>>> {
 		let this = self.box_clone();
 		Box::pin(async move {
 			let mut values = Vec::new();
-			for entry in this.list(stack.clone()).await? {
-				let value = this
-					.get(stack.clone(), entry.secret.clone())
-					.await?
-					.ok_or_else(|| {
+			for entry in this.list().await? {
+				let value =
+					this.get(entry.secret.clone()).await?.ok_or_else(|| {
 						bevyhow!(
 							"secret {} vanished between the listing and the read",
 							entry.address
@@ -278,7 +265,6 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 	/// See [`SecretStore::delete`].
 	fn delete(
 		&self,
-		stack: ResolvedStack,
 		secrets: Vec<SecretRef>,
 	) -> SendBoxedFuture<Result<Vec<SecretRef>>>;
 }
@@ -295,7 +281,7 @@ pub struct SecretEntry {
 	/// When the value was last written, where the provider says.
 	pub modified: Option<Timestamp>,
 	/// How the secret rotates, stored at mint; absent on one parked by hand.
-	pub rotation: Option<Rotation>,
+	pub rotation: Option<SecretRotation>,
 }
 
 /// What a write stores beside a value: the note and the rotation, which a
@@ -306,7 +292,7 @@ pub struct SecretMeta {
 	pub note: Option<SmolStr>,
 	/// How the value rotates; every mint declares one, a restore carries
 	/// the record's.
-	pub rotation: Option<Rotation>,
+	pub rotation: Option<SecretRotation>,
 }
 
 /// The one failure a consumer matches on: [`SecretStore::create`] found the
@@ -325,20 +311,57 @@ impl SecretStoreError {
 }
 
 /// Declares that the stack's secrets live in AWS parameter store, in the
-/// stack's region: `<SsmSecrets/>` under a `<Stack>`. The default for a
-/// [`Remote`](ServiceAccess::Remote) launch, so a stack on AWS need not
-/// declare it. Native and `deploy` only, since the provider drives the `aws`
-/// cli.
+/// stack's region: `<SsmSecrets/>` under a `<Stack>`, and the declaration a
+/// stack with none is taken to carry. As with a declared bucket, the
+/// declaration is the deploy meaning and the launch decides the runtime
+/// one ([`runtime_store`](Self::runtime_store)): a `Remote` launch attaches
+/// parameter store, a `Local` one the document stand-in under
+/// `target/secrets`, so a stack runs both ways without knowing there are
+/// two.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct SsmSecrets;
 
+impl SsmSecrets {
+	/// The store a launch under `access` attaches for this declaration, the
+	/// ONE place the local/remote choice is made for secrets: parameter store
+	/// in `stack`'s region when `Remote` (native and `deploy`, since the
+	/// provider drives the `aws` cli), the document at
+	/// `target/secrets/<app>--<stage>.toml` when `Local`, its `default`
+	/// group seeded from `seed`.
+	pub fn runtime_store(
+		access: ServiceAccess,
+		stack: ResolvedStack,
+		seed: Option<SecretsHandle>,
+	) -> Result<SecretStore> {
+		match access {
+			ServiceAccess::Local => DocumentSecretStore::local(stack)?
+				.with_seed(seed)
+				.xmap(SecretStore::new)
+				.xok(),
+			ServiceAccess::Remote => {
+				cfg_if! {
+					if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+						SecretStore::new(SsmSecretStore::new(stack)).xok()
+					} else {
+						bevybail!(
+							"stack `{}--{}` keeps its secrets in parameter store and this \
+							build has no provider for it (the `deploy` feature, native): \
+							declare `<DocumentSecrets path=\"..\"/>` under the stack",
+							stack.app_name(),
+							stack.stage()
+						)
+					}
+				}
+			}
+		}
+	}
+}
+
 /// Declares that the stack's secrets live in a secrets document:
 /// `<DocumentSecrets path="infra/secrets/app--prod.toml"/>` under a
 /// `<Stack>`, the file in the nearest ancestor `BlobStore` (the repo store).
-/// The default for a [`Local`](ServiceAccess::Local) launch is the same store
-/// over `target/secrets/<app>--<stage>.toml`, so a stack need not declare it
-/// to run locally.
+/// Target-agnostic, so the same file on either launch.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DocumentSecrets {
@@ -363,11 +386,45 @@ impl DocumentSecrets {
 	}
 }
 
+/// Observer: land the [`SecretStore`] an `<SsmSecrets/>` declares on its
+/// entity, [`SsmSecrets::runtime_store`] for the stack it is declared under.
+/// Deferred through the command queue because the stack is an ancestor,
+/// which lands after insertion.
+pub(crate) fn attach_ssm_secrets(
+	ev: On<Insert, SsmSecrets>,
+	mut commands: Commands,
+) {
+	commands
+		.entity(ev.entity)
+		.queue(|mut entity: EntityWorldMut| -> Result {
+			if !entity.world().contains_resource::<PackageConfig>() {
+				bevybail!(
+					"resolving `<SsmSecrets/>` needs the `PackageConfig` \
+					resource, which `BootstrapPlugin` inserts"
+				);
+			}
+			let (stack, seed) = entity
+				.with_state::<(StackQuery, SecretsQuery), _>(
+					|entity, (stacks, documents)| {
+						(
+							stacks.resolve(entity),
+							documents.resolve_default(entity).ok(),
+						)
+					},
+				);
+			entity.insert(SsmSecrets::runtime_store(
+				BootstrapConfig::get().service_access,
+				stack,
+				seed,
+			)?);
+			Ok(())
+		});
+}
+
 #[cfg(test)]
 mod test {
 	use super::*;
 	use crate::types::test_support::*;
-	use beet_net::prelude::*;
 
 	/// A stack root carrying the repo store, with `declarations` under it.
 	fn stack_with(world: &mut World, declarations: impl Bundle) -> Entity {
@@ -383,7 +440,8 @@ mod test {
 		root
 	}
 
-	/// The declared store wins, resolved from anywhere under the stack.
+	/// The declared store wins, resolved from anywhere under the stack and
+	/// scoped to it.
 	#[beet_core::test]
 	fn resolution_picks_the_declared_store() {
 		let mut world = infra_world();
@@ -399,36 +457,52 @@ mod test {
 			store
 				.describe()
 				.xpect_contains("infra/secrets/app--prod.toml");
+			store.stack().clone().xpect_eq(stacks.resolve(root));
 		});
 	}
 
-	/// With nothing declared the launch's access decides: local is the
-	/// stand-in document under `target/secrets`, remote is parameter store
-	/// in the stack's region.
+	/// With nothing declared the stack carries an implicit `<SsmSecrets/>`,
+	/// and the launch decides: local is the stand-in document under
+	/// `target/secrets`, remote is parameter store in the stack's region.
 	#[beet_core::test]
-	fn resolution_falls_back_by_service_access() {
+	fn an_undeclared_stack_is_ssm_by_launch() {
 		let mut world = infra_world();
 		let root = stack_with(&mut world, ());
-		world.with_state::<StackQuery, _>(|stacks| {
-			let stack = stacks.resolve(root);
-			let local = stacks
-				.default_secret_store(ServiceAccess::Local, root, stack.clone())
-				.unwrap();
-			local.id().xpect_eq("document");
-			local.describe().xpect_contains("app--prod.toml");
-			// the test launch is local, so the plain resolution agrees
+		let stack = world.with_state::<StackQuery, _>(|stacks| {
+			// the test launch is local
 			stacks.secret_store(root).unwrap().id().xpect_eq("document");
-			#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-			{
-				let remote = stacks
-					.default_secret_store(ServiceAccess::Remote, root, stack)
-					.unwrap();
-				remote.id().xpect_eq("ssm");
-				remote
-					.region()
-					.unwrap()
-					.xpect_eq(stacks.resolve(root).region().clone());
-			}
+			stacks.resolve(root)
+		});
+		let local = SsmSecrets::runtime_store(
+			ServiceAccess::Local,
+			stack.clone(),
+			None,
+		)
+		.unwrap();
+		local.id().xpect_eq("document");
+		local.describe().xpect_contains("app--prod.toml");
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		{
+			let remote = SsmSecrets::runtime_store(
+				ServiceAccess::Remote,
+				stack.clone(),
+				None,
+			)
+			.unwrap();
+			remote.id().xpect_eq("ssm");
+			remote.region().unwrap().xpect_eq(stack.region().clone());
+			remote.stack().clone().xpect_eq(stack);
+		}
+		// a declared `<SsmSecrets/>` on this local launch is the stand-in too
+		// (one repo store per world, so a second world)
+		let mut world = infra_world();
+		let declared = stack_with(&mut world, SsmSecrets);
+		world.with_state::<StackQuery, _>(|stacks| {
+			stacks
+				.secret_store(declared)
+				.unwrap()
+				.id()
+				.xpect_eq("document");
 		});
 	}
 
@@ -469,55 +543,51 @@ mod test {
 			}
 			fn id(&self) -> &'static str { "racing" }
 			fn region(&self) -> Option<SmolStr> { None }
-			fn address(
+			fn stack(&self) -> &ResolvedStack { self.inner.stack() }
+			fn for_stack(
 				&self,
 				stack: &ResolvedStack,
-				secret: &SecretRef,
-			) -> SmolStr {
-				self.inner.address(stack, secret)
+			) -> Result<Box<dyn SecretStoreProvider>> {
+				self.inner.for_stack(stack)
+			}
+			fn address(&self, secret: &SecretRef) -> SmolStr {
+				self.inner.address(secret)
 			}
 			/// The first read misses, as the loser's did.
 			fn get(
 				&self,
-				stack: ResolvedStack,
 				secret: SecretRef,
 			) -> SendBoxedFuture<Result<Option<String>>> {
 				use core::sync::atomic::Ordering;
 				match self.misses.fetch_sub(1, Ordering::Relaxed) > 0 {
 					true => Box::pin(async { None.xok() }),
-					false => self.inner.get(stack, secret),
+					false => self.inner.get(secret),
 				}
 			}
 			fn create(
 				&self,
-				stack: ResolvedStack,
 				secret: SecretRef,
 				value: SmolStr,
 				meta: SecretMeta,
 			) -> SendBoxedFuture<Result> {
-				self.inner.create(stack, secret, value, meta)
+				self.inner.create(secret, value, meta)
 			}
 			fn overwrite(
 				&self,
-				stack: ResolvedStack,
 				secret: SecretRef,
 				value: SmolStr,
 				meta: SecretMeta,
 			) -> SendBoxedFuture<Result> {
-				self.inner.overwrite(stack, secret, value, meta)
+				self.inner.overwrite(secret, value, meta)
 			}
-			fn list(
-				&self,
-				stack: ResolvedStack,
-			) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
-				self.inner.list(stack)
+			fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
+				self.inner.list()
 			}
 			fn delete(
 				&self,
-				stack: ResolvedStack,
 				secrets: Vec<SecretRef>,
 			) -> SendBoxedFuture<Result<Vec<SecretRef>>> {
-				self.inner.delete(stack, secrets)
+				self.inner.delete(secrets)
 			}
 		}
 		let stack = Stack::new("app").resolve(&PackageConfig::default());
@@ -525,7 +595,7 @@ mod test {
 		let secret = SecretRef::new("db-password");
 		// the winner minted first
 		SecretStore::new(inner.clone())
-			.create(&stack, &secret, "winner", None, Rotation::Remint)
+			.create(&secret, "winner", None, SecretRotation::Remint)
 			.await
 			.unwrap();
 		let store = SecretStore::new(Racing {
@@ -533,7 +603,7 @@ mod test {
 			misses: Arc::new(1.into()),
 		});
 		let (value, minted) = store
-			.ensure(&stack, &secret, None, Rotation::Remint, async || {
+			.ensure(&secret, None, SecretRotation::Remint, async || {
 				"loser".to_string().xok()
 			})
 			.await

@@ -78,7 +78,7 @@ pub struct SecretRecord {
 	/// How the secret is rotated, declared by whatever minted it; absent on
 	/// a hand-kept record.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub rotation: Option<Rotation>,
+	pub rotation: Option<SecretRotation>,
 }
 
 impl SecretRecord {

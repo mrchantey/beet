@@ -865,7 +865,7 @@ impl StalwartBlock {
 		);
 		// the pair, parked as the apply derives it and rotated by replacing
 		// the access key, which the same apply re-parks
-		let rotation = Rotation::replace(key.address());
+		let rotation = SecretRotation::replace(key.address());
 		let user_param = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("ses-smtp-user")),
 			AwsSsmParameterDetails {

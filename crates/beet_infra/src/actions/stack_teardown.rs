@@ -63,10 +63,7 @@ pub async fn StackTeardown(
 	// the rendered config, lockfile and scratch files
 	report(work_dir, fs_ext::remove_async(&project.work_dir()).await);
 	// what the actions minted outside terraform, which nothing else removes
-	report(
-		secrets,
-		sweep_secrets(project.secret_store()?, project.stack()).await,
-	);
+	report(secrets, sweep_secrets(project.secret_store()?).await);
 
 	Pass(cx.input).xok()
 }
@@ -90,12 +87,9 @@ impl StackTeardown {
 }
 
 /// Delete every secret of the stack in its store, naming each label.
-async fn sweep_secrets(
-	store: &SecretStore,
-	stack: &ResolvedStack,
-) -> Result<usize> {
+async fn sweep_secrets(store: &SecretStore) -> Result<usize> {
 	let labels = store
-		.list(stack)
+		.list()
 		.await?
 		.into_iter()
 		.map(|entry| entry.secret)
@@ -104,7 +98,7 @@ async fn sweep_secrets(
 		info!("no secrets in {}", store.describe());
 		return Ok(0);
 	}
-	let deleted = store.delete(stack, &labels).await?;
+	let deleted = store.delete(&labels).await?;
 	for secret in &deleted {
 		info!("deleted secret {}", secret.label());
 	}
@@ -219,23 +213,16 @@ mod test {
 		for label in ["mail-admin-password", "dkim-example-com"] {
 			store
 				.create(
-					&stack,
 					&SecretRef::new(label),
 					"x",
 					None,
-					Rotation::Remint,
+					SecretRotation::Remint,
 				)
 				.await
 				.unwrap();
 		}
-		super::sweep_secrets(&store, &stack)
-			.await
-			.unwrap()
-			.xpect_eq(2);
-		store.list(&stack).await.unwrap().len().xpect_eq(0);
-		super::sweep_secrets(&store, &stack)
-			.await
-			.unwrap()
-			.xpect_eq(0);
+		super::sweep_secrets(&store).await.unwrap().xpect_eq(2);
+		store.list().await.unwrap().len().xpect_eq(0);
+		super::sweep_secrets(&store).await.unwrap().xpect_eq(0);
 	}
 }

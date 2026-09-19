@@ -12,8 +12,10 @@ use core::str::FromStr;
 /// omit one, so no secret arrives un-rotatable.
 ///
 /// Written as one string: `replace:<resource>`, `remint`, `manual:<why>`.
+/// Named for what it rotates, since a bare `Rotation` is a 3D thing in the
+/// same prelude.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
-pub enum Rotation {
+pub enum SecretRotation {
 	/// A terraform-derived secret (the SES pair, a bucket token): `tofu apply
 	/// -replace=<resource>` mints a new one and the same apply re-parks it.
 	Replace {
@@ -32,7 +34,7 @@ pub enum Rotation {
 	},
 }
 
-impl Rotation {
+impl SecretRotation {
 	/// A [`Manual`](Self::Manual) rotation for `why`.
 	pub fn manual(why: impl Into<SmolStr>) -> Self {
 		Self::Manual { why: why.into() }
@@ -55,7 +57,7 @@ impl Rotation {
 	}
 }
 
-impl fmt::Display for Rotation {
+impl fmt::Display for SecretRotation {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Replace { resource } => write!(f, "replace:{resource}"),
@@ -65,7 +67,7 @@ impl fmt::Display for Rotation {
 	}
 }
 
-impl FromStr for Rotation {
+impl FromStr for SecretRotation {
 	type Err = BevyError;
 	fn from_str(value: &str) -> Result<Self> {
 		let value = value.trim();
@@ -86,7 +88,7 @@ impl FromStr for Rotation {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for Rotation {
+impl Serialize for SecretRotation {
 	fn serialize<S: serde::Serializer>(
 		&self,
 		serializer: S,
@@ -96,7 +98,7 @@ impl Serialize for Rotation {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Rotation {
+impl<'de> Deserialize<'de> for SecretRotation {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,
 	) -> core::result::Result<Self, D::Error> {
@@ -112,18 +114,20 @@ mod test {
 	#[crate::test]
 	fn roundtrips_the_string_form() {
 		for (rotation, text) in [
-			(Rotation::Remint, "remint"),
+			(SecretRotation::Remint, "remint"),
 			(
-				Rotation::replace("cloudflare_account_token.x"),
+				SecretRotation::replace("cloudflare_account_token.x"),
 				"replace:cloudflare_account_token.x",
 			),
 			(
-				Rotation::manual("a new selector: beside the old"),
+				SecretRotation::manual("a new selector: beside the old"),
 				"manual:a new selector: beside the old",
 			),
 		] {
 			rotation.to_string().xpect_eq(text);
-			text.parse::<Rotation>().unwrap().xpect_eq(rotation.clone());
+			text.parse::<SecretRotation>()
+				.unwrap()
+				.xpect_eq(rotation.clone());
 			// serialized as its string form
 			let record = SecretRecord {
 				rotation: Some(rotation.clone()),
@@ -136,8 +140,8 @@ mod test {
 				.rotation
 				.xpect_eq(Some(rotation));
 		}
-		"replace:".parse::<Rotation>().unwrap_err();
-		"weekly".parse::<Rotation>().unwrap_err();
-		Rotation::Remint.kind().xpect_eq("remint");
+		"replace:".parse::<SecretRotation>().unwrap_err();
+		"weekly".parse::<SecretRotation>().unwrap_err();
+		SecretRotation::Remint.kind().xpect_eq("remint");
 	}
 }

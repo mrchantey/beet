@@ -132,7 +132,7 @@ pub async fn MailDane(
 
 	let secret = mail.mail_box.tlsa_secret();
 	let (usage, selector, matching) = StalwartBlock::TLSA_PARAMS;
-	match mail.secrets.get(&mail.stack, &secret).await?.as_deref() {
+	match mail.secrets.get(&secret).await?.as_deref() {
 		Some(parked) if parked == pin => info!(
 			"{} pins {usage} {selector} {matching} {pin}, unchanged",
 			mail.mail_box.tlsa_record_name()
@@ -140,7 +140,6 @@ pub async fn MailDane(
 		parked => {
 			mail.secrets
 				.overwrite(
-					&mail.stack,
 					&secret,
 					&pin,
 					Some(&format!(
@@ -148,7 +147,7 @@ pub async fn MailDane(
 						mail.mail_box.tlsa_record_name()
 					)),
 					// the next deploy reads the served key and parks it again
-					Some(Rotation::Remint),
+					Some(SecretRotation::Remint),
 				)
 				.await?;
 			info!(

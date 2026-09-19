@@ -1,6 +1,6 @@
 //! A secrets document written back into a stack's secret store.
 use crate::actions::export_target;
-use crate::actions::stack_and_store;
+use crate::actions::secret_store;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -45,13 +45,12 @@ struct RestoreParams {
 #[require(ParamsPartial = ParamsPartial::new::<RestoreParams>())]
 pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<RestoreParams>()?;
-	let (stack, store) = stack_and_store(&cx.caller).await?;
+	let store = secret_store(&cx.caller).await?;
 	let source = SecretsRestore::source(
 		&cx.caller,
 		params.document.as_deref(),
 		params.from.as_deref(),
 		&store,
-		&stack,
 	)
 	.await?;
 	let document = source.read().await?;
@@ -73,7 +72,7 @@ pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	// refuse to replace what is live unless told to
 	let held = store
-		.list(&stack)
+		.list()
 		.await?
 		.into_iter()
 		.map(|entry| entry.secret.label().clone())
@@ -95,18 +94,13 @@ pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
 		let secret_ref = SecretRef::new(name.clone());
 		store
 			.overwrite(
-				&stack,
 				&secret_ref,
 				&secret.value,
 				secret.record.note.as_deref(),
 				secret.record.rotation.clone(),
 			)
 			.await?;
-		writeln!(
-			out,
-			"restored `{name}` to {}",
-			store.address(&stack, &secret_ref)
-		)?;
+		writeln!(out, "restored `{name}` to {}", store.address(&secret_ref))?;
 		info!("restored secret {name}");
 	}
 	writeln!(
@@ -127,7 +121,6 @@ impl SecretsRestore {
 		selector: Option<&str>,
 		from: Option<&str>,
 		store: &SecretStore,
-		stack: &ResolvedStack,
 	) -> Result<SecretsHandle> {
 		let declared = SecretsHandle::resolve(caller, selector).await?;
 		// a declaration may target a bucket reached under a parked pair
@@ -142,7 +135,7 @@ impl SecretsRestore {
 			.await?;
 		let handle = match declaration {
 			Some(declaration) => {
-				export_target(caller, declaration, store, stack).await?
+				export_target(caller, declaration, store).await?
 			}
 			None => declared,
 		};
@@ -262,23 +255,23 @@ mod tests {
 	#[beet_core::test]
 	async fn restore_is_the_inverse_of_export() {
 		let mut world = infra_world();
-		let (root, export, store, stack) = exported_stack(&mut world).await;
-		let before = store.read_all(&stack).await.unwrap();
+		let (root, export, store) = exported_stack(&mut world).await;
+		let before = store.read_all().await.unwrap();
 		run_export(&mut world, root, export, false).await.unwrap();
 		// wipe
 		let labels = before
 			.iter()
 			.map(|(entry, _)| entry.secret.clone())
 			.collect::<Vec<_>>();
-		store.delete(&stack, &labels).await.unwrap();
-		store.list(&stack).await.unwrap().len().xpect_eq(0);
+		store.delete(&labels).await.unwrap();
+		store.list().await.unwrap().len().xpect_eq(0);
 
 		restore(&mut world, root, "--document=mail-prod")
 			.await
 			.unwrap()
 			.xpect_contains("restored `dkim-example-com`")
 			.xpect_contains("2 record(s) restored");
-		let after = store.read_all(&stack).await.unwrap();
+		let after = store.read_all().await.unwrap();
 		after.len().xpect_eq(2);
 		for (entry, value) in &before {
 			let restored = after
@@ -316,12 +309,9 @@ mod tests {
 	#[beet_core::test]
 	async fn restores_from_a_dated_series() {
 		let mut world = infra_world();
-		let (root, export, store, stack) = exported_stack(&mut world).await;
+		let (root, export, store) = exported_stack(&mut world).await;
 		run_export(&mut world, root, export, true).await.unwrap();
-		store
-			.delete(&stack, &[SecretRef::new("mail-tlsa")])
-			.await
-			.unwrap();
+		store.delete(&[SecretRef::new("mail-tlsa")]).await.unwrap();
 		restore(&mut world, root, "--document=mail-prod --only=mail-tlsa")
 			.await
 			.unwrap()

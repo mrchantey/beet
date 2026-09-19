@@ -6,19 +6,29 @@ use beet_net::prelude::*;
 /// A variable to be passed to tofu commands, commonly used
 /// for inserting application-specific environment variables in runtimes,
 /// catching missing variables before deploy.
+///
+/// Three independent things: where the value comes from
+/// ([`VariableSource`]), whether terraform may print it (`sensitive`, a
+/// property of the use, never implied by the source: the two store-backed
+/// variables today are public halves), and whether absence is a legal state,
+/// which only the store source can answer and carries itself.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Reflect)]
 pub struct Variable {
 	key: SmolStr,
-	value: VariableValue,
+	source: VariableSource,
 	/// Redact this value everywhere tofu would otherwise print it: the plan, the
 	/// apply output, an `output` that reads it. State is NOT covered, which is
 	/// why a stack declaring one turns on state encryption.
 	sensitive: bool,
 }
 
-/// How a [`Variable`] value is resolved at deploy time.
+/// Where a [`Variable`]'s value comes from at deploy time. Two families:
+/// the ambient sources (`ProcessEnv`, `Header`, `Param`) a pipeline step
+/// supplies at apply, harmless with an empty default; and the content
+/// sources (`Fixed`, `Secret`) every rendering verb resolves, since their
+/// value decides what a resource IS.
 #[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
-pub enum VariableValue {
+pub enum VariableSource {
 	/// A fixed literal value.
 	Fixed(SmolStr),
 	/// Collected from the deployer's process environment via [`env_ext::var`].
@@ -39,20 +49,25 @@ pub enum VariableValue {
 	/// "this key is revoked", so every message the domain signs fails.
 	///
 	/// Hence: no default, resolved by every verb that renders, and a hard error
-	/// when the secret is absent.
-	Secret(SecretRef),
-	/// [`Secret`](Self::Secret) for a resource whose ABSENCE is a legal state:
-	/// the secret not existing resolves to empty rather than refusing, and the
-	/// block reading it emits nothing for empty (a `count` on the value).
-	///
-	/// The case: a `TLSA` pinning the certificate a server serves. Nothing
-	/// has been issued on a fresh stack, so there is nothing to pin and no
-	/// record is the right record; the value is parked once the server serves
-	/// one, and the next render publishes it. Still content (every verb that
-	/// renders reads it, so a `plan` is truthful) and still no terraform
-	/// default, so a bare invocation outside these verbs refuses rather than
-	/// withdrawing the record.
-	SecretOptional(SecretRef),
+	/// when the secret is absent, unless `optional`.
+	Secret {
+		/// The secret, by label; the store composes the address.
+		secret: SecretRef,
+		/// Whether ABSENCE is a legal state: the secret not existing resolves
+		/// to empty rather than refusing, and the block reading it emits
+		/// nothing for empty (a `count` on the value). The store is the one
+		/// source where absence is a runtime state that changes over time,
+		/// which is why this lives here and not on every variable.
+		///
+		/// The case: a `TLSA` pinning the certificate a server serves. Nothing
+		/// has been issued on a fresh stack, so there is nothing to pin and no
+		/// record is the right record; the value is parked once the server
+		/// serves one, and the next render publishes it. Still content (every
+		/// verb that renders reads it, so a `plan` is truthful) and still no
+		/// terraform default, so a bare invocation outside these verbs refuses
+		/// rather than withdrawing the record.
+		optional: bool,
+	},
 }
 
 impl Variable {
@@ -60,7 +75,7 @@ impl Variable {
 	pub fn fixed(key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::Fixed(value.into()),
+			source: VariableSource::Fixed(value.into()),
 			sensitive: false,
 		}
 	}
@@ -69,7 +84,7 @@ impl Variable {
 	pub fn process_env(key: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::ProcessEnv,
+			source: VariableSource::ProcessEnv,
 			sensitive: false,
 		}
 	}
@@ -78,7 +93,7 @@ impl Variable {
 	pub fn header(key: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::Header,
+			source: VariableSource::Header,
 			sensitive: false,
 		}
 	}
@@ -87,27 +102,33 @@ impl Variable {
 	pub fn param(key: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::Param,
+			source: VariableSource::Param,
 			sensitive: false,
 		}
 	}
 
 	/// Create a variable read from the stack's secret store, see
-	/// [`VariableValue::Secret`].
+	/// [`VariableSource::Secret`].
 	pub fn secret(key: impl Into<SmolStr>, secret: SecretRef) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::Secret(secret),
+			source: VariableSource::Secret {
+				secret,
+				optional: false,
+			},
 			sensitive: false,
 		}
 	}
 
 	/// Create a variable read from the stack's secret store whose absence
-	/// resolves to empty, see [`VariableValue::SecretOptional`].
+	/// resolves to empty, see [`VariableSource::Secret`].
 	pub fn secret_optional(key: impl Into<SmolStr>, secret: SecretRef) -> Self {
 		Self {
 			key: key.into(),
-			value: VariableValue::SecretOptional(secret),
+			source: VariableSource::Secret {
+				secret,
+				optional: true,
+			},
 			sensitive: false,
 		}
 	}
@@ -116,21 +137,16 @@ impl Variable {
 	/// ambient runtime attribute, so it carries no default and must resolve
 	/// before any render.
 	pub fn is_content(&self) -> bool {
-		matches!(
-			self.value,
-			VariableValue::Secret(_) | VariableValue::SecretOptional(_)
-		)
+		matches!(self.source, VariableSource::Secret { .. })
 	}
 
 	/// Whether an absent secret resolves to empty rather than refusing,
-	/// see [`VariableValue::SecretOptional`].
+	/// see [`VariableSource::Secret`].
 	pub fn absent_is_empty(&self) -> bool {
-		matches!(self.value, VariableValue::SecretOptional(_))
+		matches!(self.source, VariableSource::Secret { optional: true, .. })
 	}
 
-	/// The secret this variable reads, if it is a
-	/// [`Secret`](VariableValue::Secret) or
-	/// [`SecretOptional`](VariableValue::SecretOptional) one.
+	/// The secret this variable reads, if its source is the store.
 	///
 	/// The READ itself belongs to the deploy side (`terra::Project`, through
 	/// the stack's [`SecretStore`](crate::prelude::StackQuery::secret_store)),
@@ -139,9 +155,8 @@ impl Variable {
 	/// provider at all. A declaration should not drag in the machinery that
 	/// acts on it.
 	pub fn secret_ref(&self) -> Option<&SecretRef> {
-		match &self.value {
-			VariableValue::Secret(secret)
-			| VariableValue::SecretOptional(secret) => Some(secret),
+		match &self.source {
+			VariableSource::Secret { secret, .. } => Some(secret),
 			_ => None,
 		}
 	}
@@ -149,8 +164,8 @@ impl Variable {
 	/// A fixed value, if this variable carries one, so a render can resolve it
 	/// without a request.
 	pub fn fixed_value(&self) -> Option<&SmolStr> {
-		match &self.value {
-			VariableValue::Fixed(value) => Some(value),
+		match &self.source {
+			VariableSource::Fixed(value) => Some(value),
 			_ => None,
 		}
 	}
@@ -159,32 +174,31 @@ impl Variable {
 	///
 	/// The request-bound counterpart of [`resolve_for_render`](Self::resolve_for_render),
 	/// used by a deploy pipeline where an earlier step has supplied the ambient
-	/// values as params. A [`Secret`](VariableValue::Secret) variable is not
+	/// values as params. A [`Secret`](VariableSource::Secret) variable is not
 	/// resolvable from a request and is an error here; the render resolves it
 	/// through the stack's secret store.
 	pub fn resolve_value(&self, request: &RequestParts) -> Result<SmolStr> {
-		match &self.value {
-			VariableValue::Fixed(value) => Ok(value.clone()),
-			VariableValue::Secret(secret)
-			| VariableValue::SecretOptional(secret) => bevybail!(
+		match &self.source {
+			VariableSource::Fixed(value) => Ok(value.clone()),
+			VariableSource::Secret { secret, .. } => bevybail!(
 				"variable `{}` reads secret `{}` and is not resolvable from a \
 				request",
 				self.key,
 				secret.label()
 			),
-			VariableValue::ProcessEnv => env_ext::var(self.key.as_str())
+			VariableSource::ProcessEnv => env_ext::var(self.key.as_str())
 				.map(SmolStr::new)
 				.map_err(|_| {
 					bevyhow!("process env variable '{}' not found", self.key)
 				}),
-			VariableValue::Header => request
+			VariableSource::Header => request
 				.headers()
 				.first_raw(self.key.as_str())
 				.map(SmolStr::new)
 				.ok_or_else(|| {
 					bevyhow!("header variable '{}' not found", self.key)
 				}),
-			VariableValue::Param => request
+			VariableSource::Param => request
 				.get_param(self.key.as_str())
 				.map(SmolStr::new)
 				.ok_or_else(|| {

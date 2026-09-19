@@ -62,7 +62,7 @@ impl Plugin for InfraPlugin {
 		// the deploy `Variable` + its value resolution, a field of the blocks'
 		// `env_vars` (always compiled, in `types/`).
 		app.register_type::<crate::types::Variable>()
-			.register_type::<crate::types::VariableValue>();
+			.register_type::<crate::types::VariableSource>();
 
 		// the blocks a beet *application* declares (the bucket it is served from,
 		// the stores it records to), so `<S3BucketBlock label="app"/>` and
@@ -206,13 +206,13 @@ impl Plugin for InfraPlugin {
 
 		// the secrets document surface (`<Secrets/>`, the verbs), the secret
 		// store declarations (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`)
-		// and the document provider's attach, on every target the seam
-		// compiles; parameter store's attach drives the aws cli and is
-		// registered with the deploy actions below.
+		// and their attaches, on every target the seam compiles: the launch
+		// decides what an `<SsmSecrets/>` lands (`SsmSecrets::runtime_store`).
 		#[cfg(feature = "vault")]
 		app.init_plugin::<beet_net::prelude::SecretsPlugin>()
 			.register_type::<crate::prelude::SsmSecrets>()
 			.register_type::<crate::prelude::DocumentSecrets>()
+			.add_observer(crate::types::attach_ssm_secrets)
 			.add_observer(crate::types::attach_document_secrets);
 
 		// the zone a block publishes into, a field of every block that names a
@@ -304,11 +304,9 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::CloudflarePurgeCache>();
 
 		// the create-if-missing secret step, which every stack holding a
-		// generated credential runs before its apply, and the parameter store
-		// provider an `<SsmSecrets/>` declaration attaches.
+		// generated credential runs before its apply.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::EnsureSecret>()
-			.add_observer(crate::actions::attach_ssm_secrets);
+		app.register_type::<crate::prelude::EnsureSecret>();
 		// the store's export into a secrets document, the restore back out
 		// of one, and a human's removal, in every deploy build
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

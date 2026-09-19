@@ -69,8 +69,8 @@ pub mod fs;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
-// `Rotation` is plain data every build describing a stack needs; the document
-// and its declaration behind it ride `vault`
+// `SecretRotation` is plain data every build describing a stack needs; the
+// document and its declaration behind it ride `vault`
 pub mod secrets;
 pub mod template;
 #[cfg(feature = "vault")]

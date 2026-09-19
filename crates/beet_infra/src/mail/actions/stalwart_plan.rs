@@ -708,12 +708,12 @@ impl AccountPlan {
 	/// provision mints a fresh one and sets it on the account
 	/// (`converge_account`), so every client configured against the mailbox
 	/// re-enters it.
-	pub fn rotation() -> Rotation { Rotation::Remint }
+	pub fn rotation() -> SecretRotation { SecretRotation::Remint }
 
 	/// How the server's own administrator credential rotates: by hand, since
 	/// provision signs in with it to do anything at all.
-	pub fn admin_rotation() -> Rotation {
-		Rotation::manual(
+	pub fn admin_rotation() -> SecretRotation {
+		SecretRotation::manual(
 			"set a new password on the administrator through the management \
 			api as another admin, then overwrite the entry",
 		)

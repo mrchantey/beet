@@ -141,7 +141,7 @@ pub async fn ComailDeliverability(
 /// One of the enrolment secrets, failing with the step that fills it.
 async fn read(mail: &MailStack, secret: SecretRef) -> Result<String> {
 	mail.secrets
-		.require(&mail.stack, &secret, || {
+		.require(&secret, || {
 			"run <ComailEnroll/>, which checks it".to_string()
 		})
 		.await

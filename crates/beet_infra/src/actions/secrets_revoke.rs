@@ -1,6 +1,6 @@
 //! Removing a human from a stack's secrets: re-seal what they could read,
 //! rotate what they could have read.
-use crate::actions::stack_and_store;
+use crate::actions::secret_store;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -22,7 +22,7 @@ struct RevokeParams {
 
 /// `<SecretsRevoke/>` — remove a human from a stack: re-seal every group of
 /// every declared document to its current list, then rotate every secret in
-/// the stack's store through its declared [`Rotation`], and print what needs
+/// the stack's store through its declared [`SecretRotation`], and print what needs
 /// a hand.
 ///
 /// Git history and the cold bucket keep old ciphertext a removed human can
@@ -30,10 +30,10 @@ struct RevokeParams {
 /// rotating every secret those groups held. The recipient must already be
 /// out of the lists (the verb refuses while they are listed, since a rekey
 /// to a list that still names them changes nothing). Then every secret of
-/// the store rotates by what minted it declared: a [`Rotation::Replace`]
-/// through `tofu apply -replace` on its resource, a [`Rotation::Remint`] by
+/// the store rotates by what minted it declared: a [`SecretRotation::Replace`]
+/// through `tofu apply -replace` on its resource, a [`SecretRotation::Remint`] by
 /// deleting the entry and running the stack's `deploy` group, which mints a
-/// fresh one and re-provisions its consumer, and a [`Rotation::Manual`] is
+/// fresh one and re-provisions its consumer, and a [`SecretRotation::Manual`] is
 /// printed with its reason as the residue, as is a secret with no rotation
 /// declared (one parked by hand). It never reports a rotation it did not
 /// perform, and ends with the count of each.
@@ -129,8 +129,8 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 	}
 
 	// the store: every secret by its declared rotation
-	let (stack, store) = stack_and_store(&cx.caller).await?;
-	let plan = RevokePlan::new(store.list(&stack).await?);
+	let store = secret_store(&cx.caller).await?;
+	let plan = RevokePlan::new(store.list().await?);
 	for (secret, resource) in &plan.replace {
 		writeln!(ledger, "replace `{secret}`: tofu apply -replace={resource}")?;
 	}
@@ -167,7 +167,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 				.iter()
 				.map(|label| SecretRef::new(label.clone()))
 				.collect::<Vec<_>>();
-			let deleted = store.delete(&stack, &labels).await?;
+			let deleted = store.delete(&labels).await?;
 			for secret in &deleted {
 				info!("deleted secret {} for re-minting", secret.label());
 			}
@@ -208,11 +208,11 @@ impl RevokePlan {
 		for entry in entries {
 			let label = entry.secret.label().clone();
 			match entry.rotation {
-				Some(Rotation::Replace { resource }) => {
+				Some(SecretRotation::Replace { resource }) => {
 					plan.replace.push((label, resource))
 				}
-				Some(Rotation::Remint) => plan.remint.push(label),
-				Some(Rotation::Manual { why }) => {
+				Some(SecretRotation::Remint) => plan.remint.push(label),
+				Some(SecretRotation::Manual { why }) => {
 					plan.manual.push((label, why))
 				}
 				None => plan.undeclared.push(label),
@@ -290,13 +290,7 @@ mod tests {
 	/// `default`, an empty deploy group and the verb routes.
 	async fn revocable_stack(
 		world: &mut World,
-	) -> (
-		Entity,
-		SecretStore,
-		ResolvedStack,
-		AgeIdentity,
-		SecretsHandle,
-	) {
+	) -> (Entity, SecretStore, AgeIdentity, SecretsHandle) {
 		let alice = AgeIdentity::generate();
 		let deploy = world.spawn(Group).id();
 		let destroy = world.spawn(Group).id();
@@ -322,39 +316,29 @@ mod tests {
 			})
 			.unwrap();
 		world.flush();
-		let (stack, store) = world
-			.with_state::<StackQuery, _>(|stacks| {
-				stacks
-					.secret_store(root)
-					.map(|store| (stacks.resolve(root), store))
-			})
+		let store = world
+			.with_state::<StackQuery, _>(|stacks| stacks.secret_store(root))
 			.unwrap();
 		for (label, rotation) in [
 			(
 				"cold-access-key-id",
-				Rotation::replace("cloudflare_account_token.x"),
+				SecretRotation::replace("cloudflare_account_token.x"),
 			),
 			(
 				"cold-secret-access-key",
-				Rotation::replace("cloudflare_account_token.x"),
+				SecretRotation::replace("cloudflare_account_token.x"),
 			),
-			("mail-admin-password", Rotation::Remint),
-			("dkim-example-com", Rotation::manual("a new selector")),
+			("mail-admin-password", SecretRotation::Remint),
+			("dkim-example-com", SecretRotation::manual("a new selector")),
 		] {
 			store
-				.create(&stack, &SecretRef::new(label), "x", None, rotation)
+				.create(&SecretRef::new(label), "x", None, rotation)
 				.await
 				.unwrap();
 		}
 		// one parked by hand, with no rotation
 		store
-			.overwrite(
-				&stack,
-				&SecretRef::new("comail-did"),
-				"did:plc",
-				None,
-				None,
-			)
+			.overwrite(&SecretRef::new("comail-did"), "did:plc", None, None)
 			.await
 			.unwrap();
 		// the entry document, sealed to both humans
@@ -375,7 +359,7 @@ mod tests {
 		);
 		document.set(&identities, "TOKEN", "1", default()).unwrap();
 		entry.write(&document).await.unwrap();
-		(root, store, stack, alice, entry)
+		(root, store, alice, entry)
 	}
 
 	async fn revoke(
@@ -403,8 +387,7 @@ mod tests {
 	#[beet_core::test]
 	async fn revokes_a_recipient() {
 		let mut world = infra_world();
-		let (root, store, stack, alice, entry) =
-			revocable_stack(&mut world).await;
+		let (root, store, alice, entry) = revocable_stack(&mut world).await;
 		let alice_recipient = alice.to_recipient().to_string();
 		let args = format!("--recipient={alice_recipient}");
 		revoke(&mut world, root, &args)
@@ -454,12 +437,12 @@ mod tests {
 			.unwrap()
 			.get("TOKEN")
 			.xpect_some();
-		store.list(&stack).await.unwrap().len().xpect_eq(5);
+		store.list().await.unwrap().len().xpect_eq(5);
 
 		// the store here has a `replace`, which needs tofu: dry runs only
 		// for it, so the live run is against the rest
 		store
-			.delete(&stack, &[
+			.delete(&[
 				SecretRef::new("cold-access-key-id"),
 				SecretRef::new("cold-secret-access-key"),
 			])
@@ -478,12 +461,12 @@ mod tests {
 			.get("TOKEN")
 			.xpect_none();
 		store
-			.get(&stack, &SecretRef::new("mail-admin-password"))
+			.get(&SecretRef::new("mail-admin-password"))
 			.await
 			.unwrap()
 			.xpect_none();
 		store
-			.get(&stack, &SecretRef::new("dkim-example-com"))
+			.get(&SecretRef::new("dkim-example-com"))
 			.await
 			.unwrap()
 			.xpect_some();
@@ -492,19 +475,20 @@ mod tests {
 	/// Two secrets derived from one resource are one replacement.
 	#[beet_core::test]
 	fn a_plan_sorts_by_rotation() {
-		let entry = |label: &str, rotation: Option<Rotation>| SecretEntry {
-			secret: SecretRef::new(label),
-			address: label.into(),
-			note: None,
-			modified: None,
-			rotation,
-		};
+		let entry =
+			|label: &str, rotation: Option<SecretRotation>| SecretEntry {
+				secret: SecretRef::new(label),
+				address: label.into(),
+				note: None,
+				modified: None,
+				rotation,
+			};
 		let plan = RevokePlan::new(vec![
-			entry("a", Some(Rotation::replace("r.x"))),
-			entry("b", Some(Rotation::replace("r.x"))),
-			entry("c", Some(Rotation::replace("r.y"))),
-			entry("d", Some(Rotation::Remint)),
-			entry("e", Some(Rotation::manual("why"))),
+			entry("a", Some(SecretRotation::replace("r.x"))),
+			entry("b", Some(SecretRotation::replace("r.x"))),
+			entry("c", Some(SecretRotation::replace("r.y"))),
+			entry("d", Some(SecretRotation::Remint)),
+			entry("e", Some(SecretRotation::manual("why"))),
 			entry("f", None),
 		]);
 		plan.resources()

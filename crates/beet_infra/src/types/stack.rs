@@ -220,13 +220,12 @@ impl<'w, 's> StackQuery<'w, 's> {
 		self.stores.get(entity)?.xok()
 	}
 
-	/// The [`SecretStore`] `entity`'s stack keeps its secrets in: the one
-	/// declared on or under its `<Stack>` (`<SsmSecrets/>`,
-	/// `<DocumentSecrets path=".."/>`), else the default this launch's
-	/// [`ServiceAccess`] implies: parameter store in the stack's region when
-	/// `Remote`, the document at `target/secrets/<app>--<stage>.toml` when
-	/// `Local`. Two declarations under one stack is an error naming both,
-	/// never a guess.
+	/// The [`SecretStore`] `entity`'s stack keeps its secrets in, scoped to
+	/// that stack: the one declared on or under its `<Stack>`
+	/// (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`), else the implicit
+	/// `<SsmSecrets/>` every stack carries, which the launch resolves
+	/// ([`SsmSecrets::runtime_store`]). Two declarations under one stack is
+	/// an error naming both, never a guess.
 	#[cfg(feature = "vault")]
 	pub fn secret_store(&self, entity: Entity) -> Result<SecretStore> {
 		let root = self
@@ -249,42 +248,11 @@ impl<'w, 's> StackQuery<'w, 's> {
 				first.describe(),
 				second.describe()
 			),
-			(None, _) => self.default_secret_store(
+			(None, _) => SsmSecrets::runtime_store(
 				BootstrapConfig::get().service_access,
-				entity,
 				stack,
+				self.documents.resolve_default(entity).ok(),
 			),
-		}
-	}
-
-	/// The store a stack with no declaration resolves under `access`.
-	#[cfg(feature = "vault")]
-	pub(crate) fn default_secret_store(
-		&self,
-		access: ServiceAccess,
-		entity: Entity,
-		stack: ResolvedStack,
-	) -> Result<SecretStore> {
-		match access {
-			ServiceAccess::Local => DocumentSecretStore::local(stack)?
-				.with_seed(self.documents.resolve_default(entity).ok())
-				.xmap(SecretStore::new)
-				.xok(),
-			ServiceAccess::Remote => {
-				cfg_if! {
-					if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
-						SecretStore::new(crate::prelude::SsmSecretStore::for_stack(&stack)).xok()
-					} else {
-						bevybail!(
-							"stack `{}--{}` declares no secret store and this build has no \
-							parameter store provider (the `deploy` feature, native): declare \
-							`<DocumentSecrets path=\"..\"/>` under the stack",
-							stack.app_name(),
-							stack.stage()
-						)
-					}
-				}
-			}
 		}
 	}
 }

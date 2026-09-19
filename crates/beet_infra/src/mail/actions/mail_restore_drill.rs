@@ -193,9 +193,12 @@ pub async fn MailRestoreDrill(
 			key
 		}
 		SnapshotSource::Cold => {
-			let cold =
-				ColdStore::resolve(mail.cold_store()?, &mail.secrets, &source)
-					.await?;
+			// the SOURCE stage's parked pair, through this stack's store
+			let cold = ColdStore::resolve(
+				mail.cold_store()?,
+				&mail.secrets.for_stack(&source)?,
+			)
+			.await?;
 			let key =
 				newest_key(cold.list(&prefix).await?, &cold.bucket, &prefix)?;
 			info!(
@@ -328,7 +331,8 @@ async fn assert_restored(
 	// every stack of its region
 	let password = mail
 		.secrets
-		.require(source, &secret, || {
+		.for_stack(source)?
+		.require(&secret, || {
 			"the drill authenticates as one of the SOURCE stage's accounts, so \
 			its secrets must still exist"
 				.to_string()

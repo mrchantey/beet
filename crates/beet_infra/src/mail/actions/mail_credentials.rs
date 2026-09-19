@@ -139,8 +139,8 @@ pub async fn MailCredentials(
 
 	cross_log!("");
 	for (name, secret, note) in entries {
-		let address = mail.secrets.address(&mail.stack, &secret);
-		match mail.secrets.get(&mail.stack, &secret).await? {
+		let address = mail.secrets.address(&secret);
+		match mail.secrets.get(&secret).await? {
 			Some(value) => {
 				cross_log!("{name}\n  {value}\n  {address} ({note})\n")
 			}

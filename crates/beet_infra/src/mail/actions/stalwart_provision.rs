@@ -220,9 +220,7 @@ impl Management {
 		// the commissioned path: the real administrator account over the port
 		// the world already reaches. No tunnel, no recovery credential, and
 		// nothing on the box listening in the clear.
-		if let Some(password) =
-			mail.secrets.get(&mail.stack, &admin_secret).await?
-		{
+		if let Some(password) = mail.secrets.get(&admin_secret).await? {
 			match JmapClient::connect(&public_origin, &user, &password).await {
 				Ok(client) => {
 					info!(
@@ -564,7 +562,6 @@ async fn bootstrap(
 		Some(secret) => {
 			mail.secrets
 				.overwrite(
-					stack,
 					&secret_ref,
 					secret,
 					Some(&AccountPlan::admin_note(mail.mail_box.hostname())),
@@ -573,7 +570,7 @@ async fn bootstrap(
 				.await?;
 			info!(
 				"parked the bootstrap admin credential at {}",
-				mail.secrets.address(stack, &secret_ref)
+				mail.secrets.address(&secret_ref)
 			);
 		}
 		None => warn!(
@@ -893,7 +890,7 @@ fn plan_converge(
 ///
 /// The credential is written on creation only, for the same reason an account's
 /// is: a key rotated under a published selector signs mail no verifier can
-/// check until DNS catches up. Rotation is a second selector beside this one.
+/// check until DNS catches up. SecretRotation is a second selector beside this one.
 async fn converge_dkim(
 	client: &JmapClient,
 	domain: &DomainPlan,
@@ -902,7 +899,7 @@ async fn converge_dkim(
 ) -> Result {
 	let private_key = mail
 		.secrets
-		.require(&mail.stack, &domain.dkim_secret, || {
+		.require(&domain.dkim_secret, || {
 			"<EnsureDkimKey/> mints it and the apply publishes its public \
 			half, so both run before this step"
 				.to_string()
@@ -950,7 +947,7 @@ async fn converge_dkim(
 /// generate, and the ACCOUNT decides whether to create. Reading one to answer
 /// the other is how a box rebuilt on a fresh data store gets a mailbox
 /// nobody can sign in to. The one crossing is deliberate and is the
-/// credential's [`Rotation::Remint`]: a secret minted here while the account
+/// credential's [`SecretRotation::Remint`]: a secret minted here while the account
 /// already exists (`secrets/revoke` deleted it) is set on the account, so
 /// the store and the server agree again.
 async fn converge_account(
@@ -962,7 +959,6 @@ async fn converge_account(
 	let (password, minted) = mail
 		.secrets
 		.ensure(
-			&mail.stack,
 			&account.secret,
 			Some(&account.note()),
 			AccountPlan::rotation(),
@@ -1027,7 +1023,7 @@ async fn converge_account(
 /// should have created it rather than failing as an authentication error later.
 async fn read_secret(mail: &MailStack, secret: &SecretRef) -> Result<String> {
 	mail.secrets
-		.require(&mail.stack, secret, || {
+		.require(secret, || {
 			"the deploy runs <EnsureSecret/> and the apply before this step for \
 			exactly this reason"
 				.to_string()
@@ -1102,7 +1098,7 @@ async fn read_comail_secret(
 	domain: &str,
 ) -> Result<String> {
 	mail.secrets
-		.require(&mail.stack, secret, || {
+		.require(secret, || {
 			format!(
 				"'{domain}' relays through comail; enrol the domain at \
 				https://comail.at and park the response, then run \

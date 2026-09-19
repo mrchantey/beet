@@ -141,7 +141,7 @@ impl Project {
 	async fn read_secret(&self, secret: &SecretRef) -> Result<Option<String>> {
 		cfg_if! {
 			if #[cfg(feature = "vault")] {
-				self.secret_store()?.get(&self.stack, secret).await
+				self.secret_store()?.get(secret).await
 			} else {
 				bevybail!(
 					"cannot read secret `{}`: this binary was built without the \
@@ -358,11 +358,10 @@ mod test {
 		let store = memory_secret_store(&stack);
 		store
 			.create(
-				&stack,
 				&SecretRef::new("dkim-example-com"),
 				"MIIB",
 				None,
-				Rotation::Remint,
+				SecretRotation::Remint,
 			)
 			.await
 			.unwrap();

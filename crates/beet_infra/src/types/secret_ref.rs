@@ -46,14 +46,14 @@ impl SecretRef {
 	/// `SecureString` at [`name`](Self::name) whose description carries the
 	/// note and the rotation ([`description`](Self::description)), so the
 	/// store lists it like one an action minted. The rotation is required:
-	/// every terraform-minted secret is a [`Rotation::Replace`] of the
+	/// every terraform-minted secret is a [`SecretRotation::Replace`] of the
 	/// resource it derives from, and a mint site cannot omit it.
 	pub fn parameter_resource(
 		&self,
 		stack: &ResolvedStack,
 		value: impl Into<SmolStr>,
 		note: &str,
-		rotation: Rotation,
+		rotation: SecretRotation,
 	) -> serde_json::Value {
 		serde_json::json!({
 			"name": self.name(stack),
@@ -69,7 +69,7 @@ impl SecretRef {
 	/// reads it in the console.
 	pub fn description(
 		note: Option<&str>,
-		rotation: Option<&Rotation>,
+		rotation: Option<&SecretRotation>,
 	) -> String {
 		match (rotation, note) {
 			(Some(rotation), Some(note)) => format!("{rotation} :: {note}"),
@@ -83,18 +83,18 @@ impl SecretRef {
 	/// that parses as a rotation is one, the rest is the note.
 	pub fn parse_description(
 		text: &str,
-	) -> (Option<SmolStr>, Option<Rotation>) {
+	) -> (Option<SmolStr>, Option<SecretRotation>) {
 		let text = text.trim();
 		let note = |text: &str| {
 			Some(SmolStr::new(text)).filter(|note| !note.is_empty())
 		};
 		match text.split_once(" :: ") {
 			Some((head, rest))
-				if let Ok(rotation) = head.parse::<Rotation>() =>
+				if let Ok(rotation) = head.parse::<SecretRotation>() =>
 			{
 				(note(rest.trim()), Some(rotation))
 			}
-			_ => match text.parse::<Rotation>() {
+			_ => match text.parse::<SecretRotation>() {
 				Ok(rotation) => (None, Some(rotation)),
 				Err(_) => (note(text), None),
 			},
@@ -142,14 +142,14 @@ mod tests {
 	/// each half on its own.
 	#[beet_core::test]
 	fn descriptions_carry_the_rotation_and_the_note() {
-		let replace = Rotation::replace("cloudflare_account_token.x");
+		let replace = SecretRotation::replace("cloudflare_account_token.x");
 		let text = SecretRef::description(Some("r2 token"), Some(&replace));
 		text.as_str()
 			.xpect_eq("replace:cloudflare_account_token.x :: r2 token");
 		SecretRef::parse_description(&text)
 			.xpect_eq((Some("r2 token".into()), Some(replace.clone())));
 		SecretRef::parse_description("remint")
-			.xpect_eq((None, Some(Rotation::Remint)));
+			.xpect_eq((None, Some(SecretRotation::Remint)));
 		SecretRef::parse_description("just a note")
 			.xpect_eq((Some("just a note".into()), None));
 		SecretRef::parse_description("").xpect_eq((None, None));

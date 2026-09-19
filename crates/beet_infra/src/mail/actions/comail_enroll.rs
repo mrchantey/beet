@@ -148,8 +148,8 @@ pub async fn ComailEnroll(
 		let mut values = Vec::new();
 		let mut missing = Vec::new();
 		for (secret, holds) in ComailRelay::secrets(&slug) {
-			let address = mail.secrets.address(&mail.stack, &secret);
-			match mail.secrets.get(&mail.stack, &secret).await? {
+			let address = mail.secrets.address(&secret);
+			match mail.secrets.get(&secret).await? {
 				Some(value) if !value.is_empty() => values.push(value),
 				_ => missing.push(format!("  {address}  ({holds})")),
 			}

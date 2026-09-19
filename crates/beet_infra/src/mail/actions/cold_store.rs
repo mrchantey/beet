@@ -107,9 +107,9 @@ pub struct ColdStore {
 }
 
 impl ColdStore {
-	/// The store `block` declares, under the credential parked for `stack`:
-	/// the stage whose token it is, which for a drill is the SOURCE stage
-	/// rather than the drill's own.
+	/// The store `block` declares, under the credential parked for the stack
+	/// `secrets` is scoped to: the stage whose token it is, which for a drill
+	/// is the SOURCE stage rather than the drill's own.
 	///
 	/// Missing is an error naming the apply that parks it, never a skip: a
 	/// verb that quietly did nothing against an empty cold bucket is the
@@ -117,12 +117,10 @@ impl ColdStore {
 	pub async fn resolve(
 		block: &R2BucketBlock,
 		secrets: &SecretStore,
-		stack: &ResolvedStack,
 	) -> Result<Self> {
-		let (access_key, secret_key) =
-			block.parked_pair(secrets, stack).await?;
+		let (access_key, secret_key) = block.parked_pair(secrets).await?;
 		Self {
-			bucket: block.bucket_name(stack),
+			bucket: block.bucket_name(secrets.stack()),
 			endpoint: block.endpoint(),
 			access_key,
 			secret_key,
