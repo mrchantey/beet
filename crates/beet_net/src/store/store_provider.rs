@@ -45,6 +45,9 @@ pub enum StoreProvider {
 	/// `http://<host>/<prefix>` / `http:<prefix>`.
 	#[cfg(feature = "json")]
 	Http(HttpStore),
+	/// `sqlite:<path>`.
+	#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+	Sqlite(SqliteStore),
 }
 
 /// Apply `$body` to every variant's store, the one match `insert` and
@@ -66,6 +69,8 @@ macro_rules! each_store {
 			StoreProvider::R2($store) => $body,
 			#[cfg(feature = "json")]
 			StoreProvider::Http($store) => $body,
+			#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+			StoreProvider::Sqlite($store) => $body,
 		}
 	};
 }
@@ -138,6 +143,13 @@ impl StoreProvider {
 				"store `{uri}` is served over http, whose listing is json \
 				 (enable the `json` feature)"
 			),
+			#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteStore::from_uri(uri)?),
+			#[cfg(not(all(feature = "sqlite", not(target_arch = "wasm32"))))]
+			StoreUri::Sqlite { .. } => bevybail!(
+				"store `{uri}` is a SQLite database (enable the `sqlite` \
+				 feature, native only)"
+			),
 		}
 		.xok()
 	}
@@ -198,6 +210,23 @@ mod test {
 			.into_blob_store()
 			.xmap(|store| (store.root_key(), store.subdir()))
 			.xpect_eq(("memory:m".into(), RelPath::new("docs")));
+	}
+
+	/// A database file uri builds the sqlite backend, its relative path
+	/// resolved against the cwd and its blobs unscoped.
+	#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	fn builds_a_sqlite_backend() {
+		let store = StoreProvider::from_uri(
+			&StoreUri::parse("sqlite:data.db").unwrap(),
+		)
+		.unwrap()
+		.into_blob_store();
+		store.id().xpect_eq("sqlite");
+		store
+			.root_key()
+			.xpect_eq(format!("sqlite:{}", AbsPath::new("data.db").unwrap()));
+		store.subdir().xpect_eq(RelPath::default());
 	}
 
 	/// A memory uri names one backing: every build of it reads the same data,

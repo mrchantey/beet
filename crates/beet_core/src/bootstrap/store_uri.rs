@@ -50,6 +50,10 @@ use core::str::FromStr;
 ///    the web: a browser reads it against `location.origin`, a native process
 ///    against its canonical loopback server. A process forks a remote repo
 ///    into a local store (`--store-fork`) rather than writing to it.
+/// 8. `sqlite:<path>`: a SQLite database file, the table-native store a local
+///    index names. Relative paths resolve against the context dir and `~`
+///    expands exactly as for `fs:`. The file is a whole store: there is no key
+///    prefix within it.
 ///
 /// ## Example
 ///
@@ -132,6 +136,11 @@ pub enum StoreUri {
 		/// The url path prefix the store roots at.
 		path_prefix: Option<RelPath>,
 	},
+	/// A SQLite database file, a whole store with no key prefix.
+	Sqlite {
+		/// The database file, absolute or relative to the context dir.
+		path: SmolPath,
+	},
 }
 
 impl Default for StoreUri {
@@ -164,6 +173,14 @@ impl StoreUri {
 			}
 			.xok();
 		}
+		// a database file is named or nothing: `sqlite:` alone is an error
+		if let Some(path) = value.strip_prefix("sqlite:") {
+			let path = Self::expand_home(path.trim())?.xmap(SmolPath::new);
+			if path.as_str().is_empty() {
+				bevybail!("store `sqlite:` is missing a database path");
+			}
+			return Self::Sqlite { path }.xok();
+		}
 		// `http:` and `http:/` are the origin itself, ie a bare `http`
 		if let Some(path) = value.strip_prefix("http:") {
 			return Self::Http {
@@ -186,7 +203,8 @@ impl StoreUri {
 				local-storage://<store>[/<path_prefix>] (wasm), \
 				indexed-db://<db>[/<path_prefix>] (wasm), \
 				r2://<binding>[/<path_prefix>] (cloudflare worker), \
-				http://<host>[/<path_prefix>], https://.., http:<path_prefix>"
+				http://<host>[/<path_prefix>], https://.., http:<path_prefix>, \
+				sqlite:<path>"
 			),
 		}
 		.xok()
@@ -203,7 +221,7 @@ impl StoreUri {
 		match env_ext::var("HOME") {
 			Ok(home) => SmolStr::from(format!("{home}{rest}")).xok(),
 			Err(_) => bevybail!(
-				"`~` in `fs:{path}` needs a HOME environment variable"
+				"`~` in store path `{path}` needs a HOME environment variable"
 			),
 		}
 	}
@@ -291,9 +309,10 @@ impl StoreUri {
 	}
 
 	/// The backing this uri names: a memory backing, a bucket, a table, a
-	/// browser database, a Worker binding, an http origin. `None` for a
-	/// filesystem store, whose root is its [`path_prefix`](Self::path_prefix),
-	/// and for an origin-relative http store, whose origin is the context's.
+	/// browser database, a Worker binding, an http origin, a database file.
+	/// `None` for a filesystem store, whose root is its
+	/// [`path_prefix`](Self::path_prefix), and for an origin-relative http
+	/// store, whose origin is the context's.
 	pub fn name(&self) -> Option<&str> {
 		match self {
 			Self::Fs { .. } => None,
@@ -304,12 +323,14 @@ impl StoreUri {
 			| Self::IndexedDb { name, .. }
 			| Self::R2 { name, .. } => Some(name.as_str()),
 			Self::Http { origin, .. } => origin.as_deref(),
+			Self::Sqlite { path } => Some(path.as_str()),
 		}
 	}
 
 	/// The root within the backing, the prefix every key resolves under: a
 	/// filesystem path for `fs` (absolute, or relative to the context dir), a
-	/// key prefix for every other kind.
+	/// key prefix for every other kind, `None` for a whole-store kind
+	/// (`sqlite:`).
 	pub fn path_prefix(&self) -> Option<&SmolPath> {
 		match self {
 			Self::Fs { path_prefix } => path_prefix.as_ref(),
@@ -320,6 +341,8 @@ impl StoreUri {
 			| Self::IndexedDb { path_prefix, .. }
 			| Self::R2 { path_prefix, .. }
 			| Self::Http { path_prefix, .. } => path_prefix.as_deref(),
+			// a database file is a whole store
+			Self::Sqlite { .. } => None,
 		}
 	}
 
@@ -345,7 +368,9 @@ impl StoreUri {
 	/// This store rooted at `subdir` below its current root, the uri form of
 	/// `BlobStore::with_subdir`: every kind nests `subdir` under its path
 	/// prefix. A `subdir` is a key, so a leading `/` or an escaping `..`
-	/// cannot climb above the current root.
+	/// cannot climb above the current root. A whole-store kind (`sqlite:`)
+	/// has no prefix to nest under and is returned as is: scope its provider
+	/// instead.
 	pub fn with_subdir(&self, subdir: impl Into<RelPath>) -> Self {
 		let subdir = subdir.into();
 		let nest = |path_prefix: &Option<RelPath>| -> Option<RelPath> {
@@ -406,15 +431,20 @@ impl StoreUri {
 				origin: origin.clone(),
 				path_prefix: nest(path_prefix),
 			},
+			Self::Sqlite { .. } => self.clone(),
 		}
 	}
 
 	/// This uri with its filesystem root pinned to `dir`: a bare `fs` roots at
-	/// `dir`, a relative `fs:<path>` at `<path>` under it, an absolute one
-	/// stands alone, and every self-rooted kind is untouched. The entry
-	/// resolver calls this with the resolved entry directory, so a `--repo=fs`
-	/// means "the entry's own directory" rather than the cwd.
+	/// `dir`, a relative `fs:<path>` or `sqlite:<path>` at `<path>` under it,
+	/// an absolute one stands alone, and every self-rooted kind is untouched.
+	/// The entry resolver calls this with the resolved entry directory, so a
+	/// `--repo=fs` means "the entry's own directory" rather than the cwd.
 	pub fn rooted_at(&self, dir: &AbsPath) -> Self {
+		let under_dir = |path: &SmolPath| match path.is_absolute() {
+			true => path.clone(),
+			false => dir.join(path).into_smol_path(),
+		};
 		match self {
 			Self::Fs { path_prefix: None } => Self::Fs {
 				path_prefix: Some(dir.as_smol_path().clone()),
@@ -422,10 +452,10 @@ impl StoreUri {
 			Self::Fs {
 				path_prefix: Some(path_prefix),
 			} => Self::Fs {
-				path_prefix: Some(match path_prefix.is_absolute() {
-					true => path_prefix.clone(),
-					false => dir.join(path_prefix).into_smol_path(),
-				}),
+				path_prefix: Some(under_dir(path_prefix)),
+			},
+			Self::Sqlite { path } => Self::Sqlite {
+				path: under_dir(path),
 			},
 			other => other.clone(),
 		}
@@ -549,6 +579,7 @@ impl fmt::Display for StoreUri {
 				Some(path_prefix) => write!(f, "http:{path_prefix}"),
 				None => write!(f, "http"),
 			},
+			Self::Sqlite { path } => write!(f, "sqlite:{path}"),
 		}
 	}
 }
@@ -610,6 +641,9 @@ mod test {
 			"http://127.0.0.1:8337/repo",
 			"https://beet.org",
 			"https://beet.org/repo",
+			"sqlite:data.db",
+			"sqlite:../index/data.db",
+			"sqlite:/var/lib/beet/data.db",
 		] {
 			StoreUri::parse(uri).unwrap().to_string().xpect_eq(uri);
 		}
@@ -681,6 +715,11 @@ mod test {
 				origin: None,
 				path_prefix: Some("repo".into()),
 			});
+		StoreUri::parse("sqlite:data.db")
+			.unwrap()
+			.xpect_eq(StoreUri::Sqlite {
+				path: "data.db".into(),
+			});
 	}
 
 	/// A leading `~` is the home directory, expanded at parse so the rendered
@@ -701,6 +740,10 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_eq("fs:~foo");
+		StoreUri::parse("sqlite:~/data.db")
+			.unwrap()
+			.to_string()
+			.xpect_eq(format!("sqlite:{home}/data.db"));
 	}
 
 	/// A page names its repo as a url: an authority is the origin, a bare
@@ -745,6 +788,8 @@ mod test {
 		parts("https://beet.org/repo")
 			.xpect_eq((Some("https://beet.org".into()), Some("repo".into())));
 		parts("http:repo").xpect_eq((None, Some("repo".into())));
+		// a database file is the backing and a whole store
+		parts("sqlite:data.db").xpect_eq((Some("data.db".into()), None));
 	}
 
 	/// A scoped path prefix is a key: the text is cleaned, a leading or
@@ -781,6 +826,7 @@ mod test {
 			"r2://B",
 			"http:repo",
 			"https://beet.org/repo",
+			"sqlite:data.db",
 		] {
 			StoreUri::parse(uri).unwrap().is_self_rooted().xpect_true();
 		}
@@ -831,6 +877,11 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("supported: none");
+		// a database file is always named
+		StoreUri::parse("sqlite:")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("missing a database path");
 	}
 
 	/// A subdir nests below whatever root the uri already has, uniformly
@@ -860,6 +911,8 @@ mod test {
 		nested("http", "repo").xpect_eq("http:repo");
 		nested("https://beet.org/repo", "v1")
 			.xpect_eq("https://beet.org/repo/v1");
+		// a whole store has no prefix to nest under
+		nested("sqlite:data.db", "v1").xpect_eq("sqlite:data.db");
 	}
 
 	/// Pinning a context dir resolves the filesystem kinds and leaves every
@@ -874,6 +927,8 @@ mod test {
 		rooted("fs:site").xpect_eq("fs:/srv/site");
 		rooted("fs:../other").xpect_eq("fs:/other");
 		rooted("fs:/data").xpect_eq("fs:/data");
+		rooted("sqlite:data.db").xpect_eq("sqlite:/srv/data.db");
+		rooted("sqlite:/var/data.db").xpect_eq("sqlite:/var/data.db");
 		rooted("s3://b").xpect_eq("s3://b");
 		rooted("memory://m").xpect_eq("memory://m");
 		rooted("r2://B/p").xpect_eq("r2://B/p");

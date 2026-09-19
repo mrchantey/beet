@@ -61,29 +61,19 @@ impl TempDir {
 		Self::new_with_path(dir_path)
 	}
 
-	/// Create a new temporary directory in `target/tmp`, relative to the workspace root.
-	/// The `CARGO_TARGET_DIR` env var is not used.
-	pub fn new_ws() -> FsResult<Self> {
-		let workspace_root = fs_ext::workspace_root();
-		let dir_name = format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
-		let dir_path = workspace_root.join(dir_name);
-		Self::new_with_path(dir_path)
-	}
-
-	/// Creates a new temporary directory relative to the workspace root.
-	///
-	/// The directory is created at `<workspace_root>/target/tmp/beet_tmp_<uuid>`,
-	/// where `<uuid>` is a randomly generated UUID v7. This is useful for keeping
-	/// temporary files within the project structure.
+	/// Creates a new temporary directory relative to the workspace root, at
+	/// `<workspace_root>/target/tmp/beet_tmp_<uuid>`, for temporary files
+	/// that should stay within the project structure. The `CARGO_TARGET_DIR`
+	/// env var is not used.
 	///
 	/// # Example
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
 	///
-	/// let temp = TempDir::new_workspace().unwrap();
+	/// let temp = TempDir::new_ws().unwrap();
 	/// ```
-	pub fn new_workspace() -> FsResult<Self> {
+	pub fn new_ws() -> FsResult<Self> {
 		let workspace_root = fs_ext::workspace_root();
 		let dir_name = format!("target/tmp/beet_tmp_{}", uuid_ext::now_v7());
 		let dir_path = workspace_root.join(dir_name);
@@ -154,7 +144,7 @@ mod tests {
 		let dir_path;
 		{
 			// Create a workspace-relative temp directory
-			let temp = TempDir::new_workspace()
+			let temp = TempDir::new_ws()
 				.expect("Failed to create workspace-relative temp directory");
 			dir_path = temp.path.clone();
 

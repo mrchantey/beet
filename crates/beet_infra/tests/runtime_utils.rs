@@ -61,7 +61,7 @@ pub fn setup_isolated_test_guards(
 	};
 
 	// isolated temp assets dir
-	let temp_dir = TempDir::new_workspace()?;
+	let temp_dir = TempDir::new_ws()?;
 	let src_assets = AbsPath::new_workspace_rel(ASSETS_PATH)?;
 	for entry in ReadDir::files(&src_assets)? {
 		fs_ext::copy(

@@ -242,6 +242,9 @@ serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = "0.11"
+# SQLite for the `SqliteStore` backend: `bundled` compiles the engine in rather
+# than linking a system library, so it cross-compiles like the rest of the tree.
+rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
 # gzip for the cold analytics archive: pure rust (`miniz_oxide`) rather than a
 # zlib link, so it cross-compiles and builds for wasm like the rest of the tree.
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
@@ -340,6 +343,8 @@ json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
 # reader). Off by default; a deployed site enables it and commits a
 # `country.mmdb` to `assets/databases/` to populate the analytics country field.
 geoip = ["beet_net?/geoip"]
+# The `SqliteStore` backend (`sqlite:<path>`), native only.
+sqlite = ["net", "beet_net?/sqlite"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 # RON text format for `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "beet_core/ron"]

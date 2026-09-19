@@ -63,6 +63,10 @@ sockets = ["action", "dep:sha1", "dep:base64"]
 # `flate2` is the gzip codec shared by analytics segments and daily archives;
 # json is their newline-delimited payload.
 json = ["serde", "dep:serde_json", "dep:flate2", "beet_core/json", "beet_action?/json"]
+# The `SqliteStore` backend: real SQL tables behind the erased `TableStore`,
+# rows written as canonical json (hence `json`). Native only through the target
+# table below; every call runs on the `blocking` pool.
+sqlite = ["std", "json", "dep:rusqlite", "dep:blocking"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
@@ -246,6 +250,8 @@ async-tungstenite = { version = "0.35", optional = true, default-features = fals
 "futures-03-sink"
 ] }
 blocking = { workspace = true, optional = true }
+#💡 sqlite
+rusqlite = { workspace = true, optional = true }
 async-native-tls = { version = "0.6", optional = true }
 # ureq uses ring instead of aws-lc-rs so we must too
 futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }

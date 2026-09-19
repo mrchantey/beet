@@ -19,6 +19,16 @@ impl<K, V, O> LazyPool<K, V, O> {
 			constructor,
 		}
 	}
+
+	/// Evict the value for `key`, so the next [`get`](Self::get) constructs a
+	/// fresh one: what a store does before deleting the file its pooled
+	/// connection is open on.
+	pub async fn remove(&self, key: &K) -> Option<V>
+	where
+		K: core::hash::Hash + Eq,
+	{
+		self.map.write().await.remove(key)
+	}
 }
 
 impl<K, V> LazyPool<K, V, V>
@@ -99,6 +109,25 @@ mod tests {
 		POOL.get(&1).await;
 		POOL.get(&1).await;
 		CALL_COUNT.load(Ordering::SeqCst).xpect_eq(1);
+	}
+
+	#[crate::test]
+	async fn remove_evicts() {
+		use std::sync::atomic::AtomicU32;
+		use std::sync::atomic::Ordering;
+
+		static CALL_COUNT: AtomicU32 = AtomicU32::new(0);
+		static POOL: LazyPool<u32, String, String> = LazyPool::new(|key| {
+			Box::pin(async move {
+				CALL_COUNT.fetch_add(1, Ordering::SeqCst);
+				format!("Value for key {}", key)
+			})
+		});
+		POOL.get(&1).await;
+		POOL.remove(&1).await.xpect_some();
+		POOL.remove(&1).await.xpect_none();
+		POOL.get(&1).await;
+		CALL_COUNT.load(Ordering::SeqCst).xpect_eq(2);
 	}
 
 	#[crate::test]
