@@ -1,8 +1,37 @@
-//! A secrets document as a stack's secret store.
+//! A secrets document as a stack's secret store: the declaration, its
+//! attach and the provider.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+
+/// Declares that the stack's secrets live in a secrets document:
+/// `<DocumentSecrets path="infra/secrets/app--prod.toml"/>` under a
+/// `<Stack>`, the file in the nearest ancestor `BlobStore` (the repo store).
+/// Target-agnostic, so the same file on either launch.
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct DocumentSecrets {
+	/// The document within its store, its format named by its extension.
+	pub path: RelPath,
+}
+
+impl Default for DocumentSecrets {
+	fn default() -> Self {
+		Self {
+			path: RelPath::new(SecretsDocument::DEFAULT_PATH),
+		}
+	}
+}
+
+impl DocumentSecrets {
+	/// The declaration for the document at `path`.
+	pub fn new(path: impl AsRef<str>) -> Self {
+		Self {
+			path: RelPath::new(path),
+		}
+	}
+}
 
 /// A [`SecretStore`] over one secrets document: every secret a record in
 /// the document's `default` group with its `note` and `modified`, the label

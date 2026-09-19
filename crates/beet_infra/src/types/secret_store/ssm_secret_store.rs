@@ -1,18 +1,109 @@
-//! AWS parameter store as a stack's secret store, over the `aws` cli.
+//! AWS parameter store as a stack's secret store: the declaration every
+//! stack carries by default, its attach, and the provider over the `aws`
+//! cli.
 //!
 //! The cli rather than the SDK because a deploy already depends on it (the log
 //! tail, the reverse-dns request, the SES probe) and because parameter store
 //! is five verbs: adding an SDK client for them would be more surface than
-//! the feature it buys.
+//! the feature it buys. The provider is therefore native and `deploy`; the
+//! declaration registers on every target, since a lean binary's document
+//! still carries the tag and a local launch lands the document stand-in.
 //!
 //! Nothing here logs a value. A `SecureString` that reaches a terminal is a
 //! `SecureString` that reaches a scrollback buffer, a CI log and whatever
 //! ingests it.
 
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use serde_json::Value;
+
+/// Declares that the stack's secrets live in AWS parameter store, in the
+/// stack's region: `<SsmSecrets/>` under a `<Stack>`, and the declaration a
+/// stack with none is taken to carry. As with a declared bucket, the
+/// declaration is the deploy meaning and the launch decides the runtime
+/// one ([`runtime_store`](Self::runtime_store)): a `Remote` launch attaches
+/// parameter store, a `Local` one the document stand-in under
+/// `target/secrets`, so a stack runs both ways without knowing there are
+/// two.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct SsmSecrets;
+
+impl SsmSecrets {
+	/// The store a launch under `access` attaches for this declaration, the
+	/// ONE place the local/remote choice is made for secrets: parameter store
+	/// in `stack`'s region when `Remote` (native and `deploy`, since the
+	/// provider drives the `aws` cli), the document at
+	/// `target/secrets/<app>--<stage>.toml` when `Local`, its `default`
+	/// group seeded from `seed`.
+	pub fn runtime_store(
+		access: ServiceAccess,
+		stack: ResolvedStack,
+		seed: Option<SecretsHandle>,
+	) -> Result<SecretStore> {
+		match access {
+			ServiceAccess::Local => DocumentSecretStore::local(stack)?
+				.with_seed(seed)
+				.xmap(SecretStore::new)
+				.xok(),
+			ServiceAccess::Remote => {
+				cfg_if! {
+					if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+						SecretStore::new(SsmSecretStore::new(stack)).xok()
+					} else {
+						bevybail!(
+							"stack `{}--{}` keeps its secrets in parameter store and this \
+							build has no provider for it (the `deploy` feature, native): \
+							declare `<DocumentSecrets path=\"..\"/>` under the stack",
+							stack.app_name(),
+							stack.stage()
+						)
+					}
+				}
+			}
+		}
+	}
+}
+
+/// Observer: land the [`SecretStore`] an `<SsmSecrets/>` declares on its
+/// entity, [`SsmSecrets::runtime_store`] for the stack it is declared under.
+/// Deferred through the command queue because the stack is an ancestor,
+/// which lands after insertion.
+pub(crate) fn attach_ssm_secrets(
+	ev: On<Insert, SsmSecrets>,
+	mut commands: Commands,
+) {
+	commands
+		.entity(ev.entity)
+		.queue(|mut entity: EntityWorldMut| -> Result {
+			if !entity.world().contains_resource::<PackageConfig>() {
+				bevybail!(
+					"resolving `<SsmSecrets/>` needs the `PackageConfig` \
+					resource, which `BootstrapPlugin` inserts"
+				);
+			}
+			let (stack, seed) = entity
+				.with_state::<(StackQuery, SecretsQuery), _>(
+					|entity, (stacks, documents)| {
+						(
+							stacks.resolve(entity),
+							documents.resolve_default(entity).ok(),
+						)
+					},
+				);
+			entity.insert(SsmSecrets::runtime_store(
+				BootstrapConfig::get().service_access,
+				stack,
+				seed,
+			)?);
+			Ok(())
+		});
+}
+
 
 /// The [`SecretStore`] over AWS parameter store, scoped to one stack in its
 /// region: every secret a `SecureString` at `/app/stage/label`
@@ -26,11 +117,13 @@ use serde_json::Value;
 /// what an instance role grants in one statement and what
 /// [`list`](SecretStoreProvider::list) walks; another stack of the same
 /// region is [`for_stack`](SecretStoreProvider::for_stack) away.
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 #[derive(Debug, Clone)]
 pub struct SsmSecretStore {
 	stack: ResolvedStack,
 }
 
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 impl SsmSecretStore {
 	/// The provider id.
 	pub const ID: &'static str = "ssm";
@@ -231,6 +324,7 @@ impl SsmSecretStore {
 	}
 }
 
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 impl SecretStoreProvider for SsmSecretStore {
 	fn box_clone(&self) -> Box<dyn SecretStoreProvider> {
 		Box::new(self.clone())
@@ -355,7 +449,7 @@ impl SecretStoreProvider for SsmSecretStore {
 	}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "deploy", not(target_arch = "wasm32")))]
 mod test {
 	use super::*;
 	use serde_json::json;
