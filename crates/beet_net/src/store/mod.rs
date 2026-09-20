@@ -86,7 +86,8 @@ mod aws_cli;
 mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
-// canonical json rows under gzip or zstd, the codec named by the extension.
+// canonical json rows under zstd (or gzip, behind its feature), the codec named
+// by the extension.
 #[cfg(feature = "json")]
 mod jsonl;
 // the http-served store: its listing endpoint answers json.

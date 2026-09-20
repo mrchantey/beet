@@ -60,16 +60,17 @@ action = ["dep:beet_action"]
 # tungstenite/web-sys transports and the server/channel backends ride their own
 # features on top of it.
 sockets = ["action", "dep:sha1", "dep:base64"]
-# `flate2` is the gzip codec shared by analytics segments and daily archives;
-# json is their newline-delimited payload.
-json = ["serde", "dep:serde_json", "dep:flate2", "beet_core/json", "beet_action?/json"]
+# json is the newline-delimited payload of analytics segments and daily
+# archives; zstd is the codec every JSONL object is written under, the C library
+# natively and the pure-rust `ruzstd` on wasm, each through its target table below.
+json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "beet_core/json", "beet_action?/json"]
 # The `SqliteStore` backend: real SQL tables behind the erased `TableStore`,
 # rows written as canonical json (hence `json`). Native only through the target
 # table below; every call runs on the `blocking` pool.
 sqlite = ["std", "json", "dep:rusqlite", "dep:blocking"]
-# The zstd `JsonlCodec`: `.jsonl.zst` beside the gzip default. Binds the C
-# library, so native only through the target table below.
-zstd = ["json", "dep:zstd"]
+# The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced;
+# nothing beet writes needs it.
+gzip = ["json", "dep:flate2"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
@@ -319,6 +320,8 @@ wasm-bindgen-futures.workspace = true
 # the workspace sets `default-features = false` so uuid compiles no_std; on wasm
 # the std `uuid/v7` needs a randomness backend, so re-add the `js` (WebCrypto) one.
 uuid = { workspace = true, optional = true, features = ["js"] }
+# the pure-rust zstd, the `JsonlCodec::Zstd` backend where the C library cannot build.
+ruzstd = { workspace = true, optional = true }
 # the Cloudflare Workers SDK, behind the `cloudflare` feature (the `R2WorkersStore`
 # backend + the `worker::Env`/`worker::Bucket` bindings it resolves).
 worker = { workspace = true, optional = true }

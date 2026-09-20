@@ -230,6 +230,14 @@ impl AnalyticsEvent {
 			.into()
 	}
 
+	/// The events ordered by id, the order every stored object holds them in
+	/// so the same events always encode to the same bytes.
+	pub fn by_id(events: &[Self]) -> Vec<&Self> {
+		let mut events = events.iter().collect::<Vec<_>>();
+		events.sort_by_key(|event| event.id);
+		events
+	}
+
 
 	/// Builder-style setter for the client kind.
 	pub fn with_client_kind(mut self, client_kind: ClientKind) -> Self {

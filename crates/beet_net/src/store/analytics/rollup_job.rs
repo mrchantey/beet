@@ -425,7 +425,7 @@ mod test {
 			today.timestamp,
 			9,
 		);
-		raw.insert(&corrupt, Bytes::from_static(b"not gzip"))
+		raw.insert(&corrupt, Bytes::from_static(b"not zstd"))
 			.await
 			.unwrap();
 		let report = run.call().await.unwrap();

@@ -1,4 +1,5 @@
-//! Raw analytics segment objects: their keyspace and gzip JSONL codec.
+//! Raw analytics segment objects: their keyspace and JSONL codec.
+use crate::exports::bytes::Bytes;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -17,7 +18,7 @@ impl AnalyticsSegment {
 	/// Returns the path for one writer's batch.
 	///
 	/// Paths have the form
-	/// `analytics/raw/segments/2026-08-01/<writer>/<timestamp>-<sequence>.jsonl.gz`.
+	/// `analytics/raw/segments/2026-08-01/<writer>/<timestamp>-<sequence>.jsonl.zst`.
 	pub fn object_path(
 		date: &str,
 		writer: Uuid,
@@ -25,12 +26,15 @@ impl AnalyticsSegment {
 		sequence: u64,
 	) -> RelPath {
 		RelPath::new(format!(
-			"{}/{date}/{writer}/{timestamp}-{sequence}.jsonl.gz",
-			Self::PREFIX
+			"{}/{date}/{writer}/{timestamp}-{sequence}.{}",
+			Self::PREFIX,
+			JsonlCodec::default().extension()
 		))
 	}
 
-	/// Returns the UTC date encoded in a segment path.
+	/// Returns the UTC date encoded in a segment path, under any JSONL codec,
+	/// compiled in or not: a segment this build cannot read fails the run in
+	/// [`Self::read`] rather than sitting in the store unseen.
 	pub(crate) fn date(path: &RelPath) -> Option<SmolStr> {
 		let remainder = path
 			.as_str()
@@ -41,7 +45,7 @@ impl AnalyticsSegment {
 		let writer = parts.next()?;
 		let object = parts.next()?;
 		let (timestamp, sequence) =
-			object.strip_suffix(".jsonl.gz")?.split_once('-')?;
+			JsonlCodec::split_path(object)?.0.split_once('-')?;
 		(parts.next().is_none()
 			&& Timestamp::parse_date(date).is_some()
 			&& writer.parse::<Uuid>().is_ok()
@@ -50,13 +54,23 @@ impl AnalyticsSegment {
 		.then(|| date.into())
 	}
 
+	/// Encodes events as deterministic JSONL ordered by event ID, at the cheap
+	/// level: a segment is read once by the rollup that compacts it.
+	pub fn encode(events: &[AnalyticsEvent]) -> Result<Bytes> {
+		Jsonl::encode(
+			JsonlCodec::default(),
+			JsonlLevel::Fast,
+			AnalyticsEvent::by_id(events),
+		)
+	}
+
 	/// Writes and read-verifies one segment object.
 	pub(crate) async fn write(
 		store: &BlobStore,
 		path: RelPath,
 		events: &[AnalyticsEvent],
 	) -> Result<RelPath> {
-		let bytes = AnalyticsArchive::encode(events)?;
+		let bytes = Self::encode(events)?;
 		store.insert(&path, bytes.clone()).await?;
 		let actual = store.get(&path).await?;
 		if actual != bytes {
@@ -153,7 +167,10 @@ impl AnalyticsSegment {
 		let Some(date) = Self::date(path) else {
 			bevybail!("invalid analytics segment path `{path}`");
 		};
-		let events = AnalyticsArchive::decode(&store.get(path).await?)?;
+		let events = Jsonl::decode_path::<AnalyticsEvent>(
+			path,
+			&store.get(path).await?,
+		)?;
 		for event in &events {
 			if event.date() != date {
 				bevybail!(

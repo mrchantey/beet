@@ -142,7 +142,13 @@ impl BlobStoreProvider for FsStore {
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let root = self.effective_root();
+		let scoped = self.subdir.is_some();
 		Box::pin(async move {
+			// a subdir never written to holds no files, as a missing prefix in
+			// an object store does; only a missing root is an error
+			if scoped && !fs_ext::exists_async(&root).await? {
+				return Vec::new().xok();
+			}
 			ReadDir::files_recursive_async(&root)
 				.await?
 				.into_iter()
@@ -199,6 +205,22 @@ mod test {
 		let dir = "target/tests/beet_net/test-store-001";
 		let provider = FsStore::new(AbsPath::new_workspace_rel(dir).unwrap());
 		store_test::run(provider).await;
+	}
+
+	/// A subdir never written to lists empty, as a missing prefix in an object
+	/// store does, so a table that has no rows yet reads as empty.
+	#[beet_core::test]
+	async fn lists_a_missing_subdir_as_empty() {
+		let dir =
+			AbsPath::new_workspace_rel("target/tests/beet_net/missing-subdir")
+				.unwrap();
+		fs_ext::create_dir_all_async(&dir).await.unwrap();
+		BlobStore::new(FsStore::new(dir))
+			.with_subdir(RelPath::new("never/written"))
+			.list()
+			.await
+			.unwrap()
+			.xpect_eq(Vec::<RelPath>::new());
 	}
 
 	/// The filesystem's parent universe lets a rebase walk above the store's

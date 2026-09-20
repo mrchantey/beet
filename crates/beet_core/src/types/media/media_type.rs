@@ -67,6 +67,8 @@ pub enum MediaType {
 	Zip,
 	/// `application/gzip`
 	Gzip,
+	/// `application/zstd`
+	Zstd,
 	/// `application/x-tar`
 	Tar,
 	/// `application/wasm`
@@ -165,6 +167,7 @@ impl MediaType {
 	const PDF: &'static str = "application/pdf";
 	const ZIP: &'static str = "application/zip";
 	const GZIP: &'static str = "application/gzip";
+	const ZSTD: &'static str = "application/zstd";
 	const TAR: &'static str = "application/x-tar";
 	const WASM: &'static str = "application/wasm";
 	const WEB_MANIFEST: &'static str = "application/manifest+json";
@@ -246,6 +249,7 @@ impl MediaType {
 			val if val.contains(Self::PDF) => MediaType::Pdf,
 			val if val.contains(Self::ZIP) => MediaType::Zip,
 			val if val.contains(Self::GZIP) => MediaType::Gzip,
+			val if val.contains(Self::ZSTD) => MediaType::Zstd,
 			val if val.contains(Self::TAR) => MediaType::Tar,
 			val if val.contains(Self::WASM) => MediaType::Wasm,
 			val if val.contains(Self::WOFF2) => MediaType::Woff2,
@@ -352,6 +356,7 @@ impl MediaType {
 			// archives
 			"zip" => MediaType::Zip,
 			"gz" | "gzip" => MediaType::Gzip,
+			"zst" | "zstd" => MediaType::Zstd,
 			"tar" => MediaType::Tar,
 			// documents
 			"pdf" => MediaType::Pdf,
@@ -414,6 +419,7 @@ impl MediaType {
 			MediaType::VideoOgg => Some("ogv"),
 			MediaType::Zip => Some("zip"),
 			MediaType::Gzip => Some("gz"),
+			MediaType::Zstd => Some("zst"),
 			MediaType::Tar => Some("tar"),
 			MediaType::Pdf => Some("pdf"),
 			MediaType::Wasm => Some("wasm"),
@@ -480,6 +486,7 @@ impl MediaType {
 			MediaType::Pdf => Self::PDF,
 			MediaType::Zip => Self::ZIP,
 			MediaType::Gzip => Self::GZIP,
+			MediaType::Zstd => Self::ZSTD,
 			MediaType::Tar => Self::TAR,
 			MediaType::Wasm => Self::WASM,
 			MediaType::Woff => Self::WOFF,
@@ -781,6 +788,7 @@ mod test {
 	fn from_extension_archives() {
 		MediaType::from_extension("zip").xpect_eq(MediaType::Zip);
 		MediaType::from_extension("gz").xpect_eq(MediaType::Gzip);
+		MediaType::from_extension("zst").xpect_eq(MediaType::Zstd);
 		MediaType::from_extension("tar").xpect_eq(MediaType::Tar);
 	}
 

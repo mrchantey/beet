@@ -1,4 +1,4 @@
-//! Daily analytics archives, gzip JSONL through the shared [`Jsonl`] codec.
+//! Daily analytics archives, JSONL through the shared [`Jsonl`] codec.
 use crate::exports::bytes::Bytes;
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -15,32 +15,52 @@ impl AnalyticsArchive {
 	/// The prefix analytics owns in an archive store.
 	pub const PREFIX: &'static str = "analytics/raw";
 
-	/// Returns the object path for one UTC date.
+	/// Returns the object path for one UTC date, under the codec every object
+	/// is written under. A day archived under another codec is read from
+	/// [`Self::existing_path`] and rewritten here.
 	pub fn object_path(date: &str) -> RelPath {
-		RelPath::new(format!("{}/{date}.jsonl.gz", Self::PREFIX))
+		Self::codec_path(date, JsonlCodec::default().extension())
 	}
 
-	/// Returns the UTC date encoded in a daily archive path.
+	fn codec_path(date: &str, extension: &str) -> RelPath {
+		RelPath::new(format!("{}/{date}.{extension}", Self::PREFIX))
+	}
+
+	/// Returns the UTC date encoded in a daily archive path, under any JSONL
+	/// codec, compiled in or not.
 	pub(crate) fn date(path: &RelPath) -> Option<SmolStr> {
-		let date = path
+		let (date, _) = path
 			.as_str()
 			.strip_prefix(Self::PREFIX)?
-			.strip_prefix('/')?
-			.strip_suffix(".jsonl.gz")?;
+			.strip_prefix('/')
+			.and_then(JsonlCodec::split_path)?;
 		(!date.contains('/') && Timestamp::parse_date(date).is_some())
 			.then(|| date.into())
 	}
 
-	/// Encodes events as deterministic gzip JSONL ordered by event ID.
+	/// Encodes events as deterministic JSONL ordered by event ID, at the
+	/// archive-grade level: written once a night, kept for good.
 	pub fn encode(events: &[AnalyticsEvent]) -> Result<Bytes> {
-		let mut events = events.iter().collect::<Vec<_>>();
-		events.sort_by_key(|event| event.id);
-		Jsonl::encode(JsonlCodec::Gzip, events)
+		Jsonl::encode(
+			JsonlCodec::default(),
+			JsonlLevel::Best,
+			AnalyticsEvent::by_id(events),
+		)
 	}
 
-	/// Decodes gzip JSONL into analytics events.
-	pub fn decode(bytes: &[u8]) -> Result<Vec<AnalyticsEvent>> {
-		Jsonl::decode(JsonlCodec::Gzip, bytes)
+	/// The path a date is archived under, if any: the written codec's first,
+	/// then any other the store still holds.
+	pub async fn existing_path(
+		store: &BlobStore,
+		date: &str,
+	) -> Result<Option<RelPath>> {
+		for extension in JsonlCodec::EXTENSIONS {
+			let path = Self::codec_path(date, extension);
+			if store.exists(&path).await? {
+				return Some(path).xok();
+			}
+		}
+		None.xok()
 	}
 
 	/// Reads and validates a daily archive when it exists.
@@ -48,11 +68,13 @@ impl AnalyticsArchive {
 		store: &BlobStore,
 		date: &str,
 	) -> Result<Option<Vec<AnalyticsEvent>>> {
-		let path = Self::object_path(date);
-		if !store.exists(&path).await? {
+		let Some(path) = Self::existing_path(store, date).await? else {
 			return None.xok();
-		}
-		let events = Self::decode(&store.get(&path).await?)?;
+		};
+		let events = Jsonl::decode_path::<AnalyticsEvent>(
+			&path,
+			&store.get(&path).await?,
+		)?;
 		for event in &events {
 			if event.date() != date {
 				bevybail!(
@@ -77,10 +99,13 @@ impl AnalyticsArchive {
 			.filter_map(|path| Self::date(&path))
 			.collect::<Vec<_>>();
 		dates.sort();
+		dates.dedup();
 		dates.xok()
 	}
 
-	/// Writes a daily archive and verifies its exact bytes by reading it back.
+	/// Writes a daily archive, verifies its exact bytes by reading it back, and
+	/// only then removes the day's archive under any other codec, so a day
+	/// never has two.
 	pub async fn write(
 		store: &BlobStore,
 		date: &str,
@@ -95,6 +120,12 @@ impl AnalyticsArchive {
 				"analytics archive `{path}` was written to {} but failed read-back verification",
 				store.describe()
 			);
+		}
+		for extension in JsonlCodec::EXTENSIONS {
+			let stale = Self::codec_path(date, extension);
+			if stale != path && store.exists(&stale).await? {
+				store.remove(&stale).await?;
+			}
 		}
 		path.xok()
 	}
@@ -119,6 +150,12 @@ mod test {
 			.collect()
 	}
 
+	fn paths<'a>(
+		events: impl IntoIterator<Item = &'a AnalyticsEvent>,
+	) -> Vec<SmolStr> {
+		events.into_iter().map(|event| event.path.clone()).collect()
+	}
+
 	/// The archive is lossless and its bytes are a pure function of the day: it
 	/// is the primary copy once compaction deletes the segments, and a re-run
 	/// must overwrite its own object rather than write a different one.
@@ -126,8 +163,8 @@ mod test {
 	fn round_trips_a_day() {
 		let events = events();
 		let bytes = AnalyticsArchive::encode(&events).unwrap();
-		// gzip, not the json it holds
-		bytes[..2].to_vec().xpect_eq(vec![0x1f, 0x8b]);
+		// zstd, not the json it holds
+		bytes[..4].to_vec().xpect_eq(vec![0x28, 0xb5, 0x2f, 0xfd]);
 		AnalyticsArchive::encode(&events)
 			.unwrap()
 			.xpect_eq(bytes.clone());
@@ -138,24 +175,23 @@ mod test {
 			.unwrap()
 			.xpect_eq(bytes.clone());
 
-		let mut decoded = AnalyticsArchive::decode(&bytes).unwrap();
-		decoded.sort_by_key(|event| event.id);
-		let mut expected = events;
-		expected.sort_by_key(|event| event.id);
+		let path = AnalyticsArchive::object_path("2026-08-01");
+		path.to_string()
+			.xpect_eq("analytics/raw/2026-08-01.jsonl.zst");
+		AnalyticsArchive::date(&path).xpect_eq(Some("2026-08-01".into()));
+		// a gzip archive is still a day, whether or not this build reads it
+		AnalyticsArchive::date(&RelPath::new(
+			"analytics/raw/2026-08-01.jsonl.gz",
+		))
+		.xpect_eq(Some("2026-08-01".into()));
+		AnalyticsArchive::date(&RelPath::new("analytics/raw/2026-08-01.json"))
+			.xpect_eq(None);
+
+		let decoded =
+			Jsonl::decode_path::<AnalyticsEvent>(&path, &bytes).unwrap();
 		decoded.len().xpect_eq(3);
-		decoded
-			.iter()
-			.map(|event| event.path.clone())
-			.collect::<Vec<_>>()
-			.xpect_eq(
-				expected
-					.iter()
-					.map(|event| event.path.clone())
-					.collect::<Vec<_>>(),
-			);
-		AnalyticsArchive::object_path("2026-08-01")
-			.to_string()
-			.xpect_eq("analytics/raw/2026-08-01.jsonl.gz");
+		paths(AnalyticsEvent::by_id(&decoded))
+			.xpect_eq(paths(AnalyticsEvent::by_id(&events)));
 	}
 
 	/// The read-back is the point: segments are only deleted because this object
@@ -168,15 +204,64 @@ mod test {
 		let path = AnalyticsArchive::write(&store, &events[0].date(), &events)
 			.await
 			.unwrap();
-		AnalyticsArchive::decode(&store.get(&path).await.unwrap())
-			.unwrap()
-			.len()
-			.xpect_eq(3);
+		Jsonl::decode_path::<AnalyticsEvent>(
+			&path,
+			&store.get(&path).await.unwrap(),
+		)
+		.unwrap()
+		.len()
+		.xpect_eq(3);
 		AnalyticsArchive::read(&store, &events[0].date())
 			.await
 			.unwrap()
 			.unwrap()
 			.len()
 			.xpect_eq(3);
+	}
+
+	/// A day archived under gzip is read as-is and, once rewritten, exists
+	/// only under the written codec.
+	#[cfg(feature = "gzip")]
+	#[beet_core::test]
+	async fn rewrites_a_gzip_archive_as_zstd() {
+		let store = BlobStore::temp();
+		let events = events();
+		let date = events[0].date();
+		let gzip = RelPath::new(format!(
+			"{}/{date}.jsonl.gz",
+			AnalyticsArchive::PREFIX
+		));
+		store
+			.insert(
+				&gzip,
+				Jsonl::encode(JsonlCodec::Gzip, JsonlLevel::Fast, &events)
+					.unwrap(),
+			)
+			.await
+			.unwrap();
+		AnalyticsArchive::existing_path(&store, &date)
+			.await
+			.unwrap()
+			.xpect_eq(Some(gzip.clone()));
+		AnalyticsArchive::read(&store, &date)
+			.await
+			.unwrap()
+			.unwrap()
+			.len()
+			.xpect_eq(3);
+		AnalyticsArchive::dates(&store)
+			.await
+			.unwrap()
+			.xpect_eq(vec![date.clone()]);
+
+		let zstd = AnalyticsArchive::write(&store, &date, &events)
+			.await
+			.unwrap();
+		zstd.xpect_eq(AnalyticsArchive::object_path(&date));
+		store.exists(&gzip).await.unwrap().xpect_false();
+		AnalyticsArchive::existing_path(&store, &date)
+			.await
+			.unwrap()
+			.xpect_eq(Some(zstd));
 	}
 }

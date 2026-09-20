@@ -7,7 +7,7 @@ use std::sync::Mutex;
 /// A buffered raw analytics writer backed solely by a [`BlobStore`].
 ///
 /// Each clone shares one in-process buffer and one writer UUID. Events flush to
-/// immutable gzip JSONL segments when the buffer reaches its age or byte limit,
+/// immutable zstd JSONL segments when the buffer reaches its age or byte limit,
 /// and the analytics plugin gates [`AppExit`] until every remaining event has
 /// flushed. Fresh writer/timestamp keys make concurrent processes contention-free.
 #[derive(Clone, Deref, Component)]

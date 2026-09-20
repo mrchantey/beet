@@ -25,6 +25,13 @@ The three are orthogonal. Malleable answers how software changes, agnostic answe
 
 Beet is short for Beetmash, a mispronunciation of Beat Match which nods to [MIT Scratch](https://scratch.mit.edu) continuing the DJ theme.
 
+## History
+
+1. Beet started as an entities-as-behavior library.
+2. In need of a framework for presenting the beet examples, beet evolved into a web meta framework, something like Astro but written in Rust.
+3. It then gained all kinds of other scene loading capabilities and other abstractions, like blob stores, and became a general purpose malleable engine.
+4. Finally, it gained at proto integrations and developed into an Atmospheric OS for homegrown tech.
+
 ## Beet and beetmash
 
 Beet is the open source engine and standards and [Beetmash](https://beetmash.com) is the consulting company built on top, helping organizations toward tech sovereignty. Beetmash is to Beet roughly what BlueSky is to ATProto.
