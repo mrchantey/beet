@@ -170,6 +170,7 @@ pub enum SyncDirection {
 /// - `exact_timestamps`  -> `--exact-timestamps`
 /// - `follow_symlinks`   -> `--follow-symlinks`
 /// - `acl`               -> `--acl <value>` (e.g. `public-read`)
+/// - `storage_class`     -> `--storage-class <value>` (e.g. `GLACIER_IR`)
 /// - `filters`           -> `--exclude <pat>` / `--include <pat>` in provided order
 /// - `additional_args`   -> appended verbatim at the end
 #[derive(Debug, Clone)]
@@ -194,6 +195,9 @@ pub struct S3Sync {
 	pub follow_symlinks: bool,
 	/// Access control list for uploaded objects.
 	pub acl: Option<String>,
+	/// Storage class for uploaded objects, ie `GLACIER_IR`; the bucket default
+	/// when unset. Meaningless on a pull, which the cli ignores it for.
+	pub storage_class: Option<String>,
 	/// Include/exclude filters applied in order.
 	pub filters: Vec<S3Filter>,
 	/// Additional arguments appended verbatim.
@@ -213,6 +217,7 @@ impl Default for S3Sync {
 			exact_timestamps: false,
 			follow_symlinks: false,
 			acl: None,
+			storage_class: None,
 			filters: Vec::new(),
 			additional_args: Vec::new(),
 		}
@@ -334,6 +339,11 @@ impl S3Sync {
 		self.acl = Some(value.into());
 		self
 	}
+	/// Set the storage class uploaded objects land in (e.g. `GLACIER_IR`).
+	pub fn storage_class(mut self, value: impl Into<String>) -> Self {
+		self.storage_class = Some(value.into());
+		self
+	}
 	/// Append an exclude rule. Preserves order relative to includes.
 	pub fn exclude(mut self, pattern: impl Into<String>) -> Self {
 		self.filters.push(S3Filter::Exclude(pattern.into()));
@@ -383,6 +393,10 @@ impl S3Sync {
 			out.push("--acl".into());
 			out.push(acl.clone());
 		}
+		if let Some(storage_class) = &self.storage_class {
+			out.push("--storage-class".into());
+			out.push(storage_class.clone());
+		}
 		for f in &self.filters {
 			let [flag, val] = f.to_args();
 			out.push(flag);
@@ -416,10 +430,10 @@ mod test {
 			.exact_timestamps(true)
 			.follow_symlinks(true)
 			.acl_public_read()
+			.storage_class("STANDARD_IA")
 			.include("public/**")
 			.exclude("node_modules/**")
-			.arg("--storage-class")
-			.arg("STANDARD_IA");
+			.arg("--only-show-errors");
 
 		let argv = aws.build_s3_sync_args(
 			local.as_str(),
@@ -444,13 +458,15 @@ mod test {
 			"--exact-timestamps",
 			"--follow-symlinks",
 			"--acl",
+			"--storage-class",
 		];
 		for f in flags {
 			argv.contains(&f.to_string()).xpect_true();
 		}
 		argv.contains(&"public-read".to_string()).xpect_true();
-		argv.contains(&"--storage-class".to_string()).xpect_true();
 		argv.contains(&"STANDARD_IA".to_string()).xpect_true();
+		// ..and a raw arg rides last
+		argv.last().unwrap().as_str().xpect_eq("--only-show-errors");
 	}
 
 	#[beet_core::test]

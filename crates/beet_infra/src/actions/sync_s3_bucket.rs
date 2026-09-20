@@ -35,11 +35,12 @@ pub async fn SyncS3Bucket(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
-	// the two ends of the sync, plus the per-deploy prefix a `<DirSync>` bucket
-	// publishes under. That prefix is resolved HERE rather than at declaration,
-	// because which version a sync belongs to is the verb's answer and not the
-	// declaration's: see `dir_sync::deploy_subdir`.
-	let (s3_fs_store, deploy_subdir) = cx
+	// the two ends of the sync, plus what a `<DirSync>` reads off its bucket's
+	// declaration: the per-deploy prefix it publishes under and the class its
+	// objects land in. Resolved HERE rather than at declaration, because which
+	// version a sync belongs to is the verb's answer and not the declaration's:
+	// see `dir_sync::declared_store`.
+	let (s3_fs_store, deploy_subdir, storage_class) = cx
 		.caller
 		.with_state::<(
 			AncestorQuery<&S3FsStore>,
@@ -49,14 +50,18 @@ pub async fn SyncS3Bucket(
 		), _>(|entity, (stores, syncs, stacks, declared)| -> Result<_> {
 			let store = stores.get(entity)?.clone();
 			// a store spawned directly (rather than through `<DirSync>`) already
-			// carries whatever root it means to publish into
-			let subdir = match syncs.get(entity) {
-				Ok(sync) => crate::actions::deploy_subdir(
-					entity, sync, &stacks, &declared,
-				)?,
-				Err(_) => None,
+			// carries whatever root it means to publish into, and lands objects
+			// in the bucket default
+			let Ok(sync) = syncs.get(entity) else {
+				return (store, None, None).xok();
 			};
-			(store, subdir).xok()
+			let block = crate::actions::declared_store(
+				entity, sync, &stacks, &declared,
+			)?;
+			let subdir = block
+				.deploy_versioned()
+				.then(|| ArtifactLedger::version_repo_dir(&stacks.deploy_id()));
+			(store, subdir, *block.storage_class()).xok()
 		})
 		.await??;
 	let s3_store = match deploy_subdir {
@@ -74,7 +79,15 @@ pub async fn SyncS3Bucket(
 		SyncS3Bucket::assert_mirrorable(&local_dir, follow_symlinks)?;
 	}
 	let sync = match direction {
-		SyncDirection::Push => S3Sync::push(local_dir.clone(), &s3_uri),
+		SyncDirection::Push => {
+			let sync = S3Sync::push(local_dir.clone(), &s3_uri);
+			// a class declared on the bucket lands new objects there directly,
+			// sparing each a day at Standard and a transition request
+			match storage_class {
+				Some(class) => sync.storage_class(class.as_str()),
+				None => sync,
+			}
+		}
 		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
 	};
 	trace!(

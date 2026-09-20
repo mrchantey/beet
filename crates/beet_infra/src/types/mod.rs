@@ -6,7 +6,10 @@ mod deployment;
 mod infra_plugin;
 // a bucket's per-prefix retention, shared by every provider's bucket block.
 mod prefix_expiry;
+// the class a bucket keeps its objects in, read by its transition rule and by
+// a push into it.
 mod resource_scope;
+mod s3_storage_class;
 mod secret_ref;
 mod stack;
 mod stack_backend;
@@ -21,6 +24,7 @@ pub use deployment::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;
 pub use resource_scope::*;
+pub use s3_storage_class::*;
 pub use secret_ref::*;
 pub use stack::*;
 pub use stack_backend::*;

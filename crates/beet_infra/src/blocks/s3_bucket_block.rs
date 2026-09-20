@@ -78,6 +78,14 @@ pub struct S3BucketBlock {
 	/// [`expire_days`](Self::expire_days) (the whole bucket, no filter) cannot
 	/// say. Each entry renders one filtered rule alongside the unfiltered ones.
 	expire_prefixes: Vec<PrefixExpiry>,
+	/// The class every object is kept in, see [`S3StorageClass`]. Declared
+	/// once here and read both ways: the deploy renders a day-zero transition
+	/// (or the class's minimum, for the infrequent-access classes) that moves
+	/// every object already in the bucket in place, no re-upload, and a
+	/// [`DirSync`] push lands new objects there directly. Current versions
+	/// only: a noncurrent version expiring inside the class's minimum duration
+	/// would be billed for the whole of it, more than its days at Standard.
+	storage_class: S3StorageClass,
 	/// The deploy layer for the bucket and its public-read pair
 	/// ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER) by default):
 	/// the deploy syncs content into the bucket, so it converges before anything
@@ -103,6 +111,7 @@ impl S3BucketBlock {
 			expire_noncurrent_days: 90,
 			expire_days: 0,
 			expire_prefixes: Vec::new(),
+			storage_class: S3StorageClass::Standard,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -140,6 +149,10 @@ impl StoreBlock for S3BucketBlock {
 	}
 
 	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
+
+	fn storage_class(&self) -> Option<S3StorageClass> {
+		self.storage_class.declared()
+	}
 }
 
 impl Block for S3BucketBlock {
@@ -237,14 +250,15 @@ impl S3BucketBlock {
 		Ok(())
 	}
 
-	/// Emit the one lifecycle configuration holding every declared expiry, or
-	/// nothing when the bucket declares none. Also UNTYPED, and one resource for
-	/// all rules, since two configurations on one bucket would fight for the
-	/// same address.
+	/// Emit the one lifecycle configuration holding the class transition and
+	/// every declared expiry, or nothing when the bucket declares none. Also
+	/// UNTYPED, and one resource for all rules, since two configurations on one
+	/// bucket would fight for the same address.
 	///
-	/// Rules are emitted unfiltered-first then by prefix, in declaration order,
-	/// with the noncurrent-version sweep last; each carries an id derived from
-	/// what it expires rather than from its position.
+	/// Rules are emitted transition first, then the expiries unfiltered-first
+	/// then by prefix, in declaration order, with the noncurrent-version sweep
+	/// last; each carries an id derived from what it does rather than from its
+	/// position.
 	fn emit_lifecycle(
 		&self,
 		stack: &ResolvedStack,
@@ -254,6 +268,19 @@ impl S3BucketBlock {
 		// one rule per expiry, since they answer different questions and a
 		// bucket may want any of them alone
 		let mut rules = Vec::new();
+		// the class moves objects in place, so declaring it on a bucket already
+		// holding objects migrates them without a re-upload
+		if let Some(class) = self.storage_class.declared() {
+			rules.push(json!({
+				"id": "transition-objects",
+				"status": "Enabled",
+				"filter": {},
+				"transition": {
+					"days": class.min_transition_days(),
+					"storage_class": class.as_str(),
+				},
+			}));
+		}
 		if self.expire_days > 0 {
 			rules.push(json!({
 				"id": "expire-objects",
@@ -589,6 +616,36 @@ mod tests {
 		.xpect_contains("aws_s3_bucket_versioning")
 		.xnot()
 		.xpect_contains("aws_s3_bucket_lifecycle_configuration");
+	}
+
+	/// A class declared on the bucket is a day-zero transition rule, so the
+	/// objects already in it move in place rather than by re-upload, riding
+	/// the same configuration as the expiries; the infrequent-access classes
+	/// wait the 30 days AWS requires at Standard first.
+	#[beet_core::test]
+	fn a_storage_class_is_a_transition_rule() {
+		let json = build_json(
+			S3BucketBlock::new("archive")
+				.with_object_versioning(true)
+				.with_storage_class(S3StorageClass::GlacierIr),
+		);
+		json.as_str()
+			.xpect_contains("\"id\":\"transition-objects\"")
+			.xpect_contains("\"storage_class\":\"GLACIER_IR\"")
+			.xpect_contains("\"days\":0")
+			.xpect_contains("\"id\":\"expire-noncurrent-versions\"");
+		build_json(
+			S3BucketBlock::new("archive")
+				.with_storage_class(S3StorageClass::StandardIa),
+		)
+		.as_str()
+		.xpect_contains("\"storage_class\":\"STANDARD_IA\"")
+		.xpect_contains("\"days\":30");
+		// ..and the default class is the bucket's own, needing no rule
+		build_json(S3BucketBlock::new("app"))
+			.as_str()
+			.xnot()
+			.xpect_contains("transition-objects");
 	}
 
 	#[beet_core::test]

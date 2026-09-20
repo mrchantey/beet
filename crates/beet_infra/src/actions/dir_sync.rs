@@ -63,32 +63,32 @@ impl DirSync {
 	}
 }
 
-/// The per-deploy prefix this sync publishes under, or `None` for a bucket that
-/// publishes at its root.
+/// The declaration of the bucket this sync addresses: the [`ErasedStoreBlock`]
+/// under the stack carrying the sync's label. What the sync reads off it (the
+/// per-deploy prefix, the storage class) comes from the bucket's own
+/// declaration rather than from a field on the sync, so a sync cannot
+/// disagree with the bucket it addresses. A label nothing under the stack
+/// declares is an error: the bucket name would compose fine and the sync would
+/// publish into thin air.
 ///
-/// Resolved when the sync RUNS rather than when it is declared, because which
+/// Looked up when the sync RUNS rather than when it is declared, because which
 /// deploy's prefix a sync belongs to is a property of the VERB and not of the
 /// declaration: `deploy` mints a version and fills it, while `sync` republishes
 /// into the version already being served (`<AdoptCurrentDeploy/>` is what points
 /// the launch at it). One declaration, read by both.
-///
-/// The flag comes from the bucket's own declaration (its
-/// [`ErasedStoreBlock`]) rather than from a field here, so a sync cannot
-/// disagree with the bucket it addresses. A label nothing under the stack
-/// declares is an error: the bucket name would compose fine and the sync would
-/// publish into thin air.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
-pub(crate) fn deploy_subdir(
+pub(crate) fn declared_store<'a>(
 	entity: Entity,
 	sync: &DirSync,
 	stacks: &StackQuery,
-	stores: &Query<(&ErasedBlock, &ErasedStoreBlock)>,
-) -> Result<Option<RelPath>> {
-	let (_, store) = stacks
+	stores: &'a Query<(&ErasedBlock, &ErasedStoreBlock)>,
+) -> Result<&'a ErasedStoreBlock> {
+	stacks
 		.declared(entity)?
 		.into_iter()
 		.filter_map(|entity| stores.get(entity).ok())
 		.find(|(erased, _)| erased.label == *sync.bucket())
+		.map(|(_, store)| store)
 		.ok_or_else(|| {
 			bevyhow!(
 				"the sync of '{}' addresses a bucket labelled '{}', which \
@@ -96,11 +96,7 @@ pub(crate) fn deploy_subdir(
 				sync.local_dir(),
 				sync.bucket()
 			)
-		})?;
-	store
-		.deploy_versioned()
-		.then(|| ArtifactLedger::version_repo_dir(&stacks.deploy_id()))
-		.xok()
+		})
 }
 
 /// Observer: resolve the declared bucket into the [`S3FsStore`]
@@ -111,8 +107,8 @@ pub(crate) fn deploy_subdir(
 /// ([`S3BucketBlock::store_uri`]) rather than recomposed here: a throwaway
 /// block under the sync's own stack, since an overridden `stage`/`region`
 /// addresses a bucket under another stack, which no label lookup here can
-/// reach. The per-deploy prefix a versioned bucket nests under is resolved by
-/// [`deploy_subdir`] when the sync runs, since it is not yet known here.
+/// reach. The per-deploy prefix a versioned bucket nests under is resolved
+/// from [`declared_store`] when the sync runs, since it is not yet known here.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,
@@ -144,24 +140,20 @@ mod test {
 	use beet_net::prelude::*;
 
 	/// A stack declaring `bucket` beside a sync of it, returning the sync's
-	/// entity and the declaration's root uri.
+	/// entity and the declaration's erased half.
 	fn declared_sync(
 		stack: Stack,
 		bucket: S3BucketBlock,
 		sync: DirSync,
-	) -> (World, Entity, StoreUri) {
+	) -> (World, Entity, ErasedStoreBlock) {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
 		let stack = world.spawn((stack, children![bucket, sync])).id();
 		world.flush();
 		let children = world.entity(stack).get::<Children>().unwrap();
 		let (bucket, sync) = (children[0], children[1]);
-		let root = world
-			.get::<ErasedStoreBlock>(bucket)
-			.unwrap()
-			.root()
-			.clone();
-		(world, sync, root)
+		let declared = world.get::<ErasedStoreBlock>(bucket).unwrap().clone();
+		(world, sync, declared)
 	}
 
 	/// The attached S3 end is the bucket the declaration names, spelled by the
@@ -169,7 +161,7 @@ mod test {
 	/// deploy did not create.
 	#[beet_core::test]
 	fn attaches_the_declared_bucket() {
-		let (world, sync, root) = declared_sync(
+		let (world, sync, declared) = declared_sync(
 			Stack::new("app")
 				.with_stage("prod")
 				.with_region("eu-west-1"),
@@ -177,11 +169,11 @@ mod test {
 			DirSync::new("assets", "site"),
 		);
 		let attached = world.get::<S3FsStore>(sync).unwrap().s3_store();
-		root.name().xpect_eq(Some("app--prod--assets"));
+		declared.root().name().xpect_eq(Some("app--prod--assets"));
 		attached
 			.bucket_name()
 			.as_str()
-			.xpect_eq(root.name().unwrap());
+			.xpect_eq(declared.root().name().unwrap());
 		attached
 			.region()
 			.clone()
@@ -208,5 +200,27 @@ mod test {
 			.region()
 			.clone()
 			.xpect_eq(Some(SmolStr::new("ap-southeast-2")));
+	}
+
+	/// The class a push lands objects in is the bucket's own declaration,
+	/// projected onto the erased half the sync reads, and absent for a bucket
+	/// declaring none.
+	#[beet_core::test]
+	fn the_declared_class_reaches_the_sync() {
+		let (_, _, declared) = declared_sync(
+			Stack::new("app").with_stage("prod"),
+			S3BucketBlock::new("archive")
+				.with_storage_class(S3StorageClass::GlacierIr),
+			DirSync::new("archive", "store"),
+		);
+		declared
+			.storage_class()
+			.xpect_eq(Some(S3StorageClass::GlacierIr));
+		let (_, _, declared) = declared_sync(
+			Stack::new("app").with_stage("prod"),
+			S3BucketBlock::new("assets"),
+			DirSync::new("assets", "site"),
+		);
+		declared.storage_class().xpect_eq(None);
 	}
 }

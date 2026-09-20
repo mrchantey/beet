@@ -45,6 +45,7 @@ impl Plugin for InfraPlugin {
 		app.register_type::<crate::prelude::RepoStoreBlock>()
 			.register_type::<crate::prelude::StoreUriBlock>()
 			.register_type::<crate::prelude::PrefixExpiry>()
+			.register_type::<crate::prelude::S3StorageClass>()
 			.add_systems(
 				DeployRender,
 				crate::blocks::assert_repo_store_blocks

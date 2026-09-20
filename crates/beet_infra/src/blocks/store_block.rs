@@ -23,11 +23,17 @@ pub trait StoreBlock: Block {
 	/// publishing a new document and swapping the binary that serves it is then
 	/// not a window where the old binary parses the new document.
 	fn deploy_versioned(&self) -> bool { false }
+
+	/// The class a push into this store uploads objects as, `None` for the
+	/// store's default. Read off the declaration rather than declared on the
+	/// sync, so a sync cannot land objects in a class its bucket did not
+	/// declare.
+	fn storage_class(&self) -> Option<S3StorageClass> { None }
 }
 
 /// The erased half of any [`StoreBlock`], beside its [`ErasedBlock`]: the root
 /// uri resolved against the declaration's stack, the local stand-in for the
-/// same declaration, and the versioning flag, inserted by
+/// same declaration, the versioning flag and the storage class, inserted by
 /// [`on_insert`](Self::on_insert) and removed with the block.
 ///
 /// The ROOT rather than a per-deploy uri, because the deploy id is a property
@@ -46,6 +52,8 @@ pub struct ErasedStoreBlock {
 	local: StoreUri,
 	/// See [`StoreBlock::deploy_versioned`].
 	deploy_versioned: bool,
+	/// See [`StoreBlock::storage_class`].
+	storage_class: Option<S3StorageClass>,
 }
 
 impl ErasedStoreBlock {
@@ -57,6 +65,7 @@ impl ErasedStoreBlock {
 				&stack.resource_name(block.label().clone()),
 			),
 			deploy_versioned: block.deploy_versioned(),
+			storage_class: block.storage_class(),
 		}
 	}
 
