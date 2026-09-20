@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// `<Theme color=../>` generates a whole palette from one brand colour. A brand
 /// that has picked its own key colours overrides them individually, and the
 /// neutral key is split per mode so a light scheme can be cream while its dark
-/// twin is a green-cast near-black (see [`themes::from_theme`]). The scheme is
+/// twin is a near-black of its own (see [`themes::from_theme`]). The scheme is
 /// the session default a non-html target (the terminal) falls back to when a
 /// request pins none, eg seeded from a `--color-scheme` CLI argument by the live
 /// TUI.

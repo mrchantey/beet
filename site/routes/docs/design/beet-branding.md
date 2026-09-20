@@ -80,7 +80,7 @@ Each entrypoint has one job and its own register:
 
 ## Palette
 
-Light mode is print, the cream and ink of a zine handout, and dark mode is terminal phosphor, neon on a green-black screen. The pairing maps the folk and protocol registers of the brand onto beet's own render targets, the printed page and the terminal.
+Light mode is print, the cream and ink of a zine handout, and dark mode is the same handout read at night, the brand accents on a near-neutral ink. The pairing maps the folk and protocol registers of the brand onto beet's own render targets, the printed page and the terminal.
 
 | Key | Hex | Notes |
 | --- | --- | --- |
@@ -88,11 +88,11 @@ Light mode is print, the cream and ink of a zine handout, and dark mode is termi
 | Secondary | `#f028a8` | Hot pink, hue 346°, so light tone 40 lands raspberry `#b5007c` rather than purple |
 | Tertiary | `#ea8a0c` | Harvest amber |
 | Neutral, light | `#f4eede` | Handout cream, seeds light surfaces near tone 94 |
-| Neutral, dark | `#14211d` | Handout ink, hue 173°, seeds green-cast dark surfaces near tone 8 (`#0d1a16`) |
+| Neutral, dark | `#1b1c1c` | Handout ink, near-neutral (chroma 2), seeds dark surfaces near tone 8 (`#171818`) |
 | Neutral variant | `#6a7772` | Handout muted |
 | Error | `#de3730` | Hue 35°, kept well clear of secondary pink |
 
-The neutral key is split per mode, each scheme builds its surface roles from its own neutral ramp, and the inverse-surface roles cross over to the other mode's ramp, so an inverse surface in light mode is phosphor and in dark mode is print.
+The neutral key is split per mode, each scheme builds its surface roles from its own neutral ramp, and the inverse-surface roles cross over to the other mode's ramp, so an inverse surface in light mode is ink and in dark mode is print.
 
 ## Typography
 

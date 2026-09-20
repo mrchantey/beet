@@ -89,6 +89,28 @@ pub fn RouteIndex(
 	rsx! { {items} }
 }
 
+/// An index entry's heading link. A heading is the loudest line of its entry,
+/// so the prose underline would only clutter it: the link reads by its primary
+/// colour at rest and the underline returns on hover.
+pub const INDEX_LINK: ClassName = ClassName::new_static("index-link");
+
+/// The index's own rules, contributed by [`RouterPlugin`](crate::prelude::RouterPlugin)
+/// through [`RuleSet::extend_rules`] beside the app shell's, so they compose with
+/// the material set and outweigh the bare `a` underline by class specificity.
+pub(crate) fn route_index_rules() -> Vec<Rule> {
+	vec![
+		Rule::new()
+			.with_selector(Selector::class(INDEX_LINK))
+			.with_canonical(DecorationLine::DEFAULT),
+		Rule::new()
+			.with_selector(Selector::AllOf(vec![
+				Selector::class(INDEX_LINK),
+				Selector::state(ElementState::Hovered),
+			]))
+			.with_canonical(DecorationLine::underline()),
+	]
+}
+
 /// Whether a child page appears in the index, ie its
 /// [`PageVisibility`](beet_ui::prelude::PageVisibility) read as a listing rule.
 fn lists(meta: &PageMeta, is_prod: bool) -> bool {
@@ -130,7 +152,7 @@ fn index_entry(
 	let description = entry_description(meta);
 	rsx! {
 		{rule}
-		<h4><a href=href>{heading}</a></h4>
+		<h4><a {Classes::new([INDEX_LINK])} href=href>{heading}</a></h4>
 		{byline}
 		{thumbnail}
 		{description}

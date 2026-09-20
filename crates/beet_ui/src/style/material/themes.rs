@@ -140,7 +140,7 @@ fn fixed_roles() -> Rule {
 pub(crate) fn from_theme(theme: &Theme) -> Vec<(TokenKey, TokenValue)> {
 	let core = CorePalette::of(theme.color.to_argb());
 	// a key colour holds its own hue and chroma, rather than being pushed through
-	// a Material variant, so a low-chroma key (the cream, the green-cast ink)
+	// a Material variant, so a low-chroma key (the cream, a tinted ink)
 	// keeps the cast it was picked for.
 	let key = |color: Option<Color>, seeded: TonalPalette| match color {
 		Some(color) => TonalPalette::from_hct(color.to_argb().into()),
