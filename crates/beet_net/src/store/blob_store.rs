@@ -322,6 +322,9 @@ impl BlobStoreProvider for BlobStore {
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.provider.list()
 	}
+	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+		self.provider.list_dir(path)
+	}
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.provider.get(path)
 	}
@@ -489,6 +492,31 @@ pub mod store_test {
 			.await
 			.unwrap()
 			.xpect_eq(vec![(path.clone(), stat)]);
+
+		// one directory's children by name, a missing directory empty
+		let leaf = RelPath::from("dir/nested/leaf.txt");
+		let file = RelPath::from("dir/file.txt");
+		store.insert(&leaf, body.clone()).await.unwrap();
+		store.insert(&file, body.clone()).await.unwrap();
+		store.list_dir(&RelPath::default()).await.unwrap().xpect_eq(BlobDir {
+			dirs: vec!["dir".into()],
+			files: vec!["test_path".into()],
+		});
+		store
+			.list_dir(&RelPath::from("dir"))
+			.await
+			.unwrap()
+			.xpect_eq(BlobDir {
+				dirs: vec!["nested".into()],
+				files: vec!["file.txt".into()],
+			});
+		store
+			.list_dir(&RelPath::from("missing"))
+			.await
+			.unwrap()
+			.xpect_eq(BlobDir::default());
+		store.remove(&leaf).await.unwrap();
+		store.remove(&file).await.unwrap();
 
 		store.remove(&path).await.unwrap();
 		store.get(&path).await.xpect_err();

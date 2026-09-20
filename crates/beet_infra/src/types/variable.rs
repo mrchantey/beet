@@ -70,6 +70,31 @@ pub enum VariableSource {
 	},
 }
 
+impl VariableSource {
+	/// The value of a `Fixed` source, or of a `ProcessEnv` one read now: the
+	/// two a block resolves at render without a request or a store, ie a
+	/// unit's `Environment=` line. A process variable unset at render is
+	/// empty with a warning naming `key`, so a machine without the secret
+	/// still renders (the box then falls back to whatever the runtime does
+	/// without it). Any other source is an error.
+	pub fn resolve_static(&self, key: &str) -> Result<SmolStr> {
+		match self {
+			Self::Fixed(value) => Ok(value.clone()),
+			Self::ProcessEnv => env_ext::var(key).map(SmolStr::new).or_else(|_| {
+				warn!(
+					"`{key}` is unset in the process environment, rendering it \
+					empty"
+				);
+				Ok(SmolStr::default())
+			}),
+			Self::Header | Self::Param | Self::Secret { .. } => bevybail!(
+				"`{key}` reads {self:?}, which cannot be resolved at render \
+				without a request"
+			),
+		}
+	}
+}
+
 impl Variable {
 	/// Create a variable with a fixed literal value.
 	pub fn fixed(key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {

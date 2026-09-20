@@ -183,6 +183,34 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
+	/// One `read_dir`, a missing directory empty.
+	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+		let dir = self.resolve_path(path);
+		Box::pin(async move {
+			if !fs_ext::exists_async(&dir).await? {
+				return BlobDir::default().xok();
+			}
+			let name_of = |path: std::path::PathBuf| {
+				path.file_name()
+					.map(|name| SmolStr::new(name.to_string_lossy()))
+			};
+			BlobDir {
+				dirs: ReadDir::dirs_async(&dir)
+					.await?
+					.into_iter()
+					.filter_map(name_of)
+					.collect(),
+				files: ReadDir::files_async(&dir)
+					.await?
+					.into_iter()
+					.filter_map(name_of)
+					.collect(),
+			}
+			.dedup()
+			.xok()
+		})
+	}
+
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let path = self.resolve_path(path);
 		Box::pin(async move {

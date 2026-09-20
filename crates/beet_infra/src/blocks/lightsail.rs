@@ -37,10 +37,13 @@ pub struct LightsailBlock {
 	/// Env vars written directly into the unit's `Environment=` lines, last so
 	/// a deploy can override any default, and kept off the `ExecStart` argv.
 	/// Not a stronger channel than [`env_vars`](Self::env_vars): the rendered
-	/// user data still lands in terraform state either way.
+	/// user data still lands in terraform state either way. A
+	/// [`VariableSource::ProcessEnv`] value is read at render, after the
+	/// entry's `<Secrets>` has loaded, so a template never reads a secret at
+	/// build time.
 	#[serde(default)]
 	#[set_with(skip)]
-	secret_env: Vec<(SmolStr, SmolStr)>,
+	secret_env: Vec<(SmolStr, VariableSource)>,
 	/// DNS records published at the instance's public address: an `A` record
 	/// per provider (`AAAA` under [`Ipv6`](LightsailNetworking::Ipv6)
 	/// networking). Each authority also lands in the Caddyfile, so declaring
@@ -174,7 +177,19 @@ impl LightsailBlock {
 		key: impl Into<SmolStr>,
 		value: impl Into<SmolStr>,
 	) -> Self {
-		self.secret_env.push((key.into(), value.into()));
+		self.secret_env
+			.push((key.into(), VariableSource::Fixed(value.into())));
+		self
+	}
+
+	/// Add an env var delivered off-argv whose value is the deployer's own
+	/// process variable of the same name, read at render (see
+	/// [`secret_env`](Self::secret_env)).
+	pub fn with_secret_env_from_process(
+		mut self,
+		key: impl Into<SmolStr>,
+	) -> Self {
+		self.secret_env.push((key.into(), VariableSource::ProcessEnv));
 		self
 	}
 
@@ -374,8 +389,12 @@ impl LightsailBlock {
 		let secret_env_lines = self
 			.secret_env
 			.iter()
-			.map(|(key, value)| format!("Environment={key}={value}\n"))
-			.collect::<String>();
+			.map(|(key, source)| {
+				source
+					.resolve_static(key)
+					.map(|value| format!("Environment={key}={value}\n"))
+			})
+			.collect::<Result<String>>()?;
 
 		// free port 22 for the TUI: comment out any explicit `Port` in the main
 		// sshd config and declare the management port in a drop-in, ordered
@@ -1723,6 +1742,25 @@ mod tests {
 			.xpect_contains("Environment=BEET_SSH_HOST_KEY=abc123")
 			.xnot()
 			.xpect_contains("app abc123");
+	}
+
+	/// A process-sourced secret is read when the script renders, not when the
+	/// block is declared, so a `<Secrets>` loaded after the build still feeds
+	/// it; unset, it renders empty rather than failing a local plan.
+	#[beet_core::test]
+	fn process_secret_env_is_read_at_render() {
+		let block = LightsailBlock::default()
+			.with_secret_env_from_process("LIGHTSAIL_TEST_HOST_KEY");
+		build_user_data(&block)
+			.0
+			.as_str()
+			.xpect_contains("Environment=LIGHTSAIL_TEST_HOST_KEY=\n");
+		unsafe { env_ext::set_var("LIGHTSAIL_TEST_HOST_KEY", "late") }.unwrap();
+		build_user_data(&block)
+			.0
+			.as_str()
+			.xpect_contains("Environment=LIGHTSAIL_TEST_HOST_KEY=late");
+		unsafe { env_ext::remove_var("LIGHTSAIL_TEST_HOST_KEY") }.unwrap();
 	}
 
 	/// The IAM user carries ONE inline policy naming exactly the resources the

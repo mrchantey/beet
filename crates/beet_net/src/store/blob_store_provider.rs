@@ -34,6 +34,27 @@ impl BlobStat {
 	}
 }
 
+/// One directory's immediate children, by name, see
+/// [`BlobStoreProvider::list_dir`].
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct BlobDir {
+	/// The subdirectories, sorted, no trailing slash.
+	pub dirs: Vec<SmolStr>,
+	/// The files, sorted.
+	pub files: Vec<SmolStr>,
+}
+
+impl BlobDir {
+	/// Sorted and unique on both sides, the shape every provider returns.
+	pub fn dedup(mut self) -> Self {
+		self.dirs.sort();
+		self.dirs.dedup();
+		self.files.sort();
+		self.files.dedup();
+		self
+	}
+}
+
 /// Trait for store storage backends (S3, filesystem, memory, etc.).
 ///
 /// Implementations provide the actual storage operations for [`BlobStore`].
@@ -273,6 +294,45 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// ```
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>>;
 
+	/// The immediate children of one directory (the root for an empty
+	/// `path`), as names: a missing directory is empty. The default derives
+	/// it from a whole [`list`](Self::list); the filesystem reads the one
+	/// directory and S3 lists with a delimiter, so a caller narrowing a large
+	/// store (a dated series beside a document at the repo root) never walks
+	/// the whole tree.
+	///
+	/// # Example
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// # use beet_net::prelude::*;
+	/// # async fn run() -> Result<()> {
+	/// let store = BlobStore::temp();
+	/// let listing = store.list_dir(&RelPath::from("2026")).await?;
+	/// for month in listing.dirs {
+	/// 	println!("{month}");
+	/// }
+	/// # Ok(())
+	/// # }
+	/// ```
+	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+		let this = self.box_clone();
+		let path = path.clone();
+		Box::pin(async move {
+			let mut listing = BlobDir::default();
+			for child in this.list().await? {
+				let Some(rest) = child.strip_prefix(&path) else {
+					continue;
+				};
+				match rest.as_str().split_once('/') {
+					Some((dir, _)) => listing.dirs.push(dir.into()),
+					None if rest.as_str().is_empty() => {}
+					None => listing.files.push(rest.as_str().into()),
+				}
+			}
+			listing.dedup().xok()
+		})
+	}
+
 	/// Get object from store.
 	///
 	/// # Example
@@ -441,6 +501,9 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	}
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.as_ref().list()
+	}
+	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+		self.as_ref().list_dir(path)
 	}
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		self.as_ref().get(path)

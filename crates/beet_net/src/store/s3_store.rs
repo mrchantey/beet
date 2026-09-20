@@ -488,6 +488,64 @@ impl BlobStoreProvider for S3Store {
 		async_ext::pin_tokio(async move { this.list_objects().await })
 	}
 
+	/// `ListObjectsV2` with a `/` delimiter: the common prefixes are the
+	/// directories, the contents the files, one page per thousand.
+	fn list_dir(&self, path: &RelPath) -> SendBoxedFuture<Result<BlobDir>> {
+		let this = self.clone();
+		let prefix = match path.as_str().is_empty() {
+			true => this.subdir.as_ref().map(|subdir| format!("{subdir}/")),
+			false => Some(format!("{}/", this.resolve_key(path))),
+		};
+		async_ext::pin_tokio(async move {
+			let client = this.client().await;
+			let mut listing = BlobDir::default();
+			let mut continuation_token = None;
+			let strip = |key: &str| {
+				let rest = match &prefix {
+					Some(prefix) => key.strip_prefix(prefix.as_str())?,
+					None => key,
+				};
+				rest.trim_end_matches('/').xmap(SmolStr::new).xsome()
+			};
+			loop {
+				let mut req = client
+					.list_objects_v2()
+					.bucket(this.bucket_name.as_str())
+					.delimiter("/");
+				if let Some(ref prefix) = prefix {
+					req = req.prefix(prefix);
+				}
+				if let Some(token) = &continuation_token {
+					req = req.continuation_token(token);
+				}
+				let page = req.send().await?;
+				listing.dirs.extend(
+					page.common_prefixes
+						.unwrap_or_default()
+						.into_iter()
+						.filter_map(|common| strip(&common.prefix?)),
+				);
+				listing.files.extend(
+					page.contents
+						.unwrap_or_default()
+						.into_iter()
+						.filter_map(|obj| strip(&obj.key?))
+						.filter(|name| !name.is_empty()),
+				);
+				match page.is_truncated {
+					Some(true) => {
+						continuation_token = page.next_continuation_token;
+						if continuation_token.is_none() {
+							break;
+						}
+					}
+					_ => break,
+				}
+			}
+			listing.dedup().xok()
+		})
+	}
+
 	/// `HeadObject`: the size and etag without the body.
 	fn stat(
 		&self,

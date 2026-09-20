@@ -91,7 +91,15 @@ impl SecretsHandle {
 	/// Read and parse the document. Errors when the file is missing.
 	pub async fn read(&self) -> Result<SecretsDocument> {
 		let bytes = self.store.get(&self.path).await.map_err(|err| {
-			bevyhow!("document {} cannot be read: {err}", self.describe())
+			match err.downcast_ref::<HttpError>() {
+				Some(err) if err.status_code == StatusCode::NOT_FOUND => {
+					bevyhow!(
+						"document {} is not written yet (`secrets/set` writes it)",
+						self.describe()
+					)
+				}
+				_ => bevyhow!("document {} cannot be read: {err}", self.describe()),
+			}
 		})?;
 		SecretsDocument::parse(self.media_type()?, &bytes)
 			.map_err(|err| bevyhow!("document {}: {err}", self.describe()))
@@ -133,26 +141,62 @@ impl SecretsHandle {
 
 	/// The newest document of the dated series beside this path, `None`
 	/// when none has been written: the one a restore and a probe read.
+	/// Descends year, month and day newest first by one directory listing
+	/// each, so a document at a repo root never walks the repo.
 	pub async fn newest_dated(&self) -> Result<Option<Self>> {
-		let prefix = self.dir_prefix();
-		let extension = self.extension()?;
-		let listing = match prefix.is_empty() {
-			true => self.store.clone(),
-			false => self
-				.store
-				.with_subdir(RelPath::new(prefix.trim_end_matches('/'))),
-		}
-		.list()
-		.await?;
-		listing
-			.into_iter()
-			.filter(|path| Self::is_dated(path.as_str(), extension))
-			.max()
-			.map(|path| {
-				Self::new(self.store.clone(), format!("{prefix}{path}"))
-					.map(|handle| handle.with_label_of(self))
-			})
-			.transpose()
+		let suffix = SmolStr::new(format!("Z.{}", self.extension()?));
+		Self::newest_in(
+			self.store.clone(),
+			RelPath::new(self.dir_prefix()),
+			&[4, 2, 2],
+			suffix,
+		)
+		.await?
+		.map(|path| {
+			Self::new(self.store.clone(), path.as_str())
+				.map(|handle| handle.with_label_of(self))
+		})
+		.transpose()
+	}
+
+	/// The newest dated file under `dir`: at each level the digit
+	/// directories of the next `width`, newest first, backtracking past one
+	/// holding no series; at the leaf the newest `HHMMSSZ.<ext>` file.
+	fn newest_in(
+		store: BlobStore,
+		dir: RelPath,
+		widths: &'static [usize],
+		suffix: SmolStr,
+	) -> SendBoxedFuture<Result<Option<RelPath>>> {
+		Box::pin(async move {
+			let listing = store.list_dir(&dir).await?;
+			let Some((&width, rest)) = widths.split_first() else {
+				return listing
+					.files
+					.into_iter()
+					.filter(|name| {
+						name.strip_suffix(suffix.as_str())
+							.is_some_and(|clock| Self::is_digits(clock, 6))
+					})
+					.max()
+					.map(|name| dir.join(name))
+					.xok();
+			};
+			for name in listing
+				.dirs
+				.into_iter()
+				.filter(|name| Self::is_digits(name, width))
+				.rev()
+			{
+				let found =
+					Self::newest_in(store.clone(), dir.join(name), rest, suffix.clone())
+						.await?;
+				if found.is_some() {
+					return Ok(found);
+				}
+			}
+			Ok(None)
+		})
 	}
 
 	/// Whether `path` (relative to the series dir) has the dated shape,
@@ -163,8 +207,13 @@ impl SecretsHandle {
 		};
 		let parts = stem.split('/').collect::<Vec<_>>();
 		matches!(parts.as_slice(), [year, month, day, clock]
-			if year.len() == 4 && month.len() == 2 && day.len() == 2 && clock.len() == 6
-			&& parts.iter().all(|part| part.chars().all(|char| char.is_ascii_digit())))
+			if Self::is_digits(year, 4) && Self::is_digits(month, 2)
+			&& Self::is_digits(day, 2) && Self::is_digits(clock, 6))
+	}
+
+	/// Exactly `width` ascii digits.
+	fn is_digits(text: &str, width: usize) -> bool {
+		text.len() == width && text.chars().all(|char| char.is_ascii_digit())
 	}
 
 	/// The directory the path sits in, with its trailing slash, empty at
@@ -290,6 +339,43 @@ mod test {
 			.path
 			.as_str()
 			.xpect_eq("2026/09/15/000000Z.json");
+	}
+
+	/// A document at a store root (the repo store's `secrets.toml`) looks
+	/// for its series by descending dated directories, so a sibling tree
+	/// (`target/`) is never walked and never mistaken for one.
+	#[beet_core::test]
+	async fn finds_a_root_series_among_siblings() {
+		let store = BlobStore::temp();
+		let handle = SecretsHandle::new(store.clone(), "secrets.toml").unwrap();
+		for path in [
+			"target/debug/deps/x.rlib",
+			"2026/09/notes.toml",
+			"2026/09/15/badclock.toml",
+			"2025/12/31/235959Z.toml",
+		] {
+			store.insert(&RelPath::new(path), "x").await.unwrap();
+		}
+		handle
+			.newest_dated()
+			.await
+			.unwrap()
+			.unwrap()
+			.path
+			.as_str()
+			.xpect_eq("2025/12/31/235959Z.toml");
+		store
+			.insert(&RelPath::new("2026/09/15/010101Z.toml"), "x")
+			.await
+			.unwrap();
+		handle
+			.newest_dated()
+			.await
+			.unwrap()
+			.unwrap()
+			.path
+			.as_str()
+			.xpect_eq("2026/09/15/010101Z.toml");
 	}
 
 	#[beet_core::test]

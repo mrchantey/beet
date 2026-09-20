@@ -284,7 +284,6 @@ pub fn LightsailBeetSiteBlock(
 	let stack = stacks.resolve(entity);
 	let is_production = stack.is_production();
 	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
-	let ssh_host_key = env_ext::var("BEET_SSH_HOST_KEY").unwrap_or_default();
 	let block = LightsailBlock::default()
 		.with_bundle_id("small_3_0")
 		.with_allow_ssh(true)
@@ -304,8 +303,9 @@ pub fn LightsailBeetSiteBlock(
 			..default()
 		})
 		// private key material: its own channel, so no renderer can ever put it
-		// on an argv line.
-		.with_secret_env("BEET_SSH_HOST_KEY", ssh_host_key);
+		// on an argv line, and read at render rather than here, since the
+		// entry's `<Secrets>` lands it in the environment after this builds.
+		.with_secret_env_from_process("BEET_SSH_HOST_KEY");
 	// prod claims the apex + www (proxied, edge-cached) plus the DNS-only `app`
 	// hostname carrying ssh + future live apps; other stages get their
 	// subdomain (proxied) + `app.dev` (DNS-only ssh).

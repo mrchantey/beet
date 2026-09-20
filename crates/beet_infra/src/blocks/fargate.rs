@@ -73,10 +73,13 @@ pub struct FargateBlock {
 	/// Its own list rather than a [`BootstrapConfig`] field, so the secret channel
 	/// is visible in the type and no renderer can ever put a secret on an argv
 	/// line, in a `CMD` array or in a systemd `ExecStart`. Baking a secret into
-	/// the task definition is a pre-existing exposure, noted, not widened.
+	/// the task definition is a pre-existing exposure, noted, not widened. A
+	/// [`VariableSource::ProcessEnv`] value is read at render, after the
+	/// entry's `<Secrets>` has loaded, so a template never reads a secret at
+	/// build time.
 	#[serde(default)]
 	#[set_with(skip)]
-	secret_env: Vec<(SmolStr, SmolStr)>,
+	secret_env: Vec<(SmolStr, VariableSource)>,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -163,7 +166,19 @@ impl FargateBlock {
 		key: impl Into<SmolStr>,
 		value: impl Into<SmolStr>,
 	) -> Self {
-		self.secret_env.push((key.into(), value.into()));
+		self.secret_env
+			.push((key.into(), VariableSource::Fixed(value.into())));
+		self
+	}
+
+	/// Add a secret environment variable whose value is the deployer's own
+	/// process variable of the same name, read at render (see
+	/// [`secret_env`](Self::secret_env)).
+	pub fn with_secret_env_from_process(
+		mut self,
+		key: impl Into<SmolStr>,
+	) -> Self {
+		self.secret_env.push((key.into(), VariableSource::ProcessEnv));
 		self
 	}
 
@@ -614,8 +629,9 @@ impl FargateBlock {
 				.insert(variable.key().clone(), variable.tf_var_ref().into());
 		}
 		// secrets, last so a deploy can override any default above.
-		for (key, value) in &self.secret_env {
-			env_vars.insert(key.clone(), value.to_string());
+		for (key, source) in &self.secret_env {
+			env_vars
+				.insert(key.clone(), source.resolve_static(key)?.to_string());
 		}
 
 		// Task definition. The http port is always mapped; the ssh port only
