@@ -121,6 +121,13 @@ impl JsonlLevel {
 			Self::Best => 19,
 		};
 		let mut encoder = zstd::stream::write::Encoder::new(Vec::new(), level)?;
+		// the slow level is minutes per gigabyte on one core; zstd splits a
+		// large input into jobs across the machine, a small one stays one job
+		if let (Self::Best, Ok(cores)) =
+			(self, std::thread::available_parallelism())
+		{
+			encoder.multithread(cores.get() as u32)?;
+		}
 		encoder.write_all(lines)?;
 		encoder.finish()?.xok()
 	}
