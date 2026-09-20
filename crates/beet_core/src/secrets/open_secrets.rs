@@ -77,6 +77,7 @@ mod test {
 	fn secret(name: &str, role: Option<SecretRole>) -> Secret {
 		Secret {
 			name: name.into(),
+			group: "default".into(),
 			value: format!("{name}-value").into(),
 			record: SecretRecord { role, ..default() },
 		}

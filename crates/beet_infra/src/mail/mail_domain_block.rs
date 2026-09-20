@@ -569,9 +569,9 @@ impl MailDomainBlock {
 			match relay {
 				Err(err) => scope.error(err),
 				Ok(relay) => {
-					let (stack, deployment, config) = scope.ctx();
+					let (stack, _, config) = scope.ctx();
 					if let Err(err) =
-						block.emit(stack, deployment, config, &relay, &declared)
+						block.emit(stack, config, &relay, &declared)
 					{
 						scope.error(bevyhow!(
 							"MailDomainBlock '{}': {err}",
@@ -623,7 +623,6 @@ impl MailDomainBlock {
 	fn emit(
 		&self,
 		stack: &ResolvedStack,
-		deployment: &Deployment,
 		config: &mut terra::Config,
 		relay: &RelayMode,
 		topics: &[SnsTopicBlock],
@@ -678,9 +677,7 @@ impl MailDomainBlock {
 					relay,
 					identity.as_ref(),
 				)?;
-				self.emit_delivery_records(
-					stack, deployment, config, &dns, relay,
-				)?;
+				self.emit_delivery_records(stack, config, &dns, relay)?;
 			}
 			// a domain that declares records but resolves no zone would apply
 			// clean and publish nothing, which is the one failure a mail stack
@@ -1107,7 +1104,6 @@ impl MailDomainBlock {
 	fn emit_delivery_records(
 		&self,
 		stack: &ResolvedStack,
-		deployment: &Deployment,
 		config: &mut terra::Config,
 		dns: &DnsProvider,
 		relay: &RelayMode,
@@ -1148,15 +1144,16 @@ impl MailDomainBlock {
 			&format!("_smtp._tls.{domain}"),
 			&self.tls_rpt_value(),
 		)?;
-		// the id changes with the deploy, so a policy edit is picked up by
-		// senders on their next lookup rather than after `max_age` expires.
+		// the id follows the policy body, so a policy edit is picked up by
+		// senders on their next lookup rather than after `max_age` expires,
+		// and an unchanged policy plans nothing.
 		dns.emit_txt(
 			stack,
 			config,
 			&self.label("mta-sts"),
 			&MtaStsPolicy::record_name(domain),
 			&MtaStsPolicy::record_value(&MtaStsPolicy::policy_id(
-				deployment.deploy_timestamp(),
+				&self.mta_sts_policy_text(),
 			)),
 		)?;
 		for label in Self::AUTOCONFIG_LABELS {

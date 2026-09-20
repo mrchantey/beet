@@ -32,6 +32,18 @@ pub struct Stack {
 	/// `AWS_REGION`, else the crate default.
 	#[set_with(unwrap_option, into)]
 	region: Option<SmolStr>,
+	/// The environment variable holding the passphrase this stack's tofu
+	/// state and plans are encrypted with (`state_passphrase="TF_STATE_PASSPHRASE"`,
+	/// a record of the entry's secrets document), see [`StateEncryption`].
+	/// Absent, the state is plaintext, which a stack whose apply derives a
+	/// secret should never leave it.
+	#[set_with(unwrap_option, into)]
+	state_passphrase: Option<SmolStr>,
+	/// The one-deploy migration switch: the apply that turns encryption on
+	/// reads the existing plaintext state through the `unencrypted` fallback
+	/// and writes it back encrypted; off again for the apply after, which
+	/// then plans no change.
+	state_migrate: bool,
 	/// Additional parameters, some of which may be required by a config
 	/// generator.
 	#[reflect(ignore)]
@@ -69,6 +81,14 @@ impl Stack {
 						crate::bindings::aws::region::DEFAULT.into()
 					})
 			}),
+			state_encryption: self
+				.state_passphrase
+				.clone()
+				.map(|env_var| {
+					StateEncryption::passphrase(env_var)
+						.with_migrate(self.state_migrate)
+				})
+				.unwrap_or_default(),
 			params: self.params.clone(),
 		}
 	}
@@ -92,6 +112,10 @@ pub struct ResolvedStack {
 	app_name: SmolStr,
 	stage: SmolStr,
 	region: SmolStr,
+	/// How the stack's state is encrypted, [`StateEncryption::None`] unless
+	/// the declaration names a passphrase; rendered onto this launch's
+	/// [`Deployment`] when the stack's config is seeded.
+	state_encryption: StateEncryption,
 	params: MultiMap<SmolStr, SmolStr>,
 }
 
@@ -324,6 +348,25 @@ mod tests {
 		stack.app_name().as_str().xpect_eq("other-app");
 		stack.stage().as_str().xpect_eq("shared");
 		stack.region().as_str().xpect_eq("eu-west-1");
+		stack.state_encryption().xpect_eq(StateEncryption::None);
+	}
+
+	/// A declared passphrase variable resolves to the encryption the render
+	/// seeds the deploy with, its migration switch carried along.
+	#[beet_core::test]
+	fn a_declared_passphrase_encrypts_the_state() {
+		resolved(Stack::default().with_state_passphrase("TF_STATE_PASSPHRASE"))
+			.state_encryption()
+			.xpect_eq(StateEncryption::passphrase("TF_STATE_PASSPHRASE"));
+		resolved(Stack {
+			state_migrate: true,
+			..Stack::default().with_state_passphrase("TF_STATE_PASSPHRASE")
+		})
+		.state_encryption()
+		.xpect_eq(
+			StateEncryption::passphrase("TF_STATE_PASSPHRASE")
+				.with_migrate(true),
+		);
 	}
 
 	/// The region an all-default stack resolves, unchanged from the per-block

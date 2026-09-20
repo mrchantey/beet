@@ -98,12 +98,7 @@ mod test {
 			SecretsGroup::new(vec![stranger.to_recipient()]),
 		);
 		document
-			.set(
-				&strangers,
-				"B",
-				"2",
-				SecretRecord::default().with_group("theirs"),
-			)
+			.set(&strangers, "theirs", "B", "2", default())
 			.unwrap();
 		let handle = fixture.secrets("secrets.toml");
 		handle.write(&document).await.unwrap();

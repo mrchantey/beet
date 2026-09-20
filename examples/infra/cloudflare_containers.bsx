@@ -20,8 +20,8 @@ The served content and the deploy/sync/destroy route shape are identical.
     beet --main=examples/infra/cloudflare_containers.bsx destroy
 
 Live deploy needs `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the R2
-data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in `.env`, plus
-`wrangler` and a container engine. The Workers Paid plan is required for Containers.
+data-plane keys (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in the entry's
+`secrets.toml`, plus `wrangler` and a container engine. The Workers Paid plan is required for Containers.
 -->
 <CliServer {CallOnReady}>
 <Router {RequestLogger}>

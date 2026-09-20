@@ -11,16 +11,24 @@ use std::path::PathBuf;
 /// `--document`. A `path` may climb above the store with `..`
 /// (`<Secrets path="../secrets.toml"/>` from an entry in a subdirectory of
 /// the repo, whose document is the repo's), which a filesystem store
-/// re-roots for and a bucket refuses, exactly as `<RepoRoot>` does. When the entity is ready its document is read, every group
-/// the discovered identity opens is verified, its `EnvVar` records land in
-/// the process environment (existing wins) and the opened document is
-/// inserted as [`OpenSecrets`] on the same entity. A document with no
-/// identity on the machine is one warning and nothing loaded, never an
-/// error: a cloud box's repo store never carries one, and a contributor
-/// without it still builds.
+/// re-roots for and a bucket refuses, exactly as `<RepoRoot>` does.
 ///
-/// The load itself lives beside the store I/O in `beet_net`; this is the
-/// declaration a lean build keeps as an inert tag.
+/// Loaded twice, by design. The launch reads every top-level unconditional
+/// declaration in the repo store out of the entry's prescan, before the
+/// entry builds, and sets its `EnvVar` records into the process environment
+/// (existing wins), so a declaration constructed in the build walk finds
+/// them set; the declaration therefore sits at the entry's top level with no
+/// `bx:cfg`, and a lean build keeps it as an inert tag. Then, when the entity
+/// is ready, the document is read again, every group the discovered identity
+/// opens is verified and the opened document is inserted as [`OpenSecrets`]
+/// on the same entity, for a verb reading a non-env record by name. A
+/// document with no identity on the machine is one warning and nothing
+/// loaded, never an error: a cloud box's repo store never carries one, and a
+/// contributor without it still builds. A declaration naming another store
+/// (`{StoreRef($cold)}`) is an export target the verbs read and write, never
+/// loaded into an environment.
+///
+/// The loads themselves live beside the store I/O in `beet_net`.
 ///
 /// ```rsx
 /// <Secrets/>
@@ -48,6 +56,8 @@ impl Default for Secrets {
 impl Secrets {
 	/// The label an undeclared or lone document answers to.
 	pub const DEFAULT_LABEL: &'static str = "secrets";
+	/// The formats a conventional document may be written in, by extension.
+	const EXTENSIONS: &'static [&'static str] = &["toml", "json", "ron"];
 
 	/// The document at `path`, labelled by default.
 	pub fn new(path: impl AsRef<str>) -> Self {
@@ -68,18 +78,26 @@ impl Secrets {
 		SecretsDocument::media_type_of(self.path.as_str())
 	}
 
-	/// The test runner's convention: the document beside the `.env` it
-	/// loaded (or in the cwd when there was none), loaded exactly as `.env`
-	/// is, its failure one stderr line since the runner has no logger yet.
-	pub fn load_env_vars_beside_dotenv() {
-		let Some(dir) =
-			env_ext::dotenv_dir().or_else(|| fs_ext::current_dir().ok())
-		else {
+	/// The test runner's convention: the nearest `secrets.<format>` in the
+	/// current directory or its ancestors (the repo's, from any crate's own
+	/// directory), found exactly as a `.env` is and loaded after it, its
+	/// failure one stderr line since the runner has no logger yet.
+	pub fn load_env_vars_nearest() {
+		let Some(dir) = Self::nearest_dir() else {
 			return;
 		};
 		if let Err(err) = Self::load_env_vars_from(&dir) {
 			crate::cross_log_error!("warning: {err}");
 		}
+	}
+
+	/// The nearest ancestor of the current directory (itself included)
+	/// holding a `secrets.<format>`, `None` when none does.
+	pub fn nearest_dir() -> Option<PathBuf> {
+		let cwd = fs_ext::current_dir().ok()?;
+		cwd.ancestors()
+			.find(|dir| matches!(Self::find_in_dir(dir), Ok(Some(_))))
+			.map(Path::to_path_buf)
 	}
 
 	/// Load the `EnvVar` records of the one `secrets.<format>` in `dir` into
@@ -103,7 +121,7 @@ impl Secrets {
 				were not loaded (`beet vault/keygen` makes one, \
 				`vault/restore-identity` restores one)",
 				AgeIdentityFile::default_path()?.display(),
-				document.secrets.len()
+				document.record_count()
 			);
 		};
 		let opened = document.open(&identities)?;
@@ -113,7 +131,7 @@ impl Secrets {
 				`secrets/rekey`: {}): its {} record(s) were not loaded",
 				list(&opened.locked),
 				list(&opened.pending),
-				document.secrets.len()
+				document.record_count()
 			);
 		}
 		opened.set_env_vars()
@@ -121,27 +139,23 @@ impl Secrets {
 
 	/// The one `secrets.<format>` in `dir` (`secrets.toml`, `secrets.json`,
 	/// `secrets.ron`), `None` when there is none, an error naming both when
-	/// there are two.
-	pub fn find_in_dir(dir: &Path) -> Result<Option<PathBuf>> {
-		if !fs_ext::exists(dir)? {
-			return None.xok();
-		}
-		let mut found = ReadDir::files(dir)?
-			.into_iter()
-			.filter(|path| {
-				path.file_stem().and_then(|stem| stem.to_str())
-					== Some(SecretsDocument::FILE_STEM)
-					&& SecretsDocument::media_type_of(&path.to_string_lossy())
-						.is_ok()
+	/// there are two. Probes the three names rather than listing the
+	/// directory: a listing on a js host is a recursive walk, and a repo
+	/// root holds a `target/`.
+	fn find_in_dir(dir: &Path) -> Result<Option<PathBuf>> {
+		let found = Self::EXTENSIONS
+			.iter()
+			.map(|extension| {
+				dir.join(format!("{}.{extension}", SecretsDocument::FILE_STEM))
 			})
+			.filter(|path| fs_ext::exists(path).unwrap_or(false))
 			.collect::<Vec<_>>();
-		found.sort();
 		match found.as_slice() {
 			[] => None.xok(),
 			[one] => Some(one.clone()).xok(),
 			many => bevybail!(
 				"{} holds {} secrets documents ({}): the runner loads one by \
-				convention, so keep one `secrets.<format>` beside `.env`",
+				convention, so keep one `secrets.<format>` in a directory",
 				dir.display(),
 				many.len(),
 				many.iter()
@@ -201,6 +215,7 @@ mod test {
 		document
 			.set(
 				&identities,
+				"default",
 				"BEET_TEST_CONVENTION_VAR",
 				"loaded",
 				SecretRecord {
@@ -210,7 +225,13 @@ mod test {
 			)
 			.unwrap();
 		document
-			.set(&identities, "BEET_TEST_CONVENTION_NOTE", "kept", default())
+			.set(
+				&identities,
+				"default",
+				"BEET_TEST_CONVENTION_NOTE",
+				"kept",
+				default(),
+			)
 			.unwrap();
 		fs_ext::write(dir.join("secrets.toml"), document.to_bytes().unwrap())
 			.unwrap();

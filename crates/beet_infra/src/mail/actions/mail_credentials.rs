@@ -59,14 +59,16 @@ pub async fn MailCredentials(
 	// creates, and it creates none on a domain the server does not hold.
 	for domain in mail.serving() {
 		for mailbox in domain.mailboxes() {
+			let address =
+				format!("{}@{}", mailbox.localpart(), domain.domain());
 			entries.push((
-				format!("{}@{}", mailbox.localpart(), domain.domain()),
+				address.clone(),
 				AccountPlan::secret_ref(
 					label,
 					mailbox.localpart(),
 					&domain.slug(),
 				),
-				AccountPlan::mailbox_note(mailbox.admin()),
+				AccountPlan::mailbox_note(&address, mailbox.admin()),
 			));
 		}
 	}
@@ -78,17 +80,17 @@ pub async fn MailCredentials(
 			for (secret, note) in [
 				(
 					mail.mail_box.ses_smtp_user_secret(),
-					"ses smtp username, ie the sending user's access key id",
+					mail.mail_box.ses_smtp_user_note(&mail.stack),
 				),
 				(
 					mail.mail_box.ses_smtp_password_secret(),
-					"ses smtp password, derived from it by terraform",
+					mail.mail_box.ses_smtp_password_note(&mail.stack),
 				),
 			] {
 				entries.push((
 					format!("{} ses relay", mail.mail_box.label()),
 					secret,
-					note.to_string(),
+					note,
 				));
 			}
 		}
@@ -109,13 +111,13 @@ pub async fn MailCredentials(
 		// which is why it is listed under `--infra` and not above.
 		if let Some(cold) = &mail.cold {
 			for (secret, note) in [
-				(cold.access_key_secret(), "r2 token, s3 access key id"),
-				(cold.secret_key_secret(), "r2 token, s3 secret access key"),
+				(cold.access_key_secret(), cold.access_key_note()),
+				(cold.secret_key_secret(), cold.secret_key_note()),
 			] {
 				entries.push((
 					format!("{} cold store", cold.label()),
 					secret,
-					note.to_string(),
+					note,
 				));
 			}
 		}
@@ -129,10 +131,7 @@ pub async fn MailCredentials(
 			entries.push((
 				format!("{} dkim key", domain.domain()),
 				domain.dkim_secret(),
-				format!(
-					"private half of {}._domainkey",
-					MailDomainBlock::DKIM_SELECTOR
-				),
+				EnsureDkimKey::note(domain.domain()),
 			));
 		}
 	}

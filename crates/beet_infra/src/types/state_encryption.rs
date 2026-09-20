@@ -31,6 +31,12 @@ pub enum StateEncryption {
 	Passphrase {
 		/// Environment variable holding the passphrase, eg `TF_STATE_PASSPHRASE`.
 		env_var: SmolStr,
+		/// The one-deploy migration switch: read an existing PLAINTEXT state
+		/// through OpenTofu's `unencrypted` fallback method and write it back
+		/// encrypted. On for the apply that turns encryption on, off for every
+		/// apply after, since a fallback left in place would also read a state
+		/// somebody replaced with a plaintext one.
+		migrate: bool,
 	},
 }
 
@@ -39,30 +45,65 @@ impl StateEncryption {
 	pub fn passphrase(env_var: impl Into<SmolStr>) -> Self {
 		Self::Passphrase {
 			env_var: env_var.into(),
+			migrate: false,
+		}
+	}
+
+	/// The encryption with its migration switch set, see
+	/// [`Passphrase::migrate`](Self::Passphrase).
+	pub fn with_migrate(self, migrate: bool) -> Self {
+		match self {
+			Self::Passphrase { env_var, .. } => {
+				Self::Passphrase { env_var, migrate }
+			}
+			Self::None => Self::None,
 		}
 	}
 
 	/// The `terraform.encryption` block body, if enabled. `None` emits nothing,
 	/// leaving the `terraform` block exactly as it is without this feature.
+	///
+	/// A target's `method` is a STATIC reference, which HCL's JSON syntax
+	/// spells as the bare traversal (`"method.aes_gcm.main"`): wrapped in
+	/// `${..}` it parses as a template expression and `tofu init` refuses it
+	/// ("a single static variable reference is required"). The method's
+	/// `keys` is an evaluated expression and keeps the interpolation.
 	pub fn to_json(&self) -> Option<Value> {
 		match self {
 			Self::None => None,
-			Self::Passphrase { .. } => Some(value!({
-				"key_provider": {
-					"pbkdf2": {
-						"main": {
-							"passphrase": (format!("${{var.{STATE_ENCRYPTION_VAR}}}")),
-						}
-					}
-				},
-				"method": {
+			Self::Passphrase { migrate, .. } => {
+				let mut methods = value!({
 					"aes_gcm": {
 						"main": { "keys": "${key_provider.pbkdf2.main}" }
 					}
-				},
-				"state": { "method": "${method.aes_gcm.main}" },
-				"plan": { "method": "${method.aes_gcm.main}" },
-			})),
+				});
+				let mut state = value!({ "method": "method.aes_gcm.main" });
+				if *migrate {
+					methods
+						.insert("unencrypted", value!({ "migrate": {} }))
+						.ok();
+					state
+						.insert(
+							"fallback",
+							value!({
+								"method": "method.unencrypted.migrate"
+							}),
+						)
+						.ok();
+				}
+				Some(value!({
+					"key_provider": {
+						"pbkdf2": {
+							"main": {
+								"passphrase": (format!("${{var.{STATE_ENCRYPTION_VAR}}}")),
+							}
+						}
+					},
+					"method": methods,
+					"state": state,
+					"plan": { "method": "method.aes_gcm.main" },
+				}))
+			}
 		}
 	}
 
@@ -74,7 +115,7 @@ impl StateEncryption {
 	pub fn vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
 		match self {
 			Self::None => Ok(Vec::new()),
-			Self::Passphrase { env_var } => {
+			Self::Passphrase { env_var, .. } => {
 				let value = env_ext::var(env_var.as_str()).map_err(|_| {
 					bevyhow!(
 						"state encryption is enabled but `{env_var}` is not set"
@@ -106,10 +147,42 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq("${var.tf_state_passphrase}");
+		// a static reference: the bare traversal, never an interpolation
 		json["state"]["method"]
 			.as_str()
 			.unwrap()
-			.xpect_eq("${method.aes_gcm.main}");
+			.xpect_eq("method.aes_gcm.main");
+		json["plan"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		json["state"].get("fallback").xpect_none();
+		json["method"].get("unencrypted").xpect_none();
+	}
+
+	/// The migration switch reads a plaintext state through the
+	/// `unencrypted` fallback and nothing else changes.
+	#[beet_core::test]
+	fn migration_adds_the_unencrypted_fallback() {
+		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
+			.with_migrate(true)
+			.to_json()
+			.unwrap()
+			.into_json();
+		json["method"]["unencrypted"]["migrate"]
+			.as_object()
+			.unwrap()
+			.is_empty()
+			.xpect_true();
+		json["state"]["fallback"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.unencrypted.migrate");
+		json["state"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		json["plan"].get("fallback").xpect_none();
 	}
 
 	/// Native-only: wasm has no process environment to write to, so

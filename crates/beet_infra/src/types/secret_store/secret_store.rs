@@ -139,6 +139,32 @@ impl SecretStore {
 		self.provider.meta(secret.clone()).await
 	}
 
+	/// Mirror a value another system derives (a public half, a pin read off
+	/// a box): [`overwrite`](Self::overwrite) when the stored value or its
+	/// metadata differs from what is declared, nothing when both match.
+	/// Answers whether it wrote, so a caller logs the change and not the
+	/// steady state; a stale note or rotation converges around an unchanged
+	/// value exactly as [`ensure`](Self::ensure) does.
+	pub async fn converge(
+		&self,
+		secret: &SecretRef,
+		value: &str,
+		note: Option<&str>,
+		rotation: Option<SecretRotation>,
+	) -> Result<bool> {
+		let declared = SecretMeta {
+			note: note.map(SmolStr::new),
+			rotation: rotation.clone(),
+		};
+		if self.get(secret).await?.as_deref() == Some(value)
+			&& self.meta(secret).await?.as_ref() == Some(&declared)
+		{
+			return false.xok();
+		}
+		self.overwrite(secret, value, note, rotation).await?;
+		true.xok()
+	}
+
 	/// Create-if-missing: the existing value, else `generate` created and
 	/// its value, else (the loser of a race) the winner's value re-read.
 	/// Answers the value and whether this call minted it. The one shape

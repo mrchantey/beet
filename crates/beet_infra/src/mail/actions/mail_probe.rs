@@ -221,7 +221,7 @@ pub async fn MailProbe(
 
 	// one token per run, so both legs and the mailbox poll agree on which
 	// message this is.
-	let token = EnsureSecret::generate(secret.label(), 16)?;
+	let token = Secret::generate(secret.label(), 16)?;
 
 	// both legs are the SENDER domain's, since its relay is what decides how
 	// the message leaves and what a receiver can conclude about it

@@ -24,13 +24,12 @@ pub async fn SecretsRm(cx: ActionContext<Request>) -> Result<Response> {
 	let name = name_param(&cx.input)?;
 	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
 	let mut document = handle.read().await?;
-	let record = document.remove(&AgeIdentityFile::require()?, &name)?;
+	let (group, _) = document.remove(&AgeIdentityFile::require()?, &name)?;
 	handle.write(&document).await?;
 	Response::ok_text(format!(
-		"removed `{name}` from group `{}` of {} ({} record(s) remain)\n",
-		record.group(),
+		"removed `{name}` from group `{group}` of {} ({} record(s) remain)\n",
 		handle.describe(),
-		document.secrets.len()
+		document.record_count()
 	))
 	.xok()
 }
@@ -53,7 +52,7 @@ mod test {
 			.xpect_contains("removed `A` from group `default`")
 			.xpect_contains("1 record(s) remain");
 		let document = fixture.document().await;
-		document.secrets.contains_key("A").xpect_false();
+		document.contains("A").xpect_false();
 		document
 			.open(&fixture.identities())
 			.unwrap()

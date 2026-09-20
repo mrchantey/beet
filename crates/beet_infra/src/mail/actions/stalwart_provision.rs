@@ -226,6 +226,18 @@ impl Management {
 					info!(
 						"management over {public_origin} as the administrator account"
 					);
+					// the claim parked it with whatever note it had then; the
+					// credential that just signed in carries the current one
+					mail.secrets
+						.converge(
+							&admin_secret,
+							&password,
+							Some(&AccountPlan::admin_note(
+								mail.mail_box.hostname(),
+							)),
+							Some(AccountPlan::admin_rotation()),
+						)
+						.await?;
 					return Self {
 						client,
 						origin: public_origin,
@@ -961,12 +973,12 @@ async fn converge_account(
 		.secrets
 		.ensure(
 			&account.secret,
-			Some(&account.note()),
+			Some(&account.note(&domain.name)),
 			AccountPlan::rotation(),
 			async || {
-				EnsureSecret::generate(
+				Secret::generate(
 					account.secret.label(),
-					EnsureSecret::LENGTH,
+					Secret::GENERATED_LENGTH,
 				)
 				.map(|value| value.to_string())
 			},

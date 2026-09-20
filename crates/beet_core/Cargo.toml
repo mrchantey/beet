@@ -188,6 +188,8 @@ toml = ["serde", "dep:toml"]
 vault = [
 	"std",
 	"toml",
+	# a generated value (`Secret::generate`) draws from the platform source
+	"rand",
 	"dep:age",
 	"dep:libc",
 	"dep:getrandom_02",

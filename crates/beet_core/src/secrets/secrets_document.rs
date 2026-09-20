@@ -4,21 +4,25 @@
 use crate::prelude::*;
 
 /// A secrets document, `secrets.toml` by convention: a plaintext index of
-/// records (name, role, group, note, modified) and one armored age blob per
-/// group, sealed to that group's recipients. Everyone sees which records
-/// exist and who may read them; only a group's members read its values;
-/// `ls` needs no identity at all. The only cipher is age and the only
-/// composition a payload in the document's own format, so the file is a
-/// plain toml (or json, or ron) whose sealed values are age files: a blob
-/// pasted out of it opens with `age -d` on any laptop.
+/// records (name, role, note, rotation, modified) under the group each
+/// belongs to, and one armored age blob per group, sealed to that group's
+/// recipients. Everyone sees which records exist and who may read them;
+/// only a group's members read its values; `ls` needs no identity at all.
+/// The only cipher is age and the only composition a payload in the
+/// document's own format, so the file is a plain toml (or json, or ron)
+/// whose sealed values are age files: a blob pasted out of it opens with
+/// `age -d` on any laptop.
 ///
-/// Every record belongs to exactly one group, `default` when none is named,
-/// created on first use with the identity file's own recipients. Humans sit
-/// in every group; an agent's recipient sits only in the groups it is
-/// granted. A group's list is the source of truth for the next seal: a list
-/// edit takes effect on the next [`set`](Self::set) of that group or on
-/// [`rekey`](Self::rekey), and until then [`open`](Self::open) reports the
-/// group as drifted.
+/// The file reads as the index first and the ciphertext last: `[groups.<g>]`
+/// holds the recipient list and `[groups.<g>.secrets.<NAME>]` each record's
+/// metadata, and one `[sealed]` table at the bottom maps every group name to
+/// its blob. A record lives in exactly one group, the map it sits in;
+/// `default` is the one a `set` names none for, created on first use with
+/// the identity file's own recipients. Humans sit in every group; an agent's
+/// recipient sits only in the groups it is granted. A group's list is the
+/// source of truth for the next seal: a list edit takes effect on the next
+/// [`set`](Self::set) of that group or on [`rekey`](Self::rekey), and until
+/// then [`open`](Self::open) reports the group as drifted.
 ///
 /// Inside a blob every record carries its value and a copy of its metadata,
 /// and the blob carries the list it was sealed to; the sealed side is the
@@ -34,7 +38,7 @@ use crate::prelude::*;
 /// identities.push(AgeIdentity::generate());
 /// let mut document = SecretsDocument::default();
 /// document
-/// 	.set(&identities, "OPENAI_API_KEY", "sk-test", SecretRecord {
+/// 	.set(&identities, "default", "OPENAI_API_KEY", "sk-test", SecretRecord {
 /// 		role: Some(SecretRole::EnvVar),
 /// 		..default()
 /// 	})
@@ -48,6 +52,7 @@ use crate::prelude::*;
 /// opened.env_vars().len().xpect_eq(1);
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SecretsDocument {
 	/// The format the file and every sealed payload are written in, named
 	/// by the file's extension.
@@ -56,31 +61,33 @@ pub struct SecretsDocument {
 	/// Where an export came from, absent on a hand-kept document.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub origin: Option<SecretsOrigin>,
-	/// The groups by name: a recipient list and the blob sealed to it.
+	/// The groups by name: a recipient list and the index of its records.
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub groups: BTreeMap<SmolStr, SecretsGroup>,
-	/// The index: every record's plaintext metadata by name.
+	/// The armored age file holding each group's [`SealedGroup`], by group
+	/// name; absent until the group's first record lands.
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub sealed: BTreeMap<SmolStr, String>,
+}
+
+/// A group: who may read it, and the plaintext index of what it holds.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecretsGroup {
+	/// The recipients the next seal encrypts to.
+	pub recipients: Vec<AgeRecipient>,
+	/// Every record's plaintext metadata by name, mirrored from the sealed
+	/// side on every seal.
 	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
 	pub secrets: BTreeMap<SmolStr, SecretRecord>,
 }
 
-/// A group: who may read it and the blob sealed to them, `None` until the
-/// first record lands.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SecretsGroup {
-	/// The recipients the next seal encrypts to.
-	pub recipients: Vec<AgeRecipient>,
-	/// The armored age file holding a [`SealedGroup`].
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub sealed: Option<String>,
-}
-
 impl SecretsGroup {
-	/// A group with nothing sealed yet.
+	/// A group with nothing in it yet.
 	pub fn new(recipients: Vec<AgeRecipient>) -> Self {
 		Self {
 			recipients,
-			sealed: None,
+			secrets: default(),
 		}
 	}
 
@@ -128,8 +135,10 @@ impl SecretsDocument {
 	/// The file a document lives in by convention, beside an entry.
 	pub const DEFAULT_PATH: &'static str = "secrets.toml";
 	/// The conventional file's stem, so the test runner finds
-	/// `secrets.<format>` beside a `.env`.
+	/// `secrets.<format>` from any crate's directory.
 	pub const FILE_STEM: &'static str = "secrets";
+	/// The group a record lands in when none is named.
+	pub const DEFAULT_GROUP: &'static str = "default";
 
 	/// An empty document in `media_type`.
 	pub fn new(media_type: MediaType) -> Self {
@@ -137,7 +146,7 @@ impl SecretsDocument {
 			media_type,
 			origin: None,
 			groups: default(),
-			secrets: default(),
+			sealed: default(),
 		}
 	}
 
@@ -164,9 +173,9 @@ impl SecretsDocument {
 		}
 	}
 
-	/// Parse a document in `media_type` and validate it: every record's
-	/// group is declared, every group lists a recipient, every record name
-	/// is well formed.
+	/// Parse a document in `media_type` and validate it: every group lists
+	/// a recipient, every sealed blob has its group, every record name is
+	/// well formed and in one group.
 	pub fn parse(media_type: MediaType, bytes: &[u8]) -> Result<Self> {
 		let mut document: Self = media_type.deserialize(bytes)?;
 		document.media_type = media_type;
@@ -183,24 +192,32 @@ impl SecretsDocument {
 	/// The structural rules a parsed document must satisfy, see
 	/// [`parse`](Self::parse).
 	pub fn validate(&self) -> Result<()> {
-		for (name, group) in &self.groups {
-			if name.is_empty() {
+		let mut seen = HashMap::<&SmolStr, &SmolStr>::default();
+		for (group_name, group) in &self.groups {
+			if group_name.is_empty() {
 				bevybail!("a group has no name");
 			}
 			if group.recipients.is_empty() {
 				bevybail!(
-					"group `{name}` lists no recipients: every group names \
+					"group `{group_name}` lists no recipients: every group names \
 					who may read it"
 				);
 			}
+			for name in group.secrets.keys() {
+				Self::validate_name(name)?;
+				if let Some(other) = seen.insert(name, group_name) {
+					bevybail!(
+						"record `{name}` is in both group `{other}` and group \
+						`{group_name}`: a name lives in one group"
+					);
+				}
+			}
 		}
-		for (name, record) in &self.secrets {
-			Self::validate_name(name)?;
-			if !self.groups.contains_key(record.group()) {
+		for group_name in self.sealed.keys() {
+			if !self.groups.contains_key(group_name) {
 				bevybail!(
-					"record `{name}` names group `{}`, which the document does \
-					not declare",
-					record.group()
+					"a blob is sealed for group `{group_name}`, which the \
+					document does not declare"
 				);
 			}
 		}
@@ -210,6 +227,45 @@ impl SecretsDocument {
 	/// The names of every group, in order.
 	pub fn group_names(&self) -> impl Iterator<Item = &SmolStr> {
 		self.groups.keys()
+	}
+
+	/// Every record's group, name and index entry, grouped then named in
+	/// order.
+	pub fn records(
+		&self,
+	) -> impl Iterator<Item = (&SmolStr, &SmolStr, &SecretRecord)> {
+		self.groups.iter().flat_map(|(group, records)| {
+			records
+				.secrets
+				.iter()
+				.map(move |(name, record)| (group, name, record))
+		})
+	}
+
+	/// The group holding `name` and its index entry, `None` for no such
+	/// record.
+	pub fn record(&self, name: &str) -> Option<(&SmolStr, &SecretRecord)> {
+		self.groups.iter().find_map(|(group, records)| {
+			records.secrets.get(name).map(|record| (group, record))
+		})
+	}
+
+	/// The group holding `name`.
+	pub fn group_of(&self, name: &str) -> Option<&SmolStr> {
+		self.record(name).map(|(group, _)| group)
+	}
+
+	/// Whether any group holds `name`.
+	pub fn contains(&self, name: &str) -> bool { self.record(name).is_some() }
+
+	/// How many records the index holds across every group.
+	pub fn record_count(&self) -> usize {
+		self.groups.values().map(|group| group.secrets.len()).sum()
+	}
+
+	/// Whether `group` has a blob sealed yet.
+	pub fn is_sealed(&self, group: &str) -> bool {
+		self.sealed.contains_key(group)
 	}
 
 	/// Whether any identity in `identities` is listed in `group`.
@@ -231,7 +287,7 @@ impl SecretsDocument {
 		let own = identities.recipients();
 		let mut open = OpenSecrets::default();
 		for (name, group) in &self.groups {
-			if group.sealed.is_none() {
+			if !self.is_sealed(name) {
 				// nothing sealed yet: a member may write it, a stranger not
 				match group.lists_any(&own) {
 					true => open.opened.push(name.clone()),
@@ -252,8 +308,9 @@ impl SecretsDocument {
 			for (record_name, sealed_record) in sealed.secrets {
 				open.secrets.insert(record_name.clone(), Secret {
 					name: record_name,
+					group: name.clone(),
 					value: sealed_record.value,
-					record: sealed_record.record.with_group(name),
+					record: sealed_record.record,
 				});
 			}
 			open.opened.push(name.clone());
@@ -261,8 +318,8 @@ impl SecretsDocument {
 		open.xok()
 	}
 
-	/// Write one record: its group is opened (created with the identity
-	/// file's own recipients when new), the record merged in with
+	/// Write one record into `group`: the group is opened (created with the
+	/// identity file's own recipients when new), the record merged in with
 	/// `modified` now unless given, the blob re-sealed to the group's
 	/// current list and the index updated. A record already in another
 	/// group moves, removed from the old blob and added to the new. Errors
@@ -270,13 +327,16 @@ impl SecretsDocument {
 	pub fn set(
 		&mut self,
 		identities: &AgeIdentityFile,
+		group: &str,
 		name: &str,
 		value: &str,
 		record: SecretRecord,
 	) -> Result<()> {
 		Self::validate_name(name)?;
-		let group = SmolStr::new(record.group());
-		if !self.groups.contains_key(&group) {
+		if group.is_empty() {
+			bevybail!("a group has no name");
+		}
+		if !self.groups.contains_key(group) {
 			let recipients = identities.recipients();
 			if recipients.is_empty() {
 				bevybail!(
@@ -290,63 +350,59 @@ impl SecretsDocument {
 				recipients.len()
 			);
 			self.groups
-				.insert(group.clone(), SecretsGroup::new(recipients));
+				.insert(SmolStr::new(group), SecretsGroup::new(recipients));
 		}
 		// a record moving between groups leaves its old blob first
 		if let Some(previous) = self
-			.secrets
-			.get(name)
-			.map(|existing| SmolStr::new(existing.group()))
-			.filter(|previous| *previous != group)
+			.group_of(name)
+			.cloned()
+			.filter(|previous| previous != group)
 		{
 			let mut sealed = self.open_group(&previous, identities)?;
 			sealed.secrets.remove(name);
 			self.seal_group(&previous, sealed)?;
 		}
-		let mut sealed = self.open_group(&group, identities)?;
+		let mut sealed = self.open_group(group, identities)?;
 		let record = SecretRecord {
 			modified: record.modified.or_else(|| Timestamp::try_now().ok()),
 			..record
-		}
-		.without_group();
+		};
 		sealed.secrets.insert(SmolStr::new(name), SealedRecord {
 			value: SmolStr::new(value),
 			record,
 		});
-		self.seal_group(&group, sealed)
+		self.seal_group(group, sealed)
 	}
 
-	/// Remove one record, re-sealing its group. Errors when the record does
-	/// not exist or `identities` cannot open its group.
+	/// Remove one record, re-sealing its group, answering the group it was
+	/// in and its index entry. Errors when the record does not exist or
+	/// `identities` cannot open its group.
 	pub fn remove(
 		&mut self,
 		identities: &AgeIdentityFile,
 		name: &str,
-	) -> Result<SecretRecord> {
+	) -> Result<(SmolStr, SecretRecord)> {
 		let group = self
-			.secrets
-			.get(name)
-			.map(|record| SmolStr::new(record.group()))
+			.group_of(name)
+			.cloned()
 			.ok_or_else(|| bevyhow!("no record `{name}` in the document"))?;
 		let mut sealed = self.open_group(&group, identities)?;
 		let removed = sealed
 			.secrets
 			.remove(name)
-			.map(|sealed| sealed.record.with_group(&group))
+			.map(|sealed| sealed.record)
 			.ok_or_else(|| {
-				bevyhow!("record `{name}` is in the index but not sealed")
-			})?;
+			bevyhow!("record `{name}` is in the index but not sealed")
+		})?;
 		self.seal_group(&group, sealed)?;
-		self.secrets.remove(name);
-		removed.xok()
+		(group, removed).xok()
 	}
 
 	/// Replace `group` wholesale: its list becomes `recipients` and its blob
 	/// holds exactly `records`, sealed once. A fresh seal opens nothing, so
 	/// no identity is needed: an export or a restore writes a document it
-	/// may not itself be able to read. Every index entry that was in the
-	/// group goes with it; a record of the same name in another group is an
-	/// error, since a name lives in one group.
+	/// may not itself be able to read. A record of the same name in another
+	/// group is an error, since a name lives in one group.
 	pub fn seal_records(
 		&mut self,
 		group: &str,
@@ -362,21 +418,18 @@ impl SecretsDocument {
 				may read it"
 			);
 		}
-		self.secrets.retain(|_, record| record.group() != group);
 		let mut payload = SealedGroup::default();
 		for (name, value, record) in records {
 			Self::validate_name(&name)?;
-			if let Some(existing) = self.secrets.get(&name) {
+			if let Some(existing) =
+				self.group_of(&name).filter(|existing| *existing != group)
+			{
 				bevybail!(
-					"record `{name}` is already in group `{}`: a name lives in \
-					one group",
-					existing.group()
+					"record `{name}` is already in group `{existing}`: a name \
+					lives in one group"
 				);
 			}
-			payload.secrets.insert(name, SealedRecord {
-				value,
-				record: record.without_group(),
-			});
+			payload.secrets.insert(name, SealedRecord { value, record });
 		}
 		self.groups
 			.insert(SmolStr::new(group), SecretsGroup::new(recipients));
@@ -391,10 +444,7 @@ impl SecretsDocument {
 		identities: &AgeIdentityFile,
 	) -> Result<RekeyReport> {
 		let mut report = RekeyReport::default();
-		for name in self.groups.keys().cloned().collect::<Vec<_>>() {
-			if self.groups[&name].sealed.is_none() {
-				continue;
-			}
+		for name in self.sealed.keys().cloned().collect::<Vec<_>>() {
 			match self.try_open_group(&name, identities)? {
 				Some(sealed) => {
 					self.seal_group(&name, sealed)?;
@@ -430,11 +480,7 @@ impl SecretsDocument {
 		group: &str,
 		identities: &AgeIdentityFile,
 	) -> Result<Option<SealedGroup>> {
-		let Some(sealed) = self
-			.groups
-			.get(group)
-			.and_then(|group| group.sealed.as_ref())
-		else {
+		let Some(sealed) = self.sealed.get(group) else {
 			return Some(SealedGroup::default()).xok();
 		};
 		if identities.is_empty() {
@@ -446,29 +492,23 @@ impl SecretsDocument {
 		}
 	}
 
-	/// Parse a decrypted payload and check it against the index: every
-	/// sealed record has its index entry in this group with the same
-	/// metadata, and every index entry in this group is sealed. Errors
-	/// naming every difference.
+	/// Parse a decrypted payload and check it against the group's index:
+	/// every sealed record has its index entry with the same metadata, and
+	/// every index entry is sealed. Errors naming every difference.
 	fn verify_group(&self, group: &str, payload: &[u8]) -> Result<SealedGroup> {
 		let sealed: SealedGroup = self.media_type.deserialize(payload)?;
+		let index = self
+			.groups
+			.get(group)
+			.map(|group| &group.secrets)
+			.ok_or_else(|| bevyhow!("no group `{group}`"))?;
 		let mut problems = Vec::new();
 		for (name, sealed_record) in &sealed.secrets {
-			match self.secrets.get(name) {
+			match index.get(name) {
 				None => problems.push(format!(
 					"`{name}` is sealed in `{group}` but missing from the index"
 				)),
-				Some(index) if index.group() != group => {
-					problems.push(format!(
-						"`{name}` is sealed in `{group}` but the index names group \
-					`{}`",
-						index.group()
-					))
-				}
-				Some(index)
-					if index.clone().without_group()
-						!= sealed_record.record =>
-				{
+				Some(entry) if *entry != sealed_record.record => {
 					problems.push(format!(
 						"`{name}`: the index entry differs from its sealed copy"
 					))
@@ -476,13 +516,9 @@ impl SecretsDocument {
 				Some(_) => {}
 			}
 		}
-		for name in self
-			.secrets
-			.iter()
-			.filter(|(name, record)| {
-				record.group() == group && !sealed.secrets.contains_key(*name)
-			})
-			.map(|(name, _)| name)
+		for name in index
+			.keys()
+			.filter(|name| !sealed.secrets.contains_key(*name))
 		{
 			problems.push(format!(
 				"`{name}` is in the index under `{group}` but not sealed there"
@@ -499,32 +535,27 @@ impl SecretsDocument {
 	}
 
 	/// Seal `payload` to `group`'s current list and mirror its records into
-	/// the index.
+	/// the group's index.
 	fn seal_group(
 		&mut self,
 		group: &str,
 		mut payload: SealedGroup,
 	) -> Result<()> {
-		let recipients = self
+		let entry = self
 			.groups
-			.get(group)
-			.map(|group| group.recipients.clone())
+			.get_mut(group)
 			.ok_or_else(|| bevyhow!("no group `{group}`"))?;
-		payload.recipients = recipients.clone();
+		payload.recipients = entry.recipients.clone();
 		let ciphertext = AgeRecipient::encrypt(
-			&recipients,
+			&payload.recipients,
 			&self.media_type.serialize(&payload)?,
 		)?;
-		for (name, sealed_record) in &payload.secrets {
-			self.secrets.insert(
-				name.clone(),
-				sealed_record.record.clone().with_group(group),
-			);
-		}
-		self.groups
-			.get_mut(group)
-			.ok_or_else(|| bevyhow!("no group `{group}`"))?
-			.sealed = Some(ciphertext);
+		entry.secrets = payload
+			.secrets
+			.into_iter()
+			.map(|(name, sealed_record)| (name, sealed_record.record))
+			.collect();
+		self.sealed.insert(SmolStr::new(group), ciphertext);
 		Ok(())
 	}
 
@@ -591,6 +622,7 @@ mod test {
 		document
 			.set(
 				&pete_file,
+				"default",
 				"OPENAI_API_KEY",
 				"sk-test",
 				record(Some(SecretRole::EnvVar), "billing account"),
@@ -599,15 +631,16 @@ mod test {
 		document
 			.set(
 				&pete_file,
+				"agents",
 				"CF_API_TOKEN",
 				"cf-test",
-				record(Some(SecretRole::EnvVar), "dns and workers")
-					.with_group("agents"),
+				record(Some(SecretRole::EnvVar), "dns and workers"),
 			)
 			.unwrap();
 		document
 			.set(
 				&pete_file,
+				"default",
 				"dkim-example-com",
 				"-----BEGIN PRIVATE KEY-----",
 				record(None, "the signing key"),
@@ -616,15 +649,12 @@ mod test {
 		(document, pete_file, agent_file)
 	}
 
-	#[crate::test]
-	fn roundtrips_and_snapshots() {
-		let (document, pete, _) = two_groups();
-		let bytes = document.to_bytes().unwrap();
-		let text = String::from_utf8(bytes.clone()).unwrap();
-		// the recipients and blobs differ per run, so the snapshot cuts them
+	/// The document's text with the per-run recipients and blobs cut, so it
+	/// snapshots.
+	pub(super) fn redacted(document: &SecretsDocument) -> String {
+		let text = String::from_utf8(document.to_bytes().unwrap()).unwrap();
 		let mut in_blob = false;
-		let redacted = text
-			.lines()
+		text.lines()
 			.filter(|line| {
 				let armor = line.starts_with("-----");
 				in_blob = (in_blob || armor) && !(in_blob && armor);
@@ -634,17 +664,38 @@ mod test {
 					&& line.trim() != "]"
 			})
 			.collect::<Vec<_>>()
-			.join("\n");
-		redacted.xpect_snapshot();
+			.join("\n")
+	}
+
+	/// The index reads first and the blobs last, and the whole document
+	/// round-trips.
+	#[crate::test]
+	fn roundtrips_and_snapshots() {
+		let (document, pete, _) = two_groups();
+		let bytes = document.to_bytes().unwrap();
+		let text = String::from_utf8(bytes.clone()).unwrap();
+		redacted(&document).xpect_snapshot();
 		text.as_str()
+			.xpect_contains("[groups.default.secrets.OPENAI_API_KEY]")
+			.xpect_contains("[groups.agents.secrets.CF_API_TOKEN]")
 			.xpect_contains(
-				"sealed = \"\"\"\n-----BEGIN AGE ENCRYPTED FILE-----",
+				"[sealed]\nagents = \"\"\"\n-----BEGIN AGE ENCRYPTED FILE-----",
 			)
 			.xpect_contains("modified = \"2026-09-18T00:00:00.000Z\"")
 			.xnot()
 			.xpect_contains("sk-test");
+		// the ciphertext sits below the whole index
+		let index_end = text.find("[sealed]").unwrap();
+		text[index_end..].xnot().xpect_contains("[groups.");
 		let parsed = SecretsDocument::parse(MediaType::Toml, &bytes).unwrap();
 		parsed.xpect_eq(document.clone());
+		document.record_count().xpect_eq(3);
+		document
+			.group_of("CF_API_TOKEN")
+			.unwrap()
+			.as_str()
+			.xpect_eq("agents");
+		document.contains("nope").xpect_false();
 		let opened = parsed.open(&pete).unwrap();
 		opened.secrets.len().xpect_eq(3);
 		opened.opened.xpect_eq(names(&["agents", "default"]));
@@ -657,11 +708,12 @@ mod test {
 			.unwrap()
 			.as_str()
 			.xpect_eq("billing account");
-		key.group().xpect_eq("default");
+		key.group.as_str().xpect_eq("default");
 		opened
 			.get("CF_API_TOKEN")
 			.unwrap()
-			.group()
+			.group
+			.as_str()
 			.xpect_eq("agents");
 	}
 
@@ -669,18 +721,11 @@ mod test {
 	fn json_documents_seal_json() {
 		let (_, pete) = human();
 		let mut document = SecretsDocument::new(MediaType::Json);
-		document.set(&pete, "A", "1", default()).unwrap();
+		document.set(&pete, "default", "A", "1", default()).unwrap();
 		let bytes = document.to_bytes().unwrap();
 		bytes.starts_with(b"{").xpect_true();
-		let payload = pete
-			.decrypt(
-				document.groups["default"]
-					.sealed
-					.as_ref()
-					.unwrap()
-					.as_bytes(),
-			)
-			.unwrap();
+		let payload =
+			pete.decrypt(document.sealed["default"].as_bytes()).unwrap();
 		payload.starts_with(b"{").xpect_true();
 		SecretsDocument::parse(MediaType::Json, &bytes)
 			.unwrap()
@@ -725,18 +770,13 @@ mod test {
 	fn set_by_a_non_member_is_refused() {
 		let (mut document, _, agent) = two_groups();
 		document
-			.set(&agent, "OPENAI_API_KEY", "sk-new", default())
+			.set(&agent, "default", "OPENAI_API_KEY", "sk-new", default())
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cannot open group `default`");
 		// the group it is in is fine
 		document
-			.set(
-				&agent,
-				"CF_API_TOKEN",
-				"cf-new",
-				SecretRecord::default().with_group("agents"),
-			)
+			.set(&agent, "agents", "CF_API_TOKEN", "cf-new", default())
 			.unwrap();
 	}
 
@@ -746,19 +786,27 @@ mod test {
 		document
 			.set(
 				&pete,
+				"agents",
 				"OPENAI_API_KEY",
 				"sk-test",
-				record(Some(SecretRole::EnvVar), "moved").with_group("agents"),
+				record(Some(SecretRole::EnvVar), "moved"),
 			)
 			.unwrap();
-		document.secrets["OPENAI_API_KEY"]
-			.group()
+		document
+			.group_of("OPENAI_API_KEY")
+			.unwrap()
+			.as_str()
 			.xpect_eq("agents");
+		document.groups["default"]
+			.secrets
+			.contains_key("OPENAI_API_KEY")
+			.xpect_false();
 		let opened = document.open(&agent).unwrap();
 		opened
 			.get("OPENAI_API_KEY")
 			.unwrap()
-			.group()
+			.group
+			.as_str()
 			.xpect_eq("agents");
 		// and it left `default`, which pete still verifies clean
 		document.open(&pete).unwrap().secrets.len().xpect_eq(3);
@@ -767,17 +815,11 @@ mod test {
 	#[crate::test]
 	fn remove_prunes_and_reseals() {
 		let (mut document, pete, _) = two_groups();
-		document
-			.remove(&pete, "OPENAI_API_KEY")
-			.unwrap()
-			.note
-			.unwrap()
-			.as_str()
-			.xpect_eq("billing account");
-		document
-			.secrets
-			.contains_key("OPENAI_API_KEY")
-			.xpect_false();
+		let (group, removed) =
+			document.remove(&pete, "OPENAI_API_KEY").unwrap();
+		group.as_str().xpect_eq("default");
+		removed.note.unwrap().as_str().xpect_eq("billing account");
+		document.contains("OPENAI_API_KEY").xpect_false();
 		document.open(&pete).unwrap().secrets.len().xpect_eq(2);
 		document
 			.remove(&pete, "OPENAI_API_KEY")
@@ -790,10 +832,19 @@ mod test {
 	#[crate::test]
 	fn index_tampering_is_refused() {
 		let (document, pete, _) = two_groups();
+		let index = |document: &mut SecretsDocument, group: &str| {
+			document.groups.get_mut(group).unwrap().secrets.clone()
+		};
 		// a changed role
 		let mut tampered = document.clone();
-		tampered.secrets.get_mut("dkim-example-com").unwrap().role =
-			Some(SecretRole::EnvVar);
+		tampered
+			.groups
+			.get_mut("default")
+			.unwrap()
+			.secrets
+			.get_mut("dkim-example-com")
+			.unwrap()
+			.role = Some(SecretRole::EnvVar);
 		tampered
 			.open(&pete)
 			.unwrap_err()
@@ -801,8 +852,10 @@ mod test {
 			.xpect_contains("`dkim-example-com`: the index entry differs");
 		// a renamed record
 		let mut tampered = document.clone();
-		let record = tampered.secrets.remove("OPENAI_API_KEY").unwrap();
-		tampered.secrets.insert("OPENAI_KEY".into(), record);
+		let mut secrets = index(&mut tampered, "default");
+		let record = secrets.remove("OPENAI_API_KEY").unwrap();
+		secrets.insert("OPENAI_KEY".into(), record);
+		tampered.groups.get_mut("default").unwrap().secrets = secrets;
 		tampered
 			.open(&pete)
 			.unwrap_err()
@@ -815,20 +868,38 @@ mod test {
 			);
 		// a deleted record
 		let mut tampered = document.clone();
-		tampered.secrets.remove("CF_API_TOKEN");
+		tampered
+			.groups
+			.get_mut("agents")
+			.unwrap()
+			.secrets
+			.remove("CF_API_TOKEN");
 		tampered
 			.open(&pete)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("`CF_API_TOKEN` is sealed in `agents` but missing");
-		// a record pointed at another group
+		// a record moved to another group's map by hand
 		let mut tampered = document.clone();
-		tampered.secrets.get_mut("CF_API_TOKEN").unwrap().group = None;
+		let record = tampered
+			.groups
+			.get_mut("agents")
+			.unwrap()
+			.secrets
+			.remove("CF_API_TOKEN")
+			.unwrap();
+		tampered
+			.groups
+			.get_mut("default")
+			.unwrap()
+			.secrets
+			.insert("CF_API_TOKEN".into(), record);
+		// the first group opened names it (the index maps are read in order)
 		tampered
 			.open(&pete)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("the index names group `default`");
+			.xpect_contains("`CF_API_TOKEN` is sealed in `agents` but missing");
 	}
 
 	/// A list edited by hand is reported as drift, and `rekey` clears it
@@ -876,7 +947,7 @@ mod test {
 	#[crate::test]
 	fn a_blob_opens_to_toml() {
 		let (document, pete, _) = two_groups();
-		let blob = document.groups["default"].sealed.clone().unwrap();
+		let blob = document.sealed["default"].clone();
 		blob.as_str()
 			.xpect_starts_with("-----BEGIN AGE ENCRYPTED FILE-----");
 		let payload = pete
@@ -896,13 +967,34 @@ mod test {
 	#[crate::test]
 	fn parse_validates() {
 		let (document, ..) = two_groups();
+		// a name in two groups
 		let mut bad = document.clone();
-		bad.secrets.get_mut("OPENAI_API_KEY").unwrap().group =
-			Some("nope".into());
+		let record = bad.groups["default"].secrets["OPENAI_API_KEY"].clone();
+		bad.groups
+			.get_mut("agents")
+			.unwrap()
+			.secrets
+			.insert("OPENAI_API_KEY".into(), record);
 		SecretsDocument::parse(MediaType::Toml, &bad.to_bytes().unwrap())
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("names group `nope`");
+			.xpect_contains("in both group `agents` and group `default`");
+		// a blob for no group
+		let mut bad = document.clone();
+		let blob = bad.sealed["default"].clone();
+		bad.sealed.insert("nope".into(), blob);
+		SecretsDocument::parse(MediaType::Toml, &bad.to_bytes().unwrap())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("sealed for group `nope`");
+		// a stray table (a hand edit, an older shape) is refused by name
+		SecretsDocument::parse(
+			MediaType::Toml,
+			b"[secrets.A]\nrole = \"env_var\"\n",
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("unknown field `secrets`");
 		let mut bad = document.clone();
 		bad.groups.get_mut("agents").unwrap().recipients.clear();
 		SecretsDocument::parse(MediaType::Toml, &bad.to_bytes().unwrap())
@@ -911,13 +1003,13 @@ mod test {
 			.xpect_contains("lists no recipients");
 		let (_, pete) = human();
 		SecretsDocument::default()
-			.set(&pete, "BAD NAME", "x", default())
+			.set(&pete, "default", "BAD NAME", "x", default())
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("not a record name");
 		// a fresh document with no identity to seed `default`
 		SecretsDocument::default()
-			.set(&AgeIdentityFile::default(), "A", "x", default())
+			.set(&AgeIdentityFile::default(), "default", "A", "x", default())
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("no identity");
@@ -941,11 +1033,8 @@ mod test {
 			])
 			.unwrap();
 		// the old `default` record is gone, `agents` untouched
-		document
-			.secrets
-			.contains_key("OPENAI_API_KEY")
-			.xpect_false();
-		document.secrets.len().xpect_eq(3);
+		document.contains("OPENAI_API_KEY").xpect_false();
+		document.record_count().xpect_eq(3);
 		let opened = document.open(&alice_file).unwrap();
 		opened.opened.xpect_eq(names(&["default"]));
 		opened
@@ -999,6 +1088,6 @@ mod test {
 		let opened = document.open(&AgeIdentityFile::default()).unwrap();
 		opened.secrets.is_empty().xpect_true();
 		opened.locked.xpect_eq(names(&["agents", "default"]));
-		document.secrets.len().xpect_eq(3);
+		document.record_count().xpect_eq(3);
 	}
 }

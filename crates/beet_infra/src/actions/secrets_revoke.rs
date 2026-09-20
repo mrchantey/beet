@@ -95,11 +95,10 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 		let report = match dry {
 			true => RekeyReport {
 				rekeyed: document
-					.groups
-					.iter()
-					.filter(|(_, group)| group.sealed.is_some())
-					.map(|(name, _)| name.clone())
+					.sealed
+					.keys()
 					.filter(|name| document.is_member(name, &identities))
+					.cloned()
 					.collect(),
 				locked: Vec::new(),
 			},
@@ -357,7 +356,9 @@ mod tests {
 				alice.to_recipient(),
 			]),
 		);
-		document.set(&identities, "TOKEN", "1", default()).unwrap();
+		document
+			.set(&identities, "default", "TOKEN", "1", default())
+			.unwrap();
 		entry.write(&document).await.unwrap();
 		(root, store, alice, entry)
 	}

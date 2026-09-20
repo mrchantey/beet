@@ -91,22 +91,21 @@ impl MtaStsPolicy {
 	}
 
 	/// The `_mta-sts` TXT value. `id` is opaque to senders and compared only for
-	/// change, so a deploy stamp is enough (see [`Self::policy_id`]).
+	/// change (see [`Self::policy_id`]).
 	pub fn record_value(id: &str) -> String { format!("v=STSv1; id={id}") }
 
-	/// A policy id derived from a deploy stamp. RFC 8461 allows at most 32
-	/// alphanumerics, so anything else in the stamp is dropped rather than
-	/// escaped: the value's only job is to differ from the last one.
-	pub fn policy_id(deploy_stamp: &str) -> String {
-		deploy_stamp
-			.chars()
-			.filter(char::is_ascii_alphanumeric)
-			.take(32)
+	/// A policy id derived from the policy body: the first 32 hex digits of
+	/// its sha256, the most RFC 8461 allows. Content-derived rather than a
+	/// deploy stamp, so a sender re-fetches exactly when the policy changed
+	/// and an unchanged policy plans no change (a deploy-stamped id made every
+	/// plan rewrite the record).
+	pub fn policy_id(policy_text: &str) -> String {
+		use sha2::Digest;
+		sha2::Sha256::digest(policy_text.as_bytes())
+			.iter()
+			.map(|byte| format!("{byte:02x}"))
 			.collect::<String>()
-			.xmap(|id| match id.is_empty() {
-				true => "0".to_string(),
-				false => id,
-			})
+			.xmap(|hex| hex[..32].to_string())
 	}
 
 	/// The policy body served at [`WELL_KNOWN_PATH`](Self::WELL_KNOWN_PATH).
@@ -170,18 +169,24 @@ mod tests {
 			.xpect_eq("_mta-sts.stalwart.beetmash.com");
 	}
 
-	/// The id must survive being cut out of a deploy stamp: at most 32
-	/// alphanumerics, and never empty (an empty id is a malformed record, which
-	/// senders treat as no policy at all).
+	/// The id is 32 alphanumerics (the most a record may carry, never empty:
+	/// an empty id is a malformed record senders treat as no policy), the
+	/// same for the same policy and different for a changed one.
 	#[beet_core::test]
-	fn policy_id_is_alphanumeric_and_bounded() {
-		MtaStsPolicy::policy_id("1756180000s")
-			.as_str()
-			.xpect_eq("1756180000s");
-		MtaStsPolicy::policy_id("2026-08-26T04:15:00Z")
-			.as_str()
-			.xpect_eq("20260826T041500Z");
-		MtaStsPolicy::policy_id(&"x".repeat(40)).len().xpect_eq(32);
-		MtaStsPolicy::policy_id("---").as_str().xpect_eq("0");
+	fn policy_id_follows_the_policy() {
+		let testing =
+			MtaStsPolicy::default().policy_text(&["mail.beetmash.com"]);
+		let id = MtaStsPolicy::policy_id(&testing);
+		id.len().xpect_eq(32);
+		id.chars()
+			.all(|char| char.is_ascii_alphanumeric())
+			.xpect_true();
+		MtaStsPolicy::policy_id(&testing).xpect_eq(id.clone());
+		let enforce = MtaStsPolicy {
+			mode: MtaStsMode::Enforce,
+			..default()
+		}
+		.policy_text(&["mail.beetmash.com"]);
+		(MtaStsPolicy::policy_id(&enforce) != id).xpect_true();
 	}
 }

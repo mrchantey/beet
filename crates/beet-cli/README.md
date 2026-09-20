@@ -59,7 +59,6 @@ Such a binary is a thin `main`, and it depends on the `beet` facade alone. Compo
 use beet::prelude::*;
 
 fn main() -> AppExit {
-	env_ext::load_dotenv().ok();
 	let mut app = App::new();
 	app.add_plugins((BeetPlugins, MyCratePlugin, LaunchPlugin));
 	// only the binary knows its own cargo features; an unprefixed `<RequireCfg/>`

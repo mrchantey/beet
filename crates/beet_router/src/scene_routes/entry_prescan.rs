@@ -10,8 +10,9 @@ use beet_core::prelude::*;
 /// that can go through the registry, so it is a plain pre-scan.
 ///
 /// One parse per bootstrap, versus the three the same bytes used to get. The
-/// [`RepoRoot`], [`TemplateDir`] and [`RequireCfg`] components are untouched:
-/// they remain the authoring vocabulary, this is only the extraction.
+/// [`RepoRoot`], [`TemplateDir`], [`RequireCfg`] and `Secrets` components are
+/// untouched: they remain the authoring vocabulary, this is only the
+/// extraction.
 ///
 /// A subtree carrying a `bx:cfg` is NOT scanned, whatever its condition says.
 /// This walk runs before the world that would answer the condition is reachable,
@@ -39,6 +40,14 @@ pub struct EntryPrescan {
 	/// Every local `<Template src>` include. Remote includes are skipped: they are
 	/// not local files a watcher sees.
 	pub includes: Vec<RelPath>,
+	/// Every unconditional `<Secrets>` declaration in the repo store (one
+	/// carrying a spread names another store, ie `{StoreRef($cold)}`, and is
+	/// an export target the verbs read, never loaded into an environment).
+	/// Entry resolution loads each into the process environment before the
+	/// entry builds, so a declaration constructed in the build walk finds its
+	/// credentials set.
+	#[cfg(feature = "vault")]
+	pub secrets: Vec<Secrets>,
 }
 
 impl EntryPrescan {
@@ -98,6 +107,17 @@ impl EntryPrescan {
 							.map(RelPath::new),
 					);
 				}
+				#[cfg(feature = "vault")]
+				"Secrets" if !Self::has_spread(element) => {
+					let mut secrets = Secrets::default();
+					if let Some(label) = Self::str_attr(element, "label") {
+						secrets.label = label;
+					}
+					if let Some(path) = Self::str_attr(element, "path") {
+						secrets.path = SmolPath::new(path);
+					}
+					self.secrets.push(secrets);
+				}
 				_ => {}
 			}
 			self.collect(&element.children);
@@ -115,6 +135,15 @@ impl EntryPrescan {
 				_ => None,
 			}
 		})
+	}
+
+	/// Whether the element carries a bare-position spread (`<el {..}>`).
+	#[cfg(feature = "vault")]
+	fn has_spread(element: &BsxElement) -> bool {
+		element
+			.attributes
+			.iter()
+			.any(|attr| matches!(attr.value, AttrValue::Spread(_)))
 	}
 
 	/// Whether `src` names a remote endpoint rather than a local path.
@@ -190,6 +219,28 @@ mod test {
 		EntryPrescan::parse(&MediaBytes::new_bsx("<Router/>"))
 			.unwrap()
 			.xpect_eq(EntryPrescan::default());
+	}
+
+	/// The entry's own documents are read off the top level; one in another
+	/// store (a spread naming it) and one under a `bx:cfg` are left to the
+	/// build.
+	#[cfg(feature = "vault")]
+	#[beet_core::test]
+	fn collects_the_entry_documents() {
+		let prescan = EntryPrescan::parse(&MediaBytes::new_bsx(
+			r#"<Router>
+				<Secrets/>
+				<Secrets label="mail-prod" path="infra/secrets/mail--prod.toml"/>
+				<Secrets label="mail-cold" path="secrets/export.toml" {StoreRef($cold)}/>
+				<Secrets label="gated" bx:cfg="feature:vault"/>
+			</Router>"#,
+		))
+		.unwrap();
+		prescan.secrets.xpect_eq(vec![
+			Secrets::default(),
+			Secrets::new("infra/secrets/mail--prod.toml")
+				.with_label("mail-prod"),
+		]);
 	}
 
 	/// A serde entry declares none of these, so it pre-scans to the default

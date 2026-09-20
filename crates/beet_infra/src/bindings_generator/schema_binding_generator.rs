@@ -278,7 +278,7 @@ impl SchemaBindingGenerator {
 			"[schema_binding_generator] running tofu init in {}",
 			self.work_dir
 		);
-		tofu::init(&self.work_dir).await?;
+		tofu::init(&self.work_dir, &[]).await?;
 
 		info!("[schema_binding_generator] tofu init: OK");
 		Ok(())

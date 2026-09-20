@@ -49,7 +49,7 @@ pub async fn SecretsExport(
 	dated: bool,
 	/// The group the records are sealed in, whose recipients are copied from
 	/// the entry document's group of the same name.
-	#[field(default = SmolStr::new(SecretRecord::DEFAULT_GROUP))]
+	#[field(default = SmolStr::new(SecretsDocument::DEFAULT_GROUP))]
 	group: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
@@ -77,21 +77,29 @@ pub async fn SecretsExport(
 		true => target.dated(now)?,
 		false => target,
 	};
-	if !dated
-		&& destination.exists().await?
-		&& SecretsExport::unchanged(&destination.read().await?, &export, &group)
-	{
-		info!(
-			"{} secret(s) unchanged since the last export to {}, not rewritten",
-			export.secrets.len(),
-			destination.describe()
-		);
-		return Pass(cx.input).xok();
+	if !dated && destination.exists().await? {
+		// an existing export that no longer parses is overwritten, not
+		// preserved: the store is the truth and the export its copy
+		match destination.read().await {
+			Ok(existing)
+				if SecretsExport::unchanged(&existing, &export, &group) =>
+			{
+				info!(
+					"{} secret(s) unchanged since the last export to {}, not \
+					rewritten",
+					export.record_count(),
+					destination.describe()
+				);
+				return Pass(cx.input).xok();
+			}
+			Ok(_) => {}
+			Err(err) => warn!("rewriting the existing export: {err}"),
+		}
 	}
 	destination.write(&export).await?;
 	info!(
 		"{} secret(s) from {} exported to {} in {}, sealed to {} recipient(s)",
-		export.secrets.len(),
+		export.record_count(),
 		store.describe(),
 		destination.describe(),
 		destination.store.describe(),
@@ -176,9 +184,10 @@ impl SecretsExport {
 	}
 
 	/// Whether `existing` already holds what `next` would write: the same
-	/// records with the same metadata, the same recipients in `group` and the
-	/// same origin, `exported` aside. A record's `modified` moves with its
-	/// value on every provider, so an unchanged index is an unchanged store.
+	/// records with the same metadata in `group`, the same recipients and
+	/// the same origin, `exported` aside. A record's `modified` moves with
+	/// its value on every provider, so an unchanged index is an unchanged
+	/// store.
 	pub fn unchanged(
 		existing: &SecretsDocument,
 		next: &SecretsDocument,
@@ -194,15 +203,16 @@ impl SecretsExport {
 			(None, None) => true,
 			_ => false,
 		};
-		let same_recipients =
+		let same_group =
 			match (existing.groups.get(group), next.groups.get(group)) {
 				(Some(existing), Some(next)) => {
 					existing.recipients.iter().collect::<HashSet<_>>()
 						== next.recipients.iter().collect::<HashSet<_>>()
+						&& existing.secrets == next.secrets
 				}
 				_ => false,
 			};
-		same_origin && same_recipients && existing.secrets == next.secrets
+		same_origin && same_group
 	}
 }
 
@@ -237,7 +247,11 @@ pub(crate) async fn export_target(
 	}
 	let entity = caller.world().entity(declaration);
 	let handle = SecretsHandle::of_declaration(&entity).await?;
-	#[cfg(all(feature = "cloudflare_dns", feature = "aws_sdk"))]
+	#[cfg(all(
+		feature = "cloudflare_dns",
+		feature = "aws_sdk",
+		not(target_arch = "wasm32")
+	))]
 	if let Some(block) = entity
 		.world()
 		.with(move |world: &mut World| -> Option<R2BucketBlock> {
@@ -251,7 +265,11 @@ pub(crate) async fn export_target(
 			.with_label(handle.label.clone().unwrap_or_default())
 			.xok();
 	}
-	#[cfg(not(all(feature = "cloudflare_dns", feature = "aws_sdk")))]
+	#[cfg(not(all(
+		feature = "cloudflare_dns",
+		feature = "aws_sdk",
+		not(target_arch = "wasm32")
+	)))]
 	let _ = store;
 	handle.xok()
 }
@@ -354,7 +372,9 @@ pub(crate) mod tests {
 		let repo = world.get::<BlobStore>(root).unwrap().clone();
 		let entry = SecretsHandle::new(repo.clone(), "secrets.toml").unwrap();
 		let mut document = SecretsDocument::default();
-		document.set(&alice_file, "A", "1", default()).unwrap();
+		document
+			.set(&alice_file, "default", "A", "1", default())
+			.unwrap();
 		entry.write(&document).await.unwrap();
 
 		run_export(&mut world, root, export, false).await.unwrap();
@@ -430,6 +450,22 @@ pub(crate) mod tests {
 		(second != first).xpect_true();
 		SecretsExport::unchanged(&first, &second, "default").xpect_false();
 		SecretsExport::unchanged(&second, &second, "default").xpect_true();
+		// an export that no longer parses is overwritten (the entry's own
+		// document declared so the recipients are not read from the export)
+		world.spawn((Secrets::default(), ChildOf(root)));
+		world.flush();
+		written
+			.store
+			.insert(&written.path, "not = [a document")
+			.await
+			.unwrap();
+		run_export(&mut world, root, export, false).await.unwrap();
+		SecretsExport::unchanged(
+			&written.read().await.unwrap(),
+			&second,
+			"default",
+		)
+		.xpect_true();
 	}
 
 	/// A dated export lands beside the declared path in the series shape,
@@ -449,7 +485,7 @@ pub(crate) mod tests {
 			"toml",
 		)
 		.xpect_true();
-		newest.read().await.unwrap().secrets.len().xpect_eq(2);
+		newest.read().await.unwrap().record_count().xpect_eq(2);
 	}
 
 	/// An empty store and an unnamed document both refuse.

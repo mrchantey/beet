@@ -178,23 +178,21 @@ impl SecretsRestore {
 					opened
 						.get(label)
 						.map(|secret| (label.clone(), secret))
-						.ok_or_else(|| {
-							match document.secrets.contains_key(label) {
-								true => bevyhow!(
-									"record `{label}` is in a group this identity \
+						.ok_or_else(|| match document.contains(label) {
+							true => bevyhow!(
+								"record `{label}` is in a group this identity \
 								cannot open"
-								),
-								false => bevyhow!(
-									"no record `{label}` in the document"
-								),
+							),
+							false => {
+								bevyhow!("no record `{label}` in the document")
 							}
 						})
 				})
 				.collect();
 		}
 		let locked = document
-			.secrets
-			.keys()
+			.records()
+			.map(|(_, name, _)| name)
 			.filter(|name| opened.get(name).is_none())
 			.cloned()
 			.collect::<Vec<_>>();

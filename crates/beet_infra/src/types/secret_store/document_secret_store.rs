@@ -99,8 +99,11 @@ impl DocumentSecretStore {
 		let mut document = SecretsDocument::new(self.handle.media_type()?);
 		if let Some(seed) = &self.seed
 			&& seed.exists().await?
-			&& let Some(group) =
-				seed.read().await?.groups.get(SecretRecord::DEFAULT_GROUP)
+			&& let Some(group) = seed
+				.read()
+				.await?
+				.groups
+				.get(SecretsDocument::DEFAULT_GROUP)
 		{
 			let mut recipients = group.recipients.clone();
 			for own in self.identities.recipients() {
@@ -109,7 +112,7 @@ impl DocumentSecretStore {
 				}
 			}
 			document.groups.insert(
-				SecretRecord::DEFAULT_GROUP.into(),
+				SecretsDocument::DEFAULT_GROUP.into(),
 				SecretsGroup::new(recipients),
 			);
 		}
@@ -121,11 +124,11 @@ impl DocumentSecretStore {
 	async fn open(&self, document: &SecretsDocument) -> Result<OpenSecrets> {
 		let opened = document.open(&self.identities)?;
 		if !document.groups.is_empty()
-			&& !opened.can_open(SecretRecord::DEFAULT_GROUP)
+			&& !opened.can_open(SecretsDocument::DEFAULT_GROUP)
 		{
 			bevybail!(
 				"this identity cannot open group `{}` of document {}{}",
-				SecretRecord::DEFAULT_GROUP,
+				SecretsDocument::DEFAULT_GROUP,
 				self.handle.describe(),
 				match self.identities.is_empty() {
 					true => format!(
@@ -149,7 +152,7 @@ impl DocumentSecretStore {
 		create_only: bool,
 	) -> Result {
 		let mut document = self.read_or_seed().await?;
-		if create_only && document.secrets.contains_key(secret.label()) {
+		if create_only && document.contains(secret.label()) {
 			return Err(SecretStoreError::AlreadyExists {
 				address: self.address(secret),
 			}
@@ -157,6 +160,7 @@ impl DocumentSecretStore {
 		}
 		document.set(
 			&self.identities,
+			SecretsDocument::DEFAULT_GROUP,
 			secret.label(),
 			value,
 			SecretRecord {
@@ -230,7 +234,7 @@ impl SecretStoreProvider for DocumentSecretStore {
 				return None.xok();
 			}
 			let document = this.handle.read().await?;
-			if !document.secrets.contains_key(secret.label()) {
+			if !document.contains(secret.label()) {
 				return None.xok();
 			}
 			this.open(&document)
@@ -271,9 +275,8 @@ impl SecretStoreProvider for DocumentSecretStore {
 			this.handle
 				.read()
 				.await?
-				.secrets
-				.iter()
-				.map(|(name, record)| this.entry(name, record))
+				.records()
+				.map(|(_, name, record)| this.entry(name, record))
 				.collect::<Vec<_>>()
 				.xok()
 		})
@@ -289,9 +292,8 @@ impl SecretStoreProvider for DocumentSecretStore {
 			let document = this.handle.read().await?;
 			let opened = this.open(&document).await?;
 			document
-				.secrets
-				.iter()
-				.map(|(name, record)| {
+				.records()
+				.map(|(_, name, record)| {
 					let value = opened
 						.get(name)
 						.map(|secret| secret.value.to_string())
@@ -320,7 +322,7 @@ impl SecretStoreProvider for DocumentSecretStore {
 			let mut document = this.handle.read().await?;
 			let mut deleted = Vec::new();
 			for secret in secrets {
-				if !document.secrets.contains_key(secret.label()) {
+				if !document.contains(secret.label()) {
 					continue;
 				}
 				document.remove(&this.identities, secret.label())?;
@@ -542,6 +544,45 @@ mod test {
 			.xpect_none();
 	}
 
+	/// A mirrored value is written when it or its metadata differs and left
+	/// alone when both match.
+	#[beet_core::test]
+	async fn converge_writes_only_a_difference() {
+		let stack = stack();
+		let store = memory_secret_store(&stack);
+		let secret = SecretRef::new("mail-tlsa");
+		let pin = async |value: &str, note: &str| {
+			store
+				.converge(
+					&secret,
+					value,
+					Some(note),
+					Some(SecretRotation::Remint),
+				)
+				.await
+				.unwrap()
+		};
+		pin("abc", "the pin").await.xpect_true();
+		pin("abc", "the pin").await.xpect_false();
+		// a stale note converges around the same value
+		pin("abc", "DANE pin for mail.example.com")
+			.await
+			.xpect_true();
+		store
+			.meta(&secret)
+			.await
+			.unwrap()
+			.unwrap()
+			.note
+			.unwrap()
+			.as_str()
+			.xpect_eq("DANE pin for mail.example.com");
+		pin("def", "DANE pin for mail.example.com")
+			.await
+			.xpect_true();
+		store.get(&secret).await.unwrap().unwrap().xpect_eq("def");
+	}
+
 	/// One document, one stack: rescoping to another stage is refused by
 	/// name, and to the same stage is the same store.
 	#[beet_core::test]
@@ -605,7 +646,9 @@ mod test {
 		let seed =
 			SecretsHandle::new(BlobStore::temp(), "secrets.toml").unwrap();
 		let mut document = SecretsDocument::default();
-		document.set(&alice_file, "A", "1", default()).unwrap();
+		document
+			.set(&alice_file, "default", "A", "1", default())
+			.unwrap();
 		seed.write(&document).await.unwrap();
 		let store = memory_store(&stack);
 		let store_identities = store.identities.clone();

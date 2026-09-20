@@ -103,7 +103,13 @@ impl VerbWorld {
 	pub async fn set(&self, name: &str, value: &str, record: SecretRecord) {
 		let mut document = self.document().await;
 		document
-			.set(&self.identities(), name, value, record)
+			.set(
+				&self.identities(),
+				SecretsDocument::DEFAULT_GROUP,
+				name,
+				value,
+				record,
+			)
 			.unwrap();
 		self.secrets(SecretsDocument::DEFAULT_PATH)
 			.write(&document)

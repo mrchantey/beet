@@ -5,10 +5,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use core::fmt::Write;
 
-/// List a document's groups and records: every record's name, role, group,
-/// note and modified time, with a lock on each group this identity cannot
-/// open. The index is plaintext, so no identity is needed and no value is
-/// ever printed.
+/// List a document's index, one block per group: the group's recipient
+/// count and whether this identity opens it, then every record as its name,
+/// role and modified time on one line with its note and rotation indented
+/// under it. The index is plaintext, so no identity is needed and no value
+/// is ever printed.
 ///
 /// ```sh
 /// beet secrets/ls                         # the declared document
@@ -32,7 +33,7 @@ pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
 		"{}: {} group(s), {} record(s)\n",
 		handle.describe(),
 		document.groups.len(),
-		document.secrets.len()
+		document.record_count()
 	);
 	if let Some(origin) = &document.origin {
 		writeln!(
@@ -44,39 +45,38 @@ pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
 			origin.exported.format_iso8601()
 		)?;
 	}
-	let groups = document
-		.groups
-		.iter()
-		.map(|(name, group)| {
-			vec![
-				name.to_string(),
-				format!("{} recipient(s)", group.recipients.len()),
-				group_status(name, &opened).to_string(),
-			]
-		})
-		.collect::<Vec<_>>();
-	write_table(&mut out, "groups:", &groups)?;
-	let records = document
-		.secrets
-		.iter()
-		.map(|(name, record)| {
-			let group = record.group();
-			vec![
-				name.to_string(),
-				record.role.map(|role| role.to_string()).unwrap_or_default(),
-				match opened.can_open(group) {
-					true => group.to_string(),
-					false => format!("{group} {LOCK}"),
-				},
-				record
-					.modified
-					.map(|modified| modified.format_iso8601())
-					.unwrap_or_default(),
-				record.note.as_deref().unwrap_or_default().to_string(),
-			]
-		})
-		.collect::<Vec<_>>();
-	write_table(&mut out, "records:", &records)?;
+	for (name, group) in &document.groups {
+		writeln!(
+			out,
+			"group `{name}` ({} recipient(s)): {}",
+			group.recipients.len(),
+			group_status(name, &opened)
+		)?;
+		let rows = group
+			.secrets
+			.iter()
+			.map(|(name, record)| {
+				(
+					vec![
+						name.to_string(),
+						record
+							.role
+							.map(|role| role.to_string())
+							.unwrap_or_default(),
+						record
+							.modified
+							.map(|modified| modified.format_iso8601())
+							.unwrap_or_default(),
+					],
+					[
+						record.note.as_deref().map(str::to_string),
+						record.rotation.as_ref().map(ToString::to_string),
+					],
+				)
+			})
+			.collect::<Vec<_>>();
+		write_records(&mut out, &rows)?;
+	}
 	Response::ok_text(out).xok()
 }
 
@@ -99,28 +99,26 @@ fn group_status(name: &str, opened: &OpenSecrets) -> String {
 	format!("{LOCK} not a member")
 }
 
-/// Append `rows` under `heading` with every column padded to its widest
-/// cell, nothing when there are no rows.
-fn write_table(
+/// Append every record: its columns padded to the widest cell, then each
+/// of its detail lines indented under it; `(none)` when there are no rows.
+fn write_records(
 	out: &mut String,
-	heading: &str,
-	rows: &[Vec<String>],
+	rows: &[(Vec<String>, [Option<String>; 2])],
 ) -> Result {
-	writeln!(out, "{heading}")?;
-	let Some(columns) = rows.first().map(Vec::len) else {
+	let Some(columns) = rows.first().map(|(cells, _)| cells.len()) else {
 		writeln!(out, "  (none)")?;
 		return OK;
 	};
 	let widths = (0..columns)
 		.map(|column| {
 			rows.iter()
-				.map(|row| width(&row[column]))
+				.map(|(cells, _)| width(&cells[column]))
 				.max()
 				.unwrap_or(0)
 		})
 		.collect::<Vec<_>>();
-	for row in rows {
-		let line = row
+	for (cells, details) in rows {
+		let line = cells
 			.iter()
 			.zip(&widths)
 			.map(|(cell, column)| {
@@ -129,6 +127,9 @@ fn write_table(
 			.collect::<Vec<_>>()
 			.join("  ");
 		writeln!(out, "  {}", line.trim_end())?;
+		for detail in details.iter().flatten() {
+			writeln!(out, "      {detail}")?;
+		}
 	}
 	OK
 }
@@ -170,23 +171,30 @@ mod test {
 		document
 			.set(
 				&theirs,
+				"agents",
 				"CF_API_TOKEN",
 				"cf-PRIVATE",
-				record(Some(SecretRole::EnvVar), "dns and workers")
-					.with_group("agents"),
+				record(Some(SecretRole::EnvVar), "dns and workers"),
 			)
 			.unwrap();
 		document
 			.set(
 				&fixture.identities(),
+				"default",
 				"OPENAI_API_KEY",
 				"sk-PRIVATE",
-				record(Some(SecretRole::EnvVar), "billing account"),
+				SecretRecord {
+					rotation: Some(SecretRotation::manual(
+						"platform.openai.com/api-keys",
+					)),
+					..record(Some(SecretRole::EnvVar), "billing account")
+				},
 			)
 			.unwrap();
 		document
 			.set(
 				&fixture.identities(),
+				"default",
 				"dkim-example-com",
 				"key-PRIVATE",
 				record(None, "the signing key"),

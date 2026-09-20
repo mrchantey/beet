@@ -50,31 +50,13 @@ pub(crate) fn load_on_insert(
 	Ok(())
 }
 
-/// The load itself.
+/// The load itself: the shared env var load, then `OpenSecrets` on the
+/// entity once no other document in the world holds one of its names.
 async fn load(entity: &AsyncEntity) -> Result {
 	let handle = SecretsHandle::of_declaration(entity).await?;
-	if !handle.exists().await? {
-		// every entry's state before its first `set`; `check` names it
-		debug!(
-			"document {} is not written yet: `secrets/set` writes a document, \
-			`<SecretsExport>` an export",
-			handle.describe()
-		);
-		return OK;
-	}
-	let document = handle.read().await?;
-	let Some(identities) = AgeIdentityFile::discover()? else {
-		warn!(
-			"no age identity at `{}` to open document {} with: its {} record(s) \
-			are not loaded (`beet vault/keygen` makes one, \
-			`vault/restore-identity` restores one)",
-			AgeIdentityFile::default_path()?.display(),
-			handle.describe(),
-			document.secrets.len()
-		);
+	let Some(opened) = handle.load_env_vars().await? else {
 		return OK;
 	};
-	let opened = document.open(&identities)?;
 	// one map across the world: a name in two documents is an error naming
 	// both, never a silent shadow
 	let mine = opened.clone();
@@ -100,24 +82,70 @@ async fn load(entity: &AsyncEntity) -> Result {
 			Ok(())
 		})
 		.await?;
-	let count = opened.set_env_vars()?;
-	info!(
-		"document {}: opened {} of {} group(s), {} record(s), {} env var(s) set{}",
-		handle.describe(),
-		opened.opened.len(),
-		document.groups.len(),
-		opened.secrets.len(),
-		count,
-		match opened.pending.is_empty() {
-			true => String::new(),
-			false => format!(
-				"; group(s) {} list this identity but were sealed before it was \
-				added: a member runs `secrets/rekey`",
-				opened.pending.join(", ")
-			),
-		}
-	);
 	entity.insert(opened).await
+}
+
+impl SecretsHandle {
+	/// Read the document and open it with the discovered identity: `None`
+	/// when the file is not written yet (every entry's state before its
+	/// first `set`, logged at debug) or there is no identity to open it
+	/// with (one warning naming the identity path and the file), else the
+	/// document and what this identity opened, verified against the index.
+	pub async fn open_discovered(
+		&self,
+	) -> Result<Option<(SecretsDocument, OpenSecrets)>> {
+		if !self.exists().await? {
+			debug!(
+				"document {} is not written yet: `secrets/set` writes a \
+				document, `<SecretsExport>` an export",
+				self.describe()
+			);
+			return None.xok();
+		}
+		let document = self.read().await?;
+		let Some(identities) = AgeIdentityFile::discover()? else {
+			warn!(
+				"no age identity at `{}` to open document {} with: its {} \
+				record(s) are not loaded (`beet vault/keygen` makes one, \
+				`vault/restore-identity` restores one)",
+				AgeIdentityFile::default_path()?.display(),
+				self.describe(),
+				document.record_count()
+			);
+			return None.xok();
+		};
+		let opened = document.open(&identities)?;
+		Some((document, opened)).xok()
+	}
+
+	/// [`open_discovered`](Self::open_discovered), then every `EnvVar`
+	/// record into the process environment (existing wins), one line
+	/// logged: the load the launch runs before the entry builds and the
+	/// `<Secrets>` load repeats on ready.
+	pub async fn load_env_vars(&self) -> Result<Option<OpenSecrets>> {
+		let Some((document, opened)) = self.open_discovered().await? else {
+			return None.xok();
+		};
+		let count = opened.set_env_vars()?;
+		info!(
+			"document {}: opened {} of {} group(s), {} record(s), {} env var(s) \
+			set{}",
+			self.describe(),
+			opened.opened.len(),
+			document.groups.len(),
+			opened.secrets.len(),
+			count,
+			match opened.pending.is_empty() {
+				true => String::new(),
+				false => format!(
+					"; group(s) {} list this identity but were sealed before it \
+					was added: a member runs `secrets/rekey`",
+					opened.pending.join(", ")
+				),
+			}
+		);
+		Some(opened).xok()
+	}
 }
 
 #[cfg(test)]
@@ -135,6 +163,7 @@ mod test {
 		document
 			.set(
 				&identities,
+				"default",
 				"BEET_TEST_SECRETS_LOAD",
 				"loaded",
 				SecretRecord {
@@ -144,7 +173,13 @@ mod test {
 			)
 			.unwrap();
 		document
-			.set(&identities, "BEET_TEST_SECRETS_KEPT", "kept", default())
+			.set(
+				&identities,
+				"default",
+				"BEET_TEST_SECRETS_KEPT",
+				"kept",
+				default(),
+			)
 			.unwrap();
 		fixture
 			.secrets("secrets.toml")

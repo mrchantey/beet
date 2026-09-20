@@ -132,34 +132,41 @@ pub async fn MailDane(
 
 	let secret = mail.mail_box.tlsa_secret();
 	let (usage, selector, matching) = StalwartBlock::TLSA_PARAMS;
-	match mail.secrets.get(&secret).await?.as_deref() {
+	let parked = mail.secrets.get(&secret).await?;
+	// the pin and its note converge together, so a pin parked before the
+	// note existed heals without the served key having to change
+	let written = mail
+		.secrets
+		.converge(
+			&secret,
+			&pin,
+			Some(&format!(
+				"DANE pin for {}, the {usage} {selector} {matching} digest of \
+				the certificate port 25 serves",
+				mail.mail_box.hostname()
+			)),
+			// the next deploy reads the served key and parks it again
+			Some(SecretRotation::Remint),
+		)
+		.await?;
+	match parked.as_deref() {
 		Some(parked) if parked == pin => info!(
-			"{} pins {usage} {selector} {matching} {pin}, unchanged",
-			mail.mail_box.tlsa_record_name()
+			"{} pins {usage} {selector} {matching} {pin}, unchanged{}",
+			mail.mail_box.tlsa_record_name(),
+			match written {
+				true => " (its note converged)",
+				false => "",
+			}
 		),
-		parked => {
-			mail.secrets
-				.overwrite(
-					&secret,
-					&pin,
-					Some(&format!(
-						"dane pin, the {usage} {selector} {matching} digest of {}",
-						mail.mail_box.tlsa_record_name()
-					)),
-					// the next deploy reads the served key and parks it again
-					Some(SecretRotation::Remint),
-				)
-				.await?;
-			info!(
-				"{} pins {usage} {selector} {matching} {pin} ({}); the apply \
-				after this publishes it",
-				mail.mail_box.tlsa_record_name(),
-				match parked {
-					Some(_) => "the served key changed",
-					None => "first pin",
-				}
-			);
-		}
+		parked => info!(
+			"{} pins {usage} {selector} {matching} {pin} ({}); the apply after \
+			this publishes it",
+			mail.mail_box.tlsa_record_name(),
+			match parked {
+				Some(_) => "the served key changed",
+				None => "first pin",
+			}
+		),
 	}
 	Pass(cx.input).xok()
 }

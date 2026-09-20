@@ -156,6 +156,14 @@ mod tests {
 		// a note happening to contain the separator stays a note
 		SecretRef::parse_description("weekly :: by hand")
 			.xpect_eq((Some("weekly :: by hand".into()), None));
+		// a note with a colon and a `>` in it, as a mint site writes one
+		let manual = SecretRotation::manual(
+			"dash.cloudflare.com/profile/api-tokens > Create Token > beet-deploy",
+		);
+		let note = "R2 token for bucket cold-backups: access key id";
+		let manual_text = SecretRef::description(Some(note), Some(&manual));
+		SecretRef::parse_description(&manual_text)
+			.xpect_eq((Some(note.into()), Some(manual)));
 		let resource = SecretRef::new("cold-access-key-id").parameter_resource(
 			&stack(),
 			"${x.id}",

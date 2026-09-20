@@ -10,11 +10,7 @@ use beet::prelude::*;
 use beet_cli::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> AppExit {
-	// load any local `.env` (eg `BEET_REMOTE_URL`) before the app starts.
-	env_ext::load_dotenv().ok();
-	build_app().run()
-}
+fn main() -> AppExit { build_app().run() }
 
 // the wasm entry is the exported [`start`] below, awaited explicitly by the
 // host; `main` boots nothing, so nothing runs as a side effect of module init.

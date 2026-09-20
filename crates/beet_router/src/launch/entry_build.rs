@@ -51,13 +51,14 @@ pub struct ResolvedEntry {
 	pub watch_dir: Option<AbsPath>,
 }
 
-/// Resolve an entry within its store: read the prescan once, and rebase the
+/// Resolve an entry within its store: read the prescan once, rebase the
 /// store through the entry's own `<RepoRoot src>` declaration
-/// ([`BlobStore::rebase_repo`]) when it carries one. The one widening path
-/// every entry load shares (the binary, discovery, `serve`/`check`/
-/// `export-static`, the Worker); callers differ only in how the initial
-/// `(store, entry_name)` pair is derived (a local path walk vs a key in a
-/// self-rooted store).
+/// ([`BlobStore::rebase_repo`]) when it carries one, and load its `<Secrets>`
+/// documents into the process environment ([`load_secrets`]). The one
+/// widening path every entry load shares (the binary, discovery,
+/// `serve`/`check`/`export-static`, the Worker); callers differ only in how
+/// the initial `(store, entry_name)` pair is derived (a local path walk vs a
+/// key in a self-rooted store).
 ///
 /// Live reload watches the store's local root when it has one
 /// ([`BlobStoreProvider::watch_dir`]) — the rebased root, so the watcher sees
@@ -74,6 +75,8 @@ pub async fn resolve_in_repo_store(
 		Some(src) => repo_store.rebase_repo(&entry_name, src)?,
 		None => (repo_store, entry_name),
 	};
+	#[cfg(feature = "vault")]
+	load_secrets(&repo_store, &prescan).await;
 	Ok(ResolvedEntry {
 		#[cfg(not(target_arch = "wasm32"))]
 		watch_dir: repo_store.watch_dir(),
@@ -81,6 +84,30 @@ pub async fn resolve_in_repo_store(
 		entry_name,
 		prescan,
 	})
+}
+
+/// Load every `<Secrets>` the prescan found into the process environment,
+/// before anything builds: each is resolved in the rebased repo store
+/// ([`SecretsHandle::in_store`]), opened with the discovered identity and its
+/// `EnvVar` records set where the environment does not already hold them,
+/// so every declaration constructed in the build walk (a stack's region, a
+/// bucket's account id, a compute's host key) finds them set, and no `main`
+/// knows any of this. A document that cannot be loaded (no identity, an
+/// identity in none of its groups, a corrupt file) is one warning and
+/// nothing set, never an error: a cloud box's repo store carries no
+/// identity, and a contributor without one must still build and run.
+#[cfg(feature = "vault")]
+pub async fn load_secrets(repo_store: &BlobStore, prescan: &EntryPrescan) {
+	for secrets in &prescan.secrets {
+		let loaded = async {
+			SecretsHandle::in_store(repo_store.clone(), secrets)?
+				.load_env_vars()
+				.await
+		};
+		if let Err(err) = loaded.await {
+			warn!("secrets `{}`: {err}", secrets.label);
+		}
+	}
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
@@ -726,6 +753,73 @@ mod test {
 			.xpect_true();
 		// returns rather than hanging, nothing being pending on this entry.
 		TemplatePending::settle_owned(&mut world).await;
+	}
+
+	/// The entry's declared document lands in the process environment as the
+	/// entry resolves, before anything builds: an identity handed in through
+	/// the environment opens it, and a record already set is left alone.
+	#[cfg(all(feature = "vault", not(target_arch = "wasm32")))]
+	#[beet_core::test]
+	async fn resolution_loads_the_entry_document() {
+		let identity = AgeIdentity::generate();
+		let mut identities = AgeIdentityFile::default();
+		identities.push(identity.clone());
+		let mut document = SecretsDocument::default();
+		for name in ["BEET_TEST_LAUNCH_LOADED", "BEET_TEST_LAUNCH_KEPT"] {
+			document
+				.set(
+					&identities,
+					"default",
+					name,
+					"from-document",
+					SecretRecord {
+						role: Some(SecretRole::EnvVar),
+						..default()
+					},
+				)
+				.unwrap();
+		}
+		let repo_store = BlobStore::temp();
+		repo_store
+			.insert(
+				&RelPath::from("app/main.bsx"),
+				"<Router><RepoRoot src=\"..\"/><Secrets/></Router>",
+			)
+			.await
+			.unwrap();
+		SecretsHandle::new(repo_store.clone(), "secrets.toml")
+			.unwrap()
+			.write(&document)
+			.await
+			.unwrap();
+		// SAFETY: test-only, names no other test reads; the identity is the
+		// process's for the load
+		let previous = env_ext::var(AgeIdentityFile::ENV_VAR).ok();
+		unsafe {
+			env_ext::set_var(AgeIdentityFile::ENV_VAR, &identity.to_string())
+				.unwrap();
+			env_ext::set_var("BEET_TEST_LAUNCH_KEPT", "from-shell").unwrap();
+		}
+		resolve_in_repo_store(repo_store, "app/main.bsx".into())
+			.await
+			.unwrap();
+		env_ext::var("BEET_TEST_LAUNCH_LOADED")
+			.unwrap()
+			.xpect_eq("from-document");
+		env_ext::var("BEET_TEST_LAUNCH_KEPT")
+			.unwrap()
+			.xpect_eq("from-shell");
+		unsafe {
+			match previous {
+				Some(value) => {
+					env_ext::set_var(AgeIdentityFile::ENV_VAR, &value)
+				}
+				None => env_ext::remove_var(AgeIdentityFile::ENV_VAR),
+			}
+			.unwrap();
+			env_ext::remove_var("BEET_TEST_LAUNCH_LOADED").unwrap();
+			env_ext::remove_var("BEET_TEST_LAUNCH_KEPT").unwrap();
+		}
 	}
 
 	/// An fs entry declaring `<RepoRoot src="..">` re-roots the store at the

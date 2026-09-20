@@ -58,10 +58,11 @@ impl EnsureDkimKey {
 			.xmap(|pem| Self::public_key_from_pem(&pem))
 	}
 
-	/// The note the private key is stored with: the selector it signs under.
+	/// The note the private key is stored with: the domain it signs for and
+	/// the selector it signs under.
 	pub fn note(domain: &str) -> String {
 		format!(
-			"dkim private key, {}._domainkey.{domain}",
+			"DKIM signing key for {domain} (selector {})",
 			MailDomainBlock::DKIM_SELECTOR
 		)
 	}
@@ -78,7 +79,8 @@ impl EnsureDkimKey {
 	/// The note the derived public half is stored with.
 	pub fn public_note(domain: &str) -> String {
 		format!(
-			"dkim public key, the p= of {}._domainkey.{domain}",
+			"the public half of the DKIM signing key for {domain}, the p= of \
+			{}._domainkey.{domain}",
 			MailDomainBlock::DKIM_SELECTOR
 		)
 	}
@@ -159,21 +161,22 @@ pub async fn EnsureDkimKey(
 		}
 		// publish the derived public half beside the private key, so a render
 		// reads what it needs without also reading the secret that produced it.
-		// Rewritten every deploy rather than created once: it is derived, so a
-		// missing or stale copy should heal rather than need intervention.
+		// Converged every deploy rather than created once: it is derived, so a
+		// missing or stale copy (its note included) should heal rather than
+		// need intervention.
 		let public = EnsureDkimKey::public_key(&private).await?;
-		let public_secret = domain.dkim_public_secret();
-		if mail.secrets.get(&public_secret).await? != Some(public.clone()) {
-			mail.secrets
-				.overwrite(
-					&public_secret,
-					&public,
-					Some(&EnsureDkimKey::public_note(domain.domain())),
-					Some(SecretRotation::manual(
-						"derived from the private key: rotate that",
-					)),
-				)
-				.await?;
+		if mail
+			.secrets
+			.converge(
+				&domain.dkim_public_secret(),
+				&public,
+				Some(&EnsureDkimKey::public_note(domain.domain())),
+				Some(SecretRotation::manual(
+					"derived from the private key: rotate that",
+				)),
+			)
+			.await?
+		{
 			info!("published the {} public selector", domain.domain());
 		}
 	}

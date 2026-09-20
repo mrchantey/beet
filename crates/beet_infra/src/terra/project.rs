@@ -224,7 +224,8 @@ impl Project {
 		debug!("initializing tofu backend");
 		self.backend().ensure_exists().await?;
 		debug!("initializing tofu project");
-		tofu::init(&dir).await?;
+		// init evaluates the encryption config, so it needs the passphrase
+		tofu::init(&dir, &self.required_vars()?).await?;
 		Ok(())
 	}
 

@@ -168,7 +168,7 @@ impl Report {
 		self.pass(format!(
 			"document {name}: {} group(s), {} record(s)",
 			document.groups.len(),
-			document.secrets.len()
+			document.record_count()
 		));
 		let empty = AgeIdentityFile::default();
 		let opened = match document.open(identities.unwrap_or(&empty)) {
@@ -258,12 +258,7 @@ mod test {
 			SecretsGroup::new(vec![stranger.to_recipient()]),
 		);
 		document
-			.set(
-				&strangers,
-				"B",
-				"2",
-				SecretRecord::default().with_group("theirs"),
-			)
+			.set(&strangers, "theirs", "B", "2", default())
 			.unwrap();
 		let handle = fixture.secrets("secrets.toml");
 		handle.write(&document).await.unwrap();
@@ -312,7 +307,14 @@ mod test {
 
 		// a hand edit of the index
 		let mut document = handle.read().await.unwrap();
-		document.secrets.get_mut("A").unwrap().note = Some("edited".into());
+		document
+			.groups
+			.get_mut("default")
+			.unwrap()
+			.secrets
+			.get_mut("A")
+			.unwrap()
+			.note = Some("edited".into());
 		handle.write(&document).await.unwrap();
 		let response =
 			fixture.call(SecretsCheck, Request::get("/")).await.unwrap();
@@ -329,7 +331,7 @@ mod test {
 		let series = fixture.secrets("exports/cold.toml");
 		let mut document = SecretsDocument::default();
 		document
-			.set(&fixture.identities(), "X", "1", default())
+			.set(&fixture.identities(), "default", "X", "1", default())
 			.unwrap();
 		series
 			.dated(Timestamp::parse_date("2026-09-15").unwrap())

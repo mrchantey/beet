@@ -174,7 +174,8 @@ impl ChildProcess {
 		self
 	}
 
-	/// Sets environment variables for the child process.
+	/// Sets environment variables for the child process, replacing any set
+	/// before; [`with_env`](Self::with_env) adds one.
 	pub fn with_envs(
 		mut self,
 		envs: impl IntoIterator<Item = (impl Into<SmolStr>, impl Into<SmolStr>)>,
@@ -183,6 +184,16 @@ impl ChildProcess {
 			.into_iter()
 			.map(|(k, v)| (k.into(), v.into()))
 			.collect();
+		self
+	}
+
+	/// Adds one environment variable for the child process.
+	pub fn with_env(
+		mut self,
+		key: impl Into<SmolStr>,
+		value: impl Into<SmolStr>,
+	) -> Self {
+		self.envs.push((key.into(), value.into()));
 		self
 	}
 

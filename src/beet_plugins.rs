@@ -28,6 +28,10 @@ impl PluginGroup for BeetPlugins {
 		#[allow(unused_mut)]
 		let mut builder = PluginGroupBuilder::start::<Self>();
 
+		// first, so a developer's `.env` is loaded before any plugin reads the
+		// environment (the log level, the display probe, the process config).
+		builder = builder.add(BootstrapPlugin);
+
 		// the runner. winit owns the OS event loop + main thread; without it the
 		// cooperative 30Hz loop paces headless servers/tools instead of busy-spinning.
 		// winit still needs a display server to build its event loop, so on a headless

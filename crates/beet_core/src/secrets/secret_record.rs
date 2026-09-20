@@ -46,10 +46,11 @@ impl fmt::Display for SecretRole {
 	}
 }
 
-/// A record's metadata: the plaintext index entry under `[secrets.NAME]`,
-/// mirrored inside its group's sealed blob (minus `group`, which the blob
-/// implies). The sealed copy is the truth and the index its mirror, so a
-/// hand edit of the index is caught on open rather than obeyed.
+/// A record's metadata: the plaintext index entry under
+/// `[groups.<group>.secrets.NAME]`, mirrored inside its group's sealed
+/// blob. The sealed copy is the truth and the index its mirror, so a hand
+/// edit of the index is caught on open rather than obeyed. The group is
+/// not a field: it is the map the record sits in.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize,
 )]
@@ -57,10 +58,6 @@ pub struct SecretRecord {
 	/// What consumes the record automatically.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub role: Option<SecretRole>,
-	/// The group the record is sealed in; [`DEFAULT_GROUP`](Self::DEFAULT_GROUP)
-	/// when absent.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub group: Option<SmolStr>,
 	/// A plaintext note for a reader of the index, so it is never a secret:
 	/// what the value is for, where it is rotated.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,38 +78,13 @@ pub struct SecretRecord {
 	pub rotation: Option<SecretRotation>,
 }
 
-impl SecretRecord {
-	/// The group a record with none named lands in.
-	pub const DEFAULT_GROUP: &'static str = "default";
-
-	/// The record's group, `default` when none is named.
-	pub fn group(&self) -> &str {
-		self.group.as_deref().unwrap_or(Self::DEFAULT_GROUP)
-	}
-
-	/// The record with its group set, `None` for the default so the index
-	/// stays lean.
-	pub fn with_group(mut self, group: impl AsRef<str>) -> Self {
-		self.group = Some(group.as_ref())
-			.filter(|group| *group != Self::DEFAULT_GROUP)
-			.map(SmolStr::new);
-		self
-	}
-
-	/// The record as it is sealed: without its group.
-	pub fn without_group(mut self) -> Self {
-		self.group = None;
-		self
-	}
-}
-
 /// One record inside a group's sealed blob: the value and a copy of its
 /// index entry. [`Debug`] redacts the value.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SealedRecord {
 	/// The secret itself.
 	pub value: SmolStr,
-	/// The record's metadata, mirrored from the index without its group.
+	/// The record's metadata, mirrored from the index.
 	#[serde(flatten)]
 	pub record: SecretRecord,
 }
@@ -140,21 +112,60 @@ pub struct SealedGroup {
 	pub secrets: BTreeMap<SmolStr, SealedRecord>,
 }
 
-/// One opened record: its name, its value and its sealed metadata with the
-/// group it came from. [`Debug`] redacts the value.
+/// One opened record: its name, the group it was sealed in, its value and
+/// its sealed metadata. [`Debug`] redacts the value.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Secret {
 	/// The record's name: an env var name, or a stack's secret label.
 	pub name: SmolStr,
+	/// The group the record was sealed in.
+	pub group: SmolStr,
 	/// The secret itself.
 	pub value: SmolStr,
-	/// The sealed metadata, its `group` set to the group it was read from.
+	/// The sealed metadata.
 	pub record: SecretRecord,
 }
 
 impl Secret {
-	/// The group the secret was sealed in.
-	pub fn group(&self) -> &str { self.record.group() }
+	/// Unambiguous alphanumerics: no `0`/`O` or `1`/`l`, since a generated
+	/// value is read aloud and typed by hand during an incident, and
+	/// nothing else, since these values land in shell environment files,
+	/// connection strings and a JSON config spliced together on a booting
+	/// box: restraint in the alphabet is far cheaper than correct escaping
+	/// in every one of those places, and it costs only length to make up
+	/// the entropy.
+	pub const ALPHABET: &'static [u8] =
+		b"abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+	/// 32 characters of [`ALPHABET`](Self::ALPHABET) is ~185 bits, which is
+	/// more than the 128 anything here needs and still fits on one line.
+	pub const GENERATED_LENGTH: usize = 32;
+
+	/// Below this a generated value is not worth generating.
+	pub const MIN_GENERATED_LENGTH: usize = 16;
+
+	/// A generated value of `length` characters of
+	/// [`ALPHABET`](Self::ALPHABET), drawn from the platform entropy source:
+	/// how every minted credential and every `set --generate` value is
+	/// born. Errors, naming `label`, on a length not worth generating.
+	pub fn generate(label: &str, length: usize) -> Result<SmolStr> {
+		if length < Self::MIN_GENERATED_LENGTH {
+			bevybail!(
+				"secret `{label}` is {length} characters: too short to be worth \
+				generating (at least {})",
+				Self::MIN_GENERATED_LENGTH
+			);
+		}
+		let mut source = RandomSource::default();
+		(0..length)
+			.map(|_| {
+				Self::ALPHABET[source.random_range(0..Self::ALPHABET.len())]
+					as char
+			})
+			.collect::<String>()
+			.xmap(SmolStr::from)
+			.xok()
+	}
 }
 
 impl fmt::Debug for Secret {
@@ -242,23 +253,36 @@ mod test {
 		SecretRole::EnvVar.to_string().xpect_eq("env_var");
 	}
 
+	/// The alphabet is the whole reason a value is generated here rather than
+	/// taken from `openssl rand -base64`: a `/` or a `+` in a password that
+	/// gets spliced into a DSN or a shell env file is a bug in a different
+	/// file. Two calls must not agree, or the entropy source is not one, and
+	/// a length that would not survive being guessed is an error rather than
+	/// a weak value nobody notices.
 	#[crate::test]
-	fn group_defaults() {
-		SecretRecord::default().group().xpect_eq("default");
-		SecretRecord::default()
-			.with_group("default")
-			.group
-			.xpect_none();
-		SecretRecord::default()
-			.with_group("agents")
-			.group()
-			.xpect_eq("agents");
+	fn generates_alphanumerics() {
+		let value =
+			Secret::generate("db-password", Secret::GENERATED_LENGTH).unwrap();
+		value.len().xpect_eq(Secret::GENERATED_LENGTH);
+		value
+			.chars()
+			.all(|char| char.is_ascii_alphanumeric())
+			.xpect_true();
+		(value
+			!= Secret::generate("db-password", Secret::GENERATED_LENGTH)
+				.unwrap())
+		.xpect_true();
+		Secret::generate("db-password", 8)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("too short");
 	}
 
 	#[crate::test]
 	fn debug_redacts() {
 		let secret = Secret {
 			name: "TOKEN".into(),
+			group: "default".into(),
 			value: "hunter2".into(),
 			record: default(),
 		};

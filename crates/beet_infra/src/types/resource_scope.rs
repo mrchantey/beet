@@ -111,9 +111,14 @@ impl RenderScope {
 			.collect()
 	}
 
-	/// A seeded scope: the backend and encryption this launch deploys with,
-	/// and the provider region the stack resolves.
+	/// A seeded scope: the backend this launch deploys with, the encryption
+	/// the stack declares (else the launch's), and the provider region the
+	/// stack resolves.
 	fn new(stack: ResolvedStack, deployment: Deployment) -> Result<Self> {
+		let deployment = match stack.state_encryption() {
+			StateEncryption::None => deployment,
+			declared => deployment.with_state_encryption(declared.clone()),
+		};
 		let mut config = deployment.create_config(&stack);
 		config.add_provider_config(
 			&terra::Provider::AWS,

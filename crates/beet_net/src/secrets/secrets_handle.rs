@@ -18,7 +18,7 @@ use beet_core::prelude::*;
 /// identities.push(AgeIdentity::generate());
 /// let handle = SecretsHandle::new(BlobStore::temp(), "secrets.toml")?;
 /// let mut document = handle.read_or_new().await?;
-/// document.set(&identities, "TOKEN", "hunter2", default())?;
+/// document.set(&identities, "default", "TOKEN", "hunter2", default())?;
 /// handle.write(&document).await?;
 /// handle
 /// 	.read()
@@ -272,7 +272,9 @@ mod test {
 			.xpect_contains("not written yet");
 		let mut document = handle.read_or_new().await.unwrap();
 		document.media_type().xpect_eq(MediaType::Toml);
-		document.set(&identities, "A", "1", default()).unwrap();
+		document
+			.set(&identities, "default", "A", "1", default())
+			.unwrap();
 		handle.write(&document).await.unwrap();
 		// the index is plaintext toml
 		String::from_utf8(
@@ -283,7 +285,7 @@ mod test {
 				.to_vec(),
 		)
 		.unwrap()
-		.xpect_contains("[secrets.A]");
+		.xpect_contains("[groups.default.secrets.A]");
 		handle
 			.read()
 			.await

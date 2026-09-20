@@ -7,7 +7,9 @@
 # just test-all
 # ```
 #
-set dotenv-load := true
+# no `set dotenv-load`: every credential and flag a recipe needs is a record
+# of `secrets.toml`, which the beet process loads itself; a recipe that needs
+# one in a foreign tool runs it through `just beet secrets/exec -- <command>`.
 # `"$@"` in `beet` hands each argument through as typed; `{{args}}` would
 # paste them back into the shell line unquoted, splitting a quoted `--note`.
 set positional-arguments
@@ -65,7 +67,8 @@ beet *args:
 
 # Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
 # (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so
-# tofu/aws/s3 use the explicit `.env` keys rather than a global profile.
+# tofu/aws/s3 use the deployer's pair from `secrets.toml` rather than a global
+# profile.
 # `--main=site`: the SITE entry declares its own resources and deploy verbs, so
 # the application that runs on them is the thing that provisions them.
 # `infra,extra` links the deploy blocks and the IaC verb routes. Without them the

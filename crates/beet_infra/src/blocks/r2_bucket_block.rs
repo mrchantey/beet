@@ -123,6 +123,16 @@ impl R2BucketBlock {
 		SecretRef::new(format!("{}-secret-access-key", self.label))
 	}
 
+	/// The note the access key id is parked with.
+	pub fn access_key_note(&self) -> String {
+		format!("R2 token for bucket {}: access key id", self.label)
+	}
+
+	/// The note the secret access key is parked with.
+	pub fn secret_key_note(&self) -> String {
+		format!("R2 token for bucket {}: secret access key", self.label)
+	}
+
 	/// What a consumer says when the parked pair is missing, worded once.
 	/// Free of quotes and backticks, since one of those consumers is a shell
 	/// script. The apply writes the pair beside the bucket, so its absence
@@ -168,8 +178,13 @@ impl R2BucketBlock {
 	/// ([`parked_pair`](Self::parked_pair)): the store a deploy-machine
 	/// process reads and writes the bucket through. The runtime attach lands
 	/// a store under the process's ambient credentials, which are AWS's, so
-	/// a verb targeting this bucket resolves this instead.
-	#[cfg(all(feature = "vault", feature = "aws_sdk"))]
+	/// a verb targeting this bucket resolves this instead. Native, as the
+	/// S3 client is.
+	#[cfg(all(
+		feature = "vault",
+		feature = "aws_sdk",
+		not(target_arch = "wasm32")
+	))]
 	pub async fn parked_store(
 		&self,
 		secrets: &SecretStore,
@@ -234,12 +249,12 @@ impl R2BucketBlock {
 			(
 				self.access_key_secret(),
 				token.field_ref("id"),
-				"r2 token, s3 access key id",
+				self.access_key_note(),
 			),
 			(
 				self.secret_key_secret(),
 				format!("${{sha256({})}}", token.field("value")),
-				"r2 token, s3 secret access key",
+				self.secret_key_note(),
 			),
 		] {
 			config.add_untyped_resource(
@@ -248,7 +263,7 @@ impl R2BucketBlock {
 				&secret.parameter_resource(
 					stack,
 					value,
-					note,
+					&note,
 					SecretRotation::replace(token.address()),
 				),
 			)?;
@@ -461,7 +476,7 @@ mod tests {
 			.xpect_contains("\"type\":\"SecureString\"")
 			.xpect_contains("${sha256(cloudflare_account_token.")
 			.xpect_contains(
-				"\"description\":\"replace:cloudflare_account_token.beet_infra__dev__cold_backups_token :: r2 token, s3 access key id\"",
+				"\"description\":\"replace:cloudflare_account_token.beet_infra__dev__cold_backups_token :: R2 token for bucket cold-backups: access key id\"",
 			)
 			// the resource scope is one bucket, never the account
 			.xnot()

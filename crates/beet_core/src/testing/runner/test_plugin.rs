@@ -84,12 +84,12 @@ impl Plugin for TestPlugin {
 		#[cfg(target_arch = "wasm32")]
 		console_error_panic_hook::set_once();
 
-		// tests read credentials and paths from `.env`, so load it here rather
-		// than relying on the caller (`just`, a js host) to have done it, and
-		// the secrets document beside it by the same convention.
+		// a test has no entry to declare its document, so the runner loads a
+		// developer's `.env` and the nearest `secrets.<format>` (the repo's)
+		// by convention rather than relying on the caller (`just`, a js host)
 		env_ext::load_dotenv().ok();
 		#[cfg(feature = "vault")]
-		Secrets::load_env_vars_beside_dotenv();
+		Secrets::load_env_vars_nearest();
 
 		app.init_plugin::<AsyncPlugin>()
 			.init_plugin::<TimePlugin>()

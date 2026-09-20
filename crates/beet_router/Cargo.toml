@@ -59,6 +59,10 @@ interface = ["serde"]
 # The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
 # parser). Routes `MediaType::Html` parsing through BSX for media negotiation.
 bsx = ["std", "beet_ui/bsx"]
+# The entry's `<Secrets>` declarations loaded into the process environment
+# before the entry builds (the prescan's half of `beet_net/vault`), so every
+# declaration constructed in the build walk finds its credentials set.
+vault = ["std", "beet_net/vault"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde"]

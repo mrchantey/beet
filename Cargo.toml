@@ -398,7 +398,7 @@ serde_plain = ["serde", "beet_core/serde_plain"]
 # and `secrets` verbs (`beet_net`); the stack secret store seam, export,
 # restore and revoke (`beet_infra`). Opt-in: a binary that never touches a
 # secret links no crypto.
-vault = ["beet_core/vault", "beet_net?/vault", "beet_infra?/vault"]
+vault = ["beet_core/vault", "beet_net?/vault", "beet_router?/vault", "beet_infra?/vault"]
 # QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]

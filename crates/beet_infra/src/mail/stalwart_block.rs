@@ -435,6 +435,23 @@ impl StalwartBlock {
 		self.ses_smtp_password_secret().name(stack)
 	}
 
+	/// The note the SES SMTP username is parked with.
+	pub fn ses_smtp_user_note(&self, stack: &ResolvedStack) -> String {
+		format!(
+			"SES relay smtp user for {}, the sending user's access key id",
+			stack.app_name()
+		)
+	}
+
+	/// The note the SES SMTP password is parked with.
+	pub fn ses_smtp_password_note(&self, stack: &ResolvedStack) -> String {
+		format!(
+			"SES relay smtp password for {}, derived from the access key by \
+			terraform",
+			stack.app_name()
+		)
+	}
+
 	fn build_label(&self, suffix: &str) -> String {
 		format!("{}--{suffix}", self.label)
 	}
@@ -874,9 +891,7 @@ impl StalwartBlock {
 				value: Some(key.field_ref("id").into()),
 				description: Some(
 					SecretRef::description(
-						Some(
-							"ses smtp username, ie the sending user's access key id",
-						),
+						Some(&self.ses_smtp_user_note(stack)),
 						Some(&rotation),
 					)
 					.into(),
@@ -892,7 +907,7 @@ impl StalwartBlock {
 				value: Some(key.field_ref("ses_smtp_password_v4").into()),
 				description: Some(
 					SecretRef::description(
-						Some("ses smtp password, derived from it by terraform"),
+						Some(&self.ses_smtp_password_note(stack)),
 						Some(&rotation),
 					)
 					.into(),

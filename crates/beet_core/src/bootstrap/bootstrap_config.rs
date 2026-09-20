@@ -633,8 +633,17 @@ static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
 	)
 });
 
-/// Validates the process [`BootstrapConfig`] at [`PreStartup`], and under `std`
-/// registers [`PackageConfig`] and inserts one for the readers that expect it.
+/// Loads a developer's `.env` into the process environment, validates the
+/// process [`BootstrapConfig`] at [`PreStartup`], and under `std` registers
+/// [`PackageConfig`] and inserts one for the readers that expect it.
+///
+/// The `.env` load ([`env_ext::load_dotenv`]) runs at build, so it lands
+/// before the first [`BootstrapConfig::get`] freezes the environment and no
+/// binary's `main` has to remember it; a plugin group puts this plugin first
+/// for the same reason. `.env` is a developer's own file of flags, plaintext
+/// and never committed: nothing beet needs lives there, since an entry's
+/// secrets ride its `<Secrets>` document, loaded by the launch before the
+/// entry builds.
 ///
 /// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
 /// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
@@ -647,6 +656,9 @@ pub struct BootstrapPlugin;
 
 impl Plugin for BootstrapPlugin {
 	fn build(&self, app: &mut App) {
+		// a missing `.env` is the common case; a host with no environment to
+		// load into (no_std, a browser tab) is the other non-failure
+		env_ext::load_dotenv().ok();
 		app.add_systems(PreStartup, validate_process_config);
 		// `PackageConfig` is std-only (it kebab-cases cloud resource names).
 		// Registered here rather than by a router, so a routerless app can

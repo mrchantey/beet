@@ -686,23 +686,25 @@ impl AccountPlan {
 		))
 	}
 
-	/// The note a mailbox credential is stored with, so a listing or an
-	/// export says what it opens: composed here and read back by
-	/// `MailCredentials`.
-	pub fn mailbox_note(admin: bool) -> String {
+	/// The note a mailbox credential is stored with, naming the address it
+	/// opens, so a listing or an export says what it is: composed here and
+	/// read back by `MailCredentials`.
+	pub fn mailbox_note(address: &str, admin: bool) -> String {
 		match admin {
-			true => "mailbox, administrator".to_string(),
-			false => "mailbox".to_string(),
+			true => format!("password for administrator account {address}"),
+			false => format!("password for account {address}"),
 		}
 	}
 
 	/// The note the server's own administrator credential is stored with.
 	pub fn admin_note(hostname: &str) -> String {
-		format!("administers {hostname}")
+		format!("administrator credential for {hostname}")
 	}
 
-	/// The note this account's credential is stored with.
-	pub fn note(&self) -> String { Self::mailbox_note(self.admin) }
+	/// The note this account's credential is stored with, on `domain`.
+	pub fn note(&self, domain: &str) -> String {
+		Self::mailbox_note(&self.address(domain), self.admin)
+	}
 
 	/// How a mailbox credential rotates: delete the secret and the next
 	/// provision mints a fresh one and sets it on the account

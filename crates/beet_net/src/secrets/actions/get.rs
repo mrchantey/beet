@@ -27,11 +27,10 @@ pub async fn SecretsGet(cx: ActionContext<Request>) -> Result<Response> {
 	let opened = document.open(&AgeIdentityFile::require()?)?;
 	match opened.get(&name) {
 		Some(secret) => Response::ok_text(secret.value.to_string()).xok(),
-		None => match document.secrets.get(&name) {
-			Some(record) => bevybail!(
-				"`{name}` is in group `{}` of {}, which this identity cannot \
-				open",
-				record.group(),
+		None => match document.group_of(&name) {
+			Some(group) => bevybail!(
+				"`{name}` is in group `{group}` of {}, which this identity \
+				cannot open",
 				handle.describe()
 			),
 			None => bevybail!("no record `{name}` in {}", handle.describe()),

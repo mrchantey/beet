@@ -4,14 +4,16 @@ stage = "prod"
 provider = "document"
 
 [groups.default]
-sealed = """
-"""
 
-[secrets.dkim-example-com]
+[groups.default.secrets.dkim-example-com]
 note = "the signing key"
 address = "store.toml#dkim-example-com"
 rotation = "manual:a new selector"
 
-[secrets.mail-tlsa]
+[groups.default.secrets.mail-tlsa]
 address = "store.toml#mail-tlsa"
 rotation = "remint"
+
+[sealed]
+default = """
+"""
