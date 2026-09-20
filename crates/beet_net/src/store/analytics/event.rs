@@ -60,7 +60,8 @@ pub enum AnalyticsEventData {
 	},
 	/// A viewed page and its dwell duration.
 	PageView {
-		/// Dwell duration in milliseconds (the total, after heartbeat upserts).
+		/// Dwell duration in milliseconds: the total once compaction keeps the
+		/// newest heartbeat.
 		duration_ms: u64,
 		/// The referring url, if any.
 		referrer: Option<SmolStr>,
@@ -258,7 +259,7 @@ impl AnalyticsEvent {
 	/// [`AnalyticsEventData`]. `session_cookie` (from the request cookie) and the
 	/// geoip `country` are supplied by the server; the body's `session` wins when
 	/// present. A page view keeps the client `page_view_id` as its row id (so
-	/// heartbeats overwrite); other kinds get a fresh id.
+	/// heartbeats dedupe to the newest); other kinds get a fresh id.
 	pub fn from_beacon(
 		body: Value,
 		session_cookie: Option<Uuid>,
@@ -322,7 +323,7 @@ impl AnalyticsEvent {
 		let mut event = Self::new(path, data)
 			.with_client_kind(ClientKind::Web)
 			.with_session(uuid("session").or(session_cookie));
-		// a page view keeps the client id so heartbeats overwrite; others are new.
+		// a page view keeps the client id so heartbeats dedupe; others are new.
 		if let AnalyticsEventKind::PageView = event.event_kind {
 			if let Some(id) = uuid("page_view_id") {
 				event.id = id;

@@ -3,8 +3,8 @@ use bevy::app::PluginGroupBuilder;
 
 /// The default plugin set for a *Beet* application, the trusted way to get sensible
 /// defaults. It selects the runner (a real winit window with the `winit` feature,
-/// the winit-less browser render runner on wasm, else the headless 30Hz schedule
-/// loop), installs beet's tracing [`LogPlugin`] and the async/exit runtime, and
+/// the winit-less browser render runner on wasm, else the headless 30Hz
+/// [`WakeRunnerPlugin`]), installs beet's tracing [`LogPlugin`] and the async/exit runtime, and
 /// links the router/scene/server capabilities a served or presented site needs,
 /// each gated on the relevant feature.
 ///
@@ -148,16 +148,29 @@ impl PluginGroup for BeetPlugins {
 	}
 }
 
-/// The headless runner: the cooperative 30Hz schedule loop that paces servers and
-/// tools without an OS event loop. Used when the `winit` feature is off, so the
+/// The headless frame: the cooperative 30Hz schedule loop that paces servers
+/// and tools without an OS event loop.
+const HEADLESS_FRAME: Duration = Duration::from_millis(1000 / 30);
+
+/// The headless runner. Used when the `winit` feature is off, so the
 /// render/asset stack is never linked and bare `MinimalPlugins` suffice.
+/// Natively the [`WakeRunnerPlugin`], which spends the frame gap polling woken
+/// tasks rather than asleep, so a task's sequential awaits cost what their
+/// work costs and not a frame each; wasm keeps bevy's `setTimeout` loop.
 #[cfg(not(feature = "winit"))]
 fn headless_runner() -> PluginGroupBuilder {
-	MinimalPlugins
-		.set(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
-			1.0 / 30.0,
-		)))
-		.build()
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			MinimalPlugins
+				.set(ScheduleRunnerPlugin::run_loop(HEADLESS_FRAME))
+				.build()
+		} else {
+			MinimalPlugins
+				.build()
+				.disable::<ScheduleRunnerPlugin>()
+				.add(WakeRunnerPlugin::new(HEADLESS_FRAME))
+		}
+	}
 }
 
 /// The winit-compiled fallback when no display server is reachable (headless WSL,
@@ -178,9 +191,7 @@ fn headless_render_runner() -> PluginGroupBuilder {
 	use bevy::render::settings::WgpuSettings;
 	winit_default_plugins()
 		.disable::<bevy::winit::WinitPlugin>()
-		.add(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
-			1.0 / 30.0,
-		)))
+		.add(WakeRunnerPlugin::new(HEADLESS_FRAME))
 		.set(RenderPlugin {
 			render_creation: RenderCreation::Automatic(Box::new(
 				WgpuSettings {

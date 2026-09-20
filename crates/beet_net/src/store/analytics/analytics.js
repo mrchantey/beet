@@ -7,17 +7,22 @@ Beet web analytics client.
 - Reports page views (with how long each was viewed), clicks, max scroll depth,
   and client-side errors. Page views survive caching: the server never sees a
   cached load, but this script still beacons it.
-- Posts to POST /analytics. A page view carries a page_view_id that overwrites the
-  stored row, so the load, the periodic heartbeat, and the final report fold into
-  one record whose duration is the total dwell. Other events are one-shot.
+- Posts to POST /analytics. A page view carries a page_view_id shared by its
+  load, every heartbeat and the final report; the store keeps the newest, so the
+  one record that survives holds the total dwell. Other events are one-shot.
 **/
 
-// Heartbeat interval, so a lost `pagehide` (mobile, tab discard) still bounds the
-// dwell to the last beat rather than losing it.
-const HEARTBEAT_MS = 10000;
+// The heartbeat bounds the dwell when `pagehide` is lost (mobile, tab discard),
+// and its cadence is a tenth of the page's age, from 10 seconds up to a week: the
+// dwell is always known to within a tenth, and a tab left open for a month costs
+// a few dozen posts rather than a quarter of a million. The cap must stay under
+// the 24.8 day `setTimeout` ceiling, above which a browser fires at once.
+const MIN_BEAT_MS = 10_000;
+const MAX_BEAT_MS = 7 * 24 * 60 * 60 * 1000;
+const nextBeat = (age) => Math.min(Math.max(age / 10, MIN_BEAT_MS), MAX_BEAT_MS);
 
 // A time-ordered UUIDv7 (48-bit unix-ms timestamp + random). Used for the
-// page-view row id (so records sort by time and overwrite in place) and the
+// page-view id (so records sort by time and the newest beat wins) and the
 // session id. Built on `crypto.getRandomValues`, which - unlike
 // `crypto.randomUUID` - is available in insecure contexts (plain http) too.
 function uuidv7() {
@@ -105,8 +110,8 @@ function createBeetAnalytics() {
 			),
 		);
 
-	// The page view: the same page_view_id overwrites the row, so the last post
-	// (heartbeat or final) wins and duration_ms is the total dwell.
+	// The page view: every post carries the same page_view_id and the store keeps
+	// the newest, so the last one (heartbeat or final) holds the total dwell.
 	const sendPageView = () =>
 		post({
 			kind: "page_view",
@@ -169,15 +174,20 @@ function createBeetAnalytics() {
 	};
 
 	// Final report on leave: the page view's total dwell and the max scroll depth.
+	let heartbeat;
 	const finalize = () => {
-		clearInterval(heartbeat);
+		clearTimeout(heartbeat);
 		sendPageView();
 		if (maxScroll > 0) sendEvent("scroll", { max_percent: maxScroll });
 	};
 
-	// initial view (duration 0), a periodic heartbeat, and interaction tracking.
-	sendPageView();
-	const heartbeat = setInterval(sendPageView, HEARTBEAT_MS);
+	// The first view (duration 0) and the beats after it, each scheduled from the
+	// page's age at the time; then interaction tracking.
+	const beat = () => {
+		sendPageView();
+		heartbeat = setTimeout(beat, nextBeat(Date.now() - startedAt));
+	};
+	beat();
 	trackClicks();
 	trackScroll();
 	trackErrors();

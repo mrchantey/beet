@@ -101,6 +101,7 @@ std = [
 	"dep:async-executor",
 	"dep:async-io",
 	"dep:async-task",
+	"dep:blocking",
 	# std builds want the full rand surface: `rand::rng()` (thread_rng) and the
 	# std backends. Optional so non-rand std builds are unaffected.
 	"rand?/std",
@@ -296,10 +297,12 @@ async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }
 async-process = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+# the thread pool a blocking or CPU-bound call runs on (`async_ext::unblock`),
+# also what `async-fs` uses underneath
+blocking = { workspace = true, optional = true }
 
 ## fs
 async-fs = { workspace = true, optional = true }
-blocking = { workspace = true, optional = true }
 notify = { version = "8", optional = true }
 notify-debouncer-full = { version = "0.7", optional = true }
 ctrlc = { version = "3", optional = true }

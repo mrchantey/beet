@@ -312,7 +312,7 @@ impl ReadDir {
 		{
 			let this = *self;
 			let root = root.as_ref().to_path_buf();
-			blocking::unblock(move || this.read(root)).await
+			async_ext::unblock(move || this.read(root)).await
 		}
 	}
 

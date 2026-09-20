@@ -5,10 +5,11 @@ use beet_net::prelude::*;
 
 /// A `POST /analytics` route accepting the web client beacon.
 ///
-/// The client (the `<Analytics/>` script) posts page views (on load, a 10s
-/// heartbeat, and `pagehide`) plus click / scroll / error events. A page view's
-/// `page_view_id` overwrites its stored row, so the final duration lands even
-/// when the server never sees the (cached) page load itself.
+/// The client (the `<Analytics/>` script) posts page views (on load, a
+/// heartbeat that slows with the page's age, and `pagehide`) plus click / scroll
+/// / error events. Every post of a page view carries its `page_view_id`, and
+/// compaction keeps the newest, so the final duration lands even when the server
+/// never sees the (cached) page load itself.
 pub(crate) fn analytics_handler() -> impl Bundle {
 	(
 		route::exchange("analytics", AnalyticsHandler),

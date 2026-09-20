@@ -8,6 +8,7 @@
 //! - [`AsyncCommands`] - Execute commands from async contexts
 //! - [`AsyncTask`] - A spawned task, cancelled on drop
 //! - [`AsyncRunner`] - Run apps asynchronously to completion
+//! - [`WakeRunnerPlugin`] - The headless runner, polling woken tasks between frames
 //!
 //! # Entity Utilities
 //!
@@ -44,6 +45,7 @@ mod async_task;
 // the app runner needs a sleep/yield + task pool, so it is std-only
 #[cfg(all(feature = "bevy_async", feature = "std"))]
 mod async_runner;
+// the headless runner parks a thread on the executors' wakers, so it is native
 mod bevyhow;
 #[cfg(feature = "bevy_keyboard")]
 mod common_systems;
@@ -55,6 +57,12 @@ pub mod hook_ext;
 mod non_send_plugin;
 mod required_field;
 mod subtree_trigger;
+#[cfg(all(
+	feature = "bevy_async",
+	feature = "std",
+	not(target_arch = "wasm32")
+))]
+mod wake_runner;
 
 pub use bevyhow::*;
 #[cfg(feature = "std")]
@@ -90,4 +98,10 @@ pub use perf_log::*;
 pub use pretty_tracing::*;
 pub use required_field::*;
 pub use subtree_trigger::*;
+#[cfg(all(
+	feature = "bevy_async",
+	feature = "std",
+	not(target_arch = "wasm32")
+))]
+pub use wake_runner::*;
 pub use when::*;

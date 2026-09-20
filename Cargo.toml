@@ -253,8 +253,9 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 # C library natively (default-features off drops the legacy formats and the
 # dictionary builder) and `ruzstd`, the pure-rust port of the same format, on
 # wasm: its encoder only reaches the fastest level, so the C library carries
-# the archive-grade levels where it can build.
-zstd = { version = "0.14", default-features = false }
+# the archive-grade levels where it can build. `zstdmt` lets the slow level
+# spread a large object over every core.
+zstd = { version = "0.14", default-features = false, features = ["zstdmt"] }
 ruzstd = { version = "0.9", default-features = false, features = ["std", "hash"] }
 # brotli, the encoding a static host serves a wasm artifact under, so `build-wasm`
 # reports the size the wire carries. Pure rust; default-features off drops the
