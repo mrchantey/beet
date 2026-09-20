@@ -67,6 +67,9 @@ json = ["serde", "dep:serde_json", "dep:flate2", "beet_core/json", "beet_action?
 # rows written as canonical json (hence `json`). Native only through the target
 # table below; every call runs on the `blocking` pool.
 sqlite = ["std", "json", "dep:rusqlite", "dep:blocking"]
+# The zstd `JsonlCodec`: `.jsonl.zst` beside the gzip default. Binds the C
+# library, so native only through the target table below.
+zstd = ["json", "dep:zstd"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`
 # reader (cross-platform, in-memory). Off by default; the analytics country field
@@ -252,6 +255,8 @@ async-tungstenite = { version = "0.35", optional = true, default-features = fals
 blocking = { workspace = true, optional = true }
 #💡 sqlite
 rusqlite = { workspace = true, optional = true }
+#💡 zstd
+zstd = { workspace = true, optional = true }
 async-native-tls = { version = "0.6", optional = true }
 # ureq uses ring instead of aws-lc-rs so we must too
 futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }

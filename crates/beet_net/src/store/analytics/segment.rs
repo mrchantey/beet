@@ -1,4 +1,4 @@
-//! Raw analytics segment objects: their keyspace and gzip NDJSON codec.
+//! Raw analytics segment objects: their keyspace and gzip JSONL codec.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -17,7 +17,7 @@ impl AnalyticsSegment {
 	/// Returns the path for one writer's batch.
 	///
 	/// Paths have the form
-	/// `analytics/raw/segments/2026-08-01/<writer>/<timestamp>-<sequence>.ndjson.gz`.
+	/// `analytics/raw/segments/2026-08-01/<writer>/<timestamp>-<sequence>.jsonl.gz`.
 	pub fn object_path(
 		date: &str,
 		writer: Uuid,
@@ -25,7 +25,7 @@ impl AnalyticsSegment {
 		sequence: u64,
 	) -> RelPath {
 		RelPath::new(format!(
-			"{}/{date}/{writer}/{timestamp}-{sequence}.ndjson.gz",
+			"{}/{date}/{writer}/{timestamp}-{sequence}.jsonl.gz",
 			Self::PREFIX
 		))
 	}
@@ -41,7 +41,7 @@ impl AnalyticsSegment {
 		let writer = parts.next()?;
 		let object = parts.next()?;
 		let (timestamp, sequence) =
-			object.strip_suffix(".ndjson.gz")?.split_once('-')?;
+			object.strip_suffix(".jsonl.gz")?.split_once('-')?;
 		(parts.next().is_none()
 			&& Timestamp::parse_date(date).is_some()
 			&& writer.parse::<Uuid>().is_ok()

@@ -35,7 +35,7 @@ this?" rather than one inferred from the process stage.
 
 ## Analytics, and what outlives it
 
-Raw events buffer into immutable gzip NDJSON segments under `analytics/raw/segments/` in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.ndjson.gz` archive, writes and verifies that archive plus deterministic daily rows under `analytics/rollup/` in that same bucket, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
+Raw events buffer into immutable gzip JSONL segments under `analytics/raw/segments/` in the `analytics` bucket. The nightly compaction job merges each complete day's segments with its existing `analytics/raw/<date>.jsonl.gz` archive, writes and verifies that archive plus deterministic daily rows under `analytics/rollup/` in that same bucket, then deletes the source segments. The archive is the compact primary raw history and is kept indefinitely; rollups are small and re-derivable from it.
 
 Two buckets rather than three: the rollup rows are a different dataset from the segments but not a different trust boundary or durability grade, so they ride a sibling prefix. The archive is genuinely separate — it is the sole copy, and it lives in the `archive` bucket whose whole identity is that nothing there expires.
 

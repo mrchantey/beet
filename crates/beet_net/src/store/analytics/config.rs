@@ -32,7 +32,7 @@ pub struct AnalyticsConfig {
 	pub store_ip: bool,
 	/// Maximum age of the oldest buffered event before its segment flushes.
 	pub segment_max_age: Duration,
-	/// Approximate uncompressed NDJSON bytes buffered before a segment flushes.
+	/// Approximate uncompressed JSONL bytes buffered before a segment flushes.
 	pub segment_max_bytes: usize,
 }
 

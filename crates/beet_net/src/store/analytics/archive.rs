@@ -1,18 +1,13 @@
-//! Daily analytics archives and the gzip NDJSON codec shared with segments.
+//! Daily analytics archives, gzip JSONL through the shared [`Jsonl`] codec.
 use crate::exports::bytes::Bytes;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use flate2::Compression;
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use std::io::Read;
-use std::io::Write;
 
 /// Represents one day's durable, compacted raw analytics events.
 ///
 /// Daily objects make retries deterministic: every compaction of a day replaces
 /// the same object after merging its prior archive with newly arrived segments.
-/// NDJSON keeps the format streamable even though today's small-volume reader
+/// JSONL keeps the format streamable even though today's small-volume reader
 /// decodes a whole day at once.
 pub struct AnalyticsArchive;
 
@@ -22,7 +17,7 @@ impl AnalyticsArchive {
 
 	/// Returns the object path for one UTC date.
 	pub fn object_path(date: &str) -> RelPath {
-		RelPath::new(format!("{}/{date}.ndjson.gz", Self::PREFIX))
+		RelPath::new(format!("{}/{date}.jsonl.gz", Self::PREFIX))
 	}
 
 	/// Returns the UTC date encoded in a daily archive path.
@@ -31,32 +26,21 @@ impl AnalyticsArchive {
 			.as_str()
 			.strip_prefix(Self::PREFIX)?
 			.strip_prefix('/')?
-			.strip_suffix(".ndjson.gz")?;
+			.strip_suffix(".jsonl.gz")?;
 		(!date.contains('/') && Timestamp::parse_date(date).is_some())
 			.then(|| date.into())
 	}
 
-	/// Encodes events as deterministic gzip NDJSON ordered by event ID.
+	/// Encodes events as deterministic gzip JSONL ordered by event ID.
 	pub fn encode(events: &[AnalyticsEvent]) -> Result<Bytes> {
 		let mut events = events.iter().collect::<Vec<_>>();
 		events.sort_by_key(|event| event.id);
-		let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-		for event in events {
-			encoder.write_all(&serde_json::to_vec(event)?)?;
-			encoder.write_all(b"\n")?;
-		}
-		Bytes::from(encoder.finish()?).xok()
+		Jsonl::encode(JsonlCodec::Gzip, events)
 	}
 
-	/// Decodes gzip NDJSON into analytics events.
+	/// Decodes gzip JSONL into analytics events.
 	pub fn decode(bytes: &[u8]) -> Result<Vec<AnalyticsEvent>> {
-		let mut ndjson = String::new();
-		GzDecoder::new(bytes).read_to_string(&mut ndjson)?;
-		ndjson
-			.lines()
-			.filter(|line| !line.trim().is_empty())
-			.map(|line| serde_json::from_str(line).map_err(Into::into))
-			.collect()
+		Jsonl::decode(JsonlCodec::Gzip, bytes)
 	}
 
 	/// Reads and validates a daily archive when it exists.
@@ -171,7 +155,7 @@ mod test {
 			);
 		AnalyticsArchive::object_path("2026-08-01")
 			.to_string()
-			.xpect_eq("analytics/raw/2026-08-01.ndjson.gz");
+			.xpect_eq("analytics/raw/2026-08-01.jsonl.gz");
 	}
 
 	/// The read-back is the point: segments are only deleted because this object

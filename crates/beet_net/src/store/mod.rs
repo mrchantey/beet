@@ -86,6 +86,9 @@ mod aws_cli;
 mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
+// canonical json rows under gzip or zstd, the codec named by the extension.
+#[cfg(feature = "json")]
+mod jsonl;
 // the http-served store: its listing endpoint answers json.
 #[cfg(all(feature = "std", feature = "json"))]
 mod http_store;
@@ -110,6 +113,8 @@ pub use document_blob::*;
 pub(crate) use document_store::*;
 #[cfg(all(feature = "std", feature = "json"))]
 pub use http_store::*;
+#[cfg(feature = "json")]
+pub use jsonl::*;
 #[cfg(all(feature = "template_serde", feature = "json"))]
 pub use scene_blob::*;
 #[cfg(feature = "std")]

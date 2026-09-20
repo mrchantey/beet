@@ -2,7 +2,7 @@
 //! connect, what pages they visit, and for how long.
 //!
 //! One [`AnalyticsEvent`] type (built on beet's [`Value`], not `serde_json`)
-//! spans every transport, buffered into gzip NDJSON [`AnalyticsSegment`] objects
+//! spans every transport, buffered into gzip JSONL [`AnalyticsSegment`] objects
 //! in a [`BlobStore`]. Its [`AnalyticsEventKind`]
 //! discriminates the [`AnalyticsEventData`] payload: a `Request` is the raw
 //! server traffic log, a `PageView` a viewed page with a dwell duration, and the
