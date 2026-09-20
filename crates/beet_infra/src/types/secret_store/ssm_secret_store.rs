@@ -7,7 +7,7 @@
 //! is five verbs: adding an SDK client for them would be more surface than
 //! the feature it buys. The provider is therefore native and `deploy`; the
 //! declaration registers on every target, since a lean binary's document
-//! still carries the tag and a local launch lands the document stand-in.
+//! still carries the tag.
 //!
 //! Nothing here logs a value. A `SecureString` that reaches a terminal is a
 //! `SecureString` that reaches a scrollback buffer, a CI log and whatever
@@ -17,60 +17,44 @@
 use crate::actions::aws_cli_ext;
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_net::prelude::*;
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 use serde_json::Value;
 
 /// Declares that the stack's secrets live in AWS parameter store, in the
 /// stack's region: `<SsmSecrets/>` under a `<Stack>`, and the declaration a
-/// stack with none is taken to carry. As with a declared bucket, the
-/// declaration is the deploy meaning and the launch decides the runtime
-/// one ([`runtime_store`](Self::runtime_store)): a `Remote` launch attaches
-/// parameter store, a `Local` one the document stand-in under
-/// `target/secrets`, so a stack runs both ways without knowing there are
-/// two.
+/// stack with none is taken to carry. Absolute, whatever the launch: every
+/// stack verb reaches the cloud (an apply, a provision) and addresses the
+/// declaration's meaning, exactly as a sync addresses a bucket's
+/// `store_uri` and never its runtime stand-in, so a deploy can never mint a
+/// stage's secrets somewhere its box does not read. A stand-in for a run
+/// with no account is an explicit `<DocumentSecrets path="target/.."/>`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct SsmSecrets;
 
 impl SsmSecrets {
-	/// The store a launch under `access` attaches for this declaration, the
-	/// ONE place the local/remote choice is made for secrets: parameter store
-	/// in `stack`'s region when `Remote` (native and `deploy`, since the
-	/// provider drives the `aws` cli), the document at
-	/// `target/secrets/<app>--<stage>.toml` when `Local`, its `default`
-	/// group seeded from `seed`.
-	pub fn runtime_store(
-		access: ServiceAccess,
-		stack: ResolvedStack,
-		seed: Option<SecretsHandle>,
-	) -> Result<SecretStore> {
-		match access {
-			ServiceAccess::Local => DocumentSecretStore::local(stack)?
-				.with_seed(seed)
-				.xmap(SecretStore::new)
-				.xok(),
-			ServiceAccess::Remote => {
-				cfg_if! {
-					if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
-						SecretStore::new(SsmSecretStore::new(stack)).xok()
-					} else {
-						bevybail!(
-							"stack `{}--{}` keeps its secrets in parameter store and this \
-							build has no provider for it (the `deploy` feature, native): \
-							declare `<DocumentSecrets path=\"..\"/>` under the stack",
-							stack.app_name(),
-							stack.stage()
-						)
-					}
-				}
+	/// The store this declaration means for `stack`: parameter store in its
+	/// region (native and `deploy`, since the provider drives the `aws`
+	/// cli), an error naming the feature otherwise.
+	pub fn store(stack: ResolvedStack) -> Result<SecretStore> {
+		cfg_if! {
+			if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+				SecretStore::new(SsmSecretStore::new(stack)).xok()
+			} else {
+				bevybail!(
+					"stack `{}--{}` keeps its secrets in parameter store and this \
+					build has no provider for it (the `deploy` feature, native): \
+					declare `<DocumentSecrets path=\"..\"/>` under the stack",
+					stack.app_name(),
+					stack.stage()
+				)
 			}
 		}
 	}
 }
 
 /// Observer: land the [`SecretStore`] an `<SsmSecrets/>` declares on its
-/// entity, [`SsmSecrets::runtime_store`] for the stack it is declared under.
+/// entity, [`SsmSecrets::store`] for the stack it is declared under.
 /// Deferred through the command queue because the stack is an ancestor,
 /// which lands after insertion.
 pub(crate) fn attach_ssm_secrets(
@@ -86,20 +70,10 @@ pub(crate) fn attach_ssm_secrets(
 					resource, which `BootstrapPlugin` inserts"
 				);
 			}
-			let (stack, seed) = entity
-				.with_state::<(StackQuery, SecretsQuery), _>(
-					|entity, (stacks, documents)| {
-						(
-							stacks.resolve(entity),
-							documents.resolve_default(entity).ok(),
-						)
-					},
-				);
-			entity.insert(SsmSecrets::runtime_store(
-				BootstrapConfig::get().service_access,
-				stack,
-				seed,
-			)?);
+			let stack = entity.with_state::<StackQuery, _>(|entity, stacks| {
+				stacks.resolve(entity)
+			});
+			entity.insert(SsmSecrets::store(stack)?);
 			Ok(())
 		});
 }
@@ -111,7 +85,7 @@ pub(crate) fn attach_ssm_secrets(
 /// ([`SecretRef::description`]), encrypted under the account's `aws/ssm`
 /// key, which authorises account principals through its own key policy so a
 /// reader needs no `kms:` grant. What `<SsmSecrets/>` (declared or implicit)
-/// attaches on a [`Remote`](ServiceAccess::Remote) launch.
+/// attaches.
 ///
 /// A stack's secrets nest under one prefix ([`SecretRef::prefix`]), which is
 /// what an instance role grants in one statement and what

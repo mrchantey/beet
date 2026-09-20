@@ -65,19 +65,26 @@ impl SecretsQuery<'_, '_> {
 		}
 	}
 
-	/// The default document: the one declared, an error naming the labels
-	/// when several are, or the undeclared conventional file in `caller`'s
-	/// entry store when none is.
+	/// The entry's own document, where its humans are listed and what every
+	/// verb takes with no `--document`: the declaration labelled
+	/// [`Secrets::DEFAULT_LABEL`], else the sole declared one, an error
+	/// naming the labels when several are declared and none is `secrets`,
+	/// or the undeclared conventional file in `caller`'s entry store when
+	/// none is. An export copies its recipients from here.
 	pub fn resolve_default(&self, caller: Entity) -> Result<SecretsHandle> {
+		if let Ok(entry) = self.resolve_label(Secrets::DEFAULT_LABEL) {
+			return Ok(entry);
+		}
 		let mut declared = self.declared.iter();
 		match (declared.next(), declared.next()) {
 			(Some((entity, secrets, store_ref)), None) => {
 				self.handle(entity, secrets, store_ref)
 			}
 			(Some(_), Some(_)) => bevybail!(
-				"several documents are declared ({}): name one with \
-				`--document=<label>`",
-				self.labels()
+				"several documents are declared ({}) and none is `{}`: name \
+				one with `--document=<label>`",
+				self.labels(),
+				Secrets::DEFAULT_LABEL
 			),
 			(None, _) => SecretsHandle::new(
 				self.entry_store(caller)?,
@@ -86,15 +93,6 @@ impl SecretsQuery<'_, '_> {
 			.with_label(Secrets::DEFAULT_LABEL)
 			.xok(),
 		}
-	}
-
-	/// The entry's own document, where its humans are listed: the
-	/// declaration labelled [`Secrets::DEFAULT_LABEL`], else the default
-	/// ([`resolve_default`](Self::resolve_default)). An export copies its
-	/// recipients from here.
-	pub fn resolve_entry(&self, caller: Entity) -> Result<SecretsHandle> {
-		self.resolve_label(Secrets::DEFAULT_LABEL)
-			.or_else(|_| self.resolve_default(caller))
 	}
 
 	/// The declared document labelled `label`, an error naming the declared
@@ -168,9 +166,7 @@ impl SecretsQuery<'_, '_> {
 			}
 			None => self.entry_store(entity)?,
 		};
-		SecretsHandle::new(store, secrets.path.as_str())?
-			.with_label(secrets.label.clone())
-			.xok()
+		SecretsHandle::in_store(store, secrets)
 	}
 
 	/// The store a relative document path resolves in: the nearest ancestor
@@ -205,15 +201,6 @@ impl SecretsHandle {
 			.await?
 	}
 
-	/// The entry's own document, see [`SecretsQuery::resolve_entry`].
-	pub async fn resolve_entry(caller: &AsyncEntity) -> Result<Self> {
-		caller
-			.with_state::<SecretsQuery, _>(|entity, query| {
-				query.resolve_entry(entity)
-			})
-			.await?
-	}
-
 	/// Every declared document, see [`SecretsQuery::declared`].
 	pub async fn declared(
 		caller: &AsyncEntity,
@@ -240,8 +227,30 @@ impl SecretsHandle {
 		let secrets = entity.get::<Secrets, _>(Clone::clone).await?;
 		let store =
 			StoreRef::resolve::<BlobStore>(entity.world(), target).await?;
-		Self::new(store, secrets.path.as_str())?
-			.with_label(secrets.label)
+		Self::in_store(store, &secrets)
+	}
+
+	/// The handle a declaration means in `store`: the path within it, or
+	/// one climbing above it with a leading `..`, re-rooted through
+	/// [`BlobStore::rebase_repo`] (a filesystem store re-roots, a bucket
+	/// refuses).
+	pub fn in_store(store: BlobStore, secrets: &Secrets) -> Result<Self> {
+		let path = &secrets.path;
+		let (store, path) = match path.first_segment() == Some("..") {
+			// re-root at the file's directory; the file is then at its root
+			true => {
+				let dir = path.parent().unwrap_or_default();
+				let file = path.file_name().unwrap_or_default();
+				let (store, _) =
+					store.rebase_repo(file, dir.as_str()).map_err(|err| {
+						bevyhow!("document `{}`: {err}", secrets.label)
+					})?;
+				(store, file.to_string())
+			}
+			false => (store, path.to_string()),
+		};
+		Self::new(store, path)?
+			.with_label(secrets.label.clone())
 			.xok()
 	}
 }
@@ -279,7 +288,7 @@ mod test {
 			mail.label.clone().unwrap().as_str().xpect_eq("mail-prod");
 			mail.describe()
 				.xpect_eq("`mail-prod` (infra/secrets/mail.toml)");
-			// several declared: the default needs a label
+			// several declared and none `secrets`: the default needs a label
 			query
 				.resolve(root, None)
 				.unwrap_err()
@@ -299,6 +308,56 @@ mod test {
 				.xpect_contains("BlobStore");
 			query.declared().len().xpect_eq(2);
 		});
+	}
+
+	/// Among several declarations the one labelled `secrets` is the entry's
+	/// own, and the default: the humans are listed there.
+	#[beet_core::test]
+	fn the_secrets_label_is_the_default_among_several() {
+		let (mut world, root) = world_with_documents();
+		world.spawn((Secrets::default(), ChildOf(root)));
+		world.flush();
+		world.with_state::<SecretsQuery, _>(|query| {
+			query
+				.resolve(root, None)
+				.unwrap()
+				.describe()
+				.xpect_eq("`secrets` (secrets.toml)");
+		});
+	}
+
+	/// A declared path climbs above a filesystem store with `..` (an entry in
+	/// a subdirectory naming the repo's document) and a bucket refuses it.
+	#[cfg(not(target_arch = "wasm32"))]
+	#[beet_core::test]
+	fn a_path_may_climb_above_a_filesystem_store() {
+		let root =
+			AbsPath::new_workspace_rel("target/tests/beet_net/secrets-climb")
+				.unwrap();
+		fs_ext::create_dir_all(root.join("site")).unwrap();
+		fs_ext::write(root.join("secrets.toml"), "").unwrap();
+		let above = Secrets::new("../secrets.toml").with_label("repo");
+		let handle = SecretsHandle::in_store(
+			BlobStore::new(FsStore::new(root.join("site"))),
+			&above,
+		)
+		.unwrap();
+		handle.path.as_str().xpect_eq("secrets.toml");
+		handle.describe().xpect_eq("`repo` (secrets.toml)");
+		handle.store.base_dir().unwrap().xpect_eq(root);
+		SecretsHandle::in_store(BlobStore::temp(), &above)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("above the store");
+		// a plain path is the same document as before
+		SecretsHandle::in_store(
+			BlobStore::temp(),
+			&Secrets::new("infra/x.toml"),
+		)
+		.unwrap()
+		.path
+		.as_str()
+		.xpect_eq("infra/x.toml");
 	}
 
 	#[beet_core::test]

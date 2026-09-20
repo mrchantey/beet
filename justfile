@@ -8,6 +8,9 @@
 # ```
 #
 set dotenv-load := true
+# `"$@"` in `beet` hands each argument through as typed; `{{args}}` would
+# paste them back into the shell line unquoted, splitting a quoted `--note`.
+set positional-arguments
 
 # fresh compile of beet is so big it keeps asking for bigger stacks.. this is 1GB 😭
 
@@ -58,7 +61,7 @@ init-repo:
 # Headless verification: prefix BEET_SCREENSHOT=/tmp/x.png BEET_SCREENSHOT_FRAME=N to
 # capture a frame to a PNG and exit (see `crates/beet-cli/src/render.rs`).
 beet *args:
-  cargo run -p beet-cli -- {{ args }}
+  cargo run -p beet-cli -- "$@"
 
 # Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
 # (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so

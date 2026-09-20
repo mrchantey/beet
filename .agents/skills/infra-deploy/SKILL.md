@@ -63,7 +63,7 @@ Do NOT read a single `curl: (22) The requested URL returned error: 500` in that 
 
 ## Commands
 
-Creds load from `.env` (AWS, `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ZONE_ID`, `BEET_SSH_HOST_KEY`). Always use the `beet-*` recipes: they build with `--features infra,extra` (without which the deploy routes load as inert tags and the verb does nothing) and clear `AWS_PROFILE`.
+The credentials (the AWS pair, `CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) load from the repo's `secrets.toml` as the entry's `<Secrets/>` builds, which needs this machine's age identity (`beet secrets/check` says whether it opens); `.env` holds only the flags (`AWS_REGION`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`). Always use the `beet-*` recipes: they build with `--features infra,extra` (without which the deploy routes load as inert tags and the verb does nothing) and clear `AWS_PROFILE`.
 
 | intent | command |
 | --- | --- |

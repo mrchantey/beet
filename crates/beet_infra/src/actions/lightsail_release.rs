@@ -104,7 +104,7 @@ async fn resolve_box(
 ) -> Result<(terra::Project, LightsailBlock, bool)> {
 	cx.caller
 		.with_world(move |world, entity| -> Result<_> {
-			let project = RenderScope::render(world, entity)?.project()?;
+			let project = terra::Project::resolve_in(world, entity)?;
 			let (block, serves_repo) =
 				world.with_state::<ReleaseQuery, _>(|query| {
 					query.resolve(entity, tag)

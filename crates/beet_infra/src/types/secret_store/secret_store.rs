@@ -134,11 +134,19 @@ impl SecretStore {
 			.await
 	}
 
+	/// The stored metadata of one secret, `None` when it does not exist.
+	pub async fn meta(&self, secret: &SecretRef) -> Result<Option<SecretMeta>> {
+		self.provider.meta(secret.clone()).await
+	}
+
 	/// Create-if-missing: the existing value, else `generate` created and
 	/// its value, else (the loser of a race) the winner's value re-read.
 	/// Answers the value and whether this call minted it. The one shape
 	/// every generated credential in a stack takes, so no consumer can
-	/// rotate one by accident.
+	/// rotate one by accident. An existing value whose stored note or
+	/// rotation differs from the declared is rewritten unchanged with the
+	/// declared metadata, since the mint site is where both are declared
+	/// and the store only mirrors them.
 	pub async fn ensure(
 		&self,
 		secret: &SecretRef,
@@ -148,6 +156,15 @@ impl SecretStore {
 	) -> Result<(String, bool)> {
 		let address = self.address(secret);
 		if let Some(value) = self.get(secret).await? {
+			let declared = SecretMeta {
+				note: note.map(SmolStr::new),
+				rotation: Some(rotation),
+			};
+			if self.meta(secret).await?.as_ref() != Some(&declared) {
+				self.overwrite(secret, &value, note, declared.rotation)
+					.await?;
+				info!("converged the metadata of secret {address}");
+			}
 			return (value, false).xok();
 		}
 		let generated = generate().await?;
@@ -240,6 +257,26 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 
 	/// See [`SecretStore::list`].
 	fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>>;
+
+	/// See [`SecretStore::meta`]: found in the listing, which a provider
+	/// with a cheaper single read overrides.
+	fn meta(
+		&self,
+		secret: SecretRef,
+	) -> SendBoxedFuture<Result<Option<SecretMeta>>> {
+		let this = self.box_clone();
+		Box::pin(async move {
+			this.list()
+				.await?
+				.into_iter()
+				.find(|entry| entry.secret.label() == secret.label())
+				.map(|entry| SecretMeta {
+					note: entry.note,
+					rotation: entry.rotation,
+				})
+				.xok()
+		})
+	}
 
 	/// See [`SecretStore::read_all`]: a listing then a read per entry, which
 	/// a provider with a bulk read overrides.
@@ -351,47 +388,25 @@ mod test {
 	}
 
 	/// With nothing declared the stack carries an implicit `<SsmSecrets/>`,
-	/// and the launch decides: local is the stand-in document under
-	/// `target/secrets`, remote is parameter store in the stack's region.
+	/// parameter store in the stack's region whatever the launch, and a
+	/// declared one is the same store.
+	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 	#[beet_core::test]
-	fn an_undeclared_stack_is_ssm_by_launch() {
+	fn an_undeclared_stack_is_ssm() {
 		let mut world = infra_world();
 		let root = stack_with(&mut world, ());
-		let stack = world.with_state::<StackQuery, _>(|stacks| {
-			// the test launch is local
-			stacks.secret_store(root).unwrap().id().xpect_eq("document");
-			stacks.resolve(root)
+		world.with_state::<StackQuery, _>(|stacks| {
+			let stack = stacks.resolve(root);
+			let store = stacks.secret_store(root).unwrap();
+			store.id().xpect_eq("ssm");
+			store.region().unwrap().xpect_eq(stack.region().clone());
+			store.stack().clone().xpect_eq(stack);
 		});
-		let local = SsmSecrets::runtime_store(
-			ServiceAccess::Local,
-			stack.clone(),
-			None,
-		)
-		.unwrap();
-		local.id().xpect_eq("document");
-		local.describe().xpect_contains("app--prod.toml");
-		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		{
-			let remote = SsmSecrets::runtime_store(
-				ServiceAccess::Remote,
-				stack.clone(),
-				None,
-			)
-			.unwrap();
-			remote.id().xpect_eq("ssm");
-			remote.region().unwrap().xpect_eq(stack.region().clone());
-			remote.stack().clone().xpect_eq(stack);
-		}
-		// a declared `<SsmSecrets/>` on this local launch is the stand-in too
 		// (one repo store per world, so a second world)
 		let mut world = infra_world();
 		let declared = stack_with(&mut world, SsmSecrets);
 		world.with_state::<StackQuery, _>(|stacks| {
-			stacks
-				.secret_store(declared)
-				.unwrap()
-				.id()
-				.xpect_eq("document");
+			stacks.secret_store(declared).unwrap().id().xpect_eq("ssm");
 		});
 	}
 

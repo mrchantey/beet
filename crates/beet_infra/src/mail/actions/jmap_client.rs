@@ -77,6 +77,10 @@ impl JmapClient {
 		})
 	}
 
+	/// Where the server is, so a second session (another account's, to prove
+	/// a credential) dials the same endpoint, tunnel or open.
+	pub fn origin(&self) -> &str { &self.origin }
+
 	/// The account whose mail this session reads.
 	pub fn mail_account(&self) -> Result<&str> {
 		self.mail_account.as_deref().ok_or_else(|| {

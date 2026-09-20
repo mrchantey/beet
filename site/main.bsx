@@ -182,10 +182,13 @@ run from the `atproto` build too, so the handle records count as declared.
     just site-shared pull                  # hydrate site/assets from it (no credentials)
     just site-shared push                  # publish site/assets to it
 
-Live deploy needs AWS credentials + `BEET_SSH_HOST_KEY`/`CLOUDFLARE_ZONE_ID`/
-`CLOUDFLARE_API_TOKEN` in `.env`, plus `tofu` and `cargo-zigbuild`. The social
-stack and the audit need only the Cloudflare pair (plus AWS for the social
-stack's state bucket).
+Live deploy needs the deployer's credentials (the AWS pair,
+`CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) from the repo's `secrets.toml`,
+which the `<Secrets/>` in the deployer fragment loads (`beet secrets/check`
+says whether this machine's identity opens it), `CLOUDFLARE_ZONE_ID` in
+`.env`, plus `tofu` and `cargo-zigbuild`. The social stack and the audit need
+only the Cloudflare token and zone (plus AWS for the social stack's state
+bucket).
 -->
 <CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
@@ -296,6 +299,9 @@ stack's state bucket).
 		<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 		<!-- everything from here down is the deployer, absent from the lean binary -->
 		<Fragment bx:cfg="feature:infra && feature:extra">
+		<!-- the deployer's credentials: the repo's one document, above this
+		     entry's own directory -->
+		<Secrets path="../secrets.toml"/>
 		<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip"/>
 		<!-- the box is replaceable, so it owns no durable timer: the rollup runs

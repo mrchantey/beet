@@ -59,14 +59,16 @@ pub async fn TofuApply(
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
 			// each declared artifact, paired with the label its block declared,
-			// and the client publishing them into the stack's repo store
-			let (artifacts, client) =
+			// the client publishing them into the stack's repo store, and the
+			// secret store a content variable resolves through
+			let (artifacts, client, secrets) =
 				world.with_state::<(
 					StackQuery,
 					Query<(&ErasedBlock, &BuildArtifact)>,
 					RepoStoreQuery,
 				), _>(|(stacks, artifacts, repos)| -> Result<_> {
 					let declared = stacks.declared(entity)?;
+					let secrets = stacks.secret_store(entity)?;
 					let built = declared
 						.iter()
 						.filter_map(|child| artifacts.get(*child).ok())
@@ -84,7 +86,7 @@ pub async fn TofuApply(
 						true => repos.find_artifacts_client(entity)?,
 						false => Some(repos.artifacts_client(entity)?),
 					};
-					(built, client).xok()
+					(built, client, secrets).xok()
 				})?;
 			let (stack, deployment, config) = scope.finish()?;
 			// with the declared variables, so the apply resolves the content
@@ -94,7 +96,8 @@ pub async fn TofuApply(
 				deployment,
 				config,
 				variables.clone(),
-			);
+			)
+			.with_secret_store(secrets);
 			(project, artifacts, client, variables).xok()
 		})
 		.await??;

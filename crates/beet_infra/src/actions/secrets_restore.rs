@@ -324,6 +324,6 @@ mod tests {
 		.await
 		.unwrap_err()
 		.to_string()
-		.xpect_contains("cannot be read");
+		.xpect_contains("not written yet");
 	}
 }

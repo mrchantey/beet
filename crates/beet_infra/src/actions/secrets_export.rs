@@ -110,7 +110,7 @@ impl SecretsExport {
 		caller: &AsyncEntity,
 		group: &str,
 	) -> Result<Vec<AgeRecipient>> {
-		if let Ok(entry) = SecretsHandle::resolve_entry(caller).await
+		if let Ok(entry) = SecretsHandle::resolve(caller, None).await
 			&& entry.exists().await?
 		{
 			match entry.read().await?.groups.get(group) {
@@ -217,9 +217,9 @@ pub(crate) async fn secret_store(caller: &AsyncEntity) -> Result<SecretStore> {
 
 /// The document `declaration` names, in the store it is written through.
 ///
-/// A declaration targeting an [`R2BucketBlock`] (`{StoreRef($cold)}`) on a
-/// `Remote` launch is reached under the pair the apply parked rather than
-/// the process's own credentials, which are the other vendor's: the runtime
+/// A declaration targeting an [`R2BucketBlock`] (`{StoreRef($cold)}`) is
+/// reached under the pair the apply parked rather than the process's own
+/// credentials, which are the other vendor's: the runtime
 /// attach lands a store under the ambient credentials at declaration time,
 /// synchronously and on every target, while the pair is an async read of the
 /// secret store on the deploy machine alone, so the credentialed store is
@@ -238,14 +238,13 @@ pub(crate) async fn export_target(
 	let entity = caller.world().entity(declaration);
 	let handle = SecretsHandle::of_declaration(&entity).await?;
 	#[cfg(all(feature = "cloudflare_dns", feature = "aws_sdk"))]
-	if BootstrapConfig::get().service_access == ServiceAccess::Remote
-		&& let Some(block) = entity
-			.world()
-			.with(move |world: &mut World| -> Option<R2BucketBlock> {
-				let target = world.get::<StoreRef>(declaration)?.store();
-				world.get::<R2BucketBlock>(target).cloned()
-			})
-			.await
+	if let Some(block) = entity
+		.world()
+		.with(move |world: &mut World| -> Option<R2BucketBlock> {
+			let target = world.get::<StoreRef>(declaration)?.store();
+			world.get::<R2BucketBlock>(target).cloned()
+		})
+		.await
 	{
 		let cold = block.parked_store(store).await?;
 		return SecretsHandle::new(cold, handle.path.as_str())?

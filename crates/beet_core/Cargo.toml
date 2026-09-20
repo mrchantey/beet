@@ -117,7 +117,9 @@ embedded = ["bevy/libm", "bevy/critical-section"]
 ctrlc = ["dep:ctrlc"]
 tokio = ["dep:tokio"]
 nightly = []
-testing = ["std", "dep:inventory"]
+# `vault` so the runner loads the `secrets.<format>` beside the `.env` it
+# found, in every crate's tests, the way it loads `.env` (`TestPlugin`).
+testing = ["std", "dep:inventory", "vault"]
 # no_std test runner for bare-metal targets (eg the esp32 firmware). Same
 # `#[beet_core::test]` + matchers + `TestPlugin` as `testing`, but registers
 # cases through a `linkme` distributed slice (inventory's ctors are dead on

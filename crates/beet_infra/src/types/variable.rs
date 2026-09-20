@@ -80,13 +80,15 @@ impl VariableSource {
 	pub fn resolve_static(&self, key: &str) -> Result<SmolStr> {
 		match self {
 			Self::Fixed(value) => Ok(value.clone()),
-			Self::ProcessEnv => env_ext::var(key).map(SmolStr::new).or_else(|_| {
-				warn!(
-					"`{key}` is unset in the process environment, rendering it \
+			Self::ProcessEnv => {
+				env_ext::var(key).map(SmolStr::new).or_else(|_| {
+					warn!(
+						"`{key}` is unset in the process environment, rendering it \
 					empty"
-				);
-				Ok(SmolStr::default())
-			}),
+					);
+					Ok(SmolStr::default())
+				})
+			}
 			Self::Header | Self::Param | Self::Secret { .. } => bevybail!(
 				"`{key}` reads {self:?}, which cannot be resolved at render \
 				without a request"

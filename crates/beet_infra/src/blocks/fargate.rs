@@ -178,7 +178,8 @@ impl FargateBlock {
 		mut self,
 		key: impl Into<SmolStr>,
 	) -> Self {
-		self.secret_env.push((key.into(), VariableSource::ProcessEnv));
+		self.secret_env
+			.push((key.into(), VariableSource::ProcessEnv));
 		self
 	}
 

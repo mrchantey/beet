@@ -687,7 +687,7 @@ async fn apply_plan(
 				.await?;
 		converge_dkim(client, domain, &domain_id, mail).await?;
 		for account in &domain.accounts {
-			converge_account(client, account, &domain_id, mail).await?;
+			converge_account(client, account, domain, &domain_id, mail).await?;
 		}
 		// after the accounts, since it names one of them
 		if let Some(patch) = domain.catch_all_patch() {
@@ -953,6 +953,7 @@ async fn converge_dkim(
 async fn converge_account(
 	client: &JmapClient,
 	account: &AccountPlan,
+	domain: &DomainPlan,
 	domain_id: &str,
 	mail: &MailStack,
 ) -> Result<String> {
@@ -1008,6 +1009,20 @@ async fn converge_account(
 						.map(|(key, value)| (key.clone(), value.clone())),
 				);
 			client.update("x:Account", &id, &patch).await?;
+			// claimed only once the account answers to the new credential, so
+			// a `revoke` that relies on this never reports a rotation the
+			// server did not take
+			let address = account.address(&domain.name);
+			JmapClient::connect(client.origin(), &address, &password)
+				.await
+				.map_err(|err| {
+					bevyhow!(
+						"the {address} credential was re-minted and patched \
+						onto the account, but the account does not \
+						authenticate with it: {err}"
+					)
+				})?
+				.mail_account()?;
 			info!("rotated the {} mailbox credential", account.name);
 			Ok(id)
 		}

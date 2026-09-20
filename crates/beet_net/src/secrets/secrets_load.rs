@@ -56,7 +56,8 @@ async fn load(entity: &AsyncEntity) -> Result {
 	if !handle.exists().await? {
 		// every entry's state before its first `set`; `check` names it
 		debug!(
-			"document {} is not written yet: `beet secrets/set <NAME>` writes it",
+			"document {} is not written yet: `secrets/set` writes a document, \
+			`<SecretsExport>` an export",
 			handle.describe()
 		);
 		return OK;

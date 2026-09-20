@@ -145,10 +145,6 @@ pub struct StackQuery<'w, 's> {
 	/// [`secret_store`](Self::secret_store).
 	#[cfg(feature = "vault")]
 	secret_stores: Query<'w, 's, &'static SecretStore>,
-	/// The entry's declared secrets document, which seeds the local
-	/// stand-in's recipients.
-	#[cfg(feature = "vault")]
-	documents: SecretsQuery<'w, 's>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -223,9 +219,8 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// The [`SecretStore`] `entity`'s stack keeps its secrets in, scoped to
 	/// that stack: the one declared on or under its `<Stack>`
 	/// (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`), else the implicit
-	/// `<SsmSecrets/>` every stack carries, which the launch resolves
-	/// ([`SsmSecrets::runtime_store`]). Two declarations under one stack is
-	/// an error naming both, never a guess.
+	/// `<SsmSecrets/>` every stack carries ([`SsmSecrets::store`]). Two
+	/// declarations under one stack is an error naming both, never a guess.
 	#[cfg(feature = "vault")]
 	pub fn secret_store(&self, entity: Entity) -> Result<SecretStore> {
 		let root = self
@@ -248,11 +243,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 				first.describe(),
 				second.describe()
 			),
-			(None, _) => SsmSecrets::runtime_store(
-				BootstrapConfig::get().service_access,
-				stack,
-				self.documents.resolve_default(entity).ok(),
-			),
+			(None, _) => SsmSecrets::store(stack),
 		}
 	}
 }

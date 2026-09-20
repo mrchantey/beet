@@ -206,8 +206,7 @@ impl Plugin for InfraPlugin {
 
 		// the secrets document surface (`<Secrets/>`, the verbs), the secret
 		// store declarations (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`)
-		// and their attaches, on every target the seam compiles: the launch
-		// decides what an `<SsmSecrets/>` lands (`SsmSecrets::runtime_store`).
+		// and their attaches, on every target the seam compiles.
 		#[cfg(feature = "vault")]
 		app.init_plugin::<beet_net::prelude::SecretsPlugin>()
 			.register_type::<crate::prelude::SsmSecrets>()

@@ -51,6 +51,11 @@ pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
 		}
 	};
 	let selector = cx.input.parse_params::<DocumentParams>()?.document;
+	// the entry's own store, to tell a document declared in another one
+	let entry_store = SecretsHandle::resolve(&cx.caller, None)
+		.await
+		.ok()
+		.map(|handle| handle.store.root_key());
 	let mut handles = match &selector {
 		Some(_) => Vec::new(),
 		None => SecretsHandle::declared(&cx.caller).await?,
@@ -75,7 +80,14 @@ pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	for (label, handle) in handles {
 		match handle {
-			Ok(handle) => report.document(&handle, identities.as_ref()).await?,
+			Ok(handle) => {
+				let elsewhere = entry_store
+					.as_ref()
+					.is_some_and(|entry| *entry != handle.store.root_key());
+				report
+					.document(&handle, identities.as_ref(), elsewhere)
+					.await?
+			}
 			Err(err) => report.fail(format!("document `{label}`: {err}")),
 		}
 	}
@@ -104,11 +116,16 @@ impl Report {
 	}
 
 	/// The lines for one document: whether it exists and reads, and every
-	/// group's state for this identity.
+	/// group's state for this identity. One declared in another store than
+	/// the entry's (`elsewhere`, ie an export target in a bucket) and not
+	/// found there is a note rather than a failure: this launch reaches
+	/// that store under its own credentials, while the verb that writes it
+	/// resolves the bucket's parked ones (`cold-probe` reads it back).
 	async fn document(
 		&mut self,
 		handle: &SecretsHandle,
 		identities: Option<&AgeIdentityFile>,
+		elsewhere: bool,
 	) -> Result<()> {
 		let name = handle.describe();
 		// a dated series stands in for its unwritten declared path
@@ -124,10 +141,20 @@ impl Report {
 				));
 				newest
 			}
+			None if !handle.exists().await? && elsewhere => {
+				return self
+					.note(format!(
+						"document {name}: not found in its store as this launch \
+						reaches it; the verb that reads it back verifies it \
+						(`cold-probe` for a cold bucket's export)"
+					))
+					.xok();
+			}
 			None if !handle.exists().await? => {
 				return self
 					.fail(format!(
-						"document {name}: not written yet (`secrets/set` writes it)"
+						"document {name}: not written yet (`secrets/set` writes a \
+						document, `<SecretsExport>` an export)"
 					))
 					.xok();
 			}

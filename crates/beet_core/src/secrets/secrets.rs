@@ -8,7 +8,10 @@ use std::path::PathBuf;
 /// A secrets document an entry declares, `<Secrets path="secrets.toml"/>`:
 /// the file at `path` in the nearest ancestor store (the repo store, or a
 /// `StoreRef` target's beside it), named by `label` on every document verb's
-/// `--document`. When the entity is ready its document is read, every group
+/// `--document`. A `path` may climb above the store with `..`
+/// (`<Secrets path="../secrets.toml"/>` from an entry in a subdirectory of
+/// the repo, whose document is the repo's), which a filesystem store
+/// re-roots for and a bucket refuses, exactly as `<RepoRoot>` does. When the entity is ready its document is read, every group
 /// the discovered identity opens is verified, its `EnvVar` records land in
 /// the process environment (existing wins) and the opened document is
 /// inserted as [`OpenSecrets`] on the same entity. A document with no
@@ -28,15 +31,16 @@ use std::path::PathBuf;
 pub struct Secrets {
 	/// How a verb names this document, `secrets` by default.
 	pub label: SmolStr,
-	/// The file within its store, its format named by its extension.
-	pub path: RelPath,
+	/// The file within its store, its format named by its extension; a
+	/// leading `..` climbs above the store.
+	pub path: SmolPath,
 }
 
 impl Default for Secrets {
 	fn default() -> Self {
 		Self {
 			label: Self::DEFAULT_LABEL.into(),
-			path: RelPath::new(SecretsDocument::DEFAULT_PATH),
+			path: SmolPath::new(SecretsDocument::DEFAULT_PATH),
 		}
 	}
 }
@@ -48,7 +52,7 @@ impl Secrets {
 	/// The document at `path`, labelled by default.
 	pub fn new(path: impl AsRef<str>) -> Self {
 		Self {
-			path: RelPath::new(path),
+			path: SmolPath::new(path),
 			..default()
 		}
 	}

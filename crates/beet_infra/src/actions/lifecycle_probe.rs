@@ -23,7 +23,7 @@ pub async fn LifecycleProbe(
 	let (project, store) = cx
 		.caller
 		.with_world(|world, entity| -> Result<_> {
-			let project = RenderScope::render(world, entity)?.project()?;
+			let project = terra::Project::resolve_in(world, entity)?;
 			let store = world.with_state::<StackQuery, _>(|query| {
 				query.store(entity).cloned()
 			})?;

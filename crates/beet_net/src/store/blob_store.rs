@@ -498,10 +498,14 @@ pub mod store_test {
 		let file = RelPath::from("dir/file.txt");
 		store.insert(&leaf, body.clone()).await.unwrap();
 		store.insert(&file, body.clone()).await.unwrap();
-		store.list_dir(&RelPath::default()).await.unwrap().xpect_eq(BlobDir {
-			dirs: vec!["dir".into()],
-			files: vec!["test_path".into()],
-		});
+		store
+			.list_dir(&RelPath::default())
+			.await
+			.unwrap()
+			.xpect_eq(BlobDir {
+				dirs: vec!["dir".into()],
+				files: vec!["test_path".into()],
+			});
 		store
 			.list_dir(&RelPath::from("dir"))
 			.await

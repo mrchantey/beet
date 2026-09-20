@@ -35,10 +35,9 @@ impl DocumentSecrets {
 
 /// A [`SecretStore`] over one secrets document: every secret a record in
 /// the document's `default` group with its `note` and `modified`, the label
-/// its record name. The local stand-in for parameter store (a `Local` launch
-/// resolves one over `target/secrets/<app>--<stage>.toml`, decision: the
-/// same naming as `target/stores/<app>--<stage>--<label>`) and the
-/// human-side store a `<DocumentSecrets path=".."/>` declares in the repo.
+/// its record name. The human-side store a `<DocumentSecrets path=".."/>`
+/// declares in the repo, and the explicit stand-in for parameter store on a
+/// run with no account (`<DocumentSecrets path="target/secrets/app--dev.toml"/>`).
 ///
 /// One document holds one stack's secrets, so [`for_stack`] to any other
 /// stack refuses by name rather than reading the wrong file. The identity is
@@ -65,9 +64,6 @@ impl DocumentSecretStore {
 	/// The provider id.
 	pub const ID: &'static str = "document";
 
-	/// Where a `Local` launch keeps a stack's stand-in document.
-	pub const LOCAL_DIR: &'static str = "target/secrets";
-
 	/// The store over `handle` for `stack`, opened with the discovered
 	/// identity (an empty file when there is none).
 	pub fn new(handle: SecretsHandle, stack: ResolvedStack) -> Result<Self> {
@@ -90,24 +86,6 @@ impl DocumentSecretStore {
 	pub fn with_seed(mut self, seed: Option<SecretsHandle>) -> Self {
 		self.seed = seed;
 		self
-	}
-
-	/// The `Local` stand-in for `stack`: `target/secrets/<app>--<stage>.toml`
-	/// in the workspace.
-	pub fn local(stack: ResolvedStack) -> Result<Self> {
-		let dir = WsPath::new(Self::LOCAL_DIR).into_abs();
-		let path = format!(
-			"{}--{}.{}",
-			stack.app_name(),
-			stack.stage(),
-			SecretsDocument::default_media_type()
-				.extension()
-				.unwrap_or_default()
-		);
-		Self::new(
-			SecretsHandle::new(BlobStore::new(FsStore::new(dir)), path)?,
-			stack,
-		)
 	}
 
 	/// The document this store reads and writes.
@@ -522,7 +500,8 @@ mod test {
 		store.get(&secret).await.unwrap().xpect_none();
 	}
 
-	/// The race path: the loser re-reads the winner's value.
+	/// The value is created once and kept; a changed declaration of its
+	/// note or rotation converges the stored metadata around the same value.
 	#[beet_core::test]
 	async fn ensure_is_create_if_missing() {
 		let stack = stack();
@@ -537,13 +516,30 @@ mod test {
 		value.as_str().xpect_eq("first");
 		minted.xpect_true();
 		let (value, minted) = store
-			.ensure(&secret, None, SecretRotation::Remint, async || {
-				"second".to_string().xok()
-			})
+			.ensure(
+				&secret,
+				Some("the db"),
+				SecretRotation::manual("why"),
+				async || "second".to_string().xok(),
+			)
 			.await
 			.unwrap();
 		value.as_str().xpect_eq("first");
 		minted.xpect_false();
+		store
+			.meta(&secret)
+			.await
+			.unwrap()
+			.unwrap()
+			.xpect_eq(SecretMeta {
+				note: Some("the db".into()),
+				rotation: Some(SecretRotation::manual("why")),
+			});
+		store
+			.meta(&SecretRef::new("nope"))
+			.await
+			.unwrap()
+			.xpect_none();
 	}
 
 	/// One document, one stack: rescoping to another stage is refused by

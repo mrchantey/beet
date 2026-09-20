@@ -90,17 +90,22 @@ impl SecretsHandle {
 
 	/// Read and parse the document. Errors when the file is missing.
 	pub async fn read(&self) -> Result<SecretsDocument> {
-		let bytes = self.store.get(&self.path).await.map_err(|err| {
-			match err.downcast_ref::<HttpError>() {
+		let bytes =
+			self.store.get(&self.path).await.map_err(|err| match err
+				.downcast_ref::<HttpError>()
+			{
 				Some(err) if err.status_code == StatusCode::NOT_FOUND => {
 					bevyhow!(
-						"document {} is not written yet (`secrets/set` writes it)",
+						"document {} is not written yet (`secrets/set` writes a \
+						document, `<SecretsExport>` an export)",
 						self.describe()
 					)
 				}
-				_ => bevyhow!("document {} cannot be read: {err}", self.describe()),
-			}
-		})?;
+				_ => bevyhow!(
+					"document {} cannot be read: {err}",
+					self.describe()
+				),
+			})?;
 		SecretsDocument::parse(self.media_type()?, &bytes)
 			.map_err(|err| bevyhow!("document {}: {err}", self.describe()))
 	}
@@ -188,9 +193,13 @@ impl SecretsHandle {
 				.filter(|name| Self::is_digits(name, width))
 				.rev()
 			{
-				let found =
-					Self::newest_in(store.clone(), dir.join(name), rest, suffix.clone())
-						.await?;
+				let found = Self::newest_in(
+					store.clone(),
+					dir.join(name),
+					rest,
+					suffix.clone(),
+				)
+				.await?;
 				if found.is_some() {
 					return Ok(found);
 				}
@@ -260,7 +269,7 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("cannot be read");
+			.xpect_contains("not written yet");
 		let mut document = handle.read_or_new().await.unwrap();
 		document.media_type().xpect_eq(MediaType::Toml);
 		document.set(&identities, "A", "1", default()).unwrap();
