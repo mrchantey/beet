@@ -186,6 +186,28 @@ impl<T: TableStoreRow> Table<T> {
 			.await
 	}
 
+	/// Insert many typed rows, each replacing any row at its key, through the
+	/// provider's batch path.
+	///
+	/// # Errors
+	/// Fails on an empty key, before anything is written.
+	pub async fn push_all(
+		&self,
+		bodies: impl IntoIterator<Item = T>,
+	) -> Result {
+		let rows = bodies
+			.into_iter()
+			.map(|body| {
+				let key = body.key();
+				if key.is_empty() {
+					bevybail!("empty key for a `{}` row", self.name)
+				}
+				Ok((key, Value::from_serde(body)?))
+			})
+			.collect::<Result<Vec<_>>>()?;
+		self.provider.insert_rows(&self.name, rows).await
+	}
+
 	/// Insert typed row, failing if one already exists at its key.
 	///
 	/// # Errors
@@ -440,6 +462,25 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 		key: &TableKey,
 	) -> SendBoxedFuture<Result<Value>>;
 
+	/// Insert many rows in `table`, each replacing any at its key. The default
+	/// is one [`insert_row`](Self::insert_row) per row; a backend with a batch
+	/// or transaction overrides it, so a segment of thousands of rows is one
+	/// round trip rather than thousands.
+	fn insert_rows(
+		&self,
+		table: &str,
+		rows: Vec<(TableKey, Value)>,
+	) -> SendBoxedFuture<Result> {
+		let this = self.box_clone_table();
+		let table = SmolStr::from(table);
+		Box::pin(async move {
+			for (key, row) in rows {
+				this.insert_row(&table, &key, row).await?;
+			}
+			Ok(())
+		})
+	}
+
 	/// Whether a row exists at `key` in `table`.
 	fn row_exists(
 		&self,
@@ -630,6 +671,29 @@ pub mod table_test {
 		rows.try_push(row.clone()).await.xpect_err();
 		rows.remove(row.key()).await.unwrap();
 		rows.list().await.unwrap().xpect_eq(Vec::new());
+		// a batch lands every row, later keys replacing earlier
+		let batch = (0..3)
+			.map(|idx| NamedRow {
+				key: format!("batch/{idx}"),
+				value: idx,
+			})
+			.chain([NamedRow {
+				key: "batch/0".into(),
+				value: 9,
+			}])
+			.collect::<Vec<_>>();
+		rows.push_all(batch).await.unwrap();
+		rows.get("batch/0").await.unwrap().value.xpect_eq(9);
+		rows.list().await.unwrap().len().xpect_eq(3);
+		rows.push_all([NamedRow {
+			key: "".into(),
+			value: 0,
+		}])
+		.await
+		.xpect_err();
+		for idx in 0..3 {
+			rows.remove(format!("batch/{idx}")).await.unwrap();
+		}
 
 		items.store_remove().await.unwrap();
 		items.store_exists().await.unwrap().xpect_false();

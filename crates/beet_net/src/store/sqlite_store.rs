@@ -434,6 +434,34 @@ impl TableProvider for SqliteStore {
 		})
 	}
 
+	/// One transaction for the whole batch, so a segment of thousands of
+	/// rows is one commit and the table is never seen half-applied.
+	fn insert_rows(
+		&self,
+		table: &str,
+		rows: Vec<(TableKey, Value)>,
+	) -> SendBoxedFuture<Result> {
+		let table = SmolStr::from(table);
+		self.run(move |conn| {
+			let ident = table_ident(&table)?;
+			ensure_table(conn, &ident)?;
+			let tx = conn.unchecked_transaction()?;
+			{
+				let mut stmt = tx.prepare(&format!(
+					"INSERT OR REPLACE INTO {ident} (key, json) VALUES (?1, ?2)"
+				))?;
+				for (key, row) in rows {
+					stmt.execute(params![
+						key.as_ref() as &str,
+						canonical_json(row)?
+					])?;
+				}
+			}
+			tx.commit()?;
+			Ok(())
+		})
+	}
+
 	fn get_row(
 		&self,
 		table: &str,

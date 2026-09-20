@@ -109,12 +109,24 @@ impl Jsonl {
 		codec: JsonlCodec,
 		rows: impl IntoIterator<Item = &'a T>,
 	) -> Result<Bytes> {
-		let mut lines = Vec::new();
-		for row in rows {
-			lines.extend(Self::line(row)?.into_bytes());
-			lines.push(b'\n');
+		rows.into_iter()
+			.map(Self::line)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(|lines| Self::encode_lines(codec, &lines))
+	}
+
+	/// Encodes lines already in their canonical form, ie from
+	/// [`line`](Self::line), one per row in the order given.
+	pub fn encode_lines(
+		codec: JsonlCodec,
+		lines: impl IntoIterator<Item = impl AsRef<str>>,
+	) -> Result<Bytes> {
+		let mut bytes = Vec::new();
+		for line in lines {
+			bytes.extend(line.as_ref().as_bytes());
+			bytes.push(b'\n');
 		}
-		Bytes::from(codec.compress(&lines)?).xok()
+		Bytes::from(codec.compress(&bytes)?).xok()
 	}
 
 	/// The canonical json line for one row, without its newline.
@@ -196,8 +208,16 @@ mod test {
 			r#"{"alpha":"a","mid":true,"zed":1}"#.to_string(),
 			r#"{"alpha":"b","mid":null,"zed":2}"#.to_string(),
 		]);
-		// the same rows are the same bytes
-		Jsonl::encode(codec, &rows()).unwrap().xpect_eq(bytes);
+		// the same rows are the same bytes, whichever entry point
+		Jsonl::encode(codec, &rows())
+			.unwrap()
+			.xpect_eq(bytes.clone());
+		Jsonl::encode_lines(codec, [
+			r#"{"alpha":"a","mid":true,"zed":1}"#,
+			r#"{"alpha":"b","mid":null,"zed":2}"#,
+		])
+		.unwrap()
+		.xpect_eq(bytes);
 	}
 
 	#[beet_core::test]
