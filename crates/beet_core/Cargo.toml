@@ -192,6 +192,7 @@ fs = [
 	"dep:notify-debouncer-full",
 	"dep:async-fs",
 	"dep:async-process",
+	"dep:blocking",
 	"uuid",
 ]
 tokens = [
@@ -298,6 +299,7 @@ tokio = { workspace = true, optional = true }
 
 ## fs
 async-fs = { workspace = true, optional = true }
+blocking = { workspace = true, optional = true }
 notify = { version = "8", optional = true }
 notify-debouncer-full = { version = "0.7", optional = true }
 ctrlc = { version = "3", optional = true }

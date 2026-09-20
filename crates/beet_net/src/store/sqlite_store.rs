@@ -486,6 +486,34 @@ impl TableProvider for SqliteStore {
 		})
 	}
 
+	/// One prepared select run per key on the blocking thread, so a diff of
+	/// a whole segment is one hop rather than one per row.
+	fn get_rows(
+		&self,
+		table: &str,
+		keys: Vec<TableKey>,
+	) -> SendBoxedFuture<Result<Vec<Option<Value>>>> {
+		let table = SmolStr::from(table);
+		self.run(move |conn| {
+			let ident = table_ident(&table)?;
+			if !table_exists(conn, &table)? {
+				return Ok(vec![None; keys.len()]);
+			}
+			let mut stmt = conn
+				.prepare(&format!("SELECT json FROM {ident} WHERE key = ?1"))?;
+			keys.iter()
+				.map(|key| {
+					stmt.query_row(params![key.as_ref() as &str], |row| {
+						row.get::<_, String>(0)
+					})
+					.optional()?
+					.map(|json| serde_json::from_str::<Value>(&json)?.xok())
+					.transpose()
+				})
+				.collect()
+		})
+	}
+
 	fn row_exists(
 		&self,
 		table: &str,

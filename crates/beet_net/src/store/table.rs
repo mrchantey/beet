@@ -242,6 +242,20 @@ impl<T: TableStoreRow> Table<T> {
 			.into_serde()
 	}
 
+	/// Get the typed rows at `keys`, `None` where there is none, in the order
+	/// given, through the provider's batch path.
+	pub async fn get_many(
+		&self,
+		keys: impl IntoIterator<Item = impl Into<TableKey>>,
+	) -> Result<Vec<Option<T>>> {
+		self.provider
+			.get_rows(&self.name, keys.into_iter().map(Into::into).collect())
+			.await?
+			.into_iter()
+			.map(|row| row.map(Value::into_serde).transpose())
+			.collect()
+	}
+
 	/// Get all rows and their typed data.
 	///
 	/// # Caution
@@ -481,6 +495,29 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 		})
 	}
 
+	/// The rows at `keys` in `table`, `None` where there is none, in the order
+	/// given. The default is one [`row_exists`](Self::row_exists) and
+	/// [`get_row`](Self::get_row) per key; a backend with a batch read
+	/// overrides it, so a diff of thousands of keys is one round trip.
+	fn get_rows(
+		&self,
+		table: &str,
+		keys: Vec<TableKey>,
+	) -> SendBoxedFuture<Result<Vec<Option<Value>>>> {
+		let this = self.box_clone_table();
+		let table = SmolStr::from(table);
+		Box::pin(async move {
+			let mut rows = Vec::with_capacity(keys.len());
+			for key in keys {
+				rows.push(match this.row_exists(&table, &key).await? {
+					true => Some(this.get_row(&table, &key).await?),
+					false => None,
+				});
+			}
+			rows.xok()
+		})
+	}
+
 	/// Whether a row exists at `key` in `table`.
 	fn row_exists(
 		&self,
@@ -685,6 +722,20 @@ pub mod table_test {
 		rows.push_all(batch).await.unwrap();
 		rows.get("batch/0").await.unwrap().value.xpect_eq(9);
 		rows.list().await.unwrap().len().xpect_eq(3);
+		// a batch read answers in order, `None` for a missing key
+		rows.get_many(["batch/2", "batch/9", "batch/0"])
+			.await
+			.unwrap()
+			.into_iter()
+			.map(|row| row.map(|row| row.value))
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![Some(2), None, Some(9)]);
+		store
+			.table::<TableItem<MyObject>>()
+			.get_many(["nope"])
+			.await
+			.unwrap()
+			.xpect_eq(vec![None]);
 		rows.push_all([NamedRow {
 			key: "".into(),
 			value: 0,

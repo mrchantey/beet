@@ -1365,6 +1365,7 @@ dependencies = [
  "bevy",
  "bevy_reflect",
  "bitflags 2.13.1",
+ "blocking",
  "bytes",
  "console_error_panic_hook",
  "critical-section",

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 /// Read a directory or file into a Vec<PathBuf>.
 /// All options are false by default.
 /// All paths will include the root.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ReadDir {
 	/// include files
 	pub files: bool,
@@ -297,6 +297,9 @@ impl ReadDir {
 
 	/// Async version: Read dir with the provided options. if the root is a file, the
 	/// file will be returned.
+	///
+	/// The whole walk runs as one call on the blocking pool: an executor that
+	/// polls its tasks once per frame would otherwise pay a frame per entry.
 	pub async fn read_async(
 		&self,
 		root: impl AsRef<Path>,
@@ -307,69 +310,10 @@ impl ReadDir {
 		}
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		{
-			let mut paths = Vec::new();
-			if self.root {
-				paths.push(root.as_ref().to_path_buf());
-			}
-			self.read_inner_async(root, &mut paths).await?;
-			Ok(paths)
+			let this = *self;
+			let root = root.as_ref().to_path_buf();
+			blocking::unblock(move || this.read(root)).await
 		}
-	}
-
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	async fn read_inner_async(
-		&self,
-		file_or_dir: impl AsRef<Path>,
-		paths: &mut Vec<PathBuf>,
-	) -> FsResult {
-		let root = file_or_dir.as_ref().to_path_buf();
-		let mut stack = vec![root];
-
-		while let Some(path) = stack.pop() {
-			use futures_lite::StreamExt;
-
-			let metadata = async_fs::metadata(&path)
-				.await
-				.map_err(|e| FsError::io(&path, e))?;
-
-			if metadata.is_file() {
-				if self.files {
-					paths.push(path.clone());
-				}
-				continue;
-			}
-
-			let mut read_dir = match async_fs::read_dir(&path).await {
-				Ok(rd) => rd,
-				Err(e) => return Err(FsError::io(&path, e)),
-			};
-
-			while let Some(entry) = read_dir.next().await {
-				let child = entry
-					.map_err(|err| FsError::ChildIo {
-						parent: path.clone().into(),
-						err,
-					})?
-					.path();
-				let child_metadata = async_fs::metadata(&child)
-					.await
-					.map_err(|e| FsError::io(&child, e))?;
-
-				if child_metadata.is_dir() {
-					if self.dirs {
-						paths.push(child.clone());
-					}
-					if self.recursive {
-						stack.push(child);
-					}
-				} else if child_metadata.is_file() && self.files {
-					paths.push(child.clone());
-				} else {
-					// ignore
-				}
-			}
-		}
-		Ok(())
 	}
 
 	/// Read dir recursive for each path, ignoring DirNotFound errors
