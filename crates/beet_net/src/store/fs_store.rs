@@ -140,6 +140,24 @@ impl BlobStoreProvider for FsStore {
 		})
 	}
 
+	/// A copy on the blocking pool, so a multi-gigabyte object never passes
+	/// through memory (and is a reflink where the filesystem has them).
+	fn insert_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		let path = self.resolve_path(path);
+		let file = file.clone();
+		Box::pin(async move {
+			#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+			fs_ext::copy(&file, &path)?;
+			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+			async_ext::unblock(move || fs_ext::copy(&file, &path)).await?;
+			().xok()
+		})
+	}
+
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let root = self.effective_root();
 		let scoped = self.subdir.is_some();
@@ -181,6 +199,65 @@ impl BlobStoreProvider for FsStore {
 	fn remove(&self, path: &RelPath) -> SendBoxedFuture<Result> {
 		let path = self.resolve_path(path);
 		Box::pin(async move { fs_ext::remove_async(path).await?.xok() })
+	}
+
+	/// Digested in chunks on the blocking pool, so a stat of a multi-gigabyte
+	/// file never holds it.
+	fn stat(
+		&self,
+		path: &RelPath,
+	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
+		let path = self.resolve_path(path);
+		Box::pin(async move {
+			if !fs_ext::exists_async(&path).await? {
+				return Ok(None);
+			}
+			#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
+			{
+				Some(BlobStat::of(&fs_ext::read(&path)?)).xok()
+			}
+			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+			{
+				async_ext::unblock(move || -> Result<_> {
+					use md5::Digest;
+					use std::io::Read;
+					let mut file = std::fs::File::open(path.as_str())?;
+					let mut hasher = md5::Md5::new();
+					let mut buffer = vec![0u8; 1 << 20];
+					let mut size = 0u64;
+					loop {
+						let read = file.read(&mut buffer)?;
+						if read == 0 {
+							break;
+						}
+						hasher.update(&buffer[..read]);
+						size += read as u64;
+					}
+					let md5 = hasher
+						.finalize()
+						.iter()
+						.map(|byte| format!("{byte:02x}"))
+						.collect::<String>();
+					Some(BlobStat {
+						size,
+						md5: Some(md5.into()),
+					})
+					.xok()
+				})
+				.await
+			}
+		})
+	}
+
+	/// From metadata, without reading the file.
+	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+		let path = self.resolve_path(path);
+		Box::pin(async move {
+			if !fs_ext::exists_async(&path).await? {
+				return Ok(None);
+			}
+			fs_ext::file_size(&path)?.xsome().xok()
+		})
 	}
 
 	fn public_url(

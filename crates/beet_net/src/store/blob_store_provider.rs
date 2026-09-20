@@ -247,6 +247,23 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// ```
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result>;
 
+	/// Insert the contents of a local file, for an object too large to hold
+	/// as [`Bytes`]. The default reads the file and inserts it; a filesystem
+	/// backend copies it into place instead. The file is left where it is.
+	fn insert_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		let this = self.box_clone();
+		let path = path.clone();
+		let file = file.clone();
+		Box::pin(async move {
+			let body = fs_ext::read_async(&file).await?;
+			this.insert(&path, Bytes::from(body)).await
+		})
+	}
+
 	/// List all objects in store.
 	///
 	/// # Example
@@ -319,6 +336,20 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 			this.get(&path)
 				.await
 				.map(|bytes| Some(BlobStat::of(&bytes)))
+		})
+	}
+
+	/// The object's size alone, `None` where there is no object: the cheap
+	/// half of [`stat`](Self::stat), what a writer checks before trusting an
+	/// object at a content address (a write cut short leaves a shorter one).
+	/// The default stats; a filesystem answers from metadata.
+	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+		let this = self.box_clone();
+		let path = path.clone();
+		Box::pin(async move {
+			this.stat(&path)
+				.await
+				.map(|stat| stat.map(|stat| stat.size))
 		})
 	}
 
@@ -406,6 +437,13 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
 	}
+	fn insert_file(
+		&self,
+		path: &RelPath,
+		file: &AbsPath,
+	) -> SendBoxedFuture<Result> {
+		self.as_ref().insert_file(path, file)
+	}
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		self.as_ref().list()
 	}
@@ -423,6 +461,9 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		self.as_ref().stat(path)
+	}
+	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+		self.as_ref().size(path)
 	}
 	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
 		self.as_ref().list_stats()

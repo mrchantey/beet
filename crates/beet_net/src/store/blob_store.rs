@@ -180,6 +180,12 @@ impl BlobStore {
 		self.provider.insert(path, body.into()).await
 	}
 
+	/// Insert the contents of a local file without holding it in memory, see
+	/// [`BlobStoreProvider::insert_file`].
+	pub async fn insert_file(&self, path: &RelPath, file: &AbsPath) -> Result {
+		self.provider.insert_file(path, file).await
+	}
+
 	/// Insert object, failing if it already exists.
 	///
 	/// # Example
@@ -291,6 +297,9 @@ impl BlobStoreProvider for BlobStore {
 		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<BlobStat>>> {
 		self.provider.stat(path)
+	}
+	fn size(&self, path: &RelPath) -> SendBoxedFuture<Result<Option<u64>>> {
+		self.provider.size(path)
 	}
 	fn list_stats(&self) -> SendBoxedFuture<Result<Vec<(RelPath, BlobStat)>>> {
 		self.provider.list_stats()
@@ -411,6 +420,12 @@ pub mod store_test {
 			.await
 			.unwrap()
 			.xpect_eq(Some(stat.clone()));
+		store.size(&path).await.unwrap().xpect_eq(Some(9));
+		store
+			.size(&RelPath::from("missing"))
+			.await
+			.unwrap()
+			.xpect_none();
 		store
 			.list_stats()
 			.await
@@ -420,6 +435,22 @@ pub mod store_test {
 		store.remove(&path).await.unwrap();
 		store.get(&path).await.xpect_err();
 		store.stat(&path).await.unwrap().xpect_none();
+
+		// a file inserts as its bytes and is left in place
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+		{
+			let dir = TempDir::new_ws().unwrap();
+			let file = dir.join("source.bin");
+			fs_ext::write(&file, "from a file").unwrap();
+			store.insert_file(&path, &file).await.unwrap();
+			store
+				.get(&path)
+				.await
+				.unwrap()
+				.xpect_eq(bytes::Bytes::from("from a file"));
+			fs_ext::exists(&file).unwrap().xpect_true();
+			store.remove(&path).await.unwrap();
+		}
 
 		store.store_remove().await.unwrap();
 		store.store_exists().await.unwrap().xpect_false();
