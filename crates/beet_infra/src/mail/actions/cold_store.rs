@@ -210,13 +210,7 @@ impl ListedObject {
 	/// the cold verbs make: two downloads are compared by digest rather than
 	/// held in memory together.
 	pub fn digest(path: &AbsPath) -> Result<String> {
-		use sha2::Digest;
-		let bytes = fs_ext::read(path)?;
-		sha2::Sha256::digest(&bytes)
-			.iter()
-			.map(|byte| format!("{byte:02x}"))
-			.collect::<String>()
-			.xok()
+		digest_ext::hex_file::<sha2::Sha256>(path)?.xok()
 	}
 }
 

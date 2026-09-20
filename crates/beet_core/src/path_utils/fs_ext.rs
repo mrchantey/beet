@@ -461,6 +461,23 @@ pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult {
 	}
 }
 
+/// [`write`] for a secret (a token, a private key): the file readable by
+/// its owner alone (`0600` on unix), its parent directories created.
+pub fn write_private(
+	path: impl AsRef<Path>,
+	data: impl AsRef<[u8]>,
+) -> FsResult {
+	let path = path.as_ref();
+	fs_ext::write(path, data)?;
+	#[cfg(all(unix, not(target_arch = "wasm32")))]
+	{
+		use std::os::unix::fs::PermissionsExt;
+		fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+			.map_err(|err| FsError::io(path, err))?;
+	}
+	Ok(())
+}
+
 /// Async version of write: Write a file, ensuring the path exists.
 /// Falls back to `fs_ex::write` without the feature flag
 pub async fn write_async(

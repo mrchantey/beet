@@ -22,6 +22,7 @@ mod cli_args;
 /// Coalescing trigger for async write deduplication.
 mod coalescing_trigger;
 pub mod cross_log;
+pub mod digest_ext;
 /// Display formatting utilities.
 pub mod display_ext;
 // Cross-platform env access; no_std reads return "not found" so callers fall

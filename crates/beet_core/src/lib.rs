@@ -297,6 +297,7 @@ pub mod exports {
 	// the engine, re-exported so internal macros can emit
 	// `beet_core::exports::bevy` and downstream crates need no direct `bevy` dep.
 	pub use bevy;
+	pub use heck;
 	pub use itertools::Itertools;
 	// original exports
 	#[cfg(feature = "std")]

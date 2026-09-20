@@ -150,10 +150,13 @@ impl BlobStoreProvider for FsStore {
 		let path = self.resolve_path(path);
 		let file = file.clone();
 		Box::pin(async move {
-			#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
-			fs_ext::copy(&file, &path)?;
-			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-			async_ext::unblock(move || fs_ext::copy(&file, &path)).await?;
+			cfg_if! {
+				if #[cfg(all(feature = "fs", not(target_arch = "wasm32")))] {
+					async_ext::unblock(move || fs_ext::copy(&file, &path)).await?;
+				} else {
+					fs_ext::copy(&file, &path)?;
+				}
+			}
 			().xok()
 		})
 	}
@@ -212,39 +215,23 @@ impl BlobStoreProvider for FsStore {
 			if !fs_ext::exists_async(&path).await? {
 				return Ok(None);
 			}
-			#[cfg(not(all(feature = "fs", not(target_arch = "wasm32"))))]
-			{
-				Some(BlobStat::of(&fs_ext::read(&path)?)).xok()
-			}
-			#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-			{
-				async_ext::unblock(move || -> Result<_> {
-					use md5::Digest;
-					use std::io::Read;
-					let mut file = std::fs::File::open(path.as_str())?;
-					let mut hasher = md5::Md5::new();
-					let mut buffer = vec![0u8; 1 << 20];
-					let mut size = 0u64;
-					loop {
-						let read = file.read(&mut buffer)?;
-						if read == 0 {
-							break;
+			cfg_if! {
+				if #[cfg(all(feature = "fs", not(target_arch = "wasm32")))] {
+					async_ext::unblock(move || -> Result<BlobStat> {
+						BlobStat {
+							size: fs_ext::file_size(&path)?,
+							md5: Some(
+								digest_ext::hex_file::<md5::Md5>(&path)?.into(),
+							),
 						}
-						hasher.update(&buffer[..read]);
-						size += read as u64;
-					}
-					let md5 = hasher
-						.finalize()
-						.iter()
-						.map(|byte| format!("{byte:02x}"))
-						.collect::<String>();
-					Some(BlobStat {
-						size,
-						md5: Some(md5.into()),
+						.xok()
 					})
+					.await?
+					.xsome()
 					.xok()
-				})
-				.await
+				} else {
+					BlobStat::of(&fs_ext::read(&path)?).xsome().xok()
+				}
 			}
 		})
 	}

@@ -19,14 +19,9 @@ pub struct BlobStat {
 impl BlobStat {
 	/// The stat of `bytes`, digested here.
 	pub fn of(bytes: &[u8]) -> Self {
-		use md5::Digest;
-		let digest = md5::Md5::digest(bytes)
-			.iter()
-			.map(|byte| format!("{byte:02x}"))
-			.collect::<String>();
 		Self {
 			size: bytes.len() as u64,
-			md5: Some(digest.into()),
+			md5: Some(digest_ext::hex::<md5::Md5>(bytes).into()),
 		}
 	}
 

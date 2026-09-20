@@ -951,11 +951,7 @@ exit 1
 	/// Not circular: the terraform *references* to the key are stable literals
 	/// in this string, so hashing it says nothing about the key's value.
 	fn machine_config_hash(user_data: &str) -> String {
-		use sha2::Digest;
-		sha2::Sha256::digest(user_data.as_bytes())
-			.iter()
-			.map(|byte| format!("{byte:02x}"))
-			.collect()
+		digest_ext::hex::<sha2::Sha256>(user_data.as_bytes())
 	}
 }
 

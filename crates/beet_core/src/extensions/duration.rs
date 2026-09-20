@@ -101,6 +101,65 @@ pub impl Duration {
 		};
 		Some(Duration::from_secs_f64(secs))
 	}
+
+	/// Parse an ISO 8601 duration of whole units as APIs write them, ie
+	/// `PT4M13S`, `PT1H`, `P1DT2H3M4S`, `P0D`. Days are the largest unit
+	/// (a month or a year has no fixed length); returns `None` for anything
+	/// else, a fraction included.
+	///
+	/// ```
+	/// use beet_core::prelude::*;
+	///
+	/// assert_eq!(Duration::from_iso8601("PT4M13S"), Some(Duration::from_secs(253)));
+	/// assert_eq!(Duration::from_iso8601("garbage"), None);
+	/// ```
+	fn from_iso8601(string: &str) -> Option<Duration> {
+		let rest = string.strip_prefix('P')?;
+		let (date, time) = rest.split_once('T').unwrap_or((rest, ""));
+		let mut seconds = 0u64;
+		// each unit optional, in order, each at most once
+		let mut take =
+			|input: &mut &str, unit: char, scale: u64| -> Option<()> {
+				let digits =
+					input.chars().take_while(char::is_ascii_digit).count();
+				if digits > 0 && input[digits..].starts_with(unit) {
+					seconds = seconds.checked_add(
+						input[..digits].parse::<u64>().ok()? * scale,
+					)?;
+					*input = &input[digits + 1..];
+				}
+				Some(())
+			};
+		let (mut date, mut time) = (date, time);
+		take(&mut date, 'D', 86_400)?;
+		take(&mut time, 'H', 3_600)?;
+		take(&mut time, 'M', 60)?;
+		take(&mut time, 'S', 1)?;
+		(date.is_empty() && time.is_empty() && string.len() > 1)
+			.then(|| Duration::from_secs(seconds))
+	}
+}
+
+#[cfg(test)]
+mod iso8601 {
+	use crate::prelude::*;
+
+	#[crate::test]
+	fn parses_whole_unit_durations() {
+		let secs =
+			|string: &str| Duration::from_iso8601(string).map(|d| d.as_secs());
+		secs("PT4M13S").xpect_eq(Some(253));
+		secs("PT1H").xpect_eq(Some(3600));
+		secs("P1DT2H3M4S").xpect_eq(Some(93784));
+		secs("P0D").xpect_eq(Some(0));
+		secs("PT").xpect_eq(Some(0));
+		secs("PT4M13").xpect_none();
+		secs("PT1.5S").xpect_none();
+		secs("P1M").xpect_none();
+		secs("garbage").xpect_none();
+		secs("P").xpect_none();
+		secs("").xpect_none();
+	}
 }
 
 #[cfg(all(test, feature = "json"))]

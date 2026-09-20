@@ -158,15 +158,7 @@ impl SshConnection {
 		// the key file is what `ssh -i` reads, and ssh refuses a group- or
 		// world-readable one outright
 		let key_path = project.work_dir().join("deploy_key.pem");
-		fs_ext::write_async(&key_path, key_pem.as_bytes()).await?;
-		#[cfg(unix)]
-		{
-			use std::os::unix::fs::PermissionsExt;
-			std::fs::set_permissions(
-				&key_path,
-				std::fs::Permissions::from_mode(0o600),
-			)?;
-		}
+		fs_ext::write_private(&key_path, key_pem.as_bytes())?;
 
 		SshConnection {
 			host,

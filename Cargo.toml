@@ -267,6 +267,8 @@ sha1 = { version = "0.11", default-features = false }
 # MD5 for the store mirror's change detection: S3 answers an object's etag as
 # its MD5, so the local side digests the same way and a sync skips what matches.
 md-5 = { version = "0.11", default-features = false }
+# the `Digest` trait sha2 and md-5 implement, for a digest helper generic over both
+digest = { version = "0.11", default-features = false }
 # 0.12 is the version `bevy_asset` pulls. no_std by default; std consumers
 # re-enable `ron/std` (eg via `beet_core/std`).
 ron = { version = "0.12", default-features = false }

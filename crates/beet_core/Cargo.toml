@@ -233,6 +233,7 @@ send_wrapper = { workspace = true, optional = true }
 smol_str = { workspace = true }
 indexmap = { workspace = true }
 heck.workspace = true
+digest.workspace = true
 bitflags = { workspace = true }
 
 #💡 http
@@ -381,6 +382,7 @@ web-sys = {workspace = true, features = [
 ]}
 
 [dev-dependencies]
+md-5 = { workspace = true }
 # A feature-activation shim, and nothing else: it is the only way to turn on the
 # features the unit tests and doctests need without forcing them on every
 # consumer. Nothing under `src/` may name `beet_core::` (write `crate::`, which
