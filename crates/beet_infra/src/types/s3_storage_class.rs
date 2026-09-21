@@ -17,8 +17,8 @@ use beet_core::prelude::*;
 ///
 /// # Pricing
 ///
-/// Rates are us-east-1 (N. Virginia) as of 26-09-21. Sydney (ap-southeast-2)
-/// runs slightly higher; confirm on the
+/// Rates are us-east-1 (N. Virginia) as of 2026-09-21; Sydney
+/// (ap-southeast-2) runs slightly higher, confirm on the
 /// [AWS S3 pricing page](https://aws.amazon.com/s3/pricing/).
 ///
 /// | Class | Rate/GB-month | 100 GB/month | Retrieval time | Min duration |
