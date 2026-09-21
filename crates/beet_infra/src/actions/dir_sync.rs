@@ -133,6 +133,14 @@ mod test {
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
+	/// The `prod` stage of `app`, addressed in `eu-west-1`.
+	fn prod_stack() -> impl Bundle {
+		(
+			Stack::new("app").with_stage("prod"),
+			AwsRegion::new("eu-west-1"),
+		)
+	}
+
 	/// A stack declaring `bucket` beside a sync of it, returning the sync's
 	/// entity and the declaration's erased half.
 	fn declared_sync(
@@ -156,10 +164,7 @@ mod test {
 	#[beet_core::test]
 	fn attaches_the_declared_bucket() {
 		let (world, sync, declared) = declared_sync(
-			(
-				Stack::new("app").with_stage("prod"),
-				AwsRegion::new("eu-west-1"),
-			),
+			prod_stack(),
 			S3BucketBlock::new("assets"),
 			DirSync::new("assets", "site"),
 		);
@@ -180,10 +185,7 @@ mod test {
 	#[beet_core::test]
 	fn overrides_address_another_stack() {
 		let (world, sync, _) = declared_sync(
-			(
-				Stack::new("app").with_stage("prod"),
-				AwsRegion::new("eu-west-1"),
-			),
+			prod_stack(),
 			S3BucketBlock::new("assets"),
 			(
 				DirSync::new("assets", "site").with_stage("shared"),
@@ -207,7 +209,7 @@ mod test {
 	#[beet_core::test]
 	fn the_declared_class_reaches_the_sync() {
 		let (_, _, declared) = declared_sync(
-			Stack::new("app").with_stage("prod"),
+			prod_stack(),
 			S3BucketBlock::new("archive")
 				.with_storage_class(S3StorageClass::GlacierIr),
 			DirSync::new("archive", "store"),
@@ -216,7 +218,7 @@ mod test {
 			.storage_class()
 			.xpect_eq(Some(S3StorageClass::GlacierIr));
 		let (_, _, declared) = declared_sync(
-			Stack::new("app").with_stage("prod"),
+			prod_stack(),
 			S3BucketBlock::new("assets"),
 			DirSync::new("assets", "site"),
 		);
