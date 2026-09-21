@@ -12,6 +12,7 @@ use bevy::reflect::enums::DynamicVariant;
 use bevy::reflect::enums::VariantInfo;
 use bevy::reflect::list::DynamicList;
 use bevy::reflect::structs::DynamicStruct;
+use bevy::reflect::structs::StructInfo;
 use bevy::reflect::tuple::DynamicTuple;
 use bevy::reflect::tuple_struct::DynamicTupleStruct;
 
@@ -79,6 +80,10 @@ fn scalar_value(item: &DataLiteral) -> Option<Value> {
 /// them. That is the same fill a top-level component patch gets, one level
 /// down: `mailboxes={[{localpart:"probe"}]}` means a default mailbox at that
 /// localpart, not a mailbox list that quietly stays empty.
+///
+/// A field the target does not have is an error naming both: `FromReflect`
+/// would drop it in silence, which is a declaration (`{SyncS3Bucket{paths:".."}}`
+/// after the field moved) that quietly does something else.
 pub(super) fn struct_to_reflect(
 	fields: &[(SmolStr, DataLiteral)],
 	field_info: Option<&'static TypeInfo>,
@@ -91,9 +96,7 @@ pub(super) fn struct_to_reflect(
 	};
 	let mut dynamic = DynamicStruct::default();
 	for (name, literal) in fields {
-		let nested = struct_info
-			.and_then(|info| info.field(name))
-			.and_then(|field| field.type_info());
+		let nested = struct_field_info(struct_info, name)?;
 		dynamic.insert_boxed(
 			name.as_str(),
 			DataLiteral::to_reflect(literal, nested, registry, resolver)?,
@@ -105,6 +108,27 @@ pub(super) fn struct_to_reflect(
 		field_info,
 		registry,
 	))
+}
+
+/// The type info of `name` on a struct target, `None` for an unknown target
+/// (the literal builds untyped) and an error naming both for a field the
+/// known target does not have.
+fn struct_field_info(
+	struct_info: Option<&'static StructInfo>,
+	name: &str,
+) -> Result<Option<&'static TypeInfo>> {
+	let Some(info) = struct_info else {
+		return Ok(None);
+	};
+	info.field(name)
+		.ok_or_else(|| {
+			bevyhow!(
+				"`{}` has no field `{name}`",
+				info.type_path_table().short_path()
+			)
+		})?
+		.type_info()
+		.xok()
 }
 
 /// Apply `partial` over its target type's `Default`, yielding a CONCRETE value
@@ -253,9 +277,7 @@ pub(super) fn named_struct_to_reflect(
 	let mut dynamic = DynamicStruct::default();
 	if let NamedFields::Struct(fields) = &named.fields {
 		for (name, literal) in fields {
-			let nested = struct_info
-				.and_then(|info| info.field(name))
-				.and_then(|field| field.type_info());
+			let nested = struct_field_info(struct_info, name)?;
 			dynamic.insert_boxed(
 				name.as_str(),
 				DataLiteral::to_reflect(literal, nested, registry, resolver)?,

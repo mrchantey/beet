@@ -51,35 +51,48 @@ pub async fn DirCopy(
 			},
 		)
 		.await??;
-	let mut copied = 0;
-	for path in DirCopy::iter_paths(&paths) {
-		let from = src_dir.join(path);
-		let to = dest_dir.join(path);
-		if !fs_ext::exists(&from)? {
-			bevybail!(
-				"nothing to copy at {}: the borrowed path is declared but absent, so the destination would silently keep a stale copy",
-				from
-			);
-		}
-		if let Some(parent) = to.parent() {
-			fs_ext::create_dir_all(parent)?;
-		}
-		// mirror: whatever is there is replaced wholesale.
-		fs_ext::remove(&to).ok();
-		match fs_ext::is_dir(&from) {
-			true => fs_ext::copy_recursive(&from, &to)?,
-			false => {
-				fs_ext::copy(&from, &to)?;
-			}
-		}
-		debug!("copied {} -> {}", from, to);
-		copied += 1;
-	}
+	let copied = DirCopy::copy_paths(&src_dir, &dest_dir, &paths)?;
 	info!("copied {copied} borrowed path(s) {src_dir} -> {dest_dir}");
 	Pass(cx.input).xok()
 }
 
 impl DirCopy {
+	/// Mirror every `paths` entry from `src_dir` into `dest_dir` (a file or a
+	/// directory, replaced wholesale), answering how many; a declared path
+	/// that is absent is an error, since the destination would silently keep
+	/// a stale copy.
+	pub fn copy_paths(
+		src_dir: &AbsPath,
+		dest_dir: &AbsPath,
+		paths: &str,
+	) -> Result<usize> {
+		let mut copied = 0;
+		for path in Self::iter_paths(paths) {
+			let from = src_dir.join(path);
+			let to = dest_dir.join(path);
+			if !fs_ext::exists(&from)? {
+				bevybail!(
+					"nothing to copy at {}: the path is declared but absent, so the destination would silently keep a stale copy",
+					from
+				);
+			}
+			if let Some(parent) = to.parent() {
+				fs_ext::create_dir_all(parent)?;
+			}
+			// mirror: whatever is there is replaced wholesale.
+			fs_ext::remove(&to).ok();
+			match fs_ext::is_dir(&from) {
+				true => fs_ext::copy_recursive(&from, &to)?,
+				false => {
+					fs_ext::copy(&from, &to)?;
+				}
+			}
+			debug!("copied {} -> {}", from, to);
+			copied += 1;
+		}
+		Ok(copied)
+	}
+
 	/// A copy of every `paths` entry from `src` to `dest`.
 	pub fn new(
 		src: impl Into<WsPath>,

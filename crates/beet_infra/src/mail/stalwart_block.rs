@@ -287,18 +287,18 @@ impl StalwartBlock {
 		}
 	}
 
-	/// The zone the box's `A` record is published into: the declared
-	/// [`dns`](Self::with_dns) provider, else a Cloudflare zone read from
-	/// `CLOUDFLARE_ZONE_ID`, at this box's own hostname.
+	/// The provider the box's `A` record is published through: the declared
+	/// [`dns`](Self::with_dns) provider, else a Cloudflare record at this box's
+	/// own hostname in the stack's [`CloudflareZone`], resolved at render.
 	///
 	/// The hostname is the block's, never the provider's: a declaration names
-	/// the box, and where the zone lives is a property of the launch.
+	/// the box, and the zone is an address spread on the stack or an ancestor.
 	pub fn resolved_dns(&self) -> Option<DnsProvider> {
 		if let Some(dns) = &self.dns {
 			return Some(dns.clone());
 		}
 		#[cfg(feature = "cloudflare_dns")]
-		return DnsProvider::cloudflare_env(self.hostname.clone());
+		return Some(DnsProvider::cloudflare(self.hostname.clone()));
 		#[cfg(not(feature = "cloudflare_dns"))]
 		None
 	}
@@ -547,6 +547,7 @@ impl StalwartBlock {
 	/// the box cannot see that from its own declaration.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &StalwartBlock, Option<&VpcRef>)>,
 		vpcs: Query<&VpcBlock>,
 		domains: Query<(Entity, &MailDomainBlock)>,
@@ -602,9 +603,10 @@ impl StalwartBlock {
 						},
 					);
 					let access = scope.access();
-					let (stack, _deployment, config) = scope.ctx();
+					let stack = stacks.resolve(entity);
+					let (_deployment, config) = scope.ctx();
 					if let Err(err) =
-						block.emit(stack, vpc, &access, &relays, cold, config)
+						block.emit(&stack, vpc, &access, &relays, cold, config)
 					{
 						scope.error(err);
 					}
@@ -802,7 +804,7 @@ impl StalwartBlock {
 		stack: &ResolvedStack,
 		access: &AccessGrants,
 	) -> Result<IamPolicy> {
-		let region = stack.region();
+		let region = stack.region()?;
 		let log_group = self.log_group(stack);
 		IamPolicy::new(region.clone(), "stalwart box")
 			.statement(json!({
@@ -1131,7 +1133,9 @@ impl StalwartBlock {
 		}
 		let Some(dns) = self.resolved_dns() else {
 			bevybail!(
-				"mail box '{}' resolves no zone to publish '{}' into: set CLOUDFLARE_ZONE_ID or `with_dns` a provider",
+				"mail box '{}' has no provider to publish '{}' through: \
+				`with_dns` one, or build with `cloudflare_dns` and declare a \
+				`{{CloudflareZone{{..}}}}` on the stack",
 				self.label,
 				self.hostname
 			);
@@ -1252,7 +1256,7 @@ impl StalwartBlock {
 	/// The blob store as the `Bootstrap` claim declares it, composed here
 	/// beside the data store template so the box's file and the provision
 	/// payload cannot drift.
-	pub fn blob_store_config(&self, stack: &ResolvedStack) -> Value {
+	pub fn blob_store_config(&self, stack: &ResolvedStack) -> Result<Value> {
 		let none = json!({ "@type": "None" });
 		json!({
 			"@type": "S3",
@@ -1264,9 +1268,10 @@ impl StalwartBlock {
 			"securityToken": none,
 			"sessionToken": none,
 			"region": {
-				"@type": stack.region().to_upper_camel_case()
+				"@type": stack.region()?.to_upper_camel_case()
 			}
 		})
+		.xok()
 	}
 
 	/// Returns the boot script at `/usr/local/bin/stalwart-secrets`.
@@ -1293,7 +1298,7 @@ impl StalwartBlock {
 	/// is missing and bootstrap mode is a lie. [`StalwartProvision`] is the one
 	/// caller, since only it can tell that state from a genuinely new store.
 	///
-	fn secrets_script(&self, stack: &ResolvedStack) -> String {
+	fn secrets_script(&self, stack: &ResolvedStack) -> Result<String> {
 		let template = r#"#!/bin/bash
 # Render the bootstrap credential or the claimed store config at every start.
 set -euo pipefail
@@ -1313,7 +1318,7 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
 		let admin_secret = self.admin_secret_name(stack);
 		[
-			("__REGION__", stack.region().as_str()),
+			("__REGION__", stack.region()?.as_str()),
 			("__ADMIN_SECRET__", admin_secret.as_str()),
 			("__ADMIN_USER__", Self::ADMIN_USER),
 		]
@@ -1323,6 +1328,7 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 		})
 		.trim_end()
 		.to_string()
+		.xok()
 	}
 
 	/// Returns the nightly SQLite backup script at
@@ -1332,7 +1338,7 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 	/// Stalwart continues serving. The script verifies that snapshot, uploads it,
 	/// downloads it again, compares the bytes, verifies the downloaded database,
 	/// and removes both local copies on every exit.
-	fn backup_script(&self, stack: &ResolvedStack) -> String {
+	fn backup_script(&self, stack: &ResolvedStack) -> Result<String> {
 		let template = r#"#!/bin/bash
 # Nightly consistent snapshot of the mail database into the archive bucket.
 set -euo pipefail
@@ -1363,7 +1369,7 @@ echo "mail database backed up and read-verified at $object ($(stat -c %s "$snaps
 		let bucket = stack.resource_name(self.backup_bucket.clone());
 		[
 			("__DATABASE__", Self::DATABASE_PATH),
-			("__REGION__", stack.region().as_str()),
+			("__REGION__", stack.region()?.as_str()),
 			("__BUCKET__", bucket.as_str()),
 			("__PREFIX__", Self::BACKUP_PREFIX),
 		]
@@ -1373,6 +1379,7 @@ echo "mail database backed up and read-verified at $object ($(stat -c %s "$snaps
 		})
 		.trim_end()
 		.to_string()
+		.xok()
 	}
 
 	/// The backup unit and its timer.
@@ -1456,7 +1463,7 @@ WantedBy=multi-user.target"#,
 	/// tracer is declared without colour: an escape sequence ahead of the
 	/// timestamp is a line the agent dates at ingestion), and the same prefix
 	/// keeps a multi-line backtrace one event.
-	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Value {
+	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Result<Value> {
 		let tail = |file_path: String, stream: &str| {
 			json!({
 				"file_path": file_path,
@@ -1469,7 +1476,7 @@ WantedBy=multi-user.target"#,
 			})
 		};
 		json!({
-			"agent": { "run_as_user": "root", "region": stack.region() },
+			"agent": { "run_as_user": "root", "region": stack.region()? },
 			"logs": {
 				"logs_collected": {
 					"files": {
@@ -1481,17 +1488,18 @@ WantedBy=multi-user.target"#,
 				}
 			}
 		})
+		.xok()
 	}
 
 	/// The cloud-init stanza that installs the backup script and its units, or
 	/// nothing at all when no [`backup_bucket`](Self::backup_bucket) is
 	/// declared.
 	///
-	fn backup_stanza(&self, stack: &ResolvedStack) -> String {
+	fn backup_stanza(&self, stack: &ResolvedStack) -> Result<String> {
 		if self.backup_bucket.is_empty() {
-			return String::new();
+			return Ok(String::new());
 		}
-		let script = self.backup_script(stack);
+		let script = self.backup_script(stack)?;
 		let (service, timer) = self.backup_units();
 		format!(
 			r#"# the nightly snapshot: the box holds the live database and network path, so
@@ -1510,6 +1518,7 @@ cat > /etc/systemd/system/stalwart-backup.timer <<'BACKUP_TIMER_EOF'
 BACKUP_TIMER_EOF
 "#
 		)
+		.xok()
 	}
 
 	/// The line that starts the backup timer, or nothing when there is none.
@@ -1536,7 +1545,7 @@ BACKUP_TIMER_EOF
 		&self,
 		stack: &ResolvedStack,
 		cold: &R2BucketBlock,
-	) -> String {
+	) -> Result<String> {
 		let template = r#"#!/bin/bash
 # Nightly copy of the newest database snapshot and every message blob into the
 # off-account cold store. Copy, never sync: nothing here deletes, so a mistake
@@ -1594,12 +1603,12 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let backup_bucket = stack.resource_name(self.backup_bucket.clone());
 		let blob_bucket = stack.resource_name(self.blob_bucket.clone());
 		let cold_bucket = cold.bucket_name(stack);
-		let endpoint = cold.endpoint();
+		let endpoint = cold.endpoint(stack)?;
 		let access_key = cold.access_key_secret().name(stack);
 		let secret_key = cold.secret_key_secret().name(stack);
 		let missing = cold.missing_credential(stack);
 		[
-			("__REGION__", stack.region().as_str()),
+			("__REGION__", stack.region()?.as_str()),
 			("__ENDPOINT__", endpoint.as_str()),
 			("__ACCESS_KEY_SECRET__", access_key.as_str()),
 			("__SECRET_KEY_SECRET__", secret_key.as_str()),
@@ -1616,6 +1625,7 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		})
 		.trim_end()
 		.to_string()
+		.xok()
 	}
 
 	/// The cold-copy unit and its timer, in the backup pair's shape, ordered
@@ -1683,7 +1693,7 @@ rm /tmp/rclone.rpm
 		let Some(cold) = cold else {
 			return Ok(String::new());
 		};
-		let script = self.cold_script(stack, cold);
+		let script = self.cold_script(stack, cold)?;
 		let (service, timer) = self.cold_units();
 		let unit = Self::COLD_UNIT;
 		format!(
@@ -1733,11 +1743,11 @@ COLD_TIMER_EOF
 		let sha256 = Self::STALWART_SHA256;
 		let store_template =
 			serde_json::to_string_pretty(&self.data_store_config())?;
-		let secrets_script = self.secrets_script(stack);
+		let secrets_script = self.secrets_script(stack)?;
 		let unit = self.systemd_unit();
 		let cloudwatch =
-			serde_json::to_string_pretty(&self.cloudwatch_config(stack))?;
-		let backup = self.backup_stanza(stack);
+			serde_json::to_string_pretty(&self.cloudwatch_config(stack)?)?;
+		let backup = self.backup_stanza(stack)?;
 		let backup_enable = self.backup_enable();
 		let cold_install = self.cold_install(cold);
 		let cold_stanza = self.cold_stanza(stack, cold)?;
@@ -1883,7 +1893,6 @@ mod tests {
 			.with_ssh_public_key(
 				"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITESTKEY pete",
 			)
-			.with_dns(DnsProvider::cloudflare("mail.beetmash.com", "zone123"))
 	}
 
 	/// The blocks the box is deployed beside, whose grants it lowers.
@@ -1937,15 +1946,47 @@ mod tests {
 		scope.finish().unwrap().2
 	}
 
-	/// The Sydney stack every test renders against.
-	fn sydney_stack() -> Stack {
-		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
+	/// The Sydney stack every test renders against, zoned for `beetmash.com`
+	/// with the account the box's cold store names.
+	fn sydney_stack() -> (Stack, AwsRegion, CloudflareZone, CloudflareAccount) {
+		sydney_stage(BootstrapConfig::DEFAULT_STAGE)
+	}
+
+	/// [`sydney_stack`] deployed to `stage`.
+	fn sydney_stage(
+		stage: &str,
+	) -> (Stack, AwsRegion, CloudflareZone, CloudflareAccount) {
+		(
+			Stack::new("beet_infra").with_stage(stage),
+			AwsRegion::new(aws::region::AP_SOUTHEAST_2),
+			CloudflareZone::new("beetmash.com", Stack::TEST_ZONE_ID),
+			CloudflareAccount::new("acct123"),
+		)
+	}
+
+	/// The resolved Sydney stack a script or a config template renders
+	/// against outside a world, with the zone and the account the box's cold
+	/// store names.
+	fn sydney_resolved()
+	-> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		(
+			stack
+				.with_region(aws::region::AP_SOUTHEAST_2)
+				.with_cloudflare_zone(CloudflareZone::new(
+					"beetmash.com",
+					Stack::TEST_ZONE_ID,
+				))
+				.with_cloudflare_account(CloudflareAccount::new("acct123")),
+			deployment,
+			dir,
+		)
 	}
 
 	/// The config the whole set emits against `stack`.
 	fn build_config_at(
 		block: &StalwartBlock,
-		stack: Stack,
+		stack: impl Bundle,
 	) -> (ResolvedStack, Deployment, terra::Config) {
 		let block = block.clone();
 		let (scope, _dir) = RenderScope::test_render_stack(stack, |parent| {
@@ -1971,16 +2012,13 @@ mod tests {
 		block: &StalwartBlock,
 		cold: Option<&R2BucketBlock>,
 	) -> String {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (stack, _deployment, _dir) = sydney_resolved();
 		block.build_user_data(&stack, cold).unwrap().to_string()
 	}
 
 	/// The cold store the plan declares beside the box.
 	fn cold_store() -> R2BucketBlock {
-		R2BucketBlock::new("cold-backups")
-			.with_account_id("acct123")
-			.with_location("weur")
+		R2BucketBlock::new("cold-backups").with_location("weur")
 	}
 
 	/// The box with both copies declared: a snapshot archive and the cold
@@ -2122,8 +2160,7 @@ mod tests {
 	#[beet_core::test]
 	fn boot_reads_only_the_bootstrap_admin_parameter() {
 		let block = mail_box();
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (stack, _deployment, _dir) = sydney_resolved();
 		user_data(&block)
 			.as_str()
 			.xpect_contains(&format!(
@@ -2309,7 +2346,7 @@ mod tests {
 	fn production_data_volume_and_replaceable_attachment_are_protected() {
 		let (stack, _deployment, config) = build_config_at(
 			&mail_box(),
-			sydney_stack().with_stage(BootstrapConfig::PROD_STAGE),
+			sydney_stage(BootstrapConfig::PROD_STAGE),
 		);
 		let volume = resource(&config, "aws_ebs_volume");
 		// the subnet's zone by reference, never a second literal: a volume in a
@@ -2372,7 +2409,7 @@ mod tests {
 
 		let (_stack, _deployment, config) = build_config_at(
 			&mail_box().with_data_volume_protected(false),
-			sydney_stack().with_stage(BootstrapConfig::PROD_STAGE),
+			sydney_stage(BootstrapConfig::PROD_STAGE),
 		);
 		let volume = resource(&config, "aws_ebs_volume");
 		volume["final_snapshot"].as_bool().unwrap().xpect_false();
@@ -2548,7 +2585,7 @@ mod tests {
 	#[beet_core::test]
 	fn the_recovery_credential_retires_with_the_claim() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let script = mail_box().secrets_script(&stack);
+		let script = mail_box().secrets_script(&stack).unwrap();
 		// the claimed branch renders the store and an EMPTY env file
 		let (claimed, unclaimed) = script
 			.split_once("else")
@@ -2572,6 +2609,7 @@ mod tests {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		mail_box()
 			.secrets_script(&stack)
+			.unwrap()
 			.as_str()
 			.xpect_contains("render-store");
 	}
@@ -2587,9 +2625,8 @@ mod tests {
 	/// the server's log with the root volume.
 	#[beet_core::test]
 	fn the_agent_tails_the_unit_log_and_the_servers_rotated_log() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let config = mail_box().cloudwatch_config(&stack);
+		let (stack, _deployment, _dir) = sydney_resolved();
+		let config = mail_box().cloudwatch_config(&stack).unwrap();
 		let tails = config["logs"]["logs_collected"]["files"]["collect_list"]
 			.as_array()
 			.unwrap()
@@ -2660,11 +2697,11 @@ mod tests {
 	/// readback, with byte equality between those two verified files.
 	#[beet_core::test]
 	fn backup_is_consistent_and_read_verified() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (stack, _deployment, _dir) = sydney_resolved();
 		mail_box()
 			.with_backup_bucket("archive")
 			.backup_script(&stack)
+			.unwrap()
 			.as_str()
 			.xpect_contains(&format!(
 				"database='{}'",
@@ -2719,10 +2756,10 @@ mod tests {
 	/// deletes.
 	#[beet_core::test]
 	fn cold_copy_never_syncs() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
+		let (stack, _deployment, _dir) = sydney_resolved();
 		cold_box()
 			.cold_script(&stack, &cold_store())
+			.unwrap()
 			.xpect_contains("live:beet-infra--dev--archive/sqlite")
 			.xpect_contains("live:beet-infra--dev--mail-blobs")
 			.xpect_contains("cold:beet-infra--dev--cold-backups/sqlite")
@@ -2747,9 +2784,10 @@ mod tests {
 	/// exists to close.
 	#[beet_core::test]
 	fn a_missing_cold_credential_is_loud() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let (stack, _deployment, _dir) = sydney_resolved();
 		cold_box()
 			.cold_script(&stack, &cold_store())
+			.unwrap()
 			.xpect_contains("no cold credential at")
 			.xpect_contains("run deploy")
 			.xpect_contains("exit 1");
@@ -2827,9 +2865,8 @@ mod tests {
 	#[beet_core::test]
 	fn blob_store_config_holds_s3_and_no_secrets() {
 		let block = mail_box();
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region(aws::region::AP_SOUTHEAST_2);
-		let blob = block.blob_store_config(&stack);
+		let (stack, _deployment, _dir) = sydney_resolved();
+		let blob = block.blob_store_config(&stack).unwrap();
 		blob["@type"].as_str().unwrap().xpect_eq("S3");
 		blob["bucket"]
 			.as_str()
@@ -2872,8 +2909,7 @@ mod tests {
 			.xpect_contains(".public_ip}");
 		mail_box()
 			.with_dns(
-				DnsProvider::cloudflare("mail.beetmash.com", "zone123")
-					.with_proxied(true),
+				DnsProvider::cloudflare("mail.beetmash.com").with_proxied(true),
 			)
 			.validate()
 			.unwrap_err()
@@ -3055,6 +3091,7 @@ mod tests {
 			RenderScope::test_render_stack(sydney_stack(), |parent| {
 				spawn_stack(mail_box(), parent);
 			});
+		StateEncryption::ensure_test_passphrase();
 		scope.project().unwrap().validate().await.unwrap();
 	}
 }

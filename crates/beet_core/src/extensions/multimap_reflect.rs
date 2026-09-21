@@ -312,9 +312,13 @@ fn build_field_value(
 		);
 	}
 
-	// present, but nothing above knew how to read it
-	if map.contains_key(field_name) {
-		return unsupported_field(field_name, leaf_info);
+	// present, but nothing above knew how to read it: a bare key on anything
+	// but a flag wants its value, a valued key a parser for its type
+	if let Some(values) = map.get_vec(field_name) {
+		return match values.is_empty() {
+			true => missing_value(field_name, leaf_info),
+			false => unsupported_field(field_name, leaf_info),
+		};
 	}
 	// absent: the empty form of an optional kind, or the missing flag
 	match absent {
@@ -379,6 +383,20 @@ fn parse_list_field(
 		list.push_box(item);
 	}
 	Ok(Box::new(list))
+}
+
+/// The error a bare `--key` on a non-flag field reports, naming the value it
+/// wants: `--generate` on an `Option<usize>` is `--generate=<usize>`, never
+/// "unsupported type".
+fn missing_value<T>(
+	field_name: &str,
+	type_info: Option<&TypeInfo>,
+) -> Result<T> {
+	let kind = type_info
+		.map(|info| info.type_path_table().short_path())
+		.unwrap_or("value");
+	let key = field_name.to_kebab_case();
+	bevybail!("--{key} needs a value, ie --{key}=<{kind}>")
 }
 
 /// The error a field with no authored form reports, naming the type so the
@@ -633,6 +651,22 @@ mod test {
 		message::<Holder>("--value=x")
 			.xpect_contains("unsupported type for `--value`")
 			.xpect_contains("Opaque");
+	}
+
+	/// A bare key on anything but a flag says it needs a value, naming the
+	/// flag and the type it wants, rather than calling the type unsupported.
+	#[crate::test]
+	fn bare_key_names_the_missing_value() {
+		#[derive(Debug, Reflect)]
+		#[allow(dead_code)]
+		struct Mint {
+			generate: Option<usize>,
+			note: String,
+		}
+		message::<Mint>("--generate --note=x")
+			.xpect_contains("--generate needs a value, ie --generate=<usize>");
+		message::<Mint>("--note")
+			.xpect_contains("--note needs a value, ie --note=<String>");
 	}
 
 	/// `apply_reflect` writes only the present fields over a base with its own

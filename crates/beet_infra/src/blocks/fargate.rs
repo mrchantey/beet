@@ -249,6 +249,7 @@ impl FargateBlock {
 	/// the task role's inline policy.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &FargateBlock)>,
 	) {
 		for (entity, block) in blocks.iter() {
@@ -256,8 +257,9 @@ impl FargateBlock {
 				continue;
 			};
 			let access = scope.access();
-			let (stack, deployment, config) = scope.ctx();
-			if let Err(err) = block.emit(stack, deployment, &access, config) {
+			let stack = stacks.resolve(entity);
+			let (deployment, config) = scope.ctx();
+			if let Err(err) = block.emit(&stack, deployment, &access, config) {
 				scope
 					.error(bevyhow!("FargateBlock '{}': {err}", block.label()));
 			}
@@ -274,7 +276,7 @@ impl FargateBlock {
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = stack.region();
+		let region = stack.region()?;
 		let app_name = stack.app_name();
 		let stage = stack.stage();
 		let deploy_id = deployment.deploy_id();
@@ -1023,8 +1025,9 @@ mod tests {
 		stage: &str,
 	) -> (terra::Config, ResolvedStack, TestWorkDir) {
 		let block = block.clone();
+		let (stack, region, zone) = Stack::test_zoned("example.org");
 		let (scope, dir) = RenderScope::test_render_stack(
-			Stack::new("beet_infra").with_stage(stage),
+			(stack.with_stage(stage), region, zone),
 			move |parent| {
 				parent.spawn(block);
 			},
@@ -1215,11 +1218,10 @@ mod tests {
 
 	#[beet_core::test]
 	fn dns_emits_cert_validation_and_https_listener() {
-		let json =
-			build_json(&autoscaling_block().with_dns(DnsProvider::cloudflare(
-				"dev.example.org",
-				"zone123",
-			)));
+		let json = build_json(
+			&autoscaling_block()
+				.with_dns(DnsProvider::cloudflare("dev.example.org")),
+		);
 		json.as_str()
 			// ACM cert, DNS validated, and the 443 TLS listener
 			.xpect_contains("aws_acm_certificate")
@@ -1238,12 +1240,9 @@ mod tests {
 
 	#[beet_core::test]
 	fn proxied_dns_emits_proxied_record() {
-		let json = build_json(
-			&autoscaling_block().with_dns(
-				DnsProvider::cloudflare("example.org", "zone123")
-					.with_proxied(true),
-			),
-		);
+		let json = build_json(&autoscaling_block().with_dns(
+			DnsProvider::cloudflare("example.org").with_proxied(true),
+		));
 		// the record rides the edge
 		json.as_str().xpect_contains("\"proxied\":true");
 		// ACM validation records stay unproxied even on a proxied deploy
@@ -1254,8 +1253,8 @@ mod tests {
 	fn multiple_dns_emits_san_cert_and_record_each() {
 		let json = build_json(
 			&autoscaling_block()
-				.with_dns(DnsProvider::cloudflare("example.org", "z"))
-				.with_dns(DnsProvider::cloudflare("www.example.org", "z")),
+				.with_dns(DnsProvider::cloudflare("example.org"))
+				.with_dns(DnsProvider::cloudflare("www.example.org")),
 		);
 		json.as_str()
 			// the second authority is a subject alternative name on one cert

@@ -88,8 +88,10 @@ fn load_entry(world: &mut World) {
 		world.spawn(check);
 	}
 	// the recognized template formats (`.bsx`, `.js`), read once here so the async
-	// build can both filter the `templates/` read and lower each source by format.
+	// build can both filter the `templates/` read and lower each source by format,
+	// and the declarations that act before the build, which the plugins registered.
 	let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
 		// the wasm runner forwards the *module's* flags on this same argv, so a
 		// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
@@ -109,7 +111,7 @@ fn load_entry(world: &mut World) {
 		// browser resolves exactly as every other runtime: its served page's
 		// bootstrap named an http repo, which forks into IndexedDB.
 		let resolved = match entry_build::resolve_entry(
-			repo_uri, store_fork, main,
+			&prescans, repo_uri, store_fork, main,
 		)
 		.await
 		{

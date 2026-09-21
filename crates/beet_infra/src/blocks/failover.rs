@@ -23,12 +23,9 @@ use serde_json::json;
 pub struct CloudflareFailoverBlock {
 	/// Resource label prefix.
 	label: SmolStr,
-	/// The proxied hostname the load balancer answers, eg `beet.org`.
+	/// The proxied hostname the load balancer answers, eg `beet.org`, in the
+	/// stack's [`CloudflareZone`]; the pools belong to its [`CloudflareAccount`].
 	hostname: SmolStr,
-	/// The Cloudflare zone id (from `CLOUDFLARE_ZONE_ID`).
-	zone_id: SmolStr,
-	/// The Cloudflare account id the pools belong to (from `CLOUDFLARE_ACCOUNT_ID`).
-	account_id: SmolStr,
 	/// The primary origin address (a hostname/IP), eg the Fargate NLB `dns_name`.
 	primary_origin: SmolStr,
 	/// The fallback origin address (a hostname), eg a Lambda gateway host.
@@ -47,12 +44,6 @@ impl CloudflareFailoverBlock {
 		Self {
 			label: "failover".into(),
 			hostname: hostname.into(),
-			zone_id: env_ext::var("CLOUDFLARE_ZONE_ID")
-				.unwrap_or_default()
-				.into(),
-			account_id: env_ext::var("CLOUDFLARE_ACCOUNT_ID")
-				.unwrap_or_default()
-				.into(),
 			primary_origin: primary_origin.into(),
 			fallback_origin: fallback_origin.into(),
 			health_check_path: "/health".into(),
@@ -80,7 +71,7 @@ impl CloudflareFailoverBlock {
 			"cloudflare_load_balancer_pool",
 			&label,
 			&json!({
-				"account_id": self.account_id,
+				"account_id": stack.cloudflare_account()?.id,
 				"name": ident.primary_identifier(),
 				"monitor": monitor_address,
 				"origins": [{
@@ -118,12 +109,14 @@ impl CloudflareFailoverBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		ensure_cloudflare_provider(config)?;
+		let account_id = stack.cloudflare_account()?.id.clone();
+		let zone_id = stack.cloudflare_zone_holding(&self.hostname)?.id.clone();
 
 		// the health monitor both pools share.
 		let monitor = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("monitor")),
 			CloudflareLoadBalancerMonitorDetails {
-				account_id: self.account_id.clone(),
+				account_id,
 				r#type: Some("http".into()),
 				method: Some("GET".into()),
 				path: Some(self.health_check_path.clone()),
@@ -157,7 +150,7 @@ impl CloudflareFailoverBlock {
 			stack.resource_ident(self.build_label("lb")),
 			CloudflareLoadBalancerDetails {
 				name: self.hostname.clone(),
-				zone_id: self.zone_id.clone(),
+				zone_id,
 				default_pools: vec![primary_pool.into()],
 				fallback_pool: fallback_pool.into(),
 				proxied: Some(true),
@@ -176,26 +169,36 @@ mod tests {
 
 	#[beet_core::test]
 	fn emits_load_balancer_with_primary_and_fallback_pools() {
-		RenderScope::test_json(|parent| {
-			parent.spawn(
-				CloudflareFailoverBlock::new(
+		let (scope, _dir) = RenderScope::test_render_stack(
+			(
+				Stack::test_local(),
+				CloudflareAccount::new("test-account"),
+				CloudflareZone::new("site.example", "test-zone"),
+			),
+			|parent| {
+				parent.spawn(CloudflareFailoverBlock::new(
 					"site.example",
 					"nlb.example",
 					"lambda.example",
-				)
-				// explicit ids: the env-derived defaults are absent in a test run
-				.with_zone_id("test-zone")
-				.with_account_id("test-account"),
-			);
-		})
-		.as_str()
-		.xpect_contains("cloudflare_load_balancer")
-		.xpect_contains("cloudflare_load_balancer_pool")
-		.xpect_contains("cloudflare_load_balancer_monitor")
-		// primary + fallback origins, and the lb steers between two pools
-		.xpect_contains("nlb.example")
-		.xpect_contains("lambda.example")
-		.xpect_contains("fallback_pool")
-		.xpect_contains("\"proxied\":true");
+				));
+			},
+		);
+		scope
+			.finish()
+			.unwrap()
+			.2
+			.to_json_string()
+			.unwrap()
+			.as_str()
+			.xpect_contains("cloudflare_load_balancer")
+			.xpect_contains("\"account_id\":\"test-account\"")
+			.xpect_contains("\"zone_id\":\"test-zone\"")
+			.xpect_contains("cloudflare_load_balancer_pool")
+			.xpect_contains("cloudflare_load_balancer_monitor")
+			// primary + fallback origins, and the lb steers between two pools
+			.xpect_contains("nlb.example")
+			.xpect_contains("lambda.example")
+			.xpect_contains("fallback_pool")
+			.xpect_contains("\"proxied\":true");
 	}
 }

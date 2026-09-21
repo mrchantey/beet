@@ -121,7 +121,7 @@ impl ColdStore {
 		let (access_key, secret_key) = block.parked_pair(secrets).await?;
 		Self {
 			bucket: block.bucket_name(secrets.stack()),
-			endpoint: block.endpoint(),
+			endpoint: block.endpoint(secrets.stack())?,
 			access_key,
 			secret_key,
 		}

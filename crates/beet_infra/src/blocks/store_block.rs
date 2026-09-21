@@ -15,8 +15,10 @@ use beet_net::prelude::*;
 pub trait StoreBlock: Block {
 	/// The uri of this store's ROOT resolved against `stack`: a bucket's
 	/// composed name and region, a filesystem store's path. No per-deploy
-	/// prefix, which [`ErasedStoreBlock::store_uri`] applies.
-	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri;
+	/// prefix, which [`ErasedStoreBlock::store_uri`] applies. An error when
+	/// the stack declares no address the uri needs (a bucket's region), so a
+	/// declaration never lands a store the deploy would not have created.
+	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri>;
 
 	/// Whether every deploy publishes under its own id below the root, so a
 	/// process reads the document version it shipped with: the window between
@@ -58,15 +60,16 @@ pub struct ErasedStoreBlock {
 
 impl ErasedStoreBlock {
 	/// The projection of `block` declared under `stack`.
-	pub fn new(block: &impl StoreBlock, stack: &ResolvedStack) -> Self {
+	pub fn new(block: &impl StoreBlock, stack: &ResolvedStack) -> Result<Self> {
 		Self {
-			root: block.store_uri(stack),
+			root: block.store_uri(stack)?,
 			local: ServiceAccess::local_store_uri(
 				&stack.resource_name(block.label().clone()),
 			),
 			deploy_versioned: block.deploy_versioned(),
 			storage_class: block.storage_class(),
 		}
+		.xok()
 	}
 
 	/// The uri a deploy hands a process: the root, nested under the version's
@@ -127,7 +130,7 @@ impl ErasedStoreBlock {
 			}
 			let stack = world
 				.with_state::<StackQuery, _>(|stacks| stacks.resolve(entity));
-			world.entity_mut(entity).insert(Self::new(&block, &stack));
+			world.entity_mut(entity).insert(Self::new(&block, &stack)?);
 			Ok(())
 		});
 	}

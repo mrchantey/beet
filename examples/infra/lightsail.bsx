@@ -23,7 +23,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zig
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<Stack app_name="lightsail">
+	<Stack app_name="lightsail" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LightsailSiteBlock features="aws_sdk"/>

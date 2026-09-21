@@ -80,23 +80,20 @@ Treat "no apex mail record before the cutover" as an invariant, not a preference
 
 ## 3. Credentials and preflight
 
-**Hand step.** Fill a `.env`:
+**Hand step.** Seal the deployer's credentials into the repo's secrets document, one record each with a note of what it is and where it is re-minted (the secrets tutorial covers the identity and the document):
 
 ```sh
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=ap-southeast-2
-CLOUDFLARE_API_TOKEN=...
-CLOUDFLARE_ZONE_ID=...
-CLOUDFLARE_ACCOUNT_ID=...
-TF_STATE_PASSPHRASE=$(openssl rand -base64 32)
+beet secrets/set AWS_ACCESS_KEY_ID --role=env_var --note=".." --rotation="manual:.."
+beet secrets/set AWS_SECRET_ACCESS_KEY --role=env_var --note=".." --rotation="manual:.."
+beet secrets/set CLOUDFLARE_API_TOKEN --role=env_var --note=".." --rotation="manual:.."
+beet secrets/set TF_STATE_PASSPHRASE --role=env_var --generate --note="opentofu state encryption" --rotation="manual:not re-mintable, losing it loses the state"
 ```
 
-The account variable beet reads is `CLOUDFLARE_ACCOUNT_ID`, not `CLOUDFLARE_DEFAULT_ACCOUNT_ID`. The passphrase is the one unrecoverable value in the file: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. Back it up somewhere durable before you run anything.
+The region, the Cloudflare account and the zone are not credentials: they are identifiers, public in every dashboard url, and they are declared in the markup as spreads on the stack or its root (`{AwsRegion("ap-southeast-2")}`, `{CloudflareAccount{id:".."}}`, `{CloudflareZone{domain:"example.com", id:".."}}`, see section 6), never read from the environment. The passphrase is the one unrecoverable value in the document: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. It is generated in-process and never printed; the document is committed, so the identity that opens it is the backup.
 
 Not every mail credential is in there. A comail api key is parked in parameter store by you and read by the deploy verbs directly, and the sovereign DKIM private half never leaves parameter store either; only its public half is a tofu variable. What state carries is what terraform *derives*, which for mail is the SES pair.
 
-Cloudflare token scopes: Zone > DNS > Edit and Zone > Zone > Read narrowed to the one zone; Account > Workers Scripts > Edit and Account > Workers R2 Storage > Edit (the MTA-STS worker, the cold bucket); and Account > Account API Tokens > Read + Edit, which is what lets the apply mint the cold bucket's own scoped token rather than a human doing it in the dashboard. That last one makes this token the deployer in the same sense the IAM user is: the one hand-made credential for its provider, holding enough to provision the account, from which every runtime credential is minted. Treat `.env` accordingly.
+Cloudflare token scopes: Zone > DNS > Edit and Zone > Zone > Read narrowed to the one zone; Account > Workers Scripts > Edit and Account > Workers R2 Storage > Edit (the MTA-STS worker, the cold bucket); and Account > Account API Tokens > Read + Edit, which is what lets the apply mint the cold bucket's own scoped token rather than a human doing it in the dashboard. That last one makes this token the deployer in the same sense the IAM user is: the one hand-made credential for its provider, holding enough to provision the account, from which every runtime credential is minted. Treat the document's recipient list accordingly.
 
 **Hand step, and worth doing before creating anything.** Prove every permission you are about to need, cheaply, in the order that fails fastest:
 
@@ -113,8 +110,8 @@ Then one cheap read per AWS service you will touch (`ec2`, `sesv2`, `ssm`, `iam`
 **Hand step.** Enumerate the whole zone before you touch it, rather than reasoning about what ought to be in it:
 
 ```sh
-curl -s "https://api.cloudflare.com/client/v4/zones/$CLOUDFLARE_ZONE_ID/dns_records?per_page=200" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+beet secrets/exec -- sh -c 'curl -s "https://api.cloudflare.com/client/v4/zones/<zone id>/dns_records?per_page=200" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"'
 ```
 
 The default page size is 100, so a zone that outgrew one page will quietly report only its first hundred records. Ours held two records that were in nobody's plan: the ACM DNS-validation CNAMEs for the website's certificate, whose names are computed by ACM and can therefore only ever be *allowed as a pattern*. You will want that inventory again in section 6, when you write the audit allowlist.
@@ -196,7 +193,7 @@ All the sets can publish to one account-wide SNS topic. Events carry their confi
 Now the automated part. One `.bsx` file declares the whole system, and the boundary between this section and the previous two is the honest answer to how much of this is automated.
 
 ```jsx
-<Stack app_name="acme" region="ap-southeast-2">
+<Stack app_name="acme" {(AwsRegion("ap-southeast-2"), CloudflareAccount{id:".."}, CloudflareZone{domain:"example.com", id:".."})}>
 	<DeployRoutes/>
 
 	<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false ipv6=true/>
@@ -357,8 +354,7 @@ It prints secrets to stdout, deliberately and uniquely in this stack. Mind what 
 The hand version, for when you want one value and not all of them:
 
 ```sh
-set -a && source .env && set +a
-aws ssm get-parameter --region "$AWS_REGION" \
+beet secrets/exec -- aws ssm get-parameter --region ap-southeast-2 \
   --name "/acme/prod/mail-account-pete-at-stalwart-example-com" \
   --with-decryption --query Parameter.Value --output text
 ```
@@ -476,7 +472,7 @@ The last rung is still manual: `rclone copy :s3:<cold-bucket> <local>` from hard
 
 The bucket answers to an R2 api token, which no IAM policy can grant, so the apply mints one: an account-owned token scoped to that one bucket's objects, whose id is the S3 access key id and whose value's SHA-256 is the secret. Both are parked as `SecureString` parameters under the stack's prefix (`cold-backups-access-key-id`, `cold-backups-secret-access-key`), the same way the box's SES relay pair is parked, and every cold verb reads that pair: the box's timer through its instance role (the bucket block's grants are exactly those two parameter reads), and the deploy machine's export, push, probe and drill through the same names. Rotation is `tofu apply -replace` on the token resource.
 
-This is the credential tiering the whole stack follows, and it is worth stating because the alternative looks reasonable until you have done it once. There is exactly one hand-made credential per provider, the deployer's: the IAM user in `.env` (which is why terraform can mint the SES user and its access key) and the Cloudflare token beside it, which therefore needs `Account API Tokens: Edit` alongside its DNS, Workers and R2 scopes (section 3). Every runtime credential is minted by an apply, scoped to one resource, parked in the stack's secret store and read through a grant. The version of this section that had you minting the R2 token in the dashboard and running `aws ssm put-parameter` by hand worked, and was the anomaly: a deployer with a human inside its loop.
+This is the credential tiering the whole stack follows, and it is worth stating because the alternative looks reasonable until you have done it once. There is exactly one hand-made credential per provider, the deployer's: the IAM user in the secrets document (which is why terraform can mint the SES user and its access key) and the Cloudflare token beside it, which therefore needs `Account API Tokens: Edit` alongside its DNS, Workers and R2 scopes (section 3). Every runtime credential is minted by an apply, scoped to one resource, parked in the stack's secret store and read through a grant. The version of this section that had you minting the R2 token in the dashboard and running `aws ssm put-parameter` by hand worked, and was the anomaly: a deployer with a human inside its loop.
 
 The one credential the stack does not mint is the age identity the exports are sealed to, because its whole point is to be held by a human off both clouds. `beet vault/keygen` makes one per person; the public halves are the recipient list of the entry document's `default` group, which every export copies, any one identity decrypts, and no identity is shared. Reading an export by hand is `age -d -i ~/.config/beet/age/keys.txt` on the blob pasted out of it, and the plaintext inside is the group's records as toml, each label with its value, note and provider address.
 

@@ -233,16 +233,17 @@ pub async fn MtaStsUnpublish(
 		.map(|domain| MtaStsPolicy::host(domain.domain()))
 		.collect::<Vec<_>>();
 
+	let account = mail.stack.cloudflare_account()?;
 	for removal in MtaStsUnpublish::removals(&hosts, &worker) {
 		match &removal {
 			MtaStsRemoval::CustomDomain(host) => {
-				match wrangler_ext::delete_custom_domain(host).await? {
+				match wrangler_ext::delete_custom_domain(account, host).await? {
 					true => info!("removed the custom domain at {host}"),
 					false => info!("no custom domain at {host}"),
 				}
 			}
 			MtaStsRemoval::Script(name) => {
-				match wrangler_ext::delete_script(name).await? {
+				match wrangler_ext::delete_script(account, name).await? {
 					true => info!("removed the mta-sts worker `{name}`"),
 					false => info!("no mta-sts worker `{name}`"),
 				}

@@ -138,7 +138,7 @@ async fn deploy(deploy: &TestDeploy, assets_dir: &AbsPath) -> Result {
 		.into_world()
 		.xtap(|world| world.insert_resource(deploy.deployment.clone()))
 		.spawn((
-			deploy.stack.clone(),
+			deploy.root(),
 			repo_store_block(),
 			ExchangeSequence,
 			// the bucket first, so the site is in place before the instance

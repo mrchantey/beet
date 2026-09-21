@@ -38,6 +38,14 @@ pub struct TemplateDir {
 	pub src: RelPath,
 }
 
+/// Read by the entry's source read, which registers the dir's templates
+/// before the entry parses.
+impl Prescan for TemplateDir {
+	fn describe() -> &'static str {
+		"registers the templates under `src` before the entry parses, so its own tags resolve"
+	}
+}
+
 /// The template names an owner (a [`TemplateFile`] entity, or the entry root
 /// for the entry-level pre-registration) registered into the
 /// [`BsxTemplateRegistry`]. Re-registering diffs against it so a name the

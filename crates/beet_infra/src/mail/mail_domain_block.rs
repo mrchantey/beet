@@ -209,21 +209,23 @@ impl MailDomainBlock {
 		self.report_domain.as_ref().unwrap_or(&self.domain)
 	}
 
-	/// The zone this domain's records are published into: the declared
-	/// [`dns`](Self::with_dns) provider, else a Cloudflare zone read from
-	/// `CLOUDFLARE_ZONE_ID`.
+	/// The provider this domain's records are published through: the
+	/// declared [`dns`](Self::with_dns) provider, else Cloudflare records in
+	/// the stack's [`CloudflareZone`], resolved at render from the block's
+	/// ancestry (so a second domain in a second zone carries its own spread).
 	///
 	/// A declaration says which domain it serves and nothing about where the
 	/// zone lives, exactly as it says nothing about which AWS account it
-	/// deploys into: both are properties of the launch. `None` is the honest
-	/// answer for a domain whose records somebody else publishes, which is
-	/// [`MailRecords::None`]'s whole meaning.
+	/// deploys into: both are addresses declared above it. `None` (no
+	/// provider at all) is a build without `cloudflare_dns` and no `with_dns`;
+	/// a domain whose records somebody else publishes says so with
+	/// [`MailRecords::None`], which emits nothing through any provider.
 	pub fn resolved_dns(&self) -> Option<DnsProvider> {
 		if let Some(dns) = &self.dns {
 			return Some(dns.clone());
 		}
 		#[cfg(feature = "cloudflare_dns")]
-		return DnsProvider::cloudflare_env(self.domain.clone());
+		return Some(DnsProvider::cloudflare(self.domain.clone()));
 		#[cfg(not(feature = "cloudflare_dns"))]
 		None
 	}
@@ -399,12 +401,14 @@ impl MailDomainBlock {
 		stack: &ResolvedStack,
 		topic: &SmolStr,
 		declared: &[SnsTopicBlock],
-	) -> String {
-		declared
+	) -> Result<String> {
+		match declared
 			.iter()
 			.find(|block| block.topic_name(stack) == topic.as_str())
-			.map(|block| block.arn_ref(stack))
-			.unwrap_or_else(|| SnsTopicBlock::composed_arn(stack, topic))
+		{
+			Some(block) => block.arn_ref(stack).xok(),
+			None => SnsTopicBlock::composed_arn(stack, topic),
+		}
 	}
 
 	/// The ARN of [`alarms_topic`](Self::alarms_topic), ie where every arm's
@@ -413,10 +417,11 @@ impl MailDomainBlock {
 		&self,
 		stack: &ResolvedStack,
 		declared: &[SnsTopicBlock],
-	) -> Option<String> {
+	) -> Result<Option<String>> {
 		self.alarms_topic
 			.as_ref()
 			.map(|topic| Self::topic_arn(stack, topic, declared))
+			.transpose()
 	}
 
 	/// A terraform label for this domain's `suffix` resource, distinct from
@@ -511,6 +516,7 @@ impl MailDomainBlock {
 	/// deliverability poll publishes into.
 	pub(crate) fn declare(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &MailDomainBlock)>,
 		relays: RelayQuery,
 	) {
@@ -525,13 +531,13 @@ impl MailDomainBlock {
 			match relay {
 				Err(err) => scope.error(err),
 				Ok(relay) => {
-					let grants =
-						block.grants(scope.stack()).xmap(|mut grants| {
-							grants.extend(block.relay_grants(&relay));
-							grants
-						});
+					let stack = stacks.resolve(entity);
+					let grants = block.grants(&stack).xmap(|mut grants| {
+						grants.extend(block.relay_grants(&relay));
+						grants
+					});
 					let variables =
-						block.variables(scope.stack()).xmap(|mut variables| {
+						block.variables(&stack).xmap(|mut variables| {
 							variables.extend(block.relay_variables(&relay));
 							variables
 						});
@@ -545,6 +551,7 @@ impl MailDomainBlock {
 	/// errors rather than short-circuiting the rest.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &MailDomainBlock)>,
 		relays: RelayQuery,
 		topics: Query<(Entity, &SnsTopicBlock)>,
@@ -569,9 +576,10 @@ impl MailDomainBlock {
 			match relay {
 				Err(err) => scope.error(err),
 				Ok(relay) => {
-					let (stack, _, config) = scope.ctx();
+					let stack = stacks.resolve(entity);
+					let (_, config) = scope.ctx();
 					if let Err(err) =
-						block.emit(stack, config, &relay, &declared)
+						block.emit(&stack, config, &relay, &declared)
 					{
 						scope.error(bevyhow!(
 							"MailDomainBlock '{}': {err}",
@@ -679,14 +687,14 @@ impl MailDomainBlock {
 				)?;
 				self.emit_delivery_records(stack, config, &dns, relay)?;
 			}
-			// a domain that declares records but resolves no zone would apply
+			// a domain that declares records but has no provider would apply
 			// clean and publish nothing, which is the one failure a mail stack
 			// cannot see: the identity exists, the deploy is green, and the
-			// domain is undeliverable. Checked here rather than in `validate`
-			// because which zone a launch has is not a property of the
-			// declaration, and every non-deploy reader validates too.
+			// domain is undeliverable.
 			None if self.records.proves_identity() => bevybail!(
-				"mail domain '{}' publishes records but no zone resolves: set CLOUDFLARE_ZONE_ID, `with_dns` a provider, or declare `records=\"None\"` for a domain whose records somebody else holds",
+				"mail domain '{}' publishes records but has no provider: \
+				`with_dns` one, build with `cloudflare_dns`, or declare \
+				`records=\"None\"` for a domain whose records somebody else holds",
 				self.domain
 			),
 			None => {}
@@ -792,6 +800,7 @@ impl MailDomainBlock {
 			.events_topic()
 			.as_ref()
 			.map(|topic| Self::topic_arn(stack, topic, topics))
+			.transpose()?
 		else {
 			return Ok(());
 		};
@@ -926,7 +935,7 @@ impl MailDomainBlock {
 		dimension_value: &str,
 		alarms: &[(&str, f64, &str)],
 	) -> Result {
-		let Some(topic) = self.alarms_topic_arn(stack, topics) else {
+		let Some(topic) = self.alarms_topic_arn(stack, topics)? else {
 			return Ok(());
 		};
 		// the account the apply runs in, since a topic name is not an address
@@ -1047,7 +1056,7 @@ impl MailDomainBlock {
 			&self.label("mail-from-mx"),
 			&mail_from,
 			Self::MX_PRIORITY,
-			&SesRelay::feedback_host(&stack.region()),
+			&SesRelay::feedback_host(stack.region()?),
 		)?;
 		dns.emit_txt(
 			stack,
@@ -1192,10 +1201,6 @@ mod tests {
 	/// off a third party.
 	fn staging() -> MailDomainBlock {
 		MailDomainBlock::new("stalwart.beetmash.com", "mail.beetmash.com")
-			.with_dns(DnsProvider::cloudflare(
-				"stalwart.beetmash.com",
-				"zone123",
-			))
 			.with_member(Member::new("pete"))
 			.with_member(Member::new("info"))
 			.with_mailbox(Mailbox::new("probe"))
@@ -1207,7 +1212,6 @@ mod tests {
 	/// catch-all.
 	fn news() -> MailDomainBlock {
 		MailDomainBlock::new("news.beetmash.com", "mail.beetmash.com")
-			.with_dns(DnsProvider::cloudflare("news.beetmash.com", "zone123"))
 			.with_report_domain("stalwart.beetmash.com")
 			.with_mailbox(Mailbox::new("publications"))
 			.with_alias(Alias::new("blog", "publications"))
@@ -1215,9 +1219,18 @@ mod tests {
 	}
 
 	/// The Sydney stack every test renders against, ie the one the mail stack
-	/// deploys into.
-	fn sydney_stack() -> Stack {
-		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
+	/// deploys into, zoned for `beetmash.com`.
+	fn sydney_stack() -> (Stack, AwsRegion, CloudflareZone) {
+		sydney_stage(BootstrapConfig::DEFAULT_STAGE)
+	}
+
+	/// [`sydney_stack`] deployed to `stage`.
+	fn sydney_stage(stage: &str) -> (Stack, AwsRegion, CloudflareZone) {
+		(
+			Stack::new("beet_infra").with_stage(stage),
+			AwsRegion::new(aws::region::AP_SOUTHEAST_2),
+			CloudflareZone::new("beetmash.com", Stack::TEST_ZONE_ID),
+		)
 	}
 
 	/// One domain and the relay composed beside it, ie what a declaration
@@ -1511,8 +1524,7 @@ mod tests {
 	#[beet_core::test]
 	fn identity_only_publishes_nothing_that_moves_mail() {
 		let apex = MailDomainBlock::new("beetmash.com", "mail.beetmash.com")
-			.with_records(MailRecords::IdentityOnly)
-			.with_dns(DnsProvider::cloudflare("beetmash.com", "zone123"));
+			.with_records(MailRecords::IdentityOnly);
 		records(&ses(&[apex]))
 			.into_iter()
 			.map(|(record_type, name)| format!("{record_type} {name}"))
@@ -1539,15 +1551,13 @@ mod tests {
 	#[beet_core::test]
 	fn only_the_owning_stage_publishes_the_records() {
 		let records_in = |stage: &str| {
-			let (scope, _dir) = RenderScope::test_render_stack(
-				Stack::new("beet_infra").with_stage(stage),
-				|parent| {
+			let (scope, _dir) =
+				RenderScope::test_render_stack(sydney_stage(stage), |parent| {
 					parent.spawn((
 						staging().with_dns_stage("prod"),
 						SesRelay::default(),
 					));
-				},
-			);
+				});
 			scope.finish().unwrap().2.to_json().into_json()
 		};
 		records_in("prod")["resource"]["cloudflare_dns_record"]
@@ -1597,15 +1607,13 @@ mod tests {
 		// ..and a stage outside `dns_stage` publishes no record but still
 		// declares the variable, since a `-var` for a variable the config never
 		// declared fails the apply
-		let (scope, _dir) = RenderScope::test_render_stack(
-			Stack::new("beet_infra").with_stage("drill"),
-			|parent| {
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stage("drill"), |parent| {
 				parent.spawn((
 					staging().with_dns_stage("prod"),
 					SesRelay::default(),
 				));
-			},
-		);
+			});
 		scope.finish().unwrap().2.to_json().into_json()["variable"]
 			["dkim_stalwart_beetmash_com"]
 			.is_object()

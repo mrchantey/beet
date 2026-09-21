@@ -88,11 +88,11 @@ pub async fn AwsWatch(
 ) -> Result<Outcome<Request, Response>> {
 	let (region, log_group) = cx
 		.caller
-		.with_state::<StackQuery, _>(move |entity, query| {
+		.with_state::<StackQuery, _>(move |entity, query| -> Result<_> {
 			let stack = query.resolve(entity);
-			(stack.region().clone(), target.log_group(&stack))
+			(stack.region()?.clone(), target.log_group(&stack)).xok()
 		})
-		.await?;
+		.await??;
 
 	info!("tailing CloudWatch log group: {log_group} (region: {region})");
 

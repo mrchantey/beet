@@ -113,7 +113,8 @@ impl RenderScope {
 
 	/// A seeded scope: the backend this launch deploys with, the encryption
 	/// the stack declares (else the launch's), and the provider region the
-	/// stack resolves.
+	/// stack declares, failing here rather than in every block when it
+	/// declares none.
 	fn new(stack: ResolvedStack, deployment: Deployment) -> Result<Self> {
 		let deployment = match stack.state_encryption() {
 			StateEncryption::None => deployment,
@@ -122,7 +123,7 @@ impl RenderScope {
 		let mut config = deployment.create_config(&stack);
 		config.add_provider_config(
 			&terra::Provider::AWS,
-			&serde_json::json!({ "region": stack.region() }),
+			&serde_json::json!({ "region": stack.region()? }),
 		)?;
 		Ok(Self {
 			stack,
@@ -169,10 +170,12 @@ impl RenderScope {
 	/// This launch's deploy mechanics (its id, its state backend).
 	pub fn deployment(&self) -> &Deployment { &self.deployment }
 
-	/// Split borrows for a block body: the identity, the launch, and the config
-	/// it emits into.
-	pub fn ctx(&mut self) -> (&ResolvedStack, &Deployment, &mut terra::Config) {
-		(&self.stack, &self.deployment, &mut self.config)
+	/// Split borrows for a block body: the launch and the config it emits
+	/// into. The stack a block renders against is its own
+	/// ([`StackQuery::resolve`] of the block's entity, so a block carrying an
+	/// address spread renders with it), not the root's held here.
+	pub fn ctx(&mut self) -> (&Deployment, &mut terra::Config) {
+		(&self.deployment, &mut self.config)
 	}
 
 	/// Contribute a block's declarations to the pools.
@@ -202,41 +205,47 @@ impl RenderScope {
 }
 
 /// The generic Declare-set system: contribute each declared `T`'s grants and
-/// variables to the scope above it. A block outside every rendering scope is
-/// simply not being rendered.
+/// variables to the scope above it, against the stack the block's own entity
+/// resolves (its root's identity, the addresses nearest it). A block outside
+/// every rendering scope is simply not being rendered.
 ///
 /// Public because a block crate outside `beet_infra` registers it for its own
 /// type, exactly as [`InfraPlugin`] does for the blocks defined here.
 pub fn declare<T: Block>(
 	mut scopes: AncestorQuery<&mut RenderScope>,
+	stacks: StackQuery,
 	blocks: Query<(Entity, &T)>,
 ) {
 	for (entity, block) in blocks.iter() {
 		let Ok(mut scope) = scopes.get_mut(entity) else {
 			continue;
 		};
-		let grants = block.grants(scope.stack());
-		let variables = block.variables(scope.stack());
+		let stack = stacks.resolve(entity);
+		let grants = block.grants(&stack);
+		let variables = block.variables(&stack);
 		scope.declare(grants, variables);
 	}
 }
 
 /// The generic Render-set system for a simple block: emit each declared `T`
-/// into the scope above it, collecting per-entity errors attributed to the
-/// block rather than short-circuiting the rest.
+/// into the scope above it, against the stack its own entity resolves,
+/// collecting per-entity errors attributed to the block rather than
+/// short-circuiting the rest.
 ///
 /// Public for the same reason as [`declare`]: an out-of-tree block rides these
 /// two systems rather than restating them.
 pub fn render<T: EmitBlock>(
 	mut scopes: AncestorQuery<&mut RenderScope>,
+	stacks: StackQuery,
 	blocks: Query<(Entity, &T)>,
 ) {
 	for (entity, block) in blocks.iter() {
 		let Ok(mut scope) = scopes.get_mut(entity) else {
 			continue;
 		};
-		let (stack, deployment, config) = scope.ctx();
-		if let Err(err) = block.emit(stack, deployment, config) {
+		let stack = stacks.resolve(entity);
+		let (deployment, config) = scope.ctx();
+		if let Err(err) = block.emit(&stack, deployment, config) {
 			let err = bevyhow!(
 				"{} '{}': {err}",
 				type_ext::short_name::<T>(),
@@ -296,11 +305,12 @@ pub(crate) fn related<'a, T: Component>(
 /// pool the deploy runs.
 #[cfg(test)]
 impl RenderScope {
-	/// Render the blocks `func` spawns under a fresh local `<Stack>` root.
-	/// Returns the scope with any collected errors still inside, so an error
-	/// test asserts on them and a happy test calls [`finish`](Self::finish).
+	/// Render the blocks `func` spawns under a fresh local root carrying
+	/// `stack` (a `Stack` and whatever addresses the blocks need). Returns
+	/// the scope with any collected errors still inside, so an error test
+	/// asserts on them and a happy test calls [`finish`](Self::finish).
 	pub(crate) fn test_render_stack(
-		stack: Stack,
+		stack: impl Bundle,
 		func: impl FnOnce(&mut ChildSpawner),
 	) -> (Self, crate::types::TestWorkDir) {
 		let (deployment, dir) = Deployment::default_local();
@@ -317,7 +327,26 @@ impl RenderScope {
 	pub(crate) fn test_render(
 		func: impl FnOnce(&mut ChildSpawner),
 	) -> (Self, crate::types::TestWorkDir) {
-		Self::test_render_stack(Stack::new("beet_infra"), func)
+		Self::test_render_stack(Stack::test_local(), func)
+	}
+
+	/// [`test_render`](Self::test_render) with a Cloudflare zone for `domain`
+	/// declared on the stack, for a block publishing records into it.
+	pub(crate) fn test_render_zoned(
+		domain: &str,
+		func: impl FnOnce(&mut ChildSpawner),
+	) -> (Self, crate::types::TestWorkDir) {
+		Self::test_render_stack(Stack::test_zoned(domain), func)
+	}
+
+	/// The terraform json the blocks `func` spawns render to under a stack
+	/// zoned for `domain`, failing the test on any collected error.
+	pub(crate) fn test_json_zoned(
+		domain: &str,
+		func: impl FnOnce(&mut ChildSpawner),
+	) -> String {
+		let (scope, _dir) = Self::test_render_zoned(domain, func);
+		scope.finish().unwrap().2.to_json_string().unwrap()
 	}
 
 	/// The terraform json the blocks `func` spawns render to, failing the test

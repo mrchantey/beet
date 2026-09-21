@@ -47,7 +47,9 @@ impl Block for StoreUriBlock {
 }
 
 impl StoreBlock for StoreUriBlock {
-	fn store_uri(&self, _stack: &ResolvedStack) -> StoreUri { self.uri.clone() }
+	fn store_uri(&self, _stack: &ResolvedStack) -> Result<StoreUri> {
+		self.uri.clone().xok()
+	}
 
 	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
 }

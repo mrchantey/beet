@@ -52,7 +52,8 @@ that relays everything wants.
 `validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
 machine. It also needs domains you actually own: every name below is an RFC 2606
-example domain and the zone id is a placeholder, so a real deploy replaces both.
+example domain and the zone declared on the `<Stack>` is a placeholder, so a
+real deploy replaces both.
 
 Direct delivery also needs port 25 EGRESS from the box, which it has (the
 security group allows all outbound) and which no relay arm needs at all. Note
@@ -60,11 +61,11 @@ that `<MailHealth/>`'s banner check dials port 25 INBOUND from wherever you run
 it, and most residential ISPs block that, so run it from somewhere with 25 egress
 or trust the probe instead.
 
-Note the zone is written out on all three blocks (`dns={Cloudflare{..}}`) only
-so the example validates with nothing configured, which is also why it repeats.
-A real stack omits `dns` entirely and sets `CLOUDFLARE_ZONE_ID`: which zone a
-launch writes into is a property of the launch rather than of any declaration,
-so each block reads it from the environment and none of them restate it.
+Note the zone is declared ONCE, as a `{CloudflareZone{..}}` spread on the
+`<Stack>`: every block under it publishes into the zone nearest it by ancestry,
+so none of them restate it, and a block whose records belong in another zone
+carries its own spread. A record whose name the zone does not hold fails the
+render by name, the cheap guard against a wrong spread.
 
 The box needs a zone of its own because the record it publishes is its own: an
 `A` at `mail.example.com`, which every `MX` here targets and which its
@@ -104,10 +105,11 @@ route.
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<!-- the region is a decision here (an mta near its users and its persistent
-	     volume), so the stack pins it rather than inheriting `AWS_REGION`: a deploy
-	     from a differently-configured machine builds the same stack. -->
-	<Stack app_name="mail-example" region="us-west-2">
+	<!-- the addresses are declared here, never read from the environment: the
+	     region is a decision (an mta near its users and its persistent volume)
+	     and the zone is where every record below lands, so a deploy from any
+	     machine builds the same stack. -->
+	<Stack app_name="mail-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
 		<Group bx:ref="deploy_up">
 			<EnsureSecret secret="mail-admin-password"/>
 			<!-- the sovereign signing key, minted before the apply that
@@ -170,7 +172,6 @@ route.
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
 			{VpcRef($net)}
-			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 
 		<!-- the domain people have mailboxes on. `postmaster@` and `abuse@` are the
@@ -179,7 +180,6 @@ route.
 		<MailDomainBlock
 			domain="example.com"
 			mail_host="mail.example.com"
-			dns={Cloudflare{authority:"example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			mailboxes={[
 				{localpart:"hello", admin:true},
 				{localpart:"probe"},
@@ -197,7 +197,6 @@ route.
 			domain="news.example.com"
 			mail_host="mail.example.com"
 			report_domain="example.com"
-			dns={Cloudflare{authority:"news.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			catch_all="replies"
 			mailboxes={[{localpart:"replies"}]}/>
 

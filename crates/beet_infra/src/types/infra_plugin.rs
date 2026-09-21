@@ -25,6 +25,11 @@ impl Plugin for InfraPlugin {
 		// under one id.
 		app.register_type::<crate::prelude::Stack>()
 			.init_resource::<crate::prelude::Deployment>();
+		// ..and where its resources land at each provider, spreads on the
+		// stack or an ancestor resolved by ancestry (never the environment).
+		app.register_type::<crate::prelude::AwsRegion>()
+			.register_type::<crate::prelude::CloudflareAccount>()
+			.register_type::<crate::prelude::CloudflareZone>();
 
 		// the deploy render schedule: every declaration lands before any render
 		// reads the grant pool. Target-agnostic like the definitions, so a wasm
@@ -686,7 +691,7 @@ mod test {
 	#[beet_core::test]
 	fn the_cold_copy_spawns_by_tag() {
 		let mut world = spawn(
-			r#"<Fragment>
+			r#"<Fragment {CloudflareAccount{id:"acct123"}}>
 				<R2BucketBlock label="cold-backups" location="weur"
 					expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"

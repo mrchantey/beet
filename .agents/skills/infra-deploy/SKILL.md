@@ -63,7 +63,7 @@ Do NOT read a single `curl: (22) The requested URL returned error: 500` in that 
 
 ## Commands
 
-Every credential and identifier the deploy needs (the AWS pair, `CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`, `AWS_REGION`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`) is a record of the repo's `secrets.toml`, loaded into the process environment by the launch before the entry builds; there is no `.env`. Reading it needs this machine's age identity (`beet secrets/check` says whether it opens, `beet secrets/ls` lists the records with what each is and where it is re-minted). Always use the `beet-*` recipes: they build with `--features infra,extra` (without which the deploy routes load as inert tags and the verb does nothing) and clear `AWS_PROFILE`.
+Every credential the deploy needs (the AWS pair, `CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) is a record of the repo's `secrets.toml`, loaded into the process environment by the launch before the entry builds; there is no `.env`. The provider addresses (the region, the Cloudflare account and zone) are not secrets: they are `{AwsRegion(..)}`, `{CloudflareAccount{..}}` and `{CloudflareZone{..}}` spreads on the entry's root `<Router>` (or a stack), resolved by ancestry and never read from the environment, so a stack with none fails its render naming the spread. Reading it needs this machine's age identity (`beet secrets/check` says whether it opens, `beet secrets/ls` lists the records with what each is and where it is re-minted). Always use the `beet-*` recipes: they build with `--features infra,extra` (without which the deploy routes load as inert tags and the verb does nothing) and clear `AWS_PROFILE`.
 
 | intent | command |
 | --- | --- |
@@ -273,7 +273,7 @@ Only relevant when a hostname moves between backends whose records differ in typ
 Delete the conflicting records first, then deploy immediately:
 
 1. Pre-build so the deploy's build step is a no-op and the window is as short as possible: `cargo-zigbuild build --package beet-cli --bin beet --release --target x86_64-unknown-linux-gnu --no-default-features --features aws_sdk,ssh,geoip`.
-2. Delete each conflicting record through the Cloudflare API (`DELETE /zones/$CLOUDFLARE_ZONE_ID/dns_records/<id>`). This starts the outage.
+2. Delete each conflicting record through the Cloudflare API (`DELETE /zones/<zone id>/dns_records/<id>`, the id `CloudflareZone` declares in the entry). This starts the outage.
 3. `just beet-deploy --stage=prod` straight away.
 
 Two gotchas afterwards:

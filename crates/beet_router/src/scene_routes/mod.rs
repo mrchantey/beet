@@ -40,12 +40,12 @@ pub use template_dir::*;
 mod repo_root;
 #[cfg(feature = "bsx")]
 pub use repo_root::*;
-// the one registry-free walk entry resolution reads its pre-scanned declarations
-// (`<RepoRoot>`, `<TemplateDir>`, `<RequireCfg>`, `<Template src>`) from.
+// the registered set of declarations that act before the entry builds, and the
+// one registry-free walk entry resolution reads them (and `<Template src>`) from.
 #[cfg(feature = "bsx")]
-mod entry_prescan;
+mod prescan;
 #[cfg(feature = "bsx")]
-pub use entry_prescan::*;
+pub use prescan::*;
 // `RoutesDir` + its discovery is compiled on every std target: one observer
 // scans the store off the async runtime, so native and wasm share the path.
 mod routes_dir;

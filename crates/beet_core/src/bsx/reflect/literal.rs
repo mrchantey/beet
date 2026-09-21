@@ -194,6 +194,38 @@ mod test {
 		});
 	}
 
+	/// A struct literal naming a field the target does not have is an error
+	/// naming both, never a value that quietly drops it: a declaration written
+	/// against a field that has since moved must fail rather than do something
+	/// else (`{SyncS3Bucket{paths:".."}}` once synced a whole checkout).
+	#[crate::test]
+	fn an_unknown_field_is_refused() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Sync {
+			delete: bool,
+		}
+		let registry = TypeRegistry::default();
+		let mut resolver = |_: &str| Entity::PLACEHOLDER;
+		DataLiteral::to_reflect(
+			&DataLiteral::Enum(NamedLiteral {
+				name: "Sync".into(),
+				fields: NamedFields::Struct(vec![
+					("delete".into(), DataLiteral::Scalar(Value::Bool(true))),
+					(
+						"paths".into(),
+						DataLiteral::Scalar(Value::Str("main.bsx".into())),
+					),
+				]),
+			}),
+			Some(Sync::type_info()),
+			&registry,
+			&mut resolver,
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("`Sync` has no field `paths`");
+	}
+
 	/// A malformed pattern errors rather than panicking inside the glob
 	/// validator, since a markup attribute is authored input.
 	#[crate::test]

@@ -175,7 +175,7 @@ pub async fn ZoneAudit(
 	// resolved first: a zone-scoped render filters the declarations it unions by
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.
-	let (zone_id, token) = zone_env()?;
+	let (zone_id, token) = zone_auth(&cx.caller).await?;
 	let audited = zone_id.clone();
 	let (declared, allowed) = cx
 		.caller
@@ -399,11 +399,18 @@ fn normalize(name: &str) -> String {
 	name.trim_end_matches('.').to_ascii_lowercase()
 }
 
-/// The zone id + api token from the environment, the auth every zone call
-/// needs.
-fn zone_env() -> Result<(SmolStr, SmolStr)> {
-	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID")
-		.map_err(|_| bevyhow!("CLOUDFLARE_ZONE_ID is unset"))?;
+/// The zone id the audit's entity resolves by ancestry
+/// ([`ResolvedStack::cloudflare_zone`]) and the api token from the
+/// environment, the auth every zone call needs.
+async fn zone_auth(caller: &AsyncEntity) -> Result<(SmolStr, SmolStr)> {
+	let zone_id = caller
+		.with_state::<StackQuery, _>(|entity, stacks| {
+			stacks
+				.resolve(entity)
+				.cloudflare_zone()
+				.map(|zone| zone.id.clone())
+		})
+		.await??;
 	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
 		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
 	Ok((zone_id, token))
@@ -473,15 +480,18 @@ mod tests {
 
 	fn staging() -> MailDomainBlock {
 		MailDomainBlock::new("stalwart.beetmash.com", "mail.beetmash.com")
-			.with_dns(DnsProvider::cloudflare("stalwart.beetmash.com", "zone1"))
 			.with_mailbox(Mailbox::new("pete"))
 	}
 
 	/// A second mail domain, for the sibling stack a zone-scoped audit must see.
-	fn news(zone: &str) -> MailDomainBlock {
+	fn news() -> MailDomainBlock {
 		MailDomainBlock::new("news.beetmash.com", "mail.beetmash.com")
-			.with_dns(DnsProvider::cloudflare("news.beetmash.com", zone))
 			.with_mailbox(Mailbox::new("pete"))
+	}
+
+	/// The `beetmash.com` zone with `id`, as a stack declares it.
+	fn zone(id: &str) -> CloudflareZone {
+		CloudflareZone::new("beetmash.com", id)
 	}
 
 	/// A world with the plugin, the launch and an app identity: the same seeding
@@ -502,14 +512,18 @@ mod tests {
 		news_zone: &str,
 	) -> (World, Entity, crate::types::TestWorkDir) {
 		let (mut world, dir) = infra_world();
-		world.spawn((Stack::new("beetmash-mail"), children![(
-			staging(),
-			SesRelay::default()
-		)]));
-		world.spawn((Stack::new("beetmash-news"), children![(
-			news(news_zone),
-			SesRelay::default()
-		)]));
+		world.spawn((
+			Stack::new("beetmash-mail"),
+			AwsRegion::new(Stack::TEST_REGION),
+			zone("zone1"),
+			children![(staging(), SesRelay::default())],
+		));
+		world.spawn((
+			Stack::new("beetmash-news"),
+			AwsRegion::new(Stack::TEST_REGION),
+			zone(news_zone),
+			children![(news(), SesRelay::default())],
+		));
 		let audit = world.spawn(ZoneAudit::zone_scoped()).id();
 		world.flush();
 		(world, audit, dir)
@@ -540,17 +554,21 @@ mod tests {
 	fn stack_scope_sees_only_its_own_stack() {
 		let (mut world, _dir) = infra_world();
 		let mail = world
-			.spawn((Stack::new("beetmash-mail"), children![(
-				staging(),
-				SesRelay::default()
-			)]))
+			.spawn((
+				Stack::new("beetmash-mail"),
+				AwsRegion::new(Stack::TEST_REGION),
+				zone("zone1"),
+				children![(staging(), SesRelay::default())],
+			))
 			.id();
 		// the audit sits UNDER the mail stack, the deploy-tail shape
 		let audit = world.spawn((ChildOf(mail), ZoneAudit::default())).id();
-		world.spawn((Stack::new("beetmash-news"), children![(
-			news("zone1"),
-			SesRelay::default()
-		)]));
+		world.spawn((
+			Stack::new("beetmash-news"),
+			AwsRegion::new(Stack::TEST_REGION),
+			zone("zone1"),
+			children![(news(), SesRelay::default())],
+		));
 		world.flush();
 		let (declared, _) = audit_inputs(&mut world, audit, "zone1").unwrap();
 		covers(&declared, "stalwart.beetmash.com", "MX").xpect_true();
@@ -587,11 +605,12 @@ mod tests {
 	}
 
 	fn declared() -> Vec<DeclaredRecord> {
-		let (scope, _dir) = RenderScope::test_render(|parent| {
-			// relayed through SES, whose selector tokens are the computed names
-			// this pattern matching exists for
-			parent.spawn((staging(), SesRelay::default()));
-		});
+		let (scope, _dir) =
+			RenderScope::test_render_zoned("beetmash.com", |parent| {
+				// relayed through SES, whose selector tokens are the computed names
+				// this pattern matching exists for
+				parent.spawn((staging(), SesRelay::default()));
+			});
 		declared_records(&scope.finish().unwrap().2, None)
 	}
 
@@ -642,9 +661,10 @@ mod tests {
 	/// the case a pattern that swallowed the whole label would get wrong.
 	#[beet_core::test]
 	fn enrolled_selectors_match_as_patterns() {
-		let (scope, _dir) = RenderScope::test_render(|parent| {
-			parent.spawn((staging(), ComailRelay::default()));
-		});
+		let (scope, _dir) =
+			RenderScope::test_render_zoned("beetmash.com", |parent| {
+				parent.spawn((staging(), ComailRelay::default()));
+			});
 		let declared = declared_records(&scope.finish().unwrap().2, None);
 		for name in [
 			"atmos20260904r._domainkey.stalwart.beetmash.com",

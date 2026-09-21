@@ -165,13 +165,20 @@ impl Plugin for RouterPlugin {
 					(refresh_changed_routes, rescan_changed_dirs::<RoutesDir>)
 						.in_set(BlobReactions),
 				);
+			// the declarations that act before the entry builds (see `Prescan`),
+			// in preload order: the entry-declared store root (`<RepoRoot
+			// src="../.."/>`) first, so nothing runs against a store it has not
+			// rebased, then the crate check, the entry's own template dirs and
+			// the secrets load.
+			app.register_prescan::<RepoRoot>()
+				.register_prescan::<RequireCfg>();
 			// the markup-resolved `<TemplateDir src="templates"/>`: its insert
 			// observer reads the dir through the nearest ancestor `BlobStore` and
 			// registers each `.bsx`/`.js` template by module path, off the runtime
 			// (so it runs on wasm too). An entry's own template dirs are also
 			// pre-scanned synchronously by the cli before the entry parses, so
 			// entry-level tags like `<Styles/>` resolve.
-			app.register_type::<TemplateDir>()
+			app.register_prescan::<TemplateDir>()
 				.add_observer(TemplateDir::register_on_insert)
 				.add_systems(
 					Update,
@@ -181,9 +188,8 @@ impl Plugin for RouterPlugin {
 					)
 						.in_set(BlobReactions),
 				);
-			// the entry-declared store root (`<RepoRoot src="../.."/>`), read by
-			// entry resolution before the store builds; inert in the built tree.
-			app.register_type::<RepoRoot>();
+			#[cfg(feature = "vault")]
+			app.register_prescan::<Secrets>();
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
 			// inserts its own greedy capture + handler, serving from the nearest
 			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.

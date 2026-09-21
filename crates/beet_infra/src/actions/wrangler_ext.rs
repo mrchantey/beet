@@ -5,6 +5,7 @@
 //! domain is issued by that upload. Splitting them would mean terraform owning
 //! a record whose certificate wrangler owns, which is the one arrangement
 //! guaranteed to fight itself.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The Workers runtime compatibility date every project here pins. A date
@@ -48,17 +49,15 @@ pub async fn deploy(
 /// removing one custom domain, so the teardown half of a Worker is REST.
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
-/// The account id + api token from the environment, the auth every workers call
-/// needs.
-fn account_env() -> Result<(SmolStr, SmolStr)> {
-	let account = env_ext::var("CLOUDFLARE_ACCOUNT_ID")
-		.map_err(|_| bevyhow!("CLOUDFLARE_ACCOUNT_ID is unset"))?;
-	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
-		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
-	Ok((account, token))
+/// The api token from the environment, the auth every workers call needs
+/// beside the account the caller resolved ([`ResolvedStack::cloudflare_account`]).
+fn api_token() -> Result<SmolStr> {
+	env_ext::var("CLOUDFLARE_API_TOKEN")
+		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))
 }
 
-/// Delete the Worker custom domain serving `hostname`, if there is one.
+/// Delete the Worker custom domain serving `hostname` in `account`, if there
+/// is one.
 ///
 /// `false` when there was none, which a teardown treats as success: it walks the
 /// declaration rather than a ledger of what was created, so it routinely
@@ -66,8 +65,11 @@ fn account_env() -> Result<(SmolStr, SmolStr)> {
 ///
 /// Deleting the custom domain also removes the zone record and the certificate
 /// wrangler provisioned with it, since the upload created all three together.
-pub async fn delete_custom_domain(hostname: &str) -> Result<bool> {
-	let (account, token) = account_env()?;
+pub async fn delete_custom_domain(
+	account: &CloudflareAccount,
+	hostname: &str,
+) -> Result<bool> {
+	let (account, token) = (&account.id, api_token()?);
 	let listed = send(
 		beet_net::prelude::Request::get(format!(
 			"{API_BASE}/accounts/{account}/workers/domains?hostname={hostname}"
@@ -95,10 +97,13 @@ pub async fn delete_custom_domain(hostname: &str) -> Result<bool> {
 	.map(|found| found.is_some())
 }
 
-/// Delete the Worker script `name`, if there is one. `false` when there was
-/// none, see [`delete_custom_domain`].
-pub async fn delete_script(name: &str) -> Result<bool> {
-	let (account, token) = account_env()?;
+/// Delete the Worker script `name` in `account`, if there is one. `false`
+/// when there was none, see [`delete_custom_domain`].
+pub async fn delete_script(
+	account: &CloudflareAccount,
+	name: &str,
+) -> Result<bool> {
+	let (account, token) = (&account.id, api_token()?);
 	send(
 		beet_net::prelude::Request::delete(format!(
 			"{API_BASE}/accounts/{account}/workers/scripts/{name}"

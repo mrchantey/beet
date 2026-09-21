@@ -128,6 +128,26 @@ impl StateEncryption {
 }
 
 #[cfg(test)]
+impl StateEncryption {
+	/// Set the default passphrase variable for a test that reaches `tofu
+	/// init` under an encrypted-by-default stack, when the environment (the
+	/// runner's document, on a machine with the identity) carries none.
+	pub(crate) fn ensure_test_passphrase() {
+		use crate::prelude::Stack;
+		if env_ext::var(Stack::DEFAULT_STATE_PASSPHRASE).is_err() {
+			// SAFETY: test-only, a value no other test reads
+			unsafe {
+				env_ext::set_var(
+					Stack::DEFAULT_STATE_PASSPHRASE,
+					"test-passphrase",
+				)
+			}
+			.ok();
+		}
+	}
+}
+
+#[cfg(test)]
 mod tests {
 	use super::*;
 

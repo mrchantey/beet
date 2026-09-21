@@ -187,7 +187,7 @@ pub async fn StalwartSnapshot(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let mail = cx.caller.with_world(MailStack::resolve).await??;
-	let region = mail.stack.region();
+	let region = mail.stack.region()?;
 	let filters = StalwartSnapshot::volume_filters(&mail.stack, &mail.mail_box);
 	let volume_id = aws_cli_ext::ec2(region, [
 		"describe-volumes",
@@ -295,7 +295,7 @@ pub async fn StalwartSnapshot(
 /// warning rather than a deploy failure, since the backup the step exists for
 /// already succeeded and a leaked snapshot costs cents.
 async fn prune(mail: &MailStack, keep: &str, retain: usize) -> Result {
-	let region = mail.stack.region();
+	let region = mail.stack.region()?;
 	let filters =
 		StalwartSnapshot::snapshot_filters(&mail.stack, &mail.mail_box);
 	let listing = aws_cli_ext::ec2(region, [
@@ -356,7 +356,7 @@ pub async fn StalwartSnapshotPrune(
 			mail.stack.stage()
 		);
 	}
-	let region = mail.stack.region();
+	let region = mail.stack.region()?;
 	let filters =
 		StalwartSnapshot::snapshot_filters(&mail.stack, &mail.mail_box);
 	let listing = aws_cli_ext::ec2(region, [

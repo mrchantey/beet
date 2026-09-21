@@ -24,16 +24,18 @@ use beet_net::prelude::*;
 /// agree on what an entry document is named.
 pub const ENTRY_NAMES: &[&str] = &["main.bsx", "main.json", "main.ron"];
 
-/// Pre-scan the raw entry document through `store`, the one registry-free walk
-/// entry resolution reads its declarations from.
+/// Pre-scan the raw entry document through `store` against the registered
+/// [`Prescan`] set, the one registry-free walk entry resolution reads its
+/// declarations from.
 pub async fn read_prescan(
 	repo_store: &BlobStore,
+	prescans: &PrescanRegistry,
 	entry_name: &str,
 ) -> Result<EntryPrescan> {
 	repo_store
 		.get_media(&RelPath::from(entry_name))
 		.await?
-		.xmap(|entry| EntryPrescan::parse(&entry))
+		.xmap(|entry| EntryPrescan::parse(&entry, prescans))
 }
 
 /// A resolved entry: its store, the entry document name within it, and the local
@@ -53,8 +55,10 @@ pub struct ResolvedEntry {
 
 /// Resolve an entry within its store: read the prescan once, rebase the
 /// store through the entry's own `<RepoRoot src>` declaration
-/// ([`BlobStore::rebase_repo`]) when it carries one, and load its `<Secrets>`
-/// documents into the process environment ([`load_secrets`]). The one
+/// ([`BlobStore::rebase_repo`]) when it carries one, then run every other
+/// registered declaration's preload against the rebased store
+/// ([`PrescanRegistry::preload`]: the `<Secrets>` load into the process
+/// environment, and whatever a downstream crate registered). The one
 /// widening path every entry load shares (the binary, discovery,
 /// `serve`/`check`/`export-static`, the Worker); callers differ only in how
 /// the initial `(store, entry_name)` pair is derived (a local path walk vs a
@@ -66,17 +70,17 @@ pub struct ResolvedEntry {
 /// watches nothing.
 pub async fn resolve_in_repo_store(
 	repo_store: BlobStore,
+	prescans: &PrescanRegistry,
 	entry_name: String,
 ) -> Result<ResolvedEntry> {
-	let prescan = read_prescan(&repo_store, &entry_name).await?;
+	let prescan = read_prescan(&repo_store, prescans, &entry_name).await?;
 	// the rebased store holds the same entry document, so its pre-scan is the
 	// one already read: entry resolution parses the entry exactly once.
-	let (repo_store, entry_name) = match &prescan.repo_root {
-		Some(src) => repo_store.rebase_repo(&entry_name, src)?,
+	let (repo_store, entry_name) = match prescan.first::<RepoRoot>() {
+		Some(root) => repo_store.rebase_repo(&entry_name, &root.src)?,
 		None => (repo_store, entry_name),
 	};
-	#[cfg(feature = "vault")]
-	load_secrets(&repo_store, &prescan).await;
+	prescans.preload(&prescan, &repo_store).await?;
 	Ok(ResolvedEntry {
 		#[cfg(not(target_arch = "wasm32"))]
 		watch_dir: repo_store.watch_dir(),
@@ -84,30 +88,6 @@ pub async fn resolve_in_repo_store(
 		entry_name,
 		prescan,
 	})
-}
-
-/// Load every `<Secrets>` the prescan found into the process environment,
-/// before anything builds: each is resolved in the rebased repo store
-/// ([`SecretsHandle::in_store`]), opened with the discovered identity and its
-/// `EnvVar` records set where the environment does not already hold them,
-/// so every declaration constructed in the build walk (a stack's region, a
-/// bucket's account id, a compute's host key) finds them set, and no `main`
-/// knows any of this. A document that cannot be loaded (no identity, an
-/// identity in none of its groups, a corrupt file) is one warning and
-/// nothing set, never an error: a cloud box's repo store carries no
-/// identity, and a contributor without one must still build and run.
-#[cfg(feature = "vault")]
-pub async fn load_secrets(repo_store: &BlobStore, prescan: &EntryPrescan) {
-	for secrets in &prescan.secrets {
-		let loaded = async {
-			SecretsHandle::in_store(repo_store.clone(), secrets)?
-				.load_env_vars()
-				.await
-		};
-		if let Err(err) = loaded.await {
-			warn!("secrets `{}`: {err}", secrets.label);
-		}
-	}
 }
 
 /// Resolve the entry [`BlobStore`], the entry document name within it, and the
@@ -138,6 +118,7 @@ pub async fn load_secrets(repo_store: &BlobStore, prescan: &EntryPrescan) {
 /// filesystem (deno/node through the runner's fs globals); a fs-less runtime
 /// (a browser tab) errors with guidance when handed a dir-rooted repo.
 pub async fn resolve_entry(
+	prescans: &PrescanRegistry,
 	repo_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 	main: Option<&str>,
@@ -147,7 +128,7 @@ pub async fn resolve_entry(
 	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
 		let repo_store = compose_repo_store(uri, store_fork)?;
 		let entry_name = self_rooted_entry_name(&repo_store, main).await?;
-		return resolve_in_repo_store(repo_store, entry_name).await;
+		return resolve_in_repo_store(repo_store, prescans, entry_name).await;
 	}
 
 	// dir-rooted: an explicit `main`, else the ancestor walk. On wasm the `fs`
@@ -161,8 +142,8 @@ pub async fn resolve_entry(
 		);
 	}
 	match main {
-		Some(main) => resolve_main(repo_uri, store_fork, main).await,
-		None => discover_entry(repo_uri, store_fork).await,
+		Some(main) => resolve_main(prescans, repo_uri, store_fork, main).await,
+		None => discover_entry(prescans, repo_uri, store_fork).await,
 	}
 }
 
@@ -225,6 +206,7 @@ pub async fn self_rooted_entry_name(
 /// a filesystem walk makes sense; the matched entry may still rebase its own
 /// root ([`resolve_in_repo_store`]), and no match errors with guidance.
 async fn discover_entry(
+	prescans: &PrescanRegistry,
 	repo_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 ) -> Result<ResolvedEntry> {
@@ -234,7 +216,8 @@ async fn discover_entry(
 		let repo_store = BlobStore::new(FsStore::new(current.clone()));
 		if let Some(entry_name) = probe_entry_names(&repo_store).await? {
 			let repo_store = resolve_repo_store(repo_uri, store_fork, current)?;
-			return resolve_in_repo_store(repo_store, entry_name).await;
+			return resolve_in_repo_store(repo_store, prescans, entry_name)
+				.await;
 		}
 		dir = current.parent();
 	}
@@ -251,6 +234,7 @@ async fn discover_entry(
 /// (see [`resolve_in_repo_store`]), the `--repo` param picks the backend and
 /// `--store-fork` forks it into a local store.
 pub async fn resolve_main(
+	prescans: &PrescanRegistry,
 	repo_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
 	main: &str,
@@ -279,7 +263,7 @@ pub async fn resolve_main(
 			})?;
 		(repo_store, entry_name)
 	};
-	resolve_in_repo_store(repo_store, entry_name).await
+	resolve_in_repo_store(repo_store, prescans, entry_name).await
 }
 
 /// The first [`ENTRY_NAMES`] match at the store's root, if any.
@@ -377,16 +361,16 @@ pub async fn read_sources(
 	// each so they register before the entry parses (so entry-level tags resolve). A
 	// non-markup (serde) entry declares none.
 	let mut template_sources = Vec::new();
-	for dir in &prescan.template_dirs {
+	for dir in prescan.iter::<TemplateDir>() {
 		template_sources.extend(
 			TemplateDir::read_sources(
-				&repo_store.with_subdir(dir.clone()),
+				&repo_store.with_subdir(dir.src.clone()),
 				&formats,
 			)
 			.await?
 			.into_iter()
 			.map(|(rel, source)| TemplateSource {
-				dir: dir.clone(),
+				dir: dir.src.clone(),
 				rel,
 				source,
 			}),
@@ -432,8 +416,10 @@ pub fn build_root(
 	// the pre-scanned `<RequireCfg>`s, spawned before the tree builds so a
 	// requirement reports its unmet list even when the tree itself cannot build
 	// (eg its root tag is not registered in this binary).
-	if !prescan.requirements.is_empty() {
-		for requirement in prescan.requirements {
+	let requirements =
+		prescan.iter::<RequireCfg>().cloned().collect::<Vec<_>>();
+	if !requirements.is_empty() {
+		for requirement in requirements {
 			world.spawn(requirement);
 		}
 		world.flush();
@@ -574,10 +560,16 @@ pub async fn rebuild_watched(
 	entry_name: String,
 	formats: TemplateFormats,
 ) -> Result {
-	let prescan = read_prescan(&repo_store, &entry_name).await?;
+	let prescans = world
+		.with(|world: &mut World| {
+			world.get_resource_or_init::<PrescanRegistry>().clone()
+		})
+		.await;
+	let prescan = read_prescan(&repo_store, &prescans, &entry_name).await?;
 	// the entry and its includes are known before the build, since the tree
 	// cannot name the documents it was built from.
-	let includes = include_paths(&repo_store, &entry_name, &prescan).await;
+	let includes =
+		include_paths(&repo_store, &prescans, &entry_name, &prescan).await;
 	let sources =
 		read_sources(&repo_store, formats, entry_name.clone(), prescan).await?;
 	let templates = sources.template_paths();
@@ -633,6 +625,7 @@ pub async fn rebuild_watched(
 #[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 async fn include_paths(
 	repo_store: &BlobStore,
+	prescans: &PrescanRegistry,
 	entry_name: &str,
 	prescan: &EntryPrescan,
 ) -> HashSet<RelPath> {
@@ -643,7 +636,7 @@ async fn include_paths(
 			continue;
 		}
 		if let Ok(media) = repo_store.get_media(&path).await {
-			stack.extend(EntryPrescan::parse_lossy(&media).includes);
+			stack.extend(EntryPrescan::parse_lossy(&media, prescans).includes);
 		}
 	}
 	seen
@@ -700,6 +693,16 @@ fn entry_source_paths(
 mod test {
 	use super::*;
 
+	/// The prescan set `world`'s plugins registered.
+	fn prescans(world: &World) -> PrescanRegistry {
+		world.resource::<PrescanRegistry>().clone()
+	}
+
+	/// The set the router registers, for a resolution with no world of its own.
+	fn router_prescans() -> PrescanRegistry {
+		prescans(&RouterPlugin.into_world())
+	}
+
 	/// The shared core builds an entry from any store: an in-memory store here, so
 	/// it runs storage-agnostic (on wasm too), no filesystem involved. The entry's
 	/// `<DefaultAppRoutes/>` lands on the built router root.
@@ -715,7 +718,9 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&repo_store, "main.bsx").await.unwrap();
+		let prescan = read_prescan(&repo_store, &prescans(&world), "main.bsx")
+			.await
+			.unwrap();
 		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
@@ -742,7 +747,9 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&repo_store, "main.bsx").await.unwrap();
+		let prescan = read_prescan(&repo_store, &prescans(&world), "main.bsx")
+			.await
+			.unwrap();
 		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
 			.await
 			.unwrap();
@@ -800,9 +807,13 @@ mod test {
 				.unwrap();
 			env_ext::set_var("BEET_TEST_LAUNCH_KEPT", "from-shell").unwrap();
 		}
-		resolve_in_repo_store(repo_store, "app/main.bsx".into())
-			.await
-			.unwrap();
+		resolve_in_repo_store(
+			repo_store,
+			&router_prescans(),
+			"app/main.bsx".into(),
+		)
+		.await
+		.unwrap();
 		env_ext::var("BEET_TEST_LAUNCH_LOADED")
 			.unwrap()
 			.xpect_eq("from-document");
@@ -837,7 +848,9 @@ mod test {
 		)
 		.unwrap();
 		let resolved =
-			resolve_main(None, None, entry_dir.as_str()).await.unwrap();
+			resolve_main(&router_prescans(), None, None, entry_dir.as_str())
+				.await
+				.unwrap();
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
@@ -862,10 +875,13 @@ mod test {
 			)
 			.await
 			.unwrap();
-		let resolved =
-			resolve_in_repo_store(repo_store, "apps/site/main.bsx".to_string())
-				.await
-				.unwrap();
+		let resolved = resolve_in_repo_store(
+			repo_store,
+			&router_prescans(),
+			"apps/site/main.bsx".to_string(),
+		)
+		.await
+		.unwrap();
 		resolved.entry_name.xpect_eq("site/main.bsx");
 		#[cfg(not(target_arch = "wasm32"))]
 		resolved.watch_dir.xpect_none();
@@ -889,11 +905,15 @@ mod test {
 			)
 			.await
 			.unwrap();
-		resolve_in_repo_store(repo_store, "main.bsx".to_string())
-			.await
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("mis-published");
+		resolve_in_repo_store(
+			repo_store,
+			&router_prescans(),
+			"main.bsx".to_string(),
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("mis-published");
 	}
 
 	/// The binary path and the command path share [`resolve_in_repo_store`], so the
@@ -909,10 +929,13 @@ mod test {
 			"<Router><RepoRoot src=\".\"/></Router>",
 		)
 		.unwrap();
-		let by_path =
-			resolve_main(None, None, tmp.path().as_str()).await.unwrap();
+		let prescans = router_prescans();
+		let by_path = resolve_main(&prescans, None, None, tmp.path().as_str())
+			.await
+			.unwrap();
 		let by_store = resolve_in_repo_store(
 			resolve_repo_store(None, None, tmp.path().clone()).unwrap(),
+			&prescans,
 			"main.bsx".to_string(),
 		)
 		.await
@@ -938,9 +961,11 @@ mod test {
 			.insert(&RelPath::from("main.bsx"), "<Router/>")
 			.await
 			.unwrap();
-		let resolved = resolve_entry(Some(&upstream), Some(&local), None)
-			.await
-			.unwrap();
+		let prescans = router_prescans();
+		let resolved =
+			resolve_entry(&prescans, Some(&upstream), Some(&local), None)
+				.await
+				.unwrap();
 		resolved.entry_name.xpect_eq("main.bsx");
 		resolved.repo_store.id().xpect_eq("fork");
 		resolved
@@ -960,7 +985,7 @@ mod test {
 			.unwrap()
 			.xpect_false();
 		// no store fork natively: the repo is read directly
-		resolve_entry(Some(&upstream), None, None)
+		resolve_entry(&prescans, Some(&upstream), None, None)
 			.await
 			.unwrap()
 			.repo_store

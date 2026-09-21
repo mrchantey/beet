@@ -51,8 +51,6 @@ pub struct LambdaBlock {
 	/// correctness problem for a pipeline whose stages are ordered and
 	/// idempotent, but it is a run that never finishes.
 	timeout_secs: i64,
-	/// AWS region for the buckets and lambda function.
-	region: Option<SmolStr>,
 }
 
 impl Default for LambdaBlock {
@@ -62,7 +60,6 @@ impl Default for LambdaBlock {
 			dns: Vec::new(),
 			http: true,
 			timeout_secs: 180,
-			region: None,
 			env_vars: Vec::new(),
 		}
 	}
@@ -132,6 +129,7 @@ impl LambdaBlock {
 	/// colocated [`BuildArtifact`] when there is one.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
 		repos: RepoStoreQuery,
 	) {
@@ -154,10 +152,11 @@ impl LambdaBlock {
 			let source_hash = artifact
 				.and_then(|artifact| artifact.compute_source_hash().ok());
 			let access = scope.access();
-			let (stack, deployment, config) = scope.ctx();
+			let stack = stacks.resolve(entity);
+			let (deployment, config) = scope.ctx();
 			if let Err(err) = block.emit(
 				source_hash,
-				stack,
+				&stack,
 				&repo_bucket,
 				deployment,
 				&access,
@@ -182,10 +181,7 @@ impl LambdaBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
-		let region = self
-			.region
-			.clone()
-			.unwrap_or_else(|| stack.region().clone());
+		let region = stack.region()?.clone();
 		// the function's code, under this launch's version in the repo store
 		let artifact_key = ArtifactLedger::version_artifact_key(
 			deployment.deploy_id(),
@@ -248,10 +244,8 @@ impl LambdaBlock {
 		// the repo bucket under its own identity, and the basic execution
 		// role above carries the log writes. A stack declaring nothing therefore
 		// grants the function nothing, and no policy resource is emitted at all.
-		// Grant ARNs take the STACK's region, not this block's override, since
-		// that is the region the declaring blocks provisioned into.
-		let policy = IamPolicy::new(stack.region().clone(), "lambda function")
-			.lower(access)?;
+		let policy =
+			IamPolicy::new(region.clone(), "lambda function").lower(access)?;
 		let policy_ident =
 			stack.resource_ident(self.build_label("runtime_policy"));
 		let runtime_policy = (!policy.is_empty()).then(|| {
@@ -629,9 +623,10 @@ impl LambdaBlock {
 mod tests {
 	use super::*;
 
-	/// The terraform json for `block` rendered alone.
+	/// The terraform json for `block` rendered alone, under a stack zoned for
+	/// `example.org`.
 	fn build_json(block: LambdaBlock) -> String {
-		RenderScope::test_json(move |parent| {
+		RenderScope::test_json_zoned("example.org", move |parent| {
 			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(block);
 		})
@@ -672,7 +667,7 @@ mod tests {
 		// ..and a hostname with no gateway to address fails the deploy rather
 		// than publishing a record at nothing
 		block
-			.with_dns(DnsProvider::cloudflare("jobs.beet.org", "zone"))
+			.with_dns(DnsProvider::cloudflare("jobs.beet.org"))
 			.validate()
 			.unwrap_err()
 			.to_string()
@@ -780,8 +775,9 @@ mod tests {
 	/// `dev` default renders to nothing.
 	#[beet_core::test]
 	fn injects_beet_stage_env() {
+		let (stack, region) = Stack::test_local();
 		let (scope, _dir) = RenderScope::test_render_stack(
-			Stack::new("beet_infra").with_stage("prod"),
+			(stack.with_stage("prod"), region),
 			|parent| {
 				parent.spawn(RepoStoreBlock::test_store());
 				parent.spawn(LambdaBlock::default());
@@ -816,12 +812,9 @@ mod tests {
 	/// The public record therefore points at the domain's `target_domain_name`.
 	#[beet_core::test]
 	fn dns_emits_custom_domain_mapped_to_the_default_stage() {
-		let json = build_json(
-			LambdaBlock::default().with_dns(
-				DnsProvider::cloudflare("example.org", "zone123")
-					.with_proxied(true),
-			),
-		);
+		let json = build_json(LambdaBlock::default().with_dns(
+			DnsProvider::cloudflare("example.org").with_proxied(true),
+		));
 		json.as_str()
 			.xpect_contains("aws_acm_certificate")
 			.xpect_contains("aws_acm_certificate_validation")
@@ -851,8 +844,8 @@ mod tests {
 	fn multiple_dns_emits_a_domain_each_on_one_cert() {
 		let json = build_json(
 			LambdaBlock::default()
-				.with_dns(DnsProvider::cloudflare("example.org", "z"))
-				.with_dns(DnsProvider::cloudflare("www.example.org", "z")),
+				.with_dns(DnsProvider::cloudflare("example.org"))
+				.with_dns(DnsProvider::cloudflare("www.example.org")),
 		);
 		json.as_str()
 			.xpect_contains(
@@ -878,6 +871,7 @@ mod tests {
 			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
 		});
+		StateEncryption::ensure_test_passphrase();
 		scope.project().unwrap().validate().await.unwrap();
 	}
 }

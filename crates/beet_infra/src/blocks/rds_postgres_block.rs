@@ -294,6 +294,7 @@ impl RdsPostgresBlock {
 	/// of unreachable instance.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(
 			Entity,
 			&RdsPostgresBlock,
@@ -329,8 +330,9 @@ impl RdsPostgresBlock {
 			match vpc {
 				Err(err) => scope.error(err),
 				Ok(vpc) => {
-					let (stack, _deployment, config) = scope.ctx();
-					if let Err(err) = block.emit(stack, config, vpc) {
+					let stack = stacks.resolve(entity);
+					let (_deployment, config) = scope.ctx();
+					if let Err(err) = block.emit(&stack, config, vpc) {
 						scope.error(bevyhow!(
 							"RdsPostgresBlock '{}': {err}",
 							block.label()
@@ -527,8 +529,11 @@ mod tests {
 	}
 
 	/// The Sydney stack every test renders against.
-	fn sydney_stack() -> Stack {
-		Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2)
+	fn sydney_stack() -> (Stack, AwsRegion) {
+		(
+			Stack::new("beet_infra"),
+			AwsRegion::new(aws::region::AP_SOUTHEAST_2),
+		)
 	}
 
 	/// The config `block` emits against a Sydney stack, related to its `net`
@@ -773,6 +778,7 @@ mod tests {
 				let db = parent.spawn((database(), VpcRef(vpc))).id();
 				parent.spawn(DatabaseRef(db));
 			});
+		StateEncryption::ensure_test_passphrase();
 		scope.project().unwrap().validate().await.unwrap();
 	}
 

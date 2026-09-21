@@ -101,12 +101,17 @@ pub struct TestDeploy {
 
 impl TestDeploy {
 	/// A first deploy of `app_name`, pinned to the region the live tests use.
+	/// A throwaway stack, so its state is plaintext: the test needs no
+	/// passphrase record to run.
 	pub fn new(app_name: &str) -> Self {
 		Self {
-			stack: Stack::new(app_name).with_region("us-west-2"),
+			stack: Stack::new(app_name).with_state_passphrase(None),
 			deployment: Deployment::default(),
 		}
 	}
+
+	/// The region the live tests pin.
+	pub const REGION: &'static str = "us-west-2";
 
 	/// The next deploy of the same app: same identity, new launch.
 	pub fn redeploy(&self) -> Self {
@@ -116,9 +121,17 @@ impl TestDeploy {
 		}
 	}
 
+	/// The stack root a test spawns: the stack with the region the live tests
+	/// pin declared beside it.
+	pub fn root(&self) -> (Stack, AwsRegion) {
+		(self.stack.clone(), AwsRegion::new(Self::REGION))
+	}
+
 	/// The composed identity, ie what a name resolves against outside a world.
 	pub fn resolved(&self) -> ResolvedStack {
-		self.stack.resolve(&PackageConfig::default())
+		self.stack
+			.resolve(&PackageConfig::default())
+			.with_region(Self::REGION)
 	}
 
 	/// The client of the stack's repo store, exactly as
@@ -143,6 +156,7 @@ pub fn repo_store_block() -> impl Bundle {
 /// The erased half of [`repo_store_block`] under `deploy`'s stack.
 fn repo_store(deploy: &TestDeploy) -> ErasedStoreBlock {
 	ErasedStoreBlock::new(&S3BucketBlock::new("repo"), &deploy.resolved())
+		.unwrap()
 }
 
 /// The publish steps of a deploy: stage `site_dir` and mirror it into the
@@ -165,7 +179,7 @@ pub fn render_test_project(
 	world.insert_resource(deploy.deployment.clone());
 	world.init_resource::<PackageConfig>();
 	let root = world
-		.spawn(deploy.stack.clone())
+		.spawn(deploy.root())
 		.with_children(|parent| {
 			parent.spawn(block);
 			parent.spawn(repo_store_block());

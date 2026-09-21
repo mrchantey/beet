@@ -22,13 +22,11 @@ pub struct DirSync {
 	bucket: SmolStr,
 	/// The workspace-relative local directory.
 	local_dir: WsPath,
-	/// Override the resolved stage, for a bucket outside the deploy's own stage.
+	/// Override the resolved stage, for a bucket outside the deploy's own
+	/// stage. A bucket in another region carries an `{AwsRegion(..)}` spread
+	/// on this entity, resolved by ancestry like every address.
 	#[set_with(unwrap_option, into)]
 	stage: Option<SmolStr>,
-	/// Override the region the bucket lives in, which otherwise resolves from
-	/// the ancestor [`Stack`].
-	#[set_with(unwrap_option, into)]
-	region: Option<SmolStr>,
 }
 
 impl Default for DirSync {
@@ -44,20 +42,15 @@ impl DirSync {
 			bucket: bucket.into(),
 			local_dir: local_dir.into(),
 			stage: None,
-			region: None,
 		}
 	}
 
 	/// The stack this sync addresses its bucket in: the entity's resolved stack,
-	/// with the [`stage`](Self::stage) and [`region`](Self::region) overrides
-	/// applied. Still resolved: an override replaces an answer, never unsets it.
+	/// with the [`stage`](Self::stage) override applied. Still resolved: an
+	/// override replaces an answer, never unsets it.
 	pub fn stack(&self, resolved: ResolvedStack) -> ResolvedStack {
-		let resolved = match &self.stage {
+		match &self.stage {
 			Some(stage) => resolved.with_stage(stage.clone()),
-			None => resolved,
-		};
-		match &self.region {
-			Some(region) => resolved.with_region(region.clone()),
 			None => resolved,
 		}
 	}
@@ -105,10 +98,11 @@ pub(crate) fn declared_store<'a>(
 ///
 /// The bucket IDENTITY only (its name and region), spelled by the declaration
 /// ([`S3BucketBlock::store_uri`]) rather than recomposed here: a throwaway
-/// block under the sync's own stack, since an overridden `stage`/`region`
-/// addresses a bucket under another stack, which no label lookup here can
-/// reach. The per-deploy prefix a versioned bucket nests under is resolved
-/// from [`declared_store`] when the sync runs, since it is not yet known here.
+/// block under the sync's own stack, since an overridden `stage` or a region
+/// spread on the sync addresses a bucket under another stack, which no label
+/// lookup here can reach. The per-deploy prefix a versioned bucket nests
+/// under is resolved from [`declared_store`] when the sync runs, since it is
+/// not yet known here.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,
@@ -124,7 +118,7 @@ pub(crate) fn attach_dir_sync_store(
 				})
 				.xmap(|stack| sync.stack(stack));
 			let uri =
-				S3BucketBlock::new(sync.bucket().clone()).store_uri(&stack);
+				S3BucketBlock::new(sync.bucket().clone()).store_uri(&stack)?;
 			entity.insert(S3FsStore::new(
 				FsStore::new(sync.local_dir()),
 				S3Store::from_uri(&uri)?,
@@ -142,9 +136,9 @@ mod test {
 	/// A stack declaring `bucket` beside a sync of it, returning the sync's
 	/// entity and the declaration's erased half.
 	fn declared_sync(
-		stack: Stack,
+		stack: impl Bundle,
 		bucket: S3BucketBlock,
-		sync: DirSync,
+		sync: impl Bundle,
 	) -> (World, Entity, ErasedStoreBlock) {
 		let mut world = InfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
@@ -162,9 +156,10 @@ mod test {
 	#[beet_core::test]
 	fn attaches_the_declared_bucket() {
 		let (world, sync, declared) = declared_sync(
-			Stack::new("app")
-				.with_stage("prod")
-				.with_region("eu-west-1"),
+			(
+				Stack::new("app").with_stage("prod"),
+				AwsRegion::new("eu-west-1"),
+			),
 			S3BucketBlock::new("assets"),
 			DirSync::new("assets", "site"),
 		);
@@ -180,16 +175,20 @@ mod test {
 			.xpect_eq(Some(SmolStr::new("eu-west-1")));
 	}
 
-	/// A `stage`/`region` override addresses the same label under another
-	/// stack, composed through the same declaration.
+	/// A `stage` override and a region spread on the sync address the same
+	/// label under another stack, composed through the same declaration.
 	#[beet_core::test]
 	fn overrides_address_another_stack() {
 		let (world, sync, _) = declared_sync(
-			Stack::new("app").with_stage("prod"),
+			(
+				Stack::new("app").with_stage("prod"),
+				AwsRegion::new("eu-west-1"),
+			),
 			S3BucketBlock::new("assets"),
-			DirSync::new("assets", "site")
-				.with_stage("shared")
-				.with_region("ap-southeast-2"),
+			(
+				DirSync::new("assets", "site").with_stage("shared"),
+				AwsRegion::new("ap-southeast-2"),
+			),
 		);
 		let attached = world.get::<S3FsStore>(sync).unwrap().s3_store();
 		attached

@@ -100,7 +100,9 @@ fn group_status(name: &str, opened: &OpenSecrets) -> String {
 }
 
 /// Append every record: its columns padded to the widest cell, then each
-/// of its detail lines indented under it; `(none)` when there are no rows.
+/// of its details indented under it, a detail's continuation lines (a
+/// rotation naming one dashboard step per line) indented under its first;
+/// `(none)` when there are no rows.
 fn write_records(
 	out: &mut String,
 	rows: &[(Vec<String>, [Option<String>; 2])],
@@ -128,7 +130,10 @@ fn write_records(
 			.join("  ");
 		writeln!(out, "  {}", line.trim_end())?;
 		for detail in details.iter().flatten() {
-			writeln!(out, "      {detail}")?;
+			for (index, line) in detail.lines().enumerate() {
+				let indent = if index == 0 { "      " } else { "        " };
+				writeln!(out, "{indent}{line}")?;
+			}
 		}
 	}
 	OK
@@ -184,8 +189,9 @@ mod test {
 				"OPENAI_API_KEY",
 				"sk-PRIVATE",
 				SecretRecord {
+					// one dashboard step per line, each indented under the first
 					rotation: Some(SecretRotation::manual(
-						"platform.openai.com/api-keys",
+						"https://platform.openai.com/api-keys\n> Create new secret key\n> name it beet",
 					)),
 					..record(Some(SecretRole::EnvVar), "billing account")
 				},

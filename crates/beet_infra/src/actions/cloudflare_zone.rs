@@ -6,6 +6,7 @@
 //! converges the shared zone safely. (Historically the same reasoning covered
 //! Spectrum apps: the plan-polymorphic Spectrum API also rejects the terraform
 //! provider's Enterprise-only fields.)
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -13,10 +14,18 @@ use beet_net::prelude::*;
 /// The Cloudflare v4 API base.
 const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 
-/// The zone id + api token from the environment, the auth every zone call needs.
-fn zone_env() -> Result<(SmolStr, SmolStr)> {
-	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID")
-		.map_err(|_| bevyhow!("CLOUDFLARE_ZONE_ID is unset"))?;
+/// The zone id the verb's entity resolves by ancestry
+/// ([`ResolvedStack::cloudflare_zone`]) and the api token from the
+/// environment, the auth every zone call needs.
+async fn zone_auth(caller: &AsyncEntity) -> Result<(SmolStr, SmolStr)> {
+	let zone_id = caller
+		.with_state::<StackQuery, _>(|entity, stacks| {
+			stacks
+				.resolve(entity)
+				.cloudflare_zone()
+				.map(|zone| zone.id.clone())
+		})
+		.await??;
 	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
 		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
 	Ok((zone_id, token))
@@ -56,7 +65,7 @@ async fn send_zone_request(request: Request) -> Result<serde_json::Value> {
 pub async fn CloudflareZoneSetup(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = zone_env()?;
+	let (zone_id, token) = zone_auth(&cx.caller).await?;
 
 	// the cache ruleset: an entrypoint PUT creates or replaces, idempotent
 	send_zone_request(
@@ -133,15 +142,16 @@ fn cache_rules() -> serde_json::Value {
 /// cache, which repopulates on the next hit.
 ///
 /// A REST call (`POST zones/{zone}/purge_cache`), not tofu: a purge is an
-/// event, not a resource. Reads `CLOUDFLARE_ZONE_ID` and authenticates with
-/// `CLOUDFLARE_API_TOKEN` (needs the `Cache Purge` permission).
+/// event, not a resource. The zone is the stack's [`CloudflareZone`] and the
+/// call authenticates with `CLOUDFLARE_API_TOKEN` (needs the `Cache Purge`
+/// permission).
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn CloudflarePurgeCache(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = zone_env()?;
+	let (zone_id, token) = zone_auth(&cx.caller).await?;
 	let start = Instant::now();
 	send_zone_request(
 		Request::post(format!("{API_BASE}/zones/{zone_id}/purge_cache"))

@@ -4,11 +4,10 @@ use crate::bindings::*;
 #[allow(unused)]
 use crate::prelude::*;
 
+/// The regions the live stacks and their tests name. No default: a stack
+/// declares its region ([`AwsRegion`](crate::prelude::AwsRegion)) and a block
+/// reads it from its resolved stack.
 pub mod region {
-	/// The [`Stack`](crate::prelude::Stack)'s region fallback, and nothing
-	/// else's. A block must not reach for this: region is a property of the
-	/// scope a resource is declared in, so a block resolves it from its stack.
-	pub(crate) const DEFAULT: &str = US_WEST_2;
 	pub const US_EAST_1: &str = "us-east-1";
 	pub const US_WEST_2: &str = "us-west-2";
 	pub const AP_SOUTHEAST_2: &str = "ap-southeast-2";

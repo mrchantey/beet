@@ -8,8 +8,9 @@
 //! `deploy`. The `cf` CLI is a thinner JSON-over-REST wrapper and is the
 //! documented fallback.
 //!
-//! Live deploy needs `CLOUDFLARE_API_TOKEN` (+ `CLOUDFLARE_ACCOUNT_ID`) in the
-//! environment and, for the container path, the R2 data-plane keys
+//! Live deploy needs `CLOUDFLARE_API_TOKEN` in the environment, a
+//! `{CloudflareAccount{id:".."}}` on the stack or an ancestor and, for the
+//! container path, the R2 data-plane keys
 //! (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) so the container reads the site
 //! via [`S3Store::r2`]. The Worker path needs neither to deploy (native
 //! `worker::Bucket` binding), but `destroy` needs the R2 keys for either path, to
@@ -66,6 +67,18 @@ async fn wrangler_r2_create(bucket: &str) -> Result {
 	}
 }
 
+/// The [`CloudflareAccount`] the action's entity resolves by ancestry, an
+/// error naming the spread when none is declared.
+async fn cloudflare_account(
+	cx: &ActionContext<Request>,
+) -> Result<CloudflareAccount> {
+	cx.caller
+		.with_state::<StackQuery, _>(|entity, stacks| {
+			stacks.resolve(entity).cloudflare_account().cloned()
+		})
+		.await?
+}
+
 /// Find a sibling component of type `T` by walking the action's parent's children
 /// (the same pattern [`BuildDockerImage`] uses for its block + artifact).
 async fn sibling<T: Component + Clone>(
@@ -116,10 +129,10 @@ pub async fn CloudflareContainerDeployAction(
 		bevybail!("binary not found at: {}", binary);
 	}
 
-	// the R2 endpoint the container's `S3Store::r2` reads through; the account id
-	// is also needed to address the managed registry on deploy.
-	let account_id = env_ext::var("CLOUDFLARE_ACCOUNT_ID")
-		.map_err(|_| bevyhow!("CLOUDFLARE_ACCOUNT_ID is unset"))?;
+	// the R2 endpoint the container's `S3Store::r2` reads through, at the
+	// account the stack declares; the account is also what addresses the
+	// managed registry on deploy.
+	let account_id = cloudflare_account(&cx).await?.id;
 	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
 
 	let dir = wrangler_ext::project_dir(block.name())?;
@@ -811,7 +824,7 @@ pub async fn CloudflareDestroy(
 	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty bucket
 	// and `wrangler r2 object` cannot list, so clear *every* object (any prefix,
 	// eg `site/*` and `assets/*`) through the R2 S3 endpoint before deleting.
-	empty_bucket(&bucket).await?;
+	empty_bucket(&cloudflare_account(&cx).await?, &bucket).await?;
 	info!("deleting r2 bucket `{bucket}`");
 	ChildProcess::new("wrangler")
 		.with_args(["r2", "bucket", "delete", bucket.as_str()])
@@ -910,33 +923,31 @@ async fn delete_container_images(worker_name: &str) {
 }
 
 /// Empty `bucket` completely — delete *every* object regardless of prefix — through
-/// the R2 S3-compatible endpoint. `wrangler r2 object` cannot list objects, so it
-/// cannot find keys synced under a prefix (eg the `assets/*` mount); `aws s3 rm
-/// --recursive` lists + deletes them all, which `wrangler r2 bucket delete` then
-/// requires (it refuses a non-empty bucket). The account id + R2 data-plane keys are
-/// read from the environment (loaded from `.env`); without them the empty is skipped
-/// with a warning so a no-creds teardown still deletes the worker.
-async fn empty_bucket(bucket: &str) -> Result {
-	let (account_id, access_key, secret_key) = match (
-		env_ext::var("CLOUDFLARE_ACCOUNT_ID"),
+/// the R2 S3-compatible endpoint of `account`. `wrangler r2 object` cannot list
+/// objects, so it cannot find keys synced under a prefix (eg the `assets/*`
+/// mount); `aws s3 rm --recursive` lists + deletes them all, which `wrangler r2
+/// bucket delete` then requires (it refuses a non-empty bucket). The R2
+/// data-plane keys are read from the environment (records of the entry's
+/// secrets document); without them the empty is skipped with a warning so a
+/// no-creds teardown still deletes the worker.
+async fn empty_bucket(account: &CloudflareAccount, bucket: &str) -> Result {
+	let (access_key, secret_key) = match (
 		env_ext::var("R2_ACCESS_KEY_ID"),
 		env_ext::var("R2_SECRET_ACCESS_KEY"),
 	) {
-		(Ok(account_id), Ok(access_key), Ok(secret_key)) => {
-			(account_id, access_key, secret_key)
-		}
+		(Ok(access_key), Ok(secret_key)) => (access_key, secret_key),
 		_ => {
 			warn!(
-				"CLOUDFLARE_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY \
-				 unset; skipping the R2 empty (bucket delete fails if non-empty)"
+				"R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY unset; skipping the R2 \
+				 empty (bucket delete fails if non-empty)"
 			);
 			return Ok(());
 		}
 	};
-	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
+	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id);
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
 	// the R2 data-plane keys go in as the standard AWS env vars, overriding any
-	// real-AWS creds the process inherited from `.env`, with `AWS_REGION=auto` as R2
+	// real-AWS creds the process inherited, with `AWS_REGION=auto` as R2
 	// requires (also overriding the inherited region). Drop a possibly-empty inherited
 	// `AWS_PROFILE` the cli would otherwise reject (mirrors `build_docker_image`).
 	match ChildProcess::new("aws")
@@ -1007,7 +1018,11 @@ mod test {
 			.with_bucket("hello-site")
 			.with_binding("SITE");
 		let vars = BootstrapConfig {
-			repo: Some(block.store_uri(&Stack::default().resolve(&default()))),
+			repo: Some(
+				block
+					.store_uri(&Stack::default().resolve(&default()))
+					.unwrap(),
+			),
 			..default()
 		}
 		.to_env()

@@ -179,7 +179,7 @@ pub async fn MailRestoreDrill(
 	let key = match source_snapshot {
 		SnapshotSource::Backups => {
 			let live = LiveStore {
-				region: mail.stack.region().to_string(),
+				region: mail.stack.region()?.to_string(),
 				bucket: source
 					.resource_name(mail.mail_box.backup_bucket().clone()),
 			};

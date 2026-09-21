@@ -34,6 +34,7 @@ pub async fn HelpHandler(
 
 	let path = request.path().clone();
 	let parts = request.parts().clone();
+	let is_root = path.is_empty();
 
 	// the scoped route entries: the subtree under the requested path, else the
 	// whole tree, with the `help` route itself filtered out.
@@ -47,9 +48,36 @@ pub async fn HelpHandler(
 			},
 		)
 		.await??;
+	// the declarations that act before the build belong to the entry, not to
+	// a route, so only the root help lists them
+	let prescans = match is_root {
+		true => prescan_entries(&caller).await?,
+		false => Vec::new(),
+	};
 
-	let root = spawn_route_list(&caller, &parts, None, entries).await?;
+	let root =
+		spawn_route_list(&caller, &parts, None, entries, prescans).await?;
 	PageRoot::render(root, &caller, parts).await
+}
+
+/// The registered [`Prescan`] set as help rows, empty in a world with none.
+async fn prescan_entries(caller: &AsyncEntity) -> Result<Vec<PrescanEntry>> {
+	caller
+		.world()
+		.with(|world: &mut World| {
+			world
+				.get_resource::<PrescanRegistry>()
+				.map(PrescanRegistry::describe)
+				.unwrap_or_default()
+				.into_iter()
+				.map(|(tag, description)| PrescanEntry {
+					tag: format!("<{tag}>"),
+					description: description.to_string(),
+				})
+				.collect::<Vec<_>>()
+		})
+		.await
+		.xok()
 }
 
 /// Fallback handler that renders the [`RouteList`] scoped to the nearest ancestor
@@ -71,9 +99,14 @@ pub(crate) async fn ContextualNotFound(
 		)
 		.await??;
 
-	let root =
-		spawn_route_list(&cx.caller, cx.input.parts(), Some(notice), entries)
-			.await?;
+	let root = spawn_route_list(
+		&cx.caller,
+		cx.input.parts(),
+		Some(notice),
+		entries,
+		Vec::new(),
+	)
+	.await?;
 	let mut response =
 		PageRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
@@ -104,6 +137,16 @@ pub(crate) struct RouteEntry {
 	pub params: Vec<RouteParam>,
 }
 
+/// One registered [`Prescan`] type as the root help lists it: the tag and
+/// what it does before the build.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+pub(crate) struct PrescanEntry {
+	/// The tag as authored, ie `<Secrets>`.
+	pub tag: String,
+	/// See [`Prescan::describe`].
+	pub description: String,
+}
+
 /// One row of a route's params table: a CLI flag / query param with its concrete
 /// type and whether it must be supplied.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
@@ -121,7 +164,8 @@ pub(crate) struct RouteParam {
 }
 
 /// The help view: a material list of [`RouteEntry`] rows under an "Available
-/// routes" heading, optionally prefixed with a [`NotFoundNotice`].
+/// routes" heading, optionally prefixed with a [`NotFoundNotice`] and, on the
+/// root help, followed by the [`PrescanEntry`] rows under "Before the build".
 ///
 /// One template for both the CLI `--help` and the web `?help`: the document
 /// chrome (head/sidebar/footer) is the ancestor layout's job, applied by
@@ -133,12 +177,34 @@ pub(crate) struct RouteParam {
 pub fn RouteList(
 	notice: Option<NotFoundNotice>,
 	entries: Vec<RouteEntry>,
+	prescans: Vec<PrescanEntry>,
 ) -> impl Bundle {
 	let items: Vec<_> = entries.into_iter().map(route_entry_item).collect();
+	let prescans = (!prescans.is_empty()).then(|| prescan_list(prescans));
 	rsx! {
 		<>
 			{notice.map(not_found_notice)}
 			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Available routes"</h2>
+			<ul>{items}</ul>
+			{prescans}
+		</>
+	}
+}
+
+/// The declarations that act before the entry builds, one row each: a
+/// registered type at the entry's top level with string attributes and no
+/// `bx:cfg`.
+fn prescan_list(prescans: Vec<PrescanEntry>) -> impl Bundle {
+	let items: Vec<_> = prescans
+		.into_iter()
+		.map(|entry| {
+			rsx! { <li><strong>{entry.tag}</strong>{format!(": {}", entry.description)}</li> }
+		})
+		.collect();
+	rsx! {
+		<>
+			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Before the build"</h2>
+			<p>"Declared at the entry's top level with string attributes and no bx:cfg, each acts before the entry builds."</p>
 			<ul>{items}</ul>
 		</>
 	}
@@ -264,6 +330,7 @@ async fn spawn_route_list(
 	parts: &RequestParts,
 	notice: Option<NotFoundNotice>,
 	entries: Vec<RouteEntry>,
+	prescans: Vec<PrescanEntry>,
 ) -> Result<Entity> {
 	let parts = parts.clone();
 	caller
@@ -274,9 +341,9 @@ async fn spawn_route_list(
 			// passing the `Option` through.
 			let list = match notice {
 				Some(notice) => {
-					rsx! { <RouteList notice=notice entries=entries/> }
+					rsx! { <RouteList notice=notice entries=entries prescans=prescans/> }
 				}
-				None => rsx! { <RouteList entries=entries/> },
+				None => rsx! { <RouteList entries=entries prescans=prescans/> },
 			};
 			let page = PageClasses::resolve(
 				&parts,
@@ -418,6 +485,31 @@ mod test {
 			// the help route itself is excluded
 			.xnot()
 			.xpect_contains("/help");
+	}
+
+	/// The root help lists the declarations that act before the build, the
+	/// set the router registered; a command's help does not.
+	#[beet_core::test]
+	async fn root_help_lists_the_prescan_set() {
+		let mut world = router_world();
+		let root = world
+			.spawn((Router::with_defaults(), children![
+				render_action::fixed_func_route(
+					"about",
+					|| rsx! { <p>"about"</p> }
+				),
+			]))
+			.flush();
+		help_body(&mut world, root, "--help")
+			.await
+			.xpect_contains("Before the build")
+			.xpect_contains("&lt;RepoRoot&gt;")
+			.xpect_contains("&lt;RequireCfg&gt;")
+			.xpect_contains("&lt;TemplateDir&gt;");
+		help_body(&mut world, root, "about --help")
+			.await
+			.xnot()
+			.xpect_contains("Before the build");
 	}
 
 	/// REGRESSION (39.1): the `main.bsx` markup shape — a bare [`Router`] with an

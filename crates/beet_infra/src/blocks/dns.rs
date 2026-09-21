@@ -17,14 +17,14 @@ use serde_json::json;
 /// [`emit_cname`]: Self::emit_cname
 #[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub enum DnsProvider {
-	/// A record in a Cloudflare zone. Authenticates from the
-	/// `CLOUDFLARE_API_TOKEN` environment variable at apply time.
+	/// A record in the stack's [`CloudflareZone`], resolved at render from
+	/// the declaring entity's ancestry (the zone must hold `authority`).
+	/// Authenticates from the `CLOUDFLARE_API_TOKEN` environment variable at
+	/// apply time.
 	#[cfg(feature = "cloudflare_dns")]
 	Cloudflare {
 		/// Fully-qualified record name, eg `dev.beet.org`.
 		authority: SmolStr,
-		/// The Cloudflare zone id (from `CLOUDFLARE_ZONE_ID`).
-		zone_id: SmolStr,
 		/// Whether to proxy through Cloudflare's edge. DNS-only (`false`) is
 		/// required when the origin must be reached directly, eg raw TCP ssh
 		/// or terminating TLS at the origin.
@@ -96,32 +96,14 @@ impl DnsProvider {
 		Ok(())
 	}
 
-	/// A Cloudflare record, DNS-only (not proxied) by default.
+	/// A Cloudflare record in the stack's declared zone, DNS-only (not
+	/// proxied) by default.
 	#[cfg(feature = "cloudflare_dns")]
-	pub fn cloudflare(
-		authority: impl Into<SmolStr>,
-		zone_id: impl Into<SmolStr>,
-	) -> Self {
+	pub fn cloudflare(authority: impl Into<SmolStr>) -> Self {
 		Self::Cloudflare {
 			authority: authority.into(),
-			zone_id: zone_id.into(),
 			proxied: false,
 		}
-	}
-
-	/// A Cloudflare record whose zone comes from `CLOUDFLARE_ZONE_ID`, the one
-	/// place this repo has ever kept it (`ZoneAudit` and `CloudflareZoneSetup`
-	/// both read it there, and the terraform provider block stays empty for the
-	/// same reason the api token does).
-	///
-	/// `None` when the variable is unset, so a caller can say which zone it
-	/// wanted in the error rather than emitting records into zone `""`.
-	#[cfg(feature = "cloudflare_dns")]
-	pub fn cloudflare_env(authority: impl Into<SmolStr>) -> Option<Self> {
-		env_ext::var("CLOUDFLARE_ZONE_ID")
-			.ok()
-			.filter(|zone_id| !zone_id.is_empty())
-			.map(|zone_id| Self::cloudflare(authority, zone_id))
 	}
 
 	/// A Route53 record.
@@ -153,12 +135,19 @@ impl DnsProvider {
 		}
 	}
 
-	/// The zone id the records are emitted into.
-	pub fn zone_id(&self) -> &SmolStr {
+	/// The zone id the records are emitted into: a Route53 provider's own,
+	/// a Cloudflare provider's the stack's [`CloudflareZone`] holding its
+	/// [`authority`](Self::authority), an error naming both when none does.
+	pub fn zone_id(&self, stack: &ResolvedStack) -> Result<SmolStr> {
 		match self {
 			#[cfg(feature = "cloudflare_dns")]
-			Self::Cloudflare { zone_id, .. } => zone_id,
-			Self::Route53 { zone_id, .. } => zone_id,
+			Self::Cloudflare { authority, .. } => {
+				stack.cloudflare_zone_holding(authority)?.id.clone().xok()
+			}
+			Self::Route53 { zone_id, .. } => {
+				let _ = stack;
+				zone_id.clone().xok()
+			}
 		}
 	}
 
@@ -312,9 +301,10 @@ impl DnsProvider {
 		target: &str,
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
+		let zone_id = self.zone_id(stack)?;
 		let address = match self {
 			#[cfg(feature = "cloudflare_dns")]
-			Self::Cloudflare { zone_id, .. } => {
+			Self::Cloudflare { .. } => {
 				ensure_cloudflare_provider(config)?;
 				let record = ResourceDef::new_secondary(
 					ident,
@@ -322,7 +312,7 @@ impl DnsProvider {
 						name: name.into(),
 						ttl: 1,
 						r#type: "SRV".into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						data: Some(CloudflareDnsRecordData {
 							priority: Some(priority as i64),
 							weight: Some(weight as i64),
@@ -342,13 +332,13 @@ impl DnsProvider {
 				config.add_resource(&record)?;
 				address
 			}
-			Self::Route53 { zone_id, .. } => {
+			Self::Route53 { .. } => {
 				let record = ResourceDef::new_secondary(
 					ident,
 					AwsRoute53RecordDetails {
 						name: name.into(),
 						r#type: "SRV".into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						ttl: Some(60),
 						records: Some(vec![
 							format!("{priority} {weight} {port} {target}")
@@ -385,9 +375,10 @@ impl DnsProvider {
 		certificate: &str,
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
+		let zone_id = self.zone_id(stack)?;
 		let address = match self {
 			#[cfg(feature = "cloudflare_dns")]
-			Self::Cloudflare { zone_id, .. } => {
+			Self::Cloudflare { .. } => {
 				ensure_cloudflare_provider(config)?;
 				let record = ResourceDef::new_secondary(
 					ident,
@@ -395,7 +386,7 @@ impl DnsProvider {
 						name: name.into(),
 						ttl: 1,
 						r#type: "TLSA".into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						data: Some(CloudflareDnsRecordData {
 							usage: Some(usage as i64),
 							selector: Some(selector as i64),
@@ -412,13 +403,13 @@ impl DnsProvider {
 				config.add_resource(&record)?;
 				address
 			}
-			Self::Route53 { zone_id, .. } => {
+			Self::Route53 { .. } => {
 				let record = ResourceDef::new_secondary(
 					ident,
 					AwsRoute53RecordDetails {
 						name: name.into(),
 						r#type: "TLSA".into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						ttl: Some(60),
 						records: Some(vec![
 							format!(
@@ -478,9 +469,10 @@ impl DnsProvider {
 		priority: Option<i64>,
 	) -> Result<String> {
 		let ident = stack.resource_ident(label);
+		let zone_id = self.zone_id(stack)?;
 		let address = match self {
 			#[cfg(feature = "cloudflare_dns")]
-			Self::Cloudflare { zone_id, .. } => {
+			Self::Cloudflare { .. } => {
 				ensure_cloudflare_provider(config)?;
 				let record = ResourceDef::new_secondary(
 					ident,
@@ -488,7 +480,7 @@ impl DnsProvider {
 						name: name.into(),
 						ttl: 1,
 						r#type: record_type.into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						content: Some(content.into()),
 						proxied: Some(proxied),
 						priority,
@@ -500,13 +492,13 @@ impl DnsProvider {
 				config.add_resource(&record)?;
 				address
 			}
-			Self::Route53 { zone_id, .. } => {
+			Self::Route53 { .. } => {
 				let record = ResourceDef::new_secondary(
 					ident,
 					AwsRoute53RecordDetails {
 						name: name.into(),
 						r#type: record_type.into(),
-						zone_id: zone_id.clone(),
+						zone_id,
 						ttl: Some(60),
 						records: Some(vec![content.into()]),
 						..default()
@@ -546,14 +538,28 @@ pub(crate) fn ensure_cloudflare_provider(config: &mut terra::Config) -> Result {
 mod tests {
 	use super::*;
 
+	/// The test stack with the zone every Cloudflare record here lands in.
+	#[cfg(feature = "cloudflare_dns")]
+	fn zoned() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		(
+			stack.with_cloudflare_zone(CloudflareZone::new(
+				"beetmash.com",
+				"zone123",
+			)),
+			deployment,
+			dir,
+		)
+	}
+
 	/// TXT content rides straight through for Cloudflare, whose `content` field
 	/// takes arbitrary text.
 	#[cfg(feature = "cloudflare_dns")]
 	#[beet_core::test]
 	fn cloudflare_txt_is_unquoted() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let (stack, deployment, _dir) = zoned();
 		let mut config = deployment.create_config(&stack);
-		DnsProvider::cloudflare("stalwart.beetmash.com", "zone123")
+		DnsProvider::cloudflare("stalwart.beetmash.com")
 			.emit_txt(
 				&stack,
 				&mut config,
@@ -596,9 +602,9 @@ mod tests {
 	#[cfg(feature = "cloudflare_dns")]
 	#[beet_core::test]
 	fn cloudflare_mx_sets_priority_field() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let (stack, deployment, _dir) = zoned();
 		let mut config = deployment.create_config(&stack);
-		DnsProvider::cloudflare("stalwart.beetmash.com", "zone123")
+		DnsProvider::cloudflare("stalwart.beetmash.com")
 			.emit_mx(
 				&stack,
 				&mut config,
@@ -640,11 +646,12 @@ mod tests {
 	/// is the record's, and the top-level one the api returns for an SRV
 	/// regardless. Leaving the second unset is what made the plan report
 	/// `priority = 0 -> null` on every run forever.
+	#[cfg(feature = "cloudflare_dns")]
 	#[beet_core::test]
 	fn cloudflare_srv_uses_data_block() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let (stack, deployment, _dir) = zoned();
 		let mut config = deployment.create_config(&stack);
-		DnsProvider::cloudflare("zone.example", "zone123")
+		DnsProvider::cloudflare("mail.beetmash.com")
 			.emit_srv(
 				&stack,
 				&mut config,
@@ -669,11 +676,12 @@ mod tests {
 	/// A Cloudflare TLSA carries its four fields in `data`, and the pin may be
 	/// an interpolation: the value is parked by a deploy step and read as a
 	/// variable, never typed.
+	#[cfg(feature = "cloudflare_dns")]
 	#[beet_core::test]
 	fn cloudflare_tlsa_uses_data_block() {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let (stack, deployment, _dir) = zoned();
 		let mut config = deployment.create_config(&stack);
-		DnsProvider::cloudflare("zone.example", "zone123")
+		DnsProvider::cloudflare("mail.beetmash.com")
 			.emit_tlsa(
 				&stack,
 				&mut config,
@@ -692,6 +700,40 @@ mod tests {
 			.xpect_contains("\"selector\":1")
 			.xpect_contains("\"matching_type\":1")
 			.xpect_contains("\"certificate\":\"${var.mail_tlsa}\"");
+	}
+
+	/// A Cloudflare record resolves its zone from the stack, and a name the
+	/// declared zone does not hold is refused naming both.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn cloudflare_zone_resolves_from_the_stack() {
+		let (stack, deployment, _dir) = zoned();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("mail.beetmash.com")
+			.emit_txt(&stack, &mut config, "spf", "mail.beetmash.com", "v=spf1")
+			.unwrap();
+		config
+			.to_json_string()
+			.unwrap()
+			.xpect_contains("\"zone_id\":\"zone123\"");
+		DnsProvider::cloudflare("mail.example.org")
+			.emit_txt(&stack, &mut config, "spf2", "mail.example.org", "v=spf1")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("mail.example.org")
+			.xpect_contains("beetmash.com");
+		let (bare, deployment, _dir) = ResolvedStack::default_local();
+		DnsProvider::cloudflare("mail.beetmash.com")
+			.emit_txt(
+				&bare,
+				&mut deployment.create_config(&bare),
+				"spf",
+				"mail.beetmash.com",
+				"v=spf1",
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("CloudflareZone");
 	}
 
 	/// Route53 folds the same four fields into presentation format.

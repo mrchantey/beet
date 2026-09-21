@@ -208,7 +208,7 @@ pub async fn MailProbe(
 		&mailbox,
 		&domain.slug(),
 	);
-	let region = mail.stack.region().clone();
+	let region = mail.stack.region()?.clone();
 	let password = mail
 		.secrets
 		.require(&secret, || {

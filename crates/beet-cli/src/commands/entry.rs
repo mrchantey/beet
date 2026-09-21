@@ -32,17 +32,20 @@ pub(crate) async fn build_entry(
 	entry_path: &str,
 	settle_deadline: Option<Duration>,
 ) -> Result<Entity> {
+	let (formats, prescans) = caller
+		.with_world(|world, _| {
+			(
+				world.get_resource_or_init::<TemplateFormats>().clone(),
+				world.get_resource_or_init::<PrescanRegistry>().clone(),
+			)
+		})
+		.await?;
 	let ResolvedEntry {
 		repo_store,
 		entry_name,
 		prescan,
 		..
-	} = entry_build::resolve_main(repo_uri, None, entry_path).await?;
-	let formats = caller
-		.with_world(|world, _| {
-			world.get_resource_or_init::<TemplateFormats>().clone()
-		})
-		.await?;
+	} = entry_build::resolve_main(&prescans, repo_uri, None, entry_path).await?;
 	let sources =
 		entry_build::read_sources(&repo_store, formats, entry_name, prescan)
 			.await?;
@@ -151,18 +154,30 @@ mod test {
 		AbsPath::new_workspace_rel("examples/bsx_site").unwrap()
 	}
 
+	/// The prescan set the render world registers.
+	fn prescans(world: &World) -> PrescanRegistry {
+		world.resource::<PrescanRegistry>().clone()
+	}
+
 	/// The shared [`entry_build::resolve_main`] serves the commands' positional: a dir resolves
 	/// to its highest-priority [`entry_build::ENTRY_NAMES`] entry through the store, an entry
 	/// file names itself, and a dir with no entry document errors with guidance.
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
+		let prescans = prescans(&render_world());
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
-		let dir = entry_build::resolve_main(None, None, entry_path().as_str())
-			.await
-			.unwrap();
+		let dir = entry_build::resolve_main(
+			&prescans,
+			None,
+			None,
+			entry_path().as_str(),
+		)
+		.await
+		.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
 		let file = entry_build::resolve_main(
+			&prescans,
 			None,
 			None,
 			entry_path().join("main.bsx").as_str(),
@@ -174,14 +189,14 @@ mod test {
 		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		entry_build::resolve_main(None, None, tmp.path().as_str())
+		entry_build::resolve_main(&prescans, None, None, tmp.path().as_str())
 			.await
 			.unwrap()
 			.entry_name
 			.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(None, None, empty.path().as_str())
+		entry_build::resolve_main(&prescans, None, None, empty.path().as_str())
 			.await
 			.err()
 			.unwrap()
@@ -201,9 +216,14 @@ mod test {
 			entry_name,
 			prescan,
 			..
-		} = entry_build::resolve_main(None, None, entry_path().as_str())
-			.await
-			.unwrap();
+		} = entry_build::resolve_main(
+			&prescans(&world),
+			None,
+			None,
+			entry_path().as_str(),
+		)
+		.await
+		.unwrap();
 		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
 		let sources = entry_build::read_sources(
 			&repo_store,

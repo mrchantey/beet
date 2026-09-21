@@ -255,7 +255,7 @@ impl LightsailBlock {
 		repo_bucket: &str,
 		access: &AccessGrants,
 	) -> Result<String> {
-		let region = stack.region();
+		let region = stack.region()?;
 		let log_group = self.log_group(stack);
 		let certificate_store = json!({
 			"Sid": "CertificateStore",
@@ -350,7 +350,7 @@ impl LightsailBlock {
 		refs: &MachineRefs,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
-		let region = stack.region();
+		let region = stack.region()?;
 		let app_port = self.app_port();
 		let caddy_store_prefix = Self::CADDY_STORE_PREFIX;
 		// the deployed binary's config, with the platform bindings this block owns
@@ -1015,6 +1015,7 @@ impl LightsailBlock {
 	/// policy.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &LightsailBlock)>,
 		repos: RepoStoreQuery,
 	) {
@@ -1035,9 +1036,10 @@ impl LightsailBlock {
 					}
 				};
 			let access = scope.access();
-			let (stack, deployment, config) = scope.ctx();
+			let stack = stacks.resolve(entity);
+			let (deployment, config) = scope.ctx();
 			if let Err(err) =
-				block.emit(stack, &repo_bucket, deployment, &access, config)
+				block.emit(&stack, &repo_bucket, deployment, &access, config)
 			{
 				scope.error(bevyhow!(
 					"LightsailBlock '{}': {err}",
@@ -1170,10 +1172,10 @@ impl LightsailBlock {
 		// instance with self-provisioning user data
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
 		let mut instance_details = AwsLightsailInstanceDetails {
-			availability_zone: self
-				.availability_zone
-				.clone()
-				.unwrap_or_else(|| format!("{}a", stack.region()).into()),
+			availability_zone: match &self.availability_zone {
+				Some(zone) => zone.clone(),
+				None => format!("{}a", stack.region()?).into(),
+			},
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
 			name: instance_ident.primary_identifier().clone(),
@@ -1367,11 +1369,11 @@ mod tests {
 		(script.to_string(), dir)
 	}
 
-	/// The scope a lone `block` renders under a fresh local deploy, granting
-	/// nothing (no resource blocks declared beside it).
+	/// The scope a lone `block` renders under a fresh local deploy zoned for
+	/// `example.org`, granting nothing (no resource blocks declared beside it).
 	fn render_block(block: &LightsailBlock) -> (RenderScope, TestWorkDir) {
 		let block = block.clone();
-		RenderScope::test_render(move |parent| {
+		RenderScope::test_render_zoned("example.org", move |parent| {
 			parent.spawn(block);
 			parent.spawn(RepoStoreBlock::test_store());
 		})
@@ -1497,7 +1499,7 @@ mod tests {
 	fn rebuilding_the_box_reapplies_the_firewall() {
 		let block = LightsailBlock::default()
 			.with_allow_ssh(true)
-			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+			.with_dns(DnsProvider::cloudflare("example.org"));
 		let (scope, _dir) = render_block(&block);
 		let stack = scope.stack().clone();
 		let ports_label = stack
@@ -1921,11 +1923,8 @@ mod tests {
 	#[beet_core::test]
 	fn dns_emits_a_records_and_caddy_hostnames() {
 		let block = LightsailBlock::default()
-			.with_dns(
-				DnsProvider::cloudflare("example.org", "zone123")
-					.with_proxied(true),
-			)
-			.with_dns(DnsProvider::cloudflare("app.example.org", "zone123"));
+			.with_dns(DnsProvider::cloudflare("example.org").with_proxied(true))
+			.with_dns(DnsProvider::cloudflare("app.example.org"));
 		build_json(&block)
 			.xpect_contains("cloudflare_dns_record")
 			.xpect_contains("\"type\":\"A\"")
@@ -1953,7 +1952,7 @@ mod tests {
 	#[beet_core::test]
 	fn rebuild_restores_the_certificate_store() {
 		let block = LightsailBlock::default()
-			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+			.with_dns(DnsProvider::cloudflare("example.org"));
 		let bucket = RepoStoreBlock::TEST_BUCKET;
 		let (script, _dir) = build_user_data(&block);
 		let restore = format!(
@@ -1996,7 +1995,7 @@ mod tests {
 	fn release_starts_the_tls_terminator() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();
 		let block = LightsailBlock::default()
-			.with_dns(DnsProvider::cloudflare("example.org", "zone123"));
+			.with_dns(DnsProvider::cloudflare("example.org"));
 		build_user_data(&block)
 			.0
 			.as_str()
@@ -2052,7 +2051,7 @@ mod tests {
 	fn installs_caddy_from_static_release_not_rpm() {
 		let (script, _dir) = build_user_data(
 			&LightsailBlock::default()
-				.with_dns(DnsProvider::cloudflare("example.org", "zone123")),
+				.with_dns(DnsProvider::cloudflare("example.org")),
 		);
 		script
 			.as_str()
@@ -2165,6 +2164,7 @@ mod tests {
 	#[ignore = "very slow"]
 	async fn validate() {
 		let (scope, _dir) = render_block(&LightsailBlock::default());
+		StateEncryption::ensure_test_passphrase();
 		scope.project().unwrap().validate().await.unwrap();
 	}
 }

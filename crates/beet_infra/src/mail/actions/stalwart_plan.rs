@@ -231,7 +231,7 @@ impl StalwartPlan {
 				)
 			})?;
 			routes.push(match relay {
-				RelayMode::Ses(_) => Self::ses_route(stack, credential),
+				RelayMode::Ses(_) => Self::ses_route(stack, credential)?,
 				RelayMode::Comail(comail) => {
 					Self::comail_route(&name, comail, credential)
 				}
@@ -347,14 +347,18 @@ impl StalwartPlan {
 	/// `implicitTls: false` and port 587 rather than 465 because that is the
 	/// endpoint SES documents for SMTP relay; the session is still TLS, just
 	/// negotiated after the greeting.
-	fn ses_route(stack: &ResolvedStack, credential: &RelayCredential) -> Value {
+	fn ses_route(
+		stack: &ResolvedStack,
+		credential: &RelayCredential,
+	) -> Result<Value> {
 		Self::route(
 			SesRelay::ROUTE,
 			"Amazon SES relay",
-			&SesRelay::smtp_endpoint(stack),
+			&SesRelay::smtp_endpoint(stack)?,
 			587,
 			credential,
 		)
+		.xok()
 	}
 
 	/// One enrolled domain's comail route, on the same 587 STARTTLS shape.
@@ -797,8 +801,8 @@ mod tests {
 	fn stack() -> ResolvedStack {
 		Stack::new("beetmash")
 			.with_stage("prod")
-			.with_region(crate::bindings::aws::region::AP_SOUTHEAST_2)
 			.resolve(&PackageConfig::default())
+			.with_region(crate::bindings::aws::region::AP_SOUTHEAST_2)
 	}
 
 	fn mail_box() -> StalwartBlock {

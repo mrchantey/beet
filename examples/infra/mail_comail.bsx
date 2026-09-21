@@ -100,7 +100,7 @@ inbound assertion rather than failing the deploy.
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<Stack app_name="mail-comail-example" region="us-west-2">
+	<Stack app_name="mail-comail-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
 		<Group bx:ref="deploy_up">
 			<EnsureSecret secret="mail-admin-password"/>
 			<EnsureDkimKey/>
@@ -122,6 +122,9 @@ inbound assertion rather than failing the deploy.
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 
 		<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false/>
+		<!-- the REPO STORE the observer function's code is published into and
+		     boots from; every stack with a lambda marks one -->
+		<S3BucketBlock label="repo" {RepoStoreBlock}/>
 		<S3BucketBlock label="mail-blobs" deploy_versioned=false force_destroy=false
 			runtime_write=true object_versioning=true/>
 		<S3BucketBlock label="archive" deploy_versioned=false runtime_write=true
@@ -139,7 +142,6 @@ inbound assertion rather than failing the deploy.
 		<StalwartBlock label="mail" hostname="mail.example.com"
 			blob_bucket="mail-blobs" backup_bucket="archive"
 			{VpcRef($net)}
-			dns={Cloudflare{authority:"mail.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			ssh_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIexampleexampleexampleexampleexampleexam you@example.com"/>
 
 		<!-- one enrolled domain, one DID. `{ComailRelay}` takes the hosted relay
@@ -149,7 +151,6 @@ inbound assertion rather than failing the deploy.
 		<MailDomainBlock
 			domain="news.example.com"
 			mail_host="mail.example.com"
-			dns={Cloudflare{authority:"news.example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
 			alarms_topic="mail-example-alarms"
 			{ComailRelay}
 			catch_all="replies"

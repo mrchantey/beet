@@ -35,6 +35,18 @@ impl<K, V, S: Default> Default for MultiMap<K, V, S> {
 	}
 }
 
+impl<K: Eq + Hash, V, S: BuildHasher + Default> FromIterator<(K, V)>
+	for MultiMap<K, V, S>
+{
+	fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
+		let mut map = Self::default();
+		for (key, value) in iter {
+			map.insert(key, value);
+		}
+		map
+	}
+}
+
 impl<K: Eq + Hash, V: PartialEq, S: BuildHasher> PartialEq
 	for MultiMap<K, V, S>
 {

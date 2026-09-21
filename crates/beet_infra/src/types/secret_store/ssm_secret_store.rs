@@ -39,7 +39,7 @@ impl SsmSecrets {
 	pub fn store(stack: ResolvedStack) -> Result<SecretStore> {
 		cfg_if! {
 			if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
-				SecretStore::new(SsmSecretStore::new(stack)).xok()
+				SecretStore::new(SsmSecretStore::new(stack)?).xok()
 			} else {
 				bevybail!(
 					"stack `{}--{}` keeps its secrets in parameter store and this \
@@ -95,6 +95,8 @@ pub(crate) fn attach_ssm_secrets(
 #[derive(Debug, Clone)]
 pub struct SsmSecretStore {
 	stack: ResolvedStack,
+	/// The region every request goes to, the stack's own.
+	region: SmolStr,
 }
 
 #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
@@ -102,11 +104,15 @@ impl SsmSecretStore {
 	/// The provider id.
 	pub const ID: &'static str = "ssm";
 
-	/// The store over parameter store in `stack`'s region, scoped to it.
-	pub fn new(stack: ResolvedStack) -> Self { Self { stack } }
+	/// The store over parameter store in `stack`'s region, scoped to it; an
+	/// error naming the stack when it declares no region.
+	pub fn new(stack: ResolvedStack) -> Result<Self> {
+		let region = stack.region()?.clone();
+		Self { stack, region }.xok()
+	}
 
 	/// The region every request goes to.
-	fn region(&self) -> &str { self.stack.region() }
+	fn region(&self) -> &str { &self.region }
 
 	/// The directory this stack's secrets sit under.
 	fn prefix(&self) -> String { SecretRef::prefix(&self.stack) }
@@ -306,17 +312,19 @@ impl SecretStoreProvider for SsmSecretStore {
 
 	fn id(&self) -> &'static str { Self::ID }
 
-	fn region(&self) -> Option<SmolStr> { Some(self.stack.region().clone()) }
+	fn region(&self) -> Option<SmolStr> { Some(self.region.clone()) }
 
 	fn stack(&self) -> &ResolvedStack { &self.stack }
 
-	/// The same region serves every stack, so a rescope is one.
+	/// The same region serves every stack, so a rescope keeps this one.
 	fn for_stack(
 		&self,
 		stack: &ResolvedStack,
 	) -> Result<Box<dyn SecretStoreProvider>> {
-		let store: Box<dyn SecretStoreProvider> =
-			Box::new(Self::new(stack.clone()));
+		let store: Box<dyn SecretStoreProvider> = Box::new(Self {
+			stack: stack.clone(),
+			region: self.region.clone(),
+		});
 		store.xok()
 	}
 
@@ -432,6 +440,7 @@ mod test {
 		Stack::new("beetmash")
 			.with_stage("prod")
 			.resolve(&PackageConfig::default())
+			.with_region("ap-southeast-2")
 	}
 
 	/// The composition the live boot scripts and IAM policies already carry,
@@ -439,7 +448,7 @@ mod test {
 	/// without its database password.
 	#[beet_core::test]
 	fn addresses_are_the_parameter_names() {
-		let store = SsmSecretStore::new(stack());
+		let store = SsmSecretStore::new(stack()).unwrap();
 		store
 			.address(&SecretRef::new("db-password"))
 			.as_str()
@@ -450,7 +459,7 @@ mod test {
 			.xpect_eq("/beetmash/prod/mail-admin-password");
 		SecretStoreProvider::region(&store)
 			.unwrap()
-			.xpect_eq(stack().region().clone());
+			.xpect_eq(stack().region().unwrap().clone());
 		// a rescope keeps the region and composes the other stack's names
 		let drill = Stack::new("beetmash")
 			.with_stage("drill")
@@ -467,7 +476,7 @@ mod test {
 	/// prefix and nothing else, with the description as the note.
 	#[beet_core::test]
 	fn entries_read_labels_notes_and_dates() {
-		let store = SsmSecretStore::new(stack());
+		let store = SsmSecretStore::new(stack()).unwrap();
 		let entry = store
 			.entry(&json!({
 				"Name": "/beetmash/prod/dkim-example-com",

@@ -34,7 +34,7 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<Stack app_name="lambda">
+	<Stack app_name="lambda" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<!-- the block + its build artifact share one entity (the deploy pairs them) -->
 			<LambdaSiteBlock features="lambda,aws_sdk"/>

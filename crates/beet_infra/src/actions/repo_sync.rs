@@ -59,13 +59,16 @@ mod test {
 	use beet_router::prelude::*;
 
 	/// A site tree and a workspace tree it borrows from, both under `target/`
-	/// so the stage and the copy can name them workspace-relative.
+	/// so the stage and the copy can name them workspace-relative. The site
+	/// carries a `target/` of its own, as a checkout-root entry does, which a
+	/// staged allowlist leaves behind.
 	fn trees() -> (TempDir, WsPath, WsPath) {
 		let dir = TempDir::new_ws().unwrap();
 		let site = dir.path().join("site");
 		let workspace = dir.path().join("assets");
 		fs_ext::write(site.join("main.bsx"), "<div/>").unwrap();
 		fs_ext::write(site.join("routes/index.md"), "# hi").unwrap();
+		fs_ext::write(site.join("target/debug/junk"), "junk").unwrap();
 		fs_ext::write(workspace.join("wasm/app.wasm"), "wasm").unwrap();
 		let (site, workspace) = (
 			site.into_ws_path().unwrap(),
@@ -81,6 +84,16 @@ mod test {
 		deployment: &Deployment,
 		site: &WsPath,
 		workspace: &WsPath,
+	) -> Result<(BlobStore, AbsPath)> {
+		publish_paths(deployment, site, workspace, "main.bsx,routes").await
+	}
+
+	/// [`publish`] staging the `paths` under `site` alone.
+	async fn publish_paths(
+		deployment: &Deployment,
+		site: &WsPath,
+		workspace: &WsPath,
+		paths: &str,
 	) -> Result<(BlobStore, AbsPath)> {
 		let deploy_id = *deployment.deploy_id();
 		let root = StoreUri::parse("memory://repo-sync-test")?;
@@ -99,11 +112,9 @@ mod test {
 						.with_deploy_versioned(true),
 					RepoStoreBlock
 				),
-				(RepoStage::new(site.clone()), children![DirCopy::new(
-					workspace.clone(),
-					"assets",
-					"wasm/app.wasm"
-				)]),
+				(RepoStage::new(site.clone()).with_paths(paths), children![
+					DirCopy::new(workspace.clone(), "assets", "wasm/app.wasm")
+				]),
 				RepoSync::default(),
 			]))
 			.exchange(Request::get(""))
@@ -127,8 +138,9 @@ mod test {
 	}
 
 	/// The staging dir IS the store's contents: the site plus what it borrows
-	/// lands under this launch's `<id>/repo/`, nothing is written into the
-	/// source tree, and a file removed from the source leaves the mirror.
+	/// lands under this launch's `<id>/repo/`, the allowlist keeps the site's
+	/// own `target/` out, nothing is written into the source tree, and a file
+	/// removed from the source leaves the mirror.
 	#[beet_core::test]
 	async fn the_staging_dir_is_the_published_document() {
 		let (dir, site, workspace) = trees();
@@ -165,5 +177,25 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_false();
+	}
+
+	/// With no allowlist the source is staged whole, and an allowlisted path
+	/// that is absent fails the stage rather than publishing without it.
+	#[beet_core::test]
+	async fn a_stage_without_paths_publishes_the_source_whole() {
+		let (_dir, site, workspace) = trees();
+		let (deployment, _work_dir) = Deployment::default_local();
+		let (document, _) = publish_paths(&deployment, &site, &workspace, "")
+			.await
+			.unwrap();
+		document
+			.exists(&RelPath::new("target/debug/junk"))
+			.await
+			.unwrap()
+			.xpect_true();
+		// the error flows back as the exchange's failed response
+		publish_paths(&deployment, &site, &workspace, "main.bsx,missing")
+			.await
+			.unwrap_err();
 	}
 }

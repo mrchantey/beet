@@ -183,16 +183,21 @@ run from the `atproto` build too, so the handle records count as declared.
     just site-shared push                  # publish site/assets to it
 
 Live deploy needs the deployer's credentials (the AWS pair,
-`CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) and identifiers
-(`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`, `AWS_REGION`) from the repo's
-`secrets.toml`, which the launch loads into the process environment before
-this entry builds (the top-level `<Secrets path="../secrets.toml"/>`; `beet
-secrets/check` says whether this machine's identity opens it), plus `tofu`
-and `cargo-zigbuild`. The social stack and the audit need only the Cloudflare
-token and zone (plus AWS for the social stack's state bucket).
+`CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) from the repo's `secrets.toml`,
+which the launch loads into the process environment before this entry builds
+(the top-level `<Secrets path="../secrets.toml"/>`; `beet secrets/check` says
+whether this machine's identity opens it), plus `tofu` and `cargo-zigbuild`.
+The provider addresses (the region, the Cloudflare account and zone) are
+identifiers, not secrets, declared as spreads on the root `<Router>` below and
+resolved by ancestry. The social stack and the audit need only the Cloudflare
+token (plus AWS for the social stack's state bucket).
 -->
 <CliServer always=true {CallOnReady}>
-<Router {HelpHandler}>
+<!-- the provider addresses every stack below deploys into, resolved by
+     ancestry: the region, the Cloudflare account and the `beet.org` zone,
+     identifiers public in every dashboard url and so declared here rather
+     than read from anywhere -->
+<Router {(HelpHandler, AwsRegion("us-west-2"), CloudflareAccount{id:"74aba4da669f57fc6fc3e63ebcfcff26"}, CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
 	<!-- the deployer's credentials: the repo's one document, above this
 	     entry's own directory, loaded into the process environment by the
 	     launch before this entry builds. Top level and unconditional so the
@@ -410,9 +415,8 @@ token and zone (plus AWS for the social stack's state bucket).
 			<DeployRoutes deploy={$social_up} destroy={$social_down}/>
 			<!-- one TXT record per handle at `_atproto.<name>.beet.org`,
 			     holding `did=<did>`. The entry with no `name` is the APEX
-			     handle, `beet.org` itself. No `dns` attribute: which zone a
-			     launch writes into is a property of the launch, read from
-			     `CLOUDFLARE_ZONE_ID`. -->
+			     handle, `beet.org` itself. No `dns` attribute: the records
+			     land in the `CloudflareZone` declared on the root. -->
 			<AtprotoHandleBlock domain="beet.org" dns_stage="prod"
 				handles={[
 					{did:"did:plc:vgxy56shhs3t3b2mu2avizjf"},

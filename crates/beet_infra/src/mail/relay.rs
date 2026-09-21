@@ -112,8 +112,8 @@ impl SesRelay {
 
 	/// The regional SES SMTP endpoint the relay route submits to, port 587
 	/// STARTTLS.
-	pub fn smtp_endpoint(stack: &ResolvedStack) -> String {
-		format!("email-smtp.{}.amazonaws.com", stack.region())
+	pub fn smtp_endpoint(stack: &ResolvedStack) -> Result<String> {
+		format!("email-smtp.{}.amazonaws.com", stack.region()?).xok()
 	}
 }
 

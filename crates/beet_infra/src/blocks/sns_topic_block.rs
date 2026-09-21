@@ -105,15 +105,16 @@ impl SnsTopicBlock {
 	/// The arn of a topic named `name` in `stack`'s region, composed against
 	/// the account the apply runs in. What a consumer resolves when no block
 	/// in its scope declares the topic; needs `data.aws_caller_identity.current`.
-	pub fn composed_arn(stack: &ResolvedStack, name: &str) -> String {
+	pub fn composed_arn(stack: &ResolvedStack, name: &str) -> Result<String> {
 		format!(
 			"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{name}",
-			stack.region()
+			stack.region()?
 		)
+		.xok()
 	}
 
 	/// The arn the import stanzas name, composed the same way.
-	fn import_id(&self, stack: &ResolvedStack) -> String {
+	fn import_id(&self, stack: &ResolvedStack) -> Result<String> {
 		Self::composed_arn(stack, &self.topic_name(stack))
 	}
 
@@ -210,7 +211,7 @@ impl EmitBlock for SnsTopicBlock {
 		);
 		config.add_resource(&topic)?.add_resource(&policy)?;
 		if self.adopt {
-			let id = self.import_id(stack);
+			let id = self.import_id(stack)?;
 			config
 				.add_import(topic.address(), id.clone())?
 				.add_import(policy.address(), id)?;
@@ -226,7 +227,10 @@ mod tests {
 
 	fn build_config(block: &SnsTopicBlock) -> (ResolvedStack, Value) {
 		let (scope, _dir) = RenderScope::test_render_stack(
-			Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2),
+			(
+				Stack::new("beet_infra"),
+				AwsRegion::new(aws::region::AP_SOUTHEAST_2),
+			),
 			|parent| {
 				parent.spawn(block.clone());
 			},

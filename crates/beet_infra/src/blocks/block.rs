@@ -145,7 +145,9 @@ mod test {
 	#[beet_core::test]
 	fn reinsertion_refreshes_the_erased_half() {
 		let mut world = world();
-		let entity = world.spawn(S3BucketBlock::new("app")).id();
+		let entity = world
+			.spawn((S3BucketBlock::new("app"), AwsRegion::new("us-west-2")))
+			.id();
 		world.flush();
 		world
 			.get::<ErasedBlock>(entity)
@@ -168,7 +170,9 @@ mod test {
 	#[beet_core::test]
 	fn removal_takes_the_erased_half() {
 		let mut world = world();
-		let entity = world.spawn(S3BucketBlock::new("app")).id();
+		let entity = world
+			.spawn((S3BucketBlock::new("app"), AwsRegion::new("us-west-2")))
+			.id();
 		world.flush();
 		world.get::<ErasedBlock>(entity).xpect_some();
 		world.entity_mut(entity).remove::<S3BucketBlock>();

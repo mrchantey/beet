@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Declares where an entry's repo store begins: `src` names a position relative
@@ -25,10 +26,19 @@ use beet_core::prelude::*;
 /// roots the store at the workspace (or a bucket published from it at the
 /// bucket root), replacing the old `--root` cli flag: the entry owns its root
 /// rather than every caller re-supplying it. Inert at runtime; only entry
-/// resolution reads it, through [`EntryPrescan`].
+/// resolution reads it, through [`EntryPrescan`], and the first one wins: a
+/// second is ignored rather than silently re-rooting the store mid-document.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RepoRoot {
 	/// The repo store root, relative to the entry document's location in its store.
 	pub src: String,
+}
+
+/// Read by entry resolution, which rebases the store before any other
+/// declaration's preload runs against it.
+impl Prescan for RepoRoot {
+	fn describe() -> &'static str {
+		"roots the repo store at `src`, relative to the entry document, before it is built"
+	}
 }

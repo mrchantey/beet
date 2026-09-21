@@ -56,11 +56,13 @@ addressable, so `--help` still lists it and dispatching a shared verb reports
 the condition that excluded it rather than 404ing.
 
 The shared verbs need the deployer's AWS pair, plus `tofu`. Every credential
-and identifier this workspace uses (the model-provider keys, the AWS pair,
-the Cloudflare token, account and zone, the R2 pair, the site box's host key,
-the region) is a record of `secrets.toml`, age-sealed to the humans in its
-`default` group and loaded into the process environment by the launch before
-this entry builds (`<Secrets/>` below): there is no `.env`. Reading it needs
+this workspace uses (the model-provider keys, the AWS pair, the Cloudflare
+token, the R2 pair, the site box's host key) is a record of `secrets.toml`,
+age-sealed to the humans in its `default` group and loaded into the process
+environment by the launch before this entry builds (`<Secrets/>` below): there
+is no `.env`. The provider addresses (a region, a Cloudflare account or zone)
+are identifiers, not secrets: spreads on a stack or an ancestor, resolved by
+ancestry and never read from the environment. Reading the document needs
 this machine's age identity (`~/.config/beet/age/keys.txt`); `beet
 secrets/check` says whether it does, `beet secrets/ls` what is there, and each
 record's note and rotation say what it is and where it is re-minted.
@@ -90,7 +92,10 @@ stays, an inert tag in a lean build.
 	<Route path="vault" bx:cfg="feature:vault"><VaultRoutes/></Route>
 	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
-		<Stack stage="shared">
+		<!-- the region is an address declared on the stack, never read from
+		     the environment: a region that could fall back would plan a full
+		     replacement -->
+		<Stack stage="shared" {AwsRegion("us-west-2")}>
 			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
 			<!-- the shared assets stack has one resource and no step outside
 			     terraform, so its deploy is an apply and its teardown is that

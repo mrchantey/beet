@@ -86,11 +86,12 @@ impl Block for CloudflareWorkerBlock {
 impl StoreBlock for CloudflareWorkerBlock {
 	/// The bucket as the Worker reads it, through its binding rather than the
 	/// S3-compatible api, so the uri names no account and no credential.
-	fn store_uri(&self, _stack: &ResolvedStack) -> StoreUri {
+	fn store_uri(&self, _stack: &ResolvedStack) -> Result<StoreUri> {
 		StoreUri::R2 {
 			name: self.binding.clone(),
 			path_prefix: None,
 		}
+		.xok()
 	}
 }
 

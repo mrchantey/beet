@@ -45,12 +45,6 @@ pub struct DynamoTableBlock {
 	/// change to would replace it.
 	#[set_with(unwrap_option, into)]
 	ttl: Option<SmolStr>,
-	/// Override the region this table lives in, which otherwise resolves from
-	/// the ancestor [`Stack`]. The runtime store and the tofu resource read the
-	/// one resolved value rather than the runtime falling back to an environment
-	/// the deploy never saw.
-	#[set_with(unwrap_option, into)]
-	region: Option<SmolStr>,
 	/// The deploy layer ([`Config::STORAGE_LAYER`](terra::Config::STORAGE_LAYER)
 	/// by default): the runtime writes to this table from its first request, and
 	/// nothing in the tofu graph orders the table before the service (the name
@@ -71,7 +65,6 @@ impl DynamoTableBlock {
 			label: label.into(),
 			hash_key: "id".into(),
 			ttl: None,
-			region: None,
 			layer: terra::Config::STORAGE_LAYER.into(),
 		}
 	}
@@ -84,25 +77,18 @@ impl DynamoTableBlock {
 	pub fn table_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.label.clone())
 	}
-
-	/// The region this table lives in: its own override, else `stack`'s.
-	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
-		self.region
-			.clone()
-			.unwrap_or_else(|| stack.region().clone())
-	}
 }
 
 impl StoreBlock for DynamoTableBlock {
-	/// The composed table name pinned to the region the declaration resolved,
-	/// so the process a deploy hands it to reaches the table the deploy
-	/// created.
-	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
+	/// The composed table name pinned to the stack's declared region, so the
+	/// process a deploy hands it to reaches the table the deploy created.
+	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri> {
 		StoreUri::Dynamo {
 			name: self.table_name(stack).into(),
 			path_prefix: None,
-			region: Some(self.resolved_region(stack)),
+			region: Some(stack.region()?.clone()),
 		}
+		.xok()
 	}
 }
 
@@ -148,7 +134,7 @@ impl DynamoTableBlock {
 						r#type: "S".into(),
 					},
 				]),
-				region: Some(self.resolved_region(stack)),
+				region: Some(stack.region()?.clone()),
 				// absent unless declared, so a table that expires nothing
 				// renders exactly as it did before this field existed
 				ttl: self.ttl.clone().map(|attribute_name| {
@@ -222,16 +208,18 @@ mod test {
 	}
 
 	/// The declaration's erased root is the table uri a remote process
-	/// attaches, the composed name pinned to the resolved region, so the
-	/// generic store attach serves a table exactly as it serves a bucket.
+	/// attaches, the composed name pinned to the stack's declared region, so
+	/// the generic store attach serves a table exactly as it serves a bucket.
 	#[beet_core::test]
 	fn projects_a_dynamo_root() {
 		let mut world = World::new();
 		world.init_resource::<PackageConfig>();
 		let stack = world
-			.spawn((Stack::new("app").with_stage("prod"), children![
-				DynamoTableBlock::new("analytics")
-			]))
+			.spawn((
+				Stack::new("app").with_stage("prod"),
+				AwsRegion::new("eu-west-1"),
+				children![DynamoTableBlock::new("analytics")],
+			))
 			.id();
 		world.flush();
 		let entity = world.entity(stack).get::<Children>().unwrap()[0];
@@ -240,7 +228,7 @@ mod test {
 			.unwrap()
 			.root()
 			.to_string()
-			.xpect_contains("dynamo://app--prod--analytics?region=");
+			.xpect_eq("dynamo://app--prod--analytics?region=eu-west-1");
 	}
 
 	/// The block emits an `aws_dynamodb_table` with a stage-prefixed name, an `id`

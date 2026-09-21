@@ -50,11 +50,6 @@ use beet_net::prelude::*;
 )]
 pub struct R2BucketBlock {
 	label: SmolStr,
-	/// The Cloudflare account the bucket belongs to, from
-	/// `CLOUDFLARE_ACCOUNT_ID`: which account a launch writes into is a
-	/// property of the launch, like the api token beside it.
-	#[set_with(into)]
-	account_id: SmolStr,
 	/// The location HINT, ie `weur`: where R2 places the bucket on a
 	/// best-effort basis, honoured only at creation. For a cold copy this is
 	/// the point: a store meant to survive a regional event should not sit in
@@ -93,9 +88,6 @@ impl R2BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			account_id: env_ext::var("CLOUDFLARE_ACCOUNT_ID")
-				.unwrap_or_default()
-				.into(),
 			location: SmolStr::default(),
 			expire_prefixes: Vec::new(),
 		}
@@ -107,9 +99,13 @@ impl R2BucketBlock {
 	}
 
 	/// The S3-compatible endpoint every client dials, composed from the
-	/// account rather than typed by a consumer.
-	pub fn endpoint(&self) -> String {
-		format!("https://{}.r2.cloudflarestorage.com", self.account_id)
+	/// stack's [`CloudflareAccount`] rather than typed by a consumer.
+	pub fn endpoint(&self, stack: &ResolvedStack) -> Result<String> {
+		format!(
+			"https://{}.r2.cloudflarestorage.com",
+			stack.cloudflare_account()?.id
+		)
+		.xok()
 	}
 
 	/// Where the token's S3 access key id is parked, ie
@@ -190,22 +186,23 @@ impl R2BucketBlock {
 		secrets: &SecretStore,
 	) -> Result<BlobStore> {
 		let (access_key, secret_key) = self.parked_pair(secrets).await?;
-		S3Store::from_uri(&self.store_uri(secrets.stack()))?
+		S3Store::from_uri(&self.store_uri(secrets.stack())?)?
 			.with_credentials(S3Credentials::new(access_key, secret_key))
 			.xmap(BlobStore::new)
 			.xok()
 	}
 
 	/// The token's resource scope: this bucket, in the default jurisdiction.
-	fn token_resources(&self, stack: &ResolvedStack) -> String {
+	fn token_resources(&self, stack: &ResolvedStack) -> Result<String> {
 		serde_json::json!({
 			format!(
 				"com.cloudflare.edge.r2.bucket.{}_default_{}",
-				self.account_id,
+				stack.cloudflare_account()?.id,
 				self.bucket_name(stack)
 			): "*"
 		})
 		.to_string()
+		.xok()
 	}
 
 	/// The account-owned token the apply mints for this bucket, and the two
@@ -221,7 +218,7 @@ impl R2BucketBlock {
 		let token = ResourceDef::new_secondary(
 			stack.resource_ident(format!("{}-token", self.label)),
 			CloudflareAccountTokenDetails {
-				account_id: self.account_id.clone(),
+				account_id: stack.cloudflare_account()?.id.clone(),
 				name: stack
 					.resource_name(format!("{}-token", self.label))
 					.into(),
@@ -235,7 +232,7 @@ impl R2BucketBlock {
 							id: Self::ITEM_WRITE_PERMISSION.into(),
 						},
 					],
-					resources: self.token_resources(stack).into(),
+					resources: self.token_resources(stack)?.into(),
 				}],
 				depends_on: Some(vec![bucket.address().into()]),
 				..default()
@@ -273,13 +270,6 @@ impl R2BucketBlock {
 
 	/// Rejects a declaration the provider would reject, at config time.
 	pub fn validate(&self) -> Result {
-		if self.account_id.is_empty() {
-			bevybail!(
-				"r2 bucket '{}' has no account id: set CLOUDFLARE_ACCOUNT_ID, or \
-				`with_account_id`",
-				self.label
-			);
-		}
 		if !self.location.is_empty()
 			&& !Self::LOCATIONS.contains(&self.location.as_str())
 		{
@@ -360,13 +350,14 @@ impl Block for R2BucketBlock {
 impl StoreBlock for R2BucketBlock {
 	/// The bucket over the S3 api at the account's endpoint, which is how
 	/// every non-Worker client reaches R2.
-	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
+	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri> {
 		StoreUri::S3 {
 			name: self.bucket_name(stack).into(),
 			path_prefix: None,
-			endpoint: Some(self.endpoint().into()),
+			endpoint: Some(self.endpoint(stack)?.into()),
 			region: Some(Self::REGION.into()),
 		}
+		.xok()
 	}
 }
 
@@ -379,10 +370,11 @@ impl EmitBlock for R2BucketBlock {
 	) -> Result {
 		self.validate()?;
 		ensure_cloudflare_provider(config)?;
+		let account_id = stack.cloudflare_account()?.id.clone();
 		let bucket = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
 			CloudflareR2BucketDetails {
-				account_id: self.account_id.clone(),
+				account_id: account_id.clone(),
 				location: (!self.location.is_empty())
 					.then(|| self.location.clone()),
 				..default()
@@ -396,7 +388,7 @@ impl EmitBlock for R2BucketBlock {
 		config.add_resource(&ResourceDef::new_secondary(
 			stack.resource_ident(format!("{}-lifecycle", self.label)),
 			CloudflareR2BucketLifecycleDetails {
-				account_id: self.account_id.clone(),
+				account_id,
 				bucket_name: bucket.field_ref("name").into(),
 				rules: Some(
 					self.expire_prefixes.iter().map(Self::rule).collect(),
@@ -414,19 +406,28 @@ mod tests {
 
 	fn cold() -> R2BucketBlock {
 		R2BucketBlock::new("cold-backups")
-			.with_account_id("acct123")
 			.with_location("weur")
 			.with_expire_prefixes(vec![PrefixExpiry::new("sqlite/", 180)])
 	}
 
+	/// The test stack with the account the bucket lands in.
+	fn stack() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		(
+			stack.with_cloudflare_account(CloudflareAccount::new("acct123")),
+			deployment,
+			dir,
+		)
+	}
+
 	fn render(block: R2BucketBlock) -> String {
-		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let (stack, deployment, _dir) = stack();
 		let mut config = deployment.create_config(&stack);
 		block.emit(&stack, &deployment, &mut config).unwrap();
 		config.to_json_string().unwrap()
 	}
 
-	/// The bucket lands in the account the launch names, at the composed
+	/// The bucket lands in the account the stack declares, at the composed
 	/// name, with its hint; the lifecycle counts the declared days in seconds
 	/// and names the bucket by reference rather than by a second composition.
 	#[beet_core::test]
@@ -502,9 +503,10 @@ mod tests {
 	}
 
 	/// The hint is honoured exactly once, at creation, so a misspelt one is
-	/// a bucket in the wrong place forever: it fails at render instead.
+	/// a bucket in the wrong place forever: it fails at render instead; and
+	/// a stack declaring no account fails naming the spread.
 	#[beet_core::test]
-	fn a_bad_location_is_loud() {
+	fn a_bad_location_or_a_missing_account_is_loud() {
 		cold()
 			.with_location("sydney")
 			.validate()
@@ -512,20 +514,20 @@ mod tests {
 			.to_string()
 			.xpect_contains("sydney")
 			.xpect_contains("weur");
-		R2BucketBlock::new("cold")
-			.with_account_id("")
-			.validate()
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		cold()
+			.emit(&stack, &deployment, &mut deployment.create_config(&stack))
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("CLOUDFLARE_ACCOUNT_ID");
+			.xpect_contains("CloudflareAccount");
 	}
 
 	/// The store uri is the S3 api at the account's endpoint, which is what
 	/// every client that is not a Worker binding dials.
 	#[beet_core::test]
 	fn the_store_uri_dials_the_account_endpoint() {
-		let (stack, _deployment, _dir) = ResolvedStack::default_local();
-		match cold().store_uri(&stack) {
+		let (stack, _deployment, _dir) = stack();
+		match cold().store_uri(&stack).unwrap() {
 			StoreUri::S3 {
 				name,
 				endpoint,

@@ -118,14 +118,15 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 		.map(|loaded| loaded.version != current_version)
 		.unwrap_or(true);
 	if stale {
-		let resolved = entry_build::resolve_entry(
-			Some(repo_uri),
-			config.store_fork.as_ref(),
-			config.main.as_deref(),
-		)
-		.await?;
-		worker_world =
-			Some(build_worker_world(resolved, current_version).await?);
+		worker_world = Some(
+			build_worker_world(
+				repo_uri,
+				config.store_fork.as_ref(),
+				config.main.as_deref(),
+				current_version,
+			)
+			.await?,
+		);
 	}
 	let mut worker_world = worker_world.expect("world built above");
 
@@ -144,7 +145,8 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 }
 
 /// Build the per-isolate entry world from R2: take the native binary's
-/// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]) and run the shared
+/// [`build_app`] ([`BeetPlugins`] + [`WorkersPlugin`]), resolve the entry
+/// against the prescan set its plugins registered, run the shared
 /// [`build_entry_owned`] build+settle, then resolve the host entity.
 ///
 /// The build is disarmed (`DisableCallOnReady`): the Worker itself routes each
@@ -154,7 +156,9 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 /// start would hit the (wasm-absent) backend and panic. Same disarmed build
 /// `export-static`/`check` use.
 async fn build_worker_world(
-	resolved: ResolvedEntry,
+	repo_uri: &StoreUri,
+	store_fork: Option<&StoreUri>,
+	main: Option<&str>,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
 	// the same app the native binary builds, plus `WorkersPlugin`'s no-op runner
@@ -164,6 +168,10 @@ async fn build_worker_world(
 	let mut app = build_app();
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
+	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
+	let resolved =
+		entry_build::resolve_entry(&prescans, Some(repo_uri), store_fork, main)
+			.await?;
 	entry_build::build_entry_owned(&mut world, resolved).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.

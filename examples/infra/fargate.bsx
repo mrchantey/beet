@@ -27,7 +27,7 @@ and a container engine.
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<Stack app_name="fargate">
+	<Stack app_name="fargate" {AwsRegion("us-west-2")}>
 		<Group bx:ref="deploy_up">
 			<FargateSiteBlock/>
 			<!-- deploy-versioned by default: each deploy publishes the site under

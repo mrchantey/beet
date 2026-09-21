@@ -53,10 +53,6 @@ pub struct ScheduledJobBlock {
 	/// The IANA timezone [`schedule`](Self::schedule) is read in. `UTC` by
 	/// default: a local timezone silently moves the run twice a year.
 	timezone: SmolStr,
-	/// Override the region this schedule lives in, which otherwise resolves from
-	/// the ancestor [`Stack`].
-	#[set_with(unwrap_option, into)]
-	region: Option<SmolStr>,
 }
 
 impl Default for ScheduledJobBlock {
@@ -90,7 +86,6 @@ impl ScheduledJobBlock {
 			path: default(),
 			method: HttpMethod::Post,
 			timezone: Self::UTC.into(),
-			region: None,
 		}
 	}
 
@@ -106,13 +101,6 @@ impl ScheduledJobBlock {
 	/// dispatches.
 	pub fn invoke(&self) -> ScheduledInvoke {
 		ScheduledInvoke::new(self.path.clone()).with_method(self.method)
-	}
-
-	/// The region this schedule lives in: its own override, else `stack`'s.
-	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
-		self.region
-			.clone()
-			.unwrap_or_else(|| stack.region().clone())
 	}
 
 	/// Whether this declaration can render at all: a schedule with no time to
@@ -181,6 +169,7 @@ impl ScheduledJobBlock {
 	/// [`InvokeTarget`] relation to the [`LambdaBlock`] it invokes.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
+		stacks: StackQuery,
 		blocks: Query<(Entity, &ScheduledJobBlock, Option<&InvokeTarget>)>,
 		lambdas: Query<&LambdaBlock>,
 	) {
@@ -203,8 +192,9 @@ impl ScheduledJobBlock {
 			match lambda {
 				Err(err) => scope.error(err),
 				Ok(lambda) => {
-					let (stack, _deployment, config) = scope.ctx();
-					if let Err(err) = block.emit(stack, config, lambda) {
+					let stack = stacks.resolve(entity);
+					let (_deployment, config) = scope.ctx();
+					if let Err(err) = block.emit(&stack, config, lambda) {
 						scope.error(bevyhow!(
 							"ScheduledJobBlock '{}': {err}",
 							block.label()
@@ -225,7 +215,7 @@ impl ScheduledJobBlock {
 		lambda: &LambdaBlock,
 	) -> Result {
 		self.validate()?;
-		let region = self.resolved_region(stack);
+		let region = stack.region()?.clone();
 		let function_arn = lambda.arn(stack);
 
 		// The invoke identity: the scheduler assumes this role to call the one
@@ -440,6 +430,7 @@ mod test {
 				.id();
 			parent.spawn((rollup_daily(), InvokeTarget(target)));
 		});
+		StateEncryption::ensure_test_passphrase();
 		scope.project().unwrap().validate().await.unwrap();
 	}
 

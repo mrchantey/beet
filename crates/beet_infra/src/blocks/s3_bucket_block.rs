@@ -24,10 +24,6 @@ use serde_json::json;
 )]
 pub struct S3BucketBlock {
 	label: SmolStr,
-	/// Override the region this bucket lives in, which otherwise resolves from
-	/// the ancestor [`Stack`].
-	#[set_with(unwrap_option, into)]
-	region: Option<SmolStr>,
 	/// add a tofu output for the bucket name
 	output: bool,
 	/// Allow the deploy to delete a non-empty bucket. `false` for a source of
@@ -101,7 +97,6 @@ impl S3BucketBlock {
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
 			label: label.into(),
-			region: None,
 			output: true,
 			force_destroy: true,
 			deploy_versioned: true,
@@ -122,13 +117,6 @@ impl S3BucketBlock {
 	/// a compute lowering it never shares a vocabulary with another provider's.
 	pub const ACCESS_KIND: &'static str = "s3_bucket";
 
-	/// The region this bucket lives in: its own override, else `stack`'s.
-	pub fn resolved_region(&self, stack: &ResolvedStack) -> SmolStr {
-		self.region
-			.clone()
-			.unwrap_or_else(|| stack.region().clone())
-	}
-
 	/// Returns the composed bucket name, ie `beet-site--prod--analytics`.
 	pub fn bucket_name(&self, stack: &ResolvedStack) -> String {
 		stack.resource_name(self.label.clone())
@@ -136,16 +124,17 @@ impl S3BucketBlock {
 }
 
 impl StoreBlock for S3BucketBlock {
-	/// The composed bucket name pinned to the region the declaration resolved,
-	/// so every reader of the uri (the process a deploy bakes it into, the
-	/// sync, the ledger) addresses the bucket the deploy created.
-	fn store_uri(&self, stack: &ResolvedStack) -> StoreUri {
+	/// The composed bucket name pinned to the stack's declared region, so
+	/// every reader of the uri (the process a deploy bakes it into, the sync,
+	/// the ledger) addresses the bucket the deploy created.
+	fn store_uri(&self, stack: &ResolvedStack) -> Result<StoreUri> {
 		StoreUri::S3 {
 			name: self.bucket_name(stack).into(),
 			path_prefix: None,
 			endpoint: None,
-			region: Some(self.resolved_region(stack)),
+			region: Some(stack.region()?.clone()),
 		}
+		.xok()
 	}
 
 	fn deploy_versioned(&self) -> bool { self.deploy_versioned }
@@ -193,7 +182,7 @@ impl S3BucketBlock {
 			stack.resource_ident(self.label.clone()),
 			AwsS3BucketDetails {
 				force_destroy: Some(self.force_destroy),
-				region: Some(self.resolved_region(stack)),
+				region: Some(stack.region()?.clone()),
 				..default()
 			},
 		);
@@ -458,10 +447,27 @@ mod tests {
 		build_json(S3BucketBlock::new("app"))
 			.as_str()
 			.xpect_contains("\"region\":\"us-west-2\"");
-		// ..and an override on the block wins over its stack
-		build_json(S3BucketBlock::new("app").with_region("eu-west-1"))
-			.as_str()
-			.xpect_contains("\"region\":\"eu-west-1\"");
+		// ..and an address spread on the block itself is the nearest, so it
+		// wins over its stack's
+		RenderScope::test_json(|parent| {
+			parent.spawn((
+				S3BucketBlock::new("app"),
+				AwsRegion::new("eu-west-1"),
+			));
+		})
+		.as_str()
+		.xpect_contains("\"region\":\"eu-west-1\"");
+	}
+
+	/// A bucket under a stack declaring no region fails at its erased half,
+	/// naming the spread, rather than landing a store the deploy would not
+	/// have created.
+	#[beet_core::test]
+	#[should_panic = "declares no aws region"]
+	fn a_bucket_under_an_unaddressed_stack_is_loud() {
+		RenderScope::test_render_stack(Stack::new("beet_infra"), |parent| {
+			parent.spawn(S3BucketBlock::new("app"));
+		});
 	}
 
 	/// The runtime grant defaults to read (deploy publishes, process serves) and

@@ -554,7 +554,7 @@ async fn bootstrap(
 				"requestTlsCertificate": false,
 				"generateDkimKeys": false,
 				"dataStore": data_store,
-				"blobStore": mail.mail_box.blob_store_config(stack),
+				"blobStore": mail.mail_box.blob_store_config(stack)?,
 				// `Default` IS the data store: SQLite carries search and ephemera,
 				// while S3 carries blobs
 				"searchStore": { "@type": "Default" },

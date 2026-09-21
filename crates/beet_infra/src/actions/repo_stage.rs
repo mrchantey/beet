@@ -12,9 +12,10 @@ use beet_net::prelude::*;
 /// OUTSIDE the checkout, so no deploy step writes into source, and the staging
 /// dir IS the store's contents, so a test compares the two directly.
 ///
-/// `src` is copied whole, then the children run in order: a [`DirCopy`] under
-/// a stage resolves its `dest` inside the staging dir, so the borrow manifest
-/// is the same tag the local `assets` verb uses.
+/// `src` is copied whole (or its `paths` alone, for an entry at a checkout's
+/// root whose siblings are crates and a `target/`), then the children run in
+/// order: a [`DirCopy`] under a stage resolves its `dest` inside the staging
+/// dir, so the borrow manifest is the same tag the local `assets` verb uses.
 ///
 /// ```bsx
 /// <RepoStage src="site">
@@ -38,6 +39,12 @@ pub async fn RepoStage(
 	/// The workspace-relative directory to publish.
 	#[field]
 	src: WsPath,
+	/// Comma-separated paths under `src` to publish, each a file or a
+	/// directory; empty publishes `src` whole. The allowlist for a document
+	/// whose entry sits at a checkout's root (`paths="main.bsx,routes,templates"`),
+	/// so the crates and the `target/` beside it never reach the store.
+	#[field]
+	paths: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let dir = cx
@@ -52,7 +59,12 @@ pub async fn RepoStage(
 	}
 	// a fresh copy, so nothing from an earlier stage survives
 	fs_ext::remove(&dir).ok();
-	fs_ext::copy_recursive(&src, &dir)?;
+	match paths.is_empty() {
+		true => fs_ext::copy_recursive(&src, &dir)?,
+		false => {
+			DirCopy::copy_paths(&src, &dir, &paths)?;
+		}
+	}
 	info!("staged {src} -> {dir}");
 
 	// then the borrowed paths, each resolving the staging dir by ancestry
@@ -77,8 +89,19 @@ pub async fn RepoStage(
 }
 
 impl RepoStage {
-	/// A stage of the workspace-relative `src`.
-	pub fn new(src: impl Into<WsPath>) -> Self { Self { src: src.into() } }
+	/// A stage of the workspace-relative `src`, whole.
+	pub fn new(src: impl Into<WsPath>) -> Self {
+		Self {
+			src: src.into(),
+			paths: SmolStr::default(),
+		}
+	}
+
+	/// A stage of the `paths` under `src` alone, see the `paths` field.
+	pub fn with_paths(mut self, paths: impl Into<SmolStr>) -> Self {
+		self.paths = paths.into();
+		self
+	}
 
 	/// The staging dir of the stack `entity` belongs to: `repo/` under the
 	/// deploy work directory, so a teardown removes it with the rest.

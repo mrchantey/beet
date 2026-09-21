@@ -81,8 +81,8 @@ pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
 pub fn LambdaSiteBlock(
 	#[prop] features: String,
 	/// Comma-separated public hostnames, the first being the certificate's
-	/// primary domain, eg `beetmash.com,www.beetmash.com`. Reads the zone from
-	/// `CLOUDFLARE_ZONE_ID`.
+	/// primary domain, eg `beetmash.com,www.beetmash.com`, published into the
+	/// stack's `{CloudflareZone{..}}` at render.
 	#[prop(default)]
 	authorities: String,
 	/// The route the deployed entry dispatches, for an entry that is its own CLI
@@ -99,16 +99,13 @@ pub fn LambdaSiteBlock(
 ) -> impl Bundle {
 	// the ancestor `<Stack>`'s identity, behind the stage-aware DNS
 	let is_production = stacks.resolve(entity).is_production();
-	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let block = authorities
 		.split(',')
 		.map(str::trim)
 		.filter(|authority| is_production && !authority.is_empty())
 		.fold(LambdaBlock::default(), |block, authority| {
-			block.with_dns(
-				DnsProvider::cloudflare(authority, zone_id.clone())
-					.with_proxied(true),
-			)
+			block
+				.with_dns(DnsProvider::cloudflare(authority).with_proxied(true))
 		});
 	let mut build = infra_ext::beet_cargo_build(features);
 	if let Some(exec_route) = exec_route {
@@ -283,7 +280,6 @@ pub fn LightsailBeetSiteBlock(
 	// `<PackageConfig/>`: one composition both the deploy and the runtime read.
 	let stack = stacks.resolve(entity);
 	let is_production = stack.is_production();
-	let zone_id = env_ext::var("CLOUDFLARE_ZONE_ID").unwrap_or_default();
 	let block = LightsailBlock::default()
 		.with_bundle_id("small_3_0")
 		.with_allow_ssh(true)
@@ -311,22 +307,17 @@ pub fn LightsailBeetSiteBlock(
 	// subdomain (proxied) + `app.dev` (DNS-only ssh).
 	let block = if is_production {
 		block
+			.with_dns(DnsProvider::cloudflare("beet.org").with_proxied(true))
 			.with_dns(
-				DnsProvider::cloudflare("beet.org", zone_id.clone())
-					.with_proxied(true),
+				DnsProvider::cloudflare("www.beet.org").with_proxied(true),
 			)
-			.with_dns(
-				DnsProvider::cloudflare("www.beet.org", zone_id.clone())
-					.with_proxied(true),
-			)
-			.with_dns(DnsProvider::cloudflare("app.beet.org", zone_id))
+			.with_dns(DnsProvider::cloudflare("app.beet.org"))
 	} else {
 		block
 			.with_dns(
-				DnsProvider::cloudflare("dev.beet.org", zone_id.clone())
-					.with_proxied(true),
+				DnsProvider::cloudflare("dev.beet.org").with_proxied(true),
 			)
-			.with_dns(DnsProvider::cloudflare("app.dev.beet.org", zone_id))
+			.with_dns(DnsProvider::cloudflare("app.dev.beet.org"))
 	};
 	(
 		block,
@@ -351,6 +342,14 @@ mod test {
 			InfraExamplesPlugin,
 		)
 			.into_world()
+	}
+
+	/// The router root every test's markup spawns under, addressed with the
+	/// region the pinned names render in.
+	fn router(world: &mut World) -> Entity {
+		world
+			.spawn((Router::with_defaults(), AwsRegion::new("us-west-2")))
+			.id()
 	}
 
 	fn spawn_markup(world: &mut World, router: Entity, markup: &str) {
@@ -389,7 +388,7 @@ mod test {
 		.unwrap();
 		let mut world = test_world();
 		world.init_resource::<PackageConfig>();
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(&mut world, router, &source);
 		let action = world
 			.query_filtered::<Entity, With<CloudflareWorkerDeployAction>>()
@@ -473,7 +472,7 @@ mod test {
 			app_name: "bucket-example".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -503,7 +502,7 @@ mod test {
 	#[beet_core::test]
 	fn a_stack_ancestor_names_the_block() {
 		let mut world = test_world();
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -550,7 +549,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -628,7 +627,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -777,7 +776,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -862,7 +861,7 @@ mod test {
 			app_name: "beetmash".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -900,7 +899,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -926,7 +925,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -957,7 +956,7 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -971,7 +970,7 @@ mod test {
 	#[beet_core::test]
 	fn tofu_apply_layer_prop() {
 		let mut world = test_world();
-		let router = world.spawn(Router::with_defaults()).id();
+		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
 			router,
@@ -996,7 +995,7 @@ mod test {
 				app_name: "beet-site".into(),
 				..default()
 			});
-			let router = world.spawn(Router::with_defaults()).id();
+			let router = router(&mut world);
 			spawn_markup(&mut world, router, markup);
 			world
 				.query::<&SyncS3Bucket>()

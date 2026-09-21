@@ -362,7 +362,7 @@ impl VpcBlock {
 						vpc_id: vpc.field_ref("id").into(),
 						cidr_block: Some(self.subnet_cidr(tier, index)?.into()),
 						availability_zone: Some(
-							format!("{}{zone}", stack.region()).into(),
+							format!("{}{zone}", stack.region()?).into(),
 						),
 						// a public subnet's instance gets a public address at
 						// launch; a private one must never.
@@ -519,7 +519,10 @@ mod tests {
 	/// stack deploys into and the one whose availability zones the subnets name.
 	fn build_config(block: &VpcBlock) -> (ResolvedStack, terra::Config) {
 		let (scope, _dir) = RenderScope::test_render_stack(
-			Stack::new("beet_infra").with_region(aws::region::AP_SOUTHEAST_2),
+			(
+				Stack::new("beet_infra"),
+				AwsRegion::new(aws::region::AP_SOUTHEAST_2),
+			),
 			|parent| {
 				parent.spawn(block.clone());
 			},
