@@ -136,9 +136,13 @@ impl MediaRenderer {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(feature = "template_serde")]
-			serialized if TemplateRenderer::available().contains(serialized) => {
+			serialized
+				if TemplateRenderer::available().contains(serialized) =>
+			{
 				self.template_renderer
-					.render(&mut inner_cx.with_accepts(vec![serialized.clone()]))
+					.render(
+						&mut inner_cx.with_accepts(vec![serialized.clone()]),
+					)
 					.map(Some)
 			}
 			_ => Ok(None),
