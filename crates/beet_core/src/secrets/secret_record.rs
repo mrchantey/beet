@@ -100,8 +100,8 @@ impl fmt::Debug for SealedRecord {
 
 /// The payload of one group's age blob: the recipient list it was sealed
 /// to, and its records by name. Serialized in the document's own media type
-/// (a `.toml.age` document seals toml), so `age -d` on the pasted blob
-/// yields a file in the format already chosen.
+/// (a `.toml` document seals toml), so `age -d` on the pasted blob yields
+/// a file in the format already chosen.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SealedGroup {
 	/// Who the blob was sealed to, so a list edited since can be told.
@@ -148,6 +148,17 @@ impl Secret {
 	/// [`ALPHABET`](Self::ALPHABET), drawn from the platform entropy source:
 	/// how every minted credential and every `set --generate` value is
 	/// born. Errors, naming `label`, on a length not worth generating.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let value = Secret::generate("db-password", Secret::GENERATED_LENGTH).unwrap();
+	/// value.len().xpect_eq(32);
+	/// value
+	/// 	.bytes()
+	/// 	.all(|byte| Secret::ALPHABET.contains(&byte))
+	/// 	.xpect_true();
+	/// Secret::generate("db-password", 8).unwrap_err();
+	/// ```
 	pub fn generate(label: &str, length: usize) -> Result<SmolStr> {
 		if length < Self::MIN_GENERATED_LENGTH {
 			bevybail!(

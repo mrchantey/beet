@@ -7,9 +7,10 @@ use std::sync::Arc;
 
 /// One stack's secret store: parameter store on AWS, a secrets document
 /// locally, 1Password or anything else downstream. A handle is scoped to
-/// the stack it was resolved for, exactly as a [`BlobStore`] is scoped to a
-/// bucket and prefix, so every method takes a [`SecretRef`] label alone and
-/// the provider composes its own address from the pair; a label
+/// the stack it was resolved for, exactly as a
+/// [`BlobStore`](beet_net::prelude::BlobStore) is scoped to a bucket and
+/// prefix, so every method takes a [`SecretRef`] label alone and the
+/// provider composes its own address from the pair; a label
 /// (`dkim-example-com`) never couples to a provider and an export restores
 /// into a different provider or region unchanged. Another stack's store is
 /// [`for_stack`](Self::for_stack), the `with_subdir` of the seam.
@@ -22,6 +23,42 @@ use std::sync::Arc;
 ///
 /// Values never reach a log: a consumer that prints one (`MailCredentials`)
 /// says so in its own docs.
+///
+/// ## Example
+///
+/// The seam over a document in a temp store, the same calls a deploy makes
+/// against parameter store:
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// # use beet_net::prelude::*;
+/// # use beet_infra::prelude::*;
+/// async_ext::block_on(async {
+/// 	let mut identities = AgeIdentityFile::default();
+/// 	identities.push(AgeIdentity::generate());
+/// 	let stack = Stack::new("app").with_stage("dev").resolve(&default());
+/// 	let store = SecretStore::new(
+/// 		DocumentSecretStore::new(
+/// 			SecretsHandle::new(BlobStore::temp(), "secrets.toml")?,
+/// 			stack,
+/// 		)?
+/// 		.with_identities(identities),
+/// 	);
+/// 	let secret = SecretRef::new("db-password");
+/// 	// create-if-missing: the first call mints, the second reads back
+/// 	let (value, minted) = store
+/// 		.ensure(&secret, Some("the database"), SecretRotation::Remint, async || {
+/// 			Secret::generate("db-password", Secret::GENERATED_LENGTH)
+/// 				.map(String::from)
+/// 		})
+/// 		.await?;
+/// 	minted.xpect_true();
+/// 	store.get(&secret).await?.xpect_eq(Some(value));
+/// 	store.list().await?.len().xpect_eq(1);
+/// 	Ok::<_, BevyError>(())
+/// })
+/// .unwrap();
+/// ```
 #[derive(Clone, Component)]
 pub struct SecretStore {
 	provider: Arc<dyn SecretStoreProvider>,

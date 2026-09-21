@@ -6,33 +6,37 @@ use beet_core::prelude::*;
 /// A secrets document at a path in a store: the file behind every `secrets`
 /// verb and the `<Secrets>` load, read and written typed in the format its
 /// extension names. The index is plaintext, so a read needs no identity;
-/// [`SecretsDocument::open`] takes one.
+/// [`SecretsDocument::open`] takes one. The load lands the resolved handle
+/// on its `<Secrets>` entity beside [`OpenSecrets`], so two declarations of
+/// one file (an entry checked from another entry's process) are told from
+/// two documents ([`same_file`](Self::same_file)).
 ///
 /// ## Example
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
-/// # async fn run() -> Result<()> {
-/// let mut identities = AgeIdentityFile::default();
-/// identities.push(AgeIdentity::generate());
-/// let handle = SecretsHandle::new(BlobStore::temp(), "secrets.toml")?;
-/// let mut document = handle.read_or_new().await?;
-/// document.set(&identities, "default", "TOKEN", "hunter2", default())?;
-/// handle.write(&document).await?;
-/// handle
-/// 	.read()
-/// 	.await?
-/// 	.open(&identities)?
-/// 	.get("TOKEN")
-/// 	.unwrap()
-/// 	.value
-/// 	.as_str()
-/// 	.xpect_eq("hunter2");
-/// # Ok(())
-/// # }
+/// async_ext::block_on(async {
+/// 	let mut identities = AgeIdentityFile::default();
+/// 	identities.push(AgeIdentity::generate());
+/// 	let handle = SecretsHandle::new(BlobStore::temp(), "secrets.toml")?;
+/// 	let mut document = handle.read_or_new().await?;
+/// 	document.set(&identities, "default", "TOKEN", "hunter2", default())?;
+/// 	handle.write(&document).await?;
+/// 	handle
+/// 		.read()
+/// 		.await?
+/// 		.open(&identities)?
+/// 		.get("TOKEN")
+/// 		.unwrap()
+/// 		.value
+/// 		.as_str()
+/// 		.xpect_eq("hunter2");
+/// 	Ok::<_, BevyError>(())
+/// })
+/// .unwrap();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Component)]
 pub struct SecretsHandle {
 	/// The store the document lives in.
 	pub store: BlobStore,
@@ -67,6 +71,12 @@ impl SecretsHandle {
 	pub fn with_label(mut self, label: impl Into<SmolStr>) -> Self {
 		self.label = Some(label.into());
 		self
+	}
+
+	/// Whether `other` names the same file: the same store scope and path,
+	/// whatever label each was declared under.
+	pub fn same_file(&self, other: &Self) -> bool {
+		self.store.same_scope(&other.store) && self.path == other.path
 	}
 
 	/// How a log or an error names this document: its label and path when

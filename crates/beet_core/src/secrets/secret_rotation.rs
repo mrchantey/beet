@@ -14,6 +14,22 @@ use core::str::FromStr;
 /// Written as one string: `replace:<resource>`, `remint`, `manual:<why>`.
 /// Named for what it rotates, since a bare `Rotation` is a 3D thing in the
 /// same prelude.
+///
+/// ## Example
+///
+/// ```
+/// # use beet_core::prelude::*;
+/// let rotation = "replace:aws_iam_access_key.relay"
+/// 	.parse::<SecretRotation>()
+/// 	.unwrap();
+/// rotation.kind().xpect_eq("replace");
+/// rotation.to_string().xpect_eq("replace:aws_iam_access_key.relay");
+/// "manual:https://example.com/keys\n> New key"
+/// 	.parse::<SecretRotation>()
+/// 	.unwrap()
+/// 	.xpect_eq(SecretRotation::manual("https://example.com/keys\n> New key"));
+/// "rotate-somehow".parse::<SecretRotation>().unwrap_err();
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 pub enum SecretRotation {
 	/// A terraform-derived secret (the SES pair, a bucket token): `tofu apply
@@ -29,7 +45,8 @@ pub enum SecretRotation {
 	/// Only a hand rotates it, for `why` (a DKIM key, whose rotation is a
 	/// new selector beside the published one).
 	Manual {
-		/// What a hand has to do, one line.
+		/// What a hand has to do: the full url first, then one dashboard
+		/// step or permission per line.
 		why: SmolStr,
 	},
 }

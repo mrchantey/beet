@@ -31,8 +31,9 @@ struct SetParams {
 	/// A plaintext note for the index, never a secret: one line of what the
 	/// value is.
 	note: Option<String>,
-	/// How the value is rotated, one line: `manual:<where it is re-minted>`
-	/// for a hand-made credential (`manual:dash.cloudflare.com/profile/api-tokens
+	/// How the value is rotated: `manual:<where it is re-minted>` for a
+	/// hand-made credential, the full url first and one dashboard step or
+	/// permission per line (`manual:https://dash.cloudflare.com/profile/api-tokens
 	/// > Create Token > beet-deploy`), `remint` for one `--generate` mints,
 	/// `replace:<resource>` for one an apply derives.
 	rotation: Option<String>,

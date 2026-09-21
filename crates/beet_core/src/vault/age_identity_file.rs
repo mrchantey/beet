@@ -11,8 +11,8 @@ use std::path::PathBuf;
 /// identity they have (a second line for a hardware key), and found by
 /// [`discover`](Self::discover) so nothing is ever passed in.
 ///
-/// [`Display`] is the file's text, secrets included, for the writers;
-/// [`Debug`] redacts.
+/// [`Display`](fmt::Display) is the file's text, secrets included, for the
+/// writers; [`Debug`] redacts.
 ///
 /// ## Example
 ///

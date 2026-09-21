@@ -28,6 +28,8 @@ site (eg `examples/bsx_site`) declares its own servers and routes in markup, so
 | `export-pdf` | Render a route to PDF |
 | `s3-sync` | Sync a directory between the local filesystem and S3 |
 | `qrcode` | Generate a QR code (`qrcode` feature) |
+| `vault/*` | The age identity (`keygen`, `backup`, `restore-identity`) and any age file by path (`encrypt`, `decrypt`, `rekey`); `vault` feature |
+| `secrets/*` | The entry's secrets document (`ls`, `get`, `set`, `rm`, `rekey`, `check`, `exec`); `vault` feature, see [Secrets](https://beet.org/docs/secrets) |
 
 ```sh
 # links the capabilities; the repo's main.bsx wires the dev commands as routes
@@ -51,7 +53,7 @@ An entry declares its build requirements with `<RequireCfg cfg="feature:thread &
 
 ## Downstream binaries
 
-The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet — its own `#[action]`s, deploy blocks, reflect components — builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
+The stock `beet` binary resolves the types beet itself registers, so a workspace that names only those runs through it. A workspace that EXTENDS beet (its own `#[action]`s, deploy blocks, reflect components) builds a binary of its own, because no beet build can know those types: an entry naming one warns, marks the entity `UnregisteredTag` and runs a tree with that behaviour simply missing.
 
 Such a binary is a thin `main`, and it depends on the `beet` facade alone. Compose `BeetPlugins`, the binary's capability plugin, and `LaunchPlugin`:
 
@@ -69,7 +71,7 @@ fn main() -> AppExit {
 }
 ```
 
-It then has the same entry resolution, load and process lifecycle this binary has. What it does NOT get is the dev commands below (`run-wasm`, `build-wasm`, `check`, `export-static`, …), which are `CliCommandsPlugin` and live here — this binary adds it alongside its other plugins, exactly as a downstream binary adds its own plugin.
+It then has the same entry resolution, load and process lifecycle this binary has. What it does NOT get is the dev commands below (`run-wasm`, `build-wasm`, `check`, `export-static`, …), which are `CliCommandsPlugin` and live here; this binary adds it alongside its other plugins, exactly as a downstream binary adds its own plugin.
 
 ## Development
 

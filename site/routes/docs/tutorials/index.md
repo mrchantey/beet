@@ -14,6 +14,6 @@ They are also a climb through the three layers of malleability, [scenes](/docs/s
 
 The first lesson needs only the `beet` binary. The third needs a Rust toolchain and a crate of your own.
 
-[Self-hosted mail](/docs/mail) sits outside this section. It is an infrastructure runbook rather than a lesson: it stands up a real mail server on real cloud resources with a real domain, costs about US$43 a month to keep running, and takes a week rather than an afternoon because most of that week is spent waiting on a support case.
+Two pages sit outside this section. [Secrets](/docs/secrets) is a lesson of the same shape as the three above, from an empty directory to a checked secrets document, and it is the one to read before anything that deploys. [Self-hosted mail](/docs/mail) is an infrastructure runbook rather than a lesson: it stands up a real mail server on real cloud resources with a real domain, costs about US$43 a month to keep running, and takes a week rather than an afternoon because most of that week is spent waiting on a support case.
 
 For material organised by feature rather than by lesson, the [examples](https://github.com/mrchantey/beet/tree/main/examples) directory covers behavior trees, routers, servers, scripting, agents and infrastructure one topic at a time.

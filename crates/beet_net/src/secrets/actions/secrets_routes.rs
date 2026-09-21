@@ -10,9 +10,12 @@ use beet_core::prelude::*;
 /// and age file verbs are `<VaultRoutes/>`.
 ///
 /// ```bsx
-/// <Secrets bx:cfg="feature:vault"/>
+/// <Secrets/>
 /// <Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 /// ```
+///
+/// The declaration itself carries no `bx:cfg`: the launch reads it out of the
+/// entry prescan before the build, and a lean build keeps it as an inert tag.
 #[template]
 pub fn SecretsRoutes() -> impl Bundle {
 	Children::spawn((

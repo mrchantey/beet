@@ -11,8 +11,9 @@ use std::io::Read;
 /// [`AgeIdentityFile`] in the OS config; never in a vault, a cloud or on argv.
 ///
 /// [`Debug`] redacts, so an identity can never reach a log by accident.
-/// [`Display`] is the key itself, for the identity file writers and nothing
-/// else. Two identities are equal when their recipients are.
+/// [`Display`](fmt::Display) is the key itself, for the identity file
+/// writers and nothing else. Two identities are equal when their recipients
+/// are.
 ///
 /// ## Example
 ///

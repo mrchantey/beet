@@ -15,16 +15,17 @@ use beet_core::prelude::*;
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
-/// # async fn run() -> Result<()> {
-/// let identity = AgeIdentity::generate();
-/// let mut identities = AgeIdentityFile::default();
-/// identities.push(identity.clone());
-/// let vault = VaultHandle::new(BlobStore::temp(), "cert.pem.age")?;
-/// let plaintext = b"-----BEGIN CERTIFICATE-----\n";
-/// vault.write(plaintext, &[identity.to_recipient()]).await?;
-/// vault.read(&identities).await?.xpect_eq(plaintext.to_vec());
-/// # Ok(())
-/// # }
+/// async_ext::block_on(async {
+/// 	let identity = AgeIdentity::generate();
+/// 	let mut identities = AgeIdentityFile::default();
+/// 	identities.push(identity.clone());
+/// 	let vault = VaultHandle::new(BlobStore::temp(), "cert.pem.age")?;
+/// 	let plaintext = b"-----BEGIN CERTIFICATE-----\n";
+/// 	vault.write(plaintext, &[identity.to_recipient()]).await?;
+/// 	vault.read(&identities).await?.xpect_eq(plaintext.to_vec());
+/// 	Ok::<_, BevyError>(())
+/// })
+/// .unwrap();
 /// ```
 #[derive(Debug, Clone)]
 pub struct VaultHandle {

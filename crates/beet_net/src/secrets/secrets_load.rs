@@ -50,39 +50,50 @@ pub(crate) fn load_on_insert(
 	Ok(())
 }
 
-/// The load itself: the shared env var load, then `OpenSecrets` on the
-/// entity once no other document in the world holds one of its names.
+/// The load itself: the shared env var load, then `OpenSecrets` and the
+/// resolved handle on the entity once no other document in the world holds
+/// one of its names.
 async fn load(entity: &AsyncEntity) -> Result {
 	let handle = SecretsHandle::of_declaration(entity).await?;
 	let Some(opened) = handle.load_env_vars().await? else {
 		return OK;
 	};
 	// one map across the world: a name in two documents is an error naming
-	// both, never a silent shadow
+	// both, never a silent shadow; a second declaration of the same file (an
+	// entry checked from another entry's process) is the same document
 	let mine = opened.clone();
+	let mine_handle = handle.clone();
 	let label = handle.label.clone().unwrap_or_default();
 	entity
 		.world()
-		.with_state::<Query<(&Secrets, &OpenSecrets)>, Result>(move |others| {
-			for (secrets, other) in others.iter() {
-				let overlap = mine.overlap(other);
-				if !overlap.is_empty() {
-					bevybail!(
-						"record(s) {} are declared in both `{label}` and `{}`: a \
-						name is loaded from exactly one document",
-						overlap
-							.iter()
-							.map(|name| format!("`{name}`"))
-							.collect::<Vec<_>>()
-							.join(", "),
-						secrets.label
-					);
+		.with_state::<Query<(&Secrets, &SecretsHandle, &OpenSecrets)>, Result>(
+			move |others| {
+				for (secrets, other_handle, other) in
+					others.iter().filter(|(_, other_handle, _)| {
+						!mine_handle.same_file(other_handle)
+					}) {
+					let overlap = mine.overlap(other);
+					if !overlap.is_empty() {
+						bevybail!(
+							"record(s) {} are declared in both `{label}` ({}) \
+							and `{}` ({}): a name is loaded from exactly one \
+							document",
+							overlap
+								.iter()
+								.map(|name| format!("`{name}`"))
+								.collect::<Vec<_>>()
+								.join(", "),
+							mine_handle.path,
+							secrets.label,
+							other_handle.path
+						);
+					}
 				}
-			}
-			Ok(())
-		})
+				Ok(())
+			},
+		)
 		.await?;
-	entity.insert(opened).await
+	entity.insert((handle, opened)).await
 }
 
 impl SecretsHandle {
@@ -214,6 +225,56 @@ mod test {
 		unsafe {
 			env_ext::remove_var("BEET_TEST_SECRETS_LOAD").unwrap();
 		}
+	}
+
+	/// A name loaded from two files is refused naming both, while a second
+	/// declaration of the same file is the same document and loads.
+	#[beet_core::test]
+	async fn one_name_loads_from_one_document() {
+		let mut fixture = VerbWorld::new();
+		let identities = fixture.identities();
+		for file in ["a.toml", "b.toml"] {
+			let mut document = SecretsDocument::default();
+			document
+				.set(
+					&identities,
+					"default",
+					"BEET_TEST_SHARED",
+					file,
+					default(),
+				)
+				.unwrap();
+			fixture.secrets(file).write(&document).await.unwrap();
+		}
+		let first = fixture
+			.world
+			.spawn((
+				Secrets::new("a.toml").with_label("a"),
+				ChildOf(fixture.root),
+			))
+			.id();
+		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture.world.get::<OpenSecrets>(first).xpect_some();
+		// the same file under another label is the same document
+		let again = fixture
+			.world
+			.spawn((
+				Secrets::new("a.toml").with_label("a-again"),
+				ChildOf(fixture.root),
+			))
+			.id();
+		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture.world.get::<OpenSecrets>(again).xpect_some();
+		// another file holding the name is refused: nothing lands
+		let other = fixture
+			.world
+			.spawn((
+				Secrets::new("b.toml").with_label("b"),
+				ChildOf(fixture.root),
+			))
+			.id();
+		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture.world.get::<OpenSecrets>(other).xpect_none();
 	}
 
 	/// A missing document is not an error: nothing is inserted and the load
