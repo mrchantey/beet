@@ -20,10 +20,12 @@ struct RevokeParams {
 	dry_run: bool,
 }
 
-/// `<SecretsRevoke/>` — remove a human from a stack: re-seal every group of
-/// every declared document to its current list, then rotate every secret in
-/// the stack's store through its declared [`SecretRotation`], and print what needs
-/// a hand.
+/// `<Route path="secrets/revoke" {SecretsRevoke}/>` — remove a human from a
+/// stack: re-seal every group of every declared document to its current
+/// list, then rotate every secret in the stack's store through its declared
+/// [`SecretRotation`], and print what needs a hand. A leaf answering its
+/// ledger, so it rides its route rather than stepping in an
+/// `{ExchangeSequence}`.
 ///
 /// Git history and the cold bucket keep old ciphertext a removed human can
 /// still read, so removal means re-sealing every group they were in AND
@@ -380,6 +382,41 @@ mod tests {
 			.unwrap_str()
 			.await
 			.xok()
+	}
+
+	/// The documented mount: a leaf answering its ledger rides its route,
+	/// `<Route path="secrets/revoke" {SecretsRevoke}/>`, and the router
+	/// dispatches to it by path.
+	#[beet_core::test]
+	async fn rides_its_route() {
+		let mut world = infra_world();
+		let (root, _, alice, _) = revocable_stack(&mut world).await;
+		let router = world.entity(root).get::<Children>().unwrap()[2];
+		let nodes = BsxNode::parse_document(
+			r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		world
+			.spawn(ChildOf(router))
+			.insert_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap();
+		world.flush();
+		world
+			.entity_mut(router)
+			.exchange(Request::from_cli_str(&format!(
+				"secrets/revoke --recipient={} --dry-run",
+				alice.to_recipient()
+			)))
+			.await
+			.into_result()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("still listed in group `default`");
 	}
 
 	/// Refused while the recipient is listed; a dry run then prints the

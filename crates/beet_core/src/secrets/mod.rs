@@ -20,8 +20,9 @@
 //!   `~/.config/beet/age/keys.txt`, found by [`AgeIdentityFile::discover`](crate::vault::AgeIdentityFile::discover)
 //!   (`BEET_AGE_IDENTITY` first, for an agent or a CI runner: a path or an
 //!   inline key). A new machine restores a backup (`vault/restore-identity`),
-//!   never runs `keygen` twice. Not a `BootstrapConfig` knob: a knob lands on
-//!   argv, an identity never does.
+//!   never runs `keygen` twice. Owner-only, or refused naming the `chmod`
+//!   (`age -d -o` writes `0644`). Not a `BootstrapConfig` knob: a knob lands
+//!   on argv, an identity never does.
 //! - **The document is `secrets.toml` beside the entry, committed.**
 //!   `[groups.<g>]` lists recipients and `[groups.<g>.secrets.NAME]` each
 //!   record's metadata (`role`, `note`, `rotation`, `modified`, `address`),

@@ -77,9 +77,19 @@ impl AgeIdentityFile {
 			.map(|lines| Self { lines })
 	}
 
-	/// Read and parse the file at `path`.
+	/// Read and parse the file at `path`, refusing one readable by others
+	/// (`age -d -o` and a shell redirect write `0644`) as `ssh` refuses a
+	/// loose private key, naming the `chmod`.
 	pub fn read(path: impl AsRef<Path>) -> Result<Self> {
 		let path = path.as_ref();
+		if !fs_ext::is_private(path)? {
+			bevybail!(
+				"{}: readable by others, an identity file is owner-only: \
+				`chmod 600 {}`",
+				path.display(),
+				path.display()
+			);
+		}
 		fs_ext::read_to_string(path)?
 			.xmap(|contents| Self::parse(&contents))
 			.map_err(|err| bevyhow!("{}: {err}", path.display()))
@@ -301,6 +311,26 @@ mod test {
 			.xpect_contains("line 3")
 			.xnot()
 			.xpect_contains("not-a-key");
+	}
+
+	#[cfg(unix)]
+	#[crate::test]
+	fn refuses_a_file_readable_by_others() {
+		use std::os::unix::fs::PermissionsExt;
+		let path = std::env::temp_dir()
+			.join(format!("beet-age-loose-{}.txt", Timestamp::now().millis()));
+		let mut file = AgeIdentityFile::default();
+		file.push(AgeIdentity::generate());
+		file.write(&path).unwrap();
+		AgeIdentityFile::read(&path).unwrap();
+		std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))
+			.unwrap();
+		AgeIdentityFile::read(&path)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("readable by others")
+			.xpect_contains(format!("chmod 600 {}", path.display()));
+		std::fs::remove_file(&path).unwrap();
 	}
 
 	#[crate::test]

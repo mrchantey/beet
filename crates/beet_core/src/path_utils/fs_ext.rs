@@ -521,6 +521,24 @@ pub fn write_private(
 	}
 }
 
+/// Whether only the owner may read `path`: what [`write_private`] leaves and
+/// what a private key must stay, since `age -d -o` and a shell redirect
+/// write `0644`. On unix no group or other bit is set; elsewhere always true.
+pub fn is_private(path: impl AsRef<Path>) -> FsResult<bool> {
+	let path = path.as_ref();
+	cfg_if! {
+		if #[cfg(unix)] {
+			use std::os::unix::fs::PermissionsExt;
+			fs::metadata(path)
+				.map(|meta| meta.permissions().mode() & 0o077 == 0)
+				.map_err(|err| FsError::io(path, err))
+		} else {
+			let _ = path;
+			Ok(true)
+		}
+	}
+}
+
 /// Async version of write: Write a file, ensuring the path exists.
 /// Falls back to `fs_ex::write` without the feature flag
 pub async fn write_async(

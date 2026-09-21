@@ -91,7 +91,7 @@ wrote `beet-identity-2026-09-21.age` (1 identities). Keep it on a stick in a dra
 
 Followed by the same file as a QR code. Type a passphrase you will remember; it is never echoed and never on the command line. Copy the file onto a USB stick, print the QR code if you like paper, and delete the local copy. You have done the one step no verb can do for you: the stick goes in a drawer and the passphrase in your head.
 
-On every machine after this one, you *restore* rather than generate. With beet installed that is `beet vault/restore-identity --file=<the backup>`, which asks for the passphrase and appends the identity to the machine's file; before beet is installed it is `age -d -o ~/.config/beet/age/keys.txt <the backup>`. A second `keygen` would make a second identity that can read nothing.
+On every machine after this one, you *restore* rather than generate. With beet installed that is `beet vault/restore-identity --file=<the backup>`, which asks for the passphrase and appends the identity to the machine's file, owner-only; before beet is installed it is `age -d -o ~/.config/beet/age/keys.txt <the backup>` into a directory you made first, then `chmod 600` on the file, since `age -d` writes it readable by everyone and beet refuses an identity file that is. A second `keygen` would make a second identity that can read nothing.
 
 ## Seal a secret
 
@@ -356,11 +356,15 @@ A per-person identity with a backup it can be restored from, a committed documen
 
 Everything a deploy mints (a relay credential, a bucket token, a mailbox password, a DKIM key) lives in the stack's *secret store*, parameter store on AWS, behind one seam, and is never in a document by hand. What the document does for a stack is three verbs, each a route in the stack's entry.
 
-**Export.** A deploy ends by writing the whole store into a document of the same type, sealed to the recipients of the entry's own `secrets.toml`, so the humans are listed once:
+**Export.** A deploy ends by writing the whole store into a document of the same type, sealed to the recipients of the entry's own `secrets.toml`, so the humans are listed once. The three, mounted beside the stack's other verbs (the export is a step other groups share, the other two answer a report and ride their routes):
 
 ```jsx
-<SecretsExport document={$mail_secrets}/>
-<SecretsExport document={$mail_cold} dated=true/>
+<Route path="secrets/export" {ExchangeSequence}>
+	<SecretsExport document={$mail_secrets}/>
+	<SecretsExport document={$mail_cold} dated=true/>
+</Route>
+<Route path="secrets/restore" {SecretsRestore}/>
+<Route path="secrets/revoke" {SecretsRevoke}/>
 ..
 <Secrets bx:ref="mail_secrets" label="mail-prod" path="infra/secrets/mail--prod.toml"/>
 <Secrets bx:ref="mail_cold" label="mail-cold" path="secrets/export.toml" {StoreRef($cold_backups)}/>

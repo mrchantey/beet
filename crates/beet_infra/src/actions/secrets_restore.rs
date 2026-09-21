@@ -25,11 +25,13 @@ struct RestoreParams {
 	force: bool,
 }
 
-/// `<SecretsRestore/>` — write every record of a secrets document into the
-/// stack's secret store by label, the inverse of [`SecretsExport`] and how a
-/// fresh account or a rebuilt stack starts: each record's value and note
-/// land through `overwrite` at the address the stack's store composes, so a
-/// document exported from one provider or region restores into another.
+/// `<Route path="secrets/restore" {SecretsRestore}/>` — write every record
+/// of a secrets document into the stack's secret store by label, the inverse
+/// of [`SecretsExport`] and how a fresh account or a rebuilt stack starts:
+/// each record's value and note land through `overwrite` at the address the
+/// stack's store composes, so a document exported from one provider or
+/// region restores into another. A leaf answering its report, so it rides
+/// its route rather than stepping in an `{ExchangeSequence}`.
 ///
 /// Refuses without `--force` when the store already holds any of the labels,
 /// naming them. Logs every label and never a value.

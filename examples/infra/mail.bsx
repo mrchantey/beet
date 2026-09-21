@@ -139,6 +139,10 @@ route.
 		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 		<Secrets bx:ref="secrets_export" label="mail-export"
 			path="infra/secrets/mail-example.toml" bx:cfg="feature:vault"/>
+		<!-- the export read back into a fresh account's store, and a human
+		     removed: each answers a report, so it rides its route. -->
+		<Route path="secrets/restore" {SecretsRestore} bx:cfg="feature:vault"/>
+		<Route path="secrets/revoke" {SecretsRevoke} bx:cfg="feature:vault"/>
 
 		<!-- the network is DECLARED, not assumed: this stack is one public box and
 		     one EBS volume in the same zone, so it says so and emits one subnet.
