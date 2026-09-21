@@ -181,7 +181,7 @@ impl LambdaBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		self.validate()?;
-		let region = stack.region()?.clone();
+		let region = stack.aws_region()?.clone();
 		// the function's code, under this launch's version in the repo store
 		let artifact_key = ArtifactLedger::version_artifact_key(
 			deployment.deploy_id(),

@@ -276,7 +276,7 @@ impl FargateBlock {
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		let region = stack.region()?;
+		let region = stack.aws_region()?;
 		let app_name = stack.app_name();
 		let stage = stack.stage();
 		let deploy_id = deployment.deploy_id();

@@ -362,7 +362,7 @@ impl VpcBlock {
 						vpc_id: vpc.field_ref("id").into(),
 						cidr_block: Some(self.subnet_cidr(tier, index)?.into()),
 						availability_zone: Some(
-							format!("{}{zone}", stack.region()?).into(),
+							format!("{}{zone}", stack.aws_region()?).into(),
 						),
 						// a public subnet's instance gets a public address at
 						// launch; a private one must never.

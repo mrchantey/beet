@@ -107,7 +107,7 @@ impl SsmSecretStore {
 	/// The store over parameter store in `stack`'s region, scoped to it; an
 	/// error naming the stack when it declares no region.
 	pub fn new(stack: ResolvedStack) -> Result<Self> {
-		let region = stack.region()?.clone();
+		let region = stack.aws_region()?.clone();
 		Self { stack, region }.xok()
 	}
 
@@ -440,7 +440,7 @@ mod test {
 		Stack::new("beetmash")
 			.with_stage("prod")
 			.resolve(&PackageConfig::default())
-			.with_region("ap-southeast-2")
+			.with_aws_region("ap-southeast-2")
 	}
 
 	/// The composition the live boot scripts and IAM policies already carry,
@@ -459,7 +459,7 @@ mod test {
 			.xpect_eq("/beetmash/prod/mail-admin-password");
 		SecretStoreProvider::region(&store)
 			.unwrap()
-			.xpect_eq(stack().region().unwrap().clone());
+			.xpect_eq(stack().aws_region().unwrap().clone());
 		// a rescope keeps the region and composes the other stack's names
 		let drill = Stack::new("beetmash")
 			.with_stage("drill")

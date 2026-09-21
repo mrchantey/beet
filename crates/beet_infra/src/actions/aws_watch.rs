@@ -90,7 +90,7 @@ pub async fn AwsWatch(
 		.caller
 		.with_state::<StackQuery, _>(move |entity, query| -> Result<_> {
 			let stack = query.resolve(entity);
-			(stack.region()?.clone(), target.log_group(&stack)).xok()
+			(stack.aws_region()?.clone(), target.log_group(&stack)).xok()
 		})
 		.await??;
 

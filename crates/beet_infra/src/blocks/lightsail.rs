@@ -255,7 +255,7 @@ impl LightsailBlock {
 		repo_bucket: &str,
 		access: &AccessGrants,
 	) -> Result<String> {
-		let region = stack.region()?;
+		let region = stack.aws_region()?;
 		let log_group = self.log_group(stack);
 		let certificate_store = json!({
 			"Sid": "CertificateStore",
@@ -350,7 +350,7 @@ impl LightsailBlock {
 		refs: &MachineRefs,
 	) -> Result<SmolStr> {
 		let app_name = Self::service_name(stack);
-		let region = stack.region()?;
+		let region = stack.aws_region()?;
 		let app_port = self.app_port();
 		let caddy_store_prefix = Self::CADDY_STORE_PREFIX;
 		// the deployed binary's config, with the platform bindings this block owns
@@ -1174,7 +1174,7 @@ impl LightsailBlock {
 		let mut instance_details = AwsLightsailInstanceDetails {
 			availability_zone: match &self.availability_zone {
 				Some(zone) => zone.clone(),
-				None => format!("{}a", stack.region()?).into(),
+				None => format!("{}a", stack.aws_region()?).into(),
 			},
 			blueprint_id: self.blueprint_id.clone(),
 			bundle_id: self.bundle_id.clone(),
@@ -1891,7 +1891,7 @@ mod tests {
 	#[beet_core::test]
 	fn table_arns_take_the_stack_region() {
 		let (stack, deployment, _dir) = ResolvedStack::default_local();
-		let stack = stack.with_region("eu-west-1");
+		let stack = stack.with_aws_region("eu-west-1");
 		LightsailBlock::default()
 			.runtime_policy(
 				&stack,

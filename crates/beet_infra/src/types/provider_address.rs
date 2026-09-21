@@ -121,7 +121,10 @@ mod test {
 		let leaf = world.entity(stacks[0]).get::<Children>().unwrap()[0];
 		world.with_state::<StackQuery, _>(|query| {
 			let mail = query.resolve(leaf);
-			mail.region().unwrap().as_str().xpect_eq("ap-southeast-2");
+			mail.aws_region()
+				.unwrap()
+				.as_str()
+				.xpect_eq("ap-southeast-2");
 			mail.cloudflare_account()
 				.unwrap()
 				.id
@@ -138,7 +141,7 @@ mod test {
 				.xpect_contains("beetmash.com")
 				.xpect_contains("mail.example.org");
 			let other = query.resolve(stacks[1]);
-			other.region().unwrap().as_str().xpect_eq("us-west-2");
+			other.aws_region().unwrap().as_str().xpect_eq("us-west-2");
 			other
 				.cloudflare_account()
 				.unwrap_err()
@@ -146,7 +149,7 @@ mod test {
 				.xpect_contains("CloudflareAccount");
 			query
 				.resolve(root)
-				.region()
+				.aws_region()
 				.unwrap()
 				.as_str()
 				.xpect_eq("ap-southeast-2");

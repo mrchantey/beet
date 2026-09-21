@@ -802,7 +802,7 @@ mod tests {
 		Stack::new("beetmash")
 			.with_stage("prod")
 			.resolve(&PackageConfig::default())
-			.with_region(crate::bindings::aws::region::AP_SOUTHEAST_2)
+			.with_aws_region(crate::bindings::aws::region::AP_SOUTHEAST_2)
 	}
 
 	fn mail_box() -> StalwartBlock {

@@ -94,7 +94,7 @@ impl Stack {
 				.stage
 				.clone()
 				.unwrap_or_else(|| BootstrapConfig::get().stage.clone()),
-			region: None,
+			aws_region: None,
 			cloudflare_account: None,
 			cloudflare_zone: None,
 			state_encryption: self
@@ -128,10 +128,10 @@ impl Stack {
 pub struct ResolvedStack {
 	app_name: SmolStr,
 	stage: SmolStr,
-	/// The nearest [`AwsRegion`], see [`region`](Self::region).
+	/// The nearest [`AwsRegion`], see [`aws_region`](Self::aws_region).
 	#[get(skip)]
 	#[set_with(unwrap_option, into)]
-	region: Option<SmolStr>,
+	aws_region: Option<SmolStr>,
 	/// The nearest [`CloudflareAccount`], see
 	/// [`cloudflare_account`](Self::cloudflare_account).
 	#[get(skip)]
@@ -153,8 +153,8 @@ impl ResolvedStack {
 	/// The aws region every resource in this stack deploys into, or an error
 	/// naming the stack and the spread that declares one: a region that could
 	/// fall back would silently plan a full replacement.
-	pub fn region(&self) -> Result<&SmolStr> {
-		self.region.as_ref().ok_or_else(|| {
+	pub fn aws_region(&self) -> Result<&SmolStr> {
+		self.aws_region.as_ref().ok_or_else(|| {
 			bevyhow!(
 				"stack `{}--{}` declares no aws region: declare \
 				`{{AwsRegion(\"..\")}}` on the stack or an ancestor",
@@ -248,19 +248,22 @@ impl ResolvedStack {
 	pub(crate) fn test_local() -> Self {
 		Stack::new("beet_infra")
 			.resolve(&PackageConfig::default())
-			.with_region(Stack::TEST_REGION)
+			.with_aws_region(Stack::TEST_AWS_REGION)
 	}
 }
 
 #[cfg(test)]
 impl Stack {
 	/// The region every rendered test value is pinned to.
-	pub(crate) const TEST_REGION: &'static str = "us-west-2";
+	pub(crate) const TEST_AWS_REGION: &'static str = "us-west-2";
 
 	/// The default test stack with its region declared, the root a block
 	/// test spawns under.
 	pub(crate) fn test_local() -> (Self, AwsRegion) {
-		(Stack::new("beet_infra"), AwsRegion::new(Self::TEST_REGION))
+		(
+			Stack::new("beet_infra"),
+			AwsRegion::new(Self::TEST_AWS_REGION),
+		)
 	}
 
 	/// The zone id every zoned test stack declares.
@@ -318,7 +321,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 			.cloned()
 			.unwrap_or_default()
 			.resolve(&self.package);
-		stack.region =
+		stack.aws_region =
 			self.regions.get(entity).ok().map(|region| region.0.clone());
 		stack.cloudflare_account = self.accounts.get(entity).ok().cloned();
 		stack.cloudflare_zone = self.zones.get(entity).ok().cloned();
@@ -497,14 +500,14 @@ mod tests {
 	#[beet_core::test]
 	fn an_undeclared_region_fails_by_name() {
 		resolved(Stack::default().with_stage("prod"))
-			.region()
+			.aws_region()
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("beet-site--prod")
 			.xpect_contains("AwsRegion");
 		resolved(Stack::default())
-			.with_region("eu-west-1")
-			.region()
+			.with_aws_region("eu-west-1")
+			.aws_region()
 			.unwrap()
 			.as_str()
 			.xpect_eq("eu-west-1");

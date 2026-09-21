@@ -132,7 +132,7 @@ impl StoreBlock for S3BucketBlock {
 			name: self.bucket_name(stack).into(),
 			path_prefix: None,
 			endpoint: None,
-			region: Some(stack.region()?.clone()),
+			region: Some(stack.aws_region()?.clone()),
 		}
 		.xok()
 	}
@@ -182,7 +182,7 @@ impl S3BucketBlock {
 			stack.resource_ident(self.label.clone()),
 			AwsS3BucketDetails {
 				force_destroy: Some(self.force_destroy),
-				region: Some(stack.region()?.clone()),
+				region: Some(stack.aws_region()?.clone()),
 				..default()
 			},
 		);

@@ -108,7 +108,7 @@ impl SnsTopicBlock {
 	pub fn composed_arn(stack: &ResolvedStack, name: &str) -> Result<String> {
 		format!(
 			"arn:aws:sns:{}:${{data.aws_caller_identity.current.account_id}}:{name}",
-			stack.region()?
+			stack.aws_region()?
 		)
 		.xok()
 	}

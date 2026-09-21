@@ -514,13 +514,13 @@ mod tests {
 		let (mut world, dir) = infra_world();
 		world.spawn((
 			Stack::new("beetmash-mail"),
-			AwsRegion::new(Stack::TEST_REGION),
+			AwsRegion::new(Stack::TEST_AWS_REGION),
 			zone("zone1"),
 			children![(staging(), SesRelay::default())],
 		));
 		world.spawn((
 			Stack::new("beetmash-news"),
-			AwsRegion::new(Stack::TEST_REGION),
+			AwsRegion::new(Stack::TEST_AWS_REGION),
 			zone(news_zone),
 			children![(news(), SesRelay::default())],
 		));
@@ -556,7 +556,7 @@ mod tests {
 		let mail = world
 			.spawn((
 				Stack::new("beetmash-mail"),
-				AwsRegion::new(Stack::TEST_REGION),
+				AwsRegion::new(Stack::TEST_AWS_REGION),
 				zone("zone1"),
 				children![(staging(), SesRelay::default())],
 			))
@@ -565,7 +565,7 @@ mod tests {
 		let audit = world.spawn((ChildOf(mail), ZoneAudit::default())).id();
 		world.spawn((
 			Stack::new("beetmash-news"),
-			AwsRegion::new(Stack::TEST_REGION),
+			AwsRegion::new(Stack::TEST_AWS_REGION),
 			zone("zone1"),
 			children![(news(), SesRelay::default())],
 		));

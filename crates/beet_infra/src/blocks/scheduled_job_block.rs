@@ -215,7 +215,7 @@ impl ScheduledJobBlock {
 		lambda: &LambdaBlock,
 	) -> Result {
 		self.validate()?;
-		let region = stack.region()?.clone();
+		let region = stack.aws_region()?.clone();
 		let function_arn = lambda.arn(stack);
 
 		// The invoke identity: the scheduler assumes this role to call the one

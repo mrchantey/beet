@@ -86,7 +86,7 @@ impl StoreBlock for DynamoTableBlock {
 		StoreUri::Dynamo {
 			name: self.table_name(stack).into(),
 			path_prefix: None,
-			region: Some(stack.region()?.clone()),
+			region: Some(stack.aws_region()?.clone()),
 		}
 		.xok()
 	}
@@ -134,7 +134,7 @@ impl DynamoTableBlock {
 						r#type: "S".into(),
 					},
 				]),
-				region: Some(stack.region()?.clone()),
+				region: Some(stack.aws_region()?.clone()),
 				// absent unless declared, so a table that expires nothing
 				// renders exactly as it did before this field existed
 				ttl: self.ttl.clone().map(|attribute_name| {

@@ -1056,7 +1056,7 @@ impl MailDomainBlock {
 			&self.label("mail-from-mx"),
 			&mail_from,
 			Self::MX_PRIORITY,
-			&SesRelay::feedback_host(stack.region()?),
+			&SesRelay::feedback_host(stack.aws_region()?),
 		)?;
 		dns.emit_txt(
 			stack,

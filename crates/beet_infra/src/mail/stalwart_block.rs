@@ -804,7 +804,7 @@ impl StalwartBlock {
 		stack: &ResolvedStack,
 		access: &AccessGrants,
 	) -> Result<IamPolicy> {
-		let region = stack.region()?;
+		let region = stack.aws_region()?;
 		let log_group = self.log_group(stack);
 		IamPolicy::new(region.clone(), "stalwart box")
 			.statement(json!({
@@ -1268,7 +1268,7 @@ impl StalwartBlock {
 			"securityToken": none,
 			"sessionToken": none,
 			"region": {
-				"@type": stack.region()?.to_upper_camel_case()
+				"@type": stack.aws_region()?.to_upper_camel_case()
 			}
 		})
 		.xok()
@@ -1318,7 +1318,7 @@ mv -f /etc/stalwart/stalwart.env.next /etc/stalwart/stalwart.env
 "#;
 		let admin_secret = self.admin_secret_name(stack);
 		[
-			("__REGION__", stack.region()?.as_str()),
+			("__REGION__", stack.aws_region()?.as_str()),
 			("__ADMIN_SECRET__", admin_secret.as_str()),
 			("__ADMIN_USER__", Self::ADMIN_USER),
 		]
@@ -1369,7 +1369,7 @@ echo "mail database backed up and read-verified at $object ($(stat -c %s "$snaps
 		let bucket = stack.resource_name(self.backup_bucket.clone());
 		[
 			("__DATABASE__", Self::DATABASE_PATH),
-			("__REGION__", stack.region()?.as_str()),
+			("__REGION__", stack.aws_region()?.as_str()),
 			("__BUCKET__", bucket.as_str()),
 			("__PREFIX__", Self::BACKUP_PREFIX),
 		]
@@ -1476,7 +1476,7 @@ WantedBy=multi-user.target"#,
 			})
 		};
 		json!({
-			"agent": { "run_as_user": "root", "region": stack.region()? },
+			"agent": { "run_as_user": "root", "region": stack.aws_region()? },
 			"logs": {
 				"logs_collected": {
 					"files": {
@@ -1608,7 +1608,7 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let secret_key = cold.secret_key_secret().name(stack);
 		let missing = cold.missing_credential(stack);
 		[
-			("__REGION__", stack.region()?.as_str()),
+			("__REGION__", stack.aws_region()?.as_str()),
 			("__ENDPOINT__", endpoint.as_str()),
 			("__ACCESS_KEY_SECRET__", access_key.as_str()),
 			("__SECRET_KEY_SECRET__", secret_key.as_str()),
@@ -1972,7 +1972,7 @@ mod tests {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		(
 			stack
-				.with_region(aws::region::AP_SOUTHEAST_2)
+				.with_aws_region(aws::region::AP_SOUTHEAST_2)
 				.with_cloudflare_zone(CloudflareZone::new(
 					"beetmash.com",
 					Stack::TEST_ZONE_ID,

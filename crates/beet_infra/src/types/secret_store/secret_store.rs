@@ -420,7 +420,7 @@ mod test {
 		let root = world
 			.spawn((
 				Stack::new("app").with_stage("prod"),
-				AwsRegion::new(Stack::TEST_REGION),
+				AwsRegion::new(Stack::TEST_AWS_REGION),
 				BlobStore::temp(),
 				RepoStore,
 				children![declarations],
@@ -466,7 +466,7 @@ mod test {
 			store
 				.region()
 				.unwrap()
-				.xpect_eq(stack.region().unwrap().clone());
+				.xpect_eq(stack.aws_region().unwrap().clone());
 			store.stack().clone().xpect_eq(stack);
 		});
 		// (one repo store per world, so a second world)

@@ -111,7 +111,7 @@ impl TestDeploy {
 	}
 
 	/// The region the live tests pin.
-	pub const REGION: &'static str = "us-west-2";
+	pub const AWS_REGION: &'static str = "us-west-2";
 
 	/// The next deploy of the same app: same identity, new launch.
 	pub fn redeploy(&self) -> Self {
@@ -124,14 +124,14 @@ impl TestDeploy {
 	/// The stack root a test spawns: the stack with the region the live tests
 	/// pin declared beside it.
 	pub fn root(&self) -> (Stack, AwsRegion) {
-		(self.stack.clone(), AwsRegion::new(Self::REGION))
+		(self.stack.clone(), AwsRegion::new(Self::AWS_REGION))
 	}
 
 	/// The composed identity, ie what a name resolves against outside a world.
 	pub fn resolved(&self) -> ResolvedStack {
 		self.stack
 			.resolve(&PackageConfig::default())
-			.with_region(Self::REGION)
+			.with_aws_region(Self::AWS_REGION)
 	}
 
 	/// The client of the stack's repo store, exactly as

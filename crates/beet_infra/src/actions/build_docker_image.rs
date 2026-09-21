@@ -153,7 +153,7 @@ pub async fn BuildDockerImage(
 	// terraform uses stack.resource_ident(block.build_label("ecr")).primary_identifier()
 	let ecr_ident = stack.resource_ident(block.build_label("ecr"));
 	let ecr_repo_name = ecr_ident.primary_identifier();
-	let region = stack.region()?;
+	let region = stack.aws_region()?;
 	let account_id = get_aws_account_id().await?;
 	let ecr_url =
 		format!("{account_id}.dkr.ecr.{region}.amazonaws.com/{ecr_repo_name}");
