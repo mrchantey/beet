@@ -1072,7 +1072,7 @@ impl AsyncEntity {
 	where
 		O: 'static + Send + Sync,
 	{
-		self.with(|mut entity| entity.with_state(func))
+		self.with(|mut entity| entity.with_state::<P, O>(func))
 	}
 
 	/// Spawns an async task owned by this entity (cancelled when it despawns),

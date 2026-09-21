@@ -1,6 +1,6 @@
 ---
 name: sync-downstream
-description: Refresh the downstream repos (beet_esp, beet_atproto, data-dumps) with beet's AGENTS.md marker block, the curated skill set and shared config files. Use after changing AGENTS.md, the skills, or rustfmt.toml.
+description: Refresh the downstream repos (beet_esp, beet_atproto, beet_egress) with beet's AGENTS.md marker block, the curated skill set and shared config files. Use after changing AGENTS.md, the skills, or rustfmt.toml.
 ---
 
 # Sync Downstream
@@ -11,7 +11,7 @@ Beet has downstream repos (separate git repos building on beet via a path depend
 
 - `/home/pete/me/beet_esp`
 - `/home/pete/me/beet_atproto`
-- `/home/pete/me/data-dumps`
+- `/home/pete/me/beet_egress`
 
 Add new spinoffs to this list (and to the `DOWNSTREAM` array below) when they are created.
 
@@ -51,7 +51,7 @@ Not synced, as beet-repo procedures: they name beet's justfile recipes, worktree
 
 ```sh
 BEET=/home/pete/me/beet
-DOWNSTREAM=(/home/pete/me/beet_esp /home/pete/me/beet_atproto /home/pete/me/data-dumps)
+DOWNSTREAM=(/home/pete/me/beet_esp /home/pete/me/beet_atproto /home/pete/me/beet_egress)
 SKILLS=(
 	all-nighter audit-free-fns create-cli
 	docs-diataxis docs-explanation docs-how-to docs-improving docs-reference docs-rust-conventions docs-tutorials

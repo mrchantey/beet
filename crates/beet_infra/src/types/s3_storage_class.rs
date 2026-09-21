@@ -14,17 +14,21 @@ use beet_core::prelude::*;
 /// per GB-month and trade for it in the same three coins: a minimum billable
 /// size per object, a minimum storage duration (an object deleted or expired
 /// sooner is billed for the rest of it) and a per-GB retrieval fee.
-//! # Pricing
-//! Rates are us-east-1 (N. Virginia) as of 26-09-21.
-//! Sydney (ap-southeast-2) runs slightly higher; confirm on the [AWS S3 pricing page](https://aws.amazon.com/s3/pricing/).
-//! | Class | Rate/GB-month | 100 GB/month | Retrieval time | Min duration |
-//! |---|---|---|---|---|
-//! | Standard | $0.023 | $2.30 | Instant | None |
-//! | Standard-IA (Infrequent Access) | $0.0125 | $1.25 | Instant | 30 days |
-//! | One Zone-IA | $0.01 | $1.00 | Instant | 30 days |
-//! | Glacier Instant Retrieval | $0.004 | $0.40 | Milliseconds | 90 days |
-//! | Glacier Flexible Retrieval | $0.0036 | $0.36 | Minutes to 12 hrs | 90 days |
-//! | Glacier Deep Archive | $0.00099 | $0.10 | 12–48 hrs | 180 days |
+///
+/// # Pricing
+///
+/// Rates are us-east-1 (N. Virginia) as of 26-09-21. Sydney (ap-southeast-2)
+/// runs slightly higher; confirm on the
+/// [AWS S3 pricing page](https://aws.amazon.com/s3/pricing/).
+///
+/// | Class | Rate/GB-month | 100 GB/month | Retrieval time | Min duration |
+/// |---|---|---|---|---|
+/// | Standard | $0.023 | $2.30 | Instant | None |
+/// | Standard-IA (Infrequent Access) | $0.0125 | $1.25 | Instant | 30 days |
+/// | One Zone-IA | $0.01 | $1.00 | Instant | 30 days |
+/// | Glacier Instant Retrieval | $0.004 | $0.40 | Milliseconds | 90 days |
+/// | Glacier Flexible Retrieval | $0.0036 | $0.36 | Minutes to 12 hrs | 90 days |
+/// | Glacier Deep Archive | $0.00099 | $0.10 | 12 to 48 hrs | 180 days |
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Reflect,
 )]

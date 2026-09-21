@@ -85,7 +85,7 @@ impl<P: SystemParam + 'static> AsyncSystemState<P> {
 	where
 		for<'w, 's> BridgeFn: FnOnce(P::Item<'w, 's>) -> Out,
 	{
-		BridgeFuture {
+		BridgeFuture::<P, _, _> {
 			_p: PhantomData,
 			system_set: bridge_request::async_world_sync_point::<SyncPoint>
 				.into_system_set()

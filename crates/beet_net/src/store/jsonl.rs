@@ -167,12 +167,26 @@ impl Jsonl {
 		level: JsonlLevel,
 		rows: impl IntoIterator<Item = &'a T>,
 	) -> Result<Bytes> {
-		let mut lines = Vec::new();
-		for row in rows {
-			lines.extend(Self::line(row)?.into_bytes());
-			lines.push(b'\n');
+		rows.into_iter()
+			.map(Self::line)
+			.collect::<Result<Vec<_>>>()?
+			.xmap(|lines| Self::encode_lines(codec, level, &lines))
+	}
+
+	/// Encodes lines already in their canonical form, ie from
+	/// [`line`](Self::line), one per row in the order given: the entry point
+	/// for a writer that diffs by line before it writes.
+	pub fn encode_lines(
+		codec: JsonlCodec,
+		level: JsonlLevel,
+		lines: impl IntoIterator<Item = impl AsRef<str>>,
+	) -> Result<Bytes> {
+		let mut bytes = Vec::new();
+		for line in lines {
+			bytes.extend(line.as_ref().as_bytes());
+			bytes.push(b'\n');
 		}
-		Bytes::from(codec.compress(level, &lines)?).xok()
+		Bytes::from(codec.compress(level, &bytes)?).xok()
 	}
 
 	/// The canonical json line for one row, without its newline.
@@ -260,10 +274,16 @@ mod test {
 				r#"{"alpha":"a","mid":true,"zed":1}"#.to_string(),
 				r#"{"alpha":"b","mid":null,"zed":2}"#.to_string(),
 			]);
-			// the same rows are the same bytes
+			// the same rows are the same bytes, whichever entry point
 			Jsonl::encode(codec, level, &rows())
 				.unwrap()
-				.xpect_eq(bytes);
+				.xpect_eq(bytes.clone());
+			Jsonl::encode_lines(codec, level, [
+				r#"{"alpha":"a","mid":true,"zed":1}"#,
+				r#"{"alpha":"b","mid":null,"zed":2}"#,
+			])
+			.unwrap()
+			.xpect_eq(bytes);
 		}
 		Jsonl::encode(codec, JsonlLevel::Best, &rows()).unwrap()
 	}
