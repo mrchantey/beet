@@ -180,6 +180,7 @@ mod test {
 	use crate::prelude::*;
 
 	/// A temp dir of its own per test.
+	#[cfg(not(target_arch = "wasm32"))]
 	fn temp_dir(name: &str) -> std::path::PathBuf {
 		let dir = std::env::temp_dir()
 			.join(format!("beet-secrets-{name}-{}", Timestamp::now().millis()));

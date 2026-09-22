@@ -71,9 +71,11 @@ impl ReactiveChildren {
 
 /// System that rebuilds [`ReactiveChildren`] when their synced [`Value`] changes.
 ///
-/// Chained after [`sync_document_to_local`](super::sync_document_to_local),
-/// which writes the [`Value`] and marks it `Changed`, so the rebuild reads the
-/// current list the same pass, including the initial generation.
+/// Runs in [`DocumentSyncSet::Rebuild`]: after
+/// [`sync_document_to_local`](super::sync_document_to_local) writes the
+/// [`Value`] and marks it `Changed`, so the rebuild reads the current list the
+/// same pass (including the initial generation), and before the write-back, so
+/// a vanished item's children never write into a list that has dropped them.
 pub(super) fn update_reactive_children(
 	mut commands: Commands,
 	changed: Populated<

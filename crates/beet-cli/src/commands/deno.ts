@@ -54,6 +54,11 @@ globalThis.read_dir = (path: string) => {
 globalThis.exists = (path: string) => {
 	return do_try(() => existsSync(path), false);
 };
+// The size of a file in bytes from its metadata, ie `Deno.statSync(path).size`;
+// null where the path is absent or unreadable.
+globalThis.file_size = (path: string) => {
+	return do_try(() => Deno.statSync(path).size, null, true);
+};
 globalThis.create_dir_all = (path: string) => {
 	return do_try(() => ensureDirSync(path));
 };
@@ -101,6 +106,7 @@ globalThis.env_all = () => {
 globalThis.test_cwd = globalThis.cwd;
 globalThis.test_exit = globalThis.exit;
 globalThis.test_exists = globalThis.exists;
+globalThis.test_file_size = globalThis.file_size;
 globalThis.test_catch_no_abort_inner = globalThis.catch_no_abort_inner;
 globalThis.test_read_file = globalThis.read_file;
 globalThis.test_read_dir = globalThis.read_dir;

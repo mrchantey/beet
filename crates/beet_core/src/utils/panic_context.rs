@@ -205,6 +205,29 @@ impl PanicContext {
 		}));
 	}
 
+	/// The panic the hook captured inside the current catch scope, consumed so
+	/// a stale context cannot be misread later; `None` when none fired.
+	///
+	/// For a site that swallows a panic and re-raises in its place (the wasm
+	/// bridge, where a trap escapes no closure), so the re-raise names the
+	/// original.
+	#[cfg(target_arch = "wasm32")]
+	pub(crate) fn take_captured() -> Option<String> {
+		CONTEXT
+			.with(|cx| cx.take())
+			.map(|context| Self::describe(context.payload, context.location))
+	}
+
+	/// `payload at location`, with a placeholder for a non-string payload.
+	fn describe(payload: Option<String>, location: Option<FileSpan>) -> String {
+		let payload =
+			payload.unwrap_or_else(|| "opaque panic payload".to_string());
+		match location {
+			Some(location) => format!("{payload} at {location}"),
+			None => payload,
+		}
+	}
+
 	/// Formats and appends an escaped panic to the suite-wide buffer.
 	///
 	/// No-op until [`Self::init`] has installed the test hook, so a production
@@ -213,12 +236,7 @@ impl PanicContext {
 		if INITIALIZED.get().is_none() {
 			return;
 		}
-		let payload =
-			payload.unwrap_or_else(|| "opaque panic payload".to_string());
-		let text = match location {
-			Some(location) => format!("{payload} at {location}"),
-			None => payload,
-		};
+		let text = Self::describe(payload, location);
 		// stamped before the lock: a panic inside the guard's scope would
 		// re-enter this hook and deadlock (panic, on a single-threaded target)
 		// on the lock it is still holding

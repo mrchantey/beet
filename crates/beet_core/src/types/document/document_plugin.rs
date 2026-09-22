@@ -99,25 +99,39 @@ impl Plugin for DocumentPlugin {
 		// run it to settlement ([`DocumentSync::settle`]) without driving the
 		// whole main loop; the realtime path drives it from `PreUpdate`.
 		app.init_schedule(DocumentSync);
+		app.configure_sets(
+			DocumentSync,
+			(
+				DocumentSyncSet::Read,
+				DocumentSyncSet::Rebuild,
+				DocumentSyncSet::Write,
+			)
+				.chain(),
+		);
 		app.add_systems(
 			DocumentSync,
 			(
-				update_field_bindings.run_if(field_bindings_need_update),
-				sync_schema.run_if(schema_needs_sync),
-				sync_document_to_local,
-				sync_rebound_fields,
-				// after the read path so a same-pass conflict resolves source-wins,
-				// before the write-back so the mirrored value lands the same pass.
-				sync_source_field_refs,
-				// field bindings run between the read path and the write-back, so a
-				// document change reaches the component/resource and an edit there
-				// reaches the document, both within one pass.
-				reflect_sync,
-				sync_local_to_document,
-				scene_sync,
-				update_reactive_children,
-			)
-				.chain(),
+				(
+					update_field_bindings.run_if(field_bindings_need_update),
+					sync_schema.run_if(schema_needs_sync),
+					sync_document_to_local,
+					sync_rebound_fields,
+					// after the read path so a same-pass conflict resolves
+					// source-wins, before the write-back so the mirrored value lands
+					// the same pass.
+					sync_source_field_refs,
+					// field bindings run between the read path and the write-back,
+					// so a document change reaches the component/resource and an
+					// edit there reaches the document, both within one pass.
+					reflect_sync,
+				)
+					.chain()
+					.in_set(DocumentSyncSet::Read),
+				update_reactive_children.in_set(DocumentSyncSet::Rebuild),
+				(sync_local_to_document, scene_sync)
+					.chain()
+					.in_set(DocumentSyncSet::Write),
+			),
 		);
 		// with `bevy_async` the per-frame run waits for the async sync point so an
 		// async field write (eg refresh_blob_store_list) lands the same pass.
@@ -137,7 +151,7 @@ fn run_document_sync(world: &mut World) { world.run_schedule(DocumentSync); }
 
 /// The document sync chain's schedule: one read/write pass between every
 /// [`Document`], its bound [`Value`] entities, and the reflected
-/// component/resource bindings.
+/// component/resource bindings, phased by [`DocumentSyncSet`].
 ///
 /// Driven from `PreUpdate` each frame, and on demand by render paths via
 /// [`DocumentSync::settle`].
@@ -179,6 +193,26 @@ impl DocumentSync {
 			Self::MAX_SETTLE_PASSES
 		);
 	}
+}
+
+/// The three phases of a [`DocumentSync`] pass, in order.
+///
+/// A generation reconciles *between* the read path and the write-back: it is
+/// rebuilt against the document as read this pass, so a control born of a
+/// shape the document no longer has is despawned before it can write. Left
+/// after the write-back, a list row's freshly seeded leaves outlive the row
+/// for one pass whenever the list shrinks (an async revert landing at the sync
+/// point) and seed their defaults back into the shorter list, recreating the
+/// row as a partial object. A downstream generation (a schema form's rows,
+/// entries and payloads) joins [`Rebuild`](Self::Rebuild) for the same reason.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub enum DocumentSyncSet {
+	/// Document → local: the read path and the mirrors it feeds.
+	Read,
+	/// Generations reconciled against what was just read.
+	Rebuild,
+	/// Local → document: the write-back and the scene sync behind it.
+	Write,
 }
 
 #[cfg(test)]

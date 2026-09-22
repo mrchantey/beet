@@ -68,10 +68,13 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		),
 	);
 	// ...and the value-driven twin, for the controls a schema alone does not
-	// decide: a list's rows, a map's entries, an enum's payload.
+	// decide: a list's rows, a map's entries, an enum's payload. A generation
+	// of the document's own shape reconciles inside the sync pass, between the
+	// read path and the write-back (see `DocumentSyncSet::Rebuild`).
 	app.add_systems(
-		Update,
-		super::schema_ui::value_rebuild::rebuild_value_widgets,
+		DocumentSync,
+		super::schema_ui::value_rebuild::rebuild_value_widgets
+			.in_set(DocumentSyncSet::Rebuild),
 	);
 	// a schema editor commits every change of the schema document it names
 	// against the data document it sits in, the one transaction an edit rides;

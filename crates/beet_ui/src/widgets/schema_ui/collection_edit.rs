@@ -367,6 +367,35 @@ mod test {
 			.xpect_eq(value!({ "items": [""] }));
 	}
 
+	/// A list that shrinks the pass after a row was generated (an async revert
+	/// landing at the sync point) despawns that row before its freshly seeded
+	/// leaves can write, else the `done` checkbox seeds `false` back into the
+	/// shorter list as a partial row.
+	#[beet_core::test]
+	fn a_row_dropped_before_its_first_sync_never_seeds_itself_back() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Item {
+			done: bool,
+		}
+		let (mut world, root) = build(
+			ValueSchema::of::<Vec<Item>>(),
+			value!({ "items": [{ "done": true }] }),
+		);
+		let set = |world: &mut World, items: Value| {
+			world.entity_mut(root).get_mut::<Document>().unwrap().0 =
+				value!({ "items": items });
+		};
+		// one pass: the second row is generated, its leaves not yet synced
+		set(&mut world, value!([{ "done": true }, { "done": true }]));
+		world.update_local();
+		// the list shrinks under the unsynced row
+		set(&mut world, value!([{ "done": true }]));
+		test_ext::settle_world(&mut world);
+		test_ext::document_of(&mut world, root)
+			.xpect_eq(value!({ "items": [{ "done": true }] }));
+	}
+
 	/// A remove button drops its own row and nothing else, so the control edits
 	/// the list it reads rather than a copy of it.
 	#[beet_core::test]

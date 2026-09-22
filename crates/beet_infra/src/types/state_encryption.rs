@@ -127,7 +127,8 @@ impl StateEncryption {
 	}
 }
 
-#[cfg(test)]
+// native only: `tofu init` is the native cli, so every caller is
+#[cfg(all(test, not(target_arch = "wasm32")))]
 impl StateEncryption {
 	/// Set the default passphrase variable for a test that reaches `tofu
 	/// init` under an encrypted-by-default stack, when the environment (the

@@ -91,6 +91,11 @@ impl ValueRebuild {
 /// Reconcile the generation of every [`ValueRebuild`] whose bound value
 /// changed: reuse each child whose key survived, build each key that is new,
 /// despawn each child whose key vanished, and order them as the value asks.
+///
+/// Runs in [`DocumentSyncSet::Rebuild`], so a vanished key's children are gone
+/// before the write-back of the pass that read the change: a list row's
+/// freshly seeded leaves would otherwise seed the row back into the shorter
+/// list as a partial object.
 pub(in crate::widgets) fn rebuild_value_widgets(
 	schemas: Option<Res<SchemaRegistry>>,
 	types: Option<Res<AppTypeRegistry>>,

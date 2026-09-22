@@ -128,12 +128,16 @@ mod test {
 	}
 
 	/// An idle app does not spin: a task sleeping three frames is answered
-	/// after about three updates, not thousands.
+	/// after a handful of updates, not thousands.
+	///
+	/// No lower bound: the gap runs this thread's executors, which in a test
+	/// binary also carry sibling tests' futures, and one that blocks the thread
+	/// (a spin-until-timeout case) stretches a frame past the whole sleep.
 	#[crate::test]
 	fn idles_at_the_frame_rate() {
 		let frames = run(async {
 			time_ext::sleep(FRAME * 3).await;
 		});
-		(frames >= 3 && frames <= 6).xpect_true();
+		frames.xpect_less_than(7);
 	}
 }

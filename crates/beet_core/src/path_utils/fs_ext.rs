@@ -96,12 +96,19 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> FsResult<u64> {
 	fs::copy(from, to).map_err(|err| FsError::io(from, err))
 }
 
-/// The size of a file in bytes.
+/// The size of a file in bytes, from its metadata.
 pub fn file_size(path: impl AsRef<Path>) -> FsResult<u64> {
 	let path = path.as_ref();
-	fs::metadata(path)
-		.map(|meta| meta.len())
-		.map_err(|err| FsError::io(path, err))
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			js_runtime::file_size(&path.to_string_lossy())
+				.ok_or_else(|| FsError::file_not_found(path))
+		} else {
+			fs::metadata(path)
+				.map(|meta| meta.len())
+				.map_err(|err| FsError::io(path, err))
+		}
+	}
 }
 
 /// Checks if a path exists on the filesystem.

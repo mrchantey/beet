@@ -270,6 +270,9 @@ mod stalled_store_test {
 		std::thread::spawn(move || {
 			let mut app = App::new();
 			app.add_plugins((MinimalPlugins, ServerPlugin, RouterPlugin));
+			// a parked write lands after the test is over and its read-back
+			// fails by design, which is a report, not a panic on the pool
+			app.set_error_handler(bevy::ecs::error::warn);
 			let store = app
 				.world_mut()
 				.spawn(StalledStore {

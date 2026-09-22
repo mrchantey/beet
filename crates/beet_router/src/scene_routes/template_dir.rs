@@ -90,6 +90,13 @@ impl TemplateFile {
 		// local for the same reason the scan is: the bridge poll is only
 		// guaranteed on the runtime's local executor.
 		entity_mut.run_async_local(async move |file: AsyncEntity| -> Result {
+			// a removed source marks its blob changed too: the dir's rescan
+			// despawns this file, unregistering its names, so there is nothing
+			// to re-read and an error here would only race that despawn
+			if !blob.exists().await? {
+				file.world().with(move |world| guard.resolve(world)).await;
+				return Ok(());
+			}
 			let source = blob.get().await?.to_vec().xmap(String::from_utf8)?;
 			let entity = file.id();
 			file.world()

@@ -43,6 +43,7 @@ mod raw {
 		pub fn read_dir(path: &str) -> js_sys::Array;
 		pub fn create_dir_all(path: &str);
 		pub fn exists(path: &str) -> bool;
+		pub fn file_size(path: &str) -> Option<f64>;
 		pub fn write_file(path: &str, content: &[u8]) -> Option<String>;
 		pub fn remove(path: &str) -> Option<String>;
 		pub fn env_args() -> js_sys::Array;
@@ -72,6 +73,8 @@ mod raw {
 		pub fn read_dir(path: &str) -> js_sys::Array;
 		#[wasm_bindgen(js_name = "test_exists")]
 		pub fn exists(path: &str) -> bool;
+		#[wasm_bindgen(js_name = "test_file_size")]
+		pub fn file_size(path: &str) -> Option<f64>;
 		#[wasm_bindgen(js_name = "test_create_dir_all")]
 		pub fn create_dir_all(path: &str);
 		#[wasm_bindgen(js_name = "test_write_file")]
@@ -331,6 +334,15 @@ pub fn exists(path: &str) -> bool {
 	} else {
 		false
 	}
+}
+
+/// The size of a file in bytes from its metadata, ie `Deno.statSync().size`.
+/// `None` where the path is absent or the fs global is.
+pub fn file_size(path: &str) -> Option<u64> {
+	has_global("file_size")
+		.then(|| raw::file_size(path))
+		.flatten()
+		.map(|size| size as u64)
 }
 
 /// Write a file, ie `Deno.writeFileSync()`, returning an error string on

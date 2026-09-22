@@ -340,7 +340,15 @@ fn tick_executor(executor: &BridgeExecutor) {
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 fn unwrap_bridged<O>(out: Option<O>) -> O {
 	out.unwrap_or_else(|| {
-		panic!("bridged world closure panicked, see the panic reported above")
+		// inside a test's catch scope the hook captured the trap's panic
+		// silently, so name it here rather than pointing at a report that
+		// was never printed
+		match PanicContext::take_captured() {
+			Some(panic) => panic!("bridged world closure panicked: {panic}"),
+			None => panic!(
+				"bridged world closure panicked, see the panic reported above"
+			),
+		}
 	})
 }
 
