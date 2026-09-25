@@ -6,6 +6,9 @@ use std::io::Read;
 pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
 
+	// read before the parts are taken: the policy rides the request, not its
+	// parts, since a server never follows anything
+	let max_redirects = req.redirects.max();
 	let (parts, body) = req.into_parts();
 
 	// Build the agent with proper TLS configuration
@@ -21,6 +24,9 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 				.build(),
 		)
 		.http_status_as_error(false)
+		// `0` answers the `3xx` to the caller rather than erroring:
+		// `max_redirects_do_error` is `max_redirects > 0 && ..`
+		.max_redirects(max_redirects)
 		.build()
 		.new_agent();
 	#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
@@ -31,6 +37,9 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 				.build(),
 		)
 		.http_status_as_error(false)
+		// `0` answers the `3xx` to the caller rather than erroring:
+		// `max_redirects_do_error` is `max_redirects > 0 && ..`
+		.max_redirects(max_redirects)
 		.build()
 		.new_agent();
 	#[cfg(all(feature = "rustls-tls", feature = "native-tls"))]
@@ -41,11 +50,17 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 				.build(),
 		)
 		.http_status_as_error(false)
+		// `0` answers the `3xx` to the caller rather than erroring:
+		// `max_redirects_do_error` is `max_redirects > 0 && ..`
+		.max_redirects(max_redirects)
 		.build()
 		.new_agent();
 	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
 	let agent = ureq::config::Config::builder()
 		.http_status_as_error(false)
+		// `0` answers the `3xx` to the caller rather than erroring:
+		// `max_redirects_do_error` is `max_redirects > 0 && ..`
+		.max_redirects(max_redirects)
 		.build()
 		.new_agent();
 
@@ -210,5 +225,47 @@ mod test {
 			.unwrap()
 			.unwrap()
 			.xpect_eq(BODY_LEN);
+	}
+
+	/// [`Redirects::None`] answers the `3xx` itself, so a caller can carry a
+	/// session across a hop the client would otherwise strip it from.
+	#[beet_core::test]
+	async fn does_not_follow_when_told_not_to() {
+		let (server, on_spawn) =
+			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let url = server.local_url();
+		std::thread::spawn(move || {
+			App::new()
+				.add_plugins((MinimalPlugins, ServerPlugin))
+				.spawn((server, on_spawn, children![exchange_ext::handler(
+					|cx| match cx.take().url().path_string().as_str() {
+						"/landed" => Response::ok_text("landed"),
+						_ => Response::temporary_redirect("/landed"),
+					}
+				)]))
+				.run();
+		});
+		time_ext::sleep_millis(100).await;
+
+		// followed by default, the way every other caller expects
+		Request::get(&url)
+			.send()
+			.await
+			.unwrap()
+			.text()
+			.await
+			.unwrap()
+			.xpect_eq("landed");
+
+		let response = Request::get(&url)
+			.with_redirects(Redirects::None)
+			.send()
+			.await
+			.unwrap();
+		response.status().as_u16().xpect_eq(307);
+		response
+			.headers()
+			.first_raw("location")
+			.xpect_eq(Some("/landed"));
 	}
 }

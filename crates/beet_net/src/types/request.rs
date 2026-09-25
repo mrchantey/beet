@@ -51,6 +51,64 @@ pub struct Request {
 	parts: RequestParts,
 	/// The request body, which may be bytes or a stream.
 	pub body: Body,
+	/// Whether the client follows a `3xx` itself, [`Redirects::Follow`] by
+	/// default. Ignored by a server, which never follows anything.
+	pub redirects: Redirects,
+}
+
+/// Whether a client follows a `3xx` itself, and how far.
+///
+/// Following is the default and is what almost every caller wants. A caller
+/// takes [`Self::None`] when it has to see the hops, because a client cannot
+/// know which headers are safe to resend across one and so drops them: ureq
+/// removes `cookie` on every redirect, same-host included, which silently
+/// un-authenticates a session the caller carried. Carrying credentials across
+/// a hop is the caller's business; the transport only needs to get out of the
+/// way.
+///
+/// ```no_run
+/// # use beet_net::prelude::*;
+/// # async fn demo() -> beet_core::prelude::Result {
+/// let response = Request::get("https://example.com/download")
+/// 	.with_redirects(Redirects::None)
+/// 	.send()
+/// 	.await?;
+/// let next = response.headers().first_raw("location");
+/// # let _ = next;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// On wasm the browser owns the redirect: [`Self::None`] asks `fetch` for a
+/// manual redirect, which answers an opaque response with no `location`
+/// header, so a caller that must read the hop cannot run there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Redirects {
+	/// Follow up to this many hops.
+	Follow(u32),
+	/// Answer the `3xx` itself, `location` header and all.
+	None,
+}
+
+impl Default for Redirects {
+	fn default() -> Self { Self::Follow(Self::DEFAULT_MAX) }
+}
+
+impl Redirects {
+	/// What every client this wraps already defaults to.
+	pub const DEFAULT_MAX: u32 = 10;
+
+	/// The hop budget, zero when not following.
+	pub fn max(&self) -> u32 {
+		match self {
+			Self::Follow(max) => *max,
+			Self::None => 0,
+		}
+	}
+
+	/// Whether a `3xx` is answered to the caller rather than followed.
+	pub fn is_none(&self) -> bool { *self == Self::None }
 }
 
 fn on_add(mut world: DeferredWorld, cx: HookContext) {
@@ -117,12 +175,23 @@ impl Request {
 		Self {
 			parts: RequestParts::new(method, url),
 			body: default(),
+			redirects: default(),
 		}
 	}
 
 	/// Creates a request from parts and body
 	pub fn from_parts(parts: RequestParts, body: Body) -> Self {
-		Self { parts, body }
+		Self {
+			parts,
+			body,
+			redirects: default(),
+		}
+	}
+
+	/// Sets whether the client follows a `3xx` itself.
+	pub fn with_redirects(mut self, redirects: Redirects) -> Self {
+		self.redirects = redirects;
+		self
 	}
 
 	/// Creates a GET request for the given URL.
@@ -392,7 +461,11 @@ impl Request {
 		} else {
 			default()
 		};
-		Self { parts, body }
+		Self {
+			parts,
+			body,
+			redirects: default(),
+		}
 	}
 
 	/// Creates a request from CLI arguments.
@@ -408,6 +481,7 @@ impl Request {
 		let request = Self {
 			parts: RequestParts::from(args),
 			body: default(),
+			redirects: default(),
 		};
 		match body.and_then(|values| values.into_iter().next()) {
 			Some(body) => request

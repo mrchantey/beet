@@ -26,6 +26,11 @@ fn into_request(req: Request) -> Result<web_sys::Request> {
 	let init = web_sys::RequestInit::new();
 	let method_str = req.method().to_string().to_uppercase();
 	init.set_method(&method_str);
+	// the browser owns the hop: `manual` answers an opaque response, so a
+	// caller here can refuse to follow but cannot read where it was sent
+	if req.redirects.is_none() {
+		init.set_redirect(web_sys::RequestRedirect::Manual);
+	}
 
 	let (parts, body) = req.into_parts();
 	match &body {

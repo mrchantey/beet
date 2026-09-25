@@ -7,16 +7,36 @@ use std::sync::LazyLock;
 /// Send a request using the reqwest client.
 pub(super) async fn send_reqwest(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
+	let redirects = req.redirects;
 	let req: reqwest::Request = into_request(req)?;
 	async_ext::on_tokio(async move {
-		static REQWEST_CLIENT: LazyLock<Client> =
-			LazyLock::new(|| Client::new());
-		let res = RequestBuilder::from_parts(REQWEST_CLIENT.clone(), req)
+		let res = RequestBuilder::from_parts(client(redirects), req)
 			.send()
 			.await?;
 		into_response(res).await
 	})
 	.await
+}
+
+/// The client for `redirects`. The two policies every caller uses are shared
+/// statics, so the connection pool is shared with them; an unusual hop budget
+/// pays for its own client rather than making a third static nobody reuses.
+fn client(redirects: Redirects) -> Client {
+	static FOLLOW: LazyLock<Client> = LazyLock::new(Client::new);
+	static MANUAL: LazyLock<Client> = LazyLock::new(|| {
+		Client::builder()
+			.redirect(reqwest::redirect::Policy::none())
+			.build()
+			.unwrap_or_else(|_| Client::new())
+	});
+	match redirects {
+		Redirects::None => MANUAL.clone(),
+		Redirects::Follow(Redirects::DEFAULT_MAX) => FOLLOW.clone(),
+		Redirects::Follow(max) => Client::builder()
+			.redirect(reqwest::redirect::Policy::limited(max as usize))
+			.build()
+			.unwrap_or_else(|_| FOLLOW.clone()),
+	}
 }
 
 fn into_request(request: Request) -> Result<reqwest::Request> {
