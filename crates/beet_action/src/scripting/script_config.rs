@@ -186,20 +186,12 @@ so writing it would let a script widen its own",
 		}
 	}
 
-	/// A filter on one line, for the error a script reads back.
-	///
-	/// A half with no patterns is dropped rather than printed empty, and a
-	/// filter with neither is the open grant it is.
+	/// A filter on one line, for the error a script reads back. A filter with no
+	/// rules is the open grant it is.
 	fn describe(filter: &GlobFilter) -> String {
-		let described = filter
-			.to_string()
-			.lines()
-			.filter(|half| !half.trim_end().ends_with(':'))
-			.collect::<Vec<_>>()
-			.join(", ");
-		match described.is_empty() {
+		match filter.is_empty() {
 			true => "everything".to_string(),
-			false => described,
+			false => filter.to_string(),
 		}
 	}
 

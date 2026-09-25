@@ -165,9 +165,11 @@ mod test {
 		.xpect_eq(Exposure { read: expected });
 	}
 
-	/// The full form: a `GlobFilter` struct literal names either list, each
+	/// The two-list form: a `GlobFilter` struct literal names either list, each
 	/// pattern coercing from its string, so a denylist authors as directly as an
-	/// allowlist (`{filter:{exclude:["blog/**"]}}`).
+	/// allowlist (`{filter:{exclude:["blog/**"]}}`). The includes lead and the
+	/// excludes ride last, which is what the two words mean under the filter's
+	/// last-match-wins.
 	#[crate::test]
 	fn coerces_a_glob_filter_struct_literal() {
 		#[derive(Reflect, PartialEq, Debug, Default)]
@@ -191,6 +193,59 @@ mod test {
 		}))
 		.xpect_eq(Discovery {
 			filter: GlobFilter::default().with_exclude("blog/**"),
+		});
+		// ..and unnamed, the form a colocated field spread authors
+		// (`{SyncS3Bucket{filter:{exclude:["*/blobs/*"]}}}`)
+		resolve::<Discovery>(DataLiteral::Struct(vec![(
+			"filter".into(),
+			DataLiteral::Struct(vec![(
+				"exclude".into(),
+				DataLiteral::List(vec![DataLiteral::Scalar(Value::Str(
+					"blog/**".into(),
+				))]),
+			)]),
+		)]))
+		.xpect_eq(Discovery {
+			filter: GlobFilter::default().with_exclude("blog/**"),
+		});
+	}
+
+	/// An order the two words cannot express is authored as the rules
+	/// themselves, which the parser declines so they build structurally.
+	#[crate::test]
+	fn coerces_glob_filter_rules() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Discovery {
+			filter: GlobFilter,
+		}
+		let rule = |name: &str, pattern: &str| {
+			DataLiteral::Enum(NamedLiteral {
+				name: name.into(),
+				fields: NamedFields::Tuple(vec![DataLiteral::Scalar(
+					Value::Str(pattern.into()),
+				)]),
+			})
+		};
+		resolve::<Discovery>(DataLiteral::Enum(NamedLiteral {
+			name: "Discovery".into(),
+			fields: NamedFields::Struct(vec![(
+				"filter".into(),
+				DataLiteral::Enum(NamedLiteral {
+					name: "GlobFilter".into(),
+					fields: NamedFields::Struct(vec![(
+						"rules".into(),
+						DataLiteral::List(vec![
+							rule("Exclude", "logs/*"),
+							rule("Include", "logs/keep.txt"),
+						]),
+					)]),
+				}),
+			)]),
+		}))
+		.xpect_eq(Discovery {
+			filter: GlobFilter::default()
+				.with_exclude("logs/*")
+				.with_include("logs/keep.txt"),
 		});
 	}
 

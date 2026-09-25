@@ -466,10 +466,10 @@ mod test {
 		.xpect_eq(5);
 	}
 
-	/// A prop shape the parser DECLINES is left to structural validation, so a
-	/// `GlobFilter` struct literal still validates the old way.
+	/// The two named lists ARE a `GlobFilter`'s own spelling, so a denylist
+	/// verifies through its parser rather than structurally.
 	#[crate::test]
-	fn a_declined_prop_stays_structural() {
+	fn a_struct_literal_spelling_parses() {
 		parse_widget_props(&[(
 			"read",
 			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Struct(vec![(
@@ -477,6 +477,22 @@ mod test {
 				DataLiteral::List(vec![DataLiteral::Scalar(Value::Str(
 					"blog/**".into(),
 				))]),
+			)]))),
+		)])
+		.unwrap()
+		.len()
+		.xpect_eq(1);
+	}
+
+	/// A prop shape the parser DECLINES is left to structural validation, so a
+	/// `GlobFilter` authored as its ordered rules still validates the old way.
+	#[crate::test]
+	fn a_declined_prop_stays_structural() {
+		parse_widget_props(&[(
+			"read",
+			AttrValue::Expr(ValueExpr::Literal(DataLiteral::Struct(vec![(
+				"rules".into(),
+				DataLiteral::List(Vec::new()),
 			)]))),
 		)])
 		.unwrap()

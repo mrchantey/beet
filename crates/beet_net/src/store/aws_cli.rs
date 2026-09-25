@@ -101,6 +101,9 @@ impl AwsCli {
 	async fn run_argv(&self, argv: Vec<String>) -> Result {
 		let (prog, rest) =
 			argv.split_first().ok_or_else(|| bevyhow!("empty argv"))?;
+		// the exact command, since which flags a sync resolved to (its filter
+		// rules, `--size-only`) is otherwise invisible from the outside
+		trace!("{prog} {}", rest.join(" "));
 		let mut cmd = Command::new(prog);
 		cmd.args(rest)
 			.stdout(Stdio::inherit())
@@ -117,53 +120,6 @@ impl AwsCli {
 			bevybail!("aws cli exited with non-zero status: {:?}", status);
 		}
 		Ok(())
-	}
-}
-
-/// Represents a single include/exclude directive. Order matters for the AWS CLI.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum S3Filter {
-	/// Excludes files matching the given glob pattern.
-	Exclude(String),
-	/// Includes files matching the given glob pattern.
-	Include(String),
-}
-
-impl S3Filter {
-	/// The cli filter list a [`GlobFilter`] means, in evaluation order.
-	///
-	/// The two dialects agree on patterns (`*` crosses `/` in both) but start
-	/// from opposite defaults: the cli includes everything until a rule says
-	/// otherwise, where a [`GlobFilter`] with any include pattern starts from
-	/// including nothing. So a non-empty include list opens with `--exclude "*"`,
-	/// and the excludes ride last because the cli's last matching rule wins,
-	/// which is how a [`GlobFilter`] resolves the two lists too.
-	pub fn from_glob(filter: &GlobFilter) -> Vec<Self> {
-		let include = filter.include_patterns();
-		include
-			.is_empty()
-			.xmap(|all| match all {
-				true => Vec::new(),
-				false => vec![Self::Exclude("*".to_string())],
-			})
-			.xtend(
-				include
-					.iter()
-					.map(|pattern| Self::Include(pattern.as_str().to_string())),
-			)
-			.xtend(
-				filter
-					.exclude_patterns()
-					.iter()
-					.map(|pattern| Self::Exclude(pattern.as_str().to_string())),
-			)
-	}
-
-	fn to_args(&self) -> [String; 2] {
-		match self {
-			S3Filter::Exclude(p) => ["--exclude".into(), p.clone()],
-			S3Filter::Include(p) => ["--include".into(), p.clone()],
-		}
 	}
 }
 
@@ -200,7 +156,7 @@ pub enum SyncDirection {
 /// - `follow_symlinks`   -> `--follow-symlinks`
 /// - `acl`               -> `--acl <value>` (e.g. `public-read`)
 /// - `storage_class`     -> `--storage-class <value>` (e.g. `GLACIER_IR`)
-/// - `filters`           -> `--exclude <pat>` / `--include <pat>` in provided order
+/// - `filter`            -> `--include <pat>` / `--exclude <pat>`, see [`S3Sync::filter_args`]
 /// - `additional_args`   -> appended verbatim at the end
 #[derive(Debug, Clone)]
 pub struct S3Sync {
@@ -227,8 +183,9 @@ pub struct S3Sync {
 	/// Storage class for uploaded objects, ie `GLACIER_IR`; the bucket default
 	/// when unset. Meaningless on a pull, which the cli ignores it for.
 	pub storage_class: Option<String>,
-	/// Include/exclude filters applied in order.
-	pub filters: Vec<S3Filter>,
+	/// Narrow the sync, in the filter's own last-match-wins terms. Translated
+	/// into the cli's dialect by [`S3Sync::filter_args`].
+	pub filter: GlobFilter,
 	/// Additional arguments appended verbatim.
 	pub additional_args: Vec<String>,
 }
@@ -247,7 +204,7 @@ impl Default for S3Sync {
 			follow_symlinks: false,
 			acl: None,
 			storage_class: None,
-			filters: Vec::new(),
+			filter: default(),
 			additional_args: Vec::new(),
 		}
 	}
@@ -373,27 +330,20 @@ impl S3Sync {
 		self.storage_class = Some(value.into());
 		self
 	}
-	/// Append an exclude rule. Preserves order relative to includes.
-	pub fn exclude(mut self, pattern: impl Into<String>) -> Self {
-		self.filters.push(S3Filter::Exclude(pattern.into()));
+	/// Append an exclude rule, ordered against the includes.
+	pub fn exclude(mut self, pattern: &str) -> Self {
+		self.filter.exclude(pattern);
 		self
 	}
-	/// Append an include rule. Preserves order relative to excludes.
-	pub fn include(mut self, pattern: impl Into<String>) -> Self {
-		self.filters.push(S3Filter::Include(pattern.into()));
+	/// Append an include rule, ordered against the excludes.
+	pub fn include(mut self, pattern: &str) -> Self {
+		self.filter.include(pattern);
 		self
 	}
-	/// Append a prepared filter list, preserving its order.
-	pub fn filters(
-		mut self,
-		filters: impl IntoIterator<Item = S3Filter>,
-	) -> Self {
-		self.filters.extend(filters);
+	/// Narrow the sync, replacing any rules appended so far.
+	pub fn filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
 		self
-	}
-	/// Append the rules a [`GlobFilter`] means, see [`S3Filter::from_glob`].
-	pub fn glob_filter(self, filter: &GlobFilter) -> Self {
-		self.filters(S3Filter::from_glob(filter))
 	}
 	/// Append a raw argument verbatim to the end of the argv.
 	pub fn arg(mut self, arg: impl Into<String>) -> Self {
@@ -430,13 +380,34 @@ impl S3Sync {
 			out.push("--storage-class".into());
 			out.push(storage_class.clone());
 		}
-		for f in &self.filters {
-			let [flag, val] = f.to_args();
-			out.push(flag);
-			out.push(val);
-		}
+		out.extend(self.filter_args());
 		out.extend(self.additional_args.iter().cloned());
 		out
+	}
+
+	/// The cli filter args this sync's [`GlobFilter`] means, in evaluation
+	/// order.
+	///
+	/// The two dialects agree on patterns (`*` crosses `/` in both) and on the
+	/// last matching rule winning, but start from opposite defaults: the cli
+	/// includes everything until a rule says otherwise, where a [`GlobFilter`]
+	/// holding any include rule starts from including nothing. So an allowlist
+	/// opens with `--exclude "*"`, and the rules ride after it in their own
+	/// order.
+	fn filter_args(&self) -> Vec<String> {
+		self.filter
+			.has_include()
+			.then(|| vec!["--exclude".to_string(), "*".to_string()])
+			.unwrap_or_default()
+			.xtend(self.filter.rules().iter().flat_map(|rule| {
+				[
+					match rule.is_include() {
+						true => "--include".to_string(),
+						false => "--exclude".to_string(),
+					},
+					rule.pattern().as_str().to_string(),
+				]
+			}))
 	}
 }
 
@@ -502,6 +473,8 @@ mod test {
 		argv.last().unwrap().as_str().xpect_eq("--only-show-errors");
 	}
 
+	/// The rules reach the cli in authored order, behind the `--exclude "*"` an
+	/// allowlist starts from.
 	#[beet_core::test]
 	fn preserves_filter_order() {
 		let aws = AwsCli::new();
@@ -530,6 +503,7 @@ mod test {
 		}
 
 		filter_pairs.xpect_eq(vec![
+			("--exclude".into(), "*".into()),
 			("--exclude".into(), "node_modules/**".into()),
 			("--include".into(), "public/**".into()),
 			("--exclude".into(), "**/*.map".into()),
@@ -537,26 +511,28 @@ mod test {
 		]);
 	}
 
-	/// A [`GlobFilter`]'s two lists become cli rules in evaluation order: an
-	/// include list first denies everything, and the excludes ride last so the
-	/// cli's last-match-wins resolves them the way the filter does.
+	/// A [`GlobFilter`] becomes cli rules in evaluation order, an allowlist
+	/// first denying everything so the cli starts where the filter does.
 	#[beet_core::test]
 	fn maps_a_glob_filter() {
-		let args = |filter: &GlobFilter| {
+		let args = |filter: GlobFilter| {
 			S3Sync::default()
-				.glob_filter(filter)
+				.filter(filter)
 				.to_args()
 				.into_iter()
 				.skip(1) // `--no-progress`
 				.collect::<Vec<_>>()
 		};
-		args(&GlobFilter::default()).xpect_eq(Vec::<String>::new());
-		args(&GlobFilter::default().with_exclude("*/blobs/*"))
+		args(GlobFilter::default()).xpect_eq(Vec::<String>::new());
+		args(GlobFilter::default().with_exclude("*/blobs/*"))
 			.xpect_eq(vec!["--exclude".to_string(), "*/blobs/*".to_string()]);
+		// an exclusion taken back rides in its own order, which is the shape the
+		// two-list filter could not express at all
 		args(
-			&GlobFilter::default()
+			GlobFilter::default()
 				.with_include("pete/*")
-				.with_exclude("*/blobs/*"),
+				.with_exclude("*/blobs/*")
+				.with_include("*/blobs/keep"),
 		)
 		.xpect_eq(vec![
 			"--exclude".to_string(),
@@ -565,6 +541,8 @@ mod test {
 			"pete/*".to_string(),
 			"--exclude".to_string(),
 			"*/blobs/*".to_string(),
+			"--include".to_string(),
+			"*/blobs/keep".to_string(),
 		]);
 	}
 

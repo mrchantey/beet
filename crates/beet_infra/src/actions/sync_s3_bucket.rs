@@ -22,6 +22,17 @@ pub async fn SyncS3Bucket(
 	/// additive sync). Guarded on push by [`SyncS3Bucket::assert_mirrorable`].
 	#[field]
 	delete: bool,
+	/// Compare the two ends by SIZE alone, rather than by size and modified
+	/// time.
+	///
+	/// Right for a store whose content is immutable per path (a segment log, a
+	/// content-addressed blob), where size is already a complete comparison and
+	/// the default makes a hydrate permanent: a downloaded file is always newer
+	/// than the object it came from, so the next push re-uploads the whole
+	/// store. Wrong for a mutable mirror, where an edit that happened to keep
+	/// the byte count would be skipped.
+	#[field]
+	size_only: bool,
 	/// Upload the targets of symbolic links rather than skipping them, so a
 	/// symlinked subdir is materialized into the bucket.
 	#[field]
@@ -35,7 +46,7 @@ pub async fn SyncS3Bucket(
 	/// Narrow the sync to part of the directory, ie
 	/// `{filter:{exclude:["*/blobs/*"]}}` to hydrate a store's records without
 	/// its media. Empty by default, the whole directory. Translated into the
-	/// cli's own rules by [`S3Filter::from_glob`], and matched against each
+	/// cli's own rules by [`S3Sync::filter_args`], and matched against each
 	/// entry's path below the two ends, so a pattern reads the same in either
 	/// direction. A filtered PUSH leaves what it skipped out of the bucket,
 	/// which only a store that is not the source of record should want.
@@ -87,7 +98,20 @@ pub async fn SyncS3Bucket(
 	if delete && direction == SyncDirection::Push {
 		SyncS3Bucket::assert_mirrorable(&local_dir, follow_symlinks)?;
 	}
-	let sync = match direction {
+	if !filter.is_empty() {
+		// a pull that silently skipped most of the bucket is the kind of
+		// surprise worth a line of output
+		info!("SyncS3Bucket: filtered sync: {filter}");
+	}
+	trace!(
+		"SyncS3Bucket: syncing {} {} {s3_uri}",
+		local_dir,
+		match direction {
+			SyncDirection::Push => "->",
+			SyncDirection::Pull => "<-",
+		}
+	);
+	match direction {
 		SyncDirection::Push => {
 			let sync = S3Sync::push(local_dir.clone(), &s3_uri);
 			// a class declared on the bucket lands new objects there directly,
@@ -99,25 +123,13 @@ pub async fn SyncS3Bucket(
 		}
 		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
 	}
-	.glob_filter(&filter);
-	if !filter.is_empty() {
-		// a pull that silently skipped most of the bucket is the kind of
-		// surprise worth a line of output
-		info!("SyncS3Bucket: filtered sync\n{filter}");
-	}
-	trace!(
-		"SyncS3Bucket: syncing {} {} {s3_uri}",
-		local_dir,
-		match direction {
-			SyncDirection::Push => "->",
-			SyncDirection::Pull => "<-",
-		}
-	);
-	sync.delete(delete)
-		.follow_symlinks(follow_symlinks)
-		.no_sign_request(no_sign_request)
-		.send()
-		.await?;
+	.filter(filter)
+	.delete(delete)
+	.size_only(size_only)
+	.follow_symlinks(follow_symlinks)
+	.no_sign_request(no_sign_request)
+	.send()
+	.await?;
 	trace!("synced {s3_uri} (region: {:?})", s3_store.region());
 	trace!("SyncS3Bucket: complete");
 	Pass(cx.input).xok()

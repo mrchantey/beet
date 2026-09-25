@@ -182,23 +182,17 @@ fn add_domain(table: &mut Table) {
 		})
 		// the markup form of a filter is the allowlist a human writes, one
 		// pattern or a list of them: `read="guestbook.*"` and
-		// `read=["guestbook.*"]` both author includes. An exclude needs the
-		// struct literal (`{read:{exclude:[..]}}`), which declines to the
-		// structural walk and reflects normally now that each pattern coerces
-		// from its string.
+		// `read=["guestbook.*"]` both author includes. The two named lists
+		// (`{read:{include:[..],exclude:[..]}}`) are the denylist form, and an
+		// order the two words cannot express is authored as the rules
+		// themselves (`{GlobFilter{rules:[Exclude(".."),Include("..")]}}`),
+		// which declines to the structural walk.
 		.add_hinted("a glob pattern, repeatable", |value: &Value| match value {
 			Value::Str(pattern) => glob_filter([pattern.as_str()]).map(Some),
-			Value::List(items) => items
-				.iter()
-				.map(|item| match item {
-					Value::Str(pattern) => pattern.as_str().xok(),
-					other => bevybail!(
-						"invalid glob pattern {other:?}: expected a string"
-					),
-				})
-				.collect::<Result<Vec<_>>>()?
-				.xmap(glob_filter)
-				.map(Some),
+			Value::List(items) => {
+				glob_patterns(items)?.xmap(glob_filter).map(Some)
+			}
+			Value::Map(map) => glob_filter_lists(map),
 			_ => Ok(None),
 		})
 		// one validated pattern, the item form of the filter above.
@@ -261,6 +255,58 @@ fn glob_filter<'a>(
 		filter.include(pattern);
 	}
 	filter.xok()
+}
+
+/// A [`GlobFilter`] from the two named lists, `{include:[..],exclude:[..]}`,
+/// either of which may be one pattern or a list of them.
+///
+/// The includes lead and the excludes ride last, which under the filter's
+/// last-match-wins is what the two words mean to a human: an allowlist with
+/// carve-outs. The authored KEY order is deliberately not what decides, since a
+/// map serializes sorted and a rule order that survives one round trip and not
+/// the next would be a trap; an order the two words cannot say is authored as
+/// the rules themselves.
+///
+/// A map naming neither list declines, so `{rules:[..]}` and any other shape
+/// builds structurally, where an unknown field is named as one.
+fn glob_filter_lists(map: &Map) -> Result<Option<GlobFilter>> {
+	let named = |key: &str| matches!(key, "include" | "exclude");
+	if !map.0.keys().any(|key| named(key)) {
+		return Ok(None);
+	}
+	if let Some(key) = map.0.keys().find(|key| !named(key)) {
+		bevybail!(
+			"`GlobFilter` has no field `{key}`: expected `include` or `exclude`"
+		);
+	}
+	let list = |key: &str| match map.0.get(key) {
+		None => Ok(Vec::new()),
+		Some(Value::Str(pattern)) => vec![pattern.as_str()].xok(),
+		Some(Value::List(items)) => glob_patterns(items),
+		Some(other) => bevybail!(
+			"invalid glob `{key}` {other:?}: expected a pattern or a list of them"
+		),
+	};
+	let mut filter = glob_filter(list("include")?)?;
+	for pattern in list("exclude")? {
+		glob_pattern(pattern)?;
+		filter.exclude(pattern);
+	}
+	filter.xmap(Some).xok()
+}
+
+/// The patterns of an authored list, a non-string item being an error rather
+/// than a silently dropped rule.
+fn glob_patterns(items: &[Value]) -> Result<Vec<&str>> {
+	items
+		.iter()
+		.map(|item| match item {
+			Value::Str(pattern) => pattern.as_str().xok(),
+			other => {
+				bevybail!("invalid glob pattern {other:?}: expected a string")
+			}
+		})
+		.collect()
 }
 
 /// One validated [`GlobPattern`].

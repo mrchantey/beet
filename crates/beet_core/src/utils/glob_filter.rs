@@ -1,8 +1,8 @@
 //! Glob-based string filtering.
 //!
 //! This module provides [`GlobFilter`], a type for filtering strings (paths,
-//! test names, ..) using include and exclude glob patterns. It is commonly used
-//! for file watching and path matching.
+//! test names, ..) through an ordered list of include/exclude [rules](GlobRule).
+//! It is commonly used for file watching and path matching.
 //!
 //! Matching is backed by a small vendored glob engine ([`glob_match`]) rather
 //! than the `glob` crate, so it needs no filesystem and compiles on no_std.
@@ -24,36 +24,91 @@
 
 use crate::prelude::*;
 
-/// A glob-based string filter with include and exclude patterns.
+/// A glob-based string filter: an ordered list of rules resolved the way git
+/// resolves an ignore file, **last match wins**.
 ///
-/// To pass a string must:
-/// 1. Not match any exclude patterns
-/// 2. Match at least one include pattern (or include patterns are empty)
+/// 1. no rules at all, and everything passes;
+/// 2. otherwise the last rule matching the string decides, an include passing
+///    it and an exclude rejecting it;
+/// 3. and when no rule matches, everything still passes unless the filter holds
+///    an include rule anywhere, which makes it an allowlist and rejects the
+///    rest.
+///
+/// Order is what lets a rule be taken back, the thing two unordered lists could
+/// never say, since they can only ever resolve as "excludes win":
+/// `.with_include("logs/*").with_exclude("logs/*.tmp").with_include("logs/keep.tmp")`
+/// is every log but the temporaries, and that one temporary anyway.
+///
+/// Three authored spellings, each parsed by the same [`LiteralParser`] entry:
+/// the allowlist a human writes (`read="guestbook.*"`, `read=["a","b"]`), the
+/// two named lists (`{filter:{exclude:["blog/**"]}}`, includes first and
+/// excludes last, so the two words read as a human means them), and the rules
+/// themselves when the order matters
+/// (`{GlobFilter{rules:[Exclude("logs/*"),Include("logs/keep.txt")]}}`).
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobFilter {
-	/// Glob patterns to include. Leave empty to include all.
-	include: Vec<GlobPattern>,
-	/// Glob patterns to exclude.
-	exclude: Vec<GlobPattern>,
+	/// The rules in authored order, resolved last-match-wins by
+	/// [`passes`](GlobFilter::passes).
+	rules: Vec<GlobRule>,
+}
+
+/// One rule of a [`GlobFilter`]: a pattern and what matching it means.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum GlobRule {
+	/// Strings matching this pattern pass, unless a later rule excludes them.
+	Include(GlobPattern),
+	/// Strings matching this pattern are rejected, unless a later rule includes
+	/// them.
+	Exclude(GlobPattern),
+}
+
+impl GlobRule {
+	/// The pattern this rule matches with, whichever kind it is.
+	pub fn pattern(&self) -> &GlobPattern {
+		match self {
+			Self::Include(pattern) | Self::Exclude(pattern) => pattern,
+		}
+	}
+
+	/// Whether this rule passes what it matches.
+	pub fn is_include(&self) -> bool { matches!(self, Self::Include(_)) }
+
+	/// Whether this rule's pattern matches `text`.
+	pub fn matches(&self, text: &str) -> bool { self.pattern().matches(text) }
+
+	/// This rule's kind carrying a different pattern.
+	fn with_pattern(&self, pattern: GlobPattern) -> Self {
+		match self {
+			Self::Include(_) => Self::Include(pattern),
+			Self::Exclude(_) => Self::Exclude(pattern),
+		}
+	}
+}
+
+impl core::fmt::Display for GlobRule {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let kind = match self.is_include() {
+			true => "include",
+			false => "exclude",
+		};
+		write!(f, "{kind} {}", self.pattern())
+	}
 }
 
 impl core::fmt::Display for GlobFilter {
+	/// The rules in order, comma separated, so what a reader sees is what the
+	/// filter resolves.
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		let include = self
-			.include
-			.iter()
-			.map(|pattern| pattern.as_str())
-			.collect::<Vec<_>>()
-			.join(", ");
-		let exclude = self
-			.exclude
-			.iter()
-			.map(|pattern| pattern.as_str())
-			.collect::<Vec<_>>()
-			.join(", ");
-		write!(f, "include: {}\nexclude: {}", include, exclude)
+		for (index, rule) in self.rules.iter().enumerate() {
+			if index > 0 {
+				f.write_str(", ")?;
+			}
+			write!(f, "{rule}")?;
+		}
+		Ok(())
 	}
 }
 
@@ -70,15 +125,14 @@ impl GlobFilter {
 	///
 	/// Turns `foo/bar` into `*foo/bar*` which matches any string that contains `foo/bar`.
 	pub fn wrap_all_with_wildcard(&mut self) -> &mut Self {
-		self.include = self
-			.include
+		self.rules = self
+			.rules
 			.iter()
-			.map(|pattern| Self::wrap_pattern_with_wildcard(pattern.as_str()))
-			.collect();
-		self.exclude = self
-			.exclude
-			.iter()
-			.map(|pattern| Self::wrap_pattern_with_wildcard(pattern.as_str()))
+			.map(|rule| {
+				rule.with_pattern(Self::wrap_pattern_with_wildcard(
+					rule.pattern().as_str(),
+				))
+			})
 			.collect();
 		self
 	}
@@ -96,67 +150,55 @@ impl GlobFilter {
 		GlobPattern(wrapped.into())
 	}
 
-	/// Sets the include patterns, replacing any existing ones.
-	pub fn set_include(mut self, items: Vec<&str>) -> Self {
-		self.include =
-			items.iter().map(|item| GlobPattern::new(item)).collect();
-		self
-	}
-
-	/// Sets the exclude patterns, replacing any existing ones.
-	pub fn set_exclude(mut self, items: Vec<&str>) -> Self {
-		self.exclude =
-			items.iter().map(|item| GlobPattern::new(item)).collect();
-		self
-	}
-
-	/// Extends the include patterns with additional items.
+	/// Extends the rules with an include per item.
 	pub fn extend_include<T: AsRef<str>>(
 		mut self,
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
-		self.include.extend(
+		self.rules.extend(
 			items
 				.into_iter()
-				.map(|item| GlobPattern::new(item.as_ref())),
+				.map(|item| GlobRule::Include(GlobPattern::new(item.as_ref()))),
 		);
 		self
 	}
 
-	/// Extends the exclude patterns with additional items.
+	/// Extends the rules with an exclude per item.
 	pub fn extend_exclude<T: AsRef<str>>(
 		mut self,
 		items: impl IntoIterator<Item = T>,
 	) -> Self {
-		self.exclude.extend(
+		self.rules.extend(
 			items
 				.into_iter()
-				.map(|item| GlobPattern::new(item.as_ref())),
+				.map(|item| GlobRule::Exclude(GlobPattern::new(item.as_ref()))),
 		);
 		self
 	}
 
-	/// Adds an include pattern and returns `&mut Self`.
+	/// Appends an include rule and returns `&mut Self`.
 	pub fn include(&mut self, pattern: &str) -> &mut Self {
-		self.include.push(GlobPattern::new(pattern));
+		self.rules
+			.push(GlobRule::Include(GlobPattern::new(pattern)));
 		self
 	}
 
-	/// Adds an exclude pattern and returns `&mut Self`.
+	/// Appends an exclude rule and returns `&mut Self`.
 	pub fn exclude(&mut self, pattern: &str) -> &mut Self {
-		self.exclude.push(GlobPattern::new(pattern));
+		self.rules
+			.push(GlobRule::Exclude(GlobPattern::new(pattern)));
 		self
 	}
 
-	/// Adds an include pattern and returns `Self`.
+	/// Appends an include rule and returns `Self`.
 	pub fn with_include(mut self, pattern: &str) -> Self {
-		self.include.push(GlobPattern::new(pattern));
+		self.include(pattern);
 		self
 	}
 
-	/// Adds an exclude pattern and returns `Self`.
+	/// Appends an exclude rule and returns `Self`.
 	pub fn with_exclude(mut self, pattern: &str) -> Self {
-		self.exclude.push(GlobPattern::new(pattern));
+		self.exclude(pattern);
 		self
 	}
 
@@ -169,40 +211,56 @@ impl GlobFilter {
 			.with_exclude(&format!("*/{dir}/*"))
 	}
 
-	/// Returns `true` if there are no include or exclude patterns.
-	pub fn is_empty(&self) -> bool {
-		self.include.is_empty() && self.exclude.is_empty()
+	/// Returns `true` if there are no rules, ie everything passes.
+	pub fn is_empty(&self) -> bool { self.rules.is_empty() }
+
+	/// The rules in order, for a consumer translating this filter into another
+	/// matcher's dialect, ie the aws cli's `--include`/`--exclude`.
+	pub fn rules(&self) -> &[GlobRule] { &self.rules }
+
+	/// Whether the filter holds any include rule, which is what turns it from a
+	/// denylist into an allowlist.
+	pub fn has_include(&self) -> bool {
+		self.rules.iter().any(GlobRule::is_include)
 	}
 
-	/// The include patterns, for a consumer translating this filter into
-	/// another matcher's dialect, ie the aws cli's `--include`/`--exclude`.
-	pub fn include_patterns(&self) -> &[GlobPattern] { &self.include }
-
-	/// The exclude patterns, see
-	/// [`include_patterns`](Self::include_patterns).
-	pub fn exclude_patterns(&self) -> &[GlobPattern] { &self.exclude }
-
-	/// Checks if a string passes the filter.
-	///
-	/// To pass a string must:
-	/// 1. Not match any exclude pattern
-	/// 2. Match an include pattern, or the include patterns are empty
+	/// Checks if a string passes the filter: the last rule to match it decides,
+	/// and a string no rule matches passes unless the filter is an allowlist.
 	pub fn passes(&self, text: impl AsRef<str>) -> bool {
 		let text = text.as_ref();
-		self.passes_include(text) && self.passes_exclude(text)
+		self.rules
+			.iter()
+			.rev()
+			.find(|rule| rule.matches(text))
+			.map(GlobRule::is_include)
+			.unwrap_or_else(|| !self.has_include())
 	}
 
-	/// Checks if a string passes the include filter.
+	/// Checks `text` against the include rules ALONE: it passes when there are
+	/// none, or when one of them matches.
+	///
+	/// This half and [`passes_exclude`](Self::passes_exclude) are for a consumer
+	/// matching a value that has several names (a component's full type path and
+	/// its short path), where the grant is any-of and the denial is all-of.
+	/// Everything else wants [`passes`](Self::passes), which resolves the rules
+	/// in order.
 	pub fn passes_include(&self, text: impl AsRef<str>) -> bool {
 		let text = text.as_ref();
-		self.include.is_empty()
-			|| self.include.iter().any(|pattern| pattern.matches(text))
+		!self.has_include()
+			|| self
+				.rules
+				.iter()
+				.any(|rule| rule.is_include() && rule.matches(text))
 	}
 
-	/// Checks if a string passes the exclude filter.
+	/// Checks `text` against the exclude rules ALONE: it passes when none of
+	/// them match, see [`passes_include`](Self::passes_include).
 	pub fn passes_exclude(&self, text: impl AsRef<str>) -> bool {
 		let text = text.as_ref();
-		!self.exclude.iter().any(|pattern| pattern.matches(text))
+		!self
+			.rules
+			.iter()
+			.any(|rule| !rule.is_include() && rule.matches(text))
 	}
 }
 
@@ -522,6 +580,54 @@ mod test {
 		filter.passes("src/codegen/mockups.rs").xpect_false();
 	}
 
+	/// The rules resolve last-match-wins, so an exclusion can be taken back —
+	/// the thing two unordered lists could never say.
+	#[crate::test]
+	fn last_match_wins() {
+		let filter = GlobFilter::default()
+			.with_include("logs/*")
+			.with_exclude("logs/*.tmp")
+			.with_include("logs/keep.tmp");
+		filter.passes("logs/run.log").xpect_true();
+		filter.passes("logs/scratch.tmp").xpect_false();
+		filter.passes("logs/keep.tmp").xpect_true();
+		// an include anywhere is still an allowlist, so what no rule matches
+		// is rejected
+		filter.passes("src/lib.rs").xpect_false();
+
+		// ..and the other order says the opposite about the same two patterns
+		GlobFilter::default()
+			.with_include("logs/keep.tmp")
+			.with_exclude("logs/*.tmp")
+			.passes("logs/keep.tmp")
+			.xpect_false();
+	}
+
+	/// The include/exclude halves ignore order, for a consumer matching a value
+	/// that has several names (see [`GlobFilter::passes_include`]).
+	#[crate::test]
+	fn halves_ignore_order() {
+		let filter = GlobFilter::default()
+			.with_exclude("logs/*")
+			.with_include("logs/keep.txt");
+		filter.passes_include("logs/keep.txt").xpect_true();
+		filter.passes_exclude("logs/keep.txt").xpect_false();
+		filter.passes_include("src/lib.rs").xpect_false();
+		filter.passes_exclude("src/lib.rs").xpect_true();
+	}
+
+	/// The rules in order, which is what a translated dialect and a log line
+	/// both read.
+	#[crate::test]
+	fn displays_rules_in_order() {
+		GlobFilter::default().to_string().xpect_eq("");
+		GlobFilter::default()
+			.with_exclude("logs/*")
+			.with_include("logs/keep.txt")
+			.to_string()
+			.xpect_eq("exclude logs/*, include logs/keep.txt");
+	}
+
 	#[crate::test]
 	#[cfg(feature = "json")]
 	fn serde_roundtrip() {
@@ -533,10 +639,10 @@ mod test {
 		let deserialized: GlobFilter = serde_json::from_str(&json).unwrap();
 
 		filter.xpect_eq(deserialized);
-		filter.include.len().xpect_eq(1);
-		filter.exclude.len().xpect_eq(1);
-		filter.include[0].as_str().xpect_eq("**/*.rs");
-		filter.exclude[0].as_str().xpect_eq("*target*");
+		filter.rules().to_vec().xpect_eq(vec![
+			GlobRule::Include(GlobPattern::new("**/*.rs")),
+			GlobRule::Exclude(GlobPattern::new("*target*")),
+		]);
 	}
 
 	#[crate::test]

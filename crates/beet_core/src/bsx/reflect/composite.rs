@@ -90,6 +90,9 @@ pub(super) fn struct_to_reflect(
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
 ) -> Result<Box<dyn PartialReflect>> {
+	if let Some(reflected) = parsed_fields(fields, field_info)? {
+		return Ok(reflected);
+	}
 	let struct_info = match field_info {
 		Some(TypeInfo::Struct(info)) => Some(info),
 		_ => None,
@@ -108,6 +111,36 @@ pub(super) fn struct_to_reflect(
 		field_info,
 		registry,
 	))
+}
+
+/// A struct literal offered to its target's own authored spelling, before the
+/// structural walk.
+///
+/// A literal whose every value maps cleanly to a [`Value`] is a [`Value::Map`],
+/// so a type whose fields are private still authors as the shape it reads like:
+/// `{exclude:["blog/**"]}` is one `GlobFilter`, whose ordered rules
+/// field-by-field construction cannot reach. A parser that declines the map (or
+/// a target with no entry) yields [`None`] and the structural walk takes over,
+/// which is what keeps `{GlobFilter{rules:[..]}}` building the ordinary way.
+fn parsed_fields(
+	fields: &[(SmolStr, DataLiteral)],
+	field_info: Option<&'static TypeInfo>,
+) -> Result<Option<Box<dyn PartialReflect>>> {
+	let Some(info) = field_info else {
+		return Ok(None);
+	};
+	let Some(entries) = fields
+		.iter()
+		.map(|(key, literal)| literal.value().map(|value| (key.clone(), value)))
+		.collect::<Option<Vec<_>>>()
+	else {
+		return Ok(None);
+	};
+	let mut map = Map::default();
+	for (key, value) in entries {
+		map.insert(key, value);
+	}
+	LiteralParser::parse_type(info.type_id(), &Value::Map(map))
 }
 
 /// The type info of `name` on a struct target, `None` for an unknown target
@@ -270,6 +303,11 @@ pub(super) fn named_struct_to_reflect(
 	registry: &TypeRegistry,
 	resolver: EntityResolver,
 ) -> Result<Box<dyn PartialReflect>> {
+	if let NamedFields::Struct(fields) = &named.fields
+		&& let Some(reflected) = parsed_fields(fields, field_info)?
+	{
+		return Ok(reflected);
+	}
 	let struct_info = match field_info {
 		Some(TypeInfo::Struct(info)) => Some(info),
 		_ => None,
