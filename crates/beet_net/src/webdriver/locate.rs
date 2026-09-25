@@ -71,8 +71,10 @@ pub(crate) async fn locate_nodes(
 /// answers that with an error rather than an empty match. Any other error (a
 /// bad selector) fails at once.
 ///
-/// Open-coded rather than through `poll_ext`: the async-closure's
-/// higher-ranked environment lifetime breaks `Send` inference for callers
+/// Open-coded rather than through `poll_ext`: an expired deadline has to
+/// answer with an error naming the locator, which the generic timeout of
+/// [`poll_ext::poll_async_with`] cannot, and the async-closure's
+/// higher-ranked environment lifetime has broken `Send` inference for callers
 /// whose action futures must be `Send` (rustc's "implementation of `Send` is
 /// not general enough").
 pub(crate) async fn find_polling(

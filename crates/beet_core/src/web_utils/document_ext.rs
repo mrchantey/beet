@@ -126,7 +126,7 @@ where
 	T: JsCast,
 {
 	use crate::prelude::*;
-	poll_ext::poll(|| {
+	poll_ext::poll_result(|| {
 		query_selector::<T>(selector)
 			.ok_or_else(|| bevyhow!("no element matching {selector:?}"))
 	})

@@ -732,6 +732,11 @@ impl CloudflareBench {
 
 /// Poll `url` until it serves a 200, returning how long after `since` that took.
 /// Bounded so an unreachable Worker fails the bench instead of hanging.
+///
+/// Open-coded rather than through `poll_ext`: [`CloudflareBench`] awaits this
+/// from an `#[action]`, whose future must be `Send`, and an `async ||` probe
+/// borrowing `url` makes that obligation higher-ranked (rustc's
+/// "higher-ranked lifetime error").
 async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
 	for _ in 0..100 {
 		if let Ok(res) = Request::get(url).send().await

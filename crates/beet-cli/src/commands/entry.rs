@@ -256,11 +256,10 @@ mod test {
 /// server on an ephemeral port and then drive it (`export-pdf`, the
 /// browser-hosted `run-wasm`).
 pub(crate) async fn wait_for_port() -> Result<u16> {
-	for _ in 0..200 {
-		if let Ok(port) = CanonicalPort::get() {
-			return Ok(port);
-		}
-		time_ext::sleep_millis(25).await;
-	}
-	bevybail!("http server did not bind within 5s")
+	poll_ext::poll_result_with(
+		CanonicalPort::get,
+		Duration::from_secs(5),
+		Duration::from_millis(25),
+	)
+	.await
 }

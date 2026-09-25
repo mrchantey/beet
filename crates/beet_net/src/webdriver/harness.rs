@@ -146,7 +146,7 @@ impl PageHarness {
 	async fn await_listening(
 		listening: &Store<Option<SocketAddr>>,
 	) -> Result<Listening> {
-		poll_ext::poll_async_with(
+		poll_ext::poll_result_async_with(
 			async || {
 				listening
 					.get()

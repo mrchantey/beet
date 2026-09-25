@@ -194,8 +194,9 @@ impl Page {
 	/// the caller's race; [`Self::wait_for_url`] is the one that waits for a
 	/// particular one.
 	///
-	/// Open-coded rather than through `poll_ext` for the same `Send`-inference
-	/// reason as `find_polling`.
+	/// Open-coded rather than through `poll_ext` for the same reasons as
+	/// `find_polling`: the expired deadline answers with the last read error
+	/// rather than a generic timeout.
 	pub async fn current_url(&self) -> Result<String> {
 		let start = Instant::now();
 		loop {

@@ -39,7 +39,7 @@ mod line_col;
 mod once_value;
 #[cfg(any(feature = "std", feature = "testing_embedded"))]
 mod panic_context;
-/// Poll a fallible function until it succeeds or a deadline expires.
+/// Poll a function until it finishes or a deadline expires.
 #[cfg(feature = "std")]
 pub mod poll_ext;
 /// Process and command execution utilities.

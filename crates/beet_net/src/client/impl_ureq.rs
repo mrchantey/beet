@@ -11,56 +11,14 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	let max_redirects = req.redirects.max();
 	let (parts, body) = req.into_parts();
 
-	// Build the agent with proper TLS configuration
-	// Set http_status_as_error to false so 4xx/5xx responses are not treated as errors.
-	// We want to capture the actual response (headers, body, etc) regardless of status code.
-	// Only IO/connection errors should fail the request.
-
-	#[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-	let agent = ureq::config::Config::builder()
-		.tls_config(
-			ureq::tls::TlsConfig::builder()
-				.provider(ureq::tls::TlsProvider::NativeTls)
-				.build(),
-		)
-		.http_status_as_error(false)
-		// `0` answers the `3xx` to the caller rather than erroring:
-		// `max_redirects_do_error` is `max_redirects > 0 && ..`
-		.max_redirects(max_redirects)
-		.build()
-		.new_agent();
-	#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
-	let agent = ureq::config::Config::builder()
-		.tls_config(
-			ureq::tls::TlsConfig::builder()
-				.provider(ureq::tls::TlsProvider::Rustls)
-				.build(),
-		)
-		.http_status_as_error(false)
-		// `0` answers the `3xx` to the caller rather than erroring:
-		// `max_redirects_do_error` is `max_redirects > 0 && ..`
-		.max_redirects(max_redirects)
-		.build()
-		.new_agent();
-	#[cfg(all(feature = "rustls-tls", feature = "native-tls"))]
-	let agent = ureq::config::Config::builder()
-		.tls_config(
-			ureq::tls::TlsConfig::builder()
-				.provider(ureq::tls::TlsProvider::NativeTls)
-				.build(),
-		)
-		.http_status_as_error(false)
-		// `0` answers the `3xx` to the caller rather than erroring:
-		// `max_redirects_do_error` is `max_redirects > 0 && ..`
-		.max_redirects(max_redirects)
-		.build()
-		.new_agent();
-	#[cfg(not(any(feature = "rustls-tls", feature = "native-tls")))]
+	// 4xx/5xx are answers, not io failures: the caller wants the response
+	// whatever its status, so only a connection error fails the request.
 	let agent = ureq::config::Config::builder()
 		.http_status_as_error(false)
 		// `0` answers the `3xx` to the caller rather than erroring:
 		// `max_redirects_do_error` is `max_redirects > 0 && ..`
 		.max_redirects(max_redirects)
+		.xmap(with_tls)
 		.build()
 		.new_agent();
 
@@ -85,6 +43,35 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 			.and_then(into_response)
 	})
 	.await
+}
+
+/// The `ureq` agent-config builder, named so the tls branches below can hand
+/// one through without restating the typestate.
+type AgentConfig = ureq::config::ConfigBuilder<ureq::typestate::AgentScope>;
+
+// The tls provider is the only part of the agent config the feature set
+// changes: `native-tls` wins where both are on, and a build with neither
+// never names `ureq::tls`, which is itself gated behind them.
+cfg_if! {
+	if #[cfg(feature = "native-tls")] {
+		fn with_tls(config: AgentConfig) -> AgentConfig {
+			config.tls_config(
+				ureq::tls::TlsConfig::builder()
+					.provider(ureq::tls::TlsProvider::NativeTls)
+					.build(),
+			)
+		}
+	} else if #[cfg(feature = "rustls-tls")] {
+		fn with_tls(config: AgentConfig) -> AgentConfig {
+			config.tls_config(
+				ureq::tls::TlsConfig::builder()
+					.provider(ureq::tls::TlsProvider::Rustls)
+					.build(),
+			)
+		}
+	} else {
+		fn with_tls(config: AgentConfig) -> AgentConfig { config }
+	}
 }
 
 fn into_response(res: http::Response<ureq::Body>) -> Result<Response> {

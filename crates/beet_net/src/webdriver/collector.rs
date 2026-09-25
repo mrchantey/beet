@@ -263,7 +263,7 @@ mod test {
 		page.find("#log").await.click().await.unwrap();
 
 		let mut entries = Vec::new();
-		poll_ext::poll_async(async || {
+		poll_ext::poll_result_async(async || {
 			entries.extend(console.drain());
 			(entries.len() >= 2)
 				.then_some(())

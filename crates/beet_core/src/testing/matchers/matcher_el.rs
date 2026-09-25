@@ -31,7 +31,7 @@ where
 				.trim()
 				.to_string()
 		};
-		poll_ext::poll(|| {
+		poll_ext::poll_result(|| {
 			(text() == expected)
 				.then_some(())
 				.ok_or_else(|| bevyhow!("mismatch"))
@@ -52,7 +52,7 @@ where
 				.trim()
 				.to_string()
 		};
-		poll_ext::poll(|| {
+		poll_ext::poll_result(|| {
 			text()
 				.contains(expected)
 				.then_some(())
@@ -71,7 +71,7 @@ where
 	/// Assert the `innerHTML` equals `expected`, polling.
 	async fn xpect_html(&self, expected: &str) -> &Self {
 		let html = || self.as_ref().inner_html();
-		poll_ext::poll(|| {
+		poll_ext::poll_result(|| {
 			(html() == expected)
 				.then_some(())
 				.ok_or_else(|| bevyhow!("mismatch"))
@@ -90,7 +90,7 @@ where
 				.get_attribute(name)
 				.unwrap_or_else(|| "None".to_string())
 		};
-		poll_ext::poll(|| {
+		poll_ext::poll_result(|| {
 			(attr() == expected)
 				.then_some(())
 				.ok_or_else(|| bevyhow!("mismatch"))

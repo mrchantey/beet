@@ -189,32 +189,60 @@ impl Page {
 	/// Find the first css match and click it, re-querying on staleness: a
 	/// re-render between locate and click invalidates the node reference
 	/// ("no such element"), so each retry starts from a fresh find. Bounded
-	/// by [`Page::timeout`]. Open-coded loops for the same `Send`-inference
-	/// reason as `find_polling`.
+	/// by [`Page::timeout`].
 	pub async fn click(&self, selector: &str) -> Result<()> {
-		let start = Instant::now();
-		loop {
-			let expired = start.elapsed() >= self.timeout();
-			match self.try_find(selector).await?.click().await {
-				Ok(()) => return Ok(()),
-				Err(err) if expired => return Err(err),
-				Err(_) => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
-			}
-		}
+		self.click_located(&locate::Locator::Css(selector)).await
 	}
 
 	/// [`Self::click`] by exact rendered text instead of a css selector.
 	pub async fn click_text(&self, text: &str) -> Result<()> {
+		self.click_located(&locate::Locator::InnerText(text)).await
+	}
+
+	/// The locate-then-click retry both click methods share: every attempt
+	/// re-finds the node, so a re-render between locate and click just locates
+	/// again. Bounded by [`Page::timeout`].
+	///
+	/// Open-coded rather than through `poll_ext` for the same `Send`-inference
+	/// reason as `find_polling`, and this one is load-bearing downstream:
+	/// routing it through [`poll_ext::poll_result_async_with`] was tried and
+	/// reverted, because the `async ||` probe's higher-ranked environment
+	/// lifetime stops the future being provably `Send`, which a caller boxing
+	/// a click chain as `dyn Future + Send` depends on.
+	async fn click_located(&self, locator: &locate::Locator<'_>) -> Result<()> {
 		let start = Instant::now();
 		loop {
 			let expired = start.elapsed() >= self.timeout();
-			match self.try_find_text(text).await?.click().await {
+			let located = locate::find_polling(
+				&self.session,
+				&self.context_id,
+				locator,
+				None,
+				self.timeout(),
+			)
+			.await?;
+			match located.click().await {
 				Ok(()) => return Ok(()),
 				Err(err) if expired => return Err(err),
 				Err(_) => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
 			}
 		}
 	}
+}
+
+/// A click chain must stay boxable as a `Send` future: a caller driving a
+/// login flow boxes one as `Box<dyn Future + Send>`, and an `async ||` probe
+/// anywhere under [`Page::click`] makes that future no longer provably `Send`,
+/// failing at the coercion here rather than inside the probe. Never called;
+/// it exists so the coercion is type-checked on every build.
+#[allow(dead_code)]
+fn click_future_stays_send<'a>(
+	page: &'a Page,
+	selector: &'a str,
+) -> core::pin::Pin<
+	Box<dyn core::future::Future<Output = Result<()>> + Send + 'a>,
+> {
+	Box::pin(async move { page.click(selector).await })
 }
 
 #[cfg(test)]

@@ -298,26 +298,32 @@ mod tests {
 	/// The server runs in its own thread, so its progress is only observable
 	/// through the shared stores.
 	async fn poll_until(mut check: impl FnMut() -> bool, message: &str) {
-		for _ in 0..200 {
-			if check() {
-				return;
-			}
-			time_ext::sleep_millis(10).await;
-		}
-		panic!("{message}");
+		poll_ext::poll_with(
+			|| {
+				match check() {
+					true => ControlFlow::Break(()),
+					false => ControlFlow::Continue(()),
+				}
+				.xok()
+			},
+			Duration::from_secs(2),
+			Duration::from_millis(10),
+		)
+		.await
+		.unwrap_or_else(|_| panic!("{message}"));
 	}
 
 	/// Connect anonymously and drop the session straight away, so the client is
 	/// gone by the time this returns. Retries while the server thread boots, which
 	/// a fixed sleep cannot promise on a loaded machine.
 	async fn connect_then_disconnect(addr: &str) {
-		for _ in 0..100 {
-			if SshSession::connect_raw(addr, None, None).await.is_ok() {
-				return;
-			}
-			time_ext::sleep_millis(20).await;
-		}
-		panic!("client never connected to the test server");
+		poll_ext::poll_result_async_with(
+			async || SshSession::connect_raw(addr, None, None).await.map(drop),
+			Duration::from_secs(2),
+			Duration::from_millis(20),
+		)
+		.await
+		.expect("client never connected to the test server");
 	}
 
 	/// A client that opens a channel and then asks for nothing, the port-scanner

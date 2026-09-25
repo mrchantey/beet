@@ -1514,13 +1514,17 @@ mod test {
 		/// Wait for the stress server to answer on `addr`, which a fixed sleep
 		/// cannot promise on a loaded machine.
 		async fn await_stress_server(addr: &str) {
-			for _ in 0..200 {
-				if SshSession::connect_raw(addr, None, None).await.is_ok() {
-					return;
-				}
-				time_ext::sleep_millis(50).await;
-			}
-			panic!("stress server never answered on {addr}");
+			poll_ext::poll_result_async_with(
+				async || {
+					SshSession::connect_raw(addr, None, None).await.map(drop)
+				},
+				Duration::from_secs(10),
+				Duration::from_millis(50),
+			)
+			.await
+			.unwrap_or_else(|err| {
+				panic!("stress server never answered on {addr}: {err}")
+			});
 		}
 
 		/// The multi-tenancy stress harness: [`STRESS_SESSIONS`] real ssh sessions

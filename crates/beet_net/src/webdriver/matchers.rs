@@ -44,7 +44,7 @@ async fn assert_eventually<T: Display>(
 	negated: bool,
 ) {
 	let mut last = None;
-	let result = poll_ext::poll_async_with(
+	let result = poll_ext::poll_result_async_with(
 		async || {
 			let value = received().await?;
 			let matched = predicate(&value);

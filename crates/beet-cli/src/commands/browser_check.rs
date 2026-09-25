@@ -66,7 +66,7 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 		app.run();
 	});
 	// the pre-bound listener accepts once its app thread is up
-	poll_ext::poll_async_with(
+	poll_ext::poll_result_async_with(
 		async || {
 			std::net::TcpStream::connect(("127.0.0.1", port))
 				.map(|_| ())
