@@ -346,7 +346,7 @@ impl Project {
 	/// cannot both be `main` and a swap crosses the plaintext bridge instead:
 	/// one rewrite reading under the retiring value and writing plaintext
 	/// ([`StateBridge::Decrypt`]), one reading plaintext and writing under
-	/// the current ([`StateBridge::Encrypt`], the `state_migrate` shape). A
+	/// the current ([`StateBridge::Encrypt`]). A
 	/// state that was never encrypted takes the second alone, and one
 	/// already under the current value is left as it is, so the verb re-runs
 	/// safely and the same command encrypts a plaintext stack.

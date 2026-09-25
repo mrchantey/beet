@@ -46,9 +46,8 @@ pub enum StateBridge {
 	/// No bridge: the state is read and written encrypted.
 	#[default]
 	None,
-	/// Read a plaintext state too, write it encrypted: the apply that turns
-	/// encryption on (`<Stack state_migrate=true>`) and the second rewrite of a
-	/// passphrase rotation.
+	/// Read a plaintext state too, write it encrypted: the crossing that
+	/// turns encryption on, and the second rewrite of a passphrase rotation.
 	Encrypt,
 	/// Read an encrypted state too, write it plaintext: the first rewrite of
 	/// a passphrase rotation, under the passphrase being retired. OpenTofu

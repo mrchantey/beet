@@ -40,11 +40,6 @@ pub struct Stack {
 	/// stack opts out with `state_passphrase={None}`.
 	#[set_with(into)]
 	state_passphrase: Option<SmolStr>,
-	/// The one-deploy migration switch: the apply that turns encryption on
-	/// reads the existing plaintext state through the `unencrypted` fallback
-	/// and writes it back encrypted; off again for the apply after, which
-	/// then plans no change.
-	state_migrate: bool,
 	/// Additional parameters, some of which may be required by a config
 	/// generator.
 	#[reflect(ignore)]
@@ -57,7 +52,6 @@ impl Default for Stack {
 			app_name: None,
 			stage: None,
 			state_passphrase: Some(Self::DEFAULT_STATE_PASSPHRASE.into()),
-			state_migrate: false,
 			params: MultiMap::default(),
 		}
 	}
@@ -100,14 +94,7 @@ impl Stack {
 			state_encryption: self
 				.state_passphrase
 				.clone()
-				.map(|env_var| {
-					StateEncryption::passphrase(env_var).with_bridge(match self
-						.state_migrate
-					{
-						true => StateBridge::Encrypt,
-						false => StateBridge::None,
-					})
-				})
+				.map(StateEncryption::passphrase)
 				.unwrap_or_default(),
 			params: self.params.clone(),
 		}
@@ -518,22 +505,13 @@ mod tests {
 	}
 
 	/// The state is encrypted by default, under the repo's one passphrase
-	/// variable, its migration switch carried along; a declared variable
-	/// replaces it and an explicit `None` opts out.
+	/// variable; a declared variable replaces it and an explicit `None` opts
+	/// out.
 	#[beet_core::test]
 	fn the_state_is_encrypted_by_default() {
 		resolved(Stack::default())
 			.state_encryption()
 			.xpect_eq(StateEncryption::passphrase("TF_STATE_PASSPHRASE"));
-		resolved(Stack {
-			state_migrate: true,
-			..default()
-		})
-		.state_encryption()
-		.xpect_eq(
-			StateEncryption::passphrase("TF_STATE_PASSPHRASE")
-				.with_bridge(StateBridge::Encrypt),
-		);
 		resolved(Stack::default().with_state_passphrase(SmolStr::new("OTHER")))
 			.state_encryption()
 			.xpect_eq(StateEncryption::passphrase("OTHER"));
