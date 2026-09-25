@@ -16,6 +16,10 @@ struct SetParams {
 	/// name: the way out of a developer's `.env`, whose values the dotenv
 	/// load already set.
 	from_env: bool,
+	/// Take the value of another record of the document, never printed: how
+	/// a passphrase about to be rotated is kept beside its replacement
+	/// (`secrets/set TF_STATE_PASSPHRASE_OLD --copy=TF_STATE_PASSPHRASE`).
+	copy: Option<String>,
 	/// Mint the value in-process: an unambiguous alphanumeric string from
 	/// the platform entropy source, the alphabet every generated credential
 	/// uses, never printed. How a passphrase is born.
@@ -40,8 +44,9 @@ struct SetParams {
 }
 
 /// Write one record to a document (created when it does not exist yet):
-/// the value from `--value`, `--from-env`, `--generate` (`--length` for
-/// other than 32 characters) or stdin, into `--group` (default `default`),
+/// the value from `--value`, `--from-env`, `--copy` (another record's),
+/// `--generate` (`--length` for other than 32 characters) or stdin, into
+/// `--group` (default `default`),
 /// with `--role`, `--note` and `--rotation`, re-sealing the group to its
 /// current recipient list. A record already in another group moves.
 ///
@@ -62,7 +67,10 @@ struct SetParams {
 pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 	let name = name_param(&cx.input)?;
 	let params = cx.input.parse_params::<SetParams>()?;
-	let value = SecretsSet::value(&name, &params)?;
+	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let mut document = handle.read_or_new().await?;
+	let identity = AgeIdentityFile::require()?;
+	let value = SecretsSet::value(&name, &params, &document, &identity)?;
 	let record = SecretRecord {
 		role: params.role.as_deref().map(str::parse).transpose()?,
 		note: params.note.map(SmolStr::new),
@@ -73,9 +81,7 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 		.group
 		.as_deref()
 		.unwrap_or(SecretsDocument::DEFAULT_GROUP);
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
-	let mut document = handle.read_or_new().await?;
-	document.set(&AgeIdentityFile::require()?, group, &name, &value, record)?;
+	document.set(&identity, group, &name, &value, record)?;
 	handle.write(&document).await?;
 	Response::ok_text(format!(
 		"set `{name}` in group `{group}` of {} ({} recipient(s))\n",
@@ -86,22 +92,43 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 }
 
 impl SecretsSet {
-	/// The value the flags name: exactly one of `--value`, `--from-env` and
-	/// `--generate`, else stdin.
-	fn value(name: &str, params: &SetParams) -> Result<String> {
-		let sources =
-			[params.value.is_some(), params.from_env, params.generate]
-				.into_iter()
-				.filter(|given| *given)
-				.count();
+	/// The value the flags name: exactly one of `--value`, `--from-env`,
+	/// `--copy` and `--generate`, else stdin.
+	fn value(
+		name: &str,
+		params: &SetParams,
+		document: &SecretsDocument,
+		identity: &AgeIdentityFile,
+	) -> Result<String> {
+		let sources = [
+			params.value.is_some(),
+			params.from_env,
+			params.copy.is_some(),
+			params.generate,
+		]
+		.into_iter()
+		.filter(|given| *given)
+		.count();
 		if sources > 1 {
 			bevybail!(
-				"pass one of `--value`, `--from-env` and `--generate`, not \
-				several"
+				"pass one of `--value`, `--from-env`, `--copy` and \
+				`--generate`, not several"
 			);
 		}
 		if let Some(value) = &params.value {
 			return value.clone().xok();
+		}
+		if let Some(source) = &params.copy {
+			return document
+				.open(identity)?
+				.get(source)
+				.map(|secret| secret.value.to_string())
+				.ok_or_else(|| {
+					bevyhow!(
+						"`--copy`: no record `{source}` this identity can open \
+						in the document"
+					)
+				});
 		}
 		if params.from_env {
 			return env_ext::var(name).map(|value| value.to_string()).map_err(
@@ -242,6 +269,48 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("replace:<resource>");
+	}
+
+	/// `--copy` takes another record's value without printing it, and names
+	/// a source it cannot read.
+	#[beet_core::test]
+	async fn copies_another_record() {
+		let mut fixture = VerbWorld::new();
+		fixture
+			.set("TF_STATE_PASSPHRASE", "current", default())
+			.await;
+		fixture
+			.call_str(
+				SecretsSet,
+				Request::from_cli_str(
+					"--copy=TF_STATE_PASSPHRASE --role=env_var",
+				)
+				.with_param("name", "TF_STATE_PASSPHRASE_OLD"),
+			)
+			.await
+			.unwrap()
+			.xpect_contains("set `TF_STATE_PASSPHRASE_OLD`")
+			.xnot()
+			.xpect_contains("current");
+		fixture
+			.document()
+			.await
+			.open(&fixture.identities())
+			.unwrap()
+			.get("TF_STATE_PASSPHRASE_OLD")
+			.unwrap()
+			.value
+			.as_str()
+			.xpect_eq("current");
+		fixture
+			.call(
+				SecretsSet,
+				Request::from_cli_str("--copy=NOPE").with_param("name", "X"),
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no record `NOPE`");
 	}
 
 	/// `--generate` mints a value of the shared alphabet and never prints

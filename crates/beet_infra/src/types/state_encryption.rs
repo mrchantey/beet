@@ -31,13 +31,30 @@ pub enum StateEncryption {
 	Passphrase {
 		/// Environment variable holding the passphrase, eg `TF_STATE_PASSPHRASE`.
 		env_var: SmolStr,
-		/// The one-deploy migration switch: read an existing PLAINTEXT state
-		/// through OpenTofu's `unencrypted` fallback method and write it back
-		/// encrypted. On for the apply that turns encryption on, off for every
-		/// apply after, since a fallback left in place would also read a state
-		/// somebody replaced with a plaintext one.
-		migrate: bool,
+		/// The plaintext bridge this render crosses, [`StateBridge::None`] in
+		/// the steady state.
+		bridge: StateBridge,
 	},
+}
+
+/// How one state write crosses between plaintext and encrypted: OpenTofu's
+/// `unencrypted` method beside `aes_gcm`, one as the `method` a write uses
+/// and the other as the `fallback` a read may take. Never left in place:
+/// a fallback that stays would also read a state somebody replaced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StateBridge {
+	/// No bridge: the state is read and written encrypted.
+	#[default]
+	None,
+	/// Read a plaintext state too, write it encrypted: the apply that turns
+	/// encryption on (`<Stack state_migrate=true>`) and the second rewrite of a
+	/// passphrase rotation.
+	Encrypt,
+	/// Read an encrypted state too, write it plaintext: the first rewrite of
+	/// a passphrase rotation, under the passphrase being retired. OpenTofu
+	/// keys pbkdf2's salt by key-provider name, so two passphrases cannot
+	/// both be `main` and a swap crosses plaintext instead.
+	Decrypt,
 }
 
 impl StateEncryption {
@@ -45,17 +62,28 @@ impl StateEncryption {
 	pub fn passphrase(env_var: impl Into<SmolStr>) -> Self {
 		Self::Passphrase {
 			env_var: env_var.into(),
-			migrate: false,
+			bridge: StateBridge::None,
 		}
 	}
 
-	/// The encryption with its migration switch set, see
-	/// [`Passphrase::migrate`](Self::Passphrase).
-	pub fn with_migrate(self, migrate: bool) -> Self {
+	/// The encryption crossing `bridge`, see [`StateBridge`].
+	pub fn with_bridge(self, bridge: StateBridge) -> Self {
 		match self {
 			Self::Passphrase { env_var, .. } => {
-				Self::Passphrase { env_var, migrate }
+				Self::Passphrase { env_var, bridge }
 			}
+			Self::None => Self::None,
+		}
+	}
+
+	/// The encryption reading its passphrase from `env_var` instead: how a
+	/// rotation names the retiring value.
+	pub fn with_env_var(self, env_var: impl Into<SmolStr>) -> Self {
+		match self {
+			Self::Passphrase { bridge, .. } => Self::Passphrase {
+				env_var: env_var.into(),
+				bridge,
+			},
 			Self::None => Self::None,
 		}
 	}
@@ -71,24 +99,28 @@ impl StateEncryption {
 	pub fn to_json(&self) -> Option<Value> {
 		match self {
 			Self::None => None,
-			Self::Passphrase { migrate, .. } => {
+			Self::Passphrase { bridge, .. } => {
 				let mut methods = value!({
 					"aes_gcm": {
 						"main": { "keys": "${key_provider.pbkdf2.main}" }
 					}
 				});
-				let mut state = value!({ "method": "method.aes_gcm.main" });
-				if *migrate {
+				let state = match bridge {
+					StateBridge::None => {
+						value!({ "method": "method.aes_gcm.main" })
+					}
+					StateBridge::Encrypt => value!({
+						"method": "method.aes_gcm.main",
+						"fallback": { "method": "method.unencrypted.migrate" }
+					}),
+					StateBridge::Decrypt => value!({
+						"method": "method.unencrypted.migrate",
+						"fallback": { "method": "method.aes_gcm.main" }
+					}),
+				};
+				if *bridge != StateBridge::None {
 					methods
 						.insert("unencrypted", value!({ "migrate": {} }))
-						.ok();
-					state
-						.insert(
-							"fallback",
-							value!({
-								"method": "method.unencrypted.migrate"
-							}),
-						)
 						.ok();
 				}
 				Some(value!({
@@ -181,12 +213,12 @@ mod tests {
 		json["method"].get("unencrypted").xpect_none();
 	}
 
-	/// The migration switch reads a plaintext state through the
+	/// The encrypting bridge reads a plaintext state through the
 	/// `unencrypted` fallback and nothing else changes.
 	#[beet_core::test]
-	fn migration_adds_the_unencrypted_fallback() {
+	fn encrypt_bridge_adds_the_unencrypted_fallback() {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
-			.with_migrate(true)
+			.with_bridge(StateBridge::Encrypt)
 			.to_json()
 			.unwrap()
 			.into_json();
@@ -204,6 +236,36 @@ mod tests {
 			.unwrap()
 			.xpect_eq("method.aes_gcm.main");
 		json["plan"].get("fallback").xpect_none();
+	}
+
+	/// The decrypting bridge is the same pair with the roles swapped: the
+	/// write is plaintext, the encrypted read is the fallback, and the plan
+	/// stays encrypted.
+	#[beet_core::test]
+	fn decrypt_bridge_swaps_the_roles() {
+		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
+			.with_env_var("TF_STATE_PASSPHRASE_OLD")
+			.with_bridge(StateBridge::Decrypt)
+			.to_json()
+			.unwrap()
+			.into_json();
+		json["state"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.unencrypted.migrate");
+		json["state"]["fallback"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		json["plan"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		// the variable name is fixed; only the environment behind it moves
+		json["key_provider"]["pbkdf2"]["main"]["passphrase"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("${var.tf_state_passphrase}");
 	}
 
 	/// Native-only: wasm has no process environment to write to, so

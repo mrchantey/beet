@@ -98,6 +98,11 @@ beet-validate *args:
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
+# Re-encrypt the stage stack's state under the current `TF_STATE_PASSPHRASE`
+# (the record's rotation note has the surrounding steps); the shared and social
+# stacks take the same verb as args: `just site-shared rotate-state`.
+beet-rotate-state *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site rotate-state {{ args }}
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
 # entry, since these assets belong to the repo rather than to the website.

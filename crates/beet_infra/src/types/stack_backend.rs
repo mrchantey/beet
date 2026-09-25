@@ -97,6 +97,10 @@ impl Default for LocalBackend {
 	}
 }
 impl LocalBackend {
+	/// A state directory of the caller's choosing: a test's own, so its
+	/// state never meets another's under the shared default.
+	pub fn new(path: impl Into<AbsPath>) -> Self { Self { path: path.into() } }
+
 	fn to_json(&self, key: &str) -> Value {
 		// Use the absolute path string directly. AbsPath's Serialize impl
 		// converts to a workspace-relative path, but terraform's local backend

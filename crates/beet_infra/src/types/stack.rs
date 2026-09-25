@@ -101,8 +101,12 @@ impl Stack {
 				.state_passphrase
 				.clone()
 				.map(|env_var| {
-					StateEncryption::passphrase(env_var)
-						.with_migrate(self.state_migrate)
+					StateEncryption::passphrase(env_var).with_bridge(match self
+						.state_migrate
+					{
+						true => StateBridge::Encrypt,
+						false => StateBridge::None,
+					})
 				})
 				.unwrap_or_default(),
 			params: self.params.clone(),
@@ -528,7 +532,7 @@ mod tests {
 		.state_encryption()
 		.xpect_eq(
 			StateEncryption::passphrase("TF_STATE_PASSPHRASE")
-				.with_migrate(true),
+				.with_bridge(StateBridge::Encrypt),
 		);
 		resolved(Stack::default().with_state_passphrase(SmolStr::new("OTHER")))
 			.state_encryption()

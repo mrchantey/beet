@@ -216,6 +216,45 @@ pub async fn list(
 	.await
 }
 
+/// The state as JSON, the input to a rewrite. `vars` carries anything
+/// required to read it, eg a [`StateEncryption`] passphrase.
+pub async fn state_pull(
+	dir: &AbsPath,
+	vars: &[(SmolStr, SmolStr)],
+) -> Result<String> {
+	with_vars(
+		tofu_process()
+			.with_cwd(dir.clone())
+			.with_args(["state", "pull"]),
+		vars,
+	)
+	.run_async_stdout()
+	.await
+}
+
+/// Write `file` as the state, replacing what the backend holds. Tofu reads
+/// the old state first and refuses a lineage change or a serial behind it,
+/// and skips the write when nothing changed, so a caller rewriting the state
+/// it pulled bumps the serial. `vars` carries anything required to read the
+/// old and write the new, eg a [`StateEncryption`] passphrase; across a
+/// [`StateBridge`] the two differ by method, never by variable.
+pub async fn state_push(
+	dir: &AbsPath,
+	vars: &[(SmolStr, SmolStr)],
+	file: &AbsPath,
+) -> Result<String> {
+	with_vars(
+		tofu_process().with_cwd(dir.clone()).with_args([
+			"state",
+			"push",
+			file.as_str(),
+		]),
+		vars,
+	)
+	.run_async_stdout()
+	.await
+}
+
 /// Remove a resource from the state. `vars` carries anything required to
 /// read/write it, eg a [`StateEncryption`] passphrase.
 pub async fn remove(

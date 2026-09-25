@@ -65,6 +65,7 @@ pub fn DeployRoutes(
 		Apply,
 		Show,
 		List,
+		RotateState,
 		Rollback,
 		Rollforward
 	]
@@ -167,6 +168,31 @@ pub async fn List(cx: ActionContext) -> Result<String> {
 	terra::Project::resolve(&cx.caller).await?.list().await
 }
 
+/// Request params for [`RotateState`], surfaced in `--help`.
+#[derive(Reflect)]
+struct RotateStateParams {
+	/// The environment variable holding the passphrase the state is encrypted
+	/// under now; the stack's `state_passphrase` variable holds the one it
+	/// moves to. `<that variable>_OLD` unless given.
+	retiring: Option<String>,
+}
+
+/// Re-encrypt the stack's state under its current passphrase, see
+/// [`terra::Project::rotate_state`]: the stack half of rotating
+/// `TF_STATE_PASSPHRASE`, run once per stack after the document holds the
+/// new value and `<variable>_OLD` the old. Also the one command that
+/// encrypts a stack whose state is still plaintext.
+#[action(route = "rotate-state")]
+#[derive(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<RotateStateParams>())]
+pub async fn RotateState(cx: ActionContext<Request>) -> Result<String> {
+	let retiring = cx.input.parse_params::<RotateStateParams>()?.retiring;
+	terra::Project::resolve(&cx.caller)
+		.await?
+		.rotate_state(retiring.as_deref())
+		.await
+}
+
 /// Request params for [`Rollback`], surfaced in `--help`.
 #[derive(Reflect)]
 struct RollbackParams {
@@ -251,6 +277,7 @@ mod tests {
 		tree.find(&["apply"]).xpect_some();
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
+		tree.find(&["rotate-state"]).xpect_some();
 		// artifact routes
 		tree.find(&["rollback"]).xpect_some();
 		tree.find(&["rollforward"]).xpect_some();

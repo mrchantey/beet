@@ -335,6 +335,148 @@ impl Project {
 		self.init().await?;
 		tofu::destroy(&self.dir(), &self.destroy_vars().await).await
 	}
+
+	/// Re-encrypt this stack's state under the passphrase its declared
+	/// variable holds NOW, reading it under the one in `retiring`
+	/// (`<variable>_OLD` unless given): the stack half of a rotation, run once
+	/// per stack after `secrets/set <retiring> --copy=<variable>` kept the old
+	/// value and `secrets/set <variable> --generate` minted the new.
+	///
+	/// OpenTofu keys pbkdf2's salt by key-provider name, so two passphrases
+	/// cannot both be `main` and a swap crosses the plaintext bridge instead:
+	/// one rewrite reading under the retiring value and writing plaintext
+	/// ([`StateBridge::Decrypt`]), one reading plaintext and writing under
+	/// the current ([`StateBridge::Encrypt`], the `state_migrate` shape). A
+	/// state that was never encrypted takes the second alone, and one
+	/// already under the current value is left as it is, so the verb re-runs
+	/// safely and the same command encrypts a plaintext stack.
+	pub async fn rotate_state(&self, retiring: Option<&str>) -> Result<String> {
+		let name = format!("{}--{}", self.stack.app_name(), self.stack.stage());
+		let current = self.deployment.state_encryption().clone();
+		let StateEncryption::Passphrase { env_var, .. } = &current else {
+			bevybail!("`{name}` has state encryption off: nothing to rotate");
+		};
+		let retiring = retiring
+			.map(SmolStr::new)
+			.unwrap_or_else(|| format!("{env_var}_OLD").into());
+		let encrypt = self.with_state_encryption(
+			current.clone().with_bridge(StateBridge::Encrypt),
+		);
+		match self.state_is_encrypted().await? {
+			None => bevybail!("`{name}` has no state yet: nothing to rotate"),
+			Some(false) => {
+				let serial = encrypt.rewrite_state().await?;
+				self.init().await?;
+				format!(
+					"encrypted the plaintext state of `{name}` under \
+					`{env_var}` (serial {serial})"
+				)
+				.xok()
+			}
+			Some(true) => {
+				info!(
+					"probing whether `{name}` already reads under `{env_var}`"
+				);
+				if self.reads_state().await {
+					return format!(
+						"the state of `{name}` is already encrypted under \
+						`{env_var}`"
+					)
+					.xok();
+				}
+				if env_ext::var(retiring.as_str()).is_err() {
+					bevybail!(
+						"`{name}` is encrypted under a passphrase other than \
+						`{env_var}` and `{retiring}` is not set. Keep the \
+						retiring value beside the new one BEFORE minting it: \
+						`secrets/set {retiring} --copy={env_var} \
+						--role=env_var`, then `secrets/set {env_var} \
+						--generate ..`, and `secrets/rm {retiring}` once every \
+						stack has rotated"
+					);
+				}
+				self.with_state_encryption(
+					current
+						.clone()
+						.with_env_var(retiring.clone())
+						.with_bridge(StateBridge::Decrypt),
+				)
+				.rewrite_state()
+				.await?;
+				let serial = encrypt.rewrite_state().await?;
+				self.init().await?;
+				format!(
+					"rotated the state of `{name}` from `{retiring}` to \
+					`{env_var}` (serial {serial})"
+				)
+				.xok()
+			}
+		}
+	}
+
+	/// This project reading and writing its state under `encryption` instead:
+	/// the same stack, backend, work dir and rendered resources, which is how
+	/// a rotation pushes the state across a [`StateBridge`].
+	fn with_state_encryption(&self, encryption: StateEncryption) -> Self {
+		Self {
+			config: self.config.clone().with_state_encryption(&encryption),
+			deployment: self
+				.deployment
+				.clone()
+				.with_state_encryption(encryption),
+			..self.clone()
+		}
+	}
+
+	/// Whether the backend holds this stack's state encrypted, plaintext, or
+	/// (`None`) not at all, read off the object itself: an encrypted state
+	/// is an envelope carrying `encrypted_data`, a plaintext one the state.
+	async fn state_is_encrypted(&self) -> Result<Option<bool>> {
+		let blob = self.state_file()?;
+		if !blob.exists().await? {
+			return None.xok();
+		}
+		serde_json::from_slice::<serde_json::Value>(&blob.get().await?)?
+			.get("encrypted_data")
+			.is_some()
+			.xmap(Some)
+			.xok()
+	}
+
+	/// Whether the state reads under this project's own encryption: the init
+	/// reads it, and so does the pull when the init was skipped as current.
+	async fn reads_state(&self) -> bool {
+		let Ok(vars) = self.required_vars() else {
+			return false;
+		};
+		self.init().await.is_ok()
+			&& tofu::state_pull(&self.dir(), &vars).await.is_ok()
+	}
+
+	/// Pull the state under this project's encryption and push it straight
+	/// back with its serial bumped, so the backend rewrites it under the
+	/// PRIMARY method: one crossing of a [`StateBridge`]. The bump is what
+	/// makes tofu write at all, since an unchanged state is not persisted.
+	async fn rewrite_state(&self) -> Result<u64> {
+		self.init().await?;
+		let vars = self.required_vars()?;
+		let dir = self.dir();
+		let mut state = tofu::state_pull(&dir, &vars)
+			.await?
+			.xmap(|json| serde_json::from_str::<serde_json::Value>(&json))?;
+		let serial = state["serial"]
+			.as_u64()
+			.ok_or_else(|| bevyhow!("the pulled state carries no serial"))?
+			+ 1;
+		state["serial"] = serial.into();
+		// the state holds what an apply derives, so it never sits readable
+		let file = dir.join("rewrite.tfstate");
+		fs_ext::write_private(&file, serde_json::to_vec(&state)?)?;
+		let pushed = tofu::state_push(&dir, &vars, &file).await;
+		fs_ext::remove_async(&file).await.ok();
+		pushed?;
+		serial.xok()
+	}
 }
 
 #[cfg(all(test, feature = "vault"))]
@@ -404,5 +546,80 @@ mod test {
 			.await
 			.contains(&("other".into(), SmolStr::default()))
 			.xpect_true();
+	}
+}
+
+/// Native only: drives the real `tofu` against a local backend.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod rotation {
+	use super::*;
+
+	/// A rotation reads the state under the retiring passphrase and rewrites
+	/// it under the current one across the plaintext bridge; a plaintext
+	/// state is encrypted by the same call, a state already under the
+	/// current value is left alone, and a missing retiring variable names the
+	/// `--copy` step. Eight tofu invocations, so well past the default budget.
+	#[beet_core::test(timeout_ms = 120_000)]
+	async fn rotates_the_state_passphrase() {
+		const OLD: &str = "BEET_TEST_ROTATE_OLD";
+		const NEW: &str = "BEET_TEST_ROTATE_NEW";
+		// SAFETY: test-only names no other test reads; pbkdf2 wants 16+ chars
+		unsafe {
+			env_ext::set_var(OLD, "the-retiring-passphrase").ok();
+			env_ext::set_var(NEW, "the-current-passphrase").ok();
+		}
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		// a backend of this test's own: the shared default would carry this
+		// state, encrypted, into every other test's init
+		let deployment = deployment
+			.with_backend(LocalBackend::new(dir.path().join("state")));
+		let under = |encryption: StateEncryption| {
+			let deployment =
+				deployment.clone().with_state_encryption(encryption);
+			let config = deployment.create_config(&stack);
+			Project::new(stack.clone(), deployment, config)
+		};
+		// a state written before encryption, as a stack predating it holds
+		let plaintext = under(StateEncryption::None);
+		plaintext.init().await.unwrap();
+		let seed = plaintext.dir().join("seed.tfstate");
+		fs_ext::write_private(
+			&seed,
+			br#"{"version":4,"terraform_version":"1.6.0","serial":1,"lineage":"0b8ad4af-4aed-60c5-89f2-6c4ad06ccc07","outputs":{},"resources":[]}"#,
+		)
+		.unwrap();
+		tofu::state_push(&plaintext.dir(), &[], &seed)
+			.await
+			.unwrap();
+		plaintext
+			.state_is_encrypted()
+			.await
+			.unwrap()
+			.xpect_eq(Some(false));
+
+		let old = under(StateEncryption::passphrase(OLD));
+		old.rotate_state(None)
+			.await
+			.unwrap()
+			.xpect_contains("encrypted the plaintext state");
+		old.state_is_encrypted().await.unwrap().xpect_eq(Some(true));
+		old.reads_state().await.xpect_true();
+
+		let new = under(StateEncryption::passphrase(NEW));
+		new.rotate_state(Some(OLD))
+			.await
+			.unwrap()
+			.xpect_contains(format!("from `{OLD}` to `{NEW}`"));
+		new.reads_state().await.xpect_true();
+		old.reads_state().await.xpect_false();
+		new.rotate_state(Some(OLD))
+			.await
+			.unwrap()
+			.xpect_contains("already encrypted");
+		old.rotate_state(Some("BEET_TEST_ROTATE_MISSING"))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("--copy=BEET_TEST_ROTATE_OLD");
 	}
 }
