@@ -186,12 +186,81 @@ impl Page {
 			.ok_or_else(|| bevyhow!("missing document title"))
 	}
 
-	/// Get current page URL (string convenience wrapper).
+	/// The page's url, auto-waiting through a navigation: a context
+	/// mid-navigation has no document to evaluate in and the driver answers
+	/// that with a transient error ([`BiDiError::is_transient`]), so a url
+	/// read right after a click that navigates retries rather than fails,
+	/// bounded by [`Page::timeout`]. Which of the two urls it answers with is
+	/// the caller's race; [`Self::wait_for_url`] is the one that waits for a
+	/// particular one.
+	///
+	/// Open-coded rather than through `poll_ext` for the same `Send`-inference
+	/// reason as `find_polling`.
 	pub async fn current_url(&self) -> Result<String> {
+		let start = Instant::now();
+		loop {
+			let expired = start.elapsed() >= self.timeout;
+			match self.read_url().await {
+				Ok(url) => return url.xok(),
+				Err(err) if expired => return Err(err),
+				Err(err)
+					if !err
+						.downcast_ref::<BiDiError>()
+						.is_some_and(BiDiError::is_transient) =>
+				{
+					return Err(err);
+				}
+				Err(_) => time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await,
+			}
+		}
+	}
+
+	/// Poll the url until `predicate` holds, bounded by `timeout`, answering
+	/// the url that satisfied it: the wait after a click that navigates, for
+	/// a destination named by a property rather than a full string (left the
+	/// login page, reached the dashboard). A transient read is a miss, as in
+	/// [`Self::current_url`]; the error names the last url seen, so a wait
+	/// that expires says where it got stuck.
+	pub async fn wait_for_url(
+		&self,
+		timeout: Duration,
+		predicate: impl Send + Fn(&str) -> bool,
+	) -> Result<String> {
+		let start = Instant::now();
+		let mut last = None;
+		loop {
+			let expired = start.elapsed() >= timeout;
+			match self.read_url().await {
+				Ok(url) if predicate(&url) => return url.xok(),
+				Ok(url) => last = Some(url),
+				Err(err)
+					if !err
+						.downcast_ref::<BiDiError>()
+						.is_some_and(BiDiError::is_transient) =>
+				{
+					return Err(err);
+				}
+				Err(_) => {}
+			}
+			if expired {
+				bevybail!(
+					"url did not satisfy the predicate within {timeout:?}: {}",
+					match &last {
+						Some(url) => format!("still at {url}"),
+						None => "no url was read".to_string(),
+					}
+				);
+			}
+			time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await;
+		}
+	}
+
+	/// One `location.href` read, the probe both url methods poll.
+	async fn read_url(&self) -> Result<String> {
 		self.evaluate("location.href")
 			.await?
 			.pointer("/result/result/value")
-			.and_then(|v| v.as_str())
+			.and_then(|value| value.as_str())
 			.ok_or_else(|| bevyhow!("missing location.href value"))?
 			.to_string()
 			.xok()
@@ -268,6 +337,43 @@ mod tests {
 			.to_string()
 			.xpect_contains("boom");
 
+		page.kill().await.unwrap();
+	}
+
+	/// A url read straight after a click that navigates never errors on the
+	/// torn-down context, and `wait_for_url` waits for the destination.
+	#[beet_core::test(timeout_ms = 30_000)]
+	#[ignore = "smoketest"]
+	async fn reads_the_url_through_a_navigation() {
+		let landing = test_fixtures::page_url(
+			"nav_landing",
+			"<html><body><h1>Landing</h1></body></html>",
+		);
+		let start = test_fixtures::page_url(
+			"nav_start",
+			&format!(
+				r#"<html><body><a id="go" href="{landing}">go</a></body></html>"#
+			),
+		);
+		let page = test_fixtures::visit(&start).await;
+		page.click("#go").await.unwrap();
+		// the read that used to fail with `Cannot find context with specified id`
+		page.current_url().await.unwrap();
+		page.wait_for_url(Duration::from_secs(10), |url| {
+			url.ends_with("nav_landing.html")
+		})
+		.await
+		.unwrap()
+		.xpect_eq(landing);
+		// a predicate that never holds names where it got stuck
+		page.wait_for_url(Duration::from_millis(200), |url| {
+			url.ends_with("never.html")
+		})
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("still at")
+		.xpect_contains("nav_landing.html");
 		page.kill().await.unwrap();
 	}
 }

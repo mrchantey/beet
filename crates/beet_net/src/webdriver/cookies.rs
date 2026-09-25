@@ -53,6 +53,24 @@ impl Cookie {
 		host == self.domain || host.ends_with(&format!(".{}", self.domain))
 	}
 
+	/// Whether a request for `path` carries this cookie, the RFC 6265 §5.1.4
+	/// path-match: the paths are equal, or the cookie's path is a prefix of
+	/// it ending at a `/` boundary. This is what separates two cookies of the
+	/// same name, which Blackboard and any other app mounting a servlet under
+	/// a prefix will set (a `JSESSIONID` for `/` and another for
+	/// `/learn/api`): sending both unscoped hands the server the wrong
+	/// session half the time.
+	pub fn matches_path(&self, path: &str) -> bool {
+		let cookie_path = self.path.as_str();
+		if cookie_path == "/" || cookie_path == path {
+			return true;
+		}
+		let Some(rest) = path.strip_prefix(cookie_path) else {
+			return false;
+		};
+		cookie_path.ends_with('/') || rest.starts_with('/')
+	}
+
 	/// From one entry of `storage.getCookies`' `cookies` array; `None` for
 	/// a shape this does not read (a base64 value), with a warning.
 	fn parse(cookie: &Value) -> Option<Self> {
@@ -114,13 +132,37 @@ impl Cookies {
 			.xok()
 	}
 
-	/// The cookies a request to `host` would carry.
+	/// The cookies a request to `host` would carry, whatever its path: the
+	/// whole of one site's session, for holding across many requests.
+	/// [`Self::for_url`] narrows it to one request.
 	pub fn for_host(&self, host: &str) -> Self {
 		self.0
 			.iter()
 			.filter(|cookie| cookie.matches_host(host))
 			.cloned()
 			.collect()
+	}
+
+	/// The cookies one request to `url` carries: its host and its path, most
+	/// specific path first (RFC 6265 §5.4, which is the order a server
+	/// reading only the first of a repeated name depends on). A url with no
+	/// host is scoped by path alone, on the assumption the caller has already
+	/// picked the site.
+	pub fn for_url(&self, url: &Url) -> Self {
+		let host = url.host();
+		let path = url.path_string();
+		let mut scoped = self
+			.0
+			.iter()
+			.filter(|cookie| {
+				host.is_none_or(|host| cookie.matches_host(host))
+					&& cookie.matches_path(&path)
+			})
+			.cloned()
+			.collect::<Vec<_>>();
+		// stable, so cookies of equal path depth keep the browser's order
+		scoped.sort_by_key(|cookie| core::cmp::Reverse(cookie.path.len()));
+		Self(scoped)
 	}
 
 	/// The cookie named `name`, the first if several domains set one.
@@ -140,9 +182,11 @@ impl Cookies {
 		self.0.iter().map(|cookie| cookie.name.as_str()).collect()
 	}
 
-	/// The `cookie` header value, `name=value` pairs joined by `; `. Scope
-	/// with [`Self::for_host`] first: the browser's whole jar sent to one
-	/// host would carry every other site's session too.
+	/// The `cookie` header value, `name=value` pairs joined by `; `, of
+	/// exactly the cookies held. Scope first, with [`Self::for_url`] for one
+	/// request or [`Self::for_host`] for a site: the browser's whole jar sent
+	/// to one host would carry every other site's session too, and its
+	/// unscoped paths would repeat a name.
 	pub fn header(&self) -> String {
 		self.0
 			.iter()
@@ -151,11 +195,15 @@ impl Cookies {
 			.join("; ")
 	}
 
-	/// `request` carrying these cookies: the hand-off.
+	/// `request` carrying the cookies it is scoped to, the hand-off: the
+	/// scoping reads the request's own url ([`Self::for_url`]), so a set held
+	/// for a whole site cannot leak a path's cookie into a sibling path's
+	/// request. No header is set when nothing matches.
 	pub fn apply(&self, request: Request) -> Request {
-		match self.is_empty() {
+		let scoped = self.for_url(request.url());
+		match scoped.is_empty() {
 			true => request,
-			false => request.with_header_raw("cookie", &self.header()),
+			false => request.with_header_raw("cookie", &scoped.header()),
 		}
 	}
 }
@@ -216,6 +264,13 @@ mod test {
 			.headers
 			.first_raw("cookie")
 			.xpect_eq(None);
+		// a host whose cookies match nothing sets no header
+		cookies
+			.for_host("example.org")
+			.apply(Request::get("https://example.org/x"))
+			.headers
+			.first_raw("cookie")
+			.xpect_eq(Some("other=no"));
 		format!("{scoped:?}")
 			.xpect_contains("<redacted>")
 			.xnot()
@@ -223,6 +278,55 @@ mod test {
 		Cookie::new("a", "b", "example.com")
 			.matches_host("deep.sub.example.com")
 			.xpect_true();
+	}
+
+	/// One name set at two paths, the shape a servlet under a prefix
+	/// produces: a request carries only the matching one, most specific
+	/// first, never both unscoped.
+	#[beet_core::test]
+	fn scopes_a_repeated_name_by_path() {
+		let at = |path: &str, value: &str| Cookie {
+			path: path.into(),
+			..Cookie::new("JSESSIONID", value, "example.com")
+		};
+		let cookies: Cookies = [
+			at("/", "root"),
+			at("/learn/api", "api"),
+			at("/webapps/other", "other"),
+		]
+		.into_iter()
+		.collect();
+
+		// the deeper path wins the ordering, and the sibling is excluded
+		cookies
+			.for_url(
+				&Url::parse("https://example.com/learn/api/v1/users/me")
+					.unwrap(),
+			)
+			.header()
+			.xpect_eq("JSESSIONID=api; JSESSIONID=root");
+		// a path outside both prefixes gets only the root cookie
+		cookies
+			.for_url(&Url::parse("https://example.com/ultra/courses").unwrap())
+			.header()
+			.xpect_eq("JSESSIONID=root");
+		// a prefix match must land on a boundary: `/learn/apix` is not under
+		// `/learn/api`
+		at("/learn/api", "api")
+			.matches_path("/learn/apix")
+			.xpect_false();
+		at("/learn/api", "api")
+			.matches_path("/learn/api")
+			.xpect_true();
+		at("/learn/api/", "api")
+			.matches_path("/learn/api/v1")
+			.xpect_true();
+		// apply scopes from the request itself, so a site-wide set is safe
+		cookies
+			.apply(Request::get("https://example.com/learn/api/v1/x"))
+			.headers
+			.first_raw("cookie")
+			.xpect_eq(Some("JSESSIONID=api; JSESSIONID=root"));
 	}
 
 	/// A served page's `set-cookie` lands in the jar and scopes to its host.

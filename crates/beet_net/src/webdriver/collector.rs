@@ -193,7 +193,6 @@ impl Page {
 mod test {
 	use super::*;
 	use crate::webdriver::test_fixtures;
-	use beet_core::prelude::*;
 	use serde_json::json;
 
 	/// The quiet drain returns what arrived, only once the stream has been
