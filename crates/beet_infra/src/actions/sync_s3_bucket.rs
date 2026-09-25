@@ -32,6 +32,15 @@ pub async fn SyncS3Bucket(
 	/// Optional subdir of the bucket to sync against; the bucket root by default.
 	#[field]
 	bucket_dir: Option<RelPath>,
+	/// Narrow the sync to part of the directory, ie
+	/// `{filter:{exclude:["*/blobs/*"]}}` to hydrate a store's records without
+	/// its media. Empty by default, the whole directory. Translated into the
+	/// cli's own rules by [`S3Filter::from_glob`], and matched against each
+	/// entry's path below the two ends, so a pattern reads the same in either
+	/// direction. A filtered PUSH leaves what it skipped out of the bucket,
+	/// which only a store that is not the source of record should want.
+	#[field]
+	filter: GlobFilter,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
@@ -89,7 +98,13 @@ pub async fn SyncS3Bucket(
 			}
 		}
 		SyncDirection::Pull => S3Sync::pull(&s3_uri, local_dir.clone()),
-	};
+	}
+	.glob_filter(&filter);
+	if !filter.is_empty() {
+		// a pull that silently skipped most of the bucket is the kind of
+		// surprise worth a line of output
+		info!("SyncS3Bucket: filtered sync\n{filter}");
+	}
 	trace!(
 		"SyncS3Bucket: syncing {} {} {s3_uri}",
 		local_dir,

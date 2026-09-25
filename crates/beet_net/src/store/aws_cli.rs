@@ -130,6 +130,35 @@ pub enum S3Filter {
 }
 
 impl S3Filter {
+	/// The cli filter list a [`GlobFilter`] means, in evaluation order.
+	///
+	/// The two dialects agree on patterns (`*` crosses `/` in both) but start
+	/// from opposite defaults: the cli includes everything until a rule says
+	/// otherwise, where a [`GlobFilter`] with any include pattern starts from
+	/// including nothing. So a non-empty include list opens with `--exclude "*"`,
+	/// and the excludes ride last because the cli's last matching rule wins,
+	/// which is how a [`GlobFilter`] resolves the two lists too.
+	pub fn from_glob(filter: &GlobFilter) -> Vec<Self> {
+		let include = filter.include_patterns();
+		include
+			.is_empty()
+			.xmap(|all| match all {
+				true => Vec::new(),
+				false => vec![Self::Exclude("*".to_string())],
+			})
+			.xtend(
+				include
+					.iter()
+					.map(|pattern| Self::Include(pattern.as_str().to_string())),
+			)
+			.xtend(
+				filter
+					.exclude_patterns()
+					.iter()
+					.map(|pattern| Self::Exclude(pattern.as_str().to_string())),
+			)
+	}
+
 	fn to_args(&self) -> [String; 2] {
 		match self {
 			S3Filter::Exclude(p) => ["--exclude".into(), p.clone()],
@@ -362,6 +391,10 @@ impl S3Sync {
 		self.filters.extend(filters);
 		self
 	}
+	/// Append the rules a [`GlobFilter`] means, see [`S3Filter::from_glob`].
+	pub fn glob_filter(self, filter: &GlobFilter) -> Self {
+		self.filters(S3Filter::from_glob(filter))
+	}
 	/// Append a raw argument verbatim to the end of the argv.
 	pub fn arg(mut self, arg: impl Into<String>) -> Self {
 		self.additional_args.push(arg.into());
@@ -501,6 +534,37 @@ mod test {
 			("--include".into(), "public/**".into()),
 			("--exclude".into(), "**/*.map".into()),
 			("--include".into(), "assets/**".into()),
+		]);
+	}
+
+	/// A [`GlobFilter`]'s two lists become cli rules in evaluation order: an
+	/// include list first denies everything, and the excludes ride last so the
+	/// cli's last-match-wins resolves them the way the filter does.
+	#[beet_core::test]
+	fn maps_a_glob_filter() {
+		let args = |filter: &GlobFilter| {
+			S3Sync::default()
+				.glob_filter(filter)
+				.to_args()
+				.into_iter()
+				.skip(1) // `--no-progress`
+				.collect::<Vec<_>>()
+		};
+		args(&GlobFilter::default()).xpect_eq(Vec::<String>::new());
+		args(&GlobFilter::default().with_exclude("*/blobs/*"))
+			.xpect_eq(vec!["--exclude".to_string(), "*/blobs/*".to_string()]);
+		args(
+			&GlobFilter::default()
+				.with_include("pete/*")
+				.with_exclude("*/blobs/*"),
+		)
+		.xpect_eq(vec![
+			"--exclude".to_string(),
+			"*".to_string(),
+			"--include".to_string(),
+			"pete/*".to_string(),
+			"--exclude".to_string(),
+			"*/blobs/*".to_string(),
 		]);
 	}
 

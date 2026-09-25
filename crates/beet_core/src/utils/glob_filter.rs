@@ -174,6 +174,14 @@ impl GlobFilter {
 		self.include.is_empty() && self.exclude.is_empty()
 	}
 
+	/// The include patterns, for a consumer translating this filter into
+	/// another matcher's dialect, ie the aws cli's `--include`/`--exclude`.
+	pub fn include_patterns(&self) -> &[GlobPattern] { &self.include }
+
+	/// The exclude patterns, see
+	/// [`include_patterns`](Self::include_patterns).
+	pub fn exclude_patterns(&self) -> &[GlobPattern] { &self.exclude }
+
 	/// Checks if a string passes the filter.
 	///
 	/// To pass a string must:
