@@ -15,6 +15,12 @@ impl AnalyticsSegment {
 	/// The prefix containing uncompacted raw event batches.
 	pub const PREFIX: &'static str = "analytics/raw/segments";
 
+	/// The one codec every raw analytics object, a segment or a day's
+	/// [`AnalyticsArchive`], is written and read under. An object under any
+	/// other name is another writer's and never scanned, so nothing here
+	/// contends with a second format.
+	pub const CODEC: JsonlCodec = JsonlCodec::Zstd;
+
 	/// Returns the path for one writer's batch.
 	///
 	/// Paths have the form
@@ -28,13 +34,12 @@ impl AnalyticsSegment {
 		RelPath::new(format!(
 			"{}/{date}/{writer}/{timestamp}-{sequence}.{}",
 			Self::PREFIX,
-			JsonlCodec::default().extension()
+			Self::CODEC.extension()
 		))
 	}
 
-	/// Returns the UTC date encoded in a segment path, under any JSONL codec,
-	/// compiled in or not: a segment this build cannot read fails the run in
-	/// [`Self::read`] rather than sitting in the store unseen.
+	/// Returns the UTC date encoded in a segment path. An object under any
+	/// other name, another codec's included, is another writer's.
 	pub(crate) fn date(path: &RelPath) -> Option<SmolStr> {
 		let remainder = path
 			.as_str()
@@ -44,8 +49,10 @@ impl AnalyticsSegment {
 		let date = parts.next()?;
 		let writer = parts.next()?;
 		let object = parts.next()?;
-		let (timestamp, sequence) =
-			JsonlCodec::split_path(object)?.0.split_once('-')?;
+		let (timestamp, sequence) = object
+			.strip_suffix(Self::CODEC.extension())?
+			.strip_suffix('.')?
+			.split_once('-')?;
 		(parts.next().is_none()
 			&& Timestamp::parse_date(date).is_some()
 			&& writer.parse::<Uuid>().is_ok()
@@ -58,7 +65,7 @@ impl AnalyticsSegment {
 	/// level: a segment is read once by the rollup that compacts it.
 	pub fn encode(events: &[AnalyticsEvent]) -> Result<Bytes> {
 		Jsonl::encode(
-			JsonlCodec::default(),
+			Self::CODEC,
 			JsonlLevel::Fast,
 			AnalyticsEvent::by_id(events),
 		)
@@ -167,8 +174,8 @@ impl AnalyticsSegment {
 		let Some(date) = Self::date(path) else {
 			bevybail!("invalid analytics segment path `{path}`");
 		};
-		let events = Jsonl::decode_path::<AnalyticsEvent>(
-			path,
+		let events = Jsonl::decode::<AnalyticsEvent>(
+			Self::CODEC,
 			&store.get(path).await?,
 		)?;
 		for event in &events {

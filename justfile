@@ -68,7 +68,9 @@ beet *args:
 # Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
 # (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so
 # tofu/aws/s3 use the deployer's pair from `secrets.toml` rather than a global
-# profile.
+# profile. The empty `AWS_PROFILE=` is unset to the rust SDK but a nonexistent
+# profile to the `aws` cli (`The config profile () could not be found`): a
+# hand-run cli call alongside these recipes wants `unset AWS_PROFILE`.
 # `--main=site`: the SITE entry declares its own resources and deploy verbs, so
 # the application that runs on them is the thing that provisions them.
 # `infra,extra` links the deploy blocks and the IaC verb routes. Without them the

@@ -385,7 +385,8 @@ json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
 geoip = ["beet_net?/geoip"]
 # The `SqliteStore` backend (`sqlite:<path>`), native only.
 sqlite = ["net", "beet_net?/sqlite"]
-# The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced.
+# The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced;
+# nothing beet writes uses it.
 gzip = ["net", "beet_net?/gzip"]
 postcard = ["serde", "beet_core/postcard", "beet_net?/postcard"]
 # RON text format for `MediaType::Ron` and `template_serde` loading.

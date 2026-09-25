@@ -69,7 +69,7 @@ json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "beet_core/json", "
 # table below; every call runs on the `blocking` pool.
 sqlite = ["std", "json", "dep:rusqlite", "dep:blocking"]
 # The gzip `JsonlCodec` (`.jsonl.gz`), for JSONL objects another tool produced;
-# nothing beet writes needs it.
+# nothing beet writes uses it.
 gzip = ["json", "dep:flate2"]
 postcard = ["serde", "dep:postcard", "beet_core/postcard"]
 # offline geoip country lookup for analytics: pulls the pure-rust `maxminddb`

@@ -1,7 +1,7 @@
 //! The JSONL codec: canonical json rows, one per line, compressed under the
 //! codec the object's extension names. Every object beet writes is zstd; gzip
 //! is read and written only with the `gzip` feature, for objects another tool
-//! produced.
+//! produced; nothing beet writes uses it.
 use crate::exports::bytes::Bytes;
 use beet_core::prelude::*;
 use serde::Serialize;

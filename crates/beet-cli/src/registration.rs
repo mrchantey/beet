@@ -17,6 +17,7 @@ pub fn cli() -> CrateRegistration {
 			"cloudflare",
 			"extra",
 			"geoip",
+			"gzip",
 			"infra",
 			"lambda",
 			"ml",
