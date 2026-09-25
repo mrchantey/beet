@@ -36,6 +36,32 @@ impl<T> Collector<T> {
 		items
 	}
 
+	/// Drain until no event has arrived for `quiet_for`, bounded by
+	/// `deadline` from the call: the network-idle wait, for a page that keeps
+	/// fetching after `load` (a single-page app filling itself in). Everything
+	/// received in the window is returned, in order.
+	pub async fn drain_until_quiet(
+		&self,
+		quiet_for: Duration,
+		deadline: Duration,
+	) -> Vec<T> {
+		let start = Instant::now();
+		let mut quiet_since = Instant::now();
+		let mut items = Vec::new();
+		loop {
+			time_ext::sleep(poll_ext::DEFAULT_INTERVAL).await;
+			let batch = self.drain();
+			if !batch.is_empty() {
+				quiet_since = Instant::now();
+				items.extend(batch);
+			}
+			if quiet_since.elapsed() >= quiet_for || start.elapsed() >= deadline
+			{
+				return items;
+			}
+		}
+	}
+
 	/// Await the next event, skipping frames the parser rejects.
 	pub async fn recv(&self) -> Result<T> {
 		loop {
@@ -165,8 +191,56 @@ impl Page {
 
 #[cfg(test)]
 mod test {
+	use super::*;
 	use crate::webdriver::test_fixtures;
 	use beet_core::prelude::*;
+	use serde_json::json;
+
+	/// The quiet drain returns what arrived, only once the stream has been
+	/// quiet for the window, and never later than the deadline.
+	#[beet_core::test]
+	async fn drains_until_quiet() {
+		use beet_core::exports::async_channel;
+		use serde_json::Value;
+		let (tx, rx) = async_channel::unbounded::<Value>();
+		let collector = Collector::new(rx, |event: &Value| {
+			event.get("n").and_then(Value::as_u64)
+		});
+		tx.send(json!({"n": 1})).await.unwrap();
+		tx.send(json!({"n": 2})).await.unwrap();
+		let start = Instant::now();
+		collector
+			.drain_until_quiet(
+				Duration::from_millis(120),
+				Duration::from_secs(5),
+			)
+			.await
+			.xpect_eq(vec![1, 2]);
+		(start.elapsed() >= Duration::from_millis(120)).xpect_true();
+		// a stream that never quiets ends at the deadline
+		let start = Instant::now();
+		let noisy = async {
+			loop {
+				tx.send(json!({"n": 3})).await.ok();
+				time_ext::sleep(Duration::from_millis(20)).await;
+			}
+			// never reached: types the race's other arm
+			#[allow(unreachable_code)]
+			Vec::<u64>::new()
+		};
+		let drained = async {
+			collector
+				.drain_until_quiet(
+					Duration::from_millis(200),
+					Duration::from_millis(300),
+				)
+				.await
+		};
+		let items =
+			beet_core::exports::futures_lite::future::or(drained, noisy).await;
+		(items.len() > 0).xpect_true();
+		(start.elapsed() < Duration::from_secs(2)).xpect_true();
+	}
 
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]

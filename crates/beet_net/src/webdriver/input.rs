@@ -140,6 +140,25 @@ impl WebElement {
 		perform(self.session(), self.context_id(), "key", actions).await
 	}
 
+	/// [`type_text`](Self::type_text) for a [`Secret`]: the value reaches the
+	/// page as trusted key events and nothing else, and an error from the
+	/// driver is scrubbed of it before it surfaces. Two things stay the
+	/// caller's: the driver log, which at `Info` and above writes every
+	/// command's params, so a session that types a secret keeps
+	/// [`Client`]'s default [`LogLevel::Warn`]; and the page, which sees what
+	/// any user types.
+	#[cfg(feature = "vault")]
+	pub async fn type_secret(&self, secret: &Secret) -> Result<()> {
+		self.type_text(&secret.value).await.map_err(|err| {
+			let text = err.to_string();
+			let text = match secret.value.is_empty() {
+				true => text,
+				false => text.replace(secret.value.as_str(), "<redacted>"),
+			};
+			bevyhow!("typing `{}` failed: {text}", secret.name)
+		})
+	}
+
 	/// Choose the option of a `<select>` whose label starts with `prefix`,
 	/// through the browser's own type-ahead: the select [focused](Self::focus)
 	/// closed and the prefix typed as trusted keys, so `input` and `change`
@@ -230,6 +249,28 @@ mod test {
 		input.xpect_value("hello beet").await;
 		page.press(Key::Enter).await.unwrap();
 		page.find("#out").await.xpect_text("hello beet").await;
+		page.kill().await.unwrap();
+	}
+
+	/// A secret types like text; what it typed is what the field holds.
+	#[cfg(feature = "vault")]
+	#[beet_core::test(timeout_ms = 30_000)]
+	#[ignore = "smoketest"]
+	async fn types_a_secret() {
+		let url = test_fixtures::page_url(
+			"secret",
+			r#"<html><body><input id="pw" type="password"/></body></html>"#,
+		);
+		let page = test_fixtures::visit(&url).await;
+		let secret = Secret {
+			name: "DEMO".into(),
+			group: "default".into(),
+			value: "hunter2".into(),
+			record: default(),
+		};
+		let field = page.find("#pw").await;
+		field.type_secret(&secret).await.unwrap();
+		field.xpect_value("hunter2").await;
 		page.kill().await.unwrap();
 	}
 

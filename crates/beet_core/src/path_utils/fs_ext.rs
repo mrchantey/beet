@@ -528,6 +528,23 @@ pub fn write_private(
 	}
 }
 
+/// Create a directory (and its parents) that only its owner may enter, what
+/// a browser profile holding session cookies or a directory of identity
+/// files needs. On unix the directory itself is `0700` (an existing one
+/// tightened to it); elsewhere this is a plain [`create_dir_all`].
+pub fn create_dir_private(path: impl AsRef<Path>) -> FsResult {
+	let path = path.as_ref();
+	fs_ext::create_dir_all(path)?;
+	cfg_if! {
+		if #[cfg(unix)] {
+			use std::os::unix::fs::PermissionsExt;
+			fs::set_permissions(path, fs::Permissions::from_mode(0o700))
+				.map_err(|err| FsError::io(path, err))?;
+		}
+	}
+	Ok(())
+}
+
 /// Whether only the owner may read `path`: what [`write_private`] leaves and
 /// what a private key must stay, since `age -d -o` and a shell redirect
 /// write `0644`. On unix no group or other bit is set; elsewhere always true.

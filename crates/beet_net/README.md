@@ -61,7 +61,7 @@ App::new()
 | `ureq` | Use ureq as the HTTP client backend |
 | `tungstenite` | Native WebSocket support |
 | `russh_client` / `russh_server` | SSH client and server |
-| `webdriver` | WebDriver browser automation client |
+| `webdriver` | WebDriver browser automation client: BiDi sessions, auto-waiting finds, trusted input (a secret typed without a trace), console/network collectors, cookies, persistent profiles, screenshots and PDF export |
 | `mdns` / `udp` | mDNS service discovery and UDP sockets |
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |

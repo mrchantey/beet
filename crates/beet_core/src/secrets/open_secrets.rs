@@ -58,6 +58,27 @@ impl OpenSecrets {
 		count.xok()
 	}
 
+	/// The record `name` from whichever loaded document holds it (a name
+	/// loads from exactly one), for a system or verb that reads a secret
+	/// in-process: the record needs no role, so it never enters the
+	/// environment, and the value goes only where the caller sends it (a
+	/// form field, a request header).
+	pub fn find(world: &mut World, name: &str) -> Result<Secret> {
+		let mut loaded = 0;
+		let mut query = world.query::<&OpenSecrets>();
+		for opened in query.iter(world) {
+			loaded += 1;
+			if let Some(secret) = opened.get(name) {
+				return secret.clone().xok();
+			}
+		}
+		bevybail!(
+			"no loaded secrets document holds `{name}` ({loaded} loaded): \
+			`secrets/set {name}` seals it into the entry's document, which a \
+			`<Secrets/>` declaration loads"
+		)
+	}
+
 	/// The record names both this and `other` hold: two documents loaded
 	/// into one world may not share one, since the second to load would
 	/// silently shadow the first.
@@ -124,6 +145,23 @@ mod test {
 			env_ext::remove_var("BEET_TEST_OPEN_SECRETS_SET").unwrap();
 			env_ext::remove_var("BEET_TEST_OPEN_SECRETS_NEW").unwrap();
 		}
+	}
+
+	#[crate::test]
+	fn find_reads_across_loaded_documents() {
+		let mut world = World::new();
+		world.spawn(open([secret("A", None)]));
+		world.spawn(open([secret("B", Some(SecretRole::EnvVar))]));
+		OpenSecrets::find(&mut world, "B")
+			.unwrap()
+			.value
+			.as_str()
+			.xpect_eq("B-value");
+		OpenSecrets::find(&mut world, "C")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`C`")
+			.xpect_contains("2 loaded");
 	}
 
 	#[crate::test]

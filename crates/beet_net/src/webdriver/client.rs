@@ -82,6 +82,13 @@ pub struct NewSessionOptions {
 	/// `--enable-unsafe-webgpu` (pair with `disable_gpu: false`) for a
 	/// WebGPU-granting headless chrome.
 	extra_args: Vec<String>,
+	/// A profile directory to run the browser on, so cookies, storage and
+	/// logins outlive the session: chrome's `--user-data-dir`, firefox's
+	/// `-profile`. Created owner-only if missing, since a profile holds
+	/// session cookies. `None`, the default, is the driver's own temporary
+	/// profile, gone with the session.
+	#[set_with(unwrap_option)]
+	user_data_dir: Option<AbsPath>,
 }
 
 impl Default for NewSessionOptions {
@@ -90,6 +97,7 @@ impl Default for NewSessionOptions {
 			headless: true,
 			disable_gpu: true,
 			extra_args: Vec::new(),
+			user_data_dir: None,
 		}
 	}
 }
@@ -161,6 +169,9 @@ impl Client {
 			}
 		});
 
+		if let Some(dir) = &opts.user_data_dir {
+			fs_ext::create_dir_private(dir)?;
+		}
 		match self.provider {
 			Provider::Chromedriver => {
 				let mut args = vec![
@@ -176,6 +187,9 @@ impl Client {
 				if opts.disable_gpu {
 					args.push("--disable-gpu".to_string());
 				}
+				if let Some(dir) = &opts.user_data_dir {
+					args.push(format!("--user-data-dir={dir}"));
+				}
 				args.extend(opts.extra_args.iter().cloned());
 				body["capabilities"]["alwaysMatch"]
 					.set_field("goog:chromeOptions", json!({ "args": args }))?;
@@ -185,6 +199,10 @@ impl Client {
 				if opts.headless {
 					// geckodriver expects "-headless"
 					args.push("-headless".to_string());
+				}
+				if let Some(dir) = &opts.user_data_dir {
+					args.push("-profile".to_string());
+					args.push(dir.to_string());
 				}
 				args.extend(opts.extra_args.iter().cloned());
 				body["capabilities"]["alwaysMatch"]
@@ -394,6 +412,46 @@ mod test {
 		session.kill().await.unwrap();
 		client.kill().unwrap();
 	}
+	/// A profile directory carries storage across sessions and is created
+	/// owner-only.
+	#[beet_core::test(timeout_ms = 60_000)]
+	#[ignore = "smoketest"]
+	async fn a_profile_outlives_the_session() {
+		let dir =
+			AbsPath::workspace_root().join("target/webdriver-fixtures/profile");
+		let url = test_fixtures::page_url(
+			"profile",
+			"<html><body>profile</body></html>",
+		);
+		let opts = NewSessionOptions::default().with_user_data_dir(dir.clone());
+		let mut browser =
+			Browser::new_with_opts(test_fixtures::client(), opts.clone())
+				.await
+				.unwrap();
+		browser.navigate(&url).await.unwrap();
+		browser
+			.evaluate("localStorage.setItem('beet', 'kept')")
+			.await
+			.unwrap();
+		browser.kill().await.unwrap();
+		let mut browser = Browser::new_with_opts(test_fixtures::client(), opts)
+			.await
+			.unwrap();
+		browser.navigate(&url).await.unwrap();
+		browser
+			.evaluate_value("localStorage.getItem('beet')")
+			.await
+			.unwrap()
+			.xpect_eq(serde_json::json!("kept"));
+		browser.kill().await.unwrap();
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777)
+				.xpect_eq(0o700);
+		}
+	}
+
 	#[beet_core::test(timeout_ms = 30_000)]
 	#[ignore = "smoketest"]
 	async fn chromium() {
