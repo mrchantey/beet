@@ -263,6 +263,37 @@ impl S3Store {
 		}
 	}
 
+	/// Turn object versioning on for this store's bucket.
+	///
+	/// A bucket whose objects are overwritten in place (a tofu state, a
+	/// mirrored manifest) has no undo without this, so the caller that CREATES
+	/// such a bucket sets it as part of creating it. Only then: a bucket
+	/// somebody later turned versioning off on is left the way they left it,
+	/// and nothing re-asserts it on every run.
+	///
+	/// Versions are kept, with no expiry rule: how long an old version is
+	/// worth keeping is the bucket's own declaration to make, not this call's.
+	pub async fn set_object_versioning(&self) -> Result {
+		let this = self.clone();
+		async_ext::pin_tokio(async move {
+			use aws_sdk_s3::types::BucketVersioningStatus;
+			use aws_sdk_s3::types::VersioningConfiguration;
+			this.client()
+				.await
+				.put_bucket_versioning()
+				.bucket(this.bucket_name.as_str())
+				.versioning_configuration(
+					VersioningConfiguration::builder()
+						.status(BucketVersioningStatus::Enabled)
+						.build(),
+				)
+				.send()
+				.await?;
+			Ok(())
+		})
+		.await
+	}
+
 	/// Get or create an S3 client for this store's region, endpoint and
 	/// credentials. Cached by the three so an R2 store and an AWS store in
 	/// the same region get distinct clients, as do two stores at one endpoint

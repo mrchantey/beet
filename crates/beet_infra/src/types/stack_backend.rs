@@ -56,9 +56,26 @@ impl StackBackend {
 		BlobStore::from_uri(&self.uri())
 	}
 
-	/// Ensure the backend exists, creating the directory or s3 bucket if it doesn't exist.
+	/// Ensure the backend exists, creating the directory or s3 bucket if it
+	/// doesn't exist; a bucket it creates is created with object versioning
+	/// on, see below.
 	pub async fn ensure_exists(&self) -> Result {
-		self.store()?.store_try_create().await
+		let store = self.store()?;
+		if store.store_exists().await? {
+			return Ok(());
+		}
+		store.store_create().await?;
+		// every apply overwrites the state object in place, so a version is its
+		// only undo: a bucket born here is born versioned, which is what makes a
+		// fresh account's first deploy as recoverable as an established one's.
+		// Only at creation, so an existing bucket's settings stay its owner's.
+		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+		if let Self::S3(s3) = self {
+			S3Store::from_uri(&s3.uri())?
+				.set_object_versioning()
+				.await?;
+		}
+		Ok(())
 	}
 
 	/// Clear stale lock files if the backend supports it.
@@ -135,6 +152,11 @@ const DEFAULT_STATE_NAME: &str = "beet-state";
 
 /// S3 backend for remote state storage.
 /// https://opentofu.org/docs/language/settings/backends/s3/
+///
+/// One bucket for every app and stage, a key each, created on first use by
+/// [`StackBackend::ensure_exists`] with object versioning on, so a machine with
+/// credentials and nothing else deploys without provisioning a backend by hand
+/// first, and the state it writes has an undo from the start.
 #[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
 pub struct S3Backend {
 	/// The S3 bucket containing the state file, defaults to `beet-state`
