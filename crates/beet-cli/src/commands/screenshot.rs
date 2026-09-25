@@ -1,5 +1,6 @@
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
+use core::time::Duration;
 
 /// Request params for the [`CaptureScreenshot`] command, surfaced in `--help`.
 #[derive(Reflect)]
@@ -13,6 +14,13 @@ struct ScreenshotParams {
 	/// Clip to the first element matching this css selector (auto-waits for
 	/// it to appear).
 	selector: Option<String>,
+	/// Wait for this css selector before capturing, for a page whose content
+	/// arrives after load, ie a chart that fetches its own data.
+	wait_selector: Option<String>,
+	/// How long `--wait-selector` and `--selector` may wait for content that
+	/// takes longer than a page load to arrive, unit-suffixed, ie `30s`
+	/// (default 4s).
+	wait_duration: Option<Duration>,
 	/// Output path (default `screenshot.png`).
 	output: Option<String>,
 }
@@ -26,6 +34,9 @@ struct ScreenshotParams {
 /// beet screenshot http://localhost:8337/docs --output=docs.png
 /// beet screenshot 'http://localhost:8337/docs/design/counter?color-scheme=dark' \
 ///   --selector='#sidebar' --output=sidebar.png
+/// beet screenshot http://localhost:8001/-/dashboards/youtube --full-page \
+///   --wait-selector='#chart-own-uploads table' --wait-duration=30s \
+///   --output=youtube.png
 /// ```
 #[action(route = "screenshot/*url")]
 #[derive(Component, Reflect)]
@@ -65,6 +76,8 @@ pub async fn CaptureScreenshot(
 		height,
 		params.full_page,
 		params.selector.clone(),
+		params.wait_selector.clone(),
+		params.wait_duration,
 	)
 	.await?;
 	fs_ext::write(&output, &png)?;
@@ -78,9 +91,20 @@ async fn capture(
 	height: u32,
 	full_page: bool,
 	selector: Option<String>,
+	wait_selector: Option<String>,
+	wait_duration: Option<Duration>,
 ) -> Result<Vec<u8>> {
 	let (process, page) = Page::visit(&url).await?;
+	let page = match wait_duration {
+		Some(duration) => page.with_timeout(duration),
+		None => page,
+	};
 	page.set_viewport(width, height).await?;
+	// the viewport is set before the wait, so a page that lays out from its
+	// own size has the final one while it fills
+	if let Some(wait_selector) = wait_selector {
+		page.try_find(&wait_selector).await?;
+	}
 	let png = match selector {
 		Some(selector) => {
 			let element = page.try_find(&selector).await?;
