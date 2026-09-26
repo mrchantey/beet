@@ -298,6 +298,10 @@ impl Plugin for InfraPlugin {
 			// the IaC verb routes a `<Stack>` hosts, registered beside the verbs
 			// themselves rather than by whichever crate happens to author markup.
 			.register_template::<crate::prelude::DeployRoutes>()
+			// the one thing about this launch's deploy mechanics an entry
+			// authors: where its state lives, a property of the operator rather
+			// than of any stack.
+			.register_template::<crate::prelude::S3StateBackend>()
 			.register_type::<crate::prelude::TofuApply>()
 			// the two teardown steps: `tofu destroy`, and the state carriers it
 			// leaves behind. They converge either side of the apply, so a destroy
@@ -764,5 +768,25 @@ mod test {
 			.reason()
 			.as_str()
 			.xpect_eq("fastmail");
+	}
+
+	/// Where this launch keeps its tofu state is a property of the operator, so
+	/// the tag that names their bucket lands on the process `Deployment` rather
+	/// than on a stack, and the default it overrides is the one global name.
+	#[beet_core::test]
+	fn the_state_bucket_declaration_reaches_the_launch() {
+		S3Backend::default()
+			.uri()
+			.to_string()
+			.xpect_eq("s3://beet-state?region=us-east-1");
+		let world = spawn(
+			r#"<S3StateBackend bucket="beet-state-mine" region="ap-southeast-2"/>"#,
+		);
+		world
+			.resource::<Deployment>()
+			.backend()
+			.uri()
+			.to_string()
+			.xpect_eq("s3://beet-state-mine?region=ap-southeast-2");
 	}
 }

@@ -148,6 +148,10 @@ impl LocalBackend {
 	}
 }
 
+/// The default state bucket. An S3 bucket name is global, so this one can only
+/// ever exist in a single account, in a single region: an account that already
+/// holds the name, or an operator who wants their state nearer to themselves
+/// than `us-east-1`, names their own with `<S3StateBackend>` below.
 const DEFAULT_STATE_NAME: &str = "beet-state";
 
 /// S3 backend for remote state storage.
@@ -184,8 +188,9 @@ impl Default for S3Backend {
 	fn default() -> Self {
 		Self {
 			bucket: DEFAULT_STATE_NAME.into(),
-			// State bucket lives in us-east-1 as a stable singleton,
-			// independent of the managed-resource region.
+			// State bucket lives in us-east-1 as a stable singleton, independent
+			// of the managed-resource region. A launch whose operator is nowhere
+			// near it moves both halves with `<S3StateBackend>`.
 			region: aws::region::US_EAST_1.into(),
 			use_lockfile: true,
 		}
@@ -203,4 +208,45 @@ impl S3Backend {
 			}
 		})
 	}
+}
+
+#[cfg(feature = "deploy")]
+use crate::prelude::Deployment;
+
+/// `<S3StateBackend bucket="beet-state-mine" region="ap-southeast-2"/>` — the
+/// bucket this launch keeps every stack's tofu state in, overriding
+/// [`S3Backend::default`]. Two things make it worth declaring: an S3 bucket
+/// name is global, so the default name belongs to whichever account created it
+/// first, and a bucket is regional, so an operator far from the default region
+/// reads and writes every state across the planet.
+///
+/// The backend is a property of the LAUNCH rather than of a stack's identity,
+/// so it lands on the process [`Deployment`] and is authored once per entry,
+/// outside every `<Stack>`, beside the credentials the same launch loads.
+///
+/// Deploy-only, like the verbs it configures: a runtime build never reads a
+/// state backend, so an entry that also builds lean authors this under the same
+/// `bx:cfg` as its `<DeployRoutes>`.
+#[cfg(feature = "deploy")]
+#[template(system)]
+pub fn S3StateBackend(
+	/// The bucket, which this account must own: the name is global, and a
+	/// deploy creates it on first use if it is absent.
+	#[prop(required)]
+	bucket: String,
+	/// Where the bucket lives, defaulting to [`S3Backend::default`]'s region.
+	/// Wrong here is a bucket that does not answer, not a bucket recreated.
+	#[prop]
+	region: Option<String>,
+	mut deployment: ResMut<Deployment>,
+) {
+	let region = region
+		.map(SmolStr::from)
+		.unwrap_or_else(|| S3Backend::default().region().clone());
+	deployment.set_backend(
+		S3Backend::default()
+			.with_bucket(bucket)
+			.with_region(region)
+			.into(),
+	);
 }
