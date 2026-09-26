@@ -275,7 +275,7 @@ token (plus AWS for the social stack's state bucket).
 	     unreachable from the served site even though both live in this file. -->
 	<Route path="jobs" {HttpServer}>
 		<Router>
-			<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
+			<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw: $analytics, rollups: $analytics, archive: $archive})}/>
 		</Router>
 	</Route>
 	<!-- the report reads the store the serving router's `AnalyticsConfig`

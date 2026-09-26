@@ -63,17 +63,14 @@ pub use store::*;
 pub fn analytics_plugin(app: &mut App) {
 	app.register_type::<AnalyticsConfig>()
 		.register_type::<GeoIpDb>()
-		// the nightly job and the two store relations it names its aggregate
-		// table and its archive by, so `<Route path="rollup" {(
-		// AnalyticsRollupJob, RollupStoreRef($analytics))}/>` authors from
-		// markup. A relation rather than a field is what lets a deployment
-		// point raw and rollup at ONE declaration, since their prefixes are
-		// disjoint, or at two when it wants them apart.
+		// the nightly job and the one component naming its three stores, so
+		// `<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw:
+		// $analytics, rollups: $analytics, archive: $archive})}/>` authors
+		// from markup. Two fields may name ONE declaration, which is how a
+		// deployment collapses raw and rollups into a single bucket under
+		// disjoint prefixes, or names two when it wants them apart.
 		.register_type::<AnalyticsRollupJob>()
-		.register_type::<RollupStoreRef>()
-		.register_type::<RollupStoreConsumers>()
-		.register_type::<ArchiveStoreRef>()
-		.register_type::<ArchiveStoreConsumers>()
+		.register_type::<RollupRef>()
 		.init_resource::<store::AnalyticsShutdown>()
 		.add_observer(GeoIpDb::load_on_add)
 		.add_observer(store::spawn_store_on_config)

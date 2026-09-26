@@ -3,7 +3,12 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Syncs the nearest ancestor [`S3FsStore`]'s two ends, in either direction.
+/// Syncs a local directory and a declared bucket, in either direction.
+///
+/// Both ends come from the nearest ancestor [`DirSync`] (or, where a store was
+/// spawned directly, from its [`S3FsStore`]): the bucket end is the identity
+/// the declaration composed, the local end is the sync's `local_dir` or the
+/// store a colocated `StoreRef` names.
 ///
 /// The defaults are the conservative ones: push, additive. `delete` opts into a
 /// *mirror*, where objects absent from the source are pruned so the destination
@@ -55,45 +60,18 @@ pub async fn SyncS3Bucket(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	trace!("SyncS3Bucket: starting");
-	// the two ends of the sync, plus what a `<DirSync>` reads off its bucket's
-	// declaration: the per-deploy prefix it publishes under and the class its
-	// objects land in. Resolved HERE rather than at declaration, because which
-	// version a sync belongs to is the verb's answer and not the declaration's:
-	// see `dir_sync::declared_store`.
-	let (s3_fs_store, deploy_subdir, storage_class) = cx
-		.caller
-		.with_state::<(
-			AncestorQuery<&S3FsStore>,
-			AncestorQuery<&DirSync>,
-			StackQuery,
-			Query<(&ErasedBlock, &ErasedStoreBlock)>,
-		), _>(|entity, (stores, syncs, stacks, declared)| -> Result<_> {
-			let store = stores.get(entity)?.clone();
-			// a store spawned directly (rather than through `<DirSync>`) already
-			// carries whatever root it means to publish into, and lands objects
-			// in the bucket default
-			let Ok(sync) = syncs.get(entity) else {
-				return (store, None, None).xok();
-			};
-			let block = crate::actions::declared_store(
-				entity, sync, &stacks, &declared,
-			)?;
-			let subdir = block
-				.deploy_versioned()
-				.then(|| ArtifactLedger::version_repo_dir(&stacks.deploy_id()));
-			(store, subdir, *block.storage_class()).xok()
-		})
-		.await??;
-	let s3_store = match deploy_subdir {
-		Some(subdir) => s3_fs_store.s3_store().clone().with_subdir(subdir),
-		None => s3_fs_store.s3_store().clone(),
+	let ends = SyncEnds::declared(&cx.caller).await?;
+	let local_dir = ends.local_dir(cx.caller.world()).await?;
+	let storage_class = ends.storage_class;
+	let s3_store = match ends.deploy_subdir {
+		Some(subdir) => ends.s3_store.with_subdir(subdir),
+		None => ends.s3_store,
 	};
 	// `s3_uri` already ends in a separator
 	let s3_uri = match &bucket_dir {
 		Some(dir) => format!("{}{dir}", s3_store.s3_uri()),
 		None => s3_store.s3_uri(),
 	};
-	let local_dir = s3_fs_store.fs_store().effective_root();
 	// only a mirroring push can destroy remote state, so only it is guarded
 	if delete && direction == SyncDirection::Push {
 		SyncS3Bucket::assert_mirrorable(&local_dir, follow_symlinks)?;
@@ -133,6 +111,100 @@ pub async fn SyncS3Bucket(
 	trace!("synced {s3_uri} (region: {:?})", s3_store.region());
 	trace!("SyncS3Bucket: complete");
 	Pass(cx.input).xok()
+}
+
+/// What one sync resolves when it RUNS rather than when it is declared,
+/// because each answer belongs to the verb and not to the declaration: which
+/// deploy's prefix it publishes into (see `dir_sync::declared_store`), what
+/// class the bucket lands its objects in, and which directory is its local
+/// end.
+struct SyncEnds {
+	/// The bucket end, composed by the declaration this sync addresses.
+	s3_store: S3Store,
+	/// The local end where the sync spells a path (`local_dir="store"`), or a
+	/// store was spawned directly with the root it means to publish into.
+	local_root: Option<AbsPath>,
+	/// The declaration naming the local end, where a `StoreRef` names one
+	/// instead of a path.
+	local_ref: Option<Entity>,
+	/// The per-deploy prefix a deploy-versioned bucket publishes under.
+	deploy_subdir: Option<RelPath>,
+	/// The class the bucket's own declaration lands new objects in.
+	storage_class: Option<S3StorageClass>,
+}
+
+impl SyncEnds {
+	/// Everything the caller's ancestry says about this sync, under one
+	/// exclusive read.
+	async fn declared(caller: &AsyncEntity) -> Result<Self> {
+		caller
+			.with_state::<(
+				AncestorQuery<AnyOf<(&S3FsStore, &S3Store)>>,
+				AncestorQuery<(&DirSync, Option<&StoreRef>)>,
+				StackQuery,
+				Query<(&ErasedBlock, &ErasedStoreBlock)>,
+			), _>(|entity, (stores, syncs, stacks, declared)| -> Result<_> {
+				// both ends on one entity is a `<DirSync local_dir=..>` or a
+				// store spawned directly; the bucket end alone is a
+				// `<DirSync>` whose local end is a declaration
+				let (s3_store, local_root) = match stores.get(entity)? {
+					(Some(store), _) => (
+						store.s3_store().clone(),
+						Some(store.fs_store().effective_root()),
+					),
+					(None, Some(s3_store)) => (s3_store.clone(), None),
+					(None, None) => {
+						bevybail!("entity {entity} has neither store")
+					}
+				};
+				// a store spawned directly (rather than through `<DirSync>`)
+				// already carries whatever root it means to publish into, and
+				// lands objects in the bucket default
+				let Ok((sync, store_ref)) = syncs.get(entity) else {
+					return Self {
+						s3_store,
+						local_root,
+						local_ref: None,
+						deploy_subdir: None,
+						storage_class: None,
+					}
+					.xok();
+				};
+				let block = crate::actions::declared_store(
+					entity, sync, &stacks, &declared,
+				)?;
+				Self {
+					s3_store,
+					local_root,
+					local_ref: store_ref.map(StoreRef::store),
+					deploy_subdir: block.deploy_versioned().then(|| {
+						ArtifactLedger::version_repo_dir(&stacks.deploy_id())
+					}),
+					storage_class: *block.storage_class(),
+				}
+				.xok()
+			})
+			.await?
+	}
+
+	/// The local end, resolved AFTER the exclusive read rather than inside it:
+	/// a declaration's runtime half lands through the command queue, so only
+	/// an async caller can wait for it.
+	async fn local_dir(&self, world: &AsyncWorld) -> Result<AbsPath> {
+		match self.local_ref {
+			Some(target) => StoreRef::resolve::<FsStore>(world, target)
+				.await?
+				.effective_root()
+				.xok(),
+			None => self.local_root.clone().ok_or_else(|| {
+				bevyhow!(
+					"this sync names no local directory: give the `<DirSync>` \
+					 a `local_dir`, or a `{{StoreRef($declaration)}}` naming \
+					 the store it syncs"
+				)
+			}),
+		}
+	}
 }
 
 impl SyncS3Bucket {
@@ -175,6 +247,94 @@ impl SyncS3Bucket {
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// A stack declaring `assets` beside `markup`, returning the world and the
+	/// sync entity the markup's last child is.
+	fn declared(markup: &str) -> (World, Entity) {
+		let mut world =
+			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
+				.into_world();
+		world.init_resource::<PackageConfig>();
+		let nodes = BsxNode::parse_document(
+			&format!(
+				r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>
+					<S3BucketBlock label="assets" deploy_versioned=false/>
+					{markup}
+				</Stack>"#
+			),
+			&BsxParseConfig::bsx(),
+		)
+		.unwrap();
+		let root = world
+			.spawn(())
+			.insert_template(BsxTemplate::container(
+				nodes,
+				BsxTemplateRegistry::default(),
+			))
+			.unwrap()
+			.id();
+		world.flush();
+		let stack = world.entity(root).get::<Children>().unwrap()[0];
+		let sync = *world
+			.entity(stack)
+			.get::<Children>()
+			.unwrap()
+			.last()
+			.unwrap();
+		(world, sync)
+	}
+
+	/// The local end resolved from the sync entity, whichever way it is named.
+	async fn local_dir(world: &mut World, sync: Entity) -> Result<AbsPath> {
+		world
+			.run_async_then(move |world| async move {
+				let ends = SyncEnds::declared(&world.entity(sync)).await?;
+				ends.local_dir(&world).await
+			})
+			.await
+	}
+
+	/// A path names the local end, the form for a directory no declaration
+	/// owns.
+	#[beet_core::test]
+	async fn a_local_dir_names_the_local_end() {
+		let (mut world, sync) =
+			declared(r#"<DirSync bucket="assets" local_dir="site/assets"/>"#);
+		local_dir(&mut world, sync)
+			.await
+			.unwrap()
+			.xpect_eq(WsPath::new("site/assets").into_abs());
+	}
+
+	/// A `StoreRef` names it instead, so a declared store's path is spelled
+	/// once. Resolved when the sync RUNS: the declaration's `FsStore` lands
+	/// through the same command queue the sync's own observer runs on.
+	#[beet_core::test]
+	async fn a_store_ref_names_the_local_end() {
+		let (mut world, sync) = declared(
+			r#"<Fragment>
+				<FsStore bx:ref="store" path="store"/>
+				<DirSync bucket="assets" {StoreRef($store)}/>
+			</Fragment>"#,
+		);
+		// the sync is the fragment's second child, not the stack's last
+		let sync = world.entity(sync).get::<Children>().unwrap()[1];
+		local_dir(&mut world, sync)
+			.await
+			.unwrap()
+			.xpect_eq(WsPath::new("store").into_abs());
+	}
+
+	/// Naming neither is a loud error, not a sync of the workspace root.
+	#[beet_core::test]
+	async fn naming_neither_end_fails() {
+		let (mut world, sync) = declared(r#"<DirSync bucket="assets"/>"#);
+		local_dir(&mut world, sync)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("names no local directory");
+	}
 
 	/// A mirroring push refuses an empty source dir, the shape that would empty
 	/// the bucket.

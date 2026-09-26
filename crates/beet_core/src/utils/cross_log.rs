@@ -5,6 +5,7 @@
 //! target (no stdout, so the message still reaches the platform logger, eg RTT
 //! on the esp32). The `cfg` checks live here in `beet_core`, where `std` is a
 //! declared feature, so they are never evaluated in downstream crates.
+use crate::prelude::*;
 
 /// The per-platform backends behind [`cross_log!`](crate::cross_log),
 /// [`cross_log_noline!`](crate::cross_log_noline) and
@@ -13,44 +14,62 @@
 pub struct CrossLog;
 
 impl CrossLog {
-	/// Log a line.
+	/// Log a line, ignoring a stream that will not take it.
+	///
+	/// `println!` PANICS on a write error, which on a closed stdout (`| head`)
+	/// would fault a program over the ordinary end of its own output. Raw
+	/// output is best effort here for the same reason a log subscriber's is:
+	/// nothing a caller of this could do about it. The one caller that must
+	/// know is [`inline`](Self::inline), which is the streaming half.
 	#[doc(hidden)]
 	pub fn line(msg: &str) {
 		crate::cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
 				crate::exports::web_sys::console::log_1(&msg.into());
 			} else if #[cfg(feature = "std")] {
-				println!("{msg}");
+				use std::io::Write;
+				let _ = writeln!(std::io::stdout(), "{msg}");
 			} else {
 				tracing::info!("{msg}");
 			}
 		}
 	}
 
-	/// Log without a trailing newline, flushing after.
+	/// Log without a trailing newline, flushing after, and report whether the
+	/// stream took it.
+	///
+	/// The one output call that answers, because it is the one whose caller
+	/// can act: a body streamed chunk by chunk stops streaming when stdout is
+	/// gone rather than reading the rest to write it nowhere.
 	#[doc(hidden)]
-	pub fn inline(msg: &str) {
+	pub fn inline(msg: &str) -> Result {
 		crate::cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
 				crate::exports::web_sys::console::log_1(&msg.into());
+				Ok(())
 			} else if #[cfg(feature = "std")] {
 				use std::io::Write;
-				print!("{msg}");
-				std::io::stdout().flush().unwrap();
+				let mut stdout = std::io::stdout();
+				write!(stdout, "{msg}")?;
+				stdout.flush()?;
+				Ok(())
 			} else {
 				tracing::info!("{msg}");
+				Ok(())
 			}
 		}
 	}
 
-	/// Log a line to the error stream.
+	/// Log a line to the error stream, ignoring a stream that will not take
+	/// it: best effort for the same reason [`line`](Self::line) is.
 	#[doc(hidden)]
 	pub fn error(msg: &str) {
 		crate::cfg_if! {
 			if #[cfg(target_arch = "wasm32")] {
 				crate::exports::web_sys::console::error_1(&msg.into());
 			} else if #[cfg(feature = "std")] {
-				eprintln!("{msg}");
+				use std::io::Write;
+				let _ = writeln!(std::io::stderr(), "{msg}");
 			} else {
 				tracing::error!("{msg}");
 			}
@@ -64,6 +83,9 @@ impl CrossLog {
 /// body to stdout or rendering the program's actual result. Never for
 /// informational logging, which uses the `log` crate (`error!`/`warn!`/`info!`/
 /// `debug!`), already cross-platform via the `log` facade + the app's `LogPlugin`.
+///
+/// Answers with the write result: a closed stdout is the ordinary end of a
+/// piped program's output, so a streaming caller stops rather than faulting.
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout and flushes

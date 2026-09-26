@@ -58,6 +58,32 @@ where
 	.await
 }
 
+/// Run `fut`, turning a panic inside it into an [`Err`] naming the payload.
+///
+/// For the caller that OWNS a process's lifetime and so cannot let an unwind
+/// merely end its task: whatever was waiting on that task would wait forever.
+/// Everywhere else a panic should keep travelling. Under `panic=abort` and on
+/// no_std there is nothing to catch, so the future's own output is the answer.
+pub async fn catch_panic<Out>(
+	fut: impl Future<Output = Result<Out>>,
+) -> Result<Out> {
+	crate::cfg_if! {
+		if #[cfg(feature = "std")] {
+			use futures_lite::FutureExt;
+			match std::panic::AssertUnwindSafe(fut).catch_unwind().await {
+				Ok(output) => output,
+				Err(payload) => Err(bevyhow!(
+					"panicked: {}",
+					display_ext::try_downcast_str(&payload)
+						.unwrap_or_else(|| "unknown panic".to_string())
+				)),
+			}
+		} else {
+			fut.await
+		}
+	}
+}
+
 /// Polls every unfinished future concurrently, resolving when one fails or all
 /// have completed.
 ///

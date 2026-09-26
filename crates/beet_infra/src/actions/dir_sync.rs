@@ -12,16 +12,28 @@ use beet_net::prelude::*;
 /// The sync itself is [`SyncS3Bucket`], required here and overridable as a
 /// colocated spread, ie `<DirSync bucket="app" local_dir="site"
 /// {SyncS3Bucket{delete:true}}/>`. The ends are named by where they are, not by
-/// their role, since the direction flips which one is the source: `local_dir` is
-/// workspace-relative.
+/// their role, since the direction flips which one is the source.
+///
+/// The local end is named one of two ways, and a sync naming neither is a loud
+/// error when it runs:
+///
+/// - `local_dir="site"`, a workspace-relative path, for a directory no
+///   declaration owns;
+/// - a colocated `{StoreRef($store)}`, for a directory that IS a declared
+///   store, so its path is spelled once. Only [`SyncS3Bucket`] can resolve
+///   one: a declaration's runtime half lands through the same command queue
+///   this declaration's own observer runs on, so reading it there would race
+///   the scene.
 #[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(SyncS3Bucket)]
 pub struct DirSync {
 	/// The bucket's declared label, ie `app` or `assets`.
 	bucket: SmolStr,
-	/// The workspace-relative local directory.
-	local_dir: WsPath,
+	/// The workspace-relative local directory, where the local end is a path
+	/// rather than a declared store.
+	#[set_with(unwrap_option, into)]
+	local_dir: Option<WsPath>,
 	/// Override the resolved stage, for a bucket outside the deploy's own
 	/// stage. A bucket in another region carries an `{AwsRegion(..)}` spread
 	/// on this entity, resolved by ancestry like every address.
@@ -30,17 +42,26 @@ pub struct DirSync {
 }
 
 impl Default for DirSync {
-	fn default() -> Self { Self::new("", "") }
+	fn default() -> Self { Self::declared("") }
 }
 
 impl DirSync {
+	/// A sync whose local end is a workspace-relative path.
 	pub fn new(
 		bucket: impl Into<SmolStr>,
 		local_dir: impl Into<WsPath>,
 	) -> Self {
 		Self {
+			local_dir: Some(local_dir.into()),
+			..Self::declared(bucket)
+		}
+	}
+
+	/// A sync whose local end is the store a colocated [`StoreRef`] names.
+	pub fn declared(bucket: impl Into<SmolStr>) -> Self {
+		Self {
 			bucket: bucket.into(),
-			local_dir: local_dir.into(),
+			local_dir: None,
 			stage: None,
 		}
 	}
@@ -84,17 +105,16 @@ pub(crate) fn declared_store<'a>(
 		.map(|(_, store)| store)
 		.ok_or_else(|| {
 			bevyhow!(
-				"the sync of '{}' addresses a bucket labelled '{}', which \
-				 nothing under this stack declares",
-				sync.local_dir(),
+				"this sync addresses a bucket labelled '{}', which nothing \
+				 under this stack declares",
 				sync.bucket()
 			)
 		})
 }
 
-/// Observer: resolve the declared bucket into the [`S3FsStore`]
-/// [`SyncS3Bucket`] reads. Deferred through the command queue because the
-/// ancestry a scope resolves against lands with the rest of the scene.
+/// Observer: resolve the declared bucket into the store [`SyncS3Bucket`]
+/// reads. Deferred through the command queue because the ancestry a scope
+/// resolves against lands with the rest of the scene.
 ///
 /// The bucket IDENTITY only (its name and region), spelled by the declaration
 /// ([`S3BucketBlock::store_uri`]) rather than recomposed here: a throwaway
@@ -103,6 +123,12 @@ pub(crate) fn declared_store<'a>(
 /// lookup here can reach. The per-deploy prefix a versioned bucket nests
 /// under is resolved from [`declared_store`] when the sync runs, since it is
 /// not yet known here.
+///
+/// A `local_dir` is the other end of an [`S3FsStore`], so the entity is one
+/// store over both. A sync whose local end is a declaration gets the bucket
+/// end alone: the declaration is resolved when the sync runs, and an
+/// `S3FsStore` built over a stand-in path would be a store pointing
+/// somewhere nothing asked for.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
 	ev: On<Add, DirSync>,
@@ -119,10 +145,14 @@ pub(crate) fn attach_dir_sync_store(
 				.xmap(|stack| sync.stack(stack));
 			let uri =
 				S3BucketBlock::new(sync.bucket().clone()).store_uri(&stack)?;
-			entity.insert(S3FsStore::new(
-				FsStore::new(sync.local_dir()),
-				S3Store::from_uri(&uri)?,
-			));
+			let s3_store = S3Store::from_uri(&uri)?;
+			match sync.local_dir() {
+				Some(local_dir) => entity.insert(S3FsStore::new(
+					FsStore::new(local_dir.clone()),
+					s3_store,
+				)),
+				None => entity.insert(s3_store),
+			};
 			Ok(())
 		});
 }

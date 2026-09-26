@@ -139,14 +139,15 @@ async fn repl_loop(
 	lines: async_channel::Receiver<String>,
 ) -> Result {
 	dispatch(&entity, Request::from_parts(parts, default())).await?;
-	cross_log_noline!("> ");
-	while let Ok(line) = lines.recv().await {
+	// a prompt stdout will not take means nothing is left to read it, so the
+	// repl is over: end the run below rather than loop unseen
+	while cross_log_noline!("> ").is_ok() {
+		let Ok(line) = lines.recv().await else { break };
 		let line = line.trim();
 		if line == "exit" || line == "quit" {
 			break;
 		}
 		dispatch(&entity, Request::from_cli_str(line)).await?;
-		cross_log_noline!("> ");
 	}
 	// stdin closed, or the user asked to leave: the repl IS the run, so ending it
 	// resolves the parked call and the process exits like any completed one.

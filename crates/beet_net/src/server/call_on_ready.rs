@@ -102,20 +102,30 @@ impl CallOnReady {
 	/// A failed call is the process's result too: it logs and exits nonzero
 	/// rather than raising into the app's error handler, since there is no caller
 	/// above a load to hear it.
+	///
+	/// EVERY path below reaches an [`AppExit`], a panic included. A load's
+	/// parked call IS the process: nothing above it resolves it, so an unwind
+	/// that merely ended this task (which is what the async runtime does with
+	/// one) would leave a one-shot alive forever with nobody left to answer.
 	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
-		let response = match Self::response(&entity, request).await {
-			Ok(response) => response,
+		match async_ext::catch_panic(Self::call_inner(&entity, request)).await {
+			Ok(()) => Ok(()),
 			// a run ended by whoever removed its `Running` (a driver stopping the
 			// server it booted) is neither a result nor a fault: the exit is theirs
-			Err(err) if ControlFlowError::is_interrupted(&err) => return Ok(()),
+			Err(err) if ControlFlowError::is_interrupted(&err) => Ok(()),
 			Err(err) => {
 				error!("{err}");
 				entity.world().write_message(AppExit::error()).await;
-				return Ok(());
+				Ok(())
 			}
-		};
+		}
+	}
+
+	/// The call itself: resolve the response, then stream it and exit.
+	async fn call_inner(entity: &AsyncEntity, request: Request) -> Result {
+		let response = Self::response(entity, request).await?;
 		// reached only for a one-shot; a long-running action parks the await.
-		stream_and_exit(&entity, response).await
+		stream_and_exit(entity, response).await
 	}
 
 	/// The load call itself, resolving whichever of the three shapes the entity
@@ -196,9 +206,16 @@ async fn stream_and_exit(host: &AsyncEntity, response: Response) -> Result {
 }
 
 /// Streams a [`Response`] body to stdout chunk-by-chunk.
+///
+/// A stdout that will not take a chunk (`| head`, a closed terminal) is the
+/// ordinary end of a piped program's output, not a fault: stop reading the
+/// body and let the response's own status decide the exit code. A body that
+/// fails to produce a chunk IS a fault and fails the load.
 pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 	while let Some(chunk) = body.next().await? {
-		cross_log_noline!("{}", String::from_utf8_lossy(&chunk));
+		if cross_log_noline!("{}", String::from_utf8_lossy(&chunk)).is_err() {
+			break;
+		}
 	}
 	Ok(())
 }
@@ -206,6 +223,7 @@ pub(crate) async fn stream_body_to_stdout(mut body: Body) -> Result {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use crate::exports::bytes::Bytes;
 
 	/// Sweep a load over `entity`'s subtree, as a booting binary's build does.
 	fn load(world: &mut World, entity: Entity) {
@@ -462,6 +480,51 @@ mod test {
 			AsyncRunner::tick(app.world()).await;
 		}
 		nested_ran.get().xpect_false();
+	}
+
+	/// A one-shot streaming two chunks, the second produced by `second`, which
+	/// is where a body fails or panics.
+	fn streaming_load(
+		second: impl 'static + Send + Sync + Clone + Fn() -> Result<Bytes>,
+	) -> impl Bundle {
+		(
+			CallOnReady,
+			Action::<Request, Response>::new_pure(
+				move |_: ActionContext<Request>| {
+					let second = second.clone();
+					Response::ok()
+						.with_body(Body::stream(
+							futures::stream::iter(0..2).map(move |index| {
+								match index {
+									0 => Ok(Bytes::from_static(b"one")),
+									_ => second(),
+								}
+							}),
+						))
+						.xok()
+				},
+			),
+		)
+	}
+
+	/// A body that fails to produce a chunk IS a fault, unlike a stdout that
+	/// will not take one: the load exits nonzero rather than reporting the
+	/// success its status alone would have said.
+	#[beet_core::test]
+	async fn a_failing_body_exits_nonzero() {
+		exit_of(streaming_load(|| bevybail!("the body broke")))
+			.await
+			.xpect_eq(AppExit::error());
+	}
+
+	/// A panic while streaming resolves the load too. Nothing above a one-shot's
+	/// parked call can resolve it, so an unwind that merely ended the task would
+	/// leave the process alive forever, which is what a broken pipe used to do.
+	#[beet_core::test]
+	async fn a_panic_mid_stream_still_exits() {
+		exit_of(streaming_load(|| panic!("mid-stream")))
+			.await
+			.xpect_eq(AppExit::error());
 	}
 
 	/// A failed build never runs and exits nonzero, so a broken entry fails the

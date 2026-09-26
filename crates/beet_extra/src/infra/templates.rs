@@ -609,7 +609,7 @@ mod test {
 
 	/// The analytics compaction stack the site entry declares end to end: the
 	/// analytics and archive buckets, the invoke-only function, and the timer
-	/// that drives it — plus the job bound to its stores by relation.
+	/// that drives it — plus the job naming its three stores.
 	///
 	/// TWO buckets, not three: segments and aggregate rows share the
 	/// `analytics` bucket under disjoint prefixes, because a bucket is the unit
@@ -634,7 +634,7 @@ mod test {
 			r#"<Fragment>
 				<Route path="jobs" {HttpServer}>
 					<Router>
-						<Route path="rollup" {(AnalyticsRollupJob, StoreRef($analytics), RollupStoreRef($analytics), ArchiveStoreRef($archive))}/>
+						<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw: $analytics, rollups: $analytics, archive: $archive})}/>
 					</Router>
 				</Route>
 				<Stack>
@@ -678,15 +678,14 @@ mod test {
 			.http()
 			.xpect_false();
 
-		// the job names its stores by relation, and each one resolves to the
-		// declaration whose name the deploy provisions — raw and rollup at the
-		// same one, which is what collapsing to two buckets means
+		// the job names its three stores in one component, and each field
+		// resolves to the declaration whose name the deploy provisions — raw
+		// and rollups at the same one, which is what collapsing to two buckets
+		// means
 		let (job, events, rollups, archive) = world
-			.query::<(Entity, &StoreRef, &RollupStoreRef, &ArchiveStoreRef)>()
+			.query::<(Entity, &RollupRef)>()
 			.single(&world)
-			.map(|(job, events, rollups, archive)| {
-				(job, events.0, rollups.0, archive.0)
-			})
+			.map(|(job, refs)| (job, refs.raw, refs.rollups, refs.archive))
 			.unwrap();
 		world
 			.entity(job)

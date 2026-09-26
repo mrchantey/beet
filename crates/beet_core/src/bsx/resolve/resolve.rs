@@ -273,6 +273,26 @@ mod test {
 		fn default() -> Self { Self(Entity::PLACEHOLDER) }
 	}
 
+	/// The named-field twin of [`Bound`], the shape a consumer of SEVERAL
+	/// declarations names them all in, one field per role.
+	#[derive(Component, Reflect, MapEntities, Clone, Debug, PartialEq)]
+	#[reflect(Component, MapEntities, Default)]
+	struct BoundPair {
+		#[entities]
+		first: Entity,
+		#[entities]
+		second: Entity,
+	}
+
+	impl Default for BoundPair {
+		fn default() -> Self {
+			Self {
+				first: Entity::PLACEHOLDER,
+				second: Entity::PLACEHOLDER,
+			}
+		}
+	}
+
 	/// Build `markup` into a world registering `PackageConfig` and [`Bound`],
 	/// returning the world and the built root.
 	fn build(markup: &str) -> (World, Entity) {
@@ -282,6 +302,7 @@ mod test {
 			let mut registry = registry.write();
 			registry.register::<PackageConfig>();
 			registry.register::<Bound>();
+			registry.register::<BoundPair>();
 			registry.register::<RequireCfg>();
 		}
 		let nodes =
@@ -366,6 +387,24 @@ mod test {
 			.unwrap()
 			.0
 			.xpect_eq(target);
+	}
+
+	/// A `$name` reference fills a NAMED struct field, so a consumer of several
+	/// declarations names every one of them in one component with every role
+	/// spelled, rather than one relationship per store.
+	#[crate::test]
+	fn refs_fill_named_fields() {
+		let (world, root) = build(
+			r#"<div><span bx:ref="a"/><span bx:ref="b"/><span {BoundPair{first: $a, second: $b}}/></div>"#,
+		);
+		let host = world.entity(root).get::<Children>().unwrap()[0];
+		let children = world.entity(host).get::<Children>().unwrap();
+		let (first, second, consumer) = (children[0], children[1], children[2]);
+		world
+			.entity(consumer)
+			.get::<BoundPair>()
+			.unwrap()
+			.xpect_eq(BoundPair { first, second });
 	}
 
 	/// The narrow [`AllowedUnregistered`] opt-out still resolves to nothing at
