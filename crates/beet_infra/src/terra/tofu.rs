@@ -3,9 +3,8 @@
 //! ## Architecture
 //!
 //! The default approach is a single state backend, ie a directory or s3 bucket,
-//! with each stack (app-stage pair) having its own state,
-//! ie
-//! `beet-state/beet--dev/..state`
+//! with each stack (app-stage pair) having its own state under a flat key,
+//! ie `beet--dev--tofu-tfstate` in the bucket [`S3Backend`] names.
 //!
 use crate::prelude::*;
 use beet_core::prelude::*;

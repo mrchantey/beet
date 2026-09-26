@@ -21,6 +21,15 @@ pub struct Project {
 	secrets: Option<crate::types::SecretStore>,
 }
 impl Project {
+	/// Written in the work directory once `tofu init` has finished, holding the
+	/// sha256 of the config it initialized. The rendered `main.tf.json` cannot
+	/// say that itself: it is on disk *before* init runs, so a run that wrote a
+	/// new config and then failed (an unreachable state bucket, an interrupted
+	/// init) would otherwise leave the config looking initialized, and the next
+	/// verb would drive tofu against the backend the last finished init
+	/// configured.
+	const INIT_STAMP: &'static str = ".beet-tofu-init";
+
 	pub fn new(
 		stack: ResolvedStack,
 		deployment: Deployment,
@@ -200,24 +209,28 @@ impl Project {
 	/// The state backend this project's state lives in.
 	fn backend(&self) -> &StackBackend { self.deployment.backend() }
 
-	/// Initialize the tofu project if required,
-	/// checking if the config has changes, a lockfile exists,
-	/// and the backend type matches the current config.
+	/// Initialize the tofu project unless the last init finished against this
+	/// exact config, see [`Self::INIT_STAMP`].
 	async fn init(&self) -> Result {
-		/// The lock file created by `tofu init` on successful completion.
-		const LOCK_FILE: &str = ".terraform.lock.hcl";
+		/// The directory `tofu init` creates, holding the backend it configured
+		/// and every provider it installed: deleting it un-initializes the
+		/// project, so the stamp alone is not enough.
+		const TOFU_DIR: &str = ".terraform";
 
 		let dir = self.dir();
 		let bytes = serde_json::to_vec_pretty(&self.config.to_json())?;
+		let digest = digest_ext::hex::<sha2::Sha256>(&bytes);
 		let config_path = dir.join("main.tf.json");
-		let lock_path = dir.join(LOCK_FILE);
-		let config_unchanged = fs_ext::read_async(config_path.clone())
+		let stamp_path = dir.join(Self::INIT_STAMP);
+		let config_initialized =
+			fs_ext::read_to_string_async(stamp_path.clone())
+				.await
+				.is_ok_and(|stamped| stamped == digest);
+		let init_completed = fs_ext::exists_async(dir.join(TOFU_DIR))
 			.await
-			.is_ok_and(|current| current == bytes);
-		let init_completed =
-			fs_ext::exists_async(lock_path).await.unwrap_or(false);
-		if config_unchanged && init_completed {
-			trace!("tofu config unchanged, skipping init");
+			.unwrap_or(false);
+		if config_initialized && init_completed {
+			trace!("tofu config unchanged since its init, skipping init");
 			return Ok(());
 		}
 		fs_ext::write_async(config_path, &bytes).await?;
@@ -226,6 +239,8 @@ impl Project {
 		debug!("initializing tofu project");
 		// init evaluates the encryption config, so it needs the passphrase
 		tofu::init(&dir, &self.required_vars()?).await?;
+		// only now, see `INIT_STAMP`
+		fs_ext::write_async(stamp_path, digest).await?;
 		Ok(())
 	}
 
@@ -546,6 +561,40 @@ mod test {
 			.await
 			.contains(&("other".into(), SmolStr::default()))
 			.xpect_true();
+	}
+}
+
+/// Native only: drives the real `tofu` against a local backend.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod init {
+	use super::*;
+
+	/// An init that did not finish does not look finished. The rendered config
+	/// reaches disk before init runs, so a run that re-pointed the backend and
+	/// then failed leaves exactly this behind: the new `main.tf.json` beside the
+	/// previous init. The next verb must init again, because tofu refuses every
+	/// state-touching command while its recorded backend differs from the config.
+	#[beet_core::test(timeout_ms = 120_000)]
+	async fn reinits_after_an_unfinished_init() {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		let under = |state_dir: &str| {
+			let deployment = deployment
+				.clone()
+				.with_backend(LocalBackend::new(dir.path().join(state_dir)));
+			let config = deployment.create_config(&stack);
+			Project::new(stack.clone(), deployment, config)
+		};
+		let first = under("state-a");
+		first.init().await.unwrap();
+		let second = under("state-b");
+		fs_ext::write_async(
+			second.dir().join("main.tf.json"),
+			serde_json::to_vec_pretty(&second.config.to_json()).unwrap(),
+		)
+		.await
+		.unwrap();
+		// inits, so this reads `state-b`; a skipped init makes tofu refuse
+		second.show().await.unwrap();
 	}
 }
 

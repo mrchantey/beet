@@ -159,7 +159,8 @@ const DEFAULT_STATE_NAME: &str = "beet-state";
 /// first, and the state it writes has an undo from the start.
 #[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
 pub struct S3Backend {
-	/// The S3 bucket containing the state file, defaults to `beet-state`
+	/// The S3 bucket containing the state file, defaults to
+	/// [`DEFAULT_STATE_NAME`].
 	bucket: SmolStr,
 	/// AWS region where the bucket lives.
 	region: SmolStr,
