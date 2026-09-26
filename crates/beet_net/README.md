@@ -27,6 +27,8 @@ A `BlobStore` is the erased handle every backend (`FsStore`, `S3Store`, `InMemor
 
 Consumers usually resolve it by ancestry (the `AncestorQuery<&BlobStore>` idiom, which honours any intervening `DirPath` scope); `RepoStore::get` is the direct lookup. Every other store is a plain store, declared for a purpose and reached by name through a `StoreRef`. See `src/store/mod.rs` for the backends and the reactive `BlobEvent` substrate.
 
+`src/store_actions/` is what markup and an agent toolset reach those stores through: `ListBlobs`/`ReadBlob`/`WriteBlob`/`EditText`/`RemoveBlob` over the nearest ancestor `BlobStore`, and `SqlSelect`, one authored `SELECT` over the `SqliteStore` a `StoreRef` names (`<Route path="senders" {(SqlSelect{sql:".."}, StoreRef($index))}/>`). There is no write twin of `SqlSelect` on purpose: a SQLite store a consumer queries is an index, whose schema comes from whatever fills it and whose content is rebuilt from that source.
+
 ## Example
 
 ```rust,ignore

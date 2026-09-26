@@ -13,7 +13,8 @@ use std::sync::Mutex;
 /// table (`key TEXT PRIMARY KEY, json TEXT NOT NULL`), so a backend-agnostic
 /// caller reaches it through the erased [`BlobStore`] and [`TableStore`] like
 /// any other store while a consumer that chose SQLite indexes and queries the
-/// rows with SQL ([`execute`](Self::execute), [`query`](Self::query)).
+/// rows with SQL ([`execute`](Self::execute), [`query`](Self::query)), or from
+/// markup through [`SqlSelect`](crate::prelude::SqlSelect).
 ///
 /// One pooled connection per path is shared by every clone and scope of the
 /// store, opened in WAL mode on first use (which creates the file); every
@@ -21,7 +22,7 @@ use std::sync::Mutex;
 /// stored as canonical json (sorted keys), so the same document always stores
 /// the same text and `json = ?` comparisons are meaningful.
 #[derive(Debug, Clone, Component, Get, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 #[component(on_insert = on_insert_sqlite)]
 pub struct SqliteStore {
 	/// The database file. Coerces from a workspace-relative string attribute
@@ -45,6 +46,14 @@ static POOL: LazyPool<AbsPath, SharedConnection, Result<SharedConnection>> =
 			blocking::unblock(move || SqliteStore::open(&path)).await
 		})
 	});
+
+/// The workspace's own `data.db`, so `<SqliteStore/>` names the repo's index
+/// and `<SqliteStore path="other.db"/>` any other database. A default is what
+/// makes the tag authorable at all: markup builds the default and writes the
+/// attributes over it.
+impl Default for SqliteStore {
+	fn default() -> Self { Self::new(WsPath::new("data.db")) }
+}
 
 impl SqliteStore {
 	/// The store at the database file `path`, created on first use.

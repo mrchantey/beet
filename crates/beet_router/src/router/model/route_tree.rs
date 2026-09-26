@@ -613,6 +613,7 @@ mod test {
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -621,6 +622,7 @@ mod test {
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -640,6 +642,7 @@ mod test {
 				path: PathPattern::new(":foo").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -648,6 +651,7 @@ mod test {
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -667,6 +671,7 @@ mod test {
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -675,6 +680,7 @@ mod test {
 				path: PathPattern::new(":bar").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 		];
 		RouteTree::from_nodes(nodes)
@@ -694,6 +700,7 @@ mod test {
 				path: PathPattern::new("foo").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 			ActionNode {
 				entity: Entity::PLACEHOLDER,
@@ -702,6 +709,7 @@ mod test {
 				path: PathPattern::new("bar").unwrap(),
 				method: None,
 				is_page_route: false,
+				description: None,
 			},
 		];
 		let tree = RouteTree::from_nodes(nodes).unwrap();

@@ -17,6 +17,9 @@
 //! - a present value parses through its type's [`LiteralParser`] entry, so a
 //!   type authors identically here and in markup: `Duration`, `Timestamp`,
 //!   `StoreUri`, `GlobFilter`, and whatever a downstream crate registers;
+//! - a unit-variant enum is named by its variant, case-insensitively:
+//!   `--format=jsonl` is `Format::Jsonl`, and a name spelling no variant errors
+//!   listing the ones it could have spelt;
 //! - a single-field newtype is transparent and reads its parent's key; a
 //!   nested multi-field struct is flattened into the parent's namespace.
 //!
@@ -294,6 +297,18 @@ fn build_field_value(
 				.map(wrap)
 				.map(Some);
 		}
+		// a unit-variant enum is named by its variant, ie `--format=jsonl`,
+		// the flag twin of a markup attribute's `format="jsonl"`; a name
+		// spelling no variant errors with the ones it could have spelt. An
+		// `Option<T>` is already unwrapped above, so this is the declared enum
+		// and never the option itself.
+		if let Some(TypeInfo::Enum(enum_info)) = leaf_info
+			&& let [one] = values.as_slice()
+		{
+			return reflect_ext::unit_variant_value(enum_info, one)
+				.map(wrap)
+				.map(Some);
+		}
 	}
 
 	// a struct or newtype has no key of its own: a newtype reads its parent's
@@ -409,7 +424,7 @@ fn unsupported_field<T>(
 		.map(TypeInfo::type_path)
 		.unwrap_or("an untyped field");
 	bevybail!(
-		"unsupported type for `--{}`: no authored form for `{type_path}`, expected a bool, a nested struct, or a type carrying a `LiteralParser`",
+		"unsupported type for `--{}`: no authored form for `{type_path}`, expected a bool, a unit enum, a nested struct, or a type carrying a `LiteralParser`",
 		field_name.to_kebab_case()
 	)
 }
@@ -553,6 +568,37 @@ mod test {
 				store: Some(StoreUri::parse("s3://bucket").unwrap()),
 			});
 		message::<Domain>("--timeout=30").xpect_contains("invalid duration");
+	}
+
+	/// A unit enum is named by its variant, case-insensitively, and a name
+	/// spelling none errors with the ones it could have spelt: the same
+	/// coercion a markup attribute gets.
+	#[crate::test]
+	fn unit_enum_leaves() {
+		#[derive(Debug, Default, PartialEq, Reflect)]
+		enum Format {
+			#[default]
+			Table,
+			Jsonl,
+		}
+		#[derive(Debug, PartialEq, Reflect)]
+		struct Output {
+			format: Format,
+			fallback: Option<Format>,
+		}
+		parse::<Output>("--format=jsonl").unwrap().xpect_eq(Output {
+			format: Format::Jsonl,
+			fallback: None,
+		});
+		parse::<Output>("--format=Table --fallback=JSONL")
+			.unwrap()
+			.xpect_eq(Output {
+				format: Format::Table,
+				fallback: Some(Format::Jsonl),
+			});
+		message::<Output>("--format=csv")
+			.xpect_contains("names no unit variant")
+			.xpect_contains("Table, Jsonl");
 	}
 
 	/// Keys match kebab-case (the flag) and snake_case (the field) alike.

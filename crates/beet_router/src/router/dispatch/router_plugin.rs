@@ -56,6 +56,9 @@ impl Plugin for RouterPlugin {
 			.register_type::<ParamsPartial>()
 			.register_type::<PathPattern>()
 			.register_type::<ParamsPattern>()
+			// what `--help` says a route does, for the routes that share a
+			// handler and differ by what they carry
+			.register_type::<RouteDescription>()
 			.register_type::<RequestLogger>()
 			.register_type::<NoCacheHeaders>()
 			.register_type::<CacheHeaders>()

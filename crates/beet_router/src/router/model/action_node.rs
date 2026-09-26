@@ -17,6 +17,21 @@ use beet_net::prelude::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PageRequest(pub Entity);
 
+/// What `--help` says a route does, for a route whose meaning is in its data
+/// rather than its handler type.
+///
+/// A description otherwise comes from the handler's own doc comment, which is
+/// right while one type is one verb. It stops being right the moment several
+/// routes share a handler and differ by what they carry: a dozen
+/// `<SqlSelect>` routes are a dozen questions and one doc comment. Authored
+/// beside the action, ie
+/// `<Route path="senders" {(SqlSelect{sql:".."}, RouteDescription("who sends
+/// the most messages"))}/>`, and preferred over the handler's doc where both
+/// are present.
+#[derive(Debug, Clone, PartialEq, Eq, Deref, Component, Reflect)]
+#[reflect(Component)]
+pub struct RouteDescription(pub SmolStr);
+
 /// An action route node, representing a callable action at a specific path.
 /// Scene routes are identified by their output type being [`PageRequest`].
 #[derive(Debug, Clone)]
@@ -35,14 +50,21 @@ pub struct ActionNode {
 	/// route rather than an infrastructure or data route. Drives inclusion in the
 	/// navigation [`RouteSidebar`](crate::prelude::RouteSidebar).
 	pub is_page_route: bool,
+	/// The route's own [`RouteDescription`], which wins over the handler's doc.
+	pub description: Option<SmolStr>,
 }
 
 impl ActionNode {
 	/// Whether this action is a scene route (output type is [`PageRequest`]).
 	pub fn is_scene(&self) -> bool { self.meta.output_is::<PageRequest>() }
 
-	/// The action's description from doc comments, if available.
-	pub fn description(&self) -> Option<&str> { self.meta.description() }
+	/// What this route does: its own [`RouteDescription`] where it has one,
+	/// else the handler's doc comment.
+	pub fn description(&self) -> Option<&str> {
+		self.description
+			.as_deref()
+			.or_else(|| self.meta.description())
+	}
 
 	/// Whether this node is a page the public may reach: a [`PageRoute`] at a
 	/// fully static path answering `GET`, and not a draft in a production
@@ -104,6 +126,7 @@ pub(crate) type ActionQueryItem<'a> = (
 	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
 	Has<PageRoute>,
+	Option<&'a RouteDescription>,
 );
 
 impl ActionNode {
@@ -111,13 +134,14 @@ impl ActionNode {
 	/// query item shape (`Has<PageRoute>` resolves to a `bool`), not the
 	/// query-data alias itself.
 	pub fn from_query(
-		(entity, meta, path, params, method, is_page_route): (
+		(entity, meta, path, params, method, is_page_route, description): (
 			Entity,
 			&ActionMeta,
 			&PathPattern,
 			&ParamsPattern,
 			Option<&HttpMethod>,
 			bool,
+			Option<&RouteDescription>,
 		),
 	) -> Self {
 		Self {
@@ -127,6 +151,7 @@ impl ActionNode {
 			path: path.clone(),
 			method: method.cloned(),
 			is_page_route,
+			description: description.map(|described| described.0.clone()),
 		}
 	}
 }

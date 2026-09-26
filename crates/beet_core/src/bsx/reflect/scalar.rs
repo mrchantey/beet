@@ -13,10 +13,6 @@
 use crate::prelude::*;
 use bevy::reflect::PartialReflect;
 use bevy::reflect::TypeInfo;
-use bevy::reflect::enums::DynamicEnum;
-use bevy::reflect::enums::DynamicVariant;
-use bevy::reflect::enums::EnumInfo;
-use bevy::reflect::enums::VariantInfo;
 use bevy::reflect::structs::DynamicStruct;
 use bevy::reflect::tuple_struct::DynamicTupleStruct;
 use core::any::TypeId;
@@ -77,38 +73,17 @@ pub(super) fn scalar_to_reflect(
 
 	// a string targeting an enum field coerces to that unit variant, so a markup
 	// attribute `kind="User"` resolves to `ActorKind::User` (the quoted twin of
-	// the `{Foo{kind:User}}` spread's bare-variant form).
+	// the `{Foo{kind:User}}` spread's bare-variant form). A name spelling no
+	// unit variant errors there rather than falling through to `String`, whose
+	// `from_reflect` miss would keep the field's DEFAULT — eg a
+	// `records="identity-only"` leaving `MailRecords::All` in place, which on a
+	// cutover-staged mail domain is the difference between proving an identity
+	// and taking the domain's mail. `Option` and `Cow` targets never reach
+	// here: both are unwrapped earlier.
 	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
 		(value, field_info)
 	{
-		if let Some(variant) = unit_variant(enum_info, string.as_str())? {
-			return Ok(Box::new(DynamicEnum::new(
-				variant,
-				DynamicVariant::Unit,
-			)));
-		}
-	}
-
-	// a string targeting an enum field that names no unit variant errors rather
-	// than falling through to `String` (whose `from_reflect` miss would keep
-	// the field's DEFAULT, so a mistyped variant name would read as a working
-	// declaration — eg a `records="identity-only"` leaving `MailRecords::All`
-	// in place, which on a cutover-staged mail domain is the difference
-	// between proving an identity and taking the domain's mail). `Option` and
-	// `Cow` targets never reach here: both are unwrapped earlier.
-	if let (Value::Str(string), Some(TypeInfo::Enum(enum_info))) =
-		(value, field_info)
-	{
-		bevybail!(
-			"`{string}` names no unit variant of `{}`; expected one of: {}",
-			enum_info.type_path(),
-			enum_info
-				.iter()
-				.filter(|variant| matches!(variant, VariantInfo::Unit(_)))
-				.map(|variant| variant.name())
-				.collect::<Vec<_>>()
-				.join(", ")
-		);
+		return reflect_ext::unit_variant_value(enum_info, string.as_str());
 	}
 
 	// a string that reached a struct, tuple-struct or opaque target without
@@ -154,47 +129,5 @@ fn string_to_reflect(string: &str, type_id: TypeId) -> Box<dyn PartialReflect> {
 	match type_id == TypeId::of::<SmolStr>() {
 		true => Box::new(SmolStr::new(string)),
 		false => Box::new(string.to_string()),
-	}
-}
-
-/// The unit variant of `enum_info` that `name` spells, or `None` when it spells
-/// none.
-///
-/// An exact match wins outright, so a lookup costs one probe and an enum whose
-/// variants differ only by case still resolves each one exactly. Failing that,
-/// the match is case-insensitive: a markup attribute is prose, where
-/// `visibility="draft"` is what a human writes, while the Rust variant is
-/// `Draft`.
-///
-/// # Errors
-/// Errors when a case-insensitive spelling matches more than one variant. There
-/// is no right answer there, and quietly picking one would make the declaration
-/// mean whichever variant happened to be declared first.
-fn unit_variant<'a>(
-	enum_info: &'a EnumInfo,
-	name: &str,
-) -> Result<Option<&'a str>> {
-	let is_unit =
-		|variant: &&VariantInfo| matches!(variant, VariantInfo::Unit(_));
-	if let Some(variant) = enum_info.variant(name)
-		&& is_unit(&variant)
-	{
-		return Ok(Some(variant.name()));
-	}
-	let matches: Vec<&str> = enum_info
-		.iter()
-		.filter(is_unit)
-		.map(|variant| variant.name())
-		.filter(|variant| variant.eq_ignore_ascii_case(name))
-		.collect();
-	match matches.as_slice() {
-		[] => Ok(None),
-		[variant] => Ok(Some(variant)),
-		ambiguous => bevybail!(
-			"`{name}` matches {} variants of `{}` case-insensitively: {}; spell one exactly",
-			ambiguous.len(),
-			enum_info.type_path(),
-			ambiguous.join(", ")
-		),
 	}
 }

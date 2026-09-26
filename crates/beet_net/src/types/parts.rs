@@ -204,10 +204,11 @@ impl RequestParts {
 	/// on the params type whose [`ParamsPartial`] documents it in `--help`.
 	///
 	/// A field name is its kebab-case flag, an `Option` is optional, a `Vec`
-	/// repeats, a `bool` is a flag present or absent, anything else is
-	/// required and named in the error when absent, and each value parses
-	/// through its type's [`LiteralParser`] exactly as markup does. The full
-	/// contract is [`MultiMapReflectExt::parse_reflect`].
+	/// repeats, a `bool` is a flag present or absent, a unit enum is named by
+	/// its variant, anything else is required and named in the error when
+	/// absent, and each value parses through its type's [`LiteralParser`]
+	/// exactly as markup does. The full contract is
+	/// [`MultiMapReflectExt::parse_reflect`].
 	///
 	/// ```
 	/// # use beet_core::prelude::*;
