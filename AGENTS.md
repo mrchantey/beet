@@ -112,7 +112,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 
 - The two main causes of ECS bugs are (1) missing components: an entity lacked what a system or observer expected, and (2) incorrect traversals: a traversal assuming a structure a refactor has changed. Inspect with `world.log_component_names(entity)`.
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
-- never use `println!`, it is silent in wasm. Informational logging uses the `log` macros `error!`/`warn!`/`info!`/`debug!`; `cross_log!` is ONLY for output that must not carry a log prefix (a streamed response body, the program's actual result). Temp dumps: `foo.xprint()`; control-flow log points: `breakpoint!()`.
+- **stdout is the program's answer, stderr is everything else.** Never `println!`, it is silent in wasm. Informational logging uses the `log` macros `error!`/`warn!`/`info!`/`debug!`, which land on stderr; `cross_log!` writes stdout and is ONLY for the answer itself (a streamed response body, a rendered result), so a one-shot pipes clean. Temp dumps: `foo.xprint()`; control-flow log points: `breakpoint!()`.
 - In wasm, `app.run()` immediately returns `AppExit::Success`; use `app.run_async()` to run to completion.
 - when a bug is found in actual usage of a feature (examples, `site/`), it is not enough to fix it: isolate it, understand it and add tests to avoid regression.
 

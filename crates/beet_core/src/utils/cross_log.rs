@@ -1,4 +1,11 @@
-//! Cross-platform logging macros and their per-platform backends.
+//! Cross-platform raw output macros and their per-platform backends.
+//!
+//! **Stdout is the program's answer and stderr is everything else.** The
+//! `tracing` macros (`error!`/`warn!`/`info!`/`debug!`) go to stderr through
+//! [`PrettyTracing`](crate::prelude::PrettyTracing); these go to stdout, so a
+//! one-shot's result pipes clean (`query --format=jsonl > rows.jsonl` gets
+//! rows, and nothing else) while its diagnostics still reach the terminal.
+//! That split is the whole reason these exist beside the `log` facade.
 //!
 //! Each backend routes by platform via [`cfg_if!`](crate::cfg_if): the browser
 //! console on wasm, stdout/stderr on native std, and `tracing` on a bare no_std
@@ -79,10 +86,10 @@ impl CrossLog {
 
 /// Cross-platform raw output without a trailing newline.
 ///
-/// Only for output that must not carry a log prefix, ie streaming a response
-/// body to stdout or rendering the program's actual result. Never for
-/// informational logging, which uses the `log` crate (`error!`/`warn!`/`info!`/
-/// `debug!`), already cross-platform via the `log` facade + the app's `LogPlugin`.
+/// The program's actual result, on stdout with no log prefix: a streamed
+/// response body, a rendered answer. Never informational logging, which uses
+/// the `log` crate (`error!`/`warn!`/`info!`/`debug!`) and lands on stderr
+/// through the app's `LogPlugin`.
 ///
 /// Answers with the write result: a closed stdout is the ordinary end of a
 /// piped program's output, so a streaming caller stops rather than faulting.
@@ -99,10 +106,10 @@ macro_rules! cross_log_noline {
 
 /// Cross-platform raw output with a trailing newline.
 ///
-/// Only for output that must not carry a log prefix, ie streaming a response
-/// body to stdout or rendering the program's actual result. Never for
-/// informational logging, which uses the `log` crate (`error!`/`warn!`/`info!`/
-/// `debug!`), already cross-platform via the `log` facade + the app's `LogPlugin`.
+/// The program's actual result, on stdout with no log prefix: a streamed
+/// response body, a rendered answer. Never informational logging, which uses
+/// the `log` crate (`error!`/`warn!`/`info!`/`debug!`) and lands on stderr
+/// through the app's `LogPlugin`.
 ///
 /// - **wasm32**: writes to `console.log`
 /// - **native + std**: prints to stdout

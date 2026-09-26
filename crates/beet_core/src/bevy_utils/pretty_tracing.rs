@@ -156,19 +156,28 @@ impl PrettyTracing {
 		// wasm has no useful stdout (a Cloudflare Worker discards it), so route
 		// formatted events to the JS console instead: `error!`/`info!` then surface
 		// in browser devtools and `wrangler tail`, wiring diagnostics for every
-		// upstream system rather than just the Worker entry. native keeps the
-		// pretty stdout format.
+		// upstream system rather than just the Worker entry.
 		#[cfg(target_arch = "wasm32")]
 		let dispatch = self.dispatch(console_writer::MakeConsoleWriter);
+		// natively, STDERR. Logs are the diagnostics beside a program, not its
+		// answer: stdout carries the answer alone, which is what makes
+		// `cross_log!` mean something and a one-shot's output pipeable
+		// (`query --format=jsonl > rows.jsonl` gets rows, not rows and a log).
+		// It is also what every unix tool does, so `2>/dev/null` behaves the way
+		// an operator expects.
 		#[cfg(not(target_arch = "wasm32"))]
-		let dispatch = self.dispatch(std::io::stdout);
+		let dispatch = self.dispatch(std::io::stderr);
 		// also installs the `log` -> `tracing` bridge; a no-op if a subscriber
 		// has already been installed
 		dispatch.try_init().ok();
 	}
 
-	/// `true` when stdout is an interactive terminal, ie a developer watching a
-	/// tty rather than a log file, a pipe or a deployed service.
+	/// `true` when the LOG stream is an interactive terminal, ie a developer
+	/// watching a tty rather than a log file, a pipe or a deployed service.
+	///
+	/// Stderr, because that is where the logs go: a one-shot whose stdout is
+	/// piped still has a human reading its diagnostics, and they should get the
+	/// colored format while the pipe gets clean output.
 	///
 	/// Always `false` on wasm, which has no tty: the JS console host stamps
 	/// entries at *ingest*, so beet emits its own *emit* timestamp there too.
@@ -177,7 +186,7 @@ impl PrettyTracing {
 			if #[cfg(target_arch = "wasm32")] {
 				false
 			} else {
-				std::io::IsTerminal::is_terminal(&std::io::stdout())
+				std::io::IsTerminal::is_terminal(&std::io::stderr())
 			}
 		}
 	}
@@ -275,7 +284,7 @@ impl FormatTime for Iso8601Timer {
 /// tracing events to the JS console, the wasm logging backend [`PrettyTracing`]
 /// installs. Each event becomes one `console.log`/`console.error` call, so the
 /// `tracing` macros work in the browser and in a Cloudflare Worker (`wrangler
-/// tail`) the same as they do on native stdout.
+/// tail`) the same as they do on native stderr.
 #[cfg(target_arch = "wasm32")]
 mod console_writer {
 	use bevy::log::tracing::Level;
