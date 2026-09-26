@@ -520,6 +520,10 @@ mod test {
 	/// A panic while streaming resolves the load too. Nothing above a one-shot's
 	/// parked call can resolve it, so an unwind that merely ended the task would
 	/// leave the process alive forever, which is what a broken pipe used to do.
+	///
+	/// Unwinding only: `wasm32-unknown-unknown` is `panic="abort"`, so there is
+	/// no unwind to catch and a panic ends the module instead.
+	#[cfg(panic = "unwind")]
 	#[beet_core::test]
 	async fn a_panic_mid_stream_still_exits() {
 		exit_of(streaming_load(|| panic!("mid-stream")))

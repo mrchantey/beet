@@ -62,13 +62,17 @@ where
 ///
 /// For the caller that OWNS a process's lifetime and so cannot let an unwind
 /// merely end its task: whatever was waiting on that task would wait forever.
-/// Everywhere else a panic should keep travelling. Under `panic=abort` and on
-/// no_std there is nothing to catch, so the future's own output is the answer.
+/// Everywhere else a panic should keep travelling.
+///
+/// Where the profile or the target aborts instead of unwinding (`panic="abort"`,
+/// which is every `wasm32-unknown-unknown` build) there is nothing to catch and
+/// nothing a caller could have done: the future's own output is the answer, and
+/// a panic ends the module.
 pub async fn catch_panic<Out>(
 	fut: impl Future<Output = Result<Out>>,
 ) -> Result<Out> {
 	crate::cfg_if! {
-		if #[cfg(feature = "std")] {
+		if #[cfg(all(feature = "std", panic = "unwind"))] {
 			use futures_lite::FutureExt;
 			match std::panic::AssertUnwindSafe(fut).catch_unwind().await {
 				Ok(output) => output,

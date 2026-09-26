@@ -63,14 +63,13 @@ pub use store::*;
 pub fn analytics_plugin(app: &mut App) {
 	app.register_type::<AnalyticsConfig>()
 		.register_type::<GeoIpDb>()
-		// the nightly job and the one component naming its three stores, so
-		// `<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw:
-		// $analytics, rollups: $analytics, archive: $archive})}/>` authors
-		// from markup. Two fields may name ONE declaration, which is how a
-		// deployment collapses raw and rollups into a single bucket under
-		// disjoint prefixes, or names two when it wants them apart.
+		// the nightly job, which names its three stores as its own fields, so
+		// `<Route path="rollup" {AnalyticsRollupJob{raw: $analytics, rollups:
+		// $analytics, archive: $archive}}/>` authors from markup. Two fields
+		// may name ONE declaration, which is how a deployment collapses raw
+		// and rollups into a single bucket under disjoint prefixes, or names
+		// two when it wants them apart.
 		.register_type::<AnalyticsRollupJob>()
-		.register_type::<RollupRef>()
 		.init_resource::<store::AnalyticsShutdown>()
 		.add_observer(GeoIpDb::load_on_add)
 		.add_observer(store::spawn_store_on_config)

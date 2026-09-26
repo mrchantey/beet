@@ -248,7 +248,14 @@ base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 sha2 = "0.11"
 # SQLite for the `SqliteStore` backend: `bundled` compiles the engine in rather
 # than linking a system library, so it cross-compiles like the rest of the tree.
-rusqlite = { version = "0.40", default-features = false, features = ["bundled"] }
+# `ffi-sqlite-wasm-rs` is how it reaches the browser: rusqlite swaps
+# `libsqlite3-sys` (which will not link for wasm) for `sqlite-wasm-rs` on
+# `wasm32-unknown-unknown` through its own target table, so the feature is inert
+# everywhere else and `bundled` degrades to nothing there (its
+# `libsqlite3-sys?/bundled` is a weak optional). `sqlite-wasm-rs` sets
+# `links = "wsqlite3"`, so exactly one version may be in the graph: never depend
+# on it directly, let rusqlite pick it.
+rusqlite = { version = "0.40", default-features = false, features = ["bundled", "ffi-sqlite-wasm-rs"] }
 # gzip JSONL (`JsonlCodec::Gzip`, behind beet_net's `gzip` feature) for objects
 # another tool produced: pure rust (`miniz_oxide`) rather than a zlib link, so it
 # builds on every target.

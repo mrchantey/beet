@@ -10,7 +10,7 @@ pub use list::*;
 pub use read::*;
 pub use remove::*;
 pub use write::*;
-#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+#[cfg(feature = "sqlite")]
 mod select;
-#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+#[cfg(feature = "sqlite")]
 pub use select::*;

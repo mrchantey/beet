@@ -20,6 +20,15 @@ impl<K, V, O> LazyPool<K, V, O> {
 		}
 	}
 
+	/// Whether `key` already has a value, without constructing one: what a
+	/// store whose backend has no file to stat asks instead.
+	pub async fn contains(&self, key: &K) -> bool
+	where
+		K: core::hash::Hash + Eq,
+	{
+		self.map.read().await.contains_key(key)
+	}
+
 	/// Evict the value for `key`, so the next [`get`](Self::get) constructs a
 	/// fresh one: what a store does before deleting the file its pooled
 	/// connection is open on.

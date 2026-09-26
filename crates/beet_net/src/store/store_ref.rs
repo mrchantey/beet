@@ -22,11 +22,13 @@ use beet_core::prelude::*;
 /// `allow_self_referential` so a consumer co-located with its store on one
 /// entity still links.
 ///
-/// One store per consumer: a consumer of SEVERAL names them in one component
-/// with a field per role (`AnalyticsRollupJob`'s `RollupRef`, beet_egress'
-/// `LogRef`), since a generic `StoreRef` beside a specifically named twin
-/// leaves the generic one silently role-bearing. `resolve` below is the shared
-/// resolver either shape calls.
+/// One store per consumer: a consumer of SEVERAL names them one field per role
+/// in one place, since a generic `StoreRef` beside a specifically named twin
+/// leaves the generic one silently role-bearing. That is the action's own
+/// `#[field(required)] #[entities]` fields where nothing else needs the set
+/// (`AnalyticsRollupJob`), or one shared component where several consumers do
+/// (beet_egress' `LogRef`). `resolve` below is the shared resolver every shape
+/// calls.
 #[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
 #[reflect(Component)]
 #[relationship(relationship_target = StoreConsumers, allow_self_referential)]

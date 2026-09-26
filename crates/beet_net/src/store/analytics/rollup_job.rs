@@ -4,42 +4,6 @@ use beet_core::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// The three declarations an [`AnalyticsRollupJob`] works on, every role
-/// spelled: `<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw:
-/// $analytics, rollups: $analytics, archive: $archive})}/>`.
-///
-/// A consumer of one store keeps the plain [`StoreRef`] relationship, which is
-/// what it is for. A consumer of several names them in one component rather
-/// than a generic relation plus a specifically named one per extra store: the
-/// generic name would be silently role-bearing, and half the pointing is then
-/// unexpressible, since a job either names all three or names none.
-///
-/// Two fields may name the same declaration, which is how a deployment
-/// collapses raw and rollups into one bucket: their prefixes are disjoint.
-#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, MapEntities)]
-#[reflect(Component, MapEntities, Default)]
-pub struct RollupRef {
-	/// The blob store holding the raw [`AnalyticsSegment`] shards.
-	#[entities]
-	pub raw: Entity,
-	/// The blob store the job writes [`AnalyticsRollup`] rows to.
-	#[entities]
-	pub rollups: Entity,
-	/// The blob store the job writes daily raw archives to.
-	#[entities]
-	pub archive: Entity,
-}
-
-impl Default for RollupRef {
-	fn default() -> Self {
-		Self {
-			raw: Entity::PLACEHOLDER,
-			rollups: Entity::PLACEHOLDER,
-			archive: Entity::PLACEHOLDER,
-		}
-	}
-}
-
 /// Runs analytics compaction over raw, rollup, and archive blob stores.
 ///
 /// Complete-day segments are merged with that day's existing archive and
@@ -271,35 +235,34 @@ struct AnalyticsRollupParams {
 
 /// Compacts raw analytics segments into daily archives and aggregates.
 ///
-/// The route names its raw, rollup, and archive stores in one [`RollupRef`]. A
-/// run is idempotent: archive paths and aggregate IDs are deterministic, while
-/// event-ID deduplication makes a retry safe if a prior run archived but did
-/// not delete.
+/// The route names its raw, rollup, and archive stores as fields of the job
+/// itself, one per role, so a missing one is an error by field name and half a
+/// pointing is not authorable. A run is idempotent: archive paths and aggregate
+/// IDs are deterministic, while event-ID deduplication makes a retry safe if a
+/// prior run archived but did not delete.
 #[action]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
+#[derive(Default, Component, Reflect, MapEntities)]
+#[reflect(Component, Default, MapEntities)]
 #[require(ParamsPartial = ParamsPartial::new::<AnalyticsRollupParams>())]
 pub async fn AnalyticsRollupJob(
+	/// The blob store holding the raw [`AnalyticsSegment`] shards.
+	#[field(required)]
+	#[entities]
+	raw: Entity,
+	/// The blob store this job writes [`AnalyticsRollup`] rows to. May name the
+	/// same declaration as `raw`: their prefixes are disjoint, which is how a
+	/// deployment collapses the two into one bucket.
+	#[field(required)]
+	#[entities]
+	rollups: Entity,
+	/// The blob store this job writes daily raw archives to.
+	#[field(required)]
+	#[entities]
+	archive: Entity,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let caller = cx.caller.clone();
-	let world = caller.world().clone();
+	let world = cx.caller.world().clone();
 	let full = cx.input.parse_params::<AnalyticsRollupParams>()?.full;
-	let RollupRef {
-		raw,
-		rollups,
-		archive,
-	} = caller
-		.get::<RollupRef, _>(|refs| refs.clone())
-		.await
-		.map_err(|_| {
-			bevyhow!(
-				"the analytics rollup job names the three stores it works on: \
-				 add `RollupRef{{raw: $raw, rollups: $rollups, archive: \
-				 $archive}}` beside it, pointing at the blocks that declare \
-				 them"
-			)
-		})?;
 
 	let report = AnalyticsRollupRun::new(
 		StoreRef::resolve::<BlobStore>(&world, raw).await?,
@@ -499,11 +462,11 @@ mod test {
 		let raw_store = world.entity(raw).get::<BlobStore>().unwrap().clone();
 		write_segment(&raw_store, &[event.clone()], 1).await;
 		let job = world
-			.spawn((AnalyticsRollupJob::default(), RollupRef {
-				raw,
-				rollups,
-				archive,
-			}))
+			.spawn(AnalyticsRollupJob {
+				raw: Some(raw),
+				rollups: Some(rollups),
+				archive: Some(archive),
+			})
 			.flush();
 
 		let report = world
@@ -533,9 +496,9 @@ mod test {
 			.xpect_eq(1);
 	}
 
-	/// Naming all three in one component leaves only two states, so the one
-	/// failure is the whole component missing: a job pointing at two of the
-	/// three is not authorable.
+	/// A required field is validated at call time and the failure names it, so
+	/// the job says which store it is missing rather than which relation it
+	/// went looking for.
 	#[beet_core::test]
 	async fn an_unpointed_job_fails_loudly() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
@@ -546,11 +509,11 @@ mod test {
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("RollupRef");
+			.xpect_contains("missing required field `raw`");
 	}
 
 	/// The two-bucket deployment: raw and rollups share one declaration under
-	/// disjoint prefixes, which one component says by naming it twice.
+	/// disjoint prefixes, which the job says by naming it in two fields.
 	#[beet_core::test]
 	async fn two_fields_may_name_one_declaration() {
 		let mut world = (AsyncPlugin, analytics_plugin).into_world();
@@ -561,11 +524,11 @@ mod test {
 			world.entity(analytics).get::<BlobStore>().unwrap().clone();
 		write_segment(&raw_store, &[event.clone()], 1).await;
 		let job = world
-			.spawn((AnalyticsRollupJob::default(), RollupRef {
-				raw: analytics,
-				rollups: analytics,
-				archive,
-			}))
+			.spawn(AnalyticsRollupJob {
+				raw: Some(analytics),
+				rollups: Some(analytics),
+				archive: Some(archive),
+			})
 			.flush();
 		world
 			.entity_mut(job)

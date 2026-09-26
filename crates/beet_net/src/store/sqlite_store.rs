@@ -38,12 +38,27 @@ pub struct SqliteStore {
 /// The pooled connection, a [`Mutex`] since a [`Connection`] is not [`Sync`].
 type SharedConnection = Arc<Mutex<Connection>>;
 
+cfg_if! {
+	if #[cfg(target_arch = "wasm32")] {
+		/// What a future must be to reach [`SqliteStore::erase`]: nothing in
+		/// particular on wasm, where there is one thread and `SendWrapper`
+		/// asserts the rest.
+		trait Erasable: 'static + Future {}
+		impl<T: 'static + Future> Erasable for T {}
+	} else {
+		/// What a future must be to reach [`SqliteStore::erase`]: [`Send`],
+		/// since the executor it lands on is threaded.
+		trait Erasable: 'static + Send + Future {}
+		impl<T: 'static + Send + Future> Erasable for T {}
+	}
+}
+
 /// One connection per database file, shared by every store on that path.
 static POOL: LazyPool<AbsPath, SharedConnection, Result<SharedConnection>> =
 	LazyPool::new(|path| {
 		let path = path.clone();
 		Box::pin(async move {
-			blocking::unblock(move || SqliteStore::open(&path)).await
+			SqliteStore::offload(move || SqliteStore::open(&path)).await
 		})
 	});
 
@@ -132,20 +147,30 @@ impl SqliteStore {
 	/// does before deleting the file the connection was open on.
 	async fn close(&self) {
 		let conn = POOL.remove(&self.path).await;
-		// closing checkpoints the WAL, filesystem work for the blocking pool
-		blocking::unblock(move || drop(conn)).await;
+		// closing checkpoints the WAL, filesystem work to offload
+		let _ = Self::offload(move || Ok(drop(conn))).await;
 	}
 
 	/// Open the database at `path`, creating it and the `blobs` table. WAL
 	/// journaling with normal sync: durable across a process crash, and a
 	/// reader never blocks the writer.
+	///
+	/// Both of those are about a real file, so neither happens on wasm, whose
+	/// default VFS holds the database in memory: `path` is a name there rather
+	/// than a location, there is no directory to create, no second process to
+	/// shield and no shared memory to journal through. Registering a durable
+	/// browser VFS (OPFS) is the seam to widen this at.
 	fn open(path: &AbsPath) -> Result<SharedConnection> {
+		#[cfg(not(target_arch = "wasm32"))]
 		if let Some(parent) = path.parent() {
 			fs_ext::create_dir_all(&parent)?;
 		}
 		let conn = Connection::open(path.as_str())?;
-		conn.pragma_update(None, "journal_mode", "WAL")?;
-		conn.pragma_update(None, "synchronous", "NORMAL")?;
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			conn.pragma_update(None, "journal_mode", "WAL")?;
+			conn.pragma_update(None, "synchronous", "NORMAL")?;
+		}
 		conn.execute_batch(
 			"CREATE TABLE IF NOT EXISTS blobs (\
 				path TEXT PRIMARY KEY, body BLOB NOT NULL)",
@@ -153,15 +178,15 @@ impl SqliteStore {
 		Arc::new(Mutex::new(conn)).xok()
 	}
 
-	/// Run `func` against the pooled connection on the blocking pool.
+	/// Run `func` against the pooled connection, off the async executor.
 	fn run<T: 'static + Send>(
 		&self,
 		func: impl 'static + Send + FnOnce(&Connection) -> Result<T>,
 	) -> SendBoxedFuture<Result<T>> {
 		let this = self.clone();
-		Box::pin(async move {
+		Self::erase(async move {
 			let conn = this.connection().await?;
-			blocking::unblock(move || {
+			Self::offload(move || {
 				// a poisoned lock only means a panic mid-operation; the
 				// connection itself is still consistent
 				let conn = conn.lock().unwrap_or_else(|err| err.into_inner());
@@ -169,6 +194,42 @@ impl SqliteStore {
 			})
 			.await
 		})
+	}
+
+	/// Erase a pooled operation into the currency every store provider answers
+	/// in, which is [`Send`].
+	///
+	/// The pool's own future is not, on wasm: bevy's `BoxedFuture` is its
+	/// conditional-send alias there. With one thread to be on, wrapping is the
+	/// same assertion every browser store in this module already makes.
+	fn erase<T: 'static>(fut: impl Erasable<Output = T>) -> SendBoxedFuture<T> {
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				Box::pin(send_wrapper::SendWrapper::new(fut))
+			} else {
+				Box::pin(fut)
+			}
+		}
+	}
+
+	/// Run blocking SQLite work off the async executor, which natively means
+	/// the `blocking` pool.
+	///
+	/// On wasm it means HERE: there are no threads to hand it to, so the call
+	/// occupies whichever one it is on for its duration. That is the whole of
+	/// the seam, and it is internal — every caller, native included, sees the
+	/// same future. A browser build that cares about jank belongs in a
+	/// dedicated worker for the same reason its durable VFS would.
+	fn offload<T: 'static + Send>(
+		func: impl 'static + Send + FnOnce() -> Result<T>,
+	) -> SendBoxedFuture<Result<T>> {
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				Box::pin(core::future::ready(func()))
+			} else {
+				Box::pin(blocking::unblock(func))
+			}
+		}
 	}
 
 	/// The `path` column `path` keys to: the path under this store's subdir.
@@ -291,9 +352,21 @@ impl BlobStoreProvider for SqliteStore {
 
 	fn region(&self) -> Option<String> { None }
 
+	/// Whether the database is there to open.
+	///
+	/// Natively, and under any file-backed VFS, that is a file on disk. The
+	/// default wasm VFS holds the database in memory, where `path` is a name
+	/// rather than a location, so it exists exactly while this process holds a
+	/// connection to it.
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let path = self.path.clone();
-		Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				Self::erase(async move { POOL.contains(&path).await.xok() })
+			} else {
+				Box::pin(async move { fs_ext::exists_async(path).await?.xok() })
+			}
+		}
 	}
 
 	/// Create the database file and its `blobs` table.
@@ -302,7 +375,7 @@ impl BlobStoreProvider for SqliteStore {
 	/// Fails if the file already exists.
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Self::erase(async move {
 			if this.store_exists().await? {
 				bevybail!("sqlite store `{}` already exists", this.path);
 			}
@@ -311,22 +384,27 @@ impl BlobStoreProvider for SqliteStore {
 	}
 
 	/// Close the pooled connection and delete the file, with the WAL sidecars
-	/// a crash may have left beside it.
+	/// a crash may have left beside it. Under the wasm memory VFS closing IS
+	/// the delete: the database lives in the connection, and there is no file
+	/// and no sidecar to unlink.
 	///
 	/// # Errors
-	/// Fails if the file does not exist.
+	/// Fails if the database does not exist.
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		Box::pin(async move {
+		Self::erase(async move {
 			if !this.store_exists().await? {
 				bevybail!("sqlite store `{}` does not exist", this.path);
 			}
 			this.close().await;
-			fs_ext::remove_async(&this.path).await?;
-			for sidecar in ["-wal", "-shm"] {
-				let sidecar = format!("{}{sidecar}", this.path);
-				if fs_ext::exists_async(&sidecar).await? {
-					fs_ext::remove_async(&sidecar).await?;
+			#[cfg(not(target_arch = "wasm32"))]
+			{
+				fs_ext::remove_async(&this.path).await?;
+				for sidecar in ["-wal", "-shm"] {
+					let sidecar = format!("{}{sidecar}", this.path);
+					if fs_ext::exists_async(&sidecar).await? {
+						fs_ext::remove_async(&sidecar).await?;
+					}
 				}
 			}
 			Ok(())
@@ -612,16 +690,60 @@ impl TableProvider for SqliteStore {
 	}
 }
 
+/// The one port hook the `printf` vendored in `sqlite-wasm-rs`' libc shim
+/// leaves to whoever links it, and the only free fn in this module because an
+/// `extern "C"` symbol cannot be an associated item.
+///
+/// `wasm32-unknown-unknown` has no libc, so each C library in a build brings
+/// its own shim. SQLite's is the one that defines the standard `printf` names,
+/// and its `printf.o` joins the link the moment ANY C code in the binary
+/// references one of them — quickjs does, so `sqlite` + `quickjs` in one wasm
+/// binary is the case that needs this. That object calls `putchar_`, which the
+/// library documents as the caller's to provide, and without it the link fails
+/// on an undefined symbol.
+///
+/// Buffered to a line, since C prints a character at a time and a console logs
+/// a call at a time.
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn putchar_(char: core::ffi::c_char) {
+	use std::cell::RefCell;
+	thread_local! {
+		static LINE: RefCell<String> = const { RefCell::new(String::new()) };
+	}
+	LINE.with_borrow_mut(|line| match char as u8 {
+		b'\n' => beet_core::cross_log!("{}", core::mem::take(line)),
+		byte => line.push(byte as char),
+	});
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// A fresh store in a temp dir, the dir kept alive beside it.
-	fn temp_store() -> (TempDir, SqliteStore) {
-		let dir = TempDir::new_ws().unwrap();
-		let store = SqliteStore::new(dir.join("store.db"));
-		(dir, store)
+	/// A store nothing else shares, and whatever has to outlive it.
+	///
+	/// Natively that is a real database file under a temp dir, kept alive by
+	/// the guard. On wasm the default VFS holds the database in memory, so
+	/// there is nothing to keep and the name alone makes it distinct — the
+	/// pool is keyed by path, so two tests sharing one would share a
+	/// connection.
+	fn temp_store() -> (impl Sized, SqliteStore) {
+		cfg_if! {
+			if #[cfg(target_arch = "wasm32")] {
+				use std::sync::atomic::AtomicUsize;
+				use std::sync::atomic::Ordering;
+				static NEXT: AtomicUsize = AtomicUsize::new(0);
+				let nth = NEXT.fetch_add(1, Ordering::SeqCst);
+				let path = AbsPath::new_unchecked(format!("/store-{nth}.db"));
+				((), SqliteStore::new(path))
+			} else {
+				let dir = TempDir::new_ws().unwrap();
+				let store = SqliteStore::new(dir.join("store.db"));
+				(dir, store)
+			}
+		}
 	}
 
 	#[beet_core::test]
@@ -665,6 +787,35 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(vec![RelPath::new("b.txt"), RelPath::new("docs/a.txt")]);
+	}
+
+	/// The shape a consumer indexes a json table by: `VIRTUAL` columns
+	/// generated from the row's `json` plus one index across them, which is
+	/// what turns a fold over the rows into a b-tree walk. Worth its own case
+	/// because it is the one thing a build swapping SQLite's ffi could plausibly
+	/// lose, and the query plan is the only thing that says whether it did.
+	#[beet_core::test]
+	async fn generated_columns_are_indexed() {
+		let (_dir, store) = temp_store();
+		let table = Table::<TableItem<u32>>::new(store.clone());
+		table.push(TableItem::new(7u32)).await.unwrap();
+		store
+			.execute(
+				"ALTER TABLE table_item ADD COLUMN data INTEGER \
+				 GENERATED ALWAYS AS (json_extract(json, '$.data')) VIRTUAL; \
+				 CREATE INDEX idx_table_item_data ON table_item (data)",
+			)
+			.await
+			.unwrap();
+		store
+			.query(
+				"EXPLAIN QUERY PLAN SELECT count(*) FROM table_item \
+				 WHERE data = 7",
+			)
+			.await
+			.unwrap()
+			.xmap(|rows| format!("{rows:?}"))
+			.xpect_contains("idx_table_item_data");
 	}
 
 	/// The escape hatch: a view over `json_extract` reads the rows a typed

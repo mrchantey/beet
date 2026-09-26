@@ -313,22 +313,41 @@ _test-pkgs pkgs *args:
 
 # Shared wasm cargo test runner over a space-separated list of crates.
 # Excludes `cloudflare`: it pulls the `worker` SDK, whose module init expects the
-# Cloudflare Workers runtime and hangs under the Deno wasm test runner. Every
-# other feature is enabled, `testing_embedded` included — its `linkme` slice is
-# cfg'd out on wasm, so the feature is inert there rather than unbuildable.
+# Cloudflare Workers runtime and hangs under the Deno wasm test runner. Excludes
+# `sqlite`, which gets `test-wasm-sqlite` below instead: it cannot share a wasm
+# binary with `quickjs` while `rusqlite` pins `sqlite-wasm-rs` 0.5 (see there).
+# Every other feature is enabled, `testing_embedded` included — its `linkme`
+# slice is cfg'd out on wasm, so the feature is inert there rather than
+# unbuildable.
 _test-pkgs-wasm pkgs *args:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	feats=$(just _core-features "{{ pkgs }}" "cloudflare")
+	feats=$(just _core-features "{{ pkgs }}" "cloudflare|sqlite")
 	crates=$(printf -- "-p %s " {{ pkgs }})
 	cargo test $crates --lib --target wasm32-unknown-unknown $feats {{ args }} -- {{ test-threads }}
+
+# `SqliteStore` on wasm, which the combined run above cannot cover.
+#
+# `sqlite-wasm-rs` 0.5.5 (the version `rusqlite` 0.40.2 pins) ships a `strtod.o`
+# in its libc shim that does not validate as wasm. Nothing in SQLite calls
+# `strtod`, so the object is inert — until another C library in the same binary
+# leaves `strtod` undefined and lld resolves it there. `rquickjs` does exactly
+# that, and the module then fails `wasm-bindgen` with "failed to parse code
+# section". `sqlite-wasm-rs` 0.6 drops `strtod` from the shim, which fixes it;
+# `rusqlite`'s master already widened its range to allow 0.6, so this recipe
+# folds back into the one above on its next release.
+test-wasm-sqlite *args:
+	cargo test -p beet_net --lib --target wasm32-unknown-unknown \
+		--features beet_net/std,beet_net/json,beet_net/sqlite {{ args }} -- {{ test-threads }}
 
 test-core *args:
 	just _test-pkgs "{{ _core-pkgs }}" {{ args }}
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
+	just test-wasm-sqlite {{ args }}
 
 test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
+	just test-wasm-sqlite {{ args }}
 
 # Run a crate's wasm suite inside a headless browser instead of deno: only the
 # `#[beet_core::test(browser)]` dom tests run there (everything else skips, and

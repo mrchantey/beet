@@ -10,7 +10,7 @@
 //! - [`S3Store`]: AWS S3 storage (requires `aws_sdk` feature)
 //! - [`DynamoStore`]: AWS DynamoDB storage (requires `aws_sdk` feature)
 //! - [`SqliteStore`]: a SQLite database file, blobs and real SQL tables with an
-//!   SQL escape hatch (requires `sqlite`, native only)
+//!   SQL escape hatch (requires `sqlite`)
 //! - [`HttpStore`]: a store served over http (a `<ServeBlobs>` mount), read-only
 //!   (requires `json`; reads need a transport, wasm's fetch or `ureq`/`reqwest`)
 //! - [`StoreFork`]: a local store forked off an upstream one, the fork a
@@ -163,9 +163,9 @@ pub use dynamo_store::*;
 pub use s3_fs_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 mod dynamo_store;
-#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+#[cfg(feature = "sqlite")]
 mod sqlite_store;
-#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+#[cfg(feature = "sqlite")]
 pub use sqlite_store::*;
 
 #[cfg(feature = "std")]
@@ -259,7 +259,7 @@ impl Plugin for StorePlugin {
 			.register_type::<DynamoStore>();
 
 		// the database-file store, so a scene declares a local index.
-		#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+		#[cfg(feature = "sqlite")]
 		app.register_type::<SqliteStore>();
 
 		// the http-served store, so a scene declares a remote repo it reads.

@@ -634,7 +634,7 @@ mod test {
 			r#"<Fragment>
 				<Route path="jobs" {HttpServer}>
 					<Router>
-						<Route path="rollup" {(AnalyticsRollupJob, RollupRef{raw: $analytics, rollups: $analytics, archive: $archive})}/>
+						<Route path="rollup" {AnalyticsRollupJob{raw: $analytics, rollups: $analytics, archive: $archive}}/>
 					</Router>
 				</Route>
 				<Stack>
@@ -678,14 +678,21 @@ mod test {
 			.http()
 			.xpect_false();
 
-		// the job names its three stores in one component, and each field
-		// resolves to the declaration whose name the deploy provisions — raw
-		// and rollups at the same one, which is what collapsing to two buckets
+		// the job names its three stores as its own fields, and each resolves
+		// to the declaration whose name the deploy provisions — raw and
+		// rollups at the same one, which is what collapsing to two buckets
 		// means
 		let (job, events, rollups, archive) = world
-			.query::<(Entity, &RollupRef)>()
+			.query::<(Entity, &AnalyticsRollupJob)>()
 			.single(&world)
-			.map(|(job, refs)| (job, refs.raw, refs.rollups, refs.archive))
+			.map(|(job, refs)| {
+				(
+					job,
+					refs.raw.unwrap(),
+					refs.rollups.unwrap(),
+					refs.archive.unwrap(),
+				)
+			})
 			.unwrap();
 		world
 			.entity(job)

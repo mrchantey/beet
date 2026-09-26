@@ -46,7 +46,7 @@ pub enum StoreProvider {
 	#[cfg(feature = "json")]
 	Http(HttpStore),
 	/// `sqlite:<path>`.
-	#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+	#[cfg(feature = "sqlite")]
 	Sqlite(SqliteStore),
 }
 
@@ -69,7 +69,7 @@ macro_rules! each_store {
 			StoreProvider::R2($store) => $body,
 			#[cfg(feature = "json")]
 			StoreProvider::Http($store) => $body,
-			#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+			#[cfg(feature = "sqlite")]
 			StoreProvider::Sqlite($store) => $body,
 		}
 	};
@@ -143,12 +143,12 @@ impl StoreProvider {
 				"store `{uri}` is served over http, whose listing is json \
 				 (enable the `json` feature)"
 			),
-			#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+			#[cfg(feature = "sqlite")]
 			StoreUri::Sqlite { .. } => Self::Sqlite(SqliteStore::from_uri(uri)?),
-			#[cfg(not(all(feature = "sqlite", not(target_arch = "wasm32"))))]
+			#[cfg(not(feature = "sqlite"))]
 			StoreUri::Sqlite { .. } => bevybail!(
 				"store `{uri}` is a SQLite database (enable the `sqlite` \
-				 feature, native only)"
+				 feature)"
 			),
 		}
 		.xok()
@@ -214,7 +214,7 @@ mod test {
 
 	/// A database file uri builds the sqlite backend, its relative path
 	/// resolved against the cwd and its blobs unscoped.
-	#[cfg(all(feature = "sqlite", not(target_arch = "wasm32")))]
+	#[cfg(feature = "sqlite")]
 	#[beet_core::test]
 	fn builds_a_sqlite_backend() {
 		let store = StoreProvider::from_uri(
