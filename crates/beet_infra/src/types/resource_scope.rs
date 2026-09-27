@@ -166,6 +166,20 @@ impl RenderScope {
 		.xok()
 	}
 
+	/// [`project`](Self::project) for a caller already async and holding the
+	/// whole scope: resolve the backend this launch declares, then build with
+	/// it.
+	///
+	/// [`project`](Self::project) takes a [`ResolvedBackend`] and stays sync
+	/// because `Project::resolve_in` builds inside a sync world pass, which
+	/// cannot await the discovery; a caller with no world pass left to
+	/// interleave takes this rather than restating the two steps.
+	#[cfg(not(target_arch = "wasm32"))]
+	pub async fn resolve_project(self) -> Result<terra::Project> {
+		let backend = self.deployment.backend().resolve().await?;
+		self.project(backend)
+	}
+
 	/// The resolved identity every rendered name composes from.
 	pub fn stack(&self) -> &ResolvedStack { &self.stack }
 

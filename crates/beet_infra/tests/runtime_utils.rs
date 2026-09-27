@@ -134,6 +134,19 @@ impl TestDeploy {
 			.with_aws_region(Self::AWS_REGION)
 	}
 
+	/// Point this launch at the version the ledger currently selects, so the
+	/// project built next applies what a rollback or rollforward chose: the
+	/// test's half of what those verbs do in a deploy.
+	pub async fn use_current_ledger(&mut self) -> Result {
+		let ledger = self
+			.artifacts_client()
+			.current_ledger()
+			.await?
+			.ok_or_else(|| bevyhow!("no current ledger"))?;
+		self.deployment.update_from_ledger(&ledger);
+		Ok(())
+	}
+
 	/// The client of the stack's repo store, exactly as
 	/// `RepoStoreQuery::artifacts_client` builds it in a deploy.
 	pub fn artifacts_client(&self) -> ArtifactsClient {
@@ -170,11 +183,11 @@ pub fn publish_site(site_dir: &AbsPath) -> Result<impl Bundle> {
 }
 
 /// Build the terraform project for `block` deployed beside the repo store,
-/// rendered through the same [`DeployRender`] schedule the deploy runs.
-pub fn render_test_project(
+/// rendered through the same [`DeployRender`] schedule the deploy runs and
+/// against the state backend this launch declares.
+pub async fn render_test_project(
 	deploy: &TestDeploy,
 	block: impl Bundle,
-	backend: ResolvedBackend,
 ) -> Result<terra::Project> {
 	let mut world = InfraPlugin.into_world();
 	world.insert_resource(deploy.deployment.clone());
@@ -186,7 +199,9 @@ pub fn render_test_project(
 			parent.spawn(repo_store_block());
 		})
 		.id();
-	RenderScope::render(&mut world, root)?.project(backend)
+	RenderScope::render(&mut world, root)?
+		.resolve_project()
+		.await
 }
 
 /// The document root of `deploy`'s version in the repo store, exactly as the
@@ -198,25 +213,6 @@ pub fn repo_uri(deploy: &TestDeploy) -> StoreUri {
 /// The published document of `deploy`'s version, for verification.
 pub fn repo_document(deploy: &TestDeploy) -> BlobStore {
 	BlobStore::from_uri(&repo_uri(deploy)).unwrap()
-}
-
-/// Re-apply terraform with the current ledger deploy_id.
-/// Used after rollback/rollforward to update the deployed resource.
-pub async fn apply_with_current_ledger<F>(
-	deploy: &mut TestDeploy,
-	build_project: F,
-) -> Result<String>
-where
-	F: FnOnce(&TestDeploy, ResolvedBackend) -> Result<terra::Project>,
-{
-	let ledger = deploy
-		.artifacts_client()
-		.current_ledger()
-		.await?
-		.ok_or_else(|| bevyhow!("no current ledger"))?;
-	deploy.deployment.update_from_ledger(&ledger);
-	let backend = deploy.deployment.backend().resolve().await?;
-	build_project(deploy, backend)?.apply().await
 }
 
 /// Verify the published document of `deploy`'s version carries the expected

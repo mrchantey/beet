@@ -29,8 +29,7 @@ async fn lambda_lifecycle() {
 	let mut deploy_ctx = TestDeploy::new("lambda-test");
 
 	// clean up any prior state
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	let project = build_project(&deploy_ctx, backend).unwrap();
+	let project = build_project(&deploy_ctx).await.unwrap();
 	cleanup_prior_state(&deploy_ctx, project).await;
 
 	// 1. deploy v1
@@ -38,8 +37,7 @@ async fn lambda_lifecycle() {
 	deploy(&deploy_ctx, assets_dir).await.unwrap();
 
 	// 2. verify v1 is live
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	let project = build_project(&deploy_ctx, backend).unwrap();
+	let project = build_project(&deploy_ctx).await.unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 2: verifying v1 at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
@@ -56,8 +54,7 @@ async fn lambda_lifecycle() {
 	deploy(&deploy_ctx, assets_dir).await.unwrap();
 
 	// 6. verify v2
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	let project = build_project(&deploy_ctx, backend).unwrap();
+	let project = build_project(&deploy_ctx).await.unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 6: verifying v2 at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
@@ -70,13 +67,16 @@ async fn lambda_lifecycle() {
 	info!("step 8: rolling back");
 	let client = deploy_ctx.artifacts_client();
 	client.rollback(1).await.unwrap();
-	apply_with_current_ledger(&mut deploy_ctx, build_project)
+	deploy_ctx.use_current_ledger().await.unwrap();
+	build_project(&deploy_ctx)
+		.await
+		.unwrap()
+		.apply()
 		.await
 		.unwrap();
 
 	// 9. verify v1 after rollback
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	let project = build_project(&deploy_ctx, backend).unwrap();
+	let project = build_project(&deploy_ctx).await.unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 9: verifying v1 after rollback at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
@@ -89,13 +89,16 @@ async fn lambda_lifecycle() {
 	info!("step 11: rolling forward");
 	let client = deploy_ctx.artifacts_client();
 	client.rollforward().await.unwrap();
-	apply_with_current_ledger(&mut deploy_ctx, build_project)
+	deploy_ctx.use_current_ledger().await.unwrap();
+	build_project(&deploy_ctx)
+		.await
+		.unwrap()
+		.apply()
 		.await
 		.unwrap();
 
 	// 12. verify v2 after rollforward
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	let project = build_project(&deploy_ctx, backend).unwrap();
+	let project = build_project(&deploy_ctx).await.unwrap();
 	let url = project.output("main-lambda--function_url").await.unwrap();
 	info!("step 12: verifying v2 after rollforward at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
@@ -108,8 +111,8 @@ async fn lambda_lifecycle() {
 	info!("step 14: destroying");
 	// the state carriers are `StackTeardown`'s job now, and
 	// `cleanup_prior_state` sweeps them at the start of the next run
-	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
-	build_project(&deploy_ctx, backend)
+	build_project(&deploy_ctx)
+		.await
 		.unwrap()
 		.tofu_destroy(false)
 		.await
@@ -124,11 +127,8 @@ async fn lambda_lifecycle() {
 }
 
 /// Build the terraform project for the Lambda test stack.
-fn build_project(
-	deploy: &TestDeploy,
-	backend: ResolvedBackend,
-) -> Result<terra::Project> {
-	render_test_project(deploy, LambdaBlock::default(), backend)
+async fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
+	render_test_project(deploy, LambdaBlock::default()).await
 }
 
 /// Build, upload artifacts, publish the site, and apply terraform
