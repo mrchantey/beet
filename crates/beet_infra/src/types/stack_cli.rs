@@ -81,35 +81,46 @@ pub(crate) struct DestroyParams {
 
 impl terra::Project {
 	/// Build a project from `caller`'s nearest ancestor [`Stack`], the
-	/// resolution every stack verb starts from, with its state backend
-	/// resolved (see [`Project::resolved`]).
+	/// resolution every stack verb starts from.
 	pub async fn resolve(caller: &AsyncEntity) -> Result<Self> {
-		let project = caller
-			.with_world(Self::resolve_in)
-			.await??
-			.resolved()
-			.await?;
-		// what the resolution learned is the launch's, not this verb's: the
-		// next verb, and every block that builds its own project from the
-		// world, render the same backend without asking AWS again
-		let backend = project.deployment().backend().clone();
+		let backend = Self::resolve_backend(caller).await?;
 		caller
-			.world()
-			.with_resource::<Deployment, _>(move |mut deployment| {
-				deployment.set_backend(backend);
+			.with_world(move |world, entity| {
+				Self::resolve_in(world, entity, backend)
 			})
-			.await;
-		project.xok()
+			.await?
 	}
 
-	/// [`resolve`](Self::resolve) with the world in hand: the stack rendered,
-	/// and its secret store attached so a content variable resolves.
-	pub fn resolve_in(world: &mut World, entity: Entity) -> Result<Self> {
+	/// The launch's state backend, resolved: the async half of building a
+	/// project, since the world pass that builds one is sync. An action that
+	/// runs its own world pass resolves this first and hands it over, which is
+	/// what makes holding a project proof that the discovery ran.
+	pub async fn resolve_backend(
+		caller: &AsyncEntity,
+	) -> Result<ResolvedBackend> {
+		caller
+			.world()
+			.with_resource::<Deployment, _>(|deployment| {
+				deployment.backend().clone()
+			})
+			.await
+			.resolve()
+			.await
+	}
+
+	/// [`resolve`](Self::resolve) with the world in hand: the stack rendered
+	/// against `backend`, and its secret store attached so a content variable
+	/// resolves.
+	pub fn resolve_in(
+		world: &mut World,
+		entity: Entity,
+		backend: ResolvedBackend,
+	) -> Result<Self> {
 		let secrets = world.with_state::<StackQuery, _>(|stacks| {
 			stacks.secret_store(entity)
 		})?;
 		RenderScope::render(world, entity)?
-			.project()?
+			.project(backend)?
 			.with_secret_store(secrets)
 			.xok()
 	}

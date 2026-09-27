@@ -2165,6 +2165,7 @@ mod tests {
 	async fn validate() {
 		let (scope, _dir) = render_block(&LightsailBlock::default());
 		StateEncryption::ensure_test_passphrase();
-		scope.project().unwrap().validate().await.unwrap();
+		let backend = scope.deployment().backend().resolve().await.unwrap();
+		scope.project(backend).unwrap().validate().await.unwrap();
 	}
 }

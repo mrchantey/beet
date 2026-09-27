@@ -3092,6 +3092,7 @@ mod tests {
 				spawn_stack(mail_box(), parent);
 			});
 		StateEncryption::ensure_test_passphrase();
-		scope.project().unwrap().validate().await.unwrap();
+		let backend = scope.deployment().backend().resolve().await.unwrap();
+		scope.project(backend).unwrap().validate().await.unwrap();
 	}
 }

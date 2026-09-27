@@ -2,11 +2,15 @@ use crate::bindings::aws;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Strategy for maintaining the Terraform state for this stack.
-/// By default, the state for each stack is
-/// stored in an individual directory in a shared state bucket.
+/// How this launch keeps the tofu state of every stack it declares, as
+/// DECLARED: an entry's authoring plus whatever the default fills in, which is
+/// not yet enough to address anything. [`resolve`](Self::resolve) turns it into
+/// a [`ResolvedBackend`], the only form that renders or addresses, exactly as
+/// [`Stack`](crate::prelude::Stack) resolves into
+/// [`ResolvedStack`](crate::prelude::ResolvedStack) and for the same reason: a
+/// declaration is allowed to leave things out.
 /// https://opentofu.org/docs/language/settings/backends/configuration/
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StackBackend {
 	Local(LocalBackend),
 	S3(S3Backend),
@@ -33,50 +37,71 @@ impl From<S3Backend> for StackBackend {
 	fn from(b: S3Backend) -> Self { StackBackend::S3(b) }
 }
 impl StackBackend {
-	/// The body of the opentofu "backend" field, or `None` for a backend this
-	/// launch has not resolved yet, see [`resolved`](Self::resolved). A verb
-	/// resolves before it drives tofu and re-renders the block then; one that
-	/// somehow did not is refused by `Project::init`, since a config with no
-	/// backend block is a config that keeps its state in the work directory.
-	pub fn to_json(&self, key: &str) -> Option<Value> {
-		match self {
-			Self::Local(b) => b.to_json(&key).xsome(),
-			Self::S3(b) => b.to_json(&key),
-		}
+	/// This declaration with everything it left out filled in, ready to render
+	/// and address: see [`S3Backend::resolve`]. Memoized per declaration for
+	/// the life of the process, so a launch pays for the discovery once however
+	/// many stacks and verbs ask.
+	pub async fn resolve(&self) -> Result<ResolvedBackend> {
+		static RESOLVED: LazyPool<
+			StackBackend,
+			ResolvedBackend,
+			Result<ResolvedBackend>,
+		> = LazyPool::new(|backend| {
+			let backend = backend.clone();
+			Box::pin(async move {
+				match backend {
+					StackBackend::Local(local) => {
+						ResolvedBackend::Local(local).xok()
+					}
+					StackBackend::S3(s3) => {
+						s3.resolve().await.map(ResolvedBackend::S3)
+					}
+				}
+			})
+		});
+		RESOLVED.try_get(self).await
 	}
+}
 
-	/// Whether both halves of this backend are known, see
-	/// [`resolved`](Self::resolved).
-	pub fn is_resolved(&self) -> bool {
+/// A [`StackBackend`] with nothing left to discover: a state directory, or a
+/// bucket AND the region it is in. The only form that renders a backend block
+/// or addresses a state store, so holding one is proof the discovery ran, and
+/// every operation below is total.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResolvedBackend {
+	Local(LocalBackend),
+	S3(ResolvedS3Backend),
+}
+
+impl From<LocalBackend> for ResolvedBackend {
+	fn from(b: LocalBackend) -> Self { ResolvedBackend::Local(b) }
+}
+impl From<ResolvedS3Backend> for ResolvedBackend {
+	fn from(b: ResolvedS3Backend) -> Self { ResolvedBackend::S3(b) }
+}
+
+impl ResolvedBackend {
+	/// Create the body of the opentofu "backend" field.
+	pub fn to_json(&self, key: &str) -> Value {
 		match self {
-			Self::Local(_) => true,
-			Self::S3(s3) => s3.is_resolved(),
+			Self::Local(b) => b.to_json(key),
+			Self::S3(b) => b.to_json(key),
 		}
 	}
 
 	/// The uri of the state store itself: the local state directory, or the
 	/// state bucket in its region.
-	pub fn uri(&self) -> Result<StoreUri> {
+	pub fn uri(&self) -> StoreUri {
 		match self {
-			Self::Local(local) => local.uri().xok(),
+			Self::Local(local) => local.uri(),
 			Self::S3(s3) => s3.uri(),
-		}
-	}
-
-	/// This backend with whatever the launch was not told filled in, see
-	/// [`S3Backend::resolved`]. A local backend, and an S3 one told both
-	/// halves, resolve to themselves without a round trip.
-	pub async fn resolved(&self) -> Result<Self> {
-		match self {
-			Self::Local(_) => self.clone().xok(),
-			Self::S3(s3) => s3.resolved().await.map(Self::S3),
 		}
 	}
 
 	/// The state store, see [`uri`](Self::uri). Errors without a compiled
 	/// backend for it, ie an S3 state backend in an `aws_sdk`-free build.
 	pub fn store(&self) -> Result<BlobStore> {
-		BlobStore::from_uri(&self.uri()?)
+		BlobStore::from_uri(&self.uri())
 	}
 
 	/// Ensure the backend exists, creating the directory or s3 bucket if it
@@ -94,7 +119,7 @@ impl StackBackend {
 		// Only at creation, so an existing bucket's settings stay its owner's.
 		#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 		if let Self::S3(s3) = self {
-			S3Store::from_uri(&s3.uri()?)?
+			S3Store::from_uri(&s3.uri())?
 				.set_object_versioning()
 				.await?;
 		}
@@ -123,7 +148,7 @@ impl StackBackend {
 
 /// Local filesystem backend, defaults to `.beet/infra`
 /// https://opentofu.org/docs/language/settings/backends/local/
-#[derive(Debug, Clone, PartialEq, Eq, Get)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Get)]
 pub struct LocalBackend {
 	/// The path on the local filesystem where the state file will be stored, defaults to `.beet/infra`.
 	path: AbsPath,
@@ -183,27 +208,25 @@ const DEFAULT_STATE_PREFIX: &str = "beet-state-";
 /// both answer here for an account and a bucket anywhere.
 const DEFAULT_STATE_REGION: &str = aws::region::US_EAST_1;
 
-/// S3 backend for remote state storage.
+/// The S3 state backend as DECLARED: a bucket and a region, each optional
+/// because neither is normally authored.
 /// https://opentofu.org/docs/language/settings/backends/s3/
 ///
-/// One bucket for every app and stage, a key each, created on first use by
-/// [`StackBackend::ensure_exists`] with object versioning on, so a machine with
-/// credentials and nothing else deploys without provisioning a backend by hand
-/// first, and the state it writes has an undo from the start.
-///
-/// Both halves are optional because neither is normally authored: see
-/// [`resolved`](Self::resolved), which derives the bucket from the account and
-/// reads the region off the bucket, so one account's projects share a state
-/// bucket that none of them names.
-#[derive(Debug, Clone, PartialEq, Eq, Get, SetWith)]
+/// [`resolve`](Self::resolve) derives the bucket from the AWS account and reads
+/// the region off that bucket, so every project one account deploys shares a
+/// state bucket that none of them names, with a key each
+/// (`<app>--<stage>--tofu-tfstate`). The bucket is created on first use with
+/// object versioning on, so a machine with credentials and nothing else deploys
+/// without provisioning a backend by hand, and the state it writes has an undo
+/// from the start.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Get, SetWith)]
 pub struct S3Backend {
 	/// The bucket holding every stack's state file. Unset is this account's
-	/// own, [`DEFAULT_STATE_PREFIX`] and its id, filled in by
-	/// [`resolved`](Self::resolved).
+	/// own, [`DEFAULT_STATE_PREFIX`] and its id.
 	bucket: Option<SmolStr>,
-	/// The region the bucket is in. Unset is read off the bucket itself, which
-	/// is what lets one project find the state bucket another project of the
-	/// same account created; a bucket that does not exist yet is created in the
+	/// Where the bucket is. Unset is read off the bucket itself, which is what
+	/// lets one project find the state bucket another project of the same
+	/// account created; a bucket that does not exist yet is created in the
 	/// declared region, else [`DEFAULT_STATE_REGION`].
 	region: Option<SmolStr>,
 	/// Enable OpenTofu's native S3 lockfile.
@@ -213,7 +236,7 @@ pub struct S3Backend {
 impl Default for S3Backend {
 	fn default() -> Self {
 		Self {
-			// this account's own bucket, wherever it already is: see `resolved`
+			// this account's own bucket, wherever it already is: see `resolve`
 			bucket: None,
 			region: None,
 			use_lockfile: true,
@@ -222,31 +245,17 @@ impl Default for S3Backend {
 }
 
 impl S3Backend {
-	/// The state bucket, pinned to its region, as a store uri. Errors on a
-	/// backend nothing resolved, see [`resolved`](Self::resolved).
-	pub fn uri(&self) -> Result<StoreUri> {
-		let (bucket, region) = self.resolved_parts()?;
-		StoreUri::S3 {
-			name: bucket,
-			path_prefix: None,
-			endpoint: None,
-			region: Some(region),
-		}
-		.xok()
-	}
-
-	/// This backend with whatever the launch was not told filled in: the bucket
-	/// derived from the AWS account (see [`DEFAULT_STATE_PREFIX`]) and the
-	/// region read off that bucket. Costs one `sts:GetCallerIdentity` per
-	/// process and one `GetBucketLocation` per call, and nothing at all once
-	/// both halves are known, which is how a launch resolves once and every
-	/// project built afterwards renders the same backend.
+	/// This declaration with both halves known: the bucket derived from the AWS
+	/// account (see [`DEFAULT_STATE_PREFIX`]) when it was not named, and the
+	/// region read off that bucket. One `sts:GetCallerIdentity` per process and
+	/// one `GetBucketLocation` per declaration, both behind
+	/// [`StackBackend::resolve`]'s memo.
 	///
 	/// A declared region is where a bucket that does not exist yet is CREATED.
 	/// Once it exists the bucket is the fact, so a declaration that disagrees
 	/// warns and loses: the alternative is addressing a region the state is not
 	/// in, which fails every verb.
-	pub async fn resolved(&self) -> Result<Self> {
+	pub async fn resolve(&self) -> Result<ResolvedS3Backend> {
 		cfg_if! {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 				let bucket = match &self.bucket {
@@ -274,12 +283,11 @@ impl S3Backend {
 						is where it is"
 					);
 				}
-				let region = located
-					.or_else(|| self.region.clone())
-					.unwrap_or_else(|| DEFAULT_STATE_REGION.into());
-				Self {
-					bucket: Some(bucket),
-					region: Some(region),
+				ResolvedS3Backend {
+					bucket,
+					region: located
+						.or_else(|| self.region.clone())
+						.unwrap_or_else(|| DEFAULT_STATE_REGION.into()),
 					use_lockfile: self.use_lockfile,
 				}
 				.xok()
@@ -291,38 +299,37 @@ impl S3Backend {
 			}
 		}
 	}
+}
 
-	/// The two halves a render needs, or the error that says nothing has
-	/// resolved them yet.
-	fn resolved_parts(&self) -> Result<(SmolStr, SmolStr)> {
-		match (&self.bucket, &self.region) {
-			(Some(bucket), Some(region)) => {
-				(bucket.clone(), region.clone()).xok()
-			}
-			_ => bevybail!(
-				"the state backend is unresolved: its bucket is this account's \
-				own and its region is wherever that bucket is, both read by the \
-				first verb of a launch (`Project::resolved`)"
-			),
+/// An [`S3Backend`] that knows its bucket and the region that bucket is in,
+/// which is what tofu's backend block and every state read need.
+#[derive(Debug, Clone, PartialEq, Eq, Get)]
+pub struct ResolvedS3Backend {
+	bucket: SmolStr,
+	region: SmolStr,
+	use_lockfile: bool,
+}
+
+impl ResolvedS3Backend {
+	/// The state bucket, pinned to its region, as a store uri.
+	pub fn uri(&self) -> StoreUri {
+		StoreUri::S3 {
+			name: self.bucket.clone(),
+			path_prefix: None,
+			endpoint: None,
+			region: Some(self.region.clone()),
 		}
 	}
 
-	/// Whether both halves are known, ie nothing is left to discover.
-	pub fn is_resolved(&self) -> bool {
-		self.bucket.is_some() && self.region.is_some()
-	}
-
-	fn to_json(&self, key: &str) -> Option<Value> {
-		let (bucket, region) = self.resolved_parts().ok()?;
+	fn to_json(&self, key: &str) -> Value {
 		value!({
 			"s3": {
-				"bucket": bucket,
+				"bucket": (self.bucket.clone()),
 				"key": key,
-				"region": region,
+				"region": (self.region.clone()),
 				"use_lockfile": (self.use_lockfile),
 			}
 		})
-		.xsome()
 	}
 }
 

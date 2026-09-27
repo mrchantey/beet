@@ -20,17 +20,17 @@ pub async fn LifecycleProbe(
 ) -> Result<Outcome<Request, Response>> {
 	// resolve the project (config of every block descendant) + the bucket store
 	// from this entity in one pass.
+	let backend = terra::Project::resolve_backend(&cx.caller).await?;
 	let (project, store) = cx
 		.caller
-		.with_world(|world, entity| -> Result<_> {
-			let project = terra::Project::resolve_in(world, entity)?;
+		.with_world(move |world, entity| -> Result<_> {
+			let project = terra::Project::resolve_in(world, entity, backend)?;
 			let store = world.with_state::<StackQuery, _>(|query| {
 				query.store(entity).cloned()
 			})?;
 			(project, store).xok()
 		})
 		.await??;
-	let project = project.resolved().await?;
 
 	// reset state in case of a backend change, clearing any stale store.
 	project.tofu_destroy(true).await.ok();

@@ -31,7 +31,8 @@ async fn fargate_lifecycle() {
 	info!("Stack created: {}", deploy_ctx.resolved().app_name());
 
 	// clean up any prior state
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	info!("About to cleanup_prior_state");
 	cleanup_prior_state(&deploy_ctx, project).await;
 	info!("cleanup_prior_state complete");
@@ -43,7 +44,8 @@ async fn fargate_lifecycle() {
 	info!("deploy() completed successfully");
 
 	// 2. verify v1 is live
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	let url = project.output("load_balancer_dns").await.unwrap();
 	info!("step 2: verifying v1 at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
@@ -60,7 +62,8 @@ async fn fargate_lifecycle() {
 	deploy(&deploy_ctx, assets_dir).await.unwrap();
 
 	// 6. verify v2
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	let url = project.output("load_balancer_dns").await.unwrap();
 	info!("step 6: verifying v2 at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
@@ -78,7 +81,8 @@ async fn fargate_lifecycle() {
 		.unwrap();
 
 	// 9. verify v1 after rollback
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	let url = project.output("load_balancer_dns").await.unwrap();
 	info!("step 9: verifying v1 after rollback at {url}");
 	verify_live(&url, MARKER_V1).await.unwrap();
@@ -96,7 +100,8 @@ async fn fargate_lifecycle() {
 		.unwrap();
 
 	// 12. verify v2 after rollforward
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	let url = project.output("load_balancer_dns").await.unwrap();
 	info!("step 12: verifying v2 after rollforward at {url}");
 	verify_live(&url, MARKER_V2).await.unwrap();
@@ -109,7 +114,8 @@ async fn fargate_lifecycle() {
 	info!("step 14: destroying");
 	// the state carriers are `StackTeardown`'s job now, and
 	// `cleanup_prior_state` sweeps them at the start of the next run
-	build_project(&deploy_ctx)
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	build_project(&deploy_ctx, backend)
 		.unwrap()
 		.tofu_destroy(false)
 		.await
@@ -131,13 +137,17 @@ async fn fargate_lifecycle() {
 async fn fargate_force_destroy() {
 	init_logger();
 	let deploy_ctx = TestDeploy::new("fargate-test");
-	let project = build_project(&deploy_ctx).unwrap();
+	let backend = deploy_ctx.deployment.backend().resolve().await.unwrap();
+	let project = build_project(&deploy_ctx, backend).unwrap();
 	cleanup_prior_state(&deploy_ctx, project).await;
 }
 
 /// Build the terraform project for the Fargate test stack.
-fn build_project(deploy: &TestDeploy) -> Result<terra::Project> {
-	render_test_project(deploy, FargateBlock::default())
+fn build_project(
+	deploy: &TestDeploy,
+	backend: ResolvedBackend,
+) -> Result<terra::Project> {
+	render_test_project(deploy, FargateBlock::default(), backend)
 }
 
 /// Build, upload artifacts, publish the site, build/push Docker image, and apply terraform.

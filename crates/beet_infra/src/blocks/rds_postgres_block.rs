@@ -779,7 +779,8 @@ mod tests {
 				parent.spawn(DatabaseRef(db));
 			});
 		StateEncryption::ensure_test_passphrase();
-		scope.project().unwrap().validate().await.unwrap();
+		let backend = scope.deployment().backend().resolve().await.unwrap();
+		scope.project(backend).unwrap().validate().await.unwrap();
 	}
 
 	/// The block's compositions are how a consumer builds its connection string

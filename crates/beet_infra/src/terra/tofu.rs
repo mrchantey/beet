@@ -11,12 +11,12 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Irreversibly remove the backend, destroying the tofu state for **all applications**.
-pub async fn dangerously_destroy_backend(backend: &StackBackend) -> Result {
+pub async fn dangerously_destroy_backend(backend: &ResolvedBackend) -> Result {
 	match backend {
-		StackBackend::Local(local) => {
+		ResolvedBackend::Local(local) => {
 			fs_ext::remove_async(local.path()).await?;
 		}
-		StackBackend::S3(_) => {
+		ResolvedBackend::S3(_) => {
 			backend.store()?.store_remove().await?;
 		}
 	}

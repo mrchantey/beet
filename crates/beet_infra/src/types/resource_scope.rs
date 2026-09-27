@@ -157,11 +157,13 @@ impl RenderScope {
 	/// [`finish`](Self::finish) wrapped in the tofu driver that applies it,
 	/// hence native-only.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn project(self) -> Result<terra::Project> {
+	pub fn project(self, backend: ResolvedBackend) -> Result<terra::Project> {
 		let variables = self.variables.clone();
 		let (stack, deployment, config) = self.finish()?;
-		terra::Project::new_with_variables(stack, deployment, config, variables)
-			.xok()
+		terra::Project::new_with_variables(
+			stack, deployment, config, backend, variables,
+		)
+		.xok()
 	}
 
 	/// The resolved identity every rendered name composes from.

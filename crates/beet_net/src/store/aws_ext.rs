@@ -17,18 +17,18 @@ pub async fn account_id() -> Result<SmolStr> {
 	ACCOUNT_ID
 		.get_or_try_init(|| {
 			async_ext::pin_tokio(async move {
-				let config = aws_config::from_env().load().await;
-				// STS answers for the whole partition from us-east-1, and a
-				// launch that names no region still has an account
-				let config = match config.region() {
-					Some(_) => config,
-					None => {
-						aws_config::from_env()
-							.region(aws_config::Region::new("us-east-1"))
-							.load()
-							.await
-					}
-				};
+				let mut loader = aws_config::from_env();
+				// STS answers for the whole partition from us-east-1, so a
+				// launch that names no region gets one here rather than leaving
+				// the sdk's region chain to probe instance metadata, a one
+				// second timeout on every machine that is not an EC2 box
+				if env_ext::var("AWS_REGION").is_err()
+					&& env_ext::var("AWS_DEFAULT_REGION").is_err()
+				{
+					loader =
+						loader.region(aws_config::Region::new("us-east-1"));
+				}
+				let config = loader.load().await;
 				aws_sdk_sts::Client::new(&config)
 					.get_caller_identity()
 					.send()

@@ -174,6 +174,7 @@ pub fn publish_site(site_dir: &AbsPath) -> Result<impl Bundle> {
 pub fn render_test_project(
 	deploy: &TestDeploy,
 	block: impl Bundle,
+	backend: ResolvedBackend,
 ) -> Result<terra::Project> {
 	let mut world = InfraPlugin.into_world();
 	world.insert_resource(deploy.deployment.clone());
@@ -185,7 +186,7 @@ pub fn render_test_project(
 			parent.spawn(repo_store_block());
 		})
 		.id();
-	RenderScope::render(&mut world, root)?.project()
+	RenderScope::render(&mut world, root)?.project(backend)
 }
 
 /// The document root of `deploy`'s version in the repo store, exactly as the
@@ -206,7 +207,7 @@ pub async fn apply_with_current_ledger<F>(
 	build_project: F,
 ) -> Result<String>
 where
-	F: FnOnce(&TestDeploy) -> Result<terra::Project>,
+	F: FnOnce(&TestDeploy, ResolvedBackend) -> Result<terra::Project>,
 {
 	let ledger = deploy
 		.artifacts_client()
@@ -214,7 +215,8 @@ where
 		.await?
 		.ok_or_else(|| bevyhow!("no current ledger"))?;
 	deploy.deployment.update_from_ledger(&ledger);
-	build_project(deploy)?.apply().await
+	let backend = deploy.deployment.backend().resolve().await?;
+	build_project(deploy, backend)?.apply().await
 }
 
 /// Verify the published document of `deploy`'s version carries the expected

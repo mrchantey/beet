@@ -8,6 +8,10 @@ pub struct Project {
 	config: Config,
 	#[deref]
 	stack: ResolvedStack,
+	/// Where this project's state lives, resolved: a project cannot be built
+	/// without one, which is what makes every render and every state address
+	/// below total. See [`StackBackend::resolve`].
+	backend: ResolvedBackend,
 	/// This launch's mechanics: the state backend the project drives and the
 	/// work directory it drives it in.
 	deployment: Deployment,
@@ -34,8 +38,9 @@ impl Project {
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
+		backend: ResolvedBackend,
 	) -> Self {
-		Self::new_with_variables(stack, deployment, config, Vec::new())
+		Self::new_with_variables(stack, deployment, config, backend, Vec::new())
 	}
 
 	/// A project that also knows the variables its blocks declared, which is
@@ -45,10 +50,19 @@ impl Project {
 		stack: ResolvedStack,
 		deployment: Deployment,
 		config: Config,
+		backend: ResolvedBackend,
 		variables: Vec<crate::types::Variable>,
 	) -> Self {
+		// the backend block is the one part of the config that needs the
+		// resolution, so it is rendered where the two meet rather than at
+		// `Deployment::create_config`, which knows only the declaration
+		let mut config = config;
+		config.set_backend(
+			backend.to_json(&deployment.backend_path(&stack).to_string()),
+		);
 		Self {
 			config,
+			backend,
 			stack,
 			deployment,
 			variables,
@@ -203,26 +217,10 @@ impl Project {
 
 	/// The blob holding this project's tofu state.
 	pub fn state_file(&self) -> Result<Blob> {
-		self.deployment.state_file(&self.stack)
-	}
-
-	/// The state backend this project's state lives in.
-	fn backend(&self) -> &StackBackend { self.deployment.backend() }
-
-	/// This project with its state backend resolved, the step between building
-	/// a project and driving tofu with it: a launch that declared no state
-	/// bucket learns its own here, and its config is re-rendered against what
-	/// it learned. See [`S3Backend::resolved`](crate::prelude::S3Backend::resolved).
-	pub async fn resolved(mut self) -> Result<Self> {
-		let backend = self.backend().resolved().await?;
-		if &backend != self.backend() {
-			let key = self.deployment.backend_path(&self.stack).to_string();
-			if let Some(json) = backend.to_json(&key) {
-				self.config.set_backend(json);
-			}
-			self.deployment.set_backend(backend);
-		}
-		self.xok()
+		self.backend
+			.store()?
+			.blob(self.deployment.backend_path(&self.stack))
+			.xok()
 	}
 
 	/// Initialize the tofu project unless the last init finished against this
@@ -233,17 +231,6 @@ impl Project {
 		/// project, so the stamp alone is not enough.
 		const TOFU_DIR: &str = ".terraform";
 
-		// a config whose backend block never rendered keeps its state in the
-		// work directory, so refuse rather than write one: every verb resolves
-		// (`Project::resolved`) before it drives tofu
-		if !self.backend().is_resolved() {
-			bevybail!(
-				"this project's state backend was never resolved, so its \
-				config has no backend block: build it through \
-				`Project::resolve`, or call `Project::resolved` on one built \
-				with `resolve_in`"
-			);
-		}
 		let dir = self.dir();
 		let bytes = serde_json::to_vec_pretty(&self.config.to_json())?;
 		let digest = digest_ext::hex::<sha2::Sha256>(&bytes);
@@ -550,10 +537,12 @@ mod test {
 			)
 			.await
 			.unwrap();
+		let backend = LocalBackend::default().into();
 		let project = Project::new_with_variables(
 			stack.clone(),
 			deployment.clone(),
 			config.clone(),
+			backend,
 			variables.clone(),
 		);
 		project
@@ -572,6 +561,7 @@ mod test {
 			stack.clone(),
 			deployment,
 			config,
+			LocalBackend::default().into(),
 			vec![Variable::secret("other", SecretRef::new("absent"))],
 		)
 		.with_secret_store(store);
@@ -605,11 +595,10 @@ mod init {
 	async fn reinits_after_an_unfinished_init() {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		let under = |state_dir: &str| {
-			let deployment = deployment
-				.clone()
-				.with_backend(LocalBackend::new(dir.path().join(state_dir)));
+			let local = LocalBackend::new(dir.path().join(state_dir));
+			let deployment = deployment.clone().with_backend(local.clone());
 			let config = deployment.create_config(&stack);
-			Project::new(stack.clone(), deployment, config)
+			Project::new(stack.clone(), deployment, config, local.into())
 		};
 		let first = under("state-a");
 		first.init().await.unwrap();
@@ -647,13 +636,18 @@ mod rotation {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		// a backend of this test's own: the shared default would carry this
 		// state, encrypted, into every other test's init
-		let deployment = deployment
-			.with_backend(LocalBackend::new(dir.path().join("state")));
+		let local = LocalBackend::new(dir.path().join("state"));
+		let deployment = deployment.with_backend(local.clone());
 		let under = |encryption: StateEncryption| {
 			let deployment =
 				deployment.clone().with_state_encryption(encryption);
 			let config = deployment.create_config(&stack);
-			Project::new(stack.clone(), deployment, config)
+			Project::new(
+				stack.clone(),
+				deployment,
+				config,
+				local.clone().into(),
+			)
 		};
 		// a state written before encryption, as a stack predating it holds
 		let plaintext = under(StateEncryption::None);

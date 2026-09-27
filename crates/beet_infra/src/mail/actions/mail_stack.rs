@@ -37,18 +37,25 @@ impl MailStack {
 	/// Render the stack `entity` belongs to and resolve the whole mail stack
 	/// from it: the one entry every mail verb reaches the stack through, shaped
 	/// to pass directly to [`AsyncEntity::with_world`].
-	pub fn resolve(world: &mut World, entity: Entity) -> Result<MailStack> {
-		let project = terra::Project::resolve_in(world, entity)?;
+	pub fn resolve(
+		world: &mut World,
+		entity: Entity,
+		backend: ResolvedBackend,
+	) -> Result<MailStack> {
+		let project = terra::Project::resolve_in(world, entity, backend)?;
 		world.with_state::<MailQuery, _>(|query| query.resolve(entity, project))
 	}
 
-	/// The mail stack `caller` belongs to, with its project's state backend
-	/// resolved: the one spelling every mail verb starts from, since
-	/// [`resolve`](Self::resolve) is sync and resolving a backend is not.
+	/// The mail stack `caller` belongs to: the one spelling every mail verb
+	/// starts from, pairing the async backend resolution with the sync world
+	/// pass [`resolve`](Self::resolve) is.
 	pub async fn of(caller: &AsyncEntity) -> Result<MailStack> {
-		let mut mail = caller.with_world(Self::resolve).await??;
-		mail.project = mail.project.resolved().await?;
-		mail.xok()
+		let backend = terra::Project::resolve_backend(caller).await?;
+		caller
+			.with_world(move |world, entity| {
+				Self::resolve(world, entity, backend)
+			})
+			.await?
 	}
 
 	/// The address of the box, from the apply's output.

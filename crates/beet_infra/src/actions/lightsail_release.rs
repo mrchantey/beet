@@ -102,10 +102,11 @@ async fn resolve_box(
 	cx: &ActionContext<Request>,
 	tag: &'static str,
 ) -> Result<(terra::Project, LightsailBlock, bool)> {
+	let backend = terra::Project::resolve_backend(&cx.caller).await?;
 	let (project, block, serves_repo) = cx
 		.caller
 		.with_world(move |world, entity| -> Result<_> {
-			let project = terra::Project::resolve_in(world, entity)?;
+			let project = terra::Project::resolve_in(world, entity, backend)?;
 			let (block, serves_repo) =
 				world.with_state::<ReleaseQuery, _>(|query| {
 					query.resolve(entity, tag)
@@ -113,7 +114,7 @@ async fn resolve_box(
 			(project, block, serves_repo).xok()
 		})
 		.await??;
-	(project.resolved().await?, block, serves_repo).xok()
+	(project, block, serves_repo).xok()
 }
 
 /// scp `script` to the box's management sshd and run it as root, narrating its

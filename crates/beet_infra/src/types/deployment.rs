@@ -96,22 +96,11 @@ impl Deployment {
 
 	/// Initialize `stack`'s config with the corresponding backend and state
 	/// encryption.
-	/// The backend block is absent while this launch has yet to discover where
-	/// its state lives, and `Project::resolved` renders it in: see
-	/// [`StackBackend::to_json`](crate::prelude::StackBackend::to_json).
-	pub fn create_config(&self, stack: &ResolvedStack) -> terra::Config {
-		let key = self.backend_path(stack).to_string();
-		let config = terra::Config::default()
-			.with_state_encryption(self.state_encryption());
-		match self.backend.to_json(&key) {
-			Some(backend) => config.with_backend(backend),
-			None => config,
-		}
-	}
-
-	/// The blob holding `stack`'s tofu state.
-	pub fn state_file(&self, stack: &ResolvedStack) -> Result<Blob> {
-		self.backend.store()?.blob(self.backend_path(stack)).xok()
+	/// Everything about `stack`'s config this launch knows from its
+	/// declarations. The backend block is not in it: that needs the resolved
+	/// backend, so `Project::new` renders it.
+	pub fn create_config(&self, _stack: &ResolvedStack) -> terra::Config {
+		terra::Config::default().with_state_encryption(self.state_encryption())
 	}
 
 	/// A deploy with a local backend and a temporary work directory for testing.

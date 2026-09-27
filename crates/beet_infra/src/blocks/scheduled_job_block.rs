@@ -431,7 +431,8 @@ mod test {
 			parent.spawn((rollup_daily(), InvokeTarget(target)));
 		});
 		StateEncryption::ensure_test_passphrase();
-		scope.project().unwrap().validate().await.unwrap();
+		let backend = scope.deployment().backend().resolve().await.unwrap();
+		scope.project(backend).unwrap().validate().await.unwrap();
 	}
 
 	/// A schedule with nothing to invoke, a target that is not a lambda, or

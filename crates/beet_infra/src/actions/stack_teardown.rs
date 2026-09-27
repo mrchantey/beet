@@ -46,7 +46,7 @@ pub async fn StackTeardown(
 ) -> Result<Outcome<Request, Response>> {
 	let project = terra::Project::resolve(&cx.caller).await?;
 	let deployment = project.deployment();
-	let backend = deployment.backend();
+	let backend = project.backend();
 	let state_path = deployment.backend_path(&project);
 	let [state, lock, work_dir, secrets] = StackTeardown::CARRIERS;
 

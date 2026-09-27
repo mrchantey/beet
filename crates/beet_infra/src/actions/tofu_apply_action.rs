@@ -53,9 +53,10 @@ pub async fn TofuApply(
 	trace!("TofuApply: starting, layer {layer:?}");
 	// step 1: build the project and collect variables and artifact pairs
 	trace!("TofuApply: step 1 - building project and collecting artifacts");
+	let backend = terra::Project::resolve_backend(&cx.caller).await?;
 	let (project, artifacts, client, variables) = cx
 		.caller
-		.with_world(|world, entity| -> Result<_> {
+		.with_world(move |world, entity| -> Result<_> {
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
 			// each declared artifact, paired with the label its block declared,
@@ -95,6 +96,7 @@ pub async fn TofuApply(
 				stack,
 				deployment,
 				config,
+				backend,
 				variables.clone(),
 			)
 			.with_secret_store(secrets);
