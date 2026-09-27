@@ -80,7 +80,7 @@ pub async fn EipReverseDns(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	let region = mail.stack.aws_region()?.clone();
 	let hostname = mail.mail_box.hostname().clone();
@@ -258,7 +258,7 @@ pub async fn EipReverseDnsReset(
 	settle: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let region = mail.stack.aws_region()?.clone();
 	// no state, no address, nothing to reset: the resource may never have been
 	// created, and a destroy walks the declaration either way.

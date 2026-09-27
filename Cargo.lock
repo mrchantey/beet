@@ -1602,6 +1602,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "aws-sdk-s3",
+ "aws-sdk-sts",
  "base64 0.22.1",
  "beet_action",
  "beet_core",

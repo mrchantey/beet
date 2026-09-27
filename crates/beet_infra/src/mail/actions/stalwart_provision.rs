@@ -95,7 +95,7 @@ pub async fn StalwartProvision(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	// the credentials this step writes into the relay routes, read from the
 	// secret store rather than passed in: the box reads the same values, so

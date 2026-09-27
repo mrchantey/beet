@@ -209,6 +209,22 @@ impl Project {
 	/// The state backend this project's state lives in.
 	fn backend(&self) -> &StackBackend { self.deployment.backend() }
 
+	/// This project with its state backend resolved, the step between building
+	/// a project and driving tofu with it: a launch that declared no state
+	/// bucket learns its own here, and its config is re-rendered against what
+	/// it learned. See [`S3Backend::resolved`](crate::prelude::S3Backend::resolved).
+	pub async fn resolved(mut self) -> Result<Self> {
+		let backend = self.backend().resolved().await?;
+		if &backend != self.backend() {
+			let key = self.deployment.backend_path(&self.stack).to_string();
+			if let Some(json) = backend.to_json(&key) {
+				self.config.set_backend(json);
+			}
+			self.deployment.set_backend(backend);
+		}
+		self.xok()
+	}
+
 	/// Initialize the tofu project unless the last init finished against this
 	/// exact config, see [`Self::INIT_STAMP`].
 	async fn init(&self) -> Result {
@@ -217,6 +233,17 @@ impl Project {
 		/// project, so the stamp alone is not enough.
 		const TOFU_DIR: &str = ".terraform";
 
+		// a config whose backend block never rendered keeps its state in the
+		// work directory, so refuse rather than write one: every verb resolves
+		// (`Project::resolved`) before it drives tofu
+		if !self.backend().is_resolved() {
+			bevybail!(
+				"this project's state backend was never resolved, so its \
+				config has no backend block: build it through \
+				`Project::resolve`, or call `Project::resolved` on one built \
+				with `resolve_in`"
+			);
+		}
 		let dir = self.dir();
 		let bytes = serde_json::to_vec_pretty(&self.config.to_json())?;
 		let digest = digest_ext::hex::<sha2::Sha256>(&bytes);

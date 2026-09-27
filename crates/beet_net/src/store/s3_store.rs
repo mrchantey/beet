@@ -294,6 +294,38 @@ impl S3Store {
 		.await
 	}
 
+	/// The region this store's bucket actually lives in, or `None` when there
+	/// is no such bucket. `GetBucketLocation` answers from any regional
+	/// endpoint, so this is the one call that says where a bucket is without
+	/// being told first; S3 reports `us-east-1` as an empty constraint.
+	pub async fn bucket_region(&self) -> Result<Option<SmolStr>> {
+		use aws_sdk_s3::error::ProvideErrorMetadata;
+		let this = self.clone();
+		async_ext::pin_tokio(async move {
+			match this
+				.client()
+				.await
+				.get_bucket_location()
+				.bucket(this.bucket_name.as_str())
+				.send()
+				.await
+			{
+				Ok(output) => output
+					.location_constraint
+					.map(|region| SmolStr::new(region.as_str()))
+					.filter(|region| !region.is_empty())
+					.unwrap_or_else(|| SmolStr::new("us-east-1"))
+					.xsome()
+					.xok(),
+				// S3 models this one as an unmodelled error, so the code is
+				// the only thing that says "no such bucket"
+				Err(err) if err.code() == Some("NoSuchBucket") => Ok(None),
+				Err(err) => bevybail!("Failed to locate bucket: {err:?}"),
+			}
+		})
+		.await
+	}
+
 	/// Get or create an S3 client for this store's region, endpoint and
 	/// credentials. Cached by the three so an R2 store and an AWS store in
 	/// the same region get distinct clients, as do two stores at one endpoint

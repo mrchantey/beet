@@ -115,7 +115,7 @@ pub async fn MailColdProbe(
 	max_age: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let cold = ColdStore::resolve(mail.cold_store()?, &mail.secrets).await?;
 	let region = mail.stack.aws_region()?.to_string();
 	let archive = LiveStore {

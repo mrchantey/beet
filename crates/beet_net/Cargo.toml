@@ -127,6 +127,10 @@ aws_sdk = [
 	"dep:aws-sdk-s3",
 	"dep:serde_dynamo",
 	"dep:aws-sdk-dynamodb",
+	# who the credentials belong to, which is what a derived name is derived
+	# from (`aws_ext::account_id`); already in the tree, since the credential
+	# chain resolves roles through it.
+	"dep:aws-sdk-sts",
 	"dep:aws-config",
 	"beet_core/tokio",
 ]
@@ -169,6 +173,7 @@ rustls-tls = [
 	"aws-config?/rustls",
 	"aws-sdk-dynamodb?/rustls",
 	"aws-sdk-s3?/rustls",
+	"aws-sdk-sts?/rustls",
 	"dep:futures-rustls",
 	"dep:webpki-roots",
 	# ring, not aws-lc-rs: the rest of the rustls stack here is ring-backed and
@@ -310,6 +315,11 @@ aws-sdk-dynamodb = { version = "1", optional = true, default-features = false, f
 aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
 	# defaults without rustls
 	"sigv4a",
+	"default-https-client",
+	"rt-tokio",
+] }
+aws-sdk-sts = { version = "1", optional = true, default-features = false, features = [
+	# defaults without rustls
 	"default-https-client",
 	"rt-tokio",
 ] }

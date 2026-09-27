@@ -106,7 +106,7 @@ pub async fn MailDane(
 	ssh_key: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	if !mail.mail_box.dane() {
 		bevybail!(
 			"mail box '{}' does not declare `dane=true`, so nothing would \

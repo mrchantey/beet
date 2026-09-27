@@ -41,7 +41,7 @@ pub async fn MailHealth(
 	timeout: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let hostname = mail.mail_box.hostname().to_string();
 
 	check_banner(&hostname, timeout).await?;

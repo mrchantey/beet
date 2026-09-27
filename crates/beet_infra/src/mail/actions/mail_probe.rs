@@ -194,7 +194,7 @@ pub async fn MailProbe(
 	poll: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	let domain = mail.domain_holding(&mailbox)?;
 	let address = format!("{}@{}", mailbox, domain.domain());

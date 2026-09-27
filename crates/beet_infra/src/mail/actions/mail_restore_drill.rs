@@ -145,7 +145,7 @@ pub async fn MailRestoreDrill(
 	timeout: Duration,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let stage = mail.stack.stage().clone();
 	if stage == source_stage {
 		bevybail!(

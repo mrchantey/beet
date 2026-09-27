@@ -133,7 +133,7 @@ pub async fn ComailEnroll(
 	resolver: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	let mut input = cx.input;
 	let mut checked = 0usize;

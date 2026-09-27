@@ -186,7 +186,7 @@ pub async fn StalwartSnapshot(
 	snapshot_retain: usize,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let region = mail.stack.aws_region()?;
 	let filters = StalwartSnapshot::volume_filters(&mail.stack, &mail.mail_box);
 	let volume_id = aws_cli_ext::ec2(region, [
@@ -348,7 +348,7 @@ async fn prune(mail: &MailStack, keep: &str, retain: usize) -> Result {
 pub async fn StalwartSnapshotPrune(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	if mail.mail_box.data_volume_protected(&mail.stack) {
 		bevybail!(
 			"stage '{}' protects its data volume, so its snapshots are the \

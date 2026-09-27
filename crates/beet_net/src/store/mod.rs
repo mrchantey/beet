@@ -151,6 +151,9 @@ pub use indexed_db_store::*;
 pub use local_storage_store::*;
 #[cfg(all(target_arch = "wasm32", feature = "cloudflare"))]
 pub use r2_workers_store::*;
+// who the launch is at AWS, which is how a name is derived rather than declared.
+#[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
+pub mod aws_ext;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub use s3_store::*;
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]

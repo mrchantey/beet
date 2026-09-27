@@ -30,6 +30,7 @@ pub async fn LifecycleProbe(
 			(project, store).xok()
 		})
 		.await??;
+	let project = project.resolved().await?;
 
 	// reset state in case of a backend change, clearing any stale store.
 	project.tofu_destroy(true).await.ok();

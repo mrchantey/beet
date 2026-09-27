@@ -81,9 +81,25 @@ pub(crate) struct DestroyParams {
 
 impl terra::Project {
 	/// Build a project from `caller`'s nearest ancestor [`Stack`], the
-	/// resolution every stack verb starts from.
+	/// resolution every stack verb starts from, with its state backend
+	/// resolved (see [`Project::resolved`]).
 	pub async fn resolve(caller: &AsyncEntity) -> Result<Self> {
-		caller.with_world(Self::resolve_in).await?
+		let project = caller
+			.with_world(Self::resolve_in)
+			.await??
+			.resolved()
+			.await?;
+		// what the resolution learned is the launch's, not this verb's: the
+		// next verb, and every block that builds its own project from the
+		// world, render the same backend without asking AWS again
+		let backend = project.deployment().backend().clone();
+		caller
+			.world()
+			.with_resource::<Deployment, _>(move |mut deployment| {
+				deployment.set_backend(backend);
+			})
+			.await;
+		project.xok()
 	}
 
 	/// [`resolve`](Self::resolve) with the world in hand: the stack rendered,

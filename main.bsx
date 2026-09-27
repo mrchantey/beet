@@ -92,11 +92,6 @@ stays, an inert tag in a lean build.
 	<Route path="vault" bx:cfg="feature:vault"><VaultRoutes/></Route>
 	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
-		<!-- where this machine keeps every stack's tofu state: a property of
-		     the operator rather than of a stack, so it sits outside the
-		     `<Stack>`. The default bucket is a global name in `us-east-1`; this
-		     account holds its own, in the region it deploys from -->
-		<S3StateBackend bucket="beet-state-mrchantey" region="ap-southeast-2"/>
 		<!-- the region is an address declared on the stack, never read from
 		     the environment: a region that could fall back would plan a full
 		     replacement -->

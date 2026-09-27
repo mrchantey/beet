@@ -135,7 +135,7 @@ pub async fn EnsureDkimKey(
 	bits: u32,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	let input = cx.input;
 	// only the domains whose records this stack publishes: a domain somebody

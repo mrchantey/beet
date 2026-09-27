@@ -42,6 +42,15 @@ impl MailStack {
 		world.with_state::<MailQuery, _>(|query| query.resolve(entity, project))
 	}
 
+	/// The mail stack `caller` belongs to, with its project's state backend
+	/// resolved: the one spelling every mail verb starts from, since
+	/// [`resolve`](Self::resolve) is sync and resolving a backend is not.
+	pub async fn of(caller: &AsyncEntity) -> Result<MailStack> {
+		let mut mail = caller.with_world(Self::resolve).await??;
+		mail.project = mail.project.resolved().await?;
+		mail.xok()
+	}
+
 	/// The address of the box, from the apply's output.
 	pub async fn public_ip(&self) -> Result<String> {
 		self.project

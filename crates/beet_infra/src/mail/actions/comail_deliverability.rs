@@ -94,7 +94,7 @@ pub async fn ComailDeliverability(
 	report_paused: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let region = mail.stack.aws_region()?.clone();
 
 	for (domain, relay) in mail.relayed() {

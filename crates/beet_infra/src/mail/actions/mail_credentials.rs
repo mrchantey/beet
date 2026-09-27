@@ -37,7 +37,7 @@ pub async fn MailCredentials(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let infra = cx.input.parse_params::<MailCredentialsParams>()?.infra;
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let label = mail.mail_box.label();
 
 	// the server's own administrator first, since it is the one account no

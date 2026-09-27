@@ -148,7 +148,7 @@ pub async fn MtaStsPublish(
 	worker: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 
 	// only the domains this stack publishes an `_mta-sts` record for: a policy
 	// served for a host with no record is a policy nothing looks for, and a
@@ -221,7 +221,7 @@ pub async fn MtaStsUnpublish(
 	worker: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let worker = match worker.is_empty() {
 		true => mail.stack.resource_name(MtaStsPublish::LABEL),
 		false => worker.to_string(),

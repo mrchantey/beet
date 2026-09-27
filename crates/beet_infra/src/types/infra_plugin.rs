@@ -771,22 +771,26 @@ mod test {
 	}
 
 	/// Where this launch keeps its tofu state is a property of the operator, so
-	/// the tag that names their bucket lands on the process `Deployment` rather
-	/// than on a stack, and the default it overrides is the one global name.
+	/// the tag lands on the process `Deployment` rather than on a stack. Both
+	/// halves are optional, and declaring neither is the normal case: an
+	/// account's own bucket, wherever it already is, found rather than named.
 	#[beet_core::test]
 	fn the_state_bucket_declaration_reaches_the_launch() {
-		S3Backend::default()
-			.uri()
-			.to_string()
-			.xpect_eq("s3://beet-state?region=us-east-1");
-		let world = spawn(
-			r#"<S3StateBackend bucket="beet-state-mine" region="ap-southeast-2"/>"#,
-		);
-		world
-			.resource::<Deployment>()
-			.backend()
-			.uri()
-			.to_string()
-			.xpect_eq("s3://beet-state-mine?region=ap-southeast-2");
+		let halves = |markup: &str| {
+			let world = spawn(markup);
+			let StackBackend::S3(s3) =
+				world.resource::<Deployment>().backend().clone()
+			else {
+				unreachable!("the default backend is s3 in an aws build")
+			};
+			(s3.bucket().clone(), s3.region().clone())
+		};
+		halves("<Fragment/>").xpect_eq((None, None));
+		// the one-time choice of where this account's bucket is CREATED
+		halves(r#"<S3StateBackend region="ap-southeast-2"/>"#)
+			.xpect_eq((None, Some("ap-southeast-2".into())));
+		// ..and a bucket named instead, which every project sharing it declares
+		halves(r#"<S3StateBackend bucket="shared-state"/>"#)
+			.xpect_eq((Some("shared-state".into()), None));
 	}
 }

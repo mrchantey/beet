@@ -40,7 +40,7 @@ pub async fn MailColdPush(
 	ssh_key: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let mail = cx.caller.with_world(MailStack::resolve).await??;
+	let mail = MailStack::of(&cx.caller).await?;
 	let cold = mail.cold_store()?;
 	let connection = SshConnection {
 		host: mail.public_ip().await?,
