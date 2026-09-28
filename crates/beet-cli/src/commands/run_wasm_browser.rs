@@ -152,7 +152,8 @@ pub(crate) async fn run(
 /// The runner-provided env the host page serves back to `env_var` probes.
 fn env_json() -> String {
 	format!(
-		"{{\"WORKSPACE_ROOT\": \"{}\"}}",
+		"{{\"{}\": \"{}\"}}",
+		env_ext::WORKSPACE_ROOT,
 		fs_ext::workspace_root()
 			.to_string_lossy()
 			.replace('\\', "\\\\")

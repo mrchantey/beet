@@ -338,6 +338,29 @@ impl BootstrapConfig {
 		Self::SCREENSHOT_FRAME,
 	];
 
+	/// The launch variables beet owns outside the `BEET_*` prefix, which the
+	/// prefix scrub therefore cannot reach.
+	///
+	/// The membership rule is ownership, not effect: `WORKSPACE_ROOT` is
+	/// beet's own invention, while `CARGO_TARGET_DIR` and `HOME` shape a
+	/// launch just as much and belong to cargo and the shell, so a foreign
+	/// child keeps reading them.
+	const UNPREFIXED_ENV_NAMES: [&'static str; 1] = [env_ext::WORKSPACE_ROOT];
+
+	/// Every environment variable name a beet launch reads: each knob's
+	/// `BEET_*` name, derived from [`KNOBS`](Self::KNOBS) so a new knob
+	/// cannot be forgotten, and
+	/// [`UNPREFIXED_ENV_NAMES`](Self::UNPREFIXED_ENV_NAMES).
+	///
+	/// What a child that is NOT this launch is stripped of, ie
+	/// [`ChildProcess::without_launch_env`].
+	pub(crate) fn env_names() -> impl Iterator<Item = &'static str> {
+		Self::KNOBS
+			.iter()
+			.map(|knob| knob.env)
+			.chain(Self::UNPREFIXED_ENV_NAMES)
+	}
+
 	/// The one parse. `env` resolves a `BEET_*` name, and is consulted only for a
 	/// field the params did not set.
 	fn parse(
@@ -761,9 +784,7 @@ impl ConfigReader<'_> {
 	fn list(&self, knob: Knob) -> Vec<SmolStr> {
 		self.values(knob)
 			.iter()
-			.flat_map(|value| value.split(','))
-			.map(str::trim)
-			.filter(|entry| !entry.is_empty())
+			.flat_map(|value| str_ext::csv(value))
 			.map(SmolStr::from)
 			.collect()
 	}

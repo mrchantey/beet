@@ -565,10 +565,14 @@ mod tests {
 			),
 			|parent| {
 				parent.spawn(
-					S3BucketBlock::new("app").with_deploy_versioned(false),
+					S3BucketBlock::new("app")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
 				);
 				parent.spawn(
-					S3BucketBlock::new("analytics").with_runtime_write(true),
+					S3BucketBlock::new("analytics")
+						.with_runtime_write(true)
+						.with_object_versioning(true),
 				);
 			},
 		);

@@ -14,6 +14,10 @@ mod prefix_expiry;
 // where a stack's resources land at each provider, resolved by ancestry.
 mod provider_address;
 mod resource_scope;
+// the ceiling on what a deploy may create, lowered from the IAM documents the
+// stacks render, so it rides the same gate as the documents themselves.
+#[cfg(feature = "bindings_aws_common")]
+mod runtime_boundary;
 // the class a bucket keeps its objects in, read by its transition rule and by
 // a push into it.
 mod s3_storage_class;
@@ -37,6 +41,8 @@ pub use infra_plugin::*;
 pub use prefix_expiry::*;
 pub use provider_address::*;
 pub use resource_scope::*;
+#[cfg(feature = "bindings_aws_common")]
+pub use runtime_boundary::*;
 pub use s3_storage_class::*;
 pub use secret_ref::*;
 #[cfg(feature = "vault")]

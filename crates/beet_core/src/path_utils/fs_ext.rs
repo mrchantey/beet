@@ -260,10 +260,10 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 	}
 }
 
-/// 1. tries to get the `WORKSPACE_ROOT` env var.
+/// 1. tries to get the [`env_ext::WORKSPACE_ROOT`] env var.
 /// 2. if wasm, returns an empty path (the store root is the ambient origin — a bucket
 ///    root on a Cloudflare Worker, the served page origin in a browser — so paths
-///    resolve relative to an empty root; a js runtime with a real root sets `WORKSPACE_ROOT`).
+///    resolve relative to an empty root; a js runtime with a real root sets it).
 /// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
 /// 4. Otherwise returns cwd
 ///
@@ -271,7 +271,7 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 /// - The current directory is not found
 /// - Insufficient permissions to access the current directory
 pub fn workspace_root() -> PathBuf {
-	if let Ok(root_str) = env_ext::var("WORKSPACE_ROOT") {
+	if let Ok(root_str) = env_ext::var(env_ext::WORKSPACE_ROOT) {
 		return PathBuf::from(root_str.as_str());
 	}
 	cfg_if! {

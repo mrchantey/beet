@@ -49,6 +49,8 @@ pub mod process_ext;
 mod random_source;
 #[cfg(feature = "serde")]
 pub mod serde_ext;
+/// Comma separated list parsing ([`str_ext::csv`]).
+pub mod str_ext;
 /// Stream conversion utilities for byte-to-text streaming.
 #[cfg(feature = "std")]
 pub mod stream_ext;

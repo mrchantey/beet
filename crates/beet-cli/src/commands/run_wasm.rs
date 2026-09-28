@@ -249,7 +249,7 @@ async fn run_deno(
 	deno_args.extend(args);
 	let status = ChildProcess::new("deno")
 		.with_envs([(
-			"WORKSPACE_ROOT",
+			env_ext::WORKSPACE_ROOT,
 			fs_ext::workspace_root().to_string_lossy().to_string(),
 		)])
 		.with_args(deno_args)

@@ -99,14 +99,13 @@ pub fn LambdaSiteBlock(
 ) -> impl Bundle {
 	// the ancestor `<Stack>`'s identity, behind the stage-aware DNS
 	let is_production = stacks.resolve(entity).is_production();
-	let block = authorities
-		.split(',')
-		.map(str::trim)
-		.filter(|authority| is_production && !authority.is_empty())
-		.fold(LambdaBlock::default(), |block, authority| {
+	let block = str_ext::csv(&authorities).filter(|_| is_production).fold(
+		LambdaBlock::default(),
+		|block, authority| {
 			block
 				.with_dns(DnsProvider::cloudflare(authority).with_proxied(true))
-		});
+		},
+	);
 	let mut build = infra_ext::beet_cargo_build(features);
 	if let Some(exec_route) = exec_route {
 		build = build.with_exec_route(exec_route);
@@ -555,7 +554,7 @@ mod test {
 			router,
 			r#"<Fragment>
 				<Stack>
-					<S3BucketBlock label="analytics" deploy_versioned=false runtime_write=true/>
+					<S3BucketBlock label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
 				</Stack>
 				<Route path="shared"><Stack stage="shared"/></Route>
 			</Fragment>"#,
@@ -638,7 +637,7 @@ mod test {
 					</Router>
 				</Route>
 				<Stack>
-					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
+					<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 					<!-- the repo store the job boots from, deploy-versioned like
 					     every served store: the job dispatches a route of the same

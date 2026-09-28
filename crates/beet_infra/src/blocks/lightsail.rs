@@ -1059,12 +1059,21 @@ impl LightsailBlock {
 		access: &AccessGrants,
 		config: &mut terra::Config,
 	) -> Result {
-		// IAM user for S3 access (binary download + runtime asset retrieval)
-		let user_ident = stack.resource_ident(self.build_label("deploy-user"));
+		// The box's RUNTIME identity: what the instance itself authenticates
+		// as, for the binary it downloads at boot and the stores it serves.
+		// Named `runtime-*` and not `deploy-*` because it is nothing to do
+		// with the deployer; the deploy MINTS it, which is exactly what every
+		// tier-2 identity in this account has in common.
+		let boundary = RuntimeBoundary::arn(stack, config)?;
+		let user_ident = stack.resource_ident(self.build_label("runtime-user"));
 		let user = terra::ResourceDef::new_primary(
 			user_ident.clone(),
 			AwsIamUserDetails {
 				name: user_ident.primary_identifier().clone(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary),
 				..default()
 			},
 		);
@@ -1083,7 +1092,7 @@ impl LightsailBlock {
 		// rebuilt every deploy. Judged disproportionate for two resources; scope
 		// and rotation carry the weight instead.
 		let policy_ident =
-			stack.resource_ident(self.build_label("deploy-policy"));
+			stack.resource_ident(self.build_label("runtime-policy"));
 		let policy = terra::ResourceDef::new_secondary(
 			policy_ident.clone(),
 			AwsIamUserPolicyDetails {
@@ -1095,7 +1104,7 @@ impl LightsailBlock {
 		);
 
 		// access key for the user
-		let key_ident = stack.resource_ident(self.build_label("deploy-key"));
+		let key_ident = stack.resource_ident(self.build_label("runtime-key"));
 		let access_key = terra::ResourceDef::new_secondary(
 			key_ident.clone(),
 			AwsIamAccessKeyDetails {
@@ -1782,7 +1791,9 @@ mod tests {
 				parent.spawn(block);
 				parent.spawn(RepoStoreBlock::test_store());
 				parent.spawn(
-					S3BucketBlock::new("app").with_deploy_versioned(false),
+					S3BucketBlock::new("app")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
 				);
 				parent.spawn(DynamoTableBlock::new("analytics"));
 			}

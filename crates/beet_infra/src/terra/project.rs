@@ -371,14 +371,25 @@ impl Project {
 	/// per stack after `secrets/set <retiring> --copy=<variable>` kept the old
 	/// value and `secrets/set <variable> --generate` minted the new.
 	///
-	/// OpenTofu keys pbkdf2's salt by key-provider name, so two passphrases
-	/// cannot both be `main` and a swap crosses the plaintext bridge instead:
-	/// one rewrite reading under the retiring value and writing plaintext
-	/// ([`StateBridge::Decrypt`]), one reading plaintext and writing under
-	/// the current ([`StateBridge::Encrypt`]). A
-	/// state that was never encrypted takes the second alone, and one
-	/// already under the current value is left as it is, so the verb re-runs
-	/// safely and the same command encrypts a plaintext stack.
+	/// Two writes to the backend, both encrypted under the current
+	/// passphrase: the state is pulled under the retiring one and pushed back
+	/// under the current one ([`rewrite_state`](Self::rewrite_state)), so the
+	/// only readable copy is a private temp file between the two calls.
+	///
+	/// **A rotation must never write a state the passphrase it retires can
+	/// read, and must never write a plaintext one.** The backend is versioned,
+	/// so such a write is not overwritten, it is kept.
+	///
+	/// A state that was never encrypted takes [`StateCrossing::FromPlaintext`]
+	/// instead, so the same command encrypts a plaintext stack. One already
+	/// under the current value is left as it is, so the verb re-runs safely.
+	///
+	/// **Interrupted between the two writes**, the state is readable under the
+	/// current passphrase but salted under the secondary key name, which a
+	/// steady-state read does not address: every verb of that stack fails.
+	/// Re-running this finishes it, and does so WITHOUT the retiring value,
+	/// which matters because the operator is told to remove that once the
+	/// fleet is done and the straggler is exactly the stack that crashed.
 	pub async fn rotate_state(&self, retiring: Option<&str>) -> Result<String> {
 		let name = format!("{}--{}", self.stack.app_name(), self.stack.stage());
 		let current = self.deployment.state_encryption().clone();
@@ -388,13 +399,17 @@ impl Project {
 		let retiring = retiring
 			.map(SmolStr::new)
 			.unwrap_or_else(|| format!("{env_var}_OLD").into());
-		let encrypt = self.with_state_encryption(
-			current.clone().with_bridge(StateBridge::Encrypt),
-		);
 		match self.state_is_encrypted().await? {
 			None => bevybail!("`{name}` has no state yet: nothing to rotate"),
 			Some(false) => {
-				let serial = encrypt.rewrite_state().await?;
+				// one project: `unencrypted` needs no key material, so it can
+				// be a fallback and the read and the write share a config
+				let serial = self
+					.with_state_encryption(
+						current.clone().crossing(StateCrossing::FromPlaintext),
+					)
+					.rewrite_state()
+					.await?;
 				self.init().await?;
 				format!(
 					"encrypted the plaintext state of `{name}` under \
@@ -413,6 +428,34 @@ impl Project {
 					)
 					.xok();
 				}
+				// a rotation interrupted between its two writes leaves the
+				// state readable under the CURRENT passphrase but salted under
+				// the secondary key name, which a steady-state read does not
+				// address. Re-running recovers it, and the retiring value is
+				// not needed to, so check that before demanding it.
+				if self
+					.with_state_encryption(
+						current.clone().crossing(StateCrossing::FromSecondary),
+					)
+					.reads_state()
+					.await
+				{
+					let serial = self
+						.with_state_encryption(
+							current
+								.clone()
+								.crossing(StateCrossing::FromSecondary),
+						)
+						.rewrite_state()
+						.await?;
+					self.init().await?;
+					return format!(
+						"finished an interrupted rotation of `{name}`: its \
+						state was parked mid-crossing and now reads under \
+						`{env_var}` (serial {serial})"
+					)
+					.xok();
+				}
 				if env_ext::var(retiring.as_str()).is_err() {
 					bevybail!(
 						"`{name}` is encrypted under a passphrase other than \
@@ -424,15 +467,23 @@ impl Project {
 						stack has rotated"
 					);
 				}
+				// out of the primary key holding the retiring passphrase, then
+				// back into it holding the current one: two writes, both
+				// encrypted, because the salt of the state being read is
+				// stored under the key provider's NAME
 				self.with_state_encryption(
-					current
-						.clone()
-						.with_env_var(retiring.clone())
-						.with_bridge(StateBridge::Decrypt),
+					current.clone().crossing(StateCrossing::FromRetiring(
+						retiring.clone(),
+					)),
 				)
 				.rewrite_state()
 				.await?;
-				let serial = encrypt.rewrite_state().await?;
+				let serial = self
+					.with_state_encryption(
+						current.clone().crossing(StateCrossing::FromSecondary),
+					)
+					.rewrite_state()
+					.await?;
 				self.init().await?;
 				format!(
 					"rotated the state of `{name}` from `{retiring}` to \
@@ -445,7 +496,7 @@ impl Project {
 
 	/// This project reading and writing its state under `encryption` instead:
 	/// the same stack, backend, work dir and rendered resources, which is how
-	/// a rotation pushes the state across a [`StateBridge`].
+	/// a rotation makes each half of a [`StateCrossing`].
 	fn with_state_encryption(&self, encryption: StateEncryption) -> Self {
 		Self {
 			config: self.config.clone().with_state_encryption(&encryption),
@@ -482,10 +533,16 @@ impl Project {
 			&& tofu::state_pull(&self.dir(), &vars).await.is_ok()
 	}
 
-	/// Pull the state under this project's encryption and push it straight
-	/// back with its serial bumped, so the backend rewrites it under the
-	/// PRIMARY method: one crossing of a [`StateBridge`]. The bump is what
-	/// makes tofu write at all, since an unchanged state is not persisted.
+	/// Pull the state through this project's [`StateCrossing`] and push it
+	/// straight back with its serial bumped, so the backend rewrites it under
+	/// the crossing's WRITE method. The bump is what makes tofu write at all,
+	/// since an unchanged state is not persisted.
+	///
+	/// **Every crossing writes encrypted**, so the only readable copy is one
+	/// private temp file between the pull and the push. That is the property
+	/// the whole rotation design exists to keep: the backend is versioned, so
+	/// a plaintext write would be retained rather than overwritten, and the
+	/// encryption a rotation is renewing would be defeated by the rotation.
 	async fn rewrite_state(&self) -> Result<u64> {
 		self.init().await?;
 		let vars = self.required_vars()?;
@@ -620,10 +677,18 @@ mod rotation {
 	use super::*;
 
 	/// A rotation reads the state under the retiring passphrase and rewrites
-	/// it under the current one across the plaintext bridge; a plaintext
-	/// state is encrypted by the same call, a state already under the
-	/// current value is left alone, and a missing retiring variable names the
-	/// `--copy` step. Eight tofu invocations, so well past the default budget.
+	/// it under the current one; a plaintext state is encrypted by the same
+	/// call, a state already under the current value is left alone, and a
+	/// missing retiring variable names the `--copy` step.
+	///
+	/// The assertion that matters most is the last one: **no write a rotation
+	/// makes may be readable**. A backend is versioned, so a plaintext or
+	/// stale-key write is kept rather than overwritten, and a rotation that
+	/// made one would publish the very state it was run to protect. The
+	/// check watches every version of the local backend's file, since the
+	/// finished object says nothing about what it replaced.
+	///
+	/// Well past the default budget: a dozen tofu invocations.
 	#[beet_core::test(timeout_ms = 120_000)]
 	async fn rotates_the_state_passphrase() {
 		const OLD: &str = "BEET_TEST_ROTATE_OLD";
@@ -675,12 +740,58 @@ mod rotation {
 		old.state_is_encrypted().await.unwrap().xpect_eq(Some(true));
 		old.reads_state().await.xpect_true();
 
+		// every write the rotation makes, watched as it makes them: the
+		// finished object says nothing about what it replaced
+		let state_dir = dir.path().join("state");
+		let writes = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+		let watched = writes.clone();
+		let done =
+			std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+		let stop = done.clone();
+		let watching = std::thread::spawn(move || {
+			let mut last: Vec<Vec<u8>> = Vec::new();
+			while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+				let Ok(entries) = std::fs::read_dir(&state_dir) else {
+					continue;
+				};
+				for entry in entries.flatten() {
+					let Ok(bytes) = std::fs::read(entry.path()) else {
+						continue;
+					};
+					// a tofu state, settled or in flight; anything else in the
+					// directory (a lock, a backup) is not what this watches
+					if serde_json::from_slice::<serde_json::Value>(&bytes)
+						.is_ok_and(|json| {
+							json.get("lineage").is_some()
+								|| json.get("encrypted_data").is_some()
+						}) && !last.contains(&bytes)
+					{
+						last.push(bytes.clone());
+						watched.lock().unwrap().push(bytes);
+					}
+				}
+				std::thread::sleep(Duration::from_millis(2));
+			}
+		});
+
 		let new = under(StateEncryption::passphrase(NEW));
 		new.rotate_state(Some(OLD))
 			.await
 			.unwrap()
 			.xpect_contains(format!("from `{OLD}` to `{NEW}`"));
 		new.reads_state().await.xpect_true();
+		// the retiring passphrase reads nothing the rotation left behind,
+		// which a crossing through plaintext would have failed
+		done.store(true, std::sync::atomic::Ordering::Relaxed);
+		watching.join().unwrap();
+		let seen = writes.lock().unwrap().clone();
+		seen.is_empty().xpect_false();
+		for bytes in &seen {
+			serde_json::from_slice::<serde_json::Value>(bytes)
+				.unwrap()
+				.get("encrypted_data")
+				.xpect_some();
+		}
 		old.reads_state().await.xpect_false();
 		new.rotate_state(Some(OLD))
 			.await
@@ -691,5 +802,23 @@ mod rotation {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("--copy=BEET_TEST_ROTATE_OLD");
+
+		// a rotation interrupted between its two writes: the state is readable
+		// under the current passphrase but salted under the secondary name, so
+		// every verb of the stack fails. Re-running finishes it, and WITHOUT
+		// the retiring value, which by then may be gone.
+		under(
+			StateEncryption::passphrase(NEW)
+				.crossing(StateCrossing::FromRetiring(NEW.into())),
+		)
+		.rewrite_state()
+		.await
+		.unwrap();
+		new.reads_state().await.xpect_false();
+		new.rotate_state(Some("BEET_TEST_ROTATE_MISSING"))
+			.await
+			.unwrap()
+			.xpect_contains("interrupted rotation");
+		new.reads_state().await.xpect_true();
 	}
 }

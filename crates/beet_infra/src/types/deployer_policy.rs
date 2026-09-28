@@ -49,18 +49,39 @@ use serde_json::json;
 /// document is per repo, so the same key deploys `dev` and `prod`, and a policy
 /// split by stage would draw a boundary the key does not have.
 ///
-/// The SERVICES are still one stage's, because one launch renders one stage and
-/// a stage may declare more (a prod site has a certificate and a custom domain
-/// where its dev stage has neither). So a mint runs under the stage that
-/// actually deploys, `--stage=prod` where that is not the default, which the
-/// mint verb warns about when it is not (`DeployerMint`, native and `deploy`,
-/// so not linkable from here).
+/// The SERVICES are one stage's, and that is the design rather than a
+/// limitation to route around. A launch renders one stage, a stage may declare
+/// more than another (a prod site has a certificate and a custom domain where
+/// its dev stage has neither), and a policy should describe the stage that
+/// actually deploys. So a mint runs under that stage, `--stage=prod` where it
+/// is not the default, and `DeployerMint` WARNS when a stack took a non-prod
+/// launch stage. **That warning is not a bug to fix**: prod is a superset of
+/// dev for every stack in this account today, the failure when it is not is a
+/// loud `AccessDenied` on the next plan, and one re-mint fixes it.
 ///
-/// ## What it cannot know
+/// A mint that re-launched itself per stage and unioned the services was
+/// considered and rejected: a self-relaunch is a new failure surface bought
+/// for a problem that has happened once and was caught by the warning that
+/// already exists. Revisit only if a third stage appears, or if a stage ever
+/// declares something prod does not, which is the one case this cannot cover.
 ///
-/// A bucket outside the app's namespace (a `<StoreUriBlock>` naming another
-/// app's store) and a resource the config no longer declares but the state
-/// still holds (a destroy in progress) both need a statement by hand.
+/// ## What it cannot know, and what that looks like
+///
+/// Two cases need a statement no lowering can derive. Neither happens in this
+/// account today, so the seam is added when a case appears rather than invented
+/// for a hypothetical; what is recorded here is the SYMPTOM, because an
+/// `AccessDenied` is what a reader actually meets.
+///
+/// - **A bucket outside the app's namespace**, ie a `<StoreUriBlock>` naming
+///   another app's store. The deploy fails with `AccessDenied` on an
+///   `s3:` call against a bucket whose name does not start `<app>--`, and no
+///   re-mint helps, because the policy follows the declarations and the
+///   declaration is in another app.
+/// - **A resource the config no longer declares but the state still holds**, ie
+///   a block removed before its resource was destroyed, or a destroy
+///   interrupted partway. The policy is lowered from what the config declares,
+///   so a destroy of something undeclared is denied. Put the declaration back,
+///   destroy, then remove it.
 #[derive(Debug, Clone)]
 pub struct DeployerPolicy {
 	/// The app every name is scoped to, ie `beet-site`.
@@ -72,6 +93,10 @@ pub struct DeployerPolicy {
 	regions: BTreeSet<SmolStr>,
 	/// The IAM services the lowered types named.
 	services: BTreeSet<&'static str>,
+	/// Whether every principal the app's stacks render already carries its
+	/// boundary. Until it does, the IAM statement is unconditioned, which is
+	/// the one-time state a migration passes through.
+	boundary: bool,
 }
 
 impl DeployerPolicy {
@@ -159,8 +184,35 @@ impl DeployerPolicy {
 			state_bucket: state_bucket.into(),
 			regions: BTreeSet::new(),
 			services: BTreeSet::new(),
+			boundary: false,
 		}
 	}
+
+	/// Condition every IAM write on the app's [`RuntimeBoundary`], which is
+	/// only safe once every principal already carries it: the `StringNotLike`
+	/// deny on `iam:PermissionsBoundary` is TRUE for a principal that has
+	/// none, so an apply that would attach the first one is denied. The mint
+	/// decides by asking the account, so the order is enforced rather than
+	/// remembered.
+	pub fn with_boundary(mut self) -> Self {
+		self.boundary = true;
+		self
+	}
+
+	/// The arn pattern every one of this app's boundaries matches, one per
+	/// stage ([`RuntimeBoundary::policy_name`]). A `StringLike` pattern rather
+	/// than one arn, because a policy covers every stage of its app while a
+	/// boundary's CONTENT is one stage's.
+	fn boundary_pattern(&self) -> String {
+		format!(
+			"arn:aws:iam::*:policy/{}--*--{}",
+			self.app,
+			RuntimeBoundary::SUFFIX
+		)
+	}
+
+	/// The app every name is scoped to, ie `beet-site`.
+	pub fn app(&self) -> &SmolStr { &self.app }
 
 	/// The managed policy this lowering writes, ie `beet-site--deploy`.
 	/// Deliberately outside the `<app>--<stage>--<label>` convention every
@@ -295,7 +347,9 @@ impl DeployerPolicy {
 				],
 				"Resource": "arn:aws:iam::aws:policy/*",
 			}));
+			statements.extend(self.boundary_statements());
 		}
+		statements.extend(self.irreversible_statement());
 		if self.services.contains("ssm") {
 			statements.push(json!({
 				"Sid": "Ssm",
@@ -356,6 +410,180 @@ impl DeployerPolicy {
 		(!actions.is_empty()).then_some(actions)
 	}
 
+	/// The statements that stop `iam:*` on this app's names from being a route
+	/// to an administrator, absent until the app's principals are all capped.
+	///
+	/// Without them the `Iam` statement above is an escalation in three calls:
+	/// create `role/<app>--prod--anything`, attach the AWS-managed
+	/// `AdministratorAccess` to it (the resource `iam:AttachRolePolicy` checks
+	/// is the role, which is in scope) and pass it to a compute the same
+	/// policy may create.
+	///
+	/// - **create and edit only under the boundary.** `iam:PermissionsBoundary`
+	///   names the boundary a `Create*` request SETS and the one an edited
+	///   principal already CARRIES, so one condition both forces a new
+	///   principal to be capped and refuses to touch an uncapped one.
+	/// - **never uncap.** `Delete*PermissionsBoundary` is denied outright.
+	/// - **never rewrite the cap.** The boundary and this policy are both
+	///   `<app>--*`, which the `Iam` statement reaches, so a deployer could
+	///   otherwise publish a new version of the document that grants it.
+	/// - **no service-linked roles.** They can never carry a boundary at all
+	///   (`PutRolePermissionsBoundary` answers `UnmodifiableEntity`), so the
+	///   only cap available is not creating them.
+	///
+	/// `iam:PassRole` takes no boundary condition, and is bounded instead by
+	/// the `Iam` statement's own `role/<app>--*` resource: with every role in
+	/// that namespace capped, there is no uncapped role to pass.
+	///
+	/// **Every boundary deny is scoped to this app's own principals**, which is
+	/// not tidiness: one deployer user carries one policy PER APP, an explicit
+	/// deny is a union across all of them, and a deny on `*` would therefore
+	/// make each app's policy refuse every other app's deploys, since their
+	/// boundaries differ. `NeverUncap` is the deliberate exception, being a
+	/// deny nothing should ever be exempt from.
+	fn boundary_statements(&self) -> Vec<Value> {
+		if !self.boundary {
+			return Vec::new();
+		}
+		let boundary = self.boundary_pattern();
+		vec![
+			json!({
+				"Sid": "IamOnlyUnderTheBoundary",
+				"Effect": "Deny",
+				"Action": [
+					"iam:CreateRole",
+					"iam:CreateUser",
+					"iam:PutRolePermissionsBoundary",
+					"iam:PutUserPermissionsBoundary",
+					"iam:PutRolePolicy",
+					"iam:PutUserPolicy",
+					"iam:AttachRolePolicy",
+					"iam:AttachUserPolicy",
+					"iam:DeleteRolePolicy",
+					"iam:DeleteUserPolicy",
+					"iam:DetachRolePolicy",
+					"iam:DetachUserPolicy",
+					"iam:UpdateAssumeRolePolicy",
+				],
+				// this app's principals only: see the note above about one
+				// user carrying one policy per app
+				"Resource": self.principal_resources(),
+				// `StringNotLike`, since one policy covers every stage and
+				// each stage has a boundary of its own
+				"Condition": {
+					"StringNotLike": { "iam:PermissionsBoundary": &boundary }
+				},
+			}),
+			json!({
+				"Sid": "NeverUncap",
+				"Effect": "Deny",
+				"Action": [
+					"iam:DeleteRolePermissionsBoundary",
+					"iam:DeleteUserPermissionsBoundary",
+				],
+				"Resource": self.principal_resources(),
+			}),
+			json!({
+				"Sid": "NeverMintOrRewriteACap",
+				"Effect": "Deny",
+				// `CreatePolicy` belongs here because the condition above
+				// admits any boundary of this app: without it a deployer
+				// mints `<app>--evil--runtime-boundary` granting `*`, wears
+				// it, and the cap is decorative. The mint runs as an
+				// administrator, so nothing legitimate loses anything.
+				"Action": [
+					"iam:CreatePolicy",
+					"iam:CreatePolicyVersion",
+					"iam:DeletePolicy",
+					"iam:DeletePolicyVersion",
+					"iam:SetDefaultPolicyVersion",
+				],
+				"Resource": [
+					&boundary,
+					&format!(
+						"arn:aws:iam::*:policy/{}",
+						self.policy_name()
+					),
+				],
+			}),
+		]
+	}
+
+	/// The speed bump on the genuinely unrecoverable, `None` when the app's
+	/// stacks render nothing that can be one.
+	///
+	/// Everything else this policy grants is recoverable by design: a bucket
+	/// is versioned, a table has deletion protection, a noncurrent version has
+	/// a window. **A deployer never needs to delete a production bucket**, so
+	/// denying it costs nothing day to day and makes destroying production a
+	/// human act rather than an agent's mistake.
+	///
+	/// `BoolIfExists`, never `Bool`: `aws:MultiFactorAuthPresent` is ABSENT
+	/// from a long-lived access key's requests rather than false, and a `Bool`
+	/// deny would therefore not fire for exactly the credential it is aimed
+	/// at. So this denies a deployer outright, and an operator who assumes a
+	/// role with a code is the only principal that gets through.
+	///
+	/// Scoped to `--prod--` names, so tearing a dev stack down stays free,
+	/// which the infra-deploy skill does routinely.
+	///
+	/// ## What is deliberately NOT here
+	///
+	/// Only actions a deploy never performs, because a deny is absolute and an
+	/// action a converge needs would block every apply:
+	///
+	/// - **`s3:PutBucketVersioning`**, though turning versioning off is how a
+	///   deletion becomes final. There is no condition key for the versioning
+	///   STATUS, so a deny cannot tell enabling from disabling, and every new
+	///   bucket is created with versioning enabled. Recoverability is kept
+	///   where it can be expressed instead: the render refuses a writable
+	///   bucket that declares no versioning, and `force_destroy=false` stops
+	///   the bucket going with the stack.
+	/// - **`s3:PutBucketLifecycleConfiguration`**, for the same reason: a
+	///   deploy sets the expiry rules on every converge.
+	/// - **`iam:DeleteRole` and `iam:DeleteUser`**, because renaming a role or
+	///   a user is destroy-then-create, and a rename is an ordinary change. An
+	///   IAM principal is also not a source of record: it is re-mintable from
+	///   the declarations, which is the whole of what makes it recoverable.
+	fn irreversible_statement(&self) -> Option<Value> {
+		let prod = format!("{}--{}--*", self.app, BootstrapConfig::PROD_STAGE);
+		let mut actions = Vec::<&str>::new();
+		let mut resources = Vec::<String>::new();
+		if self.services.contains("s3") {
+			actions.push("s3:DeleteBucket");
+			resources.push(format!("arn:aws:s3:::{prod}"));
+		}
+		if self.services.contains("dynamodb") {
+			actions.push("dynamodb:DeleteTable");
+			resources.push(format!("arn:aws:dynamodb:*:*:table/{prod}"));
+		}
+		if self.services.contains("rds") {
+			actions.push("rds:DeleteDBInstance");
+			resources.push(format!("arn:aws:rds:*:*:db:{prod}"));
+		}
+		(!actions.is_empty()).then(|| {
+			json!({
+				"Sid": "IrreversibleNeedsMfa",
+				"Effect": "Deny",
+				"Action": actions,
+				"Resource": resources,
+				"Condition": {
+					"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
+				},
+			})
+		})
+	}
+
+	/// The two arn patterns naming a PRINCIPAL of this app, which is what a
+	/// boundary condition applies to; the policy and instance-profile patterns
+	/// of [`iam_resources`](Self::iam_resources) carry no boundary.
+	fn principal_resources(&self) -> Vec<String> {
+		["role", "user"]
+			.into_iter()
+			.map(|kind| format!("arn:aws:iam::*:{kind}/{}--*", self.app))
+			.collect()
+	}
+
 	/// One IAM arn pattern per resource category, each under the app's own
 	/// name, so a deployer can create the roles its stacks declare and reach
 	/// nothing else, its own user and policy included (both are named for the
@@ -406,7 +634,9 @@ mod test {
 			),
 			|parent| {
 				parent.spawn(
-					S3BucketBlock::new("store").with_deploy_versioned(false),
+					S3BucketBlock::new("store")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
 				);
 			},
 		);
@@ -465,5 +695,177 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("one app's stages");
+	}
+
+	/// The escalation the boundary closes, and the shape that closes it: the
+	/// broad `iam:*` Allow means only a DENY can restrict, so the condition is
+	/// `StringNotLike` (a pattern, since one policy spans every stage), which
+	/// is also true for a principal carrying no boundary at all and therefore
+	/// refuses to edit an uncapped one.
+	#[beet_core::test]
+	fn boundary_conditions_deny_rather_than_allow() {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
+			parent.spawn(LambdaBlock::default());
+		});
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		let policy = DeployerPolicy::new(stack.app_name().clone(), "state")
+			.lower(&stack, &config)
+			.unwrap();
+		// unconditioned until the account says every principal is capped
+		policy
+			.to_json()
+			.to_string()
+			.xpect_contains("iam:*")
+			.xnot()
+			.xpect_contains("PermissionsBoundary");
+		let document = policy.with_boundary().to_json();
+		let statement = |sid: &str| {
+			document["Statement"]
+				.as_array()
+				.unwrap()
+				.iter()
+				.find(|statement| statement["Sid"] == sid)
+				.cloned()
+				.unwrap()
+		};
+		let under = statement("IamOnlyUnderTheBoundary");
+		under["Effect"].as_str().unwrap().xpect_eq("Deny");
+		// `StringNotLike`, since one deploy policy covers every stage and each
+		// stage carries a boundary of its own
+		under["Condition"]["StringNotLike"]["iam:PermissionsBoundary"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(format!(
+				"arn:aws:iam::*:policy/{}--*--runtime-boundary",
+				stack.app_name()
+			));
+		// a capped principal cannot uncap itself, and the cap itself cannot
+		// be rewritten by the policy it caps
+		statement("NeverUncap")["Action"]
+			.to_string()
+			.xpect_contains("iam:DeleteRolePermissionsBoundary");
+		// the condition admits ANY boundary of this app, so minting one is
+		// what has to be denied or the cap is decorative
+		let never_mint = statement("NeverMintOrRewriteACap");
+		never_mint["Action"]
+			.to_string()
+			.xpect_contains("iam:CreatePolicy");
+		never_mint["Resource"]
+			.to_string()
+			.xpect_contains("--*--runtime-boundary")
+			.xpect_contains("--deploy");
+	}
+
+	/// One deployer user carries one policy PER APP and an explicit deny is a
+	/// union across all of them, so a boundary deny on `*` would make each
+	/// app's policy refuse every other app's deploys. The repo that found this
+	/// has three apps on one user.
+	#[beet_core::test]
+	fn one_app_s_deny_does_not_reach_another_s() {
+		let document = |app: &str| {
+			let (scope, _dir) = RenderScope::test_render_stack(
+				(
+					Stack::new(app).with_stage("prod"),
+					AwsRegion::new("us-west-2"),
+				),
+				|parent| {
+					parent.spawn(RepoStoreBlock::test_store());
+					parent.spawn(LambdaBlock::default());
+				},
+			);
+			let (stack, _deployment, config) = scope.finish().unwrap();
+			DeployerPolicy::new(app, "state")
+				.lower(&stack, &config)
+				.unwrap()
+				.with_boundary()
+				.to_json()
+		};
+		let deny = |app: &str| {
+			document(app)["Statement"]
+				.as_array()
+				.unwrap()
+				.iter()
+				.find(|statement| statement["Sid"] == "IamOnlyUnderTheBoundary")
+				.unwrap()
+				.clone()
+		};
+		// the two apps a repo really carries on one user, each scoped to its
+		// own principals, so neither reaches the other's
+		let site = deny("beet-site");
+		let social = deny("beet-social");
+		for (held, mine, theirs) in [
+			(&site, "beet-site", "beet-social"),
+			(&social, "beet-social", "beet-site"),
+		] {
+			let resources = held["Resource"].to_string();
+			resources
+				.as_str()
+				.xpect_contains(&format!("role/{mine}--*"))
+				.xpect_contains(&format!("user/{mine}--*"))
+				.xnot()
+				.xpect_contains(theirs);
+			// never `*`: a deny unions across every policy on the user, so a
+			// deny on `*` makes each app's policy refuse the others' deploys
+			resources.contains("\"*\"").xpect_false();
+		}
+		// and the `--` separator is what keeps an app named `beet` from
+		// matching `beet-site--*`, which is what makes per-app scoping enough
+		let beet = deny("beet")["Resource"].to_string();
+		beet.as_str().xpect_contains("role/beet--*");
+		beet.contains("beet-site").xpect_false();
+	}
+
+	/// Destroying production takes a human. `BoolIfExists` is the whole point:
+	/// a long-lived key's requests carry no `aws:MultiFactorAuthPresent` at
+	/// all, so a `Bool` deny would not fire for the credential it is aimed at.
+	#[beet_core::test]
+	fn irreversible_prod_actions_need_mfa() {
+		let (scope, _dir) = RenderScope::test_render_stack(
+			(
+				Stack::new("my-egress").with_stage("prod"),
+				AwsRegion::new("us-west-2"),
+			),
+			|parent| {
+				parent.spawn(
+					S3BucketBlock::new("store")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
+				);
+			},
+		);
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		let document = DeployerPolicy::new("my-egress", "state")
+			.lower(&stack, &config)
+			.unwrap()
+			.to_json();
+		let deny = document["Statement"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+			.unwrap()
+			.clone();
+		deny["Effect"].as_str().unwrap().xpect_eq("Deny");
+		deny["Condition"]["BoolIfExists"]["aws:MultiFactorAuthPresent"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("false");
+		// only what a deploy NEVER does: `PutBucketVersioning` is how every new
+		// bucket is created, and IAM has no condition key for the status, so a
+		// deny there would refuse the create rather than the disable
+		deny["Action"]
+			.to_string()
+			.xpect_contains("s3:DeleteBucket")
+			.xnot()
+			.xpect_contains("s3:PutBucketVersioning")
+			.xnot()
+			.xpect_contains("iam:DeleteRole");
+		// a dev teardown stays free, which the infra-deploy skill does often
+		deny["Resource"]
+			.to_string()
+			.xpect_contains("my-egress--prod--*")
+			.xnot()
+			.xpect_contains("my-egress--dev");
 	}
 }

@@ -214,7 +214,7 @@ pub(super) fn spawn_store_on_config(
 			.await
 		else {
 			bevybail!(
-				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a blob-store declaration, ie `<S3BucketBlock bx:ref=\"analytics\" label=\"analytics\" runtime_write=true deploy_versioned=false/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
+				"an `AnalyticsConfig` records to the store it names: add a `StoreRef` beside it pointing at a blob-store declaration, ie `<S3BucketBlock bx:ref=\"analytics\" label=\"analytics\" runtime_write=true deploy_versioned=false object_versioning=true/>` and `{{(AnalyticsConfig, StoreRef($analytics))}}`"
 			);
 		};
 		let config = config_entity

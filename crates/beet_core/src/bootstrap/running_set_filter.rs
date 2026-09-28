@@ -75,10 +75,7 @@ impl RunningSetFilter {
 	/// Parse a comma-separated glob list, trimming each name and dropping empty
 	/// ones.
 	pub fn new(value: &str) -> Self {
-		value
-			.split(',')
-			.map(str::trim)
-			.filter(|name| !name.is_empty())
+		str_ext::csv(value)
 			.map(SmolStr::from)
 			.collect::<Vec<_>>()
 			.xmap(Self)

@@ -157,9 +157,16 @@ impl Config {
 		&mut self,
 		encryption: &StateEncryption,
 	) -> &mut Self {
-		if let Some(json) = encryption.to_json() {
-			self.encryption = Some(json);
-			self.ensure_variable(STATE_ENCRYPTION_VAR, Variable {
+		// both channels replaced together: a render that stops naming the
+		// retiring passphrase (the second half of a rotation, and every
+		// ordinary launch) must keep neither the block nor a declared variable
+		// nothing supplies a value for
+		self.encryption = encryption.to_json();
+		for name in [STATE_ENCRYPTION_VAR, STATE_ENCRYPTION_RETIRING_VAR] {
+			self.variables.shift_remove(name);
+		}
+		for name in encryption.var_names() {
+			self.ensure_variable(name, Variable {
 				r#type: Some("string".into()),
 				default: None,
 				description: Some(
@@ -271,6 +278,27 @@ impl Config {
 			.collect::<BTreeSet<_>>()
 			.into_iter()
 			.collect()
+	}
+
+	/// Every rendered resource of `resource_type`, as `(label, body)` in
+	/// insertion order; empty when the config declares none.
+	///
+	/// The read for a lowering whose input is what the blocks RENDERED rather
+	/// than what they declared: [`RuntimeBoundary`] derives an app's ceiling
+	/// from the policy documents its compute blocks emitted, which is how it
+	/// reuses [`IamPolicy`]'s lowering rather than running a second one beside
+	/// it. [`declared_types`](Self::declared_types) is the shallower read, and
+	/// what a deployer's own policy is lowered from.
+	pub fn resources_of_type(
+		&self,
+		resource_type: &str,
+	) -> impl Iterator<Item = (&SmolStr, &Value)> {
+		self.resources
+			.get(resource_type)
+			.ok()
+			.and_then(|resources| resources.as_map().ok())
+			.into_iter()
+			.flat_map(|resources| resources.iter())
 	}
 
 	/// Add a typed resource (chaining). The required provider is registered

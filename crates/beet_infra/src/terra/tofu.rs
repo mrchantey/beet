@@ -234,9 +234,12 @@ pub async fn state_pull(
 /// Write `file` as the state, replacing what the backend holds. Tofu reads
 /// the old state first and refuses a lineage change or a serial behind it,
 /// and skips the write when nothing changed, so a caller rewriting the state
-/// it pulled bumps the serial. `vars` carries anything required to read the
-/// old and write the new, eg a [`StateEncryption`] passphrase; across a
-/// [`StateBridge`] the two differ by method, never by variable.
+/// it pulled bumps the serial.
+///
+/// `vars` carries anything required to read the old and write the new, eg a
+/// [`StateEncryption`] passphrase; across a [`StateCrossing`] the read and the
+/// write differ by method, never by what the destination needs, which is what
+/// keeps the push's own refresh of the destination readable.
 pub async fn state_push(
 	dir: &AbsPath,
 	vars: &[(SmolStr, SmolStr)],

@@ -748,6 +748,7 @@ impl StalwartBlock {
 		config: &mut terra::Config,
 		access: &AccessGrants,
 	) -> Result<ResourceDef<AwsIamInstanceProfileDetails>> {
+		let boundary = RuntimeBoundary::arn(stack, config)?;
 		let role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("role")),
 			AwsIamRoleDetails {
@@ -761,6 +762,10 @@ impl StalwartBlock {
 				})
 				.to_string()
 				.into(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary),
 				..default()
 			},
 		);
@@ -851,7 +856,15 @@ impl StalwartBlock {
 	) -> Result {
 		let user = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("ses-user")),
-			AwsIamUserDetails::default(),
+			AwsIamUserDetails {
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(RuntimeBoundary::arn(
+					stack, config,
+				)?),
+				..default()
+			},
 		);
 		let policy_ident = stack.resource_ident(self.build_label("ses-policy"));
 		let policy = ResourceDef::new_secondary(
@@ -1899,9 +1912,12 @@ mod tests {
 	fn siblings() -> (VpcBlock, S3BucketBlock) {
 		(
 			VpcBlock::new("net"),
+			// the mail blob store is the record, so it is versioned exactly
+			// as the live declaration is
 			S3BucketBlock::new("mail-blobs")
 				.with_deploy_versioned(false)
-				.with_runtime_write(true),
+				.with_runtime_write(true)
+				.with_object_versioning(true),
 		)
 	}
 
@@ -2835,7 +2851,8 @@ mod tests {
 				parent.spawn(
 					S3BucketBlock::new("archive")
 						.with_deploy_versioned(false)
-						.with_runtime_write(true),
+						.with_runtime_write(true)
+						.with_object_versioning(true),
 				);
 				parent.spawn(cold_store());
 			});

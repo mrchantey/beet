@@ -546,10 +546,15 @@ impl FargateBlock {
 
 		// IAM execution role (ECS pulls images + writes logs). `new_primary`
 		// stack-prefixes the role name (IAM role names are account-global).
+		let boundary = RuntimeBoundary::arn(stack, config)?;
 		let exec_role = terra::ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("exec-role")),
 			AwsIamRoleDetails {
 				assume_role_policy: ecs_assume_role_policy(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary.clone()),
 				..default()
 			},
 		);
@@ -577,6 +582,10 @@ impl FargateBlock {
 			stack.resource_ident(self.build_label("task-role")),
 			AwsIamRoleDetails {
 				assume_role_policy: ecs_assume_role_policy(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary),
 				..default()
 			},
 		);
@@ -1073,8 +1082,11 @@ mod tests {
 	fn grants_only_least_privilege_policies() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(FargateBlock::default());
-			parent
-				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+			parent.spawn(
+				S3BucketBlock::new("app")
+					.with_deploy_versioned(false)
+					.with_accept_data_loss(true),
+			);
 			parent.spawn(DynamoTableBlock::new("analytics"));
 		});
 		let stack = scope.stack().clone();
@@ -1102,7 +1114,11 @@ mod tests {
 	fn lowers_permissions_per_grant() {
 		RenderScope::test_json(|parent| {
 			parent.spawn(FargateBlock::default());
-			parent.spawn(S3BucketBlock::new("assets").with_runtime_write(true));
+			parent.spawn(
+				S3BucketBlock::new("assets")
+					.with_runtime_write(true)
+					.with_object_versioning(true),
+			);
 			parent.spawn(DynamoTableBlock::new("analytics"));
 		})
 		.as_str()

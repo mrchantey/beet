@@ -5,6 +5,10 @@ use beet_core::prelude::*;
 /// invocation, see [`StateEncryption::vars`].
 pub const STATE_ENCRYPTION_VAR: &str = "tf_state_passphrase";
 
+/// The same for the passphrase a rotation is retiring, referenced only by the
+/// first half of a crossing ([`StateCrossing::FromRetiring`]).
+pub const STATE_ENCRYPTION_RETIRING_VAR: &str = "tf_state_passphrase_retiring";
+
 /// OpenTofu client-side state (and plan) encryption.
 /// https://opentofu.org/docs/language/state/encryption/
 ///
@@ -31,29 +35,38 @@ pub enum StateEncryption {
 	Passphrase {
 		/// Environment variable holding the passphrase, eg `TF_STATE_PASSPHRASE`.
 		env_var: SmolStr,
-		/// The plaintext bridge this render crosses, [`StateBridge::None`] in
-		/// the steady state.
-		bridge: StateBridge,
+		/// The half-step this render makes, `None` in the steady state.
+		crossing: Option<StateCrossing>,
 	},
 }
 
-/// How one state write crosses between plaintext and encrypted: OpenTofu's
-/// `unencrypted` method beside `aes_gcm`, one as the `method` a write uses
-/// and the other as the `fallback` a read may take. Never left in place:
-/// a fallback that stays would also read a state somebody replaced.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum StateBridge {
-	/// No bridge: the state is read and written encrypted.
-	#[default]
-	None,
-	/// Read a plaintext state too, write it encrypted: the crossing that
-	/// turns encryption on, and the second rewrite of a passphrase rotation.
-	Encrypt,
-	/// Read an encrypted state too, write it plaintext: the first rewrite of
-	/// a passphrase rotation, under the passphrase being retired. OpenTofu
-	/// keys pbkdf2's salt by key-provider name, so two passphrases cannot
-	/// both be `main` and a swap crosses plaintext instead.
-	Decrypt,
+/// A write that moves the state between encryption methods, and the reason
+/// [`StateEncryption`] has more than one shape.
+///
+/// **OpenTofu keys pbkdf2's salt by the key provider's ADDRESS**, storing it in
+/// the state envelope's `meta` as `key_provider.pbkdf2.<name>`. A provider
+/// under a second name therefore finds no salt of its own and reads nothing,
+/// which is why a passphrase cannot simply be swapped under one name and why
+/// a rotation takes the two halves below. Every one of them WRITES encrypted:
+/// the backend never receives a plaintext state, which on a versioned bucket
+/// would be kept rather than overwritten.
+///
+/// A crossing is never left in place, since a fallback that stays would also
+/// read a state somebody replaced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateCrossing {
+	/// Read a plaintext state too, write it encrypted: the one-off that turns
+	/// encryption on for a stack that predates it. `unencrypted` needs no key
+	/// material, so it is the one fallback with no salt to look up.
+	FromPlaintext,
+	/// Read under the primary key, holding the RETIRING passphrase this names,
+	/// and write under the secondary: the first half of a rotation, which is
+	/// the only direction the retiring salt can be read from.
+	FromRetiring(SmolStr),
+	/// Read under the secondary key and write under the primary, both holding
+	/// the current passphrase: the second half, which returns the salt to the
+	/// name a steady-state read looks for.
+	FromSecondary,
 }
 
 impl StateEncryption {
@@ -61,31 +74,27 @@ impl StateEncryption {
 	pub fn passphrase(env_var: impl Into<SmolStr>) -> Self {
 		Self::Passphrase {
 			env_var: env_var.into(),
-			bridge: StateBridge::None,
+			crossing: None,
 		}
 	}
 
-	/// The encryption crossing `bridge`, see [`StateBridge`].
-	pub fn with_bridge(self, bridge: StateBridge) -> Self {
+	/// The same encryption making `crossing`, see [`StateCrossing`].
+	pub fn crossing(self, crossing: StateCrossing) -> Self {
 		match self {
-			Self::Passphrase { env_var, .. } => {
-				Self::Passphrase { env_var, bridge }
-			}
-			Self::None => Self::None,
-		}
-	}
-
-	/// The encryption reading its passphrase from `env_var` instead: how a
-	/// rotation names the retiring value.
-	pub fn with_env_var(self, env_var: impl Into<SmolStr>) -> Self {
-		match self {
-			Self::Passphrase { bridge, .. } => Self::Passphrase {
-				env_var: env_var.into(),
-				bridge,
+			Self::Passphrase { env_var, .. } => Self::Passphrase {
+				env_var,
+				crossing: Some(crossing),
 			},
 			Self::None => Self::None,
 		}
 	}
+
+	/// The key provider a steady-state read and write both address, and the
+	/// name the salt of every settled state is stored under.
+	const PRIMARY: &'static str = "main";
+	/// The key provider a rotation parks the state under for one write, so the
+	/// primary's name is free to take the new passphrase.
+	const SECONDARY: &'static str = "next";
 
 	/// The `terraform.encryption` block body, if enabled. `None` emits nothing,
 	/// leaving the `terraform` block exactly as it is without this feature.
@@ -95,45 +104,102 @@ impl StateEncryption {
 	/// `${..}` it parses as a template expression and `tofu init` refuses it
 	/// ("a single static variable reference is required"). The method's
 	/// `keys` is an evaluated expression and keeps the interpolation.
+	///
+	/// One pbkdf2 key provider in the steady state, addressed
+	/// [`PRIMARY`](Self::PRIMARY); a [`StateCrossing`] adds the second method a
+	/// read may fall back to and chooses which key the write uses.
 	pub fn to_json(&self) -> Option<Value> {
+		let Self::Passphrase { crossing, .. } = self else {
+			return None;
+		};
+		// per crossing: what the primary key holds, what the secondary holds
+		// (absent in the steady state), which key a WRITE uses, and what a
+		// READ may fall back to
+		let (primary, secondary, write, fallback) = match crossing {
+			None => (STATE_ENCRYPTION_VAR, None, Self::PRIMARY, None),
+			Some(StateCrossing::FromPlaintext) => (
+				STATE_ENCRYPTION_VAR,
+				None,
+				Self::PRIMARY,
+				Some("method.unencrypted.migrate".to_string()),
+			),
+			// the retiring passphrase keeps the primary NAME, the only address
+			// its salt is stored under, so the current one takes the secondary
+			// for this one write
+			Some(StateCrossing::FromRetiring(_)) => (
+				STATE_ENCRYPTION_RETIRING_VAR,
+				Some(STATE_ENCRYPTION_VAR),
+				Self::SECONDARY,
+				Some(Self::method(Self::PRIMARY)),
+			),
+			Some(StateCrossing::FromSecondary) => (
+				STATE_ENCRYPTION_VAR,
+				Some(STATE_ENCRYPTION_VAR),
+				Self::PRIMARY,
+				Some(Self::method(Self::SECONDARY)),
+			),
+		};
+		let mut providers = Value::map();
+		let mut aes_gcm = Value::map();
+		let mut methods = Value::map();
+		for (name, var) in
+			[(Self::PRIMARY, Some(primary)), (Self::SECONDARY, secondary)]
+				.into_iter()
+				.filter_map(|(name, var)| var.map(|var| (name, var)))
+		{
+			providers
+				.insert(
+					name,
+					value!({ "passphrase": (format!("${{var.{var}}}")) }),
+				)
+				.ok();
+			aes_gcm
+				.insert(
+					name,
+					value!({
+						"keys": (format!("${{key_provider.pbkdf2.{name}}}"))
+					}),
+				)
+				.ok();
+		}
+		if matches!(crossing, Some(StateCrossing::FromPlaintext)) {
+			methods
+				.insert("unencrypted", value!({ "migrate": {} }))
+				.ok();
+		}
+		methods.insert("aes_gcm", aes_gcm).ok();
+		let mut state = value!({ "method": (Self::method(write)) });
+		if let Some(fallback) = fallback {
+			state
+				.insert("fallback", value!({ "method": fallback }))
+				.ok();
+		}
+		Some(value!({
+			"key_provider": { "pbkdf2": providers },
+			"method": methods,
+			"state": state,
+			// a plan is written fresh, so it never crosses; it takes the write
+			// key either way, which under `FromRetiring` is NOT the primary
+			"plan": { "method": (Self::method(write)) },
+		}))
+	}
+
+	/// The static reference naming one `aes_gcm` method, ie
+	/// `method.aes_gcm.main`.
+	fn method(key: &str) -> String { format!("method.aes_gcm.{key}") }
+
+	/// The tofu variable names this encryption's rendered block references, so
+	/// the config declares every one of them: an undeclared variable fails the
+	/// init rather than the write. [`vars`](Self::vars) resolves their values.
+	pub fn var_names(&self) -> Vec<&'static str> {
 		match self {
-			Self::None => None,
-			Self::Passphrase { bridge, .. } => {
-				let mut methods = value!({
-					"aes_gcm": {
-						"main": { "keys": "${key_provider.pbkdf2.main}" }
-					}
-				});
-				let state = match bridge {
-					StateBridge::None => {
-						value!({ "method": "method.aes_gcm.main" })
-					}
-					StateBridge::Encrypt => value!({
-						"method": "method.aes_gcm.main",
-						"fallback": { "method": "method.unencrypted.migrate" }
-					}),
-					StateBridge::Decrypt => value!({
-						"method": "method.unencrypted.migrate",
-						"fallback": { "method": "method.aes_gcm.main" }
-					}),
-				};
-				if *bridge != StateBridge::None {
-					methods
-						.insert("unencrypted", value!({ "migrate": {} }))
-						.ok();
+			Self::None => Vec::new(),
+			Self::Passphrase { crossing, .. } => {
+				let mut names = vec![STATE_ENCRYPTION_VAR];
+				if let Some(StateCrossing::FromRetiring(_)) = crossing {
+					names.push(STATE_ENCRYPTION_RETIRING_VAR);
 				}
-				Some(value!({
-					"key_provider": {
-						"pbkdf2": {
-							"main": {
-								"passphrase": (format!("${{var.{STATE_ENCRYPTION_VAR}}}")),
-							}
-						}
-					},
-					"method": methods,
-					"state": state,
-					"plan": { "method": "method.aes_gcm.main" },
-				}))
+				names
 			}
 		}
 	}
@@ -146,13 +212,23 @@ impl StateEncryption {
 	pub fn vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
 		match self {
 			Self::None => Ok(Vec::new()),
-			Self::Passphrase { env_var, .. } => {
-				let value = env_ext::var(env_var.as_str()).map_err(|_| {
-					bevyhow!(
-						"state encryption is enabled but `{env_var}` is not set"
-					)
-				})?;
-				Ok(vec![(STATE_ENCRYPTION_VAR.into(), value)])
+			Self::Passphrase { env_var, crossing } => {
+				let read = |name: &str| {
+					env_ext::var(name).map_err(|_| {
+						bevyhow!(
+							"state encryption is enabled but `{name}` is not set"
+						)
+					})
+				};
+				let mut vars =
+					vec![(SmolStr::from(STATE_ENCRYPTION_VAR), read(env_var)?)];
+				if let Some(StateCrossing::FromRetiring(retiring)) = crossing {
+					vars.push((
+						STATE_ENCRYPTION_RETIRING_VAR.into(),
+						read(retiring)?,
+					));
+				}
+				Ok(vars)
 			}
 		}
 	}
@@ -212,59 +288,118 @@ mod tests {
 		json["method"].get("unencrypted").xpect_none();
 	}
 
-	/// The encrypting bridge reads a plaintext state through the
-	/// `unencrypted` fallback and nothing else changes.
+	/// Turning encryption on is the one crossing with a plaintext fallback,
+	/// and `unencrypted` is the one fallback with no salt to look up.
 	#[beet_core::test]
-	fn encrypt_bridge_adds_the_unencrypted_fallback() {
+	fn from_plaintext_reads_plaintext_and_writes_encrypted() {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
-			.with_bridge(StateBridge::Encrypt)
+			.crossing(StateCrossing::FromPlaintext)
 			.to_json()
 			.unwrap()
 			.into_json();
-		json["method"]["unencrypted"]["migrate"]
+		json["state"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		json["state"]["fallback"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.unencrypted.migrate");
+		// one key provider: nothing names a second passphrase
+		json["key_provider"]["pbkdf2"]
 			.as_object()
 			.unwrap()
-			.is_empty()
-			.xpect_true();
-		json["state"]["fallback"]["method"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("method.unencrypted.migrate");
-		json["state"]["method"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("method.aes_gcm.main");
-		json["plan"].get("fallback").xpect_none();
+			.keys()
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["main"]);
 	}
 
-	/// The decrypting bridge is the same pair with the roles swapped: the
-	/// write is plaintext, the encrypted read is the fallback, and the plan
-	/// stays encrypted.
+	/// A rotation's first half: the RETIRING passphrase keeps the primary
+	/// NAME, since that is the only address its salt is stored under, and the
+	/// current one takes the secondary for this one write. So the write lands
+	/// under the current passphrase and the retiring one cannot read it.
 	#[beet_core::test]
-	fn decrypt_bridge_swaps_the_roles() {
+	fn from_retiring_writes_under_the_secondary_key() {
 		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
-			.with_env_var("TF_STATE_PASSPHRASE_OLD")
-			.with_bridge(StateBridge::Decrypt)
+			.crossing(StateCrossing::FromRetiring("OLD".into()))
 			.to_json()
 			.unwrap()
 			.into_json();
-		json["state"]["method"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("method.unencrypted.migrate");
-		json["state"]["fallback"]["method"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("method.aes_gcm.main");
-		json["plan"]["method"]
-			.as_str()
-			.unwrap()
-			.xpect_eq("method.aes_gcm.main");
-		// the variable name is fixed; only the environment behind it moves
 		json["key_provider"]["pbkdf2"]["main"]["passphrase"]
 			.as_str()
 			.unwrap()
+			.xpect_eq("${var.tf_state_passphrase_retiring}");
+		json["key_provider"]["pbkdf2"]["next"]["passphrase"]
+			.as_str()
+			.unwrap()
 			.xpect_eq("${var.tf_state_passphrase}");
+		json["state"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.next");
+		json["state"]["fallback"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		// the plan takes the WRITE key, not the primary: under this crossing
+		// the primary holds the passphrase being retired, and a plan file
+		// carries resource attributes in the clear
+		json["plan"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.next");
+		// nothing plaintext is reachable in either direction
+		json["method"].get("unencrypted").xpect_none();
+	}
+
+	/// The second half returns the salt to the name a steady-state read looks
+	/// for, both keys holding the current passphrase.
+	#[beet_core::test]
+	fn from_secondary_returns_the_salt_to_the_primary() {
+		let json = StateEncryption::passphrase("TF_STATE_PASSPHRASE")
+			.crossing(StateCrossing::FromSecondary)
+			.to_json()
+			.unwrap()
+			.into_json();
+		for key in ["main", "next"] {
+			json["key_provider"]["pbkdf2"][key]["passphrase"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("${var.tf_state_passphrase}");
+		}
+		json["state"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.main");
+		json["state"]["fallback"]["method"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("method.aes_gcm.next");
+		json["method"].get("unencrypted").xpect_none();
+	}
+
+	/// Only the first half names a second passphrase, so only it declares the
+	/// retiring variable: an undeclared one fails the init, and a declared one
+	/// with nothing to supply it fails the plan.
+	#[beet_core::test]
+	fn only_the_retiring_half_declares_two_variables() {
+		let names = |crossing: Option<StateCrossing>| {
+			let encryption = StateEncryption::passphrase("PP");
+			match crossing {
+				Some(crossing) => encryption.crossing(crossing),
+				None => encryption,
+			}
+			.var_names()
+		};
+		names(None).xpect_eq(vec![STATE_ENCRYPTION_VAR]);
+		names(Some(StateCrossing::FromPlaintext))
+			.xpect_eq(vec![STATE_ENCRYPTION_VAR]);
+		names(Some(StateCrossing::FromSecondary))
+			.xpect_eq(vec![STATE_ENCRYPTION_VAR]);
+		names(Some(StateCrossing::FromRetiring("OLD".into()))).xpect_eq(vec![
+			STATE_ENCRYPTION_VAR,
+			STATE_ENCRYPTION_RETIRING_VAR,
+		]);
 	}
 
 	/// Native-only: wasm has no process environment to write to, so

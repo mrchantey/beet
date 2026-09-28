@@ -207,6 +207,7 @@ impl LambdaBlock {
 		);
 
 		// IAM Role for Lambda
+		let boundary = RuntimeBoundary::arn(stack, config)?;
 		let lambda_role = ResourceDef::new_primary(
 			stack.resource_ident(self.build_label("lambda_role")),
 			AwsIamRoleDetails {
@@ -220,6 +221,10 @@ impl LambdaBlock {
 				})
 				.to_string()
 				.into(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary),
 				..default()
 			},
 		);
@@ -645,8 +650,11 @@ mod tests {
 		RenderScope::test_json(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(block.clone());
-			parent
-				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+			parent.spawn(
+				S3BucketBlock::new("app")
+					.with_deploy_versioned(false)
+					.with_accept_data_loss(true),
+			);
 		})
 		.as_str()
 		.xpect_contains("aws_lambda_function")
@@ -683,8 +691,11 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
-			parent
-				.spawn(S3BucketBlock::new("app").with_deploy_versioned(false));
+			parent.spawn(
+				S3BucketBlock::new("app")
+					.with_deploy_versioned(false)
+					.with_accept_data_loss(true),
+			);
 		});
 		let stack = scope.stack().clone();
 		scope
@@ -713,7 +724,11 @@ mod tests {
 		RenderScope::test_json(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
 			parent.spawn(LambdaBlock::default());
-			parent.spawn(S3BucketBlock::new("assets").with_runtime_write(true));
+			parent.spawn(
+				S3BucketBlock::new("assets")
+					.with_runtime_write(true)
+					.with_object_versioning(true),
+			);
 			parent.spawn(DynamoTableBlock::new("analytics"));
 		})
 		.as_str()

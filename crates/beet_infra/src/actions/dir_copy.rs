@@ -108,9 +108,6 @@ impl DirCopy {
 
 	/// The declared paths, skipping empty segments.
 	pub fn iter_paths(paths: &str) -> impl Iterator<Item = &str> {
-		paths
-			.split(',')
-			.map(str::trim)
-			.filter(|path| !path.is_empty())
+		str_ext::csv(paths)
 	}
 }

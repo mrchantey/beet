@@ -302,10 +302,12 @@ token (plus AWS for the social stack's state bucket).
 		     A bucket is this codebase's unit of IAM grant, so it earns its place
 		     by a different writer or a different durability grade, not by
 		     holding a different dataset: these two have the same writer, the
-		     same grant, and neither is a sole copy (rollup rows use the blanket
-		     JSON-over-blob TableProvider and are re-derivable from the archive,
-		     segments are transient by design). -->
-		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true/>
+		     same grant, and neither is a sole copy for long (rollup rows use the
+		     blanket JSON-over-blob TableProvider and are re-derivable from the
+		     archive, segments are transient by design). A segment IS the only
+		     copy of its events between landing and that night's rollup, which
+		     is why the bucket is versioned. -->
+		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
 		<!-- the REPO STORE, marked so the deploy publishes the site into it and
 		     the ledger names it; deploy-versioned by taking the default. The box
 		     does not bake the prefix into its `user_data` (that would rebuild it
@@ -380,7 +382,7 @@ token (plus AWS for the social stack's state bucket).
 		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every
 		     binary, including the lean one where the verbs around it are inert -->
 		<Stack stage="shared">
-			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false object_versioning=true/>
 			<!-- one resource and no step outside terraform, so the deploy is an
 			     apply and the teardown is that read backwards. `force_destroy` is
 			     off, so `destroy` REFUSES while the bucket holds anything: that

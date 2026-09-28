@@ -226,6 +226,17 @@ impl ChildProcess {
 	/// (`AWS_ACCESS_KEY_ID`, …) still inherit where a child legitimately needs
 	/// them.
 	pub fn with_bootstrap(mut self, config: &BootstrapConfig) -> Result<Self> {
+		self = self.scrub_beet_env();
+		self.args.extend(config.to_argv()?);
+		self.xok()
+	}
+
+	/// Remove every inherited `BEET_*` variable, the prefix rule both
+	/// [`with_bootstrap`](Self::with_bootstrap) and
+	/// [`without_launch_env`](Self::without_launch_env) start from: it reaches
+	/// the names outside the knob table (`BEET_AGE_IDENTITY`,
+	/// `BEET_SSH_HOST_KEY`, ..) that no enumeration would.
+	fn scrub_beet_env(mut self) -> Self {
 		self.env_removals.extend(
 			env_ext::vars()
 				.into_iter()
@@ -233,8 +244,30 @@ impl ChildProcess {
 				.filter(|key| key.starts_with("BEET_"))
 				.map(SmolStr::from),
 		);
-		self.args.extend(config.to_argv()?);
-		self.xok()
+		self
+	}
+
+	/// Strip this launch's own configuration from the child's environment:
+	/// every `BEET_*` name and `WORKSPACE_ROOT`, which is the whole of what
+	/// beet itself reads at launch (`BootstrapConfig::env_names`).
+	///
+	/// The opposite of [`with_bootstrap`](Self::with_bootstrap), and for the
+	/// opposite child. A FOREIGN tool inheriting `WORKSPACE_ROOT` or
+	/// `BEET_REPO` is not configured, it is rebound: a beet binary of another
+	/// repo run this way resolves this repo's workspace and addresses this
+	/// repo's stacks. A beet child that *does* belong to this launch is
+	/// [`with_bootstrap`](Self::with_bootstrap)'s job, which constructs the
+	/// child's config field by field.
+	///
+	/// A variable another tool owns is left alone however much it shapes a
+	/// launch: `HOME`, `XDG_CONFIG_HOME`, `CARGO_TARGET_DIR`, `RUST_LOG` and
+	/// the `AWS_*` SDK conventions are what the foreign child is there to
+	/// read.
+	pub fn without_launch_env(mut self) -> Self {
+		self = self.scrub_beet_env();
+		self.env_removals
+			.extend(BootstrapConfig::env_names().map(SmolStr::from));
+		self
 	}
 }
 
@@ -252,11 +285,14 @@ impl ChildProcess {
 	/// async caller converts with `async_process::Command::from`.
 	fn into_command_std(&self) -> std::process::Command {
 		let mut cmd = std::process::Command::new(self.command.as_str());
-		for (key, val) in &self.envs {
-			cmd.env(key.as_str(), val.as_str());
-		}
+		// removals first, so an explicit value beats a blanket strip: a
+		// `without_launch_env` child still receives a document record that
+		// happens to be named like a launch variable.
 		for key in &self.env_removals {
 			cmd.env_remove(key.as_str());
+		}
+		for (key, val) in &self.envs {
+			cmd.env(key.as_str(), val.as_str());
 		}
 		if let Some(dir) = &self.cwd {
 			cmd.current_dir(dir);
@@ -441,6 +477,21 @@ mod test {
 			.with_args(["hunter2"])
 			.to_string()
 			.xpect_eq("echo hunter2");
+	}
+
+	/// A strip and a set of the same name is not a contradiction: the set is
+	/// the deliberate one, so it wins. `secrets/exec` depends on it, since a
+	/// document may hold a record named like a launch variable
+	/// (`BEET_SSH_HOST_KEY`).
+	#[crate::test]
+	fn an_explicit_value_beats_a_strip() {
+		ChildProcess::new("sh")
+			.with_args(["-c", "printf %s \"$BEET_TEST_ORDER\""])
+			.without_env("BEET_TEST_ORDER")
+			.with_env("BEET_TEST_ORDER", "kept")
+			.run_stdout()
+			.unwrap()
+			.xpect_eq("kept");
 	}
 
 	/// The child's own stderr is where a cli is most likely to echo an argument

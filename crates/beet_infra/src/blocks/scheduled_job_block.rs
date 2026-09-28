@@ -217,6 +217,7 @@ impl ScheduledJobBlock {
 		self.validate()?;
 		let region = stack.aws_region()?.clone();
 		let function_arn = lambda.arn(stack);
+		let boundary = RuntimeBoundary::arn(stack, config)?;
 
 		// The invoke identity: the scheduler assumes this role to call the one
 		// function it targets, and can do nothing else with it. The function's
@@ -234,6 +235,10 @@ impl ScheduledJobBlock {
 				})
 				.to_string()
 				.into(),
+				// every principal a deploy creates is capped by its app's
+				// boundary, which is what stops an `iam:*` on this app's names
+				// from being a route to an administrator
+				permissions_boundary: Some(boundary),
 				..default()
 			},
 		);

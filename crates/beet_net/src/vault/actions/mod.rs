@@ -61,10 +61,7 @@ pub(crate) fn write_recipients(
 		);
 		return identities.recipients().xok();
 	};
-	let recipients = list
-		.split(',')
-		.map(str::trim)
-		.filter(|item| !item.is_empty())
+	let recipients = str_ext::csv(list)
 		.map(AgeRecipient::new)
 		.collect::<Result<Vec<_>>>()?;
 	if recipients.is_empty() {

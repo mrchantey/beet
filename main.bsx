@@ -104,7 +104,7 @@ stays, an inert tag in a lean build.
 		     the environment: a region that could fall back would plan a full
 		     replacement -->
 		<Stack stage="shared" {AwsRegion("us-west-2")}>
-			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false/>
+			<S3BucketBlock label="assets" deploy_versioned=false public_read=true force_destroy=false object_versioning=true/>
 			<!-- the shared assets stack has one resource and no step outside
 			     terraform, so its deploy is an apply and its teardown is that
 			     read backwards: `tofu destroy`, then the state carriers a deploy

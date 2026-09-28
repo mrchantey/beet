@@ -14,7 +14,7 @@ use beet_core::prelude::*;
 /// at the entity that *declares* the store, ie
 ///
 /// ```html
-/// <S3BucketBlock bx:ref="analytics" label="analytics" runtime_write=true deploy_versioned=false/>
+/// <S3BucketBlock bx:ref="analytics" label="analytics" runtime_write=true deploy_versioned=false object_versioning=true/>
 /// <Router {(AnalyticsConfig, StoreRef($analytics))}>..</Router>
 /// ```
 ///

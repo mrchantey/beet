@@ -70,6 +70,24 @@ struct MintParams {
 /// under the stage that actually deploys (`--stage=prod` where that is not the
 /// default), which this warns about when it is not.
 ///
+/// ## The order of operations, which this enforces
+///
+/// Per app it converges TWO managed policies: `<app>--runtime-boundary`
+/// ([`RuntimeBoundary`], the ceiling on what a deploy may create) and
+/// `<app>--deploy` ([`DeployerPolicy`], what the operator may do). The
+/// boundary goes first, and the deploy policy carries the conditions that name
+/// it only once every principal the render names already WEARS it, which this
+/// asks the account rather than taking on trust.
+///
+/// That is not caution, it is the only order that works: a `StringNotEquals`
+/// deny on `iam:PermissionsBoundary` is true for a principal carrying no
+/// boundary, so conditioning the policy before the apply that attaches the
+/// first boundaries would deny that apply and block every deploy of the app
+/// until an administrator intervened. So the first mint of an app with live
+/// uncapped principals writes an unconditioned policy and says so; the apply
+/// caps them; the next mint closes the door. An app whose principals are not
+/// at the account yet is conditioned from birth.
+///
 /// ## What converges
 ///
 /// - the user, `<repo>-deployer`, created when absent. Named for the
@@ -94,19 +112,40 @@ struct MintParams {
 )]
 pub async fn DeployerMint(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<MintParams>()?;
-	let policies = DeployerMint::policies(&cx.caller).await?;
+	let apps = DeployerMint::apps(&cx.caller).await?;
 	let user = DeployerMint::user_name()?;
 	if params.dry_run {
-		return Response::ok_text(DeployerMint::describe(&user, &policies)?)
-			.xok();
+		return Response::ok_text(DeployerMint::describe(&user, &apps)?).xok();
 	}
 	let account = DeployerMint::account_id().await?;
 	let mut report = vec![DeployerMint::ensure_user(&user).await?];
-	for policy in policies.iter() {
-		report.push(policy.converge(&account, &user).await?);
+	for app in apps.iter() {
+		// the boundaries FIRST: the deploy policy may only carry the
+		// conditions naming them once they exist and every principal wears one
+		for boundary in app.boundaries.values() {
+			report.push(boundary.converge(&account).await?);
+		}
+		report.push(
+			app.deploy_policy(&account)
+				.await?
+				.converge(&account, &user)
+				.await?,
+		);
 	}
 	report.push(DeployerMint::converge_key(&cx.caller, &user, &params).await?);
 	Response::ok_text(format!("{}\n", report.join("\n"))).xok()
+}
+
+/// One app's deploy policy, the boundary of each stage this launch rendered,
+/// and the principals those stacks name, which is what decides whether the
+/// deploy policy may carry the boundary conditions.
+struct AppPolicies {
+	deploy: DeployerPolicy,
+	/// Per STAGE, since a boundary's content is one stage's names. The deploy
+	/// policy is per app, and its condition matches any of them.
+	boundaries: BTreeMap<SmolStr, RuntimeBoundary>,
+	/// `(kind, name)` per principal, ie `("role", "beet-site--prod--..")`.
+	principals: Vec<(&'static str, SmolStr)>,
 }
 
 impl DeployerMint {
@@ -118,10 +157,10 @@ impl DeployerMint {
 	const KEY_ID: &'static str = "AWS_ACCESS_KEY_ID";
 	const KEY_SECRET: &'static str = "AWS_SECRET_ACCESS_KEY";
 
-	/// One [`DeployerPolicy`] per app this launch declares, lowered from every
+	/// One [`AppPolicies`] per app this launch declares, lowered from every
 	/// stack of it, in app order. Renders in one world pass, so a stack that
 	/// cannot render fails here rather than at the account.
-	async fn policies(caller: &AsyncEntity) -> Result<Vec<DeployerPolicy>> {
+	async fn apps(caller: &AsyncEntity) -> Result<Vec<AppPolicies>> {
 		let state_bucket = match terra::Project::resolve_backend(caller).await?
 		{
 			ResolvedBackend::S3(s3) => s3.bucket().clone(),
@@ -166,20 +205,38 @@ impl DeployerMint {
 				BootstrapConfig::PROD_STAGE
 			);
 		}
-		let mut policies = BTreeMap::<SmolStr, DeployerPolicy>::new();
+		let mut apps = BTreeMap::<SmolStr, AppPolicies>::new();
 		for (stack, _deployment, config) in rendered.iter() {
-			let policy = policies
-				.remove(stack.app_name())
+			let app =
+				apps.remove(stack.app_name())
+					.unwrap_or_else(|| AppPolicies {
+						deploy: DeployerPolicy::new(
+							stack.app_name().clone(),
+							state_bucket.clone(),
+						),
+						boundaries: BTreeMap::new(),
+						principals: Vec::new(),
+					});
+			let mut principals = app.principals;
+			principals.extend(RuntimeBoundary::principals(config)?);
+			let mut boundaries = app.boundaries;
+			let boundary = boundaries
+				.remove(stack.stage())
 				.unwrap_or_else(|| {
-					DeployerPolicy::new(
+					RuntimeBoundary::new(
 						stack.app_name().clone(),
-						state_bucket.clone(),
+						stack.stage().clone(),
 					)
 				})
-				.lower(stack, config)?;
-			policies.insert(stack.app_name().clone(), policy);
+				.lower(config)?;
+			boundaries.insert(stack.stage().clone(), boundary);
+			apps.insert(stack.app_name().clone(), AppPolicies {
+				deploy: app.deploy.lower(stack, config)?,
+				boundaries,
+				principals,
+			});
 		}
-		policies.into_values().collect::<Vec<_>>().xok()
+		apps.into_values().collect::<Vec<_>>().xok()
 	}
 
 	/// The user every launch of this repo deploys as: the workspace directory,
@@ -208,15 +265,25 @@ impl DeployerMint {
 	}
 
 	/// The dry run's answer: the user and every policy document, pretty
-	/// printed so it reads and pipes.
-	fn describe(user: &str, policies: &[DeployerPolicy]) -> Result<String> {
+	/// printed so it reads and pipes. The boundary conditions are absent,
+	/// since whether they apply is an account read a dry run does not make.
+	fn describe(user: &str, apps: &[AppPolicies]) -> Result<String> {
 		let mut out = format!("user {user}\n");
-		for policy in policies {
+		for app in apps {
 			out.push_str(&format!(
 				"\npolicy {}\n{}\n",
-				policy.policy_name(),
-				serde_json::to_string_pretty(&policy.to_json())?
+				app.deploy.policy_name(),
+				serde_json::to_string_pretty(&app.deploy.to_json())?
 			));
+			for boundary in
+				app.boundaries.values().filter(|held| !held.is_empty())
+			{
+				out.push_str(&format!(
+					"\npolicy {}\n{}\n",
+					boundary.policy_name(),
+					serde_json::to_string_pretty(&boundary.to_json())?
+				));
+			}
 		}
 		out.xok()
 	}
@@ -471,14 +538,132 @@ impl DeployerMint {
 	}
 }
 
+impl AppPolicies {
+	/// This app's deploy policy, carrying the boundary conditions only when
+	/// every principal its stacks render ALREADY wears the boundary.
+	///
+	/// The order of operations, enforced rather than remembered. A
+	/// `StringNotEquals` deny on `iam:PermissionsBoundary` is true for a
+	/// principal that carries none, so conditioning the policy before the
+	/// apply that attaches the first boundaries would deny that apply and
+	/// block every deploy of the app until an administrator intervened. So the
+	/// first mint of an app with live uncapped principals writes the boundary
+	/// and an unconditioned policy, the apply caps them, and the next mint
+	/// closes the door behind it. An app with no principals at the account yet
+	/// is conditioned from birth, since its `CreateRole` carries the boundary.
+	async fn deploy_policy(&self, account: &str) -> Result<DeployerPolicy> {
+		if self.boundaries.values().all(RuntimeBoundary::is_empty) {
+			return self.deploy.clone().xok();
+		}
+		// any boundary OF THIS APP satisfies the condition, so a principal
+		// capped by a stage this launch did not render still passes
+		let prefix =
+			format!("arn:aws:iam::{account}:policy/{}--", self.deploy.app());
+		let of_this_app = |arn: &str| {
+			arn.starts_with(&prefix) && arn.ends_with(RuntimeBoundary::SUFFIX)
+		};
+		let mut uncapped = Vec::new();
+		for (kind, name) in &self.principals {
+			let Some(principal) = DeployerMint::iam_json([
+				&format!("get-{kind}"),
+				&format!("--{kind}-name"),
+				name.as_str(),
+			])
+			.await?
+			else {
+				// not at the account yet, so its `CreateRole` will carry the
+				// boundary and there is nothing to wait for
+				continue;
+			};
+			let held = principal
+				.get(match *kind {
+					"role" => "Role",
+					_ => "User",
+				})
+				.and_then(|principal| principal.get("PermissionsBoundary"))
+				.and_then(|boundary| boundary.get("PermissionsBoundaryArn"))
+				.and_then(Value::as_str);
+			if !held.is_some_and(of_this_app) {
+				uncapped.push(format!("{kind} {name}"));
+			}
+		}
+		if !uncapped.is_empty() {
+			warn!(
+				"{} principal(s) of `{}` carry no boundary of this app yet, so \
+				its deploy policy stays unconditioned: apply the stack to cap \
+				them, then mint again to close the door ({})",
+				uncapped.len(),
+				self.deploy.policy_name(),
+				uncapped.join(", ")
+			);
+			return self.deploy.clone().xok();
+		}
+		self.deploy.clone().with_boundary().xok()
+	}
+}
+
+impl RuntimeBoundary {
+	/// Converge this boundary at the account: the same get-or-create-or-update
+	/// as a deploy policy, attached to nothing, since a boundary is named by
+	/// the principals that wear it rather than attached to a user.
+	async fn converge(&self, account: &str) -> Result<String> {
+		if self.is_empty() {
+			return format!(
+				"{} renders no principal, so it needs no boundary",
+				self.policy_name()
+			)
+			.xok();
+		}
+		DeployerPolicy::converge_document(
+			account,
+			&self.policy_name(),
+			&self.to_json(),
+		)
+		.await
+	}
+}
+
 impl DeployerPolicy {
 	/// Converge this policy at the account and attach it to `user`: created
 	/// when absent, a new default version when its document changed, and
 	/// nothing at all when it already matches.
 	async fn converge(&self, account: &str, user: &str) -> Result<String> {
-		let name = self.policy_name();
+		let report = Self::converge_document(
+			account,
+			&self.policy_name(),
+			&self.to_json(),
+		)
+		.await?;
+		Self::attach(
+			&format!("arn:aws:iam::{account}:policy/{}", self.policy_name()),
+			user,
+		)
+		.await?;
+		report.xok()
+	}
+
+	/// Converge one managed policy document at the account: created when
+	/// absent, a new default version when it changed, nothing when it matches.
+	/// Shared with [`RuntimeBoundary`], which is the same act minus the
+	/// attachment, since a boundary is worn rather than attached.
+	async fn converge_document(
+		account: &str,
+		name: &str,
+		document: &Value,
+	) -> Result<String> {
+		// a managed policy is capped at 6144 characters, and the failure is a
+		// `LimitExceeded` mid-mint with earlier apps already converged
+		const LIMIT: usize = 6144;
+		let rendered = document.to_string();
+		if rendered.len() > LIMIT {
+			bevybail!(
+				"the document for `{name}` is {} characters, over IAM's {LIMIT} \
+				limit for a managed policy: the app declares more than one \
+				policy can express, so split the stack or narrow its grants",
+				rendered.len()
+			);
+		}
 		let arn = format!("arn:aws:iam::{account}:policy/{name}");
-		let document = self.to_json().to_string();
 		let existing = DeployerMint::iam_json([
 			"get-policy",
 			"--policy-arn",
@@ -489,38 +674,38 @@ impl DeployerPolicy {
 			"json",
 		])
 		.await?;
-		let report = match existing {
+		match existing {
 			None => {
 				DeployerMint::iam([
 					"create-policy",
 					"--policy-name",
-					name.as_str(),
+					name,
 					"--policy-document",
-					document.as_str(),
+					rendered.as_str(),
 				])
 				.await?;
-				format!("policy {name} created")
+				format!("policy {name} created").xok()
 			}
 			Some(version) => {
-				self.converge_version(
+				Self::converge_version(
+					name,
 					&arn,
+					document,
 					version.as_str().unwrap_or_default(),
 				)
-				.await?
+				.await
 			}
-		};
-		Self::attach(&arn, user).await?;
-		report.xok()
+		}
 	}
 
 	/// Replace the default version when the live document differs, pruning the
 	/// oldest non-default version first: a managed policy holds five.
 	async fn converge_version(
-		&self,
+		name: &str,
 		arn: &str,
+		document: &Value,
 		default_version: &str,
 	) -> Result<String> {
-		let name = self.policy_name();
 		let live = DeployerMint::iam([
 			"get-policy-version",
 			"--policy-arn",
@@ -535,7 +720,8 @@ impl DeployerPolicy {
 		.await?;
 		// the cli decodes the url-encoded document, so this compares values
 		// rather than text: a key order or a whitespace change is not a change
-		if serde_json::from_str::<Value>(&live).ok() == Some(self.to_json()) {
+		if serde_json::from_str::<Value>(&live).ok().as_ref() == Some(document)
+		{
 			return format!("policy {name} unchanged").xok();
 		}
 		let versions = DeployerMint::iam([
@@ -566,7 +752,7 @@ impl DeployerPolicy {
 			"--policy-arn",
 			arn,
 			"--policy-document",
-			self.to_json().to_string().as_str(),
+			document.to_string().as_str(),
 			"--set-as-default",
 		])
 		.await?;

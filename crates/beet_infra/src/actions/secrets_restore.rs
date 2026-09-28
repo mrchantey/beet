@@ -60,13 +60,7 @@ pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
 	let only = params
 		.only
 		.as_deref()
-		.map(|only| {
-			only.split(',')
-				.map(str::trim)
-				.filter(|label| !label.is_empty())
-				.map(SmolStr::new)
-				.collect::<Vec<_>>()
-		})
+		.map(|only| str_ext::csv(only).map(SmolStr::new).collect::<Vec<_>>())
 		.unwrap_or_default();
 	let records = SecretsRestore::records(&document, &opened, &only)?;
 	if records.is_empty() {

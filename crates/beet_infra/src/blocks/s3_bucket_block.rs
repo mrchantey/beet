@@ -52,6 +52,16 @@ pub struct S3BucketBlock {
 	/// Distinct from [`deploy_versioned`](Self::deploy_versioned), which nests
 	/// objects under the deploy id and is about publication, not durability.
 	object_versioning: bool,
+	/// Admit that this bucket's contents are expendable, for a bucket that can
+	/// be overwritten in place and declares no
+	/// [`object_versioning`](Self::object_versioning).
+	///
+	/// Named for what it ADMITS rather than what it enables: such a bucket has
+	/// no way back from a bug or a bad sync, and the only honest reason to
+	/// declare one is that its contents are a copy of something that survives
+	/// losing it. `no_versioning=true` would read like a tuning knob; this
+	/// reads like the decision it is.
+	accept_data_loss: bool,
 	/// Days a noncurrent version is kept before it expires, `0` keeping them
 	/// forever. Only meaningful with
 	/// [`object_versioning`](Self::object_versioning): versions accumulate
@@ -103,6 +113,7 @@ impl S3BucketBlock {
 			runtime_write: false,
 			public_read: false,
 			object_versioning: false,
+			accept_data_loss: false,
 			expire_noncurrent_days: 90,
 			expire_days: 0,
 			expire_prefixes: Vec::new(),
@@ -171,6 +182,49 @@ impl EmitBlock for S3BucketBlock {
 }
 
 impl S3BucketBlock {
+	/// Refuse a bucket that can be overwritten in place and keeps no way back.
+	///
+	/// This is what makes "agents may break things within reason" true rather
+	/// than hopeful: the protection for a credential used every day is
+	/// recoverability, not prevention, and recoverability has to be something
+	/// the render enforces rather than a convention every declaration
+	/// remembers. [`accept_data_loss`](Self::accept_data_loss) is the way out,
+	/// and it is named for what it admits.
+	///
+	/// ## What counts as overwritable
+	///
+	/// Either writer can be the one that loses the data:
+	///
+	/// - [`runtime_write`](Self::runtime_write) is primary data the running
+	///   process stores, which exists nowhere else.
+	/// - `deploy_versioned=false` is a bucket a sync writes OVER rather than
+	///   beside: without the per-deploy nesting, this run's objects replace
+	///   the last run's. **Do not assume such a bucket is a mirror of the
+	///   repo.** `beet`'s two `assets` buckets are the counter-example that
+	///   forced this rule to cover the deploy side too: `./assets` is
+	///   gitignored and HYDRATED from the bucket, so the bucket is the source
+	///   of record and a stale local tree pushed over it is final.
+	///
+	/// `deploy_versioned=true` needs nothing, since every run writes under its
+	/// own id and `rollback` is repointing at the previous one.
+	fn validate(&self, stack: &ResolvedStack) -> Result {
+		let overwritable = self.runtime_write || !self.deploy_versioned;
+		if !overwritable || self.object_versioning || self.accept_data_loss {
+			return OK;
+		}
+		bevybail!(
+			"bucket `{}` is written {} and declares no `object_versioning`, so \
+			an overwrite or a delete is final. Declare \
+			`object_versioning=true`, or `accept_data_loss=true` if its \
+			contents are a copy of something that survives losing it",
+			stack.resource_name(self.label.clone()),
+			match self.runtime_write {
+				true => "by the runtime",
+				false => "in place by the deploy, each run over the last",
+			}
+		)
+	}
+
 	/// Emit this bucket's resources: the bucket, its optional output, and the
 	/// public-read / versioning secondaries.
 	fn emit(
@@ -178,6 +232,7 @@ impl S3BucketBlock {
 		stack: &ResolvedStack,
 		config: &mut terra::Config,
 	) -> Result {
+		self.validate(stack)?;
 		let bucket = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
 			AwsS3BucketDetails {
@@ -424,6 +479,60 @@ mod tests {
 		build_config(block).1.to_json_string().unwrap()
 	}
 
+	/// A bucket anything can overwrite and that declares no way back is
+	/// refused at render, and the override is named for what it admits.
+	#[beet_core::test]
+	fn a_writable_bucket_must_be_recoverable() {
+		let render = |block: S3BucketBlock| {
+			RenderScope::test_render_stack(
+				(
+					Stack::new("beet-site").with_stage("prod"),
+					AwsRegion::new("us-west-2"),
+				),
+				|parent| {
+					parent.spawn(block);
+				},
+			)
+			.0
+			.finish()
+			.map(|_| ())
+		};
+		render(
+			S3BucketBlock::new("analytics")
+				.with_deploy_versioned(false)
+				.with_runtime_write(true),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("beet-site--prod--analytics")
+		.xpect_contains("object_versioning=true")
+		.xpect_contains("accept_data_loss=true");
+		// either declaration is accepted; only silence is not
+		render(
+			S3BucketBlock::new("analytics")
+				.with_deploy_versioned(false)
+				.with_runtime_write(true)
+				.with_object_versioning(true),
+		)
+		.unwrap();
+		render(
+			S3BucketBlock::new("analytics")
+				.with_deploy_versioned(false)
+				.with_runtime_write(true)
+				.with_accept_data_loss(true),
+		)
+		.unwrap();
+		// the DEPLOY side is refused too: a sync writes this run's objects over
+		// the last run's, and `./assets` is gitignored and hydrated FROM the
+		// bucket, so nothing on disk is a way back
+		render(S3BucketBlock::new("assets").with_deploy_versioned(false))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("in place by the deploy");
+		// per-deploy nesting needs nothing: every run writes under its own id
+		render(S3BucketBlock::new("repo")).unwrap();
+	}
+
 	/// Both grants matter: `GetObject` serves the objects, `ListBucket` lets a
 	/// credential-free `sync` enumerate them (it lists before it gets).
 	#[beet_core::test]
@@ -478,7 +587,9 @@ mod tests {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(S3BucketBlock::new("app"));
 			parent.spawn(
-				S3BucketBlock::new("mail-blobs").with_runtime_write(true),
+				S3BucketBlock::new("mail-blobs")
+					.with_runtime_write(true)
+					.with_object_versioning(true),
 			);
 		});
 		let stack = scope.stack().clone();
