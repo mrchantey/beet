@@ -83,11 +83,12 @@ Treat "no apex mail record before the cutover" as an invariant, not a preference
 **Hand step.** Seal the deployer's credentials into the repo's secrets document, one record each with a note of what it is and where it is re-minted (the [secrets tutorial](/docs/secrets) covers the identity and the document):
 
 ```sh
-beet secrets/set AWS_ACCESS_KEY_ID --role=env_var --note=".." --rotation="manual:.."
-beet secrets/set AWS_SECRET_ACCESS_KEY --role=env_var --note=".." --rotation="manual:.."
+beet deployer/mint --stage=prod   # the AWS pair, with an admin pair in the environment
 beet secrets/set CLOUDFLARE_API_TOKEN --role=env_var --note=".." --rotation="manual:.."
 beet secrets/set TF_STATE_PASSPHRASE --role=env_var --generate --note="opentofu state encryption" --rotation="manual:not re-mintable, losing it loses the state"
 ```
+
+The AWS pair is the one credential nothing seals by hand: `deployer/mint` mints this repo's own IAM user, gives it one managed policy per app the entry declares, lowered from what the stacks render, and seals the pair as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. It is the verb an ADMIN pair runs (`AWS_ACCESS_KEY_ID=.. AWS_SECRET_ACCESS_KEY=.. beet deployer/mint`, which wins over the document), since the deployer it converges deliberately holds no `iam:` action over itself.
 
 The region, the Cloudflare account and the zone are not credentials: they are identifiers, public in every dashboard url, and they are declared in the markup as spreads on the stack or its root (`{AwsRegion("ap-southeast-2")}`, `{CloudflareAccount{id:".."}}`, `{CloudflareZone{domain:"example.com", id:".."}}`, see section 6), never read from the environment. The passphrase is the one unrecoverable value in the document: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. It is generated in-process and never printed; the document is committed, so the identity that opens it is the backup.
 

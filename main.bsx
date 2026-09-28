@@ -55,8 +55,11 @@ What remains in its place is a tombstone that keeps the `shared` route
 addressable, so `--help` still lists it and dispatching a shared verb reports
 the condition that excluded it rather than 404ing.
 
-The shared verbs need the deployer's AWS pair, plus `tofu`. Every credential
-this workspace uses (the model-provider keys, the AWS pair, the Cloudflare
+The shared verbs need the deployer's AWS pair, plus `tofu`. That pair is this
+repo's own IAM user, `beet-deployer`, holding one managed policy per app this
+repo declares and nothing else: `beet deployer/mint` converges the user, its
+policies and its key (see `crates/beet_infra/README.md`, The deployer). Every
+credential this workspace uses (the model-provider keys, the AWS pair, the Cloudflare
 token, the R2 pair, the site box's host key) is a record of `secrets.toml`,
 age-sealed to the humans in its `default` group and loaded into the process
 environment by the launch before this entry builds (`<Secrets/>` below): there
@@ -91,6 +94,11 @@ stays, an inert tag in a lean build.
 	<Secrets/>
 	<Route path="vault" bx:cfg="feature:vault"><VaultRoutes/></Route>
 	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
+	<!-- the aws identity this workspace deploys as: one iam user for this
+	     document (the site entry shares it) and one managed policy per app the
+	     entry declares, here the `beet` app of the stack below. An
+	     administrator's verb: the scoped pair it seals cannot mint itself -->
+	<DeployerMint bx:cfg="feature:infra && feature:extra"/>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the region is an address declared on the stack, never read from
 		     the environment: a region that could fall back would plan a full
