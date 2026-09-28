@@ -315,6 +315,15 @@ impl Plugin for InfraPlugin {
 		// generated credential runs before its apply.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::EnsureSecret>();
+		// the repo's own deployer user: an entry mounts it beside its secrets
+		// verbs, outside every `<Stack>`, since one credential document holds
+		// one pair however many stacks it deploys.
+		#[cfg(all(
+			feature = "deploy",
+			feature = "bindings_aws_common",
+			not(target_arch = "wasm32")
+		))]
+		app.register_type::<crate::prelude::DeployerMint>();
 		// the store's export into a secrets document, the restore back out
 		// of one, and a human's removal, in every deploy build
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

@@ -41,3 +41,14 @@ pub fn ssm<'a>(
 ) -> ChildProcess {
 	self::service("ssm", region, args)
 }
+
+/// An `aws iam` invocation, see [`service`]. IAM is global, so the region is
+/// the global endpoint's own rather than any stack's.
+pub fn iam<'a>(args: impl IntoIterator<Item = &'a str>) -> ChildProcess {
+	self::service("iam", crate::bindings::aws::region::US_EAST_1, args)
+}
+
+/// An `aws sts` invocation, see [`iam`] for the region.
+pub fn sts<'a>(args: impl IntoIterator<Item = &'a str>) -> ChildProcess {
+	self::service("sts", crate::bindings::aws::region::US_EAST_1, args)
+}

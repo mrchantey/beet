@@ -256,6 +256,23 @@ impl Config {
 			})
 	}
 
+	/// Every provider type this config declares, resources and data sources
+	/// alike, sorted and deduplicated: `aws_s3_bucket`, `aws_caller_identity`,
+	/// `cloudflare_dns_record`.
+	///
+	/// What a deployer's policy is lowered FROM (`DeployerPolicy`, in `types`):
+	/// a type is the whole of what a provider call needs a permission for, and
+	/// a read (the data source) needs one exactly as a write does.
+	pub fn declared_types(&self) -> Vec<&str> {
+		self.resources
+			.keys()
+			.chain(self.data_sources.keys())
+			.map(SmolStr::as_str)
+			.collect::<BTreeSet<_>>()
+			.into_iter()
+			.collect()
+	}
+
 	/// Add a typed resource (chaining). The required provider is registered
 	/// automatically from the resource's [`Resource`] implementation.
 	pub fn with_labeled_resource(

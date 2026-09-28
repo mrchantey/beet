@@ -7,6 +7,10 @@ mod build_docker_image;
 mod cloudflare;
 mod cloudflare_zone;
 pub mod cloudwatch_ext;
+// the repo's own deployer user, its policies and its key. Gated with the AWS
+// IAM lowering it renders (`DeployerPolicy`).
+#[cfg(feature = "bindings_aws_common")]
+mod deployer_mint;
 mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
@@ -37,6 +41,8 @@ pub use build_docker_image::*;
 pub use cloudflare::*;
 pub use cloudflare_zone::*;
 pub use cloudwatch_ext::MetricDatum;
+#[cfg(feature = "bindings_aws_common")]
+pub use deployer_mint::*;
 pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;

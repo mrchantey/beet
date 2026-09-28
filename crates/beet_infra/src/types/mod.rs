@@ -2,6 +2,11 @@
 mod access_grant;
 mod artifacts;
 mod build_artifact;
+// what a repo's deployer is allowed to do, lowered from the provider types its
+// stacks render. Gated with the AWS IAM lowering it mirrors (`IamPolicy`),
+// since both speak AWS policy documents.
+#[cfg(feature = "bindings_aws_common")]
+mod deployer_policy;
 mod deployment;
 mod infra_plugin;
 // a bucket's per-prefix retention, shared by every provider's bucket block.
@@ -25,6 +30,8 @@ mod stack_cli;
 pub use access_grant::*;
 pub use artifacts::*;
 pub use build_artifact::*;
+#[cfg(feature = "bindings_aws_common")]
+pub use deployer_policy::*;
 pub use deployment::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;
