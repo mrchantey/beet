@@ -378,6 +378,65 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 
 [Self-hosted mail](/docs/mail) section 9 is where these run for real, and the [`beet_infra` README](https://github.com/mrchantey/beet/blob/main/crates/beet_infra/README.md#secrets) covers the seam: `SecretStore`, the two providers that ship (`<SsmSecrets/>` for parameter store, `<DocumentSecrets path=".."/>` for a document as a stack's store), and what a downstream provider (1Password, a KMS) implements, which is one trait, one declaration and one attach observer.
 
+## Who holds what: the credential model
+
+Every credential in beet's own AWS account sits on one line: **power and frequency are inversely related, and the line between them is a human factor.** A thing that happens constantly is low power; a thing that is high power is rare and needs something an automated process cannot supply. The corollary is what makes the design tractable: "requires a human" and "an agent cannot reach it" are the same sentence, because an agent cannot type a six-digit code off a phone.
+
+```mermaid
+flowchart TB
+    subgraph you["what the operator physically holds"]
+        phone["📱 phone: two MFA entries,<br/>pete and beet-agent"]
+        age["🔑 one age key<br/>~/.config/beet/age/keys.txt<br/>restored by hand, never committed"]
+    end
+
+    subgraph sealed["what the age key opens · all of it recoverable"]
+        global["~/.config/beet/secrets.toml<br/>committed in arch-config, stowed<br/>ONE pair"]
+        repo["each repo's secrets.toml<br/>committed, public"]
+    end
+
+    age --> global
+    age --> repo
+
+    global --> agent["beet-agent · tier 0c<br/>ViewOnlyAccess + assume beet-admin<br/>list and describe, read no contents"]
+    repo --> deployer["repo-deployer · tier 1<br/>deploy this repo's apps<br/>capped by each app's boundary"]
+    repo --> other["TF_STATE_PASSPHRASE,<br/>app secrets, provider tokens"]
+
+    agent -->|"beet admin<br/>+ code from the phone"| admin["beet-admin · tier 0a<br/>AdministratorAccess<br/>a session, 1h default, on tmpfs<br/>stored NOWHERE"]
+    phone -.-> admin
+
+    deployer -->|"tofu apply mints"| runtime["runtime identities · tier 2<br/>lightsail user, SES user, lambda roles<br/>each wears its app and stage's boundary"]
+    admin -->|"beet admin -- deployer/mint<br/>when a stack gains a service"| deployer
+
+    pete["pete · the person<br/>console only: password + MFA<br/>permanent administrator, no access key<br/>break-glass, on no automation path"]
+    phone -.-> pete
+
+    style admin fill:#fdd,stroke:#c00
+    style pete fill:#fdd,stroke:#c00
+    style age fill:#dfd,stroke:#080
+    style phone fill:#dfd,stroke:#080
+```
+
+| tier | who | how often | credential | worst case |
+| --- | --- | --- | --- | --- |
+| 0a admin | the operator, and any agent on the machine for the session after | a few times a year | `beet admin`: a code mints a session (1h default, up to 12h) | unrecoverable, hence the phone |
+| 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document | metadata disclosure |
+| 1 deploy | the operator and CI | daily | `<repo>-deployer`, sealed in that repo's document | its own app, recoverably |
+| 2 runtime | the servers | continuous | minted by an apply, held by nobody | its own app's data |
+| break-glass | the operator, in the console | when 0a is broken | `pete`: password + MFA, no key | full admin, behind a phone and a browser |
+
+**The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** That is what decides which box a credential goes in. A deployer can destroy its own app's buckets, but every one is versioned and `force_destroy=false`, and a permissions boundary stops it creating anything more powerful than itself. `beet-agent` can read metadata and nothing else. Administrator rights are not recoverable in that sense, so they live in no document at all: `beet admin` mints them from a code, writes them to tmpfs, and they die with the session. The `pete` user is the human's own break-glass, never on an automation path, and it holds no access key, so nothing on the machine can pick it up by accident.
+
+This is also why the sealed documents may live in public repositories. age's security rests entirely on the private key, so the question is never "is ciphertext safe" but "what does that one key unlock", and the answer is bounded by construction.
+
+Four flows, day to day:
+
+- **`just cli deploy`** opens the repo document for the deployer's pair, and `tofu` mints the runtime identities wearing their boundary. You, or CI holding the age key.
+- **`beet aws -- s3 ls`** opens the global document for `beet-agent`. Lists names, reads nothing. What an agent gets by default, and it says so on stderr.
+- **`beet admin --duration=30m`** asks for a code and mints a session; for that half hour `beet aws` runs as `beet-admin` and says so. **`beet admin -- deployer/mint`** is how a deployer's policy is re-minted when a stack gains a service: rare, one code.
+- **the console, as `pete`** with a password and a code, for the day `beet admin` is itself what is broken. Behind that, the account root user.
+
+A new machine is: clone arch-config, `stow`, restore the one age key from your password manager. Every document opens. `beet admin` additionally wants the phone.
+
 ## Where to go next
 
 The [`beet_net`](/docs/crates/beet_net) crate holds the verbs and the [`beet_core`](/docs/crates/beet_core) crate the document and the age primitives; `beet vault/keygen --help` and friends document every flag. If you have not written a beet router before, [A guestbook from a scene](/docs/tutorials/guestbook-scenes) is half an hour and explains the `main.bsx` you pasted at the top.
