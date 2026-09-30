@@ -409,12 +409,9 @@ flowchart TB
 
     pete["pete · the person<br/>console only: password + MFA<br/>permanent administrator, no access key<br/>break-glass, on no automation path"]
     phone -.-> pete
-
-    style admin fill:#fdd,stroke:#c00
-    style pete fill:#fdd,stroke:#c00
-    style age fill:#dfd,stroke:#080
-    style phone fill:#dfd,stroke:#080
 ```
+
+**A dotted edge is the human factor**, and it is the only thing on the diagram an agent cannot traverse. Both of them come off the phone, and both land on an administrator.
 
 | tier | who | how often | credential | worst case |
 | --- | --- | --- | --- | --- |

@@ -123,6 +123,23 @@ site-social *args:
 # are declarations rather than strays.
 site-audit *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
+# Converge the deployer of the WORKSPACE entry's apps (`beet--shared`): its user,
+# one `<app>--deploy` policy and one `<app>--<stage>--runtime-boundary` per app,
+# and the pair sealed in `secrets.toml`. A policy covers the apps its OWN entry
+# declares, so the site entry has its own recipe below. An administrator's verb,
+# so pass an admin pair for the one command (it wins over the document); or
+# `--dry-run` for the documents alone, which touches nothing and needs no
+# credential. `infra,extra` is not optional here: without them `<DeployerMint/>`
+# is `bx:cfg`-excluded and the verb does not exist.
+beet-mint *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
+# The same for the SITE entry's apps (`beet-site--*`, `beet-social--prod`). A
+# mint covers ONE stage's services, so prod is the stage worth minting: `just
+# site-mint --stage=prod`. `atproto` so the social app's policy renders at all:
+# without it that tag spawns as nothing and the mint silently covers one app
+# fewer.
+site-mint *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

@@ -201,11 +201,16 @@ impl LocalBackend {
 /// global, so one account holding `beet-state` would leave every other account
 /// naming something else. Derived rather than declared, so the second project a
 /// user deploys finds the first one's state bucket with nothing authored.
+// only [`S3Backend::resolve`]'s `aws_sdk` branch reads these two, and the other
+// branch bails, so a build without the sdk uses neither. Kept out of the
+// `cfg_if!` so the field docs below can still link them in every build.
+#[allow(dead_code)]
 const DEFAULT_STATE_PREFIX: &str = "beet-state-";
 
 /// Where a state bucket is created when nothing says otherwise, and the
 /// endpoint a discovery asks: `sts:GetCallerIdentity` and `GetBucketLocation`
 /// both answer here for an account and a bucket anywhere.
+#[allow(dead_code)]
 const DEFAULT_STATE_REGION: &str = aws::region::US_EAST_1;
 
 /// The S3 state backend as DECLARED: a bucket and a region, each optional
