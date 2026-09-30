@@ -94,6 +94,13 @@ stays, an inert tag in a lean build.
 	<Secrets/>
 	<Route path="vault" bx:cfg="feature:vault"><VaultRoutes/></Route>
 	<Route path="secrets" bx:cfg="feature:vault"><SecretsRoutes/></Route>
+	<!-- this machine's OWN aws identity, top level because the safe path has
+	     to be the shortest path: `beet aws -- sts get-caller-identity` runs as
+	     the read-only `beet-agent`, or under a live admin session, and says
+	     which on stderr every time. `beet admin` buys that session with one
+	     code from a phone, the one thing an automated process cannot supply -->
+	<AwsExec bx:cfg="feature:vault"/>
+	<AdminElevate bx:cfg="feature:vault"/>
 	<!-- the aws identity this workspace deploys as: one iam user for this
 	     document (the site entry shares it) and one managed policy per app the
 	     entry declares, here the `beet` app of the stack below. An

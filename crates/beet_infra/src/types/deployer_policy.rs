@@ -470,13 +470,23 @@ impl DeployerPolicy {
 					"iam:DeleteUserPolicy",
 					"iam:DetachRolePolicy",
 					"iam:DetachUserPolicy",
-					"iam:UpdateAssumeRolePolicy",
 				],
 				// this app's principals only: see the note above about one
 				// user carrying one policy per app
 				"Resource": self.principal_resources(),
 				// `StringNotLike`, since one policy covers every stage and
-				// each stage has a boundary of its own
+				// each stage has a boundary of its own.
+				//
+				// Every action here is one AWS populates `iam:PermissionsBoundary`
+				// for, and that is load bearing rather than incidental: a
+				// `StringNotLike` on an ABSENT key is true, so a condition on an
+				// action the key is not defined for denies it outright. That is
+				// why `iam:UpdateAssumeRolePolicy` is deliberately not in the
+				// list -- it changes who may assume a role rather than what the
+				// role may do, so AWS has no boundary to report for it, and the
+				// deny would have fired on every trust-policy change as a bare
+				// `AccessDenied`. It also buys nothing: the boundary is already
+				// attached by then and `NeverUncap` below refuses its removal.
 				"Condition": {
 					"StringNotLike": { "iam:PermissionsBoundary": &boundary }
 				},
@@ -764,6 +774,18 @@ mod test {
 		};
 		let under = statement("IamOnlyUnderTheBoundary");
 		under["Effect"].as_str().unwrap().xpect_eq("Deny");
+		// a `StringNotLike` on an absent key is TRUE, so every action named
+		// here must be one AWS populates `iam:PermissionsBoundary` for.
+		// `UpdateAssumeRolePolicy` is not: it changes who may assume a role
+		// rather than what it may do, so conditioning it would deny every
+		// trust-policy change outright, and denying it buys nothing once the
+		// boundary is attached.
+		under["Action"]
+			.to_string()
+			.as_str()
+			.xpect_contains("iam:CreateRole")
+			.xnot()
+			.xpect_contains("iam:UpdateAssumeRolePolicy");
 		// `StringNotLike`, since one deploy policy covers every stage and each
 		// stage carries a boundary of its own
 		under["Condition"]["StringNotLike"]["iam:PermissionsBoundary"]

@@ -99,7 +99,7 @@ impl SecretsExec {
 	/// for is reported at once, since the alternative is a child that silently
 	/// runs without the credential it was asked to carry, and one typo per run
 	/// is one run per typo.
-	fn narrow(
+	pub(crate) fn narrow(
 		pairs: Vec<(SmolStr, SmolStr)>,
 		only: Option<&str>,
 		document: &str,
