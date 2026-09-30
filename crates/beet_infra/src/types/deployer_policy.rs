@@ -93,6 +93,11 @@ pub struct DeployerPolicy {
 	regions: BTreeSet<SmolStr>,
 	/// The IAM services the lowered types named.
 	services: BTreeSet<&'static str>,
+	/// The stages the lowered stacks declare, which the irreversible deny is
+	/// scoped to. Collected rather than assumed: an app whose only stage is
+	/// `shared` gets its buckets protected too, where a hard-coded `prod`
+	/// named nothing that exists.
+	stages: BTreeSet<SmolStr>,
 	/// Whether every principal the app's stacks render already carries its
 	/// boundary. Until it does, the IAM statement is unconditioned, which is
 	/// the one-time state a migration passes through.
@@ -184,6 +189,7 @@ impl DeployerPolicy {
 			state_bucket: state_bucket.into(),
 			regions: BTreeSet::new(),
 			services: BTreeSet::new(),
+			stages: BTreeSet::new(),
 			boundary: false,
 		}
 	}
@@ -244,6 +250,7 @@ impl DeployerPolicy {
 			}
 		}
 		self.regions.insert(stack.aws_region()?.clone());
+		self.stages.insert(stack.stage().clone());
 		self.xok()
 	}
 
@@ -524,8 +531,14 @@ impl DeployerPolicy {
 	/// at. So this denies a deployer outright, and an operator who assumes a
 	/// role with a code is the only principal that gets through.
 	///
-	/// Scoped to `--prod--` names, so tearing a dev stack down stays free,
-	/// which the infra-deploy skill does routinely.
+	/// Scoped to the stages this launch actually RENDERED, one resource per
+	/// stage, rather than to a hard-coded `prod`. That distinction is the whole
+	/// protection for an app whose only stage is `shared`: the assets buckets
+	/// are a source of record and not a mirror, and a `--prod--` pattern named
+	/// nothing that exists for them, so their own deployer could delete them
+	/// with no code. Tearing a dev stack down still stays free — the mint runs
+	/// under the stage that deploys, so `dev` is not among the stages a prod
+	/// mint collects, which is what the infra-deploy skill relies on.
 	///
 	/// ## What is deliberately NOT here
 	///
@@ -546,22 +559,26 @@ impl DeployerPolicy {
 	///   IAM principal is also not a source of record: it is re-mintable from
 	///   the declarations, which is the whole of what makes it recoverable.
 	fn irreversible_statement(&self) -> Option<Value> {
-		let prod = format!("{}--{}--*", self.app, BootstrapConfig::PROD_STAGE);
 		let mut actions = Vec::<&str>::new();
 		let mut resources = Vec::<String>::new();
+		let mut per_stage = |template: &str| {
+			resources.extend(self.stages.iter().map(|stage| {
+				template.replace("{}", &format!("{}--{stage}--*", self.app))
+			}))
+		};
 		if self.services.contains("s3") {
 			actions.push("s3:DeleteBucket");
-			resources.push(format!("arn:aws:s3:::{prod}"));
+			per_stage("arn:aws:s3:::{}");
 		}
 		if self.services.contains("dynamodb") {
 			actions.push("dynamodb:DeleteTable");
-			resources.push(format!("arn:aws:dynamodb:*:*:table/{prod}"));
+			per_stage("arn:aws:dynamodb:*:*:table/{}");
 		}
 		if self.services.contains("rds") {
 			actions.push("rds:DeleteDBInstance");
-			resources.push(format!("arn:aws:rds:*:*:db:{prod}"));
+			per_stage("arn:aws:rds:*:*:db:{}");
 		}
-		(!actions.is_empty()).then(|| {
+		(!actions.is_empty() && !resources.is_empty()).then(|| {
 			json!({
 				"Sid": "IrreversibleNeedsMfa",
 				"Effect": "Deny",
@@ -867,5 +884,61 @@ mod test {
 			.xpect_contains("my-egress--prod--*")
 			.xnot()
 			.xpect_contains("my-egress--dev");
+	}
+
+	/// The deny follows the stages the launch RENDERED, so an app whose only
+	/// stage is `shared` has its buckets protected too. A hard-coded `prod`
+	/// named nothing that existed for such an app, which left the assets
+	/// buckets — a source of record, not a mirror — deletable by their own
+	/// deployer with no code.
+	#[beet_core::test]
+	fn irreversible_follows_the_rendered_stages() {
+		let render = |stage: &str| {
+			let (scope, dir) = RenderScope::test_render_stack(
+				(
+					Stack::new("beet-site").with_stage(stage),
+					AwsRegion::new("us-west-2"),
+				),
+				|parent| {
+					parent.spawn(
+						S3BucketBlock::new("assets")
+							.with_deploy_versioned(false)
+							.with_accept_data_loss(true),
+					);
+				},
+			);
+			(scope.finish().unwrap(), dir)
+		};
+		let resources = |stages: &[&str]| {
+			let rendered =
+				stages.iter().map(|stage| render(stage)).collect::<Vec<_>>();
+			rendered
+				.iter()
+				.fold(
+					DeployerPolicy::new("beet-site", "state"),
+					|policy, ((stack, _deployment, config), _dir)| {
+						policy.lower(stack, config).unwrap()
+					},
+				)
+				.to_json()["Statement"]
+				.as_array()
+				.unwrap()
+				.iter()
+				.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+				.unwrap()["Resource"]
+				.to_string()
+		};
+		// a shared-only app protects `shared`, where a hard-coded prod
+		// protected a name the app does not have
+		resources(&["shared"])
+			.as_str()
+			.xpect_contains("beet-site--shared--*")
+			.xnot()
+			.xpect_contains("beet-site--prod--*");
+		// and an app rendering both gets one resource each
+		resources(&["prod", "shared"])
+			.as_str()
+			.xpect_contains("beet-site--prod--*")
+			.xpect_contains("beet-site--shared--*");
 	}
 }

@@ -801,9 +801,25 @@ impl StalwartBlock {
 	/// write statement carries `s3:AbortMultipartUpload` through the
 	/// per-compute knob.
 	///
-	/// SecureString decryption needs no `kms:` statement here: the AWS-managed
-	/// `aws/ssm` key authorises account principals through its own key policy
-	/// for requests made via SSM.
+	/// SecureString decryption DOES need a `kms:Decrypt` statement here, and the
+	/// reason is the boundary. The AWS-managed `aws/ssm` key authorises account
+	/// principals through its own key policy, so an unboundaried role reads a
+	/// `SecureString` with no `kms:` grant of its own — which is what this
+	/// block relied on until every principal started wearing a
+	/// [`RuntimeBoundary`]. A permissions boundary is not limited by a
+	/// resource-based policy only where that policy names the IAM entity as its
+	/// principal, and `aws/ssm`'s key policy names `{"AWS": "*"}` with
+	/// `kms:ViaService` conditions instead. So under a boundary the key policy's
+	/// grant no longer survives, decryption falls back to identity ∩ boundary,
+	/// and a boundary derived from a render with no `kms:` action denies it.
+	///
+	/// The failure that makes this worth a statement rather than a comment is
+	/// its TIMING: the box decrypts at boot and at provision, and the cold
+	/// backup timer decrypts on its own schedule, so a running box passes every
+	/// check made right after the boundary lands and fails at its next reboot.
+	/// Declaring the grant here also keeps the derivation honest, since the
+	/// boundary is the union of what the stacks render and this is a thing the
+	/// runtime genuinely does.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -820,6 +836,21 @@ impl StalwartBlock {
 					"arn:aws:ssm:{region}:*:parameter{}",
 					self.admin_secret_name(stack)
 				)
+			}))
+			// the key is addressed by condition rather than by arn: the
+			// account's `aws/ssm` key id is not knowable at render time, and
+			// `kms:ViaService` bounds the grant to decryption SSM itself
+			// performs, which is the only way this box ever asks.
+			.statement(json!({
+				"Sid": "SsmSecureStringDecrypt",
+				"Effect": "Allow",
+				"Action": ["kms:Decrypt"],
+				"Resource": "*",
+				"Condition": {
+					"StringEquals": {
+						"kms:ViaService": format!("ssm.{region}.amazonaws.com")
+					}
+				}
 			}))
 			.write_action("s3:AbortMultipartUpload")
 			.lower(access)?
@@ -2941,6 +2972,43 @@ mod tests {
 	/// declare `dane` renders neither. REGRESSION-shaped on purpose: a pin
 	/// typed into the entry, or defaulted, is a refused session at every
 	/// validating sender.
+	/// The box decrypts every `SecureString` it reads, and a boundary makes
+	/// that an identity grant rather than a favour from the key policy: the
+	/// `aws/ssm` key names `{"AWS": "*"}` as its principal, not this role, so
+	/// the resource-policy exception to a permissions boundary does not apply.
+	/// Without this statement the boundary denies `kms:Decrypt` and the box
+	/// fails at its NEXT boot, not at the apply.
+	#[beet_core::test]
+	fn the_box_may_decrypt_its_own_secure_strings() {
+		let (_stack, _deployment, config) = build_config(&mail_box());
+		let json = config.to_json().into_json();
+		let policy = json["resource"]["aws_iam_role_policy"]
+			.as_object()
+			.unwrap()
+			.values()
+			.next()
+			.unwrap()["policy"]
+			.as_str()
+			.unwrap()
+			.to_string();
+		let decrypt = serde_json::from_str::<serde_json::Value>(&policy)
+			.unwrap()["Statement"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.find(|statement| statement["Sid"] == "SsmSecureStringDecrypt")
+			.unwrap()
+			.clone();
+		decrypt["Action"].to_string().xpect_contains("kms:Decrypt");
+		// bounded by the service that asks rather than by an arn, since the
+		// account's `aws/ssm` key id is not knowable at render time
+		decrypt["Condition"]["StringEquals"]["kms:ViaService"]
+			.as_str()
+			.unwrap()
+			.xpect_contains("ssm.")
+			.xpect_contains(".amazonaws.com");
+	}
+
 	#[beet_core::test]
 	fn the_dane_pin_is_read_never_typed() {
 		let (stack, _deployment, config) =
