@@ -801,25 +801,28 @@ impl StalwartBlock {
 	/// write statement carries `s3:AbortMultipartUpload` through the
 	/// per-compute knob.
 	///
-	/// SecureString decryption DOES need a `kms:Decrypt` statement here, and the
-	/// reason is the boundary. The AWS-managed `aws/ssm` key authorises account
-	/// principals through its own key policy, so an unboundaried role reads a
-	/// `SecureString` with no `kms:` grant of its own — which is what this
-	/// block relied on until every principal started wearing a
-	/// [`RuntimeBoundary`]. A permissions boundary is not limited by a
-	/// resource-based policy only where that policy names the IAM entity as its
-	/// principal, and `aws/ssm`'s key policy names `{"AWS": "*"}` with
-	/// `kms:ViaService` conditions instead. So under a boundary the key policy's
-	/// grant no longer survives, decryption falls back to identity ∩ boundary,
-	/// and a boundary derived from a render with no `kms:` action denies it.
+	/// The `kms:Decrypt` statement is here because this box reads
+	/// `SecureString` parameters, and it states that grant rather than relying
+	/// on the AWS-managed `aws/ssm` key policy to supply it.
 	///
-	/// The failure that makes this worth a statement rather than a comment is
-	/// its TIMING: the box decrypts at boot and at provision, and the cold
-	/// backup timer decrypts on its own schedule, so a running box passes every
-	/// check made right after the boundary lands and fails at its next reboot.
-	/// Declaring the grant here also keeps the derivation honest, since the
-	/// boundary is the union of what the stacks render and this is a thing the
-	/// runtime genuinely does.
+	/// An unboundaried role reads a `SecureString` with no `kms:` grant of its
+	/// own, because that key policy allows `{"AWS": "*"}` under a
+	/// `kms:ViaService` condition. Whether the same holds for a role wearing a
+	/// [`RuntimeBoundary`] is NOT settled: AWS exempts a resource-based policy
+	/// from a boundary where it grants to the principal directly, and enforces
+	/// the boundary where it delegates to the account root, and a `"*"`
+	/// principal is arguably the first of those. The simulator calls this
+	/// statement redundant, and also allows an account-root delegation under a
+	/// boundary, which the documented rule forbids — so it does not settle it
+	/// either.
+	///
+	/// It is stated anyway, because the bet is asymmetric. One action under one
+	/// service condition costs nothing if redundant; if it were needed and
+	/// absent, the box decrypts at boot, at provision and on the cold-backup
+	/// timer, so a running box would pass every check made when the boundary
+	/// landed and fail at its next reboot. Declaring it also keeps the
+	/// derivation honest, since the boundary is the union of what the stacks
+	/// render and this is a thing the runtime genuinely does.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -2965,19 +2968,47 @@ mod tests {
 			.xpect_contains("must not be Cloudflare-proxied");
 	}
 
-	/// The DANE pin is a `TLSA` at the box's own `_25._tcp` name whose content
-	/// is the parked variable, present exactly when that variable is: the
-	/// record carries a `count` on the value, the variable is optional content
-	/// (every render reads it, absence is empty), and a box that does not
-	/// declare `dane` renders neither. REGRESSION-shaped on purpose: a pin
-	/// typed into the entry, or defaulted, is a refused session at every
-	/// validating sender.
-	/// The box decrypts every `SecureString` it reads, and a boundary makes
-	/// that an identity grant rather than a favour from the key policy: the
-	/// `aws/ssm` key names `{"AWS": "*"}` as its principal, not this role, so
-	/// the resource-policy exception to a permissions boundary does not apply.
-	/// Without this statement the boundary denies `kms:Decrypt` and the box
-	/// fails at its NEXT boot, not at the apply.
+	/// The box decrypts every `SecureString` it reads, and this states that
+	/// grant instead of leaning on the `aws/ssm` key policy for it.
+	///
+	/// Whether it has to is genuinely unsettled. That key policy grants
+	/// `kms:Decrypt` to `{"AWS": "*"}` under `kms:ViaService`, and AWS exempts
+	/// a resource-based policy from a permissions boundary when it grants to
+	/// the principal directly while enforcing the boundary when it delegates to
+	/// the account root; a `"*"` principal is arguably the former, in which
+	/// case this statement is redundant. `simulate-principal-policy` says
+	/// redundant, but it also allows an account-root delegation under a
+	/// boundary, which the documented rule forbids, so its resource-policy
+	/// handling is not to be trusted here.
+	///
+	/// So this is belt and braces, and cheap: one action, conditioned on the
+	/// one service that ever asks. It also keeps the derivation honest, since
+	/// [`RuntimeBoundary`] is the union of what the stacks render and decrypting
+	/// is a thing this runtime genuinely does. If it were needed and absent the
+	/// failure would be delayed rather than loud — the box decrypts at boot, at
+	/// provision, and on the cold-backup timer — which is the asymmetry that
+	/// makes stating it the cheaper side of the bet.
+	/// The statement above is only worth anything if the DERIVATION picks it up:
+	/// the boundary is the ceiling, so a grant present in the role policy and
+	/// absent from the boundary is denied by the intersection. That is the thing
+	/// that would regress if the union ever stopped covering an inline policy.
+	#[beet_core::test]
+	fn the_boundary_carries_the_decrypt_grant() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		let boundary = RuntimeBoundary::new(
+			stack.app_name().clone(),
+			stack.stage().clone(),
+		)
+		.lower(&config)
+		.unwrap()
+		.to_json()
+		.to_string();
+		boundary
+			.as_str()
+			.xpect_contains("kms:Decrypt")
+			.xpect_contains("kms:ViaService");
+	}
+
 	#[beet_core::test]
 	fn the_box_may_decrypt_its_own_secure_strings() {
 		let (_stack, _deployment, config) = build_config(&mail_box());
@@ -3009,6 +3040,13 @@ mod tests {
 			.xpect_contains(".amazonaws.com");
 	}
 
+	/// The DANE pin is a `TLSA` at the box's own `_25._tcp` name whose content
+	/// is the parked variable, present exactly when that variable is: the
+	/// record carries a `count` on the value, the variable is optional content
+	/// (every render reads it, absence is empty), and a box that does not
+	/// declare `dane` renders neither. REGRESSION-shaped on purpose: a pin
+	/// typed into the entry, or defaulted, is a refused session at every
+	/// validating sender.
 	#[beet_core::test]
 	fn the_dane_pin_is_read_never_typed() {
 		let (stack, _deployment, config) =

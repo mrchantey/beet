@@ -94,9 +94,9 @@ pub struct DeployerPolicy {
 	/// The IAM services the lowered types named.
 	services: BTreeSet<&'static str>,
 	/// The stages the lowered stacks declare, which the irreversible deny is
-	/// scoped to. Collected rather than assumed: an app whose only stage is
-	/// `shared` gets its buckets protected too, where a hard-coded `prod`
-	/// named nothing that exists.
+	/// scoped to alongside `prod`. Collected rather than assumed: an app whose
+	/// only stage is `shared` gets its buckets protected too, where a
+	/// hard-coded `prod` named nothing that exists.
 	stages: BTreeSet<SmolStr>,
 	/// Whether every principal the app's stacks render already carries its
 	/// boundary. Until it does, the IAM statement is unconditioned, which is
@@ -531,14 +531,19 @@ impl DeployerPolicy {
 	/// at. So this denies a deployer outright, and an operator who assumes a
 	/// role with a code is the only principal that gets through.
 	///
-	/// Scoped to the stages this launch actually RENDERED, one resource per
-	/// stage, rather than to a hard-coded `prod`. That distinction is the whole
-	/// protection for an app whose only stage is `shared`: the assets buckets
-	/// are a source of record and not a mirror, and a `--prod--` pattern named
-	/// nothing that exists for them, so their own deployer could delete them
-	/// with no code. Tearing a dev stack down still stays free — the mint runs
-	/// under the stage that deploys, so `dev` is not among the stages a prod
-	/// mint collects, which is what the infra-deploy skill relies on.
+	/// Scoped to the stages this launch RENDERED, plus `prod` unconditionally,
+	/// one resource per stage. The rendered stages are what protects an app
+	/// whose only stage is `shared`: the assets buckets are a source of record
+	/// and not a mirror, and a hard-coded `--prod--` pattern named nothing that
+	/// exists for them, so their own deployer could delete them with no code.
+	/// Prod stays named regardless so a mint under the wrong stage cannot
+	/// quietly drop the deny from the stage that matters most.
+	///
+	/// Tearing a DEV stack down stays free, which the infra-deploy skill does
+	/// routinely, because a mint runs under the stage that deploys and `dev` is
+	/// therefore never among the stages it collects. A mint run under `dev`
+	/// would deny that teardown — loudly, and after the warning `DeployerMint`
+	/// already prints for a non-prod stage.
 	///
 	/// ## What is deliberately NOT here
 	///
@@ -561,8 +566,19 @@ impl DeployerPolicy {
 	fn irreversible_statement(&self) -> Option<Value> {
 		let mut actions = Vec::<&str>::new();
 		let mut resources = Vec::<String>::new();
+		// PROD is in the set whatever this launch rendered. Scoping to the
+		// rendered stages ALONE would mean a mint under the wrong stage dropped
+		// prod from the deny, turning a wrong-stage mint from over-protecting
+		// into silently under-protecting the one stage that matters. A deny
+		// naming a stage an app does not have is inert.
+		let stages = self
+			.stages
+			.iter()
+			.map(SmolStr::as_str)
+			.chain([BootstrapConfig::PROD_STAGE])
+			.collect::<BTreeSet<_>>();
 		let mut per_stage = |template: &str| {
-			resources.extend(self.stages.iter().map(|stage| {
+			resources.extend(stages.iter().map(|stage| {
 				template.replace("{}", &format!("{}--{stage}--*", self.app))
 			}))
 		};
@@ -929,11 +945,11 @@ mod test {
 				.to_string()
 		};
 		// a shared-only app protects `shared`, where a hard-coded prod
-		// protected a name the app does not have
+		// protected a name the app does not have; prod stays named regardless,
+		// so a wrong-stage mint cannot drop it
 		resources(&["shared"])
 			.as_str()
 			.xpect_contains("beet-site--shared--*")
-			.xnot()
 			.xpect_contains("beet-site--prod--*");
 		// and an app rendering both gets one resource each
 		resources(&["prod", "shared"])
