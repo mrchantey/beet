@@ -2,6 +2,7 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use std::path::PathBuf;
 
 /// Request params for [`AdminElevate`], surfaced in `--help`.
 #[derive(Reflect)]
@@ -32,10 +33,12 @@ struct AdminParams {
 ///
 /// ## The code is typed, and that is the design
 ///
-/// It is read from the terminal and reaches the `aws` child on STDIN, never as
-/// an argument and never as an environment variable: argv is readable by any
-/// process on the machine through `/proc/<pid>/cmdline`, an environment is
-/// readable by its children, and a shell argument lands in history.
+/// It is read from the terminal and handed to the `aws` child in a `0600` file
+/// on tmpfs, never as an argument and never as an environment variable: argv is
+/// readable by any process on the machine through `/proc/<pid>/cmdline`, an
+/// environment is readable by its children, and a shell argument lands in
+/// history. A pipe would be better still and the cli does not support one — see
+/// [`write_request`](AdminElevate::write_request).
 ///
 /// More importantly, a typed code is the one thing an automated process cannot
 /// supply, which is exactly why the role's trust policy conditions on it:
@@ -242,7 +245,9 @@ impl AdminElevate {
 		// the device is named for the user, so its arn is composed the same way
 		let device =
 			format!("arn:aws:iam::{account}:mfa/{}", AgentIdentity::USER);
-		let body = agent
+		let (request_path, request) =
+			Self::write_request(&role, &device, code, seconds)?;
+		let result = agent
 			.iter()
 			.fold(ChildProcess::new("aws"), |process, (_, value)| {
 				process.with_secret(value.clone())
@@ -256,13 +261,8 @@ impl AdminElevate {
 			.with_args([
 				"sts",
 				"assume-role",
-				// every parameter including the code arrives on STDIN. argv is
-				// readable by any process on the machine through
-				// `/proc/<pid>/cmdline`, and a one-time code is still a factor
-				// while it is live; `with_secret` governs what beet WRITES
-				// DOWN, not what the kernel shows about the child.
 				"--cli-input-json",
-				"file:///dev/stdin",
+				request.as_str(),
 				// the four fields as text rather than the json document: this
 				// crate links no json parser outside its `json` feature, and
 				// the cli's own `--query` is the narrower ask anyway
@@ -272,19 +272,52 @@ impl AdminElevate {
 				"text",
 			])
 			.with_envs(agent.to_vec())
-			.run_async_stdin(Self::assume_request(
-				&role, &device, code, seconds,
-			))
-			.await
-			.map_err(|err| Self::explain(err, &device))?
-			.stdout;
-		Self::parse_credentials(&String::from_utf8_lossy(&body), seconds)
+			.run_async_stdout()
+			.await;
+		// the request holds the code, so it goes the moment the call returns,
+		// whichever way it went
+		fs_ext::remove(&request_path)?;
+		let body = result.map_err(|err| Self::explain(err, &device))?;
+		Self::parse_credentials(&body, seconds)
 	}
 
-	/// The `sts:AssumeRole` request as json, handed to the cli on stdin so the
-	/// code never reaches argv. Hand-built rather than through `serde_json`,
-	/// which this crate links only behind its `json` feature; every field here
-	/// is an arn, a fixed name or digits, so there is nothing to escape.
+	/// Write the request where the cli can read it: a `0600` file on tmpfs,
+	/// returning the path and the `file://` argument naming it.
+	///
+	/// **The cli cannot read `--cli-input-json` from a pipe.** `file:///dev/stdin`
+	/// is rejected as `Invalid JSON received` even from a plain shell
+	/// redirect, so the obvious way to keep the code out of argv is not
+	/// available and this is the next one: `$XDG_RUNTIME_DIR` is tmpfs, so the
+	/// code never reaches a disk, [`fs_ext::write_private`] creates the file
+	/// owner-only before a byte of it exists, and the caller removes it as soon
+	/// as the call returns.
+	///
+	/// Worth the file rather than `--token-code` on argv because argv is
+	/// readable by every process on the machine through `/proc/<pid>/cmdline`,
+	/// where this is readable by its owner alone. `with_secret` governs what
+	/// beet writes down, not what the kernel shows about a child.
+	fn write_request(
+		role: &str,
+		device: &str,
+		code: &str,
+		seconds: i64,
+	) -> Result<(PathBuf, String)> {
+		let path = AdminSession::path()?.with_file_name("assume-request.json");
+		if let Some(parent) = path.parent() {
+			fs_ext::create_dir_private(parent)?;
+		}
+		fs_ext::write_private(
+			&path,
+			Self::assume_request(role, device, code, seconds),
+		)?;
+		let arg = format!("file://{}", path.display());
+		(path, arg).xok()
+	}
+
+	/// The `sts:AssumeRole` request as json. Hand-built rather than through
+	/// `serde_json`, which this crate links only behind its `json` feature;
+	/// every field is an arn, a fixed name or digits, so there is nothing to
+	/// escape.
 	fn assume_request(
 		role: &str,
 		device: &str,
@@ -446,9 +479,43 @@ mod test {
 			.xpect_false();
 	}
 
-	/// The request carries the code, and it goes on stdin: the shape is worth
-	/// pinning because the whole claim that a code never reaches argv rests on
-	/// this one function being what is sent.
+	/// The DELIVERY, not just the string. The previous version of this verb
+	/// built correct json and handed it to the cli as `file:///dev/stdin`,
+	/// which the cli rejects as `Invalid JSON received` even from a plain shell
+	/// redirect — so a test that only checked the json passed while the verb
+	/// could not work at all, and the cost of finding out was a spent mfa code.
+	/// This asserts the three properties that failure had: a `file://`
+	/// argument, a file that EXISTS at that path, and owner-only permissions.
+	#[beet_core::test]
+	fn the_request_reaches_the_cli_as_a_private_file() {
+		// no `XDG_RUNTIME_DIR` on this host means no tmpfs to write to
+		if AdminSession::path().is_err() {
+			return;
+		}
+		let (path, arg) = AdminElevate::write_request(
+			"arn:aws:iam::1234:role/beet-admin",
+			"arn:aws:iam::1234:mfa/beet-agent",
+			"123456",
+			1800,
+		)
+		.unwrap();
+		arg.as_str()
+			.xpect_starts_with("file://")
+			// a pipe is what the cli cannot read, so it must not be one
+			.xnot()
+			.xpect_contains("/dev/stdin");
+		fs_ext::exists(&path).unwrap().xpect_true();
+		fs_ext::is_private(&path).unwrap().xpect_true();
+		// and the code is in it, since that is the whole reason for the file
+		fs_ext::read_to_string(&path)
+			.unwrap()
+			.as_str()
+			.xpect_contains("\"TokenCode\":\"123456\"");
+		fs_ext::remove(&path).unwrap();
+	}
+
+	/// The request carries the code, and the shape is worth pinning separately
+	/// from the delivery above.
 	#[beet_core::test]
 	fn builds_the_assume_request() {
 		let body = AdminElevate::assume_request(
