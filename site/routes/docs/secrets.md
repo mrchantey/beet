@@ -432,7 +432,19 @@ Four flows, day to day:
 - **`beet admin --duration=30m`** asks for a code and mints a session; for that half hour `beet aws` runs as `beet-admin` and says so. **`beet admin -- deployer/mint`** is how a deployer's policy is re-minted when a stack gains a service: rare, one code.
 - **the console, as `pete`** with a password and a code, for the day `beet admin` is itself what is broken. Behind that, the account root user.
 
-A new machine is: clone arch-config, `stow`, restore the one age key from your password manager. Every document opens. `beet admin` additionally wants the phone.
+### A fresh machine, start to finish
+
+Two files and nothing else. One is committed and one you restore by hand, and the asymmetry is the whole design: everything a machine can be handed is sealed, and the thing that opens it is the thing only a person has.
+
+1. **Clone arch-config** and run its `stow-symlinks` recipe. That links `~/.config/beet/secrets.toml` — the global document, committed and age-sealed, holding `beet-agent`'s pair. Nothing is decrypted yet.
+2. **Restore the age identity by hand** from your password manager into `~/.config/beet/age/keys.txt`, mode 600. With beet installed that is `beet vault/restore-identity --file=<backup>`; without it, `age -d -o ~/.config/beet/age/keys.txt <backup>` and a `chmod 600`, since `age -d` writes world-readable and beet refuses an identity file that is. Never `keygen` here — a second identity reads nothing.
+3. **Clone the repos you deploy.** Each carries its own sealed `secrets.toml`, so the same one key opens every deployer pair and every state passphrase. There is nothing per-repo to fetch.
+4. **Check it**: `beet aws -- sts get-caller-identity` should answer as `beet-agent`, and `beet secrets/check` should pass in each repo. At this point the machine can read the account and deploy every app, and it holds no plaintext credential anywhere.
+5. **`beet admin` additionally wants the phone**, and nothing more: the MFA device is registered against the `beet-agent` IAM user rather than against a machine, so a new machine inherits it. Same six digits, same authenticator entry.
+
+Two things deliberately absent. There is no `~/.aws` — nothing on the machine is ambiently authenticated, and every credential reaches exactly one child process that asked for it. And there is no long-lived administrator to install: the only administrators are a role that needs a code and the `pete` console login, so a fresh machine starts out unable to do irreversible damage and stays that way until someone types six digits.
+
+One trap if you are editing the stow package rather than using it. `~/.config/beet` must already exist as a real directory before stowing, which the recipe's `mkdir -p` guarantees. Folded, stow would replace it with a symlink into the repo, and the next `vault/keygen` would write the age identity — the one key that opens every document in every repo — into version control. It is the same hazard `~/.ssh` has, with more to lose.
 
 ## Where to go next
 
