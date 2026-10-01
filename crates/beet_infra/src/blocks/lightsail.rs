@@ -386,14 +386,18 @@ impl LightsailBlock {
 			.iter()
 			.map(|(key, value)| format!("Environment={key}={value}\n"))
 			.collect::<String>();
-		// secrets last, so a deploy can override any default above.
+		// Secrets go to the ENV FILE rather than the unit, and last so a deploy
+		// can override any default above. A unit file is 0644 by convention and
+		// `systemctl cat` prints it for any local user: this box's own AWS
+		// secret and the TUI's private host key were both readable without
+		// sudo, and one of them reached an agent transcript that way.
 		let secret_env_lines = self
 			.secret_env
 			.iter()
 			.map(|(key, source)| {
 				source
 					.resolve_static(key)
-					.map(|value| format!("Environment={key}={value}\n"))
+					.map(|value| format!("{key}={value}\n"))
 			})
 			.collect::<Result<String>>()?;
 
@@ -586,7 +590,17 @@ cat > /usr/local/bin/{app_name}-run <<'RUN_EOF'
 RUN_EOF
 chmod +x /usr/local/bin/{app_name}-fetch /usr/local/bin/{app_name}-run
 {ssh_setup}
-# create systemd service with AWS credentials for runtime S3 access
+# The runtime credentials live in a 0600 file, NOT in the unit: a unit is
+# world-readable by convention and `systemctl cat` hands it to any local user.
+# `install -m 600 /dev/null` creates the file private before a byte of it
+# exists, and the redirect below keeps that mode.
+install -m 600 /dev/null /etc/{app_name}.env
+cat > /etc/{app_name}.env <<'ENVEOF'
+AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
+AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
+{secret_env_lines}ENVEOF
+chmod 600 /etc/{app_name}.env
+# create systemd service; the credentials arrive through EnvironmentFile
 cat > /etc/systemd/system/{app_name}.service <<'EOF'
 [Unit]
 Description={app_name}
@@ -601,9 +615,8 @@ StandardOutput=append:/var/log/{app_name}.log
 StandardError=append:/var/log/{app_name}.log
 Environment=RUST_LOG=info
 Environment=AWS_REGION={region}
-Environment=AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
-Environment=AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
-{bootstrap_env}__ENV_VARS__{secret_env_lines}[Install]
+EnvironmentFile=/etc/{app_name}.env
+{bootstrap_env}__ENV_VARS__[Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
@@ -1742,18 +1755,51 @@ mod tests {
 			.xpect_contains("127.0.0.1:9001");
 	}
 
-	/// Secret env rides the unit's `Environment=` lines, never `ExecStart`.
+	/// Secret env rides the 0600 ENV FILE, never `ExecStart` and never the
+	/// unit. REGRESSION-shaped: a unit file is world-readable by convention and
+	/// `systemctl cat` prints it to any local user, which is how this box's AWS
+	/// secret and the TUI's private host key were both readable without sudo.
 	#[beet_core::test]
-	fn secret_env_rides_environment_lines() {
+	fn secret_env_rides_the_private_env_file() {
 		let (script, _dir) = build_user_data(
 			&LightsailBlock::default()
 				.with_secret_env("BEET_SSH_HOST_KEY", "abc123"),
 		);
 		script
 			.as_str()
-			.xpect_contains("Environment=BEET_SSH_HOST_KEY=abc123")
+			// in the env file, bare rather than prefixed
+			.xpect_contains("BEET_SSH_HOST_KEY=abc123")
+			.xpect_contains("install -m 600 /dev/null")
+			.xpect_contains("EnvironmentFile=")
+			// and NOT as a unit line, nor on the command line
+			.xnot()
+			.xpect_contains("Environment=BEET_SSH_HOST_KEY")
 			.xnot()
 			.xpect_contains("app abc123");
+	}
+
+	/// The AWS pair is in the env file too, and the unit names neither half.
+	/// The pair is what a boundary bounds rather than what it hides, so keeping
+	/// it out of a 0644 file is the other half of the job.
+	#[beet_core::test]
+	fn the_unit_names_no_credential() {
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		let unit = script
+			.split_once("/etc/systemd/system/")
+			.map(|(_, rest)| rest.to_string())
+			.unwrap();
+		// the unit half of the script mentions neither half of the pair
+		unit.as_str()
+			.xnot()
+			.xpect_contains("Environment=AWS_ACCESS_KEY_ID")
+			.xnot()
+			.xpect_contains("Environment=AWS_SECRET_ACCESS_KEY");
+		// while the env file carries both, and the region stays ambient
+		script
+			.as_str()
+			.xpect_contains("AWS_ACCESS_KEY_ID=")
+			.xpect_contains("AWS_SECRET_ACCESS_KEY=")
+			.xpect_contains("Environment=AWS_REGION=");
 	}
 
 	/// A process-sourced secret is read when the script renders, not when the
@@ -1766,12 +1812,12 @@ mod tests {
 		build_user_data(&block)
 			.0
 			.as_str()
-			.xpect_contains("Environment=LIGHTSAIL_TEST_HOST_KEY=\n");
+			.xpect_contains("LIGHTSAIL_TEST_HOST_KEY=\n");
 		unsafe { env_ext::set_var("LIGHTSAIL_TEST_HOST_KEY", "late") }.unwrap();
 		build_user_data(&block)
 			.0
 			.as_str()
-			.xpect_contains("Environment=LIGHTSAIL_TEST_HOST_KEY=late");
+			.xpect_contains("LIGHTSAIL_TEST_HOST_KEY=late");
 		unsafe { env_ext::remove_var("LIGHTSAIL_TEST_HOST_KEY") }.unwrap();
 	}
 

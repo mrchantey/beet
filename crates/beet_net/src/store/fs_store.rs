@@ -290,7 +290,7 @@ mod test {
 
 	// cross-platform: `FsStore` reads/writes through `fs_ext`, which routes to the
 	// deno runner's fs globals on wasm, so the same suite runs under both. On wasm
-	// the runner supplies `WORKSPACE_ROOT` (resolving the workspace-relative dir) and
+	// the runner supplies `BEET_WORKSPACE_ROOT` (resolving the workspace-relative dir) and
 	// `--allow-write`.
 	#[beet_core::test]
 	async fn works() {

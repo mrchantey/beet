@@ -260,7 +260,22 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 	}
 }
 
-/// 1. tries to get the [`env_ext::WORKSPACE_ROOT`] env var.
+/// The workspace root a launch resolves every relative path against, set by a
+/// launch that has one (cargo's own `[env]` block, the wasm runner) and read by
+/// [`workspace_root`].
+///
+/// It lives here rather than in `env_ext` because `env_ext` owns the mechanism
+/// of reading an environment and this is a *path* concern: the one name beet
+/// resolves paths against, beside the function that resolves them.
+///
+/// `BEET_`-prefixed like every other variable beet owns, which is what lets
+/// [`ChildProcess::without_launch_env`](crate::prelude::ChildProcess) catch it
+/// in the prefix scrub rather than by name. It was once bare `WORKSPACE_ROOT`,
+/// and the exception cost a hard-coded list of "the ones the prefix cannot
+/// reach" that no longer has anything in it.
+pub const WORKSPACE_ROOT: &str = "BEET_WORKSPACE_ROOT";
+
+/// 1. tries to get the [`WORKSPACE_ROOT`] env var.
 /// 2. if wasm, returns an empty path (the store root is the ambient origin — a bucket
 ///    root on a Cloudflare Worker, the served page origin in a browser — so paths
 ///    resolve relative to an empty root; a js runtime with a real root sets it).
@@ -271,14 +286,14 @@ pub async fn remove_async(path: impl AsRef<Path>) -> FsResult {
 /// - The current directory is not found
 /// - Insufficient permissions to access the current directory
 pub fn workspace_root() -> PathBuf {
-	if let Ok(root_str) = env_ext::var(env_ext::WORKSPACE_ROOT) {
+	if let Ok(root_str) = env_ext::var(WORKSPACE_ROOT) {
 		return PathBuf::from(root_str.as_str());
 	}
 	cfg_if! {
 		if #[cfg(target_arch = "wasm32")] {
 			// no filesystem/workspace in a js runtime (browser, Cloudflare Worker): the
 			// store root is the ambient origin, so paths resolve relative to an empty root.
-			// A js runtime with a real root sets WORKSPACE_ROOT above; panicking here made
+			// A js runtime with a real root sets BEET_WORKSPACE_ROOT above; panicking here made
 			// serving any site from a Worker impossible.
 			return PathBuf::new();
 		} else {

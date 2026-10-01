@@ -338,27 +338,19 @@ impl BootstrapConfig {
 		Self::SCREENSHOT_FRAME,
 	];
 
-	/// The launch variables beet owns outside the `BEET_*` prefix, which the
-	/// prefix scrub therefore cannot reach.
+	/// Every environment variable name a beet launch reads, derived from
+	/// [`KNOBS`](Self::KNOBS) so a new knob cannot be forgotten.
 	///
-	/// The membership rule is ownership, not effect: `WORKSPACE_ROOT` is
-	/// beet's own invention, while `CARGO_TARGET_DIR` and `HOME` shape a
-	/// launch just as much and belong to cargo and the shell, so a foreign
-	/// child keeps reading them.
-	const UNPREFIXED_ENV_NAMES: [&'static str; 1] = [env_ext::WORKSPACE_ROOT];
-
-	/// Every environment variable name a beet launch reads: each knob's
-	/// `BEET_*` name, derived from [`KNOBS`](Self::KNOBS) so a new knob
-	/// cannot be forgotten, and
-	/// [`UNPREFIXED_ENV_NAMES`](Self::UNPREFIXED_ENV_NAMES).
-	///
-	/// What a child that is NOT this launch is stripped of, ie
-	/// [`ChildProcess::without_launch_env`].
+	/// Every one is `BEET_*`, `BEET_WORKSPACE_ROOT` included, so
+	/// [`ChildProcess::without_launch_env`]'s prefix scrub already reaches them
+	/// all and this is belt and braces for a name that happens to be unset.
+	/// There was once a second list for the variables the prefix could not
+	/// reach; renaming the one member is what emptied it.
 	pub(crate) fn env_names() -> impl Iterator<Item = &'static str> {
 		Self::KNOBS
 			.iter()
 			.map(|knob| knob.env)
-			.chain(Self::UNPREFIXED_ENV_NAMES)
+			.chain([fs_ext::WORKSPACE_ROOT])
 	}
 
 	/// The one parse. `env` resolves a `BEET_*` name, and is consulted only for a

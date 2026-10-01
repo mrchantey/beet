@@ -183,13 +183,6 @@ pub unsafe fn remove_var(key: &str) -> Result<(), EnvError> {
 	}
 }
 
-/// The workspace root a launch resolves every relative path against, read by
-/// [`fs_ext::workspace_root`] and set by a launch that has one (cargo's own
-/// `[env]` block, the wasm runner). Beet's own invention rather than a tool
-/// convention, which is what makes it something a foreign child must not
-/// inherit: see [`ChildProcess::without_launch_env`].
-pub const WORKSPACE_ROOT: &str = "WORKSPACE_ROOT";
-
 /// Try get the environment variable with the given key, returning
 /// an error containing the key name if not found.
 pub fn var(key: &str) -> Result<SmolStr, EnvError> {

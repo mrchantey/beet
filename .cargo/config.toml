@@ -28,7 +28,7 @@ rustflags = [
 rustflags = ['--cfg', 'getrandom_backend="custom"']
 
 [env]
-WORKSPACE_ROOT = { value = "", relative = true }
+BEET_WORKSPACE_ROOT = { value = "", relative = true }
 # A fresh release build of the deep beet type graph overflows rustc's default
 # codegen-thread stack and SIGSEGVs (eg a bare `cargo install --path
 # crates/beet-cli`). The justfile exports the same value for its recipes; setting

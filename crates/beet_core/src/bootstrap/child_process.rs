@@ -248,11 +248,11 @@ impl ChildProcess {
 	}
 
 	/// Strip this launch's own configuration from the child's environment:
-	/// every `BEET_*` name and `WORKSPACE_ROOT`, which is the whole of what
+	/// every `BEET_*` name and `BEET_WORKSPACE_ROOT`, which is the whole of what
 	/// beet itself reads at launch (`BootstrapConfig::env_names`).
 	///
 	/// The opposite of [`with_bootstrap`](Self::with_bootstrap), and for the
-	/// opposite child. A FOREIGN tool inheriting `WORKSPACE_ROOT` or
+	/// opposite child. A FOREIGN tool inheriting `BEET_WORKSPACE_ROOT` or
 	/// `BEET_REPO` is not configured, it is rebound: a beet binary of another
 	/// repo run this way resolves this repo's workspace and addresses this
 	/// repo's stacks. A beet child that *does* belong to this launch is

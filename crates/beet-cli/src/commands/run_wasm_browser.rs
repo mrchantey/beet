@@ -11,7 +11,7 @@
 //! `test_start` / `start` per the shared host contract. Runner args and the
 //! [`BootstrapConfig`] ride the url query, which the wasm side already parses
 //! exactly like argv (`search_params_ext::location_args`); the one runner-fed
-//! side channel is `env.json` (`WORKSPACE_ROOT`). No fs shims are installed,
+//! side channel is `env.json` (`BEET_WORKSPACE_ROOT`). No fs shims are installed,
 //! so snapshot and store tests stay deno and native territory.
 
 use beet::prelude::webdriver::*;
@@ -153,7 +153,7 @@ pub(crate) async fn run(
 fn env_json() -> String {
 	format!(
 		"{{\"{}\": \"{}\"}}",
-		env_ext::WORKSPACE_ROOT,
+		fs_ext::WORKSPACE_ROOT,
 		fs_ext::workspace_root()
 			.to_string_lossy()
 			.replace('\\', "\\\\")

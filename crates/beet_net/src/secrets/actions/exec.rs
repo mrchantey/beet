@@ -34,7 +34,7 @@ struct ExecParams {
 /// child of this verb is a foreign tool by definition, and a beet child that
 /// belongs to THIS launch is `with_bootstrap`'s job, which hands over a config
 /// constructed field by field. Without the strip another repo's beet binary
-/// run this way inherits `WORKSPACE_ROOT` and every `BEET_*` knob, so it
+/// run this way inherits `BEET_WORKSPACE_ROOT` and every `BEET_*` knob, so it
 /// resolves THIS repo's workspace and addresses THIS repo's stacks.
 ///
 /// What the strip does NOT cover is a record this launch's own document
@@ -191,14 +191,14 @@ mod test {
 	}
 
 	/// The child is a foreign tool, so this launch's own configuration does
-	/// not reach it while the document's records still do. `WORKSPACE_ROOT` is
+	/// not reach it while the document's records still do. `BEET_WORKSPACE_ROOT` is
 	/// the assertion that bites: cargo's `[env]` block sets it for every
 	/// process it spawns, this one included, and a beet child inheriting it
 	/// resolves the wrong workspace.
 	#[beet_core::test]
 	async fn strips_this_launch_from_the_child() {
 		// the child's empty value only means something because the parent has one
-		env_ext::var(env_ext::WORKSPACE_ROOT).unwrap();
+		env_ext::var(fs_ext::WORKSPACE_ROOT).unwrap();
 		let mut fixture = VerbWorld::new();
 		fixture
 			.set("BEET_TEST_STRIP_VAR", "seen", SecretRecord {
@@ -210,7 +210,7 @@ mod test {
 			.call(
 				SecretsExec,
 				Request::from_cli_str(
-					"-- sh -c 'test -z \"$WORKSPACE_ROOT\" && \
+					"-- sh -c 'test -z \"$BEET_WORKSPACE_ROOT\" && \
 					test \"$BEET_TEST_STRIP_VAR\" = seen'",
 				),
 			)
