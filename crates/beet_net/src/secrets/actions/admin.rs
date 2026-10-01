@@ -32,12 +32,15 @@ struct AdminParams {
 ///
 /// ## The code is typed, and that is the design
 ///
-/// It is read from the terminal and never from an argument or an environment
-/// variable, because both are readable by other processes and one of them lands
-/// in shell history. More importantly it is the one thing an automated process
-/// cannot supply, which is exactly why the role's trust policy conditions on
-/// it: `aws:MultiFactorAuthPresent` must be true, and no amount of held
-/// credential makes it so.
+/// It is read from the terminal and reaches the `aws` child on STDIN, never as
+/// an argument and never as an environment variable: argv is readable by any
+/// process on the machine through `/proc/<pid>/cmdline`, an environment is
+/// readable by its children, and a shell argument lands in history.
+///
+/// More importantly, a typed code is the one thing an automated process cannot
+/// supply, which is exactly why the role's trust policy conditions on it:
+/// `aws:MultiFactorAuthPresent` must be true, and no amount of held credential
+/// makes it so.
 ///
 /// So an agent cannot mint this session. An agent running in the terminal where
 /// the operator just typed a code CAN use it, for as long as the operator sized
@@ -62,29 +65,26 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 	AdminElevate::check_code(&code)?;
 	let session =
 		AdminElevate::assume(&agent, &account, &code, seconds).await?;
-	match params.nested_args.split_first() {
-		// one command, nothing kept: the grant lives as long as the child
-		Some((command, args)) => {
+	match params.nested_args.is_empty() {
+		// one verb, nothing kept: the grant lives as long as the child
+		false => {
+			let route = params.nested_args.join(" ");
 			info!(
-				"running `{command}` as the `{}` role, keeping nothing",
+				"running `{route}` as the `{}` role, keeping nothing",
 				AgentIdentity::ADMIN_ROLE
 			);
 			let status = session
 				.sdk_vars()
 				.iter()
 				.fold(
-					ChildProcess::new(command.as_str()),
+					ChildProcess::new(AdminElevate::own_binary()?),
 					|process, (_, value)| process.with_secret(value.clone()),
 				)
-				.without_launch_env()
+				// NOT `without_launch_env`: this child is THIS launch, so it
+				// must resolve the same workspace and the same entry. The only
+				// thing added is the role's credentials.
 				.without_env("AWS_PROFILE")
-				.without_env("AWS_SESSION_TOKEN")
-				.without_env("AWS_SESSION_TOKEN")
-				// and any stale token: a long-lived pair plus a foreign session token
-				// authenticates as nobody. Removals apply before additions, so a
-				// session re-adds its own token over this.
-				.without_env("AWS_SESSION_TOKEN")
-				.with_args(args.iter().map(String::as_str))
+				.with_args(params.nested_args.iter().map(String::as_str))
 				.with_envs(session.sdk_vars())
 				.spawn()?
 				.status()
@@ -92,12 +92,12 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 			match status.success() {
 				true => Response::ok().xok(),
 				false => bevybail!(
-					"`{command}` exited with {}",
+					"`{route}` exited with {}",
 					status.code().unwrap_or(-1)
 				),
 			}
 		}
-		None => {
+		true => {
 			session.write()?;
 			// the expiry and nothing else: the credential itself never prints
 			Response::ok_text(format!(
@@ -112,6 +112,28 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 }
 
 impl AdminElevate {
+	/// This same binary, which is what `-- <verb>` runs.
+	///
+	/// The nested arguments are a beet ROUTE, not a command on `PATH`:
+	/// `beet admin -- deployer/mint --stage=prod` is the documented mint path,
+	/// and `deployer/mint` is a route this binary serves rather than a program
+	/// anything could execute. Spawning the current executable also means the
+	/// path works on a machine where `beet` was never installed onto `PATH`,
+	/// which is most of them — a previous version spawned the first argument
+	/// directly and died on `No such file or directory` AFTER the code had been
+	/// typed and spent.
+	fn own_binary() -> Result<String> {
+		std::env::current_exe()
+			.map(|path| path.to_string_lossy().to_string())
+			.map_err(|err| {
+				bevyhow!(
+					"cannot find this binary to run `-- <verb>` with ({err}): \
+					run `beet admin` on its own and the session will be \
+					waiting for the next command"
+				)
+			})
+	}
+
 	/// The default grant, an hour: long enough for a mint or a rotation, short
 	/// enough that forgetting it costs nothing.
 	const DEFAULT: i64 = 3600;
@@ -180,10 +202,8 @@ impl AdminElevate {
 			})
 			.without_launch_env()
 			.without_env("AWS_PROFILE")
-			.without_env("AWS_SESSION_TOKEN")
-			// and any stale token: a long-lived pair plus a foreign session token
-			// authenticates as nobody. Removals apply before additions, so a
-			// session re-adds its own token over this.
+			// the agent pair carries no token of its own, so an inherited one
+			// would make it authenticate as nobody
 			.without_env("AWS_SESSION_TOKEN")
 			.with_args([
 				"sts",
@@ -229,25 +249,20 @@ impl AdminElevate {
 			})
 			.without_launch_env()
 			.without_env("AWS_PROFILE")
-			.without_env("AWS_SESSION_TOKEN")
-			// and any stale token: a long-lived pair plus a foreign session token
-			// authenticates as nobody. Removals apply before additions, so a
-			// session re-adds its own token over this.
+			// the agent pair carries no token of its own, so an inherited one
+			// would make it authenticate as nobody
 			.without_env("AWS_SESSION_TOKEN")
 			.with_secret(code)
 			.with_args([
 				"sts",
 				"assume-role",
-				"--role-arn",
-				role.as_str(),
-				"--role-session-name",
-				"beet-admin",
-				"--serial-number",
-				device.as_str(),
-				"--token-code",
-				code,
-				"--duration-seconds",
-				seconds.to_string().as_str(),
+				// every parameter including the code arrives on STDIN. argv is
+				// readable by any process on the machine through
+				// `/proc/<pid>/cmdline`, and a one-time code is still a factor
+				// while it is live; `with_secret` governs what beet WRITES
+				// DOWN, not what the kernel shows about the child.
+				"--cli-input-json",
+				"file:///dev/stdin",
 				// the four fields as text rather than the json document: this
 				// crate links no json parser outside its `json` feature, and
 				// the cli's own `--query` is the narrower ask anyway
@@ -257,10 +272,32 @@ impl AdminElevate {
 				"text",
 			])
 			.with_envs(agent.to_vec())
-			.run_async_stdout()
+			.run_async_stdin(Self::assume_request(
+				&role, &device, code, seconds,
+			))
 			.await
-			.map_err(|err| Self::explain(err, &device))?;
-		Self::parse_credentials(&body, seconds)
+			.map_err(|err| Self::explain(err, &device))?
+			.stdout;
+		Self::parse_credentials(&String::from_utf8_lossy(&body), seconds)
+	}
+
+	/// The `sts:AssumeRole` request as json, handed to the cli on stdin so the
+	/// code never reaches argv. Hand-built rather than through `serde_json`,
+	/// which this crate links only behind its `json` feature; every field here
+	/// is an arn, a fixed name or digits, so there is nothing to escape.
+	fn assume_request(
+		role: &str,
+		device: &str,
+		code: &str,
+		seconds: i64,
+	) -> String {
+		format!(
+			"{{\"RoleArn\":\"{role}\",\
+			 \"RoleSessionName\":\"beet-admin\",\
+			 \"SerialNumber\":\"{device}\",\
+			 \"TokenCode\":\"{code}\",\
+			 \"DurationSeconds\":{seconds}}}"
+		)
 	}
 
 	/// The four tab-separated fields `--query` asked for, in that order.
@@ -392,6 +429,42 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("rather than four");
+	}
+
+	/// `-- <verb>` runs THIS binary, and the path it resolves has to exist: the
+	/// previous version spawned the first argument as a program, so
+	/// `beet admin -- deployer/mint` died on `No such file or directory` AFTER
+	/// the code had been typed and spent. That is the expensive kind of bug,
+	/// since the cost is a credential rather than a retry.
+	#[beet_core::test]
+	fn the_nested_verb_runs_this_binary() {
+		let path = AdminElevate::own_binary().unwrap();
+		std::path::Path::new(&path).is_file().xpect_true();
+		// a route, not a program on PATH: `deployer/mint` is never executable
+		std::path::Path::new("deployer/mint")
+			.is_file()
+			.xpect_false();
+	}
+
+	/// The request carries the code, and it goes on stdin: the shape is worth
+	/// pinning because the whole claim that a code never reaches argv rests on
+	/// this one function being what is sent.
+	#[beet_core::test]
+	fn builds_the_assume_request() {
+		let body = AdminElevate::assume_request(
+			"arn:aws:iam::1234:role/beet-admin",
+			"arn:aws:iam::1234:mfa/beet-agent",
+			"123456",
+			1800,
+		);
+		body.as_str()
+			.xpect_contains("\"TokenCode\":\"123456\"")
+			.xpect_contains("\"RoleArn\":\"arn:aws:iam::1234:role/beet-admin\"")
+			.xpect_contains(
+				"\"SerialNumber\":\"arn:aws:iam::1234:mfa/beet-agent\"",
+			)
+			.xpect_contains("\"DurationSeconds\":1800")
+			.xpect_contains("\"RoleSessionName\":\"beet-admin\"");
 	}
 
 	/// An unregistered device is the expected first failure, so it must read

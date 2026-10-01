@@ -16,8 +16,15 @@ struct AwsParams {
 /// ```sh
 /// beet aws -- sts get-caller-identity
 /// beet aws -- iam list-roles
-/// beet aws -- logs tail /beet-site/main-lightsail/prod
+/// beet aws -- logs tail /beet-site/main-lightsail/prod --region us-west-2
 /// ```
+///
+/// **A regional service needs its region naming**, as the third line does.
+/// There is no `~/.aws/config` on a beet machine to supply one ambiently --
+/// that is the point, since ambient configuration is what made every tool on
+/// the machine an administrator -- so `iam` and `sts` work bare while `logs`,
+/// `lightsail` and the rest want `--region`. An exported `AWS_REGION` also
+/// works, since only this launch's own variables are stripped.
 ///
 /// ## It always says which
 ///

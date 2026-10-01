@@ -169,6 +169,29 @@ impl AdminSession {
 			token: token.into(),
 			expires: expires.parse::<i64>().unwrap_or_default(),
 		};
+		// a session file anyone else can read is not one, and the age identity
+		// path already refuses on the same rule
+		if !fs_ext::is_private(&path)? {
+			fs_ext::remove(&path)?;
+			bevybail!(
+				"the administrator session at `{}` was readable by more than \
+				its owner, so it has been removed rather than used: `beet \
+				admin` mints another",
+				path.display()
+			);
+		}
+		// further out than the role can grant means a clock that moved or a
+		// file that was edited; either way it will fail as `ExpiredToken`, and
+		// saying so beats announcing hours that do not exist
+		if session.remaining_secs() > AdminSession::MAX_REMAINING {
+			fs_ext::remove(&path)?;
+			bevybail!(
+				"the administrator session claims {} seconds left, beyond the \
+				role's own ceiling, so the clock has moved or the file was \
+				edited: removed, and `beet admin` mints another",
+				session.remaining_secs()
+			);
+		}
 		match session.remaining_secs() > 0 {
 			true => SessionState::Live(session).xok(),
 			false => {
@@ -178,21 +201,24 @@ impl AdminSession {
 		}
 	}
 
+	/// The longest a grant can legitimately have left: the role's own
+	/// `MaxSessionDuration`. Anything beyond it is a clock or an edit.
+	const MAX_REMAINING: i64 = 43200;
+
 	/// Seconds left on the grant, zero once it has lapsed.
 	pub fn remaining_secs(&self) -> i64 {
 		(self.expires - Timestamp::now().secs()).max(0)
 	}
 
-	/// Write the session to tmpfs, mode 600 before any value reaches it, so
-	/// the credential is never briefly world readable.
+	/// Write the session to tmpfs through [`fs_ext::write_private`], which
+	/// creates it `0600` in one `open` so there is no moment it is readable by
+	/// anyone else, and creates the parent directory on the way.
 	pub fn write(&self) -> Result {
 		let path = Self::path()?;
 		if let Some(parent) = path.parent() {
-			fs_ext::create_dir_all(parent)?;
+			fs_ext::create_dir_private(parent)?;
 		}
-		fs_ext::write(&path, "")?;
-		Self::restrict(&path)?;
-		fs_ext::write(
+		fs_ext::write_private(
 			&path,
 			format!(
 				"AWS_ACCESS_KEY_ID={}\nAWS_SECRET_ACCESS_KEY={}\n\
@@ -200,7 +226,7 @@ impl AdminSession {
 				self.key_id, self.secret, self.token, self.expires
 			),
 		)?;
-		Self::restrict(&path)
+		OK
 	}
 
 	/// The three variables a child needs to act as the role.
@@ -210,28 +236,6 @@ impl AdminSession {
 			("AWS_SECRET_ACCESS_KEY".into(), self.secret.clone()),
 			("AWS_SESSION_TOKEN".into(), self.token.clone()),
 		]
-	}
-
-	/// Owner-only, or nothing: a session file another user can read is not a
-	/// session file.
-	fn restrict(path: &std::path::Path) -> Result {
-		cfg_if! {
-			if #[cfg(unix)] {
-				use std::os::unix::fs::PermissionsExt;
-				std::fs::set_permissions(
-					path,
-					std::fs::Permissions::from_mode(0o600),
-				)?;
-				OK
-			} else {
-				let _ = path;
-				bevybail!(
-					"this platform cannot restrict a file to its owner, so an \
-					administrator session will not be written: run the \
-					command under `-- <command>` instead"
-				)
-			}
-		}
 	}
 }
 
@@ -270,33 +274,91 @@ mod test {
 			.xpect_eq("beet");
 	}
 
-	/// A lapsed session reads as no session at all, and its file goes with it:
-	/// a stale credential on disk is a trap for the next reader.
+	/// The round trip, and the three states `read` distinguishes. Written
+	/// against the real file rather than against the arithmetic, because the
+	/// arithmetic was never the risky part: the mode of the file is, and so is
+	/// a stale credential left on disk for the next reader to pick up.
 	#[beet_core::test]
-	fn a_lapsed_session_is_no_session() {
-		let past = AdminSession {
-			key_id: "AKIAEXAMPLE".into(),
+	fn a_session_round_trips_and_lapses() {
+		let path = match AdminSession::path() {
+			Ok(path) => path,
+			// no `XDG_RUNTIME_DIR` on this host, so there is no tmpfs to test
+			Err(_) => return,
+		};
+		let restore = fs_ext::exists(&path).unwrap_or(false);
+		let saved = restore
+			.then(|| fs_ext::read_to_string(&path).ok())
+			.flatten();
+		let live = AdminSession {
+			key_id: "ASIAEXAMPLE".into(),
+			secret: "secrethalf".into(),
+			token: "sessiontoken".into(),
+			expires: Timestamp::now().secs() + 600,
+		};
+		live.write().unwrap();
+		// owner-only, with no window in which it was not
+		fs_ext::is_private(&path).unwrap().xpect_true();
+		match AdminSession::read().unwrap() {
+			SessionState::Live(read) => {
+				read.key_id.as_str().xpect_eq("ASIAEXAMPLE");
+				read.token.as_str().xpect_eq("sessiontoken");
+				(read.remaining_secs() > 590).xpect_true();
+			}
+			_ => panic!("a session with ten minutes left read as not live"),
+		}
+		// a lapsed one is Expired, and its file is GONE rather than left for
+		// the next reader
+		AdminSession {
+			expires: Timestamp::now().secs() - 1,
+			..live.clone()
+		}
+		.write()
+		.unwrap();
+		matches!(AdminSession::read().unwrap(), SessionState::Expired)
+			.xpect_true();
+		fs_ext::exists(&path).unwrap().xpect_false();
+		// and absence is None rather than an error
+		matches!(AdminSession::read().unwrap(), SessionState::None)
+			.xpect_true();
+		// a file claiming more than the role can grant is a moved clock
+		AdminSession {
+			expires: Timestamp::now().secs() + 43200 * 3,
+			..live.clone()
+		}
+		.write()
+		.unwrap();
+		AdminSession::read()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("beyond the role's own ceiling");
+		fs_ext::exists(&path).unwrap().xpect_false();
+		// a truncated file is no session, not a panic
+		fs_ext::write_private(&path, "AWS_ACCESS_KEY_ID=only\n").unwrap();
+		matches!(AdminSession::read().unwrap(), SessionState::None)
+			.xpect_true();
+		if let Some(saved) = saved {
+			fs_ext::write_private(&path, saved).unwrap();
+		}
+	}
+
+	/// The three the sdk needs, token included: a role's credentials without it
+	/// authenticate as nobody.
+	#[beet_core::test]
+	fn a_session_hands_over_all_three_variables() {
+		AdminSession {
+			key_id: "ASIAEXAMPLE".into(),
 			secret: "x".into(),
 			token: "y".into(),
-			expires: Timestamp::now().secs() - 1,
-		};
-		past.remaining_secs().xpect_eq(0);
-		let future = AdminSession {
 			expires: Timestamp::now().secs() + 600,
-			..past.clone()
-		};
-		(future.remaining_secs() > 590).xpect_true();
-		// the three the sdk needs, token included: a role's credentials
-		// without it authenticate as nobody
-		future
-			.sdk_vars()
-			.iter()
-			.map(|(name, _)| name.to_string())
-			.collect::<Vec<_>>()
-			.xpect_eq(vec![
-				"AWS_ACCESS_KEY_ID",
-				"AWS_SECRET_ACCESS_KEY",
-				"AWS_SESSION_TOKEN",
-			]);
+		}
+		.sdk_vars()
+		.iter()
+		.map(|(name, _)| name.to_string())
+		.collect::<Vec<_>>()
+		.xpect_eq(vec![
+			"AWS_ACCESS_KEY_ID",
+			"AWS_SECRET_ACCESS_KEY",
+			"AWS_SESSION_TOKEN",
+		]);
 	}
 }

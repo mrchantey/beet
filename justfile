@@ -126,11 +126,13 @@ site-audit *args:
 # Converge the deployer of the WORKSPACE entry's apps (`beet--shared`): its user,
 # one `<app>--deploy` policy and one `<app>--<stage>--runtime-boundary` per app,
 # and the pair sealed in `secrets.toml`. A policy covers the apps its OWN entry
-# declares, so the site entry has its own recipe below. An administrator's verb,
-# so pass an admin pair for the one command (it wins over the document); or
-# `--dry-run` for the documents alone, which touches nothing and needs no
-# credential. `infra,extra` is not optional here: without them `<DeployerMint/>`
-# is `bx:cfg`-excluded and the verb does not exist.
+# declares, so the site entry has its own recipe below. An administrator's verb:
+# `beet admin -- deployer/mint` is the one-code path, and an admin pair in the
+# environment also wins over the document. `--dry-run` WRITES nothing but still
+# renders, so it needs a credential that answers `sts:GetCallerIdentity` -- just
+# not an administrator -- and its preview omits the boundary conditions, which
+# are an account read it skips. `infra,extra` is not optional here: without them
+# `<DeployerMint/>` is `bx:cfg`-excluded and the verb does not exist.
 beet-mint *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
 # The same for the SITE entry's apps (`beet-site--*`, `beet-social--prod`). A

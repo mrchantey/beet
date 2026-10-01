@@ -10,9 +10,19 @@ use serde_json::Value;
 /// Request params for [`DeployerMint`], surfaced in `--help`.
 #[derive(Reflect)]
 struct MintParams {
-	/// Print the user, the policy documents and what would change, touching
-	/// neither the account nor the document. The documents are the response,
-	/// so a one-shot pipes them.
+	/// Print the user and the policy documents, WRITING to neither the account
+	/// nor the document. The documents are the response, so a one-shot pipes
+	/// them.
+	///
+	/// It still READS: the stacks render first, which resolves the state
+	/// backend, so this needs a credential that answers
+	/// `sts:GetCallerIdentity` even though it needs no administrator.
+	///
+	/// And the documents it prints are a FLOOR rather than the whole: whether a
+	/// deploy policy may carry the boundary conditions is an account read this
+	/// skips, so a preview shows `IrreversibleNeedsMfa` and never
+	/// `IamOnlyUnderTheBoundary`, `NeverUncap` or `NeverMintOrRewriteACap`.
+	/// Read a live policy to see those.
 	dry_run: bool,
 	/// Mint a fresh access key even when the document already holds a working
 	/// one, and delete the key it replaces: this is the rotation.
