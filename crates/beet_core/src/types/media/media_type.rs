@@ -137,8 +137,9 @@ pub enum MediaType {
 	/// `text/ansi-term`, plaintext annotated with
 	/// Ansi escape sequences for pretty terminal output
 	AnsiTerm,
-	/// An unrecognized media type.
-	Other(String),
+	/// An unrecognized media type, which must not be an exact
+	/// match for the content type of any other variant
+	Other(SmolStr),
 }
 
 impl MediaType {
