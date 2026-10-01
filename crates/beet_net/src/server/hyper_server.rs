@@ -58,10 +58,13 @@ impl HttpServer {
 		// when canonical
 		Listening::register(&entity, addr).await?;
 
+		// the declared caps and their shared permits, resolved once
+		let guard = ServerGuard::resolve(&entity).await?;
+
 		// race the accept loop against the shutdown signal: signalling drops the loop
 		// future, releasing the listener so the port closes (the mini server pattern).
 		beet_core::exports::futures_lite::future::or(
-			hyper_accept_loop(entity, listener, tls),
+			hyper_accept_loop(entity, listener, tls, guard),
 			async move {
 				shutdown.wait().await;
 				Result::Ok(())
@@ -81,6 +84,7 @@ async fn hyper_accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
+	guard: ServerGuard,
 ) -> Result {
 	loop {
 		let (tcp, addr) = match listener.accept().await {
@@ -93,9 +97,12 @@ async fn hyper_accept_loop(
 		trace!("New connection from: {}", addr);
 
 		let tls = tls.clone();
+		let guard = guard.clone();
 		entity
 			.run_async_local(async move |entity| {
-				if let Err(err) = serve_sniffed(entity, tcp, addr, tls).await {
+				if let Err(err) =
+					serve_sniffed(entity, tcp, addr, tls, guard).await
+				{
 					error!("Error handling connection from {addr}: {err}");
 				}
 			})
@@ -113,6 +120,7 @@ async fn serve_sniffed(
 	tcp: async_io::Async<std::net::TcpStream>,
 	addr: SocketAddr,
 	tls: MaybeTls,
+	guard: ServerGuard,
 ) -> Result {
 	use stream_sniff::SecureProtocol;
 	let (protocol, replay) = SecureProtocol::sniff(tcp).await?;
@@ -125,13 +133,13 @@ async fn serve_sniffed(
 						.unwrap_or_else(stream_sniff::tls_required_response);
 				return stream_sniff::write_and_close(replay, response).await;
 			}
-			serve_connection(entity, replay, addr).await
+			serve_connection(entity, replay, addr, guard).await
 		}
 		SecureProtocol::Tls => {
 			#[cfg(feature = "secure")]
 			if let Some(server_tls) = tls.get() {
 				let tls_stream = server_tls.accept(replay).await?;
-				return serve_connection(entity, tls_stream, addr).await;
+				return serve_connection(entity, tls_stream, addr, guard).await;
 			}
 			debug!("TLS ClientHello on a plaintext listener, dropping");
 			Ok(())
@@ -144,6 +152,7 @@ async fn serve_connection<S>(
 	entity: AsyncEntity,
 	stream: S,
 	addr: SocketAddr,
+	guard: ServerGuard,
 ) -> Result
 where
 	S: 'static + Send + Unpin + futures::AsyncRead + futures::AsyncWrite,
@@ -152,6 +161,7 @@ where
 	// pass an AsyncEntity to the service_fn
 	let service = service_fn(move |mut req| {
 		let entity = entity.clone();
+		let guard = guard.clone();
 
 		async move {
 			// grab the upgrade future before consuming the request; if
@@ -159,7 +169,22 @@ where
 			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 			let on_upgrade = hyper::upgrade::on(&mut req);
 			let req = hyper_to_request(req, addr).await;
+			// one of the server's permits for the life of the build (see
+			// [`ServerLimits::max_in_flight`]). Per REQUEST, not per
+			// connection: http1 keep-alive means a connection outlives its
+			// request, and a permit held across the idle gap would starve
+			// the listener on a handful of browser tabs.
+			let Some(permit) = guard.dispatch().await else {
+				warn!("{addr} waited out the dispatch limit, answering 503");
+				return response_to_hyper(
+					HttpError::from_status(StatusCode::SERVICE_UNAVAILABLE)
+						.xmap(Response::from),
+				)
+				.await
+				.xok::<Infallible>();
+			};
 			let res = entity.exchange_child(req).await;
+			drop(permit);
 			#[cfg(all(feature = "tungstenite", not(target_arch = "wasm32")))]
 			if http_ext::is_websocket_response(&res) {
 				spawn_hyper_upgrade(entity, on_upgrade).await;

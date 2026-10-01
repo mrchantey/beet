@@ -176,6 +176,36 @@ pub fn tls_required_response() -> Vec<u8> {
 	.into_bytes()
 }
 
+/// A `413` for a request whose `content-length` exceeds the server's
+/// [`ServerLimits::max_body_bytes`](crate::prelude::ServerLimits::max_body_bytes), written before a byte of the body is read:
+/// the declared length is the one number a client picks, so it is refused
+/// rather than believed.
+pub fn payload_too_large_response(limit: usize) -> Vec<u8> {
+	let body =
+		format!("request body exceeds the server limit of {limit} bytes\n");
+	format!(
+		"HTTP/1.1 413 Content Too Large\r\n\
+		content-type: text/plain; charset=utf-8\r\n\
+		content-length: {}\r\n\
+		connection: close\r\n\r\n{body}",
+		body.len()
+	)
+	.into_bytes()
+}
+/// A `503` for a request whose wait for a dispatch permit expired (see
+/// [`ServerLimits::dispatch_timeout`](crate::prelude::ServerLimits::dispatch_timeout)).
+pub fn service_unavailable_response() -> Vec<u8> {
+	let body = "server is at its in-flight request limit, retry shortly\n";
+	format!(
+		"HTTP/1.1 503 Service Unavailable\r\n\
+		content-type: text/plain; charset=utf-8\r\n\
+		content-length: {}\r\n\
+		connection: close\r\n\r\n{body}",
+		body.len()
+	)
+	.into_bytes()
+}
+
 /// The page a socket listener serves to a plain browser `GET` (no websocket
 /// upgrade). Over TLS this doubles as the cert-acceptance step: browsers show
 /// no acceptance UI for a failed `wss://` handshake, so visiting the socket

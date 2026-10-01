@@ -134,6 +134,17 @@ impl LightsailBlock {
 	/// today and a box built next month are the same box. Bump deliberately.
 	pub const CADDY_VERSION: &'static str = "2.11.4";
 
+	/// How many CONSECUTIVE passes the release gate needs before it calls a box
+	/// served.
+	///
+	/// One pass is luck. The gate's checks are cheap and a crash-looping or
+	/// half-built app answers some of them some of the time: prod's own first
+	/// ten seconds after a deploy have alternated `200` and `500` on the very
+	/// route the gate polls, which a single lucky poll reports as success. Three
+	/// in a row spans two poll intervals, so it costs ten seconds on a healthy
+	/// box and catches that shape.
+	pub const RELEASE_STREAK: u32 = 3;
+
 	/// The prefix in the repo bucket Caddy's certificate store is saved
 	/// under, beside the versions and the release pointer.
 	///
@@ -340,6 +351,27 @@ impl LightsailBlock {
 	/// changes. If it changes per deploy it belongs on the release pointer, not
 	/// in this script.
 	///
+	/// ## Surviving a spike
+	///
+	/// The box is 1913 MB with no swap, so there is no headroom and no graceful
+	/// degradation: the kernel's only move under pressure is to kill the largest
+	/// process, which is always the app, and on 2026-09-30 it did. Three pieces
+	/// answer that, all machine config and so all costing a rebuild:
+	///
+	/// - a **swapfile**, so a spike degrades into slowness rather than a kill;
+	/// - **`MemoryHigh` / `MemoryMax` / `MemorySwapMax`** on the unit, so an
+	///   overrun reclaims, then spills into a bounded slice of the swapfile, and
+	///   finally takes THIS unit alone (restarted in `RestartSec`) rather than
+	///   the kernel choosing a victim and possibly taking Caddy or the
+	///   management ssh daemon with it. The ceiling sits well above the app's
+	///   honest peak (~560 MB under
+	///   [`ServerLimits`](beet_net::prelude::ServerLimits)) and well below the
+	///   box's total, so it bites only on a real fault, and the swap slice is
+	///   bounded so a runaway dies in seconds instead of thrashing indefinitely;
+	/// - the **per-minute sampler** of [`memory_script`](Self::memory_script),
+	///   so the next occurrence is a curve rather than a single number printed by
+	///   the kernel as it kills.
+	///
 	/// `refs` are the terraform interpolation expressions the script carries
 	/// (ie `${aws_iam_access_key.xxx.id}`), resolved by terraform before the
 	/// script runs on the instance.
@@ -507,6 +539,62 @@ systemctl enable caddy
 			)
 		};
 
+		// Survive a spike instead of being killed by one, and leave a reading
+		// behind either way. The box is 1913 MB with no swap by default, so
+		// there is no headroom and no graceful degradation: the kernel's only
+		// move is to kill the largest process, which is always the app. All
+		// three pieces are MACHINE config and so cost a rebuild (see the rebuild
+		// rule above) — they are here rather than hand-installed because a
+		// hand-installed drop-in is lost at the next rebuild, which is exactly
+		// when it is most wanted.
+		let memory_script = self.memory_script(stack);
+		let memory_setup = format!(
+			r#"
+# a swapfile, so a spike degrades into slowness rather than a kill
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+# a safety net, not a routine path: the app should be resident
+echo 'vm.swappiness=10' > /etc/sysctl.d/90-{app_name}-swappiness.conf
+sysctl -p /etc/sysctl.d/90-{app_name}-swappiness.conf >/dev/null
+
+# the per-minute memory sampler and its timer
+cat > /usr/local/bin/{app_name}-mem <<'MEM_EOF'
+{memory_script}
+MEM_EOF
+chmod +x /usr/local/bin/{app_name}-mem
+
+cat > /etc/systemd/system/{app_name}-mem.service <<'MEM_UNIT_EOF'
+[Unit]
+Description=Sample {app_name}'s memory
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/{app_name}-mem
+StandardOutput=append:/var/log/{app_name}-mem.log
+StandardError=append:/var/log/{app_name}-mem.log
+MEM_UNIT_EOF
+
+cat > /etc/systemd/system/{app_name}-mem.timer <<'MEM_TIMER_EOF'
+[Unit]
+Description=Sample {app_name}'s memory every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+MEM_TIMER_EOF
+systemctl daemon-reload
+systemctl enable --now {app_name}-mem.timer
+"#
+		);
+
 		// build CloudWatch agent setup for log forwarding; the log group matches
 		// `AwsWatch::for_lightsail` so `watch` tails the same group.
 		//
@@ -544,6 +632,14 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
             "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
             "timezone": "UTC",
             "multi_line_start_pattern": "{{timestamp_format}}"
+          }},
+          {{
+            "file_path": "/var/log/{app_name}-mem.log",
+            "log_group_name": "{log_group}",
+            "log_stream_name": "{app_name}-mem",
+            "retention_in_days": 30,
+            "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
+            "timezone": "UTC"
           }}
         ]
       }}
@@ -611,6 +707,11 @@ ExecStart=/usr/local/bin/{app_name}-run
 WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3
+# this unit's own ceiling (see the block): reclaim at High, swap a little past
+# Max, cgroup kill once SwapMax is gone too
+MemoryHigh=900M
+MemoryMax=1300M
+MemorySwapMax=512M
 StandardOutput=append:/var/log/{app_name}.log
 StandardError=append:/var/log/{app_name}.log
 Environment=RUST_LOG=info
@@ -621,7 +722,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now {app_name}.service
-{https_setup}{cloudwatch_setup}"#
+{https_setup}{memory_setup}{cloudwatch_setup}"#
 		);
 
 		// build env var lines for terraform variable references
@@ -716,6 +817,39 @@ touch /etc/__APP__/deploy.env
 				),
 				("__ARTIFACT_KEY_VAR__", ArtifactLedger::ARTIFACT_KEY_VAR),
 			],
+		)
+	}
+
+	/// The memory sampler installed at `/usr/local/bin/<app>-mem` and run every
+	/// minute by its own timer: one line per minute of the unit's resident set,
+	/// its peak, what the box has left, and the release it is running.
+	///
+	/// A creep and a spike look nothing alike at one-minute resolution and
+	/// identical in hindsight without it. When `beet.org` was OOM-killed on
+	/// 2026-09-30 the only memory figure that existed anywhere was the one the
+	/// kernel printed as it killed, which is why the cause took a reproduction
+	/// rather than a reading. The line is forwarded to CloudWatch beside the app
+	/// log, so the curve reads without a shell on the box, and `/var/log` is
+	/// append-only across restarts, so the minutes BEFORE a kill survive it.
+	fn memory_script(&self, stack: &ResolvedStack) -> String {
+		Self::render_script(
+			r#"#!/bin/bash
+# Sample the unit's memory. One line, parseable, timestamped like the app log.
+set -uo pipefail
+pid=$(systemctl show __APP__ -p MainPID --value)
+# not running: the next sample says so rather than this one lying
+if [ "${pid:-0}" = 0 ] || [ ! -r "/proc/$pid/status" ]; then exit 0; fi
+rss=$(sed -n 's/^VmRSS:[[:space:]]*\([0-9]*\).*/\1/p' "/proc/$pid/status")
+hwm=$(sed -n 's/^VmHWM:[[:space:]]*\([0-9]*\).*/\1/p' "/proc/$pid/status")
+avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
+swap=$(awk '/^SwapFree:/ {print $2}' /proc/meminfo)
+restarts=$(systemctl show __APP__ -p NRestarts --value)
+# the leak is always on a specific artifact, so every sample names its own
+deploy=$(sed -n 's/^BEET_DEPLOY_ID=//p' /etc/__APP__/deploy.env 2>/dev/null | tail -1)
+echo "$(date -u +%Y-%m-%dT%H:%M:%S.000Z) mem rss_kb=${rss:-0} hwm_kb=${hwm:-0} avail_kb=${avail:-0} swapfree_kb=${swap:-0} restarts=${restarts:-0} deploy=${deploy:-unknown}"
+"#,
+			stack,
+			&[],
 		)
 	}
 
@@ -865,7 +999,10 @@ systemctl restart "$unit" >&2 || true"#,
 		poll: Duration,
 	) -> String {
 		let poll_secs = poll.as_secs().max(1);
-		let attempts = (timeout.as_secs() / poll_secs).max(1);
+		// at least the streak, so a tight budget cannot make the gate
+		// unpassable by running out of attempts before it can be satisfied
+		let attempts =
+			(timeout.as_secs() / poll_secs).max(Self::RELEASE_STREAK as u64);
 		Self::render_script(
 			r#"#!/bin/bash
 # Make the unit run what the stores now hold, and prove the process now running
@@ -910,6 +1047,9 @@ fi
 
 __RESTART__
 
+# the gate is __STREAK__ CONSECUTIVE passes: one is luck (see RELEASE_STREAK),
+# and a failed attempt starts the count again rather than discounting it
+streak=0
 for _ in $(seq 1 __ATTEMPTS__); do
 	# read the restart counter first, so the comparison spans every check below
 	# and any restart during the attempt invalidates it
@@ -918,13 +1058,18 @@ for _ in $(seq 1 __ATTEMPTS__); do
 		identity_ok &&
 		serves &&
 		[ "$(restarts)" = "$before" ]; then
-		echo "__SUCCESS__"
-		exit 0
+		streak=$((streak + 1))
+		if [ "$streak" -ge __STREAK__ ]; then
+			echo "__SUCCESS__"
+			exit 0
+		fi
+	else
+		streak=0
 	fi
 	sleep __POLL__
 done
 
-echo "beet: $unit never served a request on port __APP_PORT__ __FAILURE__" >&2
+echo "beet: $unit never served __STREAK__ consecutive requests on port __APP_PORT__ __FAILURE__" >&2
 systemctl status "$unit" --no-pager --lines=40 >&2 || true
 exit 1
 "#,
@@ -935,6 +1080,7 @@ exit 1
 				("__SUCCESS__", success),
 				("__FAILURE__", failure),
 				("__ATTEMPTS__", &attempts.to_string()),
+				("__STREAK__", &Self::RELEASE_STREAK.to_string()),
 				("__POLL__", &poll_secs.to_string()),
 				("__APP_PORT__", &self.app_port().to_string()),
 				(
@@ -1402,6 +1548,32 @@ mod tests {
 	}
 
 	/// The rendered terraform config json for a block.
+	/// The box survives a spike and leaves a reading behind: a swapfile, a
+	/// ceiling on the app's own unit, and a per-minute sampler whose line is
+	/// forwarded beside the app log.
+	///
+	/// On 2026-09-30 prod was OOM-killed with 1913 MB, no swap, no ceiling and
+	/// no sampler, so the kernel picked the victim and the only memory figure
+	/// that existed anywhere was the one it printed on the way out.
+	#[beet_core::test]
+	fn the_box_degrades_rather_than_being_killed() {
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		let script = script.as_str();
+		// a spike has somewhere to go
+		script.xpect_contains("mkswap /swapfile");
+		script.xpect_contains("/swapfile none swap sw 0 0");
+		// and the app alone is what gives way
+		script.xpect_contains("MemoryMax=");
+		script.xpect_contains("MemorySwapMax=");
+		// sampled every minute, into its own forwarded stream
+		script.xpect_contains("beet_infra-mem.timer");
+		script.xpect_contains("OnUnitActiveSec=1min");
+		script.xpect_contains("/var/log/beet_infra-mem.log");
+		script.xpect_contains("\"log_stream_name\": \"beet_infra-mem\"");
+		// every sample names the artifact it belongs to
+		script.xpect_contains("BEET_DEPLOY_ID=");
+	}
+
 	fn build_json(block: &LightsailBlock) -> String {
 		let (scope, _dir) = render_block(block);
 		scope.finish().unwrap().2.to_json_string().unwrap()
@@ -1644,6 +1816,45 @@ mod tests {
 				"${key_id",
 				"${key_secret",
 			]);
+	}
+
+	/// The gate needs [`RELEASE_STREAK`](LightsailBlock::RELEASE_STREAK)
+	/// CONSECUTIVE passes, and a failed attempt starts the count again.
+	///
+	/// One pass is luck: prod's own first ten seconds after a deploy have
+	/// alternated `200` and `500` on the very route the gate polls, and a single
+	/// lucky poll reports that as a served box. A tight budget must not make the
+	/// streak unreachable either, so the attempt count never falls below it.
+	#[beet_core::test]
+	fn the_release_gate_needs_consecutive_passes() {
+		let (stack, _deployment, _dir) = ResolvedStack::default_local();
+		let streak = LightsailBlock::RELEASE_STREAK.to_string();
+		LightsailBlock::default()
+			.release_script(
+				&stack,
+				"my-deploy-id",
+				false,
+				Duration::from_secs(60),
+				Duration::from_secs(5),
+			)
+			.as_str()
+			.xpect_contains("streak=0")
+			.xpect_contains("streak=$((streak + 1))")
+			.xpect_contains(&format!("[ \"$streak\" -ge {streak} ]"))
+			.xpect_contains(&format!(
+				"never served {streak} consecutive requests"
+			));
+		// a budget smaller than the streak still leaves it reachable
+		LightsailBlock::default()
+			.release_script(
+				&stack,
+				"my-deploy-id",
+				false,
+				Duration::from_secs(1),
+				Duration::from_secs(5),
+			)
+			.as_str()
+			.xpect_contains(&format!("seq 1 {streak}"));
 	}
 
 	/// The release step proves the RUNNING process carries the deploy's id,

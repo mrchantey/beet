@@ -55,6 +55,12 @@ pub use http_server::*;
 mod server_params;
 pub use server_params::*;
 
+// The caps every accepted connection is served under, so peak memory is a
+// property of the declaration rather than of the traffic. Plain data, so an
+// embedded host declares the same limits its own backend reads.
+mod server_limits;
+pub use server_limits::*;
+
 // The request a schedule delivers to a serverless invoke: the one shape a
 // deploy declaration renders and an adapter dispatches. Action-free and
 // transport-free (a plain `Request` factory), so the block that renders it

@@ -61,13 +61,17 @@ impl HttpServer {
 		// when canonical
 		Listening::register(&entity, addr).await?;
 
+		// the declared caps and their shared permits, resolved once: every
+		// connection below is served under this one guard
+		let guard = ServerGuard::resolve(&entity).await?;
+
 		// race the accept loop against the shutdown signal: when teardown signals,
 		// the loop future is dropped, releasing the listener so the port closes. The
 		// per-connection tasks are spawned, so this is a minimal drain — in-flight
 		// requests finish on their own (or are cut by process exit when nothing else
 		// holds the process up).
 		let served = beet_core::exports::futures_lite::future::or(
-			accept_loop(entity, listener, tls),
+			accept_loop(entity, listener, tls, guard),
 			async move {
 				shutdown.wait().await;
 				Result::Ok(())
@@ -91,6 +95,7 @@ async fn accept_loop(
 	entity: AsyncEntity,
 	listener: async_io::Async<std::net::TcpListener>,
 	tls: MaybeTls,
+	guard: ServerGuard,
 ) -> Result {
 	loop {
 		let accept_result = listener.accept().await;
@@ -103,10 +108,11 @@ async fn accept_loop(
 		};
 
 		let tls = tls.clone();
+		let guard = guard.clone();
 		entity
 			.run_async(async move |entity| {
 				if let Err(err) =
-					serve_sniffed(entity, stream, peer_addr, tls).await
+					serve_sniffed(entity, stream, peer_addr, tls, guard).await
 				{
 					error!("Error handling connection from {peer_addr}: {err}");
 				}
@@ -126,6 +132,7 @@ async fn serve_sniffed(
 	stream: async_io::Async<std::net::TcpStream>,
 	peer_addr: SocketAddr,
 	tls: MaybeTls,
+	guard: ServerGuard,
 ) -> Result {
 	use stream_sniff::SecureProtocol;
 	let (protocol, replay) = SecureProtocol::sniff(stream).await?;
@@ -138,19 +145,25 @@ async fn serve_sniffed(
 						.unwrap_or_else(stream_sniff::tls_required_response);
 				return stream_sniff::write_and_close(replay, response).await;
 			}
-			handle_connection(entity, replay, peer_addr).await
+			handle_connection(entity, replay, peer_addr, guard).await
 		}
 		SecureProtocol::Tls => {
 			#[cfg(feature = "secure")]
 			if let Some(server_tls) = tls.get() {
 				let tls_stream = server_tls.accept(replay).await?;
-				return handle_connection(entity, tls_stream, peer_addr).await;
+				return handle_connection(entity, tls_stream, peer_addr, guard)
+					.await;
 			}
 			debug!("TLS ClientHello on a plaintext listener, dropping");
 			Ok(())
 		}
 	}
 }
+
+/// How much of a request body [`handle_connection`] reads per step, so the
+/// buffer grows with the bytes that arrive rather than with the length the
+/// client declared.
+const BODY_READ_CHUNK: usize = 8192;
 
 /// Handle a single HTTP connection: read the request, dispatch it,
 /// and write the response. Generic over the transport so the sniffed
@@ -159,6 +172,7 @@ async fn handle_connection<S>(
 	entity: AsyncEntity,
 	mut stream: S,
 	peer_addr: SocketAddr,
+	guard: ServerGuard,
 ) -> Result
 where
 	S: 'static
@@ -178,29 +192,35 @@ where
 	}
 	buf.truncate(bytes_read);
 
-	// Check if we need to read more bytes based on Content-Length
+	// Read the rest of the body the headers declare, under the server's cap.
+	//
+	// The declared `content-length` is the one number a client picks, so it is
+	// refused rather than believed, and the buffer grows as bytes ARRIVE rather
+	// than to the declared length: a single `Content-Length: 2000000000` with no
+	// body at all used to allocate and zero two gigabytes, which is one request
+	// and an OOM kill on any box beet deploys to.
 	let header_end = http_ext::find_header_end(&buf);
-	if let Some(header_end_pos) = header_end {
-		let content_length =
-			http_ext::parse_content_length(&buf[..header_end_pos]);
-		if content_length > 0 {
-			let body_start = header_end_pos;
-			let body_received = buf.len() - body_start;
-			let remaining = content_length.saturating_sub(body_received);
-			if remaining > 0 {
-				buf.resize(body_start + content_length, 0);
-				let mut total_read = body_received;
-				while total_read < content_length {
-					let read_count = stream
-						.read(&mut buf[body_start + total_read..])
-						.await?;
-					if read_count == 0 {
-						break;
-					}
-					total_read += read_count;
-				}
-				buf.truncate(body_start + total_read);
+	if let Some(body_start) = header_end {
+		let content_length = http_ext::parse_content_length(&buf[..body_start]);
+		if content_length > guard.max_body_bytes() {
+			let response = stream_sniff::payload_too_large_response(
+				guard.max_body_bytes(),
+			);
+			return stream_sniff::write_and_close(stream, response).await;
+		}
+		let mut total_read = buf.len() - body_start;
+		while total_read < content_length {
+			let want = (content_length - total_read).min(BODY_READ_CHUNK);
+			let at = buf.len();
+			// `truncate` keeps the capacity, so a steady stream re-uses this
+			// grow rather than reallocating per chunk
+			buf.resize(at + want, 0);
+			let read_count = stream.read(&mut buf[at..]).await?;
+			buf.truncate(at + read_count);
+			if read_count == 0 {
+				break;
 			}
+			total_read += read_count;
 		}
 	}
 
@@ -210,8 +230,22 @@ where
 		.with_header_raw(PEER_ADDR_HEADER, &peer_addr.to_string());
 	let is_head = request.method() == &HttpMethod::Head;
 
-	// Dispatch through the router child
+	// Dispatch through the router child, holding one of the server's permits
+	// for as long as the build runs: a page build is megabytes while it is in
+	// flight, so this is what bounds peak memory to
+	// [`ServerLimits::max_in_flight`] times the cost of the dearest route,
+	// whatever concurrency a client chooses. Taken HERE rather than around the
+	// connection, so a client slow to send its request line queues nothing.
+	let Some(permit) = guard.dispatch().await else {
+		warn!("{peer_addr} waited out the dispatch limit, answering 503");
+		return stream_sniff::write_and_close(
+			stream,
+			stream_sniff::service_unavailable_response(),
+		)
+		.await;
+	};
 	let response: Response = entity.exchange_child(request).await;
+	drop(permit);
 
 	// A `101 Switching Protocols` (a route returning `WebSocketUpgrade`) means we
 	// write the handshake then keep the raw stream as a `Socket`, instead of
@@ -387,6 +421,7 @@ mod secure_test {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_action::prelude::Action;
 
 	// -- integration test via shared suite --
 	// (pure parse/serialise unit tests live with the shared helpers in
@@ -473,6 +508,184 @@ mod test {
 		.await
 		.unwrap()
 		.xpect_eq(0);
+	}
+
+	/// Serve `handler` under `limits` on its own thread, returning the port a
+	/// raw client can speak bytes at. Shared by the limit cases below, which
+	/// assert on the wire rather than through a client that would normalise it.
+	fn serve_with(
+		limits: ServerLimits,
+		handler: Action<Request, Response>,
+	) -> u16 {
+		let (server, on_spawn) =
+			HttpServer::new_test(HttpServer::start_mini_with_tcp);
+		let port = server.port.unwrap();
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			app.world_mut()
+				.spawn((server, on_spawn, limits, children![handler]));
+			app.run();
+		});
+		port
+	}
+
+	/// Write `request` on a fresh connection and read the whole reply, which the
+	/// mini server terminates by closing.
+	async fn raw_exchange(port: u16, request: &[u8]) -> String {
+		use futures_lite::AsyncReadExt;
+		use futures_lite::AsyncWriteExt;
+		let mut client = async_io::Async::<std::net::TcpStream>::connect((
+			[127, 0, 0, 1],
+			port,
+		))
+		.await
+		.unwrap();
+		client.write_all(request).await.unwrap();
+		client.flush().await.unwrap();
+		let mut reply = Vec::new();
+		client.read_to_end(&mut reply).await.unwrap();
+		String::from_utf8_lossy(&reply).to_string()
+	}
+
+	/// A declared body length over the cap is answered `413` before a byte of
+	/// the body is read or allocated.
+	///
+	/// The read used to `resize` its buffer to whatever `content-length` said,
+	/// so one request carrying `Content-Length: 2000000000` and no body at all
+	/// allocated and zeroed two gigabytes. Live, `beet.org` had 1913 MB and no
+	/// swap, which made that a one-request kill. The client here sends no body,
+	/// so being answered at all is the proof.
+	#[beet_core::test]
+	async fn an_oversized_body_length_is_refused_unread() {
+		let port = serve_with(
+			ServerLimits {
+				max_body_bytes: 64,
+				..default()
+			},
+			exchange_ext::handler(|_| Response::ok()),
+		);
+		raw_exchange(
+			port,
+			b"POST / HTTP/1.1\r\nhost: x\r\ncontent-length: 2000000000\r\n\r\n",
+		)
+		.await
+		.xpect_starts_with("HTTP/1.1 413");
+	}
+
+	/// A body inside the cap still arrives whole, so the incremental read that
+	/// replaced the declared-length `resize` did not break the body path.
+	#[beet_core::test]
+	async fn a_body_inside_the_cap_arrives_whole() {
+		let port = serve_with(
+			ServerLimits::default(),
+			exchange_ext::handler(|cx| {
+				Response::ok().with_body(cx.take().body)
+			}),
+		);
+		raw_exchange(
+			port,
+			b"POST / HTTP/1.1\r\nhost: x\r\ncontent-length: 11\r\n\r\nhello world",
+		)
+		.await
+		.xpect_ends_with("hello world");
+	}
+
+	/// A wait for a permit that expires is answered `503` rather than hanging.
+	///
+	/// The valve on the one way the cap could wedge a server: a handler that
+	/// calls its own server holds a permit while it waits for a second one, so
+	/// the wait has to end in an answer. Here the first client holds the only
+	/// permit for longer than the second will wait.
+	#[beet_core::test]
+	async fn a_request_that_waits_out_the_cap_is_answered() {
+		let port = serve_with(
+			ServerLimits {
+				max_in_flight: 1,
+				dispatch_timeout: Duration::from_millis(100),
+				..default()
+			},
+			exchange_ext::handler_async(|_| async move {
+				time_ext::sleep_millis(1500).await;
+				Response::ok()
+			}),
+		);
+		// zipped, not awaited in turn: a future does nothing until polled, so
+		// awaiting the first to completion would hand the second a free permit
+		let (first, second) = futures_lite::future::zip(
+			raw_exchange(port, b"GET / HTTP/1.1\r\nhost: x\r\n\r\n"),
+			raw_exchange(port, b"GET / HTTP/1.1\r\nhost: x\r\n\r\n"),
+		)
+		.await;
+		// whichever wins the permit is answered `200` and the other `503`, so
+		// assert on the pair rather than on an order the scheduler picks
+		let mut answers = vec![first, second];
+		answers.sort();
+		let [served, refused] = answers.try_into().unwrap();
+		served.xpect_starts_with("HTTP/1.1 200");
+		refused.xpect_starts_with("HTTP/1.1 503");
+	}
+
+	/// At most [`ServerLimits::max_in_flight`] requests are dispatched at once,
+	/// whatever concurrency the client chooses. This is what bounds peak memory,
+	/// since a page build holds megabytes for as long as it runs: around a
+	/// hundred concurrent requests for one unmatched path killed `beet.org`, and
+	/// is what an ordinary vulnerability scanner does by default.
+	#[beet_core::test]
+	async fn the_dispatch_cap_bounds_concurrent_builds() {
+		use futures_lite::AsyncReadExt;
+		use futures_lite::AsyncWriteExt;
+		const CAP: usize = 3;
+		const CLIENTS: usize = 12;
+		// one entry per handler currently inside the dispatch, and the count
+		// each entry saw on the way in
+		let live = Store::<Vec<()>>::default();
+		let seen = Store::<Vec<usize>>::default();
+		let (entered, observed) = (live.clone(), seen.clone());
+		let port = serve_with(
+			ServerLimits {
+				max_in_flight: CAP,
+				..default()
+			},
+			exchange_ext::handler_async(move |_| {
+				let (entered, observed) = (entered.clone(), observed.clone());
+				async move {
+					entered.push(());
+					observed.push(entered.len());
+					// held long enough that an unbounded server would have
+					// every client inside the handler at once
+					time_ext::sleep_millis(50).await;
+					entered.pop();
+					Response::ok()
+				}
+			}),
+		);
+
+		// every request on the wire before any reply is read, so the server is
+		// offered all of them at once
+		let mut clients = Vec::new();
+		for _ in 0..CLIENTS {
+			let mut client = async_io::Async::<std::net::TcpStream>::connect((
+				[127, 0, 0, 1],
+				port,
+			))
+			.await
+			.unwrap();
+			client
+				.write_all(b"GET / HTTP/1.1\r\nhost: x\r\n\r\n")
+				.await
+				.unwrap();
+			client.flush().await.unwrap();
+			clients.push(client);
+		}
+		for mut client in clients {
+			let mut reply = Vec::new();
+			client.read_to_end(&mut reply).await.unwrap();
+			String::from_utf8_lossy(&reply).xpect_starts_with("HTTP/1.1 200");
+		}
+		// every client was served, and never more than the cap at a time
+		seen.len().xpect_eq(CLIENTS);
+		seen.get().into_iter().max().xpect_eq(Some(CAP));
 	}
 
 	#[cfg(feature = "ureq")]

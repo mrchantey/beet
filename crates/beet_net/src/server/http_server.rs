@@ -111,7 +111,7 @@ impl Listening {
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[component(on_add = hook_ext::component_hook(HttpServer::add_facet))]
-#[require(ExchangeStats)]
+#[require(ExchangeStats, ServerLimits)]
 pub struct HttpServer {
 	/// The port the server listens on. `None` means the OS will assign
 	/// an available port (equivalent to binding to port `0`).
