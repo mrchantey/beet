@@ -707,8 +707,10 @@ mod test {
 		body.contains("about").xpect_false();
 	}
 
+	/// A miss at the root points at the root help, and does not list it: the
+	/// listing is `?help`/`--help`'s job alone (see `NotFoundPage`).
 	#[beet_core::test]
-	async fn not_found_shows_ancestor_help() {
+	async fn not_found_points_at_the_root_help() {
 		router_world()
 			.spawn((Router::with_defaults(), children![Increment::bundle(
 				FieldRef::new("count")
@@ -719,11 +721,15 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("not found")
+			.xpect_contains("/?help")
+			.xnot()
 			.xpect_contains("Available routes");
 	}
 
+	/// A miss UNDER a scene route points at that route's help rather than the
+	/// root's, so the link lands on the help that covers it.
 	#[beet_core::test]
-	async fn not_found_shows_scoped_ancestor_help() {
+	async fn not_found_points_at_the_nearest_ancestor_help() {
 		router_world()
 			.spawn((Router::with_defaults(), children![
 				(
@@ -743,6 +749,9 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("not found")
+			.xpect_contains("/counter?help")
+			// neither the ancestor's routes nor its siblings are listed here
+			.xnot()
 			.xpect_contains("increment")
 			.xnot()
 			.xpect_contains("about");

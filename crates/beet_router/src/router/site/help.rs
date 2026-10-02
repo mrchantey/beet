@@ -2,11 +2,12 @@
 //!
 //! When the `--help` (or `?help`) param is present, [`HelpHandler`] collects the
 //! scoped [`RouteTree`] into [`RouteEntry`] rows and renders the [`RouteList`]
-//! template. [`ContextualNotFound`] renders the same template for an unmatched
-//! path, prefixed with a not-found notice. Both go through
-//! [`PageRoot::render`], so an ancestor layout (the document chrome) wraps the
-//! list exactly like any other route, and the one template serves both the CLI
-//! `--help` and the web `?help` view.
+//! template. That listing has exactly one home: an unmatched path gets
+//! [`ContextualNotFound`]'s small [`NotFoundPage`], which names the miss and
+//! links here rather than enumerating the url space to whoever asked. Both go
+//! through [`PageRoot::render`], so an ancestor layout (the document chrome)
+//! wraps them exactly like any other route, and the one listing serves both the
+//! CLI `--help` and the web `?help` view.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -55,8 +56,7 @@ pub async fn HelpHandler(
 		false => Vec::new(),
 	};
 
-	let root =
-		spawn_route_list(&caller, &parts, None, entries, prescans).await?;
+	let root = spawn_route_list(&caller, &parts, entries, prescans).await?;
 	PageRoot::render(root, &caller, parts).await
 }
 
@@ -80,46 +80,41 @@ async fn prescan_entries(caller: &AsyncEntity) -> Result<Vec<PrescanEntry>> {
 		.xok()
 }
 
-/// Fallback handler that renders the [`RouteList`] scoped to the nearest ancestor
-/// scene route of an unmatched path, prefixed with a not-found notice. Returns a
-/// `NOT_FOUND` status.
+/// Fallback handler for an unmatched path: renders the small [`NotFoundPage`],
+/// pointing at the help of the nearest ancestor scene route, with a `NOT_FOUND`
+/// status.
+///
+/// It does NOT render the listing itself. See [`NotFoundPage`] for why.
 #[action]
 pub(crate) async fn ContextualNotFound(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let path = cx.input.path().clone();
 
-	let (notice, entries) = cx
+	let notice = cx
 		.caller
 		.with_state::<AncestorQuery<&RouteTree>, Result<_>>(
 			move |entity, query| {
-				let tree = query.get(entity)?;
-				nearest_ancestor_help(tree, &path).xok()
+				nearest_ancestor_notice(query.get(entity)?, &path).xok()
 			},
 		)
 		.await??;
 
-	let root = spawn_route_list(
-		&cx.caller,
-		cx.input.parts(),
-		Some(notice),
-		entries,
-		Vec::new(),
-	)
-	.await?;
+	let root = spawn_not_found(&cx.caller, cx.input.parts(), notice).await?;
 	let mut response =
 		PageRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
 
-/// A not-found notice rendered above the [`RouteList`]: the path that missed and
-/// the nearest ancestor scene route whose help is shown, if any.
-#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+/// What [`NotFoundPage`] says: the path that missed, and the nearest ancestor
+/// scene route whose help to send the caller to, if any.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 pub struct NotFoundNotice {
 	/// The path that was not found.
 	pub not_found_path: String,
-	/// The nearest ancestor scene-route path whose help is shown, if any.
+	/// The nearest ancestor scene-route path whose help covers this miss, if
+	/// any. `None` sends the caller to the root help.
 	pub ancestor_path: Option<String>,
 }
 
@@ -164,18 +159,19 @@ pub(crate) struct RouteParam {
 }
 
 /// The help view: a material list of [`RouteEntry`] rows under an "Available
-/// routes" heading, optionally prefixed with a [`NotFoundNotice`] and, on the
-/// root help, followed by the [`PrescanEntry`] rows under "Before the build".
+/// routes" heading, followed on the root help by the [`PrescanEntry`] rows under
+/// "Before the build".
 ///
-/// One template for both the CLI `--help` and the web `?help`: the document
-/// chrome (head/sidebar/footer) is the ancestor layout's job, applied by
+/// One template for both the CLI `--help` and the web `?help`, and the ONE place
+/// the url space is enumerated: an unmatched path gets [`NotFoundPage`], which
+/// links here instead of repeating it. The document chrome
+/// (head/sidebar/footer) is the ancestor layout's job, applied by
 /// [`PageRoot::render`], so this widget only owns the route listing. The list is
 /// a bare fragment that inherits the page `Background`, not a `.card-filled`
 /// surface, so the help reads as the conservative app base — the same near-black
 /// page as the regular site — rather than a lighter, tinted card tone.
 #[template]
 pub fn RouteList(
-	notice: Option<NotFoundNotice>,
 	entries: Vec<RouteEntry>,
 	prescans: Vec<PrescanEntry>,
 ) -> impl Bundle {
@@ -183,7 +179,6 @@ pub fn RouteList(
 	let prescans = (!prescans.is_empty()).then(|| prescan_list(prescans));
 	rsx! {
 		<>
-			{notice.map(not_found_notice)}
 			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Available routes"</h2>
 			<ul>{items}</ul>
 			{prescans}
@@ -210,27 +205,40 @@ fn prescan_list(prescans: Vec<PrescanEntry>) -> impl Bundle {
 	}
 }
 
-/// The not-found preamble: the missing path linked, and the ancestor route whose
-/// help follows, if any.
-fn not_found_notice(notice: NotFoundNotice) -> impl Bundle {
+/// The not-found view: the path that missed, and one link to the route listing
+/// that covers it. Nothing else.
+///
+/// Deliberately small, and deliberately not the listing. This used to render the
+/// whole [`RouteList`], which made an unmatched path the dearest route on a site:
+/// `beet.org`'s 404 was a 147 KB document of 62 route rows, 13 MB of in-flight
+/// memory against 6.2 MB for a real page, and ~100 concurrent probes for one of
+/// them is what OOM-killed the box on 2026-09-30. It also handed every scanner a
+/// map of the url space for the cost of one wrong guess. The listing keeps one
+/// home, `?help` / `--help`, which this links to — scoped to the nearest
+/// ancestor scene route when there is one, so the link lands on the help that
+/// actually covers the miss.
+#[template]
+pub fn NotFoundPage(notice: NotFoundNotice) -> impl Bundle {
 	let not_found_href = format!("/{}", notice.not_found_path);
-	// when help is scoped to an ancestor scene route, name it; otherwise the
-	// notice ends at the plain "not found." after the missing-path link.
-	let scoped = notice.ancestor_path.map(|ancestor| {
-		let ancestor_href = format!("/{ancestor}");
-		rsx! {
-			" Showing help for "
-			<a href=ancestor_href.clone()>{ancestor_href}</a>
-			":"
-		}
-	});
+	// the help that covers this miss: the ancestor scene route's, else the root's
+	let (help_href, help_label) = match &notice.ancestor_path {
+		Some(ancestor) => (format!("/{ancestor}?help"), format!("/{ancestor}")),
+		None => ("/?help".to_string(), "this site".to_string()),
+	};
 	rsx! {
-		<p {Classes::new([classes::ERROR_TEXT])}>
-			"Route "
-			<a href=not_found_href.clone()>{not_found_href}</a>
-			" not found."
-			{scoped}
-		</p>
+		<>
+			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Not found"</h2>
+			<p {Classes::new([classes::ERROR_TEXT])}>
+				"Route "
+				<a href=not_found_href.clone()>{not_found_href}</a>
+				" not found."
+			</p>
+			<p>
+				"See the routes "
+				<a href=help_href>{format!("{help_label} serves")}</a>
+				"."
+			</p>
+		</>
 	}
 }
 
@@ -328,34 +336,50 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 async fn spawn_route_list(
 	caller: &AsyncEntity,
 	parts: &RequestParts,
-	notice: Option<NotFoundNotice>,
 	entries: Vec<RouteEntry>,
 	prescans: Vec<PrescanEntry>,
 ) -> Result<Entity> {
 	let parts = parts.clone();
 	caller
 		.world()
-		.with(move |world: &mut World| -> Result<Entity> {
-			// an `Option` prop takes the inner value at the call site (auto-`Some`)
-			// or is omitted (defaults to `None`); branch on the notice rather than
-			// passing the `Option` through.
-			let list = match notice {
-				Some(notice) => {
-					rsx! { <RouteList notice=notice entries=entries prescans=prescans/> }
-				}
-				None => rsx! { <RouteList entries=entries prescans=prescans/> },
-			};
-			let page = PageClasses::resolve(
+		.with(move |world: &mut World| {
+			spawn_page(
+				world,
 				&parts,
-				&world.resource::<Theme>().clone(),
-			);
-			let mut entity =
-				world.spawn_template(rsx! { <div {page}>{list}</div> })?;
-			let id = entity.id();
-			PageRoot::insert(&mut entity, vec![id]);
-			id.xok()
+				rsx! { <RouteList entries=entries prescans=prescans/> },
+			)
 		})
 		.await
+}
+
+/// Spawn the [`NotFoundPage`] the same way, so the small view wears the same
+/// chrome as the listing it links to.
+async fn spawn_not_found(
+	caller: &AsyncEntity,
+	parts: &RequestParts,
+	notice: NotFoundNotice,
+) -> Result<Entity> {
+	let parts = parts.clone();
+	caller
+		.world()
+		.with(move |world: &mut World| {
+			spawn_page(world, &parts, rsx! { <NotFoundPage notice=notice/> })
+		})
+		.await
+}
+
+/// Spawn `body` inside a themed [`PageClasses`] root marked a self-referential
+/// [`PageRoot`], the shared tail of the two views above.
+fn spawn_page(
+	world: &mut World,
+	parts: &RequestParts,
+	body: impl Bundle,
+) -> Result<Entity> {
+	let page = PageClasses::resolve(parts, &world.resource::<Theme>().clone());
+	let mut entity = world.spawn_template(rsx! { <div {page}>{body}</div> })?;
+	let id = entity.id();
+	PageRoot::insert(&mut entity, vec![id]);
+	id.xok()
 }
 
 /// Collect a [`RouteTree`] into [`RouteEntry`] rows, excluding the `help` route.
@@ -413,37 +437,26 @@ fn route_entry(node: &ActionNode) -> RouteEntry {
 	}
 }
 
-/// Walk path segments from longest to shortest prefix, returning the not-found
-/// notice and the route entries for the first ancestor that matches a scene
-/// route (else the whole tree).
-fn nearest_ancestor_help(
+/// Walk path segments from longest to shortest prefix, naming the first ancestor
+/// that matches a scene route, so the not-found link lands on the help that
+/// covers the miss rather than always on the root's.
+///
+/// Builds no [`RouteEntry`] rows: a miss costs a tree lookup, not a flatten of
+/// the whole url space.
+fn nearest_ancestor_notice(
 	tree: &RouteTree,
 	segments: &[SmolStr],
-) -> (NotFoundNotice, Vec<RouteEntry>) {
-	let not_found_path = segments.join("/");
-
-	for length in (1..segments.len()).rev() {
+) -> NotFoundNotice {
+	let ancestor_path = (1..segments.len()).rev().find_map(|length| {
 		let prefix = &segments[..length];
-		if let Some(node) = tree.find(prefix)
-			&& node.is_scene()
-		{
-			let help_tree = tree.find_subtree(prefix).unwrap_or(tree);
-			return (
-				NotFoundNotice {
-					not_found_path,
-					ancestor_path: Some(prefix.join("/")),
-				},
-				route_entries(help_tree),
-			);
-		}
+		tree.find(prefix)
+			.filter(|node| node.is_scene())
+			.map(|_| prefix.join("/"))
+	});
+	NotFoundNotice {
+		not_found_path: segments.join("/"),
+		ancestor_path,
 	}
-	(
-		NotFoundNotice {
-			not_found_path,
-			ancestor_path: None,
-		},
-		route_entries(tree),
-	)
 }
 
 #[cfg(test)]
@@ -744,7 +757,7 @@ mod test {
 	}
 
 	#[beet_core::test]
-	async fn not_found_shows_route_list() {
+	async fn not_found_links_to_the_listing_without_repeating_it() {
 		let mut world = router_world();
 		let root = world
 			.spawn((Router::with_defaults(), children![Increment::bundle(
@@ -765,7 +778,12 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("not found")
+			.xpect_contains("?help")
+			// the url space is NOT enumerated: the route the caller missed
+			// should not hand them the one they did not ask for
+			.xnot()
 			.xpect_contains("Available routes")
+			.xnot()
 			.xpect_contains("/increment");
 	}
 }

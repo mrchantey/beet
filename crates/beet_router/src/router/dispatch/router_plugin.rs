@@ -114,6 +114,7 @@ impl Plugin for RouterPlugin {
 				// the diagnostic pages: the help/not-found route list and the
 				// navigation-failure error page, both rendered through the layout.
 				.register_template::<RouteList>()
+				.register_template::<NotFoundPage>()
 				.register_template::<ErrorPage>()
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@entity:PageRoot::PageMeta.title`
