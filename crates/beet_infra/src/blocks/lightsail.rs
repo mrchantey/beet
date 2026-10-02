@@ -314,6 +314,31 @@ impl LightsailBlock {
 		beet_net::prelude::resolve_server_port(self.app_port)
 	}
 
+	/// The memory guards for this box: a swapfile, a ceiling on the app's own
+	/// unit, and a per-minute sampler naming the release each reading belongs to.
+	fn memory_guards(&self, stack: &ResolvedStack) -> MemoryGuards {
+		let app_name = Self::service_name(stack);
+		MemoryGuards::for_ram_mb(app_name.clone(), self.bundle_ram_mb())
+			.with_release_env(format!("/etc/{app_name}/deploy.env"))
+	}
+
+	/// The USABLE memory of this block's bundle, in MiB: what the instance
+	/// reports, not what the bundle advertises. A `small_3_0` is sold as 2 GB
+	/// and boots with 1913 MB, and a ceiling sized against the larger figure is
+	/// a ceiling above what the box has.
+	fn bundle_ram_mb(&self) -> u64 {
+		match self.bundle_id.split('_').next().unwrap_or_default() {
+			"nano" => 512,
+			"micro" => 961,
+			"small" => 1913,
+			"medium" => 3837,
+			"large" => 7937,
+			// an unknown bundle is sized as the smallest, so a guess is never
+			// a ceiling above the box
+			_ => 512,
+		}
+	}
+
 	/// The CloudWatch log group the instance forwards its app logs to, the
 	/// single source of truth shared by the cloud-init agent config and
 	/// `WatchTarget::Instance`. Includes the label so distinct blocks in one
@@ -540,73 +565,12 @@ systemctl enable caddy
 		};
 
 		// Survive a spike instead of being killed by one, and leave a reading
-		// behind either way. The box is 1913 MB with no swap by default, so
-		// there is no headroom and no graceful degradation: the kernel's only
-		// move is to kill the largest process, which is always the app. All
-		// three pieces are MACHINE config and so cost a rebuild (see the rebuild
-		// rule above) — they are here rather than hand-installed because a
-		// hand-installed drop-in is lost at the next rebuild, which is exactly
-		// when it is most wanted.
-		let memory_script = self.memory_script(stack);
-		let memory_setup = format!(
-			r#"
-# Best-effort, and deliberately so: cloud-init runs under `set -e`, and a guard
-# against a spike must never itself be the thing that stops the box serving. Each
-# piece below is independently fail-safe, and `setup_memory` is the backstop for
-# anything they miss, so the worst case is a box with no swap and no sampler
-# rather than no box. Note `set -e` does NOT apply inside a function on the left
-# of `||`, which is exactly why the chains here are explicit.
-setup_memory() {{
-# a swapfile, so a spike degrades into slowness rather than a kill. A partial
-# file is removed rather than left for `swapon` to choke on at the next boot.
-if [ ! -f /swapfile ]; then
-  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none \
-    && chmod 600 /swapfile \
-    && mkswap /swapfile >/dev/null \
-    && swapon /swapfile \
-    && echo '/swapfile none swap sw 0 0' >> /etc/fstab \
-    || {{ rm -f /swapfile; echo "beet: no swapfile, continuing" >&2; }}
-fi
-# a safety net, not a routine path: the app should be resident
-echo 'vm.swappiness=10' > /etc/sysctl.d/90-{app_name}-swappiness.conf \
-  && sysctl -p /etc/sysctl.d/90-{app_name}-swappiness.conf >/dev/null \
-  || echo "beet: could not set vm.swappiness, continuing" >&2
-
-# the per-minute memory sampler and its timer
-cat > /usr/local/bin/{app_name}-mem <<'MEM_EOF'
-{memory_script}
-MEM_EOF
-chmod +x /usr/local/bin/{app_name}-mem
-
-cat > /etc/systemd/system/{app_name}-mem.service <<'MEM_UNIT_EOF'
-[Unit]
-Description=Sample {app_name}'s memory
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/{app_name}-mem
-StandardOutput=append:/var/log/{app_name}-mem.log
-StandardError=append:/var/log/{app_name}-mem.log
-MEM_UNIT_EOF
-
-cat > /etc/systemd/system/{app_name}-mem.timer <<'MEM_TIMER_EOF'
-[Unit]
-Description=Sample {app_name}'s memory every minute
-
-[Timer]
-OnBootSec=1min
-OnUnitActiveSec=1min
-
-[Install]
-WantedBy=timers.target
-MEM_TIMER_EOF
-systemctl daemon-reload \
-  && systemctl enable --now {app_name}-mem.timer \
-  || echo "beet: memory sampler timer not started, continuing" >&2
-}}
-setup_memory || echo "beet: memory guards and sampler not installed, continuing" >&2
-"#
-		);
+		// behind either way; see [`MemoryGuards`] for all three pieces and why
+		// every one of them is best-effort. Machine config, so it rides this
+		// script and a change to it replaces the box (see the rebuild rule).
+		let guards = self.memory_guards(stack);
+		let memory_setup = guards.setup_script();
+		let memory_unit_lines = guards.unit_lines();
 
 		// build CloudWatch agent setup for log forwarding; the log group matches
 		// `AwsWatch::for_lightsail` so `watch` tails the same group.
@@ -618,6 +582,7 @@ setup_memory || echo "beet: memory guards and sampler not installed, continuing"
 		// default and beet emits `Z`. `multi_line_start_pattern` reuses that same
 		// regex so a panic backtrace stays one event instead of N.
 		let log_group = self.log_group(stack);
+		let (mem_log, mem_stream) = (guards.log_path(), guards.log_stream());
 		let cloudwatch_setup = format!(
 			r#"
 # install and configure CloudWatch agent for log forwarding
@@ -647,9 +612,9 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
             "multi_line_start_pattern": "{{timestamp_format}}"
           }},
           {{
-            "file_path": "/var/log/{app_name}-mem.log",
+            "file_path": "{mem_log}",
             "log_group_name": "{log_group}",
-            "log_stream_name": "{app_name}-mem",
+            "log_stream_name": "{mem_stream}",
             "retention_in_days": 30,
             "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
             "timezone": "UTC"
@@ -720,12 +685,7 @@ ExecStart=/usr/local/bin/{app_name}-run
 WorkingDirectory=/opt/{app_name}
 Restart=always
 RestartSec=3
-# this unit's own ceiling (see the block): reclaim at High, swap a little past
-# Max, cgroup kill once SwapMax is gone too
-MemoryHigh=900M
-MemoryMax=1300M
-MemorySwapMax=512M
-StandardOutput=append:/var/log/{app_name}.log
+{memory_unit_lines}StandardOutput=append:/var/log/{app_name}.log
 StandardError=append:/var/log/{app_name}.log
 Environment=RUST_LOG=info
 Environment=AWS_REGION={region}
@@ -830,39 +790,6 @@ touch /etc/__APP__/deploy.env
 				),
 				("__ARTIFACT_KEY_VAR__", ArtifactLedger::ARTIFACT_KEY_VAR),
 			],
-		)
-	}
-
-	/// The memory sampler installed at `/usr/local/bin/<app>-mem` and run every
-	/// minute by its own timer: one line per minute of the unit's resident set,
-	/// its peak, what the box has left, and the release it is running.
-	///
-	/// A creep and a spike look nothing alike at one-minute resolution and
-	/// identical in hindsight without it. When `beet.org` was OOM-killed on
-	/// 2026-09-30 the only memory figure that existed anywhere was the one the
-	/// kernel printed as it killed, which is why the cause took a reproduction
-	/// rather than a reading. The line is forwarded to CloudWatch beside the app
-	/// log, so the curve reads without a shell on the box, and `/var/log` is
-	/// append-only across restarts, so the minutes BEFORE a kill survive it.
-	fn memory_script(&self, stack: &ResolvedStack) -> String {
-		Self::render_script(
-			r#"#!/bin/bash
-# Sample the unit's memory. One line, parseable, timestamped like the app log.
-set -uo pipefail
-pid=$(systemctl show __APP__ -p MainPID --value)
-# not running: the next sample says so rather than this one lying
-if [ "${pid:-0}" = 0 ] || [ ! -r "/proc/$pid/status" ]; then exit 0; fi
-rss=$(sed -n 's/^VmRSS:[[:space:]]*\([0-9]*\).*/\1/p' "/proc/$pid/status")
-hwm=$(sed -n 's/^VmHWM:[[:space:]]*\([0-9]*\).*/\1/p' "/proc/$pid/status")
-avail=$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)
-swap=$(awk '/^SwapFree:/ {print $2}' /proc/meminfo)
-restarts=$(systemctl show __APP__ -p NRestarts --value)
-# the leak is always on a specific artifact, so every sample names its own
-deploy=$(sed -n 's/^BEET_DEPLOY_ID=//p' /etc/__APP__/deploy.env 2>/dev/null | tail -1)
-echo "$(date -u +%Y-%m-%dT%H:%M:%S.000Z) mem rss_kb=${rss:-0} hwm_kb=${hwm:-0} avail_kb=${avail:-0} swapfree_kb=${swap:-0} restarts=${restarts:-0} deploy=${deploy:-unknown}"
-"#,
-			stack,
-			&[],
 		)
 	}
 
@@ -1560,7 +1487,6 @@ mod tests {
 		})
 	}
 
-	/// The rendered terraform config json for a block.
 	/// The box survives a spike and leaves a reading behind: a swapfile, a
 	/// ceiling on the app's own unit, and a per-minute sampler whose line is
 	/// forwarded beside the app log.
@@ -1570,7 +1496,10 @@ mod tests {
 	/// that existed anywhere was the one it printed on the way out.
 	#[beet_core::test]
 	fn the_box_degrades_rather_than_being_killed() {
-		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		// the deployed bundle: `small_3_0` is the 1913 MB box prod runs on
+		let (script, _dir) = build_user_data(
+			&LightsailBlock::default().with_bundle_id("small_3_0"),
+		);
 		let script = script.as_str();
 		// a spike has somewhere to go
 		script.xpect_contains("mkswap /swapfile");
@@ -1603,6 +1532,26 @@ mod tests {
 		swap.xpect_less_than(unit);
 	}
 
+	/// A box too small to carry a ceiling that is not hostile gets the swapfile
+	/// and the sampler but NO ceiling.
+	///
+	/// `nano_3_0` is 512 MB, and the headroom every box owes its kernel, TLS
+	/// terminator and log agent is more than that. Clamping a cap into what is
+	/// left would hand the unit one below its own working set — beet idles at
+	/// ~156 MB — so a guard against a rare spike would become a kill on ordinary
+	/// traffic. The cheap halves still apply.
+	#[beet_core::test]
+	fn a_box_too_small_for_a_ceiling_gets_none() {
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		let script = script.as_str();
+		script.xnot().xpect_contains("MemoryMax=");
+		script.xnot().xpect_contains("MemoryHigh=");
+		// but it still degrades rather than dying, and still leaves a reading
+		script.xpect_contains("mkswap /swapfile");
+		script.xpect_contains("beet_infra-mem.timer");
+	}
+
+	/// The rendered terraform config json for a block.
 	fn build_json(block: &LightsailBlock) -> String {
 		let (scope, _dir) = render_block(block);
 		scope.finish().unwrap().2.to_json_string().unwrap()

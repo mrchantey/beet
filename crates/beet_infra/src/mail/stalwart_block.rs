@@ -1468,11 +1468,38 @@ WantedBy=timers.target"#,
 		(service, timer)
 	}
 
+	/// This box's memory guards: a swapfile, a ceiling on the Stalwart unit, and
+	/// a per-minute sampler.
+	///
+	/// A `t4g.small` is a 2 GB box with no swap, which is the same shape of box
+	/// and the same absence of headroom that had `beet.org` OOM-killed on
+	/// 2026-09-30. There is no release pointer to name here, so a sample carries
+	/// no `deploy=` field.
+	fn memory_guards(&self) -> MemoryGuards {
+		MemoryGuards::for_ram_mb("stalwart", self.instance_ram_mb())
+	}
+
+	/// The USABLE memory of this block's instance type, in MiB: what the
+	/// instance reports, not what the type advertises (see
+	/// [`MemoryGuards::for_ram_mb`]). An unrecognised type is sized small, so an
+	/// unknown box gets the swapfile and the sampler but never a ceiling guessed
+	/// above what it has.
+	fn instance_ram_mb(&self) -> u64 {
+		match self.instance_type.rsplit('.').next().unwrap_or_default() {
+			"small" => 1898,
+			"medium" => 3824,
+			"large" => 7918,
+			"xlarge" => 15837,
+			_ => 0,
+		}
+	}
+
 	/// The systemd unit, modeled on the one Stalwart ships: unprivileged user
 	/// with `CAP_NET_BIND_SERVICE` for the sub-1024 mail ports, SIGINT for a
 	/// clean queue shutdown, secrets re-rendered on every start, and the log
 	/// appended where the CloudWatch agent tails it.
 	fn systemd_unit(&self) -> String {
+		let memory_unit_lines = self.memory_guards().unit_lines();
 		format!(
 			r#"[Unit]
 Description=Stalwart Server
@@ -1482,7 +1509,7 @@ RequiresMountsFor=/var/lib/stalwart
 
 [Service]
 Type=simple
-LimitNOFILE=65536
+{memory_unit_lines}LimitNOFILE=65536
 KillMode=process
 KillSignal=SIGINT
 Restart=on-failure
@@ -1530,6 +1557,7 @@ WantedBy=multi-user.target"#,
 						"collect_list": [
 							tail(Self::UNIT_LOG.to_string(), "unit"),
 							tail(Self::server_log_glob(), "server"),
+							tail(self.memory_guards().log_path(), "mem"),
 						]
 					}
 				}
@@ -1792,6 +1820,8 @@ COLD_TIMER_EOF
 			serde_json::to_string_pretty(&self.data_store_config())?;
 		let secrets_script = self.secrets_script(stack)?;
 		let unit = self.systemd_unit();
+		let guards = self.memory_guards();
+		let memory_setup = guards.setup_script();
 		let cloudwatch =
 			serde_json::to_string_pretty(&self.cloudwatch_config(stack)?)?;
 		let backup = self.backup_stanza(stack)?;
@@ -1894,6 +1924,7 @@ cat > /usr/local/bin/stalwart-secrets <<'SECRETS_EOF'
 SECRETS_EOF
 chmod 0755 /usr/local/bin/stalwart-secrets
 
+{memory_setup}
 cat > /etc/systemd/system/stalwart.service <<'UNIT_EOF'
 {unit}
 UNIT_EOF
@@ -2055,6 +2086,44 @@ mod tests {
 	/// The rendered user_data, ie the machine identity, with no cold store.
 	fn user_data(block: &StalwartBlock) -> String {
 		user_data_cold(block, None)
+	}
+
+	/// The mail box degrades rather than being killed, and leaves a reading
+	/// behind either way.
+	///
+	/// A `t4g.small` is a 2 GB box with no swap: the same shape of box, and the
+	/// same absence of headroom, that had `beet.org` OOM-killed on 2026-09-30.
+	/// It carries the same three guards, sized for its own memory by
+	/// [`MemoryGuards`], and its samples ride the agent beside the logs they
+	/// explain. Stalwart is not a beet release, so a sample names no deploy.
+	#[beet_core::test]
+	fn the_mail_box_degrades_rather_than_being_killed() {
+		let script = user_data_cold(
+			&StalwartBlock::new("mail", "mail.beetmash.com"),
+			None,
+		);
+		let script = script.as_str();
+		// a spike has somewhere to go, and the sampler records the fall
+		script
+			.xpect_contains("mkswap /swapfile")
+			.xpect_contains("stalwart-mem.timer")
+			// the ceiling is sized for THIS box, not copied from another
+			.xpect_contains("MemoryMax=1200M")
+			.xpect_contains("MemoryHigh=800M")
+			// and the unit it caps is Stalwart's, not beet's
+			.xpect_contains("systemctl show stalwart -p MainPID")
+			// nothing in it can abort the boot
+			.xpect_contains("setup_memory || echo")
+			// no beet release pointer here, so no deploy field to carry
+			.xnot()
+			.xpect_contains("BEET_DEPLOY_ID=");
+		// installed BEFORE the unit it caps, so Stalwart has swap from its first
+		// second rather than from whenever cloud-init reaches the tail
+		let (swap, unit) = (
+			script.find("mkswap").unwrap(),
+			script.find("/etc/systemd/system/stalwart.service").unwrap(),
+		);
+		swap.xpect_less_than(unit);
 	}
 
 	/// The rendered user_data beside the cold store it copies into.
@@ -2697,6 +2766,8 @@ mod tests {
 				"/var/log/stalwart/stalwart.????-??-??".to_string(),
 				"server".to_string(),
 			),
+			// the memory sampler, forwarded beside the logs it explains
+			("/var/log/stalwart-mem.log".to_string(), "mem".to_string()),
 		]);
 		// the glob is the one file shape the tracer writes and never the
 		// unit's, since the agent follows only the newest match. `?` is the

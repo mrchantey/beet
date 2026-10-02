@@ -11,6 +11,11 @@ mod repo_store_block;
 pub use repo_store_block::*;
 mod store_uri_block;
 pub use store_uri_block::*;
+// The machine-level memory config every box block shares: a swapfile, a ceiling
+// on the unit that matters, and a per-minute sampler. Ungated — a box block of
+// any provider renders the same three pieces.
+mod memory_guards;
+pub use memory_guards::*;
 #[cfg(feature = "lambda_block")]
 mod lambda;
 #[cfg(feature = "lambda_block")]
