@@ -5,6 +5,11 @@ mod aws_watch;
 mod build_docker_image;
 #[cfg(feature = "cloudflare_block")]
 mod cloudflare;
+// the Cloudflare v4 api: its base, its credential and its envelope, shared by
+// every call here (the zone verbs, the Worker teardown, the token mint).
+pub mod cloudflare_api_ext;
+// the repo's own Cloudflare token, lowered from what its declarations ask for.
+mod cloudflare_mint;
 mod cloudflare_zone;
 pub mod cloudwatch_ext;
 // the repo's own deployer user, its policies and its key. Gated with the AWS
@@ -39,6 +44,7 @@ pub use aws_watch::*;
 pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]
 pub use cloudflare::*;
+pub use cloudflare_mint::*;
 pub use cloudflare_zone::*;
 pub use cloudwatch_ext::MetricDatum;
 #[cfg(feature = "bindings_aws_common")]

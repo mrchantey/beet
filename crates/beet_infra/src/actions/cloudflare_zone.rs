@@ -6,44 +6,11 @@
 //! converges the shared zone safely. (Historically the same reasoning covered
 //! Spectrum apps: the plan-polymorphic Spectrum API also rejects the terraform
 //! provider's Enterprise-only fields.)
-use crate::prelude::*;
+use crate::actions::cloudflare_api_ext;
+use crate::actions::cloudflare_api_ext::API_BASE;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-
-/// The Cloudflare v4 API base.
-const API_BASE: &str = "https://api.cloudflare.com/client/v4";
-
-/// The zone id the verb's entity resolves by ancestry
-/// ([`ResolvedStack::cloudflare_zone`]) and the api token from the
-/// environment, the auth every zone call needs.
-async fn zone_auth(caller: &AsyncEntity) -> Result<(SmolStr, SmolStr)> {
-	let zone_id = caller
-		.with_state::<StackQuery, _>(|entity, stacks| {
-			stacks
-				.resolve(entity)
-				.cloudflare_zone()
-				.map(|zone| zone.id.clone())
-		})
-		.await??;
-	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
-		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
-	Ok((zone_id, token))
-}
-
-/// Send `request`, failing on a non-2xx or `success: false` envelope, and
-/// return the parsed body.
-async fn send_zone_request(request: Request) -> Result<serde_json::Value> {
-	let response = request.send().await?;
-	let status = response.status();
-	let body = response.text().await.unwrap_or_default();
-	let json: serde_json::Value =
-		serde_json::from_str(&body).unwrap_or_default();
-	if !status.is_ok() || json["success"] != true {
-		bevybail!("cloudflare zone call failed: {status} - {body}");
-	}
-	Ok(json)
-}
 
 /// Publishes the zone-level edge config after an apply, converging the shared
 /// zone from any stage's deploy:
@@ -65,35 +32,38 @@ async fn send_zone_request(request: Request) -> Result<serde_json::Value> {
 pub async fn CloudflareZoneSetup(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = zone_auth(&cx.caller).await?;
+	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
 
 	// the cache ruleset: an entrypoint PUT creates or replaces, idempotent
-	send_zone_request(
+	cloudflare_api_ext::send(
 		Request::put(format!(
 			"{API_BASE}/zones/{zone_id}/rulesets/phases/http_request_cache_settings/entrypoint"
 		))
 		.with_auth_bearer(&token)
 		.with_json_body(&cache_rules())?,
+		"publishing the edge cache ruleset",
 	)
 	.await?;
 	info!("published the edge cache ruleset");
 
 	// strict TLS on the edge-to-origin leg
-	send_zone_request(
+	cloudflare_api_ext::send(
 		Request::patch(format!("{API_BASE}/zones/{zone_id}/settings/ssl"))
 			.with_auth_bearer(&token)
 			.with_json_body(&serde_json::json!({ "value": "strict" }))?,
+		"setting the zone ssl mode",
 	)
 	.await?;
 	info!("zone ssl mode is strict");
 
 	// http never reaches the origin: the edge redirects it to https first
-	send_zone_request(
+	cloudflare_api_ext::send(
 		Request::patch(format!(
 			"{API_BASE}/zones/{zone_id}/settings/always_use_https"
 		))
 		.with_auth_bearer(&token)
 		.with_json_body(&serde_json::json!({ "value": "on" }))?,
+		"redirecting http to https at the edge",
 	)
 	.await?;
 	info!("zone redirects http to https");
@@ -151,12 +121,13 @@ fn cache_rules() -> serde_json::Value {
 pub async fn CloudflarePurgeCache(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = zone_auth(&cx.caller).await?;
+	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
 	let start = Instant::now();
-	send_zone_request(
+	cloudflare_api_ext::send(
 		Request::post(format!("{API_BASE}/zones/{zone_id}/purge_cache"))
 			.with_auth_bearer(&token)
 			.with_json_body(&serde_json::json!({ "purge_everything": true }))?,
+		"purging the zone cache",
 	)
 	.await?;
 	info!(

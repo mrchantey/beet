@@ -3,6 +3,8 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use serde_json::Value;
+use serde_json::json;
 
 /// The Cloudflare counterpart of [`DeployerPolicy`]: that lowers the AWS types
 /// a stack renders into what the deployer applying it may do, this lowers the
@@ -42,10 +44,11 @@ use beet_core::prelude::*;
 /// [`Display`]: std::fmt::Display
 #[derive(Debug, Default, Clone)]
 pub struct DeployerToken {
-	/// The accounts the lowered stacks address, the `Account Resources` of
-	/// every account-scoped group. More than one is not an error: a user-owned
-	/// token, which the hand-made one is, may name several where an
-	/// account-owned one may name only its own.
+	/// The accounts the lowered stacks address: where the token lives, and the
+	/// `Account Resources` of an account-scoped group. Recorded for a zone-only
+	/// lowering too, since an account-owned token is created under an account
+	/// however narrow its groups are; [`account`](Self::account) is the one a
+	/// mint uses, and refuses to guess between two.
 	accounts: BTreeSet<SmolStr>,
 	/// The zones the lowered stacks address by domain, the `Zone Resources` of
 	/// every zone-scoped group. Keyed by domain because that is what the
@@ -235,22 +238,24 @@ impl DeployerToken {
 			})
 	}
 
-	/// Record `permissions` as asked for by `asker`, resolving the address each
-	/// group's scope names: an account-scoped group needs the stack's
-	/// [`CloudflareAccount`], a zone-scoped one its [`CloudflareZone`], and a
-	/// stack declaring neither fails naming the spread.
+	/// Record `permissions` as asked for by `asker`, resolving the addresses they
+	/// need: the stack's [`CloudflareAccount`] always, since the token LIVES in
+	/// an account whatever its groups are scoped to, and its
+	/// [`CloudflareZone`] as well for a zone-scoped group. A stack declaring
+	/// neither fails naming the spread.
 	fn add(
 		&mut self,
 		stack: &ResolvedStack,
 		asker: &str,
 		permissions: &[TokenPermission],
 	) -> Result {
+		if permissions.is_empty() {
+			return OK;
+		}
+		self.accounts.insert(stack.cloudflare_account()?.id.clone());
 		for permission in permissions {
 			match permission.scope {
-				TokenScope::Account => {
-					self.accounts
-						.insert(stack.cloudflare_account()?.id.clone());
-				}
+				TokenScope::Account => {}
 				TokenScope::Zone => {
 					let zone = stack.cloudflare_zone()?;
 					self.zones.insert(zone.domain.clone(), zone.id.clone());
@@ -287,12 +292,141 @@ impl DeployerToken {
 	pub fn escalating(&self) -> Option<&BTreeSet<SmolStr>> {
 		self.asked.get(&TokenPermission::API_TOKENS_WRITE)
 	}
+
+	/// The one account a minted token lives in, an error when the lowered
+	/// stacks name none or several: an account-owned token is created under one
+	/// account, so two would need two tokens and two documents to hold them.
+	pub fn account(&self) -> Result<&SmolStr> {
+		match self.accounts.iter().collect::<Vec<_>>().as_slice() {
+			[account] => (*account).xok(),
+			[] => bevybail!(
+				"no cloudflare account is declared, so there is nowhere to mint \
+				a token: declare `{{CloudflareAccount{{id:\"..\"}}}}` on the \
+				stack or an ancestor"
+			),
+			accounts => bevybail!(
+				"the stacks name {} cloudflare accounts ({}), and one token \
+				lives in one account: deploy them from separate repos, each \
+				with its own document",
+				accounts.len(),
+				accounts
+					.iter()
+					.map(|account| account.as_str())
+					.collect::<Vec<_>>()
+					.join(", ")
+			),
+		}
+	}
+
+	/// The resource strings a group of `scope` is granted over, in the form a
+	/// token policy names them.
+	fn resources(&self, scope: TokenScope) -> Vec<String> {
+		match scope {
+			TokenScope::Account => self
+				.accounts
+				.iter()
+				.map(|account| format!("com.cloudflare.api.account.{account}"))
+				.collect(),
+			TokenScope::Zone => self
+				.zones
+				.values()
+				.map(|zone| format!("com.cloudflare.api.account.zone.{zone}"))
+				.collect(),
+			// never held by a token that deploys, see `TokenScope::Bucket`
+			TokenScope::Bucket => Vec::new(),
+		}
+	}
+
+	/// The `policies` of the token this lowers to, ready for
+	/// `POST /accounts/{id}/tokens`: one allow policy per scope the lowering
+	/// named, each over that scope's resources alone, so a zone group never
+	/// reaches the account and an account group never reaches a zone.
+	pub fn to_json(&self) -> Value {
+		[TokenScope::Account, TokenScope::Zone]
+			.into_iter()
+			.filter_map(|scope| {
+				let groups = self
+					.asked
+					.keys()
+					.filter(|permission| permission.scope == scope)
+					.map(|permission| json!({ "id": permission.id }))
+					.collect::<Vec<_>>();
+				if groups.is_empty() {
+					return None;
+				}
+				let resources = self
+					.resources(scope)
+					.into_iter()
+					.map(|resource| (resource, Value::from("*")))
+					.collect::<serde_json::Map<_, _>>();
+				json!({
+					"effect": "allow",
+					"resources": resources,
+					"permission_groups": groups,
+				})
+				.xmap(Some)
+			})
+			.collect::<Vec<_>>()
+			.xmap(Value::Array)
+	}
+
+	/// What the lowering grants, flattened to one `(resource, group id)` pair
+	/// per combination: the form a held token is COMPARED in, since how
+	/// Cloudflare groups the pairs into policies is not what either side means.
+	pub fn fingerprint(&self) -> BTreeSet<(SmolStr, SmolStr)> {
+		self.asked
+			.keys()
+			.flat_map(|permission| {
+				self.resources(permission.scope)
+					.into_iter()
+					.map(|resource| (resource.into(), permission.id.into()))
+			})
+			.collect()
+	}
+
+	/// [`fingerprint`](Self::fingerprint) of the `policies` of a token
+	/// Cloudflare answered with, so the two compare as sets. A policy that
+	/// denies rather than allows is not a grant and is left out of both.
+	pub fn fingerprint_of(policies: &Value) -> BTreeSet<(SmolStr, SmolStr)> {
+		policies
+			.as_array()
+			.map(Vec::as_slice)
+			.unwrap_or_default()
+			.iter()
+			.filter(|policy| policy["effect"] == "allow")
+			.flat_map(|policy| {
+				let groups = policy["permission_groups"]
+					.as_array()
+					.map(Vec::as_slice)
+					.unwrap_or_default()
+					.iter()
+					.filter_map(|group| group["id"].as_str())
+					.map(SmolStr::new)
+					.collect::<Vec<_>>();
+				policy["resources"]
+					.as_object()
+					.map(|resources| {
+						resources.keys().cloned().collect::<Vec<_>>()
+					})
+					.unwrap_or_default()
+					.into_iter()
+					.flat_map(move |resource| {
+						groups
+							.clone()
+							.into_iter()
+							.map(move |group| (SmolStr::new(&resource), group))
+					})
+			})
+			.collect()
+	}
 }
 
 impl std::fmt::Display for DeployerToken {
-	/// The dashboard recipe, in the order the Create Custom Token form asks
-	/// for it: one line per group with what asked for it, then the two
-	/// resource lists.
+	/// The dashboard recipe, in the order the Create Custom Token form asks for
+	/// it: one line per group with what asked for it, then the resource list of
+	/// each scope that HAS a group, which is what the minted policies carry. An
+	/// account holding no account-scoped group is where the token LIVES rather
+	/// than anything it reaches, so it is not listed as a resource.
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		for (permission, askers) in &self.asked {
 			let askers = askers
@@ -302,21 +436,28 @@ impl std::fmt::Display for DeployerToken {
 				.join(", ");
 			writeln!(f, "permission: {permission} ({askers})")?;
 		}
-		if !self.accounts.is_empty() {
-			let accounts = self
-				.accounts
-				.iter()
-				.map(SmolStr::as_str)
-				.collect::<Vec<_>>();
-			writeln!(f, "account resources: {}", accounts.join(", "))?;
-		}
-		if !self.zones.is_empty() {
-			let zones = self
-				.zones
-				.iter()
-				.map(|(domain, id)| format!("{domain} ({id})"))
-				.collect::<Vec<_>>();
-			writeln!(f, "zone resources: {}", zones.join(", "))?;
+		for scope in [TokenScope::Account, TokenScope::Zone] {
+			if !self.asked.keys().any(|held| held.scope == scope) {
+				continue;
+			}
+			let described = match scope {
+				TokenScope::Zone => self
+					.zones
+					.iter()
+					.map(|(domain, id)| format!("{domain} ({id})"))
+					.collect::<Vec<_>>(),
+				_ => self
+					.accounts
+					.iter()
+					.map(SmolStr::to_string)
+					.collect::<Vec<_>>(),
+			};
+			writeln!(
+				f,
+				"{} resources: {}",
+				scope.to_string().to_lowercase(),
+				described.join(", ")
+			)?;
 		}
 		Ok(())
 	}
@@ -581,8 +722,75 @@ mod test {
 				"DNS Write",
 				"Zone Settings Write",
 			]);
-		token.accounts().is_empty().xpect_true();
+		// the account is where the token LIVES, never what it reaches: a zone
+		// group's resource list names the zone alone
+		token.account().unwrap().as_str().xpect_eq("acct123");
+		token
+			.to_json()
+			.to_string()
+			.as_str()
+			.xpect_contains("com.cloudflare.api.account.zone.zone123")
+			.xnot()
+			.xpect_contains("\"com.cloudflare.api.account.acct123\"");
 		token.escalating().is_none().xpect_true();
+	}
+
+	/// The body a mint posts: one allow policy per scope, each over that scope's
+	/// own resources, and a fingerprint that compares equal however Cloudflare
+	/// groups the same pairs back. A deny is not a grant and counts for
+	/// neither side.
+	#[beet_core::test]
+	fn the_token_body_is_one_policy_per_scope() {
+		let (stack, ..) = addressed();
+		let token = ["CloudflarePurgeCache", "CloudflareR2Sync"]
+			.into_iter()
+			.try_fold(DeployerToken::default(), |token, action| {
+				token.lower_action(&stack, action)
+			})
+			.unwrap();
+		let policies = token.to_json();
+		let scoped = |permission: TokenPermission| {
+			policies
+				.as_array()
+				.unwrap()
+				.iter()
+				.find(|policy| policy.to_string().contains(permission.id()))
+				.unwrap()["resources"]
+				.as_object()
+				.unwrap()
+				.keys()
+				.cloned()
+				.collect::<Vec<_>>()
+		};
+		// two scopes, two policies, neither reaching the other's resources
+		policies.as_array().unwrap().len().xpect_eq(2);
+		scoped(TokenPermission::CACHE_PURGE)
+			.xpect_eq(vec!["com.cloudflare.api.account.zone.zone123"]);
+		scoped(TokenPermission::WORKERS_R2_STORAGE_WRITE)
+			.xpect_eq(vec!["com.cloudflare.api.account.acct123"]);
+		DeployerToken::fingerprint_of(&policies).xpect_eq(token.fingerprint());
+		// the same grants, one policy per pair, plus a deny: still a match
+		let regrouped = serde_json::json!([
+			{
+				"effect": "allow",
+				"resources": { "com.cloudflare.api.account.zone.zone123": "*" },
+				"permission_groups": [{ "id": TokenPermission::CACHE_PURGE.id() }],
+			},
+			{
+				"effect": "allow",
+				"resources": { "com.cloudflare.api.account.acct123": "*" },
+				"permission_groups": [
+					{ "id": TokenPermission::ACCOUNT_SETTINGS_READ.id() },
+					{ "id": TokenPermission::WORKERS_R2_STORAGE_WRITE.id() },
+				],
+			},
+			{
+				"effect": "deny",
+				"resources": { "com.cloudflare.api.account.acct123": "*" },
+				"permission_groups": [{ "id": TokenPermission::API_TOKENS_WRITE.id() }],
+			},
+		]);
+		DeployerToken::fingerprint_of(&regrouped).xpect_eq(token.fingerprint());
 	}
 
 	/// A rendered record lowers to the one group that publishes it and names
@@ -636,11 +844,16 @@ mod test {
 			.to_string()
 			.as_str()
 			.xpect_contains("Account > Workers R2 Storage Write")
-			.xpect_contains("account resources: acct123");
+			.xpect_contains("account resources: acct123")
+			// the stack declares a zone and the bucket needs nothing in it, so
+			// the token reaches none
+			.xnot()
+			.xpect_contains("zone resources");
 	}
 
-	/// An action with no entry fails naming it, and a group whose scope the
-	/// stack declares no address for fails naming the spread.
+	/// An action with no entry fails naming it, and an address the lowering
+	/// needs and the stack does not declare fails naming the spread: the
+	/// account always, the zone for a zone-scoped group.
 	#[beet_core::test]
 	fn an_unlowered_action_and_a_missing_address_are_loud() {
 		let (stack, ..) = addressed();
@@ -653,6 +866,16 @@ mod test {
 		let (bare, ..) = ResolvedStack::default_local();
 		DeployerToken::default()
 			.lower_action(&bare, "CloudflarePurgeCache")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("CloudflareAccount");
+		let (accounted, ..) = ResolvedStack::default_local();
+		DeployerToken::default()
+			.lower_action(
+				&accounted
+					.with_cloudflare_account(CloudflareAccount::new("acct123")),
+				"CloudflarePurgeCache",
+			)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("CloudflareZone");

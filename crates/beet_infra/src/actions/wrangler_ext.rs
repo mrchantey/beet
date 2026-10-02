@@ -5,6 +5,8 @@
 //! domain is issued by that upload. Splitting them would mean terraform owning
 //! a record whose certificate wrangler owns, which is the one arrangement
 //! guaranteed to fight itself.
+use crate::actions::cloudflare_api_ext;
+use crate::actions::cloudflare_api_ext::API_BASE;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -45,17 +47,6 @@ pub async fn deploy(
 	Ok(())
 }
 
-/// The Cloudflare v4 API base. `wrangler` uploads a Worker but has no verb for
-/// removing one custom domain, so the teardown half of a Worker is REST.
-const API_BASE: &str = "https://api.cloudflare.com/client/v4";
-
-/// The api token from the environment, the auth every workers call needs
-/// beside the account the caller resolved ([`ResolvedStack::cloudflare_account`]).
-fn api_token() -> Result<SmolStr> {
-	env_ext::var("CLOUDFLARE_API_TOKEN")
-		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))
-}
-
 /// Delete the Worker custom domain serving `hostname` in `account`, if there
 /// is one.
 ///
@@ -63,14 +54,16 @@ fn api_token() -> Result<SmolStr> {
 /// declaration rather than a ledger of what was created, so it routinely
 /// addresses a resource that was never made.
 ///
+/// REST rather than wrangler, which has no verb for removing one custom domain.
+///
 /// Deleting the custom domain also removes the zone record and the certificate
 /// wrangler provisioned with it, since the upload created all three together.
 pub async fn delete_custom_domain(
 	account: &CloudflareAccount,
 	hostname: &str,
 ) -> Result<bool> {
-	let (account, token) = (&account.id, api_token()?);
-	let listed = send(
+	let (account, token) = (&account.id, cloudflare_api_ext::token()?);
+	let listed = cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::get(format!(
 			"{API_BASE}/accounts/{account}/workers/domains?hostname={hostname}"
 		))
@@ -86,7 +79,7 @@ pub async fn delete_custom_domain(
 	else {
 		return Ok(false);
 	};
-	send(
+	cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::delete(format!(
 			"{API_BASE}/accounts/{account}/workers/domains/{id}"
 		))
@@ -103,8 +96,8 @@ pub async fn delete_script(
 	account: &CloudflareAccount,
 	name: &str,
 ) -> Result<bool> {
-	let (account, token) = (&account.id, api_token()?);
-	send(
+	let (account, token) = (&account.id, cloudflare_api_ext::token()?);
+	cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::delete(format!(
 			"{API_BASE}/accounts/{account}/workers/scripts/{name}"
 		))
@@ -113,28 +106,4 @@ pub async fn delete_script(
 	)
 	.await
 	.map(|found| found.is_some())
-}
-
-/// Send `request`, returning [`None`] when the thing it addressed is not there
-/// and failing on any other non-2xx or `success: false` envelope.
-async fn send(
-	request: beet_net::prelude::Request,
-	what: &str,
-) -> Result<Option<serde_json::Value>> {
-	let response = request.send().await?;
-	let status = response.status();
-	let body = response.text().await.unwrap_or_default();
-	if status.as_u16() == 404 {
-		return Ok(None);
-	}
-	// a `204` answers a delete with nothing at all, which is not an envelope
-	if status.is_ok() && body.trim().is_empty() {
-		return Ok(Some(serde_json::Value::Null));
-	}
-	let json: serde_json::Value =
-		serde_json::from_str(&body).unwrap_or_default();
-	if !status.is_ok() || json["success"] != true {
-		bevybail!("{what} failed: {status} - {body}");
-	}
-	Ok(Some(json))
 }

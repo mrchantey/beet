@@ -142,6 +142,17 @@ beet-mint *args:
 # fewer.
 site-mint *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
+# Converge the CLOUDFLARE token this repo deploys with: one account-owned
+# `beet-deploy` token scoped to exactly the permission groups the site entry's
+# stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
+# MINT token, which holds `Account API Tokens Write` and nothing else and lives
+# in the password manager rather than any document, so it is passed for the one
+# command: `CLOUDFLARE_API_TOKEN=.. just site-cloudflare-mint`. `--dry-run`
+# prints the scope and the policies it would post, touching neither Cloudflare
+# nor the document and needing no credential at all. `atproto` so the social
+# stack's records render, for the same reason `site-audit` builds with it.
+site-cloudflare-mint *args:
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

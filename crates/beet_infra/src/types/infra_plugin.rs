@@ -324,6 +324,12 @@ impl Plugin for InfraPlugin {
 			not(target_arch = "wasm32")
 		))]
 		app.register_type::<crate::prelude::DeployerMint>();
+		// and the repo's own Cloudflare token, mounted the same way and for the
+		// same reason. No bindings gate: the lowering reads declared type names
+		// and action type names, so a repo with no Cloudflare resource at all
+		// still has the verb to tell it so.
+		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+		app.register_type::<crate::prelude::CloudflareMint>();
 		// the store's export into a secrets document, the restore back out
 		// of one, and a human's removal, in every deploy build
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

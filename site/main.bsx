@@ -292,6 +292,14 @@ token (plus AWS for the social stack's state bucket).
 	     deploys, and an administrator's verb: the scoped pair it seals cannot
 	     mint itself -->
 	<DeployerMint bx:cfg="feature:infra && feature:extra"/>
+	<!-- and the Cloudflare identity beside it: one account-owned token for this
+	     repo, scoped to exactly the permission groups the stacks below and the
+	     zone verbs above ask for. Runs as the MINT token, which holds `Account
+	     API Tokens Write` and nothing else and lives in the password manager,
+	     in no document: Cloudflare has no mfa condition and no permissions
+	     boundary, so the only cap on the group that mints credentials is that
+	     nothing the age key opens carries it -->
+	<CloudflareMint bx:cfg="feature:infra && feature:extra"/>
 	<!-- the stage stack: every resource the running site needs, then the verbs
 	     that provision them behind the one `bx:cfg`. The stores stay outside
 	     it: the served binary reaches them by `bx:ref`, and an excluded

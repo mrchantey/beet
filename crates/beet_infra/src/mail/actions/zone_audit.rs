@@ -1,9 +1,10 @@
 //! What the zone holds, against what the stack declared.
+use crate::actions::cloudflare_api_ext;
+use crate::actions::cloudflare_api_ext::API_BASE;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
-use serde_json::Value;
 
 
 
@@ -175,7 +176,7 @@ pub async fn ZoneAudit(
 	// resolved first: a zone-scoped render filters the declarations it unions by
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.
-	let (zone_id, token) = zone_auth(&cx.caller).await?;
+	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
 	let audited = zone_id.clone();
 	let (declared, allowed) = cx
 		.caller
@@ -399,23 +400,6 @@ fn normalize(name: &str) -> String {
 	name.trim_end_matches('.').to_ascii_lowercase()
 }
 
-/// The zone id the audit's entity resolves by ancestry
-/// ([`ResolvedStack::cloudflare_zone`]) and the api token from the
-/// environment, the auth every zone call needs.
-async fn zone_auth(caller: &AsyncEntity) -> Result<(SmolStr, SmolStr)> {
-	let zone_id = caller
-		.with_state::<StackQuery, _>(|entity, stacks| {
-			stacks
-				.resolve(entity)
-				.cloudflare_zone()
-				.map(|zone| zone.id.clone())
-		})
-		.await??;
-	let token = env_ext::var("CLOUDFLARE_API_TOKEN")
-		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))?;
-	Ok((zone_id, token))
-}
-
 /// Every record in the zone, paged through to the end. Paging is not optional:
 /// the default page is 100 and a zone that outgrew it would report every record
 /// past the first page as absent and every one in it as fine.
@@ -423,18 +407,14 @@ async fn list_records(zone_id: &str, token: &str) -> Result<Vec<ZoneRecord>> {
 	const PER_PAGE: usize = 100;
 	let mut records = Vec::new();
 	for page in 1.. {
-		let response = Request::get(format!(
-			"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records?per_page={PER_PAGE}&page={page}"
-		))
-		.with_auth_bearer(token)
-		.send()
+		let json = cloudflare_api_ext::send(
+			Request::get(format!(
+				"{API_BASE}/zones/{zone_id}/dns_records?per_page={PER_PAGE}&page={page}"
+			))
+			.with_auth_bearer(token),
+			&format!("listing zone {zone_id}"),
+		)
 		.await?;
-		let status = response.status();
-		let body = response.text().await.unwrap_or_default();
-		let json: Value = serde_json::from_str(&body).unwrap_or_default();
-		if !status.is_ok() || json["success"] != true {
-			bevybail!("listing zone {zone_id} failed: {status} - {body}");
-		}
 		let page_records = json["result"]
 			.as_array()
 			.cloned()
@@ -460,18 +440,13 @@ async fn list_records(zone_id: &str, token: &str) -> Result<Vec<ZoneRecord>> {
 }
 
 async fn delete_record(zone_id: &str, token: &str, id: &str) -> Result {
-	let response = Request::delete(format!(
-		"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{id}"
-	))
-	.with_auth_bearer(token)
-	.send()
-	.await?;
-	let status = response.status();
-	if !status.is_ok() {
-		let body = response.text().await.unwrap_or_default();
-		bevybail!("deleting record {id} failed: {status} - {body}");
-	}
-	Ok(())
+	cloudflare_api_ext::send_optional(
+		Request::delete(format!("{API_BASE}/zones/{zone_id}/dns_records/{id}"))
+			.with_auth_bearer(token),
+		&format!("deleting record {id}"),
+	)
+	.await
+	.map(|_| ())
 }
 
 #[cfg(test)]

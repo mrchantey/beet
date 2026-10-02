@@ -51,7 +51,10 @@ that relays everything wants.
 
 `validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
-machine. It also needs domains you actually own: every name below is an RFC 2606
+machine. The `<R2BucketBlock/>` below asks that token for `Account API Tokens
+Write`, since the apply MINTS the bucket's own credential: a deploy token lowered
+from an entry without one does not carry it (`beet cloudflare/mint --dry-run`
+says what an entry asks for). It also needs domains you actually own: every name below is an RFC 2606
 example domain and the zone declared on the `<Stack>` is a placeholder, so a
 real deploy replaces both.
 
