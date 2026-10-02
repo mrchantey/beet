@@ -550,17 +550,27 @@ systemctl enable caddy
 		let memory_script = self.memory_script(stack);
 		let memory_setup = format!(
 			r#"
-# a swapfile, so a spike degrades into slowness rather than a kill
+# Best-effort, and deliberately so: cloud-init runs under `set -e`, and a guard
+# against a spike must never itself be the thing that stops the box serving. Each
+# piece below is independently fail-safe, and `setup_memory` is the backstop for
+# anything they miss, so the worst case is a box with no swap and no sampler
+# rather than no box. Note `set -e` does NOT apply inside a function on the left
+# of `||`, which is exactly why the chains here are explicit.
+setup_memory() {{
+# a swapfile, so a spike degrades into slowness rather than a kill. A partial
+# file is removed rather than left for `swapon` to choke on at the next boot.
 if [ ! -f /swapfile ]; then
-  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
-  chmod 600 /swapfile
-  mkswap /swapfile >/dev/null
-  swapon /swapfile
-  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none \
+    && chmod 600 /swapfile \
+    && mkswap /swapfile >/dev/null \
+    && swapon /swapfile \
+    && echo '/swapfile none swap sw 0 0' >> /etc/fstab \
+    || {{ rm -f /swapfile; echo "beet: no swapfile, continuing" >&2; }}
 fi
 # a safety net, not a routine path: the app should be resident
-echo 'vm.swappiness=10' > /etc/sysctl.d/90-{app_name}-swappiness.conf
-sysctl -p /etc/sysctl.d/90-{app_name}-swappiness.conf >/dev/null
+echo 'vm.swappiness=10' > /etc/sysctl.d/90-{app_name}-swappiness.conf \
+  && sysctl -p /etc/sysctl.d/90-{app_name}-swappiness.conf >/dev/null \
+  || echo "beet: could not set vm.swappiness, continuing" >&2
 
 # the per-minute memory sampler and its timer
 cat > /usr/local/bin/{app_name}-mem <<'MEM_EOF'
@@ -590,8 +600,11 @@ OnUnitActiveSec=1min
 [Install]
 WantedBy=timers.target
 MEM_TIMER_EOF
-systemctl daemon-reload
-systemctl enable --now {app_name}-mem.timer
+systemctl daemon-reload \
+  && systemctl enable --now {app_name}-mem.timer \
+  || echo "beet: memory sampler timer not started, continuing" >&2
+}}
+setup_memory || echo "beet: memory guards and sampler not installed, continuing" >&2
 "#
 		);
 
@@ -685,7 +698,7 @@ cat > /usr/local/bin/{app_name}-run <<'RUN_EOF'
 {run_script}
 RUN_EOF
 chmod +x /usr/local/bin/{app_name}-fetch /usr/local/bin/{app_name}-run
-{ssh_setup}
+{ssh_setup}{memory_setup}
 # The runtime credentials live in a 0600 file, NOT in the unit: a unit is
 # world-readable by convention and `systemctl cat` hands it to any local user.
 # `install -m 600 /dev/null` creates the file private before a byte of it
@@ -722,7 +735,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now {app_name}.service
-{https_setup}{memory_setup}{cloudwatch_setup}"#
+{https_setup}{cloudwatch_setup}"#
 		);
 
 		// build env var lines for terraform variable references
@@ -1572,6 +1585,22 @@ mod tests {
 		script.xpect_contains("\"log_stream_name\": \"beet_infra-mem\"");
 		// every sample names the artifact it belongs to
 		script.xpect_contains("BEET_DEPLOY_ID=");
+		// and none of it can stop the box serving: cloud-init runs under
+		// `set -e`, so a guard against a spike that aborted the boot would be
+		// strictly worse than the spike. Each piece is independently fail-safe,
+		// `setup_memory` backstops the rest, and a half-written swapfile is
+		// removed rather than left for the next boot's `swapon`.
+		script.xpect_contains("setup_memory || echo");
+		script.xpect_contains("rm -f /swapfile");
+		// it is installed BEFORE the unit, so the app has swap and the sampler
+		// from its first second
+		let (swap, unit) = (
+			script.find("mkswap").unwrap(),
+			script
+				.find("systemctl enable --now beet_infra.service")
+				.unwrap(),
+		);
+		swap.xpect_less_than(unit);
 	}
 
 	fn build_json(block: &LightsailBlock) -> String {
