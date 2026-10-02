@@ -165,10 +165,11 @@ impl DeployerPolicy {
 	const GLOBAL: &'static [&'static str] = &["route53", "sts"];
 
 	/// Provider prefixes no IAM policy grants, for one of two reasons: the
-	/// provider answers to its own credential (Cloudflare's account token), or
-	/// it makes no remote call at all (terraform's own builtins, the local
-	/// providers). Absence here is not a silent pass: a prefix this does not
-	/// name and [`SERVICES`](Self::SERVICES) does not place FAILS the mint.
+	/// provider answers to its own credential ([`DeployerToken`] lowers what
+	/// Cloudflare's asks for), or it makes no remote call at all (terraform's
+	/// own builtins, the local providers). Absence here is not a silent pass: a
+	/// prefix this does not name and [`SERVICES`](Self::SERVICES) does not
+	/// place FAILS the mint.
 	const NO_GRANT: &'static [&'static str] = &[
 		"cloudflare_",
 		"local_",
@@ -541,19 +542,28 @@ impl DeployerPolicy {
 	/// at. So this denies a deployer outright, and an operator who assumes a
 	/// role with a code is the only principal that gets through.
 	///
-	/// Scoped to the stages this launch RENDERED, plus `prod` unconditionally,
-	/// one resource per stage. The rendered stages are what protects an app
-	/// whose only stage is `shared`: the assets buckets are a source of record
-	/// and not a mirror, and a hard-coded `--prod--` pattern named nothing that
-	/// exists for them, so their own deployer could delete them with no code.
-	/// Prod stays named regardless so a mint under the wrong stage cannot
-	/// quietly drop the deny from the stage that matters most.
+	/// Scoped to the stages this launch RENDERED, plus `prod` unconditionally
+	/// and minus [`DEFAULT_STAGE`](BootstrapConfig::DEFAULT_STAGE), one resource
+	/// per stage. The rendered stages are what protects an app whose only stage
+	/// is `shared`: the assets buckets are a source of record and not a mirror,
+	/// and a hard-coded `--prod--` pattern named nothing that exists for them,
+	/// so their own deployer could delete them with no code. Prod stays named
+	/// regardless so a mint under the wrong stage cannot quietly drop the deny
+	/// from the stage that matters most.
 	///
-	/// Tearing a DEV stack down stays free, which the infra-deploy skill does
-	/// routinely, because a mint runs under the stage that deploys and `dev` is
-	/// therefore never among the stages it collects. A mint run under `dev`
-	/// would deny that teardown — loudly, and after the warning `DeployerMint`
-	/// already prints for a non-prod stage.
+	/// **Tearing the default stage down stays free whatever stage the mint ran
+	/// under**, because it is excluded here rather than merely absent from what
+	/// a prod launch happens to render. It is the disposable stage: the
+	/// infra-deploy skill stands a dev stack up and tears it down every cycle,
+	/// so its teardown is routine rather than irreversible.
+	///
+	/// That exclusion is load-bearing, not tidiness. While the set was "rendered
+	/// stages plus prod" alone, minting under `dev` — the bare `just site-mint`,
+	/// which is what creates a dev boundary in the first place — pulled `dev`
+	/// into this deny and left `beet-site--dev--*` undeletable without a code.
+	/// A dev teardown then failed on all three buckets (2026-10-02) and the only
+	/// cure was a second mint under prod to undo the first. Pinned by
+	/// `the_disposable_stage_is_never_irreversible`.
 	///
 	/// ## What is deliberately NOT here
 	///
@@ -581,11 +591,16 @@ impl DeployerPolicy {
 		// prod from the deny, turning a wrong-stage mint from over-protecting
 		// into silently under-protecting the one stage that matters. A deny
 		// naming a stage an app does not have is inert.
+		//
+		// The DEFAULT stage is excluded outright, whatever a launch rendered: it
+		// is the disposable one, stood up and torn down every release cycle, so
+		// its teardown is routine rather than irreversible.
 		let stages = self
 			.stages
 			.iter()
 			.map(SmolStr::as_str)
 			.chain([BootstrapConfig::PROD_STAGE])
+			.filter(|stage| *stage != BootstrapConfig::DEFAULT_STAGE)
 			.collect::<BTreeSet<_>>();
 		let mut per_stage = |template: &str| {
 			resources.extend(stages.iter().map(|stage| {
@@ -978,5 +993,47 @@ mod test {
 			.as_str()
 			.xpect_contains("beet-site--prod--*")
 			.xpect_contains("beet-site--shared--*");
+	}
+
+	/// The disposable stage is never in the deny, whatever stage the mint ran
+	/// under, so tearing a dev stack down never needs a code.
+	///
+	/// It used to be in it whenever a launch rendered it, which made the mint's
+	/// stage silently destructive: the bare `just site-mint` is what creates a
+	/// dev boundary, and the same run pulled `beet-site--dev--*` into this deny
+	/// and left those buckets undeletable. A real dev teardown failed on all
+	/// three (2026-10-02) and wanted a second mint under prod to undo the first.
+	#[beet_core::test]
+	fn the_disposable_stage_is_never_irreversible() {
+		let (scope, _dir) = RenderScope::test_render_stack(
+			(
+				Stack::new("beet-site")
+					.with_stage(BootstrapConfig::DEFAULT_STAGE),
+				AwsRegion::new("us-west-2"),
+			),
+			|parent| {
+				parent.spawn(
+					S3BucketBlock::new("assets")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
+				);
+			},
+		);
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		let deny = DeployerPolicy::new("beet-site", "state")
+			.lower(&stack, &config)
+			.unwrap()
+			.to_json()["Statement"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.find(|statement| statement["Sid"] == "IrreversibleNeedsMfa")
+			.unwrap()["Resource"]
+			.to_string();
+		// a mint under `dev` still protects prod, and leaves dev deletable
+		deny.as_str()
+			.xpect_contains("beet-site--prod--*")
+			.xnot()
+			.xpect_contains("beet-site--dev");
 	}
 }

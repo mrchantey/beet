@@ -238,6 +238,16 @@ Read the bound http + ssh ports from the serve output (defaults 8337 / 8339). Ru
 
 ## Step 2: Dev
 
+PREREQUISITE, ONCE PER ACCOUNT: dev needs its own `beet-site--dev--runtime-boundary`, and the deployer cannot mint one (it is explicitly denied `iam:CreatePolicy` on `--*--runtime-boundary`, or the cap it wears would be decorative). Without it the stack apply fails on `NoSuchEntity: Scope ARN ... does not exist or is not attachable` after the storage layer has already created the three dev buckets. Minting is an administrator's act, needs the typed MFA code, and is one command:
+
+```sh
+cargo run -p beet-cli --features infra,extra,atproto -- admin -- --main=site deployer/mint
+```
+
+Bare, with no `--stage`: the boundary is per stage and `--stage=prod` converges prod's, which already exists. The features are not optional — without them `<DeployerMint/>` is `bx:cfg`-excluded and the verb does not exist. Verify with `aws iam get-policy --policy-arn arn:aws:iam::<account>:policy/beet-site--dev--runtime-boundary`, through `beet secrets/exec` or an admin session: `beet admin -- <cmd>` persists nothing, so a bare shell afterwards has no credentials and answers `NoCredentials` whatever the mint did.
+
+A mint under `dev` used to be destructive as well: it rewrote the app-wide `beet-site--deploy` from the dev render, which pulled `beet-site--dev--*` into the `IrreversibleNeedsMfa` deny and left a dev teardown unable to delete its own buckets. `irreversible_statement` now excludes `BootstrapConfig::DEFAULT_STAGE` outright, so the mint's stage no longer changes that deny; pinned by `the_disposable_stage_is_never_irreversible` in `crates/beet_infra/src/types/deployer_policy.rs`. If a dev teardown ever reports `AccessDenied ... explicit deny in an identity-based policy` on a bucket, that exclusion is gone.
+
 ```sh
 just beet-validate            # resolves, no cloud
 just beet-plan                # EYEBALL: dev must touch only beet-site--dev--* and dev.beet.org

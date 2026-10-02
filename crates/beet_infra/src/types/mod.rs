@@ -7,6 +7,10 @@ mod build_artifact;
 // since both speak AWS policy documents.
 #[cfg(feature = "bindings_aws_common")]
 mod deployer_policy;
+// the same lowering for Cloudflare, whose api token has no policy document and
+// no bindings behind it: the input is declared type names and action type
+// names, both strings, so it is ungated.
+mod deployer_token;
 mod deployment;
 mod infra_plugin;
 // a bucket's per-prefix retention, shared by every provider's bucket block.
@@ -36,6 +40,7 @@ pub use artifacts::*;
 pub use build_artifact::*;
 #[cfg(feature = "bindings_aws_common")]
 pub use deployer_policy::*;
+pub use deployer_token::*;
 pub use deployment::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;

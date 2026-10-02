@@ -1,0 +1,660 @@
+//! The Cloudflare api token a repo's deployer needs, LOWERED from the provider
+//! types its stacks render and the Cloudflare actions their routes run.
+
+use crate::prelude::*;
+use beet_core::prelude::*;
+
+/// The Cloudflare counterpart of [`DeployerPolicy`]: that lowers the AWS types
+/// a stack renders into what the deployer applying it may do, this lowers the
+/// CLOUDFLARE ones, plus the Cloudflare actions a deploy route runs, which
+/// reach the api without rendering anything at all.
+///
+/// ## Why the actions are a second input
+///
+/// On the AWS side every call a deploy makes belongs to a service that some
+/// rendered resource names, so the config is the whole input. Cloudflare's
+/// zone work is not like that: `<CloudflareZoneSetup/>` publishes a ruleset and
+/// patches two settings, `<CloudflarePurgeCache/>` purges, `<ZoneAudit/>` lists
+/// and deletes records, and none of the three renders a resource. A token
+/// lowered from the config alone would be three groups short on every deploy,
+/// so an action contributes its own by type name
+/// ([`ACTIONS`](Self::ACTIONS)).
+///
+/// ## What Cloudflare does not have, and what this is instead
+///
+/// There is no permissions boundary and no mfa condition on an api token, so
+/// neither half of the AWS ceiling transfers: a token's power is exactly the
+/// groups and resources it was created with, for as long as it exists. So this
+/// lowering IS the ceiling rather than a derivation of one, and the one group
+/// that escalates ([`TokenPermission::API_TOKENS_WRITE`], which may mint any
+/// token the account can hold, a wider one included) is a line the credential
+/// model has to draw by hand. [`escalating`](Self::escalating) names who asks
+/// for it.
+///
+/// ## What makes a token out of this
+///
+/// No verb yet: the deploy token is hand-made in the dashboard and sealed as
+/// `CLOUDFLARE_API_TOKEN`, so the lowering is read as the `> permission:` lines
+/// of that record's rotation note, which is what [`Display`] prints. Each
+/// group carries the api's own id beside its name, so a verb that mints one
+/// needs no second table.
+///
+/// [`Display`]: std::fmt::Display
+#[derive(Debug, Default, Clone)]
+pub struct DeployerToken {
+	/// The accounts the lowered stacks address, the `Account Resources` of
+	/// every account-scoped group. More than one is not an error: a user-owned
+	/// token, which the hand-made one is, may name several where an
+	/// account-owned one may name only its own.
+	accounts: BTreeSet<SmolStr>,
+	/// The zones the lowered stacks address by domain, the `Zone Resources` of
+	/// every zone-scoped group. Keyed by domain because that is what the
+	/// dashboard's zone picker shows, with the id a mint would use.
+	zones: BTreeMap<SmolStr, SmolStr>,
+	/// Every permission the lowering named, and the declared types and actions
+	/// that asked for each: a narrowing has to say which declaration to remove,
+	/// not only which group to drop.
+	asked: BTreeMap<TokenPermission, BTreeSet<SmolStr>>,
+}
+
+impl DeployerToken {
+	/// The one declared-type prefix this lowers. Every other provider's types
+	/// lower through that provider's own policy, so they are skipped rather
+	/// than refused.
+	const PREFIX: &'static str = "cloudflare_";
+
+	/// What a rendered provider type needs, by longest matching prefix so a
+	/// family rides one entry, and loud on a `cloudflare_` type with no entry
+	/// at all ([`DeployerPolicy::service`]'s rule, for the same reason: a
+	/// silently dropped type is a deploy that works until the apply that
+	/// touches it).
+	const RESOURCES: &'static [(&'static str, &'static [TokenPermission])] = &[
+		// the per-bucket R2 token an `R2BucketBlock` apply mints, which is the
+		// only declaration in the tree that asks for the escalating group
+		("cloudflare_account_token", &[
+			TokenPermission::API_TOKENS_READ,
+			TokenPermission::API_TOKENS_WRITE,
+		]),
+		("cloudflare_dns_record", &[TokenPermission::DNS_WRITE]),
+		// a load balancer is zone-scoped, its monitors and pools account-scoped,
+		// so the opt-in failover block asks for both lists
+		("cloudflare_load_balancer", &[
+			TokenPermission::LOAD_BALANCERS_WRITE,
+		]),
+		("cloudflare_load_balancer_monitor", &[
+			TokenPermission::LOAD_BALANCER_POOLS_WRITE,
+		]),
+		("cloudflare_load_balancer_pool", &[
+			TokenPermission::LOAD_BALANCER_POOLS_WRITE,
+		]),
+		("cloudflare_r2_bucket", &[
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+		]),
+	];
+
+	/// What a Cloudflare action needs, by the type name of the action's own
+	/// component, with the call that asks for it named beside it. An action
+	/// that reaches no api carries an EMPTY list rather than no entry, so a
+	/// reader can tell "needs nothing" from "nobody lowered this".
+	///
+	/// Every `wrangler` action also needs [`ACCOUNT_SETTINGS_READ`]: wrangler
+	/// is given no account id, so it resolves one by listing the accounts the
+	/// token can see. Setting `CLOUDFLARE_ACCOUNT_ID` on the child would drop
+	/// that group, which is a narrowing worth taking when one is wanted.
+	///
+	/// [`ACCOUNT_SETTINGS_READ`]: TokenPermission::ACCOUNT_SETTINGS_READ
+	const ACTIONS: &'static [(&'static str, &'static [TokenPermission])] = &[
+		// the zone verbs first, since they are the frequent ones: every deploy
+		// and every content sync of every repo runs them
+		//
+		// `POST zones/{zone}/purge_cache`
+		("CloudflarePurgeCache", &[TokenPermission::CACHE_PURGE]),
+		// the cache-phase entrypoint ruleset, then the `ssl` and
+		// `always_use_https` settings
+		("CloudflareZoneSetup", &[
+			TokenPermission::CACHE_SETTINGS_WRITE,
+			TokenPermission::ZONE_SETTINGS_WRITE,
+		]),
+		// lists every record in the zone and deletes the unaccounted ones
+		("ZoneAudit", &[TokenPermission::DNS_WRITE]),
+		// then the wrangler ones, which only the Worker and container examples
+		// declare
+		//
+		// times a redeploy against an R2 sync, so it asks for both paths
+		("CloudflareBench", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+			TokenPermission::WORKERS_ROUTES_WRITE,
+			TokenPermission::WORKERS_SCRIPTS_WRITE,
+		]),
+		// `wrangler deploy` of the fronting Worker, the image it builds and
+		// pushes to the managed registry, and the bucket the container reads
+		("CloudflareContainerDeployAction", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::CLOUDCHAMBER_WRITE,
+			TokenPermission::WORKERS_CONTAINERS_WRITE,
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+			TokenPermission::WORKERS_SCRIPTS_WRITE,
+		]),
+		// deletes the script, its custom domain, the container application, its
+		// registry image and the bucket
+		("CloudflareDestroy", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::CLOUDCHAMBER_WRITE,
+			TokenPermission::WORKERS_CONTAINERS_WRITE,
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+			TokenPermission::WORKERS_ROUTES_WRITE,
+			TokenPermission::WORKERS_SCRIPTS_WRITE,
+		]),
+		// `wrangler r2 object put` per file
+		("CloudflareR2Sync", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+		]),
+		// `wrangler tail`, whose session is opened under the script's own
+		// group; a 403 here is Cloudflare asking for `Workers Tail Read`
+		// instead, which no token of this account has ever held
+		("CloudflareWatch", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::WORKERS_SCRIPTS_WRITE,
+		]),
+		// a local cargo + wasm-bindgen build, which reaches nothing
+		("CloudflareWorkerBuildAction", &[]),
+		// the Worker upload, its secrets, the bucket it binds and the custom
+		// domain the upload provisions (with the record and certificate)
+		("CloudflareWorkerDeployAction", &[
+			TokenPermission::ACCOUNT_SETTINGS_READ,
+			TokenPermission::WORKERS_R2_STORAGE_WRITE,
+			TokenPermission::WORKERS_ROUTES_WRITE,
+			TokenPermission::WORKERS_SCRIPTS_WRITE,
+		]),
+	];
+
+	/// Lower one of the repo's stacks: the groups its `cloudflare_` types need,
+	/// and the account or zone each group's resource list names. A stack
+	/// rendering no Cloudflare type at all adds nothing and demands no address.
+	pub fn lower(
+		mut self,
+		stack: &ResolvedStack,
+		config: &terra::Config,
+	) -> Result<Self> {
+		for declared in config
+			.declared_types()
+			.into_iter()
+			.filter(|declared| declared.starts_with(Self::PREFIX))
+		{
+			self.add(stack, declared, Self::resource(declared)?)?;
+		}
+		self.xok()
+	}
+
+	/// Lower one Cloudflare action a route of the repo declares, by the type
+	/// name of its component. The addresses come from the action's OWN stack,
+	/// resolved by ancestry from its entity, since a route's verbs may sit
+	/// outside every stack.
+	pub fn lower_action(
+		mut self,
+		stack: &ResolvedStack,
+		action: &str,
+	) -> Result<Self> {
+		let permissions = Self::ACTIONS
+			.iter()
+			.find(|(name, _)| *name == action)
+			.map(|(_, permissions)| *permissions)
+			.ok_or_else(|| {
+				bevyhow!(
+					"no deploy token permission is declared for the action \
+					`{action}`: add it to `DeployerToken::ACTIONS` with the \
+					calls it makes"
+				)
+			})?;
+		self.add(stack, action, permissions)?;
+		self.xok()
+	}
+
+	/// Every action name a collector looks for in the world: the lowering's
+	/// own table is the list, so a type registry lookup per name finds the
+	/// ones a route actually declares.
+	pub fn action_names() -> impl Iterator<Item = &'static str> {
+		Self::ACTIONS.iter().map(|(name, _)| *name)
+	}
+
+	/// The permissions a declared type needs, an error for a `cloudflare_`
+	/// type with no entry.
+	fn resource(declared: &str) -> Result<&'static [TokenPermission]> {
+		Self::RESOURCES
+			.iter()
+			.filter(|(prefix, _)| declared.starts_with(prefix))
+			.max_by_key(|(prefix, _)| prefix.len())
+			.map(|(_, permissions)| *permissions)
+			.ok_or_else(|| {
+				bevyhow!(
+					"no deploy token permission is declared for `{declared}`: \
+					add its prefix to `DeployerToken::RESOURCES`"
+				)
+			})
+	}
+
+	/// Record `permissions` as asked for by `asker`, resolving the address each
+	/// group's scope names: an account-scoped group needs the stack's
+	/// [`CloudflareAccount`], a zone-scoped one its [`CloudflareZone`], and a
+	/// stack declaring neither fails naming the spread.
+	fn add(
+		&mut self,
+		stack: &ResolvedStack,
+		asker: &str,
+		permissions: &[TokenPermission],
+	) -> Result {
+		for permission in permissions {
+			match permission.scope {
+				TokenScope::Account => {
+					self.accounts
+						.insert(stack.cloudflare_account()?.id.clone());
+				}
+				TokenScope::Zone => {
+					let zone = stack.cloudflare_zone()?;
+					self.zones.insert(zone.domain.clone(), zone.id.clone());
+				}
+				TokenScope::Bucket => bevybail!(
+					"`{asker}` asks a deploy token for the bucket-scoped \
+					`{permission}`, which belongs to a token an apply MINTS \
+					rather than to the one applying it"
+				),
+			}
+			self.asked
+				.entry(*permission)
+				.or_default()
+				.insert(asker.into());
+		}
+		Ok(())
+	}
+
+	/// Every permission the lowering named, and what asked for each.
+	pub fn asked(&self) -> &BTreeMap<TokenPermission, BTreeSet<SmolStr>> {
+		&self.asked
+	}
+
+	/// The accounts every account-scoped group is granted over.
+	pub fn accounts(&self) -> &BTreeSet<SmolStr> { &self.accounts }
+
+	/// The zones every zone-scoped group is granted over, by domain.
+	pub fn zones(&self) -> &BTreeMap<SmolStr, SmolStr> { &self.zones }
+
+	/// What asks for the one group that can mint a credential wider than
+	/// itself, [`None`] when nothing does. A lowering that answers [`None`] is
+	/// a repo whose deploy token never needs to escalate, which is the whole
+	/// point of asking.
+	pub fn escalating(&self) -> Option<&BTreeSet<SmolStr>> {
+		self.asked.get(&TokenPermission::API_TOKENS_WRITE)
+	}
+}
+
+impl std::fmt::Display for DeployerToken {
+	/// The dashboard recipe, in the order the Create Custom Token form asks
+	/// for it: one line per group with what asked for it, then the two
+	/// resource lists.
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		for (permission, askers) in &self.asked {
+			let askers = askers
+				.iter()
+				.map(SmolStr::as_str)
+				.collect::<Vec<_>>()
+				.join(", ");
+			writeln!(f, "permission: {permission} ({askers})")?;
+		}
+		if !self.accounts.is_empty() {
+			let accounts = self
+				.accounts
+				.iter()
+				.map(SmolStr::as_str)
+				.collect::<Vec<_>>();
+			writeln!(f, "account resources: {}", accounts.join(", "))?;
+		}
+		if !self.zones.is_empty() {
+			let zones = self
+				.zones
+				.iter()
+				.map(|(domain, id)| format!("{domain} ({id})"))
+				.collect::<Vec<_>>();
+			writeln!(f, "zone resources: {}", zones.join(", "))?;
+		}
+		Ok(())
+	}
+}
+
+/// Which resource list a permission group is granted over. A token policy
+/// names one resource string per scope, so the scope is also what decides
+/// which address a lowering has to resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TokenScope {
+	/// `com.cloudflare.api.account.<id>`, the stack's [`CloudflareAccount`].
+	Account,
+	/// `com.cloudflare.api.account.zone.<id>`, the stack's [`CloudflareZone`].
+	Zone,
+	/// `com.cloudflare.edge.r2.bucket.<account>_default_<bucket>`, one bucket
+	/// and nothing else in the account. Only ever MINTED into a token (the
+	/// `R2BucketBlock` pair), never held by one that deploys.
+	Bucket,
+}
+
+impl std::fmt::Display for TokenScope {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str(match self {
+			Self::Account => "Account",
+			Self::Zone => "Zone",
+			Self::Bucket => "Bucket",
+		})
+	}
+}
+
+/// One Cloudflare api-token permission group, by Cloudflare's own name for it
+/// and the id a token policy names it by.
+///
+/// The ids are global constants rather than per-account, listed by
+/// `GET /accounts/{id}/tokens/permission_groups`; one that stopped existing
+/// fails the call that uses it, which is the same loud failure a renamed group
+/// gives.
+///
+/// The names are the api's. The dashboard's Create Custom Token form spells
+/// the same groups as `<noun>: Edit` where the api says `<noun> Write`, and
+/// renames two outright: `Cache Settings` is `Cache Rules` there, and
+/// `Workers Containers` is `Containers`. There is deliberately no second
+/// spelling here, since a group has one id and that is the fact worth keeping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TokenPermission {
+	/// What the group is granted over, which orders a printed list the way the
+	/// dashboard asks for it: every account group, then every zone one.
+	scope: TokenScope,
+	/// Cloudflare's own name, ie `DNS Write`.
+	name: &'static str,
+	/// The account-wide constant id a token policy names the group by.
+	id: &'static str,
+}
+
+impl TokenPermission {
+	const fn account(name: &'static str, id: &'static str) -> Self {
+		Self {
+			scope: TokenScope::Account,
+			name,
+			id,
+		}
+	}
+
+	const fn zone(name: &'static str, id: &'static str) -> Self {
+		Self {
+			scope: TokenScope::Zone,
+			name,
+			id,
+		}
+	}
+
+	const fn bucket(name: &'static str, id: &'static str) -> Self {
+		Self {
+			scope: TokenScope::Bucket,
+			name,
+			id,
+		}
+	}
+
+	/// Lists the accounts the token can see, which is how `wrangler` resolves
+	/// an account it was given no id for.
+	pub const ACCOUNT_SETTINGS_READ: Self = Self::account(
+		"Account Settings Read",
+		"c1fde68c7bcc44588cbb6ddbc16d6480",
+	);
+
+	/// Reads the account's api tokens, which a provider refresh of a minted
+	/// token needs.
+	pub const API_TOKENS_READ: Self = Self::account(
+		"Account API Tokens Read",
+		"eb56a6953c034b9d97dd838155666f06",
+	);
+
+	/// Creates, rewrites and deletes the account's api tokens: the one group
+	/// that can mint a credential WIDER than the token holding it, since a
+	/// minted token may carry any group the account has. Cloudflare has no
+	/// boundary to condition it with, so nothing but keeping it out of a held
+	/// credential limits it.
+	pub const API_TOKENS_WRITE: Self = Self::account(
+		"Account API Tokens Write",
+		"5bc3f8b21c554832afc660159ab75fa4",
+	);
+
+	/// The compute the container applications run on, which `wrangler deploy`
+	/// addresses alongside the registry image.
+	pub const CLOUDCHAMBER_WRITE: Self =
+		Self::account("Cloudchamber Write", "26ce6c7d18a346528e7b905d5e269866");
+
+	/// The account half of a load balancer: its health monitors and its
+	/// origin pools.
+	pub const LOAD_BALANCER_POOLS_WRITE: Self = Self::account(
+		"Load Balancing: Monitors and Pools Write",
+		"d2a1802cc9a34e30852f8b33869b2f3c",
+	);
+
+	/// The container applications and their managed-registry images.
+	pub const WORKERS_CONTAINERS_WRITE: Self = Self::account(
+		"Workers Containers Write",
+		"bdbcd690c763475a985e8641dddc09f7",
+	);
+
+	/// R2 buckets and their contents at the account level: creating one,
+	/// deleting one, and `wrangler r2 object put`.
+	pub const WORKERS_R2_STORAGE_WRITE: Self = Self::account(
+		"Workers R2 Storage Write",
+		"bf7481a1826f439697cb59a20b22293e",
+	);
+
+	/// Worker scripts, their bindings and their secrets: the `wrangler deploy`
+	/// upload.
+	pub const WORKERS_SCRIPTS_WRITE: Self = Self::account(
+		"Workers Scripts Write",
+		"e086da7e2179491d91ee5f35b3ca210a",
+	);
+
+	/// Purges the zone cache. Its own group, held by nothing else, and the one
+	/// whose dashboard level reads `Purge` rather than `Edit`.
+	pub const CACHE_PURGE: Self =
+		Self::zone("Cache Purge", "e17beae8b8cb423a99b1730f21238bed");
+
+	/// The cache-phase ruleset, ie the `http_request_cache_settings`
+	/// entrypoint the zone setup publishes.
+	pub const CACHE_SETTINGS_WRITE: Self =
+		Self::zone("Cache Settings Write", "9ff81cbbe65c400b97d92c3c1033cab6");
+
+	/// Every record in the zone: what an apply publishes and what an audit
+	/// deletes.
+	pub const DNS_WRITE: Self =
+		Self::zone("DNS Write", "4755a26eedb94da69e1066d98aa820be");
+
+	/// The zone half of a load balancer, steering one proxied hostname.
+	pub const LOAD_BALANCERS_WRITE: Self =
+		Self::zone("Load Balancers Write", "6d7f2f5f5b1d4a0e9081fdc98d432fd1");
+
+	/// A Worker's routes and custom domains, which a `wrangler deploy`
+	/// provisions with their record and certificate.
+	pub const WORKERS_ROUTES_WRITE: Self =
+		Self::zone("Workers Routes Write", "28f4b596e7d643029c524985477ae49a");
+
+	/// The zone settings the setup patches, ie `ssl` and `always_use_https`.
+	pub const ZONE_SETTINGS_WRITE: Self =
+		Self::zone("Zone Settings Write", "3030687196b94b638145a3953da2b699");
+
+	/// Reads the objects of one bucket, half of what a minted R2 token holds.
+	pub const BUCKET_ITEM_READ: Self = Self::bucket(
+		"Workers R2 Storage Bucket Item Read",
+		"6a018a9f2fc74eb6b293b0c548f38b39",
+	);
+
+	/// Writes and deletes the objects of one bucket, the other half. R2 keeps
+	/// no versions, so this is also the group that makes a delete final.
+	pub const BUCKET_ITEM_WRITE: Self = Self::bucket(
+		"Workers R2 Storage Bucket Item Write",
+		"2efd5506f9c8494dacb1fa10a3e7d5b6",
+	);
+
+	/// What the group is granted over.
+	pub const fn scope(&self) -> TokenScope { self.scope }
+
+	/// Cloudflare's own name for the group.
+	pub const fn name(&self) -> &'static str { self.name }
+
+	/// The id a token policy names the group by.
+	pub const fn id(&self) -> &'static str { self.id }
+}
+
+impl std::fmt::Display for TokenPermission {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{} > {}", self.scope, self.name)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A stack with both Cloudflare addresses declared, which every lowering
+	/// here resolves against.
+	fn addressed() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		(
+			stack
+				.with_cloudflare_account(CloudflareAccount::new("acct123"))
+				.with_cloudflare_zone(CloudflareZone::new(
+					"beetmash.com",
+					"zone123",
+				)),
+			deployment,
+			dir,
+		)
+	}
+
+	/// A declared type's groups are its longest matching prefix's, a bucket's
+	/// lifecycle rides the bucket's own entry, and a `cloudflare_` type with
+	/// none is a loud error.
+	#[beet_core::test]
+	fn places_every_cloudflare_type() {
+		let names = |declared| {
+			DeployerToken::resource(declared)
+				.unwrap()
+				.iter()
+				.map(TokenPermission::name)
+				.collect::<Vec<_>>()
+		};
+		names("cloudflare_dns_record").xpect_eq(vec!["DNS Write"]);
+		names("cloudflare_r2_bucket_lifecycle")
+			.xpect_eq(vec!["Workers R2 Storage Write"]);
+		// the longer prefix wins: a pool is account-scoped where the load
+		// balancer naming it is zone-scoped
+		names("cloudflare_load_balancer")
+			.xpect_eq(vec!["Load Balancers Write"]);
+		names("cloudflare_load_balancer_pool")
+			.xpect_eq(vec!["Load Balancing: Monitors and Pools Write"]);
+		DeployerToken::resource("cloudflare_queue")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cloudflare_queue");
+	}
+
+	/// What the frequent work needs: the three zone verbs every deploy runs ask
+	/// for four zone groups, no account group at all, and nothing that can mint
+	/// a credential.
+	#[beet_core::test]
+	fn the_zone_verbs_never_escalate() {
+		let (stack, ..) = addressed();
+		let token =
+			["CloudflareZoneSetup", "CloudflarePurgeCache", "ZoneAudit"]
+				.into_iter()
+				.try_fold(DeployerToken::default(), |token, action| {
+					token.lower_action(&stack, action)
+				})
+				.unwrap();
+		token
+			.asked()
+			.keys()
+			.map(TokenPermission::name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"Cache Purge",
+				"Cache Settings Write",
+				"DNS Write",
+				"Zone Settings Write",
+			]);
+		token.accounts().is_empty().xpect_true();
+		token.escalating().is_none().xpect_true();
+	}
+
+	/// A rendered record lowers to the one group that publishes it and names
+	/// the zone it landed in; the AWS types beside it belong to another
+	/// provider's policy and are skipped rather than refused.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn lowers_a_rendered_record() {
+		let (stack, deployment, _dir) = addressed();
+		let mut config = deployment.create_config(&stack);
+		DnsProvider::cloudflare("mail.beetmash.com")
+			.emit_txt(
+				&stack,
+				&mut config,
+				"spf",
+				"mail.beetmash.com",
+				"v=spf1 -all",
+			)
+			.unwrap();
+		let token = DeployerToken::default().lower(&stack, &config).unwrap();
+		token
+			.to_string()
+			.as_str()
+			.xpect_contains(
+				"permission: Zone > DNS Write (cloudflare_dns_record)",
+			)
+			.xpect_contains("zone resources: beetmash.com (zone123)");
+		token.escalating().is_none().xpect_true();
+	}
+
+	/// The hole the credential split closes: one `<R2BucketBlock/>` anywhere in
+	/// a repo puts the group that can mint any token the account holds into the
+	/// credential every deploy of that repo reads.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn an_r2_bucket_asks_for_the_escalating_group() {
+		let (stack, deployment, _dir) = addressed();
+		let mut config = deployment.create_config(&stack);
+		R2BucketBlock::new("cold-backups")
+			.emit(&stack, &deployment, &mut config)
+			.unwrap();
+		let token = DeployerToken::default().lower(&stack, &config).unwrap();
+		token
+			.escalating()
+			.unwrap()
+			.iter()
+			.map(SmolStr::as_str)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["cloudflare_account_token"]);
+		token
+			.to_string()
+			.as_str()
+			.xpect_contains("Account > Workers R2 Storage Write")
+			.xpect_contains("account resources: acct123");
+	}
+
+	/// An action with no entry fails naming it, and a group whose scope the
+	/// stack declares no address for fails naming the spread.
+	#[beet_core::test]
+	fn an_unlowered_action_and_a_missing_address_are_loud() {
+		let (stack, ..) = addressed();
+		DeployerToken::default()
+			.lower_action(&stack, "DirSync")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("DirSync")
+			.xpect_contains("DeployerToken::ACTIONS");
+		let (bare, ..) = ResolvedStack::default_local();
+		DeployerToken::default()
+			.lower_action(&bare, "CloudflarePurgeCache")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("CloudflareZone");
+	}
+}

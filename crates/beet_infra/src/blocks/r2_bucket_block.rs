@@ -77,13 +77,13 @@ impl R2BucketBlock {
 	pub const REGION: &'static str = "auto";
 
 	/// The permission groups the bucket's token holds: objects in this one
-	/// bucket, read and write, and nothing at the account level. Ids are
-	/// Cloudflare's global constants (`GET /accounts/{id}/tokens/permission_groups`
-	/// lists them by name); an id that stopped existing fails the apply.
-	pub const ITEM_READ_PERMISSION: &'static str =
-		"6a018a9f2fc74eb6b293b0c548f38b39";
-	pub const ITEM_WRITE_PERMISSION: &'static str =
-		"2efd5506f9c8494dacb1fa10a3e7d5b6";
+	/// bucket, read and write, and nothing at the account level. Named through
+	/// [`TokenPermission`], the one table every Cloudflare group beet uses
+	/// lives in, so the id and what it grants are read in one place.
+	pub const ITEM_PERMISSIONS: &'static [TokenPermission] = &[
+		TokenPermission::BUCKET_ITEM_READ,
+		TokenPermission::BUCKET_ITEM_WRITE,
+	];
 
 	pub fn new(label: impl Into<SmolStr>) -> Self {
 		Self {
@@ -224,14 +224,14 @@ impl R2BucketBlock {
 					.into(),
 				policies: vec![CloudflareAccountTokenPolicies {
 					effect: "allow".into(),
-					permission_groups: vec![
-						CloudflareAccountTokenPoliciesPermissionGroups {
-							id: Self::ITEM_READ_PERMISSION.into(),
-						},
-						CloudflareAccountTokenPoliciesPermissionGroups {
-							id: Self::ITEM_WRITE_PERMISSION.into(),
-						},
-					],
+					permission_groups: Self::ITEM_PERMISSIONS
+						.iter()
+						.map(|permission| {
+							CloudflareAccountTokenPoliciesPermissionGroups {
+								id: permission.id().into(),
+							}
+						})
+						.collect(),
 					resources: self.token_resources(stack)?.into(),
 				}],
 				depends_on: Some(vec![bucket.address().into()]),
@@ -465,8 +465,8 @@ mod tests {
 		rendered
 			.xpect_contains("\"cloudflare_account_token\"")
 			.xpect_contains("\"name\":\"beet-infra--dev--cold-backups-token\"")
-			.xpect_contains(R2BucketBlock::ITEM_READ_PERMISSION)
-			.xpect_contains(R2BucketBlock::ITEM_WRITE_PERMISSION)
+			.xpect_contains(TokenPermission::BUCKET_ITEM_READ.id())
+			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
 			.xpect_contains(
 				"com.cloudflare.edge.r2.bucket.acct123_default_beet-infra--dev--cold-backups",
 			)
