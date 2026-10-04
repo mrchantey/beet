@@ -821,29 +821,34 @@ mod test {
 		token.escalating().is_none().xpect_true();
 	}
 
-	/// The hole the credential split closes: one `<R2BucketBlock/>` anywhere in
-	/// a repo puts the group that can mint any token the account holds into the
-	/// credential every deploy of that repo reads.
+	/// The hole the credential split closed, from the lowering's side: a bucket
+	/// renders its own storage group and NOTHING that mints, so no repo's deploy
+	/// token escalates however many buckets it declares. `cloudflare/mint` mints
+	/// the bucket's own token out of band.
+	///
+	/// The `cloudflare_account_token` entry stays in the table deliberately, and
+	/// `places_every_cloudflare_type` covers it: if a declaration ever renders
+	/// one again, the lowering names the escalating group out loud rather than
+	/// letting it back in quietly.
 	#[cfg(feature = "cloudflare_dns")]
 	#[beet_core::test]
-	fn an_r2_bucket_asks_for_the_escalating_group() {
+	fn an_r2_bucket_never_escalates() {
 		let (stack, deployment, _dir) = addressed();
 		let mut config = deployment.create_config(&stack);
 		R2BucketBlock::new("cold-backups")
 			.emit(&stack, &deployment, &mut config)
 			.unwrap();
 		let token = DeployerToken::default().lower(&stack, &config).unwrap();
+		token.escalating().is_none().xpect_true();
 		token
-			.escalating()
-			.unwrap()
-			.iter()
-			.map(SmolStr::as_str)
+			.asked()
+			.keys()
+			.map(TokenPermission::name)
 			.collect::<Vec<_>>()
-			.xpect_eq(vec!["cloudflare_account_token"]);
+			.xpect_eq(vec!["Workers R2 Storage Write"]);
 		token
 			.to_string()
 			.as_str()
-			.xpect_contains("Account > Workers R2 Storage Write")
 			.xpect_contains("account resources: acct123")
 			// the stack declares a zone and the bucket needs nothing in it, so
 			// the token reaches none

@@ -15,24 +15,28 @@ use beet_net::prelude::*;
 /// ancestor [`Stack`] exactly as an S3 bucket's does, so a consumer names it by
 /// label and never by a second composition.
 ///
-/// ## The credential is minted by the apply and parked, not lowered
+/// ## The credential is parked, and the apply never mints it
 ///
-/// An R2 bucket is reached over the S3 api with an api token, and no IAM
-/// policy can grant that. So the apply mints one: an account-owned
-/// `cloudflare_account_token` scoped to this one bucket (read and write on its
-/// objects, nothing else in the account), whose id IS the S3 access key id and
-/// whose value's SHA-256 IS the secret access key. Both are parked as
-/// `SecureString` parameters under the stack's secret prefix, exactly as the
-/// mail box parks its SES relay pair, and this block's [grants](Block::grants)
-/// name those two parameters rather than the bucket, so an AWS compute lowers
-/// them to `ssm:GetParameter` on exactly those. SecretRotation is replacing the
-/// token resource; the parameters follow it in the same apply.
+/// An R2 bucket is reached over the S3 api with an api token, and no IAM policy
+/// can grant that. So one is minted for this bucket alone: an account-owned
+/// token scoped to its objects and nothing else in the account, whose id IS the
+/// S3 access key id and whose value's SHA-256 IS the secret access key. Both
+/// are parked as `SecureString` parameters under the stack's secret prefix,
+/// exactly as the mail box parks its SES relay pair, and this block's
+/// [grants](Block::grants) name those two parameters rather than the bucket, so
+/// an AWS compute lowers them to `ssm:GetParameter` on exactly those.
 ///
-/// That asks one thing of the deployer's own Cloudflare token: `Account API
-/// Tokens: Edit`, which is the tier every deployer credential sits at (the AWS
-/// deploy user mints IAM users and access keys the same way). One hand-made
-/// credential per provider, the deployer's; every runtime credential is
-/// minted by an apply.
+/// **`cloudflare/mint` does that minting, not the apply**, and the difference
+/// is the whole reason the seam exists. Creating a token needs `Account API
+/// Tokens Write`, which can mint any token the account can hold, a wider one
+/// included; Cloudflare has no permissions boundary to cap that with and no mfa
+/// condition to put on it, so the only thing that keeps it out of reach is that
+/// no credential a deploy reads carries it. An apply that minted this token
+/// would put it in every deploy credential of every repo declaring a bucket.
+/// So the rare operator verb mints it with a credential that exists in no
+/// document, the apply creates the bucket and reads nothing, and
+/// [`missing_credential`](Self::missing_credential) names the verb when the
+/// parked pair is not there.
 ///
 /// ## What R2 does not have
 ///
@@ -131,13 +135,14 @@ impl R2BucketBlock {
 
 	/// What a consumer says when the parked pair is missing, worded once.
 	/// Free of quotes and backticks, since one of those consumers is a shell
-	/// script. The apply writes the pair beside the bucket, so its absence
-	/// means the apply has not run since the bucket was declared, or somebody
-	/// deleted the parameter, and either way the next apply restores it.
+	/// script. The verb that mints parks the pair, so its absence means it has
+	/// not run since the bucket was declared, or somebody deleted the
+	/// parameter, and either way running it again restores the pair without
+	/// touching the bucket.
 	pub fn missing_credential(&self, stack: &ResolvedStack) -> String {
 		format!(
-			"the apply mints the token for {} and parks its S3 pair at {} and \
-			{}; run deploy",
+			"beet cloudflare/mint mints the token for {} and parks its S3 pair \
+			at {} and {}; run it with the mint token in the environment",
 			self.bucket_name(stack),
 			self.access_key_secret().name(stack),
 			self.secret_key_secret().name(stack),
@@ -192,8 +197,47 @@ impl R2BucketBlock {
 			.xok()
 	}
 
+	/// The name the bucket's own token carries at the account, ie
+	/// `beetmash-mail--prod--cold-backups-token`: how the verb that mints finds
+	/// the one it already made.
+	pub fn token_name(&self, stack: &ResolvedStack) -> String {
+		stack.resource_name(format!("{}-token", self.label))
+	}
+
+	/// The policy the bucket's own token carries, ready for
+	/// `POST /accounts/{id}/tokens`: read and write on the objects of this one
+	/// bucket, and nothing else in the account. One place says what the token
+	/// grants, so the verb that mints it posts a declaration rather than
+	/// composing one.
+	pub fn token_policies(
+		&self,
+		stack: &ResolvedStack,
+	) -> Result<serde_json::Value> {
+		serde_json::json!([{
+			"effect": "allow",
+			"resources": self.token_resources(stack)?,
+			"permission_groups": Self::ITEM_PERMISSIONS
+				.iter()
+				.map(|permission| serde_json::json!({ "id": permission.id() }))
+				.collect::<Vec<_>>(),
+		}])
+		.xok()
+	}
+
+	/// The S3 secret access key a token value derives to: its lowercase hex
+	/// SHA-256, which is what R2 expects and the only half of the pair that is
+	/// computed rather than read. Pinned by a test, because a derivation that
+	/// changed shape would park a credential that authenticates nowhere and
+	/// nothing would say so until a copy failed.
+	pub fn derive_secret_key(token_value: &str) -> String {
+		digest_ext::hex::<sha2::Sha256>(token_value.as_bytes())
+	}
+
 	/// The token's resource scope: this bucket, in the default jurisdiction.
-	fn token_resources(&self, stack: &ResolvedStack) -> Result<String> {
+	fn token_resources(
+		&self,
+		stack: &ResolvedStack,
+	) -> Result<serde_json::Value> {
 		serde_json::json!({
 			format!(
 				"com.cloudflare.edge.r2.bucket.{}_default_{}",
@@ -201,71 +245,7 @@ impl R2BucketBlock {
 				self.bucket_name(stack)
 			): "*"
 		})
-		.to_string()
 		.xok()
-	}
-
-	/// The account-owned token the apply mints for this bucket, and the two
-	/// parameters its S3 pair is parked in. The token depends on the bucket
-	/// explicitly, since its policy names the bucket as a string rather than
-	/// a reference.
-	fn emit_token(
-		&self,
-		stack: &ResolvedStack,
-		config: &mut terra::Config,
-		bucket: &ResourceDef<CloudflareR2BucketDetails>,
-	) -> Result {
-		let token = ResourceDef::new_secondary(
-			stack.resource_ident(format!("{}-token", self.label)),
-			CloudflareAccountTokenDetails {
-				account_id: stack.cloudflare_account()?.id.clone(),
-				name: stack
-					.resource_name(format!("{}-token", self.label))
-					.into(),
-				policies: vec![CloudflareAccountTokenPolicies {
-					effect: "allow".into(),
-					permission_groups: Self::ITEM_PERMISSIONS
-						.iter()
-						.map(|permission| {
-							CloudflareAccountTokenPoliciesPermissionGroups {
-								id: permission.id().into(),
-							}
-						})
-						.collect(),
-					resources: self.token_resources(stack)?.into(),
-				}],
-				depends_on: Some(vec![bucket.address().into()]),
-				..default()
-			},
-		);
-		config.add_resource(&token)?;
-		// the S3 pair, derived in-config so the secret exists nowhere but the
-		// state (encrypted) and the parameter (SecureString); rotated by
-		// replacing the token, which the same apply re-parks
-		for (secret, value, note) in [
-			(
-				self.access_key_secret(),
-				token.field_ref("id"),
-				self.access_key_note(),
-			),
-			(
-				self.secret_key_secret(),
-				format!("${{sha256({})}}", token.field("value")),
-				self.secret_key_note(),
-			),
-		] {
-			config.add_untyped_resource(
-				"aws_ssm_parameter",
-				stack.resource_ident(secret.label().clone()).label(),
-				&secret.parameter_resource(
-					stack,
-					value,
-					&note,
-					SecretRotation::replace(token.address()),
-				),
-			)?;
-		}
-		Ok(())
 	}
 
 	/// Rejects a declaration the provider would reject, at config time.
@@ -381,7 +361,6 @@ impl EmitBlock for R2BucketBlock {
 			},
 		);
 		config.add_layer_resource(terra::Config::STORAGE_LAYER, &bucket)?;
-		self.emit_token(stack, config, &bucket)?;
 		if self.expire_prefixes.is_empty() {
 			return Ok(());
 		}
@@ -454,34 +433,54 @@ mod tests {
 			.xpect_contains("cloudflare_r2_bucket_lifecycle");
 	}
 
-	/// The apply mints the credential: an account-owned token scoped to this
-	/// bucket's objects and nothing else, created after the bucket it names,
-	/// its id and the sha256 of its value parked as the S3 pair under the
-	/// stack's secret prefix, each described as a replacement of the token
-	/// so a listing says how it rotates. No hand step anywhere in the path.
+	/// The apply creates the bucket and NOTHING else: no token, and no
+	/// parameter holding one. A rendered `cloudflare_account_token` would put
+	/// `Account API Tokens Write` into the deploy credential of every repo that
+	/// declares a bucket, which is the one group no deploy credential may have,
+	/// so `cloudflare/mint` mints it out of band and the config never names it.
 	#[beet_core::test]
-	fn the_token_is_minted_and_parked_by_the_apply() {
-		let rendered = render(cold());
-		rendered
-			.xpect_contains("\"cloudflare_account_token\"")
-			.xpect_contains("\"name\":\"beet-infra--dev--cold-backups-token\"")
-			.xpect_contains(TokenPermission::BUCKET_ITEM_READ.id())
-			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
+	fn the_apply_mints_no_credential() {
+		render(cold())
+			.xnot()
+			.xpect_contains("cloudflare_account_token")
+			.xnot()
+			.xpect_contains("aws_ssm_parameter")
+			.xnot()
+			.xpect_contains("sha256");
+	}
+
+	/// What the out-of-band mint addresses, which is the apply's own
+	/// composition read back: one token name per bucket, scoped to that
+	/// bucket's objects and never to the account.
+	#[beet_core::test]
+	fn the_token_is_named_and_scoped_by_the_bucket() {
+		let (stack, ..) = stack();
+		let block = cold();
+		block
+			.token_name(&stack)
+			.xpect_eq("beet-infra--dev--cold-backups-token");
+		block
+			.token_policies(&stack)
+			.unwrap()
+			.to_string()
+			.as_str()
 			.xpect_contains(
 				"com.cloudflare.edge.r2.bucket.acct123_default_beet-infra--dev--cold-backups",
 			)
-			.xpect_contains("\"depends_on\":[\"cloudflare_r2_bucket.")
-			.xpect_contains("\"aws_ssm_parameter\"")
-			.xpect_contains("\"name\":\"/beet-infra/dev/cold-backups-access-key-id\"")
-			.xpect_contains("\"name\":\"/beet-infra/dev/cold-backups-secret-access-key\"")
-			.xpect_contains("\"type\":\"SecureString\"")
-			.xpect_contains("${sha256(cloudflare_account_token.")
-			.xpect_contains(
-				"\"description\":\"replace:cloudflare_account_token.beet_infra__dev__cold_backups_token :: R2 token for bucket cold-backups: access key id\"",
-			)
-			// the resource scope is one bucket, never the account
+			.xpect_contains(TokenPermission::BUCKET_ITEM_READ.id())
+			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
 			.xnot()
 			.xpect_contains("com.cloudflare.api.account");
+	}
+
+	/// The secret half is a derivation, so it is pinned: lowercase hex SHA-256
+	/// of the token value, the standard digest R2 expects, checked against a
+	/// published vector rather than against itself.
+	#[beet_core::test]
+	fn the_secret_key_is_the_hex_sha256_of_the_token() {
+		R2BucketBlock::derive_secret_key("test").xpect_eq(
+			"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+		);
 	}
 
 	/// The grants name the parked credential, never the bucket: an AWS

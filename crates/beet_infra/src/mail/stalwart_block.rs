@@ -2899,7 +2899,7 @@ mod tests {
 	}
 
 	/// The token is read with the same parameter-store call the secrets
-	/// script makes, and the script names the apply that parks it when it is
+	/// script makes, and the script names the verb that parks it when it is
 	/// missing: a cold copy that silently skipped would be the bucket sitting
 	/// empty with every check green, which is the failure this whole phase
 	/// exists to close.
@@ -2910,7 +2910,7 @@ mod tests {
 			.cold_script(&stack, &cold_store())
 			.unwrap()
 			.xpect_contains("no cold credential at")
-			.xpect_contains("run deploy")
+			.xpect_contains("beet cloudflare/mint")
 			.xpect_contains("exit 1");
 	}
 

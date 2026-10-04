@@ -51,10 +51,10 @@ that relays everything wants.
 
 `validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
-machine. The `<R2BucketBlock/>` below asks that token for `Account API Tokens
-Write`, since the apply MINTS the bucket's own credential: a deploy token lowered
-from an entry without one does not carry it (`beet cloudflare/mint --dry-run`
-says what an entry asks for). It also needs domains you actually own: every name below is an RFC 2606
+machine. The Cloudflare token must be scoped to the zone you replace the
+placeholder with: `beet --main=examples/infra/mail.bsx cloudflare/mint --dry-run`
+says what this entry asks for, which is `Zone > DNS Write` and nothing else, and
+`cloudflare/mint` with the mint token in the environment makes exactly that. It also needs domains you actually own: every name below is an RFC 2606
 example domain and the zone declared on the `<Stack>` is a placeholder, so a
 real deploy replaces both.
 
@@ -65,7 +65,8 @@ it, and most residential ISPs block that, so run it from somewhere with 25 egres
 or trust the probe instead.
 
 Note the zone is declared ONCE, as a `{CloudflareZone{..}}` spread on the
-`<Stack>`: every block under it publishes into the zone nearest it by ancestry,
+`<Stack>`, with the `{CloudflareAccount{..}}` a minted token lives in beside it:
+every block under it publishes into the zone nearest it by ancestry,
 so none of them restate it, and a block whose records belong in another zone
 carries its own spread. A record whose name the zone does not hold fails the
 render by name, the cheap guard against a wrong spread.
@@ -112,7 +113,7 @@ route.
 	     region is a decision (an mta near its users and its persistent volume)
 	     and the zone is where every record below lands, so a deploy from any
 	     machine builds the same stack. -->
-	<Stack app_name="mail-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
+	<Stack app_name="mail-example" {(AwsRegion("us-west-2"), CloudflareAccount{id:"0123456789abcdef0123456789abcdef"}, CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
 		<Group bx:ref="deploy_up">
 			<EnsureSecret secret="mail-admin-password"/>
 			<!-- the sovereign signing key, minted before the apply that
@@ -144,6 +145,11 @@ route.
 			path="infra/secrets/mail-example.toml" bx:cfg="feature:vault"/>
 		<!-- the export read back into a fresh account's store, and a human
 		     removed: each answers a report, so it rides its route. -->
+		<!-- the Cloudflare token this entry deploys with, lowered from what it
+		     declares. Minted with the mint token rather than by an apply: an
+		     apply that minted a token would need `Account API Tokens Write` in
+		     the credential every deploy reads -->
+		<CloudflareMint/>
 		<Route path="secrets/restore" {SecretsRestore} bx:cfg="feature:vault"/>
 		<Route path="secrets/revoke" {SecretsRevoke} bx:cfg="feature:vault"/>
 

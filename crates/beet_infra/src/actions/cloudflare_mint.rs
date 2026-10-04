@@ -1,5 +1,6 @@
-//! `cloudflare/mint`: the narrow Cloudflare api token this repo deploys with,
-//! lowered from what its stacks and routes actually ask for.
+//! `cloudflare/mint`: every Cloudflare credential this repo's declarations ask
+//! for — the narrow token it deploys with, and the token of each bucket it
+//! declares — minted in the one place that holds the group which mints.
 
 use crate::actions::cloudflare_api_ext;
 use crate::actions::cloudflare_api_ext::API_BASE;
@@ -23,11 +24,20 @@ struct CloudflareMintParams {
 	group: Option<String>,
 }
 
-/// `<CloudflareMint/>` — converge the Cloudflare api token this repo deploys
-/// with: one account-owned token per repo, scoped to exactly the permission
-/// groups its declarations ask for ([`DeployerToken`], lowered from what the
-/// stacks render and the Cloudflare actions its routes run), sealed into the
-/// credential document as `CLOUDFLARE_API_TOKEN`.
+/// `<CloudflareMint/>` — converge every Cloudflare credential this repo's
+/// declarations ask for:
+///
+/// - **the deploy token**: one account-owned token per repo, scoped to exactly
+///   the permission groups the declarations need ([`DeployerToken`], lowered
+///   from what the stacks render and the Cloudflare actions their routes run),
+///   sealed into the credential document as `CLOUDFLARE_API_TOKEN`.
+/// - **one token per declared `<R2BucketBlock/>`**, scoped to that bucket's
+///   objects and nothing else, its S3 pair parked in the stack's own secret
+///   store where the compute beside the bucket reads it. Not sealed in any
+///   document: it is a runtime credential, not a deploy one.
+///
+/// Both live here because both need the one group that mints credentials, and
+/// that group is held by one credential in one place.
 ///
 /// ```sh
 /// beet cloudflare/mint --dry-run   # the token's scope, nothing touched
@@ -55,13 +65,21 @@ struct CloudflareMintParams {
 /// it. An agent with the age identity opens every document and still cannot
 /// mint.
 ///
-/// ## Why a verb rather than a hand-made token
+/// ## Why a verb rather than a hand-made token, and why not an apply
 ///
-/// The same reason `deployer/mint` is a verb: a credential written by hand
-/// drifts from the declarations the moment a block is added, and the drift
-/// surfaces as a 403 mid-deploy that names nothing useful. Lowered from the
-/// render, the token is as narrow as the declarations allow and widens only
-/// when they do.
+/// Against a hand-made token, the same reason `deployer/mint` is a verb: a
+/// credential written by hand drifts from the declarations the moment a block
+/// is added, and the drift surfaces as a 403 mid-deploy that names nothing
+/// useful. Lowered from the render, the token is as narrow as the declarations
+/// allow and widens only when they do.
+///
+/// Against an apply, which CAN mint a token (`cloudflare_account_token` is a
+/// bound resource, and the R2 bucket's credential was rendered that way until
+/// this verb existed): an apply that mints needs `Account API Tokens Write` in
+/// the credential every deploy of that repo reads, which is exactly the
+/// escalation with no boundary to cap it. Minting is rare and deploying is
+/// constant, so they hold different credentials, and the rare one is the only
+/// one that can mint. That is the whole shape of this file.
 ///
 /// ## What converges
 ///
@@ -74,10 +92,14 @@ struct CloudflareMintParams {
 ///   the deploy actually makes, and the token it replaces is deleted only after
 ///   that: a failure anywhere leaves the previous credential in place.
 ///
-/// What it deliberately does not do is delete a token it did not make. The
-/// hand-made one this replaces is user-owned, which `Account API Tokens Write`
-/// cannot touch at all, so the verb names it and the operator revokes it in the
-/// dashboard.
+/// - a bucket's token, minted when its pair is not parked, when the parked
+///   access key id is not the account's live token of that name, or on
+///   `--rotate`. The parked access key id IS the token id, so that comparison
+///   costs no call of its own.
+///
+/// What it deliberately does not do is delete a token it did not make. A
+/// hand-made token is user-owned, which `Account API Tokens Write` cannot touch
+/// at all, so the verb names it and the operator revokes it in the dashboard.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -103,15 +125,15 @@ pub async fn CloudflareMint(cx: ActionContext<Request>) -> Result<Response> {
 				.join(", ")
 		);
 	}
-	if params.dry_run {
-		return Response::ok_text(CloudflareMint::describe(&name, &lowered)?)
-			.xok();
-	}
-	Response::ok_text(format!(
-		"{}\n",
-		CloudflareMint::converge(&cx.caller, &name, &lowered, &params).await?
-	))
-	.xok()
+	let mut report = match params.dry_run {
+		true => vec![CloudflareMint::describe(&name, &lowered)?],
+		false => vec![
+			CloudflareMint::converge(&cx.caller, &name, &lowered, &params)
+				.await?,
+		],
+	};
+	report.extend(CloudflareMint::buckets(&cx.caller, &params).await?);
+	Response::ok_text(format!("{}\n", report.join("\n"))).xok()
 }
 
 impl CloudflareMint {
@@ -285,8 +307,10 @@ impl CloudflareMint {
 			)
 			.xok();
 		}
-		let (id, value) = Self::create_token(&account, name, lowered).await?;
-		Self::prove_token(&value, lowered).await?;
+		let (id, value) =
+			Self::create_token(&account, name, lowered.to_json()).await?;
+		let (url, what) = Self::deploy_proof(lowered)?;
+		Self::prove_token(&value, url, what).await?;
 		let group = params.group.as_deref().unwrap_or(Self::DEFAULT_GROUP);
 		document.set(&identity, group, Self::RECORD, &value, SecretRecord {
 			role: Some(SecretRole::EnvVar),
@@ -401,14 +425,14 @@ impl CloudflareMint {
 	async fn create_token(
 		account: &str,
 		name: &str,
-		lowered: &DeployerToken,
+		policies: Value,
 	) -> Result<(SmolStr, SmolStr)> {
 		let response = Self::authed(Request::post(format!(
 			"{API_BASE}/accounts/{account}/tokens"
 		)))?
 		.with_json_body(&serde_json::json!({
 			"name": name,
-			"policies": lowered.to_json(),
+			"policies": policies,
 		}))?
 		.send()
 		.await?;
@@ -449,27 +473,15 @@ impl CloudflareMint {
 	}
 
 	/// Prove a freshly minted token before anything relies on it, with a read
-	/// the deploy itself makes: one page of the zone's records where a zone is
-	/// in scope, else the token's own verify.
+	/// `what` describes: one page of the zone's records for a token that
+	/// deploys, its own verify for one scoped to a bucket's objects (whose S3
+	/// pair is a derivation no bearer call can exercise).
 	///
 	/// Retried rather than slept through, since a new token answers `1000
 	/// Invalid API Token` for a few seconds. A failure here leaves the previous
-	/// credential sealed and in place.
-	async fn prove_token(value: &str, lowered: &DeployerToken) -> Result {
+	/// credential in place, sealed or parked.
+	async fn prove_token(value: &str, url: String, what: &str) -> Result {
 		const ATTEMPTS: usize = 10;
-		let (url, what) = match lowered.zones().values().next() {
-			Some(zone) => (
-				format!("{API_BASE}/zones/{zone}/dns_records?per_page=1"),
-				"read the zone's records",
-			),
-			None => (
-				format!(
-					"{API_BASE}/accounts/{}/tokens/verify",
-					lowered.account()?
-				),
-				"verify itself",
-			),
-		};
 		let mut last = None;
 		for attempt in 0..ATTEMPTS {
 			match cloudflare_api_ext::send(
@@ -486,10 +498,30 @@ impl CloudflareMint {
 			}
 		}
 		bevybail!(
-			"the minted token never managed to {what}, so it is not sealed and \
-			the previous one is untouched: {}",
+			"the minted token never managed to {what}, so nothing was sealed or \
+			parked and the previous one is untouched: {}",
 			last.map(|err| err.to_string()).unwrap_or_default()
 		)
+	}
+
+	/// Where a deploy token proves itself: one page of the zone's records, the
+	/// read every plan of it makes, or its own verify when it is scoped to no
+	/// zone at all.
+	fn deploy_proof(lowered: &DeployerToken) -> Result<(String, &'static str)> {
+		match lowered.zones().values().next() {
+			Some(zone) => (
+				format!("{API_BASE}/zones/{zone}/dns_records?per_page=1"),
+				"read the zone's records",
+			),
+			None => (
+				format!(
+					"{API_BASE}/accounts/{}/tokens/verify",
+					lowered.account()?
+				),
+				"verify itself",
+			),
+		}
+		.xok()
 	}
 
 	async fn delete_token(account: &str, id: &str) -> Result {
@@ -524,6 +556,168 @@ impl CloudflareMint {
 				),
 				false => err,
 			})
+	}
+
+	/// Converge the token of every `<R2BucketBlock/>` this launch declares, or
+	/// describe what that would do under `--dry-run`. One report line per
+	/// bucket, none at all for a launch that declares none.
+	///
+	/// A bucket's token is not a deploy credential and is never sealed in a
+	/// document: its S3 pair is parked in the stack's own secret store, where
+	/// the compute beside the bucket reads it under its own grants.
+	#[cfg(feature = "cloudflare_dns")]
+	async fn buckets(
+		caller: &AsyncEntity,
+		params: &CloudflareMintParams,
+	) -> Result<Vec<String>> {
+		let mut report = Vec::new();
+		let declared = caller
+			.with_world(|world, _| Self::declared_buckets(world))
+			.await??;
+		for (block, stack, store) in declared {
+			report.push(match params.dry_run {
+				true => format!(
+					"bucket token {} over {}, parked at {} and {}",
+					block.token_name(&stack),
+					block.bucket_name(&stack),
+					store.address(&block.access_key_secret()),
+					store.address(&block.secret_key_secret()),
+				),
+				false => {
+					Self::converge_bucket(&block, &stack, &store, params)
+						.await?
+				}
+			});
+		}
+		report.xok()
+	}
+
+	/// Every declared bucket with the stack it belongs to and the secret store
+	/// that stack keeps its secrets in. A concrete query rather than the
+	/// registry walk the actions need, since a block is one type.
+	#[cfg(feature = "cloudflare_dns")]
+	fn declared_buckets(
+		world: &mut World,
+	) -> Result<Vec<(R2BucketBlock, ResolvedStack, SecretStore)>> {
+		let declared =
+			world.with_state::<Query<(Entity, &R2BucketBlock)>, _>(|blocks| {
+				blocks
+					.iter()
+					.map(|(entity, block)| (entity, block.clone()))
+					.collect::<Vec<_>>()
+			});
+		let mut resolved = Vec::new();
+		for (entity, block) in declared {
+			let (stack, store) =
+				world.with_state::<StackQuery, _>(|stacks| -> Result<_> {
+					(stacks.resolve(entity), stacks.secret_store(entity)?).xok()
+				})?;
+			resolved.push((block, stack, store));
+		}
+		resolved.xok()
+	}
+
+	/// Converge one bucket's token: mint and park when the pair is not there,
+	/// when the parked access key id is not the account's live token of that
+	/// name, or on `--rotate`.
+	///
+	/// The parked access key id IS the token id, so the comparison needs no
+	/// call beyond the listing every converge makes anyway.
+	#[cfg(feature = "cloudflare_dns")]
+	async fn converge_bucket(
+		block: &R2BucketBlock,
+		stack: &ResolvedStack,
+		store: &SecretStore,
+		params: &CloudflareMintParams,
+	) -> Result<String> {
+		let account = stack.cloudflare_account()?.id.clone();
+		let name = block.token_name(stack);
+		let (access_ref, secret_ref) =
+			(block.access_key_secret(), block.secret_key_secret());
+		let parked =
+			(store.get(&access_ref).await?, store.get(&secret_ref).await?);
+		let existing = Self::find_token(&account, &name).await?;
+		let current = match (&parked, &existing) {
+			((Some(access_key), Some(_)), Some(held_token)) => {
+				held_token.active && held_token.id == *access_key
+			}
+			_ => false,
+		};
+		if current && !params.rotate {
+			return format!(
+				"bucket token {name} is parked at {} and {}, `--rotate` mints \
+				another",
+				store.address(&access_ref),
+				store.address(&secret_ref)
+			)
+			.xok();
+		}
+		let (id, value) =
+			Self::create_token(&account, &name, block.token_policies(stack)?)
+				.await?;
+		Self::prove_token(
+			&value,
+			format!("{API_BASE}/accounts/{account}/tokens/verify"),
+			"verify itself",
+		)
+		.await?;
+		// the SECRET half first, and the order is the recovery: a crash between
+		// the two writes leaves the OLD id beside the new secret, which no
+		// longer matches the account's token, so the next run mints again. The
+		// other order would leave a pair that looks current and is not.
+		store
+			.overwrite(
+				&secret_ref,
+				&R2BucketBlock::derive_secret_key(&value),
+				Some(&block.secret_key_note()),
+				Some(Self::bucket_rotation()),
+			)
+			.await?;
+		store
+			.overwrite(
+				&access_ref,
+				&id,
+				Some(&block.access_key_note()),
+				Some(Self::bucket_rotation()),
+			)
+			.await?;
+		// only now: the pair that replaces it is parked
+		let replaced = match existing {
+			Some(held_token) if held_token.id != id => {
+				Self::delete_token(&account, &held_token.id).await?;
+				format!(", replacing {}", held_token.id)
+			}
+			_ => String::new(),
+		};
+		format!(
+			"bucket token {name} ({id}) minted and parked at {} and {}{}",
+			store.address(&access_ref),
+			store.address(&secret_ref),
+			replaced
+		)
+		.xok()
+	}
+
+	/// A launch built without the Cloudflare bindings declares no bucket, so
+	/// there is nothing to converge.
+	#[cfg(not(feature = "cloudflare_dns"))]
+	async fn buckets(
+		_caller: &AsyncEntity,
+		_params: &CloudflareMintParams,
+	) -> Result<Vec<String>> {
+		Vec::new().xok()
+	}
+
+	/// How a bucket's parked pair rotates: this verb again, which replaces the
+	/// token and re-parks both halves. The S3 secret is the SHA-256 of the
+	/// token value, so neither half survives the other.
+	#[cfg(feature = "cloudflare_dns")]
+	fn bucket_rotation() -> SecretRotation {
+		SecretRotation::manual(
+			"beet cloudflare/mint --rotate\n> with the mint token in the \
+			environment: the bucket's token is replaced, both halves re-parked \
+			and the old token deleted",
+		)
 	}
 }
 
@@ -579,6 +773,39 @@ mod test {
 					panic!("`{action}` is registered but not a component")
 				});
 		}
+	}
+
+	/// Every declared bucket is found with the stack above it and the store that
+	/// stack parks its secrets in, so a bucket anywhere in the scene gets its
+	/// token converged. The addresses are the ones the box reads under its own
+	/// grants, which is why they are asserted here rather than taken on trust.
+	#[cfg(feature = "cloudflare_dns")]
+	#[beet_core::test]
+	fn finds_every_declared_bucket() {
+		use crate::types::test_support::*;
+		let mut world = infra_world();
+		world.spawn((
+			Stack::new("mail").with_stage("prod"),
+			// the default store is the stack's own ssm prefix, which is
+			// regional, so the addresses below need the region declared
+			AwsRegion::new("us-west-2"),
+			CloudflareAccount::new("acct123"),
+			children![R2BucketBlock::new("cold-backups")],
+		));
+		world.flush();
+		let declared = CloudflareMint::declared_buckets(&mut world).unwrap();
+		let (block, stack, store) = declared.into_iter().next().unwrap();
+		block
+			.token_name(&stack)
+			.xpect_eq("mail--prod--cold-backups-token");
+		store
+			.address(&block.access_key_secret())
+			.as_str()
+			.xpect_contains("/mail/prod/cold-backups-access-key-id");
+		store
+			.address(&block.secret_key_secret())
+			.as_str()
+			.xpect_contains("/mail/prod/cold-backups-secret-access-key");
 	}
 
 	/// The token name is the repo's, not an app's: one document holds one token.
