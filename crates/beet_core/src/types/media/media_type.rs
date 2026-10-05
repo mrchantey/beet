@@ -288,11 +288,11 @@ impl MediaType {
 			val if val.contains(Self::SQL) => MediaType::Sql,
 			val if val.contains(Self::GRAPHQL) => MediaType::GraphQl,
 			val if val.contains(Self::ANSI_TERM) => MediaType::AnsiTerm,
-			other => MediaType::Other(other.to_string()),
+			other => MediaType::Other(other.into()),
 		}
 	}
 	/// Create a custom media type from a string.
-	pub fn other(other: impl Into<String>) -> Self {
+	pub fn other(other: impl Into<SmolStr>) -> Self {
 		MediaType::Other(other.into())
 	}
 
@@ -703,7 +703,7 @@ mod test {
 	#[crate::test]
 	fn from_content_type_unknown() {
 		MediaType::from_content_type("application/x-custom")
-			.xpect_eq(MediaType::Other("application/x-custom".to_string()));
+			.xpect_eq(MediaType::Other("application/x-custom".into()));
 	}
 
 	#[crate::test]
