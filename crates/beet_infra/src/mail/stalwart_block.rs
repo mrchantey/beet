@@ -1615,7 +1615,15 @@ BACKUP_TIMER_EOF
 	/// byte for byte (a hash a store reports is a claim, a byte it serves is a
 	/// fact, and egress from the cold side is free), then integrity-checked
 	/// as a database; then every blob not already in the cold bucket is
-	/// copied across. Nothing here overwrites and nothing here deletes.
+	/// copied across.
+	///
+	/// Nothing here overwrites and nothing here deletes, which is a property
+	/// of the script rather than of the credential: the parked token may do
+	/// both. Every copy is `--ignore-existing`, so the bucket is append-only
+	/// from this side and the [`R2BucketBlock`] lock is never the thing a
+	/// nightly run discovers. A cold object that exists and differs is
+	/// then the compare's failure, which names it, rather than a lock
+	/// violation on a PUT, which names the api.
 	fn cold_script(
 		&self,
 		stack: &ResolvedStack,
@@ -1658,7 +1666,9 @@ newest="$(rclone lsf --files-only --recursive --include '*.db' 'live:__BACKUP_BU
 	echo "no snapshot under s3://__BACKUP_BUCKET__/__PREFIX__ to copy: the backup timer is what writes one" >&2
 	exit 1
 }
-rclone copyto "live:__BACKUP_BUCKET__/__PREFIX__/$newest" "cold:__COLD_BUCKET__/__PREFIX__/$newest"
+# `--ignore-existing` so this side only ever appends: a snapshot already there
+# is read back and compared below like any other, never written over
+rclone copyto --ignore-existing "live:__BACKUP_BUCKET__/__PREFIX__/$newest" "cold:__COLD_BUCKET__/__PREFIX__/$newest"
 rclone copyto "live:__BACKUP_BUCKET__/__PREFIX__/$newest" "$expected"
 rclone copyto "cold:__COLD_BUCKET__/__PREFIX__/$newest" "$readback"
 cmp --silent "$expected" "$readback" || {
@@ -2137,7 +2147,9 @@ mod tests {
 
 	/// The cold store the plan declares beside the box.
 	fn cold_store() -> R2BucketBlock {
-		R2BucketBlock::new("cold-backups").with_location("weur")
+		R2BucketBlock::new("cold-backups")
+			.with_location("weur")
+			.with_retain_days(30)
 	}
 
 	/// The box with both copies declared: a snapshot archive and the cold
@@ -2874,7 +2886,9 @@ mod tests {
 	/// out of the two parked parameters, verifies the snapshot from BOTH
 	/// sides byte for byte before checking it as a database, and copies blobs
 	/// with `--ignore-existing`: never an overwrite, and no flag anywhere that
-	/// deletes.
+	/// deletes. The snapshot carries the same flag, so every write this side
+	/// makes is an append and the bucket's lock is never what a nightly run
+	/// discovers.
 	#[beet_core::test]
 	fn cold_copy_never_syncs() {
 		let (stack, _deployment, _dir) = sydney_resolved();
@@ -2892,6 +2906,7 @@ mod tests {
 			.xpect_contains("cmp --silent \"$expected\" \"$readback\"")
 			.xpect_contains("PRAGMA integrity_check;")
 			.xpect_contains("rclone copy --ignore-existing")
+			.xpect_contains("rclone copyto --ignore-existing")
 			.xnot()
 			.xpect_contains("rclone sync")
 			.xnot()

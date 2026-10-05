@@ -20,7 +20,10 @@ use beet_net::prelude::*;
 /// An R2 bucket is reached over the S3 api with an api token, and no IAM policy
 /// can grant that. So one is minted for this bucket alone: an account-owned
 /// token scoped to its objects and nothing else in the account, whose id IS the
-/// S3 access key id and whose value's SHA-256 IS the secret access key. Both
+/// S3 access key id and whose value's SHA-256 IS the secret access key
+/// ([`cloudflare_api_ext::derive_secret_key`], where the derivation lives
+/// because it is a property of a Cloudflare token rather than of a bucket).
+/// Both
 /// are parked as `SecureString` parameters under the stack's secret prefix,
 /// exactly as the mail box parks its SES relay pair, and this block's
 /// [grants](Block::grants) name those two parameters rather than the bucket, so
@@ -38,13 +41,24 @@ use beet_net::prelude::*;
 /// [`missing_credential`](Self::missing_credential) names the verb when the
 /// parked pair is not there.
 ///
-/// ## What R2 does not have
+/// ## What R2 does not have, and what stands in for it
 ///
-/// Object versioning. A deletion or an overwrite is final, so the retention
-/// story is entirely [`expire_prefixes`](Self::expire_prefixes) plus the
-/// writer's own discipline (copy, never sync). The credential that writes here
-/// can also delete here, and this block does not pretend otherwise: it is the
-/// off-account copy, not the off-everything one.
+/// Object versioning. A deletion or an overwrite is final, so the way back a
+/// versioned [`S3BucketBlock`] has does not exist here and cannot be declared
+/// into existence. What R2 does have is a bucket LOCK, and
+/// [`retain_days`](Self::retain_days) is it: a refusal at the vendor that
+/// every credential reaching the objects meets, the parked token and a
+/// lifecycle rule included. The guarantee is a floor rather than a rollback,
+/// so it is worth stating exactly: nothing younger than the window can be
+/// destroyed by anything, and nothing older is protected at all. A bucket
+/// declaring no window is refused at render unless it admits the loss
+/// ([`accept_data_loss`](Self::accept_data_loss)), exactly as an unversioned
+/// writable S3 bucket is.
+///
+/// The writer's discipline is the other half and is not something a render can
+/// enforce: the box copies and never syncs, so a deletion upstream stops at
+/// the archive instead of reaching here. It is the off-account copy, not the
+/// off-everything one.
 #[derive(
 	Debug, Clone, Get, SetWith, Serialize, Deserialize, Component, Reflect,
 )]
@@ -61,9 +75,39 @@ pub struct R2BucketBlock {
 	/// caller, which is the wrong answer for a backup.
 	#[set_with(into)]
 	location: SmolStr,
-	/// Expiries scoped to a key prefix, see [`PrefixExpiry`]. The whole
-	/// retention story for a bucket with no versioning: a prefix not named
-	/// here is kept forever.
+	/// Days an object is refused a delete and an overwrite, `0` for none: the
+	/// bucket LOCK, which R2 enforces itself rather than leaving to the
+	/// credential holder.
+	///
+	/// This is the whole recoverability story for a store with no versions, so
+	/// what it promises is worth being exact about. Nothing younger than this
+	/// can be destroyed, by a bug, a leaked token or a rogue sync, which is
+	/// precisely the copies a restore would use. Nothing older is protected,
+	/// and nothing here is a way back from a delete, since R2 has none.
+	///
+	/// The parked token cannot lift it: a lock is bucket CONFIGURATION, which
+	/// an account-scoped R2 group reaches, and the parked token holds only the
+	/// two bucket-item groups ([`ITEM_PERMISSIONS`](Self::ITEM_PERMISSIONS),
+	/// the S3 data plane) for this one bucket. The deploy credential can,
+	/// because the lock is its own declaration, and a lock gone missing is a
+	/// plan away from being seen.
+	///
+	/// Must not exceed the window an
+	/// [`expire_prefixes`](Self::expire_prefixes) rule declares, since a lock
+	/// refuses a lifecycle delete as readily as any other.
+	retain_days: i64,
+	/// Admit that this bucket's contents are expendable, for a bucket that
+	/// declares no [`retain_days`](Self::retain_days).
+	///
+	/// Named for what it ADMITS rather than what it enables, the same
+	/// admission an unversioned writable [`S3BucketBlock`] asks for: such a
+	/// bucket has no way back from a bug or a bad sync, and the only honest
+	/// reason to declare one is that its contents are a copy of something
+	/// that survives losing it.
+	accept_data_loss: bool,
+	/// Expiries scoped to a key prefix, see [`PrefixExpiry`]. When an object
+	/// may go, where [`retain_days`](Self::retain_days) is when it may not: a
+	/// prefix not named here is kept forever.
 	expire_prefixes: Vec<PrefixExpiry>,
 }
 
@@ -93,6 +137,8 @@ impl R2BucketBlock {
 		Self {
 			label: label.into(),
 			location: SmolStr::default(),
+			retain_days: 0,
+			accept_data_loss: false,
 			expire_prefixes: Vec::new(),
 		}
 	}
@@ -224,15 +270,6 @@ impl R2BucketBlock {
 		.xok()
 	}
 
-	/// The S3 secret access key a token value derives to: its lowercase hex
-	/// SHA-256, which is what R2 expects and the only half of the pair that is
-	/// computed rather than read. Pinned by a test, because a derivation that
-	/// changed shape would park a credential that authenticates nowhere and
-	/// nothing would say so until a copy failed.
-	pub fn derive_secret_key(token_value: &str) -> String {
-		digest_ext::hex::<sha2::Sha256>(token_value.as_bytes())
-	}
-
 	/// The token's resource scope: this bucket, in the default jurisdiction.
 	fn token_resources(
 		&self,
@@ -248,7 +285,9 @@ impl R2BucketBlock {
 		.xok()
 	}
 
-	/// Rejects a declaration the provider would reject, at config time.
+	/// Rejects a declaration the provider would reject, at config time, and
+	/// one it would accept and should not
+	/// ([`validate_retention`](Self::validate_retention)).
 	pub fn validate(&self) -> Result {
 		if !self.location.is_empty()
 			&& !Self::LOCATIONS.contains(&self.location.as_str())
@@ -266,7 +305,63 @@ impl R2BucketBlock {
 		PrefixExpiry::assert_unique_ids(
 			&self.label,
 			self.rule_ids().iter().map(String::as_str),
-		)
+		)?;
+		self.validate_retention()
+	}
+
+	/// Refuse a bucket that keeps no way back, and one whose two windows
+	/// contradict each other.
+	///
+	/// This is what makes "agents may break things within reason" true of the
+	/// one store with no versions: the protection for a credential used every
+	/// night is recoverability, and R2's only form of it is a window nothing
+	/// may delete inside. So the window is declared or the loss is admitted,
+	/// and the render is what enforces the choice rather than a convention
+	/// every declaration remembers. `S3BucketBlock::validate` is the same rule
+	/// where versioning is the way back.
+	///
+	/// A lock longer than an expiry is refused rather than quietly reconciled:
+	/// R2 refuses a lifecycle delete of a locked object, so such a bucket keeps
+	/// its contents for the lock's window while its declaration says the
+	/// expiry's, and the lifecycle is the half that looks right in a plan.
+	fn validate_retention(&self) -> Result {
+		if self.retain_days < 0 {
+			bevybail!(
+				"r2 bucket '{}' declares {} retain_days; a window is positive \
+				or absent",
+				self.label,
+				self.retain_days
+			);
+		}
+		if self.retain_days == 0 && !self.accept_data_loss {
+			bevybail!(
+				"r2 bucket '{}' keeps no object versions, so a delete or an \
+				overwrite is final and nothing that reaches it has a way \
+				back. Declare `retain_days=N`, which refuses both at the \
+				vendor for an object's first N days, or \
+				`accept_data_loss=true` if its contents are a copy of \
+				something that survives losing it",
+				self.label
+			);
+		}
+		if let Some(expiry) = self
+			.expire_prefixes
+			.iter()
+			.find(|expiry| expiry.expire_days() < self.retain_days)
+		{
+			bevybail!(
+				"r2 bucket '{}' locks every object for {} days and expires \
+				'{}' after {}, so that expiry is refused for the {} days \
+				between them. Declare `retain_days` no longer than the \
+				shortest expiry",
+				self.label,
+				self.retain_days,
+				expiry.prefix(),
+				expiry.expire_days(),
+				self.retain_days - expiry.expire_days()
+			);
+		}
+		OK
 	}
 
 	/// The location hints R2 accepts, checked at render because a typo here
@@ -274,11 +369,32 @@ impl R2BucketBlock {
 	pub const LOCATIONS: &'static [&'static str] =
 		&["apac", "eeur", "enam", "weur", "wnam", "oc"];
 
+	/// The id of the one lock rule a bucket renders. One rule with no prefix,
+	/// since the window is a property of the bucket rather than of a writer's
+	/// convention: a prefix-scoped lock would leave every prefix nobody
+	/// thought of unprotected, which is the opposite of an expiry's default.
+	const LOCK_RULE_ID: &'static str = "retain";
+
 	fn rule_ids(&self) -> Vec<String> {
 		self.expire_prefixes
 			.iter()
 			.map(PrefixExpiry::rule_id)
 			.collect()
+	}
+
+	/// The whole-bucket lock [`retain_days`](Self::retain_days) renders as:
+	/// R2 counts in seconds, as it does for an expiry.
+	fn lock_rule(&self) -> CloudflareR2BucketLockRules {
+		CloudflareR2BucketLockRules {
+			id: Self::LOCK_RULE_ID.into(),
+			enabled: true,
+			prefix: None,
+			condition: CloudflareR2BucketLockRulesCondition {
+				r#type: "Age".into(),
+				max_age_seconds: Some(self.retain_days * 24 * 60 * 60),
+				date: None,
+			},
+		}
 	}
 
 	/// The age transition a [`PrefixExpiry`] renders as: R2 counts in
@@ -361,20 +477,30 @@ impl EmitBlock for R2BucketBlock {
 			},
 		);
 		config.add_layer_resource(terra::Config::STORAGE_LAYER, &bucket)?;
-		if self.expire_prefixes.is_empty() {
-			return Ok(());
+		if !self.expire_prefixes.is_empty() {
+			config.add_resource(&ResourceDef::new_secondary(
+				stack.resource_ident(format!("{}-lifecycle", self.label)),
+				CloudflareR2BucketLifecycleDetails {
+					account_id: account_id.clone(),
+					bucket_name: bucket.field_ref("name").into(),
+					rules: Some(
+						self.expire_prefixes.iter().map(Self::rule).collect(),
+					),
+					..default()
+				},
+			))?;
 		}
-		config.add_resource(&ResourceDef::new_secondary(
-			stack.resource_ident(format!("{}-lifecycle", self.label)),
-			CloudflareR2BucketLifecycleDetails {
-				account_id,
-				bucket_name: bucket.field_ref("name").into(),
-				rules: Some(
-					self.expire_prefixes.iter().map(Self::rule).collect(),
-				),
-				..default()
-			},
-		))?;
+		if self.retain_days > 0 {
+			config.add_resource(&ResourceDef::new_secondary(
+				stack.resource_ident(format!("{}-lock", self.label)),
+				CloudflareR2BucketLockDetails {
+					account_id,
+					bucket_name: bucket.field_ref("name").into(),
+					rules: Some(vec![self.lock_rule()]),
+					..default()
+				},
+			))?;
+		}
 		Ok(())
 	}
 }
@@ -386,6 +512,7 @@ mod tests {
 	fn cold() -> R2BucketBlock {
 		R2BucketBlock::new("cold-backups")
 			.with_location("weur")
+			.with_retain_days(30)
 			.with_expire_prefixes(vec![PrefixExpiry::new("sqlite/", 180)])
 	}
 
@@ -425,12 +552,71 @@ mod tests {
 	}
 
 	/// No versioning means no unfiltered sweep to render: a bucket declaring
-	/// no expiry renders no lifecycle at all rather than an empty one.
+	/// no expiry renders no lifecycle at all rather than an empty one. The
+	/// lock is independent of it and still renders.
 	#[beet_core::test]
 	fn no_expiry_renders_no_lifecycle() {
 		render(cold().with_expire_prefixes(Vec::new()))
+			.xpect_contains("cloudflare_r2_bucket_lock")
 			.xnot()
 			.xpect_contains("cloudflare_r2_bucket_lifecycle");
+	}
+
+	/// The declared window renders as one whole-bucket lock rule in seconds,
+	/// which is R2's only way to refuse a delete; a bucket admitting the loss
+	/// instead renders none.
+	#[beet_core::test]
+	fn the_window_renders_as_a_whole_bucket_lock() {
+		render(cold())
+			.xpect_contains("\"cloudflare_r2_bucket_lock\"")
+			.xpect_contains("\"id\":\"retain\"")
+			.xpect_contains("\"enabled\":true")
+			.xpect_contains(&format!("\"max_age_seconds\":{}", 30 * 86400))
+			.xpect_contains("\"type\":\"Age\"")
+			.xpect_contains("\"bucket_name\":\"${cloudflare_r2_bucket.")
+			// the window is the bucket's, so the rule names no prefix
+			.xnot()
+			.xpect_contains("\"prefix\":\"\"");
+		render(cold().with_retain_days(0).with_accept_data_loss(true))
+			.xnot()
+			.xpect_contains("cloudflare_r2_bucket_lock");
+	}
+
+	/// R2 keeps no versions, so a bucket is refused until it says which it is:
+	/// a window nothing may delete inside, or an admission that its contents
+	/// are a copy of something that survives losing them.
+	#[beet_core::test]
+	fn a_bucket_with_no_window_must_admit_the_loss() {
+		cold()
+			.with_retain_days(0)
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cold-backups")
+			.xpect_contains("retain_days")
+			.xpect_contains("accept_data_loss");
+		cold()
+			.with_retain_days(0)
+			.with_accept_data_loss(true)
+			.validate()
+			.unwrap();
+	}
+
+	/// A lock outliving an expiry is a contradiction rather than a tuning
+	/// choice: R2 refuses a lifecycle delete of a locked object, so the bucket
+	/// would keep what its declaration says it expires. Equal windows are
+	/// fine, which is the strongest honest pair.
+	#[beet_core::test]
+	fn a_lock_may_not_outlive_an_expiry() {
+		cold()
+			.with_retain_days(365)
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("sqlite/")
+			.xpect_contains("365")
+			.xpect_contains("185");
+		cold().with_retain_days(180).validate().unwrap();
 	}
 
 	/// The apply creates the bucket and NOTHING else: no token, and no
@@ -471,16 +657,6 @@ mod tests {
 			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
 			.xnot()
 			.xpect_contains("com.cloudflare.api.account");
-	}
-
-	/// The secret half is a derivation, so it is pinned: lowercase hex SHA-256
-	/// of the token value, the standard digest R2 expects, checked against a
-	/// published vector rather than against itself.
-	#[beet_core::test]
-	fn the_secret_key_is_the_hex_sha256_of_the_token() {
-		R2BucketBlock::derive_secret_key("test").xpect_eq(
-			"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-		);
 	}
 
 	/// The grants name the parked credential, never the bucket: an AWS

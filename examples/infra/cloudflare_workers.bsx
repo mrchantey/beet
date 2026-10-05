@@ -31,8 +31,10 @@ children of the route and the sequence runs them in order.
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` in the entry's `secrets.toml` and the
 account declared on the root (`{CloudflareAccount("..")}`, a placeholder below),
-plus `wrangler` and `worker-build`. No R2 keys are needed (native binding).
-`build` needs neither (a local compile).
+plus `wrangler` and `worker-build`. No R2 pair is needed anywhere: the Worker
+reads its bucket through the native binding, and the teardown's empty derives
+its S3 credentials from the same token. `build` needs neither (a local
+compile).
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`beet cloudflare/mint`), so it carries no account-level Workers group: a live run

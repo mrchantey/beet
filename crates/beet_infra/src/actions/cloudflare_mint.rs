@@ -675,7 +675,7 @@ impl CloudflareMint {
 		store
 			.overwrite(
 				&secret_ref,
-				&R2BucketBlock::derive_secret_key(&value),
+				&cloudflare_api_ext::derive_secret_key(&value),
 				Some(&block.secret_key_note()),
 				Some(Self::bucket_rotation()),
 			)

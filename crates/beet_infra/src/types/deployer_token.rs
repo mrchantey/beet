@@ -72,8 +72,11 @@ impl DeployerToken {
 	/// silently dropped type is a deploy that works until the apply that
 	/// touches it).
 	const RESOURCES: &'static [(&'static str, &'static [TokenPermission])] = &[
-		// the per-bucket R2 token an `R2BucketBlock` apply mints, which is the
-		// only declaration in the tree that asks for the escalating group
+		// a tripwire rather than a need: nothing in either tree renders an api
+		// token any more (`cloudflare/mint` mints out of band, see
+		// `an_r2_bucket_never_escalates`), and a declaration that rendered one
+		// again would name the escalating group out loud instead of quietly
+		// widening every deploy credential that lowers it
 		("cloudflare_account_token", &[
 			TokenPermission::API_TOKENS_READ,
 			TokenPermission::API_TOKENS_WRITE,
@@ -693,6 +696,8 @@ mod test {
 		names("cloudflare_dns_record").xpect_eq(vec!["DNS Write"]);
 		names("cloudflare_r2_bucket_lifecycle")
 			.xpect_eq(vec!["Workers R2 Storage Write"]);
+		names("cloudflare_r2_bucket_lock")
+			.xpect_eq(vec!["Workers R2 Storage Write"]);
 		// the longer prefix wins: a pool is account-scoped where the load
 		// balancer naming it is zone-scoped
 		names("cloudflare_load_balancer")
@@ -842,7 +847,10 @@ mod test {
 	fn an_r2_bucket_never_escalates() {
 		let (stack, deployment, _dir) = addressed();
 		let mut config = deployment.create_config(&stack);
+		// its lock rides the same `cloudflare_r2_bucket` prefix entry, so the
+		// retention a bucket must declare asks for no further group
 		R2BucketBlock::new("cold-backups")
+			.with_retain_days(30)
 			.emit(&stack, &deployment, &mut config)
 			.unwrap();
 		let token = DeployerToken::default().lower(&stack, &config).unwrap();

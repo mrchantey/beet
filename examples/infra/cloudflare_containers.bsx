@@ -19,11 +19,17 @@ The served content and the deploy/sync/destroy route shape are identical.
     beet --main=examples/infra/cloudflare_containers.bsx sync
     beet --main=examples/infra/cloudflare_containers.bsx destroy
 
-Live deploy needs `CLOUDFLARE_API_TOKEN` and the R2 data-plane keys
-(`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in the entry's `secrets.toml`,
-the account declared on the root (`{CloudflareAccount("..")}`, a placeholder
-below), plus `wrangler` and a container engine. The Workers Paid plan is
-required for Containers.
+Live deploy needs `CLOUDFLARE_API_TOKEN` and the account declared on the root
+(`{CloudflareAccount("..")}`, a placeholder below), plus `wrangler` and a
+container engine. The Workers Paid plan is required for Containers. No R2 pair
+is held anywhere: the deploy DERIVES the S3 credentials the container reads the
+site with from that token (a token's id is the access key id, the sha256 of its
+value the secret) and uploads them as the Worker's own secrets, so an R2
+credential with object write over the account is never a record of a document
+the age key opens. The container holds one as wide as the token the deploy ran
+with, which is honest for an example whose bucket holds nothing but published
+site files; a container of its own takes a token scoped to one bucket's
+objects, the way an `<R2BucketBlock/>`'s is.
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`beet cloudflare/mint`), so it carries no account-level Workers group: a live run

@@ -20,217 +20,6 @@ use std::collections::BTreeMap as Map;
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
 )]
-pub struct CloudflareAccountTokenCondition {
-	/// Client IP restrictions.
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub request_ip: Option<CloudflareAccountTokenConditionRequestIp>,
-}
-#[derive(
-	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
-)]
-pub struct CloudflareAccountTokenConditionRequestIp {
-	/// List of IPv4/IPv6 CIDR addresses.
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub r#in: Option<Vec<SmolStr>>,
-	/// List of IPv4/IPv6 CIDR addresses.
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub not_in: Option<Vec<SmolStr>>,
-}
-#[derive(
-	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
-)]
-pub struct CloudflareAccountTokenDetails {
-	/// Account identifier tag.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub account_id: SmolStr,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub condition: Option<CloudflareAccountTokenCondition>,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub count: Option<i64>,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub depends_on: Option<Vec<SmolStr>>,
-	/// The expiration time on or after which the JWT MUST NOT be accepted for processing.
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub expires_on: Option<SmolStr>,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub for_each: Option<Vec<SmolStr>>,
-	/// Token identifier tag.
-	/// ## Attribute
-	/// `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub id: Option<SmolStr>,
-	/// The time on which the token was created.
-	/// ## Attribute
-	/// `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub issued_on: Option<SmolStr>,
-	/// Last time the token was used.
-	/// ## Attribute
-	/// `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub last_used_on: Option<SmolStr>,
-	/// Last time the token was modified.
-	/// ## Attribute
-	/// `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub modified_on: Option<SmolStr>,
-	/// Token name.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub name: SmolStr,
-	/// The time before which the token MUST NOT be accepted for processing.
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub not_before: Option<SmolStr>,
-	/// Set of access policies assigned to the token.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	pub policies: Vec<CloudflareAccountTokenPolicies>,
-	/// ## Attribute
-	/// `optional`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub provider: Option<SmolStr>,
-	/// Status of the token.
-	/// Available values: "active", "disabled", "expired".
-	/// ## Attribute
-	/// `optional`, `computed`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub status: Option<SmolStr>,
-	/// The token value.
-	/// ## Attribute
-	/// `computed`, `sensitive`
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub value: Option<SmolStr>,
-}
-impl terra::ToJson for CloudflareAccountTokenDetails {
-	fn to_json(&self) -> Value {
-		Value::from_serde(self).expect("serialization should not fail")
-	}
-}
-impl terra::Resource for CloudflareAccountTokenDetails {
-	fn resource_type(&self) -> &'static str { "cloudflare_account_token" }
-	fn provider(&self) -> &'static terra::Provider {
-		&terra::Provider::CLOUDFLARE
-	}
-	fn validate_definition(
-		&self,
-	) -> Result<(), terra::ResourceValidationError> {
-		if self.account_id.is_empty() {
-			return Err(terra::ResourceValidationError::MissingRequiredField {
-				resource_type: self.resource_type(),
-				field_name: "account_id",
-			});
-		}
-		if self.id.is_some() {
-			return Err(
-				terra::ResourceValidationError::NonEmptyComputedField {
-					resource_type: self.resource_type(),
-					field_name: "id",
-				},
-			);
-		}
-		if self.issued_on.is_some() {
-			return Err(
-				terra::ResourceValidationError::NonEmptyComputedField {
-					resource_type: self.resource_type(),
-					field_name: "issued_on",
-				},
-			);
-		}
-		if self.last_used_on.is_some() {
-			return Err(
-				terra::ResourceValidationError::NonEmptyComputedField {
-					resource_type: self.resource_type(),
-					field_name: "last_used_on",
-				},
-			);
-		}
-		if self.modified_on.is_some() {
-			return Err(
-				terra::ResourceValidationError::NonEmptyComputedField {
-					resource_type: self.resource_type(),
-					field_name: "modified_on",
-				},
-			);
-		}
-		if self.name.is_empty() {
-			return Err(terra::ResourceValidationError::MissingRequiredField {
-				resource_type: self.resource_type(),
-				field_name: "name",
-			});
-		}
-		if self.policies.is_empty() {
-			return Err(terra::ResourceValidationError::MissingRequiredField {
-				resource_type: self.resource_type(),
-				field_name: "policies",
-			});
-		}
-		if self.value.is_some() {
-			return Err(
-				terra::ResourceValidationError::NonEmptyComputedField {
-					resource_type: self.resource_type(),
-					field_name: "value",
-				},
-			);
-		}
-		Ok(())
-	}
-}
-#[derive(
-	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
-)]
-pub struct CloudflareAccountTokenPolicies {
-	/// Allow or deny operations against the resources.
-	/// Available values: "allow", "deny".
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub effect: SmolStr,
-	/// A set of permission groups that are specified to the policy.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "Vec::is_empty")]
-	pub permission_groups: Vec<CloudflareAccountTokenPoliciesPermissionGroups>,
-	/// A json object representing the resources that are specified to the policy.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub resources: SmolStr,
-}
-#[derive(
-	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
-)]
-pub struct CloudflareAccountTokenPoliciesPermissionGroups {
-	/// Identifier of the permission group.
-	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub id: SmolStr,
-}
-#[derive(
-	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
-)]
 pub struct CloudflareDnsRecordData {
 	/// Algorithm.
 	/// ## Attribute
@@ -2002,6 +1791,115 @@ pub struct CloudflareR2BucketLifecycleRulesStorageClassTransitionsCondition {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub max_age: Option<i64>,
 	/// Available values: "Age", "Date".
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub r#type: SmolStr,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLockDetails {
+	/// Account ID.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub account_id: SmolStr,
+	/// Name of the bucket.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub bucket_name: SmolStr,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub count: Option<i64>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub depends_on: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub for_each: Option<Vec<SmolStr>>,
+	/// Jurisdiction of the bucket
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub jurisdiction: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub provider: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub rules: Option<Vec<CloudflareR2BucketLockRules>>,
+}
+impl terra::ToJson for CloudflareR2BucketLockDetails {
+	fn to_json(&self) -> Value {
+		Value::from_serde(self).expect("serialization should not fail")
+	}
+}
+impl terra::Resource for CloudflareR2BucketLockDetails {
+	fn resource_type(&self) -> &'static str { "cloudflare_r2_bucket_lock" }
+	fn provider(&self) -> &'static terra::Provider {
+		&terra::Provider::CLOUDFLARE
+	}
+	fn validate_definition(
+		&self,
+	) -> Result<(), terra::ResourceValidationError> {
+		if self.account_id.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "account_id",
+			});
+		}
+		if self.bucket_name.is_empty() {
+			return Err(terra::ResourceValidationError::MissingRequiredField {
+				resource_type: self.resource_type(),
+				field_name: "bucket_name",
+			});
+		}
+		Ok(())
+	}
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLockRules {
+	/// Condition to apply a lock rule to an object for how long in seconds.
+	/// ## Attribute
+	/// `required`
+	pub condition: CloudflareR2BucketLockRulesCondition,
+	/// Whether or not this rule is in effect.
+	/// ## Attribute
+	/// `required`
+	pub enabled: bool,
+	/// Unique identifier for this rule.
+	/// ## Attribute
+	/// `required`
+	#[serde(skip_serializing_if = "SmolStr::is_empty")]
+	pub id: SmolStr,
+	/// Rule will only apply to objects/uploads in the bucket that start with the given prefix, an empty prefix can be provided to scope rule to all objects/uploads.
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub prefix: Option<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+pub struct CloudflareR2BucketLockRulesCondition {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub date: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub max_age_seconds: Option<i64>,
+	/// Available values: "Age", "Date", "Indefinite".
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "SmolStr::is_empty")]

@@ -8,14 +8,14 @@
 //! `deploy`. The `cf` CLI is a thinner JSON-over-REST wrapper and is the
 //! documented fallback.
 //!
-//! Live deploy needs `CLOUDFLARE_API_TOKEN` in the environment, a
-//! `{CloudflareAccount("..")}` on the stack or an ancestor and, for the
-//! container path, the R2 data-plane keys
-//! (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) so the container reads the site
-//! via [`S3Store::r2`]. The Worker path needs neither to deploy (native
-//! `worker::Bucket` binding), but `destroy` needs the R2 keys for either path, to
-//! empty the bucket through the R2 S3 endpoint before deleting it. All commands are
-//! `--dry-run`-able; see each example's module doc.
+//! Live deploy needs `CLOUDFLARE_API_TOKEN` in the environment and a
+//! `{CloudflareAccount("..")}` on the stack or an ancestor, and nothing else:
+//! the R2 data-plane pair the container reads the site with ([`S3Store::r2`])
+//! and the teardown empties the bucket with is DERIVED from that same token
+//! ([`cloudflare_api_ext::r2_credentials`]), never held as a second
+//! credential. The Worker path needs no pair at all to deploy (native
+//! `worker::Bucket` binding). All commands are `--dry-run`-able; see each
+//! example's module doc.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -132,8 +132,8 @@ pub async fn CloudflareContainerDeployAction(
 	// the R2 endpoint the container's `S3Store::r2` reads through, at the
 	// account the stack declares; the account is also what addresses the
 	// managed registry on deploy.
-	let account_id = cloudflare_account(&cx).await?.0;
-	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
+	let account = cloudflare_account(&cx).await?;
+	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
 
 	let dir = wrangler_ext::project_dir(block.name())?;
 	let binary_name = "beet";
@@ -142,7 +142,7 @@ pub async fn CloudflareContainerDeployAction(
 	write_container_worker_js(&dir, &block)?;
 	write_container_wrangler(&dir, &block)?;
 	write_container_package_json(&dir)?;
-	let secrets_file = write_r2_secrets_file(&dir)?;
+	let secrets_file = write_r2_secrets_file(&dir, account.id()).await?;
 
 	// `wrangler deploy` bundles `worker.js`, whose `@cloudflare/containers` import
 	// is resolved from `node_modules`, so install deps before deploying.
@@ -296,33 +296,38 @@ fn write_container_wrangler(
 	Ok(())
 }
 
-/// Write the R2 data-plane keys to a `.env`-format secrets file (`secrets.env`)
-/// the deploy uploads as real Worker secrets (`wrangler deploy --secrets-file`).
-/// Returns the file name (relative to the project dir, which is the deploy cwd),
-/// or `None` when the keys are absent so a dry run still works.
-fn write_r2_secrets_file(dir: &AbsPath) -> Result<Option<String>> {
-	match (
-		env_ext::var("R2_ACCESS_KEY_ID"),
-		env_ext::var("R2_SECRET_ACCESS_KEY"),
-	) {
-		(Ok(id), Ok(secret)) => {
-			let file_name = "secrets.env";
-			fs_ext::write(
-				dir.join(file_name),
-				format!(
-					"R2_ACCESS_KEY_ID={id}\nR2_SECRET_ACCESS_KEY={secret}\n"
-				),
-			)?;
-			Some(file_name.to_string()).xok()
-		}
-		_ => {
-			warn!(
-				"R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY unset; the container \
-				 cannot read R2 until they are uploaded as Worker secrets"
-			);
-			None.xok()
-		}
+/// Write the R2 data-plane pair derived from the api token to a `.env`-format
+/// secrets file (`secrets.env`) the deploy uploads as real Worker secrets
+/// (`wrangler deploy --secrets-file`). Returns the file name (relative to the
+/// project dir, which is the deploy cwd), or `None` with no token in the
+/// environment, so a credential-free run still writes the project.
+///
+/// The container's env var names are the pair's, and what the Worker holds is
+/// as wide as the token this deploy ran with: an example deployed by hand a
+/// few times a year takes a wider credential for the command, and its bucket
+/// holds nothing but the published site. A container of its own would take a
+/// token scoped to one bucket's objects, the way an [`R2BucketBlock`]'s is.
+async fn write_r2_secrets_file(
+	dir: &AbsPath,
+	account: &str,
+) -> Result<Option<String>> {
+	if cloudflare_api_ext::token().is_err() {
+		warn!(
+			"CLOUDFLARE_API_TOKEN unset, so no R2 pair could be derived; the \
+			 container cannot read R2 until one is uploaded as Worker secrets"
+		);
+		return None.xok();
 	}
+	let (access_key, secret_key) =
+		cloudflare_api_ext::r2_credentials(account).await?;
+	let file_name = "secrets.env";
+	fs_ext::write(
+		dir.join(file_name),
+		format!(
+			"R2_ACCESS_KEY_ID={access_key}\nR2_SECRET_ACCESS_KEY={secret_key}\n"
+		),
+	)?;
+	Some(file_name.to_string()).xok()
 }
 
 // ───────────────────────────── worker build ────────────────────────────────
@@ -931,24 +936,20 @@ async fn delete_container_images(worker_name: &str) {
 /// the R2 S3-compatible endpoint of `account`. `wrangler r2 object` cannot list
 /// objects, so it cannot find keys synced under a prefix (eg the `assets/*`
 /// mount); `aws s3 rm --recursive` lists + deletes them all, which `wrangler r2
-/// bucket delete` then requires (it refuses a non-empty bucket). The R2
-/// data-plane keys are read from the environment (records of the entry's
-/// secrets document); without them the empty is skipped with a warning so a
-/// no-creds teardown still deletes the worker.
+/// bucket delete` then requires (it refuses a non-empty bucket). The S3 pair is
+/// derived from the api token the teardown already runs with; with no token the
+/// empty is skipped with a warning so a no-creds teardown still deletes the
+/// worker.
 async fn empty_bucket(account: &CloudflareAccount, bucket: &str) -> Result {
-	let (access_key, secret_key) = match (
-		env_ext::var("R2_ACCESS_KEY_ID"),
-		env_ext::var("R2_SECRET_ACCESS_KEY"),
-	) {
-		(Ok(access_key), Ok(secret_key)) => (access_key, secret_key),
-		_ => {
-			warn!(
-				"R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY unset; skipping the R2 \
-				 empty (bucket delete fails if non-empty)"
-			);
-			return Ok(());
-		}
-	};
+	if cloudflare_api_ext::token().is_err() {
+		warn!(
+			"CLOUDFLARE_API_TOKEN unset, so no R2 pair could be derived; \
+			 skipping the R2 empty (bucket delete fails if non-empty)"
+		);
+		return Ok(());
+	}
+	let (access_key, secret_key) =
+		cloudflare_api_ext::r2_credentials(account.id()).await?;
 	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
 	// the R2 data-plane keys go in as the standard AWS env vars, overriding any
@@ -957,6 +958,7 @@ async fn empty_bucket(account: &CloudflareAccount, bucket: &str) -> Result {
 	// `AWS_PROFILE` the cli would otherwise reject (mirrors `build_docker_image`).
 	match ChildProcess::new("aws")
 		.without_env("AWS_PROFILE")
+		.with_secret(secret_key.as_str())
 		.with_envs([
 			("AWS_ACCESS_KEY_ID", access_key.as_str()),
 			("AWS_SECRET_ACCESS_KEY", secret_key.as_str()),

@@ -191,13 +191,15 @@ async fn main() -> Result {
 				"cloudflare_load_balancer_pool",
 				"cloudflare_load_balancer_monitor",
 				// the off-account cold store an `R2BucketBlock` declares, the
-				// lifecycle that keeps it a rolling window (R2 has no object
-				// versioning, so expiry is the whole retention story), and the
-				// account-owned token the block mints to reach it over the S3
-				// api: a runtime credential is minted by the apply, never by hand.
+				// lifecycle that keeps it a rolling window, and the lock that
+				// makes the window a floor as well as a ceiling. R2 has no
+				// object versioning, so those two are the whole retention
+				// story: the lifecycle says when an object may go, the lock
+				// says that nothing younger than that may be deleted or
+				// overwritten by any credential, the parked one included.
 				"cloudflare_r2_bucket",
 				"cloudflare_r2_bucket_lifecycle",
-				"cloudflare_account_token",
+				"cloudflare_r2_bucket_lock",
 			]),
 		)
 		// NOTE the cloudflare zone-level edge config (cache ruleset, zone settings)
