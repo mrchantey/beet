@@ -12,7 +12,7 @@ Beet is an operating system built around a person rather than a machine. The sof
 
 ## How it works
 
-Beet is built on the [Bevy](https://bevy.org) game engine, and everything in beet, from a ui tree to a router to a cloud deploy, is Entity Component System (ECS) data. A repo is an account's whole store, and a runtime is a binary that runs one, doing nothing until given the repo's main scene, `main.bsx`, the data driven entry point to the program. Servers, routes, behaviors and deploys are entities declared there or in the scenes it pulls in, and behavior is spelled as actions, entities that behave like functions. The [glossary](/docs/glossary) has one meaning for each of these words.
+Beet is built on the [Bevy](https://bevy.org) game engine, and everything in beet, from a ui tree to a router to a cloud deploy, is Entity Component System (ECS) data. A repo is an account's whole store, and a runtime is a binary that runs one, doing nothing until given the repo's entry document, `main.bsx`, the data driven entry point to the program. Servers, routes, behaviors and deploys are entities declared there or in the documents it pulls in, and behavior is spelled as actions, entities that behave like functions. The [glossary](/docs/glossary) has one meaning for each of these words.
 
 Because behavior lives in scenes rather than compiled control flow, software stays open while it runs, ready for you, your collaborators and your agents to inspect and reshape.
 

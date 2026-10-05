@@ -45,4 +45,4 @@ Where the action lives in the url space is the scene's decision rather than the 
 
 ## Runtimes
 
-A plugin reaches a person through a runtime, a binary that links it. The `beet` cli is the runtime with no plugins of yours, a crate that adds `BeetPlugins` and one of yours is another, and a wasm build of either is what a browser tab fetches. The main scene names the runtime it needs, so the entry comes first and the binary follows from it.
+A plugin reaches a person through a runtime, a binary that links it. The `beet` cli is the runtime with no plugins of yours, a crate that adds `BeetPlugins` and one of yours is another, and a wasm build of either is what a browser tab fetches. The entry document names the runtime it needs, so the entry comes first and the binary follows from it.
