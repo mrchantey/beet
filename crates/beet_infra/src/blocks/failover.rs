@@ -71,7 +71,7 @@ impl CloudflareFailoverBlock {
 			"cloudflare_load_balancer_pool",
 			&label,
 			&json!({
-				"account_id": stack.cloudflare_account()?.id,
+				"account_id": stack.cloudflare_account()?.id(),
 				"name": ident.primary_identifier(),
 				"monitor": monitor_address,
 				"origins": [{
@@ -109,7 +109,7 @@ impl CloudflareFailoverBlock {
 		config: &mut terra::Config,
 	) -> Result {
 		ensure_cloudflare_provider(config)?;
-		let account_id = stack.cloudflare_account()?.id.clone();
+		let account_id = SmolStr::new(stack.cloudflare_account()?.id());
 		let zone_id = stack.cloudflare_zone_holding(&self.hostname)?.id.clone();
 
 		// the health monitor both pools share.

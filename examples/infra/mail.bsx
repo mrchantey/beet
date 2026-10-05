@@ -65,7 +65,7 @@ it, and most residential ISPs block that, so run it from somewhere with 25 egres
 or trust the probe instead.
 
 Note the zone is declared ONCE, as a `{CloudflareZone{..}}` spread on the
-`<Stack>`, with the `{CloudflareAccount{..}}` a minted token lives in beside it:
+`<Stack>`, with the `{CloudflareAccount("..")}` a minted token lives in beside it:
 every block under it publishes into the zone nearest it by ancestry,
 so none of them restate it, and a block whose records belong in another zone
 carries its own spread. A record whose name the zone does not hold fails the
@@ -113,7 +113,7 @@ route.
 	     region is a decision (an mta near its users and its persistent volume)
 	     and the zone is where every record below lands, so a deploy from any
 	     machine builds the same stack. -->
-	<Stack app_name="mail-example" {(AwsRegion("us-west-2"), CloudflareAccount{id:"0123456789abcdef0123456789abcdef"}, CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>
+	<Stack app_name="mail-example" {(AwsRegion("us-west-2"), CloudflareAccount("0123456789abcdef0123456789abcdef"), CloudflareZone{domain:"example.com", id:"fedcba9876543210fedcba9876543210"})}>
 		<Group bx:ref="deploy_up">
 			<EnsureSecret secret="mail-admin-password"/>
 			<!-- the sovereign signing key, minted before the apply that

@@ -161,7 +161,7 @@ impl ResolvedStack {
 		self.cloudflare_account.as_ref().ok_or_else(|| {
 			bevyhow!(
 				"stack `{}--{}` declares no cloudflare account: declare \
-				`{{CloudflareAccount{{id:\"..\"}}}}` on the stack or an ancestor",
+				`{{CloudflareAccount(\"..\")}}` on the stack or an ancestor",
 				self.app_name,
 				self.stage
 			)

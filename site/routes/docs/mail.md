@@ -90,7 +90,7 @@ beet secrets/set TF_STATE_PASSPHRASE --role=env_var --generate --note="opentofu 
 
 The AWS pair is the one credential nothing seals by hand: `deployer/mint` mints this repo's own IAM user, gives it one managed policy per app the entry declares, lowered from what the stacks render, and seals the pair as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. It is the verb an ADMIN pair runs (`AWS_ACCESS_KEY_ID=.. AWS_SECRET_ACCESS_KEY=.. beet deployer/mint`, which wins over the document), since the deployer it converges deliberately holds no `iam:` action over itself.
 
-The region, the Cloudflare account and the zone are not credentials: they are identifiers, public in every dashboard url, and they are declared in the markup as spreads on the stack or its root (`{AwsRegion("ap-southeast-2")}`, `{CloudflareAccount{id:".."}}`, `{CloudflareZone{domain:"example.com", id:".."}}`, see section 6), never read from the environment. The passphrase is the one unrecoverable value in the document: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. It is generated in-process and never printed; the document is committed, so the identity that opens it is the backup.
+The region, the Cloudflare account and the zone are not credentials: they are identifiers, public in every dashboard url, and they are declared in the markup as spreads on the stack or its root (`{AwsRegion("ap-southeast-2")}`, `{CloudflareAccount("..")}`, `{CloudflareZone{domain:"example.com", id:".."}}`, see section 6), never read from the environment. The passphrase is the one unrecoverable value in the document: it encrypts the OpenTofu state client-side, and state carries the SES SMTP credential because `sensitive = true` on a tofu value redacts it from plan and apply output but not from state. It is generated in-process and never printed; the document is committed, so the identity that opens it is the backup.
 
 Not every mail credential is in there. A comail api key is parked in parameter store by you and read by the deploy verbs directly, and the sovereign DKIM private half never leaves parameter store either; only its public half is a tofu variable. What state carries is what terraform *derives*, which for mail is the SES pair.
 
@@ -194,7 +194,7 @@ All the sets can publish to one account-wide SNS topic. Events carry their confi
 Now the automated part. One `.bsx` file declares the whole system, and the boundary between this section and the previous two is the honest answer to how much of this is automated.
 
 ```jsx
-<Stack app_name="acme" {(AwsRegion("ap-southeast-2"), CloudflareAccount{id:".."}, CloudflareZone{domain:"example.com", id:".."})}>
+<Stack app_name="acme" {(AwsRegion("ap-southeast-2"), CloudflareAccount(".."), CloudflareZone{domain:"example.com", id:".."})}>
 	<DeployRoutes/>
 
 	<VpcBlock bx:ref="net" label="net" zones={["a"]} private_tier=false ipv6=true/>

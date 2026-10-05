@@ -62,7 +62,7 @@ pub async fn delete_custom_domain(
 	account: &CloudflareAccount,
 	hostname: &str,
 ) -> Result<bool> {
-	let (account, token) = (&account.id, cloudflare_api_ext::token()?);
+	let (account, token) = (account.id(), cloudflare_api_ext::token()?);
 	let listed = cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::get(format!(
 			"{API_BASE}/accounts/{account}/workers/domains?hostname={hostname}"
@@ -96,7 +96,7 @@ pub async fn delete_script(
 	account: &CloudflareAccount,
 	name: &str,
 ) -> Result<bool> {
-	let (account, token) = (&account.id, cloudflare_api_ext::token()?);
+	let (account, token) = (account.id(), cloudflare_api_ext::token()?);
 	cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::delete(format!(
 			"{API_BASE}/accounts/{account}/workers/scripts/{name}"

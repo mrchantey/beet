@@ -21,7 +21,7 @@ The served content and the deploy/sync/destroy route shape are identical.
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` and the R2 data-plane keys
 (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) in the entry's `secrets.toml`,
-the account declared on the root (`{CloudflareAccount{..}}`, a placeholder
+the account declared on the root (`{CloudflareAccount("..")}`, a placeholder
 below), plus `wrangler` and a container engine. The Workers Paid plan is
 required for Containers.
 
@@ -31,7 +31,7 @@ here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
 deploy`). `DeployerToken::ACTIONS` names the groups each action needs.
 -->
 <CliServer {CallOnReady}>
-<Router {(RequestLogger, CloudflareAccount{id:"0123456789abcdef0123456789abcdef"})}>
+<Router {(RequestLogger, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareContainerBlock name="beet-hello-container" bucket="beet-hello-site"/>

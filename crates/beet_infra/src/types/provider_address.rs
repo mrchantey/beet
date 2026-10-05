@@ -5,7 +5,7 @@
 //! An address is declaration data, public in every dashboard url, so it lives
 //! in committed markup as a spread on the stack or any ancestor
 //! (`<Router {AwsRegion("ap-southeast-2")}>` for every stack under it, `<Stack
-//! {(CloudflareAccount{id:".."}, CloudflareZone{domain:"beetmash.com",
+//! {(CloudflareAccount(".."), CloudflareZone{domain:"beetmash.com",
 //! id:".."})}>` for one) and a block that genuinely needs another zone or
 //! region carries the same spread itself. [`StackQuery::resolve`] reads the
 //! nearest ancestor-or-self of the asking entity into the [`ResolvedStack`],
@@ -33,16 +33,22 @@ impl AwsRegion {
 }
 
 /// The Cloudflare account a stack's Cloudflare resources belong to (an R2
-/// bucket, a load-balancer pool, a Worker), ie `{CloudflareAccount{id:".."}}`.
+/// bucket, a load-balancer pool, a Worker) and the account a minted token lives
+/// in, ie `{CloudflareAccount("..")}`.
+///
+/// One field, so a tuple exactly as [`AwsRegion`] is: an `id:` label in front
+/// of an account id says nothing a reader did not already know. A zone's two
+/// fields stay named, since `domain` and `id` are both strings and the wrong
+/// order would quietly retarget every record ([`CloudflareZone`]).
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct CloudflareAccount {
-	/// The account id, as the dashboard url shows it.
-	pub id: SmolStr,
-}
+pub struct CloudflareAccount(pub SmolStr);
 
 impl CloudflareAccount {
-	pub fn new(id: impl Into<SmolStr>) -> Self { Self { id: id.into() } }
+	pub fn new(id: impl Into<SmolStr>) -> Self { Self(id.into()) }
+
+	/// The account id, as the dashboard url shows it.
+	pub fn id(&self) -> &str { &self.0 }
 }
 
 /// The Cloudflare zone a stack publishes its records into, ie
@@ -104,7 +110,7 @@ mod test {
 		let root = BsxTemplate::parse_entry(
 			&world,
 			r#"<Router {AwsRegion("ap-southeast-2")}>
-				<Stack app_name="mail" {(CloudflareAccount{id:"acct"}, CloudflareZone{domain:"beetmash.com", id:"zone"})}>
+				<Stack app_name="mail" {(CloudflareAccount("acct"), CloudflareZone{domain:"beetmash.com", id:"zone"})}>
 					<div/>
 				</Stack>
 				<Stack app_name="other" {AwsRegion("us-west-2")}/>
@@ -125,11 +131,7 @@ mod test {
 				.unwrap()
 				.as_str()
 				.xpect_eq("ap-southeast-2");
-			mail.cloudflare_account()
-				.unwrap()
-				.id
-				.as_str()
-				.xpect_eq("acct");
+			mail.cloudflare_account().unwrap().id().xpect_eq("acct");
 			mail.cloudflare_zone_holding("mail.beetmash.com")
 				.unwrap()
 				.id

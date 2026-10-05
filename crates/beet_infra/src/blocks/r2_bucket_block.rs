@@ -107,7 +107,7 @@ impl R2BucketBlock {
 	pub fn endpoint(&self, stack: &ResolvedStack) -> Result<String> {
 		format!(
 			"https://{}.r2.cloudflarestorage.com",
-			stack.cloudflare_account()?.id
+			stack.cloudflare_account()?.id()
 		)
 		.xok()
 	}
@@ -241,7 +241,7 @@ impl R2BucketBlock {
 		serde_json::json!({
 			format!(
 				"com.cloudflare.edge.r2.bucket.{}_default_{}",
-				stack.cloudflare_account()?.id,
+				stack.cloudflare_account()?.id(),
 				self.bucket_name(stack)
 			): "*"
 		})
@@ -350,7 +350,7 @@ impl EmitBlock for R2BucketBlock {
 	) -> Result {
 		self.validate()?;
 		ensure_cloudflare_provider(config)?;
-		let account_id = stack.cloudflare_account()?.id.clone();
+		let account_id = SmolStr::new(stack.cloudflare_account()?.id());
 		let bucket = ResourceDef::new_primary(
 			stack.resource_ident(self.label.clone()),
 			CloudflareR2BucketDetails {

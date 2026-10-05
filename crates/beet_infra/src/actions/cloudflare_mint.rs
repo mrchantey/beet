@@ -258,10 +258,17 @@ impl CloudflareMint {
 
 	/// The dry run's answer: the token, every group with what asked for it, and
 	/// the policies a mint would post, pretty printed so it reads and pipes.
+	///
+	/// An entry declaring no account still gets the whole list, and the one line
+	/// it is missing instead of a token: what an entry ASKS FOR is worth reading
+	/// whether or not anybody has said where its token would live.
 	fn describe(name: &str, lowered: &DeployerToken) -> Result<String> {
+		let home = match lowered.account() {
+			Ok(account) => format!("account {account}"),
+			Err(err) => format!("NOT MINTABLE: {err}"),
+		};
 		format!(
-			"token {name}\naccount {}\n\n{lowered}\npolicies\n{}\n",
-			lowered.account()?,
+			"token {name}\n{home}\n\n{lowered}\npolicies\n{}\n",
 			serde_json::to_string_pretty(&lowered.to_json())?
 		)
 		.xok()
@@ -630,7 +637,7 @@ impl CloudflareMint {
 		store: &SecretStore,
 		params: &CloudflareMintParams,
 	) -> Result<String> {
-		let account = stack.cloudflare_account()?.id.clone();
+		let account = stack.cloudflare_account()?.id().to_string();
 		let name = block.token_name(stack);
 		let (access_ref, secret_ref) =
 			(block.access_key_secret(), block.secret_key_secret());

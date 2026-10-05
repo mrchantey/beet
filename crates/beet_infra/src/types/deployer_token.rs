@@ -239,10 +239,15 @@ impl DeployerToken {
 	}
 
 	/// Record `permissions` as asked for by `asker`, resolving the addresses they
-	/// need: the stack's [`CloudflareAccount`] always, since the token LIVES in
-	/// an account whatever its groups are scoped to, and its
-	/// [`CloudflareZone`] as well for a zone-scoped group. A stack declaring
-	/// neither fails naming the spread.
+	/// need: the stack's [`CloudflareZone`] for a zone-scoped group, and its
+	/// [`CloudflareAccount`] when it declares one.
+	///
+	/// A zone-scoped group needs the zone, so a stack without one fails here
+	/// naming the spread. The ACCOUNT is noted rather than demanded, because
+	/// only a mint needs it (a token lives in an account) and only a mint can
+	/// say so usefully: [`account`](Self::account) is where the absence is an
+	/// error, so a lowering still answers what an entry asks for when nobody
+	/// has declared where its token would live.
 	fn add(
 		&mut self,
 		stack: &ResolvedStack,
@@ -252,7 +257,9 @@ impl DeployerToken {
 		if permissions.is_empty() {
 			return OK;
 		}
-		self.accounts.insert(stack.cloudflare_account()?.id.clone());
+		if let Ok(account) = stack.cloudflare_account() {
+			self.accounts.insert(SmolStr::new(account.id()));
+		}
 		for permission in permissions {
 			match permission.scope {
 				TokenScope::Account => {}
@@ -300,8 +307,8 @@ impl DeployerToken {
 		match self.accounts.iter().collect::<Vec<_>>().as_slice() {
 			[account] => (*account).xok(),
 			[] => bevybail!(
-				"no cloudflare account is declared, so there is nowhere to mint \
-				a token: declare `{{CloudflareAccount{{id:\"..\"}}}}` on the \
+				"no cloudflare account is declared, so there is nowhere for a \
+				token to live: declare `{{CloudflareAccount(\"..\")}}` on the \
 				stack or an ancestor"
 			),
 			accounts => bevybail!(
@@ -856,9 +863,10 @@ mod test {
 			.xpect_contains("zone resources");
 	}
 
-	/// An action with no entry fails naming it, and an address the lowering
-	/// needs and the stack does not declare fails naming the spread: the
-	/// account always, the zone for a zone-scoped group.
+	/// An action with no entry fails naming it; a zone-scoped group with no zone
+	/// fails naming the spread; and a missing ACCOUNT is not the lowering's
+	/// complaint at all — the list still answers, and only the mint that needs
+	/// somewhere to put a token says so.
 	#[beet_core::test]
 	fn an_unlowered_action_and_a_missing_address_are_loud() {
 		let (stack, ..) = addressed();
@@ -873,16 +881,24 @@ mod test {
 			.lower_action(&bare, "CloudflarePurgeCache")
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("CloudflareAccount");
-		let (accounted, ..) = ResolvedStack::default_local();
-		DeployerToken::default()
-			.lower_action(
-				&accounted
-					.with_cloudflare_account(CloudflareAccount::new("acct123")),
-				"CloudflarePurgeCache",
-			)
+			.xpect_contains("CloudflareZone");
+		let zoned = ResolvedStack::default_local().0.with_cloudflare_zone(
+			CloudflareZone::new("beetmash.com", "zone123"),
+		);
+		let lowered = DeployerToken::default()
+			.lower_action(&zoned, "CloudflarePurgeCache")
+			.unwrap();
+		lowered
+			.asked()
+			.keys()
+			.map(TokenPermission::name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["Cache Purge"]);
+		lowered
+			.account()
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("CloudflareZone");
+			.xpect_contains("CloudflareAccount")
+			.xpect_contains("nowhere for a token to live");
 	}
 }

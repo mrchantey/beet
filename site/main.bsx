@@ -198,7 +198,7 @@ token (plus AWS for the social stack's state bucket).
      ancestry: the region, the Cloudflare account and the `beet.org` zone,
      identifiers public in every dashboard url and so declared here rather
      than read from anywhere -->
-<Router {(HelpHandler, AwsRegion("us-west-2"), CloudflareAccount{id:"74aba4da669f57fc6fc3e63ebcfcff26"}, CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
+<Router {(HelpHandler, AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
 	<!-- the deployer's credentials: the repo's one document, above this
 	     entry's own directory, loaded into the process environment by the
 	     launch before this entry builds. Top level and unconditional so the

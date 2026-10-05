@@ -710,7 +710,7 @@ mod test {
 	#[beet_core::test]
 	fn the_cold_copy_spawns_by_tag() {
 		let mut world = spawn(
-			r#"<Fragment {CloudflareAccount{id:"acct123"}}>
+			r#"<Fragment {CloudflareAccount("acct123")}>
 				<R2BucketBlock label="cold-backups" location="weur"
 					expire_prefixes={[{prefix:"sqlite/", expire_days:180}]}/>
 				<StalwartBlock label="mail" hostname="mail.beetmash.com"

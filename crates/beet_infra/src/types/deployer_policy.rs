@@ -31,9 +31,12 @@ use serde_json::json;
 /// - `iam:*` on this app's own roles, users, policies and instance profiles
 ///   (`<app>--*`), when a stack renders any; a stack with no IAM resource gets
 ///   no IAM statement at all.
-/// - `ssm:*` under this app's own parameter prefix (`/<app>/`), the stack's
-///   secret store, plus AWS's public `/aws/service/` tree (an AMI id) and the
-///   one parameter call that takes no resource, `ssm:DescribeParameters`.
+/// - `ssm:*` under this app's own parameter prefix (`/<app>/`), which is the
+///   stack's secret store, granted whether or not the config renders a
+///   parameter: a verb that parks a secret writes through the store, not
+///   through a rendered resource. The provider's own parameter reads add AWS's
+///   public `/aws/service/` tree (an AMI id) and the one call that takes no
+///   resource, `ssm:DescribeParameters`.
 /// - `<service>:*` on `*` for every other service, conditioned on the regions
 ///   the stacks declare.
 ///
@@ -358,15 +361,26 @@ impl DeployerPolicy {
 			statements.extend(self.boundary_statements());
 		}
 		statements.extend(self.irreversible_statement());
+		// the app's own parameter prefix, unconditionally: a stack's secret store
+		// defaults to exactly this prefix whether or not the config RENDERS a
+		// parameter, and the verbs that park a secret (`<EnsureSecret/>`, the
+		// bucket credential `cloudflare/mint` parks) write there through the
+		// store rather than through a rendered resource. Gating this on a
+		// rendered `aws_ssm_*` denied those writes for a stack that renders
+		// none, with an `AccessDenied` on `ssm:PutParameter` that no re-mint
+		// could fix, since the lowering follows the declarations.
+		statements.push(json!({
+			"Sid": "Ssm",
+			"Effect": "Allow",
+			"Action": "ssm:*",
+			"Resource": format!("arn:aws:ssm:*:*:parameter/{}/*", self.app),
+		}));
 		if self.services.contains("ssm") {
-			statements.push(json!({
-				"Sid": "Ssm",
-				"Effect": "Allow",
-				"Action": "ssm:*",
-				"Resource": format!("arn:aws:ssm:*:*:parameter/{}/*", self.app),
-			}));
 			// AWS's own public parameter tree, which a compute block reads its
-			// AMI id out of: public, and outside every app's prefix
+			// AMI id out of: public, and outside every app's prefix. Both of
+			// these stay gated on a rendered parameter, since both are the
+			// provider's reads rather than a verb's write and the second takes
+			// no resource at all
 			statements.push(json!({
 				"Sid": "SsmPublic",
 				"Effect": "Allow",
@@ -715,6 +729,46 @@ mod test {
 			.xpect_contains("Regional")
 			.xnot()
 			.xpect_contains("iam:");
+	}
+
+	/// The app's own parameter prefix is granted whether or not the config
+	/// renders a parameter, because the verbs that park a secret write through
+	/// the stack's store rather than through a rendered resource; the
+	/// provider's own parameter reads are not.
+	#[beet_core::test]
+	fn the_secret_prefix_is_granted_without_a_rendered_parameter() {
+		let (scope, _dir) = RenderScope::test_render_stack(
+			(
+				Stack::new("my-egress").with_stage("prod"),
+				AwsRegion::new("us-west-2"),
+			),
+			|parent| {
+				parent.spawn(
+					S3BucketBlock::new("store")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
+				);
+			},
+		);
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		// no `aws_ssm_parameter` anywhere in this stack
+		config
+			.declared_types()
+			.iter()
+			.any(|declared| declared.starts_with("aws_ssm"))
+			.xpect_false();
+		DeployerPolicy::new("my-egress", "beet-state-1234")
+			.lower(&stack, &config)
+			.unwrap()
+			.to_json()
+			.to_string()
+			.as_str()
+			.xpect_contains("arn:aws:ssm:*:*:parameter/my-egress/*")
+			// the provider's reads are the gated half
+			.xnot()
+			.xpect_contains("parameter/aws/service/*")
+			.xnot()
+			.xpect_contains("ssm:DescribeParameters");
 	}
 
 	/// Two stages of one app share one policy and one state key pattern; a

@@ -9,7 +9,7 @@
 //! documented fallback.
 //!
 //! Live deploy needs `CLOUDFLARE_API_TOKEN` in the environment, a
-//! `{CloudflareAccount{id:".."}}` on the stack or an ancestor and, for the
+//! `{CloudflareAccount("..")}` on the stack or an ancestor and, for the
 //! container path, the R2 data-plane keys
 //! (`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`) so the container reads the site
 //! via [`S3Store::r2`]. The Worker path needs neither to deploy (native
@@ -132,7 +132,7 @@ pub async fn CloudflareContainerDeployAction(
 	// the R2 endpoint the container's `S3Store::r2` reads through, at the
 	// account the stack declares; the account is also what addresses the
 	// managed registry on deploy.
-	let account_id = cloudflare_account(&cx).await?.id;
+	let account_id = cloudflare_account(&cx).await?.0;
 	let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
 
 	let dir = wrangler_ext::project_dir(block.name())?;
@@ -949,7 +949,7 @@ async fn empty_bucket(account: &CloudflareAccount, bucket: &str) -> Result {
 			return Ok(());
 		}
 	};
-	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id);
+	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
 	// the R2 data-plane keys go in as the standard AWS env vars, overriding any
 	// real-AWS creds the process inherited, with `AWS_REGION=auto` as R2
