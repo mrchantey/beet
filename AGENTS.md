@@ -1,6 +1,6 @@
 # Agent Instructions
 
-You are the coding agent for the beet project. Assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. Dont overdo the lingo, only the initial greeting and final response should hint at the personality.
+You are the coding agent for the beet project.
 
 Beet is a pre-release (no current users) Atmospheric OS for homegrown tech built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard. `site/routes/docs/about.md` argues its principles and `site/routes/docs/glossary.md` fixes every word (a binary is a `runtime`, never an `app`).
 
@@ -11,7 +11,7 @@ Beet is a pre-release (no current users) Atmospheric OS for homegrown tech built
 
 ## This file
 
-Every agent reads this file, so it keeps only what every session needs and stays under ~15KB: a new subsystem gets one pointer line below, its cheatsheet in its crate docs, any procedure in a skill. `CLAUDE.md` is a symlink to this file.
+Every agent reads this file, so it keeps only what every session needs and stays under ~15KB: a new subsystem gets one pointer line below, its cheatsheet in its crate docs, any procedure in a skill.
 
 Situational cheatsheets, read before touching the subsystem:
 
@@ -29,71 +29,29 @@ Situational cheatsheets, read before touching the subsystem:
 - when provided a plan or list of work to do, just do it! dont ask which one to start with
 - when you think you're done, reread the instructions and double check you did not miss one.
 
-## Context
-
-- There is no time constraint. Be proactive: if asked to fix a bug or test and you encounter another issue, fix that too.
-- Rapidly changing pre-release project: never consider backward compatibility, prioritize clean refactors, delete dead or experimental code. Never mark `#[deprecated]`, replace the machinery instead.
-- Prefer iterative approaches: try something, learn from it, try again. Search the codebase as-needed instead of preloading everything.
-- when told to run a command, run that command before doing anything else, including searching the codebase
-- Never use `cargo clippy` in this workspace. Never run `cargo clean` without permission, rebuilds take hours.
-- leave code better than you found it: add missing docs, clarify ambiguous language, clean up antipatterns, fix spelling mistakes you come across.
-- Be fearless pushing changes upstream and generalizing patterns. If a type would always be used with another, wire it directly (`#[require(BazzAction)]` on `Bazz`, then `<Bazz/>`) and massage it into `Reflect` rather than wrapping it in a `BazzTemplate`.
-- Do not create non-doc examples without being explicitly asked.
-- Always check diagnostics for compile errors before trying to run commands.
-- We do not use `tokio`, always the `async-` equivalents, ie `async-io`, `async-task`.
-
-## Memory
-
-Never use `.claude/projects/../memory`, all content related to this project must live in this project. The only place you are permitted to persist memory is in `./agent/memory`.
-
 ## Conventions
 
-- A rust module reads like a good book: public high level structs at the top, implementation details below. Mod files are just reexports; prefer splitting into specific sub files, but dont 'create a fresh file' because the one you're working on is messy.
-- Respond to the user with a single numbered sequence, strictly one point per number, subheadings as required (unnumbered). Open questions list their options alphabetically, a) selected by default if no answer:
-```md
-## Subheading foo
-1. some info about this point...
-## Subheading bar
-2. a point that needs a decision..
-	- a) do foo
-	- b) do bar
-```
-- Functions longer than ~20 lines may have brief comments describing each step.
-- Never insert arbitrary ie 80 col manual reflow newlines in markdown documents.
-- all shared dependencies are declared in the workspace Cargo.toml; if one needs no-default-features, disable that at the workspace level and reenable as required
-- for reserved keyword idents, use escaping `r#struct`, never misspelling `strukt`
+- Order trait bounds and function parameters lowest to highest specificity: `'static + Send + Sync + Debug + Default + Clone + Reflect + Component`, `fn foo(world: World, entity: Entity, value: Value)`.
+- prefer method chaining over if statements, but dont use `.for_each(..)`: `for child in children.iter().filter(..)` is correct.
+- Prefer `use crate::prelude::*` / `use other_crate::prelude::*` over individual imports.
 - Beet is cross-platform: use `fs_ext`, `env_ext` instead of `std::fs`/`std::env`, adding missing methods as needed.
-- prefer the beet_core `cfg_if!` macro when appropriate
+- prefer `beet::prelude::cfg_if!` over attributes where appropriate
 - The one canonical store a runtime runs from is the **repo store**: `RepoStore` for types, `repo_store` for idents, "repo store" in prose (never "site"/"entry"/"app" store), enforced one per world. Every other `BlobStore` is a plain store, named by a `StoreRef`, or one field per role where a consumer needs several, or scoped out of an ancestor by a `DirPath`. Its deploy-side declaration is the store block carrying `RepoStoreBlock`, found by type through `RepoStoreQuery`, never by label.
 - Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them. `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).
-- We prefer `use crate::prelude::*` / `use other_crate::prelude::*` over individual imports.
 - Never run `cargo fmt`, formatting is `just fmt` and nothing else: it pins the nightly toolchain `rustfmt.toml` requires and passes `--all`; bare `cargo fmt` reformats the tree into a huge bogus diff.
-- DRY, code reuse is very important, even in tests, refactor into shared functions wherever possible.
-- prefer method chaining over if statements, but dont use `for_each`: `for child in children.iter().filter(..)` is correct.
-- Order trait bounds and function parameters lowest to highest specificity: `'static + Send + Sync + Debug + Default + Clone + Reflect + Component`, `fn foo(world: World, entity: Entity, value: Value)`.
-- Never mention agent plans or temporary tasks in code docs.
 - `HashMap`, `HashSet`, `Instant`, `Result` etc are re-exported from `beet_core::prelude::*`, optimized for beet (cross-platform, faster non-crypto), only use others with good reason. Prefer `SmolStr` for strings likely to be small.
 - Always use `bevyhow!{}`, `bevybail!{}` unless a consumer needs the error type, then `thiserror` (now no_std). Never wrap errors (`.map_err(|e| bevyhow!("{e}"))?`): `BevyError` implements `From<E: Error>`, just use `?`.
 - Where a `Result` cannot be returned (component hooks, commands, async tasks), raise through `World`/`Commands`/`AsyncWorld` `::handle_command_error`, never `panic!`, `debug_assert!` or a bare `error!`; a hook reaches it via `DeferredWorld::commands()`.
-- Never use single letter variable names (except `i` in loops): function pointers `func`, events `ev`, FooContext `cx`, entities `entity`.
 - Continue `long().method().chains()` rather than storing temporaries; the `xtend.rs` blanket traits assist: `.xmap()` is `.map()` for any type, `bar(bazz).xmap(foo)` not `foo(bar(bazz))`, `.xok(foo)` not `Ok(foo)`.
 - Getters/setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation; adjust the macros to suit new usecases if required.
 - Utility modules have the `_ext` suffix, are reexported as `pub mod`, and callers keep the qualifier: `async_ext::do_async_thing().await`.
 - Free items: a top-level `pub fn`/`pub const`/`pub static` is permitted only in a `*_ext` module, a sanctioned namespace module (ie `js_runtime::cwd()`), a `#[template]` constructor, or generated code; everything else is an associated item on its type, or not pub. Bevy systems and observers stay free fns but private, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: `.agents/skills/audit-free-fns`.
 - git: never create branches or make commits unless explicitly told to, whatever the checkout state; keep things as unstaged changes.
 - never pass through bundles unnecessarily: `fn default_router(bundle: impl Bundle) -> impl Bundle` is pointless and obscures the signature
-- `.agents`: files by users and agents, for agents: `plans`, `reports`, `skills`, `tmp` (scratchpads, logs and dumps, wip scripts).
 - Unless explicitly told to, never create extension methods on `World`, `EntityRef`, `Commands` or their async/mut counterparts.
 - The erased-provider pattern, for any swappable backend (`BlobStore`, `SecretStore`): a `FooProvider` trait (`'static + Send + Sync`, `box_clone`, `id`, `describe`, async methods as `SendBoxedFuture`), a `Foo` handle wrapping `Arc<dyn FooProvider>` that is `Clone + Component` with a redacting `Debug` and the typed conveniences, a reflect declaration per provider whose attach observer lands the handle on the declaring entity, and a `SystemParam` that resolves it; a downstream provider is exactly those three pieces and nothing in the crate names it.
 - Web APIs: use the rust wrappers in `beet_core::web_utils` (`AnimationFrame`, `IntervalStream`, `HtmlEventListener` are `Stream`s), never a raw `wasm-bindgen` `Closure` at the call site: the wrappers own the closure lifetime in `Drop`, where leaks and use-after-free come from. A missing wrapper is a reason to add one.
 
-## Documentation
-
-- Quality over quantity, documentation and comments as short as possible: `// run launch step if no match`, never `// if there is not a match for the hash then we should run the launch step`.
-- doctests: `ignore` is an absolute last resort (macros); prefer helper methods that let a doctest run over `no_run`, though `no_run` is sometimes required, ie network requests.
-- avoid type suffixes: `Similar to a Bevy [Event]` not `[Event]s`, `A [Clone] version` not `[Clone]able`.
-- prefer concise conventions over to-the-letter grammatical correctness: `does foo, ie bar`, not `does foo, i.e., bar`.
-- Docs describe what exists, never what is coming; one source of truth per fact, every other page cites it.
 
 ## Testing
 
