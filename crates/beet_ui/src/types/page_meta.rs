@@ -12,6 +12,29 @@
 //!
 //! It lives here rather than in the router because it is DOCUMENT metadata; the
 //! router is one consumer of it, as the head widgets are.
+//!
+//! # Metadata rules
+//!
+//! The limits below are not a house style, they are the smallest envelope every
+//! consumer of a page's metadata accepts, so one set of frontmatter serves the
+//! document head, the feed and a syndicated record with no second pass and no
+//! truncation anywhere.
+//!
+//! - [`description`](PageMeta::description): at most 300 graphemes and 3000
+//!   bytes. The tightest limit of the set, and it comes from the furthest
+//!   consumer: a post's description becomes the text of the Bluesky post
+//!   announcing it, and `app.bsky.feed.post.text` caps at 300 graphemes and
+//!   3000 bytes. The same string is the page's meta description, its feed entry
+//!   summary and its link card description. Graphemes rather than chars because
+//!   an emoji with a skin-tone modifier is one thing a reader sees and should
+//!   cost one unit of the budget.
+//! - [`title`](PageMeta::title): at most 500 graphemes and 5000 bytes, the
+//!   `site.standard.document` limit, which nothing downstream undercuts.
+//! - `tags`: each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
+//!   vocabulary its site declares. Lowercase kebab because a tag is a url
+//!   segment of its own listing page and a plain string in a syndicated record,
+//!   and a closed vocabulary because an open one drifts into synonyms that
+//!   split one topic across two names nobody browses.
 
 use beet_core::prelude::*;
 
