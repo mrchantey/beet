@@ -395,7 +395,6 @@ impl AdminElevate {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// A duration is bounded here rather than at the api, so a bad one costs a
 	/// re-run and not a burnt code.

@@ -11,6 +11,8 @@
 //!   pair, and [`AdminSession`], the tmpfs session that elevates it
 
 mod actions;
+// native and fs only, like the `aws`/`admin` verbs that read it
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod agent_identity;
 mod secrets_handle;
 mod secrets_load;
@@ -18,6 +20,7 @@ mod secrets_plugin;
 mod secrets_query;
 
 pub use actions::*;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use agent_identity::*;
 pub use secrets_handle::*;
 pub(crate) use secrets_load::*;

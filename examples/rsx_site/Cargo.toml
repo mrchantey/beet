@@ -62,6 +62,10 @@ serde.workspace = true
 [dev-dependencies]
 beet = { workspace = true, features = ["testing"] }
 
+[[bin]]
+name = "rsx-site"
+path = "src/main.rs"
+
 # the `beet` test runner replaces libtest's harness
 [[test]]
 name = "render"

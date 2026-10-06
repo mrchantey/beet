@@ -7,12 +7,7 @@
 // `crates/beet_core/src/testing/runner/test_desc.rs`.
 #![cfg_attr(
 	feature = "nightly",
-	feature(
-		unboxed_closures,
-		never_type,
-		async_fn_track_caller,
-		closure_track_caller
-	)
+	feature(unboxed_closures, async_fn_track_caller)
 )]
 // `extern crate test` (the libtest conversion shims) requires the unstable
 // `test` feature, on both test and non-test builds.

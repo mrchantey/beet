@@ -40,7 +40,6 @@ uuid = { workspace = true, features = ["std", "v7", "js"] }
 async-openai = { version = "0.41", optional=true, default-features=false, features=["chat-completion-types"] }
 serde.workspace = true
 futures.workspace = true
-strum.workspace = true
 thiserror.workspace = true
 async-lock.workspace = true
 base64.workspace = true

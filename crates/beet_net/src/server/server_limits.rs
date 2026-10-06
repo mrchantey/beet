@@ -76,14 +76,20 @@ impl Default for ServerLimits {
 /// A server's live limits: the [`ServerLimits`] it resolved at start, and the
 /// permits its connections share. Built once per accept loop and cloned per
 /// connection.
-#[cfg(feature = "std")]
+#[cfg(all(
+	any(feature = "hyper", feature = "server"),
+	not(target_arch = "wasm32")
+))]
 #[derive(Clone)]
 pub(crate) struct ServerGuard {
 	limits: ServerLimits,
 	dispatch: std::sync::Arc<async_lock::Semaphore>,
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(
+	any(feature = "hyper", feature = "server"),
+	not(target_arch = "wasm32")
+))]
 impl ServerGuard {
 	/// The limits declared on `entity` (the [`HttpServer`] requirement puts the
 	/// defaults there when nothing else does), with a permit pool to match.

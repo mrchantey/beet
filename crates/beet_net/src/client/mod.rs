@@ -33,6 +33,14 @@ mod impl_file;
 	not(target_arch = "wasm32")
 ))]
 mod impl_reqwest;
+// ureq shadows reqwest, which stays linked: mark it used for the unused
+// dependency lint
+#[cfg(all(
+	feature = "reqwest",
+	feature = "ureq",
+	not(target_arch = "wasm32")
+))]
+use reqwest as _;
 #[cfg(all(feature = "ureq", not(target_arch = "wasm32")))]
 mod impl_ureq;
 // the fetch transport rides `std`: its response stream goes through the

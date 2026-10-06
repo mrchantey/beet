@@ -242,7 +242,6 @@ impl AdminSession {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// The record names are not the sdk's, because a name lives in one
 	/// document and every repo's own already holds those.

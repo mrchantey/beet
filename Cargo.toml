@@ -55,7 +55,6 @@ categories = [
 	"science::robotics",
 	"embedded",
 ]
-publish = false
 
 [workspace]
 # default resolver
@@ -180,7 +179,6 @@ webbrowser = "1"
 #💡 logging
 log = "0.4"
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_env_logger = "0.5"
 
 #💡 async

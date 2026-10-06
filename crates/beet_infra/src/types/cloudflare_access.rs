@@ -154,7 +154,8 @@ impl CloudflareAccess {
 	}
 }
 
-#[cfg(test)]
+// its callers are the deploy actions' tests, native only
+#[cfg(all(test, feature = "deploy", not(target_arch = "wasm32")))]
 impl CloudflareAccess {
 	/// The declaration the action `T` requires, read off a spawned `T` the way
 	/// the mint reads one off a scene, so a test pins what the action really

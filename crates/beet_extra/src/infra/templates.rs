@@ -613,8 +613,8 @@ mod test {
 	/// TWO buckets, not three: segments and aggregate rows share the
 	/// `analytics` bucket under disjoint prefixes, because a bucket is the unit
 	/// of IAM grant and those two have the same writer, the same grant, and
-	/// neither is a sole copy. The archive is separate because it IS the sole
-	/// copy and lives where nothing expires.
+	/// neither is a sole copy for long. The archive is separate because it IS
+	/// the sole copy and lives where nothing expires.
 	///
 	/// The deploy has to RENDER, not just spawn: an unpointed schedule and a
 	/// hostname on a gateway-less function are both render-time failures, and a
@@ -648,8 +648,9 @@ mod test {
 				</Stack>
 			</Fragment>"#,
 		);
-		// Every analytics store is stable across deploys and runtime-writable; only
-		// the sole-copy archive keeps object versions.
+		// Every analytics store is stable across deploys, runtime-writable and
+		// versioned: a segment is the only copy of its events until the nightly
+		// rollup, and the archive is the sole raw history.
 		let mut buckets = world
 			.query::<&S3BucketBlock>()
 			.iter(&world)
@@ -664,7 +665,7 @@ mod test {
 			.collect::<Vec<_>>();
 		buckets.sort();
 		buckets.xpect_eq(vec![
-			("analytics".to_string(), true, false, false),
+			("analytics".to_string(), true, false, true),
 			("archive".to_string(), true, false, true),
 			// the repo store, versioned per deploy
 			("repo".to_string(), false, true, false),

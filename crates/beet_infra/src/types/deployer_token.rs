@@ -618,7 +618,11 @@ mod test {
 	/// for four zone groups, no account group at all, and nothing that can mint
 	/// a credential. Read off the actions' own declarations, so a change to one
 	/// of them is a change to this answer.
-	#[cfg(feature = "mail")]
+	#[cfg(all(
+		feature = "mail",
+		feature = "deploy",
+		not(target_arch = "wasm32")
+	))]
 	#[beet_core::test]
 	fn the_zone_verbs_never_escalate() {
 		let (stack, ..) = addressed();

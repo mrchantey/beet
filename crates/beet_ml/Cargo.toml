@@ -2,7 +2,6 @@
 name = "beet_ml"
 version.workspace = true
 edition.workspace = true
-readme = "README.md"
 description = "Machine Learning actions built upon beet_action"
 documentation.workspace = true
 homepage.workspace = true

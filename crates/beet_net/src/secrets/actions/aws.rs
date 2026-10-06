@@ -143,7 +143,6 @@ impl AwsExec {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use beet_core::prelude::*;
 
 	/// The remaining time reads at a glance, since it is the thing that
 	/// decides whether a long command will outlive its own credential.

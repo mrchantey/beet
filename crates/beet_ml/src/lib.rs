@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+// proving the shared wgpu setup `Send` walks deeper than the default 128
+#![recursion_limit = "256"]
 
 beet_core::test_main!();
 

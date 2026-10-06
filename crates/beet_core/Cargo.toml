@@ -141,7 +141,6 @@ custom_test_frameworks = [
 	"testing",
 	"nightly",
 ]
-http = ["dep:http"]
 crossterm = ["dep:crossterm", "dep:libc"]
 bevy_default = ["template_serde", "bevy_multithreaded", "bevy_asset"]
 # template serialization, see src/template_serde. needs reflect + Entity serde
@@ -226,7 +225,6 @@ tokens = [
 	"dep:quote",
 	"dep:proc-macro2",
 	"dep:prettyplease",
-	"dep:proc-macro2-diagnostics",
 ]
 rsx = ["beet_core_macros/rsx"]
 # The hand-written BSX (`.bsx`) cursor parser and its resolution into the
@@ -259,10 +257,6 @@ heck.workspace = true
 digest.workspace = true
 bitflags = { workspace = true }
 
-#💡 http
-http = {workspace = true,optional=true}
-
-
 #💡 path
 pathdiff = { version = "0.2", optional = true }
 either = { version = "1", default-features = false }
@@ -293,7 +287,6 @@ rust-embed = { workspace = true, optional = true }
 syn = { workspace = true, optional = true }
 quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
-proc-macro2-diagnostics = { workspace = true, optional = true }
 variadics_please = { workspace = true }
 prettyplease = { workspace = true, optional = true }
 
