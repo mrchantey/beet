@@ -25,11 +25,13 @@ pub fn project_dir(name: &str) -> Result<AbsPath> {
 	Ok(dir)
 }
 
-/// `wrangler deploy` from a project directory. When `secrets_file` is set, its
-/// keys are uploaded as real Worker secrets *with* this version
-/// (`--secrets-file`), which is the only way a deploy publishes secrets: a
-/// `.dev.vars` file is a local-development input and never leaves the machine.
+/// `wrangler deploy` from a project directory, under the deploy token the
+/// calling action's `access` declares. When `secrets_file` is set, its keys are
+/// uploaded as real Worker secrets *with* this version (`--secrets-file`),
+/// which is the only way a deploy publishes secrets: a `.dev.vars` file is a
+/// local-development input and never leaves the machine.
 pub async fn deploy(
+	access: &CloudflareAccess,
 	project_dir: &AbsPath,
 	secrets_file: Option<&str>,
 ) -> Result {
@@ -39,7 +41,8 @@ pub async fn deploy(
 		args.push("--secrets-file".to_string());
 		args.push(secrets_file.to_string());
 	}
-	ChildProcess::new("wrangler")
+	access
+		.wrangler()
 		.with_args(args)
 		.with_cwd(project_dir.clone())
 		.run_async()
@@ -59,10 +62,11 @@ pub async fn deploy(
 /// Deleting the custom domain also removes the zone record and the certificate
 /// wrangler provisioned with it, since the upload created all three together.
 pub async fn delete_custom_domain(
+	access: &CloudflareAccess,
 	account: &CloudflareAccount,
 	hostname: &str,
 ) -> Result<bool> {
-	let (account, token) = (account.id(), cloudflare_api_ext::token()?);
+	let (account, token) = (account.id(), access.token()?);
 	let listed = cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::get(format!(
 			"{API_BASE}/accounts/{account}/workers/domains?hostname={hostname}"
@@ -93,10 +97,11 @@ pub async fn delete_custom_domain(
 /// Delete the Worker script `name` in `account`, if there is one. `false`
 /// when there was none, see [`delete_custom_domain`].
 pub async fn delete_script(
+	access: &CloudflareAccess,
 	account: &CloudflareAccount,
 	name: &str,
 ) -> Result<bool> {
-	let (account, token) = (account.id(), cloudflare_api_ext::token()?);
+	let (account, token) = (account.id(), access.token()?);
 	cloudflare_api_ext::send_optional(
 		beet_net::prelude::Request::delete(format!(
 			"{API_BASE}/accounts/{account}/workers/scripts/{name}"

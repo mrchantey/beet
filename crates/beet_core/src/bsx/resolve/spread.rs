@@ -208,6 +208,46 @@ pub(super) fn build_patch(
 	Ok(Box::new(patch))
 }
 
+/// Refuse an attribute naming no field of a struct component or resource tag.
+///
+/// A template forwards the attributes beyond its props (a `class` reaches its
+/// root element), but a component or a resource has nowhere to forward one:
+/// [`build_patch`] carried it as an untyped entry and the apply over the
+/// default dropped it in silence. That is how `<R2BucketBlock retain_days=30/>`,
+/// built against a block with no such field, rendered a bucket with no window
+/// and said nothing. A directive and an `@` binding are not field patches and
+/// pass.
+pub(super) fn assert_attributes_are_fields(
+	el: &BsxElement,
+	type_info: &'static bevy::reflect::TypeInfo,
+) -> Result<()> {
+	let bevy::reflect::TypeInfo::Struct(info) = type_info else {
+		return Ok(());
+	};
+	let unknown = el
+		.attributes
+		.iter()
+		.filter(|attr| !is_directive(&attr.key) && !attr.key.is_empty())
+		.filter(|attr| {
+			!matches!(&attr.value, AttrValue::Expr(ValueExpr::Binding(_)))
+		})
+		.filter(|attr| info.field(&attr.key).is_none())
+		.map(|attr| format!("`{}`", attr.key))
+		.collect::<Vec<_>>();
+	if unknown.is_empty() {
+		return Ok(());
+	}
+	bevybail!(
+		"`<{}>` has no field {}: {}",
+		el.tag,
+		unknown.join(", "),
+		match info.field_names() {
+			[] => "it has none".to_string(),
+			names => format!("its fields are {}", names.join(", ")),
+		}
+	)
+}
+
 /// Insert a reflect-patched component over its default onto `entity`.
 pub(in crate::bsx) fn insert_component(
 	entity: &mut EntityWorldMut,

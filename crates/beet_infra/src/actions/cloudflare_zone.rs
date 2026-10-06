@@ -8,6 +8,7 @@
 //! provider's Enterprise-only fields.)
 use crate::actions::cloudflare_api_ext;
 use crate::actions::cloudflare_api_ext::API_BASE;
+use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -29,10 +30,17 @@ use beet_net::prelude::*;
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// the cache-phase entrypoint ruleset, then the `ssl` and `always_use_https`
+// settings
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::CACHE_SETTINGS_WRITE,
+	TokenPermission::ZONE_SETTINGS_WRITE,
+]))]
 pub async fn CloudflareZoneSetup(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let (zone_id, token) = access.zone_auth(&cx.caller).await?;
 
 	// the cache ruleset: an entrypoint PUT creates or replaces, idempotent
 	cloudflare_api_ext::send(
@@ -113,15 +121,20 @@ fn cache_rules() -> serde_json::Value {
 ///
 /// A REST call (`POST zones/{zone}/purge_cache`), not tofu: a purge is an
 /// event, not a resource. The zone is the stack's [`CloudflareZone`] and the
-/// call authenticates with `CLOUDFLARE_API_TOKEN` (needs the `Cache Purge`
-/// permission).
+/// call authenticates with the deploy token, whose `Cache Purge` group this
+/// action declares.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// `POST zones/{zone}/purge_cache`
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::CACHE_PURGE,
+]))]
 pub async fn CloudflarePurgeCache(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let (zone_id, token) = access.zone_auth(&cx.caller).await?;
 	let start = Instant::now();
 	cloudflare_api_ext::send(
 		Request::post(format!("{API_BASE}/zones/{zone_id}/purge_cache"))

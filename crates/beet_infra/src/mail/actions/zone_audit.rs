@@ -6,8 +6,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-
-
 /// How much of the world a [`ZoneAudit`] renders before diffing it against the
 /// zone.
 ///
@@ -149,6 +147,10 @@ impl ZoneAudit {
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(ParamsPartial = ParamsPartial::new::<ZoneAuditParams>())]
+// lists every record in the zone and deletes the unaccounted ones
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::DNS_WRITE,
+]))]
 pub async fn ZoneAudit(
 	/// Records the zone is expected to carry that this stack does not declare:
 	/// another stack's, a third party's, or a provider's own.
@@ -176,7 +178,8 @@ pub async fn ZoneAudit(
 	// resolved first: a zone-scoped render filters the declarations it unions by
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.
-	let (zone_id, token) = cloudflare_api_ext::zone_auth(&cx.caller).await?;
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let (zone_id, token) = access.zone_auth(&cx.caller).await?;
 	let audited = zone_id.clone();
 	let (declared, allowed) = cx
 		.caller

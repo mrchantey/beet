@@ -140,6 +140,15 @@ export default {{
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
+// `wrangler deploy` of the Worker and the custom domain the upload provisions
+// per policy host (its record and certificate with it). The project names no
+// account id, so wrangler resolves one by listing the accounts the token can
+// see, which is the `Account Settings Read`
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::WORKERS_ROUTES_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn MtaStsPublish(
 	/// The Worker's name, which is also its `target/<name>-cf` project
 	/// directory. Stack-composed by the action when left empty, so the usual
@@ -148,6 +157,7 @@ pub async fn MtaStsPublish(
 	worker: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let mail = MailStack::of(&cx.caller).await?;
 
 	// only the domains this stack publishes an `_mta-sts` record for: a policy
@@ -180,7 +190,7 @@ pub async fn MtaStsPublish(
 		MtaStsPublish::wrangler_json(&worker, &policies)?,
 	)
 	.await?;
-	wrangler_ext::deploy(&dir, None).await?;
+	wrangler_ext::deploy(&access, &dir, None).await?;
 
 	for host in policies.keys() {
 		info!(
@@ -214,6 +224,11 @@ pub async fn MtaStsPublish(
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
+// the custom domains over REST, then the script, both naming their account
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::WORKERS_ROUTES_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn MtaStsUnpublish(
 	/// The Worker's name, stack-composed when left empty exactly as
 	/// [`MtaStsPublish`] composes it.
@@ -221,6 +236,7 @@ pub async fn MtaStsUnpublish(
 	worker: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let mail = MailStack::of(&cx.caller).await?;
 	let worker = match worker.is_empty() {
 		true => mail.stack.resource_name(MtaStsPublish::LABEL),
@@ -237,13 +253,17 @@ pub async fn MtaStsUnpublish(
 	for removal in MtaStsUnpublish::removals(&hosts, &worker) {
 		match &removal {
 			MtaStsRemoval::CustomDomain(host) => {
-				match wrangler_ext::delete_custom_domain(account, host).await? {
+				match wrangler_ext::delete_custom_domain(&access, account, host)
+					.await?
+				{
 					true => info!("removed the custom domain at {host}"),
 					false => info!("no custom domain at {host}"),
 				}
 			}
 			MtaStsRemoval::Script(name) => {
-				match wrangler_ext::delete_script(account, name).await? {
+				match wrangler_ext::delete_script(&access, account, name)
+					.await?
+				{
 					true => info!("removed the mta-sts worker `{name}`"),
 					false => info!("no mta-sts worker `{name}`"),
 				}
@@ -358,5 +378,29 @@ mod tests {
 		MtaStsPublish::script()
 			.as_str()
 			.xpect_contains("\"/.well-known/mta-sts.txt\"");
+	}
+
+	/// What the pair asks of the deploy token, read off the actions' own
+	/// declarations: the Workers groups for the script and its custom domains,
+	/// and the account read wrangler's account lookup needs on the publish.
+	/// Nothing that touches a zone's records directly, since the custom domain
+	/// brings its own.
+	#[beet_core::test]
+	fn the_pair_declares_the_worker_groups() {
+		CloudflareAccess::declared_by::<MtaStsPublish>()
+			.permissions()
+			.to_vec()
+			.xpect_eq(vec![
+				TokenPermission::ACCOUNT_SETTINGS_READ,
+				TokenPermission::WORKERS_ROUTES_WRITE,
+				TokenPermission::WORKERS_SCRIPTS_WRITE,
+			]);
+		CloudflareAccess::declared_by::<MtaStsUnpublish>()
+			.permissions()
+			.to_vec()
+			.xpect_eq(vec![
+				TokenPermission::WORKERS_ROUTES_WRITE,
+				TokenPermission::WORKERS_SCRIPTS_WRITE,
+			]);
 	}
 }

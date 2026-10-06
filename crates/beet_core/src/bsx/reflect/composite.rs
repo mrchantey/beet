@@ -295,8 +295,10 @@ fn assert_variant_complete(
 }
 
 /// Build a [`DynamicStruct`] from a named literal targeting a struct component,
-/// eg a `{MyComponent{foo:"bar"}}` spread. Unit/tuple forms become an empty
-/// patch over default.
+/// eg a `{MyComponent{foo:"bar"}}` spread. The unit form is an empty patch over
+/// default; the positional form is an error, since a struct with named fields
+/// has no position for a value to land in and an empty patch would build the
+/// default in silence.
 pub(super) fn named_struct_to_reflect(
 	named: &NamedLiteral,
 	field_info: Option<&'static TypeInfo>,
@@ -312,6 +314,19 @@ pub(super) fn named_struct_to_reflect(
 		Some(TypeInfo::Struct(info)) => Some(info),
 		_ => None,
 	};
+	if let (NamedFields::Tuple(items), Some(info)) =
+		(&named.fields, struct_info)
+		&& !items.is_empty()
+	{
+		let name = info.type_path_table().short_path();
+		bevybail!(
+			"`{name}` has named fields ({}), so it is written `{name}{{{}:..}}`: \
+			{} positional value(s) have no field to land in",
+			info.field_names().join(", "),
+			info.field_names().first().copied().unwrap_or("field"),
+			items.len()
+		);
+	}
 	let mut dynamic = DynamicStruct::default();
 	if let NamedFields::Struct(fields) = &named.fields {
 		for (name, literal) in fields {
@@ -328,6 +343,13 @@ pub(super) fn named_struct_to_reflect(
 
 /// Build a [`DynamicTupleStruct`] from a named literal targeting a tuple-struct
 /// component, eg `{Wrapper(1, 2)}`.
+///
+/// A tuple struct is written positionally, so on a known target a field literal
+/// is an error (unless the type's own [`LiteralParser`] takes it as a map), and
+/// so is a value past its last position. Both used to build an empty patch over
+/// the default in silence, which is how `{CloudflareAccount{id:".."}}` once
+/// resolved to an account with no id and only failed where a provider happened
+/// to require the field.
 pub(super) fn named_tuple_struct_to_reflect(
 	named: &NamedLiteral,
 	field_info: Option<&'static TypeInfo>,
@@ -338,6 +360,34 @@ pub(super) fn named_tuple_struct_to_reflect(
 		Some(TypeInfo::TupleStruct(info)) => Some(info),
 		_ => None,
 	};
+	if let (NamedFields::Struct(fields), Some(info)) =
+		(&named.fields, tuple_info)
+		&& !fields.is_empty()
+	{
+		if let Some(reflected) = parsed_fields(fields, field_info)? {
+			return Ok(reflected);
+		}
+		let name = info.type_path_table().short_path();
+		bevybail!(
+			"`{name}` is a tuple struct, so it is written positionally as \
+			`{name}(..)`: the field(s) {} name nothing it has",
+			fields
+				.iter()
+				.map(|(field, _)| format!("`{field}`"))
+				.collect::<Vec<_>>()
+				.join(", ")
+		);
+	}
+	if let (NamedFields::Tuple(items), Some(info)) = (&named.fields, tuple_info)
+		&& items.len() > info.field_len()
+	{
+		bevybail!(
+			"`{}` has {} field(s) and is given {}",
+			info.type_path_table().short_path(),
+			info.field_len(),
+			items.len()
+		);
+	}
 	let mut dynamic = DynamicTupleStruct::default();
 	if let NamedFields::Tuple(items) = &named.fields {
 		for (index, item) in items.iter().enumerate() {

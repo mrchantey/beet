@@ -58,10 +58,10 @@ compile).
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`beet cloudflare/mint`), so it carries no account-level Workers group: a live run
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
-deploy`). `DeployerToken::ACTIONS` names the groups each action needs.
+deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
 <CliServer {CallOnReady}>
-<Router {(RequestLogger, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
+<Router {(RequestLogger, HelpHandler, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
 	<Route path="build" {ExchangeSequence}>

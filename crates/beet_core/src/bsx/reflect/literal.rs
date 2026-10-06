@@ -281,6 +281,73 @@ mod test {
 		.xpect_contains("`Sync` has no field `paths`");
 	}
 
+	/// The literal's form must match the target's: a tuple struct is written
+	/// positionally and a named-field struct by name, and the other form is an
+	/// error naming the right spelling rather than an empty patch over the
+	/// default.
+	///
+	/// REGRESSION: `{CloudflareAccount{id:".."}}` against the tuple struct
+	/// `CloudflareAccount(SmolStr)` built an account with an EMPTY id, and the
+	/// only thing that noticed was a provider field that happened to be
+	/// required; an R2 endpoint composed from it would have read
+	/// `https://.r2.cloudflarestorage.com` without complaint.
+	#[crate::test]
+	fn a_literal_in_the_wrong_form_is_refused() {
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Account(SmolStr);
+		#[derive(Reflect, PartialEq, Debug, Default)]
+		struct Zone {
+			domain: SmolStr,
+		}
+		fn build(
+			name: &str,
+			fields: NamedFields,
+			info: &'static TypeInfo,
+		) -> Result<Box<dyn PartialReflect>> {
+			let registry = TypeRegistry::default();
+			let mut resolver = |_: &str| Entity::PLACEHOLDER;
+			DataLiteral::to_reflect(
+				&DataLiteral::Enum(NamedLiteral {
+					name: name.into(),
+					fields,
+				}),
+				Some(info),
+				&registry,
+				&mut resolver,
+			)
+		}
+		let id = || DataLiteral::Scalar(Value::Str("acct".into()));
+		build(
+			"Account",
+			NamedFields::Struct(vec![("id".into(), id())]),
+			Account::type_info(),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("`Account` is a tuple struct")
+		.xpect_contains("`Account(..)`")
+		.xpect_contains("`id`");
+		build(
+			"Account",
+			NamedFields::Tuple(vec![id(), id()]),
+			Account::type_info(),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("`Account` has 1 field(s) and is given 2");
+		build("Zone", NamedFields::Tuple(vec![id()]), Zone::type_info())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`Zone` has named fields (domain)")
+			.xpect_contains("`Zone{domain:..}`");
+		// ..and the right form still builds
+		resolve::<Account>(DataLiteral::Enum(NamedLiteral {
+			name: "Account".into(),
+			fields: NamedFields::Tuple(vec![id()]),
+		}))
+		.xpect_eq(Account("acct".into()));
+	}
+
 	/// A malformed pattern errors rather than panicking inside the glob
 	/// validator, since a markup attribute is authored input.
 	#[crate::test]

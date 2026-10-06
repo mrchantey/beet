@@ -2,14 +2,17 @@
 mod access_grant;
 mod artifacts;
 mod build_artifact;
+// what a Cloudflare action asks of the deploy token, declared on the action and
+// the only way it reaches that token.
+mod cloudflare_access;
 // what a repo's deployer is allowed to do, lowered from the provider types its
 // stacks render. Gated with the AWS IAM lowering it mirrors (`IamPolicy`),
 // since both speak AWS policy documents.
 #[cfg(feature = "bindings_aws_common")]
 mod deployer_policy;
 // the same lowering for Cloudflare, whose api token has no policy document and
-// no bindings behind it: the input is declared type names and action type
-// names, both strings, so it is ungated.
+// no bindings behind it: the input is declared type names and the
+// `CloudflareAccess` each action declares, so it is ungated.
 mod deployer_token;
 mod deployment;
 mod infra_plugin;
@@ -38,6 +41,7 @@ mod stack_cli;
 pub use access_grant::*;
 pub use artifacts::*;
 pub use build_artifact::*;
+pub use cloudflare_access::*;
 #[cfg(feature = "bindings_aws_common")]
 pub use deployer_policy::*;
 pub use deployer_token::*;

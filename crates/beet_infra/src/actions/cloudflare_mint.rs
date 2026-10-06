@@ -180,13 +180,13 @@ impl CloudflareMint {
 				for (stack, _deployment, config) in rendered.iter() {
 					lowered = lowered.lower(stack, config)?;
 				}
-				for (entity, action) in Self::declared_actions(world) {
+				for (entity, access) in Self::declared_access(world) {
 					// the action's OWN stack: a route's verbs may sit outside
 					// every `<Stack>`, resolving the addresses above them
 					let stack = world.with_state::<StackQuery, _>(|stacks| {
 						stacks.resolve(entity)
 					});
-					lowered = lowered.lower_action(&stack, action)?;
+					lowered = lowered.lower_access(&stack, &access)?;
 				}
 				if lowered.asked().is_empty() {
 					bevybail!(
@@ -200,32 +200,15 @@ impl CloudflareMint {
 			.await?
 	}
 
-	/// Every entity carrying one of the actions [`DeployerToken`] lowers, with
-	/// the action's name. Driven by that table through the type registry rather
-	/// than by a second list of queries, so adding an action to the table is the
-	/// whole change; a name the registry does not know is a Cloudflare feature
-	/// this binary was not built with, which is why absence is skipped rather
-	/// than refused (`declares_every_lowered_action` holds the table honest).
-	fn declared_actions(world: &mut World) -> Vec<(Entity, &'static str)> {
-		let registry = world.resource::<AppTypeRegistry>().clone();
-		DeployerToken::action_names()
-			.filter_map(|action| {
-				let reflect_component = {
-					let registry = registry.read();
-					reflect_ext::registration_by_name(&registry, action)?
-						.data::<ReflectComponent>()
-						.cloned()?
-				};
-				let component = reflect_component.register_component(world);
-				QueryBuilder::<Entity>::new(world)
-					.with_id(component)
-					.build()
-					.iter(world)
-					.map(|entity| (entity, action))
-					.collect::<Vec<_>>()
-					.xmap(Some)
-			})
-			.flatten()
+	/// Every Cloudflare action this launch runs, by the [`CloudflareAccess`]
+	/// each one declares. No list of action names stands between the two: the
+	/// declaration is how an action reaches the token at all, so an action that
+	/// calls Cloudflare is one this finds.
+	fn declared_access(world: &mut World) -> Vec<(Entity, CloudflareAccess)> {
+		world
+			.query::<(Entity, &CloudflareAccess)>()
+			.iter(world)
+			.map(|(entity, access)| (entity, *access))
 			.collect()
 	}
 
@@ -756,30 +739,35 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// Every action the lowering names is a registered component, so the world
-	/// walk finds the ones a route declares. A name that resolves to nothing
-	/// here is a typo in the table, which would otherwise look exactly like a
-	/// Cloudflare feature the binary was built without — hence the gate: the
-	/// table spans the wrangler actions and the mail audit, so only a build
-	/// carrying both can hold it honest.
-	#[cfg(all(feature = "cloudflare_block", feature = "mail"))]
+	/// Every Cloudflare action in the scene is found by the declaration it
+	/// carries, so an action is lowered by being written down rather than by
+	/// being listed somewhere else.
+	///
+	/// REGRESSION: the MTA-STS publish reached Cloudflare through wrangler but
+	/// sat in no table of action names, so a token minted for a mail repo would
+	/// have lacked its Workers groups and the next mail deploy would have
+	/// answered 403 while publishing the policy.
+	#[cfg(feature = "mail")]
 	#[beet_core::test]
-	fn declares_every_lowered_action() {
-		let world = InfraPlugin.into_world();
-		let registry = world.resource::<AppTypeRegistry>().read();
-		for action in DeployerToken::action_names() {
-			reflect_ext::registration_by_name(&registry, action)
-				.unwrap_or_else(|| {
-					panic!(
-						"`DeployerToken::ACTIONS` names `{action}`, which no \
-						type is registered under"
-					)
-				})
-				.data::<ReflectComponent>()
-				.unwrap_or_else(|| {
-					panic!("`{action}` is registered but not a component")
-				});
-		}
+	fn finds_every_declared_action() {
+		let mut world = InfraPlugin.into_world();
+		world.spawn(CloudflarePurgeCache::default());
+		world.spawn(MtaStsPublish::default());
+		world.spawn(AwsRegion::new("us-west-2"));
+		let mut found = super::CloudflareMint::declared_access(&mut world)
+			.into_iter()
+			.map(|(_, access)| access)
+			.collect::<Vec<_>>();
+		found.sort_by_key(|access| access.action());
+		found
+			.iter()
+			.map(CloudflareAccess::action)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["CloudflarePurgeCache", "MtaStsPublish"]);
+		found[1]
+			.permissions()
+			.contains(&TokenPermission::WORKERS_SCRIPTS_WRITE)
+			.xpect_true();
 	}
 
 	/// Every declared bucket is found with the stack above it and the store that

@@ -295,7 +295,11 @@ mod test {
 
 	/// Build `markup` into a world registering `PackageConfig` and [`Bound`],
 	/// returning the world and the built root.
-	fn build(markup: &str) -> (World, Entity) {
+	fn build(markup: &str) -> (World, Entity) { try_build(markup).unwrap() }
+
+	/// Build `markup`, returning the world and the built root, or the build
+	/// error.
+	fn try_build(markup: &str) -> Result<(World, Entity)> {
 		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
 		{
 			let registry = world.resource_mut::<AppTypeRegistry>();
@@ -305,17 +309,15 @@ mod test {
 			registry.register::<BoundPair>();
 			registry.register::<RequireCfg>();
 		}
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
+		let nodes = BsxNode::parse_document(markup, &BsxParseConfig::bsx())?;
 		let root = world
 			.spawn_template(BsxTemplate::container(
 				nodes,
 				BsxTemplateRegistry::default(),
-			))
-			.unwrap()
+			))?
 			.id();
 		world.flush();
-		(world, root)
+		Ok((world, root))
 	}
 
 	/// The entities `markup` builds, root included.
@@ -365,6 +367,23 @@ mod test {
 			.get::<RequireCfg>()
 			.unwrap()
 			.xpect_eq(RequireCfg::new("feature:ml && feature:beet_esp/alvik"));
+	}
+
+	/// An attribute naming no field of a component is an error naming both,
+	/// since a component has nowhere to forward it, while a directive still
+	/// passes.
+	///
+	/// REGRESSION: the attribute rode the patch untyped and the apply over the
+	/// default dropped it, so `<R2BucketBlock retain_days=30/>` against a block
+	/// with no such field rendered a bucket with no lock and no warning.
+	#[crate::test]
+	fn an_attribute_naming_no_field_is_refused() {
+		try_build(r#"<RequireCfg cfg="feature:ml" cfgs="feature:extra"/>"#)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`<RequireCfg>` has no field `cfgs`")
+			.xpect_contains("its fields are cfg");
+		try_build(r#"<RequireCfg cfg="feature:ml" bx:key="one"/>"#).unwrap();
 	}
 
 	/// A `$name` reference into a formerly-gated region resolves to the real

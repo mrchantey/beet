@@ -104,11 +104,11 @@ pub(super) fn build_uppercase(
 				(kind, registration.type_info())
 			})
 			.map(|(kind, info)| {
-				(kind, build_patch(el, info, &registry, &entity_refs))
+				(kind, info, build_patch(el, info, &registry, &entity_refs))
 			})
 	};
 
-	let Some((kind, patch)) = registration_kind else {
+	let Some((kind, type_info, patch)) = registration_kind else {
 		// a known featured-out tag (eg `<LiveReloadScript/>` with `client_io`
 		// compiled out) resolves to nothing at all, children included.
 		if AllowedUnregistered::allows(cx, &el.tag) {
@@ -136,6 +136,7 @@ pub(super) fn build_uppercase(
 		}
 		UppercaseKind::Resource => {
 			// a resource declaration: patch the live resource, no entity content.
+			assert_attributes_are_fields(el, type_info)?;
 			apply_resource_tag(el, patch.as_ref(), &app_registry, cx)?;
 		}
 		UppercaseKind::Component => {
@@ -151,6 +152,7 @@ pub(super) fn build_uppercase(
 				)?,
 				// a bare/attribute component: reflect-patch over default and insert.
 				None => {
+					assert_attributes_are_fields(el, type_info)?;
 					insert_component(cx.entity, patch.as_ref(), &app_registry)?
 				}
 			}

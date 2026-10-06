@@ -12,10 +12,11 @@
 //! `{CloudflareAccount("..")}` on the stack or an ancestor, and nothing else:
 //! the R2 data-plane pair the container reads the site with ([`S3Store::r2`])
 //! and the teardown empties the bucket with is DERIVED from that same token
-//! ([`cloudflare_api_ext::r2_credentials`]), never held as a second
-//! credential. The Worker path needs no pair at all to deploy (native
-//! `worker::Bucket` binding). All commands are `--dry-run`-able; see each
-//! example's module doc.
+//! ([`CloudflareAccess::r2_credentials`]), never held as a second credential.
+//! The Worker path needs no pair at all to deploy (native `worker::Bucket`
+//! binding). Each action declares the groups its calls need on itself
+//! ([`CloudflareAccess`]), which is also how it reaches the token. All commands
+//! are `--dry-run`-able; see each example's module doc.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -44,12 +45,13 @@ fn container_app_name(worker_name: &str) -> String {
 
 /// Create an R2 bucket, treating an "already exists" failure as success so
 /// `deploy` is idempotent.
-async fn wrangler_r2_create(bucket: &str) -> Result {
+async fn wrangler_r2_create(access: &CloudflareAccess, bucket: &str) -> Result {
 	info!("ensuring R2 bucket `{bucket}`");
 	// `run_async` errors on a non-zero exit, folding wrangler's stderr into the
 	// error message, so match on that: `10004` / "already exists" / "already
 	// owned" are the idempotent cases (the bucket is already there and ours).
-	match ChildProcess::new("wrangler")
+	match access
+		.wrangler()
 		.with_args(["r2", "bucket", "create", bucket])
 		.run_async()
 		.await
@@ -118,9 +120,19 @@ async fn sibling<T: Component + Clone>(
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// `wrangler deploy` of the fronting Worker, the image it builds and pushes to
+// the managed registry, and the bucket the container reads
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::CLOUDCHAMBER_WRITE,
+	TokenPermission::WORKERS_CONTAINERS_WRITE,
+	TokenPermission::WORKERS_R2_STORAGE_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn CloudflareContainerDeployAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let block = sibling::<CloudflareContainerBlock>(&cx).await?;
 	let artifact = sibling::<BuildArtifact>(&cx).await?;
 
@@ -142,15 +154,16 @@ pub async fn CloudflareContainerDeployAction(
 	write_container_worker_js(&dir, &block)?;
 	write_container_wrangler(&dir, &block)?;
 	write_container_package_json(&dir)?;
-	let secrets_file = write_r2_secrets_file(&dir, account.id()).await?;
+	let secrets_file =
+		write_r2_secrets_file(&access, &dir, account.id()).await?;
 
 	// `wrangler deploy` bundles `worker.js`, whose `@cloudflare/containers` import
 	// is resolved from `node_modules`, so install deps before deploying.
 	npm_install(&dir).await?;
-	wrangler_r2_create(block.bucket()).await?;
+	wrangler_r2_create(&access, block.bucket()).await?;
 	// upload the R2 keys as real Worker secrets with this version (`.dev.vars` is
 	// otherwise local-only), so the container's `this.env.R2_*` reads resolve.
-	wrangler_ext::deploy(&dir, secrets_file.as_deref()).await?;
+	wrangler_ext::deploy(&access, &dir, secrets_file.as_deref()).await?;
 	info!("deployed container worker `{}`", block.name());
 	Pass(cx.input).xok()
 }
@@ -308,18 +321,18 @@ fn write_container_wrangler(
 /// holds nothing but the published site. A container of its own would take a
 /// token scoped to one bucket's objects, the way an [`R2BucketBlock`]'s is.
 async fn write_r2_secrets_file(
+	access: &CloudflareAccess,
 	dir: &AbsPath,
 	account: &str,
 ) -> Result<Option<String>> {
-	if cloudflare_api_ext::token().is_err() {
+	if access.token().is_err() {
 		warn!(
 			"CLOUDFLARE_API_TOKEN unset, so no R2 pair could be derived; the \
 			 container cannot read R2 until one is uploaded as Worker secrets"
 		);
 		return None.xok();
 	}
-	let (access_key, secret_key) =
-		cloudflare_api_ext::r2_credentials(account).await?;
+	let (access_key, secret_key) = access.r2_credentials(account).await?;
 	let file_name = "secrets.env";
 	fs_ext::write(
 		dir.join(file_name),
@@ -424,17 +437,26 @@ fn fmt_bytes(bytes: u64) -> String {
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// the Worker upload, its secrets, the bucket it binds and the custom domain the
+// upload provisions (with the record and certificate)
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::WORKERS_R2_STORAGE_WRITE,
+	TokenPermission::WORKERS_ROUTES_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn CloudflareWorkerDeployAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let start = Instant::now();
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
 	ensure_worker_artifacts().await?;
 	let dir = wrangler_ext::project_dir(block.name())?;
 	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
 
-	wrangler_r2_create(block.bucket()).await?;
-	wrangler_ext::deploy(&dir, None).await?;
+	wrangler_r2_create(&access, block.bucket()).await?;
+	wrangler_ext::deploy(&access, &dir, None).await?;
 	info!(
 		"deployed wasm worker `{}` in {}",
 		block.name(),
@@ -535,6 +557,11 @@ fn worker_wrangler_json(
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// `wrangler r2 object put` per file
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::WORKERS_R2_STORAGE_WRITE,
+]))]
 pub async fn CloudflareR2Sync(
 	/// Local directory to publish (cwd-relative), eg `examples/bsx_site`.
 	#[field]
@@ -549,8 +576,10 @@ pub async fn CloudflareR2Sync(
 	prefix: Option<RelPath>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let start = Instant::now();
 	sync_dir_to_r2(
+		&access,
 		local_dir.as_str(),
 		&bucket,
 		prefix.as_ref().map(|prefix| prefix.as_str()),
@@ -588,6 +617,7 @@ impl CloudflareR2Sync {
 /// directory can mount under a bucket sub-path (eg workspace `assets/` under the
 /// site's `assets/` prefix). `None` uploads to the bucket root.
 async fn sync_dir_to_r2(
+	access: &CloudflareAccess,
 	local_dir: &str,
 	bucket: &str,
 	prefix: Option<&str>,
@@ -623,13 +653,15 @@ async fn sync_dir_to_r2(
 	// dominates; upload concurrently. Bound the fan-out to 16: a large site (hundreds
 	// of files) would otherwise spawn hundreds of concurrent node processes and
 	// exhaust file descriptors / PIDs. 16 at a time keeps the wall-clock near one put.
+	let access = *access;
 	for chunk in puts.chunks(16) {
 		chunk
 			.iter()
 			.map(|(key, file_arg)| async move {
 				// `--remote` targets the real R2 bucket; without it wrangler writes to
 				// its *local* Miniflare store, which a deployed Worker never reads.
-				ChildProcess::new("wrangler")
+				access
+					.wrangler()
 					.with_args([
 						"r2",
 						"object",
@@ -661,6 +693,13 @@ async fn sync_dir_to_r2(
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// times a redeploy against an R2 sync, so it asks for both paths
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::WORKERS_R2_STORAGE_WRITE,
+	TokenPermission::WORKERS_ROUTES_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn CloudflareBench(
 	/// Worker name, redeployed to time the full-redeploy path.
 	#[field]
@@ -677,9 +716,10 @@ pub async fn CloudflareBench(
 	url: Option<SmolStr>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	// sync path: publish the site to R2; the Worker serves it on the next fetch.
 	let sync_start = Instant::now();
-	sync_dir_to_r2(local_dir.as_str(), &bucket, None).await?;
+	sync_dir_to_r2(&access, local_dir.as_str(), &bucket, None).await?;
 	let sync_elapsed = sync_start.elapsed();
 
 	// with a url, also time how soon the live Worker serves the fresh site.
@@ -696,7 +736,7 @@ pub async fn CloudflareBench(
 		CloudflareWorkerBlock::new(name.clone()).with_bucket(bucket.clone());
 	let dir = wrangler_ext::project_dir(&name)?;
 	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
-	wrangler_ext::deploy(&dir, None).await?;
+	wrangler_ext::deploy(&access, &dir, None).await?;
 	let redeploy_elapsed = redeploy_start.elapsed();
 
 	let speedup = redeploy_elapsed.as_secs_f64() / sync_elapsed.as_secs_f64();
@@ -765,6 +805,13 @@ async fn poll_until_ok(url: &str, since: Instant) -> Result<Duration> {
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// `wrangler tail`, whose session is opened under the script's own group; a 403
+// here is Cloudflare asking for `Workers Tail Read` instead, which no token of
+// this account has ever held
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn CloudflareWatch(
 	/// Worker name, used to list deployments and (optionally) poll the host.
 	#[field]
@@ -774,10 +821,12 @@ pub async fn CloudflareWatch(
 	timeout: Option<Duration>,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	info!("tailing worker `{name}`");
 	// group: `wrangler` is a wrapper that spawns the real node process; a plain
 	// kill orphans it and the leaked tail holds stdio open past process exit.
-	let mut child = ChildProcess::new("wrangler")
+	let mut child = access
+		.wrangler()
 		.with_args(["tail", name.as_str(), "--format", "pretty"])
 		.with_group(true)
 		.spawn()?;
@@ -810,6 +859,16 @@ impl CloudflareWatch {
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
+// deletes the script, its custom domain, the container application, its
+// registry image and the bucket
+#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
+	TokenPermission::ACCOUNT_SETTINGS_READ,
+	TokenPermission::CLOUDCHAMBER_WRITE,
+	TokenPermission::WORKERS_CONTAINERS_WRITE,
+	TokenPermission::WORKERS_R2_STORAGE_WRITE,
+	TokenPermission::WORKERS_ROUTES_WRITE,
+	TokenPermission::WORKERS_SCRIPTS_WRITE,
+]))]
 pub async fn CloudflareDestroy(
 	/// Worker name to delete.
 	#[field]
@@ -820,8 +879,10 @@ pub async fn CloudflareDestroy(
 	bucket: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
+	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	info!("deleting worker `{name}`");
-	ChildProcess::new("wrangler")
+	access
+		.wrangler()
 		.with_args(["delete", "--name", name.as_str(), "--force"])
 		.run_async()
 		.await
@@ -829,14 +890,15 @@ pub async fn CloudflareDestroy(
 	// deleting the worker leaves the container application and its pushed
 	// managed-registry image behind (they are not cascade-deleted), so remove both
 	// explicitly or they keep billing.
-	delete_container_app(&name).await;
-	delete_container_images(&name).await;
+	delete_container_app(&access, &name).await;
+	delete_container_images(&access, &name).await;
 	// empty the bucket first: `wrangler r2 bucket delete` refuses a non-empty bucket
 	// and `wrangler r2 object` cannot list, so clear *every* object (any prefix,
 	// eg `site/*` and `assets/*`) through the R2 S3 endpoint before deleting.
-	empty_bucket(&cloudflare_account(&cx).await?, &bucket).await?;
+	empty_bucket(&access, &cloudflare_account(&cx).await?, &bucket).await?;
 	info!("deleting r2 bucket `{bucket}`");
-	ChildProcess::new("wrangler")
+	access
+		.wrangler()
 		.with_args(["r2", "bucket", "delete", bucket.as_str()])
 		.run_async()
 		.await
@@ -858,9 +920,10 @@ impl CloudflareDestroy {
 /// the apps as json, finds the one named `<worker>-<class>` (the only stable
 /// handle, since `wrangler containers delete` takes the generated id, not the
 /// name), and deletes it by id. A worker with no container is a no-op.
-async fn delete_container_app(worker_name: &str) {
+async fn delete_container_app(access: &CloudflareAccess, worker_name: &str) {
 	let app_name = container_app_name(worker_name);
-	let Ok(json) = ChildProcess::new("wrangler")
+	let Ok(json) = access
+		.wrangler()
 		.with_args(["containers", "list", "--json"])
 		.run_async_stdout()
 		.await
@@ -883,7 +946,8 @@ async fn delete_container_app(worker_name: &str) {
 	}
 	if let Some(id) = id {
 		info!("deleting container app `{app_name}` ({id})");
-		ChildProcess::new("wrangler")
+		access
+			.wrangler()
 			.with_args(["containers", "delete", &id])
 			.run_async()
 			.await
@@ -894,9 +958,10 @@ async fn delete_container_app(worker_name: &str) {
 /// Delete every managed-registry image pushed for `worker_name`. Lists the repos
 /// as json (`[{ name, tags }]`), then deletes each `<repo>:<tag>` whose repo is
 /// the container app's. An empty registry is a no-op.
-async fn delete_container_images(worker_name: &str) {
+async fn delete_container_images(access: &CloudflareAccess, worker_name: &str) {
 	let repo = container_app_name(worker_name);
-	let Ok(json) = ChildProcess::new("wrangler")
+	let Ok(json) = access
+		.wrangler()
 		.with_args(["containers", "images", "list", "--json"])
 		.run_async_stdout()
 		.await
@@ -923,7 +988,8 @@ async fn delete_container_images(worker_name: &str) {
 			};
 			let image = format!("{repo}:{tag}");
 			info!("deleting container image `{image}`");
-			ChildProcess::new("wrangler")
+			access
+				.wrangler()
 				.with_args(["containers", "images", "delete", &image])
 				.run_async()
 				.await
@@ -940,16 +1006,19 @@ async fn delete_container_images(worker_name: &str) {
 /// derived from the api token the teardown already runs with; with no token the
 /// empty is skipped with a warning so a no-creds teardown still deletes the
 /// worker.
-async fn empty_bucket(account: &CloudflareAccount, bucket: &str) -> Result {
-	if cloudflare_api_ext::token().is_err() {
+async fn empty_bucket(
+	access: &CloudflareAccess,
+	account: &CloudflareAccount,
+	bucket: &str,
+) -> Result {
+	if access.token().is_err() {
 		warn!(
 			"CLOUDFLARE_API_TOKEN unset, so no R2 pair could be derived; \
 			 skipping the R2 empty (bucket delete fails if non-empty)"
 		);
 		return Ok(());
 	}
-	let (access_key, secret_key) =
-		cloudflare_api_ext::r2_credentials(account.id()).await?;
+	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
 	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
 	// the R2 data-plane keys go in as the standard AWS env vars, overriding any

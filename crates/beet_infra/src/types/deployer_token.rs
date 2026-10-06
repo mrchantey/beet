@@ -19,8 +19,9 @@ use serde_json::json;
 /// patches two settings, `<CloudflarePurgeCache/>` purges, `<ZoneAudit/>` lists
 /// and deletes records, and none of the three renders a resource. A token
 /// lowered from the config alone would be three groups short on every deploy,
-/// so an action contributes its own by type name
-/// ([`ACTIONS`](Self::ACTIONS)).
+/// so each action declares its own on itself ([`CloudflareAccess`]), and that
+/// declaration is also the only way the action reaches the token, so an action
+/// cannot call Cloudflare without being lowered.
 ///
 /// ## What Cloudflare does not have, and what this is instead
 ///
@@ -35,11 +36,10 @@ use serde_json::json;
 ///
 /// ## What makes a token out of this
 ///
-/// No verb yet: the deploy token is hand-made in the dashboard and sealed as
-/// `CLOUDFLARE_API_TOKEN`, so the lowering is read as the `> permission:` lines
-/// of that record's rotation note, which is what [`Display`] prints. Each
-/// group carries the api's own id beside its name, so a verb that mints one
-/// needs no second table.
+/// `cloudflare/mint` ([`CloudflareMint`]) posts [`to_json`](Self::to_json) as
+/// an account-owned token and seals it as `CLOUDFLARE_API_TOKEN`; [`Display`]
+/// prints the same lowering for its `--dry-run`. Each group carries the api's
+/// own id beside its name, so the mint needs no second table.
 ///
 /// [`Display`]: std::fmt::Display
 #[derive(Debug, Default, Clone)]
@@ -98,84 +98,6 @@ impl DeployerToken {
 		]),
 	];
 
-	/// What a Cloudflare action needs, by the type name of the action's own
-	/// component, with the call that asks for it named beside it. An action
-	/// that reaches no api carries an EMPTY list rather than no entry, so a
-	/// reader can tell "needs nothing" from "nobody lowered this".
-	///
-	/// Every `wrangler` action also needs [`ACCOUNT_SETTINGS_READ`]: wrangler
-	/// is given no account id, so it resolves one by listing the accounts the
-	/// token can see. Setting `CLOUDFLARE_ACCOUNT_ID` on the child would drop
-	/// that group, which is a narrowing worth taking when one is wanted.
-	///
-	/// [`ACCOUNT_SETTINGS_READ`]: TokenPermission::ACCOUNT_SETTINGS_READ
-	const ACTIONS: &'static [(&'static str, &'static [TokenPermission])] = &[
-		// the zone verbs first, since they are the frequent ones: every deploy
-		// and every content sync of every repo runs them
-		//
-		// `POST zones/{zone}/purge_cache`
-		("CloudflarePurgeCache", &[TokenPermission::CACHE_PURGE]),
-		// the cache-phase entrypoint ruleset, then the `ssl` and
-		// `always_use_https` settings
-		("CloudflareZoneSetup", &[
-			TokenPermission::CACHE_SETTINGS_WRITE,
-			TokenPermission::ZONE_SETTINGS_WRITE,
-		]),
-		// lists every record in the zone and deletes the unaccounted ones
-		("ZoneAudit", &[TokenPermission::DNS_WRITE]),
-		// then the wrangler ones, which only the Worker and container examples
-		// declare
-		//
-		// times a redeploy against an R2 sync, so it asks for both paths
-		("CloudflareBench", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::WORKERS_R2_STORAGE_WRITE,
-			TokenPermission::WORKERS_ROUTES_WRITE,
-			TokenPermission::WORKERS_SCRIPTS_WRITE,
-		]),
-		// `wrangler deploy` of the fronting Worker, the image it builds and
-		// pushes to the managed registry, and the bucket the container reads
-		("CloudflareContainerDeployAction", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::CLOUDCHAMBER_WRITE,
-			TokenPermission::WORKERS_CONTAINERS_WRITE,
-			TokenPermission::WORKERS_R2_STORAGE_WRITE,
-			TokenPermission::WORKERS_SCRIPTS_WRITE,
-		]),
-		// deletes the script, its custom domain, the container application, its
-		// registry image and the bucket
-		("CloudflareDestroy", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::CLOUDCHAMBER_WRITE,
-			TokenPermission::WORKERS_CONTAINERS_WRITE,
-			TokenPermission::WORKERS_R2_STORAGE_WRITE,
-			TokenPermission::WORKERS_ROUTES_WRITE,
-			TokenPermission::WORKERS_SCRIPTS_WRITE,
-		]),
-		// `wrangler r2 object put` per file
-		("CloudflareR2Sync", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::WORKERS_R2_STORAGE_WRITE,
-		]),
-		// `wrangler tail`, whose session is opened under the script's own
-		// group; a 403 here is Cloudflare asking for `Workers Tail Read`
-		// instead, which no token of this account has ever held
-		("CloudflareWatch", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::WORKERS_SCRIPTS_WRITE,
-		]),
-		// a local cargo + wasm-bindgen build, which reaches nothing
-		("CloudflareWorkerBuildAction", &[]),
-		// the Worker upload, its secrets, the bucket it binds and the custom
-		// domain the upload provisions (with the record and certificate)
-		("CloudflareWorkerDeployAction", &[
-			TokenPermission::ACCOUNT_SETTINGS_READ,
-			TokenPermission::WORKERS_R2_STORAGE_WRITE,
-			TokenPermission::WORKERS_ROUTES_WRITE,
-			TokenPermission::WORKERS_SCRIPTS_WRITE,
-		]),
-	];
-
 	/// Lower one of the repo's stacks: the groups its `cloudflare_` types need,
 	/// and the account or zone each group's resource list names. A stack
 	/// rendering no Cloudflare type at all adds nothing and demands no address.
@@ -194,35 +116,17 @@ impl DeployerToken {
 		self.xok()
 	}
 
-	/// Lower one Cloudflare action a route of the repo declares, by the type
-	/// name of its component. The addresses come from the action's OWN stack,
-	/// resolved by ancestry from its entity, since a route's verbs may sit
-	/// outside every stack.
-	pub fn lower_action(
+	/// Lower one Cloudflare action a route of the repo runs, by the
+	/// [`CloudflareAccess`] it declares. The addresses come from the action's
+	/// OWN stack, resolved by ancestry from its entity, since a route's verbs
+	/// may sit outside every stack.
+	pub fn lower_access(
 		mut self,
 		stack: &ResolvedStack,
-		action: &str,
+		access: &CloudflareAccess,
 	) -> Result<Self> {
-		let permissions = Self::ACTIONS
-			.iter()
-			.find(|(name, _)| *name == action)
-			.map(|(_, permissions)| *permissions)
-			.ok_or_else(|| {
-				bevyhow!(
-					"no deploy token permission is declared for the action \
-					`{action}`: add it to `DeployerToken::ACTIONS` with the \
-					calls it makes"
-				)
-			})?;
-		self.add(stack, action, permissions)?;
+		self.add(stack, access.action(), access.permissions())?;
 		self.xok()
-	}
-
-	/// Every action name a collector looks for in the world: the lowering's
-	/// own table is the list, so a type registry lookup per name finds the
-	/// ones a route actually declares.
-	pub fn action_names() -> impl Iterator<Item = &'static str> {
-		Self::ACTIONS.iter().map(|(name, _)| *name)
 	}
 
 	/// The permissions a declared type needs, an error for a `cloudflare_`
@@ -712,17 +616,22 @@ mod test {
 
 	/// What the frequent work needs: the three zone verbs every deploy runs ask
 	/// for four zone groups, no account group at all, and nothing that can mint
-	/// a credential.
+	/// a credential. Read off the actions' own declarations, so a change to one
+	/// of them is a change to this answer.
+	#[cfg(feature = "mail")]
 	#[beet_core::test]
 	fn the_zone_verbs_never_escalate() {
 		let (stack, ..) = addressed();
-		let token =
-			["CloudflareZoneSetup", "CloudflarePurgeCache", "ZoneAudit"]
-				.into_iter()
-				.try_fold(DeployerToken::default(), |token, action| {
-					token.lower_action(&stack, action)
-				})
-				.unwrap();
+		let token = [
+			CloudflareAccess::declared_by::<CloudflareZoneSetup>(),
+			CloudflareAccess::declared_by::<CloudflarePurgeCache>(),
+			CloudflareAccess::declared_by::<ZoneAudit>(),
+		]
+		.iter()
+		.try_fold(DeployerToken::default(), |token, access| {
+			token.lower_access(&stack, access)
+		})
+		.unwrap();
 		token
 			.asked()
 			.keys()
@@ -753,13 +662,21 @@ mod test {
 	/// neither side.
 	#[beet_core::test]
 	fn the_token_body_is_one_policy_per_scope() {
+		struct Purge;
+		struct Sync;
 		let (stack, ..) = addressed();
-		let token = ["CloudflarePurgeCache", "CloudflareR2Sync"]
-			.into_iter()
-			.try_fold(DeployerToken::default(), |token, action| {
-				token.lower_action(&stack, action)
-			})
-			.unwrap();
+		let token = [
+			CloudflareAccess::new::<Purge>(&[TokenPermission::CACHE_PURGE]),
+			CloudflareAccess::new::<Sync>(&[
+				TokenPermission::ACCOUNT_SETTINGS_READ,
+				TokenPermission::WORKERS_R2_STORAGE_WRITE,
+			]),
+		]
+		.iter()
+		.try_fold(DeployerToken::default(), |token, access| {
+			token.lower_access(&stack, access)
+		})
+		.unwrap();
 		let policies = token.to_json();
 		let scoped = |permission: TokenPermission| {
 			policies
@@ -871,22 +788,19 @@ mod test {
 			.xpect_contains("zone resources");
 	}
 
-	/// An action with no entry fails naming it; a zone-scoped group with no zone
-	/// fails naming the spread; and a missing ACCOUNT is not the lowering's
-	/// complaint at all — the list still answers, and only the mint that needs
-	/// somewhere to put a token says so.
+	/// A zone-scoped group with no zone fails naming the spread; a missing
+	/// ACCOUNT is not the lowering's complaint at all, since the list still
+	/// answers and only the mint that needs somewhere to put a token says so.
+	/// (An action that declares nothing is refused where it reaches for the
+	/// token, see `CloudflareAccess`.)
 	#[beet_core::test]
-	fn an_unlowered_action_and_a_missing_address_are_loud() {
-		let (stack, ..) = addressed();
-		DeployerToken::default()
-			.lower_action(&stack, "DirSync")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("DirSync")
-			.xpect_contains("DeployerToken::ACTIONS");
+	fn a_missing_address_is_loud() {
+		struct Purge;
+		let purge =
+			CloudflareAccess::new::<Purge>(&[TokenPermission::CACHE_PURGE]);
 		let (bare, ..) = ResolvedStack::default_local();
 		DeployerToken::default()
-			.lower_action(&bare, "CloudflarePurgeCache")
+			.lower_access(&bare, &purge)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("CloudflareZone");
@@ -894,7 +808,7 @@ mod test {
 			CloudflareZone::new("beetmash.com", "zone123"),
 		);
 		let lowered = DeployerToken::default()
-			.lower_action(&zoned, "CloudflarePurgeCache")
+			.lower_access(&zoned, &purge)
 			.unwrap();
 		lowered
 			.asked()
