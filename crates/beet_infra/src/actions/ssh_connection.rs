@@ -115,26 +115,42 @@ impl SshConnection {
 
 	/// Wait for SSH to become available, retrying every `poll` until `timeout`
 	/// elapses. At least one attempt is always made.
+	///
+	/// A missing identity file is refused before the first attempt, since no
+	/// amount of waiting supplies one, and the final failure carries the last
+	/// attempt's error rather than only a count.
 	pub async fn wait_for_ready(
 		&self,
 		timeout: Duration,
 		poll: Duration,
 	) -> Result {
+		if !fs_ext::exists(&self.key_path)? {
+			bevybail!(
+				"no private key at {}: the box admits only the public half \
+				 its block declares, so put the matching private key there, \
+				 or declare this device's public key and redeploy",
+				self.key_path
+			);
+		}
 		let max_attempts = (timeout.as_secs() / poll.as_secs().max(1)).max(1);
+		let mut last_err = None;
 		for attempt in 1..=max_attempts {
 			info!(
 				"waiting for ssh on {}:{} (attempt {attempt}/{max_attempts})...",
 				self.host, self.port
 			);
-			if self.run_command("echo ready").await.is_ok() {
-				return Ok(());
+			match self.run_command("echo ready").await {
+				Ok(_) => return Ok(()),
+				Err(err) => last_err = Some(err),
 			}
 			time_ext::sleep(poll).await;
 		}
 		bevybail!(
-			"failed to connect to {}:{} after {max_attempts} attempts",
+			"failed to connect to {}:{} after {max_attempts} attempts, the \
+			 last with: {}",
 			self.host,
-			self.port
+			self.port,
+			last_err.map(|err| err.to_string()).unwrap_or_default()
 		)
 	}
 }
@@ -167,5 +183,30 @@ impl SshConnection {
 			key_path,
 		}
 		.xok()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A missing identity file is an error naming it, at once, rather than
+	/// every attempt failing auth until the timeout.
+	#[beet_core::test]
+	async fn a_missing_key_is_refused_before_waiting() {
+		let dir = TempDir::new().unwrap();
+		let key_path = dir.path().join("absent_key");
+		SshConnection {
+			host: "192.0.2.1".into(),
+			user: "ec2-user".into(),
+			port: 22,
+			key_path: key_path.clone(),
+		}
+		.wait_for_ready(Duration::from_secs(600), Duration::from_secs(5))
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains(&format!("no private key at {key_path}"));
 	}
 }
