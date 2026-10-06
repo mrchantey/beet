@@ -1068,7 +1068,17 @@ impl StalwartBlock {
 		);
 
 		let data_volume = self.data_volume(stack, vpc);
-		let user_data = self.build_user_data(stack, cold)?;
+		// EC2 caps user_data at 16 KiB before encoding, which the script
+		// outgrows, so it rides a local gzipped at plan: cloud-init inflates a
+		// gzip payload itself, and the local still resolves the volume ref.
+		let user_data_local = stack
+			.resource_ident(self.build_label("user_data"))
+			.label()
+			.to_string();
+		config.add_local(
+			&user_data_local,
+			self.build_user_data(stack, cold)?.as_str(),
+		)?;
 		let instance_ident = stack.resource_ident(self.build_label("instance"));
 		let instance = ResourceDef::new_secondary(
 			instance_ident.clone(),
@@ -1089,7 +1099,9 @@ impl StalwartBlock {
 				// one address out of the subnet's /64; the listeners already
 				// bind `::`, so this is the whole of the box's side of v6
 				ipv6_address_count: vpc.ipv6().then_some(1),
-				user_data: Some(user_data),
+				user_data_base64: Some(
+					format!("${{base64gzip(local.{user_data_local})}}").into(),
+				),
 				// the rebuild rule: an edited machine is a new machine.
 				user_data_replace_on_change: Some(true),
 				metadata_options: Some(vec![
@@ -2179,6 +2191,38 @@ mod tests {
 		resource(config, "aws_instance")
 	}
 
+	/// The script the instance boots, read out of the local its
+	/// `user_data_base64` gzips.
+	fn rendered_user_data(config: &terra::Config) -> String {
+		let local = instance(config)["user_data_base64"]
+			.as_str()
+			.unwrap()
+			.trim_start_matches("${base64gzip(local.")
+			.trim_end_matches(")}")
+			.to_string();
+		config.to_json().into_json()["locals"][&local]
+			.as_str()
+			.unwrap()
+			.to_string()
+	}
+
+	/// EC2 refuses user_data over 16 KiB before encoding, which the script
+	/// outgrew, so the instance boots it gzipped out of a local: the plain
+	/// `user_data` is never set, and the local still holds the volume ref.
+	#[beet_core::test]
+	fn user_data_rides_gzipped() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		let instance = instance(&config);
+		instance["user_data"].is_null().xpect_true();
+		instance["user_data_base64"]
+			.as_str()
+			.unwrap()
+			.xpect_starts_with("${base64gzip(local.");
+		rendered_user_data(&config)
+			.xpect_starts_with("#!/bin/bash")
+			.xpect_contains(&mail_box().data_volume_id(&stack));
+	}
+
 	/// A code-only deploy renders the identical config, so terraform plans no
 	/// change and nothing rebuilds: the box's identity carries no deploy id,
 	/// and every per-deploy value lives in SSM or in the database.
@@ -2990,10 +3034,7 @@ mod tests {
 				"parameter/beet-infra/dev/cold-backups-secret-access-key",
 			);
 		// ..and the rendered box carries the copier
-		instance(&config)["user_data"]
-			.as_str()
-			.unwrap()
-			.xpect_contains("stalwart-cold-backup");
+		rendered_user_data(&config).xpect_contains("stalwart-cold-backup");
 	}
 
 	/// The blob store the `Bootstrap` claim declares: the stack's bucket with
