@@ -51,9 +51,7 @@ async fn a_live_record_cid_matches() {
 		.await
 		.unwrap()
 		.unwrap();
-	dag_cbor_ext::record_cid(&entry.value)
-		.unwrap()
-		.xpect_eq(entry.cid);
+	dag_cbor_ext::record_cid(&entry.value).xpect_eq(entry.cid);
 }
 
 /// Both resolvers agree on beet.org's handles.
@@ -87,7 +85,10 @@ async fn a_read_only_repo_refuses_writes() {
 	Pds::new(XrpcPds::new(Did::parse(BEET_ORG).unwrap()))
 		.put_record(
 			&Nsid::new_static("com.example.doc"),
-			Rkeyed::new(Rkey::parse("never").unwrap(), value!({}).into()),
+			Rkeyed::new(
+				Rkey::parse("never").unwrap(),
+				value!({}).try_into().unwrap(),
+			),
 		)
 		.await
 		.unwrap_err()

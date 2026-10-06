@@ -2,11 +2,12 @@ use crate::prelude::*;
 use base64::Engine;
 
 /// A [`Value`] in the protocol's data model: json's shape with two additions
-/// and one omission, sealed so it can only hold what a repo accepts.
+/// and two omissions, sealed so it can only hold what a repo accepts, which is
+/// what lets every consumer (the DAG-CBOR encoder, a cid) be infallible.
 ///
-/// Bytes are `{"$bytes": "<base64>"}`, a link is `{"$link": "<cid>"}`, and
-/// there are no floats at all, since a float has no canonical encoding to
-/// hash. A beet component holds floats freely, so a float crosses into the
+/// Bytes are `{"$bytes": "<base64>"}`, a link is `{"$link": "<cid>"}`,
+/// integers are signed 64 bit, and there are no floats at all, since a float
+/// has no canonical encoding to hash. A beet component holds floats freely, so a float crosses into the
 /// data model as a self-describing object:
 ///
 /// ```json
@@ -21,9 +22,11 @@ use base64::Engine;
 /// beet's lexicon, the protocol's own way for a value to say what it is, so it
 /// survives a store or a stranger's tool that keeps what it does not know.
 ///
-/// Two ways in, one way out:
-/// - [`From<Value>`]: a beet value encoded, every float an
-///   [`FLOAT`](Self::FLOAT) object and every byte string `$bytes`;
+/// Two ways in, both through the one validator, and one way out:
+/// - [`TryFrom<Value>`]: a beet value encoded, every float a
+///   [`FLOAT`](Self::FLOAT) object and every byte string `$bytes`, refused
+///   when it still breaks a rule (an integer past `i64`, a `$link` that is not
+///   a cid);
 /// - [`from_wire`](Self::from_wire): a value read off the network, already in
 ///   the data model, refused when it is not;
 /// - [`decode`](Self::decode) (and [`From<AtprotoValue>`] for [`Value`]): back
@@ -36,7 +39,7 @@ use base64::Engine;
 /// ```
 /// # use beet_core::prelude::*;
 /// let value = value!({ "scale": 0.5, "name": "cube" });
-/// let record = AtprotoValue::from(value.clone());
+/// let record = AtprotoValue::try_from(value.clone()).unwrap();
 /// record
 /// 	.as_map()
 /// 	.unwrap()
@@ -55,9 +58,11 @@ impl AtprotoValue {
 	/// The def a float crosses into the data model as.
 	pub const FLOAT: Nsid = Nsid::new_static("org.beet.core#float");
 
-	/// A value read off the network, already in the data model. A float or a
-	/// raw byte string anywhere is refused, since no wire form carries either,
-	/// as is a [`FLOAT`](Self::FLOAT) object that does not hold a float.
+	/// A value read off the network, already in the data model, refused when
+	/// it breaks a rule: a float or a raw byte string anywhere (no wire form
+	/// carries either), an integer past `i64`, a `$link` that is not a cid,
+	/// `$bytes` that are not base64, or a [`FLOAT`](Self::FLOAT) object that
+	/// does not hold a float.
 	pub fn from_wire(value: Value) -> Result<Self> {
 		Self::validate(&value)?;
 		Self(value).xok()
@@ -66,7 +71,7 @@ impl AtprotoValue {
 	/// A serializable type in the data model.
 	#[cfg(feature = "serde")]
 	pub fn from_serde<T: Serialize>(value: &T) -> Result<Self> {
-		Value::from_serde(value)?.xmap(Self::from).xok()
+		Value::from_serde(value)?.try_into()
 	}
 
 	/// The data model form read as a `T`, its floats and bytes decoded first.
@@ -169,6 +174,10 @@ impl AtprotoValue {
 				"raw bytes are not in the atproto data model: bytes are \
 				 written `{{\"$bytes\": \"<base64>\"}}`"
 			),
+			Value::Uint(uint) if *uint > i64::MAX as u64 => bevybail!(
+				"`{uint}` is past the atproto data model's signed 64 bit \
+				 integers: write it as a string"
+			),
 			Value::List(items) => {
 				for item in items {
 					Self::validate(item)?;
@@ -188,6 +197,14 @@ impl AtprotoValue {
 				let is_bytes = map.contains("$bytes") && map.len() == 1;
 				if is_bytes && Self::as_bytes(map).is_none() {
 					bevybail!("`$bytes` must be base64, found {map}");
+				}
+				if map.len() == 1
+					&& let Ok(link) = map.get("$link")
+				{
+					let Ok(link) = link.as_str() else {
+						bevybail!("`$link` must be a cid string, found {link}");
+					};
+					Cid::parse(link)?;
 				}
 				for (_, child) in map {
 					Self::validate(child)?;
@@ -221,8 +238,11 @@ impl AtprotoValue {
 	}
 }
 
-impl From<Value> for AtprotoValue {
-	fn from(value: Value) -> Self { Self(Self::encode(value)) }
+impl TryFrom<Value> for AtprotoValue {
+	type Error = BevyError;
+	fn try_from(value: Value) -> Result<Self> {
+		Self::from_wire(Self::encode(value))
+	}
 }
 
 impl From<AtprotoValue> for Value {
@@ -270,13 +290,16 @@ mod test {
 			f64::NEG_INFINITY,
 		] {
 			let Value::Float(back) =
-				AtprotoValue::from(Value::Float(float)).decode()
+				AtprotoValue::try_from(Value::Float(float))
+					.unwrap()
+					.decode()
 			else {
 				panic!("{float} did not decode to a float");
 			};
 			back.to_bits().xpect_eq(float.to_bits());
 		}
-		AtprotoValue::from(Value::Float(f64::NAN))
+		AtprotoValue::try_from(Value::Float(f64::NAN))
+			.unwrap()
 			.decode()
 			.xmap(
 				|value| matches!(value, Value::Float(float) if float.is_nan()),
@@ -289,7 +312,7 @@ mod test {
 	#[crate::test]
 	fn writes_the_documented_form() {
 		let value = value!({ "x": 0.5, "b": (Value::Bytes(b"hi".to_vec())) });
-		let record = AtprotoValue::from(value.clone());
+		let record = AtprotoValue::try_from(value.clone()).unwrap();
 		let json = record.to_json();
 		serde_json::to_string(&json)
 			.unwrap()
@@ -320,12 +343,31 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("base64");
+		AtprotoValue::from_wire(value!({ "l": { "$link": "bafy" } }))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cid");
+	}
+
+	/// An encode refuses what no float or bytes rule can fix.
+	#[crate::test]
+	fn refuses_what_no_encoding_fixes() {
+		AtprotoValue::try_from(value!({ "n": (u64::MAX) }))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("signed 64 bit");
+		AtprotoValue::try_from(value!({ "l": { "$link": "not a cid" } }))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cid");
+		AtprotoValue::try_from(value!({ "n": (i64::MAX as u64) })).unwrap();
 	}
 
 	#[crate::test]
 	fn types_a_record_body() {
 		let collection = Nsid::new_static("com.example.note");
-		AtprotoValue::from(value!({ "text": "hi" }))
+		AtprotoValue::try_from(value!({ "text": "hi" }))
+			.unwrap()
 			.into_record(&collection)
 			.unwrap()
 			.as_map()
@@ -334,7 +376,8 @@ mod test {
 			.unwrap()
 			.clone()
 			.xpect_eq(Value::from("com.example.note"));
-		AtprotoValue::from(value!({ "$type": "com.example.other" }))
+		AtprotoValue::try_from(value!({ "$type": "com.example.other" }))
+			.unwrap()
 			.into_record(&collection)
 			.unwrap_err()
 			.to_string()

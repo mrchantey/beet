@@ -31,7 +31,7 @@ use core::fmt;
 /// let collection = Nsid::new_static("com.example.note");
 /// let rkey = Rkey::parse("first").unwrap();
 /// let written = pds
-/// 	.put_record(&collection, Rkeyed::new(rkey.clone(), value!({ "text": "hi" }).into()))
+/// 	.put_record(&collection, Rkeyed::new(rkey.clone(), value!({ "text": "hi" }).try_into()?))
 /// 	.await?;
 /// pds.get_record(&collection, &rkey)
 /// 	.await?

@@ -107,7 +107,7 @@ impl EmulatorPds {
 			.map(|value| {
 				self.entry(collection, Rkeyed::new(rkey.clone(), value))
 			})
-			.transpose()
+			.xok()
 	}
 
 	fn uri(&self, collection: &Nsid, rkey: &Rkey) -> AtUri {
@@ -118,13 +118,12 @@ impl EmulatorPds {
 		&self,
 		collection: &Nsid,
 		record: Rkeyed<AtprotoValue>,
-	) -> Result<RecordEntry> {
+	) -> RecordEntry {
 		RecordEntry {
 			uri: self.uri(collection, record.rkey()),
-			cid: dag_cbor_ext::record_cid(&record)?,
+			cid: dag_cbor_ext::record_cid(&record),
 			value: record.into_value(),
 		}
-		.xok()
 	}
 
 	async fn put(
@@ -134,7 +133,7 @@ impl EmulatorPds {
 	) -> Result<StrongRef> {
 		let record = record.try_map(|body| body.into_record(&collection))?;
 		let uri = self.uri(&collection, record.rkey());
-		let cid = dag_cbor_ext::record_cid(&record)?;
+		let cid = dag_cbor_ext::record_cid(&record);
 		let referenced = Self::blob_refs(&record);
 		for blob in &referenced {
 			if !self.store.exists(&Self::blob_path(blob)).await? {
@@ -335,7 +334,7 @@ mod test {
 
 	/// `value` at `key`.
 	fn record(key: &str, value: Value) -> Rkeyed<AtprotoValue> {
-		Rkeyed::new(rkey(key), value.into())
+		Rkeyed::new(rkey(key), value.try_into().unwrap())
 	}
 
 	/// A card at `key` holding `blob`, the shape every retention case

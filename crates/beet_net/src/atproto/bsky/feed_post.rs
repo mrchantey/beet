@@ -81,8 +81,8 @@ mod test {
 			.unwrap()
 			.into_record(&FeedPost::COLLECTION)
 			.unwrap()
-			.xmap(|body| dag_cbor_ext::record_cid(&body).unwrap())
-			.xpect_eq(dag_cbor_ext::record_cid(&value).unwrap());
+			.xmap(|body| dag_cbor_ext::record_cid(&body))
+			.xpect_eq(dag_cbor_ext::record_cid(&value));
 	}
 
 	/// A post with facets and a reply survives the repo's data model, so

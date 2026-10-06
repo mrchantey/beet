@@ -11,9 +11,10 @@
 //! ```
 //! # use beet_core::prelude::*;
 //! # use beet_net::prelude::*;
-//! let record = AtprotoValue::from(value!({ "$type": "app.bsky.feed.post", "text": "hi" }));
+//! let record =
+//! 	AtprotoValue::try_from(value!({ "$type": "app.bsky.feed.post", "text": "hi" }))
+//! 		.unwrap();
 //! dag_cbor_ext::record_cid(&record)
-//! 	.unwrap()
 //! 	.as_str()
 //! 	.xpect_starts_with("bafyrei");
 //! ```
@@ -22,68 +23,60 @@ use beet_core::prelude::*;
 use ipld_core::ipld::Ipld;
 
 /// The cid of `record`, CIDv1 over its canonical DAG-CBOR.
-pub fn record_cid(record: &AtprotoValue) -> Result<Cid> {
-	encode(record)?
-		.xmap(|bytes| Cid::new(Cid::DAG_CBOR, &bytes))
-		.xok()
+pub fn record_cid(record: &AtprotoValue) -> Cid {
+	Cid::new(Cid::DAG_CBOR, &encode(record))
 }
 
-/// `record` in canonical DAG-CBOR. Fails only on a malformed `$link`, which
-/// the data model leaves to the encoder that reads it.
-pub fn encode(record: &AtprotoValue) -> Result<Vec<u8>> {
-	serde_ipld_dagcbor::to_vec(&to_ipld(record)?)?.xok()
+/// `record` in canonical DAG-CBOR. Infallible, since an [`AtprotoValue`] was
+/// refused at construction for anything the data model cannot encode.
+pub fn encode(record: &AtprotoValue) -> Vec<u8> {
+	serde_ipld_dagcbor::to_vec(&to_ipld(record))
+		.expect("an `Ipld` encodes into a `Vec`, short of allocation failing")
 }
 
 /// The data model's view of a json value: `$link` and `$bytes` objects become
-/// the link and the bytes they stand for.
-fn to_ipld(value: &Value) -> Result<Ipld> {
+/// the link and the bytes they stand for. Total over what an
+/// [`AtprotoValue`] can hold, so each branch it rules out says why.
+fn to_ipld(value: &Value) -> Ipld {
 	match value {
 		Value::Null => Ipld::Null,
 		Value::Bool(bool) => Ipld::Bool(*bool),
 		Value::Int(int) => Ipld::Integer(*int as i128),
 		Value::Uint(uint) => Ipld::Integer(*uint as i128),
-		// unreachable through an `AtprotoValue`, which encodes both
-		Value::Float(_) | Value::Bytes(_) => {
-			bevybail!("an `AtprotoValue` holds no float and no raw bytes")
-		}
+		Value::Float(_) | Value::Bytes(_) => unreachable!(
+			"an `AtprotoValue` encodes every float and byte string as an object"
+		),
 		Value::Str(string) => Ipld::String(string.to_string()),
-		Value::List(items) => {
-			Ipld::List(items.iter().map(to_ipld).collect::<Result<_>>()?)
-		}
+		Value::List(items) => Ipld::List(items.iter().map(to_ipld).collect()),
 		Value::Map(map) => match map.into_iter().collect::<Vec<_>>().as_slice()
 		{
-			[(key, Value::Str(cid))] if key.as_str() == "$link" => {
-				Ipld::Link(
-					ipld_core::cid::Cid::try_from(
-						Cid::parse(cid)?.to_binary()?.as_slice(),
-					)
-					// no_std, so the cid crate's error is not an `Error`
-					.map_err(|err| bevyhow!("link `{cid}`: {err}"))?,
-				)
-			}
+			[(key, Value::Str(cid))] if key.as_str() == "$link" => Ipld::Link(
+				Cid::parse(cid)
+					.and_then(|cid| cid.to_binary())
+					.ok()
+					.and_then(|binary| {
+						ipld_core::cid::Cid::try_from(binary.as_slice()).ok()
+					})
+					.expect("an `AtprotoValue` holds only `$link`s that parse"),
+			),
 			[(key, Value::Str(base64))] if key.as_str() == "$bytes" => {
 				Ipld::Bytes(
 					base64::engine::general_purpose::STANDARD_NO_PAD
 						.decode(base64.trim_end_matches('='))
-						// without `base64/std` the error is not an `Error`
-						.map_err(|err| {
-							bevyhow!("`$bytes` is not base64: {err}")
-						})?,
+						.ok()
+						.expect(
+							"an `AtprotoValue` holds only `$bytes` that decode",
+						),
 				)
 			}
 			entries => Ipld::Map(
 				entries
 					.iter()
-					.map(|(key, value)| {
-						(key.to_string(), to_ipld(value)).xmap(
-							|(key, value)| value.map(|value| (key, value)),
-						)
-					})
-					.collect::<Result<_>>()?,
+					.map(|(key, value)| (key.to_string(), to_ipld(value)))
+					.collect(),
 			),
 		},
 	}
-	.xok()
 }
 
 #[cfg(test)]
@@ -104,7 +97,6 @@ mod test {
 		dag_cbor_ext::record_cid(&record(
 			r#"{"$type":"app.bsky.actor.profile","avatar":{"ref":{"$link":"bafkreievhbcfvoqgwlttfzvismqchhb3hphb6dss7lsbtqvv42x7cipzxe"},"size":10012,"$type":"blob","mimeType":"image/jpeg"},"createdAt":"2026-09-12T00:20:37.584Z","displayName":""}"#,
 		))
-		.unwrap()
 		.as_str()
 		.xpect_eq("bafyreiatdl7asot7lskiljqp2ulow4tm6tlmtxou6ej6yrpbq3fw7htmau");
 	}
@@ -115,7 +107,6 @@ mod test {
 		dag_cbor_ext::record_cid(&record(
 			r#"{"$type":"app.bsky.feed.post","createdAt":"2026-09-23T15:22:16.682Z","langs":["en"],"reply":{"parent":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"},"root":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"}},"text":"my plane left for thailand just as you posted, im getting married here in a month\n🤘🇹🇭🤘\n    😁"}"#,
 		))
-		.unwrap()
 		.as_str()
 		.xpect_eq("bafyreifvk5qurbc64bidnt2abjbfs3tbux5ol2qc674ga5fs3agkd474am");
 	}
@@ -126,27 +117,26 @@ mod test {
 	fn encodes_bytes() {
 		let encode = |value: Value| {
 			dag_cbor_ext::encode(&AtprotoValue::from_wire(value).unwrap())
-				.unwrap()
 		};
 		let padded = encode(value!({ "b": { "$bytes": "aGk=" } }));
 		encode(value!({ "b": { "$bytes": "aGk" } })).xpect_eq(padded.clone());
-		dag_cbor_ext::encode(&AtprotoValue::from(value!({
-			"b": (Value::Bytes(b"hi".to_vec()))
-		})))
-		.unwrap()
+		dag_cbor_ext::encode(
+			&AtprotoValue::try_from(value!({
+				"b": (Value::Bytes(b"hi".to_vec()))
+			}))
+			.unwrap(),
+		)
 		.xpect_eq(padded);
 	}
 
 	/// A float hashes as the `org.beet.core#float` object it crossed as.
 	#[beet_core::test]
 	fn hashes_a_float() {
-		dag_cbor_ext::record_cid(&AtprotoValue::from(value!({ "x": 0.5 })))
-			.unwrap()
-			.xpect_eq(
-				dag_cbor_ext::record_cid(&record(
-					r#"{"x":{"$type":"org.beet.core#float","value":"0.5"}}"#,
-				))
-				.unwrap(),
-			);
+		dag_cbor_ext::record_cid(
+			&AtprotoValue::try_from(value!({ "x": 0.5 })).unwrap(),
+		)
+		.xpect_eq(dag_cbor_ext::record_cid(&record(
+			r#"{"x":{"$type":"org.beet.core#float","value":"0.5"}}"#,
+		)));
 	}
 }

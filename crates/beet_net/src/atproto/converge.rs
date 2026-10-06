@@ -150,7 +150,7 @@ impl Pds {
 					dag_cbor_ext::record_cid(
 						&AtprotoValue::from_serde(&*record)?
 							.into_record(&T::COLLECTION)?,
-					)?,
+					),
 				),
 				_ => self.put(&record).await?,
 			};
