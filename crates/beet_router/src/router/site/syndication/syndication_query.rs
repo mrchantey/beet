@@ -144,7 +144,7 @@ pub(crate) mod test_fixtures {
 		PageMeta {
 			title: Some(title.into()),
 			description: Some(format!("all about {title}")),
-			author: Some("Pete Hayman".into()),
+			authors: vec!["Pete Hayman".into()],
 			created: Timestamp::parse_date(created),
 			..default()
 		}

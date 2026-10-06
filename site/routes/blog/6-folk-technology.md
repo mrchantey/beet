@@ -4,7 +4,7 @@ slug = "folk-technology"
 description = "Drawing parallels between malleable software and the open participitary culture of folk festivals."
 tags = ["malleable-software", "talks"]
 created = "2025-12-04"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/NFjdN8KGkg8"
 +++
 

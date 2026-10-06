@@ -124,7 +124,7 @@ fn head_prefers_page_metadata() {
 		description: Some("routing as a tree of entities".into()),
 		created: Timestamp::parse_date("2025-08-09"),
 		updated: Timestamp::parse_date("2025-09-01"),
-		author: Some("Pete Hayman".into()),
+		authors: vec!["Pete Hayman".into()],
 		video_url: Some("https://youtu.be/7koepBSRoUI".into()),
 		..default()
 	};

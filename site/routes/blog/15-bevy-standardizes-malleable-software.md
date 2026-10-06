@@ -4,7 +4,7 @@ slug = "bevy-standardizes-malleable-software"
 description = "Most tech layers see standardization but applications are siloes. Bevy's layered malleability is the best bet we have for standardardizing malleable software."
 tags = ["bevy", "malleable-software", "atproto"]
 created = "2026-08-28"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 +++
 
 In the tradition of Bevy Birthdays we get a chance to reflect on our adventures over the past year and hopes for the future. For me the last twelve months carried two major themes:

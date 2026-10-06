@@ -4,7 +4,7 @@ slug = "gentle-slopes-up-lonely-mountains"
 description = "Often a gentle slope means climbing up a mountain peak of specialization, only to climb all the way back down again when we want to visit another domain. Game engines are more like escarpments leading to broad plateaus: domains of UI, physics, networking etc are connected, remaining within reach at all skill levels."
 tags = ["bevy", "malleable-software", "terminal"]
 created = "2026-06-02"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/3V4-WM6Pc-4"
 +++
 

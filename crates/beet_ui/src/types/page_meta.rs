@@ -72,8 +72,11 @@ pub struct PageMeta {
 	/// freshness by. Authored exactly like [`created`](Self::created), and
 	/// unset on a page that has not changed since publication.
 	pub updated: Option<Timestamp>,
-	/// Who wrote the page.
-	pub author: Option<SmolStr>,
+	/// Who wrote the page, in credit order.
+	///
+	/// Authored as a list, ie `authors = ["Ada", "Grace"]`.
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub authors: Vec<SmolStr>,
 	/// The topics the page belongs to, lowercase kebab and drawn from the
 	/// vocabulary its site declares (see the module docs' metadata rules).
 	///
@@ -130,6 +133,12 @@ impl PageMeta {
 
 	/// Whether the page is unfinished, ie must not reach production.
 	pub fn is_draft(&self) -> bool { self.visibility == PageVisibility::Draft }
+
+	/// The authors as one line, joined by `, `, or `None` when there are none:
+	/// the byline a header, a feed item or a search result shows.
+	pub fn byline(&self) -> Option<String> {
+		(!self.authors.is_empty()).then(|| self.authors.join(", "))
+	}
 
 	/// The date a reader judges the page by: its
 	/// [`updated`](Self::updated), else its [`created`](Self::created).
@@ -283,7 +292,7 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_article_keys() {
 		let meta = parse(
-			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthor = \"Pete Hayman\"\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]",
+			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthors = [\"Pete Hayman\", \"Ada Lovelace\"]\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]",
 			FrontmatterKind::Toml,
 		);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
@@ -298,7 +307,8 @@ mod test {
 			.unwrap()
 			.format_date()
 			.xpect_eq("2025-08-01");
-		meta.author.as_deref().unwrap().xpect_eq("Pete Hayman");
+		meta.authors
+			.xpect_eq(vec![SmolStr::new("Pete Hayman"), "Ada Lovelace".into()]);
 		meta.video_url
 			.unwrap()
 			.to_string()

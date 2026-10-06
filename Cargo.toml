@@ -388,7 +388,7 @@ tui_server = ["tui","router", "markdown", "beet_router?/tui", "beet_ui?/net"]
 
 # 💡 Core
 
-serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_router?/serde"]
+serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_router?/serde", "beet_ui?/serde"]
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]

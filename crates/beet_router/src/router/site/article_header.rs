@@ -52,7 +52,7 @@ pub fn ArticleHeader(
 /// same line, so the two cannot drift apart.
 pub(crate) fn article_byline(meta: &PageMeta) -> Snippet {
 	let text = [
-		meta.author.as_deref().map(str::to_uppercase),
+		meta.byline().map(|byline| byline.to_uppercase()),
 		meta.created
 			.map(|created| created.format_long_date().to_uppercase()),
 	]

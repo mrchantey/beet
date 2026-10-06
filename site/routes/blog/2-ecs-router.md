@@ -4,7 +4,7 @@ slug = "ecs-router"
 description = "An ECS-native router unifies server actions, client island scenes, and static file serving under one paradigm."
 tags = ["release-notes", "ecs", "web"]
 created = "2025-08-09"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/YKiHKQJmEoU"
 +++
 

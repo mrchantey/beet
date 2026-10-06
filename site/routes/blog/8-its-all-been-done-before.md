@@ -4,7 +4,7 @@ slug = "its-all-been-done-before"
 description = "Looking for the similarites between the old and new leads to clean abstractions like a transport-agnostic router."
 tags = ["architecture", "ecs"]
 created = "2026-02-01"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/8nokKDoz2_4"
 +++
 

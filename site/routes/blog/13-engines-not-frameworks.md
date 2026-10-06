@@ -4,7 +4,7 @@ slug = "engines-not-frameworks"
 description = "Apps are avocado slicers, reflecting the frameworks used to build them. Out of necessity, game engines are generalizable and the natural fit for 'tools, not apps'."
 tags = ["bevy", "malleable-software"]
 created = "2026-06-30"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/TVPtTf-ThjM"
 +++
 

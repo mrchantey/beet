@@ -99,7 +99,7 @@ template = "ArticleLayout"
 
 The scan reads the ROOT only, resolving each declaration against the type registry with the same coercions a spread gets (`created` becomes a `Timestamp`), and hoists every resolved component onto the route entity. Nothing is built, no hook runs and no child is spawned, which is what lets discovery know a page's title, order and slug before anyone visits it. Unsectioned keys declare the document's `FrontmatterType` (`PageMeta` by default, overridable per dir); a `[Section]` header names its component by short type path.
 
-`PageMeta` is a consumer of that set like any other: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, `visibility` for static export and dispatch, and `<ArticleHeader/>` renders its `title`/`author`/`created`/`video_url` as the article chrome.
+`PageMeta` is a consumer of that set like any other: the router reads `slug` for the url, `order`/`sidebar_label`/`expanded` for the nav, `visibility` for static export and dispatch, and `<ArticleHeader/>` renders its `title`/`authors`/`created`/`video_url` as the article chrome.
 
 `visibility` is the one knob every listing reads: `Public` serves and is listed everywhere, `Unlisted` serves to whoever holds the link and appears in no index (and is marked `noindex` for crawlers), and `Draft` never reaches production at all — dropped from a prod static export and answered `404` by a prod dispatch, exactly as an unknown url is.
 

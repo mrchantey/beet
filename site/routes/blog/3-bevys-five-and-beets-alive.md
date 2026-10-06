@@ -4,7 +4,7 @@ slug = "bevys-five-and-beets-alive"
 description = "ECS requires a fundamental shift in how we build apps, and it takes practice to learn the Way."
 tags = ["architecture", "ecs", "bevy"]
 created = "2025-09-06"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/J0zxMdsAk_I"
 +++
 

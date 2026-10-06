@@ -11,6 +11,8 @@
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+use bevy::reflect::PartialReflect;
+use bevy::reflect::list::DynamicList;
 use bevy::reflect::structs::DynamicStruct;
 
 /// Parsed frontmatter metadata from a YAML or TOML block.
@@ -148,7 +150,9 @@ impl Frontmatter {
 					.pairs
 					.iter()
 					.filter(|(_, value)| !matches!(value, Value::Null))
-					.map(|(key, value)| (SmolStr::new(key), literal(value)))
+					.map(|(key, value)| {
+						(SmolStr::new(key), DataLiteral::from(value.clone()))
+					})
 					.collect::<Vec<_>>();
 				(!fields.is_empty()).then(|| NamedLiteral {
 					name: section
@@ -194,56 +198,40 @@ impl Frontmatter {
 	}
 }
 
-/// The literal a parsed value declares: a list stays a list, so a `Vec` field
-/// resolves item by item through the same coercions a BSX list does.
-fn literal(value: &Value) -> DataLiteral {
-	match value {
-		Value::List(items) => {
-			DataLiteral::List(items.iter().map(literal).collect())
-		}
-		value => DataLiteral::Scalar(value.clone()),
-	}
-}
-
 /// Build a [`DynamicStruct`] from a list of key-value pairs.
 fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 	let mut dynamic = DynamicStruct::default();
 	for (key, value) in pairs {
-		match value {
-			Value::Null => {
-				dynamic.insert(&key, ());
-			}
-			Value::Bool(val) => {
-				dynamic.insert(&key, val);
-			}
-			Value::Int(val) => {
-				dynamic.insert(&key, val);
-			}
-			Value::Uint(val) => {
-				dynamic.insert(&key, val);
-			}
-			Value::Float(val) => {
-				dynamic.insert(&key, val);
-			}
-			Value::Str(val) => {
-				dynamic.insert(&key, val.to_string());
-			}
-			Value::Bytes(val) => {
-				dynamic.insert(&key, val);
-			}
-			// a list mirrors as the `Value` it parsed to
-			Value::List(list) => {
-				dynamic.insert(&key, Value::List(list));
-			}
-			Value::Map(_) => {
-				bevybail!(
-					"Unsupported map value for frontmatter key '{}'",
-					key
-				);
-			}
-		}
+		let field = reflect_value(&key, value)?;
+		dynamic.insert_boxed(key, field);
 	}
 	dynamic.xok()
+}
+
+/// One frontmatter value as a reflect value: a scalar as its rust type, a list
+/// as a [`DynamicList`] of them. A map has no frontmatter spelling.
+fn reflect_value(key: &str, value: Value) -> Result<Box<dyn PartialReflect>> {
+	match value {
+		Value::Null => Box::new(()) as Box<dyn PartialReflect>,
+		Value::Bool(val) => Box::new(val),
+		Value::Int(val) => Box::new(val),
+		Value::Uint(val) => Box::new(val),
+		Value::Float(val) => Box::new(val),
+		Value::Str(val) => Box::new(val.to_string()),
+		Value::Bytes(val) => Box::new(val),
+		Value::List(items) => Box::new(
+			items
+				.into_iter()
+				.map(|item| reflect_value(key, item))
+				.collect::<Result<Vec<_>>>()?
+				.into_iter()
+				.collect::<DynamicList>(),
+		),
+		Value::Map(_) => {
+			bevybail!("Unsupported map value for frontmatter key '{key}'")
+		}
+	}
+	.xok()
 }
 
 /// Parse simple YAML key-value pairs.
@@ -445,7 +433,7 @@ fn parse_inline_list(raw: &str, item: fn(&str) -> Value) -> Option<Value> {
 		.map(item)
 		.collect::<Vec<_>>()
 		.xmap(Value::List)
-		.xmap(Some)
+		.xsome()
 }
 
 /// Strip matching single or double quotes from a string.

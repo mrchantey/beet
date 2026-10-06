@@ -55,7 +55,7 @@ struct SearchEntry {
 	url: Url,
 	title: Option<String>,
 	description: Option<String>,
-	author: Option<SmolStr>,
+	authors: Vec<SmolStr>,
 	/// The publication date as `YYYY-MM-DD`, ie sortable as text.
 	created: Option<String>,
 	/// The page's rendered prose, which is what makes this a FULL-text index
@@ -84,7 +84,7 @@ impl SearchEntry {
 				url: scope.url(&page.path)?,
 				title: page.meta.title.clone(),
 				description: page.meta.description.clone(),
-				author: page.meta.author.clone(),
+				authors: page.meta.authors.clone(),
 				created: page.meta.created.map(|created| created.format_date()),
 				body: content.map(|content| content.text()),
 			});
@@ -108,16 +108,22 @@ impl SearchEntry {
 		for (key, value) in [
 			("title", self.title.clone()),
 			("description", self.description.clone()),
-			(
-				"author",
-				self.author.as_ref().map(|author| author.to_string()),
-			),
 			("created", self.created.clone()),
 			("body", self.body.clone()),
 		] {
 			if let Some(value) = value {
 				map.insert(key, Value::str(value));
 			}
+		}
+		if !self.authors.is_empty() {
+			map.insert(
+				"authors",
+				Value::new_list(
+					self.authors
+						.iter()
+						.map(|author| Value::str(author.as_str())),
+				),
+			);
 		}
 		Value::Map(map)
 	}

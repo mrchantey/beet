@@ -2,7 +2,7 @@
 The blog listing, generated from each post's frontmatter rather than maintained
 by hand: <RouteIndex/> lists this route's children, ordered by the number their
 filenames carry and reversed so the newest reads first. A post's title,
-description, author and date all come from its own `+++` block, so adding a post
+description, authors and date all come from its own `+++` block, so adding a post
 is adding a file.
 
 The `{PageMeta{..}}` spread is a ROOT DECLARATION, what frontmatter is in a

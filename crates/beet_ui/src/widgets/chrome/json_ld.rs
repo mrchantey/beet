@@ -24,8 +24,8 @@ pub(crate) struct JsonLd {
 	pub published: Option<String>,
 	/// Last modification as ISO 8601.
 	pub modified: Option<String>,
-	/// The author's name, rendered as a schema.org `Person`.
-	pub author: Option<SmolStr>,
+	/// The authors' names, each rendered as a schema.org `Person`.
+	pub authors: Vec<SmolStr>,
 	/// The page's social card image.
 	pub image: Option<Url>,
 	/// The site name, ie the publisher of every page on it.
@@ -58,8 +58,21 @@ impl JsonLd {
 				map.insert(key, Value::str(value));
 			}
 		}
-		if let Some(author) = &self.author {
-			map.insert("author", named("Person", author));
+		// one author is a `Person`, several a list of them, as schema.org
+		// allows either
+		match self.authors.as_slice() {
+			[] => {}
+			[author] => {
+				map.insert("author", named("Person", author));
+			}
+			authors => {
+				map.insert(
+					"author",
+					Value::new_list(
+						authors.iter().map(|author| named("Person", author)),
+					),
+				);
+			}
 		}
 		// this document is embedded in a `<script>`, where a `</script>` in any
 		// value would close the block early and spill the rest into the page as
@@ -90,13 +103,29 @@ mod test {
 			url: Some("https://beet.org/blog/ecs-router".into()),
 			published: Some("2025-08-09T00:00:00.000Z".into()),
 			modified: Some("2025-09-01T00:00:00.000Z".into()),
-			author: Some("Pete Hayman".into()),
+			authors: vec!["Pete Hayman".into()],
 			image: Some("https://beet.org/card.png".into()),
 			publisher: "Beet".into(),
 		}
 		.to_json()
 		.xpect_eq(
 			r#"{"@context":"https://schema.org","@type":"Article","author":{"@type":"Person","name":"Pete Hayman"},"dateModified":"2025-09-01T00:00:00.000Z","datePublished":"2025-08-09T00:00:00.000Z","headline":"ECS Router","image":"https://beet.org/card.png","publisher":{"@type":"Organization","name":"Beet"},"url":"https://beet.org/blog/ecs-router"}"#,
+		);
+	}
+
+	/// Several authors are a list of `Person`s, in credit order.
+	#[beet_core::test]
+	fn lists_several_authors() {
+		JsonLd {
+			headline: "Beet".into(),
+			published: Some("2025-08-09T00:00:00.000Z".into()),
+			authors: vec!["Pete Hayman".into(), "Ada Lovelace".into()],
+			publisher: "Beet".into(),
+			..default()
+		}
+		.to_json()
+		.xpect_contains(
+			r#""author":[{"@type":"Person","name":"Pete Hayman"},{"@type":"Person","name":"Ada Lovelace"}]"#,
 		);
 	}
 

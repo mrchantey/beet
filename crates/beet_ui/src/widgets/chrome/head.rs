@@ -87,7 +87,10 @@ pub fn Head(
 		.created
 		.and(meta.updated)
 		.map(|updated| updated.format_iso8601());
-	let article_author = meta.created.and(meta.author.clone());
+	let article_authors = meta
+		.created
+		.map(|_| meta.authors.clone())
+		.unwrap_or_default();
 	let og_type = match meta.created.is_some() {
 		true => "article",
 		false => "website",
@@ -102,7 +105,7 @@ pub fn Head(
 		url: canonical.clone(),
 		published: published.clone(),
 		modified: modified.clone(),
-		author: article_author.clone(),
+		authors: article_authors.clone(),
 		image: social_image.clone(),
 		publisher: title.clone(),
 	}
@@ -146,7 +149,8 @@ pub fn Head(
 			// article facts, emitted only for a page that has a publication date
 			{published.as_ref().map(|time| rsx!{ <meta property="article:published_time" content={time.clone()}/> })}
 			{modified.as_ref().map(|time| rsx!{ <meta property="article:modified_time" content={time.clone()}/> })}
-			{article_author.as_ref().map(|author| rsx!{ <meta property="article:author" content={author.clone()}/> })}
+			// one tag per author, the property repeating as Open Graph's arrays do
+			{article_authors.iter().map(|author| rsx!{ <meta property="article:author" content={author.clone()}/> }).collect::<Vec<_>>()}
 			{noindex.then(|| rsx!{ <meta name="robots" content="noindex"/> })}
 			<script type="application/ld+json">{json_ld}</script>
 			// Twitter card

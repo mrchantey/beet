@@ -227,6 +227,28 @@ impl DataLiteral {
 	}
 }
 
+/// A plain value as the literal that authors it, the inverse of
+/// [`DataLiteral::value`]: a list as a [`List`](DataLiteral::List), a map as a
+/// [`Struct`](DataLiteral::Struct), anything else a
+/// [`Scalar`](DataLiteral::Scalar), so a frontmatter list lands in a `Vec`
+/// field as a markup `[a, b]` does.
+impl From<Value> for DataLiteral {
+	fn from(value: Value) -> Self {
+		match value {
+			Value::List(items) => {
+				Self::List(items.into_iter().map(Self::from).collect())
+			}
+			Value::Map(map) => Self::Struct(
+				map.0
+					.into_iter()
+					.map(|(key, value)| (key, Self::from(value)))
+					.collect(),
+			),
+			other => Self::Scalar(other),
+		}
+	}
+}
+
 /// A name plus its fields, used for enum variants (`Center`, `Rgb(..)`) and
 /// spread components/templates (`MyComponent { .. }`). The name disambiguates a
 /// bare enum variant from a typed component only at resolution, against the

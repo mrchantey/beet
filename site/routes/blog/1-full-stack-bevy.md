@@ -4,7 +4,7 @@ slug = "full-stack-bevy"
 description = "Bevy ECS as the foundation for a full-stack metaframework with file based routes, markdown, rusty MDX, SSR, CSR, SSG, client islands, server actions, template scoped styles and live reload."
 tags = ["release-notes", "bevy", "web", "ecs"]
 created = "2025-07-11"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/7koepBSRoUI"
 +++
 

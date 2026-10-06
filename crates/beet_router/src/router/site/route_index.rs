@@ -188,7 +188,7 @@ mod test {
 		PageMeta {
 			title: Some(title.into()),
 			description: Some(format!("about {title}")),
-			author: Some("Pete Hayman".into()),
+			authors: vec!["Pete Hayman".into()],
 			created: Timestamp::parse_date(created),
 			order: Some(order),
 			..default()
@@ -263,11 +263,11 @@ mod test {
 			),
 			(
 				"blog/1-full-stack-bevy.md",
-				"+++\ntitle = \"Full Stack Bevy\"\nslug = \"full-stack-bevy\"\ndescription = \"the first one\"\ncreated = \"2025-07-11\"\nauthor = \"Pete Hayman\"\n+++\n\n# One",
+				"+++\ntitle = \"Full Stack Bevy\"\nslug = \"full-stack-bevy\"\ndescription = \"the first one\"\ncreated = \"2025-07-11\"\nauthors = [\"Pete Hayman\"]\n+++\n\n# One",
 			),
 			(
 				"blog/2-ecs-router.md",
-				"+++\ntitle = \"ECS Router\"\nslug = \"ecs-router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthor = \"Pete Hayman\"\n+++\n\n# Two",
+				"+++\ntitle = \"ECS Router\"\nslug = \"ecs-router\"\ndescription = \"the second one\"\ncreated = \"2025-08-09\"\nauthors = [\"Pete Hayman\"]\n+++\n\n# Two",
 			),
 		] {
 			store.insert(&RelPath::from(path), content).await.unwrap();

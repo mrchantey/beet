@@ -133,7 +133,9 @@ struct FeedItem {
 	/// The publication date as RFC 2822, the format the RSS spec names.
 	pub_date: String,
 	description: Option<String>,
-	author: Option<SmolStr>,
+	/// The byline: RSS gives an item one `<author>`, so several authors share
+	/// it.
+	author: Option<String>,
 	/// The page's rendered article markup, absent when the page failed to
 	/// render (see [`PageContent::render`]).
 	content: Option<String>,
@@ -180,7 +182,7 @@ impl FeedItem {
 			// `entries` selected on `created`, so this is never the fallback
 			pub_date: page.meta.created.unwrap_or_default().format_rfc2822(),
 			description: page.meta.description.clone(),
-			author: page.meta.author.clone(),
+			author: page.meta.byline(),
 			content: content.map(|content| content.html),
 		}
 		.xok()

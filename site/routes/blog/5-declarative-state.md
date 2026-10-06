@@ -4,7 +4,7 @@ slug = "declarative-state"
 description = "Exploring a declarative, local-first htmx-like state bindings with Automerge as an alternative to client islands."
 tags = ["web", "local-first", "architecture"]
 created = "2025-11-05"
-author = "Pete Hayman"
+authors = ["Pete Hayman"]
 video_url = "https://youtu.be/BhLvfvw1rgw"
 +++
 
