@@ -87,8 +87,7 @@ async fn a_read_only_repo_refuses_writes() {
 	Pds::new(XrpcPds::new(Did::parse(BEET_ORG).unwrap()))
 		.put_record(
 			&Nsid::new_static("com.example.doc"),
-			&Rkey::parse("never").unwrap(),
-			value!({}).into(),
+			Rkeyed::new(Rkey::parse("never").unwrap(), value!({}).into()),
 		)
 		.await
 		.unwrap_err()

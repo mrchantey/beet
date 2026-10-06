@@ -147,10 +147,10 @@ impl Pds {
 				(false, _, Some(existing)) => existing.strong_ref(),
 				(_, true, _) => StrongRef::new(
 					self.uri(&T::COLLECTION, &rkey),
-					AtprotoValue::from_serde(&*record)?
-						.into_record(&T::COLLECTION)?
-						.xref()
-						.xmap(dag_cbor_ext::record_cid)?,
+					dag_cbor_ext::record_cid(
+						&AtprotoValue::from_serde(&*record)?
+							.into_record(&T::COLLECTION)?,
+					)?,
 				),
 				_ => self.put(&record).await?,
 			};

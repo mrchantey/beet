@@ -156,14 +156,13 @@ impl XrpcPds {
 	async fn put(
 		&self,
 		collection: Nsid,
-		rkey: Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> Result<StrongRef> {
 		let body = PutRecord {
 			address: RecordAddress {
 				repo: &self.did,
 				collection: &collection,
-				rkey: &rkey,
+				rkey: record.rkey(),
 			},
 			record: &record,
 		};
@@ -256,11 +255,10 @@ impl PdsProvider for XrpcPds {
 	fn put_record(
 		&self,
 		collection: Nsid,
-		rkey: Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
-		Box::pin(async move { this.put(collection, rkey, record).await })
+		Box::pin(async move { this.put(collection, record).await })
 	}
 
 	fn delete_record(

@@ -104,20 +104,25 @@ impl EmulatorPds {
 	) -> Result<Option<RecordEntry>> {
 		self.read(&Self::record_path(collection, rkey))
 			.await?
-			.map(|value| self.entry(collection, rkey, value))
+			.map(|value| {
+				self.entry(collection, Rkeyed::new(rkey.clone(), value))
+			})
 			.transpose()
+	}
+
+	fn uri(&self, collection: &Nsid, rkey: &Rkey) -> AtUri {
+		AtUri::new(self.did.clone(), collection.clone(), rkey.clone())
 	}
 
 	fn entry(
 		&self,
 		collection: &Nsid,
-		rkey: &Rkey,
-		value: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> Result<RecordEntry> {
 		RecordEntry {
-			uri: AtUri::new(self.did.clone(), collection.clone(), rkey.clone()),
-			cid: dag_cbor_ext::record_cid(&value)?,
-			value,
+			uri: self.uri(collection, record.rkey()),
+			cid: dag_cbor_ext::record_cid(&record)?,
+			value: record.into_value(),
 		}
 		.xok()
 	}
@@ -125,29 +130,27 @@ impl EmulatorPds {
 	async fn put(
 		&self,
 		collection: Nsid,
-		rkey: Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> Result<StrongRef> {
-		let record = record.into_record(&collection)?;
+		let record = record.try_map(|body| body.into_record(&collection))?;
+		let uri = self.uri(&collection, record.rkey());
 		let cid = dag_cbor_ext::record_cid(&record)?;
 		let referenced = Self::blob_refs(&record);
 		for blob in &referenced {
 			if !self.store.exists(&Self::blob_path(blob)).await? {
 				bevybail!(
-					"{} references blob {blob}, which was never uploaded to \
-					 this repo",
-					AtUri::new(self.did.clone(), collection, rkey)
+					"{uri} references blob {blob}, which was never uploaded \
+					 to this repo"
 				);
 			}
 		}
-		let path = Self::record_path(&collection, &rkey);
+		let path = Self::record_path(&collection, record.rkey());
 		let dropped = self.dropped_blobs(&path, &referenced).await?;
 		self.store
 			.insert(&path, serde_json::to_vec(&record.to_json())?)
 			.await?;
 		self.release(dropped).await?;
-		StrongRef::new(AtUri::new(self.did.clone(), collection, rkey), cid)
-			.xok()
+		StrongRef::new(uri, cid).xok()
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
@@ -289,11 +292,10 @@ impl PdsProvider for EmulatorPds {
 	fn put_record(
 		&self,
 		collection: Nsid,
-		rkey: Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
-		Box::pin(async move { this.put(collection, rkey, record).await })
+		Box::pin(async move { this.put(collection, record).await })
 	}
 
 	fn delete_record(
@@ -331,9 +333,15 @@ mod test {
 	fn collection() -> Nsid { Nsid::new_static("com.example.card") }
 	fn rkey(key: &str) -> Rkey { Rkey::parse(key).unwrap() }
 
-	/// A card holding `blob`, the shape every retention case writes.
-	fn card(blob: &BlobRef) -> AtprotoValue {
-		value!({ "image": (Value::from_serde(blob).unwrap()) }).into()
+	/// `value` at `key`.
+	fn record(key: &str, value: Value) -> Rkeyed<AtprotoValue> {
+		Rkeyed::new(rkey(key), value.into())
+	}
+
+	/// A card at `key` holding `blob`, the shape every retention case
+	/// writes.
+	fn card(key: &str, blob: &BlobRef) -> Rkeyed<AtprotoValue> {
+		record(key, value!({ "image": (Value::from_serde(blob).unwrap()) }))
 	}
 
 	/// The layout is the documented one, and the cid a written record answers
@@ -344,7 +352,7 @@ mod test {
 		let pds = Pds::new(emulator.clone());
 		let blob = pds.upload_blob("png", MediaType::Png).await.unwrap();
 		let written = pds
-			.put_record(&collection(), &rkey("a"), card(&blob))
+			.put_record(&collection(), card("a", &blob))
 			.await
 			.unwrap();
 		let mut paths = emulator.store().list().await.unwrap();
@@ -371,15 +379,14 @@ mod test {
 		let pds = Pds::temp();
 		pds.put_record(
 			&collection(),
-			&rkey("a"),
-			value!({ "$type": "com.example.other" }).into(),
+			record("a", value!({ "$type": "com.example.other" })),
 		)
 		.await
 		.unwrap_err()
 		.to_string()
 		.xpect_contains("declares `$type");
 		let blob = BlobRef::of(b"never uploaded", MediaType::Png);
-		pds.put_record(&collection(), &rkey("a"), card(&blob))
+		pds.put_record(&collection(), card("a", &blob))
 			.await
 			.unwrap_err()
 			.to_string()
@@ -401,14 +408,14 @@ mod test {
 		let first = pds.upload_blob("one", MediaType::Png).await.unwrap();
 		let second = pds.upload_blob("two", MediaType::Png).await.unwrap();
 		// two records share the first blob
-		pds.put_record(&collection(), &rkey("a"), card(&first))
+		pds.put_record(&collection(), card("a", &first))
 			.await
 			.unwrap();
-		pds.put_record(&collection(), &rkey("b"), card(&first))
+		pds.put_record(&collection(), card("b", &first))
 			.await
 			.unwrap();
 		// replacing one keeps the blob the other still holds
-		pds.put_record(&collection(), &rkey("a"), card(&second))
+		pds.put_record(&collection(), card("a", &second))
 			.await
 			.unwrap();
 		exists(&first).await.xpect_true();
@@ -431,18 +438,13 @@ mod test {
 	async fn lists_a_collection_in_rkey_order() {
 		let pds = Pds::temp();
 		for key in ["c", "a", "b"] {
-			pds.put_record(
-				&collection(),
-				&rkey(key),
-				value!({ "key": key }).into(),
-			)
-			.await
-			.unwrap();
+			pds.put_record(&collection(), record(key, value!({ "key": key })))
+				.await
+				.unwrap();
 		}
 		pds.put_record(
 			&Nsid::new_static("com.example.other"),
-			&rkey("z"),
-			value!({}).into(),
+			record("z", value!({})),
 		)
 		.await
 		.unwrap();

@@ -31,7 +31,7 @@ use core::fmt;
 /// let collection = Nsid::new_static("com.example.note");
 /// let rkey = Rkey::parse("first").unwrap();
 /// let written = pds
-/// 	.put_record(&collection, &rkey, value!({ "text": "hi" }).into())
+/// 	.put_record(&collection, Rkeyed::new(rkey.clone(), value!({ "text": "hi" }).into()))
 /// 	.await?;
 /// pds.get_record(&collection, &rkey)
 /// 	.await?
@@ -92,20 +92,18 @@ impl Pds {
 			.await
 	}
 
-	/// Create or replace the record at `rkey`, answering the version written.
-	/// A `record` with no `$type` is written as `collection`; one naming
+	/// Create or replace `record` at its rkey, answering the version
+	/// written. A body with no `$type` is written as `collection`; one naming
 	/// another collection is refused ([`AtprotoValue::into_record`]).
 	pub async fn put_record(
 		&self,
 		collection: &Nsid,
-		rkey: &Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> Result<StrongRef> {
 		self.provider
 			.put_record(
 				collection.clone(),
-				rkey.clone(),
-				record.into_record(collection)?,
+				record.try_map(|body| body.into_record(collection))?,
 			)
 			.await
 	}
@@ -157,8 +155,7 @@ impl Pds {
 	) -> Result<StrongRef> {
 		self.put_record(
 			&T::COLLECTION,
-			record.rkey(),
-			AtprotoValue::from_serde(&**record)?,
+			record.as_ref().try_map(AtprotoValue::from_serde)?,
 		)
 		.await
 	}
@@ -206,8 +203,7 @@ pub trait PdsProvider: 'static + Send + Sync {
 	fn put_record(
 		&self,
 		collection: Nsid,
-		rkey: Rkey,
-		record: AtprotoValue,
+		record: Rkeyed<AtprotoValue>,
 	) -> SendBoxedFuture<Result<StrongRef>>;
 
 	/// See [`Pds::delete_record`].
