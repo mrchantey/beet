@@ -397,15 +397,27 @@ impl ChildProcess {
 		self.spawn_with(cmd)
 	}
 
-	/// A spawn failure, with a missing executable mapped onto the configured
-	/// [`not_found`](Self::with_not_found) message.
+	/// A failure to start the process, naming what was missing, since a bare
+	/// `NotFound` names neither the working directory nor the executable: a
+	/// missing [`cwd`](Self::with_cwd) says so, and a missing executable maps
+	/// onto the configured [`not_found`](Self::with_not_found) message.
 	fn map_spawn_error(&self, err: std::io::Error) -> BevyError {
-		match err.kind() == ErrorKind::NotFound {
-			true => match &self.not_found {
-				Some(msg) => bevyhow!("{msg}"),
-				None => err.into(),
-			},
-			false => err.into(),
+		if err.kind() != ErrorKind::NotFound {
+			return err.into();
+		}
+		if let Some(dir) = self
+			.cwd
+			.as_ref()
+			.filter(|dir| matches!(fs_ext::exists(dir), Ok(false)))
+		{
+			return bevyhow!(
+				"cannot run `{}`: its working directory {dir} does not exist",
+				self.command
+			);
+		}
+		match &self.not_found {
+			Some(msg) => bevyhow!("{msg}"),
+			None => bevyhow!("cannot run `{}`: {err}", self.command),
 		}
 	}
 
@@ -426,15 +438,7 @@ impl ChildProcess {
 		&self,
 		result: Result<Output, std::io::Error>,
 	) -> Result<Output> {
-		result.map_err(|e| {
-			if e.kind() == ErrorKind::NotFound
-				&& let Some(msg) = &self.not_found
-			{
-				bevyhow!("{msg}")
-			} else {
-				e.into()
-			}
-		})
+		result.map_err(|err| self.map_spawn_error(err))
 	}
 	#[track_caller]
 	fn map_output(&self, output: Output) -> Result<Output> {
@@ -507,5 +511,32 @@ mod test {
 			.to_string();
 		err.contains("hunter2").xpect_false();
 		err.xpect_contains("<redacted>");
+	}
+
+	/// A spawn into a directory that is gone names the directory, where the
+	/// os error alone reads like a missing executable.
+	#[crate::test]
+	async fn a_missing_working_directory_is_named() {
+		let dir = TempDir::new().unwrap();
+		let absent = dir.path().join("absent");
+		ChildProcess::new("sh")
+			.with_cwd(absent.clone())
+			.run_async()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains(&format!(
+				"working directory {absent} does not exist"
+			));
+	}
+
+	/// A missing executable with no configured message still names itself.
+	#[crate::test]
+	fn a_missing_executable_is_named() {
+		ChildProcess::new("beet-no-such-executable")
+			.run()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("cannot run `beet-no-such-executable`");
 	}
 }
