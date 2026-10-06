@@ -347,10 +347,11 @@ impl BootstrapConfig {
 	/// There was once a second list for the variables the prefix could not
 	/// reach; renaming the one member is what emptied it.
 	pub(crate) fn env_names() -> impl Iterator<Item = &'static str> {
-		Self::KNOBS
-			.iter()
-			.map(|knob| knob.env)
-			.chain([fs_ext::WORKSPACE_ROOT])
+		let names = Self::KNOBS.iter().map(|knob| knob.env);
+		// the workspace root is the std filesystem's own variable
+		#[cfg(feature = "std")]
+		let names = names.chain([fs_ext::WORKSPACE_ROOT]);
+		names
 	}
 
 	/// The one parse. `env` resolves a `BEET_*` name, and is consulted only for a

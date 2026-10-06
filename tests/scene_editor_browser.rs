@@ -134,13 +134,15 @@ impl SceneHost {
 			for element in page.try_find_all(selector).await? {
 				let text = element.text_content().await?.unwrap_or_default();
 				if fold(text).contains(needle) {
-					return Ok(element);
+					return Ok(ControlFlow::Break(element));
 				}
 			}
-			bevybail!("no `{selector}` containing {needle:?}")
+			Ok(ControlFlow::Continue(()))
 		})
 		.await
-		.unwrap_or_else(|err| panic!("{err}"))
+		.unwrap_or_else(|err| {
+			panic!("no `{selector}` containing {needle:?}: {err}")
+		})
 	}
 
 	/// The tree row whose label contains `label`.
@@ -279,23 +281,30 @@ impl SceneHost {
 	/// The fork the browser's store holds, waited for: a write lands off a
 	/// task after the edit that made it.
 	async fn fork_landed(&self) -> Value {
-		poll_ext::poll_async(async || {
-			self.fork()
-				.await
-				.ok_or_else(|| bevyhow!("the fork has not landed"))
+		poll_ext::poll_async(async || match self.fork().await {
+			Some(fork) => Ok(ControlFlow::Break(fork)),
+			None => Ok(ControlFlow::Continue(())),
 		})
 		.await
-		.unwrap()
+		.unwrap_or_else(|err| panic!("the fork has not landed: {err}"))
 	}
 
 	/// The fork as the server's store holds it, what it published, waited
 	/// for: the server's first boot writes it off a task.
 	async fn published(&self) -> Value {
 		let store = &self.store;
-		poll_ext::poll_async(async || store.get(&RelPath::from(FORK)).await)
-			.await
-			.map(|bytes| serde_json::from_slice(&bytes).unwrap())
-			.unwrap()
+		poll_ext::poll_async(async || {
+			match store.exists(&RelPath::from(FORK)).await? {
+				true => store
+					.get(&RelPath::from(FORK))
+					.await
+					.map(ControlFlow::Break),
+				false => Ok(ControlFlow::Continue(())),
+			}
+		})
+		.await
+		.map(|bytes| serde_json::from_slice(&bytes).unwrap())
+		.unwrap()
 	}
 
 	/// Close the tab and the served app, failing on anything either
@@ -479,12 +488,13 @@ async fn the_edit_loop_survives_a_reload() {
 			entities.target(3, ChildOf::type_path()) == Some(1)
 				&& entities.component(2, Name::type_path()).is_none()
 		};
-		landed
-			.then_some(fork)
-			.ok_or_else(|| bevyhow!("the last edit has not landed"))
+		match landed {
+			true => Ok(ControlFlow::Break(fork)),
+			false => Ok(ControlFlow::Continue(())),
+		}
 	})
 	.await
-	.unwrap();
+	.unwrap_or_else(|err| panic!("the last edit has not landed: {err}"));
 	labels(&host.published().await)[2]
 		.as_str()
 		.xpect_eq("#2 \"Garden\"");
@@ -642,11 +652,11 @@ async fn a_returning_editor_never_sees_the_published_text() {
 	host.find("h1").await.xpect_text("Garden!").await;
 	// the fork lands in the browser's store, marking it as an editor's
 	poll_ext::poll_async(async || match host.is_marked().await {
-		true => Ok(()),
-		false => bevybail!("the fork is not marked yet"),
+		true => Ok(ControlFlow::Break(())),
+		false => Ok(ControlFlow::Continue(())),
 	})
 	.await
-	.unwrap();
+	.unwrap_or_else(|err| panic!("the fork is not marked yet: {err}"));
 	// the next load: hidden, and booting without a gesture
 	host.goto("/").await;
 	let mut samples = 0;

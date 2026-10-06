@@ -52,6 +52,7 @@ pub use utils::cross_log::CrossLog;
 
 #[cfg(feature = "std")]
 pub mod arena;
+pub mod atproto;
 mod bevy_extensions;
 pub mod bevy_utils;
 pub mod bootstrap;
@@ -170,6 +171,7 @@ pub mod prelude {
 
 	#[cfg(feature = "std")]
 	pub use crate::arena::*;
+	pub use crate::atproto::*;
 	pub use crate::bevy_extensions::*;
 	pub use crate::bevy_utils::*;
 	pub use crate::bevybail;

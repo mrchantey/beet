@@ -30,13 +30,15 @@ pub async fn build_site(world: &mut World) -> Entity {
 	let source = entry.as_utf8().unwrap();
 	// pre-scan: register the entry's declared `<TemplateDir>`s before parsing, so
 	// entry-level tags resolve against them.
-	let prescan = EntryPrescan::parse(&entry).unwrap();
+	let prescan =
+		EntryPrescan::parse(&entry, world.resource::<PrescanRegistry>())
+			.unwrap();
 	// the root is spawned first so it owns the entry-level registrations, as the
 	// binary's entry build does.
 	let root = world.spawn_empty().id();
-	for dir in &prescan.template_dirs {
+	for dir in prescan.iter::<TemplateDir>() {
 		let sources = TemplateDir::read_sources(
-			&store.with_subdir(dir.clone()),
+			&store.with_subdir(dir.src.clone()),
 			&formats,
 		)
 		.await

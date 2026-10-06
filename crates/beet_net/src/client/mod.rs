@@ -47,6 +47,8 @@ mod impl_ureq;
 // std-gated `futures` channel and `send_wrapper`.
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod impl_web_sys;
+#[cfg(feature = "std")]
+pub(crate) mod provider_send;
 mod send;
 #[cfg(feature = "http")]
 pub use event_source::*;

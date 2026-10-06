@@ -224,13 +224,18 @@ async fn serve_entry(store: BlobStore, entry: &str) -> PageHarness {
 			.world_mut()
 			.get_resource_or_init::<TemplateFormats>()
 			.clone();
+		let prescans = app
+			.world_mut()
+			.get_resource_or_init::<PrescanRegistry>()
+			.clone();
 		app.world_mut().run_async_local(async move |world| {
 			let ResolvedEntry {
 				repo_store,
 				entry_name,
 				prescan,
 				..
-			} = entry_build::resolve_in_repo_store(store, entry).await?;
+			} = entry_build::resolve_in_repo_store(store, &prescans, entry)
+				.await?;
 			let sources = entry_build::read_sources(
 				&repo_store,
 				formats,

@@ -75,6 +75,17 @@ impl BsxTemplate {
 			as_container: true,
 		}
 	}
+
+	/// `markup` parsed as a `.bsx` document into a [`container`](Self::container)
+	/// with an empty registry: the load a test or a fixture makes of an
+	/// entry's markup.
+	pub fn parse_document(markup: &str) -> Result<Self> {
+		Self::container(
+			BsxNode::parse_document(markup, &BsxParseConfig::bsx())?,
+			BsxTemplateRegistry::default(),
+		)
+		.xok()
+	}
 }
 
 impl Template for BsxTemplate {

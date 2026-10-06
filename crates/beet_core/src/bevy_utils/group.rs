@@ -255,13 +255,8 @@ mod bsx_test {
 	fn build(markup: &str) -> (World, Entity) {
 		let mut world =
 			(TemplatePlugin, DocumentPlugin, MinimalTypesPlugin).into_world();
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		let root = world
-			.spawn_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.spawn_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap()
 			.id();
 		world.flush();

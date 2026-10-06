@@ -13,6 +13,7 @@ pub fn cli() -> CrateRegistration {
 	crate_registration!({
 		features: [
 			"atproto",
+			"atproto_infra",
 			"aws_sdk",
 			"cloudflare",
 			"extra",

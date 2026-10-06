@@ -352,14 +352,9 @@ mod test {
 	}
 
 	fn spawn_markup(world: &mut World, router: Entity, markup: &str) {
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		world
 			.spawn(ChildOf(router))
-			.insert_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.insert_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap();
 		world.flush();
 	}

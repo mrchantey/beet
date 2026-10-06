@@ -266,6 +266,8 @@ pub trait BlobStoreProvider: 'static + Send + Sync {
 	/// Insert the contents of a local file, for an object too large to hold
 	/// as [`Bytes`]. The default reads the file and inserts it; a filesystem
 	/// backend copies it into place instead. The file is left where it is.
+	/// A local file is a std concept, so the method is too.
+	#[cfg(feature = "std")]
 	fn insert_file(
 		&self,
 		path: &RelPath,
@@ -492,6 +494,7 @@ impl BlobStoreProvider for Box<dyn BlobStoreProvider> {
 	fn insert(&self, path: &RelPath, body: Bytes) -> SendBoxedFuture<Result> {
 		self.as_ref().insert(path, body)
 	}
+	#[cfg(feature = "std")]
 	fn insert_file(
 		&self,
 		path: &RelPath,

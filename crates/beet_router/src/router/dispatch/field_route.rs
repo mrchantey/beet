@@ -131,14 +131,9 @@ mod test {
 	fn router_with(markup: &str) -> (World, Entity) {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world.spawn(Router::with_defaults()).flush();
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		world
 			.spawn(ChildOf(root))
-			.insert_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.insert_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap();
 		world.flush();
 		settle(&mut world);

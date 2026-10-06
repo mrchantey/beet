@@ -10,6 +10,10 @@ beet_core::test_main!();
 
 /// Transport-agnostic request/response wire types — the no_std core.
 mod types;
+// An account's repo as a provider, and the converge over it. The family rides
+// `json`; its network half is behind `atproto` inside the module.
+#[cfg(feature = "json")]
+mod atproto;
 /// Re-export the typed header module at crate level.
 pub use types::header;
 /// Alias for [`header`] for ergonomic typed header access.
@@ -95,6 +99,8 @@ pub mod prelude {
 
 	#[cfg(feature = "action")]
 	pub use crate::actions::*;
+	#[cfg(feature = "json")]
+	pub use crate::atproto::*;
 	pub use crate::client::*;
 	#[cfg(feature = "mdns")]
 	pub use crate::mdns::*;

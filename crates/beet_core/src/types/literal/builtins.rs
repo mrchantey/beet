@@ -18,6 +18,7 @@ pub(super) fn builtins() -> HashMap<TypeId, LiteralParser> {
 	add_numbers(&mut table);
 	add_strings(&mut table);
 	add_domain(&mut table);
+	add_atproto(&mut table);
 	table.0
 }
 
@@ -124,6 +125,42 @@ fn add_strings(table: &mut Table) {
 			_ => Ok(None),
 		}
 	});
+}
+
+/// The protocol's primitives, each authored as the string it is written as,
+/// so `<AtprotoAccount did="did:plc:.."/>` refuses a malformed did at load
+/// rather than storing one no repo answers to.
+fn add_atproto(table: &mut Table) {
+	table
+		.add_hinted("a did, eg \"did:plc:..\"", |value: &Value| match value {
+			Value::Str(string) => Did::parse(string).map(Some),
+			_ => Ok(None),
+		})
+		.add_hinted("an nsid, eg \"app.bsky.feed.post\"", |value: &Value| {
+			match value {
+				Value::Str(string) => Nsid::parse(string).map(Some),
+				_ => Ok(None),
+			}
+		})
+		.add_hinted("a record key", |value: &Value| match value {
+			Value::Str(string) => Rkey::parse(string).map(Some),
+			_ => Ok(None),
+		})
+		.add_hinted("a 13 character tid", |value: &Value| match value {
+			Value::Str(string) => Tid::parse(string).map(Some),
+			_ => Ok(None),
+		})
+		.add_hinted("a cid, eg \"bafkrei..\"", |value: &Value| match value {
+			Value::Str(string) => Cid::parse(string).map(Some),
+			_ => Ok(None),
+		})
+		.add_hinted(
+			"an at uri, eg \"at://did:plc:../<collection>/<rkey>\"",
+			|value: &Value| match value {
+				Value::Str(string) => AtUri::parse(string).map(Some),
+				_ => Ok(None),
+			},
+		);
 }
 
 /// The domain types whose authored spelling is a single word rather than their

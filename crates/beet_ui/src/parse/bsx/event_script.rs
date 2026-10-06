@@ -80,11 +80,7 @@ mod test {
 	/// onto (the container's one content child).
 	fn click_target(world: &mut World, doc: Entity, markup: &str) -> Entity {
 		let container = world
-			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(markup, &BsxParseConfig::bsx())
-					.unwrap(),
-				BsxTemplateRegistry::default(),
-			))
+			.spawn_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap()
 			.id();
 		world.entity_mut(container).insert(ChildOf(doc));

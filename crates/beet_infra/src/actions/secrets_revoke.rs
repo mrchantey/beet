@@ -392,17 +392,14 @@ mod tests {
 		let mut world = infra_world();
 		let (root, _, alice, _) = revocable_stack(&mut world).await;
 		let router = world.entity(root).get::<Children>().unwrap()[2];
-		let nodes = BsxNode::parse_document(
-			r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
-			&BsxParseConfig::bsx(),
-		)
-		.unwrap();
 		world
 			.spawn(ChildOf(router))
-			.insert_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.insert_template(
+				BsxTemplate::parse_document(
+					r#"<Route path="secrets/revoke" {SecretsRevoke}/>"#,
+				)
+				.unwrap(),
+			)
 			.unwrap();
 		world.flush();
 		world

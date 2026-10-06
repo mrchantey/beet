@@ -200,16 +200,13 @@ mod test {
 			.resource_mut::<AppTypeRegistry>()
 			.write()
 			.register::<PackageConfig>();
-		let nodes = BsxNode::parse_document(
-			r#"<PackageConfig title="Patched"/>"#,
-			&BsxParseConfig::bsx(),
-		)
-		.unwrap();
 		world
-			.spawn_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.spawn_template(
+				BsxTemplate::parse_document(
+					r#"<PackageConfig title="Patched"/>"#,
+				)
+				.unwrap(),
+			)
 			.unwrap();
 
 		let config = world.resource::<PackageConfig>();

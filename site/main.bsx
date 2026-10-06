@@ -146,15 +146,18 @@ different process from a stage deploy. No stage deploy or destroy touches it.
 `beet.org` and `pete.beet.org` are atproto (Bluesky) handles because
 `_atproto.<handle>` holds a `did=` TXT record, and that record is the WHOLE of
 a handle's infrastructure: the accounts live on bsky.social and keep their dids
-across every rename. `<Route path="social">` holds them as their own
+across every rename. Each account is declared once, as a top-level
+`<AtprotoAccount/>` outside every `bx:cfg`, since both the served site and the
+deploy verbs read them, and they are plain data in every build.
+`<Route path="social">` holds the handles as their own
 `<Stack app_name="beet-social">`, since they share nothing with the site but the
-zone: no compute, no region, two records and the probe that asks Bluesky's own
-resolver whether each answers with its declared did. `dns_stage="prod"` guards
-the names exactly as the mail blocks do, so only `--stage=prod` publishes them.
-`<AtprotoHandleBlock/>` is defined in the sibling `beet_atproto` workspace, which
-`beet-cli` links behind its `atproto` feature, so the route is gated on that
-feature too: a binary that never linked the block must exclude the stack rather
-than spawn its tag as nothing.
+zone: no compute, no region, one record per account its
+`<AtprotoHandleBlock accounts={[..]}/>` names, and the probe that asks Bluesky's
+own resolver whether each answers with its account's did. `dns_stage="prod"`
+guards the names exactly as the mail blocks do, so only `--stage=prod`
+publishes them. The block links behind `beet-cli`'s `atproto_infra` feature, so
+the route is gated on that feature too: a binary that never linked the block
+must exclude the stack rather than spawn its tag as nothing.
 
 The record is half the job. A resolver verifies a handle BOTH ways, against the
 record and against the account's did document, so a published record resolves
@@ -169,7 +172,8 @@ hand-created records all publish into, so its audit belongs to no stack.
 entry, so a sibling's records are declarations rather than strays and the
 allowlist below holds only what NOTHING here declares, each row a decision with
 a reason. `--fix` deletes the strays rather than reporting them. The audit is
-run from the `atproto` build too, so the handle records count as declared.
+run from the `atproto_infra` build too, so the handle records count as
+declared.
 
     just site-social deploy --stage=prod   # publish the handle records
     just site-social probe --stage=prod    # after the claim: does each handle resolve
@@ -214,6 +218,15 @@ token (plus AWS for the social stack's state bucket).
 		homepage="https://beet.org"
 		social_image="https://beet.org/assets/branding/social-card.png"
 		theme_color="#006c4f"/>
+	<!-- the atproto accounts this entry reads and writes, each declared once
+	     and named by `bx:ref` wherever a declaration needs one (the handle
+	     block below). Plain data, outside every `bx:cfg`: the served site and
+	     the deploy verbs both read them, and a build without `atproto` keeps
+	     them as inert declarations. -->
+	<AtprotoAccount bx:ref="beet_org" handle="beet.org"
+		did="did:plc:vgxy56shhs3t3b2mu2avizjf" display_name="Beet"/>
+	<AtprotoAccount bx:ref="pete" handle="pete.beet.org"
+		did="did:plc:hnv7bd4gtxrf7iigjo22qukp" display_name="Pete Hayman"/>
 	<Route path="serve" {(HttpServer, TuiServer, SshTuiServer)}>
 		<Router {(RequestLogger, AnalyticsMiddleware, AnalyticsConfig, GeoIpDb, StoreRef($analytics), CacheHeadersMiddleware, CacheHeaders, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
 			<!-- the brand palette, one key colour per Material palette. The neutral
@@ -287,7 +300,7 @@ token (plus AWS for the social stack's state bucket).
 	<!-- the aws identity this repo deploys as: one iam user for its one
 	     document (the workspace entry shares it) and one managed policy per app
 	     THIS entry declares, lowered from what the stacks below render. Built
-	     with `atproto` so the social app's policy renders too; outside every
+	     with `atproto_infra` so the social app's policy renders too; outside every
 	     `<Stack>`, since a document holds one pair however many stacks it
 	     deploys, and an administrator's verb: the scoped pair it seals cannot
 	     mint itself -->
@@ -414,10 +427,10 @@ token (plus AWS for the social stack's state bucket).
 	</Route>
 	<!-- the atproto handles: their own stack because they share nothing with
 	     the site but the zone, see "The handles, and the zone" above. The
-	     block is defined out of tree, so the route needs the binary that
-	     links it: an infra build without `atproto` would spawn the tag as
-	     nothing and deploy an empty stack green. -->
-	<Route path="social" bx:cfg="feature:infra && feature:extra && feature:atproto">
+	     route needs the binary that links the block: an infra build without
+	     `atproto_infra` would spawn the tag as nothing and deploy an empty
+	     stack green. -->
+	<Route path="social" bx:cfg="feature:infra && feature:extra && feature:atproto_infra">
 		<Stack app_name="beet-social">
 			<!-- a deploy is the apply alone, and the teardown that read
 			     backwards, since this stack owns nothing outside terraform. The
@@ -432,15 +445,12 @@ token (plus AWS for the social stack's state bucket).
 				<TofuDestroy/>
 			</Group>
 			<DeployRoutes deploy={$social_up} destroy={$social_down}/>
-			<!-- one TXT record per handle at `_atproto.<name>.beet.org`,
-			     holding `did=<did>`. The entry with no `name` is the APEX
-			     handle, `beet.org` itself. No `dns` attribute: the records
-			     land in the `CloudflareZone` declared on the root. -->
+			<!-- one TXT record per account at `_atproto.<handle>`, holding
+			     `did=<did>`. `beet.org`'s handle is the APEX, the domain
+			     itself. No `dns` attribute: the records land in the
+			     `CloudflareZone` declared on the root. -->
 			<AtprotoHandleBlock domain="beet.org" dns_stage="prod"
-				handles={[
-					{did:"did:plc:vgxy56shhs3t3b2mu2avizjf"},
-					{name:"pete", did:"did:plc:hnv7bd4gtxrf7iigjo22qukp"},
-				]}/>
+				accounts={[$beet_org, $pete]}/>
 			<!-- the post-claim check: cheap, read-only, and the honest answer
 			     to "does the handle work", which nothing about a converged
 			     record can tell you. -->

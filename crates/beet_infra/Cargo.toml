@@ -53,6 +53,10 @@ cloudflare_dns = ["bindings_cloudflare_common", "bindings_aws_dns"]
 # terraform bindings; needs `deploy` (the actions) and `aws_sdk` (the container's
 # `S3Store::r2` path) at the consumer.
 cloudflare_block = []
+# `<AtprotoHandleBlock/>`, the TXT records that make a domain's names atproto
+# handles, read off the `<AtprotoAccount/>`s it names, and `<AtprotoHandleProbe/>`,
+# the post-apply read asking the network whether each resolves.
+atproto = ["cloudflare_dns", "beet_net/atproto"]
 # The self-hosted mail stack: the per-domain DNS + SES declaration
 # (`MailDomainBlock`), the box that serves it (`StalwartBlock`, hence the ec2,
 # ssm and iam/common bindings) and the member/mailbox/alias inputs both are

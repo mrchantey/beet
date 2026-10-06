@@ -62,7 +62,9 @@ impl AgentIdentity {
 	///
 	/// Reads the two records by name through the same narrowing
 	/// [`SecretsExec`] uses, so a document missing one half says which rather
-	/// than handing a child half a credential.
+	/// than handing a child half a credential. Native with `fs`, like every
+	/// verb that spawns the child.
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub async fn sdk_pair() -> Result<Vec<(SmolStr, SmolStr)>> {
 		let handle = Self::handle().await?;
 		let pairs = SecretsExec::narrow(

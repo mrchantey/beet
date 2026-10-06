@@ -221,6 +221,7 @@ impl BlobStore {
 
 	/// Insert the contents of a local file without holding it in memory, see
 	/// [`BlobStoreProvider::insert_file`].
+	#[cfg(feature = "std")]
 	pub async fn insert_file(&self, path: &RelPath, file: &AbsPath) -> Result {
 		self.provider.insert_file(path, file).await
 	}

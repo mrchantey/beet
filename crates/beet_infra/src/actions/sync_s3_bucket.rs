@@ -255,22 +255,17 @@ mod test {
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
 				.into_world();
 		world.init_resource::<PackageConfig>();
-		let nodes = BsxNode::parse_document(
-			&format!(
-				r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>
+		let root = world
+			.spawn(())
+			.insert_template(
+				BsxTemplate::parse_document(&format!(
+					r#"<Stack stage="prod" {{AwsRegion("eu-west-1")}}>
 					<S3BucketBlock label="assets" deploy_versioned=false/>
 					{markup}
 				</Stack>"#
-			),
-			&BsxParseConfig::bsx(),
-		)
-		.unwrap();
-		let root = world
-			.spawn(())
-			.insert_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+				))
+				.unwrap(),
+			)
 			.unwrap()
 			.id();
 		world.flush();

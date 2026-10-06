@@ -255,6 +255,8 @@ smol_str = { workspace = true }
 indexmap = { workspace = true }
 heck.workspace = true
 digest.workspace = true
+# the content id a blob and a record are addressed by (`atproto::Cid`)
+sha2.workspace = true
 bitflags = { workspace = true }
 
 #💡 path

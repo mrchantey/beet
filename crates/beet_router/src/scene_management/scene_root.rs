@@ -210,16 +210,13 @@ mod test {
 			.write()
 			.register::<PackageConfig>();
 		let spawn = |world: &mut World| -> Entity {
-			let nodes = BsxNode::parse_document(
-				r#"<PackageConfig title="Owned"/>"#,
-				&BsxParseConfig::bsx(),
-			)
-			.unwrap();
 			let root = world
-				.spawn_template(BsxTemplate::container(
-					nodes,
-					BsxTemplateRegistry::default(),
-				))
+				.spawn_template(
+					BsxTemplate::parse_document(
+						r#"<PackageConfig title="Owned"/>"#,
+					)
+					.unwrap(),
+				)
 				.unwrap()
 				.id();
 			world.entity_mut(root).insert(BeetSceneRoot);
@@ -256,14 +253,10 @@ mod test {
 			.register::<PackageConfig>();
 		// the host entry declares the resource and owns it, with no `BeetSceneRoot`
 		let entry = world
-			.spawn_template(BsxTemplate::container(
-				BsxNode::parse_document(
-					r#"<PackageConfig title="Host"/>"#,
-					&BsxParseConfig::bsx(),
-				)
-				.unwrap(),
-				BsxTemplateRegistry::default(),
-			))
+			.spawn_template(
+				BsxTemplate::parse_document(r#"<PackageConfig title="Host"/>"#)
+					.unwrap(),
+			)
 			.unwrap()
 			.id();
 		world

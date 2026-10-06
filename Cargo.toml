@@ -243,7 +243,8 @@ postcard = { version = "1", features = ["alloc"] }
 serde_plain = "1"
 # no_std by default (alloc only); std consumers re-enable `base64/std`.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
-sha2 = "0.11"
+# no_std by default, since `beet_core` computes every content id with it.
+sha2 = { version = "0.11", default-features = false }
 # SQLite for the `SqliteStore` backend: `bundled` compiles the engine in rather
 # than linking a system library, so it cross-compiles like the rest of the tree.
 # `ffi-sqlite-wasm-rs` is how it reaches the browser: rusqlite swaps
@@ -273,6 +274,13 @@ brotli = { version = "9", default-features = false, features = ["std"] }
 # SHA-1 for the websocket `Sec-WebSocket-Accept` handshake (RFC 6455). no_std by
 # default; the digest API works on alloc, so consumers need not re-enable `std`.
 sha1 = { version = "0.11", default-features = false }
+# Canonical DAG-CBOR, the encoding a record's cid is computed over
+# (`beet_net`'s `EmulatorPds`), with the `Ipld` model it serializes. Not hand
+# written: deterministic map order, minimal lengths and tag 42 links are rules a
+# hand rolled encoder gets subtly wrong, and a cid that differs from a real
+# PDS's is a snapshot rkey that differs between a bucket and a PDS. Both no_std.
+serde_ipld_dagcbor = { version = "0.6", default-features = false }
+ipld-core = { version = "0.4", default-features = false, features = ["serde"] }
 # MD5 for the store mirror's change detection: S3 answers an object's etag as
 # its MD5, so the local side digests the same way and a sync skips what matches.
 md-5 = { version = "0.11", default-features = false }
@@ -405,6 +413,12 @@ serde_plain = ["serde", "beet_core/serde_plain"]
 # restore and revoke (`beet_infra`). Opt-in: a binary that never touches a
 # secret links no crypto.
 vault = ["beet_core/vault", "beet_net?/vault", "beet_router?/vault", "beet_infra?/vault"]
+# The AT Protocol's network half (`beet_net/atproto`): a real PDS over xrpc
+# through the credential seam, did and handle resolution, an
+# `<AtprotoAccount/>` landing its repo, and the Bluesky record shapes beet
+# writes; with `infra` also the handle block and its probe
+# (`beet_infra/atproto`). The data model and the `Pds` family need none of it.
+atproto = ["net", "json", "beet_net?/atproto", "beet_infra?/atproto"]
 # QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]

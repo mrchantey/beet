@@ -168,6 +168,25 @@ impl Plugin for InfraPlugin {
 					.in_set(DeployRenderSet::Render),
 			);
 
+		// the atproto handles a domain publishes, read off the accounts it
+		// names (`<AtprotoHandleBlock domain="beet.org" accounts={[$beet_org,
+		// $pete]}/>`), the accounts themselves, and the post-apply probe asking
+		// the network whether each resolves. Definitions, so every target: a
+		// wasm consumer authors the stack it cannot apply.
+		#[cfg(feature = "atproto")]
+		app.init_plugin::<beet_net::prelude::AtprotoPlugin>()
+			.register_type::<crate::prelude::AtprotoHandleBlock>()
+			.register_type::<crate::prelude::AtprotoHandleProbe>()
+			.add_systems(
+				DeployRender,
+				(
+					crate::types::declare::<crate::prelude::AtprotoHandleBlock>
+						.in_set(DeployRenderSet::Declare),
+					crate::prelude::AtprotoHandleBlock::render
+						.in_set(DeployRenderSet::Render),
+				),
+			);
+
 		// the network and the database, spawned by tag (`<VpcBlock bx:ref="net"
 		// label="net"/>`, `<RdsPostgresBlock label="db" {VpcRef($net)}/>`) in
 		// any build carrying them, and the relations their consumers name them
@@ -471,14 +490,9 @@ mod test {
 		let mut world =
 			(AsyncPlugin, TemplatePlugin, DocumentPlugin, InfraPlugin)
 				.into_world();
-		let nodes =
-			BsxNode::parse_document(markup, &BsxParseConfig::bsx()).unwrap();
 		world
 			.spawn(())
-			.insert_template(BsxTemplate::container(
-				nodes,
-				BsxTemplateRegistry::default(),
-			))
+			.insert_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap();
 		world.flush();
 		world

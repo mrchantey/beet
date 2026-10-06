@@ -1,6 +1,18 @@
 #![allow(unused)]
 mod block;
 pub use block::*;
+// The atproto handles a domain publishes: one TXT record per declared account,
+// through the Cloudflare zone the dns module emits into, and the probe asking
+// the network whether each resolves. The probe is an http read rather than a
+// deploy verb that shells out, so it compiles on every target beside the block.
+#[cfg(feature = "atproto")]
+mod atproto_handle_block;
+#[cfg(feature = "atproto")]
+mod atproto_handle_probe;
+#[cfg(feature = "atproto")]
+pub use atproto_handle_block::*;
+#[cfg(feature = "atproto")]
+pub use atproto_handle_probe::*;
 // A block whose resource is a store, its erased half and the generic runtime
 // attach; the marker naming which store block is the repo store, and the
 // block naming a store this deploy does not create. Feature-free, so a lean
