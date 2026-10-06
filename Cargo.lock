@@ -1444,7 +1444,6 @@ dependencies = [
  "getrandom 0.3.4",
  "getrandom 0.4.2",
  "heck",
- "http 1.4.0",
  "indexmap 2.14.0",
  "inventory",
  "itertools 0.14.0",
@@ -1458,7 +1457,6 @@ dependencies = [
  "postcard",
  "prettyplease",
  "proc-macro2",
- "proc-macro2-diagnostics",
  "quote",
  "rand 0.10.2",
  "raw-window-handle",
@@ -1701,7 +1699,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "strum 0.28.0",
  "thiserror 2.0.18",
  "uuid",
  "wasm-bindgen",
@@ -1746,7 +1743,6 @@ dependencies = [
  "vte",
  "wasm-bindgen",
  "web-sys",
- "webbrowser",
 ]
 
 [[package]]
