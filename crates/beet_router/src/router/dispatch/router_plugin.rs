@@ -27,12 +27,15 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<BootstrapPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			// the five triggers that dirty a `RouteTree`: a route joining or
-			// leaving the tree (`PathPattern` insert/remove), a route being
-			// hidden or unhidden (`RouteHidden` insert/remove), and a template
-			// build settling its slots (`SpawnTemplate`, which reparents routes
-			// without touching either component). Each just wakes
-			// `rebuild_dirty_route_trees`, which resolves what actually changed.
+			// the six triggers that dirty a `RouteTree`: a url space root
+			// appearing (a root `PathPartial`, so a routeless router still owns
+			// a tree), a route joining or leaving the tree (`PathPattern`
+			// insert/remove), a route being hidden or unhidden (`RouteHidden`
+			// insert/remove), and a template build settling its slots
+			// (`SpawnTemplate`, which reparents routes without touching any of
+			// those). Each just wakes `rebuild_dirty_route_trees`, which
+			// resolves what actually changed.
+			.add_observer(queue_route_tree_rebuild_on_root)
 			.add_observer(queue_route_tree_rebuild_on_insert::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
@@ -363,6 +366,21 @@ fn insert_path_pattern_for_late_path_partial(
 	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
 	commands.entity(ev.entity).insert((path, params));
 	Ok(())
+}
+
+/// Observer that wakes [`rebuild_dirty_route_trees`] when a url space root
+/// appears, a [`PathPartial::root`] (every `Router`). The root is not itself a
+/// route, so no [`PathPattern`] insert ever fires for it; without this wake a
+/// router with no routes would never get a tree, and every request into it,
+/// `--help` included, would fail dispatch rather than answer not-found.
+fn queue_route_tree_rebuild_on_root(
+	ev: On<Insert, PathPartial>,
+	paths: Query<&PathPartial>,
+	mut commands: Commands,
+) {
+	if paths.get(ev.entity).is_ok_and(|path| path.is_root) {
+		queue_route_tree_rebuild(&mut commands, ev.entity);
+	}
 }
 
 /// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is inserted

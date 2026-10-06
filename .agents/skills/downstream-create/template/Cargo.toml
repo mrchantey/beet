@@ -1,0 +1,55 @@
+[package]
+name = "beet_@name@"
+version = "0.1.0"
+edition = "2024"
+description = "@description@"
+
+[features]
+default = []
+# This repo's own beet binary: `BeetPlugins` + `@Name@Plugin` + `LaunchPlugin`,
+# so `main.bsx` resolves the types defined here. Off by default so a library
+# consumer never links the runner; the `[[bin]]` below requires it, which is
+# what makes a flagless `cargo run` fail with cargo's own guidance. `launch` is
+# the entry loader (`router` + `template_serde`), the rest its `--help` render.
+cli = [
+	"beet/template_serde",
+	"beet/serde_plain",
+	"beet/markdown",
+	"beet/style",
+	"beet/template",
+]
+
+[dependencies]
+# The local beet checkout, the facade rather than the individual crates so
+# `#[action]`/`#[template]` expansions (which emit `beet::` paths) resolve.
+beet = { path = "../beet", default-features = false, features = [
+	"std",
+	"serde",
+	"json",
+	"router",
+] }
+
+[dev-dependencies]
+beet = { path = "../beet", default-features = false, features = ["testing"] }
+
+# the beet harness main is `beet::test_main!()` in `lib.rs`
+[lib]
+harness = false
+
+# 💡 Binary
+
+[[bin]]
+name = "beet-@name@"
+path = "src/main.rs"
+required-features = ["cli"]
+
+# profiles mirror beet's: fast test builds, lightly optimized dev, optimized deps
+[profile.test]
+opt-level = 0
+
+[profile.dev]
+opt-level = 1
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+opt-level = 3

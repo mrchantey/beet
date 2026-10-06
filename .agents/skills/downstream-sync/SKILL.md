@@ -1,19 +1,21 @@
 ---
-name: sync-downstream
-description: Refresh the downstream repos (beet_esp, beet_atproto, beet_egress) with beet's AGENTS.md marker block, the curated skill set and shared config files. Use after changing AGENTS.md, the skills, or rustfmt.toml.
+name: downstream-sync
+description: Refresh every downstream repo (beet_atproto, beet_egress, beet_connect) with beet's AGENTS.md marker block, the curated skill set and shared config files. Use after changing AGENTS.md, the skills, or rustfmt.toml.
 ---
 
-# Sync Downstream
+# Downstream Sync
 
-Beet has downstream repos (separate git repos building on beet via a path dependency). Each inherits beet's conventions rather than fracturing into its own: a verbatim copy of beet's `AGENTS.md` lives inside a marker block at the bottom of the downstream `AGENTS.md`, and the beet skills that apply to a crate built on beet are copied as-is along with shared config files. This skill refreshes all of that.
+Beet has downstream repos (separate git repos building on beet via a path dependency). Each inherits beet's conventions rather than fracturing into its own: a verbatim copy of beet's `AGENTS.md` lives inside a marker block at the bottom of the downstream `AGENTS.md`, and the beet skills that apply to a crate built on beet are copied as-is along with shared config files. This skill refreshes all of that; `downstream-create` scaffolds a new repo and registers it here.
 
 ## Downstream repos
 
-- `/home/pete/me/beet_esp`
 - `/home/pete/me/beet_atproto`
+- `/home/pete/me/beet_connect`
 - `/home/pete/me/beet_egress`
+- `/home/pete/me/beet_esp`
+- `/home/pete/me/beet_eval`
 
-Add new spinoffs to this list (and to the `DOWNSTREAM` array below) when they are created.
+`downstream-create` adds a new repo to this list and to the `DOWNSTREAM` array below.
 
 ## What is synced
 
@@ -21,12 +23,12 @@ Add new spinoffs to this list (and to the `DOWNSTREAM` array below) when they ar
 2. `AGENTS.md` inherited block: everything between the markers is replaced with beet's current `AGENTS.md` (the working tree version, so in-flight edits propagate):
 
 ```md
-<!-- beet:sync:begin — beet's AGENTS.md, refreshed by the sync-downstream skill; do not hand-edit -->
+<!-- beet:sync:begin, beet's AGENTS.md refreshed by the downstream-sync skill, do not hand-edit -->
 <!-- beet:sync:end -->
 ```
 
 3. `CLAUDE.md -> AGENTS.md` symlink.
-4. `.agents/skills`: the skills in the `SKILLS` array below, each directory copied whole. Any directory named like a beet skill is beet-owned: the listed ones are refreshed, the unlisted ones (dropped from the list, or never in it) are removed, and everything else in the tree is the downstream's own (`beet_esp` keeps `esp-rust` there). A downstream skill must never share a name with a beet skill. Skills not in the list stay reachable at `$BEET/.agents/skills/<name>`, like every other beet-relative path in the block.
+4. `.agents/skills`: the skills in the `SKILLS` array below, each directory copied whole. Any directory named like a beet skill is beet-owned: the listed ones are refreshed, the unlisted ones (dropped from the list, or never in it) are removed, and everything else in the tree is the downstream's own (`beet_egress` keeps `download-takeout` there). A downstream skill must never share a name with a beet skill. Skills not in the list stay reachable at `$BEET/.agents/skills/<name>`, like every other beet-relative path in the block.
 
 ## Which skills sync
 
@@ -38,20 +40,21 @@ A skill syncs when an agent working on a crate built on beet would invoke it the
 - Writing docs: the `docs-diataxis` family (`docs-explanation`, `docs-how-to`, `docs-reference`, `docs-tutorials`, `docs-improving`).
 - Session and planning process: `all-nighter`, `phased-plan`, `write-plan`.
 
-Not synced, as beet-repo procedures: they name beet's justfile recipes, worktrees, example set, site and website deploy (`test-run`, `test-examples`, `test-the-works`, `test-dependency-audit`, `docs-rust-sweep`, `docs-site`, `infra-deploy`, `git-sync-all`, `git-worktree-sync`, and this skill). A downstream's own equivalents (its test command, its deploy entry) belong in its `AGENTS.md` header.
+Not synced, as beet-repo procedures: they name beet's justfile recipes, worktrees, example set, site and website deploy (`test-run`, `test-examples`, `test-the-works`, `test-dependency-audit`, `docs-rust-sweep`, `docs-site`, `infra-deploy`, `git-sync-all`, `git-worktree-sync`, `downstream-create` and this skill). A downstream's own equivalents (its test command, its deploy entry) belong in its `AGENTS.md` header.
 
 ## The contract
 
 - A downstream `AGENTS.md` is its repo-specific header followed by the synced block. Where the header conflicts with the block, the header wins; downstream deltas (target quirks, path-dep notes, test attribute spellings) belong in the header, never as edits inside the block.
 - Never hand-edit inside the markers; the next sync clobbers it.
 - Leave all changes unstaged in every repo, including this one. Never commit.
-- A downstream `AGENTS.md` missing the markers is malformed, and a missing `AGENTS.md` is the same case: the script warns and skips it. Write the header by hand with the markers at the end, never append a second copy of anything, then rerun.
+- A downstream `AGENTS.md` missing the markers is malformed, and a missing `AGENTS.md` is the same case: the script warns and skips it. Write the header by hand with the markers at the end (`downstream-create`'s template is the shape), never append a second copy of anything, then rerun.
 
 ## Run it
 
 ```sh
 BEET=/home/pete/me/beet
-DOWNSTREAM=(/home/pete/me/beet_esp /home/pete/me/beet_atproto /home/pete/me/beet_egress)
+DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_connect /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval)
+
 SKILLS=(
 	all-nighter audit-free-fns create-cli
 	docs-diataxis docs-explanation docs-how-to docs-improving docs-reference docs-rust-conventions docs-tutorials
@@ -84,5 +87,5 @@ Afterwards spot-check one downstream repo: `AGENTS.md` header intact, exactly on
 
 ## Candidates deliberately not synced
 
-- `justfile`, `.cargo/config.toml`, `.gitignore`: repo-shaped, they drift for real reasons.
-- `.github/workflows/rust_ci.yml`: revisit when the downstream repos gain remotes/CI.
+- `justfile`, `.cargo/config.toml`, `.gitignore`: repo-shaped, they drift for real reasons; `downstream-create` writes their initial shape.
+- `.github/workflows/test.yml`: revisit when a downstream gains CI.

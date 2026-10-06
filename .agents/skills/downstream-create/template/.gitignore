@@ -1,0 +1,10 @@
+.agents/*
+!.agents/skills
+target
+# the local tofu state backend a deploy entry defaults to
+.beet/infra
+.env
+dump.*
+out.txt
+rustc-ice*
+.rustc_info.json

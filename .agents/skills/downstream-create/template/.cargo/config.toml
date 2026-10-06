@@ -1,0 +1,15 @@
+[target.wasm32-unknown-unknown]
+# wasm runner for cargo run and cargo test
+runner = 'beet run-wasm'
+# Bump the wasm stack from LLD's 1MB default (a feature-heavy bevy `App` future
+# at `opt-level=0` overflows it), and select getrandom's WebCrypto backend (it
+# has no default wasm32 backend; matches beet's setting).
+rustflags = [
+	'-C', 'link-arg=-zstack-size=16777216',
+	'--cfg', 'getrandom_backend="wasm_js"',
+]
+
+[env]
+# A fresh release build of the deep beet type graph overflows rustc's default
+# codegen-thread stack; matches beet's setting.
+RUST_MIN_STACK = { value = "1073741824" }

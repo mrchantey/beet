@@ -1,0 +1,13 @@
+<!--
+beet_@name@'s entry: `just cli` discovers it, builds it, and the root's
+`CallOnReady` calls it with the process request, dispatching down into the
+router. A route naming a type defined in this crate resolves because the binary
+links `@Name@Plugin`; the stock `beet` cannot, hence the `<RequireCfg>`.
+
+    just cli --help
+-->
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
+	<RequireCfg cfg="feature:cli"/>
+</Router>
+</CliServer>

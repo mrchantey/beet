@@ -12,6 +12,8 @@ use beet_net::prelude::*;
 pub struct RouteTreeBuilder<'w, 's> {
 	ancestors: Query<'w, 's, &'static ChildOf>,
 	paths: Query<'w, 's, &'static PathPartial>,
+	// the url space roots, bucketed ahead of the routes that land under them
+	space_roots: Query<'w, 's, (Entity, &'static PathPartial)>,
 	actions: Query<'w, 's, ActionQueryItem<'static>, Without<RouteHidden>>,
 	existing_trees: Query<'w, 's, Entity, With<RouteTree>>,
 	commands: Commands<'w, 's>,
@@ -35,17 +37,31 @@ impl RouteTreeBuilder<'_, '_> {
 	/// namespace and tree, so its routes never bucket to an ancestor), and
 	/// insert a fresh tree per bucket.
 	///
+	/// Every url space root in the subtree is a bucket from the moment it
+	/// exists, empty until its routes land: a `Router` declared ahead of its
+	/// routes (a scaffolded entry, a router filled at runtime) answers
+	/// not-found, rather than failing every dispatch, `--help` included, for
+	/// want of a tree.
+	///
 	/// Every namespace, not just `root`'s: a mounted scene rooted in its own
 	/// `Router` is a url space of its own, and reparenting is exactly when its
 	/// ancestry (and so its namespace) settles.
 	///
 	/// Any subtree entity that currently carries a [`RouteTree`] but is not a
-	/// bucket this pass — no longer a namespace root (reparented away), or a
-	/// namespace root left with no live routes — has it removed. This closes
-	/// the phantom-tree class: a stale tree that would otherwise keep
+	/// bucket this pass, no longer a namespace root (reparented away) or a
+	/// document-root fallback left with no live routes, has it removed. This
+	/// closes the phantom-tree class: a stale tree that would otherwise keep
 	/// dispatching routes that no longer live there.
 	pub fn rebuild_subtree(&mut self, root: Entity) -> Result {
-		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = Vec::new();
+		// the url space roots first, so a routeless one still gets its tree
+		let mut spaces: Vec<(Entity, Vec<ActionNode>)> = self
+			.space_roots
+			.iter()
+			.filter(|(entity, partial)| {
+				partial.is_root && self.is_at_or_under(*entity, root)
+			})
+			.map(|(entity, _)| (entity, Vec::new()))
+			.collect();
 		for item in self.actions.iter() {
 			if !self.is_at_or_under(item.0, root) {
 				continue;
@@ -85,5 +101,31 @@ impl RouteTreeBuilder<'_, '_> {
 		self.ancestors
 			.iter_ancestors_inclusive_once::<ChildOf>(entity)
 			.any(|ancestor| ancestor == root)
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// A router owns its url space from the moment it exists: with no routes
+	/// its tree is empty, so a request into it answers not-found rather than
+	/// failing dispatch for want of a tree.
+	#[beet_core::test]
+	async fn routeless_router_owns_an_empty_tree() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let router = world.spawn(Router).flush();
+		RouteTree::of(&world, router)
+			.unwrap()
+			.find(&["anything"])
+			.xpect_none();
+		world
+			.entity_mut(router)
+			.exchange(Request::get("anything"))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 }
