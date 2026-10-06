@@ -1,11 +1,11 @@
 ---
-name: git-sync-all
-description: Sync the main branch with every worktree in both directions, applying the git-worktree-sync skill to each in turn, then levelling them. Use when asked to sync all worktrees.
+name: worktree-sync-all
+description: Sync the main branch with every worktree in both directions, applying the worktree-sync-upstream skill to each in turn, then levelling them. Use when asked to sync all worktrees.
 ---
 
-# Sync All
+# Worktree Sync All
 
-Sync `~/me/beet`'s `main` with every worktree, in both directions, by applying the `git-worktree-sync` skill to each.
+Sync `~/me/beet`'s `main` with every worktree, in both directions, by applying the `worktree-sync-upstream` skill to each.
 
 ## Which worktrees
 

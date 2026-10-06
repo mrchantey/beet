@@ -11,7 +11,7 @@ Beet is a pre-release (no current users) Atmospheric OS for homegrown tech built
 
 ## This file
 
-Every agent reads this file, so it keeps only what every session needs and stays under ~15KB: a new subsystem gets one pointer line below, its cheatsheet in its crate docs, any procedure in a skill.
+Every agent reads this file, so it keeps only what every session needs and stays under ~15KB: a new subsystem gets one pointer line below, its cheatsheet in its crate docs, any procedure in a skill. A skill only this repo runs lives in `.agents/skills`; one a downstream also needs lives in the shared `~/.agents/skills` (`/home/pete/me/arch-config/stow/agents/.agents/skills`), named `beet-*` when it is about beet.
 
 Situational cheatsheets, read before touching the subsystem:
 
@@ -21,7 +21,7 @@ Situational cheatsheets, read before touching the subsystem:
 - The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
-- Rendering (web + charcell): `.agents/skills/rendering`
+- Rendering (web + charcell): the `beet-rendering` skill
 - Secrets (the age identity, `secrets.toml`, the `vault`/`secrets` verbs, a stack's secret store): `crates/beet_core/src/secrets/mod.rs` + `site/routes/docs/secrets.md`
 
 ## Workflow
@@ -45,7 +45,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Continue `long().method().chains()` rather than storing temporaries; the `xtend.rs` blanket traits assist: `.xmap()` is `.map()` for any type, `bar(bazz).xmap(foo)` not `foo(bar(bazz))`, `.xok(foo)` not `Ok(foo)`.
 - Getters/setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation; adjust the macros to suit new usecases if required.
 - Utility modules have the `_ext` suffix, are reexported as `pub mod`, and callers keep the qualifier: `async_ext::do_async_thing().await`.
-- Free items: a top-level `pub fn`/`pub const`/`pub static` is permitted only in a `*_ext` module, a sanctioned namespace module (ie `js_runtime::cwd()`), a `#[template]` constructor, or generated code; everything else is an associated item on its type, or not pub. Bevy systems and observers stay free fns but private, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: `.agents/skills/audit-free-fns`.
+- Free items: a top-level `pub fn`/`pub const`/`pub static` is permitted only in a `*_ext` module, a sanctioned namespace module (ie `js_runtime::cwd()`), a `#[template]` constructor, or generated code; everything else is an associated item on its type, or not pub. Bevy systems and observers stay free fns but private, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: the `beet-audit-free-fns` skill.
 - git: never create branches or make commits unless explicitly told to, whatever the checkout state; keep things as unstaged changes.
 - never pass through bundles unnecessarily: `fn default_router(bundle: impl Bundle) -> impl Bundle` is pointless and obscures the signature
 - Unless explicitly told to, never create extension methods on `World`, `EntityRef`, `Commands` or their async/mut counterparts.

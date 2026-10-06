@@ -1,9 +1,9 @@
 ---
-name: git-worktree-sync
+name: worktree-sync-upstream
 description: Sync a detached-HEAD worktree with its upstream branch in the main repo in both directions, rebasing only owned commits and fast-forwarding upstream, with recovery steps for tangled history. Use from inside a worktree.
 ---
 
-# Worktree Sync
+# Worktree Sync Upstream
 
 Sync this worktree with its upstream branch in the main repo at `~/me/beet`, in **both directions**. Do not delete this worktree and do not create a branch for it.
 

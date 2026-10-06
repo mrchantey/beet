@@ -1,11 +1,11 @@
 ---
 name: downstream-sync
-description: Refresh every downstream repo (beet_atproto, beet_egress, beet_connect) with beet's AGENTS.md marker block, the curated skill set and shared config files. Use after changing AGENTS.md, the skills, or rustfmt.toml.
+description: Refresh every downstream repo (beet_atproto, beet_connect, beet_egress, beet_esp, beet_eval) with beet's AGENTS.md marker block, its MIT/Apache licenses and shared config files. Use after changing AGENTS.md, the licenses or rustfmt.toml.
 ---
 
 # Downstream Sync
 
-Beet has downstream repos (separate git repos building on beet via a path dependency). Each inherits beet's conventions rather than fracturing into its own: a verbatim copy of beet's `AGENTS.md` lives inside a marker block at the bottom of the downstream `AGENTS.md`, and the beet skills that apply to a crate built on beet are copied as-is along with shared config files. This skill refreshes all of that; `downstream-create` scaffolds a new repo and registers it here.
+Beet has downstream repos (separate git repos building on beet via a path dependency). Each inherits beet's conventions rather than fracturing into its own: a verbatim copy of beet's `AGENTS.md` lives inside a marker block at the bottom of the downstream `AGENTS.md`, and beet's licenses and shared config files are copied as-is. This skill refreshes all of that; `downstream-create` scaffolds a new repo and registers it here.
 
 ## Downstream repos
 
@@ -19,7 +19,7 @@ Beet has downstream repos (separate git repos building on beet via a path depend
 
 ## What is synced
 
-1. `rustfmt.toml`: verbatim copy of beet's.
+1. `rustfmt.toml`, `LICENSE-MIT.txt`, `LICENSE-APACHE.txt`: verbatim copies of beet's, so every downstream formats like beet and is dual licensed `MIT OR Apache-2.0` like beet.
 2. `AGENTS.md` inherited block: everything between the markers is replaced with beet's current `AGENTS.md` (the working tree version, so in-flight edits propagate):
 
 ```md
@@ -28,19 +28,12 @@ Beet has downstream repos (separate git repos building on beet via a path depend
 ```
 
 3. `CLAUDE.md -> AGENTS.md` symlink.
-4. `.agents/skills`: the skills in the `SKILLS` array below, each directory copied whole. Any directory named like a beet skill is beet-owned: the listed ones are refreshed, the unlisted ones (dropped from the list, or never in it) are removed, and everything else in the tree is the downstream's own (`beet_egress` keeps `download-takeout` there). A downstream skill must never share a name with a beet skill. Skills not in the list stay reachable at `$BEET/.agents/skills/<name>`, like every other beet-relative path in the block.
 
-## Which skills sync
+## Skills are not synced
 
-A skill syncs when an agent working on a crate built on beet would invoke it there. The list is a judgement, not a mirror; revisit it when a skill is added or its scope changes.
+No skill is copied into a downstream. A skill an agent working on a crate built on beet would invoke lives in the shared user-level `~/.agents/skills` (stowed from `/home/pete/me/arch-config/stow/agents/.agents/skills`), so every repo already sees it: the generic ones under their own names (`docs-diataxis`, `release`, `phased-plan`, ..), the beet-specific ones prefixed `beet-` (`beet-rendering`, `beet-create-cli`, `beet-audit-free-fns`).
 
-- Conventions the block points into: `audit-free-fns` (the free-item rule's recipe), `rendering` (the beet_ui change-render-verify loop, needed by any downstream page).
-- Building on beet: `create-cli` (a downstream binary is a beet CLI).
-- Per-crate hygiene: `release` (docs, native + wasm tests, examples per crate), `docs-rust-conventions`.
-- Writing docs: the `docs-diataxis` family (`docs-explanation`, `docs-how-to`, `docs-reference`, `docs-tutorials`, `docs-improving`).
-- Session and planning process: `all-nighter`, `phased-plan`, `write-plan`.
-
-Not synced, as beet-repo procedures: they name beet's justfile recipes, worktrees, example set, site and website deploy (`test-run`, `test-examples`, `test-the-works`, `test-dependency-audit`, `docs-rust-sweep`, `docs-site`, `infra-deploy`, `git-sync-all`, `git-worktree-sync`, `downstream-create` and this skill). A downstream's own equivalents (its test command, its deploy entry) belong in its `AGENTS.md` header.
+Beet-repo procedures stay in `$BEET/.agents/skills`, since they name beet's justfile recipes, worktrees, example set, site and deploy; they are reachable at that path like every other beet-relative path in the block. A downstream's own equivalents (its test command, its deploy entry) belong in its `AGENTS.md` header, and its `.agents/skills` holds only its own skills (`beet_egress` keeps `download-takeout` there), never named like a shared one.
 
 ## The contract
 
@@ -55,13 +48,10 @@ Not synced, as beet-repo procedures: they name beet's justfile recipes, worktree
 BEET=/home/pete/me/beet
 DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_connect /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval)
 
-SKILLS=(
-	all-nighter audit-free-fns create-cli
-	docs-diataxis docs-explanation docs-how-to docs-improving docs-reference docs-rust-conventions docs-tutorials
-	phased-plan release rendering write-plan
-)
 for repo in "${DOWNSTREAM[@]}"; do
-	cp "$BEET/rustfmt.toml" "$repo/rustfmt.toml"
+	for file in rustfmt.toml LICENSE-MIT.txt LICENSE-APACHE.txt; do
+		cp "$BEET/$file" "$repo/$file"
+	done
 	if grep -q '<!-- beet:sync:begin' "$repo/AGENTS.md" 2>/dev/null; then
 		awk -v src="$BEET/AGENTS.md" '
 			/<!-- beet:sync:begin/ { print; while ((getline line < src) > 0) print line; close(src); skip=1; next }
@@ -72,20 +62,13 @@ for repo in "${DOWNSTREAM[@]}"; do
 	else
 		echo "$repo/AGENTS.md: missing or no sync markers, write the header by hand" >&2
 	fi
-	# beet-named skill dirs are beet-owned: drop them all, copy back the listed ones
-	mkdir -p "$repo/.agents/skills"
-	for dir in "$BEET"/.agents/skills/*/; do
-		rm -rf "$repo/.agents/skills/$(basename "$dir")"
-	done
-	for name in "${SKILLS[@]}"; do
-		cp -r "$BEET/.agents/skills/$name" "$repo/.agents/skills/"
-	done
 done
 ```
 
-Afterwards spot-check one downstream repo: `AGENTS.md` header intact, exactly one block with beet's current text inside it, and `.agents/skills` holding exactly the `SKILLS` list plus the repo's own skills.
+Afterwards spot-check one downstream repo: `AGENTS.md` header intact, exactly one block with beet's current text inside it, and both license files present.
 
 ## Candidates deliberately not synced
 
 - `justfile`, `.cargo/config.toml`, `.gitignore`: repo-shaped, they drift for real reasons; `downstream-create` writes their initial shape.
+- `Cargo.toml`: repo-shaped; its `license = "MIT OR Apache-2.0"` (on the package, or `[workspace.package]` in a workspace) is set once, and `downstream-create`'s template carries it.
 - `.github/workflows/test.yml`: revisit when a downstream gains CI.
