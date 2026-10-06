@@ -34,8 +34,7 @@ impl AnalyticsArchive {
 			.strip_prefix('/')?
 			.strip_suffix(AnalyticsSegment::CODEC.extension())?
 			.strip_suffix('.')?;
-		(!date.contains('/') && Date::parse(date).is_ok())
-			.then(|| date.into())
+		(!date.contains('/') && Date::parse(date).is_ok()).then(|| date.into())
 	}
 
 	/// Encodes events as deterministic JSONL ordered by event ID, at the

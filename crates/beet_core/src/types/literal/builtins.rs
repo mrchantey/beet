@@ -473,7 +473,9 @@ mod test {
 		// a `Timestamp` has no entry, so every value declines to the newtype
 		// cast over its inner i64, which refuses a string
 		parse::<Timestamp>(Value::Int(5)).unwrap().xpect_none();
-		parse::<Timestamp>(Value::str("2026-08-28")).unwrap().xpect_none();
+		parse::<Timestamp>(Value::str("2026-08-28"))
+			.unwrap()
+			.xpect_none();
 		// a struct literal targeting a `GlobFilter` builds structurally
 		parse::<GlobFilter>(Value::map()).unwrap().xpect_none();
 		parse::<GlobPattern>(Value::Int(1)).unwrap().xpect_none();
@@ -500,7 +502,8 @@ mod test {
 		message::<Duration>(Value::str("50"))
 			.xpect_contains("invalid duration");
 		message::<Duration>(Value::Uint(50)).xpect_contains("invalid duration");
-		message::<Date>(Value::str("yesterday")).xpect_contains("is not a date");
+		message::<Date>(Value::str("yesterday"))
+			.xpect_contains("is not a date");
 		message::<Date>(Value::Int(5)).xpect_contains("is not a date");
 		message::<GlobFilter>(Value::str("["))
 			.xpect_contains("invalid glob pattern");

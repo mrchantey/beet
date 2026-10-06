@@ -15,7 +15,7 @@ use crate::prelude::*;
 /// # use beet_core::prelude::*;
 /// let tid = Tid::parse("3mw72aaeuj22n").unwrap();
 /// tid.to_string().xpect_eq("3mw72aaeuj22n");
-/// tid.timestamp().format_date().xpect_eq("2026-09-23");
+/// tid.timestamp().xinto::<Date>().to_string().xpect_eq("2026-09-23");
 /// ```
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,

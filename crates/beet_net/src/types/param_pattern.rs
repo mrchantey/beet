@@ -443,7 +443,7 @@ mod test {
 		#[allow(dead_code)]
 		struct Params {
 			timeout: core::time::Duration,
-			created: Option<Timestamp>,
+			created: Option<Date>,
 			label: String,
 		}
 		let TypeInfo::Struct(info) = Params::type_info() else {

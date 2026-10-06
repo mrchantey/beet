@@ -343,7 +343,8 @@ mod test {
 		let mut event = AnalyticsEvent::new(path, data)
 			.with_client_kind(ClientKind::Web)
 			.with_session(Some(uuid_ext::now_v7()));
-		event.timestamp = Date::parse(date).unwrap().timestamp().millis() as u64;
+		event.timestamp =
+			Date::parse(date).unwrap().timestamp().millis() as u64;
 		event
 	}
 
