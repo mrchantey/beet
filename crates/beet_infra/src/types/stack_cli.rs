@@ -65,6 +65,7 @@ pub fn DeployRoutes(
 		Apply,
 		Show,
 		List,
+		Forget,
 		RotateState,
 		Rollback,
 		Rollforward
@@ -195,6 +196,38 @@ pub async fn List(cx: ActionContext) -> Result<String> {
 	terra::Project::resolve(&cx.caller).await?.list().await
 }
 
+/// Request params for [`Forget`], surfaced in `--help`.
+#[derive(Reflect)]
+struct ForgetParams {
+	/// The state addresses to forget, comma separated, spelled as `list`
+	/// prints them.
+	resources: String,
+}
+
+/// Remove resources from the stack's state without touching them: the live
+/// resource stays where it is and simply stops being managed (`tofu state
+/// rm`). For a resource whose declaration moved out of the apply, whose next
+/// plan would otherwise DESTROY what the config no longer renders; `tofu
+/// import` is the way back.
+#[action(route = "forget")]
+#[derive(Component)]
+#[require(ParamsPartial = ParamsPartial::new::<ForgetParams>())]
+pub async fn Forget(cx: ActionContext<Request>) -> Result<String> {
+	let resources = cx.input.parse_params::<ForgetParams>()?.resources;
+	let resources = str_ext::csv(&resources).collect::<Vec<_>>();
+	if resources.is_empty() {
+		bevybail!(
+			"`forget` names no resource: pass `--resources=<address>,..`"
+		);
+	}
+	let project = terra::Project::resolve(&cx.caller).await?;
+	let mut report = String::new();
+	for resource in resources {
+		report.push_str(&project.remove(resource).await?);
+	}
+	report.xok()
+}
+
 /// Request params for [`RotateState`], surfaced in `--help`.
 #[derive(Reflect)]
 struct RotateStateParams {
@@ -304,6 +337,7 @@ mod tests {
 		tree.find(&["apply"]).xpect_some();
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
+		tree.find(&["forget"]).xpect_some();
 		tree.find(&["rotate-state"]).xpect_some();
 		// artifact routes
 		tree.find(&["rollback"]).xpect_some();
