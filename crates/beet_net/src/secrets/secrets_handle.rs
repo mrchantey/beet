@@ -139,7 +139,7 @@ impl SecretsHandle {
 	/// one listing reads either. An export with `dated=true` writes here; the
 	/// declared path itself is never written.
 	pub fn dated(&self, now: Timestamp) -> Result<Self> {
-		let (year, month, day) = now.civil_date();
+		let (year, month, day) = Date::from(now).civil();
 		let secs = now.secs().rem_euclid(86_400);
 		let path = format!(
 			"{}{year:04}/{month:02}/{day:02}/{:02}{:02}{:02}Z.{}",
@@ -321,7 +321,7 @@ mod test {
 		let handle = SecretsHandle::new(store.clone(), "secrets/export.toml")
 			.unwrap()
 			.with_label("cold");
-		let midnight = Timestamp::parse_date("2026-09-15").unwrap();
+		let midnight = Date::parse("2026-09-15").unwrap().timestamp();
 		let first = handle.dated(midnight).unwrap();
 		first
 			.path

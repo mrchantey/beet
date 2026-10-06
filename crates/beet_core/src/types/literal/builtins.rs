@@ -205,17 +205,16 @@ fn add_domain(table: &mut Table) {
 				"invalid duration {value:?}: expected a unit-suffixed string like \"50ms\" or \"1s\""
 			))
 		})
-		// a `YYYY-MM-DD` string is midnight UTC on that date, so a markup
+		// a day is its `YYYY-MM-DD` string, so a markup
 		// `{PageMeta{created:"2026-08-28"}}` authors a publication date. Any
-		// other string errors rather than silently landing on the epoch; a
-		// number declines to the newtype cast over its inner `i64`.
-		.add_hinted("a `YYYY-MM-DD` date", |value: &Value| {
-			let Value::Str(string) = value else {
-				return Ok(None);
-			};
-			Timestamp::parse_date(string).map(Some).ok_or_else(|| bevyhow!(
-				"invalid date {string:?}: expected a `YYYY-MM-DD` string like \"2026-08-28\""
-			))
+		// other value errors rather than silently landing on the epoch, since
+		// nothing structural builds an opaque date. A `Timestamp` has no entry:
+		// a person writes a day, never an instant.
+		.add_hinted("a `YYYY-MM-DD` date", |value: &Value| match value {
+			Value::Str(string) => Date::parse(string).map(Some),
+			other => bevybail!(
+				"`{other:?}` is not a date, expected a `YYYY-MM-DD` string like \"2026-08-28\""
+			),
 		})
 		// the markup form of a filter is the allowlist a human writes, one
 		// pattern or a list of them: `read="guestbook.*"` and
@@ -444,9 +443,9 @@ mod test {
 		parse::<Duration>(Value::str("50ms"))
 			.unwrap()
 			.xpect_eq(Some(Duration::from_millis(50)));
-		parse::<Timestamp>(Value::str("2026-08-28"))
+		parse::<Date>(Value::str("2026-08-28"))
 			.unwrap()
-			.xpect_eq(Timestamp::parse_date("2026-08-28"));
+			.xpect_eq(Date::parse("2026-08-28").ok());
 		parse::<GlobFilter>(Value::str("guestbook.*"))
 			.unwrap()
 			.xpect_eq(Some(GlobFilter::default().with_include("guestbook.*")));
@@ -471,8 +470,10 @@ mod test {
 		parse::<u16>(Value::Bool(true)).unwrap().xpect_none();
 		parse::<bool>(Value::Bool(true)).unwrap().xpect_none();
 		parse::<String>(Value::Int(1)).unwrap().xpect_none();
-		// a `Timestamp` number declines to the newtype cast over its inner i64
+		// a `Timestamp` has no entry, so every value declines to the newtype
+		// cast over its inner i64, which refuses a string
 		parse::<Timestamp>(Value::Int(5)).unwrap().xpect_none();
+		parse::<Timestamp>(Value::str("2026-08-28")).unwrap().xpect_none();
 		// a struct literal targeting a `GlobFilter` builds structurally
 		parse::<GlobFilter>(Value::map()).unwrap().xpect_none();
 		parse::<GlobPattern>(Value::Int(1)).unwrap().xpect_none();
@@ -499,8 +500,8 @@ mod test {
 		message::<Duration>(Value::str("50"))
 			.xpect_contains("invalid duration");
 		message::<Duration>(Value::Uint(50)).xpect_contains("invalid duration");
-		message::<Timestamp>(Value::str("yesterday"))
-			.xpect_contains("invalid date");
+		message::<Date>(Value::str("yesterday")).xpect_contains("is not a date");
+		message::<Date>(Value::Int(5)).xpect_contains("is not a date");
 		message::<GlobFilter>(Value::str("["))
 			.xpect_contains("invalid glob pattern");
 		message::<GlobFilter>(Value::new_list([Value::Int(1)]))

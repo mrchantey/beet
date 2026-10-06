@@ -7,7 +7,7 @@
 //! `title`/`description` override the
 //! [`PackageConfig`](beet_core::prelude::PackageConfig) defaults in the document
 //! [`Head`](crate::prelude::Head), and its `sidebar_label`/`order`/`expanded`,
-//! `slug`, `created` and `author` are read by the router: the url a page serves
+//! `slug`, `created` and `authors` are read by the router: the url a page serves
 //! at, its place in the nav, and the entry a generated index renders for it.
 //!
 //! It lives here rather than in the router because it is DOCUMENT metadata; the
@@ -61,17 +61,17 @@ pub struct PageMeta {
 	/// url stays a stable name: `blog/1-full-stack-bevy.md` declaring
 	/// `slug = "full-stack-bevy"` serves at `blog/full-stack-bevy`.
 	pub slug: Option<SmolStr>,
-	/// Publication date, ie midnight UTC on the day the page was published.
+	/// The day the page was published.
 	///
-	/// Authored as a `YYYY-MM-DD` string in either surface — markdown frontmatter
-	/// (`created = "2026-08-28"`) or a BSX spread (`{PageMeta{created:".."}}`,
-	/// coerced by the reflect string-to-[`Timestamp`] rule) — and parsed to an
-	/// instant here, so it sorts and formats as a date rather than as text.
-	pub created: Option<Timestamp>,
-	/// The last substantive edit, ie the date a reader should judge the page's
-	/// freshness by. Authored exactly like [`created`](Self::created), and
-	/// unset on a page that has not changed since publication.
-	pub updated: Option<Timestamp>,
+	/// Authored as a `YYYY-MM-DD` string in either surface, markdown frontmatter
+	/// (`created = "2026-08-28"`) or a BSX spread (`{PageMeta{created:".."}}`),
+	/// through [`Date`]'s literal parser, so it sorts and formats as a day
+	/// rather than as text.
+	pub created: Option<Date>,
+	/// The day of the last substantive edit, the one a reader judges the
+	/// page's freshness by. Authored exactly like [`created`](Self::created),
+	/// and unset on a page that has not changed since publication.
+	pub updated: Option<Date>,
 	/// Who wrote the page, in credit order.
 	///
 	/// Authored as a list, ie `authors = ["Ada", "Grace"]`.
@@ -142,7 +142,7 @@ impl PageMeta {
 
 	/// The date a reader judges the page by: its
 	/// [`updated`](Self::updated), else its [`created`](Self::created).
-	pub fn last_modified(&self) -> Option<Timestamp> {
+	pub fn last_modified(&self) -> Option<Date> {
 		self.updated.or(self.created)
 	}
 
@@ -287,7 +287,7 @@ mod test {
 		meta.sidebar_label().unwrap().xpect_eq("Getting Started");
 	}
 
-	/// A `YYYY-MM-DD` string coerces to the instant it names, the rule a BSX
+	/// A `YYYY-MM-DD` string coerces to the day it names, the rule a BSX
 	/// spread gets for free and frontmatter used to hand-roll.
 	#[beet_core::test]
 	fn frontmatter_reads_article_keys() {
@@ -298,14 +298,11 @@ mod test {
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
 		meta.tags
 			.xpect_eq(vec![SmolStr::new("bevy"), SmolStr::new("web")]);
-		meta.created
-			.unwrap()
-			.format_long_date()
-			.xpect_eq("11 July 2025");
+		meta.created.unwrap().format_long().xpect_eq("11 July 2025");
 		// the freshness date a sitemap and a feed read, falling back to `created`
 		meta.last_modified()
 			.unwrap()
-			.format_date()
+			.to_string()
 			.xpect_eq("2025-08-01");
 		meta.authors
 			.xpect_eq(vec![SmolStr::new("Pete Hayman"), "Ada Lovelace".into()]);

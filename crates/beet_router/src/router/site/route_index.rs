@@ -189,7 +189,7 @@ mod test {
 			title: Some(title.into()),
 			description: Some(format!("about {title}")),
 			authors: vec!["Pete Hayman".into()],
-			created: Timestamp::parse_date(created),
+			created: Date::parse(created).ok(),
 			order: Some(order),
 			..default()
 		}

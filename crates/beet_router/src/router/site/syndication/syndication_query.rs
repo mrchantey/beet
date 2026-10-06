@@ -145,7 +145,7 @@ pub(crate) mod test_fixtures {
 			title: Some(title.into()),
 			description: Some(format!("all about {title}")),
 			authors: vec!["Pete Hayman".into()],
-			created: Timestamp::parse_date(created),
+			created: Date::parse(created).ok(),
 			..default()
 		}
 	}
@@ -169,7 +169,7 @@ pub(crate) mod test_fixtures {
 				}),
 				page("blog/full-stack-bevy", {
 					let mut meta = post("Full Stack Bevy", "2025-07-11");
-					meta.updated = Timestamp::parse_date("2025-09-01");
+					meta.updated = Date::parse("2025-09-01").ok();
 					meta
 				}),
 				page("blog/ecs-router", post("ECS Router", "2025-08-09")),

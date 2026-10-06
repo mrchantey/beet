@@ -57,14 +57,14 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
-/// A UTC calendar day, `YYYY-MM-DD` in every text form, the date-only twin of
-/// [`Timestamp`].
+/// A UTC calendar day, `YYYY-MM-DD` in every text form, and the owner of the
+/// calendar math.
 mod date;
 /// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
 /// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
 /// An absolute, serializable wall-clock instant, the persistable counterpart of
-/// the monotonic [`Instant`], and the owner of the UTC calendar math.
+/// the monotonic [`Instant`].
 mod timestamp;
 /// Naming a rust type the way markup and the reflect registry name it
 /// ([`type_ext::short_name`]).

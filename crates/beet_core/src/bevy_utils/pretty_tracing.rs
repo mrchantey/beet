@@ -396,7 +396,7 @@ mod test {
 	}
 
 	/// Today's date, the prefix of every timestamp [`Iso8601Timer`] emits.
-	fn today() -> String { Timestamp::now().format_iso8601()[..10].into() }
+	fn today() -> String { Date::today().to_string() }
 
 	#[crate::test]
 	fn non_interactive_stamps_lines() {

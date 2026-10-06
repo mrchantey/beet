@@ -147,7 +147,7 @@ impl FeedItem {
 		scope: &SyndicationScope,
 		limit: usize,
 	) -> Vec<&SyndicationPage> {
-		let mut dated: Vec<(Timestamp, &SyndicationPage)> = scope
+		let mut dated: Vec<(Date, &SyndicationPage)> = scope
 			.pages
 			.iter()
 			.filter_map(|page| Some((page.meta.created?, page)))
@@ -180,7 +180,12 @@ impl FeedItem {
 				.unwrap_or_else(|| page.path.to_string()),
 			link: scope.url(&page.path)?,
 			// `entries` selected on `created`, so this is never the fallback
-			pub_date: page.meta.created.unwrap_or_default().format_rfc2822(),
+			pub_date: page
+				.meta
+				.created
+				.unwrap_or_default()
+				.timestamp()
+				.format_rfc2822(),
 			description: page.meta.description.clone(),
 			author: page.meta.byline(),
 			content: content.map(|content| content.html),

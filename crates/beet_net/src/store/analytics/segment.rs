@@ -54,7 +54,7 @@ impl AnalyticsSegment {
 			.strip_suffix('.')?
 			.split_once('-')?;
 		(parts.next().is_none()
-			&& Timestamp::parse_date(date).is_some()
+			&& Date::parse(date).is_ok()
 			&& writer.parse::<Uuid>().is_ok()
 			&& timestamp.parse::<u64>().is_ok()
 			&& sequence.parse::<u64>().is_ok())

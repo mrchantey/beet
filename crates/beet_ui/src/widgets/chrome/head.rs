@@ -82,11 +82,13 @@ pub fn Head(
 	// a dated page is an ARTICLE to a crawler and to a link preview, which is
 	// what earns it a byline and a date in a search result; the `article:*`
 	// block hangs off that same fact rather than off a second switch.
-	let published = meta.created.map(|created| created.format_iso8601());
+	let published = meta
+		.created
+		.map(|created| created.timestamp().format_iso8601());
 	let modified = meta
 		.created
 		.and(meta.updated)
-		.map(|updated| updated.format_iso8601());
+		.map(|updated| updated.timestamp().format_iso8601());
 	let article_authors = meta
 		.created
 		.map(|_| meta.authors.clone())

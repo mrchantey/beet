@@ -15,7 +15,13 @@ impl MailColdProbe {
 		let mut parts = rest.trim_start_matches('/').split('/');
 		let (year, month, day, file) =
 			(parts.next()?, parts.next()?, parts.next()?, parts.next()?);
-		let midnight = Timestamp::parse_date(&format!("{year}-{month}-{day}"))?;
+		let midnight = Date::from_civil(
+			year.parse().ok()?,
+			month.parse().ok()?,
+			day.parse().ok()?,
+		)
+		.ok()?
+		.timestamp();
 		let clock = file.strip_suffix("Z.db")?;
 		if clock.len() != 6 {
 			return None;

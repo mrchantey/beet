@@ -334,7 +334,7 @@ mod test {
 			.set(&fixture.identities(), "default", "X", "1", default())
 			.unwrap();
 		series
-			.dated(Timestamp::parse_date("2026-09-15").unwrap())
+			.dated(Date::parse("2026-09-15").unwrap().timestamp())
 			.unwrap()
 			.write(&document)
 			.await

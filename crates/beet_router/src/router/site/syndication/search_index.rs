@@ -85,7 +85,7 @@ impl SearchEntry {
 				title: page.meta.title.clone(),
 				description: page.meta.description.clone(),
 				authors: page.meta.authors.clone(),
-				created: page.meta.created.map(|created| created.format_date()),
+				created: page.meta.created.map(|created| created.to_string()),
 				body: content.map(|content| content.text()),
 			});
 		}

@@ -15,7 +15,7 @@
 //!   `["a", "b"]`, and is empty when absent;
 //! - every other field is required, and an absent one errors naming its flag;
 //! - a present value parses through its type's [`LiteralParser`] entry, so a
-//!   type authors identically here and in markup: `Duration`, `Timestamp`,
+//!   type authors identically here and in markup: `Duration`, `Date`,
 //!   `StoreUri`, `GlobFilter`, and whatever a downstream crate registers;
 //! - a unit-variant enum is named by its variant, case-insensitively:
 //!   `--format=jsonl` is `Format::Jsonl`, and a name spelling no variant errors

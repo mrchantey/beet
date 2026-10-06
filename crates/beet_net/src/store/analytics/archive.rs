@@ -34,7 +34,7 @@ impl AnalyticsArchive {
 			.strip_prefix('/')?
 			.strip_suffix(AnalyticsSegment::CODEC.extension())?
 			.strip_suffix('.')?;
-		(!date.contains('/') && Timestamp::parse_date(date).is_some())
+		(!date.contains('/') && Date::parse(date).is_ok())
 			.then(|| date.into())
 	}
 

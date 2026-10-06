@@ -988,10 +988,10 @@ mod test {
 			.xpect_eq("The Full Moon Harvest");
 		meta.sidebar_label.as_deref().unwrap().xpect_eq("Blog");
 		meta.order.unwrap().xpect_eq(1);
-		// the date string coerces to the instant it names
+		// the date string coerces to the day it names
 		meta.created
 			.unwrap()
-			.format_long_date()
+			.format_long()
 			.xpect_eq("6 September 2025");
 	}
 

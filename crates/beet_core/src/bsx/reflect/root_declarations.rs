@@ -209,7 +209,8 @@ mod test {
 		draft: bool,
 		order: Option<u32>,
 		nested: Nested,
-		created: Option<Timestamp>,
+		created: Option<Date>,
+		at: Option<Timestamp>,
 	}
 
 	/// A type this test world never registers, so a document naming it resolves
@@ -262,15 +263,20 @@ mod test {
 					order: Some(1),
 				},
 				created: None,
+				at: None,
 			});
-		// a `YYYY-MM-DD` string coerces to the instant it names, through the
+		// a `YYYY-MM-DD` string coerces to the day it names, through the
 		// `Option` wrapper the field declares
 		get(r#"<Fragment {Meta{created:"2025-09-06"}}/>"#)
 			.unwrap()
 			.created
 			.unwrap()
-			.format_date()
+			.to_string()
 			.xpect_eq("2025-09-06");
+		// ..while an instant takes no string at all: a person writes a day
+		scan(r#"<Fragment {Meta{at:"2025-09-06"}}/>"#)
+			.get::<Meta>(&registry)
+			.xpect_err();
 		// a tuple spread names it alongside others
 		get(r#"<Fragment {(Meta{draft: true}, PackageConfig)}/>"#)
 			.unwrap()

@@ -138,7 +138,7 @@ impl AnalyticsRollupRun {
 	/// always left alone: its segments are still being appended to and an
 	/// archive written now would be replaced by the next run anyway.
 	async fn dates(&self) -> Result<Vec<SmolStr>> {
-		let today = Timestamp::now().format_date();
+		let today = Date::today().to_string();
 		let mut dates = AnalyticsSegment::dates(&self.raw)
 			.await?
 			.into_iter()

@@ -76,7 +76,7 @@ impl SitemapEntry {
 					lastmod: page
 						.meta
 						.last_modified()
-						.map(|date| date.format_date()),
+						.map(|date| date.to_string()),
 				}
 				.xok()
 			})

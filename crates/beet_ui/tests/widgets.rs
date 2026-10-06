@@ -122,8 +122,8 @@ fn head_prefers_page_metadata() {
 	let meta = PageMeta {
 		title: Some("ECS Router".into()),
 		description: Some("routing as a tree of entities".into()),
-		created: Timestamp::parse_date("2025-08-09"),
-		updated: Timestamp::parse_date("2025-09-01"),
+		created: Date::parse("2025-08-09").ok(),
+		updated: Date::parse("2025-09-01").ok(),
 		authors: vec!["Pete Hayman".into()],
 		video_url: Some("https://youtu.be/7koepBSRoUI".into()),
 		..default()

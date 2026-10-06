@@ -603,7 +603,7 @@ mod test {
 		SecretRecord {
 			role,
 			note: Some(note.into()),
-			modified: Some(Timestamp::parse_date("2026-09-18").unwrap()),
+			modified: Some(Date::parse("2026-09-18").unwrap().timestamp()),
 			..default()
 		}
 	}

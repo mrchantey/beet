@@ -53,7 +53,7 @@ pub async fn VaultBackup(cx: ActionContext<Request>) -> Result<Response> {
 	let ciphertext = AgePassphrase::new(passphrase)
 		.encrypt(identities.to_string().as_bytes())?;
 	let out = params.out.unwrap_or_else(|| {
-		format!("beet-identity-{}.age", Timestamp::now().format_date())
+		format!("beet-identity-{}.age", Date::today())
 	});
 	fs_ext::write_private(&out, &ciphertext)?;
 	let mut text = format!(

@@ -202,7 +202,7 @@ impl TableStoreRow for AnalyticsRollup {
 	fn table_name() -> SmolStr { "rollup".into() }
 	fn key(&self) -> TableKey { self.id.into() }
 	fn timestamp(&self) -> Option<Timestamp> {
-		Timestamp::parse_date(&self.date)
+		Date::parse(&self.date).ok().map(|date| date.timestamp())
 	}
 }
 
@@ -423,7 +423,7 @@ mod test {
 
 	/// A day's epoch milliseconds, `hour` into the UTC day.
 	fn at(date: &str, hour: u64) -> u64 {
-		(Timestamp::parse_date(date).unwrap().secs() as u64 + hour * 3600)
+		(Date::parse(date).unwrap().timestamp().secs() as u64 + hour * 3600)
 			* 1000
 	}
 

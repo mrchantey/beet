@@ -12,7 +12,7 @@ use core::any::TypeId;
 /// How human-authored input parses into one type, held in a process-wide table
 /// keyed by [`TypeId`].
 ///
-/// A `Duration` field is authored as `"30s"`, a `Timestamp` as `"2026-08-28"`,
+/// A `Duration` field is authored as `"30s"`, a `Date` as `"2026-08-28"`,
 /// a `GlobFilter` as `"guestbook.*"`. Each spelling is one entry here, consulted
 /// at every seam where a human's input becomes a reflected value: a BSX
 /// attribute or spread, a CLI flag, a query param, template prop verification,
@@ -132,7 +132,7 @@ impl LiteralParser {
 	/// Describe how this type is written, for a surface that names a value it
 	/// cannot show: `--help` renders it as the param's `kind`, so a
 	/// `--created` flag reads as `a YYYY-MM-DD date` rather than as
-	/// `beet_core::utils::timestamp::Timestamp`.
+	/// `beet_core::utils::date::Date`.
 	///
 	/// Only worth setting where the type's own name does not already say it: a
 	/// `u16` or a `String` needs none.
