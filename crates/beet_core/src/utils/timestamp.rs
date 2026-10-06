@@ -60,6 +60,12 @@ impl Timestamp {
 	/// An instant `secs` after the Unix epoch, negative before it.
 	pub fn from_secs(secs: i64) -> Self { Self(secs * 1_000) }
 
+	/// Midnight UTC on the day this instant falls in, rounded towards the
+	/// epoch's past as [`secs`](Self::secs) is.
+	pub fn start_of_day(&self) -> Self {
+		Self(self.0 - self.0.rem_euclid(Self::MILLIS_PER_DAY))
+	}
+
 	/// Whole seconds since the Unix epoch, rounded towards the epoch's past so
 	/// that an instant always belongs to the second it falls in.
 	pub fn secs(&self) -> i64 { self.0.div_euclid(1_000) }

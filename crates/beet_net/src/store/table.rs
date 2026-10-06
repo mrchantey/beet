@@ -591,6 +591,10 @@ pub trait TableProvider: BlobStoreProvider + 'static + Send + Sync {
 /// table, and a single [`BlobStore`] back many typed [`Table`]s, one per
 /// table subdir. The one impl that knows about bytes; a native beet [`Value`]
 /// codec would swap in here.
+///
+/// A row is written pretty-printed with a trailing newline, one field to a
+/// line in sorted key order, so a table kept in a repository diffs by field
+/// rather than as one rewritten line. Reads take any JSON whitespace.
 #[cfg(feature = "json")]
 impl TableProvider for BlobStore {
 	fn box_clone_table(&self) -> Box<dyn TableProvider> {
@@ -604,8 +608,11 @@ impl TableProvider for BlobStore {
 		row: Value,
 	) -> SendBoxedFuture<Result> {
 		let path = key.path(table);
-		match serde_json::to_vec(&row) {
-			Ok(bytes) => BlobStoreProvider::insert(self, &path, bytes.into()),
+		match serde_json::to_vec_pretty(&row) {
+			Ok(mut bytes) => {
+				bytes.push(b'\n');
+				BlobStoreProvider::insert(self, &path, bytes.into())
+			}
 			Err(err) => Box::pin(async move { Err(err.into()) }),
 		}
 	}
@@ -784,6 +791,23 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq(vec![RelPath::new(format!("table_item/{}", item.id))]);
+	}
+
+	/// A row's blob is its own JSON document, one field to a line, ending in a
+	/// newline.
+	#[beet_core::test]
+	async fn row_blob_is_pretty_json() {
+		let store = BlobStore::temp();
+		let table = Table::<table_test::NamedRow>::new(store.clone());
+		table
+			.push(serde_json::from_str(r#"{"key":"one","value":7}"#).unwrap())
+			.await
+			.unwrap();
+		BlobStoreProvider::get(&store, &RelPath::new("custom_rows/one"))
+			.await
+			.unwrap()
+			.xmap(|bytes| String::from_utf8(bytes.to_vec()).unwrap())
+			.xpect_eq("{\n  \"key\": \"one\",\n  \"value\": 7\n}\n");
 	}
 
 	/// A row that fails to deserialize (eg a legacy schema) is skipped by the

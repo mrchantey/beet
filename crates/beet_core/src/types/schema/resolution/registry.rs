@@ -54,9 +54,9 @@ impl SchemaRegistry {
 	/// document validates wherever it is read; and a scene is the shape every
 	/// beet page is, so a scene document validates wherever it is read too,
 	/// each component against whatever this registry holds under its key.
-	/// [`Name`] and [`Value`] reflect opaque (`Any`, which nothing can edit)
-	/// while serializing as text, so the by-name entry that wins over
-	/// reflection says so and an inspector edits both in a text field.
+	/// [`Name`] and [`Value`] derive `Any` from reflection, which nothing can
+	/// edit, so the by-name entry that wins over reflection makes each text and
+	/// an inspector edits both in a text field.
 	pub fn new() -> Self {
 		let mut registry = Self {
 			schemas: HashMap::default(),

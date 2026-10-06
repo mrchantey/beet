@@ -17,6 +17,7 @@ use bevy::reflect::set::SetInfo;
 use bevy::reflect::structs::StructInfo;
 use bevy::reflect::tuple::TupleInfo;
 use bevy::reflect::tuple_struct::TupleStructInfo;
+use core::any::TypeId;
 
 impl ValueSchema {
 	/// Build a schema for `T` via its bevy reflect type info.
@@ -38,6 +39,12 @@ struct Builder {
 
 impl Builder {
 	fn build(&mut self, type_info: &TypeInfo) -> ValueSchema {
+		// a `Value` is json by nature: its serde form is the value itself, never
+		// the tagged shape of the enum it reflects as, so a field holding one
+		// admits anything
+		if type_info.type_id() == TypeId::of::<Value>() {
+			return ValueSchema::Any;
+		}
 		// only named types (struct/tuple-struct/enum) can cycle
 		let named = matches!(
 			type_info,
@@ -346,10 +353,11 @@ fn type_path_schema(type_path: &str) -> ValueSchema {
 		.trim_start_matches('&');
 	match short {
 		// `Duration` reflects as opaque but is authored as a unit-suffixed string
-		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string.
+		// (eg `"30s"`), coerced by `scalar_to_reflect`, so validate it as a string;
+		// `Date` is opaque with `YYYY-MM-DD` as its serde form.
 		"String" | "str" | "char" | "Cow<str>" | "PathBuf" | "OsString"
 		| "SmolStr" | "SmolPath" | "RelPath" | "AbsPath" | "WsPath"
-		| "Duration" => ValueSchema::String(StringSchema::default()),
+		| "Duration" | "Date" => ValueSchema::String(StringSchema::default()),
 		"u8" | "u16" | "u32" | "u64" | "u128" | "usize" => {
 			ValueSchema::U64(U64Schema::default())
 		}
@@ -471,6 +479,21 @@ mod test {
 		type_path_schema("core::option::Option<bool>").xpect_eq(
 			ValueSchema::Optional(Box::new(ValueSchema::Bool(default()))),
 		);
+	}
+
+	/// A [`Value`] admits any json, its serde form, rather than the tagged shape
+	/// of the enum it reflects as, wherever it is met in a walk.
+	#[crate::test]
+	fn a_value_admits_anything() {
+		ValueSchema::of::<Value>().xpect_eq(ValueSchema::Any);
+		ValueSchema::of::<Vec<Value>>().xpect_eq(ValueSchema::List(
+			ListSchema {
+				item: Box::new(ValueSchema::Any),
+				min_items: None,
+				max_items: None,
+				unique: false,
+			},
+		));
 	}
 
 	/// Only an `Option` may be absent; the check reads the path because a field

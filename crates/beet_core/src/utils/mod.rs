@@ -57,6 +57,9 @@ pub mod stream_ext;
 pub use into_option::*;
 #[cfg(feature = "std")]
 pub use stream_ext::TextStream;
+/// A UTC calendar day, `YYYY-MM-DD` in every text form, the date-only twin of
+/// [`Timestamp`].
+mod date;
 /// Time and duration utilities. Sleep/clock helpers are std-gated per-function;
 /// [`time_ext::pretty_print_duration`] works on no_std.
 pub mod time_ext;
@@ -90,6 +93,7 @@ pub use backoff::*;
 pub use bevy::tasks::BoxedFuture;
 pub use cli_args::*;
 pub use coalescing_trigger::*;
+pub use date::*;
 pub use file_span::*;
 pub use glob_filter::*;
 pub use line_col::*;
