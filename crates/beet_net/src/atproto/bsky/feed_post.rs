@@ -65,7 +65,9 @@ mod test {
 	#[beet_core::test]
 	fn round_trips_a_pds_post() {
 		let json = r#"{"$type":"app.bsky.feed.post","createdAt":"2026-09-23T15:22:16.682Z","langs":["en"],"reply":{"parent":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"},"root":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"}},"text":"hi"}"#;
-		let value = Value::from_json(serde_json::from_str(json).unwrap());
+		let value =
+			AtprotoValue::from_json(serde_json::from_str(json).unwrap())
+				.unwrap();
 		let post = value.clone().into_serde::<FeedPost>().unwrap();
 		post.reply
 			.as_ref()
@@ -75,16 +77,15 @@ mod test {
 			.rkey()
 			.as_str()
 			.xpect_eq("3mw5t5lac4k2y");
-		RecordEntry::typed_body(
-			&FeedPost::COLLECTION,
-			Value::from_serde(&post).unwrap(),
-		)
-		.unwrap()
-		.xmap(|body| dag_cbor_ext::record_cid(&body).unwrap())
-		.xpect_eq(dag_cbor_ext::record_cid(&value).unwrap());
+		AtprotoValue::from_serde(&post)
+			.unwrap()
+			.into_record(&FeedPost::COLLECTION)
+			.unwrap()
+			.xmap(|body| dag_cbor_ext::record_cid(&body).unwrap())
+			.xpect_eq(dag_cbor_ext::record_cid(&value).unwrap());
 	}
 
-	/// A post with facets and a reply survives the repo's `Value` path, so
+	/// A post with facets and a reply survives the repo's data model, so
 	/// writing it twice is one create and one no-op.
 	#[beet_core::test]
 	async fn a_post_converges() {
@@ -116,13 +117,13 @@ mod test {
 			}
 		};
 		let rkey = Rkey::from(Tid::from(Timestamp::from_millis(1)));
-		pds.converge([(rkey.clone(), post().await)], &default())
+		pds.converge([Rkeyed::new(rkey.clone(), post().await)], &default())
 			.await
 			.unwrap()
 			.created
 			.len()
 			.xpect_eq(1);
-		pds.converge([(rkey, post().await)], &default())
+		pds.converge([Rkeyed::new(rkey, post().await)], &default())
 			.await
 			.unwrap()
 			.is_noop()

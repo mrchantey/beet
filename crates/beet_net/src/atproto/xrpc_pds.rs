@@ -157,14 +157,16 @@ impl XrpcPds {
 		&self,
 		collection: Nsid,
 		rkey: Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> Result<StrongRef> {
-		let body = value!({
-			"repo": (self.did.as_str()),
-			"collection": (collection.as_str()),
-			"rkey": (rkey.as_str()),
-			"record": record
-		});
+		let body = PutRecord {
+			address: RecordAddress {
+				repo: &self.did,
+				collection: &collection,
+				rkey: &rkey,
+			},
+			record: &record,
+		};
 		self.call("com.atproto.repo.putRecord", true, |url| {
 			Request::post(url).with_json_body(&body)?.xok()
 		})
@@ -174,11 +176,11 @@ impl XrpcPds {
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
-		let body = value!({
-			"repo": (self.did.as_str()),
-			"collection": (collection.as_str()),
-			"rkey": (rkey.as_str())
-		});
+		let body = RecordAddress {
+			repo: &self.did,
+			collection: &collection,
+			rkey: &rkey,
+		};
 		self.call("com.atproto.repo.deleteRecord", true, |url| {
 			Request::post(url).with_json_body(&body)?.xok()
 		})
@@ -255,7 +257,7 @@ impl PdsProvider for XrpcPds {
 		&self,
 		collection: Nsid,
 		rkey: Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
 		Box::pin(async move { this.put(collection, rkey, record).await })
@@ -342,6 +344,22 @@ struct XrpcErrorBody {
 	error: SmolStr,
 	#[serde(default)]
 	message: Option<String>,
+}
+
+/// Where a write lands, the `deleteRecord` input.
+#[derive(Serialize)]
+struct RecordAddress<'a> {
+	repo: &'a Did,
+	collection: &'a Nsid,
+	rkey: &'a Rkey,
+}
+
+/// The `putRecord` input.
+#[derive(Serialize)]
+struct PutRecord<'a> {
+	#[serde(flatten)]
+	address: RecordAddress<'a>,
+	record: &'a AtprotoValue,
 }
 
 #[derive(Deserialize)]

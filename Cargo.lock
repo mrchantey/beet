@@ -1421,6 +1421,7 @@ dependencies = [
  "async-lock",
  "async-process",
  "async-task",
+ "base64 0.22.1",
  "beet_async",
  "beet_core",
  "beet_core_macros",

@@ -16,10 +16,12 @@ use core::fmt;
 /// and resolved by [`PdsQuery`]. [`Debug`] prints the provider and the did,
 /// never a credential.
 ///
-/// The typed conveniences read and write [`AtprotoRecord`] types, writing a
-/// record's `$type` as its collection when the type does not, and
-/// [`converge`](Self::converge) makes a collection match what a document
-/// declares.
+/// Bodies cross as [`AtprotoValue`], sealed in the protocol's data model, so
+/// nothing a repo would refuse reaches one. The typed conveniences read and
+/// write [`AtprotoRecord`] types, a write pairing the body with its rkey in an
+/// [`Rkeyed`] and writing its `$type` as its collection when the type does
+/// not, and [`converge`](Self::converge) makes a collection match what a
+/// document declares.
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -29,7 +31,7 @@ use core::fmt;
 /// let collection = Nsid::new_static("com.example.note");
 /// let rkey = Rkey::parse("first").unwrap();
 /// let written = pds
-/// 	.put_record(&collection, &rkey, value!({ "text": "hi" }))
+/// 	.put_record(&collection, &rkey, value!({ "text": "hi" }).into())
 /// 	.await?;
 /// pds.get_record(&collection, &rkey)
 /// 	.await?
@@ -92,18 +94,18 @@ impl Pds {
 
 	/// Create or replace the record at `rkey`, answering the version written.
 	/// A `record` with no `$type` is written as `collection`; one naming
-	/// another collection is refused.
+	/// another collection is refused ([`AtprotoValue::into_record`]).
 	pub async fn put_record(
 		&self,
 		collection: &Nsid,
 		rkey: &Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> Result<StrongRef> {
 		self.provider
 			.put_record(
 				collection.clone(),
 				rkey.clone(),
-				RecordEntry::typed_body(collection, record)?,
+				record.into_record(collection)?,
 			)
 			.await
 	}
@@ -148,14 +150,17 @@ impl Pds {
 			.transpose()
 	}
 
-	/// Write `record` at `rkey`.
+	/// Write `record` at its rkey.
 	pub async fn put<T: AtprotoRecord>(
 		&self,
-		rkey: &Rkey,
-		record: &T,
+		record: &Rkeyed<T>,
 	) -> Result<StrongRef> {
-		self.put_record(&T::COLLECTION, rkey, Value::from_serde(record)?)
-			.await
+		self.put_record(
+			&T::COLLECTION,
+			record.rkey(),
+			AtprotoValue::from_serde(&**record)?,
+		)
+		.await
 	}
 
 	/// Every `T` in its collection, with its address and cid, in rkey order:
@@ -202,7 +207,7 @@ pub trait PdsProvider: 'static + Send + Sync {
 		&self,
 		collection: Nsid,
 		rkey: Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> SendBoxedFuture<Result<StrongRef>>;
 
 	/// See [`Pds::delete_record`].
@@ -229,7 +234,7 @@ pub trait PdsProvider: 'static + Send + Sync {
 /// One record as a repo stores it: its address, its cid and its body, the
 /// `getRecord` answer.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RecordEntry<T = Value> {
+pub struct RecordEntry<T = AtprotoValue> {
 	/// The record's address.
 	pub uri: AtUri,
 	/// Its content id at this version.
@@ -246,48 +251,27 @@ impl<T> RecordEntry<T> {
 
 	/// The record's key.
 	pub fn rkey(&self) -> &Rkey { self.uri.rkey() }
+
+	/// The body paired with its key, ready to write back.
+	pub fn into_rkeyed(self) -> Rkeyed<T> {
+		Rkeyed::new(self.uri.rkey().clone(), self.value)
+	}
 }
 
 impl RecordEntry {
-	/// The body read as a `T` through [`DataModel::decode`], an error naming
-	/// the record when it is not one.
+	/// The body read as a `T`, an error naming the record when it is not one.
 	pub fn into_typed<T: DeserializeOwned>(self) -> Result<RecordEntry<T>> {
 		let uri = self.uri;
 		RecordEntry {
-			value: DataModel::decode(self.value)?.into_serde::<T>().map_err(
-				|err| {
-					bevyhow!(
-						"{uri} does not read as a `{}`: {err}",
-						core::any::type_name::<T>()
-					)
-				},
-			)?,
+			value: self.value.into_serde::<T>().map_err(|err| {
+				bevyhow!(
+					"{uri} does not read as a `{}`: {err}",
+					core::any::type_name::<T>()
+				)
+			})?,
 			uri,
 			cid: self.cid,
 		}
 		.xok()
-	}
-
-	/// `record` in the data model ([`DataModel::encode`]) with its `$type`
-	/// written as `collection` when absent: the body a repo stores. A body
-	/// that is not an object, or names another collection, is refused.
-	pub fn typed_body(collection: &Nsid, record: Value) -> Result<Value> {
-		let kind = record.kind();
-		let Value::Map(mut map) = DataModel::encode(record) else {
-			bevybail!(
-				"a `{collection}` record must be an object, found {kind}"
-			);
-		};
-		match map.get("$type").ok() {
-			None => {
-				map.insert("$type", collection.as_str());
-			}
-			Some(Value::Str(r#type))
-				if r#type.as_str() == collection.as_str() => {}
-			Some(other) => bevybail!(
-				"a record written to `{collection}` declares `$type: {other}`"
-			),
-		}
-		Value::Map(map).xok()
 	}
 }

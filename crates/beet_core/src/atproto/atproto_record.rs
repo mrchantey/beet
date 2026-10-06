@@ -5,7 +5,7 @@ use crate::prelude::*;
 ///
 /// The key a record lives at is its address, never part of its body, so it
 /// travels beside the body: a read answers it in the record's uri, and a
-/// write names it. A foreign record keyed by TID is written at the key it was
+/// write pairs the body with it in an [`Rkeyed`]. A foreign record keyed by TID is written at the key it was
 /// minted with, which the index remembering its natural key supplies; a beet
 /// record derives its key from its identity components, which its collection
 /// says how. A body read back from a repo therefore never pretends to know

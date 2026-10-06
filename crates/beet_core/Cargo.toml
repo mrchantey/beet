@@ -257,6 +257,8 @@ heck.workspace = true
 digest.workspace = true
 # the content id a blob and a record are addressed by (`atproto::Cid`)
 sha2.workspace = true
+# bytes in the protocol's json form, `{"$bytes": "<base64>"}` (`atproto::AtprotoValue`)
+base64.workspace = true
 bitflags = { workspace = true }
 
 #💡 path

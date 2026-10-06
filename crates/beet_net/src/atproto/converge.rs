@@ -110,7 +110,7 @@ impl Pds {
 	/// }
 	/// # async_ext::block_on(async {
 	/// let pds = Pds::temp();
-	/// let note = || (Rkey::parse("first").unwrap(), Note { text: "hi".into() });
+	/// let note = || Rkeyed::new(Rkey::parse("first").unwrap(), Note { text: "hi".into() });
 	/// let report = pds.converge([note()], &default()).await?;
 	/// report.created.len().xpect_eq(1);
 	/// pds.converge([note()], &default()).await?.is_noop().xpect_true();
@@ -120,12 +120,13 @@ impl Pds {
 	/// ```
 	pub async fn converge<T: AtprotoRecord>(
 		&self,
-		wanted: impl IntoIterator<Item = (Rkey, T)>,
+		wanted: impl IntoIterator<Item = Rkeyed<T>>,
 		options: &Converge<T>,
 	) -> Result<ConvergeReport> {
 		let mut report = ConvergeReport::default();
 		let mut wanted_rkeys = HashSet::<Rkey>::default();
-		for (rkey, record) in wanted {
+		for record in wanted {
+			let rkey = record.rkey().clone();
 			if !wanted_rkeys.insert(rkey.clone()) {
 				bevybail!(
 					"two wanted `{}` records share the rkey `{rkey}`",
@@ -135,31 +136,33 @@ impl Pds {
 			let existing = self.get_record(&T::COLLECTION, &rkey).await?;
 			let (list, changed) = match &existing {
 				None => (&mut report.created, true),
-				Some(existing) => match Self::same(&record, &existing.value)? {
-					true => (&mut report.unchanged, false),
-					false => (&mut report.updated, true),
-				},
+				Some(existing) => {
+					match Self::same(&*record, &existing.value)? {
+						true => (&mut report.unchanged, false),
+						false => (&mut report.updated, true),
+					}
+				}
 			};
 			let strong_ref = match (changed, options.dry_run, existing) {
 				(false, _, Some(existing)) => existing.strong_ref(),
 				(_, true, _) => StrongRef::new(
 					self.uri(&T::COLLECTION, &rkey),
-					RecordEntry::typed_body(
-						&T::COLLECTION,
-						Value::from_serde(&record)?,
-					)?
-					.xref()
-					.xmap(dag_cbor_ext::record_cid)?,
+					AtprotoValue::from_serde(&*record)?
+						.into_record(&T::COLLECTION)?
+						.xref()
+						.xmap(dag_cbor_ext::record_cid)?,
 				),
-				_ => self.put(&rkey, &record).await?,
+				_ => self.put(&record).await?,
 			};
 			list.push(strong_ref);
 		}
 		// the one listing: records in scope that nothing wanted
 		for entry in self.list_records(&T::COLLECTION).await? {
 			if wanted_rkeys.contains(entry.rkey())
-				|| !DataModel::decode(entry.value.clone())
-					.and_then(|value| value.into_serde::<T>())
+				|| !entry
+					.value
+					.clone()
+					.into_serde::<T>()
 					.is_ok_and(|record| (options.scope)(&record))
 			{
 				continue;
@@ -178,13 +181,14 @@ impl Pds {
 
 	/// Whether `existing` already holds `wanted`, both read through `T`. A
 	/// body that does not read as a `T` at all differs.
-	fn same<T: AtprotoRecord>(wanted: &T, existing: &Value) -> Result<bool> {
-		let Ok(existing) = DataModel::decode(existing.clone())
-			.and_then(|existing| existing.into_serde::<T>())
-		else {
+	fn same<T: AtprotoRecord>(
+		wanted: &T,
+		existing: &AtprotoValue,
+	) -> Result<bool> {
+		let Ok(existing) = existing.clone().into_serde::<T>() else {
 			return Ok(false);
 		};
-		Value::from_serde(wanted)?
+		AtprotoValue::from_serde(wanted)?
 			.into_serde::<T>()?
 			.xmap(|wanted| wanted == existing)
 			.xok()
@@ -210,8 +214,8 @@ pub(crate) mod test {
 	}
 
 	/// `rkey` paired with its document.
-	fn doc(rkey: &str, path: &str, title: &str) -> (Rkey, Doc) {
-		(Rkey::parse(rkey).unwrap(), Doc {
+	fn doc(rkey: &str, path: &str, title: &str) -> Rkeyed<Doc> {
+		Rkeyed::new(Rkey::parse(rkey).unwrap(), Doc {
 			path: path.into(),
 			title: title.into(),
 			weight: 0.1,

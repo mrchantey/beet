@@ -1,16 +1,17 @@
 //! A record in canonical DAG-CBOR, the encoding its cid is computed over.
 //!
-//! A record travels as json, the protocol's own json form: a link is
-//! `{"$link": "<cid>"}` and bytes are `{"$bytes": "<base64>"}`. Its cid is the
-//! sha2-256 of its DAG-CBOR, where a link is CBOR tag 42 and map keys sort
-//! length first. Computed here exactly as a PDS computes it, so a record
-//! written to an [`EmulatorPds`](crate::prelude::EmulatorPds) and one written
-//! to a real PDS answer the same cid.
+//! A record travels as an [`AtprotoValue`], the protocol's json form, which
+//! holds no float by construction: a link is `{"$link": "<cid>"}` and bytes
+//! are `{"$bytes": "<base64>"}`. Its cid is the sha2-256 of its DAG-CBOR, where
+//! a link is CBOR tag 42 and map keys sort length first. Computed here exactly
+//! as a PDS computes it, so a record written to an
+//! [`EmulatorPds`](crate::prelude::EmulatorPds) and one written to a real PDS
+//! answer the same cid.
 //!
 //! ```
 //! # use beet_core::prelude::*;
 //! # use beet_net::prelude::*;
-//! let record = value!({ "$type": "app.bsky.feed.post", "text": "hi" });
+//! let record = AtprotoValue::from(value!({ "$type": "app.bsky.feed.post", "text": "hi" }));
 //! dag_cbor_ext::record_cid(&record)
 //! 	.unwrap()
 //! 	.as_str()
@@ -21,16 +22,15 @@ use beet_core::prelude::*;
 use ipld_core::ipld::Ipld;
 
 /// The cid of `record`, CIDv1 over its canonical DAG-CBOR.
-pub fn record_cid(record: &Value) -> Result<Cid> {
+pub fn record_cid(record: &AtprotoValue) -> Result<Cid> {
 	encode(record)?
 		.xmap(|bytes| Cid::new(Cid::DAG_CBOR, &bytes))
 		.xok()
 }
 
-/// `record` in canonical DAG-CBOR. A float is an error, since the data model
-/// has none: a record carrying one is not a record any PDS accepts, so a body
-/// reaches here through [`DataModel::encode`](crate::prelude::DataModel::encode).
-pub fn encode(record: &Value) -> Result<Vec<u8>> {
+/// `record` in canonical DAG-CBOR. Fails only on a malformed `$link`, which
+/// the data model leaves to the encoder that reads it.
+pub fn encode(record: &AtprotoValue) -> Result<Vec<u8>> {
 	serde_ipld_dagcbor::to_vec(&to_ipld(record)?)?.xok()
 }
 
@@ -42,12 +42,10 @@ fn to_ipld(value: &Value) -> Result<Ipld> {
 		Value::Bool(bool) => Ipld::Bool(*bool),
 		Value::Int(int) => Ipld::Integer(*int as i128),
 		Value::Uint(uint) => Ipld::Integer(*uint as i128),
-		Value::Float(float) => bevybail!(
-			"the atproto data model has no floats, found {float}: a record \
-			 body crosses `DataModel::encode`, which writes each as an \
-			 `org.beet.core#f64`"
-		),
-		Value::Bytes(bytes) => Ipld::Bytes(bytes.clone()),
+		// unreachable through an `AtprotoValue`, which encodes both
+		Value::Float(_) | Value::Bytes(_) => {
+			bevybail!("an `AtprotoValue` holds no float and no raw bytes")
+		}
 		Value::Str(string) => Ipld::String(string.to_string()),
 		Value::List(items) => {
 			Ipld::List(items.iter().map(to_ipld).collect::<Result<_>>()?)
@@ -94,8 +92,8 @@ mod test {
 	use beet_core::prelude::*;
 
 	/// `record` parsed from the json a PDS answered.
-	fn record(json: &str) -> Value {
-		Value::from_json(serde_json::from_str(json).unwrap())
+	fn record(json: &str) -> AtprotoValue {
+		AtprotoValue::from_json(serde_json::from_str(json).unwrap()).unwrap()
 	}
 
 	/// beet.org's profile, read from its PDS with the cid the PDS computed. It
@@ -122,25 +120,33 @@ mod test {
 		.xpect_eq("bafyreifvk5qurbc64bidnt2abjbfs3tbux5ol2qc674ga5fs3agkd474am");
 	}
 
-	/// Bytes in their json form encode as bytes, padded or not.
+	/// Bytes in their json form encode as bytes, padded or not, and a beet
+	/// byte string reaches the same encoding.
 	#[beet_core::test]
-	fn decodes_bytes() {
-		let padded =
-			dag_cbor_ext::encode(&value!({ "b": { "$bytes": "aGk=" } }))
-				.unwrap();
-		dag_cbor_ext::encode(&value!({ "b": { "$bytes": "aGk" } }))
-			.unwrap()
-			.xpect_eq(padded.clone());
-		dag_cbor_ext::encode(&value!({ "b": (Value::Bytes(b"hi".to_vec())) }))
-			.unwrap()
-			.xpect_eq(padded);
+	fn encodes_bytes() {
+		let encode = |value: Value| {
+			dag_cbor_ext::encode(&AtprotoValue::from_wire(value).unwrap())
+				.unwrap()
+		};
+		let padded = encode(value!({ "b": { "$bytes": "aGk=" } }));
+		encode(value!({ "b": { "$bytes": "aGk" } })).xpect_eq(padded.clone());
+		dag_cbor_ext::encode(&AtprotoValue::from(value!({
+			"b": (Value::Bytes(b"hi".to_vec()))
+		})))
+		.unwrap()
+		.xpect_eq(padded);
 	}
 
+	/// A float hashes as the `org.beet.core#float` object it crossed as.
 	#[beet_core::test]
-	fn refuses_a_float() {
-		dag_cbor_ext::encode(&value!({ "x": 0.5 }))
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("no floats");
+	fn hashes_a_float() {
+		dag_cbor_ext::record_cid(&AtprotoValue::from(value!({ "x": 0.5 })))
+			.unwrap()
+			.xpect_eq(
+				dag_cbor_ext::record_cid(&record(
+					r#"{"x":{"$type":"org.beet.core#float","value":"0.5"}}"#,
+				))
+				.unwrap(),
+			);
 	}
 }

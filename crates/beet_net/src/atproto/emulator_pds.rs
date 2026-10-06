@@ -87,12 +87,12 @@ impl EmulatorPds {
 	}
 
 	/// The body stored at `path`, `None` when there is none.
-	async fn read(&self, path: &RelPath) -> Result<Option<Value>> {
+	async fn read(&self, path: &RelPath) -> Result<Option<AtprotoValue>> {
 		if !self.store.exists(path).await? {
 			return Ok(None);
 		}
 		let bytes = self.store.get(path).await?;
-		Value::from_json(serde_json::from_slice(&bytes)?)
+		AtprotoValue::from_json(serde_json::from_slice(&bytes)?)?
 			.xmap(Some)
 			.xok()
 	}
@@ -112,7 +112,7 @@ impl EmulatorPds {
 		&self,
 		collection: &Nsid,
 		rkey: &Rkey,
-		value: Value,
+		value: AtprotoValue,
 	) -> Result<RecordEntry> {
 		RecordEntry {
 			uri: AtUri::new(self.did.clone(), collection.clone(), rkey.clone()),
@@ -126,9 +126,9 @@ impl EmulatorPds {
 		&self,
 		collection: Nsid,
 		rkey: Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> Result<StrongRef> {
-		let record = RecordEntry::typed_body(&collection, record)?;
+		let record = record.into_record(&collection)?;
 		let cid = dag_cbor_ext::record_cid(&record)?;
 		let referenced = Self::blob_refs(&record);
 		for blob in &referenced {
@@ -143,7 +143,7 @@ impl EmulatorPds {
 		let path = Self::record_path(&collection, &rkey);
 		let dropped = self.dropped_blobs(&path, &referenced).await?;
 		self.store
-			.insert(&path, serde_json::to_vec(&record.into_json())?)
+			.insert(&path, serde_json::to_vec(&record.to_json())?)
 			.await?;
 		self.release(dropped).await?;
 		StrongRef::new(AtUri::new(self.did.clone(), collection, rkey), cid)
@@ -290,7 +290,7 @@ impl PdsProvider for EmulatorPds {
 		&self,
 		collection: Nsid,
 		rkey: Rkey,
-		record: Value,
+		record: AtprotoValue,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
 		Box::pin(async move { this.put(collection, rkey, record).await })
@@ -332,8 +332,8 @@ mod test {
 	fn rkey(key: &str) -> Rkey { Rkey::parse(key).unwrap() }
 
 	/// A card holding `blob`, the shape every retention case writes.
-	fn card(blob: &BlobRef) -> Value {
-		value!({ "image": (Value::from_serde(blob).unwrap()) })
+	fn card(blob: &BlobRef) -> AtprotoValue {
+		value!({ "image": (Value::from_serde(blob).unwrap()) }).into()
 	}
 
 	/// The layout is the documented one, and the cid a written record answers
@@ -372,7 +372,7 @@ mod test {
 		pds.put_record(
 			&collection(),
 			&rkey("a"),
-			value!({ "$type": "com.example.other" }),
+			value!({ "$type": "com.example.other" }).into(),
 		)
 		.await
 		.unwrap_err()
@@ -431,14 +431,18 @@ mod test {
 	async fn lists_a_collection_in_rkey_order() {
 		let pds = Pds::temp();
 		for key in ["c", "a", "b"] {
-			pds.put_record(&collection(), &rkey(key), value!({ "key": key }))
-				.await
-				.unwrap();
+			pds.put_record(
+				&collection(),
+				&rkey(key),
+				value!({ "key": key }).into(),
+			)
+			.await
+			.unwrap();
 		}
 		pds.put_record(
 			&Nsid::new_static("com.example.other"),
 			&rkey("z"),
-			value!({}),
+			value!({}).into(),
 		)
 		.await
 		.unwrap();

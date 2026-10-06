@@ -10,7 +10,10 @@
 //!   and [`Tid`], a record's key; [`AtUri`], a record's address
 //! - [`Cid`], content addressing for bytes and records; [`StrongRef`] and
 //!   [`BlobRef`], the two references a record holds
-//! - [`AtprotoRecord`], one shape for every record type beet reads or writes
+//! - [`AtprotoRecord`], one shape for every record type beet reads or writes,
+//!   the body alone, and [`Rkeyed`], a body paired with the rkey it lives at
+//! - [`AtprotoValue`], a value sealed in the data model, which is how a float
+//!   reaches a repo that has none
 //! - [`Provenance`], what a beet record or a derived file was computed from
 //!
 //! # Words
@@ -45,23 +48,27 @@
 mod at_uri;
 #[cfg(feature = "serde")]
 mod atproto_record;
+mod atproto_value;
 mod blob_ref;
 mod cid;
 mod did;
 mod nsid;
 mod provenance;
 mod rkey;
+mod rkeyed;
 mod strong_ref;
 mod tid;
 pub use at_uri::*;
 #[cfg(feature = "serde")]
 pub use atproto_record::*;
+pub use atproto_value::*;
 pub use blob_ref::*;
 pub use cid::*;
 pub use did::*;
 pub use nsid::*;
 pub use provenance::*;
 pub use rkey::*;
+pub use rkeyed::*;
 pub use strong_ref::*;
 pub use tid::*;
 
