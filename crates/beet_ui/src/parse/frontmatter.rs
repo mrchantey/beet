@@ -1,7 +1,9 @@
 //! Frontmatter parsing for YAML and TOML metadata blocks.
 //!
 //! Provides the [`Frontmatter`] component and lightweight hand-rolled parsers
-//! for simple key-value frontmatter. Values parse into the existing
+//! for simple key-value frontmatter: scalars, plus a list of scalars written
+//! inline (`tags = ["ecs", "web"]`, `tags: [ecs, web]`) or, in YAML, as a block
+//! of `- item` lines. Values parse into the existing
 //! [`Value`](beet_core::prelude::Value) type, and the block as a whole lowers to
 //! [`RootDeclarations`]: frontmatter is the markdown surface for a document's
 //! root component declarations exactly as a root spread is the BSX surface, so
@@ -146,9 +148,7 @@ impl Frontmatter {
 					.pairs
 					.iter()
 					.filter(|(_, value)| !matches!(value, Value::Null))
-					.map(|(key, value)| {
-						(SmolStr::new(key), DataLiteral::Scalar(value.clone()))
-					})
+					.map(|(key, value)| (SmolStr::new(key), literal(value)))
 					.collect::<Vec<_>>();
 				(!fields.is_empty()).then(|| NamedLiteral {
 					name: section
@@ -194,6 +194,17 @@ impl Frontmatter {
 	}
 }
 
+/// The literal a parsed value declares: a list stays a list, so a `Vec` field
+/// resolves item by item through the same coercions a BSX list does.
+fn literal(value: &Value) -> DataLiteral {
+	match value {
+		Value::List(items) => {
+			DataLiteral::List(items.iter().map(literal).collect())
+		}
+		value => DataLiteral::Scalar(value.clone()),
+	}
+}
+
 /// Build a [`DynamicStruct`] from a list of key-value pairs.
 fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 	let mut dynamic = DynamicStruct::default();
@@ -220,9 +231,13 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 			Value::Bytes(val) => {
 				dynamic.insert(&key, val);
 			}
-			Value::Map(_) | Value::List(_) => {
+			// a list mirrors as the `Value` it parsed to
+			Value::List(list) => {
+				dynamic.insert(&key, Value::List(list));
+			}
+			Value::Map(_) => {
 				bevybail!(
-					"Unsupported complex value for frontmatter key '{}'",
+					"Unsupported map value for frontmatter key '{}'",
 					key
 				);
 			}
@@ -233,17 +248,32 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 
 /// Parse simple YAML key-value pairs.
 ///
-/// Supports flat `key: value` lines with scalar values. Blank lines
-/// and comment lines (starting with `#`) are skipped. Quoted string
+/// Supports flat `key: value` lines with scalar values, an inline `[a, b]`
+/// list, and a block list: a valueless `key:` followed by `- item` lines.
+/// Blank lines and comment lines (starting with `#`) are skipped. Quoted string
 /// values (single or double) have their quotes stripped.
 fn parse_yaml_kv(content: &str) -> Result<Vec<(String, Value)>> {
-	let mut pairs = Vec::new();
+	let mut pairs: Vec<(String, Value)> = Vec::new();
 
 	for line in content.lines() {
 		let trimmed = line.trim();
 
 		// skip blanks and comments
 		if trimmed.is_empty() || trimmed.starts_with('#') {
+			continue;
+		}
+
+		// a `- item` line extends the list a valueless key opened
+		if let Some(item) = trimmed.strip_prefix('-')
+			&& (item.is_empty() || item.starts_with(' '))
+			&& let Some((_, value)) = pairs.last_mut()
+			&& matches!(value, Value::Null | Value::List(_))
+		{
+			let item = parse_yaml_value(item.trim());
+			match value {
+				Value::List(items) => items.push(item),
+				_ => *value = Value::List(vec![item]),
+			}
 			continue;
 		}
 
@@ -281,6 +311,10 @@ fn parse_yaml_value(raw: &str) -> Value {
 		raw
 	};
 
+	if let Some(list) = parse_inline_list(effective, parse_yaml_value) {
+		return list;
+	}
+
 	// strip quotes
 	let unquoted = strip_quotes(effective);
 
@@ -295,8 +329,9 @@ fn parse_yaml_value(raw: &str) -> Value {
 
 /// Parse TOML key-value pairs, grouped by `[Section]` header.
 ///
-/// Supports flat `key = value` lines. Blank lines and comment lines (starting
-/// with `#`) are skipped; string values must be quoted. A `[Section]` header
+/// Supports flat `key = value` lines, a value being a scalar or a one-line
+/// `[a, b]` array of scalars. Blank lines and comment lines (starting with `#`)
+/// are skipped; string values must be quoted. A `[Section]` header
 /// opens a new group naming the component its keys declare, so the keys before
 /// the first header are the unsectioned group.
 fn parse_toml_sections(content: &str) -> Result<Vec<FrontmatterSection>> {
@@ -369,6 +404,10 @@ fn parse_toml_value(raw: &str) -> Value {
 		return Value::Bool(false);
 	}
 
+	if let Some(list) = parse_inline_list(effective, parse_toml_value) {
+		return list;
+	}
+
 	// quoted strings
 	let unquoted = strip_quotes(effective);
 	if unquoted.len() != effective.len() {
@@ -377,6 +416,36 @@ fn parse_toml_value(raw: &str) -> Value {
 
 	// try numeric parsing
 	Value::parse_string(effective)
+}
+
+/// Parse a one-line `[a, "b, c", 3]` list, each item through `item`, or `None`
+/// when `raw` is not bracketed. Commas inside quotes belong to their item, and a
+/// trailing comma is allowed.
+fn parse_inline_list(raw: &str, item: fn(&str) -> Value) -> Option<Value> {
+	let inner = raw.strip_prefix('[')?.strip_suffix(']')?;
+	let mut items = Vec::new();
+	let mut quote = None;
+	let mut start = 0;
+	for (index, char) in inner.char_indices() {
+		match (quote, char) {
+			(None, '"' | '\'') => quote = Some(char),
+			(Some(open), char) if char == open => quote = None,
+			(None, ',') => {
+				items.push(&inner[start..index]);
+				start = index + 1;
+			}
+			_ => {}
+		}
+	}
+	items.push(&inner[start..]);
+	items
+		.into_iter()
+		.map(str::trim)
+		.filter(|raw| !raw.is_empty())
+		.map(item)
+		.collect::<Vec<_>>()
+		.xmap(Value::List)
+		.xmap(Some)
 }
 
 /// Strip matching single or double quotes from a string.
@@ -465,6 +534,26 @@ mod test {
 		pairs[0].1.to_string().xpect_eq("Hello");
 	}
 
+	/// Both list spellings parse to the same value, and an unbracketed comma
+	/// list stays the string it always was.
+	#[beet_core::test]
+	fn yaml_lists() {
+		let expected =
+			Value::List(vec![Value::str("ecs"), Value::str("web, http")]);
+		parse_yaml_kv("tags: [ecs, \"web, http\"]").unwrap()[0]
+			.1
+			.xpect_eq(expected.clone());
+		let pairs =
+			parse_yaml_kv("tags:\n  - ecs\n  - \"web, http\"\ntitle: Hi")
+				.unwrap();
+		pairs[0].1.xpect_eq(expected);
+		// the key after the block is its own pair
+		pairs[1].0.as_str().xpect_eq("title");
+		parse_yaml_kv("tags: rust, bevy").unwrap()[0]
+			.1
+			.xpect_eq(Value::str("rust, bevy"));
+	}
+
 	#[beet_core::test]
 	fn yaml_multiple_pairs() {
 		let content = "title: My Post\nauthor: Jane\ntags: rust, bevy";
@@ -507,6 +596,19 @@ mod test {
 		toml_pairs("weight = 3.14")[0]
 			.1
 			.xpect_eq(Value::Float(3.14));
+	}
+
+	#[beet_core::test]
+	fn toml_inline_array() {
+		toml_pairs("tags = [\"ecs\", \"web\",]")[0]
+			.1
+			.xpect_eq(Value::List(vec![Value::str("ecs"), Value::str("web")]));
+		toml_pairs("sizes = [16, 32]")[0]
+			.1
+			.xpect_eq(Value::List(vec![Value::Uint(16), Value::Uint(32)]));
+		toml_pairs("empty = []")[0]
+			.1
+			.xpect_eq(Value::List(Vec::new()));
 	}
 
 	/// A `[Section]` header names the component its keys declare, so the pairs

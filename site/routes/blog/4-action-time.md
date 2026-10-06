@@ -1,7 +1,8 @@
 +++
 title = "Action Time!"
 slug = "action-time"
-description = "A groundwork release for the upcoming `bsn!` templating system, adding browser testing, analytics, and PDF export utilities."
+description = "Rewriting beet_flow on the Bevy 0.17 event triggers and other additions: cross platform websockets, Webdriver BiDi, analytics, PDF printing and the first moves toward bsn."
+tags = ["release-notes", "behavior-trees"]
 created = "2025-10-07"
 author = "Pete Hayman"
 video_url = "https://youtu.be/yI9tuBsrW1M"

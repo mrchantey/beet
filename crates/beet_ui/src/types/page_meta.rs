@@ -30,7 +30,7 @@
 //!   cost one unit of the budget.
 //! - [`title`](PageMeta::title): at most 500 graphemes and 5000 bytes, the
 //!   `site.standard.document` limit, which nothing downstream undercuts.
-//! - `tags`: each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
+//! - [`tags`](PageMeta::tags): each matching `^[a-z0-9]+(-[a-z0-9]+)*$` and drawn from the
 //!   vocabulary its site declares. Lowercase kebab because a tag is a url
 //!   segment of its own listing page and a plain string in a syndicated record,
 //!   and a closed vocabulary because an open one drifts into synonyms that
@@ -74,6 +74,12 @@ pub struct PageMeta {
 	pub updated: Option<Timestamp>,
 	/// Who wrote the page.
 	pub author: Option<SmolStr>,
+	/// The topics the page belongs to, lowercase kebab and drawn from the
+	/// vocabulary its site declares (see the module docs' metadata rules).
+	///
+	/// Authored as a list, ie `tags = ["ecs", "web"]`.
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub tags: Vec<SmolStr>,
 	/// Who the page is for: everyone, whoever holds the link, or nobody yet.
 	///
 	/// Authored by variant name, ie `visibility = "unlisted"` (the match is
@@ -258,9 +264,10 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_flat_keys() {
 		let meta = parse(
-			"title: Getting Started\ndescription: A guide\nvisibility: draft\norder: 2\nexpanded: true",
+			"title: Getting Started\ndescription: A guide\nvisibility: draft\norder: 2\nexpanded: true\ntags:\n  - ecs",
 			FrontmatterKind::Yaml,
 		);
+		meta.tags.xpect_eq(vec![SmolStr::new("ecs")]);
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
 		meta.description.as_deref().unwrap().xpect_eq("A guide");
 		meta.is_draft().xpect_true();
@@ -276,10 +283,12 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_article_keys() {
 		let meta = parse(
-			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthor = \"Pete Hayman\"\nvideo_url = \"https://youtu.be/7koepBSRoUI\"",
+			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthor = \"Pete Hayman\"\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]",
 			FrontmatterKind::Toml,
 		);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
+		meta.tags
+			.xpect_eq(vec![SmolStr::new("bevy"), SmolStr::new("web")]);
 		meta.created
 			.unwrap()
 			.format_long_date()

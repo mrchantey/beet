@@ -1,7 +1,8 @@
 +++
 title = "It's All Been Done Before"
 slug = "its-all-been-done-before"
-description = "A unified `Request/Response` abstraction brings CLI, server, and AI tool calls under one ECS routing architecture."
+description = "Looking for the similarites between the old and new leads to clean abstractions like a transport-agnostic router."
+tags = ["architecture", "ecs"]
 created = "2026-02-01"
 author = "Pete Hayman"
 video_url = "https://youtu.be/8nokKDoz2_4"

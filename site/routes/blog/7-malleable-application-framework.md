@@ -1,7 +1,8 @@
 +++
 title = "Malleable Application Framework"
 slug = "malleable-application-framework"
-description = 'Completing the great ECS-ification of the entire beet repo and introducing the "Malleable Application Framework" branding.'
+description = "Completing the great ECS-ification of the beet repo and rebranding as a Malleable Application Framework."
+tags = ["release-notes", "architecture", "ecs", "malleable-software"]
 created = "2026-01-04"
 author = "Pete Hayman"
 video_url = "https://youtu.be/ycOUd6f0XRw"

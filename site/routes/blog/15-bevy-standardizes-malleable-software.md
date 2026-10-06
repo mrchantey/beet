@@ -1,7 +1,8 @@
 +++
 title = "Bevy standardizes malleable software"
 slug = "bevy-standardizes-malleable-software"
-description = "Why I think Bevy will rule the world."
+description = "Most tech layers see standardization but applications are siloes. Bevy's layered malleability is the best bet we have for standardardizing malleable software."
+tags = ["bevy", "malleable-software", "atproto"]
 created = "2026-08-28"
 author = "Pete Hayman"
 +++

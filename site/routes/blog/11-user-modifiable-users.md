@@ -1,7 +1,8 @@
 +++
 title = "User Modifiable Users"
 slug = "user-modifiable-users"
-description = "Is malleable software the key to effective personal development tech? Also some progression on cross-application state."
+description = "Papert says learning is an act of creation, so effective personal development tools must be creative. Also explorations of self-describing data types and a new token based design system."
+tags = ["malleable-software", "local-first"]
 created = "2026-05-01"
 author = "Pete Hayman"
 video_url = "https://youtu.be/iDhZLY5WvlM"

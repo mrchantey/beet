@@ -1,7 +1,8 @@
 +++
 title = "Bevy's Five and Beet's Alive!"
 slug = "bevys-five-and-beets-alive"
-description = "The recurring lesson that ECS data models must come first, illustrated by rewrites and initial DOM diffing."
+description = "ECS requires a fundamental shift in how we build apps, and it takes practice to learn the Way."
+tags = ["architecture", "ecs", "bevy"]
 created = "2025-09-06"
 author = "Pete Hayman"
 video_url = "https://youtu.be/J0zxMdsAk_I"

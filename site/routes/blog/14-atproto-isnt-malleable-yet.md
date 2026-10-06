@@ -1,7 +1,8 @@
 +++
 title = "ATProto isn't malleable yet"
 slug = "atproto-isnt-malleable-yet"
-description = "The locked open stack is missing a layer."
+description = "The Atmosphere is swappable but opaque, we need data-driven primitives for fine-grained malleability."
+tags = ["atproto", "malleable-software", "talks"]
 created = "2026-08-18"
 author = "Pete Hayman"
 +++

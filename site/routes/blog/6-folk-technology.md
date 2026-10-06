@@ -1,7 +1,8 @@
 +++
 title = "Folk Technology"
 slug = "folk-technology"
-description = "Drawing parallels between folk festival culture and open, malleable software design in the spirit of Alan Kay."
+description = "Drawing parallels between malleable software and the open participitary culture of folk festivals."
+tags = ["malleable-software", "talks"]
 created = "2025-12-04"
 author = "Pete Hayman"
 video_url = "https://youtu.be/NFjdN8KGkg8"
