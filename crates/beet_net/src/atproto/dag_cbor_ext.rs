@@ -28,7 +28,8 @@ pub fn record_cid(record: &Value) -> Result<Cid> {
 }
 
 /// `record` in canonical DAG-CBOR. A float is an error, since the data model
-/// has none: a record carrying one is not a record any PDS accepts.
+/// has none: a record carrying one is not a record any PDS accepts, so a body
+/// reaches here through [`DataModel::encode`](crate::prelude::DataModel::encode).
 pub fn encode(record: &Value) -> Result<Vec<u8>> {
 	serde_ipld_dagcbor::to_vec(&to_ipld(record)?)?.xok()
 }
@@ -42,8 +43,9 @@ fn to_ipld(value: &Value) -> Result<Ipld> {
 		Value::Int(int) => Ipld::Integer(*int as i128),
 		Value::Uint(uint) => Ipld::Integer(*uint as i128),
 		Value::Float(float) => bevybail!(
-			"the atproto data model has no floats, found {float}: write it \
-			 as an integer or a string"
+			"the atproto data model has no floats, found {float}: a record \
+			 body crosses `DataModel::encode`, which writes each as an \
+			 `org.beet.core#f64`"
 		),
 		Value::Bytes(bytes) => Ipld::Bytes(bytes.clone()),
 		Value::Str(string) => Ipld::String(string.to_string()),

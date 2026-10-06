@@ -20,7 +20,6 @@
 //! key, which is the stack's secret store. `authorize` then signs a DPoP proof
 //! for the exact method and url, and `recover` retries with the server's
 //! `dpop_nonce`, so either is a drop-in behind this trait.
-use crate::client::provider_send;
 use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
@@ -112,15 +111,14 @@ impl AppPassword {
 				self.env_var
 			)
 		})?;
-		let response = provider_send::send(
-			Request::post(format!(
-				"{origin}/xrpc/com.atproto.server.createSession"
-			))
-			.with_json_body(&value!({
-				"identifier": (self.did.as_str()),
-				"password": password
-			}))?,
-		)
+		let response = Request::post(format!(
+			"{origin}/xrpc/com.atproto.server.createSession"
+		))
+		.with_json_body(&value!({
+			"identifier": (self.did.as_str()),
+			"password": password
+		}))?
+		.send()
 		.await?;
 		Self::session(origin, "com.atproto.server.createSession", response)
 			.await
@@ -128,13 +126,12 @@ impl AppPassword {
 
 	/// Trade the refresh token for a new pair.
 	async fn refresh_session(&self, session: Session) -> Result<Session> {
-		let response = provider_send::send(
-			Request::post(format!(
-				"{}/xrpc/com.atproto.server.refreshSession",
-				session.origin
-			))
-			.with_auth_bearer(&session.refresh_jwt),
-		)
+		let response = Request::post(format!(
+			"{}/xrpc/com.atproto.server.refreshSession",
+			session.origin
+		))
+		.with_auth_bearer(&session.refresh_jwt)
+		.send()
 		.await?;
 		Self::session(
 			session.origin,
@@ -167,7 +164,7 @@ impl AtprotoAuth for AppPassword {
 
 	fn authorize(&self, request: Request) -> SendBoxedFuture<Result<Request>> {
 		let this = self.clone();
-		provider_send::boxed(async move {
+		Box::pin(async move {
 			let session = match this.current() {
 				Some(session) => session,
 				None => {
@@ -189,7 +186,7 @@ impl AtprotoAuth for AppPassword {
 	fn recover(&self, error: &XrpcError) -> SendBoxedFuture<Result<bool>> {
 		let this = self.clone();
 		let error = error.error.clone();
-		provider_send::boxed(async move {
+		Box::pin(async move {
 			match (error.as_str(), this.current()) {
 				("ExpiredToken", Some(session)) => {
 					// a refresh that fails starts over with a new session

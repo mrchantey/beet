@@ -155,8 +155,8 @@ zone: no compute, no region, one record per account its
 `<AtprotoHandleBlock accounts={[..]}/>` names, and the probe that asks Bluesky's
 own resolver whether each answers with its account's did. `dns_stage="prod"`
 guards the names exactly as the mail blocks do, so only `--stage=prod`
-publishes them. The block links behind `beet-cli`'s `atproto_infra` feature, so
-the route is gated on that feature too: a binary that never linked the block
+publishes them. The block links behind `beet-cli`'s `atproto` feature with
+`infra`, so the route is gated on that pair too: a binary that never linked the block
 must exclude the stack rather than spawn its tag as nothing.
 
 The record is half the job. A resolver verifies a handle BOTH ways, against the
@@ -172,8 +172,7 @@ hand-created records all publish into, so its audit belongs to no stack.
 entry, so a sibling's records are declarations rather than strays and the
 allowlist below holds only what NOTHING here declares, each row a decision with
 a reason. `--fix` deletes the strays rather than reporting them. The audit is
-run from the `atproto_infra` build too, so the handle records count as
-declared.
+run from the `atproto` build too, so the handle records count as declared.
 
     just site-social deploy --stage=prod   # publish the handle records
     just site-social probe --stage=prod    # after the claim: does each handle resolve
@@ -300,7 +299,7 @@ token (plus AWS for the social stack's state bucket).
 	<!-- the aws identity this repo deploys as: one iam user for its one
 	     document (the workspace entry shares it) and one managed policy per app
 	     THIS entry declares, lowered from what the stacks below render. Built
-	     with `atproto_infra` so the social app's policy renders too; outside every
+	     with `atproto` so the social app's policy renders too; outside every
 	     `<Stack>`, since a document holds one pair however many stacks it
 	     deploys, and an administrator's verb: the scoped pair it seals cannot
 	     mint itself -->
@@ -428,9 +427,9 @@ token (plus AWS for the social stack's state bucket).
 	<!-- the atproto handles: their own stack because they share nothing with
 	     the site but the zone, see "The handles, and the zone" above. The
 	     route needs the binary that links the block: an infra build without
-	     `atproto_infra` would spawn the tag as nothing and deploy an empty
+	     `atproto` would spawn the tag as nothing and deploy an empty
 	     stack green. -->
-	<Route path="social" bx:cfg="feature:infra && feature:extra && feature:atproto_infra">
+	<Route path="social" bx:cfg="feature:infra && feature:extra && feature:atproto">
 		<Stack app_name="beet-social">
 			<!-- a deploy is the apply alone, and the teardown that read
 			     backwards, since this stack owns nothing outside terraform. The

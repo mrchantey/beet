@@ -54,21 +54,32 @@ pub(super) fn check_https_features(_req: &Request) -> Result {
 
 /// Send a request via the appropriate HTTP backend.
 ///
-/// This is the HTTP-specific send path used by scheme routing.
+/// This is the HTTP-specific send path used by scheme routing. On every `std`
+/// build its future is `Send`, so [`Request::send`] is too and a provider whose
+/// contract hands back a `Send` future (a store, a PDS) awaits it directly: the
+/// browser's fetch and a runtime-installed transport are not `Send`, so each is
+/// wrapped as [`Body`] wraps its stream, a [`SendWrapper`] that is sound because
+/// the future is only ever polled on the one thread that made it.
+///
+/// [`SendWrapper`]: send_wrapper::SendWrapper
 #[allow(unused)]
 async fn send_http(request: Request) -> Result<Response> {
 	cfg_if! {
 		if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-			super::impl_web_sys::send_wasm(request).await
+			send_wrapper::SendWrapper::new(super::impl_web_sys::send_wasm(request))
+				.await
 		} else if #[cfg(feature = "ureq")] {
 			super::impl_ureq::send_ureq(request).await
 		} else if #[cfg(feature = "reqwest")] {
 			super::impl_reqwest::send_reqwest(request).await
 		} else {
-			// No transport feature compiled in — defer to a transport
-			// installed at runtime via `Request::set_http_client` (eg an embedded
-			// adapter). This is the no_std bare-metal path.
+			// No transport feature compiled in: defer to a transport
+			// installed at runtime via `Request::set_http_client` (eg an
+			// embedded adapter), the no_std bare-metal path.
 			match HTTP_CLIENT.get() {
+				#[cfg(feature = "std")]
+				Some(send) => send_wrapper::SendWrapper::new(send(request)).await,
+				#[cfg(not(feature = "std"))]
 				Some(send) => send(request).await,
 				None => bevybail!(
 					"No HTTP transport configured. Enable a transport feature \
@@ -540,4 +551,13 @@ mod test_loopback {
 			.to_string()
 			.xpect_eq("http://127.0.0.1:8339/assets/x.jpg?v=1");
 	}
+}
+
+/// [`Request::send`] is `Send` on every `std` build, the guarantee a provider
+/// whose futures must be `Send` relies on.
+#[cfg(feature = "std")]
+#[allow(dead_code)]
+fn send_is_send() {
+	fn assert_send(_: impl Send) {}
+	assert_send(Request::get("https://beet.org").send());
 }

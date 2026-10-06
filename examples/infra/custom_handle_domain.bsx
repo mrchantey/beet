@@ -33,9 +33,9 @@ passphrase. Only the apply inside `deploy` authenticates, so `validate` and
    account wants; drop it from `accounts` if you only want the subdomain.
 4. Run it through the beet binary built with the handle block:
 
-       cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
-       cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=examples/infra/custom_handle_domain.bsx --stage=prod plan
-       cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=examples/infra/custom_handle_domain.bsx --stage=prod deploy
+       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
+       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod plan
+       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod deploy
 
    `deploy` ends in `<AtprotoHandleProbe/>`, so it passes only once the handle
    actually resolves to the declared did through Bluesky's own resolver, which
@@ -76,7 +76,7 @@ so it can be authored wherever the zone's owner is.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<RequireCfg cfg="feature:infra && feature:extra && feature:atproto_infra"/>
+	<RequireCfg cfg="feature:infra && feature:extra && feature:atproto"/>
 	<PackageConfig title="Custom Domain Handle" app_name="atproto-handles"
 		description="Publish the _atproto records that make a domain you own an atproto handle"/>
 	<!-- the accounts, each declared once and named by `bx:ref` from the block

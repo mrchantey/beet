@@ -1,5 +1,4 @@
 //! A real PDS over xrpc.
-use crate::client::provider_send;
 use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
@@ -119,7 +118,7 @@ impl XrpcPds {
 			if authorized {
 				request = self.auth()?.authorize(request).await?;
 			}
-			let response = provider_send::send(request).await?;
+			let response = request.send().await?;
 			if response.status().is_ok() {
 				return Ok(response);
 			}
@@ -249,7 +248,7 @@ impl PdsProvider for XrpcPds {
 		rkey: Rkey,
 	) -> SendBoxedFuture<Result<Option<RecordEntry>>> {
 		let this = self.clone();
-		provider_send::boxed(async move { this.get(collection, rkey).await })
+		Box::pin(async move { this.get(collection, rkey).await })
 	}
 
 	fn put_record(
@@ -259,9 +258,7 @@ impl PdsProvider for XrpcPds {
 		record: Value,
 	) -> SendBoxedFuture<Result<StrongRef>> {
 		let this = self.clone();
-		provider_send::boxed(
-			async move { this.put(collection, rkey, record).await },
-		)
+		Box::pin(async move { this.put(collection, rkey, record).await })
 	}
 
 	fn delete_record(
@@ -270,7 +267,7 @@ impl PdsProvider for XrpcPds {
 		rkey: Rkey,
 	) -> SendBoxedFuture<Result> {
 		let this = self.clone();
-		provider_send::boxed(async move { this.delete(collection, rkey).await })
+		Box::pin(async move { this.delete(collection, rkey).await })
 	}
 
 	fn list_records(
@@ -278,7 +275,7 @@ impl PdsProvider for XrpcPds {
 		collection: Nsid,
 	) -> SendBoxedFuture<Result<Vec<RecordEntry>>> {
 		let this = self.clone();
-		provider_send::boxed(async move { this.list(collection).await })
+		Box::pin(async move { this.list(collection).await })
 	}
 
 	fn upload_blob(
@@ -287,7 +284,7 @@ impl PdsProvider for XrpcPds {
 		mime_type: MediaType,
 	) -> SendBoxedFuture<Result<BlobRef>> {
 		let this = self.clone();
-		provider_send::boxed(async move { this.upload(bytes, mime_type).await })
+		Box::pin(async move { this.upload(bytes, mime_type).await })
 	}
 }
 

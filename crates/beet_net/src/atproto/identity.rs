@@ -1,6 +1,5 @@
 //! Resolving the two names an account has: a did to the document saying where
 //! its repo lives, and a handle to the did it points at right now.
-use crate::client::provider_send;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -36,7 +35,8 @@ impl DidResolver {
 				did.identifier().replace("%3A", ":")
 			),
 		};
-		let document = provider_send::send(Request::get(url))
+		let document = Request::get(url)
+			.send()
 			.await?
 			.into_result()
 			.await
@@ -156,12 +156,11 @@ impl HandleResolver {
 	pub async fn resolve(&self, handle: &str) -> Result<Did> {
 		let handle = handle.trim_start_matches('@').to_ascii_lowercase();
 		match self {
-			Self::Service { host } => provider_send::send(
-				Request::get(format!(
-					"{host}/xrpc/com.atproto.identity.resolveHandle"
-				))
-				.with_param("handle", &handle),
-			)
+			Self::Service { host } => Request::get(format!(
+				"{host}/xrpc/com.atproto.identity.resolveHandle"
+			))
+			.with_param("handle", &handle)
+			.send()
 			.await?
 			.into_result()
 			.await
@@ -184,17 +183,16 @@ impl HandleResolver {
 	/// resolves to neither.
 	async fn dns(doh: &str, handle: &str) -> Result<Option<Did>> {
 		let name = format!("_atproto.{handle}");
-		let answer = provider_send::send(
-			Request::get(doh)
-				.with_param("name", &name)
-				.with_param("type", "TXT")
-				.with_header_raw("accept", "application/dns-json"),
-		)
-		.await?
-		.into_result()
-		.await?
-		.json::<DnsAnswer>()
-		.await?;
+		let answer = Request::get(doh)
+			.with_param("name", &name)
+			.with_param("type", "TXT")
+			.with_header_raw("accept", "application/dns-json")
+			.send()
+			.await?
+			.into_result()
+			.await?
+			.json::<DnsAnswer>()
+			.await?;
 		let dids = answer
 			.answer
 			.iter()
@@ -217,20 +215,20 @@ impl HandleResolver {
 
 	/// The did the handle's own host serves.
 	async fn well_known(handle: &str) -> Result<Did> {
-		let body = provider_send::send(Request::get(format!(
-			"https://{handle}/.well-known/atproto-did"
-		)))
-		.await?
-		.into_result()
-		.await
-		.map_err(|err| {
-			bevyhow!(
-				"@{handle} does not resolve: no `_atproto.{handle}` TXT \
+		let body =
+			Request::get(format!("https://{handle}/.well-known/atproto-did"))
+				.send()
+				.await?
+				.into_result()
+				.await
+				.map_err(|err| {
+					bevyhow!(
+						"@{handle} does not resolve: no `_atproto.{handle}` TXT \
 				 record and no `/.well-known/atproto-did`: {err}"
-			)
-		})?
-		.text()
-		.await?;
+					)
+				})?
+				.text()
+				.await?;
 		Did::parse(body.trim()).map_err(|err| {
 			bevyhow!(
 				"@{handle} does not resolve: no `_atproto.{handle}` TXT \

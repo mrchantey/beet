@@ -94,6 +94,12 @@ impl Map {
 	/// Returns `true` if the map contains the given key.
 	pub fn contains(&self, key: &str) -> bool { self.0.contains_key(key) }
 
+	/// The number of entries.
+	pub fn len(&self) -> usize { self.0.len() }
+
+	/// Whether the map has no entries.
+	pub fn is_empty(&self) -> bool { self.0.is_empty() }
+
 	/// Inserts a key-value pair, overwriting any existing value. A new key lands
 	/// last, an existing one keeps its position.
 	///

@@ -87,14 +87,14 @@ impl core::fmt::Display for ConvergeReport {
 }
 
 impl Pds {
-	/// Make `T`'s collection match `wanted`: for each record, get it at its
-	/// rkey, compare, and write only what differs; then list the collection
-	/// once to find the orphans in `options`' scope, deleting them under
-	/// `prune`.
+	/// Make `T`'s collection match `wanted`, each record paired with the rkey
+	/// it lives at: get it there, compare, and write only what differs; then
+	/// list the collection once to find the orphans in `options`' scope,
+	/// deleting them under `prune`.
 	///
-	/// Both sides are read through `T` before the comparison, so a field `T`
-	/// skips (its rkey) or a field the PDS added that `T` does not know never
-	/// reads as a change, and `T`'s `PartialEq` decides the rest. Running it
+	/// Both sides are read through `T` before the comparison, so a field the
+	/// PDS added that `T` does not know never reads as a change, and `T`'s
+	/// `PartialEq` decides the rest. Running it
 	/// twice writes nothing the second time, and an interrupted run resumes,
 	/// since every record it already wrote now compares equal.
 	///
@@ -103,20 +103,14 @@ impl Pds {
 	/// # use beet_net::prelude::*;
 	/// #[derive(Debug, PartialEq, Serialize, Deserialize)]
 	/// struct Note {
-	/// 	#[serde(skip)]
-	/// 	rkey: Rkey,
 	/// 	text: String,
 	/// }
 	/// impl AtprotoRecord for Note {
 	/// 	const COLLECTION: Nsid = Nsid::new_static("com.example.note");
-	/// 	fn rkey(&self) -> Rkey { self.rkey.clone() }
 	/// }
 	/// # async_ext::block_on(async {
 	/// let pds = Pds::temp();
-	/// let note = || Note {
-	/// 	rkey: Rkey::parse("first").unwrap(),
-	/// 	text: "hi".into(),
-	/// };
+	/// let note = || (Rkey::parse("first").unwrap(), Note { text: "hi".into() });
 	/// let report = pds.converge([note()], &default()).await?;
 	/// report.created.len().xpect_eq(1);
 	/// pds.converge([note()], &default()).await?.is_noop().xpect_true();
@@ -126,13 +120,12 @@ impl Pds {
 	/// ```
 	pub async fn converge<T: AtprotoRecord>(
 		&self,
-		wanted: impl IntoIterator<Item = T>,
+		wanted: impl IntoIterator<Item = (Rkey, T)>,
 		options: &Converge<T>,
 	) -> Result<ConvergeReport> {
 		let mut report = ConvergeReport::default();
 		let mut wanted_rkeys = HashSet::<Rkey>::default();
-		for record in wanted {
-			let rkey = record.rkey();
+		for (rkey, record) in wanted {
 			if !wanted_rkeys.insert(rkey.clone()) {
 				bevybail!(
 					"two wanted `{}` records share the rkey `{rkey}`",
@@ -158,17 +151,15 @@ impl Pds {
 					.xref()
 					.xmap(dag_cbor_ext::record_cid)?,
 				),
-				_ => self.put(&record).await?,
+				_ => self.put(&rkey, &record).await?,
 			};
 			list.push(strong_ref);
 		}
 		// the one listing: records in scope that nothing wanted
 		for entry in self.list_records(&T::COLLECTION).await? {
 			if wanted_rkeys.contains(entry.rkey())
-				|| !entry
-					.value
-					.clone()
-					.into_serde::<T>()
+				|| !DataModel::decode(entry.value.clone())
+					.and_then(|value| value.into_serde::<T>())
 					.is_ok_and(|record| (options.scope)(&record))
 			{
 				continue;
@@ -188,7 +179,9 @@ impl Pds {
 	/// Whether `existing` already holds `wanted`, both read through `T`. A
 	/// body that does not read as a `T` at all differs.
 	fn same<T: AtprotoRecord>(wanted: &T, existing: &Value) -> Result<bool> {
-		let Ok(existing) = existing.clone().into_serde::<T>() else {
+		let Ok(existing) = DataModel::decode(existing.clone())
+			.and_then(|existing| existing.into_serde::<T>())
+		else {
 			return Ok(false);
 		};
 		Value::from_serde(wanted)?
@@ -203,27 +196,26 @@ pub(crate) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// A foreign record keyed by TID: its rkey is carried, never serialized,
-	/// and its natural key is `path`.
+	/// A foreign record keyed by TID, its natural key `path`, with a float
+	/// to cross the data model.
 	#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 	struct Doc {
-		#[serde(skip)]
-		rkey: Rkey,
 		path: String,
 		title: String,
+		weight: f32,
 	}
 
 	impl AtprotoRecord for Doc {
 		const COLLECTION: Nsid = Nsid::new_static("com.example.doc");
-		fn rkey(&self) -> Rkey { self.rkey.clone() }
 	}
 
-	fn doc(rkey: &str, path: &str, title: &str) -> Doc {
-		Doc {
-			rkey: Rkey::parse(rkey).unwrap(),
+	/// `rkey` paired with its document.
+	fn doc(rkey: &str, path: &str, title: &str) -> (Rkey, Doc) {
+		(Rkey::parse(rkey).unwrap(), Doc {
 			path: path.into(),
 			title: title.into(),
-		}
+			weight: 0.1,
+		})
 	}
 
 	/// The rkeys of `refs`, for a compact assertion.

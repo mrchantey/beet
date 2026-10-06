@@ -57,12 +57,11 @@ thread = ["beet/thread", "beet/ui"]
 infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block", "beet/lightsail_block", "beet/fargate_block", "beet/aws_sdk", "beet/mail"]
 # The atproto network half: an `<AtprotoAccount/>` lands its repo, reads and
 # writes reach a real PDS, handles resolve. Lean, so a serving binary can link
-# it without the deploy machinery.
+# it without the deploy machinery; with `infra` too it brings the handle block
+# and its probe (`<AtprotoHandleBlock/>`, `<AtprotoHandleProbe/>`), so the site
+# entry's `social` stack resolves its tags. Run with:
+# `cargo run -p beet-cli --features infra,extra,atproto -- --main=site social deploy --stage=prod`.
 atproto = ["beet/atproto"]
-# The atproto deploy blocks (`<AtprotoHandleBlock/>`, `<AtprotoHandleProbe/>`),
-# so the site entry's `social` stack resolves its tags. Run with:
-# `cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=site social deploy --stage=prod`.
-atproto_infra = ["atproto", "infra"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
 # `beet/examples` (winit + bevy_default + spatial + `extra`), so `BeetPlugins` adds

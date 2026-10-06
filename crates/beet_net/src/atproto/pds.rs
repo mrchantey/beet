@@ -148,14 +148,14 @@ impl Pds {
 			.transpose()
 	}
 
-	/// Write `record` at its own rkey.
-	pub async fn put<T: AtprotoRecord>(&self, record: &T) -> Result<StrongRef> {
-		self.put_record(
-			&T::COLLECTION,
-			&record.rkey(),
-			Value::from_serde(record)?,
-		)
-		.await
+	/// Write `record` at `rkey`.
+	pub async fn put<T: AtprotoRecord>(
+		&self,
+		rkey: &Rkey,
+		record: &T,
+	) -> Result<StrongRef> {
+		self.put_record(&T::COLLECTION, rkey, Value::from_serde(record)?)
+			.await
 	}
 
 	/// Every `T` in its collection, with its address and cid, in rkey order:
@@ -249,29 +249,31 @@ impl<T> RecordEntry<T> {
 }
 
 impl RecordEntry {
-	/// The body read as a `T`, an error naming the record when it is not one.
+	/// The body read as a `T` through [`DataModel::decode`], an error naming
+	/// the record when it is not one.
 	pub fn into_typed<T: DeserializeOwned>(self) -> Result<RecordEntry<T>> {
 		let uri = self.uri;
 		RecordEntry {
-			value: self.value.into_serde::<T>().map_err(|err| {
-				bevyhow!(
-					"{uri} does not read as a `{}`: {err}",
-					core::any::type_name::<T>()
-				)
-			})?,
+			value: DataModel::decode(self.value)?.into_serde::<T>().map_err(
+				|err| {
+					bevyhow!(
+						"{uri} does not read as a `{}`: {err}",
+						core::any::type_name::<T>()
+					)
+				},
+			)?,
 			uri,
 			cid: self.cid,
 		}
 		.xok()
 	}
 
-	/// `record` with its `$type` written as `collection` when absent and its
-	/// bytes in their json form, `{"$bytes": "<base64>"}`: the body a repo
-	/// stores. A body that is not an object, or names another collection, is
-	/// refused.
+	/// `record` in the data model ([`DataModel::encode`]) with its `$type`
+	/// written as `collection` when absent: the body a repo stores. A body
+	/// that is not an object, or names another collection, is refused.
 	pub fn typed_body(collection: &Nsid, record: Value) -> Result<Value> {
 		let kind = record.kind();
-		let Value::Map(mut map) = Self::json_bytes(record) else {
+		let Value::Map(mut map) = DataModel::encode(record) else {
 			bevybail!(
 				"a `{collection}` record must be an object, found {kind}"
 			);
@@ -287,26 +289,5 @@ impl RecordEntry {
 			),
 		}
 		Value::Map(map).xok()
-	}
-
-	/// Every [`Value::Bytes`] in `value` as the `$bytes` object the protocol
-	/// writes bytes as in json.
-	fn json_bytes(value: Value) -> Value {
-		use base64::Engine;
-		match value {
-			Value::Bytes(bytes) => value!({
-				"$bytes": (base64::engine::general_purpose::STANDARD_NO_PAD
-					.encode(bytes))
-			}),
-			Value::List(items) => {
-				Value::List(items.into_iter().map(Self::json_bytes).collect())
-			}
-			Value::Map(map) => Value::Map(
-				map.into_iter()
-					.map(|(key, value)| (key, Self::json_bytes(value)))
-					.collect(),
-			),
-			other => other,
-		}
 	}
 }

@@ -114,15 +114,15 @@ site-shared *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
 # The atproto handles under beet.org (the site entry's `social` stack):
 # `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
-# block's `dns_stage` publishes nothing from any other stage. `atproto_infra`
-# links the block.
+# block's `dns_stage` publishes nothing from any other stage. `atproto` with
+# `infra` links the block.
 site-social *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=site social {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site social {{ args }}
 # Diff the beet.org zone against every stack the site entry declares, reporting
-# the strays; `--fix` deletes them. Built with `atproto_infra` so the handle
-# records are declarations rather than strays.
+# the strays; `--fix` deletes them. Built with `atproto` so the handle records
+# are declarations rather than strays.
 site-audit *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=site audit {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
 # Converge the deployer of the WORKSPACE entry's apps (`beet--shared`): its user,
 # one `<app>--deploy` policy and one `<app>--<stage>--runtime-boundary` per app,
 # and the pair sealed in `secrets.toml`. A policy covers the apps its OWN entry
@@ -137,11 +137,11 @@ beet-mint *args:
   AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
 # The same for the SITE entry's apps (`beet-site--*`, `beet-social--prod`). A
 # mint covers ONE stage's services, so prod is the stage worth minting: `just
-# site-mint --stage=prod`. `atproto_infra` so the social app's policy renders at all:
+# site-mint --stage=prod`. `atproto` so the social app's policy renders at all:
 # without it that tag spawns as nothing and the mint silently covers one app
 # fewer.
 site-mint *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=site deployer/mint {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
 # Converge the CLOUDFLARE token this repo deploys with: one account-owned
 # `beet-deploy` token scoped to exactly the permission groups the site entry's
 # stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
@@ -149,10 +149,10 @@ site-mint *args:
 # in the password manager rather than any document, so it is passed for the one
 # command: `CLOUDFLARE_API_TOKEN=.. just site-cloudflare-mint`. `--dry-run`
 # prints the scope and the policies it would post, touching neither Cloudflare
-# nor the document and needing no credential at all. `atproto_infra` so the social
+# nor the document and needing no credential at all. `atproto` so the social
 # stack's records render, for the same reason `site-audit` builds with it.
 site-cloudflare-mint *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto_infra -- --main=site cloudflare/mint {{ args }}
+  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

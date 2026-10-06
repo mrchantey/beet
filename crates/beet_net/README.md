@@ -72,4 +72,4 @@ App::new()
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |
 | `secure` | TLS serving: the `Tls` component (self-signed dev cert or provided PEM files) |
-| `atproto` | An account's repo on a real PDS: `XrpcPds`, the `AtprotoAuth` seam with `AppPassword`, did and handle resolution, `PostRecord` and `RichText`. The `Pds` family itself (`EmulatorPds`, the converge, `<AtprotoAccount/>`) rides `json`; see `src/atproto/mod.rs` |
+| `atproto` | An account's repo on a real PDS: `XrpcPds`, the `AtprotoAuth` seam with `AppPassword`, did and handle resolution, and the `app.bsky.*` lexicons beet writes (`FeedPost`, `RichText`). The `Pds` family itself (`EmulatorPds`, the converge, `<AtprotoAccount/>`) rides `json`; see `src/atproto/mod.rs` |

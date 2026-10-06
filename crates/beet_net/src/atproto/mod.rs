@@ -11,6 +11,12 @@
 //! - `XrpcPds`, a real PDS over xrpc through the `AtprotoAuth` credential
 //!   seam, with did and handle resolution, behind the `atproto` feature.
 //!
+//! A record body crosses [`DataModel`] on its way in and out of a repo, which
+//! is how a float reaches a data model that has none, and a record type is its
+//! body alone: the rkey it lives at travels beside it, in the uri a read
+//! answers and the key a write names. The `app.bsky.*` lexicons beet writes
+//! (`FeedPost`, `RichText`) are the `bsky` module's, behind `atproto`.
+//!
 //! The protocol's primitives (`Did`, `Rkey`, `Tid`, `Cid`, `StrongRef`,
 //! `BlobRef`) and their words are `beet_core::atproto`'s.
 //!
@@ -53,17 +59,21 @@ mod atproto_account;
 mod atproto_plugin;
 mod converge;
 pub mod dag_cbor_ext;
+mod data_model;
 mod emulator_pds;
 mod pds;
 mod pds_query;
 pub use atproto_account::*;
 pub use atproto_plugin::*;
 pub use converge::*;
+pub use data_model::*;
 pub use emulator_pds::*;
 pub use pds::*;
 pub use pds_query::*;
 #[cfg(feature = "atproto")]
 mod atproto_auth;
+#[cfg(feature = "atproto")]
+mod bsky;
 #[cfg(feature = "atproto")]
 mod identity;
 #[cfg(all(
@@ -74,18 +84,12 @@ mod identity;
 ))]
 mod live_test;
 #[cfg(feature = "atproto")]
-mod post_record;
-#[cfg(feature = "atproto")]
-mod rich_text;
-#[cfg(feature = "atproto")]
 mod xrpc_pds;
 #[cfg(feature = "atproto")]
 pub use atproto_auth::*;
 #[cfg(feature = "atproto")]
+pub use bsky::*;
+#[cfg(feature = "atproto")]
 pub use identity::*;
-#[cfg(feature = "atproto")]
-pub use post_record::*;
-#[cfg(feature = "atproto")]
-pub use rich_text::*;
 #[cfg(feature = "atproto")]
 pub use xrpc_pds::*;

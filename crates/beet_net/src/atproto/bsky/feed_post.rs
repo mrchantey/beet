@@ -1,17 +1,11 @@
-//! `app.bsky.feed.post`, the Bluesky record shape beet reads and writes.
+//! `app.bsky.feed.post`, a Bluesky post.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// An `app.bsky.feed.post` record: the text, the facets that make parts of it
-/// live, and what it replies to or embeds.
-///
-/// A foreign record keyed by TID, so it carries the rkey it was minted with
-/// and never serializes it: the address does.
+/// `app.bsky.feed.post`: the text, the facets that make parts of it live,
+/// and what it replies to or embeds. Keyed by TID, minted on first write.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PostRecord {
-	/// The key this post lives at, minted on first write.
-	#[serde(skip)]
-	pub rkey: Rkey,
+pub struct FeedPost {
 	/// The post text, plain: a link or a mention is only live when a facet
 	/// names its byte range. Defaulted on read, like `created_at`, so a
 	/// hydrated view trimmed of its record still reads.
@@ -35,16 +29,14 @@ pub struct PostRecord {
 	pub embed: Option<Value>,
 }
 
-impl AtprotoRecord for PostRecord {
+impl AtprotoRecord for FeedPost {
 	const COLLECTION: Nsid = Nsid::new_static("app.bsky.feed.post");
-	fn rkey(&self) -> Rkey { self.rkey.clone() }
 }
 
-impl PostRecord {
-	/// A post of `rich` text at `rkey`, written at `created_at`.
-	pub fn new(rkey: Rkey, rich: RichText, created_at: Timestamp) -> Self {
+impl FeedPost {
+	/// A post of `rich` text, written at `created_at`.
+	pub fn new(rich: RichText, created_at: Timestamp) -> Self {
 		Self {
-			rkey,
 			text: rich.text,
 			facets: rich.facets,
 			created_at: created_at.format_iso8601().into(),
@@ -53,61 +45,14 @@ impl PostRecord {
 	}
 }
 
-/// Where a reply sits: the thread's first post and the one it answers.
+/// `app.bsky.feed.post#replyRef`: where a reply sits, the thread's first
+/// post and the one it answers.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplyRef {
 	/// The thread's first post.
 	pub root: StrongRef,
 	/// The post this one answers.
 	pub parent: StrongRef,
-}
-
-/// One live range of a post's text, `app.bsky.richtext.facet`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Facet {
-	/// The range, in bytes of the UTF-8 text.
-	pub index: ByteSlice,
-	/// What the range is.
-	pub features: Vec<FacetFeature>,
-}
-
-/// A byte range of a post's UTF-8 text, end exclusive: bytes, never chars or
-/// graphemes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ByteSlice {
-	/// The first byte.
-	#[serde(rename = "byteStart")]
-	pub byte_start: usize,
-	/// One past the last byte.
-	#[serde(rename = "byteEnd")]
-	pub byte_end: usize,
-}
-
-/// What a facet's range is.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "$type")]
-pub enum FacetFeature {
-	/// A link to `uri`.
-	#[serde(rename = "app.bsky.richtext.facet#link")]
-	Link {
-		/// The link target.
-		uri: SmolStr,
-	},
-	/// A mention of the account `did`.
-	#[serde(rename = "app.bsky.richtext.facet#mention")]
-	Mention {
-		/// The mentioned account.
-		did: Did,
-	},
-	/// A hashtag, `tag` without its `#`.
-	#[serde(rename = "app.bsky.richtext.facet#tag")]
-	Tag {
-		/// The tag text.
-		tag: SmolStr,
-	},
-	/// A feature this build does not know, kept so a foreign post still reads.
-	#[serde(other)]
-	Other,
 }
 
 #[cfg(test)]
@@ -121,7 +66,7 @@ mod test {
 	fn round_trips_a_pds_post() {
 		let json = r#"{"$type":"app.bsky.feed.post","createdAt":"2026-09-23T15:22:16.682Z","langs":["en"],"reply":{"parent":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"},"root":{"cid":"bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza","uri":"at://did:plc:y2aci3l7tvrs3vuoz6tou2eb/app.bsky.feed.post/3mw5t5lac4k2y"}},"text":"hi"}"#;
 		let value = Value::from_json(serde_json::from_str(json).unwrap());
-		let post = value.clone().into_serde::<PostRecord>().unwrap();
+		let post = value.clone().into_serde::<FeedPost>().unwrap();
 		post.reply
 			.as_ref()
 			.unwrap()
@@ -131,7 +76,7 @@ mod test {
 			.as_str()
 			.xpect_eq("3mw5t5lac4k2y");
 		RecordEntry::typed_body(
-			&PostRecord::COLLECTION,
+			&FeedPost::COLLECTION,
 			Value::from_serde(&post).unwrap(),
 		)
 		.unwrap()
@@ -161,26 +106,23 @@ mod test {
 				)
 				.unwrap(),
 			);
-			PostRecord {
+			FeedPost {
 				langs: vec!["en".into()],
 				reply: Some(ReplyRef {
 					root: parent.clone(),
 					parent,
 				}),
-				..PostRecord::new(
-					Rkey::from(Tid::from(Timestamp::from_millis(1))),
-					rich,
-					Timestamp::from_millis(1),
-				)
+				..FeedPost::new(rich, Timestamp::from_millis(1))
 			}
 		};
-		pds.converge([post().await], &default())
+		let rkey = Rkey::from(Tid::from(Timestamp::from_millis(1)));
+		pds.converge([(rkey.clone(), post().await)], &default())
 			.await
 			.unwrap()
 			.created
 			.len()
 			.xpect_eq(1);
-		pds.converge([post().await], &default())
+		pds.converge([(rkey, post().await)], &default())
 			.await
 			.unwrap()
 			.is_noop()

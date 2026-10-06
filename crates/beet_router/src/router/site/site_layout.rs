@@ -16,7 +16,7 @@ use beet_ui::prelude::Reset;
 ///
 /// Reproduces the reference `BeetLayout`: the `<body>` carries [`classes::PAGE`]
 /// plus a resolved color-scheme class, and the web-only `<head>` chrome (the
-/// [`Stylesheet`] CSS bake, preflight/reset, color-scheme script, favicon) is
+/// [`Stylesheet`] CSS bake, preflight/reset, color-scheme script) is
 /// emitted only for the HTML target. The terminal's `<head>` is `display: none`,
 /// so baking the whole rule set to CSS there is pure cost; the gate is a perf
 /// guard, never a visual one.
@@ -34,8 +34,9 @@ use beet_ui::prelude::Reset;
 ///
 /// Slots, each defaulting to the standard chrome:
 /// - `head`: EXTRA head content appended to the always-emitted chrome inside
-///   [`RouteHead`] (eg a page-view beacon), so a site adds to the head without
-///   losing the chrome.
+///   [`RouteHead`] (eg a page-view beacon, or the site's icon links: the
+///   layout links no icon of its own, since it cannot know the site has one),
+///   so a site adds to the head without losing the chrome.
 /// - `header`: defaults to the library [`Header`] with a [`MenuButton`] and the
 ///   Docs/Blog/GitHub nav links.
 /// - `sidebar`: defaults to the route-tree [`RouteSidebar`] (`home=false`).
@@ -69,7 +70,6 @@ pub fn SiteLayout(
 			<Reset/>
 			<Stylesheet/>
 			<ColorSchemeScript/>
-			<link rel="icon" href="/assets/branding/favicon-32x32.png"/>
 		}
 	});
 	// The dev live-reload client, injected centrally so every site served through

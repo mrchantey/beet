@@ -1,7 +1,6 @@
 //! [`HttpStore`]: a store read over http, the client half of a
 //! `<ServeBlobs>` mount.
 
-use crate::client::provider_send;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
@@ -107,13 +106,8 @@ fn push_segments(url: Url, path: &RelPath) -> Url {
 
 /// Fetch `url`, a non-2xx status becoming its [`HttpError`].
 async fn fetch(url: Url) -> Result<Response> {
-	provider_send::send(Request::get(url))
-		.await?
-		.into_result()
-		.await?
-		.xok()
+	Request::get(url).send().await?.into_result().await?.xok()
 }
-
 
 impl BlobStoreProvider for HttpStore {
 	fn box_clone(&self) -> Box<dyn BlobStoreProvider> { Box::new(self.clone()) }
@@ -147,42 +141,40 @@ impl BlobStoreProvider for HttpStore {
 	/// store that does not exist.
 	fn store_exists(&self) -> SendBoxedFuture<Result<bool>> {
 		let list = self.list();
-		provider_send::boxed(async move { list.await.is_ok().xok() })
+		Box::pin(async move { list.await.is_ok().xok() })
 	}
 
 	fn store_create(&self) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
-		provider_send::boxed(async move { Err(err) })
+		Box::pin(async move { Err(err) })
 	}
 
 	fn store_remove(&self) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
-		provider_send::boxed(async move { Err(err) })
+		Box::pin(async move { Err(err) })
 	}
 
 	fn insert(&self, _path: &RelPath, _body: Bytes) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
-		provider_send::boxed(async move { Err(err) })
+		Box::pin(async move { Err(err) })
 	}
 
 	fn list(&self) -> SendBoxedFuture<Result<Vec<RelPath>>> {
 		let url = self.url(&RelPath::default()).with_flag(Self::LIST_PARAM);
-		provider_send::boxed(async move {
-			fetch(url).await?.json::<Vec<RelPath>>().await
-		})
+		Box::pin(async move { fetch(url).await?.json::<Vec<RelPath>>().await })
 	}
 
 	fn get(&self, path: &RelPath) -> SendBoxedFuture<Result<Bytes>> {
 		let url = self.url(path);
-		provider_send::boxed(async move { fetch(url).await?.bytes().await })
+		Box::pin(async move { fetch(url).await?.bytes().await })
 	}
 
 	/// A fetch whose status answers: a 404 is absence, any other failure is
 	/// the store's.
 	fn exists(&self, path: &RelPath) -> SendBoxedFuture<Result<bool>> {
 		let url = self.url(path);
-		provider_send::boxed(async move {
-			let response = provider_send::send(Request::head(url)).await?;
+		Box::pin(async move {
+			let response = Request::head(url).send().await?;
 			match response.status() {
 				StatusCode::NOT_FOUND => Ok(false),
 				status if status.is_ok() => Ok(true),
@@ -193,7 +185,7 @@ impl BlobStoreProvider for HttpStore {
 
 	fn remove(&self, _path: &RelPath) -> SendBoxedFuture<Result> {
 		let err = self.read_only();
-		provider_send::boxed(async move { Err(err) })
+		Box::pin(async move { Err(err) })
 	}
 
 	/// The url a key is served at, absolute only: an origin-relative mount
@@ -203,7 +195,7 @@ impl BlobStoreProvider for HttpStore {
 		path: &RelPath,
 	) -> SendBoxedFuture<Result<Option<String>>> {
 		let url = self.url(path);
-		provider_send::boxed(async move {
+		Box::pin(async move {
 			url.authority().is_some().then(|| url.to_string()).xok()
 		})
 	}
