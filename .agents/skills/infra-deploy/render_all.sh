@@ -14,7 +14,7 @@ mkdir -p "$out"
 
 run() { # run <dump-name> <target-dir> <args...>
 	local name=$1 dir=$2; shift 2
-	if AWS_PROFILE= cargo run -q -p beet-cli --features infra,extra -- "$@" >"$out/$name.log" 2>&1; then
+	if cargo run -q -p beet-cli --features infra,extra -- "$@" >"$out/$name.log" 2>&1; then
 		cp "target/infra/$dir/main.tf.json" "$out/$name"
 	else
 		echo "RENDER FAILED: $name (see $out/$name.log)"

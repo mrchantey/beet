@@ -128,31 +128,15 @@ impl ColdStore {
 		.xok()
 	}
 
-	/// An `aws <service>` invocation against the cold endpoint. Region `auto`
-	/// is what every R2 bucket answers to; the session token is cleared so a
-	/// deploy machine holding temporary AWS credentials does not send them to
-	/// the other vendor.
+	/// An `aws <service>` invocation against the cold endpoint, as the
+	/// bucket's own pair.
 	fn aws<'a>(
 		&self,
 		service: &'a str,
 		args: impl IntoIterator<Item = &'a str>,
 	) -> ChildProcess {
-		ChildProcess::new("aws")
-			.without_env("AWS_PROFILE")
-			.without_env("AWS_SESSION_TOKEN")
-			.with_envs([
-				("AWS_ACCESS_KEY_ID", self.access_key.as_str()),
-				("AWS_SECRET_ACCESS_KEY", self.secret_key.as_str()),
-			])
-			.with_args(
-				[service].into_iter().chain(args).map(SmolStr::from).chain([
-					SmolStr::from("--endpoint-url"),
-					SmolStr::from(self.endpoint.as_str()),
-					SmolStr::from("--region"),
-					SmolStr::from(R2BucketBlock::REGION),
-				]),
-			)
-			.with_secret(self.secret_key.as_str())
+		aws_cli_ext::r2(&self.endpoint, &self.access_key, &self.secret_key)
+			.with_args([service].into_iter().chain(args))
 	}
 
 	pub async fn list(&self, prefix: &str) -> Result<Listing> {

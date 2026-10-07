@@ -375,33 +375,31 @@ async fn send_inbound_ses(
 	address: &str,
 	token: &str,
 ) -> Result {
-	ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args([
-			"sesv2".to_string(),
-			"send-email".to_string(),
-			"--from-email-address".to_string(),
-			from.to_string(),
-			"--destination".to_string(),
-			format!("ToAddresses={address}"),
-			// through the domain's own configuration set, so a bounce or a
-			// complaint on the probe lands in the same event stream as real
-			// mail rather than silently nowhere.
-			"--configuration-set-name".to_string(),
-			sender_domain.configuration_set_name(),
-			"--content".to_string(),
-			json!({
-				"Simple": {
-					"Subject": { "Data": MailProbe::subject(token) },
-					"Body": { "Text": { "Data": "Inbound leg of the beet mail probe." } },
-				}
-			})
-			.to_string(),
-			"--region".to_string(),
-			region.to_string(),
-		])
-		.run_async()
-		.await?;
+	let destination = format!("ToAddresses={address}");
+	// through the domain's own configuration set, so a bounce or a complaint
+	// on the probe lands in the same event stream as real mail rather than
+	// silently nowhere.
+	let configuration_set = sender_domain.configuration_set_name();
+	let content = json!({
+		"Simple": {
+			"Subject": { "Data": MailProbe::subject(token) },
+			"Body": { "Text": { "Data": "Inbound leg of the beet mail probe." } },
+		}
+	})
+	.to_string();
+	aws_cli_ext::service("sesv2", region, [
+		"send-email",
+		"--from-email-address",
+		from,
+		"--destination",
+		&destination,
+		"--configuration-set-name",
+		&configuration_set,
+		"--content",
+		&content,
+	])
+	.run_async()
+	.await?;
 	Ok(())
 }
 

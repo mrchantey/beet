@@ -121,9 +121,6 @@ impl R2BucketBlock {
 	/// policy it cannot write.
 	pub const ACCESS_KIND: &'static str = "r2_bucket";
 
-	/// The S3 api's region for every R2 bucket.
-	pub const REGION: &'static str = "auto";
-
 	/// The permission groups the bucket's token holds: objects in this one
 	/// bucket, read and write, and nothing at the account level. Named through
 	/// [`TokenPermission`], the one table every Cloudflare group beet uses
@@ -151,11 +148,7 @@ impl R2BucketBlock {
 	/// The S3-compatible endpoint every client dials, composed from the
 	/// stack's [`CloudflareAccount`] rather than typed by a consumer.
 	pub fn endpoint(&self, stack: &ResolvedStack) -> Result<String> {
-		format!(
-			"https://{}.r2.cloudflarestorage.com",
-			stack.cloudflare_account()?.id()
-		)
-		.xok()
+		stack.cloudflare_account()?.r2_endpoint().xok()
 	}
 
 	/// Where the token's S3 access key id is parked, ie
@@ -451,7 +444,7 @@ impl StoreBlock for R2BucketBlock {
 			name: self.bucket_name(stack).into(),
 			path_prefix: None,
 			endpoint: Some(self.endpoint(stack)?.into()),
-			region: Some(Self::REGION.into()),
+			region: Some(CloudflareAccount::R2_REGION.into()),
 		}
 		.xok()
 	}

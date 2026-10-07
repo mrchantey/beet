@@ -47,8 +47,17 @@ pub struct CloudflareAccount(pub SmolStr);
 impl CloudflareAccount {
 	pub fn new(id: impl Into<SmolStr>) -> Self { Self(id.into()) }
 
+	/// The S3 api's region for every R2 bucket.
+	pub const R2_REGION: &'static str = "auto";
+
 	/// The account id, as the dashboard url shows it.
 	pub fn id(&self) -> &str { &self.0 }
+
+	/// The account's R2 endpoint over the S3 api, ie
+	/// `https://<id>.r2.cloudflarestorage.com`.
+	pub fn r2_endpoint(&self) -> String {
+		format!("https://{}.r2.cloudflarestorage.com", self.id())
+	}
 }
 
 /// The Cloudflare zone a stack publishes its records into, ie

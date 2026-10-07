@@ -23,8 +23,8 @@ pub struct ChildProcess {
 	/// Environment variables to set for the child process.
 	#[set_with(skip)]
 	envs: Vec<(SmolStr, SmolStr)>,
-	/// Environment variables to remove from the inherited environment, eg an empty
-	/// `AWS_PROFILE` the `aws` cli rejects.
+	/// Environment variables to remove from the inherited environment, eg an
+	/// `AWS_SESSION_TOKEN` that must not ride beside an explicitly handed pair.
 	#[set_with(skip)]
 	env_removals: Vec<SmolStr>,
 	/// Optional working directory for the command. If `None`, uses the current directory.
@@ -198,9 +198,9 @@ impl ChildProcess {
 	}
 
 	/// Remove an environment variable from the inherited environment for the child
-	/// process. Needed when an inherited var is actively harmful, eg an empty
-	/// `AWS_PROFILE` (`AWS_PROFILE=`) which the `aws` cli reads as a profile literally
-	/// named `""` and rejects, rather than falling back to explicit keys.
+	/// process. Needed when an inherited var is actively harmful, eg an
+	/// `AWS_SESSION_TOKEN` beside an explicitly handed long-lived pair, which
+	/// then authenticates as nobody.
 	pub fn without_env(mut self, key: impl Into<SmolStr>) -> Self {
 		self.env_removals.push(key.into());
 		self

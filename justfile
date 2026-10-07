@@ -66,24 +66,22 @@ beet *args:
   cargo run -p beet-cli -- "$@"
 
 # Deploy the beet website to its AWS Lightsail box; --stage=prod targets prod
-# (default dev). Lean headless build (no winit/ml) and AWS_PROFILE cleared so
-# tofu/aws/s3 use the deployer's pair from `secrets.toml` rather than a global
-# profile. The empty `AWS_PROFILE=` is unset to the rust SDK but a nonexistent
-# profile to the `aws` cli (`The config profile () could not be found`): a
-# hand-run cli call alongside these recipes wants `unset AWS_PROFILE`.
+# (default dev). Lean headless build (no winit/ml); tofu, aws and s3 all run
+# as the deployer pair `secrets.toml` seals, since the machine holds no ambient
+# AWS credential.
 # `--main=site`: the SITE entry declares its own resources and deploy verbs, so
 # the application that runs on them is the thing that provisions them.
 # `infra,extra` links the deploy blocks and the IaC verb routes. Without them the
 # entry still loads whole, with the deploy tags inert: the stack's
 # `RequireFeatures(["infra","extra"])` then fails the dispatch naming them.
 beet-deploy *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site deploy {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site deploy {{ args }}
 # Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
 beet-sync *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site sync {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site sync {{ args }}
 # Tail the deployed instance's logs.
 beet-watch *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site watch {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site watch {{ args }}
 # Refresh the files site/assets borrows from the workspace tree (the wasm binary,
 # the geoip database, the robot faces). Runs ahead of every publish anyway.
 beet-assets *args:
@@ -91,38 +89,38 @@ beet-assets *args:
 # Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:
 # the `shared` stage (the assets bucket) has its own verbs under `site-shared`.
 beet-destroy *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site destroy --force {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site destroy --force {{ args }}
 # Resolve the deploy config without touching cloud (safe pre-apply check).
 beet-validate *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site validate {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site validate {{ args }}
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
 # Re-encrypt the stage stack's state under the current `TF_STATE_PASSPHRASE`
 # (the record's rotation note has the surrounding steps); the shared and social
 # stacks take the same verb as args: `just site-shared rotate-state`.
 beet-rotate-state *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site rotate-state {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site rotate-state {{ args }}
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
 # entry, since these assets belong to the repo rather than to the website.
 beet-shared *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- shared {{ args }}
+  cargo run -p beet-cli --features infra,extra -- shared {{ args }}
 # The SITE assets bucket (`beet-site--shared--assets`), the source of record for
 # ./site/assets: `just site-shared plan|apply|pull|push|..`.
 site-shared *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
 # The atproto handles under beet.org (the site entry's `social` stack):
 # `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
 # block's `dns_stage` publishes nothing from any other stage. `atproto` with
 # `infra` links the block.
 site-social *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site social {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --main=site social {{ args }}
 # Diff the beet.org zone against every stack the site entry declares, reporting
 # the strays; `--fix` deletes them. Built with `atproto` so the handle records
 # are declarations rather than strays.
 site-audit *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
 # Converge the deployer of the WORKSPACE entry's apps (`beet--shared`): its user,
 # one `<app>--deploy` policy and one `<app>--<stage>--runtime-boundary` per app,
 # and the pair sealed in `secrets.toml`. A policy covers the apps its OWN entry
@@ -134,14 +132,14 @@ site-audit *args:
 # are an account read it skips. `infra,extra` is not optional here: without them
 # `<DeployerMint/>` is `bx:cfg`-excluded and the verb does not exist.
 beet-mint *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
+  cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
 # The same for the SITE entry's apps (`beet-site--*`, `beet-social--prod`). A
 # mint covers ONE stage's services, so prod is the stage worth minting: `just
 # site-mint --stage=prod`. `atproto` so the social app's policy renders at all:
 # without it that tag spawns as nothing and the mint silently covers one app
 # fewer.
 site-mint *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
 # Converge the CLOUDFLARE token this repo deploys with: one account-owned
 # `beet-deploy` token scoped to exactly the permission groups the site entry's
 # stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
@@ -152,7 +150,7 @@ site-mint *args:
 # nor the document and needing no credential at all. `atproto` so the social
 # stack's records render, for the same reason `site-audit` builds with it.
 site-cloudflare-mint *args:
-  AWS_PROFILE= cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

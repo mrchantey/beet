@@ -108,12 +108,6 @@ impl AwsCli {
 		cmd.args(rest)
 			.stdout(Stdio::inherit())
 			.stderr(Stdio::inherit());
-		// without an explicit `--profile`, drop a possibly-empty inherited
-		// `AWS_PROFILE` (the lean `beet-*` recipes export `AWS_PROFILE=`) the cli
-		// would read as a profile named `""`; fall back to explicit keys instead.
-		if self.profile.is_none() {
-			cmd.env_remove("AWS_PROFILE");
-		}
 		let status = cmd.status().await?;
 
 		if !status.success() {

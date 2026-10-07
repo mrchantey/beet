@@ -98,7 +98,7 @@ pub async fn AwsExec(cx: ActionContext<Request>) -> Result<Response> {
 		})
 		.without_launch_env()
 		// an inherited profile would address a different identity than the one
-		// just named, and an empty value is a MISSING profile to the cli
+		// just named
 		.without_env("AWS_PROFILE")
 		// and any stale token: a long-lived pair plus a foreign session token
 		// authenticates as nobody. Removals apply before additions, so a

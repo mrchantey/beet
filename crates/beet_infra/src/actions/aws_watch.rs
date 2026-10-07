@@ -96,21 +96,15 @@ pub async fn AwsWatch(
 
 	info!("tailing CloudWatch log group: {log_group} (region: {region})");
 
-	// spawn aws logs tail with inherited stdout/stderr for streaming output.
-	// drop a possibly-empty inherited `AWS_PROFILE` (see `build_docker_image`).
-	let mut child = ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_args([
-			"logs",
-			"tail",
-			log_group.as_str(),
-			"--follow",
-			"--region",
-			region.as_str(),
-			"--format",
-			"short",
-		])
-		.spawn()?;
+	// spawn aws logs tail with inherited stdout/stderr for streaming output
+	let mut child = aws_cli_ext::service("logs", &region, [
+		"tail",
+		log_group.as_str(),
+		"--follow",
+		"--format",
+		"short",
+	])
+	.spawn()?;
 
 	// if timeout is set, wait then kill; otherwise follow indefinitely
 	if let Some(timeout) = timeout {

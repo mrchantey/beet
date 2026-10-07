@@ -145,7 +145,7 @@ pub async fn CloudflareContainerDeployAction(
 	// account the stack declares; the account is also what addresses the
 	// managed registry on deploy.
 	let account = cloudflare_account(&cx).await?;
-	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
+	let endpoint = account.r2_endpoint();
 
 	let dir = wrangler_ext::project_dir(block.name())?;
 	let binary_name = "beet";
@@ -1019,28 +1019,10 @@ async fn empty_bucket(
 		return Ok(());
 	}
 	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
-	let endpoint = format!("https://{}.r2.cloudflarestorage.com", account.id());
+	let endpoint = account.r2_endpoint();
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
-	// the R2 data-plane keys go in as the standard AWS env vars, overriding any
-	// real-AWS creds the process inherited, with `AWS_REGION=auto` as R2
-	// requires (also overriding the inherited region). Drop a possibly-empty inherited
-	// `AWS_PROFILE` the cli would otherwise reject (mirrors `build_docker_image`).
-	match ChildProcess::new("aws")
-		.without_env("AWS_PROFILE")
-		.with_secret(secret_key.as_str())
-		.with_envs([
-			("AWS_ACCESS_KEY_ID", access_key.as_str()),
-			("AWS_SECRET_ACCESS_KEY", secret_key.as_str()),
-			("AWS_REGION", "auto"),
-		])
-		.with_args([
-			"s3",
-			"rm",
-			&format!("s3://{bucket}"),
-			"--recursive",
-			"--endpoint-url",
-			&endpoint,
-		])
+	match aws_cli_ext::r2(&endpoint, &access_key, &secret_key)
+		.with_args(["s3", "rm", &format!("s3://{bucket}"), "--recursive"])
 		.run_async()
 		.await
 	{
