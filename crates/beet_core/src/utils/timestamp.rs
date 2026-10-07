@@ -170,6 +170,16 @@ impl Timestamp {
 	}
 }
 
+/// The instant `duration` later, saturating at the far future.
+impl core::ops::Add<Duration> for Timestamp {
+	type Output = Self;
+	fn add(self, duration: Duration) -> Self {
+		Self(self.0.saturating_add(
+			duration.as_millis().try_into().unwrap_or(i64::MAX),
+		))
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

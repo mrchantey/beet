@@ -150,6 +150,12 @@ Three actions that belong to that idea are **deliberately absent**, because a de
 
 `BoolIfExists`, never `Bool`: `aws:MultiFactorAuthPresent` is ABSENT from a long-lived access key's requests rather than false, so a `Bool` deny would not fire for exactly the credential it is aimed at. Scoped to `<app>--prod--*`, so tearing a dev stack down stays free.
 
+## The Cloudflare deploy token
+
+Cloudflare's half of the deployer is one account-owned api token per credential document, `<repo>-deploy`, sealed as `CLOUDFLARE_API_TOKEN` and converged by `<CloudflareMint/>` (`beet cloudflare/mint`). `DeployerToken` lowers its scope from the `cloudflare_*` types the stacks render and the `CloudflareAccess` each Cloudflare action declares, so it holds exactly the permission groups the declarations ask for and never `Account API Tokens Write`; the verb runs as a separate mint token that lives in the password manager and in no document, since that group can mint any token the account can hold.
+
+Cloudflare has no permissions boundary to cap a token with and no mfa condition to put on one, so the token is held to the two terms it does offer instead: a lifetime (`ttl_days`, ninety by default), carried by the sealed record as `expires` so every launch that loads it warns in the fortnight before and the verb renews inside the same fortnight, and an optional address filter (`request_ips`) for a repo whose deploys always leave from fixed addresses. Neither is a boundary; both narrow the window a leaked value is good for. The verb's docs carry the convergence rule, the write order and why a bucket's token is held to neither.
+
 ## Grants
 
 Permissions are declared by the resource (`Block::grants` -> `AccessGrant`) and **lowered** by the compute block, which for the AWS computes is the shared `IamPolicy`: it seeds the statements the compute needs on its own account (the repo bucket it boots from, a log group) and lowers the stack's grants into read/write bucket and per-table statements. A compute whose lowering yields nothing emits no policy resource at all, never a managed `FullAccess` one; per-compute needs ride knobs on the shared core, never forks. A resource block never writes an ARN; a compute block never names a sibling resource.

@@ -69,6 +69,17 @@ pub struct SecretRecord {
 		with = "iso8601::option"
 	)]
 	pub modified: Option<Timestamp>,
+	/// When the value stops authenticating, for a credential minted with a
+	/// lifetime; absent on one that lasts until revoked. A launch that puts
+	/// the record to use warns inside the last
+	/// [`EXPIRY_NOTICE`](Self::EXPIRY_NOTICE) of it, and `secrets/check`
+	/// fails once it has passed.
+	#[serde(
+		default,
+		skip_serializing_if = "Option::is_none",
+		with = "iso8601::option"
+	)]
+	pub expires: Option<Timestamp>,
 	/// The provider address the value was exported from, on an export.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
@@ -76,6 +87,45 @@ pub struct SecretRecord {
 	/// a hand-kept record.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub rotation: Option<SecretRotation>,
+}
+
+impl SecretRecord {
+	/// How long before its [`expires`](Self::expires) a record is
+	/// [`Expiring`](SecretExpiry::Expiring): a fortnight, so a credential
+	/// used weekly still warns twice before it lapses. A mint that sets an
+	/// expiry renews inside the same window, so the warning and the renewal
+	/// agree on when a credential is due.
+	pub const EXPIRY_NOTICE: Duration = Duration::from_secs(14 * 24 * 60 * 60);
+
+	/// Where this record stands against its [`expires`](Self::expires) at
+	/// `now`.
+	pub fn expiry(&self, now: Timestamp) -> SecretExpiry {
+		match self.expires {
+			Some(at) if at <= now => SecretExpiry::Expired { at },
+			Some(at) if at <= now + Self::EXPIRY_NOTICE => {
+				SecretExpiry::Expiring { at }
+			}
+			_ => SecretExpiry::Lasting,
+		}
+	}
+}
+
+/// Where a record stands against its [`SecretRecord::expires`] at one
+/// instant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecretExpiry {
+	/// No expiry, or one further off than [`SecretRecord::EXPIRY_NOTICE`].
+	Lasting,
+	/// Still authenticating, inside the notice.
+	Expiring {
+		/// When it stops.
+		at: Timestamp,
+	},
+	/// No longer authenticating.
+	Expired {
+		/// When it stopped.
+		at: Timestamp,
+	},
 }
 
 /// One record inside a group's sealed blob: the value and a copy of its
@@ -176,6 +226,59 @@ impl Secret {
 			.collect::<String>()
 			.xmap(SmolStr::from)
 			.xok()
+	}
+
+	/// One line saying this record is expiring or has expired, and how it
+	/// rotates; `None` while it lasts. What a launch warns and
+	/// `secrets/check` reports.
+	///
+	/// ```
+	/// # use beet_core::prelude::*;
+	/// let now = Date::parse("2027-01-01").unwrap().timestamp();
+	/// let secret = Secret {
+	/// 	name: "API_TOKEN".into(),
+	/// 	group: "default".into(),
+	/// 	value: "..".into(),
+	/// 	record: SecretRecord {
+	/// 		expires: Some(Date::parse("2027-01-10").unwrap().timestamp()),
+	/// 		rotation: Some(SecretRotation::manual("beet mint\n> step two")),
+	/// 		..default()
+	/// 	},
+	/// };
+	/// secret
+	/// 	.expiry_notice(now)
+	/// 	.unwrap()
+	/// 	.xpect_eq("`API_TOKEN` expires 2027-01-10, in 9 day(s), rotated by `beet mint`");
+	/// ```
+	pub fn expiry_notice(&self, now: Timestamp) -> Option<String> {
+		let when = match self.record.expiry(now) {
+			SecretExpiry::Lasting => return None,
+			SecretExpiry::Expiring { at } => {
+				// rounded up, so the last hours of a credential read as a day
+				let days = (at.millis() - now.millis() + Date::MILLIS_PER_DAY
+					- 1) / Date::MILLIS_PER_DAY;
+				format!("expires {}, in {days} day(s)", Date::from(at))
+			}
+			SecretExpiry::Expired { at } => {
+				format!("expired {}", Date::from(at))
+			}
+		};
+		// the first line of a rotation is the command, the rest its steps
+		let rotation = match &self.record.rotation {
+			Some(SecretRotation::Manual { why }) => {
+				why.lines().next().map(|line| line.trim().to_string())
+			}
+			Some(rotation) => Some(rotation.to_string()),
+			None => None,
+		};
+		format!(
+			"`{}` {when}{}",
+			self.name,
+			rotation
+				.map(|rotation| format!(", rotated by `{rotation}`"))
+				.unwrap_or_default()
+		)
+		.xmap(Some)
 	}
 }
 

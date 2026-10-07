@@ -41,14 +41,20 @@ struct SetParams {
 	/// > Create Token > beet-deploy`), `remint` for one `--generate` mints,
 	/// `replace:<resource>` for one an apply derives.
 	rotation: Option<String>,
+	/// When the value stops authenticating, for a credential issued with a
+	/// lifetime: a day (`2027-01-05`, midnight UTC) or an ISO 8601 instant.
+	/// Every launch that loads it warns in the fortnight before, and
+	/// `secrets/check` fails after. Re-setting a record restates it, as it
+	/// restates the note and rotation.
+	expires: Option<String>,
 }
 
 /// Write one record to a document (created when it does not exist yet):
 /// the value from `--value`, `--from-env`, `--copy` (another record's),
 /// `--generate` (`--length` for other than 32 characters) or stdin, into
-/// `--group` (default `default`),
-/// with `--role`, `--note` and `--rotation`, re-sealing the group to its
-/// current recipient list. A record already in another group moves.
+/// `--group` (default `default`), with `--role`, `--note`, `--rotation` and
+/// `--expires`, re-sealing the group to its current recipient list. A record
+/// already in another group moves.
 ///
 /// ```sh
 /// beet secrets/set OPENAI_API_KEY --role=env_var       # prompts, no echo
@@ -75,6 +81,11 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 		role: params.role.as_deref().map(str::parse).transpose()?,
 		note: params.note.map(SmolStr::new),
 		rotation: params.rotation.as_deref().map(str::parse).transpose()?,
+		expires: params
+			.expires
+			.as_deref()
+			.map(SecretsSet::expires)
+			.transpose()?,
 		..default()
 	};
 	let group = params
@@ -92,6 +103,18 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 }
 
 impl SecretsSet {
+	/// `--expires`: a day, read as its midnight UTC, or a full instant.
+	fn expires(text: &str) -> Result<Timestamp> {
+		Timestamp::parse_rfc3339(text)
+			.or_else(|| Date::parse(text).ok().map(|day| day.timestamp()))
+			.ok_or_else(|| {
+				bevyhow!(
+					"`--expires={text}` is neither a day (`2027-01-05`) nor an \
+					ISO 8601 instant (`2027-01-05T00:00:00Z`)"
+				)
+			})
+	}
+
 	/// The value the flags name: exactly one of `--value`, `--from-env`,
 	/// `--copy` and `--generate`, else stdin.
 	fn value(
@@ -183,7 +206,7 @@ mod test {
 
 	/// The first `set` creates the document and `default`; a second with
 	/// `--group` creates that group; a `set` of an existing record moves it;
-	/// the rotation lands as typed.
+	/// the rotation lands as typed and a day's expiry as its midnight.
 	#[beet_core::test]
 	async fn sets_creating_document_and_groups() {
 		let mut fixture = VerbWorld::new();
@@ -192,7 +215,8 @@ mod test {
 				SecretsSet,
 				Request::from_cli_str(
 					"--value=sk-test --role=env_var --note=billing \
-					--rotation=manual:platform.openai.com/api-keys",
+					--rotation=manual:platform.openai.com/api-keys \
+					--expires=2027-01-05",
 				)
 				.with_param("name", "OPENAI_API_KEY"),
 			)
@@ -228,6 +252,9 @@ mod test {
 				"platform.openai.com/api-keys",
 			)));
 		key.record.modified.xpect_some();
+		key.record
+			.expires
+			.xpect_eq(Some(Date::parse("2027-01-05").unwrap().timestamp()));
 		// moved
 		fixture
 			.call_str(
@@ -269,6 +296,16 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("replace:<resource>");
+		fixture
+			.call(
+				SecretsSet,
+				Request::from_cli_str("--value=x --expires=soon")
+					.with_param("name", "X"),
+			)
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`2027-01-05`");
 	}
 
 	/// `--copy` takes another record's value without printing it, and names

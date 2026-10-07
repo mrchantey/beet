@@ -25,7 +25,8 @@
 //!   on argv, an identity never does.
 //! - **The document is `secrets.toml` beside the entry, committed.**
 //!   `[groups.<g>]` lists recipients and `[groups.<g>.secrets.NAME]` each
-//!   record's metadata (`role`, `note`, `rotation`, `modified`, `address`),
+//!   record's metadata (`role`, `note`, `rotation`, `modified`, `expires`,
+//!   `address`),
 //!   `[sealed]` holds one armored age file per group. No `.age` suffix: the
 //!   file is plaintext, its blobs are the age files, and `age -d -i
 //!   ~/.config/beet/age/keys.txt` on a pasted blob is the escape hatch.
@@ -57,6 +58,12 @@
 //!   `replace:<resource>`, `remint` or `manual:<how>` (the url first, one
 //!   step per line); a mint site cannot omit it, and `secrets/revoke` runs
 //!   what it can and prints the rest.
+//! - **A credential with a lifetime says when it dies.** A mint that sets
+//!   one records `expires`; the launch that sets the record into the
+//!   environment warns inside its last
+//!   [`SecretRecord::EXPIRY_NOTICE`], naming the rotation, and `check`
+//!   fails once it has passed. `set --expires=<date>` records a hand-made
+//!   one's.
 //! - **Two nouns, two flags.** `secrets/*` verbs take
 //!   `--document=<label or path>` (the declaration labelled `secrets`, else
 //!   the sole one, else `secrets.toml` beside the entry); `vault/*` verbs

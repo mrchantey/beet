@@ -8,8 +8,9 @@ use core::fmt::Write;
 /// Verify the secrets setup: the identity resolves; every declared document
 /// (or the one `--document` names) reads and every group this identity
 /// opens verifies against its index; every group's sealed recipient list
-/// matches its list (else "run `secrets/rekey`"); and which groups this
-/// identity is not in. A declared path that is unwritten but has a dated
+/// matches its list (else "run `secrets/rekey`"); which groups this
+/// identity is not in; and every opened record inside its expiry notice (a
+/// note) or past its expiry (a failure). A declared path that is unwritten but has a dated
 /// series beside it (an export with `dated=true`) checks the newest of the
 /// series. One line per item with a tick or the reason; the whole ledger
 /// prints, then a non-zero exit on any failure.
@@ -184,6 +185,7 @@ impl Report {
 				));
 			} else if opened.can_open(group_name) {
 				self.pass(format!("  group `{group_name}`: opens ({members})"));
+				self.expiries(&opened, group_name);
 			} else if opened.pending.iter().any(|group| group == group_name) {
 				self.fail(format!(
 					"  group `{group_name}`: lists this identity but was sealed \
@@ -197,6 +199,28 @@ impl Report {
 			}
 		}
 		Ok(())
+	}
+
+	/// One line per record of an opened group that is expiring (a note) or
+	/// has expired (a failure), read from the sealed side so a hand edit of
+	/// the index cannot raise or silence one.
+	fn expiries(&mut self, opened: &OpenSecrets, group: &str) {
+		let now = Timestamp::now();
+		for secret in opened
+			.secrets
+			.values()
+			.filter(|secret| secret.group == group)
+		{
+			let Some(notice) = secret.expiry_notice(now) else {
+				continue;
+			};
+			match secret.record.expiry(now) {
+				SecretExpiry::Expired { .. } => {
+					self.fail(format!("    {notice}"))
+				}
+				_ => self.note(format!("    {notice}")),
+			}
+		}
 	}
 
 	/// The report, with a failing status (a non-zero exit) on any failure.
@@ -380,5 +404,55 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("✗ document `nope.toml`: not written yet");
+	}
+
+	/// A record inside its notice is a note and the check still passes; one
+	/// past its expiry fails it, both naming how the record rotates.
+	#[beet_core::test]
+	async fn reports_expiring_records() {
+		let mut fixture = VerbWorld::new();
+		let in_days = |days: u64| {
+			Some(Timestamp::now() + Duration::from_secs(days * 24 * 60 * 60))
+		};
+		fixture
+			.set("LASTING", "1", SecretRecord {
+				expires: in_days(60),
+				..default()
+			})
+			.await;
+		fixture
+			.set("EXPIRING", "2", SecretRecord {
+				expires: in_days(3),
+				rotation: Some(SecretRotation::manual("beet mint\n> a step")),
+				..default()
+			})
+			.await;
+		let response =
+			fixture.call(SecretsCheck, Request::get("/")).await.unwrap();
+		response.status().xpect_eq(StatusCode::OK);
+		response
+			.unwrap_str()
+			.await
+			.xpect_contains("-     `EXPIRING` expires ")
+			.xpect_contains(", in 3 day(s), rotated by `beet mint`")
+			.xnot()
+			.xpect_contains("LASTING");
+
+		fixture
+			.set("EXPIRED", "3", SecretRecord {
+				expires: Some(Timestamp::UNIX_EPOCH),
+				..default()
+			})
+			.await;
+		let response =
+			fixture.call(SecretsCheck, Request::get("/")).await.unwrap();
+		response
+			.status()
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
+		response
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("✗     `EXPIRED` expired 1970-01-01");
 	}
 }

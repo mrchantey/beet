@@ -47,14 +47,32 @@ impl OpenSecrets {
 	/// Set every `EnvVar` record into the process environment where it is
 	/// not already set (the environment wins, then `.env`, then the
 	/// document), answering how many landed.
+	///
+	/// A record that lands expiring or expired is one warning naming how it
+	/// rotates ([`Secret::expiry_notice`]): only the load that puts a record
+	/// to use says so, so a launch loading its document twice warns once, and
+	/// a value the environment overrides for one command is not nagged about.
 	pub fn set_env_vars(&self) -> Result<usize> {
-		let pairs = self
-			.env_vars()
-			.into_iter()
-			.filter(|(key, _)| env_ext::var(key).is_err())
+		let landing = self
+			.secrets
+			.values()
+			.filter(|secret| secret.record.role == Some(SecretRole::EnvVar))
+			.filter(|secret| env_ext::var(&secret.name).is_err())
 			.collect::<Vec<_>>();
-		let count = pairs.len();
-		env_ext::set_missing(pairs)?;
+		if let Ok(now) = Timestamp::try_now() {
+			for notice in landing
+				.iter()
+				.filter_map(|secret| secret.expiry_notice(now))
+			{
+				warn!("{notice}");
+			}
+		}
+		let count = landing.len();
+		env_ext::set_missing(
+			landing
+				.into_iter()
+				.map(|secret| (secret.name.clone(), secret.value.clone())),
+		)?;
 		count.xok()
 	}
 

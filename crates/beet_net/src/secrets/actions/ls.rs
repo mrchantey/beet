@@ -7,8 +7,8 @@ use core::fmt::Write;
 
 /// List a document's index, one block per group: the group's recipient
 /// count and whether this identity opens it, then every record as its name,
-/// role and modified time on one line with its note and rotation indented
-/// under it. The index is plaintext, so no identity is needed and no value
+/// role and modified time on one line with its expiry, note and rotation
+/// indented under it. The index is plaintext, so no identity is needed and no value
 /// is ever printed.
 ///
 /// ```sh
@@ -69,6 +69,9 @@ pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
 							.unwrap_or_default(),
 					],
 					[
+						record.expires.map(|expires| {
+							format!("expires {}", expires.format_iso8601())
+						}),
 						record.note.as_deref().map(str::to_string),
 						record.rotation.as_ref().map(ToString::to_string),
 					],
@@ -105,7 +108,7 @@ fn group_status(name: &str, opened: &OpenSecrets) -> String {
 /// `(none)` when there are no rows.
 fn write_records(
 	out: &mut String,
-	rows: &[(Vec<String>, [Option<String>; 2])],
+	rows: &[(Vec<String>, [Option<String>; 3])],
 ) -> Result {
 	let Some(columns) = rows.first().map(|(cells, _)| cells.len()) else {
 		writeln!(out, "  (none)")?;
@@ -189,6 +192,7 @@ mod test {
 				"OPENAI_API_KEY",
 				"sk-PRIVATE",
 				SecretRecord {
+					expires: Some(Date::parse("2027-01-05").unwrap().timestamp()),
 					// one dashboard step per line, each indented under the first
 					rotation: Some(SecretRotation::manual(
 						"https://platform.openai.com/api-keys\n> Create new secret key\n> name it beet",
