@@ -10,7 +10,7 @@ use crate::prelude::*;
 /// This is a [`Component`] spawned alongside test bundles. All parameters
 /// are parsed eagerly at construction time rather than lazily extracted.
 #[derive(Debug, Clone, Component)]
-pub(crate) struct TestRunnerConfig {
+pub struct TestRunnerConfig {
 	/// The instant this was created, for timing.
 	started: Instant,
 	/// Clear the terminal on run and always exit ok for cleaner output when in watch mode.
@@ -139,7 +139,7 @@ impl TestRunnerConfig {
 	pub fn timeout(&self) -> Duration { Duration::from_millis(self.timeout_ms) }
 
 	/// Returns true if the given test passes the filter.
-	pub fn passes_filter(&self, test: &super::Test) -> bool {
+	pub(crate) fn passes_filter(&self, test: &super::Test) -> bool {
 		self.filter.passes(test.name.to_string())
 			|| self.filter.passes(test.source_file)
 	}

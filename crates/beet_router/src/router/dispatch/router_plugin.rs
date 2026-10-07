@@ -41,12 +41,17 @@ impl Plugin for RouterPlugin {
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
 			.add_observer(rebuild_route_tree_on_build)
-			// `CfgExcluded` (a beet_core component) is reported here, where
-			// dispatch lives: an unmet declaration fails any call at or under
-			// it naming the missing features.
-			.add_observer(report_cfg_excluded)
 			// a replaced route outlives the swap while a request holds it
 			.add_systems(Update, despawn_idle_retired);
+		// a loaded scene's routes settle their parents after the load, on every
+		// target that loads scenes (the esp scene server among them).
+		#[cfg(feature = "template_serde")]
+		app.add_observer(rebuild_route_trees_on_load);
+		// `CfgExcluded` (a beet_core component) is reported here, where
+		// dispatch lives: an unmet declaration fails any call at or under it
+		// naming the missing features.
+		#[cfg(feature = "bsx_core")]
+		app.add_observer(report_cfg_excluded);
 
 		// no_std-core reflect registrations: these types are shared across std
 		// and no_std and reflection works on bare metal, so register them
@@ -261,8 +266,6 @@ impl Plugin for RouterPlugin {
 				.get_resource_or_init::<RuleSet>()
 				.extend_rules(app_shell_rules())
 				.extend_rules(route_index_rules());
-			#[cfg(feature = "template_serde")]
-			app.add_observer(rebuild_route_trees_on_load);
 			// the `<Template src>` include handler (local-file includes resolved
 			// against the nearest ancestor `BlobStore`), into the BSX tag seam.
 			#[cfg(all(feature = "bsx", feature = "template_serde"))]

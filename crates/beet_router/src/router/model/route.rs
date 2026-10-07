@@ -45,6 +45,7 @@ where
 /// scripted route selects — so a handler speaking it leaves `M1`/`M2` ambiguous.
 /// This names the ordinary choice, content negotiation both ways, so such a
 /// route reads no differently from any other.
+#[cfg(feature = "serde")]
 pub fn exchange_serde<In, Out, M, B>(
 	path: &str,
 	action: B,

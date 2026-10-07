@@ -87,8 +87,8 @@ mod document_blob;
 #[cfg(feature = "json")]
 mod document_store;
 // canonical json rows under zstd (or gzip, behind its feature), the codec named
-// by the extension.
-#[cfg(feature = "json")]
+// by the extension. std: the codecs stream through `std::io`.
+#[cfg(all(feature = "std", feature = "json"))]
 mod jsonl;
 // the http-served store: its listing endpoint answers json.
 #[cfg(all(feature = "std", feature = "json"))]
@@ -114,7 +114,7 @@ pub use document_blob::*;
 pub(crate) use document_store::*;
 #[cfg(all(feature = "std", feature = "json"))]
 pub use http_store::*;
-#[cfg(feature = "json")]
+#[cfg(all(feature = "std", feature = "json"))]
 pub use jsonl::*;
 #[cfg(all(feature = "template_serde", feature = "json"))]
 pub use scene_blob::*;
@@ -171,27 +171,21 @@ mod sqlite_store;
 #[cfg(feature = "sqlite")]
 pub use sqlite_store::*;
 
-#[cfg(feature = "std")]
 use beet_core::prelude::*;
 
-/// Plugin that registers store types for world serialization.
-#[cfg(feature = "std")]
+/// Plugin that registers store types for world serialization, and the
+/// observers resolving a scoped store or blob from its nearest ancestor store.
+/// no_std-capable: the std backends and the event bus register only with `std`.
 #[derive(Default)]
 pub struct StorePlugin;
 
-#[cfg(feature = "std")]
 impl Plugin for StorePlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<FsStore>()
-			.register_type::<InMemoryStore>()
+		app.register_type::<InMemoryStore>()
 			// store-path components: resolve a scoped store / blob from the nearest
 			// ancestor store, kept correct as stores churn above them.
 			.register_type::<DirPath>()
 			.register_type::<BlobPath>()
-			// the consumer -> declared-store relationship, so markup binds a
-			// consumer to a declaration (`{StoreRef($analytics)}`).
-			.register_type::<StoreRef>()
-			.register_type::<StoreConsumers>()
 			// the repo store marker: one canonical store per app, the one an
 			// entry loads through, enforced by its own insert hook.
 			.register_type::<RepoStore>()
@@ -199,14 +193,21 @@ impl Plugin for StorePlugin {
 			.add_observer(on_insert_blob_path)
 			.add_observer(on_insert_child_of)
 			.add_observer(on_insert_store)
-			.add_observer(on_remove_store);
-
-		// reactive substrate: global event bus, drain, and the two propagation
-		// observers marking matching BlobStore / Blob components Changed.
-		app.init_resource::<BlobEventBus>()
-			.add_systems(PreUpdate, drain_blob_events)
+			.add_observer(on_remove_store)
+			// the two propagation observers marking matching BlobStore / Blob
+			// components Changed.
 			.add_observer(propagate_blob_store_changes)
-			.add_observer(propagate_blob_changes)
+			.add_observer(propagate_blob_changes);
+
+		// the consumer -> declared-store relationship, so markup binds a
+		// consumer to a declaration (`{StoreRef($analytics)}`), the fs store,
+		// and the reactive substrate's global event bus and its drain.
+		#[cfg(feature = "std")]
+		app.register_type::<FsStore>()
+			.register_type::<StoreRef>()
+			.register_type::<StoreConsumers>()
+			.init_resource::<BlobEventBus>()
+			.add_systems(PreUpdate, drain_blob_events)
 			.add_observer(add_memory_store_watcher)
 			.add_observer(remove_memory_store_watcher);
 
@@ -266,7 +267,7 @@ impl Plugin for StorePlugin {
 		app.register_type::<SqliteStore>();
 
 		// the http-served store, so a scene declares a remote repo it reads.
-		#[cfg(feature = "json")]
+		#[cfg(all(feature = "std", feature = "json"))]
 		app.register_type::<HttpStore>();
 	}
 }

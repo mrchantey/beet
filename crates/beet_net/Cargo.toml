@@ -281,8 +281,6 @@ async-tungstenite = { version = "0.35", optional = true, default-features = fals
 "futures-03-sink"
 ] }
 blocking = { workspace = true, optional = true }
-#💡 zstd
-zstd = { workspace = true, optional = true }
 async-native-tls = { version = "0.6", optional = true }
 # ureq uses ring instead of aws-lc-rs so we must too
 futures-rustls = { version = "0.26", optional = true, default-features = false, features = ["ring", "logging", "tls12"] }
@@ -338,6 +336,13 @@ aws-config = { version = "1", optional = true, default-features = false, feature
 ] }
 
 
+
+# the zstd C library, the native `JsonlCodec::Zstd` backend. Hosted targets only:
+# a bare-metal build (`target_os = "none"`, eg esp32 firmware) has no libc for it
+# to compile against, and its JSONL codec is std-only anyway, so `dep:zstd` is
+# inert there.
+[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "none")))'.dependencies]
+zstd = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # non-optional on wasm: `Body`'s stream is not `Send`, so the `SendWrapper` that

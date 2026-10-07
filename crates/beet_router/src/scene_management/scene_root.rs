@@ -1,7 +1,7 @@
 //! Core scene-management primitives, shared by every host of a loadable beet
 //! scene (the file-watching CLI, the HTTP scene server, …): the
-//! [`BeetSceneRoot`] marker, the [`ResetScene`] event and [`set_scene`], which
-//! swaps the active scene atomically.
+//! [`BeetSceneRoot`] marker, the [`ResetScene`] event and
+//! [`BeetSceneRoot::load`], which swaps the active scene atomically.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -23,44 +23,44 @@ pub struct BeetSceneRoot;
 #[derive(Event)]
 pub struct ResetScene;
 
-/// Despawn the active scene (if any), then spawn the scene described by `media`,
-/// marking each spawned root [`BeetSceneRoot`]. Returns the new roots.
-///
-/// Runs under one exclusive world lock so no frame observes a half-swapped scene:
-/// the old [`BeetSceneRoot`] trees are despawned (after a [`ResetScene`] trigger,
-/// so hardware returns to rest), the new scene is deserialized and its roots
-/// marked. When `parent` is given the loader parents the roots under it before
-/// the load signal fires, so the [`rebuild_route_trees_on_load`] observer sees
-/// each route in its final url space either way.
-pub(crate) fn set_scene(
-	world: &mut World,
-	media: &MediaBytes,
-	parent: Option<Entity>,
-) -> Result<Vec<Entity>> {
-	BeetSceneRoot::despawn_all(world);
-
-	let mut loader = TemplateLoader::new(world);
-	if let Some(parent) = parent {
-		loader = loader.with_entity(parent);
-	}
-	// roots are the spawned entities sitting directly under `parent` (none, for
-	// an unparented load); mark them so the whole scene can be despawned
-	// together on the next swap.
-	let roots = loader
-		.load(media)?
-		.into_iter()
-		.filter(|entity| {
-			world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
-				== parent
-		})
-		.collect::<Vec<_>>();
-	roots.iter().for_each(|root| {
-		world.entity_mut(*root).insert(BeetSceneRoot);
-	});
-	Ok(roots)
-}
-
 impl BeetSceneRoot {
+	/// Despawn the active scene (if any), then spawn the scene described by
+	/// `media`, marking each spawned root [`BeetSceneRoot`]. Returns the new roots.
+	///
+	/// Runs under one exclusive world lock so no frame observes a half-swapped
+	/// scene: the old [`BeetSceneRoot`] trees are despawned (after a
+	/// [`ResetScene`] trigger, so hardware returns to rest), the new scene is
+	/// deserialized and its roots marked. When `parent` is given the loader
+	/// parents the roots under it before the load signal fires, so the route
+	/// tree rebuild on load sees each route in its final url space either way.
+	pub fn load(
+		world: &mut World,
+		media: &MediaBytes,
+		parent: Option<Entity>,
+	) -> Result<Vec<Entity>> {
+		BeetSceneRoot::despawn_all(world);
+
+		let mut loader = TemplateLoader::new(world);
+		if let Some(parent) = parent {
+			loader = loader.with_entity(parent);
+		}
+		// roots are the spawned entities sitting directly under `parent` (none, for
+		// an unparented load); mark them so the whole scene can be despawned
+		// together on the next swap.
+		let roots = loader
+			.load(media)?
+			.into_iter()
+			.filter(|entity| {
+				world.entity(*entity).get::<ChildOf>().map(ChildOf::parent)
+					== parent
+			})
+			.collect::<Vec<_>>();
+		roots.iter().for_each(|root| {
+			world.entity_mut(*root).insert(BeetSceneRoot);
+		});
+		Ok(roots)
+	}
+
 	/// Despawn the active scene: trigger [`ResetScene`] then despawn every
 	/// [`BeetSceneRoot`] tree and the [`SceneResource`]-backed resources *those roots*
 	/// declared (so a rebuild reinserts each fresh from markup rather than patching
@@ -153,11 +153,11 @@ mod test {
 		world
 	}
 
-	/// A serialized router scene reloads via [`set_scene`] with its routes
+	/// A serialized router scene reloads via [`BeetSceneRoot::load`] with its routes
 	/// reconstructed and reparented under a server, proving the reflectable
 	/// markers rebuild their path/behaviour from their require hooks.
 	#[beet_core::test(timeout_ms = 10000)]
-	async fn set_scene_round_trips() {
+	async fn load_round_trips() {
 		// build + serialize a one-route scene, as an exporter would.
 		let mut world = test_world();
 		let root = world
@@ -173,7 +173,8 @@ mod test {
 		// load it under a fresh server entity, as the scene server does.
 		let mut world = test_world();
 		let server = world.spawn(Router::with_defaults()).flush();
-		let roots = set_scene(&mut world, &json, Some(server)).unwrap();
+		let roots =
+			BeetSceneRoot::load(&mut world, &json, Some(server)).unwrap();
 		roots.len().xpect_eq(1);
 		world.flush();
 
@@ -306,7 +307,8 @@ mod test {
 		for _ in 0..3 {
 			let mut world = test_world();
 			let host = world.spawn(Router::with_defaults()).flush();
-			let roots = set_scene(&mut world, &bytes, Some(host)).unwrap();
+			let roots =
+				BeetSceneRoot::load(&mut world, &bytes, Some(host)).unwrap();
 			world.flush();
 			RouteTree::of(&world, roots[0])
 				.unwrap()

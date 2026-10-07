@@ -19,6 +19,7 @@ impl Retired {
 	/// Retire `route`: despawned at once if no request holds it, else marked
 	/// [`Retired`] so it leaves dispatch now and despawns once the last
 	/// request answers.
+	#[cfg(feature = "std")]
 	pub(crate) fn retire(world: &mut World, route: Entity) {
 		let idle = world
 			.get::<RouteInFlight>(route)

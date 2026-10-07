@@ -76,8 +76,12 @@ pub fn libtest_runner(tests: &[&test::TestDescAndFn]) {
 }
 
 /// Bevy plugin that sets up the test runner infrastructure.
+///
+/// Public for hosts that assemble their own test app, ie a bare-metal
+/// `testing_embedded` binary spawning a [`TestRunnerConfig`] beside a
+/// [`tests_bundle`] of its `linkme`-registered cases.
 #[derive(Default)]
-pub(crate) struct TestPlugin;
+pub struct TestPlugin;
 
 impl Plugin for TestPlugin {
 	fn build(&self, app: &mut App) {

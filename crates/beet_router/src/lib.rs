@@ -42,6 +42,7 @@ pub mod prelude {
 	pub use crate::client_io::*;
 	#[cfg(feature = "std")]
 	pub use crate::diagnostics::*;
+	#[cfg(feature = "std")]
 	pub use crate::extra::*;
 	#[cfg(all(feature = "std", feature = "template_serde"))]
 	pub use crate::launch::entry_build;

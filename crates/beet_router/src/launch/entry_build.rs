@@ -1037,7 +1037,7 @@ mod test {
 	/// [`LiveReload`] site carrying the store, so the fix latches a reload on
 	/// it and the next rebuild tears it down: the dev loop survives a broken
 	/// save rather than needing a restart.
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "client_io", not(target_arch = "wasm32")))]
 	#[beet_core::test]
 	async fn failed_rebuild_keeps_the_site_reloadable() {
 		let repo_store = BlobStore::temp();

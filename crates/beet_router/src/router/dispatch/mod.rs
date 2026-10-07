@@ -9,8 +9,9 @@ mod exchange_sequence;
 #[cfg(feature = "std")]
 mod field_route;
 // the `ExchangeScript` route marker, the `<ScriptRoute>` front-end, and the
-// `ExchangeScriptElement` console-capturing `<script>` entry action.
-#[cfg(feature = "scripting")]
+// `ExchangeScriptElement` console-capturing `<script>` entry action. std-only:
+// they register with the std router plugin.
+#[cfg(all(feature = "scripting", feature = "std"))]
 mod exchange_script;
 // The `Router` dispatch action and the route-building `RouterPlugin` are shared
 // across std and no_std (one `Router` type, one plugin). The single builder that
@@ -25,7 +26,7 @@ mod server_action_client;
 
 pub use exchange_group::*;
 pub use exchange_overload::*;
-#[cfg(feature = "scripting")]
+#[cfg(all(feature = "scripting", feature = "std"))]
 pub use exchange_script::*;
 pub use exchange_sequence::*;
 #[cfg(feature = "std")]

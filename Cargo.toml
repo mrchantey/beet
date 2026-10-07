@@ -365,8 +365,9 @@ std = ["beet_core/std", "beet_action?/std", "beet_net?/std", "beet_spatial?/std"
 embedded = ["beet_core/embedded"]
 # The no_std BSX parser/build runtime (eg parsing a `.bsx` scene pushed to esp
 # firmware). Forwards `beet_core`'s parser only, not `beet_router/bsx` (the std +
-# `beet_ui` rendering path).
-bsx = ["beet_core/bsx"]
+# `beet_ui` rendering path), plus the router's reporting of its `bx:cfg`
+# tombstones where a router is present.
+bsx = ["beet_core/bsx", "beet_router?/bsx_core"]
 # The `#[template]`/`rsx!` proc-macros (compile-time only, no_std-safe).
 rsx = ["beet_core/rsx"]
 # Bevy colour types (`Color`, `Srgba`, …) plus beet's `ColorExt`.
@@ -549,10 +550,11 @@ perceive_act_web = ["web", "extra", "beet_extra?/perceive_act_web"]
 # action/exchange integration so `exchange_handler` / `AsyncEntity::exchange`
 # are available on bare-metal targets too.
 action = ["dep:beet_action","beet_ui?/action","beet_net?/action"]
-# The typed `Script` and its route registrations, with no backend compiled in:
-# a script-bearing world builds and serializes, and only errors if a script is
-# actually run. Pair with `quickjs` for the embedded engine.
-scripting = ["action","serde","std","beet_action/scripting", "beet_extra?/scripting", "beet_router?/scripting","beet_ui?/scripting"]
+# The typed `Script`, plus its route registrations where `std` is on, with no
+# backend compiled in: a script-bearing world builds and serializes, and only
+# errors if a script is actually run. Pair with `quickjs` for the embedded engine.
+# no_std-capable, so bare-metal firmware can run scripts too.
+scripting = ["action","serde","beet_action/scripting", "beet_extra?/scripting", "beet_router?/scripting","beet_ui?/scripting"]
 # The embedded QuickJS backend, re-exported via `beet::exports::rquickjs`, plus
 # the scripting registrations above. Also forwards the scripting *example* wiring
 # (`<NumberScript>`/`<TextScript>`) when `beet_extra` is a dep, the same shape

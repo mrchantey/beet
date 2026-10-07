@@ -165,7 +165,7 @@ cargo check -p beet-cli --features infra         # examples/infra/*.bsx deploy t
    ```sh
    : > .agents/tmp/scratch.txt
    ```
-2. Walk through sections 1–7 in order, appending each invocation's output:
+2. Walk through sections 1–8 and the skip-set compile checks in order, appending each invocation's output:
    ```sh
    timeout 60 cargo run --example hello_world --features=action 2>&1 | tee -a .agents/tmp/scratch.txt
    ```
@@ -176,4 +176,4 @@ cargo check -p beet-cli --features infra         # examples/infra/*.bsx deploy t
 
 ## Success
 
-The smoke set passes when every command in sections 1–7 exits 0 (or, for the server probes, the `curl` returns the expected body) and `.agents/tmp/scratch.txt` contains no unexpected `error`/`warning`/`panicked` lines.
+The smoke set passes when every command in sections 1–8 and the skip-set compile checks exit 0 (or, for the server probes, the `curl` returns the expected body) and the scratch output contains no `error`/`warning`/`panicked` lines beyond the `tracing` example's own demo `WARN`/`ERROR`. Every other one is fixed, whoever wrote the code it points at.

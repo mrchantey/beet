@@ -46,7 +46,7 @@ pub(crate) fn tests_bundle_borrowed(
 }
 
 /// Inserts an owned set of tests.
-pub(crate) fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
+pub fn tests_bundle(tests: Vec<TestDescAndFn>) -> impl Bundle {
 	let test_bundles: Vec<_> = tests.into_iter().map(test_bundle).collect();
 	(
 		// Request::from_cli_args(CliArgs::parse_env()).unwrap_or_exit(),

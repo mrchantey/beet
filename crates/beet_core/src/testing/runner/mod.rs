@@ -15,7 +15,7 @@ mod test_plugin;
 pub(crate) use exit_on_suite_outcome::*;
 pub use insert_tests::*;
 pub use register_test::*;
-pub(crate) use runner_args::*;
+pub use runner_args::*;
 pub(crate) use suite_outcome::*;
 pub(crate) use test_outcome::*;
 pub use test_plugin::*;

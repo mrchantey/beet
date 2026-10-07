@@ -13,7 +13,7 @@
 //! These are inert capabilities until a `main.bsx` wires them as routes (the
 //! device-push side of the unified model). The receiving counterpart is
 //! [`scene_server`](super::scene_server), which applies a pushed scene via
-//! [`set_scene`](super::set_scene).
+//! [`BeetSceneRoot::load`](super::BeetSceneRoot::load).
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;

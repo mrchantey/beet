@@ -5,8 +5,10 @@
 //! analytics routes, and a batteries-included [`Router::with_defaults`].
 
 // the shared static-host serve rules (`serve_blob`) for a [`BlobStore`], used by
-// `ServeBlobs` (no_std core).
+// the std `ServeBlobs`.
+#[cfg(feature = "std")]
 mod blob_store;
+#[cfg(feature = "std")]
 pub(crate) use blob_store::*;
 // the standard blob-store agent toolset + a markup store mount, composing
 // `exchange_route` with beet_net's blob-store actions.
@@ -36,6 +38,8 @@ mod health;
 #[cfg(feature = "std")]
 pub(crate) use health::*;
 // The single router builder, available on std and no_std. The feature-specific
-// app routes (`app-info`, `analytics`) are gated inside the module.
+// app routes (`app-info`, `analytics`) are gated inside the module, and are all
+// it exports beside the `Router::with_defaults` impl.
 mod default_router;
+#[cfg(feature = "std")]
 pub use default_router::*;

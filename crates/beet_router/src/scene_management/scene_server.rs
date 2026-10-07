@@ -8,7 +8,8 @@
 //! Hardware-agnostic and no_std-friendly, so the same server runs on a host or
 //! on bare-metal firmware. Add [`SceneServerPlugin`] to register the reflectable
 //! types a scene can carry; spawn the meta-routes under a [`Router`] (itself the
-//! dispatch child of whichever server exposes it) to expose them.
+//! dispatch child of whichever server exposes it) to expose them, with
+//! `<SceneServer/>` in markup or [`SceneServer::routes`] in code.
 
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -37,15 +38,30 @@ impl Plugin for SceneServerPlugin {
 /// `<SceneServer/>` under a `<Router>` inside an `<HttpServer>` to expose
 /// `POST /load`, `GET /clear`, `GET /reset` and `GET /dump` — the device side of
 /// a scene push, receiving a scene over the wire and swapping it via
-/// [`set_scene`]. The host side is the `SceneLoad`/`SceneClear`/... push commands.
+/// [`BeetSceneRoot::load`]. The host side is the `SceneLoad`/`SceneClear`/...
+/// push commands.
 #[template]
-pub fn SceneServer() -> impl Bundle {
-	(
-		OnSpawn::insert_child(route::exchange("load", LoadScene)),
-		OnSpawn::insert_child(route::exchange("clear", ClearScene)),
-		OnSpawn::insert_child(route::exchange("reset", Reset)),
-		OnSpawn::insert_child(route::exchange("dump", DumpScene)),
-	)
+pub fn SceneServer() -> impl Bundle { SceneServer::routes() }
+
+impl SceneServer {
+	/// The meta-routes as a plain bundle, the code counterpart of
+	/// `<SceneServer/>` for a server spawned in Rust:
+	///
+	/// ```ignore
+	/// world.spawn((
+	///     HttpServer::default(),
+	///     CallOnReady::on_spawn(),
+	///     children![(Router::with_defaults(), SceneServer::routes())],
+	/// ));
+	/// ```
+	pub fn routes() -> impl Bundle {
+		(
+			OnSpawn::insert_child(route::exchange("load", LoadScene)),
+			OnSpawn::insert_child(route::exchange("clear", ClearScene)),
+			OnSpawn::insert_child(route::exchange("reset", Reset)),
+			OnSpawn::insert_child(route::exchange("dump", DumpScene)),
+		)
+	}
 }
 
 /// Wires an HTTP path to a behaviour tree. The tree is the route entity's single
@@ -81,7 +97,9 @@ pub async fn SpawnAction(cx: ActionContext<RequestParts>) -> Response {
 
 /// `POST /load` — load a scene from the request body (JSON or postcard, per the
 /// `content-type`), replacing any previously loaded scene. The new roots are
-/// reparented under the server so the router serves them as routes.
+/// parented under the url space serving `/load`, ie its enclosing [`Router`],
+/// so that router serves them as routes. Its ancestors are the scene's too, so a
+/// loaded behaviour still resolves an agent by root ancestor.
 #[action]
 #[derive(Default, Clone, Component)]
 pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
@@ -97,8 +115,16 @@ pub async fn LoadScene(cx: ActionContext<Request>) -> Response {
 
 	cx.caller
 		.with_world(move |world, caller| -> Response {
-			let server = world.root_ancestor(caller);
-			match set_scene(world, &media, Some(server)) {
+			// the router this route is dispatched from, not the root ancestor: a
+			// server's router is its child, and a scene loaded beside the router
+			// would sit outside every url space.
+			let space = world
+				.with_state::<(Query<&ChildOf>, Query<&PathPartial>), _>(
+					|(parents, paths)| {
+						PathPattern::namespace_root(caller, &parents, &paths)
+					},
+				);
+			match BeetSceneRoot::load(world, &media, Some(space)) {
 				Ok(roots) => Response::ok_text(format!(
 					"loaded scene: {} root(s)\n",
 					roots.len()
@@ -194,24 +220,20 @@ mod test {
 		world
 	}
 
-	/// The device side of a scene push end to end: a host serializes a one-route
-	/// scene, POSTs it to the server's `/load`, and the route it carried answers
-	/// live — the server received the bytes, swapped them in via `set_scene`, and
-	/// now dispatches the pushed route.
+	/// A host-serialized one-route scene: `ping` answers `pong`.
 	///
 	/// The route is a `<ScriptRoute>`: its reflectable `ExchangeScript` re-derives
-	/// its runtime dispatch (the `ExchangeOverload` adapter) from its `#[require]` hook on
-	/// load, so it survives the round-trip (a bare `exchange_route`'s adapter does not,
-	/// the scene-routing constraint a device scene authors around).
+	/// its runtime dispatch (the `ExchangeOverload` adapter) from its `#[require]`
+	/// hook on load, so it survives the round-trip (a bare `route::exchange`'s
+	/// adapter does not, the scene-routing constraint a device scene authors
+	/// around).
 	///
 	/// A scene carries only *registered* types, and a generic registers per
 	/// instantiation: `<ScriptRoute>` builds the one `ExchangeScript<Value, Value, ..>`
 	/// `RouterPlugin` registers. A directly spawned `ExchangeScript::<(), String>`
 	/// dispatches live but is invisible to reflection, so it would leave the loaded
 	/// entity with its path and no action, and the route would never join the tree.
-	#[beet_core::test(timeout_ms = 10000)]
-	async fn load_route_installs_pushed_scene() {
-		// the host builds + serializes a one-route scripted scene.
+	fn ping_scene() -> MediaBytes {
 		let mut host = server_world();
 		let root = host
 			.spawn_template(rsx! {
@@ -219,20 +241,21 @@ mod test {
 			})
 			.unwrap()
 			.flush();
-		let scene = TemplateSaver::new()
+		TemplateSaver::new()
 			.with_entity_tree(&host, root)
 			.save(&host, MediaType::Json)
-			.unwrap();
+			.unwrap()
+	}
 
-		// the device runs the `SceneServer` meta-routes; POST the scene to /load.
-		let mut world = server_world();
-		let server = world
-			.spawn((Router::with_defaults(), children![route::exchange(
-				"load", LoadScene
-			)]))
-			.flush();
+	/// POST `scene` to `router`'s `/load`, then assert its pushed `ping` route
+	/// answers live from that router.
+	async fn load_and_ping(
+		world: &mut World,
+		router: Entity,
+		scene: MediaBytes,
+	) {
 		world
-			.entity_mut(server)
+			.entity_mut(router)
 			.exchange(
 				Request::post("load")
 					.with_content_type(MediaType::Json)
@@ -242,21 +265,50 @@ mod test {
 			.status()
 			.xpect_eq(StatusCode::OK);
 		world.flush();
-
-		// the device installed the pushed route into its live route tree,
 		world
-			.entity(server)
-			.get::<RouteTree>()
-			.unwrap()
-			.find(&["ping"])
-			.xpect_some();
-		// and dispatches it: the pushed route answers on the device.
-		world
-			.entity_mut(server)
+			.entity_mut(router)
 			.exchange(Request::get("ping"))
 			.await
 			.unwrap_str()
 			.await
 			.xpect_contains("pong");
+	}
+
+	/// The device side of a scene push end to end: a host serializes a one-route
+	/// scene, POSTs it to the server's `/load`, and the route it carried answers
+	/// live: the server received the bytes, swapped them in via
+	/// `BeetSceneRoot::load`, and now dispatches the pushed route.
+	#[beet_core::test(timeout_ms = 10000)]
+	async fn load_route_installs_pushed_scene() {
+		let mut world = server_world();
+		let router = world
+			.spawn((Router::with_defaults(), SceneServer::routes()))
+			.flush();
+		load_and_ping(&mut world, router, ping_scene()).await;
+		// the pushed route joined the router's own tree
+		world
+			.entity(router)
+			.get::<RouteTree>()
+			.unwrap()
+			.find(&["ping"])
+			.xpect_some();
+	}
+
+	/// A server's router is its child, so a pushed scene lands in the router's
+	/// url space rather than under the root ancestor beside it, where no tree
+	/// would ever dispatch it.
+	#[beet_core::test(timeout_ms = 10000)]
+	async fn load_lands_in_the_router_url_space() {
+		let mut world = server_world();
+		// stands in for the server entity, parking rather than dispatching
+		let server = world.spawn_empty().id();
+		let router = world
+			.spawn((
+				ChildOf(server),
+				Router::with_defaults(),
+				SceneServer::routes(),
+			))
+			.flush();
+		load_and_ping(&mut world, router, ping_scene()).await;
 	}
 }

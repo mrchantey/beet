@@ -3,7 +3,8 @@
 //! A *scene* is a reflection-serialized slice of an ECS world; scene management
 //! is the machinery to make it the live behaviour of a process:
 //! - [`scene_root`]: the shared core — the [`BeetSceneRoot`] marker, the
-//!   [`ResetScene`] event and [`set_scene`], which swaps the active scene.
+//!   [`ResetScene`] event and [`BeetSceneRoot::load`], which swaps the active
+//!   scene.
 //! - [`scene_server`]: an HTTP API (no_std-friendly) whose real routes arrive as
 //!   a POSTed scene; runs equally on a host or on bare-metal firmware.
 //! - [`scene_commands`]: the host push commands (load/clear/reset/dump/run), each

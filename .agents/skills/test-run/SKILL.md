@@ -24,4 +24,4 @@ Run `just test-core` If you encounter an error, isolate it and run again, ie if 
 
 ## Success
 
-Success means that `just test-core` passes without warnings. Upon completion provide a comprehensive summary of what was changed.
+Success means that `just test-core` passes without warnings. Every warning counts, including ones in code you did not touch or another agent just committed: fix it, do not report it as pre-existing. Upon completion provide a comprehensive summary of what was changed.

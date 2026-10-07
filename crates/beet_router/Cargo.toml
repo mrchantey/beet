@@ -57,7 +57,10 @@ aws_sdk = ["std", "beet_net/aws_sdk"]
 interface = ["serde"]
 # The BSX markup parser, forwarded to `beet_ui` (which delegates to the core
 # parser). Routes `MediaType::Html` parsing through BSX for media negotiation.
-bsx = ["std", "beet_ui/bsx"]
+bsx = ["std", "bsx_core", "beet_ui/bsx"]
+# The no_std core parser alone, so a `bx:cfg` tombstone it leaves still answers
+# at dispatch, naming the condition that excluded it.
+bsx_core = ["beet_core/bsx"]
 # The entry's `<Secrets>` declarations loaded into the process environment
 # before the entry builds (the prescan's half of `beet_net/vault`), so every
 # declaration constructed in the build walk finds its credentials set.
@@ -97,8 +100,11 @@ template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
 # A script marshals its values as json in both directions, so the scripted
 # route surfaces ride that gate rather than half-existing without it.
 # `beet_ui?/scripting` is the `bx:<event>` installer: where beet_ui is present a
-# scripting build is one whose event directives actually run.
-scripting = ["std", "beet_action/scripting", "beet_ui?/scripting", "serde", "json"]
+# scripting build is one whose event directives actually run. The scripted route
+# surfaces (`ExchangeScript`, `<ScriptRoute>`, `ExchangeScriptElement`) register
+# with the std router plugin, so they ride `std` too; a no_std router with
+# `scripting` gets the engine and none of them.
+scripting = ["beet_action/scripting", "beet_ui?/scripting", "serde", "json"]
 # The embedded QuickJS backend for the scripting registrations above.
 quickjs = ["scripting", "beet_action/quickjs", "beet_ui?/quickjs"]
 # Build-time code generation: route tree, server/client actions, typed links.

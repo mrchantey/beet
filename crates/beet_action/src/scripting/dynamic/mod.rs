@@ -79,9 +79,11 @@ pub use world_read::*;
 pub use world_write::*;
 
 // The JS half is only meaningful where something evaluates it, and both the
-// embedded engine and the host-realm runner splice it, so it lives beside the
-// data types and stays crate-internal.
+// embedded engine and the host-realm runner (std) splice it, so it lives beside
+// the data types and stays crate-internal.
+#[cfg(any(feature = "quickjs", feature = "std"))]
 mod world_shim;
+#[cfg(any(feature = "quickjs", feature = "std"))]
 pub(crate) use world_shim::WORLD_SHIM;
 
 #[cfg(test)]

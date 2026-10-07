@@ -1,6 +1,7 @@
 use super::Message;
 use super::*;
 use beet_core::prelude::*;
+#[cfg(feature = "json")]
 use bevy::platform::sync::OnceLock;
 
 /// Log the received socket message to info output
@@ -41,6 +42,7 @@ pub fn echo_close(ev: On<MessageRecv>, mut commands: Commands) {
 
 /// Microseconds elapsed on a process-global monotonic clock, the cross-platform
 /// (no_std) serializable stand-in for a wall-clock timestamp.
+#[cfg(feature = "json")]
 fn ping_epoch_micros() -> u64 {
 	static EPOCH: OnceLock<Instant> = OnceLock::new();
 	EPOCH.get_or_init(Instant::now).elapsed().as_micros() as u64
@@ -50,12 +52,15 @@ fn ping_epoch_micros() -> u64 {
 ///
 /// Carries microseconds from a process-global monotonic [`Instant`] epoch (a
 /// serializable `u64`), so the round trip is measured against beet's
-/// cross-platform clock rather than the std-only `SystemTime`.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// cross-platform clock rather than the std-only `SystemTime`. Rides `json`,
+/// the wire it round-trips over.
+#[cfg(feature = "json")]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct PingTime {
 	elapsed_micros: u64,
 }
 
+#[cfg(feature = "json")]
 impl Default for PingTime {
 	fn default() -> Self {
 		Self {

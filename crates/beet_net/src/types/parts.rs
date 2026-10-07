@@ -38,6 +38,7 @@ const DEFAULT_HTTP_VERSION: &str = "1.1";
 /// server-side after parsing so a router middleware (eg analytics) can read the
 /// client address a transport would otherwise discard. Analytics prefers a
 /// proxy's `x-forwarded-for` when present, falling back to this.
+#[cfg(feature = "std")]
 pub(crate) const PEER_ADDR_HEADER: &str = "x-beet-peer-addr";
 
 /// The default CLI version string.

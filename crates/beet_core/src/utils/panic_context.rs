@@ -317,6 +317,13 @@ pub enum PanicResult {
 	/// The operation returned an error.
 	Err(String),
 	/// The operation panicked.
+	#[cfg_attr(
+		not(feature = "std"),
+		expect(
+			dead_code,
+			reason = "a bare-metal panic aborts, it is never caught"
+		)
+	)]
 	Panic {
 		/// The panic payload if it could be downcast to string.
 		payload: Option<String>,

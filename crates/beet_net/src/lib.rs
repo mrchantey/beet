@@ -23,14 +23,13 @@ pub use types::headers;
 // the concrete transports (reqwest/ureq/web-sys/file) stay feature-gated.
 mod client;
 // `store` is no_std-capable at its core (BlobStore, BlobStoreProvider,
-// InMemoryStore); the concrete backends (fs/s3/dynamo/local-storage) and
-// StorePlugin stay feature/std-gated inside the module.
+// InMemoryStore, StorePlugin's path resolution); the concrete backends
+// (fs/s3/dynamo/local-storage) stay feature/std-gated inside the module.
 mod store;
 // The action/exchange integration (`exchange_ext::handler`, …) only needs
 // `beet_action`, so it rides the no_std-capable `action` feature, not `std`.
 #[cfg(feature = "action")]
 mod actions;
-#[cfg(feature = "std")]
 mod net_plugin;
 #[cfg(feature = "vault")]
 mod secrets;
@@ -104,7 +103,6 @@ pub mod prelude {
 	pub use crate::client::*;
 	#[cfg(feature = "mdns")]
 	pub use crate::mdns::*;
-	#[cfg(feature = "std")]
 	pub use crate::net_plugin::*;
 	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;

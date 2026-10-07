@@ -2,6 +2,7 @@
 //! guard a subtree declares its required features with.
 
 mod cache_headers;
+#[cfg(feature = "bsx_core")]
 mod cfg_excluded;
 mod cors;
 mod interrupt;
@@ -11,6 +12,7 @@ mod redirect;
 mod request_logger;
 
 pub use cache_headers::*;
+#[cfg(feature = "bsx_core")]
 pub(crate) use cfg_excluded::*;
 pub use cors::*;
 pub use interrupt::*;
