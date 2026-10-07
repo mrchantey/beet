@@ -42,6 +42,11 @@ pub extern crate alloc as _alloc;
 #[cfg(feature = "custom_test_frameworks")]
 extern crate test;
 
+// declared only to enable getrandom 0.3's `wasm_js` backend, see Cargo.toml:
+// mark it used for the unused dependency lint
+#[cfg(target_arch = "wasm32")]
+use getrandom_03 as _;
+
 pub use utils::async_ext;
 pub use utils::time_ext;
 

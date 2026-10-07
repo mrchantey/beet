@@ -21,7 +21,7 @@ pub struct Provenance {
 	/// The inputs a derived document was computed from, each with the digest
 	/// it had.
 	#[cfg_attr(feature = "serde", serde(default))]
-	pub sources: Vec<Source>,
+	pub sources: Vec<ProvenanceSource>,
 	/// How long the derivation holds for an input nothing local can hash.
 	#[cfg_attr(feature = "serde", serde(default))]
 	pub ttl: Option<Duration>,
@@ -31,7 +31,7 @@ pub struct Provenance {
 #[derive(Debug, Clone, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-pub enum Source {
+pub enum ProvenanceSource {
 	/// A file by its path in the store it was read from, and its content id.
 	Blob {
 		/// The file's path.

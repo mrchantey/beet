@@ -120,6 +120,18 @@ mod tests {
 	use bevy::platform::sync::atomic::Ordering;
 	use bevy::tasks::AsyncComputeTaskPool;
 
+	/// Updates `app` until `done` holds, at most 1000 times: a detached task
+	/// only progresses once the task pool polls it, which one tick races.
+	fn update_until(app: &mut App, done: impl Fn() -> bool) {
+		for _ in 0..1000 {
+			app.update();
+			if done() {
+				return;
+			}
+			std::thread::yield_now();
+		}
+	}
+
 	/// This tests that if a world is dropped we return an error from attempting to run it and
 	/// that everything cleans up nicely
 	/// Because of a quirk of how bevy's task pools work we have to always have at least one
@@ -163,14 +175,10 @@ mod tests {
 		app.update();
 		drop(app);
 		// the detached task only observes the drop once the task pool polls it
-		// again; a single tick races its scheduling, so pump until it resolves.
-		for _ in 0..1000 {
-			other_app.update();
-			if WORLD_WAS_DROPPED.load(Ordering::Relaxed) {
-				break;
-			}
-			std::thread::yield_now();
-		}
+		// again, so pump until it resolves
+		update_until(&mut other_app, || {
+			WORLD_WAS_DROPPED.load(Ordering::Relaxed)
+		});
 		assert!(WORLD_WAS_DROPPED.load(Ordering::Relaxed));
 	}
 
@@ -211,8 +219,7 @@ mod tests {
 				.detach();
 		});
 
-		app.update();
-
+		update_until(&mut app, || FAILED_VALIDATION.load(Ordering::Relaxed));
 		assert!(FAILED_VALIDATION.load(Ordering::Relaxed));
 	}
 
@@ -247,8 +254,7 @@ mod tests {
 				.detach();
 		});
 
-		app.update();
-
+		update_until(&mut app, || SPAWNED.load(Ordering::Relaxed) >= 1);
 		assert!(SPAWNED.load(Ordering::Relaxed) >= 1);
 	}
 
@@ -323,12 +329,7 @@ mod tests {
 
 		// Drive until every task completes. Pre-fix, the driver panics here.
 		let total = (TASKS_PER_KIND * 2) as i32;
-		for _ in 0..1000 {
-			app.update();
-			if COMPLETED.load(Ordering::Relaxed) == total {
-				break;
-			}
-		}
+		update_until(&mut app, || COMPLETED.load(Ordering::Relaxed) == total);
 		assert_eq!(COMPLETED.load(Ordering::Relaxed), total);
 	}
 
@@ -395,12 +396,7 @@ mod tests {
 			})
 			.detach();
 
-		for _ in 0..1000 {
-			app.update();
-			if COMPLETED.load(Ordering::Relaxed) == 2 {
-				break;
-			}
-		}
+		update_until(&mut app, || COMPLETED.load(Ordering::Relaxed) == 2);
 		assert_eq!(COMPLETED.load(Ordering::Relaxed), 2);
 		assert_eq!(RAN_UNDER_SCOPE.load(Ordering::Relaxed), 2);
 	}
@@ -459,12 +455,7 @@ mod tests {
 		})
 		.detach();
 
-		for _ in 0..1000 {
-			app.update();
-			if COMPLETED.load(Ordering::Relaxed) == 1 {
-				break;
-			}
-		}
+		update_until(&mut app, || COMPLETED.load(Ordering::Relaxed) == 1);
 		assert_eq!(COMPLETED.load(Ordering::Relaxed), 1);
 		// once inside the closure (queued), once woken by the driver
 		assert_eq!(SIBLING_POLLS.load(Ordering::Relaxed), 2);

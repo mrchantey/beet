@@ -14,7 +14,14 @@ use std::pin::Pin;
 	any(feature = "testing", feature = "testing_embedded")
 ))]
 use std::task;
-#[cfg(feature = "std")]
+#[cfg(all(
+	feature = "std",
+	any(
+		feature = "testing",
+		feature = "testing_embedded",
+		not(target_arch = "wasm32")
+	)
+))]
 use std::task::Poll;
 
 #[cfg(feature = "std")]
@@ -100,6 +107,11 @@ impl PanicContext {
 	/// This method uses [`panic::set_hook`], calling the prev hook if
 	/// a panic occurs outside of this scope. If another hook has overridden
 	/// ours the report degrades to the unwind payload with no location.
+	#[cfg(any(
+		feature = "testing",
+		feature = "testing_embedded",
+		not(target_arch = "wasm32")
+	))]
 	pub fn catch(func: impl FnOnce() -> Result<(), String>) -> PanicResult {
 		match Self::catch_poll(|| Poll::Ready(func())) {
 			Poll::Ready(result) => result,
@@ -124,6 +136,11 @@ impl PanicContext {
 	}
 
 	/// Like [`Self::catch`] but supports [`Poll::Pending`] results
+	#[cfg(any(
+		feature = "testing",
+		feature = "testing_embedded",
+		not(target_arch = "wasm32")
+	))]
 	fn catch_poll(
 		func: impl FnOnce() -> Poll<Result<(), String>>,
 	) -> Poll<PanicResult> {
@@ -182,6 +199,11 @@ impl PanicContext {
 		result
 	}
 
+	#[cfg(any(
+		feature = "testing",
+		feature = "testing_embedded",
+		not(target_arch = "wasm32")
+	))]
 	fn init() {
 		INITIALIZED.get_or_init(|| true);
 		let default_hook = std::panic::take_hook();
@@ -283,6 +305,11 @@ impl PanicContext {
 }
 
 /// Result of running code that may panic.
+#[cfg(any(
+	feature = "testing",
+	feature = "testing_embedded",
+	not(target_arch = "wasm32")
+))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PanicResult {
 	/// The operation completed successfully.
