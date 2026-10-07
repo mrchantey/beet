@@ -7,7 +7,9 @@ use beet_core::prelude::*;
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
 /// back into CommonMark-compatible markdown. Supports headings, emphasis,
 /// strong, links, images, lists, code blocks, blockquotes, thematic
-/// breaks, inline code, and optional expression rendering.
+/// breaks, inline code, GFM tables, and optional expression rendering. A
+/// `<mark>`, and a `<span>` carrying a `style`, pass through as inline HTML,
+/// since markdown has no syntax for what they signal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkdownRenderer {
 	/// Shared block/inline tracking state and output buffer.
@@ -16,6 +18,56 @@ pub struct MarkdownRenderer {
 	render_expressions: bool,
 	/// Stack of active inline wrappers to emit on leave.
 	inline_stack: Vec<InlineWrapper>,
+	/// The tables being collected, innermost last.
+	tables: Vec<TableCapture>,
+}
+
+/// A table being collected, written as GFM when it closes, since a row is
+/// only known once every cell in it is.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct TableCapture {
+	/// Where the table starts in the buffer.
+	start: usize,
+	/// The rows so far, each cell's text.
+	rows: Vec<Vec<String>>,
+	/// Where the open cell's text starts in the buffer, and its column span.
+	cell: Option<(usize, usize)>,
+}
+
+impl TableCapture {
+	/// A cell's rendered text as one GFM cell: its lines joined by `<br>`,
+	/// its pipes escaped.
+	fn cell_text(text: &str) -> String {
+		text.lines()
+			.map(str::trim)
+			.filter(|line| !line.is_empty())
+			.collect::<Vec<_>>()
+			.join("<br>")
+			.replace('|', "\\|")
+	}
+
+	/// The table as GFM, its first row the header, every row padded to the
+	/// widest.
+	fn to_markdown(&self) -> String {
+		let width = self.rows.iter().map(Vec::len).max().unwrap_or(0);
+		if width == 0 {
+			return String::new();
+		}
+		let line = |row: &Vec<String>| {
+			let cells = (0..width)
+				.map(|index| {
+					row.get(index).map(String::as_str).unwrap_or_default()
+				})
+				.collect::<Vec<_>>();
+			format!("| {} |\n", cells.join(" | "))
+		};
+		let mut out = line(&self.rows[0]);
+		out.push_str(&format!("|{}\n", "---|".repeat(width)));
+		for row in &self.rows[1..] {
+			out.push_str(&line(row));
+		}
+		out
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +82,8 @@ enum InlineWrapper {
 	Sup,
 	/// Subscript.
 	Sub,
+	/// Inline HTML, closed by this tag.
+	Html(&'static str),
 }
 
 impl Default for MarkdownRenderer {
@@ -42,6 +96,7 @@ impl MarkdownRenderer {
 			state: TextRenderState::new(),
 			render_expressions: false,
 			inline_stack: Vec::new(),
+			tables: Vec::new(),
 		}
 	}
 
@@ -69,6 +124,24 @@ impl MarkdownRenderer {
 	fn push_str(&mut self, text: &str) { self.state.push_raw(text); }
 
 	fn push_char(&mut self, ch: char) { self.state.push_raw_char(ch); }
+
+	/// Opens an inline HTML element, its `style` kept: `mark` always, any
+	/// other only when styled, since an unstyled `span` signals nothing.
+	fn open_html(&mut self, view: &ElementView, close: &'static str) {
+		let style = view.attribute_string("style");
+		match (view.tag(), style.is_empty()) {
+			("mark", true) => self.push_str("<mark>"),
+			(tag, false) => self.push_str(&format!(
+				"<{tag} style=\"{}\">",
+				style.replace('"', "&quot;")
+			)),
+			_ => {
+				self.inline_stack.push(InlineWrapper::Html(""));
+				return;
+			}
+		}
+		self.inline_stack.push(InlineWrapper::Html(close));
+	}
 }
 
 impl NodeVisitor for MarkdownRenderer {
@@ -196,10 +269,35 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_str("  \n");
 			}
 
-			// ── Tables ──
-			"table" | "thead" | "tbody" | "tr" | "th" | "td" => {
-				// text content flows through visit_value
+			// ── Inline HTML ──
+			"mark" => self.open_html(&view, "</mark>"),
+			"span" => self.open_html(&view, "</span>"),
+
+			// ── Tables, collected and written on leave ──
+			"table" => {
+				self.state.ensure_block_separator();
+				self.tables.push(TableCapture {
+					start: self.state.buffer.len(),
+					..default()
+				});
 			}
+			"tr" => {
+				if let Some(table) = self.tables.last_mut() {
+					table.rows.push(Vec::new());
+				}
+			}
+			"th" | "td" => {
+				let span = view
+					.attribute_string("colspan")
+					.parse::<usize>()
+					.unwrap_or(1)
+					.max(1);
+				let start = self.state.buffer.len();
+				if let Some(table) = self.tables.last_mut() {
+					table.cell = Some((start, span));
+				}
+			}
+			"thead" | "tbody" | "tfoot" => {}
 
 			// ── Catch-all for unknown block/inline elements ──
 			_ => {
@@ -313,6 +411,48 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_str(&href);
 				self.push_char(')');
 			}
+
+			// ── Inline HTML ──
+			"mark" | "span" => {
+				if let Some(InlineWrapper::Html(close)) =
+					self.inline_stack.last()
+				{
+					let close = *close;
+					self.inline_stack.pop();
+					self.push_str(close);
+				}
+			}
+
+			// ── Tables ──
+			"th" | "td" => {
+				let Some((start, span)) =
+					self.tables.last_mut().and_then(|table| table.cell.take())
+				else {
+					return;
+				};
+				let text =
+					TableCapture::cell_text(&self.state.take_from(start));
+				self.state.needs_block_separator = false;
+				if let Some(table) = self.tables.last_mut() {
+					if table.rows.is_empty() {
+						table.rows.push(Vec::new());
+					}
+					let row = table.rows.last_mut().unwrap();
+					row.push(text);
+					row.extend((1..span).map(|_| String::new()));
+				}
+			}
+			"table" => {
+				let Some(table) = self.tables.pop() else {
+					return;
+				};
+				// whatever the table held outside its cells is dropped
+				self.state.take_from(table.start);
+				self.push_str(&table.to_markdown());
+				self.state.ensure_newline();
+				self.state.needs_block_separator = true;
+			}
+			"tr" | "thead" | "tbody" | "tfoot" => {}
 
 			// ── Images (void element, fully handled in visit_element) ──
 			"img" => {}
@@ -530,6 +670,33 @@ mod test {
 		render_unescaped("<p>&lt;div&gt;</p>")
 			.trim()
 			.xpect_eq("<div>");
+	}
+
+	#[beet_core::test]
+	fn render_table() {
+		roundtrip("| a | b |\n|---|---|\n| c | d \\| e |")
+			.trim()
+			.xpect_eq("| a | b |\n|---|---|\n| c | d \\| e |");
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn render_html_table() {
+		render_unescaped(
+			"<p>before</p><table><tr><td><p>one</p><p>two</p></td><td colspan=\"2\">x</td></tr><tr><td>a</td></tr></table><p>after</p>",
+		)
+		.trim()
+		.xpect_eq("before\n\n| one<br>two | x |  |\n|---|---|---|\n| a |  |  |\n\nafter");
+	}
+
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn render_inline_html() {
+		render_unescaped(
+			"<p><mark>due</mark> <span>plain</span> <span style=\"color: #FF0000\">red</span></p>",
+		)
+		.trim()
+		.xpect_eq("<mark>due</mark> plain <span style=\"color: #FF0000\">red</span>");
 	}
 
 	#[beet_core::test]
