@@ -82,20 +82,32 @@ pub async fn export_schema(dir: &AbsPath) -> Result<String> {
 }
 
 /// Initialize an opentofu directory, using the `./providers.tf.json`.
-/// Always passes `-reconfigure` so the shared per-app work directory can
-/// re-point at a different backend key when switching stages (eg `dev` ->
-/// `prod`), which each own an independent remote state and so need no
-/// migration. `vars` carries what the encryption config evaluates at init,
-/// ie a [`StateEncryption`] passphrase.
+/// `vars` carries what the encryption config evaluates at init, ie a
+/// [`StateEncryption`] passphrase.
 pub async fn init(dir: &AbsPath, vars: &[(SmolStr, SmolStr)]) -> Result {
-	let mut process = tofu_process()
-		.with_cwd(dir.clone())
-		.with_args(["init", "-reconfigure"]);
-	if let Some(cache) = plugin_cache_dir() {
-		process = process.with_env("TF_PLUGIN_CACHE_DIR", cache.as_str());
-	}
-	with_vars(process, vars).run_async().await?;
+	with_vars(init_process(dir), vars).run_async().await?;
 	Ok(())
+}
+
+/// The `tofu init` invocation, without its vars.
+///
+/// `-reconfigure` lets the shared per-app work directory re-point at a
+/// different backend key when switching stages (eg `dev` -> `prod`), which
+/// each own an independent remote state and so need no migration. `-upgrade`
+/// lets the lock file follow a provider bump: every provider is pinned to one
+/// exact release ([`Provider::version`](super::Provider::version)), so it selects that release and
+/// nothing newer, where without it a lock naming the previous release refuses
+/// the init.
+fn init_process(dir: &AbsPath) -> ChildProcess {
+	let process = tofu_process().with_cwd(dir.clone()).with_args([
+		"init",
+		"-reconfigure",
+		"-upgrade",
+	]);
+	match plugin_cache_dir() {
+		Some(cache) => process.with_env("TF_PLUGIN_CACHE_DIR", cache.as_str()),
+		None => process,
+	}
 }
 
 /// Validates the opentofu file, ie the `main.tf.json`. Never needs `-var`:
@@ -307,4 +319,18 @@ pub async fn destroy_force(
 	)
 	.run_async_stdout()
 	.await
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// A provider bump must reach a work directory whose lock file names the
+	/// previous release, which only `-upgrade` allows.
+	#[beet_core::test]
+	fn init_lets_the_lock_follow_the_pin() {
+		init_process(&AbsPath::new_unchecked("/tmp/stack"))
+			.to_string()
+			.xpect_contains("init -reconfigure -upgrade");
+	}
 }
