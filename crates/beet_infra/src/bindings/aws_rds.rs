@@ -1,7 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
-//! Generated from the hashicorp/aws v6.62.0 schema.
+//! Generated from the hashicorp/aws v6.66.0 schema.
 
 #![allow(
 	unused_imports,
@@ -370,6 +370,10 @@ pub struct AwsDbInstanceDetails {
 	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub vpc_security_group_ids: Option<Vec<SmolStr>>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub warning_event_categories: Option<Vec<SmolStr>>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub blue_green_update:
 		Option<Vec<AwsDbInstanceResourceBlockTypeBlueGreenUpdate>>,

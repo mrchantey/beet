@@ -171,9 +171,10 @@ install-cli *args:
 #💡 Aliases
 
 # Regenerate the committed terraform provider bindings. Reproducible: each
-# provider is pinned to its exact `schema_version` in `terra::Provider`,
-# bumped deliberately; the pinned schema export is cached under
-# `target/terra-bindings-generator` so a warm rerun is offline and fast.
+# provider is pinned to its exact `version` in `terra::Provider`, the same
+# release every rendered config pins, bumped deliberately; the pinned schema
+# export is cached under `target/terra-bindings-generator` so a warm rerun is
+# offline and fast.
 bindings *args:
   cargo run -p beet_infra --bin bindings --features bindings_generator {{ args }}
 

@@ -4,9 +4,9 @@
 //! so we commit these types to the repository.
 //!
 //! Reproducible: each provider is pinned to its exact
-//! [`schema_version`](terra::Provider::schema_version), so the same command
-//! yields the same tree on every machine. To move to a newer provider, bump
-//! the pin and rerun.
+//! [`version`](terra::Provider::version), so the same command yields the same
+//! tree on every machine, and every rendered config pins that same release.
+//! To move to a newer provider, bump the version and rerun.
 //!
 //! Run with `just bindings`, or:
 //!     cargo run -p beet_infra --bin bindings --features bindings_generator

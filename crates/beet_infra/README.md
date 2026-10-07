@@ -11,7 +11,7 @@ Cloud resources are declared as Bevy entities and exported to Terraform/OpenTofu
 
 ## Bindings
 
-The committed provider bindings (`bindings`) are generated, never hand-edited: regenerate with `just bindings`. A provider bump is a two-line deliberate act, edit its `schema_version` in `terra::Provider` and rerun, which is what makes generation reproducible (`Provider::version` floats and would not).
+The committed provider bindings (`bindings`) are generated, never hand-edited: regenerate with `just bindings`. A provider bump is a deliberate act: edit its `version` in `terra::Provider` and rerun. That one exact release is both what the bindings are generated from and what every rendered config pins, so `tofu init` never resolves a release the bindings have not seen.
 
 Every generated resource implements `terra::ToJson`, whose output is a `beet_core::Value` rather than a `serde_json::Value`, so a rendered body enters `terra::Config` in the type the config already holds and no conversion sits at that boundary.
 

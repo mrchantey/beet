@@ -31,7 +31,7 @@
 //!
 //! ```rust,ignore
 //! let mut config = Config::new();
-//! config.add_required_provider("aws", "hashicorp/aws", "~> 6.0")?;
+//! config.add_required_provider("aws", "hashicorp/aws", "= 6.66.0")?;
 //! config.add_untyped_provider("aws", &json!({"region": "us-west-2"}))?;
 //! config.add_untyped_resource("aws_instance", "web", &my_instance)?;
 //! config.export_to_file("main.tf.json").await?;
@@ -773,7 +773,7 @@ impl Config {
 			return;
 		}
 		let source = provider.short_source();
-		let version = provider.version.as_ref();
+		let version = provider.constraint();
 		self.required_providers.insert(
 			SmolStr::from(local),
 			value!({ "source": source, "version": version }),

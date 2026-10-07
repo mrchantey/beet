@@ -23,14 +23,12 @@ pub struct Provider {
 	pub name: Cow<'static, str>,
 	/// Full registry source path (e.g. "registry.opentofu.org/hashicorp/aws").
 	pub source: Cow<'static, str>,
-	/// Version constraint rendered into deployed configs (e.g. "~> 6.0").
+	/// The exact release every rendered config pins and the committed
+	/// bindings are generated from (e.g. "6.66.0"), bumped deliberately with
+	/// `just bindings`. Exact rather than a constraint: a floating `~> 6.0`
+	/// lets `tofu init` resolve a release the bindings have never seen, so a
+	/// new provider attribute reaches every stack's next apply unannounced.
 	pub version: Cow<'static, str>,
-	/// Exact provider release the committed bindings are generated from
-	/// (e.g. "6.62.0"), bumped deliberately. The binding generator pins its
-	/// `tofu init` to this so a regeneration yields the same tree on every
-	/// machine; [`Self::version`] floats and would not. `None` for a custom
-	/// provider that never generates bindings.
-	pub schema_version: Option<Cow<'static, str>>,
 }
 
 impl Provider {
@@ -38,19 +36,17 @@ impl Provider {
 	pub const AWS: Self = Self {
 		name: Cow::Borrowed("Amazon Web Services"),
 		source: Cow::Borrowed("registry.opentofu.org/hashicorp/aws"),
-		version: Cow::Borrowed("~> 6.0"),
-		schema_version: Some(Cow::Borrowed("6.62.0")),
+		version: Cow::Borrowed("6.66.0"),
 	};
 
 	/// Cloudflare provider.
 	pub const CLOUDFLARE: Self = Self {
 		name: Cow::Borrowed("Cloudflare"),
 		source: Cow::Borrowed("registry.opentofu.org/cloudflare/cloudflare"),
-		version: Cow::Borrowed("~> 5.0"),
-		schema_version: Some(Cow::Borrowed("5.24.0")),
+		version: Cow::Borrowed("5.26.0"),
 	};
 
-	/// Create a custom provider definition.
+	/// Create a custom provider definition pinned to the exact `version`.
 	pub fn new(
 		name: impl Into<String>,
 		source: impl Into<String>,
@@ -60,26 +56,11 @@ impl Provider {
 			name: Cow::Owned(name.into()),
 			source: Cow::Owned(source.into()),
 			version: Cow::Owned(version.into()),
-			schema_version: None,
 		}
 	}
 
-	/// Pin the exact release used for binding generation.
-	pub fn with_schema_version(mut self, version: impl Into<String>) -> Self {
-		self.schema_version = Some(Cow::Owned(version.into()));
-		self
-	}
-
-	/// The pinned [`schema_version`](Self::schema_version), or a loud error:
-	/// generating bindings from a floating constraint is not reproducible.
-	pub fn schema_version_required(&self) -> Result<&str> {
-		self.schema_version.as_deref().ok_or_else(|| {
-			bevyhow!(
-				"provider `{}` has no schema_version pin, binding generation would not be reproducible. Pin one with `Provider::with_schema_version`",
-				self.source
-			)
-		})
-	}
+	/// The `required_providers` version constraint, ie `= 6.66.0`.
+	pub fn constraint(&self) -> String { format!("= {}", self.version) }
 
 	/// The local name used in `required_providers` blocks (last segment of source).
 	///
@@ -293,10 +274,11 @@ mod tests {
 		let provider = Provider::new(
 			"My Provider",
 			"registry.opentofu.org/acme/thing",
-			"~> 1.0",
+			"1.2.3",
 		);
 		provider.local_name().xpect_eq("thing");
 		provider.short_source().xpect_eq("acme/thing");
+		provider.constraint().xpect_eq("= 1.2.3");
 	}
 
 	#[beet_core::test]

@@ -1,7 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
-//! Generated from the hashicorp/aws v6.62.0 schema.
+//! Generated from the hashicorp/aws v6.66.0 schema.
 
 #![allow(
 	unused_imports,
@@ -2022,17 +2022,24 @@ pub struct DeploymentConfigurationResourceBlockTypeLifecycleHook {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub hook_details: Option<SmolStr>,
 	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub hook_target_arn: SmolStr,
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub hook_target_arn: Option<SmolStr>,
 	/// ## Attribute
 	/// `required`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub lifecycle_stages: Vec<SmolStr>,
 	/// ## Attribute
-	/// `required`
-	#[serde(skip_serializing_if = "SmolStr::is_empty")]
-	pub role_arn: SmolStr,
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub role_arn: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub target_type: Option<SmolStr>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeout_configuration:
+		Option<Vec<LifecycleHookResourceBlockTypeTimeoutConfiguration>>,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
@@ -2094,6 +2101,20 @@ pub struct JwtValidationResourceBlockTypeAdditionalClaim {
 	/// `required`
 	#[serde(skip_serializing_if = "Vec::is_empty")]
 	pub values: Vec<SmolStr>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "timeout_configuration")]
+pub struct LifecycleHookResourceBlockTypeTimeoutConfiguration {
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub action: Option<SmolStr>,
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub timeout_in_minutes: Option<SmolStr>,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,

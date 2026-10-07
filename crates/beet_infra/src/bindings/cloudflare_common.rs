@@ -1,7 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
-//! Generated from the cloudflare/cloudflare v5.24.0 schema.
+//! Generated from the cloudflare/cloudflare v5.26.0 schema.
 
 #![allow(
 	unused_imports,
@@ -133,7 +133,7 @@ pub struct CloudflareDnsRecordData {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub preference: Option<i64>,
-	/// Required for MX and URI records; ignored for other record types (but may still be returned by the API). Records with lower priorities are preferred. This field is to be deprecated in favor of the priority field within the data map.
+	/// Priority.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -178,7 +178,7 @@ pub struct CloudflareDnsRecordData {
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub tag: Option<SmolStr>,
-	/// A valid mail server hostname, or "." for a NULL MX record.
+	/// Target.
 	/// ## Attribute
 	/// `optional`
 	#[serde(skip_serializing_if = "Option::is_none")]
@@ -250,6 +250,11 @@ pub struct CloudflareDnsRecordDetails {
 	/// `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub id: Option<SmolStr>,
+	/// Whether to include shadow metadata in the `meta` field of each record in the response. See [Shadowed records](https://developers.cloudflare.com/dns/manage-dns-records/reference/shadowed-records).
+	/// ## Attribute
+	/// `optional`, `computed`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub include_shadow_metadata: Option<bool>,
 	/// Extra Cloudflare-specific information about the record.
 	/// ## Attribute
 	/// `computed`
@@ -1425,7 +1430,7 @@ pub struct CloudflareLoadBalancerRulesOverridesSessionAffinityAttributes {
 	pub drain_duration: Option<i64>,
 	/// Configures the names of HTTP headers to base session affinity on when header `session_affinity` is enabled. At least one HTTP header name must be provided. To specify the exact cookies to be used, include an item in the following format: `"cookie:<cookie-name-1>,<cookie-name-2>"` (example) where everything after the colon is a comma-separated list of cookie names. Providing only `"cookie"` will result in all cookies being used. The default max number of HTTP header names that can be provided depends on your plan: 5 for Enterprise, 1 for all other plans.
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub headers: Option<Vec<SmolStr>>,
 	/// When header `session_affinity` is enabled, this option can be used to specify how HTTP headers on load balancing requests will be used. The supported values are: - `"true"`: Load balancing requests must contain *all* of the HTTP headers specified by the `headers` session affinity attribute, otherwise sessions aren't created. - `"false"`: Load balancing requests must contain *at least one* of the HTTP headers specified by the `headers` session affinity attribute, otherwise sessions aren't created.
@@ -1463,7 +1468,7 @@ pub struct CloudflareLoadBalancerSessionAffinityAttributes {
 	pub drain_duration: Option<i64>,
 	/// Configures the names of HTTP headers to base session affinity on when header `session_affinity` is enabled. At least one HTTP header name must be provided. To specify the exact cookies to be used, include an item in the following format: `"cookie:<cookie-name-1>,<cookie-name-2>"` (example) where everything after the colon is a comma-separated list of cookie names. Providing only `"cookie"` will result in all cookies being used. The default max number of HTTP header names that can be provided depends on your plan: 5 for Enterprise, 1 for all other plans.
 	/// ## Attribute
-	/// `optional`
+	/// `optional`, `computed`
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub headers: Option<Vec<SmolStr>>,
 	/// When header `session_affinity` is enabled, this option can be used to specify how HTTP headers on load balancing requests will be used. The supported values are: - `"true"`: Load balancing requests must contain *all* of the HTTP headers specified by the `headers` session affinity attribute, otherwise sessions aren't created. - `"false"`: Load balancing requests must contain *at least one* of the HTTP headers specified by the `headers` session affinity attribute, otherwise sessions aren't created.

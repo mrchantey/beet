@@ -1,7 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
-//! Generated from the hashicorp/aws v6.62.0 schema.
+//! Generated from the hashicorp/aws v6.66.0 schema.
 
 #![allow(
 	unused_imports,
@@ -237,6 +237,10 @@ pub struct AwsCloudwatchMetricAlarmDetails {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub metric_query:
 		Option<Vec<AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery>>,
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub warm_up_configuration: Option<
+		Vec<AwsCloudwatchMetricAlarmResourceBlockTypeWarmUpConfiguration>,
+	>,
 }
 impl terra::ToJson for AwsCloudwatchMetricAlarmDetails {
 	fn to_json(&self) -> Value {
@@ -1231,6 +1235,19 @@ pub struct AwsCloudwatchMetricAlarmResourceBlockTypeMetricQuery {
 	pub return_data: Option<bool>,
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub metric: Option<Vec<MetricQueryResourceBlockTypeMetric>>,
+}
+#[derive(
+	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,
+)]
+#[serde(rename = "warm_up_configuration")]
+pub struct AwsCloudwatchMetricAlarmResourceBlockTypeWarmUpConfiguration {
+	/// ## Attribute
+	/// `optional`
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub only_start_evaluating_after_warm_up_period_ends: Option<bool>,
+	/// ## Attribute
+	/// `required`
+	pub warm_up_period_duration_in_minutes: i64,
 }
 #[derive(
 	Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize, Default,

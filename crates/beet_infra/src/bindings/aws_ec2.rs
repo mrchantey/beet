@@ -1,7 +1,7 @@
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
 //! Auto-generated Terraform provider bindings — do not edit!
-//! Generated from the hashicorp/aws v6.62.0 schema.
+//! Generated from the hashicorp/aws v6.66.0 schema.
 
 #![allow(
 	unused_imports,

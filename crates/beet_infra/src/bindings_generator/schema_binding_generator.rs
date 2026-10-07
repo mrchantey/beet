@@ -3,7 +3,7 @@
 //! [`SchemaBindingGenerator`] orchestrates the full workflow:
 //!
 //! 1. Write a `providers.tf.json` pinning each provider to its exact
-//!    [`schema_version`](terra::Provider::schema_version).
+//!    [`version`](terra::Provider::version).
 //! 2. Run `tofu init` to download provider plugins.
 //! 3. Run `tofu providers schema -json` to export the full schema.
 //! 4. Parse the schema with [`BindingGenerator`] (applying filters).
@@ -12,8 +12,9 @@
 //! Generation is reproducible: the exact pin means the same command yields
 //! the same tree on every machine, and each generated file records the schema
 //! versions it came from in its preamble. To move to a newer provider, bump
-//! `schema_version` and rerun (`just bindings`); the bump then shows in every
-//! regenerated file's diff as a version line.
+//! its `version` and rerun (`just bindings`); the bump then shows in every
+//! regenerated file's diff as a version line, and every rendered config pins
+//! the same release.
 
 use super::binding_generator::BindingGenerator;
 use crate::prelude::*;
@@ -167,8 +168,8 @@ impl SchemaBindingGenerator {
 	/// Caches `providers.tf.json` and reuses `schema.json` when it matches,
 	/// skipping the slow `tofu init` and `tofu providers schema` steps. The
 	/// cached content pins each provider's exact
-	/// [`schema_version`](terra::Provider::schema_version), and a released
-	/// provider's schema is immutable, so a byte-equal cache is never stale.
+	/// [`version`](terra::Provider::version), and a released provider's
+	/// schema is immutable, so a byte-equal cache is never stale.
 	pub async fn generate(&self) -> Result {
 		let new_content = self.build_providers_tf_content()?;
 		let providers_path = self.work_dir.join("providers.tf.json");
@@ -228,10 +229,9 @@ impl SchemaBindingGenerator {
 
 	/// Build the serialized `providers.tf.json` content as bytes.
 	///
-	/// Each provider is pinned to its exact `schema_version`: the floating
-	/// [`version`](terra::Provider::version) constraint would resolve to
-	/// whatever release shipped last, making the cache stale by construction
-	/// and the generated tree machine-dependent.
+	/// Each provider is pinned to its exact
+	/// [`constraint`](terra::Provider::constraint), the same one every
+	/// rendered config carries.
 	fn build_providers_tf_content(&self) -> Result<Vec<u8>> {
 		let mut required_providers = serde_json::Map::new();
 
@@ -246,8 +246,7 @@ impl SchemaBindingGenerator {
 					local,
 					json!({
 						"source": list.provider.short_source(),
-						"version":
-							format!("= {}", list.provider.schema_version_required()?),
+						"version": list.provider.constraint(),
 					}),
 				);
 			}
@@ -407,7 +406,7 @@ fn preamble_with_versions(
 		let line = format!(
 			"//! Generated from the {} v{} schema.",
 			list.provider.short_source(),
-			list.provider.schema_version_required()?
+			list.provider.version
 		);
 		if !lines.contains(&line) {
 			lines.push(line);
@@ -429,11 +428,7 @@ mod test {
 	use super::*;
 
 	fn test_provider() -> terra::Provider {
-		terra::Provider::new(
-			"Test",
-			"registry.opentofu.org/test/test",
-			"~> 2.0",
-		)
+		terra::Provider::new("Test", "registry.opentofu.org/test/test", "2.3.4")
 	}
 
 	fn file_with(provider: terra::Provider) -> BindingFile {
@@ -444,32 +439,20 @@ mod test {
 	/// a floating constraint resolves differently over time and across
 	/// machines, making a stale cache undetectable by construction.
 	#[beet_core::test]
-	fn providers_tf_pins_exact_schema_version() {
+	fn providers_tf_pins_the_exact_release() {
 		SchemaBindingGenerator::default()
-			.with_file(file_with(test_provider().with_schema_version("2.3.4")))
+			.with_file(file_with(test_provider()))
 			.build_providers_tf_content()
 			.unwrap()
 			.xmap(String::from_utf8)
 			.unwrap()
-			.xpect_contains("\"version\": \"= 2.3.4\"")
-			.xnot()
-			.xpect_contains("~> 2.0");
-	}
-
-	#[beet_core::test]
-	fn unpinned_provider_fails_loudly() {
-		SchemaBindingGenerator::default()
-			.with_file(file_with(test_provider()))
-			.build_providers_tf_content()
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("schema_version");
+			.xpect_contains("\"version\": \"= 2.3.4\"");
 	}
 
 	/// Version lines land after the leading `//!` block, deduplicated.
 	#[beet_core::test]
 	fn preamble_records_schema_versions() {
-		let provider = test_provider().with_schema_version("2.3.4");
+		let provider = test_provider();
 		let file = BindingFile::new("out.rs")
 			.with_resources(provider.clone(), ["res_a"])
 			.with_resources(provider, ["res_b"]);
