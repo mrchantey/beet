@@ -38,7 +38,11 @@ use heck::ToKebabCase;
 #[reflect(Component)]
 pub struct ParamsPartial {
 	/// The parameter metadata items for this partial.
+	#[deref]
 	pub items: Vec<ParamMeta>,
+	/// Checks params against the declared type without calling the route.
+	#[reflect(ignore)]
+	validate_fn: ValidateFn,
 }
 
 impl ParamsPartial {
@@ -48,7 +52,7 @@ impl ParamsPartial {
 	/// ## Panics
 	///
 	/// Panics if a non-struct is passed in or fields are missing TypeInfo
-	pub fn new<T: Typed>() -> Self {
+	pub fn new<T: FromReflect + Typed>() -> Self {
 		let mut items = Vec::new();
 		fn parse_inner(
 			items: &mut Vec<ParamMeta>,
@@ -79,8 +83,81 @@ impl ParamsPartial {
 		}
 
 		parse_inner(&mut items, T::type_info()).unwrap();
-		Self { items }
+		let validate_fn = match T::type_info() {
+			TypeInfo::Struct(_) => ValidateFn(Some(Self::validate_as::<T>)),
+			_ => ValidateFn(None),
+		};
+		Self { items, validate_fn }
 	}
+
+	/// Checks `params` against the declared type without calling the route,
+	/// the check a caller makes before dispatching params it did not read
+	/// from a person: every key one this partial declares, every required
+	/// one present and every value parsing as its field's type. A tuple of
+	/// params types is checked by its keys alone.
+	pub fn validate(&self, params: &MultiMap<SmolStr, SmolStr>) -> Result {
+		for key in params.keys() {
+			let flag = key.replace('_', "-");
+			if !self.items.iter().any(|item| item.key == flag) {
+				bevybail!(
+					"`--{flag}` is no param here; the params are {}",
+					self.items
+						.iter()
+						.map(|item| format!("`--{}`", item.key))
+						.collect::<Vec<_>>()
+						.join(", ")
+				);
+			}
+		}
+		match self.validate_fn.0 {
+			Some(validate) => validate(params),
+			None => Ok(()),
+		}
+	}
+
+	/// Whether `params` parse as `T`, the check a [`ValidateFn`] holds.
+	fn validate_as<T: FromReflect + Typed>(
+		params: &MultiMap<SmolStr, SmolStr>,
+	) -> Result {
+		params.parse_reflect::<T>().map(|_| ())
+	}
+}
+
+/// The check [`ParamsPartial::validate`] runs after the keys: whether params
+/// parse as the declared type, absent for a tuple of params types. Equal to
+/// every other, since the metadata is what a partial is compared by.
+#[derive(Clone, Copy, Default)]
+struct ValidateFn(Option<fn(&MultiMap<SmolStr, SmolStr>) -> Result>);
+
+impl core::fmt::Debug for ValidateFn {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
+		formatter.write_str("ValidateFn")
+	}
+}
+
+impl PartialEq for ValidateFn {
+	fn eq(&self, _other: &Self) -> bool { true }
+}
+
+impl Eq for ValidateFn {}
+
+impl PartialOrd for ValidateFn {
+	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for ValidateFn {
+	fn cmp(&self, _other: &Self) -> core::cmp::Ordering {
+		core::cmp::Ordering::Equal
+	}
+}
+
+impl core::hash::Hash for ValidateFn {
+	fn hash<H: core::hash::Hasher>(&self, _state: &mut H) {}
 }
 
 /// The param equivelent of a [`PathPattern`], denoting
@@ -563,22 +640,51 @@ mod test {
 			boo: bool,
 		}
 
-		ParamsPartial::new::<MyParams>().xpect_eq(ParamsPartial {
-			items: vec![
-				ParamMeta::new("foo", ParamValue::Single)
-					.with_type_path("u32")
-					.required(),
-				ParamMeta::new("bar", ParamValue::Single)
-					.with_type_path("alloc::string::String")
-					.with_description("all about 'bar'"),
-				ParamMeta::new("bazz", ParamValue::Multiple)
-					.with_type_path("alloc::vec::Vec<f64>")
-					.with_description("all about 'bazz'")
-					.with_short('b'),
-				// .required(),
-				ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
-			],
-		});
+		ParamsPartial::new::<MyParams>().items.xpect_eq(vec![
+			ParamMeta::new("foo", ParamValue::Single)
+				.with_type_path("u32")
+				.required(),
+			ParamMeta::new("bar", ParamValue::Single)
+				.with_type_path("alloc::string::String")
+				.with_description("all about 'bar'"),
+			ParamMeta::new("bazz", ParamValue::Multiple)
+				.with_type_path("alloc::vec::Vec<f64>")
+				.with_description("all about 'bazz'")
+				.with_short('b'),
+			// .required(),
+			ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
+		]);
+	}
+
+	/// Params are checked against the declared type without a call: an
+	/// unknown key, a missing required one and a value that will not parse
+	/// are each refused.
+	#[beet_core::test]
+	fn validates_params() {
+		#[derive(Reflect)]
+		struct MyParams {
+			foo: u32,
+			bar: Option<String>,
+		}
+		let partial = ParamsPartial::new::<MyParams>();
+		let params = |pairs: &[(&str, &str)]| {
+			let mut map = MultiMap::<SmolStr, SmolStr>::default();
+			for (key, value) in pairs {
+				map.insert(SmolStr::new(key), SmolStr::new(value));
+			}
+			map
+		};
+		partial.validate(&params(&[("foo", "3")])).unwrap();
+		partial
+			.validate(&params(&[("foo", "3"), ("bar", "x")]))
+			.unwrap();
+		partial.validate(&params(&[("bar", "x")])).xpect_err();
+		partial.validate(&params(&[("foo", "three")])).xpect_err();
+		partial
+			.validate(&params(&[("foo", "3"), ("bazz", "x")]))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`--bazz` is no param here");
 	}
 
 	/// What `--help` says a flag is, the typed read enforces: over a params

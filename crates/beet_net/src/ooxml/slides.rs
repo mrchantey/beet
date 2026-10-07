@@ -5,12 +5,7 @@ use ooxmlsdk::parts::PartRef;
 use ooxmlsdk::parts::presentation_document::PresentationDocument;
 use ooxmlsdk::parts::slide_part::SlidePart;
 
-const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
-const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
-const R: &str =
-	"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const DGM: &str = "http://schemas.openxmlformats.org/drawingml/2006/diagram";
-const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+type Ns = OoxmlNamespace;
 
 /// A slide deck, `.pptx`, read for its words: the slide order and size come
 /// from `ooxmlsdk`'s typed presentation part, each slide and its notes are
@@ -143,7 +138,7 @@ impl SlideDeck {
 			part: part.path(&self.file).unwrap_or_default().to_string(),
 			layout: layout
 				.as_ref()
-				.and_then(|layout| layout.root.child(P, "cSld"))
+				.and_then(|layout| layout.root.child(Ns::PRESENTATION, "cSld"))
 				.and_then(|common| common.attribute(None, "name"))
 				.unwrap_or_default()
 				.to_string(),
@@ -159,8 +154,8 @@ impl SlideDeck {
 		};
 		if let Some(shapes) = tree
 			.root
-			.child(P, "cSld")
-			.and_then(|common| common.child(P, "spTree"))
+			.child(Ns::PRESENTATION, "cSld")
+			.and_then(|common| common.child(Ns::PRESENTATION, "spTree"))
 		{
 			for shape in reader.walk(shapes) {
 				reader.read(shape, &mut slide)?;
@@ -182,17 +177,17 @@ impl SlideDeck {
 	fn notes(tree: &XmlTree) -> String {
 		let body = tree
 			.root
-			.descendants_named(P, "sp")
+			.descendants_named(Ns::PRESENTATION, "sp")
 			.into_iter()
 			.find(|shape| {
 				placeholder(shape).is_some_and(|placeholder| {
 					placeholder.attribute(None, "type") == Some("body")
 				})
 			})
-			.and_then(|shape| shape.child(P, "txBody"));
+			.and_then(|shape| shape.child(Ns::PRESENTATION, "txBody"));
 		let text = body
 			.map(|body| {
-				body.children_named(A, "p")
+				body.children_named(Ns::DRAWING, "p")
 					.map(paragraph_text)
 					.collect::<Vec<_>>()
 					.join("\n")
@@ -555,16 +550,18 @@ impl ShapeReader<'_> {
 	fn walk<'b>(&self, tree: &'b XmlElement) -> Vec<&'b XmlElement> {
 		let mut shapes = tree
 			.elements()
-			.flat_map(|element| match element.is(MC, "AlternateContent") {
-				// the choice is what an Office reader shows
-				true => element
-					.child(MC, "Choice")
-					.map(|choice| choice.elements().collect::<Vec<_>>())
-					.unwrap_or_default(),
-				false => vec![element],
+			.flat_map(|element| {
+				match element.is(Ns::COMPATIBILITY, "AlternateContent") {
+					// the choice is what an Office reader shows
+					true => element
+						.child(Ns::COMPATIBILITY, "Choice")
+						.map(|choice| choice.elements().collect::<Vec<_>>())
+						.unwrap_or_default(),
+					false => vec![element],
+				}
 			})
 			.filter(|element| {
-				element.namespace.as_deref() == Some(P)
+				element.namespace.as_deref() == Some(Ns::PRESENTATION)
 					&& ["sp", "grpSp", "graphicFrame", "pic", "cxnSp"]
 						.contains(&element.local_name())
 			})
@@ -575,7 +572,7 @@ impl ShapeReader<'_> {
 		});
 		shapes
 			.into_iter()
-			.flat_map(|shape| match shape.is(P, "grpSp") {
+			.flat_map(|shape| match shape.is(Ns::PRESENTATION, "grpSp") {
 				true => self.walk(shape),
 				false => vec![shape],
 			})
@@ -583,9 +580,9 @@ impl ShapeReader<'_> {
 	}
 
 	fn read(&self, shape: &XmlElement, slide: &mut SlideRead) -> Result {
-		if let Some(body) = shape.child(P, "txBody") {
+		if let Some(body) = shape.child(Ns::PRESENTATION, "txBody") {
 			let text = body
-				.children_named(A, "p")
+				.children_named(Ns::DRAWING, "p")
 				.map(paragraph_text)
 				.collect::<Vec<_>>()
 				.join("\n");
@@ -603,12 +600,14 @@ impl ShapeReader<'_> {
 				slide.body.push(self.text_blocks(body));
 			}
 		}
-		for table in shape.descendants_named(A, "tbl") {
+		for table in shape.descendants_named(Ns::DRAWING, "tbl") {
 			slide.tables += 1;
-			let rows = table.children_named(A, "tr").collect::<Vec<_>>();
-			let columns = table
-				.child(A, "tblGrid")
-				.map_or(0, |grid| grid.children_named(A, "gridCol").count());
+			let rows =
+				table.children_named(Ns::DRAWING, "tr").collect::<Vec<_>>();
+			let columns =
+				table.child(Ns::DRAWING, "tblGrid").map_or(0, |grid| {
+					grid.children_named(Ns::DRAWING, "gridCol").count()
+				});
 			slide.body.push(format!(
 				"<p><strong>[table {}]</strong> {} rows x {columns} cols</p>\n",
 				slide.tables,
@@ -618,7 +617,7 @@ impl ShapeReader<'_> {
 				&rows
 					.iter()
 					.map(|row| {
-						row.children_named(A, "tc")
+						row.children_named(Ns::DRAWING, "tc")
 							.map(|cell| cell_lines(cell).join("\n"))
 							.collect::<Vec<_>>()
 					})
@@ -626,7 +625,7 @@ impl ShapeReader<'_> {
 			));
 			slide.words += rows
 				.iter()
-				.flat_map(|row| row.children_named(A, "tc"))
+				.flat_map(|row| row.children_named(Ns::DRAWING, "tc"))
 				.map(|cell| {
 					cell_lines(cell).join(" ").split_whitespace().count()
 				})
@@ -646,8 +645,9 @@ impl ShapeReader<'_> {
 			}
 		}
 		let cover = self.cover(shape);
-		for blip in shape.descendants_named(A, "blip") {
-			let Some(id) = blip.attribute(Some(R), "embed") else {
+		for blip in shape.descendants_named(Ns::DRAWING, "blip") {
+			let Some(id) = blip.attribute(Some(Ns::RELATIONSHIPS), "embed")
+			else {
 				slide.pictures.push(Picture {
 					source: "linked or unreadable".into(),
 					size: String::new(),
@@ -665,9 +665,9 @@ impl ShapeReader<'_> {
 	fn text_blocks(&self, body: &XmlElement) -> String {
 		let mut out = String::new();
 		let mut lists = 0usize;
-		for paragraph in body.children_named(A, "p") {
+		for paragraph in body.children_named(Ns::DRAWING, "p") {
 			let level = paragraph
-				.child(A, "pPr")
+				.child(Ns::DRAWING, "pPr")
 				.and_then(|properties| properties.attribute(None, "lvl"))
 				.and_then(|level| level.parse::<usize>().ok())
 				.unwrap_or(0);
@@ -676,17 +676,20 @@ impl ShapeReader<'_> {
 				let line = lines.last_mut().unwrap();
 				match element.local_name() {
 					"br" => lines.push(String::new()),
-					"fld" => {
-						line.push_str(&html::text(&element.text_of(A, "t")))
-					}
+					"fld" => line.push_str(&html::text(
+						&element.text_of(Ns::DRAWING, "t"),
+					)),
 					"r" => {
-						let run = html::text(&element.text_of(A, "t"));
+						let run =
+							html::text(&element.text_of(Ns::DRAWING, "t"));
 						match element
-							.child(A, "rPr")
+							.child(Ns::DRAWING, "rPr")
 							.and_then(|properties| {
-								properties.child(A, "hlinkClick")
+								properties.child(Ns::DRAWING, "hlinkClick")
 							})
-							.and_then(|click| click.attribute(Some(R), "id"))
+							.and_then(|click| {
+								click.attribute(Some(Ns::RELATIONSHIPS), "id")
+							})
 							.and_then(|id| self.links.get(id))
 						{
 							Some(link) => line.push_str(&format!(
@@ -731,9 +734,9 @@ impl ShapeReader<'_> {
 	/// order: none of it is in the slide's shape tree.
 	fn smartart(&self, shape: &XmlElement) -> Result<Vec<String>> {
 		let mut lines: Vec<String> = Vec::new();
-		for ids in shape.descendants_named(DGM, "relIds") {
+		for ids in shape.descendants_named(Ns::DIAGRAM, "relIds") {
 			let Some(PartRef::DiagramDataPart(data)) = ids
-				.attribute(Some(R), "dm")
+				.attribute(Some(Ns::RELATIONSHIPS), "dm")
 				.and_then(|id| self.related.get(id))
 			else {
 				continue;
@@ -741,7 +744,10 @@ impl ShapeReader<'_> {
 			let Some(bytes) = data.try_data(&self.deck.file)? else {
 				continue;
 			};
-			for text in XmlTree::parse(bytes)?.root.descendants_named(A, "t") {
+			for text in XmlTree::parse(bytes)?
+				.root
+				.descendants_named(Ns::DRAWING, "t")
+			{
 				let text = text.text().trim().to_string();
 				if !text.is_empty() && lines.last() != Some(&text) {
 					lines.push(text);
@@ -821,11 +827,11 @@ impl ShapeReader<'_> {
 fn own_frame(shape: &XmlElement) -> Option<((i64, i64), (i64, i64))> {
 	let transform = ["spPr", "grpSpPr"]
 		.iter()
-		.find_map(|local| shape.child(P, local))
-		.and_then(|properties| properties.child(A, "xfrm"))
-		.or_else(|| shape.child(P, "xfrm"))?;
+		.find_map(|local| shape.child(Ns::PRESENTATION, local))
+		.and_then(|properties| properties.child(Ns::DRAWING, "xfrm"))
+		.or_else(|| shape.child(Ns::PRESENTATION, "xfrm"))?;
 	let pair = |local: &str, first: &str, second: &str| {
-		let element = transform.child(A, local)?;
+		let element = transform.child(Ns::DRAWING, local)?;
 		Some((
 			element.attribute(None, first)?.parse::<i64>().ok()?,
 			element.attribute(None, second)?.parse::<i64>().ok()?,
@@ -840,8 +846,8 @@ fn placeholder(shape: &XmlElement) -> Option<&XmlElement> {
 	shape
 		.elements()
 		.find(|element| element.local_name().starts_with("nv"))?
-		.child(P, "nvPr")?
-		.child(P, "ph")
+		.child(Ns::PRESENTATION, "nvPr")?
+		.child(Ns::PRESENTATION, "ph")
 }
 
 /// A paragraph's text, a soft break as a newline and a field as its text.
@@ -850,7 +856,7 @@ fn paragraph_text(paragraph: &XmlElement) -> String {
 		.elements()
 		.map(|element| match element.local_name() {
 			"br" => "\n".to_string(),
-			"r" | "fld" => element.text_of(A, "t"),
+			"r" | "fld" => element.text_of(Ns::DRAWING, "t"),
 			_ => String::new(),
 		})
 		.collect()
@@ -858,9 +864,9 @@ fn paragraph_text(paragraph: &XmlElement) -> String {
 
 /// A table cell's lines, whitespace collapsed and empty ones dropped.
 fn cell_lines(cell: &XmlElement) -> Vec<String> {
-	cell.child(A, "txBody")
+	cell.child(Ns::DRAWING, "txBody")
 		.map(|body| {
-			body.children_named(A, "p")
+			body.children_named(Ns::DRAWING, "p")
 				.map(paragraph_text)
 				.collect::<Vec<_>>()
 				.join("\n")
@@ -925,6 +931,8 @@ mod test {
 	/// A one-slide deck: a title placeholder, a bulleted body with a nested
 	/// level and a two-row table.
 	fn deck() -> SlideDeck {
+		let (presentation_ns, drawing_ns, relationships_ns) =
+			(Ns::PRESENTATION, Ns::DRAWING, Ns::RELATIONSHIPS);
 		let mut file = PresentationDocument::create(Default::default());
 		let presentation = file.add_presentation_part().unwrap();
 		let slide: SlidePart =
@@ -933,7 +941,7 @@ mod test {
 			.set_data(
 				&mut file,
 				format!(
-					"<p:sld xmlns:p=\"{P}\" xmlns:a=\"{A}\"><p:cSld><p:spTree>\
+					"<p:sld xmlns:p=\"{presentation_ns}\" xmlns:a=\"{drawing_ns}\"><p:cSld><p:spTree>\
 					 <p:sp><p:nvSpPr><p:cNvPr id=\"3\" name=\"Body\"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>\
 					 <p:spPr><a:xfrm><a:off x=\"0\" y=\"2000\"/><a:ext cx=\"100\" cy=\"100\"/></a:xfrm></p:spPr>\
 					 <p:txBody><a:p><a:r><a:t>Ask three customers</a:t></a:r></a:p>\
@@ -958,7 +966,7 @@ mod test {
 			.set_data(
 				&mut file,
 				format!(
-					"<p:presentation xmlns:p=\"{P}\" xmlns:r=\"{R}\">\
+					"<p:presentation xmlns:p=\"{presentation_ns}\" xmlns:r=\"{relationships_ns}\">\
 					 <p:sldIdLst><p:sldId id=\"256\" r:id=\"rIdSlide1\"/></p:sldIdLst>\
 					 <p:sldSz cx=\"12192000\" cy=\"6858000\"/><p:notesSz cx=\"6858000\" cy=\"9144000\"/>\
 					 </p:presentation>"

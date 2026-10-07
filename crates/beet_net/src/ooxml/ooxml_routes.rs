@@ -14,7 +14,7 @@ impl Plugin for OoxmlPlugin {
 #[derive(Reflect)]
 struct CellsParams {
 	/// The file's path in the store, ie `assets/forms/plan.docx`.
-	path: Vec<String>,
+	path: RelPath,
 }
 
 /// `cells <path>`: every table cell of a Word file, `| t1r1c1 | text |`, or
@@ -37,18 +37,15 @@ struct CellsParams {
 	ParamsPartial = ParamsPartial::new::<CellsParams>()
 )]
 pub async fn OoxmlCells(cx: ActionContext<Request>) -> Result<Response> {
-	let path = cx.input.parse_params::<CellsParams>()?.path.join("/");
-	if path.is_empty() {
-		bevybail!("name the file to dump, ie `cells assets/forms/plan.docx`");
-	}
+	let path = cx.input.parse_params::<CellsParams>()?.path;
 	let blob = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {
 			query.get(entity).cloned()
 		})
 		.await??
-		.blob(RelPath::new(&path));
-	let rows = match MediaType::from_path(&path) {
+		.blob(path.clone());
+	let rows = match MediaType::from_path(path.as_str()) {
 		MediaType::Docx => WordDocument::open(&blob)
 			.await?
 			.cells()

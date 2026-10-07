@@ -27,7 +27,7 @@ pub struct WorkbookCell {
 	/// Where the cell is.
 	pub address: SheetCellAddress,
 	/// What it holds.
-	pub value: String,
+	pub value: SmolStr,
 }
 
 /// The cells dump's row, `| Sheet!A1 | value |`, an empty cell `(empty)`.
@@ -160,7 +160,7 @@ impl Workbook {
 	}
 
 	/// The value of one cell, a merged cell answering its range's first.
-	pub fn value(&self, address: &SheetCellAddress) -> Result<String> {
+	pub fn value(&self, address: &SheetCellAddress) -> Result<SmolStr> {
 		let strings = self.shared_strings()?;
 		let part = self.sheet(&address.sheet)?;
 		let sheet = part.root_element(&self.file)?;
@@ -430,7 +430,7 @@ impl<'a> SheetLayout<'a> {
 
 	/// The value shown at a position, a merged cell showing its range's
 	/// first.
-	fn value(&self, column: u32, row: u32) -> String {
+	fn value(&self, column: u32, row: u32) -> SmolStr {
 		let (column, row) = self
 			.masters
 			.get(&(column, row))
@@ -444,7 +444,7 @@ impl<'a> SheetLayout<'a> {
 			.and_then(|row| {
 				Self::row_cells(row)
 					.get(&column)
-					.map(|cell| self.show(cell))
+					.map(|cell| self.show(cell).into())
 			})
 			.unwrap_or_default()
 	}

@@ -18,6 +18,10 @@
 
 mod page_root;
 pub use page_root::*;
+// any store file a request names, parsed like a `BlobPage` and rendered as the
+// request accepts
+mod blob_view;
+pub use blob_view::*;
 // the persistent counterpart of the per-request page routes: one live tree,
 // served request after request.
 mod fixed_page;

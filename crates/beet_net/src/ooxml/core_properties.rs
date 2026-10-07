@@ -1,29 +1,27 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+type Ns = OoxmlNamespace;
+
 /// A file's core properties, `docProps/core.xml`: who made it and when, as
 /// a dump's header names them.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CoreProperties {
 	/// `dc:title`.
-	pub title: String,
+	pub title: SmolStr,
 	/// `dc:creator`, the author.
-	pub author: String,
+	pub author: SmolStr,
 	/// `cp:lastModifiedBy`.
-	pub modified_by: String,
+	pub modified_by: SmolStr,
 	/// `dcterms:created`, as written.
-	pub created: String,
+	pub created: SmolStr,
 	/// `dcterms:modified`, as written.
-	pub modified: String,
+	pub modified: SmolStr,
 	/// `cp:revision`.
-	pub revision: String,
+	pub revision: SmolStr,
 }
 
 impl CoreProperties {
-	const DC: &str = "http://purl.org/dc/elements/1.1/";
-	const DCTERMS: &str = "http://purl.org/dc/terms/";
-	const CP: &str = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties";
-
 	/// Reads the core properties part, every field empty when it has none.
 	pub fn parse(bytes: Option<&[u8]>) -> Result<Self> {
 		let Some(bytes) = bytes else {
@@ -34,15 +32,16 @@ impl CoreProperties {
 			tree.root
 				.child(namespace, local)
 				.map(XmlElement::text)
+				.map(SmolStr::from)
 				.unwrap_or_default()
 		};
 		Self {
-			title: field(Self::DC, "title"),
-			author: field(Self::DC, "creator"),
-			modified_by: field(Self::CP, "lastModifiedBy"),
-			created: field(Self::DCTERMS, "created"),
-			modified: field(Self::DCTERMS, "modified"),
-			revision: field(Self::CP, "revision"),
+			title: field(Ns::DUBLIN_CORE, "title"),
+			author: field(Ns::DUBLIN_CORE, "creator"),
+			modified_by: field(Ns::CORE_PROPERTIES, "lastModifiedBy"),
+			created: field(Ns::DUBLIN_CORE_TERMS, "created"),
+			modified: field(Ns::DUBLIN_CORE_TERMS, "modified"),
+			revision: field(Ns::CORE_PROPERTIES, "revision"),
 		}
 		.xok()
 	}

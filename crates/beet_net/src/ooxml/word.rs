@@ -2,8 +2,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::wordprocessing_document::WordprocessingDocument;
 
-const W: &str = WordDocument::NAMESPACE;
-const W14: &str = WordDocument::NAMESPACE_2010;
+type Ns = OoxmlNamespace;
+
 /// The empty and the ticked checkbox glyphs.
 const BOX: char = '\u{2610}';
 const TICKED: char = '\u{2612}';
@@ -29,7 +29,7 @@ pub struct WordCell {
 	/// Where the cell is.
 	pub address: TableCellAddress,
 	/// What it says.
-	pub text: String,
+	pub text: SmolStr,
 }
 
 /// The cells dump's row, `| t1r1c1 | text |`, an empty cell `(empty)`.
@@ -48,14 +48,6 @@ impl core::fmt::Display for WordCell {
 }
 
 impl WordDocument {
-	/// WordprocessingML's main namespace, the `w:` prefix.
-	pub const NAMESPACE: &str =
-		"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-	/// Word 2010's namespace, the `w14:` prefix, home of the checkbox
-	/// control.
-	pub const NAMESPACE_2010: &str =
-		"http://schemas.microsoft.com/office/word/2010/wordml";
-
 	/// Opens a Word file from its bytes.
 	pub fn from_bytes(bytes: impl Into<Vec<u8>>) -> Result<Self> {
 		let file =
@@ -77,9 +69,11 @@ impl WordDocument {
 			&mut file,
 			format!(
 				"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
-				 <w:document xmlns:w=\"{W}\" xmlns:w14=\"{W14}\" \
-				 xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\
-				 <w:body>{body}</w:body></w:document>"
+				 <w:document xmlns:w=\"{}\" xmlns:w14=\"{}\" xmlns:r=\"{}\">\
+				 <w:body>{body}</w:body></w:document>",
+				Ns::WORD,
+				Ns::WORD_2010,
+				Ns::RELATIONSHIPS,
 			),
 		)?;
 		let bytes = file.to_package_bytes()?;
@@ -125,11 +119,13 @@ impl WordDocument {
 	/// Every table cell in document order, tables numbered as they open.
 	pub fn cells(&self) -> Vec<WordCell> {
 		let mut cells = Vec::new();
-		let tables = self.main.root.descendants_named(W, "tbl");
+		let tables = self.main.root.descendants_named(Ns::WORD, "tbl");
 		for (table_index, table) in tables.into_iter().enumerate() {
-			for (row_index, row) in table.children_named(W, "tr").enumerate() {
+			for (row_index, row) in
+				table.children_named(Ns::WORD, "tr").enumerate()
+			{
 				for (cell_index, cell) in
-					row.children_named(W, "tc").enumerate()
+					row.children_named(Ns::WORD, "tc").enumerate()
 				{
 					cells.push(WordCell {
 						address: TableCellAddress {
@@ -173,9 +169,11 @@ impl WordDocument {
 	pub fn check(&mut self, label: &str) -> Result<usize> {
 		let needle = plain(label);
 		let checkboxes = self.main.root.paths(|element| {
-			element.is(W, "sdt")
-				&& element.child(W, "sdtPr").is_some_and(|properties| {
-					!properties.descendants_named(W14, "checkbox").is_empty()
+			element.is(Ns::WORD, "sdt")
+				&& element.child(Ns::WORD, "sdtPr").is_some_and(|properties| {
+					!properties
+						.descendants_named(Ns::WORD_2010, "checkbox")
+						.is_empty()
 				})
 		});
 		let mut ticked = 0;
@@ -184,11 +182,12 @@ impl WordDocument {
 				self.main
 					.root
 					.at(&path[..len])
-					.filter(|element| element.is(W, "p"))
+					.filter(|element| element.is(Ns::WORD, "p"))
 			});
 			match labelled {
 				Some(paragraph)
-					if plain(&paragraph.text_of(W, "t")).contains(&needle) =>
+					if plain(&paragraph.text_of(Ns::WORD, "t"))
+						.contains(&needle) =>
 				{
 					self.tick(&path)?;
 					ticked += 1;
@@ -211,8 +210,8 @@ impl WordDocument {
 			let parent = self.main.root.at(parent_path).ok_or_else(|| {
 				bevyhow!("a matched paragraph lost its parent")
 			})?;
-			let replacement = match parent.is(W, "tc")
-				&& parent.children_named(W, "p").count() == 1
+			let replacement = match parent.is(Ns::WORD, "tc")
+				&& parent.children_named(Ns::WORD, "p").count() == 1
 			{
 				true => Some(self.paragraph(parent.at(index), "")?),
 				false => None,
@@ -249,12 +248,15 @@ impl WordDocument {
 	}
 
 	/// A cell's paragraphs' text as the cells dump shows it.
-	fn cell_text(cell: &XmlElement) -> String {
-		cell.children_named(W, "p")
-			.map(|paragraph| paragraph.text_of(W, "t").trim().to_string())
+	fn cell_text(cell: &XmlElement) -> SmolStr {
+		cell.children_named(Ns::WORD, "p")
+			.map(|paragraph| {
+				paragraph.text_of(Ns::WORD, "t").trim().to_string()
+			})
 			.filter(|text| !text.is_empty())
 			.collect::<Vec<_>>()
 			.join(" / ")
+			.into()
 	}
 
 	/// Refuses an empty match, which every paragraph carries.
@@ -269,8 +271,8 @@ impl WordDocument {
 
 	fn paragraphs_carrying(&self, needle: &str) -> Vec<Vec<usize>> {
 		self.main.root.paths(|element| {
-			element.is(W, "p")
-				&& plain(&element.text_of(W, "t")).contains(needle)
+			element.is(Ns::WORD, "p")
+				&& plain(&element.text_of(Ns::WORD, "t")).contains(needle)
 		})
 	}
 
@@ -282,7 +284,7 @@ impl WordDocument {
 	) -> Result {
 		let path = self.cell_path(address)?;
 		let cell = self.main.root.at(&path).unwrap();
-		let model = cell.child(W, "p");
+		let model = cell.child(Ns::WORD, "p");
 		let paragraphs = text
 			.split('\n')
 			.map(|line| self.paragraph(model, line).map(XmlNode::Element))
@@ -290,7 +292,7 @@ impl WordDocument {
 		let cell = self.main.root.at_mut(&path).unwrap();
 		if !append {
 			cell.children.retain(
-				|node| !matches!(node, XmlNode::Element(element) if element.is(W, "p")),
+				|node| !matches!(node, XmlNode::Element(element) if element.is(Ns::WORD, "p")),
 			);
 		}
 		// a cell's properties come first and its paragraphs last, so
@@ -305,7 +307,7 @@ impl WordDocument {
 		let mut path = self
 			.main
 			.root
-			.paths(|element| element.is(W, "tbl"))
+			.paths(|element| element.is(Ns::WORD, "tbl"))
 			.into_iter()
 			.nth(address.table as usize - 1)
 			.ok_or_else(missing)?;
@@ -316,7 +318,7 @@ impl WordDocument {
 				.iter()
 				.enumerate()
 				.filter(|(_, node)| {
-					matches!(node, XmlNode::Element(element) if element.is(W, local))
+					matches!(node, XmlNode::Element(element) if element.is(Ns::WORD, local))
 				})
 				.nth(nth as usize - 1)
 				.map(|(index, _)| index)
@@ -334,26 +336,28 @@ impl WordDocument {
 		model: Option<&XmlElement>,
 		text: &str,
 	) -> Result<XmlElement> {
-		let mut paragraph = self.main.element(W, "p")?;
-		if let Some(properties) = model.and_then(|model| model.child(W, "pPr"))
+		let mut paragraph = self.main.element(Ns::WORD, "p")?;
+		if let Some(properties) =
+			model.and_then(|model| model.child(Ns::WORD, "pPr"))
 		{
 			paragraph
 				.children
 				.push(XmlNode::Element(properties.clone()));
 		}
-		let mut run = self.main.element(W, "r")?;
+		let mut run = self.main.element(Ns::WORD, "r")?;
 		let runs = model
-			.map(|model| model.descendants_named(W, "r"))
+			.map(|model| model.descendants_named(Ns::WORD, "r"))
 			.unwrap_or_default();
 		let model_run = runs
 			.iter()
-			.find(|run| !run.descendants_named(W, "t").is_empty())
+			.find(|run| !run.descendants_named(Ns::WORD, "t").is_empty())
 			.or(runs.first());
-		if let Some(properties) = model_run.and_then(|run| run.child(W, "rPr"))
+		if let Some(properties) =
+			model_run.and_then(|run| run.child(Ns::WORD, "rPr"))
 		{
 			run.children.push(XmlNode::Element(properties.clone()));
 		}
-		let mut text_element = self.main.element(W, "t")?;
+		let mut text_element = self.main.element(Ns::WORD, "t")?;
 		text_element.set_attribute(self.main.attribute(
 			XmlTree::XML_NAMESPACE,
 			"space",
@@ -368,22 +372,27 @@ impl WordDocument {
 	/// Marks the checkbox control at `path` checked, ticks its glyphs and
 	/// makes their runs bold and highlighted.
 	fn tick(&mut self, path: &[usize]) -> Result {
-		let checked = self.main.attribute(W14, "val", "1")?;
-		let mut checked_element = self.main.element(W14, "checked")?;
+		let checked = self.main.attribute(Ns::WORD_2010, "val", "1")?;
+		let mut checked_element =
+			self.main.element(Ns::WORD_2010, "checked")?;
 		checked_element.set_attribute(checked.clone());
-		let bold = self.main.element(W, "b")?;
-		let mut highlight = self.main.element(W, "highlight")?;
-		highlight.set_attribute(self.main.attribute(W, "val", "yellow")?);
-		let empty_properties = self.main.element(W, "rPr")?;
+		let bold = self.main.element(Ns::WORD, "b")?;
+		let mut highlight = self.main.element(Ns::WORD, "highlight")?;
+		highlight.set_attribute(self.main.attribute(
+			Ns::WORD,
+			"val",
+			"yellow",
+		)?);
+		let empty_properties = self.main.element(Ns::WORD, "rPr")?;
 
 		let control = self.main.root.at_mut(path).unwrap();
 		let checkbox_path = control
-			.paths(|element| element.is(W14, "checkbox"))
+			.paths(|element| element.is(Ns::WORD_2010, "checkbox"))
 			.into_iter()
 			.next()
 			.unwrap();
 		let checkbox = control.at_mut(&checkbox_path).unwrap();
-		match checkbox.child_mut(W14, "checked") {
+		match checkbox.child_mut(Ns::WORD_2010, "checked") {
 			Some(existing) => existing.set_attribute(checked),
 			// the schema puts `checked` first
 			None => checkbox
@@ -391,7 +400,7 @@ impl WordDocument {
 				.insert(0, XmlNode::Element(checked_element)),
 		}
 		let glyphs = control.paths(|element| {
-			element.is(W, "t") && element.text().contains(BOX)
+			element.is(Ns::WORD, "t") && element.text().contains(BOX)
 		});
 		for glyph_path in glyphs {
 			let glyph = control.at_mut(&glyph_path).unwrap();
@@ -399,13 +408,13 @@ impl WordDocument {
 			glyph.set_text(ticked);
 			let run =
 				control.at_mut(&glyph_path[..glyph_path.len() - 1]).unwrap();
-			if run.child(W, "rPr").is_none() {
+			if run.child(Ns::WORD, "rPr").is_none() {
 				run.children
 					.insert(0, XmlNode::Element(empty_properties.clone()));
 			}
-			let properties = run.child_mut(W, "rPr").unwrap();
+			let properties = run.child_mut(Ns::WORD, "rPr").unwrap();
 			for mark in [&bold, &highlight] {
-				if properties.child(W, mark.local_name()).is_none() {
+				if properties.child(Ns::WORD, mark.local_name()).is_none() {
 					insert_run_property(properties, mark.clone());
 				}
 			}
@@ -421,7 +430,7 @@ impl WordDocument {
 		new: &str,
 		preserve: &XmlAttribute,
 	) -> usize {
-		let text_paths = paragraph.paths(|element| element.is(W, "t"));
+		let text_paths = paragraph.paths(|element| element.is(Ns::WORD, "t"));
 		let mut replaced = 0;
 		// bounded, since a replacement may itself carry the needle
 		for _ in 0..50 {
@@ -516,7 +525,7 @@ fn insert_run_property(properties: &mut XmlElement, property: XmlElement) {
 		.iter()
 		.position(|node| {
 			matches!(node, XmlNode::Element(element)
-				if element.namespace.as_deref() == Some(W)
+				if element.namespace.as_deref() == Some(Ns::WORD)
 					&& rank(element.local_name()) > own)
 		})
 		.unwrap_or(properties.children.len());

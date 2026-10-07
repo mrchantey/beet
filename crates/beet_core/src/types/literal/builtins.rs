@@ -52,6 +52,28 @@ impl Table {
 		self
 	}
 
+	/// `T` parses from a path, one string or the segments a greedy route
+	/// capture collects, so `docs/plan.docx` and `["docs", "plan.docx"]` are
+	/// the same path; a list holding anything but strings declines.
+	fn add_path<T: 'static + Send + Sync + PartialReflect>(
+		&mut self,
+		parse: impl 'static + Send + Sync + Fn(&str) -> T,
+	) -> &mut Self {
+		self.add(move |value: &Value| match value {
+			Value::Str(string) => Ok(Some(parse(string.as_str()))),
+			Value::List(segments) => segments
+				.iter()
+				.map(|segment| match segment {
+					Value::Str(segment) => Some(segment.as_str()),
+					_ => None,
+				})
+				.collect::<Option<Vec<_>>>()
+				.map(|segments| parse(&segments.join("/")))
+				.xok(),
+			_ => Ok(None),
+		})
+	}
+
 	/// `T` parses from a string and declines every other shape, the common form
 	/// of a type spelled as one word.
 	fn add_str<T: 'static + Send + Sync + PartialReflect>(
@@ -112,9 +134,10 @@ fn add_strings(table: &mut Table) {
 		// plain string, so `<Name("Malenia")/>` builds via `Name::new`.
 		.add_str(|string| Name::new(string.to_string()))
 		// a logical path, so a markup `src="assets"` resolves to a `SmolPath`,
-		// and a store key to a `RelPath`
-		.add_str(|string| SmolPath::new(string))
-		.add_str(|string| RelPath::new(string));
+		// and a store key to a `RelPath`, from a greedy route capture's
+		// segments as readily as from one string
+		.add_path(|string| SmolPath::new(string))
+		.add_path(|string| RelPath::new(string));
 
 	// a url is authored as the string it displays as, and the strict
 	// `Url::parse` is what makes a control character in a frontmatter
@@ -252,7 +275,7 @@ fn add_domain(table: &mut Table) {
 	// `AbsPath`'s workspace-relative serde, so `<FsStore path="assets"/>`
 	// takes a string attribute directly. Resolving needs the workspace root,
 	// so a no_std (embedded) build authors a `WsPath` instead.
-	table.add_str(|string| WsPath::new(string));
+	table.add_path(|string| WsPath::new(string));
 	#[cfg(feature = "std")]
 	table.add_hinted(
 		"a workspace-relative path",
@@ -437,6 +460,13 @@ mod test {
 		parse::<RelPath>(Value::str("/assets/x"))
 			.unwrap()
 			.xpect_eq(Some(RelPath::new("assets/x")));
+		// a greedy route capture's segments are one path
+		parse::<RelPath>(Value::List(vec![
+			Value::str("docs"),
+			Value::str("plan.docx"),
+		]))
+		.unwrap()
+		.xpect_eq(Some(RelPath::new("docs/plan.docx")));
 		parse::<WsPath>(Value::str("/assets/x"))
 			.unwrap()
 			.xpect_eq(Some(WsPath::new("assets/x")));

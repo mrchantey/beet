@@ -50,6 +50,7 @@
 mod cell_address;
 mod core_properties;
 mod html;
+mod namespace;
 mod ooxml_routes;
 mod slides;
 mod word;
@@ -58,6 +59,7 @@ mod workbook;
 mod xml_tree;
 pub use cell_address::*;
 pub use core_properties::*;
+pub use namespace::*;
 pub use ooxml_routes::*;
 pub use slides::*;
 pub use word::*;

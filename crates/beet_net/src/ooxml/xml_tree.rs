@@ -24,13 +24,13 @@ pub enum XmlNode {
 	/// An element.
 	Element(XmlElement),
 	/// Character data, unescaped.
-	Text(String),
+	Text(SmolStr),
 	/// A `<![CDATA[..]]>` section's content.
-	CData(String),
+	CData(SmolStr),
 	/// A comment's content.
-	Comment(String),
+	Comment(SmolStr),
 	/// A declaration, processing instruction or doctype, as written.
-	Raw(String),
+	Raw(SmolStr),
 }
 
 /// An element: its name as written, the namespace that name resolved to, its
@@ -56,7 +56,7 @@ pub struct XmlAttribute {
 	/// The namespace a prefix resolved to; an unprefixed attribute has none.
 	pub namespace: Option<SmolStr>,
 	/// The value, unescaped.
-	pub value: String,
+	pub value: SmolStr,
 }
 
 impl XmlTree {
@@ -103,7 +103,7 @@ impl XmlTree {
 					Self::push_node(
 						&mut stack,
 						&mut prolog,
-						XmlNode::CData(text),
+						XmlNode::CData(text.into()),
 					);
 				}
 				Event::Comment(comment) => {
@@ -111,7 +111,7 @@ impl XmlTree {
 					Self::push_node(
 						&mut stack,
 						&mut prolog,
-						XmlNode::Comment(text),
+						XmlNode::Comment(text.into()),
 					);
 				}
 				Event::Decl(decl) => {
@@ -119,7 +119,7 @@ impl XmlTree {
 					Self::push_node(
 						&mut stack,
 						&mut prolog,
-						XmlNode::Raw(format!("<?{text}?>")),
+						XmlNode::Raw(format!("<?{text}?>").into()),
 					);
 				}
 				Event::PI(pi) => {
@@ -127,7 +127,7 @@ impl XmlTree {
 					Self::push_node(
 						&mut stack,
 						&mut prolog,
-						XmlNode::Raw(format!("<?{text}?>")),
+						XmlNode::Raw(format!("<?{text}?>").into()),
 					);
 				}
 				Event::DocType(doctype) => {
@@ -135,7 +135,7 @@ impl XmlTree {
 					Self::push_node(
 						&mut stack,
 						&mut prolog,
-						XmlNode::Raw(format!("<!DOCTYPE {text}>")),
+						XmlNode::Raw(format!("<!DOCTYPE {text}>").into()),
 					);
 				}
 				Event::Eof => break,
@@ -186,7 +186,7 @@ impl XmlTree {
 		&self,
 		namespace: &str,
 		local: &str,
-		value: impl Into<String>,
+		value: impl Into<SmolStr>,
 	) -> Result<XmlAttribute> {
 		let prefix = match namespace {
 			Self::XML_NAMESPACE => "xml",
@@ -224,8 +224,10 @@ impl XmlTree {
 	fn push_text(stack: &mut Vec<XmlElement>, text: &str) {
 		if let Some(parent) = stack.last_mut() {
 			match parent.children.last_mut() {
-				Some(XmlNode::Text(existing)) => existing.push_str(text),
-				_ => parent.children.push(XmlNode::Text(text.to_string())),
+				Some(XmlNode::Text(existing)) => {
+					*existing = format!("{existing}{text}").into()
+				}
+				_ => parent.children.push(XmlNode::Text(text.into())),
 			}
 		}
 	}
@@ -270,7 +272,7 @@ impl XmlNode {
 		match self {
 			Self::Element(element) => element.write(out),
 			Self::Text(text) => {
-				out.push_str(&quick_xml::escape::partial_escape(text))
+				out.push_str(&quick_xml::escape::partial_escape(text.as_str()))
 			}
 			Self::CData(text) => {
 				out.push_str("<![CDATA[");
@@ -403,7 +405,7 @@ impl XmlElement {
 	}
 
 	/// Replaces the children with one text node.
-	pub fn set_text(&mut self, text: impl Into<String>) {
+	pub fn set_text(&mut self, text: impl Into<SmolStr>) {
 		self.children = vec![XmlNode::Text(text.into())];
 	}
 
@@ -574,7 +576,7 @@ impl NamespaceScopes {
 						.filter(|(prefix, _)| *prefix != "xmlns")
 						.and_then(|(prefix, _)| self.resolve(prefix)),
 					name: key.into(),
-					value,
+					value: value.into(),
 				})
 				.collect(),
 			children: Vec::new(),
