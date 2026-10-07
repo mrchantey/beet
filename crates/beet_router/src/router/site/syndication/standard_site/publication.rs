@@ -14,9 +14,9 @@ use beet_ui::prelude::*;
 #[reflect(Serialize, Deserialize)]
 pub struct StandardSitePublication {
 	/// The base url, no trailing slash, ie `https://beet.org/blog`.
-	pub url: SmolStr,
+	pub url: Uri,
 	/// The publication's name.
-	pub name: String,
+	pub name: SmolStr,
 	/// What the publication is about.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub description: Option<String>,
@@ -54,7 +54,7 @@ impl StandardSitePublication {
 	/// Errors when the homepage is unset or names no origin (see
 	/// [`PackageConfig::absolute_url`]), or when the theme does not resolve.
 	pub fn from_declaration(
-		declaration: &StandardSite,
+		declaration: &StandardSitePub,
 		package: &PackageConfig,
 		theme: &Theme,
 		icon: Option<BlobRef>,
@@ -64,7 +64,7 @@ impl StandardSitePublication {
 				.absolute_url(declaration.path.as_str())?
 				.to_string()
 				.trim_end_matches('/')
-				.into(),
+				.xmap(Uri::parse)?,
 			name: declaration.name.clone(),
 			description: declaration.description.clone(),
 			icon,
@@ -117,7 +117,7 @@ mod test {
 	/// Every field filled.
 	fn filled() -> StandardSitePublication {
 		StandardSitePublication::from_declaration(
-			&StandardSite {
+			&StandardSitePub {
 				labels: vec!["graphic-media".into()],
 				..harvest()
 			},
@@ -145,7 +145,7 @@ mod test {
 	fn trims_the_url() {
 		let url = |homepage: &str, path: &str| {
 			StandardSitePublication::from_declaration(
-				&StandardSite {
+				&StandardSitePub {
 					path: RelPath::new(path),
 					..harvest()
 				},
@@ -155,6 +155,7 @@ mod test {
 			)
 			.unwrap()
 			.url
+			.to_string()
 		};
 		url("https://beet.org", "blog").xpect_eq("https://beet.org/blog");
 		url("https://beet.org/", "blog/").xpect_eq("https://beet.org/blog");
@@ -184,7 +185,7 @@ mod test {
 				.unwrap()
 				.into_serde::<StandardSitePublication>()
 				.unwrap();
-		publication.url.xpect_eq("https://lab.leaflet.pub");
+		publication.url.as_str().xpect_eq("https://lab.leaflet.pub");
 		publication
 			.icon
 			.unwrap()

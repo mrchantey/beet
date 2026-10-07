@@ -7,7 +7,8 @@
 //! `Pds`, whose module docs carry the converge's words.
 //!
 //! - [`Did`], an account; [`Nsid`], a collection or a lexicon def; [`Rkey`]
-//!   and [`Tid`], a record's key; [`AtUri`], a record's address
+//!   and [`Tid`], a record's key; [`AtUri`], a record's address; [`Uri`],
+//!   the lexicon's `uri` format verbatim
 //! - [`Cid`], content addressing for bytes and records; [`StrongRef`] and
 //!   [`BlobRef`], the two references a record holds
 //! - [`AtprotoRecord`], one shape for every record type beet reads or writes,
@@ -62,6 +63,7 @@ mod rkeyed;
 mod self_labels;
 mod strong_ref;
 mod tid;
+mod uri;
 pub use at_uri::*;
 #[cfg(feature = "serde")]
 pub use atproto_record::*;
@@ -77,6 +79,7 @@ pub use rkeyed::*;
 pub use self_labels::*;
 pub use strong_ref::*;
 pub use tid::*;
+pub use uri::*;
 
 /// The conversions every string primitive here shares: its text, `Display`,
 /// `FromStr` and `TryFrom<SmolStr>` through its validating `parse`, and the

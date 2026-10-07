@@ -14,8 +14,10 @@ use beet_net::prelude::*;
 #[derive(Debug, Clone, PartialEq, Reflect, Serialize, Deserialize)]
 #[reflect(Serialize, Deserialize)]
 pub struct StandardSiteDocument {
-	/// The publication the document belongs to.
-	pub site: PublicationRef,
+	/// The publication record the document belongs to, `at://..`, or for a
+	/// loose document the url of its site, with no trailing slash; the
+	/// record's own view is [`Uri::at_uri`].
+	pub site: Uri,
 	/// Joined to the publication's url to form the canonical page, with a
 	/// leading slash, ie `/full-stack-bevy`.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
@@ -98,7 +100,7 @@ impl StandardSiteDocument {
 	/// Errors when the page is not beneath the publication's path, or lacks
 	/// the title or the `created` day the lexicon requires.
 	pub fn from_page(
-		publication: &StandardSite,
+		publication: &StandardSitePub,
 		site: AtUri,
 		page: &SyndicationPage,
 	) -> Result<Self> {
@@ -112,7 +114,7 @@ impl StandardSiteDocument {
 			})?;
 		let meta = &page.meta;
 		Self {
-			site: PublicationRef::Record(site),
+			site: site.into(),
 			path: Some(format!("/{path}").into()),
 			title: meta.title.clone().ok_or_else(|| {
 				bevyhow!(
@@ -143,40 +145,6 @@ impl StandardSiteDocument {
 			bsky_post_ref: None,
 		}
 		.xok()
-	}
-}
-
-/// What a standard site document belongs to, the lexicon's `site`: a
-/// publication record, or for a loose document the url of the site it
-/// belongs to. Written as the bare string either way.
-#[derive(Debug, Clone, PartialEq, Eq, Reflect, Serialize, Deserialize)]
-#[serde(try_from = "SmolStr", into = "SmolStr")]
-#[reflect(Serialize, Deserialize)]
-pub enum PublicationRef {
-	/// The publication record, `at://..`.
-	Record(AtUri),
-	/// The url of a loose document's site, `https://..`, with no trailing
-	/// slash.
-	Url(SmolStr),
-}
-
-impl TryFrom<SmolStr> for PublicationRef {
-	type Error = BevyError;
-	fn try_from(site: SmolStr) -> Result<Self> {
-		match site.starts_with(AtUri::SCHEME) {
-			true => Self::Record(AtUri::parse(&site)?),
-			false => Self::Url(site),
-		}
-		.xok()
-	}
-}
-
-impl From<PublicationRef> for SmolStr {
-	fn from(site: PublicationRef) -> Self {
-		match site {
-			PublicationRef::Record(uri) => uri.into(),
-			PublicationRef::Url(url) => url,
-		}
 	}
 }
 
@@ -349,8 +317,7 @@ mod test {
 	}
 
 	/// Standard.site's own document as its PDS answered on 2026-10-06, a
-	/// field beet does not know (`canonicalUrl`) ignored, and a loose
-	/// document's https `site` read as a url.
+	/// field beet does not know (`canonicalUrl`) ignored.
 	#[beet_core::test]
 	fn reads_a_foreign_document() {
 		let json = r#"{"path":"/docs/lexicons/recommend","site":"at://did:plc:re3ebnp5v7ffagz6rb6xfei4/site.standard.publication/3me5vykp6lf2y","$type":"site.standard.document","title":"Recommend Lexicon","coverImage":{"ref":{"$link":"bafkreibyshzq4yiashq67ajipj3eo6n2dybbvsdmzspox7mpgoxtfimoeq"},"size":113475,"$type":"blob","mimeType":"image/png"},"description":"Schema reference for document recommends, used to declare that a user endorses or recommends a document.","publishedAt":"2026-05-19T00:00:00.000Z","canonicalUrl":"https://standard.site/docs/lexicons/recommend"}"#;
@@ -359,17 +326,16 @@ mod test {
 				.unwrap()
 				.into_serde::<StandardSiteDocument>()
 				.unwrap();
-		match &document.site {
-			PublicationRef::Record(site) => site.rkey().as_str(),
-			PublicationRef::Url(url) => url.as_str(),
-		}
-		.xpect_eq("3me5vykp6lf2y");
+		document
+			.site
+			.at_uri()
+			.unwrap()
+			.rkey()
+			.as_str()
+			.xpect_eq("3me5vykp6lf2y");
 		document
 			.published_at
 			.xpect_eq(Date::parse("2026-05-19").unwrap().timestamp());
 		document.cover_image.unwrap().size.xpect_eq(113475);
-		PublicationRef::try_from(SmolStr::new("https://example.com"))
-			.unwrap()
-			.xpect_eq(PublicationRef::Url("https://example.com".into()));
 	}
 }

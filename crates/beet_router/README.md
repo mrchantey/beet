@@ -111,4 +111,4 @@ Position is the whole configuration surface. A `Router` is a url space and route
 
 They need an origin to resolve their absolute urls against, so a `PackageConfig` with no `homepage` fails their dispatch naming the field.
 
-The same listed pages are the source of a site's [standard.site](https://standard.site) records, built with `json`: `StandardSitePublication::from_declaration` turns a `StandardSite` declaration into the `site.standard.publication` record, and `StandardSiteDocument::from_page` turns a page's metadata into its `site.standard.document`. Each record type is exactly its lexicon; the cheatsheet is the module docs of `src/router/site/syndication/standard_site/`.
+The same listed pages are the source of a site's [standard.site](https://standard.site) records, built with `json`: `StandardSitePublication::from_declaration` turns a `StandardSitePub` declaration into the `site.standard.publication` record, and `StandardSiteDocument::from_page` turns a page's metadata into its `site.standard.document`. Each record type is exactly its lexicon; the cheatsheet is the module docs of `src/router/site/syndication/standard_site/`.

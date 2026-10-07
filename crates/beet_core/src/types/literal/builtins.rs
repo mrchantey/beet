@@ -183,6 +183,13 @@ fn add_atproto(table: &mut Table) {
 				Value::Str(string) => AtUri::parse(string).map(Some),
 				_ => Ok(None),
 			},
+		)
+		.add_hinted(
+			"an absolute uri, eg \"https://beet.org\"",
+			|value: &Value| match value {
+				Value::Str(string) => Uri::parse(string).map(Some),
+				_ => Ok(None),
+			},
 		);
 }
 

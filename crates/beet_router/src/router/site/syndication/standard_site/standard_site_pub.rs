@@ -1,4 +1,4 @@
-//! `<StandardSite/>`: the declaration a publication is built from.
+//! `<StandardSitePub/>`: the declaration a publication is built from.
 use beet_core::prelude::*;
 
 /// A route subtree published as a standard.site publication: what the
@@ -9,12 +9,12 @@ use beet_core::prelude::*;
 /// posts.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct StandardSite {
+pub struct StandardSitePub {
 	/// The route path the publication roots at, ie `blog`, joined to the
 	/// site's homepage to form the publication's url. Empty for a whole site.
 	pub path: RelPath,
 	/// The publication's name.
-	pub name: String,
+	pub name: SmolStr,
 	/// What the publication is about.
 	pub description: Option<String>,
 	/// The self labels the publication carries, normally none.
@@ -23,7 +23,7 @@ pub struct StandardSite {
 	pub show_in_discover: bool,
 }
 
-impl Default for StandardSite {
+impl Default for StandardSitePub {
 	fn default() -> Self {
 		Self {
 			path: default(),

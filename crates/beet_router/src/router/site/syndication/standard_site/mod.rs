@@ -13,7 +13,7 @@
 //! travels beside it in an [`Rkeyed`], never in the body.
 //!
 //! - [`StandardSitePublication`], `site.standard.publication`, built from the
-//!   [`StandardSite`] declaration by
+//!   [`StandardSitePub`] declaration by
 //!   [`from_declaration`](StandardSitePublication::from_declaration), with its
 //!   [`ThemeBasic`] resolved from the site's [`Theme`]
 //! - [`StandardSiteDocument`], `site.standard.document`, built from a listed
@@ -36,12 +36,12 @@
 mod content_renderer;
 mod document;
 mod publication;
-mod standard_site;
+mod standard_site_pub;
 mod theme;
 pub use content_renderer::*;
 pub use document::*;
 pub use publication::*;
-pub use standard_site::*;
+pub use standard_site_pub::*;
 pub use theme::*;
 
 /// What every standard site test serializes against: the fixture
@@ -54,8 +54,8 @@ pub(crate) mod test_fixtures {
 	use beet_net::prelude::*;
 
 	/// The blog of the syndication fixture site as a publication.
-	pub fn harvest() -> StandardSite {
-		StandardSite {
+	pub fn harvest() -> StandardSitePub {
+		StandardSitePub {
 			path: RelPath::new("blog"),
 			name: "The Full Moon Harvest".into(),
 			description: Some("Monthly news from the beet garden".into()),
