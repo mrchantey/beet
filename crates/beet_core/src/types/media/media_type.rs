@@ -63,6 +63,15 @@ pub enum MediaType {
 	Tiff,
 	/// `application/pdf`
 	Pdf,
+	/// A Word file,
+	/// `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+	Docx,
+	/// A workbook,
+	/// `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+	Xlsx,
+	/// A slide deck,
+	/// `application/vnd.openxmlformats-officedocument.presentationml.presentation`
+	Pptx,
 	/// `application/zip`
 	Zip,
 	/// `application/gzip`
@@ -166,6 +175,10 @@ impl MediaType {
 	const BMP: &'static str = "image/bmp";
 	const TIFF: &'static str = "image/tiff";
 	const PDF: &'static str = "application/pdf";
+	const DOCX: &'static str = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+	const XLSX: &'static str =
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+	const PPTX: &'static str = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 	const ZIP: &'static str = "application/zip";
 	const GZIP: &'static str = "application/gzip";
 	const ZSTD: &'static str = "application/zstd";
@@ -223,6 +236,10 @@ impl MediaType {
 			.unwrap_or(content_type)
 			.trim();
 		match raw {
+			// the Office types first, since their long names carry `xml`
+			val if val.contains(Self::DOCX) => MediaType::Docx,
+			val if val.contains(Self::XLSX) => MediaType::Xlsx,
+			val if val.contains(Self::PPTX) => MediaType::Pptx,
 			val if val.contains(Self::WEB_MANIFEST) => MediaType::WebManifest,
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
@@ -361,6 +378,9 @@ impl MediaType {
 			"tar" => MediaType::Tar,
 			// documents
 			"pdf" => MediaType::Pdf,
+			"docx" => MediaType::Docx,
+			"xlsx" => MediaType::Xlsx,
+			"pptx" => MediaType::Pptx,
 			// binary / app
 			"wasm" => MediaType::Wasm,
 			"postcard" => MediaType::Postcard,
@@ -423,6 +443,9 @@ impl MediaType {
 			MediaType::Zstd => Some("zst"),
 			MediaType::Tar => Some("tar"),
 			MediaType::Pdf => Some("pdf"),
+			MediaType::Docx => Some("docx"),
+			MediaType::Xlsx => Some("xlsx"),
+			MediaType::Pptx => Some("pptx"),
 			MediaType::Wasm => Some("wasm"),
 			MediaType::Postcard => Some("postcard"),
 			MediaType::Ron => Some("ron"),
@@ -485,6 +508,9 @@ impl MediaType {
 			MediaType::Bmp => Self::BMP,
 			MediaType::Tiff => Self::TIFF,
 			MediaType::Pdf => Self::PDF,
+			MediaType::Docx => Self::DOCX,
+			MediaType::Xlsx => Self::XLSX,
+			MediaType::Pptx => Self::PPTX,
 			MediaType::Zip => Self::ZIP,
 			MediaType::Gzip => Self::GZIP,
 			MediaType::Zstd => Self::ZSTD,
@@ -756,6 +782,8 @@ mod test {
 		MediaType::from_extension("gif").xpect_eq(MediaType::Gif);
 		MediaType::from_extension("svg").xpect_eq(MediaType::Svg);
 		MediaType::from_extension("pdf").xpect_eq(MediaType::Pdf);
+		MediaType::from_extension("docx").xpect_eq(MediaType::Docx);
+		MediaType::from_extension("pptx").xpect_eq(MediaType::Pptx);
 		MediaType::from_extension("wasm").xpect_eq(MediaType::Wasm);
 		MediaType::from_extension("txt").xpect_eq(MediaType::Text);
 		MediaType::from_extension("md").xpect_eq(MediaType::Markdown);
@@ -848,6 +876,9 @@ mod test {
 			MediaType::Webp,
 			MediaType::Svg,
 			MediaType::Pdf,
+			MediaType::Docx,
+			MediaType::Xlsx,
+			MediaType::Pptx,
 			MediaType::Wasm,
 			MediaType::Woff2,
 			MediaType::Mp3,

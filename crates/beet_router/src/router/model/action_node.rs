@@ -99,21 +99,22 @@ impl ActionNode {
 	/// into the request params, so handlers can read a `:id` value via
 	/// [`RequestParts::get_param`] or the [`QueryParams`] extractor.
 	///
-	/// Path params take precedence over query params on key collision.
-	/// A no-op when the request path does not match this node's pattern.
+	/// Path params take precedence over query params on key collision. An
+	/// optional segment that matched nothing sets no param, so the handler
+	/// reads it absent rather than present without a value. A no-op when the
+	/// request path does not match this node's pattern.
 	pub fn merge_path_params(&self, request: &mut Request) {
 		let Ok(path_match) = self.path.parse_path(request.path()) else {
 			return;
 		};
 		let params = request.params_mut();
 		for (key, values) in path_match.dyn_map.into_iter_all() {
+			if values.is_empty() {
+				continue;
+			}
 			// path params win over query params on collision
 			params.remove(&key);
-			if values.is_empty() {
-				params.insert_key(key);
-			} else {
-				params.insert_vec(key, values);
-			}
+			params.insert_vec(key, values);
 		}
 	}
 }

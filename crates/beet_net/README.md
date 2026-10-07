@@ -68,6 +68,7 @@ App::new()
 | `tungstenite` | Native WebSocket support |
 | `russh_client` / `russh_server` | SSH client and server |
 | `webdriver` | WebDriver browser automation client: BiDi sessions, auto-waiting finds, trusted input (a secret typed without a trace), console/network collectors, cookies, persistent profiles, screenshots and PDF export |
+| `ooxml` | Office Open XML over `ooxmlsdk`: a Word file's tables, checkboxes and runs and a workbook's unlocked cells read and filled through a `Blob`, Word files and slide decks transcoded to HTML (which `beet_ui`'s `OoxmlParser` parses as media), and the `<OoxmlCells/>` dump; see `src/ooxml/mod.rs` |
 | `mdns` / `udp` | mDNS service discovery and UDP sockets |
 | `rustls-tls` | Use rustls for TLS |
 | `native-tls` | Use native TLS implementation |

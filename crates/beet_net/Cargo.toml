@@ -88,6 +88,11 @@ geoip = ["std", "dep:maxminddb"]
 # verbs, on `beet_core/vault`. `beet_core/rsx` is the `#[template]` attribute
 # `<VaultRoutes/>` and `<SecretsRoutes/>` are authored with.
 vault = ["std", "beet_core/vault", "beet_core/rsx"]
+# Office Open XML over `ooxmlsdk`: a Word file's tables, checkboxes and runs,
+# a workbook's unlocked cells, a slide deck's text, read from and written to a
+# `Blob`, Word files and slide decks transcoded to HTML, and the `<OoxmlCells/>`
+# dump. Pure rust, every target.
+ooxml = ["std", "dep:ooxmlsdk", "dep:quick-xml"]
 # QR rendering in the terminal (unicode half-blocks), so `vault backup
 # --qr` prints an identity's backup for paper. Pure rust, wasm-clean.
 qrcode = ["dep:qrcode"]
@@ -259,6 +264,10 @@ postcard = { workspace = true, optional = true }
 # the terminal qr print behind `vault backup --qr`
 qrcode = { workspace = true, optional = true }
 
+
+#💡 ooxml
+ooxmlsdk = { workspace = true, optional = true }
+quick-xml = { workspace = true, optional = true }
 
 # http
 http = { workspace = true, optional = true }

@@ -56,16 +56,22 @@ impl BsxNode {
 /// Drop insignificant inter-element whitespace from a node tree, the runtime BSX
 /// twin of the `rsx!` macro's compile-time trim and the browser's collapsing.
 ///
-/// A whitespace-only [`BsxNode::Text`] is insignificant when both its neighbours
-/// (or a list edge) are non-inline (an element, comment, or doctype): formatting
-/// indentation between block tags. Whitespace touching inline content (text or an
-/// `{expr}`) stays, collapsing to a single space at render. Recurses, but skips
-/// `<pre>`-family elements whose whitespace is meaningful.
+/// A whitespace-only [`BsxNode::Text`] is insignificant when neither neighbour
+/// (or a list edge) is inline content (text or an `{expr}`): formatting
+/// indentation between tags. Whitespace touching inline content stays,
+/// collapsing to a single space at render, as does a run on one line between
+/// two [`Element::INLINE_ELEMENTS`] tags, ie `<b>a</b> <i>b</i>`, the way JSX
+/// keeps a space but not a line break. Recurses, but skips `<pre>`-family
+/// elements whose whitespace is meaningful.
 fn normalize_whitespace(nodes: &mut Vec<BsxNode>) {
 	// a text/`{expr}` neighbour makes adjacent whitespace inline-significant.
 	let is_inline = |node: &BsxNode| {
 		matches!(node, BsxNode::Text(text) if !text.trim().is_empty())
 			|| matches!(node, BsxNode::Expr(_))
+	};
+	let is_inline_tag = |node: &BsxNode| {
+		matches!(node, BsxNode::Element(element)
+			if Element::INLINE_ELEMENTS.contains(&element.tag.as_str()))
 	};
 	// an insignificant node is a whitespace-only text run with no inline neighbour
 	// (between block tags or comments), so it drops like the browser collapses it.
@@ -73,13 +79,18 @@ fn normalize_whitespace(nodes: &mut Vec<BsxNode>) {
 		.iter()
 		.enumerate()
 		.map(|(index, node)| {
-			let insignificant = matches!(node, BsxNode::Text(text) if text.trim().is_empty())
-				&& index
-					.checked_sub(1)
-					.and_then(|prev| nodes.get(prev))
-					.map_or(true, |prev| !is_inline(prev))
-				&& nodes.get(index + 1).map_or(true, |next| !is_inline(next));
-			!insignificant
+			let prev = index.checked_sub(1).and_then(|prev| nodes.get(prev));
+			let next = nodes.get(index + 1);
+			let BsxNode::Text(text) = node else {
+				return true;
+			};
+			let word_break = !text.contains('\n')
+				&& prev.is_some_and(is_inline_tag)
+				&& next.is_some_and(is_inline_tag);
+			!text.trim().is_empty()
+				|| prev.is_some_and(is_inline)
+				|| next.is_some_and(is_inline)
+				|| word_break
 		})
 		.collect();
 	let mut keep = keep.into_iter();

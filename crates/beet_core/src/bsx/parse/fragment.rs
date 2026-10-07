@@ -649,6 +649,19 @@ mod test {
 	}
 
 	#[crate::test]
+	fn keeps_whitespace_between_inline_tags() {
+		// `<b>a</b> <i>b</i>` reads "a b": the space between two phrasing tags
+		// on one line is a word break, not formatting.
+		children_of("<p><b>a</b> <i>b</i></p>").len().xpect_eq(3);
+		// a line break between them is formatting, as is indentation at a
+		// block's edge
+		children_of("<p><b>a</b>\n\t<i>b</i></p>").len().xpect_eq(2);
+		children_of("<div>\n\t<a href=\"x\">A</a>\n</div>")
+			.len()
+			.xpect_eq(1);
+	}
+
+	#[crate::test]
 	fn preserves_pre_whitespace() {
 		// `<pre>` content is whitespace-significant, so its newlines/indent survive.
 		let children = children_of("<pre>\n  line one\n  line two\n</pre>");

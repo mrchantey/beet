@@ -224,6 +224,9 @@ impl Plugin for RouterPlugin {
 				.register_type::<FixedPage>()
 				.register_template::<ServeBlobs>()
 				.register_type::<ServeBlobsHandler>()
+				// any store file a request names, rendered as it accepts
+				// (`<BlobView/>`, `view docs/plan.docx`)
+				.register_type::<BlobView>()
 				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
 				// `ServeBlobs` scoped to a subdir of the inherited store.
 				.register_template::<AssetsDir>()

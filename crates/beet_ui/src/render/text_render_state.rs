@@ -110,6 +110,14 @@ impl TextRenderState {
 		self.needs_block_separator = false;
 	}
 
+	/// Take the text written since `start`, rewinding the buffer to it.
+	pub fn take_from(&mut self, start: usize) -> String {
+		let text = self.buffer.split_off(start);
+		self.trailing_newline =
+			self.buffer.is_empty() || self.buffer.ends_with('\n');
+		text
+	}
+
 	/// Write text directly to the buffer, updating newline tracking.
 	pub fn push_raw(&mut self, text: &str) {
 		self.buffer.push_str(text);

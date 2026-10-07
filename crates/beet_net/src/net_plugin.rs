@@ -6,13 +6,16 @@ use beet_core::prelude::*;
 /// Includes [`StorePlugin`] for typed store and blob registration,
 /// [`AtprotoPlugin`] for account declarations under `json` and, under
 /// the `vault` feature, `SecretsPlugin` (which brings `VaultPlugin`) for the
-/// `<Secrets>` declaration and the `vault` and `secrets` verbs.
+/// `<Secrets>` declaration and the `vault` and `secrets` verbs, and under
+/// `ooxml`, `OoxmlPlugin` for the cells dump.
 #[derive(Default)]
 pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<StorePlugin>();
+		#[cfg(feature = "ooxml")]
+		app.init_plugin::<OoxmlPlugin>();
 		// account declarations load in every build; their repos need `atproto`
 		#[cfg(feature = "json")]
 		app.init_plugin::<AtprotoPlugin>();

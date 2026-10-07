@@ -40,6 +40,14 @@ impl Element {
 	/// markdown tree builder).
 	pub const PRE_ELEMENTS: &[&str] = &["pre", "textarea", "script", "style"];
 
+	/// Phrasing tags, which sit inline in their line of text, so the whitespace
+	/// between two of them is a space a reader sees, ie `<b>a</b> <i>b</i>`.
+	pub const INLINE_ELEMENTS: &[&str] = &[
+		"a", "abbr", "b", "bdi", "bdo", "cite", "code", "data", "del", "dfn",
+		"em", "i", "img", "ins", "kbd", "mark", "q", "s", "samp", "small",
+		"span", "strong", "sub", "sup", "time", "u", "var",
+	];
+
 	/// Construct an element with the given tag name.
 	pub fn new(name: impl Into<SmolStr>) -> Self { Self(name.into()) }
 	/// The tag name of this element, ie `div`, `span`, `p`.

@@ -4,7 +4,9 @@
 //! One markup parser: with the `bsx` feature, both [`MediaType::Bsx`] and
 //! [`MediaType::Html`] dispatch to the core BSX parser (HTML is the
 //! features-off subset). Enable additional parsers via feature flags:
-//! - `markdown_parser` — adds [`MarkdownParser`] support for [`MediaType::Markdown`]
+//! - `markdown_parser`: adds [`MarkdownParser`] support for [`MediaType::Markdown`]
+//! - `ooxml`: adds [`OoxmlParser`] support for [`MediaType::Docx`] and
+//!   [`MediaType::Pptx`], through their transcode to HTML
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -90,6 +92,10 @@ impl MediaParser {
 				.unwrap_or_default(),
 			MediaType::Bsx => markup(BsxParseConfig::bsx())?,
 			MediaType::Html => markup(BsxParseConfig::html())?,
+			#[cfg(feature = "ooxml")]
+			MediaType::Docx | MediaType::Pptx => {
+				OoxmlParser::declarations(bytes, frontmatter_type)?
+			}
 			_ => default(),
 		}
 		.xok()
@@ -111,6 +117,8 @@ impl NodeParser for MediaParser {
 			MediaType::Html => BsxParser::html().parse(cx),
 			#[cfg(feature = "markdown_parser")]
 			MediaType::Markdown => self.markdown_parser.parse(cx),
+			#[cfg(feature = "ooxml")]
+			MediaType::Docx | MediaType::Pptx => OoxmlParser.parse(cx),
 			ref other if self.plaintext_fallback && other.is_text() => {
 				self.plain_text_parser.parse(cx)
 			}
@@ -124,6 +132,8 @@ impl NodeParser for MediaParser {
 				}
 				#[cfg(feature = "markdown_parser")]
 				supported.push(MediaType::Markdown);
+				#[cfg(feature = "ooxml")]
+				supported.extend(OoxmlParser::SUPPORTED);
 				Err(ParseError::UnsupportedType {
 					unsupported: other,
 					supported,

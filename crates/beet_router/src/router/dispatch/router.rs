@@ -428,6 +428,34 @@ mod test {
 			.xpect_contains("path=a/b/c.txt");
 	}
 
+	/// An optional segment that matched nothing sets no param, so a query
+	/// param of the same name survives and an absent one reads absent.
+	#[beet_core::test]
+	async fn absent_optional_segment_sets_no_param() {
+		let mut world = router_world();
+		let router = world
+			.spawn((Router::with_defaults(), children![route::exchange(
+				"blocks/:name?",
+				EchoParams
+			)]))
+			.id();
+		world
+			.entity_mut(router)
+			.exchange(Request::get("blocks"))
+			.await
+			.unwrap_str()
+			.await
+			.xnot()
+			.xpect_contains("name");
+		world
+			.entity_mut(router)
+			.exchange(Request::get("blocks?name=x"))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("name=x");
+	}
+
 	#[beet_core::test]
 	async fn path_param_wins_over_query_param() {
 		router_world()
