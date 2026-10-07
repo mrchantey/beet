@@ -1,0 +1,45 @@
+{
+  "$type": "site.standard.document",
+  "bskyPostRef": {
+    "cid": "bafyreihzukpzbnzrlnlrg4bweuercgc3r5tz6f37e6qr3n34rneslivaza",
+    "uri": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/app.bsky.feed.post/3mw72aaeuj22n"
+  },
+  "content": {
+    "$type": "pub.leaflet.content",
+    "pages": []
+  },
+  "contributors": [
+    {
+      "did": "did:plc:hnv7bd4gtxrf7iigjo22qukp",
+      "displayName": "Pete Hayman",
+      "role": "author"
+    }
+  ],
+  "coverImage": {
+    "$type": "blob",
+    "mimeType": "image/jpeg",
+    "ref": {
+      "$link": "bafkreib7uqc2qma2zy2nchhujkawbafy6dsjush32belrlxrkq5iywf5wy"
+    },
+    "size": 5
+  },
+  "description": "One language across the stack.",
+  "labels": {
+    "$type": "com.atproto.label.defs#selfLabels",
+    "values": [
+      {
+        "val": "graphic-media"
+      }
+    ]
+  },
+  "path": "/full-stack-bevy",
+  "publishedAt": "2025-07-11T00:00:00.000Z",
+  "site": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3mw72aaeuj22n",
+  "tags": [
+    "bevy",
+    "web"
+  ],
+  "textContent": "One language.\nOne paradigm.",
+  "title": "Full Stack Bevy",
+  "updatedAt": "2025-09-01T00:00:00.000Z"
+}

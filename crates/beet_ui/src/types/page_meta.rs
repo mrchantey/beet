@@ -83,6 +83,12 @@ pub struct PageMeta {
 	/// Authored as a list, ie `tags = ["ecs", "web"]`.
 	#[cfg_attr(feature = "serde", serde(default))]
 	pub tags: Vec<SmolStr>,
+	/// The self labels a syndicated record of the page carries, effectively
+	/// content warnings, normally none.
+	///
+	/// Authored as a list, ie `labels = ["graphic-media"]`.
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub labels: Vec<SmolStr>,
 	/// Who the page is for: everyone, whoever holds the link, or nobody yet.
 	///
 	/// Authored by variant name, ie `visibility = "unlisted"` (the match is
@@ -292,12 +298,13 @@ mod test {
 	#[beet_core::test]
 	fn frontmatter_reads_article_keys() {
 		let meta = parse(
-			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthors = [\"Pete Hayman\", \"Ada Lovelace\"]\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]",
+			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthors = [\"Pete Hayman\", \"Ada Lovelace\"]\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]\nlabels = [\"graphic-media\"]",
 			FrontmatterKind::Toml,
 		);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
 		meta.tags
 			.xpect_eq(vec![SmolStr::new("bevy"), SmolStr::new("web")]);
+		meta.labels.xpect_eq(vec![SmolStr::new("graphic-media")]);
 		meta.created.unwrap().format_long().xpect_eq("11 July 2025");
 		// the freshness date a sitemap and a feed read, falling back to `created`
 		meta.last_modified()

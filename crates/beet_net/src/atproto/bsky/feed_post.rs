@@ -23,10 +23,9 @@ pub struct FeedPost {
 	/// The thread this post replies into.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub reply: Option<ReplyRef>,
-	/// The open union of embeds, ie an `app.bsky.embed.external` link card,
-	/// carried as its json with its `$type`.
+	/// The open union of embeds, ie an `app.bsky.embed.external` link card.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub embed: Option<Value>,
+	pub embed: Option<OpenUnion>,
 }
 
 impl AtprotoRecord for FeedPost {

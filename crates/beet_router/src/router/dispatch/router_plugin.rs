@@ -166,6 +166,10 @@ impl Plugin for RouterPlugin {
 				// thread's `<StoreToolset/>`); the store itself is mounted with a
 				// plain `{FsStore{path:..}}`.
 				.register_template::<StoreToolset>();
+			// the `content` formats a standard site document can carry, each
+			// registered here by the NSID a publication names it with
+			#[cfg(feature = "json")]
+			app.init_resource::<StandardSiteContentRenderers>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it

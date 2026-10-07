@@ -113,7 +113,7 @@ pub struct SecretsOrigin {
 	/// The secret store provider the records were read from.
 	pub provider: SmolStr,
 	/// When the export was taken.
-	#[serde(with = "super::secret_record::iso8601")]
+	#[serde(with = "timestamp_iso8601")]
 	pub exported: Timestamp,
 }
 

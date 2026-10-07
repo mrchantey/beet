@@ -8,7 +8,7 @@ use beet_ui::prelude::*;
 /// A page a syndication route lists: where it serves and what it was authored
 /// with.
 #[derive(Debug, Clone)]
-pub(crate) struct SyndicationPage {
+pub struct SyndicationPage {
 	/// The route path within the router's url space, ie `blog/ecs-router`.
 	pub path: RelPath,
 	/// The page's authored metadata. Defaulted for a page that declared none,

@@ -1,0 +1,17 @@
+{
+  "$type": "site.standard.document",
+  "description": "all about ECS Router",
+  "path": "/ecs-router",
+  "publishedAt": "2025-08-09T00:00:00.000Z",
+  "site": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3mw72aaeuj22n",
+  "title": "ECS Router"
+}
+{
+  "$type": "site.standard.document",
+  "description": "all about Full Stack Bevy",
+  "path": "/full-stack-bevy",
+  "publishedAt": "2025-07-11T00:00:00.000Z",
+  "site": "at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3mw72aaeuj22n",
+  "title": "Full Stack Bevy",
+  "updatedAt": "2025-09-01T00:00:00.000Z"
+}

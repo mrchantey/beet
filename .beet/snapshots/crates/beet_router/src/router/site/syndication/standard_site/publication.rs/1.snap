@@ -1,0 +1,52 @@
+{
+  "$type": "site.standard.publication",
+  "basicTheme": {
+    "$type": "site.standard.theme.basic",
+    "accent": {
+      "$type": "site.standard.theme.color#rgb",
+      "b": 0,
+      "g": 110,
+      "r": 0
+    },
+    "accentForeground": {
+      "$type": "site.standard.theme.color#rgb",
+      "b": 255,
+      "g": 255,
+      "r": 255
+    },
+    "background": {
+      "$type": "site.standard.theme.color#rgb",
+      "b": 232,
+      "g": 238,
+      "r": 238
+    },
+    "foreground": {
+      "$type": "site.standard.theme.color#rgb",
+      "b": 24,
+      "g": 28,
+      "r": 26
+    }
+  },
+  "description": "Monthly news from the beet garden",
+  "icon": {
+    "$type": "blob",
+    "mimeType": "image/png",
+    "ref": {
+      "$link": "bafkreigc2s2enjcm4vh2xdqbcuhcjxje6pmfbr6bjxh6gh3dee2b3wdioq"
+    },
+    "size": 4
+  },
+  "labels": {
+    "$type": "com.atproto.label.defs#selfLabels",
+    "values": [
+      {
+        "val": "graphic-media"
+      }
+    ]
+  },
+  "name": "The Full Moon Harvest",
+  "preferences": {
+    "showInDiscover": true
+  },
+  "url": "https://beet.org/blog"
+}

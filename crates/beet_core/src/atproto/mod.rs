@@ -14,6 +14,8 @@
 //!   the body alone, and [`Rkeyed`], a body paired with the rkey it lives at
 //! - [`AtprotoValue`], a value sealed in the data model, which is how a float
 //!   reaches a repo that has none
+//! - [`OpenUnion`], an object naming its own lexicon in `$type`, and
+//!   [`SelfLabels`], the protocol's own content warnings
 //! - [`Provenance`], what a beet record or a derived file was computed from
 //!
 //! # Words
@@ -53,9 +55,11 @@ mod blob_ref;
 mod cid;
 mod did;
 mod nsid;
+mod open_union;
 mod provenance;
 mod rkey;
 mod rkeyed;
+mod self_labels;
 mod strong_ref;
 mod tid;
 pub use at_uri::*;
@@ -66,9 +70,11 @@ pub use blob_ref::*;
 pub use cid::*;
 pub use did::*;
 pub use nsid::*;
+pub use open_union::*;
 pub use provenance::*;
 pub use rkey::*;
 pub use rkeyed::*;
+pub use self_labels::*;
 pub use strong_ref::*;
 pub use tid::*;
 

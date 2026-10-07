@@ -66,7 +66,7 @@ pub struct SecretRecord {
 	#[serde(
 		default,
 		skip_serializing_if = "Option::is_none",
-		with = "iso8601::option"
+		with = "timestamp_iso8601::option"
 	)]
 	pub modified: Option<Timestamp>,
 	/// When the value stops authenticating, for a credential minted with a
@@ -305,55 +305,6 @@ impl fmt::Debug for Secret {
 			.field("value", &"<redacted>")
 			.field("record", &self.record)
 			.finish()
-	}
-}
-
-/// A [`Timestamp`] as ISO 8601 text in a document, so a reviewer reads
-/// `modified = "2026-09-18T06:00:00.000Z"` rather than an epoch integer.
-pub(crate) mod iso8601 {
-	use crate::prelude::*;
-	use serde::Deserializer;
-	use serde::Serializer;
-	use serde::de::Error;
-
-	pub fn serialize<S: Serializer>(
-		value: &Timestamp,
-		serializer: S,
-	) -> core::result::Result<S::Ok, S::Error> {
-		serializer.serialize_str(&value.format_iso8601())
-	}
-
-	pub fn deserialize<'de, D: Deserializer<'de>>(
-		deserializer: D,
-	) -> core::result::Result<Timestamp, D::Error> {
-		let text = <alloc::borrow::Cow<str>>::deserialize(deserializer)?;
-		Timestamp::parse_iso8601(&text).ok_or_else(|| {
-			D::Error::custom(format!(
-				"`{text}` is not an ISO 8601 UTC timestamp, ie \
-				`2026-09-18T06:00:00.000Z`"
-			))
-		})
-	}
-
-	/// The same over an `Option`, `None` never written.
-	pub mod option {
-		use super::*;
-
-		pub fn serialize<S: Serializer>(
-			value: &Option<Timestamp>,
-			serializer: S,
-		) -> core::result::Result<S::Ok, S::Error> {
-			match value {
-				Some(value) => super::serialize(value, serializer),
-				None => serializer.serialize_none(),
-			}
-		}
-
-		pub fn deserialize<'de, D: Deserializer<'de>>(
-			deserializer: D,
-		) -> core::result::Result<Option<Timestamp>, D::Error> {
-			super::deserialize(deserializer).map(Some)
-		}
 	}
 }
 

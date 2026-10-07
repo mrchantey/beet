@@ -70,6 +70,34 @@ impl Default for Theme {
 	}
 }
 
+impl Theme {
+	/// The colour `role` takes in `scheme`, ie [`colors::Background`] of the
+	/// light scheme: the scheme's tone for that role, read from this theme's
+	/// palettes exactly as the `:root` bake reads it.
+	///
+	/// For a consumer outside the cascade, ie a syndicated record naming the
+	/// site's colours, which has no element to resolve against.
+	///
+	/// # Errors
+	/// Errors when `role` is not a colour role of the scheme.
+	pub fn resolve(
+		&self,
+		scheme: ColorScheme,
+		role: impl Into<Token>,
+	) -> Result<Color> {
+		let roles = match scheme {
+			ColorScheme::Light => themes::light_scheme(),
+			ColorScheme::Dark => themes::dark_scheme(),
+		};
+		match roles.get(&role.into())? {
+			TokenValue::Token(tone) => Rule::new()
+				.with_extend(themes::from_theme(self))
+				.get_typed::<Color>(tone),
+			TokenValue::Value(value) => value.into_typed::<Color>(),
+		}
+	}
+}
+
 /// Installs the Material rule set. The palette keys and scheme are owned by the
 /// [`Theme`] resource (insert it before adding this plugin to override the
 /// default), the only way to configure them.
@@ -209,6 +237,21 @@ mod tests {
 
 	/// A theme seeded by colour alone, the do-nothing shape every host gets.
 	fn seeded(color: Color) -> Theme { Theme { color, ..default() } }
+
+	/// A role resolves to its scheme's tone of this theme's palette, the same
+	/// colour the cascade resolves it to.
+	#[beet_core::test]
+	fn resolves_a_role_per_scheme() {
+		let theme = seeded(Color::srgb(0.5, 0.0, 1.0));
+		theme
+			.resolve(ColorScheme::Light, colors::OnPrimary)
+			.unwrap()
+			.xpect_eq(tone(&theme, tones::Primary100));
+		theme
+			.resolve(ColorScheme::Dark, colors::OnPrimary)
+			.unwrap()
+			.xpect_eq(tone(&theme, tones::Primary20));
+	}
 
 	/// Setting [`Theme::color`] and running [`rebuild_theme_tones`] rewrites the
 	/// `:root` palette tones to exactly `from_theme(that theme)`, and a different

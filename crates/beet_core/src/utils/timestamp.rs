@@ -188,6 +188,69 @@ impl core::ops::Add<Duration> for Timestamp {
 	}
 }
 
+/// Serde for a [`Timestamp`] as ISO 8601 text rather than an epoch integer,
+/// for a field a person reads (`modified = "2026-09-18T06:00:00.000Z"`) or a
+/// wire that names its format (an atproto `datetime`). Use via
+/// `#[serde(with = "beet_core::prelude::timestamp_iso8601")]`, or its
+/// [`option`](timestamp_iso8601::option) module over an `Option`.
+///
+/// Writes [`Timestamp::format_iso8601`], UTC with milliseconds, which is also
+/// the form an atproto `datetime` recommends. Reads any RFC 3339 instant
+/// ([`Timestamp::parse_rfc3339`]), an offset included, since a foreign record
+/// may carry one.
+#[cfg(feature = "serde")]
+pub mod timestamp_iso8601 {
+	use crate::prelude::*;
+	use serde::Deserializer;
+	use serde::Serializer;
+	use serde::de::Error;
+
+	/// Serialize as ISO 8601 UTC text.
+	pub fn serialize<S: Serializer>(
+		value: &Timestamp,
+		serializer: S,
+	) -> core::result::Result<S::Ok, S::Error> {
+		serializer.serialize_str(&value.format_iso8601())
+	}
+
+	/// Deserialize RFC 3339 text, an offset read as the instant it names.
+	pub fn deserialize<'de, D: Deserializer<'de>>(
+		deserializer: D,
+	) -> core::result::Result<Timestamp, D::Error> {
+		let text = <alloc::borrow::Cow<str>>::deserialize(deserializer)?;
+		Timestamp::parse_rfc3339(&text).ok_or_else(|| {
+			D::Error::custom(format!(
+				"`{text}` is not an RFC 3339 timestamp, ie \
+				`2026-09-18T06:00:00.000Z`"
+			))
+		})
+	}
+
+	/// The same over an `Option`, `None` never written: pair it with
+	/// `default` and `skip_serializing_if = "Option::is_none"`.
+	pub mod option {
+		use super::*;
+
+		/// Serialize a present value as ISO 8601 UTC text.
+		pub fn serialize<S: Serializer>(
+			value: &Option<Timestamp>,
+			serializer: S,
+		) -> core::result::Result<S::Ok, S::Error> {
+			match value {
+				Some(value) => super::serialize(value, serializer),
+				None => serializer.serialize_none(),
+			}
+		}
+
+		/// Deserialize a present value from RFC 3339 text.
+		pub fn deserialize<'de, D: Deserializer<'de>>(
+			deserializer: D,
+		) -> core::result::Result<Option<Timestamp>, D::Error> {
+			super::deserialize(deserializer).map(Some)
+		}
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -1,5 +1,5 @@
 //! The machine-readable faces of a site: `robots.txt`, `sitemap.xml`,
-//! `rss.xml` and `search-index.json`.
+//! `rss.xml` and `search-index.json`, and its posts as standard.site records.
 //!
 //! Each is an ordinary [`ExportStrategy::Static`] `GET` route spawned by a
 //! markup tag, so it serves live and static-exports through the same path any
@@ -20,6 +20,10 @@ mod robots;
 mod rss;
 mod search_index;
 mod sitemap;
+// the standard.site records: plain data in the protocol's model, beside the
+// `Pds` family in `beet_net`, which rides `json` too.
+#[cfg(feature = "json")]
+mod standard_site;
 mod syndication_query;
 mod xml;
 
@@ -29,6 +33,9 @@ pub use robots::*;
 pub use rss::*;
 pub use search_index::*;
 pub use sitemap::*;
+#[cfg(feature = "json")]
+pub use standard_site::*;
+pub use syndication_query::SyndicationPage;
 #[cfg(test)]
 pub(crate) use syndication_query::test_fixtures::*;
 #[allow(unused_imports)]
