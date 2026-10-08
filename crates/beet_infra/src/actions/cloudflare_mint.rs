@@ -50,31 +50,28 @@ struct CloudflareMintParams {
 /// Creating a token needs `Account API Tokens Write`, which is the one group
 /// that can mint a credential wider than itself and therefore the one group a
 /// held credential must not have. So this verb does not run as the token it
-/// converges: the **mint token** is passed for one command and wins over the
-/// document, exactly as an admin pair is passed to `deployer/mint`.
-///
-/// The mint token holds `Account API Tokens Write` and nothing else, and it is
-/// kept NOWHERE: each mint rolls it on the account's api tokens page and pastes
-/// the fresh value into the one command, so the value from last time, wherever
-/// it was left, no longer works. Cloudflare has no mfa condition to put on a
-/// token and no permissions boundary to cap one with, so the dashboard login a
-/// roll needs is the human factor, and an agent with the age identity opens
-/// every document and still cannot mint.
-///
-/// The steps are rendered here rather than written anywhere else: the dry run
-/// ends with them and a run without the mint token answers them, the page's
-/// full url for the account and the declared `command` included (this
-/// launch's own command line when none is declared). Whoever is asked for a
-/// mint prints them as they are.
+/// converges but as the **mint token**, which holds that group and nothing
+/// else and is kept NOWHERE: the run shows the operator where to roll it,
+/// asks for the fresh value with echo off, and carries on, the way `beet
+/// admin` asks for an mfa code. A roll kills the value from last time,
+/// wherever it was left. Cloudflare has no mfa condition to put on a token and
+/// no permissions boundary to cap one with, so the dashboard login a roll
+/// needs is the human factor, and an agent with the age identity opens every
+/// document and still cannot mint.
 ///
 /// ```text
-/// steps:
+/// this mint runs as the mint token, rolled for this run:
 ///
-/// 1. Roll the mint token
-/// 	- [Cloudflare Tokens Page](https://dash.cloudflare.com/<account>/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy
-/// 2. Paste it over 👇 and run this command
-/// 	- `CLOUDFLARE_API_TOKEN=👇 just site-cloudflare-mint --stage=prod`
+/// 1. Roll it at https://dash.cloudflare.com/<account>/api-tokens
+///    beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy
+/// 2. Paste it here (not echoed):
 /// ```
+///
+/// A value in the environment that is not the sealed deploy token is taken
+/// instead, the way CI hands one over. With no terminal to ask on (an agent),
+/// the run is answered with the steps to relay, which the dry run also ends
+/// with: the declared `command` to run in a terminal, then the page's full url
+/// and the clicks. Whoever is asked for a mint prints them as they are.
 ///
 /// ## Why a verb rather than a hand-made token, and why not an apply
 ///
@@ -165,11 +162,12 @@ pub async fn CloudflareMint(
 	/// steps for rolling it name.
 	#[field(default = "beet-mint")]
 	mint_token: SmolStr,
-	/// The command the operator's steps paste the mint token into, ie `just
-	/// site-cloudflare-mint --stage=prod`; absent, this launch's own command
-	/// line less `--dry-run`. Worth declaring wherever the binary is shared with
-	/// other builds, as `cargo run`'s `target/debug` is, since a later build
-	/// with other features no longer serves this verb.
+	/// The command the operator runs in a terminal to mint, which then asks
+	/// for the mint token, ie `just site-cloudflare-mint --stage=prod`; absent,
+	/// this launch's own command line less `--dry-run`. Worth declaring
+	/// wherever the binary is shared with other builds, as `cargo run`'s
+	/// `target/debug` is, since a later build with other features no longer
+	/// serves this verb.
 	#[field]
 	command: Option<SmolStr>,
 	cx: ActionContext<Request>,
@@ -200,21 +198,30 @@ pub async fn CloudflareMint(
 	let steps = lowered
 		.account()
 		.map(|account| MintSteps::new(account, &mint_token, command));
-	let mut report = match params.dry_run {
-		true => vec![CloudflareMint::describe(
-			&name,
-			&lowered,
-			&terms,
-			steps.ok().as_ref(),
-		)?],
-		false => vec![
-			CloudflareMint::converge(
+	let mut report = Vec::new();
+	// a dry run holds no mint token, and with none the buckets are described
+	let mint = match params.dry_run {
+		true => {
+			report.push(CloudflareMint::describe(
+				&name,
+				&lowered,
+				&terms,
+				steps.ok().as_ref(),
+			)?);
+			None
+		}
+		false => {
+			let (line, mint) = CloudflareMint::converge(
 				&cx.caller, &name, &lowered, &terms, &steps?, &params,
 			)
-			.await?,
-		],
+			.await?;
+			report.push(line);
+			Some(mint)
+		}
 	};
-	report.extend(CloudflareMint::buckets(&cx.caller, &params).await?);
+	report.extend(
+		CloudflareMint::buckets(&cx.caller, mint.as_ref(), &params).await?,
+	);
 	Response::ok_text(format!("{}\n", report.join("\n"))).xok()
 }
 
@@ -352,7 +359,8 @@ impl CloudflareMint {
 	/// this name that grants what the declarations ask for under the declared
 	/// terms, is active and not yet due, and is the one the document holds; or
 	/// on `--rotate`. The new value is sealed only once proven, and every other
-	/// token of the name deleted only once sealed.
+	/// token of the name deleted only once sealed. Answers the report and the
+	/// mint token the run acts as, which the buckets are converged with next.
 	async fn converge(
 		caller: &AsyncEntity,
 		name: &str,
@@ -360,7 +368,7 @@ impl CloudflareMint {
 		terms: &TokenTerms,
 		steps: &MintSteps,
 		params: &CloudflareMintParams,
-	) -> Result<String> {
+	) -> Result<(String, MintToken)> {
 		let account = lowered.account()?.clone();
 		let handle = SecretsHandle::resolve(caller, None).await?;
 		let identity = AgeIdentityFile::require()?;
@@ -368,11 +376,8 @@ impl CloudflareMint {
 		let held = document.open(&identity).ok().and_then(|opened| {
 			opened.get(Self::RECORD).map(|secret| secret.value.clone())
 		});
-		// the first call as the mint token: a run without it is answered with
-		// how to give it one, rather than with a refusal naming nothing
-		let existing = Self::find_tokens(&account, name)
-			.await
-			.map_err(|err| steps.explain(err))?;
+		let (mint, existing) =
+			MintToken::open(steps, held.as_deref(), &account, name).await?;
 		// a second token of the name is never current: it is a mint a failure
 		// interrupted, and minting again is what deletes it
 		let current = match existing.as_slice() {
@@ -387,20 +392,21 @@ impl CloudflareMint {
 			_ => false,
 		};
 		if current && !params.rotate {
-			return format!(
+			let line = format!(
 				"token {name} ({}) matches the declarations, {}, and is sealed \
 				in {}; `--rotate` mints another",
 				existing[0].id,
 				TokenTerms::lifetime(existing[0].expires_on),
 				handle.describe()
-			)
-			.xok();
+			);
+			return (line, mint).xok();
 		}
-		let (id, value) =
-			Self::create_token(&account, terms.body(name, lowered.to_json()))
-				.await?;
+		let (id, value) = mint
+			.create_token(&account, terms.body(name, lowered.to_json()))
+			.await?;
 		let (url, what) = Self::deploy_proof(lowered)?;
-		Self::prove_or_discard(&account, &id, &value, url, what).await?;
+		mint.prove_or_discard(&account, &id, &value, url, what)
+			.await?;
 		let group = params.group.as_deref().unwrap_or(Self::DEFAULT_GROUP);
 		document.set(&identity, group, Self::RECORD, &value, SecretRecord {
 			role: Some(SecretRole::EnvVar),
@@ -419,65 +425,14 @@ impl CloudflareMint {
 		})?;
 		handle.write(&document).await?;
 		// only now: the token that replaces them is sealed and proven
-		let replaced = Self::delete_others(&account, &existing, &id).await?;
-		format!(
+		let replaced = mint.delete_others(&account, &existing, &id).await?;
+		let line = format!(
 			"token {name} ({id}) minted, {}, and sealed in {} (group \
 			`{group}`){replaced}",
 			TokenTerms::lifetime(terms.expires_on),
 			handle.describe(),
-		)
-		.xok()
-	}
-
-	/// Every token of the account named `name`, empty when it holds none.
-	/// Paged to the end: a token past the first page would read as absent,
-	/// and the verb would mint a second token of the same name on every run.
-	async fn find_tokens(account: &str, name: &str) -> Result<Vec<HeldToken>> {
-		const PER_PAGE: usize = 50;
-		let mut found = Vec::new();
-		for page in 1.. {
-			let body = Self::send(
-				Request::get(format!(
-					"{API_BASE}/accounts/{account}/tokens?per_page={PER_PAGE}&page={page}"
-				)),
-				"listing the account's api tokens",
-			)
-			.await?;
-			found.extend(
-				body["result"]
-					.as_array()
-					.map(Vec::as_slice)
-					.unwrap_or_default()
-					.iter()
-					.filter(|token| token["name"] == name)
-					.filter_map(HeldToken::parse),
-			);
-			let pages =
-				body["result_info"]["total_pages"].as_u64().unwrap_or(1);
-			if page >= pages.max(1) {
-				break;
-			}
-		}
-		found.xok()
-	}
-
-	/// Delete every token of `existing` but the one just sealed, answering
-	/// the report's `, replacing ..` clause.
-	async fn delete_others(
-		account: &str,
-		existing: &[HeldToken],
-		kept: &str,
-	) -> Result<String> {
-		let mut replaced = Vec::new();
-		for held_token in existing.iter().filter(|token| token.id != kept) {
-			Self::delete_token(account, &held_token.id).await?;
-			replaced.push(held_token.id.as_str());
-		}
-		match replaced.is_empty() {
-			true => String::new(),
-			false => format!(", replacing {}", replaced.join(", ")),
-		}
-		.xok()
+		);
+		(line, mint).xok()
 	}
 
 	/// Whether the document's value IS the token the account holds, which is
@@ -502,48 +457,6 @@ impl CloudflareMint {
 			Ok(Some(body)) => body["result"]["id"] == id,
 			Ok(None) => true,
 			Err(_) => false,
-		}
-	}
-
-	/// Create the token `body` describes (its `name`, `policies` and any
-	/// terms), answering its id and its value. The value is the only copy
-	/// Cloudflare will ever hand over, so nothing here logs the answer and a
-	/// failure is reported through its `errors` alone.
-	async fn create_token(
-		account: &str,
-		body: Value,
-	) -> Result<(SmolStr, SmolStr)> {
-		let name = body["name"].as_str().unwrap_or_default().to_string();
-		let response = Self::authed(Request::post(format!(
-			"{API_BASE}/accounts/{account}/tokens"
-		)))?
-		.with_json_body(&body)?
-		.send()
-		.await?;
-		let status = response.status();
-		let body = serde_json::from_str::<Value>(
-			&response.text().await.unwrap_or_default(),
-		)
-		.unwrap_or_default();
-		if !status.is_ok() || body["success"] != true {
-			bevybail!(
-				"minting the token failed: {status} - {}",
-				cloudflare_api_ext::error_messages(&body),
-			);
-		}
-		match (
-			body["result"]["id"].as_str(),
-			body["result"]["value"].as_str(),
-		) {
-			(Some(id), Some(value)) => {
-				(SmolStr::new(id), SmolStr::new(value)).xok()
-			}
-			// a token whose value was not answered is unusable and unsealed, so
-			// it is named rather than left behind silently
-			_ => bevybail!(
-				"the minted token answered no value, so nothing was sealed: \
-				delete `{name}` in the dashboard and run this again"
-			),
 		}
 	}
 
@@ -579,28 +492,6 @@ impl CloudflareMint {
 		)
 	}
 
-	/// [`prove_token`](Self::prove_token), deleting the new token `id` when it
-	/// fails: unproven and unsealed, it would stay live beside the token it was
-	/// to replace, under the same name, with a value nobody holds.
-	async fn prove_or_discard(
-		account: &str,
-		id: &str,
-		value: &str,
-		url: String,
-		what: &str,
-	) -> Result {
-		let Err(err) = Self::prove_token(value, url, what).await else {
-			return OK;
-		};
-		match Self::delete_token(account, id).await {
-			Ok(()) => Err(err),
-			Err(delete_err) => bevybail!(
-				"{err}\nand deleting the unproven token {id} failed too, so \
-				delete it in the dashboard: {delete_err}"
-			),
-		}
-	}
-
 	/// Where a deploy token proves itself: one page of the zone's records, the
 	/// read every plan of it makes, or its own verify when it is scoped to no
 	/// zone at all.
@@ -621,31 +512,8 @@ impl CloudflareMint {
 		.xok()
 	}
 
-	async fn delete_token(account: &str, id: &str) -> Result {
-		Self::send(
-			Request::delete(format!(
-				"{API_BASE}/accounts/{account}/tokens/{id}"
-			)),
-			"deleting the replaced api token",
-		)
-		.await
-		.map(|_| ())
-	}
-
-	/// `request` carrying the credential this verb runs as, which is the mint
-	/// token rather than the one it converges.
-	fn authed(request: Request) -> Result<Request> {
-		cloudflare_api_ext::token()
-			.map(|token| request.with_auth_bearer(&token))
-	}
-
-	/// An api call as the mint token.
-	async fn send(request: Request, what: &str) -> Result<Value> {
-		cloudflare_api_ext::send(Self::authed(request)?, what).await
-	}
-
-	/// Converge the token of every `<R2BucketBlock/>` this launch declares, or
-	/// describe what that would do under `--dry-run`. One report line per
+	/// Converge the token of every `<R2BucketBlock/>` this launch declares as
+	/// `mint`, or describe what that would do when there is none (a dry run). One report line per
 	/// bucket, none at all for a launch that declares none.
 	///
 	/// A bucket's token is not a deploy credential and is never sealed in a
@@ -654,6 +522,7 @@ impl CloudflareMint {
 	#[cfg(feature = "cloudflare_dns")]
 	async fn buckets(
 		caller: &AsyncEntity,
+		mint: Option<&MintToken>,
 		params: &CloudflareMintParams,
 	) -> Result<Vec<String>> {
 		let mut report = Vec::new();
@@ -661,16 +530,16 @@ impl CloudflareMint {
 			.with_world(|world, _| Self::declared_buckets(world))
 			.await??;
 		for (block, stack, store) in declared {
-			report.push(match params.dry_run {
-				true => format!(
+			report.push(match mint {
+				None => format!(
 					"bucket token {} over {}, parked at {} and {}",
 					block.token_name(&stack),
 					block.bucket_name(&stack),
 					store.address(&block.access_key_secret()),
 					store.address(&block.secret_key_secret()),
 				),
-				false => {
-					Self::converge_bucket(&block, &stack, &store, params)
+				Some(mint) => {
+					Self::converge_bucket(&block, &stack, &store, mint, params)
 						.await?
 				}
 			});
@@ -714,6 +583,7 @@ impl CloudflareMint {
 		block: &R2BucketBlock,
 		stack: &ResolvedStack,
 		store: &SecretStore,
+		mint: &MintToken,
 		params: &CloudflareMintParams,
 	) -> Result<String> {
 		let account = stack.cloudflare_account()?.id().to_string();
@@ -722,7 +592,7 @@ impl CloudflareMint {
 			(block.access_key_secret(), block.secret_key_secret());
 		let parked =
 			(store.get(&access_ref).await?, store.get(&secret_ref).await?);
-		let existing = Self::find_tokens(&account, &name).await?;
+		let existing = mint.find_tokens(&account, &name).await?;
 		let current = match (&parked, existing.as_slice()) {
 			((Some(access_key), Some(_)), [held_token]) => {
 				held_token.active && held_token.id == *access_key
@@ -738,15 +608,16 @@ impl CloudflareMint {
 			)
 			.xok();
 		}
-		let (id, value) = Self::create_token(
-			&account,
-			serde_json::json!({
-				"name": name,
-				"policies": block.token_policies(stack)?,
-			}),
-		)
-		.await?;
-		Self::prove_or_discard(
+		let (id, value) = mint
+			.create_token(
+				&account,
+				serde_json::json!({
+					"name": name,
+					"policies": block.token_policies(stack)?,
+				}),
+			)
+			.await?;
+		mint.prove_or_discard(
 			&account,
 			&id,
 			&value,
@@ -783,7 +654,7 @@ impl CloudflareMint {
 				)
 			})?;
 		// only now: the pair that replaces them is parked
-		let replaced = Self::delete_others(&account, &existing, &id).await?;
+		let replaced = mint.delete_others(&account, &existing, &id).await?;
 		format!(
 			"bucket token {name} ({id}) minted and parked at {} and {}{replaced}",
 			store.address(&access_ref),
@@ -797,6 +668,7 @@ impl CloudflareMint {
 	#[cfg(not(feature = "cloudflare_dns"))]
 	async fn buckets(
 		_caller: &AsyncEntity,
+		_mint: Option<&MintToken>,
 		_params: &CloudflareMintParams,
 	) -> Result<Vec<String>> {
 		Vec::new().xok()
@@ -808,30 +680,226 @@ impl CloudflareMint {
 	#[cfg(feature = "cloudflare_dns")]
 	fn bucket_rotation() -> SecretRotation {
 		SecretRotation::manual(
-			"beet cloudflare/mint --rotate\n> with the mint token in the \
-			environment: the bucket's token is replaced, both halves re-parked \
-			and the old token deleted",
+			"beet cloudflare/mint --rotate\n> run it in a terminal and paste \
+			the mint token when asked: the bucket's token is replaced, both \
+			halves re-parked and the old token deleted",
 		)
 	}
 }
 
-/// What the operator does to hand this verb the mint token: roll it on the
-/// account's api tokens page and paste it into this same command. The one
-/// place those steps are written: a run without the mint token is answered
-/// with them, the dry run ends with them, and the sealed record's rotation
-/// carries them. Rolling rather than keeping a copy means a value pasted last
-/// time, wherever it was left, has stopped working.
+/// The mint token one run acts as: taken for the run and written nowhere.
+/// Every call that reads or edits the account's api tokens goes through it,
+/// so none can fall back to the deploy token the document puts in the
+/// environment.
+struct MintToken(SmolStr);
+
+impl MintToken {
+	/// How many values a run takes before giving up, so a mis-paste costs a
+	/// re-prompt rather than a rerun.
+	const ATTEMPTS: usize = 3;
+
+	/// The mint token for this run and the account's tokens named `name`,
+	/// listed with it, which is the first call that proves it.
+	///
+	/// A value passed in the environment is taken when it is not the deploy
+	/// token the document sealed (`held`), the way CI hands one over; else the
+	/// operator is shown the steps that roll it and asked to paste it. A refused
+	/// value is asked for again, and without a terminal to ask on, the steps
+	/// are the error, naming the command to run in one.
+	async fn open(
+		steps: &MintSteps,
+		held: Option<&str>,
+		account: &str,
+		name: &str,
+	) -> Result<(Self, Vec<HeldToken>)> {
+		let mut passed = cloudflare_api_ext::token()
+			.ok()
+			.filter(|token| Some(token.as_str()) != held);
+		let mut attempt = 1;
+		loop {
+			let mint = match passed.take() {
+				Some(token) => Self(token),
+				None => Self(steps.prompt()?.into()),
+			};
+			match mint.find_tokens(account, name).await {
+				Ok(found) => return (mint, found).xok(),
+				Err(err) if attempt < Self::ATTEMPTS => {
+					match MintSteps::refused(&err) {
+						Some(refusal) => {
+							warn!(
+								"Cloudflare refused that token ({}), so paste it \
+							again",
+								refusal.messages()
+							);
+							attempt += 1;
+						}
+						None => return Err(err),
+					}
+				}
+				Err(err) => return Err(steps.explain(err)),
+			}
+		}
+	}
+
+	/// An api call as this token.
+	async fn send(&self, request: Request, what: &str) -> Result<Value> {
+		cloudflare_api_ext::send(request.with_auth_bearer(&self.0), what).await
+	}
+
+	/// Every token of the account named `name`, empty when it holds none.
+	/// Paged to the end: a token past the first page would read as absent,
+	/// and the verb would mint a second token of the same name on every run.
+	async fn find_tokens(
+		&self,
+		account: &str,
+		name: &str,
+	) -> Result<Vec<HeldToken>> {
+		const PER_PAGE: usize = 50;
+		let mut found = Vec::new();
+		for page in 1.. {
+			let body = self
+				.send(
+					Request::get(format!(
+						"{API_BASE}/accounts/{account}/tokens?per_page={PER_PAGE}&page={page}"
+					)),
+					"listing the account's api tokens",
+				)
+				.await?;
+			found.extend(
+				body["result"]
+					.as_array()
+					.map(Vec::as_slice)
+					.unwrap_or_default()
+					.iter()
+					.filter(|token| token["name"] == name)
+					.filter_map(HeldToken::parse),
+			);
+			let pages =
+				body["result_info"]["total_pages"].as_u64().unwrap_or(1);
+			if page >= pages.max(1) {
+				break;
+			}
+		}
+		found.xok()
+	}
+
+	/// Create the token `body` describes (its `name`, `policies` and any
+	/// terms), answering its id and its value. The value is the only copy
+	/// Cloudflare will ever hand over, so nothing here logs the answer and a
+	/// failure is reported through its `errors` alone.
+	async fn create_token(
+		&self,
+		account: &str,
+		body: Value,
+	) -> Result<(SmolStr, SmolStr)> {
+		let name = body["name"].as_str().unwrap_or_default().to_string();
+		let response =
+			Request::post(format!("{API_BASE}/accounts/{account}/tokens"))
+				.with_auth_bearer(&self.0)
+				.with_json_body(&body)?
+				.send()
+				.await?;
+		let status = response.status();
+		let body = serde_json::from_str::<Value>(
+			&response.text().await.unwrap_or_default(),
+		)
+		.unwrap_or_default();
+		if !status.is_ok() || body["success"] != true {
+			bevybail!(
+				"minting the token failed: {status} - {}",
+				cloudflare_api_ext::error_messages(&body),
+			);
+		}
+		match (
+			body["result"]["id"].as_str(),
+			body["result"]["value"].as_str(),
+		) {
+			(Some(id), Some(value)) => {
+				(SmolStr::new(id), SmolStr::new(value)).xok()
+			}
+			// a token whose value was not answered is unusable and unsealed, so
+			// it is named rather than left behind silently
+			_ => bevybail!(
+				"the minted token answered no value, so nothing was sealed: \
+				delete `{name}` in the dashboard and run this again"
+			),
+		}
+	}
+
+	/// [`CloudflareMint::prove_token`], deleting the new token `id` when it
+	/// fails: unproven and unsealed, it would stay live beside the token it was
+	/// to replace, under the same name, with a value nobody holds.
+	async fn prove_or_discard(
+		&self,
+		account: &str,
+		id: &str,
+		value: &str,
+		url: String,
+		what: &str,
+	) -> Result {
+		let Err(err) = CloudflareMint::prove_token(value, url, what).await
+		else {
+			return OK;
+		};
+		match self.delete_token(account, id).await {
+			Ok(()) => Err(err),
+			Err(delete_err) => bevybail!(
+				"{err}\nand deleting the unproven token {id} failed too, so \
+				delete it in the dashboard: {delete_err}"
+			),
+		}
+	}
+
+	/// Delete every token of `existing` but the one just sealed, answering
+	/// the report's `, replacing ..` clause.
+	async fn delete_others(
+		&self,
+		account: &str,
+		existing: &[HeldToken],
+		kept: &str,
+	) -> Result<String> {
+		let mut replaced = Vec::new();
+		for held_token in existing.iter().filter(|token| token.id != kept) {
+			self.delete_token(account, &held_token.id).await?;
+			replaced.push(held_token.id.as_str());
+		}
+		match replaced.is_empty() {
+			true => String::new(),
+			false => format!(", replacing {}", replaced.join(", ")),
+		}
+		.xok()
+	}
+
+	async fn delete_token(&self, account: &str, id: &str) -> Result {
+		self.send(
+			Request::delete(format!(
+				"{API_BASE}/accounts/{account}/tokens/{id}"
+			)),
+			"deleting the replaced api token",
+		)
+		.await
+		.map(|_| ())
+	}
+}
+
+/// What the operator does to hand this verb the mint token: run the command
+/// in a terminal, roll the token on the account's api tokens page, and paste
+/// it when asked. The one place those steps are written: the run itself asks
+/// with them, a run with no terminal to ask on is answered with them, the dry
+/// run ends with them, and the sealed record's rotation carries them. Rolling
+/// rather than keeping a copy means a value pasted last time, wherever it was
+/// left, has stopped working.
 struct MintSteps {
 	/// The account whose api tokens page holds the mint token.
 	account: SmolStr,
 	/// The mint token's name on that page.
 	mint_token: SmolStr,
-	/// The command the mint token is pasted into.
+	/// The command the operator runs in a terminal.
 	command: String,
 }
 
 impl MintSteps {
-	/// The steps for `account`'s `mint_token`, pasted into `command`.
+	/// The steps for `account`'s `mint_token`, run as `command`.
 	fn new(account: &str, mint_token: &str, command: String) -> Self {
 		Self {
 			account: account.into(),
@@ -875,40 +943,56 @@ impl MintSteps {
 		)
 	}
 
-	/// The command with the value's place marked.
-	fn run(&self) -> String {
-		format!("CLOUDFLARE_API_TOKEN=👇 {}", self.command)
+	/// Ask for the mint token on the controlling terminal: how to roll it,
+	/// then one line read with echo off. The url stands bare so the terminal
+	/// makes it a link. Without a terminal (an agent, a pipe, CI) the steps
+	/// are the error.
+	fn prompt(&self) -> Result<String> {
+		terminal_ext::read_secret_line(&format!(
+			"\nthis mint runs as the mint token, rolled for this run:\n\n\
+			1. Roll it at {}\n   {}\n2. Paste it here (not echoed): ",
+			self.url(),
+			self.clicks()
+		))
+		.map(|value| value.trim().to_string())
+		.map_err(|err| {
+			bevyhow!("a mint asks for the mint token, and {err}\n\n{self}")
+		})
 	}
 
 	/// The same steps as a rotation: the url first, one step per line.
 	fn rotation(&self) -> SecretRotation {
 		SecretRotation::manual(format!(
-			"{}\n> {}\n> {}",
+			"{}\n> {}\n> run `{}` in a terminal and paste it when asked",
 			self.url(),
 			self.clicks(),
-			self.run()
+			self.command
 		))
 	}
 
-	/// `err` answered with these steps when it is the credential that was
-	/// refused or absent, else as it is.
+	/// The refusal `err` is, when it is a credential Cloudflare refused.
+	fn refused(
+		err: &BevyError,
+	) -> Option<&cloudflare_api_ext::CloudflareApiError> {
+		err.downcast_ref::<cloudflare_api_ext::CloudflareApiError>()
+			.filter(|refusal| refusal.refused_credential())
+	}
+
+	/// `err` answered with these steps when it is a refused credential, else
+	/// as it is.
 	fn explain(&self, err: BevyError) -> BevyError {
-		let refused = cloudflare_api_ext::token().is_err()
-			|| err
-				.downcast_ref::<cloudflare_api_ext::CloudflareApiError>()
-				.is_some_and(
-					cloudflare_api_ext::CloudflareApiError::refused_credential,
-				);
-		match refused {
-			true => bevyhow!(
-				"a mint runs as the mint token, and this run is not: {err}\n\n{self}"
+		match Self::refused(&err) {
+			Some(refusal) => bevyhow!(
+				"a mint runs as the mint token, and Cloudflare refused that one \
+				({}): {err}\n\n{self}",
+				refusal.messages()
 			),
-			false => err,
+			None => err,
 		}
 	}
 }
 
-/// The steps as the operator reads them, every link whole.
+/// The steps as an operator reads them relayed, every link whole.
 impl core::fmt::Display for MintSteps {
 	fn fmt(
 		&self,
@@ -916,10 +1000,10 @@ impl core::fmt::Display for MintSteps {
 	) -> core::fmt::Result {
 		write!(
 			formatter,
-			"steps:\n\n1. Roll the mint token\n\t- [Cloudflare Tokens Page]({}) -> {}\n2. Paste it over 👇 and run this command\n\t- `{}`",
+			"steps:\n\n1. Run this in a terminal\n\t- `{}`\n2. When it asks for the mint token, roll it and paste it there\n\t- [Cloudflare Tokens Page]({}) -> {}",
+			self.command,
 			self.url(),
-			self.clicks(),
-			self.run()
+			self.clicks()
 		)
 	}
 }
@@ -1189,9 +1273,9 @@ mod test {
 			.unwrap()
 			.xpect_eq("beet-deploy");
 	}
-	/// The steps an operator follows to run a mint, rendered from the account
-	/// and, undeclared, this launch's own command less its `--dry-run`, with
-	/// every link whole and the value's place marked.
+	/// The steps an operator is relayed to run a mint, rendered from the
+	/// account and, undeclared, this launch's own command less its
+	/// `--dry-run`, with every link whole.
 	#[beet_core::test]
 	fn renders_the_operator_steps() {
 		let steps = super::MintSteps::new(
@@ -1210,7 +1294,7 @@ mod test {
 			),
 		);
 		steps.to_string().xpect_eq(
-			"steps:\n\n1. Roll the mint token\n\t- [Cloudflare Tokens Page](https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy\n2. Paste it over 👇 and run this command\n\t- `CLOUDFLARE_API_TOKEN=👇 target/debug/beet --main=site cloudflare/mint --stage=prod 'a path with spaces'`",
+			"steps:\n\n1. Run this in a terminal\n\t- `target/debug/beet --main=site cloudflare/mint --stage=prod 'a path with spaces'`\n2. When it asks for the mint token, roll it and paste it there\n\t- [Cloudflare Tokens Page](https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy",
 		);
 		// the rotation sealed beside the token: the url first, a step a line
 		steps
@@ -1231,7 +1315,7 @@ mod test {
 			)
 			.to_string()
 			.xpect_contains("403 Forbidden")
-			.xpect_contains("1. Roll the mint token");
+			.xpect_contains("1. Run this in a terminal");
 	}
 
 	/// A mid-afternoon mint, so a lifetime visibly lands on a midnight.

@@ -20,7 +20,8 @@ pub const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 /// A deploy action reads it through its own
 /// [`CloudflareAccess`](crate::prelude::CloudflareAccess), which is what
 /// keeps every call it makes lowered into the token; the mint verb is the one
-/// direct reader, since it runs as the mint token, which no action lowers.
+/// direct reader, taking a mint token passed here for one command (as CI
+/// would) when it is not the sealed deploy token.
 pub(crate) fn token() -> Result<SmolStr> {
 	env_ext::var("CLOUDFLARE_API_TOKEN")
 		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))
@@ -90,6 +91,12 @@ impl CloudflareApiError {
 	/// lacking the permission the call needs.
 	pub fn refused_credential(&self) -> bool {
 		matches!(self.status.as_u16(), 400 | 401 | 403)
+	}
+
+	/// The envelope's `errors[].message` list, joined, for a line that names
+	/// what Cloudflare said without quoting its whole answer.
+	pub fn messages(&self) -> String {
+		error_messages(&serde_json::from_str(&self.body).unwrap_or_default())
 	}
 }
 

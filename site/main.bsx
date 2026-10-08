@@ -307,9 +307,9 @@ token (plus AWS for the social stack's state bucket).
 	<!-- and the Cloudflare identity beside it: one account-owned token for this
 	     repo, scoped to exactly the permission groups the stacks below and the
 	     zone verbs above ask for. Runs as the MINT token, which holds `Account
-	     API Tokens Write` and nothing else and is kept nowhere, rolled on the
-	     dashboard for each run: Cloudflare has no mfa condition and no
-	     permissions boundary, so the only cap on the group that mints
+	     API Tokens Write` and nothing else and is kept nowhere: the run shows
+	     where to roll it and asks for it. Cloudflare has no mfa condition and
+	     no permissions boundary, so the only cap on the group that mints
 	     credentials is that nothing the age key opens carries it. The dry run
 	     ends with the steps -->
 	<CloudflareMint

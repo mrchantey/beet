@@ -54,7 +54,7 @@ api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
 machine. The Cloudflare token must be scoped to the zone you replace the
 placeholder with: `beet --main=examples/infra/mail.bsx cloudflare/mint --dry-run`
 says what this entry asks for, which is `Zone > DNS Write` and nothing else, and
-`cloudflare/mint` with the mint token in the environment makes exactly that. It also needs domains you actually own: every name below is an RFC 2606
+`cloudflare/mint`, run in a terminal where it asks for the mint token, makes exactly that. It also needs domains you actually own: every name below is an RFC 2606
 example domain and the zone declared on the `<Stack>` is a placeholder, so a
 real deploy replaces both.
 

@@ -144,9 +144,9 @@ site-mint *args:
 # `beet-deploy` token scoped to exactly the permission groups the site entry's
 # stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
 # MINT token, which holds `Account API Tokens Write` and nothing else and is
-# rolled on the dashboard for each run, never kept. `--dry-run` needs no
-# credential, prints the scope and the body a mint would post, and ends with
-# the steps that roll the mint token and the command to paste it into.
+# kept nowhere: the run shows where to roll it and asks for it, echo off.
+# `--dry-run` needs no credential, prints the scope and the body a mint would
+# post, and ends with the steps to relay to the operator.
 # `atproto` so the social stack's records render, for the same reason
 # `site-audit` builds with it.
 site-cloudflare-mint *args:
