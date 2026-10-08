@@ -84,7 +84,7 @@ Treat "no apex mail record before the cutover" as an invariant, not a preference
 
 ```sh
 beet deployer/mint --stage=prod   # the AWS pair, with an admin pair in the environment
-beet secrets/set CLOUDFLARE_API_TOKEN --role=env_var --note=".." --rotation="manual:.."
+beet cloudflare/mint --stage=prod # the Cloudflare token, asking for the mint token
 beet secrets/set TF_STATE_PASSPHRASE --role=env_var --generate --note="opentofu state encryption" --rotation="manual:not re-mintable, losing it loses the state"
 ```
 
@@ -101,7 +101,7 @@ What it deliberately does not carry is Account API Tokens Write. A token that ma
 **Hand step, and worth doing before creating anything.** Prove every permission you are about to need, cheaply, in the order that fails fastest:
 
 ```sh
-curl -s https://api.cloudflare.com/client/v4/user/tokens/verify \
+curl -s https://api.cloudflare.com/client/v4/accounts/<account id>/tokens/verify \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"
 aws sts get-caller-identity
 ```

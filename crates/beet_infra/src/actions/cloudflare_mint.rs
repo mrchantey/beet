@@ -20,7 +20,8 @@ struct CloudflareMintParams {
 	/// Mint a fresh token even when the account already holds one that matches
 	/// the declarations, and delete the one it replaces: this is the rotation.
 	rotate: bool,
-	/// The document group the token is sealed in, `default` when absent.
+	/// The document group the token is sealed in; absent, the group it is
+	/// already sealed in, else `default`.
 	group: Option<String>,
 }
 
@@ -101,7 +102,9 @@ struct CloudflareMintParams {
 ///   PROVEN itself with a read the deploy actually makes, and every other token
 ///   of the name is deleted only after that: a failure anywhere leaves the
 ///   previous credential in place, and a token that never proved itself is
-///   deleted on the spot rather than left live beside it.
+///   deleted on the spot rather than left live beside it. A current token's
+///   record is resealed, value unchanged, when its note or rotation is not
+///   what this verb writes now, so the steps it carries never go stale.
 ///
 /// - a bucket's token, minted unless the account holds exactly one token of its
 ///   name, its pair is parked, and the parked access key id is that token's, or
@@ -373,11 +376,19 @@ impl CloudflareMint {
 		let handle = SecretsHandle::resolve(caller, None).await?;
 		let identity = AgeIdentityFile::require()?;
 		let mut document = handle.read_or_new().await?;
-		let held = document.open(&identity).ok().and_then(|opened| {
-			opened.get(Self::RECORD).map(|secret| secret.value.clone())
-		});
+		let held = document
+			.open(&identity)
+			.ok()
+			.and_then(|opened| opened.get(Self::RECORD).cloned());
+		let held_value = held.as_ref().map(|secret| secret.value.as_str());
+		// a record stays in the group it was sealed in unless told otherwise
+		let group = params
+			.group
+			.as_deref()
+			.or(held.as_ref().map(|secret| secret.group.as_str()))
+			.unwrap_or(Self::DEFAULT_GROUP);
 		let (mint, existing) =
-			MintToken::open(steps, held.as_deref(), &account, name).await?;
+			MintToken::open(steps, held_value, &account, name).await?;
 		// a second token of the name is never current: it is a mint a failure
 		// interrupted, and minting again is what deletes it
 		let current = match existing.as_slice() {
@@ -386,17 +397,39 @@ impl CloudflareMint {
 					&& DeployerToken::fingerprint_of(&held_token.policies)
 						== lowered.fingerprint()
 					&& terms.kept_by(held_token, Timestamp::now())
-					&& Self::holds(&account, held.as_deref(), &held_token.id)
-						.await
+					&& Self::holds(&account, held_value, &held_token.id).await
 			}
 			_ => false,
 		};
 		if current && !params.rotate {
+			let token = &existing[0];
+			let restated = held.as_ref().and_then(|secret| {
+				Self::restated(
+					secret,
+					group,
+					Self::record(name, &token.id, token.expires_on, steps),
+				)
+				.map(|record| (secret, record))
+			});
+			let resealed = match restated {
+				Some((secret, record)) => {
+					document.set(
+						&identity,
+						group,
+						Self::RECORD,
+						&secret.value,
+						record,
+					)?;
+					handle.write(&document).await?;
+					", its note and rotation resealed as this verb writes them"
+				}
+				None => "",
+			};
 			let line = format!(
 				"token {name} ({}) matches the declarations, {}, and is sealed \
-				in {}; `--rotate` mints another",
-				existing[0].id,
-				TokenTerms::lifetime(existing[0].expires_on),
+				in {}{resealed}; `--rotate` mints another",
+				token.id,
+				TokenTerms::lifetime(token.expires_on),
 				handle.describe()
 			);
 			return (line, mint).xok();
@@ -407,22 +440,13 @@ impl CloudflareMint {
 		let (url, what) = Self::deploy_proof(lowered)?;
 		mint.prove_or_discard(&account, &id, &value, url, what)
 			.await?;
-		let group = params.group.as_deref().unwrap_or(Self::DEFAULT_GROUP);
-		document.set(&identity, group, Self::RECORD, &value, SecretRecord {
-			role: Some(SecretRole::EnvVar),
-			note: Some(
-				format!(
-					"cloudflare deploy token `{name}` ({id}): account-owned, \
-					scoped to exactly what this repo's stacks and routes \
-					declare; every tofu apply, wrangler call and zone verb \
-					reads it from here"
-				)
-				.into(),
-			),
-			expires: terms.expires_on,
-			rotation: Some(steps.rotation()),
-			..default()
-		})?;
+		document.set(
+			&identity,
+			group,
+			Self::RECORD,
+			&value,
+			Self::record(name, &id, terms.expires_on, steps),
+		)?;
 		handle.write(&document).await?;
 		// only now: the token that replaces them is sealed and proven
 		let replaced = mint.delete_others(&account, &existing, &id).await?;
@@ -433,6 +457,47 @@ impl CloudflareMint {
 			handle.describe(),
 		);
 		(line, mint).xok()
+	}
+
+	/// The record the deploy token `id` named `name` is sealed under, expiring
+	/// at `expires`: what it is, and the steps that rotate it.
+	fn record(
+		name: &str,
+		id: &str,
+		expires: Option<Timestamp>,
+		steps: &MintSteps,
+	) -> SecretRecord {
+		SecretRecord {
+			role: Some(SecretRole::EnvVar),
+			note: Some(
+				format!(
+					"cloudflare deploy token `{name}` ({id}): account-owned, \
+					scoped to exactly what this repo's stacks and routes \
+					declare; every tofu apply, wrangler call and zone verb \
+					reads it from here"
+				)
+				.into(),
+			),
+			expires,
+			rotation: Some(steps.rotation()),
+			..default()
+		}
+	}
+
+	/// The `record` a current token's `secret` is resealed under, when what
+	/// is sealed is not what this verb writes now (a note or rotation in
+	/// older wording, another group), else `None`. Its value is unchanged, so
+	/// its `modified` is kept.
+	fn restated(
+		secret: &Secret,
+		group: &str,
+		record: SecretRecord,
+	) -> Option<SecretRecord> {
+		let record = SecretRecord {
+			modified: secret.record.modified,
+			..record
+		};
+		(secret.record != record || secret.group != group).then_some(record)
 	}
 
 	/// Whether the document's value IS the token the account holds, which is
@@ -1316,6 +1381,45 @@ mod test {
 			.to_string()
 			.xpect_contains("403 Forbidden")
 			.xpect_contains("1. Run this in a terminal");
+	}
+
+	/// A current token's record is resealed only when what is sealed is not
+	/// what the verb writes now, and never with a new `modified`: a reseal
+	/// on every run would rewrite the committed document each time.
+	#[beet_core::test]
+	fn restates_only_a_stale_record() {
+		let steps =
+			super::MintSteps::new("acct", "beet-mint", "beet mint".into());
+		let today = || {
+			super::CloudflareMint::record("beet-deploy", "abc", None, &steps)
+		};
+		// sealed at `minted_at` with `rotation`
+		let held = |rotation: SecretRotation| Secret {
+			name: "CLOUDFLARE_API_TOKEN".into(),
+			group: "default".into(),
+			value: "token".into(),
+			record: SecretRecord {
+				modified: Some(minted_at()),
+				rotation: Some(rotation),
+				..today()
+			},
+		};
+		let restate = |secret: &Secret, group: &str| {
+			super::CloudflareMint::restated(secret, group, today())
+		};
+		// sealed as the verb writes it now: left alone
+		let current = held(steps.rotation());
+		restate(&current, "default").xpect_none();
+		// another group, as `--group` asks
+		restate(&current, "agents").xpect_some();
+		// an older rotation: resealed, its `modified` kept
+		let restated = restate(
+			&held(SecretRotation::manual("in the password manager")),
+			"default",
+		)
+		.unwrap();
+		restated.modified.xpect_eq(Some(minted_at()));
+		restated.rotation.xpect_eq(Some(steps.rotation()));
 	}
 
 	/// A mid-afternoon mint, so a lifetime visibly lands on a midnight.

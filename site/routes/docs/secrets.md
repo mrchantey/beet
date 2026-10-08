@@ -380,71 +380,90 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 
 ## Who holds what: the credential model
 
-Every credential in beet's own AWS account sits on one line: **power and frequency are inversely related, and the line between them is a human factor.** A thing that happens constantly is low power; a thing that is high power is rare and needs something an automated process cannot supply. The corollary is what makes the design tractable: "requires a human" and "an agent cannot reach it" are the same sentence, because an agent cannot type a six-digit code off a phone.
+Every credential beet deploys with, at AWS and at Cloudflare, sits on one line: **power and frequency are inversely related, and the line between them is a human factor.** A thing that happens constantly is low power; a thing that is high power is rare and needs something an automated process cannot supply. The corollary is what makes the design tractable: "requires a human" and "an agent cannot reach it" are the same sentence, because an agent cannot type a six-digit code off a phone or log in to a dashboard.
+
+The two providers reach that line by different routes. AWS caps a credential with a permissions boundary and puts the escalating one behind an mfa condition. Cloudflare offers neither, so its deploy token is capped by its scope at creation, and the one token that can mint another is kept in no file at all.
 
 ```mermaid
 flowchart TB
     subgraph you["what the operator physically holds"]
         phone["📱 phone: two MFA entries,<br/>pete and beet-agent"]
         age["🔑 one age key<br/>~/.config/beet/age/keys.txt<br/>restored by hand, never committed"]
+        login["🌐 the Cloudflare dashboard login"]
     end
 
     subgraph sealed["what the age key opens · all of it recoverable"]
         global["~/.config/beet/secrets.toml<br/>committed in arch-config, stowed<br/>ONE pair"]
         repo["each repo's secrets.toml<br/>committed, public"]
+        ledger["a stack's export<br/>the sealed ledger of its secret store"]
     end
 
     age --> global
     age --> repo
+    age --> ledger
 
     global --> agent["beet-agent · tier 0c<br/>ViewOnlyAccess + assume beet-admin<br/>list and describe, read no contents"]
-    repo --> deployer["repo-deployer · tier 1<br/>deploy this repo's apps<br/>capped by each app's boundary"]
-    repo --> other["TF_STATE_PASSPHRASE,<br/>app secrets, provider tokens"]
+    repo --> deployer["repo-deployer · tier 1<br/>deploy this repo's apps at AWS<br/>capped by each app's boundary"]
+    repo --> cfdeploy["repo-deploy · tier 1<br/>deploy this repo's apps at Cloudflare<br/>exactly the groups its declarations ask for"]
+    repo --> other["TF_STATE_PASSPHRASE,<br/>app secrets, third-party api keys"]
 
     agent -->|"beet admin<br/>+ code from the phone"| admin["beet-admin · tier 0a<br/>AdministratorAccess<br/>a session, 1h default, on tmpfs<br/>stored NOWHERE"]
     phone -.-> admin
+    login -.->|"roll, then paste<br/>into one run"| mint["beet-mint · tier 0a<br/>Account API Tokens Write alone<br/>stored NOWHERE"]
 
     deployer -->|"tofu apply mints"| runtime["runtime identities · tier 2<br/>lightsail user, SES user, lambda roles<br/>each wears its app and stage's boundary"]
     admin -->|"beet admin -- deployer/mint<br/>when a stack gains a service"| deployer
+    mint -->|"beet cloudflare/mint<br/>when a declaration changes"| cfdeploy
+    mint -->|"beet cloudflare/mint"| bucket["an R2 bucket's token · tier 2<br/>its own bucket's objects<br/>under the bucket's lock"]
+    ledger -->|"the pairs a store parks"| runtime
+    ledger --> bucket
 
     pete["pete · the person<br/>console only: password + MFA<br/>permanent administrator, no access key<br/>break-glass, on no automation path"]
     phone -.-> pete
 ```
 
-**A dotted edge is the human factor**, and it is the only thing on the diagram an agent cannot traverse. Both of them come off the phone, and both land on an administrator.
+**A dotted edge is the human factor**, and it is the only thing on the diagram an agent cannot traverse. Every one lands on a credential that can mint any other: two come off the phone onto an AWS administrator, and one comes off the Cloudflare dashboard login onto the mint token.
 
 | tier | who | how often | credential | worst case |
 | --- | --- | --- | --- | --- |
 | 0a admin | the operator, and any agent on the machine for the session after | a few times a year | `beet admin`: a code mints a session (1h default, up to 12h) | unrecoverable, hence the phone |
+| 0a mint | the operator, and the one run the value is pasted into | when a declaration changes what a Cloudflare token needs | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each `cloudflare/mint` | mints any token the account can hold, hence the login |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document | metadata disclosure |
-| 1 deploy | the operator and CI | daily | `<repo>-deployer`, sealed in that repo's document | its own app, recoverably |
-| 2 runtime | the servers | continuous | minted by an apply, held by nobody | its own app's data |
+| 1 deploy | the operator and CI | daily | `<repo>-deployer` at AWS and `<repo>-deploy` at Cloudflare, both sealed in that repo's document | its own app, recoverably |
+| 2 runtime | the servers | continuous | minted by an apply, or by `cloudflare/mint` for an R2 bucket; parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
 | break-glass | the operator, in the console | when 0a is broken | `pete`: password + MFA, no key | full admin, behind a phone and a browser |
 
-**The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** That is what decides which box a credential goes in. A deployer can destroy its own app's buckets, but every one is versioned and `force_destroy=false`, and a permissions boundary stops it creating anything more powerful than itself. `beet-agent` can read metadata and nothing else. Administrator rights are not recoverable in that sense, so they live in no document at all: `beet admin` mints them from a code, writes them to tmpfs, and they die with the session. The `pete` user is the human's own break-glass, never on an automation path, and it holds no access key, so nothing on the machine can pick it up by accident.
+**The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** Recoverable is a claim about every credential a document holds: it cannot mint a credential wider than itself, and the worst it can destroy is rebuilt from the declarations, a version or a backup. What it can read is a separate question, settled by holding the key at all: whoever holds it reads everything it opens, which is why the key belongs to one person and is backed up rather than shared.
+
+That is what decides which box a credential goes in. A deployer can destroy its own app's buckets, but every one is versioned and `force_destroy=false`, and a permissions boundary stops it creating anything more powerful than itself. The Cloudflare deploy token holds exactly the groups its repo's declarations ask for, at the scope Cloudflare grants each: one zone's records and settings and, for a repo that deploys a Worker or declares a bucket, the account's Workers and R2 buckets. The next deploy rebuilds all of that except a bucket's contents, and an R2 bucket is a cold copy whose source lives in AWS, under a lock its own token cannot lift. The deploy token can lift it, in two calls that leave the lock missing from the next plan, so for a bucket, recoverable rests on it being a copy. `beet-agent` can read metadata and nothing else.
+
+Administrator rights and the power to mint a Cloudflare token are not recoverable in that sense, so they live in no document at all. `beet admin` mints the first from a code, writes it to tmpfs, and it dies with the session. The second is the mint token, which `cloudflare/mint` asks for at the terminal after showing where to roll it: each roll kills the value from last time, and the fresh one is written to no file, so an agent holding the age key opens every document and still cannot mint. The `pete` user is the human's own break-glass, never on an automation path, and it holds no access key, so nothing on the machine can pick it up by accident.
+
+Cloudflare offers two more terms for a deploy token, a lifetime and an address filter. Neither is a boundary, and both are off unless an entry declares them, since each costs a mint by hand; the [`beet_infra` README](https://github.com/mrchantey/beet/blob/main/crates/beet_infra/README.md#the-cloudflare-deploy-token) says when each is worth it.
 
 This is also why the sealed documents may live in public repositories. age's security rests entirely on the private key, so the question is never "is ciphertext safe" but "what does that one key unlock", and the answer is bounded by construction.
 
-Four flows, day to day:
+Five flows, day to day:
 
-- **`just cli deploy`** opens the repo document for the deployer's pair, and `tofu` mints the runtime identities wearing their boundary. You, or CI holding the age key.
+- **`just cli deploy`** opens the repo document for the AWS deployer's pair and the Cloudflare deploy token, and `tofu` mints the runtime identities wearing their boundary. You, or CI holding the age key.
 - **`beet aws -- s3 ls`** opens the global document for `beet-agent`. Lists names, reads nothing. What an agent gets by default, and it says so on stderr.
 - **`beet admin --duration=30m`** asks for a code and mints a session; for that half hour `beet aws` runs as `beet-admin` and says so. **`beet admin -- deployer/mint`** is how a deployer's policy is re-minted when a stack gains a service: rare, one code.
+- **`beet cloudflare/mint`** when a declaration changes what the Cloudflare token needs, ie a first Worker or bucket. It shows where to roll the mint token, asks for the fresh value with echo off, and converges the deploy token and every bucket's token. Its `--dry-run` needs no credential and prints the scope and the steps: rare, one login.
 - **the console, as `pete`** with a password and a code, for the day `beet admin` is itself what is broken. Behind that, the account root user.
 
 ### A fresh machine, start to finish
 
 Two files and nothing else. One is committed and one you restore by hand, and the asymmetry is the whole design: everything a machine can be handed is sealed, and the thing that opens it is the thing only a person has.
 
-1. **Clone arch-config** and run its `stow-symlinks` recipe. That links `~/.config/beet/secrets.toml` — the global document, committed and age-sealed, holding `beet-agent`'s pair. Nothing is decrypted yet.
-2. **Restore the age identity by hand** from your password manager into `~/.config/beet/age/keys.txt`, mode 600. With beet installed that is `beet vault/restore-identity --file=<backup>`; without it, `age -d -o ~/.config/beet/age/keys.txt <backup>` and a `chmod 600`, since `age -d` writes world-readable and beet refuses an identity file that is. Never `keygen` here — a second identity reads nothing.
-3. **Clone the repos you deploy.** Each carries its own sealed `secrets.toml`, so the same one key opens every deployer pair and every state passphrase. There is nothing per-repo to fetch.
+1. **Clone arch-config** and run its `stow-symlinks` recipe. That links `~/.config/beet/secrets.toml`, the global document, committed and age-sealed, holding `beet-agent`'s pair. Nothing is decrypted yet.
+2. **Restore the age identity by hand** from its `vault/backup` file into `~/.config/beet/age/keys.txt`, mode 600. With beet installed that is `beet vault/restore-identity --file=<backup>`; without it, `age -d -o ~/.config/beet/age/keys.txt <backup>` and a `chmod 600`, since `age -d` writes world-readable and beet refuses an identity file that is. Never `keygen` here: a second identity reads nothing.
+3. **Clone the repos you deploy.** Each carries its own sealed `secrets.toml`, so the same one key opens every deployer pair, every Cloudflare deploy token and every state passphrase. There is nothing per-repo to fetch.
 4. **Check it**: `beet aws -- sts get-caller-identity` should answer as `beet-agent`, and `beet secrets/check` should pass in each repo. At this point the machine can read the account and deploy every app, and it holds no plaintext credential anywhere.
-5. **`beet admin` additionally wants the phone**, and nothing more: the MFA device is registered against the `beet-agent` IAM user rather than against a machine, so a new machine inherits it. Same six digits, same authenticator entry.
+5. **`beet admin` additionally wants the phone**, and nothing more: the MFA device is registered against the `beet-agent` IAM user rather than against a machine, so a new machine inherits it. Same six digits, same authenticator entry. **`beet cloudflare/mint` wants the Cloudflare dashboard login**, and nothing more: the mint token is rolled there for each run, so there is nothing of it to install.
 
-Two things deliberately absent. There is no `~/.aws` — nothing on the machine is ambiently authenticated, and every credential reaches exactly one child process that asked for it. And there is no long-lived administrator to install: the only administrators are a role that needs a code and the `pete` console login, so a fresh machine starts out unable to do irreversible damage and stays that way until someone types six digits.
+Two things deliberately absent. There is no `~/.aws`: nothing on the machine is ambiently authenticated. A repo's records reach only a beet launch beside its document, and the global document's pair only the one child `beet aws` or `beet admin` opens it for. And there is no long-lived administrator to install: the only administrators are a role that needs a code and the `pete` console login, and the only Cloudflare credential that can mint is rolled on the dashboard for each run, so a fresh machine starts out unable to do irreversible damage and stays that way until someone types six digits or logs in.
 
-One trap if you are editing the stow package rather than using it. `~/.config/beet` must already exist as a real directory before stowing, which the recipe's `mkdir -p` guarantees. Folded, stow would replace it with a symlink into the repo, and the next `vault/keygen` would write the age identity — the one key that opens every document in every repo — into version control. It is the same hazard `~/.ssh` has, with more to lose.
+One trap if you are editing the stow package rather than using it. `~/.config/beet` must already exist as a real directory before stowing, which the recipe's `mkdir -p` guarantees. Folded, stow would replace it with a symlink into the repo, and the next `vault/keygen` would write the age identity, the one key that opens every document in every repo, into version control. It is the same hazard `~/.ssh` has, with more to lose.
 
 ## Where to go next
 
