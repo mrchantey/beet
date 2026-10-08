@@ -23,6 +23,10 @@ struct CloudflareMintParams {
 	/// The document group the token is sealed in; absent, the group it is
 	/// already sealed in, else `default`.
 	group: Option<String>,
+	/// A route to run under an elevated token, everything after `--`, ie
+	/// `-- mail/deploy`: a token holding the deploy token's groups and the ones
+	/// only a change needs is minted for it, and deleted once it exits.
+	nested_args: Vec<String>,
 }
 
 /// `<CloudflareMint/>` — converge every Cloudflare credential this repo's
@@ -41,9 +45,10 @@ struct CloudflareMintParams {
 /// that group is held by one credential in one place.
 ///
 /// ```sh
-/// beet cloudflare/mint --dry-run   # the token's scope, nothing touched
-/// beet cloudflare/mint             # converge the token and seal it
-/// beet cloudflare/mint --rotate    # ..and replace it even if it matches
+/// beet cloudflare/mint --dry-run           # the token's scope, nothing touched
+/// beet cloudflare/mint                     # converge the token and seal it
+/// beet cloudflare/mint --rotate            # ..and replace it even if it matches
+/// beet cloudflare/mint -- mail/deploy      # ..then run a deploy elevated
 /// ```
 ///
 /// ## Which credential it runs as
@@ -73,6 +78,21 @@ struct CloudflareMintParams {
 /// the run is answered with the steps to relay, which the dry run also ends
 /// with: the declared `command` to run in a terminal, then the page's full url
 /// and the clicks. Whoever is asked for a mint prints them as they are.
+///
+/// ## The elevated run, for the change the deploy token cannot make
+///
+/// Some declared types are only REFRESHED by the deploy token, and written by
+/// a group it never holds ([`DeployerToken::elevated`]): an R2 bucket's
+/// configuration, since the group that writes its lock also lifts it, over
+/// every bucket in the account. A deploy that changes one is refused before it
+/// writes anything and names this form: `-- <route>` mints `<repo>-elevated`,
+/// holding the deploy token's groups and the elevated ones, proves it, runs
+/// the route as this launch with it in `CLOUDFLARE_API_TOKEN` (which wins over
+/// the document the route loads) and deletes it once the route exits, however
+/// it exits. It is never sealed, a token a crash leaves behind is deleted by
+/// the next run, and every one lapses within the hour regardless: the
+/// Cloudflare counterpart of `beet admin -- <route>`, with the dashboard login
+/// in place of the mfa code.
 ///
 /// ## Why a verb rather than a hand-made token, and why not an apply
 ///
@@ -225,6 +245,17 @@ pub async fn CloudflareMint(
 	report.extend(
 		CloudflareMint::buckets(&cx.caller, mint.as_ref(), &params).await?,
 	);
+	if let (Some(mint), false) = (&mint, params.nested_args.is_empty()) {
+		report.push(
+			CloudflareMint::run_elevated(
+				mint,
+				&lowered,
+				&terms,
+				&params.nested_args,
+			)
+			.await?,
+		);
+	}
 	Response::ok_text(format!("{}\n", report.join("\n"))).xok()
 }
 
@@ -233,7 +264,7 @@ impl CloudflareMint {
 	/// Cloudflare consumer reads: the tofu provider, `wrangler` and the zone
 	/// verbs all take it from the environment, so what the document holds is
 	/// what they get.
-	const RECORD: &'static str = "CLOUDFLARE_API_TOKEN";
+	pub(crate) const RECORD: &'static str = "CLOUDFLARE_API_TOKEN";
 
 	/// The `--group` default, the group a first mint seals into.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
@@ -310,6 +341,17 @@ impl CloudflareMint {
 	/// deploys, and derived from the directory because a repo has no other name
 	/// ([`DeployerMint::user_name`] names the AWS deployer the same way).
 	fn token_name() -> Result<String> {
+		format!("{}-deploy", Self::repo_name()?).xok()
+	}
+
+	/// The token an elevated run holds for its one command, named beside the
+	/// deploy token so the account's api tokens page reads as one repo's pair.
+	fn elevated_name() -> Result<String> {
+		format!("{}-elevated", Self::repo_name()?).xok()
+	}
+
+	/// The workspace directory, kebab-cased: the one name a repo has.
+	fn repo_name() -> Result<String> {
 		let root = fs_ext::workspace_root();
 		let name = root
 			.file_name()
@@ -328,7 +370,7 @@ impl CloudflareMint {
 					root.display()
 				)
 			})?;
-		format!("{name}-deploy").xok()
+		name.xok()
 	}
 
 	/// The dry run's answer: the token, its terms, every group with what asked
@@ -348,8 +390,14 @@ impl CloudflareMint {
 			Ok(account) => format!("account {account}"),
 			Err(err) => format!("NOT MINTABLE: {err}"),
 		};
+		let elevated = match lowered.elevated().is_empty() {
+			true => String::new(),
+			false => "an elevated run (`-- <route>`) also holds each \
+			`elevated:` group, for that one command\n"
+				.to_string(),
+		};
 		format!(
-			"token {name}\n{home}\n{terms}\n\n{lowered}\nbody\n{}\n{}",
+			"token {name}\n{home}\n{terms}\n\n{lowered}{elevated}\nbody\n{}\n{}",
 			serde_json::to_string_pretty(&terms.body(name, lowered.to_json()))?,
 			steps
 				.map(|steps| format!("\n{steps}\n"))
@@ -498,6 +546,90 @@ impl CloudflareMint {
 			..record
 		};
 		(secret.record != record || secret.group != group).then_some(record)
+	}
+
+	/// Run `args` (a route and its params) as this launch under the
+	/// [elevated](DeployerToken::elevate) token, minted for the one command
+	/// with `mint`, answering the report line. See the type's docs for the
+	/// lifecycle; the delete runs however the route exits, and a failed delete
+	/// is named with the instant the token lapses on its own.
+	async fn run_elevated(
+		mint: &MintToken,
+		lowered: &DeployerToken,
+		terms: &TokenTerms,
+		args: &[String],
+	) -> Result<String> {
+		if lowered.elevated().is_empty() {
+			bevybail!(
+				"nothing this launch declares needs an elevated token: run \
+				`{}` on its own",
+				args.join(" ")
+			);
+		}
+		let account = lowered.account()?;
+		let name = Self::elevated_name()?;
+		let elevated = lowered.elevate();
+		let terms = terms.elevated(Timestamp::now());
+		// a token a crash left behind is never the one this run holds
+		let leftover = mint.find_tokens(account, &name).await?;
+		mint.delete_others(account, &leftover, "").await?;
+		let (id, value) = mint
+			.create_token(account, terms.body(&name, elevated.to_json()))
+			.await?;
+		let (url, what) = Self::deploy_proof(&elevated)?;
+		mint.prove_or_discard(account, &id, &value, url, what)
+			.await?;
+		let route = args.join(" ");
+		info!(
+			"running `{route}` as {name} ({id}), which also holds {}, and \
+			deleting it once it exits",
+			lowered
+				.elevated()
+				.keys()
+				.map(TokenPermission::name)
+				.collect::<Vec<_>>()
+				.join(", ")
+		);
+		let ran = Self::run_route(args, &value).await;
+		let deleted = mint.delete_token(account, &id).await;
+		match (ran, deleted) {
+			(Ok(()), Ok(())) => {
+				format!("ran `{route}` as {name} ({id}), since deleted").xok()
+			}
+			(Err(err), Ok(())) => {
+				bevybail!("{err}; {name} ({id}) is deleted")
+			}
+			(ran, Err(delete_err)) => bevybail!(
+				"{}deleting {name} ({id}) failed, so it lapses at {} unless \
+				deleted in the dashboard first: {delete_err}",
+				ran.err()
+					.map(|err| format!("{err}; and "))
+					.unwrap_or_default(),
+				terms
+					.expires_on
+					.map(|at| at.format_iso8601_secs())
+					.unwrap_or_default()
+			),
+		}
+	}
+
+	/// Run `args` as this launch with `token` as the Cloudflare credential,
+	/// an error naming the exit code when the route fails.
+	async fn run_route(args: &[String], token: &str) -> Result {
+		let status = ChildProcess::this_launch(args)?
+			.with_secret(token)
+			.with_env(Self::RECORD, token)
+			.spawn()?
+			.status()
+			.await?;
+		match status.success() {
+			true => OK,
+			false => bevybail!(
+				"`{}` exited with {}",
+				args.join(" "),
+				status.code().unwrap_or(-1)
+			),
+		}
 	}
 
 	/// Whether the document's value IS the token the account holds, which is
@@ -940,7 +1072,7 @@ impl MintToken {
 			Request::delete(format!(
 				"{API_BASE}/accounts/{account}/tokens/{id}"
 			)),
-			"deleting the replaced api token",
+			"deleting an api token",
 		)
 		.await
 		.map(|_| ())
@@ -1087,6 +1219,24 @@ struct TokenTerms {
 impl TokenTerms {
 	const SECS_PER_DAY: u64 = 24 * 60 * 60;
 
+	/// How long an elevated token authenticates for: a backstop for the delete
+	/// a crash would skip, since the run deletes it as soon as the route
+	/// exits, and long enough for the longest deploy (a mail box replaced and
+	/// provisioned).
+	const ELEVATED_LIFETIME: Duration = Duration::from_secs(60 * 60);
+
+	/// The terms an elevated token minted at `now` is held to: these
+	/// addresses, for [`ELEVATED_LIFETIME`](Self::ELEVATED_LIFETIME), to the
+	/// second.
+	fn elevated(&self, now: Timestamp) -> Self {
+		Self {
+			expires_on: Some(Timestamp::from_secs(
+				(now + Self::ELEVATED_LIFETIME).secs(),
+			)),
+			request_ips: self.request_ips.clone(),
+		}
+	}
+
 	/// The terms a token minted at `now` is held to, refusing a lifetime the
 	/// renewal notice would swallow and an address that is not one.
 	fn new(
@@ -1182,9 +1332,7 @@ impl TokenTerms {
 			"policies": policies,
 		});
 		if let Some(expires_on) = self.expires_on {
-			// midnight by construction, so the day spells it exactly
-			body["expires_on"] =
-				format!("{}T00:00:00Z", Date::from(expires_on)).into();
+			body["expires_on"] = expires_on.format_iso8601_secs().into();
 		}
 		if !self.request_ips.is_empty() {
 			body["condition"] =
@@ -1471,6 +1619,13 @@ mod test {
 				"2606:4700::/32",
 			]}}),
 		);
+		// an elevated token keeps the addresses and lapses within the hour, to
+		// the second, however long the deploy token lasts
+		let elevated = terms
+			.elevated(minted_at() + Duration::from_millis(1_500))
+			.body("beet-elevated", serde_json::json!([]));
+		elevated["expires_on"].xpect_eq("2026-10-07T16:00:01Z");
+		elevated["condition"]["request_ip"]["in"][0].xpect_eq("203.0.113.7/32");
 	}
 
 	/// A lifetime the renewal notice would mostly swallow is refused naming

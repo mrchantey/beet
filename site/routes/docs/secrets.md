@@ -415,6 +415,7 @@ flowchart TB
     admin -->|"beet admin -- deployer/mint<br/>when a stack gains a service"| deployer
     mint -->|"beet cloudflare/mint<br/>when a declaration changes"| cfdeploy
     mint -->|"beet cloudflare/mint"| bucket["an R2 bucket's token · tier 2<br/>its own bucket's objects<br/>under the bucket's lock"]
+    mint -->|"beet cloudflare/mint -- route<br/>when a bucket's declaration changes"| elevated["repo-elevated · one command<br/>the deploy groups + R2 Storage Write<br/>deleted when the route exits"]
     ledger -->|"the pairs a store parks"| runtime
     ledger --> bucket
 
@@ -427,7 +428,7 @@ flowchart TB
 | tier | who | how often | credential | worst case |
 | --- | --- | --- | --- | --- |
 | 0a admin | the operator, and any agent on the machine for the session after | a few times a year | `beet admin`: a code mints a session (1h default, up to 12h) | unrecoverable, hence the phone |
-| 0a mint | the operator, and the one run the value is pasted into | when a declaration changes what a Cloudflare token needs | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each `cloudflare/mint` | mints any token the account can hold, hence the login |
+| 0a mint | the operator, and the one run the value is pasted into | when a declaration changes what a Cloudflare token needs, or a deploy changes a bucket | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each `cloudflare/mint` | mints any token the account can hold, hence the login |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document | metadata disclosure |
 | 1 deploy | the operator and CI | daily | `<repo>-deployer` at AWS and `<repo>-deploy` at Cloudflare, both sealed in that repo's document | its own app, recoverably |
 | 2 runtime | the servers | continuous | minted by an apply, or by `cloudflare/mint` for an R2 bucket; parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
@@ -435,7 +436,7 @@ flowchart TB
 
 **The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** Recoverable is a claim about every credential a document holds: it cannot mint a credential wider than itself, and the worst it can destroy is rebuilt from the declarations, a version or a backup. What it can read is a separate question, settled by holding the key at all: whoever holds it reads everything it opens, which is why the key belongs to one person and is backed up rather than shared.
 
-That is what decides which box a credential goes in. A deployer can destroy its own app's buckets, but every one is versioned and `force_destroy=false`, and a permissions boundary stops it creating anything more powerful than itself. The Cloudflare deploy token holds exactly the groups its repo's declarations ask for, at the scope Cloudflare grants each: one zone's records and settings and, for a repo that deploys a Worker or declares a bucket, the account's Workers and R2 buckets. The next deploy rebuilds all of that except a bucket's contents, and an R2 bucket is a cold copy whose source lives in AWS, under a lock its own token cannot lift. The deploy token can lift it, in two calls that leave the lock missing from the next plan, so for a bucket, recoverable rests on it being a copy. `beet-agent` can read metadata and nothing else.
+That is what decides which box a credential goes in. A deployer can destroy its own app's buckets, but every one is versioned and `force_destroy=false`, and a permissions boundary stops it creating anything more powerful than itself. The Cloudflare deploy token holds exactly the groups its repo's declarations ask for, at the scope Cloudflare grants each: one zone's records and settings and, for a repo that deploys a Worker, the account's Workers, all of which the next deploy rebuilds. A bucket is the exception, since its contents are the one thing no deploy rebuilds and the group that writes its configuration also lifts its lock, over every bucket in the account. So the deploy token only reads buckets, and a deploy that would change one is refused before it writes anything, naming `beet cloudflare/mint -- <route>`: the same deploy, under a token that also holds the write, minted for that one command behind the dashboard login and deleted when it exits. `beet-agent` can read metadata and nothing else.
 
 Administrator rights and the power to mint a Cloudflare token are not recoverable in that sense, so they live in no document at all. `beet admin` mints the first from a code, writes it to tmpfs, and it dies with the session. The second is the mint token, which `cloudflare/mint` asks for at the terminal after showing where to roll it: each roll kills the value from last time, and the fresh one is written to no file, so an agent holding the age key opens every document and still cannot mint. The `pete` user is the human's own break-glass, never on an automation path, and it holds no access key, so nothing on the machine can pick it up by accident.
 
@@ -448,7 +449,7 @@ Five flows, day to day:
 - **`just cli deploy`** opens the repo document for the AWS deployer's pair and the Cloudflare deploy token, and `tofu` mints the runtime identities wearing their boundary. You, or CI holding the age key.
 - **`beet aws -- s3 ls`** opens the global document for `beet-agent`. Lists names, reads nothing. What an agent gets by default, and it says so on stderr.
 - **`beet admin --duration=30m`** asks for a code and mints a session; for that half hour `beet aws` runs as `beet-admin` and says so. **`beet admin -- deployer/mint`** is how a deployer's policy is re-minted when a stack gains a service: rare, one code.
-- **`beet cloudflare/mint`** when a declaration changes what the Cloudflare token needs, ie a first Worker or bucket. It shows where to roll the mint token, asks for the fresh value with echo off, and converges the deploy token and every bucket's token. Its `--dry-run` needs no credential and prints the scope and the steps: rare, one login.
+- **`beet cloudflare/mint`** when a declaration changes what the Cloudflare token needs, ie a first Worker or bucket. It shows where to roll the mint token, asks for the fresh value with echo off, and converges the deploy token and every bucket's token. **`beet cloudflare/mint -- mail/deploy`** is how a deploy that changes a bucket runs, after the plain deploy refuses it: rare, one login. Its `--dry-run` needs no credential and prints the scope, what an elevated run adds and the steps.
 - **the console, as `pete`** with a password and a code, for the day `beet admin` is itself what is broken. Behind that, the account root user.
 
 ### A fresh machine, start to finish

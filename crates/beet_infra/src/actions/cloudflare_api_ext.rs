@@ -21,7 +21,9 @@ pub const API_BASE: &str = "https://api.cloudflare.com/client/v4";
 /// [`CloudflareAccess`](crate::prelude::CloudflareAccess), which is what
 /// keeps every call it makes lowered into the token; the mint verb is the one
 /// direct reader, taking a mint token passed here for one command (as CI
-/// would) when it is not the sealed deploy token.
+/// would) when it is not the sealed deploy token. An apply compares it with
+/// the sealed one too, to know whether it holds the deploy token, without
+/// calling anything with it.
 pub(crate) fn token() -> Result<SmolStr> {
 	env_ext::var("CLOUDFLARE_API_TOKEN")
 		.map_err(|_| bevyhow!("CLOUDFLARE_API_TOKEN is unset"))

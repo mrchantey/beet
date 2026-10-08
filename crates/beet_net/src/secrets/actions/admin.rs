@@ -80,14 +80,13 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 				.sdk_vars()
 				.iter()
 				.fold(
-					ChildProcess::new(AdminElevate::own_binary()?),
+					// NOT `without_launch_env`: this child is THIS launch, so it
+					// must resolve the same workspace and the same entry. The
+					// only thing added is the role's credentials.
+					ChildProcess::this_launch(&params.nested_args)?,
 					|process, (_, value)| process.with_secret(value.clone()),
 				)
-				// NOT `without_launch_env`: this child is THIS launch, so it
-				// must resolve the same workspace and the same entry. The only
-				// thing added is the role's credentials.
 				.without_env("AWS_PROFILE")
-				.with_args(params.nested_args.iter().map(String::as_str))
 				.with_envs(session.sdk_vars())
 				.spawn()?
 				.status()
@@ -115,28 +114,6 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 }
 
 impl AdminElevate {
-	/// This same binary, which is what `-- <verb>` runs.
-	///
-	/// The nested arguments are a beet ROUTE, not a command on `PATH`:
-	/// `beet admin -- deployer/mint --stage=prod` is the documented mint path,
-	/// and `deployer/mint` is a route this binary serves rather than a program
-	/// anything could execute. Spawning the current executable also means the
-	/// path works on a machine where `beet` was never installed onto `PATH`,
-	/// which is most of them — a previous version spawned the first argument
-	/// directly and died on `No such file or directory` AFTER the code had been
-	/// typed and spent.
-	fn own_binary() -> Result<String> {
-		std::env::current_exe()
-			.map(|path| path.to_string_lossy().to_string())
-			.map_err(|err| {
-				bevyhow!(
-					"cannot find this binary to run `-- <verb>` with ({err}): \
-					run `beet admin` on its own and the session will be \
-					waiting for the next command"
-				)
-			})
-	}
-
 	/// The default grant, an hour: long enough for a mint or a rotation, short
 	/// enough that forgetting it costs nothing.
 	const DEFAULT: i64 = 3600;
@@ -461,21 +438,6 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("rather than four");
-	}
-
-	/// `-- <verb>` runs THIS binary, and the path it resolves has to exist: the
-	/// previous version spawned the first argument as a program, so
-	/// `beet admin -- deployer/mint` died on `No such file or directory` AFTER
-	/// the code had been typed and spent. That is the expensive kind of bug,
-	/// since the cost is a credential rather than a retry.
-	#[beet_core::test]
-	fn the_nested_verb_runs_this_binary() {
-		let path = AdminElevate::own_binary().unwrap();
-		std::path::Path::new(&path).is_file().xpect_true();
-		// a route, not a program on PATH: `deployer/mint` is never executable
-		std::path::Path::new("deployer/mint")
-			.is_file()
-			.xpect_false();
 	}
 
 	/// The DELIVERY, not just the string. The previous version of this verb

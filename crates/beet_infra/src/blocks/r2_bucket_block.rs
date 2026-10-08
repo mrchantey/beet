@@ -88,9 +88,11 @@ pub struct R2BucketBlock {
 	/// The parked token cannot lift it: a lock is bucket CONFIGURATION, which
 	/// an account-scoped R2 group reaches, and the parked token holds only the
 	/// two bucket-item groups ([`ITEM_PERMISSIONS`](Self::ITEM_PERMISSIONS),
-	/// the S3 data plane) for this one bucket. The deploy credential can,
-	/// because the lock is its own declaration, and a lock gone missing is a
-	/// plan away from being seen.
+	/// the S3 data plane) for this one bucket. Nor can the deploy token, which
+	/// holds the account's R2 group read-only, enough for a plan to refresh the
+	/// lock: writing it is [elevated](DeployerToken::elevated), held only by
+	/// the token `cloudflare/mint -- <route>` mints for the one deploy that
+	/// changes it.
 	///
 	/// Must not exceed the window an
 	/// [`expire_prefixes`](Self::expire_prefixes) rule declares, since a lock

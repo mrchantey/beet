@@ -141,6 +141,14 @@ impl Timestamp {
 		)
 	}
 
+	/// This instant as an ISO 8601 / RFC 3339 UTC timestamp at whole-second
+	/// precision, eg `2024-09-09T19:46:02Z`: the form an api that names no
+	/// fraction asks for. Truncated towards the second the instant falls in.
+	pub fn format_iso8601_secs(&self) -> String {
+		let (hour, min, sec, _) = self.civil_time();
+		format!("{}T{hour:02}:{min:02}:{sec:02}Z", Date::from(*self))
+	}
+
 	/// This instant as an RFC 2822 date-time in UTC, eg
 	/// `Mon, 08 Sep 2026 00:00:00 GMT` — the format an RSS `pubDate` requires.
 	///
@@ -206,6 +214,10 @@ mod test {
 		Timestamp::from_millis(1_725_911_162_102)
 			.format_iso8601()
 			.xpect_eq("2024-09-09T19:46:02.102Z");
+		// whole seconds, the fraction truncated rather than rounded up
+		Timestamp::from_millis(1_725_911_162_902)
+			.format_iso8601_secs()
+			.xpect_eq("2024-09-09T19:46:02Z");
 		// leap year day
 		Timestamp::from_secs(1_709_164_800)
 			.format_iso8601()

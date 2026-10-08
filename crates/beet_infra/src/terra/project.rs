@@ -299,6 +299,20 @@ impl Project {
 		tofu::apply_with_vars(&self.dir(), &all_vars, targets).await
 	}
 
+	/// The writes [`apply_with_vars`](Self::apply_with_vars) would make with
+	/// the same `vars` and `targets`, planned against the state alone, see
+	/// [`tofu::planned_changes`].
+	pub async fn planned_changes(
+		&self,
+		vars: &[(SmolStr, SmolStr)],
+		targets: &[String],
+	) -> Result<Vec<tofu::PlannedChange>> {
+		self.init().await?;
+		let mut all_vars = self.render_vars().await?;
+		all_vars.extend_from_slice(vars);
+		tofu::planned_changes(&self.dir(), &all_vars, targets).await
+	}
+
 	/// Apply with `resources` (addresses) replaced, see
 	/// [`tofu::apply_replacing`]: the rotation of every secret an apply
 	/// derives.

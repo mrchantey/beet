@@ -134,6 +134,71 @@ pub async fn plan(
 	.await
 }
 
+/// The writes an apply narrowed to `targets` would make, planned against the
+/// state alone (`-refresh=false`): what the declarations changed, for the cost
+/// of reading the state rather than refreshing every resource, which is how an
+/// apply checks what it is about to write before it writes anything.
+pub async fn planned_changes(
+	dir: &AbsPath,
+	vars: &[(SmolStr, SmolStr)],
+	targets: &[String],
+) -> Result<Vec<PlannedChange>> {
+	let mut args: Vec<SmolStr> = vec![
+		"plan".into(),
+		"-refresh=false".into(),
+		"-input=false".into(),
+		"-json".into(),
+	];
+	for target in targets {
+		args.push(format!("-target={target}").into());
+	}
+	with_vars(tofu_process().with_cwd(dir.clone()).with_args(args), vars)
+		.run_async_stdout()
+		.await?
+		.xmap(|output| PlannedChange::parse(&output))
+		.xok()
+}
+
+/// One write a plan would make, as `tofu plan -json` reports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlannedChange {
+	/// The resource address, ie `cloudflare_r2_bucket_lock.cold_backups`.
+	pub address: SmolStr,
+	/// Its declared type, ie `cloudflare_r2_bucket_lock`.
+	pub resource_type: SmolStr,
+	/// What the apply would do: `create`, `update`, `replace` or `delete`.
+	pub action: SmolStr,
+}
+
+impl PlannedChange {
+	/// The actions that write: a `read`, a `noop` and a `move` call the
+	/// provider for no change.
+	const WRITES: [&'static str; 4] = ["create", "update", "replace", "delete"];
+
+	/// Every write in `tofu plan -json`'s output, one json message a line,
+	/// from its `planned_change` messages.
+	pub fn parse(output: &str) -> Vec<Self> {
+		output
+			.lines()
+			.filter_map(|line| {
+				serde_json::from_str::<serde_json::Value>(line).ok()
+			})
+			.filter(|message| message["type"] == "planned_change")
+			.filter_map(|message| {
+				let change = &message["change"];
+				let resource = &change["resource"];
+				Self {
+					address: resource["addr"].as_str()?.into(),
+					resource_type: resource["resource_type"].as_str()?.into(),
+					action: change["action"].as_str()?.into(),
+				}
+				.xmap(Some)
+			})
+			.filter(|change| Self::WRITES.contains(&change.action.as_str()))
+			.collect()
+	}
+}
+
 /// Apply the execution plan. `vars` carries anything required to read/write
 /// state, eg a [`StateEncryption`] passphrase.
 pub async fn apply(
@@ -332,5 +397,45 @@ mod test {
 		init_process(&AbsPath::new_unchecked("/tmp/stack"))
 			.to_string()
 			.xpect_contains("init -reconfigure -upgrade");
+	}
+
+	/// A plan's writes are read off its `planned_change` messages, and a read,
+	/// a no-op and every other message are not writes.
+	#[beet_core::test]
+	fn reads_the_planned_writes() {
+		let change = |addr: &str, kind: &str, action: &str| {
+			serde_json::json!({
+				"type": "planned_change",
+				"change": {
+					"resource": { "addr": addr, "resource_type": kind },
+					"action": action,
+				},
+			})
+			.to_string()
+		};
+		let output = [
+			r#"{"type":"version","tofu":"1.10.0"}"#.to_string(),
+			change(
+				"cloudflare_r2_bucket_lock.cold",
+				"cloudflare_r2_bucket_lock",
+				"update",
+			),
+			change("aws_instance.box", "aws_instance", "replace"),
+			change("data.aws_ami.debian", "aws_ami", "read"),
+			r#"{"type":"change_summary","changes":{"add":0}}"#.to_string(),
+		]
+		.join("\n");
+		PlannedChange::parse(&output).xpect_eq(vec![
+			PlannedChange {
+				address: "cloudflare_r2_bucket_lock.cold".into(),
+				resource_type: "cloudflare_r2_bucket_lock".into(),
+				action: "update".into(),
+			},
+			PlannedChange {
+				address: "aws_instance.box".into(),
+				resource_type: "aws_instance".into(),
+				action: "replace".into(),
+			},
+		]);
 	}
 }
