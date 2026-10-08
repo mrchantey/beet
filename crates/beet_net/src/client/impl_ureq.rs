@@ -2,6 +2,17 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use bytes::Bytes;
 use std::io::Read;
+use std::net::SocketAddr;
+use std::net::TcpStream;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use ureq::unversioned::resolver::DefaultResolver;
+use ureq::unversioned::resolver::ResolvedSocketAddrs;
+use ureq::unversioned::resolver::Resolver;
+use ureq::unversioned::transport::DefaultConnector;
+use ureq::unversioned::transport::NextTimeout;
 
 pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 	super::send::check_https_features(&req)?;
@@ -13,14 +24,21 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 
 	// 4xx/5xx are answers, not io failures: the caller wants the response
 	// whatever its status, so only a connection error fails the request.
-	let agent = ureq::config::Config::builder()
+	let config = ureq::config::Config::builder()
 		.http_status_as_error(false)
 		// `0` answers the `3xx` to the caller rather than erroring:
 		// `max_redirects_do_error` is `max_redirects > 0 && ..`
 		.max_redirects(max_redirects)
+		// the socket and the tls handshake, never the response: a stalled
+		// connect otherwise waits out the operating system's SYN retries
+		.timeout_connect(Some(CONNECT_TIMEOUT))
 		.xmap(with_tls)
-		.build()
-		.new_agent();
+		.build();
+	let agent = ureq::Agent::with_parts(
+		config,
+		DefaultConnector::new(),
+		ReachableFirst::default(),
+	);
 
 	// Convert to http::Request
 	let http_parts: http::request::Parts = parts.try_into()?;
@@ -43,6 +61,103 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 			.and_then(into_response)
 	})
 	.await
+}
+
+/// The longest a request may take to connect, tls included.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// ureq's [`DefaultResolver`] with the reachable address first.
+///
+/// ureq tries resolved addresses one at a time in the order the system gives
+/// them, and a network that advertises an IPv6 route it cannot carry puts every
+/// IPv6 address first: each costs its share of the connect timeout (without
+/// one, the operating system's SYN retries, about two minutes) before an IPv4
+/// address is tried. So the families are interleaved and raced as RFC 8305
+/// (Happy Eyeballs) does, one attempt started every
+/// [`ATTEMPT_DELAY`](Self::ATTEMPT_DELAY), and the first address to connect
+/// leads the list. The probe connection is dropped and ureq opens its own to
+/// the winner, one extra handshake per request.
+#[derive(Debug, Default)]
+struct ReachableFirst(DefaultResolver);
+
+impl ReachableFirst {
+	/// The stagger between attempts, RFC 8305's recommended default.
+	const ATTEMPT_DELAY: Duration = Duration::from_millis(250);
+	/// How long one attempt may take before the race leaves it behind.
+	const ATTEMPT_TIMEOUT: Duration = Duration::from_secs(10);
+
+	/// `addrs` with the families alternating, the system's preferred family
+	/// first and each family's own order kept.
+	fn interleave(addrs: &[SocketAddr]) -> Vec<SocketAddr> {
+		let Some(first) = addrs.first() else {
+			return Vec::new();
+		};
+		let (preferred, other): (Vec<_>, Vec<_>) = addrs
+			.iter()
+			.copied()
+			.partition(|addr| addr.is_ipv6() == first.is_ipv6());
+		let mut other = other.into_iter();
+		let mut interleaved = Vec::with_capacity(addrs.len());
+		for addr in preferred {
+			interleaved.push(addr);
+			interleaved.extend(other.next());
+		}
+		interleaved.extend(other);
+		interleaved
+	}
+
+	/// The first of `addrs` to accept a TCP connection, each attempt started
+	/// [`ATTEMPT_DELAY`](Self::ATTEMPT_DELAY) after the last; [`None`] when
+	/// none connects. An attempt still running when another wins finishes on
+	/// its own thread and is dropped.
+	fn race(addrs: &[SocketAddr]) -> Option<SocketAddr> {
+		let (sender, receiver) = mpsc::channel();
+		let won = Arc::new(AtomicBool::new(false));
+		for (index, addr) in addrs.iter().copied().enumerate() {
+			let (sender, won) = (sender.clone(), won.clone());
+			std::thread::spawn(move || {
+				std::thread::sleep(Self::ATTEMPT_DELAY * index as u32);
+				if !won.load(Ordering::Relaxed)
+					&& TcpStream::connect_timeout(&addr, Self::ATTEMPT_TIMEOUT)
+						.is_ok()
+				{
+					sender.send(addr).ok();
+				}
+			});
+		}
+		// every attempt holds a sender, so a race nobody wins disconnects
+		drop(sender);
+		let winner = receiver
+			.recv_timeout(
+				Self::ATTEMPT_TIMEOUT
+					+ Self::ATTEMPT_DELAY * addrs.len() as u32,
+			)
+			.ok();
+		won.store(true, Ordering::Relaxed);
+		winner
+	}
+}
+
+impl Resolver for ReachableFirst {
+	fn resolve(
+		&self,
+		uri: &ureq::http::Uri,
+		config: &ureq::config::Config,
+		timeout: NextTimeout,
+	) -> Result<ResolvedSocketAddrs, ureq::Error> {
+		let mut resolved = self.0.resolve(uri, config, timeout)?;
+		if resolved.len() > 1 {
+			let mut ordered = Self::interleave(&resolved);
+			// nobody connecting leaves the interleaved order, and ureq's own
+			// attempt reports the failure
+			if let Some(winner) = Self::race(&ordered) {
+				ordered.retain(|addr| *addr != winner);
+				ordered.insert(0, winner);
+			}
+			resolved.copy_from_slice(&ordered);
+		}
+		Ok(resolved)
+	}
 }
 
 /// The `ureq` agent-config builder, named so the tls branches below can hand
@@ -254,5 +369,53 @@ mod test {
 			.headers()
 			.first_raw("location")
 			.xpect_eq(Some("/landed"));
+	}
+}
+
+#[cfg(test)]
+mod reachable_first_test {
+	use super::ReachableFirst;
+	use beet_core::prelude::*;
+	use std::net::SocketAddr;
+	use std::net::TcpListener;
+
+	fn addr(text: &str) -> SocketAddr { text.parse().unwrap() }
+
+	/// The families alternate from the system's first choice, each keeping its
+	/// own order, so one unreachable family cannot hold every early attempt.
+	#[beet_core::test]
+	fn interleaves_the_families() {
+		ReachableFirst::interleave(&[
+			addr("[2606:4700::1]:443"),
+			addr("[2606:4700::2]:443"),
+			addr("[2606:4700::3]:443"),
+			addr("104.19.192.1:443"),
+			addr("104.19.192.2:443"),
+		])
+		.xpect_eq(vec![
+			addr("[2606:4700::1]:443"),
+			addr("104.19.192.1:443"),
+			addr("[2606:4700::2]:443"),
+			addr("104.19.192.2:443"),
+			addr("[2606:4700::3]:443"),
+		]);
+	}
+
+	/// The address that accepts wins inside a few staggers, however long the
+	/// one ahead of it would have stalled.
+	///
+	/// REGRESSION: a network advertising an IPv6 route it could not carry hung
+	/// every Cloudflare call for two minutes per IPv6 address, since ureq tried
+	/// them one at a time with no connect timeout. The documentation address
+	/// stands in for the dead route: dropped where there is a route, refused
+	/// where there is none, the race goes on either way.
+	#[beet_core::test]
+	fn races_to_the_reachable_address() {
+		let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+		let reachable = listener.local_addr().unwrap();
+		let start = Instant::now();
+		ReachableFirst::race(&[addr("192.0.2.1:443"), reachable])
+			.xpect_eq(Some(reachable));
+		start.elapsed().xpect_less_than(Duration::from_secs(2));
 	}
 }

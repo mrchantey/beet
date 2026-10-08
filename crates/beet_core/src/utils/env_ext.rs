@@ -124,6 +124,18 @@ fn unquote(value: &str) -> SmolStr {
 	}
 }
 
+/// The program name this process was launched as, ie `target/debug/beet`,
+/// [`None`] where the platform has no argv to read it from.
+pub fn program() -> Option<SmolStr> {
+	cfg_if! {
+		if #[cfg(all(not(target_arch = "wasm32"), feature = "std"))] {
+			return std::env::args().next().map(SmolStr::from);
+		} else {
+			return None;
+		}
+	}
+}
+
 /// Get the command line arguments, excluding the program name
 pub fn args() -> Vec<SmolStr> {
 	cfg_if! {

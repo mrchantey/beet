@@ -143,14 +143,12 @@ site-mint *args:
 # Converge the CLOUDFLARE token this repo deploys with: one account-owned
 # `beet-deploy` token scoped to exactly the permission groups the site entry's
 # stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
-# MINT token, which holds `Account API Tokens Write` and nothing else and lives
-# in the password manager rather than any document, so it is passed for the one
-# command: `CLOUDFLARE_API_TOKEN=.. just site-cloudflare-mint`. The token
-# expires after 90 days, every launch warns in its last fortnight, and this
-# recipe renews it inside that fortnight. `--dry-run` prints the scope, the
-# expiry and the body it would post, touching neither Cloudflare nor the
-# document and needing no credential at all. `atproto` so the social
-# stack's records render, for the same reason `site-audit` builds with it.
+# MINT token, which holds `Account API Tokens Write` and nothing else and is
+# rolled on the dashboard for each run, never kept. `--dry-run` needs no
+# credential, prints the scope and the body a mint would post, and ends with
+# the steps that roll the mint token and the command to paste it into.
+# `atproto` so the social stack's records render, for the same reason
+# `site-audit` builds with it.
 site-cloudflare-mint *args:
   cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
 

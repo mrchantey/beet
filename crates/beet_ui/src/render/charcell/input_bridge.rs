@@ -272,11 +272,12 @@ fn emit_mouse(
 /// when it changes, the cross-platform stand-in for a `SIGWINCH` handler.
 ///
 /// Polls `terminal_ext::size()` each frame and reallocates on a change, forcing a
-/// full repaint. Only [`StdioTerminal`]s are polled; a [`ChannelTerminal`] has a
-/// fixed, caller-controlled size (and is resized via `DoubleBuffer::resize`
-/// directly in tests), so it is left alone.
+/// full repaint. Only [`StdioTerminal`]s are polled, and the system is skipped
+/// while there are none; a [`ChannelTerminal`] has a fixed, caller-controlled
+/// size (and is resized via `DoubleBuffer::resize` directly in tests), so it is
+/// left alone.
 pub(crate) fn resize_stdio_buffers(
-	mut query: Query<&mut DoubleBuffer, With<StdioTerminal>>,
+	mut query: Populated<&mut DoubleBuffer, With<StdioTerminal>>,
 ) {
 	let size = terminal_ext::size();
 	for mut buffer in query.iter_mut() {

@@ -204,10 +204,20 @@ pub fn move_to(x: u16, y: u16) -> std::io::Result<()> {
 }
 
 /// Returns the terminal size, defaulting to 80,24 if it could not be determined.
+///
+/// On unix only the tty ioctl is asked: crossterm's `size` falls back to
+/// running `tput` twice when there is no controlling terminal (an agent, a
+/// pipe, CI), and the resize system polls this every frame.
 pub fn size() -> UVec2 {
 	let default_size = UVec2::new(80, 24);
 	cfg_if! {
-		if #[cfg(all(not(target_arch = "wasm32"), feature = "crossterm"))]{
+		if #[cfg(all(unix, feature = "crossterm"))] {
+			crossterm::terminal::window_size()
+				.ok()
+				.filter(|size| size.columns > 0 && size.rows > 0)
+				.map(|size| UVec2::new(size.columns as u32, size.rows as u32))
+				.unwrap_or(default_size)
+		} else if #[cfg(all(not(target_arch = "wasm32"), feature = "crossterm"))] {
 			crossterm::terminal::size()
 				.map(|(cols,rows)|UVec2::new(cols as u32, rows as u32))
 				.unwrap_or(default_size)

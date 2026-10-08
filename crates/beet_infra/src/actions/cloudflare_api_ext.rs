@@ -7,6 +7,7 @@
 
 use beet_core::prelude::*;
 use beet_net::prelude::Request;
+use beet_net::prelude::StatusCode;
 use serde_json::Value;
 
 /// The Cloudflare v4 api base.
@@ -60,9 +61,36 @@ pub async fn send_optional(
 	}
 	let json = serde_json::from_str::<Value>(&body).unwrap_or_default();
 	if !status.is_ok() || json["success"] != true {
-		bevybail!("{what} failed: {status} - {body}");
+		return Err(CloudflareApiError {
+			what: what.into(),
+			status,
+			body,
+		}
+		.into());
 	}
 	Some(json).xok()
+}
+
+/// A Cloudflare call that answered a failing status or a `success: false`
+/// envelope, typed so a caller can tell a refused credential from anything
+/// else by [`BevyError::downcast_ref`] rather than by reading the message.
+#[derive(Debug, thiserror::Error)]
+#[error("{what} failed: {status} - {body}")]
+pub struct CloudflareApiError {
+	/// What was being attempted.
+	pub what: String,
+	/// The status it answered.
+	pub status: StatusCode,
+	/// The body it answered, an envelope naming its errors.
+	pub body: String,
+}
+
+impl CloudflareApiError {
+	/// Whether the credential itself was refused: malformed, unknown, or
+	/// lacking the permission the call needs.
+	pub fn refused_credential(&self) -> bool {
+		matches!(self.status.as_u16(), 400 | 401 | 403)
+	}
 }
 
 /// The `errors[].message` list of a Cloudflare answer, joined, for a failure

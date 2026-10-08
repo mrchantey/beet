@@ -53,17 +53,28 @@ struct CloudflareMintParams {
 /// converges: the **mint token** is passed for one command and wins over the
 /// document, exactly as an admin pair is passed to `deployer/mint`.
 ///
-/// ```sh
-/// CLOUDFLARE_API_TOKEN=<the mint token> beet cloudflare/mint
-/// ```
+/// The mint token holds `Account API Tokens Write` and nothing else, and it is
+/// kept NOWHERE: each mint rolls it on the account's api tokens page and pastes
+/// the fresh value into the one command, so the value from last time, wherever
+/// it was left, no longer works. Cloudflare has no mfa condition to put on a
+/// token and no permissions boundary to cap one with, so the dashboard login a
+/// roll needs is the human factor, and an agent with the age identity opens
+/// every document and still cannot mint.
 ///
-/// The mint token holds `Account API Tokens Write` and nothing else, and it
-/// lives in the password manager, in NO document. That absence is the whole
-/// design: Cloudflare has no mfa condition to put on a token and no
-/// permissions boundary to cap one with, so the only thing that keeps the
-/// escalating group out of reach of a held key is that no sealed file carries
-/// it. An agent with the age identity opens every document and still cannot
-/// mint.
+/// The steps are rendered here rather than written anywhere else: the dry run
+/// ends with them and a run without the mint token answers them, the page's
+/// full url for the account and the declared `command` included (this
+/// launch's own command line when none is declared). Whoever is asked for a
+/// mint prints them as they are.
+///
+/// ```text
+/// steps:
+///
+/// 1. Roll the mint token
+/// 	- [Cloudflare Tokens Page](https://dash.cloudflare.com/<account>/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy
+/// 2. Paste it over 👇 and run this command
+/// 	- `CLOUDFLARE_API_TOKEN=👇 just site-cloudflare-mint --stage=prod`
+/// ```
 ///
 /// ## Why a verb rather than a hand-made token, and why not an apply
 ///
@@ -106,8 +117,9 @@ struct CloudflareMintParams {
 ///
 /// ## The two levers that are not a boundary
 ///
-/// Cloudflare caps a token by nothing but its scope, so the deploy token is
-/// also held to two terms that narrow the window a leaked value is good for:
+/// Cloudflare caps a token by nothing but its scope, so the deploy token may
+/// also be held to two terms that narrow the window a leaked value is good for.
+/// Both are opt-in, since each costs a mint the operator runs by hand:
 ///
 /// - **a lifetime**, `ttl_days`: the token stops authenticating on a day, so a
 ///   leak has a deadline however it leaked. The sealed record carries that day
@@ -115,7 +127,10 @@ struct CloudflareMintParams {
 ///   ([`SecretRecord::EXPIRY_NOTICE`]), and this verb renews inside the same
 ///   fortnight, so the deadline arrives as a warning naming one command rather
 ///   than as a 401 mid-deploy. Renewal is a fresh token, never an extended
-///   one: an extension would keep a leaked value alive with it.
+///   one: an extension would keep a leaked value alive with it. Absent, the
+///   token lasts until rotated, which suits a token as narrow as a zone's
+///   records and settings: its worst case is rewritten records the next apply
+///   restores.
 /// - **an address filter**, `request_ips`: the CIDRs the token may be used
 ///   from, any address when empty. Worth declaring only where every deploy
 ///   leaves from fixed addresses (a self-hosted CI runner, a static egress
@@ -138,14 +153,25 @@ struct CloudflareMintParams {
 )]
 pub async fn CloudflareMint(
 	/// The days a minted deploy token authenticates for, to the midnight UTC
-	/// it lands on. At least twice the renewal notice, so a token spends most
-	/// of its life quiet.
-	#[field(default = 90u32)]
-	ttl_days: u32,
+	/// it lands on, or until rotated when absent. At least twice the renewal
+	/// notice, so a token spends most of its life quiet.
+	#[field]
+	ttl_days: Option<u32>,
 	/// The CIDRs the deploy token may be used from (a bare address is its
 	/// `/32` or `/128`), any address when empty.
 	#[field]
 	request_ips: Vec<SmolStr>,
+	/// The mint token's name on the account's api tokens page, which the
+	/// steps for rolling it name.
+	#[field(default = "beet-mint")]
+	mint_token: SmolStr,
+	/// The command the operator's steps paste the mint token into, ie `just
+	/// site-cloudflare-mint --stage=prod`; absent, this launch's own command
+	/// line less `--dry-run`. Worth declaring wherever the binary is shared with
+	/// other builds, as `cargo run`'s `target/debug` is, since a later build
+	/// with other features no longer serves this verb.
+	#[field]
+	command: Option<SmolStr>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let params = cx.input.parse_params::<CloudflareMintParams>()?;
@@ -166,11 +192,24 @@ pub async fn CloudflareMint(
 				.join(", ")
 		);
 	}
+	let command = command.map(String::from).unwrap_or_else(|| {
+		MintSteps::command_line(
+			env_ext::program().into_iter().chain(env_ext::args()),
+		)
+	});
+	let steps = lowered
+		.account()
+		.map(|account| MintSteps::new(account, &mint_token, command));
 	let mut report = match params.dry_run {
-		true => vec![CloudflareMint::describe(&name, &lowered, &terms)?],
+		true => vec![CloudflareMint::describe(
+			&name,
+			&lowered,
+			&terms,
+			steps.ok().as_ref(),
+		)?],
 		false => vec![
 			CloudflareMint::converge(
-				&cx.caller, &name, &lowered, &terms, &params,
+				&cx.caller, &name, &lowered, &terms, &steps?, &params,
 			)
 			.await?,
 		],
@@ -283,8 +322,8 @@ impl CloudflareMint {
 	}
 
 	/// The dry run's answer: the token, its terms, every group with what asked
-	/// for it, and the body a mint would post, pretty printed so it reads and
-	/// pipes.
+	/// for it, the body a mint would post, pretty printed so it reads and
+	/// pipes, and the steps that run it for real.
 	///
 	/// An entry declaring no account still gets the whole list, and the one line
 	/// it is missing instead of a token: what an entry ASKS FOR is worth reading
@@ -293,14 +332,18 @@ impl CloudflareMint {
 		name: &str,
 		lowered: &DeployerToken,
 		terms: &TokenTerms,
+		steps: Option<&MintSteps>,
 	) -> Result<String> {
 		let home = match lowered.account() {
 			Ok(account) => format!("account {account}"),
 			Err(err) => format!("NOT MINTABLE: {err}"),
 		};
 		format!(
-			"token {name}\n{home}\n{terms}\n\n{lowered}\nbody\n{}\n",
-			serde_json::to_string_pretty(&terms.body(name, lowered.to_json()))?
+			"token {name}\n{home}\n{terms}\n\n{lowered}\nbody\n{}\n{}",
+			serde_json::to_string_pretty(&terms.body(name, lowered.to_json()))?,
+			steps
+				.map(|steps| format!("\n{steps}\n"))
+				.unwrap_or_default()
 		)
 		.xok()
 	}
@@ -315,6 +358,7 @@ impl CloudflareMint {
 		name: &str,
 		lowered: &DeployerToken,
 		terms: &TokenTerms,
+		steps: &MintSteps,
 		params: &CloudflareMintParams,
 	) -> Result<String> {
 		let account = lowered.account()?.clone();
@@ -324,7 +368,11 @@ impl CloudflareMint {
 		let held = document.open(&identity).ok().and_then(|opened| {
 			opened.get(Self::RECORD).map(|secret| secret.value.clone())
 		});
-		let existing = Self::find_tokens(&account, name).await?;
+		// the first call as the mint token: a run without it is answered with
+		// how to give it one, rather than with a refusal naming nothing
+		let existing = Self::find_tokens(&account, name)
+			.await
+			.map_err(|err| steps.explain(err))?;
 		// a second token of the name is never current: it is a mint a failure
 		// interrupted, and minting again is what deletes it
 		let current = match existing.as_slice() {
@@ -340,13 +388,10 @@ impl CloudflareMint {
 		};
 		if current && !params.rotate {
 			return format!(
-				"token {name} ({}) matches the declarations, expires {}, and is \
-				sealed in {}; `--rotate` mints another",
+				"token {name} ({}) matches the declarations, {}, and is sealed \
+				in {}; `--rotate` mints another",
 				existing[0].id,
-				existing[0]
-					.expires_on
-					.map(|at| Date::from(at).to_string())
-					.unwrap_or_default(),
+				TokenTerms::lifetime(existing[0].expires_on),
 				handle.describe()
 			)
 			.xok();
@@ -368,36 +413,20 @@ impl CloudflareMint {
 				)
 				.into(),
 			),
-			expires: Some(terms.expires_on),
-			rotation: Some(Self::rotation()),
+			expires: terms.expires_on,
+			rotation: Some(steps.rotation()),
 			..default()
 		})?;
 		handle.write(&document).await?;
 		// only now: the token that replaces them is sealed and proven
 		let replaced = Self::delete_others(&account, &existing, &id).await?;
 		format!(
-			"token {name} ({id}) minted, expiring {}, and sealed in {} (group \
+			"token {name} ({id}) minted, {}, and sealed in {} (group \
 			`{group}`){replaced}",
-			Date::from(terms.expires_on),
+			TokenTerms::lifetime(terms.expires_on),
 			handle.describe(),
 		)
 		.xok()
-	}
-
-	/// How the token rotates: this verb again, which only the mint token can
-	/// run. The first line is the command an expiry notice quotes.
-	fn rotation() -> SecretRotation {
-		SecretRotation::manual(
-			"beet cloudflare/mint\n> with the mint token in the environment, \
-			which wins over this document: `CLOUDFLARE_API_TOKEN=.. beet \
-			cloudflare/mint`\n> renews the token inside its last fortnight and \
-			replaces it whenever the declarations change; `--rotate` replaces \
-			it at any time\n> the mint token holds `Account API Tokens Write` \
-			and nothing else, and lives in the password manager rather than in \
-			any document: it is the one credential the age key must not \
-			open\n> the new token is minted, proven with a read this repo's \
-			deploy makes and sealed, then the token it replaces is deleted",
-		)
 	}
 
 	/// Every token of the account named `name`, empty when it holds none.
@@ -498,17 +527,8 @@ impl CloudflareMint {
 		.unwrap_or_default();
 		if !status.is_ok() || body["success"] != true {
 			bevybail!(
-				"minting the token failed: {status} - {}{}",
+				"minting the token failed: {status} - {}",
 				cloudflare_api_ext::error_messages(&body),
-				match status.as_u16() {
-					401 | 403 =>
-						"\nthis credential may not edit the account's \
-						api tokens, and a deploy token never may: pass the \
-						mint token for this one command \
-						(`CLOUDFLARE_API_TOKEN=.. beet cloudflare/mint`), \
-						which wins over the document",
-					_ => "",
-				}
 			);
 		}
 		match (
@@ -619,20 +639,9 @@ impl CloudflareMint {
 			.map(|token| request.with_auth_bearer(&token))
 	}
 
-	/// An api call as the mint token, whose `Account API Tokens Write` failure
-	/// is re-raised as what to do about it.
+	/// An api call as the mint token.
 	async fn send(request: Request, what: &str) -> Result<Value> {
-		cloudflare_api_ext::send(Self::authed(request)?, what)
-			.await
-			.map_err(|err| match err.to_string().contains("403") {
-				true => bevyhow!(
-					"this credential may not read or edit the account's api \
-					tokens, and a deploy token never may: pass the mint token \
-					for this one command (`CLOUDFLARE_API_TOKEN=.. beet \
-					cloudflare/mint`), which wins over the document. {err}"
-				),
-				false => err,
-			})
+		cloudflare_api_ext::send(Self::authed(request)?, what).await
 	}
 
 	/// Converge the token of every `<R2BucketBlock/>` this launch declares, or
@@ -806,12 +815,122 @@ impl CloudflareMint {
 	}
 }
 
+/// What the operator does to hand this verb the mint token: roll it on the
+/// account's api tokens page and paste it into this same command. The one
+/// place those steps are written: a run without the mint token is answered
+/// with them, the dry run ends with them, and the sealed record's rotation
+/// carries them. Rolling rather than keeping a copy means a value pasted last
+/// time, wherever it was left, has stopped working.
+struct MintSteps {
+	/// The account whose api tokens page holds the mint token.
+	account: SmolStr,
+	/// The mint token's name on that page.
+	mint_token: SmolStr,
+	/// The command the mint token is pasted into.
+	command: String,
+}
+
+impl MintSteps {
+	/// The steps for `account`'s `mint_token`, pasted into `command`.
+	fn new(account: &str, mint_token: &str, command: String) -> Self {
+		Self {
+			account: account.into(),
+			mint_token: mint_token.into(),
+			command,
+		}
+	}
+
+	/// A launch's program and arguments as a shell command that repeats it,
+	/// less any `--dry-run`.
+	fn command_line(args: impl IntoIterator<Item = SmolStr>) -> String {
+		args.into_iter()
+			.filter(|arg| !arg.starts_with("--dry-run"))
+			.map(|arg| Self::quote(&arg))
+			.collect::<Vec<_>>()
+			.join(" ")
+	}
+
+	/// `arg` as a shell reads it back: bare when plain, else single quoted.
+	fn quote(arg: &str) -> String {
+		let plain = !arg.is_empty()
+			&& arg.chars().all(|char| {
+				char.is_ascii_alphanumeric() || "-_=./:,@%+".contains(char)
+			});
+		match plain {
+			true => arg.to_string(),
+			false => format!("'{}'", arg.replace('\'', r"'\''")),
+		}
+	}
+
+	/// The account's api tokens page.
+	fn url(&self) -> String {
+		format!("https://dash.cloudflare.com/{}/api-tokens", self.account)
+	}
+
+	/// The clicks from that page to the rolled value on the clipboard.
+	fn clicks(&self) -> String {
+		format!(
+			"{} -> `...` -> Roll -> Roll token -> Your API Token -> Copy",
+			self.mint_token
+		)
+	}
+
+	/// The command with the value's place marked.
+	fn run(&self) -> String {
+		format!("CLOUDFLARE_API_TOKEN=👇 {}", self.command)
+	}
+
+	/// The same steps as a rotation: the url first, one step per line.
+	fn rotation(&self) -> SecretRotation {
+		SecretRotation::manual(format!(
+			"{}\n> {}\n> {}",
+			self.url(),
+			self.clicks(),
+			self.run()
+		))
+	}
+
+	/// `err` answered with these steps when it is the credential that was
+	/// refused or absent, else as it is.
+	fn explain(&self, err: BevyError) -> BevyError {
+		let refused = cloudflare_api_ext::token().is_err()
+			|| err
+				.downcast_ref::<cloudflare_api_ext::CloudflareApiError>()
+				.is_some_and(
+					cloudflare_api_ext::CloudflareApiError::refused_credential,
+				);
+		match refused {
+			true => bevyhow!(
+				"a mint runs as the mint token, and this run is not: {err}\n\n{self}"
+			),
+			false => err,
+		}
+	}
+}
+
+/// The steps as the operator reads them, every link whole.
+impl core::fmt::Display for MintSteps {
+	fn fmt(
+		&self,
+		formatter: &mut core::fmt::Formatter<'_>,
+	) -> core::fmt::Result {
+		write!(
+			formatter,
+			"steps:\n\n1. Roll the mint token\n\t- [Cloudflare Tokens Page]({}) -> {}\n2. Paste it over 👇 and run this command\n\t- `{}`",
+			self.url(),
+			self.clicks(),
+			self.run()
+		)
+	}
+}
+
 /// What the deploy token is held to besides its scope: the instant it stops
 /// authenticating and the addresses it may be used from.
 #[derive(Debug, Clone, PartialEq)]
 struct TokenTerms {
-	/// Midnight UTC `ttl_days` after the mint.
-	expires_on: Timestamp,
+	/// Midnight UTC `ttl_days` after the mint, [`None`] for a token that lasts
+	/// until rotated.
+	expires_on: Option<Timestamp>,
 	/// Normalized CIDRs, sorted, empty for any address.
 	request_ips: Vec<SmolStr>,
 }
@@ -822,13 +941,15 @@ impl TokenTerms {
 	/// The terms a token minted at `now` is held to, refusing a lifetime the
 	/// renewal notice would swallow and an address that is not one.
 	fn new(
-		ttl_days: u32,
+		ttl_days: Option<u32>,
 		request_ips: &[SmolStr],
 		now: Timestamp,
 	) -> Result<Self> {
 		let notice_days =
 			SecretRecord::EXPIRY_NOTICE.as_secs() / Self::SECS_PER_DAY;
-		if u64::from(ttl_days) < notice_days * 2 {
+		if let Some(ttl_days) = ttl_days
+			&& u64::from(ttl_days) < notice_days * 2
+		{
 			bevybail!(
 				"`ttl_days={ttl_days}` is under twice the {notice_days} day \
 				notice a token is renewed inside, so it would spend most of its \
@@ -842,10 +963,13 @@ impl TokenTerms {
 			.collect::<Result<Vec<_>>>()?;
 		request_ips.sort();
 		request_ips.dedup();
-		let lifetime =
-			Duration::from_secs(u64::from(ttl_days) * Self::SECS_PER_DAY);
 		Self {
-			expires_on: Date::from(now + lifetime).timestamp(),
+			expires_on: ttl_days.map(|ttl_days| {
+				let lifetime = Duration::from_secs(
+					u64::from(ttl_days) * Self::SECS_PER_DAY,
+				);
+				Date::from(now + lifetime).timestamp()
+			}),
 			request_ips,
 		}
 		.xok()
@@ -878,14 +1002,27 @@ impl TokenTerms {
 		SmolStr::from(format!("{address}/{prefix}")).xok()
 	}
 
-	/// Whether `held` was minted under these terms and is not yet due: it
-	/// expires after the renewal notice and no later than a token minted now
-	/// would, and is usable from exactly the declared addresses. A token that
-	/// never expires outlives every declaration, so it is never kept.
+	/// Whether `held` was minted under these terms and is not yet due: under a
+	/// lifetime it expires after the renewal notice and no later than a token
+	/// minted now would, without one it never expires, and either way it is
+	/// usable from exactly the declared addresses.
 	fn kept_by(&self, held: &HeldToken, now: Timestamp) -> bool {
-		held.expires_on.is_some_and(|at| {
-			at > now + SecretRecord::EXPIRY_NOTICE && at <= self.expires_on
-		}) && held.request_ips == self.request_ips
+		let lasts = match (self.expires_on, held.expires_on) {
+			(None, None) => true,
+			(Some(latest), Some(at)) => {
+				at > now + SecretRecord::EXPIRY_NOTICE && at <= latest
+			}
+			_ => false,
+		};
+		lasts && held.request_ips == self.request_ips
+	}
+
+	/// How long a token expiring at `expires_on` lasts, for a report line.
+	fn lifetime(expires_on: Option<Timestamp>) -> String {
+		match expires_on {
+			Some(at) => format!("expires {}", Date::from(at)),
+			None => "lasts until rotated".into(),
+		}
 	}
 
 	/// The create body of a token named `name` granting `policies` under
@@ -894,9 +1031,12 @@ impl TokenTerms {
 		let mut body = serde_json::json!({
 			"name": name,
 			"policies": policies,
-			// midnight by construction, so the day spells it exactly
-			"expires_on": format!("{}T00:00:00Z", Date::from(self.expires_on)),
 		});
+		if let Some(expires_on) = self.expires_on {
+			// midnight by construction, so the day spells it exactly
+			body["expires_on"] =
+				format!("{}T00:00:00Z", Date::from(expires_on)).into();
+		}
 		if !self.request_ips.is_empty() {
 			body["condition"] =
 				serde_json::json!({ "request_ip": { "in": self.request_ips } });
@@ -912,11 +1052,17 @@ impl core::fmt::Display for TokenTerms {
 		&self,
 		formatter: &mut core::fmt::Formatter<'_>,
 	) -> core::fmt::Result {
+		write!(formatter, "{}", Self::lifetime(self.expires_on))?;
+		if self.expires_on.is_some() {
+			write!(
+				formatter,
+				", renewed by a mint inside its last {} days",
+				SecretRecord::EXPIRY_NOTICE.as_secs() / Self::SECS_PER_DAY
+			)?;
+		}
 		write!(
 			formatter,
-			"expires {}, renewed by a mint inside its last {} days\nusable from {}",
-			Date::from(self.expires_on),
-			SecretRecord::EXPIRY_NOTICE.as_secs() / Self::SECS_PER_DAY,
+			"\nusable from {}",
 			match self.request_ips.is_empty() {
 				true => "any address".to_string(),
 				false => self.request_ips.join(", "),
@@ -970,6 +1116,7 @@ impl HeldToken {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// Every Cloudflare action in the scene is found by the declaration it
 	/// carries, so an action is lowered by being written down rather than by
@@ -1042,6 +1189,51 @@ mod test {
 			.unwrap()
 			.xpect_eq("beet-deploy");
 	}
+	/// The steps an operator follows to run a mint, rendered from the account
+	/// and, undeclared, this launch's own command less its `--dry-run`, with
+	/// every link whole and the value's place marked.
+	#[beet_core::test]
+	fn renders_the_operator_steps() {
+		let steps = super::MintSteps::new(
+			"74aba4da669f57fc6fc3e63ebcfcff26",
+			"beet-mint",
+			super::MintSteps::command_line(
+				[
+					"target/debug/beet",
+					"--main=site",
+					"cloudflare/mint",
+					"--dry-run",
+					"--stage=prod",
+					"a path with spaces",
+				]
+				.map(SmolStr::from),
+			),
+		);
+		steps.to_string().xpect_eq(
+			"steps:\n\n1. Roll the mint token\n\t- [Cloudflare Tokens Page](https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy\n2. Paste it over 👇 and run this command\n\t- `CLOUDFLARE_API_TOKEN=👇 target/debug/beet --main=site cloudflare/mint --stage=prod 'a path with spaces'`",
+		);
+		// the rotation sealed beside the token: the url first, a step a line
+		steps
+			.rotation()
+			.to_string()
+			.xpect_starts_with(
+				"manual:https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens\n> beet-mint -> ",
+			);
+		// a refused credential is answered with the steps
+		steps
+			.explain(
+				super::cloudflare_api_ext::CloudflareApiError {
+					what: "listing the account's api tokens".into(),
+					status: StatusCode::FORBIDDEN,
+					body: "{}".into(),
+				}
+				.into(),
+			)
+			.to_string()
+			.xpect_contains("403 Forbidden")
+			.xpect_contains("1. Roll the mint token");
+	}
+
 	/// A mid-afternoon mint, so a lifetime visibly lands on a midnight.
 	fn minted_at() -> Timestamp {
 		Date::parse("2026-10-07").unwrap().timestamp()
@@ -1065,16 +1257,22 @@ mod test {
 		.unwrap()
 	}
 
-	/// The create body carries the lifetime as the midnight it lands on, and
-	/// an address filter only when one is declared, normalized.
+	/// The create body carries a declared lifetime as the midnight it lands
+	/// on and an address filter as normalized CIDRs, and neither when none is
+	/// declared.
 	#[beet_core::test]
 	fn the_body_carries_the_terms() {
-		let terms = super::TokenTerms::new(90, &[], minted_at()).unwrap();
+		let body = super::TokenTerms::new(None, &[], minted_at())
+			.unwrap()
+			.body("beet-deploy", serde_json::json!([]));
+		body.get("expires_on").xpect_none();
+		body.get("condition").xpect_none();
+		let terms = super::TokenTerms::new(Some(90), &[], minted_at()).unwrap();
 		let body = terms.body("beet-deploy", serde_json::json!([]));
 		body["expires_on"].xpect_eq("2027-01-05T00:00:00Z");
 		body.get("condition").xpect_none();
 		let terms = super::TokenTerms::new(
-			90,
+			Some(90),
 			&["203.0.113.7".into(), "2606:4700:0::/32".into()],
 			minted_at(),
 		)
@@ -1091,45 +1289,51 @@ mod test {
 	/// the floor, as is anything that is not an address.
 	#[beet_core::test]
 	fn refuses_terms_that_cannot_hold() {
-		super::TokenTerms::new(27, &[], minted_at())
+		super::TokenTerms::new(Some(27), &[], minted_at())
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("at least 28");
-		super::TokenTerms::new(28, &[], minted_at()).unwrap();
+		super::TokenTerms::new(Some(28), &[], minted_at()).unwrap();
 		for cidr in ["beet.org", "203.0.113.7/33", "::1/129", "10.0.0.1/"] {
-			super::TokenTerms::new(90, &[cidr.into()], minted_at())
+			super::TokenTerms::new(Some(90), &[cidr.into()], minted_at())
 				.unwrap_err();
 		}
 	}
 
 	/// A held token is kept only while it is minted under the declared terms
-	/// and not yet due: one that never expires, one inside its notice, one
-	/// outliving a shortened lifetime and one usable from elsewhere are all
-	/// minted again.
+	/// and not yet due: one inside its notice, one outliving a shortened
+	/// lifetime, one whose lifetime was added or dropped and one usable from
+	/// elsewhere are all minted again.
 	#[beet_core::test]
 	fn keeps_only_a_token_under_the_terms_and_not_yet_due() {
-		let terms = super::TokenTerms::new(90, &[], minted_at()).unwrap();
+		let terms = super::TokenTerms::new(Some(90), &[], minted_at()).unwrap();
 		// the token a mint this afternoon would make, read back
 		terms
 			.kept_by(&held(Some("2027-01-05T00:00:00Z"), &[]), minted_at())
 			.xpect_true();
 		// the same token sixty days on, still outside its notice
 		let later = minted_at() + days(60);
-		super::TokenTerms::new(90, &[], later)
+		super::TokenTerms::new(Some(90), &[], later)
 			.unwrap()
 			.kept_by(&held(Some("2027-01-05T00:00:00Z"), &[]), later)
 			.xpect_true();
 		// and eighty days on, inside it
 		let due = minted_at() + days(80);
-		super::TokenTerms::new(90, &[], due)
+		super::TokenTerms::new(Some(90), &[], due)
 			.unwrap()
 			.kept_by(&held(Some("2027-01-05T00:00:00Z"), &[]), due)
 			.xpect_false();
-		// a token that never expires, the shape of every one minted before
-		// the lifetime existed
+		// a token that never expires, under a declared lifetime
 		terms.kept_by(&held(None, &[]), minted_at()).xpect_false();
+		// without one, the token that never expires is the one kept, and a
+		// token minted under a lifetime since dropped is minted again
+		let lasting = super::TokenTerms::new(None, &[], minted_at()).unwrap();
+		lasting.kept_by(&held(None, &[]), minted_at()).xpect_true();
+		lasting
+			.kept_by(&held(Some("2027-01-05T00:00:00Z"), &[]), minted_at())
+			.xpect_false();
 		// a lifetime shortened under a token that outlives it
-		super::TokenTerms::new(30, &[], minted_at())
+		super::TokenTerms::new(Some(30), &[], minted_at())
 			.unwrap()
 			.kept_by(&held(Some("2027-01-05T00:00:00Z"), &[]), minted_at())
 			.xpect_false();
@@ -1140,7 +1344,7 @@ mod test {
 				minted_at(),
 			)
 			.xpect_false();
-		super::TokenTerms::new(90, &["203.0.113.7".into()], minted_at())
+		super::TokenTerms::new(Some(90), &["203.0.113.7".into()], minted_at())
 			.unwrap()
 			.kept_by(
 				&held(Some("2027-01-05T00:00:00Z"), &["203.0.113.7/32"]),
