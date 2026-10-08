@@ -166,6 +166,25 @@ impl Frontmatter {
 			.xmap(RootDeclarations)
 	}
 
+	/// The YAML block declaring every field of `component` its default does
+	/// not, the inverse of [`extract`](Self::extract) and [`declarations`](Self::declarations),
+	/// or `None` when every field is default. A flat struct writes one
+	/// `key: value` line per field, a list inline as `[a, b]`.
+	pub fn write<T: Default + serde::Serialize>(
+		component: &T,
+	) -> Result<Option<String>> {
+		let default = Value::from_serde(T::default())?;
+		let lines = Value::from_serde(component)?
+			.as_map()?
+			.into_iter()
+			.filter(|(key, value)| default.get(key) != Some(*value))
+			.map(|(key, value)| format!("{key}: {}\n", write_yaml_value(value)))
+			.collect::<String>();
+		(!lines.is_empty())
+			.then(|| format!("---\n{lines}---\n"))
+			.xok()
+	}
+
 	/// Get a string field from the frontmatter by name.
 	///
 	/// Returns `None` if the field does not exist or is not a string.
@@ -313,6 +332,39 @@ fn parse_yaml_value(raw: &str) -> Value {
 
 	// try parsing as typed value
 	Value::parse_string(unquoted)
+}
+
+/// One YAML value as [`parse_yaml_value`] reads it back: a list inline, a
+/// string plain unless that would read as something else, quoted otherwise.
+fn write_yaml_value(value: &Value) -> String {
+	match value {
+		Value::List(items) => items
+			.iter()
+			.map(|item| match item {
+				Value::Str(text) => write_yaml_str(text, true),
+				item => write_yaml_value(item),
+			})
+			.collect::<Vec<_>>()
+			.join(", ")
+			.xmap(|items| format!("[{items}]")),
+		Value::Str(text) => write_yaml_str(text, false),
+		value => value.to_string(),
+	}
+}
+
+/// A string on one line, quoted where plain it would read as another type,
+/// lose its edges or comment, or split or close a list it is an item of.
+fn write_yaml_str(text: &str, in_list: bool) -> String {
+	let text = text.replace(['\r', '\n'], " ");
+	let is_plain = parse_yaml_value(&text) == Value::str(text.as_str())
+		&& text.trim() == text
+		&& !text.contains(" #")
+		&& !(in_list && text.contains([',', '[', ']']));
+	match (is_plain, text.contains('"')) {
+		(true, _) => text,
+		(false, false) => format!("\"{text}\""),
+		(false, true) => format!("'{text}'"),
+	}
 }
 
 /// Parse TOML key-value pairs, grouped by `[Section]` header.
@@ -639,6 +691,36 @@ mod test {
 		fields.len().xpect_eq(2);
 		fields[0].0.as_str().xpect_eq("title");
 		fields[1].1.xpect_eq(DataLiteral::Scalar(Value::Uint(2)));
+	}
+
+	/// A component writes as the block declaring it again, its default fields
+	/// unwritten.
+	#[beet_core::test]
+	fn writes_what_it_reads() {
+		let meta = PageMeta {
+			title: Some("Plan: one, two".into()),
+			created: Some(Date::parse("2025-07-09").unwrap()),
+			authors: vec!["Mel Richards".into(), "Packwood, Geoff".into()],
+			order: Some(2),
+			..default()
+		};
+		let block = Frontmatter::write(&meta).unwrap().unwrap();
+		block.xpect_eq(
+			"---\ntitle: Plan: one, two\ncreated: 2025-07-09\n\
+			 authors: [Mel Richards, \"Packwood, Geoff\"]\norder: 2\n---\n",
+		);
+		let mut registry = bevy::reflect::TypeRegistry::default();
+		registry.register::<PageMeta>();
+		Frontmatter::extract(&block)
+			.unwrap()
+			.unwrap()
+			.declarations("PageMeta")
+			.get::<PageMeta>(&registry)
+			.unwrap()
+			.xpect_eq(Some(meta));
+		Frontmatter::write(&PageMeta::default())
+			.unwrap()
+			.xpect_none();
 	}
 
 	/// A `[Section]` header declares its own component alongside the default.

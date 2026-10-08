@@ -9,6 +9,8 @@ pub type NodeView<'a> = (
 	Option<&'a Value>,
 	Option<&'a Expression>,
 	Option<&'a Portal>,
+	Option<&'a CData>,
+	Option<&'a ProcessingInstruction>,
 );
 
 #[derive(SystemParam)]
@@ -53,6 +55,8 @@ impl NodeWalker<'_, '_> {
 			value,
 			expression,
 			render_ref,
+			cdata,
+			instruction,
 		) = node;
 
 		// A Portal holder is transparent: recurse directly into the
@@ -73,9 +77,15 @@ impl NodeWalker<'_, '_> {
 		if let Some(doctype) = doctype {
 			visitor.visit_doctype(&cx, doctype);
 		}
-		// 2. Comment
+		// 2. Comment, processing instruction and CDATA, the other leaves
 		if let Some(comment) = comment {
 			visitor.visit_comment(&cx, comment);
+		}
+		if let Some(instruction) = instruction {
+			visitor.visit_processing_instruction(&cx, instruction);
+		}
+		if let Some(cdata) = cdata {
+			visitor.visit_cdata(&cx, cdata);
 		}
 		// 3. Element
 		if let Ok(view) = self.elements.get(cx.entity) {
@@ -170,6 +180,18 @@ pub trait NodeVisitor {
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}
 	fn visit_comment(&mut self, _cx: &VisitContext, _comment: &Comment) {}
+	/// A processing instruction, ie `<?xml version="1.0"?>`: markup
+	/// punctuation, which no reader sees.
+	fn visit_processing_instruction(
+		&mut self,
+		_cx: &VisitContext,
+		_instruction: &ProcessingInstruction,
+	) {
+	}
+	/// A CDATA section, which a reader reads as the text it holds.
+	fn visit_cdata(&mut self, cx: &VisitContext, cdata: &CData) {
+		self.visit_value(cx, &Value::Str(cdata.0.as_str().into()));
+	}
 	fn visit_element(&mut self, _cx: &VisitContext, _view: ElementView) {}
 	fn leave_element(&mut self, _cx: &VisitContext, _element: &Element) {}
 	fn visit_value(&mut self, _cx: &VisitContext, _value: &Value) {}

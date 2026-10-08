@@ -7,7 +7,9 @@
 //! cargo run --example router -- --accept=text/html
 //! cargo run --example router -- --accept=text/html,text/plain
 //! ```
-//! When omitted the default preference is `ansi-term, text, markdown, json`.
+//! When omitted the default preference is `ansi-term, text, markdown, json` for
+//! a terminal, and `markdown, text, json` when stdout is not one, ie piped to
+//! an agent or a file, so a one-shot pipes clean.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -83,14 +85,25 @@ impl CliServer {
 	}
 }
 
-/// The default content negotiation when `--accept` is unset.
+/// The default content negotiation when `--accept` is unset: ANSI for a
+/// terminal, markdown first when stdout is not one.
 fn default_accept() -> Vec<MediaType> {
-	vec![
-		MediaType::AnsiTerm,
-		MediaType::Text,
-		MediaType::Markdown,
-		MediaType::Json,
-	]
+	cfg_if! {
+		if #[cfg(all(feature = "std", not(target_arch = "wasm32")))] {
+			let is_terminal = std::io::IsTerminal::is_terminal(&std::io::stdout());
+		} else {
+			let is_terminal = true;
+		}
+	}
+	match is_terminal {
+		true => vec![
+			MediaType::AnsiTerm,
+			MediaType::Text,
+			MediaType::Markdown,
+			MediaType::Json,
+		],
+		false => vec![MediaType::Markdown, MediaType::Text, MediaType::Json],
+	}
 }
 
 /// Route the request through the host's dispatch, then resolve the parked call

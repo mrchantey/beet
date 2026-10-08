@@ -22,6 +22,17 @@ pub use page_root::*;
 // request accepts
 mod blob_view;
 pub use blob_view::*;
+// any store file's addressed cells, the map an edit fills a form by
+#[cfg(feature = "serde")]
+mod blob_cells;
+#[cfg(feature = "serde")]
+pub use blob_cells::*;
+// an answer that is both a scene and its data, rendered or serialized as the
+// request accepts
+#[cfg(feature = "serde")]
+mod data_page;
+#[cfg(feature = "serde")]
+pub use data_page::*;
 // the persistent counterpart of the per-request page routes: one live tree,
 // served request after request.
 mod fixed_page;

@@ -5,7 +5,8 @@ use beet_core::prelude::*;
 /// Renders an entity tree back to an HTML string via [`NodeVisitor`].
 ///
 /// Supports pretty-printing with configurable indentation,
-/// void elements, and optional expression rendering.
+/// void elements, and optional expression rendering. Its [`xml`](Self::xml)
+/// mode writes a tree as the XML it was read from instead.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HtmlRenderer {
 	buffer: String,
@@ -41,6 +42,8 @@ pub struct HtmlRenderer {
 	/// The value of the `<select>` being written, so the `<option>` it names
 	/// is marked `selected`.
 	select_value: Option<String>,
+	/// Write XML rather than HTML, see [`xml`](Self::xml).
+	xml: bool,
 }
 
 /// Indentation style for pretty-printing.
@@ -82,6 +85,20 @@ impl HtmlRenderer {
 			raw_text_elements: default_raw_text_elements(),
 			in_raw_text_element: false,
 			select_value: None,
+			xml: false,
+		}
+	}
+
+	/// The XML mode: a tree written as the markup it was read from, every
+	/// node kept, an empty element as `<name/>`. A node is written from its
+	/// [`SourceElement`] when it has one and from its [`Element`] and
+	/// [`Attribute`]s otherwise; below a source element an entity with no
+	/// source identity is projection only, so it is passed through and its
+	/// children written in place. Answers [`MediaType::Xml`].
+	pub fn xml() -> Self {
+		Self {
+			xml: true,
+			..Self::new()
 		}
 	}
 
@@ -371,6 +388,14 @@ impl NodeRenderer for HtmlRenderer {
 		&mut self,
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
+		if self.xml {
+			cx.check_accepts(&[MediaType::Xml])?;
+			let entity = cx.entity;
+			let text = cx
+				.world
+				.with_state::<XmlWriter, _>(|writer| writer.write(entity));
+			return MediaBytes::new_string(MediaType::Xml, text).xok();
+		}
 		cx.check_accepts(&[MediaType::Html])?;
 		cx.walk(self);
 		// fallback: a fragment with no `<head>` never triggered the in-walk drain,

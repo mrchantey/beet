@@ -4,6 +4,8 @@
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
+//! - `ooxml` — adds [`OoxmlRenderer`] support, a document read from an Office
+//!   file written back to its own format
 
 use crate::prelude::*;
 #[allow(unused_imports)]
@@ -22,11 +24,14 @@ pub struct MediaRenderer {
 	default_media_type: MediaType,
 	plain_text_renderer: PlainTextRenderer,
 	html_renderer: HtmlRenderer,
+	xml_renderer: HtmlRenderer,
 	#[cfg(feature = "template_serde")]
 	template_renderer: TemplateRenderer,
 	markdown_renderer: MarkdownRenderer,
 	#[cfg(feature = "style")]
 	ansi_term_renderer: AnsiTermRenderer,
+	#[cfg(feature = "ooxml")]
+	ooxml_renderer: OoxmlRenderer,
 }
 
 #[allow(unreachable_code)]
@@ -49,11 +54,14 @@ impl MediaRenderer {
 			default_media_type,
 			plain_text_renderer: default(),
 			html_renderer: default(),
+			xml_renderer: HtmlRenderer::xml(),
 			markdown_renderer: default(),
 			#[cfg(feature = "style")]
 			ansi_term_renderer: default(),
 			#[cfg(feature = "template_serde")]
 			template_renderer: default(),
+			#[cfg(feature = "ooxml")]
+			ooxml_renderer: default(),
 		}
 	}
 
@@ -128,12 +136,18 @@ impl MediaRenderer {
 			MediaType::Html => {
 				self.html_renderer.render(&mut inner_cx).map(Some)
 			}
+			MediaType::Xml => self.xml_renderer.render(&mut inner_cx).map(Some),
 			MediaType::Markdown => {
 				self.markdown_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(feature = "style")]
 			MediaType::AnsiTerm => {
 				self.ansi_term_renderer.render(&mut inner_cx).map(Some)
+			}
+			// an Office file writes back to its own format
+			#[cfg(feature = "ooxml")]
+			MediaType::Docx | MediaType::Xlsx | MediaType::Pptx => {
+				self.ooxml_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(feature = "template_serde")]
 			serialized
@@ -151,13 +165,20 @@ impl MediaRenderer {
 
 	/// The list of media type this renderer can produce.
 	fn available_types(&self) -> Vec<MediaType> {
-		let mut available =
-			vec![MediaType::Text, MediaType::Html, MediaType::Markdown];
+		let available = [
+			MediaType::Text,
+			MediaType::Html,
+			MediaType::Xml,
+			MediaType::Markdown,
+		]
+		.into_iter();
 		#[cfg(feature = "style")]
-		available.push(MediaType::AnsiTerm);
+		let available = available.chain([MediaType::AnsiTerm]);
 		#[cfg(feature = "template_serde")]
-		available.extend(TemplateRenderer::available());
-		available
+		let available = available.chain(TemplateRenderer::available());
+		#[cfg(feature = "ooxml")]
+		let available = available.chain(OoxmlPackage::MEDIA_TYPES);
+		available.collect()
 	}
 }
 

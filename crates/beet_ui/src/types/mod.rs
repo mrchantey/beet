@@ -14,4 +14,8 @@ mod into_bundle;
 pub use into_bundle::*;
 mod portal;
 pub use portal::*;
+mod reader_text;
+pub use reader_text::*;
+mod table_cell;
 pub use state::*;
+pub use table_cell::*;

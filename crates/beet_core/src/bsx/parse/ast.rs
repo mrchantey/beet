@@ -24,6 +24,10 @@ pub enum BsxNode {
 	Comment(String),
 	/// `<!DOCTYPE ..>`.
 	Doctype(String),
+	/// `<![CDATA[ .. ]]>`, its content as written.
+	CData(String),
+	/// `<? .. ?>`, ie the XML declaration, its content as written.
+	ProcessingInstruction(String),
 }
 
 /// An element: a tag, its attributes, and its children.
@@ -46,6 +50,124 @@ pub struct BsxElement {
 	pub children: Vec<BsxNode>,
 	/// Whether the tag was self-closing (`<br/>`), so it has no children.
 	pub self_closing: bool,
+}
+
+/// Read access over a parsed tree, for a caller that reads a small document
+/// without building it, ie an Office package's relationships. A name is
+/// matched by its local part, whatever prefix it was written with.
+impl BsxElement {
+	/// The tag without its prefix, ie `p` for `w:p`.
+	pub fn local_name(&self) -> &str {
+		self.tag
+			.split_once(':')
+			.map_or(self.tag.as_str(), |(_, local)| local)
+	}
+
+	/// The element children, in order.
+	pub fn elements(&self) -> impl Iterator<Item = &BsxElement> {
+		self.children.iter().filter_map(|node| match node {
+			BsxNode::Element(element) => Some(element),
+			_ => None,
+		})
+	}
+
+	/// The element children whose local name is `local`, in order.
+	pub fn children_named<'a>(
+		&'a self,
+		local: &'a str,
+	) -> impl Iterator<Item = &'a BsxElement> {
+		self.elements()
+			.filter(move |element| element.local_name() == local)
+	}
+
+	/// The first element child whose local name is `local`.
+	pub fn child(&self, local: &str) -> Option<&BsxElement> {
+		self.elements()
+			.find(|element| element.local_name() == local)
+	}
+
+	/// Every descendant element whose local name is `local`, in document
+	/// order.
+	pub fn descendants_named(&self, local: &str) -> Vec<&BsxElement> {
+		let mut out = Vec::new();
+		self.collect_named(local, &mut out);
+		out
+	}
+
+	fn collect_named<'a>(&'a self, local: &str, out: &mut Vec<&'a BsxElement>) {
+		for element in self.elements() {
+			if element.local_name() == local {
+				out.push(element);
+			}
+			element.collect_named(local, out);
+		}
+	}
+
+	/// The string value of the attribute written `key`, ie `r:id`.
+	pub fn attribute(&self, key: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|attribute| {
+			match (&attribute.value, attribute.key == key) {
+				(AttrValue::Str(value), true) => Some(value.as_str()),
+				_ => None,
+			}
+		})
+	}
+
+	/// The string value of the attribute whose local name is `local`,
+	/// whatever its prefix, ie `val` for `w:val`.
+	pub fn attribute_local(&self, local: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|attribute| {
+			let name = attribute
+				.key
+				.split_once(':')
+				.map_or(attribute.key.as_str(), |(_, name)| name);
+			match (&attribute.value, name == local) {
+				(AttrValue::Str(value), true) => Some(value.as_str()),
+				_ => None,
+			}
+		})
+	}
+
+	/// The string value of the prefixed attribute whose local name is
+	/// `local`, ie `r:id`, never an unprefixed one, ie a slide's own `id`.
+	pub fn prefixed_attribute(&self, local: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|attribute| {
+			let (_, name) = attribute.key.split_once(':')?;
+			match (&attribute.value, name == local) {
+				(AttrValue::Str(value), true) => Some(value.as_str()),
+				_ => None,
+			}
+		})
+	}
+
+	/// The text of every descendant text and CDATA node, joined.
+	pub fn text(&self) -> String {
+		let mut out = String::new();
+		self.collect_text(&mut out);
+		out
+	}
+
+	fn collect_text(&self, out: &mut String) {
+		for node in &self.children {
+			match node {
+				BsxNode::Element(element) => element.collect_text(out),
+				BsxNode::Text(text) | BsxNode::CData(text) => {
+					out.push_str(text)
+				}
+				_ => {}
+			}
+		}
+	}
+}
+
+impl BsxNode {
+	/// The first element of a parsed document, its document element.
+	pub fn document_element(nodes: &[BsxNode]) -> Option<&BsxElement> {
+		nodes.iter().find_map(|node| match node {
+			BsxNode::Element(element) => Some(element),
+			_ => None,
+		})
+	}
 }
 
 /// One attribute on an element.

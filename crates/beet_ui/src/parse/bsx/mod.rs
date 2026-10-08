@@ -5,7 +5,8 @@
 //! AST-to-world resolution all live in `beet_core`; this file only adapts that
 //! to the ui-side [`MediaParser`] dispatch. One parser, one grammar:
 //! [`MediaType::Bsx`] parses with BSX features on, [`MediaType::Html`] with them
-//! off (the HTML-only subset). The default event registration lives in
+//! off (the HTML-only subset), and [`MediaType::Xml`] as XML, building plain
+//! markup that writes back as it was read. The default event registration lives in
 //! [`BsxDefaultsPlugin`], and the `bx:<event>` script installer it wires in
 //! `event_script`.
 mod defaults;
@@ -16,8 +17,8 @@ mod event_script;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A [`NodeParser`] for the BSX and HTML media types, delegating to the core
-/// parser.
+/// A [`NodeParser`] for the BSX, HTML and XML media types, delegating to the
+/// core parser.
 ///
 /// The parsed tree is resolved into the calling entity through
 /// `insert_template`, so slots, references, and the lifecycle resolve in the one
@@ -43,9 +44,21 @@ impl BsxParser {
 		}
 	}
 
+	/// A parser reading XML, every element plain markup named as written.
+	pub fn xml() -> Self {
+		Self {
+			config: BsxParseConfig::xml(),
+		}
+	}
+
 	/// Parse `text` and build the result into `entity`.
 	fn parse_into(&self, entity: &mut EntityWorldMut, text: &str) -> Result {
 		let nodes = BsxNode::parse_document(text, &self.config)?;
+		// xml resolves nothing: every element is markup as written
+		if self.config.is_xml() {
+			BsxNode::spawn_markup(&nodes, entity);
+			return Ok(());
+		}
 		// snapshot the BSX-template registry so `<path::to::X>` resolves mid-build.
 		let registry = entity
 			.world_scope(|world| {
@@ -65,10 +78,15 @@ impl NodeParser for BsxParser {
 		let config = match media_type {
 			MediaType::Bsx => BsxParseConfig::bsx(),
 			MediaType::Html => BsxParseConfig::html(),
+			MediaType::Xml => BsxParseConfig::xml(),
 			other => {
 				return Err(ParseError::UnsupportedType {
 					unsupported: other,
-					supported: vec![MediaType::Bsx, MediaType::Html],
+					supported: vec![
+						MediaType::Bsx,
+						MediaType::Html,
+						MediaType::Xml,
+					],
 				});
 			}
 		};

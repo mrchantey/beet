@@ -19,10 +19,6 @@ mod mermaid;
 #[cfg(feature = "mermaid")]
 pub use mermaid::*;
 mod node_parser;
-#[cfg(feature = "ooxml")]
-mod ooxml;
-#[cfg(feature = "ooxml")]
-pub use ooxml::*;
 mod parse_plugin;
 mod plaintext;
 mod span_tracker;

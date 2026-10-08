@@ -31,9 +31,6 @@ mod store;
 #[cfg(feature = "action")]
 mod actions;
 mod net_plugin;
-// Office Open XML: Word files, workbooks and slide decks over `ooxmlsdk`.
-#[cfg(feature = "ooxml")]
-mod ooxml;
 #[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "std")]
@@ -107,8 +104,6 @@ pub mod prelude {
 	#[cfg(feature = "mdns")]
 	pub use crate::mdns::*;
 	pub use crate::net_plugin::*;
-	#[cfg(feature = "ooxml")]
-	pub use crate::ooxml::*;
 	#[cfg(feature = "vault")]
 	pub use crate::secrets::*;
 	pub use crate::server::*;

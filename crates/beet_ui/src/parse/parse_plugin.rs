@@ -14,6 +14,7 @@
 //! the world on every tick, so latency climbs as routes accumulate their cached
 //! trees. Only a realtime app driven by the main loop wants per-frame repaint,
 //! and it opts in with [`RealtimeParsePlugin`].
+use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Registers the [`PostParseTree`] schedule for on-demand runs.
@@ -33,6 +34,14 @@ impl Plugin for ParsePlugin {
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]
 		app.init_plugin::<crate::prelude::BsxDefaultsPlugin>();
+		// the cell addresses every parsed document's tables carry
+		app.register_type::<TableCellAddress>()
+			.register_type::<SheetCellAddress>()
+			.register_type::<CellLocked>()
+			.register_type::<CellFormula>()
+			.register_type::<CoveredBy>();
+		#[cfg(feature = "ooxml")]
+		app.init_plugin::<crate::prelude::OoxmlPlugin>();
 	}
 }
 

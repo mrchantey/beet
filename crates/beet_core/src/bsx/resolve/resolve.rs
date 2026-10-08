@@ -238,7 +238,8 @@ fn build_node_at(
 	}
 }
 
-/// Apply a text/expr/comment/doctype leaf onto `cx.entity`.
+/// Apply a text, expr, comment, doctype, CDATA or processing instruction
+/// leaf onto `cx.entity`.
 fn apply_leaf(
 	node: &BsxNode,
 	refs: &RefBindings,
@@ -264,6 +265,13 @@ fn apply_leaf(
 		}
 		BsxNode::Doctype(value) => {
 			cx.entity.insert(Doctype::new(value.clone()));
+		}
+		BsxNode::CData(content) => {
+			cx.entity.insert(CData::new(content.clone()));
+		}
+		BsxNode::ProcessingInstruction(content) => {
+			cx.entity
+				.insert(ProcessingInstruction::new(content.clone()));
 		}
 		BsxNode::Element(_) => unreachable!("handled before apply_leaf"),
 	}

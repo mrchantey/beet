@@ -30,6 +30,10 @@ impl OoxmlNamespace {
 	/// `r:embed`.
 	pub const RELATIONSHIPS: &str =
 		"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+	/// SpreadsheetML, a workbook's sheets, cells, styles and shared strings,
+	/// written unprefixed: `worksheet`, `c`, `si`.
+	pub const SPREADSHEET: &str =
+		"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 	/// Markup compatibility, `mc:`: `mc:AlternateContent`, a newer form and
 	/// its fallback.
 	pub const COMPATIBILITY: &str =

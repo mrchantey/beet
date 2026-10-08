@@ -69,11 +69,12 @@ pub(crate) async fn ServeBlobsHandler(
 			|entity, stores| stores.get(entity).cloned(),
 		)
 		.await??;
+	// an absent capture is the mount itself, its store's root
 	let path = cx
 		.input
 		.get_params(STORE_PATH_PARAM)
 		.map(|segments| RelPath::from_segments(segments))
-		.unwrap_or_else(|| RelPath::from(cx.input.path()));
+		.unwrap_or_default();
 	// the listing endpoint an `HttpStore` reads the mount's keys through
 	#[cfg(feature = "json")]
 	if cx.input.has_param(HttpStore::LIST_PARAM) {

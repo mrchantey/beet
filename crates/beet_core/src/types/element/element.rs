@@ -2,9 +2,10 @@
 //! macro, the BSX parser, serde) and read by the renderers.
 //!
 //! An [`Element`] is a single XML node (`div`, `span`, …); its
-//! [`Attribute`](crate::prelude::Attribute)s are related entities. [`Comment`]
-//! and [`Doctype`] are the sibling node kinds. These are pure data: rendering
-//! them to HTML or charcell lives in `beet_ui`.
+//! [`Attribute`](crate::prelude::Attribute)s are related entities. [`Comment`],
+//! [`Doctype`], [`CData`] and [`ProcessingInstruction`] are the sibling node
+//! kinds. These are pure data: rendering them to HTML or charcell lives in
+//! `beet_ui`.
 use crate::prelude::*;
 #[cfg(feature = "tokens")]
 use beet_core_macros::ToTokens;
@@ -66,7 +67,8 @@ impl Element {
 /// `<!DOCTYPE html>` says which nodes it means rather than open-coding the
 /// pair. Used by layout (a comment has no box) and by control flow (a comment
 /// is not a step).
-pub type Punctuation = Or<(With<Comment>, With<Doctype>)>;
+pub type Punctuation =
+	Or<(With<Comment>, With<Doctype>, With<ProcessingInstruction>)>;
 
 /// A comment node. The inner string is the comment content excluding the
 /// `<!--` and `-->` delimiters.
@@ -116,4 +118,61 @@ pub struct Doctype(pub SmolStr);
 impl Doctype {
 	/// Construct a doctype from its value (ie `"html"`).
 	pub fn new(value: impl Into<SmolStr>) -> Self { Self(value.into()) }
+}
+
+/// A CDATA section, `<![CDATA[..]]>`: character data written unescaped. The
+/// inner string is its content excluding the delimiters, and a reader reads
+/// it as text.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[component(immutable)]
+pub struct CData(pub String);
+
+impl CData {
+	/// Construct a CDATA section from its (delimiter-free) content.
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+}
+
+/// A processing instruction, `<?target data?>`, ie the XML declaration
+/// `<?xml version="1.0"?>`. The inner string is its content excluding the
+/// delimiters, as written.
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Deref,
+	Reflect,
+	Component,
+)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+#[component(immutable)]
+pub struct ProcessingInstruction(pub String);
+
+impl ProcessingInstruction {
+	/// Construct a processing instruction from its (delimiter-free) content.
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+
+	/// The target, the first word, ie `xml`.
+	pub fn target(&self) -> &str {
+		self.0.split_whitespace().next().unwrap_or_default()
+	}
 }

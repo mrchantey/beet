@@ -6,20 +6,88 @@ use beet_core::prelude::*;
 ///
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
 /// back into CommonMark-compatible markdown. Supports headings, emphasis,
-/// strong, links, images, lists, code blocks, blockquotes, thematic
-/// breaks, inline code, GFM tables, and optional expression rendering. A
-/// `<mark>`, and a `<span>` carrying a `style`, pass through as inline HTML,
-/// since markdown has no syntax for what they signal.
+/// strong, links, images, lists, task list checkboxes, code blocks,
+/// blockquotes, thematic breaks, inline code, GFM tables with their captions,
+/// and optional expression rendering. A `<mark>`, and a `<span>` carrying a
+/// `style`, pass through as inline HTML, since markdown has no syntax for what
+/// they signal. A root carrying [`PageMeta`] leads with the YAML frontmatter
+/// declaring it, so a parsed markdown file renders its metadata back and a
+/// Word file its core properties.
+///
+/// A tree read from a richer format reads as a person would write it: an
+/// inline wrapper's edge whitespace sits outside its marker, two adjacent
+/// wrappers of one look read as one, an empty wrapper or block writes
+/// nothing, and a table nested in a cell, which GFM cannot hold, follows its
+/// host, named in the cell.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarkdownRenderer {
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
 	render_expressions: bool,
-	/// Stack of active inline wrappers to emit on leave.
-	inline_stack: Vec<InlineWrapper>,
+	/// The inline elements open in the walk, innermost last, each with the
+	/// markers it writes.
+	inline_stack: Vec<InlineMark>,
+	/// Inline wrappers opened but not yet written: written before the first
+	/// words inside them, after their leading whitespace, and dropped when
+	/// nothing is.
+	pending_opens: Vec<InlineMark>,
+	/// Inline wrappers closed but not yet written: written before whatever
+	/// follows, after hoisting the trailing whitespace, and cancelled when
+	/// the same wrapper opens again at once.
+	pending_closes: Vec<InlineMark>,
+	/// The blocks open in the walk, innermost last, so an empty one is
+	/// unwritten.
+	blocks: Vec<BlockStart>,
 	/// The tables being collected, innermost last.
 	tables: Vec<TableCapture>,
+	/// A checkbox was just written, so the words after it are spaced from
+	/// it unless they bring their own space.
+	after_box: bool,
+	/// A block's prefix was just written, so the words after it lose their
+	/// leading whitespace.
+	at_block_start: bool,
+}
+
+/// An inline element's markers, ie `**` and `**` for `<strong>`; a wrapper
+/// that signals nothing, ie an unstyled `<span>`, writes none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct InlineMark {
+	wrapper: InlineWrapper,
+	open: String,
+	close: String,
+}
+
+impl InlineMark {
+	fn new(
+		wrapper: InlineWrapper,
+		open: impl Into<String>,
+		close: impl Into<String>,
+	) -> Self {
+		Self {
+			wrapper,
+			open: open.into(),
+			close: close.into(),
+		}
+	}
+
+	/// A wrapper written by its own handling, not deferred.
+	fn eager(wrapper: InlineWrapper) -> Self { Self::new(wrapper, "", "") }
+
+	fn is_deferred(&self) -> bool { !self.open.is_empty() }
+}
+
+/// Where a block began, to unwrite it when it holds nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BlockStart {
+	/// The buffer before its separator.
+	start: usize,
+	/// The buffer after its prefix, ie `## `.
+	content: usize,
+	/// Whether a separator was pending before it.
+	needed_separator: bool,
+	/// Whether the buffer ended a line before it.
+	trailing_newline: bool,
 }
 
 /// A table being collected, written as GFM when it closes, since a row is
@@ -32,6 +100,12 @@ struct TableCapture {
 	rows: Vec<Vec<String>>,
 	/// Where the open cell's text starts in the buffer, and its column span.
 	cell: Option<(usize, usize)>,
+	/// Where the open caption starts in the buffer.
+	caption_start: Option<usize>,
+	/// The caption, written before the table.
+	caption: String,
+	/// The tables nested in this one's cells, written after it.
+	nested: Vec<String>,
 }
 
 impl TableCapture {
@@ -47,26 +121,49 @@ impl TableCapture {
 	}
 
 	/// The table as GFM, its first row the header, every row padded to the
-	/// widest.
+	/// widest, its caption before it and its nested tables after.
 	fn to_markdown(&self) -> String {
 		let width = self.rows.iter().map(Vec::len).max().unwrap_or(0);
-		if width == 0 {
-			return String::new();
+		let mut out = String::new();
+		if !self.caption.is_empty() {
+			out.push_str(&self.caption);
+			out.push_str("\n\n");
 		}
-		let line = |row: &Vec<String>| {
-			let cells = (0..width)
-				.map(|index| {
-					row.get(index).map(String::as_str).unwrap_or_default()
-				})
-				.collect::<Vec<_>>();
-			format!("| {} |\n", cells.join(" | "))
-		};
-		let mut out = line(&self.rows[0]);
-		out.push_str(&format!("|{}\n", "---|".repeat(width)));
-		for row in &self.rows[1..] {
-			out.push_str(&line(row));
+		if width > 0 {
+			let line = |row: &Vec<String>| {
+				let cells = (0..width)
+					.map(|index| {
+						row.get(index).map(String::as_str).unwrap_or_default()
+					})
+					.collect::<Vec<_>>();
+				format!("| {} |\n", cells.join(" | "))
+			};
+			out.push_str(&line(&self.rows[0]));
+			out.push_str(&format!("|{}\n", "---|".repeat(width)));
+			for row in &self.rows[1..] {
+				out.push_str(&line(row));
+			}
+		}
+		for nested in &self.nested {
+			out.push('\n');
+			out.push_str(nested);
 		}
 		out
+	}
+
+	/// What a cell holding this table shows in its place: its caption's
+	/// words, a comment's without its markers, ie `[table t5]`.
+	fn placeholder(&self) -> String {
+		let named = self
+			.caption
+			.trim()
+			.trim_start_matches("<!--")
+			.trim_end_matches("-->")
+			.trim();
+		match named.is_empty() {
+			true => "[table]".into(),
+			false => format!("[table {named}]"),
+		}
 	}
 }
 
@@ -82,8 +179,10 @@ enum InlineWrapper {
 	Sup,
 	/// Subscript.
 	Sub,
-	/// Inline HTML, closed by this tag.
-	Html(&'static str),
+	/// Inline HTML, ie `<mark>`.
+	Html,
+	/// An element that writes nothing, ie an unstyled `<span>`.
+	Transparent,
 }
 
 impl Default for MarkdownRenderer {
@@ -91,12 +190,21 @@ impl Default for MarkdownRenderer {
 }
 
 impl MarkdownRenderer {
+	/// The blocks unwritten when they hold nothing.
+	const SUPPRESSIBLE: &[&str] =
+		&["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"];
+
 	pub fn new() -> Self {
 		Self {
 			state: TextRenderState::new(),
 			render_expressions: false,
 			inline_stack: Vec::new(),
+			pending_opens: Vec::new(),
+			pending_closes: Vec::new(),
+			blocks: Vec::new(),
 			tables: Vec::new(),
+			after_box: false,
+			at_block_start: false,
 		}
 	}
 
@@ -125,22 +233,153 @@ impl MarkdownRenderer {
 
 	fn push_char(&mut self, ch: char) { self.state.push_raw_char(ch); }
 
+	/// Opens an inline wrapper, deferred until words are written inside it,
+	/// or continuing the identical wrapper that just closed.
+	fn open_inline(&mut self, mark: InlineMark) {
+		if self.pending_closes.last() == Some(&mark) {
+			self.pending_closes.pop();
+			self.inline_stack.push(mark);
+			return;
+		}
+		self.flush_closes();
+		self.pending_opens.push(mark.clone());
+		self.inline_stack.push(mark);
+	}
+
+	/// Closes the innermost inline element: an unwritten one vanishes, a
+	/// written one closes once whatever follows is known.
+	fn close_inline(&mut self, wrapper: InlineWrapper) -> Option<InlineMark> {
+		let position = self
+			.inline_stack
+			.iter()
+			.rposition(|mark| mark.wrapper == wrapper)?;
+		let mark = self.inline_stack.remove(position);
+		if !mark.is_deferred() {
+			return Some(mark);
+		}
+		match self.pending_opens.last() == Some(&mark) {
+			true => {
+				self.pending_opens.pop();
+			}
+			false => self.pending_closes.push(mark.clone()),
+		}
+		Some(mark)
+	}
+
+	/// Writes the closes pending, each wrapper's trailing whitespace moved
+	/// after its marker, so `**Date **` reads `**Date** `.
+	fn flush_closes(&mut self) {
+		for mark in core::mem::take(&mut self.pending_closes) {
+			let buffer = &self.state.buffer;
+			let kept = buffer.trim_end_matches([' ', '\t', '\u{a0}']).len();
+			let trailing = self.state.buffer.split_off(kept);
+			self.push_str(&mark.close);
+			self.push_str(&trailing);
+		}
+	}
+
+	/// Writes every pending marker before something that is no words, ie a
+	/// line break, an image or a block.
+	fn flush_inline(&mut self) {
+		self.after_box = false;
+		self.at_block_start = false;
+		self.flush_closes();
+		for mark in core::mem::take(&mut self.pending_opens) {
+			self.push_str(&mark.open);
+		}
+	}
+
+	/// Writes words, the pending opens after their leading whitespace and
+	/// before the rest, whitespace alone leaving them pending.
+	fn push_words(&mut self, text: &str) {
+		let text = match self.at_block_start {
+			true => text.trim_start(),
+			false => text,
+		};
+		if text.is_empty() {
+			return;
+		}
+		self.at_block_start = false;
+		if core::mem::take(&mut self.after_box)
+			&& !text.starts_with(char::is_whitespace)
+		{
+			self.push_char(' ');
+		}
+		self.flush_closes();
+		if self.pending_opens.is_empty() {
+			self.push_str(text);
+			return;
+		}
+		let rest = text.trim_start_matches([' ', '\t', '\u{a0}', '\n']);
+		let lead = &text[..text.len() - rest.len()];
+		self.push_str(lead);
+		if rest.is_empty() {
+			return;
+		}
+		for mark in core::mem::take(&mut self.pending_opens) {
+			self.push_str(&mark.open);
+		}
+		self.push_str(rest);
+	}
+
 	/// Opens an inline HTML element, its `style` kept: `mark` always, any
 	/// other only when styled, since an unstyled `span` signals nothing.
 	fn open_html(&mut self, view: &ElementView, close: &'static str) {
 		let style = view.attribute_string("style");
-		match (view.tag(), style.is_empty()) {
-			("mark", true) => self.push_str("<mark>"),
-			(tag, false) => self.push_str(&format!(
-				"<{tag} style=\"{}\">",
-				style.replace('"', "&quot;")
-			)),
+		let open = match (view.tag(), style.is_empty()) {
+			("mark", true) => "<mark>".to_string(),
+			(tag, false) => {
+				format!("<{tag} style=\"{}\">", style.replace('"', "&quot;"))
+			}
 			_ => {
-				self.inline_stack.push(InlineWrapper::Html(""));
+				self.inline_stack
+					.push(InlineMark::eager(InlineWrapper::Transparent));
 				return;
 			}
+		};
+		self.open_inline(InlineMark::new(InlineWrapper::Html, open, close));
+	}
+
+	/// Records a suppressible block's start before its separator.
+	fn start_block(&mut self) -> BlockStart {
+		BlockStart {
+			start: self.state.buffer.len(),
+			content: self.state.buffer.len(),
+			needed_separator: self.state.needs_block_separator,
+			trailing_newline: self.state.trailing_newline,
 		}
-		self.inline_stack.push(InlineWrapper::Html(close));
+	}
+
+	/// Closes a suppressible block, unwriting it when it wrote nothing past
+	/// its prefix. Answers whether it was kept.
+	fn end_block(&mut self) -> bool {
+		self.flush_closes();
+		let Some(block) = self.blocks.pop() else {
+			return true;
+		};
+		// trailing spaces, or a line break, say nothing at a block's end
+		let kept = self
+			.state
+			.buffer
+			.trim_end_matches([' ', '\t', '\u{a0}', '\n'])
+			.len()
+			.max(block.content);
+		if kept < self.state.buffer.len() {
+			self.state.buffer.truncate(kept);
+			self.state.trailing_newline = self.state.buffer.ends_with('\n')
+				|| self.state.buffer.is_empty();
+		}
+		let empty = self
+			.state
+			.buffer
+			.get(block.content..)
+			.is_some_and(|written| written.trim().is_empty());
+		if empty {
+			self.state.buffer.truncate(block.start);
+			self.state.needs_block_separator = block.needed_separator;
+			self.state.trailing_newline = block.trailing_newline;
+		}
+		!empty
 	}
 }
 
@@ -148,6 +387,24 @@ impl NodeVisitor for MarkdownRenderer {
 	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
 		let name = view.tag();
 		let value = view.value;
+		let inline = matches!(
+			name,
+			"em" | "i"
+				| "strong" | "b"
+				| "del" | "s"
+				| "sup" | "sub"
+				| "mark" | "span"
+		);
+		// whether the block around has written nothing yet
+		let block_start = self.at_block_start;
+		if !inline {
+			self.flush_inline();
+		}
+		let block = Self::SUPPRESSIBLE
+			.contains(&name)
+			.then(|| self.start_block());
+		let is_checkbox =
+			name == "input" && view.attribute_string("type") == "checkbox";
 
 		match name {
 			// ── Headings ──
@@ -197,15 +454,20 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.in_preformatted = true;
 			}
 			"code" if self.state.in_preformatted => {
-				// fenced code block: extract language from class
-				let info = view
-					.attribute("class")
-					.and_then(|attr| match attr.value {
-						Value::Str(class) => class
-							.strip_prefix("language-")
-							.map(|lang| lang.to_string())
-							.or_else(|| Some(class.to_string())),
-						_ => None,
+				// fenced code block: the whole info string where the parser
+				// kept it, else the language from the class
+				let info = Some(view.attribute_string("data-info"))
+					.filter(|info| !info.is_empty())
+					.or_else(|| {
+						view.attribute("class").and_then(|attr| {
+							match attr.value {
+								Value::Str(class) => class
+									.strip_prefix("language-")
+									.map(|lang| lang.to_string())
+									.or_else(|| Some(class.to_string())),
+								_ => None,
+							}
+						})
 					})
 					.unwrap_or_default();
 				self.state.code_fence_info = Some(info.clone());
@@ -216,29 +478,33 @@ impl NodeVisitor for MarkdownRenderer {
 			"code" => {
 				// inline code
 				self.push_char('`');
-				self.inline_stack.push(InlineWrapper::InlineCode);
+				self.inline_stack
+					.push(InlineMark::eager(InlineWrapper::InlineCode));
 			}
 
 			// ── Inline formatting ──
 			"em" | "i" => {
-				self.push_char('*');
-				self.inline_stack.push(InlineWrapper::Em);
+				self.open_inline(InlineMark::new(InlineWrapper::Em, "*", "*"));
 			}
 			"strong" | "b" => {
-				self.push_str("**");
-				self.inline_stack.push(InlineWrapper::Strong);
+				self.open_inline(InlineMark::new(
+					InlineWrapper::Strong,
+					"**",
+					"**",
+				));
 			}
 			"del" | "s" => {
-				self.push_str("~~");
-				self.inline_stack.push(InlineWrapper::Del);
+				self.open_inline(InlineMark::new(
+					InlineWrapper::Del,
+					"~~",
+					"~~",
+				));
 			}
 			"sup" => {
-				self.push_char('^');
-				self.inline_stack.push(InlineWrapper::Sup);
+				self.open_inline(InlineMark::new(InlineWrapper::Sup, "^", "^"));
 			}
 			"sub" => {
-				self.push_char('~');
-				self.inline_stack.push(InlineWrapper::Sub);
+				self.open_inline(InlineMark::new(InlineWrapper::Sub, "~", "~"));
 			}
 
 			// ── Links ──
@@ -246,7 +512,8 @@ impl NodeVisitor for MarkdownRenderer {
 				let href = view.attribute_string("href");
 				self.state.pending_link_href = Some(href);
 				self.push_char('[');
-				self.inline_stack.push(InlineWrapper::Link);
+				self.inline_stack
+					.push(InlineMark::eager(InlineWrapper::Link));
 			}
 
 			// ── Images (void element) ──
@@ -254,6 +521,14 @@ impl NodeVisitor for MarkdownRenderer {
 				let src = view.attribute_string("src");
 				let alt = view.attribute_string("alt");
 				self.push_str(&format!("![{}]({})", alt, src));
+			}
+
+			// ── A checkbox, as a task list writes it ──
+			"input" if is_checkbox => {
+				let checked = matches!(value, Some(Value::Bool(true)))
+					|| view.attribute("checked").is_some();
+				self.push_str(if checked { "[x]" } else { "[ ]" });
+				self.after_box = true;
 			}
 
 			// ── Thematic break ──
@@ -264,10 +539,11 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.needs_block_separator = true;
 			}
 
-			// ── Line break ──
-			"br" => {
+			// ── Line break, none before a block's first words ──
+			"br" if !block_start => {
 				self.push_str("  \n");
 			}
+			"br" => {}
 
 			// ── Inline HTML ──
 			"mark" => self.open_html(&view, "</mark>"),
@@ -275,11 +551,21 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── Tables, collected and written on leave ──
 			"table" => {
-				self.state.ensure_block_separator();
+				// a table in a cell is GFM's to hold nowhere, so it follows
+				// its host
+				if self.tables.last().is_none_or(|table| table.cell.is_none()) {
+					self.state.ensure_block_separator();
+				}
 				self.tables.push(TableCapture {
 					start: self.state.buffer.len(),
 					..default()
 				});
+			}
+			"caption" => {
+				let start = self.state.buffer.len();
+				if let Some(table) = self.tables.last_mut() {
+					table.caption_start = Some(start);
+				}
 			}
 			"tr" => {
 				if let Some(table) = self.tables.last_mut() {
@@ -306,24 +592,68 @@ impl NodeVisitor for MarkdownRenderer {
 				}
 			}
 		}
-		// a control's typed value is its text
-		if let Some(value) = value {
+		if let Some(mut block) = block {
+			block.content = self.state.buffer.len();
+			self.blocks.push(block);
+			self.at_block_start = true;
+		}
+		// a control's typed value is its text, a checkbox's its box
+		if let Some(value) = value
+			&& !is_checkbox
+		{
 			self.visit_value(cx, value);
 		}
 	}
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
 		let name = element.tag();
+		let inline = matches!(
+			name,
+			"em" | "i"
+				| "strong" | "b"
+				| "del" | "s"
+				| "sup" | "sub"
+				| "mark" | "span"
+		);
+		if inline {
+			let wrapper = match name {
+				"em" | "i" => InlineWrapper::Em,
+				"strong" | "b" => InlineWrapper::Strong,
+				"del" | "s" => InlineWrapper::Del,
+				"sup" => InlineWrapper::Sup,
+				"sub" => InlineWrapper::Sub,
+				"mark" => InlineWrapper::Html,
+				_ => match self.inline_stack.last() {
+					Some(mark)
+						if mark.wrapper == InlineWrapper::Transparent =>
+					{
+						InlineWrapper::Transparent
+					}
+					_ => InlineWrapper::Html,
+				},
+			};
+			self.close_inline(wrapper);
+			return;
+		}
+		let kept = match Self::SUPPRESSIBLE.contains(&name) {
+			true => self.end_block(),
+			// a void element wrote all it writes on its visit
+			false if matches!(name, "input" | "img" | "br" | "hr") => true,
+			false => {
+				self.flush_inline();
+				true
+			}
+		};
 
 		match name {
 			// ── Headings ──
-			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
+			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" if kept => {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
 			}
 
 			// ── Paragraph ──
-			"p" => {
+			"p" if kept => {
 				self.state.ensure_newline();
 				self.state.needs_block_separator = true;
 			}
@@ -344,7 +674,7 @@ impl NodeVisitor for MarkdownRenderer {
 					self.state.needs_block_separator = true;
 				}
 			}
-			"li" => {
+			"li" if kept => {
 				self.state.ensure_newline();
 			}
 
@@ -356,11 +686,7 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.code_fence_info = None;
 			}
 			"code" => {
-				if let Some(InlineWrapper::InlineCode) =
-					self.inline_stack.last()
-				{
-					self.inline_stack.pop();
-				}
+				self.close_inline(InlineWrapper::InlineCode);
 				self.push_char('`');
 			}
 			"pre" => {
@@ -368,43 +694,9 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.needs_block_separator = true;
 			}
 
-			// ── Inline formatting ──
-			"em" | "i" => {
-				if let Some(InlineWrapper::Em) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
-				self.push_char('*');
-			}
-			"strong" | "b" => {
-				if let Some(InlineWrapper::Strong) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
-				self.push_str("**");
-			}
-			"del" | "s" => {
-				if let Some(InlineWrapper::Del) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
-				self.push_str("~~");
-			}
-			"sup" => {
-				if let Some(InlineWrapper::Sup) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
-				self.push_char('^');
-			}
-			"sub" => {
-				if let Some(InlineWrapper::Sub) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
-				self.push_char('~');
-			}
-
 			// ── Links ──
 			"a" => {
-				if let Some(InlineWrapper::Link) = self.inline_stack.last() {
-					self.inline_stack.pop();
-				}
+				self.close_inline(InlineWrapper::Link);
 				let href =
 					self.state.pending_link_href.take().unwrap_or_default();
 				self.push_str("](");
@@ -412,18 +704,21 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_char(')');
 			}
 
-			// ── Inline HTML ──
-			"mark" | "span" => {
-				if let Some(InlineWrapper::Html(close)) =
-					self.inline_stack.last()
-				{
-					let close = *close;
-					self.inline_stack.pop();
-					self.push_str(close);
+			// ── Tables ──
+			"caption" => {
+				let Some(start) = self
+					.tables
+					.last_mut()
+					.and_then(|table| table.caption_start.take())
+				else {
+					return;
+				};
+				let caption = self.state.take_from(start).trim().to_string();
+				self.state.needs_block_separator = false;
+				if let Some(table) = self.tables.last_mut() {
+					table.caption = caption;
 				}
 			}
-
-			// ── Tables ──
 			"th" | "td" => {
 				let Some((start, span)) =
 					self.tables.last_mut().and_then(|table| table.cell.take())
@@ -448,14 +743,23 @@ impl NodeVisitor for MarkdownRenderer {
 				};
 				// whatever the table held outside its cells is dropped
 				self.state.take_from(table.start);
-				self.push_str(&table.to_markdown());
-				self.state.ensure_newline();
-				self.state.needs_block_separator = true;
+				match self.tables.last_mut() {
+					// nested in a cell: named there, written after its host
+					Some(host) if host.cell.is_some() => {
+						host.nested.push(table.to_markdown());
+						self.push_str(&table.placeholder());
+					}
+					_ => {
+						self.push_str(&table.to_markdown());
+						self.state.ensure_newline();
+						self.state.needs_block_separator = true;
+					}
+				}
 			}
 			"tr" | "thead" | "tbody" | "tfoot" => {}
 
 			// ── Images (void element, fully handled in visit_element) ──
-			"img" => {}
+			"img" | "input" => {}
 
 			// ── Void/self-closing ──
 			"hr" | "br" => {
@@ -463,7 +767,7 @@ impl NodeVisitor for MarkdownRenderer {
 			}
 
 			_ => {
-				if self.state.is_block_element(name) {
+				if kept && self.state.is_block_element(name) {
 					self.state.ensure_newline();
 					self.state.needs_block_separator = true;
 				}
@@ -473,10 +777,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
 		let text = value.to_string();
-		if text.is_empty() {
-			return;
-		}
-		self.push_str(&text);
+		self.push_words(&text);
 	}
 
 	fn visit_expression(
@@ -485,6 +786,7 @@ impl NodeVisitor for MarkdownRenderer {
 		expression: &Expression,
 	) {
 		if self.render_expressions {
+			self.flush_inline();
 			self.push_char('{');
 			self.push_str(&expression.0);
 			self.push_char('}');
@@ -492,6 +794,7 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
+		self.flush_inline();
 		self.state.ensure_block_separator();
 		self.push_str("<!--");
 		self.push_str(comment);
@@ -507,7 +810,20 @@ impl NodeRenderer for MarkdownRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Markdown])?;
+		// a document's metadata leads it as the frontmatter that declares it
+		#[cfg(feature = "bsx")]
+		if let Some(block) = cx
+			.world
+			.get::<PageMeta>(cx.entity)
+			.map(Frontmatter::write)
+			.transpose()?
+			.flatten()
+		{
+			self.push_str(&block);
+			self.state.needs_block_separator = true;
+		}
 		cx.walk(self);
+		self.flush_inline();
 		MediaBytes::new_string(
 			MediaType::Markdown,
 			core::mem::take(&mut self.state.buffer),
@@ -634,6 +950,29 @@ mod test {
 			.xpect_eq("# Title\n\nParagraph");
 	}
 
+	/// A root's metadata leads its render as the frontmatter declaring it.
+	#[beet_core::test]
+	fn renders_page_meta_as_frontmatter() {
+		let mut world = World::new();
+		let entity = world
+			.spawn(PageMeta {
+				title: Some("Plan".into()),
+				..default()
+			})
+			.id();
+		MarkdownParser::new()
+			.parse(ParseContext::new(
+				&mut world.entity_mut(entity),
+				&MediaBytes::new_markdown("# Plan"),
+			))
+			.unwrap();
+		MarkdownRenderer::new()
+			.render(&mut RenderContext::new(entity, &mut world))
+			.unwrap()
+			.to_string()
+			.xpect_eq("---\ntitle: Plan\n---\n\n# Plan\n");
+	}
+
 	#[beet_core::test]
 	fn render_comment() {
 		roundtrip("<!-- hello -->")
@@ -697,6 +1036,46 @@ mod test {
 		)
 		.trim()
 		.xpect_eq("<mark>due</mark> plain <span style=\"color: #FF0000\">red</span>");
+	}
+
+	/// A tree read from a richer format reads as a person writes markdown:
+	/// edge whitespace outside its emphasis, two wrappers of one look as one,
+	/// an empty wrapper or block unwritten.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn writes_inline_looks_as_a_person_would() {
+		render_unescaped(
+			"<p><strong>Date </strong>due<em> soon</em></p>\
+			 <p><mark>(Insert</mark><mark> name)</mark> <strong>a</strong><strong>b</strong><strong></strong></p>\
+			 <p></p><h2> </h2><p>last<br></p>",
+		)
+		.xpect_eq("**Date** due *soon*\n\n<mark>(Insert name)</mark> **ab**\n\nlast\n");
+	}
+
+	/// A table's caption sits above it, and a table nested in a cell, which
+	/// GFM cannot hold, is named in the cell and follows its host.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn writes_captions_and_nested_tables() {
+		render_unescaped(
+			"<table><caption><!-- t1 --></caption><tr><td>a</td><td>\
+			 <table><caption><!-- t2 --></caption><tr><td>x</td></tr></table>\
+			 </td></tr></table>",
+		)
+		.xpect_eq(
+			"<!-- t1 -->\n\n| a | [table t2] |\n|---|---|\n\n<!-- t2 -->\n\n| x |\n|---|\n",
+		);
+	}
+
+	/// A checkbox reads as a task list writes it.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn writes_checkboxes() {
+		roundtrip("- [x] done\n- [ ] not yet")
+			.trim()
+			.xpect_eq("- [x] done\n- [ ] not yet");
+		render_unescaped("<p><input type=\"checkbox\"> Surveys</p>")
+			.xpect_eq("[ ] Surveys\n");
 	}
 
 	#[beet_core::test]

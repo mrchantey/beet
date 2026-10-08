@@ -267,14 +267,13 @@ flate2 = { version = "1", default-features = false, features = ["rust_backend"] 
 # spread a large object over every core.
 zstd = { version = "0.14", default-features = false, features = ["zstdmt"] }
 ruzstd = { version = "0.9", default-features = false, features = ["std", "hash"] }
-# Office Open XML (`beet_net`'s `ooxml`): Word files, workbooks and slide decks
-# as typed parts, round-trip tested across thousands of files. Pinned exactly,
-# since the crate is pre-1.0 and its generated api moves between releases;
-# `parts` is the package read and write, everything else it offers stays off.
+# Office Open XML (`beet_ui`'s `ooxml`): the package of a Word file, a workbook
+# or a slide deck, its parts and relationships, round-trip tested across
+# thousands of files. Pinned exactly, since the crate is pre-1.0 and its
+# generated api moves between releases; `parts` is the package read and write,
+# everything else it offers stays off, every part read by beet's own markup
+# parser.
 ooxmlsdk = { version = "=0.13.1", default-features = false, features = ["parts"] }
-# the element tree a Word or slide part is edited through, at the version
-# `ooxmlsdk` reads with, so the graph carries one
-quick-xml = "0.41"
 # brotli, the encoding a static host serves a wasm artifact under, so `build-wasm`
 # reports the size the wire carries. Pure rust; default-features off drops the
 # C FFI exports, `std` is the `Write`-based encoder.
@@ -520,10 +519,10 @@ secure = ["rustls-tls", "beet_net/secure"]
 lambda = ["rustls-tls", "beet_net?/lambda"]
 aws_sdk = ["net", "beet_net?/aws_sdk","beet_infra?/aws_sdk","beet_router?/aws_sdk"]
 deploy = ["infra", "beet_infra?/deploy"]
-# Office Open XML: Word files, workbooks and slide decks read and filled
-# (`WordDocument`, `Workbook`, `SlideDeck`), Word files and decks parsed as
-# media (`OoxmlParser`), and the `<OoxmlCells/>` dump.
-ooxml = ["net", "beet_net?/ooxml", "beet_ui?/ooxml"]
+# Office Open XML: Word files, workbooks and slide decks as media, each read
+# into the one document tree and written back by re-projection
+# (`OoxmlParser`, `OoxmlRenderer`).
+ooxml = ["ui", "beet_ui?/ooxml"]
 tungstenite = ["net", "beet_net?/tungstenite"]
 webdriver = ["net", "beet_net?/webdriver"]
 ureq = ["net", "beet_net?/ureq"]

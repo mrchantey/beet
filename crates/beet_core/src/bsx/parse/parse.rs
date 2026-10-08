@@ -1,9 +1,10 @@
 //! The hand-written recursive-descent markup parser.
 //!
-//! One grammar: BSX with its extra surface enabled, HTML with it disabled.
-//! [`BsxParseConfig::bsx`] gates the value grammar, `{..}` blocks, and
-//! `bx:` directives, so the HTML-only mode is a real, tested configuration. The
-//! parser produces a [`BsxNode`] tree; resolution into the world is
+//! One grammar in three dialects: BSX with its extra surface enabled, HTML with
+//! it disabled, and XML, which is HTML's markup read as written.
+//! [`BsxParseConfig`] gates the value grammar, `{..}` blocks, and `bx:`
+//! directives, so the HTML-only and XML modes are real, tested configurations.
+//! The parser produces a [`BsxNode`] tree; resolution into the world is
 //! [`crate::bsx::resolve`].
 
 use super::ast::*;
@@ -11,24 +12,54 @@ use super::cursor::Cursor;
 use super::value::*;
 use crate::prelude::*;
 
-/// Configuration toggling the BSX-only grammar surface.
-#[derive(Debug, Clone)]
+/// Configuration selecting the dialect a markup source is read in.
+#[derive(Debug, Default, Clone)]
 pub struct BsxParseConfig {
-	/// When `true`, the value grammar (`{..}` literals/references, bare spreads)
-	/// and `bx:` directives are parsed. When `false`, the parser accepts exactly
-	/// HTML: lowercase tags, string attributes, text, comments.
-	pub bsx: bool,
+	/// The dialect.
+	pub dialect: MarkupDialect,
 }
 
-impl Default for BsxParseConfig {
-	fn default() -> Self { Self { bsx: true } }
+/// The dialects of the one markup grammar.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum MarkupDialect {
+	/// The full BSX grammar: the value grammar (`{..}` literals and
+	/// references, bare spreads) and `bx:` directives.
+	#[default]
+	Bsx,
+	/// HTML: the BSX surface disabled, so lowercase tags, string attributes,
+	/// text and comments, with void and raw text elements as HTML has them.
+	Html,
+	/// XML: HTML's markup read exactly as written. Tags keep their case and
+	/// may carry a `.`, no element is void or raw text, whitespace is kept
+	/// wherever it falls, a literal tab or line break in an attribute value
+	/// is the space the specification normalizes it to, and a closing tag
+	/// must close the element it names.
+	Xml,
 }
 
 impl BsxParseConfig {
 	/// The full BSX grammar.
-	pub fn bsx() -> Self { Self { bsx: true } }
+	pub fn bsx() -> Self {
+		Self {
+			dialect: MarkupDialect::Bsx,
+		}
+	}
 	/// HTML-only: the BSX surface disabled.
-	pub fn html() -> Self { Self { bsx: false } }
+	pub fn html() -> Self {
+		Self {
+			dialect: MarkupDialect::Html,
+		}
+	}
+	/// XML: markup as written, see [`MarkupDialect::Xml`].
+	pub fn xml() -> Self {
+		Self {
+			dialect: MarkupDialect::Xml,
+		}
+	}
+	/// Whether the BSX surface is enabled.
+	pub fn is_bsx(&self) -> bool { self.dialect == MarkupDialect::Bsx }
+	/// Whether markup is read as XML.
+	pub fn is_xml(&self) -> bool { self.dialect == MarkupDialect::Xml }
 }
 
 /// HTML void elements that never have a closing tag.
@@ -46,9 +77,21 @@ impl BsxNode {
 		source: &str,
 		config: &BsxParseConfig,
 	) -> Result<Vec<BsxNode>> {
+		// a byte order mark announces the encoding, it is no content
+		let source = source.strip_prefix('\u{FEFF}').unwrap_or(source);
 		let mut cursor = Cursor::new(source);
 		let mut nodes = parse_nodes(&mut cursor, config, None)?;
-		normalize_whitespace(&mut nodes);
+		match config.is_xml() {
+			// xml keeps every character, and a stray closing tag is malformed
+			true if !cursor.is_eof() => {
+				bevybail!(
+					"a closing tag at {} closes no open element",
+					cursor.offset()
+				)
+			}
+			true => {}
+			false => normalize_whitespace(&mut nodes),
+		}
 		Ok(nodes)
 	}
 }
@@ -122,7 +165,7 @@ fn parse_nodes(
 				let mut probe = Cursor::new(cursor.rest());
 				probe.eat("</");
 				probe.skip_ws();
-				let name = probe.take_while(is_tag_char);
+				let name = probe.take_while(|ch| is_name_char(ch, config));
 				if name == tag {
 					break;
 				}
@@ -139,7 +182,8 @@ fn parse_nodes(
 	Ok(nodes)
 }
 
-/// Parse a single node: comment, doctype, element, `{..}` block, or text.
+/// Parse a single node: comment, CDATA section, processing instruction,
+/// doctype, element, `{..}` block, or text.
 fn parse_node(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
@@ -149,6 +193,20 @@ fn parse_node(
 		let content = cursor.take_until("-->");
 		cursor.eat("-->");
 		return Ok(Some(BsxNode::Comment(content.to_string())));
+	}
+	if cursor.eat("<![CDATA[") {
+		let content = cursor.take_until("]]>");
+		if !cursor.eat("]]>") {
+			bevybail!("unterminated `<![CDATA[..]]>` section");
+		}
+		return Ok(Some(BsxNode::CData(content.to_string())));
+	}
+	if cursor.eat("<?") {
+		let content = cursor.take_until("?>");
+		if !cursor.eat("?>") {
+			bevybail!("unterminated `<?..?>` processing instruction");
+		}
+		return Ok(Some(BsxNode::ProcessingInstruction(content.to_string())));
 	}
 	if cursor.starts_with("<!") {
 		cursor.eat("<!");
@@ -168,7 +226,7 @@ fn parse_node(
 		return parse_element(cursor, config).map(Some);
 	}
 	// a text-position `{..}` block, only in BSX mode.
-	if config.bsx && cursor.peek() == Some('{') {
+	if config.is_bsx() && cursor.peek() == Some('{') {
 		return parse_text_block(cursor).map(Some);
 	}
 	parse_text(cursor, config)
@@ -180,7 +238,8 @@ fn parse_text(
 	cursor: &mut Cursor,
 	config: &BsxParseConfig,
 ) -> Result<Option<BsxNode>> {
-	let text = cursor.take_while(|ch| ch != '<' && !(config.bsx && ch == '{'));
+	let text =
+		cursor.take_while(|ch| ch != '<' && !(config.is_bsx() && ch == '{'));
 	if text.is_empty() {
 		// avoid an infinite loop on a stray char we did not consume.
 		if !cursor.is_eof() {
@@ -264,7 +323,7 @@ fn parse_element(
 ) -> Result<BsxNode> {
 	cursor.eat("<");
 	cursor.skip_ws();
-	let tag = cursor.take_while(is_tag_char).to_string();
+	let tag = cursor.take_while(|ch| is_name_char(ch, config)).to_string();
 	if tag.is_empty() {
 		bevybail!("expected a tag name after `<`");
 	}
@@ -280,7 +339,8 @@ fn parse_element(
 		bevybail!("expected `>` or `/>` to close opening tag `<{tag}>`");
 	}
 
-	let void = VOID_ELEMENTS.contains(&tag.as_str());
+	// xml has no void elements: an element is empty only when written so
+	let void = !config.is_xml() && VOID_ELEMENTS.contains(&tag.as_str());
 	if self_closing || void {
 		return Ok(BsxNode::Element(BsxElement {
 			tag,
@@ -291,26 +351,33 @@ fn parse_element(
 		}));
 	}
 
-	// raw-text elements (script/style) take their content verbatim.
-	let children = if RAW_TEXT_ELEMENTS.contains(&tag.as_str()) {
-		let close = format!("</{tag}");
-		let raw = cursor.take_until(&close);
-		let mut kids = Vec::new();
-		if !raw.is_empty() {
-			kids.push(BsxNode::Text(raw.to_string()));
-		}
-		kids
-	} else {
-		parse_nodes(cursor, config, Some(&tag))?
-	};
+	// raw-text elements (script/style) take their content verbatim; xml has
+	// none, a `<script>` there being markup like any other element.
+	let children =
+		if !config.is_xml() && RAW_TEXT_ELEMENTS.contains(&tag.as_str()) {
+			let close = format!("</{tag}");
+			let raw = cursor.take_until(&close);
+			let mut kids = Vec::new();
+			if !raw.is_empty() {
+				kids.push(BsxNode::Text(raw.to_string()));
+			}
+			kids
+		} else {
+			parse_nodes(cursor, config, Some(&tag))?
+		};
 
-	// consume the matching close tag if present.
+	// consume the matching close tag if present; xml requires it.
 	if cursor.starts_with("</") {
 		cursor.eat("</");
 		cursor.skip_ws();
-		cursor.take_while(is_tag_char);
+		let closed = cursor.take_while(|ch| is_name_char(ch, config));
+		if config.is_xml() && closed != tag {
+			bevybail!("`<{tag}>` is closed by `</{closed}>`");
+		}
 		cursor.skip_ws();
 		cursor.eat(">");
+	} else if config.is_xml() {
+		bevybail!("`<{tag}>` is never closed");
 	}
 
 	Ok(BsxNode::Element(BsxElement {
@@ -338,7 +405,7 @@ fn parse_tag_literal(
 ) -> Result<(String, Option<NamedLiteral>)> {
 	let uppercase = tag.starts_with(|ch: char| ch.is_uppercase());
 	let opens_fields = matches!(cursor.peek(), Some('(') | Some('{'));
-	if !config.bsx || !uppercase || !(tag.contains("::") || opens_fields) {
+	if !config.is_bsx() || !uppercase || !(tag.contains("::") || opens_fields) {
 		return Ok((tag, None));
 	}
 	let fields = parse_named_fields(cursor)?;
@@ -363,7 +430,7 @@ fn parse_attributes(
 			Some('>') => break,
 			Some('/') if cursor.starts_with("/>") => break,
 			// a bare-position spread `<el {..}>`, BSX only.
-			Some('{') if config.bsx => {
+			Some('{') if config.is_bsx() => {
 				let inner = take_braced(cursor)?;
 				let spread = parse_spread(&mut Cursor::new(&inner))?;
 				attributes.push(BsxAttribute {
@@ -388,11 +455,13 @@ fn parse_attribute(
 	// the source position of the key, mapped onto the minted inline class for a
 	// `bx:style` directive (the markup twin of `inline_class!`'s callsite).
 	let key_offset = cursor.offset();
-	let key = cursor.take_while(is_attr_key_char).to_string();
+	let key = cursor
+		.take_while(|ch| is_attr_key_char(ch) || (config.is_xml() && ch == '.'))
+		.to_string();
 	if key.is_empty() {
 		bevybail!("expected an attribute name");
 	}
-	if !config.bsx && key.starts_with("bx:") {
+	if !config.is_bsx() && key.starts_with("bx:") {
 		bevybail!("`bx:` directives require bsx to be enabled");
 	}
 	cursor.skip_ws();
@@ -406,7 +475,7 @@ fn parse_attribute(
 	// `bx:style="prop=value .."` declares a one-off rule; its value is parsed
 	// downstream where the style types live, so keep the raw text plus the source
 	// span (for a stable inline class).
-	if config.bsx && key == "bx:style" {
+	if config.is_bsx() && key == "bx:style" {
 		let source = parse_attr_string(cursor)?;
 		return Ok(BsxAttribute {
 			key,
@@ -421,14 +490,25 @@ fn parse_attribute(
 		});
 	}
 	let value = match cursor.peek() {
-		Some('"') => AttrValue::Str(parse_attr_string(cursor)?),
-		Some('\'') => AttrValue::Str(parse_attr_string(cursor)?),
-		Some('{') if config.bsx => {
+		Some('"' | '\'') => {
+			let written = parse_attr_string(cursor)?;
+			AttrValue::Str(match config.dialect {
+				// a bsx string is authored as is, its `&&` a script's
+				MarkupDialect::Bsx => written,
+				MarkupDialect::Html => decode_entities(&written),
+				// a literal tab or line break is the space the specification
+				// normalizes it to, while a reference to one, `&#xA;`, is kept
+				MarkupDialect::Xml => {
+					decode_entities(&written.replace(['\t', '\n', '\r'], " "))
+				}
+			})
+		}
+		Some('{') if config.is_bsx() => {
 			let inner = take_braced(cursor)?;
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(&inner))?)
 		}
 		// unbraced value grammar, BSX only: `value=@doc:foo=42`, `align=Center`.
-		_ if config.bsx => {
+		_ if config.is_bsx() => {
 			let raw = cursor.take_while(is_unbraced_value_char);
 			AttrValue::Expr(parse_value_expr(&mut Cursor::new(raw))?)
 		}
@@ -489,6 +569,12 @@ pub(super) fn take_braced(cursor: &mut Cursor) -> Result<String> {
 /// Whether `ch` is valid in a tag name (incl `::` for `<path::to::X>`).
 pub(super) fn is_tag_char(ch: char) -> bool {
 	ch.is_alphanumeric() || ch == '-' || ch == '_' || ch == ':'
+}
+
+/// Whether `ch` continues an element name in `config`'s dialect: a tag char,
+/// or a `.` in xml, ie `<x14ac.dyDescent>`.
+fn is_name_char(ch: char, config: &BsxParseConfig) -> bool {
+	is_tag_char(ch) || (config.is_xml() && ch == '.')
 }
 
 /// Whether `ch` is valid in an attribute key (incl `:` for `bx:scope`).
@@ -645,6 +731,83 @@ mod test {
 			&BsxParseConfig::html(),
 		)
 		.xpect_err();
+	}
+
+	/// XML keeps every character as written: whitespace between elements,
+	/// references decoded in text and attributes, a literal line break in an
+	/// attribute normalized to a space while a referenced one is kept, no
+	/// void element, and CDATA and processing instructions as nodes.
+	#[crate::test]
+	fn xml_mode_reads_as_written() {
+		let nodes = BsxNode::parse_document(
+			"\u{FEFF}<?xml version=\"1.0\"?>\r\n<w:p a=\"x&#xA;y\" b=\"x\ny\" w14.c=\"1\">\n\t<br>one &amp; <Two/></br>\n<![CDATA[a < b]]></w:p>",
+			&BsxParseConfig::xml(),
+		)
+		.unwrap();
+		nodes[0].clone().xpect_eq(BsxNode::ProcessingInstruction(
+			"xml version=\"1.0\"".into(),
+		));
+		nodes[1].clone().xpect_eq(BsxNode::Text("\r\n".into()));
+		let BsxNode::Element(paragraph) = &nodes[2] else {
+			panic!("expected w:p");
+		};
+		paragraph.tag.clone().xpect_eq("w:p".to_string());
+		paragraph.attributes[0]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("x\ny".into()));
+		paragraph.attributes[1]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("x y".into()));
+		paragraph.attributes[2]
+			.key
+			.clone()
+			.xpect_eq("w14.c".to_string());
+		paragraph.children[0]
+			.clone()
+			.xpect_eq(BsxNode::Text("\n\t".into()));
+		let BsxNode::Element(br) = &paragraph.children[1] else {
+			panic!("expected br");
+		};
+		// `br` is no void element in xml, so it holds what it was written with
+		br.children[0]
+			.clone()
+			.xpect_eq(BsxNode::Text("one & ".into()));
+		paragraph.children[3]
+			.clone()
+			.xpect_eq(BsxNode::CData("a < b".into()));
+	}
+
+	#[crate::test]
+	fn xml_mode_refuses_malformed_closes() {
+		BsxNode::parse_document("<a><b></a>", &BsxParseConfig::xml())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`<b>` is closed by `</a>`");
+		BsxNode::parse_document("<a>", &BsxParseConfig::xml())
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("never closed");
+		BsxNode::parse_document("<a/></b>", &BsxParseConfig::xml()).xpect_err();
+	}
+
+	/// HTML decodes an attribute's references, so a renderer escaping it on
+	/// the way out round-trips it.
+	#[crate::test]
+	fn html_mode_decodes_attributes() {
+		let nodes = BsxNode::parse_document(
+			"<a href=\"?a=1&amp;b=2\">x</a>",
+			&BsxParseConfig::html(),
+		)
+		.unwrap();
+		let BsxNode::Element(link) = &nodes[0] else {
+			panic!("expected a");
+		};
+		link.attributes[0]
+			.value
+			.clone()
+			.xpect_eq(AttrValue::Str("?a=1&b=2".into()));
 	}
 
 	#[crate::test]

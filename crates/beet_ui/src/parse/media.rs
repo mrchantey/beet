@@ -1,12 +1,12 @@
 //! Media-type-driven parser that dispatches to format-specific [`NodeParser`]
 //! implementations based on the media type of [`ParseContext::bytes`].
 //!
-//! One markup parser: with the `bsx` feature, both [`MediaType::Bsx`] and
-//! [`MediaType::Html`] dispatch to the core BSX parser (HTML is the
-//! features-off subset). Enable additional parsers via feature flags:
+//! One markup parser: with the `bsx` feature, [`MediaType::Bsx`],
+//! [`MediaType::Html`] and [`MediaType::Xml`] dispatch to the core BSX parser
+//! (HTML is the features-off subset, XML that subset read as written). Enable additional parsers via feature flags:
 //! - `markdown_parser`: adds [`MarkdownParser`] support for [`MediaType::Markdown`]
-//! - `ooxml`: adds [`OoxmlParser`] support for [`MediaType::Docx`] and
-//!   [`MediaType::Pptx`], through their transcode to HTML
+//! - `ooxml`: adds [`OoxmlParser`] support for [`MediaType::Docx`],
+//!   [`MediaType::Xlsx`] and [`MediaType::Pptx`], each read into the one tree
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -93,7 +93,7 @@ impl MediaParser {
 			MediaType::Bsx => markup(BsxParseConfig::bsx())?,
 			MediaType::Html => markup(BsxParseConfig::html())?,
 			#[cfg(feature = "ooxml")]
-			MediaType::Docx | MediaType::Pptx => {
+			MediaType::Docx | MediaType::Xlsx | MediaType::Pptx => {
 				OoxmlParser::declarations(bytes, frontmatter_type)?
 			}
 			_ => default(),
@@ -105,7 +105,17 @@ impl MediaParser {
 impl NodeParser for MediaParser {
 	fn parse(&mut self, cx: ParseContext) -> Result<(), ParseError> {
 		let media_type = cx.bytes.media_type().clone();
-		match media_type {
+		let ParseContext {
+			entity,
+			bytes,
+			path,
+		} = cx;
+		let cx = ParseContext {
+			entity: &mut *entity,
+			bytes,
+			path,
+		};
+		match media_type.clone() {
 			MediaType::Text => self.plain_text_parser.parse(cx),
 			// the one parser: BSX (full grammar) and HTML (features-off subset)
 			// both dispatch here when the `bsx` feature is on.
@@ -115,10 +125,13 @@ impl NodeParser for MediaParser {
 			// markup it accepts), so it dispatches to the same parser.
 			#[cfg(feature = "bsx")]
 			MediaType::Html => BsxParser::html().parse(cx),
+			// xml is the same grammar read as written, every element markup
+			#[cfg(feature = "bsx")]
+			MediaType::Xml => BsxParser::xml().parse(cx),
 			#[cfg(feature = "markdown_parser")]
 			MediaType::Markdown => self.markdown_parser.parse(cx),
 			#[cfg(feature = "ooxml")]
-			MediaType::Docx | MediaType::Pptx => OoxmlParser.parse(cx),
+			MediaType::Docx | MediaType::Xlsx | MediaType::Pptx => OoxmlParser.parse(cx),
 			ref other if self.plaintext_fallback && other.is_text() => {
 				self.plain_text_parser.parse(cx)
 			}
@@ -129,6 +142,7 @@ impl NodeParser for MediaParser {
 				{
 					supported.push(MediaType::Bsx);
 					supported.push(MediaType::Html);
+					supported.push(MediaType::Xml);
 				}
 				#[cfg(feature = "markdown_parser")]
 				supported.push(MediaType::Markdown);
@@ -139,7 +153,14 @@ impl NodeParser for MediaParser {
 					supported,
 				})
 			}
+		}?;
+		// a document's tables carry the addresses an edit names their cells
+		// by; an Office file's parser numbers its own
+		if matches!(media_type, MediaType::Markdown | MediaType::Html) {
+			let root = entity.id();
+			entity.world_scope(|world| TableCellAddress::assign(world, root));
 		}
+		Ok(())
 	}
 }
 

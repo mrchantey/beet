@@ -15,6 +15,7 @@ mod spread;
 mod style_resolver;
 mod tag_resolver;
 mod uppercase;
+mod xml;
 
 pub use build_cfg::*;
 pub(in crate::bsx) use directives::*;

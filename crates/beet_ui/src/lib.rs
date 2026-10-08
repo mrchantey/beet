@@ -9,7 +9,10 @@ extern crate alloc;
 extern crate std;
 
 mod document;
+mod edit;
 mod input;
+#[cfg(feature = "ooxml")]
+pub mod ooxml;
 mod parse;
 mod render;
 #[cfg(feature = "style")]
@@ -32,8 +35,11 @@ pub mod prelude {
 	#[cfg(feature = "style")]
 	pub use crate::css_variable;
 	pub use crate::document::*;
+	pub use crate::edit::*;
 	pub use crate::inline_class;
 	pub use crate::input::*;
+	#[cfg(feature = "ooxml")]
+	pub use crate::ooxml::*;
 	#[cfg(feature = "template")]
 	pub use crate::world_ext;
 	// the `rsx!` / `#[template]` snippet runtime moved to `beet_core`; re-export it

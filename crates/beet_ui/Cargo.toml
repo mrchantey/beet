@@ -79,10 +79,11 @@ postcard = ["dep:postcard", "serde", "beet_core/postcard"]
 # authority and an embedded component/template/`bx:` resolves per-tag through the
 # BSX resolver.
 markdown_parser = ["bsx", "dep:pulldown-cmark"]
-# Word files and slide decks as media: `OoxmlParser` reads them through their
-# transcode to HTML (`beet_net/ooxml`), so `MediaParser` dispatches them like a
-# page and every renderer answers them.
-ooxml = ["bsx", "net", "beet_net/ooxml"]
+# Word files, workbooks and slide decks as media: `OoxmlParser` reads each into
+# the one document tree, HTML where a node maps cleanly and its source identity
+# beside, so `MediaParser` dispatches them like a page, every renderer answers
+# them, and `OoxmlRenderer` writes one back by re-projection.
+ooxml = ["bsx", "dep:ooxmlsdk"]
 # The `beet_ui` BSX front-end: a thin `NodeParser` delegating to the core BSX
 # parser (`beet_core/bsx`), plus the default `bx:click` event registration.
 # HTML dispatches to the same parser with its features disabled, for both
@@ -130,6 +131,8 @@ beet_action = { workspace = true, optional = true, features = ["std", "reflect"]
 bevy.workspace = true
 extend.workspace = true
 bytes.workspace = true
+# the Office package an `ooxml` document is read from and written to
+ooxmlsdk = { workspace = true, optional = true }
 libc = { workspace = true, optional = true }
 vte = { workspace = true, optional = true }
 base64 = { workspace = true, optional = true }

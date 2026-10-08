@@ -128,6 +128,12 @@ impl Response {
 	/// Returns the status code
 	pub fn status(&self) -> StatusCode { self.parts.status() }
 
+	/// Sets the status code, keeping the headers and body.
+	pub fn with_status(mut self, status: StatusCode) -> Self {
+		self.parts = self.parts.with_status(status);
+		self
+	}
+
 	/// Creates a response with the given status code
 	pub fn from_status(status: StatusCode) -> Self {
 		Self {
