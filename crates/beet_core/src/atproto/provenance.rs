@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// first written and, for a derived document, what it was computed from.
 ///
 /// A compiled record names its inputs elsewhere (a package its source branch,
-/// a snapshot its content key), so its `sources` are empty. A derived file is
+/// a scene its content key), so its `sources` are empty. A derived file is
 /// an entity-body document carrying this component, listing each input with
 /// the digest it had, and `ttl` covers an input whose change cannot be seen
 /// from here, ie records a PDS minted. Fresh means every digest unchanged and
@@ -15,8 +15,8 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Provenance {
-	/// When this was first written; on a compiled snapshot the first compile
-	/// that produced this content.
+	/// When this was first written; on a scene record the first compile that
+	/// produced this content.
 	pub created: Timestamp,
 	/// The inputs a derived document was computed from, each with the digest
 	/// it had.
@@ -33,7 +33,7 @@ pub struct Provenance {
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub enum ProvenanceSource {
 	/// A file by its path in the store it was read from, and its content id.
-	Blob {
+	File {
 		/// The file's path.
 		path: RelPath,
 		/// Its content id when the derivation read it.

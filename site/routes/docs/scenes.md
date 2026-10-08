@@ -48,7 +48,7 @@ Each tag is an entity, each attribute or `{spread}` a component and each nested 
 
 ## Scenes all the way down
 
-Everything in a repo is a scene or a plain document, apart from blobs. The main scene is one, and so is a route, a page, a behavior tree, a thread of agents, a deploy stack and a [script](/docs/scripts). A reusable scene is a record whose root is named and instantiated by cloning, so a layout or a widget is a scene the same way a page is.
+Every document in a repo compiles into a scene, and a file beet has no format for is loaded as its blob. The entry document is one, and so is a route, a page, a behavior tree, a thread of agents, a deploy stack and a [script](/docs/scripts). A reusable document is instantiated by cloning its scene, so a layout or a widget is a scene the same way a page is.
 
 Because behavior lives in scenes rather than compiled control flow, a scene stays open while it runs. Editing one, in a text editor, in the scene editor on any surface or through an agent, is an ordinary edit to a record, and the running software follows it component by component with no rebuild and no redeploy. The words a scene may use come from the runtime, and when the vocabulary runs out the next layers are [scripts](/docs/scripts) and [plugins](/docs/plugins).
 
