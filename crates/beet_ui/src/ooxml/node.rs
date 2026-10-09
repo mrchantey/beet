@@ -23,11 +23,11 @@ pub enum OoxmlNode {
 	/// Character data that is no content: a field's instruction, a
 	/// checkbox's glyph, which its `<input>` shows, a shared string's index,
 	/// whitespace between tags.
-	Text(String),
+	Text(SmolStr),
 	/// A comment.
-	Comment(String),
+	Comment(SmolStr),
 	/// A processing instruction, ie the `<?xml ..?>` declaration.
-	Instruction(String),
+	Instruction(SmolStr),
 }
 
 impl OoxmlNode {
@@ -92,10 +92,10 @@ impl OoxmlNode {
 				world.spawn((ChildOf(parent), Value::Str(text.into())));
 			}
 			BsxNode::Comment(text) => {
-				world.spawn((ChildOf(parent), Self::Comment(text.clone())));
+				world.spawn((ChildOf(parent), Self::Comment(text.into())));
 			}
 			BsxNode::ProcessingInstruction(text) => {
-				world.spawn((ChildOf(parent), Self::Instruction(text.clone())));
+				world.spawn((ChildOf(parent), Self::Instruction(text.into())));
 			}
 			BsxNode::Doctype(_) => {
 				bevybail!("an Office part declares no doctype")

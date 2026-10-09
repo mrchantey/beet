@@ -264,6 +264,39 @@ mod test {
 		app.run_async().await.xpect_eq(AppExit::Success);
 	}
 
+	/// A server's own `accept` is the negotiation a request with no
+	/// `--accept` carries, ie colour kept through a pipe.
+	#[beet_core::test]
+	#[cfg(feature = "http")]
+	async fn carries_the_servers_accept() {
+		let seen = Store::<Vec<MediaType>>::default();
+		let mut app = App::new();
+		app.add_plugins((MinimalPlugins, ServerPlugin));
+		let entity = app
+			.world_mut()
+			.spawn((
+				CliServer {
+					accept: vec![MediaType::AnsiTerm],
+					..default()
+				},
+				CallOnReady,
+				children![exchange_ext::handler(move |cx| {
+					seen.set(
+						cx.input
+							.parts()
+							.headers
+							.get_or_default::<header::Accept>()
+							.unwrap_or_default(),
+					);
+					Response::ok()
+				})],
+			))
+			.id();
+		load(app.world_mut(), entity);
+		app.run_async().await.xpect_eq(AppExit::Success);
+		seen.get().xpect_eq(vec![MediaType::AnsiTerm]);
+	}
+
 	/// A disarmed build loads the tree and stops: [`DisableCallOnReady`] on the
 	/// root is what every render-only command inserts.
 	#[beet_core::test]

@@ -258,7 +258,7 @@ impl Projected {
 				Self::Hide(entity) => {
 					let mut entity = world.entity_mut(entity);
 					if let Some(Value::Str(text)) = entity.take::<Value>() {
-						entity.insert(OoxmlNode::Text(text.to_string()));
+						entity.insert(OoxmlNode::Text(text));
 					}
 				}
 				Self::Show(entity, text) => {

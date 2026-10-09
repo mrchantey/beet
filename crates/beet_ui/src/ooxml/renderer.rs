@@ -448,7 +448,7 @@ impl WordWriter {
 					world.entity_mut(glyph).get_mut::<OoxmlNode>()
 					&& let OoxmlNode::Text(text) = &mut *node
 				{
-					*text = text.replacen(from, &to.to_string(), 1);
+					*text = text.replacen(from, &to.to_string(), 1).into();
 				}
 			}
 			if checked {

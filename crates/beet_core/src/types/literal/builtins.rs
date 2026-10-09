@@ -258,7 +258,29 @@ fn add_domain(table: &mut Table) {
 		.add_hinted("a glob pattern", |value: &Value| match value {
 			Value::Str(pattern) => glob_pattern(pattern.as_str()).map(Some),
 			_ => Ok(None),
-		});
+		})
+		// an `Accept` list in the spelling `--accept` takes, so
+		// `<CliServer accept="text/markdown, application/json">` authors a
+		// server's negotiation; an unknown type is kept as written, as there.
+		.add_hinted(
+			"an Accept list, eg \"text/markdown, application/json\"",
+			|value: &Value| match value {
+				Value::Str(accepts) => Ok(Some(MediaType::from_accepts(accepts))),
+				Value::List(items) => items
+					.iter()
+					.map(|item| match item {
+						Value::Str(media_type) => {
+							MediaType::from_content_type(media_type).xok()
+						}
+						other => bevybail!(
+							"`{other:?}` is not a media type, expected a string like \"text/markdown\""
+						),
+					})
+					.collect::<Result<Vec<_>>>()
+					.map(Some),
+				_ => Ok(None),
+			},
+		);
 
 	// a bare word naming the shape a field accepts, so `<DynamicComponent
 	// name=".." schema="u64"/>` declares what a runtime component means.
@@ -456,6 +478,9 @@ mod test {
 		parse::<SmolPath>(Value::str("assets/x"))
 			.unwrap()
 			.xpect_eq(Some(SmolPath::new("assets/x")));
+		parse::<Vec<MediaType>>(Value::str("text/markdown, application/json"))
+			.unwrap()
+			.xpect_eq(Some(vec![MediaType::Markdown, MediaType::Json]));
 		// a store key drops its leading slash on coercion
 		parse::<RelPath>(Value::str("/assets/x"))
 			.unwrap()

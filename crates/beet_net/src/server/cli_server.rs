@@ -7,9 +7,11 @@
 //! cargo run --example router -- --accept=text/html
 //! cargo run --example router -- --accept=text/html,text/plain
 //! ```
-//! When omitted the default preference is `ansi-term, text, markdown, json` for
-//! a terminal, and `markdown, text, json` when stdout is not one, ie piped to
-//! an agent or a file, so a one-shot pipes clean.
+//! When omitted the server's own [`accept`](CliServer::accept) applies, and
+//! when that is empty the preference is `text/ansi-term, text/plain,
+//! text/markdown, application/json` for a terminal, and `text/markdown,
+//! text/plain, application/json` when stdout is not one, ie piped to an agent
+//! or a file, so a one-shot pipes clean.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -47,6 +49,10 @@ pub struct CliServer {
 	/// serve --server=http` has to reach the `serve` route before the `http`
 	/// selection means anything, so the dispatch itself cannot be subject to it.
 	pub always: bool,
+	/// The `Accept` a request carries when `--accept` is unset, in the
+	/// spelling it takes, ie `accept="text/ansi-term"` keeps colour through a
+	/// pipe. Empty for ANSI to a terminal and markdown when stdout is none.
+	pub accept: Vec<MediaType>,
 }
 
 impl CliServer {
@@ -57,6 +63,7 @@ impl CliServer {
 		// an `always` dispatcher (the workspace command entry) acts on every
 		// start; otherwise `--server` decides, defaulting to acting.
 		let always = self.always;
+		let accept = self.accept.clone();
 		move |entity: &mut EntityCommands| {
 			RunningSet::<Request, Response>::add(
 				entity,
@@ -69,7 +76,7 @@ impl CliServer {
 							true,
 						)
 				},
-				|entity, request, _shutdown| {
+				move |entity, request, _shutdown| {
 					// the future owns its dispatch, so nothing borrows the input
 					// past this call. `--body` puts a real body on an argv-shaped
 					// request, so the copy has to carry it; a stream cannot be
@@ -78,15 +85,15 @@ impl CliServer {
 						request.request_parts().clone(),
 						request.body.try_clone().unwrap_or_default(),
 					);
-					Box::pin(route_and_end(entity, dispatch))
+					Box::pin(route_and_end(entity, dispatch, accept.clone()))
 				},
 			);
 		}
 	}
 }
 
-/// The default content negotiation when `--accept` is unset: ANSI for a
-/// terminal, markdown first when stdout is not one.
+/// The negotiation when neither `--accept` nor the server's `accept` is set:
+/// ANSI for a terminal, markdown first when stdout is not one.
 fn default_accept() -> Vec<MediaType> {
 	cfg_if! {
 		if #[cfg(all(feature = "std", not(target_arch = "wasm32")))] {
@@ -112,7 +119,11 @@ fn default_accept() -> Vec<MediaType> {
 /// Awaited inline by the facet rather than detached: the driver polls every
 /// selected facet concurrently, so a dispatched route that parks (a `serve`
 /// command) holds nothing else up.
-async fn route_and_end(server: AsyncEntity, request: Request) -> Result {
+async fn route_and_end(
+	server: AsyncEntity,
+	request: Request,
+	accept: Vec<MediaType>,
+) -> Result {
 	// `--accept` may arrive as several params (CliArgs splits comma lists), so
 	// gather every value's media types.
 	let accept = request
@@ -123,6 +134,7 @@ async fn route_and_end(server: AsyncEntity, request: Request) -> Result {
 				.flat_map(|value| MediaType::from_accepts(value))
 				.collect::<Vec<_>>()
 		})
+		.or_else(|| (!accept.is_empty()).then_some(accept))
 		.unwrap_or_else(default_accept);
 	// a server holds no dispatch of its own: hop down to the router child.
 	let response = server
