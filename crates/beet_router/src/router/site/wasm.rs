@@ -132,10 +132,15 @@ pub fn Wasm(
 mod test {
 	use super::*;
 	use crate::prelude::*;
+	use beet_net::prelude::*;
 
 	fn render(world: &mut World, root: Entity) -> String {
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, world))
+			.render(&mut RenderContext::new(
+				world,
+				root,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}

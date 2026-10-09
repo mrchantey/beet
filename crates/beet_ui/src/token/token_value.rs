@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "serde")]
 use bevy::reflect::Typed;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]

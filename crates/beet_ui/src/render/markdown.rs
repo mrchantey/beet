@@ -838,6 +838,24 @@ impl NodeRenderer for MarkdownRenderer {
 #[cfg(feature = "markdown_parser")]
 mod test {
 	use super::*;
+	use beet_net::prelude::*;
+
+	/// Render the tree at `entity` with `renderer`, answering a default
+	/// request.
+	fn render_with(
+		world: &mut World,
+		entity: Entity,
+		mut renderer: MarkdownRenderer,
+	) -> String {
+		renderer
+			.render(&mut RenderContext::new(
+				world,
+				entity,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	/// Parse markdown then render it back via [`MarkdownRenderer`].
 	fn roundtrip(md: &str) -> String {
@@ -847,10 +865,7 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, entity, MarkdownRenderer::new())
 	}
 
 	/// Parse markdown then render with expression support.
@@ -862,11 +877,11 @@ mod test {
 		MarkdownParser::with_expressions()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		MarkdownRenderer::new()
-			.with_expressions()
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(
+			&mut world,
+			entity,
+			MarkdownRenderer::new().with_expressions(),
+		)
 	}
 
 	#[beet_core::test]
@@ -991,10 +1006,7 @@ mod test {
 		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, entity, MarkdownRenderer::new())
 	}
 
 	#[cfg(feature = "bsx")]

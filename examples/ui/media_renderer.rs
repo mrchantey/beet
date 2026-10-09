@@ -1,4 +1,4 @@
-//! [`RenderTargets`] selects the render target for a list of accepted
+//! [`RenderTargets`] selects the render target for a request accepting a
 //! [`MediaType`]. Use cli args to specify the output
 //!
 //! With the `markdown` feature the markdown is parsed into structured
@@ -32,13 +32,12 @@ fn main() {
 		.map(|val| val.parse().unwrap())
 		.unwrap_or(MediaType::AnsiTerm);
 
-	// 3. Render to the requested media type
+	// 3. Render as the answer to a request accepting that media type
 	let entity = entity.id();
-	let output = RenderTargets::render_negotiated(
+	let output = RenderTargets::render(
 		&mut world,
 		entity,
-		&[media_type],
-		&MediaType::Markdown,
+		&RequestParts::default().with_accept(media_type),
 	)
 	.unwrap()
 	.to_string();

@@ -5,6 +5,7 @@
 beet_core::test_main!();
 
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
 
@@ -14,7 +15,11 @@ fn world() -> World { world_ext::ui_world() }
 /// Render `root` to an HTML string.
 fn render_html(world: &mut World, root: Entity) -> String {
 	HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))
+		.render(&mut RenderContext::new(
+			world,
+			root,
+			&RequestParts::default(),
+		))
 		.unwrap()
 		.to_string()
 }

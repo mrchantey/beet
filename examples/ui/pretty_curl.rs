@@ -66,13 +66,12 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 					.parse(ParseContext::new(&mut entity, &input_bytes))
 					.unwrap();
 
-				// 3. Render to the requested media type
+				// 3. Render as the answer to a request accepting that type
 				let entity = entity.id();
-				let output = RenderTargets::render_negotiated(
+				let output = RenderTargets::render(
 					world,
 					entity,
-					&[output_type],
-					&MediaType::Markdown,
+					&RequestParts::default().with_accept(output_type),
 				)
 				.unwrap()
 				.to_string();

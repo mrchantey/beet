@@ -57,7 +57,11 @@ fn main() {
 /// Render `root` to an HTML string through the substrate's [`HtmlRenderer`].
 fn render_html(world: &mut World, root: Entity) -> String {
 	HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))
+		.render(&mut RenderContext::new(
+			world,
+			root,
+			&RequestParts::default(),
+		))
 		.unwrap()
 		.to_string()
 }

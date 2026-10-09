@@ -104,12 +104,17 @@ impl SiteFixture {
 				.world_mut()
 				.get_resource_or_init::<TemplateFormats>()
 				.clone();
+			let prescans = app
+				.world_mut()
+				.get_resource_or_init::<PrescanRegistry>()
+				.clone();
 			app.world_mut().run_async_local(async move |world| {
 				let ResolvedEntry {
 					repo_store,
 					entry_name,
 					..
-				} = entry_build::resolve_main(None, None, &dir).await?;
+				} = entry_build::resolve_entry_path(&prescans, None, None, &dir)
+					.await?;
 				entry_build::build_watched(
 					&world, repo_store, entry_name, formats,
 				)
@@ -146,10 +151,11 @@ async fn until_changed(
 	poll_ext::poll_async_with(
 		async || {
 			// a read mid-reload (the document torn down) errors: keep polling
-			let value = read().await?;
-			(value != previous)
-				.then_some(value)
-				.ok_or_else(|| bevyhow!("still {previous}"))
+			match read().await {
+				Ok(value) if value != previous => ControlFlow::Break(value),
+				_ => ControlFlow::Continue(()),
+			}
+			.xok()
 		},
 		Duration::from_secs(20),
 		poll_ext::DEFAULT_INTERVAL,

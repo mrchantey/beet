@@ -579,8 +579,10 @@ scripting = ["action","serde","beet_action/scripting", "beet_extra?/scripting", 
 # `thread` uses, so a binary with the engine can run `examples/action/scripting.bsx`.
 quickjs = ["scripting", "beet_action/quickjs","beet_router?/quickjs","beet_ui?/quickjs"]
 # turning on `ui` also lights up beet_thread's chat UI (`ThreadView`,
-# `CreatePostForm`, `ThreadUiPlugin`) when `thread` is present.
-ui = ["dep:beet_ui", "beet_thread?/ui"]
+# `CreatePostForm`, `ThreadUiPlugin`) when `thread` is present. `net` because
+# every render answers a request (`RequestParts`), which beet_ui always depends
+# on.
+ui = ["dep:beet_ui", "net", "beet_thread?/ui"]
 # The `beet_ui` function-component widget set (Header, Button, Sidebar, Table)
 # and the `rsx!`/`#[template]` lowering runtime. std-only, so it stays opt-in.
 template = ["ui", "beet_ui?/template"]

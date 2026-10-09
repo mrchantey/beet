@@ -105,13 +105,15 @@ impl NodeRenderer for PlainTextRenderer {
 		&mut self,
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
+		let accepts = cx.accepts();
 		if self.plaintext_only {
 			cx.check_accepts(&[MediaType::Text])?;
-		} else if !cx.accepts.is_empty()
-			&& !cx.accepts.iter().any(|mt| mt.is_wildcard() || mt.is_text())
-		{
+		} else if !accepts.is_empty()
+			&& !accepts.iter().any(|media_type| {
+				media_type.is_wildcard() || media_type.is_text()
+			}) {
 			return Err(RenderError::AcceptMismatch {
-				requested: cx.accepts.clone(),
+				requested: accepts,
 				available: vec![MediaType::Text],
 			});
 		}
@@ -128,49 +130,50 @@ impl NodeRenderer for PlainTextRenderer {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+
+	/// The plain text `bundle` renders as, answering a default request.
+	fn text(bundle: impl Bundle) -> String {
+		let mut world = World::new();
+		let root = world.spawn(bundle).id();
+		PlainTextRenderer::default()
+			.render(&mut RenderContext::new(
+				&mut world,
+				root,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	/// The non-visual tags hold no prose: a `<script>` body and an `<svg>`'s
 	/// `<text>` never reach the plain text.
 	#[beet_core::test]
 	fn skips_non_visual_tags() {
-		let mut world = World::new();
-		let root = world
-			.spawn(rsx! {
-				<div>
-					<script>"alert(1)"</script>
-					<svg viewBox="0 0 10 10"><text>"Picture"</text></svg>
-					<p>"Visible"</p>
-				</div>
-			})
-			.id();
-		PlainTextRenderer::default()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
-			.xpect_contains("Visible")
-			.xnot()
-			.xpect_contains("Picture")
-			.xnot()
-			.xpect_contains("alert");
+		text(rsx! {
+			<div>
+				<script>"alert(1)"</script>
+				<svg viewBox="0 0 10 10"><text>"Picture"</text></svg>
+				<p>"Visible"</p>
+			</div>
+		})
+		.xpect_contains("Visible")
+		.xnot()
+		.xpect_contains("Picture")
+		.xnot()
+		.xpect_contains("alert");
 	}
 
 	/// One newline per block, inline elements flowing into their line.
 	#[beet_core::test]
 	fn one_line_per_block() {
-		let mut world = World::new();
-		let root = world
-			.spawn(rsx! {
-				<article>
-					<h1>"Title"</h1>
-					<p>"Some "<strong>"bold"</strong>" and "<a href="/x">"linked"</a>" prose."</p>
-					<ul><li>"one"</li><li>"two"</li></ul>
-				</article>
-			})
-			.id();
-		PlainTextRenderer::default()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		text(rsx! {
+			<article>
+				<h1>"Title"</h1>
+				<p>"Some "<strong>"bold"</strong>" and "<a href="/x">"linked"</a>" prose."</p>
+				<ul><li>"one"</li><li>"two"</li></ul>
+			</article>
+		})
 			.xpect_eq("Title\nSome bold and linked prose.\none\ntwo\n");
 	}
 
@@ -178,23 +181,16 @@ mod test {
 	/// two elements with nothing between them are spaced.
 	#[beet_core::test]
 	fn rows_and_items_stay_apart() {
-		let mut world = World::new();
-		let root = world
-			.spawn(rsx! {
-				<div>
-					<nav><a href="/docs">"Docs"</a><a href="/blog">"Blog"</a></nav>
-					<details><summary>"Docs ▾"</summary><ul><li>"Scenes"</li></ul></details>
-					<table>
-						<tr><th>"name"</th><th>"kind"</th></tr>
-						<tr><td>"root"</td><td>"one of"</td></tr>
-					</table>
-				</div>
-			})
-			.id();
-		PlainTextRenderer::default()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
-			.xpect_eq("Docs Blog\nDocs ▾\nScenes\nname kind\nroot one of\n");
+		text(rsx! {
+			<div>
+				<nav><a href="/docs">"Docs"</a><a href="/blog">"Blog"</a></nav>
+				<details><summary>"Docs ▾"</summary><ul><li>"Scenes"</li></ul></details>
+				<table>
+					<tr><th>"name"</th><th>"kind"</th></tr>
+					<tr><td>"root"</td><td>"one of"</td></tr>
+				</table>
+			</div>
+		})
+		.xpect_eq("Docs Blog\nDocs ▾\nScenes\nname kind\nroot one of\n");
 	}
 }

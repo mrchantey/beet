@@ -210,19 +210,29 @@ mod test {
 	use crate::parse::mermaid::collect::test::parse_md;
 	use crate::style::DiagramRender;
 	use crate::style::common_props::DiagramRenderProp;
+	use beet_net::prelude::*;
 
 	const FLOWCHART: &str =
 		"```mermaid\ngraph LR; A[Parse] --> B[Style]; B --> C[Paint]\n```";
+
+	/// The html the tree at `root` renders as, answering a default request.
+	fn html(world: &mut World, root: Entity) -> String {
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(
+				world,
+				root,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	fn render_md(md: &str) -> String {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		parse_md(app.world_mut(), root, md);
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, app.world_mut()))
-			.unwrap()
-			.to_string()
+		html(app.world_mut(), root)
 	}
 
 	/// `Auto` on the web is the picture: an inline `<svg>` whose colours are
@@ -282,10 +292,7 @@ mod test {
 			)]))
 			.id();
 		parse_md(app.world_mut(), page, FLOWCHART);
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(page, app.world_mut()))
-			.unwrap()
-			.to_string()
+		html(app.world_mut(), page)
 			.xpect_contains("diagram-text")
 			.xnot()
 			.xpect_contains("<svg");

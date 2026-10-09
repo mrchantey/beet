@@ -226,9 +226,22 @@ mod test {
 	use crate::parse::mermaid::collect::test::parse_md;
 	use crate::render::CharcellPlugin;
 	use crate::render::FlexBuffer;
+	use beet_net::prelude::*;
 
 	const FLOWCHART: &str =
 		"```mermaid\ngraph LR; A[Parse] --> B[Style]; B --> C[Paint]\n```";
+
+	/// The html the tree at `root` renders as, answering a default request.
+	fn html(app: &mut App, root: Entity) -> String {
+		HtmlRenderer::new()
+			.render(&mut RenderContext::new(
+				app.world_mut(),
+				root,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	/// The `text` info word is the box art on the web too.
 	#[beet_core::test]
@@ -241,10 +254,7 @@ mod test {
 			root,
 			&FLOWCHART.replace("mermaid", "mermaid text"),
 		);
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, app.world_mut()))
-			.unwrap()
-			.to_string()
+		html(&mut app, root)
 			.xpect_contains("<figure class=\"diagram inline-style-")
 			.xpect_contains("<pre class=\"diagram-text\">")
 			.xpect_contains("Paint")
@@ -329,16 +339,10 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
-		let html = |app: &mut App| {
-			HtmlRenderer::new()
-				.render(&mut RenderContext::new(root, app.world_mut()))
-				.unwrap()
-				.to_string()
-		};
 		parse_md(app.world_mut(), root, FLOWCHART);
-		html(&mut app).xpect_contains("Paint");
+		html(&mut app, root).xpect_contains("Paint");
 		parse_md(app.world_mut(), root, &FLOWCHART.replace("Paint", "Draw"));
-		html(&mut app)
+		html(&mut app, root)
 			.xpect_contains("<figure class=\"diagram\">")
 			.xpect_contains("Draw")
 			.xnot()
@@ -351,10 +355,7 @@ mod test {
 		app.add_plugins(StylePlugin);
 		let root = app.world_mut().spawn_empty().id();
 		parse_md(app.world_mut(), root, "```mermaid\nnotadiagram\n```");
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, app.world_mut()))
-			.unwrap()
-			.to_string()
+		html(&mut app, root)
 			.xpect_contains("<div class=\"error\">mermaid: ")
 			.xpect_contains("<pre>notadiagram")
 			.xnot()

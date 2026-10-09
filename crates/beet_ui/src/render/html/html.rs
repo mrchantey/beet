@@ -436,6 +436,23 @@ fn default_raw_text_elements() -> Vec<Cow<'static, str>> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_net::prelude::*;
+
+	/// Render the tree at `root` with `renderer`, answering a default request.
+	fn render_with(
+		world: &mut World,
+		root: Entity,
+		mut renderer: HtmlRenderer,
+	) -> String {
+		renderer
+			.render(&mut RenderContext::new(
+				world,
+				root,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	#[cfg(feature = "bsx")]
 	/// Parse HTML (via the BSX parser's HTML mode) into a world, returning the
@@ -452,12 +469,9 @@ mod test {
 
 	#[cfg(feature = "bsx")]
 	/// Parse HTML then render it back with the given renderer.
-	fn roundtrip_with(html: &str, mut renderer: HtmlRenderer) -> String {
+	fn roundtrip_with(html: &str, renderer: HtmlRenderer) -> String {
 		let (mut world, entity) = parse_html(html);
-		renderer
-			.render(&mut RenderContext::new(entity, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, entity, renderer)
 	}
 
 	#[cfg(feature = "bsx")]
@@ -578,10 +592,7 @@ mod test {
 		let root = world
 			.spawn((Element::new("button"), Classes::new(["btn-error", "btn"])))
 			.id();
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new())
 			.xpect_contains("class=\"btn btn-error\"");
 	}
 
@@ -607,10 +618,7 @@ mod test {
 			})
 			.unwrap()
 			.id();
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new())
 			.xpect_contains("<input type=\"text\" value=\"typed\" />")
 			.xpect_contains("<input type=\"checkbox\" />")
 			.xpect_contains("<textarea>lines</textarea>")
@@ -629,11 +637,7 @@ mod test {
 		let text = world.spawn(Value::new("a & b")).id();
 		world.entity_mut(root).add_children(&[text]);
 
-		HtmlRenderer::new()
-			.with_escape_html()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new().with_escape_html())
 			.xpect_contains("a &amp; b");
 	}
 
@@ -645,11 +649,7 @@ mod test {
 		let text = world.spawn(Value::new("let x = 1 < 2;")).id();
 		world.entity_mut(root).add_children(&[text]);
 
-		HtmlRenderer::new()
-			.with_escape_html()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new().with_escape_html())
 			.xpect_contains("let x = 1 < 2;")
 			.xnot()
 			.xpect_contains("&lt;");
@@ -665,11 +665,7 @@ mod test {
 			.id();
 		world.entity_mut(root).add_children(&[text]);
 
-		HtmlRenderer::new()
-			.with_escape_html()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new().with_escape_html())
 			.xpect_contains("body { font-family: 'a' & 'b'; }")
 			.xnot()
 			.xpect_contains("&amp;");
@@ -699,11 +695,7 @@ mod test {
 			AttributeOf::new(root),
 		));
 
-		HtmlRenderer::new()
-			.with_escape_html()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
+		render_with(&mut world, root, HtmlRenderer::new().with_escape_html())
 			.xpect_contains("href=\"a&amp;b\"");
 	}
 }

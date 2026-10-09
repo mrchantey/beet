@@ -69,6 +69,7 @@ impl TokenKey {
 	}
 
 	/// Serializes with a prefix, ie `rust:io.crates/...`.
+	#[cfg(feature = "serde")]
 	fn to_prefixed_string(&self) -> alloc::string::String {
 		match self {
 			Self::RustType(s) => format!("rust:{}", s),
@@ -78,6 +79,7 @@ impl TokenKey {
 	}
 
 	/// Parses from a prefixed string produced by [`Self::to_prefixed_string`].
+	#[cfg(feature = "serde")]
 	fn from_prefixed_str(s: &str) -> Result<Self> {
 		if let Some(rest) = s.strip_prefix("rust:") {
 			Ok(Self::RustType(SmolStr::from(rest)))

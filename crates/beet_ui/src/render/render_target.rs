@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// A format a tree renders to: a [`NodeRenderer`] that names the media types
 /// it answers, registered in [`RenderTargets`].
@@ -8,17 +9,20 @@ use beet_core::prelude::*;
 /// The registry clones the registered instance for every render, so its
 /// configuration (an [`HtmlRenderer`]'s indent, an [`AnsiTermRenderer`]'s
 /// prefix) is set once at registration and its buffers start empty each time.
-/// A target is handed exactly one of its [`media_types`](Self::media_types)
-/// as the only entry of [`RenderContext::accepts`], so one serializing more
-/// than one format (the [`TemplateRenderer`]) knows which was chosen.
+/// A target is handed exactly one of its [`media_types`](Self::media_types),
+/// the negotiated one, as the only entry of [`RenderContext::accepts`], so one
+/// serializing more than one format (the [`TemplateRenderer`]) knows which was
+/// chosen.
 pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 	/// The media types this target answers, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
 }
 
 /// Every [`RenderTarget`] this world renders to, the one place a format is
-/// chosen and the one path a render takes, whether a request negotiated it
-/// from `Accept` or a caller named it.
+/// chosen and the one path a render takes: [`render`](Self::render)
+/// negotiates from the request's `Accept`, so a caller wanting a particular
+/// type renders a request accepting it and gets exactly the body a client
+/// asking for that type does.
 ///
 /// Registered through [`AppRenderTargetExt::register_render_target`], the
 /// built-in targets by [`RenderPlugin`] through the same call a downstream
@@ -30,6 +34,10 @@ pub struct RenderTargets {
 }
 
 impl RenderTargets {
+	/// The media type answering a request with no `Accept` or a wildcard: the
+	/// web document, which a bare `curl` and a browser alike expect.
+	pub const DEFAULT: MediaType = MediaType::Html;
+
 	/// Register `target`, answering its media types ahead of any target
 	/// registered before it.
 	pub fn register(&mut self, target: impl RenderTarget) -> &mut Self {
@@ -50,52 +58,24 @@ impl RenderTargets {
 		available
 	}
 
-	/// The media type a request accepting `accepts` is answered as, `default`
-	/// being the answer to an empty list or a wildcard.
+	/// The media type `request` is answered as, [`DEFAULT`](Self::DEFAULT)
+	/// for an absent `Accept` or a wildcard.
 	///
 	/// Each accepted type in order, a wildcard (`*/*`, `text/*`, ie a bare
-	/// `curl` or an API Gateway default) read as `default`, is answered by the
-	/// first one a target is registered for. Failing that, any text type, or a
-	/// wildcard, falls back to plain text, since prose reads in every text
-	/// format; otherwise the mismatch names what was asked for and what is
-	/// available.
+	/// `curl` or an API Gateway default) read as the default, is answered by
+	/// the first one a target is registered for. Failing that, any text type,
+	/// or a wildcard, falls back to plain text, since prose reads in every
+	/// text format; otherwise the mismatch names what was asked for and what
+	/// is available.
 	pub fn negotiate(
 		&self,
-		accepts: &[MediaType],
-		default: &MediaType,
+		request: &RequestParts,
 	) -> Result<MediaType, RenderError> {
-		let candidates: Vec<MediaType> = match accepts.is_empty() {
-			true => vec![default.clone()],
-			false => accepts
-				.iter()
-				.map(|media_type| match media_type.is_wildcard() {
-					true => default.clone(),
-					false => media_type.clone(),
-				})
-				.collect(),
-		};
-		if let Some(media_type) = candidates
-			.iter()
-			.find(|media_type| self.target(media_type).is_some())
-		{
-			return Ok(media_type.clone());
-		}
-		let falls_back = self.target(&MediaType::Text).is_some()
-			&& (accepts.is_empty()
-				|| accepts.iter().any(|media_type| {
-					media_type.is_wildcard() || media_type.is_text()
-				}));
-		match falls_back {
-			true => Ok(MediaType::Text),
-			false => Err(RenderError::AcceptMismatch {
-				requested: candidates,
-				available: self.available(),
-			}),
-		}
+		self.choose(request).map(|(media_type, _)| media_type)
 	}
 
-	/// Render the tree at `entity` as `media_type`, through the target
-	/// registered for it.
+	/// Render the tree at `entity` as the answer to `request`, through the
+	/// target its `Accept` negotiates to (see [`negotiate`](Self::negotiate)).
 	///
 	/// Settles the tree first: a one-shot render (a request, a publish step)
 	/// happens between frames, so the `@` bindings built with the tree have not
@@ -104,41 +84,57 @@ impl RenderTargets {
 	pub fn render(
 		world: &mut World,
 		entity: Entity,
-		media_type: &MediaType,
+		request: &RequestParts,
 	) -> Result<MediaBytes, RenderError> {
-		let target = world
-			.get_resource::<Self>()
-			.and_then(|targets| targets.target(media_type))
-			.ok_or_else(|| RenderError::AcceptMismatch {
-				requested: vec![media_type.clone()],
-				available: world
-					.get_resource::<Self>()
-					.map(Self::available)
-					.unwrap_or_default(),
-			})?;
-		DocumentSync::settle(world);
-		#[cfg(feature = "template")]
-		crate::widgets::settle_stylesheets(world);
-		target.render_as(entity, world, media_type)
-	}
-
-	/// Render the tree at `entity` as the media type `accepts` negotiates to
-	/// (see [`negotiate`](Self::negotiate)), the render a request makes.
-	pub fn render_negotiated(
-		world: &mut World,
-		entity: Entity,
-		accepts: &[MediaType],
-		default: &MediaType,
-	) -> Result<MediaBytes, RenderError> {
-		let media_type = world
+		let (media_type, target) = world
 			.get_resource::<Self>()
 			.ok_or_else(|| {
 				RenderError::Other(bevyhow!(
 					"no `RenderTargets` in this world: add the `RenderPlugin`"
 				))
 			})?
-			.negotiate(accepts, default)?;
-		Self::render(world, entity, &media_type)
+			.choose(request)?;
+		DocumentSync::settle(world);
+		#[cfg(feature = "template")]
+		crate::widgets::settle_stylesheets(world);
+		target.render_as(world, entity, request, media_type)
+	}
+
+	/// The negotiated media type of [`negotiate`](Self::negotiate) and the
+	/// target answering it.
+	fn choose(
+		&self,
+		request: &RequestParts,
+	) -> Result<(MediaType, Arc<dyn ErasedRenderTarget>), RenderError> {
+		let accepts = request.accept();
+		let candidates: Vec<MediaType> = match accepts.is_empty() {
+			true => vec![Self::DEFAULT],
+			false => accepts
+				.iter()
+				.map(|media_type| match media_type.is_wildcard() {
+					true => Self::DEFAULT,
+					false => media_type.clone(),
+				})
+				.collect(),
+		};
+		if let Some(chosen) = candidates.iter().find_map(|media_type| {
+			self.target(media_type)
+				.map(|target| (media_type.clone(), target))
+		}) {
+			return Ok(chosen);
+		}
+		match self.target(&MediaType::Text).filter(|_| {
+			accepts.is_empty()
+				|| accepts.iter().any(|media_type| {
+					media_type.is_wildcard() || media_type.is_text()
+				})
+		}) {
+			Some(target) => Ok((MediaType::Text, target)),
+			None => Err(RenderError::AcceptMismatch {
+				requested: candidates,
+				available: self.available(),
+			}),
+		}
 	}
 
 	/// The target answering `media_type`, the last registered winning.
@@ -193,9 +189,10 @@ trait ErasedRenderTarget: 'static + Send + Sync {
 	fn media_types(&self) -> Vec<MediaType>;
 	fn render_as(
 		&self,
-		entity: Entity,
 		world: &mut World,
-		media_type: &MediaType,
+		entity: Entity,
+		request: &RequestParts,
+		media_type: MediaType,
 	) -> Result<MediaBytes, RenderError>;
 }
 
@@ -204,14 +201,15 @@ impl<T: RenderTarget> ErasedRenderTarget for T {
 
 	fn render_as(
 		&self,
-		entity: Entity,
 		world: &mut World,
-		media_type: &MediaType,
+		entity: Entity,
+		request: &RequestParts,
+		media_type: MediaType,
 	) -> Result<MediaBytes, RenderError> {
 		NodeRenderer::render(
 			&mut self.clone(),
-			&mut RenderContext::new(entity, world)
-				.with_accepts(vec![media_type.clone()]),
+			&mut RenderContext::new(world, entity, request)
+				.with_negotiated(media_type),
 		)
 	}
 }
@@ -244,6 +242,8 @@ mod test {
 	use crate::prelude::*;
 	#[allow(unused)]
 	use beet_core::prelude::*;
+	#[allow(unused)]
+	use beet_net::prelude::*;
 
 	/// A world holding `<div><p>hi</p></div>`, parsed from html, with the
 	/// built-in targets, and its root.
@@ -258,32 +258,28 @@ mod test {
 		(world, entity)
 	}
 
-	/// The media type `accepts` negotiates to under `default`, and the body.
+	/// The media type a request with `accept` (raw, `None` for no header)
+	/// negotiates to, and the body.
 	#[cfg(feature = "bsx")]
 	fn negotiate(
-		default: MediaType,
-		accepts: &[&str],
+		accept: Option<&str>,
 	) -> Result<(MediaType, String), RenderError> {
 		let (mut world, entity) = page();
-		let accepts = accepts
-			.iter()
-			.map(|accept| MediaType::from(*accept))
-			.collect::<Vec<_>>();
-		RenderTargets::render_negotiated(&mut world, entity, &accepts, &default)
+		let mut request = RequestParts::default();
+		if let Some(accept) = accept {
+			request.headers.set_raw("accept", accept);
+		}
+		RenderTargets::render(&mut world, entity, &request)
 			.map(|bytes| (bytes.media_type().clone(), bytes.to_string()))
 	}
 
-	/// An empty `accepts` renders the default media type.
+	/// No `Accept` renders the default media type.
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
-	fn empty_accepts_renders_the_default() {
-		negotiate(MediaType::Html, &[])
+	fn no_accept_renders_the_default() {
+		negotiate(None)
 			.unwrap()
 			.xpect_eq((MediaType::Html, "<div><p>hi</p></div>".to_string()));
-		negotiate(MediaType::Text, &[])
-			.unwrap()
-			.0
-			.xpect_eq(MediaType::Text);
 	}
 
 	/// `accepts` is consulted in priority order, the first registered type
@@ -291,18 +287,18 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn accepts_in_priority_order() {
-		negotiate(MediaType::Text, &["text/html", "text/plain"])
+		negotiate(Some("text/html, text/plain"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Html);
-		negotiate(MediaType::Html, &["text/markdown", "text/html"])
+		negotiate(Some("text/markdown, text/html"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Markdown);
-		negotiate(MediaType::Html, &["text/plain"])
+		negotiate(Some("text/plain"))
 			.unwrap()
 			.xpect_eq((MediaType::Text, "hi\n".to_string()));
-		negotiate(MediaType::Html, &["text/plain", "text/html"])
+		negotiate(Some("text/plain, text/html"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Text);
@@ -314,18 +310,15 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn wildcard_resolves_to_the_default() {
-		negotiate(MediaType::Html, &["*/*"])
+		negotiate(Some("*/*")).unwrap().0.xpect_eq(MediaType::Html);
+		negotiate(Some("text/*"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Html);
-		negotiate(MediaType::Html, &["text/*"])
+		negotiate(Some("image/png, */*"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Html);
-		negotiate(MediaType::Markdown, &["image/png", "*/*"])
-			.unwrap()
-			.0
-			.xpect_eq(MediaType::Markdown);
 	}
 
 	/// A text type with no target of its own falls back to plain text, even
@@ -333,11 +326,11 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn text_falls_back_to_plain_text() {
-		negotiate(MediaType::Html, &["text/css"])
+		negotiate(Some("text/css"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Text);
-		negotiate(MediaType::Html, &["image/png", "text/csv"])
+		negotiate(Some("image/png, text/csv"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Text);
@@ -348,7 +341,7 @@ mod test {
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn no_match_is_a_mismatch() {
-		match negotiate(MediaType::Text, &["image/png"]) {
+		match negotiate(Some("image/png")) {
 			Err(RenderError::AcceptMismatch {
 				requested,
 				available,
@@ -369,12 +362,12 @@ mod test {
 	#[cfg(all(feature = "bsx", feature = "template_serde", feature = "json"))]
 	#[beet_core::test]
 	fn serializes_the_scene() {
-		negotiate(MediaType::Html, &["application/json"])
+		negotiate(Some("application/json"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Json);
 		#[cfg(feature = "postcard")]
-		negotiate(MediaType::Html, &["application/x-postcard"])
+		negotiate(Some("application/x-postcard"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Postcard);
@@ -384,15 +377,16 @@ mod test {
 	#[cfg(all(feature = "bsx", feature = "style"))]
 	#[beet_core::test]
 	fn renders_ansi() {
-		negotiate(MediaType::Html, &["text/ansi-term"])
+		negotiate(Some("text/ansi-term"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::AnsiTerm);
 	}
 
 	/// A target registered from outside this crate's built-ins answers its own
-	/// media type through the same call, and one registered later replaces a
-	/// built-in for the type both answer.
+	/// media type through the same call, one registered later replaces a
+	/// built-in for the type both answer, and the negotiated type reaches it
+	/// though the request's `Accept` names only a wildcard.
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn registers_a_downstream_target() {
@@ -406,7 +400,7 @@ mod test {
 				let mut text = PlainTextRenderer::default();
 				cx.walk(&mut text);
 				MediaBytes::new_string(
-					cx.accepts[0].clone(),
+					cx.accepts()[0].clone(),
 					text.into_string().to_uppercase(),
 				)
 				.xok()
@@ -419,15 +413,33 @@ mod test {
 		}
 		let (mut world, entity) = page();
 		world.resource_mut::<RenderTargets>().register(Shout);
-		let shout = MediaType::other("text/x-shout");
-		RenderTargets::render(&mut world, entity, &shout)
-			.unwrap()
-			.to_string()
-			.xpect_contains("HI");
-		RenderTargets::render(&mut world, entity, &MediaType::Html)
-			.unwrap()
-			.to_string()
-			.xpect_contains("HI");
+		let accepting =
+			|media_type| RequestParts::default().with_accept(media_type);
+		RenderTargets::render(
+			&mut world,
+			entity,
+			&accepting(MediaType::other("text/x-shout")),
+		)
+		.unwrap()
+		.to_string()
+		.xpect_contains("HI");
+		let html = RenderTargets::render(
+			&mut world,
+			entity,
+			&accepting(MediaType::Html),
+		)
+		.unwrap();
+		html.to_string().xpect_contains("HI");
+		html.media_type().clone().xpect_eq(MediaType::Html);
+		RenderTargets::render(
+			&mut world,
+			entity,
+			&accepting(MediaType::from_content_type("*/*")),
+		)
+		.unwrap()
+		.media_type()
+		.clone()
+		.xpect_eq(MediaType::Html);
 	}
 
 	/// Parse markdown then render back as markdown.
@@ -440,10 +452,14 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		RenderTargets::render(&mut world, entity, &MediaType::Markdown)
-			.unwrap()
-			.to_string()
-			.trim()
-			.xpect_eq("# Title");
+		RenderTargets::render(
+			&mut world,
+			entity,
+			&RequestParts::default().with_accept(MediaType::Markdown),
+		)
+		.unwrap()
+		.to_string()
+		.trim()
+		.xpect_eq("# Title");
 	}
 }

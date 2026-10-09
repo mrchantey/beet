@@ -40,7 +40,7 @@ impl NodeRenderer for TemplateRenderer {
 		&mut self,
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
-		let media_type = Self::negotiate(&cx.accepts)?;
+		let media_type = Self::negotiate(&cx.accepts())?;
 		TemplateSaver::new()
 			.with_entity_tree(cx.world, cx.entity)
 			.save(cx.world, media_type)?
@@ -52,15 +52,17 @@ impl NodeRenderer for TemplateRenderer {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
-	/// An empty accepts list accepts anything, so it serializes the preferred
-	/// format rather than reporting a mismatch against nothing.
+	/// A request with no `Accept` accepts anything, so it serializes the
+	/// preferred format rather than reporting a mismatch against nothing.
 	#[cfg(feature = "json")]
 	#[beet_core::test]
-	fn empty_accepts_serializes_the_preferred_format() {
+	fn no_accept_serializes_the_preferred_format() {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
-		let mut cx = RenderContext::new(entity, &mut world);
+		let request = RequestParts::default();
+		let mut cx = RenderContext::new(&mut world, entity, &request);
 		TemplateRenderer::default()
 			.render(&mut cx)
 			.unwrap()
@@ -72,8 +74,8 @@ mod test {
 	fn unsupported_accepts_mismatch() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().id();
-		let mut cx = RenderContext::new(entity, &mut world)
-			.with_accepts(vec![MediaType::Png]);
+		let request = RequestParts::default().with_accept(MediaType::Png);
+		let mut cx = RenderContext::new(&mut world, entity, &request);
 		match TemplateRenderer::default().render(&mut cx) {
 			Err(RenderError::AcceptMismatch { .. }) => {}
 			other => panic!("expected AcceptMismatch, got {other:?}"),

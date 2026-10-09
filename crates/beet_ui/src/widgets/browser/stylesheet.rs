@@ -106,10 +106,7 @@ mod test {
 			(TemplatePlugin, MaterialStylePlugin, StylePlugin).into_world();
 		let head = world.spawn_template(rsx! { <Stylesheet/> }).unwrap().id();
 		let html = |world: &mut World| {
-			HtmlRenderer::new()
-				.render(&mut RenderContext::new(head, world))
-				.unwrap()
-				.to_string()
+			crate::widgets::test_ext::render_world(world, head)
 		};
 		let baked = html(&mut world);
 		baked

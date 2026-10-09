@@ -254,6 +254,22 @@ impl RequestParts {
 				.unwrap_or(false)
 	}
 
+	/// The `Accept` header's media types, highest priority first. Empty for a
+	/// request with no (or an unparseable) `Accept` header, which accepts
+	/// anything.
+	pub fn accept(&self) -> Vec<MediaType> {
+		self.headers
+			.get::<header::Accept>()
+			.and_then(|result| result.ok())
+			.unwrap_or_default()
+	}
+
+	/// Sets the `Accept` header to accept only `media_type`.
+	pub fn with_accept(mut self, media_type: MediaType) -> Self {
+		self.headers.set::<header::Accept>(vec![media_type]);
+		self
+	}
+
 	/// Whether the request's `Accept` header lists the given media type or a
 	/// wildcard (`*/*`, the curl/bot default, or `text/*`). A request with no
 	/// (or unparseable) `Accept` header is treated as accepting anything,

@@ -8,6 +8,7 @@
 //! onto this one.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 
 /// Render a template to an HTML string through the substrate.
 pub fn render_html(
@@ -22,7 +23,11 @@ pub fn render_html(
 /// settled (an attribute mirrored from a synced [`Value`], say).
 pub fn render_world(world: &mut World, root: Entity) -> String {
 	HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))
+		.render(&mut RenderContext::new(
+			world,
+			root,
+			&RequestParts::default(),
+		))
 		.unwrap()
 		.to_string()
 }

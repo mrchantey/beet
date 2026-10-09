@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use alloc::collections::VecDeque;
 use beet_core::prelude::*;
+#[cfg(feature = "serde")]
 use bevy::reflect::Typed;
 
 /// Global store of style [`Rule`]s.

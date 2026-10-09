@@ -12,7 +12,11 @@ pub(crate) fn wasm_page(body: impl Bundle) -> Result<String> {
 	let mut world = (AsyncPlugin, RouterPlugin).into_world();
 	let root = world.spawn_template(Snippet::from_bundle(body))?.id();
 	let body = HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, &mut world))?
+		.render(&mut RenderContext::new(
+			&mut world,
+			root,
+			&RequestParts::default(),
+		))?
 		.to_string();
 	format!(
 		"<!doctype html>\n<html><head><meta charset=\"utf-8\"/></head><body>{body}</body></html>"

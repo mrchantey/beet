@@ -55,11 +55,11 @@ std = []
 # Terminal renderers enable it; the browser's native controls own their keys.
 keyboard = ["std", "beet_core/bevy_keyboard"]
 action = ["dep:beet_action", "net"]
-# The `beet_net` integration beet_ui needs: the std `BlobStore` + serde. wasm-safe
+# The std half of the `beet_net` integration: the `BlobStore` + serde. wasm-safe
 # — it deliberately omits the native-only `fs`/`http` (a render/document consumer
 # does not touch the filesystem store or the http transport directly; native
 # consumers pull those through `beet_router/std`).
-net = ["std", "dep:beet_net", "beet_net/std", "beet_net/serde", "beet_net/action"]
+net = ["std", "beet_net/std", "beet_net/serde", "beet_net/action"]
 tokens = ["beet_core/tokens"]
 rsx = ["beet_core/rsx"]
 # The function-component widget layer: `#[template]` widgets and the `rsx!`
@@ -126,7 +126,9 @@ template_serde = ["beet_core/template_serde", "serde"]
 # `FieldRef`/`DocumentSync` binding layer beet_ui's own `document` module extends)
 # is serde-gated there, and beet_ui's core is document-driven.
 beet_core = { workspace = true, features = ["std", "serde"] }
-beet_net = { workspace = true, optional = true }
+# unconditional for `RequestParts`: every render answers a request, so the
+# no_std wire types are part of the render surface; `net` adds the std half.
+beet_net.workspace = true
 beet_action = { workspace = true, optional = true, features = ["std", "reflect"] }
 bevy.workspace = true
 extend.workspace = true

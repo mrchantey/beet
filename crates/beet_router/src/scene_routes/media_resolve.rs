@@ -113,20 +113,22 @@ impl InlineBlob {
 		}
 	}
 
-	/// The media resolve step over the tree at `root`, a page served at
-	/// `page_url` by `router`: fetch every image source under `policy` and
-	/// insert an [`InlineBlob`] on each source's entity, answering the
-	/// entities given one.
+	/// The media resolve step over the tree at `root`, the page `request`
+	/// asked `router` for: fetch every image source under `policy` and insert
+	/// an [`InlineBlob`] on each source's entity, answering the entities given
+	/// one.
 	pub(crate) async fn resolve(
 		world: &AsyncWorld,
 		router: Entity,
-		page_url: Url,
+		request: &RequestParts,
 		root: Entity,
 		policy: MediaIngestPolicy,
 	) -> Result<Vec<Entity>> {
 		if policy == MediaIngestPolicy::Link {
 			return Ok(Vec::new());
 		}
+		// the page's own url, every relative source resolving against it
+		let page_url = Url::coerce(request.path_string());
 		// collect every source first, deduplicated by its resolved link
 		let homepage = world
 			.with(|world: &mut World| {

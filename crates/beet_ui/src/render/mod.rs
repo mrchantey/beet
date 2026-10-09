@@ -3,15 +3,17 @@
 //! A [`NodeRenderer`] walks the tree rooted at an entity (through
 //! [`NodeWalker`], which transcludes every [`Portal`] in place) and writes one
 //! format. Each format is a [`RenderTarget`], and every target a world renders
-//! to lives in one registry, [`RenderTargets`], the one path every render takes:
+//! to lives in one registry, [`RenderTargets`], the one path every render takes.
 //!
-//! - a request negotiates from its `Accept` list
-//!   ([`RenderTargets::render_negotiated`]), the default media type answering
-//!   an empty list or a wildcard and any unregistered text type falling back
-//!   to plain text;
-//! - a caller holding a tree names the media type it wants
-//!   ([`RenderTargets::render`]), so a direct render can never drift from what
-//!   a client asking for the same type receives.
+//! Every render answers a request: an http request, a cli command, a
+//! syndication route's in-process `Request::get`, a publish step, a test's
+//! [`RequestParts::default()`]. [`RenderTargets::render`] negotiates the format
+//! from its `Accept` ([`RenderTargets::negotiate`]), the default media type
+//! answering an absent header or a wildcard and any unregistered text type
+//! falling back to plain text, and the target reads the same request off its
+//! [`RenderContext`]. A caller wanting a particular format renders a request
+//! accepting it, so a direct render can never drift from what a client asking
+//! for the same type receives.
 //!
 //! [`RenderPlugin`] registers the built-in targets: [`HtmlRenderer`],
 //! [`MarkdownRenderer`], [`PlainTextRenderer`], and with their features
@@ -25,6 +27,7 @@
 //!
 //! ```
 //! # use beet_core::prelude::*;
+//! # use beet_net::prelude::*;
 //! # use beet_ui::prelude::*;
 //! #[derive(Clone)]
 //! struct Shout;
@@ -54,7 +57,9 @@
 //! app.add_plugins(RenderPlugin).register_render_target(Shout);
 //! let world = app.world_mut();
 //! let page = world.spawn(rsx! { <p>"hello"</p> }).id();
-//! RenderTargets::render(world, page, &MediaType::other("text/x-shout"))
+//! let request = RequestParts::default()
+//! 	.with_accept(MediaType::other("text/x-shout"));
+//! RenderTargets::render(world, page, &request)
 //! 	.unwrap()
 //! 	.to_string()
 //! 	.xpect_eq("HELLO\n");
@@ -65,6 +70,7 @@
 //! types ahead of an earlier one, which is how a built-in is replaced.
 //!
 //! [`Portal`]: crate::prelude::Portal
+//! [`RequestParts::default()`]: beet_net::prelude::RequestParts
 #[cfg(feature = "style")]
 mod charcell;
 #[cfg(feature = "style")]

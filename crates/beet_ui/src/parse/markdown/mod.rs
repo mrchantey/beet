@@ -184,6 +184,7 @@ impl NodeParser for MarkdownParser {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// Parse markdown bytes into an entity.
 	fn parse_md(entity: &mut EntityWorldMut, md: &str) {
@@ -410,7 +411,11 @@ mod test {
 		let entity = world.spawn_empty().id();
 		parse_md(&mut world.entity_mut(entity), md);
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
+			.render(&mut RenderContext::new(
+				&mut world,
+				entity,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}

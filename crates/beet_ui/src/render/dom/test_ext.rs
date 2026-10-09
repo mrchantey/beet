@@ -82,10 +82,7 @@ pub(super) fn install_pre_boot() {
 
 /// The html the string sink writes for `root`.
 pub(super) fn ssr(world: &mut World, root: Entity) -> String {
-	HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))
-		.unwrap()
-		.to_string()
+	crate::widgets::test_ext::render_world(world, root)
 }
 
 /// The html the string sink writes for `root`, as the browser serializes it:

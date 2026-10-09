@@ -18,6 +18,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::DEFAULT_HTTP_PORT;
 use beet_net::prelude::HttpServer;
 use beet_net::prelude::MediaType;
+use beet_net::prelude::RequestParts;
 use beet_net::prelude::Response;
 use beet_net::prelude::ServerPlugin;
 use beet_net::prelude::exchange_ext;
@@ -57,7 +58,11 @@ fn serve_showcase(world: &mut World) -> Result {
 		.spawn_template(Snippet::from_bundle(showcase_page()))?
 		.id();
 	let html = HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, world))?
+		.render(&mut RenderContext::new(
+			world,
+			root,
+			&RequestParts::default(),
+		))?
 		.to_string();
 
 	// write to disk for offline inspection

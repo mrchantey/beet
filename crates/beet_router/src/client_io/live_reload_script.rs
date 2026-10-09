@@ -32,6 +32,7 @@ pub fn LiveReloadScript(channels: Query<&ClientIo>) -> Snippet {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// Render a template to an HTML string through the substrate.
@@ -41,7 +42,11 @@ mod test {
 			.unwrap()
 			.id();
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, &mut *world))
+			.render(&mut RenderContext::new(
+				&mut *world,
+				root,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}

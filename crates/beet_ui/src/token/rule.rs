@@ -2,6 +2,7 @@ use crate::prelude::*;
 use alloc::sync::Arc;
 use beet_core::prelude::*;
 use bevy::math::Vec2;
+#[cfg(feature = "serde")]
 use bevy::reflect::Typed;
 
 /// A set of declarations applied to elements matching the given selector.

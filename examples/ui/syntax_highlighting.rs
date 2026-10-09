@@ -31,7 +31,11 @@ fn main() {
 	// by `StylePlugin`.
 	let output = AnsiTermRenderer::new()
 		.with_clear_on_render(false)
-		.render(&mut RenderContext::new(entity, app.world_mut()))
+		.render(&mut RenderContext::new(
+			app.world_mut(),
+			entity,
+			&RequestParts::default(),
+		))
 		.unwrap()
 		.to_string();
 	cross_log!("{output}");

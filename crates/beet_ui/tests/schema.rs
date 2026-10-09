@@ -8,6 +8,7 @@
 beet_core::test_main!();
 
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// A spawn-capable template world.
@@ -158,7 +159,11 @@ fn module_path_resolution_from_path() {
 
 	let root = parse_bsx(&mut world, "<path::to::X/>");
 	let html = HtmlRenderer::new()
-		.render(&mut RenderContext::new(root, &mut world))
+		.render(&mut RenderContext::new(
+			&mut world,
+			root,
+			&RequestParts::default(),
+		))
 		.unwrap()
 		.to_string();
 	html.xpect_contains("indexed");

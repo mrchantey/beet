@@ -156,13 +156,6 @@ mod test {
 		(world, root)
 	}
 
-	fn html(world: &mut World, root: Entity) -> String {
-		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, world))
-			.unwrap()
-			.to_string()
-	}
-
 	fn figure(world: &World, root: Entity) -> Entity {
 		world.entity(root).get::<Children>().unwrap()[0]
 	}
@@ -198,7 +191,7 @@ mod test {
 			.contains::<MermaidSource>()
 			.xpect_false();
 		resolve_render(&mut world, figure).xpect_eq(DiagramRender::Text);
-		html(&mut world, root)
+		crate::widgets::test_ext::render_world(&mut world, root)
 			.xpect_contains("<figure class=\"diagram inline-style-")
 			.xpect_contains("<pre class=\"diagram-text\">")
 			.xpect_contains("│ Parse │")
@@ -228,7 +221,7 @@ mod test {
 			.title()
 			.xpect_eq("sequenceDiagram");
 		resolve_render(&mut world, figure).xpect_eq(DiagramRender::Auto);
-		let html = html(&mut world, root);
+		let html = crate::widgets::test_ext::render_world(&mut world, root);
 		html.xref().xpect_contains("<figure class=\"diagram\">");
 		#[cfg(all(feature = "mermaid_svg", not(target_arch = "wasm32")))]
 		html.xref().xpect_contains("<svg ");
@@ -350,6 +343,7 @@ mod test {
 			.unwrap()
 			.to_vec()
 			.xpect_eq(art);
-		html(world, root).xpect_contains("<pre class=\"diagram-text\">");
+		crate::widgets::test_ext::render_world(world, root)
+			.xpect_contains("<pre class=\"diagram-text\">");
 	}
 }

@@ -107,6 +107,7 @@ impl PortalOf {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	#[beet_core::test]
 	fn walker_renders_referenced_entity() {
@@ -120,7 +121,11 @@ mod test {
 		let root = world.spawn(Portal::new(content)).id();
 
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(root, &mut world))
+			.render(&mut RenderContext::new(
+				&mut world,
+				root,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 			.xpect_contains("<em>transcluded</em>");

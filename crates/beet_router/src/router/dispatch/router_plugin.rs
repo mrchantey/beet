@@ -108,7 +108,6 @@ impl Plugin for RouterPlugin {
 				.register_type::<RenderRoot>()
 				.register_type::<MediaIngestPolicy>()
 				.register_type::<InlineBlob>()
-				.register_type::<PageUrl>()
 				// template routes render through the charcell layout/paint
 				// pipeline; without it the `PostParseTree` schedule has no systems
 				// and ANSI output is blank.

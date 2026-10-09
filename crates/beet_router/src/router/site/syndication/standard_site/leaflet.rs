@@ -35,6 +35,14 @@
 //! expressed as two facets over overlapping ranges, which is the only way the
 //! model can say it. Unused: `#didMention`, `#atMention`, `#id`, `#footnote`.
 //!
+//! # Links
+//!
+//! A record is read far from the site, so every link is absolute: a relative
+//! `href` or `src` resolves against the page's url, the site's homepage
+//! ([`PackageConfig::absolute_url`]) over the path of the request the render
+//! answers. A relative link with no homepage declared is an error naming
+//! `PackageConfig.homepage`, as the sitemap and the feeds refuse one.
+//!
 //! # What degrades, and to what
 //!
 //! Every row here is a deliberate choice of the most legible lossy form, never a
@@ -78,6 +86,7 @@
 //! records carry for one, else a `blocks.website` with the url.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// `pub.leaflet.content`: a post as Leaflet's block model, the object a
@@ -195,7 +204,7 @@ pub struct TextBlock {
 	pub plaintext: String,
 	/// The inline markup over [`plaintext`](Self::plaintext).
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<Facet>,
+	pub facets: Vec<LeafletFacet>,
 }
 
 /// `pub.leaflet.blocks.header`: a heading.
@@ -208,7 +217,7 @@ pub struct HeaderBlock {
 	pub plaintext: String,
 	/// The inline markup over [`plaintext`](Self::plaintext).
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<Facet>,
+	pub facets: Vec<LeafletFacet>,
 }
 
 /// `pub.leaflet.blocks.blockquote`: a quotation.
@@ -219,7 +228,7 @@ pub struct BlockquoteBlock {
 	pub plaintext: String,
 	/// The inline markup over [`plaintext`](Self::plaintext).
 	#[serde(default, skip_serializing_if = "Vec::is_empty")]
-	pub facets: Vec<Facet>,
+	pub facets: Vec<LeafletFacet>,
 }
 
 /// `pub.leaflet.blocks.code`: a code block, verbatim.
@@ -352,16 +361,16 @@ pub struct IframeBlock {
 /// `pub.leaflet.richtext.facet`: inline markup over a byte range of a block's
 /// `plaintext`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Facet {
+pub struct LeafletFacet {
 	/// The byte range the features apply to.
-	pub index: ByteSlice,
+	pub index: LeafletByteSlice,
 	/// What the range is.
-	pub features: Vec<FacetFeature>,
+	pub features: Vec<LeafletFacetFeature>,
 }
 
 /// `#byteSlice`: a range of UTF-8 bytes, start inclusive, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ByteSlice {
+pub struct LeafletByteSlice {
 	/// The first byte.
 	#[serde(rename = "byteStart")]
 	pub byte_start: usize,
@@ -373,7 +382,7 @@ pub struct ByteSlice {
 /// A feature of a facet, naming its def in `$type`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "$type")]
-pub enum FacetFeature {
+pub enum LeafletFacetFeature {
 	/// A link to `uri`.
 	#[serde(rename = "pub.leaflet.richtext.facet#link")]
 	Link {
@@ -427,10 +436,10 @@ impl NodeRenderer for LeafletRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[Self::media_type()])?;
-		let root = cx.entity;
-		let content = cx
-			.world
-			.with_state::<LeafletQuery, _>(|query| query.content(root))?;
+		let (request, root) = (cx.request, cx.entity);
+		let content = cx.world.with_state::<LeafletQuery, _>(|query| {
+			query.content(request, root)
+		})?;
 		let bytes = MediaType::Json.serialize(&content)?;
 		if bytes.len() > LeafletContent::BUDGET {
 			return Err(RenderError::Other(bevyhow!(
@@ -458,7 +467,7 @@ struct LeafletQuery<'w, 's> {
 	attributes: AttributeQuery<'w, 's>,
 	inline_blobs: Query<'w, 's, &'static InlineBlob>,
 	metas: Query<'w, 's, &'static PageMeta>,
-	urls: Query<'w, 's, &'static PageUrl>,
+	package: Option<Res<'w, PackageConfig>>,
 	unregistered: Query<'w, 's, (), With<UnregisteredTag>>,
 	#[cfg(feature = "mermaid")]
 	diagrams: Query<'w, 's, &'static MermaidDiagram>,
@@ -504,9 +513,13 @@ const INLINE: &[&str] = &[
 ];
 
 impl LeafletQuery<'_, '_> {
-	/// The document the tree at `root` renders as: the companion video, then
-	/// the blocks.
-	fn content(&self, root: Entity) -> Result<LeafletContent> {
+	/// The document the tree at `root` renders as, answering `request`: the
+	/// companion video, then the blocks.
+	fn content(
+		&self,
+		request: &RequestParts,
+		root: Entity,
+	) -> Result<LeafletContent> {
 		let mut blocks = Vec::new();
 		if let Some(video) = self
 			.metas
@@ -516,7 +529,7 @@ impl LeafletQuery<'_, '_> {
 		{
 			blocks.push(Self::video(&video)?);
 		}
-		self.blocks(root, &mut blocks)?;
+		self.blocks(request, root, &mut blocks)?;
 		LeafletContent {
 			pages: vec![LeafletPage {
 				id: None,
@@ -549,60 +562,71 @@ impl LeafletQuery<'_, '_> {
 		.xok()
 	}
 
-	/// The url the page answers at, which every relative link resolves
-	/// against.
-	fn page_url(&self, entity: Entity) -> Url {
-		self.urls
-			.get(entity)
-			.map(|url| url.0.clone())
-			.unwrap_or_default()
+	/// The url the page `request` asked for answers at, which every relative
+	/// link resolves against: the site's homepage over the request's path.
+	///
+	/// # Errors
+	/// Errors naming `PackageConfig.homepage` when it is unset, since a
+	/// record is read far from the site and a relative link there is broken.
+	fn page_url(&self, request: &RequestParts) -> Result<Url> {
+		let path = request.path_string();
+		match self.package.as_deref() {
+			Some(package) => package.absolute_url(&path),
+			// no package declared is no homepage declared
+			None => PackageConfig::default().absolute_url(&path),
+		}
 	}
 
 	/// `href` as a link a reader anywhere follows: an absolute uri verbatim,
-	/// a relative one resolved against the page.
-	fn absolute(&self, root: Entity, href: &str) -> Result<Uri> {
+	/// a relative one resolved against the page's url.
+	fn absolute(&self, request: &RequestParts, href: &str) -> Result<Uri> {
 		match Uri::parse(href) {
 			Ok(uri) => uri.xok(),
 			Err(_) => Uri::parse(
-				&self.page_url(root).join(Url::parse(href)?).to_string(),
+				&self.page_url(request)?.join(Url::parse(href)?).to_string(),
 			),
 		}
 	}
 
 	/// The blocks the tree at `entity` writes, appended to `out`: block
 	/// elements as their blocks, runs of inline content as text blocks.
-	fn blocks(&self, entity: Entity, out: &mut Vec<LeafletBlock>) -> Result {
+	fn blocks(
+		&self,
+		request: &RequestParts,
+		entity: Entity,
+		out: &mut Vec<LeafletBlock>,
+	) -> Result {
 		let mut run = InlineRun::default();
-		self.block_node(entity, entity, out, &mut run)?;
+		self.block_node(request, entity, out, &mut run)?;
 		run.flush_text(out);
 		Ok(())
 	}
 
-	/// One node of a block walk from `root`: a block element flushes the
+	/// One node of a block walk answering `request`: a block element flushes the
 	/// pending inline `run` and writes its block, inline content extends it.
 	fn block_node(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
 		if let Ok(portal) = self.portals.get(entity) {
-			return self.block_node(root, portal.target(), out, run);
+			return self.block_node(request, portal.target(), out, run);
 		}
 		if let Ok(value) = self.values.get(entity) {
 			run.push_text(&value.to_string());
 			return Ok(());
 		}
 		let Ok(element) = self.elements.get(entity) else {
-			return self.block_children(root, entity, out, run);
+			return self.block_children(request, entity, out, run);
 		};
 		let tag = element.tag().to_ascii_lowercase();
 		match tag.as_str() {
 			tag if SKIPPED.contains(&tag) => {}
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				run.flush_text(out);
-				let (plaintext, facets) = self.inline_text(root, entity)?;
+				let (plaintext, facets) = self.inline_text(request, entity)?;
 				out.push(LeafletBlock::Header(HeaderBlock {
 					level: tag[1..].parse().unwrap_or(1),
 					plaintext,
@@ -611,12 +635,12 @@ impl LeafletQuery<'_, '_> {
 			}
 			"p" => {
 				run.flush_text(out);
-				self.inline_children(root, entity, out, run)?;
+				self.inline_children(request, entity, out, run)?;
 				run.flush_text(out);
 			}
 			"blockquote" => {
 				run.flush_text(out);
-				out.push(self.blockquote(root, entity)?);
+				out.push(self.blockquote(request, entity)?);
 			}
 			"pre" => {
 				run.flush_text(out);
@@ -635,18 +659,18 @@ impl LeafletQuery<'_, '_> {
 			"ul" => {
 				run.flush_text(out);
 				out.push(LeafletBlock::UnorderedList(
-					self.unordered_list(root, entity)?,
+					self.unordered_list(request, entity)?,
 				));
 			}
 			"ol" => {
 				run.flush_text(out);
 				out.push(LeafletBlock::OrderedList(
-					self.ordered_list(root, entity)?,
+					self.ordered_list(request, entity)?,
 				));
 			}
 			"img" => {
 				run.flush_text(out);
-				out.push(self.image(root, entity)?);
+				out.push(self.image(request, entity)?);
 			}
 			"table" => {
 				run.flush_text(out);
@@ -657,7 +681,7 @@ impl LeafletQuery<'_, '_> {
 			}
 			"iframe" => {
 				run.flush_text(out);
-				if let Some(block) = self.iframe(root, entity)? {
+				if let Some(block) = self.iframe(request, entity)? {
 					out.push(block);
 				}
 			}
@@ -668,11 +692,11 @@ impl LeafletQuery<'_, '_> {
 			"br" => run.push_break(),
 			tag if CONTAINERS.contains(&tag) => {
 				run.flush_text(out);
-				self.block_children(root, entity, out, run)?;
+				self.block_children(request, entity, out, run)?;
 				run.flush_text(out);
 			}
 			_ if self.is_inline(entity, &tag) => {
-				self.inline_node(root, entity, out, run)?;
+				self.inline_node(request, entity, out, run)?;
 			}
 			// an island or any other element nothing maps: its prose alone
 			_ => {
@@ -691,14 +715,14 @@ impl LeafletQuery<'_, '_> {
 
 	fn block_children(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
 		if let Ok(children) = self.children.get(entity) {
 			for child in children.iter() {
-				self.block_node(root, child, out, run)?;
+				self.block_node(request, child, out, run)?;
 			}
 		}
 		Ok(())
@@ -715,14 +739,14 @@ impl LeafletQuery<'_, '_> {
 
 	fn inline_children(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
 		if let Ok(children) = self.children.get(entity) {
 			for child in children.iter() {
-				self.inline_node(root, child, out, run)?;
+				self.inline_node(request, child, out, run)?;
 			}
 		}
 		Ok(())
@@ -733,20 +757,20 @@ impl LeafletQuery<'_, '_> {
 	/// own block.
 	fn inline_node(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
 		if let Ok(portal) = self.portals.get(entity) {
-			return self.inline_node(root, portal.target(), out, run);
+			return self.inline_node(request, portal.target(), out, run);
 		}
 		if let Ok(value) = self.values.get(entity) {
 			run.push_text(&value.to_string());
 			return Ok(());
 		}
 		let Ok(element) = self.elements.get(entity) else {
-			return self.inline_children(root, entity, out, run);
+			return self.inline_children(request, entity, out, run);
 		};
 		let tag = element.tag().to_ascii_lowercase();
 		match tag.as_str() {
@@ -757,23 +781,23 @@ impl LeafletQuery<'_, '_> {
 			}
 			"img" => {
 				run.split(out);
-				out.push(self.image(root, entity)?);
+				out.push(self.image(request, entity)?);
 				Ok(())
 			}
 			"a" => {
 				let feature = self
 					.attribute(entity, "href")
-					.map(|href| self.absolute(root, &href))
+					.map(|href| self.absolute(request, &href))
 					.transpose()?
-					.map(|uri| FacetFeature::Link { uri });
+					.map(|uri| LeafletFacetFeature::Link { uri });
 				run.open(feature);
-				self.inline_children(root, entity, out, run)?;
+				self.inline_children(request, entity, out, run)?;
 				run.close();
 				Ok(())
 			}
 			tag => {
 				run.open(InlineRun::feature(tag));
-				self.inline_children(root, entity, out, run)?;
+				self.inline_children(request, entity, out, run)?;
 				run.close();
 				Ok(())
 			}
@@ -784,22 +808,26 @@ impl LeafletQuery<'_, '_> {
 	/// that holds one run (a heading, a list item).
 	fn inline_text(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
-	) -> Result<(String, Vec<Facet>)> {
+	) -> Result<(String, Vec<LeafletFacet>)> {
 		let mut run = InlineRun::default();
 		let mut out = Vec::new();
-		self.inline_children(root, entity, &mut out, &mut run)?;
+		self.inline_children(request, entity, &mut out, &mut run)?;
 		run.trim_end();
 		(run.plaintext, run.facets).xok()
 	}
 
 	/// A quotation: its paragraphs joined by a blank line, their facets
 	/// shifted along with them.
-	fn blockquote(&self, root: Entity, entity: Entity) -> Result<LeafletBlock> {
+	fn blockquote(
+		&self,
+		request: &RequestParts,
+		entity: Entity,
+	) -> Result<LeafletBlock> {
 		let mut inner = Vec::new();
 		let mut run = InlineRun::default();
-		self.block_children(root, entity, &mut inner, &mut run)?;
+		self.block_children(request, entity, &mut inner, &mut run)?;
 		run.flush_text(&mut inner);
 		let mut quote = BlockquoteBlock::default();
 		for block in inner {
@@ -828,12 +856,12 @@ impl LeafletQuery<'_, '_> {
 	/// The bulleted list at `entity`.
 	fn unordered_list(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 	) -> Result<UnorderedListBlock> {
 		let mut list = UnorderedListBlock::default();
 		for item in self.child_elements(entity, "li") {
-			let (content, nested) = self.list_item(root, item)?;
+			let (content, nested) = self.list_item(request, item)?;
 			let mut item = UnorderedListItem {
 				content,
 				..default()
@@ -856,7 +884,7 @@ impl LeafletQuery<'_, '_> {
 	/// The numbered list at `entity`.
 	fn ordered_list(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 	) -> Result<OrderedListBlock> {
 		let mut list = OrderedListBlock {
@@ -866,7 +894,7 @@ impl LeafletQuery<'_, '_> {
 			..default()
 		};
 		for item in self.child_elements(entity, "li") {
-			let (content, nested) = self.list_item(root, item)?;
+			let (content, nested) = self.list_item(request, item)?;
 			let mut item = OrderedListItem {
 				content,
 				..default()
@@ -889,7 +917,7 @@ impl LeafletQuery<'_, '_> {
 	/// A list item's own text and the lists nested in it.
 	fn list_item(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		item: Entity,
 	) -> Result<(TextBlock, Vec<NestedList>)> {
 		let mut run = InlineRun::default();
@@ -904,17 +932,21 @@ impl LeafletQuery<'_, '_> {
 					.as_deref()
 				{
 					Ok("ul") => nested.push(NestedList::Unordered(
-						self.unordered_list(root, child)?,
+						self.unordered_list(request, child)?,
 					)),
 					Ok("ol") => nested.push(NestedList::Ordered(
-						self.ordered_list(root, child)?,
+						self.ordered_list(request, child)?,
 					)),
 					// a loose list wraps each item's text in a paragraph
 					Ok("p") => {
 						run.push_text(" ");
-						self.inline_children(root, child, &mut out, &mut run)?;
+						self.inline_children(
+							request, child, &mut out, &mut run,
+						)?;
 					}
-					_ => self.inline_node(root, child, &mut out, &mut run)?,
+					_ => {
+						self.inline_node(request, child, &mut out, &mut run)?
+					}
 				}
 			}
 		}
@@ -930,7 +962,11 @@ impl LeafletQuery<'_, '_> {
 	}
 
 	/// An image: its fetched blob, else a link card to it.
-	fn image(&self, root: Entity, entity: Entity) -> Result<LeafletBlock> {
+	fn image(
+		&self,
+		request: &RequestParts,
+		entity: Entity,
+	) -> Result<LeafletBlock> {
 		let alt = self.attribute(entity, "alt").filter(|alt| !alt.is_empty());
 		let source = self
 			.attributes
@@ -965,7 +1001,7 @@ impl LeafletQuery<'_, '_> {
 		let src = match blob {
 			Some(blob) => Uri::parse(&blob.link.to_string())?,
 			None => self.absolute(
-				root,
+				request,
 				&source
 					.and_then(|(_, _, value)| {
 						value.as_str().ok().map(str::to_string)
@@ -980,7 +1016,7 @@ impl LeafletQuery<'_, '_> {
 	/// url a YouTube embed carries as `alt-src`) where it has one.
 	fn iframe(
 		&self,
-		root: Entity,
+		request: &RequestParts,
 		entity: Entity,
 	) -> Result<Option<LeafletBlock>> {
 		let Some(src) = self
@@ -990,7 +1026,7 @@ impl LeafletQuery<'_, '_> {
 			return Ok(None);
 		};
 		LeafletBlock::Website(WebsiteBlock {
-			src: self.absolute(root, &src)?,
+			src: self.absolute(request, &src)?,
 			title: self.attribute(entity, "title"),
 		})
 		.xmap(Some)
@@ -1171,22 +1207,22 @@ enum NestedList {
 #[derive(Default)]
 struct InlineRun {
 	plaintext: String,
-	facets: Vec<Facet>,
+	facets: Vec<LeafletFacet>,
 	/// The open marks, each its feature (none for an element that only
 	/// flows) and the byte it started at.
-	open: Vec<(Option<FacetFeature>, usize)>,
+	open: Vec<(Option<LeafletFacetFeature>, usize)>,
 }
 
 impl InlineRun {
 	/// The facet feature an inline `tag` marks its content with.
-	fn feature(tag: &str) -> Option<FacetFeature> {
+	fn feature(tag: &str) -> Option<LeafletFacetFeature> {
 		match tag {
-			"strong" | "b" => Some(FacetFeature::Bold),
-			"em" | "i" => Some(FacetFeature::Italic),
-			"code" => Some(FacetFeature::Code),
-			"mark" => Some(FacetFeature::Highlight),
-			"u" | "ins" => Some(FacetFeature::Underline),
-			"s" | "del" | "strike" => Some(FacetFeature::Strikethrough),
+			"strong" | "b" => Some(LeafletFacetFeature::Bold),
+			"em" | "i" => Some(LeafletFacetFeature::Italic),
+			"code" => Some(LeafletFacetFeature::Code),
+			"mark" => Some(LeafletFacetFeature::Highlight),
+			"u" | "ins" => Some(LeafletFacetFeature::Underline),
+			"s" | "del" | "strike" => Some(LeafletFacetFeature::Strikethrough),
 			_ => None,
 		}
 	}
@@ -1215,7 +1251,7 @@ impl InlineRun {
 	}
 
 	/// Open a mark at the current position.
-	fn open(&mut self, feature: Option<FacetFeature>) {
+	fn open(&mut self, feature: Option<LeafletFacetFeature>) {
 		self.open.push((feature, self.plaintext.len()));
 	}
 
@@ -1226,11 +1262,16 @@ impl InlineRun {
 		}
 	}
 
-	fn push_facet(&mut self, feature: FacetFeature, start: usize, end: usize) {
+	fn push_facet(
+		&mut self,
+		feature: LeafletFacetFeature,
+		start: usize,
+		end: usize,
+	) {
 		let end = end.min(self.plaintext.trim_end().len());
 		if start < end {
-			self.facets.push(Facet {
-				index: ByteSlice {
+			self.facets.push(LeafletFacet {
+				index: LeafletByteSlice {
 					byte_start: start,
 					byte_end: end,
 				},
@@ -1288,24 +1329,42 @@ fn collapse_whitespace(text: &str) -> String {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
-	#[allow(unused_imports)]
 	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
-	/// A world rendering to Leaflet.
-	fn world() -> World {
+	/// A world rendering to Leaflet, its site at `homepage`.
+	fn world_at(homepage: Option<&str>) -> World {
 		let mut world = world_ext::ui_world();
+		world.insert_resource(PackageConfig {
+			homepage: homepage.map(|homepage| Url::parse(homepage).unwrap()),
+			..default()
+		});
 		world
 			.resource_mut::<RenderTargets>()
 			.register(LeafletRenderer);
 		world
 	}
 
+	/// A world rendering to Leaflet, its site at `https://beet.org`.
+	fn world() -> World { world_at(Some("https://beet.org")) }
+
+	/// The tree at `root` as Leaflet's content, answering a request for
+	/// `/blog/post`.
+	fn leaflet(
+		world: &mut World,
+		root: Entity,
+	) -> Result<MediaBytes, RenderError> {
+		RenderTargets::render(
+			world,
+			root,
+			&RequestParts::get("/blog/post")
+				.with_accept(LeafletRenderer::media_type()),
+		)
+	}
+
 	/// The blocks the tree at `root` renders as, as json.
 	fn blocks(world: &mut World, root: Entity) -> serde_json::Value {
-		let bytes =
-			RenderTargets::render(world, root, &LeafletRenderer::media_type())
-				.unwrap();
+		let bytes = leaflet(world, root).unwrap();
 		let content: serde_json::Value =
 			serde_json::from_slice(&bytes).unwrap();
 		content["pages"][0]["blocks"]
@@ -1393,18 +1452,21 @@ mod test {
 			);
 	}
 
-	/// A relative link resolves against the page's url.
+	/// A relative link resolves against the homepage over the request's
+	/// path, and with no homepage declared it is refused, naming the field.
 	#[beet_core::test]
 	fn resolves_relative_links() {
+		let link = || rsx! { <p><a href="../docs">"docs"</a></p> };
 		let mut world = world();
-		let root = world
-			.spawn((
-				PageUrl(Url::parse("https://beet.org/blog/post").unwrap()),
-				rsx! { <p><a href="../docs">"docs"</a></p> },
-			))
-			.id();
+		let root = world.spawn(link()).id();
 		blocks(&mut world, root)[0]["facets"][0]["features"][0]["uri"]
 			.xpect_eq(json(r#""https://beet.org/docs""#));
+		let mut world = world_at(None);
+		let root = world.spawn(link()).id();
+		leaflet(&mut world, root)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("PackageConfig.homepage");
 	}
 
 	#[beet_core::test]
@@ -1474,15 +1536,12 @@ mod test {
 	fn maps_images() {
 		let mut world = world();
 		let root = world
-			.spawn((
-				PageUrl(Url::parse("https://beet.org/blog/post").unwrap()),
-				rsx! {
-					<div>
-						<p>"Before "<img src="./fetched.png" alt="Fetched"/>" after."</p>
-						<img src="/linked.png" alt="Linked"/>
-					</div>
-				},
-			))
+			.spawn(rsx! {
+				<div>
+					<p>"Before "<img src="./fetched.png" alt="Fetched"/>" after."</p>
+					<img src="/linked.png" alt="Linked"/>
+				</div>
+			})
 			.id();
 		let fetched = world
 			.query::<(Entity, &Attribute, &Value)>()
@@ -1596,7 +1655,7 @@ mod test {
 				"x".repeat(LeafletContent::BUDGET)
 			)]))
 			.id();
-		RenderTargets::render(&mut world, root, &LeafletRenderer::media_type())
+		leaflet(&mut world, root)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("blobPages");

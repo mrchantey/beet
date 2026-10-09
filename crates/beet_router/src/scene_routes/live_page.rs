@@ -3,10 +3,11 @@
 //! [`LivePage::prepare`] runs a built page's render middleware (the layouts),
 //! resolves the `--root` cascade ([`RenderRoot`]) and, when the request names
 //! a [`MediaIngestPolicy`], the media resolve step ([`InlineBlob`]). The live
-//! page renders through any registered target as many times as its holder
-//! likes, and its release takes back everything the preparation put on a tree
-//! it does not own. [`LivePage::scoped`] and [`LivePage::respond`] release it
-//! whatever the outcome; a live surface binds one instead.
+//! page keeps the request it was built for, the [`RequestParts`] every render
+//! of it answers, and renders through any registered target as many times as
+//! its holder likes; its release takes back everything the preparation put on
+//! a tree it does not own. [`LivePage::scoped`] and [`LivePage::respond`]
+//! release it whatever the outcome; a live surface binds one instead.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
@@ -14,9 +15,10 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
 /// A page built and held alive: its render middleware run (the layouts), the
-/// `--root` cascade resolved, the route's [`PageMeta`] and its [`PageUrl`]
-/// carried onto the root it chose, and the media its request named resolved.
-/// Rendered through any registered target as many times as its holder likes.
+/// `--root` cascade resolved, the route's [`PageMeta`] carried onto the root it
+/// chose, and the media its request named resolved. Rendered through any
+/// registered target as many times as its holder likes, each render answering
+/// the request it was built for.
 ///
 /// [`LivePage::scoped`] and [`LivePage::respond`] release it whatever the
 /// outcome, so an early `?` never strands a page; a live surface binds one
@@ -24,6 +26,8 @@ use beet_ui::prelude::*;
 #[derive(Clone)]
 pub struct LivePage {
 	world: AsyncWorld,
+	/// The request the page was built for, which every render answers.
+	request: RequestParts,
 	/// The whole page, its layouts included, on which its ephemerals are
 	/// recorded.
 	page: Entity,
@@ -38,16 +42,6 @@ pub struct LivePage {
 	/// on release so a persistent tree keeps no fetched bytes.
 	inline_blobs: Vec<Entity>,
 }
-
-/// The url the page a render root belongs to answers at: absolute on the
-/// site's homepage when the site declares one, else rooted.
-///
-/// Carried onto the render root by [`LivePage::prepare`] for the life of the
-/// live page, so a target writing links a reader follows elsewhere (a Leaflet
-/// document) resolves the page's relative links as a browser would.
-#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
-#[reflect(Component)]
-pub struct PageUrl(pub Url);
 
 /// A page bound to a live surface: the `page` whose ephemerals the surface
 /// reclaims on the next swap, and the entity `shown` in the surface's slot,
@@ -68,7 +62,8 @@ impl LivePage {
 	/// ([`RenderRoot`]), carry the route's [`PageMeta`] onto the root it chose,
 	/// so a scene response reads the page's metadata where it reads the tree,
 	/// and, when the request names a [`MediaIngestPolicy`], run the media
-	/// resolve step ([`InlineBlob::resolve`]). A failure releases what was
+	/// resolve step ([`InlineBlob::resolve`]). The live page keeps `parts`,
+	/// the request every render of it answers. A failure releases what was
 	/// built.
 	pub async fn prepare(
 		page: Entity,
@@ -82,7 +77,7 @@ impl LivePage {
 				return Err(err);
 			}
 		};
-		let page_url = Url::coerce(parts.path_string());
+		let request = parts.clone();
 		// apply ancestor render middleware (layout wrapping, etc.)
 		let wrapped = match route
 			.call_with_middleware(Action::new_fixed(page), parts)
@@ -96,7 +91,6 @@ impl LivePage {
 		};
 		let world = route.world().clone();
 		let route_id = route.id();
-		let page_url_carried = page_url.clone();
 		let prepared = route
 			.world()
 			.with(move |world_mut: &mut World| -> Result<(Self, Entity)> {
@@ -128,12 +122,6 @@ impl LivePage {
 						world_mut.entity_mut(resolved).insert(meta);
 						resolved
 					});
-				let absolute = world_mut
-					.get_resource::<PackageConfig>()
-					.and_then(|package| package.homepage.as_ref())
-					.map(|homepage| homepage.join(page_url_carried.clone()))
-					.unwrap_or(page_url_carried);
-				world_mut.entity_mut(resolved).insert(PageUrl(absolute));
 				// the router a source fetch re-enters
 				let router = world_mut
 					.with_state::<AncestorQuery<&RouteTree>, _>(|trees| {
@@ -142,6 +130,7 @@ impl LivePage {
 					.unwrap_or(route_id);
 				let live = Self {
 					world,
+					request,
 					page: wrapped,
 					root: resolved,
 					to_despawn,
@@ -165,7 +154,7 @@ impl LivePage {
 		match InlineBlob::resolve(
 			&live.world,
 			router,
-			page_url,
+			&live.request,
 			live.root,
 			policy,
 		)
@@ -218,18 +207,16 @@ impl LivePage {
 	/// The response a request makes of a built `page`: negotiate the media
 	/// type from `Accept`, prepare the page, render it and release it.
 	///
-	/// This is the http page handler, so html is the preferred type: a request
-	/// with no `Accept` or a wildcard (`*/*`) renders the web document.
+	/// This is the http page handler, so a request with no `Accept` or a
+	/// wildcard (`*/*`) renders the web document, the registry's
+	/// [`DEFAULT`](RenderTargets::DEFAULT). Negotiating before the build means
+	/// a type nothing renders builds nothing and answers `406 Not Acceptable`.
 	pub async fn respond(
 		page: Entity,
 		route: &AsyncEntity,
 		parts: RequestParts,
 	) -> Result<Response> {
-		let accepts: Vec<MediaType> = parts
-			.headers
-			.get::<header::Accept>()
-			.and_then(|result| result.ok())
-			.unwrap_or_default();
+		let request = parts.clone();
 		let negotiated = route
 			.world()
 			.with(move |world: &mut World| -> Result<MediaType> {
@@ -240,7 +227,8 @@ impl LivePage {
 							"no `RenderTargets` in this world: add the `RenderPlugin`"
 						)
 					})?
-					.negotiate(&accepts, &MediaType::Html)?
+					.negotiate(&request)
+					.map_err(HttpError::from)?
 					.xok()
 			})
 			.await;
@@ -288,13 +276,14 @@ impl LivePage {
 			.await
 	}
 
-	/// Render the page as `media_type`, through the target registered for it.
+	/// Render the page as `media_type`: this page's request, accepting only
+	/// that type, so the body is exactly the one a client asking for it gets.
 	pub async fn render(&self, media_type: &MediaType) -> Result<MediaBytes> {
 		let root = self.root;
-		let media_type = media_type.clone();
+		let request = self.request.clone().with_accept(media_type.clone());
 		self.world
 			.with(move |world: &mut World| {
-				RenderTargets::render(world, root, &media_type)
+				RenderTargets::render(world, root, &request)
 			})
 			.await?
 			.xok()
@@ -361,7 +350,7 @@ impl LivePage {
 	}
 
 	/// Despawn the page's ephemerals and take back what was carried onto a
-	/// tree it does not own: the metadata, the url and the fetched media.
+	/// tree it does not own: the metadata and the fetched media.
 	async fn release(self) {
 		self.world
 			.with(move |world: &mut World| {
@@ -369,9 +358,6 @@ impl LivePage {
 					&& let Ok(mut entity) = world.get_entity_mut(entity)
 				{
 					entity.remove::<PageMeta>();
-				}
-				if let Ok(mut root) = world.get_entity_mut(self.root) {
-					root.remove::<PageUrl>();
 				}
 				for entity in self.inline_blobs {
 					if let Ok(mut entity) = world.get_entity_mut(entity) {
@@ -709,6 +695,56 @@ mod test {
 		}
 	}
 
+	/// A type no target renders answers `406 Not Acceptable`, building nothing.
+	#[beet_core::test]
+	async fn unrenderable_type_is_not_acceptable() {
+		let (mut world, router) = site();
+		// the first render spawns the cached systems and observers it runs on
+		get(&mut world, router, Request::get(POST), MediaType::Html).await;
+		let baseline = entities(&mut world);
+		world
+			.entity_mut(router)
+			.exchange(Request::get(POST).with_accept(MediaType::Png))
+			.await
+			.status()
+			.xpect_eq(StatusCode::NOT_ACCEPTABLE);
+		entities(&mut world).xpect_eq(baseline);
+	}
+
+	/// One live page renders as every type its holder asks for, each the body
+	/// a request for that type answers.
+	#[beet_core::test]
+	async fn renders_one_page_as_two_types() {
+		let (mut world, router) = site();
+		let (html, markdown) = world
+			.run_async_then(async move |world| {
+				LivePage::scoped(
+					&world.entity(router),
+					at(POST, "main"),
+					async |live| {
+						(
+							live.render(&MediaType::Html).await?.to_string(),
+							live.render(&MediaType::Markdown)
+								.await?
+								.to_string(),
+						)
+							.xok()
+					},
+				)
+				.await
+			})
+			.await
+			.unwrap();
+		html.clone().xpect_starts_with("<main>");
+		markdown.clone().xpect_contains("# Full Stack Bevy");
+		get(&mut world, router, at(POST, "main"), MediaType::Html)
+			.await
+			.xpect_eq(html);
+		get(&mut world, router, at(POST, "main"), MediaType::Markdown)
+			.await
+			.xpect_eq(markdown);
+	}
+
 	/// The scope releases the page whether its closure succeeds or fails, and
 	/// a request leaves nothing behind either.
 	#[beet_core::test]
@@ -742,7 +778,7 @@ mod test {
 	}
 
 	/// A target registered from outside `beet_ui` answers a request through
-	/// the same registry the built-ins do.
+	/// the same registry the built-ins do, reading the request it answers.
 	#[beet_core::test]
 	async fn renders_a_downstream_target() {
 		#[derive(Clone)]
@@ -756,7 +792,11 @@ mod test {
 				cx.walk(&mut text);
 				MediaBytes::new_string(
 					MediaType::other("text/x-shout"),
-					text.into_string().to_uppercase(),
+					format!(
+						"{}: {}",
+						cx.request.path_string(),
+						text.into_string().to_uppercase()
+					),
 				)
 				.xok()
 			}
@@ -775,6 +815,6 @@ mod test {
 			MediaType::other("text/x-shout"),
 		)
 		.await
-		.xpect_eq("PAGE\n");
+		.xpect_eq("/blog/full-stack-bevy: PAGE\n");
 	}
 }

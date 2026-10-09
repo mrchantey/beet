@@ -174,7 +174,11 @@ mod test {
 			.unwrap()
 			.id();
 		HtmlRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
+			.render(&mut RenderContext::new(
+				&mut world,
+				entity,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}

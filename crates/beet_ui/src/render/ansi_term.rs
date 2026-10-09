@@ -96,6 +96,21 @@ impl NodeRenderer for AnsiTermRenderer {
 #[cfg(feature = "markdown_parser")]
 mod test {
 	use super::*;
+	use beet_net::prelude::*;
+
+	/// The tree at `entity` rendered via [`AnsiTermRenderer`], answering a
+	/// default request.
+	fn ansi(world: &mut World, entity: Entity) -> String {
+		AnsiTermRenderer::new()
+			.with_clear_on_render(false)
+			.render(&mut RenderContext::new(
+				world,
+				entity,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
+	}
 
 	/// Parse markdown, resolve styles, then render via [`AnsiTermRenderer`].
 	fn render(md: &str) -> String {
@@ -109,11 +124,7 @@ mod test {
 				&bytes,
 			))
 			.unwrap();
-		AnsiTermRenderer::new()
-			.with_clear_on_render(false)
-			.render(&mut RenderContext::new(entity, app.world_mut()))
-			.unwrap()
-			.to_string()
+		ansi(app.world_mut(), entity)
 	}
 
 	/// Strip ANSI escape sequences (CSI and OSC-8), leaving visible text.
@@ -280,11 +291,7 @@ mod test {
 				&bytes,
 			))
 			.unwrap();
-		AnsiTermRenderer::new()
-			.with_clear_on_render(false)
-			.render(&mut RenderContext::new(entity, app.world_mut()))
-			.unwrap()
-			.to_string()
+		ansi(app.world_mut(), entity)
 			.xmap(strip_ansi)
 			.xpect_contains("a & b");
 	}
