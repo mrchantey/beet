@@ -38,7 +38,6 @@ pub(crate) fn call_on_spawn<
 	In: 'static + Send + Sync + Clone,
 	Out: 'static + Send + Sync,
 >(
-	// ev: On<Insert, CallOnSpawn<In, Out>>,
 	mut commands: Commands,
 	query: Query<(Entity, &CallOnSpawn<In, Out>), Added<CallOnSpawn<In, Out>>>,
 ) -> Result {

@@ -41,7 +41,7 @@ impl Default for SetCurveOnRun {
 /// Observer that rebuilds the [`PlayProceduralAnimation`] curve each time
 /// the action enters the [`Running`] state.
 pub(crate) fn set_curve_on_run(
-	ev: On<Add, Running<Outcome>>,
+	ev: On<Add<Running<Outcome>>>,
 	transforms: AgentQuery<&Transform>,
 	mut rng: ResMut<RandomSource>,
 	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,

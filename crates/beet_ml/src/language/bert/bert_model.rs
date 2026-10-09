@@ -7,9 +7,9 @@ use burn::nn::transformer::TransformerEncoder;
 use burn::nn::transformer::TransformerEncoderConfig;
 use burn::nn::transformer::TransformerEncoderInput;
 use burn::tensor::Bool;
+use burn::tensor::Device;
 use burn::tensor::Int;
 use burn::tensor::Tensor;
-use burn::tensor::backend::Backend;
 
 /// HuggingFace-compatible bert model config (sentence-transformers
 /// MiniLM family). Load from a `config.json` via [`serde_json`]; extra
@@ -29,21 +29,21 @@ pub struct BertModelConfig {
 
 /// Bert encoder for sentence embeddings.
 #[derive(Module, Debug)]
-pub struct BertModel<B: Backend> {
-	pub(crate) embeddings: BertEmbeddings<B>,
-	pub(crate) encoder: TransformerEncoder<B>,
+pub struct BertModel {
+	pub(crate) embeddings: BertEmbeddings,
+	pub(crate) encoder: TransformerEncoder,
 }
 
 /// Output of [`BertModel::forward`].
 #[derive(Debug, Clone)]
-pub struct BertOutput<B: Backend> {
+pub struct BertOutput {
 	/// Hidden states from the last encoder layer, shape `[batch, seq_len, hidden]`.
-	pub hidden_states: Tensor<B, 3>,
+	pub hidden_states: Tensor<3>,
 }
 
 impl BertModelConfig {
 	/// Initialise a model with random weights on `device`.
-	pub fn init<B: Backend>(&self, device: &B::Device) -> BertModel<B> {
+	pub fn init(&self, device: &Device) -> BertModel {
 		BertModel {
 			embeddings: self.embeddings_config().init(device),
 			encoder: self.encoder_config().init(device),
@@ -79,7 +79,7 @@ impl BertModelConfig {
 	}
 }
 
-impl<B: Backend> BertModel<B> {
+impl BertModel {
 	/// Forward pass.
 	///
 	/// * `input_ids`: `[batch, seq_len]`
@@ -87,16 +87,16 @@ impl<B: Backend> BertModel<B> {
 	/// * `token_type_ids`: optional `[batch, seq_len]`
 	pub fn forward(
 		&self,
-		input_ids: Tensor<B, 2, Int>,
-		attention_mask: Tensor<B, 2>,
-		token_type_ids: Option<Tensor<B, 2, Int>>,
-	) -> BertOutput<B> {
+		input_ids: Tensor<2, Int>,
+		attention_mask: Tensor<2>,
+		token_type_ids: Option<Tensor<2, Int>>,
+	) -> BertOutput {
 		let embeddings = self.embeddings.forward(input_ids, token_type_ids);
 
 		// convert (1=real, 0=pad) → bool mask where true = padding
 		let device = attention_mask.device();
-		let zeros = Tensor::<B, 2>::zeros(attention_mask.shape(), &device);
-		let mask_pad: Tensor<B, 2, Bool> = attention_mask.equal(zeros);
+		let zeros = Tensor::<2>::zeros(attention_mask.shape(), &device);
+		let mask_pad: Tensor<2, Bool> = attention_mask.equal(zeros);
 
 		let encoder_input =
 			TransformerEncoderInput::new(embeddings).mask_pad(mask_pad);
@@ -109,8 +109,7 @@ impl<B: Backend> BertModel<B> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::language::bert::DefaultBackend;
-	use crate::language::bert::default_device_async;
+	use crate::language::bert::default_device;
 	use crate::language::bert::has_device;
 	use crate::language::bert::mean_pool;
 	use crate::language::bert::normalize_l2;
@@ -123,15 +122,13 @@ mod test {
 	/// [`bert_asset`](super::bert_asset).
 	#[beet_core::test]
 	async fn forward_smoke() {
-		use burn::tensor::Tensor;
-
 		// this asserts the modules wire together, not that a GPU exists, so a host
 		// granting no adapter (gpu-less CI, a broken driver) skips rather than fails
 		if !has_device().await {
 			warn!("no gpu adapter granted, skipping forward_smoke");
 			return;
 		}
-		let device = default_device_async().await;
+		let device = default_device().await.unwrap();
 		let config = BertModelConfig::new(
 			16,    // hidden_size
 			2,     // num_attention_heads
@@ -143,16 +140,15 @@ mod test {
 			0.0,   // hidden_dropout_prob
 			1e-12, // layer_norm_eps
 		);
-		let model = config.init::<DefaultBackend>(&device);
+		let model = config.init(&device);
 
 		// batch=2, seq_len=4, one padded token in row 0
-		let input_ids =
-			Tensor::<DefaultBackend, 1, burn::tensor::Int>::from_data(
-				[7i64, 9, 11, 0, 4, 5, 6, 7].as_slice(),
-				&device,
-			)
-			.reshape([2, 4]);
-		let attention_mask = Tensor::<DefaultBackend, 1>::from_data(
+		let input_ids = Tensor::<1, Int>::from_data(
+			[7i64, 9, 11, 0, 4, 5, 6, 7].as_slice(),
+			&device,
+		)
+		.reshape([2, 4]);
+		let attention_mask = Tensor::<1>::from_data(
 			[1.0f32, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0].as_slice(),
 			&device,
 		)

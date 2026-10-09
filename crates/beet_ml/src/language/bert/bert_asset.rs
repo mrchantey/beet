@@ -1,6 +1,7 @@
 use crate::language::bert::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use burn::tensor::Device;
 use burn::tensor::Tensor;
 use burn_store::ModuleSnapshot;
 use burn_store::PyTorchToBurnAdapter;
@@ -14,27 +15,28 @@ use tokenizers::Tokenizer;
 /// hand (eg downloaded by [`fetch_ext::fetch_bytes`]) or via
 /// [`Bert::new`] which adds the fetch step.
 ///
-/// The default backend is configurable via cargo features — see
-/// [`DefaultBackend`].
+/// The burn backend is configurable via cargo features, see
+/// [`default_device`].
 #[derive(Asset, TypePath)]
 pub struct Bert {
 	/// User-facing options (eg `normalize_embeddings`).
 	pub config: BertConfig,
 	/// The encoder.
-	pub model: BertModel<DefaultBackend>,
+	pub model: BertModel,
 	/// The tokenizer, padded for batch encoding.
 	pub tokenizer: Tokenizer,
 	/// Device the model lives on.
-	pub device: DefaultDevice,
+	pub device: Device,
 }
 
 impl Bert {
 	/// Download the model + tokenizer from the urls in `config` and
-	/// return a fully-constructed [`Bert`].
+	/// return a fully-constructed [`Bert`] on the [`default_device`].
 	///
 	/// The network/storage work is done by [`fetch_ext::fetch_bytes`];
 	/// see its docs for the currently supported targets.
 	pub async fn new(config: BertConfig) -> Result<Self> {
+		let device = default_device().await?;
 		let model_config_bytes =
 			fetch_ext::fetch_bytes(&config.model.config_url()).await?;
 		let weights_bytes =
@@ -43,28 +45,28 @@ impl Bert {
 			fetch_ext::fetch_bytes(&config.model.tokenizer_url()).await?;
 		Self::from_bytes(
 			config,
+			device,
 			&model_config_bytes,
 			weights_bytes,
 			&tokenizer_bytes,
 		)
 	}
 
-	/// Construct a [`Bert`] from pre-loaded bytes.
+	/// Construct a [`Bert`] on `device` from pre-loaded bytes.
 	///
 	/// * `model_config_bytes` — the HuggingFace `config.json` payload
 	/// * `weights_bytes` — the safetensors-encoded weights
 	/// * `tokenizer_bytes` — the tokenizer.json payload
 	pub fn from_bytes(
 		config: BertConfig,
+		device: Device,
 		model_config_bytes: &[u8],
 		weights_bytes: Vec<u8>,
 		tokenizer_bytes: &[u8],
 	) -> Result<Self> {
-		let device = default_device();
-
 		let model_config: BertModelConfig =
 			serde_json::from_slice(model_config_bytes)?;
-		let mut model = model_config.init::<DefaultBackend>(&device);
+		let mut model = model_config.init(&device);
 		load_safetensors(&mut model, weights_bytes)?;
 
 		let mut tokenizer = Tokenizer::from_bytes(tokenizer_bytes)
@@ -99,11 +101,8 @@ impl Bert {
 		options: Vec<Cow<'static, str>>,
 	) -> Result<SentenceEmbeddings> {
 		let refs: Vec<&str> = options.iter().map(|s| s.as_ref()).collect();
-		let (input_ids, attention_mask) = tokenize_batch::<DefaultBackend>(
-			&self.tokenizer,
-			&refs,
-			&self.device,
-		);
+		let (input_ids, attention_mask) =
+			tokenize_batch(&self.tokenizer, &refs, &self.device)?;
 		let output =
 			self.model.forward(input_ids, attention_mask.clone(), None);
 		let pooled = mean_pool(output.hidden_states, attention_mask);
@@ -159,13 +158,13 @@ pub struct SentenceEmbeddings {
 	pub sentences: Vec<Cow<'static, str>>,
 	/// Pooled (and optionally normalised) embeddings, shape
 	/// `[n_sentences, hidden]`.
-	pub embeddings: Tensor<DefaultBackend, 2>,
+	pub embeddings: Tensor<2>,
 }
 
 impl SentenceEmbeddings {
 	pub(crate) fn new(
 		sentences: Vec<Cow<'static, str>>,
-		embeddings: Tensor<DefaultBackend, 2>,
+		embeddings: Tensor<2>,
 	) -> Self {
 		Self {
 			sentences,
@@ -185,10 +184,7 @@ impl SentenceEmbeddings {
 		let others = self.embeddings.clone().narrow(0, 1, n - 1);
 		// rows are L2-normalised, so cosine sim is just the dot product
 		let scores = (others * target).sum_dim(1).reshape([n - 1]);
-		scores
-			.into_data()
-			.to_vec::<f32>()
-			.map_err(|e| bevyhow!("failed to extract embedding scores: {e:?}"))
+		scores.into_data().try_into_vec::<f32>()?.xok()
 	}
 
 	/// Same as [`scores_from_first`](Self::scores_from_first) but returns
@@ -259,10 +255,7 @@ mod test {
 ///
 /// The HuggingFace key naming differs from burn's `TransformerEncoder`;
 /// the remap below mirrors the one in `minilm-burn::loader`.
-fn load_safetensors(
-	model: &mut BertModel<DefaultBackend>,
-	bytes: Vec<u8>,
-) -> Result<()> {
+fn load_safetensors(model: &mut BertModel, bytes: Vec<u8>) -> Result<()> {
 	use burn_store::KeyRemapper;
 
 	let key_mappings: Vec<(&str, &str)> = vec![
@@ -284,13 +277,10 @@ fn load_safetensors(
 		("embeddings\\.LayerNorm", "embeddings.layer_norm"),
 	];
 
-	let remapper = KeyRemapper::from_patterns(key_mappings)
-		.map_err(|e| bevyhow!("KeyRemapper: {e}"))?;
+	let remapper = KeyRemapper::from_patterns(key_mappings)?;
 	let mut store = SafetensorsStore::from_bytes(Some(bytes))
 		.with_from_adapter(PyTorchToBurnAdapter)
 		.remap(remapper);
-	model
-		.load_from(&mut store)
-		.map_err(|e| bevyhow!("load_from: {e}"))?;
+	model.load_from(&mut store)?;
 	Ok(())
 }

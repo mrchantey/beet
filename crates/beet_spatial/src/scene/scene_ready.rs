@@ -28,7 +28,7 @@ impl Plugin for SceneReadyPlugin {
 /// `Ready` waits for the scene to spawn; a despawned scene resolves it
 /// implicitly. A `WorldAssetRoot` added outside a build gates nothing.
 fn register_pending_scene(
-	add: On<Add, WorldAssetRoot>,
+	add: On<Add<WorldAssetRoot>>,
 	build_root: Option<Res<TemplateBuildRoot>>,
 	mut commands: Commands,
 ) {

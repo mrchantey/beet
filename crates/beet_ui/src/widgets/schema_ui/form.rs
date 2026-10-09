@@ -258,6 +258,7 @@ fn uneditable(
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::Button;
 	use crate::prelude::*;
 	use crate::widgets::schema_ui::test_ext;
 	use beet_core::prelude::*;

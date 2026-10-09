@@ -55,6 +55,7 @@ mod test {
 
 		#[derive(Clone)]
 		struct Noop;
+		subtree_template!(Noop);
 		impl Template for Noop {
 			type Output = ();
 			fn build_template(&self, _: &mut TemplateContext) -> Result<()> {

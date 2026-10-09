@@ -191,8 +191,8 @@ test-all *args:
 	# unifying `bevy/default` across the whole graph has tripped a mold linker bug.
 	# A second reason since: `bevy/default` turns on `bevy/reflect_auto_register`,
 	# whose inventory pass registers *every* reflected type in the binary, so
-	# bevy's own `Button`/`Slider`/`Display`/`Overflow` join the registry and
-	# collide by short type path with beet's. `<Button>` from a Rust `rsx!` then
+	# bevy's own `Button`/`Slider`/`Display`/`Overflow`/`Pointer` join the registry
+	# and collide by short type path with beet's. `<Button>` from a Rust `rsx!` then
 	# resolves to bevy's component instead of beet_ui's template (the `rsx!`
 	# expansion opens with `use beet_core::prelude::*`, which shadows the call
 	# site), so `-p beet_ui` co-built with any `bevy/default` crate fails three
@@ -274,7 +274,7 @@ _extra-pkgs := "beet_spatial beet_ml beet_extra"
 
 # Subset of `_extra-pkgs` whose wasm tests pass. beet_ml runs under deno, whose
 # WebGPU grants a real wgpu device: the bert forward pass initializes it through
-# burn's async setup (`default_device_async`) and probes first, skipping with a
+# burn's async setup (`default_device`) and probes first, skipping with a
 # warning on a host that grants no adapter (gpu-less CI).
 _extra-pkgs-wasm := "beet_spatial beet_ml beet_extra"
 
@@ -282,9 +282,10 @@ _extra-pkgs-wasm := "beet_spatial beet_ml beet_extra"
 # crate's `[features]` and excluding the ones that must not be co-enabled.
 # Always excludes:
 # - `default`: redundant, cargo keeps default features on without naming them
-# - `ndarray` / `cuda`: burn backends mutually exclusive with `wgpu` (the
-#   default). Co-enabling them links conflicting backend runtimes and corrupts
-#   the heap at process teardown, so `--all-features` is never safe here.
+# - `flex` / `cuda`: beet_ml's alternative burn backends. It runs on one backend,
+#   picked by feature priority, so co-enabling either would move its suites off
+#   `wgpu` (the default); `cuda`'s `cudarc` build script also cannot build on
+#   every host. `--all-features` is never safe here.
 # On stable additionally excludes `nightly` / `custom_test_frameworks`, the
 # nightly-only test-runner features that stable cannot compile.
 # `extra` is a `|`-joined list of additional feature names to exclude; the wasm
@@ -292,7 +293,7 @@ _extra-pkgs-wasm := "beet_spatial beet_ml beet_extra"
 _core-features pkgs extra="":
 	#!/usr/bin/env bash
 	set -euo pipefail
-	base='default|ndarray|cuda'
+	base='default|flex|cuda'
 	if ! rustc --version | grep -q nightly; then
 		base="nightly|custom_test_frameworks|$base"
 	fi

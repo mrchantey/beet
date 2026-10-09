@@ -1,9 +1,10 @@
 //! The BSX value grammar: literals, `@` bindings, `$` references, and spreads.
 //!
-//! A hand-written cursor over the value surface, mirroring the `bsn!` surface:
-//! scalars, named-field structs, lists, and enums (unit/tuple/struct variants),
-//! plus `@source:path` reactive bindings ([`BindingExpr`]) and `$entity`
-//! references. Position decides which entry point is called:
+//! A hand-written cursor over the value surface, beet's own grammar inspired by
+//! bevy's `bsn!`: scalars, named-field structs, lists, and enums (unit, tuple
+//! and struct variants), plus `@source:path` reactive bindings
+//! ([`BindingExpr`]) and `$entity` references. Position decides which entry
+//! point is called:
 //! [`parse_value_expr`] for attribute-value and text position, [`parse_spread`]
 //! for bare-child position. Both share the literal grammar ([`parse_literal`]).
 

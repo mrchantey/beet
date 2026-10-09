@@ -202,6 +202,7 @@ pub(crate) fn scheme_independent_declarations() -> Rule {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::style::FontWeight;
 
 	#[beet_core::test]
 	fn material_rule_set() {

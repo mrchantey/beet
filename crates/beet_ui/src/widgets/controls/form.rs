@@ -270,7 +270,7 @@ impl Plugin for FormPlugin {
 /// data by rendering. An absent field's null is typable (it promotes to a
 /// string) and displays as empty, which is what nothing-typed looks like.
 ///
-/// A system rather than an `On<Add, Element>` observer for that same reason: a
+/// A system rather than an `On<Add<Element>>` observer for that same reason: a
 /// widget's `{field}` spread lands as a deferred insert, so at the moment the
 /// element is added a bound control does not yet look like one.
 fn ensure_form_field_value(
@@ -443,6 +443,7 @@ fn ancestor_form(
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::Button;
 	use crate::prelude::*;
 	use crate::widgets::test_ext;
 	use beet_core::prelude::*;

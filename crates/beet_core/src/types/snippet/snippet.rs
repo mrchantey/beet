@@ -76,6 +76,8 @@ impl Snippet {
 	fn effect(self, entity: &mut EntityWorldMut) { self.build_into(entity); }
 }
 
+subtree_template!(Snippet);
+
 impl Template for Snippet {
 	type Output = ();
 	fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
@@ -176,12 +178,11 @@ impl<T: Into<Value>> IntoSnippet<(NotSnippetBundleMarker, SnippetValueMarker)>
 }
 
 /// An `on*` event handler closure becomes an observer on the spawning entity.
-impl<T, E, B, M>
-	IntoSnippet<(NotSnippetBundleMarker, (SnippetObserverMarker, E, B, M))> for T
+impl<T, E, M>
+	IntoSnippet<(NotSnippetBundleMarker, (SnippetObserverMarker, E, M))> for T
 where
-	E: Event,
-	B: Bundle,
-	T: 'static + Send + Sync + IntoObserverSystem<E, B, M>,
+	E: EventPattern,
+	T: 'static + Send + Sync + IntoObserverSystem<E, M>,
 {
 	fn into_snippet(self) -> impl Bundle { OnSpawn::observe(self) }
 }
@@ -258,10 +259,10 @@ all_tuples!(impl_into_snippet_tuple, 2, 15, T, t, M);
 /// This is the discriminator that lets [`IntoSnippetBundle`] dispatch a spread
 /// or an uppercase tag between "insert as a component/bundle" and "build as a
 /// template" without overlap. A reflect-patch [`Component`] does not implement
-/// it (Bevy's blanket `Template for T: Default + Clone + Unpin` would otherwise
-/// make a component look like a template); only a `#[template]` struct does,
-/// because it opts out of `Unpin` via `subtree_template!` and supplies its own
-/// build.
+/// it (Bevy's blanket `Template for T: Clone + Unpin` makes every `Clone`
+/// component a [`Template`] too, so that bound alone cannot discriminate); only
+/// a `#[template]` struct does, because it opts out of `Unpin` via
+/// `subtree_template!` and supplies its own build.
 pub trait BuildTemplate:
 	'static + Send + Sync + Clone + Template<Output = ()>
 {

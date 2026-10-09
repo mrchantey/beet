@@ -196,7 +196,7 @@ impl AnalyticsBuffer {
 /// Observer: resolve the [`BlobStore`] named beside an [`AnalyticsConfig`] and
 /// attach its buffered writer to that config entity.
 pub(super) fn spawn_store_on_config(
-	ev: On<Add, AnalyticsConfig>,
+	ev: On<Add<AnalyticsConfig>>,
 	stores: Query<&AnalyticsStore>,
 	commands: AsyncCommands,
 ) {

@@ -29,9 +29,9 @@ use beet_core_macros::ToTokens;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[component(immutable)]
-// `Default` (empty tag) exists so `Element` picks up Bevy's blanket
-// `Template`/`FromTemplate` impls (`Clone + Default`), making it usable as a
-// scene template via `template_value`. The default is always overwritten.
+// `Default` (empty tag) gives `Element` Bevy's blanket `FromTemplate` impl
+// (`Clone + Default`) and backs `#[reflect(Default)]`; the blanket `Template`
+// impl needs only `Clone`. The default is always overwritten.
 pub struct Element(SmolStr);
 
 impl Element {

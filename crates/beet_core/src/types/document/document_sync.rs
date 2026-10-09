@@ -130,7 +130,7 @@ impl FieldOf {
 /// Resolves the [`DocumentPath`] to find the actual document entity and
 /// establishes the relationship so document changes can efficiently propagate to this field.
 pub(super) fn link_field_to_document(
-	ev: On<Insert, FieldRef>,
+	ev: On<Insert<FieldRef>>,
 	mut commands: Commands,
 	fields: Query<&FieldRef>,
 	docs: Query<(), With<Document>>,
@@ -152,7 +152,7 @@ pub(super) fn link_field_to_document(
 /// in particular records what the document held for *that* field, and a record
 /// of a field nothing points at any more is stale by construction.
 pub(super) fn unlink_field_from_document(
-	ev: On<Remove, FieldRef>,
+	ev: On<Remove<FieldRef>>,
 	mut commands: Commands,
 ) -> Result {
 	commands

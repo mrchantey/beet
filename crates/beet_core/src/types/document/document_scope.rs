@@ -121,7 +121,7 @@ impl ScopeQuery<'_, '_> {
 /// present when this runs. Handles every newly-inserted ref, including each
 /// [`ReactiveChildren`] generation.
 pub(super) fn resolve_field_path(
-	ev: On<Insert, FieldRef>,
+	ev: On<Insert<FieldRef>>,
 	mut commands: Commands,
 	fields: Query<&FieldRef>,
 	docs: DocumentResolver,

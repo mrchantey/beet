@@ -17,7 +17,7 @@ pub async fn run(args: Option<&str>, test: TestDescAndFn) -> TestOutcome {
 	let store = Store::new(None);
 
 	app.add_observer(
-		move |ev: On<Insert, TestOutcome>, outcomes: Query<&TestOutcome>| {
+		move |ev: On<Insert<TestOutcome>>, outcomes: Query<&TestOutcome>| {
 			store.set(Some(outcomes.get(ev.entity).unwrap().clone()));
 		},
 	);

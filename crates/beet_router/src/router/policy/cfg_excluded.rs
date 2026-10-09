@@ -24,7 +24,7 @@ use beet_net::prelude::*;
 /// `site/deploy` is not found. Nothing could do better without running the
 /// effect the exclusion existed to prevent.
 pub(crate) fn report_cfg_excluded(
-	ev: On<Add, CfgExcluded>,
+	ev: On<Add<CfgExcluded>>,
 	query: Query<&CfgExcluded>,
 	mut commands: Commands,
 ) -> Result {

@@ -88,9 +88,10 @@ pub use scene_editor::*;
 pub use schema_ui::*;
 pub use toast::*;
 pub(crate) use widget_plugin::widget_plugin;
-// `button::Button` collides with the bevy_ui `Button` that leaks in via the
-// `beet_core::prelude` glob in the widget files; the explicit re-export pins
-// the public `Button`, and downstream `prelude::Button`, to this crate's widget.
+// `button::Button` collides with bevy's deprecated `bevy::ui::widget::Button`,
+// which leaks in via the `beet_core::prelude` glob under `bevy_default`; the
+// explicit re-export pins the public `Button`, and downstream `prelude::Button`,
+// to this crate's widget.
 // A widget file authoring `<Button>` pins it the same way, with its own
 // `use crate::prelude::Button`, since two globs offering the name are ambiguous.
 pub use controls::button::Button;

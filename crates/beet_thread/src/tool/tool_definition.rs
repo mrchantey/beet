@@ -12,7 +12,7 @@ use serde::Serialize;
 #[cfg(feature = "action")]
 pub(crate) fn insert_tool_definition(
 	// path pattern is inserted by ActionMeta
-	ev: On<Insert, PathPattern>,
+	ev: On<Insert<PathPattern>>,
 	mut commands: Commands,
 	query: Query<(&ActionMeta, &PathPattern)>,
 ) -> Result {

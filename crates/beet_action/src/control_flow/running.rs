@@ -438,7 +438,7 @@ pub(crate) fn tick_run_timers(
 
 /// Resets `last_run` when [`Running`] is added.
 pub(crate) fn reset_run_time_started<T>(
-	ev: On<Add, Running<T>>,
+	ev: On<Add<Running<T>>>,
 	mut query: Populated<&mut RunTimer>,
 ) -> Result
 where
@@ -450,7 +450,7 @@ where
 
 /// Resets `last_end` when [`Running`] is removed.
 pub(crate) fn reset_run_timer_stopped<T>(
-	ev: On<Remove, Running<T>>,
+	ev: On<Remove<Running<T>>>,
 	mut query: Populated<&mut RunTimer>,
 ) -> Result
 where

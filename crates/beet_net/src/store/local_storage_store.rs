@@ -220,7 +220,7 @@ pub(crate) struct LocalStorageBlobWatcher {
 
 /// Install the global `storage` listener on the first [`LocalStorageStore`].
 pub(crate) fn add_local_storage_store_watcher(
-	_ev: On<Add, LocalStorageStore>,
+	_ev: On<Add<LocalStorageStore>>,
 	bus: Res<BlobEventBus>,
 	spawner: Res<AsyncSpawner>,
 	mut watcher: NonSendMut<LocalStorageBlobWatcher>,
@@ -244,7 +244,7 @@ pub(crate) fn add_local_storage_store_watcher(
 /// Drop the refcount, tearing down the listener on the last
 /// [`LocalStorageStore`].
 pub(crate) fn remove_local_storage_store_watcher(
-	_ev: On<Remove, LocalStorageStore>,
+	_ev: On<Remove<LocalStorageStore>>,
 	mut watcher: NonSendMut<LocalStorageBlobWatcher>,
 ) {
 	watcher.subscribers = watcher.subscribers.saturating_sub(1);

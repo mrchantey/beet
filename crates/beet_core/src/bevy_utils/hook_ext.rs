@@ -1,6 +1,6 @@
 //! Constructors for common component hooks.
 //!
-//! Bevy's hook attributes (`on_add`, `on_insert`, `on_replace`, `on_remove`,
+//! Bevy's hook attributes (`on_add`, `on_insert`, `on_discard`, `on_remove`,
 //! `on_despawn`) accept a function call yielding a closure, evaluated fresh on
 //! every hook invocation. These constructors exploit that to express common
 //! hooks inline, and apply to any of the five:
@@ -96,7 +96,8 @@ where
 /// each watching the hooked entity.
 ///
 /// Uses [`observe_any`](crate::prelude::EntityCommandsActionEventExt::observe_any),
-/// so any [`Event`] type is accepted, not just [`EntityEvent`].
+/// so any [`EventPattern`] is accepted, not just an [`EntityEvent`]: a plain
+/// event or a lifecycle pattern like `On<Insert<Foo>>`.
 pub fn observe<M>(
 	observers: impl HookObservers<M>,
 ) -> impl FnOnce(DeferredWorld, HookContext) {
@@ -151,8 +152,8 @@ pub trait HookObservers<M> {
 	fn add_observers(self, entity: &mut EntityCommands);
 }
 
-impl<E: Event, B: Bundle, M, O: IntoObserverSystem<E, B, M>>
-	HookObservers<fn(E, B, M)> for O
+impl<E: EventPattern, M, O: IntoObserverSystem<E, M>> HookObservers<fn(E, M)>
+	for O
 {
 	fn add_observers(self, entity: &mut EntityCommands) {
 		entity.observe_any(self);

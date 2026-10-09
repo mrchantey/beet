@@ -158,7 +158,7 @@ impl ErasedStoreBlock {
 /// Deferred through the command queue because the erased half itself lands
 /// through it.
 pub(crate) fn attach_store(
-	ev: On<Insert, ErasedStoreBlock>,
+	ev: On<Insert<ErasedStoreBlock>>,
 	mut commands: Commands,
 ) {
 	commands

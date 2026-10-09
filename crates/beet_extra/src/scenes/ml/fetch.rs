@@ -198,7 +198,7 @@ fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
 /// Logs the [`Sentence`] of the item the fox is fetching once the fetch action sets
 /// its [`SteerTarget`], the data form of `fetch_npc`'s spawn-time observer.
 fn announce_fetch(
-	ev: On<Insert, SteerTarget>,
+	ev: On<Insert<SteerTarget>>,
 	steer_targets: Query<&SteerTarget>,
 	sentences: Query<&Sentence>,
 	mut log: MessageWriter<OnLogMessage>,

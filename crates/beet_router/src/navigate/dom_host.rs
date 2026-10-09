@@ -55,7 +55,7 @@ impl DomHost {
 
 /// Observer: the host's page landed, so the tab's console says which url the
 /// world dispatched. The boot check reads this line, then the paint's.
-fn log_landing(ev: On<Insert, RenderSurfaceOf>, navigators: Query<&Navigator>) {
+fn log_landing(ev: On<Insert<RenderSurfaceOf>>, navigators: Query<&Navigator>) {
 	if let Ok(navigator) = navigators.get(ev.entity) {
 		info!("dom host landed {}", navigator.current_url());
 	}

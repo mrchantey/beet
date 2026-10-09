@@ -12,11 +12,12 @@
 use crate::prelude::*;
 use bevy::ecs::template::Template;
 use bevy::ecs::template::TemplateContext;
-use bevy::reflect::FromType;
+use bevy::reflect::CreateTypeData;
 use bevy::reflect::GetTypeRegistration;
 use bevy::reflect::TypeRegistration;
 use bevy::reflect::TypeRegistry;
 use bevy::reflect::Typed;
+use core::any::TypeId;
 
 /// Reflect type-data that builds a template from a reflected data value.
 ///
@@ -25,8 +26,9 @@ use bevy::reflect::Typed;
 /// `#[derive(Clone)]` gives it the blanket [`TypeData`](bevy::reflect::TypeData)
 /// impl, so it lives in the registry.
 ///
-/// The schema-side companion [`ReflectTemplateSchema`] registers beside this,
-/// keeping prop validation separate from the build bridge.
+/// Registering it also inserts the schema-side companion
+/// [`ReflectTemplateSchema`] beside it, keeping prop validation separate from
+/// the build bridge.
 #[derive(Clone)]
 pub struct ReflectTemplate {
 	/// Builds the template: `from_reflect` the data into `T`, then
@@ -103,8 +105,8 @@ impl ReflectTemplate {
 	}
 }
 
-/// Reflect type-data carrying a template type's prop [`ValueSchema`], attached
-/// alongside [`ReflectTemplate`] by [`register_template`](WorldRegisterTemplateExt::register_template).
+/// Reflect type-data carrying a template type's prop [`ValueSchema`], inserted
+/// alongside every [`ReflectTemplate`] registration as its dependency.
 ///
 /// The schema sits *beside* the build bridge, not inside it: a tag resolves to
 /// its build function (`ReflectTemplate`) and, separately,
@@ -128,11 +130,11 @@ impl ReflectTemplateSchema {
 	pub fn schema(&self) -> &ValueSchema { &self.schema }
 }
 
-impl<T> FromType<T> for ReflectTemplateSchema
+impl<T> CreateTypeData<T> for ReflectTemplateSchema
 where
 	T: GetTemplateSchema,
 {
-	fn from_type() -> Self {
+	fn create_type_data(_input: ()) -> Self {
 		Self {
 			schema: T::template_schema(),
 		}
@@ -151,11 +153,11 @@ pub trait GetTemplateSchema {
 	fn template_schema() -> ValueSchema { ValueSchema::Any }
 }
 
-impl<T> FromType<T> for ReflectTemplate
+impl<T> CreateTypeData<T> for ReflectTemplate
 where
-	T: FromReflect + Typed + Template<Output = ()>,
+	T: FromReflect + Typed + GetTemplateSchema + Template<Output = ()>,
 {
-	fn from_type() -> Self {
+	fn create_type_data(_input: ()) -> Self {
 		Self {
 			build: |value, cx| {
 				let template = T::from_reflect(value).ok_or_else(|| {
@@ -168,13 +170,18 @@ where
 			},
 		}
 	}
+
+	/// A build bridge always carries its prop schema beside it.
+	fn insert_dependencies(registration: &mut TypeRegistration) {
+		registration.register_type_data::<ReflectTemplateSchema, T>();
+	}
 }
 
 /// Registers a template type on a [`World`].
 #[extend::ext(name=WorldRegisterTemplateExt)]
 pub impl World {
-	/// Registers `T` and its [`ReflectTemplate`] type-data, so it resolves by
-	/// short type path.
+	/// Registers `T` and its [`ReflectTemplate`] type-data, which brings its
+	/// [`ReflectTemplateSchema`] along, so it resolves by short type path.
 	fn register_template<T>(&mut self) -> &mut Self
 	where
 		T: FromReflect
@@ -186,9 +193,12 @@ pub impl World {
 		let registry = self.resource_mut::<AppTypeRegistry>();
 		let mut registry = registry.write();
 		registry.register::<T>();
-		registry.register_type_data::<T, ReflectTemplate>();
-		// attach the prop schema (from `GetTemplateSchema`) beside the build bridge.
-		registry.register_type_data::<T, ReflectTemplateSchema>();
+		// `TypeRegistry::register_type_data` skips dependencies, so insert
+		// through the registration to bring the schema along.
+		registry
+			.get_mut(TypeId::of::<T>())
+			.expect("registered above")
+			.register_type_data::<ReflectTemplate, T>();
 		drop(registry);
 		// index the schema by short type path so a `SchemaRef::Name` resolves.
 		let name = T::type_info().type_path_table().short_path();
@@ -331,7 +341,7 @@ mod test {
 	}
 
 	// opt out of `Unpin` so `Label` escapes Bevy's blanket
-	// `Template for T: Default + Clone + Unpin` and can supply its own
+	// `Template for T: Clone + Unpin` and can supply its own
 	// subtree-building impl. See [`subtree_template`].
 	subtree_template!(Label);
 	impl GetTemplateSchema for Label {}
@@ -359,6 +369,8 @@ mod test {
 		patch.insert("text", "hello".to_string());
 
 		let registry = world.resource::<AppTypeRegistry>().clone();
+		// the build bridge brings its prop schema along
+		ValueSchema::template_by_name(&registry, "Label").xpect_some();
 		let root = world.spawn_empty().id();
 		world
 			.entity_mut(root)

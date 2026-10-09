@@ -854,9 +854,9 @@ pub impl AsyncWorld {
 	}
 
 	/// Registers an observer.
-	fn observe<E: Event, B: Bundle, M>(
+	fn observe<E: EventPattern, M>(
 		&self,
-		observer: impl IntoObserverSystem<E, B, M>,
+		observer: impl IntoObserverSystem<E, M>,
 	) -> impl Future<Output = ()> + Send {
 		self.with(|world| {
 			world.add_observer(observer);
@@ -870,13 +870,12 @@ pub impl AsyncWorld {
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
 	/// resolves to, eg `|ev: On<Ready>| ev.entity` to await a
 	/// [`Ready`](crate::prelude::Ready) and surface the entity it fired on.
-	fn await_event<E, B, M, O>(
+	fn await_event<E, M, O>(
 		&self,
-		observer: impl IntoObserverSystem<E, B, M, O>,
+		observer: impl IntoObserverSystem<E, M, O>,
 	) -> impl Future<Output = O> + Send
 	where
-		E: Event<Trigger<'static>: Default>,
-		B: Bundle,
+		E: EventPattern<Event: Event<Trigger<'static>: Default>>,
 		O: 'static + Send + Sync,
 	{
 		let world = self.clone();
@@ -1287,9 +1286,9 @@ impl AsyncEntity {
 	}
 
 	/// Registers an observer on the entity.
-	pub fn observe<E: Event, B: Bundle, M>(
+	pub fn observe<E: EventPattern, M>(
 		&self,
-		observer: impl IntoObserverSystem<E, B, M>,
+		observer: impl IntoObserverSystem<E, M>,
 	) -> impl Future<Output = Result<()>> + Send {
 		self.with(|mut entity| {
 			entity.observe_any(observer);
@@ -1303,15 +1302,14 @@ impl AsyncEntity {
 	/// `observer` is a full observer system, so beyond the [`On<E>`] trigger it
 	/// may take arbitrary [`SystemParam`]s and returns the value the future
 	/// resolves to. The route-handler case: `spawn_template` a root, then
-	/// `entity.await_event::<Ready, _, _, _>(|ev: On<Ready>, errors: Query<(), With<TemplateError>>| errors.contains(ev.entity))`
+	/// `entity.await_event::<Ready, _, _>(|ev: On<Ready>, errors: Query<(), With<TemplateError>>| errors.contains(ev.entity))`
 	/// to await readiness and branch on the root's error state.
-	pub fn await_event<E, B, M, O>(
+	pub fn await_event<E, M, O>(
 		&self,
-		observer: impl IntoObserverSystem<E, B, M, O>,
+		observer: impl IntoObserverSystem<E, M, O>,
 	) -> impl Future<Output = Result<O>> + Send
 	where
-		E: EntityEvent<Trigger<'static>: Default>,
-		B: Bundle,
+		E: EventPattern<Event: EntityEvent<Trigger<'static>: Default>>,
 		O: 'static + Send + Sync,
 	{
 		let world = self.world.clone();

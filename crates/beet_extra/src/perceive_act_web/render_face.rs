@@ -12,7 +12,7 @@ use web_sys::HtmlImageElement;
 ///
 /// Runs on insert, so every `show-image` call re-renders the face.
 pub(crate) fn render_face(
-	ev: On<Insert, DisplayedImage>,
+	ev: On<Insert<DisplayedImage>>,
 	images: Query<&DisplayedImage>,
 ) {
 	let Ok(image) = images.get(ev.entity) else {

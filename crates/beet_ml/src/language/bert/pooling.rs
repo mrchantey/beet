@@ -1,5 +1,6 @@
+use burn::linalg::Norm;
+use burn::linalg::vector_normalize;
 use burn::tensor::Tensor;
-use burn::tensor::backend::Backend;
 
 /// Mean-pool over the sequence dimension, ignoring padded positions.
 ///
@@ -8,10 +9,10 @@ use burn::tensor::backend::Backend;
 /// * `attention_mask`: `[batch, seq_len]` — 1.0 for real tokens, 0.0 for padding
 ///
 /// Returns `[batch, hidden]`.
-pub(crate) fn mean_pool<B: Backend>(
-	hidden_states: Tensor<B, 3>,
-	attention_mask: Tensor<B, 2>,
-) -> Tensor<B, 2> {
+pub(crate) fn mean_pool(
+	hidden_states: Tensor<3>,
+	attention_mask: Tensor<2>,
+) -> Tensor<2> {
 	let [batch_size, seq_len, hidden_size] = hidden_states.dims();
 
 	let mask_expanded = attention_mask
@@ -19,11 +20,11 @@ pub(crate) fn mean_pool<B: Backend>(
 		.reshape([batch_size, seq_len, 1])
 		.expand([batch_size, seq_len, hidden_size]);
 
-	let sum_hidden: Tensor<B, 2> = (hidden_states * mask_expanded)
+	let sum_hidden: Tensor<2> = (hidden_states * mask_expanded)
 		.sum_dim(1)
 		.reshape([batch_size, hidden_size]);
 
-	let token_counts: Tensor<B, 2> = attention_mask
+	let token_counts: Tensor<2> = attention_mask
 		.sum_dim(1)
 		.reshape([batch_size, 1])
 		.expand([batch_size, hidden_size])
@@ -35,10 +36,6 @@ pub(crate) fn mean_pool<B: Backend>(
 /// L2-normalise each row of `embeddings` to unit length.
 ///
 /// Matches the default behaviour of sentence-transformers.
-pub(crate) fn normalize_l2<B: Backend>(
-	embeddings: Tensor<B, 2>,
-) -> Tensor<B, 2> {
-	use burn::tensor::linalg::Norm;
-	use burn::tensor::linalg::vector_normalize;
+pub(crate) fn normalize_l2(embeddings: Tensor<2>) -> Tensor<2> {
 	vector_normalize(embeddings, Norm::L2, 1, 1e-12)
 }

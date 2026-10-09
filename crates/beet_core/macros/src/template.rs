@@ -9,7 +9,8 @@
 //!   required props, binds the props by name, runs the body verbatim (any
 //!   `rsx!` inside expands normally), and inserts the resulting bundle into the
 //!   build target;
-//! - a `subtree_template!(Name)` opt-out of Bevy's blanket `Template` impl;
+//! - a generics-aware `Unpin` opt-out of Bevy's blanket
+//!   `Template for T: Clone + Unpin` impl, the `subtree_template!` pattern;
 //! - a `register_Name` registration fn (called by `register_template::<Name>()`)
 //!   exposing the template by name to the loader.
 //!
@@ -286,7 +287,7 @@ fn emit(
 		#[allow(non_snake_case)]
 		#data_struct
 
-		// opt out of Bevy's blanket `Template for T: Default + Clone + Unpin`,
+		// opt out of Bevy's blanket `Template for T: Clone + Unpin`,
 		// generics-aware (the `subtree_template!` macro cannot express generics).
 		impl #impl_generics ::core::marker::Unpin for #name #ty_generics #unpin_where
 		{

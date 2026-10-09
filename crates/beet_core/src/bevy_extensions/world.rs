@@ -242,7 +242,8 @@ pub impl World {
 	fn component_names(&self, entity: Entity) -> Vec<String> {
 		self.inspect_entity(entity)
 			.map(|ent| {
-				ent.map(|comp| self.pretty_name(comp)).collect::<Vec<_>>()
+				ent.map(|(_, comp)| self.pretty_name(comp))
+					.collect::<Vec<_>>()
 			})
 			.unwrap_or_default()
 	}
@@ -260,7 +261,7 @@ pub impl World {
 					.filter_map(|entity| self.inspect_entity(entity).ok())
 					.map(|component_iter| {
 						component_iter
-							.map(|component| self.pretty_name(component))
+							.map(|(_, component)| self.pretty_name(component))
 							.collect::<Vec<_>>()
 					})
 					.collect::<Vec<_>>()
@@ -306,7 +307,7 @@ pub impl World {
 				.inspect_entity(entity)
 				.map(|component_iter| {
 					component_iter
-						.map(|component| world.pretty_name(component))
+						.map(|(_, component)| world.pretty_name(component))
 						.collect::<Vec<_>>()
 				})
 				.unwrap_or_default();
@@ -399,18 +400,18 @@ pub impl World {
 #[ext(name=CoreWorldExt)]
 pub impl World {
 	/// Returns self with an observer spawned.
-	fn with_observer<E: Event, B: Bundle, M>(
+	fn with_observer<E: EventPattern, M>(
 		mut self,
-		system: impl IntoObserverSystem<E, B, M>,
+		system: impl IntoObserverSystem<E, M>,
 	) -> Self {
 		self.spawn(Observer::new(system));
 		self
 	}
 
 	/// Spawns an observer and returns self for chaining.
-	fn observing<E: Event, B: Bundle, M>(
+	fn observing<E: EventPattern, M>(
 		&mut self,
-		system: impl IntoObserverSystem<E, B, M>,
+		system: impl IntoObserverSystem<E, M>,
 	) -> &mut Self {
 		self.spawn(Observer::new(system));
 		self

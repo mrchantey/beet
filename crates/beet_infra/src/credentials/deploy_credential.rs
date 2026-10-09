@@ -371,7 +371,7 @@ impl DeployCredentialQuery<'_, '_> {
 pub(crate) fn attach_deploy_credential<
 	T: 'static + Send + Sync + Clone + Component + DeployCredentialProvider,
 >(
-	ev: On<Insert, T>,
+	ev: On<Insert<T>>,
 	declarations: Query<&T>,
 	mut commands: Commands,
 ) {

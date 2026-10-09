@@ -1,7 +1,7 @@
 //! [`ReflectDerived`] and [`Derived`]: the marks saying a type, or an entity
 //! and its subtree, is derived state, never content.
 use crate::prelude::*;
-use bevy_reflect::FromType;
+use bevy_reflect::CreateTypeData;
 
 /// Reflect type data marking a type as **derived state**: present in a running
 /// world but never part of a scene's authored content, so a dump skips it.
@@ -28,8 +28,8 @@ use bevy_reflect::FromType;
 #[derive(Debug, Copy, Clone)]
 pub struct ReflectDerived;
 
-impl<T> FromType<T> for ReflectDerived {
-	fn from_type() -> Self { Self }
+impl<T> CreateTypeData<T> for ReflectDerived {
+	fn create_type_data(_input: ()) -> Self { Self }
 }
 
 /// Marks an entity, and every descendant under it, as **derived state**: built

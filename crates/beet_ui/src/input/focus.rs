@@ -187,7 +187,7 @@ impl Plugin for FocusPlugin {
 
 /// Observer: infer [`Focusable`] from a newly-added element's tag.
 fn infer_focusable(
-	ev: On<Add, Element>,
+	ev: On<Add<Element>>,
 	elements: Query<&Element>,
 	mut commands: Commands,
 ) {

@@ -302,7 +302,8 @@ pub enum SpreadItem {
 	Binding(BindingExpr),
 }
 
-/// A literal in the BSX value grammar, mirroring the `bsn!` value surface.
+/// A literal in the BSX value grammar, beet's own grammar inspired by bevy's
+/// `bsn!` value surface.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataLiteral {
 	/// A scalar resolved to the field's type, eg `42`, `"text"`, `true`.

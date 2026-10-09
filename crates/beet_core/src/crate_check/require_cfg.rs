@@ -52,7 +52,7 @@ impl RequireCfg {
 	/// compile.
 	#[cfg(feature = "bsx")]
 	pub fn check_on_insert(
-		ev: On<Insert, RequireCfg>,
+		ev: On<Insert<RequireCfg>>,
 		mut commands: Commands,
 	) -> Result {
 		let entity = ev.entity;

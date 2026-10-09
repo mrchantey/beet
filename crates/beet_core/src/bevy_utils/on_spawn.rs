@@ -147,8 +147,8 @@ impl OnSpawn {
 	}
 
 	/// Registers an observer on the entity on spawn.
-	pub fn observe<E: Event, B: Bundle, M>(
-		observer: impl 'static + Send + Sync + IntoObserverSystem<E, B, M>,
+	pub fn observe<E: EventPattern, M>(
+		observer: impl 'static + Send + Sync + IntoObserverSystem<E, M>,
 	) -> Self {
 		Self::new(move |entity| {
 			entity.observe_any(observer);

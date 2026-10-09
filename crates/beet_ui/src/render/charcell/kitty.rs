@@ -702,7 +702,7 @@ impl KittyPlacements {
 /// resource.
 #[cfg(feature = "tui")]
 pub(crate) fn clear_kitty_placements(
-	ev: On<Remove, Terminal>,
+	ev: On<Remove<Terminal>>,
 	mut placements: ResMut<KittyPlacements>,
 ) {
 	placements.terminals.remove(&ev.entity);

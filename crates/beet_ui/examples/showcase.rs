@@ -24,6 +24,9 @@ use beet_net::prelude::ServerPlugin;
 use beet_net::prelude::exchange_ext;
 use beet_ui::prelude::style::*;
 use beet_ui::prelude::*;
+// pin beet_ui's widget over bevy's deprecated `Button`, which `beet_core::prelude`
+// carries under `bevy_default`
+use beet_ui::prelude::Button;
 use bevy::MinimalPlugins;
 use bevy::app::App;
 

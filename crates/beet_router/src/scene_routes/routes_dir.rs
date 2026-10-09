@@ -109,7 +109,7 @@ impl RoutesDir {
 	/// it, and a settle ([`TemplatePending::settle`]) waits on the same set
 	/// wherever the dir was inserted.
 	pub fn spawn_on_insert(
-		ev: On<Insert, RoutesDir>,
+		ev: On<Insert<RoutesDir>>,
 		dirs: Query<&RoutesDir>,
 		build_root: Option<Res<TemplateBuildRoot>>,
 		mut commands: Commands,

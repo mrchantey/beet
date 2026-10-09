@@ -24,7 +24,7 @@ use beet_core::prelude::*;
 /// write until the blur. Watches the policy too, since a generated control's
 /// spread lands a frame after the element it is on.
 pub(super) fn hold_write_on_focus(
-	ev: On<Insert, (Focus, WritePolicy)>,
+	ev: On<Insert<(Focus, WritePolicy)>>,
 	controls: Query<&WritePolicy, With<Focus>>,
 	mut commands: Commands,
 ) {
@@ -40,7 +40,7 @@ pub(super) fn hold_write_on_focus(
 /// edit in its document at once. A despawn removes the focus too, so a
 /// control taken away mid-edit lands what it held rather than losing it.
 pub(super) fn release_write_on_blur(
-	ev: On<Remove, Focus>,
+	ev: On<Remove<Focus>>,
 	held: Query<
 		(
 			&Value,
@@ -69,6 +69,7 @@ pub(super) fn release_write_on_blur(
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::Button;
 	use crate::prelude::*;
 	use crate::widgets::test_ext;
 	use beet_core::prelude::*;

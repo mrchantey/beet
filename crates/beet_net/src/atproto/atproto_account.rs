@@ -97,7 +97,7 @@ impl AtprotoAccountQuery<'_, '_> {
 /// Observer: land the [`Pds`] an `<AtprotoAccount/>` declares on its entity.
 #[cfg(feature = "atproto")]
 pub(super) fn attach_account(
-	ev: On<Insert, AtprotoAccount>,
+	ev: On<Insert<AtprotoAccount>>,
 	accounts: Query<&AtprotoAccount>,
 	mut commands: Commands,
 ) -> Result {

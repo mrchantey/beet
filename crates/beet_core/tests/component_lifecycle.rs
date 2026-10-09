@@ -1,89 +1,138 @@
-//! Not actually testing anything in beet_core but its very
-//! hard to remember bevy's lifecycle rules.
+//! Pins the order of bevy's component lifecycle hooks and observers, which is
+//! hard to remember and could change quietly between bevy releases.
 
 beet_core::test_main!();
 
 use beet_core::prelude::*;
-
-#[derive(Component)]
-#[component(on_add=on_add1)]
-#[component(on_remove=on_remove1)]
-struct Comp1;
-
-fn on_add1(world: DeferredWorld, cx: HookContext) {
-	println!("{:?}: Comp1 Hook  - Add", cx.entity);
-	world.entity(cx.entity).get::<Comp1>().unwrap();
-}
-fn on_remove1(world: DeferredWorld, cx: HookContext) {
-	println!("{:?}: Comp1 Hook  - Remove", cx.entity);
-	world.entity(cx.entity).get::<Comp1>().unwrap();
-}
-fn added1(ev: On<Add, Comp1>, query: Query<&Comp1>) {
-	println!("{:?}: Comp1 Event - Add", ev.entity);
-	query.get(ev.entity).unwrap();
-}
-
-fn removed1(ev: On<Remove, Comp1>, query: Query<&Comp1>) {
-	println!("{:?}: Comp1 Event - Remove", ev.entity);
-	query.get(ev.entity).unwrap();
-}
-
-#[derive(Component)]
-#[component(on_add=on_add2)]
-#[component(on_remove=on_remove2)]
-struct Comp2;
-
-fn on_add2(_world: DeferredWorld, cx: HookContext) {
-	println!("{:?}: Comp2 Hook  - Add", cx.entity);
-}
-fn on_remove2(_world: DeferredWorld, cx: HookContext) {
-	println!("{:?}: Comp2 Hook  - Remove", cx.entity);
-}
-
-fn added2(ev: On<Add, Comp2>) {
-	println!("{:?}: Comp2 Event - Add", ev.entity);
-}
-
-fn removed2(ev: On<Remove, Comp2>) {
-	println!("{:?}: Comp2 Event - Remove", ev.entity);
-}
-
 use beet_core::testing;
 
-#[beet_core::test]
-#[ignore]
-fn multi_component() {
-	let mut world = World::new();
-	world.add_observer(added1);
-	world.add_observer(removed1);
-	world.add_observer(added2);
-	world.add_observer(removed2);
-	world.spawn((Comp1, Comp2)).despawn();
-	// 4v0: Comp1 Hook  - Add
-	// 4v0: Comp2 Hook  - Add
-	// 4v0: Comp1 Event - Add
-	// 4v0: Comp2 Event - Add
-	// 4v0: Comp1 Event - Remove
-	// 4v0: Comp2 Event - Remove
-	// 4v0: Comp1 Hook  - Remove
-	// 4v0: Comp2 Hook  - Remove
+/// Each hook and observer pushes `(entity, label)` here as it runs.
+#[derive(Default, Resource, Deref, DerefMut)]
+struct Log(Vec<(Entity, &'static str)>);
+
+/// A hook recording `label`, asserting the hooked component is present.
+fn record_hook<C: Component>(
+	label: &'static str,
+) -> impl Fn(DeferredWorld, HookContext) {
+	move |mut world, cx| {
+		world.entity(cx.entity).contains::<C>().xpect_true();
+		world.resource_mut::<Log>().push((cx.entity, label));
+	}
 }
 
-#[beet_core::test]
-#[ignore]
-fn child() {
+#[derive(Component)]
+#[component(on_add = record_hook::<Comp1>("Comp1 Hook Add"))]
+#[component(on_remove = record_hook::<Comp1>("Comp1 Hook Remove"))]
+struct Comp1;
+
+#[derive(Component)]
+#[component(on_add = record_hook::<Comp2>("Comp2 Hook Add"))]
+#[component(on_remove = record_hook::<Comp2>("Comp2 Hook Remove"))]
+struct Comp2;
+
+/// A world observing add and remove of both components.
+fn lifecycle_world() -> World {
 	let mut world = World::new();
-	world.add_observer(added1);
-	world.add_observer(removed1);
-	world.add_observer(added2);
-	world.add_observer(removed2);
-	world.spawn((Comp1, children![Comp1])).despawn();
-	// 4v0: Comp1 Hook  - Add
-	// 4v0: Comp1 Event - Add
-	// 5v0: Comp1 Hook  - Add
-	// 5v0: Comp1 Event - Add
-	// 4v0: Comp1 Event - Remove
-	// 4v0: Comp1 Hook  - Remove
-	// 5v0: Comp1 Event - Remove
-	// 5v0: Comp1 Hook  - Remove
+	world.init_resource::<Log>();
+	world.add_observer(
+		|ev: On<Add<Comp1>>, query: Query<&Comp1>, mut log: ResMut<Log>| {
+			query.contains(ev.entity).xpect_true();
+			log.push((ev.entity, "Comp1 Event Add"));
+		},
+	);
+	world.add_observer(
+		|ev: On<Remove<Comp1>>, query: Query<&Comp1>, mut log: ResMut<Log>| {
+			query.contains(ev.entity).xpect_true();
+			log.push((ev.entity, "Comp1 Event Remove"));
+		},
+	);
+	world.add_observer(|ev: On<Add<Comp2>>, mut log: ResMut<Log>| {
+		log.push((ev.entity, "Comp2 Event Add"));
+	});
+	world.add_observer(|ev: On<Remove<Comp2>>, mut log: ResMut<Log>| {
+		log.push((ev.entity, "Comp2 Event Remove"));
+	});
+	world
+}
+
+/// Hooks run before observers on add and after them on remove, each phase
+/// visiting the components in bundle order.
+#[beet_core::test]
+fn multi_component() {
+	let mut world = lifecycle_world();
+	let entity = world.spawn((Comp1, Comp2)).id();
+	world.despawn(entity);
+	world.resource::<Log>().0.clone().xpect_eq(vec![
+		(entity, "Comp1 Hook Add"),
+		(entity, "Comp2 Hook Add"),
+		(entity, "Comp1 Event Add"),
+		(entity, "Comp2 Event Add"),
+		(entity, "Comp1 Event Remove"),
+		(entity, "Comp2 Event Remove"),
+		(entity, "Comp1 Hook Remove"),
+		(entity, "Comp2 Hook Remove"),
+	]);
+}
+
+/// A parent finishes each phase before its children start it.
+#[beet_core::test]
+fn child() {
+	let mut world = lifecycle_world();
+	let parent = world.spawn((Comp1, children![Comp1])).id();
+	let child = world.entity(parent).get::<Children>().unwrap()[0];
+	world.despawn(parent);
+	world.resource::<Log>().0.clone().xpect_eq(vec![
+		(parent, "Comp1 Hook Add"),
+		(parent, "Comp1 Event Add"),
+		(child, "Comp1 Hook Add"),
+		(child, "Comp1 Event Add"),
+		(parent, "Comp1 Event Remove"),
+		(parent, "Comp1 Hook Remove"),
+		(child, "Comp1 Event Remove"),
+		(child, "Comp1 Hook Remove"),
+	]);
+}
+
+#[derive(Component)]
+#[component(on_add = on_add_foo)]
+struct Foo;
+/// Inserts [`Bazz`] through the hook's command queue.
+fn on_add_foo(mut world: DeferredWorld, cx: HookContext) {
+	world.resource_mut::<Log>().push((cx.entity, "Foo Hook"));
+	world.commands().entity(cx.entity).insert(Bazz);
+}
+
+#[derive(Component)]
+#[component(on_add = record_hook::<Bar>("Bar Hook"))]
+struct Bar;
+
+#[derive(Component)]
+#[component(on_add = record_hook::<Bazz>("Bazz Hook"))]
+struct Bazz;
+
+/// A command a hook queues applies before the spawned children are built,
+/// even when the children are listed first in the bundle.
+#[beet_core::test]
+fn hook_commands_before_children() {
+	let mut world = World::new();
+	world.init_resource::<Log>();
+	world.add_observer(|ev: On<Insert<Foo>>, mut log: ResMut<Log>| {
+		log.push((ev.entity, "Foo Observer"));
+	});
+	world.add_observer(|ev: On<Insert<Bar>>, mut log: ResMut<Log>| {
+		log.push((ev.entity, "Bar Observer"));
+	});
+	world.add_observer(|ev: On<Insert<Bazz>>, mut log: ResMut<Log>| {
+		log.push((ev.entity, "Bazz Observer"));
+	});
+	let parent = world.spawn((children![Bar], Foo)).id();
+	let child = world.entity(parent).get::<Children>().unwrap()[0];
+	world.resource::<Log>().0.clone().xpect_eq(vec![
+		(parent, "Foo Hook"),
+		(parent, "Foo Observer"),
+		(parent, "Bazz Hook"),
+		(parent, "Bazz Observer"),
+		(child, "Bar Hook"),
+		(child, "Bar Observer"),
+	]);
 }

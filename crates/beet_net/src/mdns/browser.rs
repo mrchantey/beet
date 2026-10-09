@@ -3,8 +3,8 @@
 //! This is the platform-independent half of the mDNS browser. It enumerates
 //! instances of a service type on the LAN and surfaces each as **one entity**
 //! carrying an [`MDnsService`] component, so downstream code observes discoveries
-//! with a plain `Query<&MDnsService>` (or `On<Add, MDnsService>` /
-//! `On<Remove, MDnsService>` observers) instead of a bespoke event/resource API:
+//! with a plain `Query<&MDnsService>` (or `On<Add<MDnsService>>` /
+//! `On<Remove<MDnsService>>` observers) instead of a bespoke event/resource API:
 //!
 //! - a low-level [`UdpPacket`] `{ from, bytes }` global event is the seam: every
 //!   inbound datagram becomes one, regardless of how it arrived (the std driver
@@ -49,7 +49,7 @@ pub struct UdpPacket {
 /// instance first resolves (a usable `SRV` host+port), updates it in place when
 /// the instance's host/port/addr change, and despawns the entity on an mDNS
 /// goodbye (TTL=0). Downstream code queries `&MDnsService` to act on discovered
-/// services, and can use `On<Add, MDnsService>` / `On<Remove, MDnsService>`
+/// services, and can use `On<Add<MDnsService>>` / `On<Remove<MDnsService>>`
 /// observers for the appear/leave edges.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct MDnsService {

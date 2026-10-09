@@ -176,7 +176,7 @@ fn sync_canvas_size(
 /// `bevy_render`'s, reacting to the removed [`RawHandleWrapper`]); a
 /// page-supplied canvas only loses its claim stamp.
 fn remove_canvas(
-	ev: On<Remove, CanvasSurface>,
+	ev: On<Remove<CanvasSurface>>,
 	surfaces: Query<&CanvasSurface>,
 ) {
 	let Ok(surface) = surfaces.get(ev.entity) else {

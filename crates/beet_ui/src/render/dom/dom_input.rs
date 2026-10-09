@@ -4,6 +4,10 @@ use super::*;
 use crate::prelude::*;
 use beet_core::exports::SendWrapper;
 use beet_core::prelude::*;
+// pin the agnostic pointer events to beet_ui's own: bevy's same-named picking
+// events arrive through `beet_core::prelude` under `bevy_default`.
+use crate::prelude::PointerOut;
+use crate::prelude::PointerOver;
 use wasm_bindgen::JsCast;
 
 /// Delivers the browser's input to the world through the events the widgets
@@ -128,7 +132,7 @@ fn activates_without_native(ev: &web_sys::Event) -> bool {
 /// then takes what happened before it could: the document's focus, and the
 /// page's pre-boot queue.
 fn listen_on_mount(
-	ev: On<Insert, DomNode>,
+	ev: On<Insert<DomNode>>,
 	roots: Query<&DomNode, (Without<Element>, Without<DomListeners>)>,
 	mut commands: Commands,
 ) {

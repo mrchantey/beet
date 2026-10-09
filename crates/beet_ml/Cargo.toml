@@ -17,7 +17,8 @@ spatial = ["dep:beet_spatial"]
 
 # burn backends — exactly one should be active for the host target.
 wgpu = ["burn/wgpu"]
-ndarray = ["burn/ndarray"]
+# burn's pure-Rust CPU backend, for a host with no usable GPU
+flex = ["burn/flex"]
 # cuda requires a system cuda install (arch linux: pacman -S cuda)
 cuda = ["burn/cuda"]
 
@@ -29,8 +30,8 @@ beet_spatial = { workspace = true, optional = true, features = ["std"] }
 
 bevy = { workspace = true, features = ["bevy_asset"] }
 
-burn = { version = "0.21", default-features = false, features = ["std"] }
-burn-store = { version = "0.21", default-features = false, features = ["std", "safetensors"] }
+burn = { version = "0.22", default-features = false, features = ["std", "linalg"] }
+burn-store = { version = "0.22", default-features = false, features = ["std", "safetensors"] }
 tokenizers = { version = "0.23", default-features = false, features = ["unstable_wasm"] }
 
 futures.workspace = true
@@ -44,8 +45,9 @@ thiserror.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook.workspace = true
-# `bevy_default` pulls bevy_math's rand 0.10, hence getrandom 0.4; enable its
-# WebCrypto backend so a wasm build links. beet_core covers 0.3 for every crate.
+# `bevy_default` pulls the rand 0.10 of `bevy_math`/`bevy_shape`, hence getrandom
+# 0.4; enable its WebCrypto backend so a wasm build links. beet_core covers 0.3 for
+# every crate.
 getrandom = { workspace = true }
 
 [dev-dependencies]

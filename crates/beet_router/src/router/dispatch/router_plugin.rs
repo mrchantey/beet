@@ -352,7 +352,7 @@ impl Plugin for RouterPlugin {
 /// Only actions whose entity directly carries a [`PathPartial`] become routes.
 /// Descendants of a route entity (eg sequence steps) are skipped.
 fn insert_action_path_and_params(
-	ev: On<Insert, ActionMeta>,
+	ev: On<Insert<ActionMeta>>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
@@ -400,7 +400,7 @@ fn route_patterns(
 /// inserted *after* [`ActionMeta`], so [`insert_action_path_and_params`]
 /// would have short-circuited. Re-runs the path/params collection here.
 fn insert_path_pattern_for_late_path_partial(
-	ev: On<Insert, PathPartial>,
+	ev: On<Insert<PathPartial>>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
@@ -427,7 +427,7 @@ fn insert_path_pattern_for_late_path_partial(
 /// router with no routes would never get a tree, and every request into it,
 /// `--help` included, would fail dispatch rather than answer not-found.
 fn queue_route_tree_rebuild_on_root(
-	ev: On<Insert, PathPartial>,
+	ev: On<Insert<PathPartial>>,
 	paths: Query<&PathPartial>,
 	mut commands: Commands,
 ) {
@@ -445,7 +445,7 @@ fn queue_route_tree_rebuild_on_root(
 /// `ChildOf` has already landed in its parent's [`Children`], which is not
 /// guaranteed yet at the point this observer itself fires.
 fn queue_route_tree_rebuild_on_insert<T: Component>(
-	ev: On<Insert, T>,
+	ev: On<Insert<T>>,
 	mut commands: Commands,
 ) {
 	queue_route_tree_rebuild(&mut commands, ev.entity);
@@ -455,13 +455,13 @@ fn queue_route_tree_rebuild_on_insert<T: Component>(
 /// from any entity, including via despawn: a route leaving the tree
 /// ([`PathPattern`]) or a hidden route being unhidden ([`RouteHidden`]).
 ///
-/// `On<Remove, T>` fires *before* the component actually leaves the entity, so
+/// `On<Remove<T>>` fires *before* the component actually leaves the entity, so
 /// resolving the dirty namespace here (rather than in the woken system, which
 /// runs later) would still see `T` present; the wake is deferred for the same
 /// reason as the insert half, and the reconciler itself works out what
 /// changed via [`RemovedComponents`].
 fn queue_route_tree_rebuild_on_remove<T: Component>(
-	ev: On<Remove, T>,
+	ev: On<Remove<T>>,
 	mut commands: Commands,
 ) {
 	queue_route_tree_rebuild(&mut commands, ev.entity);

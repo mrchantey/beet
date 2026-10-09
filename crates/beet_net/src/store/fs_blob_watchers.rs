@@ -86,7 +86,7 @@ mod native {
 	/// Register the inserted [`WatchDir`] (a replaced one re-registers under the
 	/// same entity) and re-derive the watcher set.
 	pub fn add_watch_dir(
-		ev: On<Insert, WatchDir>,
+		ev: On<Insert<WatchDir>>,
 		mut commands: Commands,
 		mut watchers: ResMut<FsBlobWatchers>,
 		watch_dirs: Query<&WatchDir>,
@@ -107,7 +107,7 @@ mod native {
 	/// Drop the removed [`WatchDir`]'s registration and re-derive the watcher
 	/// set, despawning any watcher no registration needs.
 	pub fn remove_watch_dir(
-		ev: On<Remove, WatchDir>,
+		ev: On<Remove<WatchDir>>,
 		mut commands: Commands,
 		mut watchers: ResMut<FsBlobWatchers>,
 	) {

@@ -20,14 +20,15 @@ use crate::prelude::*;
 use bevy::ecs::template::Template;
 
 /// Opts a build-subtree template type out of [`Unpin`], so it escapes Bevy's
-/// blanket `Template for T: Default + Clone + Unpin` impl and can supply its own
-/// subtree-building [`Template`] impl while still deriving `Default`/`Clone`
-/// (needed by the loader's `from_reflect`).
+/// blanket `Template for T: Clone + Unpin` impl and can supply its own
+/// subtree-building [`Template`] impl while still deriving `Clone` (and
+/// `Default`, where the loader's `from_reflect` needs it). Every `Clone` type
+/// with a manual [`Template`] impl needs it, `Default` or not.
 ///
 /// Uses Bevy's `SpecializeFromTemplate` specialization trick: the `Unpin` impl
 /// is gated on a bound nothing satisfies, so the type is `!Unpin` for coherence
-/// yet the compiler still accepts the impl. The `#[template]` derive emits this
-/// for every function component.
+/// yet the compiler still accepts the impl. The `#[template]` macro emits the
+/// same opt-out for every function component.
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -333,6 +334,7 @@ mod test {
 	/// A build-into-subtree template: spawns a labelled child under the root.
 	#[derive(Clone)]
 	struct Child(&'static str);
+	subtree_template!(Child);
 
 	impl Template for Child {
 		type Output = ();
@@ -366,6 +368,7 @@ mod test {
 	/// walker: build, slot resolution, and lifecycle in one pass.
 	#[derive(Clone)]
 	struct Card;
+	subtree_template!(Card);
 
 	impl Template for Card {
 		type Output = ();
@@ -473,6 +476,7 @@ mod test {
 	/// A template building `root -> child -> grandchild`.
 	#[derive(Clone)]
 	struct Chain;
+	subtree_template!(Chain);
 	impl Template for Chain {
 		type Output = ();
 		fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
@@ -560,6 +564,7 @@ mod test {
 	fn build_failure_rides_template_error() {
 		#[derive(Clone)]
 		struct Boom;
+		subtree_template!(Boom);
 		impl Template for Boom {
 			type Output = ();
 			fn build_template(&self, _: &mut TemplateContext) -> Result<()> {
@@ -603,6 +608,7 @@ mod test {
 		// its id in a `Store` so the test can resolve it afterwards.
 		#[derive(Clone)]
 		struct Pending(Store<Option<PendingId>>);
+		subtree_template!(Pending);
 		impl Template for Pending {
 			type Output = ();
 			fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {
@@ -648,6 +654,7 @@ mod test {
 		// dependency, and leaves its slot content for the "include" to add.
 		#[derive(Clone)]
 		struct DeferredContent(Store<Option<PendingId>>);
+		subtree_template!(DeferredContent);
 		impl Template for DeferredContent {
 			type Output = ();
 			fn build_template(&self, cx: &mut TemplateContext) -> Result<()> {

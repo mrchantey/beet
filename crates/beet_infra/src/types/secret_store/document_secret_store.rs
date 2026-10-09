@@ -342,7 +342,7 @@ impl SecretStoreProvider for DocumentSecretStore {
 /// entry's declared document. Deferred through the command queue because
 /// the stack and the store are ancestors, which land after insertion.
 pub(crate) fn attach_document_secrets(
-	ev: On<Insert, DocumentSecrets>,
+	ev: On<Insert<DocumentSecrets>>,
 	mut commands: Commands,
 ) {
 	commands

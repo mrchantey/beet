@@ -37,12 +37,10 @@ where
 
 pub struct ObserverMarker;
 
-impl<T, E, B: Bundle, M>
-	IntoBundle<(NotBundleMarker, (ObserverMarker, E, B, M))> for T
+impl<T, E, M> IntoBundle<(NotBundleMarker, (ObserverMarker, E, M))> for T
 where
-	E: Event,
-	B: Bundle,
-	T: 'static + Send + Sync + IntoObserverSystem<E, B, M>,
+	E: EventPattern,
+	T: 'static + Send + Sync + IntoObserverSystem<E, M>,
 {
 	fn into_bundle(self) -> impl Bundle { OnSpawn::observe(self) }
 }
@@ -132,6 +130,7 @@ mod test {
 		is_bundle(());
 		is_bundle(Name::new("foo"));
 		is_bundle(|_: On<Foo>| {});
+		is_bundle(|_: On<Insert<Bar>>| {});
 		is_bundle(Entity::PLACEHOLDER);
 		is_bundle(0_i32);
 		is_bundle("foo");

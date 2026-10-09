@@ -51,7 +51,7 @@ pub(crate) async fn record_page_view(
 /// Runs before the component is gone, so it reads the tracked page. Registered by
 /// [`NavigatorPlugin`]; a no-op without an analytics observer listening.
 pub(crate) fn finalize_page_view_on_remove(
-	ev: On<Remove, Navigator>,
+	ev: On<Remove<Navigator>>,
 	navigators: Query<&Navigator>,
 	mut commands: Commands,
 ) {

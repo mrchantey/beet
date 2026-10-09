@@ -121,6 +121,7 @@ fn axis_delta(
 mod test {
 	use super::*;
 	use crate::render::charcell::test_host::TestHost;
+	use crate::style::Overflow;
 	use crate::style::*;
 	use bevy::math::UVec2;
 

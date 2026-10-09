@@ -62,7 +62,7 @@ pub(crate) fn sync_string_enum_options(
 /// Re-apply the options when the [`ToolDefinition`] is (re)built from the static
 /// type (eg `insert_tool_definition`), so a scene reload does not drop the enum.
 pub(crate) fn reapply_string_enum_options(
-	ev: On<Insert, ToolDefinition>,
+	ev: On<Insert<ToolDefinition>>,
 	mut tools: Query<(&StringEnumOptions, &mut ToolDefinition)>,
 ) {
 	if let Ok((options, mut def)) = tools.get_mut(ev.entity) {

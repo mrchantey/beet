@@ -339,7 +339,7 @@ where
 /// world-free value, so a co-resident facet's failure and an interrupt tear
 /// down alike.
 fn stop_running<In, Out>(
-	ev: On<Remove, Running<Out>>,
+	ev: On<Remove<Running<Out>>>,
 	mut sets: Query<&mut RunningSet<In, Out>>,
 ) where
 	In: 'static + Send + Sync,

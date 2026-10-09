@@ -19,7 +19,9 @@ bevy_default = ["bevy/default", "beet_core/bevy_default"]
 beet_action.workspace = true
 beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rand"] }
 
-bevy.workspace = true
+# `bevy_curve` puts the curves `procedural_animation` samples (`Curve`,
+# `EasingCurve`, `EaseFunction`, `FunctionCurve`, `Interval`) into the prelude.
+bevy = { workspace = true, features = ["bevy_curve"] }
 
 extend.workspace = true
 log.workspace = true

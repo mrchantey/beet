@@ -266,19 +266,20 @@ pub impl EntityWorldMut<'_> {
 		self
 	}
 
-	/// Creates an [`Observer`] watching for an [`Event`] of type `E` targeting this entity.
+	/// Creates an [`Observer`] watching for the [`EventPattern`] `E` targeting
+	/// this entity.
 	///
 	/// Unlike the built-in `observe` method which is restricted to [`EntityEvent`],
-	/// this method works with any [`Event`] type.
+	/// this method works with any [`Event`] type or lifecycle pattern.
 	///
 	/// # Panics
 	///
 	/// Panics if the entity has been despawned while this `EntityWorldMut` is still alive.
 	/// Panics if the given system is an exclusive system.
 	// we need this because `observe` is restricted to [`EntityEvent`]
-	fn observe_any<E: Event, B: Bundle, M>(
+	fn observe_any<E: EventPattern, M>(
 		&mut self,
-		observer: impl IntoObserverSystem<E, B, M>,
+		observer: impl IntoObserverSystem<E, M>,
 	) -> &mut Self {
 		let bundle = Observer::new(observer).with_entity(self.id());
 		self.world_scope(move |world| {
@@ -339,14 +340,15 @@ pub impl EntityCommands<'_> {
 		self
 	}
 
-	/// Creates an [`Observer`] watching for an [`Event`] of type `E` targeting this entity.
+	/// Creates an [`Observer`] watching for the [`EventPattern`] `E` targeting
+	/// this entity.
 	///
 	/// Unlike the built-in `observe` method which is restricted to [`EntityEvent`],
-	/// this method works with any [`Event`] type.
+	/// this method works with any [`Event`] type or lifecycle pattern.
 	#[track_caller]
-	fn observe_any<E: Event, B: Bundle, M>(
+	fn observe_any<E: EventPattern, M>(
 		&mut self,
-		observer: impl IntoObserverSystem<E, B, M>,
+		observer: impl IntoObserverSystem<E, M>,
 	) -> &mut Self {
 		self.queue(move |mut entity: EntityWorldMut| {
 			entity.observe_any(observer);

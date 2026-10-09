@@ -177,7 +177,7 @@ impl TemplateDir {
 	/// parks a [`PendingGuard`] on the build root (or this entity outside a
 	/// build), so a load or settle ([`TemplatePending::settle`]) waits for it.
 	pub fn register_on_insert(
-		ev: On<Insert, TemplateDir>,
+		ev: On<Insert<TemplateDir>>,
 		dirs: Query<&TemplateDir>,
 		formats: Res<TemplateFormats>,
 		build_root: Option<Res<TemplateBuildRoot>>,

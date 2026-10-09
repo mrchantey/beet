@@ -1,4 +1,3 @@
-#![allow(clippy::needless_doctest_main)]
 //! Stream-based `setInterval` helper.
 //!
 //! This provides a `Stream<Item = f64>` of timestamps (ms, from `performance.now()`).
@@ -8,15 +7,14 @@
 //! Design
 //! - Starts immediately.
 //! - Uses a channel to deliver ticks from the browser callback to async consumers.
-//! - Implements `Stream`, so you can `.next().await` ticks, or use the provided
-//!   `next_tick()` convenience method.
+//! - Implements `Stream`, so you can `.next().await` ticks.
 //! - Clears automatically on `Drop`.
 //!
 //! Example (requires wasm/DOM):
 //! ```ignore
 //! # use beet_core::prelude::*;
 //!
-//! let mut every_second = Interval::new(1000);
+//! let mut every_second = IntervalStream::new(1000);
 //! let t1 = every_second.next().await.unwrap();
 //! let t2 = every_second.next().await.unwrap();
 //! assert!(t2 >= t1);

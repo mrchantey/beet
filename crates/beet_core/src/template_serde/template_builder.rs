@@ -324,7 +324,14 @@ impl<'w> TemplateBuilder<'w> {
 					let mut value = reflect_ext::clone_reflect_value(
 						component.as_partial_reflect(),
 						type_registration,
-					);
+					)
+					.inspect_err(|err| {
+						warn!(
+							"skipping uncloneable component `{}` on {entity}: {err}",
+							info.name()
+						)
+					})
+					.ok()?;
 					// an `Entity`-typed field is an entity reference, so it is
 					// written as the target's file key, never its live bits.
 					if let Some(reflect) = value.try_as_reflect_mut() {
@@ -384,13 +391,18 @@ impl<'w> TemplateBuilder<'w> {
 					.data::<ReflectComponent>()?
 					.reflect(self.original_world.entity(entity))?;
 
-				self.extracted_resources.insert(
-					component_id,
-					reflect_ext::clone_reflect_value(
-						component.as_partial_reflect(),
-						type_registration,
-					),
-				);
+				let value = reflect_ext::clone_reflect_value(
+					component.as_partial_reflect(),
+					type_registration,
+				)
+				.inspect_err(|err| {
+					warn!(
+						"skipping uncloneable resource `{}`: {err}",
+						type_registration.type_info().type_path()
+					)
+				})
+				.ok()?;
+				self.extracted_resources.insert(component_id, value);
 				Some(())
 			};
 			extract_and_push();

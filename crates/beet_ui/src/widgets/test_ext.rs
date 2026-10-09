@@ -191,7 +191,7 @@ pub fn type_text(app: &mut App, window: Entity, text: &str) {
 			// the key code is unread by the text path, which reads `logical_key`
 			KeyCode::KeyA,
 			Key::Character(ch.as_str().into()),
-			Some(ch.clone()),
+			Some(ch.as_str()),
 		));
 	}
 	settle(app);
@@ -218,13 +218,14 @@ fn key_message(
 	window: Entity,
 	key_code: bevy::input::keyboard::KeyCode,
 	logical_key: bevy::input::keyboard::Key,
-	text: Option<String>,
+	// `KeyboardInput::text` is a `SmolStr` or a `String` per `bevy_input/smol_str`
+	text: Option<&str>,
 ) -> bevy::input::keyboard::KeyboardInput {
 	bevy::input::keyboard::KeyboardInput {
 		key_code,
 		logical_key,
 		state: bevy::input::ButtonState::Pressed,
-		text,
+		text: text.map(Into::into),
 		repeat: false,
 		window,
 	}

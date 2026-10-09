@@ -22,10 +22,13 @@ pub impl Quat {
 	/// Creates a rotation facing back (+Z).
 	fn from_back() -> Quat { Quat::look_at(Vec3::Z) }
 
-	/// Creates a rotation looking at the target with the specified up vector.
+	/// Creates a rotation looking at the target with the specified up vector,
+	/// ie pointing local -Z at `target` with local +Y as close to `up` as
+	/// possible.
 	fn look_at_with_up(target: Vec3, up: Vec3) -> Quat {
-		let mat = Mat4::look_at_rh(Vec3::ZERO, target, up).inverse();
-		Quat::from_mat4(&mat)
+		let back = -target.normalize();
+		let right = up.cross(back).normalize();
+		Quat::from_mat3(&Mat3::from_cols(right, back.cross(right), back))
 	}
 
 	/// Creates a rotation looking at the target.
@@ -77,5 +80,17 @@ mod test {
 		quat.forward().z.xpect_close(-1.);
 		let quat = Quat::from_back();
 		quat.forward().z.xpect_close(1.);
+	}
+
+	#[crate::test]
+	fn look_at_with_up_keeps_up() {
+		let target = Vec3::new(1., 2., -3.);
+		Quat::look_at(target)
+			.forward()
+			.abs_diff_eq(target.normalize(), 1e-5)
+			.xpect_true();
+		(Quat::look_at_with_up(Vec3::X, Vec3::Y) * Vec3::Y)
+			.abs_diff_eq(Vec3::Y, 1e-5)
+			.xpect_true();
 	}
 }

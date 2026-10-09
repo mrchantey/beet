@@ -15,7 +15,7 @@ use beet_core::prelude::*;
 /// nothing inserted, never an error: a cloud box's repo store never carries
 /// an identity, and a contributor without one must still build and run.
 pub(crate) fn load_on_insert(
-	ev: On<Insert, Secrets>,
+	ev: On<Insert<Secrets>>,
 	declared: Query<&Secrets>,
 	build_root: Option<Res<TemplateBuildRoot>>,
 	mut commands: Commands,

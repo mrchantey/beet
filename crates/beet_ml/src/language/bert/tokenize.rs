@@ -1,18 +1,19 @@
+use beet_core::prelude::*;
+use burn::tensor::Device;
 use burn::tensor::Int;
 use burn::tensor::Tensor;
-use burn::tensor::backend::Backend;
 
 /// Batch-tokenise `sentences` and produce padded input tensors.
 ///
 /// Returns `(input_ids, attention_mask)` both shaped `[batch, max_seq_len]`.
-pub(crate) fn tokenize_batch<B: Backend>(
+pub(crate) fn tokenize_batch(
 	tokenizer: &tokenizers::Tokenizer,
 	sentences: &[&str],
-	device: &B::Device,
-) -> (Tensor<B, 2, Int>, Tensor<B, 2>) {
+	device: &Device,
+) -> Result<(Tensor<2, Int>, Tensor<2>)> {
 	let encodings = tokenizer
 		.encode_batch(sentences.to_vec(), true)
-		.expect("Failed to tokenize");
+		.map_err(|err| bevyhow!("failed to tokenize: {err}"))?;
 
 	let max_len = encodings
 		.iter()
@@ -34,11 +35,11 @@ pub(crate) fn tokenize_batch<B: Backend>(
 	}
 
 	let input_ids =
-		Tensor::<B, 1, Int>::from_data(input_ids_data.as_slice(), device)
+		Tensor::<1, Int>::from_data(input_ids_data.as_slice(), device)
 			.reshape([batch_size, max_len]);
 	let attention_mask =
-		Tensor::<B, 1>::from_data(attention_mask_data.as_slice(), device)
+		Tensor::<1>::from_data(attention_mask_data.as_slice(), device)
 			.reshape([batch_size, max_len]);
 
-	(input_ids, attention_mask)
+	(input_ids, attention_mask).xok()
 }

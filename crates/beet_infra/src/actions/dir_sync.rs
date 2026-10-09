@@ -131,7 +131,7 @@ pub(crate) fn declared_store<'a>(
 /// somewhere nothing asked for.
 #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))]
 pub(crate) fn attach_dir_sync_store(
-	ev: On<Add, DirSync>,
+	ev: On<Add<DirSync>>,
 	mut commands: Commands,
 ) {
 	commands

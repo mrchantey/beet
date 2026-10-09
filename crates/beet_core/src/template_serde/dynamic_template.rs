@@ -64,7 +64,7 @@ pub struct DynamicTemplate {
 }
 
 // `DynamicTemplate` is not `Clone` (a boxed `PartialReflect` is not), so it
-// cannot pick up Bevy's blanket `Template for T: Default + Clone + Unpin`. The
+// cannot pick up Bevy's blanket `Template for T: Clone + Unpin`. The
 // opt-out documents the intent and guards against a future `Clone`.
 subtree_template!(DynamicTemplate);
 
@@ -458,7 +458,7 @@ mod test {
 
 	/// A value slot from a concrete component, via `to_dynamic`.
 	fn value(component: impl bevy_reflect::PartialReflect) -> ComponentSlot {
-		ComponentSlot::Value(component.to_dynamic())
+		ComponentSlot::Value(component.to_dynamic().unwrap())
 	}
 
 	/// An in-template id from a raw index.

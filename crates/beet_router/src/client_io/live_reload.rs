@@ -92,7 +92,7 @@ struct ReloadTail(#[allow(dead_code)] AsyncTask);
 /// world has none (its store's watcher already emits the change events, so no
 /// per-site filesystem watcher is wired here).
 pub(crate) fn start_live_reload(
-	ev: On<Insert, LiveReload>,
+	ev: On<Insert<LiveReload>>,
 	channels: Query<&ClientIo>,
 	mut commands: Commands,
 ) {

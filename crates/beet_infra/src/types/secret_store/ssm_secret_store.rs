@@ -58,7 +58,7 @@ impl SsmSecrets {
 /// Deferred through the command queue because the stack is an ancestor,
 /// which lands after insertion.
 pub(crate) fn attach_ssm_secrets(
-	ev: On<Insert, SsmSecrets>,
+	ev: On<Insert<SsmSecrets>>,
 	mut commands: Commands,
 ) {
 	commands

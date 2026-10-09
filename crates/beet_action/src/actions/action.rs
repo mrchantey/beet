@@ -94,7 +94,7 @@ where
 	/// [`unset`](ActionMeta::unset) one an overload created first.
 	///
 	/// `on_insert` rather than `on_add` so an overwrite is caught too: bevy runs
-	/// `on_replace` then `on_insert` on overwrite and skips `on_add`.
+	/// `on_discard` then `on_insert` on overwrite and skips `on_add`.
 	fn on_insert(mut world: DeferredWorld, cx: HookContext) {
 		let Some(canonical) = world
 			.entity(cx.entity)

@@ -102,7 +102,7 @@ impl Plugin for PageHostPlugin {
 /// that ever connected. Reclaims exactly what a navigation swap does, so a shared
 /// [`FixedPage`] route (no ephemerals) outlives the surfaces viewing it.
 fn despawn_page_with_surface(
-	ev: On<Despawn, RenderSurfaceOf>,
+	ev: On<Despawn<RenderSurfaceOf>>,
 	surfaces: Query<&RenderSurfaceOf>,
 	mut commands: Commands,
 ) {

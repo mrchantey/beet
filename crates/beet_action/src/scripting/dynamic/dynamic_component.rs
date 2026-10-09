@@ -169,7 +169,10 @@ also be declared as {schema:?}: a runtime component's name is its identity"
 				StorageType::Table,
 				Layout::new::<Value>(),
 				Some(drop_value),
+				// mutable
 				true,
+				// no summary tick, the `Component` default
+				false,
 				ComponentCloneBehavior::Custom(clone_value),
 				None,
 			)

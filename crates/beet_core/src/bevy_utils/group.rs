@@ -118,7 +118,7 @@ struct AutoEnroll;
 
 /// A new child of a [`Group`] joins it, unless it declared a [`MemberOf`] of its
 /// own.
-fn auto_enroll(ev: On<Insert, ChildOf>, mut commands: Commands) {
+fn auto_enroll(ev: On<Insert<ChildOf>>, mut commands: Commands) {
 	let child = ev.entity;
 	commands.queue(move |world: &mut World| {
 		let Some(parent) = world.get::<ChildOf>(child).map(ChildOf::parent)

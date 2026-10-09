@@ -13,6 +13,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::RequestParts;
 use beet_ui::prelude::classes;
 use beet_ui::prelude::*;
+// pin beet_ui's widget over bevy's deprecated `Button`, which `beet_core::prelude`
+// carries under `bevy_default`
+use beet_ui::prelude::Button;
 
 /// A scene world with a [`PackageConfig`] resource. The document-layout widgets
 /// read this synchronously at template build via `#[template(system)]`.

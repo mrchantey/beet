@@ -169,7 +169,7 @@ async fn user_input_action(cx: ActionContext) -> Result<Outcome> {
 		let text = cx
 			.world()
 			.entity(form)
-			.await_event::<Submit, _, _, String>(|ev: On<Submit>| {
+			.await_event::<Submit, _, String>(|ev: On<Submit>| {
 				ev.values
 					.get("message")
 					.and_then(|message| message.as_str().ok())

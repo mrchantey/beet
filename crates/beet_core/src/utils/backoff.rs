@@ -780,7 +780,6 @@ mod tests {
 		let mut items = Vec::new();
 
 		while let Some(frame) = stream.next().await {
-			println!("NEXT");
 			items.push(frame);
 		}
 

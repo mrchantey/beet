@@ -399,7 +399,7 @@ impl BlobStoreProvider for InMemoryStore {
 /// `with_subdir` clone adds no duplicate sends.
 #[cfg(feature = "std")]
 pub(crate) fn add_memory_store_watcher(
-	ev: On<Add, InMemoryStore>,
+	ev: On<Add<InMemoryStore>>,
 	bus: Res<BlobEventBus>,
 	stores: Query<&InMemoryStore>,
 ) {
@@ -412,7 +412,7 @@ pub(crate) fn add_memory_store_watcher(
 /// subscriber.
 #[cfg(feature = "std")]
 pub(crate) fn remove_memory_store_watcher(
-	ev: On<Remove, InMemoryStore>,
+	ev: On<Remove<InMemoryStore>>,
 	stores: Query<&InMemoryStore>,
 ) {
 	if let Ok(store) = stores.get(ev.entity) {
@@ -504,7 +504,7 @@ mod test {
 			.insert(&RelPath::new("a.txt"), Bytes::from_static(b"hi"))
 			.await
 			.unwrap();
-		let dynamic = store.to_dynamic();
+		let dynamic = store.to_dynamic().unwrap();
 		let rebuilt = InMemoryStore::from_reflect(dynamic.as_ref()).unwrap();
 		rebuilt.name().xpect_eq("reflected");
 		rebuilt.subdir().xpect_eq(RelPath::new("docs"));

@@ -53,10 +53,10 @@ unsafe impl<T: SystemParam> SystemParam for When<T> {
 	fn init_access(
 		state: &Self::State,
 		system_meta: &mut SystemMeta,
-		component_access_set: &mut bevy::ecs::query::FilteredAccessSet,
+		system_access: &mut bevy::ecs::system::SystemAccess,
 		world: &mut World,
 	) {
-		T::init_access(state, system_meta, component_access_set, world);
+		T::init_access(state, system_meta, system_access, world);
 	}
 
 	#[inline]

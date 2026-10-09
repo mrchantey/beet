@@ -199,8 +199,8 @@ pub(crate) fn component_id_by_short_path(
 			world
 				.components()
 				.iter_registered()
-				.find(|info| info.name().shortname().to_string() == name)
-				.map(|info| info.id())
+				.find(|(_, info)| info.name().shortname().to_string() == name)
+				.map(|(id, _)| id)
 		})
 }
 

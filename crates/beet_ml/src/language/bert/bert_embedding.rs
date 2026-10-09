@@ -6,9 +6,9 @@ use burn::nn::Embedding;
 use burn::nn::EmbeddingConfig;
 use burn::nn::LayerNorm;
 use burn::nn::LayerNormConfig;
+use burn::tensor::Device;
 use burn::tensor::Int;
 use burn::tensor::Tensor;
-use burn::tensor::backend::Backend;
 
 /// Configuration for the bert embedding layer.
 #[derive(Config, Debug)]
@@ -23,19 +23,16 @@ pub(crate) struct BertEmbeddingsConfig {
 
 /// Word + position + token-type embeddings followed by LayerNorm and dropout.
 #[derive(Module, Debug)]
-pub(crate) struct BertEmbeddings<B: Backend> {
-	word_embeddings: Embedding<B>,
-	position_embeddings: Embedding<B>,
-	token_type_embeddings: Embedding<B>,
-	layer_norm: LayerNorm<B>,
+pub(crate) struct BertEmbeddings {
+	word_embeddings: Embedding,
+	position_embeddings: Embedding,
+	token_type_embeddings: Embedding,
+	layer_norm: LayerNorm,
 	dropout: Dropout,
 }
 
 impl BertEmbeddingsConfig {
-	pub(crate) fn init<B: Backend>(
-		&self,
-		device: &B::Device,
-	) -> BertEmbeddings<B> {
+	pub(crate) fn init(&self, device: &Device) -> BertEmbeddings {
 		BertEmbeddings {
 			word_embeddings: EmbeddingConfig::new(
 				self.vocab_size,
@@ -60,7 +57,7 @@ impl BertEmbeddingsConfig {
 	}
 }
 
-impl<B: Backend> BertEmbeddings<B> {
+impl BertEmbeddings {
 	/// Forward pass.
 	///
 	/// * `input_ids`: `[batch, seq_len]`
@@ -69,9 +66,9 @@ impl<B: Backend> BertEmbeddings<B> {
 	/// Returns `[batch, seq_len, hidden]`.
 	pub fn forward(
 		&self,
-		input_ids: Tensor<B, 2, Int>,
-		token_type_ids: Option<Tensor<B, 2, Int>>,
-	) -> Tensor<B, 3> {
+		input_ids: Tensor<2, Int>,
+		token_type_ids: Option<Tensor<2, Int>>,
+	) -> Tensor<3> {
 		let [batch_size, seq_len] = input_ids.dims();
 		let device = input_ids.device();
 

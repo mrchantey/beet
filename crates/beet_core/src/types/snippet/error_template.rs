@@ -50,6 +50,8 @@ impl ErrorTemplate {
 	}
 }
 
+subtree_template!(ErrorTemplate);
+
 impl Template for ErrorTemplate {
 	type Output = ();
 

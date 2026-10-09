@@ -1,105 +1,87 @@
-//! Backend selection for [`Bert`].
+//! Device selection for [`Bert`].
 //!
-//! Exactly one of `wgpu` / `ndarray` / `cuda` should be enabled. The workspace
-//! defaults to `wgpu` since it gives a single code-path that runs both natively
-//! and in the browser; `ndarray` is the CPU-only path, for a host with no usable
-//! GPU; `cuda` needs a system CUDA install.
-use beet_core::prelude::cfg_if;
+//! Burn dispatches on the [`Device`] rather than a backend type parameter, so
+//! models and tensors carry no backend generic: the cargo feature decides which
+//! backend [`default_device`] names. Exactly one of `wgpu` / `flex` / `cuda`
+//! should be enabled. The workspace defaults to `wgpu` since it gives a single
+//! code-path that runs both natively and in the browser; `flex` is Burn's
+//! pure-Rust CPU path, for a host with no usable GPU; `cuda` needs a system CUDA
+//! install.
+use beet_core::prelude::*;
+use burn::tensor::Device;
 
 cfg_if! {
 	if #[cfg(feature = "cuda")] {
-		/// The active burn backend. Selected at compile time via cargo
-		/// features (`wgpu` / `cuda` / `ndarray`).
-		pub type DefaultBackend = burn::backend::Cuda;
-		/// Returns the default device for [`DefaultBackend`].
-		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
-		/// [`default_device`]; only the wasm wgpu path needs async setup.
-		pub async fn default_device_async() -> DefaultDevice { default_device() }
-		/// Whether this host grants a device for [`DefaultBackend`]. cuda is
+		/// The device every model runs on, selected at compile time via cargo
+		/// features (`wgpu` / `cuda` / `flex`).
+		pub async fn default_device() -> Result<Device> {
+			Device::cuda(burn::tensor::DeviceIndex::Default).xok()
+		}
+		/// Whether this host grants a device for [`default_device`]. cuda is
 		/// selected explicitly, so a host without it is a build error rather than
 		/// something to probe around.
 		pub async fn has_device() -> bool { true }
-	} else if #[cfg(feature = "ndarray")] {
-		/// The active burn backend.
-		pub type DefaultBackend = burn::backend::NdArray;
-		/// Returns the default device for [`DefaultBackend`].
-		pub fn default_device() -> DefaultDevice { DefaultDevice::default() }
-		/// [`default_device`]; only the wasm wgpu path needs async setup.
-		pub async fn default_device_async() -> DefaultDevice { default_device() }
-		/// Whether this host grants a device for [`DefaultBackend`]; the CPU
+	} else if #[cfg(feature = "flex")] {
+		/// The device every model runs on, selected at compile time via cargo
+		/// features (`wgpu` / `cuda` / `flex`).
+		pub async fn default_device() -> Result<Device> { Device::flex().xok() }
+		/// Whether this host grants a device for [`default_device`]; the CPU
 		/// backend always has one.
 		pub async fn has_device() -> bool { true }
 	} else if #[cfg(feature = "wgpu")] {
-		// wgpu — also the path used in wasm
-		/// The active burn backend.
-		pub type DefaultBackend = burn::backend::Wgpu;
-		/// Returns the device for [`DefaultBackend`]: the WGPU device shared from
-		/// Bevy by [`SharedBurnWgpuPlugin`](crate::prelude::SharedBurnWgpuPlugin)
-		/// when present, so Burn and Bevy share one GPU; else Burn's own default
-		/// (the headless path, where Burn initialises its own device).
-		pub fn default_device() -> DefaultDevice {
-			crate::prelude::shared_burn_wgpu_device().unwrap_or_default()
-		}
-		/// Like [`default_device`], first completing the runtime setup wasm
-		/// requires: cubecl cannot lazily block on adapter selection there, so
-		/// the device must be initialized through the async path before first
-		/// use. Native setup is lazy and this is just [`default_device`]. A
-		/// bevy-shared device is already initialized and is returned as is.
-		pub async fn default_device_async() -> DefaultDevice {
-			let device = default_device();
-			#[cfg(target_arch = "wasm32")]
-			if !matches!(device, burn::backend::wgpu::WgpuDevice::Existing(_)) {
-				burn::backend::wgpu::init_setup_async::<
-					burn::backend::wgpu::graphics::AutoGraphicsApi,
-				>(&device, Default::default())
-				.await;
+		use burn::tensor::DeviceKind;
+		use burn::tensor::wgpu::WgpuInitError;
+		use std::sync::OnceLock;
+
+		/// Burn's own wgpu device once initialized, so later calls skip the
+		/// adapter acquisition [`default_device`] otherwise repeats.
+		static OWN_DEVICE: OnceLock<Device> = OnceLock::new();
+
+		/// The device every model runs on: the WGPU device shared from Bevy by
+		/// [`SharedBurnWgpuPlugin`](crate::prelude::SharedBurnWgpuPlugin) when
+		/// present, so Burn and Bevy share one GPU; else Burn's own, initialized
+		/// on the default adapter (the headless path).
+		///
+		/// The initialization is async because wasm cannot block on adapter
+		/// selection, so a device must be initialized through here before first
+		/// use there. Errors when the host grants no adapter.
+		pub async fn default_device() -> Result<Device> {
+			if let Some(device) = crate::prelude::shared_burn_wgpu_device() {
+				return device.xok();
 			}
-			device
+			if let Some(device) = OWN_DEVICE.get() {
+				return device.clone().xok();
+			}
+			let device = match Device::wgpu_options().init_async().await {
+				Ok(device) => device,
+				// registered already, by a concurrent caller or a tensor op's lazy
+				// init: the lazy handle names that same runtime
+				Err(WgpuInitError::Registration { .. }) => {
+					Device::wgpu(DeviceKind::DefaultDevice)
+				}
+				Err(err) => return Err(err.into()),
+			};
+			OWN_DEVICE.get_or_init(|| device).clone().xok()
 		}
-		/// Whether this host grants a device for [`DefaultBackend`].
-		///
-		/// cubecl selects its adapter lazily and *panics* when none is available
-		/// ("No possible adapter available for backend"), so there is no fallible
-		/// device call to recover from — anything that merely needs *a* GPU, rather
-		/// than asserting one exists, has to ask first and skip when the answer is
-		/// no (GPU-less CI, a host whose driver is broken).
-		///
-		/// A bevy-shared device is already live, so it answers without a probe.
-		/// Otherwise wasm asks the host through `js_runtime::probe_webgpu`, and
-		/// native runs cubecl's own eager setup and catches the panic. cubecl
-		/// exposes no fallible adapter query, so provoking the panic *here* is
-		/// what makes it recoverable: called on this thread it unwinds into the
-		/// catch, whereas the lazy init happens on a cubecl worker thread, where
-		/// the panic is unreachable and surfaces only as a `RecvError` from a
-		/// dead channel. Requires unwinding, so under `panic = "abort"` a
-		/// gpu-less host aborts rather than reporting `false`.
+		/// Whether this host grants a device for [`default_device`], so anything
+		/// that merely needs *a* GPU, rather than asserting one exists, can skip
+		/// when the answer is no (GPU-less CI, a host whose driver is broken).
+		/// Wasm asks the host through `js_runtime::probe_webgpu` before
+		/// initializing.
 		pub async fn has_device() -> bool {
-			if crate::prelude::shared_burn_wgpu_device().is_some() {
-				return true;
-			}
 			#[cfg(target_arch = "wasm32")]
-			{ beet_core::prelude::js_runtime::probe_webgpu().await }
-			#[cfg(not(target_arch = "wasm32"))]
+			if crate::prelude::shared_burn_wgpu_device().is_none()
+				&& !js_runtime::probe_webgpu().await
 			{
-				let device = default_device();
-				std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-					burn::backend::wgpu::init_setup::<
-						burn::backend::wgpu::graphics::AutoGraphicsApi,
-					>(&device, Default::default())
-				}))
-				.is_ok()
+				return false;
 			}
+			default_device().await.is_ok()
 		}
 	} else {
 		compile_error!(
 			"beet_ml needs exactly one burn backend feature: `wgpu` (the default, \
-GPU, and the only wasm path), `ndarray` (CPU-only) or `cuda` (needs a system CUDA \
+GPU, and the only wasm path), `flex` (CPU-only) or `cuda` (needs a system CUDA \
 install). There is no backend-free build — every model runs on a burn device."
 		);
 	}
 }
-
-use burn::tensor::backend::BackendTypes;
-
-/// Device type associated with [`DefaultBackend`].
-pub type DefaultDevice = <DefaultBackend as BackendTypes>::Device;

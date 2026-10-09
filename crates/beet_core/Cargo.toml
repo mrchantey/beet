@@ -44,11 +44,6 @@ path = "tests/component_lifecycle.rs"
 harness = false
 
 [[test]]
-name = "component_lifecycle2"
-path = "tests/component_lifecycle2.rs"
-harness = false
-
-[[test]]
 name = "env_ext"
 path = "tests/env_ext.rs"
 harness = false

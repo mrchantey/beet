@@ -155,7 +155,7 @@ fn resolve_blob_path(
 // registered by the std-only `StorePlugin`
 #[cfg(feature = "std")]
 pub(crate) fn on_insert_dir_path(
-	ev: On<Insert, DirPath>,
+	ev: On<Insert<DirPath>>,
 	dirs: Query<&DirPath>,
 	parents: Query<&ChildOf>,
 	stores: Query<&BlobStore>,
@@ -168,7 +168,7 @@ pub(crate) fn on_insert_dir_path(
 // registered by the std-only `StorePlugin`
 #[cfg(feature = "std")]
 pub(crate) fn on_insert_blob_path(
-	ev: On<Insert, BlobPath>,
+	ev: On<Insert<BlobPath>>,
 	blob_paths: Query<&BlobPath>,
 	parents: Query<&ChildOf>,
 	stores: Query<&BlobStore>,
@@ -216,7 +216,7 @@ fn resolve_paths(
 // registered by the std-only `StorePlugin`
 #[cfg(feature = "std")]
 pub(crate) fn on_insert_store(
-	ev: On<Insert, BlobStore>,
+	ev: On<Insert<BlobStore>>,
 	children: Query<&Children>,
 	dirs: Query<&DirPath>,
 	blob_paths: Query<&BlobPath>,
@@ -252,7 +252,7 @@ pub(crate) fn on_insert_store(
 // registered by the std-only `StorePlugin`
 #[cfg(feature = "std")]
 pub(crate) fn on_insert_child_of(
-	ev: On<Insert, ChildOf>,
+	ev: On<Insert<ChildOf>>,
 	children: Query<&Children>,
 	dirs: Query<&DirPath>,
 	blob_paths: Query<&BlobPath>,
@@ -279,7 +279,7 @@ pub(crate) fn on_insert_child_of(
 // registered by the std-only `StorePlugin`
 #[cfg(feature = "std")]
 pub(crate) fn on_remove_store(
-	ev: On<Remove, BlobStore>,
+	ev: On<Remove<BlobStore>>,
 	children: Query<&Children>,
 	dirs: Query<&DirPath>,
 	blob_paths: Query<&BlobPath>,
