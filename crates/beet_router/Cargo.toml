@@ -12,7 +12,7 @@ categories.workspace = true
 
 
 [features]
-default = ["std", "markdown"]
+default = ["std"]
 # The std render surface: the scene-rendering router pieces (help/navigate scene
 # routes + rendering via `beet_ui`), media parsing, sidebar, help, the route tree,
 # the runtime BSX parser, and the system-browser link opener (`open_link`, native
@@ -68,7 +68,6 @@ vault = ["std", "beet_net/vault"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui/serde"]
-markdown = ["std", "dep:pulldown-cmark"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
 # The live, interactive terminal target: the charcell TUI host + stdio terminal,
 # behind which the in-world `Navigator` browses the app's own routes (`TuiServer`).
@@ -140,8 +139,6 @@ bitflags = "2"
 
 serde = {workspace = true, optional=true}
 serde_json = {workspace = true, optional=true}
-
-pulldown-cmark = { version = "0.13", optional = true }
 
 #💡 codegen
 syn = { workspace = true, optional = true }

@@ -1656,7 +1656,6 @@ dependencies = [
  "heck",
  "prettyplease",
  "proc-macro2",
- "pulldown-cmark",
  "quote",
  "serde",
  "serde_json",

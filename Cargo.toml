@@ -483,16 +483,16 @@ native-tls = [
 "net", "beet_net/native-tls",
 ]
 # beet_net is a hard dependency of beet_router. The facade pins beet_router to
-# `default-features = false`, so the std router must re-enable the std + markdown
-# + http surface it relied on (previously supplied by default features + net).
+# `default-features = false`, so the std router must re-enable the std + http
+# surface it relied on (previously supplied by default features + net).
 # `beet_router/native` adds the filesystem store + http transport + browser opener.
-router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/native", "beet_router/markdown", "beet_router/http", "beet_infra?/beet_router"]
+router = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/native", "beet_router/http", "beet_infra?/beet_router"]
 # The portable render router: the route tree, scene rendering, media negotiation
 # and the runtime BSX parser (`beet_router/std`, which is now wasm-safe), without
 # the native-only `beet_router/native` surface (filesystem store, http transport,
 # server). Builds on wasm — the basis of the Cloudflare Worker target. Native
 # consumers use the full `router` instead.
-router_render = ["template", "action", "net", "dep:beet_router", "beet_router/std", "beet_router/markdown"]
+router_render = ["template", "action", "net", "dep:beet_router", "beet_router/std"]
 # no_std router for bare-metal targets (e.g. esp32 firmware): the route tree,
 # dispatch and middleware core from beet_router, without the std scene/help
 # rendering pipeline. See `beet_router`'s `embedded` module.
@@ -581,7 +581,7 @@ style = ["ui", "beet_ui?/style"]
 # Backend-agnostic keyboard input routed to the focused entity (`FocusPlugin`).
 keyboard = ["ui", "beet_ui?/keyboard"]
 tui = ["ui", "beet_ui?/tui"]
-markdown = ["beet_router?/markdown", "beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
+markdown = ["beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
 # Build-time route code generation (route tree, server/client actions, typed links).
 codegen = ["router", "beet_router?/codegen"]
 syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
