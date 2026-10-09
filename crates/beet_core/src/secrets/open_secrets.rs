@@ -49,7 +49,7 @@ impl OpenSecrets {
 	/// document), answering how many landed.
 	///
 	/// A record that lands expiring or expired is one warning naming how it
-	/// rotates ([`Secret::expiry_notice`]): only the load that puts a record
+	/// rolls ([`Secret::expiry_notice`]): only the load that puts a record
 	/// to use says so, so a launch loading its document twice warns once, and
 	/// a value the environment overrides for one command is not nagged about.
 	pub fn set_env_vars(&self) -> Result<usize> {

@@ -123,7 +123,7 @@ config only (Caddy, the sshd relocation, the CloudWatch agent, the unit), never 
 version, so a code-only deploy plans no change to it; `<LightsailRelease/>` then
 reaches the box over the management sshd on 2222 and rolls the unit onto the new
 binary, verifying the RUNNING process reports this deploy's id. A machine-config
-change still replaces the box, and rotates its access key with it. Either way the
+change still replaces the box, and rolls its access key with it. Either way the
 static IP re-attaches so DNS never moves, and the ssh host key rides the env
 channel so the fingerprint never changes.
 
@@ -186,7 +186,8 @@ run from the `atproto` build too, so the handle records count as declared.
     just site-shared push                  # publish site/assets to it
 
 Live deploy needs the deployer's credentials (the AWS pair of this repo's own
-`beet-deployer` user, which `deployer/mint` below converges,
+`beet-deployer` user, which `<AwsDeployer/>` below declares and an elevated
+deploy converges,
 `CLOUDFLARE_API_TOKEN`, `BEET_SSH_HOST_KEY`) from the repo's `secrets.toml`,
 which the launch loads into the process environment before this entry builds
 (the top-level `<Secrets path="../secrets.toml"/>`; `beet secrets/check` says
@@ -296,26 +297,18 @@ token (plus AWS for the social stack's state bucket).
 	     the served site wrote, locally or (`--service-access=remote`) deployed,
 	     with no binding of its own. -->
 	<AnalyticsReport/>
-	<!-- the aws identity this repo deploys as: one iam user for its one
-	     document (the workspace entry shares it) and one managed policy per app
-	     THIS entry declares, lowered from what the stacks below render. Built
-	     with `atproto` so the social app's policy renders too; outside every
-	     `<Stack>`, since a document holds one pair however many stacks it
-	     deploys, and an administrator's verb: the scoped pair it seals cannot
-	     mint itself -->
-	<DeployerMint bx:cfg="feature:infra && feature:extra"/>
-	<!-- and the Cloudflare identity beside it: one account-owned token for this
-	     repo, scoped to exactly the permission groups the stacks below and the
-	     zone verbs above ask for. Runs as the MINT token, which holds `Account
-	     API Tokens Write` and nothing else and is kept nowhere: the run shows
-	     where to roll it and asks for it. Cloudflare has no mfa condition and
-	     no permissions boundary, so the only cap on the group that mints
-	     credentials is that nothing the age key opens carries it. The dry run
-	     ends with the steps -->
-	<CloudflareMint
-		bx:cfg="feature:infra && feature:extra"
-		command="just site-cloudflare-mint --stage=prod"
-	/>
+	<!-- the deploy credentials this repo deploys with, one per provider:
+	     declared once outside every `<Stack>`, since a document holds one of
+	     each however many stacks it deploys, and lowered from what the stacks
+	     below render and the zone verbs above declare. Every deploy checks
+	     them before it writes anything and refuses naming `--elevated` when
+	     they fall short; the elevated deploy converges them, the aws user as
+	     an administrator bought with the code from the phone and the
+	     Cloudflare token as the MINT token, rolled on the dashboard for the
+	     run and kept nowhere. Built with `atproto` so the social app's policy
+	     renders too -->
+	<AwsDeployer bx:cfg="feature:infra && feature:extra"/>
+	<CloudflareDeployToken bx:cfg="feature:infra && feature:extra"/>
 	<!-- the stage stack: every resource the running site needs, then the verbs
 	     that provision them behind the one `bx:cfg`. The stores stay outside
 	     it: the served binary reaches them by `bx:ref`, and an excluded

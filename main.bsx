@@ -57,8 +57,9 @@ the condition that excluded it rather than 404ing.
 
 The shared verbs need the deployer's AWS pair, plus `tofu`. That pair is this
 repo's own IAM user, `beet-deployer`, holding one managed policy per app this
-repo declares and nothing else: `beet deployer/mint` converges the user, its
-policies and its key (see `crates/beet_infra/README.md`, The deployer). Every
+repo declares and nothing else, kept in line with the declarations by an
+elevated deploy (`<stack>/deploy --elevated`; see `crates/beet_infra/README.md`,
+The deployer). Every
 credential this workspace uses (the model-provider keys, the AWS pair, the Cloudflare
 token, the R2 pair, the site box's host key) is a record of `secrets.toml`,
 age-sealed to the humans in its `default` group and loaded into the process
@@ -68,7 +69,7 @@ are identifiers, not secrets: spreads on a stack or an ancestor, resolved by
 ancestry and never read from the environment. Reading the document needs
 this machine's age identity (`~/.config/beet/age/keys.txt`); `beet
 secrets/check` says whether it does, `beet secrets/ls` what is there, and each
-record's note and rotation say what it is and where it is re-minted.
+record's note and roll say what it is and where it is re-minted.
 
 The `vault` verbs (`beet vault/keygen`, `backup`, `encrypt`, `decrypt`, ..)
 manage the identity and any age file named by path or store uri; the
@@ -103,9 +104,11 @@ stays, an inert tag in a lean build.
 	<AdminElevate bx:cfg="feature:vault"/>
 	<!-- the aws identity this workspace deploys as: one iam user for this
 	     document (the site entry shares it) and one managed policy per app the
-	     entry declares, here the `beet` app of the stack below. An
-	     administrator's verb: the scoped pair it seals cannot mint itself -->
-	<DeployerMint bx:cfg="feature:infra && feature:extra"/>
+	     entry declares, here the `beet` app of the stack below. A deploy checks
+	     it against the declarations before it writes anything, and an elevated
+	     deploy converges it as an administrator: the scoped pair it seals
+	     cannot mint itself -->
+	<AwsDeployer bx:cfg="feature:infra && feature:extra"/>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the region is an address declared on the stack, never read from
 		     the environment: a region that could fall back would plan a full

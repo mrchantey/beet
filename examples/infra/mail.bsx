@@ -52,9 +52,10 @@ that relays everything wants.
 `validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
 machine. The Cloudflare token must be scoped to the zone you replace the
-placeholder with: `beet --main=examples/infra/mail.bsx cloudflare/mint --dry-run`
-says what this entry asks for, which is `Zone > DNS Write` and nothing else, and
-`cloudflare/mint`, run in a terminal where it asks for the mint token, makes exactly that. It also needs domains you actually own: every name below is an RFC 2606
+placeholder with: `beet --main=examples/infra/mail.bsx deploy --dry-run` says
+what this entry asks of it, which is `Zone > DNS Write` and nothing else, and
+`deploy --elevated`, run in a terminal where it asks for the mint token, makes
+exactly that. It also needs domains you actually own: every name below is an RFC 2606
 example domain and the zone declared on the `<Stack>` is a placeholder, so a
 real deploy replaces both.
 
@@ -146,10 +147,10 @@ route.
 		<!-- the export read back into a fresh account's store, and a human
 		     removed: each answers a report, so it rides its route. -->
 		<!-- the Cloudflare token this entry deploys with, lowered from what it
-		     declares. Minted with the mint token rather than by an apply: an
-		     apply that minted a token would need `Account API Tokens Write` in
-		     the credential every deploy reads -->
-		<CloudflareMint/>
+		     declares. Converged by an elevated deploy as the mint token rather
+		     than by an apply: an apply that minted a token would need `Account
+		     API Tokens Write` in the credential every deploy reads -->
+		<CloudflareDeployToken/>
 		<Route path="secrets/restore" {SecretsRestore} bx:cfg="feature:vault"/>
 		<Route path="secrets/revoke" {SecretsRevoke} bx:cfg="feature:vault"/>
 

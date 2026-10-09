@@ -21,7 +21,7 @@ struct RestoreParams {
 	only: Option<String>,
 	/// Overwrite secrets the store already holds. Without it a single
 	/// existing label refuses the whole restore, since a restore that
-	/// silently replaced a live credential is a rotation nobody asked for.
+	/// silently replaced a live credential is a roll nobody asked for.
 	force: bool,
 }
 
@@ -93,7 +93,7 @@ pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
 				&secret_ref,
 				&secret.value,
 				secret.record.note.as_deref(),
-				secret.record.rotation.clone(),
+				secret.record.roll.clone(),
 			)
 			.await?;
 		writeln!(out, "restored `{name}` to {}", store.address(&secret_ref))?;

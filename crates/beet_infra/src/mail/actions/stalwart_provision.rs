@@ -235,7 +235,7 @@ impl Management {
 							Some(&AccountPlan::admin_note(
 								mail.mail_box.hostname(),
 							)),
-							Some(AccountPlan::admin_rotation()),
+							Some(AccountPlan::admin_roll()),
 						)
 						.await?;
 					return Self {
@@ -577,7 +577,7 @@ async fn bootstrap(
 					&secret_ref,
 					secret,
 					Some(&AccountPlan::admin_note(mail.mail_box.hostname())),
-					Some(AccountPlan::admin_rotation()),
+					Some(AccountPlan::admin_roll()),
 				)
 				.await?;
 			info!(
@@ -901,8 +901,8 @@ fn plan_converge(
 /// mail is signed by a selector nothing answers for.
 ///
 /// The credential is written on creation only, for the same reason an account's
-/// is: a key rotated under a published selector signs mail no verifier can
-/// check until DNS catches up. SecretRotation is a second selector beside this one.
+/// is: a key rolled under a published selector signs mail no verifier can
+/// check until DNS catches up. SecretRoll is a second selector beside this one.
 async fn converge_dkim(
 	client: &JmapClient,
 	domain: &DomainPlan,
@@ -949,7 +949,7 @@ async fn converge_dkim(
 /// Create the account if it is not there, minting and parking its password on
 /// the way; else patch it, leaving the credential it already has alone.
 ///
-/// An unasked rotation would lock out every client configured against the
+/// An unasked roll would lock out every client configured against the
 /// mailbox, so the password is generated only while the secret is absent and
 /// everything that needs it (a probe, a human setting up a mail client)
 /// reads it back from the secret store.
@@ -959,7 +959,7 @@ async fn converge_dkim(
 /// generate, and the ACCOUNT decides whether to create. Reading one to answer
 /// the other is how a box rebuilt on a fresh data store gets a mailbox
 /// nobody can sign in to. The one crossing is deliberate and is the
-/// credential's [`SecretRotation::Remint`]: a secret minted here while the account
+/// credential's [`SecretRoll::Remint`]: a secret minted here while the account
 /// already exists (`secrets/revoke` deleted it) is set on the account, so
 /// the store and the server agree again.
 async fn converge_account(
@@ -974,7 +974,7 @@ async fn converge_account(
 		.ensure(
 			&account.secret,
 			Some(&account.note(&domain.name)),
-			AccountPlan::rotation(),
+			AccountPlan::roll(),
 			async || {
 				Secret::generate(
 					account.secret.label(),
@@ -1022,7 +1022,7 @@ async fn converge_account(
 				);
 			client.update("x:Account", &id, &patch).await?;
 			// claimed only once the account answers to the new credential, so
-			// a `revoke` that relies on this never reports a rotation the
+			// a `revoke` that relies on this never reports a roll the
 			// server did not take
 			let address = account.address(&domain.name);
 			JmapClient::connect(client.origin(), &address, &password)
@@ -1035,7 +1035,7 @@ async fn converge_account(
 					)
 				})?
 				.mail_account()?;
-			info!("rotated the {} mailbox credential", account.name);
+			info!("rolled the {} mailbox credential", account.name);
 			Ok(id)
 		}
 		Converge::Unchanged(id) => Ok(id),

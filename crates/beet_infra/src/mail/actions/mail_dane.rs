@@ -146,7 +146,7 @@ pub async fn MailDane(
 				mail.mail_box.hostname()
 			)),
 			// the next deploy reads the served key and parks it again
-			Some(SecretRotation::Remint),
+			Some(SecretRoll::Remint),
 		)
 		.await?;
 	match parked.as_deref() {

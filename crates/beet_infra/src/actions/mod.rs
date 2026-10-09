@@ -8,14 +8,8 @@ mod cloudflare;
 // the Cloudflare v4 api: its base, its credential and its envelope, shared by
 // every call here (the zone verbs, the Worker teardown, the token mint).
 pub mod cloudflare_api_ext;
-// the repo's own Cloudflare token, lowered from what its declarations ask for.
-mod cloudflare_mint;
 mod cloudflare_zone;
 pub mod cloudwatch_ext;
-// the repo's own deployer user, its policies and its key. Gated with the AWS
-// IAM lowering it renders (`DeployerPolicy`).
-#[cfg(feature = "bindings_aws_common")]
-mod deployer_mint;
 mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
@@ -44,11 +38,8 @@ pub use aws_watch::*;
 pub use build_docker_image::*;
 #[cfg(feature = "cloudflare_block")]
 pub use cloudflare::*;
-pub use cloudflare_mint::*;
 pub use cloudflare_zone::*;
 pub use cloudwatch_ext::MetricDatum;
-#[cfg(feature = "bindings_aws_common")]
-pub use deployer_mint::*;
 pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;

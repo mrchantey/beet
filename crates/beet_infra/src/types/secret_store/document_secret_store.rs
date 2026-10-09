@@ -165,7 +165,7 @@ impl DocumentSecretStore {
 			value,
 			SecretRecord {
 				note: meta.note,
-				rotation: meta.rotation,
+				roll: meta.roll,
 				..default()
 			},
 		)?;
@@ -179,7 +179,7 @@ impl DocumentSecretStore {
 			secret,
 			note: record.note.clone(),
 			modified: record.modified,
-			rotation: record.rotation.clone(),
+			roll: record.roll.clone(),
 		}
 	}
 }
@@ -450,7 +450,7 @@ mod test {
 				&secret,
 				"hunter2",
 				Some("the database"),
-				SecretRotation::Remint,
+				SecretRoll::Remint,
 			)
 			.await
 			.unwrap();
@@ -461,7 +461,7 @@ mod test {
 			.unwrap()
 			.xpect_eq("hunter2");
 		let err = store
-			.create(&secret, "other", None, SecretRotation::Remint)
+			.create(&secret, "other", None, SecretRoll::Remint)
 			.await
 			.unwrap_err();
 		SecretStoreError::is_already_exists(&err).xpect_true();
@@ -469,8 +469,8 @@ mod test {
 			.overwrite(
 				&secret,
 				"hunter3",
-				Some("rotated"),
-				Some(SecretRotation::manual("by hand")),
+				Some("rolled"),
+				Some(SecretRoll::manual("by hand")),
 			)
 			.await
 			.unwrap();
@@ -481,17 +481,12 @@ mod test {
 			.address
 			.as_str()
 			.xpect_eq("secrets.toml#db-password");
-		entries[0]
-			.note
-			.clone()
-			.unwrap()
-			.as_str()
-			.xpect_eq("rotated");
+		entries[0].note.clone().unwrap().as_str().xpect_eq("rolled");
 		entries[0].modified.xpect_some();
 		entries[0]
-			.rotation
+			.roll
 			.clone()
-			.xpect_eq(Some(SecretRotation::manual("by hand")));
+			.xpect_eq(Some(SecretRoll::manual("by hand")));
 		let all = store.read_all().await.unwrap();
 		all[0].1.as_str().xpect_eq("hunter3");
 		store
@@ -503,14 +498,14 @@ mod test {
 	}
 
 	/// The value is created once and kept; a changed declaration of its
-	/// note or rotation converges the stored metadata around the same value.
+	/// note or roll converges the stored metadata around the same value.
 	#[beet_core::test]
 	async fn ensure_is_create_if_missing() {
 		let stack = stack();
 		let store = memory_secret_store(&stack);
 		let secret = SecretRef::new("db-password");
 		let (value, minted) = store
-			.ensure(&secret, Some("db"), SecretRotation::Remint, async || {
+			.ensure(&secret, Some("db"), SecretRoll::Remint, async || {
 				"first".to_string().xok()
 			})
 			.await
@@ -521,7 +516,7 @@ mod test {
 			.ensure(
 				&secret,
 				Some("the db"),
-				SecretRotation::manual("why"),
+				SecretRoll::manual("why"),
 				async || "second".to_string().xok(),
 			)
 			.await
@@ -535,7 +530,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(SecretMeta {
 				note: Some("the db".into()),
-				rotation: Some(SecretRotation::manual("why")),
+				roll: Some(SecretRoll::manual("why")),
 			});
 		store
 			.meta(&SecretRef::new("nope"))
@@ -553,12 +548,7 @@ mod test {
 		let secret = SecretRef::new("mail-tlsa");
 		let pin = async |value: &str, note: &str| {
 			store
-				.converge(
-					&secret,
-					value,
-					Some(note),
-					Some(SecretRotation::Remint),
-				)
+				.converge(&secret, value, Some(note), Some(SecretRoll::Remint))
 				.await
 				.unwrap()
 		};
@@ -615,7 +605,7 @@ mod test {
 		let secret = SecretRef::new("x");
 		let store = SecretStore::new(seeded.clone());
 		store
-			.create(&secret, "1", None, SecretRotation::Remint)
+			.create(&secret, "1", None, SecretRoll::Remint)
 			.await
 			.unwrap();
 		let blind = SecretStore::new(
@@ -655,7 +645,7 @@ mod test {
 		let store = store.with_seed(Some(seed));
 		let bound = SecretStore::new(store.clone());
 		bound
-			.create(&SecretRef::new("x"), "1", None, SecretRotation::Remint)
+			.create(&SecretRef::new("x"), "1", None, SecretRoll::Remint)
 			.await
 			.unwrap();
 		let written = store.handle().read().await.unwrap();

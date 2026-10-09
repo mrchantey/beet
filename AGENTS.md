@@ -18,6 +18,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Actions: one-per-entity, overloads, providers, `#[field]`, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
+- Deploy credentials, `<stack>/deploy` and `--elevated` (no mint verb; an agent relays a refusal to the operator as it is): `crates/beet_infra/README.md`, "Deploy, and deploy elevated"
 - The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`

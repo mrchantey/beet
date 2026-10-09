@@ -70,7 +70,7 @@ pub mod fs;
 mod path;
 #[cfg(feature = "std")]
 mod path_utils;
-// `SecretRotation` is plain data every build describing a stack needs; the
+// `SecretRoll` is plain data every build describing a stack needs; the
 // document and its declaration behind it ride `vault`
 pub mod secrets;
 pub mod template;

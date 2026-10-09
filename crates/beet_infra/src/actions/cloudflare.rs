@@ -550,18 +550,23 @@ fn worker_wrangler_json(
 
 // ───────────────────────────── R2 site sync ────────────────────────────────
 
-/// Publishes a local site directory to an R2 bucket, key-free: it walks the
-/// directory and runs `wrangler r2 object put` per file (using the API token, so
-/// no R2 S3 keys are needed for the sync itself), timing the publish (the
-/// headline the `bench` verb measures against a full redeploy).
+/// Publishes a local site directory to an R2 bucket with one `aws s3 sync`
+/// over R2's S3 endpoint, as the S3 pair the deploy token derives
+/// ([`CloudflareAccess::r2_credentials`]), timing the publish (the headline
+/// the `bench` verb measures against a full redeploy). Uploads what changed
+/// and never deletes.
+///
+/// Over the S3 api rather than `wrangler r2 object put` because only S3
+/// accepts the bucket-scoped object group, so the deploy token holds object
+/// write on exactly this bucket and nothing account-wide: no other bucket's
+/// objects, and no bucket's configuration (its lock among it).
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-// `wrangler r2 object put` per file
 #[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
-	TokenPermission::ACCOUNT_SETTINGS_READ,
-	TokenPermission::WORKERS_R2_STORAGE_WRITE,
-]))]
+	TokenPermission::BUCKET_ITEM_WRITE,
+])
+.with_bucket(|entity| entity.get::<Self>().map(|sync| sync.bucket.clone())))]
 pub async fn CloudflareR2Sync(
 	/// Local directory to publish (cwd-relative), eg `examples/bsx_site`.
 	#[field]
@@ -577,9 +582,11 @@ pub async fn CloudflareR2Sync(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let account = cloudflare_account(&cx).await?;
 	let start = Instant::now();
 	sync_dir_to_r2(
 		&access,
+		&account,
 		local_dir.as_str(),
 		&bucket,
 		prefix.as_ref().map(|prefix| prefix.as_str()),
@@ -606,78 +613,41 @@ impl CloudflareR2Sync {
 	}
 }
 
-/// Upload every file under `local_dir` to `bucket` via `wrangler r2 object put`.
-/// Shared by [`CloudflareR2Sync`] and [`CloudflareBench`].
+/// Sync `local_dir` into `bucket` as the deploy token's derived S3 pair: one
+/// process for the whole directory, uploading what changed and deleting
+/// nothing, so a deploy only ever adds and replaces. Shared by
+/// [`CloudflareR2Sync`] and [`CloudflareBench`].
 ///
-/// `local_dir` is resolved relative to the cwd (like `--main`), not the workspace:
-/// the site is the user's, and a deploy `.bsx` may be run from a different repo
-/// than the beet workspace that holds the Worker source.
+/// `local_dir` is resolved relative to the cwd (like `--main`), not the
+/// workspace: the site is the user's, and a deploy `.bsx` may be run from a
+/// different repo than the beet workspace that holds the Worker source.
 ///
 /// `prefix`, when set, is prepended to every key (`<prefix>/<relpath>`), so a
-/// directory can mount under a bucket sub-path (eg workspace `assets/` under the
-/// site's `assets/` prefix). `None` uploads to the bucket root.
+/// directory can mount under a bucket sub-path (eg workspace `assets/` under
+/// the site's `assets/` prefix). `None` syncs to the bucket root.
 async fn sync_dir_to_r2(
 	access: &CloudflareAccess,
+	account: &CloudflareAccount,
 	local_dir: &str,
 	bucket: &str,
 	prefix: Option<&str>,
 ) -> Result {
 	let root = AbsPath::new(local_dir)?;
-	let files = ReadDir::files_recursive(&root)?;
-	info!(
-		"syncing {} files from {} to r2://{bucket}{}",
-		files.len(),
-		root,
-		prefix
-			.map(|prefix| format!("/{prefix}"))
-			.unwrap_or_default(),
-	);
-	// precompute owned `(bucket/key, file)` args so the uploads own their data.
-	let puts = files
-		.into_iter()
-		.map(|file| {
-			let rel = file.strip_prefix(&root).unwrap_or(file.as_path());
-			let rel_key = rel.to_string_lossy().replace('\\', "/");
-			// mount under `prefix/` when set, else at the bucket root.
-			let key = match prefix {
-				Some(prefix) => format!("{prefix}/{rel_key}"),
-				None => rel_key,
-			};
-			(
-				format!("{bucket}/{key}"),
-				file.to_string_lossy().to_string(),
-			)
-		})
-		.collect::<Vec<_>>();
-	// each `wrangler r2 object put` is its own node process, so the per-file startup
-	// dominates; upload concurrently. Bound the fan-out to 16: a large site (hundreds
-	// of files) would otherwise spawn hundreds of concurrent node processes and
-	// exhaust file descriptors / PIDs. 16 at a time keeps the wall-clock near one put.
-	let access = *access;
-	for chunk in puts.chunks(16) {
-		chunk
-			.iter()
-			.map(|(key, file_arg)| async move {
-				// `--remote` targets the real R2 bucket; without it wrangler writes to
-				// its *local* Miniflare store, which a deployed Worker never reads.
-				access
-					.wrangler()
-					.with_args([
-						"r2",
-						"object",
-						"put",
-						key.as_str(),
-						"--file",
-						file_arg.as_str(),
-						"--remote",
-					])
-					.run_async()
-					.await
-					.map(|_| ())
-			})
-			.xmap(async_ext::try_join_all)
-			.await?;
-	}
+	let target = match prefix {
+		Some(prefix) => format!("s3://{bucket}/{prefix}"),
+		None => format!("s3://{bucket}"),
+	};
+	info!("syncing {root} to {target}");
+	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
+	aws_cli_ext::r2(&account.r2_endpoint(), &access_key, &secret_key, [
+		"s3",
+		"sync",
+		&root.to_string(),
+		&target,
+		"--only-show-errors",
+	])
+	.run_async()
+	.await?;
 	Ok(())
 }
 
@@ -717,9 +687,11 @@ pub async fn CloudflareBench(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
+	let account = cloudflare_account(&cx).await?;
 	// sync path: publish the site to R2; the Worker serves it on the next fetch.
 	let sync_start = Instant::now();
-	sync_dir_to_r2(&access, local_dir.as_str(), &bucket, None).await?;
+	sync_dir_to_r2(&access, &account, local_dir.as_str(), &bucket, None)
+		.await?;
 	let sync_elapsed = sync_start.elapsed();
 
 	// with a url, also time how soon the live Worker serves the fresh site.
@@ -1021,10 +993,14 @@ async fn empty_bucket(
 	let (access_key, secret_key) = access.r2_credentials(account.id()).await?;
 	let endpoint = account.r2_endpoint();
 	info!("emptying all objects from r2://{bucket} via {endpoint}");
-	match aws_cli_ext::r2(&endpoint, &access_key, &secret_key)
-		.with_args(["s3", "rm", &format!("s3://{bucket}"), "--recursive"])
-		.run_async()
-		.await
+	match aws_cli_ext::r2(&endpoint, &access_key, &secret_key, [
+		"s3",
+		"rm",
+		&format!("s3://{bucket}"),
+		"--recursive",
+	])
+	.run_async()
+	.await
 	{
 		Ok(_) => Ok(()),
 		// an already-deleted bucket has nothing to empty; treat as done so a repeat
@@ -1043,6 +1019,24 @@ async fn empty_bucket(
 #[cfg(test)]
 mod test {
 	use super::*;
+
+	/// The R2 sync asks for object write and names its own bucket for it, so
+	/// the deploy token is granted that bucket's objects and nothing
+	/// account-wide.
+	#[beet_core::test]
+	fn the_sync_names_its_bucket() {
+		let mut world = World::new();
+		let sync = world
+			.spawn(CloudflareR2Sync::new("examples/bsx_site", "site"))
+			.id();
+		let access = CloudflareAccess::of(world.entity(sync)).unwrap();
+		access
+			.permissions()
+			.xpect_eq(&[TokenPermission::BUCKET_ITEM_WRITE][..]);
+		access
+			.bucket(world.entity(sync))
+			.xpect_eq(Some(SmolStr::from("site")));
+	}
 
 	/// A declared host lands as a wrangler custom domain, so wrangler creates
 	/// its record and certificate. Without one the key is absent entirely: an

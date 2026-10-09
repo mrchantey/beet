@@ -56,7 +56,7 @@ its S3 credentials from the same token. `build` needs neither (a local
 compile).
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
-(`beet cloudflare/mint`), so it carries no account-level Workers group: a live run
+(`<CloudflareDeployToken/>`), so it carries no account-level Workers group: a live run
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->

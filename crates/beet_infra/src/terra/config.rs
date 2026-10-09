@@ -158,7 +158,7 @@ impl Config {
 		encryption: &StateEncryption,
 	) -> &mut Self {
 		// both channels replaced together: a render that stops naming the
-		// retiring passphrase (the second half of a rotation, and every
+		// retiring passphrase (the second half of a roll, and every
 		// ordinary launch) must keep neither the block nor a declared variable
 		// nothing supplies a value for
 		self.encryption = encryption.to_json();

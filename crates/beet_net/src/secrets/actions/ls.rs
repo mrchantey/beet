@@ -7,8 +7,8 @@ use core::fmt::Write;
 
 /// List a document's index, one block per group: the group's recipient
 /// count and whether this identity opens it, then every record as its name,
-/// role and modified time on one line with its expiry, note and rotation
-/// indented under it. The index is plaintext, so no identity is needed and no value
+/// role and modified time on one line with its expiry, note, roll and
+/// metadata indented under it. The index is plaintext, so no identity is needed and no value
 /// is ever printed.
 ///
 /// ```sh
@@ -73,8 +73,17 @@ pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
 							format!("expires {}", expires.format_iso8601())
 						}),
 						record.note.as_deref().map(str::to_string),
-						record.rotation.as_ref().map(ToString::to_string),
-					],
+						record.roll.as_ref().map(ToString::to_string),
+					]
+					.into_iter()
+					.flatten()
+					.chain(
+						record
+							.metadata
+							.iter()
+							.map(|(key, value)| format!("{key}: {value}")),
+					)
+					.collect::<Vec<_>>(),
 				)
 			})
 			.collect::<Vec<_>>();
@@ -104,11 +113,11 @@ fn group_status(name: &str, opened: &OpenSecrets) -> String {
 
 /// Append every record: its columns padded to the widest cell, then each
 /// of its details indented under it, a detail's continuation lines (a
-/// rotation naming one dashboard step per line) indented under its first;
+/// roll naming one dashboard step per line) indented under its first;
 /// `(none)` when there are no rows.
 fn write_records(
 	out: &mut String,
-	rows: &[(Vec<String>, [Option<String>; 3])],
+	rows: &[(Vec<String>, Vec<String>)],
 ) -> Result {
 	let Some(columns) = rows.first().map(|(cells, _)| cells.len()) else {
 		writeln!(out, "  (none)")?;
@@ -132,7 +141,7 @@ fn write_records(
 			.collect::<Vec<_>>()
 			.join("  ");
 		writeln!(out, "  {}", line.trim_end())?;
-		for detail in details.iter().flatten() {
+		for detail in details {
 			for (index, line) in detail.lines().enumerate() {
 				let indent = if index == 0 { "      " } else { "        " };
 				writeln!(out, "{indent}{line}")?;
@@ -182,7 +191,14 @@ mod test {
 				"agents",
 				"CF_API_TOKEN",
 				"cf-PRIVATE",
-				record(Some(SecretRole::EnvVar), "dns and workers"),
+				SecretRecord {
+					// a multi-line value, indented under its key like a roll
+					metadata: BTreeMap::from([(
+						"grants".into(),
+						"Zone > Cache Purge\nZone > DNS Write".into(),
+					)]),
+					..record(Some(SecretRole::EnvVar), "dns and workers")
+				},
 			)
 			.unwrap();
 		document
@@ -194,7 +210,7 @@ mod test {
 				SecretRecord {
 					expires: Some(Date::parse("2027-01-05").unwrap().timestamp()),
 					// one dashboard step per line, each indented under the first
-					rotation: Some(SecretRotation::manual(
+					roll: Some(SecretRoll::manual(
 						"https://platform.openai.com/api-keys\n> Create new secret key\n> name it beet",
 					)),
 					..record(Some(SecretRole::EnvVar), "billing account")

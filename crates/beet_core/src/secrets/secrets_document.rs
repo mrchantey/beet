@@ -4,7 +4,7 @@
 use crate::prelude::*;
 
 /// A secrets document, `secrets.toml` by convention: a plaintext index of
-/// records (name, role, note, rotation, modified) under the group each
+/// records (name, role, note, roll, modified) under the group each
 /// belongs to, and one armored age blob per group, sealed to that group's
 /// recipients. Everyone sees which records exist and who may read them;
 /// only a group's members read its values; `ls` needs no identity at all.

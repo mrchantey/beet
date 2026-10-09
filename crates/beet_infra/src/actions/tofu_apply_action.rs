@@ -38,10 +38,9 @@ use beet_net::prelude::*;
 /// artifact still publishes its ledger, since that is what a content sync
 /// adopts and a rollback indexes.
 ///
-/// Before any of it writes, an apply holding the sealed Cloudflare deploy
-/// token refuses a planned change that token is not allowed to make, ie to an
-/// R2 bucket's configuration, naming the elevated run that is
-/// ([`DeployerToken::elevated`]).
+/// What a deploy may change at all is decided before its first step, by the
+/// route's [`DeployGate`]: a change no stored credential may make is refused
+/// there, before this or any other step writes anything.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -114,51 +113,13 @@ pub async fn TofuApply(
 		variables.len()
 	);
 
-	// step 2: resolve variables
-	trace!(
-		"TofuApply: step 2 - resolving {} variables",
-		variables.len()
-	);
-	// only the AMBIENT ones: a content variable's value is not in flight on this
-	// request, it is a fact about the stack, so `apply_with_vars` reads it from
-	// its source alongside the state passphrase. Asking the request for it would
-	// fail, and defaulting it is the revocation this split exists to prevent.
-	let resolved_vars: Vec<(SmolStr, SmolStr)> = variables
-		.iter()
-		.filter(|variable| !variable.is_content())
-		.map(|variable| {
-			variable
-				.resolve_value(cx.input.parts())
-				.map(|value| (variable.key().clone(), value))
-		})
-		.collect::<Result<Vec<_>>>()?;
-	trace!("TofuApply: resolved variables: {:?}", resolved_vars);
-	// narrowed to the layer's addresses when one is named. An unknown layer
-	// errors rather than silently widening to the whole stack.
-	let targets: &[String] = match layer.as_ref() {
-		None => &[],
-		Some(layer) => project.config().layer_targets(layer)?,
-	};
-
-	// step 3: refuse, before anything is written, a change the Cloudflare
-	// deploy token is deliberately not allowed to make
-	let route = cx.input.parts().path().join("/");
-	TofuApply::refuse_elevated(
-		&cx.caller,
-		&route,
-		&project,
-		&resolved_vars,
-		targets,
-	)
-	.await?;
-
-	// steps 4 and 5 belong to the full apply: a layered apply converges no
+	// steps 2 and 3 belong to the full apply: a layered apply converges no
 	// resource that reads an artifact, and publishing the ledger before the
 	// service rolls would mark an undeployed version current.
 	if let (None, Some(mut client)) = (&layer, client) {
-		// step 4: build and upload each artifact under this launch's version
+		// step 2: build and upload each artifact under this launch's version
 		trace!(
-			"TofuApply: step 4 - uploading {} artifacts",
+			"TofuApply: step 2 - uploading {} artifacts",
 			artifacts.len()
 		);
 		for (artifact, label) in &artifacts {
@@ -185,8 +146,8 @@ pub async fn TofuApply(
 			);
 		}
 
-		// step 5: publish ledger
-		trace!("TofuApply: step 5 - publishing artifact ledger");
+		// step 3: publish ledger
+		trace!("TofuApply: step 3 - publishing artifact ledger");
 		client.publish_ledger().await.map_err(|err| {
 			bevyhow!("failed to publish artifact ledger: {err}")
 		})?;
@@ -196,8 +157,14 @@ pub async fn TofuApply(
 		);
 	}
 
-	// step 6: apply
-	trace!("TofuApply: step 6 - applying terraform");
+	// step 4: apply, narrowed to the layer's addresses when one is named. An
+	// unknown layer errors rather than silently widening to the whole stack.
+	let resolved_vars = project.ambient_vars(cx.input.parts())?;
+	let targets: &[String] = match layer.as_ref() {
+		None => &[],
+		Some(layer) => project.config().layer_targets(layer)?,
+	};
+	trace!("TofuApply: step 4 - applying terraform");
 	let result = project.apply_with_vars(&resolved_vars, targets).await?;
 	trace!("TofuApply: terraform apply complete");
 	trace!("{result}");
@@ -213,85 +180,6 @@ pub async fn TofuApply(
 }
 
 impl TofuApply {
-	/// Refuse a planned write to a type the Cloudflare deploy token only
-	/// refreshes ([`DeployerToken::elevated_for`]) while this launch holds that
-	/// token, naming the elevated run of `route` that holds what the write
-	/// needs. Checked before the apply rather than learned from it: Cloudflare's
-	/// 403 names no permission group, and it lands mid-apply, after a replaced
-	/// box and before its provision.
-	///
-	/// Plans only when the stack declares such a type and the token is the
-	/// sealed one, so every other stack, and the elevated run itself, pays
-	/// nothing. A token passed for the command that is not the sealed one (an
-	/// elevated run, CI's) is Cloudflare's to judge.
-	async fn refuse_elevated(
-		caller: &AsyncEntity,
-		route: &str,
-		project: &terra::Project,
-		vars: &[(SmolStr, SmolStr)],
-		targets: &[String],
-	) -> Result {
-		let declares_elevated = project
-			.config()
-			.declared_types()
-			.into_iter()
-			.any(|declared| !DeployerToken::elevated_for(declared).is_empty());
-		if !declares_elevated {
-			return OK;
-		}
-		let (sealed, mint) = caller
-			.with_world(|world, _| {
-				let sealed = OpenSecrets::find(world, CloudflareMint::RECORD)
-					.ok()
-					.map(|secret| secret.value);
-				let mint = world
-					.query::<&CloudflareMint>()
-					.iter(world)
-					.find_map(|mint| mint.command.clone());
-				(sealed, mint)
-			})
-			.await?;
-		if sealed.is_none() || sealed != cloudflare_api_ext::token().ok() {
-			return OK;
-		}
-		let changes = project
-			.planned_changes(vars, targets)
-			.await?
-			.into_iter()
-			.filter(|change| {
-				!DeployerToken::elevated_for(&change.resource_type).is_empty()
-			})
-			.collect::<Vec<_>>();
-		let Some(first) = changes.first() else {
-			return OK;
-		};
-		let mint = mint.unwrap_or_else(|| "beet cloudflare/mint".into());
-		bevybail!(
-			"this apply would change {}, which the Cloudflare deploy token only \
-			reads: writing it needs {}, which reaches what no deploy rebuilds, so \
-			no held token carries it. Nothing is written yet. Run this deploy \
-			elevated in a terminal, which asks for the mint token and holds {} \
-			for the one command:\n\n\t{mint} -- {route}",
-			changes
-				.iter()
-				.map(|change| format!(
-					"`{}` ({})",
-					change.address, change.action
-				))
-				.collect::<Vec<_>>()
-				.join(", "),
-			DeployerToken::elevated_for(&first.resource_type)
-				.iter()
-				.map(TokenPermission::name)
-				.collect::<Vec<_>>()
-				.join(", "),
-			match DeployerToken::elevated_for(&first.resource_type).len() {
-				1 => "it",
-				_ => "them",
-			},
-		)
-	}
-
 	/// Converge only the named layer, rather than the whole stack.
 	pub fn for_layer(layer: impl Into<SmolStr>) -> Self {
 		Self {

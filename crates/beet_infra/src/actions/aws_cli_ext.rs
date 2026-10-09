@@ -49,13 +49,22 @@ pub fn sts<'a>(args: impl IntoIterator<Item = &'a str>) -> ChildProcess {
 	self::service("sts", crate::bindings::aws::region::US_EAST_1, args)
 }
 
-/// An `aws` invocation against R2 at `endpoint`, authenticated as exactly the
-/// pair `access_key`/`secret_key` rather than the deploy's credential. An
-/// inherited profile and session token are dropped, since a session token
-/// beside a long-lived pair authenticates as nobody and a profile may carry
-/// settings meant for another identity, and the secret half is redacted from
-/// every rendering of the command.
-pub fn r2(endpoint: &str, access_key: &str, secret_key: &str) -> ChildProcess {
+/// An `aws <args..>` invocation against R2 at `endpoint`, authenticated as
+/// exactly the pair `access_key`/`secret_key` rather than the deploy's
+/// credential. An inherited profile and session token are dropped, since a
+/// session token beside a long-lived pair authenticates as nobody and a
+/// profile may carry settings meant for another identity, and the secret half
+/// is redacted from every rendering of the command.
+///
+/// The args are taken here rather than set after, like every constructor in
+/// this module: [`ChildProcess::with_args`] replaces, so args set on the
+/// result would drop the endpoint and send the call to AWS S3 instead.
+pub fn r2<'a>(
+	endpoint: &str,
+	access_key: &str,
+	secret_key: &str,
+	args: impl IntoIterator<Item = &'a str>,
+) -> ChildProcess {
 	ChildProcess::new("aws")
 		.without_env("AWS_PROFILE")
 		.without_env("AWS_SESSION_TOKEN")
@@ -64,10 +73,39 @@ pub fn r2(endpoint: &str, access_key: &str, secret_key: &str) -> ChildProcess {
 			("AWS_ACCESS_KEY_ID", access_key),
 			("AWS_SECRET_ACCESS_KEY", secret_key),
 		])
-		.with_args([
-			"--endpoint-url",
-			endpoint,
-			"--region",
-			CloudflareAccount::R2_REGION,
-		])
+		.with_args(args.into_iter().map(SmolStr::from).chain([
+			SmolStr::from("--endpoint-url"),
+			SmolStr::from(endpoint),
+			SmolStr::from("--region"),
+			SmolStr::from(CloudflareAccount::R2_REGION),
+		]))
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// An R2 call keeps its endpoint and its region whatever it runs, and
+	/// never prints the secret half.
+	///
+	/// REGRESSION: the endpoint was set with `with_args` and every caller then
+	/// set its own command the same way, which replaced the endpoint: each R2
+	/// call (the cold copy's list, push and probe, an example's bucket empty)
+	/// went to AWS S3 with an R2 pair.
+	#[beet_core::test]
+	fn an_r2_call_keeps_its_endpoint() {
+		aws_cli_ext::r2(
+			"https://acct.r2.cloudflarestorage.com",
+			"id",
+			"hunter2",
+			["s3", "ls"],
+		)
+		.to_string()
+		.xpect_starts_with("aws s3 ls")
+		.xpect_contains("--endpoint-url https://acct.r2.cloudflarestorage.com")
+		.xpect_contains("--region auto")
+		.xnot()
+		.xpect_contains("hunter2");
+	}
 }

@@ -279,7 +279,7 @@ impl ChildProcess {
 	/// `args` (a route and its params) first, then this launch's own knobs,
 	/// so a knob `args` repeats wins and every other one carries over. How a
 	/// verb that holds a credential for one command runs it, ie
-	/// `beet admin -- deployer/mint`: the route resolves the same workspace,
+	/// `beet admin -- shared/plan`: the route resolves the same workspace,
 	/// entry and stage, and the environment is inherited, credential and all.
 	///
 	/// The binary rather than `args[0]` on `PATH`: the args name a route this
@@ -491,18 +491,19 @@ mod test {
 	/// knob it repeats wins.
 	///
 	/// REGRESSION: `beet admin -- <verb>` once spawned the first argument as a
-	/// program, so `beet admin -- deployer/mint` died on `No such file or
+	/// program, so `beet admin -- deployer/mint` (a verb since folded into the
+	/// elevated deploy) died on `No such file or
 	/// directory` AFTER the mfa code had been typed and spent: the expensive
 	/// kind of bug, since the cost is a credential rather than a retry.
 	#[crate::test]
 	fn this_launch_runs_this_binary() {
 		let rendered =
-			ChildProcess::this_launch(["deployer/mint", "--stage=prod"])
+			ChildProcess::this_launch(["mail/deploy", "--stage=prod"])
 				.unwrap()
 				.to_string();
 		let (binary, args) = rendered.split_once(' ').unwrap();
 		std::path::Path::new(binary).is_file().xpect_true();
-		args.xpect_starts_with("deployer/mint --stage=prod");
+		args.xpect_starts_with("mail/deploy --stage=prod");
 	}
 
 	/// A failed process reports its own argv, which is how a reader knows what

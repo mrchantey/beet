@@ -81,7 +81,7 @@ pub(crate) fn attach_ssm_secrets(
 
 /// The [`SecretStore`] over AWS parameter store, scoped to one stack in its
 /// region: every secret a `SecureString` at `/app/stage/label`
-/// ([`SecretRef::name`]), the note and rotation its description
+/// ([`SecretRef::name`]), the note and roll its description
 /// ([`SecretRef::description`]), encrypted under the account's `aws/ssm`
 /// key, which authorises account principals through its own key policy so a
 /// reader needs no `kms:` grant. What `<SsmSecrets/>` (declared or implicit)
@@ -164,10 +164,8 @@ impl SsmSecretStore {
 			"--value",
 			value,
 		];
-		let description = SecretRef::description(
-			meta.note.as_deref(),
-			meta.rotation.as_ref(),
-		);
+		let description =
+			SecretRef::description(meta.note.as_deref(), meta.roll.as_ref());
 		if !description.is_empty() {
 			args.extend(["--description", &description]);
 		}
@@ -287,14 +285,14 @@ impl SsmSecretStore {
 	/// One listed parameter as an entry.
 	fn entry(&self, item: &Value) -> Option<SecretEntry> {
 		let name = item["Name"].as_str()?;
-		let (note, rotation) = SecretRef::parse_description(
+		let (note, roll) = SecretRef::parse_description(
 			item["Description"].as_str().unwrap_or_default(),
 		);
 		SecretEntry {
 			secret: self.label_of(name)?,
 			address: name.into(),
 			note,
-			rotation,
+			roll,
 			// the cli prints an offset form, `2026-09-15T00:00:00.123000+00:00`
 			modified: item["LastModifiedDate"]
 				.as_str()
@@ -393,7 +391,7 @@ impl SecretStoreProvider for SsmSecretStore {
 				.iter()
 				.filter_map(|item| {
 					let mut entry = this.entry(item)?;
-					(entry.note, entry.rotation) = SecretRef::parse_description(
+					(entry.note, entry.roll) = SecretRef::parse_description(
 						entries
 							.iter()
 							.find(|described| described["Name"] == item["Name"])
@@ -491,8 +489,8 @@ mod test {
 			.xpect_eq("/beetmash/prod/dkim-example-com");
 		entry.note.unwrap().as_str().xpect_eq("the signing key");
 		entry
-			.rotation
-			.xpect_eq(Some(SecretRotation::manual("a new selector")));
+			.roll
+			.xpect_eq(Some(SecretRoll::manual("a new selector")));
 		entry
 			.modified
 			.unwrap()

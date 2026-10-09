@@ -212,12 +212,7 @@ mod test {
 		let store = crate::types::test_support::memory_secret_store(&stack);
 		for label in ["mail-admin-password", "dkim-example-com"] {
 			store
-				.create(
-					&SecretRef::new(label),
-					"x",
-					None,
-					SecretRotation::Remint,
-				)
+				.create(&SecretRef::new(label), "x", None, SecretRoll::Remint)
 				.await
 				.unwrap();
 		}

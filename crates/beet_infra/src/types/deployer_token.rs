@@ -40,18 +40,20 @@ use serde_json::json;
 /// changed, so a type whose write reaches what no deploy rebuilds is lowered
 /// twice: the deploy token holds what a refresh needs, and the write is
 /// [`elevated`](Self::elevated), held only by a token
-/// [`elevate`](Self::elevate) lowers for one command
-/// (`beet cloudflare/mint -- <route>`). An R2 bucket is the case that drew
+/// [`elevate`](Self::elevate) lowers for one elevated deploy
+/// (`<stack>/deploy --elevated`). An R2 bucket is the case that drew
 /// the line: its lock is the one thing that makes its contents recoverable,
 /// and the group that writes the lock also lifts it, over every bucket in the
 /// account, since Cloudflare scopes bucket configuration to nothing narrower.
 ///
 /// ## What makes a token out of this
 ///
-/// `cloudflare/mint` ([`CloudflareMint`]) posts [`to_json`](Self::to_json) as
-/// an account-owned token and seals it as `CLOUDFLARE_API_TOKEN`; [`Display`]
-/// prints the same lowering for its `--dry-run`. Each group carries the api's
-/// own id beside its name, so the mint needs no second table.
+/// An elevated deploy ([`CloudflareDeployToken`]) posts
+/// [`to_json`](Self::to_json) as an account-owned token and seals it as
+/// `CLOUDFLARE_API_TOKEN` with its [`grant_lines`](Self::grant_lines);
+/// [`Display`] prints the same lowering for a deploy's `--dry-run`. Each group
+/// carries the api's own id beside its name, so the converge needs no second
+/// table.
 ///
 /// [`Display`]: std::fmt::Display
 #[derive(Debug, Default, Clone)]
@@ -74,6 +76,11 @@ pub struct DeployerToken {
 	/// asked: held by an [elevated](Self::elevate) token for one command, never
 	/// by the deploy token.
 	elevated: BTreeMap<TokenPermission, BTreeSet<SmolStr>>,
+	/// The bucket-scoped permissions by the bucket each is granted over, and
+	/// what asked: one policy per bucket, so an action writing one bucket's
+	/// objects never reaches another's, and none reaches a bucket's
+	/// configuration.
+	buckets: BTreeMap<SmolStr, BTreeMap<TokenPermission, BTreeSet<SmolStr>>>,
 }
 
 impl DeployerToken {
@@ -89,7 +96,7 @@ impl DeployerToken {
 	/// touches it).
 	const RESOURCES: &'static [ResourceAccess] = &[
 		// a tripwire rather than a need: nothing in either tree renders an api
-		// token any more (`cloudflare/mint` mints out of band, see
+		// token any more (an elevated deploy mints out of band, see
 		// `an_r2_bucket_never_escalates`), and a declaration that rendered one
 		// again would name the escalating group out loud instead of quietly
 		// widening every deploy credential that lowers it
@@ -135,21 +142,23 @@ impl DeployerToken {
 			.filter(|declared| declared.starts_with(Self::PREFIX))
 		{
 			let access = Self::resource(declared)?;
-			self.add(stack, declared, access.deploy, access.elevated)?;
+			self.add(stack, declared, access.deploy, access.elevated, None)?;
 		}
 		self.xok()
 	}
 
 	/// Lower one Cloudflare action a route of the repo runs, by the
-	/// [`CloudflareAccess`] it declares. The addresses come from the action's
-	/// OWN stack, resolved by ancestry from its entity, since a route's verbs
-	/// may sit outside every stack.
+	/// [`CloudflareAccess`] it declares and the `bucket` it names for its
+	/// bucket-scoped groups ([`CloudflareAccess::bucket`]). The addresses come
+	/// from the action's OWN stack, resolved by ancestry from its entity, since
+	/// a route's verbs may sit outside every stack.
 	pub fn lower_access(
 		mut self,
 		stack: &ResolvedStack,
 		access: &CloudflareAccess,
+		bucket: Option<&str>,
 	) -> Result<Self> {
-		self.add(stack, access.action(), access.permissions(), &[])?;
+		self.add(stack, access.action(), access.permissions(), &[], bucket)?;
 		self.xok()
 	}
 
@@ -184,7 +193,8 @@ impl DeployerToken {
 
 	/// Record `deploy` and `elevated` as asked for by `asker`, resolving the
 	/// addresses they need: the stack's [`CloudflareZone`] for a zone-scoped
-	/// group, and its [`CloudflareAccount`] when it declares one.
+	/// group, `bucket` and the stack's [`CloudflareAccount`] for a
+	/// bucket-scoped one, and the account whenever the stack declares one.
 	///
 	/// A zone-scoped group needs the zone, so a stack without one fails here
 	/// naming the spread. The ACCOUNT is noted rather than demanded, because
@@ -198,6 +208,7 @@ impl DeployerToken {
 		asker: &str,
 		deploy: &[TokenPermission],
 		elevated: &[TokenPermission],
+		bucket: Option<&str>,
 	) -> Result {
 		if deploy.is_empty() && elevated.is_empty() {
 			return OK;
@@ -216,11 +227,26 @@ impl DeployerToken {
 					let zone = stack.cloudflare_zone()?;
 					self.zones.insert(zone.domain.clone(), zone.id.clone());
 				}
-				TokenScope::Bucket => bevybail!(
-					"`{asker}` asks a deploy token for the bucket-scoped \
-					`{permission}`, which belongs to a token an apply MINTS \
-					rather than to the one applying it"
-				),
+				TokenScope::Bucket => {
+					let Some(bucket) = bucket else {
+						bevybail!(
+							"`{asker}` asks for the bucket-scoped `{permission}` \
+							and names no bucket for it to be granted over: \
+							declare where the action keeps one, \
+							`CloudflareAccess::new::<Self>(..).with_bucket(..)`"
+						);
+					};
+					// a bucket's resource string names its account
+					let account = stack.cloudflare_account()?;
+					self.accounts.insert(SmolStr::new(account.id()));
+					self.buckets
+						.entry(bucket.into())
+						.or_default()
+						.entry(*permission)
+						.or_default()
+						.insert(asker.into());
+					continue;
+				}
 			}
 			match is_elevated {
 				true => &mut self.elevated,
@@ -238,6 +264,20 @@ impl DeployerToken {
 		&self.asked
 	}
 
+	/// The bucket-scoped permissions by the bucket each is granted over.
+	pub fn buckets(
+		&self,
+	) -> &BTreeMap<SmolStr, BTreeMap<TokenPermission, BTreeSet<SmolStr>>> {
+		&self.buckets
+	}
+
+	/// Whether the lowering asks nothing of Cloudflare at all.
+	pub fn is_empty(&self) -> bool {
+		self.asked.is_empty()
+			&& self.elevated.is_empty()
+			&& self.buckets.is_empty()
+	}
+
 	/// Every permission only a change asks for, and what asked for each:
 	/// what [`elevate`](Self::elevate) adds to the deploy token.
 	pub fn elevated(&self) -> &BTreeMap<TokenPermission, BTreeSet<SmolStr>> {
@@ -246,7 +286,7 @@ impl DeployerToken {
 
 	/// The token a change to an [`elevated`](Self::elevated) type is applied
 	/// with: the deploy token's permissions and the elevated ones, held for one
-	/// command by `beet cloudflare/mint -- <route>`.
+	/// elevated deploy.
 	pub fn elevate(&self) -> Self {
 		let mut asked = self.asked.clone();
 		for (permission, askers) in &self.elevated {
@@ -260,6 +300,7 @@ impl DeployerToken {
 			zones: self.zones.clone(),
 			asked,
 			elevated: default(),
+			buckets: self.buckets.clone(),
 		}
 	}
 
@@ -300,6 +341,53 @@ impl DeployerToken {
 					.join(", ")
 			),
 		}
+	}
+
+	/// Every group over every resource it reaches, one line each in the
+	/// dashboard's words (`Zone > DNS Write on beet.org`), sorted: what a
+	/// converged deploy token records it holds, and what a plain deploy
+	/// compares the declarations against.
+	pub fn grant_lines(&self) -> Vec<String> {
+		let mut lines = self
+			.asked
+			.keys()
+			.flat_map(|permission| {
+				let resources = match permission.scope {
+					TokenScope::Account => self
+						.accounts
+						.iter()
+						.map(|account| format!("account {account}"))
+						.collect::<Vec<_>>(),
+					TokenScope::Zone => {
+						self.zones.keys().map(ToString::to_string).collect()
+					}
+					TokenScope::Bucket => Vec::new(),
+				};
+				resources
+					.into_iter()
+					.map(move |resource| format!("{permission} on {resource}"))
+			})
+			.collect::<Vec<_>>();
+		lines.extend(self.buckets.iter().flat_map(|(bucket, groups)| {
+			groups
+				.keys()
+				.map(move |permission| format!("{permission} on {bucket}"))
+		}));
+		lines.sort();
+		lines
+	}
+
+	/// The resource strings `bucket` is granted as, one per account (a lowering
+	/// names one), in the form a token policy names them.
+	fn bucket_resources(&self, bucket: &str) -> Vec<String> {
+		self.accounts
+			.iter()
+			.map(|account| {
+				format!(
+					"com.cloudflare.edge.r2.bucket.{account}_default_{bucket}"
+				)
+			})
+			.collect()
 	}
 
 	/// The resource strings a group of `scope` is granted over, in the form a
@@ -350,6 +438,20 @@ impl DeployerToken {
 				})
 				.xmap(Some)
 			})
+			.chain(self.buckets.iter().map(|(bucket, groups)| {
+				json!({
+					"effect": "allow",
+					"resources": self
+						.bucket_resources(bucket)
+						.into_iter()
+						.map(|resource| (resource, Value::from("*")))
+						.collect::<serde_json::Map<_, _>>(),
+					"permission_groups": groups
+						.keys()
+						.map(|permission| json!({ "id": permission.id }))
+						.collect::<Vec<_>>(),
+				})
+			}))
 			.collect::<Vec<_>>()
 			.xmap(Value::Array)
 	}
@@ -365,6 +467,18 @@ impl DeployerToken {
 					.into_iter()
 					.map(|resource| (resource.into(), permission.id.into()))
 			})
+			.chain(self.buckets.iter().flat_map(|(bucket, groups)| {
+				self.bucket_resources(bucket).into_iter().flat_map(
+					move |resource| {
+						groups.keys().map(move |permission| {
+							(
+								SmolStr::from(resource.as_str()),
+								permission.id.into(),
+							)
+						})
+					},
+				)
+			}))
 			.collect()
 	}
 
@@ -419,6 +533,16 @@ impl std::fmt::Display for DeployerToken {
 				.collect::<Vec<_>>()
 				.join(", ");
 			writeln!(f, "permission: {permission} ({askers})")?;
+		}
+		for (bucket, groups) in &self.buckets {
+			for (permission, askers) in groups {
+				let askers = askers
+					.iter()
+					.map(SmolStr::as_str)
+					.collect::<Vec<_>>()
+					.join(", ");
+				writeln!(f, "permission: {permission} ({askers}) on {bucket}")?;
+			}
 		}
 		for scope in [TokenScope::Account, TokenScope::Zone] {
 			if !self.asked.keys().any(|held| held.scope == scope) {
@@ -507,9 +631,11 @@ pub enum TokenScope {
 	Account,
 	/// `com.cloudflare.api.account.zone.<id>`, the stack's [`CloudflareZone`].
 	Zone,
-	/// `com.cloudflare.edge.r2.bucket.<account>_default_<bucket>`, one bucket
-	/// and nothing else in the account. Only ever MINTED into a token (the
-	/// `R2BucketBlock` pair), never held by one that deploys.
+	/// `com.cloudflare.edge.r2.bucket.<account>_default_<bucket>`, one bucket's
+	/// objects and nothing else in the account: a bucket's own token (the
+	/// `R2BucketBlock` pair), and a deploy token over the bucket an action
+	/// names ([`CloudflareAccess::with_bucket`]), ie the one a site syncs into.
+	/// Usable over the S3 api only, not REST.
 	Bucket,
 }
 
@@ -624,7 +750,11 @@ impl TokenPermission {
 
 	/// R2 buckets and their contents at the account level: creating one,
 	/// deleting one, editing any bucket's configuration (its lock included,
-	/// which is how a lock is lifted) and `wrangler r2 object put`.
+	/// which is how a lock is lifted) and every object of every bucket. A
+	/// deploy that only writes objects asks for [`BUCKET_ITEM_WRITE`] over its
+	/// one bucket instead.
+	///
+	/// [`BUCKET_ITEM_WRITE`]: Self::BUCKET_ITEM_WRITE
 	pub const WORKERS_R2_STORAGE_WRITE: Self = Self::account(
 		"Workers R2 Storage Write",
 		"bf7481a1826f439697cb59a20b22293e",
@@ -778,7 +908,7 @@ mod test {
 		]
 		.iter()
 		.try_fold(DeployerToken::default(), |token, access| {
-			token.lower_access(&stack, access)
+			token.lower_access(&stack, access, None)
 		})
 		.unwrap();
 		token
@@ -823,7 +953,7 @@ mod test {
 		]
 		.iter()
 		.try_fold(DeployerToken::default(), |token, access| {
-			token.lower_access(&stack, access)
+			token.lower_access(&stack, access, None)
 		})
 		.unwrap();
 		let policies = token.to_json();
@@ -901,12 +1031,12 @@ mod test {
 
 	/// The hole the credential split closed, from the lowering's side: a bucket
 	/// renders its own storage group and NOTHING that mints, so no repo's deploy
-	/// token escalates however many buckets it declares. `cloudflare/mint` mints
-	/// the bucket's own token out of band.
+	/// token escalates however many buckets it declares. An elevated deploy
+	/// mints the bucket's own token out of band.
 	///
 	/// And the deploy token only READS the bucket: the group that writes its
-	/// lock also lifts it, so the write is elevated, held for one command by
-	/// `cloudflare/mint -- <route>`, and never sealed.
+	/// lock also lifts it, so the write is elevated, held for one elevated
+	/// deploy, and never sealed.
 	///
 	/// The `cloudflare_account_token` entry stays in the table deliberately, and
 	/// `places_every_cloudflare_type` covers it: if a declaration ever renders
@@ -957,6 +1087,50 @@ mod test {
 			.xpect_contains("zone resources");
 	}
 
+	/// An object write is granted over the one bucket the action names, in a
+	/// policy of its own, and nothing account-wide: no other bucket's objects
+	/// and no bucket's configuration. The fingerprint reads the posted body
+	/// back the same, and a bucket-scoped group naming no bucket is refused.
+	#[beet_core::test]
+	fn a_bucket_write_is_granted_over_its_bucket_alone() {
+		struct Sync;
+		let (stack, ..) = addressed();
+		let sync = CloudflareAccess::new::<Sync>(&[
+			TokenPermission::BUCKET_ITEM_WRITE,
+		]);
+		let token = DeployerToken::default()
+			.lower_access(&stack, &sync, Some("site"))
+			.unwrap();
+		token.asked().is_empty().xpect_true();
+		let policies = token.to_json();
+		policies.as_array().unwrap().len().xpect_eq(1);
+		policies[0]["resources"]
+			.as_object()
+			.unwrap()
+			.keys()
+			.cloned()
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![
+				"com.cloudflare.edge.r2.bucket.acct123_default_site"
+					.to_string(),
+			]);
+		policies
+			.to_string()
+			.as_str()
+			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
+			.xnot()
+			.xpect_contains(TokenPermission::WORKERS_R2_STORAGE_WRITE.id());
+		DeployerToken::fingerprint_of(&policies).xpect_eq(token.fingerprint());
+		token.grant_lines().xpect_eq(vec![
+			"Bucket > Workers R2 Storage Bucket Item Write on site".to_string(),
+		]);
+		DeployerToken::default()
+			.lower_access(&stack, &sync, None)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("with_bucket");
+	}
+
 	/// A zone-scoped group with no zone fails naming the spread; a missing
 	/// ACCOUNT is not the lowering's complaint at all, since the list still
 	/// answers and only the mint that needs somewhere to put a token says so.
@@ -969,7 +1143,7 @@ mod test {
 			CloudflareAccess::new::<Purge>(&[TokenPermission::CACHE_PURGE]);
 		let (bare, ..) = ResolvedStack::default_local();
 		DeployerToken::default()
-			.lower_access(&bare, &purge)
+			.lower_access(&bare, &purge, None)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("CloudflareZone");
@@ -977,7 +1151,7 @@ mod test {
 			CloudflareZone::new("beetmash.com", "zone123"),
 		);
 		let lowered = DeployerToken::default()
-			.lower_access(&zoned, &purge)
+			.lower_access(&zoned, &purge, None)
 			.unwrap();
 		lowered
 			.asked()

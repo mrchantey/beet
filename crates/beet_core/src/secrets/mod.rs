@@ -4,7 +4,7 @@
 //! - [`SecretsDocument`]: a [`SecretsGroup`] per recipient list, each the
 //!   index of its [`SecretRecord`]s, and one sealed blob per group, opened
 //!   into [`OpenSecrets`]
-//! - [`SecretRotation`]: how a record's secret is rotated, declared at mint; plain
+//! - [`SecretRoll`]: how a record's secret is rolled, declared at mint; plain
 //!   data in every build, since a stack declaration renders it
 //! - [`Secrets`]: the `<Secrets path=".."/>` declaration, and the runner's
 //!   convention for the same file
@@ -25,7 +25,7 @@
 //!   on argv, an identity never does.
 //! - **The document is `secrets.toml` beside the entry, committed.**
 //!   `[groups.<g>]` lists recipients and `[groups.<g>.secrets.NAME]` each
-//!   record's metadata (`role`, `note`, `rotation`, `modified`, `expires`,
+//!   record's metadata (`role`, `note`, `roll`, `modified`, `expires`,
 //!   `address`),
 //!   `[sealed]` holds one armored age file per group. No `.age` suffix: the
 //!   file is plaintext, its blobs are the age files, and `age -d -i
@@ -33,8 +33,8 @@
 //! - **The sealed side is the truth, the index its mirror.** Every record's
 //!   metadata is sealed beside its value; `open` refuses an index that
 //!   disagrees, so a hand edit never promotes a secret. Only the `recipients`
-//!   lists are edited by hand; a note or rotation changes through
-//!   `secrets/set NAME --from-env --note=.. --rotation=..`, which re-seals
+//!   lists are edited by hand; a note or roll changes through
+//!   `secrets/set NAME --from-env --note=.. --roll=..`, which re-seals
 //!   the value the launch loaded.
 //! - **Everything is in a group; `default` is the one you get.** Humans sit
 //!   in every group, an agent only in `agents`; a writer must be a member of
@@ -54,14 +54,15 @@
 //!   deliberately as their response. `set` takes its value from a no-echo
 //!   prompt, a pipe, `--from-env` or `--generate` ([`Secret::generate`], the
 //!   one mint every credential draws from), never argv by preference.
-//! - **Every mint names its rotation.** [`SecretRotation`] is
-//!   `replace:<resource>`, `remint` or `manual:<how>` (the url first, one
-//!   step per line); a mint site cannot omit it, and `secrets/revoke` runs
-//!   what it can and prints the rest.
+//! - **Every mint names its roll.** [`SecretRoll`] is
+//!   `replace:<resource>`, `remint`, `elevated` (a deploy credential, which
+//!   `<stack>/deploy --elevated --roll` replaces) or `manual:<how>` (the url
+//!   first, one step per line); a mint site cannot omit it, and
+//!   `secrets/revoke` runs what it can and prints the rest.
 //! - **A credential with a lifetime says when it dies.** A mint that sets
 //!   one records `expires`; the launch that sets the record into the
 //!   environment warns inside its last
-//!   [`SecretRecord::EXPIRY_NOTICE`], naming the rotation, and `check`
+//!   [`SecretRecord::EXPIRY_NOTICE`], naming the roll, and `check`
 //!   fails once it has passed. `set --expires=<date>` records a hand-made
 //!   one's.
 //! - **Two nouns, two flags.** `secrets/*` verbs take
@@ -73,7 +74,7 @@
 mod open_secrets;
 #[cfg(feature = "vault")]
 mod secret_record;
-mod secret_rotation;
+mod secret_roll;
 #[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "vault")]
@@ -83,7 +84,7 @@ mod secrets_document;
 pub use open_secrets::*;
 #[cfg(feature = "vault")]
 pub use secret_record::*;
-pub use secret_rotation::*;
+pub use secret_roll::*;
 #[cfg(feature = "vault")]
 pub use secrets::*;
 #[cfg(feature = "vault")]

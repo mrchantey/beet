@@ -174,7 +174,7 @@ impl SecretsExport {
 						note: entry.note,
 						modified: entry.modified,
 						address: Some(entry.address),
-						rotation: entry.rotation,
+						roll: entry.roll,
 						..default()
 					},
 				)
@@ -307,7 +307,7 @@ pub(crate) mod tests {
 				&SecretRef::new("dkim-example-com"),
 				"-----BEGIN PRIVATE KEY-----",
 				Some("the signing key"),
-				SecretRotation::manual("a new selector"),
+				SecretRoll::manual("a new selector"),
 			)
 			.await
 			.unwrap();
@@ -316,7 +316,7 @@ pub(crate) mod tests {
 				&SecretRef::new("mail-tlsa"),
 				"abc",
 				None,
-				SecretRotation::Remint,
+				SecretRoll::Remint,
 			)
 			.await
 			.unwrap();

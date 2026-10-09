@@ -79,15 +79,23 @@ impl Stack {
 	/// [`app_name`](PackageConfig::app_name) always set, so there is no
 	/// half-resolved outcome and nothing downstream re-asks the question.
 	pub fn resolve(&self, package: &PackageConfig) -> ResolvedStack {
+		self.resolve_at(package, &BootstrapConfig::get().stage)
+	}
+
+	/// [`resolve`](Self::resolve) with `stage` standing in for the launch's,
+	/// for a stack that declares none: how one launch renders what another
+	/// stage declares ([`RenderStage`]).
+	pub fn resolve_at(
+		&self,
+		package: &PackageConfig,
+		stage: &SmolStr,
+	) -> ResolvedStack {
 		ResolvedStack {
 			app_name: self
 				.app_name
 				.clone()
 				.unwrap_or_else(|| package.app_name().into()),
-			stage: self
-				.stage
-				.clone()
-				.unwrap_or_else(|| BootstrapConfig::get().stage.clone()),
+			stage: self.stage.clone().unwrap_or_else(|| stage.clone()),
 			aws_region: None,
 			cloudflare_account: None,
 			cloudflare_zone: None,
@@ -274,6 +282,13 @@ impl Stack {
 	}
 }
 
+/// The stage every stack that declares none resolves at while this resource
+/// is present, in place of the launch's: set around one render by
+/// [`RenderScope::render_all_at`], which is how a deploy credential lowers
+/// what `prod` declares from a launch of any stage.
+#[derive(Debug, Clone, PartialEq, Eq, Resource)]
+pub struct RenderStage(pub SmolStr);
+
 /// Resolves the [`Stack`] an entity belongs to and the provider addresses
 /// above it, and the deploy traversal that starts from it. Rendering the
 /// stack's config is not here: every caller, including tests and wasm
@@ -293,6 +308,8 @@ pub struct StackQuery<'w, 's> {
 	/// The process app identity, which [`BootstrapPlugin`] inserts at build time
 	/// and [`InfraPlugin`] therefore guarantees, so resolution is total.
 	package: Res<'w, PackageConfig>,
+	/// A stage standing in for the launch's for one render.
+	render_stage: Option<Res<'w, RenderStage>>,
 	deployment: Option<Res<'w, Deployment>>,
 	/// The secret store a declaration landed, see
 	/// [`secret_store`](Self::secret_store).
@@ -307,11 +324,11 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// not an error, it simply belongs to no deploy's config and resolves the
 	/// names the process itself would.
 	pub fn resolve(&self, entity: Entity) -> ResolvedStack {
-		let mut stack = self
-			.stack(entity)
-			.cloned()
-			.unwrap_or_default()
-			.resolve(&self.package);
+		let stack = self.stack(entity).cloned().unwrap_or_default();
+		let mut stack = match &self.render_stage {
+			Some(stage) => stack.resolve_at(&self.package, &stage.0),
+			None => stack.resolve(&self.package),
+		};
 		stack.aws_region =
 			self.regions.get(entity).ok().map(|region| region.0.clone());
 		stack.cloudflare_account = self.accounts.get(entity).ok().cloned();

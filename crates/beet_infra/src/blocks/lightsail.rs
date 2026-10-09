@@ -855,7 +855,7 @@ exec /opt/__APP__/app__EXEC_ARGS__
 	/// that budget: the converge loop IS the gate, there is no third loop.
 	///
 	/// Only ever scp'd and run as a file, never embedded in `user_data`, so it
-	/// is outside `machine_config_hash` and editing it cannot rotate the box.
+	/// is outside `machine_config_hash` and editing it cannot replace the box.
 	pub fn release_script(
 		&self,
 		stack: &ResolvedStack,
@@ -1060,8 +1060,8 @@ exit 1
 	/// cloud-init script, which is exactly what terraform replaces the instance
 	/// on.
 	///
-	/// This is what the access key's rotation trigger keys on, so the key
-	/// rotates with every machine-config change (a rebuild from a non-script
+	/// This is what the access key's roll trigger keys on, so the key
+	/// rolls with every machine-config change (a rebuild from a non-script
 	/// change, ie a bundle resize, keeps its key). Keying it on the deploy id
 	/// instead (as it once was) replaced the key every deploy, and since the
 	/// instance interpolates the key into its `user_data` that alone forced a
@@ -1148,7 +1148,7 @@ impl LightsailBlock {
 		}
 	}
 
-	/// Emit the box's resources: the IAM identity and its key rotation, the key
+	/// Emit the box's resources: the IAM identity and its key roll, the key
 	/// pair, log group, instance, firewall, networking and outputs.
 	fn emit(
 		&self,
@@ -1189,7 +1189,7 @@ impl LightsailBlock {
 		// IAM Roles Anywhere would retire the static key entirely, but it needs a
 		// CA, cert issuance and renewal, and a credential helper on a box that is
 		// rebuilt every deploy. Judged disproportionate for two resources; scope
-		// and rotation carry the weight instead.
+		// and roll carry the weight instead.
 		let policy_ident =
 			stack.resource_ident(self.build_label("runtime-policy"));
 		let policy = terra::ResourceDef::new_secondary(
@@ -1217,26 +1217,28 @@ impl LightsailBlock {
 		};
 
 		// the machine config, rendered once and used twice: as the instance's
-		// user data, and as the identity the key rotation keys on.
+		// user data, and as the identity the key roll keys on.
 		let user_data = self.build_user_data(stack, repo_bucket, &refs)?;
 
-		// Rotate the access key with every machine-config change, bounding a
+		// Roll the access key with every machine-config change, bounding a
 		// leaked credential to the next rebuild rather than forever (see
 		// `machine_config_hash`).
 		//
 		// The trigger cannot be the instance itself: the instance's user data
 		// interpolates the key, so the instance already depends on the key and
 		// pointing back at it would be a cycle. A `terraform_data` carrying the
-		// machine config's digest gives the ordering rotation -> key -> instance,
-		// and the coupling runs both ways: a machine change rotates the key, and
-		// a rotated key changes the user data terraform renders, which replaces
+		// machine config's digest gives the ordering roll -> key -> instance,
+		// and the coupling runs both ways: a machine change rolls the key, and
+		// a rolled key changes the user data terraform renders, which replaces
 		// the instance.
-		let rotation_ident =
+		let roll_ident =
+			// the live resource's label, named before credentials rolled: renaming
+			// it recreates the trigger, which replaces the key and the box
 			stack.resource_ident(self.build_label("key-rotation"));
-		let rotation_label = rotation_ident.label().to_string();
+		let roll_label = roll_ident.label().to_string();
 		config.add_untyped_resource(
 			"terraform_data",
-			&rotation_label,
+			&roll_label,
 			&json!({
 				"input": Self::machine_config_hash(&user_data)
 			}),
@@ -1353,12 +1355,12 @@ impl LightsailBlock {
 			.add_resource(&policy)?
 			.add_resource(&access_key)?
 			.xmap(|config| {
-				// rotate on the deploy-scoped trigger declared above
+				// roll on the deploy-scoped trigger declared above
 				config.set_lifecycle(
 					"aws_iam_access_key",
 					access_key.ident().label(),
 					json!({
-						"replace_triggered_by": [format!("terraform_data.{rotation_label}")]
+						"replace_triggered_by": [format!("terraform_data.{roll_label}")]
 					}),
 				)
 			})?
@@ -1560,7 +1562,7 @@ mod tests {
 	/// The `terraform_data` input the access key's replacement is triggered by,
 	/// ie the identity of the box's machine config. Each call is its own
 	/// deploy, so two calls on one block ARE two deploys of the same machine.
-	fn rotation_input(block: &LightsailBlock) -> String {
+	fn roll_input(block: &LightsailBlock) -> String {
 		let (scope, _dir) = render_block(block);
 		let label = scope
 			.stack()
@@ -1636,25 +1638,25 @@ mod tests {
 			.xpect_contains("Environment=BEET_DEPLOY_ID");
 	}
 
-	/// A machine-config change DOES rebuild the box, and rotates the access key
+	/// A machine-config change DOES rebuild the box, and rolls the access key
 	/// with it, so a leaked credential is bounded by the next machine-config
 	/// change rather than living forever.
 	///
-	/// Keying rotation on the deploy id instead (as it once was) replaced the
+	/// Keying roll on the deploy id instead (as it once was) replaced the
 	/// key every deploy, and since the instance interpolates the key into its
 	/// user data, that alone forced a rebuild every deploy no matter what else
 	/// was constant.
 	#[beet_core::test]
-	fn machine_config_change_rebuilds_and_rotates() {
+	fn machine_config_change_rebuilds_and_rolls() {
 		let block = LightsailBlock::default();
-		// same machine, two deploys: no rotation, so no new user data, so no
+		// same machine, two deploys: no roll, so no new user data, so no
 		// replacement
-		rotation_input(&block).xpect_eq(rotation_input(&block));
+		roll_input(&block).xpect_eq(roll_input(&block));
 		// a different machine: a new key, and the user data that carries it
-		rotation_input(&block.clone().with_allow_ssh(true))
-			.xpect_not_eq(rotation_input(&block));
-		rotation_input(&block.clone().with_app_port(9001))
-			.xpect_not_eq(rotation_input(&block));
+		roll_input(&block.clone().with_allow_ssh(true))
+			.xpect_not_eq(roll_input(&block));
+		roll_input(&block.clone().with_app_port(9001))
+			.xpect_not_eq(roll_input(&block));
 	}
 
 	/// A rebuild re-applies the firewall, because a replaced instance comes up
@@ -1919,7 +1921,7 @@ mod tests {
 	///
 	/// The release script is scp'd and run as a file, never embedded in
 	/// `user_data`, so it is outside `machine_config_hash` and this phase's
-	/// edit cannot rotate the box.
+	/// edit cannot replace the box.
 	#[beet_core::test]
 	fn release_probes_the_declared_port() {
 		let (stack, _deployment, _dir) = ResolvedStack::default_local();

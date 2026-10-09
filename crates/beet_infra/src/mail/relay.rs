@@ -59,7 +59,7 @@ impl SesRelay {
 	/// From, which is one of the two ways to pass DMARC.
 	pub const MAIL_FROM_LABEL: &'static str = "bounce";
 
-	/// Easy DKIM publishes three rotating selectors, so three `CNAME`s per
+	/// Easy DKIM publishes three rolling selectors, so three `CNAME`s per
 	/// identity. Fixed by SES.
 	pub const DKIM_TOKENS: usize = 3;
 

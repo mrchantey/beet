@@ -29,17 +29,18 @@ use beet_net::prelude::*;
 /// [grants](Block::grants) name those two parameters rather than the bucket, so
 /// an AWS compute lowers them to `ssm:GetParameter` on exactly those.
 ///
-/// **`cloudflare/mint` does that minting, not the apply**, and the difference
+/// **An elevated deploy does that minting, not the apply**
+/// ([`CloudflareDeployToken`]), and the difference
 /// is the whole reason the seam exists. Creating a token needs `Account API
 /// Tokens Write`, which can mint any token the account can hold, a wider one
 /// included; Cloudflare has no permissions boundary to cap that with and no mfa
 /// condition to put on it, so the only thing that keeps it out of reach is that
 /// no credential a deploy reads carries it. An apply that minted this token
 /// would put it in every deploy credential of every repo declaring a bucket.
-/// So the rare operator verb mints it with a credential that exists in no
+/// So an elevated deploy mints it with a credential that exists in no
 /// document, the apply creates the bucket and reads nothing, and
-/// [`missing_credential`](Self::missing_credential) names the verb when the
-/// parked pair is not there.
+/// [`missing_credential`](Self::missing_credential) names that deploy when
+/// the parked pair is not there.
 ///
 /// ## What R2 does not have, and what stands in for it
 ///
@@ -91,8 +92,7 @@ pub struct R2BucketBlock {
 	/// the S3 data plane) for this one bucket. Nor can the deploy token, which
 	/// holds the account's R2 group read-only, enough for a plan to refresh the
 	/// lock: writing it is [elevated](DeployerToken::elevated), held only by
-	/// the token `cloudflare/mint -- <route>` mints for the one deploy that
-	/// changes it.
+	/// the token an elevated deploy mints for the one run that changes it.
 	///
 	/// Must not exceed the window an
 	/// [`expire_prefixes`](Self::expire_prefixes) rule declares, since a lock
@@ -174,21 +174,32 @@ impl R2BucketBlock {
 		format!("R2 token for bucket {}: secret access key", self.label)
 	}
 
-	/// What a consumer says when the parked pair is missing, worded once.
-	/// Free of quotes and backticks, since one of those consumers is a shell
-	/// script. The verb that mints parks the pair, so its absence means it has
-	/// not run since the bucket was declared, or somebody deleted the
-	/// parameter, and either way running it again restores the pair without
-	/// touching the bucket.
+	/// What a deploy-machine consumer says when the parked pair is missing,
+	/// worded once. An elevated deploy parks the pair, so its absence means
+	/// none has run since the bucket was declared, or somebody deleted the
+	/// parameter, and either way one restores the pair without touching the
+	/// bucket.
+	///
+	/// The box's own script does not carry this: anything a person may want
+	/// to reword stays out of `user_data`, since a changed `user_data` replaces
+	/// the box. It echoes [`UNPARKED`](Self::UNPARKED) instead.
 	pub fn missing_credential(&self, stack: &ResolvedStack) -> String {
 		format!(
-			"beet cloudflare/mint mints the token for {} and parks its S3 pair \
-			at {} and {}; run it with the mint token in the environment",
+			"an elevated deploy of the stack (`<stack>/deploy --elevated`) \
+			mints the token for {} and parks its S3 pair at {} and {}",
 			self.bucket_name(stack),
 			self.access_key_secret().name(stack),
 			self.secret_key_secret().name(stack),
 		)
 	}
+
+	/// What the box's cold-copy script echoes when the parked pair is missing:
+	/// a fixed pointer, since it renders into `user_data`, where any change to
+	/// it replaces the box. The deploy-machine verbs say the rest
+	/// ([`missing_credential`](Self::missing_credential)). Free of quotes and
+	/// backticks, since a shell script carries it.
+	pub const UNPARKED: &'static str =
+		"not parked; an elevated deploy of the stack parks it";
 
 	/// The S3 pair the apply parked for this bucket, read from the stack's
 	/// secret store (the stack being the store's): what a deploy-machine
@@ -618,7 +629,7 @@ mod tests {
 	/// parameter holding one. A rendered `cloudflare_account_token` would put
 	/// `Account API Tokens Write` into the deploy credential of every repo that
 	/// declares a bucket, which is the one group no deploy credential may have,
-	/// so `cloudflare/mint` mints it out of band and the config never names it.
+	/// so an elevated deploy mints it out of band and the config never names it.
 	#[beet_core::test]
 	fn the_apply_mints_no_credential() {
 		render(cold())

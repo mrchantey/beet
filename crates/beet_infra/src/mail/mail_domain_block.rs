@@ -156,7 +156,7 @@ impl MailDomainBlock {
 	pub const MX_PRIORITY: u16 = 10;
 
 	/// The selector the SOVEREIGN key signs under, ie the one this stack holds
-	/// rather than the three Amazon rotates. Named for the server that signs
+	/// rather than the three Amazon rolls. Named for the server that signs
 	/// with it, so a reader of the zone can tell the two sources apart at a
 	/// glance.
 	pub const DKIM_SELECTOR: &'static str = "stalwart";
@@ -1635,7 +1635,7 @@ mod tests {
 	}
 
 	/// The DKIM records read the selectors off the identity's computed tokens
-	/// rather than restating the ones a console showed, so a rotated key is a
+	/// rather than restating the ones a console showed, so a rolled key is a
 	/// re-apply and not a hunt through the zone.
 	#[beet_core::test]
 	fn dkim_records_reference_the_identity_outputs() {

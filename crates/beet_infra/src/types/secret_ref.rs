@@ -44,58 +44,56 @@ impl SecretRef {
 	/// The `aws_ssm_parameter` resource an apply mints this secret as, for a
 	/// value terraform derives (a relay pair, a bucket token): a
 	/// `SecureString` at [`name`](Self::name) whose description carries the
-	/// note and the rotation ([`description`](Self::description)), so the
-	/// store lists it like one an action minted. The rotation is required:
-	/// every terraform-minted secret is a [`SecretRotation::Replace`] of the
+	/// note and the roll ([`description`](Self::description)), so the
+	/// store lists it like one an action minted. The roll is required:
+	/// every terraform-minted secret is a [`SecretRoll::Replace`] of the
 	/// resource it derives from, and a mint site cannot omit it.
 	pub fn parameter_resource(
 		&self,
 		stack: &ResolvedStack,
 		value: impl Into<SmolStr>,
 		note: &str,
-		rotation: SecretRotation,
+		roll: SecretRoll,
 	) -> serde_json::Value {
 		serde_json::json!({
 			"name": self.name(stack),
 			"type": "SecureString",
 			"value": value.into(),
-			"description": Self::description(Some(note), Some(&rotation)),
+			"description": Self::description(Some(note), Some(&roll)),
 		})
 	}
 
-	/// The one string a parameter's description holds: the rotation, then
+	/// The one string a parameter's description holds: the roll, then
 	/// `::`, then the note, either half optional, so a listing reads both
 	/// back ([`parse_description`](Self::parse_description)) and a human
 	/// reads it in the console.
 	pub fn description(
 		note: Option<&str>,
-		rotation: Option<&SecretRotation>,
+		roll: Option<&SecretRoll>,
 	) -> String {
-		match (rotation, note) {
-			(Some(rotation), Some(note)) => format!("{rotation} :: {note}"),
-			(Some(rotation), None) => rotation.to_string(),
+		match (roll, note) {
+			(Some(roll), Some(note)) => format!("{roll} :: {note}"),
+			(Some(roll), None) => roll.to_string(),
 			(None, Some(note)) => note.to_string(),
 			(None, None) => String::new(),
 		}
 	}
 
 	/// The inverse of [`description`](Self::description): a leading half
-	/// that parses as a rotation is one, the rest is the note.
+	/// that parses as a roll is one, the rest is the note.
 	pub fn parse_description(
 		text: &str,
-	) -> (Option<SmolStr>, Option<SecretRotation>) {
+	) -> (Option<SmolStr>, Option<SecretRoll>) {
 		let text = text.trim();
 		let note = |text: &str| {
 			Some(SmolStr::new(text)).filter(|note| !note.is_empty())
 		};
 		match text.split_once(" :: ") {
-			Some((head, rest))
-				if let Ok(rotation) = head.parse::<SecretRotation>() =>
-			{
-				(note(rest.trim()), Some(rotation))
+			Some((head, rest)) if let Ok(roll) = head.parse::<SecretRoll>() => {
+				(note(rest.trim()), Some(roll))
 			}
-			_ => match text.parse::<SecretRotation>() {
-				Ok(rotation) => (None, Some(rotation)),
+			_ => match text.parse::<SecretRoll>() {
+				Ok(roll) => (None, Some(roll)),
 				Err(_) => (note(text), None),
 			},
 		}
@@ -138,18 +136,18 @@ mod tests {
 			.xpect_eq("/beetmash/prod/mail-admin-password");
 	}
 
-	/// A description carries the rotation and the note and reads both back,
+	/// A description carries the roll and the note and reads both back,
 	/// each half on its own.
 	#[beet_core::test]
-	fn descriptions_carry_the_rotation_and_the_note() {
-		let replace = SecretRotation::replace("cloudflare_account_token.x");
+	fn descriptions_carry_the_roll_and_the_note() {
+		let replace = SecretRoll::replace("cloudflare_account_token.x");
 		let text = SecretRef::description(Some("r2 token"), Some(&replace));
 		text.as_str()
 			.xpect_eq("replace:cloudflare_account_token.x :: r2 token");
 		SecretRef::parse_description(&text)
 			.xpect_eq((Some("r2 token".into()), Some(replace.clone())));
 		SecretRef::parse_description("remint")
-			.xpect_eq((None, Some(SecretRotation::Remint)));
+			.xpect_eq((None, Some(SecretRoll::Remint)));
 		SecretRef::parse_description("just a note")
 			.xpect_eq((Some("just a note".into()), None));
 		SecretRef::parse_description("").xpect_eq((None, None));
@@ -157,7 +155,7 @@ mod tests {
 		SecretRef::parse_description("weekly :: by hand")
 			.xpect_eq((Some("weekly :: by hand".into()), None));
 		// a note with a colon and a `>` in it, as a mint site writes one
-		let manual = SecretRotation::manual(
+		let manual = SecretRoll::manual(
 			"dash.cloudflare.com/profile/api-tokens > Create Token > beet-deploy",
 		);
 		let note = "R2 token for bucket cold-backups: access key id";

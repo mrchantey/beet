@@ -8,11 +8,11 @@ provider = "document"
 [groups.default.secrets.dkim-example-com]
 note = "the signing key"
 address = "store.toml#dkim-example-com"
-rotation = "manual:a new selector"
+roll = "manual:a new selector"
 
 [groups.default.secrets.mail-tlsa]
 address = "store.toml#mail-tlsa"
-rotation = "remint"
+roll = "remint"
 
 [sealed]
 default = """

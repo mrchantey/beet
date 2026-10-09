@@ -1,5 +1,5 @@
 //! Removing a human from a stack's secrets: re-seal what they could read,
-//! rotate what they could have read.
+//! roll what they could have read.
 use crate::actions::secret_store;
 use crate::prelude::*;
 use beet_action::prelude::*;
@@ -15,29 +15,29 @@ struct RevokeParams {
 	/// every group's list in every declared document: the human edits the
 	/// lists first, and the verb refuses while they are still listed.
 	recipient: Option<String>,
-	/// Print the ledger of what would be re-sealed and rotated and change
+	/// Print the ledger of what would be re-sealed and rolled and change
 	/// nothing.
 	dry_run: bool,
 }
 
 /// `<Route path="secrets/revoke" {SecretsRevoke}/>` — remove a human from a
 /// stack: re-seal every group of every declared document to its current
-/// list, then rotate every secret in the stack's store through its declared
-/// [`SecretRotation`], and print what needs a hand. A leaf answering its
+/// list, then roll every secret in the stack's store through its declared
+/// [`SecretRoll`], and print what needs a hand. A leaf answering its
 /// ledger, so it rides its route rather than stepping in an
 /// `{ExchangeSequence}`.
 ///
 /// Git history and the cold bucket keep old ciphertext a removed human can
 /// still read, so removal means re-sealing every group they were in AND
-/// rotating every secret those groups held. The recipient must already be
+/// rolling every secret those groups held. The recipient must already be
 /// out of the lists (the verb refuses while they are listed, since a rekey
 /// to a list that still names them changes nothing). Then every secret of
-/// the store rotates by what minted it declared: a [`SecretRotation::Replace`]
-/// through `tofu apply -replace` on its resource, a [`SecretRotation::Remint`] by
+/// the store rolls by what minted it declared: a [`SecretRoll::Replace`]
+/// through `tofu apply -replace` on its resource, a [`SecretRoll::Remint`] by
 /// deleting the entry and running the stack's `deploy` group, which mints a
-/// fresh one and re-provisions its consumer, and a [`SecretRotation::Manual`] is
-/// printed with its reason as the residue, as is a secret with no rotation
-/// declared (one parked by hand). It never reports a rotation it did not
+/// fresh one and re-provisions its consumer, and a [`SecretRoll::Manual`] is
+/// printed with its reason as the residue, as is a secret with no roll
+/// declared (one parked by hand). It never reports a roll it did not
 /// perform, and ends with the count of each.
 ///
 /// ```sh
@@ -129,7 +129,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 		)?;
 	}
 
-	// the store: every secret by its declared rotation
+	// the store: every secret by its declared roll
 	let store = secret_store(&cx.caller).await?;
 	let plan = RevokePlan::new(store.list().await?);
 	for (secret, resource) in &plan.replace {
@@ -147,7 +147,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 	for secret in &plan.undeclared {
 		writeln!(
 			ledger,
-			"manual `{secret}`: no rotation declared (parked by hand), rotate \
+			"manual `{secret}`: no roll declared (parked by hand), roll \
 			it where it was made"
 		)?;
 	}
@@ -179,8 +179,8 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 		ledger,
 		"{}: {} replaced, {} re-minted, {} manual",
 		match dry {
-			true => "would rotate",
-			false => "rotated",
+			true => "would roll",
+			false => "rolled",
 		},
 		plan.replace.len(),
 		plan.remint.len(),
@@ -189,31 +189,39 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 	Response::ok_text(ledger).xok()
 }
 
-/// A store's secrets sorted by how each rotates.
+/// A store's secrets sorted by how each rolls.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct RevokePlan {
 	/// Label and the terraform resource to replace.
 	pub replace: Vec<(SmolStr, SmolStr)>,
 	/// Labels to delete ahead of a deploy.
 	pub remint: Vec<SmolStr>,
-	/// Label and why a hand rotates it.
+	/// Label and why a hand rolls it.
 	pub manual: Vec<(SmolStr, SmolStr)>,
-	/// Labels with no rotation stored, parked by hand.
+	/// Labels with no roll stored, parked by hand.
 	pub undeclared: Vec<SmolStr>,
 }
 
 impl RevokePlan {
-	/// Sort `entries` by rotation.
+	/// Sort `entries` by roll.
 	pub fn new(entries: Vec<SecretEntry>) -> Self {
 		let mut plan = Self::default();
 		for entry in entries {
 			let label = entry.secret.label().clone();
-			match entry.rotation {
-				Some(SecretRotation::Replace { resource }) => {
+			match entry.roll {
+				Some(SecretRoll::Replace { resource }) => {
 					plan.replace.push((label, resource))
 				}
-				Some(SecretRotation::Remint) => plan.remint.push(label),
-				Some(SecretRotation::Manual { why }) => {
+				Some(SecretRoll::Remint) => plan.remint.push(label),
+				// a revoke cannot ask a person for the human factor, so the
+				// elevated roll is residue like a manual one, naming the run
+				Some(SecretRoll::Elevated) => plan.manual.push((
+					label,
+					"deploy the stack with `--elevated --roll`, which asks for \
+					the human factor"
+						.into(),
+				)),
+				Some(SecretRoll::Manual { why }) => {
 					plan.manual.push((label, why))
 				}
 				None => plan.undeclared.push(label),
@@ -286,7 +294,7 @@ mod tests {
 	use super::*;
 	use crate::types::test_support::*;
 
-	/// A stack with a document store holding one secret of each rotation,
+	/// A stack with a document store holding one secret of each roll,
 	/// an entry document listing the process identity and alice in
 	/// `default`, an empty deploy group and the verb routes.
 	async fn revocable_stack(
@@ -320,24 +328,24 @@ mod tests {
 		let store = world
 			.with_state::<StackQuery, _>(|stacks| stacks.secret_store(root))
 			.unwrap();
-		for (label, rotation) in [
+		for (label, roll) in [
 			(
 				"cold-access-key-id",
-				SecretRotation::replace("cloudflare_account_token.x"),
+				SecretRoll::replace("cloudflare_account_token.x"),
 			),
 			(
 				"cold-secret-access-key",
-				SecretRotation::replace("cloudflare_account_token.x"),
+				SecretRoll::replace("cloudflare_account_token.x"),
 			),
-			("mail-admin-password", SecretRotation::Remint),
-			("dkim-example-com", SecretRotation::manual("a new selector")),
+			("mail-admin-password", SecretRoll::Remint),
+			("dkim-example-com", SecretRoll::manual("a new selector")),
 		] {
 			store
-				.create(&SecretRef::new(label), "x", None, rotation)
+				.create(&SecretRef::new(label), "x", None, roll)
 				.await
 				.unwrap();
 		}
-		// one parked by hand, with no rotation
+		// one parked by hand, with no roll
 		store
 			.overwrite(&SecretRef::new("comail-did"), "did:plc", None, None)
 			.await
@@ -461,8 +469,8 @@ mod tests {
 			.xpect_contains("replace `cold-access-key-id`: tofu apply -replace=cloudflare_account_token.x")
 			.xpect_contains("remint `mail-admin-password`")
 			.xpect_contains("manual `dkim-example-com`: a new selector")
-			.xpect_contains("manual `comail-did`: no rotation declared")
-			.xpect_contains("would rotate: 2 replaced, 1 re-minted, 2 manual");
+			.xpect_contains("manual `comail-did`: no roll declared")
+			.xpect_contains("would roll: 2 replaced, 1 re-minted, 2 manual");
 		// nothing changed
 		entry
 			.read()
@@ -486,7 +494,7 @@ mod tests {
 		let ledger = revoke(&mut world, root, &args).await.unwrap();
 		ledger
 			.as_str()
-			.xpect_contains("rotated: 0 replaced, 1 re-minted, 2 manual");
+			.xpect_contains("rolled: 0 replaced, 1 re-minted, 2 manual");
 		entry
 			.read()
 			.await
@@ -509,21 +517,20 @@ mod tests {
 
 	/// Two secrets derived from one resource are one replacement.
 	#[beet_core::test]
-	fn a_plan_sorts_by_rotation() {
-		let entry =
-			|label: &str, rotation: Option<SecretRotation>| SecretEntry {
-				secret: SecretRef::new(label),
-				address: label.into(),
-				note: None,
-				modified: None,
-				rotation,
-			};
+	fn a_plan_sorts_by_roll() {
+		let entry = |label: &str, roll: Option<SecretRoll>| SecretEntry {
+			secret: SecretRef::new(label),
+			address: label.into(),
+			note: None,
+			modified: None,
+			roll,
+		};
 		let plan = RevokePlan::new(vec![
-			entry("a", Some(SecretRotation::replace("r.x"))),
-			entry("b", Some(SecretRotation::replace("r.x"))),
-			entry("c", Some(SecretRotation::replace("r.y"))),
-			entry("d", Some(SecretRotation::Remint)),
-			entry("e", Some(SecretRotation::manual("why"))),
+			entry("a", Some(SecretRoll::replace("r.x"))),
+			entry("b", Some(SecretRoll::replace("r.x"))),
+			entry("c", Some(SecretRoll::replace("r.y"))),
+			entry("d", Some(SecretRoll::Remint)),
+			entry("e", Some(SecretRoll::manual("why"))),
 			entry("f", None),
 		]);
 		plan.resources()

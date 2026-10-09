@@ -56,11 +56,9 @@ use serde_json::json;
 /// limitation to route around. A launch renders one stage, a stage may declare
 /// more than another (a prod site has a certificate and a custom domain where
 /// its dev stage has neither), and a policy should describe the stage that
-/// actually deploys. So a mint runs under that stage, `--stage=prod` where it
-/// is not the default, and `DeployerMint` WARNS when a stack took a non-prod
-/// launch stage. **That warning is not a bug to fix**: prod is a superset of
-/// dev for every stack in this account today, the failure when it is not is a
-/// loud `AccessDenied` on the next plan, and one re-mint fixes it.
+/// actually deploys. So a credential is lowered at the launch's stage AND at
+/// `prod` ([`DeployCredential::render_stages`]): an elevated deploy of any
+/// stage carries what prod declares, and never narrows it to what dev does.
 ///
 /// A mint that re-launched itself per stage and unioned the services was
 /// considered and rejected: a self-relaunch is a new failure surface bought
@@ -361,10 +359,11 @@ impl DeployerPolicy {
 			statements.extend(self.boundary_statements());
 		}
 		statements.extend(self.irreversible_statement());
+		statements.extend(self.data_volume_statement());
 		// the app's own parameter prefix, unconditionally: a stack's secret store
 		// defaults to exactly this prefix whether or not the config RENDERS a
 		// parameter, and the verbs that park a secret (`<EnsureSecret/>`, the
-		// bucket credential `cloudflare/mint` parks) write there through the
+		// bucket credential an elevated deploy parks) write there through the
 		// store rather than through a rendered resource. Gating this on a
 		// rendered `aws_ssm_*` denied those writes for a stack that renders
 		// none, with an `AccessDenied` on `ssm:PutParameter` that no re-mint
@@ -546,9 +545,17 @@ impl DeployerPolicy {
 	///
 	/// Everything else this policy grants is recoverable by design: a bucket
 	/// is versioned, a table has deletion protection, a noncurrent version has
-	/// a window. **A deployer never needs to delete a production bucket**, so
-	/// denying it costs nothing day to day and makes destroying production a
-	/// human act rather than an agent's mistake.
+	/// a window. What would make any of that final is here: deleting the
+	/// bucket, deleting an object VERSION (which no deploy does; a prune or a
+	/// sync writes delete markers), suspending versioning, or rewriting the
+	/// lifecycle (a one-day noncurrent expiry is a deletion AWS performs).
+	/// **A plain deploy never does any of them**: a bucket's versioning and
+	/// lifecycle change only when their declaration does, and the deploy gate
+	/// refuses that plan before it runs ([`AwsDeployer`]), so the change is an
+	/// elevated deploy, made as an administrator this deny does not name. That
+	/// also stops a `force_destroy` teardown of a prod bucket at its first
+	/// version delete, with nothing deleted, where the `DeleteBucket` deny alone
+	/// was reached only after the provider had emptied it.
 	///
 	/// `BoolIfExists`, never `Bool`: `aws:MultiFactorAuthPresent` is ABSENT
 	/// from a long-lived access key's requests rather than false, and a `Bool`
@@ -572,27 +579,22 @@ impl DeployerPolicy {
 	/// so its teardown is routine rather than irreversible.
 	///
 	/// That exclusion is load-bearing, not tidiness. While the set was "rendered
-	/// stages plus prod" alone, minting under `dev` — the bare `just site-mint`,
-	/// which is what creates a dev boundary in the first place — pulled `dev`
-	/// into this deny and left `beet-site--dev--*` undeletable without a code.
+	/// stages plus prod" alone, minting under `dev` (the bare mint, which is
+	/// what creates a dev boundary in the first place) pulled `dev` into this
+	/// deny and left `beet-site--dev--*` undeletable without a code.
 	/// A dev teardown then failed on all three buckets (2026-10-02) and the only
 	/// cure was a second mint under prod to undo the first. Pinned by
 	/// `the_disposable_stage_is_never_irreversible`.
 	///
 	/// ## What is deliberately NOT here
 	///
-	/// Only actions a deploy never performs, because a deny is absolute and an
-	/// action a converge needs would block every apply:
+	/// Only actions a plain deploy never performs, because a deny is absolute
+	/// and an action a converge needs would block every apply. Versioning and
+	/// lifecycle were once left out on that ground (no condition key tells
+	/// enabling from disabling, and every new bucket sets both); the deploy
+	/// gate removed it, since a deploy that sets them now goes elevated first,
+	/// so creating a bucket outside `dev` is an elevated deploy, once.
 	///
-	/// - **`s3:PutBucketVersioning`**, though turning versioning off is how a
-	///   deletion becomes final. There is no condition key for the versioning
-	///   STATUS, so a deny cannot tell enabling from disabling, and every new
-	///   bucket is created with versioning enabled. Recoverability is kept
-	///   where it can be expressed instead: the render refuses a writable
-	///   bucket that declares no versioning, and `force_destroy=false` stops
-	///   the bucket going with the stack.
-	/// - **`s3:PutBucketLifecycleConfiguration`**, for the same reason: a
-	///   deploy sets the expiry rules on every converge.
 	/// - **`iam:DeleteRole` and `iam:DeleteUser`**, because renaming a role or
 	///   a user is destroy-then-create, and a rename is an ordinary change. An
 	///   IAM principal is also not a source of record: it is re-mintable from
@@ -622,8 +624,18 @@ impl DeployerPolicy {
 			}))
 		};
 		if self.services.contains("s3") {
-			actions.push("s3:DeleteBucket");
+			// the bucket, and the history that makes its contents recoverable:
+			// a version deleted, versioning suspended, or a one-day noncurrent
+			// expiry are each final, and a deploy changes none of them without
+			// the gate sending it elevated first
+			actions.extend([
+				"s3:DeleteBucket",
+				"s3:DeleteObjectVersion",
+				"s3:PutBucketVersioning",
+				"s3:PutLifecycleConfiguration",
+			]);
 			per_stage("arn:aws:s3:::{}");
+			per_stage("arn:aws:s3:::{}/*");
 		}
 		if self.services.contains("dynamodb") {
 			actions.push("dynamodb:DeleteTable");
@@ -641,6 +653,31 @@ impl DeployerPolicy {
 				"Resource": resources,
 				"Condition": {
 					"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
+				},
+			})
+		})
+	}
+
+	/// The data volumes of this app outside the disposable stage, behind the
+	/// same code as [`irreversible_statement`](Self::irreversible_statement),
+	/// `None` when the app renders no `ec2`. A volume has no name an arn can
+	/// pattern, so the deny keys on the `Project` and `Stage` tags every block
+	/// gives its volume: a plain deploy never deletes one (a replaced
+	/// instance's root volume goes with `DeleteOnTermination`, not this call),
+	/// and the gate refuses a plan that would, before it runs.
+	fn data_volume_statement(&self) -> Option<Value> {
+		self.services.contains("ec2").then(|| {
+			json!({
+				"Sid": "DataVolumeNeedsMfa",
+				"Effect": "Deny",
+				"Action": ["ec2:DeleteVolume"],
+				"Resource": "*",
+				"Condition": {
+					"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" },
+					"StringEquals": { "aws:ResourceTag/Project": self.app },
+					"StringNotEquals": {
+						"aws:ResourceTag/Stage": BootstrapConfig::DEFAULT_STAGE
+					},
 				},
 			})
 		})
@@ -975,22 +1012,60 @@ mod test {
 			.as_str()
 			.unwrap()
 			.xpect_eq("false");
-		// only what a deploy NEVER does: `PutBucketVersioning` is how every new
-		// bucket is created, and IAM has no condition key for the status, so a
-		// deny there would refuse the create rather than the disable
+		// the bucket and the history that makes its contents recoverable, each
+		// of which a plain deploy never changes: the gate sends a plan that
+		// would elevated first. A rename is an ordinary change, so not a role.
 		deny["Action"]
 			.to_string()
 			.xpect_contains("s3:DeleteBucket")
-			.xnot()
+			.xpect_contains("s3:DeleteObjectVersion")
 			.xpect_contains("s3:PutBucketVersioning")
+			.xpect_contains("s3:PutLifecycleConfiguration")
 			.xnot()
 			.xpect_contains("iam:DeleteRole");
-		// a dev teardown stays free, which the infra-deploy skill does often
+		// the buckets and their objects, and a dev teardown stays free, which
+		// the infra-deploy skill does often
 		deny["Resource"]
 			.to_string()
-			.xpect_contains("my-egress--prod--*")
+			.xpect_contains("arn:aws:s3:::my-egress--prod--*\"")
+			.xpect_contains("arn:aws:s3:::my-egress--prod--*/*")
 			.xnot()
 			.xpect_contains("my-egress--dev");
+	}
+
+	/// An app rendering `ec2` cannot delete one of its own data volumes
+	/// outside the disposable stage without the code: the deny keys on the
+	/// `Project` and `Stage` tags every block gives a volume, since a volume
+	/// has no name an arn can pattern.
+	#[beet_core::test]
+	fn a_data_volume_needs_mfa() {
+		let mut policy = DeployerPolicy::new("mail", "state");
+		policy.services.insert("ec2".into());
+		let document = policy.to_json();
+		let deny = document["Statement"]
+			.as_array()
+			.unwrap()
+			.iter()
+			.find(|statement| statement["Sid"] == "DataVolumeNeedsMfa")
+			.unwrap()
+			.clone();
+		deny["Action"]
+			.to_string()
+			.xpect_contains("ec2:DeleteVolume");
+		deny["Condition"]["StringEquals"]["aws:ResourceTag/Project"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("mail");
+		deny["Condition"]["StringNotEquals"]["aws:ResourceTag/Stage"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(BootstrapConfig::DEFAULT_STAGE);
+		// and an app rendering no `ec2` carries no such statement
+		DeployerPolicy::new("site", "state")
+			.to_json()
+			.to_string()
+			.xnot()
+			.xpect_contains("DataVolumeNeedsMfa");
 	}
 
 	/// The deny follows the stages the launch RENDERED, so an app whose only
@@ -1053,8 +1128,8 @@ mod test {
 	/// under, so tearing a dev stack down never needs a code.
 	///
 	/// It used to be in it whenever a launch rendered it, which made the mint's
-	/// stage silently destructive: the bare `just site-mint` is what creates a
-	/// dev boundary, and the same run pulled `beet-site--dev--*` into this deny
+	/// stage silently destructive: the bare mint is what creates a dev
+	/// boundary, and the same run pulled `beet-site--dev--*` into this deny
 	/// and left those buckets undeletable. A real dev teardown failed on all
 	/// three (2026-10-02) and wanted a second mint under prod to undo the first.
 	#[beet_core::test]

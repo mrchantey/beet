@@ -44,7 +44,7 @@ use serde_json::json;
 /// ## The cost, which is real
 ///
 /// A grant added to a stack widens the rendered runtime policy but not this,
-/// until the next `deployer/mint`. The apply succeeds and the runtime silently
+/// until the next elevated deploy. The apply succeeds and the runtime silently
 /// cannot use the new permission. That is the same cadence [`DeployerPolicy`]
 /// already has, since a new SERVICE needs a re-mint too, and it is why the mint
 /// converges both policies from one render.

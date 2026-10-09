@@ -52,31 +52,37 @@ impl ExchangeGroup {
 	}
 }
 
-/// The [`ExchangeOverload`] serving dispatch from a [`RunGroup<Request, Response>`]:
-/// `Pass` becomes a `200`, `Fail` the failing step's response.
+impl ExchangeGroup {
+	/// Run the route's [`RunGroup`] for `cx`: `Pass` becomes a `200`, `Fail`
+	/// the failing step's response. What this shell's overload does, and what
+	/// a shell that wraps it (a deploy gated by its credentials) calls once it
+	/// has decided the run may go ahead.
+	pub async fn run(cx: ActionContext<Request>) -> Result<Response> {
+		let forced = cx
+			.caller
+			.get(|shell: &ExchangeGroup| shell.force_param.clone())
+			.await?
+			.is_some_and(|param| cx.input.has_param(&param));
+		// by value, so the request's flag decides this run's mode without
+		// editing the route's declaration.
+		let mut run = cx
+			.caller
+			.get(|run: &RunGroup<Request, Response>| run.clone())
+			.await?;
+		run.continue_on_failure |= forced;
+		let caller = cx.caller.clone();
+		match caller.call_detached(run.into_action(), cx.input).await {
+			Ok(Pass(_)) => Response::ok().xok(),
+			Ok(Fail(response)) => response.xok(),
+			Err(err) => Err(name_unregistered_members(&caller, err).await),
+		}
+	}
+}
+
+/// The [`ExchangeOverload`] serving dispatch from a [`RunGroup<Request, Response>`],
+/// see [`ExchangeGroup::run`].
 fn group_overload() -> ExchangeOverload {
-	ActionOverload::new(Action::new_async(
-		async |cx: ActionContext<Request>| -> Result<Response> {
-			let forced = cx
-				.caller
-				.get(|shell: &ExchangeGroup| shell.force_param.clone())
-				.await?
-				.is_some_and(|param| cx.input.has_param(&param));
-			// by value, so the request's flag decides this run's mode without
-			// editing the route's declaration.
-			let mut run = cx
-				.caller
-				.get(|run: &RunGroup<Request, Response>| run.clone())
-				.await?;
-			run.continue_on_failure |= forced;
-			let caller = cx.caller.clone();
-			match caller.call_detached(run.into_action(), cx.input).await {
-				Ok(Pass(_)) => Response::ok().xok(),
-				Ok(Fail(response)) => response.xok(),
-				Err(err) => Err(name_unregistered_members(&caller, err).await),
-			}
-		},
-	))
+	ActionOverload::new(Action::new_async(ExchangeGroup::run))
 }
 
 /// Append the names of any [`UnregisteredTag`] members to a failed run, the

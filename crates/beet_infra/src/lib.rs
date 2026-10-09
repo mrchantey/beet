@@ -9,6 +9,10 @@ beet_core::test_main!();
 mod actions;
 pub mod bindings;
 mod blocks;
+// a repo's deploy credentials, one per provider, and the gate a stack's deploy
+// and elevated deploy pass through: native, since every converge shells out.
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+mod credentials;
 // the mail stack's blocks and their declarative identity inputs. Definitions
 // only, so a wasm consumer authors a mail stack like any other.
 #[cfg(feature = "mail")]
@@ -30,6 +34,8 @@ pub mod prelude {
 	pub use crate::bindings;
 	#[allow(unused)]
 	pub use crate::blocks::*;
+	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+	pub use crate::credentials::*;
 	#[cfg(feature = "mail")]
 	pub use crate::mail::*;
 	pub use crate::terra;

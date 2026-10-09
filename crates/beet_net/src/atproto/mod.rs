@@ -48,7 +48,7 @@
 //! ```sh
 //! beet secrets/set BEET_TEST_ATPROTO_HANDLE --group=agents --role=env_var --note="throwaway bsky.social account for live write tests"
 //! beet secrets/set BEET_TEST_ATPROTO_DID --group=agents --role=env_var --note="the did of that account, so a test needs no resolution to start"
-//! beet secrets/set BEET_TEST_ATPROTO_APP_PASSWORD --group=agents --role=env_var --note="app password for that account" --rotation="manual:https://bsky.app/settings/app-passwords"
+//! beet secrets/set BEET_TEST_ATPROTO_APP_PASSWORD --group=agents --role=env_var --note="app password for that account" --roll="manual:https://bsky.app/settings/app-passwords"
 //! ```
 //!
 //! A live write test reads the three and skips with a note naming them when

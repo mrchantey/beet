@@ -407,7 +407,7 @@ mod test {
 	}
 
 	/// A record inside its notice is a note and the check still passes; one
-	/// past its expiry fails it, both naming how the record rotates.
+	/// past its expiry fails it, both naming how the record rolls.
 	#[beet_core::test]
 	async fn reports_expiring_records() {
 		let mut fixture = VerbWorld::new();
@@ -423,7 +423,7 @@ mod test {
 		fixture
 			.set("EXPIRING", "2", SecretRecord {
 				expires: in_days(3),
-				rotation: Some(SecretRotation::manual("beet mint\n> a step")),
+				roll: Some(SecretRoll::manual("beet mint\n> a step")),
 				..default()
 			})
 			.await;
@@ -434,7 +434,7 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("-     `EXPIRING` expires ")
-			.xpect_contains(", in 3 day(s), rotated by `beet mint`")
+			.xpect_contains(", in 3 day(s), rolled by `beet mint`")
 			.xnot()
 			.xpect_contains("LASTING");
 

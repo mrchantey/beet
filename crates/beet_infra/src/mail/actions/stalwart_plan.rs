@@ -614,7 +614,7 @@ impl DomainPlan {
 	/// replaceable without a deliverability cliff.
 	///
 	/// `private_key` is present only on creation, exactly as an account's
-	/// credential is: a key rotated under a published selector is a fortnight
+	/// credential is: a key rolled under a published selector is a fortnight
 	/// of mail signed by something no resolver can check.
 	/// The headers the sovereign signature covers: exactly the ones that
 	/// survive the relay. SES rewrites `Message-ID` and `Date` on every
@@ -710,16 +710,16 @@ impl AccountPlan {
 		Self::mailbox_note(&self.address(domain), self.admin)
 	}
 
-	/// How a mailbox credential rotates: delete the secret and the next
+	/// How a mailbox credential rolls: delete the secret and the next
 	/// provision mints a fresh one and sets it on the account
 	/// (`converge_account`), so every client configured against the mailbox
 	/// re-enters it.
-	pub fn rotation() -> SecretRotation { SecretRotation::Remint }
+	pub fn roll() -> SecretRoll { SecretRoll::Remint }
 
-	/// How the server's own administrator credential rotates: by hand, since
+	/// How the server's own administrator credential rolls: by hand, since
 	/// provision signs in with it to do anything at all.
-	pub fn admin_rotation() -> SecretRotation {
-		SecretRotation::manual(
+	pub fn admin_roll() -> SecretRoll {
+		SecretRoll::manual(
 			"set a new password on the administrator through the management \
 			api as another admin, then overwrite the entry",
 		)
@@ -768,7 +768,7 @@ impl AccountPlan {
 	///
 	/// `password` is the generated value parked at [`secret`](Self::secret),
 	/// and is present only on creation: an account that already exists keeps
-	/// the credential it has, since rotating it on every deploy would lock out
+	/// the credential it has, since rolling it on every deploy would lock out
 	/// every client configured against it.
 	pub fn object(&self, domain_id: &str, password: Option<&str>) -> Value {
 		let mut object = json!({
@@ -1479,7 +1479,7 @@ mod tests {
 	}
 
 	/// The key is absent from the form convergence MATCHES on, exactly as an
-	/// account's password is: a key rotated under a published selector signs
+	/// account's password is: a key rolled under a published selector signs
 	/// mail no verifier can check until dns catches up.
 	#[beet_core::test]
 	fn the_signing_key_is_written_once() {

@@ -1,37 +1,37 @@
-//! How a secret is rotated, declared by whatever mints it.
+//! How a secret is rolled, declared by whatever mints it.
 
 use crate::prelude::*;
 use core::fmt;
 use core::str::FromStr;
 
-/// The declared way a secret is rotated, carried by whatever mints it and
-/// stored beside the value (a document record's `rotation`, a parameter's
-/// description), so a store lists how each of its secrets rotates without
-/// the declarations in hand. `secrets/revoke` runs every rotation it can and
+/// The declared way a secret is rolled, carried by whatever mints it and
+/// stored beside the value (a document record's `roll`, a parameter's
+/// description), so a store lists how each of its secrets rolls without
+/// the declarations in hand. `secrets/revoke` runs every roll it can and
 /// prints the rest as the residue that needs a hand; a mint site cannot
-/// omit one, so no secret arrives un-rotatable.
+/// omit one, so no secret arrives un-rollable.
 ///
-/// Written as one string: `replace:<resource>`, `remint`, `manual:<why>`.
-/// Named for what it rotates, since a bare `Rotation` is a 3D thing in the
-/// same prelude.
+/// Written as one string: `replace:<resource>`, `remint`, `elevated`,
+/// `manual:<why>`. Named for what it rolls, since a bare `Roll` reads as the
+/// rotation about a forward axis in a crate full of transforms.
 ///
 /// ## Example
 ///
 /// ```
 /// # use beet_core::prelude::*;
-/// let rotation = "replace:aws_iam_access_key.relay"
-/// 	.parse::<SecretRotation>()
+/// let roll = "replace:aws_iam_access_key.relay"
+/// 	.parse::<SecretRoll>()
 /// 	.unwrap();
-/// rotation.kind().xpect_eq("replace");
-/// rotation.to_string().xpect_eq("replace:aws_iam_access_key.relay");
+/// roll.kind().xpect_eq("replace");
+/// roll.to_string().xpect_eq("replace:aws_iam_access_key.relay");
 /// "manual:https://example.com/keys\n> New key"
-/// 	.parse::<SecretRotation>()
+/// 	.parse::<SecretRoll>()
 /// 	.unwrap()
-/// 	.xpect_eq(SecretRotation::manual("https://example.com/keys\n> New key"));
-/// "rotate-somehow".parse::<SecretRotation>().unwrap_err();
+/// 	.xpect_eq(SecretRoll::manual("https://example.com/keys\n> New key"));
+/// "roll-somehow".parse::<SecretRoll>().unwrap_err();
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
-pub enum SecretRotation {
+pub enum SecretRoll {
 	/// A terraform-derived secret (the SES pair, a bucket token): `tofu apply
 	/// -replace=<resource>` mints a new one and the same apply re-parks it.
 	Replace {
@@ -42,7 +42,12 @@ pub enum SecretRotation {
 	/// delete the entry, and the next `deploy` mints a fresh one and
 	/// re-provisions its consumer.
 	Remint,
-	/// Only a hand rotates it, for `why` (a DKIM key, whose rotation is a
+	/// A deploy credential an elevated deploy keeps in line with the
+	/// declarations: `<stack>/deploy --elevated --roll` replaces it, which
+	/// asks a person for the human factor, so `secrets/revoke` lists it rather
+	/// than running it.
+	Elevated,
+	/// Only a hand rolls it, for `why` (a DKIM key, whose roll is a
 	/// new selector beside the published one).
 	Manual {
 		/// What a hand has to do: the full url first, then one dashboard
@@ -51,8 +56,8 @@ pub enum SecretRotation {
 	},
 }
 
-impl SecretRotation {
-	/// A [`Manual`](Self::Manual) rotation for `why`.
+impl SecretRoll {
+	/// A [`Manual`](Self::Manual) roll for `why`.
 	pub fn manual(why: impl Into<SmolStr>) -> Self {
 		Self::Manual { why: why.into() }
 	}
@@ -64,32 +69,36 @@ impl SecretRotation {
 		}
 	}
 
-	/// The one-word kind, for a ledger: `replace`, `remint`, `manual`.
+	/// The one-word kind, for a ledger: `replace`, `remint`, `elevated`,
+	/// `manual`.
 	pub fn kind(&self) -> &'static str {
 		match self {
 			Self::Replace { .. } => "replace",
 			Self::Remint => "remint",
+			Self::Elevated => "elevated",
 			Self::Manual { .. } => "manual",
 		}
 	}
 }
 
-impl fmt::Display for SecretRotation {
+impl fmt::Display for SecretRoll {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Replace { resource } => write!(f, "replace:{resource}"),
 			Self::Remint => f.write_str("remint"),
+			Self::Elevated => f.write_str("elevated"),
 			Self::Manual { why } => write!(f, "manual:{why}"),
 		}
 	}
 }
 
-impl FromStr for SecretRotation {
+impl FromStr for SecretRoll {
 	type Err = BevyError;
 	fn from_str(value: &str) -> Result<Self> {
 		let value = value.trim();
 		match value.split_once(':') {
 			None if value == "remint" => Self::Remint.xok(),
+			None if value == "elevated" => Self::Elevated.xok(),
 			Some(("replace", resource)) if !resource.trim().is_empty() => {
 				Self::replace(resource.trim()).xok()
 			}
@@ -97,15 +106,15 @@ impl FromStr for SecretRotation {
 				Self::manual(why.trim()).xok()
 			}
 			_ => bevybail!(
-				"`{value}` is not a rotation: `replace:<resource>`, `remint` or \
-				`manual:<why>`"
+				"`{value}` is not a roll: `replace:<resource>`, `remint`, \
+				`elevated` or `manual:<why>`"
 			),
 		}
 	}
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for SecretRotation {
+impl Serialize for SecretRoll {
 	fn serialize<S: serde::Serializer>(
 		&self,
 		serializer: S,
@@ -115,7 +124,7 @@ impl Serialize for SecretRotation {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for SecretRotation {
+impl<'de> Deserialize<'de> for SecretRoll {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,
 	) -> core::result::Result<Self, D::Error> {
@@ -130,35 +139,39 @@ mod test {
 
 	#[crate::test]
 	fn roundtrips_the_string_form() {
-		for (rotation, text) in [
-			(SecretRotation::Remint, "remint"),
+		for (roll, text) in [
+			(SecretRoll::Remint, "remint"),
+			(SecretRoll::Elevated, "elevated"),
 			(
-				SecretRotation::replace("cloudflare_account_token.x"),
+				SecretRoll::replace("cloudflare_account_token.x"),
 				"replace:cloudflare_account_token.x",
 			),
 			(
-				SecretRotation::manual("a new selector: beside the old"),
+				SecretRoll::manual("a new selector: beside the old"),
 				"manual:a new selector: beside the old",
 			),
 		] {
-			rotation.to_string().xpect_eq(text);
-			text.parse::<SecretRotation>()
-				.unwrap()
-				.xpect_eq(rotation.clone());
+			roll.to_string().xpect_eq(text);
+			text.parse::<SecretRoll>().unwrap().xpect_eq(roll.clone());
 			// serialized as its string form
 			let record = SecretRecord {
-				rotation: Some(rotation.clone()),
+				roll: Some(roll.clone()),
 				..default()
 			};
 			let toml = toml::to_string(&record).unwrap();
-			toml.xpect_eq(format!("rotation = {text:?}\n"));
+			toml.xpect_eq(format!("roll = {text:?}\n"));
 			toml::from_str::<SecretRecord>(&toml)
 				.unwrap()
-				.rotation
-				.xpect_eq(Some(rotation));
+				.roll
+				.xpect_eq(Some(roll));
 		}
-		"replace:".parse::<SecretRotation>().unwrap_err();
-		"weekly".parse::<SecretRotation>().unwrap_err();
-		SecretRotation::Remint.kind().xpect_eq("remint");
+		// a record sealed before `roll` had its name still opens
+		toml::from_str::<SecretRecord>("rotation = \"remint\"\n")
+			.unwrap()
+			.roll
+			.xpect_eq(Some(SecretRoll::Remint));
+		"replace:".parse::<SecretRoll>().unwrap_err();
+		"weekly".parse::<SecretRoll>().unwrap_err();
+		SecretRoll::Remint.kind().xpect_eq("remint");
 	}
 }

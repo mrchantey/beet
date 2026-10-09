@@ -9,8 +9,9 @@ use core::fmt::Write;
 /// list, naming the ones it cannot: the second half of adding a reader,
 /// after their recipient is added to a group's list in the document. With
 /// no `--document` every declared document is rekeyed (the conventional
-/// `secrets.toml` when none is declared). Removing a reader is a rekey plus
-/// rotating what they could read, since git history keeps the old
+/// `secrets.toml` when none is declared), skipping one never written, ie a
+/// dated export's declared path, which nothing writes. Removing a reader is a rekey plus
+/// rolling what they could read, since git history keeps the old
 /// ciphertext; `revoke` does both. An age file is re-encrypted by
 /// `vault/rekey` instead.
 ///
@@ -44,6 +45,10 @@ pub async fn SecretsRekey(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	let mut out = String::new();
 	for handle in handles {
+		if selector.is_none() && !handle.exists().await? {
+			writeln!(out, "skipped {}: not written yet", handle.describe())?;
+			continue;
+		}
 		let mut document = handle.read().await?;
 		let report = document.rekey(&identities)?;
 		handle.write(&document).await?;
@@ -73,6 +78,42 @@ mod test {
 	use crate::prelude::*;
 	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
+
+	/// With no `--document`, every declared document is rekeyed and one never
+	/// written is skipped rather than failing the rest; named, a missing one is
+	/// still an error.
+	///
+	/// REGRESSION: beetmash declares its cold bucket's dated export series,
+	/// whose declared path nothing ever writes, and a bare `secrets/rekey`
+	/// failed on it before reaching the documents that exist.
+	#[beet_core::test]
+	async fn skips_a_declared_document_never_written() {
+		let mut fixture = VerbWorld::new();
+		let root = fixture.root;
+		fixture.world.spawn((
+			Secrets::new("secrets.toml").with_label("secrets"),
+			ChildOf(root),
+		));
+		fixture.world.spawn((
+			Secrets::new("cold/export.toml").with_label("cold"),
+			ChildOf(root),
+		));
+		fixture.set("A", "1", default()).await;
+		fixture
+			.call_str(SecretsRekey, Request::get("/"))
+			.await
+			.unwrap()
+			.xpect_contains("rekeyed `secrets`")
+			.xpect_contains(
+				"skipped `cold` (cold/export.toml): not written yet",
+			);
+		fixture
+			.call(SecretsRekey, Request::from_cli_str("--document=cold"))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("not written yet");
+	}
 
 	/// A recipient added to a group's list reads it after `rekey`, and a
 	/// group this identity is not in is left as it was.

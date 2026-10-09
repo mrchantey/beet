@@ -5,7 +5,7 @@ use beet_core::prelude::*;
 /// invocation, see [`StateEncryption::vars`].
 pub const STATE_ENCRYPTION_VAR: &str = "tf_state_passphrase";
 
-/// The same for the passphrase a rotation is retiring, referenced only by the
+/// The same for the passphrase a roll is retiring, referenced only by the
 /// first half of a crossing ([`StateCrossing::FromRetiring`]).
 pub const STATE_ENCRYPTION_RETIRING_VAR: &str = "tf_state_passphrase_retiring";
 
@@ -47,7 +47,7 @@ pub enum StateEncryption {
 /// the state envelope's `meta` as `key_provider.pbkdf2.<name>`. A provider
 /// under a second name therefore finds no salt of its own and reads nothing,
 /// which is why a passphrase cannot simply be swapped under one name and why
-/// a rotation takes the two halves below. Every one of them WRITES encrypted:
+/// a roll takes the two halves below. Every one of them WRITES encrypted:
 /// the backend never receives a plaintext state, which on a versioned bucket
 /// would be kept rather than overwritten.
 ///
@@ -60,7 +60,7 @@ pub enum StateCrossing {
 	/// material, so it is the one fallback with no salt to look up.
 	FromPlaintext,
 	/// Read under the primary key, holding the RETIRING passphrase this names,
-	/// and write under the secondary: the first half of a rotation, which is
+	/// and write under the secondary: the first half of a roll, which is
 	/// the only direction the retiring salt can be read from.
 	FromRetiring(SmolStr),
 	/// Read under the secondary key and write under the primary, both holding
@@ -92,7 +92,7 @@ impl StateEncryption {
 	/// The key provider a steady-state read and write both address, and the
 	/// name the salt of every settled state is stored under.
 	const PRIMARY: &'static str = "main";
-	/// The key provider a rotation parks the state under for one write, so the
+	/// The key provider a roll parks the state under for one write, so the
 	/// primary's name is free to take the new passphrase.
 	const SECONDARY: &'static str = "next";
 
@@ -314,7 +314,7 @@ mod tests {
 			.xpect_eq(vec!["main"]);
 	}
 
-	/// A rotation's first half: the RETIRING passphrase keeps the primary
+	/// A roll's first half: the RETIRING passphrase keeps the primary
 	/// NAME, since that is the only address its salt is stored under, and the
 	/// current one takes the secondary for this one write. So the write lands
 	/// under the current passphrase and the retiring one cannot read it.

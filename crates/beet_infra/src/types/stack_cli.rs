@@ -32,6 +32,11 @@ use beet_router::prelude::*;
 /// <DeployRoutes deploy={$up} destroy={$down}/>
 /// ```
 ///
+/// Both lifecycle verbs pass through the [`DeployGate`]: each runs plainly as
+/// the repo's stored deploy credentials, refusing before its first step when
+/// they cannot do what it is about to, and `--elevated` runs it with the human
+/// factor instead.
+///
 /// Both are required and there is no compatibility mode: a stack that can be
 /// brought up and not taken down is the thing this replaced. They are separate
 /// declarations rather than one reversible group because a deploy is not a
@@ -51,14 +56,21 @@ pub fn DeployRoutes(
 	children![
 		(
 			PathPartial::new("deploy"),
+			ParamsPartial::new::<ElevationParams>(),
 			ExchangeGroup::default(),
 			RunGroup::<Request, Response>::new(deploy),
+			// the gate's overload in place of the group's own, declared rather
+			// than required so it wins
+			DeployGate,
+			DeployGate::overload(),
 		),
 		(
 			PathPartial::new("destroy"),
-			ParamsPartial::new::<DestroyParams>(),
+			ParamsPartial::new::<(DestroyParams, ElevationParams)>(),
 			ExchangeGroup::forced_by("force"),
 			RunGroup::<Request, Response>::reversed(destroy),
+			DeployGate,
+			DeployGate::overload(),
 		),
 		Validate,
 		Plan,
@@ -66,7 +78,7 @@ pub fn DeployRoutes(
 		Show,
 		List,
 		Forget,
-		RotateState,
+		RollState,
 		Rollback,
 		Rollforward
 	]
@@ -228,9 +240,9 @@ pub async fn Forget(cx: ActionContext<Request>) -> Result<String> {
 	report.xok()
 }
 
-/// Request params for [`RotateState`], surfaced in `--help`.
+/// Request params for [`RollState`], surfaced in `--help`.
 #[derive(Reflect)]
-struct RotateStateParams {
+struct RollStateParams {
 	/// The environment variable holding the passphrase the state is encrypted
 	/// under now; the stack's `state_passphrase` variable holds the one it
 	/// moves to. `<that variable>_OLD` unless given.
@@ -238,18 +250,18 @@ struct RotateStateParams {
 }
 
 /// Re-encrypt the stack's state under its current passphrase, see
-/// [`terra::Project::rotate_state`]: the stack half of rotating
+/// [`terra::Project::roll_state`]: the stack half of rolling
 /// `TF_STATE_PASSPHRASE`, run once per stack after the document holds the
 /// new value and `<variable>_OLD` the old. Also the one command that
 /// encrypts a stack whose state is still plaintext.
-#[action(route = "rotate-state")]
+#[action(route = "roll-state")]
 #[derive(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<RotateStateParams>())]
-pub async fn RotateState(cx: ActionContext<Request>) -> Result<String> {
-	let retiring = cx.input.parse_params::<RotateStateParams>()?.retiring;
+#[require(ParamsPartial = ParamsPartial::new::<RollStateParams>())]
+pub async fn RollState(cx: ActionContext<Request>) -> Result<String> {
+	let retiring = cx.input.parse_params::<RollStateParams>()?.retiring;
 	terra::Project::resolve(&cx.caller)
 		.await?
-		.rotate_state(retiring.as_deref())
+		.roll_state(retiring.as_deref())
 		.await
 }
 
@@ -338,7 +350,7 @@ mod tests {
 		tree.find(&["show"]).xpect_some();
 		tree.find(&["list"]).xpect_some();
 		tree.find(&["forget"]).xpect_some();
-		tree.find(&["rotate-state"]).xpect_some();
+		tree.find(&["roll-state"]).xpect_some();
 		// artifact routes
 		tree.find(&["rollback"]).xpect_some();
 		tree.find(&["rollforward"]).xpect_some();

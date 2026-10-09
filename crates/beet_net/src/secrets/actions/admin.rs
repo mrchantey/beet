@@ -21,7 +21,7 @@ struct AdminParams {
 /// ```sh
 /// beet admin                                  # an hour, stored on tmpfs
 /// beet admin --duration=8h                    # a working day
-/// beet admin -- deployer/mint --stage=prod     # one command, nothing kept
+/// beet admin -- shared/plan --stage=prod       # one command, nothing kept
 /// ```
 ///
 /// Opens the global document for [`beet-agent`](AgentIdentity)'s pair, prompts
@@ -59,15 +59,7 @@ struct AdminParams {
 pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 	let params = cx.input.parse_params::<AdminParams>()?;
 	let seconds = AdminElevate::parse_duration(params.duration.as_deref())?;
-	let agent = AgentIdentity::sdk_pair().await?;
-	let account = AdminElevate::account_id(&agent).await?;
-	let code = terminal_ext::read_secret_line(&format!(
-		"six-digit code for the `{}` mfa device: ",
-		AgentIdentity::USER
-	))?;
-	AdminElevate::check_code(&code)?;
-	let session =
-		AdminElevate::assume(&agent, &account, &code, seconds).await?;
+	let session = AdminSession::mint(seconds).await?;
 	match params.nested_args.is_empty() {
 		// one verb, nothing kept: the grant lives as long as the child
 		false => {
@@ -113,8 +105,41 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 	}
 }
 
+impl AdminSession {
+	/// The least a reused session must have left: an elevated deploy, a
+	/// mail box replaced and provisioned, takes most of it.
+	const REUSE_FLOOR: i64 = 20 * 60;
+
+	/// An administrator session for one elevated command: the live one on
+	/// tmpfs when `beet admin` left one with time to spare, else a fresh hour
+	/// bought with a code from the phone, asked for on the terminal and kept
+	/// nowhere. Without a terminal the ask is the error.
+	pub async fn acquire() -> Result<Self> {
+		if let Ok(SessionState::Live(session)) = Self::read()
+			&& session.remaining_secs() >= Self::REUSE_FLOOR
+		{
+			return session.xok();
+		}
+		Self::mint(AdminElevate::DEFAULT).await
+	}
+
+	/// A fresh session of `seconds`: `beet-agent`'s pair from the global
+	/// document, the six-digit code from the phone, and `sts:AssumeRole` on
+	/// `beet-admin` with it.
+	pub async fn mint(seconds: i64) -> Result<Self> {
+		let agent = AgentIdentity::sdk_pair().await?;
+		let account = AdminElevate::account_id(&agent).await?;
+		let code = terminal_ext::read_secret_line(&format!(
+			"six-digit code for the `{}` mfa device: ",
+			AgentIdentity::USER
+		))?;
+		AdminElevate::check_code(&code)?;
+		AdminElevate::assume(&agent, &account, &code, seconds).await
+	}
+}
+
 impl AdminElevate {
-	/// The default grant, an hour: long enough for a mint or a rotation, short
+	/// The default grant, an hour: long enough for a mint or a roll, short
 	/// enough that forgetting it costs nothing.
 	const DEFAULT: i64 = 3600;
 	/// The role's own `MaxSessionDuration`, which STS refuses to exceed.
@@ -201,7 +226,7 @@ impl AdminElevate {
 				bevyhow!(
 					"`{}`'s pair does not answer `sts:GetCallerIdentity`, so \
 					there is nobody to elevate FROM: the key may have been \
-					rotated at the account without the global document \
+					rolled at the account without the global document \
 					following it. {err}",
 					AgentIdentity::USER
 				)

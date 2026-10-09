@@ -135,8 +135,12 @@ impl ColdStore {
 		service: &'a str,
 		args: impl IntoIterator<Item = &'a str>,
 	) -> ChildProcess {
-		aws_cli_ext::r2(&self.endpoint, &self.access_key, &self.secret_key)
-			.with_args([service].into_iter().chain(args))
+		aws_cli_ext::r2(
+			&self.endpoint,
+			&self.access_key,
+			&self.secret_key,
+			[service].into_iter().chain(args),
+		)
 	}
 
 	pub async fn list(&self, prefix: &str) -> Result<Listing> {

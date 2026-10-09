@@ -14,7 +14,7 @@ struct RekeyParams {
 }
 
 /// Re-encrypt an age file to a recipient list: the second half of adding a
-/// reader. Removing one is a rekey plus rotating what they could read, since
+/// reader. Removing one is a rekey plus rolling what they could read, since
 /// git history keeps the old ciphertext. A secrets document's groups are
 /// re-sealed by `secrets/rekey` instead.
 ///

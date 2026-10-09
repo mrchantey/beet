@@ -97,10 +97,10 @@ beet-validate *args:
 beet-plan *args:
   cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
 # Re-encrypt the stage stack's state under the current `TF_STATE_PASSPHRASE`
-# (the record's rotation note has the surrounding steps); the shared and social
-# stacks take the same verb as args: `just site-shared rotate-state`.
-beet-rotate-state *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site rotate-state {{ args }}
+# (the record's roll note has the surrounding steps); the shared and social
+# stacks take the same verb as args: `just site-shared roll-state`.
+beet-roll-state *args:
+  cargo run -p beet-cli --features infra,extra -- --main=site roll-state {{ args }}
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
 # entry, since these assets belong to the repo rather than to the website.
@@ -121,36 +121,11 @@ site-social *args:
 # are declarations rather than strays.
 site-audit *args:
   cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
-# Converge the deployer of the WORKSPACE entry's apps (`beet--shared`): its user,
-# one `<app>--deploy` policy and one `<app>--<stage>--runtime-boundary` per app,
-# and the pair sealed in `secrets.toml`. A policy covers the apps its OWN entry
-# declares, so the site entry has its own recipe below. An administrator's verb:
-# `beet admin -- deployer/mint` is the one-code path, and an admin pair in the
-# environment also wins over the document. `--dry-run` WRITES nothing but still
-# renders, so it needs a credential that answers `sts:GetCallerIdentity` -- just
-# not an administrator -- and its preview omits the boundary conditions, which
-# are an account read it skips. `infra,extra` is not optional here: without them
-# `<DeployerMint/>` is `bx:cfg`-excluded and the verb does not exist.
-beet-mint *args:
-  cargo run -p beet-cli --features infra,extra -- deployer/mint {{ args }}
-# The same for the SITE entry's apps (`beet-site--*`, `beet-social--prod`). A
-# mint covers ONE stage's services, so prod is the stage worth minting: `just
-# site-mint --stage=prod`. `atproto` so the social app's policy renders at all:
-# without it that tag spawns as nothing and the mint silently covers one app
-# fewer.
-site-mint *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --main=site deployer/mint {{ args }}
-# Converge the CLOUDFLARE token this repo deploys with: one account-owned
-# `beet-deploy` token scoped to exactly the permission groups the site entry's
-# stacks and zone verbs ask for, sealed as `CLOUDFLARE_API_TOKEN`. Runs as the
-# MINT token, which holds `Account API Tokens Write` and nothing else and is
-# kept nowhere: the run shows where to roll it and asks for it, echo off.
-# `--dry-run` needs no credential, prints the scope and the body a mint would
-# post, and ends with the steps to relay to the operator.
-# `atproto` so the social stack's records render, for the same reason
-# `site-audit` builds with it.
-site-cloudflare-mint *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --main=site cloudflare/mint {{ args }}
+# There is no mint recipe: the deploy credentials (`<AwsDeployer/>`,
+# `<CloudflareDeployToken/>`) are kept in line with the declarations by an
+# elevated deploy. Any deploy recipe above takes `--elevated`, which asks for the
+# code from the phone and the Cloudflare dashboard login only where its
+# credentials need them, and `--dry-run`, which says whether they do.
 
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,

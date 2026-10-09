@@ -398,7 +398,7 @@ impl StalwartBlock {
 
 	/// The `usage selector matching-type` triple the pin is published under:
 	/// `3 1 1`, ie DANE-EE on the leaf's SubjectPublicKeyInfo by SHA-256. The
-	/// leaf rather than the issuer, because Let's Encrypt rotates
+	/// leaf rather than the issuer, because Let's Encrypt rolls
 	/// intermediates unannounced; the key rather than the certificate,
 	/// because the key survives a renewal and the certificate does not.
 	pub const TLSA_PARAMS: (u8, u8, u8) = (3, 1, 1);
@@ -929,9 +929,9 @@ impl StalwartBlock {
 				..default()
 			},
 		);
-		// the pair, parked as the apply derives it and rotated by replacing
+		// the pair, parked as the apply derives it and rolled by replacing
 		// the access key, which the same apply re-parks
-		let rotation = SecretRotation::replace(key.address());
+		let roll = SecretRoll::replace(key.address());
 		let user_param = ResourceDef::new_secondary(
 			stack.resource_ident(self.build_label("ses-smtp-user")),
 			AwsSsmParameterDetails {
@@ -941,7 +941,7 @@ impl StalwartBlock {
 				description: Some(
 					SecretRef::description(
 						Some(&self.ses_smtp_user_note(stack)),
-						Some(&rotation),
+						Some(&roll),
 					)
 					.into(),
 				),
@@ -957,7 +957,7 @@ impl StalwartBlock {
 				description: Some(
 					SecretRef::description(
 						Some(&self.ses_smtp_password_note(stack)),
-						Some(&rotation),
+						Some(&roll),
 					)
 					.into(),
 				),
@@ -1041,7 +1041,7 @@ impl StalwartBlock {
 			&json!({ "name": Self::AMI_PARAMETER }),
 		)?;
 
-		// `key_name_prefix` so a rotated public key is a NEW key pair name,
+		// `key_name_prefix` so a rolled public key is a NEW key pair name,
 		// which forces instance replacement: EC2 only installs the key at
 		// launch, so an in-place key update would be silently ignored.
 		let keypair_ident = stack.resource_ident(self.build_label("keypair"));
@@ -1648,8 +1648,8 @@ BACKUP_TIMER_EOF
 set -euo pipefail
 umask 077
 get() { aws ssm get-parameter --region '__REGION__' --name "$1" --with-decryption --query Parameter.Value --output text; }
-# the live side answers to the instance profile; the cold side to the token
-# the apply minted, read into the environment and never onto argv or a file
+# the live side answers to the instance profile; the cold side to the bucket's
+# own token, read into the environment and never onto argv or a file
 export RCLONE_CONFIG=/dev/null
 export RCLONE_CONFIG_LIVE_TYPE=s3
 export RCLONE_CONFIG_LIVE_PROVIDER=AWS
@@ -1660,11 +1660,11 @@ export RCLONE_CONFIG_COLD_PROVIDER=Cloudflare
 export RCLONE_CONFIG_COLD_ENDPOINT='__ENDPOINT__'
 export RCLONE_CONFIG_COLD_NO_CHECK_BUCKET=true
 RCLONE_CONFIG_COLD_ACCESS_KEY_ID="$(get '__ACCESS_KEY_SECRET__')" || {
-	echo "no cold credential at __ACCESS_KEY_SECRET__: __MISSING__" >&2
+	echo "no cold credential at __ACCESS_KEY_SECRET__: __UNPARKED__" >&2
 	exit 1
 }
 RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY="$(get '__SECRET_KEY_SECRET__')" || {
-	echo "no cold credential at __SECRET_KEY_SECRET__: __MISSING__" >&2
+	echo "no cold credential at __SECRET_KEY_SECRET__: __UNPARKED__" >&2
 	exit 1
 }
 export RCLONE_CONFIG_COLD_ACCESS_KEY_ID RCLONE_CONFIG_COLD_SECRET_ACCESS_KEY
@@ -1703,13 +1703,12 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let endpoint = cold.endpoint(stack)?;
 		let access_key = cold.access_key_secret().name(stack);
 		let secret_key = cold.secret_key_secret().name(stack);
-		let missing = cold.missing_credential(stack);
 		[
 			("__REGION__", stack.aws_region()?.as_str()),
 			("__ENDPOINT__", endpoint.as_str()),
 			("__ACCESS_KEY_SECRET__", access_key.as_str()),
 			("__SECRET_KEY_SECRET__", secret_key.as_str()),
-			("__MISSING__", missing.as_str()),
+			("__UNPARKED__", R2BucketBlock::UNPARKED),
 			("__BACKUP_BUCKET__", backup_bucket.as_str()),
 			("__BLOB_BUCKET__", blob_bucket.as_str()),
 			("__COLD_BUCKET__", cold_bucket.as_str()),
@@ -1963,7 +1962,7 @@ CW_EOF
 {cold_install}
 {cold_stanza}
 # secrets rendered before the first start, and by ExecStartPre on every later
-# one, so rotation is a restart rather than a rebuild
+# one, so a roll is a restart rather than a rebuild
 sudo -u stalwart /usr/local/bin/stalwart-secrets
 systemctl daemon-reload
 systemctl enable --now stalwart
@@ -2383,7 +2382,7 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_contains(".ses_smtp_password_v4}");
-		// both rotate by replacing the access key, and say so
+		// both roll by replacing the access key, and say so
 		for param in [&user, &password] {
 			SecretRef::parse_description(
 				param["description"].as_str().unwrap(),
@@ -2958,19 +2957,23 @@ mod tests {
 	}
 
 	/// The token is read with the same parameter-store call the secrets
-	/// script makes, and the script names the verb that parks it when it is
-	/// missing: a cold copy that silently skipped would be the bucket sitting
-	/// empty with every check green, which is the failure this whole phase
-	/// exists to close.
+	/// script makes, and the script says what parks it when it is missing: a
+	/// cold copy that silently skipped would be the bucket sitting empty with
+	/// every check green, which is the failure this whole phase exists to
+	/// close. It says so in the fixed pointer, never the deploy machine's
+	/// wording, which may change without replacing the box.
 	#[beet_core::test]
 	fn a_missing_cold_credential_is_loud() {
 		let (stack, _deployment, _dir) = sydney_resolved();
-		cold_box()
-			.cold_script(&stack, &cold_store())
-			.unwrap()
+		let script = cold_box().cold_script(&stack, &cold_store()).unwrap();
+		script
+			.as_str()
 			.xpect_contains("no cold credential at")
-			.xpect_contains("beet cloudflare/mint")
+			.xpect_contains(R2BucketBlock::UNPARKED)
 			.xpect_contains("exit 1");
+		script
+			.contains(&cold_store().missing_credential(&stack))
+			.xpect_false();
 	}
 
 	/// A cold bucket with nothing to copy from is a declaration error, and a

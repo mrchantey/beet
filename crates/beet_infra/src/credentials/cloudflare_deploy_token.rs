@@ -1,6 +1,6 @@
-//! `cloudflare/mint`: every Cloudflare credential this repo's declarations ask
-//! for — the narrow token it deploys with, and the token of each bucket it
-//! declares — minted in the one place that holds the group which mints.
+//! `<CloudflareDeployToken/>`: the Cloudflare deploy credential, every token
+//! the declarations ask for, minted in the one place that holds the group
+//! which mints.
 
 use crate::actions::cloudflare_api_ext;
 use crate::actions::cloudflare_api_ext::API_BASE;
@@ -9,64 +9,46 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// Request params for [`CloudflareMint`], surfaced in `--help`.
-#[derive(Reflect)]
-struct CloudflareMintParams {
-	/// Print the token this would create and what asked for each of its
-	/// permissions, WRITING to neither Cloudflare nor the document. The stacks
-	/// render, which needs no credential at all, so this is also how a reader
-	/// sees the scope without holding anything.
-	dry_run: bool,
-	/// Mint a fresh token even when the account already holds one that matches
-	/// the declarations, and delete the one it replaces: this is the rotation.
-	rotate: bool,
-	/// The document group the token is sealed in; absent, the group it is
-	/// already sealed in, else `default`.
-	group: Option<String>,
-	/// A route to run under an elevated token, everything after `--`, ie
-	/// `-- mail/deploy`: a token holding the deploy token's groups and the ones
-	/// only a change needs is minted for it, and deleted once it exits.
-	nested_args: Vec<String>,
-}
-
-/// `<CloudflareMint/>` — converge every Cloudflare credential this repo's
-/// declarations ask for:
+/// `<CloudflareDeployToken/>` — the repo's Cloudflare deploy credential,
+/// declared at the entry's root like `<Secrets/>`, and every Cloudflare token
+/// its declarations ask for:
 ///
 /// - **the deploy token**: one account-owned token per repo, scoped to exactly
 ///   the permission groups the declarations need ([`DeployerToken`], lowered
 ///   from what the stacks render and the Cloudflare actions their routes run),
-///   sealed into the credential document as `CLOUDFLARE_API_TOKEN`.
+///   sealed into the credential document as `CLOUDFLARE_API_TOKEN` with the
+///   grants it holds in its record's metadata.
 /// - **one token per declared `<R2BucketBlock/>`**, scoped to that bucket's
 ///   objects and nothing else, its S3 pair parked in the stack's own secret
 ///   store where the compute beside the bucket reads it. Not sealed in any
 ///   document: it is a runtime credential, not a deploy one.
 ///
-/// Both live here because both need the one group that mints credentials, and
-/// that group is held by one credential in one place.
+/// Nobody mints either by hand: a deploy checks the sealed grants against the
+/// declarations before it writes anything, and refuses naming `--elevated`
+/// when they fall short; the elevated deploy ([`DeployGate`]) converges both
+/// here.
 ///
-/// ```sh
-/// beet cloudflare/mint --dry-run           # the token's scope, nothing touched
-/// beet cloudflare/mint                     # converge the token and seal it
-/// beet cloudflare/mint --rotate            # ..and replace it even if it matches
-/// beet cloudflare/mint -- mail/deploy      # ..then run a deploy elevated
+/// ```jsx
+/// <CloudflareDeployToken/>
+/// <CloudflareDeployToken ttl_days=30 request_ips={["203.0.113.7/32"]}/>
 /// ```
 ///
-/// ## Which credential it runs as
+/// ## Which credential an elevated deploy runs this as
 ///
 /// Creating a token needs `Account API Tokens Write`, which is the one group
 /// that can mint a credential wider than itself and therefore the one group a
-/// held credential must not have. So this verb does not run as the token it
+/// held credential must not have. So the converge does not run as the token it
 /// converges but as the **mint token**, which holds that group and nothing
-/// else and is kept NOWHERE: the run shows the operator where to roll it,
-/// asks for the fresh value with echo off, and carries on, the way `beet
-/// admin` asks for an mfa code. A roll kills the value from last time,
-/// wherever it was left. Cloudflare has no mfa condition to put on a token and
-/// no permissions boundary to cap one with, so the dashboard login a roll
-/// needs is the human factor, and an agent with the age identity opens every
-/// document and still cannot mint.
+/// else and is kept NOWHERE: the elevated deploy shows where to roll it, asks
+/// for the fresh value with echo off, and carries on, the way it asks for the
+/// AWS code. A roll kills the value from last time, wherever it was left.
+/// Cloudflare has no mfa condition to put on a token and no permissions
+/// boundary to cap one with, so the dashboard login a roll needs is the human
+/// factor, and an agent with the age identity opens every document and still
+/// cannot mint.
 ///
 /// ```text
-/// this mint runs as the mint token, rolled for this run:
+/// this elevated deploy runs Cloudflare as the mint token, rolled for this run:
 ///
 /// 1. Roll it at https://dash.cloudflare.com/<account>/api-tokens
 ///    beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy
@@ -75,40 +57,35 @@ struct CloudflareMintParams {
 ///
 /// A value in the environment that is not the sealed deploy token is taken
 /// instead, the way CI hands one over. With no terminal to ask on (an agent),
-/// the run is answered with the steps to relay, which the dry run also ends
-/// with: the declared `command` to run in a terminal, then the page's full url
-/// and the clicks. Whoever is asked for a mint prints them as they are.
+/// the deploy is answered with the steps to relay: the command to run in a
+/// terminal, then the page's full url and the clicks.
 ///
-/// ## The elevated run, for the change the deploy token cannot make
+/// ## The change the deploy token cannot make
 ///
 /// Some declared types are only REFRESHED by the deploy token, and written by
 /// a group it never holds ([`DeployerToken::elevated`]): an R2 bucket's
 /// configuration, since the group that writes its lock also lifts it, over
-/// every bucket in the account. A deploy that changes one is refused before it
-/// writes anything and names this form: `-- <route>` mints `<repo>-elevated`,
-/// holding the deploy token's groups and the elevated ones, proves it, runs
-/// the route as this launch with it in `CLOUDFLARE_API_TOKEN` (which wins over
-/// the document the route loads) and deletes it once the route exits, however
-/// it exits. It is never sealed, a token a crash leaves behind is deleted by
-/// the next run, and every one lapses within the hour regardless: the
-/// Cloudflare counterpart of `beet admin -- <route>`, with the dashboard login
-/// in place of the mfa code.
+/// every bucket in the account. A plain deploy that would change one is
+/// refused before it writes anything. The elevated deploy mints
+/// `<repo>-elevated`, holding the deploy token's groups and the elevated ones,
+/// proves it, runs the deploy with it in `CLOUDFLARE_API_TOKEN`, and deletes it
+/// once the deploy exits, however it exits. It is never sealed, a token a crash
+/// leaves behind is deleted by the next run, and every one lapses within the
+/// hour regardless.
 ///
-/// ## Why a verb rather than a hand-made token, and why not an apply
+/// ## Why derived rather than hand-made, and why not an apply
 ///
-/// Against a hand-made token, the same reason `deployer/mint` is a verb: a
-/// credential written by hand drifts from the declarations the moment a block
-/// is added, and the drift surfaces as a 403 mid-deploy that names nothing
-/// useful. Lowered from the render, the token is as narrow as the declarations
-/// allow and widens only when they do.
+/// Against a hand-made token: a credential written by hand drifts from the
+/// declarations the moment a block is added, and the drift surfaces as a 403
+/// mid-deploy that names nothing useful. Lowered from the render, the token is
+/// as narrow as the declarations allow and widens only when they do.
 ///
 /// Against an apply, which CAN mint a token (`cloudflare_account_token` is a
-/// bound resource, and the R2 bucket's credential was rendered that way until
-/// this verb existed): an apply that mints needs `Account API Tokens Write` in
-/// the credential every deploy of that repo reads, which is exactly the
-/// escalation with no boundary to cap it. Minting is rare and deploying is
-/// constant, so they hold different credentials, and the rare one is the only
-/// one that can mint. That is the whole shape of this file.
+/// bound resource, and the R2 bucket's credential was rendered that way once):
+/// an apply that mints needs `Account API Tokens Write` in the credential every
+/// deploy of that repo reads, which is exactly the escalation with no boundary
+/// to cap it. Minting is rare and deploying is constant, so they hold
+/// different credentials, and the rare one is the only one that can mint.
 ///
 /// ## What converges
 ///
@@ -118,189 +95,300 @@ struct CloudflareMintParams {
 ///   declarations ask for under the declared terms, and not yet inside its
 ///   renewal notice.
 /// - the record, sealed as `CLOUDFLARE_API_TOKEN` in the document's group with
-///   the token's `expires`. The value is written only after the new token has
-///   PROVEN itself with a read the deploy actually makes, and every other token
-///   of the name is deleted only after that: a failure anywhere leaves the
-///   previous credential in place, and a token that never proved itself is
-///   deleted on the spot rather than left live beside it. A current token's
-///   record is resealed, value unchanged, when its note or rotation is not
-///   what this verb writes now, so the steps it carries never go stale.
-///
+///   the token's `expires` and its grants. The value is written only after the
+///   new token has PROVEN itself with a read the deploy actually makes, and
+///   every other token of the name is deleted only after that: a failure
+///   anywhere leaves the previous credential in place, and a token that never
+///   proved itself is deleted on the spot rather than left live beside it. A
+///   current token's record is resealed, value unchanged, when its note, roll
+///   or grants are not what this writes now.
 /// - a bucket's token, minted unless the account holds exactly one token of its
 ///   name, its pair is parked, and the parked access key id is that token's, or
-///   on `--rotate`. The parked access key id IS the token id, so that
+///   on `--roll`. The parked access key id IS the token id, so that
 ///   comparison costs no call of its own.
 ///
 /// What it deliberately does not do is delete a token it did not make. A
 /// hand-made token is user-owned, which `Account API Tokens Write` cannot touch
-/// at all, so the verb names it and the operator revokes it in the dashboard.
+/// at all, so it is the operator's to revoke in the dashboard.
 ///
 /// ## The two levers that are not a boundary
 ///
 /// Cloudflare caps a token by nothing but its scope, so the deploy token may
 /// also be held to two terms that narrow the window a leaked value is good for.
-/// Both are opt-in, since each costs a mint the operator runs by hand:
+/// Both are opt-in, since each costs an elevated deploy by hand:
 ///
 /// - **a lifetime**, `ttl_days`: the token stops authenticating on a day, so a
 ///   leak has a deadline however it leaked. The sealed record carries that day
 ///   as its `expires`, every launch that loads it warns in the fortnight before
-///   ([`SecretRecord::EXPIRY_NOTICE`]), and this verb renews inside the same
-///   fortnight, so the deadline arrives as a warning naming one command rather
-///   than as a 401 mid-deploy. Renewal is a fresh token, never an extended
-///   one: an extension would keep a leaked value alive with it. Absent, the
-///   token lasts until rotated, which suits a token as narrow as a zone's
-///   records and settings: its worst case is rewritten records the next apply
-///   restores.
+///   ([`SecretRecord::EXPIRY_NOTICE`]), a plain deploy notes it and refuses
+///   once it has passed, and an elevated deploy renews inside the same
+///   fortnight. Renewal is a fresh token, never an extended one: an extension
+///   would keep a leaked value alive with it. Absent, the token lasts until
+///   rolled, which suits a token as narrow as a zone's records and settings:
+///   its worst case is rewritten records the next apply restores.
 /// - **an address filter**, `request_ips`: the CIDRs the token may be used
 ///   from, any address when empty. Worth declaring only where every deploy
 ///   leaves from fixed addresses (a self-hosted CI runner, a static egress
 ///   box); a laptop's address changes with the network it is on, and each
-///   change would cost a mint.
-///
-/// ```jsx
-/// <CloudflareMint ttl_days=30 request_ips={["203.0.113.7/32"]}/>
-/// ```
+///   change would cost an elevated deploy.
 ///
 /// A bucket's token is held to neither: the box beside the bucket uses it
 /// nightly and cannot renew it, and the bucket's lock is what bounds its
 /// damage.
-#[action]
-#[derive(Debug, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(
-	PathPartial = PathPartial::new("cloudflare/mint"),
-	ParamsPartial = ParamsPartial::new::<CloudflareMintParams>()
-)]
-pub async fn CloudflareMint(
+pub struct CloudflareDeployToken {
 	/// The days a minted deploy token authenticates for, to the midnight UTC
-	/// it lands on, or until rotated when absent. At least twice the renewal
+	/// it lands on, or until rolled when absent. At least twice the renewal
 	/// notice, so a token spends most of its life quiet.
-	#[field]
-	ttl_days: Option<u32>,
+	pub ttl_days: Option<u32>,
 	/// The CIDRs the deploy token may be used from (a bare address is its
 	/// `/32` or `/128`), any address when empty.
-	#[field]
-	request_ips: Vec<SmolStr>,
+	pub request_ips: Vec<SmolStr>,
 	/// The mint token's name on the account's api tokens page, which the
 	/// steps for rolling it name.
-	#[field(default = "beet-mint")]
-	mint_token: SmolStr,
-	/// The command the operator runs in a terminal to mint, which then asks
-	/// for the mint token, ie `just site-cloudflare-mint --stage=prod`; absent,
-	/// this launch's own command line less `--dry-run`. Worth declaring
-	/// wherever the binary is shared with other builds, as `cargo run`'s
-	/// `target/debug` is, since a later build with other features no longer
-	/// serves this verb.
-	#[field]
-	command: Option<SmolStr>,
-	cx: ActionContext<Request>,
-) -> Result<Response> {
-	let params = cx.input.parse_params::<CloudflareMintParams>()?;
-	let terms = TokenTerms::new(ttl_days, &request_ips, Timestamp::now())?;
-	let lowered = CloudflareMint::lower(&cx.caller).await?;
-	let name = CloudflareMint::token_name()?;
-	if let Some(askers) = lowered.escalating() {
-		warn!(
-			"the lowered token carries `{}`, so this repo's deploy credential \
-			can mint any token the account holds: asked for by {}. A bucket's \
-			own token is the only thing that needs it, and an apply that mints \
-			one is what puts it here",
-			TokenPermission::API_TOKENS_WRITE,
-			askers
-				.iter()
-				.map(SmolStr::as_str)
-				.collect::<Vec<_>>()
-				.join(", ")
-		);
-	}
-	let command = command.map(String::from).unwrap_or_else(|| {
-		MintSteps::command_line(
-			env_ext::program().into_iter().chain(env_ext::args()),
-		)
-	});
-	let steps = lowered
-		.account()
-		.map(|account| MintSteps::new(account, &mint_token, command));
-	let mut report = Vec::new();
-	// a dry run holds no mint token, and with none the buckets are described
-	let mint = match params.dry_run {
-		true => {
-			report.push(CloudflareMint::describe(
-				&name,
-				&lowered,
-				&terms,
-				steps.ok().as_ref(),
-			)?);
-			None
-		}
-		false => {
-			let (line, mint) = CloudflareMint::converge(
-				&cx.caller, &name, &lowered, &terms, &steps?, &params,
-			)
-			.await?;
-			report.push(line);
-			Some(mint)
-		}
-	};
-	report.extend(
-		CloudflareMint::buckets(&cx.caller, mint.as_ref(), &params).await?,
-	);
-	if let (Some(mint), false) = (&mint, params.nested_args.is_empty()) {
-		report.push(
-			CloudflareMint::run_elevated(
-				mint,
-				&lowered,
-				&terms,
-				&params.nested_args,
-			)
-			.await?,
-		);
-	}
-	Response::ok_text(format!("{}\n", report.join("\n"))).xok()
+	pub mint_token: SmolStr,
 }
 
-impl CloudflareMint {
+impl Default for CloudflareDeployToken {
+	fn default() -> Self {
+		Self {
+			ttl_days: None,
+			request_ips: Vec::new(),
+			mint_token: "beet-mint".into(),
+		}
+	}
+}
+
+impl DeployCredentialProvider for CloudflareDeployToken {
+	fn id(&self) -> &'static str { "cloudflare" }
+
+	fn human_factor(&self) -> &'static str {
+		"the Cloudflare dashboard login, to roll the mint token"
+	}
+
+	fn records(&self) -> &'static [&'static str] { &[Self::RECORD] }
+
+	fn guards(&self, declared: &str) -> bool {
+		!DeployerToken::elevated_for(declared).is_empty()
+	}
+
+	fn protects(
+		&self,
+		change: &tofu::PlannedChange,
+		_stack: &ResolvedStack,
+	) -> Option<String> {
+		let needs = DeployerToken::elevated_for(&change.resource_type);
+		(!needs.is_empty()).then(|| {
+			format!(
+				"this deploy would {} `{}`, which the deploy token only reads: \
+				writing it needs {}, which reaches what no deploy rebuilds",
+				change.action,
+				change.address,
+				needs
+					.iter()
+					.map(ToString::to_string)
+					.collect::<Vec<_>>()
+					.join(", ")
+			)
+		})
+	}
+
+	fn status(
+		&self,
+		caller: AsyncEntity,
+	) -> SendBoxedFuture<Result<CredentialStatus>> {
+		let this = self.clone();
+		Box::pin(async move { this.status_of(&caller).await })
+	}
+
+	fn elevate(
+		&self,
+		caller: AsyncEntity,
+		ask: ElevationAsk,
+	) -> SendBoxedFuture<Result<Elevation>> {
+		let this = self.clone();
+		Box::pin(async move { this.elevate_with(&caller, ask).await })
+	}
+
+	fn describe(&self, caller: AsyncEntity) -> SendBoxedFuture<Result<String>> {
+		let this = self.clone();
+		Box::pin(async move { this.describe_of(&caller).await })
+	}
+}
+
+impl CloudflareDeployToken {
 	/// The record the token is sealed under, which is the variable every
 	/// Cloudflare consumer reads: the tofu provider, `wrangler` and the zone
 	/// verbs all take it from the environment, so what the document holds is
 	/// what they get.
 	pub(crate) const RECORD: &'static str = "CLOUDFLARE_API_TOKEN";
 
-	/// The `--group` default, the group a first mint seals into.
+	/// The group a first converge seals into; a record already sealed stays
+	/// in its own.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
 
-	/// Lower every stack this launch declares and every Cloudflare action its
-	/// routes carry, in one world pass, so a stack that cannot render fails
-	/// here rather than at the account.
-	async fn lower(caller: &AsyncEntity) -> Result<DeployerToken> {
+	/// The terms a token minted at `now` is held to.
+	fn terms(&self, now: Timestamp) -> Result<TokenTerms> {
+		TokenTerms::new(self.ttl_days, &self.request_ips, now)
+	}
+
+	/// Where the sealed token stands against what this launch declares: its
+	/// grants against the record's, and its lifetime against the notice.
+	async fn status_of(
+		&self,
+		caller: &AsyncEntity,
+	) -> Result<CredentialStatus> {
+		let Some(lowered) = Self::lower(caller).await? else {
+			return CredentialStatus::not_needed().xok();
+		};
+		let now = Timestamp::now();
+		let grants =
+			self.grants(&lowered, &Self::bucket_names(caller).await?)?;
+		let held = DeployCredential::sealed(caller, Self::RECORD).await;
+		let mut status = CredentialStatus::compare(
+			self.id(),
+			Self::RECORD,
+			&grants,
+			held.as_ref(),
+			None,
+		);
+		match held.map(|held| held.record.expiry(now)) {
+			Some(SecretExpiry::Expired { at }) => status.stale.push(format!(
+				"{}: the sealed token stopped authenticating at {}",
+				self.id(),
+				at.format_iso8601_secs()
+			)),
+			Some(SecretExpiry::Expiring { at }) => status.notes.push(format!(
+				"{}: the sealed token stops authenticating at {}, so the next \
+				elevated deploy renews it",
+				self.id(),
+				at.format_iso8601_secs()
+			)),
+			_ => {}
+		}
+		status.xok()
+	}
+
+	/// The grants this launch's declarations ask the credential for, one line
+	/// each: every group over every resource it reaches, the token's terms,
+	/// and each bucket's own token. What the sealed record carries in its
+	/// metadata once converged, and what a plain deploy compares against.
+	fn grants(
+		&self,
+		lowered: &DeployerToken,
+		buckets: &[String],
+	) -> Result<Vec<String>> {
+		let terms = self.terms(Timestamp::now())?;
+		let mut grants = lowered.grant_lines();
+		grants.push(match self.ttl_days {
+			Some(days) => format!("lifetime: {days} days"),
+			None => "lifetime: until rolled".into(),
+		});
+		grants.push(match terms.request_ips.is_empty() {
+			true => "usable from: any address".into(),
+			false => format!("usable from: {}", terms.request_ips.join(", ")),
+		});
+		grants.extend(
+			buckets
+				.iter()
+				.map(|bucket| format!("bucket token: {bucket}")),
+		);
+		grants.sort();
+		grants.xok()
+	}
+
+	/// Ask for the mint token, converge the deploy token and every bucket's
+	/// own, and when `ask.run`, mint the elevated token the deploy runs as.
+	async fn elevate_with(
+		&self,
+		caller: &AsyncEntity,
+		ask: ElevationAsk,
+	) -> Result<Elevation> {
+		let Some(lowered) = Self::lower(caller).await? else {
+			bevybail!(
+				"this launch declares nothing at Cloudflare, so there is no token \
+				to elevate"
+			);
+		};
+		if let Some(askers) = lowered.escalating() {
+			warn!(
+				"the lowered token carries `{}`, so this repo's deploy credential \
+				can mint any token the account holds: asked for by {}. A \
+				bucket's own token is the only thing that needs it, and an apply \
+				that mints one is what puts it here",
+				TokenPermission::API_TOKENS_WRITE,
+				askers
+					.iter()
+					.map(SmolStr::as_str)
+					.collect::<Vec<_>>()
+					.join(", ")
+			);
+		}
+		let terms = self.terms(Timestamp::now())?;
+		let account = lowered.account()?.clone();
+		let steps =
+			MintSteps::new(&account, &self.mint_token, ask.relay.clone());
+		let grants =
+			self.grants(&lowered, &Self::bucket_names(caller).await?)?;
+		let (line, mint) = Self::converge(
+			caller,
+			&Self::token_name()?,
+			&lowered,
+			&terms,
+			&steps,
+			ask.roll,
+			&grants,
+		)
+		.await?;
+		let mut report = vec![line];
+		report.extend(Self::buckets(caller, Some(&mint), ask.roll).await?);
+		let mut elevation = Elevation {
+			report,
+			..default()
+		};
+		if ask.run {
+			let (line, env, cleanup) =
+				Self::mint_elevated(mint, &lowered, &terms).await?;
+			elevation.report.push(line);
+			elevation.env = env;
+			elevation.cleanup = Some(cleanup);
+		}
+		elevation.xok()
+	}
+
+	/// The dry run's answer, needing no credential: the token, its terms,
+	/// every group with what asked for it and the body a converge would post,
+	/// then each bucket's token.
+	async fn describe_of(&self, caller: &AsyncEntity) -> Result<String> {
+		let Some(lowered) = Self::lower(caller).await? else {
+			return "cloudflare: this launch declares nothing at Cloudflare\n"
+				.to_string()
+				.xok();
+		};
+		let mut out = Self::describe(
+			&Self::token_name()?,
+			&lowered,
+			&self.terms(Timestamp::now())?,
+		)?;
+		for line in Self::buckets(caller, None, false).await? {
+			out.push_str(&format!("{line}\n"));
+		}
+		out.xok()
+	}
+
+	/// Lower every stack this launch declares, at the launch's stage and at
+	/// `prod` ([`DeployCredential::render_stages`]), and every Cloudflare
+	/// action its routes carry, in one world pass, so a stack that cannot
+	/// render fails here rather than at the account. `None` when this launch
+	/// asks nothing of Cloudflare.
+	async fn lower(caller: &AsyncEntity) -> Result<Option<DeployerToken>> {
 		caller
 			.with_world(|world, _| {
-				let rendered = RenderScope::render_all(world)?
-					.into_iter()
-					.map(RenderScope::finish)
-					.collect::<Result<Vec<_>>>()?;
-				// one launch renders one stage, and a stage may declare a block
-				// another does not (the bucket whose token an apply mints), so
-				// a token lowered from a non-prod launch can be short of what
-				// the deployed stage needs. A Cloudflare 403 names no
-				// permission group, so this warning is the only thing that
-				// would ever explain one.
-				let launch = BootstrapConfig::get().stage.clone();
-				if launch != BootstrapConfig::PROD_STAGE
-					&& let Some(stage) = rendered
-						.iter()
-						.map(|(stack, ..)| stack.stage())
-						.find(|stage| **stage == launch)
-				{
-					warn!(
-						"lowering the stage `{stage}` declarations: a stage \
-						that declares more needs its own run, so mint under \
-						the stage that deploys (`--stage={}`)",
-						BootstrapConfig::PROD_STAGE
-					);
-				}
 				let mut lowered = DeployerToken::default();
-				for (stack, _deployment, config) in rendered.iter() {
+				for (stack, _deployment, config) in
+					DeployCredential::render_stages(world)?.iter()
+				{
 					lowered = lowered.lower(stack, config)?;
 				}
 				for (entity, access) in Self::declared_access(world) {
@@ -309,16 +397,18 @@ impl CloudflareMint {
 					let stack = world.with_state::<StackQuery, _>(|stacks| {
 						stacks.resolve(entity)
 					});
-					lowered = lowered.lower_access(&stack, &access)?;
+					let bucket = access.bucket(world.entity(entity));
+					lowered = lowered.lower_access(
+						&stack,
+						&access,
+						bucket.as_deref(),
+					)?;
 				}
-				if lowered.asked().is_empty() {
-					bevybail!(
-						"this launch declares nothing at Cloudflare: no stack \
-						renders a `cloudflare_` resource and no route runs a \
-						Cloudflare action, so there is no token to mint"
-					);
+				match lowered.is_empty() {
+					true => None,
+					false => Some(lowered),
 				}
-				lowered.xok()
+				.xok()
 			})
 			.await?
 	}
@@ -339,7 +429,7 @@ impl CloudflareMint {
 	/// directory, kebab-cased, and `-deploy`. Named for the repo rather than for
 	/// an app, since a credential document holds one token however many apps it
 	/// deploys, and derived from the directory because a repo has no other name
-	/// ([`DeployerMint::user_name`] names the AWS deployer the same way).
+	/// ([`AwsDeployer::user_name`] names the AWS deployer the same way).
 	fn token_name() -> Result<String> {
 		format!("{}-deploy", Self::repo_name()?).xok()
 	}
@@ -373,9 +463,9 @@ impl CloudflareMint {
 		name.xok()
 	}
 
-	/// The dry run's answer: the token, its terms, every group with what asked
-	/// for it, the body a mint would post, pretty printed so it reads and
-	/// pipes, and the steps that run it for real.
+	/// The token's half of the dry run: the token, its terms, every group with
+	/// what asked for it, and the body a converge would post, pretty printed so
+	/// it reads and pipes.
 	///
 	/// An entry declaring no account still gets the whole list, and the one line
 	/// it is missing instead of a token: what an entry ASKS FOR is worth reading
@@ -384,7 +474,6 @@ impl CloudflareMint {
 		name: &str,
 		lowered: &DeployerToken,
 		terms: &TokenTerms,
-		steps: Option<&MintSteps>,
 	) -> Result<String> {
 		let home = match lowered.account() {
 			Ok(account) => format!("account {account}"),
@@ -392,16 +481,13 @@ impl CloudflareMint {
 		};
 		let elevated = match lowered.elevated().is_empty() {
 			true => String::new(),
-			false => "an elevated run (`-- <route>`) also holds each \
-			`elevated:` group, for that one command\n"
+			false => "an elevated deploy also holds each `elevated:` group, \
+			for the run that changes what it guards\n"
 				.to_string(),
 		};
 		format!(
-			"token {name}\n{home}\n{terms}\n\n{lowered}{elevated}\nbody\n{}\n{}",
+			"token {name}\n{home}\n{terms}\n\n{lowered}{elevated}\nbody\n{}\n",
 			serde_json::to_string_pretty(&terms.body(name, lowered.to_json()))?,
-			steps
-				.map(|steps| format!("\n{steps}\n"))
-				.unwrap_or_default()
 		)
 		.xok()
 	}
@@ -409,16 +495,18 @@ impl CloudflareMint {
 	/// Converge the token: mint one unless the account holds exactly one of
 	/// this name that grants what the declarations ask for under the declared
 	/// terms, is active and not yet due, and is the one the document holds; or
-	/// on `--rotate`. The new value is sealed only once proven, and every other
-	/// token of the name deleted only once sealed. Answers the report and the
-	/// mint token the run acts as, which the buckets are converged with next.
+	/// on `roll`. The new value is sealed with its `grants` only once proven,
+	/// and every other token of the name deleted only once sealed. Answers the
+	/// report and the mint token the run acts as, which the buckets are
+	/// converged with next.
 	async fn converge(
 		caller: &AsyncEntity,
 		name: &str,
 		lowered: &DeployerToken,
 		terms: &TokenTerms,
 		steps: &MintSteps,
-		params: &CloudflareMintParams,
+		roll: bool,
+		grants: &[String],
 	) -> Result<(String, MintToken)> {
 		let account = lowered.account()?.clone();
 		let handle = SecretsHandle::resolve(caller, None).await?;
@@ -429,11 +517,10 @@ impl CloudflareMint {
 			.ok()
 			.and_then(|opened| opened.get(Self::RECORD).cloned());
 		let held_value = held.as_ref().map(|secret| secret.value.as_str());
-		// a record stays in the group it was sealed in unless told otherwise
-		let group = params
-			.group
-			.as_deref()
-			.or(held.as_ref().map(|secret| secret.group.as_str()))
+		// a record stays in the group it was sealed in
+		let group = held
+			.as_ref()
+			.map(|secret| secret.group.as_str())
 			.unwrap_or(Self::DEFAULT_GROUP);
 		let (mint, existing) =
 			MintToken::open(steps, held_value, &account, name).await?;
@@ -449,13 +536,13 @@ impl CloudflareMint {
 			}
 			_ => false,
 		};
-		if current && !params.rotate {
+		if current && !roll {
 			let token = &existing[0];
 			let restated = held.as_ref().and_then(|secret| {
-				Self::restated(
+				DeployCredential::restated(
 					secret,
 					group,
-					Self::record(name, &token.id, token.expires_on, steps),
+					Self::record(name, &token.id, token.expires_on, grants),
 				)
 				.map(|record| (secret, record))
 			});
@@ -469,13 +556,13 @@ impl CloudflareMint {
 						record,
 					)?;
 					handle.write(&document).await?;
-					", its note and rotation resealed as this verb writes them"
+					", its note, roll and grants resealed"
 				}
 				None => "",
 			};
 			let line = format!(
 				"token {name} ({}) matches the declarations, {}, and is sealed \
-				in {}{resealed}; `--rotate` mints another",
+				in {}{resealed}",
 				token.id,
 				TokenTerms::lifetime(token.expires_on),
 				handle.describe()
@@ -493,7 +580,7 @@ impl CloudflareMint {
 			group,
 			Self::RECORD,
 			&value,
-			Self::record(name, &id, terms.expires_on, steps),
+			Self::record(name, &id, terms.expires_on, grants),
 		)?;
 		handle.write(&document).await?;
 		// only now: the token that replaces them is sealed and proven
@@ -508,12 +595,13 @@ impl CloudflareMint {
 	}
 
 	/// The record the deploy token `id` named `name` is sealed under, expiring
-	/// at `expires`: what it is, and the steps that rotate it.
+	/// at `expires` and holding `grants`: what it is, how it rolls, and what a
+	/// plain deploy compares the declarations against.
 	fn record(
 		name: &str,
 		id: &str,
 		expires: Option<Timestamp>,
-		steps: &MintSteps,
+		grants: &[String],
 	) -> SecretRecord {
 		SecretRecord {
 			role: Some(SecretRole::EnvVar),
@@ -527,62 +615,44 @@ impl CloudflareMint {
 				.into(),
 			),
 			expires,
-			rotation: Some(steps.rotation()),
+			roll: Some(SecretRoll::Elevated),
+			metadata: BTreeMap::from([(
+				DeployCredential::GRANTS.into(),
+				grants.join("\n").into(),
+			)]),
 			..default()
 		}
 	}
 
-	/// The `record` a current token's `secret` is resealed under, when what
-	/// is sealed is not what this verb writes now (a note or rotation in
-	/// older wording, another group), else `None`. Its value is unchanged, so
-	/// its `modified` is kept.
-	fn restated(
-		secret: &Secret,
-		group: &str,
-		record: SecretRecord,
-	) -> Option<SecretRecord> {
-		let record = SecretRecord {
-			modified: secret.record.modified,
-			..record
-		};
-		(secret.record != record || secret.group != group).then_some(record)
-	}
-
-	/// Run `args` (a route and its params) as this launch under the
-	/// [elevated](DeployerToken::elevate) token, minted for the one command
-	/// with `mint`, answering the report line. See the type's docs for the
-	/// lifecycle; the delete runs however the route exits, and a failed delete
-	/// is named with the instant the token lapses on its own.
-	async fn run_elevated(
-		mint: &MintToken,
+	/// Mint `<repo>-elevated` with `mint`: the deploy token's groups and the
+	/// elevated ones, proven, held for one deploy. Answers the report line,
+	/// the variable the deploy runs with, and its deletion, which owns the mint
+	/// token so it runs however the deploy exits; a failed deletion names the
+	/// instant the token lapses on its own.
+	async fn mint_elevated(
+		mint: MintToken,
 		lowered: &DeployerToken,
 		terms: &TokenTerms,
-		args: &[String],
-	) -> Result<String> {
-		if lowered.elevated().is_empty() {
-			bevybail!(
-				"nothing this launch declares needs an elevated token: run \
-				`{}` on its own",
-				args.join(" ")
-			);
-		}
-		let account = lowered.account()?;
+	) -> Result<(
+		String,
+		Vec<(SmolStr, SmolStr)>,
+		SendBoxedFuture<Result<String>>,
+	)> {
+		let account = lowered.account()?.clone();
 		let name = Self::elevated_name()?;
 		let elevated = lowered.elevate();
 		let terms = terms.elevated(Timestamp::now());
 		// a token a crash left behind is never the one this run holds
-		let leftover = mint.find_tokens(account, &name).await?;
-		mint.delete_others(account, &leftover, "").await?;
+		let leftover = mint.find_tokens(&account, &name).await?;
+		mint.delete_others(&account, &leftover, "").await?;
 		let (id, value) = mint
-			.create_token(account, terms.body(&name, elevated.to_json()))
+			.create_token(&account, terms.body(&name, elevated.to_json()))
 			.await?;
 		let (url, what) = Self::deploy_proof(&elevated)?;
-		mint.prove_or_discard(account, &id, &value, url, what)
+		mint.prove_or_discard(&account, &id, &value, url, what)
 			.await?;
-		let route = args.join(" ");
-		info!(
-			"running `{route}` as {name} ({id}), which also holds {}, and \
-			deleting it once it exits",
+		let line = format!(
+			"{name} ({id}) minted for this deploy, which also holds {}",
 			lowered
 				.elevated()
 				.keys()
@@ -590,46 +660,20 @@ impl CloudflareMint {
 				.collect::<Vec<_>>()
 				.join(", ")
 		);
-		let ran = Self::run_route(args, &value).await;
-		let deleted = mint.delete_token(account, &id).await;
-		match (ran, deleted) {
-			(Ok(()), Ok(())) => {
-				format!("ran `{route}` as {name} ({id}), since deleted").xok()
+		let lapses = terms
+			.expires_on
+			.map(|at| at.format_iso8601_secs())
+			.unwrap_or_default();
+		let cleanup: SendBoxedFuture<Result<String>> = Box::pin(async move {
+			match mint.delete_token(&account, &id).await {
+				Ok(()) => format!("{name} ({id}) deleted").xok(),
+				Err(err) => bevybail!(
+					"deleting {name} ({id}) failed, so it lapses at {lapses} \
+					unless deleted in the dashboard first: {err}"
+				),
 			}
-			(Err(err), Ok(())) => {
-				bevybail!("{err}; {name} ({id}) is deleted")
-			}
-			(ran, Err(delete_err)) => bevybail!(
-				"{}deleting {name} ({id}) failed, so it lapses at {} unless \
-				deleted in the dashboard first: {delete_err}",
-				ran.err()
-					.map(|err| format!("{err}; and "))
-					.unwrap_or_default(),
-				terms
-					.expires_on
-					.map(|at| at.format_iso8601_secs())
-					.unwrap_or_default()
-			),
-		}
-	}
-
-	/// Run `args` as this launch with `token` as the Cloudflare credential,
-	/// an error naming the exit code when the route fails.
-	async fn run_route(args: &[String], token: &str) -> Result {
-		let status = ChildProcess::this_launch(args)?
-			.with_secret(token)
-			.with_env(Self::RECORD, token)
-			.spawn()?
-			.status()
-			.await?;
-		match status.success() {
-			true => OK,
-			false => bevybail!(
-				"`{}` exited with {}",
-				args.join(" "),
-				status.code().unwrap_or(-1)
-			),
-		}
+		});
+		(line, vec![(SmolStr::new(Self::RECORD), value)], cleanup).xok()
 	}
 
 	/// Whether the document's value IS the token the account holds, which is
@@ -710,8 +754,9 @@ impl CloudflareMint {
 	}
 
 	/// Converge the token of every `<R2BucketBlock/>` this launch declares as
-	/// `mint`, or describe what that would do when there is none (a dry run). One report line per
-	/// bucket, none at all for a launch that declares none.
+	/// `mint`, or describe what that would do when there is none (a dry run).
+	/// One report line per bucket, none at all for a launch that declares
+	/// none.
 	///
 	/// A bucket's token is not a deploy credential and is never sealed in a
 	/// document: its S3 pair is parked in the stack's own secret store, where
@@ -720,7 +765,7 @@ impl CloudflareMint {
 	async fn buckets(
 		caller: &AsyncEntity,
 		mint: Option<&MintToken>,
-		params: &CloudflareMintParams,
+		roll: bool,
 	) -> Result<Vec<String>> {
 		let mut report = Vec::new();
 		let declared = caller
@@ -736,7 +781,7 @@ impl CloudflareMint {
 					store.address(&block.secret_key_secret()),
 				),
 				Some(mint) => {
-					Self::converge_bucket(&block, &stack, &store, mint, params)
+					Self::converge_bucket(&block, &stack, &store, mint, roll)
 						.await?
 				}
 			});
@@ -771,7 +816,7 @@ impl CloudflareMint {
 
 	/// Converge one bucket's token: mint and park unless the account holds
 	/// exactly one token of its name, the pair is parked and the parked access
-	/// key id is that token's; or on `--rotate`.
+	/// key id is that token's; or on `--roll`.
 	///
 	/// The parked access key id IS the token id, so the comparison needs no
 	/// call beyond the listing every converge makes anyway.
@@ -781,7 +826,7 @@ impl CloudflareMint {
 		stack: &ResolvedStack,
 		store: &SecretStore,
 		mint: &MintToken,
-		params: &CloudflareMintParams,
+		roll: bool,
 	) -> Result<String> {
 		let account = stack.cloudflare_account()?.id().to_string();
 		let name = block.token_name(stack);
@@ -796,10 +841,10 @@ impl CloudflareMint {
 			}
 			_ => false,
 		};
-		if current && !params.rotate {
+		if current && !roll {
+			let restated = Self::restate_parked(block, store).await?;
 			return format!(
-				"bucket token {name} is parked at {} and {}, `--rotate` mints \
-				another",
+				"bucket token {name} is parked at {} and {}{restated}",
 				store.address(&access_ref),
 				store.address(&secret_ref)
 			)
@@ -832,7 +877,7 @@ impl CloudflareMint {
 				&secret_ref,
 				&cloudflare_api_ext::derive_secret_key(&value),
 				Some(&block.secret_key_note()),
-				Some(Self::bucket_rotation()),
+				Some(Self::bucket_roll()),
 			)
 			.await?;
 		store
@@ -840,14 +885,14 @@ impl CloudflareMint {
 				&access_ref,
 				&id,
 				Some(&block.access_key_note()),
-				Some(Self::bucket_rotation()),
+				Some(Self::bucket_roll()),
 			)
 			.await
 			.map_err(|err| {
 				bevyhow!(
 					"parked the secret half of {name} but not its access key \
-					id, so the parked pair authenticates nowhere until \
-					`cloudflare/mint` runs again: {err}"
+					id, so the parked pair authenticates nowhere until the \
+					next elevated deploy: {err}"
 				)
 			})?;
 		// only now: the pair that replaces them is parked
@@ -860,34 +905,91 @@ impl CloudflareMint {
 		.xok()
 	}
 
+	/// Re-park a current pair whose stored note or roll is not what a converge
+	/// parks now (a roll naming the `cloudflare_account_token` an apply once
+	/// rendered), values unchanged, answering the report's clause.
+	#[cfg(feature = "cloudflare_dns")]
+	async fn restate_parked(
+		block: &R2BucketBlock,
+		store: &SecretStore,
+	) -> Result<&'static str> {
+		let parked = store.list().await?;
+		let mut restated = false;
+		for (secret, note) in [
+			(block.secret_key_secret(), block.secret_key_note()),
+			(block.access_key_secret(), block.access_key_note()),
+		] {
+			let stale = parked
+				.iter()
+				.find(|entry| entry.secret == secret)
+				.is_some_and(|entry| {
+					entry.roll != Some(Self::bucket_roll())
+						|| entry.note.as_deref() != Some(note.as_str())
+				});
+			if !stale {
+				continue;
+			}
+			if let Some(value) = store.get(&secret).await? {
+				store
+					.overwrite(
+						&secret,
+						&value,
+						Some(&note),
+						Some(Self::bucket_roll()),
+					)
+					.await?;
+				restated = true;
+			}
+		}
+		match restated {
+			true => ", its note and roll re-parked",
+			false => "",
+		}
+		.xok()
+	}
+
 	/// A launch built without the Cloudflare bindings declares no bucket, so
 	/// there is nothing to converge.
 	#[cfg(not(feature = "cloudflare_dns"))]
 	async fn buckets(
 		_caller: &AsyncEntity,
 		_mint: Option<&MintToken>,
-		_params: &CloudflareMintParams,
+		_roll: bool,
 	) -> Result<Vec<String>> {
 		Vec::new().xok()
 	}
 
-	/// How a bucket's parked pair rotates: this verb again, which replaces the
-	/// token and re-parks both halves. The S3 secret is the SHA-256 of the
-	/// token value, so neither half survives the other.
+	/// The name of each declared bucket's own token, which the grants list so
+	/// a bucket declared since the last converge makes the credential stale.
 	#[cfg(feature = "cloudflare_dns")]
-	fn bucket_rotation() -> SecretRotation {
-		SecretRotation::manual(
-			"beet cloudflare/mint --rotate\n> run it in a terminal and paste \
-			the mint token when asked: the bucket's token is replaced, both \
-			halves re-parked and the old token deleted",
-		)
+	async fn bucket_names(caller: &AsyncEntity) -> Result<Vec<String>> {
+		caller
+			.with_world(|world, _| Self::declared_buckets(world))
+			.await??
+			.into_iter()
+			.map(|(block, stack, _)| block.token_name(&stack))
+			.collect::<Vec<_>>()
+			.xok()
 	}
+
+	/// A launch built without the Cloudflare bindings declares no bucket.
+	#[cfg(not(feature = "cloudflare_dns"))]
+	async fn bucket_names(_caller: &AsyncEntity) -> Result<Vec<String>> {
+		Vec::new().xok()
+	}
+
+	/// How a bucket's parked pair rolls: an elevated deploy with `--roll`,
+	/// which replaces the token and re-parks both halves. The S3 secret is the
+	/// SHA-256 of the token value, so neither half survives the other.
+	#[cfg(feature = "cloudflare_dns")]
+	fn bucket_roll() -> SecretRoll { SecretRoll::Elevated }
 }
 
 /// The mint token one run acts as: taken for the run and written nowhere.
 /// Every call that reads or edits the account's api tokens goes through it,
 /// so none can fall back to the deploy token the document puts in the
 /// environment.
+#[derive(Clone)]
 struct MintToken(SmolStr);
 
 impl MintToken {
@@ -1023,7 +1125,7 @@ impl MintToken {
 		}
 	}
 
-	/// [`CloudflareMint::prove_token`], deleting the new token `id` when it
+	/// [`CloudflareDeployToken::prove_token`], deleting the new token `id` when it
 	/// fails: unproven and unsealed, it would stay live beside the token it was
 	/// to replace, under the same name, with a value nobody holds.
 	async fn prove_or_discard(
@@ -1034,7 +1136,8 @@ impl MintToken {
 		url: String,
 		what: &str,
 	) -> Result {
-		let Err(err) = CloudflareMint::prove_token(value, url, what).await
+		let Err(err) =
+			CloudflareDeployToken::prove_token(value, url, what).await
 		else {
 			return OK;
 		};
@@ -1079,19 +1182,18 @@ impl MintToken {
 	}
 }
 
-/// What the operator does to hand this verb the mint token: run the command
-/// in a terminal, roll the token on the account's api tokens page, and paste
-/// it when asked. The one place those steps are written: the run itself asks
-/// with them, a run with no terminal to ask on is answered with them, the dry
-/// run ends with them, and the sealed record's rotation carries them. Rolling
-/// rather than keeping a copy means a value pasted last time, wherever it was
-/// left, has stopped working.
+/// What the operator does to hand an elevated deploy the mint token: run the
+/// deploy elevated in a terminal, roll the token on the account's api tokens
+/// page, and paste it when asked. The one place those steps are written: the
+/// run itself asks with them, and a run with no terminal to ask on is answered
+/// with them. Rolling rather than keeping a copy means a value pasted last
+/// time, wherever it was left, has stopped working.
 struct MintSteps {
 	/// The account whose api tokens page holds the mint token.
 	account: SmolStr,
 	/// The mint token's name on that page.
 	mint_token: SmolStr,
-	/// The command the operator runs in a terminal.
+	/// The command the operator runs in a terminal: the deploy, elevated.
 	command: String,
 }
 
@@ -1102,28 +1204,6 @@ impl MintSteps {
 			account: account.into(),
 			mint_token: mint_token.into(),
 			command,
-		}
-	}
-
-	/// A launch's program and arguments as a shell command that repeats it,
-	/// less any `--dry-run`.
-	fn command_line(args: impl IntoIterator<Item = SmolStr>) -> String {
-		args.into_iter()
-			.filter(|arg| !arg.starts_with("--dry-run"))
-			.map(|arg| Self::quote(&arg))
-			.collect::<Vec<_>>()
-			.join(" ")
-	}
-
-	/// `arg` as a shell reads it back: bare when plain, else single quoted.
-	fn quote(arg: &str) -> String {
-		let plain = !arg.is_empty()
-			&& arg.chars().all(|char| {
-				char.is_ascii_alphanumeric() || "-_=./:,@%+".contains(char)
-			});
-		match plain {
-			true => arg.to_string(),
-			false => format!("'{}'", arg.replace('\'', r"'\''")),
 		}
 	}
 
@@ -1146,25 +1226,18 @@ impl MintSteps {
 	/// are the error.
 	fn prompt(&self) -> Result<String> {
 		terminal_ext::read_secret_line(&format!(
-			"\nthis mint runs as the mint token, rolled for this run:\n\n\
+			"\nthis elevated deploy runs Cloudflare as the mint token, rolled \
+			for this run:\n\n\
 			1. Roll it at {}\n   {}\n2. Paste it here (not echoed): ",
 			self.url(),
 			self.clicks()
 		))
 		.map(|value| value.trim().to_string())
 		.map_err(|err| {
-			bevyhow!("a mint asks for the mint token, and {err}\n\n{self}")
+			bevyhow!(
+				"an elevated deploy asks for the mint token, and {err}\n\n{self}"
+			)
 		})
-	}
-
-	/// The same steps as a rotation: the url first, one step per line.
-	fn rotation(&self) -> SecretRotation {
-		SecretRotation::manual(format!(
-			"{}\n> {}\n> run `{}` in a terminal and paste it when asked",
-			self.url(),
-			self.clicks(),
-			self.command
-		))
 	}
 
 	/// The refusal `err` is, when it is a credential Cloudflare refused.
@@ -1180,8 +1253,8 @@ impl MintSteps {
 	fn explain(&self, err: BevyError) -> BevyError {
 		match Self::refused(&err) {
 			Some(refusal) => bevyhow!(
-				"a mint runs as the mint token, and Cloudflare refused that one \
-				({}): {err}\n\n{self}",
+				"an elevated deploy runs Cloudflare as the mint token, and \
+				Cloudflare refused that one ({}): {err}\n\n{self}",
 				refusal.messages()
 			),
 			None => err,
@@ -1210,7 +1283,7 @@ impl core::fmt::Display for MintSteps {
 #[derive(Debug, Clone, PartialEq)]
 struct TokenTerms {
 	/// Midnight UTC `ttl_days` after the mint, [`None`] for a token that lasts
-	/// until rotated.
+	/// until rolled.
 	expires_on: Option<Timestamp>,
 	/// Normalized CIDRs, sorted, empty for any address.
 	request_ips: Vec<SmolStr>,
@@ -1320,7 +1393,7 @@ impl TokenTerms {
 	fn lifetime(expires_on: Option<Timestamp>) -> String {
 		match expires_on {
 			Some(at) => format!("expires {}", Date::from(at)),
-			None => "lasts until rotated".into(),
+			None => "lasts until rolled".into(),
 		}
 	}
 
@@ -1430,10 +1503,11 @@ mod test {
 		world.spawn(CloudflarePurgeCache::default());
 		world.spawn(MtaStsPublish::default());
 		world.spawn(AwsRegion::new("us-west-2"));
-		let mut found = super::CloudflareMint::declared_access(&mut world)
-			.into_iter()
-			.map(|(_, access)| access)
-			.collect::<Vec<_>>();
+		let mut found =
+			super::CloudflareDeployToken::declared_access(&mut world)
+				.into_iter()
+				.map(|(_, access)| access)
+				.collect::<Vec<_>>();
 		found.sort_by_key(|access| access.action());
 		found
 			.iter()
@@ -1464,7 +1538,8 @@ mod test {
 			children![R2BucketBlock::new("cold-backups")],
 		));
 		world.flush();
-		let declared = CloudflareMint::declared_buckets(&mut world).unwrap();
+		let declared =
+			CloudflareDeployToken::declared_buckets(&mut world).unwrap();
 		let (block, stack, store) = declared.into_iter().next().unwrap();
 		block
 			.token_name(&stack)
@@ -1482,41 +1557,23 @@ mod test {
 	/// The token name is the repo's, not an app's: one document holds one token.
 	#[beet_core::test]
 	fn names_the_token_after_the_repo() {
-		CloudflareMint::token_name()
+		CloudflareDeployToken::token_name()
 			.unwrap()
 			.xpect_eq("beet-deploy");
 	}
-	/// The steps an operator is relayed to run a mint, rendered from the
-	/// account and, undeclared, this launch's own command less its
-	/// `--dry-run`, with every link whole.
+	/// The steps an operator is relayed to run an elevated deploy, rendered
+	/// from the account and the deploy's own command, with every link whole,
+	/// and a refused credential answered with them.
 	#[beet_core::test]
 	fn renders_the_operator_steps() {
 		let steps = super::MintSteps::new(
 			"74aba4da669f57fc6fc3e63ebcfcff26",
 			"beet-mint",
-			super::MintSteps::command_line(
-				[
-					"target/debug/beet",
-					"--main=site",
-					"cloudflare/mint",
-					"--dry-run",
-					"--stage=prod",
-					"a path with spaces",
-				]
-				.map(SmolStr::from),
-			),
+			"just cli mail/deploy --stage=prod --elevated".into(),
 		);
 		steps.to_string().xpect_eq(
-			"steps:\n\n1. Run this in a terminal\n\t- `target/debug/beet --main=site cloudflare/mint --stage=prod 'a path with spaces'`\n2. When it asks for the mint token, roll it and paste it there\n\t- [Cloudflare Tokens Page](https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy",
+			"steps:\n\n1. Run this in a terminal\n\t- `just cli mail/deploy --stage=prod --elevated`\n2. When it asks for the mint token, roll it and paste it there\n\t- [Cloudflare Tokens Page](https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens) -> beet-mint -> `...` -> Roll -> Roll token -> Your API Token -> Copy",
 		);
-		// the rotation sealed beside the token: the url first, a step a line
-		steps
-			.rotation()
-			.to_string()
-			.xpect_starts_with(
-				"manual:https://dash.cloudflare.com/74aba4da669f57fc6fc3e63ebcfcff26/api-tokens\n> beet-mint -> ",
-			);
-		// a refused credential is answered with the steps
 		steps
 			.explain(
 				super::cloudflare_api_ext::CloudflareApiError {
@@ -1532,42 +1589,62 @@ mod test {
 	}
 
 	/// A current token's record is resealed only when what is sealed is not
-	/// what the verb writes now, and never with a new `modified`: a reseal
-	/// on every run would rewrite the committed document each time.
+	/// what a converge writes now, and never with a new `modified`: a reseal
+	/// on every run would rewrite the committed document each time. Grants
+	/// recorded before the declarations changed are stale like an old roll.
 	#[beet_core::test]
 	fn restates_only_a_stale_record() {
-		let steps =
-			super::MintSteps::new("acct", "beet-mint", "beet mint".into());
+		let grants = vec!["Zone > DNS Write on beet.org".to_string()];
 		let today = || {
-			super::CloudflareMint::record("beet-deploy", "abc", None, &steps)
+			super::CloudflareDeployToken::record(
+				"beet-deploy",
+				"abc",
+				None,
+				&grants,
+			)
 		};
-		// sealed at `minted_at` with `rotation`
-		let held = |rotation: SecretRotation| Secret {
+		// sealed at `minted_at` as a converge writes it, then changed by `edit`
+		let held = |edit: &dyn Fn(SecretRecord) -> SecretRecord| Secret {
 			name: "CLOUDFLARE_API_TOKEN".into(),
 			group: "default".into(),
 			value: "token".into(),
-			record: SecretRecord {
+			record: edit(SecretRecord {
 				modified: Some(minted_at()),
-				rotation: Some(rotation),
 				..today()
-			},
+			}),
 		};
 		let restate = |secret: &Secret, group: &str| {
-			super::CloudflareMint::restated(secret, group, today())
+			DeployCredential::restated(secret, group, today())
 		};
-		// sealed as the verb writes it now: left alone
-		let current = held(steps.rotation());
+		// sealed as a converge writes it now: left alone
+		let current = held(&|record| record);
 		restate(&current, "default").xpect_none();
-		// another group, as `--group` asks
+		// another group
 		restate(&current, "agents").xpect_some();
-		// an older rotation: resealed, its `modified` kept
+		// an older roll: resealed, its `modified` kept
 		let restated = restate(
-			&held(SecretRotation::manual("in the password manager")),
+			&held(&|record| SecretRecord {
+				roll: Some(SecretRoll::manual("in the password manager")),
+				..record
+			}),
 			"default",
 		)
 		.unwrap();
 		restated.modified.xpect_eq(Some(minted_at()));
-		restated.rotation.xpect_eq(Some(steps.rotation()));
+		restated.roll.xpect_eq(Some(SecretRoll::Elevated));
+		// grants from before the declarations changed
+		restate(
+			&held(&|record| SecretRecord {
+				metadata: default(),
+				..record
+			}),
+			"default",
+		)
+		.unwrap()
+		.metadata
+		.get(DeployCredential::GRANTS)
+		.cloned()
+		.xpect_eq(Some(SmolStr::from("Zone > DNS Write on beet.org")));
 	}
 
 	/// A mid-afternoon mint, so a lifetime visibly lands on a midnight.

@@ -47,7 +47,7 @@ use std::sync::Arc;
 /// 	let secret = SecretRef::new("db-password");
 /// 	// create-if-missing: the first call mints, the second reads back
 /// 	let (value, minted) = store
-/// 		.ensure(&secret, Some("the database"), SecretRotation::Remint, async || {
+/// 		.ensure(&secret, Some("the database"), SecretRoll::Remint, async || {
 /// 			Secret::generate("db-password", Secret::GENERATED_LENGTH)
 /// 				.map(String::from)
 /// 		})
@@ -132,21 +132,21 @@ impl SecretStore {
 	/// it exists. Deliberately never an overwrite: two deploys racing to mint
 	/// the same secret must not each believe theirs is the one in use, and
 	/// the loser re-reads the winner's value instead
-	/// ([`ensure`](Self::ensure)). `note` and `rotation` are stored where the
+	/// ([`ensure`](Self::ensure)). `note` and `roll` are stored where the
 	/// provider can (SSM's description, a document's index); a note is never
-	/// a secret, and a rotation is required so no secret arrives
-	/// un-rotatable.
+	/// a secret, and a roll is required so no secret arrives
+	/// un-rollable.
 	pub async fn create(
 		&self,
 		secret: &SecretRef,
 		value: &str,
 		note: Option<&str>,
-		rotation: SecretRotation,
+		roll: SecretRoll,
 	) -> Result {
 		self.provider
 			.create(secret.clone(), value.into(), SecretMeta {
 				note: note.map(SmolStr::new),
-				rotation: Some(rotation),
+				roll: Some(roll),
 			})
 			.await
 	}
@@ -161,12 +161,12 @@ impl SecretStore {
 		secret: &SecretRef,
 		value: &str,
 		note: Option<&str>,
-		rotation: Option<SecretRotation>,
+		roll: Option<SecretRoll>,
 	) -> Result {
 		self.provider
 			.overwrite(secret.clone(), value.into(), SecretMeta {
 				note: note.map(SmolStr::new),
-				rotation,
+				roll,
 			})
 			.await
 	}
@@ -180,25 +180,25 @@ impl SecretStore {
 	/// a box): [`overwrite`](Self::overwrite) when the stored value or its
 	/// metadata differs from what is declared, nothing when both match.
 	/// Answers whether it wrote, so a caller logs the change and not the
-	/// steady state; a stale note or rotation converges around an unchanged
+	/// steady state; a stale note or roll converges around an unchanged
 	/// value exactly as [`ensure`](Self::ensure) does.
 	pub async fn converge(
 		&self,
 		secret: &SecretRef,
 		value: &str,
 		note: Option<&str>,
-		rotation: Option<SecretRotation>,
+		roll: Option<SecretRoll>,
 	) -> Result<bool> {
 		let declared = SecretMeta {
 			note: note.map(SmolStr::new),
-			rotation: rotation.clone(),
+			roll: roll.clone(),
 		};
 		if self.get(secret).await?.as_deref() == Some(value)
 			&& self.meta(secret).await?.as_ref() == Some(&declared)
 		{
 			return false.xok();
 		}
-		self.overwrite(secret, value, note, rotation).await?;
+		self.overwrite(secret, value, note, roll).await?;
 		true.xok()
 	}
 
@@ -206,32 +206,31 @@ impl SecretStore {
 	/// its value, else (the loser of a race) the winner's value re-read.
 	/// Answers the value and whether this call minted it. The one shape
 	/// every generated credential in a stack takes, so no consumer can
-	/// rotate one by accident. An existing value whose stored note or
-	/// rotation differs from the declared is rewritten unchanged with the
+	/// roll one by accident. An existing value whose stored note or
+	/// roll differs from the declared is rewritten unchanged with the
 	/// declared metadata, since the mint site is where both are declared
 	/// and the store only mirrors them.
 	pub async fn ensure(
 		&self,
 		secret: &SecretRef,
 		note: Option<&str>,
-		rotation: SecretRotation,
+		roll: SecretRoll,
 		generate: impl AsyncFnOnce() -> Result<String>,
 	) -> Result<(String, bool)> {
 		let address = self.address(secret);
 		if let Some(value) = self.get(secret).await? {
 			let declared = SecretMeta {
 				note: note.map(SmolStr::new),
-				rotation: Some(rotation),
+				roll: Some(roll),
 			};
 			if self.meta(secret).await?.as_ref() != Some(&declared) {
-				self.overwrite(secret, &value, note, declared.rotation)
-					.await?;
+				self.overwrite(secret, &value, note, declared.roll).await?;
 				info!("converged the metadata of secret {address}");
 			}
 			return (value, false).xok();
 		}
 		let generated = generate().await?;
-		match self.create(secret, &generated, note, rotation).await {
+		match self.create(secret, &generated, note, roll).await {
 			Ok(()) => (generated, true).xok(),
 			Err(err) if SecretStoreError::is_already_exists(&err) => {
 				info!("secret {address} was minted concurrently, re-reading");
@@ -335,7 +334,7 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 				.find(|entry| entry.secret.label() == secret.label())
 				.map(|entry| SecretMeta {
 					note: entry.note,
-					rotation: entry.rotation,
+					roll: entry.roll,
 				})
 				.xok()
 		})
@@ -379,19 +378,19 @@ pub struct SecretEntry {
 	pub note: Option<SmolStr>,
 	/// When the value was last written, where the provider says.
 	pub modified: Option<Timestamp>,
-	/// How the secret rotates, stored at mint; absent on one parked by hand.
-	pub rotation: Option<SecretRotation>,
+	/// How the secret rolls, stored at mint; absent on one parked by hand.
+	pub roll: Option<SecretRoll>,
 }
 
-/// What a write stores beside a value: the note and the rotation, which a
+/// What a write stores beside a value: the note and the roll, which a
 /// provider keeps where it can (SSM's description, a document's index).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SecretMeta {
 	/// A plaintext note, never a secret: what the value is for.
 	pub note: Option<SmolStr>,
-	/// How the value rotates; every mint declares one, a restore carries
+	/// How the value rolls; every mint declares one, a restore carries
 	/// the record's.
-	pub rotation: Option<SecretRotation>,
+	pub roll: Option<SecretRoll>,
 }
 
 /// The one failure a consumer matches on: [`SecretStore::create`] found the
@@ -566,7 +565,7 @@ mod test {
 		let secret = SecretRef::new("db-password");
 		// the winner minted first
 		SecretStore::new(inner.clone())
-			.create(&secret, "winner", None, SecretRotation::Remint)
+			.create(&secret, "winner", None, SecretRoll::Remint)
 			.await
 			.unwrap();
 		let store = SecretStore::new(Racing {
@@ -574,7 +573,7 @@ mod test {
 			misses: Arc::new(1.into()),
 		});
 		let (value, minted) = store
-			.ensure(&secret, None, SecretRotation::Remint, async || {
+			.ensure(&secret, None, SecretRoll::Remint, async || {
 				"loser".to_string().xok()
 			})
 			.await

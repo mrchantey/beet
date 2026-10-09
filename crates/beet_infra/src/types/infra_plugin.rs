@@ -334,21 +334,30 @@ impl Plugin for InfraPlugin {
 		// generated credential runs before its apply.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::EnsureSecret>();
-		// the repo's own deployer user: an entry mounts it beside its secrets
-		// verbs, outside every `<Stack>`, since one credential document holds
-		// one pair however many stacks it deploys.
+		// the repo's deploy credentials, declared at an entry's root since one
+		// credential document holds one per provider however many stacks it
+		// deploys, each landing its handle for the deploy gate. The AWS one is
+		// gated with the IAM lowering it renders (`DeployerPolicy`); the
+		// Cloudflare one reads declared type names, so it needs no bindings.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "bindings_aws_common",
 			not(target_arch = "wasm32")
 		))]
-		app.register_type::<crate::prelude::DeployerMint>();
-		// and the repo's own Cloudflare token, mounted the same way and for the
-		// same reason. No bindings gate: the lowering reads declared type names
-		// and action type names, so a repo with no Cloudflare resource at all
-		// still has the verb to tell it so.
+		app.register_type::<crate::prelude::AwsDeployer>()
+			.add_observer(
+				crate::credentials::attach_deploy_credential::<
+					crate::prelude::AwsDeployer,
+				>,
+			);
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::CloudflareMint>();
+		app.register_type::<crate::prelude::CloudflareDeployToken>()
+			.register_type::<crate::prelude::DeployGate>()
+			.add_observer(
+				crate::credentials::attach_deploy_credential::<
+					crate::prelude::CloudflareDeployToken,
+				>,
+			);
 		// the store's export into a secrets document, the restore back out
 		// of one, and a human's removal, in every deploy build
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]

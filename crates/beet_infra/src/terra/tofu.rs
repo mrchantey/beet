@@ -228,7 +228,7 @@ pub async fn apply_with_vars(
 }
 
 /// Apply with every resource in `replaces` (addresses) forced to be
-/// destroyed and recreated: how a terraform-derived secret rotates, since
+/// destroyed and recreated: how a terraform-derived secret rolls, since
 /// the same apply re-parks what the new resource derives.
 pub async fn apply_replacing(
 	dir: &AbsPath,

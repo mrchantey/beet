@@ -12,8 +12,9 @@ use beet_net::prelude::Request;
 ///
 /// An action that calls Cloudflare requires one naming the groups its calls
 /// need, ie `#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[TokenPermission::CACHE_PURGE]))]`,
-/// so the declaration sits beside the calls it describes. `cloudflare/mint`
-/// lowers every one in the world into the repo's deploy token
+/// so the declaration sits beside the calls it describes. The deploy
+/// credential ([`CloudflareDeployToken`]) lowers every one in the world into
+/// the repo's deploy token
 /// ([`DeployerToken::lower_access`]), and the action holds that token only
 /// through [`resolve`](Self::resolve) on its own entity.
 ///
@@ -25,16 +26,35 @@ use beet_net::prelude::Request;
 /// first call, naming the fix. An action that reaches nothing at Cloudflare
 /// declares nothing, and can reach nothing.
 ///
-/// The mint verb is the one reader of the token that does not go through
-/// this: it runs as the mint token, which no action lowers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+/// A bucket-scoped group (an object read or write over the S3 api) is granted
+/// over one bucket, which the declaration cannot know statically, so it names
+/// where the action keeps it: [`with_bucket`](Self::with_bucket), read off
+/// the action's own entity when the token is lowered.
+///
+/// The converge of the deploy credential is the one reader of the token that
+/// does not go through this: it runs as the mint token, which no action
+/// lowers.
+#[derive(Debug, Clone, Copy, Component)]
 pub struct CloudflareAccess {
 	/// The action's type path, reported as what asked for each group.
 	action: &'static str,
 	/// The groups the action's calls need, from the one vocabulary
 	/// [`TokenPermission`] holds.
 	permissions: &'static [TokenPermission],
+	/// The bucket a bucket-scoped group is granted over, read off the action's
+	/// own entity, ie its `bucket` field.
+	bucket: Option<fn(EntityRef) -> Option<SmolStr>>,
 }
+
+/// Two declarations are the same when they ask the same groups for the same
+/// action: the bucket is where a value is read from, not a value.
+impl PartialEq for CloudflareAccess {
+	fn eq(&self, other: &Self) -> bool {
+		self.action == other.action && self.permissions == other.permissions
+	}
+}
+
+impl Eq for CloudflareAccess {}
 
 impl CloudflareAccess {
 	/// The declaration of the action `T`, ie `CloudflareAccess::new::<Self>`
@@ -43,7 +63,25 @@ impl CloudflareAccess {
 		Self {
 			action: core::any::type_name::<T>(),
 			permissions,
+			bucket: None,
 		}
+	}
+
+	/// Where the action keeps the bucket its bucket-scoped groups are granted
+	/// over, ie `|entity| entity.get::<Self>().map(|sync| sync.bucket.clone())`
+	/// inside the action's own `#[require]`.
+	pub const fn with_bucket(
+		mut self,
+		bucket: fn(EntityRef) -> Option<SmolStr>,
+	) -> Self {
+		self.bucket = Some(bucket);
+		self
+	}
+
+	/// The bucket `entity`, the action declaring this, names for its
+	/// bucket-scoped groups, `None` when it names none.
+	pub fn bucket(&self, entity: EntityRef) -> Option<SmolStr> {
+		self.bucket.and_then(|bucket| bucket(entity))
 	}
 
 	/// The action's short name, ie `MtaStsPublish`.
@@ -66,7 +104,7 @@ impl CloudflareAccess {
 			bevyhow!(
 				"entity {} reaches Cloudflare but declares no `CloudflareAccess`: \
 				require one on the action naming the groups its calls need, so \
-				`cloudflare/mint` lowers them into the deploy token",
+				the elevated deploy lowers them into the deploy token",
 				entity.id()
 			)
 		})
@@ -198,7 +236,7 @@ mod tests {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("declares no `CloudflareAccess`")
-			.xpect_contains("cloudflare/mint");
+			.xpect_contains("lowers them into the deploy token");
 		let declared = world
 			.spawn(CloudflareAccess::new::<PurgeLike>(&[
 				TokenPermission::CACHE_PURGE,

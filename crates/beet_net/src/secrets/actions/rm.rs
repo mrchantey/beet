@@ -7,7 +7,7 @@ use beet_core::prelude::*;
 
 /// Remove one record from a document and re-seal its group. The old
 /// ciphertext lives on in git history, so a removed secret its readers should
-/// no longer hold is rotated at its source as well.
+/// no longer hold is rolled at its source as well.
 ///
 /// ```sh
 /// beet secrets/rm OPENAI_API_KEY

@@ -17,7 +17,7 @@ struct SetParams {
 	/// load already set.
 	from_env: bool,
 	/// Take the value of another record of the document, never printed: how
-	/// a passphrase about to be rotated is kept beside its replacement
+	/// a passphrase about to be rolled is kept beside its replacement
 	/// (`secrets/set TF_STATE_PASSPHRASE_OLD --copy=TF_STATE_PASSPHRASE`).
 	copy: Option<String>,
 	/// Mint the value in-process: an unambiguous alphanumeric string from
@@ -35,30 +35,32 @@ struct SetParams {
 	/// A plaintext note for the index, never a secret: one line of what the
 	/// value is.
 	note: Option<String>,
-	/// How the value is rotated: `manual:<where it is re-minted>` for a
+	/// How the value is rolled: `manual:<where it is re-minted>` for a
 	/// hand-made credential, the full url first and one dashboard step or
 	/// permission per line (`manual:https://dash.cloudflare.com/profile/api-tokens
 	/// > Create Token > beet-deploy`), `remint` for one `--generate` mints,
 	/// `replace:<resource>` for one an apply derives.
-	rotation: Option<String>,
+	roll: Option<String>,
 	/// When the value stops authenticating, for a credential issued with a
 	/// lifetime: a day (`2027-01-05`, midnight UTC) or an ISO 8601 instant.
 	/// Every launch that loads it warns in the fortnight before, and
 	/// `secrets/check` fails after. Re-setting a record restates it, as it
-	/// restates the note and rotation.
+	/// restates the note and roll.
 	expires: Option<String>,
+	// no flag for the record's metadata: it describes the value, so a re-set
+	// of the same value keeps it and a new value drops it
 }
 
 /// Write one record to a document (created when it does not exist yet):
 /// the value from `--value`, `--from-env`, `--copy` (another record's),
 /// `--generate` (`--length` for other than 32 characters) or stdin, into
-/// `--group` (default `default`), with `--role`, `--note`, `--rotation` and
+/// `--group` (default `default`), with `--role`, `--note`, `--roll` and
 /// `--expires`, re-sealing the group to its current recipient list. A record
 /// already in another group moves.
 ///
 /// ```sh
 /// beet secrets/set OPENAI_API_KEY --role=env_var       # prompts, no echo
-/// beet secrets/set OPENAI_API_KEY --from-env --role=env_var --note="openai api key" --rotation="manual:platform.openai.com/api-keys"
+/// beet secrets/set OPENAI_API_KEY --from-env --role=env_var --note="openai api key" --roll="manual:platform.openai.com/api-keys"
 /// beet secrets/set TF_STATE_PASSPHRASE --generate --role=env_var
 /// echo -n "$TOKEN" | beet secrets/set CF_API_TOKEN --group=agents
 /// beet secrets/set dkim-example-com --document=mail-prod --value=..
@@ -77,15 +79,23 @@ pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
 	let mut document = handle.read_or_new().await?;
 	let identity = AgeIdentityFile::require()?;
 	let value = SecretsSet::value(&name, &params, &document, &identity)?;
+	let metadata = document
+		.open(&identity)
+		.ok()
+		.and_then(|opened| opened.get(&name).cloned())
+		.filter(|held| held.value == value)
+		.map(|held| held.record.metadata)
+		.unwrap_or_default();
 	let record = SecretRecord {
 		role: params.role.as_deref().map(str::parse).transpose()?,
 		note: params.note.map(SmolStr::new),
-		rotation: params.rotation.as_deref().map(str::parse).transpose()?,
+		roll: params.roll.as_deref().map(str::parse).transpose()?,
 		expires: params
 			.expires
 			.as_deref()
 			.map(SecretsSet::expires)
 			.transpose()?,
+		metadata,
 		..default()
 	};
 	let group = params
@@ -206,7 +216,7 @@ mod test {
 
 	/// The first `set` creates the document and `default`; a second with
 	/// `--group` creates that group; a `set` of an existing record moves it;
-	/// the rotation lands as typed and a day's expiry as its midnight.
+	/// the roll lands as typed and a day's expiry as its midnight.
 	#[beet_core::test]
 	async fn sets_creating_document_and_groups() {
 		let mut fixture = VerbWorld::new();
@@ -215,7 +225,7 @@ mod test {
 				SecretsSet,
 				Request::from_cli_str(
 					"--value=sk-test --role=env_var --note=billing \
-					--rotation=manual:platform.openai.com/api-keys \
+					--roll=manual:platform.openai.com/api-keys \
 					--expires=2027-01-05",
 				)
 				.with_param("name", "OPENAI_API_KEY"),
@@ -246,11 +256,9 @@ mod test {
 			.as_str()
 			.xpect_eq("billing");
 		key.record
-			.rotation
+			.roll
 			.clone()
-			.xpect_eq(Some(SecretRotation::manual(
-				"platform.openai.com/api-keys",
-			)));
+			.xpect_eq(Some(SecretRoll::manual("platform.openai.com/api-keys")));
 		key.record.modified.xpect_some();
 		key.record
 			.expires
@@ -275,7 +283,7 @@ mod test {
 			.group
 			.as_str()
 			.xpect_eq("agents");
-		// a bad role names the good one, a bad rotation the three forms
+		// a bad role names the good one, a bad roll the three forms
 		fixture
 			.call(
 				SecretsSet,
@@ -289,7 +297,7 @@ mod test {
 		fixture
 			.call(
 				SecretsSet,
-				Request::from_cli_str("--value=x --rotation=weekly")
+				Request::from_cli_str("--value=x --roll=weekly")
 					.with_param("name", "X"),
 			)
 			.await
@@ -306,6 +314,52 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("`2027-01-05`");
+	}
+
+	/// A record's metadata describes its value: a re-set of the same value
+	/// (a new note through `--from-env`) keeps it, a new value drops it.
+	#[beet_core::test]
+	async fn keeps_metadata_only_for_the_same_value() {
+		let mut fixture = VerbWorld::new();
+		fixture
+			.set("CLOUDFLARE_API_TOKEN", "token-a", SecretRecord {
+				metadata: BTreeMap::from([(
+					"grants".into(),
+					"DNS Write".into(),
+				)]),
+				..default()
+			})
+			.await;
+		let metadata = async |fixture: &mut VerbWorld| {
+			fixture
+				.document()
+				.await
+				.open(&fixture.identities())
+				.unwrap()
+				.get("CLOUDFLARE_API_TOKEN")
+				.unwrap()
+				.record
+				.metadata
+				.clone()
+		};
+		let set = async |fixture: &mut VerbWorld, args: &str| {
+			fixture
+				.call_str(
+					SecretsSet,
+					Request::from_cli_str(args)
+						.with_param("name", "CLOUDFLARE_API_TOKEN"),
+				)
+				.await
+				.unwrap();
+		};
+		set(&mut fixture, "--value=token-a --note=renamed").await;
+		metadata(&mut fixture)
+			.await
+			.get("grants")
+			.cloned()
+			.xpect_eq(Some(SmolStr::from("DNS Write")));
+		set(&mut fixture, "--value=token-b").await;
+		metadata(&mut fixture).await.is_empty().xpect_true();
 	}
 
 	/// `--copy` takes another record's value without printing it, and names

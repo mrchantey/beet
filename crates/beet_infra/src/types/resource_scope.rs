@@ -81,6 +81,23 @@ impl RenderScope {
 		Self::render_roots(world, roots)
 	}
 
+	/// [`render_all`](Self::render_all) with every stack that declares no stage
+	/// resolved at `stage` rather than the launch's ([`RenderStage`]), the
+	/// override removed again whatever the render answers.
+	pub fn render_all_at(
+		world: &mut World,
+		stage: &SmolStr,
+	) -> Result<Vec<Self>> {
+		let previous = world.remove_resource::<RenderStage>();
+		world.insert_resource(RenderStage(stage.clone()));
+		let rendered = Self::render_all(world);
+		world.remove_resource::<RenderStage>();
+		if let Some(previous) = previous {
+			world.insert_resource(previous);
+		}
+		rendered
+	}
+
 	/// Seed a scope on each of `roots`, run the schedule once, take each scope
 	/// back out. That take IS the reset: nothing else persists a run.
 	fn render_roots(

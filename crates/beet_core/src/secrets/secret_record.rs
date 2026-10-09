@@ -59,7 +59,7 @@ pub struct SecretRecord {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub role: Option<SecretRole>,
 	/// A plaintext note for a reader of the index, so it is never a secret:
-	/// what the value is for, where it is rotated.
+	/// what the value is for, where it is rolled.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub note: Option<SmolStr>,
 	/// When the value was last written.
@@ -83,18 +83,32 @@ pub struct SecretRecord {
 	/// The provider address the value was exported from, on an export.
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
-	/// How the secret is rotated, declared by whatever minted it; absent on
-	/// a hand-kept record.
-	#[serde(default, skip_serializing_if = "Option::is_none")]
-	pub rotation: Option<SecretRotation>,
+	/// How the secret is rolled, declared by whatever minted it; absent on a
+	/// hand-kept record. Read under its old name `rotation` too, and always
+	/// will be: the cold bucket's dated exports are history nothing rewrites,
+	/// and a restore from one must still open it.
+	#[serde(
+		default,
+		alias = "rotation",
+		skip_serializing_if = "Option::is_none"
+	)]
+	pub roll: Option<SecretRoll>,
+	/// Facts a writer records about the value, by its own keys, for a later
+	/// reader to compare against: ie what a deploy credential was minted to
+	/// grant. Plaintext in the index like every other field, so never a
+	/// secret. Strings, since every document format holds them; a writer
+	/// needing structure encodes it, a newline-joined list reading well in
+	/// `secrets/ls`.
+	#[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+	pub metadata: BTreeMap<SmolStr, SmolStr>,
 }
 
 impl SecretRecord {
 	/// How long before its [`expires`](Self::expires) a record is
 	/// [`Expiring`](SecretExpiry::Expiring): a fortnight, so a credential
-	/// used weekly still warns twice before it lapses. A mint that sets an
-	/// expiry renews inside the same window, so the warning and the renewal
-	/// agree on when a credential is due.
+	/// used weekly still warns twice before it lapses. An elevated deploy
+	/// renews a deploy credential with a lifetime inside the same window, so
+	/// the warning and the renewal agree on when a credential is due.
 	pub const EXPIRY_NOTICE: Duration = Duration::from_secs(14 * 24 * 60 * 60);
 
 	/// Where this record stands against its [`expires`](Self::expires) at
@@ -229,7 +243,7 @@ impl Secret {
 	}
 
 	/// One line saying this record is expiring or has expired, and how it
-	/// rotates; `None` while it lasts. What a launch warns and
+	/// rolls; `None` while it lasts. What a launch warns and
 	/// `secrets/check` reports.
 	///
 	/// ```
@@ -241,14 +255,14 @@ impl Secret {
 	/// 	value: "..".into(),
 	/// 	record: SecretRecord {
 	/// 		expires: Some(Date::parse("2027-01-10").unwrap().timestamp()),
-	/// 		rotation: Some(SecretRotation::manual("beet mint\n> step two")),
+	/// 		roll: Some(SecretRoll::manual("beet mint\n> step two")),
 	/// 		..default()
 	/// 	},
 	/// };
 	/// secret
 	/// 	.expiry_notice(now)
 	/// 	.unwrap()
-	/// 	.xpect_eq("`API_TOKEN` expires 2027-01-10, in 9 day(s), rotated by `beet mint`");
+	/// 	.xpect_eq("`API_TOKEN` expires 2027-01-10, in 9 day(s), rolled by `beet mint`");
 	/// ```
 	pub fn expiry_notice(&self, now: Timestamp) -> Option<String> {
 		let when = match self.record.expiry(now) {
@@ -263,19 +277,21 @@ impl Secret {
 				format!("expired {}", Date::from(at))
 			}
 		};
-		// the first line of a rotation is the command, the rest its steps
-		let rotation = match &self.record.rotation {
-			Some(SecretRotation::Manual { why }) => {
-				why.lines().next().map(|line| line.trim().to_string())
+		// the first line of a roll is the command, the rest its steps
+		let roll = match &self.record.roll {
+			Some(SecretRoll::Manual { why }) => {
+				why.lines().next().map(|line| format!("`{}`", line.trim()))
 			}
-			Some(rotation) => Some(rotation.to_string()),
+			Some(SecretRoll::Elevated) => {
+				Some("an elevated deploy (`--elevated --roll`)".into())
+			}
+			Some(roll) => Some(format!("`{roll}`")),
 			None => None,
 		};
 		format!(
 			"`{}` {when}{}",
 			self.name,
-			rotation
-				.map(|rotation| format!(", rotated by `{rotation}`"))
+			roll.map(|roll| format!(", rolled by {roll}"))
 				.unwrap_or_default()
 		)
 		.xmap(Some)
