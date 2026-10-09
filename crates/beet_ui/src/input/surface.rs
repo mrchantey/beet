@@ -1,14 +1,14 @@
 //! The surface an interactive subtree is displayed on, the key that scopes input
 //! (focus, scroll) to one session when many coexist in one world.
 
-use crate::prelude::PortalOf;
+use crate::prelude::RenderTreeQuery;
 use beet_core::prelude::*;
 use bevy::ecs::system::SystemParam;
 
 /// Resolves which [`RenderSurface`] a (possibly deep) element belongs to: the
 /// nearest self-or-ancestor carrying a [`RenderSurface`], walking *visual*
-/// ancestry — `ChildOf`, crossing each [`Portal`](crate::prelude::Portal)
-/// transclusion via its [`PortalOf`] holder.
+/// ancestry through [`RenderTreeQuery`], so each
+/// [`Portal`](crate::prelude::Portal) transclusion is crossed to its holder.
 ///
 /// The single per-surface resolver. Every input system (focus, typing, tab,
 /// form submit) and the terminal-title decoration share it instead of
@@ -22,8 +22,7 @@ use bevy::ecs::system::SystemParam;
 #[derive(SystemParam)]
 pub struct SurfaceQuery<'w, 's> {
 	surfaces: Query<'w, 's, &'static RenderSurface>,
-	parents: Query<'w, 's, &'static ChildOf>,
-	portals: Query<'w, 's, &'static PortalOf>,
+	tree: RenderTreeQuery<'w, 's>,
 }
 
 impl SurfaceQuery<'_, '_> {
@@ -35,25 +34,29 @@ impl SurfaceQuery<'_, '_> {
 	/// tree, which the per-surface input systems treat as belonging to no surface
 	/// (it receives no scoped input).
 	pub fn surface_of(&self, entity: Entity) -> Option<Entity> {
-		let mut current = entity;
-		loop {
-			if let Ok(surface) = self.surfaces.get(current) {
-				return Some(surface.surface());
-			}
-			// transclusion wins for visual ancestry: a Portal holder is the visual
-			// parent of the content it renders in place, so cross it before walking
-			// `ChildOf`. The two are mutually exclusive at a node in practice (a
-			// transcluded root has a holder but no parent), so this just bridges the
-			// gap where the `ChildOf` chain dead-ends at the content root.
-			current = self
-				.portals
-				.get(current)
-				.ok()
-				.and_then(|portal_of| portal_of.holders().first().copied())
-				.or_else(|| {
-					self.parents.get(current).ok().map(ChildOf::parent)
-				})?;
-		}
+		self.tree
+			.iter_ancestors_inclusive(entity)
+			.find_map(|ancestor| {
+				self.surfaces.get(ancestor).ok().map(RenderSurface::surface)
+			})
+	}
+
+	/// The render root of `entity`: the [surface](Self::surface_of) it renders
+	/// on, else the top of its visual ancestry when it renders on no surface.
+	///
+	/// Scopes lookups (eg id resolution) to the tree an entity actually renders
+	/// in, so concurrent surfaces (one per SSH session) never cross wires. A
+	/// surface is a *visual* root even when it hangs under a shared owner by
+	/// `ChildOf` (an SSH connection surface is a child of its router), so the
+	/// walk stops at the surface, never crossing up into that shared owner
+	/// (whose subtree holds every other session's tree).
+	pub fn render_root(&self, entity: Entity) -> Entity {
+		self.surface_of(entity).unwrap_or_else(|| {
+			self.tree
+				.iter_ancestors_inclusive(entity)
+				.last()
+				.unwrap_or(entity)
+		})
 	}
 
 	/// Whether `entity` should receive input sourced from `window`: its surface
@@ -143,6 +146,40 @@ mod test {
 		world
 			.with_state::<SurfaceQuery, _>(|surfaces| surfaces.surface_of(link))
 			.xpect_eq(Some(window));
+	}
+
+	/// Multi-tenant regression: [`render_root`](SurfaceQuery::render_root)
+	/// stops at the render surface, not at a shared owner the surface hangs
+	/// under. Two session surfaces are `ChildOf` a common owner (as SSH
+	/// connection surfaces are children of their router); a control in one
+	/// session must resolve to *its* surface, so id-scoped lookups never reach
+	/// the owner's subtree (which holds the other session's tree). A walk
+	/// crossing `ChildOf` past the surface up into the owner once let one
+	/// session's disclosure toggle another session's target.
+	#[beet_core::test]
+	fn render_root_stops_at_the_surface() {
+		let mut world = World::new();
+		// the shared owner, eg the router the two SSH connections hang off.
+		let owner = world.spawn_empty().id();
+		// build a session: a buffer-host surface that is a ChildOf child of the
+		// shared owner, its page transcluded into it by a Portal holder and
+		// carrying `RenderSurface(host)`, exactly as the live page binding wires it.
+		let session = |world: &mut World| -> (Entity, Entity) {
+			let host = world.spawn(ChildOf(owner)).id();
+			let page = world.spawn(RenderSurface(host)).id();
+			let control = world.spawn(ChildOf(page)).id();
+			world.spawn((ChildOf(host), Portal::new(page)));
+			(host, control)
+		};
+		let (host_a, control_a) = session(&mut world);
+		let (host_b, _control_b) = session(&mut world);
+		// A's control resolves to A's surface, never the shared owner or B's.
+		world
+			.with_state::<SurfaceQuery, _>(|surfaces| {
+				surfaces.render_root(control_a)
+			})
+			.xpect_eq(host_a);
+		(host_a != host_b).xpect_true();
 	}
 
 	/// A bare element outside any surface (no `RenderSurface` ancestor, no holder)

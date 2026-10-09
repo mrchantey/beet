@@ -23,11 +23,10 @@ pub(crate) fn resolve_styles(
 	// buffer writes.
 	resized: Query<Entity, Changed<MediaViewport>>,
 	ancestors: Query<&ChildOf>,
-	children: Query<&Children>,
 	// content transcluded by reference has no `ChildOf` edge to the layout, so the
 	// traversal follows holders to re-resolve referenced content under the layout's
 	// cascade (eg the color scheme), even when the content itself is unchanged.
-	render_refs: Query<&Portal>,
+	tree: RenderTreeQuery,
 	// the box model (margin/border/padding/background) is element-level; text and
 	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
 	elements: Query<(), With<Element>>,
@@ -53,20 +52,16 @@ pub(crate) fn resolve_styles(
 	// through rather than resolved, so a resize never touches a node nothing
 	// in the cascade would otherwise reach.
 	if !resized.is_empty() && ruleset_query.has_width_media() {
-		let mut pending = resized.iter().collect::<Vec<_>>();
+		let mut pending = resized
+			.iter()
+			.map(|entity| tree.resolve(entity))
+			.collect::<Vec<_>>();
 		while let Some(entity) = pending.pop() {
 			if owned.contains(entity) {
 				roots.insert(entity);
 				continue;
 			}
-			pending.extend(
-				children
-					.get(entity)
-					.into_iter()
-					.flat_map(|children| children.iter()),
-			);
-			pending
-				.extend(render_refs.get(entity).map(|portal| portal.target()));
+			pending.extend(tree.children(entity));
 		}
 	}
 
@@ -78,7 +73,10 @@ pub(crate) fn resolve_styles(
 
 	// inheritance cache friendly parallelism, top down queue,
 	// as described in stylo https://youtu.be/Y6SSTRr2mFU?t=310
-	let mut queue = roots.into_iter().collect::<Vec<_>>();
+	let mut queue = roots
+		.into_iter()
+		.map(|root| tree.resolve(root))
+		.collect::<Vec<_>>();
 	while !queue.is_empty() {
 		for entity in queue.drain(..).collect::<Vec<_>>() {
 			// resolve visual style
@@ -160,15 +158,10 @@ pub(crate) fn resolve_styles(
 				None => {}
 			}
 
-			if let Some(children_list) = children.get(entity).ok() {
-				queue.extend(children_list.into_iter().cloned());
-			}
-			// follow a `Portal` holder into the content it renders in place, so
-			// transcluded content re-resolves under this (layout) cascade. An
+			// a `Portal` holder is replaced by the content it renders in place,
+			// so transcluded content re-resolves under this (layout) cascade. An
 			// unresolved holder (no `Portal` yet) has no content to cascade into.
-			if let Ok(render_ref) = render_refs.get(entity) {
-				queue.push(render_ref.target());
-			}
+			queue.extend(tree.children(entity));
 		}
 	}
 	Ok(())

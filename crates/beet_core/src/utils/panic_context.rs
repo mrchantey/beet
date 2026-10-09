@@ -98,7 +98,15 @@ impl PanicContext {
 	pub fn escaped_since(_start: Instant) -> Vec<String> { Vec::new() }
 }
 
-#[cfg(feature = "std")]
+/// The catch path: the test runner's, and native `time_ext::timeout_sync`'s.
+#[cfg(all(
+	feature = "std",
+	any(
+		feature = "testing",
+		feature = "testing_embedded",
+		not(target_arch = "wasm32")
+	)
+))]
 impl PanicContext {
 	/// Cross-platform method for capturing panic info, including in
 	/// non-unwind contexts like wasm.
@@ -120,21 +128,6 @@ impl PanicContext {
 			}
 		}
 	}
-	/// Cross-platform method for capturing panic info, including in
-	/// non-unwind contexts like wasm.
-	///
-	/// ## Note
-	/// This method uses [`panic::set_hook`], calling the prev hook if
-	/// a panic occurs outside of this scope. If another hook has overridden
-	/// ours the report degrades to the unwind payload with no location.
-	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
-	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
-	where
-		Fut: Future<Output = Result<(), String>>,
-	{
-		PanicContextFuture::new(async move { fut.await })
-	}
-
 	/// Like [`Self::catch`] but supports [`Poll::Pending`] results
 	#[cfg(any(
 		feature = "testing",
@@ -225,6 +218,24 @@ impl PanicContext {
 				ESCAPE_RECORDED.with(|cell| cell.set(true));
 			}
 		}));
+	}
+}
+
+#[cfg(feature = "std")]
+impl PanicContext {
+	/// Cross-platform method for capturing panic info, including in
+	/// non-unwind contexts like wasm.
+	///
+	/// ## Note
+	/// This method uses [`panic::set_hook`], calling the prev hook if
+	/// a panic occurs outside of this scope. If another hook has overridden
+	/// ours the report degrades to the unwind payload with no location.
+	#[cfg(any(feature = "testing", feature = "testing_embedded"))]
+	pub fn catch_async<Fut>(fut: Fut) -> impl Future<Output = PanicResult>
+	where
+		Fut: Future<Output = Result<(), String>>,
+	{
+		PanicContextFuture::new(async move { fut.await })
 	}
 
 	/// The panic the hook captured inside the current catch scope, consumed so

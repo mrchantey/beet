@@ -287,6 +287,8 @@ pub(crate) fn scroll_input(
 	surfaces: SurfaceQuery,
 	// the ancestor walk (crossing `Portal` transclusion) that resolves which
 	// container a hovered/focused element scrolls.
+	render_tree: RenderTreeQuery,
+	// the page scrollport fallback, the first scrollable node of the flow.
 	tree: CharcellTree,
 	roots: Query<(Entity, &DoubleBuffer)>,
 	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
@@ -374,7 +376,8 @@ pub(crate) fn scroll_input(
 			// the nearest visual ancestor (self-inclusive) that can scroll the delta
 			// axis, so a pinned/zero-extent inner container falls through.
 			let scrollable_ancestor = |start: Entity| {
-				tree.visual_ancestors(start)
+				render_tree
+					.iter_ancestors_inclusive(start)
 					.find(|entity| can_scroll(*entity))
 			};
 			pointers

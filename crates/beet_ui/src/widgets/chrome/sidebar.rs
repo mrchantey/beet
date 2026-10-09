@@ -148,8 +148,7 @@ pub(crate) fn sync_sidebar_breakpoint(
 	mut commands: Commands,
 	surfaces: Query<(Entity, &MediaViewport), With<DoubleBuffer>>,
 	added_elements: Query<(), Added<Element>>,
-	children: Query<&Children>,
-	portals: Query<&Portal>,
+	tree: RenderTreeQuery,
 	attributes: Query<&Attributes>,
 	attr_keys: Query<&Attribute>,
 	mut values: Query<&mut Value>,
@@ -169,8 +168,7 @@ pub(crate) fn sync_sidebar_breakpoint(
 			continue;
 		}
 		let Some(sidebar) = find_by_id(
-			&children,
-			&portals,
+			&tree,
 			&attributes,
 			&attr_keys,
 			&values,

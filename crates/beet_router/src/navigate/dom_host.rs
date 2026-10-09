@@ -35,28 +35,21 @@ impl DomHost {
 	/// Whether nothing under `host` is still arriving: no store reader marked
 	/// [`Loading`] and no template dependency pending, crossing each
 	/// [`Portal`] as the render walk does.
-	pub fn settled(world: &World, host: Entity) -> bool {
-		let mut stack = vec![host];
-		while let Some(entity) = stack.pop() {
-			let Ok(entity) = world.get_entity(entity) else {
-				continue;
-			};
-			if entity.contains::<Loading>()
-				|| entity
-					.get::<TemplatePending>()
-					.is_some_and(|pending| !pending.is_empty())
-			{
-				return false;
-			}
-			stack.extend(
-				entity
-					.get::<Children>()
-					.into_iter()
-					.flat_map(|children| children.iter()),
-			);
-			stack.extend(entity.get::<Portal>().map(Portal::target));
-		}
-		true
+	pub fn settled(world: &mut World, host: Entity) -> bool {
+		world.with_state::<(
+			RenderTreeQuery,
+			Query<(Has<Loading>, Option<&TemplatePending>)>,
+		), _>(|(tree, arriving)| {
+			!tree
+				.iter_descendants_inclusive_depth_first(host)
+				.any(|entity| {
+					arriving.get(entity).is_ok_and(|(loading, pending)| {
+						loading
+							|| pending
+								.is_some_and(|pending| !pending.is_empty())
+					})
+				})
+		})
 	}
 }
 
@@ -114,14 +107,14 @@ mod test {
 		let host = world
 			.spawn((DomHost, children![(PageSlot, Portal::new(page))]))
 			.id();
-		DomHost::settled(&world, host).xpect_false();
+		DomHost::settled(&mut world, host).xpect_false();
 		let reader = world.get::<Children>(page).unwrap()[0];
 		world.entity_mut(reader).remove::<Loading>();
-		DomHost::settled(&world, host).xpect_true();
+		DomHost::settled(&mut world, host).xpect_true();
 		// a pending template dependency holds it too
 		let mut pending = TemplatePending::default();
 		pending.register(PendingKind::Structural, "<Template src>");
 		world.entity_mut(page).insert(pending);
-		DomHost::settled(&world, host).xpect_false();
+		DomHost::settled(&mut world, host).xpect_false();
 	}
 }

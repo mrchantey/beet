@@ -15,7 +15,7 @@ use bevy::math::UVec2;
 
 /// Per-node flat style view, without children.
 ///
-/// Children are traversed separately via ECS [`Children`] queries.
+/// Children are traversed separately through the [`CharcellTree`] flow.
 /// A new instance is created per node during each render phase.
 pub(super) struct CharcellNodeData<'a> {
 	pub entity: Entity,
@@ -25,7 +25,6 @@ pub(super) struct CharcellNodeData<'a> {
 	value: Option<&'a Value>,
 	visual: Option<&'a VisualStyle>,
 	layout: Option<&'a LayoutStyle>,
-	children: Option<&'a Children>,
 	box_style: Option<&'a BoxStyle>,
 	hyperlink: Option<&'a Hyperlink>,
 	marker: Option<&'a Marker>,
@@ -179,7 +178,8 @@ impl CharcellNodeData<'_> {
 		// tag-less grouping wrapper (children, no [`Element`]) is spliced out, its
 		// children hoisted into this flow so they lay out as direct siblings.
 		query
-			.flow_child_entities(self.children)
+			.tree
+			.children_of(self.entity)
 			.into_iter()
 			.filter_map(move |child| query.unresolved_node(child).ok())
 			.filter(|node| node.layout_style().display != Display::None)
@@ -201,20 +201,6 @@ impl CharcellNodeData<'_> {
 	pub(super) fn has_child_nodes(&self, query: &CharcellQuery) -> bool {
 		self.child_nodes(query).next().is_some()
 	}
-}
-
-/// Follow a chain of [`Portal`] holders to the entity that renders in place.
-///
-/// A [`Portal`] holder is transparent: the charcell pipeline treats the
-/// referenced entity as if it sat at the holder's position (see [`Portal`]),
-/// so every traversal resolves through this before visiting a node.
-fn resolve_render_ref(refs: &Query<&Portal>, mut entity: Entity) -> Entity {
-	// follow holders to their target; the relationship always names one, so an
-	// unresolved slot points at a placeholder that renders empty in place.
-	while let Ok(render_ref) = refs.get(entity) {
-		entity = render_ref.target();
-	}
-	entity
 }
 
 /// Detects a *transparent grouping wrapper*: a node that groups children without
@@ -254,13 +240,13 @@ pub(crate) struct WrapperQuery<'w, 's> {
 }
 
 /// How a tag-less child resolves into its parent's flow.
-pub(crate) enum FlowChild<'a> {
+pub(crate) enum FlowChild {
 	/// A real node (an element, a text leaf, or a hand-styled box): lays out as
 	/// itself.
 	Keep,
 	/// A transparent grouping wrapper: hoist its children into the parent's flow
 	/// in its place (eg a collected `{cells.collect()}` position).
-	Hoist(&'a Children),
+	Hoist,
 	/// An empty placeholder with nothing to paint (eg an unfilled `{Option::None}`
 	/// slot, a tag-less node with no children, value, or box): reserves no flow
 	/// slot, so it never breaks an inline formatting context.
@@ -270,7 +256,7 @@ pub(crate) enum FlowChild<'a> {
 impl WrapperQuery<'_, '_> {
 	/// How `entity` participates in its parent's flow: kept as itself, hoisted as a
 	/// transparent wrapper, or dropped as an empty placeholder (see [`FlowChild`]).
-	fn resolve_flow(&self, entity: Entity) -> FlowChild<'_> {
+	fn resolve_flow(&self, entity: Entity) -> FlowChild {
 		// only a tag-less node can be transparent; an element always lays out as
 		// itself.
 		let Ok((children, value, box_style, visual)) =
@@ -286,62 +272,46 @@ impl WrapperQuery<'_, '_> {
 			&& visual.is_none_or(|style| style.background.is_none());
 		match (transparent, children) {
 			(false, _) => FlowChild::Keep,
-			(true, Some(children)) => FlowChild::Hoist(children),
+			(true, Some(_)) => FlowChild::Hoist,
 			(true, None) => FlowChild::Drop,
 		}
 	}
 }
 
-/// [`Portal`]-aware traversal of a charcell buffer tree.
+/// The charcell flow over [`RenderTreeQuery`]: a [`Portal`] holder is
+/// replaced by the entity it renders in place, and a transparent grouping
+/// wrapper is spliced out so its children lay out as its parent's.
 ///
-/// Every phase (prepare, measure, layout, paint) walks the tree through this, so
-/// a [`Portal`] holder is transparently replaced by the entity it renders in
-/// a single place rather than each system threading [`Children`] + [`Portal`]
-/// queries and re-deriving the resolution. Its orderings match
-/// [`CharcellNodeData::child_nodes`], so the per-entity rect map keys line up.
+/// Every phase (prepare, measure, layout, paint) walks the tree through this,
+/// and [`CharcellNodeData::child_nodes`] reads the same flow, so the per-entity
+/// rect map keys line up.
 #[derive(SystemParam)]
 pub(crate) struct CharcellTree<'w, 's> {
-	children: Query<'w, 's, &'static Children>,
-	refs: Query<'w, 's, &'static Portal>,
-	// the upward half of the walk (see [`visual_parent`](CharcellTree::visual_parent)).
-	#[cfg(any(feature = "tui", feature = "keyboard"))]
-	parents: Query<'w, 's, &'static ChildOf>,
-	#[cfg(any(feature = "tui", feature = "keyboard"))]
-	portals: Query<'w, 's, &'static PortalOf>,
-	// transparent grouping wrappers spliced out so every traversal agrees with
-	// [`CharcellNodeData::child_nodes`] (see [`WrapperQuery`]).
+	tree: RenderTreeQuery<'w, 's>,
+	// transparent grouping wrappers spliced out of the flow (see
+	// [`WrapperQuery`]).
 	wrappers: WrapperQuery<'w, 's>,
 }
 
 impl CharcellTree<'_, '_> {
-	/// Follow [`Portal`] holders to the entity that renders in place.
-	pub fn resolve(&self, entity: Entity) -> Entity {
-		resolve_render_ref(&self.refs, entity)
-	}
-
 	/// Resolved children of `entity`: holders replaced by their referents and
 	/// tag-less grouping wrappers spliced out so their children are hoisted.
 	fn children(&self, entity: Entity) -> impl Iterator<Item = Entity> + '_ {
 		let mut out = Vec::new();
-		for child in self
-			.children
-			.get(entity)
-			.into_iter()
-			.flat_map(|children| children.iter())
-		{
+		for child in self.tree.children(entity) {
 			self.push_flow_entity(child, &mut out);
 		}
 		out.into_iter()
 	}
 
-	/// Resolve `child` into the flow, recursing through transparent wrappers so
-	/// their children take their place and dropping empty placeholders.
+	/// Push the resolved `child` into the flow, recursing through transparent
+	/// wrappers so their children take their place and dropping empty
+	/// placeholders.
 	fn push_flow_entity(&self, child: Entity, out: &mut Vec<Entity>) {
-		let child = self.resolve(child);
 		match self.wrappers.resolve_flow(child) {
 			FlowChild::Keep => out.push(child),
-			FlowChild::Hoist(grandchildren) => {
-				for grandchild in grandchildren.iter() {
+			FlowChild::Hoist => {
+				for grandchild in self.tree.children(child) {
 					self.push_flow_entity(grandchild, out);
 				}
 			}
@@ -360,7 +330,7 @@ impl CharcellTree<'_, '_> {
 	/// Pre-order traversal from `root`, inclusive.
 	pub fn pre_order(&self, root: Entity) -> Vec<Entity> {
 		let mut result = Vec::new();
-		let mut stack = vec![self.resolve(root)];
+		let mut stack = vec![self.tree.resolve(root)];
 		while let Some(entity) = stack.pop() {
 			result.push(entity);
 			stack.extend(
@@ -373,7 +343,7 @@ impl CharcellTree<'_, '_> {
 	/// Post-order traversal from `root`, inclusive.
 	pub fn post_order(&self, root: Entity) -> Vec<Entity> {
 		let mut result = Vec::new();
-		let mut stack = vec![(self.resolve(root), false)];
+		let mut stack = vec![(self.tree.resolve(root), false)];
 		while let Some((entity, visited)) = stack.pop() {
 			if visited {
 				result.push(entity);
@@ -395,38 +365,6 @@ impl CharcellTree<'_, '_> {
 	pub fn descendants(&self, entity: Entity) -> impl Iterator<Item = Entity> {
 		self.pre_order(entity).into_iter().skip(1)
 	}
-
-	/// The *visual* parent of `entity`: the [`Portal`] holder that renders it in
-	/// place when there is one, else its `ChildOf` parent.
-	///
-	/// Transclusion wins, mirroring [`children`](Self::children) downward: a
-	/// holder is the charcell parent of the entity it points at, so a walk up from
-	/// transcluded content (eg a route's page) crosses into the holder's container
-	/// (eg the page-host scrollport) rather than dead-ending at the content root.
-	// only the two input surfaces walk upward (hit testing and scroll-into-view)
-	#[cfg(any(feature = "tui", feature = "keyboard"))]
-	pub fn visual_parent(&self, entity: Entity) -> Option<Entity> {
-		self.portals
-			.get(entity)
-			.ok()
-			.and_then(|portal_of| portal_of.holders().first().copied())
-			.or_else(|| self.parents.get(entity).ok().map(ChildOf::parent))
-	}
-
-	/// The visual ancestors of `entity`, innermost first and self-inclusive, each
-	/// hop through [`visual_parent`](Self::visual_parent). The upward twin of
-	/// [`pre_order`](Self::pre_order), shared by the scroll routing and
-	/// scroll-into-view so both agree on which container owns an element.
-	// only the two input surfaces walk upward (hit testing and scroll-into-view)
-	#[cfg(any(feature = "tui", feature = "keyboard"))]
-	pub fn visual_ancestors(
-		&self,
-		entity: Entity,
-	) -> impl Iterator<Item = Entity> {
-		std::iter::successors(Some(entity), |entity| {
-			self.visual_parent(*entity)
-		})
-	}
 }
 
 /// System parameter shared by all charcell render systems.
@@ -443,7 +381,6 @@ pub(crate) struct CharcellQuery<'w, 's> {
 			Option<&'static VisualStyle>,
 			Option<&'static LayoutStyle>,
 			Option<&'static BoxStyle>,
-			Option<&'static Children>,
 			Option<&'static Hyperlink>,
 			Option<&'static Marker>,
 			Option<&'static ScrollPosition>,
@@ -453,50 +390,15 @@ pub(crate) struct CharcellQuery<'w, 's> {
 			Option<&'static KittyImage>,
 		),
 	>,
-	refs: Query<'w, 's, &'static Portal>,
+	// the flow `child_nodes` reads, shared with every phase's traversal.
+	tree: CharcellTree<'w, 's>,
 	// the focused entity, so a control can paint its caret. Gated with [`Focus`]
 	// itself: a build without a keyboard has nothing to focus.
 	#[cfg(feature = "keyboard")]
 	focused: Query<'w, 's, (), With<Focus>>,
-	// transparent grouping wrappers (see [`WrapperQuery`]); their children are
-	// hoisted into the parent's flow. Such a wrapper carries no box, so the render
-	// systems never assign it an `IntrinsicSize`/`LayoutRect` and it is absent from
-	// `nodes`: `WrapperQuery` reads its [`Children`] directly so the hoist still
-	// finds them.
-	wrappers: WrapperQuery<'w, 's>,
 }
 
 impl CharcellQuery<'_, '_> {
-	/// The flow child entities behind a [`Children`]: each resolved through
-	/// [`Portal`] holders, with transparent grouping wrappers spliced out so
-	/// their own children take their place (depth-first, order preserved). Keeps
-	/// [`CharcellNodeData::child_nodes`] aligned with the [`CharcellTree`]
-	/// traversal that paint reads.
-	fn flow_child_entities(&self, children: Option<&Children>) -> Vec<Entity> {
-		let mut out = Vec::new();
-		for child in children.iter().flat_map(|children| children.iter()) {
-			self.push_flow_entity(child, &mut out);
-		}
-		out
-	}
-
-	/// Resolve a child into the flow: push its [`Portal`]-resolved id, or, when
-	/// it is a transparent wrapper, recurse so its children take its place.
-	fn push_flow_entity(&self, entity: Entity, out: &mut Vec<Entity>) {
-		let entity = resolve_render_ref(&self.refs, entity);
-		// the wrapper is checked independently of `nodes`: it has no box, so it is
-		// never prepared into `nodes`, but its children must still be hoisted.
-		match self.wrappers.resolve_flow(entity) {
-			FlowChild::Keep => out.push(entity),
-			FlowChild::Hoist(children) => {
-				for child in children.iter() {
-					self.push_flow_entity(child, out);
-				}
-			}
-			FlowChild::Drop => {}
-		}
-	}
-
 	/// Whether `entity` holds keyboard focus. Always false without the `keyboard`
 	/// feature, which has no focus model to read.
 	#[cfg(feature = "keyboard")]
@@ -520,7 +422,6 @@ impl CharcellQuery<'_, '_> {
 			visual,
 			layout,
 			box_style,
-			children,
 			hyperlink,
 			marker,
 			scroll,
@@ -537,7 +438,6 @@ impl CharcellQuery<'_, '_> {
 			value,
 			visual,
 			layout,
-			children,
 			box_style,
 			hyperlink,
 			marker,

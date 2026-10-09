@@ -1,8 +1,8 @@
 //! Rendering an entity tree to bytes: one walk, many formats.
 //!
 //! A [`NodeRenderer`] walks the tree rooted at an entity (through
-//! [`NodeWalker`], which transcludes every [`Portal`] in place) and writes one
-//! format. Each format is a [`RenderTarget`], and every target a world renders
+//! [`NodeWalker`], which reads it through [`RenderTreeQuery`], so every
+//! [`Portal`] renders the tree it transcludes in place) and writes one format. Each format is a [`RenderTarget`], and every target a world renders
 //! to lives in one registry, [`RenderTargets`], the one path every render takes.
 //!
 //! Every render answers a request: an http request, a cli command, a
@@ -70,6 +70,7 @@
 //! types ahead of an earlier one, which is how a built-in is replaced.
 //!
 //! [`Portal`]: crate::prelude::Portal
+//! [`RenderTreeQuery`]: crate::prelude::RenderTreeQuery
 //! [`RequestParts::default()`]: beet_net::prelude::RequestParts
 #[cfg(feature = "style")]
 mod charcell;

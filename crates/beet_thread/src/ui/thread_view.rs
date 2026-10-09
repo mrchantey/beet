@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 // `ScrollPosition` is beet_ui's renderer-agnostic type; pin it explicitly so it wins
 // over bevy's same-named ui type (reached via `beet_core::prelude` under
 // `bevy_default`). The rest of beet_ui's prelude arrives via `crate::prelude`.
-use beet_ui::prelude::PortalOf;
+use beet_ui::prelude::RenderTreeQuery;
 use beet_ui::prelude::ScrollPosition;
 // styling for the transcript: an `inline_class!` per role keeps the rule colocated
 // with the widget (a callsite-keyed class, so each role's literal is its own rule).
@@ -328,8 +328,11 @@ pub(crate) fn follow_thread_scroll(
 		With<ThreadView>,
 	>,
 	children: Query<&Children>,
-	parents: Query<&ChildOf>,
-	portals: Query<&PortalOf>,
+	// the transcript and every container it renders inside, innermost first:
+	// ancestry is visual, so a router page reaches the surface scrollport
+	// hosting it across its transclusion, the walk the charcell wheel/key
+	// scrolling uses to resolve its container.
+	tree: RenderTreeQuery,
 	mut transcripts: Query<&mut ThreadScroll>,
 	mut scrolls: Query<&mut ScrollPosition>,
 ) {
@@ -342,7 +345,9 @@ pub(crate) fn follow_thread_scroll(
 		else {
 			continue;
 		};
-		let path = scroll_path(transcript, &parents, &portals);
+		let path = tree
+			.iter_ancestors_inclusive(transcript)
+			.collect::<Vec<_>>();
 		// the innermost container with somewhere to scroll owns the reader's
 		// position; with nothing scrollable yet there is nothing to follow.
 		let scroller = path
@@ -386,32 +391,6 @@ pub(crate) fn follow_thread_scroll(
 /// How many frames a follow keeps pinning: enough to outlast the row spawn, the
 /// layout pass and the clamp that gives the containers their extent.
 const FOLLOW_FRAMES: u8 = 4;
-
-/// The transcript and every container it renders inside, innermost first.
-///
-/// Ancestry is *visual*, so the walk crosses transclusion: a [`PortalOf`] holder
-/// is the visual parent of the content it renders in place, which is how a
-/// router page reaches the surface scrollport hosting it. The same walk the
-/// charcell wheel/key scrolling uses to resolve its container.
-fn scroll_path(
-	transcript: Entity,
-	parents: &Query<&ChildOf>,
-	portals: &Query<&PortalOf>,
-) -> Vec<Entity> {
-	let mut path = vec![transcript];
-	let mut current = Some(transcript);
-	while let Some(entity) = current {
-		current = portals
-			.get(entity)
-			.ok()
-			.and_then(|portal| portal.holders().first().copied())
-			.or_else(|| {
-				parents.get(entity).ok().map(|child_of| child_of.parent())
-			});
-		path.extend(current);
-	}
-	path
-}
 
 /// Build the document value for a window: a `posts` list of `{ id, author, text }`.
 fn project_window(window: &ThreadWindow) -> Value {

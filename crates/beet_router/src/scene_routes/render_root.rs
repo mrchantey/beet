@@ -36,7 +36,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
-use std::collections::VecDeque;
 
 /// Which part of a page a render answers, the `--root` render param, its
 /// absence being the whole tree. See the [module docs](self) for the cascade
@@ -74,8 +73,7 @@ impl RenderParams {
 #[derive(SystemParam)]
 pub struct RenderRootQuery<'w, 's> {
 	elements: Query<'w, 's, &'static Element>,
-	children: Query<'w, 's, &'static Children>,
-	portals: Query<'w, 's, &'static Portal>,
+	tree: RenderTreeQuery<'w, 's>,
 	layout_contents: Query<'w, 's, &'static LayoutContent>,
 }
 
@@ -111,24 +109,11 @@ impl RenderRootQuery<'_, '_> {
 	/// The first `<{tag}>` element under `start` in breadth-first order,
 	/// stepping through each [`Portal`] into the tree it transcludes.
 	fn first_element(&self, start: Entity, tag: &str) -> Option<Entity> {
-		let mut queue = VecDeque::from([start]);
-		while let Some(entity) = queue.pop_front() {
-			if let Ok(portal) = self.portals.get(entity) {
-				queue.push_back(portal.target());
-				continue;
-			}
-			if self
-				.elements
-				.get(entity)
+		self.tree.iter_descendants_inclusive(start).find(|entity| {
+			self.elements
+				.get(*entity)
 				.is_ok_and(|element| element.tag().eq_ignore_ascii_case(tag))
-			{
-				return Some(entity);
-			}
-			if let Ok(children) = self.children.get(entity) {
-				queue.extend(children.iter());
-			}
-		}
-		None
+		})
 	}
 }
 

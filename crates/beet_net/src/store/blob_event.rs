@@ -108,6 +108,7 @@ pub(crate) fn drain_blob_events(
 ///
 /// Reading through `Mut`'s `Deref` in the filter does not mark; only the matched
 /// `set_changed()` marks, so unrelated stores stay unchanged.
+#[cfg(feature = "std")]
 pub(crate) fn propagate_blob_store_changes(
 	ev: On<BlobEvent>,
 	mut stores: Query<&mut BlobStore>,
@@ -128,6 +129,7 @@ pub(crate) fn propagate_blob_store_changes(
 /// components an app hung beside the handle) on a deletion the object may recover
 /// from moments later, eg an editor that writes by remove-then-create, whose
 /// re-creation then resurrects through the same untouched handle.
+#[cfg(feature = "std")]
 pub(crate) fn propagate_blob_changes(
 	ev: On<BlobEvent>,
 	mut blobs: Query<&mut Blob>,

@@ -1,27 +1,29 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// The components a [`NodeVisitor`] reads off one node.
 pub type NodeView<'a> = (
 	Option<&'a Doctype>,
 	Option<&'a Comment>,
 	Option<&'a Element>,
-	Option<&'a Children>,
 	Option<&'a Value>,
 	Option<&'a Expression>,
-	Option<&'a Portal>,
 	Option<&'a CData>,
 	Option<&'a ProcessingInstruction>,
 );
 
+/// Walks a rendered tree depth-first through [`RenderTreeQuery`], so every
+/// [`Portal`] renders the tree it transcludes in place, calling a
+/// [`NodeVisitor`] on each node.
 #[derive(SystemParam)]
 pub struct NodeWalker<'w, 's> {
 	elements: ElementQuery<'w, 's>,
 	nodes: Query<'w, 's, NodeView<'static>>,
+	tree: RenderTreeQuery<'w, 's>,
 }
 
+/// Where a [`NodeVisitor`] is in the walk.
 pub struct VisitContext {
-	/// The entity from which the walker began.
-	pub start: Entity,
 	/// The element/value node currently being visited.
 	pub entity: Entity,
 	/// Current depth in the tree, starting at 0 for the root.
@@ -29,10 +31,10 @@ pub struct VisitContext {
 }
 
 impl NodeWalker<'_, '_> {
+	/// Walk the tree at `entity`, a holder walking the tree it transcludes.
 	pub fn walk(&self, visitor: &mut impl NodeVisitor, entity: Entity) {
 		let cx = VisitContext {
-			start: entity,
-			entity,
+			entity: self.tree.resolve(entity),
 			depth: 0,
 		};
 		self.walk_entity(visitor, cx);
@@ -47,31 +49,8 @@ impl NodeWalker<'_, '_> {
 			return;
 		}
 
-		let (
-			doctype,
-			comment,
-			element,
-			children,
-			value,
-			expression,
-			render_ref,
-			cdata,
-			instruction,
-		) = node;
-
-		// A Portal holder is transparent: recurse directly into the
-		// referenced entity, rendering it in place without touching this
-		// entity's own components. Absence of the holder is the unresolved
-		// state (no page yet), which renders nothing.
-		if let Some(render_ref) = render_ref {
-			let child_cx = VisitContext {
-				start: cx.start,
-				entity: render_ref.target(),
-				depth: cx.depth,
-			};
-			self.walk_entity(visitor, child_cx);
-			return;
-		}
+		let (doctype, comment, element, value, expression, cdata, instruction) =
+			node;
 
 		// 1. Doctype
 		if let Some(doctype) = doctype {
@@ -108,15 +87,12 @@ impl NodeWalker<'_, '_> {
 			visitor.visit_expression(&cx, expression);
 		}
 		// 6. Children
-		if let Some(children) = children {
-			for child in children {
-				let child_cx = VisitContext {
-					start: cx.start,
-					entity: *child,
-					depth: cx.depth + 1,
-				};
-				self.walk_entity(visitor, child_cx);
-			}
+		for child in self.tree.children(cx.entity) {
+			let child_cx = VisitContext {
+				entity: child,
+				depth: cx.depth + 1,
+			};
+			self.walk_entity(visitor, child_cx);
 		}
 
 		// 7. Leave Element
@@ -124,36 +100,6 @@ impl NodeWalker<'_, '_> {
 			visitor.leave_element(&cx, element);
 		}
 	}
-}
-
-/// HTML tags that carry no text content: document metadata, scripting,
-/// embedded resources and vector graphics (an `<svg>`'s `<text>` is part of a
-/// picture, not prose). This is the single source of truth for "non-visual",
-/// consumed in two places that must agree:
-/// - the user-agent style layer ([`default_element_rules`]) maps these to
-///   [`Display::None`] so the style-resolved visual renderer (charcell) omits
-///   them via its `display: none` filter (the metadata tags everywhere, the
-///   embedded and vector tags on the terminal only, where they have no
-///   picture), and
-/// - [`NodeVisitor::skip_node`] skips them for the markup/text renderers
-///   (markdown, plaintext) that walk the raw node tree without resolving CSS,
-///   so `display: none` is unavailable to them.
-///
-/// A markup serializer ([`HtmlRenderer`]) is the exception: it overrides
-/// `skip_node` to emit every tag, since `<head>`/`<style>`/`<script>` are valid,
-/// non-visual-but-serialized HTML.
-///
-/// [`Display::None`]: crate::style::Display
-/// [`default_element_rules`]: crate::style::default_element_rules
-/// [`HtmlRenderer`]: crate::prelude::HtmlRenderer
-pub(crate) const NON_VISUAL_TAGS: &[&str] = &[
-	"head", "script", "style", "template", "noscript", "meta", "link", "title",
-	"base", "iframe", "object", "embed", "svg",
-];
-
-/// Whether a tag carries no visual content, ie [`NON_VISUAL_TAGS`].
-pub(crate) fn is_non_visual(tag: &str) -> bool {
-	NON_VISUAL_TAGS.contains(&tag)
 }
 
 /// Form-control tags whose own [`Value`] is their displayed content (eg the
@@ -167,15 +113,18 @@ pub(crate) fn is_value_element(tag: &str) -> bool {
 	VALUE_ELEMENT_TAGS.contains(&tag)
 }
 
+/// Visits each node of a [`NodeWalker`] walk, in document order.
 pub trait NodeVisitor {
 	/// Return `true` to skip visiting this node and all its children.
-	/// By default skips all non-visual html tags, ie `head, style, ..`
+	/// By default skips every tag carrying no text, ie `head, style, svg, ..`
+	/// (see [`RenderTreeQuery::is_textless`]).
 	fn skip_node(
 		&mut self,
 		_cx: &VisitContext,
 		(_, _, element, ..): &NodeView,
 	) -> bool {
-		element.is_some_and(|element| is_non_visual(element.tag()))
+		element
+			.is_some_and(|element| RenderTreeQuery::is_textless(element.tag()))
 	}
 
 	fn visit_doctype(&mut self, _cx: &VisitContext, _doctype: &Doctype) {}

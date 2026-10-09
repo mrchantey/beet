@@ -461,9 +461,8 @@ impl RenderTarget for LeafletRenderer {
 #[derive(SystemParam)]
 struct LeafletQuery<'w, 's> {
 	elements: Query<'w, 's, &'static Element>,
-	children: Query<'w, 's, &'static Children>,
 	values: Query<'w, 's, &'static Value, Without<Element>>,
-	portals: Query<'w, 's, &'static Portal>,
+	tree: RenderTreeQuery<'w, 's>,
 	attributes: AttributeQuery<'w, 's>,
 	inline_blobs: Query<'w, 's, &'static InlineBlob>,
 	metas: Query<'w, 's, &'static PageMeta>,
@@ -498,12 +497,6 @@ const CONTAINERS: &[&str] = &[
 	"hgroup",
 	"search",
 	"dialog",
-];
-
-/// The tags whose content is never prose: metadata, scripts, pictures.
-const SKIPPED: &[&str] = &[
-	"head", "script", "style", "template", "noscript", "meta", "link", "title",
-	"svg", "video", "audio", "canvas",
 ];
 
 /// The inline tags whose text flows into the line with no facet of its own.
@@ -597,7 +590,7 @@ impl LeafletQuery<'_, '_> {
 		out: &mut Vec<LeafletBlock>,
 	) -> Result {
 		let mut run = InlineRun::default();
-		self.block_node(request, entity, out, &mut run)?;
+		self.block_node(request, self.tree.resolve(entity), out, &mut run)?;
 		run.flush_text(out);
 		Ok(())
 	}
@@ -611,9 +604,6 @@ impl LeafletQuery<'_, '_> {
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
-		if let Ok(portal) = self.portals.get(entity) {
-			return self.block_node(request, portal.target(), out, run);
-		}
 		if let Ok(value) = self.values.get(entity) {
 			run.push_text(&value.to_string());
 			return Ok(());
@@ -623,7 +613,14 @@ impl LeafletQuery<'_, '_> {
 		};
 		let tag = element.tag().to_ascii_lowercase();
 		match tag.as_str() {
-			tag if SKIPPED.contains(&tag) => {}
+			// an embed is textless, but maps to a link card before the skip
+			"iframe" => {
+				run.flush_text(out);
+				if let Some(block) = self.iframe(request, entity)? {
+					out.push(block);
+				}
+			}
+			tag if RenderTreeQuery::is_textless(tag) => {}
 			"h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
 				run.flush_text(out);
 				let (plaintext, facets) = self.inline_text(request, entity)?;
@@ -679,12 +676,6 @@ impl LeafletQuery<'_, '_> {
 					language: None,
 				}));
 			}
-			"iframe" => {
-				run.flush_text(out);
-				if let Some(block) = self.iframe(request, entity)? {
-					out.push(block);
-				}
-			}
 			"figure" if self.is_diagram(entity) => {
 				run.flush_text(out);
 				out.push(self.diagram(entity));
@@ -720,10 +711,8 @@ impl LeafletQuery<'_, '_> {
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
-		if let Ok(children) = self.children.get(entity) {
-			for child in children.iter() {
-				self.block_node(request, child, out, run)?;
-			}
+		for child in self.tree.children(entity) {
+			self.block_node(request, child, out, run)?;
 		}
 		Ok(())
 	}
@@ -744,10 +733,8 @@ impl LeafletQuery<'_, '_> {
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
-		if let Ok(children) = self.children.get(entity) {
-			for child in children.iter() {
-				self.inline_node(request, child, out, run)?;
-			}
+		for child in self.tree.children(entity) {
+			self.inline_node(request, child, out, run)?;
 		}
 		Ok(())
 	}
@@ -762,9 +749,6 @@ impl LeafletQuery<'_, '_> {
 		out: &mut Vec<LeafletBlock>,
 		run: &mut InlineRun,
 	) -> Result {
-		if let Ok(portal) = self.portals.get(entity) {
-			return self.inline_node(request, portal.target(), out, run);
-		}
 		if let Ok(value) = self.values.get(entity) {
 			run.push_text(&value.to_string());
 			return Ok(());
@@ -774,7 +758,7 @@ impl LeafletQuery<'_, '_> {
 		};
 		let tag = element.tag().to_ascii_lowercase();
 		match tag.as_str() {
-			tag if SKIPPED.contains(&tag) => Ok(()),
+			tag if RenderTreeQuery::is_textless(tag) => Ok(()),
 			"br" => {
 				run.push_break();
 				Ok(())
@@ -923,31 +907,25 @@ impl LeafletQuery<'_, '_> {
 		let mut run = InlineRun::default();
 		let mut out = Vec::new();
 		let mut nested = Vec::new();
-		if let Ok(children) = self.children.get(item) {
-			for child in children.iter() {
-				match self
-					.elements
-					.get(child)
-					.map(|element| element.tag().to_ascii_lowercase())
-					.as_deref()
-				{
-					Ok("ul") => nested.push(NestedList::Unordered(
-						self.unordered_list(request, child)?,
-					)),
-					Ok("ol") => nested.push(NestedList::Ordered(
-						self.ordered_list(request, child)?,
-					)),
-					// a loose list wraps each item's text in a paragraph
-					Ok("p") => {
-						run.push_text(" ");
-						self.inline_children(
-							request, child, &mut out, &mut run,
-						)?;
-					}
-					_ => {
-						self.inline_node(request, child, &mut out, &mut run)?
-					}
+		for child in self.tree.children(item) {
+			match self
+				.elements
+				.get(child)
+				.map(|element| element.tag().to_ascii_lowercase())
+				.as_deref()
+			{
+				Ok("ul") => nested.push(NestedList::Unordered(
+					self.unordered_list(request, child)?,
+				)),
+				Ok("ol") => nested.push(NestedList::Ordered(
+					self.ordered_list(request, child)?,
+				)),
+				// a loose list wraps each item's text in a paragraph
+				Ok("p") => {
+					run.push_text(" ");
+					self.inline_children(request, child, &mut out, &mut run)?;
 				}
+				_ => self.inline_node(request, child, &mut out, &mut run)?,
 			}
 		}
 		run.trim_end();
@@ -1080,40 +1058,24 @@ impl LeafletQuery<'_, '_> {
 	fn pipe_table(&self, table: Entity) -> String {
 		let mut rows: Vec<Vec<String>> = Vec::new();
 		let mut header_rows = 0;
-		let mut queue = vec![table];
-		while let Some(entity) = queue.pop() {
-			let tag = self
-				.elements
-				.get(entity)
-				.map(|element| element.tag().to_ascii_lowercase())
-				.unwrap_or_default();
-			if tag == "tr" {
-				let cells = self
-					.children
-					.get(entity)
-					.map(|children| {
-						children
-							.iter()
-							.filter(|cell| {
-								self.elements.get(*cell).is_ok_and(|element| {
-									matches!(element.tag(), "td" | "th")
-								})
-							})
-							.map(|cell| collapse_whitespace(&self.text(cell)))
-							.collect()
-					})
-					.unwrap_or_default();
-				let is_header = self.child_elements(entity, "th").len() > 0;
-				if is_header && rows.len() == header_rows {
-					header_rows += 1;
-				}
-				rows.push(cells);
-				continue;
+		for row in self
+			.tree
+			.iter_descendants_inclusive_depth_first(table)
+			.filter(|entity| self.is_tag(*entity, "tr"))
+		{
+			let cells = self
+				.tree
+				.children(row)
+				.filter(|cell| {
+					self.is_tag(*cell, "td") || self.is_tag(*cell, "th")
+				})
+				.map(|cell| collapse_whitespace(&self.text(cell)))
+				.collect();
+			let is_header = !self.child_elements(row, "th").is_empty();
+			if is_header && rows.len() == header_rows {
+				header_rows += 1;
 			}
-			if let Ok(children) = self.children.get(entity) {
-				// depth first in document order
-				queue.extend(children.iter().rev());
-			}
+			rows.push(cells);
 		}
 		let columns = rows.iter().map(Vec::len).max().unwrap_or_default();
 		let widths = (0..columns)
@@ -1159,40 +1121,28 @@ impl LeafletQuery<'_, '_> {
 			.and_then(|(_, _, value)| value.as_str().ok().map(str::to_string))
 	}
 
+	/// Whether `entity` is an element tagged `tag`.
+	fn is_tag(&self, entity: Entity, tag: &str) -> bool {
+		self.elements
+			.get(entity)
+			.is_ok_and(|element| element.tag().eq_ignore_ascii_case(tag))
+	}
+
 	/// The child elements of `entity` tagged `tag`.
 	fn child_elements(&self, entity: Entity, tag: &str) -> Vec<Entity> {
-		self.children
-			.get(entity)
-			.map(|children| {
-				children
-					.iter()
-					.filter(|child| {
-						self.elements.get(*child).is_ok_and(|element| {
-							element.tag().eq_ignore_ascii_case(tag)
-						})
-					})
-					.collect()
-			})
-			.unwrap_or_default()
+		self.tree
+			.children(entity)
+			.filter(|child| self.is_tag(*child, tag))
+			.collect()
 	}
 
 	/// Every text node under `entity` verbatim, in document order.
 	fn text(&self, entity: Entity) -> String {
-		let mut out = String::new();
-		let mut stack = vec![entity];
-		while let Some(entity) = stack.pop() {
-			if let Ok(portal) = self.portals.get(entity) {
-				stack.push(portal.target());
-				continue;
-			}
-			if let Ok(value) = self.values.get(entity) {
-				out.push_str(&value.to_string());
-			}
-			if let Ok(children) = self.children.get(entity) {
-				stack.extend(children.iter().rev());
-			}
-		}
-		out
+		self.tree
+			.iter_descendants_inclusive_depth_first(entity)
+			.filter_map(|entity| self.values.get(entity).ok())
+			.map(|value| value.to_string())
+			.collect()
 	}
 }
 

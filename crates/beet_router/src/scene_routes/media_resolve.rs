@@ -34,7 +34,6 @@
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
-use std::collections::VecDeque;
 
 /// The standard site media ingest policy: which of a page's image sources are
 /// fetched into the tree, the rest being linked. The `--media-ingest` render
@@ -253,8 +252,7 @@ impl MediaSource {
 #[derive(SystemParam)]
 struct MediaSourceQuery<'w, 's> {
 	elements: Query<'w, 's, &'static Element>,
-	children: Query<'w, 's, &'static Children>,
-	portals: Query<'w, 's, &'static Portal>,
+	tree: RenderTreeQuery<'w, 's>,
 	attributes: AttributeQuery<'w, 's>,
 	metas: Query<'w, 's, &'static PageMeta>,
 }
@@ -269,25 +267,18 @@ impl MediaSourceQuery<'_, '_> {
 		page_url: &Url,
 	) -> Result<Vec<(Entity, Url)>> {
 		let mut sources = Vec::new();
-		let mut queue = VecDeque::from([root]);
-		while let Some(entity) = queue.pop_front() {
-			if let Ok(portal) = self.portals.get(entity) {
-				queue.push_back(portal.target());
+		for entity in self.tree.iter_descendants_inclusive(root) {
+			let Ok(element) = self.elements.get(entity) else {
 				continue;
-			}
-			if let Ok(element) = self.elements.get(entity) {
-				for (attribute, key, value) in self.attributes.all(entity) {
-					if !Self::is_image_source(element.tag(), key) {
-						continue;
-					}
-					let Ok(text) = value.as_str() else {
-						continue;
-					};
-					sources.push((attribute, page_url.join(Url::parse(text)?)));
+			};
+			for (attribute, key, value) in self.attributes.all(entity) {
+				if !Self::is_image_source(element.tag(), key) {
+					continue;
 				}
-			}
-			if let Ok(children) = self.children.get(entity) {
-				queue.extend(children.iter());
+				let Ok(text) = value.as_str() else {
+					continue;
+				};
+				sources.push((attribute, page_url.join(Url::parse(text)?)));
 			}
 		}
 		if let Some(cover) = self

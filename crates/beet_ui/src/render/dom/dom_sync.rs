@@ -74,14 +74,19 @@ fn sync_dom(world: &mut World, state: &mut SystemState<DomChanges>) {
 	}
 	// every changed list under one painted element reconciles that element
 	// once
-	let mut targets: Vec<(Entity, web_sys::Element)> = Vec::new();
-	for entity in children {
-		if let Some(target) = reconcile_target(world, entity)
-			&& !targets.iter().any(|(known, _)| *known == target.0)
-		{
-			targets.push(target);
-		}
-	}
+	let targets = world.with_state::<(RenderTreeQuery, Query<&DomNode>), _>(
+		|(tree, nodes)| {
+			let mut targets: Vec<(Entity, web_sys::Element)> = Vec::new();
+			for entity in children {
+				if let Some(target) = reconcile_target(&tree, &nodes, entity)
+					&& !targets.iter().any(|(known, _)| *known == target.0)
+				{
+					targets.push(target);
+				}
+			}
+			targets
+		},
+	);
 	for (entity, target) in targets {
 		sync_children(world, entity, target);
 	}
@@ -201,27 +206,17 @@ fn sync_children(world: &mut World, entity: Entity, target: web_sys::Element) {
 /// one, else the nearest visual ancestor that does, crossing a transclusion
 /// to its holder. `None` outside any painted tree.
 fn reconcile_target(
-	world: &World,
+	tree: &RenderTreeQuery,
+	nodes: &Query<&DomNode>,
 	entity: Entity,
 ) -> Option<(Entity, web_sys::Element)> {
-	let mut current = entity;
-	loop {
-		if let Some(element) =
-			world.get::<DomNode>(current).and_then(DomNode::element)
-		{
-			return Some((current, element.clone()));
-		}
-		current = visual_parent(world, current)?;
-	}
-}
-
-/// The parent an entity renders under: its portal holder, else its
-/// [`ChildOf`] parent.
-fn visual_parent(world: &World, entity: Entity) -> Option<Entity> {
-	world
-		.get::<PortalOf>(entity)
-		.and_then(|of| of.holders().first().copied())
-		.or_else(|| world.get::<ChildOf>(entity).map(ChildOf::parent))
+	tree.iter_ancestors_inclusive(entity).find_map(|ancestor| {
+		nodes
+			.get(ancestor)
+			.ok()
+			.and_then(DomNode::element)
+			.map(|element| (ancestor, element.clone()))
+	})
 }
 
 /// What one entity contributes to its parent's DOM child list.
@@ -231,8 +226,6 @@ enum Contribution {
 	/// Its own children, through it: a document element, a group with no
 	/// node of its own.
 	Children,
-	/// What it transcludes.
-	Portal(Entity),
 	/// Nodes painted fresh.
 	Paint,
 	/// Nothing: an attribute's binding, never a child.
@@ -244,35 +237,33 @@ fn contribution(world: &World, entity: Entity) -> Contribution {
 		Some(DomNode::Node(node)) => Contribution::Node((**node).clone()),
 		Some(DomNode::Document(_)) => Contribution::Children,
 		Some(DomNode::Attribute(_)) => Contribution::None,
-		None => match world.get::<Portal>(entity) {
-			Some(portal) => Contribution::Portal(portal.target()),
-			// the document's own `<html>` is transparent; anything else with a
-			// node of its own paints, and a group without one contributes its
-			// children
-			None if world
-				.get::<Element>(entity)
-				.is_some_and(|element| element.tag() != "html")
-				|| world.get::<Value>(entity).is_some()
-				|| world.get::<Comment>(entity).is_some() =>
-			{
-				Contribution::Paint
-			}
-			None => Contribution::Children,
-		},
+		// the document's own `<html>` is transparent; anything else with a
+		// node of its own paints, and a group without one contributes its
+		// children
+		None if world
+			.get::<Element>(entity)
+			.is_some_and(|element| element.tag() != "html")
+			|| world.get::<Value>(entity).is_some()
+			|| world.get::<Comment>(entity).is_some() =>
+		{
+			Contribution::Paint
+		}
+		None => Contribution::Children,
 	}
 }
 
-/// The nodes `entity`'s children contribute to its DOM child list, in order.
+/// The nodes `entity`'s children contribute to its DOM child list, in order,
+/// each holder contributing what it transcludes.
 fn collect_children(
 	world: &mut World,
 	renderer: &mut DomRenderer,
 	entity: Entity,
 	out: &mut Vec<web_sys::Node>,
 ) {
-	let children: Vec<Entity> = world
-		.get::<Children>(entity)
-		.map(|children| children.iter().collect())
-		.unwrap_or_default();
+	let children: Vec<Entity> =
+		world.with_state::<RenderTreeQuery, _>(|tree| {
+			tree.children(entity).collect()
+		});
 	for child in children {
 		collect(world, renderer, child, out);
 	}
@@ -290,7 +281,6 @@ fn collect(
 		Contribution::Children => {
 			collect_children(world, renderer, entity, out)
 		}
-		Contribution::Portal(target) => collect(world, renderer, target, out),
 		Contribution::Paint => out.extend(renderer.render(world, entity)),
 		Contribution::None => {}
 	}

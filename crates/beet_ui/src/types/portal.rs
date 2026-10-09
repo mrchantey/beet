@@ -1,13 +1,16 @@
-use crate::prelude::RenderSurface;
+//! Transclusion, a [`Portal`] rendering another entity in place, and
+//! [`RenderTreeQuery`], the one traversal over the tree a render sees.
+use alloc::collections::VecDeque;
 use beet_core::prelude::*;
 
 /// Renders another entity in place, by reference, without reparenting it.
 ///
-/// When a [`NodeWalker`] visits an entity carrying this component it recurses
-/// into the referenced entity instead of the holder's own components and
-/// [`Children`]. The referenced entity is neither owned nor moved, so it can be
-/// a separately-managed subtree (eg per-request route content) transcluded into
-/// a document layout without being owned by it.
+/// A holder is transparent: every walk over a rendered tree reads it through
+/// [`RenderTreeQuery`], which substitutes the referenced entity for the holder,
+/// ignoring the holder's own components and [`Children`]. The referenced entity
+/// is neither owned nor moved, so it can be a separately-managed subtree (eg
+/// per-request route content) transcluded into a document layout without being
+/// owned by it.
 ///
 /// This is distinct from author-facing `<slot>` composition (which lowers to
 /// [`SceneProp`] props at macro time): the layout middleware needs to inject
@@ -33,56 +36,6 @@ impl Portal {
 
 	/// The referenced entity.
 	pub fn target(&self) -> Entity { self.0 }
-
-	/// The Portal-aware parent of `entity`: the first holder rendering it in
-	/// place (transcluded content's visual parent), else the [`ChildOf`]
-	/// parent. The hop the style cascade inherits through; loop it to the top
-	/// with [`Self::render_root`].
-	pub fn visual_parent(
-		parents: &Query<&ChildOf>,
-		holders: &Query<&PortalOf>,
-		entity: Entity,
-	) -> Option<Entity> {
-		holders
-			.get(entity)
-			.ok()
-			.and_then(|portal_of| portal_of.holders().first().copied())
-			.or_else(|| {
-				parents.get(entity).ok().map(|child_of| child_of.parent())
-			})
-	}
-
-	/// The render root of `entity`: the surface it renders on — the buffer host
-	/// named by the nearest [`RenderSurface`] on its
-	/// [`visual_parent`](Self::visual_parent) chain — else the top of that chain
-	/// when it renders on no surface.
-	///
-	/// Scopes lookups (eg id resolution) to the tree an entity actually renders
-	/// in, so concurrent surfaces (one per SSH session) never cross wires. A
-	/// surface is a *visual* root even when it hangs under a shared owner by
-	/// `ChildOf` (an SSH connection surface is a child of its router), so the
-	/// walk must stop at the surface, never crossing up into that shared owner
-	/// (whose subtree holds every other session's tree).
-	pub fn render_root(
-		parents: &Query<&ChildOf>,
-		holders: &Query<&PortalOf>,
-		surfaces: &Query<&RenderSurface>,
-		entity: Entity,
-	) -> Entity {
-		let mut current = entity;
-		loop {
-			// a render surface is the visual root: resolve the host it renders into
-			// and stop, so id resolution stays within this session's own tree.
-			if let Ok(surface) = surfaces.get(current) {
-				return surface.surface();
-			}
-			match Self::visual_parent(parents, holders, current) {
-				// a self-referential edge would loop; a malformed graph is a clean stop.
-				Some(parent) if parent != current => current = parent,
-				_ => return current,
-			}
-		}
-	}
 }
 
 /// The holders that render this entity in place by reference, the target half of
@@ -101,6 +54,125 @@ pub struct PortalOf(Vec<Entity>);
 impl PortalOf {
 	/// The holders rendering this entity in place.
 	pub fn holders(&self) -> &[Entity] { &self.0 }
+}
+
+/// The tree a render sees: [`Children`] downward with each [`Portal`] holder
+/// replaced by the entity it transcludes, and [`ChildOf`] upward with each
+/// transcluded entity's first [`PortalOf`] holder as its parent.
+///
+/// Every walk over a rendered tree reads it through this, so a portal is
+/// stepped through in one place. A holder renders as its target, so every
+/// method reads `entity` as the entity it renders as: a holder's children are
+/// its target's, and an iterator yields the target where a holder sits.
+/// Neither [`ChildOf`] nor [`Portal`] admits a self-referential edge, so the
+/// upward walk always terminates.
+///
+/// The tags a text walk skips are owned here too:
+/// [`is_textless`](Self::is_textless).
+#[derive(SystemParam)]
+pub struct RenderTreeQuery<'w, 's> {
+	children: Query<'w, 's, &'static Children>,
+	parents: Query<'w, 's, &'static ChildOf>,
+	portals: Query<'w, 's, &'static Portal>,
+	holders: Query<'w, 's, &'static PortalOf>,
+}
+
+impl RenderTreeQuery<'_, '_> {
+	/// Document metadata and scripting, never rendered by any target: a visual
+	/// one hides them with `display: none`, a text one skips them.
+	pub const METADATA_TAGS: &'static [&'static str] = &[
+		"head", "script", "style", "template", "noscript", "meta", "link",
+		"title", "base",
+	];
+
+	/// Embedded resources and pictures: visual on the web, but no text, so a
+	/// text walk skips them (an `<svg>`'s `<text>` is part of a picture, not
+	/// prose).
+	pub const EMBEDDED_TAGS: &'static [&'static str] = &[
+		"iframe", "object", "embed", "svg", "video", "audio", "canvas",
+	];
+
+	/// Whether a `tag`'s content is no text a reader reads, ie
+	/// [`METADATA_TAGS`](Self::METADATA_TAGS) and
+	/// [`EMBEDDED_TAGS`](Self::EMBEDDED_TAGS). A walk reading prose (markdown,
+	/// plaintext, Leaflet) skips these subtrees; a markup serializer emits them.
+	pub fn is_textless(tag: &str) -> bool {
+		Self::METADATA_TAGS.contains(&tag) || Self::EMBEDDED_TAGS.contains(&tag)
+	}
+
+	/// The entity `entity` renders as: itself, or for a holder the entity its
+	/// [`Portal`] chain ends at.
+	pub fn resolve(&self, mut entity: Entity) -> Entity {
+		while let Ok(portal) = self.portals.get(entity) {
+			entity = portal.target();
+		}
+		entity
+	}
+
+	/// The children of the entity `entity` renders as, in order, each holder
+	/// replaced by the entity it renders as.
+	pub fn children(
+		&self,
+		entity: Entity,
+	) -> impl '_ + DoubleEndedIterator<Item = Entity> {
+		self.children
+			.get(self.resolve(entity))
+			.into_iter()
+			.flat_map(|children| children.iter())
+			.map(|child| self.resolve(child))
+	}
+
+	/// `root` and every entity under it, breadth-first: the shallowest first,
+	/// then in document order.
+	pub fn iter_descendants_inclusive(
+		&self,
+		root: Entity,
+	) -> impl '_ + Iterator<Item = Entity> {
+		let mut queue = VecDeque::from([self.resolve(root)]);
+		core::iter::from_fn(move || {
+			let entity = queue.pop_front()?;
+			queue.extend(self.children(entity));
+			Some(entity)
+		})
+	}
+
+	/// `root` and every entity under it, depth-first in document order, ie
+	/// pre-order.
+	pub fn iter_descendants_inclusive_depth_first(
+		&self,
+		root: Entity,
+	) -> impl '_ + Iterator<Item = Entity> {
+		let mut stack = vec![self.resolve(root)];
+		core::iter::from_fn(move || {
+			let entity = stack.pop()?;
+			stack.extend(self.children(entity).rev());
+			Some(entity)
+		})
+	}
+
+	/// The parent `entity` renders under: the first holder transcluding it,
+	/// else its [`ChildOf`] parent. Transclusion wins, mirroring
+	/// [`children`](Self::children) downward, so a walk up from transcluded
+	/// content crosses into its holder rather than dead-ending at the content
+	/// root.
+	pub fn visual_parent(&self, entity: Entity) -> Option<Entity> {
+		self.holders
+			.get(entity)
+			.ok()
+			.and_then(|portal_of| portal_of.holders().first().copied())
+			.or_else(|| self.parents.get(entity).ok().map(ChildOf::parent))
+	}
+
+	/// `entity` and its visual ancestors, innermost first, each hop through
+	/// [`visual_parent`](Self::visual_parent).
+	pub fn iter_ancestors_inclusive(
+		&self,
+		entity: Entity,
+	) -> impl '_ + Iterator<Item = Entity> {
+		core::iter::successors(Some(entity), |entity| {
+			self.visual_parent(*entity)
+		})
+	}
 }
 
 #[cfg(test)]
@@ -145,43 +217,68 @@ mod test {
 			.xpect_eq(&[holder]);
 	}
 
-	/// Multi-tenant regression: [`render_root`](Portal::render_root) stops at the
-	/// render surface, not at a shared owner the surface hangs under. Two session
-	/// surfaces are `ChildOf` a common owner (as SSH connection surfaces are
-	/// children of their router); a control in one session must resolve to *its*
-	/// surface, so id-scoped lookups never reach the owner's subtree (which holds
-	/// the other session's tree). Before the fix the walk crossed `ChildOf` past
-	/// the surface up into the owner, so one session's disclosure toggled another
-	/// session's target.
+	/// A root holding `before`, a holder transcluding `content` (itself
+	/// holding `first` and `second`), then `after`: `[root, before, holder,
+	/// content, first, second, after]`.
+	fn transcluded(world: &mut World) -> [Entity; 7] {
+		let first = world.spawn_empty().id();
+		let second = world.spawn_empty().id();
+		let content = world.spawn_empty().add_children(&[first, second]).id();
+		let before = world.spawn_empty().id();
+		let holder = world.spawn(Portal::new(content)).id();
+		let after = world.spawn_empty().id();
+		let root = world
+			.spawn_empty()
+			.add_children(&[before, holder, after])
+			.id();
+		[root, before, holder, content, first, second, after]
+	}
+
 	#[beet_core::test]
-	fn render_root_stops_at_the_surface() {
+	fn children_substitute_the_holder() {
 		let mut world = World::new();
-		// the shared owner, eg the router the two SSH connections hang off.
-		let owner = world.spawn_empty().id();
-		// build a session: a buffer-host surface that is a ChildOf child of the
-		// shared owner, its page transcluded into it by a Portal holder and
-		// carrying `RenderSurface(host)`, exactly as the live page binding wires it.
-		let session = |world: &mut World| -> (Entity, Entity) {
-			let host = world.spawn(ChildOf(owner)).id();
-			// the page carries `RenderSurface(host)` and holds the control; a holder
-			// child of the host transcludes the page into the surface by `Portal`.
-			let page = world.spawn(RenderSurface(host)).id();
-			let control = world.spawn(ChildOf(page)).id();
-			world.spawn((ChildOf(host), Portal::new(page)));
-			(host, control)
-		};
-		let (host_a, control_a) = session(&mut world);
-		let (host_b, _control_b) = session(&mut world);
-		// A's control resolves to A's surface, never the shared owner or B's.
+		let [root, before, holder, content, first, second, after] =
+			transcluded(&mut world);
 		world
-			.with_state::<(Query<&ChildOf>, Query<&PortalOf>, Query<&RenderSurface>), _>(
-				move |(parents, holders, surfaces)| {
-					Portal::render_root(
-						&parents, &holders, &surfaces, control_a,
-					)
-				},
-			)
-			.xpect_eq(host_a);
-		(host_a != host_b).xpect_true();
+			.with_state::<RenderTreeQuery, _>(|tree| {
+				tree.children(root).collect::<Vec<_>>()
+			})
+			.xpect_eq(vec![before, content, after]);
+		// a holder renders as its target, so its children are the target's
+		world
+			.with_state::<RenderTreeQuery, _>(|tree| {
+				tree.children(holder).collect::<Vec<_>>()
+			})
+			.xpect_eq(vec![first, second]);
+	}
+
+	#[beet_core::test]
+	fn descendants_substitute_the_holder_in_both_orders() {
+		let mut world = World::new();
+		let [root, before, _holder, content, first, second, after] =
+			transcluded(&mut world);
+		world
+			.with_state::<RenderTreeQuery, _>(|tree| {
+				tree.iter_descendants_inclusive(root).collect::<Vec<_>>()
+			})
+			.xpect_eq(vec![root, before, content, after, first, second]);
+		world
+			.with_state::<RenderTreeQuery, _>(|tree| {
+				tree.iter_descendants_inclusive_depth_first(root)
+					.collect::<Vec<_>>()
+			})
+			.xpect_eq(vec![root, before, content, first, second, after]);
+	}
+
+	#[beet_core::test]
+	fn visual_parent_crosses_the_portal() {
+		let mut world = World::new();
+		let [root, _before, holder, content, first, ..] =
+			transcluded(&mut world);
+		world
+			.with_state::<RenderTreeQuery, _>(|tree| {
+				tree.iter_ancestors_inclusive(first).collect::<Vec<_>>()
+			})
+			.xpect_eq(vec![first, content, holder, root]);
 	}
 }

@@ -129,24 +129,21 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 	]
 }
 
-/// User-agent rule removing metadata and scripting tags from layout via
-/// `display: none`, so visual renderers omit them.
+/// User-agent rule removing metadata and scripting tags
+/// ([`RenderTreeQuery::METADATA_TAGS`]) from layout via `display: none`, so
+/// visual renderers omit them.
 ///
-/// Note this is a strict subset of [`NON_VISUAL_TAGS`]: the embedded-media and
-/// vector tags (`iframe`/`object`/`embed`/`svg`) are visual on the web, so they
-/// are *not* hidden here; the terminal collapses an `<iframe>` to a link
-/// ([`default_element_rules`]) and hides an `<svg>` through its own
-/// terminal-gated rule, so they render on the web but not the terminal.
+/// The embedded-media and vector tags ([`RenderTreeQuery::EMBEDDED_TAGS`]) a
+/// text walk also skips are visual on the web, so they are *not* hidden here;
+/// the terminal collapses an `<iframe>` to a link ([`default_element_rules`])
+/// and hides an `<svg>` through its own terminal-gated rule, so they render on
+/// the web but not the terminal.
 ///
 /// Kept separate from the prose [`default_element_rules`] so theme rule sets (eg
 /// Material) can include it without pulling in prose props that need their own
 /// CSS resolvers.
 pub(crate) fn non_visual_rule() -> Rule {
-	Rule::tags(&[
-		"head", "script", "style", "template", "noscript", "meta", "link",
-		"title", "base",
-	])
-	.with_canonical(Display::None)
+	Rule::tags(RenderTreeQuery::METADATA_TAGS).with_canonical(Display::None)
 }
 
 /// A rule forcing `display: block` on the given tags.

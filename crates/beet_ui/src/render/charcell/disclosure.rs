@@ -33,11 +33,8 @@ use beet_core::prelude::*;
 #[cfg(feature = "tui")]
 pub(crate) fn toggle_aria_controls_on_click(
 	ev: On<PointerUp>,
-	parents: Query<&ChildOf>,
-	holders: Query<&PortalOf>,
-	surfaces: Query<&RenderSurface>,
-	children: Query<&Children>,
-	portals: Query<&Portal>,
+	surfaces: SurfaceQuery,
+	tree: RenderTreeQuery,
 	attributes: Query<&Attributes>,
 	attr_keys: Query<&Attribute>,
 	mut values: Query<&mut Value>,
@@ -50,16 +47,10 @@ pub(crate) fn toggle_aria_controls_on_click(
 	else {
 		return;
 	};
-	let root = Portal::render_root(&parents, &holders, &surfaces, control);
-	let Some(target) = find_by_id(
-		&children,
-		&portals,
-		&attributes,
-		&attr_keys,
-		&values,
-		root,
-		&id,
-	) else {
+	let root = surfaces.render_root(control);
+	let Some(target) =
+		find_by_id(&tree, &attributes, &attr_keys, &values, root, &id)
+	else {
 		return;
 	};
 	// hidden only when explicitly "true", exactly like the script's `isHidden`
@@ -150,29 +141,18 @@ pub(crate) fn set_attr_str(
 /// content so a control can reference a target across a transclusion boundary.
 #[cfg(feature = "tui")]
 pub(crate) fn find_by_id(
-	children: &Query<&Children>,
-	portals: &Query<&Portal>,
+	tree: &RenderTreeQuery,
 	attributes: &Query<&Attributes>,
 	attr_keys: &Query<&Attribute>,
 	values: &Query<&mut Value>,
 	root: Entity,
 	id: &str,
 ) -> Option<Entity> {
-	let mut stack = vec![root];
-	while let Some(entity) = stack.pop() {
-		if attr_string(attributes, attr_keys, values, entity, "id")
-			.is_some_and(|value| value == id)
-		{
-			return Some(entity);
-		}
-		if let Ok(kids) = children.get(entity) {
-			stack.extend(kids.iter());
-		}
-		if let Ok(portal) = portals.get(entity) {
-			stack.push(portal.target());
-		}
-	}
-	None
+	tree.iter_descendants_inclusive_depth_first(root)
+		.find(|entity| {
+			attr_string(attributes, attr_keys, values, *entity, "id")
+				.is_some_and(|value| value == id)
+		})
 }
 
 #[cfg(all(test, feature = "tui"))]

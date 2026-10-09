@@ -286,13 +286,11 @@ pub struct CascadeMemo {
 #[derive(SystemParam)]
 pub struct RuleSetQuery<'w, 's> {
 	rule_set: ResMut<'w, RuleSet>,
-	ancestors: Query<'w, 's, &'static ChildOf>,
-	_children: Query<'w, 's, &'static Children>,
-	// the [`Portal`] reverse edge, so the inherited cascade crosses transclusion
+	// the visual ancestry, so the inherited cascade crosses transclusion
 	// boundaries: content transcluded into a layout by reference has no `ChildOf`
 	// edge to the layout, so inheritance (eg the color scheme) continues from the
 	// holder that renders it in place.
-	render_refs: Query<'w, 's, &'static PortalOf>,
+	tree: RenderTreeQuery<'w, 's>,
 	// the surface viewport width-gated media rules resolve against, found by
 	// walking the same Portal-aware parent chain inheritance uses.
 	viewports: Query<'w, 's, &'static MediaViewport>,
@@ -353,9 +351,13 @@ impl RuleSetQuery<'_, '_> {
 				self.resolve_untyped(entity, &next, memo)
 			}
 			Err(err) => {
-				// inherited tokens search ancestors before the root fallback
+				// inherited tokens search ancestors before the root fallback:
+				// a transcluded entity (the target of a [`Portal`]) inherits from
+				// the holder that renders it in place, not from its `ChildOf`
+				// spawn location, so the cascade (eg the color scheme) crosses
+				// the transclusion boundary.
 				if token.is_inherited()
-					&& let Some(ancestor) = self.parent(entity)
+					&& let Some(ancestor) = self.tree.visual_parent(entity)
 				{
 					self.resolve_untyped(ancestor, token, memo)
 				} else {
@@ -366,17 +368,9 @@ impl RuleSetQuery<'_, '_> {
 		}
 	}
 
-	/// The cascade parent of `entity`. A transcluded entity (the target of a
-	/// [`Portal`]) inherits from the holder that renders it in place, not from
-	/// its original [`ChildOf`] spawn location — so the cascade (eg the color
-	/// scheme) crosses the transclusion boundary. Otherwise the `ChildOf` parent.
-	fn parent(&self, entity: Entity) -> Option<Entity> {
-		Portal::visual_parent(&self.ancestors, &self.render_refs, entity)
-	}
-
 	/// The surface `entity` renders into and its [`MediaViewport`]: the nearest
-	/// self-or-ancestor carrying one, walking the same Portal-aware
-	/// [`parent`](Self::parent) chain inheritance uses, so transcluded content
+	/// self-or-ancestor carrying one, walking the same
+	/// [visual ancestry](RenderTreeQuery::visual_parent) inheritance uses, so transcluded content
 	/// (eg a live page under a buffer host's slot) resolves the surface that
 	/// renders it. `None` when no surface exists (eg building static HTML
 	/// server-side), which skips width-gated rules; a terminal buffer always
@@ -387,41 +381,30 @@ impl RuleSetQuery<'_, '_> {
 		&self,
 		entity: Entity,
 	) -> Option<(Entity, MediaViewport)> {
-		let mut current = entity;
-		loop {
-			if let Ok(viewport) = self.viewports.get(current) {
-				return Some((current, *viewport));
-			}
-			match self.parent(current) {
-				// a self-referential edge would loop; a malformed graph is a clean stop.
-				Some(parent) if parent != current => current = parent,
-				_ => return None,
-			}
-		}
+		self.tree
+			.iter_ancestors_inclusive(entity)
+			.find_map(|ancestor| {
+				self.viewports
+					.get(ancestor)
+					.ok()
+					.map(|viewport| (ancestor, *viewport))
+			})
 	}
 
 	/// See [`RuleSet::has_width_media`].
 	pub fn has_width_media(&self) -> bool { self.rule_set.has_width_media() }
 
 	/// The ancestor element views of `entity`, nearest-first, for evaluating the
-	/// combinator selectors (`>`, descendant). Walks the same Portal-aware
-	/// [`parent`](Self::parent) chain inheritance uses, so content transcluded
+	/// combinator selectors (`>`, descendant). Walks the same
+	/// [visual ancestry](RenderTreeQuery::visual_parent) inheritance uses, so content transcluded
 	/// into `<main>` is seen as its child, and skips non-element (text/fragment)
 	/// nodes so `main > *` reads the same tree the HTML serializer flattens to.
 	fn ancestor_elements(&self, entity: Entity) -> Vec<ElementView<'_>> {
-		let mut ancestors = Vec::new();
-		let mut current = entity;
-		while let Some(parent) = self.parent(current) {
-			// a self-referential edge would loop; a malformed graph is a clean stop.
-			if parent == current {
-				break;
-			}
-			current = parent;
-			if let Ok(view) = self.element_query.get(parent) {
-				ancestors.push(view);
-			}
-		}
-		ancestors
+		self.tree
+			.iter_ancestors_inclusive(entity)
+			.skip(1)
+			.filter_map(|ancestor| self.element_query.get(ancestor).ok())
+			.collect()
 	}
 
 	/// Resolves `token` against the `:root` default rule — the lowest-priority

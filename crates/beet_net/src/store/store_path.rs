@@ -21,6 +21,7 @@
 //! safe. [`on_insert_child_of`] covers the third way an ancestor store changes,
 //! the entity (or a subtree) being parented under one after it spawned.
 
+#[cfg(feature = "std")]
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -75,6 +76,7 @@ impl BlobPath {
 /// holds it: the parent store a [`DirPath`]/[`BlobPath`] resolves against. Exclusive
 /// so a re-resolution starts from the ancestor and never compounds the store this
 /// entity itself produced.
+#[cfg(feature = "std")]
 fn nearest_store<'a>(
 	entity: Entity,
 	parents: &Query<&ChildOf>,
@@ -87,6 +89,7 @@ fn nearest_store<'a>(
 
 /// (Re)compute a [`DirPath`] entity's scoped store from its nearest ancestor store,
 /// inserting it only when the scope changes so a cascade of ancestor inserts settles.
+#[cfg(feature = "std")]
 fn resolve_dir_path(
 	entity: Entity,
 	dirs: &Query<&DirPath>,
@@ -121,6 +124,7 @@ fn resolve_dir_path(
 
 /// (Re)compute a [`BlobPath`] entity's [`Blob`] from its own or nearest ancestor
 /// store, inserting it only when the target changes.
+#[cfg(feature = "std")]
 fn resolve_blob_path(
 	entity: Entity,
 	blob_paths: &Query<&BlobPath>,
@@ -148,6 +152,8 @@ fn resolve_blob_path(
 }
 
 /// On [`DirPath`] insert, scope the nearest ancestor store onto the entity.
+// registered by the std-only `StorePlugin`
+#[cfg(feature = "std")]
 pub(crate) fn on_insert_dir_path(
 	ev: On<Insert, DirPath>,
 	dirs: Query<&DirPath>,
@@ -159,6 +165,8 @@ pub(crate) fn on_insert_dir_path(
 }
 
 /// On [`BlobPath`] insert, resolve the [`Blob`] from the nearest ancestor store.
+// registered by the std-only `StorePlugin`
+#[cfg(feature = "std")]
 pub(crate) fn on_insert_blob_path(
 	ev: On<Insert, BlobPath>,
 	blob_paths: Query<&BlobPath>,
@@ -179,6 +187,7 @@ pub(crate) fn on_insert_blob_path(
 
 /// (Re)compute every [`DirPath`]/[`BlobPath`] in `entities` against its nearest
 /// ancestor store, inserting only where the scope or target changed.
+#[cfg(feature = "std")]
 fn resolve_paths(
 	entities: impl IntoIterator<Item = Entity>,
 	dirs: &Query<&DirPath>,
@@ -204,6 +213,8 @@ fn resolve_paths(
 /// and a [`BlobPath`] on this entity itself. Never a [`DirPath`] on self: the
 /// scoped store this fired on is its own output, so re-resolving would compound
 /// it.
+// registered by the std-only `StorePlugin`
+#[cfg(feature = "std")]
 pub(crate) fn on_insert_store(
 	ev: On<Insert, BlobStore>,
 	children: Query<&Children>,
@@ -238,6 +249,8 @@ pub(crate) fn on_insert_store(
 /// On [`ChildOf`] insert, re-resolve the parented entity and its subtree: a
 /// [`DirPath`]/[`BlobPath`] spawned first and parented under a store after
 /// (`add_children`, a reparent) resolves like one spawned in place.
+// registered by the std-only `StorePlugin`
+#[cfg(feature = "std")]
 pub(crate) fn on_insert_child_of(
 	ev: On<Insert, ChildOf>,
 	children: Query<&Children>,
@@ -263,6 +276,8 @@ pub(crate) fn on_insert_child_of(
 /// whose nearest store is exactly the one going away (a nearer scoped store backs the
 /// rest, and cascades on its own removal). The removed store is still present during
 /// this observer, so `nearest_store` still identifies the descendants it backed.
+// registered by the std-only `StorePlugin`
+#[cfg(feature = "std")]
 pub(crate) fn on_remove_store(
 	ev: On<Remove, BlobStore>,
 	children: Query<&Children>,

@@ -29,7 +29,7 @@ const FOCUS_SCROLL_MARGIN: i32 = 1;
 pub(crate) fn scroll_focus_into_view<B: Component + AsBuffer>(
 	focused: Populated<Entity, Added<Focus>>,
 	surfaces: SurfaceQuery,
-	tree: CharcellTree,
+	tree: RenderTreeQuery,
 	roots: Query<&B>,
 	// `CharcellQuery` (p0) reads `ScrollPosition`, so it can't coexist with the
 	// `&mut ScrollPosition` writer (p1) outside a `ParamSet`.
@@ -50,10 +50,12 @@ pub(crate) fn scroll_focus_into_view<B: Component + AsBuffer>(
 		// the nearest scrollable ancestor, excluding the element itself: scrolling
 		// a focused box's own content cannot bring that box into view.
 		let container =
-			tree.visual_ancestors(entity).skip(1).find(|ancestor| {
-				scrollable_extent(*ancestor, &charcell, viewport)
-					.is_some_and(|max| max != IVec2::ZERO)
-			});
+			tree.iter_ancestors_inclusive(entity)
+				.skip(1)
+				.find(|ancestor| {
+					scrollable_extent(*ancestor, &charcell, viewport)
+						.is_some_and(|max| max != IVec2::ZERO)
+				});
 		let (Some(container), Ok(focus_node)) =
 			(container, charcell.unresolved_node(entity))
 		else {
