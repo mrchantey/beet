@@ -1,7 +1,7 @@
 //! A tiny in-terminal web browser shell on the charcell renderer.
 //!
 //! Parses HTML and markdown only (no SPAs, no heavy css/js). It hosts a
-//! [`Navigator`] on the HTTP transport and a live-render host ([`LivePagePlugin`])
+//! [`Navigator`] on the HTTP transport and a live-render host ([`PageHostPlugin`])
 //! that paints the navigator's bound page into a persistent
 //! [`DoubleBuffer`], with an editable URL bar and back/forward keys.
 //!
@@ -27,7 +27,7 @@ fn main() {
 			// link-click navigation + the single-active-page invariant.
 			NavigatorPlugin,
 			// paint the navigator's bound page into the host DoubleBuffer.
-			LivePagePlugin,
+			PageHostPlugin,
 			AsyncPlugin::default(),
 		))
 		.add_systems(PreUpdate, (url_bar_enter, history_keys))

@@ -66,7 +66,7 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
 
-`PageRoot::prepare` runs the layouts, resolves the `--root` render param (`document`, `main` or `content`, one cascade documented on `RenderRoot`) and, for a target that embeds media, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `RenderTargets`). A request is `PageRoot::scoped` around one render whose media type `Accept` negotiates, so a direct caller naming the same type gets exactly the body a client does, and the scope releases the page whatever the outcome.
+`LivePage::prepare` runs the layouts, resolves the `--root` render param (`main` or `content`, one cascade documented on `RenderRoot`, absent for the whole page) and, when the request names a `--media-ingest` policy, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `RenderTargets`). A request is `LivePage::respond`, one render whose media type `Accept` negotiates, so a direct caller in `LivePage::scoped` naming the same type gets exactly the body a client does, and both release the page whatever the outcome.
 
 ### Layouts
 

@@ -332,7 +332,7 @@ fn beet_runtime_plugin(app: &mut App) {
 /// former `ClientAppPlugin`), plus the scene-server meta-routes and the dormant
 /// card-stack machinery.
 ///
-/// The page lifecycle (`LivePagePlugin`) rides here rather than the terminal
+/// The page lifecycle (`PageHostPlugin`) rides here rather than the terminal
 /// stack alone: the browser's `DomServer` binds pages to its host through the
 /// same navigator on every target the router builds for.
 #[cfg(any(feature = "router", feature = "router_render"))]
@@ -341,7 +341,7 @@ fn router_plugin(app: &mut App) {
 		.init_plugin::<RouterPlugin>()
 		.init_plugin::<ServerPlugin>()
 		.init_plugin::<NavigatorPlugin>()
-		.init_plugin::<LivePagePlugin>()
+		.init_plugin::<PageHostPlugin>()
 		.add_plugins(CardStackPlugin);
 	// the scene-server meta-routes load/save scenes through world serde, so they
 	// are only available (and only useful) with `template_serde`.
@@ -354,5 +354,5 @@ fn router_plugin(app: &mut App) {
 fn tui_server_plugin(app: &mut App) {
 	app.init_plugin::<CharcellTuiPlugin>()
 		.init_plugin::<NavigatorPlugin>()
-		.init_plugin::<LivePagePlugin>();
+		.init_plugin::<PageHostPlugin>();
 }

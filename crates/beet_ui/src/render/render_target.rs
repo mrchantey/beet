@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use beet_core::prelude::*;
 
 /// A format a tree renders to: a [`NodeRenderer`] that names the media types
-/// it answers and the media kinds it embeds, registered in [`RenderTargets`].
+/// it answers, registered in [`RenderTargets`].
 ///
 /// The registry clones the registered instance for every render, so its
 /// configuration (an [`HtmlRenderer`]'s indent, an [`AnsiTermRenderer`]'s
@@ -14,11 +14,6 @@ use beet_core::prelude::*;
 pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 	/// The media types this target answers, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
-
-	/// The media kinds a render through this target embeds, each source of
-	/// those kinds resolved onto the tree before it renders. Empty for a
-	/// target that only links media, which costs nothing.
-	fn embeds(&self) -> Vec<MediaKind> { Vec::new() }
 }
 
 /// Every [`RenderTarget`] this world renders to, the one place a format is
@@ -53,14 +48,6 @@ impl RenderTargets {
 			}
 		}
 		available
-	}
-
-	/// The media kinds a render as `media_type` embeds, empty when nothing
-	/// answers it.
-	pub fn embeds(&self, media_type: &MediaType) -> Vec<MediaKind> {
-		self.target(media_type)
-			.map(|target| target.embeds())
-			.unwrap_or_default()
 	}
 
 	/// The media type a request accepting `accepts` is answered as, `default`
@@ -204,7 +191,6 @@ impl Plugin for RenderPlugin {
 /// The object-safe face of a [`RenderTarget`], which a registry can hold.
 trait ErasedRenderTarget: 'static + Send + Sync {
 	fn media_types(&self) -> Vec<MediaType>;
-	fn embeds(&self) -> Vec<MediaKind>;
 	fn render_as(
 		&self,
 		entity: Entity,
@@ -215,8 +201,6 @@ trait ErasedRenderTarget: 'static + Send + Sync {
 
 impl<T: RenderTarget> ErasedRenderTarget for T {
 	fn media_types(&self) -> Vec<MediaType> { RenderTarget::media_types(self) }
-
-	fn embeds(&self) -> Vec<MediaKind> { RenderTarget::embeds(self) }
 
 	fn render_as(
 		&self,
@@ -432,7 +416,6 @@ mod test {
 			fn media_types(&self) -> Vec<MediaType> {
 				vec![MediaType::other("text/x-shout"), MediaType::Html]
 			}
-			fn embeds(&self) -> Vec<MediaKind> { vec![MediaKind::Image] }
 		}
 		let (mut world, entity) = page();
 		world.resource_mut::<RenderTargets>().register(Shout);
@@ -445,14 +428,6 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect_contains("HI");
-		world
-			.resource::<RenderTargets>()
-			.embeds(&shout)
-			.xpect_eq(vec![MediaKind::Image]);
-		world
-			.resource::<RenderTargets>()
-			.embeds(&MediaType::Markdown)
-			.xpect_empty();
 	}
 
 	/// Parse markdown then render back as markdown.

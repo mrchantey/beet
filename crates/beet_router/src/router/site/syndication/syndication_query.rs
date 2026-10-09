@@ -45,7 +45,7 @@ impl SyndicationScope {
 	}
 
 	/// `page`'s own content, nothing a layout contributed, rendered as
-	/// `media_type`: the `--root=content` render of [`PageRoot::scoped`], the
+	/// `media_type`: the `--root=content` render of [`LivePage::scoped`], the
 	/// one boundary every syndication consumer reads, so a feed and a search
 	/// index can never disagree about where a page's content begins.
 	///
@@ -60,12 +60,9 @@ impl SyndicationScope {
 	) -> Option<String> {
 		let request = Request::get(page.path.with_leading_slash())
 			.with_param("root", "content");
-		PageRoot::scoped(
-			&world.entity(self.router),
-			request,
-			&[media_type.clone()],
-			async |live| live.render(&media_type).await,
-		)
+		LivePage::scoped(&world.entity(self.router), request, async |live| {
+			live.render(&media_type).await
+		})
 		.await
 		.and_then(|bytes| bytes.as_utf8().map(str::to_string))
 		.inspect_err(|err| {

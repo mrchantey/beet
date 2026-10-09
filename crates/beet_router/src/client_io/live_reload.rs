@@ -787,7 +787,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			NavigatorPlugin,
 		));
 		// the reload's render diagnostics paint the layout chrome (header/sidebar)

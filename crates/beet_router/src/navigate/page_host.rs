@@ -1,5 +1,5 @@
-//! Live route rendering: paint the active route tree into a persistent
-//! [`DoubleBuffer`] and re-render on navigation.
+//! Page hosts: the surfaces a [`LivePage`] is bound to, its tree painted into
+//! a persistent [`DoubleBuffer`] and re-rendered on navigation.
 //!
 //! The one-shot CLI path serializes a route's template tree to a string and
 //! despawns it. The live TUI instead keeps the rendered tree alive and paints it
@@ -81,9 +81,9 @@ fn page_viewport_style() -> impl Bundle {
 /// the [`DomHost`] mount that first paints a settled page after it, and the
 /// input path delivering the document's events to the painted entities.
 #[derive(Default)]
-pub struct LivePagePlugin;
+pub struct PageHostPlugin;
 
-impl Plugin for LivePagePlugin {
+impl Plugin for PageHostPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(despawn_page_with_surface);
 		#[cfg(target_arch = "wasm32")]
@@ -115,15 +115,15 @@ fn despawn_page_with_surface(
 }
 
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
-/// scene route into a living page: [`PageRoot::prepare_request`] alone, the
-/// same route build, layout middleware and `--root` cascade the static
-/// [`PageRoot::render`] path runs, its tree bound to a surface via
+/// scene route into a living page: [`LivePage::prepare_request`] alone, the
+/// same route build, layout middleware and `--root` cascade a request's
+/// [`LivePage::respond`] runs, its tree bound to a surface via
 /// [`bind_surface_page`] instead of rendered and released.
 pub(crate) async fn build_live_page(
 	router: &AsyncEntity,
 	request: Request,
 ) -> Result<SurfacePage> {
-	PageRoot::prepare_request(router, request, &[])
+	LivePage::prepare_request(router, request)
 		.await?
 		.into_surface()
 		.xok()
@@ -278,7 +278,7 @@ mod test {
 			DocumentPlugin,
 			CharcellPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 		));
 		app
 	}
@@ -341,7 +341,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			NavigatorPlugin,
 		));
 		app

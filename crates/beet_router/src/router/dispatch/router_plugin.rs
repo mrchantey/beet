@@ -104,7 +104,7 @@ impl Plugin for RouterPlugin {
 				.init_plugin::<ServerPlugin>()
 				// every scene route renders through the render target registry
 				.init_plugin::<RenderPlugin>()
-				// the scene routes' render params and the media they embed
+				// the scene routes' render params and the media a request resolves
 				.register_type::<RenderRoot>()
 				.register_type::<MediaIngestPolicy>()
 				.register_type::<InlineBlob>()

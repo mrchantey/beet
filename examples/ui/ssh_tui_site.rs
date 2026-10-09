@@ -35,7 +35,7 @@ fn main() -> Result {
 		// the live interactive terminal stack (input bridge, repaint, navigation).
 		CharcellTuiPlugin,
 		NavigatorPlugin,
-		LivePagePlugin,
+		PageHostPlugin,
 		// the multi-tenant SSH-TUI per-connection behavior.
 		SshTuiPlugin,
 		// the style rule set the pages render with.

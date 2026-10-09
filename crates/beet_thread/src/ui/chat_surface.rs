@@ -29,7 +29,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			NavigatorPlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			CharcellTuiPlugin,
 		))
 		.init_plugin::<ThreadPlugin>()

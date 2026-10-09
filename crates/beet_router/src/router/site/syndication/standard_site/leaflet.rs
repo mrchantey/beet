@@ -23,7 +23,7 @@
 //! | `pre > code` | `blocks.code`, `language` from the code's class (`rust`, or `language-rust`) |
 //! | `hr` | `blocks.horizontalRule` |
 //! | `ul`, `ol` | `blocks.unorderedList`, `blocks.orderedList`; each item's `content` is a `blocks.text`, and a nested list rides `children` |
-//! | `img` | `blocks.image`: the `BlobRef` of the `InlineBlob` the media resolve step left on its `src` attribute, and the `aspectRatio` the lexicon requires read from the bytes' header; under a `link` policy, `blocks.website` with the image's url |
+//! | `img` | `blocks.image`: the `BlobRef` of the `InlineBlob` the media resolve step left on its `src` attribute, and the `aspectRatio` the lexicon requires read from the bytes' header; an image not fetched (a `link` policy, or a request naming none) is a `blocks.website` with its url |
 //! | `a`, `strong`/`b`, `em`/`i`, `code` (inline), `mark`, `u`, `s`, `del` | not blocks: facets over the enclosing block's `plaintext` |
 //!
 //! # Facets
@@ -446,8 +446,6 @@ impl NodeRenderer for LeafletRenderer {
 
 impl RenderTarget for LeafletRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
-
-	fn embeds(&self) -> Vec<MediaKind> { vec![MediaKind::Image] }
 }
 
 /// What the Leaflet walk reads off a rendered tree.
@@ -1606,7 +1604,8 @@ mod test {
 
 	/// The `--root=content` Leaflet render of the site's own blog post at
 	/// `slug`, read off `site/routes/blog` and rendered as a request would
-	/// render it, its media linked so a run needs no assets.
+	/// render it, naming no media ingest policy so its media is linked and a
+	/// run needs no assets.
 	#[cfg(all(
 		feature = "markdown_parser",
 		feature = "native",
@@ -1628,7 +1627,6 @@ mod test {
 			.exchange(
 				Request::get(format!("/{slug}"))
 					.with_param("root", "content")
-					.with_param("media-ingest", "link")
 					.with_accept(LeafletRenderer::media_type()),
 			)
 			.await

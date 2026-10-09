@@ -25,7 +25,7 @@ fn main() {
 	// the live TUI layers the interactive plugins onto the shared substrate:
 	// the charcell host loop, link navigation, and the current-page painter.
 	#[cfg(feature = "tui")]
-	app.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
+	app.add_plugins((CharcellTuiPlugin, NavigatorPlugin, PageHostPlugin));
 	app.add_systems(Startup, |mut commands: Commands| {
 		// spawn the feature-selected server with the site router as its dispatch
 		// child, plus the load context that calls it: a one-shot `CliServer`

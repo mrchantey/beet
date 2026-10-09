@@ -41,7 +41,7 @@ impl SiteHost {
 				title: "Beet".into(),
 				..pkg_config!()
 			})
-			.add_plugins((CharcellTuiPlugin, NavigatorPlugin, LivePagePlugin));
+			.add_plugins((CharcellTuiPlugin, NavigatorPlugin, PageHostPlugin));
 		setup(&mut app);
 
 		// the router on its own entity; the in-world navigator dispatches to it.

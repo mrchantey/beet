@@ -48,8 +48,6 @@
 //! 	fn media_types(&self) -> Vec<MediaType> {
 //! 		vec![MediaType::other("text/x-shout")]
 //! 	}
-//! 	// a target embedding media names the kinds, ie `vec![MediaKind::Image]`,
-//! 	// and their sources are resolved onto the tree before it renders
 //! }
 //!
 //! let mut app = App::new();

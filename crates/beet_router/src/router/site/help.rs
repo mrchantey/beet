@@ -5,7 +5,7 @@
 //! template. That listing has exactly one home: an unmatched path gets
 //! [`ContextualNotFound`]'s small [`NotFoundPage`], which names the miss and
 //! links here rather than enumerating the url space to whoever asked. Both go
-//! through [`PageRoot::render`], so an ancestor layout (the document chrome)
+//! through [`LivePage::respond`], so an ancestor layout (the document chrome)
 //! wraps them exactly like any other route, and the one listing serves both the
 //! CLI `--help` and the web `?help` view.
 
@@ -57,7 +57,7 @@ pub async fn HelpHandler(
 	};
 
 	let root = spawn_route_list(&caller, &parts, entries, prescans).await?;
-	PageRoot::render(root, &caller, parts).await
+	LivePage::respond(root, &caller, parts).await
 }
 
 /// The registered [`Prescan`] set as help rows, empty in a world with none.
@@ -102,7 +102,7 @@ pub(crate) async fn ContextualNotFound(
 
 	let root = spawn_not_found(&cx.caller, cx.input.parts(), notice).await?;
 	let mut response =
-		PageRoot::render(root, &cx.caller, cx.input.parts().clone()).await?;
+		LivePage::respond(root, &cx.caller, cx.input.parts().clone()).await?;
 	response.parts.status = StatusCode::NOT_FOUND;
 	Ok(response)
 }
@@ -166,7 +166,7 @@ pub(crate) struct RouteParam {
 /// the url space is enumerated: an unmatched path gets [`NotFoundPage`], which
 /// links here instead of repeating it. The document chrome
 /// (head/sidebar/footer) is the ancestor layout's job, applied by
-/// [`PageRoot::render`], so this widget only owns the route listing. The list is
+/// [`LivePage::respond`], so this widget only owns the route listing. The list is
 /// a bare fragment that inherits the page `Background`, not a `.card-filled`
 /// surface, so the help reads as the conservative app base — the same near-black
 /// page as the regular site — rather than a lighter, tinted card tone.
@@ -331,7 +331,7 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 /// identically.
 ///
 /// Built through `spawn_template` so the widget's slots and lifecycle resolve,
-/// then marked a self-referential [`PageRoot`] so [`PageRoot::render`] walks
+/// then marked a self-referential [`PageRoot`] so [`LivePage::respond`] walks
 /// it (wrapping it in any ancestor layout) and despawns it after rendering.
 async fn spawn_route_list(
 	caller: &AsyncEntity,

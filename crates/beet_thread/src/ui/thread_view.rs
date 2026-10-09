@@ -583,7 +583,7 @@ mod test {
 		frame(&app, host).xpect_contains("newest post");
 	}
 
-	/// The live-TUI render stack minus the terminal (as `live_page`'s own tests
+	/// The live-TUI render stack minus the terminal (as `page_host`'s own tests
 	/// build it), hosting a page-bound view of a fresh thread: the app, the
 	/// thread entity and the host whose buffer is painted.
 	fn live_host() -> (App, Entity, Entity) {
@@ -594,7 +594,7 @@ mod test {
 			DocumentPlugin,
 			CharcellPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 		))
 		.init_plugin::<ThreadPlugin>()
 		.init_plugin::<ThreadUiPlugin>();

@@ -4,7 +4,8 @@
 //! `?root=main`, `--root=main` and a field on an in-process request are the
 //! same switch, a param on every scene route's [`RenderParams`], so `--help`
 //! documents it and each value is its own cache key. It chooses the tree a
-//! target renders, never how, so it applies to every registered target.
+//! target renders, never how, so it applies to every registered target. With
+//! no `--root` a render answers the whole tree, document chrome and all.
 //!
 //! # The cascade
 //!
@@ -37,14 +38,11 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 use std::collections::VecDeque;
 
-/// Which part of a page a render answers, the `--root` render param. See the
-/// [module docs](self) for the cascade `main` and `content` resolve through.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
-#[reflect(Default)]
+/// Which part of a page a render answers, the `--root` render param, its
+/// absence being the whole tree. See the [module docs](self) for the cascade
+/// `main` and `content` resolve through.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum RenderRoot {
-	/// The whole tree, document chrome and all.
-	#[default]
-	Document,
 	/// The page's main content: its first `<main>`, else the route content a
 	/// layout transcludes, else its `<body>`, else the whole tree.
 	Main,
@@ -57,22 +55,19 @@ pub enum RenderRoot {
 /// construction so `--help` lists them.
 #[derive(Debug, Default, Clone, Reflect)]
 pub struct RenderParams {
-	/// The part of the page to render: `document` (the default, the whole
-	/// page), `main` (its main content) or `content` (the route's own content,
-	/// nothing a layout contributed).
+	/// The part of the page to render: `main` (its main content) or
+	/// `content` (the route's own content, nothing a layout contributed),
+	/// unset for the whole page.
 	pub root: Option<RenderRoot>,
-	/// The standard site media ingest policy, for a target that embeds media:
-	/// `upload` (the default) fetches every source, `local` the site's own,
-	/// `link` none.
+	/// The standard site media ingest policy: when set, the page's images are
+	/// fetched onto the tree before it renders, `upload` every source,
+	/// `local` the site's own, `link` none; unset fetches nothing.
 	pub media_ingest: Option<MediaIngestPolicy>,
 }
 
 impl RenderParams {
 	/// The render params `parts` carries.
 	pub fn of(parts: &RequestParts) -> Result<Self> { parts.parse_params() }
-
-	/// The part of the page to render, [`RenderRoot::Document`] when unset.
-	pub fn root(&self) -> RenderRoot { self.root.unwrap_or_default() }
 }
 
 /// The cascade [`RenderRoot`] resolves through, over a rendered tree.
@@ -86,15 +81,19 @@ pub struct RenderRootQuery<'w, 's> {
 
 impl RenderRootQuery<'_, '_> {
 	/// The entity a render as `root` starts from, `rendered` being the whole
-	/// tree.
-	pub fn resolve(&self, rendered: Entity, root: RenderRoot) -> Entity {
+	/// tree and the answer to no `root`.
+	pub fn resolve(
+		&self,
+		rendered: Entity,
+		root: Option<RenderRoot>,
+	) -> Entity {
 		let main = || self.first_element(rendered, "main");
 		let content = || self.layout_content(rendered);
 		let body = || self.first_element(rendered, "body");
 		match root {
-			RenderRoot::Document => None,
-			RenderRoot::Main => main().or_else(content).or_else(body),
-			RenderRoot::Content => content().or_else(body),
+			None => None,
+			Some(RenderRoot::Main) => main().or_else(content).or_else(body),
+			Some(RenderRoot::Content) => content().or_else(body),
 		}
 		.unwrap_or(rendered)
 	}
@@ -137,10 +136,11 @@ impl RenderRootQuery<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// The tag of the entity `root` resolves to over `tree`.
-	fn resolve(tree: impl Bundle, root: RenderRoot) -> String {
+	fn resolve(tree: impl Bundle, root: Option<RenderRoot>) -> String {
 		let mut world = world_ext::ui_world();
 		let rendered = world.spawn(tree).id();
 		let resolved = world.with_state::<RenderRootQuery, _>(|query| {
@@ -156,12 +156,9 @@ mod test {
 	}
 
 	#[beet_core::test]
-	fn document_is_the_whole_tree() {
-		resolve(
-			rsx! { <html><body><main/></body></html> },
-			RenderRoot::Document,
-		)
-		.xpect_eq("whole");
+	fn none_is_the_whole_tree() {
+		resolve(rsx! { <html><body><main/></body></html> }, None)
+			.xpect_eq("whole");
 	}
 
 	/// The shallowest `<main>` wins, then the earliest.
@@ -176,7 +173,7 @@ mod test {
 		let mut world = world_ext::ui_world();
 		let rendered = world.spawn(tree).id();
 		let main = world.with_state::<RenderRootQuery, _>(|query| {
-			query.resolve(rendered, RenderRoot::Main)
+			query.resolve(rendered, Some(RenderRoot::Main))
 		});
 		world
 			.with_state::<AttributeQuery, _>(|attributes| {
@@ -193,11 +190,18 @@ mod test {
 	/// then to the whole tree.
 	#[beet_core::test]
 	fn falls_to_the_body_then_the_tree() {
-		resolve(rsx! { <html><body><p/></body></html> }, RenderRoot::Main)
-			.xpect_eq("body");
-		resolve(rsx! { <html><body><p/></body></html> }, RenderRoot::Content)
-			.xpect_eq("body");
-		resolve(rsx! { <div><p/></div> }, RenderRoot::Main).xpect_eq("whole");
+		resolve(
+			rsx! { <html><body><p/></body></html> },
+			Some(RenderRoot::Main),
+		)
+		.xpect_eq("body");
+		resolve(
+			rsx! { <html><body><p/></body></html> },
+			Some(RenderRoot::Content),
+		)
+		.xpect_eq("body");
+		resolve(rsx! { <div><p/></div> }, Some(RenderRoot::Main))
+			.xpect_eq("whole");
 	}
 
 	/// A layout's transcluded content is the second rung: `content` takes it
@@ -223,8 +227,8 @@ mod test {
 				query.resolve(layout, root)
 			})
 		};
-		resolve(&mut world, RenderRoot::Content).xpect_eq(content);
-		let main = resolve(&mut world, RenderRoot::Main);
+		resolve(&mut world, Some(RenderRoot::Content)).xpect_eq(content);
+		let main = resolve(&mut world, Some(RenderRoot::Main));
 		world.get::<Element>(main).unwrap().tag().xpect_eq("main");
 	}
 
@@ -237,8 +241,28 @@ mod test {
 			.spawn((Element::new("div"), children![Portal::new(content)]))
 			.id();
 		let main = world.with_state::<RenderRootQuery, _>(|query| {
-			query.resolve(shell, RenderRoot::Main)
+			query.resolve(shell, Some(RenderRoot::Main))
 		});
 		world.get::<Element>(main).unwrap().tag().xpect_eq("main");
+	}
+
+	/// `--help` lists `--root` and the words it takes on a scene route.
+	#[beet_core::test]
+	async fn help_lists_the_root_param() {
+		let mut world = syndication_world(None);
+		let router = world
+			.spawn((Router::with_defaults(), children![page(
+				"post",
+				default()
+			)]))
+			.flush();
+		world
+			.entity_mut(router)
+			.exchange(Request::get("/?help").with_accept(MediaType::Text))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("root")
+			.xpect_contains("one of: main, content");
 	}
 }

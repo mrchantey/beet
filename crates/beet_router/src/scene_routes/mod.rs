@@ -4,7 +4,7 @@
 //! A regular `exchange_route` returns an `IntoResponseWithRequestParts` (JSON, a redirect,
 //! bytes) already in final form. A *scene route* instead yields the [`Entity`]
 //! root of a tree (an rsx/markdown/parsed document, a behavior tree, …)
-//! carrying a [`PageRoot`]. [`PageRoot::prepare`] runs its render middleware
+//! carrying a [`PageRoot`]. [`LivePage::prepare`] runs its render middleware
 //! (the layouts) and resolves the `--root` cascade ([`RenderRoot`]) into a
 //! [`LivePage`], which renders through the `RenderTargets` registry as the
 //! request's `Accept` negotiates (HTML, markdown, charcell, …) or as a caller
@@ -20,6 +20,12 @@
 
 mod page_root;
 pub use page_root::*;
+// a built page held alive between its build and its renders
+mod live_page;
+pub use live_page::*;
+// a store file served as a page, parsed per request
+mod blob_page;
+pub use blob_page::*;
 // any store file a request names, parsed like a `BlobPage` and rendered as the
 // request accepts
 mod blob_view;
@@ -43,7 +49,8 @@ pub mod render_action;
 // the `--root` render param and the cascade it resolves through
 mod render_root;
 pub use render_root::*;
-// the sources a render target embeds, fetched onto the tree before it renders
+// the media a request names a policy for, fetched onto the tree before it
+// renders
 mod media_resolve;
 #[cfg(test)]
 pub(crate) use media_resolve::test_fixtures::*;

@@ -409,7 +409,7 @@ fn authored_kind(type_id: TypeId) -> Option<String> {
 }
 
 /// How a unit-only enum is written: its variants as the kebab-case words a
-/// flag takes, ie `one of: document, main, content` for a `--root`, since the
+/// flag takes, ie `one of: main, content` for a `--root`, since the
 /// type path names none of them.
 fn variant_kind(info: Option<&TypeInfo>) -> Option<String> {
 	let Some(TypeInfo::Enum(info)) = info else {

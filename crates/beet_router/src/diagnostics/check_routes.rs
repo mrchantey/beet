@@ -4,7 +4,7 @@
 //!
 //! Each scene route's own `Action<Request, PageRequest>` builds its content
 //! through the template substrate, so the built tree, incl any [`TemplateError`]
-//! the build rode, is there to scan. Cleanup then mirrors [`PageRoot::render`]:
+//! the build rode, is there to scan. Cleanup then mirrors [`LivePage::respond`]:
 //! only the route's [`DespawnAfterRender`] ephemerals are despawned, never the
 //! `content` entity, which for a `BlobPage`/`RoutesDir` route is the persistent
 //! [`RouteTree`] node that every later request reuses.

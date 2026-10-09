@@ -42,7 +42,7 @@ pub(super) async fn send_ureq(req: Request) -> Result<Response> {
 
 	// Convert to http::Request
 	let http_parts: http::request::Parts = parts.try_into()?;
-	let body = body.into_bytes().await?.to_vec();
+	let body = Vec::from(body.into_bytes().await?);
 	let http_req = http::Request::from_parts(http_parts, body);
 
 	// Run the whole blocking exchange on a thread pool, the body read included:

@@ -22,7 +22,7 @@ use beet_ui::prelude::*;
 /// signal it despawns that host, so the terminal does not outlive the run.
 ///
 /// Reusable: any app gets a live TUI by adding the live plugins
-/// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]) and spreading
+/// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`PageHostPlugin`]) and spreading
 /// this on its server root, then booting it.
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]

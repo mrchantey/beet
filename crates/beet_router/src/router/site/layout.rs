@@ -33,8 +33,8 @@
 //! and the `--root` render param reads it ([`RenderRoot`], whose module docs
 //! hold the cascade). Everything outside the `<main>` is chrome: the head, the
 //! header and nav, the sidebar, the footer. So `--root=main` answers the
-//! `<main>` and what a layout put inside it, while `--root=content` answers
-//! only the route content the layouts transclude.
+//! `<main>` and what a layout put inside it, `--root=content` only the route
+//! content the layouts transclude, and no `--root` the whole page.
 //!
 //! The two differ by what an inner layout adds inside `<main>`. The site's
 //! `ArticleLayout` renders `ArticleHeader` (the `<h1>` title, the byline and

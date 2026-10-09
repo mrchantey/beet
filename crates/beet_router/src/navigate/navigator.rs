@@ -601,7 +601,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			NavigatorPlugin,
 		));
 		let events = Arc::new(Mutex::new(Vec::<AnalyticsEvent>::new()));

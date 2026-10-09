@@ -93,7 +93,7 @@ mod test {
 	use super::*;
 	use bevy::math::UVec2;
 
-	/// The live-TUI render stack minus the terminal host, matching `live_page`'s
+	/// The live-TUI render stack minus the terminal host, matching `page_host`'s
 	/// test app: charcell pipeline, per-frame repaint, document chain, page sync.
 	fn live_app() -> App {
 		let mut app = App::new();
@@ -103,7 +103,7 @@ mod test {
 			DocumentPlugin,
 			CharcellPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 		));
 		app
 	}

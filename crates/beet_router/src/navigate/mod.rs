@@ -16,11 +16,11 @@ pub use navigate::*;
 mod navigator_plugin;
 #[cfg(feature = "std")]
 pub use navigator_plugin::*;
-// std-only: renders the active route into a persistent DoubleBuffer (needs beet_ui).
+// std-only: the surface a live page is bound to and painted into (needs beet_ui).
 #[cfg(feature = "std")]
-mod live_page;
+mod page_host;
 #[cfg(feature = "std")]
-pub use live_page::*;
+pub use page_host::*;
 // std-only: link classification + OnOpenLink (needs beet_ui ElementQuery/LinkView).
 #[cfg(feature = "std")]
 mod open_link;

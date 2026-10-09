@@ -44,7 +44,7 @@ impl SiteHost {
 			RouterPlugin,
 			CharcellTuiPlugin,
 			NavigatorPlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			material::MaterialStylePlugin,
 		))
 		.insert_resource(pkg_config!());

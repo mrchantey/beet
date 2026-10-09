@@ -1,20 +1,17 @@
-//! The media resolve step: the sources a render target embeds, fetched onto
-//! the tree before it renders.
+//! The media resolve step: a page's images, fetched onto the tree before it
+//! renders.
 //!
-//! A target that embeds media (Leaflet embeds images) declares the
-//! [`MediaKind`]s it embeds. When a render's target declares any, this step
-//! runs in [`PageRoot::prepare`](crate::prelude::PageRoot::prepare), after the
-//! layouts and the `--root` cascade,
-//! over the render root's subtree: each source attribute of a declared kind
-//! (an `img`'s `src`, a `video`'s `poster`), plus the page's cover image
-//! (`PageMeta::social_image_url`) when images are declared, resolves against
-//! the page's url, is fetched, and lands as an [`InlineBlob`] on the
-//! attribute's entity. The attribute's value stays the link. A target with no
-//! kinds (html, markdown, plain text) costs nothing.
-//!
-//! The standard site media ingest policy ([`MediaIngestPolicy`], the
-//! `--media-ingest` render param) says which sources are fetched: every one,
-//! the site's own alone, or none, so a target links what was not fetched.
+//! The caller asks for it: the step runs in
+//! [`LivePage::prepare`](crate::prelude::LivePage::prepare) when the request
+//! names a standard site media ingest policy ([`MediaIngestPolicy`], the
+//! `--media-ingest` render param), and only then, so a plain request fetches
+//! nothing. It runs after the layouts and the `--root` cascade, over the
+//! render root's subtree: each image source (an `img`'s `src`) and the page's
+//! cover image (`PageMeta::social_image_url`) resolves against the page's
+//! url, is fetched, and lands as an [`InlineBlob`] on the attribute's entity.
+//! The attribute's value stays the link. The policy says which sources are
+//! fetched: every one, the site's own alone, or none, so a target links what
+//! was not fetched.
 //!
 //! # Fetching
 //!
@@ -30,8 +27,8 @@
 //! # Lifetime
 //!
 //! The bytes live on the tree for exactly its life: the page's release takes
-//! back every [`InlineBlob`] it inserted, so nothing is persisted and an
-//! ordinary request for an embedding target resolves, renders and discards.
+//! back every [`InlineBlob`] it inserted, so nothing is persisted and a
+//! request naming a policy resolves, renders and discards.
 //! The cover image's [`InlineBlob`] sits on the render root itself, beside the
 //! `PageMeta` carried there; an attribute's sits on the attribute.
 use beet_core::prelude::*;
@@ -39,10 +36,10 @@ use beet_net::prelude::*;
 use beet_ui::prelude::*;
 use std::collections::VecDeque;
 
-/// The standard site media ingest policy: which sources of the kinds a render
-/// target embeds are fetched into the tree, the rest being linked. The
-/// `--media-ingest` render param, so a cli, a browser and a publish step set
-/// it the same way.
+/// The standard site media ingest policy: which of a page's image sources are
+/// fetched into the tree, the rest being linked. The `--media-ingest` render
+/// param, so a cli, a browser and a publish step set it the same way, and a
+/// request naming none fetches nothing.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Default)]
 pub enum MediaIngestPolicy {
@@ -117,18 +114,17 @@ impl InlineBlob {
 	}
 
 	/// The media resolve step over the tree at `root`, a page served at
-	/// `page_url` by `router`: fetch every source of `kinds` under
-	/// `policy` and insert an [`InlineBlob`] on each source's entity,
-	/// answering the entities given one.
+	/// `page_url` by `router`: fetch every image source under `policy` and
+	/// insert an [`InlineBlob`] on each source's entity, answering the
+	/// entities given one.
 	pub(crate) async fn resolve(
 		world: &AsyncWorld,
 		router: Entity,
 		page_url: Url,
 		root: Entity,
-		kinds: Vec<MediaKind>,
 		policy: MediaIngestPolicy,
 	) -> Result<Vec<Entity>> {
-		if kinds.is_empty() || policy == MediaIngestPolicy::Link {
+		if policy == MediaIngestPolicy::Link {
 			return Ok(Vec::new());
 		}
 		// collect every source first, deduplicated by its resolved link
@@ -142,7 +138,7 @@ impl InlineBlob {
 		let sources = world
 			.with_state::<MediaSourceQuery, _>({
 				let page_url = page_url.clone();
-				move |query| query.collect(root, &kinds, &page_url)
+				move |query| query.collect(root, &page_url)
 			})
 			.await?;
 		let mut fetches: Vec<(MediaSource, Vec<Entity>)> = Vec::new();
@@ -262,13 +258,12 @@ struct MediaSourceQuery<'w, 's> {
 }
 
 impl MediaSourceQuery<'_, '_> {
-	/// Every source of `kinds` under `root`, each resolved against
-	/// `page_url`: the attributes naming one in breadth-first order, then the
-	/// page's cover image, which the root itself holds.
+	/// Every image source under `root`, each resolved against `page_url`: the
+	/// attributes naming one in breadth-first order, then the page's cover
+	/// image, which the root itself holds.
 	fn collect(
 		&self,
 		root: Entity,
-		kinds: &[MediaKind],
 		page_url: &Url,
 	) -> Result<Vec<(Entity, Url)>> {
 		let mut sources = Vec::new();
@@ -280,12 +275,7 @@ impl MediaSourceQuery<'_, '_> {
 			}
 			if let Ok(element) = self.elements.get(entity) {
 				for (attribute, key, value) in self.attributes.all(entity) {
-					let Some(kind) =
-						MediaKind::of_attribute(element.tag(), key)
-					else {
-						continue;
-					};
-					if !kinds.contains(&kind) {
+					if !Self::is_image_source(element.tag(), key) {
 						continue;
 					}
 					let Ok(text) = value.as_str() else {
@@ -298,16 +288,22 @@ impl MediaSourceQuery<'_, '_> {
 				queue.extend(children.iter());
 			}
 		}
-		if kinds.contains(&MediaKind::Image)
-			&& let Some(cover) = self
-				.metas
-				.get(root)
-				.ok()
-				.and_then(PageMeta::social_image_url)
+		if let Some(cover) = self
+			.metas
+			.get(root)
+			.ok()
+			.and_then(PageMeta::social_image_url)
 		{
 			sources.push((root, page_url.join(cover)));
 		}
 		sources.xok()
+	}
+
+	/// Whether `attribute` on a `tag` element names an image the step
+	/// fetches. Images alone, since the one target embedding media (Leaflet)
+	/// has no video or audio block.
+	fn is_image_source(tag: &str, attribute: &str) -> bool {
+		tag.eq_ignore_ascii_case("img") && attribute == "src"
 	}
 }
 
@@ -337,31 +333,6 @@ mod test {
 	use std::sync::atomic::AtomicUsize;
 	use std::sync::atomic::Ordering;
 
-	/// A target that embeds images and video and writes nothing, so a test
-	/// reads what the media resolve step fetched for it.
-	#[derive(Clone)]
-	struct Embeds;
-
-	impl Embeds {
-		fn media_type() -> MediaType { MediaType::other("text/x-embeds") }
-	}
-
-	impl NodeRenderer for Embeds {
-		fn render(
-			&mut self,
-			_cx: &mut RenderContext,
-		) -> Result<MediaBytes, RenderError> {
-			MediaBytes::new_text("").xok()
-		}
-	}
-
-	impl RenderTarget for Embeds {
-		fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
-		fn embeds(&self) -> Vec<MediaKind> {
-			vec![MediaKind::Image, MediaKind::Video]
-		}
-	}
-
 	/// A router serving `page` at `/blog/post` and the repo store's media (a
 	/// 4 by 3 photo, a 2 by 1 poster, a clip) at `/media`, plus `routes`.
 	async fn site<Func, B>(page: Func, routes: impl Bundle) -> (World, Entity)
@@ -378,7 +349,6 @@ mod test {
 			store.insert(&RelPath::from(path), bytes).await.unwrap();
 		}
 		let mut world = syndication_world(Some("https://beet.org"));
-		world.resource_mut::<RenderTargets>().register(Embeds);
 		let router = world
 			.spawn((Router::with_defaults(), store, children![
 				ServeBlobs {
@@ -393,30 +363,52 @@ mod test {
 		(world, router)
 	}
 
-	/// The [`InlineBlob`]s a page prepared for [`Embeds`] holds under `policy`,
+	/// `/blog/post` under `policy`.
+	fn ingesting(policy: &str) -> Request {
+		Request::get("/blog/post").with_param("media-ingest", policy)
+	}
+
+	/// A route at `counted/photo.png` serving a png, counting each fetch in
+	/// `fetches`.
+	fn counted(fetches: &Arc<AtomicUsize>) -> impl Bundle {
+		route::exchange(
+			"counted/photo.png",
+			exchange_ext::handler({
+				let fetches = fetches.clone();
+				move |_cx| {
+					fetches.fetch_add(1, Ordering::SeqCst);
+					Response::ok_body(png(1, 1), MediaType::Png)
+				}
+			}),
+		)
+	}
+
+	/// The [`InlineBlob`]s the page `request` names holds once prepared,
 	/// sorted by link.
+	async fn prepared(
+		world: &mut World,
+		router: Entity,
+		request: Request,
+	) -> Result<Vec<InlineBlob>> {
+		world
+			.run_async_then(async move |world| {
+				LivePage::scoped(&world.entity(router), request, async |live| {
+					let mut blobs = live.inline_blobs().await;
+					blobs.sort_by_key(|blob| blob.link.to_string());
+					blobs.xok()
+				})
+				.await
+			})
+			.await
+	}
+
+	/// The [`InlineBlob`]s `/blog/post` holds under `policy`, sorted by link.
 	async fn resolved(
 		world: &mut World,
 		router: Entity,
 		policy: &str,
 	) -> Result<Vec<InlineBlob>> {
-		let request =
-			Request::get("/blog/post").with_param("media-ingest", policy);
-		world
-			.run_async_then(async move |world| {
-				PageRoot::scoped(
-					&world.entity(router),
-					request,
-					&[Embeds::media_type()],
-					async |live| {
-						let mut blobs = live.inline_blobs().await;
-						blobs.sort_by_key(|blob| blob.link.to_string());
-						blobs.xok()
-					},
-				)
-				.await
-			})
-			.await
+		prepared(world, router, ingesting(policy)).await
 	}
 
 	/// The links `blobs` were fetched from.
@@ -486,22 +478,61 @@ mod test {
 			.xpect_contains("/blog/post");
 	}
 
-	/// A `video` with a `poster` is two sources of two kinds, each held on
-	/// its own attribute.
+	/// Images alone are fetched: a `video`'s source and its `poster` stay
+	/// links.
 	#[beet_core::test]
-	async fn a_poster_is_its_own_source() {
+	async fn fetches_images_alone() {
 		let (mut world, router) = site(
-			|| rsx! { <video src="/media/clip.mp4" poster="/media/poster.png"/> },
+			|| {
+				rsx! {
+					<div>
+						<video src="/media/clip.mp4" poster="/media/poster.png"/>
+						<img src="/media/photo.png"/>
+					</div>
+				}
+			},
 			(),
 		)
 		.await;
-		let blobs = resolved(&mut world, router, "upload").await.unwrap();
-		links(&blobs).xpect_eq(vec![
-			"/media/clip.mp4".to_string(),
-			"/media/poster.png".to_string(),
-		]);
-		blobs[0].bytes.media_type().xpect_eq(MediaType::Mp4);
-		blobs[1].bytes.media_type().xpect_eq(MediaType::Png);
+		links(&resolved(&mut world, router, "upload").await.unwrap())
+			.xpect_eq(vec!["/media/photo.png".to_string()]);
+	}
+
+	/// A request naming no policy fetches nothing, a request for Leaflet, which
+	/// embeds images, included; one naming a policy fetches through the same
+	/// route.
+	#[beet_core::test]
+	async fn a_plain_request_fetches_nothing() {
+		let fetches = Arc::new(AtomicUsize::new(0));
+		let (mut world, router) = site(
+			|| rsx! { <img src="/counted/photo.png"/> },
+			counted(&fetches),
+		)
+		.await;
+		for accept in [
+			MediaType::Html,
+			#[cfg(all(feature = "dag_cbor", feature = "json"))]
+			LeafletRenderer::media_type(),
+		] {
+			world
+				.entity_mut(router)
+				.exchange(Request::get("/blog/post").with_accept(accept))
+				.await
+				.into_result()
+				.await
+				.unwrap();
+		}
+		prepared(&mut world, router, Request::get("/blog/post"))
+			.await
+			.unwrap()
+			.xpect_empty();
+		fetches.load(Ordering::SeqCst).xpect_eq(0);
+		resolved(&mut world, router, "upload")
+			.await
+			.unwrap()
+			.len()
+			.xpect_eq(1);
+		fetches.load(Ordering::SeqCst).xpect_eq(1);
 	}
 
 	/// The cover image resolves with the content's images, held on the
@@ -523,15 +554,12 @@ mod test {
 			(),
 		)
 		.await;
-		let request = Request::get("/blog/post");
+		let request = ingesting("upload");
 		world
 			.run_async_then(async move |world| {
-				PageRoot::scoped(
-					&world.entity(router),
-					request,
-					&[Embeds::media_type()],
-					async |live| live.cover().await.xok(),
-				)
+				LivePage::scoped(&world.entity(router), request, async |live| {
+					live.cover().await.xok()
+				})
 				.await
 			})
 			.await
@@ -551,16 +579,7 @@ mod test {
 					<div><img src="/counted/photo.png"/><img src="/counted/photo.png"/></div>
 				}
 			},
-			route::exchange(
-				"counted/photo.png",
-				exchange_ext::handler({
-					let fetches = fetches.clone();
-					move |_cx| {
-						fetches.fetch_add(1, Ordering::SeqCst);
-						Response::ok_body(png(1, 1), MediaType::Png)
-					}
-				}),
-			),
+			counted(&fetches),
 		)
 		.await;
 		let blobs = resolved(&mut world, router, "upload").await.unwrap();
@@ -611,8 +630,8 @@ mod test {
 		in_flight.load(Ordering::SeqCst).xpect_eq(3);
 	}
 
-	/// An ordinary request for an embedding target resolves, renders and
-	/// leaves no fetched bytes behind, a persistent page's included.
+	/// A request naming a policy resolves, renders and leaves no fetched bytes
+	/// behind, a persistent page's included.
 	#[beet_core::test]
 	async fn a_request_leaves_no_bytes_behind() {
 		let (mut world, router) = site(
@@ -627,7 +646,9 @@ mod test {
 		for path in ["/blog/post", "/fixed"] {
 			world
 				.entity_mut(router)
-				.exchange(Request::get(path).with_accept(Embeds::media_type()))
+				.exchange(
+					Request::get(path).with_param("media-ingest", "upload"),
+				)
 				.await
 				.into_result()
 				.await

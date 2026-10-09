@@ -129,7 +129,7 @@ async fn serve_ssh_tui(
 ///
 /// The server component boots the listener; this plugin provides
 /// the connection lifecycle, mirroring how [`TuiServer`] pairs with the live
-/// plugins ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`LivePagePlugin`]), which
+/// plugins ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`PageHostPlugin`]), which
 /// an SSH-TUI app must also add.
 #[derive(Default)]
 pub struct SshTuiPlugin;
@@ -140,7 +140,7 @@ impl Plugin for SshTuiPlugin {
 		// optional here: without it a closed session leaves its page behind. The
 		// transport plugin is likewise not optional: it enforces the pty timeout
 		// this server sets on every connection.
-		app.init_plugin::<LivePagePlugin>()
+		app.init_plugin::<PageHostPlugin>()
 			.init_plugin::<SshServerPlugin>()
 			.register_type::<SshTuiServer>()
 			.add_observer(on_ssh_recv)
@@ -387,7 +387,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			RealtimeParsePlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			NavigatorPlugin,
 			SshTuiPlugin,
 		));
@@ -920,7 +920,7 @@ mod test {
 			MinimalPlugins,
 			RouterPlugin,
 			NavigatorPlugin,
-			LivePagePlugin,
+			PageHostPlugin,
 			SshTuiPlugin,
 			CharcellTuiPlugin,
 		));
