@@ -12,6 +12,8 @@ use beet_ui::prelude::Snippet;
 /// `Accept` at all renders the scene.
 ///
 /// ```no_run
+/// # // the action macro reaches its own crate through `crate::prelude`
+/// # use beet_router::prelude;
 /// # use beet_router::prelude::*;
 /// # use beet_action::prelude::*;
 /// # use beet_core::prelude::*;
@@ -23,6 +25,7 @@ use beet_ui::prelude::Snippet;
 /// async fn Count(cx: ActionContext<Request>) -> Result<DataPage<u32>> {
 /// 	DataPage::new(&cx.caller, rsx! { <p>"three"</p> }, 3).await
 /// }
+/// # fn main() {}
 /// ```
 pub struct DataPage<T> {
 	/// The scene, an ephemeral render root.
@@ -82,19 +85,15 @@ impl<T: 'static + Send + Sync + Serialize>
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move {
-			let accept = parts
-				.headers
-				.get_or_default::<header::Accept>()
-				.unwrap_or_default();
-			let serialized = accept
-				.iter()
+			let serialized = parts
+				.accept()
+				.into_iter()
 				.find(|media_type| {
 					media_type.is_serializable()
 						|| media_type.is_text()
 						|| media_type.is_wildcard()
 				})
-				.filter(|media_type| media_type.is_serializable())
-				.cloned();
+				.filter(|media_type| media_type.is_serializable());
 			match serialized {
 				Some(media_type) => {
 					let page = self.page.0;
@@ -115,7 +114,7 @@ impl<T: 'static + Send + Sync + Serialize>
 						.with_status(self.status)
 						.xok()
 				}
-				None => PageRoot::render(self.page.0, &caller, parts)
+				None => LivePage::respond(self.page.0, &caller, parts)
 					.await?
 					.with_status(self.status)
 					.xok(),

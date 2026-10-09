@@ -25,9 +25,10 @@ type Ns = OoxmlNamespace;
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct OoxmlRenderer;
 
-impl OoxmlRenderer {
-	/// The media types this renderer writes.
-	pub const MEDIA_TYPES: [MediaType; 2] = [MediaType::Docx, MediaType::Xlsx];
+impl RenderTarget for OoxmlRenderer {
+	fn media_types(&self) -> Vec<MediaType> {
+		vec![MediaType::Docx, MediaType::Xlsx]
+	}
 }
 
 impl NodeRenderer for OoxmlRenderer {
@@ -786,6 +787,7 @@ impl WorkbookWriter {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	fn parse(bytes: &MediaBytes) -> (World, Entity) {
 		let mut world =
@@ -802,12 +804,12 @@ mod test {
 		root: Entity,
 		media_type: MediaType,
 	) -> MediaBytes {
-		MediaRenderer::default()
-			.render(
-				&mut RenderContext::new(root, world)
-					.with_accepts(vec![media_type]),
-			)
-			.unwrap()
+		RenderTargets::render(
+			world,
+			root,
+			&RequestParts::default().with_accept(media_type),
+		)
+		.unwrap()
 	}
 
 	/// Every XML part of a file in canonical form: its element tree with

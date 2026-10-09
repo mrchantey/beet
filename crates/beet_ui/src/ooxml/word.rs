@@ -534,6 +534,7 @@ impl WordProjection {
 pub(crate) mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// A Word file parsed into a world with the parse plugins.
 	pub(crate) fn parse(bytes: MediaBytes) -> (World, Entity) {
@@ -548,7 +549,11 @@ pub(crate) mod test {
 
 	pub(crate) fn markdown(world: &mut World, root: Entity) -> String {
 		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(root, world))
+			.render(&mut RenderContext::new(
+				world,
+				root,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}

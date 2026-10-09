@@ -77,7 +77,7 @@ pub struct SecretRecord {
 	#[serde(
 		default,
 		skip_serializing_if = "Option::is_none",
-		with = "iso8601::option"
+		with = "timestamp_iso8601::option"
 	)]
 	pub expires: Option<Timestamp>,
 	/// The provider address the value was exported from, on an export.

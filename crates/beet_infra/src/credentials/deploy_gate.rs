@@ -307,7 +307,7 @@ impl DeployGate {
 	}
 
 	/// This request as argv, less this gate's own params and the launch's
-	/// knobs (`--main`, `--stage`, ..), which [`ChildProcess::this_launch`]
+	/// knobs (`--entry`, `--stage`, ..), which [`ChildProcess::this_launch`]
 	/// and the relay carry from the launch itself: the route as one `a/b`
 	/// path, the way a person types it, then each param.
 	fn request_args(input: &Request) -> Vec<String> {

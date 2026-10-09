@@ -166,8 +166,8 @@ pub impl App {
 	}
 }
 
-/// Registers the built-in render targets: html, markdown, plain text, and
-/// with their features ansi (`style`) and the serialized scene
+/// Registers the built-in render targets: html, xml, markdown, plain text,
+/// and with their features ansi (`style`) and the serialized scene
 /// (`template_serde`).
 #[derive(Default)]
 pub struct RenderPlugin;
@@ -176,6 +176,7 @@ impl Plugin for RenderPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_render_target(PlainTextRenderer::default())
 			.register_render_target(HtmlRenderer::default())
+			.register_render_target(XmlRenderer)
 			.register_render_target(MarkdownRenderer::default());
 		#[cfg(feature = "style")]
 		app.register_render_target(AnsiTermRenderer::default());
@@ -220,6 +221,10 @@ impl RenderTarget for PlainTextRenderer {
 
 impl RenderTarget for HtmlRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Html] }
+}
+
+impl RenderTarget for XmlRenderer {
+	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Xml] }
 }
 
 impl RenderTarget for MarkdownRenderer {

@@ -3,7 +3,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Registers what an Office tree carries, so a scene holding one serializes,
-/// and appends a deck's triage in [`PostParseTree`].
+/// the [`OoxmlRenderer`] that writes one back, and appends a deck's triage in
+/// [`PostParseTree`].
 #[derive(Default)]
 pub struct OoxmlPlugin;
 
@@ -22,6 +23,7 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<Slide>()
 			.register_type::<SlidePicture>()
 			.register_type::<DeckReported>()
+			.register_render_target(OoxmlRenderer)
 			.init_schedule(PostParseTree)
 			.add_systems(PostParseTree, append_deck_reports);
 	}

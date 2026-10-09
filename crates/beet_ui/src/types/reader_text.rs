@@ -3,9 +3,9 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The text a reader reads under an entity, the words every renderer shows:
-/// text values and a node's own text, never a non-visual element's content,
-/// with a checkbox as `[x] ` or `[ ] `, and a line
-/// break, a paragraph's end and a cell's as a newline.
+/// text values and a node's own text, never a textless element's content
+/// ([`RenderTreeQuery::is_textless`]), with a checkbox as `[x] ` or `[ ] `,
+/// and a line break, a paragraph's end and a cell's as a newline.
 #[derive(SystemParam)]
 pub struct ReaderText<'w, 's> {
 	nodes: Query<
@@ -83,7 +83,8 @@ impl ReaderText<'_, '_> {
 		};
 		match element.map(Element::tag) {
 			Some(tag) if Self::BLOCKS.contains(&tag) => out.push(entity),
-			Some(tag) if tag == "table" || is_non_visual(tag) => {}
+			Some(tag)
+				if tag == "table" || RenderTreeQuery::is_textless(tag) => {}
 			_ => {
 				for child in self.children(entity) {
 					self.push_blocks(child, out);
@@ -107,7 +108,7 @@ impl ReaderText<'_, '_> {
 			return;
 		}
 		match element.map(Element::tag) {
-			Some(tag) if is_non_visual(tag) => return,
+			Some(tag) if RenderTreeQuery::is_textless(tag) => return,
 			Some("br") => out.push('\n'),
 			Some("table") if skip_tables && !is_start => return,
 			// an element's own value is binding state, never its words

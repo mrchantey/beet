@@ -79,7 +79,7 @@ impl DeployCredential {
 		&self,
 		caller: &AsyncEntity,
 		ask: ElevationAsk,
-	) -> Result<Elevation> {
+	) -> Result<CredentialElevation> {
 		self.provider.elevate(caller.clone(), ask).await
 	}
 
@@ -223,7 +223,7 @@ pub trait DeployCredentialProvider: 'static + Send + Sync {
 		&self,
 		caller: AsyncEntity,
 		ask: ElevationAsk,
-	) -> SendBoxedFuture<Result<Elevation>>;
+	) -> SendBoxedFuture<Result<CredentialElevation>>;
 
 	/// What the credential would be converged to, for a dry run: needs no
 	/// credential at all.
@@ -327,7 +327,7 @@ pub struct ElevationAsk {
 /// What elevating one credential produced, see
 /// [`DeployCredentialProvider::elevate`].
 #[derive(Default)]
-pub struct Elevation {
+pub struct CredentialElevation {
 	/// One line per thing converged, for the report.
 	pub report: Vec<String>,
 	/// What the elevated deploy runs as, by variable: empty when the deploy

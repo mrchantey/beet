@@ -984,7 +984,11 @@ mod test {
 			))
 			.unwrap();
 		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(entity, &mut world))
+			.render(&mut RenderContext::new(
+				&mut world,
+				entity,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 			.xpect_eq("---\ntitle: Plan\n---\n\n# Plan\n");

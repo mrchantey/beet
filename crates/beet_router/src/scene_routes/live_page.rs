@@ -497,7 +497,9 @@ mod test {
 	}
 
 	/// Markdown and plain text answer the main content alone, and `content`
-	/// leaves out what the article layout contributed.
+	/// leaves out what the article layout contributed. Markdown leads every
+	/// rung with the page's frontmatter, so `content` reads back as the
+	/// source it was parsed from.
 	#[beet_core::test]
 	async fn text_formats_at_each_root() {
 		let (mut world, router) = site();
@@ -512,7 +514,9 @@ mod test {
 		get(&mut world, router, at(POST, "content"), MediaType::Markdown)
 			.await
 			.trim()
-			.xpect_eq("page");
+			.xpect_eq(
+				"---\ntitle: Full Stack Bevy\ndescription: all about Full Stack Bevy\ncreated: 2025-07-11\nauthors: [Pete Hayman]\n---\n\npage",
+			);
 		get(&mut world, router, at(POST, "main"), MediaType::Text)
 			.await
 			.xpect_starts_with("Full Stack Bevy\n")

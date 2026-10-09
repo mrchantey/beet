@@ -206,7 +206,7 @@ impl DeployCredentialProvider for CloudflareDeployToken {
 		&self,
 		caller: AsyncEntity,
 		ask: ElevationAsk,
-	) -> SendBoxedFuture<Result<Elevation>> {
+	) -> SendBoxedFuture<Result<CredentialElevation>> {
 		let this = self.clone();
 		Box::pin(async move { this.elevate_with(&caller, ask).await })
 	}
@@ -304,7 +304,7 @@ impl CloudflareDeployToken {
 		&self,
 		caller: &AsyncEntity,
 		ask: ElevationAsk,
-	) -> Result<Elevation> {
+	) -> Result<CredentialElevation> {
 		let Some(lowered) = Self::lower(caller).await? else {
 			bevybail!(
 				"this launch declares nothing at Cloudflare, so there is no token \
@@ -343,7 +343,7 @@ impl CloudflareDeployToken {
 		.await?;
 		let mut report = vec![line];
 		report.extend(Self::buckets(caller, Some(&mint), ask.roll).await?);
-		let mut elevation = Elevation {
+		let mut elevation = CredentialElevation {
 			report,
 			..default()
 		};

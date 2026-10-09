@@ -1,16 +1,38 @@
-//! The XML mode of [`HtmlRenderer`]: a tree written as the markup it reads
-//! as.
+//! Rendering a tree as XML: the [`XmlRenderer`] target and the
+//! [`XmlWriter`] it and an Office file's writer share.
+use crate::prelude::*;
 use beet_core::prelude::*;
+
+/// Writes a tree as the XML it reads as, every node kept and an empty element
+/// as `<name/>`, so a `.xml` file writes back as it was read. Answers
+/// [`MediaType::Xml`].
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct XmlRenderer;
+
+impl NodeRenderer for XmlRenderer {
+	fn render(
+		&mut self,
+		cx: &mut RenderContext,
+	) -> Result<MediaBytes, RenderError> {
+		cx.check_accepts(&[MediaType::Xml])?;
+		let entity = cx.entity;
+		let text = cx
+			.world
+			.with_state::<XmlWriter, _>(|writer| writer.write(entity));
+		MediaBytes::new_string(MediaType::Xml, text).xok()
+	}
+}
 
 /// Writes a tree as XML: an element from its [`Element`] and [`Attribute`]s,
 /// text from its [`Value`], and a comment, doctype, CDATA section or
 /// processing instruction as itself. An entity with no element, ie a parse
 /// root or a node only an Office file's writer reads, is written through,
-/// its children in place.
+/// its children in place, and a [`Portal`] as the tree it transcludes.
 #[derive(SystemParam)]
 pub(crate) struct XmlWriter<'w, 's> {
 	nodes: Query<'w, 's, XmlNode<'static>>,
 	attributes: Query<'w, 's, (&'static Attribute, Option<&'static Value>)>,
+	tree: RenderTreeQuery<'w, 's>,
 }
 
 type XmlNode<'a> = (
@@ -21,7 +43,6 @@ type XmlNode<'a> = (
 	Option<&'a Doctype>,
 	Option<&'a CData>,
 	Option<&'a ProcessingInstruction>,
-	Option<&'a Children>,
 );
 
 impl XmlWriter<'_, '_> {
@@ -33,6 +54,7 @@ impl XmlWriter<'_, '_> {
 	}
 
 	fn write_node(&self, entity: Entity, out: &mut String) {
+		let entity = self.tree.resolve(entity);
 		let Ok((
 			element,
 			attributes,
@@ -41,7 +63,6 @@ impl XmlWriter<'_, '_> {
 			doctype,
 			cdata,
 			instruction,
-			children,
 		)) = self.nodes.get(entity)
 		else {
 			return;
@@ -66,7 +87,6 @@ impl XmlWriter<'_, '_> {
 			out.push_str(cdata);
 			out.push_str("]]>");
 		}
-		let children = children.map(|children| children.to_vec());
 		match (element, value) {
 			(Some(element), _) => {
 				self.open(element.tag(), out);
@@ -80,13 +100,13 @@ impl XmlWriter<'_, '_> {
 						Self::write_attribute(key, &value, out);
 					}
 				}
-				self.close_children(element.tag(), children, out);
+				self.close_children(element.tag(), entity, out);
 			}
 			(None, Some(value)) => {
 				out.push_str(&Self::escape_text(&value.to_string()))
 			}
 			(None, None) => {
-				for child in children.into_iter().flatten() {
+				for child in self.tree.children(entity) {
 					self.write_node(child, out);
 				}
 			}
@@ -98,17 +118,12 @@ impl XmlWriter<'_, '_> {
 		out.push_str(name);
 	}
 
-	/// Writes the children after an open tag's attributes and closes it, an
-	/// element that wrote nothing as `<name/>`.
-	fn close_children(
-		&self,
-		name: &str,
-		children: Option<Vec<Entity>>,
-		out: &mut String,
-	) {
+	/// Writes `entity`'s children after an open tag's attributes and closes
+	/// it, an element that wrote nothing as `<name/>`.
+	fn close_children(&self, name: &str, entity: Entity, out: &mut String) {
 		out.push('>');
 		let start = out.len();
-		for child in children.into_iter().flatten() {
+		for child in self.tree.children(entity) {
 			self.write_node(child, out);
 		}
 		match out.len() == start {
@@ -165,6 +180,7 @@ impl XmlWriter<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// Every lexical form the writer chooses is the one Office writes, so a
 	/// document written that way round-trips byte for byte: the declaration,
@@ -174,22 +190,29 @@ mod test {
 
 	fn parse(xml: &str) -> (World, Entity) {
 		let mut world = World::new();
+		let entity = parse_into(&mut world, xml);
+		(world, entity)
+	}
+
+	/// `xml` parsed into a fresh entity of `world`.
+	fn parse_into(world: &mut World, xml: &str) -> Entity {
 		let entity = world.spawn_empty().id();
 		MediaParser::new()
 			.parse(ParseContext::new(
 				&mut world.entity_mut(entity),
-				&MediaBytes::new(MediaType::Xml, xml.as_bytes()),
+				&MediaBytes::new_string(MediaType::Xml, xml.into()),
 			))
 			.unwrap();
-		(world, entity)
+		entity
 	}
 
 	fn write(world: &mut World, entity: Entity) -> String {
-		MediaRenderer::default()
-			.render(
-				&mut RenderContext::new(entity, world)
-					.with_accepts(vec![MediaType::Xml]),
-			)
+		XmlRenderer
+			.render(&mut RenderContext::new(
+				world,
+				entity,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 	}
@@ -211,5 +234,15 @@ mod test {
 		world.entity_mut(text).insert(Value::str("two & three"));
 		world.entity_mut(children[1]).despawn();
 		write(&mut world, entity).xpect_eq("<a><b>two &amp; three</b></a>");
+	}
+
+	/// A [`Portal`] is written as the tree it transcludes, in place.
+	#[beet_core::test]
+	fn writes_through_a_portal() {
+		let (mut world, entity) = parse("<a/>");
+		let content = parse_into(&mut world, "<b>c</b>");
+		let root = world.entity(entity).get::<Children>().unwrap()[0];
+		world.spawn((Portal::new(content), ChildOf(root)));
+		write(&mut world, entity).xpect_eq("<a><b>c</b></a>");
 	}
 }

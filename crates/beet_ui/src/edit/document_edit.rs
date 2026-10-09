@@ -413,7 +413,7 @@ impl DocumentEdit<'_, '_> {
 				Some(tag) if ReaderText::BLOCKS.contains(&tag) => {
 					out.push(child)
 				}
-				Some(tag) if is_non_visual(tag) => {}
+				Some(tag) if RenderTreeQuery::is_textless(tag) => {}
 				_ => self.push_paragraphs(child, out),
 			}
 		}
@@ -427,7 +427,7 @@ impl DocumentEdit<'_, '_> {
 		let mut out = Vec::new();
 		for child in self.children(entity) {
 			match self.tag(child) {
-				Some(tag) if is_non_visual(tag) => {}
+				Some(tag) if RenderTreeQuery::is_textless(tag) => {}
 				_ if self.is_text(child) => out.push(child),
 				_ => out.extend(self.text_nodes(child)),
 			}
@@ -441,7 +441,8 @@ impl DocumentEdit<'_, '_> {
 		let mut out = Vec::new();
 		for child in self.children(entity) {
 			match self.tag(child) {
-				Some(tag) if is_non_visual(tag) || tag == "table" => {}
+				Some(tag)
+					if RenderTreeQuery::is_textless(tag) || tag == "table" => {}
 				_ if self.is_text(child) => out.push(child),
 				_ => out.extend(self.own_text_nodes(child)),
 			}
@@ -550,6 +551,7 @@ impl DocumentEdit<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// The edits a Word form takes, applied to a markdown one: its table's
 	/// cells, its task list's box, its instruction and its placeholder.
@@ -601,7 +603,11 @@ mod test {
 		.unwrap()
 		.xpect_eq(1);
 		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(root, &mut world))
+			.render(&mut RenderContext::new(
+				&mut world,
+				root,
+				&RequestParts::default(),
+			))
 			.unwrap()
 			.to_string()
 			.xpect_eq(

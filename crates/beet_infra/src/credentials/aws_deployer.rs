@@ -139,7 +139,7 @@ impl DeployCredentialProvider for AwsDeployer {
 		&self,
 		caller: AsyncEntity,
 		ask: ElevationAsk,
-	) -> SendBoxedFuture<Result<Elevation>> {
+	) -> SendBoxedFuture<Result<CredentialElevation>> {
 		let this = self.clone();
 		Box::pin(async move { this.elevate_with(&caller, ask).await })
 	}
@@ -258,7 +258,7 @@ impl AwsDeployer {
 		&self,
 		caller: &AsyncEntity,
 		ask: ElevationAsk,
-	) -> Result<Elevation> {
+	) -> Result<CredentialElevation> {
 		let Some(apps) = Self::apps(caller).await? else {
 			bevybail!(
 				"this launch declares no stack keeping its state at AWS, so \
@@ -294,7 +294,7 @@ impl AwsDeployer {
 			Self::converge_key(caller, &admin, &user, &apps, &grants, ask.roll)
 				.await?,
 		);
-		Elevation {
+		CredentialElevation {
 			report,
 			env: match ask.run {
 				true => session.sdk_vars(),

@@ -798,6 +798,7 @@ impl SlideProjection {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 
 	/// A one-slide deck: a bulleted body with a nested level written before
 	/// the title it sits below, and a two-row table.
@@ -837,11 +838,11 @@ mod test {
 			)
 			.xpect_contains("| 1 | slide1.xml | 11 | 0 | 0% | 1 |  | picture |");
 		// a deck is read, never written
-		MediaRenderer::default()
-			.render(
-				&mut RenderContext::new(root, &mut world)
-					.with_accepts(vec![MediaType::Pptx]),
-			)
-			.xpect_err();
+		RenderTargets::render(
+			&mut world,
+			root,
+			&RequestParts::default().with_accept(MediaType::Pptx),
+		)
+		.xpect_err();
 	}
 }

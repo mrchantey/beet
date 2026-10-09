@@ -1,5 +1,5 @@
-//! HTML rendering: the [`HtmlRenderer`] and its utilities, its XML mode, plus
-//! the template-serde wiring.
+//! HTML rendering: the [`HtmlRenderer`] and its utilities, the
+//! [`XmlRenderer`], plus the template-serde wiring.
 //!
 //! The shared walk/serialize substrate (`node_walker`, `node_renderer`) lives
 //! one level up in `render/`, since the markdown, ANSI, and charcell targets
@@ -13,4 +13,4 @@ pub use template::*;
 mod html_utils;
 pub(crate) use html_utils::*;
 mod xml;
-pub(crate) use xml::*;
+pub use xml::*;
