@@ -1,4 +1,5 @@
-use super::source_tree::*;
+use super::ooxml_query::*;
+use super::writer::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use bevy::ecs::change_detection::Tick;
@@ -6,10 +7,10 @@ use ooxmlsdk::parts::PartRef;
 
 type Ns = OoxmlNamespace;
 
-/// Writes a document read from an Office file back to its own media type, by
-/// re-projection: every source node from its source components, and what an
-/// edit made with no source identity by the reverse of the mapping, new
-/// content in its neighbour's style.
+/// Writes a document read from a Word file or a workbook back to its own
+/// media type, by re-projection: every [`OoxmlNode`] as it says, and what an
+/// edit made with none by the reverse of the mapping, new content in its
+/// neighbour's style. A slide deck is read, never written.
 ///
 /// A Word file writes a new paragraph with its cell's first paragraph's
 /// properties and new words in a run of that paragraph's first look, marks
@@ -23,6 +24,11 @@ type Ns = OoxmlNamespace;
 /// the tree holds is written, and every other part is kept as read.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct OoxmlRenderer;
+
+impl OoxmlRenderer {
+	/// The media types this renderer writes.
+	pub const MEDIA_TYPES: [MediaType; 2] = [MediaType::Docx, MediaType::Xlsx];
+}
 
 impl NodeRenderer for OoxmlRenderer {
 	fn render(
@@ -51,25 +57,29 @@ impl NodeRenderer for OoxmlRenderer {
 					WorkbookWriter::recalculate(&mut file)?;
 				}
 			}
-			_ => {}
+			other => {
+				return Err(
+					bevyhow!("a {other} file is read, never written").into()
+				);
+			}
 		}
 		let parts = world
-			.with_state::<(Query<&Children>, Query<&SourcePart>), _>(
-				|(children, parts)| {
+			.with_state::<(Query<&Children>, Query<&OoxmlNode>), _>(
+				|(children, nodes)| {
 					children
 						.iter_descendants_depth_first(root)
-						.filter_map(|entity| {
-							parts
-								.get(entity)
-								.ok()
-								.map(|part| (entity, part.path.clone()))
+						.filter_map(|entity| match nodes.get(entity) {
+							Ok(OoxmlNode::Part { path }) => {
+								Some((entity, path.clone()))
+							}
+							_ => None,
 						})
 						.collect::<Vec<_>>()
 				},
 			);
 		for (entity, path) in parts {
-			let text =
-				world.with_state::<XmlWriter, _>(|writer| writer.write(entity));
+			let text = world
+				.with_state::<OoxmlWriter, _>(|writer| writer.write(entity));
 			let utf16 = file
 				.data_at(&path)?
 				.is_some_and(|bytes| bytes.starts_with(&[0xFF, 0xFE]));
@@ -86,15 +96,12 @@ impl NodeRenderer for OoxmlRenderer {
 	}
 }
 
-/// A deep copy of a source subtree under `parent`, ie a model paragraph's
+/// A deep copy of a part's subtree under `parent`, ie a model paragraph's
 /// properties for a new one.
-fn clone_source(world: &mut World, entity: Entity, parent: Entity) -> Entity {
+fn clone_nodes(world: &mut World, entity: Entity, parent: Entity) -> Entity {
 	let copy = world.spawn(ChildOf(parent)).id();
-	if let Some(source) = world.entity(entity).get::<SourceElement>().cloned() {
-		world.entity_mut(copy).insert(source);
-	}
-	if let Some(text) = world.entity(entity).get::<SourceText>().cloned() {
-		world.entity_mut(copy).insert(text);
+	if let Some(node) = world.entity(entity).get::<OoxmlNode>().cloned() {
+		world.entity_mut(copy).insert(node);
 	}
 	if let Some(value) = world.entity(entity).get::<Value>().cloned() {
 		world.entity_mut(copy).insert(value);
@@ -105,7 +112,7 @@ fn clone_source(world: &mut World, entity: Entity, parent: Entity) -> Entity {
 		.map(|children| children.to_vec())
 		.unwrap_or_default();
 	for child in children {
-		clone_source(world, child, copy);
+		clone_nodes(world, child, copy);
 	}
 	copy
 }
@@ -178,13 +185,13 @@ impl WordWriter {
 		Self::cells(world, root);
 	}
 
-	/// Gives every new paragraph its source identity, a `w:p` with its first
-	/// source sibling's properties, answering each paragraph's model, the
-	/// paragraph whose runs its new words take their look from.
+	/// Makes every new paragraph a `w:p` with its first written sibling's
+	/// properties, answering each paragraph's model, the paragraph whose runs
+	/// its new words take their look from.
 	fn paragraphs(world: &mut World, root: Entity) -> HashMap<Entity, Entity> {
 		let found = world.with_state::<(
-			SourceTree,
-			Query<(Entity, &Element), Without<SourceElement>>,
+			OoxmlQuery,
+			Query<(Entity, &Element), Without<OoxmlNode>>,
 			Query<&Children>,
 		), _>(|(tree, elements, children)| {
 			children
@@ -195,7 +202,7 @@ impl WordWriter {
 						.contains(&element.tag())
 						&& element.tag() != "pre";
 					let parent = tree.parent(entity)?;
-					// a new paragraph sits among source nodes
+					// a new paragraph sits among the file's nodes
 					let in_source = tree
 						.ancestors(entity)
 						.into_iter()
@@ -219,13 +226,15 @@ impl WordWriter {
 		});
 		let mut models = HashMap::default();
 		for (entity, model, properties, named) in found {
-			let source = match named {
+			let paragraph = match named {
 				Some(named) => named.sibling(Ns::WORD, "p"),
-				None => SourceElement::new("w:p", Some(Ns::WORD.into())),
+				None => OoxmlElement::new("w:p", Some(Ns::WORD.into())),
 			};
-			world.entity_mut(entity).insert(source);
+			world
+				.entity_mut(entity)
+				.insert(OoxmlNode::Element(paragraph));
 			if let Some(properties) = properties {
-				let copy = clone_source(world, properties, entity);
+				let copy = clone_nodes(world, properties, entity);
 				world.entity_mut(entity).insert_child(0, copy);
 			}
 			models.insert(entity, model.unwrap_or(entity));
@@ -241,15 +250,12 @@ impl WordWriter {
 		models: &HashMap<Entity, Entity>,
 		parsed: Tick,
 	) {
-		let preserve = SourceAttribute::new(
-			"xml:space",
-			Some(SourceElement::XML_NAMESPACE.into()),
-			"preserve",
-		);
+		let preserve =
+			OoxmlAttribute::new("xml:space", Some(Ns::XML.into()), "preserve");
 		let texts = world.with_state::<(
-			SourceTree,
+			OoxmlQuery,
 			Query<&Children>,
-			Query<(), (With<Value>, Without<Element>, Without<SourceElement>)>,
+			Query<(), (With<Value>, Without<Element>, Without<OoxmlNode>)>,
 		), _>(|(tree, children, texts)| {
 			children
 				.iter_descendants_depth_first(root)
@@ -271,16 +277,17 @@ impl WordWriter {
 		for (text, parent, in_t, paragraph) in texts {
 			if in_t {
 				if edited(world, text, parsed)
-					&& let Some(mut source) =
-						world.entity_mut(parent).get_mut::<SourceElement>()
+					&& let Some(mut node) =
+						world.entity_mut(parent).get_mut::<OoxmlNode>()
+					&& let Some(element) = node.element_mut()
 				{
-					source.set_attribute(preserve.clone());
+					element.set_attribute(preserve.clone());
 				}
 				continue;
 			}
 			let model = models.get(&paragraph).copied().unwrap_or(paragraph);
 			let (run_properties, named) =
-				world.with_state::<SourceTree, _>(|tree| {
+				world.with_state::<OoxmlQuery, _>(|tree| {
 					let runs = tree.descendants_named(model, Ns::WORD, "r");
 					let run = runs
 						.iter()
@@ -295,7 +302,7 @@ impl WordWriter {
 					)
 				});
 			let named = named.unwrap_or_else(|| {
-				SourceElement::new("w:p", Some(Ns::WORD.into()))
+				OoxmlElement::new("w:p", Some(Ns::WORD.into()))
 			});
 			let index = world
 				.entity(parent)
@@ -304,13 +311,17 @@ impl WordWriter {
 					children.iter().position(|child| child == text)
 				})
 				.unwrap_or_default();
-			let run = world.spawn(named.sibling(Ns::WORD, "r")).id();
+			let run = world
+				.spawn(OoxmlNode::Element(named.sibling(Ns::WORD, "r")))
+				.id();
 			if let Some(properties) = run_properties {
-				clone_source(world, properties, run);
+				clone_nodes(world, properties, run);
 			}
 			let mut written = named.sibling(Ns::WORD, "t");
 			written.set_attribute(preserve.clone());
-			let element = world.spawn((written, ChildOf(run))).id();
+			let element = world
+				.spawn((OoxmlNode::Element(written), ChildOf(run)))
+				.id();
 			world.entity_mut(element).add_child(text);
 			world.entity_mut(parent).insert_child(index, run);
 		}
@@ -321,7 +332,7 @@ impl WordWriter {
 	/// and highlighted.
 	fn checkboxes(world: &mut World, root: Entity) {
 		let boxes = world
-			.with_state::<(SourceTree, ReaderText, Query<&Children>), _>(
+			.with_state::<(OoxmlQuery, ReaderText, Query<&Children>), _>(
 				|(tree, text, children)| {
 					children
 						.iter_descendants_depth_first(root)
@@ -406,24 +417,25 @@ impl WordWriter {
 			boxes
 		{
 			let Some(named) = named else { continue };
-			let value = SourceAttribute::new(
+			let value = OoxmlAttribute::new(
 				format!("{}:val", named.prefix()),
 				named.namespace.clone(),
 				if checked { "1" } else { "0" },
 			);
 			match state {
 				Some(state) => {
-					if let Some(mut source) =
-						world.entity_mut(state).get_mut::<SourceElement>()
+					if let Some(mut node) =
+						world.entity_mut(state).get_mut::<OoxmlNode>()
+						&& let Some(element) = node.element_mut()
 					{
-						source.set_attribute(value);
+						element.set_attribute(value);
 					}
 				}
 				// the schema puts `checked` first
 				None => {
-					let mut source = named.sibling(Ns::WORD_2010, "checked");
-					source.set_attribute(value);
-					let state = world.spawn(source).id();
+					let mut element = named.sibling(Ns::WORD_2010, "checked");
+					element.set_attribute(value);
+					let state = world.spawn(OoxmlNode::Element(element)).id();
 					world.entity_mut(checkbox).insert_child(0, state);
 				}
 			}
@@ -432,10 +444,11 @@ impl WordWriter {
 				false => (ticked, empty),
 			};
 			for glyph in glyphs {
-				if let Some(mut text) =
-					world.entity_mut(glyph).get_mut::<SourceText>()
+				if let Some(mut node) =
+					world.entity_mut(glyph).get_mut::<OoxmlNode>()
+					&& let OoxmlNode::Text(text) = &mut *node
 				{
-					text.0 = text.0.replacen(from, &to.to_string(), 1);
+					*text = text.replacen(from, &to.to_string(), 1);
 				}
 			}
 			if checked {
@@ -450,7 +463,7 @@ impl WordWriter {
 	/// order.
 	fn mark(world: &mut World, run: Entity) {
 		let (properties, named, present) =
-			world.with_state::<SourceTree, _>(|tree| {
+			world.with_state::<OoxmlQuery, _>(|tree| {
 				let properties = tree.child(run, Ns::WORD, "rPr");
 				let present = properties
 					.map(|properties| {
@@ -465,7 +478,9 @@ impl WordWriter {
 			});
 		let Some(named) = named else { return };
 		let properties = properties.unwrap_or_else(|| {
-			let properties = world.spawn(named.sibling(Ns::WORD, "rPr")).id();
+			let properties = world
+				.spawn(OoxmlNode::Element(named.sibling(Ns::WORD, "rPr")))
+				.id();
 			world.entity_mut(run).insert_child(0, properties);
 			properties
 		});
@@ -479,15 +494,15 @@ impl WordWriter {
 			if present.iter().any(|existing| existing == local) {
 				continue;
 			}
-			let mut source = named.sibling(Ns::WORD, local);
+			let mut property = named.sibling(Ns::WORD, local);
 			if let Some(value) = value {
-				source.set_attribute(SourceAttribute::new(
+				property.set_attribute(OoxmlAttribute::new(
 					format!("{}:val", named.prefix()),
 					Some(Ns::WORD.into()),
 					value,
 				));
 			}
-			let siblings = world.with_state::<SourceTree, _>(|tree| {
+			let siblings = world.with_state::<OoxmlQuery, _>(|tree| {
 				tree.children(properties)
 					.into_iter()
 					.map(|child| {
@@ -501,14 +516,14 @@ impl WordWriter {
 				.iter()
 				.position(|existing| rank(existing) > rank(local))
 				.unwrap_or(siblings.len());
-			let property = world.spawn(source).id();
+			let property = world.spawn(OoxmlNode::Element(property)).id();
 			world.entity_mut(properties).insert_child(index, property);
 		}
 	}
 
 	/// Keeps a paragraph in every cell, since Word holds a cell to one.
 	fn cells(world: &mut World, root: Entity) {
-		let empty = world.with_state::<(SourceTree, Query<&Children>), _>(
+		let empty = world.with_state::<(OoxmlQuery, Query<&Children>), _>(
 			|(tree, children)| {
 				children
 					.iter_descendants_depth_first(root)
@@ -523,7 +538,10 @@ impl WordWriter {
 			},
 		);
 		for (cell, named) in empty {
-			world.spawn((named.sibling(Ns::WORD, "p"), ChildOf(cell)));
+			world.spawn((
+				OoxmlNode::Element(named.sibling(Ns::WORD, "p")),
+				ChildOf(cell),
+			));
 		}
 	}
 }
@@ -544,9 +562,9 @@ impl WorkbookWriter {
 				(&SheetCellAddress, Option<&SheetCellStyle>),
 				Without<CoveredBy>,
 			>,
-			Query<&SourceElement>,
+			Query<&OoxmlNode>,
 			Query<(), With<Value>>,
-		), _>(|(children, cells, sources, values)| {
+		), _>(|(children, cells, nodes, values)| {
 			children
 				.iter_descendants_depth_first(root)
 				.filter_map(|entity| {
@@ -560,15 +578,15 @@ impl WorkbookWriter {
 						entity,
 						address.clone(),
 						style.map(|style| style.0),
-						sources.contains(entity),
+						nodes.contains(entity),
 						texts,
 					))
 				})
 				.collect::<Vec<_>>()
 		});
 		let mut any = false;
-		for (cell, address, style, is_source, texts) in cells {
-			let changed = match is_source {
+		for (cell, address, style, is_written, texts) in cells {
+			let changed = match is_written {
 				true => texts.iter().any(|text| edited(world, *text, parsed)),
 				// a gap is a cell once anything is written in it
 				false => !texts.is_empty(),
@@ -603,69 +621,74 @@ impl WorkbookWriter {
 		style: Option<u32>,
 		value: &str,
 	) {
-		let named = match world.entity(cell).get::<SourceElement>().cloned() {
+		let element = |entity: Entity| {
+			world
+				.entity(entity)
+				.get::<OoxmlNode>()
+				.and_then(OoxmlNode::element)
+				.cloned()
+		};
+		let named = match element(cell) {
 			Some(named) => named,
 			None => {
 				let row = world
 					.entity(cell)
 					.get::<ChildOf>()
-					.and_then(|parent| {
-						world.entity(parent.parent()).get::<SourceElement>()
-					})
-					.cloned()
+					.and_then(|parent| element(parent.parent()))
 					.unwrap_or_else(|| {
-						SourceElement::new("row", Some(Ns::SPREADSHEET.into()))
+						OoxmlElement::new("row", Some(Ns::SPREADSHEET.into()))
 					});
 				let mut named = row.sibling(Ns::SPREADSHEET, "c");
-				named.set_attribute(SourceAttribute::new(
+				named.set_attribute(OoxmlAttribute::new(
 					"r",
 					None,
 					address.a1(),
 				));
 				if let Some(style) = style.filter(|style| *style != 0) {
-					named.set_attribute(SourceAttribute::new(
+					named.set_attribute(OoxmlAttribute::new(
 						"s",
 						None,
 						style.to_string(),
 					));
 				}
-				world.entity_mut(cell).insert(named.clone());
 				named
 			}
 		};
 		world.entity_mut(cell).despawn_children();
-		let mut source = named.clone();
+		let mut written = named.clone();
 		let is_number = Self::is_number(value);
 		match is_number {
 			true => {
-				source.remove_attribute(None, "t");
+				written.remove_attribute(None, "t");
 			}
-			false => source.set_attribute(SourceAttribute::new(
+			false => written.set_attribute(OoxmlAttribute::new(
 				"t",
 				None,
 				"inlineStr",
 			)),
 		}
-		world.entity_mut(cell).insert(source);
+		world.entity_mut(cell).insert(OoxmlNode::Element(written));
 		match is_number {
 			true => {
 				world.spawn((
-					named.sibling(Ns::SPREADSHEET, "v"),
+					OoxmlNode::Element(named.sibling(Ns::SPREADSHEET, "v")),
 					ChildOf(cell),
 					children![Value::str(value)],
 				));
 			}
 			false => {
 				let mut text = named.sibling(Ns::SPREADSHEET, "t");
-				text.set_attribute(SourceAttribute::new(
+				text.set_attribute(OoxmlAttribute::new(
 					"xml:space",
-					Some(SourceElement::XML_NAMESPACE.into()),
+					Some(Ns::XML.into()),
 					"preserve",
 				));
 				world.spawn((
-					named.sibling(Ns::SPREADSHEET, "is"),
+					OoxmlNode::Element(named.sibling(Ns::SPREADSHEET, "is")),
 					ChildOf(cell),
-					children![(text, children![Value::str(value)])],
+					children![(OoxmlNode::Element(text), children![
+						Value::str(value)
+					])],
 				));
 			}
 		}
@@ -698,10 +721,9 @@ impl WorkbookWriter {
 			return Ok(());
 		};
 		let mut world = World::new();
-		let part = world.spawn(SourcePart::new(path.clone())).id();
-		BsxNode::spawn_source(&nodes, &mut world.entity_mut(part));
+		let part = OoxmlNode::spawn_part(&mut world, path.clone(), &nodes)?;
 		let (book, calculation, after) =
-			world.with_state::<SourceTree, _>(|tree| {
+			world.with_state::<OoxmlQuery, _>(|tree| {
 				let book = tree
 					.children(part)
 					.into_iter()
@@ -729,21 +751,25 @@ impl WorkbookWriter {
 		let Some(book) = book else {
 			return Ok(());
 		};
-		let full = SourceAttribute::new("fullCalcOnLoad", None, "1");
+		let full = OoxmlAttribute::new("fullCalcOnLoad", None, "1");
 		match calculation {
 			Some(calculation) => {
-				if let Some(mut source) =
-					world.entity_mut(calculation).get_mut::<SourceElement>()
+				if let Some(mut node) =
+					world.entity_mut(calculation).get_mut::<OoxmlNode>()
+					&& let Some(element) = node.element_mut()
 				{
-					source.set_attribute(full);
+					element.set_attribute(full);
 				}
 			}
 			None => {
-				let named =
-					world.entity(book).get::<SourceElement>().cloned().unwrap();
-				let mut source = named.sibling(Ns::SPREADSHEET, "calcPr");
-				source.set_attribute(full);
-				let calculation = world.spawn(source).id();
+				let named = world
+					.with_state::<OoxmlQuery, _>(|query| {
+						query.element(book).cloned()
+					})
+					.ok_or_else(|| bevyhow!("the workbook part has no root"))?;
+				let mut element = named.sibling(Ns::SPREADSHEET, "calcPr");
+				element.set_attribute(full);
+				let calculation = world.spawn(OoxmlNode::Element(element)).id();
 				world.entity_mut(book).insert_child(
 					after.map_or(0, |index| index + 1),
 					calculation,
@@ -751,7 +777,7 @@ impl WorkbookWriter {
 			}
 		}
 		let text =
-			world.with_state::<XmlWriter, _>(|writer| writer.write(part));
+			world.with_state::<OoxmlWriter, _>(|writer| writer.write(part));
 		file.set_data(&path, text.into_bytes())
 	}
 }
@@ -853,8 +879,7 @@ mod test {
 	}
 
 	fn cells(world: &mut World, root: Entity) -> Vec<String> {
-		world
-			.with_state::<TableCells, _>(|cells| cells.listing(root))
+		CellText::listing(world, root)
 			.iter()
 			.map(|cell| cell.text.to_string())
 			.collect()
@@ -962,8 +987,7 @@ mod test {
 	#[beet_core::test]
 	fn lists_and_sets_unlocked_cells() {
 		let (mut world, root) = parse(&workbook());
-		world
-			.with_state::<TableCells, _>(|cells| cells.listing(root))
+		CellText::listing(&mut world, root)
 			.iter()
 			.map(ToString::to_string)
 			.collect::<Vec<_>>()

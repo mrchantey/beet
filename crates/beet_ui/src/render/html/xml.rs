@@ -1,135 +1,74 @@
-//! The XML mode of [`HtmlRenderer`]: a tree written as the markup it was read
-//! from.
+//! The XML mode of [`HtmlRenderer`]: a tree written as the markup it reads
+//! as.
 use beet_core::prelude::*;
 
-/// Writes a tree as XML: a node from its source identity when it has one and
-/// from its [`Element`] and [`Attribute`]s otherwise.
-///
-/// Inside a source tree, below a [`SourceElement`], an entity with no source
-/// identity is projection only, ie a list's `<ul>`: the writer passes through
-/// it and writes its children in place, and writes text, a comment or any
-/// other leaf only where a source element holds it, so the projection's own
-/// words are never written. A
-/// [`SourceText`] is written wherever it sits, children are written in their
-/// [`SourceOrder`] where a projection moved them, and a [`SourcePart`] below
-/// the one being written is another part, so is skipped.
+/// Writes a tree as XML: an element from its [`Element`] and [`Attribute`]s,
+/// text from its [`Value`], and a comment, doctype, CDATA section or
+/// processing instruction as itself. An entity with no element, ie a parse
+/// root or a node only an Office file's writer reads, is written through,
+/// its children in place.
 #[derive(SystemParam)]
 pub(crate) struct XmlWriter<'w, 's> {
 	nodes: Query<'w, 's, XmlNode<'static>>,
 	attributes: Query<'w, 's, (&'static Attribute, Option<&'static Value>)>,
-	orders: Query<'w, 's, &'static SourceOrder>,
 }
 
 type XmlNode<'a> = (
-	Option<&'a SourceElement>,
 	Option<&'a Element>,
 	Option<&'a Attributes>,
 	Option<&'a Value>,
-	Option<&'a SourceText>,
 	Option<&'a Comment>,
 	Option<&'a Doctype>,
 	Option<&'a CData>,
 	Option<&'a ProcessingInstruction>,
 	Option<&'a Children>,
-	Has<SourcePart>,
 );
-
-/// Where a node sits: below a source element at all, and directly.
-#[derive(Clone, Copy, Default)]
-struct Place {
-	in_source: bool,
-	parent_is_source: bool,
-}
 
 impl XmlWriter<'_, '_> {
 	/// `entity` and its subtree as XML.
 	pub fn write(&self, entity: Entity) -> String {
 		let mut out = String::new();
-		self.write_node(entity, true, Place::default(), &mut out);
+		self.write_node(entity, &mut out);
 		out
 	}
 
-	fn write_node(
-		&self,
-		entity: Entity,
-		is_start: bool,
-		place: Place,
-		out: &mut String,
-	) {
+	fn write_node(&self, entity: Entity, out: &mut String) {
 		let Ok((
-			source,
 			element,
 			attributes,
 			value,
-			source_text,
 			comment,
 			doctype,
 			cdata,
 			instruction,
 			children,
-			is_part,
 		)) = self.nodes.get(entity)
 		else {
 			return;
 		};
-		if is_part && !is_start {
-			return;
-		}
-		// a leaf is written where a source element holds it, or anywhere in
-		// plain markup, so a projection's own words and comments never are
-		let written = place.parent_is_source || !place.in_source;
-		if let Some(doctype) = doctype.filter(|_| written) {
+		if let Some(doctype) = doctype {
 			out.push_str("<!DOCTYPE ");
 			out.push_str(doctype);
 			out.push('>');
 		}
-		if let Some(comment) = comment.filter(|_| written) {
+		if let Some(comment) = comment {
 			out.push_str("<!--");
 			out.push_str(comment);
 			out.push_str("-->");
 		}
-		if let Some(instruction) = instruction.filter(|_| written) {
+		if let Some(instruction) = instruction {
 			out.push_str("<?");
 			out.push_str(instruction);
 			out.push_str("?>");
 		}
-		if let Some(cdata) = cdata.filter(|_| written) {
+		if let Some(cdata) = cdata {
 			out.push_str("<![CDATA[");
 			out.push_str(cdata);
 			out.push_str("]]>");
 		}
-		if let Some(text) = source_text {
-			out.push_str(&Self::escape_text(text));
-		}
-		if let Some(value) = value
-			&& source.is_none()
-			&& element.is_none()
-			&& written
-		{
-			out.push_str(&Self::escape_text(&value.to_string()));
-		}
-		let children = children.map(|children| self.ordered(children));
-		match (source, element) {
-			(Some(source), _) => {
-				self.open(&source.name, out);
-				for attribute in &source.attributes {
-					Self::write_attribute(
-						&attribute.name,
-						&attribute.value,
-						out,
-					);
-				}
-				self.close_children(
-					&source.name,
-					children,
-					Place {
-						in_source: true,
-						parent_is_source: true,
-					},
-					out,
-				);
-			}
-			(None, Some(element)) if !place.in_source => {
+		let children = children.map(|children| children.to_vec());
+		match (element, value) {
+			(Some(element), _) => {
 				self.open(element.tag(), out);
 				for attribute in attributes.iter().flat_map(|list| list.iter())
 				{
@@ -141,20 +80,14 @@ impl XmlWriter<'_, '_> {
 						Self::write_attribute(key, &value, out);
 					}
 				}
-				self.close_children(element.tag(), children, place, out);
+				self.close_children(element.tag(), children, out);
 			}
-			// projection only, or a container: its children in place
-			_ => {
+			(None, Some(value)) => {
+				out.push_str(&Self::escape_text(&value.to_string()))
+			}
+			(None, None) => {
 				for child in children.into_iter().flatten() {
-					self.write_node(
-						child,
-						false,
-						Place {
-							parent_is_source: false,
-							..place
-						},
-						out,
-					);
+					self.write_node(child, out);
 				}
 			}
 		}
@@ -171,13 +104,12 @@ impl XmlWriter<'_, '_> {
 		&self,
 		name: &str,
 		children: Option<Vec<Entity>>,
-		place: Place,
 		out: &mut String,
 	) {
 		out.push('>');
 		let start = out.len();
 		for child in children.into_iter().flatten() {
-			self.write_node(child, false, place, out);
+			self.write_node(child, out);
 		}
 		match out.len() == start {
 			true => {
@@ -192,24 +124,8 @@ impl XmlWriter<'_, '_> {
 		}
 	}
 
-	/// The children in source order: by [`SourceOrder`] where a projection
-	/// recorded one, else as they stand.
-	fn ordered(&self, children: &Children) -> Vec<Entity> {
-		let mut children = children.iter().enumerate().collect::<Vec<_>>();
-		if children
-			.iter()
-			.any(|(_, child)| self.orders.contains(*child))
-		{
-			children.sort_by_key(|(index, child)| {
-				self.orders
-					.get(*child)
-					.map_or(*index as u32, |order| order.0)
-			});
-		}
-		children.into_iter().map(|(_, child)| child).collect()
-	}
-
-	fn write_attribute(name: &str, value: &str, out: &mut String) {
+	/// Writes ` name="value"`, the value escaped for an attribute.
+	pub(crate) fn write_attribute(name: &str, value: &str, out: &mut String) {
 		out.push(' ');
 		out.push_str(name);
 		out.push_str("=\"");
@@ -230,7 +146,7 @@ impl XmlWriter<'_, '_> {
 	}
 
 	/// Text escaped for XML character data.
-	fn escape_text(text: &str) -> String {
+	pub(crate) fn escape_text(text: &str) -> String {
 		let mut out = String::with_capacity(text.len());
 		for char in text.chars() {
 			match char {
@@ -295,58 +211,5 @@ mod test {
 		world.entity_mut(text).insert(Value::str("two & three"));
 		world.entity_mut(children[1]).despawn();
 		write(&mut world, entity).xpect_eq("<a><b>two &amp; three</b></a>");
-	}
-
-	/// In a source tree an entity with no source identity is projection
-	/// only: written through, its own words never written, a source text
-	/// written though no reader sees it, children restored to their source
-	/// order, and a nested part left to be written on its own.
-	#[beet_core::test]
-	fn writes_a_source_tree_through_its_projection() {
-		let mut world = World::new();
-		let mut root = world.spawn(SourcePart::new("part.xml"));
-		BsxNode::spawn_source(
-			&BsxNode::parse_document(
-				"<w:p xmlns:w=\"urn:w\"><w:r><w:t>one</w:t></w:r><w:instr>PAGE</w:instr><w:n/></w:p>",
-				&BsxParseConfig::xml(),
-			)
-			.unwrap(),
-			&mut root,
-		);
-		let root = root.id();
-		let paragraph = world.entity(root).get::<Children>().unwrap()[0];
-		let children =
-			world.entity(paragraph).get::<Children>().unwrap().to_vec();
-		let (run, instruction, nested) =
-			(children[0], children[1], children[2]);
-		// the instruction's text kept for the writer alone
-		let text = world.entity(instruction).get::<Children>().unwrap()[0];
-		world
-			.entity_mut(text)
-			.remove::<Value>()
-			.insert(SourceText::new("PAGE"));
-		world
-			.entity_mut(nested)
-			.insert(SourcePart::new("nested.xml"));
-		// a projection: the run moved into a `strong` after its siblings, and
-		// a caption of the projection's own words
-		world.entity_mut(paragraph).insert(Element::new("p"));
-		let strong = world
-			.spawn((Element::new("strong"), ChildOf(paragraph)))
-			.id();
-		world.entity_mut(run).insert(ChildOf(strong));
-		world.spawn((Element::new("caption"), ChildOf(paragraph), children![
-			Value::str("not written")
-		]));
-		for (order, entity) in [(0, strong), (1, instruction), (2, nested)] {
-			world.entity_mut(entity).insert(SourceOrder(order));
-		}
-		HtmlRenderer::xml()
-			.render(&mut RenderContext::new(root, &mut world))
-			.unwrap()
-			.to_string()
-			.xpect_eq(
-				"<w:p xmlns:w=\"urn:w\"><w:r><w:t>one</w:t></w:r><w:instr>PAGE</w:instr></w:p>",
-			);
 	}
 }

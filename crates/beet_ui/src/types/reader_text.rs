@@ -3,8 +3,8 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// The text a reader reads under an entity, the words every renderer shows:
-/// text values and a node's own text, never a non-visual element's content
-/// nor a [`SourceText`], with a checkbox as `[x] ` or `[ ] `, and a line
+/// text values and a node's own text, never a non-visual element's content,
+/// with a checkbox as `[x] ` or `[ ] `, and a line
 /// break, a paragraph's end and a cell's as a newline.
 #[derive(SystemParam)]
 pub struct ReaderText<'w, 's> {

@@ -397,7 +397,9 @@ impl NodeVisitor for MarkdownRenderer {
 		);
 		// whether the block around has written nothing yet
 		let block_start = self.at_block_start;
-		if !inline {
+		// a line break before a block's first words writes nothing, so the
+		// wrappers around it stay unwritten, ie a bold page break
+		if !inline && !(name == "br" && block_start) {
 			self.flush_inline();
 		}
 		let block = Self::SUPPRESSIBLE
@@ -1047,7 +1049,7 @@ mod test {
 		render_unescaped(
 			"<p><strong>Date </strong>due<em> soon</em></p>\
 			 <p><mark>(Insert</mark><mark> name)</mark> <strong>a</strong><strong>b</strong><strong></strong></p>\
-			 <p></p><h2> </h2><p>last<br></p>",
+			 <p></p><h2> </h2><p>last<br></p><p><strong><br></strong></p>",
 		)
 		.xpect_eq("**Date** due *soon*\n\n<mark>(Insert name)</mark> **ab**\n\nlast\n");
 	}

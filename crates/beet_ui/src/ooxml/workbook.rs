@@ -1,17 +1,10 @@
 //! A workbook read as tables: each sheet a `<table>` of its rows and cells.
-use super::source_tree::*;
+use super::ooxml_query::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
 
 type Ns = OoxmlNamespace;
-
-/// The cell format a gap's cell is written with when an edit sets a value
-/// there: its row's when the row carries one, else its column's. A cell the
-/// sheet already holds names its own.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deref, Reflect, Component)]
-#[reflect(Component)]
-pub struct SheetCellStyle(pub u32);
 
 /// Reads a workbook's sheets into the one tree.
 pub(crate) struct WorkbookProjection {
@@ -165,7 +158,7 @@ impl WorkbookProjection {
 	/// gap before a row's last cell filled by a projection-only `<td>`.
 	fn project(&self, world: &mut World, part: Entity, name: SmolStr) {
 		let sheet =
-			world.with_state::<SourceTree, _>(|tree| self.read(&tree, part));
+			world.with_state::<OoxmlQuery, _>(|tree| self.read(&tree, part));
 		let Some(data) = sheet.data else {
 			return;
 		};
@@ -313,7 +306,7 @@ impl WorkbookProjection {
 		})
 	}
 
-	fn read(&self, tree: &SourceTree, part: Entity) -> SheetRead {
+	fn read(&self, tree: &OoxmlQuery, part: Entity) -> SheetRead {
 		let mut sheet = SheetRead::default();
 		let number = |entity: Entity, key: &str| {
 			tree.attribute(entity, None, key)
@@ -430,7 +423,7 @@ impl WorkbookProjection {
 	}
 
 	/// The text nodes under `entity`.
-	fn texts(tree: &SourceTree, entity: Entity) -> Vec<Entity> {
+	fn texts(tree: &OoxmlQuery, entity: Entity) -> Vec<Entity> {
 		tree.descendants(entity)
 			.into_iter()
 			.filter(|descendant| tree.is_text(*descendant))

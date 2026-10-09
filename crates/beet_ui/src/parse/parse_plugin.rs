@@ -35,11 +35,7 @@ impl Plugin for ParsePlugin {
 		#[cfg(feature = "bsx")]
 		app.init_plugin::<crate::prelude::BsxDefaultsPlugin>();
 		// the cell addresses every parsed document's tables carry
-		app.register_type::<TableCellAddress>()
-			.register_type::<SheetCellAddress>()
-			.register_type::<CellLocked>()
-			.register_type::<CellFormula>()
-			.register_type::<CoveredBy>();
+		app.register_type::<TableCellAddress>();
 		#[cfg(feature = "ooxml")]
 		app.init_plugin::<crate::prelude::OoxmlPlugin>();
 	}

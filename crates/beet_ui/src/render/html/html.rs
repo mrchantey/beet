@@ -89,12 +89,9 @@ impl HtmlRenderer {
 		}
 	}
 
-	/// The XML mode: a tree written as the markup it was read from, every
-	/// node kept, an empty element as `<name/>`. A node is written from its
-	/// [`SourceElement`] when it has one and from its [`Element`] and
-	/// [`Attribute`]s otherwise; below a source element an entity with no
-	/// source identity is projection only, so it is passed through and its
-	/// children written in place. Answers [`MediaType::Xml`].
+	/// The XML mode: a tree written as the markup it reads as, every node
+	/// kept, an empty element as `<name/>`, so a `.xml` file writes back as
+	/// it was read. Answers [`MediaType::Xml`].
 	pub fn xml() -> Self {
 		Self {
 			xml: true,

@@ -1,5 +1,6 @@
 //! The triage of a deck, appended to its tree after the parse.
 use super::deck::*;
+use super::ooxml_query::*;
 use beet_core::prelude::*;
 
 /// Marks a deck whose triage is appended, so a later run of
@@ -145,14 +146,13 @@ impl DeckReport {
 		}
 		let table = Self::table(world, &rows);
 		// the inventory sits before the notes, the section's last part
-		let notes = world
-			.with_state::<(Query<&Children>, Query<(), With<SourcePart>>), _>(
-				|(children, parts)| {
-					children.get(slide.section).ok().and_then(|children| {
-						children.iter().position(|child| parts.contains(child))
-					})
-				},
-			);
+		let notes = world.with_state::<(Query<&Children>, OoxmlQuery), _>(
+			|(children, query)| {
+				children.get(slide.section).ok().and_then(|children| {
+					children.iter().position(|child| query.is_part(child))
+				})
+			},
+		);
 		let mut section = world.entity_mut(slide.section);
 		match notes {
 			Some(index) => section.insert_children(index, &[heading, table]),

@@ -1,26 +1,29 @@
-//! Reading a part's source tree, and the changes a projection makes to it.
-
+//! Reading a part's [`OoxmlNode`]s, and the changes a projection makes to
+//! them.
+use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Read access over the source tree of a part: its elements by namespace and
-/// local name, their attributes, and their text. What a projection reads
-/// before deciding what each node means.
+/// Read access over the nodes of a part: its elements by namespace and local
+/// name, their attributes, and their text. What a projection reads before
+/// deciding what each node means.
 #[derive(SystemParam)]
-pub(crate) struct SourceTree<'w, 's> {
-	elements: Query<'w, 's, &'static SourceElement>,
+pub(crate) struct OoxmlQuery<'w, 's> {
+	nodes: Query<'w, 's, &'static OoxmlNode>,
 	children: Query<'w, 's, &'static Children>,
 	parents: Query<'w, 's, &'static ChildOf>,
-	texts: Query<
-		'w,
-		's,
-		&'static Value,
-		(Without<SourceElement>, Without<Element>),
-	>,
+	texts:
+		Query<'w, 's, &'static Value, (Without<OoxmlNode>, Without<Element>)>,
 }
 
-impl SourceTree<'_, '_> {
-	pub fn element(&self, entity: Entity) -> Option<&SourceElement> {
-		self.elements.get(entity).ok()
+impl OoxmlQuery<'_, '_> {
+	/// `entity`'s element, when it is one.
+	pub fn element(&self, entity: Entity) -> Option<&OoxmlElement> {
+		self.nodes.get(entity).ok().and_then(OoxmlNode::element)
+	}
+
+	/// Whether `entity` is a part.
+	pub fn is_part(&self, entity: Entity) -> bool {
+		self.nodes.get(entity).is_ok_and(OoxmlNode::is_part)
 	}
 
 	/// Whether `entity` is `local` in `namespace`.
@@ -29,7 +32,7 @@ impl SourceTree<'_, '_> {
 			.is_some_and(|element| element.is(namespace, local))
 	}
 
-	/// Whether `entity` is a text node.
+	/// Whether `entity` is a reader's text node.
 	pub fn is_text(&self, entity: Entity) -> bool {
 		self.texts.contains(entity)
 	}
@@ -218,7 +221,8 @@ impl Tagged {
 pub(crate) enum Projected {
 	/// The node means what this element means.
 	Tag(Entity, Tagged),
-	/// A text node no reader sees: its value becomes a [`SourceText`].
+	/// A text node no reader sees: its value becomes an
+	/// [`OoxmlNode::Text`].
 	Hide(Entity),
 	/// A node's own words, ie a tab's space, as its own [`Value`].
 	Show(Entity, SmolStr),
@@ -254,7 +258,7 @@ impl Projected {
 				Self::Hide(entity) => {
 					let mut entity = world.entity_mut(entity);
 					if let Some(Value::Str(text)) = entity.take::<Value>() {
-						entity.insert(SourceText::new(text.as_str()));
+						entity.insert(OoxmlNode::Text(text.to_string()));
 					}
 				}
 				Self::Show(entity, text) => {

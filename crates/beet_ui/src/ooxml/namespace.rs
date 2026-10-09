@@ -6,6 +6,8 @@
 pub struct OoxmlNamespace;
 
 impl OoxmlNamespace {
+	/// XML's own, `xml:`, bound in every document: `xml:space`.
+	pub const XML: &str = "http://www.w3.org/XML/1998/namespace";
 	/// WordprocessingML, a Word file's body, `w:`: `w:p`, `w:tbl`, `w:r`.
 	pub const WORD: &str =
 		"http://schemas.openxmlformats.org/wordprocessingml/2006/main";

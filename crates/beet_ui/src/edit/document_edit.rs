@@ -1,26 +1,30 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// A cell an edit addresses: a table cell or a workbook cell.
+/// A cell an edit addresses: a table cell, or with the `ooxml` feature a
+/// workbook cell.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CellAddress {
 	/// A table cell, `t<table>r<row>c<cell>`.
 	Table(TableCellAddress),
 	/// A workbook cell, `<sheet>!<A1>`.
+	#[cfg(feature = "ooxml")]
 	Sheet(SheetCellAddress),
 }
 
 impl CellAddress {
 	/// Parses either form, a table cell or a workbook cell.
 	pub fn parse(text: &str) -> Result<Self> {
-		TableCellAddress::parse(text)
-			.map(Self::Table)
-			.or_else(|_| SheetCellAddress::parse(text).map(Self::Sheet))
-			.map_err(|_| {
-				bevyhow!(
-					"`{text}` is not a cell, expected `t<n>r<n>c<n>` or `<sheet>!<A1>`"
-				)
-			})
+		if let Ok(address) = TableCellAddress::parse(text) {
+			return Self::Table(address).xok();
+		}
+		#[cfg(feature = "ooxml")]
+		if let Ok(address) = SheetCellAddress::parse(text) {
+			return Self::Sheet(address).xok();
+		}
+		bevybail!(
+			"`{text}` is not a cell, expected `t<n>r<n>c<n>` or `<sheet>!<A1>`"
+		)
 	}
 }
 
@@ -31,6 +35,7 @@ impl core::fmt::Display for CellAddress {
 	) -> core::fmt::Result {
 		match self {
 			Self::Table(address) => address.fmt(formatter),
+			#[cfg(feature = "ooxml")]
 			Self::Sheet(address) => address.fmt(formatter),
 		}
 	}
@@ -93,6 +98,7 @@ impl SetText {
 	/// Applies the edit to the document under `root`.
 	pub fn apply_to(&self, world: &mut World, root: Entity) -> Result<Entity> {
 		let cell = DocumentEdit::cell(world, root, &self.cell)?;
+		#[cfg(feature = "ooxml")]
 		if let CellAddress::Sheet(address) = &self.cell
 			&& self.text.trim().starts_with('=')
 		{
@@ -298,19 +304,24 @@ impl DocumentEdit<'_, '_> {
 		root: Entity,
 		address: &CellAddress,
 	) -> Result<Entity> {
-		world.with_state::<TableCells, _>(|cells| {
-			let cell = match address {
-				CellAddress::Table(table) => cells.table_cell(root, *table),
-				CellAddress::Sheet(sheet) => cells.sheet_cell(root, sheet),
-			}
-			.ok_or_else(|| bevyhow!("the document has no cell {address}"))?;
-			if cells.is_locked(cell) {
-				bevybail!(
-					"{address} is locked; only an unlocked cell takes a value"
-				);
-			}
-			cell.xok()
-		})
+		let absent = || bevyhow!("the document has no cell {address}");
+		match address {
+			CellAddress::Table(table) => world
+				.with_state::<TableCells, _>(|cells| {
+					cells.table_cell(root, *table)
+				})
+				.ok_or_else(absent),
+			#[cfg(feature = "ooxml")]
+			CellAddress::Sheet(sheet) => world.with_state::<SheetCells, _>(|cells| {
+				let cell = cells.sheet_cell(root, sheet).ok_or_else(absent)?;
+				if cells.is_locked(cell) {
+					bevybail!(
+						"{address} is locked; only an unlocked cell takes a value"
+					);
+				}
+				cell.xok()
+			}),
+		}
 	}
 
 	/// Text as matching reads it, a no-break space as a space.

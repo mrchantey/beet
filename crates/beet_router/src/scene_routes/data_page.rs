@@ -141,8 +141,7 @@ mod test {
 
 	/// A data page answers markdown with its scene and JSON with its data.
 	#[beet_core::test]
-	async fn answers_its_scene_or_its_data() {5. I'm guessing again this will need to be configurable. I can imagine sometimes we want ansii output
-
+	async fn answers_its_scene_or_its_data() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn((Router::with_defaults(), children![Count]))

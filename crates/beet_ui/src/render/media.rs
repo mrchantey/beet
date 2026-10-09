@@ -4,8 +4,8 @@
 //!
 //! Enable additional renderers via feature flags:
 //! - `ansi_term` — adds [`AnsiTermRenderer`] support
-//! - `ooxml` — adds [`OoxmlRenderer`] support, a document read from an Office
-//!   file written back to its own format
+//! - `ooxml` — adds [`OoxmlRenderer`] support, a document read from a Word
+//!   file or a workbook written back to its own format
 
 use crate::prelude::*;
 #[allow(unused_imports)]
@@ -146,7 +146,7 @@ impl MediaRenderer {
 			}
 			// an Office file writes back to its own format
 			#[cfg(feature = "ooxml")]
-			MediaType::Docx | MediaType::Xlsx | MediaType::Pptx => {
+			MediaType::Docx | MediaType::Xlsx => {
 				self.ooxml_renderer.render(&mut inner_cx).map(Some)
 			}
 			#[cfg(feature = "template_serde")]
@@ -177,7 +177,7 @@ impl MediaRenderer {
 		#[cfg(feature = "template_serde")]
 		let available = available.chain(TemplateRenderer::available());
 		#[cfg(feature = "ooxml")]
-		let available = available.chain(OoxmlPackage::MEDIA_TYPES);
+		let available = available.chain(OoxmlRenderer::MEDIA_TYPES);
 		available.collect()
 	}
 }

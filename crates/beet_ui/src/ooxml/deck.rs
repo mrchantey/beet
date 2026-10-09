@@ -1,6 +1,6 @@
 //! A slide deck read as the one tree: its slides as `<section>`s in
 //! presentation order, each slide's shapes in reading order.
-use super::source_tree::*;
+use super::ooxml_query::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
@@ -200,20 +200,10 @@ impl SlideProjection {
 			pictures,
 		};
 		let mut read = world
-			.with_state::<SourceTree, _>(|tree| projection.read(&tree, entity));
+			.with_state::<OoxmlQuery, _>(|tree| projection.read(&tree, entity));
 		read.slide.part = file.path(part).unwrap_or_default();
 		Projected::apply(world, core::mem::take(&mut read.changes));
 		for (container, order) in &read.orders {
-			let written = world
-				.entity(*container)
-				.get::<Children>()
-				.map(|children| children.to_vec())
-				.unwrap_or_default();
-			for (position, child) in written.iter().enumerate() {
-				world
-					.entity_mut(*child)
-					.insert(SourceOrder(position as u32));
-			}
 			world.entity_mut(*container).replace_children(order);
 		}
 		for (parent, position, element, words) in read.labels.iter().rev() {
@@ -233,7 +223,7 @@ impl SlideProjection {
 			};
 			let data = OoxmlParser::spawn_part(world, *frame, file, diagram)?;
 			let (changes, words) = world
-				.with_state::<SourceTree, _>(|tree| Self::diagram(&tree, data));
+				.with_state::<OoxmlQuery, _>(|tree| Self::diagram(&tree, data));
 			Projected::apply(world, changes);
 			read.slide.words += words;
 		}
@@ -276,7 +266,7 @@ impl SlideProjection {
 		Ok(())
 	}
 
-	fn read(&self, tree: &SourceTree, part: Entity) -> SlideRead {
+	fn read(&self, tree: &OoxmlQuery, part: Entity) -> SlideRead {
 		let mut read = SlideRead::default();
 		read.slide.index = self.index;
 		read.slide.layout = self.layout.clone();
@@ -465,7 +455,7 @@ impl SlideProjection {
 	}
 
 	/// The child index of `entity` within `parent`.
-	fn position(tree: &SourceTree, parent: Entity, entity: Entity) -> usize {
+	fn position(tree: &OoxmlQuery, parent: Entity, entity: Entity) -> usize {
 		tree.children(parent)
 			.iter()
 			.position(|child| *child == entity)
@@ -476,7 +466,7 @@ impl SlideProjection {
 	/// then left to right, after what is no shape, ie its own properties.
 	fn reading_order(
 		&self,
-		tree: &SourceTree,
+		tree: &OoxmlQuery,
 		container: Entity,
 	) -> Vec<Entity> {
 		let (mut shapes, rest): (Vec<_>, Vec<_>) =
@@ -507,14 +497,14 @@ impl SlideProjection {
 	}
 
 	/// How much of the slide `shape` covers, in percent.
-	fn cover(&self, tree: &SourceTree, shape: Entity) -> u32 {
+	fn cover(&self, tree: &OoxmlQuery, shape: Entity) -> u32 {
 		let (_, (cx, cy)) = self.frame(tree, shape);
 		((100 * cx * cy) as f64 / self.area as f64).round() as u32
 	}
 
 	/// A shape's frame, a placeholder without its own taking its layout
 	/// placeholder's.
-	fn frame(&self, tree: &SourceTree, shape: Entity) -> Frame {
+	fn frame(&self, tree: &OoxmlQuery, shape: Entity) -> Frame {
 		Self::own_frame(tree, shape)
 			.or_else(|| {
 				let declared = Self::placeholder(tree, shape)?;
@@ -533,7 +523,7 @@ impl SlideProjection {
 
 	/// A shape's own `a:off` and `a:ext`, from its shape, group or frame
 	/// properties.
-	fn own_frame(tree: &SourceTree, shape: Entity) -> Option<Frame> {
+	fn own_frame(tree: &OoxmlQuery, shape: Entity) -> Option<Frame> {
 		let transform = ["spPr", "grpSpPr"]
 			.iter()
 			.find_map(|local| tree.child(shape, Ns::PRESENTATION, local))
@@ -551,7 +541,7 @@ impl SlideProjection {
 
 	/// A shape's placeholder declaration, `p:ph` under its non-visual
 	/// properties.
-	fn placeholder(tree: &SourceTree, shape: Entity) -> Option<Entity> {
+	fn placeholder(tree: &OoxmlQuery, shape: Entity) -> Option<Entity> {
 		let properties = tree.children(shape).into_iter().find(|child| {
 			tree.element(*child)
 				.is_some_and(|element| element.local_name().starts_with("nv"))
@@ -603,7 +593,7 @@ impl SlideProjection {
 	}
 
 	/// A text frame's paragraphs' text, one a line.
-	fn frame_text(tree: &SourceTree, body: Entity) -> String {
+	fn frame_text(tree: &OoxmlQuery, body: Entity) -> String {
 		tree.children_named(body, Ns::DRAWING, "p")
 			.into_iter()
 			.map(|paragraph| Self::paragraph_text(tree, paragraph))
@@ -613,7 +603,7 @@ impl SlideProjection {
 
 	/// A paragraph's text, a soft break as a line break and a field as its
 	/// text.
-	fn paragraph_text(tree: &SourceTree, paragraph: Entity) -> String {
+	fn paragraph_text(tree: &OoxmlQuery, paragraph: Entity) -> String {
 		tree.children(paragraph)
 			.into_iter()
 			.filter_map(|child| {
@@ -629,7 +619,7 @@ impl SlideProjection {
 
 	/// Reads a SmartArt data part read under its frame, its paragraphs
 	/// read as any others: the changes, and its words.
-	fn diagram(tree: &SourceTree, data: Entity) -> (Vec<Projected>, usize) {
+	fn diagram(tree: &OoxmlQuery, data: Entity) -> (Vec<Projected>, usize) {
 		let mut changes = Vec::new();
 		let mut words = 0;
 		for entity in tree.descendants(data) {
@@ -655,7 +645,7 @@ impl SlideProjection {
 	}
 
 	/// Whether a text node is words a reader reads: an `a:t`'s.
-	fn is_read(tree: &SourceTree, text: Entity) -> bool {
+	fn is_read(tree: &OoxmlQuery, text: Entity) -> bool {
 		tree.parent(text)
 			.and_then(|parent| tree.element(parent))
 			.is_some_and(|parent| parent.local_name() == "t")
@@ -668,7 +658,7 @@ impl SlideProjection {
 	/// notes' words.
 	fn notes(world: &mut World, notes: Entity) -> usize {
 		let (changes, aside, words) =
-			world.with_state::<SourceTree, _>(|tree| {
+			world.with_state::<OoxmlQuery, _>(|tree| {
 				let body = tree
 					.descendants_named(notes, Ns::PRESENTATION, "sp")
 					.into_iter()
@@ -846,33 +836,12 @@ mod test {
 				"**[table 1] 2 rows x 2 cols**\n\n| Channel | Cost |\n|---|---|\n| Stall | a\\|b |\n",
 			)
 			.xpect_contains("| 1 | slide1.xml | 11 | 0 | 0% | 1 |  | picture |");
-		// the reading order is a projection the writer undoes
-		let written = MediaRenderer::default()
+		// a deck is read, never written
+		MediaRenderer::default()
 			.render(
 				&mut RenderContext::new(root, &mut world)
 					.with_accepts(vec![MediaType::Pptx]),
 			)
-			.unwrap();
-		String::from_utf8(
-			OoxmlFile::open(&written)
-				.unwrap()
-				.data_at("ppt/slides/slide1.xml")
-				.unwrap()
-				.unwrap()
-				.to_vec(),
-		)
-		.unwrap()
-		.xpect_contains("<p:cNvPr id=\"3\" name=\"Body\"/>")
-		.xpect_starts_with(
-			&String::from_utf8(
-				OoxmlFile::open(&deck())
-					.unwrap()
-					.data_at("ppt/slides/slide1.xml")
-					.unwrap()
-					.unwrap()
-					.to_vec(),
-			)
-			.unwrap(),
-		);
+			.xpect_err();
 	}
 }

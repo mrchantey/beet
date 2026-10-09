@@ -7,8 +7,8 @@ use ooxmlsdk::parts::PartRef;
 
 /// Parses a Word file, a workbook or a slide deck into the one document tree:
 /// the [`PageMeta`] its core properties declare and its [`OoxmlPackage`] on
-/// the root, each part it reads a [`SourcePart`] beneath, every node of the
-/// part an entity with its source identity and, where it means what an HTML
+/// the root, each part it reads an [`OoxmlNode::Part`] beneath, every node of
+/// the part an entity with its [`OoxmlNode`] and, where it means what an HTML
 /// element means, that [`Element`]. See the [`ooxml`](crate::ooxml) module
 /// for what each format's nodes become.
 #[derive(Debug, Default, Clone)]
@@ -30,8 +30,8 @@ impl OoxmlParser {
 			.xok()
 	}
 
-	/// Reads `part` of `package` as a source subtree: a [`SourcePart`]
-	/// child of `root` holding the part's prolog and document element.
+	/// Reads `part` of `package` as an [`OoxmlNode::Part`] child of `root`,
+	/// holding the part's prolog and document element.
 	pub(crate) fn spawn_part(
 		world: &mut World,
 		root: Entity,
@@ -45,8 +45,8 @@ impl OoxmlParser {
 			.data(part)?
 			.ok_or_else(|| bevyhow!("the part `{path}` is empty"))?;
 		let nodes = OoxmlFile::read_xml(bytes)?;
-		let entity = world.spawn((SourcePart::new(path), ChildOf(root))).id();
-		BsxNode::spawn_source(&nodes, &mut world.entity_mut(entity));
+		let entity = OoxmlNode::spawn_part(world, path, &nodes)?;
+		world.entity_mut(root).add_child(entity);
 		entity.xok()
 	}
 }

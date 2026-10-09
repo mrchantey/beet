@@ -50,8 +50,7 @@ pub async fn BlobCells(
 				&mut world.entity_mut(root),
 				&bytes,
 			))?;
-			let cells =
-				world.with_state::<TableCells, _>(|cells| cells.listing(root));
+			let cells = CellText::listing(world, root);
 			world.entity_mut(root).despawn();
 			cells.xok()
 		})

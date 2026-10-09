@@ -1,6 +1,6 @@
 //! A Word file read as the one tree: what each WordprocessingML node means to
 //! a reader, as HTML where it maps cleanly and components where it does not.
-use super::source_tree::*;
+use super::ooxml_query::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
 use ooxmlsdk::parts::PartRef;
@@ -83,12 +83,12 @@ impl WordProjection {
 	/// paragraphs into lists.
 	pub fn project(&self, world: &mut World, part: Entity) {
 		let changes =
-			world.with_state::<SourceTree, _>(|tree| self.read(&tree, part));
+			world.with_state::<OoxmlQuery, _>(|tree| self.read(&tree, part));
 		Projected::apply(world, changes);
 		ListLevel::wrap(world, part);
 	}
 
-	fn read(&self, tree: &SourceTree, part: Entity) -> Vec<Projected> {
+	fn read(&self, tree: &OoxmlQuery, part: Entity) -> Vec<Projected> {
 		let mut changes = Vec::new();
 		// text a checkbox's glyph is written in, which its `<input>` shows
 		let mut glyphs = HashSet::<Entity>::default();
@@ -182,7 +182,7 @@ impl WordProjection {
 	/// `w:delText`'s, which a `<del>` shows struck. Any other, ie a field's
 	/// instruction or the whitespace between elements, only the writer
 	/// reads.
-	fn is_read(tree: &SourceTree, text: Entity) -> bool {
+	fn is_read(tree: &OoxmlQuery, text: Entity) -> bool {
 		tree.parent(text)
 			.and_then(|parent| tree.element(parent))
 			.is_some_and(|parent| {
@@ -192,7 +192,7 @@ impl WordProjection {
 
 	/// Whether `entity` sits in a properties element, ie a `w:ins` marking
 	/// a paragraph mark inserted.
-	fn in_properties(tree: &SourceTree, entity: Entity) -> bool {
+	fn in_properties(tree: &OoxmlQuery, entity: Entity) -> bool {
 		tree.parent(entity)
 			.and_then(|parent| tree.element(parent))
 			.is_some_and(|parent| parent.local_name().ends_with("Pr"))
@@ -202,7 +202,7 @@ impl WordProjection {
 	/// when numbered, else a `<p>`.
 	fn paragraph(
 		&self,
-		tree: &SourceTree,
+		tree: &OoxmlQuery,
 		entity: Entity,
 		changes: &mut Vec<Projected>,
 	) {
@@ -246,7 +246,7 @@ impl WordProjection {
 	/// wrappers around everything after its properties.
 	fn run(
 		&self,
-		tree: &SourceTree,
+		tree: &OoxmlQuery,
 		entity: Entity,
 		changes: &mut Vec<Projected>,
 	) {
@@ -288,7 +288,7 @@ impl WordProjection {
 
 	/// A table cell, its span and its shading kept as `colspan` and a
 	/// background.
-	fn cell(&self, tree: &SourceTree, entity: Entity) -> Projected {
+	fn cell(&self, tree: &OoxmlQuery, entity: Entity) -> Projected {
 		let mut cell = Tagged::new("td");
 		if let Some(span) = tree
 			.property(entity, "tcPr", Ns::WORD, "gridSpan", "val")
@@ -308,7 +308,7 @@ impl WordProjection {
 	/// A hyperlink to its relationship's target. A link to a bookmark in
 	/// the file, ie a table of contents entry, stays its text, since no
 	/// bookmark is an element a reader could follow it to.
-	fn link(&self, tree: &SourceTree, entity: Entity) -> Option<Projected> {
+	fn link(&self, tree: &OoxmlQuery, entity: Entity) -> Option<Projected> {
 		let href = tree
 			.attribute(entity, Some(Ns::RELATIONSHIPS), "id")
 			.and_then(|id| self.links.get(id))?;
@@ -320,7 +320,7 @@ impl WordProjection {
 	/// kept for the writer since the input shows it.
 	fn checkbox(
 		&self,
-		tree: &SourceTree,
+		tree: &OoxmlQuery,
 		entity: Entity,
 		glyphs: &mut HashSet<Entity>,
 	) -> Option<Vec<Projected>> {
@@ -353,7 +353,7 @@ impl WordProjection {
 
 	/// A picture as an `<img>` of its image part, named by its drawing's
 	/// name and description.
-	fn image(&self, tree: &SourceTree, entity: Entity) -> Option<Projected> {
+	fn image(&self, tree: &OoxmlQuery, entity: Entity) -> Option<Projected> {
 		let source = tree
 			.attribute(entity, Some(Ns::RELATIONSHIPS), "embed")
 			.and_then(|id| self.images.get(id))?;
@@ -590,8 +590,7 @@ pub(crate) mod test {
 	#[beet_core::test]
 	fn lists_the_cells_of_a_form() {
 		let (mut world, root) = parse(form());
-		world
-			.with_state::<TableCells, _>(|cells| cells.listing(root))
+		CellText::listing(&mut world, root)
 			.iter()
 			.map(ToString::to_string)
 			.collect::<Vec<_>>()
