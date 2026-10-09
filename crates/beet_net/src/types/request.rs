@@ -245,9 +245,9 @@ impl Request {
 		self
 	}
 
-	/// Sets the request body from bytes
-	pub fn with_body(mut self, body: impl AsRef<[u8]>) -> Self {
-		self.body = Bytes::copy_from_slice(body.as_ref()).into();
+	/// Sets the request body, an owned buffer moving in without a copy.
+	pub fn with_body(mut self, body: impl Into<Body>) -> Self {
+		self.body = body.into();
 		self
 	}
 
@@ -317,9 +317,10 @@ impl Request {
 			.xok()
 	}
 
-	/// Mutably sets the request body
-	pub fn set_body(&mut self, body: impl AsRef<[u8]>) -> &mut Self {
-		self.body = Bytes::copy_from_slice(body.as_ref()).into();
+	/// Mutably sets the request body, an owned buffer moving in without a
+	/// copy.
+	pub fn set_body(&mut self, body: impl Into<Body>) -> &mut Self {
+		self.body = body.into();
 		self
 	}
 

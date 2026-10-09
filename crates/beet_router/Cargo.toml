@@ -66,12 +66,20 @@ bsx_core = ["beet_core/bsx"]
 # declaration constructed in the build walk finds its credentials set.
 vault = ["std", "beet_net/vault"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
+# The standard.site records (`router/site/syndication/standard_site`): plain
+# data in the atproto model, beside `beet_net`'s `Pds` family. With `json`, the
+# Leaflet render target, whose image blocks read an image's size off its header
+# (`imagesize`).
+dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor", "dep:imagesize"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui/serde"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
 # The live, interactive terminal target: the charcell TUI host + stdio terminal,
 # behind which the in-world `Navigator` browses the app's own routes (`TuiServer`).
 tui = ["std", "beet_ui/tui"]
+# A mermaid diagram (`beet_ui/mermaid`) read as the fence it was written as,
+# by a target that writes the source rather than the picture (Leaflet).
+mermaid = ["std", "beet_ui/mermaid"]
 # The multi-tenant SSH-TUI server (`SshTuiServer`): serves each SSH connection its
 # own navigable terminal, all browsing the same router, alongside the http server.
 ssh = ["tui", "beet_net/russh_server"]
@@ -91,7 +99,7 @@ client_io = ["http", "beet_net/tungstenite"]
 # drags in `bevy_asset` (std) and so breaks no_std consumers.
 # `beet_core/rsx`: the `SceneServer` meta-route bundle is a `#[template]`, whose
 # attribute macro is rsx-gated; scene_server compiles wherever template_serde is on.
-template_serde = ["beet_core/template_serde", "beet_core/rsx", "serde"]
+template_serde = ["beet_core/template_serde", "beet_core/rsx", "beet_ui?/template_serde", "serde"]
 # The scripting route registrations (the `Script`/`ExchangeScript`/
 # `ExchangeScriptElement` reflect types and the `<ScriptRoute>` template).
 # Backend-agnostic and self-sufficient: this compiles and registers on its own,
@@ -139,6 +147,8 @@ bitflags = "2"
 
 serde = {workspace = true, optional=true}
 serde_json = {workspace = true, optional=true}
+# the raster formats the web serves, for a Leaflet image block's aspect ratio
+imagesize = { workspace = true, optional = true, features = ["png", "jpeg", "gif", "webp", "heif", "bmp", "tiff", "ico"] }
 
 #💡 codegen
 syn = { workspace = true, optional = true }

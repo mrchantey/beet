@@ -2,15 +2,15 @@
 # Wasm: a beet program running in the browser
 
 Serves a page that boots the wasm `beet` binary with a launch of its own: the
-page's `<Wasm src repo main>` names the served repo store and the entry within
+page's `<Wasm src repo entry>` names the served repo store and the entry within
 it, the browser process resolves and builds that entry exactly as the native
-binary does its `--main`, runs it headless, and `<RenderConsole>` renders its
+binary does its `--entry`, runs it headless, and `<RenderConsole>` renders its
 console output. Honors `?color-scheme=dark`.
 
 Install a wasm binary once, then serve:
 
     just build-wasm-min                  # assets/wasm/beet-min.wasm, what `/` mounts
-    beet --main=examples/wasm --watch    # then open http://127.0.0.1:8337
+    beet --entry=examples/wasm --watch    # then open http://127.0.0.1:8337
 
 The pages walk the artifact range, which is the whole point of the split: `/`
 boots `beet-min.wasm` (`web_min`, the smallest binary that is still a beet
@@ -19,7 +19,7 @@ runtime, so its entry sticks to the core vocabulary), `/render` boots
 `just build-wasm-render` first), and `/scripting` boots `beet-full.wasm`
 (`web_full`, the kitchen sink, so `just build-wasm-full` first). Any
 `examples/action/*.bsx` runs off the full binary: point a page's `<Wasm repo
-main>` at eg `repo="/examples/action" main="malenia.bsx"`. The entry roots at
+entry>` at eg `repo="/examples/action" entry="malenia.bsx"`. The entry roots at
 the workspace (`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser
 reads as its repo and `--watch` live-reloads the browser on any edit under them.
 

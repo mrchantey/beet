@@ -45,10 +45,11 @@ fn run_webdriver(async_commands: AsyncCommands) {
 			.click()
 			.await?;
 		poll_ext::poll_async(async || {
-			let url = page.current_url().await?;
-			url.contains("iana.org")
-				.then_some(())
-				.ok_or_else(|| bevyhow!("still at {url}"))
+			match page.current_url().await?.contains("iana.org") {
+				true => ControlFlow::Break(()),
+				false => ControlFlow::Continue(()),
+			}
+			.xok()
 		})
 		.await?;
 		info!("landed on {}", page.current_url().await?);

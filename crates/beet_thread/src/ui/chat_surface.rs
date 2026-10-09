@@ -21,7 +21,7 @@ mod test {
 	use bevy::math::UVec2;
 
 	/// The live-TUI stack a thread scene is served through, the in-process twin of
-	/// `beet --main=examples/thread/chat.bsx`: the charcell render + input
+	/// `beet --entry=examples/thread/chat.bsx`: the charcell render + input
 	/// pipeline, live navigation, and the thread plugins.
 	fn thread_app() -> App {
 		let mut app = App::new();

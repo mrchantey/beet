@@ -89,8 +89,8 @@ as a pause.
 
 ## Usage
 
-    beet --main=examples/infra/mail_comail.bsx validate
-    beet --main=examples/infra/mail_comail.bsx deploy
+    beet --entry=examples/infra/mail_comail.bsx validate
+    beet --entry=examples/infra/mail_comail.bsx deploy
 
 `validate` needs only `tofu`. Live deploy needs everything `mail.bsx` needs plus
 a completed enrolment. A `429` from the send API during the 14-day warming

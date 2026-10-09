@@ -136,7 +136,7 @@ mod test {
 	async fn accepts_text_plain_beacon() {
 		beacon_hits(Request::with_media(
 			"analytics",
-			MediaBytes::new(MediaType::Text, PAYLOAD.as_bytes().to_vec()),
+			MediaBytes::new_text(PAYLOAD),
 		))
 		.await
 		.xpect_eq(1);

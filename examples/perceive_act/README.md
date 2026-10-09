@@ -28,7 +28,7 @@ cycle 3: acted in 0.10s (show-image 0.07s | speak-text 0.10s | drive 0.07s)
 One process, both clients mocked: the head reads the floor photos and logs the chosen image, the body records the drive command.
 
 ```sh
-beet --main=examples/perceive_act/main-v1.bsx
+beet --entry=examples/perceive_act/main-v1.bsx
 ```
 
 ## v2: wgpu fox body
@@ -36,7 +36,7 @@ beet --main=examples/perceive_act/main-v1.bsx
 Same mock head, but the body is a 3d fox in a window that drives off each command.
 
 ```sh
-beet --main=examples/perceive_act/main-v2.bsx
+beet --entry=examples/perceive_act/main-v2.bsx
 ```
 
 ## v3: browser head
@@ -45,7 +45,7 @@ No in-process clients. A second HTTP server serves a wasm browser head that conn
 
 ```sh
 just build-wasm-full
-beet --main=examples/perceive_act/main-v3.bsx
+beet --entry=examples/perceive_act/main-v3.bsx
 ```
 
 That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --package=beet-cli --bin=beet --features=web_head --out=assets/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.

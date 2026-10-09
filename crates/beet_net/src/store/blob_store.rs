@@ -150,8 +150,7 @@ impl BlobStore {
 	/// Get an object and infer the [`MediaType`] from its path extension.
 	pub async fn get_media(&self, path: &RelPath) -> Result<MediaBytes> {
 		let media_type = path.media_type().unwrap_or(MediaType::Bytes);
-		let bytes = self.get(path).await?;
-		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+		MediaBytes::new(media_type, self.get(path).await?).xok()
 	}
 
 	/// Create a [`Blob`] handle for a single object in this store.

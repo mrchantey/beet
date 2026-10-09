@@ -13,10 +13,10 @@ TUI is compiled in, so there is no S3 site sync.
 
 ## Usage
 
-    beet --main=examples/infra/ssh_site.bsx validate
-    beet --main=examples/infra/ssh_site.bsx deploy
-    beet --main=examples/infra/ssh_site.bsx watch
-    beet --main=examples/infra/ssh_site.bsx destroy --force
+    beet --entry=examples/infra/ssh_site.bsx validate
+    beet --entry=examples/infra/ssh_site.bsx deploy
+    beet --entry=examples/infra/ssh_site.bsx watch
+    beet --entry=examples/infra/ssh_site.bsx destroy --force
 
 Live deploy needs AWS credentials, plus `tofu`, `cargo-zigbuild` and a container
 engine.

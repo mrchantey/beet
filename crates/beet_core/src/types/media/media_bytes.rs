@@ -1,34 +1,49 @@
 //! Bytes typed by a [`MediaType`]
 use crate::prelude::*;
+use bytes::Bytes;
 
-/// Owned bytes paired with a [`MediaType`].
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, Reflect)]
-#[reflect(Default)]
+/// Bytes paired with a [`MediaType`], the bytes a shared [`Bytes`] buffer so a
+/// clone costs a reference count rather than a copy: a blob two attributes
+/// reference, a response body handed on, a store read.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+#[reflect(Debug, Default, Clone, PartialEq)]
 pub struct MediaBytes {
 	/// The media type of these bytes.
 	media_type: MediaType,
 	/// The raw bytes of the media content.
-	#[deref]
-	bytes: Vec<u8>,
+	bytes: OpaqueBytes,
 }
 
+/// A [`Bytes`] buffer reflected whole, the one field of [`MediaBytes`] that
+/// `Bytes`, having no `Reflect` of its own, cannot be. Serialized as a byte
+/// string, so a scene holding [`MediaBytes`] still writes through reflection.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deref, Reflect)]
+#[reflect(opaque)]
+#[reflect(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+#[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
+struct OpaqueBytes(Bytes);
+
 impl MediaBytes {
-	/// Create a new [`MediaBytes`] with the given media type and bytes.
-	pub fn new(media_type: MediaType, bytes: impl Into<Vec<u8>>) -> Self {
+	/// Create a new [`MediaBytes`] with the given media type and bytes. A
+	/// `Vec`, a `String`, a `'static` slice or another [`Bytes`] moves in
+	/// without a copy.
+	pub fn new(media_type: MediaType, bytes: impl Into<Bytes>) -> Self {
 		Self {
 			media_type,
-			bytes: bytes.into(),
+			bytes: OpaqueBytes(bytes.into()),
 		}
 	}
 
-	/// Create a [`MediaBytes`] from a UTF-8 string slice.
+	/// Create a [`MediaBytes`] from a borrowed UTF-8 string slice, copying it.
 	pub fn new_str(media_type: MediaType, content: &str) -> Self {
-		Self::new(media_type, content.as_bytes().to_vec())
+		Self::new(media_type, Bytes::copy_from_slice(content.as_bytes()))
 	}
 
-	/// Create a [`MediaBytes`] from an owned [`String`].
+	/// Create a [`MediaBytes`] from an owned [`String`], without a copy.
 	pub fn new_string(media_type: MediaType, content: String) -> Self {
-		Self::new(media_type, content.into_bytes())
+		Self::new(media_type, content)
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Html`].
@@ -42,7 +57,7 @@ impl MediaBytes {
 	}
 
 	/// Create [`MediaBytes`] with [`MediaType::Bytes`].
-	pub fn new_octet(bytes: impl Into<Vec<u8>>) -> Self {
+	pub fn new_octet(bytes: impl Into<Bytes>) -> Self {
 		Self::new(MediaType::Bytes, bytes)
 	}
 
@@ -74,16 +89,16 @@ impl MediaBytes {
 	/// The media type of these bytes.
 	pub fn media_type(&self) -> &MediaType { &self.media_type }
 
-	/// The raw bytes of the content.
-	pub fn bytes(&self) -> &[u8] { &self.bytes }
+	/// The shared buffer, cloned for a reference count rather than a copy.
+	pub fn bytes(&self) -> &Bytes { &self.bytes }
 
 	/// Try to interpret the bytes as a UTF-8 string slice.
 	pub fn as_utf8(&self) -> Result<&str> {
 		core::str::from_utf8(&self.bytes)?.xok()
 	}
 
-	/// Consume and return the media type and bytes.
-	pub fn take(self) -> (MediaType, Vec<u8>) { (self.media_type, self.bytes) }
+	/// Consume and return the media type and the shared buffer.
+	pub fn take(self) -> (MediaType, Bytes) { (self.media_type, self.bytes.0) }
 
 	/// Serialize `value` using the given media type's format, returning [`MediaBytes`].
 	///
@@ -123,6 +138,11 @@ impl MediaBytes {
 	}
 }
 
+impl core::ops::Deref for MediaBytes {
+	type Target = [u8];
+	fn deref(&self) -> &[u8] { &self.bytes }
+}
+
 impl core::fmt::Display for MediaBytes {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		match core::str::from_utf8(&self.bytes) {
@@ -134,8 +154,8 @@ impl core::fmt::Display for MediaBytes {
 	}
 }
 
-impl Into<bytes::Bytes> for MediaBytes {
-	fn into(self) -> bytes::Bytes { self.bytes.into() }
+impl From<MediaBytes> for Bytes {
+	fn from(media: MediaBytes) -> Self { media.bytes.0 }
 }
 
 #[cfg(test)]
@@ -152,6 +172,7 @@ mod test {
 	fn new_from_slice() {
 		let mb = MediaBytes::new(MediaType::Text, b"hello".as_slice());
 		mb.bytes().xpect_eq(b"hello".as_slice());
+		(&*mb).xpect_eq(b"hello".as_slice());
 		mb.media_type().xpect_eq(MediaType::Text);
 	}
 
@@ -186,7 +207,7 @@ mod test {
 	fn new_octet_helper() {
 		let mb = MediaBytes::new_octet(vec![0xFF, 0xFE]);
 		mb.media_type().xpect_eq(MediaType::Bytes);
-		mb.bytes().xpect_eq(&[0xFF, 0xFE]);
+		mb.bytes().xpect_eq([0xFF, 0xFE].as_slice());
 	}
 
 	#[crate::test]
@@ -207,7 +228,15 @@ mod test {
 		let mb = MediaBytes::new_text("data");
 		let (media_type, bytes) = mb.take();
 		media_type.xpect_eq(MediaType::Text);
-		bytes.xpect_eq(b"data".to_vec());
+		bytes.xpect_eq(b"data".as_slice());
+	}
+
+	/// A clone shares the buffer rather than copying it.
+	#[crate::test]
+	fn clone_shares_the_buffer() {
+		let mb = MediaBytes::new_octet(vec![1, 2, 3]);
+		let clone = mb.clone();
+		mb.as_ptr().xpect_eq(clone.as_ptr());
 	}
 
 	#[crate::test]
@@ -243,6 +272,6 @@ mod test {
 	fn default_is_empty() {
 		let mb = MediaBytes::default();
 		mb.media_type().xpect_eq(MediaType::Bytes);
-		mb.bytes().xpect_eq(&[] as &[u8]);
+		mb.bytes().is_empty().xpect_true();
 	}
 }

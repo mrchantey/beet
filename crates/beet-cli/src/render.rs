@@ -82,7 +82,7 @@ fn exit_when_all_windows_closed(
 /// names an output PNG. When set, it captures the first window's contents on frame
 /// `--screenshot-frame` / `BEET_SCREENSHOT_FRAME` (default 30), saves the PNG, and
 /// exits once written. So any windowed beet scene is verifiable headlessly:
-/// `BEET_SCREENSHOT=/tmp/x.png beet --main=scene.bsx`.
+/// `BEET_SCREENSHOT=/tmp/x.png beet --entry=scene.bsx`.
 ///
 /// The arming is a [`PreStartup`] system, not work done in `build`: a plugin
 /// registers systems, it does not read config and conditionally insert resources.

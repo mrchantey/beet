@@ -28,21 +28,6 @@ pub(crate) fn escape(text: &str) -> String {
 	out
 }
 
-/// The inverse of [`escape`]: the five predefined entities decoded back to the
-/// characters they stand for.
-///
-/// Read by the search index, which carries a page's rendered prose as text: the
-/// document it came from was escaped for markup, and a reader searching for
-/// `Tom & Jerry` types the ampersand.
-pub(crate) fn unescape(text: &str) -> String {
-	text.replace("&lt;", "<")
-		.replace("&gt;", ">")
-		.replace("&quot;", "\"")
-		.replace("&apos;", "'")
-		// last, so a literal `&amp;lt;` decodes to `&lt;` rather than to `<`
-		.replace("&amp;", "&")
-}
-
 /// An `<{name}>{escaped value}</{name}>` element, indented by `indent` tabs and
 /// newline-terminated.
 pub(crate) fn element(indent: usize, name: &str, value: &str) -> String {
@@ -78,14 +63,6 @@ mod test {
 			"Tom &amp; Jerry&apos;s &lt;b&gt;&quot;show&quot;&lt;/b&gt;"
 				.to_string(),
 		);
-	}
-
-	#[beet_core::test]
-	fn round_trips_through_escaping() {
-		let text = "Tom & Jerry's <b>\"show\"</b>";
-		unescape(&escape(text)).xpect_eq(text.to_string());
-		// the ampersand decodes last, so an escaped entity survives one trip
-		unescape("&amp;lt;").xpect_eq("&lt;".to_string());
 	}
 
 	#[beet_core::test]

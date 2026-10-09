@@ -3,7 +3,7 @@
 A site declared entirely in markup. `main.bsx` is the entrypoint, `routes/` is the content, `templates/` holds the site's own BSX templates. No Rust authoring, no codegen, and no `main.rs`: the `beet` binary discovers `main.bsx`, and the `CallOnReady` verb it declares boots the servers the moment the entry loads.
 
 ```sh
-# run from the site dir so the binary discovers its main.bsx (or pass --main=<path>)
+# run from the site dir so the binary discovers its main.bsx (or pass --entry=<path>)
 cd examples/bsx_site
 
 # CLI render mode: the home route, or a named route

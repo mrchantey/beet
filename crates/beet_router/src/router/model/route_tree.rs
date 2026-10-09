@@ -527,7 +527,7 @@ mod test {
 	/// not the command url space it is addressed from; a route inside a url
 	/// space still resolves to the space holding it.
 	///
-	/// Regression: `beet --main=site serve --server=tui` resolved the command
+	/// Regression: `beet --entry=site serve --server=tui` resolved the command
 	/// dispatcher's tree, so its home page opened on "no route matched /".
 	#[beet_core::test]
 	fn resolves_a_mounted_servers_own_router() {

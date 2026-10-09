@@ -132,20 +132,28 @@ impl Stream for Body {
 	}
 }
 
-impl Into<Body> for &[u8] {
-	fn into(self) -> Body { Body::Bytes(Bytes::from(self.to_vec())) }
+/// A borrowed slice is copied; every owned form moves in without a copy.
+impl From<&[u8]> for Body {
+	fn from(bytes: &[u8]) -> Self { Body::Bytes(Bytes::copy_from_slice(bytes)) }
 }
-impl Into<Body> for &str {
-	fn into(self) -> Body { Body::Bytes(Bytes::from(self.as_bytes().to_vec())) }
+impl From<&str> for Body {
+	fn from(text: &str) -> Self {
+		Body::Bytes(Bytes::copy_from_slice(text.as_bytes()))
+	}
 }
-impl Into<Body> for String {
-	fn into(self) -> Body { Body::Bytes(Bytes::from(self.as_bytes().to_vec())) }
+impl From<String> for Body {
+	fn from(text: String) -> Self { Body::Bytes(Bytes::from(text)) }
 }
-impl Into<Body> for Bytes {
-	fn into(self) -> Body { Body::Bytes(self) }
+impl<const N: usize> From<&'static [u8; N]> for Body {
+	fn from(bytes: &'static [u8; N]) -> Self {
+		Body::Bytes(Bytes::from_static(bytes))
+	}
 }
-impl Into<Body> for Vec<u8> {
-	fn into(self) -> Body { Body::Bytes(Bytes::from(self)) }
+impl From<Bytes> for Body {
+	fn from(bytes: Bytes) -> Self { Body::Bytes(bytes) }
+}
+impl From<Vec<u8>> for Body {
+	fn from(bytes: Vec<u8>) -> Self { Body::Bytes(Bytes::from(bytes)) }
 }
 
 impl Body {
@@ -172,8 +180,7 @@ impl Body {
 
 	/// Consumes the body and returns the content as a UTF-8 string.
 	pub async fn into_string(self) -> Result<String> {
-		let bytes = self.into_bytes().await?;
-		String::from_utf8(bytes.to_vec())?.xok()
+		String::from_utf8(Vec::from(self.into_bytes().await?))?.xok()
 	}
 
 	/// Consumes the body and deserializes the content as JSON.
@@ -192,10 +199,7 @@ impl Body {
 	}
 
 	/// Creates a body from [`MediaBytes`], using the raw bytes.
-	pub fn from_media(bytes: MediaBytes) -> Self {
-		let (_media_type, bytes) = bytes.take();
-		Body::Bytes(Bytes::from(bytes))
-	}
+	pub fn from_media(bytes: MediaBytes) -> Self { Body::Bytes(bytes.into()) }
 
 	/// Consumes the body and deserializes using the given [`MediaType`].
 	#[cfg(feature = "serde")]
@@ -218,8 +222,7 @@ impl Body {
 		content_type: Option<MediaType>,
 	) -> Result<MediaBytes> {
 		let media_type = content_type.unwrap_or(MediaType::Bytes);
-		let bytes = self.into_bytes().await?;
-		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+		MediaBytes::new(media_type, self.into_bytes().await?).xok()
 	}
 
 	/// Consumes the body and decodes it into a [`Value`].
@@ -257,9 +260,9 @@ impl Body {
 				Value::str(String::from_utf8_lossy(&bytes).into_owned())
 			}
 			// a declared non-text type stays bytes.
-			Some(_) => Value::Bytes(bytes.to_vec()),
+			Some(_) => Value::Bytes(Vec::from(bytes)),
 			// no type: a string if valid UTF-8, else bytes.
-			None => match String::from_utf8(bytes.to_vec()) {
+			None => match String::from_utf8(Vec::from(bytes)) {
 				Ok(text) => Value::str(text),
 				Err(err) => Value::Bytes(err.into_bytes()),
 			},

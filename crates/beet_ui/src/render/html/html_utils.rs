@@ -49,7 +49,6 @@ pub(crate) const BLOCK_ELEMENTS: &[&str] = &[
 
 /// Whether `name` is an HTML block-level element (case-insensitive), per
 /// [`BLOCK_ELEMENTS`].
-#[cfg(feature = "markdown_parser")]
 pub(crate) fn is_block_element(name: &str) -> bool {
 	BLOCK_ELEMENTS
 		.iter()

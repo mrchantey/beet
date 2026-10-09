@@ -3,7 +3,7 @@
 //! world adopts every route's served page as it stands, and the counter counts
 //! again through the world running in the tab.
 //!
-//! The site is served exactly as `beet --main=examples/bsx_site` serves it
+//! The site is served exactly as `beet --entry=examples/bsx_site` serves it
 //! (the entry resolved through its own fs repo store, built through the plain
 //! one-shot path, its declared `<HttpServer>` booting), the harness reading the
 //! url off the listener the entry binds. The page's `<Wasm/>` boots the entry

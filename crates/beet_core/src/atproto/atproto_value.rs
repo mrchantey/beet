@@ -117,6 +117,41 @@ impl AtprotoValue {
 		Self(Value::Map(map)).xok()
 	}
 
+	/// Every blob this value references, anywhere in it, each once in the
+	/// order first met. A PDS retains a blob by structure, so a reference
+	/// nested in any field counts, and this is the set a writer uploads before
+	/// the record that holds it.
+	#[cfg(feature = "serde")]
+	pub fn blob_refs(&self) -> Vec<BlobRef> {
+		let mut found = Vec::new();
+		Self::collect_blob_refs(&self.0, &mut found);
+		found
+	}
+
+	#[cfg(feature = "serde")]
+	fn collect_blob_refs(value: &Value, found: &mut Vec<BlobRef>) {
+		match value {
+			Value::Map(map) => {
+				if map.get("$type").ok().and_then(|ty| ty.as_str().ok())
+					== Some(BlobRef::TYPE)
+					&& let Ok(blob) = value.clone().into_serde::<BlobRef>()
+					&& !found.iter().any(|seen| seen.cid == blob.cid)
+				{
+					found.push(blob);
+				}
+				for (_, child) in map {
+					Self::collect_blob_refs(child, found);
+				}
+			}
+			Value::List(items) => {
+				for item in items {
+					Self::collect_blob_refs(item, found);
+				}
+			}
+			_ => {}
+		}
+	}
+
 	fn encode(value: Value) -> Value {
 		match value {
 			Value::Float(float) => value!({
@@ -260,14 +295,19 @@ impl Serialize for AtprotoValue {
 	}
 }
 
-/// Deserialized as a value off the wire, through
-/// [`from_wire`](AtprotoValue::from_wire).
+/// Deserialized from either form through [`TryFrom<Value>`]: the data model
+/// form reads as itself, since encoding it changes nothing, and a decoded
+/// value (what [`into_serde`](AtprotoValue::into_serde) hands a `T`) is encoded
+/// back. So an `AtprotoValue` reads back through `into_serde` and through
+/// every [`MediaType`], [`MediaType::DagCbor`] included, which decodes before
+/// it hands over. [`from_wire`](AtprotoValue::from_wire) is the strict reader,
+/// for a value that must already be in the data model.
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for AtprotoValue {
 	fn deserialize<D: serde::Deserializer<'de>>(
 		deserializer: D,
 	) -> Result<Self, D::Error> {
-		Self::from_wire(Value::deserialize(deserializer)?)
+		Self::try_from(Value::deserialize(deserializer)?)
 			.map_err(serde::de::Error::custom)
 	}
 }
@@ -361,6 +401,22 @@ mod test {
 			.to_string()
 			.xpect_contains("cid");
 		AtprotoValue::try_from(value!({ "n": (i64::MAX as u64) })).unwrap();
+	}
+
+	/// A blob nested anywhere is found, once.
+	#[cfg(feature = "serde")]
+	#[crate::test]
+	fn finds_blob_refs() {
+		let first = BlobRef::of(b"one", MediaType::Png);
+		let second = BlobRef::of(b"two", MediaType::Jpeg);
+		let blob = |blob: &BlobRef| Value::from_serde(blob).unwrap();
+		AtprotoValue::try_from(value!({
+			"cover": (blob(&first)),
+			"pages": [{ "blocks": [{ "image": (blob(&second)) }, { "image": (blob(&first)) }] }]
+		}))
+		.unwrap()
+		.blob_refs()
+		.xpect_eq(vec![first, second]);
 	}
 
 	#[crate::test]

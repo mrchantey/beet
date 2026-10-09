@@ -3,13 +3,13 @@ The entry the wasm binary runs: a headless behavior tree that logs a greeting
 and exits. It uses only `web`-feature types (`Sequence`/`Log`/`CallOnReady`), so it
 runs in a `--features web` wasm build with no extra registration.
 
-The page names it as its launch, `<Wasm repo="/examples/wasm" main="hello.bsx"/>`:
+The page names it as its launch, `<Wasm repo="/examples/wasm" entry="hello.bsx"/>`:
 the browser process reads `hello.bsx` out of the served repo and boots it exactly
-as the native binary boots its `--main`. Any `.bsx` whose tags are compiled into
+as the native binary boots its `--entry`. Any `.bsx` whose tags are compiled into
 the wasm binary runs the same way; build the wasm with more features to run richer
 examples.
 
-    beet --main=examples/wasm/hello.bsx   # the same entry, natively
+    beet --entry=examples/wasm/hello.bsx   # the same entry, natively
 -->
 <Sequence {CallOnReady}>
 	<Log message="Hello from beet, running headless in your browser."/>

@@ -5,7 +5,7 @@ With async actions, "long running" is simply a future that takes a while to
 resolve. `<Patrol>` loops several times with a delay between steps, then a final
 log. `{CallOnReady}` runs the sequence on load, then exits.
 
-    beet --main=examples/action/long_running.bsx
+    beet --entry=examples/action/long_running.bsx
 -->
 <Sequence {CallOnReady}>
 	<Patrol/>

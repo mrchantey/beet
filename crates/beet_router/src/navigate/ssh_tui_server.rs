@@ -563,7 +563,7 @@ mod test {
 	/// its own router serves, not at the command path that addressed it.
 	///
 	/// This is the deployed shape (`app --repo=.. --server=ssh serve`, and `beet
-	/// --main=site serve --server=ssh` locally): the site hangs off a `serve` route, so
+	/// --entry=site serve --server=ssh` locally): the site hangs off a `serve` route, so
 	/// every session used to open on a "no route matched /serve" error page.
 	#[beet_core::test]
 	async fn boot_opens_at_the_mounted_url_space() {
@@ -895,7 +895,7 @@ mod test {
 	// input pipeline (no `pointer_input`, disclosure observers, or
 	// `sync_sidebar_breakpoint`) and its multi-session tests drive navigation
 	// directly. The harness below adds the full live-TUI stack the real
-	// `beet --main=site serve --server=ssh` runs and drives real SGR mouse bytes across
+	// `beet --entry=site serve --server=ssh` runs and drives real SGR mouse bytes across
 	// two concurrent sessions, so cross-session state leaks are actually
 	// exercised.
 	// ================================================================
@@ -910,7 +910,7 @@ mod test {
 		format!("\x1b[<{b};{};{}{m}", col + 1, row + 1).into_bytes()
 	}
 
-	/// The live-TUI stack the real `beet --main=site serve --server=ssh` runs, including
+	/// The live-TUI stack the real `beet --entry=site serve --server=ssh` runs, including
 	/// the input pipeline the plain [`ssh_tui_app`] omits: [`CharcellTuiPlugin`]
 	/// brings `pointer_input`/`scroll_input`, the disclosure observers, and
 	/// `sync_sidebar_breakpoint`, so concurrent SGR input is exercised.

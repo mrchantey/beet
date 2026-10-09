@@ -147,10 +147,9 @@ impl Pds {
 				(false, _, Some(existing)) => existing.strong_ref(),
 				(_, true, _) => StrongRef::new(
 					self.uri(&T::COLLECTION, &rkey),
-					dag_cbor_ext::record_cid(
-						&AtprotoValue::from_serde(&*record)?
-							.into_record(&T::COLLECTION)?,
-					),
+					AtprotoValue::from_serde(&*record)?
+						.into_record(&T::COLLECTION)?
+						.cid(),
 				),
 				_ => self.put(&record).await?,
 			};

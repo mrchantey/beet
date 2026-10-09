@@ -60,7 +60,7 @@ const PIXEL_PROBE: &str = r#"(() => {
 /// under test is the one the served `/render` page uses. No canvas is supplied,
 /// exercising the created-and-appended path (`/render` covers page-supplied).
 fn render_page() -> Result<String> {
-	wasm_page(rsx! { <Wasm src=WASM_SRC repo=SCENE_REPO main=SCENE_MAIN/> })
+	wasm_page(rsx! { <Wasm src=WASM_SRC repo=SCENE_REPO entry=SCENE_MAIN/> })
 }
 
 #[beet::test(timeout_ms = 300_000)]

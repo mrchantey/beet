@@ -102,6 +102,13 @@ impl Plugin for RouterPlugin {
 				// `ServerPlugin` installs the `HttpServer` backend and registers the
 				// server types.
 				.init_plugin::<ServerPlugin>()
+				// every scene route renders through the render target registry
+				.init_plugin::<RenderPlugin>()
+				// the scene routes' render params and the media they embed
+				.register_type::<RenderRoot>()
+				.register_type::<MediaIngestPolicy>()
+				.register_type::<InlineBlob>()
+				.register_type::<PageUrl>()
 				// template routes render through the charcell layout/paint
 				// pipeline; without it the `PostParseTree` schedule has no systems
 				// and ANSI output is blank.
@@ -166,10 +173,6 @@ impl Plugin for RouterPlugin {
 				// thread's `<StoreToolset/>`); the store itself is mounted with a
 				// plain `{FsStore{path:..}}`.
 				.register_template::<StoreToolset>();
-			// the `content` formats a standard site document can carry, each
-			// registered here by the NSID a publication names it with
-			#[cfg(feature = "json")]
-			app.init_resource::<StandardSiteContentRenderers>();
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it
@@ -321,6 +324,20 @@ impl Plugin for RouterPlugin {
 			// an `<AnalyticsConfig/>` is spawned, so nothing records until a site
 			// opts in with that on-switch.
 			app.register_type::<AnalyticsMiddleware>();
+			// the standard.site `content` formats, each answered by a render
+			// target registered beside it
+			#[cfg(feature = "dag_cbor")]
+			{
+				app.init_resource::<StandardSiteContentFormats>()
+					.world_mut()
+					.resource_mut::<StandardSiteContentFormats>()
+					.register(
+						LeafletContent::NSID,
+						LeafletRenderer::media_type(),
+					);
+				#[cfg(feature = "json")]
+				app.register_render_target(LeafletRenderer);
+			}
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
 		}
@@ -340,6 +357,7 @@ fn insert_action_path_and_params(
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
+	metas: Query<&ActionMeta>,
 	mut commands: Commands,
 ) -> Result {
 	// only entities that have their own PathPartial become routes; children of a
@@ -348,10 +366,35 @@ fn insert_action_path_and_params(
 	if !paths.get(ev.entity).is_ok_and(|path| !path.is_root) {
 		return Ok(());
 	}
-	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
-	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
-	commands.entity(ev.entity).insert((path, params));
+	commands.entity(ev.entity).insert(route_patterns(
+		ev.entity, &ancestors, &paths, &params, &metas,
+	)?);
 	Ok(())
+}
+
+/// The [`PathPattern`] and [`ParamsPattern`] of the route at `entity`, its
+/// own partials and its ancestors'. A scene route's params include the render
+/// step's ([`RenderParams`]), since every page renders through it.
+fn route_patterns(
+	entity: Entity,
+	ancestors: &Query<&ChildOf>,
+	paths: &Query<&PathPartial>,
+	params: &Query<&ParamsPartial>,
+	metas: &Query<&ActionMeta>,
+) -> Result<(PathPattern, ParamsPattern)> {
+	let path = PathPattern::collect(entity, ancestors, paths)?;
+	#[allow(unused_mut)]
+	let mut items = ParamsPattern::collect(entity, ancestors, params)?.to_vec();
+	#[cfg(feature = "std")]
+	if metas
+		.get(entity)
+		.is_ok_and(|meta| meta.output_is::<PageRequest>())
+	{
+		items.extend(ParamsPartial::new::<RenderParams>().items);
+	}
+	#[cfg(not(feature = "std"))]
+	let _ = metas;
+	(path, ParamsPattern::from_metas(items)?).xok()
 }
 
 /// Observer that catches the scene-load case where [`PathPartial`] is
@@ -362,6 +405,7 @@ fn insert_path_pattern_for_late_path_partial(
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
 	params: Query<&ParamsPartial>,
+	metas: Query<&ActionMeta>,
 	actions: Query<(), (With<ActionMeta>, Without<PathPattern>)>,
 	mut commands: Commands,
 ) -> Result {
@@ -372,9 +416,9 @@ fn insert_path_pattern_for_late_path_partial(
 	{
 		return Ok(());
 	}
-	let path = PathPattern::collect(ev.entity, &ancestors, &paths)?;
-	let params = ParamsPattern::collect(ev.entity, &ancestors, &params)?;
-	commands.entity(ev.entity).insert((path, params));
+	commands.entity(ev.entity).insert(route_patterns(
+		ev.entity, &ancestors, &paths, &params, &metas,
+	)?);
 	Ok(())
 }
 

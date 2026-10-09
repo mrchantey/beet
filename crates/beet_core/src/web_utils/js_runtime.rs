@@ -168,7 +168,7 @@ impl JsEnvironment {
 	}
 
 	/// Whether this runtime has a filesystem reachable through the runner's fs
-	/// globals (so `--main` + an `FsStore` entry load), ie Deno or Node. Every
+	/// globals (so `--entry` + an `FsStore` entry load), ie Deno or Node. Every
 	/// other host has none, degrading each `fs_ext` call to a no-op.
 	pub fn has_fs(&self) -> bool {
 		matches!(self, JsEnvironment::Deno | JsEnvironment::Node)
@@ -389,7 +389,7 @@ pub fn args() -> Vec<SmolStr> {
 /// The launch the served page describes: the argv of its
 /// `<script type="application/x-beet-bootstrap">`
 /// ([`BootstrapConfig::to_script`]), empty for a page carrying none. Appended
-/// after the location's own args, so the page's `--main`/`--repo`/`--server`
+/// after the location's own args, so the page's `--entry`/`--repo`/`--server`
 /// reach [`BootstrapConfig::get`] and the entry's start request through the
 /// one channel every target reads, while the location keeps naming the page.
 fn bootstrap_args() -> Vec<SmolStr> {

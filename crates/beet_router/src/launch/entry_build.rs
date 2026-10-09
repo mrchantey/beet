@@ -2,7 +2,7 @@
 //! beet entry runs through here, as do the `check`/`serve`/`export-static`
 //! commands and the wasm Worker entry.
 //!
-//! An entry load splits into resolution ([`resolve_main`]: the store + the entry
+//! An entry load splits into resolution ([`resolve_entry_path`]: the store + the entry
 //! document name within it, honouring `--repo` and the entry's own
 //! `<RepoRoot src>`), a world-free async read ([`read_sources`]: the
 //! entry document and the templates under its declared `<TemplateDir>`s, through the
@@ -95,16 +95,16 @@ pub async fn resolve_in_repo_store(
 /// local root, ie a self-rooted store). The one launch resolution every
 /// world-owning driver runs: the binary's `Startup` loader (native, and the
 /// browser the served page boots) and the wasm Worker, each handing in the
-/// `--repo`/`--store-fork`/`--main` its process config carries.
+/// `--repo`/`--store-fork`/`--entry` its process config carries.
 ///
 /// Resolution order:
 /// 1. a self-rooted `repo_uri` (`s3://<bucket>`, `r2://<binding>`,
-///    `indexed-db://<db>`, `http:<prefix>`): the store roots itself, so `main`
+///    `indexed-db://<db>`, `http:<prefix>`): the store roots itself, so `entry`
 ///    names the entry document *within* it, defaulting to an [`ENTRY_NAMES`]
 ///    probe. A deployed task passes `--repo=s3://<bucket>` (deploy config as
 ///    args, not env); a served page's bootstrap passes `--repo=http:repo`.
-/// 2. `main=<path>`: the entry file itself (a recognized extension) or a
-///    directory probed for [`ENTRY_NAMES`]; see [`resolve_main`].
+/// 2. `entry=<path>`: the entry file itself (a recognized extension) or a
+///    directory probed for [`ENTRY_NAMES`]; see [`resolve_entry_path`].
 /// 3. otherwise: discovery walks the cwd and its ancestors through an `fs`
 ///    store for the first [`ENTRY_NAMES`] match.
 ///
@@ -121,17 +121,17 @@ pub async fn resolve_entry(
 	prescans: &PrescanRegistry,
 	repo_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
-	main: Option<&str>,
+	entry: Option<&str>,
 ) -> Result<ResolvedEntry> {
-	// a self-rooted store: no local dir and no ancestor walk, so `main` is a
+	// a self-rooted store: no local dir and no ancestor walk, so `entry` is a
 	// key within the store, defaulting to the entry-name probe.
 	if let Some(uri) = repo_uri.filter(|uri| uri.is_self_rooted()) {
 		let repo_store = compose_repo_store(uri, store_fork)?;
-		let entry_name = self_rooted_entry_name(&repo_store, main).await?;
+		let entry_name = self_rooted_entry_name(&repo_store, entry).await?;
 		return resolve_in_repo_store(repo_store, prescans, entry_name).await;
 	}
 
-	// dir-rooted: an explicit `main`, else the ancestor walk. On wasm the `fs`
+	// dir-rooted: an explicit `entry`, else the ancestor walk. On wasm the `fs`
 	// store reads through the runner's fs globals, so a fs-less runtime cannot
 	// resolve a dir-rooted entry at all.
 	#[cfg(target_arch = "wasm32")]
@@ -141,8 +141,10 @@ pub async fn resolve_entry(
 			(http:<prefix>, s3://<bucket>, r2://<binding>, indexed-db://<db>)"
 		);
 	}
-	match main {
-		Some(main) => resolve_main(prescans, repo_uri, store_fork, main).await,
+	match entry {
+		Some(entry) => {
+			resolve_entry_path(prescans, repo_uri, store_fork, entry).await
+		}
 		None => discover_entry(prescans, repo_uri, store_fork).await,
 	}
 }
@@ -180,20 +182,20 @@ fn compose_repo_store(
 	StoreProvider::compose(uri, store_fork.or(default.as_ref()))
 }
 
-/// The entry document a self-rooted store serves: `main` when the launch names
+/// The entry document a self-rooted store serves: `entry` when the launch names
 /// one, else the first [`ENTRY_NAMES`] match at the store's root, erroring with
 /// guidance on none. Shared by [`resolve_entry`] and a driver that heads the
 /// document between builds (the Worker's version check).
 pub async fn self_rooted_entry_name(
 	repo_store: &BlobStore,
-	main: Option<&str>,
+	entry: Option<&str>,
 ) -> Result<String> {
-	match main {
-		Some(main) => main.to_string(),
+	match entry {
+		Some(entry) => entry.to_string(),
 		None => probe_entry_names(repo_store).await?.ok_or_else(|| {
 			bevyhow!(
 				"no entry document found in the `--repo` backend: looked \
-				for {ENTRY_NAMES:?}. Seed one, or pass `--main=<name>`."
+				for {ENTRY_NAMES:?}. Seed one, or pass `--entry=<name>`."
 			)
 		})?,
 	}
@@ -223,23 +225,23 @@ async fn discover_entry(
 	}
 	bevybail!(
 		"no entry document found: looked for {ENTRY_NAMES:?} in `{start}` and \
-		its ancestors. Create a `main.bsx` or pass `--main=<path>`."
+		its ancestors. Create a `main.bsx` or pass `--entry=<path>`."
 	)
 }
 
-/// Resolve an explicit entry path (the binary's `--main`, a command's `<entry>`
+/// Resolve an explicit entry path (the binary's `--entry`, a command's `<entry>`
 /// positional): a path with an extension names the entry file itself, anything
 /// else is a directory probed for the first [`ENTRY_NAMES`] match. Either way
 /// the entry may rebase its own store root with a `<RepoRoot src>` declaration
 /// (see [`resolve_in_repo_store`]), the `--repo` param picks the backend and
 /// `--store-fork` forks it into a local store.
-pub async fn resolve_main(
+pub async fn resolve_entry_path(
 	prescans: &PrescanRegistry,
 	repo_uri: Option<&StoreUri>,
 	store_fork: Option<&StoreUri>,
-	main: &str,
+	entry: &str,
 ) -> Result<ResolvedEntry> {
-	let path = AbsPath::new(main)?;
+	let path = AbsPath::new(entry)?;
 	let (repo_store, entry_name) = if path.extension().is_some() {
 		// an entry file: its parent is the initial root
 		let dir = path.parent().ok_or_else(|| {
@@ -838,7 +840,7 @@ mod test {
 	/// entry name grows the path back down to the document.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
-	async fn fs_entry_rebases_through_resolve_main() {
+	async fn fs_entry_rebases_through_resolve_entry_path() {
 		let tmp = TempDir::new().unwrap();
 		let entry_dir = tmp.path().join("app");
 		fs_ext::create_dir_all(&entry_dir).unwrap();
@@ -847,10 +849,14 @@ mod test {
 			"<Router><RepoRoot src=\"..\"/></Router>",
 		)
 		.unwrap();
-		let resolved =
-			resolve_main(&router_prescans(), None, None, entry_dir.as_str())
-				.await
-				.unwrap();
+		let resolved = resolve_entry_path(
+			&router_prescans(),
+			None,
+			None,
+			entry_dir.as_str(),
+		)
+		.await
+		.unwrap();
 		resolved.entry_name.xpect_eq("app/main.bsx");
 		resolved.watch_dir.xpect_eq(Some(tmp.path().clone()));
 		resolved
@@ -918,7 +924,7 @@ mod test {
 
 	/// The binary path and the command path share [`resolve_in_repo_store`], so the
 	/// same inputs resolve an identical `(store, entry_name)`: here the
-	/// command-shaped `resolve_main` against the binary-shaped store + name
+	/// command-shaped `resolve_entry_path` against the binary-shaped store + name
 	/// pair.
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
@@ -930,9 +936,10 @@ mod test {
 		)
 		.unwrap();
 		let prescans = router_prescans();
-		let by_path = resolve_main(&prescans, None, None, tmp.path().as_str())
-			.await
-			.unwrap();
+		let by_path =
+			resolve_entry_path(&prescans, None, None, tmp.path().as_str())
+				.await
+				.unwrap();
 		let by_store = resolve_in_repo_store(
 			resolve_repo_store(None, None, tmp.path().clone()).unwrap(),
 			&prescans,

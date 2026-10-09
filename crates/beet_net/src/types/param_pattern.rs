@@ -303,6 +303,7 @@ impl ParamMeta {
 			required: value == ParamValue::Single && some_inner.is_none(),
 			value,
 			type_path: authored_kind(leaf_id)
+				.or_else(|| variant_kind(some_inner.or(info)))
 				.unwrap_or_else(|| kind_from_type_path(field.type_path())),
 			options: ParamOptions::from_reflect(field),
 		}
@@ -407,6 +408,25 @@ fn authored_kind(type_id: TypeId) -> Option<String> {
 	LiteralParser::get(type_id)?.hint().map(str::to_string)
 }
 
+/// How a unit-only enum is written: its variants as the kebab-case words a
+/// flag takes, ie `one of: document, main, content` for a `--root`, since the
+/// type path names none of them.
+fn variant_kind(info: Option<&TypeInfo>) -> Option<String> {
+	let Some(TypeInfo::Enum(info)) = info else {
+		return None;
+	};
+	info.iter()
+		.map(|variant| match variant {
+			bevy::reflect::enums::VariantInfo::Unit(unit) => {
+				Some(unit.name().to_kebab_case())
+			}
+			_ => None,
+		})
+		.collect::<Option<Vec<_>>>()
+		.filter(|variants| !variants.is_empty())
+		.map(|variants| format!("one of: {}", variants.join(", ")))
+}
+
 /// The concrete type path shown as a param's `kind`, with a `core::option::Option<..>`
 /// wrapper stripped (its optionality is conveyed by the param's `required` flag).
 fn kind_from_type_path(type_path: &str) -> String {
@@ -478,6 +498,28 @@ impl ParamOptions {
 mod test {
 	use super::*;
 	use crate::prelude::*;
+
+	/// A unit-only enum documents the words it takes.
+	#[beet_core::test]
+	fn unit_enum_lists_its_variants() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		enum Shape {
+			Round,
+			SharpEdged,
+		}
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct Params {
+			shape: Option<Shape>,
+		}
+		let TypeInfo::Struct(info) = Params::type_info() else {
+			panic!("expected struct");
+		};
+		ParamMeta::from_field(info.field("shape").unwrap())
+			.type_path()
+			.xpect_eq("one of: round, sharp-edged");
+	}
 
 	/// A reflected field's concrete type is captured as the param `kind`, with an
 	/// `Option<..>` wrapper stripped (the option drives `required`, not `kind`).

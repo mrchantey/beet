@@ -7,15 +7,19 @@
 //!
 //! - [`EmulatorPds`], a repo laid out in any [`BlobStore`] that performs a
 //!   PDS's duties on write, for tests and for a repo that never leaves the
-//!   machine. Always compiled: the data model needs no network.
+//!   machine, its records stored in canonical DAG-CBOR by default. Compiled
+//!   under `dag_cbor` alone: the data model needs no network.
 //! - `XrpcPds`, a real PDS over xrpc through the `AtprotoAuth` credential
-//!   seam, with did and handle resolution, behind the `atproto` feature.
+//!   seam, with did and handle resolution, behind the `atproto` feature,
+//!   which adds `json` for the wire.
 //!
 //! A record body crosses as an `AtprotoValue`, sealed in the data model, which
 //! is how a float reaches a repo that has none, and a record type is its body
 //! alone: the rkey it lives at travels beside it, in the uri a read answers
-//! and the `Rkeyed` a write takes. The `app.bsky.*` lexicons beet writes
-//! (`FeedPost`, `RichText`) are the `bsky` module's, behind `atproto`.
+//! and the `Rkeyed` a write takes. Every encoding goes through
+//! `MediaType::serialize`, so `MediaType::DagCbor` writes exactly the block a
+//! PDS stores and `AtprotoValue::cid` hashes. The `app.bsky.*` lexicons beet
+//! writes (`FeedPost`, `RichText`) are the `bsky` module's, behind `atproto`.
 //!
 //! The protocol's primitives (`Did`, `Rkey`, `Tid`, `Cid`, `StrongRef`,
 //! `BlobRef`) and their words are `beet_core::atproto`'s.
@@ -58,7 +62,6 @@
 mod atproto_account;
 mod atproto_plugin;
 mod converge;
-pub mod dag_cbor_ext;
 mod emulator_pds;
 mod pds;
 mod pds_query;

@@ -11,6 +11,14 @@
 //! assert_eq!(value, 42);
 //! # }
 //! ```
+//!
+//! Each format rides its own feature (`json`, `ron`, `toml`, `postcard`,
+//! `serde_plain`, `dag_cbor`), and a build without it answers the same
+//! "feature is required" error from every caller, so a disabled format fails
+//! identically everywhere. [`MediaType::DagCbor`] is canonical DAG-CBOR
+//! through the atproto data model ([`AtprotoValue`]): a link is CBOR tag 42,
+//! bytes a byte string and a float the object it crosses as, so its output is
+//! exactly the block a PDS stores.
 use crate::prelude::*;
 
 /// Options for controlling serialization output.
@@ -88,6 +96,7 @@ impl MediaType {
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
+	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn serialize<T: serde::Serialize>(&self, value: &T) -> Result<Vec<u8>> {
@@ -181,6 +190,20 @@ impl MediaType {
 					}
 				}
 			}
+			MediaType::DagCbor => {
+				cfg_if! {
+					if #[cfg(feature = "dag_cbor")] {
+						// one canonical layout, through the data model
+						let _ = options;
+						AtprotoValue::from_serde(value)?.to_dag_cbor().xok()
+					} else {
+						let _ = (value, options);
+						bevybail!(
+							"The `dag_cbor` feature is required for DAG-CBOR serialization"
+						)
+					}
+				}
+			}
 			MediaType::Postcard | MediaType::Bytes => {
 				cfg_if! {
 					if #[cfg(feature = "postcard")] {
@@ -205,6 +228,11 @@ impl MediaType {
 	/// For [`MediaType::Json`], empty bytes are treated as JSON `null`,
 	/// enabling unit-type inputs on requests with no body.
 	///
+	/// [`MediaType::DagCbor`] crosses through the atproto data model: a link
+	/// is CBOR tag 42, bytes a byte string, and a float the
+	/// `org.beet.core#float` object it was written as (see
+	/// [`AtprotoValue`]), so serializing is exactly the block a PDS stores.
+	///
 	/// ## Errors
 	///
 	/// Returns an error if:
@@ -219,6 +247,7 @@ impl MediaType {
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
+	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
 	pub fn deserialize<T: serde::de::DeserializeOwned>(
@@ -286,6 +315,18 @@ impl MediaType {
 						let _ = bytes;
 						bevybail!(
 							"The `toml` feature is required for TOML deserialization"
+						)
+					}
+				}
+			}
+			MediaType::DagCbor => {
+				cfg_if! {
+					if #[cfg(feature = "dag_cbor")] {
+						AtprotoValue::from_dag_cbor(bytes)?.into_serde()
+					} else {
+						let _ = bytes;
+						bevybail!(
+							"The `dag_cbor` feature is required for DAG-CBOR deserialization"
 						)
 					}
 				}

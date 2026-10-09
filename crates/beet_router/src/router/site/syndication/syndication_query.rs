@@ -8,7 +8,7 @@ use beet_ui::prelude::*;
 /// A page a syndication route lists: where it serves and what it was authored
 /// with.
 #[derive(Debug, Clone)]
-pub struct SyndicationPage {
+pub(crate) struct SyndicationPage {
 	/// The route path within the router's url space, ie `blog/ecs-router`.
 	pub path: RelPath,
 	/// The page's authored metadata. Defaulted for a page that declared none,
@@ -42,6 +42,39 @@ impl SyndicationScope {
 	/// [`PackageConfig::absolute_url`] against this site's origin.
 	pub fn url(&self, path: &RelPath) -> Result<Url> {
 		self.package.absolute_url(path.as_str())
+	}
+
+	/// `page`'s own content, nothing a layout contributed, rendered as
+	/// `media_type`: the `--root=content` render of [`PageRoot::scoped`], the
+	/// one boundary every syndication consumer reads, so a feed and a search
+	/// index can never disagree about where a page's content begins.
+	///
+	/// `None` when the page fails to render, with a warning naming it: one
+	/// broken page drops its own entry rather than failing the whole document.
+	/// Recursion is not a hazard, since a page never requests the feed.
+	pub async fn render_content(
+		&self,
+		world: &AsyncWorld,
+		page: &SyndicationPage,
+		media_type: MediaType,
+	) -> Option<String> {
+		let request = Request::get(page.path.with_leading_slash())
+			.with_param("root", "content");
+		PageRoot::scoped(
+			&world.entity(self.router),
+			request,
+			&[media_type.clone()],
+			async |live| live.render(&media_type).await,
+		)
+		.await
+		.and_then(|bytes| bytes.as_utf8().map(str::to_string))
+		.inspect_err(|err| {
+			warn!(
+				"syndication: skipping '{}', it failed to render: {err}",
+				page.path
+			)
+		})
+		.ok()
 	}
 }
 
@@ -114,6 +147,7 @@ impl SyndicationQuery<'_, '_> {
 pub(crate) mod test_fixtures {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use beet_net::prelude::*;
 	use beet_ui::prelude::*;
 
 	/// A router world whose [`PackageConfig`] names the site the syndication
@@ -129,18 +163,23 @@ pub(crate) mod test_fixtures {
 		world
 	}
 
-	/// A page route at `path` carrying `meta`. The body is irrelevant:
-	/// syndication reads the route tree and the metadata, never the render.
-	fn page(path: &str, meta: PageMeta) -> impl Bundle {
+	/// A page route at `path` carrying `meta`, its body the one paragraph
+	/// `page`. The metadata sits on the route, where a scan finds it, and on
+	/// the content each request builds, where a layout reads it, as a
+	/// discovered file's frontmatter does.
+	pub fn page(path: &str, meta: PageMeta) -> impl Bundle {
 		(
-			render_action::fixed_func_route(path, || rsx! { <p>"page"</p> }),
+			render_action::fixed_func_route(path, {
+				let meta = meta.clone();
+				move || (meta.clone(), rsx! { <p>"page"</p> })
+			}),
 			PageRoute,
 			meta,
 		)
 	}
 
 	/// A published post's frontmatter.
-	fn post(title: &str, created: &str) -> PageMeta {
+	pub fn post(title: &str, created: &str) -> PageMeta {
 		PageMeta {
 			title: Some(title.into()),
 			description: Some(format!("all about {title}")),
@@ -190,5 +229,39 @@ pub(crate) mod test_fixtures {
 			.unwrap();
 		world.flush();
 		root
+	}
+
+	/// The fixture site wearing layouts as `site/` declares its own: a
+	/// document shell (a head, a nav, a `<main>` around the page, a footer) on
+	/// every page, and inside it the article layout, `<ArticleHeader/>` above
+	/// the post, on the blog's dated post `blog/full-stack-bevy`.
+	pub fn spawn_layout_router(world: &mut World) -> Entity {
+		let mut registry = world.get_resource_or_init::<BsxTemplateRegistry>();
+		registry
+			.insert_source(
+				"FixtureLayout",
+				"<html><head><title>Beet</title><style>main { margin: 0 }</style></head>\
+				 <body><nav>Home</nav><main><Slot/></main><footer>Bye</footer></body></html>",
+			)
+			.unwrap();
+		registry
+			.insert_source("ArticleLayout", "<ArticleHeader/><Slot/>")
+			.unwrap();
+		world
+			.spawn((Router, Layout::new("FixtureLayout"), children![
+				page("", PageMeta {
+					title: Some("Beet".into()),
+					..default()
+				}),
+				(
+					PathPartial::new("blog"),
+					Layout::new("ArticleLayout"),
+					children![page(
+						"full-stack-bevy",
+						post("Full Stack Bevy", "2025-07-11")
+					)]
+				),
+			]))
+			.flush()
 	}
 }

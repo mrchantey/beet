@@ -7,14 +7,17 @@
 //! `Pds`, whose module docs carry the converge's words.
 //!
 //! - [`Did`], an account; [`Nsid`], a collection or a lexicon def; [`Rkey`]
-//!   and [`Tid`], a record's key; [`AtUri`], a record's address; [`Uri`],
-//!   the lexicon's `uri` format verbatim
+//!   and [`Tid`], a record's key; [`AtUri`], a record's address, and
+//!   [`Uri::at_uri`], the view of a lexicon `uri` field (a [`Uri`], held
+//!   verbatim) that names one
 //! - [`Cid`], content addressing for bytes and records; [`StrongRef`] and
 //!   [`BlobRef`], the two references a record holds
 //! - [`AtprotoRecord`], one shape for every record type beet reads or writes,
 //!   the body alone, and [`Rkeyed`], a body paired with the rkey it lives at
 //! - [`AtprotoValue`], a value sealed in the data model, which is how a float
-//!   reaches a repo that has none
+//!   reaches a repo that has none; in canonical DAG-CBOR through
+//!   [`MediaType::DagCbor`] under the `dag_cbor` feature, which is also what
+//!   its [`cid`](AtprotoValue::cid) hashes
 //! - [`OpenUnion`], an object naming its own lexicon in `$type`, and
 //!   [`SelfLabels`], the protocol's own content warnings
 //! - [`Provenance`], what a beet record or a derived file was computed from
@@ -54,6 +57,8 @@ mod atproto_record;
 mod atproto_value;
 mod blob_ref;
 mod cid;
+#[cfg(feature = "dag_cbor")]
+mod dag_cbor;
 mod did;
 mod nsid;
 mod open_union;
@@ -63,7 +68,6 @@ mod rkeyed;
 mod self_labels;
 mod strong_ref;
 mod tid;
-mod uri;
 pub use at_uri::*;
 #[cfg(feature = "serde")]
 pub use atproto_record::*;
@@ -79,9 +83,9 @@ pub use rkeyed::*;
 pub use self_labels::*;
 pub use strong_ref::*;
 pub use tid::*;
-pub use uri::*;
 
-/// The conversions every string primitive here shares: its text, `Display`,
+/// The conversions every validated string primitive shares, here and
+/// [`Uri`]: its text, `Display`,
 /// `FromStr` and `TryFrom<SmolStr>` through its validating `parse`, and the
 /// serde round trip through that text so a deserialized value holds the
 /// invariants.

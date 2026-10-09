@@ -1,7 +1,7 @@
 <!--
 A todo app with nothing todo-specific in it. Run it through the one binary:
 
-    beet --main=examples/ui/dynamic_view.bsx
+    beet --entry=examples/ui/dynamic_view.bsx
 
 Nothing here knows what a todo is. `dynamic_view/schema.json` is a schema
 document holding the row schema (`TodoItem`), `dynamic_view/todos.json` is the

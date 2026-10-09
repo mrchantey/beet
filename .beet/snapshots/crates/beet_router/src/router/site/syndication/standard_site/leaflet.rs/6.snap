@@ -1,0 +1,222 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/NFjdN8KGkg8"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Last week I was lucky enough to attend the first DevOps Days in my hometown of Wollongong, Australia. DevOps Days has a very cool format, employing tools like five-minute Ignite Talks and group discussions called Open Spaces to ensure all voices have an opportunity to be heard. It is designed to foster a marketplace of ideas and the experience reminded me of my love for folk festivals. The same principles of abundance that bring these events to life can and should shape how we design software."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Scarcity vs abundance"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I spent much of my twenties traveling the festival circuit in Serenity, my beloved Mitsubishi Express. I started working at the commercial festivals I'd attended as a teenager, but quickly discovered what I love about festivals is better represented in folk culture. Before long I was exclusively seeking folk festivals and alternative gatherings where the lines between organizer, performer, and attendee are blurred, and in some cases disappear completely. In this culture, the experience is crafted by each participant and the result is radical individuality. For me, this meant dressing up like a pirate and performing to an audience not much bigger than our own motley crew."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.website",
+            "src": "https://beet.org/assets/blog/kiama-sea-shanty-club.jpg",
+            "title": "Kiama Sea Shanty Club at Folk by the Sea 2023"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 44,
+                  "byteStart": 0
+                }
+              }
+            ],
+            "plaintext": "Kiama Sea Shanty Club - Folk By The Sea 2023"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The difference in these events is reflected in the tools used to produce them. Commercial festivals are built on tools of scarcity: businesses, Top 40 charts, copyright law; whereas folk cultures strictly employ tools of abundance: volunteers, jam sessions, public domain. Each has its place—we certainly need commerce—but there is a difference in the affordances they offer to participants, and consequently the culture they produce."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "The game creates the player"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Our behavior is shaped by our environment. Environments of scarcity like record labels, companies, and universities are zero-sum games. They may be won socially and ethically, but at the end of the day there is only one contract, one senior position, one tenure."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Folk culture is a kind of magic. Neighbors can't seem to agree on much, but one thing we can all get behind is a community garden. Given a guitar and a book of folk songs, we can freely build on the ideas of others while exploring our own. This is only possible because the tools used are accessible, tangible, and free."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "The computer revolution still hasn't happened yet"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://youtu.be/oKg1hTOQXoY"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 136,
+                  "byteStart": 95
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://youtu.be/MbEZ-DC0L-g"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 181,
+                  "byteStart": 162
+                }
+              }
+            ],
+            "plaintext": "In 1997, a quarter century after the founding of Xerox PARC, Alan Kay confronted the industry: \"we don't know how to design systems yet\". Another 25 years later, he is still waiting. Digital technology is a structured medium of abundance just like music—the authoring tools are readily accessible and the end product is pure information—yet the technical equivalent of a symphony costs millions of dollars to produce."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://www.youtube.com/watch?v=oKg1hTOQXoY&t=2402s"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 42,
+                  "byteStart": 13
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://en.wikipedia.org/wiki/No_Silver_Bullet"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 125,
+                  "byteStart": 104
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://www.youtube.com/watch?v=QboI_1WJUlM&t=3689s"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 262,
+                  "byteStart": 211
+                }
+              }
+            ],
+            "plaintext": "Kay believes getting stuck in the old ways has derailed the medium. The result is software riddled with accidental complexity that requires years of specialized training to wrangle, and our abstractions produce siloed smokestacks instead of interoperable mashups. Of course FOSS plays an important role, but it's not an automatic fix. Open source projects have a scarcity of their own: they usually solve for a narrow slice of the stack, and forking is costly, so they can practically only move in one direction."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://www.youtube.com/watch?v=oKg1hTOQXoY&t=814s"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 353,
+                  "byteStart": 326
+                }
+              }
+            ],
+            "plaintext": "Folk technology is alive and well—we can see it in game jams, makerspaces, and creative coding workshops—but it is limited to tech-savvy students and hobbyists. In order to make tools like Scratch, Arduino, and Processing accessible to laypeople, we lower the barrier by teaching imperative design patterns. This is Kay's doghouse/cathedral metaphor: anybody can build a doghouse, but that design collapses when scaled to the size of a cathedral. In tech, I think we know how to build cathedrals, but only for our own denomination and without consideration for the broader community."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "At DevOps Days Wollongong, I gave a talk describing the problems these silos create for developers, and the principles that make ECS architecture different. I believe it is our best shot at fulfilling Kay's vision for the Computer Revolution—technology as beautiful and free as music."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.website",
+            "src": "https://youtu.be/oK1o0AX-FRU",
+            "title": "Unifying the Fuller Stack with ECS"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -102,7 +102,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 	};
 	let entry_name = entry_build::self_rooted_entry_name(
 		&BlobStore::new(store.clone()),
-		config.main.as_deref(),
+		config.entry.as_deref(),
 	)
 	.await?;
 
@@ -122,7 +122,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 			build_worker_world(
 				repo_uri,
 				config.store_fork.as_ref(),
-				config.main.as_deref(),
+				config.entry.as_deref(),
 				current_version,
 			)
 			.await?,
@@ -158,7 +158,7 @@ async fn handle(req: WorkerRequest) -> Result<WorkerResponse> {
 async fn build_worker_world(
 	repo_uri: &StoreUri,
 	store_fork: Option<&StoreUri>,
-	main: Option<&str>,
+	entry: Option<&str>,
 	version: Option<String>,
 ) -> Result<WorkerWorld> {
 	// the same app the native binary builds, plus `WorkersPlugin`'s no-op runner
@@ -169,9 +169,13 @@ async fn build_worker_world(
 	app.init();
 	let mut world = core::mem::take(app.world_mut());
 	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
-	let resolved =
-		entry_build::resolve_entry(&prescans, Some(repo_uri), store_fork, main)
-			.await?;
+	let resolved = entry_build::resolve_entry(
+		&prescans,
+		Some(repo_uri),
+		store_fork,
+		entry,
+	)
+	.await?;
 	entry_build::build_entry_owned(&mut world, resolved).await?;
 
 	// the host carries the `Router` action exchanges dispatch to.

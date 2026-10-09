@@ -1,7 +1,7 @@
 //! Thread example wiring for the `beet` binary.
 //!
 //! The thread chat examples (`examples/thread/*.bsx`) run through the one binary
-//! via `beet --main=examples/thread/chat.bsx`. This plugin adds the thread
+//! via `beet --entry=examples/thread/chat.bsx`. This plugin adds the thread
 //! runtime plus its charcell chat UI, and registers the example-specific inline
 //! tool types so a scene's `<AgentChoiceAction/>` tag resolves from markup with
 //! no per-example `.rs`.

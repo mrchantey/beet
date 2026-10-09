@@ -51,7 +51,7 @@ async fn a_live_record_cid_matches() {
 		.await
 		.unwrap()
 		.unwrap();
-	dag_cbor_ext::record_cid(&entry.value).xpect_eq(entry.cid);
+	entry.value.cid().xpect_eq(entry.cid);
 }
 
 /// Both resolvers agree on beet.org's handles.

@@ -6,7 +6,7 @@ a display.
 
 The `<video id="webcam">` is declared here (shared markup contract with `/`) and shown at
 size, so `take-photo`'s captured frames are visible as the live feed. `<RenderConsole>`
-mirrors the head's logs; `<Wasm repo main>` boots the same `web_head` binary and head
+mirrors the head's logs; `<Wasm repo entry>` boots the same `web_head` binary and head
 entry as `/`.
 -->
 <HtmlDocument>
@@ -27,5 +27,5 @@ entry as `/`.
 	<video id="webcam" autoplay muted playsinline width="320"/>
 	<h2>Head log</h2>
 	<RenderConsole/>
-	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/perceive_act/head" main="head.bsx"/>
+	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/perceive_act/head" entry="head.bsx"/>
 </HtmlDocument>

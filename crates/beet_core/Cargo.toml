@@ -165,7 +165,9 @@ bevy_asset = ["bevy/bevy_asset"]
 serde = [
 	"bevy/serialize",
 	"dep:serde",
-	"smol_str/serde"
+	"smol_str/serde",
+	# `MediaBytes` serializes its shared buffer as a byte string
+	"bytes/serde",
 ]
 # RON text format, used by `MediaType::Ron` and `template_serde` loading.
 ron = ["serde", "dep:ron"]
@@ -175,6 +177,10 @@ json = ["serde", "dep:serde_json"]
 postcard = ["serde", "dep:postcard"]
 # TOML through `MediaType::Toml`'s serde dispatch, values only.
 toml = ["serde", "dep:toml"]
+# Canonical DAG-CBOR through `MediaType::DagCbor`, the encoding an atproto repo
+# stores a record as and hashes for its cid. Crosses through `ipld-core`'s
+# `Ipld` so a link is CBOR tag 42 and bytes a byte string (`atproto::dag_cbor`).
+dag_cbor = ["serde", "dep:serde_ipld_dagcbor", "dep:ipld-core"]
 # The vault layer (`src/vault`: the identity a human holds, the recipients a
 # file is encrypted to, the identity file in the OS config, the passphrase
 # envelope an identity is backed up in) and the secrets document on it
@@ -274,6 +280,10 @@ serde_json = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
+# canonical DAG-CBOR, hand rolling being where map ordering and tag 42 go
+# subtly wrong (`dag_cbor`)
+serde_ipld_dagcbor = { workspace = true, optional = true }
+ipld-core = { workspace = true, optional = true }
 
 
 #💡 async

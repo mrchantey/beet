@@ -99,7 +99,7 @@ impl<T: serde::Serialize, E: serde::Serialize> TryInto<Response>
 				let err_body = serde_json::to_string(&err)?;
 				Response::from_status_body(
 					self.err_status,
-					&err_body,
+					err_body,
 					MediaType::Json,
 				)
 			}

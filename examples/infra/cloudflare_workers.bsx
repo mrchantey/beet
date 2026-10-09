@@ -18,11 +18,11 @@ artifact (no recompile); `bench` times a `sync` against a full rebuild + redeplo
 
 ## Usage
 
-    beet --main=examples/infra/cloudflare_workers.bsx build
-    beet --main=examples/infra/cloudflare_workers.bsx deploy
-    beet --main=examples/infra/cloudflare_workers.bsx sync
-    beet --main=examples/infra/cloudflare_workers.bsx bench
-    beet --main=examples/infra/cloudflare_workers.bsx destroy
+    beet --entry=examples/infra/cloudflare_workers.bsx build
+    beet --entry=examples/infra/cloudflare_workers.bsx deploy
+    beet --entry=examples/infra/cloudflare_workers.bsx sync
+    beet --entry=examples/infra/cloudflare_workers.bsx bench
+    beet --entry=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
 its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
@@ -38,7 +38,7 @@ compile).
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployToken/>`), so it carries no account-level Workers group: a live run
-here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
+here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
 <CliServer {CallOnReady}>

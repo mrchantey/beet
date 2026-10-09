@@ -11,7 +11,6 @@
 //! [`Portal`] slot under the buffer host).
 
 use crate::prelude::*;
-use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
@@ -116,55 +115,18 @@ fn despawn_page_with_surface(
 }
 
 /// Resolve `request` against the router's [`RouteTree`] and build the matched
-/// scene route into a living entity tree, returning its root.
-///
-/// The live parallel of the static [`PageRoot::render`] path: it shares the
-/// route build *and* the ancestor layout middleware (header/sidebar/footer, the
-/// document chrome) but forks at the output, handing back the built entity rather
-/// than serializing and despawning it. That entity is kept alive to be bound to a
-/// surface via [`bind_surface_page`]. The static path is untouched.
+/// scene route into a living page: [`PageRoot::prepare_request`] alone, the
+/// same route build, layout middleware and `--root` cascade the static
+/// [`PageRoot::render`] path runs, its tree bound to a surface via
+/// [`bind_surface_page`] instead of rendered and released.
 pub(crate) async fn build_live_page(
 	router: &AsyncEntity,
-	mut request: Request,
-) -> Result<Entity> {
-	let path = request.path().clone();
-	let router_id = router.id();
-	// resolve the matched route node from the ancestor RouteTree (as Router does)
-	let node = router
-		.world()
-		.with_state::<AncestorQuery<&RouteTree>, Result<Option<ActionNode>>>(
-			move |query| {
-				query
-					.get(router_id)
-					.map(|tree| tree.find(&path).cloned())
-					.map_err(|_| {
-						bevyhow!(
-							"route tree not found, was the RouterPlugin added?"
-						)
-					})
-			},
-		)
-		.await?;
-	let Some(node) = node else {
-		bevybail!("no route matched {}", request.path_string());
-	};
-	// surface matched dynamic segments (`:id`) to the handler
-	node.merge_path_params(&mut request);
-	let parts = request.parts().clone();
-	let route = router.world().entity(node.entity);
-	// build the route's own content (output `PageRequest`) through the route's
-	// canonical action, skipping the `ExchangeOverload` adapter that would serialize
-	// then despawn the tree.
-	let content = route.call::<Request, PageRequest>(request).await?.0;
-	// wrap it in the ancestor layout middleware (the `Layout` document chrome),
-	// transcluding the content by reference, exactly as `PageRoot::render` does
-	// for the static path; here the wrapped tree is kept alive as the page.
-	route
-		.call_with_middleware::<RequestParts, Entity>(
-			Action::new_fixed(content),
-			parts,
-		)
-		.await
+	request: Request,
+) -> Result<SurfacePage> {
+	PageRoot::prepare_request(router, request, &[])
+		.await?
+		.into_surface()
+		.xok()
 }
 
 /// Parse fetched [`MediaBytes`] (markdown/html) into a living entity tree on a
@@ -191,16 +153,22 @@ pub(crate) fn parse_page(
 /// Bind `page` to `host` (a [`PageHost`] surface), cleaning up the page it
 /// replaces.
 ///
-/// The host's [`PageSlot`] [`Portal`] is re-pointed at `page` *before* the
-/// despawn, so nothing references the outgoing tree when it is removed. The
-/// outgoing page is the host's current [`RenderSurfaceOf`] (the one-to-one
-/// back-link `RenderSurface(host)` maintains); its [`DespawnAfterRender`]
-/// ephemerals (a per-request or parsed tree) are then despawned so pages do not
-/// accumulate, while a self-referential fixed route (empty set) survives.
+/// The host's [`PageSlot`] [`Portal`] is re-pointed at the entity the page
+/// shows (the page itself, or the part a `--root` chose) *before* the despawn,
+/// so nothing references the outgoing tree when it is removed. The outgoing
+/// page is the host's current [`RenderSurfaceOf`] (the one-to-one back-link
+/// `RenderSurface(host)` maintains); its [`DespawnAfterRender`] ephemerals (a
+/// per-request or parsed tree) are then despawned so pages do not accumulate,
+/// while a self-referential fixed route (empty set) survives.
 ///
 /// Scoped to one surface, so binding a page on one SSH session never disturbs
 /// another session's page.
-pub(crate) fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
+pub(crate) fn bind_surface_page(
+	world: &mut World,
+	host: Entity,
+	page: impl Into<SurfacePage>,
+) {
+	let SurfacePage { page, shown } = page.into();
 	let Some(slot) = page_slot_of(world, host) else {
 		// a host that went away while its page was building (a client
 		// disconnecting mid-navigation) is not a misconfiguration; either way the
@@ -218,9 +186,9 @@ pub(crate) fn bind_surface_page(world: &mut World, host: Entity, page: Entity) {
 		.map(|surface| surface.page());
 
 	// back-link the page to its surface (one-to-one, so the outgoing page's link is
-	// dropped), then re-point the slot at it.
+	// dropped), then re-point the slot at what it shows.
 	world.entity_mut(page).insert(RenderSurface(host));
-	world.entity_mut(slot).insert(Portal::new(page));
+	world.entity_mut(slot).insert(Portal::new(shown));
 
 	// despawn the outgoing page's ephemerals now that nothing references them,
 	// keeping the incoming page (a fixed route rebinding to itself).

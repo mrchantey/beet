@@ -44,15 +44,15 @@ that relays everything wants.
 
 ## Usage
 
-    beet --main=examples/infra/mail.bsx validate
-    beet --main=examples/infra/mail.bsx plan
-    beet --main=examples/infra/mail.bsx deploy
-    beet --main=examples/infra/mail.bsx destroy --force
+    beet --entry=examples/infra/mail.bsx validate
+    beet --entry=examples/infra/mail.bsx plan
+    beet --entry=examples/infra/mail.bsx deploy
+    beet --entry=examples/infra/mail.bsx destroy --force
 
 `validate` needs only `tofu`. Live deploy needs AWS credentials, a Cloudflare
 api token in `CLOUDFLARE_API_TOKEN`, and `aws`/`ssh`/`curl` on the deploy
 machine. The Cloudflare token must be scoped to the zone you replace the
-placeholder with: `beet --main=examples/infra/mail.bsx deploy --dry-run` says
+placeholder with: `beet --entry=examples/infra/mail.bsx deploy --dry-run` says
 what this entry asks of it, which is `Zone > DNS Write` and nothing else, and
 `deploy --elevated`, run in a terminal where it asks for the mint token, makes
 exactly that. It also needs domains you actually own: every name below is an RFC 2606

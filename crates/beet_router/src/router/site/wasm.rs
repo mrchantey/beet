@@ -2,13 +2,13 @@
 //! browser support.
 //!
 //! A page built natively and served to the browser is a launch description:
-//! the SSR is the first paint, and `<Wasm src repo main server>` is the
+//! the SSR is the first paint, and `<Wasm src repo entry server>` is the
 //! bootstrap of the browser process, emitting the `<script type="module">`
 //! that boots the wasm `beet` binary beside a
 //! `<script type="application/x-beet-bootstrap">` carrying the launch's argv.
 //! The booted binary appends that argv to its location's own
 //! (`js_runtime::args`), so `BootstrapConfig::get()` and the entry's start
-//! request read `--main`/`--repo`/`--server` through the one channel every
+//! request read `--entry`/`--repo`/`--server` through the one channel every
 //! target uses, and the browser resolves its entry through the same launch
 //! path as the terminal and the server.
 //!
@@ -39,7 +39,7 @@ use beet_ui::prelude::*;
 /// [`BootstrapConfig::to_script`] into a bootstrap script the binary reads
 /// ([`BootstrapConfig::SCRIPT_TYPE`]): `repo` names the http store the entry
 /// loads through (the site's `<ServeBlobs prefix="repo"/>`, so `/repo`; an
-/// absolute url reads another origin), `main` the entry document within it,
+/// absolute url reads another origin), `entry` the entry document within it,
 /// and `server` which of the entry's declared servers boot (`dom` paints the
 /// page; none boots the entry headless). A page naming no launch mounts a
 /// module that boots on its own.
@@ -57,7 +57,7 @@ use beet_ui::prelude::*;
 /// head, before the body parses.
 ///
 /// ```bsx
-/// <Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot="intent"/>
+/// <Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot="intent"/>
 /// ```
 #[template]
 pub fn Wasm(
@@ -71,7 +71,7 @@ pub fn Wasm(
 	/// the mount a `<ServeBlobs>` publishes (`/repo`), or another origin's.
 	repo: Option<Url>,
 	/// The entry document within `repo`, eg `main.bsx`.
-	main: Option<SmolStr>,
+	entry: Option<SmolStr>,
 	/// The `--server` selection the entry boots with, eg `dom`.
 	server: Option<SmolStr>,
 	/// When the wasm loads: at once, or on intent.
@@ -89,7 +89,7 @@ pub fn Wasm(
 	let fork_mark = repo.as_ref().map(StoreUri::fork_mark);
 	let launch = BootstrapConfig {
 		repo,
-		main,
+		entry,
 		server: server.as_deref().map(RunningSetFilter::new),
 		..default()
 	};
@@ -177,7 +177,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
+				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
 			})
 			.unwrap()
 			.id();
@@ -201,7 +201,7 @@ mod test {
 		render(&mut world, root).xpect_contains("await import(\"/b/glue.js\")");
 	}
 
-	// `<Wasm repo main server>` renders the launch as a bootstrap script before
+	// `<Wasm repo entry server>` renders the launch as a bootstrap script before
 	// the loader: the repo as an origin-relative http store, the entry within
 	// it, and the server selection, in the argv the browser appends to its own.
 	#[beet_core::test]
@@ -209,13 +209,13 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/examples/ui" main="scene_editor.bsx" server="dom"/>
+				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/examples/ui" entry="scene_editor.bsx" server="dom"/>
 			})
 			.unwrap()
 			.id();
 		let html = render(&mut world, root);
 		html.as_str().xpect_contains(
-			"<script type=\"application/x-beet-bootstrap\">--main=scene_editor.bsx --repo=http:examples/ui --server=dom</script>",
+			"<script type=\"application/x-beet-bootstrap\">--entry=scene_editor.bsx --repo=http:examples/ui --server=dom</script>",
 		);
 		// the bootstrap precedes the loader, so it is in the document before
 		// the module boots
@@ -225,11 +225,11 @@ mod test {
 		// an absolute repo keeps its origin
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-min.wasm" repo="https://beet.org/repo" main="hello.bsx"/>
+				<Wasm src="/assets/wasm/beet-min.wasm" repo="https://beet.org/repo" entry="hello.bsx"/>
 			})
 			.unwrap()
 			.id();
 		render(&mut world, root)
-			.xpect_contains("--main=hello.bsx --repo=https://beet.org/repo<");
+			.xpect_contains("--entry=hello.bsx --repo=https://beet.org/repo<");
 	}
 }

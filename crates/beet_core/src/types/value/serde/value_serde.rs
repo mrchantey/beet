@@ -12,14 +12,10 @@ impl ::serde::Serialize for Value {
 			Value::Int(i) => serializer.serialize_i64(*i),
 			Value::Uint(u) => serializer.serialize_u64(*u),
 			Value::Float(f) => serializer.serialize_f64(*f),
-			Value::Bytes(bytes) => {
-				use ::serde::ser::SerializeSeq;
-				let mut seq = serializer.serialize_seq(Some(bytes.len()))?;
-				for b in bytes {
-					seq.serialize_element(b)?;
-				}
-				seq.end()
-			}
+			// a byte string, which json writes as the same array of numbers a
+			// seq would, while a format with bytes (DAG-CBOR, postcard, a
+			// `Value` itself) keeps them bytes
+			Value::Bytes(bytes) => serializer.serialize_bytes(bytes),
 			Value::Str(s) => serializer.serialize_str(s.as_str()),
 			Value::List(list) => {
 				use ::serde::ser::SerializeSeq;

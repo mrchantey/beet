@@ -2,6 +2,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use beet_ui::prelude::*;
 
 /// `site.standard.document`: one published post, its metadata, the forms of
 /// its body a reader can render without visiting the site, and the
@@ -86,15 +87,16 @@ impl AtprotoRecord for StandardSiteDocument {
 }
 
 impl StandardSiteDocument {
-	/// The document `page` makes within `publication`, written to the
-	/// publication record at `site`, filled from the page's metadata: its
-	/// path beneath the publication, title, description, dates, tags and
-	/// labels.
+	/// The document the listed page at `path` makes within `publication`,
+	/// written to the publication record at `site`, filled from the page's
+	/// metadata `meta`: its path beneath the publication, title, description,
+	/// dates, tags and labels.
 	///
 	/// What the publish step derives rather than reads is left empty for it to
 	/// fill: the body forms (`text_content`, `content`), the uploaded
-	/// `cover_image`, the `contributors` its authors resolve to and the
-	/// announcement's `bsky_post_ref`.
+	/// `cover_image` (all three [`render`](Self::render)'s), the
+	/// `contributors` its authors resolve to and the announcement's
+	/// `bsky_post_ref`.
 	///
 	/// # Errors
 	/// Errors when the page is not beneath the publication's path, or lacks
@@ -102,25 +104,23 @@ impl StandardSiteDocument {
 	pub fn from_page(
 		publication: &StandardSitePub,
 		site: AtUri,
-		page: &SyndicationPage,
+		path: &RelPath,
+		meta: &PageMeta,
 	) -> Result<Self> {
-		let path =
-			page.path.strip_prefix(&publication.path).ok_or_else(|| {
+		let relative =
+			path.strip_prefix(&publication.path).ok_or_else(|| {
 				bevyhow!(
-					"page '{}' is not beneath the publication at '{}'",
-					page.path,
+					"page '{path}' is not beneath the publication at '{}'",
 					publication.path
 				)
 			})?;
-		let meta = &page.meta;
 		Self {
 			site: site.into(),
-			path: Some(format!("/{path}").into()),
+			path: Some(format!("/{relative}").into()),
 			title: meta.title.clone().ok_or_else(|| {
 				bevyhow!(
-					"page '{}' has no title, which a standard site document \
-					 requires",
-					page.path
+					"page '{path}' has no title, which a standard site \
+					 document requires"
 				)
 			})?,
 			description: meta.description.clone(),
@@ -128,9 +128,8 @@ impl StandardSiteDocument {
 				.created
 				.ok_or_else(|| {
 					bevyhow!(
-						"page '{}' has no `created` day, which a standard site \
-						 document requires as its `publishedAt`",
-						page.path
+						"page '{path}' has no `created` day, which a standard \
+						 site document requires as its `publishedAt`"
 					)
 				})?
 				.timestamp(),
@@ -219,8 +218,13 @@ mod test {
 			.iter()
 			.filter(|page| page.meta.created.is_some())
 			.map(|page| {
-				StandardSiteDocument::from_page(&harvest(), harvest_uri(), page)
-					.unwrap()
+				StandardSiteDocument::from_page(
+					&harvest(),
+					harvest_uri(),
+					&page.path,
+					&page.meta,
+				)
+				.unwrap()
 			})
 			.map(|document| wire(&document))
 			.collect::<Vec<_>>()
@@ -269,8 +273,13 @@ mod test {
 			),
 			contributors: vec![Contributor::author(&author)],
 			bsky_post_ref: Some(post),
-			..StandardSiteDocument::from_page(&harvest(), harvest_uri(), &page)
-				.unwrap()
+			..StandardSiteDocument::from_page(
+				&harvest(),
+				harvest_uri(),
+				&page.path,
+				&page.meta,
+			)
+			.unwrap()
 		}
 	}
 
@@ -299,9 +308,14 @@ mod test {
 			..default()
 		};
 		let build = |page: SyndicationPage| {
-			StandardSiteDocument::from_page(&harvest(), harvest_uri(), &page)
-				.unwrap_err()
-				.to_string()
+			StandardSiteDocument::from_page(
+				&harvest(),
+				harvest_uri(),
+				&page.path,
+				&page.meta,
+			)
+			.unwrap_err()
+			.to_string()
 		};
 		build(page("docs/post", dated.clone())).xpect_contains("not beneath");
 		build(page("blog/post", PageMeta {

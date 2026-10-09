@@ -236,10 +236,7 @@ async fn send_data(request: Request) -> Result<Response> {
 		return Ok(Response::from_status(StatusCode::NOT_ACCEPTABLE));
 	}
 
-	Response::ok()
-		.with_content_type(mb.media_type().clone())
-		.with_body(mb.bytes().to_vec())
-		.xok()
+	Response::ok().with_media(mb).xok()
 }
 
 #[cfg(test)]
@@ -483,7 +480,7 @@ mod test_response {
 		let original = serde_json::json!({"foo": "bar"});
 		let resp: EchoResponse =
 			Request::post(server.url().clone().push("post"))
-				.with_body(&original.to_string())
+				.with_body(original.to_string())
 				.send()
 				.await
 				.unwrap()

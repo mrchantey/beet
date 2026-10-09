@@ -15,9 +15,9 @@ The served content and the deploy/sync/destroy route shape are identical.
 
 ## Usage
 
-    beet --main=examples/infra/cloudflare_containers.bsx deploy
-    beet --main=examples/infra/cloudflare_containers.bsx sync
-    beet --main=examples/infra/cloudflare_containers.bsx destroy
+    beet --entry=examples/infra/cloudflare_containers.bsx deploy
+    beet --entry=examples/infra/cloudflare_containers.bsx sync
+    beet --entry=examples/infra/cloudflare_containers.bsx destroy
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` and the account declared on the root
 (`{CloudflareAccount("..")}`, a placeholder below), plus `wrangler` and a
@@ -33,7 +33,7 @@ objects, the way an `<R2BucketBlock/>`'s is.
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployToken/>`), so it carries no account-level Workers group: a live run
-here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
+here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
 <CliServer {CallOnReady}>

@@ -66,6 +66,8 @@ The matched `route` entity is reachable from **no** layout edge (`Portal` and `L
 
 `PageRoot` names the entity the serializer walks (self-referential for a plain route, the layout itself for a wrapped one). `DespawnAfterRender` lists the ephemerals torn down after each render; nothing is cached between requests.
 
+`PageRoot::prepare` runs the layouts, resolves the `--root` render param (`document`, `main` or `content`, one cascade documented on `RenderRoot`) and, for a target that embeds media, the media resolve step, into a `LivePage` a caller renders through any registered target (`beet_ui`'s `RenderTargets`). A request is `PageRoot::scoped` around one render whose media type `Accept` negotiates, so a direct caller naming the same type gets exactly the body a client does, and the scope releases the page whatever the outcome.
+
 ### Layouts
 
 A layout is render middleware, `Layout{template:"Layout"}` declared on an ancestor of the routes it wraps (typically the router). The name resolves exactly as it would in tag position: a `.bsx` document in the `BsxTemplateRegistry` first, else a rust `#[template]` registered by short type path, so markup and rust layouts are one mechanism with one declaration. From rust that name comes from the type, `Layout::of::<SiteLayout>()`, so a rename follows the symbol; `Layout::new("..")` is for a `.bsx` document, which has no type to name.
@@ -107,8 +109,8 @@ The scan reads the ROOT only, resolving each declaration against the type regist
 
 `<Sitemap/>`, `<Robots/>`, `<RssFeed/>` and `<SearchIndex/>` are the machine-readable faces of a site: opt-in tags spawning ordinary static `GET` routes (`sitemap.xml`, `robots.txt`, `rss.xml`, `search-index.json`) that walk the `RouteTree` and serialize it, so they serve live and static-export as files with no special casing.
 
-Position is the whole configuration surface. A `Router` is a url space and routes root at their ancestors, so `<Sitemap/>` under the router root covers the site while `<RssFeed/>` inside `<Route path="blog">` serves at `/blog/rss.xml` and feeds only the posts beneath it. The feed and the index carry each page's real body, rendered by re-entering dispatch exactly as static export does.
+Position is the whole configuration surface. A `Router` is a url space and routes root at their ancestors, so `<Sitemap/>` under the router root covers the site while `<RssFeed/>` inside `<Route path="blog">` serves at `/blog/rss.xml` and feeds only the posts beneath it. The feed and the index carry each page's real body, its `--root=content` render (html for the feed, plain text for the index), so neither carries the chrome a layout adds.
 
 They need an origin to resolve their absolute urls against, so a `PackageConfig` with no `homepage` fails their dispatch naming the field.
 
-The same listed pages are the source of a site's [standard.site](https://standard.site) records, built with `json`: `StandardSitePublication::from_declaration` turns a `StandardSitePub` declaration into the `site.standard.publication` record, and `StandardSiteDocument::from_page` turns a page's metadata into its `site.standard.document`. Each record type is exactly its lexicon; the cheatsheet is the module docs of `src/router/site/syndication/standard_site/`.
+The same listed pages are the source of a site's [standard.site](https://standard.site) records, built with `dag_cbor`: `StandardSitePublication::from_declaration` turns a `StandardSitePub` declaration into the `site.standard.publication` record, and `StandardSiteDocument::render` turns a page's metadata and its live page into its `site.standard.document`, the post as plain text and as Leaflet blocks through the `LeafletRenderer` target, its images uploaded off the same tree. Each record type is exactly its lexicon; the cheatsheet is the module docs of `src/router/site/syndication/standard_site/`.

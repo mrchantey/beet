@@ -1,0 +1,394 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/D-d_mJ9N5mA"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 76,
+                  "byteStart": 69
+                }
+              }
+            ],
+            "plaintext": "As much as I'd like to be I'm not a lisp guy, when somebody tells me (+ 1 2) is so cool because its all just data, I believe them and can admire the symmetry but have not yet built up an intuition for why thats useful."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I'm a games guy, I've seen how messy hard-coded control flow gets in patterns like enemy AI. I've also seen how brittle it is to shoehorn in (and often back out) some highly opinionated DSL to address this."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 27,
+                  "byteStart": 17
+                }
+              }
+            ],
+            "plaintext": "The core idea of beet 0.0.1 was an application level homoiconicity, piggybacking the exact same scene hierarchies we're already using for scene layouts and UI to describe control flow patterns like behavior trees."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "fn enemy_ai() -> impl Bundle {\n\t(\n\t\tFallback,\n\t\tchildren![\n\t\t\tAttack,\n\t\t\tPatrol,\n\t\t]\n\t)\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 61,
+                  "byteStart": 27
+                }
+              }
+            ],
+            "plaintext": "In bevy this translates to Behavior Expressed as Entity Trees, a backronym I thought of soon after releasing beet. Technically the control flow patterns aren't limited to just trees, although they are strongly preferred over looser patterns like state machines for the same reasons that GOTO is considered an antipattern."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Its a simple idea, the hard part is doing it well. Upon release, beet was actually the third iteration of this idea, and while the public api for this pattern has remained the same in the two years since its release, the implementation has evolved dramatically. But with every rewrite it gets closer, feels more native and with the grain of the existing bevy ecosystem."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 112,
+                  "byteStart": 103
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 154,
+                  "byteStart": 145
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 238,
+                  "byteStart": 211
+                }
+              }
+            ],
+            "plaintext": "In the last month I've fully rewritten the implementation for what feels very close to the ideal form. beet_flow will be deprecated in favour of beet_tool, instead of juggling multiple observers and a dangerous Arc<Mutex<Option<T>>>::take pattern for non-clone types, the api is now just an async function."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "/// run all children in sequence,\n/// propagating the input or short-circuting\n/// with the 'output' if one fails.\nasync fn sequence::<In,Out>(mut input: In, entity: AsyncEntity) -> Outcome<In,Out> {\n\tfor child in entity.children().await {\n\t\tmatch child.call.await {\n\t\t\tOutcome::Pass(next_input) => {\n\t\t\t\t*input = next_input;\n\t\t\t}\n\t\t\tOutcome::Fail(fail) => {\n\t\t\t\treturn Outcome::Fail(fail)\n\t\t\t}\n\t\t}\n\t}\n\tOutcome::Pass(input)\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Example: Router"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 79,
+                  "byteStart": 77
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 173,
+                  "byteStart": 166
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 186,
+                  "byteStart": 178
+                }
+              }
+            ],
+            "plaintext": "For many behavior tree usages both the input and output are just a unit type (), but the propagation pattern is extremely useful for patterns like routers, where the Request and Response types are not clone, and we want to fall back to a 404 handler."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Here's the router for the server of this web page. The Request is propagated without clone until a match is found."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "fn default_router() -> impl Bundle {\n\t(\n\t\tFallback::<Request, Response>::default(),\n\t\tchildren![\n\t\t\t// short circuit on `help` query param\n\t\t\tHelpHandler,\n\t\t\t// try to find a matching route\n\t\t\tRouteHandler,\n\t\t\t// finally fall back to not found\n\t\t\tNotFoundHandler,\n\t\t]\n\t)\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Example: Agent Harness"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "These primitives are very versatile, here's a simple agent chat loop."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "\nfn chat_agent() -> impl Bundle{\n\t(Repeat::new(), children![(\n\t\tThread::default(),\n\t\tSequence::new()\n\t\t\t// skip static actors like the system\n\t\t\t.allow_no_tool(),\n\t\tchildren![\n\t\t\t(\n\t\t\t\tActor::new(\"BeepBot\", ActorKind::System), \n\t\t\t\tchildren![\n\t\t\t\t\tPost::spawn(\"you are robot, make beep boop noises\")\n\t\t\t\t]),\n\t\t\t(\n\t\t\t\tActor::new(\"BeepBot\", ActorKind::Agent),\n\t\t\t\t// tool calls are just nested actions\n\t\t\t\tOpenAiProvider::gpt_5_mini().unwrap(),\n\t\t\t\tchildren![add_tool()]\n\t\t\t),\n\t\t\t(\n\t\t\t\tActor::new(\"User\", ActorKind::User), \n\t\t\t\t// this action just gets user input\n\t\t\t\tStdinPost\n\t\t\t),\n\t\t]\n\t)])\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "And there you have it, serializable homoiconicity for common application logic."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Serialization is key to malleability"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The gains in simplicity are self-evident but i think thats just the beginning:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "What productivity boosts can we get by writing application logic in a game engine editor?"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "How can infra deployments be simplified when the router logic itself is just a json file?"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "What capabilities does an agent get when it can confidently modify its own behavior without source code changes?"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "I accidentally built a web (1.0) browser"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "ECS is a weird architecture in that its so agnostic to the application, and the scope of beet has evolved beyond a simple behavior library into a full stack framework to explore this."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 234,
+                  "byteStart": 223
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 333,
+                  "byteStart": 324
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 344,
+                  "byteStart": 335
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 355,
+                  "byteStart": 349
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://github.com/mrchantey/beet/blob/1dcd4d8574b8ec254623a0c99bc3dc586c65a65b/examples/router/mini_browser.rs#L1"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 422,
+                  "byteStart": 393
+                }
+              }
+            ],
+            "plaintext": "As a concrete example, I am currently rewriting the web ui layer of beet to be target agnostic. I just finished building the parsers and renderers for various formats: html, markdown, ratatui etc, and realized I could view example.com in ratatui by combining the html parser and tui renderer. A few hours twiddling with the Naivgator, Scrollbar and UrlBar components, and there you have it! A crude sans-js/css web browser."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I wasn't intending to build that, it just came out of the general nature of the architecture. No need to create some intricate binding layer between the html AST and application framework, its already represented as Bevy ECS! Likewise for the tui renderer. Translating between technologies is not required when everything speaks the same language."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Its gonna be awesome"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "It feels like we're on the ground floor of discovering the implications of this architecture, and I can't wait to see how the landscape unfolds."
+          }
+        }
+      ]
+    }
+  ]
+}

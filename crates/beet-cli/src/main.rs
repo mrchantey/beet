@@ -63,7 +63,7 @@ fn build_app() -> App {
 
 /// The capabilities this binary links on top of the trusted defaults: the
 /// native-only dev commands, inert until a `main.bsx` names them, and the one
-/// command among them that runs ANOTHER program, whose `--main`/`--repo` the
+/// command among them that runs ANOTHER program, whose `--entry`/`--repo` the
 /// loader must therefore leave alone.
 fn cli_plugins(app: &mut App) {
 	#[cfg(not(target_arch = "wasm32"))]

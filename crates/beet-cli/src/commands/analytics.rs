@@ -33,8 +33,8 @@ struct AnalyticsParams {
 /// read from exactly one source.
 ///
 /// ```sh
-/// beet --main=site analytics summary                          # the site's declared store
-/// beet --main=site --service-access=remote analytics summary  # the same declaration, deployed
+/// beet --entry=site analytics summary                          # the site's declared store
+/// beet --entry=site --service-access=remote analytics summary  # the same declaration, deployed
 /// beet analytics summary --store fs:target/stores/beet-site--dev--analytics
 /// beet analytics summary --store s3://beet-site--prod--analytics
 /// ```

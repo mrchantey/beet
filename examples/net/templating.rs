@@ -78,7 +78,7 @@ fn home(visitor_number: u32) -> Response {
 "#,
 			visitor_number
 		)),
-		MimeType::Html,
+		MediaType::Html,
 	)
 }
 
@@ -91,7 +91,7 @@ fn planting_trees() -> Response {
 <p>Do it, just do it. Dont ask questions. Go and buy a native tree and plant it somewhere.</p>
 "#,
 		),
-		MimeType::Html,
+		MediaType::Html,
 	)
 }
 
@@ -106,7 +106,7 @@ fn not_found(request: &Request) -> Response {
 <p>The path at <a href="{path}">{path}</a> could not be found.</p>
 "#,
 		)),
-		MimeType::Html,
+		MediaType::Html,
 	)
 }
 

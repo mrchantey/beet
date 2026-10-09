@@ -96,8 +96,7 @@ impl Blob {
 	/// [`MediaType`] from the path extension.
 	pub async fn get_media(&self) -> Result<MediaBytes> {
 		let media_type = self.path.media_type().unwrap_or(MediaType::Bytes);
-		let bytes = self.get().await?;
-		Ok(MediaBytes::new(media_type, bytes.to_vec()))
+		MediaBytes::new(media_type, self.get().await?).xok()
 	}
 
 	/// Check whether the blob exists in the store.

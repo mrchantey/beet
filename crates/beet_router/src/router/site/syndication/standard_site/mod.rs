@@ -17,9 +17,12 @@
 //!   [`from_declaration`](StandardSitePublication::from_declaration), with its
 //!   [`ThemeBasic`] resolved from the site's [`Theme`]
 //! - [`StandardSiteDocument`], `site.standard.document`, built from a listed
-//!   page's metadata by [`from_page`](StandardSiteDocument::from_page)
-//! - [`StandardSiteContentRenderer`], a format a document's `content` slot
-//!   carries, registered by NSID in [`StandardSiteContentRenderers`]
+//!   page's metadata and rendered off its live page (the `publish` module:
+//!   the body forms, the cover, the blob upload)
+//! - [`LeafletContent`], `pub.leaflet.content`, the rich `content` format,
+//!   rendered by the [`LeafletRenderer`] target, and the
+//!   [`StandardSiteContentFormats`] registry a publication's `content` NSID
+//!   resolves through
 //!
 //! # Limits
 //!
@@ -33,13 +36,17 @@
 //!
 //! [`Rkeyed`]: beet_core::prelude::Rkeyed
 //! [`Theme`]: beet_ui::prelude::Theme
-mod content_renderer;
+mod content_format;
 mod document;
+mod leaflet;
 mod publication;
+#[cfg(feature = "json")]
+mod publish;
 mod standard_site_pub;
 mod theme;
-pub use content_renderer::*;
+pub use content_format::*;
 pub use document::*;
+pub use leaflet::*;
 pub use publication::*;
 pub use standard_site_pub::*;
 pub use theme::*;

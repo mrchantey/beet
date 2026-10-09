@@ -3,7 +3,7 @@
 
 The fox chases a cursor-following cheese: its action tree plays the idle clip, then walks (`Seek`) with the walk clip until `EndOnArrive` passes, looping via `Repeat`.
 
-    beet --main=examples/spatial/seek_3d.bsx
+    beet --entry=examples/spatial/seek_3d.bsx
 -->
 <Scene3d>
 	<RequireCfg cfg="feature:winit"/>

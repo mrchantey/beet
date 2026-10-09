@@ -12,11 +12,11 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 
 ## Usage
 
-    beet --main=examples/infra/lightsail.bsx validate
-    beet --main=examples/infra/lightsail.bsx deploy
-    beet --main=examples/infra/lightsail.bsx sync
-    beet --main=examples/infra/lightsail.bsx watch
-    beet --main=examples/infra/lightsail.bsx destroy --force
+    beet --entry=examples/infra/lightsail.bsx validate
+    beet --entry=examples/infra/lightsail.bsx deploy
+    beet --entry=examples/infra/lightsail.bsx sync
+    beet --entry=examples/infra/lightsail.bsx watch
+    beet --entry=examples/infra/lightsail.bsx destroy --force
 
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->

@@ -89,7 +89,7 @@ impl SiteFixture {
 		fs_ext::write(self.dir.join(rel), content).unwrap();
 	}
 
-	/// Serve the fixture exactly as `beet --main=<dir> --watch` does: the
+	/// Serve the fixture exactly as `beet --entry=<dir> --watch` does: the
 	/// entry resolves through its own fs repo store and builds through the
 	/// `--watch` driver path, so its declared `<HttpServer>` boots on
 	/// [`Self::port`] and a structural edit rebuilds the whole scene.

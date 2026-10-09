@@ -256,11 +256,7 @@ mod test {
 	) {
 		world
 			.entity_mut(router)
-			.exchange(
-				Request::post("load")
-					.with_content_type(MediaType::Json)
-					.with_body(scene.bytes()),
-			)
+			.exchange(Request::with_media("load", scene))
 			.await
 			.status()
 			.xpect_eq(StatusCode::OK);

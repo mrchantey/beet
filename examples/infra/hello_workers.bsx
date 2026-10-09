@@ -24,10 +24,10 @@ same resolution as a checkout, which is the point of the symlink.
 
 ## The edit → sync → live loop (no redeploy)
 
-    beet --main=examples/infra/hello_workers.bsx deploy   # worker up + bucket seeded
+    beet --entry=examples/infra/hello_workers.bsx deploy   # worker up + bucket seeded
     # visit https://<name>.workers.dev — the site renders
     # edit a markdown file under site/routes/
-    beet --main=examples/infra/hello_workers.bsx sync     # re-upload site/ + assets/
+    beet --entry=examples/infra/hello_workers.bsx sync     # re-upload site/ + assets/
     # reload the page — the change is live
 
 `sync` re-uploads every `site/` file including `main.bsx`, giving `main.bsx` a fresh R2
@@ -37,10 +37,10 @@ content. `destroy` deletes the Worker and empties + deletes the bucket.
 
 ## Usage
 
-    beet --main=examples/infra/hello_workers.bsx build
-    beet --main=examples/infra/hello_workers.bsx deploy
-    beet --main=examples/infra/hello_workers.bsx sync
-    beet --main=examples/infra/hello_workers.bsx destroy
+    beet --entry=examples/infra/hello_workers.bsx build
+    beet --entry=examples/infra/hello_workers.bsx deploy
+    beet --entry=examples/infra/hello_workers.bsx sync
+    beet --entry=examples/infra/hello_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
 its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
@@ -57,7 +57,7 @@ compile).
 
 The token a repo's document holds is lowered from what its DEPLOYED entry declares
 (`<CloudflareDeployToken/>`), so it carries no account-level Workers group: a live run
-here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --main=..
+here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
 <CliServer {CallOnReady}>

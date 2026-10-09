@@ -63,7 +63,7 @@ fn Handler(
 		return Response::from_status_body(
 			StatusCode::NOT_FOUND,
 			message,
-			MimeType::Text,
+			MediaType::Text,
 		)
 		.xok();
 	}
@@ -85,5 +85,5 @@ pass the 'name' parameter to receive a warm personal greeting.
 	);
 
 	info!("{}: {}", request.method(), request.path_string());
-	Response::ok_body(message, MimeType::Text).xok()
+	Response::ok_body(message, MediaType::Text).xok()
 }

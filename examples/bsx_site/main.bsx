@@ -8,7 +8,7 @@ declares five servers, so `--server` picks one on load: the default `HttpServer`
 `--server=dom` the browser, which is how the served page boots this same entry
 in the tab (see `templates/Layout.bsx`):
 
-    beet --main=examples/bsx_site/main.bsx --server=http
+    beet --entry=examples/bsx_site/main.bsx --server=http
     cd examples/bsx_site && beet --server=tui   # or rely on discovery
 
 There is no `main.rs`: the binary discovers this entry and declares the load live,

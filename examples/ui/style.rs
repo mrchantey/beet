@@ -78,5 +78,5 @@ fn Handler(
 		&html,
 	)?;
 
-	Response::ok_body(html, MimeType::Html).xok()
+	Response::ok_body(html, MediaType::Html).xok()
 }

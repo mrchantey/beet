@@ -13,7 +13,7 @@ throughout, and the last beat asks for something its `<ScriptConfig>` forbids,
 catches the refusal and writes it onto the roll call, whose `<Log>`
 reports it.
 
-    beet --main=examples/action/world_script.bsx
+    beet --entry=examples/action/world_script.bsx
 -->
 <Fragment>
 	<!-- the vocabulary this document mints, kept by the scene rather than

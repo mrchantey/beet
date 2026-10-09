@@ -4,10 +4,10 @@ one-shot CLI exchange or a long-running HTTP server. The servers own the root an
 the router is their dispatch child; `{CallOnReady}` starts them on load, reading
 `--server` to pick one:
 
-    beet --main=examples/calculator/main.bsx --server=cli add --a=3 --b=4
+    beet --entry=examples/calculator/main.bsx --server=cli add --a=3 --b=4
     # result: 7  (one-shot, then exits)
 
-    beet --main=examples/calculator/main.bsx --server=http
+    beet --entry=examples/calculator/main.bsx --server=http
     # serves /add?a=3&b=4 on :8080 and stays alive
 
 Each `<ScriptRoute>` is a path plus a JavaScript script over the request, whose

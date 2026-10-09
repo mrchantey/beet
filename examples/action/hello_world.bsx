@@ -5,6 +5,6 @@
 a `name` field; `{CallOnReady}` runs the entity's action once on load, which reads
 the name and prints the greeting, then exits.
 
-    beet --main=examples/action/hello_world.bsx
+    beet --entry=examples/action/hello_world.bsx
 -->
 <Greet{name:"world"} {CallOnReady}/>

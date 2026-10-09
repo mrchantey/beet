@@ -16,7 +16,7 @@ The action tree is spawned under Malenia, so `AgentQuery` resolves her as the
 agent the attacks operate on. The `Elden Lord` player carries `{AttackTarget}` so
 the attacks resolve their target by query. The loop runs until someone falls.
 
-    beet --main=examples/action/malenia.bsx
+    beet --entry=examples/action/malenia.bsx
 -->
 <Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>
 	<Fallback>

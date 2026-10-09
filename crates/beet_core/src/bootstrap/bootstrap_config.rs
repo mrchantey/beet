@@ -70,8 +70,8 @@ use core::str::FromStr;
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
 	/// The entry document: a path for a dir-rooted repo store, a name within a
-	/// self-rooted one. `--main` / `BEET_MAIN`.
-	pub main: Option<SmolStr>,
+	/// self-rooted one. `--entry` / `BEET_ENTRY`.
+	pub entry: Option<SmolStr>,
 	/// The repo store the entry loads through. `--repo` / `BEET_REPO`.
 	pub repo: Option<StoreUri>,
 	/// The local store the repo store is forked into: reads fall through to
@@ -132,7 +132,7 @@ pub struct BootstrapConfig {
 impl Default for BootstrapConfig {
 	fn default() -> Self {
 		Self {
-			main: None,
+			entry: None,
 			repo: None,
 			store_fork: None,
 			watch: false,
@@ -176,9 +176,9 @@ impl BootstrapConfig {
 	/// in, see [`to_script`](Self::to_script).
 	pub const SCRIPT_TYPE: &'static str = "application/x-beet-bootstrap";
 
-	const MAIN: Knob = Knob {
-		arg: "main",
-		env: "BEET_MAIN",
+	const ENTRY: Knob = Knob {
+		arg: "entry",
+		env: "BEET_ENTRY",
 	};
 	const REPO: Knob = Knob {
 		arg: "repo",
@@ -317,7 +317,7 @@ impl BootstrapConfig {
 	/// Every knob, in field order. The one enumeration of the table, so a new
 	/// field is either listed here or is not a knob at all.
 	const KNOBS: [Knob; 19] = [
-		Self::MAIN,
+		Self::ENTRY,
 		Self::REPO,
 		Self::STORE_FORK,
 		Self::WATCH,
@@ -385,7 +385,7 @@ impl BootstrapConfig {
 	/// Read every field through `reader`.
 	fn read(reader: ConfigReader) -> Result<Self> {
 		Self {
-			main: reader.value(Self::MAIN),
+			entry: reader.value(Self::ENTRY),
 			repo: reader.parsed(Self::REPO)?,
 			store_fork: reader.parsed(Self::STORE_FORK)?,
 			watch: reader.flag(Self::WATCH),
@@ -478,7 +478,7 @@ impl BootstrapConfig {
 	/// `(knob, value)`, the one enumeration [`to_argv`](Self::to_argv) and
 	/// [`to_env`](Self::to_env) share so the two channels cannot drift.
 	fn render(&self, push: &mut impl FnMut(Knob, Option<String>)) {
-		push(Self::MAIN, self.main.as_ref().map(ToString::to_string));
+		push(Self::ENTRY, self.entry.as_ref().map(ToString::to_string));
 		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
 		push(
 			Self::STORE_FORK,
@@ -556,7 +556,7 @@ impl BootstrapConfig {
 	/// selection, the opening path) is visible on argv, ambient service config
 	/// (the bind address, the ports, the stage, the deploy identity) rides env.
 	///
-	/// The dev-harness fields (`main`, `watch`, `features`, `tls_dir`,
+	/// The dev-harness fields (`entry`, `watch`, `features`, `tls_dir`,
 	/// `headless`, `screenshot*`) belong to neither deploy channel and
 	/// are dropped: a deploy has no use for them, and a deployed process probes
 	/// its repo store for the entry rather than being told.
@@ -809,7 +809,7 @@ mod test {
 	/// A config with every field set, so a round trip exercises each one.
 	fn full() -> BootstrapConfig {
 		BootstrapConfig {
-			main: Some("main.bsx".into()),
+			entry: Some("main.bsx".into()),
 			repo: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
 			store_fork: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
 			watch: true,
@@ -907,7 +907,7 @@ mod test {
 	#[crate::test]
 	fn rejects_unencodable_tokens() {
 		BootstrapConfig {
-			main: Some("my entry.bsx".into()),
+			entry: Some("my entry.bsx".into()),
 			..default()
 		}
 		.to_argv()
@@ -915,7 +915,7 @@ mod test {
 		.to_string()
 		.xpect_contains("cannot be rendered");
 		BootstrapConfig {
-			main: Some("say\"hi\"".into()),
+			entry: Some("say\"hi\"".into()),
 			..default()
 		}
 		.to_cmd_json("/app")
@@ -1007,14 +1007,14 @@ mod test {
 	#[crate::test]
 	fn script_appends_to_the_location_argv() {
 		let launch = BootstrapConfig {
-			main: Some("scene_editor.bsx".into()),
+			entry: Some("scene_editor.bsx".into()),
 			repo: Some(StoreUri::parse("http:examples/ui").unwrap()),
 			server: Some(RunningSetFilter::new("dom")),
 			..default()
 		};
 		let script = launch.to_script().unwrap();
 		script.xpect_eq(
-			"--main=scene_editor.bsx --repo=http:examples/ui --server=dom",
+			"--entry=scene_editor.bsx --repo=http:examples/ui --server=dom",
 		);
 		// the page at `/docs?color-scheme=dark` booting through the script
 		let mut argv = vec![SmolStr::new("docs"), "--color-scheme=dark".into()];

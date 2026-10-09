@@ -5,7 +5,7 @@ A `<Sequence>` runs its children in order, threading the input through each and
 stopping at the first failure. Each child here is a `<Log>` leaf; both
 pass, so the sequence passes. `{CallOnReady}` runs the root on load, then exits.
 
-    beet --main=examples/action/behavior_tree.bsx
+    beet --entry=examples/action/behavior_tree.bsx
 -->
 <Sequence {CallOnReady}>
 	<Log message="running child1"/>

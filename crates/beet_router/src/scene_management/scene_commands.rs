@@ -80,9 +80,7 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		)
 		.await??;
 	let media = store.get_media(&RelPath::from(path.as_str())).await?;
-	let res = Request::post(format!("{url}/load"))
-		.with_content_type(media.media_type().clone())
-		.with_body(media.bytes())
+	let res = Request::with_media(format!("{url}/load"), media)
 		.send()
 		.await?;
 	// the device may accept the upload but reject the scene (eg an unsupported

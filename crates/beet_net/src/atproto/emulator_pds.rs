@@ -10,19 +10,25 @@ use bytes::Bytes;
 /// browser and to mirror with `BlobSync`:
 ///
 /// ```text
-/// records/<collection>/<rkey>.json   a record body, the protocol's json form
+/// records/<collection>/<rkey>.cbor   a record body in its storage format
 /// blobs/<cid>                        a blob's bytes
 /// ```
 ///
-/// The `.json` suffix names the format to every store that picks a media type
-/// by extension; an rkey may hold a dot, so exactly one suffix is stripped.
+/// A record is stored in its [`storage_format`](Self::storage_format),
+/// [`MediaType::DagCbor`] by default, through [`MediaType::serialize`] and
+/// [`MediaType::deserialize`], and named with that format's extension so a
+/// store that picks a media type by extension serves it correctly; an rkey may
+/// hold a dot, so exactly one suffix is stripped. Under DAG-CBOR a record file
+/// is exactly the block its cid hashes, so a read re-encodes nothing;
+/// [`with_storage_format`](Self::with_storage_format) selects
+/// [`MediaType::Json`] for a bucket meant to be read by eye.
 ///
 /// And authoritative on the PDS's duties on write, so a repo here and one on a
 /// real PDS cannot drift apart:
 ///
 /// - the record cid is computed over canonical DAG-CBOR under CIDv1, exactly
-///   as a PDS computes it (`dag_cbor_ext`), so a record's strong ref and any
-///   rkey derived from it are the same in a bucket and on the network;
+///   as a PDS computes it ([`AtprotoValue::cid`]), so a record's strong ref
+///   and any rkey derived from it are the same in a bucket and on the network;
 /// - a record's `$type` must be its collection, and every blob it references
 ///   must have been uploaded;
 /// - a blob is retained exactly while a current record references it: a write
@@ -30,10 +36,17 @@ use bytes::Bytes;
 ///   blob, and [`sweep`](Self::sweep) collects uploads no record ever took up,
 ///   the PDS's periodic garbage collection;
 /// - a listing is per collection, in rkey order.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Get, SetWith)]
 pub struct EmulatorPds {
+	#[get(skip)]
+	#[set_with(skip)]
 	did: Did,
+	/// The store the repo is laid out in.
+	#[set_with(skip)]
 	store: BlobStore,
+	/// The format a record body is stored in, [`MediaType::DagCbor`] by
+	/// default.
+	storage_format: MediaType,
 }
 
 impl EmulatorPds {
@@ -44,10 +57,15 @@ impl EmulatorPds {
 
 	const RECORDS: &'static str = "records";
 	const BLOBS: &'static str = "blobs";
-	const SUFFIX: &'static str = ".json";
 
-	/// The repo of `did` laid out in `store`.
-	pub fn new(did: Did, store: BlobStore) -> Self { Self { did, store } }
+	/// The repo of `did` laid out in `store`, its records in DAG-CBOR.
+	pub fn new(did: Did, store: BlobStore) -> Self {
+		Self {
+			did,
+			store,
+			storage_format: MediaType::DagCbor,
+		}
+	}
 
 	/// A repo in a fresh in-memory store, answering for [`Self::TEST_DID`].
 	pub fn temp() -> Self {
@@ -56,9 +74,6 @@ impl EmulatorPds {
 			BlobStore::temp(),
 		)
 	}
-
-	/// The store the repo is laid out in.
-	pub fn store(&self) -> &BlobStore { &self.store }
 
 	/// Delete every blob no current record references, answering their cids:
 	/// what a PDS does to an upload no record took up.
@@ -74,11 +89,17 @@ impl EmulatorPds {
 		self.release(blobs).await
 	}
 
-	fn record_path(collection: &Nsid, rkey: &Rkey) -> RelPath {
+	/// The suffix a record file carries, `.` and the storage format's
+	/// extension.
+	fn suffix(&self) -> String {
+		format!(".{}", self.storage_format.extension().unwrap_or("bin"))
+	}
+
+	fn record_path(&self, collection: &Nsid, rkey: &Rkey) -> RelPath {
 		RelPath::new(format!(
 			"{}/{collection}/{rkey}{}",
 			Self::RECORDS,
-			Self::SUFFIX
+			self.suffix()
 		))
 	}
 
@@ -92,7 +113,8 @@ impl EmulatorPds {
 			return Ok(None);
 		}
 		let bytes = self.store.get(path).await?;
-		AtprotoValue::from_json(serde_json::from_slice(&bytes)?)?
+		self.storage_format
+			.deserialize::<AtprotoValue>(&bytes)?
 			.xmap(Some)
 			.xok()
 	}
@@ -102,7 +124,7 @@ impl EmulatorPds {
 		collection: &Nsid,
 		rkey: &Rkey,
 	) -> Result<Option<RecordEntry>> {
-		self.read(&Self::record_path(collection, rkey))
+		self.read(&self.record_path(collection, rkey))
 			.await?
 			.map(|value| {
 				self.entry(collection, Rkeyed::new(rkey.clone(), value))
@@ -121,7 +143,7 @@ impl EmulatorPds {
 	) -> RecordEntry {
 		RecordEntry {
 			uri: self.uri(collection, record.rkey()),
-			cid: dag_cbor_ext::record_cid(&record),
+			cid: record.cid(),
 			value: record.into_value(),
 		}
 	}
@@ -133,8 +155,7 @@ impl EmulatorPds {
 	) -> Result<StrongRef> {
 		let record = record.try_map(|body| body.into_record(&collection))?;
 		let uri = self.uri(&collection, record.rkey());
-		let cid = dag_cbor_ext::record_cid(&record);
-		let referenced = Self::blob_refs(&record);
+		let referenced = Self::blob_cids(&record);
 		for blob in &referenced {
 			if !self.store.exists(&Self::blob_path(blob)).await? {
 				bevybail!(
@@ -143,17 +164,17 @@ impl EmulatorPds {
 				);
 			}
 		}
-		let path = Self::record_path(&collection, record.rkey());
+		let path = self.record_path(&collection, record.rkey());
 		let dropped = self.dropped_blobs(&path, &referenced).await?;
 		self.store
-			.insert(&path, serde_json::to_vec(&record.to_json())?)
+			.insert(&path, self.storage_format.serialize(&*record)?)
 			.await?;
 		self.release(dropped).await?;
-		StrongRef::new(uri, cid).xok()
+		StrongRef::new(uri, record.cid()).xok()
 	}
 
 	async fn delete(&self, collection: Nsid, rkey: Rkey) -> Result {
-		let path = Self::record_path(&collection, &rkey);
+		let path = self.record_path(&collection, &rkey);
 		let dropped = self.dropped_blobs(&path, &HashSet::default()).await?;
 		if self.store.exists(&path).await? {
 			self.store.remove(&path).await?;
@@ -163,13 +184,16 @@ impl EmulatorPds {
 	}
 
 	async fn list(&self, collection: &Nsid) -> Result<Vec<RecordEntry>> {
+		let suffix = self.suffix();
 		let mut rkeys = self
 			.store
 			.list_dir(&RelPath::new(format!("{}/{collection}", Self::RECORDS)))
 			.await?
 			.files
 			.into_iter()
-			.filter_map(|file| file.strip_suffix(Self::SUFFIX).map(Rkey::parse))
+			.filter_map(|file| {
+				file.strip_suffix(suffix.as_str()).map(Rkey::parse)
+			})
 			.collect::<Result<Vec<_>>>()?;
 		rkeys.sort();
 		let mut entries = Vec::with_capacity(rkeys.len());
@@ -202,7 +226,7 @@ impl EmulatorPds {
 	) -> Result<HashSet<Cid>> {
 		self.read(path)
 			.await?
-			.map(|old| Self::blob_refs(&old))
+			.map(|old| Self::blob_cids(&old))
 			.unwrap_or_default()
 			.into_iter()
 			.filter(|cid| !kept.contains(cid))
@@ -224,7 +248,7 @@ impl EmulatorPds {
 			.filter(|path| path.as_str().starts_with(Self::RECORDS));
 		for path in records {
 			if let Some(record) = self.read(&path).await? {
-				for cid in Self::blob_refs(&record) {
+				for cid in Self::blob_cids(&record) {
 					candidates.remove(&cid);
 				}
 			}
@@ -237,34 +261,9 @@ impl EmulatorPds {
 		released.xok()
 	}
 
-	/// Every blob `value` references, anywhere in it: the PDS retains by
-	/// structure, so a reference nested in any field counts.
-	fn blob_refs(value: &Value) -> HashSet<Cid> {
-		let mut found = HashSet::default();
-		Self::collect_blob_refs(value, &mut found);
-		found
-	}
-
-	fn collect_blob_refs(value: &Value, found: &mut HashSet<Cid>) {
-		match value {
-			Value::Map(map) => {
-				if map.get("$type").ok().and_then(|ty| ty.as_str().ok())
-					== Some(BlobRef::TYPE)
-					&& let Ok(blob) = value.clone().into_serde::<BlobRef>()
-				{
-					found.insert(blob.cid);
-				}
-				for (_, child) in map {
-					Self::collect_blob_refs(child, found);
-				}
-			}
-			Value::List(items) => {
-				for item in items {
-					Self::collect_blob_refs(item, found);
-				}
-			}
-			_ => {}
-		}
+	/// The cid of every blob `value` references.
+	fn blob_cids(value: &AtprotoValue) -> HashSet<Cid> {
+		value.blob_refs().into_iter().map(|blob| blob.cid).collect()
 	}
 }
 
@@ -332,6 +331,17 @@ mod test {
 	fn collection() -> Nsid { Nsid::new_static("com.example.card") }
 	fn rkey(key: &str) -> Rkey { Rkey::parse(key).unwrap() }
 
+	/// A fresh repo in each storage format this build can write: DAG-CBOR,
+	/// and json under `json`.
+	fn emulators() -> Vec<EmulatorPds> {
+		#[allow(unused_mut)]
+		let mut emulators = vec![EmulatorPds::temp()];
+		#[cfg(feature = "json")]
+		emulators
+			.push(EmulatorPds::temp().with_storage_format(MediaType::Json));
+		emulators
+	}
+
 	/// `value` at `key`.
 	fn record(key: &str, value: Value) -> Rkeyed<AtprotoValue> {
 		Rkeyed::new(rkey(key), value.try_into().unwrap())
@@ -343,119 +353,200 @@ mod test {
 		record(key, value!({ "image": (Value::from_serde(blob).unwrap()) }))
 	}
 
-	/// The layout is the documented one, and the cid a written record answers
-	/// is the one a read recomputes.
+	/// The layout is the documented one, the record file named for its
+	/// format, and the cid a written record answers is the one a read
+	/// recomputes.
 	#[beet_core::test]
 	async fn lays_out_records_and_blobs() {
+		for emulator in emulators() {
+			let pds = Pds::new(emulator.clone());
+			let blob = pds.upload_blob("png", MediaType::Png).await.unwrap();
+			let written = pds
+				.put_record(&collection(), card("a", &blob))
+				.await
+				.unwrap();
+			let mut paths = emulator.store().list().await.unwrap();
+			paths.sort();
+			paths.xpect_eq(vec![
+				RelPath::new(format!("blobs/{}", blob.cid)),
+				RelPath::new(format!(
+					"records/com.example.card/a.{}",
+					emulator.storage_format().extension().unwrap()
+				)),
+			]);
+			pds.get_record(&collection(), &rkey("a"))
+				.await
+				.unwrap()
+				.unwrap()
+				.strong_ref()
+				.xpect_eq(written);
+			pds.get_record(&collection(), &rkey("b"))
+				.await
+				.unwrap()
+				.xpect_none();
+		}
+	}
+
+	/// A DAG-CBOR record file is exactly the block its cid hashes, and a
+	/// float survives both formats.
+	#[beet_core::test]
+	async fn stores_the_hashed_block() {
 		let emulator = EmulatorPds::temp();
-		let pds = Pds::new(emulator.clone());
-		let blob = pds.upload_blob("png", MediaType::Png).await.unwrap();
-		let written = pds
-			.put_record(&collection(), card("a", &blob))
+		let written = Pds::new(emulator.clone())
+			.put_record(&collection(), record("a", value!({ "scale": 0.5 })))
 			.await
 			.unwrap();
-		let mut paths = emulator.store().list().await.unwrap();
-		paths.sort();
-		paths.xpect_eq(vec![
-			RelPath::new(format!("blobs/{}", blob.cid)),
-			RelPath::new("records/com.example.card/a.json"),
-		]);
+		let file = emulator
+			.store()
+			.get(&RelPath::new("records/com.example.card/a.cbor"))
+			.await
+			.unwrap();
+		Cid::new(Cid::DAG_CBOR, &file).xpect_eq(written.cid);
+		for emulator in emulators() {
+			let pds = Pds::new(emulator);
+			pds.put_record(
+				&collection(),
+				record("a", value!({ "scale": 0.5 })),
+			)
+			.await
+			.unwrap();
+			pds.get_record(&collection(), &rkey("a"))
+				.await
+				.unwrap()
+				.unwrap()
+				.value
+				.decode()
+				.xpect_eq(
+					value!({ "$type": "com.example.card", "scale": 0.5 }),
+				);
+		}
+	}
+
+	/// A json store in a build without `json` fails exactly as any json write
+	/// and read does, so a disabled format fails identically everywhere.
+	#[cfg(not(feature = "json"))]
+	#[beet_core::test]
+	async fn json_store_needs_json() {
+		let message =
+			|result: Result<()>| result.map_err(|err| err.to_string());
+		let emulator = EmulatorPds::temp().with_storage_format(MediaType::Json);
+		let pds = Pds::new(emulator.clone());
+		pds.put_record(&collection(), record("a", value!({})))
+			.await
+			.map(|_| ())
+			.xmap(message)
+			.xpect_eq(message(
+				MediaType::Json.serialize(&value!({})).map(|_| ()),
+			));
+		emulator
+			.store()
+			.insert(&RelPath::new("records/com.example.card/a.json"), "{}")
+			.await
+			.unwrap();
 		pds.get_record(&collection(), &rkey("a"))
 			.await
-			.unwrap()
-			.unwrap()
-			.strong_ref()
-			.xpect_eq(written);
-		pds.get_record(&collection(), &rkey("b"))
-			.await
-			.unwrap()
-			.xpect_none();
+			.map(|_| ())
+			.xmap(message)
+			.xpect_eq(message(
+				MediaType::Json
+					.deserialize::<AtprotoValue>(b"{}")
+					.map(|_| ()),
+			));
 	}
 
 	/// A record's `$type` is its collection, and a blob it names must exist.
 	#[beet_core::test]
 	async fn refuses_what_a_pds_refuses() {
-		let pds = Pds::temp();
-		pds.put_record(
-			&collection(),
-			record("a", value!({ "$type": "com.example.other" })),
-		)
-		.await
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("declares `$type");
-		let blob = BlobRef::of(b"never uploaded", MediaType::Png);
-		pds.put_record(&collection(), card("a", &blob))
+		for emulator in emulators() {
+			let pds = Pds::new(emulator);
+			pds.put_record(
+				&collection(),
+				record("a", value!({ "$type": "com.example.other" })),
+			)
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("never uploaded");
+			.xpect_contains("declares `$type");
+			let blob = BlobRef::of(b"never uploaded", MediaType::Png);
+			pds.put_record(&collection(), card("a", &blob))
+				.await
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("never uploaded");
+		}
 	}
 
 	/// A blob lives exactly while a current record references it.
 	#[beet_core::test]
 	async fn retains_referenced_blobs() {
-		let emulator = EmulatorPds::temp();
-		let pds = Pds::new(emulator.clone());
-		let exists = async |blob: &BlobRef| {
+		for emulator in emulators() {
+			let pds = Pds::new(emulator.clone());
+			let exists = async |blob: &BlobRef| {
+				emulator
+					.store()
+					.exists(&RelPath::new(format!("blobs/{}", blob.cid)))
+					.await
+					.unwrap()
+			};
+			let first = pds.upload_blob("one", MediaType::Png).await.unwrap();
+			let second = pds.upload_blob("two", MediaType::Png).await.unwrap();
+			// two records share the first blob
+			pds.put_record(&collection(), card("a", &first))
+				.await
+				.unwrap();
+			pds.put_record(&collection(), card("b", &first))
+				.await
+				.unwrap();
+			// replacing one keeps the blob the other still holds
+			pds.put_record(&collection(), card("a", &second))
+				.await
+				.unwrap();
+			exists(&first).await.xpect_true();
+			// deleting the last holder releases it
+			pds.delete_record(&collection(), &rkey("b")).await.unwrap();
+			exists(&first).await.xpect_false();
+			exists(&second).await.xpect_true();
+			// an upload no record takes up is swept
+			let orphan =
+				pds.upload_blob("three", MediaType::Png).await.unwrap();
 			emulator
-				.store()
-				.exists(&RelPath::new(format!("blobs/{}", blob.cid)))
+				.sweep()
 				.await
 				.unwrap()
-		};
-		let first = pds.upload_blob("one", MediaType::Png).await.unwrap();
-		let second = pds.upload_blob("two", MediaType::Png).await.unwrap();
-		// two records share the first blob
-		pds.put_record(&collection(), card("a", &first))
-			.await
-			.unwrap();
-		pds.put_record(&collection(), card("b", &first))
-			.await
-			.unwrap();
-		// replacing one keeps the blob the other still holds
-		pds.put_record(&collection(), card("a", &second))
-			.await
-			.unwrap();
-		exists(&first).await.xpect_true();
-		// deleting the last holder releases it
-		pds.delete_record(&collection(), &rkey("b")).await.unwrap();
-		exists(&first).await.xpect_false();
-		exists(&second).await.xpect_true();
-		// an upload no record takes up is swept
-		let orphan = pds.upload_blob("three", MediaType::Png).await.unwrap();
-		emulator
-			.sweep()
-			.await
-			.unwrap()
-			.xpect_eq(vec![orphan.cid.clone()]);
-		exists(&orphan).await.xpect_false();
-		exists(&second).await.xpect_true();
+				.xpect_eq(vec![orphan.cid.clone()]);
+			exists(&orphan).await.xpect_false();
+			exists(&second).await.xpect_true();
+		}
 	}
 
 	#[beet_core::test]
 	async fn lists_a_collection_in_rkey_order() {
-		let pds = Pds::temp();
-		for key in ["c", "a", "b"] {
-			pds.put_record(&collection(), record(key, value!({ "key": key })))
+		for emulator in emulators() {
+			let pds = Pds::new(emulator);
+			for key in ["c", "a", "b"] {
+				pds.put_record(
+					&collection(),
+					record(key, value!({ "key": key })),
+				)
+				.await
+				.unwrap();
+			}
+			pds.put_record(
+				&Nsid::new_static("com.example.other"),
+				record("z", value!({})),
+			)
+			.await
+			.unwrap();
+			pds.list_records(&collection())
+				.await
+				.unwrap()
+				.iter()
+				.map(|entry| entry.rkey().to_string())
+				.collect::<Vec<_>>()
+				.xpect_eq(vec!["a", "b", "c"]);
+			pds.delete_record(&collection(), &rkey("missing"))
 				.await
 				.unwrap();
 		}
-		pds.put_record(
-			&Nsid::new_static("com.example.other"),
-			record("z", value!({})),
-		)
-		.await
-		.unwrap();
-		pds.list_records(&collection())
-			.await
-			.unwrap()
-			.iter()
-			.map(|entry| entry.rkey().to_string())
-			.collect::<Vec<_>>()
-			.xpect_eq(vec!["a", "b", "c"]);
-		pds.delete_record(&collection(), &rkey("missing"))
-			.await
-			.unwrap();
 	}
 }

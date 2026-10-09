@@ -112,9 +112,9 @@ cargo run -p beet_ml   --example hello_rl_basic --features=bevy_default
 
 The `examples,ml` feature only gates windowed scene code (now scene modules in `beet_extra`, not runnable `--example` targets), so there is no self-terminating CLI smoke here. The runtime ML smoke lives in the crate (`hello_ml_basic`, section 6); this feature's compilation is covered by the skip-set check below (and is the only coverage, since `beet_extra` is excluded from the test crates).
 
-### 8. BSX scenes (`beet --main=<file>.bsx`)
+### 8. BSX scenes (`beet --entry=<file>.bsx`)
 
-The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --main=..` command in its header, and an entry that declares its hard requirements with `<RequireCfg>` fails fast on a leaner binary, naming what is missing. The self-terminating ones render and exit:
+The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --entry=..` command in its header, and an entry that declares its hard requirements with `<RequireCfg>` fails fast on a leaner binary, naming what is missing. The self-terminating ones render and exit:
 
 A documented command never carries `--features`: that is the entry's own `<RequireCfg>`'s job. The binary still has to *link* the capability though, and the demo scenes name actions from `beet_extra`, which is the `extra` cargo feature. Build the CLI once with what the set needs and run everything against it:
 
@@ -128,15 +128,15 @@ A binary without `extra` does not fail fast on these entries the way `hello_ml.b
 Beware the `ml` build specifically: it pulls `winit` and bevy_render, so every scene brings up a wgpu device and compiles compute pipelines whether or not it needs a GPU. On an NVIDIA host that intermittently segfaults inside `libnvidia-glcore` during `create_compute_pipeline`, on bevy's async compute thread, which has nothing to do with the scene. Use the `extra`-only binary for everything but the ml scene.
 
 ```sh
-beet --main=examples/hello                                       # prints "hello world"
-beet --main=examples/action/behavior_tree.bsx                    # sequence + log
-beet --main=examples/ml/hello_ml.bsx                             # logs "NearestSentence chose: ..."
-beet --main=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # result: 7
+beet --entry=examples/hello                                       # prints "hello world"
+beet --entry=examples/action/behavior_tree.bsx                    # sequence + log
+beet --entry=examples/ml/hello_ml.bsx                             # logs "NearestSentence chose: ..."
+beet --entry=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # result: 7
 ```
 
 The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_running`, `repeat_while`, `state_machine`, `utility_ai`, `scripting`, `world_script`) are also self-terminating and worth a sweep.
 
-Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --main=examples/bsx_site --server=cli` instead).
+Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead).
 
 Every scene in `examples/action/` exits 0. A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
 

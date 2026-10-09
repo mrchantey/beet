@@ -15,7 +15,7 @@ once, then run both servers (the socket and http servers both default-boot, so n
 --server flag is needed):
 
     just build-wasm-full
-    beet --main=examples/perceive_act/main-v3.bsx
+    beet --entry=examples/perceive_act/main-v3.bsx
     # for running on esp32, cd ../beet_esp and load
     beet load templates/alvik/perceive-act-body.bsx
 

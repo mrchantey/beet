@@ -1,0 +1,392 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/ycOUd6f0XRw"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://github.com/mrchantey/beet/pull/75"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 20,
+                  "byteStart": 14
+                }
+              }
+            ],
+            "plaintext": "This post and pr #75 marks the completion of the great ECS-ification. The test runner was the final crate built in the hap-hazard 'c++ style oop' and now that it has been converted the beet repo is entirely ECS."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "In celebration I'd like to dive a bit deeper into this specific refactor. Its all well and good to make grandious statements how ECS architecture is the bees knees, but these kinds of claims are best served alongside concrete examples."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Before: Separate Runtimes"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The very first thing the original runner does is fork behavior between native and wasm. These two environments are very different, for example a wasm app must first yield to the event loop in order to run async tests, and accomodating for this resulted in two completely different runtimes."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "pub fn test_runner(tests: &[&TestDescAndFn]) {\t\n\t#[cfg(target_arch = \"wasm32\")]\n\ttest_runner_wasm(tests);\n\t#[cfg(not(target_arch = \"wasm32\"))]\n\ttest_runner_native(tests);\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "After: Unified Runtime"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Bevy has already solved a lot of the cross-platform differences for us, now the test runner is a regular bevy app. This is a shift from a unique and bespoke implementation, to a standardized well trodden path, reducing bugs and maintenance costs."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "pub fn test_runner(tests: &[&TestDescAndFn]) {\n\tApp::new()\n\t\t.add_plugins(TestPlugin)\n\t\t.spawn(tests_bundle(tests))\n\t\t.run();\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Before: Abstract Traits"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Extensibility was always a goal for sweet, the original implementation was full of traits, best-effort attempts to accomodate for current and future needs. A lot of busy-work is involved in moving these strategy types around, and the traits inevitably become tangled as requirements shift."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "struct TestHarness {\n\tsuites: Vec<TestSuite>,\n\trunner: Box<dyn Runner>,\n\tcase_logger: Box<dyn CaseLogger>,\n\tsuite_logger: Box<dyn SuiteLogger>,\n}\n\nstruct TestSuite {\n\tcases: Vec<TestCase>,\n\trunner: Box<dyn Runner>,\n\tcase_logger: Box<dyn CaseLogger>,\n\tsuite_logger: Box<dyn SuiteLogger>,\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "After: Flat System Architecture"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 103,
+                  "byteStart": 86
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 293,
+                  "byteStart": 277
+                }
+              }
+            ],
+            "plaintext": "The flat architecture of ECS systems is much easier to reason about. For instance the log_case_outcomes system is right there in plain sight, no longer buried under layers of traits and indirection. This also trivializes modding, to use a parallel runner we'd just replace the run_tests_series system."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "impl Plugin for TestPlugin {\n\tfn build(&self, app: &mut App) {\n\t\tapp.add_systems(\n\t\t\t\tUpdate,\n\t\t\t\t(\n\t\t\t\t\tlog_suite_running,\n\t\t\t\t\tfilter_tests,\n\t\t\t\t\tlog_case_running,\n\t\t\t\t\t(run_tests_series, run_non_send_tests_series),\n\t\t\t\t\ttrigger_timeouts,\n\t\t\t\t\tinsert_suite_outcome,\n\t\t\t\t\tlog_case_outcomes,\n\t\t\t\t\tlog_suite_outcome,\n\t\t\t\t\texit_on_suite_outcome,\n\t\t\t\t)\n\t\t\t\t\t.chain(),\n\t\t\t);\n\t}\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Branding"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "In other news the repo has had a slight adjustment from last months rebranding:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.blockquote",
+            "plaintext": "A Malleable Application Framework"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Mostly inspired by some recent reading I've been doing:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "CodingItWrong - User-modifiable software"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#link",
+                          "uri": "https://usermodifiable.codingitwrong.com/"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 5,
+                        "byteStart": 0
+                      }
+                    }
+                  ],
+                  "plaintext": "Essay"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#link",
+                          "uri": "https://youtu.be/x-FkNd5DkOQ?si=yXyLtS1k0Cs5TpKO"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 7,
+                        "byteStart": 0
+                      }
+                    }
+                  ],
+                  "plaintext": "YouTube"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 78,
+                  "byteStart": 69
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 92,
+                  "byteStart": 83
+                }
+              }
+            ],
+            "plaintext": "This is a great breakdown on two pioneers in malleable applications: smalltalk and hypercard."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "InkAndSwitch - Malleable Software"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#link",
+                          "uri": "https://www.inkandswitch.com/essay/malleable-software/"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 5,
+                        "byteStart": 0
+                      }
+                    }
+                  ],
+                  "plaintext": "Essay"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The phrasing used in this essay is really growing on me. The term 'malleable' has this tangible quality I really like, and reflects well this idea of technology that can be bent into shape without breaking."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Maggie Appleton: Bare-foot developers"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#link",
+                          "uri": "https://maggieappleton.com/home-cooked-software"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 9,
+                        "byteStart": 0
+                      }
+                    }
+                  ],
+                  "plaintext": "Blog Post"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#link",
+                          "uri": "https://youtu.be/qo5m92-9_QI"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 7,
+                        "byteStart": 0
+                      }
+                    }
+                  ],
+                  "plaintext": "YouTube"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I think Maggie's concept of 'bare-foot developers' well articulates the semi-technical as a key audience for malleable applications."
+          }
+        }
+      ]
+    }
+  ]
+}

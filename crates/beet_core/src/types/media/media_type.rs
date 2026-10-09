@@ -33,6 +33,9 @@ pub enum MediaType {
 	Postcard,
 	/// `application/x-ron`
 	Ron,
+	/// `application/vnd.ipld.dag-cbor`, the canonical CBOR an atproto repo
+	/// stores and hashes a record as.
+	DagCbor,
 	/// `text/markdown`
 	Markdown,
 	/// `application/x-bsx` — Beet Scripting XML, the `.bsx` template format.
@@ -156,6 +159,7 @@ impl MediaType {
 	const JSON: &'static str = "application/json";
 	const POSTCARD: &'static str = "application/x-postcard";
 	const RON: &'static str = "application/x-ron";
+	const DAG_CBOR: &'static str = "application/vnd.ipld.dag-cbor";
 	const TEXT: &'static str = "text/plain";
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
@@ -244,6 +248,7 @@ impl MediaType {
 			val if val.contains(Self::JSON) => MediaType::Json,
 			val if val.contains(Self::POSTCARD) => MediaType::Postcard,
 			val if val.contains(Self::RON) => MediaType::Ron,
+			val if val.contains(Self::DAG_CBOR) => MediaType::DagCbor,
 			val if val.contains(Self::HTML) => MediaType::Html,
 			val if val.contains(Self::BSX) => MediaType::Bsx,
 			val if val.contains(Self::MARKDOWN) => MediaType::Markdown,
@@ -344,6 +349,7 @@ impl MediaType {
 			"csv" => MediaType::Csv,
 			"toml" => MediaType::Toml,
 			"ron" => MediaType::Ron,
+			"cbor" => MediaType::DagCbor,
 			"sql" => MediaType::Sql,
 			"graphql" | "gql" => MediaType::GraphQl,
 			// images
@@ -449,6 +455,7 @@ impl MediaType {
 			MediaType::Wasm => Some("wasm"),
 			MediaType::Postcard => Some("postcard"),
 			MediaType::Ron => Some("ron"),
+			MediaType::DagCbor => Some("cbor"),
 			MediaType::Protobuf => Some("proto"),
 			MediaType::MessagePack => Some("msgpack"),
 			MediaType::Shell => Some("sh"),
@@ -493,6 +500,7 @@ impl MediaType {
 			MediaType::WebManifest => Self::WEB_MANIFEST,
 			MediaType::Postcard => Self::POSTCARD,
 			MediaType::Ron => Self::RON,
+			MediaType::DagCbor => Self::DAG_CBOR,
 			MediaType::Markdown => Self::MARKDOWN,
 			MediaType::Bsx => Self::BSX,
 			MediaType::EventStream => Self::EVENT_STREAM,
@@ -551,9 +559,17 @@ impl MediaType {
 		}
 	}
 
-	/// Whether this is a serializable format (JSON or Postcard).
+	/// Whether this is a structured serde format, ie json, postcard, ron,
+	/// toml or DAG-CBOR.
 	pub fn is_serializable(&self) -> bool {
-		matches!(self, MediaType::Json | MediaType::Postcard | MediaType::Ron)
+		matches!(
+			self,
+			MediaType::Json
+				| MediaType::Postcard
+				| MediaType::Ron
+				| MediaType::Toml
+				| MediaType::DagCbor
+		)
 	}
 
 	/// Whether this is an HTTP wildcard media type (`*/*` or `text/*`).
@@ -664,10 +680,6 @@ impl core::fmt::Display for MediaType {
 		write!(formatter, "{}", self.as_str())
 	}
 }
-
-/// Deprecated alias for [`MediaType`].
-#[allow(missing_docs)]
-pub type MimeType = MediaType;
 
 #[cfg(test)]
 mod test {
@@ -838,6 +850,7 @@ mod test {
 		MediaType::from_extension("yml").xpect_eq(MediaType::Yaml);
 		MediaType::from_extension("csv").xpect_eq(MediaType::Csv);
 		MediaType::from_extension("toml").xpect_eq(MediaType::Toml);
+		MediaType::from_extension("cbor").xpect_eq(MediaType::DagCbor);
 		MediaType::from_extension("sql").xpect_eq(MediaType::Sql);
 	}
 
@@ -886,6 +899,7 @@ mod test {
 			MediaType::Yaml,
 			MediaType::Csv,
 			MediaType::Toml,
+			MediaType::DagCbor,
 			MediaType::AnsiTerm,
 		];
 		for media_type in types {

@@ -317,7 +317,7 @@ The public half goes into `<StalwartBlock ssh_public_key=..>` and the path to th
 Then:
 
 ```sh
-beet --main=infra/mail.bsx --stage=prod deploy
+beet --entry=infra/mail.bsx --stage=prod deploy
 ```
 
 Budget an hour for the first one and expect it to fail at least once. Most of that hour is the box: the AMI, the pinned release, the volume it waits for and the certificate it orders. A converged, idempotent re-deploy afterwards runs in under two minutes.
@@ -353,7 +353,7 @@ Assert all three verdicts, not any of them. A partial pass is how a broken SPF r
 Every credential in this stack is generated and never displayed, which is right, and it leaves one real gap: setting up a mail client needs the value. That is what `export-passwords` is for.
 
 ```sh
-beet --main=infra/mail.bsx --stage=prod export-passwords
+beet --entry=infra/mail.bsx --stage=prod export-passwords
 ```
 
 It composes the parameter names off the declaration rather than making you type `/acme/prod/mail-account-<localpart>-at-<domain-with-dots-as-hyphens>` from memory, which is the part that goes wrong. It lists every mailbox on every served domain plus `admin@`, the account the server itself creates when the data store is first claimed and which no declaration names. `--infra` adds the relay credentials in use and the DKIM private keys, kept behind a flag because reading a mailbox password is setting up a client while relay and signing credentials are infrastructure access.

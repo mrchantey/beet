@@ -1,0 +1,205 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/7koepBSRoUI"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 35,
+                  "byteStart": 25
+                }
+              }
+            ],
+            "plaintext": "I'm very excited for the 0.0.6-rc.3 of beet, now available."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://youtu.be/JeXOajFv8Dk"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 35,
+                  "byteStart": 11
+                }
+              }
+            ],
+            "plaintext": "In March I spoke at the bevy meetup about unifying structural representations (games, dom trees, behavior etc), since then I've only become more certain this is how I want to develop applications. One language (rust), one paradigm (bevy ecs) across the entire stack."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The biggest missing piece of this picture is the DOM so this has been my focus. I got the first implementation wrong though, thinking it would be overkill to use bevy for the web parser etc."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "js",
+            "plaintext": "// bevy as a feature\nbeet\n├── html\n└── bevy"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://discord.com/channels/691052431525675048/811674847767167027/1371290138306678795"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 96,
+                  "byteStart": 73
+                }
+              }
+            ],
+            "plaintext": "It was working but it was not beautiful and much less maintainable, so I threw down the gauntlet and made the call to rewrite the entire dom parsing system in bevy."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "js",
+            "plaintext": "// bevy as a foundation\nbevy\n└── beet\n    └── html"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "And that brings us to today, the first RC for the fullstack bevy experience with a growing list of features:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "File based routes"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Markdown & Rusty MDX"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "All the Rendering: SSR, CSR & SSG"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Client Islands"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Server Actions"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Template Scoped Styles"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Instant Template Reloading"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 70,
+                  "byteStart": 54
+                }
+              }
+            ],
+            "plaintext": "If this project is of interest come and say hi in the Beet Roomy space, and keep me in the loop if you decide to give the quickstart a go. Its difficult to do much without stepping on a proverbial rake at the moment 😅"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Happy Harvest!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Pete"
+          }
+        }
+      ]
+    }
+  ]
+}

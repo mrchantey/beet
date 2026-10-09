@@ -203,7 +203,7 @@ impl BrowserHost {
 	}
 }
 
-/// Serve the entry at `entry` within `store` as `beet --main` would: the
+/// Serve the entry at `entry` within `store` as `beet --entry` would: the
 /// entry resolved in its store, built through the plain one-shot path, its
 /// declared `<HttpServer>` booting on an OS port. The launch, read once the
 /// first server spawns: only the http server boots (a cli render would exit

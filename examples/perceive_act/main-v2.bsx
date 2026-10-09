@@ -4,7 +4,7 @@ in-process mock head as v1, but the mock body is swapped for a real wgpu body: a
 that drives off the model's `drive` command. That one client swap is the only change from
 v1. Run it; the socket server default-boots and <WgpuBody> opens the render window:
 
-    beet --main=examples/perceive_act/main-v2.bsx
+    beet --entry=examples/perceive_act/main-v2.bsx
 
 `<WgpuBody>` opens a window with the fox over a ground plane and serves `drive` by feeding
 the agent-chosen `DifferentialDrive` into the fox through the agnostic `SetDrive` leaf,

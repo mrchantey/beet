@@ -10,11 +10,11 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
 
 ## Usage
 
-    beet --main=examples/infra/lambda.bsx validate
-    beet --main=examples/infra/lambda.bsx deploy
-    beet --main=examples/infra/lambda.bsx sync
-    beet --main=examples/infra/lambda.bsx watch
-    beet --main=examples/infra/lambda.bsx destroy --force
+    beet --entry=examples/infra/lambda.bsx validate
+    beet --entry=examples/infra/lambda.bsx deploy
+    beet --entry=examples/infra/lambda.bsx sync
+    beet --entry=examples/infra/lambda.bsx watch
+    beet --entry=examples/infra/lambda.bsx destroy --force
 
 A one-shot `CliServer` root whose `CallOnReady` fires the CLI request on load, with
 the `Router` as its dispatch child. `<Stack app_name="lambda">` is the resource

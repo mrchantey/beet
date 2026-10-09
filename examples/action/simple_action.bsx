@@ -5,6 +5,6 @@ A named entity carrying the `SayHello` action, which reads the caller entity's
 `Name` off the async world and greets it, then passes. `{CallOnReady}` runs it on
 load, then exits.
 
-    beet --main=examples/action/simple_action.bsx
+    beet --entry=examples/action/simple_action.bsx
 -->
 <Name("greeter") {(SayHello, CallOnReady)}/>

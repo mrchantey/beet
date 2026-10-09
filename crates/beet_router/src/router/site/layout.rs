@@ -26,6 +26,22 @@
 //! doing, wrapping leaf-first so the root ancestor lands outermost; each
 //! instance reads the [`Layout`] of the entity that DECLARED it, never the
 //! nearest one to the route.
+//!
+//! ## Main content
+//!
+//! A site's layout marks its main content with a `<main>`, as the web does,
+//! and the `--root` render param reads it ([`RenderRoot`], whose module docs
+//! hold the cascade). Everything outside the `<main>` is chrome: the head, the
+//! header and nav, the sidebar, the footer. So `--root=main` answers the
+//! `<main>` and what a layout put inside it, while `--root=content` answers
+//! only the route content the layouts transclude.
+//!
+//! The two differ by what an inner layout adds inside `<main>`. The site's
+//! `ArticleLayout` renders `ArticleHeader` (the `<h1>` title, the byline and
+//! the companion video, all from `PageMeta`) above the post: a `main` render
+//! keeps that header, which a reader asking for the main content wants, and a
+//! `content` render leaves it out, which every syndication target wants since
+//! its record already carries the title and dates.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;

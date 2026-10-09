@@ -33,9 +33,9 @@ passphrase. Only the apply inside `deploy` authenticates, so `validate` and
    account wants; drop it from `accounts` if you only want the subdomain.
 4. Run it through the beet binary built with the handle block:
 
-       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
-       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod plan
-       cargo run -p beet-cli --features infra,extra,atproto -- --main=examples/infra/custom_handle_domain.bsx --stage=prod deploy
+       cargo run -p beet-cli --features infra,extra,atproto -- --entry=examples/infra/custom_handle_domain.bsx --stage=prod validate
+       cargo run -p beet-cli --features infra,extra,atproto -- --entry=examples/infra/custom_handle_domain.bsx --stage=prod plan
+       cargo run -p beet-cli --features infra,extra,atproto -- --entry=examples/infra/custom_handle_domain.bsx --stage=prod deploy
 
    `deploy` ends in `<AtprotoHandleProbe/>`, so it passes only once the handle
    actually resolves to the declared did through Bluesky's own resolver, which

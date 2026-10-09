@@ -168,9 +168,9 @@ async fn response_to_lambda(
 	let lambda_body = if bytes.is_empty() {
 		lambda_http::Body::Empty
 	} else {
-		match String::from_utf8(bytes.to_vec()) {
+		match String::from_utf8(Vec::from(bytes)) {
 			Ok(text) => lambda_http::Body::Text(text),
-			Err(_) => lambda_http::Body::Binary(bytes.to_vec()),
+			Err(err) => lambda_http::Body::Binary(err.into_bytes()),
 		}
 	};
 	let http_parts = parts.try_into()?;

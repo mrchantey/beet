@@ -62,13 +62,18 @@ sockets = ["action", "dep:sha1", "dep:base64"]
 # json is the newline-delimited payload of analytics segments and daily
 # archives; zstd is the codec every JSONL object is written under, the C library
 # natively and the pure-rust `ruzstd` on wasm, each through its target table below.
-json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "dep:serde_ipld_dagcbor", "dep:ipld-core", "beet_core/json", "beet_action?/json"]
+json = ["serde", "dep:serde_json", "dep:zstd", "dep:ruzstd", "beet_core/json", "beet_action?/json"]
+# The `atproto` module's data model half: the `Pds` family, `EmulatorPds`, the
+# converge and the `<AtprotoAccount/>` declaration, every record crossing
+# through `MediaType::DagCbor`. No network.
+dag_cbor = ["serde", "beet_core/dag_cbor"]
 # The network half of the `atproto` module: `XrpcPds`, the `AtprotoAuth`
 # credential seam, did and handle resolution, the account attach that lands an
 # account's repo, and the Bluesky record shapes beet writes. The `Pds` family
-# itself (`EmulatorPds`, the converge, the account declaration) rides `json`,
-# since the data model needs no network. `rand` mints a TID.
-atproto = ["std", "json", "beet_core/rand"]
+# itself (`EmulatorPds`, the converge, the account declaration) rides
+# `dag_cbor`, since the data model needs no network; `json` is the wire. `rand`
+# mints a TID.
+atproto = ["std", "json", "dag_cbor", "beet_core/rand"]
 # The `SqliteStore` backend: real SQL tables behind the erased `TableStore`,
 # rows written as canonical json (hence `json`). Every target: rusqlite swaps
 # its ffi for `sqlite-wasm-rs` on wasm (see the workspace manifest). `blocking`
@@ -251,9 +256,6 @@ md-5.workspace = true
 flate2 = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
-# a record's canonical DAG-CBOR, the encoding its cid is computed over
-serde_ipld_dagcbor = { workspace = true, optional = true }
-ipld-core = { workspace = true, optional = true }
 serde_urlencoded = { version = "0.7", optional = true }
 postcard = { workspace = true, optional = true }
 # the terminal qr print behind `vault backup --qr`

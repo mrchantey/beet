@@ -8,5 +8,5 @@ only reads the page loads nothing. A returning editor, whose local fork the
 served page cannot show, boots at once behind a hidden body until it paints.
 -->
 <AppShell>
-	<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="scene_editor.bsx" server="dom" boot="intent" slot="head"/>
+	<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot="intent" slot="head"/>
 </AppShell>

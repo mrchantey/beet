@@ -112,7 +112,7 @@ impl FeedChannel {
 		for page in FeedItem::entries(scope, self.limit) {
 			let content = match self.full_content {
 				true => {
-					PageContent::render(world, scope.router, &page.path).await
+					scope.render_content(world, page, MediaType::Html).await
 				}
 				false => None,
 			};
@@ -136,8 +136,8 @@ struct FeedItem {
 	/// The byline: RSS gives an item one `<author>`, so several authors share
 	/// it.
 	author: Option<String>,
-	/// The page's rendered article markup, absent when the page failed to
-	/// render (see [`PageContent::render`]).
+	/// The page's own content as markup, absent when the page failed to
+	/// render (see [`SyndicationScope::render_content`]).
 	content: Option<String>,
 }
 
@@ -170,7 +170,7 @@ impl FeedItem {
 	fn new(
 		scope: &SyndicationScope,
 		page: &SyndicationPage,
-		content: Option<PageContent>,
+		content: Option<String>,
 	) -> Result<Self> {
 		Self {
 			title: page
@@ -188,7 +188,7 @@ impl FeedItem {
 				.format_rfc2822(),
 			description: page.meta.description.clone(),
 			author: page.meta.byline(),
-			content: content.map(|content| content.html),
+			content,
 		}
 		.xok()
 	}

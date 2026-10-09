@@ -1,5 +1,5 @@
-//! The [`MediaRenderer`] will select the best renderer based on a
-//! list of accepted [`MediaType`]. Use cli args to specify the output
+//! [`RenderTargets`] selects the render target for a list of accepted
+//! [`MediaType`]. Use cli args to specify the output
 //!
 //! With the `markdown` feature the markdown is parsed into structured
 //! nodes; without it the [`MediaParser`] falls back to plain text.
@@ -15,7 +15,7 @@
 use beet::prelude::*;
 
 fn main() {
-	let mut world = World::new();
+	let mut world = RenderPlugin.into_world();
 	let mut entity = world.spawn_empty();
 	let md_bytes = MediaBytes::new_markdown(MARKDOWN);
 
@@ -33,10 +33,15 @@ fn main() {
 		.unwrap_or(MediaType::AnsiTerm);
 
 	// 3. Render to the requested media type
-	let output = MediaRenderer::default()
-		.run(&mut entity, vec![media_type])
-		.unwrap()
-		.to_string();
+	let entity = entity.id();
+	let output = RenderTargets::render_negotiated(
+		&mut world,
+		entity,
+		&[media_type],
+		&MediaType::Markdown,
+	)
+	.unwrap()
+	.to_string();
 	cross_log!("{output}");
 }
 

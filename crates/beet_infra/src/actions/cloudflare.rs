@@ -618,7 +618,7 @@ impl CloudflareR2Sync {
 /// nothing, so a deploy only ever adds and replaces. Shared by
 /// [`CloudflareR2Sync`] and [`CloudflareBench`].
 ///
-/// `local_dir` is resolved relative to the cwd (like `--main`), not the
+/// `local_dir` is resolved relative to the cwd (like `--entry`), not the
 /// workspace: the site is the user's, and a deploy `.bsx` may be run from a
 /// different repo than the beet workspace that holds the Worker source.
 ///

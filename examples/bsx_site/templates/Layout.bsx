@@ -13,6 +13,6 @@ its event scripts (`routes/counter.bsx`) run on click.
 -->
 <SiteLayout>
 	<LiveReloadScript slot="head"/>
-	<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" main="main.bsx" server="dom" slot="head"/>
+	<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="main.bsx" server="dom" slot="head"/>
 	<RouteSidebar home=false exclude={["export"]} slot="sidebar"/>
 </SiteLayout>

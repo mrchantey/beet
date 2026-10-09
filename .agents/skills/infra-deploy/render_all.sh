@@ -21,14 +21,14 @@ run() { # run <dump-name> <target-dir> <args...>
 	fi
 }
 
-run beet-site.dev.main.tf.json beet-site --main=site validate
-run beet-site.prod.main.tf.json beet-site --main=site validate --stage=prod
-run mail-example.main.tf.json mail-example --main=examples/infra/mail.bsx validate
-run lambda.main.tf.json lambda --main=examples/infra/lambda.bsx validate
-run fargate.main.tf.json fargate --main=examples/infra/fargate.bsx validate
-run lightsail.main.tf.json lightsail --main=examples/infra/lightsail.bsx validate
-run bucket-example.main.tf.json bucket-example --main=examples/infra/bucket.bsx validate
-run ssh-site.main.tf.json ssh-site --main=examples/infra/ssh_site.bsx validate
+run beet-site.dev.main.tf.json beet-site --entry=site validate
+run beet-site.prod.main.tf.json beet-site --entry=site validate --stage=prod
+run mail-example.main.tf.json mail-example --entry=examples/infra/mail.bsx validate
+run lambda.main.tf.json lambda --entry=examples/infra/lambda.bsx validate
+run fargate.main.tf.json fargate --entry=examples/infra/fargate.bsx validate
+run lightsail.main.tf.json lightsail --entry=examples/infra/lightsail.bsx validate
+run bucket-example.main.tf.json bucket-example --entry=examples/infra/bucket.bsx validate
+run ssh-site.main.tf.json ssh-site --entry=examples/infra/ssh_site.bsx validate
 
 [ -n "$baseline" ] || { echo "dumped to $out (no baseline given, nothing diffed)"; exit 0; }
 

@@ -1,15 +1,23 @@
-use super::string_primitive;
+//! [`Uri`], an absolute uri held exactly as written.
+//!
+//! Beside [`Url`], and the one rule between them: **a field you store or
+//! compare is a `Uri`, a request you send is a `Url`.** A `Url` is the parsed
+//! form a request is routed and sent by, lowercasing its scheme, re-encoding
+//! its query and reading every authority as a host and port, so a value read
+//! through one and written back can differ from what was read. A record field,
+//! a canonical address or anything hashed must read back byte for byte, which
+//! a `Uri` does; [`to_url`](Uri::to_url) is the parsed view for the moment a
+//! request is sent.
+use crate::atproto::string_primitive;
 use crate::prelude::*;
 
-/// The lexicon's `uri` string format: any absolute uri, a publication's
-/// `https://beet.org/blog` or a record's `at://did:plc:../<collection>/<rkey>`,
-/// held exactly as written.
+/// Any absolute uri, a publication's `https://beet.org/blog` or a record's
+/// `at://did:plc:../<collection>/<rkey>`, held exactly as written: the
+/// lexicon `uri` string format. See the [module docs](self) for when to reach
+/// for it over a [`Url`].
 ///
-/// Verbatim rather than a [`Url`], because a record field must read back
-/// byte for byte: a `Url` is the parsed form a request sends, lowercasing its
-/// scheme and re-encoding its query, so a foreign record read through one and
-/// written back would change its cid. [`at_uri`](Self::at_uri) and
-/// [`to_url`](Self::to_url) are the typed views.
+/// [`to_url`](Self::to_url) is the parsed view a request sends, and the
+/// atproto view is [`at_uri`](Self::at_uri).
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -17,8 +25,11 @@ use crate::prelude::*;
 /// 	"at://did:plc:vgxy56shhs3t3b2mu2avizjf/site.standard.publication/3mw72aaeuj22n",
 /// )
 /// .unwrap();
+/// site.scheme().xpect_eq("at");
 /// site.at_uri().unwrap().rkey().as_str().xpect_eq("3mw72aaeuj22n");
-/// Uri::parse("https://beet.org/blog").unwrap().at_uri().xpect_none();
+/// let blog = Uri::parse("https://beet.org/blog").unwrap();
+/// blog.at_uri().xpect_none();
+/// blog.to_url().unwrap().path().xpect_eq(&["blog"]);
 /// Uri::parse("beet.org").unwrap_err();
 /// ```
 #[derive(
@@ -27,12 +38,12 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
-pub struct Uri(SmolStr);
+pub struct Uri(pub(crate) SmolStr);
 
 string_primitive!(Uri);
 
 impl Uri {
-	/// The longest uri the protocol allows.
+	/// The longest uri the atproto lexicons allow, and the longest this holds.
 	pub const MAX_LEN: usize = 8192;
 
 	/// Parse an absolute uri: a scheme of a letter then letters, digits, `+`,
@@ -58,25 +69,13 @@ impl Uri {
 		Self(SmolStr::new(text)).xok()
 	}
 
-	/// The scheme, ie `https`, `at`.
+	/// The scheme as written, ie `https`, `at`.
 	pub fn scheme(&self) -> &str {
 		self.0.split(':').next().unwrap_or_default()
 	}
 
-	/// The record this uri addresses, when it is an `at://` record address.
-	pub fn at_uri(&self) -> Option<AtUri> {
-		self.0
-			.starts_with(AtUri::SCHEME)
-			.then(|| AtUri::parse(&self.0).ok())
-			.flatten()
-	}
-
 	/// The parsed url a request sends.
 	pub fn to_url(&self) -> Result<Url> { Url::parse(&self.0) }
-}
-
-impl From<AtUri> for Uri {
-	fn from(uri: AtUri) -> Self { Self(uri.into()) }
 }
 
 #[cfg(test)]

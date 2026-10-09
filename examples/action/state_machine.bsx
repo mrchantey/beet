@@ -8,7 +8,7 @@ wire the jumps as forward references, so the graph reads top to bottom.
 
     state1 -> transition -> state2
 
-    beet --main=examples/action/state_machine.bsx
+    beet --entry=examples/action/state_machine.bsx
 -->
 <Name("state1") {(StateAction, GoTo($transition), CallOnReady)}>
 	<Name("transition") bx:ref="transition" {(StateAction, GoTo($state2))}/>

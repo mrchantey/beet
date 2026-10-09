@@ -24,17 +24,17 @@ positional route arg selects the command, and the command resolves and the proce
 
 Serving a site is NOT a command here. A site entry is its own CLI, so it is
 launched directly and names its own verb, exactly as its deploy verbs are
-(`--main` takes a directory holding an entry document, or the entry file itself):
+(`--entry` takes a directory holding an entry document, or the entry file itself):
 
-    beet --main=site serve --server=http       # the beet website (site/main.bsx)
-    beet --main=site serve --server=tui        # ..as a live terminal
-    beet --main=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
-    beet --main=examples/bsx_site --server=http   # a zero-code BSX site, whose root IS the server
+    beet --entry=site serve --server=http       # the beet website (site/main.bsx)
+    beet --entry=site serve --server=tui        # ..as a live terminal
+    beet --entry=site serve --server=http,ssh   # ..http plus a multi-tenant ssh terminal
+    beet --entry=examples/bsx_site --server=http   # a zero-code BSX site, whose root IS the server
 
 That is the identical path the deployed box takes (`app --repo=s3://.. serve`),
 and it is why the site's resources and deploy verbs live in `site/main.bsx`: the
 application that runs on them is the thing that declares them (`just beet-deploy`
-runs `beet --main=site deploy`).
+runs `beet --entry=site deploy`).
 
 What lives here is this WORKSPACE's own shared asset bucket
 (`beet--shared--assets`), the source of record for the files too large for git

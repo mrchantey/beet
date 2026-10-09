@@ -98,7 +98,12 @@ fn on_add(mut world: DeferredWorld, cx: HookContext) {
 
 /// Bind `page` to `navigator`'s surface (its [`PageHost`], resolved
 /// structurally), reclaiming the page if it has none.
-fn bind_or_reclaim(world: &mut World, navigator: Entity, page: Entity) {
+fn bind_or_reclaim(
+	world: &mut World,
+	navigator: Entity,
+	page: impl Into<SurfacePage>,
+) {
+	let page = page.into();
 	match PageHost::of(world, navigator) {
 		Some(host) => bind_surface_page(world, host, page),
 		None => {
@@ -108,7 +113,7 @@ fn bind_or_reclaim(world: &mut World, navigator: Entity, page: Entity) {
 			if world.get_entity(navigator).is_ok() {
 				error!("navigator {navigator} has no page host to render into");
 			}
-			despawn_page_ephemerals(world, page, None);
+			despawn_page_ephemerals(world, page.page, None);
 		}
 	}
 }
@@ -507,14 +512,14 @@ impl OpeningRoute {
 	/// The opening route from the start request, relative to the server's own url
 	/// space.
 	///
-	/// An explicit `--path` wins (eg `beet --main=<dir> serve --server=tui
+	/// An explicit `--path` wins (eg `beet --entry=<dir> serve --server=tui
 	/// --path=docs/form`). Otherwise a mounted server opens at its home: a server
 	/// under a command route (`<Route path="serve" {TuiServer}>`) is *addressed*
 	/// by that path, which is no route in the url space its `Router` child
 	/// serves, and dispatch requires an exact pattern match, so the boot path
 	/// never carries anything past the mount. An unmounted server roots its own
 	/// url space, the one place address and page coincide, so a compiled
-	/// binary's own args open the page they name (`beet --main=chat.bsx
+	/// binary's own args open the page they name (`beet --entry=chat.bsx
 	/// docs/form`).
 	pub fn from_parts(parts: &RequestParts, mounted: bool) -> Result<Self> {
 		// an opening route addresses a page in the server's url space, so it is
@@ -545,7 +550,7 @@ mod test {
 	/// home; an unmounted server roots its own url space, so its args name the
 	/// page.
 	///
-	/// Regression: `beet --main=site serve --server=tui` and every deployed ssh session
+	/// Regression: `beet --entry=site serve --server=tui` and every deployed ssh session
 	/// (`app --repo=.. --server=ssh serve`) opened on a "no route matched
 	/// /serve" error page, because the whole request path became the opening
 	/// route.
@@ -566,7 +571,7 @@ mod test {
 	}
 
 	/// An explicit `--path` is the opening route mounted or not, so
-	/// `beet --main=site serve --server=tui --path=docs/form` lands there.
+	/// `beet --entry=site serve --server=tui --path=docs/form` lands there.
 	#[beet_core::test]
 	fn opening_route_prefers_the_path_param() {
 		use beet_net::prelude::*;

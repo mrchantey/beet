@@ -4,17 +4,19 @@
 //! A regular `exchange_route` returns an `IntoResponseWithRequestParts` (JSON, a redirect,
 //! bytes) already in final form. A *scene route* instead yields the [`Entity`]
 //! root of a tree (an rsx/markdown/parsed document, a behavior tree, …)
-//! carrying a [`PageRoot`]; a `NodeRenderer` walks [`PageRoot::rendered`]
-//! and serializes it per the request's `Accept` header (HTML, markdown,
-//! charcell, …), then despawns the [`DespawnAfterRender`] entities.
+//! carrying a [`PageRoot`]. [`PageRoot::prepare`] runs its render middleware
+//! (the layouts) and resolves the `--root` cascade ([`RenderRoot`]) into a
+//! [`LivePage`], which renders through the `RenderTargets` registry as the
+//! request's `Accept` negotiates (HTML, markdown, charcell, …) or as a caller
+//! names, and is then released, its [`DespawnAfterRender`] entities despawned.
 //!
 //! Handlers produce a content [`Bundle`]; the [`render_action`] constructors
 //! build a complete route from a path + handler:
 //! [`render_action::fixed_func_route`] (static, per request), and
 //! [`render_action::pure_route`] / [`render_action::async_route`] /
-//! [`render_action::system_route`] (per handler kind). The tree is serialized
-//! by [`default_renderer`]. [`FixedPage`] is the persistent exception: its route
-//! entity *is* the render root, so one live tree serves every request.
+//! [`render_action::system_route`] (per handler kind). [`FixedPage`] is the
+//! persistent exception: its route entity *is* the render root, so one live
+//! tree serves every request.
 
 mod page_root;
 pub use page_root::*;
@@ -37,9 +39,15 @@ pub use data_page::*;
 // served request after request.
 mod fixed_page;
 pub use fixed_page::*;
-mod default_renderer;
 pub mod render_action;
-pub use default_renderer::*;
+// the `--root` render param and the cascade it resolves through
+mod render_root;
+pub use render_root::*;
+// the sources a render target embeds, fetched onto the tree before it renders
+mod media_resolve;
+#[cfg(test)]
+pub(crate) use media_resolve::test_fixtures::*;
+pub use media_resolve::*;
 mod route_query;
 pub use route_query::*;
 // reactive template registration: a `<TemplateDir src="templates"/>` reads its

@@ -126,7 +126,7 @@ async fn read_scene_blob(
 			})
 		})
 		.await??;
-	store.insert(&path, fork.take().1).await
+	store.insert(&path, fork).await
 }
 
 /// Write each edited scene document back to its store.
@@ -176,7 +176,7 @@ async fn write_scene_blob(
 			SceneDocument::to_bytes(&registry, &document.0, media_type)
 		})
 		.await??;
-	blob.insert(bytes.take().1).await
+	blob.insert(bytes).await
 }
 
 #[cfg(test)]

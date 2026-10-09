@@ -231,7 +231,7 @@ async fn http_server_declarable_in_markup() {
 #[derive(Component)]
 struct ServerStarted;
 
-/// Regression (`beet --main=site serve` bound the http server twice, the second bind
+/// Regression (`beet --entry=site serve` bound the http server twice, the second bind
 /// failing with "address already in use" and orphaning the live listener's
 /// teardown): the site shape is a dispatcher root whose served site hangs off a
 /// `serve` route, and a server no longer drags a load verb in with it, so the

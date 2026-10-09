@@ -1,8 +1,8 @@
 <!--
 A page that edits itself. Run it through the one binary:
 
-    beet --main=examples/ui/scene_editor.bsx                # the terminal, and the site
-    beet --main=examples/ui/scene_editor.bsx --server=http  # the site alone
+    beet --entry=examples/ui/scene_editor.bsx                # the terminal, and the site
+    beet --entry=examples/ui/scene_editor.bsx --server=http  # the site alone
 
 The same entry serves itself and boots in the tab: `<ServeBlobs>` publishes
 this directory at `/repo`, the served page's `<Wasm/>` (`templates/EditorShell.bsx`)

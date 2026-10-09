@@ -45,7 +45,7 @@ pub struct CliServer {
 	/// A site's default `CliServer` only acts when `--server` selects `cli`, so
 	/// `--server=http` serves http rather than streaming once to stdout. A
 	/// command-dispatcher root sets this, because `--server` names the transports
-	/// of whichever route it dispatches INTO, never its own: `beet --main=site
+	/// of whichever route it dispatches INTO, never its own: `beet --entry=site
 	/// serve --server=http` has to reach the `serve` route before the `http`
 	/// selection means anything, so the dispatch itself cannot be subject to it.
 	pub always: bool,

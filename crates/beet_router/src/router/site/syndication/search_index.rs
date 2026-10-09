@@ -60,11 +60,16 @@ struct SearchEntry {
 	created: Option<String>,
 	/// The page's rendered prose, which is what makes this a FULL-text index
 	/// rather than a list of titles. Absent when the page failed to render (see
-	/// [`PageContent::render`]).
+	/// [`SyndicationScope::render_content`]).
 	body: Option<String>,
 }
 
 impl SearchEntry {
+	/// How much plain text one page contributes to a search index. Client-side
+	/// search matches on the opening prose in practice, and the index is
+	/// fetched whole by every visitor, so the tail is cost without benefit.
+	const TEXT_LIMIT: usize = 8 * 1024;
+
 	/// The entries for every page in `scope`, in route-tree order, each
 	/// rendered in-process for its body text.
 	///
@@ -78,15 +83,17 @@ impl SearchEntry {
 		let started = Instant::now();
 		let mut entries = Vec::with_capacity(scope.pages.len());
 		for page in &scope.pages {
-			let content =
-				PageContent::render(world, scope.router, &page.path).await;
+			let body = scope
+				.render_content(world, page, MediaType::Text)
+				.await
+				.map(|text| Self::reduce(&text));
 			entries.push(Self {
 				url: scope.url(&page.path)?,
 				title: page.meta.title.clone(),
 				description: page.meta.description.clone(),
 				authors: page.meta.authors.clone(),
 				created: page.meta.created.map(|created| created.to_string()),
-				body: content.map(|content| content.text()),
+				body,
 			});
 		}
 		debug!(
@@ -97,6 +104,21 @@ impl SearchEntry {
 		Value::new_list(entries.iter().map(Self::to_value))
 			.to_json_string()
 			.xok()
+	}
+
+	/// A page's plain text as an index carries it: whitespace collapsed to
+	/// single spaces and capped at [`TEXT_LIMIT`](Self::TEXT_LIMIT), cut at a
+	/// char boundary so a multi-byte glyph is never split down the middle.
+	fn reduce(text: &str) -> String {
+		let mut text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+		if text.len() > Self::TEXT_LIMIT {
+			let end = (0..=Self::TEXT_LIMIT)
+				.rev()
+				.find(|index| text.is_char_boundary(*index))
+				.unwrap_or_default();
+			text.truncate(end);
+		}
+		text
 	}
 
 	/// This entry as a json object. An unauthored field is left OUT rather than
@@ -131,9 +153,18 @@ impl SearchEntry {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_core::prelude::*;
-	use beet_net::prelude::*;
+	use super::*;
+
+	/// The reduction keeps the prose, whitespace collapsed, and caps it at a
+	/// char boundary.
+	#[beet_core::test]
+	fn reduces_the_text() {
+		SearchEntry::reduce("Hello &\n\n  welcome\tto\nthe garden\n")
+			.xpect_eq("Hello & welcome to the garden".to_string());
+		let reduced = SearchEntry::reduce(&"é".repeat(SearchEntry::TEXT_LIMIT));
+		reduced.len().xpect_eq(SearchEntry::TEXT_LIMIT);
+		reduced.chars().all(|char| char == 'é').xpect_true();
+	}
 
 	#[beet_core::test]
 	async fn indexes_public_pages() {

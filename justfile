@@ -56,7 +56,7 @@ init-repo:
 #💡 CLI
 
 # Run a beet cli command (scene/site/server) with no install step, eg
-#   just beet --main=examples/spatial/seek_3d.bsx
+#   just beet --entry=examples/spatial/seek_3d.bsx
 # `--features winit` links winit/wgpu + the example scene templates; the binary
 # resolves the assets dir from the workspace root itself (see `winit_default_plugins`),
 # so no `BEVY_ASSET_ROOT` is needed. Add `,ml` to run an ml scene (eg `fetch.bsx`).
@@ -69,38 +69,38 @@ beet *args:
 # (default dev). Lean headless build (no winit/ml); tofu, aws and s3 all run
 # as the deployer pair `secrets.toml` seals, since the machine holds no ambient
 # AWS credential.
-# `--main=site`: the SITE entry declares its own resources and deploy verbs, so
+# `--entry=site`: the SITE entry declares its own resources and deploy verbs, so
 # the application that runs on them is the thing that provisions them.
 # `infra,extra` links the deploy blocks and the IaC verb routes. Without them the
 # entry still loads whole, with the deploy tags inert: the stack's
 # `RequireFeatures(["infra","extra"])` then fails the dispatch naming them.
 beet-deploy *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site deploy {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site deploy {{ args }}
 # Re-publish the site to S3 without a redeploy (site assets: `site-shared push`).
 beet-sync *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site sync {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site sync {{ args }}
 # Tail the deployed instance's logs.
 beet-watch *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site watch {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site watch {{ args }}
 # Refresh the files site/assets borrows from the workspace tree (the wasm binary,
 # the geoip database, the robot faces). Runs ahead of every publish anyway.
 beet-assets *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site assets {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site assets {{ args }}
 # Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:
 # the `shared` stage (the assets bucket) has its own verbs under `site-shared`.
 beet-destroy *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site destroy --force {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site destroy --force {{ args }}
 # Resolve the deploy config without touching cloud (safe pre-apply check).
 beet-validate *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site validate {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site validate {{ args }}
 # Show the tofu plan without applying (eyeball before deploy).
 beet-plan *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site plan {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site plan {{ args }}
 # Re-encrypt the stage stack's state under the current `TF_STATE_PASSPHRASE`
 # (the record's roll note has the surrounding steps); the shared and social
 # stacks take the same verb as args: `just site-shared roll-state`.
 beet-roll-state *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site roll-state {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site roll-state {{ args }}
 # The WORKSPACE assets bucket (`beet--shared--assets`), the source of record for
 # ./assets: `just beet-shared plan|apply|pull|push|..`. Rooted at the workspace
 # entry, since these assets belong to the repo rather than to the website.
@@ -109,18 +109,18 @@ beet-shared *args:
 # The SITE assets bucket (`beet-site--shared--assets`), the source of record for
 # ./site/assets: `just site-shared plan|apply|pull|push|..`.
 site-shared *args:
-  cargo run -p beet-cli --features infra,extra -- --main=site shared {{ args }}
+  cargo run -p beet-cli --features infra,extra -- --entry=site shared {{ args }}
 # The atproto handles under beet.org (the site entry's `social` stack):
 # `just site-social plan|deploy|probe|destroy --stage=prod`. Prod only: the
 # block's `dns_stage` publishes nothing from any other stage. `atproto` with
 # `infra` links the block.
 site-social *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --main=site social {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social {{ args }}
 # Diff the beet.org zone against every stack the site entry declares, reporting
 # the strays; `--fix` deletes them. Built with `atproto` so the handle records
 # are declarations rather than strays.
 site-audit *args:
-  cargo run -p beet-cli --features infra,extra,atproto -- --main=site audit {{ args }}
+  cargo run -p beet-cli --features infra,extra,atproto -- --entry=site audit {{ args }}
 # There is no mint recipe: the deploy credentials (`<AwsDeployer/>`,
 # `<CloudflareDeployToken/>`) are kept in line with the declarations by an
 # elevated deploy. Any deploy recipe above takes `--elevated`, which asks for the
@@ -374,7 +374,7 @@ check-wasm-render *args:
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
 # Headless-chrome verification of the browser bootstrap: serves the built
-# artifacts at pages naming an entry through `<Wasm repo main>` and reads from
+# artifacts at pages naming an entry through `<Wasm repo entry>` and reads from
 # the console that the entry resolved through the http repo and ran, headless
 # (beet-min.wasm on the `serve-wasm` hello entry) and under `--server=dom`
 # (beet-ui.wasm on the scene editor entry, its DOM host painting `/`). Needs
@@ -459,18 +459,18 @@ build-wasm-render:
 # stale in site/assets (the tutorial page serves it from there).
 build-wasm-full:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
-	beet --main=site assets
+	beet --entry=site assets
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet entry (examples/wasm/hello.bsx) in the browser, read out
-# of the served repo through the page's `<Wasm repo main>` launch; its console
+# of the served repo through the page's `<Wasm repo entry>` launch; its console
 # output renders on the page via <RenderConsole>. The entry roots at the
 # workspace (<RepoRoot>) so the served examples are reachable and --watch
 # live-reloads on edit. Its /scripting page mounts the full binary, so run
 # `just build-wasm-full` once to serve that page too.
 serve-wasm *args:
 	just build-wasm-min
-	beet --main=examples/wasm --watch {{ args }}
+	beet --entry=examples/wasm --watch {{ args }}
 
 clear-rust-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer

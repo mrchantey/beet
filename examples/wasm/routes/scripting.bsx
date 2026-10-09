@@ -30,5 +30,5 @@ which entry it names.
 		more.
 	</p>
 	<RenderConsole/>
-	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/action" main="scripting.bsx"/>
+	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/action" entry="scripting.bsx"/>
 </HtmlDocument>

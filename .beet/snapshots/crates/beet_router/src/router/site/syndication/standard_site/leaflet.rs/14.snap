@@ -1,0 +1,248 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 449,
+                  "byteStart": 427
+                }
+              }
+            ],
+            "plaintext": "I'm a malleable software nerd, I love thinking about applications and how we can improve them from first principles. DWeb Camp '26 was my first opportunity to talk to people who do the same at the protocol layer. It was also the first time I heard Brewster Kahle eccentrically yell on stage that we are \"Locking the web open!\" and in that moment something clicked for me, the application layer is only half the battle, its the whole damn system man!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://projectweave.tech/"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 92,
+                  "byteStart": 79
+                }
+              }
+            ],
+            "plaintext": "Later that day I was introduced to Kevin Triplett who explained that while the Project Weave protocol standards are reaching maturity, the picture is incomplete without malleable application standards. It feels like we're builing two sides of the same coin."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "ATProto is swappable"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "In this post I am using ATProto as an example but a similar reasoning can be applied to other open protocols like Matrix or ActivityPub. The ATProto data storage, feed generators and client apps can all be seamlessly swapped out for another, but this is not to say that the components themselves are easily modified. Whether I am using BlueSky, BlackSky or any other service, the provided feed generators and client apps are black boxes exposing a handful of knobs determined by product designers with specific use-cases in mind. Adding a button or filter means forking, modifying and deploying an entire new instance of that component."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://mashable.com/article/bluesky-announces-attie-ai-app-for-custom-feeds"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 32,
+                  "byteStart": 17
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://blackskyweb.xyz/introducing-acorn-community-infrastructure-that-grows-with-you/"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 61,
+                  "byteStart": 46
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://www.inkandswitch.com/essay/malleable-software/#ai-assisted-coding"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 303,
+                  "byteStart": 279
+                }
+              }
+            ],
+            "plaintext": "In March BlueSky announced Attie and BlackSky announced Acorn, both offering customizability not available in the vanilla clients and algorithms. While on the surface these appear to be malleable solutions, code is a brittle instrument even when AI generated, as outlined in the malleable software essay. To me the deepest issues with code-first approaches are composability and security, each program is itself a silo and a challenge to sandbox. We need more powerful abstractions."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Data, not code"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://youtu.be/eRpMQhOR93U?si=-elrJ5NFsi2FZ0Bw"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 56,
+                  "byteStart": 18
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 91,
+                  "byteStart": 78
+                }
+              }
+            ],
+            "plaintext": "After DWeb Camp I presented Beet at Local-First Conf '26, demonstrating how a single binary can be used to run a game, a web app, an infra deploy, an AI agent and a robot, all without scripting. This can only be done with data-driven software, the code simply offers a collection of systems ready to operate on the serialized data it is provided."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The most powerful form of data-driven software I have encounted is the scene graph used by Entity Component System frameworks. ECS is conceptually a very simple architecture, and so is its serialized representation."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "json",
+            "plaintext": "{\n\t\"0\": { \n\t\t\"org.beet.Button\": {},\n\t\t\"org.beet.RunScript\": \"console.log(\\\"hello world!\\\")\" \n\t},\n\t\"1\": { \n\t\t\"org.bevy.ChildOf\": \"0\",\n\t\t\"org.bevy.Text\": \"Click Me!\"\n\t}\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Scripting is still supported, but now sandboxed via QuickJS with fine-grained control over capabilities as opposed to coarser techniques like iframes and web workers. It also has the added benefit of being highly portable, using the same runtime in native, browser and even microcontroller environments."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Locked open applications"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 177,
+                  "byteStart": 164
+                }
+              }
+            ],
+            "plaintext": "The good news is that nothing needs to change at the protocol layer to add malleability. We can already build clients and feed generators capable of interpreting a scene lexicon, and running user provided scenes in a safe and composable manner."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Malleable ATProto components are just the beginning. With this fine grained control we can write clients that interpret posts defined as scenes, sharing widgets and games just as we share text and video. And, as Thomas Kelly proposes, for even more powerful customization users could share pluggable wasm modules to execute some or all of that behavior!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Its early days but perhaps once these ideas are proven out we could discuss a standardized format for locked open malleable software, I think interoperability would be a great benefit for the ecosystem."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://beet.org"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 79,
+                  "byteStart": 75
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 125,
+                  "byteStart": 109
+                }
+              }
+            ],
+            "plaintext": "This is the area that I am building in, if it sounds of interest check out beet or come and say hello in the Beet Roomy space."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-//! Fetch a URL and render it in the terminal using [`MediaRenderer`].
+//! Fetch a URL and render it in the terminal through [`RenderTargets`].
 //!
-//! Combines the HTTP client with [`MediaParser`] and [`MediaRenderer`]
+//! Combines the HTTP client with [`MediaParser`] and [`RenderTargets`]
 //! to load remote content into ECS, then render it with the chosen
 //! media type. The `content-type` response header is used to select
 //! the parser automatically via [`MediaParser`].
@@ -23,7 +23,7 @@ use beet::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins((MinimalPlugins, AsyncPlugin::default()))
+		.add_plugins((MinimalPlugins, AsyncPlugin::default(), RenderPlugin))
 		.add_systems(Startup, fetch_and_render)
 		.run();
 }
@@ -67,11 +67,15 @@ fn fetch_and_render(async_commands: AsyncCommands) {
 					.unwrap();
 
 				// 3. Render to the requested media type
-				#[allow(unused)]
-				let output = MediaRenderer::default()
-					.run(&mut entity, vec![output_type])
-					.unwrap()
-					.to_string();
+				let entity = entity.id();
+				let output = RenderTargets::render_negotiated(
+					world,
+					entity,
+					&[output_type],
+					&MediaType::Markdown,
+				)
+				.unwrap()
+				.to_string();
 				cross_log!("{output}");
 			})
 			.await;

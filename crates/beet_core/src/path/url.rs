@@ -23,6 +23,11 @@
 //! `tel:`, `javascript:`, ...) hold their payload verbatim as a single opaque
 //! path segment, neither split on `/` nor percent-coded.
 //!
+//! A url is the form a request is sent by, never the one a stored field
+//! holds: **a field you store or compare is a [`Uri`], a request you send is a
+//! `Url`**, since the parse normalizes and a value read through it and written
+//! back can differ from what was read.
+//!
 //! # Example
 //!
 //! ```

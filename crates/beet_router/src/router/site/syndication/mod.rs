@@ -15,27 +15,23 @@
 //! [`ExportStrategy::Static`]: beet_core::prelude::ExportStrategy
 //! [`Router`]: crate::prelude::Router
 
-mod page_content;
 mod robots;
 mod rss;
 mod search_index;
 mod sitemap;
 // the standard.site records: plain data in the protocol's model, beside the
-// `Pds` family in `beet_net`, which rides `json` too.
-#[cfg(feature = "json")]
+// `Pds` family in `beet_net`, which rides `dag_cbor` too.
+#[cfg(feature = "dag_cbor")]
 mod standard_site;
 mod syndication_query;
 mod xml;
 
-#[allow(unused_imports)]
-pub(crate) use page_content::*;
 pub use robots::*;
 pub use rss::*;
 pub use search_index::*;
 pub use sitemap::*;
-#[cfg(feature = "json")]
+#[cfg(feature = "dag_cbor")]
 pub use standard_site::*;
-pub use syndication_query::SyndicationPage;
 #[cfg(test)]
 pub(crate) use syndication_query::test_fixtures::*;
 #[allow(unused_imports)]

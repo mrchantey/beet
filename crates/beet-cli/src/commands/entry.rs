@@ -9,10 +9,10 @@
 use beet::prelude::*;
 
 /// Load the entry onto the caller's world through its [`BlobStore`], returning its
-/// root entity. Resolution is the binary's own [`entry_build::resolve_main`] (the
+/// root entity. Resolution is the binary's own [`entry_build::resolve_entry_path`] (the
 /// command's [`EntryParams`] `--repo` picks the backend, the entry's
 /// `<RepoRoot src>` rebases the root), so the same resolution serves
-/// `beet --main=..` and these commands.
+/// `beet --entry=..` and these commands.
 ///
 /// `check`/`export-static` render the entry rather than serve it, so the build
 /// disarms the root ([`DisableCallOnReady`]) and the entry's `CallOnReady` verb
@@ -45,7 +45,8 @@ pub(crate) async fn build_entry(
 		entry_name,
 		prescan,
 		..
-	} = entry_build::resolve_main(&prescans, repo_uri, None, entry_path).await?;
+	} = entry_build::resolve_entry_path(&prescans, repo_uri, None, entry_path)
+		.await?;
 	let sources =
 		entry_build::read_sources(&repo_store, formats, entry_name, prescan)
 			.await?;
@@ -159,14 +160,14 @@ mod test {
 		world.resource::<PrescanRegistry>().clone()
 	}
 
-	/// The shared [`entry_build::resolve_main`] serves the commands' positional: a dir resolves
+	/// The shared [`entry_build::resolve_entry_path`] serves the commands' positional: a dir resolves
 	/// to its highest-priority [`entry_build::ENTRY_NAMES`] entry through the store, an entry
 	/// file names itself, and a dir with no entry document errors with guidance.
 	#[beet::test]
 	async fn resolves_dir_and_entry_file() {
 		let prescans = prescans(&render_world());
 		// a dir resolves to its highest-priority `entry_build::ENTRY_NAMES` entry (`main.bsx` here)
-		let dir = entry_build::resolve_main(
+		let dir = entry_build::resolve_entry_path(
 			&prescans,
 			None,
 			None,
@@ -176,7 +177,7 @@ mod test {
 		.unwrap();
 		dir.entry_name.xpect_eq("main.bsx");
 		// passing the entry file itself roots the store at its parent
-		let file = entry_build::resolve_main(
+		let file = entry_build::resolve_entry_path(
 			&prescans,
 			None,
 			None,
@@ -189,19 +190,29 @@ mod test {
 		// a non-`main.bsx` entry name is still discovered (the search spans entry_build::ENTRY_NAMES)
 		let tmp = TempDir::new().unwrap();
 		fs_ext::write(tmp.path().join("main.json"), "{}").unwrap();
-		entry_build::resolve_main(&prescans, None, None, tmp.path().as_str())
-			.await
-			.unwrap()
-			.entry_name
-			.xpect_eq("main.json");
+		entry_build::resolve_entry_path(
+			&prescans,
+			None,
+			None,
+			tmp.path().as_str(),
+		)
+		.await
+		.unwrap()
+		.entry_name
+		.xpect_eq("main.json");
 		// a dir with no entry document errors with guidance
 		let empty = TempDir::new().unwrap();
-		entry_build::resolve_main(&prescans, None, None, empty.path().as_str())
-			.await
-			.err()
-			.unwrap()
-			.to_string()
-			.xpect_contains("no entry document");
+		entry_build::resolve_entry_path(
+			&prescans,
+			None,
+			None,
+			empty.path().as_str(),
+		)
+		.await
+		.err()
+		.unwrap()
+		.to_string()
+		.xpect_contains("no entry document");
 	}
 
 	/// The entry declares its own servers and app routes: loading its entry document
@@ -216,7 +227,7 @@ mod test {
 			entry_name,
 			prescan,
 			..
-		} = entry_build::resolve_main(
+		} = entry_build::resolve_entry_path(
 			&prescans(&world),
 			None,
 			None,

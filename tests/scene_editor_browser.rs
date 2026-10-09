@@ -19,7 +19,7 @@
 //! editor, whose fork the served page cannot show, never sees the published
 //! text: their page is hidden until the fork paints.
 //!
-//! The example is served the way `beet --main=examples/ui/scene_editor.bsx`
+//! The example is served the way `beet --entry=examples/ui/scene_editor.bsx`
 //! serves it, from an in-memory copy of the entry, its scene, its shell and
 //! the artifact (the shared [`BrowserHost`]), so no on-disk fork leaks in.
 //! Needs the artifact and a browser on PATH:

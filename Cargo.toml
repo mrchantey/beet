@@ -287,6 +287,8 @@ sha1 = { version = "0.11", default-features = false }
 # hand rolled encoder gets subtly wrong, and a cid that differs from a real
 # PDS's is a snapshot rkey that differs between a bucket and a PDS. Both no_std.
 serde_ipld_dagcbor = { version = "0.6", default-features = false }
+# an image's pixel size read from its header, no decode
+imagesize = { version = "0.15", default-features = false }
 ipld-core = { version = "0.4", default-features = false, features = ["serde"] }
 # MD5 for the store mirror's change detection: S3 answers an object's etag as
 # its MD5, so the local side digests the same way and a sync skips what matches.
@@ -400,6 +402,10 @@ serde = ["beet_core/serde", "beet_action?/serde", "beet_net?/serde", "beet_route
 nightly = ["beet_core/nightly"]
 rand = ["beet_core/rand"]
 json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
+# Canonical DAG-CBOR through `MediaType::DagCbor`, and with it the atproto data
+# model's providers and records: the `Pds` family and `<AtprotoAccount/>`
+# (`beet_net`), the standard.site records (`beet_router`). No network.
+dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net?/dag_cbor", "beet_router?/dag_cbor"]
 # offline geoip country lookup for analytics (pulls the pure-rust `maxminddb`
 # reader). Off by default; a deployed site enables it and commits a
 # `country.mmdb` to `assets/databases/` to populate the analytics country field.
@@ -425,8 +431,9 @@ vault = ["beet_core/vault", "beet_net?/vault", "beet_router?/vault", "beet_infra
 # through the credential seam, did and handle resolution, an
 # `<AtprotoAccount/>` landing its repo, and the Bluesky record shapes beet
 # writes; with `infra` also the handle block and its probe
-# (`beet_infra/atproto`). The data model and the `Pds` family need none of it.
-atproto = ["net", "json", "beet_net?/atproto", "beet_infra?/atproto"]
+# (`beet_infra/atproto`). The data model and the `Pds` family need none of it:
+# they ride `dag_cbor`.
+atproto = ["net", "json", "dag_cbor", "beet_net?/atproto", "beet_infra?/atproto"]
 # QR rendering in the terminal, so `vault backup --qr` prints an identity's
 # backup for paper (`beet_net/qrcode`); the cli's png command adds `image`.
 qrcode = ["beet_net?/qrcode"]
@@ -586,7 +593,7 @@ markdown = ["beet_router?/markdown_parser", "beet_ui?/markdown_parser"]
 codegen = ["router", "beet_router?/codegen"]
 syntax_highlighting = ["ui", "style", "beet_ui?/syntax_highlighting"]
 # ```mermaid fences render as box-drawing text on every sink.
-mermaid = ["ui", "style", "beet_ui?/mermaid"]
+mermaid = ["ui", "style", "beet_ui?/mermaid", "beet_router?/mermaid"]
 # ```mermaid fences render as themed inline svg on the web (native builds).
 mermaid_svg = ["mermaid", "beet_ui?/mermaid_svg"]
 
@@ -865,7 +872,7 @@ required-features = ["thread", "router", "fs", "tui_server", "ssh_tui", "testing
 
 # The no-code `examples/bsx_site` example, loaded on-disk and rendered/navigated
 # through `beet`'s public API. The example is pure `.bsx`/`.md` (not a crate); its
-# render + live-tui suites live here, run via `beet --main=examples/bsx_site/main.bsx`.
+# render + live-tui suites live here, run via `beet --entry=examples/bsx_site/main.bsx`.
 [[test]]
 name = "bsx_site"
 path = "tests/bsx_site.rs"

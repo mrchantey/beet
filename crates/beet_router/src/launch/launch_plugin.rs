@@ -27,7 +27,7 @@ impl Plugin for LaunchPlugin {
 	fn build(&self, app: &mut App) { app.add_systems(Startup, load_entry); }
 }
 
-/// Positional commands that run ANOTHER program, so the `--main`, `--repo` and
+/// Positional commands that run ANOTHER program, so the `--entry`, `--repo` and
 /// `--store-fork` on this process's argv belong to that program and are forwarded
 /// untouched rather than read as this launch's own.
 ///
@@ -43,7 +43,7 @@ impl ArgvPassthrough {
 		Self(commands.into_iter().map(Into::into).collect())
 	}
 
-	/// Whether `args` names one of them, ie whether this launch's `--main`,
+	/// Whether `args` names one of them, ie whether this launch's `--entry`,
 	/// `--repo` and `--store-fork` are somebody else's.
 	pub fn forwards(&self, args: &CliArgs) -> bool {
 		args.path
@@ -94,24 +94,24 @@ fn load_entry(world: &mut World) {
 	let prescans = world.get_resource_or_init::<PrescanRegistry>().clone();
 	world.run_async_local(async move |world: AsyncWorld| {
 		// the wasm runner forwards the *module's* flags on this same argv, so a
-		// `beet run-wasm <module> --main=<wasm-entry> --repo=fs ...` invocation
-		// carries a `--main`/`--repo` meant for the wasm module, not this native
+		// `beet run-wasm <module> --entry=<wasm-entry> --repo=fs ...` invocation
+		// carries a `--entry`/`--repo` meant for the wasm module, not this native
 		// runner. When acting as the runner (first positional `run-wasm`), drop
 		// them and discover the workspace command entry; the `<RunWasm/>` route
 		// forwards the module's own config on via `ChildProcess::with_bootstrap`.
-		let (repo_uri, store_fork, main) = match forwards_argv {
+		let (repo_uri, store_fork, entry) = match forwards_argv {
 			true => (None, None, None),
 			false => (
 				config.repo.as_ref(),
 				config.store_fork.as_ref(),
-				config.main.as_deref(),
+				config.entry.as_deref(),
 			),
 		};
 		// resolve on the runtime, since discovery now awaits the store. A
 		// browser resolves exactly as every other runtime: its served page's
 		// bootstrap named an http repo, which forks into IndexedDB.
 		let resolved = match entry_build::resolve_entry(
-			&prescans, repo_uri, store_fork, main,
+			&prescans, repo_uri, store_fork, entry,
 		)
 		.await
 		{
@@ -187,7 +187,7 @@ async fn build_entry(
 /// The `--features` flag as a [`RequireCfg`]: verify this binary was compiled
 /// with the named cargo features, failing with the full missing list rather
 /// than degrading into unresolved tags. Applies when running an entry (an
-/// explicit `--main`, or no positional command); a command dispatch (eg `beet
+/// explicit `--entry`, or no positional command); a command dispatch (eg `beet
 /// build-wasm --features=..`) owns its own `--features` meaning, and the wasm
 /// runner forwards the module's flags untouched.
 ///
@@ -198,7 +198,7 @@ fn features_self_check(
 	config: &BootstrapConfig,
 	forwards_argv: bool,
 ) -> Option<RequireCfg> {
-	let runs_entry = config.main.is_some() || args.path.is_empty();
+	let runs_entry = config.entry.is_some() || args.path.is_empty();
 	if forwards_argv || !runs_entry || config.features.is_empty() {
 		return None;
 	}

@@ -41,5 +41,5 @@ which entry it names.
 	     otherwise create one appended to `body`. -->
 	<canvas id="beet-canvas"></canvas>
 	<RenderConsole/>
-	<Wasm src="/assets/wasm/beet-render.wasm" repo="/examples/spatial" main="scene_3d.bsx"/>
+	<Wasm src="/assets/wasm/beet-render.wasm" repo="/examples/spatial" entry="scene_3d.bsx"/>
 </HtmlDocument>

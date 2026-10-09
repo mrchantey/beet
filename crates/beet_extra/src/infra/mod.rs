@@ -1,7 +1,7 @@
 //! The deploy example wiring for the `beet` binary.
 //!
 //! The infra examples (`examples/infra/hello_*.bsx`) run through the one binary,
-//! eg `beet --main=examples/infra/cloudflare_workers.bsx deploy`. The deploy
+//! eg `beet --entry=examples/infra/cloudflare_workers.bsx deploy`. The deploy
 //! block/config types and directly-spawnable deploy actions register upstream in
 //! beet_infra's [`InfraPlugin`]; this module adds that plugin plus the few templates
 //! that wrap non-`Reflect` infra values (see `templates.rs`), so a scene's

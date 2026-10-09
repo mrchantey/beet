@@ -94,7 +94,7 @@ fn setup(async_commands: AsyncCommands) {
 					})
 				})
 				.await??;
-			store.insert(&path, fork.take().1).await?;
+			store.insert(&path, fork).await?;
 		}
 		// the restored server root, booted with the process request: the load
 		// rebuilt the tree, this runs it.

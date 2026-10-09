@@ -226,14 +226,14 @@ impl Response {
 	/// Creates a response with status, body, and content type
 	pub fn from_status_body(
 		status: StatusCode,
-		body: impl AsRef<[u8]>,
+		body: impl Into<Body>,
 		content_type: MediaType,
 	) -> Self {
 		let mut parts = ResponseParts::new(status);
 		parts.headers.set_content_type(content_type);
 		Self {
 			parts,
-			body: Bytes::copy_from_slice(body.as_ref()).into(),
+			body: body.into(),
 		}
 	}
 
@@ -312,7 +312,7 @@ impl Response {
 
 	/// Consumes the response body and returns it as bytes
 	pub async fn bytes_vec(self) -> Result<Vec<u8>> {
-		self.bytes().await.map(|b| b.to_vec())
+		self.bytes().await.map(Vec::from)
 	}
 	/// Consumes the response body and returns it as [`MediaBytes`],
 	/// using the [`header::ContentType`], or defaulting to [`MediaType::Bytes`].

@@ -97,6 +97,22 @@ impl From<AtUri> for SmolStr {
 	fn from(uri: AtUri) -> SmolStr { SmolStr::new(uri.to_string()) }
 }
 
+/// The atproto view of a [`Uri`]: a lexicon `uri` field names a record or a
+/// web page, and this reads which.
+impl Uri {
+	/// The record this uri addresses, when it is an `at://` record address.
+	pub fn at_uri(&self) -> Option<AtUri> {
+		self.as_str()
+			.starts_with(AtUri::SCHEME)
+			.then(|| AtUri::parse(self.as_str()).ok())
+			.flatten()
+	}
+}
+
+impl From<AtUri> for Uri {
+	fn from(uri: AtUri) -> Self { Self(uri.into()) }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

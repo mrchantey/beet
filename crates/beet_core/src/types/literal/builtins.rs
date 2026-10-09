@@ -148,6 +148,15 @@ fn add_strings(table: &mut Table) {
 			_ => Ok(None),
 		}
 	});
+	// a uri is held verbatim, so only a malformed one (no scheme, whitespace)
+	// is refused
+	table.add_hinted(
+		"an absolute uri, eg \"https://beet.org\"",
+		|value: &Value| match value {
+			Value::Str(string) => Uri::parse(string).map(Some),
+			_ => Ok(None),
+		},
+	);
 }
 
 /// The protocol's primitives, each authored as the string it is written as,
@@ -181,13 +190,6 @@ fn add_atproto(table: &mut Table) {
 			"an at uri, eg \"at://did:plc:../<collection>/<rkey>\"",
 			|value: &Value| match value {
 				Value::Str(string) => AtUri::parse(string).map(Some),
-				_ => Ok(None),
-			},
-		)
-		.add_hinted(
-			"an absolute uri, eg \"https://beet.org\"",
-			|value: &Value| match value {
-				Value::Str(string) => Uri::parse(string).map(Some),
 				_ => Ok(None),
 			},
 		);

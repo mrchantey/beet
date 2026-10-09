@@ -490,13 +490,10 @@ mod test {
 	/// rather than erroring on non-markup bytes.
 	#[beet_core::test]
 	fn non_markup_yields_default() {
-		EntryPrescan::parse(
-			&MediaBytes::new(MediaType::Json, b"{}".to_vec()),
-			&registry(),
-		)
-		.unwrap()
-		.is_empty()
-		.xpect_true();
+		EntryPrescan::parse(&MediaBytes::new_json("{}"), &registry())
+			.unwrap()
+			.is_empty()
+			.xpect_true();
 	}
 
 	/// A downstream type registers into the same walk, and its preload runs

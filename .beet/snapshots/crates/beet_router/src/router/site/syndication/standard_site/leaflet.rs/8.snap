@@ -1,0 +1,542 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/8nokKDoz2_4"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "My one-year-old has started getting new ideas, wanting to try something he hasn't done before like open a screw-top lid. Naturally things usually dont go as planned the first time which can be frustrating. In these times I find myself reminding him to take it easy by quoting one of my faviorite songs as a ten-year-old."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.blockquote",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 31,
+                  "byteStart": 0
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 68,
+                  "byteStart": 33
+                }
+              }
+            ],
+            "plaintext": "Chill out, what ya yellin' for?\n\nLay back, it's all been done before\n\n— Avril Lavigne, Complicated"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Input - Process - Output"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Advancements in computing interfaces don't repeat but they certainly rhyme, and the more I play with them the less unique they feel."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "If I were old enough to start software development in the 70s my first program might have been a UNIX command-line application:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "c",
+            "plaintext": "int main(int argc, char *argv[]) {\n\tprintf(\"Hello %s\", argv[1]);\n\treturn 0;\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "If instead I began in the 80s it may have been some kind of REPL-style BASIC program:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "sh",
+            "plaintext": "10 INPUT \"ENTER YOUR NAME\"; N$\n20 PRINT \"Hello \"; N$\n30 GOTO 10"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Maybe in the 90s I would have created a simple CGI web server:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "sh",
+            "plaintext": "#!/usr/bin/perl\nuse CGI;\n\nmy $q = CGI->new;\nmy $name = $q->param('name');\n\nprint $q->header;\nprint \"<html><body><h1>Hello $name</h1></body></html>\";"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I wasn't around for any of that, my first coding steps in the 2000s was a Visual Basic GUI:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "sh",
+            "plaintext": "Private Sub btnSayHello_Click()\n  lblOutput.Caption = \"Hello \" & txtName.Text\nEnd Sub"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 72,
+                  "byteStart": 52
+                }
+              }
+            ],
+            "plaintext": "As each of these interfaces has been introduced the input-process-output paradigm has remained the same, and will continue to do so with newer interfaces like voice assistants, XR and humanoid robots."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 53,
+                  "byteStart": 33
+                }
+              }
+            ],
+            "plaintext": "So if thats true the question is what ya yellin' for?, why do these changes cause so much disruption? To software the difference between a CLI, Server or GUI is simply a matter of I/O, or at least it should be. Instead we usually find ourselves in a tech stack that does not translate well to the new interface: C is too verbose for UI, BASIC is too heavy for browsers, javascript is too slow for XR, etc, so we start again from scratch."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "As somebody with a career split across web, games and robotics I'm tired of starting again, learning entirely new ecosystems just because the interface is different. Rust can run anywhere and does so very well. Bevy ECS can represent any application and does so very well. For me its time to stop starting again."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Request / Response as IO"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The biggest change this month has been the generalization of the Request / Response structure, decoupling it from the server so that it also represents a CLI, REPL, Clanker tool, and soon forms as well. No more Axum, Clap, Rig or other interface-specific libraries."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The primitives of an exchange are now as follows, simplified for brevity:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 5,
+                  "byteStart": 0
+                }
+              }
+            ],
+            "plaintext": "Parts"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "children": [
+                  {
+                    "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                    "content": {
+                      "$type": "pub.leaflet.blocks.text",
+                      "plaintext": "ie http headers, tool caching instructions"
+                    }
+                  }
+                ],
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 37,
+                        "byteStart": 9
+                      }
+                    }
+                  ],
+                  "plaintext": "headers: HashMap<String, Vec<String>>"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "children": [
+                  {
+                    "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                    "content": {
+                      "$type": "pub.leaflet.blocks.text",
+                      "plaintext": "ie http body, tool call payload"
+                    }
+                  }
+                ],
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 13,
+                        "byteStart": 6
+                      }
+                    }
+                  ],
+                  "plaintext": "body: Vec<u8>"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 7,
+                  "byteStart": 0
+                }
+              }
+            ],
+            "plaintext": "Request"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "children": [
+                  {
+                    "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                    "content": {
+                      "$type": "pub.leaflet.blocks.text",
+                      "plaintext": "ie http url, cli positional arguments, tool name"
+                    }
+                  }
+                ],
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 17,
+                        "byteStart": 6
+                      }
+                    }
+                  ],
+                  "plaintext": "path: Vec<String>"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "children": [
+                  {
+                    "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                    "content": {
+                      "$type": "pub.leaflet.blocks.text",
+                      "plaintext": "ie http query params, cli flags"
+                    }
+                  }
+                ],
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 36,
+                        "byteStart": 8
+                      }
+                    }
+                  ],
+                  "plaintext": "params: HashMap<String, Vec<String>>"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 12,
+                        "byteStart": 7
+                      }
+                    }
+                  ],
+                  "plaintext": "parts: Parts"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 8,
+                  "byteStart": 0
+                }
+              }
+            ],
+            "plaintext": "Response"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.unorderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "children": [
+                  {
+                    "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                    "content": {
+                      "$type": "pub.leaflet.blocks.text",
+                      "plaintext": "ie http status, cli exit code, tool error"
+                    }
+                  }
+                ],
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 16,
+                        "byteStart": 13
+                      }
+                    }
+                  ],
+                  "plaintext": "status_code: u32"
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.unorderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "facets": [
+                    {
+                      "features": [
+                        {
+                          "$type": "pub.leaflet.richtext.facet#code"
+                        }
+                      ],
+                      "index": {
+                        "byteEnd": 12,
+                        "byteStart": 7
+                      }
+                    }
+                  ],
+                  "plaintext": "parts: Parts"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 90,
+                  "byteStart": 84
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 181,
+                  "byteStart": 159
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://beet.org/?help"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 181,
+                  "byteStart": 159
+                }
+              }
+            ],
+            "plaintext": "With this generalization things can get very weird, for example a http sitemap, cli --help flag and clanker tool definition list are now the same thing. Visit https://beet.org/?help to see it in action!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 58,
+                  "byteStart": 54
+                }
+              }
+            ],
+            "plaintext": "The change has removed some massive dependencies from beet alongside their bespoke architectures. The website, cli and clanker tools now all share the same exchange and routing patterns."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Beet is a project that is getting simpler as its capabilities expand, it takes a lot of iterations to get there but the result is shaping up to be a very pretty piece of software, just like the giants of rust and bevy that it sits on the shoulders of."
+          }
+        }
+      ]
+    }
+  ]
+}

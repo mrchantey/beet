@@ -50,7 +50,7 @@ thread = ["beet/thread", "beet/ui"]
 # Opt-in (like `winit`), so a plain `beet` never links the deploy
 # machinery. The example deploy templates (`<DeployVerbs/>`, `<SiteSync/>`, ...)
 # ride the separate `extra` feature. Run with:
-# `cargo run -p beet-cli --features infra,extra -- --main=examples/infra/cloudflare_workers.bsx deploy`.
+# `cargo run -p beet-cli --features infra,extra -- --entry=examples/infra/cloudflare_workers.bsx deploy`.
 # `beet/mail` carries the network and mail stack with it, so a deployer entry
 # declaring `<VpcBlock/>`/`<StalwartBlock/>`/`<MailDomainBlock/>` resolves those
 # tags from the same build rather than needing a feature of its own.
@@ -60,7 +60,7 @@ infra = ["beet/cloudflare_block", "beet/lambda_block", "beet/scheduled_job_block
 # it without the deploy machinery; with `infra` too it brings the handle block
 # and its probe (`<AtprotoHandleBlock/>`, `<AtprotoHandleProbe/>`), so the site
 # entry's `social` stack resolves its tags. Run with:
-# `cargo run -p beet-cli --features infra,extra,atproto -- --main=site social deploy --stage=prod`.
+# `cargo run -p beet-cli --features infra,extra,atproto -- --entry=site social deploy --stage=prod`.
 atproto = ["beet/atproto"]
 # The windowed render stack, so one `beet` binary runs a wgpu scene `.bsx` (which
 # spawns its own `Window`) and a headless server `.bsx` from the same build. Pulls
@@ -71,7 +71,7 @@ atproto = ["beet/atproto"]
 # feature also gates that module. Opt-in, so deploy/headless builds never link wgpu.
 # The ml stack (burn + the shared wgpu device) is split into the `ml` feature, so a
 # windowed spatial scene builds without it.
-# Run a spatial scene with: `cargo run -p beet-cli --features winit -- --main=<scene.bsx>`.
+# Run a spatial scene with: `cargo run -p beet-cli --features winit -- --entry=<scene.bsx>`.
 winit = [
 	"beet/examples",
 ]
@@ -80,7 +80,7 @@ winit = [
 # windowed stack the ml scenes draw into); `beet/ml` forwards `beet_extra/ml`, whose
 # scene/template registrations are `#[cfg(feature = "ml")]`-gated, so `winit` alone
 # excludes them.
-# Run an ml scene with: `cargo run -p beet-cli --features winit,ml -- --main=<scene.bsx>`.
+# Run an ml scene with: `cargo run -p beet-cli --features winit,ml -- --entry=<scene.bsx>`.
 ml = ["winit", "beet/ml"]
 # HTTP transport for the remote scene-control commands. Native-only: the
 # ureq/rustls stack does not build on wasm, so it is enabled via the non-wasm
@@ -90,7 +90,7 @@ net = ["beet/ureq","beet/rustls-tls"]
 # `{SocketServer}` boots and `Socket::connect` works, eg the perceive-act agent and
 # its in-process head/body clients. Opt-in (like `winit`), so a plain `beet`
 # never links tungstenite. Run with:
-# `cargo run -p beet-cli --features sockets -- --main=examples/perceive_act/main-v1.bsx --server=socket`.
+# `cargo run -p beet-cli --features sockets -- --entry=examples/perceive_act/main-v1.bsx --server=socket`.
 sockets = ["beet/tungstenite"]
 # TLS serving (the `Tls` component): https/wss with a generated self-signed
 # dev cert, so LAN devices get a secure context (webcam, mic).
@@ -106,7 +106,7 @@ vault = ["beet/vault"]
 # the markup-declarable `TuiServer` (`beet/tui_server` pulls `beet_router/tui`,
 # which registers it). On by default so a bare `beet present` boots the deck.
 tui = ["beet/tui_server"]
-# The multi-tenant SSH-TUI server (`SshTuiServer`), so `beet --main=<site> serve
+# The multi-tenant SSH-TUI server (`SshTuiServer`), so `beet --entry=<site> serve
 # --server=http,ssh` serves http and an ssh terminal from one process. Registers
 # the markup-declarable `SshTuiServer` via `SshTuiPlugin`.
 ssh = ["tui", "beet/ssh_tui"]
@@ -129,7 +129,7 @@ lambda = ["beet/lambda", "beet/aws_sdk"]
 # uses it too), so it is not a `dep:` activation here.
 cloudflare = ["beet/cloudflare", "dep:worker"]
 # The browser-wasm target (wasm32-only): builds the standalone `beet` binary for
-# the browser, which boots the launch its page's `<Wasm repo main server>`
+# the browser, which boots the launch its page's `<Wasm repo entry server>`
 # describes (an http repo forked into IndexedDB, resolved through the one
 # `LaunchPlugin` path) and paints the DOM under `--server=dom`, else runs headless
 # and logs to the console. The wasm-safe render base, no Worker SDK. `BuildWasm`
@@ -218,6 +218,9 @@ web_full = [
 [dependencies]
 beet = { workspace = true, features = [
 	"json",
+	# the atproto data model, so every build serves and checks the
+	# standard.site records and the `<AtprotoAccount/>` declarations
+	"dag_cbor",
 	"template_serde",
 	"markdown",
 	"style",

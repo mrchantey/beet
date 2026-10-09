@@ -1,0 +1,241 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/YKiHKQJmEoU"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "The stack bevyfication continues this harvest, with ecs proving to be the anything paradigm!"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "A Very Bevy Router"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Servers like axum prioritize performance in the order of microseconds, with use-cases like proxy servers handling 10,000 requests per second. Web frameworks have different requirements, preferring cdns and s3 redirects over hitting the server, and averaging 200ms roundtrips when they do."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 8,
+                  "byteStart": 0
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 162,
+                  "byteStart": 146
+                }
+              }
+            ],
+            "plaintext": "beet_net addresses the ergonomics of webframework routing with features like multiple rendering strategies (ssr,ssg) and middleware beyond opaque Request/Response types."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "\nfn routes() -> impl Bundle {\n  children![\n    (\n      PathFilter::new(\"/hello\"),\n      bundle_endpoint( || rsx!{<div>hello world!</div>}),\n    ),\n    (\n      HandlerConditions::fallback(),\n      bundle_endpoint( || rsx!{<div>fallback</div>}),\n    )\n  ]\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "ECS Server Actions"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Thanks to our bevy router, server actions are now regular systems:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// add.rs\npub fn get(params: In<(i32, i32)>) -> i32 {\n  params.0 + params.1\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Client Island Scenes"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Client islands are now regular bevy scenes embedded in the html, no more codegen! 🥳"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "html",
+            "plaintext": "<script type=\"beet/client-islands\">(\n  ...\n  components: {\n    \"NodeTag\": (\"ServerCounter\"),\n    \"ClientLoadDirective\": (),\n    \"DomIdx\": (3),\n    \"ServerCounter\": (\n      value: (initial: 0)\n    ),\n  },\n</script>"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Static files via buckets"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "I knew this would be required soon and guess I crossed that threshold a few days ago, lambda functions just aren't designed for serving large wasm files. These are now served via s3 alongside the ssg html. A side benefit to this is we can update the static parts of the site via an s3 sync without needing to redeploy the server."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// crates/beet_site/src/routes.rs\nfn bucket_fallback() -> impl Bundle {\n\t(\n\t\tHandlerConditions::fallback(),\n\t\tbucket_file_handler(),\n\t\tAsyncAction::new(async move |mut world, entity| {\n\t\t\tlet provider = S3Provider::create().await;\n\t\t\tworld\n\t\t\t\t.entity_mut(entity)\n\t\t\t\t.insert(Bucket::new(provider, \"beet-site-bucket-prod\"));\n\t\t\tworld\n\t\t}),\n\t)\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "Goodbye CLI"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 64,
+                  "byteStart": 55
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 253,
+                  "byteStart": 247
+                }
+              }
+            ],
+            "plaintext": "Config files are a bug not a feature, even I found the beet.toml hard to work with and I'm the one who wrote it! Previously the cli would load the config file into an tree of entities, now these are declared directly by the user, gated behind the launch feature."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// crates/beet_site/src/collections.rs\n#[cfg(feature = \"launch\")]\nfn pages_collection() -> impl Bundle {\n\t(\n\t\tRouteFileCollection {\n\t\t\tsrc: AbsPath::new_workspace_rel(\"crates/beet_site/src/pages\").unwrap(),\n\t\t\t..default()\n\t\t},\n\t\tModifyRoutePath::default().base_route(\"/docs\"),\n\t\tMetaType::new(syn::parse_quote!(beet::prelude::PageMeta)),\n\t\tCodegenFile::new(\n\t\t\tAbsPath::new_workspace_rel(\"crates/beet_site/src/codegen/pages.rs\").unwrap(),\n\t\t),\n\t)\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Syntax Highlighting"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 58,
+                  "byteStart": 51
+                }
+              }
+            ],
+            "plaintext": "Last but not least we now have an integration with syntect, which provides all the syntax highlighting in this post :)"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Onward"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "And thats it for this harvest, I'll need to focus on beetmash for the next month so so the next harvest will likely be a polish release."
+          }
+        }
+      ]
+    }
+  ]
+}

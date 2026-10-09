@@ -46,8 +46,8 @@ time you go looking for a bounce that should have been recorded.
 
 ## Usage
 
-    beet --main=examples/infra/mail_ses.bsx validate
-    beet --main=examples/infra/mail_ses.bsx deploy
+    beet --entry=examples/infra/mail_ses.bsx validate
+    beet --entry=examples/infra/mail_ses.bsx deploy
 
 `validate` needs only `tofu`. Live deploy needs the same things `mail.bsx` does,
 plus SES production access if you want to send to anyone who has not verified

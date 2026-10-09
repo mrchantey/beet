@@ -1,0 +1,537 @@
+{
+  "$type": "pub.leaflet.content",
+  "pages": [
+    {
+      "$type": "pub.leaflet.pages.linearDocument",
+      "blocks": [
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.iframe",
+            "aspectRatio": {
+              "height": 9,
+              "width": 16
+            },
+            "url": "https://www.youtube.com/embed/BhLvfvw1rgw"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Writing a metaframework can be surprisingly straightforward: Start with an unmet need, and copy-pasta the best modern patterns and principles that align with this need. So far the web layer of beet has been entirely based on Astro which is taking the web dev world by storm with a single principle:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.blockquote",
+            "plaintext": "Make writing performant web apps a delightful developer experience."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "But porting Astro's islands architecture from JS to rust has surfaced some major drawbacks:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.orderedList",
+            "children": [
+              {
+                "$type": "pub.leaflet.blocks.orderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Hybrid server-client architecture means two recompilations per change, doubling the achilles heel of rust DX."
+                }
+              },
+              {
+                "$type": "pub.leaflet.blocks.orderedList#listItem",
+                "content": {
+                  "$type": "pub.leaflet.blocks.text",
+                  "plaintext": "Wasm binary sizes are quite large, big enough to present a noticable hydration lag."
+                }
+              }
+            ],
+            "startIndex": 1
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 22,
+                  "byteStart": 16
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 33,
+                  "byteStart": 27
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 104,
+                  "byteStart": 95
+                }
+              }
+            ],
+            "plaintext": "The creators of dioxus and leptos are working hard to overcome these issues with projects like subsecond and wasm bundle splitting but I feel like we're fixing symptoms of a deeper underlying issue, so for the past month I've taken a step back and started researching alternative approaches from first principles."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "State Binding"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "HTML provides declarative rendering, but when it comes to binding state to the DOM we traditionally need to reach for imperative binding patterns:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// app.rs\nfn Counter() -> impl Template {\n  const (count, set_count) = signal(0);\n  rsx!{\n    <button onclick={|| set_count(count() + 1)}>\n      Clicked {count} Times\n    </button>\n  }\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://blog.cloudflare.com/deep-dive-into-cloudflares-sept-12-dashboard-and-api-outage/"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 145,
+                  "byteStart": 125
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 187,
+                  "byteStart": 178
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 283,
+                  "byteStart": 274
+                }
+              }
+            ],
+            "plaintext": "Imperative state binding in general is error-prone, all the best engineering practices in the world couldn't save Cloudflare from DDoSing itsself two months ago due to a classic useEffect bug we can all relate to, I clearly remember my boss helping me debug a pesky spinner useEffect I wrote that was causing a 60fps full page rerender."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "HTMX circumnavigates this by pairing declarative template directives with SSR, demonstrating a crucial insight about web development:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.blockquote",
+            "plaintext": "Most web apps are CRUD apps and most CRUD apps don't need custom client-side code"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// index.html\n<button hx-post=\"/clicked\" hx-swap=\"innerHTML\">Clicked 0 Times</button>\n// server.rs\nRouter::new().route(\"/clicked\", |mut state: State<u32>| {\n  state += 1;\n  format!(\"Clicked {state} Times\")\n});"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 271,
+                  "byteStart": 250
+                }
+              }
+            ],
+            "plaintext": "Now we have a gloriously thin client and the surface-area for bugs has largely been constrained to the server, but it does com at a cost. We've broken colocation as our counter is now spread across two files, and we've introduced a 200ms server trip per every interaction."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Interesting but lets keep looking."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "State Synchronization"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "Sync Engines do a similar thing for state synchronization to what HTMX does for state DOM binding:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "jsx",
+            "plaintext": "// client.jsx\nfunction App() {\n  const [count] = useQuery(zero.query.counter.get());\n\n  const increment = () => {\n    zero.mutate.counter.update(count + 1);\n  };\n\n  return <button onClick={increment}>Clicked {count} Times</button>\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "plaintext": "This solves the 200ms roundtrip problem but we're back to imperative DOM binding, something we're trying to avoid."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 3,
+            "plaintext": "Synchronized State Binding"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#bold"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 247,
+                  "byteStart": 235
+                }
+              }
+            ],
+            "plaintext": "What if we combined these patterns, could we get the best of both worlds? This has been my focus of research in the last few weeks, the idea is for the framework to generate a declarative manifest of all state and templates, and for a pre-compiled client library to use the manifest for all state and rendering operations:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "rust",
+            "plaintext": "// client.rs\nfn Counter()-> impl Template {\n  let count = State::new(\"count\", 0);\n  rsx!{\n \t  <button bx:click={count.increment}>Clicked {count} Times</button>\n  }\n}"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 70,
+                  "byteStart": 63
+                }
+              }
+            ],
+            "plaintext": "At a glance this looks almost identical to your garden variety solidjs component, but now lets see the html this compiles to:"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.code",
+            "language": "html",
+            "plaintext": "// index.html\n<button id=\"counter\" type=\"button\" data-state-id=\"0\">Clicked 0 Times</button>\n<script data-state-manifest type=\"application/json\">\n{\n\"directives\": [\n  {\n    \"kind\": \"handle_event\",\n    \"el_state_id\": 0,\n    \"field_path\": \"count\",\n    \"event\": \"click\",\n    \"action\": \"increment\",\n  },\n  {\n    \"kind\": \"render_text_content\",\n    \"el_state_id\": 0,\n    \"field_path\": \"count\",\n    \"template\": \"Clicked %VALUE% Times\",\n  }\n]\n}\n</script>"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 34,
+                  "byteStart": 27
+                }
+              }
+            ],
+            "plaintext": "Importantly notice what is missing from the output: No js, no wasm, just some json directives to be fed to a (theoretically) battle-hardened client library, resulting in a kind of local-first HTMX."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://automerge.org/"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 9,
+                  "byteStart": 0
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://github.com/mrchantey/beet/blob/beet_state/packages/beet_state/src/demos/RenderListDemo.ts"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 100,
+                  "byteStart": 82
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 117,
+                  "byteStart": 110
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#italic"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 505,
+                  "byteStart": 494
+                }
+              }
+            ],
+            "plaintext": "Automerge is an excellent sync-engine (with a very stylish new website), and some initial prototypes with its solidjs layer have shown promise. The next iteration will likely be written in rust/bevy like the rest of beet is, automerge is already a rust wasm binary so we'd just be adding the dom binding layer on top of that. The key difference between this approach and client islands is that this wasm binary is pre-compiled, the user will rarely need to refetch it, even if the site content or behavior changes."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 114,
+                  "byteStart": 105
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 130,
+                  "byteStart": 116
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 153,
+                  "byteStart": 132
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 211,
+                  "byteStart": 202
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 222,
+                  "byteStart": 213
+                }
+              }
+            ],
+            "plaintext": "Of course there are limitations to this approach. State mutations are constrained to specific verbs like increment, push_form_data, set_from_target_value in a similar way to the HTMX rendering verbs of innerHTML, outerHTML, etc. Here we're counting on the HTMX insight: 80% of reactive operations are CRUD-like and do not require custom client code. We can use Astro-style JS sprinkling for special cases and we still have client islands in the back pocket for inherently heavy applications like 3D rendering or robotics dashboards."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#link",
+                    "uri": "https://roomy.space/did:plc:ldv7dtcgryzerqtffzmleeqm"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 293,
+                  "byteStart": 277
+                }
+              }
+            ],
+            "plaintext": "There is still a lot of questions around both in performance and developer experience that can only be answered by hacking away at something like this but I think it looks promising. If you'd like to nerd out on this and other metaframework stuff please come and say hi in the Beet Roomy space."
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.header",
+            "level": 2,
+            "plaintext": "A Fully ECS Router"
+          }
+        },
+        {
+          "$type": "pub.leaflet.pages.linearDocument#block",
+          "block": {
+            "$type": "pub.leaflet.blocks.text",
+            "facets": [
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 114,
+                  "byteStart": 109
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 136,
+                  "byteStart": 127
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 191,
+                  "byteStart": 184
+                }
+              },
+              {
+                "features": [
+                  {
+                    "$type": "pub.leaflet.richtext.facet#code"
+                  }
+                ],
+                "index": {
+                  "byteEnd": 204,
+                  "byteStart": 196
+                }
+              }
+            ],
+            "plaintext": "Aside from this exploration the stack bevyfication continues. Axum has now been entirely replaced by our own hyper layer using beet_flow for the router control flow, and inserting the Request and Response as entities. The page you're viewing now is compiled, routed and rendered with ecs technology. Still a super experimental space but a fully ECS router allows for some really fun and interesting patterns, for example the outer content for this blog post is inserted by a render-aware middleware layer, an alternative to Astro's collection-template binding pattern."
+          }
+        }
+      ]
+    }
+  ]
+}
