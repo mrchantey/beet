@@ -4,25 +4,30 @@
 //!
 //! Run with:
 //! ```sh
-//! cargo bench --bench server_bench --features server_app
+//! cargo bench --bench server_bench --features http_server,ureq
 //! ```
 use beet::prelude::*;
 
 fn main() { async_ext::block_on(main_async()); }
+
 async fn main_async() {
-	let _handle = std::thread::spawn(|| {
+	let server = HttpServer::new(HttpServer::free_port().unwrap());
+	let url = server.local_url();
+	std::thread::spawn(|| {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin::default()))
-			.add_observer(|ev: On<Insert, Request>, mut commands: Commands| {
-				commands
-					.entity(ev.event_target())
-					.insert(Response::ok_body("hello world", MediaType::Text));
-			})
+			.spawn((
+				server,
+				CallOnReady::on_spawn(),
+				children![exchange_ext::handler(|_| {
+					Response::ok_body("hello world", MediaType::Text)
+				})],
+			))
 			.run();
 	});
 
 	time_ext::sleep_millis(10).await;
-	let start = std::time::Instant::now();
+	let start = Instant::now();
 
 	// let num_requests = 1; //     700 us
 	// let num_requests = 10; //    850 us
@@ -31,20 +36,16 @@ async fn main_async() {
 
 	let futures = (0..num_requests).map(|_| async {
 		let start = Instant::now();
-		Request::get(DEFAULT_HTTP_LOCAL_URL).send().await.unwrap();
+		Request::get(&url).send().await.unwrap();
 		start.elapsed()
 	});
 	let durations = futures::future::join_all(futures).await;
-	let avg = durations.iter().sum::<std::time::Duration>()
-		/ (durations.len() as u32);
+	let avg = durations.iter().sum::<Duration>() / (durations.len() as u32);
 
-	let total = start.elapsed();
-	println!(
+	cross_log!(
 		"Complete:\n  requests: {}\n  avg: {}\n  total: {}",
 		num_requests,
 		time_ext::pretty_print_duration(avg),
-		time_ext::pretty_print_duration(total)
+		time_ext::pretty_print_duration(start.elapsed())
 	);
-
-	// let mut
 }

@@ -213,7 +213,7 @@ fn run_app_default_plugins_benchmark(num_operations: usize) -> Duration {
 		let start_time = Instant::now();
 
 		let mut app = App::new();
-		app.add_plugins(DefaultPlugins.build().disable::<LogPlugin>())
+		app.add_plugins(DefaultPlugins.build().disable::<bevy::log::LogPlugin>())
 			.insert_resource(BenchmarkConfig {
 				entity_operations: 1,
 				current_count: 0,

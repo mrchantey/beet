@@ -314,17 +314,32 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 /// detached analytics write that cannot reach its table must not take the site
 /// down with it. The loud-once latch on `AnalyticsStore::record` is what keeps
 /// that from becoming a log per event.
+///
+/// Bevy catches a panicking system, observer or command and hands it to this
+/// handler as an error with [`Severity::Panic`]. Both builds resume that unwind,
+/// see [`release_error_handler`].
 fn beet_runtime_plugin(app: &mut App) {
 	app.init_plugin::<AsyncPlugin>()
 		.init_plugin::<AppExitPlugin>()
 		.init_plugin::<BootstrapPlugin>()
 		.init_plugin::<CrateCheckPlugin>();
-	cfg_if! {
-		if #[cfg(debug_assertions)] {
-			app.try_set_error_handler(bevy::ecs::error::panic);
-		} else {
-			app.try_set_error_handler(bevy::ecs::error::error);
-		}
+	app.try_set_error_handler(if cfg!(debug_assertions) {
+		bevy::ecs::error::panic
+	} else {
+		release_error_handler
+	});
+}
+
+/// The release fallback error handler: resumes a caught panic, logs everything
+/// else at the `error` level.
+///
+/// A panic is a bug, so the process crashes and a supervisor restarts it rather
+/// than running on with broken invariants; a returned error is a recoverable
+/// failure and must not take a deployed server down.
+fn release_error_handler(error: BevyError, cx: bevy::ecs::error::ErrorContext) {
+	match error.severity() {
+		Severity::Panic => bevy::ecs::error::panic(error, cx),
+		_ => bevy::ecs::error::error(error, cx),
 	}
 }
 

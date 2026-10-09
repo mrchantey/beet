@@ -133,7 +133,10 @@ pub mod prelude {
 			pub use crate::ui::prelude::style::Visibility;
 			pub use crate::ui::prelude::style::FlexWrap;
 			pub use crate::ui::prelude::style::Overflow;
+			// bevy's flat picking events share these names under `bevy/default`
 			pub use crate::ui::prelude::Pointer;
+			pub use crate::ui::prelude::PointerOut;
+			pub use crate::ui::prelude::PointerOver;
 			pub use crate::ui::prelude::ScrollPosition;
 		}
 	}

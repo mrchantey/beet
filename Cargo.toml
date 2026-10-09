@@ -666,9 +666,6 @@ uuid = { workspace = true, features = ["std", "js"] }
 
 [dev-dependencies]
 beet = { path = "." }
-# beet = { path = "", features = ["launch", "server_app", "client", "rand"] }
-# bevy.workspace = true
-# bevy = { workspace = true, default_features = true }
 serde.workspace = true
 serde_json.workspace = true
 async-executor.workspace = true
@@ -692,7 +689,7 @@ required-features = ["net", "ureq", "native-tls"]
 [[example]]
 name = "http_server"
 path = "examples/net/http_server.rs"
-required-features = ["http_server"]
+required-features = ["http_server", "ureq"]
 
 [[example]]
 name = "socket_client"
@@ -712,7 +709,7 @@ required-features = ["tungstenite", "action"]
 [[example]]
 name = "templating"
 path = "examples/net/templating.rs"
-required-features = ["http_server"]
+required-features = ["http_server", "ureq"]
 
 [[example]]
 name = "webdriver"
@@ -970,6 +967,7 @@ harness = false
 name = "server_bench"
 path = "tests/benches/beet_net/server_bench.rs"
 harness = false
+required-features = ["http_server", "ureq"]
 
 [[bench]]
 name = "bench_observer_global"

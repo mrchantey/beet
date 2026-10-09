@@ -12,27 +12,27 @@ use std::process::Command;
 /// rust: 50,000
 ///
 /// ## Expect
-/// 10 lines of 'expect' comilied in 0.53s, each line added 53.00ms
-/// 100 lines of 'expect' comilied in 0.47s, each line added 4.70ms
-/// 1000 lines of 'expect' comilied in 0.49s, each line added 0.49ms
-/// 2000 lines of 'expect' comilied in 0.50s, each line added 0.25ms
-/// 3000 lines of 'expect' comilied in 0.53s, each line added 0.18ms
-/// 5000 lines of 'expect' comilied in 0.56s, each line added 0.11ms
-/// 10000 lines of 'expect' comilied in 0.70s, each line added 0.07ms * consistency starts here
-/// 100000 lines of 'expect' comilied in 5.37s, each line added 0.05ms
-/// 20000 lines of 'expect' comilied in 1.06s, each line added 0.05ms
-/// 500000 lines of 'expect' comilied in 44.00s, each line added 0.09ms
+/// 10 lines of 'expect' compiled in 0.53s, each line added 53.00ms
+/// 100 lines of 'expect' compiled in 0.47s, each line added 4.70ms
+/// 1000 lines of 'expect' compiled in 0.49s, each line added 0.49ms
+/// 2000 lines of 'expect' compiled in 0.50s, each line added 0.25ms
+/// 3000 lines of 'expect' compiled in 0.53s, each line added 0.18ms
+/// 5000 lines of 'expect' compiled in 0.56s, each line added 0.11ms
+/// 10000 lines of 'expect' compiled in 0.70s, each line added 0.07ms * consistency starts here
+/// 100000 lines of 'expect' compiled in 5.37s, each line added 0.05ms
+/// 20000 lines of 'expect' compiled in 1.06s, each line added 0.05ms
+/// 500000 lines of 'expect' compiled in 44.00s, each line added 0.09ms
 ///
 /// ## Assert
 ///
-/// 10 lines of 'assert' comilied in 0.21s, each line added 21.00ms
-/// 100 lines of 'assert' comilied in 0.23s, each line added 2.30ms
-/// 1000 lines of 'assert' comilied in 1.54s, each line added 1.54ms * smallest
-/// 2000 lines of 'assert' comilied in 4.92s, each line added 2.46ms
-/// 3000 lines of 'assert' comilied in 11.61s, each line added 3.87ms
-/// 5000 lines of 'assert' comilied in 26.96s, each line added 5.39ms * consistency starts here
-/// 10000 lines of 'assert' comilied in 55.00s, each line added 5.50ms
-/// 20000 lines of 'expect' comilied in 1.06s, each line added 0.05ms * this is incorrect, it actually took 10 mins
+/// 10 lines of 'assert' compiled in 0.21s, each line added 21.00ms
+/// 100 lines of 'assert' compiled in 0.23s, each line added 2.30ms
+/// 1000 lines of 'assert' compiled in 1.54s, each line added 1.54ms * smallest
+/// 2000 lines of 'assert' compiled in 4.92s, each line added 2.46ms
+/// 3000 lines of 'assert' compiled in 11.61s, each line added 3.87ms
+/// 5000 lines of 'assert' compiled in 26.96s, each line added 5.39ms * consistency starts here
+/// 10000 lines of 'assert' compiled in 55.00s, each line added 5.50ms
+/// 20000 lines of 'expect' compiled in 1.06s, each line added 0.05ms * this is incorrect, it actually took 10 mins
 /// 100000... no way dude
 
 #[derive(Debug)]
@@ -128,7 +128,7 @@ impl BenchAssert {
 		let time_per_iter = (duration / self.iterations as f64) * 1000.;
 
 		println!(
-			"{} lines of '{}' comilied in {:.2}s, each line added {:.2}ms",
+			"{} lines of '{}' compiled in {:.2}s, each line added {:.2}ms",
 			self.iterations, test_name, duration, time_per_iter
 		);
 		Ok(())

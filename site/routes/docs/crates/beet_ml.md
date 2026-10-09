@@ -8,7 +8,7 @@ title = "beet_ml"
 
 It currently spans two domains:
 
-- **Language**: the `Bert` sentence-embedding asset, running on [burn](https://burn.dev) with selectable wgpu, ndarray or cuda backends, paired with a `Sentence` action that picks the closest match to a user phrase. This is enough to route natural language to behavior without a cloud round trip.
+- **Language**: the `Bert` sentence-embedding asset, running on [burn](https://burn.dev) with selectable wgpu, flex (pure-Rust CPU) or cuda backends, paired with a `Sentence` action that picks the closest match to a user phrase. This is enough to route natural language to behavior without a cloud round trip.
 - **Reinforcement learning**: a `FrozenLake` environment and Q-learning agents ported from OpenAI Gym, runnable headless for training or in realtime to watch them learn.
 
 Add `BeetMlPlugins` to register the assets, actions and tick schedule.
