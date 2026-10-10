@@ -2,7 +2,7 @@
 //! the in-house replacement for the retired playwright `verify_client.js`:
 //! drive the live site through the webdriver, fail on any client error, and
 //! prove the counter page's first paint, in-page navigability, asset store
-//! topology and mobile layout.
+//! topology and the desktop and mobile layouts.
 //!
 //! Client-side interactivity is not asserted here: the deployed site does not
 //! yet boot the wasm runtime its pages could carry (`<Wasm/>`, see
@@ -110,10 +110,38 @@ async fn verifies_client() {
 		.collect::<Vec<_>>()
 		.xpect_empty();
 
+	// desktop layout: every table stays inside the page's measure column, and
+	// a table page's sidebar rail is exactly as wide as a prose page's, ie no
+	// content widens the row around it. 1280 is inside the rail's shrink
+	// range, 1920 past the column's measure cap.
+	cross_log!("stage: asset sweep done");
+	let mut layout_faults = Vec::new();
+	for width in [1280, 1920] {
+		page.set_viewport(width, 800).await.unwrap();
+		let prose =
+			DesktopLayout::measure(&mut page, &base, "/docs/about").await;
+		for path in ["/docs/design/table", "/docs/crates", "/docs/secrets"] {
+			let layout = DesktopLayout::measure(&mut page, &base, path).await;
+			if layout.sidebar != prose.sidebar {
+				layout_faults.push(format!(
+					"{width}px {path}: sidebar {} != prose sidebar {}",
+					layout.sidebar, prose.sidebar
+				));
+			}
+			layout_faults.extend(
+				layout
+					.escapes
+					.into_iter()
+					.map(|escape| format!("{width}px {path}: {escape}")),
+			);
+		}
+	}
+	layout_faults.xpect_empty();
+
 	// mobile layout: no horizontal overflow at phone widths (the matcher
 	// prints the offending elements on failure), and the opened sidebar
 	// drawer overlays the content rather than squeezing it into overflow
-	cross_log!("stage: asset sweep done");
+	cross_log!("stage: desktop layout done");
 	for width in [375, 320] {
 		page.set_viewport(width, 812).await.unwrap();
 		for path in ["/", "/blog", "/blog/bevys-five-and-beets-alive"] {
@@ -149,4 +177,46 @@ async fn verifies_client() {
 		.xpect_empty();
 
 	page.kill().await.unwrap();
+}
+
+
+/// The desktop layout facts a page is judged by.
+struct DesktopLayout {
+	/// The sidebar rail's width in px.
+	sidebar: f64,
+	/// Each table whose visible box (its scroll wrapper) escapes the page's
+	/// measure column, the extent of its `h1`.
+	escapes: Vec<String>,
+}
+
+impl DesktopLayout {
+	/// Navigate to `path` and measure its layout.
+	async fn measure(page: &mut Page, base: &str, path: &str) -> Self {
+		page.navigate(&format!("{base}{path}")).await.unwrap();
+		page.find("main h1").await;
+		let layout = page
+			.evaluate_value(
+				r#"(() => {
+					const column = document.querySelector('main h1').getBoundingClientRect();
+					return {
+						sidebar: document.querySelector('#sidebar').getBoundingClientRect().width,
+						escapes: [...document.querySelectorAll('main table')]
+							.map(table => (table.closest('.table-scroll') ?? table).getBoundingClientRect())
+							.filter(rect => rect.left < column.left - 0.5 || rect.right > column.right + 0.5)
+							.map(rect => `table ${rect.left}..${rect.right} escapes column ${column.left}..${column.right}`),
+					};
+				})()"#,
+			)
+			.await
+			.unwrap();
+		Self {
+			sidebar: layout["sidebar"].as_f64().unwrap(),
+			escapes: layout["escapes"]
+				.as_array()
+				.unwrap()
+				.iter()
+				.map(|escape| escape.as_str().unwrap().to_string())
+				.collect(),
+		}
+	}
 }

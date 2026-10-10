@@ -109,10 +109,13 @@ pub fn all_rules() -> Vec<Rule> {
 		mark_prose(),
 		code_prose(),
 		pre_prose(),
+		pre_code_prose(),
 		blockquote_prose(),
 		// terminal-only heading hue, gated behind `@media` Terminal
 		terminal_headings(),
 		main_content(),
+		// the `@media screen` row basis, ignored by charcell
+		main_content_basis(),
 		main_content_measure(),
 		page(),
 		// form controls — state/compound rules first so they win the cascade

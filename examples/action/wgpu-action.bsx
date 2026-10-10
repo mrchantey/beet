@@ -10,8 +10,8 @@ agent-chosen `DifferentialDrive` into the fox exactly as these `SetDrive` +
 `EndInDuration` steps do. Copied upstream from a downstream demo; `Drive` was renamed
 to `SetDrive` to match the current API.
 -->
+<RequireCfg cfg="feature:winit"/>
 <Scene3d>
-	<RequireCfg cfg="feature:winit"/>
 	<AppWindow/>
 	<Camera3d {CameraDistance{width:95., offset:{x:0., y:42., z:60.}}}/>
 	<Lighting3d/>

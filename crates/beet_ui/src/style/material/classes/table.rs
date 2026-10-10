@@ -19,16 +19,20 @@ pub const TABLE_VERTICAL_BORDERS: ClassName =
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
-/// The [`TABLE_SCROLL`] wrapper: a full-width block with the block gap below
-/// (so the next block clears the table rather than butting against its last
-/// row) that scrolls horizontally rather than growing past its column. The gap
-/// sits here, not on the table, so the web's scrollbar hugs the last row. The
-/// terminal scales the columns down to fit instead, so it never overflows.
+/// The [`TABLE_SCROLL`] wrapper: a block filling its column with the block gap
+/// below (so the next block clears the table rather than butting against its
+/// last row) that scrolls horizontally rather than growing past its column. The
+/// gap sits here, not on the table, so the web's scrollbar hugs the last row.
+/// The terminal scales the columns down to fit instead, so it never overflows.
+///
+/// Declares no width of its own: as a direct child of `<main>` (a markdown
+/// table) the wrapper takes the prose measure from
+/// [`main_content_measure`](super::main_content_measure), which any width here
+/// would outrank by specificity, stretching the table past the column.
 pub fn table_scroll() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(TABLE_SCROLL))
 		.with_value(common_props::DisplayProp, Display::Block)
-		.with_value(common_props::MaxWidth, Length::Percent(100.))
 		.with_value(common_props::OverflowXProp, Overflow::Auto)
 		.with_value(common_props::MarginProp, Spacing {
 			bottom: Length::Rem(1.),

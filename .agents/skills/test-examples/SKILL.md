@@ -123,9 +123,9 @@ cargo build -p beet-cli --features=extra        # every scene below except the m
 cargo build -p beet-cli --features=extra,ml     # adds `hello_ml.bsx`
 ```
 
-A binary without `extra` does not fail fast on these entries the way `hello_ml.bsx` does: none of them declare `<RequireCfg cfg="feature:extra"/>`, so instead of a named missing capability you get a spread warning (`skipping spread 'SayHello'`) and then `No Action<(), ()>`. Worth fixing in the entries; until then, read that pair of messages as "rebuild with `extra`".
+Every action scene naming a `beet_extra` action (`hello_world`, `simple_action`, `long_running`, `malenia`, `state_machine`, `scripting`) declares `<RequireCfg cfg="feature:extra"/>` beside its root element, where the entry prescan consumes it rather than building it into the `<Sequence>`, so a binary without `extra` refuses the load before anything builds with `this binary does not satisfy <RequireCfg cfg="feature:extra"/>, unmet: feature:extra`. `behavior_tree`, `repeat_while`, `utility_ai` and `world_script` use only the core vocabulary and run on any build. `winit` enables `extra`, so the windowed build satisfies the requirement too.
 
-Beware the `ml` build specifically: it pulls `winit` and bevy_render, so every scene brings up a wgpu device and compiles compute pipelines whether or not it needs a GPU. On an NVIDIA host that intermittently segfaults inside `libnvidia-glcore` during `create_compute_pipeline`, on bevy's async compute thread, which has nothing to do with the scene. Use the `extra`-only binary for everything but the ml scene.
+The `ml` build pulls `winit` and bevy_render, so every scene brings up a wgpu device and compiles bevy's compute pipelines on its async compute pool whether or not it needs a GPU; a short scene exits while those compiles are still in the driver. A segfault inside `libnvidia-glcore` during `create_compute_pipeline` (or an `NVVM compilation failed` + `DeviceLost` log) is an exit tearing the driver down beneath that thread, which `process_ext::exit` avoids by `_exit`ing. It is a regression, never host noise: `__GL_SHADER_DISK_CACHE=0` forces every compile through the driver and reproduces it on every short scene. The `extra`-only binary is still the faster build for everything but the ml scene.
 
 ```sh
 beet --entry=examples/hello                                       # prints "hello world"
@@ -138,7 +138,7 @@ The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_runni
 
 Skip: `examples/spatial/*.bsx`, `examples/action/wgpu-action.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead).
 
-Every other scene in `examples/action/` exits 0 (`wgpu-action.bsx` requires `feature:winit`, so a leaner binary refuses it before anything builds). A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
+Every other scene in `examples/action/` exits 0 (`wgpu-action.bsx` requires `feature:winit`, so a leaner binary refuses it before anything builds). Verify a refusal once per sweep against a binary built without `extra` (`cargo build -p beet-cli`): `hello_world.bsx` must exit nonzero naming `feature:extra`. A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
 
 ## Not Verifiable Via CLI (skip)
 

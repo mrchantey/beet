@@ -97,6 +97,8 @@ std = [
 	"dep:async-io",
 	"dep:async-task",
 	"dep:blocking",
+	# `process_ext::exit`'s `_exit`, native only (a target dependency)
+	"dep:libc",
 	# std builds want the full rand surface: `rand::rng()` (thread_rng) and the
 	# std backends. Optional so non-rand std builds are unaffected.
 	"rand?/std",

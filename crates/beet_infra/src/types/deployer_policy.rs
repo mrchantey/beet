@@ -34,9 +34,10 @@ use serde_json::json;
 /// - `ssm:*` under this app's own parameter prefix (`/<app>/`), which is the
 ///   stack's secret store, granted whether or not the config renders a
 ///   parameter: a verb that parks a secret writes through the store, not
-///   through a rendered resource. The provider's own parameter reads add AWS's
-///   public `/aws/service/` tree (an AMI id) and the one call that takes no
-///   resource, `ssm:DescribeParameters`.
+///   through a rendered resource. Listing that store (a teardown's sweep,
+///   `secrets/ls`) is `ssm:DescribeParameters`, the one parameter call that
+///   takes no resource, so it is granted on `*` alongside. The provider's own
+///   parameter reads add AWS's public `/aws/service/` tree (an AMI id).
 /// - `<service>:*` on `*` for every other service, conditioned on the regions
 ///   the stacks declare.
 ///
@@ -374,27 +375,28 @@ impl DeployerPolicy {
 			"Action": "ssm:*",
 			"Resource": format!("arn:aws:ssm:*:*:parameter/{}/*", self.app),
 		}));
+		// listing that store, just as unconditionally: every teardown sweeps
+		// it through `describe-parameters`, which supports no resource-level
+		// permission, so `*` is the only form it takes. It
+		// answers names and descriptions, never a value. Gating it on a
+		// rendered parameter left every stack rendering none unable to sweep
+		// its own store on destroy.
+		statements.push(json!({
+			"Sid": "SsmDescribe",
+			"Effect": "Allow",
+			"Action": "ssm:DescribeParameters",
+			"Resource": "*",
+		}));
 		if self.services.contains("ssm") {
 			// AWS's own public parameter tree, which a compute block reads its
-			// AMI id out of: public, and outside every app's prefix. Both of
-			// these stay gated on a rendered parameter, since both are the
-			// provider's reads rather than a verb's write and the second takes
-			// no resource at all
+			// AMI id out of: public, outside every app's prefix, and the
+			// provider's read rather than a verb's, so gated on a rendered
+			// parameter
 			statements.push(json!({
 				"Sid": "SsmPublic",
 				"Effect": "Allow",
 				"Action": ["ssm:GetParameter", "ssm:GetParameters"],
 				"Resource": "arn:aws:ssm:*:*:parameter/aws/service/*",
-			}));
-			// `DescribeParameters` supports no resource-level permission at
-			// all, so `*` is the only form it takes; it answers names and
-			// descriptions, never a value, and every provider refresh of a
-			// parameter calls it
-			statements.push(json!({
-				"Sid": "SsmDescribe",
-				"Effect": "Allow",
-				"Action": "ssm:DescribeParameters",
-				"Resource": "*",
 			}));
 		}
 		json!({ "Version": "2012-10-17", "Statement": statements })
@@ -768,12 +770,12 @@ mod test {
 			.xpect_contains("iam:");
 	}
 
-	/// The app's own parameter prefix is granted whether or not the config
-	/// renders a parameter, because the verbs that park a secret write through
-	/// the stack's store rather than through a rendered resource; the
-	/// provider's own parameter reads are not.
+	/// The stack's secret store, its prefix and the listing a teardown sweeps
+	/// it with, is granted whether or not the config renders a parameter,
+	/// because the verbs that park a secret write through the store rather
+	/// than through a rendered resource; the provider's public-tree read is not.
 	#[beet_core::test]
-	fn the_secret_prefix_is_granted_without_a_rendered_parameter() {
+	fn the_secret_store_is_granted_without_a_rendered_parameter() {
 		let (scope, _dir) = RenderScope::test_render_stack(
 			(
 				Stack::new("my-egress").with_stage("prod"),
@@ -801,11 +803,11 @@ mod test {
 			.to_string()
 			.as_str()
 			.xpect_contains("arn:aws:ssm:*:*:parameter/my-egress/*")
-			// the provider's reads are the gated half
+			// the store's listing, which `StackTeardown` sweeps it with
+			.xpect_contains("ssm:DescribeParameters")
+			// the provider's read is the gated half
 			.xnot()
-			.xpect_contains("parameter/aws/service/*")
-			.xnot()
-			.xpect_contains("ssm:DescribeParameters");
+			.xpect_contains("parameter/aws/service/*");
 	}
 
 	/// Two stages of one app share one policy and one state key pattern; a

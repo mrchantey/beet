@@ -6,7 +6,10 @@
 //! returned entity exactly as `world.spawn((Router, ..))` would place them. This
 //! differs from the document-parse convention ([`BsxTemplate::container`]) where
 //! every root node spawns as a child of a container. [`BsxTemplate::load_entry`]
-//! is the file convenience over it.
+//! is the file convenience over it, and [`BsxTemplate::from_entry_nodes`] the
+//! rule itself, for a caller that parsed the document already: the entry launch
+//! consumes the declarations it pre-scans beside the root, then hands it the
+//! rest.
 
 use super::*;
 use crate::prelude::*;
@@ -15,39 +18,67 @@ use std::path::Path;
 
 impl BsxTemplate {
 	/// Parse `source` as an entry document and return the template for its single
-	/// root element, ready to build into a root entity.
-	///
-	/// Like an XML document element, exactly one root element is required;
-	/// comments and whitespace at the root are ignored. `<path::to::X>` tags
-	/// resolve against the world's current [`BsxTemplateRegistry`] (snapshotted
-	/// here), so register any template directories (eg via a `<TemplateDir>` the
-	/// loader pre-scans, or [`BsxTemplateRegistry::insert_source_from_path`]) before
-	/// parsing the entry.
+	/// root element, ready to build into a root entity, see
+	/// [`from_entry_nodes`](Self::from_entry_nodes).
 	///
 	/// This is the single BSX entry-parse path: the unified
 	/// [`TemplateLoader`](crate::prelude::TemplateLoader) dispatches `.bsx`/`.html`
 	/// bytes here, and [`load_entry`](Self::load_entry) is a file convenience over it.
 	pub fn parse_entry(world: &World, source: &str) -> Result<Self> {
-		let mut roots =
-			BsxNode::parse_document(source, &BsxParseConfig::bsx())?
-				.into_iter()
-				.filter(|node| match node {
-					BsxNode::Comment(_) => false,
-					BsxNode::Text(text) => !text.trim().is_empty(),
-					_ => true,
-				});
-		let root = match (roots.next(), roots.next()) {
-			(Some(root @ BsxNode::Element(_)), None) => root,
-			(_, Some(_)) => bevybail!(
-				"an entry document must have a single root element, found multiple roots"
-			),
-			_ => bevybail!("an entry document must have a single root element"),
+		BsxNode::parse_document(source, &BsxParseConfig::bsx())?
+			.xmap(|nodes| Self::from_entry_nodes(world, nodes))
+	}
+
+	/// The template for the single root element among an entry document's
+	/// top-level `nodes`.
+	///
+	/// Like an XML document element, exactly one root element is required;
+	/// comments and whitespace at the root are ignored, and anything else is
+	/// named in the error. `<path::to::X>` tags resolve against the world's
+	/// current [`BsxTemplateRegistry`] (snapshotted here), so register any
+	/// template directories (eg via a `<TemplateDir>` the loader pre-scans, or
+	/// [`BsxTemplateRegistry::insert_source_from_path`]) before calling this.
+	pub fn from_entry_nodes(
+		world: &World,
+		nodes: Vec<BsxNode>,
+	) -> Result<Self> {
+		let roots = nodes
+			.into_iter()
+			.filter(|node| match node {
+				BsxNode::Comment(_) => false,
+				BsxNode::Text(text) => !text.trim().is_empty(),
+				_ => true,
+			})
+			.collect::<Vec<_>>();
+		let root = match <[BsxNode; 1]>::try_from(roots) {
+			Ok([root @ BsxNode::Element(_)]) => root,
+			Ok(roots) => return Err(Self::single_root_error(&roots)),
+			Err(roots) => return Err(Self::single_root_error(&roots)),
 		};
 		let registry = world
 			.get_resource::<BsxTemplateRegistry>()
 			.cloned()
 			.unwrap_or_default();
 		Ok(Self::new(vec![root], registry))
+	}
+
+	/// The single-root rule broken by `roots`, naming each.
+	fn single_root_error(roots: &[BsxNode]) -> BevyError {
+		let found = match roots {
+			[] => "none".to_string(),
+			roots => roots
+				.iter()
+				.map(|node| match node {
+					BsxNode::Element(element) => format!("`<{}>`", element.tag),
+					BsxNode::Text(text) => format!("text `{}`", text.trim()),
+					_ => "non-element content".into(),
+				})
+				.collect::<Vec<_>>()
+				.join(", "),
+		};
+		bevyhow!(
+			"an entry document must have a single root element, found {found}"
+		)
 	}
 
 	/// Read and [`parse_entry`](Self::parse_entry) the entry document at `path`, a
@@ -114,7 +145,7 @@ mod test {
 			.err()
 			.unwrap()
 			.to_string()
-			.xpect_contains("single root element");
+			.xpect_contains("single root element, found `<a>`, `<b>`");
 	}
 
 	#[derive(Debug, Default, Component, Reflect)]

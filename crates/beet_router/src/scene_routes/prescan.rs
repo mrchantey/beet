@@ -5,9 +5,16 @@
 //! `<RequireCfg>` fires even when the tree cannot build, and `<Secrets>` sets
 //! the environment before any constructor reads it. None has a meaning after
 //! the build that differs, so the set is a registry of TYPES rather than a
-//! per-element annotation an author could forget: a registered type at the
-//! entry's top level, with string attributes and no `bx:cfg`, acts before the
-//! build, and nothing else does.
+//! per-element annotation an author could forget: a registered type with
+//! string attributes and no `bx:cfg`, beside the entry's root element or
+//! anywhere within it, acts before the build, and nothing else does.
+//!
+//! One beside the root element is consumed by the prescan rather than built,
+//! so a root admitting no such child (a `<Sequence>`, whose every child is a
+//! step) still declares what it needs, and the single-root rule counts what
+//! remains ([`EntryPrescan::bsx_template`]). A declaration the built tree must
+//! also find (the `<Secrets>` the `secrets` verbs default to, a `<TemplateDir>`
+//! whose files live reload) belongs inside the root.
 
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -186,8 +193,10 @@ pub impl App {
 }
 
 /// Everything entry resolution reads out of a raw entry document, from one
-/// registry-free walk: every registered [`Prescan`] declaration and every
-/// `<Template src>` include.
+/// registry-free walk: every registered [`Prescan`] declaration, every
+/// `<Template src>` include, and the document left once the declarations
+/// beside its root are consumed, which the build resolves
+/// ([`bsx_template`](Self::bsx_template)).
 ///
 /// One parse per bootstrap, versus the several the same bytes used to get. The
 /// declarations remain the authoring vocabulary; this is only the extraction,
@@ -201,8 +210,9 @@ pub impl App {
 /// instead, an include is one the watcher picks up on rebuild), while scanning an
 /// EXCLUDED branch would fire a `<RequireCfg>` this build was never meant to
 /// satisfy and fail the load over a requirement that does not apply. So the
-/// conditional case is left to the build, which is the stage that can answer it.
-/// Entry-level declarations belong at the entry's top level regardless.
+/// conditional case is left to the build, which is the stage that can answer it,
+/// and a conditional declaration beside the root is not consumed: it counts as
+/// a second root. An entry-level declaration is written unconditional.
 ///
 /// What the entry *instantiates* is not read here: the build resolves every tag
 /// and marks each registry template it expands
@@ -216,6 +226,10 @@ pub struct EntryPrescan {
 	/// not local files a watcher sees, and an include is the watcher's business
 	/// rather than a declaration, so it stays a plain path list.
 	pub includes: Vec<RelPath>,
+	/// A markup entry's top-level nodes less the declarations collected among
+	/// them. `None` for a serde entry, which declares nothing and builds from
+	/// its bytes.
+	document: Option<Vec<BsxNode>>,
 }
 
 impl EntryPrescan {
@@ -234,6 +248,16 @@ impl EntryPrescan {
 			BsxNode::parse_document(entry.as_utf8()?, &BsxParseConfig::bsx())?;
 		let mut prescan = Self::default();
 		prescan.collect(&nodes, registry)?;
+		// a declaration beside the root is the prescan's alone: consumed here
+		// rather than built, or counted as a second root
+		prescan.document = nodes
+			.into_iter()
+			.filter(|node| {
+				!matches!(node, BsxNode::Element(element)
+					if Self::declaration(element, registry).is_some())
+			})
+			.collect::<Vec<_>>()
+			.xsome();
 		prescan.xok()
 	}
 
@@ -242,6 +266,14 @@ impl EntryPrescan {
 	/// walk uses it, so a broken include never blocks watch startup.
 	pub fn parse_lossy(entry: &MediaBytes, registry: &PrescanRegistry) -> Self {
 		Self::parse(entry, registry).unwrap_or_default()
+	}
+
+	/// The template a markup entry builds: its single root element
+	/// ([`BsxTemplate::from_entry_nodes`]) once the declarations beside it
+	/// are consumed. `None` for a serde entry, which builds from its bytes.
+	pub fn bsx_template(self, world: &World) -> Option<Result<BsxTemplate>> {
+		self.document
+			.map(|nodes| BsxTemplate::from_entry_nodes(world, nodes))
 	}
 
 	/// Every collected `T`, in document order.
@@ -286,7 +318,7 @@ impl EntryPrescan {
 				continue;
 			};
 			// a conditional subtree is the build's to answer, see the type docs
-			if element.attributes.iter().any(|attr| attr.key == "bx:cfg") {
+			if Self::is_conditional(element) {
 				continue;
 			}
 			if element.tag == "Template" {
@@ -295,14 +327,31 @@ impl EntryPrescan {
 						.filter(|src| !Self::is_remote(src))
 						.map(RelPath::new),
 				);
-			} else if let Some(registration) = registry.by_tag(&element.tag)
-				&& !Self::has_spread(element)
+			} else if let Some(registration) =
+				Self::declaration(element, registry)
 			{
 				self.declarations.push((registration.collect)(element)?);
 			}
 			self.collect(&element.children, registry)?;
 		}
 		Ok(())
+	}
+
+	/// The registration `element` is collected as: a registered tag carrying
+	/// no spread (which names something the build resolves) and no `bx:cfg`.
+	fn declaration<'a>(
+		element: &BsxElement,
+		registry: &'a PrescanRegistry,
+	) -> Option<&'a PrescanRegistration> {
+		registry.by_tag(&element.tag).filter(|_| {
+			!Self::has_spread(element) && !Self::is_conditional(element)
+		})
+	}
+
+	/// Whether the element carries a `bx:cfg`, leaving its subtree to the
+	/// build.
+	fn is_conditional(element: &BsxElement) -> bool {
+		element.attributes.iter().any(|attr| attr.key == "bx:cfg")
 	}
 
 	/// The value of a string attribute, if present. A non-literal (block) value

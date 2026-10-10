@@ -116,8 +116,11 @@ pub fn sidebar() -> Rule {
 }
 
 /// Web sidebar - a responsive rail that prefers a comfortable 22rem but shrinks
-/// to a 16rem floor when a wide main column needs the room (the rail is a flex
-/// item beside it, so `min-width` is the floor and `max-width` the ceiling).
+/// toward a 16rem floor while the viewport is too narrow for it beside the main
+/// column's full measure (the rail is a flex item beside it, so `min-width` is
+/// the floor and `max-width` the ceiling). The column's fixed basis
+/// ([`main_content_basis`](super::main_content_basis)) makes the rail's width a
+/// function of the viewport alone, the same on every page whatever its content.
 /// Screen-gated; the terminal uses the fixed [`sidebar_terminal`].
 pub fn sidebar_web() -> Rule {
 	Rule::new()

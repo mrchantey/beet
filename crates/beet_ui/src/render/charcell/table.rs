@@ -1,13 +1,14 @@
 //! Table layout for the charcell engine.
 //!
 //! A `<table>` ([`Display::Table`]) is laid out as a column-aligned grid: every
-//! column takes the width of its widest cell (scaled down to fit the table), and
-//! every row is as tall as its tallest cell. Rows and row groups carry no
-//! display of their own — a *row* is found structurally as any node whose direct
-//! children are [`Display::TableCell`], which covers a `<tr>` wherever it sits
-//! and a `<thead>` holding its header cells directly. The intermediate wrappers
-//! (`<thead>`/`<tbody>`/`<tr>`) are recorded as table-managed so the main layout
-//! loop leaves them alone rather than re-stacking the grid as plain blocks.
+//! column takes the width of its widest cell (narrowed to fit the table, see
+//! [`column_widths`]), and every row is as tall as its tallest cell. Rows and
+//! row groups carry no display of their own — a *row* is found structurally as
+//! any node whose direct children are [`Display::TableCell`], which covers a
+//! `<tr>` wherever it sits and a `<thead>` holding its header cells directly.
+//! The intermediate wrappers (`<thead>`/`<tbody>`/`<tr>`) are recorded as
+//! table-managed so the main layout loop leaves them alone rather than
+//! re-stacking the grid as plain blocks.
 use super::*;
 use crate::style::Display;
 use beet_core::prelude::*;
@@ -60,37 +61,80 @@ fn collect_rows(
 	}
 }
 
-/// The intrinsic width a cell entity wants, in cells (at least one).
-fn cell_width(entity: Entity, query: &CharcellQuery) -> u32 {
-	query
-		.unresolved_node(entity)
-		.map(|cell| cell.intrinsic_size().x.max(1))
-		.unwrap_or(1)
-}
-
-/// Each column's width in cells: the widest cell in the column, scaled down
-/// proportionally when the columns together overflow the table's `available`
-/// content width.
+/// Each column's width in cells, the CSS auto table layout: the widest cell's
+/// max-content width when the columns fit the table's `available` content
+/// width, else each column floored at its longest word with the remaining space
+/// shared in proportion to how much wider each wants to be. Only a table too
+/// narrow for even its longest words scales the floors down, breaking words.
 fn column_widths(
 	rows: &[TableRow],
 	query: &CharcellQuery,
 	available: u32,
+	viewport: UVec2,
 ) -> Vec<u32> {
 	let cols = rows.iter().map(|row| row.cells.len()).max().unwrap_or(0);
-	let mut widths = vec![0u32; cols];
+	// each column's (min-content, max-content) width, at least one cell
+	let mut min = vec![1u32; cols];
+	let mut max = vec![1u32; cols];
 	for row in rows {
 		for (col, &cell) in row.cells.iter().enumerate() {
-			widths[col] = widths[col].max(cell_width(cell, query));
+			let Ok(node) = query.unresolved_node(cell) else {
+				continue;
+			};
+			let cell_max = node.intrinsic_size().x.max(1);
+			max[col] = max[col].max(cell_max);
+			min[col] = min[col]
+				.max(min_content_width(&node, query, viewport).min(cell_max));
 		}
 	}
-	let total: u32 = widths.iter().sum();
-	if total > available && available > 0 {
-		for width in &mut widths {
-			*width = ((*width as u64 * available as u64) / total as u64).max(1)
-				as u32;
-		}
+	let (min_total, max_total) =
+		(min.iter().sum::<u32>(), max.iter().sum::<u32>());
+	if available == 0 || max_total <= available {
+		max
+	} else if min_total >= available {
+		min.iter()
+			.map(|&width| {
+				((width as u64 * available as u64) / min_total as u64).max(1)
+					as u32
+			})
+			.collect()
+	} else {
+		let (spare, wanted) = (
+			(available - min_total) as u64,
+			(max_total - min_total) as u64,
+		);
+		min.iter()
+			.zip(&max)
+			.map(|(&lo, &hi)| lo + ((hi - lo) as u64 * spare / wanted) as u32)
+			.collect()
 	}
-	widths
+}
+
+/// The narrowest `node` lays out without breaking a word, in cells: its longest
+/// word at its glyph scale, or its widest child's, plus its own padding and
+/// border (the CSS min-content width).
+fn min_content_width(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+) -> u32 {
+	let text = node
+		.value()
+		.map(|value| value.to_string())
+		.or_else(|| node.marker().map(str::to_string));
+	let content = match text {
+		Some(text) => text
+			.split(collapsible)
+			.map(|word| measure_scaled(node.visual_style(), word, u32::MAX).x)
+			.max()
+			.unwrap_or(0),
+		None => node
+			.child_nodes(query)
+			.map(|child| min_content_width(&child, query, viewport))
+			.max()
+			.unwrap_or(0),
+	};
+	content + BoxModel::from_node(node, viewport).overhead().x
 }
 
 /// A row's height: the tallest of its cells, each resolved at its column width.
@@ -128,7 +172,7 @@ pub(super) fn measure_table(
 ) -> UVec2 {
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, &mut HashSet::default());
-	let widths = column_widths(&rows, query, available.x);
+	let widths = column_widths(&rows, query, available.x, viewport);
 	// the measure pass bounds a raster by the viewport, not a scroll port it
 	// cannot know yet (see `measure_node`).
 	let height = rows
@@ -148,7 +192,7 @@ pub(super) fn resolve_table_height(
 ) -> u32 {
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, &mut HashSet::default());
-	let widths = column_widths(&rows, query, content_width);
+	let widths = column_widths(&rows, query, content_width, viewport);
 	rows.iter()
 		.map(|row| row_height(row, query, &widths, viewport, port_rows))
 		.sum()
@@ -173,7 +217,8 @@ pub(super) fn table_layout_rects(
 		scrollport_of(node, query, box_model.content_rect(container_rect));
 	let mut rows = Vec::new();
 	collect_rows(node.entity, query, &mut rows, managed);
-	let widths = column_widths(&rows, query, content.width().max(0) as u32);
+	let widths =
+		column_widths(&rows, query, content.width().max(0) as u32, viewport);
 
 	let mut row_y = content.min.y;
 	for row in &rows {
@@ -223,32 +268,51 @@ mod test {
 		)
 	}
 
+	/// Render `table` through the real pipeline and Material rule set.
+	fn render(width: u32, table: Snippet) -> String {
+		crate::widgets::test_ext::render_charcell(width, (), table)
+	}
+
 	/// Cells lay out as a grid, each row on its own line with its columns side by
 	/// side — guarding the original bug where a `<table>` rendered as a vertical
 	/// list (every cell stacked on its own row). The wider first-column cell also
 	/// pushes the second column right, so columns line up across rows.
 	#[beet_core::test]
 	fn rows_lay_cells_side_by_side() {
-		let table = (
-			LayoutStyle {
-				display: Display::Table,
-				..default()
-			},
-			children![
-				// a `<tr>` is a plain block whose cells mark it as a row
-				(LayoutStyle::default(), children![cell("Name"), cell("Age")]),
-				(LayoutStyle::default(), children![cell("Alice"), cell("30")]),
-			],
-		);
-		let out = Buffer::render_oneshot_plain_sized(UVec2::new(20, 6), table)
-			.trim_lines();
-		// each row keeps its two cells on one line (not stacked into a list)
+		let out = render(20, rsx! {
+			<table>
+				<tr><td>"Name"</td><td>"Age"</td></tr>
+				<tr><td>"Alice"</td><td>"30"</td></tr>
+			</table>
+		});
 		let header = out.lines().find(|line| line.contains("Name")).unwrap();
 		let body = out.lines().find(|line| line.contains("Alice")).unwrap();
-		header.xpect_contains("Name").xpect_contains("Age");
-		body.xpect_contains("Alice").xpect_contains("30");
-		// the second column sits past the widest first-column cell ("Alice" = 5)
-		(body.find("30").unwrap() >= 5).xpect_true();
+		// each row keeps its two cells on one line, the rows on separate lines
+		header.xpect_contains("Age").xnot().xpect_contains("Alice");
+		body.xpect_contains("30");
+		// the second column starts past the widest first-column cell, the same
+		// offset in every row
+		body.find("30").xpect_eq(header.find("Age"));
+		(body.find("30").unwrap() > body.find("Alice").unwrap() + 5)
+			.xpect_true();
+	}
+
+	/// A table narrower than its content keeps every word whole while the
+	/// space allows: a short-worded column holds its longest word and the prose
+	/// column wraps, rather than every column scaling down and splitting
+	/// `beet_core` mid-word.
+	#[beet_core::test]
+	fn narrow_table_keeps_words_whole() {
+		render(40, rsx! {
+			<Table>
+				<tr>
+					<td>"beet_core"</td>
+					<td>"Cross-platform types, extension traits and the test runner"</td>
+				</tr>
+			</Table>
+		})
+		.xpect_contains("beet_core")
+		.xpect_contains("Cross-platform");
 	}
 
 	/// The `<table>` rule carries `width: 100%`. With explicit-width resolution in

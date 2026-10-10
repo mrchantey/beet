@@ -226,6 +226,8 @@ pub fn grid() -> Rule {
 
 /// The readable measure the main content column is capped at.
 const MAIN_MEASURE_REM: f32 = 70.;
+/// The padding around the main content column, on every side.
+const MAIN_PADDING_REM: f32 = 1.;
 
 /// Main content column: a centred flex column that grows to fill the space
 /// beside the sidebar. Paired with [`main_content_measure`], which caps each
@@ -246,7 +248,22 @@ pub fn main_content() -> Rule {
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
-		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
+		.with_value(common_props::Padding, Spacing::all(Length::Rem(MAIN_PADDING_REM)))
+}
+
+/// Web main column basis - in the [`container`] row `<main>` starts from its
+/// full measure plus padding rather than its content, so the [`sidebar_web`]
+/// rail and the column split any shortfall by a fixed ratio. A content-sized
+/// basis let each page's content width the rail: a page of short blocks kept
+/// the full 22rem rail, prose shrank it and a wide table drove it to its floor.
+/// Screen-gated, pairing with [`sidebar_web`]; the terminal rail is fixed.
+///
+/// [`sidebar_web`]: super::sidebar_web
+pub fn main_content_basis() -> Rule {
+	Rule::new()
+		.with_media(MediaQuery::Screen)
+		.with_selector(Selector::child(Selector::class(CONTAINER), Selector::tag("main")))
+		.with_value(common_props::FlexBasisProp, Length::Rem(MAIN_MEASURE_REM + 2. * MAIN_PADDING_REM))
 }
 
 /// Cap each direct child of `<main>` at [`MAIN_MEASURE_REM`] so page content

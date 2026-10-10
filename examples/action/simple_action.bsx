@@ -7,4 +7,5 @@ load, then exits.
 
     beet --entry=examples/action/simple_action.bsx
 -->
+<RequireCfg cfg="feature:extra"/>
 <Name("greeter") {(SayHello, CallOnReady)}/>

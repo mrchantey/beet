@@ -7,6 +7,7 @@ log. `{CallOnReady}` runs the sequence on load, then exits.
 
     beet --entry=examples/action/long_running.bsx
 -->
+<RequireCfg cfg="feature:extra"/>
 <Sequence {CallOnReady}>
 	<Patrol/>
 	<Log message="patrol complete"/>

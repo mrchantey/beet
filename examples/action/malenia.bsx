@@ -18,6 +18,7 @@ the attacks resolve their target by query. The loop runs until someone falls.
 
     beet --entry=examples/action/malenia.bsx
 -->
+<RequireCfg cfg="feature:extra"/>
 <Name("Malenia") {(Health(100.0), HealingPotions(2), Repeat, CallOnReady)}>
 	<Fallback>
 		<TryHealSelf/>

@@ -277,6 +277,15 @@ pub fn pre_prose() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(1.)))
 }
 
+/// The `<code>` inside a block `<pre>` - drops the [`code_prose`] chip inset,
+/// which as inline padding lands on the first line alone, shifting it right of
+/// every line below. The `<pre>` carries the padding instead.
+pub fn pre_code_prose() -> Rule {
+	Rule::new()
+		.with_selector(Selector::child(Selector::tag("pre"), Selector::tag("code")))
+		.with_value(common_props::Padding, Spacing::DEFAULT)
+}
+
 /// Block `<blockquote>` - a flat tonal callout with an italic body and a primary
 /// left rule, the look shared by web and terminal. A plain `surface-container-low`
 /// fill (no elevation shadow, which would fight the flat surface) keeps it

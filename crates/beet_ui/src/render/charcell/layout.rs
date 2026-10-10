@@ -853,7 +853,9 @@ mod tests {
 	/// The content measure applies in the terminal too: on a wide viewport a
 	/// `main > *` child stops at the 70-cell measure and `align-items: center`
 	/// insets it equally. End-to-end regression for the charcell cascade honouring
-	/// the child combinator (previously web-only, so the terminal ignored it).
+	/// the child combinator (previously web-only, so the terminal ignored it), and
+	/// for a markdown table's wrapper outranking the measure with a width of its
+	/// own, stretching the table past the prose column.
 	#[beet_core::test]
 	fn main_content_measure_caps_in_terminal() {
 		use crate::prelude::*;
@@ -869,7 +871,10 @@ mod tests {
 				<html lang="en">
 					<body {Classes::new([classes::PAGE])}>
 						<div {Classes::new([classes::CONTAINER])}>
-							<main><section>"content"</section></main>
+							<main>
+								<section>"content"</section>
+								<Table><tr><td>"cell"</td></tr></Table>
+							</main>
 						</div>
 					</body>
 				</html>
@@ -880,12 +885,24 @@ mod tests {
 			.entity_mut(root)
 			.insert(Buffer::new(UVec2::new(100, 24)).into_double_buffer());
 		world.run_schedule(crate::parse::PostParseTree);
+		// keyed by tag, the table wrapper by its class to tell it from the
+		// container `div`
 		let rects = world
-			.run_system_once(|q: Query<(&Element, &LayoutRect)>| {
-				q.iter()
-					.map(|(el, r)| (el.tag().to_string(), r.0))
-					.collect::<HashMap<_, _>>()
-			})
+			.run_system_once(
+				|q: Query<(&Element, &LayoutRect, Option<&Classes>)>| {
+					q.iter()
+						.map(|(el, rect, class_set)| {
+							let key = match class_set.is_some_and(|class_set| {
+								class_set.contains_name(&classes::TABLE_SCROLL)
+							}) {
+								true => classes::TABLE_SCROLL.to_string(),
+								false => el.tag().to_string(),
+							};
+							(key, rect.0)
+						})
+						.collect::<HashMap<_, _>>()
+				},
+			)
 			.unwrap();
 		let (main, section) = (rects["main"], rects["section"]);
 		// capped at the 70-cell measure, not main's ~100-cell width
@@ -896,6 +913,10 @@ mod tests {
 			(section.min.x - main.min.x, main.max.x - section.max.x);
 		(left > 1).xpect_true();
 		((left - right).abs() <= 1).xpect_true();
+		// the table wrapper, a direct child too, keeps to the same column
+		let table_scroll = rects[classes::TABLE_SCROLL.to_string().as_str()];
+		(table_scroll.min.x, table_scroll.max.x)
+			.xpect_eq((section.min.x, section.max.x));
 	}
 
 	/// The web's narrow-screen sidebar collapse applies in the terminal too:

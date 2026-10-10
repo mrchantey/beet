@@ -393,8 +393,9 @@ pub async fn read_sources(
 /// root. The entry runs itself: its own `CallOnReady` verbs act on their `Ready`, so
 /// a render-only command (`check`, `export-static`, the Worker) passes
 /// [`DisableCallOnReady`] in `extra` to build the tree disarmed. Registers the
-/// entry's declared template sources *before* parsing the entry (so its own tags
-/// resolve), then marks the root [`TemplatesLoaded`]. The synchronous
+/// entry's declared template sources *before* resolving the document its
+/// prescan parsed (so its own tags resolve), then marks the root
+/// [`TemplatesLoaded`]. The synchronous
 /// world-mutating tail of an entry load; returns the root entity. A driver
 /// passes [`RepoStore`] in `extra` to claim the built store as the process's
 /// canonical one.
@@ -430,8 +431,8 @@ pub fn build_root(
 	// in a binary that cannot support it, and the report holds even when the
 	// tree itself cannot build (eg its root tag is not registered here).
 	RequireCfg::assert_all(world, prescan.iter::<RequireCfg>())?;
-	// the entry's own template dirs, registered before the entry parses so its
-	// entry-level tags (eg `<Styles/>`) resolve. The reactive `<TemplateDir>` observer
+	// the entry's own template dirs, registered before its tags resolve so the
+	// entry-level ones (eg `<Styles/>`) find them. The reactive `<TemplateDir>` observer
 	// re-registers them (plus any crate/route dirs) once the tree is built.
 	TemplateDir::register_sources(
 		world,
@@ -442,9 +443,13 @@ pub fn build_root(
 			.map(|template| (template.rel, template.source))
 			.collect(),
 	)?;
-	let template = EntryTemplate::from_bytes(world, &entry).map_err(|err| {
-		bevyhow!("failed to parse entry `{entry_name}`: {err}")
-	})?;
+	// a markup entry builds the document its prescan left, the declarations
+	// beside its root consumed; a serde entry builds from its bytes
+	let template = match prescan.bsx_template(world) {
+		Some(template) => template.map(EntryTemplate::Bsx),
+		None => EntryTemplate::from_bytes(world, &entry),
+	}
+	.map_err(|err| bevyhow!("failed to parse entry `{entry_name}`: {err}"))?;
 	// `TemplatesLoaded` marks the entry-level templates registered (the
 	// readiness signal a wasm Worker waits on before serving).
 	let mut root_entity = world.entity_mut(root);
@@ -539,7 +544,7 @@ pub async fn build_watched(
 /// `/__client_io` socket reconnects and reloads into the new tree.
 ///
 /// Once the tree settles, the structural source set is read off it
-/// ([`entry_source_paths`]) and handed to the [`EntryReloader`], so an include or
+/// (`entry_source_paths`) and handed to the [`EntryReloader`], so an include or
 /// template tag this very edit added is structural on the next one without a
 /// restart. A build that fails leaves the previous set in place: the entry and
 /// its includes are in it, so the fix rebuilds.
@@ -749,26 +754,86 @@ mod test {
 		TemplatePending::settle_owned(&mut world).await;
 	}
 
-	/// An unmet `<RequireCfg>` refuses the load before the tree builds, even
-	/// nested in the root element: nothing it declares spawns, so no
+	/// An unmet `<RequireCfg>` refuses the load before the tree builds, nested
+	/// in the root element or beside it: nothing it declares spawns, so no
 	/// `CallOnReady` action runs in a binary that cannot support it (the
 	/// windowed `wgpu-action.bsx` drove its fox on a headless binary).
 	#[beet_core::test]
 	async fn unmet_requirement_refuses_the_build() {
-		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		build_source(
-			&mut world,
+		for source in [
 			r#"<Router><RequireCfg cfg="feature:nosuch"/><DefaultAppRoutes/></Router>"#,
+			r#"<RequireCfg cfg="feature:nosuch"/><Router><DefaultAppRoutes/></Router>"#,
+		] {
+			let mut world = (AsyncPlugin, RouterPlugin).into_world();
+			build_source(&mut world, source)
+				.await
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("feature:nosuch");
+			world
+				.query_filtered::<(), Or<(With<Router>, With<RequireCfg>)>>()
+				.iter(&world)
+				.count()
+				.xpect_eq(0);
+		}
+	}
+
+	/// A declaration beside the root acts and is consumed rather than built,
+	/// before or after the root, so a root admitting no such child (a
+	/// `<Sequence>`) can still declare what it needs.
+	#[beet_core::test]
+	async fn declarations_beside_the_root_are_consumed() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		world.spawn(
+			CrateRegistration::new("beet-cli", "0.0.9")
+				.with_feature("extra")
+				.with_skip_prefix(),
+		);
+		let root = build_source(
+			&mut world,
+			r#"<!-- a scene -->
+			<RequireCfg cfg="feature:extra"/>
+			<Router><DefaultAppRoutes/></Router>
+			<RequireCfg cfg="version:0.0.1"/>"#,
 		)
 		.await
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("feature:nosuch");
+		.unwrap();
+		world.entity(root).contains::<Router>().xpect_true();
 		world
-			.query_filtered::<(), Or<(With<Router>, With<RequireCfg>)>>()
+			.query_filtered::<(), With<RequireCfg>>()
 			.iter(&world)
 			.count()
 			.xpect_eq(0);
+	}
+
+	/// Only a collected declaration is consumed: a second root, an
+	/// unregistered tag or a conditional declaration beside the root still
+	/// breaks the single-root rule, named in the error.
+	#[beet_core::test]
+	async fn a_second_root_still_errors() {
+		for (source, found) in [
+			("<Router/><Router/>", "found `<Router>`, `<Router>`"),
+			// the consumed declaration leads the document, so is not listed
+			(
+				r#"<RequireCfg cfg="version:0.0.1"/><Router/><NotRegistered/>"#,
+				"found `<Router>`, `<NotRegistered>`",
+			),
+			(
+				r#"<RequireCfg cfg="version:0.0.1" bx:cfg="version:0.0.1"/><Router/>"#,
+				"found `<RequireCfg>`, `<Router>`",
+			),
+		] {
+			let mut world = (AsyncPlugin, RouterPlugin).into_world();
+			world.spawn(
+				CrateRegistration::new("beet-cli", "0.0.9").with_skip_prefix(),
+			);
+			build_source(&mut world, source)
+				.await
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("single root element")
+				.xpect_contains(found);
+		}
 	}
 
 	/// The entry's declared document lands in the process environment as the

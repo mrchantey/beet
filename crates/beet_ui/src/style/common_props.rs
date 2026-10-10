@@ -47,6 +47,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(OverflowWrapProp)
 		.insert(MarginProp)
 		.insert(FlexGrowProp)
+		.insert(FlexBasisProp)
 		.insert(AlignItemsProp)
 		.insert(AlignSelfProp)
 		.insert(AlignContentProp)
@@ -141,6 +142,10 @@ css_property!(LineHeight, Length, "line-height");
 css_property!(Tracking, Length, "letter-spacing");
 
 css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
+// The size a flex item starts from before growing or shrinking. Web only: the
+// charcell flex sizes an item by its `width` or content, so author it in a
+// `MediaQuery::Screen` rule.
+css_property!(FlexBasisProp, Length, TokenInheritance::NotInherited, "flex-basis");
 css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
 canonical_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");
 canonical_property!(DisplayProp, Display, TokenInheritance::NotInherited, "display");

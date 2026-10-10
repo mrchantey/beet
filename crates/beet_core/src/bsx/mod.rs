@@ -40,7 +40,7 @@
 //! stays universal by default because an inert entity costs nothing; a node that
 //! performs a build-time EFFECT (`<Template src>` reading a file) has no inert
 //! form, and `bx:cfg` is how such a branch is kept out of a build that must not
-//! run it. It leaves a [`CfgExcluded`](crate::prelude::CfgExcluded) tombstone,
+//! run it. It leaves a [`CfgExcluded`] tombstone,
 //! so an excluded route still reports why it is missing rather than 404ing.
 //! Asserting the same condition instead of applying it is
 //! [`RequireCfg`](crate::prelude::RequireCfg), which refuses the whole load.
@@ -186,6 +186,19 @@
 //! children (slots are transparent), so a child-reading handler like
 //! `{ExchangeSequence}` reads them:
 //! `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
+//!
+//! An entry document has a single root element. Beside it may sit only the
+//! declarations its launch pre-scans (`<RepoRoot>`, `<TemplateDir>`,
+//! `<RequireCfg>`, `<Secrets>`, and whatever `app.register_prescan::<T>()`
+//! adds), with string attributes and no `bx:cfg`: each acts before the build
+//! and is consumed rather than built, so a root admitting no such child still
+//! states what it needs. Anything else there is a second root, an error
+//! naming every root found.
+//!
+//! ```text
+//! <RequireCfg cfg="feature:extra"/>
+//! <Sequence {CallOnReady}><Greet{name:"world"}/></Sequence>
+//! ```
 //!
 //! A sequence route that skipped every child fails naming its unregistered
 //! tags, and `beet check` elevates [`UnregisteredTag`] to an error;

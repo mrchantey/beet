@@ -8,6 +8,7 @@ increment, then a string greeting. `{CallOnReady}` runs the sequence on load.
 
     beet --entry=examples/action/scripting.bsx
 -->
+<RequireCfg cfg="feature:extra"/>
 <Sequence {CallOnReady}>
 	<NumberScript script="input + 1"/>
 	<TextScript script='"hello " + input'/>
