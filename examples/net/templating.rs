@@ -55,18 +55,17 @@ fn router(
 
 	match request.path_string().as_str() {
 		"/" => {
-			let mut count = counts.get_mut(entity).unwrap();
+			let mut count = counts.get_mut(entity)?;
 			count.0 += 1;
 			home(count.0)
 		}
 		"/planting-trees" => planting_trees(),
 		_ => not_found(&request),
 	}
-	.xok()
 }
 
 /// Home page.
-fn home(visitor_number: u32) -> Response {
+fn home(visitor_number: u32) -> Result<Response> {
 	Response::ok_body(
 		render(&format!(
 			r#"
@@ -77,26 +76,28 @@ fn home(visitor_number: u32) -> Response {
 <p>Visit a link or check out a <a href="/foobar">broken link</a>
 "#,
 			visitor_number
-		)),
+		))?,
 		MediaType::Html,
 	)
+	.xok()
 }
 
 /// Planting trees page.
-fn planting_trees() -> Response {
+fn planting_trees() -> Result<Response> {
 	Response::ok_body(
 		render(
 			r#"
 <h1>Planting Trees</h1>
 <p>Do it, just do it. Dont ask questions. Go and buy a native tree and plant it somewhere.</p>
 "#,
-		),
+		)?,
 		MediaType::Html,
 	)
+	.xok()
 }
 
 /// 404 handler
-fn not_found(request: &Request) -> Response {
+fn not_found(request: &Request) -> Result<Response> {
 	let path = request.path_string();
 	Response::from_status_body(
 		StatusCode::NOT_FOUND,
@@ -105,9 +106,10 @@ fn not_found(request: &Request) -> Response {
 <h1>Not Found</h1>
 <p>The path at <a href="{path}">{path}</a> could not be found.</p>
 "#,
-		)),
+		))?,
 		MediaType::Html,
 	)
+	.xok()
 }
 
 fn nav_items() -> &'static [(&'static str, &'static str)] {
@@ -123,26 +125,21 @@ fn nav_items() -> &'static [(&'static str, &'static str)] {
 /// Loads the layout from disk and injects head, navigation, and main content.
 /// Since this loads from disk on every request, you can edit the HTML files
 /// without restarting the server!
-fn render(main_content: &str) -> String {
-	use std::fs::read_to_string;
-
-	read_to_string("examples/assets/layouts/default-layout.html")
-		.unwrap()
-		.replace(r#"<slot name="head" />"#, &head())
+fn render(main_content: &str) -> Result<String> {
+	fs_ext::read_to_string("examples/assets/layouts/default-layout.html")?
+		.replace(r#"<slot name="head" />"#, &head()?)
 		.replace(r#"<slot name="nav" />"#, &nav())
-		.replace(r#"<slot name="main" />"#, &main_content)
+		.replace(r#"<slot name="main" />"#, main_content)
+		.xok()
 }
 
 /// Generates the `<head>` content for pages.
 ///
 /// Includes JavaScript for theme switching functionality.
-fn head() -> String {
-	use std::fs::read_to_string;
-
-	let theme_switcher =
-		read_to_string("examples/assets/js/minimal-theme-switcher.js").unwrap();
-
-	format!(r#"<script>{theme_switcher}</script>"#)
+fn head() -> Result<String> {
+	fs_ext::read_to_string("examples/assets/js/minimal-theme-switcher.js")?
+		.xmap(|theme_switcher| format!(r#"<script>{theme_switcher}</script>"#))
+		.xok()
 }
 
 /// Generates navigation HTML from a list of nav items.

@@ -1,12 +1,13 @@
 //! # Material Design Style Example
 //!
-//! This example demonstrates the Material Design 3 styling system in Beet,
-//! including buttons, cards, typography, and layout components.
+//! This example demonstrates the Material Design 3 styling system in Beet:
+//! the theme seeds a rule set whose built CSS is served with a minimal page,
+//! and also written to `target/examples/style/index.html` for inspection.
 //!
 //! ## Running the Example
 //!
 //! ```sh
-//! cargo run --example style --features http_server
+//! cargo run --example style --features http_server,style
 //! ```
 //!
 //! Then open your browser to:
@@ -74,7 +75,7 @@ fn Handler(
 
 	// write the html for inspection
 	fs_ext::write(
-		AbsPath::new_workspace_rel("target/examples/style/index.html").unwrap(),
+		AbsPath::new_workspace_rel("target/examples/style/index.html")?,
 		&html,
 	)?;
 

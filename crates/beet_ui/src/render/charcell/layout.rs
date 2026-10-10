@@ -1400,4 +1400,20 @@ mod tests {
 		let pinned_top = world.get::<LayoutRect>(stick).unwrap().0.min.y;
 		(pinned_top - flow_top).xpect_eq(3);
 	}
+
+	/// A box too short for its vertical padding still pads its sides: the
+	/// overflowing axis falls back alone, rather than dropping every inset and
+	/// painting the content over the padding corner (the `render_simple`
+	/// example at a non-tty's half height).
+	#[beet_core::test]
+	fn short_box_keeps_horizontal_padding() {
+		use crate::style::common_props::Padding;
+		let frame =
+			Buffer::render_oneshot_plain_sized(UVec2::new(20, 4), rsx! {
+				<div {inline_class![(Padding, Spacing::all(Length::Rem(2.)))]}>
+					"x"
+				</div>
+			});
+		cell_of(&frame, 'x').xpect_eq((4, 0));
+	}
 }

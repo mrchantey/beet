@@ -258,7 +258,7 @@ mod tests {
 		assert!(SPAWNED.load(Ordering::Relaxed) >= 1);
 	}
 
-	/// Regression test for an async-bridge panic (see `agent/plans/async_bridge.md`).
+	/// Regression test for an async-bridge panic.
 	///
 	/// When two futures with *different* `SystemParam` types (hence different
 	/// `SystemStateCell`s) are woken in the same sync point, one can grab the

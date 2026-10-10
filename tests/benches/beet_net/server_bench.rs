@@ -16,13 +16,11 @@ async fn main_async() {
 	std::thread::spawn(|| {
 		App::new()
 			.add_plugins((MinimalPlugins, ServerPlugin::default()))
-			.spawn((
-				server,
-				CallOnReady::on_spawn(),
-				children![exchange_ext::handler(|_| {
+			.spawn((server, CallOnReady::on_spawn(), children![
+				exchange_ext::handler(|_| {
 					Response::ok_body("hello world", MediaType::Text)
-				})],
-			))
+				})
+			]))
 			.run();
 	});
 

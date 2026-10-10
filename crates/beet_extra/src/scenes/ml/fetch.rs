@@ -95,8 +95,11 @@ pub fn FetchItems(
 /// same way because a handle is not a markup value and [`SentenceSteerTarget`] is a
 /// generic action, not a markup spread, so the whole tree is built in Rust.
 ///
+/// The fox idles from load with [`PlayAnimationOnLoad`], never a [`CallOnReady`]
+/// node: that load verb exits the app once its action resolves, and playing a
+/// clip resolves at once.
+///
 /// Behaviour tree (mirrors `fetch_npc`):
-///   Initial Idle   — play idle once the fox's assets load ([`CallOnReady`])
 ///   Fetch Behavior — on each user sentence:
 ///     Sequence
 ///       Apply Sentence Steer Target — closest [`Collectable`] -> [`SteerTarget`]
@@ -119,6 +122,7 @@ pub fn FetchFox(
 		Transform::from_scale(Vec3::splat(0.01)),
 		WorldAssetRoot(assets.load::<WorldAsset>("misc/fox.glb#Scene0")),
 		AnimationGraphClips::build(&clips, &mut graphs, &mut assets),
+		PlayAnimationOnLoad::new("misc/fox.glb#Animation0"),
 		RotateToVelocity3d::default(),
 		ForceBundle::default(),
 		SteerBundle {
@@ -143,16 +147,6 @@ pub fn FetchFox(
 /// fox via [`ActionOf`]. Split out of [`FetchFox`]'s [`OnSpawn`] hook so the tree
 /// structure reads top-down.
 fn spawn_fetch_tree(world: &mut World, fox: Entity, bert: Handle<Bert>) {
-	// plays idle once the fox's assets load (`CallOnReady`), so the fox has a resting
-	// pose before the user types a command.
-	world.spawn((
-		Name::new("Initial Idle"),
-		ChildOf(fox),
-		ActionOf(fox),
-		CallOnReady,
-		PlayAnimation::new("misc/fox.glb#Animation0").repeat_forever(),
-	));
-
 	// the `TriggerWithUserSentence` node holds the user's typed prompt, so spawn it
 	// first to get its id, then point the steer-target search at its `Sentence`.
 	let fetch_behavior = world
@@ -215,5 +209,41 @@ fn announce_fetch(
 			.with_color(OnLogMessage::GAME_COLOR.into())
 			.and_log(),
 		);
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::FetchFox;
+	use crate::beet::prelude::*;
+	use beet_core::prelude::*;
+	use bevy::world_serialization::WorldSerializationPlugin;
+
+	/// A [`CallOnReady`] exits the app once its action resolves, so a fox that
+	/// idles until the window closes must arm none.
+	#[beet_core::test]
+	fn fox_arms_no_load_verb() {
+		let mut world = (
+			MinimalPlugins,
+			AssetPlugin::default(),
+			AnimationPlugin,
+			WorldSerializationPlugin,
+			TemplatePlugin,
+			language_plugin,
+		)
+			.into_world();
+		world.spawn_template(rsx! { <FetchFox/> }).unwrap();
+		world.flush();
+
+		world
+			.query_filtered::<(), With<CallOnReady>>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
+		world
+			.query_filtered::<(), With<PlayAnimationOnLoad>>()
+			.iter(&world)
+			.count()
+			.xpect_eq(1);
 	}
 }

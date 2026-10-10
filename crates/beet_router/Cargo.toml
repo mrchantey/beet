@@ -72,7 +72,7 @@ json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 # (`imagesize`).
 dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor", "dep:imagesize"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
-serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui/serde"]
+serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui?/serde"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
 # The live, interactive terminal target: the charcell TUI host + stdio terminal,
 # behind which the in-world `Navigator` browses the app's own routes (`TuiServer`).
@@ -99,7 +99,8 @@ client_io = ["http", "beet_net/tungstenite"]
 # drags in `bevy_asset` (std) and so breaks no_std consumers.
 # `beet_core/rsx`: the `SceneServer` meta-route bundle is a `#[template]`, whose
 # attribute macro is rsx-gated; scene_server compiles wherever template_serde is on.
-template_serde = ["beet_core/template_serde", "beet_core/rsx", "beet_ui?/template_serde", "serde"]
+# `bsx_core`: swapping a scene despawns the `SceneResource`s its markup created.
+template_serde = ["beet_core/template_serde", "beet_core/rsx", "bsx_core", "beet_ui?/template_serde", "serde"]
 # The scripting route registrations (the `Script`/`ExchangeScript`/
 # `ExchangeScriptElement` reflect types and the `<ScriptRoute>` template).
 # Backend-agnostic and self-sufficient: this compiles and registers on its own,
@@ -136,7 +137,9 @@ codegen = [
 # in scope even in a build with no markup surface at all.
 beet_core = { workspace = true, default-features = false, features = ["bevy_async", "rsx"] }
 beet_action = { workspace = true, default-features = false }
-beet_net = { workspace = true, default-features = false }
+# `action`: every build dispatches a request down the route tree through
+# `AsyncExchangeExt`, which rides beet_net's no_std `action` feature
+beet_net = { workspace = true, default-features = false, features = ["action"] }
 # std-only: the template/render pipeline backing template routes, media, help, sidebar.
 beet_ui = { workspace = true, optional = true, features = ["action", "template"] }
 bevy.workspace = true

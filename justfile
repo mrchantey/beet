@@ -185,6 +185,7 @@ test-all *args:
 		echo "please download the site assets: just site-shared pull"; \
 		exit 1; \
 	fi
+	just check-embedded
 	just test-core {{ args }}
 	just test-scripting-fallback {{ args }}
 	# `bevy_default`-enabling crates each run in their own cargo invocation —
@@ -359,6 +360,22 @@ test-core *args:
 test-core-wasm *args:
 	just _test-pkgs-wasm "{{ _core-pkgs-wasm }}" {{ args }}
 	just test-wasm-sqlite {{ args }}
+
+# The facade feature set `beet_esp` builds for the ESP32-S3 must keep every beet
+# crate std-free. A host build links std regardless, so a feature that drags in a
+# `std` (ie a non-weak `beet_ui/..` forward reaching the std-only `beet_ui`) only
+# fails on bare metal; resolving the target graph catches it without the esp
+# toolchain. Proc macros run on the host, so their std is excluded.
+check-embedded:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	features=embedded,bevy_color,template_serde,json,bsx,net,action,mdns,quickjs,rand,router_embedded,scripting,sockets,testing_embedded
+	tree="cargo tree -p beet --no-default-features --features $features --target xtensa-esp32s3-none-elf -e features,normal,no-proc-macro"
+	if $tree | grep -E 'beet[a-z_]* feature "std"'; then
+		echo "the embedded feature set enables a beet crate's std, trace it with: $tree -i <crate>"
+		exit 1
+	fi
+	echo "PASS check-embedded"
 
 # Run a crate's wasm suite inside a headless browser instead of deno: only the
 # `#[beet_core::test(browser)]` dom tests run there (everything else skips, and

@@ -398,6 +398,52 @@ mod test {
 			)]);
 	}
 
+	/// Every infra example renders its whole config offline, ie each block
+	/// clears its render-time guards before the deploy makes any cloud call.
+	///
+	/// REGRESSION: the S3 data-loss guard refused `examples/infra/bucket.bsx`,
+	/// whose in-place bucket declared neither `object_versioning` nor
+	/// `accept_data_loss`, and nothing rendered the examples to notice.
+	#[beet_core::test]
+	fn every_infra_example_renders() {
+		[
+			"bucket",
+			"cloudflare_containers",
+			"cloudflare_workers",
+			"custom_handle_domain",
+			"fargate",
+			"hello_workers",
+			"lambda",
+			"lightsail",
+			"mail",
+			"mail_comail",
+			"mail_ses",
+			"ssh_site",
+		]
+		.into_iter()
+		.filter_map(|name| {
+			let source = fs_ext::read_to_string(
+				WsPath::new(format!("examples/infra/{name}.bsx")).into_abs(),
+			)
+			.unwrap();
+			let mut world = test_world();
+			world.init_resource::<PackageConfig>();
+			let router = router(&mut world);
+			spawn_markup(&mut world, router, &source);
+			RenderScope::render_all(&mut world)
+				.and_then(|scopes| {
+					scopes
+						.into_iter()
+						.map(RenderScope::finish)
+						.collect::<Result<Vec<_>>>()
+				})
+				.err()
+				.map(|err| format!("{name}: {err}"))
+		})
+		.collect::<Vec<_>>()
+		.xpect_empty();
+	}
+
 	/// The stores the served site reaches by `bx:ref` are declared OUTSIDE every
 	/// `bx:cfg`-excluded branch of the entry, so the lean binary still binds
 	/// them.

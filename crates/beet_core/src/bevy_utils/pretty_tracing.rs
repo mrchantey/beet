@@ -132,6 +132,13 @@ const QUIET_TARGETS: &[&str] = &[
 	"gilrs_core",
 	"cosmic_text",
 	"fontdb",
+	// ml backend (burn / cubecl): runtime setup, kernel compiler passes,
+	// build-id probing and the autotune cache database
+	"cubecl",
+	"pliron",
+	"buildid",
+	"turso",
+	"turso_core",
 	// networking / cloud / wasm tooling
 	"walrus",
 	"aws",
@@ -411,6 +418,31 @@ mod test {
 			.xpect_contains("hello")
 			.xnot()
 			.xpect_contains("\u{1b}[");
+	}
+
+	/// A [`QUIET_TARGETS`](super::QUIET_TARGETS) origin's debug output is
+	/// dropped while the app's own survives (the ml backend's kernel compiler
+	/// logs thousands of lines per run).
+	#[crate::test]
+	fn quiets_dependency_noise() {
+		let writer = CaptureWriter::default();
+		let dispatch = PrettyTracing {
+			interactive: false,
+			// a catch-all `debug`, so neither the test build's `warn` default nor
+			// the ambient `RUST_LOG` hides what the quiet directive should
+			filter: "debug".into(),
+			..default()
+		}
+		.dispatch(writer.clone());
+		tracing::dispatcher::with_default(&dispatch, || {
+			tracing::debug!(target: "pliron::pass", "kernel pass");
+			tracing::debug!("app output");
+		});
+		writer
+			.into_string()
+			.xpect_contains("app output")
+			.xnot()
+			.xpect_contains("kernel pass");
 	}
 
 	#[crate::test]

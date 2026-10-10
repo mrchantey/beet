@@ -574,21 +574,29 @@ pub(super) fn translate_rect(rect: IRect, offset: IVec2) -> IRect {
 /// `max` edges by the trailing ones, in signed space so an off-screen or scrolled
 /// box stays representable.
 ///
-/// Returns `outer` unchanged when the result would be invalid (zero or
-/// inverted dimensions).
+/// Each axis is inset independently: an axis too small to hold its insets (zero
+/// or inverted extent) keeps `outer`'s extent, so content stays visible, while
+/// the other axis is still inset.
 pub(super) fn inset_rect(outer: IRect, insets: URect) -> IRect {
-	let left = outer.min.x + insets.min.x as i32;
-	let top = outer.min.y + insets.min.y as i32;
-	let right = outer.max.x - insets.max.x as i32;
-	let bottom = outer.max.y - insets.max.y as i32;
-
-	if left >= right || top >= bottom {
-		return outer;
-	}
-
+	let (left, right) =
+		inset_axis(outer.min.x, outer.max.x, insets.min.x, insets.max.x);
+	let (top, bottom) =
+		inset_axis(outer.min.y, outer.max.y, insets.min.y, insets.max.y);
 	IRect {
 		min: IVec2::new(left, top),
 		max: IVec2::new(right, bottom),
+	}
+}
+
+/// One axis of [`inset_rect`]: the `(min, max)` span moved inward by the
+/// leading and trailing insets, or unchanged when they do not fit.
+fn inset_axis(min: i32, max: i32, leading: u32, trailing: u32) -> (i32, i32) {
+	let start = min + leading as i32;
+	let end = max - trailing as i32;
+	if start < end {
+		(start, end)
+	} else {
+		(min, max)
 	}
 }
 
@@ -601,4 +609,40 @@ pub(crate) fn tui_inset(spacing: &Spacing, viewport: Vec2) -> URect {
 	val.min.x *= 2;
 	val.max.x *= 2;
 	val
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	fn rect(min: (i32, i32), max: (i32, i32)) -> IRect {
+		IRect {
+			min: IVec2::new(min.0, min.1),
+			max: IVec2::new(max.0, max.1),
+		}
+	}
+
+	fn insets(min: (u32, u32), max: (u32, u32)) -> URect {
+		URect {
+			min: UVec2::new(min.0, min.1),
+			max: UVec2::new(max.0, max.1),
+		}
+	}
+
+	#[beet_core::test]
+	fn insets_both_axes() {
+		inset_rect(rect((0, 0), (10, 10)), insets((1, 2), (3, 4)))
+			.xpect_eq(rect((1, 2), (7, 6)));
+	}
+
+	/// An axis too small for its insets keeps its extent without dropping the
+	/// other axis' insets, so a box too short for its padding still pads its
+	/// sides.
+	#[beet_core::test]
+	fn overflowing_axis_keeps_the_other() {
+		inset_rect(rect((0, 0), (20, 4)), insets((6, 3), (6, 3)))
+			.xpect_eq(rect((6, 0), (14, 4)));
+		inset_rect(rect((0, 0), (4, 20)), insets((3, 6), (3, 6)))
+			.xpect_eq(rect((0, 6), (4, 14)));
+	}
 }

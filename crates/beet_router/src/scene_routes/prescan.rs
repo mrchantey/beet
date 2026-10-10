@@ -335,7 +335,8 @@ impl EntryPrescan {
 }
 
 /// `<RequireCfg cfg="..">` fires even when the tree cannot build: the build
-/// spawns every collected one ahead of the tree.
+/// asserts every collected one ahead of the tree, refusing it when one is unmet
+/// ([`RequireCfg::assert_all`]).
 impl Prescan for RequireCfg {
 	fn describe() -> &'static str {
 		"refuses the load unless this binary satisfies its `cfg`, naming every unmet atom"

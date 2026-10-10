@@ -2,9 +2,6 @@
 //! `assets/ml/frozen_lake_qtable.ron`.
 use beet_core::prelude::*;
 use beet_ml::prelude::*;
-use std::fs;
-use std::fs::File;
-use std::io::Write;
 
 fn main() -> Result {
 	let map = FrozenLakeMap::default_four_by_four();
@@ -25,8 +22,6 @@ fn main() -> Result {
 	assert_eq!(eval.total_steps, 600);
 
 	let text = ron::ser::to_string_pretty(&trainer.table, Default::default())?;
-	fs::create_dir_all("assets/ml")?;
-	File::create("assets/ml/frozen_lake_qtable.ron")
-		.and_then(|mut file| file.write(text.as_bytes()))?;
+	fs_ext::write("assets/ml/frozen_lake_qtable.ron", text)?;
 	Ok(())
 }

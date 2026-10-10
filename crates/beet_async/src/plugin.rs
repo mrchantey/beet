@@ -104,7 +104,10 @@ impl AsyncWorld {
 	///   app.add_systems(Update, async_world_sync_point::<MySyncPoint>);
 	///   app.add_systems(Startup, move |world: Res<AsyncWorld>| {
 	///       let world = world.clone();
-	///       AsyncComputeTaskPool::get().spawn(async move {
+	///       // `spawn_local`: the sync point ticks this thread's executor, so the
+	///       // bridge completes within one update. A `spawn` onto a worker thread
+	///       // races it, needing more updates.
+	///       AsyncComputeTaskPool::get().spawn_local(async move {
 	///           let system_state = world.system_state::<Commands>();
 	///           system_state.bridge(MySyncPoint, |mut commands: Commands| {
 	///               commands.spawn_empty();

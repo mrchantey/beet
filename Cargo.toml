@@ -689,7 +689,7 @@ required-features = ["net", "ureq", "native-tls"]
 [[example]]
 name = "http_server"
 path = "examples/net/http_server.rs"
-required-features = ["http_server", "ureq"]
+required-features = ["http_server"]
 
 [[example]]
 name = "socket_client"
@@ -709,7 +709,7 @@ required-features = ["tungstenite", "action"]
 [[example]]
 name = "templating"
 path = "examples/net/templating.rs"
-required-features = ["http_server", "ureq"]
+required-features = ["http_server"]
 
 [[example]]
 name = "webdriver"

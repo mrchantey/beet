@@ -230,6 +230,9 @@ impl Plugin for RouterPlugin {
 				.register_type::<FixedPage>()
 				.register_template::<ServeBlobs>()
 				.register_type::<ServeBlobsHandler>()
+				// one store file served as a page (`<Route path="guide"
+				// {BlobPage{path:"guide.md"}}/>`)
+				.register_type::<BlobPage>()
 				// any store file a request names, rendered as it accepts
 				// (`<BlobView/>`, `view docs/plan.docx`)
 				.register_type::<BlobView>()
@@ -239,6 +242,10 @@ impl Plugin for RouterPlugin {
 				// the browser-wasm page template: the module loader plus the launch
 				// a served page boots a wasm `beet` binary with.
 				.register_template::<Wasm>();
+			// any store file's addressed cells (`<BlobCells/>`, `cells
+			// forms/plan.docx`), whose serde answer needs `serde`
+			#[cfg(feature = "serde")]
+			app.register_type::<BlobCells>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `Router::with_defaults` wires the
@@ -582,4 +589,58 @@ fn rebuild_route_trees_on_load(
 		builder.rebuild_subtree(root)?;
 	}
 	Ok(())
+}
+
+#[cfg(all(test, feature = "std", feature = "bsx"))]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+	use beet_net::prelude::*;
+	use beet_ui::prelude::*;
+
+	/// The store-file routes are authored in markup, as an entry declares them,
+	/// so each must be registered: an unregistered tag builds inert and its
+	/// route answers `404`.
+	#[beet_core::test]
+	async fn registers_the_store_file_routes() {
+		let store = BlobStore::temp();
+		store
+			.insert(
+				&"guide.md".into(),
+				"# Guide\n\n| a | b |\n|---|---|\n| c | d |\n".to_owned(),
+			)
+			.await
+			.unwrap();
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let mut root = world.spawn((store, Router));
+		MediaParser::new()
+			.parse(ParseContext::new(
+				&mut root,
+				&MediaBytes::new_bsx(
+					r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
+					<BlobView/>
+					<BlobCells/>"#,
+				),
+			))
+			.unwrap();
+		let root = root.flush();
+		for (path, expected) in [
+			("guide", "# Guide"),
+			("view/guide.md", "# Guide"),
+			#[cfg(feature = "serde")]
+			("cells/guide.md", "| t1r2c2 | d |"),
+		] {
+			world
+				.entity_mut(root)
+				.exchange(
+					Request::get(path).with_header::<header::Accept>(vec![
+						MediaType::Markdown,
+					]),
+				)
+				.await
+				.unwrap_str()
+				.await
+				.xpect_contains(expected);
+		}
+	}
 }

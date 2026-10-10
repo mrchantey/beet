@@ -415,17 +415,6 @@ pub fn build_root(
 		template_sources,
 		formats,
 	} = sources;
-	// the pre-scanned `<RequireCfg>`s, spawned before the tree builds so a
-	// requirement reports its unmet list even when the tree itself cannot build
-	// (eg its root tag is not registered in this binary).
-	let requirements =
-		prescan.iter::<RequireCfg>().cloned().collect::<Vec<_>>();
-	if !requirements.is_empty() {
-		for requirement in requirements {
-			world.spawn(requirement);
-		}
-		world.flush();
-	}
 	// the root is spawned first so it can own the entry-level template
 	// registrations: tearing the entry scene down (a structural live reload)
 	// unregisters them with it, so no stale template survives a rebuild. It
@@ -436,6 +425,11 @@ pub fn build_root(
 	// world builds a second rooted store, which is that sub-app's, not this
 	// process's.
 	let root = world.spawn((extra, repo_store)).id();
+	// the pre-scanned `<RequireCfg>`s, asserted before the tree builds: an unmet
+	// one refuses the load, so nothing in the tree (a `CallOnReady` action) runs
+	// in a binary that cannot support it, and the report holds even when the
+	// tree itself cannot build (eg its root tag is not registered here).
+	RequireCfg::assert_all(world, prescan.iter::<RequireCfg>())?;
 	// the entry's own template dirs, registered before the entry parses so its
 	// entry-level tags (eg `<Styles/>`) resolve. The reactive `<TemplateDir>` observer
 	// re-registers them (plus any crate/route dirs) once the tree is built.
@@ -705,28 +699,31 @@ mod test {
 		prescans(&RouterPlugin.into_world())
 	}
 
+	/// Build `source` as the `main.bsx` entry of an in-memory store, through the
+	/// same prescan, read and build steps a launch runs.
+	async fn build_source(world: &mut World, source: &str) -> Result<Entity> {
+		let repo_store = BlobStore::temp();
+		repo_store
+			.insert(&RelPath::from("main.bsx"), source.to_owned())
+			.await?;
+		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
+		let prescan =
+			read_prescan(&repo_store, &prescans(world), "main.bsx").await?;
+		let sources =
+			read_sources(&repo_store, formats, "main.bsx", prescan).await?;
+		build_root(world, repo_store, sources, ())
+	}
+
 	/// The shared core builds an entry from any store: an in-memory store here, so
 	/// it runs storage-agnostic (on wasm too), no filesystem involved. The entry's
 	/// `<DefaultAppRoutes/>` lands on the built router root.
 	#[beet_core::test]
 	async fn builds_an_entry_from_an_in_memory_store() {
-		let repo_store = BlobStore::temp();
-		repo_store
-			.insert(
-				&RelPath::from("main.bsx"),
-				"<Router><DefaultAppRoutes/></Router>",
-			)
-			.await
-			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&repo_store, &prescans(&world), "main.bsx")
-			.await
-			.unwrap();
-		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
-			.await
-			.unwrap();
-		let root = build_root(&mut world, repo_store, sources, ()).unwrap();
+		let root =
+			build_source(&mut world, "<Router><DefaultAppRoutes/></Router>")
+				.await
+				.unwrap();
 		// the entry built into a router root carrying the default app routes
 		world.entity(root).contains::<Router>().xpect_true();
 		world
@@ -742,26 +739,36 @@ mod test {
 	/// `build_root` returns; the gate must return rather than hang.
 	#[beet_core::test]
 	async fn gate_settles_when_ready() {
-		let repo_store = BlobStore::temp();
-		repo_store
-			.insert(&RelPath::from("main.bsx"), "<Router/>")
-			.await
-			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let formats = world.get_resource_or_init::<TemplateFormats>().clone();
-		let prescan = read_prescan(&repo_store, &prescans(&world), "main.bsx")
-			.await
-			.unwrap();
-		let sources = read_sources(&repo_store, formats, "main.bsx", prescan)
-			.await
-			.unwrap();
-		let root = build_root(&mut world, repo_store, sources, ()).unwrap();
+		let root = build_source(&mut world, "<Router/>").await.unwrap();
 		world
 			.entity(root)
 			.contains::<TemplatesLoaded>()
 			.xpect_true();
 		// returns rather than hanging, nothing being pending on this entry.
 		TemplatePending::settle_owned(&mut world).await;
+	}
+
+	/// An unmet `<RequireCfg>` refuses the load before the tree builds, even
+	/// nested in the root element: nothing it declares spawns, so no
+	/// `CallOnReady` action runs in a binary that cannot support it (the
+	/// windowed `wgpu-action.bsx` drove its fox on a headless binary).
+	#[beet_core::test]
+	async fn unmet_requirement_refuses_the_build() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		build_source(
+			&mut world,
+			r#"<Router><RequireCfg cfg="feature:nosuch"/><DefaultAppRoutes/></Router>"#,
+		)
+		.await
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("feature:nosuch");
+		world
+			.query_filtered::<(), Or<(With<Router>, With<RequireCfg>)>>()
+			.iter(&world)
+			.count()
+			.xpect_eq(0);
 	}
 
 	/// The entry's declared document lands in the process environment as the

@@ -136,9 +136,9 @@ beet --entry=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # resul
 
 The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_running`, `repeat_while`, `state_machine`, `utility_ai`, `scripting`, `world_script`) are also self-terminating and worth a sweep.
 
-Skip: `examples/spatial/*.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead).
+Skip: `examples/spatial/*.bsx`, `examples/action/wgpu-action.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead).
 
-Every scene in `examples/action/` exits 0. A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
+Every other scene in `examples/action/` exits 0 (`wgpu-action.bsx` requires `feature:winit`, so a leaner binary refuses it before anything builds). A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
 
 ## Not Verifiable Via CLI (skip)
 

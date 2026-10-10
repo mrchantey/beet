@@ -41,6 +41,28 @@ impl RequireCfg {
 		}
 	}
 
+	/// Assert every one of `requirements` holds for this build, before anything
+	/// builds: the entry launch runs it over the pre-scanned declarations so an
+	/// unmet requirement refuses the load outright, rather than reporting while
+	/// the rest of the tree builds and its `CallOnReady` actions run in a binary
+	/// that cannot support them. Errors naming every unmet requirement at once.
+	#[cfg(feature = "bsx")]
+	pub fn assert_all<'a>(
+		world: &mut World,
+		requirements: impl IntoIterator<Item = &'a RequireCfg>,
+	) -> Result {
+		let mut reports = Vec::new();
+		for requirement in requirements {
+			if let Some(report) = requirement.report(world)? {
+				reports.push(report);
+			}
+		}
+		if reports.is_empty() {
+			return Ok(());
+		}
+		bevybail!("{}", reports.join("\n"))
+	}
+
 	/// Observer: validate an inserted [`RequireCfg`] against this build,
 	/// logging every unmet atom and exiting non-zero.
 	///
@@ -62,32 +84,44 @@ impl RequireCfg {
 			else {
 				return Ok(());
 			};
-			let condition = BuildCondition::parse(&require.cfg)?;
-			let conditions =
-				world.get_resource_or_init::<BsxConditions>().clone_seam();
-			let registrations = world
-				.with_state::<Query<&CrateRegistration>, _>(|query| {
-					query.iter().cloned().collect::<Vec<_>>()
-				});
-			let cx = ConditionCx {
-				world,
-				registrations: &registrations,
-			};
-			let failures = condition.explain(&conditions, &cx)?;
-			if failures.is_empty() {
-				return Ok(());
+			if let Some(report) = require.report(world)? {
+				error!("{report}");
+				world.write_message(AppExit::error());
 			}
-			error!(
-				"this binary does not satisfy `<RequireCfg cfg=\"{}\"/>`, unmet:\n  {}\n\
-				rebuild with what it names, ie `cargo install --path \
-				crates/beet-cli --all-features`",
-				require.cfg,
-				failures.join("\n  ")
-			);
-			world.write_message(AppExit::error());
 			Ok(())
 		});
 		Ok(())
+	}
+
+	/// What this binary is missing to satisfy the requirement, or `None` when it
+	/// holds: the condition and every unmet atom, since
+	/// [`BuildCondition::explain`] walks without short-circuiting.
+	#[cfg(feature = "bsx")]
+	fn report(&self, world: &mut World) -> Result<Option<String>> {
+		let condition = BuildCondition::parse(&self.cfg)?;
+		let conditions =
+			world.get_resource_or_init::<BsxConditions>().clone_seam();
+		let registrations =
+			world.with_state::<Query<&CrateRegistration>, _>(|query| {
+				query.iter().cloned().collect::<Vec<_>>()
+			});
+		let cx = ConditionCx {
+			world,
+			registrations: &registrations,
+		};
+		let failures = condition.explain(&conditions, &cx)?;
+		if failures.is_empty() {
+			return Ok(None);
+		}
+		format!(
+			"this binary does not satisfy `<RequireCfg cfg=\"{}\"/>`, unmet:\n  {}\n\
+			rebuild with what it names, ie `cargo install --path \
+			crates/beet-cli --all-features`",
+			self.cfg,
+			failures.join("\n  ")
+		)
+		.xsome()
+		.xok()
 	}
 }
 
@@ -181,6 +215,28 @@ mod test {
 			.iter_current_update_messages()
 			.count()
 			.xpect_eq(0);
+	}
+
+	/// The pre-build assertion refuses with every unmet requirement named, and
+	/// passes a satisfied set.
+	#[crate::test]
+	fn assert_all_names_every_unmet() {
+		let mut world = world();
+		RequireCfg::assert_all(&mut world, &[RequireCfg::new(
+			"feature:sockets",
+		)])
+		.unwrap();
+		RequireCfg::assert_all(&mut world, &[
+			RequireCfg::new("feature:sockets"),
+			RequireCfg::new("feature:winit"),
+			RequireCfg::new("version:9.0.0"),
+		])
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("feature:winit")
+		.xpect_contains("version:9.0.0")
+		.xnot()
+		.xpect_contains("feature:sockets\"");
 	}
 
 	/// An unsatisfied one writes an error exit, and `explain` means the log
