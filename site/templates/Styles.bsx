@@ -29,7 +29,7 @@ to a Material colour token, resolving on both the web and terminal targets.
 
 <Rule class="color-box"
       width=Rem(10.0)
-      height=Rem(3.0)
+      min-height=Rem(3.0)
       padding={Spacing{top:Rem(0.3), right:Rem(0.3), bottom:Rem(0.3), left:Rem(0.3)}} />
 
 <!-- Primary -->

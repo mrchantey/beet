@@ -110,14 +110,30 @@ async fn verifies_client() {
 		.collect::<Vec<_>>()
 		.xpect_empty();
 
-	// desktop layout: every table stays inside the page's measure column, and
-	// a table page's sidebar rail is exactly as wide as a prose page's, ie no
-	// content widens the row around it. 1280 is inside the rail's shrink
-	// range, 1920 past the column's measure cap.
+	// desktop layout: every table stays inside the page's measure column, a
+	// table page's sidebar rail is exactly as wide as a prose page's, ie no
+	// content widens the row around it, and every color swatch grows to hold
+	// its wrapped label. 1280 is inside the rail's shrink range, 1920 past the
+	// column's measure cap.
 	cross_log!("stage: asset sweep done");
 	let mut layout_faults = Vec::new();
 	for width in [1280, 1920] {
 		page.set_viewport(width, 800).await.unwrap();
+		page.navigate(&format!("{base}/docs/design/color_schemes"))
+			.await
+			.unwrap();
+		page.find("main h1").await;
+		let clipped = page
+			.evaluate_value(
+				r#"[...document.querySelectorAll('.color-box')]
+					.filter(swatch => swatch.scrollHeight > swatch.clientHeight + 1)
+					.map(swatch => swatch.textContent.trim())"#,
+			)
+			.await
+			.unwrap();
+		layout_faults.extend(clipped.as_array().unwrap().iter().map(|label| {
+			format!("{width}px color swatch {label} overflows its box")
+		}));
 		let prose =
 			DesktopLayout::measure(&mut page, &base, "/docs/about").await;
 		for path in ["/docs/design/table", "/docs/crates", "/docs/secrets"] {
@@ -178,7 +194,6 @@ async fn verifies_client() {
 
 	page.kill().await.unwrap();
 }
-
 
 /// The desktop layout facts a page is judged by.
 struct DesktopLayout {

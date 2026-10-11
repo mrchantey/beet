@@ -187,8 +187,8 @@ pub fn RouteList(
 }
 
 /// The declarations that act before the entry builds, one row each: a
-/// registered type at the entry's top level with string attributes and no
-/// `bx:cfg`.
+/// registered type beside the entry's root element or within it, with string
+/// attributes and no `bx:cfg`.
 fn prescan_list(prescans: Vec<PrescanEntry>) -> impl Bundle {
 	let items: Vec<_> = prescans
 		.into_iter()
@@ -199,7 +199,7 @@ fn prescan_list(prescans: Vec<PrescanEntry>) -> impl Bundle {
 	rsx! {
 		<>
 			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Before the build"</h2>
-			<p>"Declared at the entry's top level with string attributes and no bx:cfg, each acts before the entry builds."</p>
+			<p>"Declared beside the entry's root element or within it, with string attributes and no bx:cfg, each acts before the entry builds."</p>
 			<ul>{items}</ul>
 		</>
 	}
