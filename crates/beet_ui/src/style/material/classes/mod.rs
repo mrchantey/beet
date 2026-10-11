@@ -143,7 +143,7 @@ pub fn all_rules() -> Vec<Rule> {
 		select_option_active(),
 		select_option_selected(),
 		error_text(),
-		error(),
+		error_box(),
 		// table (the `.table-vertical-borders` column dividers are drawn per target:
 		// an adjacent-sibling rule in `browser_overrides.css` on the web, the
 		// `apply_table_vertical_borders` decorate system on the terminal)
@@ -292,6 +292,48 @@ mod tests {
 			// the centred content column: a direct-child measure cap
 			.xpect_contains("main > *")
 			.xpect_contains("70rem");
+	}
+
+	/// Author content names color roles freely, so a class named after one
+	/// restyles it: the `.error` box once shrank the `Error` swatch on the
+	/// palette page to its small type.
+	#[beet_core::test]
+	fn no_class_is_named_after_a_color_role() {
+		use heck::ToKebabCase;
+		fn push_classes(selector: &Selector, classes: &mut Vec<SmolStr>) {
+			match selector {
+				Selector::Class(class) => classes.push(class.clone()),
+				Selector::Not(inner) => push_classes(inner, classes),
+				Selector::AnyOf(parts) | Selector::AllOf(parts) => {
+					for part in parts {
+						push_classes(part, classes);
+					}
+				}
+				Selector::Descendant {
+					ancestor: first,
+					descendant: second,
+				}
+				| Selector::Child {
+					parent: first,
+					child: second,
+				} => {
+					push_classes(first, classes);
+					push_classes(second, classes);
+				}
+				_ => {}
+			}
+		}
+		let mut classes = Vec::new();
+		for rule in all_rules() {
+			push_classes(rule.selector(), &mut classes);
+		}
+		colors::token_map()
+			.keys()
+			.filter_map(|key| key.as_str().rsplit('/').next())
+			.map(|role| role.to_kebab_case())
+			.filter(|role| classes.iter().any(|class| class == role))
+			.collect::<Vec<_>>()
+			.xpect_empty();
 	}
 
 	/// The narrow-screen sidebar collapse is CSS-first: below the breakpoint the

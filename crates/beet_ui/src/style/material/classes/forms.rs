@@ -19,7 +19,9 @@ pub const SELECT_OPTION: ClassName = ClassName::new_static("select-option");
 /// The open panel's filter line, what its rows are refined by.
 pub const SELECT_FILTER: ClassName = ClassName::new_static("select-filter");
 pub const ERROR_TEXT: ClassName = ClassName::new_static("error-text");
-pub const ERROR: ClassName = ClassName::new_static("error");
+/// Named for the box rather than the `error` color role, which author content
+/// names freely, ie a palette swatch.
+pub const ERROR_BOX: ClassName = ClassName::new_static("error-box");
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
 
@@ -302,9 +304,9 @@ pub fn error_text() -> Rule {
 /// An error box: the [`Error`](crate::prelude::Error) container painted on the
 /// material `Error`/`OnError` pair, for surfacing a failure inline (eg a render
 /// error beside a broken widget).
-pub fn error() -> Rule {
+pub fn error_box() -> Rule {
 	Rule::new()
-		.with_selector(Selector::class(ERROR))
+		.with_selector(Selector::class(ERROR_BOX))
 		.with_token(common_props::BackgroundColor,colors::Error).unwrap()
 		.with_token(common_props::ForegroundColor,colors::OnError).unwrap()
 		.with_token(TypographyProps,typography::BodySmall).unwrap()

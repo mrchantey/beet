@@ -529,6 +529,62 @@ mod test {
 			.xpect_true();
 	}
 
+	/// A launch of any stage lowers `prod`'s boundary exactly as a `prod`
+	/// launch does, since an elevated deploy of any stage converges it.
+	///
+	/// REGRESSION: the repo store's root was read as it landed, at the
+	/// launch's stage, so an elevated `dev` deploy converged a prod boundary
+	/// naming `beet-site--dev--repo` wherever the box names its repo store,
+	/// its certificate backup on `caddy/*` included, and prod's `caddy-backup`
+	/// was denied by its own boundary from then on.
+	#[cfg(feature = "lightsail_block")]
+	#[beet_core::test]
+	fn lowers_prod_as_a_prod_launch_does() {
+		let prod = |stack: Stack| {
+			let (deployment, _dir) = Deployment::default_local();
+			let mut world = InfraPlugin.into_world();
+			world.insert_resource(deployment);
+			world.init_resource::<PackageConfig>();
+			world.spawn((
+				stack,
+				AwsRegion::new(Stack::TEST_AWS_REGION),
+				children![
+					(
+						S3BucketBlock::new("repo")
+							.with_deploy_versioned(true)
+							.with_accept_data_loss(true),
+						RepoStoreBlock
+					),
+					LightsailBlock::default(),
+				],
+			));
+			// the declaration lands at the launch's stage, as at build
+			world.flush();
+			let (stack, _deployment, config) =
+				RenderScope::render_all_at(&mut world, &"prod".into())
+					.unwrap()
+					.pop()
+					.unwrap()
+					.finish()
+					.unwrap();
+			RuntimeBoundary::new(
+				stack.app_name().clone(),
+				stack.stage().clone(),
+			)
+			.lower(&config)
+			.unwrap()
+			.to_json()
+			.to_string()
+		};
+		// a stack taking the launch's stage, rendered at prod
+		let from_any_launch = prod(Stack::new("app"));
+		from_any_launch
+			.as_str()
+			.xpect_contains("arn:aws:s3:::app--prod--repo");
+		// what a prod launch resolves
+		from_any_launch.xpect_eq(prod(Stack::new("app").with_stage("prod")));
+	}
+
 	/// The union is a set: two principals of one app routinely read the same
 	/// bucket, and the boundary says so once.
 	#[beet_core::test]

@@ -211,7 +211,7 @@ pub(super) fn spawn_error(
 	warn!("mermaid diagram failed to render: {err}\n{source}");
 	commands.spawn((
 		Element::new("div"),
-		Classes::new([classes::ERROR]),
+		Classes::new([classes::ERROR_BOX]),
 		ChildOf(figure),
 		children![Value::str(format!("mermaid: {err}"))],
 	));
@@ -356,7 +356,7 @@ mod test {
 		let root = app.world_mut().spawn_empty().id();
 		parse_md(app.world_mut(), root, "```mermaid\nnotadiagram\n```");
 		html(&mut app, root)
-			.xpect_contains("<div class=\"error\">mermaid: ")
+			.xpect_contains("<div class=\"error-box\">mermaid: ")
 			.xpect_contains("<pre>notadiagram")
 			.xnot()
 			.xpect_contains("diagram-text");

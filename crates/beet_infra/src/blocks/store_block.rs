@@ -4,6 +4,7 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
+use std::sync::Arc;
 
 /// A [`Block`] whose resource is a blob store: a bucket the deploy creates, or
 /// a [`StoreUriBlock`] naming one it does not. What every store block shares
@@ -43,7 +44,11 @@ pub trait StoreBlock: Block {
 /// content sync at the live version): a consumer applies the id it holds
 /// through [`store_uri`](Self::store_uri). Both uris are total, so the store
 /// a process attaches is nothing but [`runtime_uri`](Self::runtime_uri) built.
-#[derive(Debug, Clone, PartialEq, Get, Component)]
+///
+/// Both are resolved against the stack as the declaration LANDED, ie at the
+/// launch's stage; a render at another stage ([`RenderStage`]) reads the
+/// projection [`at`](Self::at) the stack it renders instead.
+#[derive(Debug, Clone, Get, Component)]
 #[component(immutable)]
 pub struct ErasedStoreBlock {
 	/// The store's root, see [`StoreBlock::store_uri`].
@@ -56,11 +61,29 @@ pub struct ErasedStoreBlock {
 	deploy_versioned: bool,
 	/// See [`StoreBlock::storage_class`].
 	storage_class: Option<S3StorageClass>,
+	/// The declaration this projects, for [`at`](Self::at).
+	#[get(skip)]
+	declared: Reproject,
+}
+
+/// Two projections are equal when they describe the same store, whichever
+/// declaration they came from.
+impl PartialEq for ErasedStoreBlock {
+	fn eq(&self, other: &Self) -> bool {
+		self.root == other.root
+			&& self.local == other.local
+			&& self.deploy_versioned == other.deploy_versioned
+			&& self.storage_class == other.storage_class
+	}
 }
 
 impl ErasedStoreBlock {
 	/// The projection of `block` declared under `stack`.
-	pub fn new(block: &impl StoreBlock, stack: &ResolvedStack) -> Result<Self> {
+	pub fn new<T: StoreBlock>(
+		block: &T,
+		stack: &ResolvedStack,
+	) -> Result<Self> {
+		let declared = block.clone();
 		Self {
 			root: block.store_uri(stack)?,
 			local: ServiceAccess::local_store_uri(
@@ -68,8 +91,20 @@ impl ErasedStoreBlock {
 			),
 			deploy_versioned: block.deploy_versioned(),
 			storage_class: block.storage_class(),
+			declared: Reproject(Arc::new(move |stack| {
+				Self::new(&declared, stack)
+			})),
 		}
 		.xok()
+	}
+
+	/// The same declaration projected against `stack` rather than the stack it
+	/// landed under: how a render at another stage ([`RenderStage`]) names that
+	/// stage's store. A credential converged from a `dev` launch lowers what
+	/// `prod` declares, and a root read as it landed named the dev bucket in
+	/// prod's boundary.
+	pub fn at(&self, stack: &ResolvedStack) -> Result<Self> {
+		(self.declared.0)(stack)
 	}
 
 	/// The uri a deploy hands a process: the root, nested under the version's
@@ -174,6 +209,24 @@ pub(crate) fn attach_store(
 			StoreProvider::from_uri(&uri)?.insert(&mut entity);
 			Ok(())
 		});
+}
+
+/// The erased declaration behind an [`ErasedStoreBlock`], projecting it again
+/// against another stack.
+#[derive(Clone)]
+struct Reproject(
+	Arc<
+		dyn 'static
+			+ Send
+			+ Sync
+			+ Fn(&ResolvedStack) -> Result<ErasedStoreBlock>,
+	>,
+);
+
+impl std::fmt::Debug for Reproject {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("Reproject")
+	}
 }
 
 #[cfg(test)]

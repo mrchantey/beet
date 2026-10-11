@@ -110,12 +110,13 @@ async fn verifies_client() {
 		.collect::<Vec<_>>()
 		.xpect_empty();
 
+	cross_log!("stage: asset sweep done");
+
 	// desktop layout: every table stays inside the page's measure column, a
 	// table page's sidebar rail is exactly as wide as a prose page's, ie no
 	// content widens the row around it, and every color swatch grows to hold
-	// its wrapped label. 1280 is inside the rail's shrink range, 1920 past the
-	// column's measure cap.
-	cross_log!("stage: asset sweep done");
+	// its wrapped label in the same type as its siblings. 1280 is inside the
+	// rail's shrink range, 1920 past the column's measure cap.
 	let mut layout_faults = Vec::new();
 	for width in [1280, 1920] {
 		page.set_viewport(width, 800).await.unwrap();
@@ -123,17 +124,33 @@ async fn verifies_client() {
 			.await
 			.unwrap();
 		page.find("main h1").await;
-		let clipped = page
+		let swatch_faults = page
 			.evaluate_value(
-				r#"[...document.querySelectorAll('.color-box')]
-					.filter(swatch => swatch.scrollHeight > swatch.clientHeight + 1)
-					.map(swatch => swatch.textContent.trim())"#,
+				r#"(() => {
+					const swatches = [...document.querySelectorAll('.color-box')];
+					const size = swatch => getComputedStyle(swatch).fontSize;
+					const expected = size(swatches[0]);
+					return swatches.flatMap(swatch => {
+						const label = swatch.textContent.trim();
+						const faults = [];
+						if (swatch.scrollHeight > swatch.clientHeight + 1)
+							faults.push(`${label} overflows its box`);
+						if (size(swatch) !== expected)
+							faults.push(`${label} is ${size(swatch)}, not ${expected}`);
+						return faults;
+					});
+				})()"#,
 			)
 			.await
 			.unwrap();
-		layout_faults.extend(clipped.as_array().unwrap().iter().map(|label| {
-			format!("{width}px color swatch {label} overflows its box")
-		}));
+		layout_faults.extend(
+			swatch_faults
+				.as_array()
+				.unwrap()
+				.iter()
+				.filter_map(|fault| fault.as_str())
+				.map(|fault| format!("{width}px color swatch {fault}")),
+		);
 		let prose =
 			DesktopLayout::measure(&mut page, &base, "/docs/about").await;
 		for path in ["/docs/design/table", "/docs/crates", "/docs/secrets"] {

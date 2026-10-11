@@ -287,10 +287,9 @@ mod test {
 					if let Some(attr) = view.attribute("viewBox") {
 						out.push_str(&format!("[viewBox={}]", attr.value));
 					}
-					if let Some((_, text)) = view
-						.inner_text
-						.filter(|_| view.contains_class_name(&classes::ERROR))
-					{
+					if let Some((_, text)) = view.inner_text.filter(|_| {
+						view.contains_class_name(&classes::ERROR_BOX)
+					}) {
 						out.push_str(&format!(" {text:?}"));
 					}
 					out

@@ -339,7 +339,7 @@ mod test {
 	#[beet_core::test]
 	fn parse_error_keeps_the_source() {
 		render_md("```mermaid\ngraph LR\n--> A\n```")
-			.xpect_contains("<div class=\"error\">mermaid: ")
+			.xpect_contains("<div class=\"error-box\">mermaid: ")
 			.xpect_contains("<pre>graph LR")
 			.xnot()
 			.xpect_contains("<svg");

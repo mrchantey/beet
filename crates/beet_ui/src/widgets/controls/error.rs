@@ -5,12 +5,12 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// A styled error box: paints its children on the material `Error`/`OnError`
-/// palette (the `.error` rule). Wrap any failure content (a message, a broken
+/// palette (the `.error-box` rule). Wrap any failure content (a message, a broken
 /// widget) in `<Error>...</Error>` to surface it inline.
 #[template]
 pub fn Error() -> impl Bundle {
 	rsx! {
-		<div {Classes::new([classes::ERROR])}><Slot/></div>
+		<div {Classes::new([classes::ERROR_BOX])}><Slot/></div>
 	}
 }
 

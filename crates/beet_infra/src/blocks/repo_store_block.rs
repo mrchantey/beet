@@ -149,7 +149,9 @@ impl RepoStoreQuery<'_, '_> {
 		Some(RepoStoreDecl {
 			entity: marker,
 			label: erased.label.clone(),
-			store: store.clone(),
+			// the stack as this query sees it rather than as the declaration
+			// landed, so a render at another stage names that stage's store
+			store: store.at(&self.stacks.resolve(marker))?,
 		})
 		.xok()
 	}
