@@ -184,7 +184,7 @@ pub fn footer() -> Rule {
 pub fn footer_side() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(FOOTER_SIDE))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 }
 
 /// App bar in scrolled state - adds elevation shadow.
@@ -238,12 +238,12 @@ const MAIN_PADDING_REM: f32 = 1.;
 /// flex item in [`container`], `<main>` would otherwise default to `min-width:
 /// auto` (`min-content`), so a wide unbreakable child - a long code line in a
 /// `<pre>`, a fixed-size embed - would force the column past the viewport on a
-/// narrow screen instead of the child scrolling/scaling within it. A no-op on
-/// the terminal, whose charcell box model applies no `min-content` floor.
+/// narrow screen instead of the child scrolling/scaling within it, on both
+/// targets.
 pub fn main_content() -> Rule {
 	Rule::new()
 		.with_selector(Selector::tag("main"))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 		.with_value(common_props::MinWidth, Length::Px(0.))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
@@ -251,17 +251,17 @@ pub fn main_content() -> Rule {
 		.with_value(common_props::Padding, Spacing::all(Length::Rem(MAIN_PADDING_REM)))
 }
 
-/// Web main column basis - in the [`container`] row `<main>` starts from its
-/// full measure plus padding rather than its content, so the [`sidebar_web`]
-/// rail and the column split any shortfall by a fixed ratio. A content-sized
-/// basis let each page's content width the rail: a page of short blocks kept
-/// the full 22rem rail, prose shrank it and a wide table drove it to its floor.
-/// Screen-gated, pairing with [`sidebar_web`]; the terminal rail is fixed.
+/// Main column basis - in the [`container`] row `<main>` starts from its full
+/// measure plus padding rather than its content, so the rail beside it and the
+/// column split any shortfall by a fixed ratio. A content-sized basis let each
+/// page's content width the rail: a page of short blocks kept the full 22rem
+/// web rail, prose shrank it and a wide table drove it to its floor. The
+/// terminal rail holds its width ([`sidebar_terminal`]), so there the column
+/// takes the whole shortfall.
 ///
-/// [`sidebar_web`]: super::sidebar_web
+/// [`sidebar_terminal`]: super::sidebar_terminal
 pub fn main_content_basis() -> Rule {
 	Rule::new()
-		.with_media(MediaQuery::Screen)
 		.with_selector(Selector::child(Selector::class(CONTAINER), Selector::tag("main")))
 		.with_value(common_props::FlexBasisProp, Length::Rem(MAIN_MEASURE_REM + 2. * MAIN_PADDING_REM))
 }
@@ -298,16 +298,12 @@ pub fn page() -> Rule {
 		.with_canonical(OverflowWrap::BreakWord)
 }
 
-// ── Web-only overrides ────────────────────────────────────────────────────────
-// `@media screen` rules: the charcell cascade ignores media-gated rules, so
-// these refine the web look without touching the terminal, which keeps its
-// colored headings and grows to fit its content.
+// ── Viewport fill ─────────────────────────────────────────────────────────────
 
 /// The `.page` body fills at least the viewport height as a flex column, so a
 /// short page still pins its footer to the bottom — of the screen on the web, and
 /// of the terminal window in charcell (the cell viewport resolves `100vh`).
-/// Ungated so both targets fill the window; the terminal no longer shrinks to its
-/// content.
+/// Ungated so both targets fill the window.
 pub fn page_fill_viewport() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(PAGE))
@@ -325,5 +321,5 @@ pub fn page_fill_viewport() -> Rule {
 pub fn container_grow() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CONTAINER))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 }

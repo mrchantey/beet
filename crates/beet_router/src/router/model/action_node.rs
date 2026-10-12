@@ -66,6 +66,36 @@ impl ActionNode {
 			.or_else(|| self.meta.description())
 	}
 
+	/// Every param a request dispatched to this route may carry: its own
+	/// [`ParamsPattern`] (its steps' included) and everything declared along
+	/// its dispatch path. The one union a [`RejectUnknownParams`] url space
+	/// checks against and `--help` lists, so the two cannot drift.
+	pub fn declared_params(
+		&self,
+		query: &DeclaredParamsQuery,
+	) -> DeclaredParams {
+		let mut declared = query.of(self.entity);
+		declared.extend_metas(self.params.iter());
+		declared
+	}
+
+	/// The line pointing a person refused a param at this route's help, ie
+	/// "`deploy --help` lists the params it takes", scoped to the route's
+	/// static prefix, the part a person can type.
+	pub fn help_hint(&self) -> String {
+		self.path
+			.iter()
+			.take_while(|segment| segment.is_static())
+			.map(|segment| segment.name())
+			.collect::<Vec<_>>()
+			.join("/")
+			.xmap(|route| match route.is_empty() {
+				true => "--help".to_string(),
+				false => format!("{route} --help"),
+			})
+			.xmap(|help| format!("`{help}` lists the params it takes"))
+	}
+
 	/// Whether this node is a page the public may reach: a [`PageRoute`] at a
 	/// fully static path answering `GET`, and not a draft in a production
 	/// build.

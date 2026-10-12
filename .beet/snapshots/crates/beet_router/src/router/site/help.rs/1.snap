@@ -1,0 +1,58 @@
+## Available routes
+
+- [/stack/audit](/stack/audit)
+
+| name | kind | required | description |
+|---|---|---|---|
+| fix | bool | no | Repair what the audit finds. |
+- [/stack/deploy](/stack/deploy)
+  - **description:** Stands in for a command.
+
+| name | kind | required | description |
+|---|---|---|---|
+| dry-run | bool | no | Plan without applying. |
+| elevated | bool | no | Deploy as an administrator. |
+- [/stack/serve](/stack/serve)
+  - **description:** Stands in for a command.
+
+from **VerboseLogger**
+
+| name | kind | required | description |
+|---|---|---|---|
+| verbose | bool | no | Log every request. |
+
+## Inherited params
+
+Taken by every route above, read by the middleware, server or launch declaring them.
+
+from **HelpHandler**
+
+| name | kind | required | description |
+|---|---|---|---|
+| help | bool | no | List the routes beneath this one and the params each takes, rather than calling it. |
+| color-scheme | one of: light, dark | no | Pin the page's color scheme over the negotiated one. |
+
+from **CliServer**
+
+| name | kind | required | description |
+|---|---|---|---|
+| accept | alloc::vec::Vec<alloc::string::String> | no | The media types to answer in, highest priority first, eg `--accept=text/html,text/plain`. Defaults to ANSI for a terminal and markdown when stdout is not one. |
+| entry | alloc::string::String | no | The entry document: a path, or a directory holding a `main.bsx`. |
+| repo | a store uri, eg "s3://<bucket>" | no | The repo store the entry loads through, eg `s3://my-bucket`. |
+| store-fork | a store uri, eg "s3://<bucket>" | no | The local store the repo store is forked into, reads falling through to the repo and writes landing here. |
+| watch | bool | no | Watch the entry's sources and live-reload. |
+| features | alloc::vec::Vec<alloc::string::String> | no | Cargo features this binary must have been built with, comma separated. |
+| server | alloc::string::String | no | Which declared servers boot, comma separated, eg `http,ssh`. |
+| path | alloc::string::String | no | The route a freshly-opened tui/ssh surface navigates to. |
+| host | alloc::string::String | no | The address servers bind to. |
+| port | u16 | no | The http listener port. |
+| ssh-port | u16 | no | The ssh listener port. |
+| stage | alloc::string::String | no | The infrastructure stage this process runs in, defaulting to `dev`. |
+| service-access | one of: local, remote | no | Whether services resolve locally or against the cloud. |
+| deploy-id | alloc::string::String | no | This deployment's unique id. |
+| deploy-timestamp | alloc::string::String | no | This deployment's timestamp. |
+| tls | bool | no | Force TLS on or off, overriding the managed-platform detection. |
+| tls-dir | alloc::string::String | no | Where the cached dev certificate lives. |
+| headless | bool | no | Run terminal surfaces buffered, never touching the real tty. |
+| screenshot | alloc::string::String | no | Capture the first window to this PNG and exit. |
+| screenshot-frame | u32 | no | The frame the screenshot harness captures on. |

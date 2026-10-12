@@ -121,7 +121,10 @@ pub(crate) fn entry_arg(parts: &RequestParts) -> Result<String> {
 		.map(|segments| segments.join("/"))
 		.unwrap_or_default();
 	if entry.is_empty() {
-		bevybail!("usage: beet <command> <entry-dir>");
+		return Err(HttpError::bad_request(
+			"usage: beet <command> <entry-dir>",
+		)
+		.into());
 	}
 	entry.xok()
 }

@@ -26,3 +26,5 @@ Running an entry is the zero-command path: `beet` discovers a `main.bsx` by walk
 beet --entry=examples/hello
 beet --entry=examples/perceive_act/main-v1.bsx
 ```
+
+A flag no command declares is refused rather than ignored: beet's entries opt in with `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`, so a typo like `deploy --elevate` answers `did you mean --elevated?` before anything runs, while a site served over http keeps accepting whatever a link carries.

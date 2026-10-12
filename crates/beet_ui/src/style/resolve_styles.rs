@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::style::AlignSelf;
 use crate::style::FlexBox;
 use crate::style::LayoutStyle;
 use crate::style::VisualStyle;
@@ -30,6 +31,8 @@ pub(crate) fn resolve_styles(
 	// the box model (margin/border/padding/background) is element-level; text and
 	// fragment nodes must not resolve their nearest ancestor's box and re-paint it.
 	elements: Query<(), With<Element>>,
+	// a tag-less text node, the anonymous box a run of text lays out as
+	texts: Query<(), (With<Value>, Without<Element>)>,
 	// the nodes the cascade owns: what the change filters above watch
 	owned: Query<(), Or<(With<Element>, With<Classes>, With<ElementStateMap>)>>,
 	mut styles: Query<(
@@ -87,8 +90,15 @@ pub(crate) fn resolve_styles(
 				commands.entity(entity).insert(visual);
 			}
 
-			// resolve layout style
-			let layout = resolve_layout(&ruleset_query, entity, &mut memo)?;
+			// resolve layout style, as the box this node is (see `LayoutBox`)
+			let layout_box =
+				match (elements.contains(entity), texts.contains(entity)) {
+					(true, _) => LayoutBox::Element,
+					(false, true) => LayoutBox::Text,
+					(false, false) => LayoutBox::Fragment,
+				};
+			let layout =
+				resolve_layout(&ruleset_query, entity, layout_box, &mut memo)?;
 			if let Some(mut style) = styles.get_mut(entity)?.1 {
 				style.set_if_neq(layout);
 			} else {
@@ -224,23 +234,56 @@ fn resolve_visual(
 	style.xok()
 }
 
+/// The box a node's resolved [`LayoutStyle`] describes. A non-element matches
+/// its nearest element's rules, yet it is an anonymous box rather than that
+/// element, so only some of what it matches is its own.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum LayoutBox {
+	/// An element, every prop its own.
+	Element,
+	/// A tag-less text run: in a flex container an anonymous item (CSS
+	/// `flex: 0 1 auto`), so it reads only its element's `display` and the
+	/// inherited `white-space`, never the element's own sizing or overflow.
+	Text,
+	/// A tag-less node kept in the flow (eg a slot carrying its element's
+	/// background): it lays its children out as its element would, so it reads
+	/// the element's container props, but the element's own `flex-*`, `order`
+	/// and `align-self` place the element in its parent's line, never a box
+	/// inside it, so those stay initial.
+	Fragment,
+}
+
+/// Resolve `entity`'s [`LayoutStyle`] as the `layout_box` it is.
 fn resolve_layout(
 	query: &RuleSetQuery,
 	entity: Entity,
+	layout_box: LayoutBox,
 	memo: &mut CascadeMemo,
 ) -> Result<LayoutStyle> {
+	let display = query.resolve(entity, DisplayProp, memo).unwrap_or_default();
+	let white_space = query
+		.resolve(entity, WhiteSpaceProp, memo)
+		.unwrap_or_default();
+	if layout_box == LayoutBox::Text {
+		return LayoutStyle {
+			display,
+			white_space,
+			..default()
+		}
+		.xok();
+	}
 	let flex_grow = query
 		.resolve(entity, FlexGrowProp, memo)
-		.unwrap_or_default();
+		.unwrap_or(LayoutStyle::DEFAULT.flex_grow);
+	let flex_shrink = query
+		.resolve(entity, FlexShrinkProp, memo)
+		.unwrap_or(LayoutStyle::DEFAULT.flex_shrink);
+	let flex_basis = query.resolve(entity, FlexBasisProp, memo).ok();
 	let flex_order = query
 		.resolve(entity, FlexOrderProp, memo)
 		.unwrap_or_default();
 	let align_self = query
 		.resolve(entity, AlignSelfProp, memo)
-		.unwrap_or_default();
-	let display = query.resolve(entity, DisplayProp, memo).unwrap_or_default();
-	let white_space = query
-		.resolve(entity, WhiteSpaceProp, memo)
 		.unwrap_or_default();
 	let direction = query
 		.resolve(entity, FlexDirectionProp, memo)
@@ -292,11 +335,24 @@ fn resolve_layout(
 		},
 		grid,
 		flex_grow,
+		flex_shrink,
+		flex_basis,
 		flex_order,
 		align_self,
 		overflow_x,
 		overflow_y,
 	}
+	.xmap(|layout| match layout_box {
+		LayoutBox::Fragment => LayoutStyle {
+			flex_grow: LayoutStyle::DEFAULT.flex_grow,
+			flex_shrink: LayoutStyle::DEFAULT.flex_shrink,
+			flex_basis: None,
+			flex_order: LayoutStyle::DEFAULT.flex_order,
+			align_self: AlignSelf::Auto,
+			..layout
+		},
+		_ => layout,
+	})
 	.xok()
 }
 

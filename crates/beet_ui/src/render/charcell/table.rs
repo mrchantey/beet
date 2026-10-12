@@ -110,33 +110,6 @@ fn column_widths(
 	}
 }
 
-/// The narrowest `node` lays out without breaking a word, in cells: its longest
-/// word at its glyph scale, or its widest child's, plus its own padding and
-/// border (the CSS min-content width).
-fn min_content_width(
-	node: &CharcellNodeData,
-	query: &CharcellQuery,
-	viewport: UVec2,
-) -> u32 {
-	let text = node
-		.value()
-		.map(|value| value.to_string())
-		.or_else(|| node.marker().map(str::to_string));
-	let content = match text {
-		Some(text) => text
-			.split(collapsible)
-			.map(|word| measure_scaled(node.visual_style(), word, u32::MAX).x)
-			.max()
-			.unwrap_or(0),
-		None => node
-			.child_nodes(query)
-			.map(|child| min_content_width(&child, query, viewport))
-			.max()
-			.unwrap_or(0),
-	};
-	content + BoxModel::from_node(node, viewport).overhead().x
-}
-
 /// A row's height: the tallest of its cells, each resolved at its column width.
 fn row_height(
 	row: &TableRow,

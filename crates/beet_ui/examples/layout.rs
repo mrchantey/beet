@@ -295,12 +295,12 @@ fn setup_flex_grow() -> impl Bundle {
 			(
 				rsx! {"Grow 1"},
 				bordered(),
-				LayoutStyle::default().with_flex_grow(1)
+				LayoutStyle::default().with_flex_grow(1.)
 			),
 			(
 				rsx! {"Grow 2"},
 				bordered(),
-				LayoutStyle::default().with_flex_grow(2)
+				LayoutStyle::default().with_flex_grow(2.)
 			),
 			(rsx! {"Fixed"}, bordered()),
 		],
@@ -666,7 +666,7 @@ fn setup_text_align() -> impl Bundle {
 		BoxStyle::default()
 			.with_padding(Spacing::all(Length::Rem(2.)))
 			.with_border(Spacing::all(Length::Rem(1.))),
-		LayoutStyle::default().with_flex_grow(1),
+		LayoutStyle::default().with_flex_grow(1.),
 	);
 
 	(

@@ -57,11 +57,11 @@ use beet_ui::prelude::*;
 /// head, before the body parses.
 ///
 /// ```bsx
-/// <Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot="intent"/>
+/// <Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot="intent"/>
 /// ```
 #[template]
 pub fn Wasm(
-	/// The wasm artifact url, eg `/assets/wasm/beet-min.wasm`.
+	/// The wasm artifact url, eg `/wasm/beet-min.wasm`.
 	#[prop]
 	src: String,
 	/// The wasm-bindgen glue url; defaults to `src` with `.wasm` swapped for `.js`.
@@ -182,7 +182,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
+				<Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="scene_editor.bsx" server="dom" boot=BootPolicy::Intent/>
 			})
 			.unwrap()
 			.id();
@@ -214,7 +214,7 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-ui.wasm" repo="/examples/ui" entry="scene_editor.bsx" server="dom"/>
+				<Wasm src="/wasm/beet-ui.wasm" repo="/examples/ui" entry="scene_editor.bsx" server="dom"/>
 			})
 			.unwrap()
 			.id();
@@ -230,7 +230,7 @@ mod test {
 		// an absolute repo keeps its origin
 		let root = world
 			.spawn_template(rsx! {
-				<Wasm src="/assets/wasm/beet-min.wasm" repo="https://beet.org/repo" entry="hello.bsx"/>
+				<Wasm src="/wasm/beet-min.wasm" repo="https://beet.org/repo" entry="hello.bsx"/>
 			})
 			.unwrap()
 			.id();

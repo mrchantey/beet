@@ -29,6 +29,9 @@ std = [
 	"sockets",
 	"beet_action/std",
 	"beet_action/reflect",
+	# `beet_action/reflect` already compiles the reflect docs in, so a param's
+	# doc comment is its `--help` description
+	"bevy_reflect_documentation",
 	"dep:async-channel",
 	"dep:async-lock",
 	"dep:futures",

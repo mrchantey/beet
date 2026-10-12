@@ -114,11 +114,14 @@ impl fmt::Display for WasmHost {
 /// `Deno.args`. cargo passes an absolute binary path, which `CliArgs` keeps as
 /// one intact segment, so the rejoin reproduces it leading-`/` and all. The capture
 /// is named `run-wasm-args` to distinguish the route's own path capture from the
-/// module args it forwards.
+/// module args it forwards. Its params are declared
+/// [`forwarding`](ParamsPartial::forwarding) for the same reason: a param it
+/// does not name belongs to the module, so a strict entry
+/// ([`RejectUnknownParams`]) passes the test runner's `--nocapture` through.
 #[action(route = "run-wasm/*run-wasm-args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>())]
+#[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>().forwarding())]
 pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 	let parts = &cx.input;
 	let params = parts.parse_params::<RunWasmParams>()?;
@@ -128,7 +131,10 @@ pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 	// args (eg a libtest name filter cargo appends after the binary).
 	let mut segments = core::mem::take(&mut cli.path);
 	if segments.is_empty() {
-		bevybail!("usage: beet run-wasm <binary-path> [args..]");
+		return Err(HttpError::bad_request(
+			"usage: beet run-wasm <binary-path> [args..]",
+		)
+		.into());
 	}
 	segments.remove(0);
 	// the binary path ends at the `.wasm` segment; segments after it are positional
@@ -137,7 +143,9 @@ pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 		.iter()
 		.position(|segment| segment.ends_with(".wasm"))
 		.ok_or_else(|| {
-			bevyhow!("usage: beet run-wasm <binary-path>.wasm [args..]")
+			HttpError::bad_request(
+				"usage: beet run-wasm <binary-path>.wasm [args..]",
+			)
 		})?;
 	let trailing = segments.split_off(wasm_idx + 1);
 	let exe_path = segments.join("/");

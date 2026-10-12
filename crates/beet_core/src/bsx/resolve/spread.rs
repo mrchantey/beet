@@ -85,7 +85,9 @@ fn apply_spread(
 /// A name with no registered type is a capability this binary did not link (eg a
 /// `<Router {(.., TuiServer)}>` spread loaded by a lean http-only deploy that
 /// dropped the `tui` feature). Skip it with a warning rather than failing the
-/// whole load, so the same site serves the subset each binary supports.
+/// whole load, so the same site serves the subset each binary supports; a name
+/// the binary marked [`AllowedUnregistered`] is known to be featured out (the
+/// browser runtime's `TuiServer`), so it skips silently.
 pub(super) fn apply_spread_named(
 	named: &NamedLiteral,
 	entity: &mut EntityWorldMut,
@@ -103,10 +105,16 @@ pub(super) fn apply_spread_named(
 			.or_else(|| enum_variant_registration(&registry, &named.name))
 		else {
 			drop(registry);
-			warn!(
-				"skipping spread `{}`: no component or template of that name is registered in this binary",
-				named.name
-			);
+			let featured_out = entity
+				.world()
+				.get_resource::<AllowedUnregistered>()
+				.is_some_and(|allowed| allowed.contains(&named.name));
+			if !featured_out {
+				warn!(
+					"skipping spread `{}`: no component or template of that name is registered in this binary",
+					named.name
+				);
+			}
 			return Ok(());
 		};
 		let info = Some(registration.type_info());

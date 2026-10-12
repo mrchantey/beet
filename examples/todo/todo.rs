@@ -51,17 +51,13 @@ async fn main() -> Result {
 	let document = load_document().await?;
 	let before = document.0.clone();
 
+	// the `CliServer` negotiates the answer's media type (`--accept`, else
+	// markdown or ANSI) and hands the request down to its router child
 	let root = world
-		.spawn((
-			document,
-			(Router::with_defaults(), children![
-				create(),
-				read(),
-				update(),
-				delete(),
-				list(),
-			]),
-		))
+		.spawn((document, CliServer::default(), children![(
+			Router::with_defaults(),
+			children![create(), read(), update(), delete(), list(),]
+		)]))
 		.flush();
 
 	// settle the read path so each route's `Value` mirrors the loaded list
@@ -76,13 +72,17 @@ async fn main() -> Result {
 		.entity_mut(root)
 		.call::<Request, Response>(request)
 		.await?;
-
+	let status = response.status();
 	cross_log!("{}", response.pretty_text().await?);
 
 	// persist only when a command actually changed the list
 	let after = world.entity(root).get::<Document>().unwrap().0.clone();
 	if after != before {
 		save_document(&after).await?;
+	}
+	// a failed command exits with its status's code, as every beet CLI does
+	if let Err(code) = status.to_exit_code() {
+		process_ext::exit(code.get() as i32);
 	}
 	Ok(())
 }

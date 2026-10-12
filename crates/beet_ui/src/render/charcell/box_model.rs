@@ -462,6 +462,23 @@ fn min_height_cells(
 	explicit_cells(length, vp, containing)
 }
 
+/// Resolve a [`Length`] along one axis to whole cells, against the cell
+/// `viewport` and an optional `containing` block extent on that axis: a width
+/// as [`explicit_cells`] does, a height as [`min_height_cells`] does, so a
+/// viewport-relative height in the unbounded stdout buffer resolves to `None`
+/// rather than a 65535-row extent.
+pub(super) fn axis_cells(
+	length: Length,
+	viewport: UVec2,
+	containing: Option<u32>,
+	vertical: bool,
+) -> Option<u32> {
+	match vertical {
+		true => min_height_cells(length, viewport, containing),
+		false => explicit_cells(length, viewport.as_vec2(), containing),
+	}
+}
+
 /// Resolve an explicit `width`/`height` [`Length`] to whole cells.
 ///
 /// Absolute lengths use the rem convention (1rem ≈ 1 cell). Viewport-relative

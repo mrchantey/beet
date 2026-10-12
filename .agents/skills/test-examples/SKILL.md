@@ -64,13 +64,14 @@ cargo run -p rsx_site --features cli -- guide --accept=text/html # render one ro
 
 ### 4. Todo (`--features=router,json`)
 
-Round-trip the todo document: list → create → list → delete → list.
+Round-trip the todo document: list → create → list → delete → list, ending on `[]` so `examples/todo/todos.json` is left as found. Keep the `--body` single-quoted wherever the command is scripted: a word-split body routes to `/create/test",..` instead. A missing route (`-- nope`) answers the markdown not-found page and exits 1, like every beet CLI.
 
 ```sh
 cargo run --example todo --features=router,json -- list
 cargo run --example todo --features=router,json -- create --body='{"description":"smoke test","done":false}'
 cargo run --example todo --features=router,json -- list
 cargo run --example todo --features=router,json -- delete --body=0
+cargo run --example todo --features=router,json -- list
 ```
 
 ### 5. Net (`--features=net,ureq,native-tls` / `--features=http_server`)
@@ -123,7 +124,7 @@ cargo build -p beet-cli --features=extra        # every scene below except the m
 cargo build -p beet-cli --features=extra,ml     # adds `hello_ml.bsx`
 ```
 
-Every action scene naming a `beet_extra` action (`hello_world`, `simple_action`, `long_running`, `malenia`, `state_machine`, `scripting`) declares `<RequireCfg cfg="feature:extra"/>` beside its root element, where the entry prescan consumes it rather than building it into the `<Sequence>`, so a binary without `extra` refuses the load before anything builds with `this binary does not satisfy <RequireCfg cfg="feature:extra"/>, unmet: feature:extra`. `behavior_tree`, `repeat_while`, `utility_ai` and `world_script` use only the core vocabulary and run on any build. `winit` enables `extra`, so the windowed build satisfies the requirement too.
+Every action scene naming a `beet_extra` action (`hello_world`, `simple_action`, `long_running`, `malenia`, `state_machine`, `scripting`) declares `<RequireCfg cfg="feature:extra"/>` beside its root element, where the entry prescan consumes it rather than building it into the `<Sequence>`, so a binary without `extra` refuses the load before anything builds, logging `this binary does not satisfy <RequireCfg cfg="feature:extra"/>` with the unmet `feature:extra` on the next line. `behavior_tree`, `repeat_while`, `utility_ai` and `world_script` use only the core vocabulary and run on any build. `winit` enables `extra`, so the windowed build satisfies the requirement too.
 
 The `ml` build pulls `winit` and bevy_render, so every scene brings up a wgpu device and compiles bevy's compute pipelines on its async compute pool whether or not it needs a GPU; a short scene exits while those compiles are still in the driver. A segfault inside `libnvidia-glcore` during `create_compute_pipeline` (or an `NVVM compilation failed` + `DeviceLost` log) is an exit tearing the driver down beneath that thread, which `process_ext::exit` avoids by `_exit`ing. It is a regression, never host noise: `__GL_SHADER_DISK_CACHE=0` forces every compile through the driver and reproduces it on every short scene. The `extra`-only binary is still the faster build for everything but the ml scene.
 
@@ -136,7 +137,14 @@ beet --entry=examples/calculator/main.bsx --server=cli add --a=3 --b=4   # resul
 
 The rest of `examples/action/*.bsx` (`hello_world`, `simple_action`, `long_running`, `repeat_while`, `state_machine`, `utility_ai`, `scripting`, `world_script`) are also self-terminating and worth a sweep.
 
-Skip: `examples/spatial/*.bsx`, `examples/action/wgpu-action.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead).
+Skip: `examples/spatial/*.bsx`, `examples/action/wgpu-action.bsx` and `examples/ml/frozen_lake_*.bsx` (windowed), `examples/thread/*.bsx` (need an LLM key), `examples/bsx_site/main.bsx` (HTTP server; verify with `beet --entry=examples/bsx_site --server=cli` instead, whose markdown page must keep its nav links apart and read `© BSX Site <year> v<version> | stage=dev` in the footer). Its served page boots `/wasm/beet-ui.wasm`, a build output under `target/wasm` rather than a synced asset, so serving it over http for a browser needs `just build-wasm-ui` first; `just test-browser` builds it itself.
+
+The `examples/infra/*.bsx` deploy entries are never run (they deploy), but each opts into `RejectUnknownParams`, so its `--help` is the offline check that the declared-params union renders: every entry exits 0 listing its routes and their flags, `bucket.bsx`'s listing `--s3-backend` (its `StateBackendToggle`). Only ever pass `--help` at the root, never a route path, which is a real deploy. `custom_handle_domain.bsx` also requires `feature:atproto`, so a binary without it refuses it naming that.
+
+```sh
+cargo build -p beet-cli --features=infra,extra,atproto
+for f in examples/infra/*.bsx; do beet --entry=$f --help > /dev/null || echo "FAIL $f"; done
+```
 
 Every other scene in `examples/action/` exits 0 (`wgpu-action.bsx` requires `feature:winit`, so a leaner binary refuses it before anything builds). Verify a refusal once per sweep against a binary built without `extra` (`cargo build -p beet-cli`): `hello_world.bsx` must exit nonzero naming `feature:extra`. A `() -> Outcome` load exits zero once it resolves whatever the outcome (an outcome is a branch, not an error), so `malenia.bsx` and `repeat_while.bsx`, whose `<Repeat>` ends by returning its body's fail, report a completed run. Only a scene carrying `{OutcomeOverload{error_on_fail:true}}` turns a `Fail` into a nonzero exit.
 

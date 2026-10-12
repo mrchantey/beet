@@ -107,19 +107,18 @@ impl BsxTemplate {
 mod test {
 	use crate::prelude::*;
 
-	/// Write `source` to a temp `.bsx` file and return its path.
-	fn entry_file(name: &str, source: &str) -> std::path::PathBuf {
-		let path = fs_ext::workspace_root()
-			.join("target/tests/bsx_entry")
-			.join(name);
+	/// Write `source` to an `entry.bsx` in a fresh [`TempDir`], returning the
+	/// dir and the file's path.
+	fn entry_file(source: &str) -> (TempDir, AbsPath) {
+		let dir = TempDir::new_ws().unwrap();
+		let path = dir.join("entry.bsx");
 		fs_ext::write(&path, source).unwrap();
-		path
+		(dir, path)
 	}
 
 	#[crate::test]
 	fn builds_root_element_into_entity() {
-		let path = entry_file(
-			"single.bsx",
+		let (_dir, path) = entry_file(
 			"<!-- entry -->\n<main class=\"app\"><span>hi</span></main>\n",
 		);
 		let mut world = TemplatePlugin::world();
@@ -138,7 +137,7 @@ mod test {
 
 	#[crate::test]
 	fn rejects_multiple_roots() {
-		let path = entry_file("multi.bsx", "<a/><b/>");
+		let (_dir, path) = entry_file("<a/><b/>");
 		let world = TemplatePlugin::world();
 		// `BsxTemplate` is not `Debug`, so take the error without `unwrap_err`
 		BsxTemplate::load_entry(&world, &path)

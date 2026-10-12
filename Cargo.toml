@@ -293,10 +293,14 @@ ron = { version = "0.12", default-features = false }
 # (ssh keys as recipients, which hardware and agent-held keys cannot decrypt),
 # `plugin` (the external plugin protocol) and `cli-common` (prompts, pinentry);
 # `armor` is the text output every vault is written in. 0.11, not 0.12: 0.12
-# adds post-quantum recipients through `ml-kem 0.2`, which pins `kem
-# 0.3.0-pre.0`, and russh's `ml-kem 0.3` needs `kem 0.3.0`; cargo unifies the
-# two into one `kem 0.3`, so they cannot share a graph. beet only ever encrypts
-# to x25519 recipients, whose format both versions write identically.
+# adds post-quantum recipients through `ml-kem 0.2`, and russh (0.62 through
+# 0.64) needs `ml-kem 0.3`, which needs `kem 0.3.0`. cargo allows one `kem 0.3`
+# per graph, and `ml-kem` 0.2.2+ pins `=0.3.0-pre.0`, so the lockfile resolves
+# only by falling back to `ml-kem 0.2.1`, whose looser `^0.3.0-pre.0` admits
+# `kem 0.3.0` and then fails to compile against it (E0437, no `Error` on
+# `kem::Decapsulate`). The cost of staying is `proc-macro-error2`'s
+# future-incompat notice, through 0.11's `i18n-embed-fl 0.9`. beet only ever
+# encrypts to x25519 recipients, whose format both versions write identically.
 age = { version = "0.11", default-features = false, features = ["armor"] }
 # `age` embeds its message catalogue through rust-embed, which in a debug build
 # reads the files off the crate source dir at runtime, a path a wasm test has
@@ -885,13 +889,14 @@ required-features = ["router", "style", "markdown", "fs", "http_server", "templa
 
 # the scene editor's browser half: the served page boots the wasm binary on intent,
 # adopts the served page invisibly, replays what was clicked while it loaded and
-# hides the published page from a returning editor. Needs the built artifact,
+# hides the published page from a returning editor. `tui` because the entry
+# refuses a binary that could paint on no surface. Built and run by
 # `just test-scene-editor-browser`.
 [[test]]
 name = "scene_editor_browser"
 path = "tests/scene_editor_browser.rs"
 harness = false
-required-features = ["router", "style", "json", "fs", "http_server", "template_serde", "testing", "webdriver"]
+required-features = ["router", "style", "json", "fs", "http_server", "tui", "template_serde", "testing", "webdriver"]
 
 # the embodiment gate: the on-disk `examples/ui/dynamic_view.bsx` todo app, its
 # schema and data documents, and item 3's schema-edit loop through the terminal.

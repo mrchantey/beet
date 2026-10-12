@@ -95,7 +95,7 @@ fn card_center() -> Rule {
 		.with_selector(Selector::class(CardDeck::CARD_CENTER))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 		.with_value(common_props::JustifyContentProp, JustifyContent::Center)
 		.with_value(common_props::AlignItemsProp, AlignItems::Center)
 		.with_value(common_props::TextAlignProp, TextAlign::Center)
@@ -108,14 +108,14 @@ fn card_content() -> Rule {
 		.with_selector(Selector::class(CardDeck::CARD_CONTENT))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Vertical)
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 }
 
 /// Card heading band - the heading row, holding its natural height (no growth).
 fn card_heading() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CardDeck::CARD_HEADING))
-		.with_value(common_props::FlexGrowProp, 0u32)
+		.with_value(common_props::FlexGrowProp, 0_f32)
 }
 
 /// Card column row - a flex row growing to fill the height beneath the heading,
@@ -125,7 +125,7 @@ fn card_columns() -> Rule {
 		.with_selector(Selector::class(CardDeck::CARD_COLUMNS))
 		.with_value(common_props::DisplayProp, Display::Flex)
 		.with_value(common_props::FlexDirectionProp, Direction::Horizontal)
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 		.with_value(common_props::ColumnGapProp, Length::Rem(2.0))
 }
 
@@ -136,5 +136,5 @@ fn card_columns() -> Rule {
 fn card_column() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(CardDeck::CARD_COLUMN))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 }

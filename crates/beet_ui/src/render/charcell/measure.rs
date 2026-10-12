@@ -2,7 +2,9 @@
 //!
 //! Each node answers: *"If I had infinite space, how big would I want to be?"*
 use super::*;
+use crate::style::Direction;
 use crate::style::Display;
+use crate::style::FlexWrap;
 use beet_core::prelude::*;
 use bevy::math::UVec2;
 
@@ -156,6 +158,82 @@ fn measure_block(
 		total_h += height;
 	}
 	UVec2::new((gutter + max_w).min(available.x), total_h)
+}
+
+/// The narrowest `node`'s box lays out without breaking a word, in cells with
+/// its own margin, border and padding (the CSS min-content size, outer).
+///
+/// A text run is its longest word at its glyph scale, or its longest line when
+/// preformatted; a control is its caret cell, since its value is what the user
+/// types rather than a size it asks for; a nowrap flex row is its items' side
+/// by side; any other box is its widest child. The node's own `width` is not
+/// consulted (a flex item's automatic minimum weighs it separately), its
+/// children's are (see [`min_content_contribution`]).
+pub(super) fn min_content_width(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+) -> u32 {
+	let text = node
+		.value()
+		.map(|value| value.to_string())
+		.or_else(|| node.marker().map(str::to_string));
+	let style = node.visual_style();
+	let layout = node.layout_style();
+	let content = match text {
+		_ if node.is_control() && node.marker().is_none() => 1,
+		Some(text) if is_preformatted(node) => {
+			let chars = text.chars().map(|ch| (ch, 0)).collect::<Vec<_>>();
+			split_pre_lines(&chars)
+				.iter()
+				.map(|line| {
+					line.iter().map(|(ch, _)| unicode_width(*ch) as u32).sum()
+				})
+				.max()
+				.unwrap_or(0)
+		}
+		Some(text) => text
+			.split(collapsible)
+			.map(|word| measure_scaled(style, word, u32::MAX).x)
+			.max()
+			.unwrap_or(0),
+		// a nowrap row cannot break between its items, so they sum
+		None if layout.display == Display::Flex
+			&& layout.flex_box.wrap == FlexWrap::NoWrap
+			&& resolve_direction(layout.flex_box.direction, viewport)
+				== Direction::Horizontal =>
+		{
+			let items = node
+				.flow_child_nodes(query)
+				.map(|child| min_content_contribution(&child, query, viewport))
+				.collect::<Vec<_>>();
+			let gaps = layout.flex_box.column_gap_cells(viewport)
+				* (items.len() as u32).saturating_sub(1);
+			items.iter().sum::<u32>() + gaps
+		}
+		None => node
+			.flow_child_nodes(query)
+			.map(|child| min_content_contribution(&child, query, viewport))
+			.max()
+			.unwrap_or(0),
+	};
+	content + BoxModel::from_node(node, viewport).overhead().x
+}
+
+/// The width `node` asks of its container at min-content (the CSS min-content
+/// contribution): its [`min_content_width`], or its `width` when set, clamped
+/// into its `min-width`/`max-width`.
+pub(super) fn min_content_contribution(
+	node: &CharcellNodeData,
+	query: &CharcellQuery,
+	viewport: UVec2,
+) -> u32 {
+	let box_model = BoxModel::from_node(node, viewport);
+	let overhead = box_model.overhead().x;
+	let content = box_model.width.unwrap_or_else(|| {
+		min_content_width(node, query, viewport).saturating_sub(overhead)
+	});
+	box_model.clamp_width(content) + overhead
 }
 
 #[cfg(test)]

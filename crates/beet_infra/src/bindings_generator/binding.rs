@@ -855,12 +855,12 @@ mod test {
 		registry.unwrap().len().xpect_eq(10);
 	}
 
-	/// Generous timeout because this test shells out to `cargo` against a scratch
-	/// crate, so it competes for the same build lock and cores as the rest of the
-	/// suite. It blew the 120s budget once under full-suite load (2026-08-05) while
-	/// passing in ~620ms when run isolated, so a future failure here is far more
-	/// likely to be contention than a codegen regression: re-run it alone before
-	/// investigating the generator.
+	/// Shells out to `cargo build` against a scratch crate. Its target dir is
+	/// its own, never the workspace's `target/debug`: cargo locks a build dir for
+	/// a whole build, so any concurrent workspace build (a second `cargo run`, an
+	/// editor's check) held this test on `Blocking waiting for file lock` past
+	/// its budget, failing it with no fault in the generator. The timeout still
+	/// covers a cold dir compiling the three dependencies.
 	#[beet_core::test(timeout_ms = 120000)]
 	async fn generate_serde_model_from_registry() {
 		let tf_schema = read_tf_schema_from_file(
@@ -909,9 +909,13 @@ mod test {
 			format!("{}{}", preamble_stubs, generated)
 		};
 		fs_ext::write(&source_path, source_with_stub).unwrap();
-		// Use a stable `target` dir to avoid downloading and recompiling crates every time.
-		let target_dir = fs_ext::workspace_root().join("target");
+		// stable, so the dependencies compile once, and dedicated, so no
+		// workspace build shares its lock
+		let target_dir =
+			fs_ext::workspace_root().join("target/bindings_generator");
 		let output = async_process::Command::new("cargo")
+			// a timed out test must not leave the build running
+			.kill_on_drop(true)
 			.current_dir(dir.as_ref())
 			.arg("build")
 			.arg("--target-dir")

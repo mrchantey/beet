@@ -54,7 +54,7 @@ impl CorsConfig {
 #[action]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[component(on_add = on_add_middleware::<Self, Request, Response>)]
+#[component(on_add = MiddlewareList::<Request, Response>::on_add::<Self>)]
 pub async fn CorsHandler(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {

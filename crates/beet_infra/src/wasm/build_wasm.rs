@@ -50,11 +50,8 @@ pub struct BuildWasm {
 /// With no `--package` it builds the current directory's crate (a
 /// non-workspace `main.bsx` build).
 ///
-/// Runs `cargo build --target wasm32-unknown-unknown` (`--no-default-features`
-/// plus the selected features), then `wasm-bindgen --target web`, then in release
-/// `wasm-opt -Oz`, and finally renames the `<name>_bg.wasm`/`<name>.js` pair to
-/// the exact `--out` names (patching the glue's wasm URL to match), returning the
-/// artifact size raw and brotli-compressed, the latter what a static host sends.
+/// Runs [`BuildWasm::build`], answering with the artifact size raw and
+/// brotli-compressed, the latter what a static host sends.
 #[action(route = "build-wasm")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
@@ -67,117 +64,131 @@ pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 		.await
 		.unwrap_or_default();
 	cx.input.apply_params(&mut params)?;
+	params.build().await
+}
 
-	// the cargo build, fully driven by the resolved params.
-	let mut cargo = CargoBuild::default()
-		.with_release(params.release())
-		.with_target(BuildTarget::Wasm)
-		.with_no_default_features(!params.default_features())
-		.with_all_features(params.all_features());
-	// no `--package` builds the current directory's crate (a non-workspace build).
-	if let Some(package) = params.package() {
-		cargo = cargo.with_package(package.as_str());
-	}
-	if !params.all_features()
-		&& let Some(features) = params.features()
-	{
-		cargo = cargo.with_features(
-			features
-				.split(',')
-				.filter(|feature| !feature.is_empty())
-				.map(SmolStr::from)
-				.collect(),
-		);
-	}
-	// an `--example` target overrides `--bin`
-	if let Some(example) = params.example() {
-		cargo = cargo.with_example(example.as_str());
-	} else if let Some(bin) = params.bin() {
-		cargo = cargo.with_binary(bin.as_str());
-	}
+impl BuildWasm {
+	/// Run the build these settings describe, returning the size report.
+	///
+	/// Runs `cargo build --target wasm32-unknown-unknown` (`--no-default-features`
+	/// plus the selected features), then `wasm-bindgen --target web`, then in
+	/// release `wasm-opt -Oz`, and finally renames the `<name>_bg.wasm`/`<name>.js`
+	/// pair to the exact [`out`](Self::out) names (patching the glue's wasm URL to
+	/// match). A relative `out` resolves against the cwd.
+	pub async fn build(&self) -> Result<String> {
+		// the cargo build, fully driven by the settings.
+		let mut cargo = CargoBuild::default()
+			.with_release(self.release)
+			.with_target(BuildTarget::Wasm)
+			.with_no_default_features(!self.default_features)
+			.with_all_features(self.all_features);
+		// no `--package` builds the current directory's crate (a non-workspace build).
+		if let Some(package) = &self.package {
+			cargo = cargo.with_package(package.as_str());
+		}
+		if !self.all_features
+			&& let Some(features) = &self.features
+		{
+			cargo = cargo.with_features(
+				features
+					.split(',')
+					.filter(|feature| !feature.is_empty())
+					.map(SmolStr::from)
+					.collect(),
+			);
+		}
+		// an `--example` target overrides `--bin`
+		if let Some(example) = &self.example {
+			cargo = cargo.with_example(example.as_str());
+		} else if let Some(bin) = &self.bin {
+			cargo = cargo.with_binary(bin.as_str());
+		}
 
-	// the requested artifact names, parsed from the required `--out`: the `.wasm`
-	// file, its `.js` sibling, and the interim `wasm-bindgen` `<stem>_bg.wasm`.
-	let out_raw = params.out().as_deref().ok_or_else(|| {
-		bevyhow!("--out is required, eg --out=assets/wasm/beet-min.wasm")
-	})?;
-	let out_path = std::path::Path::new(out_raw);
-	let stem = out_path
-		.file_stem()
-		.and_then(|stem| stem.to_str())
-		.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file stem"))?
-		.to_string();
-	let wasm_name = out_path
-		.file_name()
-		.and_then(|name| name.to_str())
-		.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file name"))?
-		.to_string();
-	let dir_raw = out_path
-		.parent()
-		.map(|dir| dir.to_string_lossy().to_string())
-		.unwrap_or_default();
-	let out_dir = AbsPath::new(&dir_raw)
-		.unwrap_or_else(|_| AbsPath::new_unchecked(&dir_raw));
-	let bindgen_wasm = out_dir.join(format!("{stem}_bg.wasm"));
-	let out_wasm = out_dir.join(&wasm_name);
-	let out_js = out_dir.join(format!("{stem}.js"));
+		// the requested artifact names, parsed from the required `--out`: the
+		// `.wasm` file, its `.js` sibling, and the interim `wasm-bindgen`
+		// `<stem>_bg.wasm`.
+		let out_raw = self.out.as_deref().ok_or_else(|| {
+			bevyhow!("--out is required, eg --out=target/wasm/beet-min.wasm")
+		})?;
+		let out_path = std::path::Path::new(out_raw);
+		let stem = out_path
+			.file_stem()
+			.and_then(|stem| stem.to_str())
+			.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file stem"))?
+			.to_string();
+		let wasm_name = out_path
+			.file_name()
+			.and_then(|name| name.to_str())
+			.ok_or_else(|| bevyhow!("--out `{out_raw}` has no file name"))?
+			.to_string();
+		let dir_raw = out_path
+			.parent()
+			.map(|dir| dir.to_string_lossy().to_string())
+			.unwrap_or_default();
+		let out_dir = AbsPath::new(&dir_raw)
+			.unwrap_or_else(|_| AbsPath::new_unchecked(&dir_raw));
+		let bindgen_wasm = out_dir.join(format!("{stem}_bg.wasm"));
+		let out_wasm = out_dir.join(&wasm_name);
+		let out_js = out_dir.join(format!("{stem}.js"));
 
-	// 1. cargo build
-	ChildProcess::new("cargo")
-		.with_args(cargo.cargo_args())
-		.run_async()
-		.await?;
+		// 1. cargo build
+		ChildProcess::new("cargo")
+			.with_args(cargo.cargo_args())
+			.run_async()
+			.await?;
 
-	// 2. wasm-bindgen → <out_dir>/<stem>_bg.wasm + <out_dir>/<stem>.js
-	fs_ext::create_dir_all(&out_dir)?;
-	ChildProcess::new("wasm-bindgen")
-		.with_args([
-			"--out-dir".to_string(),
-			out_dir.as_str().to_string(),
-			"--out-name".to_string(),
-			stem.clone(),
-			"--target".to_string(),
-			"web".to_string(),
-			"--no-typescript".to_string(),
-			cargo.exe_path().to_string_lossy().to_string(),
-		])
-		.run_async()
-		.await?;
-
-	// 3. wasm-opt (release only), in place over the bindgen output
-	if cargo.release {
-		ChildProcess::new("wasm-opt")
+		// 2. wasm-bindgen → <out_dir>/<stem>_bg.wasm + <out_dir>/<stem>.js
+		fs_ext::create_dir_all(&out_dir)?;
+		ChildProcess::new("wasm-bindgen")
 			.with_args([
-				"-Oz".to_string(),
-				"--output".to_string(),
-				bindgen_wasm.as_str().to_string(),
-				bindgen_wasm.as_str().to_string(),
+				"--out-dir".to_string(),
+				out_dir.as_str().to_string(),
+				"--out-name".to_string(),
+				stem.clone(),
+				"--target".to_string(),
+				"web".to_string(),
+				"--no-typescript".to_string(),
+				cargo.exe_path().to_string_lossy().to_string(),
 			])
 			.run_async()
 			.await?;
-	}
 
-	// 4. rename `<stem>_bg.wasm` → the requested `.wasm` and patch the glue's
-	// `new URL('<stem>_bg.wasm', import.meta.url)` reference to match, so the
-	// `<name>.wasm`/`<name>.js` pair is self-consistent for a static load.
-	if bindgen_wasm != out_wasm {
-		fs_ext::write(&out_wasm, fs_ext::read(&bindgen_wasm)?)?;
-		fs_ext::remove(&bindgen_wasm)?;
-		let glue = fs_ext::read_to_string(&out_js)?
-			.replace(&format!("{stem}_bg.wasm"), &wasm_name);
-		fs_ext::write(&out_js, glue)?;
-	}
+		// 3. wasm-opt (release only), in place over the bindgen output
+		if cargo.release {
+			ChildProcess::new("wasm-opt")
+				.with_args([
+					"-Oz".to_string(),
+					"--output".to_string(),
+					bindgen_wasm.as_str().to_string(),
+					bindgen_wasm.as_str().to_string(),
+				])
+				.run_async()
+				.await?;
+		}
 
-	// 5. the report: the artifact raw and as the wire carries it. Compressing
-	// the larger artifacts takes seconds, so it runs off the executor.
-	let raw = fs_ext::read(&out_wasm)?;
-	let raw_kb = raw.len() / 1024;
-	let brotli_kb = blocking::unblock(move || brotli_size(&raw)).await? / 1024;
-	let report = format!(
-		"🌱 wasm size: {raw_kb} KB raw, {brotli_kb} KB brotli ({wasm_name})"
-	);
-	info!("{report}");
-	Ok(report)
+		// 4. rename `<stem>_bg.wasm` → the requested `.wasm` and patch the glue's
+		// `new URL('<stem>_bg.wasm', import.meta.url)` reference to match, so the
+		// `<name>.wasm`/`<name>.js` pair is self-consistent for a static load.
+		if bindgen_wasm != out_wasm {
+			fs_ext::write(&out_wasm, fs_ext::read(&bindgen_wasm)?)?;
+			fs_ext::remove(&bindgen_wasm)?;
+			let glue = fs_ext::read_to_string(&out_js)?
+				.replace(&format!("{stem}_bg.wasm"), &wasm_name);
+			fs_ext::write(&out_js, glue)?;
+		}
+
+		// 5. the report: the artifact raw and as the wire carries it. Compressing
+		// the larger artifacts takes seconds, so it runs off the executor.
+		let raw = fs_ext::read(&out_wasm)?;
+		let raw_kb = raw.len() / 1024;
+		let brotli_kb =
+			blocking::unblock(move || brotli_size(&raw)).await? / 1024;
+		let report = format!(
+			"🌱 wasm size: {raw_kb} KB raw, {brotli_kb} KB brotli ({wasm_name})"
+		);
+		info!("{report}");
+		Ok(report)
+	}
 }
 
 /// The size of `bytes` brotli-compressed at the quality and window a static

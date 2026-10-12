@@ -107,7 +107,7 @@ lookup, which is exactly what direct delivery has to prove, while the inbound le
 is submitted through the box's own port and so only ever exercises the local
 route.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<!-- the addresses are declared here, never read from the environment: the

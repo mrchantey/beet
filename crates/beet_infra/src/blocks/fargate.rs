@@ -1024,7 +1024,7 @@ mod tests {
 	/// work dir guard that keeps the local stack alive.
 	fn build_config(
 		block: &FargateBlock,
-	) -> (terra::Config, ResolvedStack, TestWorkDir) {
+	) -> (terra::Config, ResolvedStack, TempDir) {
 		build_config_at(block, BootstrapConfig::DEFAULT_STAGE)
 	}
 
@@ -1032,7 +1032,7 @@ mod tests {
 	fn build_config_at(
 		block: &FargateBlock,
 		stage: &str,
-	) -> (terra::Config, ResolvedStack, TestWorkDir) {
+	) -> (terra::Config, ResolvedStack, TempDir) {
 		let block = block.clone();
 		let (stack, region, zone) = Stack::test_zoned("example.org");
 		let (scope, dir) = RenderScope::test_render_stack(

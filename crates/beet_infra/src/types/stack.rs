@@ -236,8 +236,7 @@ impl ResolvedStack {
 	/// A resolved stack plus the launch that deploys it locally: a local state
 	/// backend and a temporary work directory removed on drop.
 	#[cfg(test)]
-	pub(crate) fn default_local()
-	-> (Self, Deployment, crate::types::TestWorkDir) {
+	pub(crate) fn default_local() -> (Self, Deployment, TempDir) {
 		let (deployment, dir) = Deployment::default_local();
 		(Self::test_local(), deployment, dir)
 	}

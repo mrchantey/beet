@@ -8,19 +8,22 @@ The wasm test runner depends on it: `.cargo/config.toml` sets
 `<RunWasm/>` route. The rest are convenience: build, check, static export, pdf,
 s3 sync.
 
-It is a one-shot `<CliServer always=true {CallOnReady}>` root with the `Router` as its
-child: the binary declares only that this load should run itself, the root's
-`CallOnReady` calls it with the process request, it hops down to the router, the
-positional route arg selects the command, and the command resolves and the process exits.
-`always=true` makes this dispatcher run on every boot regardless of `--server`, since
-`--server` selects a *declared server's* transports, not this dispatcher's.
+It is a one-shot `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`
+root with the `Router` as its child: the binary declares only that this load
+should run itself, the root's `CallOnReady` calls it with the process request, it
+hops down to the router, the positional route arg selects the command, and the
+command resolves and the process exits. `always=true` makes this dispatcher run
+on every boot regardless of `--server`, since `--server` selects a *declared
+server's* transports, not this dispatcher's. `RejectUnknownParams` refuses a
+flag no command declares, so `beet build-wasm --relase` answers `did you mean
+--release?` rather than building a debug module.
 
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
     beet check examples/bsx_site           # lint a no-code site
     beet export-static examples/bsx_site   # write its dist/
-    just build-wasm-min                    # the smallest browser runtime (assets/wasm/beet-min.wasm)
-    just build-wasm-full                   # ..and the kitchen sink (assets/wasm/beet-full.wasm)
+    just build-wasm-min                    # the smallest browser runtime (target/wasm/beet-min.wasm)
+    just build-wasm-full                   # ..and the kitchen sink (target/wasm/beet-full.wasm)
 
 Serving a site is NOT a command here. A site entry is its own CLI, so it is
 launched directly and names its own verb, exactly as its deploy verbs are
@@ -38,7 +41,9 @@ runs `beet --entry=site deploy`).
 
 What lives here is this WORKSPACE's own shared asset bucket
 (`beet--shared--assets`), the source of record for the files too large for git
-that the examples, tests and wasm builds read out of `./assets`. It is
+that the examples and tests read out of `./assets`. Build outputs (the wasm
+binaries) are never in it: they live under `target/` and are built by whatever
+uses them. It is
 public-read so a fresh checkout hydrates without credentials, and it is declared
 under a `shared`-stage `<Stack>` because a source shared by developers is not
 owned by any deploy stage. A resource belongs to the stack it is authored under
@@ -78,7 +83,7 @@ Both ride the `vault` feature (on by default natively, off in the lean browser
 builds), so the routes are excluded where the verbs are not; the declaration
 stays, an inert tag in a lean build.
 -->
-<CliServer always=true {CallOnReady}>
+<CliServer always=true {(CallOnReady, RejectUnknownParams)}>
 <Router {HelpHandler}>
 	<PackageConfig title="Beet" app_name="beet" description="An Atmospheric OS for homegrown tech" version="0.0.9-dev.16"/>
 	<RunWasm/>

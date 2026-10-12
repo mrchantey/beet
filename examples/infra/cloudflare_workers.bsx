@@ -13,8 +13,11 @@ declaration: `<CloudflareWorkerBlock>` is the stack's repo store, so `deploy` ba
 exactly as a native binary boots from `--repo`. The Worker is generic: it loads
 `main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
 request, so a `sync` updates the entire site behavior with no redeploy, live on the
-very next fetch. `build` compiles the wasm once; `deploy` uploads that prebuilt
-artifact (no recompile); `bench` times a `sync` against a full rebuild + redeploy.
+very next fetch. `build` compiles the Worker alone, to inspect it before an
+upload; `deploy` builds it again and uploads what it just built, never an
+earlier build; `bench` times a `sync` against a full rebuild + redeploy. The
+site's page boots `beet-ui.wasm` in the browser, so every verb publishing the
+site builds that first (`<WasmArtifact/>`).
 
 ## Usage
 
@@ -25,8 +28,9 @@ artifact (no recompile); `bench` times a `sync` against a full rebuild + redeplo
     beet --entry=examples/infra/cloudflare_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
-its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
-`<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
+its `CallOnReady` fires the CLI request on load and the matching verb runs, and
+`RejectUnknownParams` refuses a flag the verb does not declare. Each verb is a
+child-sequenced `<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
 children of the route and the sequence runs them in order.
 
 Live deploy needs `CLOUDFLARE_API_TOKEN` in the entry's `secrets.toml` and the
@@ -41,10 +45,10 @@ The token a repo's document holds is lowered from what its DEPLOYED entry declar
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
+	<!-- compile the wasm Worker to inspect it; artifacts land in `target/worker/` -->
 	<Route path="build" {ExchangeSequence}>
 		<CloudflareWorkerBuildAction/>
 	</Route>

@@ -69,7 +69,10 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		.map(|segments| segments.join("/"))
 		.unwrap_or_default();
 	if path.is_empty() {
-		bevybail!("usage: load <path-to-scene.json> --url=<device>");
+		return Err(HttpError::bad_request(
+			"usage: load <path-to-scene.json> --url=<device>",
+		)
+		.into());
 	}
 	let url = device_url(&cx.input)?;
 	// read the scene through the nearest ancestor store (absent is an error).
@@ -127,11 +130,13 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// `run <route> --url=<device>` — fire an action route the device's scene
 /// installed, eg `beet run led-script`. The original request (method, headers,
 /// query and body) is forwarded unchanged; only its destination URL is rewritten
-/// to `<device>/<route>`.
+/// to `<device>/<route>`. Its other params are the device route's, so it
+/// forwards what it does not name ([`ParamsPartial::forwarding`]) and a strict
+/// server passes them through.
 #[action(route = "run/:route")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
+#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>().forwarding())]
 pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
 	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));
 	let url = device_url(cx.input.request_parts())?;

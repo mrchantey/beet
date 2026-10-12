@@ -10,8 +10,8 @@ Two servers in one process, each a child of its own root, both bound to
 all interfaces so a phone on the LAN can load the head page and connect back: the agent's
 `SocketServer` (all interfaces by default) on `:8338`, and the head `HttpServer` (all
 interfaces via its `host` field) on `:8337`. The head capabilities ride the `web_head`
-feature, which today lives only in the kitchen-sink browser binary, so install that
-once, then run both servers (the socket and http servers both default-boot, so no
+feature, which today lives only in the kitchen-sink browser binary, so build that
+first, then run both servers (the socket and http servers both default-boot, so no
 --server flag is needed):
 
     just build-wasm-full
@@ -43,10 +43,12 @@ LLM, `secure` the TLS serving; the page + assets ride the default native router.
 		<PackageConfig title="Perceive-act head" description="The robot's browser head"/>
 		<DefaultAppRoutes/>
 		<RoutesDir src="examples/perceive_act/head/routes"/>
-		<!-- the workspace assets tree at /assets: the wasm binary the pages boot
-		     (/assets/wasm/beet-full.wasm) and the scene face images the head renders
-		     (/assets/extra/perceive-act/explorer/images/joy.png). The examples tree at
-		     /examples is the repo the head page names, read over http. -->
+		<!-- the wasm build outputs at /wasm (the binary the pages boot,
+		     /wasm/beet-full.wasm), the workspace assets tree at /assets (the scene
+		     face images the head renders, /assets/extra/perceive-act/explorer/images/joy.png).
+		     The examples tree at /examples is the repo the head page names, read
+		     over http. -->
+		<AssetsDir src="target/wasm" prefix="wasm"/>
 		<AssetsDir src="assets" prefix="assets"/>
 		<AssetsDir src="examples" prefix="examples"/>
 	</Router>

@@ -20,10 +20,13 @@ pub fn Footer(pkg_config: Res<PackageConfig>) -> impl Bundle {
 		build_text.push_str(&format!(" | stage={}", bootstrap.stage));
 	}
 
+	// a flex row lays the items out on the web and in the terminal, ignoring
+	// the spaces between them, which keep them apart where nothing else does,
+	// ie markdown, where adjacent spans run together
 	rsx! {
 		<footer id="page-footer" {Classes::new([classes::PRINT_HIDDEN])}>
-			<span {Classes::new([classes::FOOTER_SIDE])}><Slot/></span>
-			<span>{footer_text}</span>
+			<span {Classes::new([classes::FOOTER_SIDE])}><Slot/></span>" "
+			<span>{footer_text}</span>" "
 			<span {Classes::new([classes::FOOTER_SIDE, classes::TEXT_RIGHT])}>{build_text}</span>
 		</footer>
 	}

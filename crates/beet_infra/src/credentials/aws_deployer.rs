@@ -46,7 +46,9 @@ use serde_json::Value;
 /// A launch renders the stacks of one stage, and a credential is per repo, so
 /// the policies are lowered at the launch's stage AND at `prod`
 /// ([`DeployCredential::render_stages`]): an elevated `dev` deploy can never
-/// narrow what prod needs.
+/// narrow what prod needs. The reverse holds for the sealed record: a prod
+/// launch renders prod alone, so it keeps the dev boundary's grant as the
+/// last dev launch sealed it rather than dropping a line it never rendered.
 ///
 /// ## The order of operations, which this enforces
 ///
@@ -195,7 +197,8 @@ impl AwsDeployer {
 
 	/// Where the sealed pair stands against the policies this launch's
 	/// declarations render, by the grants its key id's record carries. The
-	/// record holds every entry's apps, so only this launch's are compared.
+	/// record holds every entry's apps and every stage's boundary, so only the
+	/// policies this launch lowers are compared.
 	async fn status_of(
 		&self,
 		caller: &AsyncEntity,
@@ -205,7 +208,7 @@ impl AwsDeployer {
 		};
 		let grants = Self::grant_lines(&apps)?;
 		let held = DeployCredential::sealed(caller, Self::KEY_ID).await;
-		let ours = |line: &str| Self::belongs(&apps, line);
+		let ours = |line: &str| Self::lowers(&apps, line);
 		CredentialStatus::compare(
 			self.id(),
 			Self::KEY_ID,
@@ -216,10 +219,38 @@ impl AwsDeployer {
 		.xok()
 	}
 
-	/// Whether a grant `line` names a policy of one of `apps`.
-	fn belongs(apps: &[AppPolicies], line: &str) -> bool {
-		apps.iter()
-			.any(|app| line.starts_with(&format!("{}--", app.deploy.app())))
+	/// Whether a grant `line` names a policy this launch lowers: an app's
+	/// deploy policy, or the boundary of a stage it rendered, empty or not.
+	/// Another entry's app is not this launch's to judge or replace, and
+	/// neither is the boundary of a stage it did not render: a prod launch
+	/// renders prod alone, so dev's boundary stays as a dev launch sealed it.
+	fn lowers(apps: &[AppPolicies], line: &str) -> bool {
+		let name = line.split_once(' ').map_or(line, |(name, _)| name);
+		apps.iter().any(|app| {
+			app.deploy.policy_name() == name
+				|| app
+					.boundaries
+					.values()
+					.any(|boundary| boundary.policy_name() == name)
+		})
+	}
+
+	/// The grants a converge seals: this launch's `grants`, beside every
+	/// `held` line naming a policy it does not lower, as that line was sealed.
+	fn merge_grants(
+		held: Vec<SmolStr>,
+		apps: &[AppPolicies],
+		grants: &[String],
+	) -> Vec<String> {
+		let mut merged = held
+			.into_iter()
+			.filter(|line| !Self::lowers(apps, line))
+			.map(String::from)
+			.chain(grants.iter().cloned())
+			.collect::<Vec<_>>();
+		merged.sort();
+		merged.dedup();
+		merged
 	}
 
 	/// One line per policy this launch's apps render: its name and a digest of
@@ -414,7 +445,8 @@ impl AwsDeployer {
 	/// Converge the access key: mint one when the document holds none of this
 	/// user's, or on `roll`, sealing the pair with `grants` before deleting
 	/// what it replaces; restate a current pair's records otherwise. The key
-	/// id's record keeps the grants of apps this launch does not declare.
+	/// id's record keeps the grants of policies this launch does not lower
+	/// ([`Self::merge_grants`]).
 	async fn converge_key(
 		caller: &AsyncEntity,
 		admin: &AwsAdmin,
@@ -433,15 +465,11 @@ impl AwsDeployer {
 		let held_secret = opened
 			.as_ref()
 			.and_then(|opened| opened.get(Self::KEY_SECRET).cloned());
-		// another entry's apps keep their lines, this launch's are replaced
-		let mut merged = DeployCredential::held_grants(held_id.as_ref())
-			.into_iter()
-			.filter(|line| !Self::belongs(apps, line))
-			.map(String::from)
-			.chain(grants.iter().cloned())
-			.collect::<Vec<_>>();
-		merged.sort();
-		merged.dedup();
+		let merged = Self::merge_grants(
+			DeployCredential::held_grants(held_id.as_ref()),
+			apps,
+			grants,
+		);
 		let group = held_id
 			.as_ref()
 			.map(|secret| secret.group.to_string())
@@ -996,6 +1024,7 @@ impl DeployerPolicy {
 
 #[cfg(test)]
 mod test {
+	use super::AppPolicies;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
@@ -1009,6 +1038,41 @@ mod test {
 			.xpect_contains("-deployer")
 			.xnot()
 			.xpect_contains("_");
+	}
+
+	/// An elevated prod deploy renders prod alone, so it replaces the lines of
+	/// the policies it lowers and keeps another entry's app and the dev
+	/// boundary as they were sealed: dropping the dev line once left every
+	/// later dev deploy refusing for `--elevated` over a boundary the account
+	/// already held byte for byte.
+	#[beet_core::test]
+	fn keeps_the_grants_of_a_stage_it_did_not_render() {
+		let apps = vec![AppPolicies {
+			deploy: DeployerPolicy::new("beet-site", "state"),
+			boundaries: BTreeMap::from([(
+				SmolStr::new(BootstrapConfig::PROD_STAGE),
+				RuntimeBoundary::new("beet-site", BootstrapConfig::PROD_STAGE),
+			)]),
+			principals: Vec::new(),
+		}];
+		let held = [
+			"beet--deploy 11",
+			"beet-site--deploy 22",
+			"beet-site--dev--runtime-boundary 33",
+			"beet-site--prod--runtime-boundary 44",
+		]
+		.map(SmolStr::from)
+		.to_vec();
+		AwsDeployer::merge_grants(held, &apps, &[
+			"beet-site--deploy 55".into(),
+			"beet-site--prod--runtime-boundary 66".into(),
+		])
+		.xpect_eq(vec![
+			"beet--deploy 11".to_string(),
+			"beet-site--deploy 55".into(),
+			"beet-site--dev--runtime-boundary 33".into(),
+			"beet-site--prod--runtime-boundary 66".into(),
+		]);
 	}
 
 	/// Outside the disposable stage, removing a bucket, a table, a database or

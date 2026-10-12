@@ -27,6 +27,11 @@
 //! type has no authored form is an error naming the type, never a silent
 //! default.
 //!
+//! A param the caller got wrong, missing or malformed, is a [`ParamError`],
+//! which a server answers `400` and a CLI exits with its usage code; a params
+//! type the walk cannot read at all is the route author's error, and stays an
+//! internal one.
+//!
 //! ```
 //! # use beet_core::prelude::*;
 //! #[derive(Debug, PartialEq, Reflect)]
@@ -113,6 +118,92 @@ pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 			base.try_apply(dynamic.as_partial_reflect())?;
 		}
 		Ok(())
+	}
+}
+
+/// A request param the caller got wrong: a client error, so a server answers
+/// it `400` and a CLI exits with its usage code, per the [module](self)
+/// contract.
+///
+/// The key and problem alone: a router naming the param's type and doc line
+/// reads them from the declaration its `--help` lists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamError {
+	/// The param's key in its flag spelling, ie `out-dir` for `--out-dir`.
+	key: SmolStr,
+	/// What is wrong with it.
+	problem: ParamProblem,
+}
+
+/// What is wrong with a [`ParamError`]'s param.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParamProblem {
+	/// A required param is absent.
+	Missing,
+	/// A bare `--key` on a param wanting a value, ie `--port` for a `u16`.
+	NeedsValue {
+		/// The short type path of the value it wants, ie `u16`.
+		kind: SmolStr,
+	},
+	/// A value its param's type cannot read.
+	Invalid {
+		/// Why, as the type's parser put it.
+		reason: String,
+	},
+}
+
+impl ParamError {
+	/// The process exit code for a param the caller got wrong, ie `EX_USAGE`,
+	/// the code a `400` answer exits a CLI with.
+	pub const EXIT_CODE: i32 = 64;
+
+	/// A required param absent from the request.
+	pub fn missing(field_name: &str) -> Self {
+		Self::new(field_name, ParamProblem::Missing)
+	}
+
+	/// A bare `--key` on a param wanting a value of `kind`.
+	pub fn needs_value(field_name: &str, kind: &str) -> Self {
+		Self::new(field_name, ParamProblem::NeedsValue { kind: kind.into() })
+	}
+
+	/// A value its param's type cannot read, for `reason`.
+	pub fn invalid(field_name: &str, reason: impl Into<String>) -> Self {
+		Self::new(field_name, ParamProblem::Invalid {
+			reason: reason.into(),
+		})
+	}
+
+	/// The param's key in its flag spelling, ie `out-dir`.
+	pub fn key(&self) -> &str { &self.key }
+
+	/// What is wrong with the param.
+	pub fn problem(&self) -> &ParamProblem { &self.problem }
+
+	fn new(field_name: &str, problem: ParamProblem) -> Self {
+		Self {
+			key: field_name.to_kebab_case().into(),
+			problem,
+		}
+	}
+}
+
+impl core::error::Error for ParamError {}
+
+impl core::fmt::Display for ParamError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		let key = &self.key;
+		match &self.problem {
+			ParamProblem::Missing => {
+				write!(f, "missing required param `--{key}`")
+			}
+			ParamProblem::NeedsValue { kind } => {
+				write!(f, "`--{key}` needs a value, ie `--{key}=<{kind}>`")
+			}
+			ParamProblem::Invalid { reason } => {
+				write!(f, "invalid param `--{key}`: {reason}")
+			}
+		}
 	}
 }
 
@@ -244,9 +335,7 @@ fn build_dynamic_tuple(
 			field.type_info(),
 			absent,
 		)?
-		.ok_or_else(|| {
-			bevyhow!("missing required param `--{field_name}` for tuple")
-		})?;
+		.ok_or_else(|| ParamError::missing(&field_name))?;
 		dynamic.insert_boxed(value);
 	}
 	Ok(Some(Box::new(dynamic)))
@@ -285,7 +374,9 @@ fn build_field_value(
 	// (one value a `Value::Str`, a repeated key a `Value::List`). A parser
 	// that declines, or a type with no entry, falls to the structural rules.
 	if let Some(values) = map.get_vec(field_name) {
-		if let Some(parsed) = parse_leaf_literal(values, leaf_id)? {
+		if let Some(parsed) = parse_leaf_literal(values, leaf_id)
+			.map_err(|err| ParamError::invalid(field_name, reason(err)))?
+		{
 			return Ok(Some(wrap(parsed)));
 		}
 		// a list-typed field takes EVERY value under its key, each parsed into
@@ -303,11 +394,21 @@ fn build_field_value(
 		// `Option<T>` is already unwrapped above, so this is the declared enum
 		// and never the option itself.
 		if let Some(TypeInfo::Enum(enum_info)) = leaf_info
-			&& let [one] = values.as_slice()
+			&& !values.is_empty()
 		{
-			return reflect_ext::unit_variant_value(enum_info, one)
-				.map(wrap)
-				.map(Some);
+			return match values.as_slice() {
+				[one] => reflect_ext::unit_variant_value(enum_info, one)
+					.map_err(|err| {
+						ParamError::invalid(field_name, reason(err))
+					}),
+				many => Err(ParamError::invalid(
+					field_name,
+					format!("takes one value, got {}", many.len()),
+				)),
+			}?
+			.xmap(wrap)
+			.xmap(Some)
+			.xok();
 		}
 	}
 
@@ -347,10 +448,7 @@ fn build_field_value(
 		Absent::Complete if matches!(leaf_info, Some(TypeInfo::List(_))) => {
 			Ok(Some(Box::new(DynamicList::default())))
 		}
-		Absent::Complete => bevybail!(
-			"missing required param `--{}`",
-			field_name.to_kebab_case()
-		),
+		Absent::Complete => Err(ParamError::missing(field_name).into()),
 	}
 }
 
@@ -410,8 +508,16 @@ fn missing_value<T>(
 	let kind = type_info
 		.map(|info| info.type_path_table().short_path())
 		.unwrap_or("value");
-	let key = field_name.to_kebab_case();
-	bevybail!("--{key} needs a value, ie --{key}=<{kind}>")
+	Err(ParamError::needs_value(field_name, kind).into())
+}
+
+/// A parser's error as the caller reads it: the message, without the source
+/// location a `bevyhow!` carries.
+fn reason(err: BevyError) -> String {
+	match err.downcast_ref::<BevyhowError>() {
+		Some(err) => err.message.clone(),
+		None => err.to_string(),
+	}
 }
 
 /// The error a field with no authored form reports, naming the type so the
@@ -448,10 +554,11 @@ fn parse_bool_field(
 		Some(values) => match values[0].to_lowercase().as_str() {
 			"true" | "1" | "yes" | "on" | "" => Ok(Some(true)),
 			"false" | "0" | "no" | "off" => Ok(Some(false)),
-			other => bevybail!(
-				"invalid bool for `--{}`: '{other}', expected true/false",
-				field_name.to_kebab_case()
-			),
+			other => Err(ParamError::invalid(
+				field_name,
+				format!("'{other}' is no bool, expected true/false"),
+			)
+			.into()),
 		},
 	}
 }
@@ -471,6 +578,17 @@ mod test {
 			Ok(_) => panic!("expected an error"),
 			Err(err) => err.to_string(),
 		}
+	}
+
+	/// The [`ParamError`] parsing `args` into `T` fails with, a param the
+	/// caller got wrong rather than one the route author did.
+	fn param_error<T: FromReflect + Typed>(args: &str) -> ParamError {
+		parse::<T>(args)
+			.err()
+			.unwrap()
+			.downcast_ref::<ParamError>()
+			.cloned()
+			.unwrap()
 	}
 
 	#[derive(Debug, PartialEq, Reflect)]
@@ -527,7 +645,8 @@ mod test {
 		for spelling in ["--watch=false", "--watch=0", "--watch=off"] {
 			parse::<Flag>(spelling).unwrap().watch.xpect_false();
 		}
-		message::<Flag>("--watch=maybe").xpect_contains("invalid bool");
+		message::<Flag>("--watch=maybe")
+			.xpect_contains("invalid param `--watch`: 'maybe' is no bool");
 	}
 
 	/// An `Option<T>` leaf separates "unset" from "set to the type's default":
@@ -697,6 +816,12 @@ mod test {
 		message::<Holder>("--value=x")
 			.xpect_contains("unsupported type for `--value`")
 			.xpect_contains("Opaque");
+		// the route author's error, not the caller's
+		parse::<Holder>("--value=x")
+			.unwrap_err()
+			.downcast_ref::<ParamError>()
+			.is_none()
+			.xpect_true();
 	}
 
 	/// A bare key on anything but a flag says it needs a value, naming the
@@ -709,10 +834,45 @@ mod test {
 			generate: Option<usize>,
 			note: String,
 		}
-		message::<Mint>("--generate --note=x")
-			.xpect_contains("--generate needs a value, ie --generate=<usize>");
+		message::<Mint>("--generate --note=x").xpect_contains(
+			"`--generate` needs a value, ie `--generate=<usize>`",
+		);
 		message::<Mint>("--note")
-			.xpect_contains("--note needs a value, ie --note=<String>");
+			.xpect_contains("`--note` needs a value, ie `--note=<String>`");
+	}
+
+	/// Every param the caller got wrong is a [`ParamError`] naming its flag,
+	/// the client error a server answers `400`, and a parser's reason reads
+	/// without the source location its `bevyhow!` carried.
+	#[crate::test]
+	fn caller_mistakes_are_param_errors() {
+		#[derive(Debug, Default, Reflect)]
+		enum Format {
+			#[default]
+			Table,
+		}
+		#[derive(Debug, Reflect)]
+		#[allow(dead_code)]
+		struct Serve {
+			port: u16,
+			format: Option<Format>,
+		}
+		param_error::<Serve>("").xpect_eq(ParamError::missing("port"));
+		param_error::<Serve>("--port")
+			.xpect_eq(ParamError::needs_value("port", "u16"));
+		let malformed = param_error::<Serve>("--port=abc");
+		malformed.key().xpect_eq("port");
+		malformed
+			.to_string()
+			.xpect_contains("invalid param `--port`: invalid number")
+			.xnot()
+			.xpect_contains(" at ");
+		param_error::<Serve>("--port=1 --format=csv")
+			.to_string()
+			.xpect_contains("invalid param `--format`");
+		param_error::<Serve>("--port=1 --format=table --format=table")
+			.to_string()
+			.xpect_contains("takes one value, got 2");
 	}
 
 	/// `apply_reflect` writes only the present fields over a base with its own

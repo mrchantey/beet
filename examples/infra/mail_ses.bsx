@@ -54,7 +54,7 @@ plus SES production access if you want to send to anyone who has not verified
 themselves as a recipient. The probe works inside the sandbox either way: the
 simulator address it sends to is always permitted.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="mail-ses-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>

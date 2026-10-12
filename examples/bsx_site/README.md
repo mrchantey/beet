@@ -20,7 +20,7 @@ beet --server=tui
 beet export-static examples/bsx_site
 
 # the browser boots the same entry from the served page (see Layout.bsx),
-# on the wasm binary this installs (run from the repo)
+# on the wasm binary this builds into target/wasm (run from the repo)
 just build-wasm-ui
 ```
 
@@ -47,14 +47,14 @@ There is no `main.rs`. The `beet` binary discovers `main.bsx`, registers the sib
 	<PackageConfig title="BSX Site" description="A beet site with zero code"/>
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="repo"/>
-	<AssetsDir src="assets" prefix="assets"/>
+	<AssetsDir src="wasm" prefix="wasm"/>
 </Router>
 </CallOnReady>
 ```
 
 - The servers own the root: `HttpServer`, `TuiServer`, `SshTuiServer`, `DomServer` and `CliServer` are transport components, and `CallOnReady` is the boot verb: on load it calls them with the process request, and `--server` selects which boot, so the same markup serves every target with no host binary. A server a binary lacks (`SshTuiServer` in a lean build, `HttpServer` in the browser) is skipped with a warning and the entry keeps its shape.
 - `<Router>` is the `beet_router` dispatch component, the servers' child. The route tree and the middleware live on it.
-- `<ServeBlobs prefix="repo"/>` publishes the site's own directory read-only at `/repo`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots.
+- `<ServeBlobs prefix="repo"/>` publishes the site's own directory read-only at `/repo`, the store the browser process reads this entry through; `<AssetsDir>` mounts the wasm binary the page boots, whose `wasm/beet-ui.{wasm,js}` link to the build output in `target/wasm`.
 - `<PackageConfig/>` is a resource declaration: a capitalized tag naming a `#[reflect(Resource)]` type patches the live resource's named fields (here the site title and description), leaving the rest, eg the compile-time version, untouched. It produces no markup.
 - The `{(..)}` spread stacks middleware components onto the router entity, exactly as a Rust `world.spawn((Router, RequestLogger, ..))` would: request logging, `--help`, terminal link navigation, and the layout.
 - `Layout{template:"Layout"}` is render middleware: every page's body transcludes into the default `<Slot/>` of the `templates/Layout.bsx` template, resolved by name exactly as the tag `<Layout/>` would be (a `.bsx` file, else a rust `#[template]`). Declared on a child route instead, it nests inside its ancestors', giving a subtree its own chrome.

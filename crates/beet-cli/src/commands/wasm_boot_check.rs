@@ -17,8 +17,7 @@
 //! Ignored by default since they need the artifacts and a browser on PATH:
 //!
 //! ```sh
-//! just build-wasm-min build-wasm-ui   # the artifacts under test
-//! just check-wasm-boot                # these checks (needs chromedriver + a chromium)
+//! just check-wasm-boot   # builds the artifacts, then runs these (needs chromedriver + a chromium)
 //! ```
 
 use super::browser_check::*;
@@ -58,9 +57,9 @@ async fn boot_until(page: String, needle: &str) -> (String, Browser) {
 #[beet::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-min` + chromedriver"]
 async fn browser_headless_boot() {
-	require_artifact("assets/wasm/beet-min.wasm", "just build-wasm-min");
+	require_artifact("beet-min.wasm", "just build-wasm-min");
 	let page = wasm_page(rsx! {
-		<Wasm src="/assets/wasm/beet-min.wasm" repo="/examples/wasm" entry="hello.bsx"/>
+		<Wasm src="/wasm/beet-min.wasm" repo="/examples/wasm" entry="hello.bsx"/>
 	})
 	.unwrap();
 	let (log, browser) = boot_until(
@@ -78,9 +77,9 @@ async fn browser_headless_boot() {
 #[beet::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-ui` + chromedriver"]
 async fn browser_dom_boot() {
-	require_artifact("assets/wasm/beet-ui.wasm", "just build-wasm-ui");
+	require_artifact("beet-ui.wasm", "just build-wasm-ui");
 	let page = wasm_page(rsx! {
-		<Wasm src="/assets/wasm/beet-ui.wasm" repo="/examples/ui" entry="scene_editor.bsx" server="dom"/>
+		<Wasm src="/wasm/beet-ui.wasm" repo="/examples/ui" entry="scene_editor.bsx" server="dom"/>
 	})
 	.unwrap();
 	// what the DOM host logs once its navigator binds the page at the request

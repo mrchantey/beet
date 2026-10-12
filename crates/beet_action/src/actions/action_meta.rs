@@ -132,6 +132,11 @@ impl ActionMeta {
 	/// The full type name of the handler function or type.
 	pub fn name(&self) -> &'static str { self.handler.type_name() }
 
+	/// Returns true if the input type matches `T`.
+	pub fn input_is<T: 'static>(&self) -> bool {
+		self.input.type_id() == core::any::TypeId::of::<T>()
+	}
+
 	/// Returns true if the output type matches `T`.
 	pub fn output_is<T: 'static>(&self) -> bool {
 		self.output.type_id() == core::any::TypeId::of::<T>()

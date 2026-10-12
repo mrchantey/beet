@@ -212,6 +212,11 @@ where
 		self.inner.remove(key)
 	}
 
+	/// Keep only the keys `keep` accepts, with all their values.
+	pub fn retain(&mut self, mut keep: impl FnMut(&K, &Vec<V>) -> bool) {
+		self.inner.retain(|key, values| keep(key, values));
+	}
+
 	/// Clear all entries.
 	pub fn clear(&mut self) { self.inner.clear(); }
 }

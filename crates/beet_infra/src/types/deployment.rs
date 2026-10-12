@@ -5,13 +5,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// The work-dir guard [`Deployment::default_local`] returns: a real [`TempDir`]
-/// on native, nothing on wasm where the config-only tests never write to it.
-#[cfg(all(test, not(target_arch = "wasm32")))]
-pub(crate) type TestWorkDir = TempDir;
-#[cfg(all(test, target_arch = "wasm32"))]
-pub(crate) struct TestWorkDir;
-
 /// Everything about THIS deploy run, as [`BootstrapConfig`] is everything about
 /// this process launch. Deliberately not `Reflect`: none of it is authored, so
 /// none of it belongs in markup. Identity is the other half and lives on
@@ -103,21 +96,12 @@ impl Deployment {
 		terra::Config::default().with_state_encryption(self.state_encryption())
 	}
 
-	/// A deploy with a local backend and a temporary work directory for testing.
-	/// The directory is removed on drop. On wasm it is a fixed pseudo path: the
-	/// config-only tests never touch the fs, and the two `Project::validate`
-	/// tests that do are native-gated.
+	/// A deploy with a local backend and a temporary work directory for testing,
+	/// removed when the returned [`TempDir`] drops.
 	#[cfg(test)]
-	pub(crate) fn default_local() -> (Self, TestWorkDir) {
-		#[cfg(not(target_arch = "wasm32"))]
-		let (dir, path) = {
-			let dir = TempDir::new_ws().unwrap();
-			let path = dir.path().into_ws_path().unwrap();
-			(dir, path)
-		};
-		#[cfg(target_arch = "wasm32")]
-		let (dir, path) = (TestWorkDir, WsPath::new("target/infra/test"));
-
+	pub(crate) fn default_local() -> (Self, TempDir) {
+		let dir = TempDir::new_ws().unwrap();
+		let path = dir.path().into_ws_path().unwrap();
 		(
 			Self {
 				backend: LocalBackend::default().into(),

@@ -42,9 +42,9 @@ quit and run again: every edit came back from the fork.
 	<Router {Layout{template:"EditorShell"}}>
 		<TemplateDir src="templates"/>
 		<!-- the store the browser reads this entry through, and the wasm binary
-		     its page boots (`assets` links to the workspace tree, `just build-wasm-ui`). -->
+		     its page boots (`wasm/` links to the build output, `just build-wasm-ui`). -->
 		<ServeBlobs prefix="repo"/>
-		<AssetsDir src="assets" prefix="assets"/>
+		<AssetsDir src="wasm" prefix="wasm"/>
 		<Route path="/" {FixedPage}>
 			<SceneBlob path="scene_editor/scene.json" from="scene_editor/scene.bsx"/>
 			<!-- what the keys do on each surface, one line per surface forked by

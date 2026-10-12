@@ -17,8 +17,10 @@ the lambda runtime offers no argv), so a site change re-publishes by re-running
     beet --entry=examples/infra/lambda.bsx destroy --force
 
 A one-shot `CliServer` root whose `CallOnReady` fires the CLI request on load, with
-the `Router` as its dispatch child. `<Stack app_name="lambda">` is the resource
-identity every block and verb beneath it resolves by ancestry, and
+the `Router` as its dispatch child. `RejectUnknownParams` refuses a flag no verb
+declares, so `destroy --froce` asks `did you mean --force?` rather than running.
+`<Stack app_name="lambda">` is the resource identity every block and verb beneath
+it resolves by ancestry, and
 `<DeployRoutes deploy=.. destroy=../>` adds the standard IaC verb routes
 (deploy/destroy/validate/plan/apply/...) to it.
 
@@ -31,7 +33,7 @@ direct children of the route and the sequence runs them in order.
 Live deploy needs AWS credentials in the environment, plus `tofu`,
 `cargo-zigbuild` and `zip`.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="lambda" {AwsRegion("us-west-2")}>

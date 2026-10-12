@@ -224,13 +224,10 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn mirrors_a_directory() {
-		let root =
-			AbsPath::new_workspace_rel("target/tests/beet_net/blob-sync")
-				.unwrap();
-		fs_ext::remove(&root).ok();
+		let root = TempDir::new_ws().unwrap();
 		fs_ext::write(root.join("main.bsx"), "<div/>").unwrap();
 		fs_ext::write(root.join("assets/logo.png"), "png").unwrap();
-		let source = BlobStore::new(FsStore::new(root));
+		let source = BlobStore::new(FsStore::new(root.path().clone()));
 		let dest = BlobStore::temp();
 		BlobSync::new(source.clone(), dest.clone())
 			.with_delete(true)

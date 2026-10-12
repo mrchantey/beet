@@ -79,7 +79,7 @@ pub(crate) async fn run(
 		.run_async_local(move |world| async move {
 			CallOnReady::call(
 				world.entity(root),
-				Request::from_cli_str("--server=http"),
+				Request::from_cli_str("--server=http --port=0"),
 			)
 			.await?;
 			Ok(())

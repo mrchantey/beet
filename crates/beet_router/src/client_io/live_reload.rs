@@ -310,17 +310,10 @@ mod test {
 		world
 	}
 
-	/// Write a site fixture (`templates/` + `routes/`) under `target/tests` and
-	/// return its root dir.
-	fn site_fixture(name: &str) -> AbsPath {
-		let root = AbsPath::new(
-			fs_ext::workspace_root()
-				.join("target/tests/live_reload")
-				.join(name),
-		)
-		.unwrap();
-		// clean slate so files from previous runs do not leak in
-		fs_ext::remove(&root).ok();
+	/// Write a site fixture (`templates/` + `routes/`) in a fresh [`TempDir`],
+	/// returning it.
+	fn site_fixture() -> TempDir {
+		let root = TempDir::new_ws().unwrap();
 		fs_ext::write(
 			root.join("templates/Card.bsx"),
 			"<section>first card</section>",
@@ -374,7 +367,7 @@ mod test {
 	#[beet_core::test]
 	async fn reload_reregisters_templates_and_swaps_routes() {
 		let mut world = reload_world();
-		let site_dir = site_fixture("swaps");
+		let site_dir = site_fixture();
 		let store = BlobStore::new(FsStore::new(site_dir.clone()));
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		// the RoutesDir scan is async, so settle it before reading the tree
@@ -493,7 +486,7 @@ mod test {
 	#[beet_core::test]
 	async fn request_in_flight_survives_the_swap() {
 		let mut world = reload_world();
-		let site_dir = site_fixture("in_flight");
+		let site_dir = site_fixture();
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		let home_of = |world: &World| {
@@ -629,7 +622,7 @@ mod test {
 	#[beet_core::test]
 	async fn changed_routes_narrow_to_the_edited_pages() {
 		let mut world = reload_world();
-		let site_dir = site_fixture("changed_routes");
+		let site_dir = site_fixture();
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		let home = world
@@ -657,7 +650,7 @@ mod test {
 	#[beet_core::test]
 	async fn broadcasts_reload_to_clients() {
 		let mut world = reload_world();
-		let site_dir = site_fixture("broadcasts");
+		let site_dir = site_fixture();
 		let root = spawn_site(&mut world, FsStore::new(site_dir.clone()));
 		AsyncRunner::settle_async_tasks(&mut world).await;
 		// the `ClientIo` channel `start_live_reload` spawned as the root's child
@@ -705,14 +698,8 @@ mod test {
 
 	/// A deck fixture: zero-padded card files under `slides/` (deliberately
 	/// out-of-order on disk) backing a [`CardDeck`] router. Returns the site dir.
-	fn deck_fixture(name: &str) -> AbsPath {
-		let root = AbsPath::new(
-			fs_ext::workspace_root()
-				.join("target/tests/live_reload")
-				.join(name),
-		)
-		.unwrap();
-		fs_ext::remove(&root).ok();
+	fn deck_fixture() -> TempDir {
+		let root = TempDir::new_ws().unwrap();
 		fs_ext::write(root.join("slides/02-beta.md"), "# Beta").unwrap();
 		fs_ext::write(root.join("slides/01-alpha.md"), "# Alpha first")
 			.unwrap();
@@ -739,7 +726,7 @@ mod test {
 	#[beet_core::test]
 	async fn reload_preserves_card_deck_marker_and_order() {
 		let mut world = reload_world();
-		let site_dir = deck_fixture("deck_marker");
+		let site_dir = deck_fixture();
 		// a deck router marked for live reload: the CardDeck marker (declared in the
 		// deck's markup spread); the repo store on the root backs the `RoutesDir` scan
 		// by ancestry.
@@ -843,7 +830,7 @@ mod test {
 		use bevy::math::UVec2;
 
 		let mut app = tui_app();
-		let site_dir = deck_fixture("tui_repaint");
+		let site_dir = deck_fixture();
 		// the repo store on the router root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()
@@ -909,7 +896,7 @@ mod test {
 
 		let mut app = tui_app();
 		app.add_plugins(CardStackPlugin);
-		let site_dir = deck_fixture("deck_nav");
+		let site_dir = deck_fixture();
 		// the repo store on the root backs the `RoutesDir` scan by ancestry.
 		let router = app
 			.world_mut()

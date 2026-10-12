@@ -45,8 +45,12 @@ impl ServerParams {
 		self.host
 			.as_deref()
 			.map(|host| {
-				host.parse::<IpAddr>()
-					.map_err(|err| bevyhow!("invalid --host `{host}`: {err}"))
+				host.parse::<IpAddr>().map_err(|err| {
+					ParamError::invalid(
+						"host",
+						format!("`{host}` is no address, {err}"),
+					)
+				})
 			})
 			.transpose()?
 			.and_then(BootstrapConfig::ipv4_octets)

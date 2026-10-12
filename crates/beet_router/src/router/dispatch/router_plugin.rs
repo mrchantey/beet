@@ -27,19 +27,21 @@ impl Plugin for RouterPlugin {
 			.init_plugin::<BootstrapPlugin>()
 			.add_observer(insert_action_path_and_params)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			// the six triggers that dirty a `RouteTree`: a url space root
+			// the seven triggers that dirty a `RouteTree`: a url space root
 			// appearing (a root `PathPartial`, so a routeless router still owns
 			// a tree), a route joining or leaving the tree (`PathPattern`
 			// insert/remove), a route being hidden or unhidden (`RouteHidden`
-			// insert/remove), and a template build settling its slots
-			// (`SpawnTemplate`, which reparents routes without touching any of
-			// those). Each just wakes `rebuild_dirty_route_trees`, which
+			// insert/remove), a route's step declaring its params (a
+			// `ParamsPartial` off any route), and a template build settling its
+			// slots (`SpawnTemplate`, which reparents routes without touching
+			// any of those). Each just wakes `rebuild_dirty_route_trees`, which
 			// resolves what actually changed.
 			.add_observer(queue_route_tree_rebuild_on_root)
 			.add_observer(queue_route_tree_rebuild_on_insert::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
+			.add_observer(queue_route_tree_rebuild_on_step_params)
 			.add_observer(rebuild_route_tree_on_build)
 			// a replaced route outlives the swap while a request holds it
 			.add_systems(Update, despawn_idle_retired);
@@ -73,6 +75,8 @@ impl Plugin for RouterPlugin {
 			.register_type::<CacheHeadersMiddleware>()
 			.register_type::<CorsHandler>()
 			.register_type::<CorsConfig>()
+			// the opt-in refusal of a param nothing on a route's path declares
+			.register_type::<RejectUnknownParams>()
 			.register_type::<Router>()
 			// a child-sequenced route is `<Route path=".." {ExchangeSequence}>` with
 			// the steps as direct children (the sequence reads its direct children).
@@ -296,12 +300,18 @@ impl Plugin for RouterPlugin {
 			// terminal app when the start walk selects `tui`.
 			#[cfg(feature = "tui")]
 			app.register_type::<TuiServer>();
+			// a binary without the terminal (the browser runtime) still loads
+			// an entry declaring it, the spread a known featured-out name
+			#[cfg(not(feature = "tui"))]
+			app.allow_unregistered("TuiServer");
 			// the multi-tenant SSH-TUI server, likewise declarable in a markup
 			// spread. Registered by feature rather than by `SshTuiPlugin` (which
 			// adds the per-connection behavior), so an entry naming it resolves in
 			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
 			app.register_type::<SshTuiServer>();
+			#[cfg(not(feature = "ssh"))]
+			app.allow_unregistered("SshTuiServer");
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
 			// builds: the whole request in, whatever the script returned out.
 			// `Script<Value, Value>` itself is registered upstream by
@@ -498,9 +508,10 @@ fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
 /// funnels into, run once per dirty namespace root rather than once per
 /// changed entity.
 ///
-/// `trigger` is the entity whose [`PathPattern`]/[`RouteHidden`] just changed,
-/// handed over by the waking observer. An insert or a live removal leaves the
-/// entity and its ancestry intact, so [`PathPattern::namespace_root`] answers
+/// `trigger` is the entity whose [`PathPattern`]/[`RouteHidden`] (or, for a
+/// step, [`ParamsPartial`]) just changed, handed over by the waking observer.
+/// An insert or a live removal leaves the entity and its ancestry intact, so
+/// [`PathPattern::namespace_root`] answers
 /// and only that namespace is dirty. A despawn does not: by the time this runs
 /// the entity is gone, which namespace lost the route can no longer be found,
 /// and every existing namespace is rebuilt this pass instead.

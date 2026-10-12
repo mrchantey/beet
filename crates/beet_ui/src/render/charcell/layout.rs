@@ -1167,7 +1167,7 @@ mod tests {
 				(
 					rsx! { "Supercalifragilistic" },
 					bordered.clone(),
-					LayoutStyle::default().with_flex_grow(1)
+					LayoutStyle::default().with_flex_grow(1.)
 				),
 			],
 		);

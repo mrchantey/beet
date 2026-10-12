@@ -5,6 +5,7 @@
 //!
 //! - [`FsError`] - Filesystem operation error type, always naming the path
 //! - [`ReadDir`] - Directory listing
+//! - [`TempDir`] - A uniquely named directory removed on drop
 //! - [`EnvVar`] - Serde and reflect-friendly environment variable
 //!
 //! # Modules
@@ -16,7 +17,11 @@ mod env_var;
 mod fs_error;
 pub mod fs_ext;
 mod read_dir;
+#[cfg(feature = "uuid")]
+mod temp_dir;
 
 pub use env_var::*;
 pub use fs_error::*;
 pub use read_dir::*;
+#[cfg(feature = "uuid")]
+pub use temp_dir::*;

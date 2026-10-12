@@ -280,11 +280,12 @@ async fn serving_a_dispatcher_starts_each_server_once() {
 			counter.set(counter.get() + 1)
 		}
 	});
-	// boot it the way a launched entry does: argv names the `serve` route
+	// boot it the way a launched entry does: argv names the `serve` route, on an
+	// os-assigned port so a concurrent run never collides
 	world.run_async_local(move |async_world| async move {
 		CallOnReady::call(
 			async_world.entity(root),
-			Request::from_cli_str("serve --server=http"),
+			Request::from_cli_str("serve --server=http --port=0"),
 		)
 		.await
 		.ok();

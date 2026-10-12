@@ -8,13 +8,17 @@ every start.
 The workspace commands that take an entry as an argument (`beet check site`,
 `beet export-static site`) load it from the repo root.
 
-The root is a one-shot `<CliServer always=true {CallOnReady}>` dispatcher whose
-`Router` is its child, so the entry is a set of commands and the served site is ONE
-of them: `serve`. `always=true` makes the dispatcher run on every boot regardless of
-`--server`, since `--server` selects the *served site's* transports, not this
-entry's. The box launches `app --repo=s3://.. --server=http,ssh serve` and a
-developer launches `beet --entry=site serve --server=http`: one process, one
-argv, the same verb, so local and deployed take the same path.
+The root is a one-shot `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`
+dispatcher whose `Router` is its child, so the entry is a set of commands and the
+served site is ONE of them: `serve`. `always=true` makes the dispatcher run on every
+boot regardless of `--server`, since `--server` selects the *served site's*
+transports, not this entry's. `RejectUnknownParams` refuses a flag no command
+declares, so `deploy --elevate` answers `did you mean --elevated?` rather than
+running a plain deploy; the site `serve` serves is its own url space and keeps
+accepting whatever a link carries (`?utm_source=..`). The box launches
+`app --repo=s3://.. --server=http,ssh serve` and a developer launches
+`beet --entry=site serve --server=http`: one process, one argv, the same verb,
+so local and deployed take the same path.
 
     beet --entry=site serve --server=http      # the website over http
     beet --entry=site serve --server=tui       # ..as a live terminal (like `beet present`)
@@ -80,11 +84,13 @@ its ancestors' paths either way.
 
 `site/assets` is a real directory whose source of record is the site's own shared
 bucket (`beet-site--shared--assets`), hydrated with `just site-shared pull`. A
-few files it serves are BUILT in the workspace tree (the wasm binary the tutorial
-embeds, the geoip database, the perceive-act robot faces); `<DirCopy/>` is the
-one declaration of what is borrowed. Under the deploy's `<RepoStage>` it borrows
-into the staging dir the mirror publishes, so nothing is written into the
-checkout; the `assets` verb borrows into `site/assets` for a local `serve`.
+few files it serves are owned by the workspace tree (the geoip database, the
+perceive-act robot faces); `<DirCopy/>` is the one declaration of what is
+borrowed. Under the deploy's `<RepoStage>` it borrows into the staging dir the
+mirror publishes, so nothing is written into the checkout; the `assets` verb
+borrows into `site/assets` for a local `serve`. Only source files are borrowed,
+never a build output: the site boots no wasm, and a deploy that ships one
+builds it right before its stage (`<WasmArtifact/>`).
 
 ## The deploy
 
@@ -197,7 +203,7 @@ identifiers, not secrets, declared as spreads on the root `<Router>` below and
 resolved by ancestry. The social stack and the audit need only the Cloudflare
 token (plus AWS for the social stack's state bucket).
 -->
-<CliServer always=true {CallOnReady}>
+<CliServer always=true {(CallOnReady, RejectUnknownParams)}>
 <!-- the provider addresses every stack below deploys into, resolved by
      ancestry: the region, the Cloudflare account and the `beet.org` zone,
      identifiers public in every dashboard url and so declared here rather

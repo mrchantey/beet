@@ -47,6 +47,7 @@ pub(crate) fn token_map()->CssTokenMap{
 		.insert(OverflowWrapProp)
 		.insert(MarginProp)
 		.insert(FlexGrowProp)
+		.insert(FlexShrinkProp)
 		.insert(FlexBasisProp)
 		.insert(AlignItemsProp)
 		.insert(AlignSelfProp)
@@ -141,10 +142,12 @@ canonical_property!(FontWeightProp, FontWeight, "font-weight");
 css_property!(LineHeight, Length, "line-height");
 css_property!(Tracking, Length, "letter-spacing");
 
-css_property!(FlexGrowProp, u32, TokenInheritance::NotInherited, "flex-grow");
-// The size a flex item starts from before growing or shrinking. Web only: the
-// charcell flex sizes an item by its `width` or content, so author it in a
-// `MediaQuery::Screen` rule.
+// The flex factors: a unitless `f32`, as CSS `<number>`. Absent, an item grows
+// by 0 and shrinks by 1, the CSS initial values.
+css_property!(FlexGrowProp, f32, TokenInheritance::NotInherited, "flex-grow");
+css_property!(FlexShrinkProp, f32, TokenInheritance::NotInherited, "flex-shrink");
+// The size a flex item starts from before growing or shrinking; absent is
+// `auto`, its `width` or content size.
 css_property!(FlexBasisProp, Length, TokenInheritance::NotInherited, "flex-basis");
 css_property!(FlexOrderProp, i32, TokenInheritance::NotInherited, "order");
 canonical_property!(AlignSelfProp, AlignSelf, TokenInheritance::NotInherited, "align-self");

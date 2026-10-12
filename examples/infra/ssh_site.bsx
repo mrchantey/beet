@@ -21,7 +21,7 @@ TUI is compiled in, so there is no S3 site sync.
 Live deploy needs AWS credentials, plus `tofu`, `cargo-zigbuild` and a container
 engine.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="ssh-site" {AwsRegion("us-west-2")}>

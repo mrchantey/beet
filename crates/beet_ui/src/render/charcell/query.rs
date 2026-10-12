@@ -218,12 +218,14 @@ impl CharcellNodeData<'_> {
 ///
 /// These two are the reliable signals after `resolve_styles`, which gives every
 /// node a resolved style: it leaves a non-element's [`BoxStyle`] at the default
-/// (the box model is element-only) and never inherits a `background` (it is a
-/// non-inherited property), so a hoisted wrapper has neither while an authored box
-/// has one. The resolved [`LayoutStyle`] is *not* a usable signal — a tag-less
-/// node resolves its `display` from its nearest ancestor element, so a fragment
-/// under a `display: grid` parent picks up `Grid`; its display is simply never
-/// read, as it is spliced before layout.
+/// (the box model is element-only), and a non-element matches its nearest
+/// element's rules, so it carries a `background` only when that element
+/// declares one. A wrapper under such an element (a layout's `<Slot>` under the
+/// page body) therefore stays in the flow, laying its children out with the
+/// element's container props (see `LayoutBox` in `resolve_styles`). The
+/// resolved [`LayoutStyle`] is *not* a usable signal: a tag-less node resolves
+/// its `display` from its nearest ancestor element, so a fragment under a
+/// `display: grid` parent picks up `Grid` whether or not it is spliced.
 #[derive(SystemParam)]
 pub(crate) struct WrapperQuery<'w, 's> {
 	wrappers: Query<

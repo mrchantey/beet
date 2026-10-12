@@ -44,6 +44,10 @@ pub struct MarkdownRenderer {
 	/// A checkbox was just written, so the words after it are spaced from
 	/// it unless they bring their own space.
 	after_box: bool,
+	/// The element that just ended with nothing written after it, if any:
+	/// `Some(true)` for an [item](Self::is_item), so an element beside it is
+	/// spaced from it.
+	after_element: Option<bool>,
 	/// A block's prefix was just written, so the words after it lose their
 	/// leading whitespace.
 	at_block_start: bool,
@@ -204,6 +208,7 @@ impl MarkdownRenderer {
 			blocks: Vec::new(),
 			tables: Vec::new(),
 			after_box: false,
+			after_element: None,
 			at_block_start: false,
 		}
 	}
@@ -232,6 +237,29 @@ impl MarkdownRenderer {
 	fn push_str(&mut self, text: &str) { self.state.push_raw(text); }
 
 	fn push_char(&mut self, ch: char) { self.state.push_raw_char(ch); }
+
+	/// Whether `tag` is a discrete item rather than a formatting run: a link,
+	/// an image or a control, spaced from an element directly beside it.
+	fn is_item(tag: &str) -> bool {
+		matches!(
+			tag,
+			"a" | "button" | "img" | "input" | "select" | "textarea"
+		)
+	}
+
+	/// Whether `tag` may be spaced from an item directly beside it: flowing
+	/// elements may, while a block, a line break and a table's structure
+	/// separate themselves.
+	fn spaces_from_sibling(state: &TextRenderState, tag: &str) -> bool {
+		!state.is_block_element(tag)
+			&& !matches!(
+				tag,
+				"br" | "tr"
+					| "th" | "td" | "thead"
+					| "tbody" | "tfoot"
+					| "caption"
+			)
+	}
 
 	/// Opens an inline wrapper, deferred until words are written inside it,
 	/// or continuing the identical wrapper that just closed.
@@ -397,10 +425,28 @@ impl NodeVisitor for MarkdownRenderer {
 		);
 		// whether the block around has written nothing yet
 		let block_start = self.at_block_start;
+		let spaced = self.after_element.take().is_some_and(|after_item| {
+			(after_item || Self::is_item(name))
+				&& Self::spaces_from_sibling(&self.state, name)
+		});
 		// a line break before a block's first words writes nothing, so the
 		// wrappers around it stay unwritten, ie a bold page break
 		if !inline && !(name == "br" && block_start) {
 			self.flush_inline();
+		}
+		// an item and an element beside it with nothing between them never
+		// run together, ie a nav's links or a pair of buttons; adjacent
+		// formatting runs still join, a word split across them by a richer
+		// format. An inline wrapper's marker is deferred, so its space waits
+		// for its words
+		match (spaced, inline) {
+			(true, true) => self.after_box = true,
+			(true, false)
+				if !self.state.buffer.ends_with(char::is_whitespace) =>
+			{
+				self.push_char(' ')
+			}
+			_ => {}
 		}
 		let block = Self::SUPPRESSIBLE
 			.contains(&name)
@@ -448,6 +494,9 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.write_list_indent();
 				let prefix = self.state.next_list_prefix("- ");
 				self.push_str(&prefix);
+				// a block opening the item belongs on its line, whatever
+				// block ended in an item before it
+				self.state.needs_block_separator = false;
 			}
 
 			// ── Code blocks ──
@@ -554,8 +603,10 @@ impl NodeVisitor for MarkdownRenderer {
 			// ── Tables, collected and written on leave ──
 			"table" => {
 				// a table in a cell is GFM's to hold nowhere, so it follows
-				// its host
+				// its host; any other opens a block of its own, never the
+				// tail of a line of text like a list item's link
 				if self.tables.last().is_none_or(|table| table.cell.is_none()) {
+					self.state.needs_block_separator = true;
 					self.state.ensure_block_separator();
 				}
 				self.tables.push(TableCapture {
@@ -591,6 +642,9 @@ impl NodeVisitor for MarkdownRenderer {
 			_ => {
 				if self.state.is_block_element(name) {
 					self.state.ensure_block_separator();
+					// leading whitespace in a block says nothing, as html
+					// collapses it, ie the space after an empty first item
+					self.at_block_start = true;
 				}
 			}
 		}
@@ -609,6 +663,8 @@ impl NodeVisitor for MarkdownRenderer {
 
 	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
 		let name = element.tag();
+		self.after_element = Self::spaces_from_sibling(&self.state, name)
+			.then(|| Self::is_item(name));
 		let inline = matches!(
 			name,
 			"em" | "i"
@@ -673,8 +729,11 @@ impl NodeVisitor for MarkdownRenderer {
 				self.state.leave_list();
 				if self.state.list_depth == 0 {
 					self.state.ensure_newline();
-					self.state.needs_block_separator = true;
 				}
+				// a block after a list is one of its own at any depth, ie an
+				// item's paragraph after its nested list; the next item's
+				// prefix clears it
+				self.state.needs_block_separator = true;
 			}
 			"li" if kept => {
 				self.state.ensure_newline();
@@ -778,6 +837,7 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
+		self.after_element = None;
 		let text = value.to_string();
 		self.push_words(&text);
 	}
@@ -1056,6 +1116,44 @@ mod test {
 		.xpect_eq("<mark>due</mark> plain <span style=\"color: #FF0000\">red</span>");
 	}
 
+	/// A block opening a list item stays on the item's line, whatever block
+	/// ended in an item before it, ie a sidebar's disclosure groups.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn block_opens_on_its_item_line() {
+		render_unescaped(
+			"<ul><li><details><summary>blog</summary></details></li>\
+			 <li><a href=\"/counter\">counter</a></li>\
+			 <li><details><summary>docs</summary></details></li></ul>",
+		)
+		.xpect_eq("- blog\n- [counter](/counter)\n- docs\n");
+	}
+
+	/// A block after an item's nested list is a block of its own, never a
+	/// continuation of the nested item's line.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn block_after_nested_list_is_its_own() {
+		render_unescaped(
+			"<ul><li><a href=\"/a\">a</a><ul><li>note</li></ul><p>more</p></li>\
+			 <li>b</li></ul>",
+		)
+		.xpect_eq("- [a](/a)\n  - note\n\nmore\n- b\n");
+	}
+
+	/// Items with nothing between them stay apart, ie a nav's links or a
+	/// pair of buttons, while adjacent formatting runs still join.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn spaces_adjacent_items() {
+		render_unescaped(
+			"<nav><a href=\"/docs\">Docs</a><a href=\"/blog\">Blog</a><strong>new</strong></nav>\
+			 <p><button>More</button><button>Less</button></p>",
+		)
+		.trim()
+		.xpect_eq("[Docs](/docs) [Blog](/blog) **new**\n\nMore Less");
+	}
+
 	/// A tree read from a richer format reads as a person writes markdown:
 	/// edge whitespace outside its emphasis, two wrappers of one look as one,
 	/// an empty wrapper or block unwritten.
@@ -1083,6 +1181,17 @@ mod test {
 		.xpect_eq(
 			"<!-- t1 -->\n\n| a | [table t2] |\n|---|---|\n\n<!-- t2 -->\n\n| x |\n|---|\n",
 		);
+	}
+
+	/// A table opens a block of its own, never the tail of a line of text,
+	/// ie the link of the list item holding it.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn table_opens_its_own_block() {
+		render_unescaped(
+			"<ul><li><a href=\"/a\">/a</a><table><tr><td>x</td></tr></table></li></ul>",
+		)
+		.xpect_eq("- [/a](/a)\n\n| x |\n|---|\n");
 	}
 
 	/// A checkbox reads as a task list writes it.

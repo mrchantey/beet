@@ -208,7 +208,8 @@ impl RequestParts {
 	/// repeats, a `bool` is a flag present or absent, a unit enum is named by
 	/// its variant, anything else is required and named in the error when
 	/// absent, and each value parses through its type's [`LiteralParser`]
-	/// exactly as markup does. The full contract is
+	/// exactly as markup does. A param missing or malformed is a
+	/// [`ParamError`], answered `400`. The full contract is
 	/// [`MultiMapReflectExt::parse_reflect`].
 	///
 	/// ```

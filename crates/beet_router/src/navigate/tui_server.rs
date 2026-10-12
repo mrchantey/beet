@@ -25,7 +25,7 @@ use beet_ui::prelude::*;
 /// ([`CharcellTuiPlugin`], [`NavigatorPlugin`], [`PageHostPlugin`]) and spreading
 /// this on its server root, then booting it.
 #[derive(Component, Reflect)]
-#[reflect(Default, Component)]
+#[reflect(Default, Component, DeclaresParams)]
 #[component(on_add = hook_ext::component_hook(TuiServer::add_facet))]
 pub struct TuiServer {
 	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
@@ -36,6 +36,13 @@ pub struct TuiServer {
 
 impl Default for TuiServer {
 	fn default() -> Self { Self { default_boot: true } }
+}
+
+/// The bind knobs and the color scheme its start request carries.
+impl DeclaresParams for TuiServer {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<(ServerParams, ColorSchemeParams)>()
+	}
 }
 
 impl TuiServer {
@@ -80,7 +87,7 @@ async fn serve_tui(
 	parts: RequestParts,
 	shutdown: OnceValueRx<()>,
 ) -> Result {
-	let scheme = parts.get_param("color-scheme").and_then(ColorScheme::parse);
+	let scheme = ColorSchemeParams::of(&parts);
 	// the opening route is recorded on the server (the shared mechanism the SSH
 	// server also reads), resolved against this server's own url space.
 	entity

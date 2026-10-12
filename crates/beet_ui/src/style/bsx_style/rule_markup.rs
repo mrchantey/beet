@@ -386,6 +386,24 @@ mod test {
 			.xpect_eq(style::Length::Rem(1.0));
 	}
 
+	/// The flex factors and basis parse to the typed values the cascade maps
+	/// into `LayoutStyle`, a bare integer factor included.
+	#[beet_core::test]
+	fn flex_props_match_typed() {
+		let rule = rule_from(
+			r#"<Rule class="item" flex-grow=1 flex-shrink=0.5 flex-basis=Rem(10.0)/>"#,
+		);
+		rule.get_typed::<f32>(&common_props::FlexGrowProp.into())
+			.unwrap()
+			.xpect_eq(1.);
+		rule.get_typed::<f32>(&common_props::FlexShrinkProp.into())
+			.unwrap()
+			.xpect_eq(0.5);
+		rule.get_typed::<style::Length>(&common_props::FlexBasisProp.into())
+			.unwrap()
+			.xpect_eq(style::Length::Rem(10.0));
+	}
+
 	// the width forms all resolve to `MaxWidth`; keywords stay themselves
 	#[beet_core::test]
 	fn media_parses_max_width() {

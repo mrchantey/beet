@@ -475,7 +475,7 @@ mod tests {
 	/// A world with the plugin, the launch and an app identity: the same seeding
 	/// `RenderScope::test_render_stack` does, for a test that needs SEVERAL
 	/// stack roots rather than one.
-	fn infra_world() -> (World, crate::types::TestWorkDir) {
+	fn infra_world() -> (World, TempDir) {
 		let (deployment, dir) = Deployment::default_local();
 		let mut world = InfraPlugin.into_world();
 		world.insert_resource(deployment);
@@ -486,9 +486,7 @@ mod tests {
 	/// Two sibling stacks, the second publishing into `news_zone`, plus a
 	/// zone-scoped audit sitting OUTSIDE both — the entry-level shape, where the
 	/// zone belongs to no stack.
-	fn two_stacks(
-		news_zone: &str,
-	) -> (World, Entity, crate::types::TestWorkDir) {
+	fn two_stacks(news_zone: &str) -> (World, Entity, TempDir) {
 		let (mut world, dir) = infra_world();
 		world.spawn((
 			Stack::new("beetmash-mail"),

@@ -55,7 +55,10 @@ pub async fn CaptureScreenshot(
 	let mut cli = parts.to_cli_args();
 	let mut segments = core::mem::take(&mut cli.path);
 	if segments.len() < 2 {
-		bevybail!("usage: beet screenshot <url> [--output=path.png]");
+		return Err(HttpError::bad_request(
+			"usage: beet screenshot <url> [--output=path.png]",
+		)
+		.into());
 	}
 	segments.remove(0);
 	let url = segments.join("/");

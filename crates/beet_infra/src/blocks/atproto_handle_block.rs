@@ -330,7 +330,7 @@ mod test {
 		stack: Stack,
 		accounts: &[(&str, &str)],
 		block: impl FnOnce(AtprotoHandleBlock) -> AtprotoHandleBlock,
-	) -> (RenderScope, crate::types::TestWorkDir) {
+	) -> (RenderScope, TempDir) {
 		let accounts = accounts.to_vec();
 		RenderScope::test_render_stack(
 			(

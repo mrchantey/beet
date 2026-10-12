@@ -8,9 +8,11 @@ use beet_net::prelude::*;
 /// document, in the staging dir [`RepoSync`] mirrors from.
 ///
 /// A published document is rarely one checkout directory: the site's own tree
-/// plus a few files built elsewhere in the workspace. Staging composes them
+/// plus a few files owned elsewhere in the workspace. Staging composes them
 /// OUTSIDE the checkout, so no deploy step writes into source, and the staging
-/// dir IS the store's contents, so a test compares the two directly.
+/// dir IS the store's contents, so a test compares the two directly. A build
+/// output the document serves is never borrowed: a [`WasmArtifact`] declared
+/// before the stage builds it, and the stage reads what was just built.
 ///
 /// `src` is copied whole (or its `paths` alone, for an entry at a checkout's
 /// root whose siblings are crates and a `target/`), then the children run in
@@ -19,7 +21,7 @@ use beet_net::prelude::*;
 ///
 /// ```bsx
 /// <RepoStage src="site">
-///     <DirCopy src="assets" dest="assets" paths="wasm/beet-full.wasm"/>
+///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
 /// </RepoStage>
 /// <RepoSync/>
 /// ```

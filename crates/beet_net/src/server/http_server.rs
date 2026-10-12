@@ -109,7 +109,7 @@ impl Listening {
 /// ));
 /// ```
 #[derive(Clone, Component, Reflect)]
-#[reflect(Component, Default)]
+#[reflect(Component, Default, DeclaresParams)]
 #[component(on_add = hook_ext::component_hook(HttpServer::add_facet))]
 #[require(ExchangeStats, ServerLimits)]
 pub struct HttpServer {
@@ -138,6 +138,13 @@ pub struct HttpServer {
 	/// in without racing the first-install-wins global.
 	#[reflect(ignore)]
 	pub backend: Option<HttpServerBackend>,
+}
+
+/// The bind knobs its start request carries.
+impl DeclaresParams for HttpServer {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<ServerParams>()
+	}
 }
 
 impl Default for HttpServer {

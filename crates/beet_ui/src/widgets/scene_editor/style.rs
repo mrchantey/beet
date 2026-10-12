@@ -107,7 +107,7 @@ fn scene_editor_tree_terminal() -> Rule {
 fn scene_editor_inspector() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SCENE_EDITOR_INSPECTOR))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 		.with_value(common_props::MinWidth, Length::Px(0.))
 }
 

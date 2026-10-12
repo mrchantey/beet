@@ -76,7 +76,7 @@ fn transcript_style() -> OnSpawn {
 			style::common_props::FlexDirectionProp,
 			style::Direction::Vertical
 		),
-		(style::common_props::FlexGrowProp, 1u32),
+		(style::common_props::FlexGrowProp, 1_f32),
 		(style::common_props::OverflowYProp, style::Overflow::Auto),
 		(style::common_props::RowGapProp, style::Length::Rem(1.)),
 		(

@@ -29,8 +29,9 @@ use core::ops::DerefMut;
 #[path = "../example_store/mod.rs"]
 mod example_store;
 
-/// The artifact the served pages boot, and the recipe that builds it.
-pub const ARTIFACT: &str = "assets/wasm/beet-ui.wasm";
+/// The artifact the served pages boot (the build output the examples'
+/// `wasm/beet-ui.wasm` links name), and the recipe that builds it.
+pub const ARTIFACT: &str = "target/wasm/beet-ui.wasm";
 pub const BUILD_RECIPE: &str = "just build-wasm-ui";
 
 /// How long a case waits for the tab to paint: the artifact fetched,
@@ -50,9 +51,9 @@ pub struct BrowserHost {
 	/// Everything the console has said since the last [`Self::goto`],
 	/// streamed as it arrives for the person watching.
 	pub log: String,
-	/// Every error the console has reported since the tab opened, whatever
-	/// the load, which [`Self::kill`] refuses on.
-	errors: Vec<String>,
+	/// Every error or warning the console has reported since the tab opened,
+	/// whatever the load, which [`Self::kill`] refuses on.
+	faults: Vec<String>,
 	/// The store the entry was built from, so a suite can read back what the
 	/// server persisted.
 	pub store: BlobStore,
@@ -69,7 +70,7 @@ impl DerefMut for BrowserHost {
 
 impl BrowserHost {
 	/// The files at `paths` within the workspace-relative `dir`, copied off
-	/// disk into an in-memory store, a symlinked `assets` tree included.
+	/// disk into an in-memory store, symlinked files included.
 	pub async fn seeded_store(dir: &str, paths: &[&str]) -> BlobStore {
 		example_store::seeded_store(dir, paths).await
 	}
@@ -97,7 +98,7 @@ impl BrowserHost {
 			console,
 			responses,
 			log: String::new(),
-			errors: Vec::new(),
+			faults: Vec::new(),
 			store,
 		}
 	}
@@ -111,12 +112,17 @@ impl BrowserHost {
 	}
 
 	/// Drain the console into the log, streaming each entry for the person
-	/// watching and keeping every error aside.
+	/// watching and keeping every error and warning aside, at the console's
+	/// level or the beet log line's.
 	pub fn drain(&mut self) {
 		for entry in self.console.drain() {
 			cross_log!("{}", entry.text);
-			if entry.is_error() || entry.text.contains("ERROR") {
-				self.errors.push(entry.text.clone());
+			if entry.is_error()
+				|| entry.is_warning()
+				|| entry.text.contains("ERROR")
+				|| entry.text.contains(" WARN ")
+			{
+				self.faults.push(entry.text.clone());
 			}
 			self.log.push_str(&entry.text);
 			self.log.push('\n');
@@ -186,12 +192,12 @@ impl BrowserHost {
 	}
 
 	/// Close the tab and the served app, failing on anything the console
-	/// reported as an error or any response the page had fail: a failed
-	/// subresource (a 404 favicon) raises no console error, so a clean boot
-	/// needs both empty.
+	/// reported as an error or warning, or any response the page had fail: a
+	/// failed subresource (a 404 favicon) raises no console error, so a clean
+	/// boot needs both empty.
 	pub async fn kill(mut self) {
 		self.drain();
-		self.errors.xpect_empty();
+		self.faults.xpect_empty();
 		self.responses
 			.drain()
 			.into_iter()
@@ -220,6 +226,12 @@ async fn serve_entry(store: BlobStore, entry: &str) -> PageHarness {
 			RouterPlugin,
 			material::MaterialStylePlugin::default(),
 		));
+		// the primary registration the binary spawns, so an entry's
+		// `<RequireCfg>` checks against what this suite compiled
+		app.world_mut().spawn(
+			crate_registration!({ features: ["tui", "web"] })
+				.with_skip_prefix(),
+		);
 		let formats = app
 			.world_mut()
 			.get_resource_or_init::<TemplateFormats>()

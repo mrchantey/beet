@@ -290,24 +290,20 @@ mod test {
 
 	// cross-platform: `FsStore` reads/writes through `fs_ext`, which routes to the
 	// deno runner's fs globals on wasm, so the same suite runs under both. On wasm
-	// the runner supplies `BEET_WORKSPACE_ROOT` (resolving the workspace-relative dir) and
-	// `--allow-write`.
+	// the runner supplies `BEET_WORKSPACE_ROOT` (resolving the workspace-relative
+	// `TempDir`) and `--allow-write`.
 	#[beet_core::test]
 	async fn works() {
-		let dir = "target/tests/beet_net/test-store-001";
-		let provider = FsStore::new(AbsPath::new_workspace_rel(dir).unwrap());
-		store_test::run(provider).await;
+		let dir = TempDir::new_ws().unwrap();
+		store_test::run(FsStore::new(dir.path().clone())).await;
 	}
 
 	/// A subdir never written to lists empty, as a missing prefix in an object
 	/// store does, so a table that has no rows yet reads as empty.
 	#[beet_core::test]
 	async fn lists_a_missing_subdir_as_empty() {
-		let dir =
-			AbsPath::new_workspace_rel("target/tests/beet_net/missing-subdir")
-				.unwrap();
-		fs_ext::create_dir_all_async(&dir).await.unwrap();
-		BlobStore::new(FsStore::new(dir))
+		let dir = TempDir::new_ws().unwrap();
+		BlobStore::new(FsStore::new(dir.path().clone()))
 			.with_subdir(RelPath::new("never/written"))
 			.list()
 			.await
@@ -321,8 +317,7 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn rebases_above_the_repo_root() {
-		let tmp = AbsPath::new_workspace_rel("target/tests/beet_net/rebase-fs")
-			.unwrap();
+		let tmp = TempDir::new_ws().unwrap();
 		let entry_dir = tmp.join("a/b");
 		fs_ext::create_dir_all(&entry_dir).unwrap();
 		fs_ext::write(entry_dir.join("main.bsx"), "<Router/>").unwrap();

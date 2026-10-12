@@ -7,9 +7,9 @@ it, the browser process resolves and builds that entry exactly as the native
 binary does its `--entry`, runs it headless, and `<RenderConsole>` renders its
 console output. Honors `?color-scheme=dark`.
 
-Install a wasm binary once, then serve:
+Build the wasm binary, then serve (`just serve-wasm` runs both):
 
-    just build-wasm-min                  # assets/wasm/beet-min.wasm, what `/` mounts
+    just build-wasm-min                  # target/wasm/beet-min.wasm, what `/` mounts
     beet --entry=examples/wasm --watch    # then open http://127.0.0.1:8337
 
 The pages walk the artifact range, which is the whole point of the split: `/`
@@ -24,7 +24,7 @@ the workspace (`<RepoRoot>`), so `<AssetsDir>` serves the examples the browser
 reads as its repo and `--watch` live-reloads the browser on any edit under them.
 
 `<RoutesDir>` serves examples/wasm/routes (the pages); `<AssetsDir>` mounts the
-workspace assets (the wasm binaries) at /assets and the examples tree at /examples.
+wasm build outputs (`target/wasm`) at /wasm and the examples tree at /examples.
 The server owns the boot (`CallOnReady` calls it with the process request the
 moment the entry loads) and the router is its dispatch child.
 -->
@@ -39,10 +39,10 @@ moment the entry loads) and the router is its dispatch child.
 	<Rule tag="html" background-color="@token:Surface" color="@token:OnSurface"/>
 	<DefaultAppRoutes/>
 	<RoutesDir src="examples/wasm/routes"/>
-	<!-- the workspace assets at /assets (the wasm/js binary the page boots), and the
-	     examples tree at /examples, the repo store a page's `<Wasm repo="/examples/..">`
-	     names, read over http. -->
-	<AssetsDir src="assets" prefix="assets"/>
+	<!-- the wasm build outputs at /wasm (the wasm/js binaries the pages boot), and
+	     the examples tree at /examples, the repo store a page's
+	     `<Wasm repo="/examples/..">` names, read over http. -->
+	<AssetsDir src="target/wasm" prefix="wasm"/>
 	<AssetsDir src="examples" prefix="examples"/>
 </Router>
 </HttpServer>

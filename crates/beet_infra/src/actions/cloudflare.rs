@@ -22,11 +22,11 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Where the `build` verb publishes the deployable wasm Worker artifacts
-/// (`index.js`, `index_bg.wasm`, `package.json`), workspace-relative. `deploy`
-/// points the generated `wrangler.jsonc` `main` here, so the upload reuses the
-/// build output instead of recompiling. Under `assets/` so it is gitignored.
-const WORKER_ASSETS_DIR: &str = "assets/worker";
+/// Where a Worker build publishes the deployable wasm artifacts (`index.js`,
+/// `index_bg.wasm`, `package.json`), workspace-relative: a build output, so
+/// under `target/`. `deploy` builds into it and points the generated
+/// `wrangler.jsonc` `main` at it.
+const WORKER_BUILD_DIR: &str = "target/worker";
 
 /// The container Durable Object class name. Cloudflare derives the deployed
 /// container application name as `<worker-name>-<lowercased class name>`
@@ -345,11 +345,10 @@ async fn write_r2_secrets_file(
 
 // ───────────────────────────── worker build ────────────────────────────────
 
-/// Compile the wasm Worker and publish its artifacts to [`WORKER_ASSETS_DIR`]
-/// without deploying. The slow step (a full wasm-bindgen + wasm-opt build) that
-/// `deploy` and `bench` reuse; running it as its own verb makes the artifacts
-/// (and the wasm size) visible before an upload, and warms the build so a
-/// following `deploy` only uploads.
+/// Compile the wasm Worker and publish its artifacts to [`WORKER_BUILD_DIR`]
+/// without deploying, making the artifacts (and the wasm size) visible before
+/// an upload. `deploy` and `bench` run the same build themselves rather than
+/// reuse this one's output, so an upload never ships a stale Worker.
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -359,7 +358,7 @@ pub async fn CloudflareWorkerBuildAction(
 	let start = Instant::now();
 	let wasm_size = build_worker_artifacts().await?;
 	info!(
-		"built worker: {} wasm in {} (published to {WORKER_ASSETS_DIR}/)",
+		"built worker: {} wasm in {} (published to {WORKER_BUILD_DIR}/)",
 		fmt_bytes(wasm_size),
 		time_ext::pretty_print_duration(start.elapsed()),
 	);
@@ -367,10 +366,9 @@ pub async fn CloudflareWorkerBuildAction(
 }
 
 /// Compile the `beet-cli` crate to a wasm Worker with `worker-build` and copy the
-/// deployable artifacts into [`WORKER_ASSETS_DIR`], returning the wasm size in
+/// deployable artifacts into [`WORKER_BUILD_DIR`], returning the wasm size in
 /// bytes. `worker-build` wraps wasm-bindgen + wasm-opt and emits `index.js` +
-/// `index_bg.wasm` under `<crate>/build/`; the copy makes them inspectable and
-/// lets `deploy` upload them without a rebuild.
+/// `index_bg.wasm` under `<crate>/build/`.
 async fn build_worker_artifacts() -> Result<u64> {
 	let cli_dir = AbsPath::new_workspace_rel("crates/beet-cli")?;
 	let cli_arg = cli_dir.to_string();
@@ -390,26 +388,15 @@ async fn build_worker_artifacts() -> Result<u64> {
 	// the `worker/shim.mjs` it also writes is a backwards-compat re-export of
 	// `index.js`, so these three files are the whole deployable set.
 	let build_dir = cli_dir.join("build");
-	let assets_dir = AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?;
+	let out_dir = AbsPath::new_workspace_rel(WORKER_BUILD_DIR)?;
 	let mut wasm_size = 0;
 	for name in ["index.js", "index_bg.wasm", "package.json"] {
-		let bytes = fs_ext::copy(build_dir.join(name), assets_dir.join(name))?;
+		let bytes = fs_ext::copy(build_dir.join(name), out_dir.join(name))?;
 		if name == "index_bg.wasm" {
 			wasm_size = bytes;
 		}
 	}
 	Ok(wasm_size)
-}
-
-/// Ensure the prebuilt Worker artifacts exist, building them first if the `build`
-/// verb has not run, so a bare `deploy` still works.
-async fn ensure_worker_artifacts() -> Result {
-	let index = AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
-	if !fs_ext::exists(&index)? {
-		info!("no prebuilt worker at {WORKER_ASSETS_DIR}/, building first");
-		build_worker_artifacts().await?;
-	}
-	Ok(())
 }
 
 /// Format a byte count as a human-readable size, eg `17.4 MB`.
@@ -426,14 +413,16 @@ fn fmt_bytes(bytes: u64) -> String {
 
 // ───────────────────────────── worker deploy ───────────────────────────────
 
-/// Deploy `beet-cli` (wasm) as a Cloudflare Worker: ensure the prebuilt artifacts
-/// (from `build`, or built now), write `wrangler.jsonc` pointing `main` at them
-/// plus the R2 binding, ensure the R2 bucket, then `wrangler deploy` (upload, no
-/// recompile). Reads the sibling [`CloudflareWorkerBlock`].
+/// Deploy `beet-cli` (wasm) as a Cloudflare Worker: build the artifacts, write
+/// `wrangler.jsonc` pointing `main` at them plus the R2 binding, ensure the R2
+/// bucket, then `wrangler deploy` (an upload of what was just built, no
+/// further compile). Reads the sibling [`CloudflareWorkerBlock`].
 ///
-/// The wasm artifact is produced from the `beet-cli` crate (`--features
-/// cloudflare`) by `worker-build` in [`build_worker_artifacts`], so this action
-/// carries no separate [`BuildArtifact`].
+/// The build belongs to the step that uploads it, as [`TofuApply`] builds each
+/// [`BuildArtifact`] before reading it: an earlier `build` (or a stale copy)
+/// is never reused. The artifact is produced from the `beet-cli` crate
+/// (`--features cloudflare`) by `worker-build` in [`build_worker_artifacts`],
+/// so this action carries no separate [`BuildArtifact`].
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -451,7 +440,7 @@ pub async fn CloudflareWorkerDeployAction(
 	let access = CloudflareAccess::resolve(&cx.caller).await?;
 	let start = Instant::now();
 	let block = sibling::<CloudflareWorkerBlock>(&cx).await?;
-	ensure_worker_artifacts().await?;
+	build_worker_artifacts().await?;
 	let dir = wrangler_ext::project_dir(block.name())?;
 	write_worker_wrangler(&dir, &block, &worker_vars(&cx, &block).await?)?;
 
@@ -495,11 +484,11 @@ fn write_worker_wrangler(
 	block: &CloudflareWorkerBlock,
 	vars: &BTreeMap<SmolStr, SmolStr>,
 ) -> Result {
-	// `main` is the prebuilt `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
+	// `main` is the built `index.js` (the wasm-bindgen entry; its `index_bg.wasm`
 	// sibling resolves by relative import). An absolute path outside this wrangler
 	// project dir is fine: wrangler bundles `main` and follows its wasm import.
 	let main_js =
-		AbsPath::new_workspace_rel(WORKER_ASSETS_DIR)?.join("index.js");
+		AbsPath::new_workspace_rel(WORKER_BUILD_DIR)?.join("index.js");
 	fs_ext::write(
 		dir.join("wrangler.jsonc"),
 		worker_wrangler_json(block, &main_js.to_string(), vars)?,
@@ -507,7 +496,7 @@ fn write_worker_wrangler(
 	Ok(())
 }
 
-/// `wrangler.jsonc` for the wasm Worker: `main` points at the prebuilt artifacts
+/// `wrangler.jsonc` for the wasm Worker: `main` points at the built artifacts
 /// (no `build.command`, so the deploy uploads them as-is), plus the R2 bucket
 /// bound by the block's [`binding`](CloudflareWorkerBlock::binding), the
 /// `vars` ([`worker_vars`]) and any custom domains the block declares.
@@ -700,8 +689,7 @@ pub async fn CloudflareBench(
 		None => None,
 	};
 
-	// redeploy path: a full wasm rebuild + Worker redeploy (the prebuilt artifacts
-	// are rebuilt, then uploaded).
+	// redeploy path: a full wasm rebuild + Worker redeploy.
 	let redeploy_start = Instant::now();
 	build_worker_artifacts().await?;
 	let block =

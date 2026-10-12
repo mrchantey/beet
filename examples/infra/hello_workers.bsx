@@ -13,14 +13,13 @@ declaration: `<CloudflareWorkerBlock>` is the stack's repo store, so `deploy` ba
 exactly as a native binary boots from `--repo`. The Worker is generic: it loads
 `main.bsx`, `routes/` and `templates/` from R2 and version-checks the entry on every
 request, so a `sync` updates the entire site with no redeploy, live on the very next
-fetch. `build` compiles the wasm once; `deploy` uploads that prebuilt
-artifact (no recompile) and seeds the bucket.
+fetch. `build` compiles the Worker alone, to inspect it before an upload;
+`deploy` builds it again, uploads what it just built and seeds the bucket.
 
 One directory is synced: `site/` to the bucket root (its `main.bsx`, `routes/`,
-`templates/`, and `assets/`). The sync walk follows the committed `site/assets ->
-../assets` symlink, so the workspace assets land under the bucket's `assets/` key and
-the Worker's `<AssetsDir src="assets"/>` reads them from the one store it has — the
-same resolution as a checkout, which is the point of the symlink.
+`templates/`, and `assets/`), so the Worker's `<AssetsDir src="assets"/>` reads
+`site/assets` from the one store it has, the same resolution as a checkout.
+Hydrate it first (`just site-shared pull`).
 
 ## The edit → sync → live loop (no redeploy)
 
@@ -43,8 +42,9 @@ content. `destroy` deletes the Worker and empties + deletes the bucket.
     beet --entry=examples/infra/hello_workers.bsx destroy
 
 A one-shot `CliServer` root (no long-running server) with the `Router` as its child;
-its `CallOnReady` fires the CLI request on load and the matching verb runs. Each verb is a child-sequenced
-`<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
+its `CallOnReady` fires the CLI request on load and the matching verb runs, and
+`RejectUnknownParams` refuses a flag the verb does not declare. Each verb is a
+child-sequenced `<Route path=".." {ExchangeSequence}>`: its config block and actions are direct
 children of the route and the sequence runs them in order. Run from the workspace
 root: `local_dir` paths are cwd-relative.
 
@@ -60,10 +60,10 @@ The token a repo's document holds is lowered from what its DEPLOYED entry declar
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
-	<!-- compile the wasm Worker once; artifacts land in `assets/worker/` -->
+	<!-- compile the wasm Worker to inspect it; artifacts land in `target/worker/` -->
 	<Route path="build" {ExchangeSequence}>
 		<CloudflareWorkerBuildAction/>
 	</Route>

@@ -27,5 +27,5 @@ entry as `/`.
 	<video id="webcam" autoplay muted playsinline width="320"/>
 	<h2>Head log</h2>
 	<RenderConsole/>
-	<Wasm src="/assets/wasm/beet-full.wasm" repo="/examples/perceive_act/head" entry="head.bsx"/>
+	<Wasm src="/wasm/beet-full.wasm" repo="/examples/perceive_act/head" entry="head.bsx"/>
 </HtmlDocument>

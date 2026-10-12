@@ -547,7 +547,7 @@ impl AsCssValue for ListStyle {
 pub(crate) static LAYOUT_STYLE_DEFAULT: LayoutStyle = LayoutStyle::DEFAULT;
 
 /// Layout properties for a node.
-#[derive(Debug, Default, Clone, PartialEq, SetWith, Component)]
+#[derive(Debug, Clone, PartialEq, SetWith, Component)]
 pub struct LayoutStyle {
 	pub display: Display,
 	pub white_space: WhiteSpace,
@@ -555,12 +555,26 @@ pub struct LayoutStyle {
 	/// Grid tracks, read when `display: grid`.
 	pub grid: GridTracks,
 	pub flex_order: i32,
-	pub flex_grow: u32,
+	/// CSS `flex-grow`: this item's share of a flex line's free space,
+	/// defaulting to `0` (no growth).
+	pub flex_grow: f32,
+	/// CSS `flex-shrink`: how much of a flex line's overflow this item absorbs,
+	/// weighted by its base size, defaulting to `1`; `0` holds the item at its
+	/// base size.
+	pub flex_shrink: f32,
+	/// CSS `flex-basis`: the main size a flex item starts from before growing or
+	/// shrinking, `None` for `auto` (its `width`/`height`, else its content).
+	#[set_with(unwrap_option)]
+	pub flex_basis: Option<Length>,
 	pub align_self: AlignSelf,
 	/// Horizontal overflow handling, mapping to CSS `overflow-x`.
 	pub overflow_x: Overflow,
 	/// Vertical overflow handling, mapping to CSS `overflow-y`.
 	pub overflow_y: Overflow,
+}
+
+impl Default for LayoutStyle {
+	fn default() -> Self { Self::DEFAULT }
 }
 
 impl LayoutStyle {
@@ -570,7 +584,9 @@ impl LayoutStyle {
 		flex_box: FlexBox::row(),
 		grid: GridTracks::DEFAULT,
 		flex_order: 0,
-		flex_grow: 0,
+		flex_grow: 0.,
+		flex_shrink: 1.,
+		flex_basis: None,
 		align_self: AlignSelf::Auto,
 		overflow_x: Overflow::Visible,
 		overflow_y: Overflow::Visible,
@@ -837,27 +853,6 @@ impl AsCssValue for AlignSelf {
 			Self::Baseline => "baseline",
 		}
 		.xmap(CssValue::expression)
-		.xok()
-	}
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Reflect)]
-pub enum FlexSize {
-	#[default]
-	Auto,
-	Unit(Length),
-	Grow(u16),
-	Shrink(u16),
-}
-
-impl AsCssValue for FlexSize {
-	fn as_css_value(&self) -> Result<CssValue> {
-		match self {
-			Self::Auto => CssValue::expression("auto"),
-			Self::Unit(unit) => unit.as_css_value()?,
-			Self::Grow(n) => n.as_css_value()?,
-			Self::Shrink(n) => n.as_css_value()?,
-		}
 		.xok()
 	}
 }

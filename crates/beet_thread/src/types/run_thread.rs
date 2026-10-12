@@ -206,12 +206,9 @@ mod test {
 			.len()
 	}
 
-	/// Clear whatever a previous run left at `path`.
-	async fn clear(path: &str) {
-		BlobThreadStore::new(BlobStore::new(FsStore::new(WsPath::new(path))))
-			.store_remove()
-			.await
-			.ok();
+	/// The workspace-relative path [`MountThreadStore`] declares for `dir`.
+	fn ws_rel(dir: &TempDir) -> String {
+		dir.into_ws_path().unwrap().to_string()
 	}
 
 	/// A `{MountThreadStore}` thread, run twice against the same store, adopts the
@@ -222,11 +219,11 @@ mod test {
 	// the 5s default under parallel test load.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn reload_adopts_without_duplicating() {
-		let path = "target/tests/beet_thread/run-thread-reload";
+		let dir = TempDir::new_ws().unwrap();
+		let path = &ws_rel(&dir);
 		// stable ids so the seed hash matches across runs
 		let system = ActorId::from_u128(1);
 		let agent = ActorId::from_u128(2);
-		clear(path).await;
 
 		run_once(path, system, agent);
 		stored_threads(path).await.xpect_eq(1);
@@ -241,10 +238,10 @@ mod test {
 	/// with no start notification still adopts before running.
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn a_direct_call_adopts_before_running() {
-		let path = "target/tests/beet_thread/run-thread-direct-call";
+		let dir = TempDir::new_ws().unwrap();
+		let path = &ws_rel(&dir);
 		let system = ActorId::from_u128(3);
 		let agent = ActorId::from_u128(4);
-		clear(path).await;
 
 		// seed the store through a normal start: the system seed plus one reply
 		run_once(path, system, agent);

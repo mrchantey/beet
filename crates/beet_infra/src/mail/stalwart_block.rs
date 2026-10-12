@@ -2069,8 +2069,7 @@ mod tests {
 	/// The resolved Sydney stack a script or a config template renders
 	/// against outside a world, with the zone and the account the box's cold
 	/// store names.
-	fn sydney_resolved()
-	-> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+	fn sydney_resolved() -> (ResolvedStack, Deployment, TempDir) {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		(
 			stack

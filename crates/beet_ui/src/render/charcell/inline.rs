@@ -301,7 +301,9 @@ const TAB_WIDTH: usize = 4;
 /// Tabs are expanded to spaces up to the next [`TAB_WIDTH`] stop, since a raw
 /// `\t` left in a cell makes the terminal jump to its own tab stop and overflow
 /// the code block's box (the web expands tabs via `tab-size`).
-fn split_pre_lines(chars: &[(char, usize)]) -> Vec<Vec<(char, usize)>> {
+pub(super) fn split_pre_lines(
+	chars: &[(char, usize)],
+) -> Vec<Vec<(char, usize)>> {
 	let mut lines = Vec::new();
 	let mut current = Vec::new();
 	let mut col = 0usize;
@@ -638,7 +640,7 @@ mod pipeline_tests {
 			40,
 			(LayoutStyle::flex_row(), children![
 				(rsx! { "SIDEBARWIDTH" }, LayoutStyle::default()),
-				(LayoutStyle::default().with_flex_grow(1), children![
+				(LayoutStyle::default().with_flex_grow(1.), children![
 					rsx! { <p>{text}</p> }
 				],),
 			]),

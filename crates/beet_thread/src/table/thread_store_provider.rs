@@ -270,12 +270,8 @@ pub mod thread_store_test {
 	#[beet_core::test(timeout_ms = 30000)]
 	async fn fs() {
 		use beet_net::prelude::*;
-		let blob = BlobStore::new(FsStore::new(
-			AbsPath::new_workspace_rel(
-				"target/tests/beet_thread/thread-store-fs",
-			)
-			.unwrap(),
-		));
+		let dir = TempDir::new_ws().unwrap();
+		let blob = BlobStore::new(FsStore::new(dir.path().clone()));
 		run(BlobThreadStore::new(blob)).await;
 	}
 }

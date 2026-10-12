@@ -1467,7 +1467,7 @@ mod tests {
 
 	/// The rendered cloud-init user-data script for a block, ie the systemd unit
 	/// the instance provisions itself with.
-	fn build_user_data(block: &LightsailBlock) -> (String, TestWorkDir) {
+	fn build_user_data(block: &LightsailBlock) -> (String, TempDir) {
 		let (stack, _deployment, dir) = ResolvedStack::default_local();
 		let script = block
 			.build_user_data(
@@ -1481,7 +1481,7 @@ mod tests {
 
 	/// The scope a lone `block` renders under a fresh local deploy zoned for
 	/// `example.org`, granting nothing (no resource blocks declared beside it).
-	fn render_block(block: &LightsailBlock) -> (RenderScope, TestWorkDir) {
+	fn render_block(block: &LightsailBlock) -> (RenderScope, TempDir) {
 		let block = block.clone();
 		RenderScope::test_render_zoned("example.org", move |parent| {
 			parent.spawn(block);

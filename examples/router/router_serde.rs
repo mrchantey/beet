@@ -54,6 +54,14 @@ fn main() -> AppExit {
 		.run()
 }
 
+/// The flag this example reads before it loads its scene, declared on the
+/// router so every route's `--help` lists it.
+#[derive(Reflect)]
+struct ForkParams {
+	/// Discard the forked scene file and re-fork the bundle.
+	new: bool,
+}
+
 /// Query params for the scripted greet route, exposed to the
 /// script as `input.name`.
 #[derive(Serialize, Deserialize, TypePath)]
@@ -64,10 +72,12 @@ struct GreetRequest {
 fn setup(async_commands: AsyncCommands) {
 	let store = BlobStore::new(FsStore::new(WsPath::default()));
 	let path = RelPath::new(WORLD_SERDE_FILE);
-	let new_world = CliArgs::parse_env().params.contains_key("new");
+	// the process request, read once: its `--new` picks which scene loads,
+	// then the loaded server serves it
+	let request = Request::from_cli_args(CliArgs::parse_env());
 
 	async_commands.run(async move |world: AsyncWorld| {
-		if new_world {
+		if request.parse_params::<ForkParams>()?.new {
 			store.remove(&path).await.ok();
 		}
 		// the host the scene builds under, and carries the scene document of
@@ -107,17 +117,14 @@ fn setup(async_commands: AsyncCommands) {
 			})
 			.await
 			.ok_or_else(|| bevyhow!("no `CliServer` in the loaded scene"))?;
-		CallOnReady::call(
-			world.entity(root),
-			Request::from_cli_args(CliArgs::parse_env()),
-		)
-		.await
+		CallOnReady::call(world.entity(root), request).await
 	});
 }
 
 fn route_bundle() -> impl Bundle {
 	(CliServer::default(), children![(
 		Router::with_defaults(),
+		ParamsPartial::new::<ForkParams>(),
 		children![
 			(
 				Script::<(), String>::new(r#""hello world""#),

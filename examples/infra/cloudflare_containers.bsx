@@ -8,7 +8,7 @@ between this and the wasm Worker (`cloudflare_workers.bsx`) is a small swap:
 
 - block: `CloudflareContainerBlock` <-> `CloudflareWorkerBlock`
 - build: a `<BeetBinaryBuild/>` (native binary baked into the image) vs none (the
-  Worker IS `beet-cli` wasm, built by `worker-build` on deploy)
+  Worker IS `beet-cli` wasm, built by `worker-build` on every deploy)
 - deploy: `<CloudflareContainerDeployAction/>` (+ wrangler) <-> `<CloudflareWorkerDeployAction/>`
 
 The served content and the deploy/sync/destroy route shape are identical.
@@ -36,7 +36,7 @@ The token a repo's document holds is lowered from what its DEPLOYED entry declar
 here passes a wider one for the command (`CLOUDFLARE_API_TOKEN=.. beet --entry=..
 deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 -->
-<CliServer {CallOnReady}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
 <Router {(RequestLogger, HelpHandler, CloudflareAccount("0123456789abcdef0123456789abcdef"))}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Route path="deploy" {ExchangeSequence}>

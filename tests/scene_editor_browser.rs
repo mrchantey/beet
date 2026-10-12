@@ -49,14 +49,14 @@ const SCENE: &str = "scene_editor/scene.bsx";
 /// on the first edit.
 const FORK: &str = "scene_editor/scene.json";
 /// What the entry's store must hold: the entry, the authored scene, the
-/// document shell, and the artifact its page boots (through the `assets`
-/// link into the workspace tree).
+/// document shell, and the artifact its page boots (through the `wasm/`
+/// links to the build output).
 const SEEDED: &[&str] = &[
 	ENTRY,
 	SCENE,
 	"templates/EditorShell.bsx",
-	"assets/wasm/beet-ui.wasm",
-	"assets/wasm/beet-ui.js",
+	"wasm/beet-ui.wasm",
+	"wasm/beet-ui.js",
 ];
 /// The local-storage bit the fork sets, as the page names its repo.
 const FORK_MARK: &str = "beet:fork:http:repo";

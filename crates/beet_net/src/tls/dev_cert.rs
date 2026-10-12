@@ -5,6 +5,7 @@ use futures_rustls::rustls;
 use rustls_pki_types::CertificateDer;
 use rustls_pki_types::PrivateKeyDer;
 use rustls_pki_types::pem::PemObject;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -41,7 +42,7 @@ impl DevCert {
 
 	/// The subject-alt-names the cached cert was generated for, one per line;
 	/// a mismatch with [`Self::subject_alt_names`] triggers regeneration.
-	fn sans_path(dir: &PathBuf) -> PathBuf { dir.join("sans.txt") }
+	fn sans_path(dir: &Path) -> PathBuf { dir.join("sans.txt") }
 
 	/// The names the cert answers for: localhost, the loopback addresses and
 	/// the machine's primary LAN address (the one a phone dials).
@@ -71,8 +72,9 @@ impl DevCert {
 
 	/// [`Self::load_or_generate`] against an explicit cache directory (tests).
 	pub(crate) fn load_or_generate_in(
-		dir: &PathBuf,
+		dir: impl AsRef<Path>,
 	) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> {
+		let dir = dir.as_ref();
 		// serialize check-then-generate so concurrent listeners (two servers
 		// booting, parallel tests) never interleave a half-written pair
 		static GENERATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -160,8 +162,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn caches_and_regenerates() {
-		let dir = fs_ext::workspace_root().join("target/tls-test");
-		fs_ext::remove(&dir).ok();
+		let dir = TempDir::new_ws().unwrap();
 
 		// first call generates
 		let (certs, _key) = DevCert::load_or_generate_in(&dir).unwrap();
@@ -182,8 +183,7 @@ mod tests {
 
 	#[beet_core::test]
 	fn key_survives_san_change() {
-		let dir = fs_ext::workspace_root().join("target/tls-test-key");
-		fs_ext::remove(&dir).ok();
+		let dir = TempDir::new_ws().unwrap();
 
 		DevCert::load_or_generate_in(&dir).unwrap();
 		let key = fs_ext::read_to_string(dir.join("key.pem")).unwrap();

@@ -183,6 +183,11 @@ impl Client {
 				];
 				if opts.headless {
 					args.push("--headless=new".to_string());
+					// a scrollbar takes layout width in the viewport but not
+					// in a document-origin capture, which relays the page out
+					// wider: a full-page shot lost its right edge and an
+					// element shot clipped wherever the reflow moved it
+					args.push("--hide-scrollbars".to_string());
 				}
 				if opts.disable_gpu {
 					args.push("--disable-gpu".to_string());
@@ -417,8 +422,9 @@ mod test {
 	#[beet_core::test(timeout_ms = 60_000)]
 	#[ignore = "smoketest"]
 	async fn a_profile_outlives_the_session() {
-		let dir =
-			AbsPath::workspace_root().join("target/webdriver-fixtures/profile");
+		// a fresh parent, so the session creates the profile dir itself
+		let temp = TempDir::new_ws().unwrap();
+		let dir = temp.join("profile");
 		let url = test_fixtures::page_url(
 			"profile",
 			"<html><body>profile</body></html>",

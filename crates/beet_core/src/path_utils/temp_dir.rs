@@ -1,23 +1,20 @@
+use crate::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::prelude::*;
-
-/// A temporary directory that is automatically deleted when dropped.
+/// A uniquely named directory, removed when dropped.
 ///
-/// This struct provides a safe way to create temporary directories that are
-/// guaranteed to be cleaned up when they go out of scope. The directory name
-/// is generated using a UUID v7 to ensure uniqueness and avoid collisions.
+/// The name carries a UUID v7, so concurrent processes (two runs of one test
+/// binary) never share a directory. [`TempDir::new_ws`] works on every target
+/// `fs_ext` does, [`TempDir::new`] (the system temp dir) natively only.
 ///
-/// This type is not [`Clone`] as it removes the underlying directory on drop.
+/// Not [`Clone`], as it removes the directory on drop.
 ///
 /// # Example
 ///
 /// ```
 /// # use beet_core::prelude::*;
-///
-/// // Create a temporary directory in the system temp folder
-/// let temp = TempDir::new().unwrap();
+/// let temp = TempDir::new_ws().unwrap();
 /// ```
 #[derive(Debug)]
 pub struct TempDir {
@@ -36,6 +33,7 @@ impl std::ops::Deref for TempDir {
 	fn deref(&self) -> &Self::Target { &self.path }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Default for TempDir {
 	fn default() -> Self { Self::new().unwrap() }
 }
@@ -54,6 +52,7 @@ impl TempDir {
 	///
 	/// let temp = TempDir::new().unwrap();
 	/// ```
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn new() -> FsResult<Self> {
 		let temp_dir = std::env::temp_dir();
 		let dir_name = format!("beet_tmp_{}", uuid_ext::now_v7());
@@ -81,7 +80,7 @@ impl TempDir {
 	}
 
 	fn new_with_path(path: PathBuf) -> FsResult<Self> {
-		if path.exists() {
+		if fs_ext::exists(&path)? {
 			return Err(FsError::AlreadyExists { path });
 		}
 
@@ -122,73 +121,41 @@ impl Drop for TempDir {
 mod tests {
 	use crate::prelude::*;
 
+	/// Creates `temp`, asserts it exists, drops it, and returns its path.
+	fn create_and_drop(temp: TempDir) -> AbsPath {
+		let path = temp.path().clone();
+		fs_ext::is_dir(&path).xpect_true();
+		drop(temp);
+		path
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
 	#[crate::test]
-	fn test_tempdir_new_creates_and_cleans_up() {
-		let dir_path;
-		{
-			// Create a temp directory
-			let temp = TempDir::new().expect("Failed to create temp directory");
-			dir_path = temp.path.clone();
-
-			// Verify it exists
-			fs_ext::exists(&dir_path).unwrap().xpect_true();
-			fs_ext::is_dir(&dir_path).xpect_true();
-		} // temp is dropped here
-
-		// Verify it was cleaned up
-		fs_ext::exists(&dir_path).unwrap().xpect_false();
+	fn system_dir_cleans_up() {
+		create_and_drop(TempDir::new().unwrap())
+			.xmap(fs_ext::exists)
+			.unwrap()
+			.xpect_false();
 	}
 
 	#[crate::test]
-	fn test_tempdir_workspace_relative_creates_and_cleans_up() {
-		let dir_path;
-		{
-			// Create a workspace-relative temp directory
-			let temp = TempDir::new_ws()
-				.expect("Failed to create workspace-relative temp directory");
-			dir_path = temp.path.clone();
-
-			// Verify it exists
-			fs_ext::exists(&dir_path).unwrap().xpect_true();
-			fs_ext::is_dir(&dir_path).xpect_true();
-
-			// Verify it's in the workspace
-			dir_path.contains("target/tmp/beet_tmp_").xpect_true();
-		} // temp is dropped here
-
-		// Verify it was cleaned up
-		fs_ext::exists(&dir_path).unwrap().xpect_false();
+	fn workspace_dir_cleans_up() {
+		let path = create_and_drop(TempDir::new_ws().unwrap());
+		path.contains("target/tmp/beet_tmp_").xpect_true();
+		fs_ext::exists(&path).unwrap().xpect_false();
 	}
 
 	#[crate::test]
-	fn test_tempdir_unique_names() {
-		// Create multiple temp directories and verify they have unique names
-		let temp1 =
-			TempDir::new().expect("Failed to create first temp directory");
-		let temp2 =
-			TempDir::new().expect("Failed to create second temp directory");
-
-		temp1.path().clone().xpect_not_eq(temp2.path().clone());
+	fn unique_names() {
+		let first = TempDir::new_ws().unwrap();
+		let second = TempDir::new_ws().unwrap();
+		first.path().xpect_not_eq(second.path().clone());
 	}
 
 	#[crate::test]
-	fn test_tempdir_keep_prevents_cleanup() {
-		let dir_path;
-		{
-			// Create a temp directory and mark it to keep
-			let temp = TempDir::new()
-				.expect("Failed to create temp directory")
-				.keep();
-			dir_path = temp.path().clone();
-
-			// Verify it exists
-			fs_ext::exists(&dir_path).unwrap().xpect_true();
-		} // temp is dropped here
-
-		// Verify it was NOT cleaned up because we called keep()
-		fs_ext::exists(&dir_path).unwrap().xpect_true();
-
-		// Manual cleanup for this test
-		fs_ext::remove(&dir_path).ok();
+	fn keep_prevents_cleanup() {
+		let path = create_and_drop(TempDir::new_ws().unwrap().keep());
+		fs_ext::exists(&path).unwrap().xpect_true();
+		fs_ext::remove(&path).unwrap();
 	}
 }

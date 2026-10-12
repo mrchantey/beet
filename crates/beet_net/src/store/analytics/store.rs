@@ -355,12 +355,8 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	async fn fs_segments_are_multi_writer_safe() {
-		let dir = AbsPath::new_workspace_rel(
-			"target/tests/beet_net/analytics-multi-writer",
-		)
-		.unwrap();
-		fs_ext::remove(&dir).ok();
-		let store = BlobStore::new(FsStore::new(dir));
+		let dir = TempDir::new_ws().unwrap();
+		let store = BlobStore::new(FsStore::new(dir.path().clone()));
 		let left =
 			AnalyticsStore::with_config(store.clone(), &immediate_config());
 		let right =

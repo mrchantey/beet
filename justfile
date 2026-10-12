@@ -384,20 +384,22 @@ check-embedded:
 test-wasm-browser crate *args:
 	BEET_WASM_HOST=browser cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown {{ args }}
 
-# Headless-chrome verification of the browser render boot: serves the built
-# beet-render.wasm at a generated page and asserts the WebGPU boot claims a
-# canvas and draws pixels while the GPU-less boot stays surfaceless. Needs
-# `just build-wasm-render` first, plus the test-browser PATH deps.
+# Headless-chrome verification of the browser render boot: builds
+# beet-render.wasm, serves it at a generated page and asserts the WebGPU boot
+# claims a canvas and draws pixels while the GPU-less boot stays surfaceless.
+# Needs the test-browser PATH deps.
 check-wasm-render *args:
+	just build-wasm-render
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
-# Headless-chrome verification of the browser bootstrap: serves the built
-# artifacts at pages naming an entry through `<Wasm repo entry>` and reads from
-# the console that the entry resolved through the http repo and ran, headless
-# (beet-min.wasm on the `serve-wasm` hello entry) and under `--server=dom`
-# (beet-ui.wasm on the scene editor entry, its DOM host painting `/`). Needs
-# `just build-wasm-min build-wasm-ui` first, plus the test-browser PATH deps.
+# Headless-chrome verification of the browser bootstrap: builds the artifacts,
+# serves them at pages naming an entry through `<Wasm repo entry>` and reads
+# from the console that the entry resolved through the http repo and ran,
+# headless (beet-min.wasm on the `serve-wasm` hello entry) and under
+# `--server=dom` (beet-ui.wasm on the scene editor entry, its DOM host painting
+# `/`). Needs the test-browser PATH deps.
 check-wasm-boot *args:
+	just build-wasm-min build-wasm-ui
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*wasm_boot_check*'
 
 # The native browser-driving smoketests: the beet_net webdriver suite against
@@ -434,7 +436,7 @@ test-scene-editor-browser *args:
 	just _test-scene-editor-browser {{ args }}
 
 _test-scene-editor-browser *args:
-	cargo test --test scene_editor_browser --features "router style json fs http_server template_serde testing webdriver" {{ args }} -- --include-ignored
+	cargo test --test scene_editor_browser --features "router style json fs http_server tui template_serde testing webdriver" {{ args }} -- --include-ignored
 
 # The `Script` backends are mutually exclusive at compile time, so the host-realm
 # fallbacks need their own invocations: `test-core`/`test-core-wasm` enumerate
@@ -447,45 +449,47 @@ test-scripting-fallback *args:
 	cargo test -p beet_action --lib --target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
 
-# The floor (assets/wasm/beet-min.wasm): the smallest binary that is still a beet
+# The browser binaries are build outputs under target/wasm, never stored or
+# synced: every consumer (a test, a check, a served example) builds what it
+# boots first, and a deploy shipping one builds it (`<WasmArtifact/>`).
+
+# The floor (target/wasm/beet-min.wasm): the smallest binary that is still a beet
 # runtime in the browser, the `web` base and nothing else. A page whose program uses
 # only the core vocabulary mounts this. Needs `just install-cli`.
 build-wasm-min:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=assets/wasm/beet-min.wasm
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=target/wasm/beet-min.wasm
 
-# The editor middle (assets/wasm/beet-ui.wasm): the browser binary plus the
+# The editor middle (target/wasm/beet-ui.wasm): the browser binary plus the
 # scripting seam, so a page edits its own scene and its `bx:<event>` scripts run
 # through the iframe backend, with no JavaScript engine compiled in; see the
 # `web_ui` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
 build-wasm-ui:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_ui --out=assets/wasm/beet-ui.wasm
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_ui --out=target/wasm/beet-ui.wasm
 
-# The render middle (assets/wasm/beet-render.wasm): the browser binary plus the
+# The render middle (target/wasm/beet-render.wasm): the browser binary plus the
 # windowed render stack (wgpu via WebGPU, the spatial + example scenes), so a
 # render scene `.bsx` boots in a tab without the full binary's weight; see the
 # `web_render` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
 build-wasm-render:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_render --out=assets/wasm/beet-render.wasm
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_render --out=target/wasm/beet-render.wasm
 
-# The ceiling (assets/wasm/beet-full.wasm): every feature a browser binary can boot
+# The ceiling (target/wasm/beet-full.wasm): every feature a browser binary can boot
 # with, ie the example surface, the render stack and ml backend, the perceive-act
 # head, the thread runtime, the tui host, infra definitions and the embedded
 # JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
 # Slower to build (the JS engine's wasi sysroot downloads once) and several times
 # the artifact, so a page mounts it only when its program needs more than the floor.
-# Ends by refreshing the site's borrowed copy, so a rebuilt binary cannot go
-# stale in site/assets (the tutorial page serves it from there).
 build-wasm-full:
-	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=assets/wasm/beet-full.wasm
-	beet --entry=site assets
+	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
 # to run a headless beet entry (examples/wasm/hello.bsx) in the browser, read out
 # of the served repo through the page's `<Wasm repo entry>` launch; its console
 # output renders on the page via <RenderConsole>. The entry roots at the
 # workspace (<RepoRoot>) so the served examples are reachable and --watch
-# live-reloads on edit. Its /scripting page mounts the full binary, so run
-# `just build-wasm-full` once to serve that page too.
+# live-reloads on edit. Its /render and /scripting pages boot the render and full
+# binaries, so build those first (`just build-wasm-render build-wasm-full`) to
+# serve them too.
 serve-wasm *args:
 	just build-wasm-min
 	beet --entry=examples/wasm --watch {{ args }}

@@ -57,7 +57,7 @@ pub fn sidebar_summary() -> Rule {
 pub fn sidebar_branch() -> Rule {
 	Rule::new()
 		.with_selector(Selector::class(SIDEBAR_BRANCH))
-		.with_value(common_props::FlexGrowProp, 1u32)
+		.with_value(common_props::FlexGrowProp, 1_f32)
 }
 
 /// Sidebar disclosure caret - faint, sitting at the right edge of its summary,
@@ -140,12 +140,14 @@ pub fn sidebar_web() -> Rule {
 /// Terminal sidebar - a fixed 20rem rail, so the nav is a stable column rather
 /// than sizing to its widest label. Long anchors wrap within it (the links are
 /// full-width blocks). Fixed rather than the web's responsive range: on a cell
-/// grid a stable rail reads better than one that shifts with the main column.
+/// grid a stable rail reads better than one that shifts with the main column,
+/// so `flex-shrink: 0` leaves an overflowing row to the main column alone.
 pub fn sidebar_terminal() -> Rule {
 	Rule::new()
 		.with_media(MediaQuery::Terminal)
 		.with_selector(Selector::class(SIDEBAR))
 		.with_value(common_props::Width, Length::Rem(20.))
+		.with_value(common_props::FlexShrinkProp, 0_f32)
 }
 
 /// Narrow-viewport drawer - at or below [`SIDEBAR_BREAKPOINT_PX`] the rail

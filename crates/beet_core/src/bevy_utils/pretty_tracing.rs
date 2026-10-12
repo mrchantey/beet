@@ -212,6 +212,10 @@ impl PrettyTracing {
 			.with_file(true)
 			.with_line_number(true)
 			.with_writer(writer)
+			// a stream that will not take an event (`2>&1 | head`) drops it,
+			// best effort like `cross_log!`: the subscriber's own report of
+			// the failure is an `eprintln!`, which panics on that same stream
+			.log_internal_errors(false)
 			.with_env_filter(self.env_filter());
 		match self.interactive {
 			// a human at a terminal: colored and roomy, and the wall clock is a
@@ -451,5 +455,45 @@ mod test {
 			.xpect_contains("hello")
 			.xnot()
 			.xpect_contains(today());
+	}
+
+	/// Marks the child run of [`tolerates_a_closed_stream`].
+	#[cfg(unix)]
+	const CLOSED_STREAM_CHILD: &str = "--pretty-tracing-closed-stream-child";
+
+	/// Logs, from a child run of this test binary, into a stderr whose reader
+	/// is gone, as `2>&1 | head` leaves it: the event is dropped and the child
+	/// carries on, where the subscriber's own report of the failed write, an
+	/// `eprintln!` to that same stream, panicked.
+	#[cfg(unix)]
+	#[crate::test]
+	fn tolerates_a_closed_stream() {
+		if env_ext::args().iter().any(|arg| arg == CLOSED_STREAM_CHILD) {
+			let mut fds = [0; 2];
+			// SAFETY: `pipe` fills the two-fd array, `close` and `dup2` take
+			// the fds it returned
+			unsafe {
+				libc::pipe(fds.as_mut_ptr());
+				libc::close(fds[0]);
+				libc::dup2(fds[1], 2);
+			}
+			let dispatch = PrettyTracing {
+				interactive: false,
+				filter: format!("{}=error", module_path!()),
+				..default()
+			}
+			.dispatch(std::io::stderr);
+			tracing::dispatcher::with_default(&dispatch, || {
+				tracing::error!("nobody is listening");
+			});
+			process_ext::exit(0);
+		}
+		std::process::Command::new(std::env::current_exe().unwrap())
+			.args(["tolerates_a_closed_stream", "--quiet", CLOSED_STREAM_CHILD])
+			.output()
+			.unwrap()
+			.status
+			.code()
+			.xpect_eq(Some(0));
 	}
 }

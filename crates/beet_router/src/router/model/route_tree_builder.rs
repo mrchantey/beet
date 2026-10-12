@@ -1,4 +1,4 @@
-//! The one `SystemParam` a [`RouteTree`] rebuild threads, instead of four
+//! The one `SystemParam` a [`RouteTree`] rebuild threads, instead of its
 //! queries and [`Commands`] passed separately.
 
 use crate::prelude::*;
@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Everything a [`RouteTree`] rebuild needs, bundled into one system param so
-/// a caller threads one value instead of four queries and [`Commands`]
+/// a caller threads one value instead of its queries and [`Commands`]
 /// separately.
 #[derive(SystemParam)]
 pub struct RouteTreeBuilder<'w, 's> {
@@ -15,6 +15,11 @@ pub struct RouteTreeBuilder<'w, 's> {
 	// the url space roots, bucketed ahead of the routes that land under them
 	space_roots: Query<'w, 's, (Entity, &'static PathPartial)>,
 	actions: Query<'w, 's, ActionQueryItem<'static>, Without<RouteHidden>>,
+	// every partial, read along a route's ancestors
+	partials: Query<'w, 's, &'static ParamsPartial>,
+	// the partials on entities that are not routes, ie a sequence route's steps
+	steps:
+		Query<'w, 's, (Entity, &'static ParamsPartial), Without<PathPartial>>,
 	existing_trees: Query<'w, 's, Entity, With<RouteTree>>,
 	commands: Commands<'w, 's>,
 }
@@ -62,12 +67,16 @@ impl RouteTreeBuilder<'_, '_> {
 			})
 			.map(|(entity, _)| (entity, Vec::new()))
 			.collect();
+		let step_params = self.step_params();
 		for item in self.actions.iter() {
 			if !self.is_at_or_under(item.0, root) {
 				continue;
 			}
 			let space_root = self.namespace_of(item.0);
-			let node = ActionNode::from_query(item);
+			let mut node = ActionNode::from_query(item);
+			node.params.extend_undeclared(
+				self.route_params(node.entity, &step_params),
+			);
 			match spaces.iter_mut().find(|(space, _)| *space == space_root) {
 				Some((_, nodes)) => nodes.push(node),
 				None => spaces.push((space_root, vec![node])),

@@ -115,6 +115,7 @@ mod test {
 	use crate::webdriver::test_fixtures;
 	use crate::webdriver::*;
 	use beet_core::prelude::*;
+	use serde_json::json;
 
 	const PNG_MAGIC: &[u8] = &[0x89, b'P', b'N', b'G'];
 
@@ -143,6 +144,36 @@ mod test {
 		// the heading crops far smaller than the whole viewport
 		(element.len() < viewport.len()).xpect_true();
 
+		page.kill().await.unwrap();
+	}
+
+	/// The width of a png, from its `IHDR` chunk.
+	fn png_width(png: &[u8]) -> u32 {
+		u32::from_be_bytes(png[16..20].try_into().unwrap())
+	}
+
+	/// REGRESSION: a page taller than the viewport laid out narrower than a
+	/// document-origin capture of it, its scrollbar taking width in one and
+	/// not the other, so a full-page shot lost its right edge and an element
+	/// shot clipped wherever wrapped text above it had reflowed to.
+	#[beet_core::test(timeout_ms = 30_000)]
+	#[ignore = "smoketest"]
+	async fn captures_at_the_layout_width() {
+		let url = test_fixtures::page_url(
+			"screenshot_overflowing",
+			r#"<html><body><div style="height: 3000px">tall</div></body></html>"#,
+		);
+		let page = test_fixtures::visit(&url).await;
+		page.set_viewport(1280, 800).await.unwrap();
+		page.evaluate_value("document.documentElement.clientWidth")
+			.await
+			.unwrap()
+			.xpect_eq(json!(1280));
+		page.screenshot_with_options(&ScreenshotOptions::full_page())
+			.await
+			.unwrap()
+			.xmap(|png| png_width(&png))
+			.xpect_eq(1280);
 		page.kill().await.unwrap();
 	}
 }

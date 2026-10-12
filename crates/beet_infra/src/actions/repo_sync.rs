@@ -69,7 +69,8 @@ mod test {
 		fs_ext::write(site.join("main.bsx"), "<div/>").unwrap();
 		fs_ext::write(site.join("routes/index.md"), "# hi").unwrap();
 		fs_ext::write(site.join("target/debug/junk"), "junk").unwrap();
-		fs_ext::write(workspace.join("wasm/app.wasm"), "wasm").unwrap();
+		fs_ext::write(workspace.join("databases/country.mmdb"), "mmdb")
+			.unwrap();
 		let (site, workspace) = (
 			site.into_ws_path().unwrap(),
 			workspace.into_ws_path().unwrap(),
@@ -113,7 +114,11 @@ mod test {
 					RepoStoreBlock
 				),
 				(RepoStage::new(site.clone()).with_paths(paths), children![
-					DirCopy::new(workspace.clone(), "assets", "wasm/app.wasm")
+					DirCopy::new(
+						workspace.clone(),
+						"assets",
+						"databases/country.mmdb"
+					)
 				]),
 				RepoSync::default(),
 			]))
@@ -150,7 +155,7 @@ mod test {
 		let mut published = document.list().await.unwrap();
 		published.sort();
 		published.xpect_eq(vec![
-			RelPath::new("assets/wasm/app.wasm"),
+			RelPath::new("assets/databases/country.mmdb"),
 			RelPath::new("main.bsx"),
 			RelPath::new("routes/index.md"),
 		]);

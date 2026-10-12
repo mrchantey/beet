@@ -30,7 +30,7 @@ use bevy::math::UVec2;
 /// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
 /// [`HttpServer`] on the same root, so one process answers http and ssh at once.
 #[derive(Component, Reflect)]
-#[reflect(Default, Component)]
+#[reflect(Default, Component, DeclaresParams)]
 #[component(on_add = hook_ext::component_hook(SshTuiServer::add_facet))]
 pub struct SshTuiServer {
 	/// Whether a bare `beet` (no `--server`) boots this server. `true` by default,
@@ -53,6 +53,13 @@ impl Default for SshTuiServer {
 			default_boot: true,
 			pty_timeout: Some(Duration::from_secs(10)),
 		}
+	}
+}
+
+/// The bind knobs its start request carries.
+impl DeclaresParams for SshTuiServer {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<ServerParams>()
 	}
 }
 
@@ -541,9 +548,10 @@ mod test {
 		let server = app.world_mut().spawn(SshTuiServer::default()).flush();
 		app.world_mut().entity_mut(server).run_async_local(
 			|entity| async move {
+				// an os-assigned port, so a concurrent run never collides
 				entity
 					.call::<Request, Response>(Request::from_cli_str(
-						"--server=ssh",
+						"--server=ssh --ssh-port=0",
 					))
 					.await?;
 				Ok(())

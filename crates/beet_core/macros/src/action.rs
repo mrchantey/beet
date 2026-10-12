@@ -204,7 +204,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	//
 	// Middleware (a `Next` in the input) wraps *another* entity's action rather
 	// than being one, and several middleware happily share a host, so it claims no
-	// action slot: its `on_add_middleware` hook pushes `into_action()` onto the
+	// action slot: its `MiddlewareList::on_add` hook pushes `into_action()` onto the
 	// host's `MiddlewareList` instead.
 	let is_middleware = has_next_type(in_type);
 	let meta_expr =
@@ -1835,7 +1835,7 @@ mod test {
 
 	/// Middleware wraps another entity's action rather than being one, and several
 	/// share a host, so it claims no action slot: no `Action` require, no meta, no
-	/// provider guard. Its `on_add_middleware` hook pushes `into_action()` onto the
+	/// provider guard. Its `MiddlewareList::on_add` hook pushes `into_action()` onto the
 	/// host's `MiddlewareList` instead.
 	#[test]
 	fn middleware_claims_no_action_slot() {

@@ -430,13 +430,16 @@ impl Plugin for InfraPlugin {
 		// publishing the document: the stage assembling it, the mirror of
 		// that stage into the repo store, the borrowed-paths copy
 		// (`<DirCopy src=".." dest=".." paths=".."/>`) the stage hosts, the
-		// store-to-store mirror (`<StoreSync src=".." dest=".."/>`), and
-		// the retention window over the versions the store holds. Plain fs
-		// and `BlobStore` work, so none needs a cloud backend.
+		// wasm module a deploy builds before publishing it
+		// (`<WasmArtifact/>`), the store-to-store mirror
+		// (`<StoreSync src=".." dest=".."/>`), and the retention window over
+		// the versions the store holds. Plain fs and `BlobStore` work, so
+		// none needs a cloud backend.
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::RepoStage>()
 			.register_type::<crate::prelude::RepoSync>()
 			.register_type::<crate::prelude::DirCopy>()
+			.register_type::<crate::prelude::WasmArtifact>()
 			.register_type::<crate::prelude::StoreSync>()
 			.register_type::<crate::prelude::PruneVersions>();
 

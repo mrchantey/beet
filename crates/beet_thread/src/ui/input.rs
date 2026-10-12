@@ -81,7 +81,7 @@ fn form_style() -> OnSpawn {
 /// The message input: grows to fill the row, on the raised surface tint.
 fn input_style() -> OnSpawn {
 	inline_class![
-		(style::common_props::FlexGrowProp, 1u32),
+		(style::common_props::FlexGrowProp, 1_f32),
 		Declaration::token(
 			style::common_props::BackgroundColor,
 			colors::SurfaceContainerHigh

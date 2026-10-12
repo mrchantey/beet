@@ -12,7 +12,8 @@
 use beet::prelude::*;
 
 /// The files at `paths` within the workspace-relative `dir`, copied off disk
-/// into an in-memory store, a symlinked tree (`examples/ui/assets`) included.
+/// into an in-memory store, symlinked files (`examples/ui/wasm/beet-ui.wasm`)
+/// included.
 pub async fn seeded_store(dir: &str, paths: &[&str]) -> BlobStore {
 	let disk =
 		BlobStore::new(FsStore::new(AbsPath::new_workspace_rel(dir).unwrap()));

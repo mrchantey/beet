@@ -51,8 +51,8 @@ use core::str::FromStr;
 ///   read and memoized. Never fails; a malformed field warns and falls back to
 ///   its static default, since a `Default` impl has no error channel.
 /// - [`from_env`](Self::from_env): the same parse, *strict*. `BootstrapPlugin`
-///   runs it so a malformed `--port=nope` fails the app loudly instead of only
-///   warning.
+///   runs it so a malformed `--port=nope` exits with the usage code instead of
+///   only warning.
 ///
 /// ## Rendering it
 ///
@@ -257,8 +257,8 @@ impl BootstrapConfig {
 	/// every field argv did not set. Strict: a malformed value errors.
 	///
 	/// Most callers want [`get`](Self::get), which memoizes and cannot fail. This
-	/// is what [`BootstrapPlugin`] runs at [`PreStartup`] so a malformed value is
-	/// still surfaced through the app's error handler.
+	/// is what [`BootstrapPlugin`] runs at [`PreStartup`] so a malformed value,
+	/// a [`ParamError`], still stops the app.
 	///
 	/// In a browser [`env_ext::args`] yields the location query plus the page's
 	/// bootstrap script ([`to_script`](Self::to_script)), so a served page names
@@ -337,6 +337,13 @@ impl BootstrapConfig {
 		Self::SCREENSHOT,
 		Self::SCREENSHOT_FRAME,
 	];
+
+	/// Every argv key a beet launch reads, ie the `entry` of `--entry`, derived
+	/// from [`KNOBS`](Self::KNOBS) so a params type declaring the launch's flags
+	/// can be pinned to it.
+	pub fn arg_names() -> impl Iterator<Item = &'static str> {
+		Self::KNOBS.iter().map(|knob| knob.arg)
+	}
 
 	/// Every environment variable name a beet launch reads, derived from
 	/// [`KNOBS`](Self::KNOBS) so a new knob cannot be forgotten.
@@ -663,8 +670,8 @@ static BOOTSTRAP: LazyLock<BootstrapConfig> = LazyLock::new(|| {
 ///
 /// It does not *assign* the config: [`BootstrapConfig::get`] owns that, lazily and
 /// immutably. What this adds is the strict [`BootstrapConfig::from_env`] parse, so
-/// a malformed `--port=nope` fails the app through its error handler instead of
-/// only warning. That matters more than it looks: the lazy parse can happen before
+/// a malformed `--port=nope` exits with the usage code before anything runs,
+/// instead of only warning. That matters more than it looks: the lazy parse can happen before
 /// `LogPlugin` initializes, where its warnings go nowhere, while a `PreStartup`
 /// system runs with logging up.
 #[derive(Default)]
@@ -695,9 +702,19 @@ impl Plugin for BootstrapPlugin {
 /// The [`PreStartup`] validation, see [`BootstrapPlugin`]. The parsed value is
 /// discarded: [`BootstrapConfig::get`] already holds the equivalent lenient parse,
 /// so this exists purely to raise on a malformed field.
+///
+/// A malformed knob is the caller's mistake, so it exits with the usage code
+/// before anything runs; without `std` it raises through the error handler.
 fn validate_process_config() -> Result {
-	BootstrapConfig::from_env()?;
-	Ok(())
+	let Err(err) = BootstrapConfig::from_env() else {
+		return Ok(());
+	};
+	#[cfg(feature = "std")]
+	if let Some(param) = err.downcast_ref::<ParamError>() {
+		error!("{param}\n`--help` lists the params it takes");
+		process_ext::exit(ParamError::EXIT_CODE);
+	}
+	Err(err)
 }
 
 /// Resolves one field across both transports: the `--kebab` param when present,
@@ -726,7 +743,8 @@ impl ConfigReader<'_> {
 		self.values(knob).into_iter().next()
 	}
 
-	/// The first value parsed into `T`, naming both transports on failure.
+	/// The first value parsed into `T`, naming its type and both transports on
+	/// failure.
 	fn parsed<T>(&self, knob: Knob) -> Result<Option<T>>
 	where
 		T: FromStr,
@@ -735,22 +753,28 @@ impl ConfigReader<'_> {
 		match self.value(knob) {
 			Some(value) => match value.parse::<T>() {
 				Ok(parsed) => Ok(Some(parsed)),
-				Err(err) => self.malformed(knob, err),
+				Err(err) => self.malformed(
+					knob,
+					format!(
+						"`{value}` is no {}, {err}",
+						type_ext::short_name::<T>()
+					),
+				),
 			},
 			None => Ok(None),
 		}
 	}
 
-	/// A malformed field: an error naming both transports, or in lenient mode a
-	/// warning and `None`.
+	/// A malformed field: a [`ParamError`] naming both transports, or in
+	/// lenient mode a warning and `None`.
 	fn malformed<T>(&self, knob: Knob, err: impl Display) -> Result<Option<T>> {
-		let message = format!("invalid --{} / {}: {err}", knob.arg, knob.env);
+		let reason = format!("{err} (`--{}` / `{}`)", knob.arg, knob.env);
 		match self.lenient {
 			true => {
-				warn!("{message}");
+				warn!("invalid `--{}`: {reason}", knob.arg);
 				Ok(None)
 			}
-			false => Err(bevyhow!("{message}")),
+			false => Err(ParamError::invalid(knob.arg, reason).into()),
 		}
 	}
 
@@ -964,14 +988,20 @@ mod test {
 	/// A malformed value errors at parse rather than silently taking a default.
 	#[crate::test]
 	fn malformed_errors() {
-		parse_argv("--port=nope")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("invalid --port / BEET_HTTP_PORT");
+		let port = parse_argv("--port=nope").unwrap_err();
+		port.to_string().xpect_contains(
+			"invalid param `--port`: `nope` is no u16, invalid digit found in string (`--port` / `BEET_HTTP_PORT`)",
+		);
+		// the caller's mistake, which a launch exits on with the usage code
+		port.downcast_ref::<ParamError>()
+			.unwrap()
+			.key()
+			.xpect_eq("port");
 		parse_argv("--host=nope")
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("invalid --host / BEET_HOST");
+			.xpect_contains("invalid param `--host`")
+			.xpect_contains("`BEET_HOST`");
 	}
 
 	/// A `Default` impl has no error channel, so one malformed field warns and

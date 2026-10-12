@@ -85,21 +85,34 @@ impl DeployGate {
 
 	async fn dispatch(cx: ActionContext<Request>) -> Result<Response> {
 		let params = cx.input.parse_params::<ElevationParams>()?;
+		// what this route and everything above it reads, so a command line
+		// rebuilt from the request repeats no param nothing reads, ie a typo
+		let declared = cx
+			.caller
+			.with_state::<DeclaredParamsQuery, _>(|entity, query| {
+				query.of(entity)
+			})
+			.await?;
 		let assessed = Self::assess(&cx.caller, &cx.input).await?;
 		for note in assessed.iter().flat_map(|one| one.status.notes.iter()) {
 			info!("{note}");
 		}
 		if params.dry_run {
 			return Response::ok_text(
-				Self::dry_run(&cx.caller, &cx.input, &assessed).await?,
+				Self::dry_run(&cx.caller, &cx.input, &declared, &assessed)
+					.await?,
 			)
 			.xok();
 		}
 		let blocking = assessed.iter().any(Assessed::blocks);
 		match (params.elevated, blocking) {
 			(false, false) => ExchangeGroup::run(cx).await,
-			(false, true) => Err(Self::refusal(&cx.input, &assessed)),
-			(true, _) => Self::run_elevated(cx, assessed, params.roll).await,
+			(false, true) => {
+				Err(Self::refusal(&cx.input, &declared, &assessed))
+			}
+			(true, _) => {
+				Self::run_elevated(cx, &declared, assessed, params.roll).await
+			}
 		}
 	}
 
@@ -154,7 +167,11 @@ impl DeployGate {
 
 	/// The refusal of a plain deploy that cannot proceed: every reason, the
 	/// human factors an elevated deploy will ask for, and the command.
-	fn refusal(input: &Request, assessed: &[Assessed]) -> BevyError {
+	fn refusal(
+		input: &Request,
+		declared: &DeclaredParams,
+		assessed: &[Assessed],
+	) -> BevyError {
 		let blocking = assessed
 			.iter()
 			.filter(|one| one.blocks())
@@ -175,7 +192,7 @@ impl DeployGate {
 				.map(|one| one.credential.human_factor())
 				.collect::<Vec<_>>()
 				.join(" and "),
-			Self::relay(input)
+			Self::relay(input, declared)
 		)
 	}
 
@@ -184,6 +201,7 @@ impl DeployGate {
 	async fn dry_run(
 		caller: &AsyncEntity,
 		input: &Request,
+		declared: &DeclaredParams,
 		assessed: &[Assessed],
 	) -> Result<String> {
 		let mut out = String::new();
@@ -209,7 +227,7 @@ impl DeployGate {
 		if assessed.iter().any(Assessed::blocks) {
 			out.push_str(&format!(
 				"this deploy needs `--elevated`:\n\n\t{}\n",
-				Self::relay(input)
+				Self::relay(input, declared)
 			));
 		}
 		out.xok()
@@ -221,6 +239,7 @@ impl DeployGate {
 	/// the child exits.
 	async fn run_elevated(
 		cx: ActionContext<Request>,
+		declared: &DeclaredParams,
 		assessed: Vec<Assessed>,
 		roll: bool,
 	) -> Result<Response> {
@@ -235,7 +254,7 @@ impl DeployGate {
 			);
 			return ExchangeGroup::run(cx).await;
 		}
-		let relay = Self::relay(&cx.input);
+		let relay = Self::relay(&cx.input, declared);
 		let mut report = Vec::new();
 		let mut env = Vec::<(SmolStr, SmolStr)>::new();
 		let mut cleanups = Vec::new();
@@ -259,7 +278,7 @@ impl DeployGate {
 			cleanups.extend(elevation.cleanup);
 			stripped.extend(one.credential.records());
 		}
-		let ran = Self::run_child(&cx.input, &stripped, &env).await;
+		let ran = Self::run_child(&cx.input, declared, &stripped, &env).await;
 		for cleanup in cleanups {
 			match cleanup.await {
 				Ok(line) => report.push(line),
@@ -279,10 +298,11 @@ impl DeployGate {
 	/// inheriting the ones this launch loaded before them, then `env` set.
 	async fn run_child(
 		input: &Request,
+		declared: &DeclaredParams,
 		stripped: &[&'static str],
 		env: &[(SmolStr, SmolStr)],
 	) -> Result {
-		let args = Self::request_args(input);
+		let args = Self::request_args(input, declared);
 		let process = env.iter().fold(
 			stripped
 				.iter()
@@ -306,12 +326,14 @@ impl DeployGate {
 		}
 	}
 
-	/// This request as argv, less this gate's own params and the launch's
-	/// knobs (`--entry`, `--stage`, ..), which [`ChildProcess::this_launch`]
-	/// and the relay carry from the launch itself: the route as one `a/b`
-	/// path, the way a person types it, then each param.
-	fn request_args(input: &Request) -> Vec<String> {
+	/// This request as argv, less this gate's own params, the launch's knobs
+	/// (`--entry`, `--stage`, ..), which [`ChildProcess::this_launch`] and the
+	/// relay carry from the launch itself, and every param nothing on the
+	/// route's path declares, so a typo is never repeated back: the route as
+	/// one `a/b` path, the way a person types it, then each param.
+	fn request_args(input: &Request, declared: &DeclaredParams) -> Vec<String> {
 		let mut args = input.parts().to_cli_args();
+		args.params = declared.recognised(&args.params);
 		for param in Self::OWN_PARAMS {
 			args.params.remove(param);
 		}
@@ -327,8 +349,10 @@ impl DeployGate {
 	}
 
 	/// The command a person runs in a terminal to deploy this elevated: this
-	/// launch's own command line, its gate params replaced by `--elevated`.
-	fn relay(input: &Request) -> String {
+	/// launch's knobs and the request's recognised params, its gate params
+	/// replaced by `--elevated`. Composed from what was parsed rather than the
+	/// raw argv, which may hold the very typo that led here.
+	fn relay(input: &Request, declared: &DeclaredParams) -> String {
 		env_ext::program()
 			.into_iter()
 			.chain(
@@ -337,7 +361,11 @@ impl DeployGate {
 					.unwrap_or_default()
 					.into_iter(),
 			)
-			.chain(Self::request_args(input).into_iter().map(SmolStr::from))
+			.chain(
+				Self::request_args(input, declared)
+					.into_iter()
+					.map(SmolStr::from),
+			)
 			.chain([SmolStr::from("--elevated")])
 			.map(|arg| Self::quote(&arg))
 			.collect::<Vec<_>>()
@@ -359,16 +387,27 @@ impl DeployGate {
 
 #[cfg(test)]
 mod test {
+	use super::ElevationParams;
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
-	/// A refusal names every reason of every credential that blocks, the human
-	/// factor each will ask for, and the command to run elevated; a credential
-	/// that does not block is not mentioned.
-	#[beet_core::test]
-	fn refuses_naming_every_reason() {
-		let assessed = |stale: &[&str], protected: &[&str]| super::Assessed {
+	/// A param a gated route might take beside the gate's own.
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct NoteParams {
+		note: Option<String>,
+	}
+
+	/// What a gated route with a `--note` param declares.
+	fn declared() -> DeclaredParams {
+		DeclaredParams::default()
+			.with(&ParamsPartial::new::<(ElevationParams, NoteParams)>())
+	}
+
+	/// One credential's answer, blocking for each `stale` or `protected`.
+	fn assessed(stale: &[&str], protected: &[&str]) -> super::Assessed {
+		super::Assessed {
 			credential: DeployCredential::new(CloudflareDeployToken::default()),
 			status: CredentialStatus {
 				needed: true,
@@ -376,12 +415,23 @@ mod test {
 				notes: Vec::new(),
 			},
 			protected: protected.iter().map(ToString::to_string).collect(),
-		};
-		super::DeployGate::refusal(&Request::from_cli_str("mail/deploy"), &[
-			assessed(&["cloudflare: needs `Zone > DNS Write on a.b`"], &[]),
-			assessed(&[], &["this deploy would update `x.lock`"]),
-			assessed(&[], &[]),
-		])
+		}
+	}
+
+	/// A refusal names every reason of every credential that blocks, the human
+	/// factor each will ask for, and the command to run elevated; a credential
+	/// that does not block is not mentioned.
+	#[beet_core::test]
+	fn refuses_naming_every_reason() {
+		super::DeployGate::refusal(
+			&Request::from_cli_str("mail/deploy"),
+			&declared(),
+			&[
+				assessed(&["cloudflare: needs `Zone > DNS Write on a.b`"], &[]),
+				assessed(&[], &["this deploy would update `x.lock`"]),
+				assessed(&[], &[]),
+			],
+		)
 		.to_string()
 		.xpect_contains("nothing is written yet")
 		.xpect_contains("- cloudflare: needs `Zone > DNS Write on a.b`")
@@ -396,14 +446,33 @@ mod test {
 	fn relays_the_deploy_elevated() {
 		let request =
 			Request::from_cli_str("mail/deploy --dry-run --roll --note='a b'");
-		let args = super::DeployGate::request_args(&request);
+		let args = super::DeployGate::request_args(&request, &declared());
 		args.iter().any(|arg| arg == "mail/deploy").xpect_true();
 		args.iter()
 			.any(|arg| arg.starts_with("--dry") || arg == "--roll")
 			.xpect_false();
-		super::DeployGate::relay(&request)
+		super::DeployGate::relay(&request, &declared())
 			.xpect_contains("mail/deploy")
 			.xpect_contains("'--note=a b'")
 			.xpect_ends_with("--elevated");
+	}
+
+	/// REGRESSION: `deploy --elevate` (the `d` missing) ran a plain deploy whose
+	/// refusal told the user to run `deploy --elevate --elevated`, echoing the
+	/// typo into the command it suggested. The suggestion is composed from the
+	/// params the route declares, so an unrecognised one never reaches it.
+	#[beet_core::test]
+	fn refusal_repeats_no_unrecognised_param() {
+		let request = Request::from_cli_str("deploy --elevate --note=ship");
+		super::DeployGate::request_args(&request, &declared())
+			.xpect_eq(vec!["deploy".to_string(), "--note=ship".to_string()]);
+		super::DeployGate::refusal(&request, &declared(), &[assessed(
+			&["cloudflare: stale"],
+			&[],
+		)])
+		.to_string()
+		.xpect_contains("deploy --note=ship --elevated")
+		.xnot()
+		.xpect_contains("--elevate ");
 	}
 }

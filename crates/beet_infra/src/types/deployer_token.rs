@@ -831,7 +831,7 @@ mod test {
 
 	/// A stack with both Cloudflare addresses declared, which every lowering
 	/// here resolves against.
-	fn addressed() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+	fn addressed() -> (ResolvedStack, Deployment, TempDir) {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		(
 			stack

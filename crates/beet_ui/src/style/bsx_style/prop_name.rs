@@ -97,6 +97,7 @@ impl PropResolver {
 			("flex-direction", prop::<FlexDirectionProp>()),
 			("flex-wrap", prop::<FlexWrapProp>()),
 			("flex-grow", prop::<FlexGrowProp>()),
+			("flex-shrink", prop::<FlexShrinkProp>()),
 			("flex-basis", prop::<FlexBasisProp>()),
 			("align-items", prop::<AlignItemsProp>()),
 			("align-content", prop::<AlignContentProp>()),

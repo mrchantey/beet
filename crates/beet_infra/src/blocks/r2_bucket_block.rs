@@ -523,7 +523,7 @@ mod tests {
 	}
 
 	/// The test stack with the account the bucket lands in.
-	fn stack() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+	fn stack() -> (ResolvedStack, Deployment, TempDir) {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		(
 			stack.with_cloudflare_account(CloudflareAccount::new("acct123")),

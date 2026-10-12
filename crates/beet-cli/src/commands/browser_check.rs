@@ -1,10 +1,14 @@
 //! What the committed browser boot checks share: a page generated through the
-//! real `<Wasm>` template, served with the workspace's artifacts and examples
-//! on an ephemeral `HttpServer`, and a uniquely-ported headless chromium whose
-//! console the check reads.
+//! real `<Wasm>` template, served with the workspace's wasm build outputs and
+//! examples on an ephemeral `HttpServer`, and a uniquely-ported headless
+//! chromium whose console the check reads.
 
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
+
+/// Where the `just build-wasm-*` recipes write the artifacts under test,
+/// workspace-relative.
+const WASM_DIR: &str = "target/wasm";
 
 /// A whole document around `body`, rendered through the router's templates so
 /// the loader contract under test is the one a served page uses.
@@ -24,9 +28,10 @@ pub(crate) fn wasm_page(body: impl Bundle) -> Result<String> {
 	.xok()
 }
 
-/// Serve `page` at `/` plus the workspace's `assets/` and `examples/` on a
-/// pre-bound port-0 `HttpServer` in a background app (its own thread,
-/// mirroring `run_wasm_browser`'s server shape), returning the bound port.
+/// Serve `page` at `/`, the wasm build outputs ([`WASM_DIR`]) at `/wasm` and
+/// the workspace's `examples/` on a pre-bound port-0 `HttpServer` in a
+/// background app (its own thread, mirroring `run_wasm_browser`'s server
+/// shape), returning the bound port.
 /// The page is the root route, so a launch booting a `DomServer` lands where
 /// the served entry's own page would; the server is not the process's
 /// canonical one, so several checks serve at once in one test binary without
@@ -54,8 +59,8 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 					// the artifact and the entry's repo, from the ancestor
 					// workspace store
 					AssetsDir {
-						src: "assets".into(),
-						prefix: default(),
+						src: WASM_DIR.into(),
+						prefix: "wasm".into(),
 						cache: default(),
 					}
 					.into_snippet_bundle(),
@@ -100,10 +105,11 @@ pub(crate) fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
 	}
 }
 
-/// Fail unless the artifact at `path` (workspace-relative) is built, naming
-/// the recipe that builds it.
-pub(crate) fn require_artifact(path: &str, recipe: &str) {
-	if !AbsPath::new_workspace_rel(path)
+/// Fail unless the artifact `name` is built into [`WASM_DIR`], naming the
+/// recipe that builds it.
+pub(crate) fn require_artifact(name: &str, recipe: &str) {
+	let path = format!("{WASM_DIR}/{name}");
+	if !AbsPath::new_workspace_rel(&path)
 		.and_then(fs_ext::exists)
 		.unwrap_or_default()
 	{

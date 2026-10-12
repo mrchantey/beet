@@ -33,5 +33,5 @@ so its console wrap installs before the (deferred) module boots.
 		browser.
 	</p>
 	<RenderConsole/>
-	<Wasm src="/assets/wasm/beet-min.wasm" repo="/examples/wasm" entry="hello.bsx"/>
+	<Wasm src="/wasm/beet-min.wasm" repo="/examples/wasm" entry="hello.bsx"/>
 </HtmlDocument>

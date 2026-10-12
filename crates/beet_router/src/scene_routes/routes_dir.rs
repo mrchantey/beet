@@ -673,19 +673,17 @@ mod test {
 			.xpect_some();
 	}
 
-	/// Write a routes dir fixture under `target/tests` and return a [`BlobStore`]
-	/// backed by an [`FsStore`] rooted at it. Native-only: writes real files.
+	/// Write a routes dir fixture in a fresh [`TempDir`], returning it beside a
+	/// [`BlobStore`] backed by an [`FsStore`] rooted at it. Native-only: writes
+	/// real files.
 	#[cfg(not(target_arch = "wasm32"))]
-	fn fs_fixture(name: &str, files: &[(&str, &str)]) -> BlobStore {
-		let root = fs_ext::workspace_root()
-			.join("target/tests/routes_dir")
-			.join(name);
-		// clean slate so removed fixture files do not leak between runs
-		fs_ext::remove(&root).ok();
+	fn fs_fixture(files: &[(&str, &str)]) -> (TempDir, BlobStore) {
+		let root = TempDir::new_ws().unwrap();
 		for (rel, content) in files {
 			fs_ext::write(root.join(rel), content).unwrap();
 		}
-		BlobStore::new(FsStore::new(AbsPath::new(root).unwrap()))
+		let store = BlobStore::new(FsStore::new(root.path().clone()));
+		(root, store)
 	}
 
 	/// An in-memory [`BlobStore`] seeded with `files`, proving discovery is
@@ -747,9 +745,10 @@ mod test {
 	#[beet_core::test]
 	async fn discovers_and_serves_routes() {
 		let mut world = router_world();
+		let (_dir, store) = fs_fixture(SERVES_FILES);
 		let root = spawn_routes(
 			&mut world,
-			fs_fixture("serves", SERVES_FILES),
+			store,
 			(Router::with_defaults(), children![RoutesDir::default()]),
 		)
 		.await;
@@ -762,7 +761,7 @@ mod test {
 	#[beet_core::test]
 	async fn scopes_and_watches_its_dir() {
 		let mut world = router_world();
-		let store = fs_fixture("watches", SERVES_FILES);
+		let (_dir, store) = fs_fixture(SERVES_FILES);
 		let root = spawn_routes(
 			&mut world,
 			store.clone(),

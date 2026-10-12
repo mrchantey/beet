@@ -19,8 +19,9 @@ pub type HttpResult<T> = Result<T, HttpError>;
 /// A non-200 response from an HTTP request.
 ///
 /// The message *will be* returned to the client, so ensure that no sensitive
-/// information is included. By default, non-HTTP [`BevyError`] messages will be
-/// logged and an opaque error will be returned to the client in release builds.
+/// information is included. A [`ParamError`] is a `400` carrying its message;
+/// any other [`BevyError`] is logged and answered with an opaque error in
+/// release builds, see [`from_opaque`](Self::from_opaque).
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HttpError {
@@ -85,17 +86,18 @@ impl HttpError {
 
 	/// Converts a [`BevyError`] into an [`HttpError`].
 	///
-	/// If the error is already an [`HttpError`], it is returned directly.
-	/// Otherwise, the error is logged and an opaque internal server error
-	/// is returned in release builds.
+	/// An [`HttpError`] is returned directly, and a [`ParamError`], a request
+	/// param the caller got wrong, is a `400` carrying its message. Otherwise
+	/// the error is logged and an opaque internal server error is returned in
+	/// release builds.
 	pub fn from_opaque(error: impl Into<BevyError>) -> Self {
 		let error = error.into();
 		if let Some(inner) = error.downcast_ref::<HttpError>() {
-			// If the error is already an HttpError, return it directly
 			inner.clone()
+		} else if let Some(param) = error.downcast_ref::<ParamError>() {
+			Self::bad_request(param.to_string())
 		} else {
-			let error = error.to_string();
-			Self::internal_error(error)
+			Self::internal_error(error.to_string())
 		}
 	}
 }
@@ -151,5 +153,39 @@ impl From<HttpError> for Response {
 				MediaType::Text,
 			)
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct ServeParams {
+		port: u16,
+	}
+
+	/// The status of the response a failed parse of `args` answers.
+	fn parse_status(args: &str) -> StatusCode {
+		Request::from_cli_str(args)
+			.parse_params::<ServeParams>()
+			.err()
+			.unwrap()
+			.xmap(Response::from)
+			.status()
+	}
+
+	/// A param the caller got wrong, missing or malformed, is their error, so
+	/// a CLI exits with its usage code rather than an internal error's.
+	#[beet_core::test]
+	fn param_errors_are_bad_requests() {
+		parse_status("").xpect_eq(StatusCode::BAD_REQUEST);
+		parse_status("--port=abc").xpect_eq(StatusCode::BAD_REQUEST);
+		StatusCode::BAD_REQUEST.to_process_exit_code().xpect_eq(64);
+		HttpError::from_opaque(bevyhow!("disk on fire"))
+			.status_code
+			.xpect_eq(StatusCode::INTERNAL_SERVER_ERROR);
 	}
 }

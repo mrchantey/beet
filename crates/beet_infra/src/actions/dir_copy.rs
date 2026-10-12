@@ -5,19 +5,21 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<DirCopy src="assets" dest="site/assets" paths="wasm/beet-full.wasm"/>` —
+/// `<DirCopy src="assets" dest="site/assets" paths="databases/country.mmdb"/>` —
 /// the single declaration of what one tree BORROWS from another.
 ///
 /// Two directories can share files without either owning the other: the site's
-/// assets are its own, but a few workspace-built artifacts (a wasm binary, a
-/// geoip database) are produced in the workspace tree and served from the site.
-/// This names exactly those. Under a [`RepoStage`] it borrows into the staging
-/// dir the deploy publishes, so a rebuilt artifact cannot go stale on the far
-/// side and nothing is written into the checkout; elsewhere (the local
-/// `assets` verb) `dest` is workspace-relative.
+/// assets are its own, but a few workspace-owned files (a geoip database, a
+/// set of images) are served from the site too. This names exactly those.
+/// Under a [`RepoStage`] it borrows into the staging dir the deploy publishes,
+/// so an updated file cannot go stale on the far side and nothing is written
+/// into the checkout; elsewhere (the local `assets` verb) `dest` is
+/// workspace-relative. Only source files are borrowed: a build output is built
+/// by the deploy that ships it ([`WasmArtifact`]), never copied from a stored
+/// file.
 ///
 /// Mirror semantics per path: a destination file or directory is replaced, so a
-/// stale binary is overwritten rather than merged around.
+/// stale file is overwritten rather than merged around.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]

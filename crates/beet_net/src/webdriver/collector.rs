@@ -90,6 +90,9 @@ impl ConsoleEntry {
 	/// Whether this entry is an error, including uncaught exceptions.
 	pub fn is_error(&self) -> bool { self.level == log::Level::Error }
 
+	/// Whether this entry is a warning.
+	pub fn is_warning(&self) -> bool { self.level == log::Level::Warn }
+
 	fn parse(event: &Value) -> Option<Self> {
 		let params = event.get("params")?;
 		let level = match params.get("level")?.as_str()? {

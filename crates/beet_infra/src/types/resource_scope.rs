@@ -345,7 +345,7 @@ impl RenderScope {
 	pub(crate) fn test_render_stack(
 		stack: impl Bundle,
 		func: impl FnOnce(&mut ChildSpawner),
-	) -> (Self, crate::types::TestWorkDir) {
+	) -> (Self, TempDir) {
 		let (deployment, dir) = Deployment::default_local();
 		let mut world = InfraPlugin.into_world();
 		world.insert_resource(deployment);
@@ -359,7 +359,7 @@ impl RenderScope {
 	/// stack, mirroring [`ResolvedStack::default_local`].
 	pub(crate) fn test_render(
 		func: impl FnOnce(&mut ChildSpawner),
-	) -> (Self, crate::types::TestWorkDir) {
+	) -> (Self, TempDir) {
 		Self::test_render_stack(Stack::test_local(), func)
 	}
 
@@ -368,7 +368,7 @@ impl RenderScope {
 	pub(crate) fn test_render_zoned(
 		domain: &str,
 		func: impl FnOnce(&mut ChildSpawner),
-	) -> (Self, crate::types::TestWorkDir) {
+	) -> (Self, TempDir) {
 		Self::test_render_stack(Stack::test_zoned(domain), func)
 	}
 

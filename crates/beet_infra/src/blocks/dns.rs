@@ -540,7 +540,7 @@ mod tests {
 
 	/// The test stack with the zone every Cloudflare record here lands in.
 	#[cfg(feature = "cloudflare_dns")]
-	fn zoned() -> (ResolvedStack, Deployment, crate::types::TestWorkDir) {
+	fn zoned() -> (ResolvedStack, Deployment, TempDir) {
 		let (stack, deployment, dir) = ResolvedStack::default_local();
 		(
 			stack.with_cloudflare_zone(CloudflareZone::new(

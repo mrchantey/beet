@@ -114,7 +114,6 @@ pub fn all_rules() -> Vec<Rule> {
 		// terminal-only heading hue, gated behind `@media` Terminal
 		terminal_headings(),
 		main_content(),
-		// the `@media screen` row basis, ignored by charcell
 		main_content_basis(),
 		main_content_measure(),
 		page(),
@@ -356,6 +355,31 @@ mod tests {
 			))
 			.xpect_contains(".sidebar:not([aria-hidden=\"false\"])")
 			.xpect_contains("display: none;");
+	}
+
+	/// The main column's basis is one rule for both targets, serialized with no
+	/// `@media` wrapper, and the flex factors serialize as plain CSS numbers.
+	#[beet_core::test]
+	fn flex_props_serialize() {
+		let css = CssBuilder::default()
+			.with_minify(true)
+			.with_format_variables(FormatVariables::short())
+			.build(
+				&css_map(),
+				&RuleSet::new(Rule::new()).with_rules(vec![
+					main_content_basis(),
+					Rule::class("fixed")
+						.with_value(common_props::FlexGrowProp, 1_f32)
+						.with_value(common_props::FlexShrinkProp, 0_f32),
+				]),
+			)
+			.unwrap();
+		css.as_str()
+			.xpect_contains("flex-basis: 72rem;")
+			.xpect_contains("flex-grow: 1;")
+			.xpect_contains("flex-shrink: 0;")
+			.xnot()
+			.xpect_contains("@media");
 	}
 
 	/// The target-fork utilities serialize asymmetrically: the ungated

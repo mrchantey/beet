@@ -433,23 +433,19 @@ mod test {
 		exported(&paths, "secret").xpect_false();
 	}
 
-	/// Write a `published`/`secret` (frontmatter `visibility = "draft"`) content dir under
-	/// a per-test `name` (so parallel cases never share a directory) and return
-	/// its root.
+	/// Write a `published`/`secret` (frontmatter `visibility = "draft"`) content
+	/// dir in a fresh [`TempDir`], returning it.
 	// `RoutesDir` scans the filesystem store, so this is native-only.
 	#[cfg(all(feature = "markdown_parser", not(target_arch = "wasm32")))]
-	fn draft_content_dir(name: &str) -> AbsPath {
-		let root = fs_ext::workspace_root()
-			.join("target/tests/export_static/drafts")
-			.join(name);
-		fs_ext::remove(&root).ok();
+	fn draft_content_dir() -> TempDir {
+		let root = TempDir::new_ws().unwrap();
 		fs_ext::write(root.join("published.md"), "# Published").unwrap();
 		fs_ext::write(
 			root.join("secret.md"),
 			"+++\nvisibility = \"draft\"\n+++\n\n# Secret",
 		)
 		.unwrap();
-		AbsPath::new(root).unwrap()
+		root
 	}
 
 	/// Spawn a `RoutesDir` router over `root`, settling the async runtime so the
@@ -473,8 +469,8 @@ mod test {
 	#[beet_core::test]
 	async fn dev_keeps_draft_routes_dir() {
 		let mut world = draft_world();
-		let router =
-			spawn_routes_dir(&mut world, draft_content_dir("dev")).await;
+		let dir = draft_content_dir();
+		let router = spawn_routes_dir(&mut world, dir.path().clone()).await;
 		let written = export(&mut world, router).await;
 		exported(&written, "published").xpect_true();
 		exported(&written, "secret").xpect_true();
@@ -486,8 +482,8 @@ mod test {
 	#[beet_core::test]
 	async fn prod_drops_draft_routes_dir() {
 		let mut world = draft_world();
-		let router =
-			spawn_routes_dir(&mut world, draft_content_dir("prod")).await;
+		let dir = draft_content_dir();
+		let router = spawn_routes_dir(&mut world, dir.path().clone()).await;
 		let paths = StaticExport::paths(&world, router, true).unwrap();
 		exported(&paths, "published").xpect_true();
 		exported(&paths, "secret").xpect_false();

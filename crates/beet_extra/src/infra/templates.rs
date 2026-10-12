@@ -5,14 +5,18 @@
 //! cover the rest: types that build a non-`Reflect` value (a [`BuildArtifact`]'s
 //! `ChildProcess`, an action route bundle) or compute stack-derived config. A thin
 //! `#[template]` wraps each: its props struct is reflect-registered, its body
-//! builds the bundle.
+//! builds the bundle. Beside them sits [`StateBackendToggle`], the router
+//! middleware an example switching state backends per launch declares.
 //!
 //! None of them carries resource identity. That belongs to `<Stack>`, a component
 //! registered in every native build: a stage or app name on a template prop is
 //! absent exactly in the binary that did not link the template.
 use crate::infra::infra_ext;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_infra::prelude::*;
+use beet_net::prelude::*;
+use beet_router::prelude::*;
 
 /// `<BeetBinaryBuild features="aws_sdk"/>` — builds the generic `beet` binary
 /// (release, zigbuild) with the given feature set as a [`BuildArtifact`], the markup
@@ -40,22 +44,50 @@ pub fn ExampleBinaryBuild(
 		.into_build_artifact()
 }
 
-/// `<StateBackendToggle/>` — select this launch's tofu state backend from argv:
-/// S3 when `--s3-backend` is passed, local otherwise. The markup form of
-/// lifecycle.rs's backend toggle.
+/// `<Router {StateBackendToggle}>` — router middleware selecting the tofu
+/// state backend from the request: this account's S3 state bucket when it
+/// carries `--s3-backend`, local otherwise.
 ///
 /// The backend is a property of the LAUNCH, not of a stack's identity, so the
 /// toggle lands on the process [`Deployment`] and nothing about it is authored
-/// per stack.
-#[template(system)]
-pub fn StateBackendToggle(mut deployment: ResMut<Deployment>) {
+/// per stack. The flag is a declared request param ([`DeclaresParams`]), so a
+/// server refusing undeclared params (`RejectUnknownParams`) accepts it and
+/// names it beside a misspelling.
+#[action]
+#[derive(Default, Clone, Component, Reflect)]
+#[reflect(Component, DeclaresParams)]
+#[component(on_add = MiddlewareList::<Request, Response>::on_add::<Self>)]
+pub async fn StateBackendToggle(
+	cx: ActionContext<(Request, Next<Request, Response>)>,
+) -> Result<Response> {
+	let caller = cx.caller.clone();
+	let (request, next) = cx.take();
 	let backend: StackBackend =
-		if CliArgs::parse_env().params.contains_key("s3-backend") {
-			S3Backend::default().into()
-		} else {
-			LocalBackend::default().into()
+		match request.parse_params::<StateBackendParams>()?.s3_backend {
+			true => S3Backend::default().into(),
+			false => LocalBackend::default().into(),
 		};
-	deployment.set_backend(backend);
+	caller
+		.world()
+		.with_resource::<Deployment, _>(move |mut deployment| {
+			deployment.set_backend(backend);
+		})
+		.await;
+	next.call(request).await
+}
+
+impl DeclaresParams for StateBackendToggle {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<StateBackendParams>()
+	}
+}
+
+/// The flag [`StateBackendToggle`] reads.
+#[derive(Reflect)]
+struct StateBackendParams {
+	/// Keep the tofu state in this account's S3 state bucket rather than
+	/// under `.beet/infra`.
+	s3_backend: bool,
 }
 
 /// An **opinionated** block for websites built with lambda.
@@ -329,8 +361,6 @@ pub fn LightsailBeetSiteBlock(
 mod test {
 	use super::*;
 	use crate::infra::InfraExamplesPlugin;
-	use beet_net::prelude::*;
-	use beet_router::prelude::*;
 
 	fn test_world() -> World {
 		(
@@ -357,6 +387,42 @@ mod test {
 			.insert_template(BsxTemplate::parse_document(markup).unwrap())
 			.unwrap();
 		world.flush();
+	}
+
+	/// The backend the launch's [`Deployment`] holds once `router` has served
+	/// `args`.
+	async fn backend_after(
+		world: &mut World,
+		router: Entity,
+		args: &str,
+	) -> StackBackend {
+		world
+			.entity_mut(router)
+			.exchange(Request::from_cli_str(args))
+			.await
+			.status()
+			.xpect_eq(StatusCode::OK);
+		world.resource::<Deployment>().backend().clone()
+	}
+
+	/// The toggle reads the backend off each request, so `--s3-backend` is a
+	/// declared param rather than an ambient argv read.
+	#[beet_core::test]
+	async fn the_toggle_selects_the_backend_per_request() {
+		let mut world = test_world();
+		let router = world
+			.spawn((Router::with_defaults(), StateBackendToggle, children![
+				route::exchange("run", Action::<(), &str>::new_pure(|_| "ran"))
+			]))
+			.flush();
+		backend_after(&mut world, router, "run --s3-backend")
+			.await
+			.xmap(|backend| matches!(backend, StackBackend::S3(_)))
+			.xpect_true();
+		backend_after(&mut world, router, "run")
+			.await
+			.xmap(|backend| matches!(backend, StackBackend::Local(_)))
+			.xpect_true();
 	}
 
 	/// The directory the one declared bucket attached under local service

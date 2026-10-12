@@ -331,9 +331,7 @@ mod test {
 	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn a_path_may_climb_above_a_filesystem_store() {
-		let root =
-			AbsPath::new_workspace_rel("target/tests/beet_net/secrets-climb")
-				.unwrap();
+		let root = TempDir::new_ws().unwrap();
 		fs_ext::create_dir_all(root.join("site")).unwrap();
 		fs_ext::write(root.join("secrets.toml"), "").unwrap();
 		let above = Secrets::new("../secrets.toml").with_label("repo");
@@ -344,7 +342,11 @@ mod test {
 		.unwrap();
 		handle.path.as_str().xpect_eq("secrets.toml");
 		handle.describe().xpect_eq("`repo` (secrets.toml)");
-		handle.store.base_dir().unwrap().xpect_eq(root);
+		handle
+			.store
+			.base_dir()
+			.unwrap()
+			.xpect_eq(root.path().clone());
 		SecretsHandle::in_store(BlobStore::temp(), &above)
 			.unwrap_err()
 			.to_string()

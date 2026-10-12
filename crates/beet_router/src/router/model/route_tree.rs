@@ -441,6 +441,32 @@ impl RouteTree {
 		}
 		Some(current)
 	}
+
+	/// The route `path` most plausibly misspells, for a "did you mean" hint:
+	/// the first segment no tree node matches, swapped for its
+	/// [`str_ext::closest`] static sibling. `None` when nothing is that close,
+	/// or when the corrected path is not itself a route, so a suggestion can
+	/// always be typed as given.
+	pub fn closest(&self, path: &[impl AsRef<str>]) -> Option<String> {
+		let mut path = path
+			.iter()
+			.map(|segment| segment.as_ref())
+			.collect::<Vec<_>>();
+		// the deepest prefix the tree holds, and the first segment past it
+		let (missed, parent) = (0..path.len()).rev().find_map(|index| {
+			self.find_subtree(&path[..index]).map(|tree| (index, tree))
+		})?;
+		let siblings = parent.children.iter().filter_map(|child| {
+			child
+				.path
+				.iter()
+				.last()
+				.filter(|last| last.is_static())
+				.map(|last| last.name())
+		});
+		path[missed] = str_ext::closest(path[missed], siblings)?;
+		self.find(&path).map(|_| path.join("/"))
+	}
 }
 
 impl core::fmt::Display for RouteTree {
@@ -836,6 +862,23 @@ mod test {
 				node.path.annotated_path().to_string().contains("other")
 			})
 			.xpect_false();
+	}
+
+	/// A suggestion swaps the first segment the tree does not hold, and is
+	/// always a route: a misspelt folder that holds no route of its own
+	/// suggests nothing.
+	#[beet_core::test]
+	fn closest_names_the_misspelt_route() {
+		let mut world = router_world();
+		let root = nested_tree(&mut world);
+		let tree = world.entity(root).get::<RouteTree>().unwrap();
+		tree.closest(&["outr"]).xpect_eq(Some("outer".to_string()));
+		tree.closest(&["inner", "dep"])
+			.xpect_eq(Some("inner/deep".to_string()));
+		tree.closest(&["innr", "deep"])
+			.xpect_eq(Some("inner/deep".to_string()));
+		tree.closest(&["iner"]).xpect_none();
+		tree.closest(&["nonesuch"]).xpect_none();
 	}
 
 	#[beet_core::test]

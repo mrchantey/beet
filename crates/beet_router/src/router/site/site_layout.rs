@@ -133,10 +133,7 @@ impl PageClasses {
 	/// help, with no layout) is themed the same.
 	pub fn resolve(parts: &RequestParts, theme: &Theme) -> Classes {
 		let mut classes = Classes::new([classes::PAGE]);
-		let scheme = match parts
-			.get_param("color-scheme")
-			.and_then(ColorScheme::parse)
-		{
+		let scheme = match ColorSchemeParams::of(parts) {
 			Some(scheme) => Some(scheme),
 			None if !parts.accepts(MediaType::Html) => Some(theme.scheme),
 			None => None,

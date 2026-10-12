@@ -72,6 +72,28 @@ mod test {
 		render_charcell(false).xnot().xpect_contains("│");
 	}
 
+	/// REGRESSION: in a flex column, ie the `.page` body, the scroll wrapper
+	/// measures a few cells wide and its rows were reserved at that width, so
+	/// the table, laid out full width, wrapped past them and the next block
+	/// painted over its last row. Nested in a block, so the column's own height
+	/// resolves through its items too.
+	#[beet_core::test]
+	fn wrapped_rows_keep_their_height_in_a_column() {
+		test_ext::render_charcell(80, (), rsx! {
+			<div>
+				<div {Classes::new([classes::PAGE])}>
+					<Table>
+						<tr slot="head"><th>"name"</th><th>"kind"</th><th>"required"</th><th>"description"</th></tr>
+						<tr><td>"help"</td><td>"bool"</td><td>"no"</td><td>"List the routes beneath this one and the params each takes, rather than calling it."</td></tr>
+						<tr><td>"color-scheme"</td><td>"one of: light, dark"</td><td>"no"</td><td>"Pin the page's color scheme over the negotiated one."</td></tr>
+					</Table>
+					<p>"after"</p>
+				</div>
+			</div>
+		})
+		.xpect_contains("the negotiated one");
+	}
+
 	/// The scroll wrapper is inert on the terminal, where the columns scale to
 	/// fit: the table renders as a bare one does, no gutter row or column.
 	#[beet_core::test]

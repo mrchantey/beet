@@ -13,8 +13,8 @@ A domain on a Cloudflare zone, `tofu` on PATH, and `CLOUDFLARE_API_TOKEN` in
 the process environment (a `secrets.toml` record with `role = "env_var"`).
 Nothing else, and less than that for most of the walk: this stack declares no
 AWS resource at all,
-`<StateBackendToggle/>` keeps the tofu state under `.beet/infra` unless
-`--s3-backend` is passed, and the stack opts out of state encryption
+the router's `StateBackendToggle` keeps the tofu state under `.beet/infra`
+unless `--s3-backend` is passed, and the stack opts out of state encryption
 (`state_passphrase={None}`, its state holds nothing secret) so there is no
 passphrase. Only the apply inside `deploy` authenticates, so `validate` and
 `plan` run on `tofu` alone.
@@ -74,8 +74,12 @@ beside its other tags rather than copying this one, or add the `_atproto.*`
 names to its audit allowlist with a reason. The block is its own tag precisely
 so it can be authored wherever the zone's owner is.
 -->
-<CliServer {CallOnReady}>
-<Router {(RequestLogger, HelpHandler)}>
+<CliServer {(CallOnReady, RejectUnknownParams)}>
+<!-- the state backend is a property of the LAUNCH, not of a stack's identity, so
+     the toggle is router middleware reading `--s3-backend` off the request and
+     landing it on the process `Deployment`. Local by default, which is what keeps
+     this stack Cloudflare-only. -->
+<Router {(RequestLogger, HelpHandler, StateBackendToggle)}>
 	<RequireCfg cfg="feature:infra && feature:extra && feature:atproto"/>
 	<PackageConfig title="Custom Domain Handle" app_name="atproto-handles"
 		description="Publish the _atproto records that make a domain you own an atproto handle"/>
@@ -86,10 +90,6 @@ so it can be authored wherever the zone's owner is.
 		did="did:plc:aaaaaaaaaaaaaaaaaaaaaaaa" display_name="Example"/>
 	<AtprotoAccount bx:ref="alice" handle="alice.example.com"
 		did="did:plc:bbbbbbbbbbbbbbbbbbbbbbbb" display_name="Alice"/>
-	<!-- the state backend is a property of the LAUNCH, not of a stack's identity,
-	     so the toggle sits outside the stack and lands on the process `Deployment`.
-	     Local by default, which is what keeps this stack Cloudflare-only. -->
-	<StateBackendToggle/>
 	<!-- the zone the records land in, an address resolved by ancestry, and
 	     the region: nothing is deployed into it, it is the AWS provider config
 	     every stack renders with, declared because a render refuses to guess
