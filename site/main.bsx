@@ -358,7 +358,7 @@ token (plus AWS for the social stack's state bucket).
 			<!-- the published document: the site plus what it borrows from the
 			     workspace, staged outside the checkout and mirrored whole -->
 			<RepoStage src="site">
-				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 			</RepoStage>
 			<RepoSync/>
 			<TofuApply/>
@@ -382,7 +382,7 @@ token (plus AWS for the social stack's state bucket).
 			     minting one of this launch's own that nothing serves -->
 			<AdoptCurrentDeploy/>
 			<RepoStage src="site">
-				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 			</RepoStage>
 			<RepoSync/>
 			<!-- content is read from the store per request, so the sync above is
@@ -397,7 +397,7 @@ token (plus AWS for the social stack's state bucket).
 			<LightsailWatch timeout="300s"/>
 		</Route>
 		<Route path="assets" {ExchangeSequence}>
-			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 		</Route>
 		</Fragment>
 	</Stack>
@@ -419,7 +419,7 @@ token (plus AWS for the social stack's state bucket).
 			</Group>
 			<DeployRoutes deploy={$shared_up} destroy={$shared_down}/>
 			<Route path="push" {ExchangeSequence}>
-				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb,wasm/beet-full.wasm"/>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<DirSync bucket="assets" local_dir="site/assets"/>
 			</Route>
 			<Route path="pull" {ExchangeSequence}>

@@ -44,11 +44,17 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 		<!-- build the native binary, then the deploy bakes it into the image -->
 		<BeetBinaryBuild features="aws_sdk"/>
 		<CloudflareContainerDeployAction/>
+		<!-- the wasm binary the site's pages boot, built by this verb rather
+		     than borrowed: the sync uploads it through the site's `wasm/` links -->
+		<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-container" timeout="10s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
+		<!-- the wasm binary the site's pages boot, built by this verb rather
+		     than borrowed: the sync uploads it through the site's `wasm/` links -->
+		<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>

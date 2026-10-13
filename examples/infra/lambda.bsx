@@ -48,6 +48,9 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 			<TofuApply layer="storage"/>
 			<!-- publish the site: stage it, then one mirror into this deploy's
 			     version of the repo store -->
+			<!-- the wasm binary the site's pages boot, built by this verb rather
+			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 			<RepoStage src="examples/bsx_site"/>
 			<RepoSync/>
 			<TofuApply/>
@@ -63,6 +66,9 @@ Live deploy needs AWS credentials in the environment, plus `tofu`,
 		     built against rather than a fresh one nothing reads -->
 		<Route path="sync" {ExchangeSequence}>
 			<AdoptCurrentDeploy/>
+			<!-- the wasm binary the site's pages boot, built by this verb rather
+			     than borrowed: the stage reads it through the site's `wasm/` links -->
+			<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 			<RepoStage src="examples/bsx_site"/>
 			<RepoSync/>
 		</Route>

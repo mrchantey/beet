@@ -33,6 +33,6 @@ a deploy builds it before publishing (`<WasmArtifact/>`).
 	<DefaultAppRoutes/>
 	<RoutesDir src="routes"/>
 	<ServeBlobs prefix="repo"/>
-	<AssetsDir src="assets" prefix="assets"/>
+	<AssetsDir src="wasm" prefix="wasm"/>
 </Router>
 </CallOnReady>
