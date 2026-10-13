@@ -36,8 +36,13 @@ use beet_core::prelude::*;
 /// the entity's `Running<Response>`, which signals any co-resident facet: a bare
 /// start of an entity carrying both a `CliServer` and an [`HttpServer`]
 /// dispatches once and exits.
+///
+/// Its request is this process's argv, so it declares ([`DeclaresParams`])
+/// its own `--accept` and every launch knob [`BootstrapConfig`] reads off the
+/// same argv: a strict router beneath it (`RejectUnknownParams`) recognises
+/// `--entry` and `--stage` beside the route's own params.
 #[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
+#[reflect(Component, Default, DeclaresParams)]
 #[component(on_add = hook_ext::component_hook(CliServer::add_facet))]
 pub struct CliServer {
 	/// Dispatch on every boot, ignoring `--server`.
@@ -92,6 +97,71 @@ impl CliServer {
 	}
 }
 
+impl DeclaresParams for CliServer {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<(CliParams, LaunchParams)>()
+	}
+}
+
+/// The params a [`CliServer`] reads off its request.
+#[derive(Reflect)]
+struct CliParams {
+	/// The media types to answer in, highest priority first, eg
+	/// `--accept=text/html,text/plain`. Defaults to ANSI for a terminal and
+	/// markdown when stdout is not one.
+	accept: Vec<String>,
+}
+
+/// The launch knobs [`BootstrapConfig`] reads off this process's argv, as a
+/// params type, so the request carrying that argv (a [`CliServer`]'s)
+/// declares them like any route's params.
+///
+/// Declared, never read: a launch is not a request, so every knob is read
+/// through [`BootstrapConfig::get`]. `launch_params_match_bootstrap_knobs`
+/// pins the two together.
+#[derive(Reflect)]
+struct LaunchParams {
+	/// The entry document: a path, or a directory holding a `main.bsx`.
+	entry: Option<String>,
+	/// The repo store the entry loads through, eg `s3://my-bucket`.
+	repo: Option<StoreUri>,
+	/// The local store the repo store is forked into, reads falling through
+	/// to the repo and writes landing here.
+	store_fork: Option<StoreUri>,
+	/// Watch the entry's sources and live-reload.
+	watch: bool,
+	/// Cargo features this binary must have been built with, comma separated.
+	features: Vec<String>,
+	/// Which declared servers boot, comma separated, eg `http,ssh`.
+	server: Option<String>,
+	/// The route a freshly-opened tui/ssh surface navigates to.
+	path: Option<String>,
+	/// The address servers bind to.
+	host: Option<String>,
+	/// The http listener port.
+	port: Option<u16>,
+	/// The ssh listener port.
+	ssh_port: Option<u16>,
+	/// The infrastructure stage this process runs in, defaulting to `dev`.
+	stage: Option<String>,
+	/// Whether services resolve locally or against the cloud.
+	service_access: Option<ServiceAccess>,
+	/// This deployment's unique id.
+	deploy_id: Option<String>,
+	/// This deployment's timestamp.
+	deploy_timestamp: Option<String>,
+	/// Force TLS on or off, overriding the managed-platform detection.
+	tls: Option<bool>,
+	/// Where the cached dev certificate lives.
+	tls_dir: Option<String>,
+	/// Run terminal surfaces buffered, never touching the real tty.
+	headless: bool,
+	/// Capture the first window to this PNG and exit.
+	screenshot: Option<String>,
+	/// The frame the screenshot harness captures on.
+	screenshot_frame: Option<u32>,
+}
+
 /// The negotiation when neither `--accept` nor the server's `accept` is set:
 /// ANSI for a terminal, markdown first when stdout is not one.
 fn default_accept() -> Vec<MediaType> {
@@ -124,17 +194,17 @@ async fn route_and_end(
 	request: Request,
 	accept: Vec<MediaType>,
 ) -> Result {
-	// `--accept` may arrive as several params (CliArgs splits comma lists), so
-	// gather every value's media types.
-	let accept = request
-		.get_params("accept")
-		.map(|values| {
-			values
-				.iter()
-				.flat_map(|value| MediaType::from_accepts(value))
-				.collect::<Vec<_>>()
-		})
-		.or_else(|| (!accept.is_empty()).then_some(accept))
+	// `--accept` may repeat, each value a comma separated list, so gather
+	// every value's media types.
+	let requested = request
+		.parse_params::<CliParams>()?
+		.accept
+		.iter()
+		.flat_map(|value| MediaType::from_accepts(value))
+		.collect::<Vec<_>>();
+	let accept = [requested, accept]
+		.into_iter()
+		.find(|accept| !accept.is_empty())
 		.unwrap_or_else(default_accept);
 	// a server holds no dispatch of its own: hop down to the router child.
 	let response = server
@@ -146,6 +216,23 @@ async fn route_and_end(
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	/// Every knob a launch reads off argv is a param the [`CliServer`]
+	/// declares, and nothing else is: a knob added to [`BootstrapConfig`]
+	/// fails here rather than leaving a strict server refusing it.
+	#[beet_core::test]
+	fn launch_params_match_bootstrap_knobs() {
+		let mut declared = ParamsPartial::new::<LaunchParams>()
+			.iter()
+			.map(|meta| meta.name().to_string())
+			.collect::<Vec<_>>();
+		declared.sort();
+		let mut knobs = BootstrapConfig::arg_names()
+			.map(ToString::to_string)
+			.collect::<Vec<_>>();
+		knobs.sort();
+		declared.xpect_eq(knobs);
+	}
 
 	#[beet_core::test]
 	fn into_request_simple_path() {

@@ -1,3 +1,4 @@
+use super::*;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
@@ -40,6 +41,9 @@ pub struct ParamsPartial {
 	/// The parameter metadata items for this partial.
 	#[deref]
 	pub items: Vec<ParamMeta>,
+	/// Whether the route forwards every param it does not name to a program
+	/// it runs, see [`forwarding`](Self::forwarding).
+	forwards: bool,
 	/// Checks params against the declared type without calling the route.
 	#[reflect(ignore)]
 	validate_fn: ValidateFn,
@@ -87,8 +91,24 @@ impl ParamsPartial {
 			TypeInfo::Struct(_) => ValidateFn(Some(Self::validate_as::<T>)),
 			_ => ValidateFn(None),
 		};
-		Self { items, validate_fn }
+		Self {
+			items,
+			forwards: false,
+			validate_fn,
+		}
 	}
+
+	/// This partial, forwarding every param it does not name to a program the
+	/// route runs (`run-wasm` hands the test runner's flags to the module), so
+	/// no param is unknown to a strict server ([`DeclaredParams`]).
+	pub fn forwarding(mut self) -> Self {
+		self.forwards = true;
+		self
+	}
+
+	/// Whether the route forwards the params it does not name, see
+	/// [`forwarding`](Self::forwarding).
+	pub fn forwards(&self) -> bool { self.forwards }
 
 	/// Checks `params` against the declared type without calling the route,
 	/// the check a caller makes before dispatching params it did not read
@@ -96,19 +116,9 @@ impl ParamsPartial {
 	/// one present and every value parsing as its field's type. A tuple of
 	/// params types is checked by its keys alone.
 	pub fn validate(&self, params: &MultiMap<SmolStr, SmolStr>) -> Result {
-		for key in params.keys() {
-			let flag = key.replace('_', "-");
-			if !self.items.iter().any(|item| item.key == flag) {
-				bevybail!(
-					"`--{flag}` is no param here; the params are {}",
-					self.items
-						.iter()
-						.map(|item| format!("`--{}`", item.key))
-						.collect::<Vec<_>>()
-						.join(", ")
-				);
-			}
-		}
+		DeclaredParams::default()
+			.with(self)
+			.reject_unknown(params)?;
 		match self.validate_fn.0 {
 			Some(validate) => validate(params),
 			None => Ok(()),
@@ -205,6 +215,21 @@ impl ParamsPattern {
 		Self { items }.xok()
 	}
 
+	/// Add each of `metas` whose key this pattern does not already declare: a
+	/// second declaration of a key is a second reader of the param, not a
+	/// contradiction, so the existing one wins.
+	pub fn extend_undeclared(
+		&mut self,
+		metas: impl IntoIterator<Item = ParamMeta>,
+	) {
+		for meta in metas {
+			if !self.items.iter().any(|item| item.key == meta.key) {
+				self.items.push(meta);
+			}
+		}
+		self.items.sort_by(|a, b| a.key.cmp(&b.key));
+	}
+
 	/// [`Self::collect`] represented as a bevy system
 	pub fn collect_system(
 		entity: In<Entity>,
@@ -214,9 +239,9 @@ impl ParamsPattern {
 		Self::collect(*entity, &ancestors, &params_partials)
 	}
 
-	/// Collects a [`ParamsPattern`] for a provided entity.
-	/// Only the provided entity and its parents are checked, any sibling
-	/// middleware params should also be specified at the [`Endpoint`].
+	/// Collects a [`ParamsPattern`] for a provided entity: the partials on it
+	/// and its ancestors. Its steps' partials are not among them, a route tree
+	/// adds those with [`extend_undeclared`](Self::extend_undeclared).
 	pub fn collect(
 		entity: Entity,
 		ancestors: &Query<&ChildOf>,
@@ -345,6 +370,20 @@ impl ParamMeta {
 		self
 	}
 
+	/// The param on one line as `--help` lists it: its flag, type and doc
+	/// line, ie `--port` (u16): The port to listen on.
+	pub fn summary(&self) -> String {
+		let short = self
+			.short()
+			.map(|short| format!(", `-{short}`"))
+			.unwrap_or_default();
+		let head = format!("`--{}`{short} ({})", self.key, self.type_path);
+		match self.description() {
+			Some(description) => format!("{head}: {description}"),
+			None => head,
+		}
+	}
+
 	/// The short character representation
 	pub fn short(&self) -> Option<char> { self.options.short }
 
@@ -438,23 +477,15 @@ fn kind_from_type_path(type_path: &str) -> String {
 }
 
 /// Additional options for parameter metadata.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+)]
 pub struct ParamOptions {
-	/// A description of the route param, usually the
-	/// docs section of a provided params type
+	/// A description of the route param, usually the doc comment of its
+	/// field on the params type.
 	description: Option<String>,
-	/// requiredly specify a single character representation
-	/// for a route param
+	/// A single character short flag, ie the `r` in `-r`.
 	short: Option<char>,
-}
-
-impl Default for ParamOptions {
-	fn default() -> Self {
-		Self {
-			description: None,
-			short: None,
-		}
-	}
 }
 
 impl ParamOptions {
@@ -485,10 +516,13 @@ impl ParamOptions {
 	fn from_reflect(field: &bevy::reflect::NamedField) -> Self {
 		#[allow(unused_mut)]
 		let mut opts = field.get_attribute::<Self>().cloned().unwrap_or_default();
-		// Override description from docs if not specified
+		// the doc comment describes a param the attribute leaves undescribed,
+		// its wrapped lines joined into the one line a help row holds
 		#[cfg(feature = "bevy_reflect_documentation")]
-		if opts.description == None {
-			opts.description = field.docs().map(|docs| docs.into());
+		if opts.description.is_none() {
+			opts.description = field.docs().map(|docs| {
+				docs.split_whitespace().collect::<Vec<_>>().join(" ")
+			});
 		}
 		opts
 	}
@@ -497,7 +531,6 @@ impl ParamOptions {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 
 	/// A unit-only enum documents the words it takes.
 	#[beet_core::test]
@@ -726,7 +759,7 @@ mod test {
 			.validate(&params(&[("foo", "3"), ("bazz", "x")]))
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`--bazz` is no param here");
+			.xpect_contains("unknown param `--bazz`, did you mean `--bar`?");
 	}
 
 	/// What `--help` says a flag is, the typed read enforces: over a params

@@ -114,6 +114,26 @@ pub fn SiteLayout(
 	}
 }
 
+/// The param [`PageClasses::resolve`] reads, declared ([`DeclaresParams`]) by
+/// whatever themes a page through it: a [`Layout`], the [`HelpHandler`] page,
+/// a [`TuiServer`].
+#[derive(Debug, Default, Clone, Reflect)]
+pub struct ColorSchemeParams {
+	/// Pin the page's color scheme over the negotiated one.
+	pub color_scheme: Option<ColorScheme>,
+}
+
+impl ColorSchemeParams {
+	/// The scheme `parts` pins, if any. Lenient: a scheme no page knows is
+	/// the negotiated one rather than a failed render.
+	pub fn of(parts: &RequestParts) -> Option<ColorScheme> {
+		parts
+			.parse_params::<Self>()
+			.ok()
+			.and_then(|params| params.color_scheme)
+	}
+}
+
 /// The one page-body class resolution every layout shares: a document root is
 /// themed by request, not by host.
 ///

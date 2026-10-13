@@ -1,8 +1,9 @@
 //! Help middleware that renders route documentation as a material widget.
 //!
 //! When the `--help` (or `?help`) param is present, [`HelpHandler`] collects the
-//! scoped [`RouteTree`] into [`RouteEntry`] rows and renders the [`RouteList`]
-//! template. That listing has exactly one home: an unmatched path gets
+//! scoped [`RouteTree`] into [`RouteEntry`] rows, each documenting the params a
+//! [`RejectUnknownParams`] url space accepts for it, and renders the
+//! [`RouteList`] template. That listing has exactly one home: an unmatched path gets
 //! [`ContextualNotFound`]'s small [`NotFoundPage`], which names the miss and
 //! links here rather than enumerating the url space to whoever asked. Both go
 //! through [`LivePage::respond`], so an ancestor layout (the document chrome)
@@ -21,15 +22,18 @@ use beet_ui::prelude::*;
 /// [`RouteList`] through the layout.
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component)]
-#[component(on_add = on_add_middleware::<Self, Request, Response>)]
+#[reflect(Component, DeclaresParams)]
+#[component(on_add = MiddlewareList::<Request, Response>::on_add::<Self>)]
 pub async fn HelpHandler(
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
 
-	if !request.has_param("help") {
+	if !request
+		.parse_params::<HelpParams>()
+		.is_ok_and(|params| params.help)
+	{
 		return next.call(request).await;
 	}
 
@@ -37,15 +41,15 @@ pub async fn HelpHandler(
 	let parts = request.parts().clone();
 	let is_root = path.is_empty();
 
-	// the scoped route entries: the subtree under the requested path, else the
-	// whole tree, with the `help` route itself filtered out.
-	let entries = caller
+	// the scoped listing: the subtree under the requested path, else the whole
+	// tree, each route beside the params its dispatch path declares.
+	let listing = caller
 		.clone()
-		.with_state::<AncestorQuery<&RouteTree>, Result<Vec<RouteEntry>>>(
-			move |entity, query| {
-				let tree = query.get(entity)?;
+		.with_state::<(AncestorQuery<&RouteTree>, DeclaredParamsQuery), Result<HelpListing>>(
+			move |entity, (trees, declared)| {
+				let tree = trees.get(entity)?;
 				let subtree = tree.find_subtree(&path).unwrap_or(tree);
-				route_entries(subtree).xok()
+				HelpListing::new(subtree, &declared).xok()
 			},
 		)
 		.await??;
@@ -56,8 +60,23 @@ pub async fn HelpHandler(
 		false => Vec::new(),
 	};
 
-	let root = spawn_route_list(&caller, &parts, entries, prescans).await?;
+	let root = spawn_route_list(&caller, &parts, listing, prescans).await?;
 	LivePage::respond(root, &caller, parts).await
+}
+
+/// The params the help reads, its own flag and the page's color scheme.
+impl DeclaresParams for HelpHandler {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<(HelpParams, ColorSchemeParams)>()
+	}
+}
+
+/// The flag [`HelpHandler`] answers.
+#[derive(Reflect)]
+struct HelpParams {
+	/// List the routes beneath this one and the params each takes, rather
+	/// than calling it.
+	help: bool,
 }
 
 /// The registered [`Prescan`] set as help rows, empty in a world with none.
@@ -118,6 +137,65 @@ pub struct NotFoundNotice {
 	pub ancestor_path: Option<String>,
 }
 
+/// What a help lists: the routes in scope, each with the params only it takes,
+/// and the params every one of them inherits, listed once.
+///
+/// Built from each route's [`ActionNode::declared_params`], the union a
+/// [`RejectUnknownParams`] url space checks a request against, so the help
+/// documents exactly the params a strict server accepts.
+struct HelpListing {
+	/// One row per route, the `help` route itself excluded.
+	entries: Vec<RouteEntry>,
+	/// The params declared above every listed route, by the router's
+	/// middleware, the server or the launch it serves.
+	inherited: Vec<ParamsGroup>,
+}
+
+impl HelpListing {
+	/// The listing of every route in `tree`, the `help` route excluded.
+	fn new(tree: &RouteTree, query: &DeclaredParamsQuery) -> Self {
+		let routes = tree
+			.flatten_nodes()
+			.into_iter()
+			.filter(|node| {
+				node.path.annotated_path().last_segment() != Some("help")
+			})
+			.map(|node| (node, node.declared_params(query)))
+			.collect::<Vec<_>>();
+		let first = routes
+			.first()
+			.map(|(_, declared)| declared.declarations())
+			.unwrap_or_default();
+		// a declarer above every listed route is listed once, beneath them all
+		let shared = first
+			.iter()
+			.map(|declaration| declaration.declarer)
+			.filter(|declarer| {
+				*declarer != ParamsDeclarer::Route
+					&& routes.iter().all(|(_, declared)| {
+						declared.declarations().iter().any(|declaration| {
+							declaration.declarer == *declarer
+						})
+					})
+			})
+			.collect::<Vec<_>>();
+		let mut listed = HashSet::default();
+		let inherited = ParamsGroup::collect(
+			first
+				.iter()
+				.filter(|declaration| shared.contains(&declaration.declarer)),
+			&mut listed,
+		);
+		let entries = routes
+			.into_iter()
+			.map(|(node, declared)| {
+				RouteEntry::new(node, &declared, &shared, listed.clone())
+			})
+			.collect();
+		Self { entries, inherited }
+	}
+}
+
 /// A single route row in the [`RouteList`], flattened from an [`ActionNode`] into
 /// the render-friendly shape the template consumes.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
@@ -128,8 +206,121 @@ pub(crate) struct RouteEntry {
 	pub tag: Option<String>,
 	/// Detail rows (`label`, `value`): description, input/output types.
 	pub details: Vec<(String, String)>,
-	/// The route's params, rendered as a table beneath the details.
+	/// The route's own params, rendered as a table beneath the details.
 	pub params: Vec<RouteParam>,
+	/// The params this route inherits that not every listed route does, ie
+	/// from the server on a `serve` route.
+	pub inherited: Vec<ParamsGroup>,
+}
+
+impl RouteEntry {
+	/// Flatten one [`ActionNode`] into a row: path + kind tag, the detail rows
+	/// (description, non-trivial input/output types), its own params, then
+	/// those it inherits from a declarer outside `shared`, skipping any param
+	/// `listed` already names.
+	fn new(
+		node: &ActionNode,
+		declared: &DeclaredParams,
+		shared: &[ParamsDeclarer],
+		mut listed: HashSet<String>,
+	) -> Self {
+		let path = node.path.annotated_path().to_string();
+		let tag = if node.is_scene() {
+			Some("scene".to_string())
+		} else {
+			node.method.as_ref().map(|method| method.to_string())
+		};
+
+		let mut details: Vec<(String, String)> = Vec::new();
+		if let Some(description) = node.description() {
+			details
+				.push(("description".into(), description.trim().to_string()));
+		}
+		// only show input/output for non-trivial, non-exchange, non-scene
+		// routes, an exchange sequence's step outcome an exchange too
+		let input_type = node.meta.input().type_name();
+		let output_type = node.meta.output().type_name();
+		let is_trivial = input_type == "()" && output_type == "()";
+		let is_exchange = node.meta.input_is::<Request>()
+			&& (node.meta.output_is::<Response>()
+				|| node.meta.output_is::<Outcome<Request, Response>>());
+		if !is_trivial && !is_exchange && !node.is_scene() {
+			details.push(("input".into(), input_type.to_string()));
+			details.push(("output".into(), output_type.to_string()));
+		}
+		if declared.forwards() {
+			details.push((
+				"forwards".into(),
+				"any other param, to the program it runs".into(),
+			));
+		}
+
+		// its own params, once each by name
+		let mut own = declared
+			.declarations()
+			.iter()
+			.filter(|declaration| declaration.declarer == ParamsDeclarer::Route)
+			.flat_map(|declaration| declaration.params.iter())
+			.collect::<Vec<_>>();
+		own.sort_by(|left, right| left.name().cmp(right.name()));
+		own.dedup_by(|left, right| left.name() == right.name());
+		listed.extend(own.iter().map(|meta| meta.name().to_string()));
+		let inherited = ParamsGroup::collect(
+			declared.declarations().iter().filter(|declaration| {
+				declaration.declarer != ParamsDeclarer::Route
+					&& !shared.contains(&declaration.declarer)
+			}),
+			&mut listed,
+		);
+
+		Self {
+			href: format!("/{path}"),
+			tag,
+			details,
+			params: own.into_iter().map(RouteParam::from).collect(),
+			inherited,
+		}
+	}
+}
+
+/// The params one declarer above a route reads, ie a server's bind knobs,
+/// listed under the declaring type.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+pub(crate) struct ParamsGroup {
+	/// The declaring type, ie `CliServer`.
+	pub declarer: String,
+	/// Its params, in declaration order.
+	pub params: Vec<RouteParam>,
+}
+
+impl ParamsGroup {
+	/// One group per declaring component, each param once: a param `listed`
+	/// already names is skipped, and a group left empty dropped.
+	fn collect<'a>(
+		declarations: impl IntoIterator<Item = &'a ParamsDeclaration>,
+		listed: &mut HashSet<String>,
+	) -> Vec<Self> {
+		declarations
+			.into_iter()
+			.filter_map(|declaration| {
+				let ParamsDeclarer::Component { name, .. } =
+					declaration.declarer
+				else {
+					return None;
+				};
+				let params = declaration
+					.params
+					.iter()
+					.filter(|meta| listed.insert(meta.name().to_string()))
+					.map(RouteParam::from)
+					.collect::<Vec<_>>();
+				(!params.is_empty()).then(|| Self {
+					declarer: name.to_string(),
+					params,
+				})
+			})
+			.collect()
+	}
 }
 
 /// One registered [`Prescan`] type as the root help lists it: the tag and
@@ -158,9 +349,22 @@ pub(crate) struct RouteParam {
 	pub description: Option<String>,
 }
 
+impl From<&ParamMeta> for RouteParam {
+	fn from(meta: &ParamMeta) -> Self {
+		Self {
+			name: meta.name().to_string(),
+			kind: meta.type_path().to_string(),
+			required: meta.is_required(),
+			short: meta.short().map(|short| short.to_string()),
+			description: meta.description().map(String::from),
+		}
+	}
+}
+
 /// The help view: a material list of [`RouteEntry`] rows under an "Available
-/// routes" heading, followed on the root help by the [`PrescanEntry`] rows under
-/// "Before the build".
+/// routes" heading, the [`ParamsGroup`]s every route inherits under "Inherited
+/// params", and on the root help the [`PrescanEntry`] rows under "Before the
+/// build".
 ///
 /// One template for both the CLI `--help` and the web `?help`, and the ONE place
 /// the url space is enumerated: an unmatched path gets [`NotFoundPage`], which
@@ -173,15 +377,40 @@ pub(crate) struct RouteParam {
 #[template]
 pub fn RouteList(
 	entries: Vec<RouteEntry>,
+	inherited: Vec<ParamsGroup>,
 	prescans: Vec<PrescanEntry>,
 ) -> impl Bundle {
 	let items: Vec<_> = entries.into_iter().map(route_entry_item).collect();
+	let inherited = (!inherited.is_empty()).then(|| inherited_list(inherited));
 	let prescans = (!prescans.is_empty()).then(|| prescan_list(prescans));
 	rsx! {
 		<>
 			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Available routes"</h2>
 			<ul>{items}</ul>
+			{inherited}
 			{prescans}
+		</>
+	}
+}
+
+/// The params every listed route inherits, grouped by declarer.
+fn inherited_list(groups: Vec<ParamsGroup>) -> impl Bundle {
+	let groups: Vec<_> = groups.into_iter().map(params_group).collect();
+	rsx! {
+		<>
+			<h2 {Classes::new([classes::TEXT_HEADLINE_SMALL])}>"Inherited params"</h2>
+			<p>"Taken by every route above, read by the middleware, server or launch declaring them."</p>
+			{groups}
+		</>
+	}
+}
+
+/// One declarer's params: its name, then their table.
+fn params_group(group: ParamsGroup) -> impl Bundle {
+	rsx! {
+		<>
+			<p>"from "<strong>{group.declarer}</strong></p>
+			{params_table(group.params)}
 		</>
 	}
 }
@@ -242,14 +471,15 @@ pub fn NotFoundPage(notice: NotFoundNotice) -> impl Bundle {
 	}
 }
 
-/// One route row: the path heading with its kind tag, a nested detail list, and
-/// (when the route takes params) a params table.
+/// One route row: the path heading with its kind tag, a nested detail list,
+/// its own params table and one per declarer only it inherits from.
 fn route_entry_item(entry: RouteEntry) -> impl Bundle {
 	let RouteEntry {
 		href,
 		tag,
 		details,
 		params,
+		inherited,
 	} = entry;
 	// the kind tag (eg `[scene]`/`[GET]`) folds into the heading text so the row
 	// stays a single link plus a flat detail list.
@@ -260,12 +490,14 @@ fn route_entry_item(entry: RouteEntry) -> impl Bundle {
 			rsx! { <li><strong>{format!("{label}:")}</strong>{format!(" {value}")}</li> }
 		})
 		.collect();
+	let inherited: Vec<_> = inherited.into_iter().map(params_group).collect();
 	rsx! {
 		<li>
 			<a href=href.clone()>{href}</a>
 			{tag}
 			{(!details.is_empty()).then(|| rsx! { <ul>{details}</ul> })}
 			{(!params.is_empty()).then(|| params_table(params))}
+			{inherited}
 		</li>
 	}
 }
@@ -336,17 +568,18 @@ fn params_table(params: Vec<RouteParam>) -> impl Bundle {
 async fn spawn_route_list(
 	caller: &AsyncEntity,
 	parts: &RequestParts,
-	entries: Vec<RouteEntry>,
+	listing: HelpListing,
 	prescans: Vec<PrescanEntry>,
 ) -> Result<Entity> {
 	let parts = parts.clone();
+	let HelpListing { entries, inherited } = listing;
 	caller
 		.world()
 		.with(move |world: &mut World| {
 			spawn_page(
 				world,
 				&parts,
-				rsx! { <RouteList entries=entries prescans=prescans/> },
+				rsx! { <RouteList entries=entries inherited=inherited prescans=prescans/> },
 			)
 		})
 		.await
@@ -382,61 +615,6 @@ fn spawn_page(
 	id.xok()
 }
 
-/// Collect a [`RouteTree`] into [`RouteEntry`] rows, excluding the `help` route.
-fn route_entries(tree: &RouteTree) -> Vec<RouteEntry> {
-	tree.flatten_nodes()
-		.into_iter()
-		.filter(|node| {
-			node.path.annotated_path().last_segment() != Some("help")
-		})
-		.map(route_entry)
-		.collect()
-}
-
-/// Flatten one [`ActionNode`] into a [`RouteEntry`]: path + kind tag, then the
-/// detail rows (description, non-trivial input/output types, params).
-fn route_entry(node: &ActionNode) -> RouteEntry {
-	let path = node.path.annotated_path().to_string();
-	let tag = if node.is_scene() {
-		Some("scene".to_string())
-	} else {
-		node.method.as_ref().map(|method| method.to_string())
-	};
-
-	let mut details: Vec<(String, String)> = Vec::new();
-	if let Some(description) = node.description() {
-		details.push(("description".into(), description.to_string()));
-	}
-	// only show input/output for non-trivial, non-exchange, non-scene routes
-	let input_type = node.meta.input().type_name();
-	let output_type = node.meta.output().type_name();
-	let is_trivial = input_type == "()" && output_type == "()";
-	let is_exchange =
-		input_type.ends_with("Request") && output_type.ends_with("Response");
-	if !is_trivial && !is_exchange && !node.is_scene() {
-		details.push(("input".into(), input_type.to_string()));
-		details.push(("output".into(), output_type.to_string()));
-	}
-	let params = node
-		.params
-		.iter()
-		.map(|param| RouteParam {
-			name: param.name().to_string(),
-			kind: param.type_path().to_string(),
-			required: param.is_required(),
-			short: param.short().map(|short| short.to_string()),
-			description: param.description().map(String::from),
-		})
-		.collect();
-
-	RouteEntry {
-		href: format!("/{path}"),
-		tag,
-		details,
-		params,
-	}
-}
-
 /// Walk path segments from longest to shortest prefix, naming the first ancestor
 /// that matches a scene route, so the not-found link lands on the help that
 /// covers the miss rather than always on the root's.
@@ -469,15 +647,158 @@ mod test {
 
 	/// Request `path` (CLI form), negotiating HTML, returning the rendered body.
 	async fn help_body(world: &mut World, root: Entity, path: &str) -> String {
+		help_as(world, root, path, MediaType::Html).await
+	}
+
+	/// Request `path` (CLI form), negotiating `media`, returning the body.
+	async fn help_as(
+		world: &mut World,
+		root: Entity,
+		path: &str,
+		media: MediaType,
+	) -> String {
 		world
 			.entity_mut(root)
 			.exchange(
 				Request::from_cli_str(path)
-					.with_header::<header::Accept>(vec![MediaType::Html]),
+					.with_header::<header::Accept>(vec![media]),
 			)
 			.await
 			.unwrap_str()
 			.await
+	}
+
+	/// The flags the `deploy` command reads.
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct DeployParams {
+		/// Deploy as an administrator.
+		elevated: bool,
+		/// Plan without applying.
+		dry_run: bool,
+	}
+
+	/// The flag a step of the `audit` sequence reads.
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct AuditParams {
+		/// Repair what the audit finds.
+		fix: bool,
+	}
+
+	/// The flag [`VerboseLogger`] reads.
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct VerboseParams {
+		/// Log every request.
+		verbose: bool,
+	}
+
+	/// Stands in for a command.
+	#[action]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Command(_cx: ActionContext<Request>) -> Result<Response> {
+		Response::ok().xok()
+	}
+
+	/// Stands in for a declarer above one route alone, ie a server on `serve`.
+	#[derive(Default, Component, Reflect)]
+	#[reflect(Component, DeclaresParams)]
+	struct VerboseLogger;
+
+	impl DeclaresParams for VerboseLogger {
+		fn declared_params() -> ParamsPartial {
+			ParamsPartial::new::<VerboseParams>()
+		}
+	}
+
+	/// A strict CLI: a [`CliServer`] over a router with help and a `stack`
+	/// group whose `deploy` takes [`DeployParams`], whose `audit` step
+	/// declares [`AuditParams`] and whose `serve` carries a [`VerboseLogger`].
+	/// Returns the router.
+	fn spawn_cli(world: &mut World) -> Entity {
+		world
+			.resource::<AppTypeRegistry>()
+			.write()
+			.register::<VerboseLogger>();
+		let audit_step =
+			Action::<Request, Outcome<Request, Response>>::new_pure(
+				|cx: ActionContext<Request>| Outcome::Pass(cx.take()).xok(),
+			);
+		let root = world
+			.spawn(((CliServer::default(), RejectUnknownParams), children![(
+				(Router, HelpHandler::default()),
+				children![(PathPartial::new("stack"), children![
+					(
+						route::exchange("deploy", Command),
+						ParamsPartial::new::<DeployParams>()
+					),
+					(PathPartial::new("audit"), ExchangeSequence, children![(
+						audit_step,
+						ParamsPartial::new::<AuditParams>()
+					)]),
+					(route::exchange("serve", Command), VerboseLogger),
+				])]
+			)]))
+			.flush();
+		world.entity(root).get::<Children>().unwrap()[0]
+	}
+
+	/// Every param a strict server accepts for a route, its own, its steps'
+	/// and those declared above it, is documented by that route's help.
+	#[beet_core::test]
+	async fn help_lists_every_param_a_strict_server_accepts() {
+		let mut world = router_world();
+		let router = spawn_cli(&mut world);
+		let nodes = RouteTree::of(&world, router)
+			.unwrap()
+			.flatten_nodes()
+			.into_iter()
+			.cloned()
+			.collect::<Vec<_>>();
+		let routes = world.with_state::<DeclaredParamsQuery, _>(|query| {
+			nodes
+				.iter()
+				.map(|node| {
+					let names = node
+						.declared_params(&query)
+						.params()
+						.map(|meta| meta.name().to_string())
+						.collect::<Vec<_>>();
+					(node.path.annotated_path().to_string(), names)
+				})
+				.collect::<Vec<_>>()
+		});
+		// the fixture exercises every kind of declarer
+		routes
+			.iter()
+			.flat_map(|(_, names)| names.iter())
+			.collect::<HashSet<_>>()
+			.xmap(|names| {
+				["elevated", "fix", "verbose", "help", "accept", "entry"]
+					.iter()
+					.all(|name| names.contains(&name.to_string()))
+			})
+			.xpect_true();
+		for (path, names) in routes {
+			let body =
+				help_body(&mut world, router, &format!("{path} --help")).await;
+			names.iter().fold(body, |body, name| {
+				body.xpect_contains(format!("<td>{name}"))
+			});
+		}
+	}
+
+	/// A scoped help lists each route's own params beneath it, those only one
+	/// route inherits beside its own, and those every route inherits once.
+	#[beet_core::test]
+	async fn help_page_groups_params_by_declarer() {
+		let mut world = router_world();
+		let router = spawn_cli(&mut world);
+		help_as(&mut world, router, "stack --help", MediaType::Markdown)
+			.await
+			.xpect_snapshot();
 	}
 
 	#[beet_core::test]

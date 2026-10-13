@@ -96,8 +96,12 @@ impl Router {
 				// find the matching route in the tree, holding it in flight in
 				// the same access so a swap landing before the handler answers
 				// retires the route rather than despawning it mid-call
-				let (node, _in_flight) =
-					find_route(&world, caller.id(), path).await;
+				let FoundRoute {
+					node,
+					in_flight: _in_flight,
+					rejects_unknown_params,
+					misspells,
+				} = find_route(&world, caller.id(), path.clone()).await;
 
 				// a draft page never reaches production, live-served as well as
 				// exported: it is answered exactly as an unknown url, so a 404
@@ -137,6 +141,19 @@ impl Router {
 							}
 							_ => {}
 						}
+						// a strict url space refuses a param nothing on the
+						// route's path declares, before the path's own
+						// segments join the params
+						if rejects_unknown_params
+							&& let Err(err) = RejectUnknownParams::check(
+								&world,
+								node,
+								request.params().clone(),
+							)
+							.await
+						{
+							return Response::from(err).xok();
+						}
 						// surface matched dynamic segments (`:id`) to the handler
 						node.merge_path_params(&mut request);
 						let entity = world.entity(node.entity);
@@ -151,6 +168,15 @@ impl Router {
 						(action, entity)
 					}
 					Ok(None) => {
+						// a strict url space refuses a misspelt route exactly as
+						// it refuses a misspelt param
+						if let Some(near) = misspells {
+							return RejectUnknownParams::misspelt_route(
+								&path, &near,
+							)
+							.xmap(Response::from)
+							.xok();
+						}
 						// no matching route — std builds a not-found response through the
 						// contextual help system so middleware still applies; no_std falls
 						// back to a plain-text route listing (no scene pipeline).
@@ -163,14 +189,55 @@ impl Router {
 					Err(err) => return Ok(bevyhow!("{err}").into_response()),
 				};
 
-				dispatch_entity
+				let err = match dispatch_entity
 					.call_with_middleware(inner_action, request)
 					.await
-					.unwrap_or_else(|err| err.into_response())
-					.xok()
+				{
+					Ok(response) => return response.xok(),
+					Err(err) => err,
+				};
+				// a param the request got wrong is the caller's error, named as
+				// the route's `--help` lists it
+				match (err.downcast_ref::<ParamError>().cloned(), node) {
+					(Some(param), Ok(Some(node))) => {
+						refuse_param(&world, node, param).await
+					}
+					_ => err.into_response(),
+				}
+				.xok()
 			},
 		)
 	}
+}
+
+/// A [`ParamError`] the matched route raised, as the `400` naming the param
+/// with its type and doc line, and pointing at the route's help.
+async fn refuse_param(
+	world: &AsyncWorld,
+	node: ActionNode,
+	err: ParamError,
+) -> Response {
+	let help = node.help_hint();
+	world
+		.with_state::<DeclaredParamsQuery, _>(move |query| {
+			node.declared_params(&query).explain(&err)
+		})
+		.await
+		.xmap(|message| HttpError::bad_request(format!("{message}\n{help}\n")))
+		.into()
+}
+
+/// What [`find_route`] resolved for one request.
+struct FoundRoute {
+	/// The matched route, `None` for no match.
+	node: Result<Option<ActionNode>>,
+	/// The matched route held in flight.
+	in_flight: Option<InFlightGuard>,
+	/// Whether the router's url space carries a [`RejectUnknownParams`].
+	rejects_unknown_params: bool,
+	/// For no match in a strict url space, the route the path most plausibly
+	/// misspells ([`RouteTree::closest`]).
+	misspells: Option<String>,
 }
 
 /// The route matching `path` in the tree above `router`, with its
@@ -180,27 +247,36 @@ async fn find_route(
 	world: &AsyncWorld,
 	router: Entity,
 	path: Vec<SmolStr>,
-) -> (Result<Option<ActionNode>>, Option<InFlightGuard>) {
+) -> FoundRoute {
 	world
-		.with_state::<(AncestorQuery<&RouteTree>, Query<&RouteInFlight>), _>(
-			move |(trees, in_flight)| {
-				let Ok(tree) = trees.get(router) else {
-					return (
-						Err(bevyhow!(
-							"Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?"
-						)),
-						None,
-					);
+		.with_state::<(
+			AncestorQuery<&RouteTree>,
+			Query<&RouteInFlight>,
+			RejectUnknownParamsQuery,
+		), _>(move |(trees, in_flight, strict)| {
+			let rejects_unknown_params = strict.governs(router);
+			let Ok(tree) = trees.get(router) else {
+				return FoundRoute {
+					node: Err(bevyhow!(
+						"Route tree not found. Was the `ActionMeta` added? was the `RouterPlugin` added?"
+					)),
+					in_flight: None,
+					rejects_unknown_params,
+					misspells: None,
 				};
-				match tree.find(&path) {
-					Some(node) => (
-						Ok(Some(node.clone())),
-						in_flight.get(node.entity).ok().map(RouteInFlight::begin),
-					),
-					None => (Ok(None), None),
-				}
-			},
-		)
+			};
+			let node = tree.find(&path);
+			FoundRoute {
+				in_flight: node.and_then(|node| {
+					in_flight.get(node.entity).ok().map(RouteInFlight::begin)
+				}),
+				misspells: (rejects_unknown_params && node.is_none())
+					.then(|| tree.closest(&path))
+					.flatten(),
+				node: Ok(node.cloned()),
+				rejects_unknown_params,
+			}
+		})
 		.await
 }
 
@@ -814,5 +890,58 @@ mod test {
 			.unwrap()
 			.xpect_contains("data: {\"index\":0}")
 			.xpect_contains("data: {\"index\":2}");
+	}
+
+	#[derive(Reflect)]
+	struct ServeParams {
+		/// The port to listen on.
+		port: u16,
+	}
+
+	/// Answers the port its required `--port` names.
+	#[action]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	#[require(ParamsPartial = ParamsPartial::new::<ServeParams>())]
+	async fn Serve(cx: ActionContext<RequestParts>) -> Result<String> {
+		cx.input
+			.parse_params::<ServeParams>()?
+			.port
+			.to_string()
+			.xok()
+	}
+
+	/// A param the request got wrong is the caller's error: a `400` naming the
+	/// param with its type and doc line, pointing at the route's help, where a
+	/// request carrying it is served.
+	#[beet_core::test]
+	async fn param_errors_are_bad_requests() {
+		async fn exchange(args: &str) -> Response {
+			router_world()
+				.spawn((Router::with_defaults(), children![route::exchange(
+					"serve", Serve
+				)]))
+				.exchange(Request::from_cli_str(args))
+				.await
+		}
+		let missing = exchange("serve").await;
+		missing.status().xpect_eq(StatusCode::BAD_REQUEST);
+		missing.text().await.unwrap().xpect_eq(
+			"missing required param `--port`\n`--port` (u16): The port to listen on.\n`serve --help` lists the params it takes\n",
+		);
+		let malformed = exchange("serve --port=abc").await;
+		malformed.status().xpect_eq(StatusCode::BAD_REQUEST);
+		malformed
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("invalid param `--port`: invalid number")
+			.xpect_contains("`--port` (u16): The port to listen on.")
+			.xpect_contains("`serve --help`");
+		exchange("serve --port=8080")
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("8080");
 	}
 }

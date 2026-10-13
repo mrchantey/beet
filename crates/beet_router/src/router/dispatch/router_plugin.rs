@@ -453,6 +453,21 @@ fn queue_route_tree_rebuild_on_root(
 	}
 }
 
+/// Observer that wakes [`rebuild_dirty_route_trees`] when a step declares its
+/// params: a [`ParamsPartial`] on an entity that is not a route, which the
+/// tree lists under the route running it (see [`RouteTreeBuilder`]). A step
+/// can land after its route joined the tree, ie a `children!` step spawned
+/// behind the route's own insert, so the route's insert alone would miss it.
+fn queue_route_tree_rebuild_on_step_params(
+	ev: On<Insert<ParamsPartial>>,
+	paths: Query<(), With<PathPartial>>,
+	mut commands: Commands,
+) {
+	if !paths.contains(ev.entity) {
+		queue_route_tree_rebuild(&mut commands, ev.entity);
+	}
+}
+
 /// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is inserted
 /// on any entity: a route joining the tree ([`PathPattern`]) or a route being
 /// hidden ([`RouteHidden`]).

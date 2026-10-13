@@ -99,6 +99,50 @@ impl RouteTreeBuilder<'_, '_> {
 		Ok(())
 	}
 
+	/// The params `route` takes beyond those its own insert collected: its
+	/// ancestors' partials again, since a scene load can insert one after the
+	/// route's pattern was computed, and its steps' ([`Self::step_params`]).
+	fn route_params(
+		&self,
+		route: Entity,
+		step_params: &HashMap<Entity, Vec<ParamMeta>>,
+	) -> Vec<ParamMeta> {
+		self.ancestors
+			.iter_ancestors_inclusive(route)
+			.filter_map(|entity| self.partials.get(entity).ok())
+			.flat_map(|partial| partial.iter().cloned())
+			.chain(step_params.get(&route).into_iter().flatten().cloned())
+			.collect()
+	}
+
+	/// The params each route's steps declare, by route: a step is a
+	/// descendant that is not itself a route, ie the `<ZoneAudit/>` an
+	/// `<Route path="audit" {ExchangeSequence}>` runs, so its `--fix` is a
+	/// param of `audit`, listed by its `--help` and accepted by a
+	/// [`RejectUnknownParams`] url space. A step belongs to its nearest
+	/// [`PathPartial`] ancestor when that is a route rather than a url space
+	/// root. Walks up for the same reason [`Self::is_at_or_under`] does.
+	fn step_params(&self) -> HashMap<Entity, Vec<ParamMeta>> {
+		let mut by_route = HashMap::<Entity, Vec<ParamMeta>>::default();
+		for (step, partial) in self.steps.iter() {
+			let Some(route) = self
+				.ancestors
+				.iter_ancestors(step)
+				.find(|ancestor| self.paths.contains(*ancestor))
+				.filter(|route| {
+					self.paths.get(*route).is_ok_and(|path| !path.is_root)
+				})
+			else {
+				continue;
+			};
+			by_route
+				.entry(route)
+				.or_default()
+				.extend(partial.iter().cloned());
+		}
+		by_route
+	}
+
 	/// Whether `entity` is `root` or sits anywhere beneath it.
 	///
 	/// Walks up from `entity` through [`ChildOf`] rather than down from `root`

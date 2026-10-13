@@ -13,6 +13,8 @@
 //! - [`Url`] / [`Scheme`]: URL representation and transport scheme
 //! - [`Body`]: Request/response body (bytes or stream)
 //! - [`PathPattern`] / [`ParamsPattern`]: URL pattern matching
+//! - [`DeclaredParams`]: every param a dispatch path declares, and the check
+//!   rejecting the rest
 //!
 //! ## Exchange Patterns
 //!
@@ -45,6 +47,8 @@ pub use media_bytes_ext::*;
 pub use response::*;
 mod param_pattern;
 pub use param_pattern::*;
+mod declared_params;
+pub use declared_params::*;
 mod path_pattern;
 pub use parts::*;
 pub use path_pattern::*;
