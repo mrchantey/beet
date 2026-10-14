@@ -53,8 +53,8 @@ impl ParamsQuery<'_, '_> {
 	///
 	/// ## Errors
 	///
-	/// Errors when two sources name one key with a different type or arity,
-	/// see [`ParamsPattern::from_declarations`], or a source takes a launch
+	/// Errors when two extractors name one key with a different type or arity,
+	/// see [`ParamsPattern::from_declarations`], or an extractor takes a launch
 	/// only knob.
 	pub fn of(&self, route: Entity) -> Result<ParamsPattern> {
 		let own = core::iter::once(route).chain(self.steps(route)).filter_map(
@@ -96,7 +96,7 @@ impl ParamsQuery<'_, '_> {
 		bevybail!(
 			"`{}` takes `--{}`, a launch knob the process request never \
 			carries: name the param otherwise",
-			item.sources[0].name,
+			item.extractors[0].name,
 			item.meta.name()
 		)
 	}
@@ -137,7 +137,6 @@ impl ParamsQuery<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
 
@@ -219,7 +218,7 @@ mod test {
 			.xpect_contains("`Stage` takes `--stage`, a launch knob");
 	}
 
-	/// Two sources of one key with different types are an error.
+	/// Two extractors of one key with different types are an error.
 	#[beet_core::test]
 	fn conflicts_are_errors() {
 		#[derive(Reflect)]

@@ -1473,7 +1473,7 @@ mod test {
 		// wide enough that the no-port message does not wrap mid-phrase.
 		let mut host = TestHost::sized(UVec2::new(80, 8));
 		// the fetch is queued async, so the host needs the async runtime.
-		host.app.init_plugin::<AsyncPlugin>();
+		host.app.add_type::<AsyncPlugin>();
 		// the host is its own surface, so the img resolves its graphics support.
 		host.app.world_mut().entity_mut(host.host).insert((
 			KittyGraphicsSupport { enabled: true },

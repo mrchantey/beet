@@ -1527,8 +1527,9 @@ fn Greeting() -> impl Bundle {
 #[cfg(feature = "markdown_parser")]
 #[beet_core::test]
 fn mdx_resolves_embedded_template() {
-	let mut world = world();
-	world.register_template::<Greeting>();
+	let mut app = world_ext::ui_app();
+	app.add_type::<Greeting>();
+	let world = app.world_mut();
 	let bytes = MediaBytes::new_markdown("# Title\n\n<Greeting/>\n");
 	let mut entity = world.spawn_empty();
 	MarkdownParser::new()
@@ -1536,7 +1537,7 @@ fn mdx_resolves_embedded_template() {
 		.unwrap();
 	let root = entity.id();
 	// the embedded <Greeting/> resolved to its <strong>Hi</strong> subtree.
-	render_html(&mut world, root).xpect_contains("<strong>Hi</strong>");
+	render_html(world, root).xpect_contains("<strong>Hi</strong>");
 }
 
 /// Parse markdown into a freshly spawned entity and render it to HTML.
@@ -1571,11 +1572,12 @@ fn Wrap() -> impl Bundle {
 #[cfg(feature = "markdown_parser")]
 #[beet_core::test]
 fn mdx_resolves_component_with_children() {
-	let mut world = world();
-	world.register_template::<Wrap>();
+	let mut app = world_ext::ui_app();
+	app.add_type::<Wrap>();
+	let world = app.world_mut();
 	// the open tag, the markdown body, and the close arrive as separate events;
 	// the BSX build path resolves the whole subtree.
-	render_markdown(&mut world, "<Wrap>**bold**</Wrap>")
+	render_markdown(world, "<Wrap>**bold**</Wrap>")
 		.xpect_contains("<section>")
 		.xpect_contains("<strong>bold</strong>");
 }

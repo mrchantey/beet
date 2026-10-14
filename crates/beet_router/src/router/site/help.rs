@@ -144,7 +144,7 @@ pub struct NotFoundNotice {
 /// Partitioned by tree position from each route's [`ParamsPattern`], the
 /// pattern a [`RejectUnknownParams`] url space checks a request against, so the
 /// help documents exactly the params a strict server accepts: a route's own and
-/// its steps' beneath it, a subtree source at or above the url space root
+/// its steps' beneath it, a subtree extractor at or above the url space root
 /// once under "Inherited params", and one between the root and the route
 /// beneath that route.
 #[derive(Default)]
@@ -178,16 +178,16 @@ impl HelpListing {
 				node.path.annotated_path().last_segment() != Some("help")
 			})
 			.collect::<Vec<_>>();
-		// a source at or above the root is above every listed route, so it
+		// an extractor at or above the root is above every listed route, so it
 		// is listed once, beneath them all
-		let mut shared: Vec<(&ParamsSource, Vec<&ParamMeta>)> = Vec::new();
-		for (source, params) in
+		let mut shared: Vec<(&ParamsExtractor, Vec<&ParamMeta>)> = Vec::new();
+		for (extractor, params) in
 			routes.iter().flat_map(|node| node.params.inherited())
 		{
-			if above.contains(&source.entity)
-				&& !shared.iter().any(|(listed, _)| *listed == source)
+			if above.contains(&extractor.entity)
+				&& !shared.iter().any(|(listed, _)| *listed == extractor)
 			{
-				shared.push((source, params));
+				shared.push((extractor, params));
 			}
 		}
 		let mut listed = HashSet::default();
@@ -217,7 +217,7 @@ pub(crate) struct RouteEntry {
 	/// The route's own params and its steps', rendered as a table beneath the
 	/// details.
 	pub params: Vec<RouteParam>,
-	/// The params it inherits from a source between the url space root and
+	/// The params it inherits from an extractor between the url space root and
 	/// itself, ie a server on a `serve` route.
 	pub inherited: Vec<ParamsGroup>,
 }
@@ -225,7 +225,7 @@ pub(crate) struct RouteEntry {
 impl RouteEntry {
 	/// Flatten one [`ActionNode`] into a row: path + kind tag, the detail rows
 	/// (description, non-trivial input/output types), its own params, then
-	/// those a subtree source below the url space root (`above` holding
+	/// those a subtree extractor below the url space root (`above` holding
 	/// the root and its ancestors) adds, skipping any param `listed` already
 	/// names.
 	fn new(
@@ -271,7 +271,7 @@ impl RouteEntry {
 		let inherited = ParamsGroup::collect(
 			node.params
 				.inherited()
-				.filter(|(source, _)| !above.contains(&source.entity)),
+				.filter(|(extractor, _)| !above.contains(&extractor.entity)),
 			&mut listed,
 		);
 
@@ -299,19 +299,19 @@ impl ParamsGroup {
 	/// One group per extractor, each param once: a param `listed` already names
 	/// is skipped, and a group left empty dropped.
 	fn collect<'a>(
-		groups: impl IntoIterator<Item = (&'a ParamsSource, Vec<&'a ParamMeta>)>,
+		groups: impl IntoIterator<Item = (&'a ParamsExtractor, Vec<&'a ParamMeta>)>,
 		listed: &mut HashSet<String>,
 	) -> Vec<Self> {
 		groups
 			.into_iter()
-			.filter_map(|(source, params)| {
+			.filter_map(|(extractor, params)| {
 				let params = params
 					.into_iter()
 					.filter(|meta| listed.insert(meta.name().to_string()))
 					.map(RouteParam::from)
 					.collect::<Vec<_>>();
 				(!params.is_empty()).then(|| Self {
-					extractor: source.name.to_string(),
+					extractor: extractor.name.to_string(),
 					params,
 				})
 			})
@@ -335,7 +335,7 @@ pub(crate) struct PrescanEntry {
 pub(crate) struct RouteParam {
 	/// The param name, eg `out-dir` in `--out-dir=…`.
 	pub name: String,
-	/// The concrete Rust type the param parses into, eg `alloc::string::String`.
+	/// The concrete Rust type the param parses into, eg `String`.
 	pub kind: String,
 	/// Whether the param must be supplied.
 	pub required: bool,
@@ -779,7 +779,7 @@ mod test {
 				(node.path.annotated_path().to_string(), names)
 			})
 			.collect::<Vec<_>>();
-		// the fixture exercises every kind of source
+		// the fixture exercises every kind of extractor
 		routes
 			.iter()
 			.flat_map(|(_, names)| names.iter())
@@ -1056,10 +1056,12 @@ mod test {
 			.xpect_contains("out-dir")
 			.xpect_contains("kind")
 			.xpect_contains("required")
-			// the concrete Rust type, not the `single` arity
-			.xpect_contains("alloc::string::String")
+			// the short Rust type, not the `single` arity
+			.xpect_contains("String")
 			.xnot()
-			.xpect_contains("kind:single");
+			.xpect_contains("kind:single")
+			.xnot()
+			.xpect_contains("alloc::");
 	}
 
 	#[beet_core::test]
@@ -1112,8 +1114,9 @@ mod test {
 			}
 		}
 
-		let mut world = router_world();
-		world.register_template::<HelpShell>();
+		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
+		app.add_type::<HelpShell>();
+		let world = app.world_mut();
 		let root = world
 			.spawn((
 				Router::with_defaults(),
@@ -1122,7 +1125,7 @@ mod test {
 			))
 			.flush();
 
-		help_body(&mut world, root, "--help")
+		help_body(world, root, "--help")
 			.await
 			// the layout chrome wraps the route list content
 			.xpect_contains("<meta charset=\"utf-8\"")

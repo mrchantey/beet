@@ -42,15 +42,15 @@ impl Plugin for CharcellTuiPlugin {
 		// browser-like form behavior: editable controls and submit, so a live
 		// TUI's `<form>`/`<select>` work out of the box.
 		#[cfg(feature = "template")]
-		app.init_plugin::<crate::prelude::FormPlugin>();
-		app.init_plugin::<CharcellPlugin>()
-			.init_plugin::<RealtimeParsePlugin>()
-			.init_plugin::<crate::prelude::DocumentUiPlugin>()
-			.init_plugin::<crate::prelude::FocusPlugin>()
+		app.add_type::<crate::prelude::FormPlugin>();
+		app.add_type::<CharcellPlugin>()
+			.add_type::<RealtimeParsePlugin>()
+			.add_type::<crate::prelude::DocumentUiPlugin>()
+			.add_type::<crate::prelude::FocusPlugin>()
 			// pointer-driven `:hover` element state for the style cascade
-			.init_plugin::<crate::prelude::PointerStatePlugin>()
+			.add_type::<crate::prelude::PointerStatePlugin>()
 			// the native `<select>` dropdown interaction
-			.init_plugin::<SelectPlugin>()
+			.add_type::<SelectPlugin>()
 			// terminal bytes to bevy input, before InputPlugin consumes the messages
 			// this frame so `ButtonInput` reflects them immediately.
 			.add_systems(
@@ -97,7 +97,7 @@ pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<StylePlugin>()
+		app.add_type::<StylePlugin>()
 			.register_type::<crate::prelude::ScrollPosition>()
 			.register_type::<MediaViewport>()
 			.add_plugins((
@@ -189,7 +189,7 @@ impl Plugin for CharcellPlugin {
 		// repeated here (idempotently) so a charcell app that runs without the
 		// widget set can still copy and expire the toast.
 		#[cfg(all(feature = "tui", feature = "template"))]
-		app.init_plugin::<crate::prelude::ToastPlugin>();
+		app.add_type::<crate::prelude::ToastPlugin>();
 	}
 }
 

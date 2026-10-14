@@ -50,8 +50,9 @@ fn Badge(#[prop(required)] label: String, count: u32) -> impl Bundle {
 
 #[beet_core::test]
 fn rust_template_registers_schema() {
-	let mut world = world();
-	world.register_template::<Badge>();
+	let mut app = world_ext::ui_app();
+	app.add_type::<Badge>();
+	let world = app.world_mut();
 	// the prop schema is attached alongside the build bridge, derived from the
 	// typed signature: `label` required, `count` optional.
 	let registry = world.resource::<AppTypeRegistry>().clone();
@@ -77,20 +78,22 @@ fn rust_template_registers_schema() {
 
 #[beet_core::test]
 fn macro_missing_required_rides_template_error() {
-	let mut world = world();
-	world.register_template::<Badge>();
+	let mut app = world_ext::ui_app();
+	app.add_type::<Badge>();
+	let world = app.world_mut();
 	// `<Badge/>` without `label` builds with the required prop unset.
-	let root = parse_bsx(&mut world, "<Badge count=1/>");
+	let root = parse_bsx(world, "<Badge count=1/>");
 	// never panicked; the missing required prop rode a TemplateError.
-	has_template_error(&world, root).xpect_true();
+	has_template_error(world, root).xpect_true();
 }
 
 #[beet_core::test]
 fn macro_required_prop_present_ok() {
-	let mut world = world();
-	world.register_template::<Badge>();
-	let root = parse_bsx(&mut world, "<Badge label=\"hi\" count=1/>");
-	has_template_error(&world, root).xpect_false();
+	let mut app = world_ext::ui_app();
+	app.add_type::<Badge>();
+	let world = app.world_mut();
+	let root = parse_bsx(world, "<Badge label=\"hi\" count=1/>");
+	has_template_error(world, root).xpect_false();
 }
 
 // ---- missing required prop -> graceful TemplateError (loader path) -----------

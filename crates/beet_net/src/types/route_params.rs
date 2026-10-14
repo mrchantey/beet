@@ -5,7 +5,7 @@
 //! entity, chosen by its [`ParamsScope`]: [`RouteParams`] for a plain action,
 //! read by the route it sits on, and [`SubtreeParams`] for middleware and
 //! servers, read by every route beneath them. An extractor that is not an
-//! action declares from its plugin with the initializer
+//! action declares from its plugin with the [`OwnedPlugin`]
 //! [`declare_on`](SubtreeParams::declare_on).
 use super::*;
 use beet_core::prelude::*;
@@ -136,14 +136,14 @@ macro_rules! scope_list {
 			}
 
 			#[doc = concat!(
-								"The [`Initializer`] declaring that `Extractor` reads `T` at ",
+								"The [`OwnedPlugin`] declaring that `Extractor` reads `T` at ",
 								$scope,
 								" scope, on every entity `Extractor` is inserted on: the \
 				 declaration of an extractor that is not an `#[action]`, ie a \
 				 server, made by the plugin registering it."
 							)]
 			pub fn declare_on<Extractor: Component, T: FromReflect + Typed>()
-			-> impl Initializer {
+			-> impl FnOnce(&mut App) {
 				Self::declare_on_with::<Extractor>(ParamsDeclaration::new::<
 					Extractor,
 					T,
@@ -156,7 +156,7 @@ macro_rules! scope_list {
 			/// reads beneath a `Layout`.
 			pub fn declare_on_with<Extractor: Component>(
 				declaration: ParamsDeclaration,
-			) -> impl Initializer {
+			) -> impl FnOnce(&mut App) {
 				move |app: &mut App| {
 					app.add_observer(
 						move |ev: On<Insert<Extractor>>,
@@ -272,11 +272,8 @@ impl ParamsScope {
 pub struct Params<T>(pub T);
 
 impl<T: FromReflect + Typed> FromRequestMeta<Self> for Params<T> {
-	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response> {
-		request
-			.parse_params::<T>()
-			.map(Self)
-			.map_err(Response::from)
+	fn from_request_meta(request: &RequestMeta) -> Result<Self> {
+		request.parse_params::<T>().map(Self)
 	}
 
 	fn params() -> ParamsDeclaration { ParamsDeclaration::new::<Self, T>() }
@@ -399,7 +396,7 @@ mod test {
 		#[derive(Component)]
 		struct Server;
 		let mut app = App::new();
-		app.init(SubtreeParams::declare_on::<Server, VerboseParams>());
+		app.add(SubtreeParams::declare_on::<Server, VerboseParams>());
 		let entity = app.world_mut().spawn(Server).flush();
 		names(app.world(), entity).xpect_eq(vec![SmolStr::new("Server")]);
 	}

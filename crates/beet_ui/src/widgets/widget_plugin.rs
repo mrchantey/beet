@@ -16,38 +16,38 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// `controls::button::Button` is qualified so it resolves to this crate's
 	// widget rather than the bevy_ui `Button` that leaks through
 	// `beet_core::prelude` when `bevy_default` is co-enabled.
-	app.init(super::controls::button::Button::register_template())
-		.init(IconButton::register_template())
-		.init(Link::register_template())
-		.init(ColorSchemeScript::register_template())
+	app.add_type::<super::controls::button::Button>()
+		.add_type::<IconButton>()
+		.add_type::<Link>()
+		.add_type::<ColorSchemeScript>()
 		// `Error` is qualified for the same reason as `Button`: the name is common
 		// enough that a prelude glob may also define one.
-		.init(super::controls::error::Error::register_template())
-		.init(ErrorText::register_template())
-		.init(Footer::register_template())
-		.init(TextField::register_template())
-		.init(TextArea::register_template())
-		.init(NumberField::register_template())
-		.init(Checkbox::register_template())
-		.init(Select::register_template())
-		.init(Form::register_template())
-		.init(DynamicForm::register_template())
-		.init(DynamicView::register_template())
-		.init(SchemaEditor::register_template())
-		.init(ToggleSchemaEditor::register_template())
-		.init(Head::register_template())
-		.init(Header::register_template())
-		.init(HtmlDocument::register_template())
-		.init(PageLayout::register_template())
-		.init(PageBreak::register_template())
-		.init(ContentLayout::register_template())
-		.init(Preflight::register_template())
-		.init(Reset::register_template())
-		.init(RenderConsole::register_template())
-		.init(Sidebar::register_template())
-		.init(SidebarScript::register_template())
-		.init(MenuButton::register_template())
-		.init(Table::register_template());
+		.add_type::<super::controls::error::Error>()
+		.add_type::<ErrorText>()
+		.add_type::<Footer>()
+		.add_type::<TextField>()
+		.add_type::<TextArea>()
+		.add_type::<NumberField>()
+		.add_type::<Checkbox>()
+		.add_type::<Select>()
+		.add_type::<Form>()
+		.add_type::<DynamicForm>()
+		.add_type::<DynamicView>()
+		.add_type::<SchemaEditor>()
+		.add_type::<ToggleSchemaEditor>()
+		.add_type::<Head>()
+		.add_type::<Header>()
+		.add_type::<HtmlDocument>()
+		.add_type::<PageLayout>()
+		.add_type::<PageBreak>()
+		.add_type::<ContentLayout>()
+		.add_type::<Preflight>()
+		.add_type::<Reset>()
+		.add_type::<RenderConsole>()
+		.add_type::<Sidebar>()
+		.add_type::<SidebarScript>()
+		.add_type::<MenuButton>()
+		.add_type::<Table>();
 	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)
@@ -80,7 +80,7 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// against the data document it sits in, the one transaction an edit rides;
 	// the commit evolves data off a task, so the plugin that registers it
 	// declares the bridge that carries it
-	app.init_plugin::<AsyncPlugin>()
+	app.add_type::<AsyncPlugin>()
 		.add_systems(Update, super::schema_ui::editor::commit_schema_edits);
 	// the scene editor: its tag survives a fork as a reflected component, its
 	// frame binds the scene it sits in, and its tree and inspector follow the
@@ -89,9 +89,9 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	super::scene_editor::scene_editor_plugin(app);
 	// `Toast` is target-neutral, so its tag registration and expiry timer belong
 	// to the widget set rather than to the one renderer that pops toasts today
-	// (the charcell clipboard). `init_plugin` is idempotent, so a charcell app
+	// (the charcell clipboard). `add_type` is idempotent, so a charcell app
 	// installing it directly still gets exactly one.
-	app.init_plugin::<ToastPlugin>();
+	app.add_type::<ToastPlugin>();
 	// register the `RenderConsole` rules into the global rule set at build time, so
 	// `<Stylesheet>` emits them without coupling a generic widget to the material
 	// `classes` module (the line classes are set by `render_console.js`).
@@ -99,15 +99,15 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.get_resource_or_init::<RuleSet>()
 		.extend_rules(super::debug::render_console::console_rules());
 	#[cfg(feature = "net")]
-	app.init(Analytics::register_template());
+	app.add_type::<Analytics>();
 	#[cfg(all(
 		feature = "net",
 		feature = "syntax_highlighting",
 		not(target_arch = "wasm32")
 	))]
-	app.init(super::code_snippet::CodeSnippet::register_template());
+	app.add_type::<super::code_snippet::CodeSnippet>();
 	#[cfg(all(feature = "net", feature = "mermaid"))]
-	app.init(super::mermaid::Mermaid::register_template());
+	app.add_type::<super::mermaid::Mermaid>();
 	#[cfg(feature = "style")]
-	app.init(Stylesheet::register_template());
+	app.add_type::<Stylesheet>();
 }

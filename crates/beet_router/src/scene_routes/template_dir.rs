@@ -46,6 +46,10 @@ impl Prescan for TemplateDir {
 	}
 }
 
+impl TypePlugin<PrescanMarker> for TemplateDir {
+	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+}
+
 /// The template names an owner (a [`TemplateFile`] entity, or the entry root
 /// for the entry-level pre-registration) registered into the
 /// [`BsxTemplateRegistry`]. Re-registering diffs against it so a name the

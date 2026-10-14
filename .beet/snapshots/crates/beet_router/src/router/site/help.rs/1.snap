@@ -41,5 +41,5 @@ from **CliServer**
 
 | name | kind | required | description |
 |---|---|---|---|
-| accept | alloc::vec::Vec<alloc::string::String> | no | The media types to answer in, highest priority first, eg `--accept=text/html,text/plain`. Defaults to ANSI for a terminal and markdown when stdout is not one. |
+| accept | Vec<String> | no | The media types to answer in, highest priority first, eg `--accept=text/html,text/plain`. Defaults to ANSI for a terminal and markdown when stdout is not one. |
 | server | server names, comma separated, eg "http,ssh" | no | Which declared servers boot, comma separated, eg `http,ssh`. |

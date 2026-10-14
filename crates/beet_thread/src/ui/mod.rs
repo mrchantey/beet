@@ -37,7 +37,7 @@ pub struct ThreadUiPlugin;
 
 impl Plugin for ThreadUiPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<RouterPlugin>();
+		app.add_type::<RouterPlugin>();
 		app.register_type::<ThreadView>()
 			.register_type::<ThreadScroll>()
 			.register_type::<CreatePostForm>()

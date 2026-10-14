@@ -19,10 +19,9 @@
 //!
 //! # Systems and Plugins
 //!
-//! - [`Initializer`] - A value an [`App`] consumes to set itself up
+//! - [`TypePlugin`], [`OwnedPlugin`] - The plugin variants an [`App`] adds by type or by value
 //! - [`OnSpawn`] - Run logic when entities are spawned
 //! - [`When`] - Conditional system execution
-//! - [`NonSendPlugin`] - Plugin trait for non-send resources
 //!
 //! # Debugging
 //!
@@ -55,8 +54,7 @@ mod despawn_after;
 mod entity_target_event;
 mod group;
 pub mod hook_ext;
-mod initializer;
-mod non_send_plugin;
+mod plugin_variants;
 mod required_field;
 mod subtree_trigger;
 #[cfg(all(
@@ -92,11 +90,10 @@ pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use group::*;
-pub use initializer::*;
-pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]
 pub use perf_log::*;
+pub use plugin_variants::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
 pub use required_field::*;

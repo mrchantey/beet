@@ -33,11 +33,11 @@ impl Plugin for ParsePlugin {
 		// the default BSX event vocabulary (the `click` script installer), so
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]
-		app.init_plugin::<crate::prelude::BsxDefaultsPlugin>();
+		app.add_type::<crate::prelude::BsxDefaultsPlugin>();
 		// the cell addresses every parsed document's tables carry
 		app.register_type::<TableCellAddress>();
 		#[cfg(feature = "ooxml")]
-		app.init_plugin::<crate::prelude::OoxmlPlugin>();
+		app.add_type::<crate::prelude::OoxmlPlugin>();
 	}
 }
 
@@ -52,8 +52,8 @@ pub struct RealtimeParsePlugin;
 
 impl Plugin for RealtimeParsePlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<ParsePlugin>()
-			.insert_schedule_after(Update, PostParseTree);
+		app.add_type::<ParsePlugin>()
+			.add(InsertSchedule::after(Update, PostParseTree));
 	}
 }
 

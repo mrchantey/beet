@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// foreign type can carry the mark, so no dump site has to remember to deny
 /// them.
 ///
-/// Use [`App::init_plugin::<MinimalTypesPlugin>`](BeetCoreAppExt::init_plugin)
+/// Use [`App::add_type::<MinimalTypesPlugin>`](AppPluginVariantsExt::add_type)
 /// to attach idempotently.
 #[derive(Default)]
 pub struct MinimalTypesPlugin;
@@ -29,9 +29,13 @@ impl Plugin for MinimalTypesPlugin {
 			.register_type::<Members>()
 			// the clocks advance every frame and are never authored content, so
 			// they are marked once here rather than denied at each dump site.
-			.register_derived::<Time>()
-			.register_derived::<Time<Real>>()
-			.register_derived::<Time<Virtual>>()
-			.register_derived::<Time<Fixed>>();
+			.register_type::<Time>()
+			.register_type_data::<Time, ReflectDerived>()
+			.register_type::<Time<Real>>()
+			.register_type_data::<Time<Real>, ReflectDerived>()
+			.register_type::<Time<Virtual>>()
+			.register_type_data::<Time<Virtual>, ReflectDerived>()
+			.register_type::<Time<Fixed>>()
+			.register_type_data::<Time<Fixed>, ReflectDerived>();
 	}
 }

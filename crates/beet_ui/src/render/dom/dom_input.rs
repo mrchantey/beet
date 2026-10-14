@@ -50,14 +50,14 @@ pub struct DomInputPlugin;
 
 impl Plugin for DomInputPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<FocusPlugin>()
-			.init_plugin::<PointerStatePlugin>()
+		app.add_type::<FocusPlugin>()
+			.add_type::<PointerStatePlugin>()
 			.add_observer(listen_on_mount)
 			// the frame's first thing, so a control's write reaches its document
 			// in this frame's sync pass rather than the next
 			.add_systems(First, drain_dom_input);
 		#[cfg(feature = "template")]
-		app.init_plugin::<FormPlugin>();
+		app.add_type::<FormPlugin>();
 	}
 }
 

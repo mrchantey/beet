@@ -315,7 +315,6 @@ impl Plugin for ActionExamplesPlugin {
 			.register_type::<StateAction>();
 		// scripting, on every target: the embedded engine compiles to wasm too
 		#[cfg(feature = "scripting")]
-		app.init(NumberScript::register_template())
-			.init(TextScript::register_template());
+		app.add_type::<NumberScript>().add_type::<TextScript>();
 	}
 }

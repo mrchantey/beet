@@ -18,7 +18,7 @@ pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
 		app
-			// ensure the type registry exists for `register_template`.
+			// ensure the type registry exists for a template's `add_type`.
 			.init_resource::<AppTypeRegistry>()
 			// the dropped-guard side channel, shared with every `PendingGuard`.
 			.init_resource::<PendingDropQueue>()

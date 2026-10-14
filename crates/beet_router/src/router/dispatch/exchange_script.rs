@@ -41,6 +41,8 @@ use std::marker::PhantomData;
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn ExchangeScriptElement(
+	// the script reads whichever params it likes from its `input`
+	_any: AnyParams,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let entity = cx.id();
@@ -59,14 +61,9 @@ pub async fn ExchangeScriptElement(
 	if script.trim().is_empty() {
 		return Response::ok().xok();
 	}
-	let input = match <Value as FromRequest<ScriptInputMarker>>::from_request(
-		cx.take(),
-	)
-	.await
-	{
-		Ok(input) => input,
-		Err(response) => return Ok(response),
-	};
+	let input =
+		<Value as FromRequest<ScriptInputMarker>>::from_request(cx.take())
+			.await?;
 	let body = Script::<Value, Value>::new(script)
 		.run_captured(input, world, &config.unwrap_or_default())
 		.await?;
@@ -248,6 +245,30 @@ mod route_test {
 				PathPartial::new("greet"),
 			)]))
 			.exchange(Request::get("greet"))
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("hello world");
+	}
+
+	/// A script served the whole request reads whichever params it likes, so a
+	/// strict url space refuses none of them.
+	#[beet_core::test]
+	async fn a_strict_router_admits_any_script_param() {
+		world()
+			.spawn((Router::with_defaults(), RejectUnknownParams, children![(
+				Script::<Value, Value>::new(
+					r#""hello " + input.params.name[0]"#
+				),
+				ExchangeScript::<
+					Value,
+					Value,
+					ScriptInputMarker,
+					ScriptAnswerMarker,
+				>::default(),
+				PathPartial::new("greet"),
+			)]))
+			.exchange(Request::from_cli_str("greet --name=world"))
 			.await
 			.unwrap_str()
 			.await

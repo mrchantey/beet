@@ -42,12 +42,12 @@ async fn reduce(source: &str) -> App {
 	ensure_auth_env();
 	let mut app = App::new();
 	app.add_plugins(MinimalPlugins)
-		.init_plugin::<ThreadPlugin>()
+		.add_type::<ThreadPlugin>()
 		// registers `{UserInput}` + the store-backed `CreatePostForm` template so
 		// the interactive chat scenes resolve
-		.init_plugin::<ThreadUiPlugin>()
+		.add_type::<ThreadUiPlugin>()
 		// resolves each scene's `<RequireCfg cfg=".."/>` tag
-		.init_plugin::<CrateCheckPlugin>()
+		.add_type::<CrateCheckPlugin>()
 		.register_type::<AgentChoiceAction>();
 	app.world_mut().spawn(cli_registration());
 	AsyncRunner::settle_async_tasks(app.world_mut()).await;

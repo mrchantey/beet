@@ -11,7 +11,7 @@ pub struct SshServerPlugin;
 
 impl Plugin for SshServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>()
+		app.add_type::<AsyncPlugin>()
 			.add_observer(RequirePty::clear_on_pty)
 			.add_systems(Update, RequirePty::close_expired);
 	}

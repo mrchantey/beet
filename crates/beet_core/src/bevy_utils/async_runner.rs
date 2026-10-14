@@ -81,7 +81,7 @@ impl AsyncRunner {
 	/// extract — unlike the world-level loops below, which run only the main
 	/// schedule for world-owning async contexts.
 	pub(crate) async fn run(mut app: App) -> AppExit {
-		app.init_plugin::<AsyncPlugin>();
+		app.add_type::<AsyncPlugin>();
 		Self::init_async(&mut app).await;
 		// yield required for wasm to spawn tasks
 		async_ext::yield_now().await;

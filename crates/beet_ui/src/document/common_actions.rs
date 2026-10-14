@@ -720,8 +720,8 @@ mod test {
 	fn roundtrip_increment_template() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
-		app.init_plugin::<DocumentUiPlugin>();
-		app.finish_plugins();
+		app.add_type::<DocumentUiPlugin>();
+		app.init();
 		app.update();
 
 		let entity =

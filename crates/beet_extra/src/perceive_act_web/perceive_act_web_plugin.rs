@@ -9,10 +9,10 @@ pub struct PerceiveActWebPlugin;
 
 impl Plugin for PerceiveActWebPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<PerceiveActCorePlugin>()
+		app.add_type::<PerceiveActCorePlugin>()
 			.register_type::<WebTakePhoto>()
 			.register_type::<WebSpeakText>()
-			.init(WebHead::register_template())
+			.add_type::<WebHead>()
 			// `ShowImage` is registered by `PerceiveActCorePlugin` (shared with the
 			// native mock); this observer renders its recorded url into the `<img>`.
 			.add_observer(render_face);

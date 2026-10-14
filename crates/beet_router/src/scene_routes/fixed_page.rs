@@ -167,8 +167,9 @@ mod test {
 		fn FixedShell() -> impl Bundle {
 			rsx! { <html><body><main><Slot/></main></body></html> }
 		}
-		let mut world = router_world();
-		world.register_template::<FixedShell>();
+		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
+		app.add_type::<FixedShell>();
+		let world = app.world_mut();
 		let root = world
 			.spawn((Router, Layout::of::<FixedShell>(), children![(
 				route::new("", FixedPage),
@@ -176,8 +177,8 @@ mod test {
 			)]))
 			.flush();
 
-		let first = get(&mut world, root, "").await;
-		let second = get(&mut world, root, "").await;
+		let first = get(world, root, "").await;
+		let second = get(world, root, "").await;
 		second.as_str().xpect_contains("<p>page body</p>");
 		first.xpect_eq(second);
 	}

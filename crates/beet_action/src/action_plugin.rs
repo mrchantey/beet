@@ -10,10 +10,10 @@ pub struct ActionPlugin;
 
 impl Plugin for ActionPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<MinimalTypesPlugin>()
+		app.add_type::<MinimalTypesPlugin>()
 			// async actions queue work onto the AsyncWorld; without this
 			// plugin the runtime never drives them
-			.init_plugin::<AsyncPlugin>()
+			.add_type::<AsyncPlugin>()
 			// control-flow types
 			.register_type::<ChildError>()
 			.register_type::<CallOnSpawn<(), Outcome>>()
@@ -64,7 +64,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<ScriptConfig>()
 			// the behaviour-tree leaf marker and its markup front-end
 			.register_type::<OutcomeScript<Value, Value>>()
-			.init(RunScript::register_template());
+			.add_type::<RunScript>();
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

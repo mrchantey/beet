@@ -7,13 +7,11 @@ use rsx_site::prelude::*;
 /// Material style rule set, plus the package config the `Header`/`Footer` read.
 fn site_world() -> World {
 	// `Theme` defaults to the brand green, so the plugin needs no seed colour.
-	(RouterPlugin, material::MaterialStylePlugin)
-		.into_world()
-		.xtap(|world| {
-			world.insert_resource(pkg_config!());
-			// the layout the router names, registered here as `server_plugin` does
-			world.register_template::<BeetLayout>();
-		})
+	let mut app =
+		App::new().with_plugins((RouterPlugin, material::MaterialStylePlugin));
+	// the layout the router names, registered here as `server_plugin` does
+	app.add_type::<BeetLayout>().insert_resource(pkg_config!());
+	core::mem::take(app.world_mut())
 }
 
 /// A `GET {path}` request negotiating HTML (the web render target).

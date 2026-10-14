@@ -30,7 +30,7 @@ impl Plugin for SceneServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.register_type::<SpawnAction>()
 			.register_type::<BeetSceneRoot>()
-			.init(SceneServer::register_template());
+			.add_type::<SceneServer>();
 	}
 }
 

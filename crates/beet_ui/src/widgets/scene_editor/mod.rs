@@ -37,9 +37,9 @@ use beet_core::prelude::*;
 /// editor to its scene and following the selection, and its rules.
 pub(super) fn scene_editor_plugin(app: &mut App) {
 	app.register_type::<ToggleSceneEditor>()
-		.init(SceneEditor::register_template())
-		.init(SceneTree::register_template())
-		.init(EntityInspector::register_template())
+		.add_type::<SceneEditor>()
+		.add_type::<SceneTree>()
+		.add_type::<EntityInspector>()
 		.add_systems(
 			Update,
 			(

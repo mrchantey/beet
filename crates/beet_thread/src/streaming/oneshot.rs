@@ -16,8 +16,7 @@ impl Post {
 	/// example and the [`PostStreamer`] conformance tests build on it.
 	pub async fn run_oneshot(author_scene: impl Bundle) -> Result<Vec<Post>> {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
 		let world = app.world_mut();
 
 		// the thread is its actors wrapped in a Sequence; a seed-only actor carries

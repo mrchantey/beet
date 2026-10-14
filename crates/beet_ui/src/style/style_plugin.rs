@@ -7,9 +7,9 @@ pub struct StylePlugin;
 
 impl Plugin for StylePlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<TokenPlugin>()
-			.init_plugin::<ParsePlugin>()
-			.init_plugin::<CssPlugin>()
+		app.add_type::<TokenPlugin>()
+			.add_type::<ParsePlugin>()
+			.add_type::<CssPlugin>()
 			.register_type::<ColorScheme>();
 
 		// mirror the typed scheme handle onto classes before the cascade runs,

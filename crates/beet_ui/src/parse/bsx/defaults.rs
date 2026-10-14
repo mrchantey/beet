@@ -25,7 +25,7 @@ impl Plugin for BsxDefaultsPlugin {
 		{
 			// every `world` call an event script makes is served at the async
 			// sync point, so the seat has to exist before one can fire.
-			app.init_plugin::<AsyncPlugin>();
+			app.add_type::<AsyncPlugin>();
 			super::event_script::register_event_scripts(app.world_mut());
 		}
 	}

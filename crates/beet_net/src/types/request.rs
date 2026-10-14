@@ -560,11 +560,15 @@ impl From<CliArgs> for Request {
 /// Implement this trait for types that need access to the request body,
 /// which may be a stream. For types that only need request metadata,
 /// implement [`FromRequestMeta`] instead.
+///
+/// A failure answers as a route's own error does: an [`HttpError`] keeps its
+/// status, and a [`ParamError`] reaches the router, which explains it as the
+/// route's `--help` lists the param.
 pub trait FromRequest<M>: Sized {
 	/// Extracts the type from the request asynchronously.
 	fn from_request(
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>>;
+	) -> MaybeSendBoxedFuture<'static, Result<Self>>;
 
 	/// The params the extraction reads, which a route converting its input
 	/// through this declares. Nothing by default.
@@ -614,23 +618,23 @@ where
 {
 	fn from_request(
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
-		Box::pin(async move {
-			request
-				.into_media_bytes()
-				.await
-				.map_err(|err| err.into_response())
-				.and_then(|bytes| {
-					bytes.deserialize().map_err(|err| err.into_response())
-				})
-		})
+	) -> MaybeSendBoxedFuture<'static, Result<Self>> {
+		Box::pin(async move { request.into_media_bytes().await?.deserialize() })
+	}
+}
+
+impl FromRequest<Self> for Request {
+	fn from_request(
+		request: Request,
+	) -> MaybeSendBoxedFuture<'static, Result<Self>> {
+		Box::pin(async move { Ok(request) })
 	}
 }
 
 impl FromRequest<Self> for RequestParts {
 	fn from_request(
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Self>> {
 		Box::pin(async move { Ok(request.parts) })
 	}
 }
@@ -651,7 +655,7 @@ pub struct ScriptInputMarker;
 impl FromRequest<ScriptInputMarker> for Value {
 	fn from_request(
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Self>> {
 		Box::pin(async move {
 			let path = request
 				.path_string()
@@ -671,10 +675,7 @@ impl FromRequest<ScriptInputMarker> for Value {
 				.collect::<Map>();
 			// consumes the request, awaiting and decoding the body; path/params
 			// are already owned above, so the borrow is released before this.
-			let body = request
-				.into_value()
-				.await
-				.map_err(|err| err.into_response())?;
+			let body = request.into_value().await?;
 			let mut input = Map::default();
 			input.insert("path", path);
 			input.insert("params", Value::Map(params));
@@ -682,22 +683,10 @@ impl FromRequest<ScriptInputMarker> for Value {
 			Ok(Value::Map(input))
 		})
 	}
-}
 
-/// Marker type for [`FromRequest`] implementations via [`TryFrom`].
-pub struct TryFromRequestMarker;
-
-impl<T, E, M> FromRequest<(E, M, TryFromRequestMarker)> for T
-where
-	T: TryFrom<Request, Error = E>,
-	E: IntoResponse<M>,
-{
-	fn from_request(
-		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
-		Box::pin(async move {
-			request.try_into().map_err(|err: E| err.into_response())
-		})
+	/// The script reads whichever params it likes, so it takes any.
+	fn params() -> ParamsDeclaration {
+		ParamsDeclaration::new::<Self, AnyParams>()
 	}
 }
 
@@ -707,8 +696,9 @@ where
 /// path, query parameters, etc. For types that need the body, implement
 /// [`FromRequest`] instead.
 pub trait FromRequestMeta<M>: Sized {
-	/// Extracts the type from the request metadata.
-	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response>;
+	/// Extracts the type from the request metadata, failing as
+	/// [`FromRequest::from_request`] does.
+	fn from_request_meta(request: &RequestMeta) -> Result<Self>;
 
 	/// The params the extraction reads, see [`FromRequest::params`].
 	fn params() -> ParamsDeclaration { ParamsDeclaration::empty::<Self>() }
@@ -724,7 +714,7 @@ where
 {
 	fn from_request(
 		request: Request,
-	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>> {
+	) -> MaybeSendBoxedFuture<'static, Result<Self>> {
 		let meta = RequestMeta::new(request.parts);
 		Box::pin(async move { T::from_request_meta(&meta) })
 	}

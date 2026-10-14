@@ -3,7 +3,7 @@
 //! Bevy resolves a `Template` by its concrete Rust type. beet additionally
 //! needs to resolve one by name (a short type path from markup or a serialized
 //! tag), so it owns [`ReflectTemplate`]: reflect type-data that builds a
-//! template from a reflected data value. [`register_template`] installs it, and
+//! template from a reflected data value. `app.add_type::<T>()` installs it, and
 //! [`ReflectTemplate::build_named`] looks it up from the [`AppTypeRegistry`].
 //!
 //! A schema attaches alongside this registration: the type-data stays a thin
@@ -177,20 +177,24 @@ where
 	}
 }
 
-/// Registers a template type on a [`World`].
-#[extend::ext(name=WorldRegisterTemplateExt)]
-pub impl World {
-	/// Registers `T` and its [`ReflectTemplate`] type-data, which brings its
-	/// [`ReflectTemplateSchema`] along, so it resolves by short type path.
-	fn register_template<T>(&mut self) -> &mut Self
-	where
-		T: FromReflect
-			+ Typed
-			+ GetTypeRegistration
-			+ GetTemplateSchema
-			+ Template<Output = ()>,
-	{
-		let registry = self.resource_mut::<AppTypeRegistry>();
+/// The [`TypePlugin`] marker for a template.
+pub struct TemplateMarker;
+
+/// A template adds itself by type, `app.add_type::<Route>()`: its type and
+/// [`ReflectTemplate`] type-data, which brings its [`ReflectTemplateSchema`]
+/// along, so it resolves by short type path, and its schema in the
+/// [`SchemaRegistry`].
+impl<T> TypePlugin<TemplateMarker> for T
+where
+	T: FromReflect
+		+ Typed
+		+ GetTypeRegistration
+		+ GetTemplateSchema
+		+ Template<Output = ()>,
+{
+	fn build(app: &mut App) {
+		let world = app.world_mut();
+		let registry = world.resource_mut::<AppTypeRegistry>();
 		let mut registry = registry.write();
 		registry.register::<T>();
 		// `TypeRegistry::register_type_data` skips dependencies, so insert
@@ -202,37 +206,10 @@ pub impl World {
 		drop(registry);
 		// index the schema by short type path so a `SchemaRef::Name` resolves.
 		let name = T::type_info().type_path_table().short_path();
-		self.get_resource_or_init::<SchemaRegistry>()
+		world
+			.get_resource_or_init::<SchemaRegistry>()
 			.insert(SmolStr::from(name), T::template_schema());
-		self
 	}
-}
-
-/// Registers a template type on an [`App`], its [`Initializer`] built from the
-/// type: `app.init(Route::register_template())`.
-pub trait RegisterTemplate:
-	FromReflect
-	+ Typed
-	+ GetTypeRegistration
-	+ GetTemplateSchema
-	+ Template<Output = ()>
-{
-	/// Register this template and its [`ReflectTemplate`] type-data, see
-	/// [`WorldRegisterTemplateExt::register_template`].
-	fn register_template() -> impl Initializer {
-		|app: &mut App| {
-			app.world_mut().register_template::<Self>();
-		}
-	}
-}
-
-impl<T> RegisterTemplate for T where
-	T: FromReflect
-		+ Typed
-		+ GetTypeRegistration
-		+ GetTemplateSchema
-		+ Template<Output = ()>
-{
 }
 
 /// The name of a tag nothing was registered under, recorded on the inert entity
@@ -262,11 +239,14 @@ impl UnregisteredTag {
 	pub fn new(tag: impl Into<SmolStr>) -> Self { Self(tag.into()) }
 
 	/// Allow `tag` to resolve to nothing when nothing is registered under
-	/// it, see [`AllowedUnregistered`].
-	pub fn allow(tag: impl Into<SmolStr>) -> impl Initializer {
+	/// it, see [`AllowedUnregistered`], an [`OwnedPlugin`]:
+	/// `app.add(UnregisteredTag::allow("LiveReloadScript"))`.
+	pub fn allow(tag: impl Into<SmolStr>) -> impl FnOnce(&mut App) {
 		let tag = tag.into();
 		move |app: &mut App| {
-			app.world_mut().allow_unregistered(tag);
+			app.world_mut()
+				.get_resource_or_init::<AllowedUnregistered>()
+				.insert(tag);
 		}
 	}
 }
@@ -293,8 +273,7 @@ impl AllowedUnregistered {
 	}
 	/// Whether `tag` is allowed to be unregistered.
 	pub fn contains(&self, tag: &str) -> bool { self.names.contains(tag) }
-	/// Whether `tag` was marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)
-	/// in `cx`'s world, ie a known featured-out name the loader resolves to
+	/// Whether `tag` was [allowed](UnregisteredTag::allow) in `cx`'s world, ie a known featured-out name the loader resolves to
 	/// nothing rather than error. Consulted by both lookup paths on a missing
 	/// registration.
 	pub fn allows(cx: &mut TemplateContext, tag: &str) -> bool {
@@ -303,19 +282,6 @@ impl AllowedUnregistered {
 				.get_resource::<AllowedUnregistered>()
 				.is_some_and(|allowed| allowed.contains(tag))
 		})
-	}
-}
-
-/// Marks tags as known-but-featured-out on a [`World`].
-#[extend::ext(name=WorldAllowUnregisteredExt)]
-pub impl World {
-	/// Mark `tag` as a known featured-out name: when nothing is registered under
-	/// it, the loader resolves it to a no-op instead of erroring. See
-	/// [`AllowedUnregistered`].
-	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
-		self.get_resource_or_init::<AllowedUnregistered>()
-			.insert(tag);
-		self
 	}
 }
 
@@ -368,8 +334,9 @@ mod test {
 
 	#[crate::test]
 	fn builds_by_name() {
-		let mut world = TemplatePlugin::world();
-		world.register_template::<Label>();
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin).add_type::<Label>();
+		let world = app.world_mut();
 
 		// a partial patch over default, the loader's form.
 		let mut patch = DynamicStruct::default();
@@ -437,8 +404,9 @@ mod test {
 	/// rather than guessing, and is named by its full type path instead.
 	#[crate::test]
 	fn a_template_wins_an_ambiguous_short_path() {
-		let mut world = TemplatePlugin::world();
-		world.register_template::<Label>();
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin).add_type::<Label>();
+		let world = app.world_mut();
 		let app_registry = world.resource::<AppTypeRegistry>().clone();
 		{
 			let mut registry = app_registry.write();
@@ -464,15 +432,15 @@ mod test {
 			.xpect_true();
 	}
 
-	/// A tag marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)
-	/// builds to nothing instead of erroring (the featured-out widget contract).
+	/// A tag [allowed](UnregisteredTag::allow) builds to nothing instead of erroring (the featured-out widget contract).
 	#[crate::test]
 	fn allowed_unregistered_tag_is_noop() {
 		let world = TemplatePlugin::world();
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let patch = DynamicStruct::default();
-		let mut other = World::new();
-		other.allow_unregistered("Nope");
+		let mut app = App::new();
+		app.add(UnregisteredTag::allow("Nope"));
+		let other = app.world_mut();
 		let root = other.spawn_empty().id();
 		other
 			.entity_mut(root)

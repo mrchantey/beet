@@ -42,3 +42,7 @@ impl Prescan for RepoRoot {
 		"roots the repo store at `src`, relative to the entry document, before it is built"
 	}
 }
+
+impl TypePlugin<PrescanMarker> for RepoRoot {
+	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+}

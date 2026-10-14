@@ -13,7 +13,7 @@ pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>()
+		app.add_type::<AsyncPlugin>()
 			.register_type::<CliServer>()
 			.register_type::<HttpServer>()
 			.register_type::<ServerLimits>()
@@ -34,7 +34,7 @@ impl Plugin for ServerPlugin {
 			.register_type::<RejectUnknownParams>()
 			// what each server reads off its start request, inherited by every
 			// route beneath it
-			.init((
+			.add((
 				SubtreeParams::declare_on::<CliServer, (CliParams, BootParams)>(
 				),
 				SubtreeParams::declare_on::<

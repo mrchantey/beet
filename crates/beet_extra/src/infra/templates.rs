@@ -350,15 +350,18 @@ mod test {
 	use super::*;
 	use crate::infra::InfraExamplesPlugin;
 
-	fn test_world() -> World {
-		(
+	fn test_world() -> World { core::mem::take(test_app().world_mut()) }
+
+	/// The app a [`test_world`] is taken from, for a test adding its own
+	/// templates first.
+	fn test_app() -> App {
+		App::new().with_plugins((
 			AsyncPlugin,
 			TemplatePlugin,
 			DocumentPlugin,
 			RouterPlugin,
 			InfraExamplesPlugin,
-		)
-			.into_world()
+		))
 	}
 
 	/// The router root every test's markup spawns under, addressed with the
@@ -956,15 +959,16 @@ mod test {
 	/// than with the host. `SpawnTemplate` now wakes the route-tree rebuild.
 	#[beet_core::test]
 	fn host_mounts_slotted_routes() {
-		let mut world = test_world();
-		world.register_template::<SlottedHost>();
+		let mut app = test_app();
+		app.add_type::<SlottedHost>();
+		let world = app.world_mut();
 		world.insert_resource(PackageConfig {
 			app_name: "beetmash".into(),
 			..default()
 		});
-		let router = router(&mut world);
+		let router = router(world);
 		spawn_markup(
-			&mut world,
+			world,
 			router,
 			r#"<SlottedHost>
 				<Route path="deploy" {ExchangeSequence}>
@@ -977,9 +981,9 @@ mod test {
 		);
 		let host = world
 			.query_filtered::<Entity, With<Stack>>()
-			.single(&world)
+			.single(world)
 			.unwrap();
-		let tree = RouteTree::of(&world, host).unwrap();
+		let tree = RouteTree::of(world, host).unwrap();
 		tree.find(&["validate"]).xpect_some();
 		tree.find(&["deploy"]).xpect_some();
 		tree.find(&["audit"]).xpect_some();

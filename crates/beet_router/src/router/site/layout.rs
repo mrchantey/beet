@@ -65,7 +65,7 @@ use beet_net::prelude::*;
 /// document in the [`BsxTemplateRegistry`] first (eg `Layout` for a `Layout.bsx`
 /// registered via `<TemplateDir src="templates"/>`), else a rust `#[template]`
 /// registered by short type path (eg [`SiteLayout`], via
-/// [`register_template`](beet_core::prelude::WorldRegisterTemplateExt::register_template)).
+/// `app.add_type::<SiteLayout>()`).
 /// A name resolving to neither fails the request rather than serving an
 /// unwrapped page.
 ///
@@ -98,8 +98,7 @@ impl Default for Layout {
 
 impl Layout {
 	/// Wrap descendant routes in the rust template `T`, named by its short type
-	/// path, the name [`register_template`](beet_core::prelude::WorldRegisterTemplateExt::register_template)
-	/// registers it under.
+	/// path, the name `app.add_type::<T>()` registers it under.
 	///
 	/// The rust-side spelling of [`new`](Self::new): a symbol the compiler
 	/// checks and a rename follows, where a `.bsx` layout has no type to name
@@ -314,7 +313,7 @@ fn assert_registered(
 			"no layout template named `{template}`: it is neither a `.bsx` \
 			 document in the `BsxTemplateRegistry` (eg `{template}.bsx` under a \
 			 `<TemplateDir/>`) nor a rust template registered by short type path \
-			 (`app.init({template}::register_template())`)"
+			 (`app.add_type::<{template}>()`)"
 		),
 	}
 }
@@ -351,12 +350,11 @@ mod test {
 	/// A world whose rust test layouts resolve by name, the registration a
 	/// `#[template]` layout needs to be nameable from a [`Layout`] declaration.
 	fn router_world() -> World {
-		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		world.register_template::<PageShell>();
-		world.register_template::<NavLayout>();
+		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
+		app.add_type::<(PageShell, NavLayout)>();
 		#[cfg(feature = "json")]
-		world.register_template::<MetaLayout>();
-		world
+		app.add_type::<MetaLayout>();
+		core::mem::take(app.world_mut())
 	}
 
 	/// A [`router_world`] whose `Layout` is the named `.bsx` document `source`.

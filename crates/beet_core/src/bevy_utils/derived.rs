@@ -19,8 +19,8 @@ use bevy_reflect::CreateTypeData;
 /// struct CachedExtents(f32);
 /// ```
 ///
-/// A foreign type is marked at registration instead, with
-/// [`App::register_derived`](crate::prelude::BeetCoreAppExt::register_derived).
+/// A foreign type is marked at registration instead, with bevy's own
+/// `app.register_type_data::<Time, ReflectDerived>()`.
 ///
 /// Because the mark travels with the type, there are no per-dump-site deny
 /// lists: every saver skips every derived type by construction, so a new dump

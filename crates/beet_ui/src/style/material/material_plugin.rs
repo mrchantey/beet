@@ -106,7 +106,7 @@ pub struct MaterialStylePlugin;
 
 impl Plugin for MaterialStylePlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<CssPlugin>()
+		app.add_type::<CssPlugin>()
 			.register_type::<Theme>()
 			.init_resource::<Theme>();
 		// Extend the existing rule set rather than replacing it, so the prose

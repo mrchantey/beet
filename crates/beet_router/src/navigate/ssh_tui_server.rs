@@ -136,8 +136,8 @@ impl Plugin for SshTuiPlugin {
 		// optional here: without it a closed session leaves its page behind. The
 		// transport plugin is likewise not optional: it enforces the pty timeout
 		// this server sets on every connection.
-		app.init_plugin::<PageHostPlugin>()
-			.init_plugin::<SshServerPlugin>()
+		app.add_type::<PageHostPlugin>()
+			.add_type::<SshServerPlugin>()
 			.register_type::<SshTuiServer>()
 			.add_observer(on_ssh_recv)
 			// drain each surface's painted frame to its client after the render
@@ -942,7 +942,7 @@ mod test {
 	/// An SSH-TUI server root opening on `home`, its router child carrying the
 	/// drawer layout and serving that one route. Returns the server entity.
 	fn spawn_drawer_router(app: &mut App) -> Entity {
-		app.init(DrawerLayout::register_template());
+		app.add_type::<DrawerLayout>();
 		app.world_mut()
 			.spawn((
 				SshTuiServer::default(),
@@ -1450,7 +1450,7 @@ mod test {
 		/// The page the stress sessions browse: the shared drawer chrome every
 		/// deployed page has, wrapped around a body that fills the window.
 		fn spawn_stress_router(app: &mut App) -> Entity {
-			app.init(DrawerLayout::register_template());
+			app.add_type::<DrawerLayout>();
 			app.world_mut()
 				.spawn((
 					SshTuiServer::default(),

@@ -23,7 +23,7 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<Slide>()
 			.register_type::<SlidePicture>()
 			.register_type::<DeckReported>()
-			.init(OoxmlRenderer.register_render_target())
+			.add(OoxmlRenderer)
 			.init_schedule(PostParseTree)
 			.add_systems(PostParseTree, append_deck_reports);
 	}

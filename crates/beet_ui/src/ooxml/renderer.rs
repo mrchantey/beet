@@ -31,6 +31,10 @@ impl RenderTarget for OoxmlRenderer {
 	}
 }
 
+impl OwnedPlugin for OoxmlRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+}
+
 impl NodeRenderer for OoxmlRenderer {
 	fn render(
 		&mut self,

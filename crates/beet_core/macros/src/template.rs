@@ -11,8 +11,8 @@
 //!   build target;
 //! - a generics-aware `Unpin` opt-out of Bevy's blanket
 //!   `Template for T: Clone + Unpin` impl, the `subtree_template!` pattern;
-//! - a `register_Name` registration fn (called by `Name::register_template()`)
-//!   exposing the template by name to the loader.
+//! - a [`GetTemplateSchema`] impl, so `app.add_type::<Name>()` exposes the
+//!   template by name to the loader.
 //!
 //! There is no `NameProps` struct and no marker component: the data struct *is*
 //! the props, and props are runtime-verified input values, not a compile-time
@@ -36,7 +36,6 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 use beet_core_shared::prelude::*;
 use proc_macro2::TokenStream;
-use quote::format_ident;
 use quote::quote;
 use syn::ItemFn;
 use syn::parse_macro_input;
@@ -173,7 +172,7 @@ fn emit(
 	// non-generic path is unchanged. Trait bounds the generated impls need are
 	// deferred onto `Self`, so the author only declares their own param bounds.
 	let generics = &item.sig.generics;
-	let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+	let (impl_generics, ty_generics, _) = generics.split_for_impl();
 	// `Self`-deferred bounds the generated impls require, no-ops when non-generic.
 	let unpin_where = merge_where(generics, quote! {
 		for<'a> [()]:
@@ -190,13 +189,6 @@ fn emit(
 	});
 	let schema_where =
 		merge_where(generics, quote! { Self: #bevy::reflect::Typed });
-	let register_where = merge_where(generics, quote! {
-		Self: #bevy::reflect::FromReflect
-			+ #bevy::reflect::Typed
-			+ #bevy::reflect::GetTypeRegistration
-			+ #beet_core::prelude::GetTemplateSchema
-			+ #bevy::ecs::template::Template<Output = ()>
-	});
 
 	let field_idents: Vec<&syn::Ident> =
 		props.iter().map(|prop| &prop.ident).collect();
@@ -268,8 +260,6 @@ fn emit(
 	// system templates move `self` into a `FnOnce`, so bind a clone first.
 	let props_binding = is_system.then(|| quote! { let props = self.clone(); });
 
-	let register_fn = format_ident!("register_{}", name);
-
 	// a `#[prop(default = expr)]` forces a manual `Default` impl (emitted by
 	// `data_struct`), so omit the `Default` derive to avoid a conflict.
 	let needs_manual_default =
@@ -337,17 +327,6 @@ fn emit(
 					}
 				}
 				schema
-			}
-		}
-
-		impl #impl_generics #name #ty_generics #where_clause {
-			/// Registers this template by name on the world's type registry,
-			/// attaching its prop schema alongside the build bridge.
-			#[allow(dead_code, non_snake_case)]
-			#vis fn #register_fn(
-				world: &mut #bevy::ecs::world::World,
-			) #register_where {
-				#beet_core::prelude::WorldRegisterTemplateExt::register_template::<Self>(world);
 			}
 		}
 	})

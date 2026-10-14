@@ -8,7 +8,7 @@ use beet_core::prelude::*;
 /// `deploy --elevate` answers `did you mean --elevated?` rather than running a
 /// plain deploy.
 ///
-/// What a route takes is what its [`ParamsPattern`] holds: every param a
+/// What a route takes is what its [`ParamsPattern`] holds: every param an
 /// extractor running for it declares by taking it, the route's own and its
 /// steps' ([`RouteParams`]) and those of the middleware and servers above it
 /// ([`SubtreeParams`]). A route taking [`AnyParams`] refuses nothing.

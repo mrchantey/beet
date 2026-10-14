@@ -892,25 +892,43 @@ mod test {
 		port.to_string().xok()
 	}
 
+	/// The params [`Bind`] takes as its input.
+	#[derive(Reflect)]
+	struct BindParams {
+		/// The port to bind.
+		port: u16,
+	}
+
+	/// [`Serve`] taking its params as its input rather than an argument.
+	#[action]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Bind(cx: ActionContext<Params<BindParams>>) -> Result<String> {
+		cx.input.port.to_string().xok()
+	}
+
+	/// Exchange `args` with a router serving [`Serve`] and [`Bind`].
+	async fn exchange_cli(args: &str) -> Response {
+		router_world()
+			.spawn((Router::with_defaults(), children![
+				route::exchange("serve", Serve),
+				route::exchange("bind", Bind)
+			]))
+			.exchange(Request::from_cli_str(args))
+			.await
+	}
+
 	/// A param the request got wrong is the caller's error: a `400` naming the
 	/// param with its type and doc line, pointing at the route's help, where a
 	/// request carrying it is served.
 	#[beet_core::test]
 	async fn param_errors_are_bad_requests() {
-		async fn exchange(args: &str) -> Response {
-			router_world()
-				.spawn((Router::with_defaults(), children![route::exchange(
-					"serve", Serve
-				)]))
-				.exchange(Request::from_cli_str(args))
-				.await
-		}
-		let missing = exchange("serve").await;
+		let missing = exchange_cli("serve").await;
 		missing.status().xpect_eq(StatusCode::BAD_REQUEST);
 		missing.text().await.unwrap().xpect_eq(
 			"missing required param `--port`\n`--port` (u16): The port to listen on.\n`serve --help` lists the params it takes\n",
 		);
-		let malformed = exchange("serve --port=abc").await;
+		let malformed = exchange_cli("serve --port=abc").await;
 		malformed.status().xpect_eq(StatusCode::BAD_REQUEST);
 		malformed
 			.text()
@@ -919,7 +937,26 @@ mod test {
 			.xpect_contains("invalid param `--port`: invalid number")
 			.xpect_contains("`--port` (u16): The port to listen on.")
 			.xpect_contains("`serve --help`");
-		exchange("serve --port=8080")
+		exchange_cli("serve --port=8080")
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("8080");
+	}
+
+	/// A malformed [`Params`] input is explained as a `#[param]` argument is.
+	#[beet_core::test]
+	async fn params_input_errors_are_explained() {
+		let malformed = exchange_cli("bind --port=abc").await;
+		malformed.status().xpect_eq(StatusCode::BAD_REQUEST);
+		malformed
+			.text()
+			.await
+			.unwrap()
+			.xpect_contains("invalid param `--port`: invalid number")
+			.xpect_contains("`--port` (u16): The port to bind.")
+			.xpect_contains("`bind --help`");
+		exchange_cli("bind --port=8080")
 			.await
 			.unwrap_str()
 			.await

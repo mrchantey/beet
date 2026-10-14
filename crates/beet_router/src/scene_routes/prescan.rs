@@ -34,8 +34,9 @@ use std::sync::Arc;
 /// names something the build resolves, ie another store), a `bx:cfg` subtree
 /// is left to the build, and a non-literal attribute is skipped.
 ///
-/// Registered with [`register_prescan`](Self::register_prescan), in the order
-/// its [`preload`](Self::preload) should run.
+/// Added by type, `app.add_type::<RepoRoot>()`, in the order its
+/// [`preload`](Self::preload) should run: the type's [`TypePlugin`] impl
+/// forwards to [`PrescanRegistry::register_on`].
 pub trait Prescan: Default + Clone + FromReflect + Typed {
 	/// One line of what the declaration does before the build, listed by
 	/// `--help` under "before the build".
@@ -52,22 +53,11 @@ pub trait Prescan: Default + Clone + FromReflect + Typed {
 		let _ = repo_store;
 		Box::pin(async { Ok(()) })
 	}
-
-	/// Register this type as acting before the entry builds, and as a reflect
-	/// type so the built tree resolves the same tag: `app.init(RepoRoot::register_prescan())`.
-	/// Call order is preload order.
-	fn register_prescan() -> impl Initializer
-	where
-		Self: GetTypeRegistration,
-	{
-		|app: &mut App| {
-			app.register_type::<Self>();
-			app.world_mut()
-				.get_resource_or_init::<PrescanRegistry>()
-				.register::<Self>();
-		}
-	}
 }
+
+/// The [`TypePlugin`] marker for a [`Prescan`], local so this crate can add
+/// one declared upstream (`<Secrets>`, `<RequireCfg>`).
+pub struct PrescanMarker;
 
 /// The registered [`Prescan`] set, in registration order, which is the order
 /// their preloads run in.
@@ -84,6 +74,16 @@ impl PrescanRegistry {
 			self.registrations.push(PrescanRegistration::new::<T>());
 		}
 		self
+	}
+
+	/// Register `T` on `app` as acting before the entry builds, and as a
+	/// reflect type so the built tree resolves the same tag, the body of every
+	/// [`Prescan`]'s [`TypePlugin`] impl. Call order is preload order.
+	pub fn register_on<T: Prescan + GetTypeRegistration>(app: &mut App) {
+		app.register_type::<T>();
+		app.world_mut()
+			.get_resource_or_init::<Self>()
+			.register::<T>();
 	}
 
 	/// Whether `T` is registered.
@@ -391,6 +391,10 @@ impl Prescan for RequireCfg {
 	}
 }
 
+impl TypePlugin<PrescanMarker> for RequireCfg {
+	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+}
+
 /// `<Secrets path="..">` sets its `EnvVar` records into the process
 /// environment before anything builds, so every declaration constructed in
 /// the build walk and every verb dispatched on ready finds them set, and no
@@ -421,6 +425,11 @@ impl Prescan for Secrets {
 			Ok(())
 		})
 	}
+}
+
+#[cfg(feature = "vault")]
+impl TypePlugin<PrescanMarker> for Secrets {
+	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }
 
 #[cfg(test)]
@@ -594,8 +603,18 @@ mod test {
 				})
 			}
 		}
+		impl TypePlugin for Warm {
+			fn build(app: &mut App) {
+				PrescanRegistry::register_on::<Self>(app);
+			}
+		}
+		impl TypePlugin for Second {
+			fn build(app: &mut App) {
+				PrescanRegistry::register_on::<Self>(app);
+			}
+		}
 		let mut app = App::new();
-		app.init((Warm::register_prescan(), Second::register_prescan()));
+		app.add_type::<(Warm, Second)>();
 		let registry = app.world().resource::<PrescanRegistry>().clone();
 		registry.describe().xpect_eq(vec![
 			("Warm", "warms a cache"),

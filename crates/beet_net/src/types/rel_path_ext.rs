@@ -3,7 +3,7 @@ use beet_core::prelude::*;
 
 /// Extract the relative path from request metadata.
 impl FromRequestMeta<Self> for RelPath {
-	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
+	fn from_request_meta(req: &RequestMeta) -> Result<Self> {
 		Self::new(req.path_string()).xok()
 	}
 }

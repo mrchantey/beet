@@ -151,7 +151,7 @@ pub(crate) async fn wait_for_port() -> Result<u16> {
 /// and the default `bx:` event vocabulary, so a markup entry using live widgets renders
 /// here as it would under `BeetPlugins`. It is added *before* [`RouterPlugin`] so its
 /// inner `BsxPlugin` registers once (the router's charcell stack reaches it through the
-/// idempotent `init_plugin`). [`RouterPlugin`] registers the markup-declarable
+/// idempotent `add_type`). [`RouterPlugin`] registers the markup-declarable
 /// server *types* (`TuiServer`, `SshTuiServer`) by feature, so an entry's server
 /// spread resolves without the ssh runtime systems (which need an input backend);
 /// the disarmed build keeps the declared servers dormant anyway.

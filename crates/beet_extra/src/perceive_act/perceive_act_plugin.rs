@@ -12,9 +12,9 @@ pub struct PerceiveActPlugin;
 
 impl Plugin for PerceiveActPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<ThreadPlugin>()
-			.init_plugin::<ThreadUiPlugin>()
-			.init_plugin::<PerceiveActCorePlugin>()
+		app.add_type::<ThreadPlugin>()
+			.add_type::<ThreadUiPlugin>()
+			.add_type::<PerceiveActCorePlugin>()
 			.add_plugins(CapabilityBindingPlugin)
 			.init_resource::<PhotoStream>()
 			.init_resource::<RandomSource>()
@@ -33,14 +33,13 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<SceneOrder>()
 			.register_type::<ScenePrompt>()
 			.add_systems(Update, sync_image_options)
-			.init(MockHead::register_template())
-			.init(MockBody::register_template())
-			.init(RobotStreamer::register_template());
+			.add_type::<MockHead>()
+			.add_type::<MockBody>()
+			.add_type::<RobotStreamer>();
 		// the wgpu render body (v2): the driven fox and its `drive` handler, so
 		// `<WgpuBody/>` resolves once the render stack is linked.
 		#[cfg(feature = "bevy_default")]
-		app.register_type::<DriveFox>()
-			.init(WgpuBody::register_template());
+		app.register_type::<DriveFox>().add_type::<WgpuBody>();
 	}
 }
 
@@ -53,8 +52,7 @@ mod test {
 	#[beet_core::test]
 	fn tools_resolve_to_definitions() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
 		app.world_mut().spawn(children![
 			RespondMultiModal::default(),
 			SpeakText,

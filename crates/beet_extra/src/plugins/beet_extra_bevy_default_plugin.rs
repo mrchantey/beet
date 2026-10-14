@@ -8,9 +8,9 @@ use beet_core::prelude::*;
 /// job; this only adds behaviour, so it composes under either runner.
 pub(crate) fn beet_extra_bevy_default_plugin(app: &mut App) {
 	// `ActionPlugin` may already be present (the router stack adds it via
-	// `init_plugin` on the CLI render path), so add it idempotently rather than
+	// `add_type` on the CLI render path), so add it idempotently rather than
 	// panic on the double-add when this group composes with a router-bearing app.
-	app.init_plugin::<ActionPlugin>()
+	app.add_type::<ActionPlugin>()
 		.add_plugins((
 			// drains deferred asset loads (clips, Bert) so a scene's `Ready`
 			// (and its `CallOnReady` gate) fires once every asset has settled.
@@ -60,14 +60,14 @@ pub(crate) fn beet_extra_ml_plugin(app: &mut App) {
 		// the markup ml scene templates, so `<NearestSentenceAgent/>` /
 		// `<SentenceOption/>` / `<ChatSentenceAgent/>` / `<FrozenLake/>` etc resolve
 		// in a `.bsx`.
-		.init(NearestSentenceAgent::register_template())
-		.init(SentenceOption::register_template())
-		.init(ChatSentenceAgent::register_template())
-		.init(FetchItems::register_template())
-		.init(FetchFox::register_template())
-		.init(FrozenLake::register_template())
-		.init(FrozenLakeRunAgent::register_template())
-		.init(FrozenLakeTrainSession::register_template());
+		.add_type::<NearestSentenceAgent>()
+		.add_type::<SentenceOption>()
+		.add_type::<ChatSentenceAgent>()
+		.add_type::<FetchItems>()
+		.add_type::<FetchFox>()
+		.add_type::<FrozenLake>()
+		.add_type::<FrozenLakeRunAgent>()
+		.add_type::<FrozenLakeTrainSession>();
 }
 
 fn plugin_2d(app: &mut App) {
@@ -88,11 +88,11 @@ fn plugin_2d(app: &mut App) {
 		.register_type::<FollowCursor2d>()
 		// the markup 2d scene templates, so `<Scene2d/>`/`<Sprite2d/>`/`<SpaceScene/>`/
 		// `<SeekAgent2d/>`/`<Flock/>` resolve in a `.bsx`.
-		.init(Scene2d::register_template())
-		.init(Sprite2d::register_template())
-		.init(SpaceScene::register_template())
-		.init(SeekAgent2d::register_template())
-		.init(Flock::register_template())
+		.add_type::<Scene2d>()
+		.add_type::<Sprite2d>()
+		.add_type::<SpaceScene>()
+		.add_type::<SeekAgent2d>()
+		.add_type::<Flock>()
 		/*_*/;
 }
 
@@ -109,15 +109,15 @@ fn plugin_3d(app: &mut App) {
 		.register_type::<CameraDistance>()
 		// the markup scene templates, so `<AppWindow/>`/`<UiTerminal/>`/`<Scene3d/>`/
 		// `<Lighting3d/>`/`<Ground3d/>` resolve in a `.bsx`.
-		.init(AppWindow::register_template())
-		.init(UiTerminal::register_template())
-		.init(Scene3d::register_template())
-		.init(WorldScene::register_template())
-		.init(Foxie::register_template())
-		.init(Lighting3d::register_template())
-		.init(Ground3d::register_template())
-		.init(Camera3dLookAt::register_template())
-		.init(IkTarget::register_template())
+		.add_type::<AppWindow>()
+		.add_type::<UiTerminal>()
+		.add_type::<Scene3d>()
+		.add_type::<WorldScene>()
+		.add_type::<Foxie>()
+		.add_type::<Lighting3d>()
+		.add_type::<Ground3d>()
+		.add_type::<Camera3dLookAt>()
+		.add_type::<IkTarget>()
 		// the render body for the agnostic `<Drive>` action: `{CharacterDrive}`
 		// integrates the agent's commanded velocity into a `Transform` and animates it.
 		.add_plugins(crate::prelude::character_drive_plugin)

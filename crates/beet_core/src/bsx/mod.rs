@@ -189,7 +189,7 @@
 //!
 //! An entry document has a single root element. Beside it may sit only the
 //! declarations its launch pre-scans (`<RepoRoot>`, `<TemplateDir>`,
-//! `<RequireCfg>`, `<Secrets>`, and whatever `app.init(T::register_prescan())`
+//! `<RequireCfg>`, `<Secrets>`, and whatever prescan type `app.add_type::<T>()`
 //! adds), with string attributes and no `bx:cfg`: each acts before the build
 //! and is consumed rather than built, so a root admitting no such child still
 //! states what it needs. Anything else there is a second root, an error
@@ -202,7 +202,7 @@
 //!
 //! A sequence route that skipped every child fails naming its unregistered
 //! tags, and `beet check` elevates [`UnregisteredTag`] to an error;
-//! `allow_unregistered` opts out a tag whose whole content is the missing
+//! `UnregisteredTag::allow` opts out a tag whose whole content is the missing
 //! behavior (`<LiveReloadScript/>`). `bx:cfg` atoms are `namespace:argument`
 //! resolved through the `BsxConditions` seam (`feature:`, `version:`, `env:` in
 //! core, downstream registers its own) with Rust's `#[cfg]` operators and

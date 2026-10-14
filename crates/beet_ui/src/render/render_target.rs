@@ -4,7 +4,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// A format a tree renders to: a [`NodeRenderer`] that names the media types
-/// it answers, registered in [`RenderTargets`].
+/// it answers, registered in [`RenderTargets`] by its [`OwnedPlugin`] impl,
+/// which forwards to [`RenderTargets::register_on`]:
+/// `app.add(MarkdownRenderer::default())`.
 ///
 /// The registry clones the registered instance for every render, so its
 /// configuration (an [`HtmlRenderer`]'s indent, an [`AnsiTermRenderer`]'s
@@ -16,17 +18,6 @@ use beet_net::prelude::*;
 pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 	/// The media types this target answers, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
-
-	/// Register this target in the [`RenderTargets`], answering its media types
-	/// ahead of any target registered before it:
-	/// `app.init(MarkdownRenderer::default().register_render_target())`.
-	fn register_render_target(self) -> impl Initializer {
-		move |app: &mut App| {
-			app.world_mut()
-				.get_resource_or_init::<RenderTargets>()
-				.register(self);
-		}
-	}
 }
 
 /// Every [`RenderTarget`] this world renders to, the one place a format is
@@ -35,9 +26,10 @@ pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 /// type renders a request accepting it and gets exactly the body a client
 /// asking for that type does.
 ///
-/// Registered through [`RenderTarget::register_render_target`], the built-in
-/// targets by [`RenderPlugin`] through the same call a downstream target uses. For an overlapping media type the target registered last
-/// wins, so a downstream crate replaces a built-in by registering its own.
+/// A target is added by value, `app.add(HtmlRenderer::default())`, the
+/// built-in targets by [`RenderPlugin`] through the same call a downstream
+/// target uses. For an overlapping media type the target registered last wins,
+/// so a downstream crate replaces a built-in by registering its own.
 #[derive(Default, Clone, Resource)]
 pub struct RenderTargets {
 	targets: Vec<Arc<dyn ErasedRenderTarget>>,
@@ -53,6 +45,14 @@ impl RenderTargets {
 	pub fn register(&mut self, target: impl RenderTarget) -> &mut Self {
 		self.targets.push(Arc::new(target));
 		self
+	}
+
+	/// [`register`](Self::register) `target` in `app`'s registry, the body of
+	/// every [`RenderTarget`]'s [`OwnedPlugin`] impl.
+	pub fn register_on(app: &mut App, target: impl RenderTarget) {
+		app.world_mut()
+			.get_resource_or_init::<Self>()
+			.register(target);
 	}
 
 	/// Every media type a registered target answers, in registration order.
@@ -168,16 +168,16 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
 	fn build(&self, app: &mut App) {
-		app.init((
-			PlainTextRenderer::default().register_render_target(),
-			HtmlRenderer::default().register_render_target(),
-			XmlRenderer.register_render_target(),
-			MarkdownRenderer::default().register_render_target(),
+		app.add((
+			PlainTextRenderer::default(),
+			HtmlRenderer::default(),
+			XmlRenderer,
+			MarkdownRenderer::default(),
 		));
 		#[cfg(feature = "style")]
-		app.init(AnsiTermRenderer::default().register_render_target());
+		app.add(AnsiTermRenderer::default());
 		#[cfg(feature = "template_serde")]
-		app.init(TemplateRenderer::default().register_render_target());
+		app.add(TemplateRenderer::default());
 	}
 }
 
@@ -215,16 +215,32 @@ impl RenderTarget for PlainTextRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
 }
 
+impl OwnedPlugin for PlainTextRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+}
+
 impl RenderTarget for HtmlRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Html] }
+}
+
+impl OwnedPlugin for HtmlRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
 }
 
 impl RenderTarget for XmlRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Xml] }
 }
 
+impl OwnedPlugin for XmlRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+}
+
 impl RenderTarget for MarkdownRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::Markdown] }
+}
+
+impl OwnedPlugin for MarkdownRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
 }
 
 #[cfg(feature = "style")]
@@ -232,9 +248,19 @@ impl RenderTarget for AnsiTermRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![MediaType::AnsiTerm] }
 }
 
+#[cfg(feature = "style")]
+impl OwnedPlugin for AnsiTermRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+}
+
 #[cfg(feature = "template_serde")]
 impl RenderTarget for TemplateRenderer {
 	fn media_types(&self) -> Vec<MediaType> { Self::available() }
+}
+
+#[cfg(feature = "template_serde")]
+impl OwnedPlugin for TemplateRenderer {
+	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
 }
 
 #[cfg(test)]

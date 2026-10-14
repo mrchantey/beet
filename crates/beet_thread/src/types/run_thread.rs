@@ -176,8 +176,7 @@ mod test {
 
 	fn app() -> App {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
 		app
 	}
 

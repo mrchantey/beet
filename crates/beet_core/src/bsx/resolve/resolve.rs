@@ -450,8 +450,10 @@ mod test {
 	/// behavior takes it.
 	#[crate::test]
 	fn allowed_unregistered_tag_builds_nothing() {
-		let mut world = (TemplatePlugin, DocumentPlugin).into_world();
-		world.allow_unregistered("NotRegistered");
+		let mut app = App::new();
+		app.add_plugins((TemplatePlugin, DocumentPlugin))
+			.add(UnregisteredTag::allow("NotRegistered"));
+		let world = app.world_mut();
 		let nodes = BsxNode::parse_document(
 			"<NotRegistered><NorThis/></NotRegistered>",
 			&BsxParseConfig::bsx(),

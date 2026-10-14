@@ -16,9 +16,9 @@ pub struct InfraPlugin;
 
 impl Plugin for InfraPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_plugin::<AsyncPlugin>();
+		app.add_type::<AsyncPlugin>();
 		#[cfg(feature = "deploy")]
-		app.init_plugin::<beet_router::prelude::RouterPlugin>();
+		app.add_type::<beet_router::prelude::RouterPlugin>();
 
 		// the identity every declaration composes its name from, registered in
 		// every native build so `<Stack stage="shared"/>` authors anywhere, and
@@ -176,7 +176,7 @@ impl Plugin for InfraPlugin {
 		// the network whether each resolves. Definitions, so every target: a
 		// wasm consumer authors the stack it cannot apply.
 		#[cfg(feature = "atproto")]
-		app.init_plugin::<beet_net::prelude::AtprotoPlugin>()
+		app.add_type::<beet_net::prelude::AtprotoPlugin>()
 			.register_type::<crate::prelude::AtprotoHandleBlock>()
 			.register_type::<crate::prelude::AtprotoHandleProbe>()
 			.add_systems(
@@ -234,7 +234,7 @@ impl Plugin for InfraPlugin {
 		// store declarations (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`)
 		// and their attaches, on every target the seam compiles.
 		#[cfg(feature = "vault")]
-		app.init_plugin::<beet_net::prelude::SecretsPlugin>()
+		app.add_type::<beet_net::prelude::SecretsPlugin>()
 			.register_type::<crate::prelude::SsmSecrets>()
 			.register_type::<crate::prelude::DocumentSecrets>()
 			.add_observer(crate::types::attach_ssm_secrets)
@@ -318,11 +318,11 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::AdoptCurrentDeploy>()
 			// the IaC verb routes a `<Stack>` hosts, registered beside the verbs
 			// themselves rather than by whichever crate happens to author markup.
-			.init(crate::prelude::DeployRoutes::register_template())
+			.add_type::<crate::prelude::DeployRoutes>()
 			// the one thing about this launch's deploy mechanics an entry
 			// authors: where its state lives, a property of the operator rather
 			// than of any stack.
-			.init(crate::prelude::S3StateBackend::register_template())
+			.add_type::<crate::prelude::S3StateBackend>()
 			.register_type::<crate::prelude::TofuApply>()
 			// the two teardown steps: `tofu destroy`, and the state carriers it
 			// leaves behind. They converge either side of the apply, so a destroy
@@ -355,7 +355,7 @@ impl Plugin for InfraPlugin {
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::CloudflareDeployToken>()
 			.register_type::<crate::prelude::DeployGate>()
-			.init(RouteParams::declare_on::<
+			.add(RouteParams::declare_on::<
 				crate::prelude::DeployGate,
 				crate::credentials::ElevationParams,
 			>())
@@ -417,8 +417,8 @@ impl Plugin for InfraPlugin {
 			// the two paired declarations, each spawning its up-action and its
 			// down-action from one tag at one file position, so the deploy and
 			// teardown groups cannot drift apart.
-			.init(crate::prelude::EipReverseRecord::register_template())
-			.init(crate::prelude::MtaStsPolicyHost::register_template());
+			.add_type::<crate::prelude::EipReverseRecord>()
+			.add_type::<crate::prelude::MtaStsPolicyHost>();
 
 		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
 		// enum a markup attribute names by variant, and the `<DirSync>` front-end

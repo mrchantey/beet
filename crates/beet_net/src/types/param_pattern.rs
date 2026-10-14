@@ -6,36 +6,36 @@ use core::any::TypeId;
 use heck::ToKebabCase;
 
 /// The params one route takes: the union over every extractor that runs for
-/// it, each param beside every source declaring it, so `--help`, the strict refusal
+/// it, each param beside every extractor declaring it, so `--help`, the strict refusal
 /// and the `400` explanation all read the one pattern.
 ///
 /// Collected per route by the router from the [`RouteParams`] on the route
 /// and its steps and the [`SubtreeParams`] on the route and every ancestor.
-/// Two sources naming one key must agree on its type and arity, see
+/// Two extractors naming one key must agree on its type and arity, see
 /// [`from_declarations`](Self::from_declarations).
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParamsPattern {
 	/// Each param once, sorted by key.
 	items: Vec<PatternParam>,
-	/// Every source, in the order the collector supplied them.
-	sources: Vec<ParamsSource>,
-	/// Whether any source takes any param, see [`AnyParams`].
+	/// Every extractor, in the order the collector supplied them.
+	extractors: Vec<ParamsExtractor>,
+	/// Whether any extractor takes any param, see [`AnyParams`].
 	takes_any: bool,
 }
 
-/// One param of a [`ParamsPattern`], beside every source declaring it.
+/// One param of a [`ParamsPattern`], beside every extractor declaring it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatternParam {
-	/// The param, as its first source declared it.
+	/// The param, as its first extractor declared it.
 	pub meta: ParamMeta,
-	/// Every source declaring it.
-	pub sources: Vec<ParamsSource>,
+	/// Every extractor declaring it.
+	pub extractors: Vec<ParamsExtractor>,
 }
 
-/// Where a [`ParamsPattern`]'s params come from: one extractor's declaration
-/// on one entity.
+/// One extractor a [`ParamsPattern`]'s params come from: its declaration on
+/// one entity.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParamsSource {
+pub struct ParamsExtractor {
 	/// The entity the extractor sits on.
 	pub entity: Entity,
 	/// The extractor's short type name, ie `CliServer`.
@@ -50,9 +50,9 @@ impl ParamsPattern {
 	///
 	/// ## Errors
 	///
-	/// Errors when two sources name one key with a different type or arity.
+	/// Errors when two extractors name one key with a different type or arity.
 	/// One key of one type declared twice is two extractors of the same param,
-	/// kept once with both sources.
+	/// kept once with both extractors.
 	pub fn from_declarations<'a>(
 		declarations: impl IntoIterator<
 			Item = (Entity, ParamsScope, &'a ParamsDeclaration),
@@ -60,17 +60,17 @@ impl ParamsPattern {
 	) -> Result<Self> {
 		let mut pattern = Self::default();
 		for (entity, scope, declaration) in declarations {
-			let source = ParamsSource {
+			let extractor = ParamsExtractor {
 				entity,
 				name: declaration.name().clone(),
 				scope,
 			};
 			pattern.takes_any |= declaration.takes_any();
 			for meta in declaration.metas() {
-				pattern.add(&source, meta)?;
+				pattern.add(&extractor, meta)?;
 			}
-			if !pattern.sources.contains(&source) {
-				pattern.sources.push(source);
+			if !pattern.extractors.contains(&extractor) {
+				pattern.extractors.push(extractor);
 			}
 		}
 		pattern
@@ -79,38 +79,38 @@ impl ParamsPattern {
 		pattern.xok()
 	}
 
-	/// Add `meta` declared by `source`, applying the conflict rule.
-	fn add(&mut self, source: &ParamsSource, meta: &ParamMeta) -> Result {
+	/// Add `meta` declared by `extractor`, applying the conflict rule.
+	fn add(&mut self, extractor: &ParamsExtractor, meta: &ParamMeta) -> Result {
 		let Some(item) =
 			self.items.iter_mut().find(|item| item.meta.key == meta.key)
 		else {
 			self.items.push(PatternParam {
 				meta: meta.clone(),
-				sources: vec![source.clone()],
+				extractors: vec![extractor.clone()],
 			});
 			return Ok(());
 		};
 		if item.meta.type_path != meta.type_path
 			|| item.meta.value != meta.value
 		{
-			let first = &item.sources[0].name;
+			let first = &item.extractors[0].name;
 			bevybail!(
 				"conflicting declarations of `--{key}`: `{first}` takes {} ({}), `{}` takes {} ({})",
 				item.meta.type_path,
 				item.meta.value,
-				source.name,
+				extractor.name,
 				meta.type_path,
 				meta.value,
 				key = meta.key,
 			);
 		}
-		if !item.sources.contains(source) {
-			item.sources.push(source.clone());
+		if !item.extractors.contains(extractor) {
+			item.extractors.push(extractor.clone());
 		}
 		Ok(())
 	}
 
-	/// Each param once, sorted by key, beside its sources.
+	/// Each param once, sorted by key, beside its extractors.
 	pub fn items(&self) -> &[PatternParam] { &self.items }
 
 	/// Each declared param once, sorted by key.
@@ -118,7 +118,7 @@ impl ParamsPattern {
 		self.items.iter().map(|item| &item.meta)
 	}
 
-	/// Whether any source takes any param, so no param is unknown, see
+	/// Whether any extractor takes any param, so no param is unknown, see
 	/// [`AnyParams`].
 	pub fn takes_any(&self) -> bool { self.takes_any }
 
@@ -128,29 +128,29 @@ impl ParamsPattern {
 		self.items
 			.iter()
 			.filter(|item| {
-				item.sources
+				item.extractors
 					.iter()
-					.any(|source| source.scope == ParamsScope::Route)
+					.any(|extractor| extractor.scope == ParamsScope::Route)
 			})
 			.map(|item| &item.meta)
 	}
 
-	/// Each subtree source ([`ParamsScope::Subtree`]) in collector order,
+	/// Each subtree extractor ([`ParamsScope::Subtree`]) in collector order,
 	/// beside the params it takes, sorted by key.
 	pub fn inherited(
 		&self,
-	) -> impl Iterator<Item = (&ParamsSource, Vec<&ParamMeta>)> {
-		self.sources
+	) -> impl Iterator<Item = (&ParamsExtractor, Vec<&ParamMeta>)> {
+		self.extractors
 			.iter()
-			.filter(|source| source.scope == ParamsScope::Subtree)
-			.map(|source| {
+			.filter(|extractor| extractor.scope == ParamsScope::Subtree)
+			.map(|extractor| {
 				let params = self
 					.items
 					.iter()
-					.filter(|item| item.sources.contains(source))
+					.filter(|item| item.extractors.contains(extractor))
 					.map(|item| &item.meta)
 					.collect();
-				(source, params)
+				(extractor, params)
 			})
 	}
 
@@ -261,7 +261,7 @@ pub struct ParamMeta {
 	key: String,
 	/// The param value arity (flag / single / multiple).
 	value: ParamValue,
-	/// The concrete Rust type the param parses into, eg `alloc::string::String`,
+	/// The concrete Rust type the param parses into, eg `String`,
 	/// with any `Option<..>` wrapper stripped (its optionality is conveyed by
 	/// [`required`](Self::required)). This is the param's displayed `kind`.
 	type_path: String,
@@ -320,7 +320,9 @@ impl ParamMeta {
 			value,
 			type_path: authored_kind(leaf_id)
 				.or_else(|| variant_kind(some_inner.or(info)))
-				.unwrap_or_else(|| kind_from_type_path(field.type_path())),
+				.unwrap_or_else(|| {
+					kind_from_type_path(field.type_path_table().short_path())
+				}),
 			options: ParamOptions::from_reflect(field),
 		}
 	}
@@ -478,8 +480,8 @@ impl ParamValue {
 	fn placeholder_type_path(&self) -> &'static str {
 		match self {
 			Self::Flag => "bool",
-			Self::Single => "alloc::string::String",
-			Self::Multiple => "alloc::vec::Vec<alloc::string::String>",
+			Self::Single => "String",
+			Self::Multiple => "Vec<String>",
 		}
 	}
 }
@@ -513,11 +515,12 @@ fn variant_kind(info: Option<&TypeInfo>) -> Option<String> {
 		.map(|variants| format!("one of: {}", variants.join(", ")))
 }
 
-/// The concrete type path shown as a param's `kind`, with a `core::option::Option<..>`
-/// wrapper stripped (its optionality is conveyed by the param's `required` flag).
+/// The short type path shown as a param's `kind`, ie `Vec<String>`, with an
+/// `Option<..>` wrapper stripped (its optionality is conveyed by the param's
+/// `required` flag).
 fn kind_from_type_path(type_path: &str) -> String {
 	type_path
-		.strip_prefix("core::option::Option<")
+		.strip_prefix("Option<")
 		.and_then(|inner| inner.strip_suffix('>'))
 		.unwrap_or(type_path)
 		.to_string()
@@ -619,18 +622,16 @@ mod test {
 			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
 		// a required `String` shows its concrete type, not the `single` arity
 		let package = by_name("package");
-		package.type_path().xpect_eq("alloc::string::String");
+		package.type_path().xpect_eq("String");
 		package.is_required().xpect_true();
 		// an `Option<String>` is not required and its `kind` strips the wrapper
 		let out_dir = by_name("out_dir");
-		out_dir.type_path().xpect_eq("alloc::string::String");
+		out_dir.type_path().xpect_eq("String");
 		out_dir.is_required().xpect_false();
 		// a `bool` is a flag whose kind is `bool`
 		by_name("release").type_path().xpect_eq("bool");
 		// the Display form now carries the concrete type as `kind`
-		package
-			.to_string()
-			.xpect_contains("kind: alloc::string::String");
+		package.to_string().xpect_contains("kind: String");
 	}
 
 	/// A field whose type is AUTHORED as text documents itself that way, since
@@ -657,9 +658,7 @@ mod test {
 			.type_path()
 			.xpect_eq("a `YYYY-MM-DD` date");
 		// a type whose own name says how it is written keeps its path
-		by_name("label")
-			.type_path()
-			.xpect_eq("alloc::string::String");
+		by_name("label").type_path().xpect_eq("String");
 	}
 
 	#[derive(Reflect)]
@@ -776,21 +775,18 @@ mod test {
 				false,
 			)
 		};
-		pattern(&[
-			port("HttpServer", "u16"),
-			port("Serve", "alloc::string::String"),
-		])
-		.unwrap_err()
-		.to_string()
-		.xpect_contains("conflicting declarations of `--port`");
+		pattern(&[port("HttpServer", "u16"), port("Serve", "String")])
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("conflicting declarations of `--port`");
 		let pattern =
 			pattern(&[port("HttpServer", "u16"), port("TuiServer", "u16")])
 				.unwrap();
 		pattern.items().len().xpect_eq(1);
 		pattern.items()[0]
-			.sources
+			.extractors
 			.iter()
-			.map(|source| source.name.as_str())
+			.map(|extractor| extractor.name.as_str())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["HttpServer", "TuiServer"]);
 	}
@@ -812,10 +808,10 @@ mod test {
 				.with_type_path("u32")
 				.required(),
 			ParamMeta::new("bar", ParamValue::Single)
-				.with_type_path("alloc::string::String")
+				.with_type_path("String")
 				.with_description("all about 'bar'"),
 			ParamMeta::new("bazz", ParamValue::Multiple)
-				.with_type_path("alloc::vec::Vec<f64>")
+				.with_type_path("Vec<f64>")
 				.with_description("all about 'bazz'")
 				.with_short('b'),
 			// .required(),

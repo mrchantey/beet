@@ -8,7 +8,7 @@ impl Plugin for NavigatorPlugin {
 	fn build(&self, app: &mut App) {
 		// link click handling (internal nav vs external open) lives in
 		// OpenLinkPlugin, which classifies a clicked `<a>` and routes it.
-		app.init_plugin::<OpenLinkPlugin>();
+		app.add_type::<OpenLinkPlugin>();
 		// finalize a terminal session's last page-view dwell when its navigator is
 		// removed (the session closes); a no-op without an analytics observer.
 		app.add_observer(finalize_page_view_on_remove);

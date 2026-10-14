@@ -5,7 +5,7 @@
 //!
 //! # App Extensions
 //!
-//! - [`BeetCoreAppExt`] - Plugin initialization, async execution, time control
+//! - [`BeetCoreAppExt`] - Runners: async execution, time control
 //!
 //! # World Extensions
 //!

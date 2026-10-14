@@ -81,6 +81,6 @@ impl Plugin for AgentExamplesPlugin {
 			.register_type::<CalcSubtract>()
 			.register_type::<CalcMultiply>()
 			.register_type::<CalcDivide>()
-			.init(CalculatorToolset::register_template());
+			.add_type::<CalculatorToolset>();
 	}
 }

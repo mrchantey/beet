@@ -170,8 +170,7 @@ mod test {
 	fn drive_load(backing: &BlobThreadStore, user: ActorId, agent: ActorId) {
 		let store = ThreadStore::new(backing.clone());
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.init_plugin::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
 		app.world_mut()
 			.with_state::<AsyncCommands, _>(move |commands| {
 				commands.run(async move |world: AsyncWorld| -> Result {
