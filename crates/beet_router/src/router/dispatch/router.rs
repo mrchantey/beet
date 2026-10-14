@@ -888,7 +888,6 @@ mod test {
 		/// The port to listen on.
 		#[param]
 		port: u16,
-		_cx: ActionContext<RequestParts>,
 	) -> Result<String> {
 		port.to_string().xok()
 	}

@@ -571,6 +571,38 @@ pub trait FromRequest<M>: Sized {
 	fn params() -> ParamsDeclaration { ParamsDeclaration::empty::<Self>() }
 }
 
+/// The request an action input carries, for the `#[action]` macro to read
+/// params through whatever shape the input takes.
+pub trait RequestPartsRef {
+	/// The request parts.
+	fn request_parts(&self) -> &RequestParts;
+}
+
+impl RequestPartsRef for RequestParts {
+	fn request_parts(&self) -> &RequestParts { self }
+}
+
+impl RequestPartsRef for Request {
+	fn request_parts(&self) -> &RequestParts { Request::request_parts(self) }
+}
+
+#[cfg(feature = "action")]
+impl RequestPartsRef
+	for (Request, beet_action::prelude::Next<Request, Response>)
+{
+	fn request_parts(&self) -> &RequestParts { self.0.request_parts() }
+}
+
+#[cfg(feature = "action")]
+impl RequestPartsRef
+	for (
+		RequestParts,
+		beet_action::prelude::Next<RequestParts, Response>,
+	)
+{
+	fn request_parts(&self) -> &RequestParts { &self.0 }
+}
+
 /// Marker type for [`FromRequest`] implementations via [`serde::de::DeserializeOwned`].
 /// This type also matches primitives: `(), String, u32 etc`
 #[derive(TypePath)]

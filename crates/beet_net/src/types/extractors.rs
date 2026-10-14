@@ -1,12 +1,11 @@
 //! Extractors for declaratively converting parts of an exchange into concrete types.
 //!
 //! Extractors simplify request handling by automatically parsing and validating
-//! parts of the request (query params, body, headers) into typed Rust values.
+//! parts of the request (body, headers) into typed Rust values. Request params
+//! are [`Params`], the one params mechanism, declared as well as read.
 //!
 //! ## Available Extractors
 //!
-//! - [`QueryParams`]: Parse URL query parameters into a struct
-//! - [`JsonQueryParams`]: Parse complex types encoded as JSON in query params
 //! - [`Json`]: Parse JSON request body
 //! - [`Html`], [`Css`], [`Javascript`], [`Png`]: Response type wrappers
 #[allow(unused)]
@@ -150,120 +149,6 @@ impl<T: serde::Serialize> TryInto<Response> for Json<T> {
 	}
 }
 
-/// Query params wrapper that supports complex types via JSON encoding.
-///
-/// [`QueryParams`] is limited (no enums or tuples). This type accepts any
-/// serializable value by first converting to JSON, then URL-encoding.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct JsonQueryParams<T>(pub T);
-
-/// Internal representation for JSON query params.
-#[cfg(all(feature = "json", feature = "std"))]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct JsonQueryParamsInner {
-	data: String,
-}
-
-#[cfg(all(feature = "json", feature = "std"))]
-impl<T: serde::Serialize> JsonQueryParams<T> {
-	/// Serializes a value to a URL-encoded query string.
-	pub fn to_query_string(value: &T) -> Result<String> {
-		let data = serde_json::to_string(value)?;
-		serde_urlencoded::to_string(&JsonQueryParamsInner { data })?.xok()
-	}
-}
-
-#[cfg(all(feature = "json", feature = "std"))]
-impl<T: serde::de::DeserializeOwned> JsonQueryParams<T> {
-	/// Deserializes a value from a URL-encoded query string.
-	pub fn from_query_string(query: &str) -> Result<T> {
-		let inner = serde_urlencoded::from_str::<JsonQueryParamsInner>(query)?;
-		serde_json::from_str::<T>(&inner.data)?.xok()
-	}
-}
-#[cfg(all(feature = "json", feature = "std"))]
-impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
-	for JsonQueryParams<T>
-{
-	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		let query = req.query_string();
-		if query.is_empty() {
-			return Err(
-				HttpError::bad_request("no query params in request").into()
-			);
-		}
-		let value = Self::from_query_string(&query).map_err(|err| {
-			HttpError::bad_request(format!(
-				"Failed to parse query params: {}",
-				err
-			))
-		})?;
-		Ok(Self(value))
-	}
-
-	/// Its keys are serde's, which reflect cannot name, so it takes the rest.
-	fn params() -> ParamsDeclaration {
-		ParamsDeclaration::named(type_ext::short_name::<Self>(), [], true)
-	}
-}
-/// An extractor to represent query params as a struct.
-/// # Example
-/// ```
-/// # use beet_net::prelude::*;
-/// # use serde::Deserialize;
-/// #[derive(Deserialize)]
-/// struct MyParams {
-/// 	name: String,
-/// }
-///
-/// fn my_route(params: QueryParams<MyParams>) -> String {
-///   params.name.clone()
-/// }
-/// ```
-#[derive(Debug, Clone, Deref, TypePath)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
-pub struct QueryParams<T>(pub T);
-
-#[cfg(all(feature = "serde", feature = "std"))]
-impl<T: serde::Serialize> QueryParams<T> {
-	/// Encodes the params as a URL-encoded query string.
-	pub fn encode(&self) -> Result<String> {
-		serde_urlencoded::to_string(&self.0)?.xok()
-	}
-}
-
-#[cfg(all(feature = "serde", feature = "std"))]
-impl<T: serde::de::DeserializeOwned> QueryParams<T> {
-	/// Decodes a URL-encoded query string into the specified type.
-	pub fn decode(value: &str) -> Result<T> {
-		serde_urlencoded::from_str::<T>(value)?.xok()
-	}
-}
-
-#[cfg(all(feature = "serde", feature = "std"))]
-impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
-	fn from_request_meta(req: &RequestMeta) -> Result<Self, Response> {
-		let query = req.query_string();
-		if query.is_empty() {
-			return Err(
-				HttpError::bad_request("no query params in request").into()
-			);
-		}
-		let params: T = serde_urlencoded::from_str(&query).map_err(|err| {
-			HttpError::bad_request(format!(
-				"Failed to parse query params: {}",
-				err
-			))
-		})?;
-		Ok(Self(params))
-	}
-
-	/// Its keys are serde's, which reflect cannot name, so it takes the rest.
-	fn params() -> ParamsDeclaration {
-		ParamsDeclaration::named(type_ext::short_name::<Self>(), [], true)
-	}
-}
-
 impl<T> Into<Response> for Html<T>
 where
 	T: Into<Body>,
@@ -329,23 +214,5 @@ mod test {
 
 		let parts_without = RequestParts::get("/test");
 		parts_without.has_body().xpect_false();
-	}
-
-	#[beet_core::test]
-	#[cfg(feature = "json")]
-	fn json_query_params() {
-		#[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq)]
-		struct Foo(u32, String);
-		let val = Foo(42, "foo$\" \" &dsds?sd#@$)#@$*()".to_owned());
-
-		let query_str = JsonQueryParams::to_query_string(&val).unwrap();
-		(&query_str).xpect_starts_with("data=%5B42%2C%22foo");
-		for str in &[" ", "$", "\"", "&", "?", "#", "@", "(", ")"] {
-			(&query_str).xnot().xpect_contains(str);
-		}
-
-		let val2 =
-			JsonQueryParams::<Foo>::from_query_string(&query_str).unwrap();
-		val.xpect_eq(val2);
 	}
 }

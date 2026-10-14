@@ -2,7 +2,7 @@
 use beet::prelude::*;
 
 /// Every feature `beet-cli` can be compiled with, each recorded if enabled, so
-/// an entry's `<RequireCfg/>` and the `--features` flag verify against the
+/// an entry's `<RequireCfg/>` and the `--required-features` knob verify against the
 /// running binary. Spawned by every entry driver (the native binary, the wasm
 /// binary, the Worker) before the entry loads.
 ///

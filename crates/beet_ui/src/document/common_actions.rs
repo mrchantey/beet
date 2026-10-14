@@ -721,7 +721,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins);
 		app.init_plugin::<DocumentUiPlugin>();
-		app.init();
+		app.finish_plugins();
 		app.update();
 
 		let entity =

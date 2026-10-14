@@ -4,38 +4,6 @@ use crate::prelude::*;
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
-/// Request params for the [`ExportPdf`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct ExportPdfParams {
-	/// Page width in `--unit`s (default A4 width).
-	width: Option<f64>,
-	/// Page height in `--unit`s (default A4 height).
-	height: Option<f64>,
-	/// Unit for `--width`/`--height`: `mm` (default) or `px` (96 dpi).
-	unit: Option<String>,
-	/// Zoom factor for the content, `0.1` to `2.0` (default `1.0`). Raise it when
-	/// a large `--width`/`--height` renders the text too small.
-	zoom: Option<f64>,
-	/// Limit each route's printed pages, ie `--page-ranges=1` for a single page,
-	/// or `--page-ranges=1-3,5`.
-	page_ranges: Option<String>,
-	/// Glob of route paths to include, ie `--include="blog/**"`.
-	include: Option<String>,
-	/// Glob of route paths to exclude, ie `--exclude="draft/**"`.
-	exclude: Option<String>,
-	/// Query string appended to every page request, ie
-	/// `--search-params="color-scheme=dark"`.
-	search_params: Option<String>,
-	/// Write one PDF per route to `<output>/<route>.pdf` instead of merging them
-	/// into a single document.
-	separate: bool,
-	/// Output path: the merged file (default `<entry>/site.pdf`), or with
-	/// `--separate` the directory for per-route files (default `<entry>/pdf`).
-	output: Option<String>,
-	/// Disable page margins.
-	no_margin: bool,
-}
-
 /// Exports the pages of a no-code entry to PDF via a headless browser (webdriver),
 /// merged into one document in route order or, with `--separate`, one file per route.
 ///
@@ -55,7 +23,44 @@ struct ExportPdfParams {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn ExportPdf(
-	Params(params): Params<ExportPdfParams>,
+	/// Page width in `--unit`s (default A4 width).
+	#[param]
+	width: Option<f64>,
+	/// Page height in `--unit`s (default A4 height).
+	#[param]
+	height: Option<f64>,
+	/// Unit for `--width`/`--height`: `mm` (default) or `px` (96 dpi).
+	#[param]
+	unit: Option<String>,
+	/// Zoom factor for the content, `0.1` to `2.0` (default `1.0`). Raise it when
+	/// a large `--width`/`--height` renders the text too small.
+	#[param]
+	zoom: Option<f64>,
+	/// Limit each route's printed pages, ie `--page-ranges=1` for a single page,
+	/// or `--page-ranges=1-3,5`.
+	#[param]
+	page_ranges: Option<String>,
+	/// Glob of route paths to include, ie `--include="blog/**"`.
+	#[param]
+	include: Option<String>,
+	/// Glob of route paths to exclude, ie `--exclude="draft/**"`.
+	#[param]
+	exclude: Option<String>,
+	/// Query string appended to every page request, ie
+	/// `--search-params="color-scheme=dark"`.
+	#[param]
+	search_params: Option<String>,
+	/// Write one PDF per route to `<output>/<route>.pdf` instead of merging them
+	/// into a single document.
+	#[param]
+	separate: bool,
+	/// Output path: the merged file (default `<entry>/site.pdf`), or with
+	/// `--separate` the directory for per-route files (default `<entry>/pdf`).
+	#[param]
+	output: Option<String>,
+	/// Disable page margins.
+	#[param]
+	no_margin: bool,
 	entry_params: Params<EntryParams>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
@@ -79,24 +84,24 @@ pub async fn ExportPdf(
 
 	// resolve the page size (cm, the `PdfPageSize` unit) and matching browser
 	// viewport (px), defaulting to A4 when a dimension is unset.
-	let unit = PdfUnit::parse(params.unit.as_deref())?;
-	let (page_size, viewport) = resolve_size(params.width, params.height, unit);
+	let unit = PdfUnit::parse(unit.as_deref())?;
+	let (page_size, viewport) = resolve_size(width, height, unit);
 	let mut options = PdfOptions {
 		page_size,
 		..default()
 	};
-	if params.no_margin {
+	if no_margin {
 		options.margin = PdfMargin::none();
 	}
 	// `--page-ranges` limits each route's printed pages, eg `1` for a single page.
-	if let Some(ranges) = &params.page_ranges {
+	if let Some(ranges) = &page_ranges {
 		options.page_ranges = ranges
 			.split(',')
 			.map(|range| range.trim().to_string())
 			.collect();
 	}
 	// `--zoom` scales the content, eg to enlarge text on a large page.
-	if let Some(zoom) = params.zoom {
+	if let Some(zoom) = zoom {
 		if !(0.1..=2.0).contains(&zoom) {
 			bevybail!("--zoom must be between 0.1 and 2.0");
 		}
@@ -105,10 +110,10 @@ pub async fn ExportPdf(
 
 	// the entry's static pages, glob-filtered by `--include`/`--exclude`.
 	let mut filter = GlobFilter::default();
-	if let Some(include) = &params.include {
+	if let Some(include) = &include {
 		filter = filter.with_include(include);
 	}
-	if let Some(exclude) = &params.exclude {
+	if let Some(exclude) = &exclude {
 		filter = filter.with_exclude(exclude);
 	}
 	let paths = StaticExport::collect_paths(&cx.world(), root)
@@ -137,8 +142,7 @@ pub async fn ExportPdf(
 	let port = super::wait_for_port().await?;
 
 	// the query rides every request verbatim, eg `?color-scheme=dark`.
-	let query = params
-		.search_params
+	let query = search_params
 		.as_deref()
 		.filter(|search| !search.is_empty())
 		.map(|search| format!("?{search}"))
@@ -159,15 +163,15 @@ pub async fn ExportPdf(
 	// `--separate` writes one file per route to a dir; the default merges into one
 	// file (which needs the `pdf` feature). The default lands in the entry's own
 	// dir (not a `<RepoRoot>`-widened root).
-	let output = match params.output {
+	let output = match output {
 		Some(output) => AbsPath::new(output)?,
-		None => entry_dir(&entry_path)?.join(if params.separate {
+		None => entry_dir(&entry_path)?.join(if separate {
 			"pdf"
 		} else {
 			"site.pdf"
 		}),
 	};
-	let count = if params.separate {
+	let count = if separate {
 		write_separate(pages, &output).await?
 	} else {
 		write_concat(pages, &output).await?

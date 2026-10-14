@@ -10,9 +10,9 @@ pub struct TextEdit {
 	pub new_text: String,
 }
 
-/// Parameters for editing text in a blob.
+/// The props for editing text in a blob.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct EditTextParams {
+pub struct EditTextProps {
 	/// Path to the file to edit.
 	pub path: RelPath,
 	/// One or more targeted replacements matched against the original file.
@@ -26,7 +26,7 @@ pub struct EditTextParams {
 /// not applied incrementally.
 #[action]
 #[derive(Component, Reflect)]
-pub async fn EditText(cx: ActionContext<EditTextParams>) -> Result<()> {
+pub async fn EditText(cx: ActionContext<EditTextProps>) -> Result<()> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {

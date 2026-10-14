@@ -314,7 +314,7 @@ fn assert_registered(
 			"no layout template named `{template}`: it is neither a `.bsx` \
 			 document in the `BsxTemplateRegistry` (eg `{template}.bsx` under a \
 			 `<TemplateDir/>`) nor a rust template registered by short type path \
-			 (`register_template::<{template}>()`)"
+			 (`app.init({template}::register_template())`)"
 		),
 	}
 }

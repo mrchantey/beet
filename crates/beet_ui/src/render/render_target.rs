@@ -16,6 +16,17 @@ use beet_net::prelude::*;
 pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 	/// The media types this target answers, preferred first.
 	fn media_types(&self) -> Vec<MediaType>;
+
+	/// Register this target in the [`RenderTargets`], answering its media types
+	/// ahead of any target registered before it:
+	/// `app.init(MarkdownRenderer::default().register_render_target())`.
+	fn register_render_target(self) -> impl Initializer {
+		move |app: &mut App| {
+			app.world_mut()
+				.get_resource_or_init::<RenderTargets>()
+				.register(self);
+		}
+	}
 }
 
 /// Every [`RenderTarget`] this world renders to, the one place a format is
@@ -24,9 +35,8 @@ pub trait RenderTarget: 'static + Send + Sync + Clone + NodeRenderer {
 /// type renders a request accepting it and gets exactly the body a client
 /// asking for that type does.
 ///
-/// Registered through [`AppRenderTargetExt::register_render_target`], the
-/// built-in targets by [`RenderPlugin`] through the same call a downstream
-/// target uses. For an overlapping media type the target registered last
+/// Registered through [`RenderTarget::register_render_target`], the built-in
+/// targets by [`RenderPlugin`] through the same call a downstream target uses. For an overlapping media type the target registered last
 /// wins, so a downstream crate replaces a built-in by registering its own.
 #[derive(Default, Clone, Resource)]
 pub struct RenderTargets {
@@ -150,22 +160,6 @@ impl RenderTargets {
 	}
 }
 
-/// Registers a [`RenderTarget`] on an [`App`].
-#[extend::ext(name=AppRenderTargetExt)]
-pub impl App {
-	/// Register `target` in the [`RenderTargets`], answering its media types
-	/// ahead of any target registered before it.
-	fn register_render_target(
-		&mut self,
-		target: impl RenderTarget,
-	) -> &mut Self {
-		self.world_mut()
-			.get_resource_or_init::<RenderTargets>()
-			.register(target);
-		self
-	}
-}
-
 /// Registers the built-in render targets: html, xml, markdown, plain text,
 /// and with their features ansi (`style`) and the serialized scene
 /// (`template_serde`).
@@ -174,14 +168,16 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_render_target(PlainTextRenderer::default())
-			.register_render_target(HtmlRenderer::default())
-			.register_render_target(XmlRenderer)
-			.register_render_target(MarkdownRenderer::default());
+		app.init((
+			PlainTextRenderer::default().register_render_target(),
+			HtmlRenderer::default().register_render_target(),
+			XmlRenderer.register_render_target(),
+			MarkdownRenderer::default().register_render_target(),
+		));
 		#[cfg(feature = "style")]
-		app.register_render_target(AnsiTermRenderer::default());
+		app.init(AnsiTermRenderer::default().register_render_target());
 		#[cfg(feature = "template_serde")]
-		app.register_render_target(TemplateRenderer::default());
+		app.init(TemplateRenderer::default().register_render_target());
 	}
 }
 

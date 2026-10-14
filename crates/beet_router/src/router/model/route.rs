@@ -42,7 +42,7 @@ where
 		exchange_overload::<In, Out, M1, M2>(),
 		OnSpawn::new(move |entity| {
 			if !declaration.is_empty() {
-				Reach::Route.push(entity, declaration);
+				ParamsScope::Route.push(entity, declaration);
 			}
 		}),
 	)
@@ -129,7 +129,11 @@ pub fn declare_exchange<In, Out, M1, M2>(
 {
 	let declaration = exchange_params::<In, Out, M1, M2>();
 	if !declaration.is_empty() {
-		Reach::Route.queue_push(&mut world.commands(), cx.entity, declaration);
+		ParamsScope::Route.queue_push(
+			&mut world.commands(),
+			cx.entity,
+			declaration,
+		);
 	}
 }
 

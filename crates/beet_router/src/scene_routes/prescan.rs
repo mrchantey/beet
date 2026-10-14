@@ -34,7 +34,7 @@ use std::sync::Arc;
 /// names something the build resolves, ie another store), a `bx:cfg` subtree
 /// is left to the build, and a non-literal attribute is skipped.
 ///
-/// Registered with [`AppRegisterPrescanExt::register_prescan`], in the order
+/// Registered with [`register_prescan`](Self::register_prescan), in the order
 /// its [`preload`](Self::preload) should run.
 pub trait Prescan: Default + Clone + FromReflect + Typed {
 	/// One line of what the declaration does before the build, listed by
@@ -51,6 +51,21 @@ pub trait Prescan: Default + Clone + FromReflect + Typed {
 	fn preload(&self, repo_store: &BlobStore) -> SendBoxedFuture<Result> {
 		let _ = repo_store;
 		Box::pin(async { Ok(()) })
+	}
+
+	/// Register this type as acting before the entry builds, and as a reflect
+	/// type so the built tree resolves the same tag: `app.init(RepoRoot::register_prescan())`.
+	/// Call order is preload order.
+	fn register_prescan() -> impl Initializer
+	where
+		Self: GetTypeRegistration,
+	{
+		|app: &mut App| {
+			app.register_type::<Self>();
+			app.world_mut()
+				.get_resource_or_init::<PrescanRegistry>()
+				.register::<Self>();
+		}
 	}
 }
 
@@ -173,22 +188,6 @@ impl PrescanRegistration {
 			Some(value) => value.preload(repo_store),
 			None => Box::pin(async { Ok(()) }),
 		}
-	}
-}
-
-/// Registers a [`Prescan`] type on an [`App`].
-#[extend::ext(name=AppRegisterPrescanExt)]
-pub impl App {
-	/// Register `T` as acting before the entry builds, and as a reflect type
-	/// so the built tree resolves the same tag. Call order is preload order.
-	fn register_prescan<T: Prescan + GetTypeRegistration>(
-		&mut self,
-	) -> &mut Self {
-		self.register_type::<T>();
-		self.world_mut()
-			.get_resource_or_init::<PrescanRegistry>()
-			.register::<T>();
-		self
 	}
 }
 
@@ -596,7 +595,7 @@ mod test {
 			}
 		}
 		let mut app = App::new();
-		app.register_prescan::<Warm>().register_prescan::<Second>();
+		app.init((Warm::register_prescan(), Second::register_prescan()));
 		let registry = app.world().resource::<PrescanRegistry>().clone();
 		registry.describe().xpect_eq(vec![
 			("Warm", "warms a cache"),

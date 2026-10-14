@@ -43,7 +43,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<Provider>()
 			.register_type::<ModelApi>()
 			.register_type::<ModelSize>()
-			.register_template::<ModelStreamer>();
+			.init(ModelStreamer::register_template());
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -74,8 +74,8 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ToolChoice>()
 			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
-			.register_template::<CreatePost>()
-			.register_template::<CreateActor>()
+			.init(CreatePost::register_template())
+			.init(CreateActor::register_template())
 			.add_observer(reapply_string_enum_options)
 			// _
 			;

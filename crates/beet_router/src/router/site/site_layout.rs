@@ -4,6 +4,7 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::ParamsDeclaration;
 use beet_net::prelude::RequestParts;
+use beet_net::prelude::SubtreeParams;
 use beet_ui::prelude::*;
 // the document-chrome widgets, imported by name so the tags resolve regardless of
 // which feature set's glob (`crate::prelude` vs `beet_ui::prelude`) also defines a
@@ -115,8 +116,8 @@ pub fn SiteLayout(
 	}
 }
 
-/// The param [`PageClasses::resolve`] reads, declared under the reader name
-/// `PageClasses` ([`declaration`](Self::declaration)) by whatever themes a page
+/// The param [`PageClasses::resolve`] reads, declared under the name
+/// `PageClasses` ([`declare_on`](Self::declare_on)) by whatever themes a page
 /// through it: a [`Layout`], the [`HelpHandler`] page, a [`TuiServer`].
 #[derive(Debug, Default, Clone, Reflect)]
 pub struct ColorSchemeParams {
@@ -125,10 +126,15 @@ pub struct ColorSchemeParams {
 }
 
 impl ColorSchemeParams {
-	/// The declaration of the scheme, read by [`PageClasses`] beneath whatever
-	/// declares it at middleware reach from its plugin.
-	pub fn declaration() -> ParamsDeclaration {
-		ParamsDeclaration::new::<PageClasses, Self>()
+	/// The [`Initializer`] declaring the scheme at subtree scope on every
+	/// entity `Extractor` is inserted on, read by [`PageClasses`] beneath it:
+	/// leniently, so a scheme no page knows is the negotiated one rather than a
+	/// refused request.
+	pub fn declare_on<Extractor: Component>() -> impl Initializer {
+		SubtreeParams::declare_on_with::<Extractor>(ParamsDeclaration::new::<
+			PageClasses,
+			Self,
+		>())
 	}
 
 	/// The scheme `parts` pins, if any. Lenient: a scheme no page knows is

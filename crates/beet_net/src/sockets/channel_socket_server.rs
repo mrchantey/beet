@@ -62,7 +62,7 @@ impl ChannelSocketServer {
 			entity,
 			"channel",
 			|request: &Request| {
-				RunningSetFilter::selects(request.params(), "channel", true)
+				ServerFilter::selects(request.params(), "channel", true)
 			},
 			|entity, _request, shutdown| {
 				Box::pin(accept_channel_sockets(entity, shutdown))

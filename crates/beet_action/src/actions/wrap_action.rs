@@ -384,7 +384,7 @@ mod test {
 		app.add_plugins((MinimalPlugins, AsyncPlugin));
 		app.register_type::<AddOneWrapper<Doubler>>();
 		app.register_type::<i32>();
-		app.init();
+		app.finish_plugins();
 		app.update();
 		app
 	}

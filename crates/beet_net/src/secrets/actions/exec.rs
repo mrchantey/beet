@@ -35,10 +35,9 @@ use beet_core::prelude::*;
 /// under the wrong passphrase. `--only` is the answer where that matters: it
 /// hands over the records the tool needs by name, so what the other document
 /// lacks is a loud absence rather than a wrong value.
-#[action]
+#[action(route = "exec")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("exec"))]
 pub async fn SecretsExec(
 	document: Params<DocumentParams>,
 	/// Pass only these records, comma separated; absent, every `EnvVar`

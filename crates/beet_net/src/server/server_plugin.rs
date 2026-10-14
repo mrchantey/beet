@@ -34,15 +34,14 @@ impl Plugin for ServerPlugin {
 			.register_type::<RejectUnknownParams>()
 			// what each server reads off its start request, inherited by every
 			// route beneath it
-			.declare_params::<CliServer>(
-				Reach::Middleware,
-				ParamsDeclaration::new::<CliServer, (CliParams, BootParams)>(),
-			)
-			.declare_params::<HttpServer>(
-				Reach::Middleware,
-				ParamsDeclaration::new::<HttpServer, (BootParams, ServerParams)>(
+			.init((
+				SubtreeParams::declare_on::<CliServer, (CliParams, BootParams)>(
 				),
-			);
+				SubtreeParams::declare_on::<
+					HttpServer,
+					(BootParams, ServerParams),
+				>(),
+			));
 
 		// the repl reads a real stdin on a background thread, so it exists only
 		// where there is one.

@@ -64,7 +64,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<ScriptConfig>()
 			// the behaviour-tree leaf marker and its markup front-end
 			.register_type::<OutcomeScript<Value, Value>>()
-			.register_template::<RunScript>();
+			.init(RunScript::register_template());
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

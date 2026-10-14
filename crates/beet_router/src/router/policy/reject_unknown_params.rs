@@ -8,7 +8,7 @@ impl ActionNode {
 	/// Refuse, as a `400`, `params` this route does not take, naming each
 	/// and the declared param it most plausibly misspells and pointing at the
 	/// route's help. What it takes is its [`ParamsPattern`], so a route taking
-	/// `rest: Params<Rest>` refuses nothing. The caller has already
+	/// [`AnyParams`] refuses nothing. The caller has already
 	/// established that the url space is governed
 	/// ([`RejectUnknownParamsQuery::governs`]).
 	pub(crate) fn reject_unknown_params(
@@ -59,7 +59,6 @@ mod test {
 	async fn Deploy(
 		#[param] elevated: bool,
 		#[param] dry_run: bool,
-		_cx: ActionContext<RequestParts>,
 	) -> Result<String> {
 		let _ = (elevated, dry_run);
 		Ok("deployed".into())
@@ -69,11 +68,8 @@ mod test {
 	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
-	async fn Forward(
-		rest: Params<Rest>,
-		_cx: ActionContext<RequestParts>,
-	) -> Result<String> {
-		let mut keys = rest.keys().map(SmolStr::to_string).collect::<Vec<_>>();
+	async fn Forward(any: AnyParams) -> Result<String> {
+		let mut keys = any.keys().map(SmolStr::to_string).collect::<Vec<_>>();
 		keys.sort();
 		Ok(keys.join(","))
 	}
@@ -82,7 +78,7 @@ mod test {
 
 	/// A CLI-shaped root: `server` over a router with help, a `deploy` command
 	/// taking `--elevated --dry-run`, an `audit` sequence whose step declares
-	/// [`AuditParams`] and a `forward` command taking the rest.
+	/// [`AuditParams`] and a `forward` command taking any param.
 	fn spawn_cli(world: &mut World, server: impl Bundle) -> Entity {
 		let audit_step =
 			Action::<Request, Outcome<Request, Response>>::new_pure(
@@ -219,9 +215,9 @@ mod test {
 			.xpect_eq(StatusCode::BAD_REQUEST);
 	}
 
-	/// A route taking the rest refuses nothing, even in a strict url space.
+	/// A route taking any param refuses nothing, even in a strict url space.
 	#[beet_core::test]
-	async fn a_rest_taker_refuses_nothing() {
+	async fn any_params_refuses_nothing() {
 		let mut world = router_world();
 		let root = spawn_cli(&mut world, CliServer::default());
 		send(&mut world, root, "forward --nocapture --test-threads=1")

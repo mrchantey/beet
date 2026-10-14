@@ -83,7 +83,7 @@ impl CloudflareContainerBlock {
 				endpoint: Some(endpoint.into()),
 				region: None,
 			}),
-			server: Some(RunningSetFilter::new("http")),
+			server: Some(ServerFilter::new("http")),
 			..default()
 		}
 	}

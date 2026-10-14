@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Parameters for writing a blob to a store.
+/// The props for writing a blob to a store.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct WriteBlobParams {
+pub struct WriteBlobProps {
 	/// Path to write the blob to.
 	pub path: RelPath,
 	/// Raw bytes to write.
@@ -16,7 +16,7 @@ pub struct WriteBlobParams {
 /// s3 reactivity that no external watcher provides.
 #[action]
 #[derive(Component, Reflect)]
-pub async fn WriteBlob(cx: ActionContext<WriteBlobParams>) -> Result<()> {
+pub async fn WriteBlob(cx: ActionContext<WriteBlobProps>) -> Result<()> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {

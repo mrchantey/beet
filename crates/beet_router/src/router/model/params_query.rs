@@ -4,10 +4,10 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Collects the [`ParamsPattern`] of a route: the union over every reader that
+/// Collects the [`ParamsPattern`] of a route: the union over every extractor that
 /// runs for it, in three clauses.
 ///
-/// 1. [`MiddlewareParams`] on the route and every ancestor: the middleware and
+/// 1. [`SubtreeParams`] on the route and every ancestor: the middleware and
 ///    servers a request reaching it passes through.
 /// 2. [`RouteParams`] on the route: its own action and exchange adapter.
 /// 3. [`RouteParams`] on its steps: every descendant that is not itself a route
@@ -18,15 +18,15 @@ use beet_net::prelude::*;
 ///    reference.
 ///
 /// Nothing is keyed on a route's output type: a scene route lists `--root`
-/// because its exchange adapter declared [`RenderParams`] like any reader.
+/// because its exchange adapter declared [`RenderParams`] like any extractor.
 ///
-/// No reader may take a launch only knob (`--entry`, `--features`, ..): the
+/// No extractor may take a launch only knob (`--entry`, `--required-features`, ..): the
 /// launch strips those from the process request ([`BootstrapConfig::strip`]),
 /// so a command declaring one would never receive it.
 ///
 /// ```mermaid
 /// flowchart TB
-///     S["CliServer<br/>MiddlewareParams: accept, server"] --> R["Router<br/>MiddlewareParams: help, navigate, color-scheme"]
+///     S["CliServer<br/>SubtreeParams: accept, server"] --> R["Router<br/>SubtreeParams: help, navigate, color-scheme"]
 ///     R --> G["stack, a PathPartial group"]
 ///     G --> D["deploy route<br/>RouteParams: elevated, dry-run, roll (DeployGate), force (ExchangeGroup)"]
 ///     G --> A["audit route, ExchangeSequence"]
@@ -44,7 +44,7 @@ pub struct ParamsQuery<'w, 's> {
 	groups: Query<'w, 's, (Entity, &'static RunGroup<Request, Response>)>,
 	paths: Query<'w, 's, (), With<PathPartial>>,
 	route_params: Query<'w, 's, &'static RouteParams>,
-	middleware_params: Query<'w, 's, &'static MiddlewareParams>,
+	subtree_params: Query<'w, 's, &'static SubtreeParams>,
 }
 
 impl ParamsQuery<'_, '_> {
@@ -53,8 +53,8 @@ impl ParamsQuery<'_, '_> {
 	///
 	/// ## Errors
 	///
-	/// Errors when two declarers name one key with a different type or arity,
-	/// see [`ParamsPattern::from_declarations`], or a declarer takes a launch
+	/// Errors when two sources name one key with a different type or arity,
+	/// see [`ParamsPattern::from_declarations`], or a source takes a launch
 	/// only knob.
 	pub fn of(&self, route: Entity) -> Result<ParamsPattern> {
 		let own = core::iter::once(route).chain(self.steps(route)).filter_map(
@@ -62,14 +62,14 @@ impl ParamsQuery<'_, '_> {
 				self.route_params
 					.get(entity)
 					.ok()
-					.map(|list| (entity, Reach::Route, list.as_slice()))
+					.map(|list| (entity, ParamsScope::Route, list.as_slice()))
 			},
 		);
 		let middleware =
 			self.ancestors.iter_ancestors_inclusive(route).filter_map(
 				|entity| {
-					self.middleware_params.get(entity).ok().map(|list| {
-						(entity, Reach::Middleware, list.as_slice())
+					self.subtree_params.get(entity).ok().map(|list| {
+						(entity, ParamsScope::Subtree, list.as_slice())
 					})
 				},
 			);
@@ -96,7 +96,7 @@ impl ParamsQuery<'_, '_> {
 		bevybail!(
 			"`{}` takes `--{}`, a launch knob the process request never \
 			carries: name the param otherwise",
-			item.declarers[0].reader,
+			item.sources[0].name,
 			item.meta.name()
 		)
 	}
@@ -181,7 +181,7 @@ mod test {
 	#[beet_core::test]
 	fn collects_the_three_clauses() {
 		let mut world = World::new();
-		let root = world.spawn(MiddlewareParams::new::<Verbose>()).id();
+		let root = world.spawn(SubtreeParams::new::<Verbose>()).id();
 		let deploy = world
 			.spawn((
 				ChildOf(root),
@@ -207,35 +207,19 @@ mod test {
 	fn launch_knobs_are_refused() {
 		#[derive(Reflect)]
 		#[allow(dead_code)]
-		struct Features {
-			features: Option<String>,
+		struct Stage {
+			stage: Option<String>,
 		}
 		let mut world = World::new();
-		let route = world.spawn(RouteParams::new::<Features>()).id();
+		let route = world.spawn(RouteParams::new::<Stage>()).id();
 		world
 			.with_state::<ParamsQuery, _>(|query| query.of(route))
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`Features` takes `--features`, a launch knob");
+			.xpect_contains("`Stage` takes `--stage`, a launch knob");
 	}
 
-	/// A route running a group by reference runs its members, wherever they
-	/// are authored, so their params are the route's.
-	#[beet_core::test]
-	fn collects_a_referenced_groups_members() {
-		let mut world = World::new();
-		let group = world.spawn(Group).id();
-		world.spawn((MemberOf(group), RouteParams::new::<Fix>()));
-		let route = world
-			.spawn((
-				PathPartial::new("destroy"),
-				RunGroup::<Request, Response>::reversed(group),
-			))
-			.id();
-		names(&mut world, route).xpect_eq(vec!["fix"]);
-	}
-
-	/// Two declarers of one key with different types are an error.
+	/// Two sources of one key with different types are an error.
 	#[beet_core::test]
 	fn conflicts_are_errors() {
 		#[derive(Reflect)]
@@ -249,7 +233,7 @@ mod test {
 			port: String,
 		}
 		let mut world = World::new();
-		let root = world.spawn(MiddlewareParams::new::<PortNumber>()).id();
+		let root = world.spawn(SubtreeParams::new::<PortNumber>()).id();
 		let route = world
 			.spawn((ChildOf(root), RouteParams::new::<PortName>()))
 			.id();

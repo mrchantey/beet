@@ -26,7 +26,7 @@ pub fn http_bootstrap(
 	entity: Entity,
 ) -> Result<BootstrapConfig> {
 	BootstrapConfig {
-		server: Some(RunningSetFilter::new("http")),
+		server: Some(ServerFilter::new("http")),
 		..repos.bootstrap(entity)?
 	}
 	.xok()

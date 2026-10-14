@@ -2,19 +2,6 @@ use beet::prelude::*;
 use image::Rgb;
 use qrcode::QrCode as QrCodeGenerator;
 
-/// Request params for the [`QrCode`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct QrCodeParams {
-	/// The text/url to encode.
-	input: String,
-	/// The output file path, defaults to `qrcode.png`.
-	output: Option<String>,
-	/// Light module color as `r,g,b`, defaults to `255,255,255`.
-	light: Option<String>,
-	/// Dark module color as `r,g,b`, defaults to `0,0,0`.
-	dark: Option<String>,
-}
-
 /// Generates a QR code PNG.
 ///
 /// `--input` is the encoded text/url, `--output` the file (default
@@ -23,14 +10,24 @@ struct QrCodeParams {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn QrCode(
-	params: Params<QrCodeParams>,
-	_parts: RequestParts,
+	/// The text/url to encode.
+	#[param]
+	input: String,
+	/// The output file path, defaults to `qrcode.png`.
+	#[param]
+	output: Option<String>,
+	/// Light module color as `r,g,b`, defaults to `255,255,255`.
+	#[param]
+	light: Option<String>,
+	/// Dark module color as `r,g,b`, defaults to `0,0,0`.
+	#[param]
+	dark: Option<String>,
 ) -> Result<String> {
-	let output = params.output.as_deref().unwrap_or("qrcode.png");
-	let light = parse_rgb(params.light.as_deref().unwrap_or("255,255,255"))?;
-	let dark = parse_rgb(params.dark.as_deref().unwrap_or("0,0,0"))?;
+	let output = output.as_deref().unwrap_or("qrcode.png");
+	let light = parse_rgb(light.as_deref().unwrap_or("255,255,255"))?;
+	let dark = parse_rgb(dark.as_deref().unwrap_or("0,0,0"))?;
 
-	let image = QrCodeGenerator::new(&params.input)?
+	let image = QrCodeGenerator::new(&input)?
 		.render::<Rgb<u8>>()
 		.dark_color(Rgb(dark))
 		.light_color(Rgb(light))

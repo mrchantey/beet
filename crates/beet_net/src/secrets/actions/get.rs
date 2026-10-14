@@ -13,10 +13,9 @@ use beet_core::prelude::*;
 /// beet secrets/get OPENAI_API_KEY
 /// beet secrets/get dkim-example-com --document=mail-prod
 /// ```
-#[action]
+#[action(route = "get/:name")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("get/:name"))]
 pub async fn SecretsGet(
 	document: Params<DocumentParams>,
 	cx: ActionContext<Request>,

@@ -80,7 +80,7 @@ pub async fn ExchangeScriptElement(
 /// Serves what the script returned (eg a `String`), not its console output (that
 /// is [`ExchangeScriptElement`]). `M1`/`M2` are
 /// [`FromRequest`]/[`IntoResponseWithRequestParts`] markers. The defaults handle
-/// the serde blanket case; for custom extractors (eg [`QueryParams`],
+/// the serde blanket case; for custom extractors (eg [`Params`],
 /// [`RequestParts`], or the `Value` pair [`ScriptRoute`] uses) instantiate as
 /// `ExchangeScript::<Input, Output, _, _>` and let inference pick them.
 #[derive(Component, Reflect)]

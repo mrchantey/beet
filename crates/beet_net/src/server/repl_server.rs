@@ -90,7 +90,7 @@ impl ReplServer {
 				entity,
 				"repl",
 				move |request: &Request| {
-					RunningSetFilter::selects(
+					ServerFilter::selects(
 						request.params(),
 						"repl",
 						default_boot,

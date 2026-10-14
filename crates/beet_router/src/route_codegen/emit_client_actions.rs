@@ -24,7 +24,7 @@ enum ClientInput {
 	None,
 	/// `Json<T>` extractor: send `T` as a JSON body.
 	Json(syn::Type),
-	/// `QueryParams<T>` extractor: send `T` as a URL-encoded query string.
+	/// `Params<T>` extractor: send `T` as a URL-encoded query string.
 	Query(syn::Type),
 }
 
@@ -107,7 +107,7 @@ fn client_fn(path: &RelPath, method: &RouteMethod) -> Result<ItemFn> {
 			}
 			ClientInput::Query(ty) => (
 				quote! { input: #ty },
-				quote! { .with_query_string(&QueryParams(input).encode()?) },
+				quote! { .with_query_string(&Params(input).encode()?) },
 			),
 		};
 
@@ -139,7 +139,7 @@ fn client_input(item: &ItemFn) -> ClientInput {
 	};
 	if let Some(inner) = inner_generic(&extractor, "Json") {
 		ClientInput::Json(inner)
-	} else if let Some(inner) = inner_generic(&extractor, "QueryParams") {
+	} else if let Some(inner) = inner_generic(&extractor, "Params") {
 		ClientInput::Query(inner)
 	} else {
 		ClientInput::None

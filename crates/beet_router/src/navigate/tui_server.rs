@@ -50,11 +50,7 @@ impl TuiServer {
 				entity,
 				"tui",
 				move |request: &Request| {
-					RunningSetFilter::selects(
-						request.params(),
-						"tui",
-						default_boot,
-					)
+					ServerFilter::selects(request.params(), "tui", default_boot)
 				},
 				|entity, request, shutdown| {
 					// the future owns what it needs, so nothing borrows the input

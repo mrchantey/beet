@@ -23,9 +23,9 @@ impl Plugin for InfraExamplesPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_plugin::<InfraPlugin>()
 			// the `beet` binary build artifact (zigbuild), for binary-shipping deploys.
-			.register_template::<BeetBinaryBuild>()
+			.init(BeetBinaryBuild::register_template())
 			// an example-target binary build artifact (eg the `ssh_tui_site` server).
-			.register_template::<ExampleBinaryBuild>()
+			.init(ExampleBinaryBuild::register_template())
 			// the state-backend toggle middleware the bucket and handle examples
 			// put on their router. The IaC verb routes register upstream in
 			// `InfraPlugin`, beside the verbs.
@@ -36,16 +36,16 @@ impl Plugin for InfraExamplesPlugin {
 			// `<Stack>` it resolves by ancestry. The resource declarations
 			// themselves are authored as their blocks (`<S3BucketBlock/>`,
 			// `<DynamoTableBlock/>`), registered upstream.
-			.register_template::<LightsailBeetSiteBlock>()
-			.register_template::<LambdaSiteBlock>()
+			.init(LightsailBeetSiteBlock::register_template())
+			.init(LambdaSiteBlock::register_template())
 			// the invoke-only counterpart, the target a `<ScheduledJobBlock/>`
 			// drives on a timer.
-			.register_template::<LambdaJobBlock>()
-			.register_template::<LambdaWatch>()
-			.register_template::<LightsailSiteBlock>()
-			.register_template::<LightsailWatch>()
-			.register_template::<FargateSiteBlock>()
-			.register_template::<FargateSshBlock>()
-			.register_template::<FargateWatch>();
+			.init(LambdaJobBlock::register_template())
+			.init(LambdaWatch::register_template())
+			.init(LightsailSiteBlock::register_template())
+			.init(LightsailWatch::register_template())
+			.init(FargateSiteBlock::register_template())
+			.init(FargateSshBlock::register_template())
+			.init(FargateWatch::register_template());
 	}
 }

@@ -115,7 +115,7 @@ impl ActionNode {
 
 	/// Merge the dynamic path segments matched by this node's [`PathPattern`]
 	/// into the request params, so handlers can read a `:id` value via
-	/// [`RequestParts::get_param`] or the [`QueryParams`] extractor.
+	/// [`RequestParts::get_param`] or a [`Params`] extractor.
 	///
 	/// Path params take precedence over query params on key collision. An
 	/// optional segment that matched nothing sets no param, so the handler

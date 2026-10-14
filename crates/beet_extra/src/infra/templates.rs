@@ -209,7 +209,7 @@ pub fn LambdaWatch(timeout: Option<Duration>) -> impl Bundle {
 pub fn LightsailSiteBlock(#[prop] features: String) -> impl Bundle {
 	(
 		LightsailBlock::default().with_bootstrap(BootstrapConfig {
-			server: Some(RunningSetFilter::new("http")),
+			server: Some(ServerFilter::new("http")),
 			..default()
 		}),
 		infra_ext::beet_cargo_build(features).into_build_artifact(),
@@ -313,7 +313,7 @@ pub fn LightsailBeetSiteBlock(
 		// cannot update in place, so a per-deploy value would rebuild the box on
 		// every deploy. The release pointer carries it, resolved per start.
 		.with_bootstrap(BootstrapConfig {
-			server: Some(RunningSetFilter::new("http,ssh")),
+			server: Some(ServerFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
 			..default()
 		})

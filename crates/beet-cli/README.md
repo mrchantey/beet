@@ -51,7 +51,7 @@ An entry that mounts paths outside its own directory declares `<RepoRoot src="..
 
 A misspelt flag is refused rather than ignored: every `CliServer` is strict, so `beet --entry=site deploy --elevate` answers ``unknown param `--elevate`, did you mean `--elevated`?`` and exits `64` before anything runs, as does a misspelt command (`beet --entry=site serv` asks ``did you mean `serve`?``). A declared param missing or malformed exits `64` too, naming its type and doc line (`beet s3-sync` answers ``missing required param `--src` ``), as does a malformed launch knob (`beet --port=abc`). The launch only knobs (`--entry`, `--repo`, `--stage`, ..) are the launch's own and never reach a command, so a command loading an entry of its own names its store `--entry-repo`; the root `--help` lists them under **Launch**, a command's `--help` what it takes. The mechanism is `beet_router`'s README, Params.
 
-An entry declares its build requirements with `<RequireCfg cfg="feature:thread && feature:sockets"/>`, which errors when the running binary does not satisfy them; `beet --features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --entry=..`, never carrying `--features`: the entry's own `<RequireCfg>` is the verification mechanism.
+An entry declares its build requirements with `<RequireCfg cfg="feature:thread && feature:sockets"/>`, which errors when the running binary does not satisfy them; `beet --required-features=..` performs the same check from argv. A runnable documented command is therefore plain `beet --entry=..`, never carrying `--required-features`: the entry's own `<RequireCfg>` is the verification mechanism.
 
 ## Downstream binaries
 

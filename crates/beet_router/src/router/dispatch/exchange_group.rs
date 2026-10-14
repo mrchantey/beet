@@ -64,7 +64,7 @@ impl ExchangeGroup {
 		};
 		let meta = ParamMeta::new(flag.as_str(), ParamValue::Flag)
 			.with_description("Keep going past a failing step.");
-		Reach::Route.queue_push(
+		ParamsScope::Route.queue_push(
 			&mut world.commands(),
 			cx.entity,
 			ParamsDeclaration::named(

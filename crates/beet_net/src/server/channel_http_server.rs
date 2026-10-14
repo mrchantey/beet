@@ -57,7 +57,7 @@ impl ChannelHttpServer {
 			entity,
 			"channel",
 			|request: &Request| {
-				RunningSetFilter::selects(request.params(), "channel", true)
+				ServerFilter::selects(request.params(), "channel", true)
 			},
 			|entity, _request, shutdown| {
 				Box::pin(serve_channel_http(entity, shutdown))

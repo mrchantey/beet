@@ -11,7 +11,7 @@
 //!   build target;
 //! - a generics-aware `Unpin` opt-out of Bevy's blanket
 //!   `Template for T: Clone + Unpin` impl, the `subtree_template!` pattern;
-//! - a `register_Name` registration fn (called by `register_template::<Name>()`)
+//! - a `register_Name` registration fn (called by `Name::register_template()`)
 //!   exposing the template by name to the loader.
 //!
 //! There is no `NameProps` struct and no marker component: the data struct *is*

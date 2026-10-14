@@ -5,71 +5,72 @@ use bevy::reflect::Typed;
 use core::any::TypeId;
 use heck::ToKebabCase;
 
-/// The params one route takes: the union over every reader that runs for it,
-/// each param beside every declarer taking it, so `--help`, the strict refusal
+/// The params one route takes: the union over every extractor that runs for
+/// it, each param beside every source declaring it, so `--help`, the strict refusal
 /// and the `400` explanation all read the one pattern.
 ///
 /// Collected per route by the router from the [`RouteParams`] on the route
-/// and its steps and the [`MiddlewareParams`] on the route and every ancestor.
-/// Two declarers naming one key must agree on its type and arity, see
+/// and its steps and the [`SubtreeParams`] on the route and every ancestor.
+/// Two sources naming one key must agree on its type and arity, see
 /// [`from_declarations`](Self::from_declarations).
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParamsPattern {
 	/// Each param once, sorted by key.
 	items: Vec<PatternParam>,
-	/// Every declarer, in the order the collector supplied them.
-	declarers: Vec<Declarer>,
-	/// Whether any declarer takes the rest, see [`Rest`].
-	rest: bool,
+	/// Every source, in the order the collector supplied them.
+	sources: Vec<ParamsSource>,
+	/// Whether any source takes any param, see [`AnyParams`].
+	takes_any: bool,
 }
 
-/// One param of a [`ParamsPattern`], beside every declarer taking it.
+/// One param of a [`ParamsPattern`], beside every source declaring it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatternParam {
-	/// The param, as its first declarer declared it.
+	/// The param, as its first source declared it.
 	pub meta: ParamMeta,
-	/// Every declarer taking it.
-	pub declarers: Vec<Declarer>,
+	/// Every source declaring it.
+	pub sources: Vec<ParamsSource>,
 }
 
-/// A reader declaring params on a [`ParamsPattern`].
+/// Where a [`ParamsPattern`]'s params come from: one extractor's declaration
+/// on one entity.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Declarer {
-	/// The entity the reader sits on.
+pub struct ParamsSource {
+	/// The entity the extractor sits on.
 	pub entity: Entity,
-	/// The reader's short type name, ie `CliServer`.
-	pub reader: SmolStr,
+	/// The extractor's short type name, ie `CliServer`.
+	pub name: SmolStr,
 	/// Which list the declaration came from.
-	pub reach: Reach,
+	pub scope: ParamsScope,
 }
 
 impl ParamsPattern {
-	/// The pattern of `declarations`, each the entity it sits on, its reach
+	/// The pattern of `declarations`, each the entity it sits on, its scope
 	/// and what it declares.
 	///
 	/// ## Errors
 	///
-	/// Errors when two declarers name one key with a different type or arity.
-	/// One key of one type declared twice is two readers of the same param,
-	/// kept once with both declarers.
+	/// Errors when two sources name one key with a different type or arity.
+	/// One key of one type declared twice is two extractors of the same param,
+	/// kept once with both sources.
 	pub fn from_declarations<'a>(
 		declarations: impl IntoIterator<
-			Item = (Entity, Reach, &'a ParamsDeclaration),
+			Item = (Entity, ParamsScope, &'a ParamsDeclaration),
 		>,
 	) -> Result<Self> {
 		let mut pattern = Self::default();
-		for (entity, reach, declaration) in declarations {
-			let declarer = Declarer {
+		for (entity, scope, declaration) in declarations {
+			let source = ParamsSource {
 				entity,
-				reader: declaration.reader().clone(),
-				reach,
+				name: declaration.name().clone(),
+				scope,
 			};
-			pattern.rest |= declaration.rest();
+			pattern.takes_any |= declaration.takes_any();
 			for meta in declaration.metas() {
-				pattern.add(&declarer, meta)?;
+				pattern.add(&source, meta)?;
 			}
-			if !pattern.declarers.contains(&declarer) {
-				pattern.declarers.push(declarer);
+			if !pattern.sources.contains(&source) {
+				pattern.sources.push(source);
 			}
 		}
 		pattern
@@ -78,38 +79,38 @@ impl ParamsPattern {
 		pattern.xok()
 	}
 
-	/// Add `meta` read by `declarer`, applying the conflict rule.
-	fn add(&mut self, declarer: &Declarer, meta: &ParamMeta) -> Result {
+	/// Add `meta` declared by `source`, applying the conflict rule.
+	fn add(&mut self, source: &ParamsSource, meta: &ParamMeta) -> Result {
 		let Some(item) =
 			self.items.iter_mut().find(|item| item.meta.key == meta.key)
 		else {
 			self.items.push(PatternParam {
 				meta: meta.clone(),
-				declarers: vec![declarer.clone()],
+				sources: vec![source.clone()],
 			});
 			return Ok(());
 		};
 		if item.meta.type_path != meta.type_path
 			|| item.meta.value != meta.value
 		{
-			let first = &item.declarers[0].reader;
+			let first = &item.sources[0].name;
 			bevybail!(
 				"conflicting declarations of `--{key}`: `{first}` takes {} ({}), `{}` takes {} ({})",
 				item.meta.type_path,
 				item.meta.value,
-				declarer.reader,
+				source.name,
 				meta.type_path,
 				meta.value,
 				key = meta.key,
 			);
 		}
-		if !item.declarers.contains(declarer) {
-			item.declarers.push(declarer.clone());
+		if !item.sources.contains(source) {
+			item.sources.push(source.clone());
 		}
 		Ok(())
 	}
 
-	/// Each param once, sorted by key, beside its declarers.
+	/// Each param once, sorted by key, beside its sources.
 	pub fn items(&self) -> &[PatternParam] { &self.items }
 
 	/// Each declared param once, sorted by key.
@@ -117,39 +118,39 @@ impl ParamsPattern {
 		self.items.iter().map(|item| &item.meta)
 	}
 
-	/// Whether any declarer takes the rest, so no param is unknown, see
-	/// [`Rest`].
-	pub fn takes_rest(&self) -> bool { self.rest }
+	/// Whether any source takes any param, so no param is unknown, see
+	/// [`AnyParams`].
+	pub fn takes_any(&self) -> bool { self.takes_any }
 
-	/// The params the route itself takes, its own readers' and its steps'
-	/// ([`Reach::Route`]), sorted by key.
+	/// The params the route itself takes, its own extractors' and its steps'
+	/// ([`ParamsScope::Route`]), sorted by key.
 	pub fn own(&self) -> impl Iterator<Item = &ParamMeta> {
 		self.items
 			.iter()
 			.filter(|item| {
-				item.declarers
+				item.sources
 					.iter()
-					.any(|declarer| declarer.reach == Reach::Route)
+					.any(|source| source.scope == ParamsScope::Route)
 			})
 			.map(|item| &item.meta)
 	}
 
-	/// Each middleware declarer ([`Reach::Middleware`]) in collector order,
+	/// Each subtree source ([`ParamsScope::Subtree`]) in collector order,
 	/// beside the params it takes, sorted by key.
 	pub fn inherited(
 		&self,
-	) -> impl Iterator<Item = (&Declarer, Vec<&ParamMeta>)> {
-		self.declarers
+	) -> impl Iterator<Item = (&ParamsSource, Vec<&ParamMeta>)> {
+		self.sources
 			.iter()
-			.filter(|declarer| declarer.reach == Reach::Middleware)
-			.map(|declarer| {
+			.filter(|source| source.scope == ParamsScope::Subtree)
+			.map(|source| {
 				let params = self
 					.items
 					.iter()
-					.filter(|item| item.declarers.contains(declarer))
+					.filter(|item| item.sources.contains(source))
 					.map(|item| &item.meta)
 					.collect();
-				(declarer, params)
+				(source, params)
 			})
 	}
 
@@ -181,14 +182,14 @@ impl ParamsPattern {
 	/// The message naming every param `params` carries that nothing declares,
 	/// each with the declared one it most plausibly misspells, so `--elevate`
 	/// reads `did you mean --elevated?`. `None` when every param is declared,
-	/// as is any param to a pattern taking the rest.
+	/// as is any param to a pattern taking any.
 	pub fn unknown(
 		&self,
 		params: &MultiMap<SmolStr, SmolStr>,
 	) -> Option<String> {
 		let mut unknown = params
 			.keys()
-			.filter(|key| !self.rest && !self.contains(key))
+			.filter(|key| !self.takes_any && !self.contains(key))
 			.map(|key| self.describe_unknown(key))
 			.collect::<Vec<_>>();
 		unknown.sort();
@@ -217,13 +218,13 @@ impl ParamsPattern {
 
 	/// `params` less every one nothing declares: what a command line rebuilt
 	/// from a request may repeat, since a typo the request carried is no
-	/// instruction to pass on. A pattern taking the rest keeps them all.
+	/// instruction to pass on. A pattern taking any keeps them all.
 	pub fn recognised(
 		&self,
 		params: &MultiMap<SmolStr, SmolStr>,
 	) -> MultiMap<SmolStr, SmolStr> {
 		let mut params = params.clone();
-		params.retain(|key, _| self.rest || self.contains(key));
+		params.retain(|key, _| self.takes_any || self.contains(key));
 		params
 	}
 
@@ -326,8 +327,8 @@ impl ParamMeta {
 
 	/// One meta per field of `T`: a struct, or a tuple of structs walked
 	/// recursively, a nested struct with no authored form flattened into its
-	/// parent exactly as [`RequestParts::parse_params`] reads it, and a
-	/// [`Rest`] member contributing none.
+	/// parent exactly as [`RequestParts::parse_params`] reads it, and an
+	/// [`AnyParams`] member contributing none.
 	///
 	/// ## Panics
 	///
@@ -340,13 +341,13 @@ impl ParamMeta {
 	}
 
 	/// Push one meta per field of the params type `type_info` describes,
-	/// returning whether a member is [`Rest`].
+	/// returning whether a member is [`AnyParams`].
 	pub(crate) fn walk(
 		type_info: &TypeInfo,
 		metas: &mut Vec<ParamMeta>,
 	) -> Result<bool> {
 		match type_info {
-			_ if Rest::is(type_info) => Ok(true),
+			_ if AnyParams::is(type_info) => Ok(true),
 			TypeInfo::Struct(info) => {
 				for field in info.iter() {
 					match field.type_info() {
@@ -364,14 +365,14 @@ impl ParamMeta {
 				Ok(false)
 			}
 			TypeInfo::Tuple(info) => {
-				let mut rest = false;
+				let mut takes_any = false;
 				for field in info.iter() {
 					let field = field
 						.type_info()
 						.ok_or_else(|| bevyhow!("Field has no type info"))?;
-					rest |= Self::walk(field, metas)?;
+					takes_any |= Self::walk(field, metas)?;
 				}
-				Ok(rest)
+				Ok(takes_any)
 			}
 			_ => bevybail!(
 				"`{}` is no params type, only structs and tuples of structs are",
@@ -671,7 +672,9 @@ mod test {
 	/// The pattern of `declarations`, each read by a route on a placeholder.
 	fn pattern(declarations: &[ParamsDeclaration]) -> Result<ParamsPattern> {
 		ParamsPattern::from_declarations(declarations.iter().map(
-			|declaration| (Entity::PLACEHOLDER, Reach::Route, declaration),
+			|declaration| {
+				(Entity::PLACEHOLDER, ParamsScope::Route, declaration)
+			},
 		))
 	}
 
@@ -737,16 +740,16 @@ mod test {
 			.xpect_eq("missing required param `--host`");
 	}
 
-	/// A pattern taking the rest knows no param as unknown, and keeps every
-	/// one it recognises.
+	/// A pattern taking any param knows none as unknown, and keeps every one
+	/// it recognises.
 	#[beet_core::test]
-	fn the_rest_taker_refuses_nothing() {
+	fn any_params_refuses_nothing() {
 		let pattern = pattern(&[ParamsDeclaration::new::<
 			DeployParams,
-			(DeployParams, Rest),
+			(DeployParams, AnyParams),
 		>()])
 		.unwrap();
-		pattern.takes_rest().xpect_true();
+		pattern.takes_any().xpect_true();
 		pattern.reject_unknown(&params("--nocapture")).unwrap();
 		pattern
 			.recognised(&params("--nocapture"))
@@ -762,12 +765,12 @@ mod test {
 	}
 
 	/// One key of two types is a contradiction; one key of one type is two
-	/// readers of the same param, kept once beside both.
+	/// extractors of the same param, kept once beside both.
 	#[beet_core::test]
-	fn conflicts_on_type_not_on_readers() {
-		let port = |reader: &str, type_path: &str| {
+	fn conflicts_on_type_not_on_sources() {
+		let port = |name: &str, type_path: &str| {
 			ParamsDeclaration::named(
-				reader,
+				name,
 				[ParamMeta::new("port", ParamValue::Single)
 					.with_type_path(type_path)],
 				false,
@@ -785,9 +788,9 @@ mod test {
 				.unwrap();
 		pattern.items().len().xpect_eq(1);
 		pattern.items()[0]
-			.declarers
+			.sources
 			.iter()
-			.map(|declarer| declarer.reader.as_str())
+			.map(|source| source.name.as_str())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["HttpServer", "TuiServer"]);
 	}

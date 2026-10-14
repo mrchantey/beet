@@ -189,7 +189,7 @@
 //!
 //! An entry document has a single root element. Beside it may sit only the
 //! declarations its launch pre-scans (`<RepoRoot>`, `<TemplateDir>`,
-//! `<RequireCfg>`, `<Secrets>`, and whatever `app.register_prescan::<T>()`
+//! `<RequireCfg>`, `<Secrets>`, and whatever `app.init(T::register_prescan())`
 //! adds), with string attributes and no `bx:cfg`: each acts before the build
 //! and is consumed rather than built, so a root admitting no such child still
 //! states what it needs. Anything else there is a second root, an error

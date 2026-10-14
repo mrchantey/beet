@@ -2,29 +2,6 @@ use beet::prelude::webdriver::*;
 use beet::prelude::*;
 use core::time::Duration;
 
-/// Request params for the [`CaptureScreenshot`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct ScreenshotParams {
-	/// Viewport width in px (default 1280).
-	width: Option<u32>,
-	/// Viewport height in px (default 800).
-	height: Option<u32>,
-	/// Capture the full document instead of the viewport.
-	full_page: bool,
-	/// Clip to the first element matching this css selector (auto-waits for
-	/// it to appear).
-	selector: Option<String>,
-	/// Wait for this css selector before capturing, for a page whose content
-	/// arrives after load, ie a chart that fetches its own data.
-	wait_selector: Option<String>,
-	/// How long `--wait-selector` and `--selector` may wait for content that
-	/// takes longer than a page load to arrive, unit-suffixed, ie `30s`
-	/// (default 4s).
-	wait_duration: Option<Duration>,
-	/// Output path (default `screenshot.png`).
-	output: Option<String>,
-}
-
 /// Captures a png of a url via a headless browser (webdriver): the viewport
 /// by default, `--full-page` for the whole document, or `--selector` for one
 /// element. Color schemes and other page state ride the url itself, eg
@@ -45,7 +22,31 @@ struct ScreenshotParams {
 // `Screenshot` component under the render features, and two short type paths
 // cannot share a tag
 pub async fn CaptureScreenshot(
-	params: Params<ScreenshotParams>,
+	/// Viewport width in px (default 1280).
+	#[param]
+	width: Option<u32>,
+	/// Viewport height in px (default 800).
+	#[param]
+	height: Option<u32>,
+	/// Capture the full document instead of the viewport.
+	#[param]
+	full_page: bool,
+	/// Clip to the first element matching this css selector (auto-waits for
+	/// it to appear).
+	#[param]
+	selector: Option<String>,
+	/// Wait for this css selector before capturing, for a page whose content
+	/// arrives after load, ie a chart that fetches its own data.
+	#[param]
+	wait_selector: Option<String>,
+	/// How long `--wait-selector` and `--selector` may wait for content that
+	/// takes longer than a page load to arrive, unit-suffixed, ie `30s`
+	/// (default 4s).
+	#[param]
+	wait_duration: Option<Duration>,
+	/// Output path (default `screenshot.png`).
+	#[param]
+	output: Option<String>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	// like `run-wasm`, the greedy capture keeps the url as intact trailing
@@ -59,12 +60,9 @@ pub async fn CaptureScreenshot(
 	}
 	let url = segments[1..].join("/");
 
-	let width = params.width.unwrap_or(1280);
-	let height = params.height.unwrap_or(800);
-	let output = params
-		.output
-		.clone()
-		.unwrap_or_else(|| "screenshot.png".to_string());
+	let width = width.unwrap_or(1280);
+	let height = height.unwrap_or(800);
+	let output = output.unwrap_or_else(|| "screenshot.png".to_string());
 
 	// owned args + a helper fn: inline borrows across the awaits here trip
 	// the action macro's `Send` bound ("implementation of `Send` is not
@@ -73,10 +71,10 @@ pub async fn CaptureScreenshot(
 		url,
 		width,
 		height,
-		params.full_page,
-		params.selector.clone(),
-		params.wait_selector.clone(),
-		params.wait_duration,
+		full_page,
+		selector.clone(),
+		wait_selector.clone(),
+		wait_duration,
 	)
 	.await?;
 	fs_ext::write(&output, &png)?;

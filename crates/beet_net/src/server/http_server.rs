@@ -238,7 +238,7 @@ impl HttpServer {
 				entity,
 				"http",
 				move |request: &Request| {
-					RunningSetFilter::selects(
+					ServerFilter::selects(
 						request.params(),
 						"http",
 						default_boot,

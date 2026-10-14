@@ -37,10 +37,9 @@ use std::path::PathBuf;
 /// the operator just typed a code CAN use it, for as long as the operator sized
 /// it, and that is intended rather than a leak: the human factor was required,
 /// the grant is bounded, and it expires on its own.
-#[action]
+#[action(route = "admin")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("admin"))]
 pub async fn AdminElevate(
 	/// How long the session lasts, `30m` to `12h`, default `1h`. STS enforces
 	/// its own floor of 15 minutes and the role's 12-hour ceiling.

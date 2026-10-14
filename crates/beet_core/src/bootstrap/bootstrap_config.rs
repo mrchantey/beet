@@ -95,10 +95,11 @@ pub struct BootstrapConfig {
 	pub store_fork: Option<StoreUri>,
 	/// Watch the entry's sources and live-reload.
 	pub watch: bool,
-	/// Cargo features this binary is asserted to have been built with.
-	pub features: Vec<SmolStr>,
+	/// Cargo features this binary must have been built with, refusing the
+	/// launch otherwise, as Cargo's own `required-features` gates a target.
+	pub required_features: Vec<SmolStr>,
 	/// Which declared servers boot.
-	pub server: Option<RunningSetFilter>,
+	pub server: Option<ServerFilter>,
 	/// The opening route a freshly-opened tui/ssh surface navigates to.
 	pub path: Option<SmolStr>,
 	/// The address servers bind to, usually read through
@@ -140,7 +141,7 @@ impl Default for BootstrapConfig {
 			repo: None,
 			store_fork: None,
 			watch: false,
-			features: default(),
+			required_features: default(),
 			server: None,
 			path: None,
 			host: None,
@@ -372,7 +373,7 @@ impl BootstrapConfig {
 	}
 
 	/// Whether a field is a list knob, comma separated on either transport: a
-	/// list, or a newtype over one ([`RunningSetFilter`]).
+	/// list, or a newtype over one ([`ServerFilter`]).
 	fn is_list(info: Option<&TypeInfo>) -> bool {
 		match Self::leaf(info) {
 			Some(TypeInfo::List(_)) => true,
@@ -474,8 +475,9 @@ impl BootstrapConfig {
 		push("screenshot", shown(self.screenshot.as_ref()));
 		push("screenshot_frame", shown(self.screenshot_frame.as_ref()));
 		push(
-			"features",
-			(!self.features.is_empty()).then(|| self.features.join(",")),
+			"required_features",
+			(!self.required_features.is_empty())
+				.then(|| self.required_features.join(",")),
 		);
 	}
 
@@ -517,7 +519,7 @@ impl BootstrapConfig {
 	/// selection, the opening path) is visible on argv, ambient service config
 	/// (the bind address, the ports, the stage, the deploy identity) rides env.
 	///
-	/// The dev-harness fields (`entry`, `watch`, `features`, `tls_dir`,
+	/// The dev-harness fields (`entry`, `watch`, `required_features`, `tls_dir`,
 	/// `headless`, `screenshot*`) belong to neither deploy channel and
 	/// are dropped: a deploy has no use for them, and a deployed process probes
 	/// its repo store for the entry rather than being told.
@@ -574,7 +576,7 @@ impl BootstrapConfig {
 	/// `CMD` array or a systemd `ExecStart`: no whitespace, quotes, backslashes
 	/// or control characters.
 	///
-	/// The [`StoreUri`] and [`RunningSetFilter`] grammars cannot produce one, so a
+	/// The [`StoreUri`] and [`ServerFilter`] grammars cannot produce one, so a
 	/// violation means malformed input rather than a gap in the encoding.
 	fn validate_token(token: &str) -> Result {
 		if let Some(bad) = token.chars().find(|char| {
@@ -689,8 +691,8 @@ mod test {
 			repo: Some(StoreUri::parse("s3://site?region=us-west-2").unwrap()),
 			store_fork: Some(StoreUri::parse("fs:/tmp/fork").unwrap()),
 			watch: true,
-			features: vec!["thread".into(), "sockets".into()],
-			server: Some(RunningSetFilter::new("http,ssh")),
+			required_features: vec!["thread".into(), "sockets".into()],
+			server: Some(ServerFilter::new("http,ssh")),
 			path: Some("/docs".into()),
 			host: Some("0.0.0.0".parse().unwrap()),
 			port: Some(8337),
@@ -804,7 +806,7 @@ mod test {
 	fn renders_cmd_json() {
 		BootstrapConfig {
 			repo: Some(StoreUri::parse("s3://site").unwrap()),
-			server: Some(RunningSetFilter::new("http,ssh")),
+			server: Some(ServerFilter::new("http,ssh")),
 			..default()
 		}
 		.to_cmd_json("/app")
@@ -891,7 +893,7 @@ mod test {
 		let launch = BootstrapConfig {
 			entry: Some("scene_editor.bsx".into()),
 			repo: Some(StoreUri::parse("http:examples/ui").unwrap()),
-			server: Some(RunningSetFilter::new("dom")),
+			server: Some(ServerFilter::new("dom")),
 			..default()
 		};
 		let script = launch.to_script().unwrap();
@@ -909,7 +911,7 @@ mod test {
 		BootstrapConfig::parse(&args.params, &|_| None)
 			.unwrap()
 			.xpect_eq(launch);
-		let filter = RunningSetFilter::from_params(&args.params).unwrap();
+		let filter = ServerFilter::from_params(&args.params).unwrap();
 		filter.passes("dom").xpect_true();
 		filter.passes("tui").xpect_false();
 	}

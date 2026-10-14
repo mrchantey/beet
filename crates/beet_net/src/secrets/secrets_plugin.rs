@@ -17,7 +17,7 @@ impl Plugin for SecretsPlugin {
 			.register_type::<Secrets>()
 			.register_type::<SecretRole>()
 			.add_observer(load_on_insert)
-			.register_template::<SecretsRoutes>()
+			.init(SecretsRoutes::register_template())
 			.register_type::<SecretsCheck>()
 			.register_type::<SecretsLs>()
 			.register_type::<SecretsGet>()

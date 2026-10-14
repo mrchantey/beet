@@ -41,7 +41,7 @@ fn main() -> AppExit {
 			..default()
 		}))
 		// the document shell `routes` names in its `Layout` declaration
-		.register_template::<RouterLayout>()
+		.init(RouterLayout::register_template())
 		.add_systems(Startup, setup)
 		.run()
 }

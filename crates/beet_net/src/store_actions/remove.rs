@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Parameters for removing a blob from a store.
+/// The props for removing a blob from a store.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct RemoveBlobParams {
+pub struct RemoveBlobProps {
 	/// Path to the blob to remove.
 	pub path: RelPath,
 }
@@ -14,7 +14,7 @@ pub struct RemoveBlobParams {
 /// and giving s3 reactivity that no external watcher provides.
 #[action]
 #[derive(Component, Reflect)]
-pub async fn RemoveBlob(cx: ActionContext<RemoveBlobParams>) -> Result<()> {
+pub async fn RemoveBlob(cx: ActionContext<RemoveBlobProps>) -> Result<()> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {

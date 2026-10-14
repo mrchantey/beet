@@ -402,7 +402,7 @@ mod test {
 	fn declared() -> ParamsPattern {
 		ParamsPattern::from_declarations([(
 			Entity::PLACEHOLDER,
-			Reach::Route,
+			ParamsScope::Route,
 			&ParamsDeclaration::new::<
 				super::DeployGate,
 				(ElevationParams, NoteParams),

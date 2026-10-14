@@ -79,11 +79,7 @@ impl CliServer {
 				"cli",
 				move |request: &Request| {
 					always
-						|| RunningSetFilter::selects(
-							request.params(),
-							"cli",
-							true,
-						)
+						|| ServerFilter::selects(request.params(), "cli", true)
 				},
 				move |entity, request, _shutdown| {
 					// the future owns its dispatch, so nothing borrows the input

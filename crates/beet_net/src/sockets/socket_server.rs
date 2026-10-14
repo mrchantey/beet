@@ -165,7 +165,7 @@ impl SocketServer {
 				entity,
 				"socket",
 				move |request: &Request| {
-					RunningSetFilter::selects(
+					ServerFilter::selects(
 						request.params(),
 						"socket",
 						default_boot,

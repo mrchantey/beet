@@ -32,7 +32,7 @@ impl Plugin for RouterPlugin {
 			// a tree), a route joining or leaving the tree (`PathPattern`
 			// insert/remove), a route being hidden or unhidden (`RouteHidden`
 			// insert/remove), a reader declaring its params (a `RouteParams` or
-			// `MiddlewareParams` insert, which can land after its route joined
+			// `SubtreeParams` insert, which can land after its route joined
 			// the tree, ie a `children!` step spawned behind the route), and a
 			// template build settling its slots (`SpawnTemplate`, which
 			// reparents routes without touching any of those). Each just wakes
@@ -43,9 +43,7 @@ impl Plugin for RouterPlugin {
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteParams>)
-			.add_observer(
-				queue_route_tree_rebuild_on_insert::<MiddlewareParams>,
-			)
+			.add_observer(queue_route_tree_rebuild_on_insert::<SubtreeParams>)
 			.add_observer(rebuild_route_tree_on_build)
 			// a replaced route outlives the swap while a request holds it
 			.add_systems(Update, despawn_idle_retired);
@@ -132,16 +130,13 @@ impl Plugin for RouterPlugin {
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
 				// the color scheme a page is themed by, read leniently by
-				// `PageClasses` beneath every reader rendering through it
-				.declare_params::<HelpHandler>(
-					Reach::Middleware,
-					ColorSchemeParams::declaration(),
-				)
+				// `PageClasses` beneath every extractor rendering through it
+				.init(ColorSchemeParams::declare_on::<HelpHandler>())
 				// the diagnostic pages: the help/not-found route list and the
 				// navigation-failure error page, both rendered through the layout.
-				.register_template::<RouteList>()
-				.register_template::<NotFoundPage>()
-				.register_template::<ErrorPage>()
+				.init(RouteList::register_template())
+				.init(NotFoundPage::register_template())
+				.init(ErrorPage::register_template())
 				// per-route metadata, bindable via the reserved ref, eg
 				// `@entity:PageRoot::PageMeta.title`
 				.register_type::<PageMeta>()
@@ -156,38 +151,35 @@ impl Plugin for RouterPlugin {
 				// (`<RoutesDir/>`, a `Layout` spread) and the by-name
 				// route-aware head/sidebar widgets.
 				.register_type::<Layout>()
-				.declare_params::<Layout>(
-					Reach::Middleware,
-					ColorSchemeParams::declaration(),
-				)
-				.register_template::<RouteHead>()
-				.register_template::<RouteSidebar>()
+				.init(ColorSchemeParams::declare_on::<Layout>())
+				.init(RouteHead::register_template())
+				.init(RouteSidebar::register_template())
 				// the generated page listing a content index page places instead
 				// of a hand-maintained list, eg `<RouteIndex reverse="true"/>`
-				.register_template::<RouteIndex>()
+				.init(RouteIndex::register_template())
 				// the article chrome a blog layout places above the post body,
 				// rendered from the page's own `PageMeta`
-				.register_template::<ArticleHeader>()
-				.register_template::<YouTubeEmbed>()
+				.init(ArticleHeader::register_template())
+				.init(YouTubeEmbed::register_template())
 				// the shipped document shell a no-code site wraps its pages in,
 				// requested with `<SiteLayout>`.
-				.register_template::<SiteLayout>()
+				.init(SiteLayout::register_template())
 				// its chrome-free twin, for an app that wants the theme and
 				// nothing else: `<Router {Layout{template:"AppShell"}}>`.
-				.register_template::<AppShell>()
+				.init(AppShell::register_template())
 				// the machine-readable faces of a site, each an opt-in static
 				// route scoped by where it is declared
-				.register_template::<Robots>()
-				.register_template::<Sitemap>()
-				.register_template::<RssFeed>()
-				.register_template::<SearchIndex>()
+				.init(Robots::register_template())
+				.init(Sitemap::register_template())
+				.init(RssFeed::register_template())
+				.init(SearchIndex::register_template())
 				// the default app routes as a markup template, so a no-code BSX
 				// site requests them with `<DefaultAppRoutes/>`.
-				.register_template::<DefaultAppRoutes>()
+				.init(DefaultAppRoutes::register_template())
 				// the standard blob-store agent toolset, for agent scenes (eg a
 				// thread's `<StoreToolset/>`); the store itself is mounted with a
 				// plain `{FsStore{path:..}}`.
-				.register_template::<StoreToolset>();
+				.init(StoreToolset::register_template());
 			// the markup-resolved `<RoutesDir src=".."/>`, registered on every std
 			// target so a no-code site loads. Its discovery observer scans the store
 			// asynchronously (off the runtime, see `RoutesDir::spawn_on_insert`), so it
@@ -204,15 +196,17 @@ impl Plugin for RouterPlugin {
 			// src="../.."/>`) first, so nothing runs against a store it has not
 			// rebased, then the crate check, the entry's own template dirs and
 			// the secrets load.
-			app.register_prescan::<RepoRoot>()
-				.register_prescan::<RequireCfg>();
+			app.init((
+				RepoRoot::register_prescan(),
+				RequireCfg::register_prescan(),
+			));
 			// the markup-resolved `<TemplateDir src="templates"/>`: its insert
 			// observer reads the dir through the nearest ancestor `BlobStore` and
 			// registers each `.bsx`/`.js` template by module path, off the runtime
 			// (so it runs on wasm too). An entry's own template dirs are also
 			// pre-scanned synchronously by the cli before the entry parses, so
 			// entry-level tags like `<Styles/>` resolve.
-			app.register_prescan::<TemplateDir>()
+			app.init(TemplateDir::register_prescan())
 				.add_observer(TemplateDir::register_on_insert)
 				.add_systems(
 					Update,
@@ -223,28 +217,28 @@ impl Plugin for RouterPlugin {
 						.in_set(BlobReactions),
 				);
 			#[cfg(feature = "vault")]
-			app.register_prescan::<Secrets>();
+			app.init(Secrets::register_prescan());
 			// the no-code static-asset mount: `ServeBlobs` owns its mount prefix and
 			// inserts its own greedy capture + handler, serving from the nearest
 			// self-or-ancestor store, eg `<AssetsDir src="assets"/>`.
 			// Cross-platform, so the wasm Worker resolves a served site's asset routes.
-			app.register_template::<Route>()
+			app.init(Route::register_template())
 				// the renamed-page redirect (`<Redirect path="post-1"
 				// redirect="full-stack-bevy"/>`), an ordinary GET route
 				// answering a 301
-				.register_template::<Redirect>()
+				.init(Redirect::register_template())
 				// the redirect's target as plain data, read by dispatch and by
 				// the static export's meta-refresh stub
 				.register_type::<RedirectTo>()
 				// the document-field route (`<FieldRoute path=".." field=".."
 				// verb="push"/>`): a typed document action plus the
 				// `ExchangeOverload` that markup cannot spread for itself.
-				.register_template::<FieldRoute>()
+				.init(FieldRoute::register_template())
 				.register_type::<FieldVerb>()
 				// the persistent page route (`<Route path="/" {FixedPage}>`): its
 				// declared children are one live tree served by every request.
 				.register_type::<FixedPage>()
-				.register_template::<ServeBlobs>()
+				.init(ServeBlobs::register_template())
 				.register_type::<ServeBlobsHandler>()
 				// one store file served as a page (`<Route path="guide"
 				// {BlobPage{path:"guide.md"}}/>`)
@@ -254,10 +248,10 @@ impl Plugin for RouterPlugin {
 				.register_type::<BlobView>()
 				// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
 				// `ServeBlobs` scoped to a subdir of the inherited store.
-				.register_template::<AssetsDir>()
+				.init(AssetsDir::register_template())
 				// the browser-wasm page template: the module loader plus the launch
 				// a served page boots a wasm `beet` binary with.
-				.register_template::<Wasm>();
+				.init(Wasm::register_template());
 			// any store file's addressed cells (`<BlobCells/>`, `cells
 			// forms/plan.docx`), whose serde answer needs `serde`
 			#[cfg(feature = "serde")]
@@ -280,7 +274,7 @@ impl Plugin for RouterPlugin {
 						.run_if(any_with_component::<NeedsReload>)
 						.after(BlobReactions),
 				)
-				.register_template::<LiveReloadScript>();
+				.init(LiveReloadScript::register_template());
 			// where client_io is compiled out (wasm Worker, no-dev-reload builds)
 			// mark `<LiveReloadScript/>` as a known featured-out tag, so a site
 			// layout that includes it still loads and renders nothing rather than
@@ -289,7 +283,7 @@ impl Plugin for RouterPlugin {
 				feature = "client_io",
 				not(target_arch = "wasm32")
 			)))]
-			app.allow_unregistered("LiveReloadScript");
+			app.init(UnregisteredTag::allow("LiveReloadScript"));
 			// the site widgets' own rules (the app shell's scroll region, the
 			// index heading link), extending the shared rule set the way the
 			// card-stack rules do, so they compose with the material set and
@@ -311,37 +305,30 @@ impl Plugin for RouterPlugin {
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
 			// terminal app when the start walk selects `tui`.
 			#[cfg(feature = "tui")]
-			app.register_type::<TuiServer>()
-				.declare_params::<TuiServer>(
-					Reach::Middleware,
-					ParamsDeclaration::new::<
-						TuiServer,
-						(BootParams, ServerParams),
-					>(),
-				)
-				.declare_params::<TuiServer>(
-					Reach::Middleware,
-					ColorSchemeParams::declaration(),
-				);
+			app.register_type::<TuiServer>().init((
+				SubtreeParams::declare_on::<
+					TuiServer,
+					(BootParams, ServerParams),
+				>(),
+				ColorSchemeParams::declare_on::<TuiServer>(),
+			));
 			// a binary without the terminal (the browser runtime) still loads
 			// an entry declaring it, the spread a known featured-out name
 			#[cfg(not(feature = "tui"))]
-			app.allow_unregistered("TuiServer");
+			app.init(UnregisteredTag::allow("TuiServer"));
 			// the multi-tenant SSH-TUI server, likewise declarable in a markup
 			// spread. Registered by feature rather than by `SshTuiPlugin` (which
 			// adds the per-connection behavior), so an entry naming it resolves in
 			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
-			app.register_type::<SshTuiServer>()
-				.declare_params::<SshTuiServer>(
-					Reach::Middleware,
-					ParamsDeclaration::new::<
-						SshTuiServer,
-						(BootParams, ServerParams),
-					>(),
-				);
+			app.register_type::<SshTuiServer>().init(
+				SubtreeParams::declare_on::<
+					SshTuiServer,
+					(BootParams, ServerParams),
+				>(),
+			);
 			#[cfg(not(feature = "ssh"))]
-			app.allow_unregistered("SshTuiServer");
+			app.init(UnregisteredTag::allow("SshTuiServer"));
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
 			// builds: the whole request in, whatever the script returned out.
 			// `Script<Value, Value>` itself is registered upstream by
@@ -355,7 +342,7 @@ impl Plugin for RouterPlugin {
 				ScriptAnswerMarker,
 			>>()
 			// the markup-friendly `<ScriptRoute path=".." script=".."/>` front-end.
-			.register_template::<ScriptRoute>();
+			.init(ScriptRoute::register_template());
 
 			// the `ExchangeScriptElement` console-capturing entry action, so a
 			// `<script {ExchangeScriptElement}>` entry resolves it. The backend it
@@ -382,7 +369,7 @@ impl Plugin for RouterPlugin {
 						LeafletRenderer::media_type(),
 					);
 				#[cfg(feature = "json")]
-				app.register_render_target(LeafletRenderer);
+				app.init(LeafletRenderer.register_render_target());
 			}
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
@@ -456,7 +443,7 @@ fn queue_route_tree_rebuild_on_root(
 /// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is inserted
 /// on any entity: a route joining the tree ([`PathPattern`]), a route being
 /// hidden ([`RouteHidden`]) or a reader declaring its params ([`RouteParams`],
-/// [`MiddlewareParams`]).
+/// [`SubtreeParams`]).
 ///
 /// The wake is deferred (queued rather than run inline), so by the time it
 /// runs the insert has settled — in particular so a route added via a bundle's
@@ -510,7 +497,7 @@ fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
 /// changed entity.
 ///
 /// `trigger` is the entity whose [`PathPattern`], [`RouteHidden`],
-/// [`RouteParams`] or [`MiddlewareParams`] just changed, handed over by the
+/// [`RouteParams`] or [`SubtreeParams`] just changed, handed over by the
 /// waking observer.
 /// An insert or a live removal leaves the entity and its ancestry intact, so
 /// [`PathPattern::namespace_root`] answers

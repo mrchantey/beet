@@ -16,38 +16,38 @@ pub(crate) fn widget_plugin(app: &mut App) {
 	// `controls::button::Button` is qualified so it resolves to this crate's
 	// widget rather than the bevy_ui `Button` that leaks through
 	// `beet_core::prelude` when `bevy_default` is co-enabled.
-	app.register_template::<super::controls::button::Button>()
-		.register_template::<IconButton>()
-		.register_template::<Link>()
-		.register_template::<ColorSchemeScript>()
+	app.init(super::controls::button::Button::register_template())
+		.init(IconButton::register_template())
+		.init(Link::register_template())
+		.init(ColorSchemeScript::register_template())
 		// `Error` is qualified for the same reason as `Button`: the name is common
 		// enough that a prelude glob may also define one.
-		.register_template::<super::controls::error::Error>()
-		.register_template::<ErrorText>()
-		.register_template::<Footer>()
-		.register_template::<TextField>()
-		.register_template::<TextArea>()
-		.register_template::<NumberField>()
-		.register_template::<Checkbox>()
-		.register_template::<Select>()
-		.register_template::<Form>()
-		.register_template::<DynamicForm>()
-		.register_template::<DynamicView>()
-		.register_template::<SchemaEditor>()
-		.register_template::<ToggleSchemaEditor>()
-		.register_template::<Head>()
-		.register_template::<Header>()
-		.register_template::<HtmlDocument>()
-		.register_template::<PageLayout>()
-		.register_template::<PageBreak>()
-		.register_template::<ContentLayout>()
-		.register_template::<Preflight>()
-		.register_template::<Reset>()
-		.register_template::<RenderConsole>()
-		.register_template::<Sidebar>()
-		.register_template::<SidebarScript>()
-		.register_template::<MenuButton>()
-		.register_template::<Table>();
+		.init(super::controls::error::Error::register_template())
+		.init(ErrorText::register_template())
+		.init(Footer::register_template())
+		.init(TextField::register_template())
+		.init(TextArea::register_template())
+		.init(NumberField::register_template())
+		.init(Checkbox::register_template())
+		.init(Select::register_template())
+		.init(Form::register_template())
+		.init(DynamicForm::register_template())
+		.init(DynamicView::register_template())
+		.init(SchemaEditor::register_template())
+		.init(ToggleSchemaEditor::register_template())
+		.init(Head::register_template())
+		.init(Header::register_template())
+		.init(HtmlDocument::register_template())
+		.init(PageLayout::register_template())
+		.init(PageBreak::register_template())
+		.init(ContentLayout::register_template())
+		.init(Preflight::register_template())
+		.init(Reset::register_template())
+		.init(RenderConsole::register_template())
+		.init(Sidebar::register_template())
+		.init(SidebarScript::register_template())
+		.init(MenuButton::register_template())
+		.init(Table::register_template());
 	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)
@@ -99,15 +99,15 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		.get_resource_or_init::<RuleSet>()
 		.extend_rules(super::debug::render_console::console_rules());
 	#[cfg(feature = "net")]
-	app.register_template::<Analytics>();
+	app.init(Analytics::register_template());
 	#[cfg(all(
 		feature = "net",
 		feature = "syntax_highlighting",
 		not(target_arch = "wasm32")
 	))]
-	app.register_template::<super::code_snippet::CodeSnippet>();
+	app.init(super::code_snippet::CodeSnippet::register_template());
 	#[cfg(all(feature = "net", feature = "mermaid"))]
-	app.register_template::<super::mermaid::Mermaid>();
+	app.init(super::mermaid::Mermaid::register_template());
 	#[cfg(feature = "style")]
-	app.register_template::<Stylesheet>();
+	app.init(Stylesheet::register_template());
 }

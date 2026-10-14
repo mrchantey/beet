@@ -60,14 +60,14 @@ pub(crate) fn beet_extra_ml_plugin(app: &mut App) {
 		// the markup ml scene templates, so `<NearestSentenceAgent/>` /
 		// `<SentenceOption/>` / `<ChatSentenceAgent/>` / `<FrozenLake/>` etc resolve
 		// in a `.bsx`.
-		.register_template::<NearestSentenceAgent>()
-		.register_template::<SentenceOption>()
-		.register_template::<ChatSentenceAgent>()
-		.register_template::<FetchItems>()
-		.register_template::<FetchFox>()
-		.register_template::<FrozenLake>()
-		.register_template::<FrozenLakeRunAgent>()
-		.register_template::<FrozenLakeTrainSession>();
+		.init(NearestSentenceAgent::register_template())
+		.init(SentenceOption::register_template())
+		.init(ChatSentenceAgent::register_template())
+		.init(FetchItems::register_template())
+		.init(FetchFox::register_template())
+		.init(FrozenLake::register_template())
+		.init(FrozenLakeRunAgent::register_template())
+		.init(FrozenLakeTrainSession::register_template());
 }
 
 fn plugin_2d(app: &mut App) {
@@ -88,11 +88,11 @@ fn plugin_2d(app: &mut App) {
 		.register_type::<FollowCursor2d>()
 		// the markup 2d scene templates, so `<Scene2d/>`/`<Sprite2d/>`/`<SpaceScene/>`/
 		// `<SeekAgent2d/>`/`<Flock/>` resolve in a `.bsx`.
-		.register_template::<Scene2d>()
-		.register_template::<Sprite2d>()
-		.register_template::<SpaceScene>()
-		.register_template::<SeekAgent2d>()
-		.register_template::<Flock>()
+		.init(Scene2d::register_template())
+		.init(Sprite2d::register_template())
+		.init(SpaceScene::register_template())
+		.init(SeekAgent2d::register_template())
+		.init(Flock::register_template())
 		/*_*/;
 }
 
@@ -109,15 +109,15 @@ fn plugin_3d(app: &mut App) {
 		.register_type::<CameraDistance>()
 		// the markup scene templates, so `<AppWindow/>`/`<UiTerminal/>`/`<Scene3d/>`/
 		// `<Lighting3d/>`/`<Ground3d/>` resolve in a `.bsx`.
-		.register_template::<AppWindow>()
-		.register_template::<UiTerminal>()
-		.register_template::<Scene3d>()
-		.register_template::<WorldScene>()
-		.register_template::<Foxie>()
-		.register_template::<Lighting3d>()
-		.register_template::<Ground3d>()
-		.register_template::<Camera3dLookAt>()
-		.register_template::<IkTarget>()
+		.init(AppWindow::register_template())
+		.init(UiTerminal::register_template())
+		.init(Scene3d::register_template())
+		.init(WorldScene::register_template())
+		.init(Foxie::register_template())
+		.init(Lighting3d::register_template())
+		.init(Ground3d::register_template())
+		.init(Camera3dLookAt::register_template())
+		.init(IkTarget::register_template())
 		// the render body for the agnostic `<Drive>` action: `{CharacterDrive}`
 		// integrates the agent's commanded velocity into a `Transform` and animates it.
 		.add_plugins(crate::prelude::character_drive_plugin)

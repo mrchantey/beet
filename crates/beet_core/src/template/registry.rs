@@ -208,22 +208,31 @@ pub impl World {
 	}
 }
 
-/// Registers a template type on an [`App`].
-#[extend::ext(name=AppRegisterTemplateExt)]
-pub impl App {
-	/// Registers `T` and its [`ReflectTemplate`] type-data. See
+/// Registers a template type on an [`App`], its [`Initializer`] built from the
+/// type: `app.init(Route::register_template())`.
+pub trait RegisterTemplate:
+	FromReflect
+	+ Typed
+	+ GetTypeRegistration
+	+ GetTemplateSchema
+	+ Template<Output = ()>
+{
+	/// Register this template and its [`ReflectTemplate`] type-data, see
 	/// [`WorldRegisterTemplateExt::register_template`].
-	fn register_template<T>(&mut self) -> &mut Self
-	where
-		T: FromReflect
-			+ Typed
-			+ GetTypeRegistration
-			+ GetTemplateSchema
-			+ Template<Output = ()>,
-	{
-		self.world_mut().register_template::<T>();
-		self
+	fn register_template() -> impl Initializer {
+		|app: &mut App| {
+			app.world_mut().register_template::<Self>();
+		}
 	}
+}
+
+impl<T> RegisterTemplate for T where
+	T: FromReflect
+		+ Typed
+		+ GetTypeRegistration
+		+ GetTemplateSchema
+		+ Template<Output = ()>
+{
 }
 
 /// The name of a tag nothing was registered under, recorded on the inert entity
@@ -251,13 +260,22 @@ pub struct UnregisteredTag(pub SmolStr);
 impl UnregisteredTag {
 	/// Record `tag` as unresolvable in this binary.
 	pub fn new(tag: impl Into<SmolStr>) -> Self { Self(tag.into()) }
+
+	/// Allow `tag` to resolve to nothing when nothing is registered under
+	/// it, see [`AllowedUnregistered`].
+	pub fn allow(tag: impl Into<SmolStr>) -> impl Initializer {
+		let tag = tag.into();
+		move |app: &mut App| {
+			app.world_mut().allow_unregistered(tag);
+		}
+	}
 }
 
 /// Tag names allowed to resolve to nothing when nothing is registered under them.
 ///
 /// The narrow opt-out from [`UnregisteredTag`]: a featured-out widget (eg
 /// `<LiveReloadScript/>` when `client_io` is compiled out) marks its tag here via
-/// [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered) and the
+/// [`UnregisteredTag::allow`] and the
 /// loader resolves it to nothing at all, silently and without its children. Only
 /// a tag whose whole *content* is the missing behavior belongs here; anything
 /// else takes the inert-entity path so its children survive. Uniform over
@@ -275,7 +293,7 @@ impl AllowedUnregistered {
 	}
 	/// Whether `tag` is allowed to be unregistered.
 	pub fn contains(&self, tag: &str) -> bool { self.names.contains(tag) }
-	/// Whether `tag` was marked [`allow_unregistered`](AppAllowUnregisteredExt::allow_unregistered)
+	/// Whether `tag` was marked [`allow_unregistered`](WorldAllowUnregisteredExt::allow_unregistered)
 	/// in `cx`'s world, ie a known featured-out name the loader resolves to
 	/// nothing rather than error. Consulted by both lookup paths on a missing
 	/// registration.
@@ -297,17 +315,6 @@ pub impl World {
 	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
 		self.get_resource_or_init::<AllowedUnregistered>()
 			.insert(tag);
-		self
-	}
-}
-
-/// Marks tags as known-but-featured-out on an [`App`].
-#[extend::ext(name=AppAllowUnregisteredExt)]
-pub impl App {
-	/// Mark `tag` as a known featured-out name. See
-	/// [`WorldAllowUnregisteredExt::allow_unregistered`].
-	fn allow_unregistered(&mut self, tag: impl Into<SmolStr>) -> &mut Self {
-		self.world_mut().allow_unregistered(tag);
 		self
 	}
 }

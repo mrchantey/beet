@@ -318,11 +318,11 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::AdoptCurrentDeploy>()
 			// the IaC verb routes a `<Stack>` hosts, registered beside the verbs
 			// themselves rather than by whichever crate happens to author markup.
-			.register_template::<crate::prelude::DeployRoutes>()
+			.init(crate::prelude::DeployRoutes::register_template())
 			// the one thing about this launch's deploy mechanics an entry
 			// authors: where its state lives, a property of the operator rather
 			// than of any stack.
-			.register_template::<crate::prelude::S3StateBackend>()
+			.init(crate::prelude::S3StateBackend::register_template())
 			.register_type::<crate::prelude::TofuApply>()
 			// the two teardown steps: `tofu destroy`, and the state carriers it
 			// leaves behind. They converge either side of the apply, so a destroy
@@ -355,13 +355,10 @@ impl Plugin for InfraPlugin {
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::CloudflareDeployToken>()
 			.register_type::<crate::prelude::DeployGate>()
-			.declare_params::<crate::prelude::DeployGate>(
-				Reach::Route,
-				ParamsDeclaration::new::<
-					crate::prelude::DeployGate,
-					crate::credentials::ElevationParams,
-				>(),
-			)
+			.init(RouteParams::declare_on::<
+				crate::prelude::DeployGate,
+				crate::credentials::ElevationParams,
+			>())
 			.add_observer(
 				crate::credentials::attach_deploy_credential::<
 					crate::prelude::CloudflareDeployToken,
@@ -420,8 +417,8 @@ impl Plugin for InfraPlugin {
 			// the two paired declarations, each spawning its up-action and its
 			// down-action from one tag at one file position, so the deploy and
 			// teardown groups cannot drift apart.
-			.register_template::<crate::prelude::EipReverseRecord>()
-			.register_template::<crate::prelude::MtaStsPolicyHost>();
+			.init(crate::prelude::EipReverseRecord::register_template())
+			.init(crate::prelude::MtaStsPolicyHost::register_template());
 
 		// the bucket sync settings (`{SyncS3Bucket{delete:true}}`), the direction
 		// enum a markup attribute names by variant, and the `<DirSync>` front-end

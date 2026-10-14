@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Parameters for listing blobs in a store subdirectory.
+/// The props for listing blobs in a store subdirectory.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct ListBlobsParams {
+pub struct ListBlobsProps {
 	/// Subdirectory path to list relative to the store root.
 	pub path: RelPath,
 }
@@ -14,7 +14,7 @@ pub struct ListBlobsParams {
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ListBlobs(
-	cx: ActionContext<ListBlobsParams>,
+	cx: ActionContext<ListBlobsProps>,
 ) -> Result<Vec<RelPath>> {
 	let store = cx
 		.caller

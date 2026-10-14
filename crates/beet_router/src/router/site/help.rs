@@ -144,7 +144,7 @@ pub struct NotFoundNotice {
 /// Partitioned by tree position from each route's [`ParamsPattern`], the
 /// pattern a [`RejectUnknownParams`] url space checks a request against, so the
 /// help documents exactly the params a strict server accepts: a route's own and
-/// its steps' beneath it, a middleware declarer at or above the url space root
+/// its steps' beneath it, a subtree source at or above the url space root
 /// once under "Inherited params", and one between the root and the route
 /// beneath that route.
 #[derive(Default)]
@@ -178,16 +178,16 @@ impl HelpListing {
 				node.path.annotated_path().last_segment() != Some("help")
 			})
 			.collect::<Vec<_>>();
-		// a declarer at or above the root is above every listed route, so it
+		// a source at or above the root is above every listed route, so it
 		// is listed once, beneath them all
-		let mut shared: Vec<(&Declarer, Vec<&ParamMeta>)> = Vec::new();
-		for (declarer, params) in
+		let mut shared: Vec<(&ParamsSource, Vec<&ParamMeta>)> = Vec::new();
+		for (source, params) in
 			routes.iter().flat_map(|node| node.params.inherited())
 		{
-			if above.contains(&declarer.entity)
-				&& !shared.iter().any(|(listed, _)| *listed == declarer)
+			if above.contains(&source.entity)
+				&& !shared.iter().any(|(listed, _)| *listed == source)
 			{
-				shared.push((declarer, params));
+				shared.push((source, params));
 			}
 		}
 		let mut listed = HashSet::default();
@@ -217,7 +217,7 @@ pub(crate) struct RouteEntry {
 	/// The route's own params and its steps', rendered as a table beneath the
 	/// details.
 	pub params: Vec<RouteParam>,
-	/// The params it inherits from a declarer between the url space root and
+	/// The params it inherits from a source between the url space root and
 	/// itself, ie a server on a `serve` route.
 	pub inherited: Vec<ParamsGroup>,
 }
@@ -225,7 +225,7 @@ pub(crate) struct RouteEntry {
 impl RouteEntry {
 	/// Flatten one [`ActionNode`] into a row: path + kind tag, the detail rows
 	/// (description, non-trivial input/output types), its own params, then
-	/// those a middleware declarer below the url space root (`above` holding
+	/// those a subtree source below the url space root (`above` holding
 	/// the root and its ancestors) adds, skipping any param `listed` already
 	/// names.
 	fn new(
@@ -250,14 +250,15 @@ impl RouteEntry {
 		let input_type = node.meta.input().type_name();
 		let output_type = node.meta.output().type_name();
 		let is_trivial = input_type == "()" && output_type == "()";
-		let is_exchange = node.meta.input_is::<Request>()
+		let is_exchange = (node.meta.input_is::<Request>()
+			|| node.meta.input_is::<RequestParts>())
 			&& (node.meta.output_is::<Response>()
 				|| node.meta.output_is::<Outcome<Request, Response>>());
 		if !is_trivial && !is_exchange && !node.is_scene() {
 			details.push(("input".into(), input_type.to_string()));
 			details.push(("output".into(), output_type.to_string()));
 		}
-		if node.params.takes_rest() {
+		if node.params.takes_any() {
 			details.push((
 				"forwards".into(),
 				"any other param, to the program it runs".into(),
@@ -270,7 +271,7 @@ impl RouteEntry {
 		let inherited = ParamsGroup::collect(
 			node.params
 				.inherited()
-				.filter(|(declarer, _)| !above.contains(&declarer.entity)),
+				.filter(|(source, _)| !above.contains(&source.entity)),
 			&mut listed,
 		);
 
@@ -284,33 +285,33 @@ impl RouteEntry {
 	}
 }
 
-/// The params one reader above a route takes, ie a server's bind knobs,
-/// listed under the reader's name.
+/// The params one extractor above a route takes, ie a server's bind knobs,
+/// listed under the extractor's name.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 pub(crate) struct ParamsGroup {
-	/// The reader, ie `CliServer`.
-	pub declarer: String,
+	/// The extractor, ie `CliServer`.
+	pub extractor: String,
 	/// Its params, sorted by name.
 	pub params: Vec<RouteParam>,
 }
 
 impl ParamsGroup {
-	/// One group per reader, each param once: a param `listed` already names
+	/// One group per extractor, each param once: a param `listed` already names
 	/// is skipped, and a group left empty dropped.
 	fn collect<'a>(
-		groups: impl IntoIterator<Item = (&'a Declarer, Vec<&'a ParamMeta>)>,
+		groups: impl IntoIterator<Item = (&'a ParamsSource, Vec<&'a ParamMeta>)>,
 		listed: &mut HashSet<String>,
 	) -> Vec<Self> {
 		groups
 			.into_iter()
-			.filter_map(|(declarer, params)| {
+			.filter_map(|(source, params)| {
 				let params = params
 					.into_iter()
 					.filter(|meta| listed.insert(meta.name().to_string()))
 					.map(RouteParam::from)
 					.collect::<Vec<_>>();
 				(!params.is_empty()).then(|| Self {
-					declarer: declarer.reader.to_string(),
+					extractor: source.name.to_string(),
 					params,
 				})
 			})
@@ -391,7 +392,7 @@ pub fn RouteList(
 	}
 }
 
-/// The params every listed route inherits, grouped by declarer.
+/// The params every listed route inherits, grouped by extractor.
 fn inherited_list(groups: Vec<ParamsGroup>) -> impl Bundle {
 	let groups: Vec<_> = groups.into_iter().map(params_group).collect();
 	rsx! {
@@ -403,11 +404,11 @@ fn inherited_list(groups: Vec<ParamsGroup>) -> impl Bundle {
 	}
 }
 
-/// One declarer's params: its name, then their table.
+/// One extractor's params: its name, then their table.
 fn params_group(group: ParamsGroup) -> impl Bundle {
 	rsx! {
 		<>
-			<p>"from "<strong>{group.declarer}</strong></p>
+			<p>"from "<strong>{group.extractor}</strong></p>
 			{params_table(group.params)}
 		</>
 	}
@@ -482,7 +483,7 @@ pub fn NotFoundPage(notice: NotFoundNotice) -> impl Bundle {
 }
 
 /// One route row: the path heading with its kind tag, a nested detail list,
-/// its own params table and one per declarer only it inherits from.
+/// its own params table and one per extractor only it inherits from.
 fn route_entry_item(entry: RouteEntry) -> impl Bundle {
 	let RouteEntry {
 		href,
@@ -724,15 +725,14 @@ mod test {
 		#[param]
 		elevated: bool,
 		plan: Params<PlanParams>,
-		_cx: ActionContext<Request>,
 	) -> Result<Response> {
 		let _ = (elevated, plan.dry_run);
 		Response::ok().xok()
 	}
 
-	/// Stands in for a reader above one route alone, ie a server on `serve`.
+	/// Stands in for an extractor above one route alone, ie a server on `serve`.
 	#[derive(Default, Component)]
-	#[component(on_add = MiddlewareParams::declare::<VerboseLogger, VerboseParams>)]
+	#[component(on_add = SubtreeParams::declare::<VerboseLogger, VerboseParams>)]
 	struct VerboseLogger;
 
 	/// A strict CLI: a [`CliServer`] over a router with help and a `stack`
@@ -779,7 +779,7 @@ mod test {
 				(node.path.annotated_path().to_string(), names)
 			})
 			.collect::<Vec<_>>();
-		// the fixture exercises every kind of declarer
+		// the fixture exercises every kind of source
 		routes
 			.iter()
 			.flat_map(|(_, names)| names.iter())
@@ -847,7 +847,7 @@ mod test {
 	/// A scoped help lists each route's own params beneath it, those only one
 	/// route inherits beside its own, and those every route inherits once.
 	#[beet_core::test]
-	async fn help_page_groups_params_by_declarer() {
+	async fn help_page_groups_params_by_extractor() {
 		let mut world = router_world();
 		let router = spawn_cli(&mut world);
 		help_as(&mut world, router, "stack --help", MediaType::Markdown)

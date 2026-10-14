@@ -9,9 +9,9 @@ use beet_core::prelude::*;
 /// plain deploy.
 ///
 /// What a route takes is what its [`ParamsPattern`] holds: every param a
-/// reader running for it declares by taking it, the route's own and its
+/// extractor running for it declares by taking it, the route's own and its
 /// steps' ([`RouteParams`]) and those of the middleware and servers above it
-/// ([`MiddlewareParams`]). A route taking `rest: Params<Rest>` refuses nothing.
+/// ([`SubtreeParams`]). A route taking [`AnyParams`] refuses nothing.
 ///
 /// Most servers must tolerate params they never read: a page is linked with
 /// `?utm_source=..` and served to a browser that appends whatever it likes. A

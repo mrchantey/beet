@@ -104,10 +104,7 @@ pub async fn SceneLoad(
 #[action(route = "clear")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn SceneClear(
-	target: Params<SceneTargetParams>,
-	_cx: ActionContext<RequestParts>,
-) -> Result<Response> {
+pub async fn SceneClear(target: Params<SceneTargetParams>) -> Result<Response> {
 	let url = target.device_url()?;
 	Request::get(format!("{url}/clear")).send().await
 }
@@ -116,10 +113,7 @@ pub async fn SceneClear(
 #[action(route = "reset")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn SceneReset(
-	target: Params<SceneTargetParams>,
-	_cx: ActionContext<RequestParts>,
-) -> Result<Response> {
+pub async fn SceneReset(target: Params<SceneTargetParams>) -> Result<Response> {
 	let url = target.device_url()?;
 	Request::get(format!("{url}/reset")).send().await
 }
@@ -128,10 +122,7 @@ pub async fn SceneReset(
 #[action(route = "dump")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub async fn SceneDump(
-	target: Params<SceneTargetParams>,
-	_cx: ActionContext<RequestParts>,
-) -> Result<Response> {
+pub async fn SceneDump(target: Params<SceneTargetParams>) -> Result<Response> {
 	let url = target.device_url()?;
 	Request::get(format!("{url}/dump")).send().await
 }
@@ -140,13 +131,13 @@ pub async fn SceneDump(
 /// installed, eg `beet run led-script`. The original request (method, headers,
 /// query and body) is forwarded unchanged; only its destination URL is rewritten
 /// to `<device>/<route>`. Its other params are the device route's, so it
-/// takes the rest and a strict server passes them through.
+/// takes any param and a strict server passes them through.
 #[action(route = "run/:route")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub async fn SceneRun(
 	target: Params<SceneTargetParams>,
-	_rest: Params<Rest>,
+	_any: AnyParams,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));

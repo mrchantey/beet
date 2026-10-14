@@ -91,7 +91,7 @@ Hand-written pairs remain permitted — the merge removes the *forced* two-type 
 
 ## Params: declare by taking
 
-An action reads request params by taking them in its signature, and that one statement is also their declaration, so nothing is declared in one place and read in another. A `#[param]` argument takes one param, a field of a hidden `{Action}Params` struct: its doc comment is its `--help` description, `short = 'x'` its short flag, and its type alone says whether it is required. A `Params<T>` argument takes every field of a `Reflect` group, and `Params<Rest>` every param the request carries, so a strict url space refuses nothing on its route. Both are parsed off the request before the body runs:
+An action reads request params by taking them in its signature, and that one statement is also their declaration, so nothing is declared in one place and read in another. A `#[param]` argument takes one param, a field of a hidden `{Action}Params` struct: its doc comment is its `--help` description, `short = 'x'` its short flag, and its type alone says whether it is required. A `Params<T>` argument takes every field of a `Reflect` group, named only when more than one extractor takes it, and `AnyParams` every param the request carries, so a strict url space refuses nothing on its route. All are parsed off the request before the body runs:
 
 ```rust,ignore
 #[action(route = "audit")]
@@ -102,13 +102,12 @@ async fn Audit(
 	#[param(short = 'f')]
 	fix: bool,
 	entry: Params<EntryParams>,
-	cx: ActionContext<Request>,
 ) -> Result<String> {
 	// `fix` and `entry` are bound before the body runs
 }
 ```
 
-The reach is inferred from the input: a plain action declares into `RouteParams`, read by the route it sits on, and middleware (a `Next` in its input) into `MiddlewareParams`, read by every route beneath it. An action taking params returns `Result`, since a bad param is the caller's `400`, raised through `?` ahead of the body, and its input is a request (`Request` or `RequestParts`, alone or beside a `Next`); either missing is a compile error, as is a param on an action without `#[derive(Component)]`, whose hook does the declaring.
+The scope is inferred from the input: a plain action declares into `RouteParams`, read by the route it sits on, and middleware (a `Next` in its input) into `SubtreeParams`, read by every route beneath it. An action taking params returns `Result`, since a bad param is the caller's `400`, raised through `?` ahead of the body, and its input is a request (`Request` or `RequestParts`, alone or beside a `Next`), the `RequestParts` when it names none. A missing `Result` is a compile error, as is a param on an action without `#[derive(Component)]`, whose hook does the declaring.
 
 Bevy keeps one `on_add` per component, so the macro emits one generated hook, an associated fn so `Self` and a generic action's type params stay in scope, running in order the author's own `on_add` (taken out of their `#[component(..)]`), the params declaration, the exchange declaration and the provider guard. The exchange declaration is the adapter's: an `#[action(route)]` converts its request through `FromRequest` and its output through `IntoResponseWithRequestParts`, and each conversion declares what it reads, so a route answering a `PageRequest` takes the render params without naming them. The model, the collector, the strict refusal and `--help` are `beet_router`'s README, Params.
 

@@ -90,7 +90,7 @@ pub fn Wasm(
 	let launch = BootstrapConfig {
 		repo,
 		entry,
-		server: server.as_deref().map(RunningSetFilter::new),
+		server: server.as_deref().map(ServerFilter::new),
 		..default()
 	};
 	// the bootstrap only when the page names a launch: a module booting on its

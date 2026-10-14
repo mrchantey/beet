@@ -13,10 +13,9 @@ use beet_core::prelude::*;
 /// ```sh
 /// beet vault/rekey --vault=infra/cert.pem.age --recipients=age1..,age1..
 /// ```
-#[action]
+#[action(route = "rekey")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("rekey"))]
 pub async fn VaultRekey(
 	vault: Params<VaultParams>,
 	/// Who may read the file from now on, comma separated `age1..,age1..`;

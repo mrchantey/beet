@@ -60,11 +60,7 @@ impl DomServer {
 				entity,
 				DOM,
 				move |request: &Request| {
-					RunningSetFilter::selects(
-						request.params(),
-						DOM,
-						default_boot,
-					)
+					ServerFilter::selects(request.params(), DOM, default_boot)
 				},
 				|entity, request, shutdown| {
 					let parts = request.request_parts().clone();

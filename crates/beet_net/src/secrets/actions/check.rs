@@ -19,10 +19,9 @@ use core::fmt::Write;
 /// beet secrets/check
 /// beet secrets/check --document=mail-prod
 /// ```
-#[action]
+#[action(route = "check")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("check"))]
 pub async fn SecretsCheck(
 	document: Params<DocumentParams>,
 	cx: ActionContext<Request>,

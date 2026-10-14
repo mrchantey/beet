@@ -33,7 +33,6 @@
 //! cargo run --example router_serde -- --new
 //! ```
 use beet::prelude::*;
-use serde::Deserialize;
 use serde::Serialize;
 
 const WORLD_SERDE_FILE: &str = "examples/router/router_serde.json";
@@ -47,9 +46,8 @@ fn main() -> AppExit {
 		// script type is missing here would vanish on the second run.
 		.register_type::<Script<(), String>>()
 		.register_type::<ExchangeScript<(), String>>()
-		.register_type::<Script<QueryParams<GreetRequest>, String>>()
-		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
-		)
+		.register_type::<Script<Params<GreetRequest>, String>>()
+		.register_type::<ExchangeScript<Params<GreetRequest>, String, _, _>>()
 		.register_type::<ForkFlag>()
 		.add_systems(Startup, setup)
 		.run()
@@ -62,17 +60,17 @@ struct ForkParams {
 	new: bool,
 }
 
-/// Declares [`ForkParams`] at middleware reach on the router, so every route's
+/// Declares [`ForkParams`] at subtree scope on the router, so every route's
 /// `--help` lists `--new` and the strict server accepts it. A reflected
 /// component, so the declaration survives the fork.
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[component(on_add = MiddlewareParams::declare::<ForkFlag, ForkParams>)]
+#[component(on_add = SubtreeParams::declare::<ForkFlag, ForkParams>)]
 struct ForkFlag;
 
-/// Query params for the scripted greet route, exposed to the
-/// script as `input.name`.
-#[derive(Serialize, Deserialize, TypePath)]
+/// The params of the scripted greet route, exposed to the script as
+/// `input.name`.
+#[derive(Serialize, Reflect)]
 struct GreetRequest {
 	name: String,
 }
@@ -145,11 +143,10 @@ fn route_bundle() -> impl Bundle {
 				PathPartial::new("foo"),
 			),
 			(
-				Script::<QueryParams<GreetRequest>, String>::new(
+				Script::<Params<GreetRequest>, String>::new(
 					r#""hello " + input.name"#,
 				),
-				ExchangeScript::<QueryParams<GreetRequest>, String, _, _>::default(
-				),
+				ExchangeScript::<Params<GreetRequest>, String, _, _>::default(),
 				PathPartial::new("greet"),
 			),
 			// same idea, but the script receives the whole request through the
@@ -159,7 +156,12 @@ fn route_bundle() -> impl Bundle {
 				Script::<Value, Value>::new(
 					r#""hello " + input.params.name[0]"#,
 				),
-				ExchangeScript::<Value, Value, ScriptInputMarker, ScriptAnswerMarker>::default(),
+				ExchangeScript::<
+					Value,
+					Value,
+					ScriptInputMarker,
+					ScriptAnswerMarker,
+				>::default(),
 				PathPartial::new("greet-request"),
 			),
 		],

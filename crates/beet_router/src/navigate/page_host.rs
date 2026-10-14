@@ -535,7 +535,7 @@ mod test {
 	#[beet_core::test]
 	async fn link_in_layouted_content_navigates() {
 		let mut app = nav_app();
-		app.register_template::<SlotLayout>();
+		app.init(SlotLayout::register_template());
 		let router = app
 			.world_mut()
 			.spawn((Router, Layout::of::<SlotLayout>(), children![

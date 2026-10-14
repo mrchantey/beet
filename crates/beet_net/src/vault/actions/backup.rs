@@ -15,10 +15,9 @@ use beet_core::prelude::*;
 /// beet vault/backup --qr
 /// beet vault/backup --out=/media/stick/keys.txt.age
 /// ```
-#[action]
+#[action(route = "backup")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("backup"))]
 pub async fn VaultBackup(
 	/// The file to write; defaults to `beet-identity-<date>.age` in the
 	/// current directory.

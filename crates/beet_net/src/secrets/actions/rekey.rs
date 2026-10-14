@@ -19,10 +19,9 @@ use core::fmt::Write;
 /// beet secrets/rekey                          # every declared document
 /// beet secrets/rekey --document=mail-prod
 /// ```
-#[action]
+#[action(route = "rekey")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("rekey"))]
 pub async fn SecretsRekey(
 	document: Params<DocumentParams>,
 	cx: ActionContext<Request>,

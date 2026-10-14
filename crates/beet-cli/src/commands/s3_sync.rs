@@ -1,22 +1,5 @@
 use beet::prelude::*;
 
-/// Request params for the [`SyncS3`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct SyncS3Params {
-	/// Source path, a local directory or an `s3://` URI.
-	src: String,
-	/// Destination path, a local directory or an `s3://` URI.
-	dst: String,
-	/// Delete destination files not present in the source.
-	delete: bool,
-	/// Print what would change without syncing.
-	dry_run: bool,
-	/// AWS region, defaults to the CLI's configured region.
-	region: Option<String>,
-	/// Skip request signing, for anonymous access to public buckets.
-	no_sign_request: bool,
-}
-
 /// Syncs a directory between the local filesystem and S3 via `aws s3 sync`.
 ///
 /// `--src` and `--dst` are the endpoints, one local and one an `s3://` URI; the
@@ -32,31 +15,47 @@ struct SyncS3Params {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn SyncS3(
-	params: Params<SyncS3Params>,
-	_parts: RequestParts,
+	/// Source path, a local directory or an `s3://` URI.
+	#[param]
+	src: String,
+	/// Destination path, a local directory or an `s3://` URI.
+	#[param]
+	dst: String,
+	/// Delete destination files not present in the source.
+	#[param]
+	delete: bool,
+	/// Print what would change without syncing.
+	#[param]
+	dry_run: bool,
+	/// AWS region, defaults to the CLI's configured region.
+	#[param]
+	region: Option<String>,
+	/// Skip request signing, for anonymous access to public buckets.
+	#[param]
+	no_sign_request: bool,
 ) -> Result<String> {
-	if !AwsCli::is_s3_uri(&params.src) && !AwsCli::is_s3_uri(&params.dst) {
+	if !AwsCli::is_s3_uri(&src) && !AwsCli::is_s3_uri(&dst) {
 		bevybail!(
 			"expected one of --src/--dst to be an s3:// URI, got {} and {}",
-			params.src,
-			params.dst
+			src,
+			dst
 		);
 	}
 
-	let mut cli = AwsCli::new().with_no_sign_request(params.no_sign_request);
-	if let Some(region) = &params.region {
+	let mut cli = AwsCli::new().with_no_sign_request(no_sign_request);
+	if let Some(region) = &region {
 		cli = cli.with_region(region.as_str());
 	}
 
 	S3Sync {
 		cli,
-		src: params.src.clone(),
-		dst: params.dst.clone(),
-		delete: params.delete,
-		dry_run: params.dry_run,
+		src: src.clone(),
+		dst: dst.clone(),
+		delete,
+		dry_run,
 		..default()
 	}
 	.send()
 	.await?;
-	Ok(format!("synced {} -> {}", params.src, params.dst))
+	Ok(format!("synced {} -> {}", src, dst))
 }

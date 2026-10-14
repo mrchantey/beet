@@ -13,10 +13,9 @@ use beet_core::prelude::*;
 /// beet vault/decrypt --vault=infra/cert.pem.age
 /// beet vault/decrypt --vault=~/keys/id_ed25519.age --out=/tmp/id_ed25519
 /// ```
-#[action]
+#[action(route = "decrypt")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("decrypt"))]
 pub async fn VaultDecrypt(
 	vault: Params<VaultParams>,
 	/// Write the plaintext to this file, owner-only, instead of printing it:

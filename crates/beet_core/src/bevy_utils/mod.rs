@@ -19,6 +19,7 @@
 //!
 //! # Systems and Plugins
 //!
+//! - [`Initializer`] - A value an [`App`] consumes to set itself up
 //! - [`OnSpawn`] - Run logic when entities are spawned
 //! - [`When`] - Conditional system execution
 //! - [`NonSendPlugin`] - Plugin trait for non-send resources
@@ -54,6 +55,7 @@ mod despawn_after;
 mod entity_target_event;
 mod group;
 pub mod hook_ext;
+mod initializer;
 mod non_send_plugin;
 mod required_field;
 mod subtree_trigger;
@@ -90,6 +92,7 @@ pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use group::*;
+pub use initializer::*;
 pub use non_send_plugin::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]

@@ -70,11 +70,7 @@ impl SshTuiServer {
 				entity,
 				"ssh",
 				move |request: &Request| {
-					RunningSetFilter::selects(
-						request.params(),
-						"ssh",
-						default_boot,
-					)
+					ServerFilter::selects(request.params(), "ssh", default_boot)
 				},
 				move |entity, request, shutdown| {
 					// the future owns what it needs, so nothing borrows the input
@@ -946,7 +942,7 @@ mod test {
 	/// An SSH-TUI server root opening on `home`, its router child carrying the
 	/// drawer layout and serving that one route. Returns the server entity.
 	fn spawn_drawer_router(app: &mut App) -> Entity {
-		app.register_template::<DrawerLayout>();
+		app.init(DrawerLayout::register_template());
 		app.world_mut()
 			.spawn((
 				SshTuiServer::default(),
@@ -1454,7 +1450,7 @@ mod test {
 		/// The page the stress sessions browse: the shared drawer chrome every
 		/// deployed page has, wrapped around a body that fills the window.
 		fn spawn_stress_router(app: &mut App) -> Entity {
-			app.register_template::<DrawerLayout>();
+			app.init(DrawerLayout::register_template());
 			app.world_mut()
 				.spawn((
 					SshTuiServer::default(),

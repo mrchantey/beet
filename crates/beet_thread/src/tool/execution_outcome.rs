@@ -1,9 +1,9 @@
 use beet_core::prelude::*;
 
-/// Parameters for the execution outcome tool.
+/// The props for the execution outcome tool.
 /// Used by a model to confirm or deny that a process was successful.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct ExecutionOutcomeParams {
+pub struct ExecutionOutcomeProps {
 	/// Whether the execution passed or failed.
 	pub passed: bool,
 	/// Description of what went wrong, required when `passed` is false.
@@ -14,12 +14,12 @@ pub struct ExecutionOutcomeParams {
 /// A tool giving a model the opportunity to confirm success
 /// or produce an error when a process behaved incorrectly.
 ///
-/// The params above are plain data; only the tool itself is an action.
+/// The props above are plain data; only the tool itself is an action.
 #[cfg(feature = "action")]
 #[action]
 #[derive(Component, Reflect)]
 pub async fn ExecutionOutcome(
-	cx: ActionContext<ExecutionOutcomeParams>,
+	cx: ActionContext<ExecutionOutcomeProps>,
 ) -> Result<()> {
 	if cx.input.passed {
 		Ok(())

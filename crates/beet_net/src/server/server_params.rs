@@ -31,7 +31,7 @@ pub struct ServerParams {
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 pub struct BootParams {
 	/// Which declared servers boot, comma separated, eg `http,ssh`.
-	pub server: Option<RunningSetFilter>,
+	pub server: Option<ServerFilter>,
 }
 
 impl ServerParams {

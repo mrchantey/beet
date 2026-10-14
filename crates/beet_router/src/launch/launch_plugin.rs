@@ -84,7 +84,7 @@ fn load_entry(world: &mut World) {
 			return;
 		}
 	};
-	if let Some(check) = features_self_check(&args, &config, forwards_argv) {
+	if let Some(check) = features_self_check(&config, forwards_argv) {
 		world.spawn(check);
 	}
 	// the recognized template formats (`.bsx`, `.js`), read once here so the async
@@ -184,29 +184,23 @@ async fn build_entry(
 		.await
 }
 
-/// The `--features` flag as a [`RequireCfg`]: verify this binary was compiled
-/// with the named cargo features, failing with the full missing list rather
-/// than degrading into unresolved tags. Applies when running an entry (an
-/// explicit `--entry`, or no positional command); the wasm runner forwards the
-/// module's flags untouched. No route reads `--features`, the launch only knobs
-/// never reaching the request ([`BootstrapConfig::strip`]), so a command
-/// building another binary names its cargo features otherwise, ie `beet
-/// build-wasm --cargo-features=..`.
+/// The `--required-features` knob as a [`RequireCfg`]: verify this binary was
+/// compiled with the named cargo features, failing with the full missing list
+/// rather than degrading into unresolved tags. The wasm runner forwards its
+/// module's knobs untouched, so those are the module's to check.
 ///
-/// The flag is a list, so it lowers to a conjunction of `feature:` atoms, which
+/// The knob is a list, so it lowers to a conjunction of `feature:` atoms, which
 /// is the same condition an entry would have written by hand.
 fn features_self_check(
-	args: &CliArgs,
 	config: &BootstrapConfig,
 	forwards_argv: bool,
 ) -> Option<RequireCfg> {
-	let runs_entry = config.entry.is_some() || args.path.is_empty();
-	if forwards_argv || !runs_entry || config.features.is_empty() {
+	if forwards_argv || config.required_features.is_empty() {
 		return None;
 	}
 	Some(RequireCfg::new(
 		config
-			.features
+			.required_features
 			.iter()
 			.map(|feature| format!("feature:{feature}"))
 			.collect::<Vec<_>>()

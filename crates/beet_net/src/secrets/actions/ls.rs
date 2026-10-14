@@ -16,10 +16,9 @@ use core::fmt::Write;
 /// beet secrets/ls --document=mail-prod    # a declared label
 /// beet secrets/ls --document=~/personal.toml
 /// ```
-#[action]
+#[action(route = "ls")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("ls"))]
 pub async fn SecretsLs(
 	document: Params<DocumentParams>,
 	cx: ActionContext<Request>,

@@ -13,7 +13,7 @@
 //! stdout and the process exits); a long-running [`HttpServer`] / `TuiServer`
 //! holds its facet open, persisting the process until that `Running` is removed,
 //! which signals every live facet. `--server` selects which servers act (see
-//! [`RunningSetFilter`]), and a selection matching none fails the call rather
+//! [`ServerFilter`]), and a selection matching none fails the call rather
 //! than parking. The dispatch host (a `Router`) is a child, reached with
 //! `exchange_child`. See [`call_on_ready`] and
 //! [`RunningSet`](beet_action::prelude::RunningSet) for the model.

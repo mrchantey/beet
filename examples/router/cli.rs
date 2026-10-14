@@ -20,7 +20,6 @@
 //! cargo run --example cli -- greet-request --name=world
 //! ```
 use beet::prelude::*;
-use serde::Deserialize;
 use serde::Serialize;
 
 fn main() -> AppExit {
@@ -30,9 +29,9 @@ fn main() -> AppExit {
 		.run()
 }
 
-/// Query params for the scripted greet route, exposed to the
-/// script as `input.name`.
-#[derive(Serialize, Deserialize)]
+/// The params of the scripted greet route, exposed to the script as
+/// `input.name`.
+#[derive(Serialize, Reflect)]
 struct GreetRequest {
 	name: String,
 }
@@ -41,44 +40,39 @@ fn setup(mut commands: Commands) {
 	commands.spawn((
 		CliServer::default(),
 		children![(Router::with_defaults(), children![
-						route::exchange(
-							"",
-							Action::<(), &str>::new_pure(|_| { "hello world" })
-						),
-						route::exchange(
-							"foo",
-							Action::<(), &str>::new_pure(|_| { "hello foo" })
-						),
-						// a `Script` is pure data, so pair it with an `ExchangeScript` to
-						// make the entity a dispatchable route.
-						(
-							Script::<QueryParams<GreetRequest>, String>::new(
-								r#""hello " + input.name"#,
-							),
-							ExchangeScript::<
-								QueryParams<GreetRequest>,
-								String,
-								_,
-								_,
-							>::default(),
-							PathPartial::new("greet"),
-						),
-						// same idea, but the script receives the whole request through the
-						// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
-						// authors) and digs out the `name` query parameter itself.
-						(
-							Script::<Value, Value>::new(
-								r#""hello " + input.params.name[0]"#,
-							),
-							ExchangeScript::<
-								Value,
-								Value,
-								ScriptInputMarker,
-								ScriptAnswerMarker,
-							>::default(),
-							PathPartial::new("greet-request"),
-						),
-					])],
+			route::exchange(
+				"",
+				Action::<(), &str>::new_pure(|_| { "hello world" })
+			),
+			route::exchange(
+				"foo",
+				Action::<(), &str>::new_pure(|_| { "hello foo" })
+			),
+			// a `Script` is pure data, so pair it with an `ExchangeScript` to
+			// make the entity a dispatchable route.
+			(
+				Script::<Params<GreetRequest>, String>::new(
+					r#""hello " + input.name"#,
+				),
+				ExchangeScript::<Params<GreetRequest>, String, _, _>::default(),
+				PathPartial::new("greet"),
+			),
+			// same idea, but the script receives the whole request through the
+			// script input shape (`{ path, params, body }`, what `<ScriptRoute>`
+			// authors) and digs out the `name` query parameter itself.
+			(
+				Script::<Value, Value>::new(
+					r#""hello " + input.params.name[0]"#,
+				),
+				ExchangeScript::<
+					Value,
+					Value,
+					ScriptInputMarker,
+					ScriptAnswerMarker,
+				>::default(),
+				PathPartial::new("greet-request"),
+			),
+		])],
 		CallOnReady::on_spawn(),
 	));
 }

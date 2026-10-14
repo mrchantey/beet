@@ -117,7 +117,7 @@ The `examples,ml` feature only gates windowed scene code (now scene modules in `
 
 The no-code `.bsx` scenes run through the installed beet CLI (when editing rust, `cargo run -p beet-cli --features=.. -- <args>` instead, so the scenes run against the working tree). Each entry documents its own `beet --entry=..` command in its header, and an entry that declares its hard requirements with `<RequireCfg>` fails fast on a leaner binary, naming what is missing. The self-terminating ones render and exit:
 
-A documented command never carries `--features`: that is the entry's own `<RequireCfg>`'s job. The binary still has to *link* the capability though, and the demo scenes name actions from `beet_extra`, which is the `extra` cargo feature. Build the CLI once with what the set needs and run everything against it:
+A documented command never carries `--required-features`: that is the entry's own `<RequireCfg>`'s job. The binary still has to *link* the capability though, and the demo scenes name actions from `beet_extra`, which is the `extra` cargo feature. Build the CLI once with what the set needs and run everything against it:
 
 ```sh
 cargo build -p beet-cli --features=extra        # every scene below except the ml one

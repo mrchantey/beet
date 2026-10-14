@@ -33,14 +33,14 @@ impl Plugin for PerceiveActPlugin {
 			.register_type::<SceneOrder>()
 			.register_type::<ScenePrompt>()
 			.add_systems(Update, sync_image_options)
-			.register_template::<MockHead>()
-			.register_template::<MockBody>()
-			.register_template::<RobotStreamer>();
+			.init(MockHead::register_template())
+			.init(MockBody::register_template())
+			.init(RobotStreamer::register_template());
 		// the wgpu render body (v2): the driven fox and its `drive` handler, so
 		// `<WgpuBody/>` resolves once the render stack is linked.
 		#[cfg(feature = "bevy_default")]
 		app.register_type::<DriveFox>()
-			.register_template::<WgpuBody>();
+			.init(WgpuBody::register_template());
 	}
 }
 

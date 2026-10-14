@@ -13,9 +13,9 @@
 //! - [`Url`] / [`Scheme`]: URL representation and transport scheme
 //! - [`Body`]: Request/response body (bytes or stream)
 //! - [`PathPattern`]: URL pattern matching
-//! - [`RouteParams`] / [`MiddlewareParams`]: a reader declares a param by
-//!   taking it, and a route's params are the union over everything that runs
-//!   for it, collected into its [`ParamsPattern`]
+//! - [`Params`] / [`RouteParams`] / [`SubtreeParams`]: an extractor declares a
+//!   param by taking it, and a route's params are the union over everything
+//!   that runs for it, collected into its [`ParamsPattern`]
 //!
 //! ## Exchange Patterns
 //!

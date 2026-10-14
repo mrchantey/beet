@@ -19,16 +19,16 @@ use core::str::FromStr;
 ///
 /// ```
 /// # use beet_core::prelude::*;
-/// let filter: RunningSetFilter = "http,ssh".parse().unwrap();
+/// let filter: ServerFilter = "http,ssh".parse().unwrap();
 /// filter.passes("http").xpect_true();
 /// filter.passes("cli").xpect_false();
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 #[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RunningSetFilter(Vec<SmolStr>);
+pub struct ServerFilter(Vec<SmolStr>);
 
-impl RunningSetFilter {
+impl ServerFilter {
 	/// The one name this selection travels under: the `--server` flag on a boot
 	/// request and, as `BEET_SERVER`, the [`BootstrapConfig`] knob a deploy
 	/// renders. Declared once so the deploy's rendered argv and a booting
@@ -97,12 +97,12 @@ impl RunningSetFilter {
 	}
 }
 
-impl FromStr for RunningSetFilter {
+impl FromStr for ServerFilter {
 	type Err = core::convert::Infallible;
 	fn from_str(value: &str) -> Result<Self, Self::Err> { Ok(Self::new(value)) }
 }
 
-impl fmt::Display for RunningSetFilter {
+impl fmt::Display for ServerFilter {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		for (index, name) in self.0.iter().enumerate() {
 			if index > 0 {
@@ -121,7 +121,7 @@ mod test {
 	#[crate::test]
 	fn round_trips() {
 		for value in ["http", "http,ssh", "*-tui,cli", ""] {
-			RunningSetFilter::new(value).to_string().xpect_eq(value);
+			ServerFilter::new(value).to_string().xpect_eq(value);
 		}
 	}
 
@@ -129,7 +129,7 @@ mod test {
 	/// selects the same pair as `--server=http,ssh`.
 	#[crate::test]
 	fn trims_and_drops_empty() {
-		RunningSetFilter::new("http, ssh,")
+		ServerFilter::new("http, ssh,")
 			.to_string()
 			.xpect_eq("http,ssh");
 	}
@@ -137,20 +137,14 @@ mod test {
 	/// An empty selection is present but unconstrained, so it passes everything.
 	#[crate::test]
 	fn empty_passes_all() {
-		RunningSetFilter::default().passes("anything").xpect_true();
+		ServerFilter::default().passes("anything").xpect_true();
 	}
 
 	#[crate::test]
 	fn globs_match() {
-		RunningSetFilter::new("http,ssh")
-			.passes("http")
-			.xpect_true();
-		RunningSetFilter::new("http,ssh")
-			.passes("cli")
-			.xpect_false();
-		RunningSetFilter::new("*-tui")
-			.passes("ssh-tui")
-			.xpect_true();
+		ServerFilter::new("http,ssh").passes("http").xpect_true();
+		ServerFilter::new("http,ssh").passes("cli").xpect_false();
+		ServerFilter::new("*-tui").passes("ssh-tui").xpect_true();
 	}
 
 	/// An absent `--server` is no selection at all (each server's `default_boot`
@@ -159,7 +153,7 @@ mod test {
 	#[crate::test]
 	fn reads_params() {
 		let from = |args: &str| {
-			RunningSetFilter::from_params(&CliArgs::parse(args).params)
+			ServerFilter::from_params(&CliArgs::parse(args).params)
 		};
 		from("").xpect_none();
 		from("--server").unwrap().passes("http").xpect_true();
@@ -175,7 +169,7 @@ mod test {
 	#[crate::test]
 	fn selects_reads_the_filter() {
 		let selects = |args: &str, name: &str, default_boot: bool| {
-			RunningSetFilter::selects(
+			ServerFilter::selects(
 				&CliArgs::parse(args).params,
 				name,
 				default_boot,

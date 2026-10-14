@@ -247,7 +247,7 @@ mod tests {
 				query.of(entity)
 			})
 			.unwrap();
-		pattern.contains("cargo-features").xpect_true();
+		pattern.contains("features").xpect_true();
 		pattern.contains("out").xpect_true();
 	}
 }

@@ -94,14 +94,14 @@ pub impl App {
 
 	/// Initializes and runs a single update, then returns the exit status.
 	fn run_once(&mut self) -> Option<AppExit> {
-		self.init();
+		self.finish_plugins();
 		self.update();
 		self.should_exit()
 	}
 
 	/// Runs the app in a loop without breaks, useful for nested apps in wasm.
 	fn run_loop(&mut self) -> AppExit {
-		self.init();
+		self.finish_plugins();
 		loop {
 			self.update();
 			if let Some(exit_code) = self.should_exit() {
@@ -163,9 +163,10 @@ pub impl App {
 		task.await
 	}
 
-	/// Ensures the app is fully initialized before updates.
+	/// Waits for every plugin to be ready, then finishes and cleans them up,
+	/// so the app is fully built before its first update.
 	// from bevy_app https://github.com/bevyengine/bevy/blob/a1f4e56610c090b44f8b4a8f3eb56aeda5eb9669/crates/bevy_app/src/app.rs#L1392
-	fn init(&mut self) -> &mut Self {
+	fn finish_plugins(&mut self) -> &mut Self {
 		while self.plugins_state() == PluginsState::Adding {
 			#[cfg(not(target_arch = "wasm32"))]
 			bevy::tasks::tick_global_task_pools_on_main_thread();

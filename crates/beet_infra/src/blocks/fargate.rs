@@ -1339,7 +1339,7 @@ mod tests {
 	fn splits_cmd_and_secret_channels() {
 		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
 			repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
-			server: Some(RunningSetFilter::new("http,ssh")),
+			server: Some(ServerFilter::new("http,ssh")),
 			stage: "staging".into(),
 			..default()
 		});

@@ -240,7 +240,7 @@ fn add_domain(table: &mut Table) {
 			"server names, comma separated, eg \"http,ssh\"",
 			|value: &Value| match value {
 				Value::Str(names) => {
-					Ok(Some(RunningSetFilter::new(names.as_str())))
+					Ok(Some(ServerFilter::new(names.as_str())))
 				}
 				Value::List(items) => items
 					.iter()
@@ -251,7 +251,7 @@ fn add_domain(table: &mut Table) {
 					.collect::<Option<Vec<_>>>()
 					.map(|names| {
 						names.into_iter().fold(
-							RunningSetFilter::default(),
+							ServerFilter::default(),
 							|mut filter, names| {
 								filter.extend(names);
 								filter

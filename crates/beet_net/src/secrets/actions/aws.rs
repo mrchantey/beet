@@ -38,10 +38,9 @@ use beet_core::prelude::*;
 /// `~/.aws/credentials` that every tool on the machine read without being
 /// asked. This reads one sealed document, hands two variables to one child, and
 /// authenticates nothing else.
-#[action]
+#[action(route = "aws")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("aws"))]
 pub async fn AwsExec(
 	/// The aws cli arguments, everything after `--`.
 	#[param]

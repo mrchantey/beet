@@ -12,10 +12,9 @@ use std::path::PathBuf;
 /// ```sh
 /// beet vault/restore-identity --file=/media/stick/beet-identity-2026-09-17.age
 /// ```
-#[action]
+#[action(route = "restore-identity")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("restore-identity"))]
 pub async fn VaultRestoreIdentity(
 	/// The backup `vault/backup` wrote.
 	#[param]

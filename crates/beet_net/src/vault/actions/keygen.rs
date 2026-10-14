@@ -13,10 +13,9 @@ use std::path::PathBuf;
 /// beet vault/keygen
 /// beet vault/keygen --out=/tmp/keys.txt
 /// ```
-#[action]
+#[action(route = "keygen")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("keygen"))]
 pub async fn VaultKeygen(
 	/// The identity file to append to; defaults to the OS config,
 	/// `~/.config/beet/age/keys.txt`.

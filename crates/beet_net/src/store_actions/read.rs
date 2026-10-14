@@ -4,9 +4,9 @@ use beet_core::prelude::*;
 const DEFAULT_MAX_LINES: usize = 2000;
 const DEFAULT_MAX_BYTES: usize = 50 * 1024; // 50KB
 
-/// Parameters for reading a blob from a store.
+/// The props for reading a blob from a store.
 #[derive(Debug, Clone, Reflect, serde::Serialize, serde::Deserialize)]
-pub struct ReadBlobParams {
+pub struct ReadBlobProps {
 	/// Path to the blob to read.
 	pub path: RelPath,
 	/// Line offset to start reading from (0-indexed).
@@ -22,7 +22,7 @@ pub struct ReadBlobParams {
 /// - Byte limit (default: 50KB)
 #[action]
 #[derive(Component, Reflect)]
-pub async fn ReadBlob(cx: ActionContext<ReadBlobParams>) -> Result<MediaBytes> {
+pub async fn ReadBlob(cx: ActionContext<ReadBlobProps>) -> Result<MediaBytes> {
 	let store = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, query| {

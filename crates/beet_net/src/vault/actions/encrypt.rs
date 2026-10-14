@@ -5,22 +5,6 @@ use super::write_recipients;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`VaultEncrypt`], surfaced in `--help`.
-#[derive(Reflect)]
-struct EncryptParams {
-	/// The plaintext file to encrypt; absent, stdin is read to its end.
-	file: Option<String>,
-	/// Encrypt to a group's recipients as a secrets document lists them:
-	/// the declared document's, or `--document`'s.
-	group: Option<String>,
-	/// The document `--group` reads, a declared label or a path; absent,
-	/// the declared document.
-	document: Option<String>,
-	/// Who may read the file, comma separated `age1..,age1..`; absent (and
-	/// no `--group`), this identity file's own recipients.
-	recipients: Option<String>,
-}
-
 /// Encrypt a plaintext file (or piped stdin) into the age file `--vault`
 /// names, replacing what it held: a key, a certificate, any bytes. A secret
 /// with a name and a role belongs in the secrets document instead. The
@@ -33,30 +17,42 @@ struct EncryptParams {
 /// beet vault/encrypt --vault=infra/cert.pem.age --file=cert.pem --group=default
 /// cat id_ed25519 | beet vault/encrypt --vault=~/keys/id_ed25519.age --recipients=age1..
 /// ```
-#[action]
+#[action(route = "encrypt")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(PathPartial = PathPartial::new("encrypt"))]
 pub async fn VaultEncrypt(
 	vault: Params<VaultParams>,
-	params: Params<EncryptParams>,
+	/// The plaintext file to encrypt; absent, stdin is read to its end.
+	#[param]
+	file: Option<String>,
+	/// Encrypt to a group's recipients as a secrets document lists them:
+	/// the declared document's, or `--document`'s.
+	#[param]
+	group: Option<String>,
+	/// The document `--group` reads, a declared label or a path; absent,
+	/// the declared document.
+	#[param]
+	document: Option<String>,
+	/// Who may read the file, comma separated `age1..,age1..`; absent (and
+	/// no `--group`), this identity file's own recipients.
+	#[param]
+	recipients: Option<String>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let plaintext = match &params.file {
+	let plaintext = match &file {
 		Some(file) => fs_ext::read(file)?,
 		None => read_stdin()?,
 	};
 	let vault = vault.resolve()?;
-	let recipients = match &params.group {
+	let recipients = match &group {
 		Some(group) => {
-			if params.recipients.is_some() {
+			if recipients.is_some() {
 				bevybail!("pass `--group` or `--recipients`, not both");
 			}
-			group_recipients(&cx.caller, params.document.as_deref(), group)
-				.await?
+			group_recipients(&cx.caller, document.as_deref(), group).await?
 		}
 		None => write_recipients(
-			params.recipients.as_deref(),
+			recipients.as_deref(),
 			&AgeIdentityFile::require()?,
 		)?,
 	};

@@ -109,7 +109,7 @@ Every example documents itself with a `beet` command, eg:
 beet --entry=examples/hello
 ```
 
-`--features` verifies the installed binary was compiled with those cargo features, and entries declare their own requirements with `<RequireCfg>`, so a leaner install fails fast with the full missing list instead of unresolved tags.
+`--required-features` verifies the installed binary was compiled with those cargo features, and entries declare their own requirements with `<RequireCfg>`, so a leaner install fails fast with the full missing list instead of unresolved tags.
 
 ## Local Development
 

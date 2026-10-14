@@ -1,116 +1,118 @@
-//! A reader declares the params it reads by taking them.
+//! An extractor declares the params it reads by taking them.
 //!
-//! An `#[action]` taking `#[param]` arguments or a `Params<T>` lands its
-//! [`ParamsDeclaration`] in one of two lists on its entity, chosen by its
-//! reach: [`RouteParams`] for a plain action, read by the route it sits on, and
-//! [`MiddlewareParams`] for middleware and servers, read by every route
-//! beneath them. A reader that is not an action declares from its plugin with
-//! [`DeclareParamsAppExt::declare_params`].
+//! An `#[action]` taking `#[param]` arguments, a `Params<T>` or an
+//! [`AnyParams`] lands its [`ParamsDeclaration`] in one of two lists on its
+//! entity, chosen by its [`ParamsScope`]: [`RouteParams`] for a plain action,
+//! read by the route it sits on, and [`SubtreeParams`] for middleware and
+//! servers, read by every route beneath them. An extractor that is not an
+//! action declares from its plugin with the initializer
+//! [`declare_on`](SubtreeParams::declare_on).
 use super::*;
 use beet_core::prelude::*;
 use bevy::reflect::TypeInfo;
 use bevy::reflect::Typed;
 use core::any::TypeId;
 
-/// The params the readers on a route entity, or on one of its steps, declare:
-/// read by that route alone, see the [module](self) docs.
+/// The params the extractors on a route entity, or on one of its steps,
+/// declare: read by that route alone, see the [module](self) docs.
 ///
-/// Derived from the readers rather than authored, so never `Reflect`: each
-/// reader's hook rebuilds it on a scene load, as [`MiddlewareParams`] is.
+/// Derived from the extractors rather than authored, so never `Reflect`: each
+/// extractor's hook rebuilds it on a scene load.
 #[derive(Debug, Default, Clone, PartialEq, Deref, Component)]
 pub struct RouteParams(Vec<ParamsDeclaration>);
 
 /// The params the middleware and servers on an entity declare: read by every
-/// route at or beneath it, see the [module](self) docs.
+/// route in the subtree it heads, see the [module](self) docs.
 ///
-/// Derived from the readers rather than authored, so never `Reflect`, see
+/// Derived from the extractors rather than authored, so never `Reflect`, see
 /// [`RouteParams`].
 #[derive(Debug, Default, Clone, PartialEq, Deref, Component)]
-pub struct MiddlewareParams(Vec<ParamsDeclaration>);
+pub struct SubtreeParams(Vec<ParamsDeclaration>);
 
 /// Which list a [`ParamsDeclaration`] lands in, and so which routes it
 /// reaches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Reach {
-	/// The route the reader sits on, or runs as a step of: [`RouteParams`].
+pub enum ParamsScope {
+	/// The route the extractor sits on, or runs as a step of: [`RouteParams`].
 	Route,
-	/// Every route at or beneath the reader: [`MiddlewareParams`].
-	Middleware,
+	/// Every route at or beneath the extractor: [`SubtreeParams`].
+	Subtree,
 }
 
-/// The params one reader takes: its short type name, the [`ParamMeta`] of
-/// each, and whether it takes the rest ([`Rest`]).
+/// The params one extractor takes: its short type name, the [`ParamMeta`] of
+/// each, and whether it takes any param ([`AnyParams`]).
 #[derive(Debug, Clone, PartialEq, Get)]
 pub struct ParamsDeclaration {
-	/// The reader's short type name, ie `CliServer`.
-	reader: SmolStr,
-	/// Each param the reader takes, in declaration order.
+	/// The extractor's short type name, ie `CliServer`.
+	name: SmolStr,
+	/// Each param the extractor takes, in declaration order.
 	metas: Vec<ParamMeta>,
-	/// Whether the reader takes every param, see [`Rest`].
+	/// Whether the extractor takes any param, see [`AnyParams`].
 	#[get(copy)]
-	rest: bool,
+	takes_any: bool,
 }
 
 impl ParamsDeclaration {
-	/// The params `T` declares, read by `Reader`: a struct, or a tuple of
-	/// structs, a [`Rest`] member marking the reader a rest taker.
+	/// The params `T` declares, read by `Extractor`: a struct, or a tuple of
+	/// structs, an [`AnyParams`] member marking the extractor as taking any.
 	///
 	/// ## Panics
 	///
 	/// Panics if `T` is not a struct or tuple of structs, see [`ParamMeta::of`].
-	pub fn new<Reader: ?Sized, T: FromReflect + Typed>() -> Self {
+	pub fn new<Extractor: ?Sized, T: FromReflect + Typed>() -> Self {
 		let mut metas = Vec::new();
-		let rest = ParamMeta::walk(T::type_info(), &mut metas).unwrap();
-		Self::named(type_ext::short_name::<Reader>(), metas, rest)
+		let takes_any = ParamMeta::walk(T::type_info(), &mut metas).unwrap();
+		Self::named(type_ext::short_name::<Extractor>(), metas, takes_any)
 	}
 
-	/// The params a reader built from data takes, ie an `ExchangeGroup`'s
-	/// force flag, named by `reader`.
+	/// The params an extractor built from data takes, ie an `ExchangeGroup`'s
+	/// force flag, under `name`.
 	pub fn named(
-		reader: impl Into<SmolStr>,
+		name: impl Into<SmolStr>,
 		metas: impl IntoIterator<Item = ParamMeta>,
-		rest: bool,
+		takes_any: bool,
 	) -> Self {
 		Self {
-			reader: reader.into(),
+			name: name.into(),
 			metas: metas.into_iter().collect(),
-			rest,
+			takes_any,
 		}
 	}
 
-	/// A declaration of nothing, read by `Reader`.
-	pub fn empty<Reader: ?Sized>() -> Self {
-		Self::named(type_ext::short_name::<Reader>(), [], false)
+	/// A declaration of nothing, by `Extractor`.
+	pub fn empty<Extractor: ?Sized>() -> Self {
+		Self::named(type_ext::short_name::<Extractor>(), [], false)
 	}
 
-	/// Whether this declares no param and does not take the rest.
-	pub fn is_empty(&self) -> bool { self.metas.is_empty() && !self.rest }
+	/// Whether this declares no param and does not take any.
+	pub fn is_empty(&self) -> bool { self.metas.is_empty() && !self.takes_any }
 
-	/// This declaration with `other`'s params added, keeping this reader.
+	/// This declaration with `other`'s params added, keeping this name.
 	pub fn with(mut self, other: Self) -> Self {
 		self.metas.extend(other.metas);
-		self.rest |= other.rest;
+		self.takes_any |= other.takes_any;
 		self
 	}
 }
 
-/// The identical API of both reach lists, one per `$reach`.
-macro_rules! reach_list {
-	($list:ident, $reach:literal) => {
+/// The identical API of both scope lists, one per `$scope`.
+macro_rules! scope_list {
+	($list:ident, $scope:literal) => {
 		impl $list {
-			/// The list holding `T`'s params read by `T`, for a reader declared
-			/// by hand, ie a closure route in a test.
+			/// The list holding `T`'s params read by `T`, for an extractor
+			/// declared by hand, ie a closure route in a test.
 			pub fn new<T: FromReflect + Typed>() -> Self {
 				Self(vec![ParamsDeclaration::new::<T, T>()])
 			}
 
-			/// Add `declaration`, replacing an earlier one by the same reader in
-			/// place, so a hook re-run on a scene load lists the reader once.
+			/// Add `declaration`, replacing an earlier one by the same
+			/// extractor in place, so a hook re-run on a scene load lists the
+			/// extractor once.
 			pub fn push(&mut self, declaration: ParamsDeclaration) {
 				match self
 					.0
 					.iter_mut()
-					.find(|existing| existing.reader == declaration.reader)
+					.find(|existing| existing.name == declaration.name)
 				{
 					Some(existing) => *existing = declaration,
 					None => self.0.push(declaration),
@@ -118,19 +120,55 @@ macro_rules! reach_list {
 			}
 
 			#[doc = concat!(
-								"The `on_add` hook declaring that `Reader` reads `T` at ",
-								$reach,
-								" reach, see [`push_on`](Self::push_on)."
+								"The `on_add` hook declaring that `Extractor` reads `T` at ",
+								$scope,
+								" scope, see [`push_on`](Self::push_on)."
 							)]
-			pub fn declare<Reader: Component, T: FromReflect + Typed>(
+			pub fn declare<Extractor: Component, T: FromReflect + Typed>(
 				mut world: DeferredWorld,
 				cx: HookContext,
 			) {
 				Self::queue_push(
 					&mut world.commands(),
 					cx.entity,
-					ParamsDeclaration::new::<Reader, T>(),
+					ParamsDeclaration::new::<Extractor, T>(),
 				);
+			}
+
+			#[doc = concat!(
+								"The [`Initializer`] declaring that `Extractor` reads `T` at ",
+								$scope,
+								" scope, on every entity `Extractor` is inserted on: the \
+				 declaration of an extractor that is not an `#[action]`, ie a \
+				 server, made by the plugin registering it."
+							)]
+			pub fn declare_on<Extractor: Component, T: FromReflect + Typed>()
+			-> impl Initializer {
+				Self::declare_on_with::<Extractor>(ParamsDeclaration::new::<
+					Extractor,
+					T,
+				>())
+			}
+
+			/// [`declare_on`](Self::declare_on) with an explicit
+			/// `declaration`, for params read by something named apart from
+			/// the component it lands with, ie the color scheme `PageClasses`
+			/// reads beneath a `Layout`.
+			pub fn declare_on_with<Extractor: Component>(
+				declaration: ParamsDeclaration,
+			) -> impl Initializer {
+				move |app: &mut App| {
+					app.add_observer(
+						move |ev: On<Insert<Extractor>>,
+						      mut commands: Commands| {
+							Self::queue_push(
+								&mut commands,
+								ev.entity,
+								declaration.clone(),
+							);
+						},
+					);
+				}
 			}
 
 			/// Push `declaration` into the list on `entity` now.
@@ -167,11 +205,11 @@ macro_rules! reach_list {
 	};
 }
 
-reach_list!(RouteParams, "route");
-reach_list!(MiddlewareParams, "middleware");
+scope_list!(RouteParams, "route");
+scope_list!(SubtreeParams, "subtree");
 
-impl Reach {
-	/// Push `declaration` into the list this reach names on `entity` now, ie
+impl ParamsScope {
+	/// Push `declaration` into the list this scope names on `entity` now, ie
 	/// from a bundle effect.
 	pub fn push(
 		self,
@@ -180,11 +218,11 @@ impl Reach {
 	) {
 		match self {
 			Self::Route => RouteParams::push_on(entity, declaration),
-			Self::Middleware => MiddlewareParams::push_on(entity, declaration),
+			Self::Subtree => SubtreeParams::push_on(entity, declaration),
 		}
 	}
 
-	/// Queue `declaration` into the list this reach names on `entity`, ie
+	/// Queue `declaration` into the list this scope names on `entity`, ie
 	/// from a component hook.
 	pub fn queue_push(
 		self,
@@ -196,16 +234,19 @@ impl Reach {
 			Self::Route => {
 				RouteParams::queue_push(commands, entity, declaration)
 			}
-			Self::Middleware => {
-				MiddlewareParams::queue_push(commands, entity, declaration)
+			Self::Subtree => {
+				SubtreeParams::queue_push(commands, entity, declaration)
 			}
 		}
 	}
 }
 
-/// A params group an `#[action]` takes, parsed off the request before the body
-/// runs: `entry: Params<EntryParams>` reads and declares every field of
-/// `EntryParams`, beside any inline `#[param]` arguments.
+/// A params group, parsed off the request through its reflected fields.
+///
+/// As an `#[action]` argument, `entry: Params<EntryParams>`, it is read and
+/// declared before the body runs, beside any inline `#[param]` arguments. As a
+/// route's input, `ActionContext<Params<T>>`, its `FromRequest` conversion
+/// reads and declares it the same way.
 ///
 /// ```
 /// # use beet_core::prelude::*;
@@ -222,26 +263,45 @@ impl Reach {
 ///
 /// #[action]
 /// #[derive(Default, Clone, Component, Reflect)]
-/// async fn Tell(
-/// 	verbosity: Params<Verbosity>,
-/// 	_cx: ActionContext<RequestParts>,
-/// ) -> Result<String> {
+/// async fn Tell(verbosity: Params<Verbosity>) -> Result<String> {
 /// 	Ok(verbosity.verbose.to_string())
 /// }
 /// ```
-#[derive(Debug, Clone, Deref, DerefMut)]
+#[derive(Debug, Clone, Deref, DerefMut, TypePath)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct Params<T>(pub T);
 
-/// Every param a request carries, the type a route taking the rest reads as
-/// `rest: Params<Rest>`: a strict url space refuses nothing on that route.
+impl<T: FromReflect + Typed> FromRequestMeta<Self> for Params<T> {
+	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response> {
+		request
+			.parse_params::<T>()
+			.map(Self)
+			.map_err(Response::from)
+	}
+
+	fn params() -> ParamsDeclaration { ParamsDeclaration::new::<Self, T>() }
+}
+
+#[cfg(all(feature = "serde", feature = "std"))]
+impl<T: serde::Serialize> Params<T> {
+	/// The params as a URL-encoded query string, the form a client sends them
+	/// in.
+	pub fn encode(&self) -> Result<String> {
+		serde_urlencoded::to_string(&self.0)?.xok()
+	}
+}
+
+/// Every param a request carries. An extractor taking it, ie an `#[action]`
+/// argument `any: AnyParams`, takes any param, so a strict url space refuses
+/// nothing on its route.
 ///
 /// Reflects as an opaque value so it may sit in a declared tuple, where it
 /// declares no param of its own.
 #[derive(Debug, Default, Clone, PartialEq, Deref, Reflect)]
 #[reflect(opaque)]
-pub struct Rest(MultiMap<SmolStr, SmolStr>);
+pub struct AnyParams(MultiMap<SmolStr, SmolStr>);
 
-impl Rest {
+impl AnyParams {
 	/// The request's params less every one `pattern` declares, for a route
 	/// forwarding only what nothing on its path names.
 	pub fn undeclared(
@@ -253,66 +313,15 @@ impl Rest {
 		params
 	}
 
-	/// Whether a reflected type is [`Rest`], the rest taker a declared tuple
-	/// may hold.
+	/// Whether a reflected type is [`AnyParams`], which a declared tuple may
+	/// hold.
 	pub(crate) fn is(type_info: &TypeInfo) -> bool {
 		type_info.type_id() == TypeId::of::<Self>()
 	}
 }
 
-impl From<&RequestParts> for Rest {
+impl From<&RequestParts> for AnyParams {
 	fn from(parts: &RequestParts) -> Self { Self(parts.params().clone()) }
-}
-
-/// Declares the params a reader that is not an `#[action]` takes, ie a server
-/// or a `Layout`, from the plugin registering it.
-#[extend::ext(name=DeclareParamsAppExt)]
-pub impl App {
-	/// Declare that `Reader` takes `declaration` at `reach`, landing it on
-	/// every entity `Reader` is inserted on.
-	fn declare_params<Reader: Component>(
-		&mut self,
-		reach: Reach,
-		declaration: ParamsDeclaration,
-	) -> &mut Self {
-		self.add_observer(
-			move |ev: On<Insert<Reader>>, mut commands: Commands| {
-				reach.queue_push(&mut commands, ev.entity, declaration.clone());
-			},
-		)
-	}
-}
-
-/// The request an action input carries, for the `#[action]` macro to read
-/// params through whatever shape the input takes.
-pub trait RequestPartsRef {
-	/// The request parts.
-	fn request_parts(&self) -> &RequestParts;
-}
-
-impl RequestPartsRef for RequestParts {
-	fn request_parts(&self) -> &RequestParts { self }
-}
-
-impl RequestPartsRef for Request {
-	fn request_parts(&self) -> &RequestParts { Request::request_parts(self) }
-}
-
-#[cfg(feature = "action")]
-impl RequestPartsRef
-	for (Request, beet_action::prelude::Next<Request, Response>)
-{
-	fn request_parts(&self) -> &RequestParts { self.0.request_parts() }
-}
-
-#[cfg(feature = "action")]
-impl RequestPartsRef
-	for (
-		RequestParts,
-		beet_action::prelude::Next<RequestParts, Response>,
-	)
-{
-	fn request_parts(&self) -> &RequestParts { &self.0 }
 }
 
 #[cfg(test)]
@@ -334,47 +343,47 @@ mod test {
 
 	/// Stands in for middleware declaring the params it reads.
 	#[derive(Component)]
-	#[component(on_add = MiddlewareParams::declare::<VerboseLogger, VerboseParams>)]
+	#[component(on_add = SubtreeParams::declare::<VerboseLogger, VerboseParams>)]
 	struct VerboseLogger;
 
-	/// Stands in for a second reader on the same entity.
+	/// Stands in for a second extractor on the same entity.
 	#[derive(Component)]
-	#[component(on_add = MiddlewareParams::declare::<Deployer, DeployParams>)]
+	#[component(on_add = SubtreeParams::declare::<Deployer, DeployParams>)]
 	struct Deployer;
 
-	fn readers(world: &World, entity: Entity) -> Vec<SmolStr> {
+	fn names(world: &World, entity: Entity) -> Vec<SmolStr> {
 		world
 			.entity(entity)
-			.get::<MiddlewareParams>()
+			.get::<SubtreeParams>()
 			.unwrap()
 			.iter()
-			.map(|declaration| declaration.reader().clone())
+			.map(|declaration| declaration.name().clone())
 			.collect()
 	}
 
-	/// Two readers on one entity are both listed, and a repeated hook lists
-	/// its reader once.
+	/// Two extractors on one entity are both listed, and a repeated hook lists
+	/// its extractor once.
 	#[beet_core::test]
-	fn pushes_each_reader_once() {
+	fn pushes_each_extractor_once() {
 		let mut world = World::new();
 		let entity = world.spawn((VerboseLogger, Deployer)).flush();
-		readers(&world, entity).xpect_eq(vec![
+		names(&world, entity).xpect_eq(vec![
 			SmolStr::new("VerboseLogger"),
 			SmolStr::new("Deployer"),
 		]);
 		world.entity_mut(entity).remove::<VerboseLogger>();
 		world.entity_mut(entity).insert(VerboseLogger);
 		world.flush();
-		readers(&world, entity).len().xpect_eq(2);
+		names(&world, entity).len().xpect_eq(2);
 	}
 
-	/// A [`Rest`] member declares nothing of its own and marks the reader a
-	/// rest taker.
+	/// An [`AnyParams`] member declares nothing of its own and marks the
+	/// extractor as taking any param.
 	#[beet_core::test]
-	fn rest_marks_the_rest_taker() {
+	fn any_params_takes_any() {
 		let declaration =
-			ParamsDeclaration::new::<Deployer, (DeployParams, Rest)>();
-		declaration.rest().xpect_true();
+			ParamsDeclaration::new::<Deployer, (DeployParams, AnyParams)>();
+		declaration.takes_any().xpect_true();
 		declaration
 			.metas()
 			.iter()
@@ -383,18 +392,34 @@ mod test {
 			.xpect_eq(vec!["elevated"]);
 	}
 
-	/// A reader that is not an action declares from its plugin, landing on
+	/// An extractor that is not an action declares from its plugin, landing on
 	/// every entity it is inserted on.
 	#[beet_core::test]
 	fn declares_from_the_plugin() {
 		#[derive(Component)]
 		struct Server;
 		let mut app = App::new();
-		app.declare_params::<Server>(
-			Reach::Middleware,
-			ParamsDeclaration::new::<Server, VerboseParams>(),
-		);
+		app.init(SubtreeParams::declare_on::<Server, VerboseParams>());
 		let entity = app.world_mut().spawn(Server).flush();
-		readers(app.world(), entity).xpect_eq(vec![SmolStr::new("Server")]);
+		names(app.world(), entity).xpect_eq(vec![SmolStr::new("Server")]);
+	}
+
+	/// As a route input, a group parses through its reflected fields and
+	/// declares them.
+	#[beet_core::test]
+	async fn reads_and_declares_as_an_input() {
+		<Params<VerboseParams> as FromRequest<_>>::from_request(
+			Request::from_cli_str("--verbose"),
+		)
+		.await
+		.unwrap()
+		.verbose
+		.xpect_true();
+		<Params<VerboseParams> as FromRequest<_>>::params()
+			.metas()
+			.iter()
+			.map(ParamMeta::name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["verbose"]);
 	}
 }

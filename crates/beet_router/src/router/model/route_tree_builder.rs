@@ -127,7 +127,7 @@ mod test {
 			port: String,
 		}
 		let mut world = World::new();
-		let root = world.spawn(MiddlewareParams::new::<PortNumber>()).id();
+		let root = world.spawn(SubtreeParams::new::<PortNumber>()).id();
 		world.spawn((
 			ChildOf(root),
 			ActionMeta::of::<(), Request, Response>(),

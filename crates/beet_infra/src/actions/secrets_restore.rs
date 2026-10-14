@@ -6,25 +6,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use core::fmt::Write;
 
-/// Request params for [`SecretsRestore`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RestoreParams {
-	/// The document to restore from: a declared `<Secrets>` label, or the
-	/// path or store uri of an undeclared file. Defaults to the one declared
-	/// document, an error naming the labels when several are.
-	document: Option<String>,
-	/// One document of a dated series, as its key relative to the series
-	/// dir (`2026/09/15/010101Z.toml`); absent, the newest when the declared
-	/// path itself is not written.
-	from: Option<String>,
-	/// Restore only these labels, comma separated; absent, every record.
-	only: Option<String>,
-	/// Overwrite secrets the store already holds. Without it a single
-	/// existing label refuses the whole restore, since a restore that
-	/// silently replaced a live credential is a roll nobody asked for.
-	force: bool,
-}
-
 /// `<Route path="secrets/restore" {SecretsRestore}/>` — write every record
 /// of a secrets document into the stack's secret store by label, the inverse
 /// of [`SecretsExport`] and how a fresh account or a rebuilt stack starts:
@@ -45,21 +26,37 @@ struct RestoreParams {
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn SecretsRestore(
-	params: Params<RestoreParams>,
+	/// The document to restore from: a declared `<Secrets>` label, or the
+	/// path or store uri of an undeclared file. Defaults to the one declared
+	/// document, an error naming the labels when several are.
+	#[param]
+	document: Option<String>,
+	/// One document of a dated series, as its key relative to the series
+	/// dir (`2026/09/15/010101Z.toml`); absent, the newest when the declared
+	/// path itself is not written.
+	#[param]
+	from: Option<String>,
+	/// Restore only these labels, comma separated; absent, every record.
+	#[param]
+	only: Option<String>,
+	/// Overwrite secrets the store already holds. Without it a single
+	/// existing label refuses the whole restore, since a restore that
+	/// silently replaced a live credential is a roll nobody asked for.
+	#[param]
+	force: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let store = secret_store(&cx.caller).await?;
 	let source = SecretsRestore::source(
 		&cx.caller,
-		params.document.as_deref(),
-		params.from.as_deref(),
+		document.as_deref(),
+		from.as_deref(),
 		&store,
 	)
 	.await?;
 	let document = source.read().await?;
 	let opened = document.open(&AgeIdentityFile::require()?)?;
-	let only = params
-		.only
+	let only = only
 		.as_deref()
 		.map(|only| str_ext::csv(only).map(SmolStr::new).collect::<Vec<_>>())
 		.unwrap_or_default();
@@ -75,7 +72,7 @@ pub async fn SecretsRestore(
 		.map(|entry| entry.secret.label().clone())
 		.filter(|label| records.iter().any(|(name, _)| name == label))
 		.collect::<Vec<_>>();
-	if !held.is_empty() && !params.force {
+	if !held.is_empty() && !force {
 		bevybail!(
 			"{} already holds {} of the {} record(s) in {} ({}): pass --force \
 			to overwrite them",

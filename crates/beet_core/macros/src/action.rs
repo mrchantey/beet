@@ -31,15 +31,15 @@
 //!
 //! # Params
 //!
-//! A reader declares a request param by taking it. A `#[param]` parameter
+//! An extractor declares a request param by taking it. A `#[param]` parameter
 //! (the [`Prop`] grammar: a doc comment and an optional `short = 'x'`) becomes
-//! a field of a hidden `{Action}Params` struct, and a `Params<T>` parameter
-//! takes a whole params group, `Params<Rest>` every param. Both are parsed off
+//! a field of a hidden `{Action}Params` struct, a `Params<T>` parameter takes
+//! a whole params group, and an `AnyParams` every param. All are parsed off
 //! the request before the body runs, through `?`, so an action taking params
-//! returns `Result` and a bad param is the caller's `400`. The same
-//! signature declares them: the component's `on_add` pushes their
-//! `ParamsDeclaration` into `RouteParams`, or `MiddlewareParams` when the input
-//! carries a `Next`.
+//! returns `Result` and a bad param is the caller's `400`; one naming no input
+//! of its own reads them off the `RequestParts`. The same signature declares
+//! them: the component's `on_add` pushes their `ParamsDeclaration` into
+//! `RouteParams`, or `SubtreeParams` when the input carries a `Next`.
 //!
 //! # The `on_add` hook
 //!
@@ -129,6 +129,11 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 			params.inline.push(ActionParams::parse_inline(pt)?);
 		} else if let Some(group) = ParamsGroup::parse(pt) {
 			params.groups.push(group);
+		} else if is_wrapper_without_args(&pt.ty, "AnyParams") {
+			if params.any.is_some() {
+				synbail!(pt, "an action takes `AnyParams` once");
+			}
+			params.any = Some((*pt.pat).clone());
 		} else {
 			rest.push(pt);
 		}
@@ -140,7 +145,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	if !params.is_empty() && !has_component {
 		synbail!(
 			&item.sig,
-			"`#[param]` and `Params<T>` require `#[derive(Component)]`: the params are declared by a component hook"
+			"`#[param]`, `Params<T>` and `AnyParams` require `#[derive(Component)]`: the params are declared by a component hook"
 		);
 	}
 	if has_fields && !has_component {
@@ -204,10 +209,15 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	};
 
 	// ── 5. Analyze the remaining parameters ──
+	// an action taking params with no input of its own reads them off the
+	// request parts, which need no body
+	let beet_net = pkg_ext::internal_or_beet("beet_net");
+	let inferred_input = (!params.is_empty())
+		.then(|| quote! { #beet_net::prelude::RequestParts });
 	let parts = if is_system_handler {
-		FnParts::system(&rest, &item, &beet_action)?
+		FnParts::system(&rest, inferred_input, &beet_action)?
 	} else {
-		FnParts::simple(&rest, &item, &beet_action)?
+		FnParts::simple(&rest, inferred_input, &item, &beet_action)?
 	};
 	let FnParts {
 		in_type,
@@ -235,13 +245,6 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 			"an action taking params returns `Result`, so a bad param is the caller's `400`"
 		);
 	}
-	if !params.is_empty() && in_type.to_string() == "()" {
-		synbail!(
-			&item.sig,
-			"an action taking params reads them off its request, so its input is a request, ie `cx: ActionContext<Request>`"
-		);
-	}
-	let beet_net = pkg_ext::internal_or_beet("beet_net");
 	let params_ident = format_ident!("{}Params", fn_name);
 	let params_struct = params.make_struct(&params_ident, &beet_net, &bevy);
 	let params_reads = params.make_reads(&params_ident, cx, &beet_net);
@@ -533,6 +536,7 @@ impl FnParts {
 	/// non-field parameter: the input.
 	fn simple(
 		params: &[&syn::PatType],
+		inferred_input: Option<TokenStream>,
 		item: &ItemFn,
 		beet_action: &syn::Path,
 	) -> syn::Result<Self> {
@@ -544,8 +548,18 @@ impl FnParts {
 			);
 		}
 
-		let parts = match params.first() {
-			None => {
+		let parts = match (params.first(), inferred_input) {
+			// No params, but an input inferred from what the action takes
+			(None, Some(input)) => Self {
+				in_type: input.clone(),
+				fn_params: quote! {
+					__action_cx: #beet_action::prelude::ActionContext<#input>
+				},
+				preamble: TokenStream::default(),
+				sys_params: Vec::new(),
+				cx: action_cx(),
+			},
+			(None, None) => {
 				// No params → input is ()
 				Self {
 					in_type: quote! { () },
@@ -557,7 +571,7 @@ impl FnParts {
 					cx: action_cx(),
 				}
 			}
-			Some(pt) => {
+			(Some(pt), _) => {
 				let ty = pt.ty.as_ref();
 				if let Some(inner) = extract_action_context_type(ty) {
 					// Passthrough: user gets the full ActionContext
@@ -595,9 +609,31 @@ impl FnParts {
 	/// parameter; the remainder are forwarded as system params.
 	fn system(
 		params: &[&syn::PatType],
-		_item: &ItemFn,
+		inferred_input: Option<TokenStream>,
 		beet_action: &syn::Path,
 	) -> syn::Result<Self> {
+		// with no input marker of its own, the context of the inferred input,
+		// else of `()`
+		let no_input = |sys_params: Vec<SysParam>| match &inferred_input {
+			Some(input) => (
+				input.clone(),
+				quote! {
+					In(__action_cx): In<#beet_action::prelude::ActionContext<#input>>
+				},
+				TokenStream::default(),
+				sys_params,
+				action_cx(),
+			),
+			None => (
+				quote! { () },
+				quote! {
+					In(__action_cx): In<#beet_action::prelude::ActionContext>
+				},
+				quote! { let _ = __action_cx.input; },
+				sys_params,
+				action_cx(),
+			),
+		};
 		let sys_params_from = |skip: usize| -> Vec<SysParam> {
 			params
 				.iter()
@@ -626,15 +662,7 @@ impl FnParts {
 		let (in_type, first_fn_param, preamble, sys_params, cx) = match params
 			.first()
 		{
-			None => (
-				quote! { () },
-				quote! {
-					In(__action_cx): In<#beet_action::prelude::ActionContext>
-				},
-				quote! { let _ = __action_cx.input; },
-				Vec::new(),
-				action_cx(),
-			),
+			None => no_input(Vec::new()),
 			Some(pt) => {
 				let ty = pt.ty.as_ref();
 
@@ -678,15 +706,7 @@ impl FnParts {
 					)
 				} else {
 					// No input marker → all params are system params
-					(
-						quote! { () },
-						quote! {
-							In(__action_cx): In<#beet_action::prelude::ActionContext>
-						},
-						quote! { let _ = __action_cx.input; },
-						sys_params_from(0),
-						action_cx(),
-					)
+					no_input(sys_params_from(0))
 				}
 			}
 		};
@@ -723,6 +743,9 @@ struct ActionParams {
 	inline: Vec<InlineParam>,
 	/// `Params<T>` parameters, in argument order.
 	groups: Vec<ParamsGroup>,
+	/// The binding of an `AnyParams` parameter, every param the request
+	/// carries.
+	any: Option<syn::Pat>,
 }
 
 /// One `#[param]` parameter.
@@ -739,8 +762,6 @@ struct ParamsGroup {
 	pat: syn::Pat,
 	/// The `T` of `Params<T>`.
 	ty: Type,
-	/// Whether `T` is `Rest`, every param the request carries.
-	is_rest: bool,
 }
 
 impl ParamsGroup {
@@ -750,7 +771,6 @@ impl ParamsGroup {
 		Some(Self {
 			pat: (*pt.pat).clone(),
 			ty: ty.clone(),
-			is_rest: is_wrapper_without_args(ty, "Rest"),
 		})
 	}
 }
@@ -777,7 +797,7 @@ impl ActionParams {
 
 	/// Whether the action takes no params.
 	fn is_empty(&self) -> bool {
-		self.inline.is_empty() && self.groups.is_empty()
+		self.inline.is_empty() && self.groups.is_empty() && self.any.is_none()
 	}
 
 	/// The hidden `{Action}Params` struct holding the `#[param]` fields, each
@@ -840,23 +860,22 @@ impl ActionParams {
 				let #ident { #(#bindings,)* } = #parts.parse_params::<#ident>()?;
 			}
 		});
-		let groups = self.groups.iter().map(|group| {
-			let ParamsGroup { pat, ty, is_rest } = group;
-			match is_rest {
-				true => quote! {
-					let #pat = #beet_net::prelude::Params(#beet_net::prelude::Rest::from(#parts));
-				},
-				false => quote! {
-					let #pat = #beet_net::prelude::Params(#parts.parse_params::<#ty>()?);
-				},
+		let groups = self.groups.iter().map(|ParamsGroup { pat, ty }| {
+			quote! {
+				let #pat = #beet_net::prelude::Params(#parts.parse_params::<#ty>()?);
 			}
 		});
-		quote! { #inline #(#groups)* }
+		let any = self.any.as_ref().map(|pat| {
+			quote! {
+				let #pat = #beet_net::prelude::AnyParams::from(#parts);
+			}
+		});
+		quote! { #inline #(#groups)* #any }
 	}
 
 	/// The `on_add` step declaring every param the action takes, the hidden
-	/// struct then each group: route reach for an action, middleware reach when
-	/// the input carries a `Next`.
+	/// struct, each group, then any `AnyParams`: route scope for an action,
+	/// subtree scope when the input carries a `Next`.
 	fn make_declare(
 		&self,
 		ident: &syn::Ident,
@@ -872,9 +891,14 @@ impl ActionParams {
 			.chain(self.groups.iter().map(|group| {
 				let ty = &group.ty;
 				quote! { #ty }
-			}));
+			}))
+			.chain(
+				self.any
+					.as_ref()
+					.map(|_| quote! { #beet_net::prelude::AnyParams }),
+			);
 		let list = match is_middleware {
-			true => quote! { MiddlewareParams },
+			true => quote! { SubtreeParams },
 			false => quote! { RouteParams },
 		};
 		quote! {
@@ -885,9 +909,12 @@ impl ActionParams {
 }
 
 /// Whether an output type is already a `Response`, needing no conversion.
-fn is_response(out_type: &TokenStream) -> bool {
-	syn::parse2::<Type>(out_type.clone())
-		.is_ok_and(|ty| is_wrapper_without_args(&ty, "Response"))
+fn is_response(out_type: &TokenStream) -> bool { is_type(out_type, "Response") }
+
+/// Whether `ty` is the plain type `name`, by its last path segment.
+fn is_type(ty: &TokenStream, name: &str) -> bool {
+	syn::parse2::<Type>(ty.clone())
+		.is_ok_and(|ty| is_wrapper_without_args(&ty, name))
 }
 
 // ---------------------------------------------------------------------------
@@ -1227,7 +1254,7 @@ fn make_meta_expr(
 ///
 /// When `has_route` is true, requires both `Action<In, Out>` and an
 /// [`ActionOverload<Request, Response>`] adapting the typed action to
-/// request/response dispatch.
+/// request/response dispatch, unless the action already is one.
 fn make_require_action(
 	action_expr: TokenStream,
 	in_type: &TokenStream,
@@ -1235,7 +1262,10 @@ fn make_require_action(
 	has_route: bool,
 	beet_action: &syn::Path,
 ) -> TokenStream {
-	if has_route {
+	// a `Request -> Response` handler is its own route action, so an adapter
+	// would never be invoked, and skipping it keeps the attribute usable in a
+	// crate beneath beet_router
+	if has_route && !(is_type(in_type, "Request") && is_response(out_type)) {
 		let beet_router = pkg_ext::internal_or_beet("beet_router");
 		quote! {
 			#beet_action::prelude::Action<#in_type, #out_type> = #action_expr,
@@ -2572,20 +2602,43 @@ mod test {
 		));
 	}
 
-	/// `Params<Rest>` binds every param the request carries and declares the
-	/// route a rest taker.
+	/// `AnyParams` binds every param the request carries and declares the
+	/// route as taking any.
 	#[test]
-	fn params_rest_binds_the_rest() {
+	fn any_params_binds_every_param() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			#[derive(Component, Reflect)]
-			async fn RunWasm(rest: Params<Rest>, cx: ActionContext<Request>) -> Result<String> {
+			async fn RunWasm(any: AnyParams, cx: ActionContext<Request>) -> Result<String> {
 				todo!()
 			}
 		});
-		assert!(result.contains("(Rest ,)"));
+		assert!(result.contains("(beet_net :: prelude :: AnyParams ,)"));
 		assert!(result.contains(
-			"let rest = beet_net :: prelude :: Params (beet_net :: prelude :: Rest :: from (beet_net :: prelude :: RequestPartsRef :: request_parts (& cx . input)))"
+			"let any = beet_net :: prelude :: AnyParams :: from (beet_net :: prelude :: RequestPartsRef :: request_parts (& cx . input))"
 		));
+	}
+
+	/// An action taking params with no input of its own reads them off the
+	/// request parts, which need no body.
+	#[test]
+	fn params_infer_a_request_input() {
+		for item in [
+			syn::parse_quote! {
+				#[derive(Component, Reflect)]
+				async fn Sync(#[param] dry_run: bool) -> Result<String> { todo!() }
+			},
+			syn::parse_quote! {
+				#[derive(Component, Reflect)]
+				fn Count(#[param] dry_run: bool, names: Query<&Name>) -> Result<usize> { todo!() }
+			},
+		] {
+			let result = parse_str(quote!(), item);
+			assert!(
+				result
+					.contains("type In = beet_net :: prelude :: RequestParts")
+			);
+			assert!(result.contains("request_parts (& __action_cx . input)"));
+		}
 	}
 
 	/// Middleware's params reach every route beneath it.
@@ -2598,7 +2651,7 @@ mod test {
 				cx: ActionContext<(Request, Next<Request, Response>)>,
 			) -> Result<Response> { todo!() }
 		});
-		assert!(result.contains("MiddlewareParams :: declare"));
+		assert!(result.contains("SubtreeParams :: declare"));
 		assert!(!result.contains("RouteParams :: declare"));
 	}
 
@@ -2625,6 +2678,19 @@ mod test {
 			}
 		});
 		assert!(!result.contains("declare_exchange"));
+	}
+
+	/// A `Request -> Response` route needs no adapter, so the attribute names no
+	/// beet_router type and serves a crate beneath it.
+	#[test]
+	fn request_response_route_needs_no_adapter() {
+		let result =
+			parse_str(quote!(route = "get/:name"), syn::parse_quote! {
+				#[derive(Component, Reflect)]
+				async fn Get(cx: ActionContext<Request>) -> Result<Response> { todo!() }
+			});
+		assert!(result.contains("PathPartial :: new (\"get/:name\")"));
+		assert!(!result.contains("ExchangeOverload"));
 	}
 
 	/// A bad param is the caller's `400`, which needs a `Result` to raise.

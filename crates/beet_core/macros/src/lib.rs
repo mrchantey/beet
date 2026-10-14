@@ -300,9 +300,9 @@ pub fn beet_main(
 /// - `#[param]` parameters (a doc comment and an optional `short = 'x'`) and
 ///   `Params<T>` parameters are request params, parsed off the request before
 ///   the body runs and declared by the same signature, so `--help` lists them
-///   and a strict url space accepts them. `Params<Rest>` takes every param. An
+///   and a strict url space accepts them. `AnyParams` takes every param. An
 ///   action taking params returns `Result`, a bad param being the caller's
-///   `400`, and its input is a request.
+///   `400`, and its input is a request, `RequestParts` when it names none.
 ///
 /// The full grammar is in `beet_action`'s README.
 ///
@@ -312,7 +312,6 @@ pub fn beet_main(
 /// async fn Serve(
 ///     /// The port to listen on.
 ///     #[param] port: u16,
-///     cx: ActionContext<RequestParts>,
 /// ) -> Result<String> {
 ///     Ok(port.to_string())
 /// }

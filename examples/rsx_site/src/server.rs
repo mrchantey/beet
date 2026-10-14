@@ -34,7 +34,7 @@ pub fn server_plugin(app: &mut App) {
 		.get_resource_or_init::<RuleSet>()
 		.insert_rule(design_row_rule());
 	// the document shell the router names in its `Layout` declaration
-	app.register_template::<BeetLayout>();
+	app.init(BeetLayout::register_template());
 }
 
 /// The store backing the markdown `content` routes, read at request time by each
