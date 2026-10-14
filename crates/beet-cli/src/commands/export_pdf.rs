@@ -54,18 +54,13 @@ struct ExportPdfParams {
 #[action(route = "export-pdf/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<(ExportPdfParams, EntryParams)>())]
-pub async fn ExportPdf(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let parts = &cx.input;
-	let params = parts.parse_params::<ExportPdfParams>()?;
-	let entry_path = entry_arg(parts)?;
-	let root = build_entry(
-		&cx.caller,
-		EntryParams::repo(parts)?.as_ref(),
-		&entry_path,
-		Some(ONE_SHOT_SETTLE_DEADLINE),
-	)
-	.await?;
+pub async fn ExportPdf(
+	Params(params): Params<ExportPdfParams>,
+	entry_params: Params<EntryParams>,
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let entry_path = entry_arg(&cx.input)?;
+	let root = entry_params.load(&cx.caller, &entry_path).await?;
 
 	// validate before exporting, like `export-static`: a broken no-code entry fails
 	// with a non-zero exit rather than shipping a broken PDF.
@@ -246,10 +241,8 @@ async fn write_concat(
 	)
 }
 
-/// Polls the process-global server port until the booted http server binds,
-/// erroring after ~5s rather than hanging.
 /// Resolves the `(page_size_cm, viewport_px)` pair from the `--width`/`--height`
-/// params (`0` = unset), defaulting each dimension to A4.
+/// params, defaulting each unset dimension to A4.
 fn resolve_size(
 	width: Option<f64>,
 	height: Option<f64>,

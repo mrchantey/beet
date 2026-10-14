@@ -18,7 +18,7 @@ proc-macro = true
 
 [features]
 default = ["slot"]
-rsx = []
+rsx = ["dep:proc-macro2-diagnostics"]
 # Hoist `<slot>` markup into scene props: the `#[template]` macro injects a
 # `SceneProp` field per slot and `rsx!` lowers `<slot name="x"/>` to that prop.
 slot = []
@@ -32,5 +32,5 @@ beet_core_shared.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
-proc-macro2-diagnostics.workspace = true
+proc-macro2-diagnostics = { workspace = true, optional = true }
 heck.workspace = true

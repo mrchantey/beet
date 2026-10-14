@@ -4,13 +4,6 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// Request params for [`BlobCells`], surfaced in `--help`.
-#[derive(Reflect)]
-struct BlobCellsParams {
-	/// The file's path in the store, ie `assets/forms/plan.docx`.
-	path: RelPath,
-}
-
 /// `cells <path>`: the addressed cells of any file in the nearest ancestor
 /// [`BlobStore`], parsed as its media type: every table cell, `t1r2c3`, in
 /// document order, and every unlocked workbook cell, `Sheet!A1`, each with
@@ -24,21 +17,22 @@ struct BlobCellsParams {
 /// ```sh
 /// beet cells assets/forms/plan.docx --accept=text/markdown
 /// ```
-#[action(route = "cells/*path")]
+#[action(route = "cells/*file")]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<BlobCellsParams>())]
 pub async fn BlobCells(
+	/// The file's path in the store, ie `assets/forms/plan.docx`.
+	#[param]
+	file: RelPath,
 	cx: ActionContext<Request>,
 ) -> Result<DataPage<Vec<CellText>>> {
-	let path = cx.input.parse_params::<BlobCellsParams>()?.path;
 	let bytes = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
 			stores.get(entity).cloned()
 		})
 		.await??
-		.blob(path)
+		.blob(file)
 		.get_media()
 		.await?;
 	let cells = cx
@@ -59,7 +53,8 @@ pub async fn BlobCells(
 	DataPage::new(&cx.caller, scene, cells).await
 }
 
-#[cfg(test)]
+// a markdown table has cells only where markdown parses
+#[cfg(all(test, feature = "markdown_parser"))]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;

@@ -4,17 +4,6 @@ use super::DocumentParams;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`SecretsExec`], surfaced in `--help`.
-#[derive(Reflect)]
-struct ExecParams {
-	/// Pass only these records, comma separated; absent, every `EnvVar`
-	/// record the document holds. A name the document does not hold is an
-	/// error, so a typo fails here rather than as the child's `AccessDenied`.
-	only: Option<String>,
-	/// The command and its arguments, everything after `--`.
-	nested_args: Vec<String>,
-}
-
 /// Run a command with a document's `EnvVar` records in its environment,
 /// the `sops exec-env` shape: for `tofu` by hand during a recovery, or any
 /// tool that reads credentials from its environment. The values reach the
@@ -49,25 +38,32 @@ struct ExecParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("exec"),
-	ParamsPartial = ParamsPartial::new::<(DocumentParams, ExecParams)>()
-)]
-pub async fn SecretsExec(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<ExecParams>()?;
-	let Some((command, args)) = params.nested_args.split_first() else {
+#[require(PathPartial = PathPartial::new("exec"))]
+pub async fn SecretsExec(
+	document: Params<DocumentParams>,
+	/// Pass only these records, comma separated; absent, every `EnvVar`
+	/// record the document holds. A name the document does not hold is an
+	/// error, so a typo fails here rather than as the child's `AccessDenied`.
+	#[param]
+	only: Option<String>,
+	/// The command and its arguments, everything after `--`.
+	#[param]
+	nested_args: Vec<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let Some((command, args)) = nested_args.split_first() else {
 		bevybail!(
 			"a command is required after `--`, ie `secrets/exec -- tofu plan`"
 		);
 	};
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let handle = document.resolve(&cx.caller).await?;
 	let pairs = SecretsExec::narrow(
 		handle
 			.read()
 			.await?
 			.open(&AgeIdentityFile::require()?)?
 			.env_vars(),
-		params.only.as_deref(),
+		only.as_deref(),
 		&handle.describe(),
 	)?;
 	info!(

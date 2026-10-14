@@ -619,7 +619,7 @@ impl FargateBlock {
 		// names the deploy writes are by construction the names the runtime reads.
 		let runtime = BootstrapConfig {
 			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
-			http_port: Some(self.container_port),
+			port: Some(self.container_port),
 			ssh_port: self.allow_ssh.then_some(self.ssh_container_port),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
@@ -1318,7 +1318,7 @@ mod tests {
 		json
 			// the platform bindings the block merges in
 			.xpect_contains(r#"\"name\":\"BEET_HOST\",\"value\":\"0.0.0.0\""#)
-			.xpect_contains(r#"\"name\":\"BEET_HTTP_PORT\",\"value\":\"9001\""#)
+			.xpect_contains(r#"\"name\":\"BEET_PORT\",\"value\":\"9001\""#)
 			.xpect_contains(r#"\"name\":\"BEET_SSH_PORT\",\"value\":\"22\""#)
 			// the deploy-declared service config
 			.xpect_contains(

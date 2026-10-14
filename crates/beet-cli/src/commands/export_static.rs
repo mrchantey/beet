@@ -4,13 +4,6 @@ use beet::prelude::*;
 /// The default output directory, relative to the entry dir, when `--out` is unset.
 const DIST_DIR: &str = "dist";
 
-/// Request params for the [`ExportStatic`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct ExportStaticParams {
-	/// Output directory for the rendered entry (default `<entry>/dist`).
-	out: Option<String>,
-}
-
 /// Statically exports a no-code entry: builds the entry world (loads its entry
 /// document), then renders every static route once and writes it to the output dir
 /// (default `<entry>/dist`, overridable with `--out`).
@@ -25,18 +18,15 @@ struct ExportStaticParams {
 #[action(route = "export-static/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<(ExportStaticParams, EntryParams)>())]
-pub async fn ExportStatic(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let parts = &cx.input;
-	let params = parts.parse_params::<ExportStaticParams>()?;
-	let entry_path = entry_arg(parts)?;
-	let root = build_entry(
-		&cx.caller,
-		EntryParams::repo(parts)?.as_ref(),
-		&entry_path,
-		Some(ONE_SHOT_SETTLE_DEADLINE),
-	)
-	.await?;
+pub async fn ExportStatic(
+	/// Output directory for the rendered entry (default `<entry>/dist`).
+	#[param]
+	out: Option<String>,
+	entry_params: Params<EntryParams>,
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let entry_path = entry_arg(&cx.input)?;
+	let root = entry_params.load(&cx.caller, &entry_path).await?;
 
 	// validate before writing: the render-diagnostics pass gates CI, so a broken
 	// no-code entry (unknown tag, dead link) fails the export with a non-zero exit
@@ -57,7 +47,7 @@ pub async fn ExportStatic(cx: ActionContext<RequestParts>) -> Result<Response> {
 	// the output is a local write target, so an `fs` store: `--out` (absolute, or
 	// relative to the cwd) overrides the default `<entry>/dist` (the entry's own
 	// dir, not a `<RepoRoot>`-widened root).
-	let out_dir = match params.out {
+	let out_dir = match out {
 		Some(out) => AbsPath::new(out)?,
 		None => entry_dir(&entry_path)?.join(DIST_DIR),
 	};

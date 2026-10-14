@@ -12,9 +12,10 @@
 //! - [`HeaderMap`] / [`MediaType`]: Header management and content types
 //! - [`Url`] / [`Scheme`]: URL representation and transport scheme
 //! - [`Body`]: Request/response body (bytes or stream)
-//! - [`PathPattern`] / [`ParamsPattern`]: URL pattern matching
-//! - [`DeclaredParams`]: every param a dispatch path declares, and the check
-//!   rejecting the rest
+//! - [`PathPattern`]: URL pattern matching
+//! - [`RouteParams`] / [`MiddlewareParams`]: a reader declares a param by
+//!   taking it, and a route's params are the union over everything that runs
+//!   for it, collected into its [`ParamsPattern`]
 //!
 //! ## Exchange Patterns
 //!
@@ -47,8 +48,8 @@ pub use media_bytes_ext::*;
 pub use response::*;
 mod param_pattern;
 pub use param_pattern::*;
-mod declared_params;
-pub use declared_params::*;
+mod route_params;
+pub use route_params::*;
 mod path_pattern;
 pub use parts::*;
 pub use path_pattern::*;

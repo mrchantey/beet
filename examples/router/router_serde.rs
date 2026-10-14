@@ -50,17 +50,25 @@ fn main() -> AppExit {
 		.register_type::<Script<QueryParams<GreetRequest>, String>>()
 		.register_type::<ExchangeScript<QueryParams<GreetRequest>, String, _, _>>(
 		)
+		.register_type::<ForkFlag>()
 		.add_systems(Startup, setup)
 		.run()
 }
 
-/// The flag this example reads before it loads its scene, declared on the
-/// router so every route's `--help` lists it.
+/// The flag this example reads before it loads its scene.
 #[derive(Reflect)]
 struct ForkParams {
 	/// Discard the forked scene file and re-fork the bundle.
 	new: bool,
 }
+
+/// Declares [`ForkParams`] at middleware reach on the router, so every route's
+/// `--help` lists `--new` and the strict server accepts it. A reflected
+/// component, so the declaration survives the fork.
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, Default)]
+#[component(on_add = MiddlewareParams::declare::<ForkFlag, ForkParams>)]
+struct ForkFlag;
 
 /// Query params for the scripted greet route, exposed to the
 /// script as `input.name`.
@@ -124,7 +132,7 @@ fn setup(async_commands: AsyncCommands) {
 fn route_bundle() -> impl Bundle {
 	(CliServer::default(), children![(
 		Router::with_defaults(),
-		ParamsPartial::new::<ForkParams>(),
+		ForkFlag,
 		children![
 			(
 				Script::<(), String>::new(r#""hello world""#),

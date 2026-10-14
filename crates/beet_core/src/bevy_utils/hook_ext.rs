@@ -36,8 +36,8 @@ use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::ecs::world::DeferredWorld;
 
-/// Runs two component hooks in order, so one component can declare its own
-/// `on_add` alongside a generated one (the `#[action]` provider guard).
+/// Runs two component hooks in order, so one component can declare two hooks
+/// for one lifecycle event.
 ///
 /// Bevy keeps a single hook per lifecycle event, silently taking the last
 /// `on_add` it parses, so composing is the only way to keep both.

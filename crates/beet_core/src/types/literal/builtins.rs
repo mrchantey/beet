@@ -223,6 +223,45 @@ fn add_domain(table: &mut Table) {
 				_ => Ok(None),
 			}
 		})
+		// an ip address, so `--host=0.0.0.0` reads a launch's bind address
+		.add_hinted("an IP address, eg \"0.0.0.0\"", |value: &Value| {
+			match value {
+				Value::Str(string) => string
+					.as_str()
+					.parse::<IpAddress>()
+					.map(Some)
+					.map_err(|err| bevyhow!("`{string}` is no IP address, {err}")),
+				_ => Ok(None),
+			}
+		})
+		// a server selection, one comma separated list or a repeated flag of
+		// them, so `--server=http,ssh` and `--server=http --server=ssh` agree
+		.add_hinted(
+			"server names, comma separated, eg \"http,ssh\"",
+			|value: &Value| match value {
+				Value::Str(names) => {
+					Ok(Some(RunningSetFilter::new(names.as_str())))
+				}
+				Value::List(items) => items
+					.iter()
+					.map(|item| match item {
+						Value::Str(names) => Some(names.as_str()),
+						_ => None,
+					})
+					.collect::<Option<Vec<_>>>()
+					.map(|names| {
+						names.into_iter().fold(
+							RunningSetFilter::default(),
+							|mut filter, names| {
+								filter.extend(names);
+								filter
+							},
+						)
+					})
+					.xok(),
+				_ => Ok(None),
+			},
+		)
 		// a unit-suffixed string, so `<EndInDuration duration="50ms"/>` authors
 		// a delay. The unit is required, and a malformed value (a non-string,
 		// or a missing/unknown unit) errors rather than silently falling

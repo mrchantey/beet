@@ -1,6 +1,6 @@
 //! The standalone middleware a router wraps its routes in, the dispatch guard
-//! a subtree declares its required features with, and the opt-in refusal of
-//! undeclared params.
+//! a subtree declares its required features with, and a strict url space's
+//! refusal of undeclared params.
 
 mod cache_headers;
 #[cfg(feature = "bsx_core")]
@@ -21,5 +21,4 @@ pub use interrupt::*;
 pub use middleware::*;
 pub use no_cache::*;
 pub use redirect::*;
-pub use reject_unknown_params::*;
 pub use request_logger::*;

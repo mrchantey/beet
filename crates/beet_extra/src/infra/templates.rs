@@ -50,23 +50,25 @@ pub fn ExampleBinaryBuild(
 ///
 /// The backend is a property of the LAUNCH, not of a stack's identity, so the
 /// toggle lands on the process [`Deployment`] and nothing about it is authored
-/// per stack. The flag is a declared request param ([`DeclaresParams`]), so a
-/// server refusing undeclared params (`RejectUnknownParams`) accepts it and
-/// names it beside a misspelling.
+/// per stack. Being middleware, its flag reaches every route beneath it, so a
+/// strict server accepts it and names it beside a misspelling.
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component, DeclaresParams)]
+#[reflect(Component)]
 #[component(on_add = MiddlewareList::<Request, Response>::on_add::<Self>)]
 pub async fn StateBackendToggle(
+	/// Keep the tofu state in this account's S3 state bucket rather than
+	/// under `.beet/infra`.
+	#[param]
+	s3_backend: bool,
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (request, next) = cx.take();
-	let backend: StackBackend =
-		match request.parse_params::<StateBackendParams>()?.s3_backend {
-			true => S3Backend::default().into(),
-			false => LocalBackend::default().into(),
-		};
+	let backend: StackBackend = match s3_backend {
+		true => S3Backend::default().into(),
+		false => LocalBackend::default().into(),
+	};
 	caller
 		.world()
 		.with_resource::<Deployment, _>(move |mut deployment| {
@@ -74,20 +76,6 @@ pub async fn StateBackendToggle(
 		})
 		.await;
 	next.call(request).await
-}
-
-impl DeclaresParams for StateBackendToggle {
-	fn declared_params() -> ParamsPartial {
-		ParamsPartial::new::<StateBackendParams>()
-	}
-}
-
-/// The flag [`StateBackendToggle`] reads.
-#[derive(Reflect)]
-struct StateBackendParams {
-	/// Keep the tofu state in this account's S3 state bucket rather than
-	/// under `.beet/infra`.
-	s3_backend: bool,
 }
 
 /// An **opinionated** block for websites built with lambda.

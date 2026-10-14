@@ -2,9 +2,11 @@
 
 use crate::prelude::*;
 use bevy::platform::sync::LazyLock;
-use core::fmt::Display;
+use bevy::reflect::TypeInfo;
+use bevy::reflect::Typed;
 use core::net::IpAddr;
-use core::str::FromStr;
+use heck::ToKebabCase;
+use heck::ToShoutySnakeCase;
 
 /// Every pre-scene knob a beet process boots from, in one type.
 ///
@@ -18,22 +20,32 @@ use core::str::FromStr;
 /// [`to_cmd_json`](Self::to_cmd_json) by `ChildProcess::with_bootstrap` and the
 /// deploy blocks.
 ///
-/// It is **not** a params parser. A route reading one flag off its request reads
-/// that flag (a `ParamsPartial` params type, so `--help` documents it), because a
-/// request is not a process launch: pulling a whole config out of one to
-/// reach a single field silently drags the `BEET_*` environment in behind it and
-/// hides the flag from the route's own help. The single request-shaped
-/// constructor, [`take_params`](Self::take_params), exists only for beet spawning
-/// beet, and consumes the knobs it reads so they cannot also be forwarded.
+/// It is **not** a params parser. A route reading one flag off its request
+/// takes that flag (an `#[action]`'s `#[param]`, so `--help` documents it),
+/// because a request is not a process launch: pulling a whole config out of one
+/// to reach a single field silently drags the `BEET_*` environment in behind it
+/// and hides the flag from the route's own help.
 ///
 /// ## The transport rule
 ///
-/// One rule, no per-field exceptions: **every field parses from both transports,
-/// `--kebab-name` argv and `BEET_SCREAMING_NAME` env, and argv wins.** So
-/// `--repo` / `BEET_REPO`, `--port` / `BEET_HTTP_PORT`, `--stage` /
-/// `BEET_STAGE`, and so on. Both channels exist because both are natural
-/// affordances: a human types argv, a platform writes env into a unit file or a
-/// task definition.
+/// Each field's doc comment is its `--help` description, listed under "Launch"
+/// by the root help, so it is written as plain text.
+///
+/// One rule, derived from the reflected fields with no per-field exceptions:
+/// **a knob's flag is its kebab-case field name and its environment variable is
+/// `BEET_` plus its screaming snake field name, and argv wins**, so `--repo` /
+/// `BEET_REPO`, `--store-fork` / `BEET_STORE_FORK`. An unqualified `port` is
+/// the http port, everywhere: the field, the flag and the variable. A list knob
+/// is comma separated on either transport. Both channels exist because both are
+/// natural affordances: a human types argv, a platform writes env into a unit
+/// file or a task definition.
+///
+/// ## The process request
+///
+/// The same argv is the process request a `CliServer` dispatches, so the
+/// launch only knobs are [stripped](Self::strip) from it first: the request
+/// keeps only the [`REQUEST_RANK`](Self::REQUEST_RANK) knobs, the ones a server
+/// overlays at request rank. The root `--help` lists the rest under "Launch".
 ///
 /// ## Reading it
 ///
@@ -65,63 +77,55 @@ use core::str::FromStr;
 /// Secrets are deliberately absent: the type has no secret field, so no renderer
 /// can put one on an argv line, a `CMD` array or a systemd `ExecStart`. Secrets
 /// stay env on their existing channels.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default))]
 pub struct BootstrapConfig {
 	/// The entry document: a path for a dir-rooted repo store, a name within a
-	/// self-rooted one. `--entry` / `BEET_ENTRY`.
+	/// self-rooted one.
 	pub entry: Option<SmolStr>,
-	/// The repo store the entry loads through. `--repo` / `BEET_REPO`.
+	/// The repo store the entry loads through.
 	pub repo: Option<StoreUri>,
 	/// The local store the repo store is forked into: reads fall through to
 	/// the repo, writes land here, so a process on a remote repo forks rather
-	/// than writes back (a visitor's local edits over a site's published
-	/// store). `--store-fork` / `BEET_STORE_FORK`. Absent, a browser whose repo
-	/// is remote forks into IndexedDB (see `entry_build::default_store_fork`);
-	/// every other launch reads its repo directly.
+	/// than writes back. Absent, a browser whose repo is remote forks into
+	/// IndexedDB; every other launch reads its repo directly.
+	// the browser default is `entry_build::default_store_fork`
 	pub store_fork: Option<StoreUri>,
-	/// Watch the entry's sources and live-reload. `--watch` / `BEET_WATCH`.
+	/// Watch the entry's sources and live-reload.
 	pub watch: bool,
 	/// Cargo features this binary is asserted to have been built with.
-	/// `--features` / `BEET_FEATURES`.
 	pub features: Vec<SmolStr>,
-	/// Which declared servers boot. `--server` / `BEET_SERVER`.
+	/// Which declared servers boot.
 	pub server: Option<RunningSetFilter>,
 	/// The opening route a freshly-opened tui/ssh surface navigates to.
-	/// `--path` / `BEET_PATH`.
 	pub path: Option<SmolStr>,
 	/// The address servers bind to, usually read through
-	/// [`host_octets`](Self::host_octets). `--host` / `BEET_HOST`.
-	pub host: Option<IpAddr>,
-	/// The http listener port. `--port` / `BEET_HTTP_PORT`.
-	pub http_port: Option<u16>,
-	/// The ssh listener port. `--ssh-port` / `BEET_SSH_PORT`.
+	/// [`host_octets`](Self::host_octets).
+	pub host: Option<IpAddress>,
+	/// The http listener port.
+	pub port: Option<u16>,
+	/// The ssh listener port.
 	pub ssh_port: Option<u16>,
-	/// The infrastructure stage this process runs in, defaulting to
-	/// [`DEFAULT_STAGE`](Self::DEFAULT_STAGE). `--stage` / `BEET_STAGE`.
+	/// The infrastructure stage this process runs in, defaulting to `dev`.
 	pub stage: SmolStr,
 	/// Whether services resolve locally or against the cloud, defaulting to
-	/// [`ServiceAccess::Local`]. `--service-access` / `BEET_SERVICE_ACCESS`.
+	/// `local`.
 	pub service_access: ServiceAccess,
-	/// This deployment's unique id. `--deploy-id` / `BEET_DEPLOY_ID`.
+	/// This deployment's unique id.
 	pub deploy_id: Option<SmolStr>,
-	/// This deployment's timestamp. `--deploy-timestamp` /
-	/// `BEET_DEPLOY_TIMESTAMP`.
+	/// This deployment's timestamp.
 	pub deploy_timestamp: Option<SmolStr>,
 	/// Force TLS on or off, overriding the managed-platform detection.
-	/// `--tls` / `BEET_TLS`.
 	pub tls: Option<bool>,
-	/// Where the cached dev certificate lives. `--tls-dir` / `BEET_TLS_DIR`.
+	/// Where the cached dev certificate lives.
 	pub tls_dir: Option<SmolStr>,
 	/// Run terminal surfaces buffered, never touching the real tty.
-	/// `--headless` / `BEET_HEADLESS`.
 	pub headless: bool,
-	/// Capture the first window to this PNG and exit. `--screenshot` /
-	/// `BEET_SCREENSHOT`.
+	/// Capture the first window to this PNG and exit.
 	pub screenshot: Option<SmolStr>,
-	/// The frame the screenshot harness captures on. `--screenshot-frame` /
-	/// `BEET_SCREENSHOT_FRAME`.
+	/// The frame the screenshot harness captures on.
 	pub screenshot_frame: Option<u32>,
 }
 
@@ -140,7 +144,7 @@ impl Default for BootstrapConfig {
 			server: None,
 			path: None,
 			host: None,
-			http_port: None,
+			port: None,
 			ssh_port: None,
 			stage: Self::DEFAULT_STAGE.into(),
 			service_access: default(),
@@ -155,16 +159,6 @@ impl Default for BootstrapConfig {
 	}
 }
 
-/// One knob's two transport names: the `--kebab-name` argv key and the
-/// `BEET_SCREAMING_NAME` env key. Declared once per field so the parse and both
-/// renderers cannot drift, which is exactly the class of bug this type retires
-/// (the deploy wrote `BEET_PORT`, the runtime read `BEET_HTTP_PORT`).
-#[derive(Debug, Copy, Clone)]
-struct Knob {
-	arg: &'static str,
-	env: &'static str,
-}
-
 impl BootstrapConfig {
 	/// The stage an unqualified launch runs in. A deploy names its own stage on
 	/// either transport, so only a local run relies on this.
@@ -175,83 +169,12 @@ impl BootstrapConfig {
 	/// The `type` of the `<script>` a served page carries its browser launch
 	/// in, see [`to_script`](Self::to_script).
 	pub const SCRIPT_TYPE: &'static str = "application/x-beet-bootstrap";
-
-	const ENTRY: Knob = Knob {
-		arg: "entry",
-		env: "BEET_ENTRY",
-	};
-	const REPO: Knob = Knob {
-		arg: "repo",
-		env: "BEET_REPO",
-	};
-	const STORE_FORK: Knob = Knob {
-		arg: "store-fork",
-		env: "BEET_STORE_FORK",
-	};
-	const WATCH: Knob = Knob {
-		arg: "watch",
-		env: "BEET_WATCH",
-	};
-	const FEATURES: Knob = Knob {
-		arg: "features",
-		env: "BEET_FEATURES",
-	};
-	const SERVER: Knob = Knob {
-		arg: RunningSetFilter::PARAM,
-		env: "BEET_SERVER",
-	};
-	const PATH: Knob = Knob {
-		arg: "path",
-		env: "BEET_PATH",
-	};
-	const HOST: Knob = Knob {
-		arg: "host",
-		env: "BEET_HOST",
-	};
-	const HTTP_PORT: Knob = Knob {
-		arg: "port",
-		env: "BEET_HTTP_PORT",
-	};
-	const SSH_PORT: Knob = Knob {
-		arg: "ssh-port",
-		env: "BEET_SSH_PORT",
-	};
-	const STAGE: Knob = Knob {
-		arg: "stage",
-		env: "BEET_STAGE",
-	};
-	const SERVICE_ACCESS: Knob = Knob {
-		arg: "service-access",
-		env: "BEET_SERVICE_ACCESS",
-	};
-	const DEPLOY_ID: Knob = Knob {
-		arg: "deploy-id",
-		env: "BEET_DEPLOY_ID",
-	};
-	const DEPLOY_TIMESTAMP: Knob = Knob {
-		arg: "deploy-timestamp",
-		env: "BEET_DEPLOY_TIMESTAMP",
-	};
-	const TLS: Knob = Knob {
-		arg: "tls",
-		env: "BEET_TLS",
-	};
-	const TLS_DIR: Knob = Knob {
-		arg: "tls-dir",
-		env: "BEET_TLS_DIR",
-	};
-	const HEADLESS: Knob = Knob {
-		arg: "headless",
-		env: "BEET_HEADLESS",
-	};
-	const SCREENSHOT: Knob = Knob {
-		arg: "screenshot",
-		env: "BEET_SCREENSHOT",
-	};
-	const SCREENSHOT_FRAME: Knob = Knob {
-		arg: "screenshot-frame",
-		env: "BEET_SCREENSHOT_FRAME",
-	};
+	/// The knobs that stay in the process request when the rest are
+	/// [stripped](Self::strip), as flags: a server reads them at request rank,
+	/// overlaying them above its markup-declared fields, so `serve
+	/// --server=http --port=8080` reaches the server the `serve` route boots.
+	pub const REQUEST_RANK: [&'static str; 5] =
+		["server", "path", "host", "port", "ssh-port"];
 
 	/// Parse this process's argv, with the `BEET_*` environment as the fallback for
 	/// every field argv did not set. Strict: a malformed value errors.
@@ -281,31 +204,18 @@ impl BootstrapConfig {
 	/// error.
 	pub fn get() -> &'static Self { &BOOTSTRAP }
 
-	/// The launch config for a beet child process, *taken out of* `params` (with
-	/// this process's `BEET_*` environment as the fallback for every knob the
-	/// params did not set).
-	///
-	///
-	/// The one request-shaped constructor, and only for beet spawning beet: the
-	/// wasm runner is handed the module's argv and must split it, delivering the
-	/// module's own knobs through [`to_argv`](Self::to_argv) and forwarding the
-	/// rest (the test-runner flags) untouched. It removes what it reads precisely
-	/// so a knob cannot be forwarded twice and the two copies disagree, which is
-	/// also what stops it being repurposed to peek at a field: a route that wants
-	/// one flag reads that flag from its own params type.
-	///
-	/// Env participates because such a caller is itself configured like a process
-	/// (`BEET_REPO=.. cargo test ..` reaches the runner only through the
-	/// environment), and the child's environment is scrubbed of `BEET_*` on the
-	/// way out, so the argv is the whole delivery.
-	pub fn take_params(
-		params: &mut MultiMap<SmolStr, SmolStr>,
-	) -> Result<Self> {
-		let config = Self::parse(params, &Self::env_var)?;
-		for knob in Self::KNOBS {
-			params.remove(knob.arg);
+	/// Remove every launch only knob from `params`, leaving the
+	/// [`REQUEST_RANK`](Self::REQUEST_RANK) ones: the process request a
+	/// `CliServer` dispatches carries what its routes and servers read, never
+	/// `--entry` or `--stage`, which the launch already consumed.
+	pub fn strip(params: &mut MultiMap<SmolStr, SmolStr>) {
+		for field in Self::field_names() {
+			let flag = field.to_kebab_case();
+			if !Self::REQUEST_RANK.contains(&flag.as_str()) {
+				params.remove(flag.as_str());
+				params.remove(field);
+			}
 		}
-		Ok(config)
 	}
 
 	/// A `BEET_*` name resolved from the real process environment, the fallback
@@ -314,50 +224,37 @@ impl BootstrapConfig {
 		env_ext::var(key).ok().map(SmolStr::from)
 	}
 
-	/// Every knob, in field order. The one enumeration of the table, so a new
-	/// field is either listed here or is not a knob at all.
-	const KNOBS: [Knob; 19] = [
-		Self::ENTRY,
-		Self::REPO,
-		Self::STORE_FORK,
-		Self::WATCH,
-		Self::FEATURES,
-		Self::SERVER,
-		Self::PATH,
-		Self::HOST,
-		Self::HTTP_PORT,
-		Self::SSH_PORT,
-		Self::STAGE,
-		Self::SERVICE_ACCESS,
-		Self::DEPLOY_ID,
-		Self::DEPLOY_TIMESTAMP,
-		Self::TLS,
-		Self::TLS_DIR,
-		Self::HEADLESS,
-		Self::SCREENSHOT,
-		Self::SCREENSHOT_FRAME,
-	];
-
-	/// Every argv key a beet launch reads, ie the `entry` of `--entry`, derived
-	/// from [`KNOBS`](Self::KNOBS) so a params type declaring the launch's flags
-	/// can be pinned to it.
-	pub fn arg_names() -> impl Iterator<Item = &'static str> {
-		Self::KNOBS.iter().map(|knob| knob.arg)
+	/// Every field name, in declaration order: the one enumeration of the
+	/// knobs, so a new field is a knob on both transports by being declared.
+	fn field_names() -> impl Iterator<Item = &'static str> {
+		Self::type_info()
+			.as_struct()
+			.into_iter()
+			.flat_map(|info| info.iter().map(|field| field.name()))
 	}
 
-	/// Every environment variable name a beet launch reads, derived from
-	/// [`KNOBS`](Self::KNOBS) so a new knob cannot be forgotten.
+	/// The environment variable a field reads, ie `BEET_STORE_FORK`.
+	fn env_name(field: &str) -> SmolStr {
+		format!("BEET_{}", field.to_shouty_snake_case()).into()
+	}
+
+	/// Every argv key a beet launch reads, ie the `entry` of `--entry`, derived
+	/// from the field names.
+	pub fn arg_names() -> impl Iterator<Item = SmolStr> {
+		Self::field_names().map(|field| field.to_kebab_case().into())
+	}
+
+	/// Every environment variable name a beet launch reads, derived from the
+	/// field names so a new knob cannot be forgotten.
 	///
 	/// Every one is `BEET_*`, `BEET_WORKSPACE_ROOT` included, so
 	/// [`ChildProcess::without_launch_env`]'s prefix scrub already reaches them
 	/// all and this is belt and braces for a name that happens to be unset.
-	/// There was once a second list for the variables the prefix could not
-	/// reach; renaming the one member is what emptied it.
-	pub(crate) fn env_names() -> impl Iterator<Item = &'static str> {
-		let names = Self::KNOBS.iter().map(|knob| knob.env);
+	pub(crate) fn env_names() -> impl Iterator<Item = SmolStr> {
+		let names = Self::field_names().map(Self::env_name);
 		// the workspace root is the std filesystem's own variable
 		#[cfg(feature = "std")]
-		let names = names.chain([fs_ext::WORKSPACE_ROOT]);
+		let names = names.chain([SmolStr::from(fs_ext::WORKSPACE_ROOT)]);
 		names
 	}
 
@@ -367,56 +264,124 @@ impl BootstrapConfig {
 		params: &MultiMap<SmolStr, SmolStr>,
 		env: &dyn Fn(&str) -> Option<SmolStr>,
 	) -> Result<Self> {
-		Self::read(ConfigReader {
-			params,
-			env,
-			lenient: false,
-		})
+		let mut config = Self::default();
+		for field in Self::field_names() {
+			config.apply_field(field, params, env)?;
+		}
+		config.xok()
 	}
 
-	/// [`parse`](Self::parse) with each malformed field warned about and dropped
-	/// instead of failing the whole parse.
+	/// [`parse`](Self::parse) with each malformed field warned about and left
+	/// at its default instead of failing the whole parse.
 	fn parse_lenient(
 		params: &MultiMap<SmolStr, SmolStr>,
 		env: &dyn Fn(&str) -> Option<SmolStr>,
 	) -> Self {
-		Self::read(ConfigReader {
-			params,
-			env,
-			lenient: true,
-		})
-		// a lenient reader never errors
-		.unwrap_or_default()
+		let mut config = Self::default();
+		for field in Self::field_names() {
+			if let Err(err) = config.apply_field(field, params, env) {
+				warn!("{err}");
+			}
+		}
+		config
 	}
 
-	/// Read every field through `reader`.
-	fn read(reader: ConfigReader) -> Result<Self> {
-		Self {
-			entry: reader.value(Self::ENTRY),
-			repo: reader.parsed(Self::REPO)?,
-			store_fork: reader.parsed(Self::STORE_FORK)?,
-			watch: reader.flag(Self::WATCH),
-			features: reader.list(Self::FEATURES),
-			server: reader.filter(Self::SERVER),
-			path: reader.value(Self::PATH),
-			host: reader.parsed(Self::HOST)?,
-			http_port: reader.parsed(Self::HTTP_PORT)?,
-			ssh_port: reader.parsed(Self::SSH_PORT)?,
-			stage: reader
-				.value(Self::STAGE)
-				.unwrap_or_else(|| Self::DEFAULT_STAGE.into()),
-			service_access: reader
-				.parsed(Self::SERVICE_ACCESS)?
-				.unwrap_or_default(),
-			deploy_id: reader.value(Self::DEPLOY_ID),
-			deploy_timestamp: reader.value(Self::DEPLOY_TIMESTAMP),
-			tls: reader.bool_value(Self::TLS)?,
-			tls_dir: reader.value(Self::TLS_DIR),
-			headless: reader.flag(Self::HEADLESS),
-			screenshot: reader.value(Self::SCREENSHOT),
-			screenshot_frame: reader.parsed(Self::SCREENSHOT_FRAME)?,
+	/// Apply one field over its current value: its params values when the
+	/// request names it, else its `BEET_*` variable, through the same reflected
+	/// read every request param takes. A malformed value is a [`ParamError`]
+	/// naming both transports.
+	fn apply_field(
+		&mut self,
+		field: &'static str,
+		params: &MultiMap<SmolStr, SmolStr>,
+		env: &dyn Fn(&str) -> Option<SmolStr>,
+	) -> Result {
+		let flag = field.to_kebab_case();
+		let env_name = Self::env_name(field);
+		let info = Self::type_info()
+			.as_struct()?
+			.field(field)
+			.and_then(|field| field.type_info());
+		let Some(values) = params
+			.get_vec(flag.as_str())
+			.or_else(|| params.get_vec(field))
+			.cloned()
+			.and_then(|values| Self::present(values, info))
+			.or_else(|| env(&env_name).map(|value| vec![value]))
+		else {
+			return Ok(());
+		};
+		let values = match Self::is_list(info) {
+			true => {
+				let names = values
+					.iter()
+					.flat_map(|value| str_ext::csv(value))
+					.map(SmolStr::from)
+					.collect::<Vec<_>>();
+				match names.is_empty()
+					&& !matches!(Self::leaf(info), Some(TypeInfo::List(_)))
+				{
+					// a newtype list (`--server`) reads present and empty
+					true => vec![SmolStr::default()],
+					false => names,
+				}
+			}
+			false => values,
+		};
+		let mut map = MultiMap::<SmolStr, SmolStr>::default();
+		map.insert_vec(field.into(), values);
+		map.apply_reflect(self).map_err(|err| {
+			let reason = match err.downcast_ref::<ParamError>() {
+				Some(param) => match param.problem() {
+					ParamProblem::Invalid { reason } => reason.clone(),
+					_ => param.to_string(),
+				},
+				None => err.to_string(),
+			};
+			ParamError::invalid(
+				&flag,
+				format!("{reason} (`--{flag}` / `{env_name}`)"),
+			)
+			.into()
+		})
+	}
+
+	/// The values a present params key carries, `None` to fall back to env: a
+	/// bare key is a flag's `true` and a list's empty, but names no value for
+	/// any other knob.
+	fn present(
+		values: Vec<SmolStr>,
+		info: Option<&TypeInfo>,
+	) -> Option<Vec<SmolStr>> {
+		match values.is_empty() {
+			false => Some(values),
+			true if Self::is_list(info)
+				|| Self::leaf(info).is_some_and(|leaf| {
+					leaf.type_id() == core::any::TypeId::of::<bool>()
+				}) =>
+			{
+				Some(values)
+			}
+			true => None,
 		}
-		.xok()
+	}
+
+	/// A field type with any `Option` wrapper seen through.
+	fn leaf(info: Option<&TypeInfo>) -> Option<&TypeInfo> {
+		info.map(|info| reflect_ext::option_some_inner(info).unwrap_or(info))
+	}
+
+	/// Whether a field is a list knob, comma separated on either transport: a
+	/// list, or a newtype over one ([`RunningSetFilter`]).
+	fn is_list(info: Option<&TypeInfo>) -> bool {
+		match Self::leaf(info) {
+			Some(TypeInfo::List(_)) => true,
+			Some(TypeInfo::TupleStruct(newtype)) => newtype
+				.field_at(0)
+				.and_then(|field| field.type_info())
+				.is_some_and(|inner| matches!(inner, TypeInfo::List(_))),
+			_ => false,
+		}
 	}
 
 	/// Whether this process runs in the [production stage](Self::PROD_STAGE), the
@@ -446,18 +411,21 @@ impl BootstrapConfig {
 	/// rather than a silently corrupted unit file.
 	pub fn to_argv(&self) -> Result<Vec<SmolStr>> {
 		let mut argv = Vec::new();
-		let mut push = |knob: Knob, value: Option<String>| {
+		let mut push = |field: &str, value: Option<String>| {
 			if let Some(value) = value {
-				argv.push(SmolStr::from(format!("--{}={value}", knob.arg)));
+				argv.push(SmolStr::from(format!(
+					"--{}={value}",
+					field.to_kebab_case()
+				)));
 			}
 		};
 		self.render(&mut push);
 		// bare flags: `--watch` parses back as a flag, so no value is rendered.
-		if self.watch {
-			argv.push(SmolStr::from(format!("--{}", Self::WATCH.arg)));
-		}
-		if self.headless {
-			argv.push(SmolStr::from(format!("--{}", Self::HEADLESS.arg)));
+		for (field, set) in [("watch", self.watch), ("headless", self.headless)]
+		{
+			if set {
+				argv.push(SmolStr::from(format!("--{field}")));
+			}
 		}
 		for token in &argv {
 			Self::validate_token(token)?;
@@ -482,45 +450,31 @@ impl BootstrapConfig {
 	}
 
 	/// Every valued knob in render order, handed to `push` as
-	/// `(knob, value)`, the one enumeration [`to_argv`](Self::to_argv) and
-	/// [`to_env`](Self::to_env) share so the two channels cannot drift.
-	fn render(&self, push: &mut impl FnMut(Knob, Option<String>)) {
-		push(Self::ENTRY, self.entry.as_ref().map(ToString::to_string));
-		push(Self::REPO, self.repo.as_ref().map(ToString::to_string));
+	/// `(field, value)`, the one enumeration [`to_argv`](Self::to_argv) and
+	/// [`to_env`](Self::to_env) share so the two channels cannot drift. The
+	/// round trip test pins it to the parse.
+	fn render(&self, push: &mut impl FnMut(&str, Option<String>)) {
+		fn shown(value: Option<&impl ToString>) -> Option<String> {
+			value.map(ToString::to_string)
+		}
+		push("entry", shown(self.entry.as_ref()));
+		push("repo", shown(self.repo.as_ref()));
+		push("store_fork", shown(self.store_fork.as_ref()));
+		push("server", shown(self.server.as_ref()));
+		push("path", shown(self.path.as_ref()));
+		push("host", shown(self.host.as_ref()));
+		push("port", shown(self.port.as_ref()));
+		push("ssh_port", shown(self.ssh_port.as_ref()));
+		push("stage", self.rendered_stage());
+		push("service_access", self.rendered_service_access());
+		push("deploy_id", shown(self.deploy_id.as_ref()));
+		push("deploy_timestamp", shown(self.deploy_timestamp.as_ref()));
+		push("tls", shown(self.tls.as_ref()));
+		push("tls_dir", shown(self.tls_dir.as_ref()));
+		push("screenshot", shown(self.screenshot.as_ref()));
+		push("screenshot_frame", shown(self.screenshot_frame.as_ref()));
 		push(
-			Self::STORE_FORK,
-			self.store_fork.as_ref().map(ToString::to_string),
-		);
-		push(Self::SERVER, self.server.as_ref().map(ToString::to_string));
-		push(Self::PATH, self.path.as_ref().map(ToString::to_string));
-		push(Self::HOST, self.host.as_ref().map(ToString::to_string));
-		push(Self::HTTP_PORT, self.http_port.map(|port| port.to_string()));
-		push(Self::SSH_PORT, self.ssh_port.map(|port| port.to_string()));
-		push(Self::STAGE, self.rendered_stage());
-		push(Self::SERVICE_ACCESS, self.rendered_service_access());
-		push(
-			Self::DEPLOY_ID,
-			self.deploy_id.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::DEPLOY_TIMESTAMP,
-			self.deploy_timestamp.as_ref().map(ToString::to_string),
-		);
-		push(Self::TLS, self.tls.map(|tls| tls.to_string()));
-		push(
-			Self::TLS_DIR,
-			self.tls_dir.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::SCREENSHOT,
-			self.screenshot.as_ref().map(ToString::to_string),
-		);
-		push(
-			Self::SCREENSHOT_FRAME,
-			self.screenshot_frame.map(|frame| frame.to_string()),
-		);
-		push(
-			Self::FEATURES,
+			"features",
 			(!self.features.is_empty()).then(|| self.features.join(",")),
 		);
 	}
@@ -530,15 +484,15 @@ impl BootstrapConfig {
 	/// `Environment=` lines, a lambda function env and a Worker's env object.
 	pub fn to_env(&self) -> Vec<(SmolStr, SmolStr)> {
 		let mut pairs: Vec<(SmolStr, SmolStr)> = Vec::new();
-		let mut push = |knob: Knob, value: Option<String>| {
+		let mut push = |field: &str, value: Option<String>| {
 			if let Some(value) = value {
-				pairs.push((knob.env.into(), value.into()));
+				pairs.push((Self::env_name(field), value.into()));
 			}
 		};
 		self.render(&mut push);
-		// presence is the signal for a flag, so any value parses back as `true`.
-		push(Self::WATCH, self.watch.then(|| "1".to_string()));
-		push(Self::HEADLESS, self.headless.then(|| "1".to_string()));
+		// a flag reads back `true` from any truthy value
+		push("watch", self.watch.then(|| "1".to_string()));
+		push("headless", self.headless.then(|| "1".to_string()));
 		pairs
 	}
 
@@ -577,7 +531,7 @@ impl BootstrapConfig {
 		};
 		let env = Self {
 			host: self.host,
-			http_port: self.http_port,
+			port: self.port,
 			ssh_port: self.ssh_port,
 			stage: self.stage,
 			service_access: self.service_access,
@@ -592,16 +546,15 @@ impl BootstrapConfig {
 	/// This launch's bind address as IPv4 octets, see
 	/// [`ipv4_octets`](Self::ipv4_octets).
 	pub fn host_octets(&self) -> Option<[u8; 4]> {
-		self.host.and_then(Self::ipv4_octets)
+		self.host.and_then(|host| Self::ipv4_octets(*host))
 	}
 
 	/// A `--host` address as IPv4 octets, the form the server components hold.
 	///
-	/// `bevy_reflect` has no [`IpAddr`] impl, so a markup-declarable server field
-	/// stays `[u8; 4]`; the typed parse still lives here, which is what fixes the
-	/// old literal `"0.0.0.0"` check (every other value, including a real
-	/// address, silently became localhost). An IPv6 address warns and yields
-	/// `None`: the listeners bind a v4 socket.
+	/// A markup-declarable server field stays `[u8; 4]`; the typed parse still
+	/// lives here, which is what fixes the old literal `"0.0.0.0"` check (every
+	/// other value, including a real address, silently became localhost). An
+	/// IPv6 address warns and yields `None`: the listeners bind a v4 socket.
 	///
 	/// The one place that rule lives, shared with the boot-request overlay a
 	/// server applies over its declared host.
@@ -717,107 +670,6 @@ fn validate_process_config() -> Result {
 	Err(err)
 }
 
-/// Resolves one field across both transports: the `--kebab` param when present,
-/// else the `BEET_*` env var. The single place the argv-over-env rule lives, so
-/// no field can opt out of it.
-struct ConfigReader<'a> {
-	params: &'a MultiMap<SmolStr, SmolStr>,
-	env: &'a dyn Fn(&str) -> Option<SmolStr>,
-	/// Whether a malformed field warns and resolves to `None` instead of failing
-	/// the parse, for a `Default` impl with no error channel to raise on.
-	lenient: bool,
-}
-
-impl ConfigReader<'_> {
-	/// Every value for a knob: the params' values (repeated flags, in order) when
-	/// the key is present with a value, else the single env value.
-	fn values(&self, knob: Knob) -> Vec<SmolStr> {
-		match self.params.get_vec(knob.arg) {
-			Some(values) if !values.is_empty() => values.clone(),
-			_ => (self.env)(knob.env).into_iter().collect(),
-		}
-	}
-
-	/// The first value for a knob.
-	fn value(&self, knob: Knob) -> Option<SmolStr> {
-		self.values(knob).into_iter().next()
-	}
-
-	/// The first value parsed into `T`, naming its type and both transports on
-	/// failure.
-	fn parsed<T>(&self, knob: Knob) -> Result<Option<T>>
-	where
-		T: FromStr,
-		T::Err: Display,
-	{
-		match self.value(knob) {
-			Some(value) => match value.parse::<T>() {
-				Ok(parsed) => Ok(Some(parsed)),
-				Err(err) => self.malformed(
-					knob,
-					format!(
-						"`{value}` is no {}, {err}",
-						type_ext::short_name::<T>()
-					),
-				),
-			},
-			None => Ok(None),
-		}
-	}
-
-	/// A malformed field: a [`ParamError`] naming both transports, or in
-	/// lenient mode a warning and `None`.
-	fn malformed<T>(&self, knob: Knob, err: impl Display) -> Result<Option<T>> {
-		let reason = format!("{err} (`--{}` / `{}`)", knob.arg, knob.env);
-		match self.lenient {
-			true => {
-				warn!("invalid `--{}`: {reason}", knob.arg);
-				Ok(None)
-			}
-			false => Err(ParamError::invalid(knob.arg, reason).into()),
-		}
-	}
-
-	/// A bare-presence flag: `--watch`, or any `BEET_WATCH` value.
-	fn flag(&self, knob: Knob) -> bool {
-		self.params.contains_key(knob.arg) || (self.env)(knob.env).is_some()
-	}
-
-	/// An explicit on/off value, where a bare `--tls` (no value) means on.
-	fn bool_value(&self, knob: Knob) -> Result<Option<bool>> {
-		match self.value(knob) {
-			Some(value) => match value.trim() {
-				"1" | "true" | "on" | "yes" => Ok(Some(true)),
-				"0" | "false" | "off" | "no" => Ok(Some(false)),
-				other => self
-					.malformed(knob, format!("`{other}`, expected on or off")),
-			},
-			None if self.params.contains_key(knob.arg) => Ok(Some(true)),
-			None => Ok(None),
-		}
-	}
-
-	/// A comma-separated list, accumulated across repeated flags.
-	fn list(&self, knob: Knob) -> Vec<SmolStr> {
-		self.values(knob)
-			.iter()
-			.flat_map(|value| str_ext::csv(value))
-			.map(SmolStr::from)
-			.collect()
-	}
-
-	/// A [`RunningSetFilter`], through the filter's own param grammar so the boot-time
-	/// read and this one cannot diverge, falling back to the env transport.
-	/// `None` when the knob is absent from both, which is what lets a server fall
-	/// back to its own `default_boot`.
-	fn filter(&self, knob: Knob) -> Option<RunningSetFilter> {
-		RunningSetFilter::from_params(self.params).or_else(|| {
-			(self.env)(knob.env)
-				.map(|value| RunningSetFilter::new(value.as_str()))
-		})
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use super::BootstrapConfig;
@@ -841,7 +693,7 @@ mod test {
 			server: Some(RunningSetFilter::new("http,ssh")),
 			path: Some("/docs".into()),
 			host: Some("0.0.0.0".parse().unwrap()),
-			http_port: Some(8337),
+			port: Some(8337),
 			ssh_port: Some(2222),
 			stage: "prod".into(),
 			service_access: ServiceAccess::Remote,
@@ -915,12 +767,12 @@ mod test {
 	fn argv_beats_env() {
 		let params = CliArgs::parse("--port=9000").params;
 		let env = |key: &str| match key {
-			"BEET_HTTP_PORT" => Some(SmolStr::from("8337")),
+			"BEET_PORT" => Some(SmolStr::from("8337")),
 			"BEET_STAGE" => Some(SmolStr::from("prod")),
 			_ => None,
 		};
 		let config = BootstrapConfig::parse(&params, &env).unwrap();
-		config.http_port.xpect_eq(Some(9000));
+		config.port.xpect_eq(Some(9000));
 		// a field argv did not set still falls back to env
 		config.stage.as_str().xpect_eq("prod");
 	}
@@ -975,7 +827,7 @@ mod test {
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
 				"BEET_HOST",
-				"BEET_HTTP_PORT",
+				"BEET_PORT",
 				"BEET_SSH_PORT",
 				"BEET_STAGE",
 				"BEET_SERVICE_ACCESS",
@@ -989,9 +841,9 @@ mod test {
 	#[crate::test]
 	fn malformed_errors() {
 		let port = parse_argv("--port=nope").unwrap_err();
-		port.to_string().xpect_contains(
-			"invalid param `--port`: `nope` is no u16, invalid digit found in string (`--port` / `BEET_HTTP_PORT`)",
-		);
+		port.to_string()
+			.xpect_contains("invalid param `--port`: invalid number \"nope\"")
+			.xpect_contains("(`--port` / `BEET_PORT`)");
 		// the caller's mistake, which a launch exits on with the usage code
 		port.downcast_ref::<ParamError>()
 			.unwrap()
@@ -1012,7 +864,7 @@ mod test {
 			&CliArgs::parse("--port=nope --stage=prod").params,
 			&|_| None,
 		);
-		config.http_port.xpect_none();
+		config.port.xpect_none();
 		config.stage.as_str().xpect_eq("prod");
 	}
 
@@ -1062,17 +914,33 @@ mod test {
 		filter.passes("tui").xpect_false();
 	}
 
-	/// Beet spawning beet: the launch knobs leave the params (delivered on the
-	/// child's argv instead) and everything else is untouched, so a flag can
-	/// never be forwarded twice.
+	/// The process request keeps only the knobs a server reads at request
+	/// rank, in either spelling, and every param that is no knob at all.
 	#[crate::test]
-	fn take_params_consumes_only_the_knobs() {
-		let mut params = CliArgs::parse("--port=9090 --nocapture").params;
-		BootstrapConfig::take_params(&mut params)
-			.unwrap()
-			.http_port
-			.xpect_eq(Some(9090));
-		params.contains_key("port").xpect_false();
-		params.contains_key("nocapture").xpect_true();
+	fn strip_keeps_the_request_rank() {
+		let mut params = CliArgs::parse(
+			"--entry=site --store_fork=fs:/tmp --port=9090 --server=http --fix",
+		)
+		.params;
+		BootstrapConfig::strip(&mut params);
+		let mut keys = params.keys().map(SmolStr::as_str).collect::<Vec<_>>();
+		keys.sort();
+		keys.xpect_eq(vec!["fix", "port", "server"]);
+	}
+
+	/// The knob names derive from the fields: the kebab flag and the
+	/// `BEET_` screaming snake variable.
+	#[crate::test]
+	fn names_derive_from_the_fields() {
+		BootstrapConfig::arg_names()
+			.any(|name| name == "store-fork")
+			.xpect_true();
+		BootstrapConfig::env_names()
+			.any(|name| name == "BEET_STORE_FORK")
+			.xpect_true();
+		BootstrapConfig::REQUEST_RANK
+			.iter()
+			.all(|knob| BootstrapConfig::arg_names().any(|name| name == *knob))
+			.xpect_true();
 	}
 }

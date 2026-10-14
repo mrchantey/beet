@@ -103,7 +103,7 @@ struct CounterParams {
 
 fn counter() -> impl Bundle {
 	(
-		ParamsPartial::new::<CounterParams>(),
+		RouteParams::new::<CounterParams>(),
 		render_action::fixed_func_route("counter", || {
 			let field_ref = FieldRef::new("count").with_init(0);
 			rsx! {

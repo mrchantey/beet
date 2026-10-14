@@ -28,7 +28,8 @@ use beet_net::prelude::*;
 /// The [`RunGroup`] the route dispatches is taken by value at call time, so the
 /// run mode can be decided per request: `force_param` names the flag that
 /// switches it to continue-on-failure, which is what `--force` means on a
-/// teardown.
+/// teardown. The flag is data rather than a type, so the group declares it
+/// from its own hook.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 #[require(
@@ -36,6 +37,7 @@ use beet_net::prelude::*;
 	RunGroup<Request, Response>,
 	ExchangeOverload = group_overload(),
 )]
+#[component(on_insert = ExchangeGroup::declare_force_param)]
 pub struct ExchangeGroup {
 	/// The request param that switches this run into continue-on-failure mode,
 	/// ie `force` on a teardown. Absent, the run is whatever the [`RunGroup`]
@@ -49,6 +51,28 @@ impl ExchangeGroup {
 		Self {
 			force_param: Some(param.into()),
 		}
+	}
+
+	/// The `on_insert` hook declaring the [`force_param`](Self::force_param)
+	/// flag at route reach, re-run when a scene load re-inserts the group.
+	fn declare_force_param(mut world: DeferredWorld, cx: HookContext) {
+		let Some(flag) = world
+			.get::<Self>(cx.entity)
+			.and_then(|group| group.force_param.clone())
+		else {
+			return;
+		};
+		let meta = ParamMeta::new(flag.as_str(), ParamValue::Flag)
+			.with_description("Keep going past a failing step.");
+		Reach::Route.queue_push(
+			&mut world.commands(),
+			cx.entity,
+			ParamsDeclaration::named(
+				type_ext::short_name::<Self>(),
+				[meta],
+				false,
+			),
+		);
 	}
 }
 

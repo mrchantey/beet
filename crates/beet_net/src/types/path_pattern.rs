@@ -157,16 +157,6 @@ impl PathPattern {
 		.xok()
 	}
 
-	/// [`Self::Collect`] represented as a bevy system
-	/// [`Self::collect`] represented as a bevy system
-	pub fn collect_system(
-		entity: In<Entity>,
-		parents: Query<&ChildOf>,
-		path_partials: Query<&PathPartial>,
-	) -> Result<PathPattern> {
-		Self::collect(*entity, &parents, &path_partials)
-	}
-
 	/// Collects a [`PathPattern`] by traversing ancestor [`PathPartial`] components.
 	// Exposed for use in RouteQuery
 	pub fn collect(

@@ -19,12 +19,12 @@ use core::fmt::Write;
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("ls"),
-	ParamsPartial = ParamsPartial::new::<DocumentParams>()
-)]
-pub async fn SecretsLs(cx: ActionContext<Request>) -> Result<Response> {
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+#[require(PathPartial = PathPartial::new("ls"))]
+pub async fn SecretsLs(
+	document: Params<DocumentParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let handle = document.resolve(&cx.caller).await?;
 	let document = handle.read().await?;
 	// no identity is fine: every group is then locked
 	let identities = AgeIdentityFile::discover()?.unwrap_or_default();

@@ -29,6 +29,27 @@
 //! wrapper. A `#[field(mut)]` action emits no `IntoAction` at all, since a
 //! detached action has nothing to write back to.
 //!
+//! # Params
+//!
+//! A reader declares a request param by taking it. A `#[param]` parameter
+//! (the [`Prop`] grammar: a doc comment and an optional `short = 'x'`) becomes
+//! a field of a hidden `{Action}Params` struct, and a `Params<T>` parameter
+//! takes a whole params group, `Params<Rest>` every param. Both are parsed off
+//! the request before the body runs, through `?`, so an action taking params
+//! returns `Result` and a bad param is the caller's `400`. The same
+//! signature declares them: the component's `on_add` pushes their
+//! `ParamsDeclaration` into `RouteParams`, or `MiddlewareParams` when the input
+//! carries a `Next`.
+//!
+//! # The `on_add` hook
+//!
+//! Bevy keeps one `on_add` per component, so the macro emits one generated
+//! associated fn as the hook, path shaped so the action's `Self` and type
+//! params stay in scope. It runs, in order, the author's own `on_add`, the
+//! params declaration, the exchange adapter's declaration (a route converting
+//! its input and output declares what those conversions read) and the
+//! provider-integrity guard.
+//!
 //! # Metadata
 //!
 //! A macro cannot test a trait bound, so rather than an attribute declaring
@@ -96,13 +117,18 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		synbail!(&item.sig, "`local` is only valid on async actions");
 	}
 
-	// ── 3. Partition parameters into `#[field]`s and the rest ──
+	// ── 3. Partition parameters into `#[field]`s, params and the rest ──
 	let mut fields: Vec<Prop> = Vec::new();
+	let mut params = ActionParams::default();
 	let mut rest: Vec<&syn::PatType> = Vec::new();
 	for arg in &item.sig.inputs {
 		let pt = Prop::typed_arg(arg, "action")?;
 		if Prop::is_param(pt, "field") {
 			fields.push(Prop::parse(pt, "field")?);
+		} else if Prop::is_param(pt, "param") {
+			params.inline.push(ActionParams::parse_inline(pt)?);
+		} else if let Some(group) = ParamsGroup::parse(pt) {
+			params.groups.push(group);
 		} else {
 			rest.push(pt);
 		}
@@ -111,6 +137,12 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 	let has_component = has_derive(fn_attrs, "Component");
 	let has_mut = fields.iter().any(|field| field.mutable);
 
+	if !params.is_empty() && !has_component {
+		synbail!(
+			&item.sig,
+			"`#[param]` and `Params<T>` require `#[derive(Component)]`: the params are declared by a component hook"
+		);
+	}
 	if has_fields && !has_component {
 		synbail!(
 			&item.sig,
@@ -182,6 +214,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		fn_params,
 		preamble,
 		sys_params,
+		cx,
 	} = &parts;
 	let out_type = compute_out_type(&item, result_out);
 	let return_type = match &item.sig.output {
@@ -196,6 +229,22 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		ReturnType::Default => false,
 	};
 	let lift_ok = !(returns_result && !result_out);
+	if !params.is_empty() && !returns_result {
+		synbail!(
+			&item.sig,
+			"an action taking params returns `Result`, so a bad param is the caller's `400`"
+		);
+	}
+	if !params.is_empty() && in_type.to_string() == "()" {
+		synbail!(
+			&item.sig,
+			"an action taking params reads them off its request, so its input is a request, ie `cx: ActionContext<Request>`"
+		);
+	}
+	let beet_net = pkg_ext::internal_or_beet("beet_net");
+	let params_ident = format_ident!("{}Params", fn_name);
+	let params_struct = params.make_struct(&params_ident, &beet_net, &bevy);
+	let params_reads = params.make_reads(&params_ident, cx, &beet_net);
 
 	// ── 6. Build the struct definition ──
 	// the meta rides on the action itself: `Action` is the sole producer of
@@ -225,21 +274,42 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 			&beet_action,
 		)
 	});
+	let mut fn_attrs = fn_attrs.to_vec();
+	let on_add = OnAdd {
+		declare_params: params.make_declare(
+			&params_ident,
+			is_middleware,
+			&beet_net,
+		),
+		declare_exchange: (has_component && has_route && !is_response(&out_type))
+			.then(|| {
+				let beet_router = pkg_ext::internal_or_beet("beet_router");
+				quote! {
+					#beet_router::prelude::route::declare_exchange::<#in_type, #out_type, _, _>(world.reborrow(), cx);
+				}
+			}),
+		guard: (has_component && require_action.is_some()).then(|| {
+			quote! {
+				#beet_action::prelude::Action::<#in_type, #out_type>::assert_provider::<Self>(world.reborrow(), cx);
+			}
+		}),
+		author: None,
+	}
+	.take_author(&mut fn_attrs);
 	let struct_def = make_struct_def(
 		vis,
 		fn_name,
 		generics,
-		fn_attrs,
+		&fn_attrs,
 		&fields,
 		require_action,
+		on_add.attr(),
 		route_expr,
-		in_type,
-		&out_type,
-		&beet_core,
 	)?;
-	let clone_impl = (!no_clone && !has_derive(fn_attrs, "Clone"))
+	let on_add_fn = on_add.make_fn(fn_name, generics, &bevy);
+	let clone_impl = (!no_clone && !has_derive(&fn_attrs, "Clone"))
 		.then(|| make_clone(fn_name, generics, &fields));
-	let default_impl = (!no_default && !has_derive(fn_attrs, "Default"))
+	let default_impl = (!no_default && !has_derive(&fn_attrs, "Default"))
 		.then(|| make_default(fn_name, generics, &fields));
 
 	// ── 7. Build the handler function at module level ──
@@ -260,6 +330,7 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 		#async_kw fn #action_fn_name #impl_generics (
 			#(#field_params,)* #fn_params
 		) -> #return_type #where_clause {
+			#params_reads
 			#preamble
 			#[allow(unused_braces)]
 			#body
@@ -391,10 +462,12 @@ fn parse(attr: TokenStream, item: ItemFn) -> syn::Result<TokenStream> {
 
 	// ── 9. Assemble output ──
 	Ok(quote! {
+		#params_struct
 		#handler_fn
 		#wrapper_fn
 		#captured_fn
 		#struct_def
+		#on_add_fn
 		#clone_impl
 		#default_impl
 		#into_action
@@ -417,6 +490,9 @@ struct FnParts {
 	/// author's attributes (a `#[cfg]` param exists in only some builds) and
 	/// binding pattern (so a `mut` binding stays mutable)
 	sys_params: Vec<SysParam>,
+	/// the handler's binding of its `ActionContext`, which params are read
+	/// through
+	cx: syn::Ident,
 }
 
 /// One non-`#[field]` system parameter, as the handler declares it.
@@ -478,6 +554,7 @@ impl FnParts {
 					},
 					preamble: quote! { let _ = __action_cx.input; },
 					sys_params: Vec::new(),
+					cx: action_cx(),
 				}
 			}
 			Some(pt) => {
@@ -492,6 +569,7 @@ impl FnParts {
 						},
 						preamble: TokenStream::default(),
 						sys_params: Vec::new(),
+						cx: param_name,
 					}
 				} else {
 					// Bare input: destructure from context
@@ -503,6 +581,7 @@ impl FnParts {
 						},
 						preamble: quote! { let #pat = __action_cx.input; },
 						sys_params: Vec::new(),
+						cx: action_cx(),
 					}
 				}
 			}
@@ -544,7 +623,7 @@ impl FnParts {
 				.collect()
 		};
 
-		let (in_type, first_fn_param, preamble, sys_params) = match params
+		let (in_type, first_fn_param, preamble, sys_params, cx) = match params
 			.first()
 		{
 			None => (
@@ -554,6 +633,7 @@ impl FnParts {
 				},
 				quote! { let _ = __action_cx.input; },
 				Vec::new(),
+				action_cx(),
 			),
 			Some(pt) => {
 				let ty = pt.ty.as_ref();
@@ -569,6 +649,7 @@ impl FnParts {
 							},
 							TokenStream::default(),
 							sys_params_from(1),
+							param_name,
 						)
 					} else {
 						// In<T> → system action with input T
@@ -580,6 +661,7 @@ impl FnParts {
 							},
 							quote! { let #param_name = In(__action_cx.input); },
 							sys_params_from(1),
+							action_cx(),
 						)
 					}
 				} else if let Some(inner) = extract_action_context_type(ty) {
@@ -592,6 +674,7 @@ impl FnParts {
 						},
 						TokenStream::default(),
 						sys_params_from(1),
+						param_name,
 					)
 				} else {
 					// No input marker → all params are system params
@@ -602,6 +685,7 @@ impl FnParts {
 						},
 						quote! { let _ = __action_cx.input; },
 						sys_params_from(0),
+						action_cx(),
 					)
 				}
 			}
@@ -618,8 +702,192 @@ impl FnParts {
 			fn_params,
 			preamble,
 			sys_params,
+			cx,
 		})
 	}
+}
+
+/// The handler's default binding of its `ActionContext`.
+fn action_cx() -> syn::Ident {
+	syn::Ident::new("__action_cx", proc_macro2::Span::call_site())
+}
+
+// ---------------------------------------------------------------------------
+// Params
+// ---------------------------------------------------------------------------
+
+/// The request params an action takes, see the [module](self) docs.
+#[derive(Default)]
+struct ActionParams {
+	/// `#[param]` parameters, the fields of the hidden `{Action}Params` struct.
+	inline: Vec<InlineParam>,
+	/// `Params<T>` parameters, in argument order.
+	groups: Vec<ParamsGroup>,
+}
+
+/// One `#[param]` parameter.
+struct InlineParam {
+	/// The field the hidden struct declares.
+	prop: Prop,
+	/// The author's binding, preserving `mut`.
+	pat: syn::PatIdent,
+}
+
+/// One `Params<T>` parameter.
+struct ParamsGroup {
+	/// The author's binding pattern.
+	pat: syn::Pat,
+	/// The `T` of `Params<T>`.
+	ty: Type,
+	/// Whether `T` is `Rest`, every param the request carries.
+	is_rest: bool,
+}
+
+impl ParamsGroup {
+	/// The group a `Params<T>` parameter takes, `None` for any other type.
+	fn parse(pt: &syn::PatType) -> Option<Self> {
+		let ty = extract_wrapper_type(&pt.ty, "Params")?;
+		Some(Self {
+			pat: (*pt.pat).clone(),
+			ty: ty.clone(),
+			is_rest: is_wrapper_without_args(ty, "Rest"),
+		})
+	}
+}
+
+impl ActionParams {
+	/// Parse a `#[param]` parameter, which takes a doc comment and a `short`.
+	fn parse_inline(pt: &syn::PatType) -> syn::Result<InlineParam> {
+		let prop = Prop::parse(pt, "param")?;
+		if prop.required
+			|| prop.mutable
+			|| prop.no_clone
+			|| prop.default_expr.is_some()
+		{
+			synbail!(
+				&prop.ident,
+				"a `#[param]` takes only `short = 'x'`: its type alone says whether it is required"
+			);
+		}
+		Ok(InlineParam {
+			pat: Prop::param_pat_ident(pt, "param")?,
+			prop,
+		})
+	}
+
+	/// Whether the action takes no params.
+	fn is_empty(&self) -> bool {
+		self.inline.is_empty() && self.groups.is_empty()
+	}
+
+	/// The hidden `{Action}Params` struct holding the `#[param]` fields, each
+	/// keeping its doc comment as its `--help` description.
+	fn make_struct(
+		&self,
+		ident: &syn::Ident,
+		beet_net: &syn::Path,
+		bevy: &syn::Path,
+	) -> Option<TokenStream> {
+		if self.inline.is_empty() {
+			return None;
+		}
+		let fields = self.inline.iter().map(|InlineParam { prop, .. }| {
+			let Prop {
+				ident,
+				ty,
+				short,
+				other_attrs,
+				..
+			} = prop;
+			let short = short.as_ref().map(|short| {
+				quote! { #[reflect(@#beet_net::prelude::ParamOptions::short(#short))] }
+			});
+			quote! {
+				#(#other_attrs)*
+				#short
+				#ident: #ty
+			}
+		});
+		quote! {
+			#[derive(#bevy::reflect::Reflect)]
+			#[doc(hidden)]
+			#[allow(non_camel_case_types)]
+			struct #ident {
+				#(#fields,)*
+			}
+		}
+		.into()
+	}
+
+	/// The reads ahead of the body: the `#[param]` fields destructured out of
+	/// the hidden struct, then each `Params<T>` in argument order.
+	fn make_reads(
+		&self,
+		ident: &syn::Ident,
+		cx: &syn::Ident,
+		beet_net: &syn::Path,
+	) -> TokenStream {
+		let parts = quote! {
+			#beet_net::prelude::RequestPartsRef::request_parts(&#cx.input)
+		};
+		let inline = (!self.inline.is_empty()).then(|| {
+			// shorthand, the author's binding being the field's own name
+			let bindings = self
+				.inline
+				.iter()
+				.map(|InlineParam { pat, .. }| quote! { #pat });
+			quote! {
+				let #ident { #(#bindings,)* } = #parts.parse_params::<#ident>()?;
+			}
+		});
+		let groups = self.groups.iter().map(|group| {
+			let ParamsGroup { pat, ty, is_rest } = group;
+			match is_rest {
+				true => quote! {
+					let #pat = #beet_net::prelude::Params(#beet_net::prelude::Rest::from(#parts));
+				},
+				false => quote! {
+					let #pat = #beet_net::prelude::Params(#parts.parse_params::<#ty>()?);
+				},
+			}
+		});
+		quote! { #inline #(#groups)* }
+	}
+
+	/// The `on_add` step declaring every param the action takes, the hidden
+	/// struct then each group: route reach for an action, middleware reach when
+	/// the input carries a `Next`.
+	fn make_declare(
+		&self,
+		ident: &syn::Ident,
+		is_middleware: bool,
+		beet_net: &syn::Path,
+	) -> Option<TokenStream> {
+		if self.is_empty() {
+			return None;
+		}
+		let types = (!self.inline.is_empty())
+			.then(|| quote! { #ident })
+			.into_iter()
+			.chain(self.groups.iter().map(|group| {
+				let ty = &group.ty;
+				quote! { #ty }
+			}));
+		let list = match is_middleware {
+			true => quote! { MiddlewareParams },
+			false => quote! { RouteParams },
+		};
+		quote! {
+			#beet_net::prelude::#list::declare::<Self, (#(#types,)*)>(world.reborrow(), cx);
+		}
+		.into()
+	}
+}
+
+/// Whether an output type is already a `Response`, needing no conversion.
+fn is_response(out_type: &TokenStream) -> bool {
+	syn::parse2::<Type>(out_type.clone())
+		.is_ok_and(|ty| is_wrapper_without_args(&ty, "Response"))
 }
 
 // ---------------------------------------------------------------------------
@@ -991,58 +1259,15 @@ fn make_struct_def(
 	fn_attrs: &[syn::Attribute],
 	fields: &[Prop],
 	require_action: Option<TokenStream>,
+	on_add_attr: TokenStream,
 	route_expr: Option<&syn::Expr>,
-	in_type: &TokenStream,
-	out_type: &TokenStream,
-	beet_core: &syn::Path,
 ) -> syn::Result<TokenStream> {
 	let has_component = has_derive(fn_attrs, "Component");
 
-	let require_action = if has_component {
-		if let Some(expr) = require_action {
-			quote! { #[require(#expr)] }
-		} else {
-			TokenStream::default()
-		}
-	} else {
-		TokenStream::default()
+	let require_action = match (has_component, require_action) {
+		(true, Some(expr)) => quote! { #[require(#expr)] },
+		_ => TokenStream::default(),
 	};
-
-	// provider-integrity guard: fail loudly if a colocated explicit action takes
-	// the slot this struct's `#[require]` provides.
-	//
-	// Bevy keeps one `on_add` per component and silently takes the last it
-	// parses, so an author's own hook is chained ahead of the guard rather than
-	// emitted beside it.
-	let beet_action = pkg_ext::internal_or_beet("beet_action");
-	let (_, ty_generics, _) = generics.split_for_impl();
-	let struct_ty = quote! { #fn_name #ty_generics };
-	let guard = quote! {
-		#beet_action::prelude::Action::<#in_type, #out_type>::assert_provider::<#struct_ty>
-	};
-	let needs_guard = has_component && !require_action.is_empty();
-	let mut fn_attrs = fn_attrs.to_vec();
-	let assert_provider = match needs_guard {
-		false => TokenStream::default(),
-		true => match take_on_add(&mut fn_attrs) {
-			Some(author) => {
-				// bevy wraps a call-shaped hook in an inner fn, which has neither
-				// `Self` nor the action's type params in scope.
-				if generics.type_params().next().is_some() {
-					synbail!(
-						fn_name,
-						"a generic `#[action]` cannot declare its own `#[component(on_add = ..)]`: \
-						 the chained hook loses the type params"
-					);
-				}
-				quote! {
-					#[component(on_add = #beet_core::prelude::hook_ext::chain(#author, #guard))]
-				}
-			}
-			None => quote! { #[component(on_add = #guard)] },
-		},
-	};
-	let fn_attrs = &fn_attrs;
 
 	let require_path = if has_component && let Some(expr) = route_expr {
 		let beet_net = pkg_ext::internal_or_beet("beet_net");
@@ -1068,50 +1293,117 @@ fn make_struct_def(
 	Ok(quote! {
 		#(#fn_attrs)*
 		#require_action
-		#assert_provider
+		#on_add_attr
 		#require_path
 		#[allow(non_camel_case_types)]
 		#vis struct #fn_name #generics #where_clause #body
 	})
 }
 
+/// The component's one `on_add`, see the [module](self) docs: each step is a
+/// statement on `world.reborrow()`, and the hook is emitted only when there is
+/// a generated step to run.
+struct OnAdd {
+	/// The author's own `on_add`, taken out of their `#[component(..)]`.
+	author: Option<TokenStream>,
+	/// Pushes the declaration of the params the action takes.
+	declare_params: Option<TokenStream>,
+	/// Pushes the declaration of the params a route's exchange adapter reads.
+	declare_exchange: Option<TokenStream>,
+	/// The provider-integrity guard: fail loudly if a colocated explicit action
+	/// takes the slot this struct's `#[require]` provides.
+	guard: Option<TokenStream>,
+}
+
+impl OnAdd {
+	/// Whether any generated step runs, so the hook is emitted.
+	fn is_generated(&self) -> bool {
+		self.declare_params.is_some()
+			|| self.declare_exchange.is_some()
+			|| self.guard.is_some()
+	}
+
+	/// Take the author's `on_add` out of `attrs` to run it first, when the hook
+	/// is emitted; otherwise the author's attribute stays where it is.
+	fn take_author(mut self, attrs: &mut Vec<syn::Attribute>) -> Self {
+		if self.is_generated() {
+			self.author = take_on_add(attrs)
+				.map(|author| quote! { (#author)(world.reborrow(), cx); });
+		}
+		self
+	}
+
+	/// The `#[component(on_add = ..)]` attribute naming the generated fn.
+	fn attr(&self) -> TokenStream {
+		match self.is_generated() {
+			true => quote! { #[component(on_add = Self::__action_on_add)] },
+			false => TokenStream::default(),
+		}
+	}
+
+	/// The generated fn, an associated fn so `Self` and the action's type
+	/// params stay in scope for every step.
+	fn make_fn(
+		&self,
+		fn_name: &syn::Ident,
+		generics: &syn::Generics,
+		bevy: &syn::Path,
+	) -> Option<TokenStream> {
+		if !self.is_generated() {
+			return None;
+		}
+		let Self {
+			author,
+			declare_params,
+			declare_exchange,
+			guard,
+		} = self;
+		let (impl_generics, ty_generics, where_clause) =
+			generics.split_for_impl();
+		quote! {
+			impl #impl_generics #fn_name #ty_generics #where_clause {
+				#[doc(hidden)]
+				#[allow(unused_mut)]
+				fn __action_on_add(
+					mut world: #bevy::ecs::world::DeferredWorld,
+					cx: #bevy::ecs::lifecycle::HookContext,
+				) {
+					#author
+					#declare_params
+					#declare_exchange
+					#guard
+				}
+			}
+		}
+		.into()
+	}
+}
+
 /// Strip an `on_add = expr` out of a `#[component(..)]` attribute, returning the
-/// expression so it can be chained ahead of the generated provider guard. Other
-/// keys (`immutable`, `on_remove`, ..) stay where they are, and an attribute
-/// left empty is dropped.
+/// expression so the generated hook runs it first. Other keys (`immutable`,
+/// `on_remove`, ..) stay where they are, and an attribute left empty is
+/// dropped.
 fn take_on_add(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
 	let mut taken = None;
 	attrs.retain_mut(|attr| {
 		if taken.is_some() || !attr.path().is_ident("component") {
 			return true;
 		}
-		let syn::Meta::List(list) = &attr.meta else {
+		// parsed as metas, so a generic path's commas stay in its expression
+		let Ok(metas) = attr.parse_args_with(
+			syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+		) else {
 			return true;
 		};
-		let mut kept: Vec<TokenStream> = Vec::new();
-		for arg in split_args(list.tokens.clone()) {
-			match arg
-				.clone()
-				.into_iter()
-				.next()
-				.is_some_and(|tt| matches!(&tt, proc_macro2::TokenTree::Ident(ident) if ident == "on_add"))
-			{
-				true => {
-					taken = Some(
-						arg.into_iter()
-							.skip_while(|tt| {
-								!matches!(tt, proc_macro2::TokenTree::Punct(punct) if punct.as_char() == '=')
-							})
-							.skip(1)
-							.collect::<TokenStream>(),
-					);
-				}
-				false => kept.push(arg),
-			}
-		}
-		if taken.is_none() {
+		let (on_add, kept): (Vec<_>, Vec<_>) = metas
+			.into_iter()
+			.partition(|meta| meta.path().is_ident("on_add"));
+		let Some(syn::Meta::NameValue(on_add)) = on_add.into_iter().next()
+		else {
 			return true;
-		}
+		};
+		let value = on_add.value;
+		taken = Some(quote! { #value });
 		if kept.is_empty() {
 			return false;
 		}
@@ -1119,25 +1411,6 @@ fn take_on_add(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
 		true
 	});
 	taken
-}
-
-/// Split a comma-separated attribute argument list into its top-level args.
-fn split_args(tokens: TokenStream) -> Vec<TokenStream> {
-	let mut args: Vec<Vec<proc_macro2::TokenTree>> = Vec::new();
-	let mut current: Vec<proc_macro2::TokenTree> = Vec::new();
-	for tt in tokens {
-		match &tt {
-			proc_macro2::TokenTree::Punct(punct) if punct.as_char() == ',' => {
-				args.push(core::mem::take(&mut current));
-			}
-			_ => current.push(tt),
-		}
-	}
-	args.push(current);
-	args.into_iter()
-		.filter(|arg| !arg.is_empty())
-		.map(|arg| arg.into_iter().collect())
-		.collect()
 }
 
 /// The `_marker` field pinning a generic action's type params, `None` when the
@@ -2206,10 +2479,10 @@ mod test {
 		assert!(result.contains("cfg (feature = \"tui\")] sessions)"));
 	}
 
-	/// Bevy keeps one `on_add` per component and silently takes the last, so an
-	/// author's hook is chained ahead of the provider guard.
+	/// Bevy keeps one `on_add` per component and silently takes the last, so the
+	/// author's hook runs first inside the one generated hook.
 	#[test]
-	fn author_on_add_chains_with_the_guard() {
+	fn author_on_add_runs_inside_the_generated_hook() {
 		let result = parse_str(quote!(), syn::parse_quote! {
 			#[derive(Component, Reflect)]
 			#[component(on_add = hook_ext::entity_hook(FixedPage::insert_page_root))]
@@ -2217,10 +2490,175 @@ mod test {
 				todo!()
 			}
 		});
-		assert!(result.contains("hook_ext :: chain"));
-		assert!(result.contains("assert_provider :: < FixedPage >"));
+		assert!(result.contains("on_add = Self :: __action_on_add"));
+		assert!(result.contains("assert_provider :: < Self >"));
 		// exactly one `on_add`, so neither hook is dropped
-		assert_eq!(result.matches("on_add").count(), 1);
+		assert_eq!(result.matches("on_add =").count(), 1);
+	}
+
+	/// The generated hook runs the author's hook, the params declaration, the
+	/// exchange declaration and the guard, in that order.
+	#[test]
+	fn generated_on_add_runs_in_order() {
+		let result = parse_str(quote!(route), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			#[component(on_add = author_hook)]
+			async fn Serve(
+				#[param] port: u16,
+				cx: ActionContext<RequestParts>,
+			) -> Result<String> {
+				todo!()
+			}
+		});
+		let steps = [
+			"(author_hook) (world . reborrow () , cx)",
+			"RouteParams :: declare",
+			"route :: declare_exchange",
+			"assert_provider",
+		]
+		.map(|step| result.find(step).unwrap());
+		assert!(steps.windows(2).all(|pair| pair[0] < pair[1]));
+	}
+
+	/// An inline `#[param]` lands on a hidden params struct carrying its doc
+	/// and short flag, declared at route reach and read before the body.
+	#[test]
+	fn inline_param_declares_and_reads() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Audit(
+				/// Repair what the audit finds.
+				#[param(short = 'f')] mut fix: bool,
+				cx: ActionContext<Request>,
+			) -> Result<String> {
+				todo!()
+			}
+		});
+		assert!(result.contains("struct AuditParams"));
+		assert!(result.contains("ParamOptions :: short ('f')"));
+		assert!(result.contains("Repair what the audit finds."));
+		assert!(
+			result.contains(
+				"RouteParams :: declare :: < Self , (AuditParams ,) >"
+			)
+		);
+		assert!(result.contains(
+			"let AuditParams { mut fix , } = beet_net :: prelude :: RequestPartsRef :: request_parts (& cx . input) . parse_params :: < AuditParams > () ?"
+		));
+		// the param is no handler argument
+		assert!(result.contains("async fn audit_action (cx :"));
+	}
+
+	/// A `Params<T>` group is declared and read whole, with no hidden struct.
+	#[test]
+	fn params_group_declares_and_reads() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Run(
+				entry: Params<EntryParams>,
+				cx: ActionContext<Request>,
+			) -> Result<String> {
+				todo!()
+			}
+		});
+		assert!(!result.contains("struct RunParams"));
+		assert!(
+			result.contains(
+				"RouteParams :: declare :: < Self , (EntryParams ,) >"
+			)
+		);
+		assert!(result.contains(
+			"let entry = beet_net :: prelude :: Params (beet_net :: prelude :: RequestPartsRef :: request_parts (& cx . input) . parse_params :: < EntryParams > () ?)"
+		));
+	}
+
+	/// `Params<Rest>` binds every param the request carries and declares the
+	/// route a rest taker.
+	#[test]
+	fn params_rest_binds_the_rest() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn RunWasm(rest: Params<Rest>, cx: ActionContext<Request>) -> Result<String> {
+				todo!()
+			}
+		});
+		assert!(result.contains("(Rest ,)"));
+		assert!(result.contains(
+			"let rest = beet_net :: prelude :: Params (beet_net :: prelude :: Rest :: from (beet_net :: prelude :: RequestPartsRef :: request_parts (& cx . input)))"
+		));
+	}
+
+	/// Middleware's params reach every route beneath it.
+	#[test]
+	fn middleware_params_reach_beneath() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn HelpHandler(
+				#[param] help: bool,
+				cx: ActionContext<(Request, Next<Request, Response>)>,
+			) -> Result<Response> { todo!() }
+		});
+		assert!(result.contains("MiddlewareParams :: declare"));
+		assert!(!result.contains("RouteParams :: declare"));
+	}
+
+	/// A route declares what its exchange adapter's conversions read, beside the
+	/// adapter it requires; one already answering a `Response` converts nothing.
+	#[test]
+	fn route_declares_its_exchange() {
+		let result = parse_str(quote!(route), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Page(cx: ActionContext<Request>) -> Result<PageRequest> {
+				todo!()
+			}
+		});
+		assert!(result.contains(
+			"route :: exchange_overload :: < Request , PageRequest , _ , _ >"
+		));
+		assert!(result.contains(
+			"route :: declare_exchange :: < Request , PageRequest , _ , _ >"
+		));
+		let result = parse_str(quote!(route), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Echo(cx: ActionContext<Request>) -> Result<Response> {
+				todo!()
+			}
+		});
+		assert!(!result.contains("declare_exchange"));
+	}
+
+	/// A bad param is the caller's `400`, which needs a `Result` to raise.
+	#[test]
+	fn params_require_a_result() {
+		let err = parse_err(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Bad(#[param] fix: bool, cx: ActionContext<Request>) -> String {
+				todo!()
+			}
+		});
+		assert!(err.contains("an action taking params returns `Result`"));
+	}
+
+	/// A generic action keeps its type params in the generated hook, so it may
+	/// take params like any other.
+	#[test]
+	fn generic_action_takes_params() {
+		let result = parse_str(quote!(), syn::parse_quote! {
+			#[derive(Component, Reflect)]
+			async fn Typed<T>(
+				#[param] verbose: bool,
+				cx: ActionContext<Request>,
+			) -> Result<String>
+			where
+				T: 'static + Send + Sync,
+			{
+				todo!()
+			}
+		});
+		assert!(result.contains(
+			"impl < T > Typed < T > where T : 'static + Send + Sync"
+		));
+		assert!(result.contains("fn __action_on_add"));
 	}
 
 	/// A `no_clone` field lands on the struct but is never bound, so an

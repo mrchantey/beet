@@ -4,14 +4,6 @@ use super::VaultParams;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`VaultDecrypt`], surfaced in `--help`.
-#[derive(Reflect)]
-struct DecryptParams {
-	/// Write the plaintext to this file, owner-only, instead of printing it:
-	/// the way out for a file that is not text.
-	out: Option<String>,
-}
-
 /// Print an age file's plaintext. This is the deliberate print: the
 /// plaintext is the response, so `beet vault/decrypt --vault=x.age > x`
 /// lands it wherever a shell sends stdout, and `--out` writes it to an
@@ -24,15 +16,18 @@ struct DecryptParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("decrypt"),
-	ParamsPartial = ParamsPartial::new::<(VaultParams, DecryptParams)>()
-)]
-pub async fn VaultDecrypt(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<DecryptParams>()?;
-	let vault = VaultParams::resolve(&cx.input)?;
+#[require(PathPartial = PathPartial::new("decrypt"))]
+pub async fn VaultDecrypt(
+	vault: Params<VaultParams>,
+	/// Write the plaintext to this file, owner-only, instead of printing it:
+	/// the way out for a file that is not text.
+	#[param]
+	out: Option<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let vault = vault.resolve()?;
 	let plaintext = vault.read(&AgeIdentityFile::require()?).await?;
-	match params.out {
+	match out {
 		Some(out) => {
 			fs_ext::write_private(&out, &plaintext)?;
 			Response::ok_text(format!(

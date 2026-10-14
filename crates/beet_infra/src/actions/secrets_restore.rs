@@ -44,9 +44,10 @@ struct RestoreParams {
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<RestoreParams>())]
-pub async fn SecretsRestore(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<RestoreParams>()?;
+pub async fn SecretsRestore(
+	params: Params<RestoreParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let store = secret_store(&cx.caller).await?;
 	let source = SecretsRestore::source(
 		&cx.caller,

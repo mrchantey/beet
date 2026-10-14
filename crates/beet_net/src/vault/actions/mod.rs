@@ -1,5 +1,5 @@
-//! The `vault` verbs, one file per verb, each a route action carrying its
-//! own params type so `--help` documents its flags: the identity verbs
+//! The `vault` verbs, one file per verb, each a route action taking its
+//! params in its signature so `--help` documents its flags: the identity verbs
 //! (`keygen`, `backup`, `restore-identity`) and the file verbs (`encrypt`,
 //! `decrypt`, `rekey`), which take `--vault=<path or store uri>` and act on
 //! one age file. Every verb but `keygen` resolves its identity through
@@ -41,9 +41,9 @@ pub(crate) struct VaultParams {
 }
 
 impl VaultParams {
-	/// The file the request names.
-	pub(crate) fn resolve(request: &Request) -> Result<VaultHandle> {
-		VaultHandle::from_uri(&request.parse_params::<Self>()?.vault)
+	/// The file `--vault` names.
+	pub(crate) fn resolve(&self) -> Result<VaultHandle> {
+		VaultHandle::from_uri(&self.vault)
 	}
 }
 

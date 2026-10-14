@@ -29,7 +29,20 @@ impl Plugin for ServerPlugin {
 			// start sweep. That declaration is registered here, instantiated for
 			// the start verb's event, so a root authors `{SweepDescendants}`.
 			.register_type::<CallOnStart>()
-			.register_type::<SweepDescendants<StartRunning<Request>>>();
+			.register_type::<SweepDescendants<StartRunning<Request>>>()
+			// the strict url space every `CliServer` requires
+			.register_type::<RejectUnknownParams>()
+			// what each server reads off its start request, inherited by every
+			// route beneath it
+			.declare_params::<CliServer>(
+				Reach::Middleware,
+				ParamsDeclaration::new::<CliServer, (CliParams, BootParams)>(),
+			)
+			.declare_params::<HttpServer>(
+				Reach::Middleware,
+				ParamsDeclaration::new::<HttpServer, (BootParams, ServerParams)>(
+				),
+			);
 
 		// the repl reads a real stdin on a background thread, so it exists only
 		// where there is one.

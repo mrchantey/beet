@@ -6,7 +6,7 @@ An [`Action`] component turns an entity into a function: `call` runs its handler
 
 An entity holds **at most one** action, and [`ActionMeta`] describes it: `Action` is the only producer of that descriptor (`ActionMeta` is immutable, so every change is an insert consumers can observe), and a second action with a different handler raises rather than silently taking the slot. Resolution is self-only, so `entity.call::<In, Out>(input)` never wanders into a relationship: it takes the entity's canonical `Action<In, Out>`, else an [`ActionOverload<In, Out>`] adapting that canonical action to another signature. `ActionMeta::matches::<In, Out>()` is the one matching predicate, used by call resolution, [`Sequence`] child validation, and the downward child selector. `ActionOf` / `Actions` mean agent targeting and nothing else; `AgentRoot` marks a subtree's agent by containment, so a wrapped tree keeps resolving (see `AgentQuery`).
 
-A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. A component declaring an `on_add` of its own keeps it: bevy allows one hook per event and silently takes the last, so the macro chains the author's ahead of the guard rather than emitting a second attribute. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
+A provider (a component that `#[require]`s an action, ie `ContinueRun`, [`RunningSet`], every `#[action]` component) guards its slot with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. A component declaring an `on_add` of its own keeps it: bevy allows one hook per event and silently takes the last, so the macro runs the author's first inside the one hook it generates (see Params below). Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
 
 ```rust
 # use beet_core::prelude::*;
@@ -88,6 +88,29 @@ The macro emits no constructors: where `Foo::new(..)` earns its keep, write a pl
 Metadata needs no declaration either. A macro cannot test a trait bound, so [`MaybeTyped`] probes `Self`, `In` and `Out` where the call is written and [`ActionMeta`] takes whatever came back: a doc description from a reflecting handler, a schema from a reflecting input or output. An action whose input is a `Request` and a generic one whose own type is not `Typed` both simply get less, with nothing to spell.
 
 Hand-written pairs remain permitted — the merge removes the *forced* two-type pattern, not the ability to write a provider. Two in the tree keep theirs and say why: `BuildArtifact`, whose type must exist in builds its action does not, and `BuildWasm`, whose fields are a patch base the request writes over through reflect rather than values bound once per call.
+
+## Params: declare by taking
+
+An action reads request params by taking them in its signature, and that one statement is also their declaration, so nothing is declared in one place and read in another. A `#[param]` argument takes one param, a field of a hidden `{Action}Params` struct: its doc comment is its `--help` description, `short = 'x'` its short flag, and its type alone says whether it is required. A `Params<T>` argument takes every field of a `Reflect` group, and `Params<Rest>` every param the request carries, so a strict url space refuses nothing on its route. Both are parsed off the request before the body runs:
+
+```rust,ignore
+#[action(route = "audit")]
+#[derive(Default, Clone, Component, Reflect)]
+#[reflect(Component)]
+async fn Audit(
+	/// Repair what the audit finds.
+	#[param(short = 'f')]
+	fix: bool,
+	entry: Params<EntryParams>,
+	cx: ActionContext<Request>,
+) -> Result<String> {
+	// `fix` and `entry` are bound before the body runs
+}
+```
+
+The reach is inferred from the input: a plain action declares into `RouteParams`, read by the route it sits on, and middleware (a `Next` in its input) into `MiddlewareParams`, read by every route beneath it. An action taking params returns `Result`, since a bad param is the caller's `400`, raised through `?` ahead of the body, and its input is a request (`Request` or `RequestParts`, alone or beside a `Next`); either missing is a compile error, as is a param on an action without `#[derive(Component)]`, whose hook does the declaring.
+
+Bevy keeps one `on_add` per component, so the macro emits one generated hook, an associated fn so `Self` and a generic action's type params stay in scope, running in order the author's own `on_add` (taken out of their `#[component(..)]`), the params declaration, the exchange declaration and the provider guard. The exchange declaration is the adapter's: an `#[action(route)]` converts its request through `FromRequest` and its output through `IntoResponseWithRequestParts`, and each conversion declares what it reads, so a route answering a `PageRequest` takes the render params without naming them. The model, the collector, the strict refusal and `--help` are `beet_router`'s README, Params.
 
 ## Groups: the same steps, forwards or backwards
 

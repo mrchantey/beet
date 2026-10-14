@@ -15,11 +15,7 @@ pub struct RouteTreeBuilder<'w, 's> {
 	// the url space roots, bucketed ahead of the routes that land under them
 	space_roots: Query<'w, 's, (Entity, &'static PathPartial)>,
 	actions: Query<'w, 's, ActionQueryItem<'static>, Without<RouteHidden>>,
-	// every partial, read along a route's ancestors
-	partials: Query<'w, 's, &'static ParamsPartial>,
-	// the partials on entities that are not routes, ie a sequence route's steps
-	steps:
-		Query<'w, 's, (Entity, &'static ParamsPartial), Without<PathPartial>>,
+	params: ParamsQuery<'w, 's>,
 	existing_trees: Query<'w, 's, Entity, With<RouteTree>>,
 	commands: Commands<'w, 's>,
 }
@@ -67,16 +63,12 @@ impl RouteTreeBuilder<'_, '_> {
 			})
 			.map(|(entity, _)| (entity, Vec::new()))
 			.collect();
-		let step_params = self.step_params();
 		for item in self.actions.iter() {
 			if !self.is_at_or_under(item.0, root) {
 				continue;
 			}
 			let space_root = self.namespace_of(item.0);
-			let mut node = ActionNode::from_query(item);
-			node.params.extend_undeclared(
-				self.route_params(node.entity, &step_params),
-			);
+			let node = ActionNode::from_query(item, self.params.of(item.0)?);
 			match spaces.iter_mut().find(|(space, _)| *space == space_root) {
 				Some((_, nodes)) => nodes.push(node),
 				None => spaces.push((space_root, vec![node])),
@@ -99,50 +91,6 @@ impl RouteTreeBuilder<'_, '_> {
 		Ok(())
 	}
 
-	/// The params `route` takes beyond those its own insert collected: its
-	/// ancestors' partials again, since a scene load can insert one after the
-	/// route's pattern was computed, and its steps' ([`Self::step_params`]).
-	fn route_params(
-		&self,
-		route: Entity,
-		step_params: &HashMap<Entity, Vec<ParamMeta>>,
-	) -> Vec<ParamMeta> {
-		self.ancestors
-			.iter_ancestors_inclusive(route)
-			.filter_map(|entity| self.partials.get(entity).ok())
-			.flat_map(|partial| partial.iter().cloned())
-			.chain(step_params.get(&route).into_iter().flatten().cloned())
-			.collect()
-	}
-
-	/// The params each route's steps declare, by route: a step is a
-	/// descendant that is not itself a route, ie the `<ZoneAudit/>` an
-	/// `<Route path="audit" {ExchangeSequence}>` runs, so its `--fix` is a
-	/// param of `audit`, listed by its `--help` and accepted by a
-	/// [`RejectUnknownParams`] url space. A step belongs to its nearest
-	/// [`PathPartial`] ancestor when that is a route rather than a url space
-	/// root. Walks up for the same reason [`Self::is_at_or_under`] does.
-	fn step_params(&self) -> HashMap<Entity, Vec<ParamMeta>> {
-		let mut by_route = HashMap::<Entity, Vec<ParamMeta>>::default();
-		for (step, partial) in self.steps.iter() {
-			let Some(route) = self
-				.ancestors
-				.iter_ancestors(step)
-				.find(|ancestor| self.paths.contains(*ancestor))
-				.filter(|route| {
-					self.paths.get(*route).is_ok_and(|path| !path.is_root)
-				})
-			else {
-				continue;
-			};
-			by_route
-				.entry(route)
-				.or_default()
-				.extend(partial.iter().cloned());
-		}
-		by_route
-	}
-
 	/// Whether `entity` is `root` or sits anywhere beneath it.
 	///
 	/// Walks up from `entity` through [`ChildOf`] rather than down from `root`
@@ -160,8 +108,39 @@ impl RouteTreeBuilder<'_, '_> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
+
+	/// Two readers on one route naming one key with different types are a
+	/// contradiction, refused by the tree build rather than at dispatch.
+	#[beet_core::test]
+	fn a_param_conflict_fails_the_build() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct PortNumber {
+			port: u16,
+		}
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct PortName {
+			port: String,
+		}
+		let mut world = World::new();
+		let root = world.spawn(MiddlewareParams::new::<PortNumber>()).id();
+		world.spawn((
+			ChildOf(root),
+			ActionMeta::of::<(), Request, Response>(),
+			PathPattern::new("serve").unwrap(),
+			RouteParams::new::<PortName>(),
+		));
+		world
+			.run_system_once_with::<_, _, Result, _>(RouteTree::rebuild, root)
+			.unwrap()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("conflicting declarations of `--port`");
+	}
 
 	/// A router owns its url space from the moment it exists: with no routes
 	/// its tree is empty, so a request into it answers not-found rather than

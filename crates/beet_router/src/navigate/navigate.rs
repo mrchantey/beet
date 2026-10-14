@@ -92,15 +92,20 @@ impl core::fmt::Display for NavigateTo {
 /// inner handler via [`Next`].
 #[action]
 #[derive(Default, Clone, Component, Reflect)]
-#[reflect(Component, DeclaresParams)]
+#[reflect(Component)]
 #[component(on_add = MiddlewareList::<Request, Response>::on_add::<Self>)]
 pub async fn NavigateHandler(
+	/// Answer the route this move reaches from the requested one instead:
+	/// `parent`, `first-child`, `next-sibling`, `prev-sibling`, or a card
+	/// step, `next`, `prev`, `first`, `last`.
+	#[param]
+	navigate: Option<String>,
 	cx: ActionContext<(Request, Next<Request, Response>)>,
 ) -> Result<Response> {
 	let caller = cx.caller.clone();
 	let (mut request, next) = cx.take();
 
-	let Some(value) = request.parse_params::<NavigateParams>()?.navigate else {
+	let Some(value) = navigate else {
 		return next.call(request).await;
 	};
 
@@ -149,22 +154,6 @@ pub async fn NavigateHandler(
 	// action, else the `ExchangeOverload` adapting a typed handler
 	node.merge_path_params(&mut request);
 	world.entity(node.entity).call(request).await
-}
-
-/// The move it answers.
-impl DeclaresParams for NavigateHandler {
-	fn declared_params() -> ParamsPartial {
-		ParamsPartial::new::<NavigateParams>()
-	}
-}
-
-/// The flag [`NavigateHandler`] answers.
-#[derive(Reflect)]
-struct NavigateParams {
-	/// Answer the route this move reaches from the requested one instead:
-	/// `parent`, `first-child`, `next-sibling`, `prev-sibling`, or a card
-	/// step, `next`, `prev`, `first`, `last`.
-	navigate: Option<String>,
 }
 
 /// Resolve a navigation direction against a [`RouteTree`] from the

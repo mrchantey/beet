@@ -2,7 +2,7 @@
 //!
 //! Both lower a function parameter into a data-struct field, so the grammar
 //! lives here once and cannot drift: templates spell it `#[prop]`, actions
-//! spell it `#[field]`.
+//! spell it `#[field]`, and an action's request param spells it `#[param]`.
 //!
 //! - bare attribute -> optional, defaults by type
 //! - `(default = expr)` -> optional, defaults to `expr`, forcing a manual
@@ -15,6 +15,8 @@
 //!   field too expensive to clone per call; only meaningful to `#[action]`
 //! - a visibility (`pub`, `pub(crate)`, `pub(in path)`) -> narrows the field
 //!   from the default `pub`
+//! - `(short = 'x')` -> a single character short flag, only meaningful to an
+//!   `#[action]`'s `#[param]`
 extern crate alloc;
 use crate::prelude::*;
 use alloc::vec::Vec;
@@ -37,6 +39,8 @@ pub struct Prop {
 	pub mutable: bool,
 	/// `(no_clone)`, declared on the struct but never bound in the body
 	pub no_clone: bool,
+	/// `(short = 'x')`, a param's short flag
+	pub short: Option<syn::Expr>,
 	/// the declared visibility, defaulting to `pub` so a markup patch resolves
 	/// across module boundaries
 	pub vis: syn::Visibility,
@@ -59,6 +63,7 @@ impl Prop {
 		let mut required = false;
 		let mut mutable = false;
 		let mut no_clone = false;
+		let mut short = None;
 		let mut vis: syn::Visibility = syn::parse_quote!(pub);
 		let mut default_expr = None;
 		let mut other_attrs: Vec<syn::Attribute> = Vec::new();
@@ -87,6 +92,13 @@ impl Prop {
 					"required" => required = true,
 					"no_clone" => no_clone = true,
 					"default" => default_expr = map.get("default").cloned(),
+					"short" if attr_name == "param" => {
+						short = map.get("short").cloned()
+					}
+					"short" => synbail!(
+						attr,
+						"`short` names a request param's flag, so only a `#[param]` takes it"
+					),
 					"into" => synbail!(
 						attr,
 						"`#[{attr_name}(into)]` has been removed; a prop takes its own type, or an `Option` of it"
@@ -110,6 +122,7 @@ impl Prop {
 			default_expr,
 			mutable,
 			no_clone,
+			short,
 			vis,
 			other_attrs,
 		})
@@ -327,6 +340,16 @@ mod test {
 		);
 		assert!(prop.no_clone);
 		assert!(matches!(prop.vis, syn::Visibility::Restricted(_)));
+	}
+
+	#[test]
+	fn short_is_parsed() {
+		let prop = Prop::parse(
+			&pat_type(syn::parse_quote! { #[param(short = 'f')] fix: bool }),
+			"param",
+		)
+		.unwrap();
+		assert!(prop.short.is_some());
 	}
 
 	#[test]

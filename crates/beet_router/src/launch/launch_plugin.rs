@@ -187,9 +187,11 @@ async fn build_entry(
 /// The `--features` flag as a [`RequireCfg`]: verify this binary was compiled
 /// with the named cargo features, failing with the full missing list rather
 /// than degrading into unresolved tags. Applies when running an entry (an
-/// explicit `--entry`, or no positional command); a command dispatch (eg `beet
-/// build-wasm --features=..`) owns its own `--features` meaning, and the wasm
-/// runner forwards the module's flags untouched.
+/// explicit `--entry`, or no positional command); the wasm runner forwards the
+/// module's flags untouched. No route reads `--features`, the launch only knobs
+/// never reaching the request ([`BootstrapConfig::strip`]), so a command
+/// building another binary names its cargo features otherwise, ie `beet
+/// build-wasm --cargo-features=..`.
 ///
 /// The flag is a list, so it lowers to a conjunction of `feature:` atoms, which
 /// is the same condition an entry would have written by hand.

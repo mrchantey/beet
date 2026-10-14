@@ -36,17 +36,17 @@ struct EncryptParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("encrypt"),
-	ParamsPartial = ParamsPartial::new::<(VaultParams, EncryptParams)>()
-)]
-pub async fn VaultEncrypt(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<EncryptParams>()?;
+#[require(PathPartial = PathPartial::new("encrypt"))]
+pub async fn VaultEncrypt(
+	vault: Params<VaultParams>,
+	params: Params<EncryptParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let plaintext = match &params.file {
 		Some(file) => fs_ext::read(file)?,
 		None => read_stdin()?,
 	};
-	let vault = VaultParams::resolve(&cx.input)?;
+	let vault = vault.resolve()?;
 	let recipients = match &params.group {
 		Some(group) => {
 			if params.recipients.is_some() {

@@ -6,9 +6,11 @@
 //!
 //! - [`new`]: a path plus any bundle, the simplest form.
 //! - [`exchange`]: a path plus a *typed* handler, including the
-//!   [`ExchangeOverload`] adapting it to `Request -> Response` dispatch.
+//!   [`ExchangeOverload`] adapting it to `Request -> Response` dispatch and the
+//!   declaration of the params that adapter's conversions read.
 //! - [`exchange_overload`]: that adapter alone, for a handler that mounts its
-//!   own path (the `#[action(route)]` macro's require site).
+//!   own path (the `#[action(route)]` macro's require site), and
+//!   [`declare_exchange`], the hook declaring what it reads.
 //! - [`fallback`]: the not-found sibling a router keeps last.
 
 use crate::prelude::*;
@@ -22,20 +24,27 @@ pub fn new<B: Bundle>(path: &str, bundle: B) -> (PathPartial, B) {
 }
 
 /// Creates a route bundle from a path and a typed action, including the
-/// [`ExchangeOverload`] adapting the action to request/response dispatch.
+/// [`ExchangeOverload`] adapting the action to request/response dispatch and
+/// the declaration of the params its conversions read ([`exchange_params`]).
 pub fn exchange<In, Out, M, M1, M2, B>(
 	path: &str,
 	action: B,
-) -> (PathPartial, B, ExchangeOverload)
+) -> impl Bundle + use<In, Out, M, M1, M2, B>
 where
 	In: 'static + Send + Sync + FromRequest<M1>,
 	Out: 'static + Send + Sync + IntoResponseWithRequestParts<M2>,
 	B: Bundle + IntoAction<M, In = In, Out = Out>,
 {
+	let declaration = exchange_params::<In, Out, M1, M2>();
 	(
 		PathPartial::new(path),
 		action,
 		exchange_overload::<In, Out, M1, M2>(),
+		OnSpawn::new(move |entity| {
+			if !declaration.is_empty() {
+				Reach::Route.push(entity, declaration);
+			}
+		}),
 	)
 }
 
@@ -49,7 +58,7 @@ where
 pub fn exchange_serde<In, Out, M, B>(
 	path: &str,
 	action: B,
-) -> (PathPartial, B, ExchangeOverload)
+) -> impl Bundle + use<In, Out, M, B>
 where
 	In: 'static + Send + Sync + FromRequest<SerdeFromRequestMarker>,
 	Out: 'static
@@ -88,6 +97,40 @@ where
 				.await
 		},
 	))
+}
+
+/// The params a route's exchange adapter reads: what converting the request
+/// into `In` reads ([`FromRequest::params`]) and what converting `Out` into
+/// the response reads ([`IntoResponseWithRequestParts::params`]), ie a scene
+/// route's [`RenderParams`](crate::prelude::RenderParams). Named after `Out`
+/// when it reads anything, else after `In`.
+pub fn exchange_params<In, Out, M1, M2>() -> ParamsDeclaration
+where
+	In: FromRequest<M1>,
+	Out: IntoResponseWithRequestParts<M2>,
+{
+	let input = <In as FromRequest<M1>>::params();
+	match <Out as IntoResponseWithRequestParts<M2>>::params() {
+		output if output.is_empty() => input,
+		output => output.with(input),
+	}
+}
+
+/// The `on_add` hook declaring the params a route's exchange adapter reads
+/// ([`exchange_params`]) at route reach, nothing when neither conversion reads
+/// any. The `#[action(route)]` macro and a reflected adapter like
+/// [`ExchangeScript`] run it beside the [`exchange_overload`] they require.
+pub fn declare_exchange<In, Out, M1, M2>(
+	mut world: DeferredWorld,
+	cx: HookContext,
+) where
+	In: FromRequest<M1>,
+	Out: IntoResponseWithRequestParts<M2>,
+{
+	let declaration = exchange_params::<In, Out, M1, M2>();
+	if !declaration.is_empty() {
+		Reach::Route.queue_push(&mut world.commands(), cx.entity, declaration);
+	}
 }
 
 /// Exchange control-flow that tries each child until one passes.

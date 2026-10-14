@@ -81,7 +81,7 @@ use beet_net::prelude::*;
 /// let bundle = (Router, Layout::of::<PageShell>());
 /// ```
 #[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component, Default, DeclaresParams)]
+#[reflect(Component, Default)]
 #[component(on_add = push_layout_middleware)]
 pub struct Layout {
 	/// The template name, eg `Layout`, `ArticleLayout` or `path::to::Layout`.
@@ -93,13 +93,6 @@ impl Default for Layout {
 		Self {
 			template: "Layout".into(),
 		}
-	}
-}
-
-/// The color scheme every page it wraps is themed by.
-impl DeclaresParams for Layout {
-	fn declared_params() -> ParamsPartial {
-		ParamsPartial::new::<ColorSchemeParams>()
 	}
 }
 

@@ -16,13 +16,13 @@ use beet_core::prelude::*;
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("rm/:name"),
-	ParamsPartial = ParamsPartial::new::<DocumentParams>()
-)]
-pub async fn SecretsRm(cx: ActionContext<Request>) -> Result<Response> {
+#[require(PathPartial = PathPartial::new("rm/:name"))]
+pub async fn SecretsRm(
+	document: Params<DocumentParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let name = name_param(&cx.input)?;
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let handle = document.resolve(&cx.caller).await?;
 	let mut document = handle.read().await?;
 	let (group, _) = document.remove(&AgeIdentityFile::require()?, &name)?;
 	handle.write(&document).await?;

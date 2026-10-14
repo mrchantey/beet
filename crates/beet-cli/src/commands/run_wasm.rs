@@ -86,6 +86,32 @@ impl RunWasm {
 	/// rather than to this process: the binary declares it as an
 	/// [`ArgvPassthrough`] so the entry loader leaves those flags alone.
 	pub const COMMAND: &'static str = "run-wasm";
+
+	/// The module's argv: every param `pattern` does not declare (the runner's
+	/// own `--wasm-host`/`--chrome-args`, an inherited `--help` and the like)
+	/// as a `--key[=value]` flag, then the `trailing` positionals (eg a libtest
+	/// filter). The route's own `run-wasm-args` capture is dropped so it never
+	/// leaks into `Deno.args`, and so is every launch knob: a launch only one
+	/// never reaches the request, and a request rank one (`--port`) reaches the
+	/// module through its delivered config rather than twice.
+	fn module_args(
+		rest: &Rest,
+		pattern: &ParamsPattern,
+		trailing: &[SmolStr],
+	) -> Vec<String> {
+		let mut params = rest.undeclared(pattern);
+		params.remove("run-wasm-args");
+		for knob in BootstrapConfig::arg_names() {
+			params.remove(knob.as_str());
+		}
+		let mut args = CliArgs {
+			path: default(),
+			params,
+		}
+		.into_args();
+		args.extend(trailing.iter().map(ToString::to_string));
+		args
+	}
 }
 
 impl fmt::Display for WasmHost {
@@ -109,34 +135,35 @@ impl fmt::Display for WasmHost {
 /// ```
 ///
 /// As a route it is served greedily (`run-wasm/*run-wasm-args`): the segments after
-/// `run-wasm` rejoin into the binary path, and any query params are forwarded to
-/// the running module as flags — the beet wasm test runner reads them back via
+/// `run-wasm` rejoin into the binary path, and any params are forwarded to the
+/// running module as flags, which the beet wasm test runner reads back via
 /// `Deno.args`. cargo passes an absolute binary path, which `CliArgs` keeps as
 /// one intact segment, so the rejoin reproduces it leading-`/` and all. The capture
 /// is named `run-wasm-args` to distinguish the route's own path capture from the
-/// module args it forwards. Its params are declared
-/// [`forwarding`](ParamsPartial::forwarding) for the same reason: a param it
-/// does not name belongs to the module, so a strict entry
-/// ([`RejectUnknownParams`]) passes the test runner's `--nocapture` through.
+/// module args it forwards.
+///
+/// It takes the rest (`Params<Rest>`): a param its route does not declare
+/// belongs to the module, ie the test runner's `--nocapture`, so a strict CLI
+/// refuses none. The module's launch knobs are this process's own
+/// [`BootstrapConfig`], delivered through [`ChildProcess::with_bootstrap`]
+/// rather than forwarded as flags.
 #[action(route = "run-wasm/*run-wasm-args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<RunWasmParams>().forwarding())]
-pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let parts = &cx.input;
-	let params = parts.parse_params::<RunWasmParams>()?;
-	let mut cli = parts.to_cli_args();
+pub async fn RunWasm(
+	params: Params<RunWasmParams>,
+	rest: Params<Rest>,
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
 	// route `run-wasm/*run-wasm-args`: the first segment is the command, the rest
 	// are the absolute binary path (split on `/`) followed by any positional module
 	// args (eg a libtest name filter cargo appends after the binary).
-	let mut segments = core::mem::take(&mut cli.path);
-	if segments.is_empty() {
+	let Some((_, segments)) = cx.input.path().split_first() else {
 		return Err(HttpError::bad_request(
 			"usage: beet run-wasm <binary-path> [args..]",
 		)
 		.into());
-	}
-	segments.remove(0);
+	};
 	// the binary path ends at the `.wasm` segment; segments after it are positional
 	// module args (the filter), so the path is not over-joined into them.
 	let wasm_idx = segments
@@ -147,43 +174,33 @@ pub async fn RunWasm(cx: ActionContext<RequestParts>) -> Result<Response> {
 				"usage: beet run-wasm <binary-path>.wasm [args..]",
 			)
 		})?;
-	let trailing = segments.split_off(wasm_idx + 1);
-	let exe_path = segments.join("/");
-	// `cli` now holds only the forwarded params; drop the route's own `run-wasm-args`
-	// capture so it never leaks into the module's `Deno.args`. The runner's own
-	// params and the module's launch knobs are both taken out (the latter
-	// delivered explicitly, see [`run_deno`]); what remains (the test-runner
-	// flags) flattens to `--key[=value]` flags plus the trailing positionals (eg
-	// the filter) the module reads via `Deno.args`.
-	cli.params.remove("run-wasm-args");
+	let exe_path = segments[..=wasm_idx].join("/");
+	let trailing = &segments[wasm_idx + 1..];
+
+	let pattern = cx
+		.caller
+		.with_state::<ParamsQuery, _>(|entity, query| query.of(entity))
+		.await??;
+	let forwarded = RunWasm::module_args(&rest, &pattern, trailing);
+	let bootstrap = BootstrapConfig::get();
 	let host = params.host()?;
-	let chrome_args = params.chrome_args();
-	cli.params.remove("wasm-host");
-	cli.params.remove("chrome-args");
-	let bootstrap = BootstrapConfig::take_params(&mut cli.params)?;
-	let mut forwarded = cli.into_args();
-	forwarded.extend(trailing.into_iter().map(Into::into));
 
 	let runner_dir = bindgen_wasm(Path::new(&exe_path)).await?;
 	// `--wasm-host=browser` / `BEET_WASM_HOST=browser`: serve the bindgen
 	// output and run the module in a headless browser instead of deno, the
 	// host for `#[beet_core::test(browser)]` dom suites
-	#[cfg(not(target_arch = "wasm32"))]
 	if host == WasmHost::Browser {
 		super::run_wasm_browser::run(
 			&cx,
 			&runner_dir,
-			&bootstrap,
+			bootstrap,
 			forwarded,
-			chrome_args,
+			params.chrome_args(),
 		)
 		.await?;
 		return Response::ok().xok();
 	}
-	// the browser host (and so the flags' consumer) is native-only
-	#[cfg(target_arch = "wasm32")]
-	let _ = (host, chrome_args);
-	run_deno(&runner_dir, &bootstrap, forwarded).await?;
+	run_deno(&runner_dir, bootstrap, forwarded).await?;
 	// the module's output already streamed via inherited stdio, so the runner's own
 	// response carries no body, only a success status.
 	Response::ok().xok()
@@ -292,4 +309,29 @@ website:    https://docs.deno.com/runtime/getting_started/installation/
 		);
 	}
 	Ok(())
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// The module receives only what the route does not declare: the runner's
+	/// own flags, its path capture and the launch knobs stay behind, the
+	/// test-runner flags and the trailing filter go through.
+	#[beet::test]
+	fn forwards_only_the_modules_args() {
+		let mut world = crate::commands::render_world();
+		let entity = world.spawn(RunWasm).flush();
+		let pattern = world
+			.with_state::<ParamsQuery, _>(|query| query.of(entity))
+			.unwrap();
+		let parts = RequestParts::from(CliArgs::parse(
+			"run-wasm --nocapture --wasm-host=deno --chrome-args=--headless --port=8",
+		))
+		.with_param("run-wasm-args", "/tmp/module.wasm");
+		RunWasm::module_args(&Rest::from(&parts), &pattern, &[
+			"my_filter".into()
+		])
+		.xpect_eq(vec!["--nocapture".to_string(), "my_filter".to_string()]);
+	}
 }

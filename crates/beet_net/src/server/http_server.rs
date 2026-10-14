@@ -109,7 +109,7 @@ impl Listening {
 /// ));
 /// ```
 #[derive(Clone, Component, Reflect)]
-#[reflect(Component, Default, DeclaresParams)]
+#[reflect(Component, Default)]
 #[component(on_add = hook_ext::component_hook(HttpServer::add_facet))]
 #[require(ExchangeStats, ServerLimits)]
 pub struct HttpServer {
@@ -140,15 +140,8 @@ pub struct HttpServer {
 	pub backend: Option<HttpServerBackend>,
 }
 
-/// The bind knobs its start request carries.
-impl DeclaresParams for HttpServer {
-	fn declared_params() -> ParamsPartial {
-		ParamsPartial::new::<ServerParams>()
-	}
-}
-
 impl Default for HttpServer {
-	/// Reads the process [`BootstrapConfig`] (`--port` / `BEET_HTTP_PORT` and
+	/// Reads the process [`BootstrapConfig`] (`--port` / `BEET_PORT` and
 	/// `--host` / `BEET_HOST`), falling back to [`DEFAULT_HTTP_PORT`] on
 	/// localhost. Both sources are empty where there is no process environment
 	/// or argv, so no feature gate is needed.

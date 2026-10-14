@@ -27,4 +27,4 @@ beet --entry=examples/hello
 beet --entry=examples/perceive_act/main-v1.bsx
 ```
 
-A flag no command declares is refused rather than ignored: beet's entries opt in with `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`, so a typo like `deploy --elevate` answers `did you mean --elevated?` before anything runs, while a site served over http keeps accepting whatever a link carries.
+A flag no command takes is refused rather than ignored: every `CliServer` is strict by requirement, so a typo like `deploy --elevate` answers `did you mean --elevated?` before anything runs, while a site served over http keeps accepting whatever a link carries (the [`beet_router` README](https://github.com/mrchantey/beet/blob/main/crates/beet_router/README.md#params), Params).

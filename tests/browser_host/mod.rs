@@ -218,7 +218,7 @@ impl BrowserHost {
 async fn serve_entry(store: BlobStore, entry: &str) -> PageHarness {
 	unsafe {
 		env_ext::set_var("BEET_SERVER", "http").unwrap();
-		env_ext::set_var("BEET_HTTP_PORT", "0").unwrap();
+		env_ext::set_var("BEET_PORT", "0").unwrap();
 	}
 	let entry = entry.to_string();
 	PageHarness::serve_app(move |app| {

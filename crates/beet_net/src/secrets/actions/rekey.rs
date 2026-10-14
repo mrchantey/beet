@@ -22,12 +22,12 @@ use core::fmt::Write;
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("rekey"),
-	ParamsPartial = ParamsPartial::new::<DocumentParams>()
-)]
-pub async fn SecretsRekey(cx: ActionContext<Request>) -> Result<Response> {
-	let selector = cx.input.parse_params::<DocumentParams>()?.document;
+#[require(PathPartial = PathPartial::new("rekey"))]
+pub async fn SecretsRekey(
+	document: Params<DocumentParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let selector = document.0.document;
 	let identities = AgeIdentityFile::require()?;
 	let mut handles = match &selector {
 		Some(_) => Vec::new(),

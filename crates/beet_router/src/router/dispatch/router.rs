@@ -141,16 +141,12 @@ impl Router {
 							}
 							_ => {}
 						}
-						// a strict url space refuses a param nothing on the
-						// route's path declares, before the path's own
-						// segments join the params
+						// a strict url space refuses a param the route does
+						// not take, before the path's own segments join the
+						// params
 						if rejects_unknown_params
-							&& let Err(err) = RejectUnknownParams::check(
-								&world,
-								node,
-								request.params().clone(),
-							)
-							.await
+							&& let Err(err) =
+								node.reject_unknown_params(request.params())
 						{
 							return Response::from(err).xok();
 						}
@@ -171,11 +167,9 @@ impl Router {
 						// a strict url space refuses a misspelt route exactly as
 						// it refuses a misspelt param
 						if let Some(near) = misspells {
-							return RejectUnknownParams::misspelt_route(
-								&path, &near,
-							)
-							.xmap(Response::from)
-							.xok();
+							return RouteTree::misspelt_route(&path, &near)
+								.xmap(Response::from)
+								.xok();
 						}
 						// no matching route — std builds a not-found response through the
 						// contextual help system so middleware still applies; no_std falls
@@ -200,7 +194,7 @@ impl Router {
 				// the route's `--help` lists it
 				match (err.downcast_ref::<ParamError>().cloned(), node) {
 					(Some(param), Ok(Some(node))) => {
-						refuse_param(&world, node, param).await
+						refuse_param(&node, &param)
 					}
 					_ => err.into_response(),
 				}
@@ -212,19 +206,13 @@ impl Router {
 
 /// A [`ParamError`] the matched route raised, as the `400` naming the param
 /// with its type and doc line, and pointing at the route's help.
-async fn refuse_param(
-	world: &AsyncWorld,
-	node: ActionNode,
-	err: ParamError,
-) -> Response {
-	let help = node.help_hint();
-	world
-		.with_state::<DeclaredParamsQuery, _>(move |query| {
-			node.declared_params(&query).explain(&err)
-		})
-		.await
-		.xmap(|message| HttpError::bad_request(format!("{message}\n{help}\n")))
-		.into()
+fn refuse_param(node: &ActionNode, err: &ParamError) -> Response {
+	HttpError::bad_request(format!(
+		"{}\n{}\n",
+		node.params.explain(err),
+		node.help_hint()
+	))
+	.into()
 }
 
 /// What [`find_route`] resolved for one request.
@@ -892,23 +880,17 @@ mod test {
 			.xpect_contains("data: {\"index\":2}");
 	}
 
-	#[derive(Reflect)]
-	struct ServeParams {
-		/// The port to listen on.
-		port: u16,
-	}
-
 	/// Answers the port its required `--port` names.
 	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
-	#[require(ParamsPartial = ParamsPartial::new::<ServeParams>())]
-	async fn Serve(cx: ActionContext<RequestParts>) -> Result<String> {
-		cx.input
-			.parse_params::<ServeParams>()?
-			.port
-			.to_string()
-			.xok()
+	async fn Serve(
+		/// The port to listen on.
+		#[param]
+		port: u16,
+		_cx: ActionContext<RequestParts>,
+	) -> Result<String> {
+		port.to_string().xok()
 	}
 
 	/// A param the request got wrong is the caller's error: a `400` naming the

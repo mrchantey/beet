@@ -4,18 +4,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Request params for [`VaultRestoreIdentity`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RestoreIdentityParams {
-	/// The backup `vault/backup` wrote.
-	file: String,
-	/// The identity file to append to; defaults to the OS config,
-	/// `~/.config/beet/age/keys.txt`.
-	out: Option<String>,
-	/// Refuse rather than prompt, for a runner with no terminal.
-	headless: bool,
-}
-
 /// Restore a backup onto this machine: prompt for its passphrase, decrypt
 /// it and append every identity it holds to the identity file, skipping
 /// any already there. A new machine restores rather than generating a
@@ -27,16 +15,20 @@ struct RestoreIdentityParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("restore-identity"),
-	ParamsPartial = ParamsPartial::new::<RestoreIdentityParams>()
-)]
+#[require(PathPartial = PathPartial::new("restore-identity"))]
 pub async fn VaultRestoreIdentity(
+	/// The backup `vault/backup` wrote.
+	#[param]
+	file: String,
+	/// The identity file to append to; defaults to the OS config,
+	/// `~/.config/beet/age/keys.txt`.
+	#[param]
+	out: Option<String>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let params = cx.input.parse_params::<RestoreIdentityParams>()?;
-	let ciphertext = fs_ext::read(&params.file)?;
-	if params.headless {
+	let ciphertext = fs_ext::read(&file)?;
+	// a launch with no terminal refuses rather than prompts
+	if BootstrapConfig::get().headless {
 		bevybail!(
 			"a backup passphrase is typed on a terminal: run this \
 			interactively, without `--headless`"
@@ -47,7 +39,7 @@ pub async fn VaultRestoreIdentity(
 	let restored = String::from_utf8(plaintext)
 		.map_err(|_| bevyhow!("the backup is not an identity file"))?
 		.xmap(|text| AgeIdentityFile::parse(&text))?;
-	let path = match params.out {
+	let path = match out {
 		Some(out) => PathBuf::from(out),
 		None => AgeIdentityFile::default_path()?,
 	};

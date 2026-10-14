@@ -4,18 +4,20 @@
 //! the `BEET_*` environment, readable from anywhere through
 //! [`BootstrapConfig::get`]. The rest of this module is either the grammar one
 //! of its fields parses into ([`StoreUri`], [`RunningSetFilter`],
-//! [`ServiceAccess`]),
+//! [`ServiceAccess`], [`IpAddress`]),
 //! or [`PackageConfig`], the resource describing *this build* rather than
 //! *this launch* (the package's identity, usually from
 //! [`pkg_config!`](crate::pkg_config)).
 
 mod bootstrap_config;
 mod child_process;
+mod ip_address;
 mod running_set_filter;
 mod service_access;
 mod store_uri;
 pub use bootstrap_config::*;
 pub use child_process::*;
+pub use ip_address::*;
 pub use running_set_filter::*;
 pub use service_access::*;
 pub use store_uri::*;

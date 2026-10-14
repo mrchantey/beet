@@ -4,8 +4,6 @@ use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-
-
 /// Reads each parameter and prints it beside the address it belongs to.
 /// `<MailCredentials/>`: print every mailbox credential this stack holds, as
 /// the address that uses it.
@@ -32,11 +30,12 @@ use beet_net::prelude::*;
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<MailCredentialsParams>())]
 pub async fn MailCredentials(
+	/// Also print the relay credentials in use and the DKIM signing keys.
+	#[param]
+	infra: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let infra = cx.input.parse_params::<MailCredentialsParams>()?.infra;
 	let mail = MailStack::of(&cx.caller).await?;
 	let label = mail.mail_box.label();
 
@@ -156,11 +155,4 @@ pub async fn MailCredentials(
 		);
 	}
 	Pass(cx.input).xok()
-}
-
-/// Parameters for the listing.
-#[derive(Reflect)]
-struct MailCredentialsParams {
-	/// Also print the relay credentials in use and the DKIM signing keys.
-	infra: bool,
 }

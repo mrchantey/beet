@@ -75,7 +75,7 @@ pub async fn ExchangeScriptElement(
 
 /// Reflect-able marker that installs the typed [`ScriptAction`], its
 /// [`ScriptConfig`], and the [`ExchangeOverload`] adapting them to
-/// request/response dispatch.
+/// request/response dispatch, declaring the params its conversions read.
 ///
 /// Serves what the script returned (eg a `String`), not its console output (that
 /// is [`ExchangeScriptElement`]). `M1`/`M2` are
@@ -91,6 +91,7 @@ pub async fn ExchangeScriptElement(
 	ScriptConfig,
 	ExchangeOverload = route::exchange_overload::<Input, Output, M1, M2>(),
 )]
+#[component(on_add = route::declare_exchange::<Input, Output, M1, M2>)]
 pub struct ExchangeScript<
 	Input = (),
 	Output = (),

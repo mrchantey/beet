@@ -74,11 +74,17 @@ impl CallOnReady {
 		})
 	}
 
-	/// The process request: argv/env as a [`Request`].
+	/// The process request: argv/env as a [`Request`], less the launch only
+	/// knobs the launch already consumed ([`BootstrapConfig::strip`]), so a
+	/// strict server sees only what its routes and servers read.
 	///
 	/// The one sanctioned ambient read, made at a process boundary (an
 	/// `on_spawn` boot, an armed load's [`Ready`]).
-	fn cli_request() -> Request { Request::from_cli_args(CliArgs::parse_env()) }
+	fn cli_request() -> Request {
+		let mut args = CliArgs::parse_env();
+		BootstrapConfig::strip(&mut args.params);
+		Request::from_cli_args(args)
+	}
 
 	/// Call the entity's action with `request` and, once the call resolves,
 	/// stream the response and write the matching [`AppExit`].

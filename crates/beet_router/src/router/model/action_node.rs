@@ -40,7 +40,8 @@ pub struct ActionNode {
 	pub entity: Entity,
 	/// Metadata about the action's input/output types.
 	pub meta: ActionMeta,
-	/// The parameter pattern for this action.
+	/// The params this route takes, collected by [`ParamsQuery`]: the one
+	/// pattern `--help`, a strict url space and the `400` explanation read.
 	pub params: ParamsPattern,
 	/// The full path pattern for this action.
 	pub path: PathPattern,
@@ -64,19 +65,6 @@ impl ActionNode {
 		self.description
 			.as_deref()
 			.or_else(|| self.meta.description())
-	}
-
-	/// Every param a request dispatched to this route may carry: its own
-	/// [`ParamsPattern`] (its steps' included) and everything declared along
-	/// its dispatch path. The one union a [`RejectUnknownParams`] url space
-	/// checks against and `--help` lists, so the two cannot drift.
-	pub fn declared_params(
-		&self,
-		query: &DeclaredParamsQuery,
-	) -> DeclaredParams {
-		let mut declared = query.of(self.entity);
-		declared.extend_metas(self.params.iter());
-		declared
 	}
 
 	/// The line pointing a person refused a param at this route's help, ie
@@ -154,31 +142,30 @@ pub(crate) type ActionQueryItem<'a> = (
 	Entity,
 	&'a ActionMeta,
 	&'a PathPattern,
-	&'a ParamsPattern,
 	Option<&'a HttpMethod>,
 	Has<PageRoute>,
 	Option<&'a RouteDescription>,
 );
 
 impl ActionNode {
-	/// Create an [`ActionNode`] from a fetched [`ActionQueryItem`]. Takes the
-	/// query item shape (`Has<PageRoute>` resolves to a `bool`), not the
-	/// query-data alias itself.
+	/// Create an [`ActionNode`] from a fetched [`ActionQueryItem`] and the
+	/// route's `params`. Takes the query item shape (`Has<PageRoute>` resolves
+	/// to a `bool`), not the query-data alias itself.
 	pub fn from_query(
-		(entity, meta, path, params, method, is_page_route, description): (
+		(entity, meta, path, method, is_page_route, description): (
 			Entity,
 			&ActionMeta,
 			&PathPattern,
-			&ParamsPattern,
 			Option<&HttpMethod>,
 			bool,
 			Option<&RouteDescription>,
 		),
+		params: ParamsPattern,
 	) -> Self {
 		Self {
 			entity,
 			meta: meta.clone(),
-			params: params.clone(),
+			params,
 			path: path.clone(),
 			method: method.cloned(),
 			is_page_route,

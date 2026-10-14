@@ -200,6 +200,11 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self>
 		})?;
 		Ok(Self(value))
 	}
+
+	/// Its keys are serde's, which reflect cannot name, so it takes the rest.
+	fn params() -> ParamsDeclaration {
+		ParamsDeclaration::named(type_ext::short_name::<Self>(), [], true)
+	}
 }
 /// An extractor to represent query params as a struct.
 /// # Example
@@ -251,6 +256,11 @@ impl<T: serde::de::DeserializeOwned> FromRequestMeta<Self> for QueryParams<T> {
 			))
 		})?;
 		Ok(Self(params))
+	}
+
+	/// Its keys are serde's, which reflect cannot name, so it takes the rest.
+	fn params() -> ParamsDeclaration {
+		ParamsDeclaration::named(type_ext::short_name::<Self>(), [], true)
 	}
 }
 

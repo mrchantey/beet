@@ -16,13 +16,13 @@ use beet_core::prelude::*;
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("get/:name"),
-	ParamsPartial = ParamsPartial::new::<DocumentParams>()
-)]
-pub async fn SecretsGet(cx: ActionContext<Request>) -> Result<Response> {
+#[require(PathPartial = PathPartial::new("get/:name"))]
+pub async fn SecretsGet(
+	document: Params<DocumentParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let name = name_param(&cx.input)?;
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let handle = document.resolve(&cx.caller).await?;
 	let document = handle.read().await?;
 	let opened = document.open(&AgeIdentityFile::require()?)?;
 	match opened.get(&name) {

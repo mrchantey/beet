@@ -97,7 +97,7 @@ a completed enrolment. A `429` from the send API during the 14-day warming
 window is expected rather than a fault, and the probe logs it and skips the
 inbound assertion rather than failing the deploy.
 -->
-<CliServer {(CallOnReady, RejectUnknownParams)}>
+<CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="mail-comail-example" {(AwsRegion("us-west-2"), CloudflareZone{domain:"example.com", id:"0123456789abcdef0123456789abcdef"})}>

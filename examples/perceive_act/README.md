@@ -48,7 +48,7 @@ just build-wasm-full
 beet --entry=examples/perceive_act/main-v3.bsx
 ```
 
-That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --package=beet-cli --bin=beet --features=web_head --out=target/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.
+That build is the ceiling of the browser feature range (the whole example surface, the agent runtime, the JavaScript engine), so it is far larger and slower to build than this head needs. A head-sized artifact is the obvious next narrowing: `beet build-wasm --release --package=beet-cli --bin=beet --cargo-features=web_head --out=target/wasm/beet-head.wasm`, with the two head pages' `<Wasm src>` pointed at it.
 
 Both servers bind all interfaces, so any device on the LAN works: open `https://<this-host>:8337` (or plain `http://127.0.0.1:8337` locally) and grant camera access; the head derives the agent's socket url from the page location. The `/debug` route shows the webcam, face, and log on one page. All socket clients reconnect with exponential backoff, so the page survives an agent restart.
 

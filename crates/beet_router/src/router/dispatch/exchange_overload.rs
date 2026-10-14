@@ -37,6 +37,10 @@ where
 		caller: AsyncEntity,
 		parts: RequestParts,
 	) -> MaybeSendBoxedFuture<'static, Result<Response>>;
+
+	/// The params the conversion reads, which a route answering with this
+	/// type declares ([`route::exchange_params`]). Nothing by default.
+	fn params() -> ParamsDeclaration { ParamsDeclaration::empty::<Self>() }
 }
 
 /// Concrete impl for [`Response`] — an action that already produced a

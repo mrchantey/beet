@@ -25,7 +25,7 @@ pub struct CloudflareContainerBlock {
 	/// R2 bucket the container reads the site from (created on deploy).
 	bucket: SmolStr,
 	/// Explicit port the container exposes and the fronting Worker proxies to. When
-	/// `None`, resolved from `--port` / `BEET_HTTP_PORT` or
+	/// `None`, resolved from `--port` / `BEET_PORT` or
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337) via
 	/// [`port`](Self::port). Must match the served site's markup `HttpServer{port}`
 	/// (the same default `bsx_site` declares and `FargateBlock` uses).
@@ -66,7 +66,7 @@ impl CloudflareContainerBlock {
 
 	/// The resolved port the container exposes and the fronting Worker proxies to:
 	/// the explicit [`app_port`](Self::with_app_port) if set, else `--port` /
-	/// `BEET_HTTP_PORT`, else
+	/// `BEET_PORT`, else
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337).
 	pub fn port(&self) -> u16 {
 		beet_net::prelude::resolve_server_port(self.app_port)

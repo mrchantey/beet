@@ -41,27 +41,23 @@ struct ScreenshotParams {
 #[action(route = "screenshot/*url")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<ScreenshotParams>())]
 // `CaptureScreenshot` not `Screenshot`: bevy's render stack registers its own
 // `Screenshot` component under the render features, and two short type paths
 // cannot share a tag
 pub async fn CaptureScreenshot(
+	params: Params<ScreenshotParams>,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
-	let parts = &cx.input;
-	let params = parts.parse_params::<ScreenshotParams>()?;
 	// like `run-wasm`, the greedy capture keeps the url as intact trailing
 	// segments; rejoin and drop the command segment
-	let mut cli = parts.to_cli_args();
-	let mut segments = core::mem::take(&mut cli.path);
+	let segments = cx.input.path();
 	if segments.len() < 2 {
 		return Err(HttpError::bad_request(
 			"usage: beet screenshot <url> [--output=path.png]",
 		)
 		.into());
 	}
-	segments.remove(0);
-	let url = segments.join("/");
+	let url = segments[1..].join("/");
 
 	let width = params.width.unwrap_or(1280);
 	let height = params.height.unwrap_or(800);

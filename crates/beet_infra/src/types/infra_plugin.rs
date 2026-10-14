@@ -1,4 +1,6 @@
 use beet_core::prelude::*;
+#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+use beet_net::prelude::*;
 
 /// The infra runtime + the deploy block/action type registrations, so adding
 /// `InfraPlugin` makes every compiled deploy type spawnable by tag (eg
@@ -353,6 +355,13 @@ impl Plugin for InfraPlugin {
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
 		app.register_type::<crate::prelude::CloudflareDeployToken>()
 			.register_type::<crate::prelude::DeployGate>()
+			.declare_params::<crate::prelude::DeployGate>(
+				Reach::Route,
+				ParamsDeclaration::new::<
+					crate::prelude::DeployGate,
+					crate::credentials::ElevationParams,
+				>(),
+			)
 			.add_observer(
 				crate::credentials::attach_deploy_credential::<
 					crate::prelude::CloudflareDeployToken,

@@ -146,7 +146,6 @@ impl ZoneAudit {
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<ZoneAuditParams>())]
 // lists every record in the zone and deletes the unaccounted ones
 #[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[
 	TokenPermission::DNS_WRITE,
@@ -172,9 +171,11 @@ pub async fn ZoneAudit(
 	/// [`ZoneAuditScope`].
 	#[field(no_clone)]
 	scope: ZoneAuditScope,
+	/// Delete the stray records instead of only reporting them.
+	#[param]
+	fix: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let fix = cx.input.parse_params::<ZoneAuditParams>()?.fix;
 	// resolved first: a zone-scoped render filters the declarations it unions by
 	// the zone they target, so the id is an input to the render, not just to the
 	// listing that follows it.
@@ -296,13 +297,6 @@ fn audit_inputs(
 			(declared, allowed).xok()
 		}
 	}
-}
-
-/// Parameters for the audit.
-#[derive(Reflect)]
-struct ZoneAuditParams {
-	/// Delete the stray records instead of only reporting them.
-	fix: bool,
 }
 
 /// One record as the zone holds it.

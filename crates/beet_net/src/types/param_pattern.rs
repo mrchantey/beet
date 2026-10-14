@@ -5,256 +5,246 @@ use bevy::reflect::Typed;
 use core::any::TypeId;
 use heck::ToKebabCase;
 
-/// The param equivelent of a [`PathPartial`], denoting
-/// all params used at this point in the graph. For the full
-/// list see [`Endpoint::params`]
+/// The params one route takes: the union over every reader that runs for it,
+/// each param beside every declarer taking it, so `--help`, the strict refusal
+/// and the `400` explanation all read the one pattern.
 ///
-/// ```
-/// # use beet_core::prelude::*;
-/// # use beet_net::prelude::*;
-/// # use beet_action::prelude::*;
-/// #[derive(Reflect)]
-/// struct MyParams {
-///     /// Print the whole story.
-///     verbose: bool,
-/// }
-///
-/// #[action]
-/// #[derive(Default, Clone, Component, Reflect)]
-/// #[require(ParamsPartial = ParamsPartial::new::<MyParams>())]
-/// pub async fn MyAction() {}
-/// ```
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct ParamsPartial {
-	/// The parameter metadata items for this partial.
-	#[deref]
-	pub items: Vec<ParamMeta>,
-	/// Whether the route forwards every param it does not name to a program
-	/// it runs, see [`forwarding`](Self::forwarding).
-	forwards: bool,
-	/// Checks params against the declared type without calling the route.
-	#[reflect(ignore)]
-	validate_fn: ValidateFn,
+/// Collected per route by the router from the [`RouteParams`] on the route
+/// and its steps and the [`MiddlewareParams`] on the route and every ancestor.
+/// Two declarers naming one key must agree on its type and arity, see
+/// [`from_declarations`](Self::from_declarations).
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ParamsPattern {
+	/// Each param once, sorted by key.
+	items: Vec<PatternParam>,
+	/// Every declarer, in the order the collector supplied them.
+	declarers: Vec<Declarer>,
+	/// Whether any declarer takes the rest, see [`Rest`].
+	rest: bool,
 }
 
-impl ParamsPartial {
-	/// Creates a new [`ParamsPartial`] from a type that implements [`Reflect`].
-	/// Accepted types are structs and tuples of structs.
+/// One param of a [`ParamsPattern`], beside every declarer taking it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PatternParam {
+	/// The param, as its first declarer declared it.
+	pub meta: ParamMeta,
+	/// Every declarer taking it.
+	pub declarers: Vec<Declarer>,
+}
+
+/// A reader declaring params on a [`ParamsPattern`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Declarer {
+	/// The entity the reader sits on.
+	pub entity: Entity,
+	/// The reader's short type name, ie `CliServer`.
+	pub reader: SmolStr,
+	/// Which list the declaration came from.
+	pub reach: Reach,
+}
+
+impl ParamsPattern {
+	/// The pattern of `declarations`, each the entity it sits on, its reach
+	/// and what it declares.
 	///
-	/// ## Panics
+	/// ## Errors
 	///
-	/// Panics if a non-struct is passed in or fields are missing TypeInfo
-	pub fn new<T: FromReflect + Typed>() -> Self {
-		let mut items = Vec::new();
-		fn parse_inner(
-			items: &mut Vec<ParamMeta>,
-			type_info: &TypeInfo,
-		) -> Result {
-			match type_info {
-				TypeInfo::Struct(struct_info) => {
-					items.extend(struct_info.iter().map(ParamMeta::from_field));
-				}
-				TypeInfo::Tuple(tuple_info) => {
-					// recursively add for each item in the tuple
-					for field in tuple_info.iter() {
-						parse_inner(
-							items,
-							field.type_info().ok_or_else(|| {
-								bevyhow!("Field has no type info")
-							})?,
-						)?;
-					}
-				}
-				_ => {
-					bevybail!(
-						"Failed to parse ParamsPartial, only structs and tuples of structs are allowed"
-					)
-				}
+	/// Errors when two declarers name one key with a different type or arity.
+	/// One key of one type declared twice is two readers of the same param,
+	/// kept once with both declarers.
+	pub fn from_declarations<'a>(
+		declarations: impl IntoIterator<
+			Item = (Entity, Reach, &'a ParamsDeclaration),
+		>,
+	) -> Result<Self> {
+		let mut pattern = Self::default();
+		for (entity, reach, declaration) in declarations {
+			let declarer = Declarer {
+				entity,
+				reader: declaration.reader().clone(),
+				reach,
+			};
+			pattern.rest |= declaration.rest();
+			for meta in declaration.metas() {
+				pattern.add(&declarer, meta)?;
 			}
-			Ok(())
+			if !pattern.declarers.contains(&declarer) {
+				pattern.declarers.push(declarer);
+			}
 		}
+		pattern
+			.items
+			.sort_by(|left, right| left.meta.key.cmp(&right.meta.key));
+		pattern.xok()
+	}
 
-		parse_inner(&mut items, T::type_info()).unwrap();
-		let validate_fn = match T::type_info() {
-			TypeInfo::Struct(_) => ValidateFn(Some(Self::validate_as::<T>)),
-			_ => ValidateFn(None),
+	/// Add `meta` read by `declarer`, applying the conflict rule.
+	fn add(&mut self, declarer: &Declarer, meta: &ParamMeta) -> Result {
+		let Some(item) =
+			self.items.iter_mut().find(|item| item.meta.key == meta.key)
+		else {
+			self.items.push(PatternParam {
+				meta: meta.clone(),
+				declarers: vec![declarer.clone()],
+			});
+			return Ok(());
 		};
-		Self {
-			items,
-			forwards: false,
-			validate_fn,
+		if item.meta.type_path != meta.type_path
+			|| item.meta.value != meta.value
+		{
+			let first = &item.declarers[0].reader;
+			bevybail!(
+				"conflicting declarations of `--{key}`: `{first}` takes {} ({}), `{}` takes {} ({})",
+				item.meta.type_path,
+				item.meta.value,
+				declarer.reader,
+				meta.type_path,
+				meta.value,
+				key = meta.key,
+			);
 		}
+		if !item.declarers.contains(declarer) {
+			item.declarers.push(declarer.clone());
+		}
+		Ok(())
 	}
 
-	/// This partial, forwarding every param it does not name to a program the
-	/// route runs (`run-wasm` hands the test runner's flags to the module), so
-	/// no param is unknown to a strict server ([`DeclaredParams`]).
-	pub fn forwarding(mut self) -> Self {
-		self.forwards = true;
-		self
+	/// Each param once, sorted by key, beside its declarers.
+	pub fn items(&self) -> &[PatternParam] { &self.items }
+
+	/// Each declared param once, sorted by key.
+	pub fn params(&self) -> impl Iterator<Item = &ParamMeta> {
+		self.items.iter().map(|item| &item.meta)
 	}
 
-	/// Whether the route forwards the params it does not name, see
-	/// [`forwarding`](Self::forwarding).
-	pub fn forwards(&self) -> bool { self.forwards }
+	/// Whether any declarer takes the rest, so no param is unknown, see
+	/// [`Rest`].
+	pub fn takes_rest(&self) -> bool { self.rest }
 
-	/// Checks `params` against the declared type without calling the route,
-	/// the check a caller makes before dispatching params it did not read
-	/// from a person: every key one this partial declares, every required
-	/// one present and every value parsing as its field's type. A tuple of
-	/// params types is checked by its keys alone.
-	pub fn validate(&self, params: &MultiMap<SmolStr, SmolStr>) -> Result {
-		DeclaredParams::default()
-			.with(self)
-			.reject_unknown(params)?;
-		match self.validate_fn.0 {
-			Some(validate) => validate(params),
+	/// The params the route itself takes, its own readers' and its steps'
+	/// ([`Reach::Route`]), sorted by key.
+	pub fn own(&self) -> impl Iterator<Item = &ParamMeta> {
+		self.items
+			.iter()
+			.filter(|item| {
+				item.declarers
+					.iter()
+					.any(|declarer| declarer.reach == Reach::Route)
+			})
+			.map(|item| &item.meta)
+	}
+
+	/// Each middleware declarer ([`Reach::Middleware`]) in collector order,
+	/// beside the params it takes, sorted by key.
+	pub fn inherited(
+		&self,
+	) -> impl Iterator<Item = (&Declarer, Vec<&ParamMeta>)> {
+		self.declarers
+			.iter()
+			.filter(|declarer| declarer.reach == Reach::Middleware)
+			.map(|declarer| {
+				let params = self
+					.items
+					.iter()
+					.filter(|item| item.declarers.contains(declarer))
+					.map(|item| &item.meta)
+					.collect();
+				(declarer, params)
+			})
+	}
+
+	/// Whether a request param named `key` is declared: its flag spelling
+	/// (`dry-run`), its field spelling (`dry_run`) or a declared short flag.
+	pub fn contains(&self, key: &str) -> bool {
+		let flag = Self::flag(key);
+		self.params().any(|meta| {
+			meta.name() == flag
+				|| meta.short().is_some_and(|short| {
+					let mut chars = key.chars();
+					chars.next() == Some(short) && chars.next().is_none()
+				})
+		})
+	}
+
+	/// Refuses, as a `400` [`HttpError`], a request carrying a param nothing
+	/// declares, with the [`unknown`](Self::unknown) message.
+	pub fn reject_unknown(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
+	) -> Result {
+		match self.unknown(params) {
+			Some(message) => Err(HttpError::bad_request(message).into()),
 			None => Ok(()),
 		}
 	}
 
-	/// Whether `params` parse as `T`, the check a [`ValidateFn`] holds.
-	fn validate_as<T: FromReflect + Typed>(
-		params: &MultiMap<SmolStr, SmolStr>,
-	) -> Result {
-		params.parse_reflect::<T>().map(|_| ())
-	}
-}
-
-/// The check [`ParamsPartial::validate`] runs after the keys: whether params
-/// parse as the declared type, absent for a tuple of params types. Equal to
-/// every other, since the metadata is what a partial is compared by.
-#[derive(Clone, Copy, Default)]
-struct ValidateFn(Option<fn(&MultiMap<SmolStr, SmolStr>) -> Result>);
-
-impl core::fmt::Debug for ValidateFn {
-	fn fmt(
+	/// The message naming every param `params` carries that nothing declares,
+	/// each with the declared one it most plausibly misspells, so `--elevate`
+	/// reads `did you mean --elevated?`. `None` when every param is declared,
+	/// as is any param to a pattern taking the rest.
+	pub fn unknown(
 		&self,
-		formatter: &mut core::fmt::Formatter<'_>,
-	) -> core::fmt::Result {
-		formatter.write_str("ValidateFn")
-	}
-}
-
-impl PartialEq for ValidateFn {
-	fn eq(&self, _other: &Self) -> bool { true }
-}
-
-impl Eq for ValidateFn {}
-
-impl PartialOrd for ValidateFn {
-	fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl Ord for ValidateFn {
-	fn cmp(&self, _other: &Self) -> core::cmp::Ordering {
-		core::cmp::Ordering::Equal
-	}
-}
-
-impl core::hash::Hash for ValidateFn {
-	fn hash<H: core::hash::Hasher>(&self, _state: &mut H) {}
-}
-
-/// The param equivelent of a [`PathPattern`], denoting
-/// all params used for this endpoint and its ancestors
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	PartialEq,
-	Eq,
-	PartialOrd,
-	Ord,
-	Hash,
-	Deref,
-	Reflect,
-	Component,
-)]
-#[reflect(Component)]
-pub struct ParamsPattern {
-	/// A list of params for this endpoint,
-	/// sorted by name and deduplicated.
-	items: Vec<ParamMeta>,
-}
-
-impl ParamsPattern {
-	/// Deduplicates the metas and creates a canonical [`ParamsPattern`]
-	/// ## Errors
-	/// - Errors if params with the same name have conflicting definitions
-	pub fn from_metas(mut items: Vec<ParamMeta>) -> Result<Self> {
-		items.sort_by(|a, b| a.key.cmp(&b.key));
-
-		// check for conflicts before deduplication
-		for window in items.windows(2) {
-			if window[0].key == window[1].key && window[0] != window[1] {
-				bevybail!(
-					"conflicting param definitions for '{name}': \nFirst: {first:#?} \nSecond: {second:#?}",
-					name = window[0].key,
-					first = window[0],
-					second = window[1],
-				);
-			}
+		params: &MultiMap<SmolStr, SmolStr>,
+	) -> Option<String> {
+		let mut unknown = params
+			.keys()
+			.filter(|key| !self.rest && !self.contains(key))
+			.map(|key| self.describe_unknown(key))
+			.collect::<Vec<_>>();
+		unknown.sort();
+		match unknown.as_slice() {
+			[] => None,
+			[one] => Some(format!("unknown param {one}")),
+			many => Some(format!(
+				"unknown params:\n{}",
+				many.iter()
+					.map(|line| format!("- {line}"))
+					.collect::<Vec<_>>()
+					.join("\n")
+			)),
 		}
-
-		items.dedup();
-		Self { items }.xok()
 	}
 
-	/// Add each of `metas` whose key this pattern does not already declare: a
-	/// second declaration of a key is a second reader of the param, not a
-	/// contradiction, so the existing one wins.
-	pub fn extend_undeclared(
-		&mut self,
-		metas: impl IntoIterator<Item = ParamMeta>,
-	) {
-		for meta in metas {
-			if !self.items.iter().any(|item| item.key == meta.key) {
-				self.items.push(meta);
-			}
+	/// The message for a param the request got wrong: the [`ParamError`], then
+	/// the param as `--help` lists it, its type and doc line, where something
+	/// here declares it.
+	pub fn explain(&self, err: &ParamError) -> String {
+		match self.params().find(|meta| meta.name() == err.key()) {
+			Some(meta) => format!("{err}\n{}", meta.summary()),
+			None => err.to_string(),
 		}
-		self.items.sort_by(|a, b| a.key.cmp(&b.key));
 	}
 
-	/// [`Self::collect`] represented as a bevy system
-	pub fn collect_system(
-		entity: In<Entity>,
-		ancestors: Query<&ChildOf>,
-		params_partials: Query<&ParamsPartial>,
-	) -> Result<ParamsPattern> {
-		Self::collect(*entity, &ancestors, &params_partials)
+	/// `params` less every one nothing declares: what a command line rebuilt
+	/// from a request may repeat, since a typo the request carried is no
+	/// instruction to pass on. A pattern taking the rest keeps them all.
+	pub fn recognised(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
+	) -> MultiMap<SmolStr, SmolStr> {
+		let mut params = params.clone();
+		params.retain(|key, _| self.rest || self.contains(key));
+		params
 	}
 
-	/// Collects a [`ParamsPattern`] for a provided entity: the partials on it
-	/// and its ancestors. Its steps' partials are not among them, a route tree
-	/// adds those with [`extend_undeclared`](Self::extend_undeclared).
-	pub fn collect(
-		entity: Entity,
-		ancestors: &Query<&ChildOf>,
-		params_partials: &Query<&ParamsPartial>,
-	) -> Result<ParamsPattern> {
-		ancestors
-			// get every PathFilter in ancestors
-			.iter_ancestors_inclusive(entity)
-			.filter_map(|entity| params_partials.get(entity).ok())
-			.flat_map(|partial| partial.items.clone())
-			.collect::<Vec<_>>()
-			.xmap(ParamsPattern::from_metas)
+	/// One unknown param as the error names it, spelled as typed (`-x` for a
+	/// short flag), with the closest declared one.
+	fn describe_unknown(&self, key: &str) -> String {
+		let dashes = match key.chars().count() {
+			1 => "-",
+			_ => "--",
+		};
+		match str_ext::closest(
+			&Self::flag(key),
+			self.params().map(|meta| meta.name()),
+		) {
+			Some(near) => format!("`{dashes}{key}`, did you mean `--{near}`?"),
+			None => format!("`{dashes}{key}`"),
+		}
 	}
+
+	/// A request param key in its flag spelling, `dry_run` as `dry-run`.
+	fn flag(key: &str) -> String { key.replace('_', "-") }
 }
 
 /// Metadata for a specific param at a route
@@ -331,6 +321,62 @@ impl ParamMeta {
 				.or_else(|| variant_kind(some_inner.or(info)))
 				.unwrap_or_else(|| kind_from_type_path(field.type_path())),
 			options: ParamOptions::from_reflect(field),
+		}
+	}
+
+	/// One meta per field of `T`: a struct, or a tuple of structs walked
+	/// recursively, a nested struct with no authored form flattened into its
+	/// parent exactly as [`RequestParts::parse_params`] reads it, and a
+	/// [`Rest`] member contributing none.
+	///
+	/// ## Panics
+	///
+	/// Panics if `T` is not a struct or tuple of structs, or a field is missing
+	/// its type info.
+	pub fn of<T: FromReflect + Typed>() -> Vec<ParamMeta> {
+		let mut metas = Vec::new();
+		Self::walk(T::type_info(), &mut metas).unwrap();
+		metas
+	}
+
+	/// Push one meta per field of the params type `type_info` describes,
+	/// returning whether a member is [`Rest`].
+	pub(crate) fn walk(
+		type_info: &TypeInfo,
+		metas: &mut Vec<ParamMeta>,
+	) -> Result<bool> {
+		match type_info {
+			_ if Rest::is(type_info) => Ok(true),
+			TypeInfo::Struct(info) => {
+				for field in info.iter() {
+					match field.type_info() {
+						// a nested struct with no authored form is read
+						// flattened into this one's namespace, so declared so
+						Some(nested @ TypeInfo::Struct(_))
+							if LiteralParser::get(field.type_id())
+								.is_none() =>
+						{
+							Self::walk(nested, metas)?;
+						}
+						_ => metas.push(Self::from_field(field)),
+					}
+				}
+				Ok(false)
+			}
+			TypeInfo::Tuple(info) => {
+				let mut rest = false;
+				for field in info.iter() {
+					let field = field
+						.type_info()
+						.ok_or_else(|| bevyhow!("Field has no type info"))?;
+					rest |= Self::walk(field, metas)?;
+				}
+				Ok(rest)
+			}
+			_ => bevybail!(
+				"`{}` is no params type, only structs and tuples of structs are",
+				type_info.type_path()
+			),
 		}
 	}
 
@@ -615,92 +661,135 @@ mod test {
 			.xpect_eq("alloc::string::String");
 	}
 
-	#[beet_core::test]
-	fn pattern_deduplication() {
-		let metas = vec![
-			ParamMeta::new("foo", ParamValue::Flag),
-			ParamMeta::new("bar", ParamValue::Single),
-			ParamMeta::new("foo", ParamValue::Flag),
-			ParamMeta::new("baz", ParamValue::Multiple),
-			ParamMeta::new("bar", ParamValue::Single),
-		];
+	#[derive(Reflect)]
+	#[allow(dead_code)]
+	struct DeployParams {
+		elevated: bool,
+		dry_run: bool,
+	}
 
-		let pattern = ParamsPattern::from_metas(metas).unwrap();
-		pattern.items.len().xpect_eq(3);
-		pattern.items[0].name().xpect_eq("bar");
-		pattern.items[1].name().xpect_eq("baz");
-		pattern.items[2].name().xpect_eq("foo");
+	/// The pattern of `declarations`, each read by a route on a placeholder.
+	fn pattern(declarations: &[ParamsDeclaration]) -> Result<ParamsPattern> {
+		ParamsPattern::from_declarations(declarations.iter().map(
+			|declaration| (Entity::PLACEHOLDER, Reach::Route, declaration),
+		))
+	}
+
+	fn deploy() -> ParamsPattern {
+		pattern(&[ParamsDeclaration::new::<DeployParams, DeployParams>()])
+			.unwrap()
+	}
+
+	fn params(args: &str) -> MultiMap<SmolStr, SmolStr> {
+		CliArgs::parse(args).params
 	}
 
 	#[beet_core::test]
-	fn conflict_different_value_types() {
-		let metas = vec![
-			ParamMeta::new("foo", ParamValue::Flag),
-			ParamMeta::new("foo", ParamValue::Single),
-		];
-
-		ParamsPattern::from_metas(metas).xpect_err();
+	fn accepts_declared_keys_in_either_spelling() {
+		deploy()
+			.reject_unknown(&params("--elevated --dry-run --dry_run"))
+			.unwrap();
 	}
 
 	#[beet_core::test]
-	fn conflict_different_required() {
-		let metas = vec![
-			ParamMeta::new("bar", ParamValue::Single),
-			ParamMeta::new("bar", ParamValue::Single).required(),
-		];
+	fn suggests_the_closest_declared_param() {
+		deploy()
+			.unknown(&params("--elevate"))
+			.unwrap()
+			.xpect_eq("unknown param `--elevate`, did you mean `--elevated`?");
+		deploy()
+			.unknown(&params("--elevate --colour"))
+			.unwrap()
+			.xpect_eq(
+				"unknown params:\n- `--colour`\n- `--elevate`, did you mean `--elevated`?",
+			);
+	}
 
-		ParamsPattern::from_metas(metas).xpect_err();
+	/// The refusal is a `400`, so a CLI exits with its usage-error code and a
+	/// response carries the message alone.
+	#[beet_core::test]
+	fn rejects_as_a_bad_request() {
+		let response = Response::from(
+			deploy().reject_unknown(&params("--elevate")).unwrap_err(),
+		);
+		response.status().xpect_eq(StatusCode::BAD_REQUEST);
+	}
+
+	/// A param the request got wrong is named with its type and doc line, as
+	/// `--help` lists it.
+	#[beet_core::test]
+	fn explains_a_param_error_by_its_declaration() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct ServeParams {
+			/// The port to listen on.
+			port: u16,
+		}
+		let pattern =
+			pattern(&[ParamsDeclaration::new::<ServeParams, ServeParams>()])
+				.unwrap();
+		pattern.explain(&ParamError::missing("port")).xpect_eq(
+			"missing required param `--port`\n`--port` (u16): The port to listen on.",
+		);
+		// an undeclared key has no declaration to read
+		pattern
+			.explain(&ParamError::missing("host"))
+			.xpect_eq("missing required param `--host`");
+	}
+
+	/// A pattern taking the rest knows no param as unknown, and keeps every
+	/// one it recognises.
+	#[beet_core::test]
+	fn the_rest_taker_refuses_nothing() {
+		let pattern = pattern(&[ParamsDeclaration::new::<
+			DeployParams,
+			(DeployParams, Rest),
+		>()])
+		.unwrap();
+		pattern.takes_rest().xpect_true();
+		pattern.reject_unknown(&params("--nocapture")).unwrap();
+		pattern
+			.recognised(&params("--nocapture"))
+			.contains_key("nocapture")
+			.xpect_true();
 	}
 
 	#[beet_core::test]
-	fn conflict_different_short() {
-		let metas = vec![
-			ParamMeta::new("baz", ParamValue::Flag).with_short('b'),
-			ParamMeta::new("baz", ParamValue::Flag).with_short('z'),
-		];
-
-		ParamsPattern::from_metas(metas).xpect_err();
+	fn recognised_drops_the_unknown() {
+		let recognised = deploy().recognised(&params("--elevate --dry-run"));
+		recognised.contains_key("dry-run").xpect_true();
+		recognised.contains_key("elevate").xpect_false();
 	}
 
+	/// One key of two types is a contradiction; one key of one type is two
+	/// readers of the same param, kept once beside both.
 	#[beet_core::test]
-	fn conflict_different_description() {
-		let metas = vec![
-			ParamMeta::new("qux", ParamValue::Multiple)
-				.with_description("first description"),
-			ParamMeta::new("qux", ParamValue::Multiple)
-				.with_description("second description"),
-		];
-
-		ParamsPattern::from_metas(metas).xpect_err();
-	}
-
-	#[beet_core::test]
-	fn no_conflict_identical_params() {
-		let metas = vec![
-			ParamMeta::new("same", ParamValue::Flag)
-				.with_short('s')
-				.required(),
-			ParamMeta::new("same", ParamValue::Flag)
-				.with_short('s')
-				.required(),
-		];
-
-		let pattern = ParamsPattern::from_metas(metas).unwrap();
-		pattern.items.len().xpect_eq(1);
-		pattern.items[0].name().xpect_eq("same");
-	}
-
-	#[beet_core::test]
-	fn conflict_multiple_params() {
-		let metas = vec![
-			ParamMeta::new("alpha", ParamValue::Flag),
-			ParamMeta::new("beta", ParamValue::Single),
-			ParamMeta::new("beta", ParamValue::Single)
-				.with_description("conflicting"),
-			ParamMeta::new("gamma", ParamValue::Multiple),
-		];
-
-		ParamsPattern::from_metas(metas).xpect_err();
+	fn conflicts_on_type_not_on_readers() {
+		let port = |reader: &str, type_path: &str| {
+			ParamsDeclaration::named(
+				reader,
+				[ParamMeta::new("port", ParamValue::Single)
+					.with_type_path(type_path)],
+				false,
+			)
+		};
+		pattern(&[
+			port("HttpServer", "u16"),
+			port("Serve", "alloc::string::String"),
+		])
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("conflicting declarations of `--port`");
+		let pattern =
+			pattern(&[port("HttpServer", "u16"), port("TuiServer", "u16")])
+				.unwrap();
+		pattern.items().len().xpect_eq(1);
+		pattern.items()[0]
+			.declarers
+			.iter()
+			.map(|declarer| declarer.reader.as_str())
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["HttpServer", "TuiServer"]);
 	}
 
 	#[beet_core::test]
@@ -715,7 +804,7 @@ mod test {
 			boo: bool,
 		}
 
-		ParamsPartial::new::<MyParams>().items.xpect_eq(vec![
+		ParamMeta::of::<MyParams>().xpect_eq(vec![
 			ParamMeta::new("foo", ParamValue::Single)
 				.with_type_path("u32")
 				.required(),
@@ -729,37 +818,6 @@ mod test {
 			// .required(),
 			ParamMeta::new("boo", ParamValue::Flag).with_type_path("bool"),
 		]);
-	}
-
-	/// Params are checked against the declared type without a call: an
-	/// unknown key, a missing required one and a value that will not parse
-	/// are each refused.
-	#[beet_core::test]
-	fn validates_params() {
-		#[derive(Reflect)]
-		struct MyParams {
-			foo: u32,
-			bar: Option<String>,
-		}
-		let partial = ParamsPartial::new::<MyParams>();
-		let params = |pairs: &[(&str, &str)]| {
-			let mut map = MultiMap::<SmolStr, SmolStr>::default();
-			for (key, value) in pairs {
-				map.insert(SmolStr::new(key), SmolStr::new(value));
-			}
-			map
-		};
-		partial.validate(&params(&[("foo", "3")])).unwrap();
-		partial
-			.validate(&params(&[("foo", "3"), ("bar", "x")]))
-			.unwrap();
-		partial.validate(&params(&[("bar", "x")])).xpect_err();
-		partial.validate(&params(&[("foo", "three")])).xpect_err();
-		partial
-			.validate(&params(&[("foo", "3"), ("bazz", "x")]))
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("unknown param `--bazz`, did you mean `--bar`?");
 	}
 
 	/// What `--help` says a flag is, the typed read enforces: over a params
@@ -777,16 +835,16 @@ mod test {
 			verbose: Option<bool>,
 			tags: Vec<String>,
 		}
-		let partial = ParamsPartial::new::<Params>();
-		partial
+		let metas = ParamMeta::of::<Params>();
+		metas
 			.iter()
 			.filter(|meta| meta.is_required())
 			.map(ParamMeta::name)
 			.collect::<Vec<_>>()
 			.xpect_eq(vec!["name", "store"]);
-		for meta in partial.iter() {
+		for meta in metas.iter() {
 			// every required param but `meta` supplied
-			let args = partial
+			let args = metas
 				.iter()
 				.filter(|other| {
 					other.is_required() && other.name() != meta.name()
@@ -810,6 +868,33 @@ mod test {
 		}
 	}
 
+	/// A nested struct is declared flattened, as the parse reads it, so a
+	/// strict server accepts the flags the route reads.
+	#[beet_core::test]
+	fn nested_structs_declare_flattened() {
+		#[derive(Debug, PartialEq, Reflect)]
+		struct Inner {
+			depth: u32,
+		}
+		#[derive(Debug, PartialEq, Reflect)]
+		struct Outer {
+			name: String,
+			inner: Inner,
+		}
+		ParamMeta::of::<Outer>()
+			.iter()
+			.map(ParamMeta::name)
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["name", "depth"]);
+		Request::from_cli_str("--name=x --depth=3")
+			.parse_params::<Outer>()
+			.unwrap()
+			.xpect_eq(Outer {
+				name: "x".into(),
+				inner: Inner { depth: 3 },
+			});
+	}
+
 	#[beet_core::test]
 	fn snake_case_converts_to_kebab_case() {
 		#[derive(Reflect)]
@@ -819,11 +904,11 @@ mod test {
 			max_retry_count: u32,
 		}
 
-		let partial = ParamsPartial::new::<SnakeCaseParams>();
+		let metas = ParamMeta::of::<SnakeCaseParams>();
 
 		// verify field names are converted to kebab-case
-		partial.items[0].name().xpect_eq("help-format");
-		partial.items[1].name().xpect_eq("enable-verbose-mode");
-		partial.items[2].name().xpect_eq("max-retry-count");
+		metas[0].name().xpect_eq("help-format");
+		metas[1].name().xpect_eq("enable-verbose-mode");
+		metas[2].name().xpect_eq("max-retry-count");
 	}
 }

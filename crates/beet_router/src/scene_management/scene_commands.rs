@@ -40,18 +40,19 @@ struct SceneTargetParams {
 	url: Option<SmolStr>,
 }
 
-/// The device URL a command targets: its `--url` param, else the
-/// `BEET_REMOTE_URL` environment variable (usually from a local `.env`, so a
-/// workshop device need not be re-typed per command). Errors when neither is
-/// set, since these commands only drive a remote device.
-fn device_url(parts: &RequestParts) -> Result<SmolStr> {
-	parts
-		.parse_params::<SceneTargetParams>()?
-		.url
-		.or_else(|| env_ext::var("BEET_REMOTE_URL").ok())
-		.ok_or_else(|| {
-			bevyhow!("a device `--url` (or `BEET_REMOTE_URL`) is required")
-		})
+impl SceneTargetParams {
+	/// The device URL a command targets: its `--url` param, else the
+	/// `BEET_REMOTE_URL` environment variable (usually from a local `.env`, so
+	/// a workshop device need not be re-typed per command). Errors when
+	/// neither is set, since these commands only drive a remote device.
+	fn device_url(&self) -> Result<SmolStr> {
+		self.url
+			.clone()
+			.or_else(|| env_ext::var("BEET_REMOTE_URL").ok())
+			.ok_or_else(|| {
+				bevyhow!("a device `--url` (or `BEET_REMOTE_URL`) is required")
+			})
+	}
 }
 
 /// `load <path> --url=<device>` — POST a scene file to the device's `/load`.
@@ -61,8 +62,10 @@ fn device_url(parts: &RequestParts) -> Result<SmolStr> {
 #[action(route = "load/*scene")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
-pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
+pub async fn SceneLoad(
+	target: Params<SceneTargetParams>,
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
 	let path = cx
 		.input
 		.get_params("scene")
@@ -74,7 +77,7 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 		)
 		.into());
 	}
-	let url = device_url(&cx.input)?;
+	let url = target.device_url()?;
 	// read the scene through the nearest ancestor store (absent is an error).
 	let store = cx
 		.caller
@@ -101,9 +104,11 @@ pub async fn SceneLoad(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "clear")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
-pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let url = device_url(&cx.input)?;
+pub async fn SceneClear(
+	target: Params<SceneTargetParams>,
+	_cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let url = target.device_url()?;
 	Request::get(format!("{url}/clear")).send().await
 }
 
@@ -111,9 +116,11 @@ pub async fn SceneClear(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "reset")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
-pub async fn SceneReset(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let url = device_url(&cx.input)?;
+pub async fn SceneReset(
+	target: Params<SceneTargetParams>,
+	_cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let url = target.device_url()?;
 	Request::get(format!("{url}/reset")).send().await
 }
 
@@ -121,9 +128,11 @@ pub async fn SceneReset(cx: ActionContext<RequestParts>) -> Result<Response> {
 #[action(route = "dump")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>())]
-pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let url = device_url(&cx.input)?;
+pub async fn SceneDump(
+	target: Params<SceneTargetParams>,
+	_cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let url = target.device_url()?;
 	Request::get(format!("{url}/dump")).send().await
 }
 
@@ -131,15 +140,17 @@ pub async fn SceneDump(cx: ActionContext<RequestParts>) -> Result<Response> {
 /// installed, eg `beet run led-script`. The original request (method, headers,
 /// query and body) is forwarded unchanged; only its destination URL is rewritten
 /// to `<device>/<route>`. Its other params are the device route's, so it
-/// forwards what it does not name ([`ParamsPartial::forwarding`]) and a strict
-/// server passes them through.
+/// takes the rest and a strict server passes them through.
 #[action(route = "run/:route")]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<SceneTargetParams>().forwarding())]
-pub async fn SceneRun(cx: ActionContext<Request>) -> Result<Response> {
+pub async fn SceneRun(
+	target: Params<SceneTargetParams>,
+	_rest: Params<Rest>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let route = SmolStr::from(cx.input.get_param("route").unwrap_or(""));
-	let url = device_url(cx.input.request_parts())?;
+	let url = target.device_url()?;
 	let target = Url::coerce(format!("{url}/{route}"));
 	let (mut parts, body) = cx.input.into_parts();
 	// redirect the request onto the device, keeping its query + fragment.

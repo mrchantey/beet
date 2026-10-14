@@ -4,18 +4,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`VaultBackup`], surfaced in `--help`.
-#[derive(Reflect)]
-struct BackupParams {
-	/// The file to write; defaults to `beet-identity-<date>.age` in the
-	/// current directory.
-	out: Option<String>,
-	/// Also print the armored text as a QR code, for paper.
-	qr: bool,
-	/// Refuse rather than prompt, for a runner with no terminal.
-	headless: bool,
-}
-
 /// Back up the identity file: prompt for a passphrase twice on the terminal
 /// (never echoed, never on argv) and write the file passphrase-encrypted as
 /// armored age text, for a USB stick in a drawer; `--qr` also prints it as
@@ -30,14 +18,20 @@ struct BackupParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("backup"),
-	ParamsPartial = ParamsPartial::new::<BackupParams>()
-)]
-pub async fn VaultBackup(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<BackupParams>()?;
+#[require(PathPartial = PathPartial::new("backup"))]
+pub async fn VaultBackup(
+	/// The file to write; defaults to `beet-identity-<date>.age` in the
+	/// current directory.
+	#[param]
+	out: Option<String>,
+	/// Also print the armored text as a QR code, for paper.
+	#[param]
+	qr: bool,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let identities = AgeIdentityFile::require()?;
-	if params.headless {
+	// a launch with no terminal refuses rather than prompts
+	if BootstrapConfig::get().headless {
 		bevybail!(
 			"a backup passphrase is typed on a terminal: run this \
 			interactively, without `--headless`"
@@ -52,16 +46,15 @@ pub async fn VaultBackup(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	let ciphertext = AgePassphrase::new(passphrase)
 		.encrypt(identities.to_string().as_bytes())?;
-	let out = params
-		.out
-		.unwrap_or_else(|| format!("beet-identity-{}.age", Date::today()));
+	let out =
+		out.unwrap_or_else(|| format!("beet-identity-{}.age", Date::today()));
 	fs_ext::write_private(&out, &ciphertext)?;
 	let mut text = format!(
 		"wrote `{out}` ({} identities). Keep it on a stick in a drawer and \
 		remember the passphrase: nothing else can open it.\n",
 		identities.len()
 	);
-	if params.qr {
+	if qr {
 		text.push_str(&qr_text(&ciphertext)?);
 	}
 	Response::ok_text(text).xok()

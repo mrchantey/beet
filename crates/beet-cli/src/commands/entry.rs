@@ -1,5 +1,5 @@
-//! Resolving and loading a no-code entry, shared by the [`Serve`], [`Check`] and
-//! [`ExportStatic`] commands.
+//! Resolving and loading a no-code entry, shared by the [`Check`],
+//! [`ExportStatic`] and [`ExportPdf`] commands.
 //!
 //! An entry is a directory containing an entry document ([`entry_build::ENTRY_NAMES`], eg
 //! `main.bsx`) or the entry file itself, loaded as the app root with its declared
@@ -8,67 +8,91 @@
 
 use beet::prelude::*;
 
-/// Load the entry onto the caller's world through its [`BlobStore`], returning its
-/// root entity. Resolution is the binary's own [`entry_build::resolve_entry_path`] (the
-/// command's [`EntryParams`] `--repo` picks the backend, the entry's
-/// `<RepoRoot src>` rebases the root), so the same resolution serves
-/// `beet --entry=..` and these commands.
+/// The repo store selector every entry-loading command shares (`check`,
+/// `export-static`, `export-pdf`), naming the backend the entry loads through.
 ///
-/// `check`/`export-static` render the entry rather than serve it, so the build
-/// disarms the root ([`DisableCallOnReady`]) and the entry's `CallOnReady` verb
-/// stays dormant.
-/// The reads go through the store ([`entry_build::read_sources`]/[`entry_build::build_root`]),
-/// the same agnostic core the native binary and the wasm Worker use, so the
-/// command is store-driven rather than filesystem-bound.
-///
-/// `settle_deadline` bounds the wait on the entry's discovery tasks. A one-shot
-/// command passes [`ONE_SHOT_SETTLE_DEADLINE`]: it produces a result and exits,
-/// so a dependency that never resolves must fail it rather than hang it. `serve`
-/// passes [`None`] and waits indefinitely, since a slow dependency there is a
-/// stall to wait out, not a failed run.
-pub(crate) async fn build_entry(
-	caller: &AsyncEntity,
-	repo_uri: Option<&StoreUri>,
-	entry_path: &str,
-	settle_deadline: Option<Duration>,
-) -> Result<Entity> {
-	let (formats, prescans) = caller
-		.with_world(|world, _| {
-			(
-				world.get_resource_or_init::<TemplateFormats>().clone(),
-				world.get_resource_or_init::<PrescanRegistry>().clone(),
-			)
-		})
-		.await?;
-	let ResolvedEntry {
-		repo_store,
-		entry_name,
-		prescan,
-		..
-	} = entry_build::resolve_entry_path(&prescans, repo_uri, None, entry_path)
-		.await?;
-	let sources =
-		entry_build::read_sources(&repo_store, formats, entry_name, prescan)
+/// A command loads an entry into *this* process rather than launching one, so
+/// it takes its own `--entry-repo` (documented in its `--help`) rather than the
+/// launch's `--repo`, which the launch consumes as its own repo store and
+/// never hands a route.
+#[derive(Reflect)]
+pub(crate) struct EntryParams {
+	/// The repo store the entry loads through, eg
+	/// `--entry-repo=s3://my-bucket`. Defaults to the filesystem, rooted at the
+	/// entry directory.
+	entry_repo: Option<StoreUri>,
+}
+
+impl EntryParams {
+	/// Load the entry at `entry_path` onto the caller's world through its
+	/// [`BlobStore`], returning its root entity. Resolution is the binary's own
+	/// [`entry_build::resolve_entry_path`] (`--entry-repo` picks the backend,
+	/// the entry's `<RepoRoot src>` rebases the root), so the same resolution
+	/// serves `beet --entry=..` and these commands.
+	///
+	/// The commands render the entry rather than serve it, so the build
+	/// disarms the root ([`DisableCallOnReady`]) and the entry's `CallOnReady`
+	/// verb stays dormant. The reads go through the store
+	/// ([`entry_build::read_sources`]/[`entry_build::build_root`]), the same
+	/// agnostic core the native binary and the wasm Worker use, so the command
+	/// is store-driven rather than filesystem-bound.
+	///
+	/// The wait on the entry's discovery tasks is bounded by
+	/// [`ONE_SHOT_SETTLE_DEADLINE`]: a one-shot command produces a result and
+	/// exits, so a dependency that never resolves must fail it rather than
+	/// hang it.
+	pub async fn load(
+		&self,
+		caller: &AsyncEntity,
+		entry_path: &str,
+	) -> Result<Entity> {
+		let (formats, prescans) = caller
+			.with_world(|world, _| {
+				(
+					world.get_resource_or_init::<TemplateFormats>().clone(),
+					world.get_resource_or_init::<PrescanRegistry>().clone(),
+				)
+			})
 			.await?;
-	let root = caller
-		.with_world(move |world, _| {
-			entry_build::build_root(
-				world,
-				repo_store,
-				sources,
-				DisableCallOnReady,
-			)
-		})
-		.await??;
-	// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it so
-	// every discovered route exists before the caller renders/exports the entry.
-	match settle_deadline {
-		Some(deadline) => {
-			TemplatePending::settle_before(caller.world(), deadline).await?
-		}
-		None => TemplatePending::settle(caller.world()).await,
+		let ResolvedEntry {
+			repo_store,
+			entry_name,
+			prescan,
+			..
+		} = entry_build::resolve_entry_path(
+			&prescans,
+			self.entry_repo.as_ref(),
+			None,
+			entry_path,
+		)
+		.await?;
+		let sources = entry_build::read_sources(
+			&repo_store,
+			formats,
+			entry_name,
+			prescan,
+		)
+		.await?;
+		let root = caller
+			.with_world(move |world, _| {
+				entry_build::build_root(
+					world,
+					repo_store,
+					sources,
+					DisableCallOnReady,
+				)
+			})
+			.await??;
+		// the entry's `<RoutesDir/>` discovery runs as an async task; wait for it
+		// so every discovered route exists before the caller renders/exports the
+		// entry.
+		TemplatePending::settle_before(
+			caller.world(),
+			ONE_SHOT_SETTLE_DEADLINE,
+		)
+		.await?;
+		Ok(root)
 	}
-	Ok(root)
 }
 
 /// How long a one-shot command (`check`, `export-static`, `export-pdf`) waits on
@@ -78,7 +102,7 @@ pub(crate) async fn build_entry(
 /// over a large site on a cold cache; it exists to turn a genuinely stuck
 /// dependency into a named error rather than a hung command, not to police build
 /// speed.
-pub(crate) const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
+const ONE_SHOT_SETTLE_DEADLINE: Duration = Duration::from_secs(60);
 
 /// The entry's own directory (an entry file's parent, or the dir itself), the
 /// default home for command outputs like `dist/` and `site.pdf`. Deliberately
@@ -90,27 +114,6 @@ pub(crate) fn entry_dir(entry_path: &str) -> Result<AbsPath> {
 			.ok_or_else(|| bevyhow!("entry `{path}` has no parent directory"))
 	} else {
 		path.xok()
-	}
-}
-
-/// The repo store selector every entry-loading command shares (`serve`, `check`,
-/// `export-static`, `export-pdf`), naming the backend the entry loads through.
-///
-/// A command loads an entry into *this* process rather than launching one, so
-/// it reads its own `--repo` param (documented in its `--help`) rather than
-/// parsing a whole [`BootstrapConfig`] out of the request to reach one field.
-#[derive(Reflect)]
-pub(crate) struct EntryParams {
-	/// The repo store the entry loads through, eg `--repo=s3://my-bucket`.
-	/// Defaults to the filesystem, rooted at the entry directory.
-	repo: Option<StoreUri>,
-}
-
-impl EntryParams {
-	/// The repo store `parts` select, `None` for the default filesystem store
-	/// rooted at the entry dir.
-	pub fn repo(parts: &RequestParts) -> Result<Option<StoreUri>> {
-		parts.parse_params::<Self>()?.repo.xok()
 	}
 }
 
@@ -127,6 +130,19 @@ pub(crate) fn entry_arg(parts: &RequestParts) -> Result<String> {
 		.into());
 	}
 	entry.xok()
+}
+
+/// Wait for the process [`CanonicalPort`] to register, ie the freshly booted
+/// canonical http server's bound port. Shared by the commands that boot a
+/// server on an ephemeral port and then drive it (`export-pdf`, the
+/// browser-hosted `run-wasm`).
+pub(crate) async fn wait_for_port() -> Result<u16> {
+	poll_ext::poll_result_with(
+		CanonicalPort::get,
+		Duration::from_secs(5),
+		Duration::from_millis(25),
+	)
+	.await
 }
 
 /// A world able to load and render a no-code entry for the `check` /
@@ -263,17 +279,4 @@ mod test {
 			.find(&["app-info"])
 			.xpect_some();
 	}
-}
-
-/// Wait for the process [`CanonicalPort`] to register, ie the freshly booted
-/// canonical http server's bound port. Shared by the commands that boot a
-/// server on an ephemeral port and then drive it (`export-pdf`, the
-/// browser-hosted `run-wasm`).
-pub(crate) async fn wait_for_port() -> Result<u16> {
-	poll_ext::poll_result_with(
-		CanonicalPort::get,
-		Duration::from_secs(5),
-		Duration::from_millis(25),
-	)
-	.await
 }

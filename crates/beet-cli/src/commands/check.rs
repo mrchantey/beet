@@ -1,14 +1,6 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-/// Request params for the [`Check`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct CheckParams {
-	/// Also write a JSON diagnostics manifest (the tags/classes/routes/style-props
-	/// a future editor would autocomplete against) to this path, or `-` for stdout.
-	manifest: Option<String>,
-}
-
 /// Validates a no-code BSX entry without rendering it to disk: builds the entry
 /// world like [`ExportStatic`], then runs the render-diagnostics pass
 /// over every static route, printing a summary and exiting NON-ZERO if any
@@ -28,17 +20,17 @@ struct CheckParams {
 #[action(route = "check/*entry")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<(CheckParams, EntryParams)>())]
-pub async fn Check(cx: ActionContext<RequestParts>) -> Result<Response> {
-	let parts = &cx.input;
-	let params = parts.parse_params::<CheckParams>()?;
-	let root = build_entry(
-		&cx.caller,
-		EntryParams::repo(parts)?.as_ref(),
-		&entry_arg(parts)?,
-		Some(ONE_SHOT_SETTLE_DEADLINE),
-	)
-	.await?;
+pub async fn Check(
+	/// Also write a JSON diagnostics manifest (the tags/classes/routes/style-props
+	/// a future editor would autocomplete against) to this path, or `-` for stdout.
+	#[param]
+	manifest: Option<String>,
+	entry_params: Params<EntryParams>,
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
+	let root = entry_params
+		.load(&cx.caller, &entry_arg(&cx.input)?)
+		.await?;
 	let report = CheckReport::check_routes(&cx.world(), root).await?;
 
 	// surface every diagnostic loudly through the log facade, then summarize.
@@ -52,7 +44,7 @@ pub async fn Check(cx: ActionContext<RequestParts>) -> Result<Response> {
 
 	// `--manifest <path|->`: export the editor-facing manifest of the loaded site
 	// (built from the same world/RouteTree/RuleSet the checks read).
-	if let Some(out) = params.manifest {
+	if let Some(out) = manifest {
 		write_manifest(&cx.world(), root, &out).await?;
 	}
 

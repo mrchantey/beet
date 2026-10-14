@@ -68,14 +68,14 @@ struct SetParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("set/:name"),
-	ParamsPartial = ParamsPartial::new::<(DocumentParams, SetParams)>()
-)]
-pub async fn SecretsSet(cx: ActionContext<Request>) -> Result<Response> {
+#[require(PathPartial = PathPartial::new("set/:name"))]
+pub async fn SecretsSet(
+	document: Params<DocumentParams>,
+	Params(params): Params<SetParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let name = name_param(&cx.input)?;
-	let params = cx.input.parse_params::<SetParams>()?;
-	let handle = DocumentParams::resolve(&cx.input, &cx.caller).await?;
+	let handle = document.resolve(&cx.caller).await?;
 	let mut document = handle.read_or_new().await?;
 	let identity = AgeIdentityFile::require()?;
 	let value = SecretsSet::value(&name, &params, &document, &identity)?;

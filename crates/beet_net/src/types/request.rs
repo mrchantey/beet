@@ -565,6 +565,10 @@ pub trait FromRequest<M>: Sized {
 	fn from_request(
 		request: Request,
 	) -> MaybeSendBoxedFuture<'static, Result<Self, Response>>;
+
+	/// The params the extraction reads, which a route converting its input
+	/// through this declares. Nothing by default.
+	fn params() -> ParamsDeclaration { ParamsDeclaration::empty::<Self>() }
 }
 
 /// Marker type for [`FromRequest`] implementations via [`serde::de::DeserializeOwned`].
@@ -673,6 +677,9 @@ where
 pub trait FromRequestMeta<M>: Sized {
 	/// Extracts the type from the request metadata.
 	fn from_request_meta(request: &RequestMeta) -> Result<Self, Response>;
+
+	/// The params the extraction reads, see [`FromRequest::params`].
+	fn params() -> ParamsDeclaration { ParamsDeclaration::empty::<Self>() }
 }
 
 /// Marker type for [`FromRequest`] implementations via [`FromRequestMeta`].
@@ -689,6 +696,8 @@ where
 		let meta = RequestMeta::new(request.parts);
 		Box::pin(async move { T::from_request_meta(&meta) })
 	}
+
+	fn params() -> ParamsDeclaration { <T as FromRequestMeta<M>>::params() }
 }
 
 #[cfg(feature = "http")]

@@ -1,22 +1,6 @@
 use beet::net::prelude::Table;
 use beet::prelude::*;
 
-/// Request params for the [`AnalyticsReport`] command, surfaced in `--help`.
-#[derive(Reflect)]
-struct AnalyticsParams {
-	/// The analytics store, ie `fs:target/stores/my-app--dev--analytics` or
-	/// `s3://my-app--prod--analytics`, for a report over a store no entry
-	/// declares. Absent, the report reads the store the entry's
-	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
-	store: Option<StoreUri>,
-	/// A separate store holding the daily aggregates. Absent, the raw store
-	/// itself.
-	rollup: Option<StoreUri>,
-	/// Report only the raw events, skipping the aggregates the long history
-	/// lives in.
-	raw_only: bool,
-}
-
 /// Summarize collected analytics: what kinds of clients connected, the pages they
 /// viewed, and for how long.
 ///
@@ -41,9 +25,23 @@ struct AnalyticsParams {
 #[action(route = "analytics/*args")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<AnalyticsParams>())]
-pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<AnalyticsParams>()?;
+pub async fn AnalyticsReport(
+	/// The analytics store, ie `fs:target/stores/my-app--dev--analytics` or
+	/// `s3://my-app--prod--analytics`, for a report over a store no entry
+	/// declares. Absent, the report reads the store the entry's
+	/// `AnalyticsConfig` writes to, local or remote by `--service-access`.
+	#[param]
+	store: Option<StoreUri>,
+	/// A separate store holding the daily aggregates. Absent, the raw store
+	/// itself.
+	#[param]
+	rollup: Option<StoreUri>,
+	/// Report only the raw events, skipping the aggregates the long history
+	/// lives in.
+	#[param]
+	raw_only: bool,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let world = cx.caller.world().clone();
 
 	// the raw segments and the aggregate rows, both json over blobs and both in
@@ -51,7 +49,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	// `analytics/rollup/`, so the single `<S3BucketBlock label="analytics"/>`
 	// the deploy provisions holds them both. `--rollup` names a store keeping
 	// the aggregates apart.
-	let store = match &params.store {
+	let store = match &store {
 		Some(uri) => BlobStore::from_uri(uri)?,
 		None => {
 			let config = one_config(&world).await?;
@@ -60,7 +58,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 				.store
 		}
 	};
-	let rollups = match &params.rollup {
+	let rollups = match &rollup {
 		Some(uri) => BlobStore::from_uri(uri)?,
 		None => store.clone(),
 	};
@@ -72,7 +70,7 @@ pub async fn AnalyticsReport(cx: ActionContext<Request>) -> Result<Response> {
 	// lossy read skips (and warns on) legacy-schema or corrupt rows rather than
 	// failing the whole summary.
 	let events = store.read_all_lossy().await?;
-	let rollups = match params.raw_only {
+	let rollups = match raw_only {
 		true => Vec::new(),
 		false => read_table(&rollups).await?,
 	};

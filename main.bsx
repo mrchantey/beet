@@ -8,15 +8,15 @@ The wasm test runner depends on it: `.cargo/config.toml` sets
 `<RunWasm/>` route. The rest are convenience: build, check, static export, pdf,
 s3 sync.
 
-It is a one-shot `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`
-root with the `Router` as its child: the binary declares only that this load
-should run itself, the root's `CallOnReady` calls it with the process request, it
-hops down to the router, the positional route arg selects the command, and the
-command resolves and the process exits. `always=true` makes this dispatcher run
-on every boot regardless of `--server`, since `--server` selects a *declared
-server's* transports, not this dispatcher's. `RejectUnknownParams` refuses a
-flag no command declares, so `beet build-wasm --relase` answers `did you mean
---release?` rather than building a debug module.
+It is a one-shot `<CliServer always=true {CallOnReady}>` root with the `Router`
+as its child: the binary declares only that this load should run itself, the
+root's `CallOnReady` calls it with the process request, it hops down to the
+router, the positional route arg selects the command, and the command resolves
+and the process exits. `always=true` makes this dispatcher run on every boot
+regardless of `--server`, since `--server` selects a *declared server's*
+transports, not this dispatcher's. A `CliServer` is strict by requirement: a
+flag the command does not take is refused, so `beet build-wasm --relase`
+answers `did you mean --release?` rather than building a debug module.
 
     cargo install --path crates/beet-cli --all-features   # then, from anywhere in the repo:
     beet run-wasm <module.wasm>            # run a wasm test module
@@ -83,7 +83,7 @@ Both ride the `vault` feature (on by default natively, off in the lean browser
 builds), so the routes are excluded where the verbs are not; the declaration
 stays, an inert tag in a lean build.
 -->
-<CliServer always=true {(CallOnReady, RejectUnknownParams)}>
+<CliServer always=true {CallOnReady}>
 <Router {HelpHandler}>
 	<PackageConfig title="Beet" app_name="beet" description="An Atmospheric OS for homegrown tech" version="0.0.9-dev.16"/>
 	<RunWasm/>

@@ -8,7 +8,7 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 
 /// Request params every gated deploy and destroy route takes beside its own,
-/// surfaced in `--help`.
+/// declared by [`DeployGate`] at route reach from [`InfraPlugin`].
 #[derive(Reflect)]
 pub(crate) struct ElevationParams {
 	/// Deploy elevated: ask for the human factor of each provider whose deploy
@@ -85,14 +85,12 @@ impl DeployGate {
 
 	async fn dispatch(cx: ActionContext<Request>) -> Result<Response> {
 		let params = cx.input.parse_params::<ElevationParams>()?;
-		// what this route and everything above it reads, so a command line
-		// rebuilt from the request repeats no param nothing reads, ie a typo
+		// what this route takes, so a command line rebuilt from the request
+		// repeats no param nothing reads, ie a typo
 		let declared = cx
 			.caller
-			.with_state::<DeclaredParamsQuery, _>(|entity, query| {
-				query.of(entity)
-			})
-			.await?;
+			.with_state::<ParamsQuery, _>(|entity, query| query.of(entity))
+			.await??;
 		let assessed = Self::assess(&cx.caller, &cx.input).await?;
 		for note in assessed.iter().flat_map(|one| one.status.notes.iter()) {
 			info!("{note}");
@@ -169,7 +167,7 @@ impl DeployGate {
 	/// human factors an elevated deploy will ask for, and the command.
 	fn refusal(
 		input: &Request,
-		declared: &DeclaredParams,
+		declared: &ParamsPattern,
 		assessed: &[Assessed],
 	) -> BevyError {
 		let blocking = assessed
@@ -201,7 +199,7 @@ impl DeployGate {
 	async fn dry_run(
 		caller: &AsyncEntity,
 		input: &Request,
-		declared: &DeclaredParams,
+		declared: &ParamsPattern,
 		assessed: &[Assessed],
 	) -> Result<String> {
 		let mut out = String::new();
@@ -239,7 +237,7 @@ impl DeployGate {
 	/// the child exits.
 	async fn run_elevated(
 		cx: ActionContext<Request>,
-		declared: &DeclaredParams,
+		declared: &ParamsPattern,
 		assessed: Vec<Assessed>,
 		roll: bool,
 	) -> Result<Response> {
@@ -298,7 +296,7 @@ impl DeployGate {
 	/// inheriting the ones this launch loaded before them, then `env` set.
 	async fn run_child(
 		input: &Request,
-		declared: &DeclaredParams,
+		declared: &ParamsPattern,
 		stripped: &[&'static str],
 		env: &[(SmolStr, SmolStr)],
 	) -> Result {
@@ -326,19 +324,20 @@ impl DeployGate {
 		}
 	}
 
-	/// This request as argv, less this gate's own params, the launch's knobs
-	/// (`--entry`, `--stage`, ..), which [`ChildProcess::this_launch`] and the
-	/// relay carry from the launch itself, and every param nothing on the
-	/// route's path declares, so a typo is never repeated back: the route as
-	/// one `a/b` path, the way a person types it, then each param.
-	fn request_args(input: &Request, declared: &DeclaredParams) -> Vec<String> {
+	/// This request as argv, less this gate's own params, every launch knob
+	/// (`--server`, `--port`, ..), which [`ChildProcess::this_launch`] and the
+	/// relay carry from the launch itself, and every param the route does not
+	/// take, so a typo is never repeated back: the route as one `a/b` path, the
+	/// way a person types it, then each param.
+	fn request_args(input: &Request, declared: &ParamsPattern) -> Vec<String> {
 		let mut args = input.parts().to_cli_args();
 		args.params = declared.recognised(&args.params);
 		for param in Self::OWN_PARAMS {
 			args.params.remove(param);
 		}
-		// read only to take the knobs out: they parsed once already, at launch
-		BootstrapConfig::take_params(&mut args.params).ok();
+		for knob in BootstrapConfig::arg_names() {
+			args.params.remove(knob.as_str());
+		}
 		let route = args.path.join("/");
 		args.path.clear();
 		Some(route)
@@ -352,7 +351,7 @@ impl DeployGate {
 	/// launch's knobs and the request's recognised params, its gate params
 	/// replaced by `--elevated`. Composed from what was parsed rather than the
 	/// raw argv, which may hold the very typo that led here.
-	fn relay(input: &Request, declared: &DeclaredParams) -> String {
+	fn relay(input: &Request, declared: &ParamsPattern) -> String {
 		env_ext::program()
 			.into_iter()
 			.chain(
@@ -399,10 +398,17 @@ mod test {
 		note: Option<String>,
 	}
 
-	/// What a gated route with a `--note` param declares.
-	fn declared() -> DeclaredParams {
-		DeclaredParams::default()
-			.with(&ParamsPartial::new::<(ElevationParams, NoteParams)>())
+	/// What a gated route with a `--note` param takes.
+	fn declared() -> ParamsPattern {
+		ParamsPattern::from_declarations([(
+			Entity::PLACEHOLDER,
+			Reach::Route,
+			&ParamsDeclaration::new::<
+				super::DeployGate,
+				(ElevationParams, NoteParams),
+			>(),
+		)])
+		.unwrap()
 	}
 
 	/// One credential's answer, blocking for each `stale` or `protected`.

@@ -4,18 +4,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Request params for [`AdminElevate`], surfaced in `--help`.
-#[derive(Reflect)]
-struct AdminParams {
-	/// How long the session lasts, `30m` to `12h`, default `1h`. STS enforces
-	/// its own floor of 15 minutes and the role's 12-hour ceiling.
-	duration: Option<String>,
-	/// A command to run under fresh credentials, everything after `--`.
-	/// Nothing is persisted, so the grant lives exactly as long as the
-	/// command.
-	nested_args: Vec<String>,
-}
-
 /// Become an administrator for a session: the one path to tier 0a.
 ///
 /// ```sh
@@ -52,18 +40,25 @@ struct AdminParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("admin"),
-	ParamsPartial = ParamsPartial::new::<AdminParams>()
-)]
-pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<AdminParams>()?;
-	let seconds = AdminElevate::parse_duration(params.duration.as_deref())?;
+#[require(PathPartial = PathPartial::new("admin"))]
+pub async fn AdminElevate(
+	/// How long the session lasts, `30m` to `12h`, default `1h`. STS enforces
+	/// its own floor of 15 minutes and the role's 12-hour ceiling.
+	#[param]
+	duration: Option<String>,
+	/// A command to run under fresh credentials, everything after `--`.
+	/// Nothing is persisted, so the grant lives exactly as long as the
+	/// command.
+	#[param]
+	nested_args: Vec<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let seconds = AdminElevate::parse_duration(duration.as_deref())?;
 	let session = AdminSession::mint(seconds).await?;
-	match params.nested_args.is_empty() {
+	match nested_args.is_empty() {
 		// one verb, nothing kept: the grant lives as long as the child
 		false => {
-			let route = params.nested_args.join(" ");
+			let route = nested_args.join(" ");
 			info!(
 				"running `{route}` as the `{}` role, keeping nothing",
 				AgentIdentity::ADMIN_ROLE
@@ -75,7 +70,7 @@ pub async fn AdminElevate(cx: ActionContext<Request>) -> Result<Response> {
 					// NOT `without_launch_env`: this child is THIS launch, so it
 					// must resolve the same workspace and the same entry. The
 					// only thing added is the role's credentials.
-					ChildProcess::this_launch(&params.nested_args)?,
+					ChildProcess::this_launch(&nested_args)?,
 					|process, (_, value)| process.with_secret(value.clone()),
 				)
 				.without_env("AWS_PROFILE")

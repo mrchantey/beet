@@ -37,7 +37,7 @@ pub async fn WasmArtifact(
 		.with_release(true)
 		.with_package(package.to_string())
 		.with_bin(bin.to_string())
-		.with_features(features.to_string())
+		.with_cargo_features(features.to_string())
 		.with_out(out.into_abs().to_string())
 		.build()
 		.await?;

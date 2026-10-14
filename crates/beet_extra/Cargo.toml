@@ -64,7 +64,7 @@ scripting = ["beet_action/quickjs"]
 [dependencies]
 beet_action = { workspace = true, features = ["std", "reflect"] }
 beet_ml = { workspace = true, features = ["spatial"], optional = true }
-beet_spatial = { workspace = true, features = ["std"] }
+beet_spatial = { workspace = true, features = ["std"], optional = true }
 beet_core = { workspace = true, features = ["std", "rand", "bevy_keyboard", "rsx"] }
 beet_thread = { workspace = true, features = ["ui"], optional = true }
 beet_net = { workspace = true, features = ["std", "serde", "json"], optional = true }

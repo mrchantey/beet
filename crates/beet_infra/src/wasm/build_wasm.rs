@@ -45,8 +45,9 @@ pub struct BuildWasm {
 /// Compiles a package to wasm and prepares it for the browser.
 ///
 /// Target-agnostic: the invoking entry (a `main.bsx`, a justfile recipe)
-/// supplies the package, features and `--out` path through [`BuildWasm`]
-/// presets and/or request params, so nothing here defaults to a beet binary.
+/// supplies the package, cargo features and `--out` path through
+/// [`BuildWasm`] presets and/or request params, so nothing here defaults to a
+/// beet binary.
 /// With no `--package` it builds the current directory's crate (a
 /// non-workspace `main.bsx` build).
 ///
@@ -55,7 +56,7 @@ pub struct BuildWasm {
 #[action(route = "build-wasm")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<BuildWasm>())]
+#[component(on_add = RouteParams::declare::<Self, BuildWasm>)]
 pub async fn BuildWasmAction(cx: ActionContext<Request>) -> Result<String> {
 	// markup-declared defaults on this entity, request params applying over them
 	let mut params = cx
@@ -233,5 +234,20 @@ mod tests {
 			.get::<PathPartial>()
 			.unwrap()
 			.xpect_eq(PathPartial::new("build-wasm-min"));
+	}
+
+	/// The author hook declares [`BuildWasm`] on its route, under names no
+	/// launch knob takes, since the launch strips those before any route.
+	#[beet_core::test]
+	fn declares_its_settings() {
+		let mut world = World::new();
+		let entity = world.spawn(BuildWasm::default()).flush();
+		let pattern = world
+			.with_state::<beet_router::prelude::ParamsQuery, _>(|query| {
+				query.of(entity)
+			})
+			.unwrap();
+		pattern.contains("cargo-features").xpect_true();
+		pattern.contains("out").xpect_true();
 	}
 }

@@ -4,14 +4,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use std::path::PathBuf;
 
-/// Request params for [`VaultKeygen`], surfaced in `--help`.
-#[derive(Reflect)]
-struct KeygenParams {
-	/// The identity file to append to; defaults to the OS config,
-	/// `~/.config/beet/age/keys.txt`.
-	out: Option<String>,
-}
-
 /// Make a new age identity and append it to the identity file, created
 /// owner-only when missing, printing its recipient and the next steps. Never
 /// overwrites: a second call appends a second identity. The identity itself
@@ -24,13 +16,15 @@ struct KeygenParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("keygen"),
-	ParamsPartial = ParamsPartial::new::<KeygenParams>()
-)]
-pub async fn VaultKeygen(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<KeygenParams>()?;
-	let path = match params.out {
+#[require(PathPartial = PathPartial::new("keygen"))]
+pub async fn VaultKeygen(
+	/// The identity file to append to; defaults to the OS config,
+	/// `~/.config/beet/age/keys.txt`.
+	#[param]
+	out: Option<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let path = match out {
 		Some(out) => PathBuf::from(out),
 		None => AgeIdentityFile::default_path()?,
 	};

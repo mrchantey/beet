@@ -88,4 +88,10 @@ impl IntoResponseWithRequestParts<Self> for PageRequest {
 	) -> MaybeSendBoxedFuture<'static, Result<Response>> {
 		Box::pin(async move { LivePage::respond(self.0, &caller, parts).await })
 	}
+
+	/// Every page renders through the render step, which reads the part of
+	/// the page to render and the media ingest policy.
+	fn params() -> ParamsDeclaration {
+		ParamsDeclaration::new::<PageRequest, RenderParams>()
+	}
 }

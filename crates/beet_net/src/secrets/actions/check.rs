@@ -22,11 +22,11 @@ use core::fmt::Write;
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("check"),
-	ParamsPartial = ParamsPartial::new::<DocumentParams>()
-)]
-pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
+#[require(PathPartial = PathPartial::new("check"))]
+pub async fn SecretsCheck(
+	document: Params<DocumentParams>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
 	let mut report = Report::default();
 	let identities = match AgeIdentityFile::require() {
 		Ok(identities) if !identities.is_empty() => {
@@ -51,7 +51,7 @@ pub async fn SecretsCheck(cx: ActionContext<Request>) -> Result<Response> {
 			None
 		}
 	};
-	let selector = cx.input.parse_params::<DocumentParams>()?.document;
+	let selector = document.0.document;
 	// the entry's own store, to tell a document declared in another one
 	let entry_store = SecretsHandle::resolve(&cx.caller, None)
 		.await

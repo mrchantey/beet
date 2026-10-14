@@ -3,13 +3,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`AwsExec`], surfaced in `--help`.
-#[derive(Reflect)]
-struct AwsParams {
-	/// The aws cli arguments, everything after `--`.
-	nested_args: Vec<String>,
-}
-
 /// Run the aws cli as this machine's own identity: `beet-agent` normally, or
 /// the `beet-admin` role while a session minted by [`AdminSession`] is live.
 ///
@@ -48,13 +41,14 @@ struct AwsParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("aws"),
-	ParamsPartial = ParamsPartial::new::<AwsParams>()
-)]
-pub async fn AwsExec(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<AwsParams>()?;
-	if params.nested_args.is_empty() {
+#[require(PathPartial = PathPartial::new("aws"))]
+pub async fn AwsExec(
+	/// The aws cli arguments, everything after `--`.
+	#[param]
+	nested_args: Vec<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	if nested_args.is_empty() {
 		bevybail!(
 			"arguments are required after `--`, ie `beet aws -- sts \
 			get-caller-identity`"
@@ -104,7 +98,7 @@ pub async fn AwsExec(cx: ActionContext<Request>) -> Result<Response> {
 		// authenticates as nobody. Removals apply before additions, so a
 		// session re-adds its own token over this.
 		.without_env("AWS_SESSION_TOKEN")
-		.with_args(params.nested_args.iter().map(String::as_str))
+		.with_args(nested_args.iter().map(String::as_str))
 		.with_envs(vars)
 		.spawn()?
 		.status()

@@ -1,100 +1,40 @@
-//! The opt-in refusal of a request carrying a param nothing on its dispatch
-//! path declares.
+//! The router's half of a strict url space ([`RejectUnknownParams`]): refusing
+//! a param the matched route does not take, and a path misspelling a route.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Refuse, with a `400`, a request carrying a param nothing on its dispatch
-/// path declares, naming each and the declared param it most plausibly
-/// misspells: `deploy --elevate` answers `did you mean --elevated?` rather
-/// than running a plain deploy.
-///
-/// Opt-in, because most servers must tolerate params they never read: a page
-/// is linked with `?utm_source=..`, and served to a browser that appends
-/// whatever it likes. A command line is the opposite case, where a misspelt
-/// flag silently ignored is a different command run, so a CLI declares this
-/// beside its server:
-///
-/// ```bsx
-/// <CliServer always=true {(CallOnReady, RejectUnknownParams)}>
-///     <Router {HelpHandler}>..</Router>
-/// </CliServer>
-/// ```
-///
-/// It governs the url space it heads: the [`Router`] it sits on, or the one
-/// beneath the server it sits on, never a router nested further down, so a
-/// site an opted-in CLI serves over http (`serve --server=http`) still accepts
-/// `?utm_source`. Once a request is routed, every param it carries is checked
-/// against the [`DeclaredParams`] of the route it matched
-/// ([`ActionNode::declared_params`], the union its `--help` lists): each
-/// [`ParamsPartial`] on the route and its ancestors, and each
-/// [`DeclaresParams`] component there, ie middleware like [`HelpHandler`], the
-/// [`CliServer`]'s `--accept` and the launch knobs (`--entry`, `--stage`, ..)
-/// it declares for the argv it serves. A route that forwards what it does not
-/// name ([`ParamsPartial::forwarding`]) accepts anything. An unmatched path is
-/// refused the same way when it misspells a route ([`RouteTree::closest`]), so
-/// `serv` answers `did you mean serve?` rather than not found, and any other
-/// is left to the not-found answer, the bigger mistake.
-#[derive(Debug, Default, Clone, Component, Reflect)]
-#[reflect(Component, Default)]
-pub struct RejectUnknownParams;
-
-impl RejectUnknownParams {
-	/// Refuse, as a `400`, `params` for the route `node` matched, naming every
-	/// one nothing on its dispatch path declares and pointing at the route's
-	/// help. The caller has already established that the url space is
-	/// governed ([`RejectUnknownParamsQuery::governs`]).
-	pub(crate) async fn check(
-		world: &AsyncWorld,
-		node: &ActionNode,
-		params: MultiMap<SmolStr, SmolStr>,
+impl ActionNode {
+	/// Refuse, as a `400`, `params` this route does not take, naming each
+	/// and the declared param it most plausibly misspells and pointing at the
+	/// route's help. What it takes is its [`ParamsPattern`], so a route taking
+	/// `rest: Params<Rest>` refuses nothing. The caller has already
+	/// established that the url space is governed
+	/// ([`RejectUnknownParamsQuery::governs`]).
+	pub(crate) fn reject_unknown_params(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
 	) -> Result {
-		let route = node.clone();
-		let unknown = world
-			.with_state::<DeclaredParamsQuery, _>(move |query| {
-				route.declared_params(&query).unknown(&params)
-			})
-			.await;
-		let Some(unknown) = unknown else {
-			return Ok(());
-		};
-		Err(HttpError::bad_request(format!(
-			"{unknown}\n{}\n",
-			node.help_hint()
-		))
-		.into())
+		match self.params.unknown(params) {
+			Some(unknown) => Err(HttpError::bad_request(format!(
+				"{unknown}\n{}\n",
+				self.help_hint()
+			))
+			.into()),
+			None => Ok(()),
+		}
 	}
+}
 
-	/// The `400` for an unmatched `path` in a governed url space, naming the
-	/// route `near` it most plausibly misspells.
+impl RouteTree {
+	/// The `400` for an unmatched `path` in a strict url space, naming the
+	/// route `near` it most plausibly misspells ([`RouteTree::closest`]), so
+	/// `serv` answers `did you mean serve?` rather than not found.
 	pub(crate) fn misspelt_route(path: &[SmolStr], near: &str) -> HttpError {
 		HttpError::bad_request(format!(
 			"unknown route `{}`, did you mean `{near}`?\n`--help` lists the routes\n",
 			path.join("/")
 		))
-	}
-}
-
-/// Whether a url space is governed by a [`RejectUnknownParams`], the cheap
-/// half of the check, made by a [`Router`] on every request it routes.
-#[derive(SystemParam)]
-pub(crate) struct RejectUnknownParamsQuery<'w, 's> {
-	ancestors: Query<'w, 's, &'static ChildOf>,
-	policies: Query<'w, 's, (), With<RejectUnknownParams>>,
-	routers: Query<'w, 's, (), With<Router>>,
-}
-
-impl RejectUnknownParamsQuery<'_, '_> {
-	/// Whether `router` rejects unknown params: a [`RejectUnknownParams`] on it
-	/// or on an ancestor below the next enclosing [`Router`].
-	pub fn governs(&self, router: Entity) -> bool {
-		self.ancestors
-			.iter_ancestors_inclusive(router)
-			.enumerate()
-			.take_while(|(index, entity)| {
-				*index == 0 || !self.routers.contains(*entity)
-			})
-			.any(|(_, entity)| self.policies.contains(entity))
 	}
 }
 
@@ -104,13 +44,6 @@ mod test {
 	use beet_action::prelude::*;
 	use beet_core::prelude::*;
 	use beet_net::prelude::*;
-
-	#[derive(Reflect)]
-	#[allow(dead_code)]
-	struct DeployParams {
-		elevated: bool,
-		dry_run: bool,
-	}
 
 	/// The flag a step of the `audit` sequence reads.
 	#[derive(Reflect)]
@@ -123,15 +56,33 @@ mod test {
 	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
 	#[reflect(Component)]
-	async fn Deploy(_cx: ActionContext<RequestParts>) -> Result<String> {
+	async fn Deploy(
+		#[param] elevated: bool,
+		#[param] dry_run: bool,
+		_cx: ActionContext<RequestParts>,
+	) -> Result<String> {
+		let _ = (elevated, dry_run);
 		Ok("deployed".into())
+	}
+
+	/// Stands in for a command forwarding every param to a program it runs.
+	#[action]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Forward(
+		rest: Params<Rest>,
+		_cx: ActionContext<RequestParts>,
+	) -> Result<String> {
+		let mut keys = rest.keys().map(SmolStr::to_string).collect::<Vec<_>>();
+		keys.sort();
+		Ok(keys.join(","))
 	}
 
 	fn router_world() -> World { (AsyncPlugin, RouterPlugin).into_world() }
 
-	/// A CLI-shaped root: a server carrying `server`, a router with help, a
-	/// `deploy` command taking [`DeployParams`], and an `audit` sequence whose
-	/// step declares [`AuditParams`].
+	/// A CLI-shaped root: `server` over a router with help, a `deploy` command
+	/// taking `--elevated --dry-run`, an `audit` sequence whose step declares
+	/// [`AuditParams`] and a `forward` command taking the rest.
 	fn spawn_cli(world: &mut World, server: impl Bundle) -> Entity {
 		let audit_step =
 			Action::<Request, Outcome<Request, Response>>::new_pure(
@@ -141,13 +92,11 @@ mod test {
 			.spawn((server, children![(
 				(Router, HelpHandler::default()),
 				children![
-					(
-						route::exchange("deploy", Deploy),
-						ParamsPartial::new::<DeployParams>()
-					),
+					route::exchange("deploy", Deploy),
+					route::exchange("forward", Forward),
 					(PathPartial::new("audit"), ExchangeSequence, children![(
 						audit_step,
-						ParamsPartial::new::<AuditParams>()
+						RouteParams::new::<AuditParams>()
 					)]),
 				]
 			)]))
@@ -170,8 +119,7 @@ mod test {
 	#[beet_core::test]
 	async fn rejects_an_unknown_param_naming_the_closest() {
 		let mut world = router_world();
-		let root =
-			spawn_cli(&mut world, (CliServer::default(), RejectUnknownParams));
+		let root = spawn_cli(&mut world, CliServer::default());
 		let response = send(&mut world, root, "deploy --elevate").await;
 		response.status().xpect_eq(StatusCode::BAD_REQUEST);
 		response
@@ -190,8 +138,7 @@ mod test {
 	#[beet_core::test]
 	async fn rejects_a_misspelt_route_naming_the_closest() {
 		let mut world = router_world();
-		let root =
-			spawn_cli(&mut world, (CliServer::default(), RejectUnknownParams));
+		let root = spawn_cli(&mut world, CliServer::default());
 		let response = send(&mut world, root, "depoy --elevated").await;
 		response.status().xpect_eq(StatusCode::BAD_REQUEST);
 		response
@@ -206,10 +153,11 @@ mod test {
 			.xpect_eq(StatusCode::NOT_FOUND);
 	}
 
+	/// A url space no strict server heads tolerates what it does not read.
 	#[beet_core::test]
-	async fn accepts_an_unknown_param_without_the_opt_in() {
+	async fn accepts_an_unknown_param_where_not_strict() {
 		let mut world = router_world();
-		let root = spawn_cli(&mut world, CliServer::default());
+		let root = spawn_cli(&mut world, ());
 		send(&mut world, root, "deploy --elevate")
 			.await
 			.unwrap_str()
@@ -222,16 +170,15 @@ mod test {
 	}
 
 	/// The route's own params, a param the router's middleware declares and
-	/// the launch knobs the server declares all pass.
+	/// those the server declares all pass.
 	#[beet_core::test]
 	async fn accepts_params_declared_along_the_path() {
 		let mut world = router_world();
-		let root =
-			spawn_cli(&mut world, (CliServer::default(), RejectUnknownParams));
+		let root = spawn_cli(&mut world, CliServer::default());
 		send(
 			&mut world,
 			root,
-			"deploy --elevated --dry_run --entry=site --stage=dev --accept=text/plain",
+			"deploy --elevated --dry_run --server=cli --accept=text/plain",
 		)
 		.await
 		.unwrap_str()
@@ -249,8 +196,7 @@ mod test {
 	#[beet_core::test]
 	async fn accepts_a_param_a_step_declares() {
 		let mut world = router_world();
-		let root =
-			spawn_cli(&mut world, (CliServer::default(), RejectUnknownParams));
+		let root = spawn_cli(&mut world, CliServer::default());
 		send(&mut world, root, "audit --fix")
 			.await
 			.status()
@@ -266,10 +212,27 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_contains("unknown param `--fx`, did you mean `--fix`?");
+		// a step's param is its route's alone
+		send(&mut world, root, "deploy --fix")
+			.await
+			.status()
+			.xpect_eq(StatusCode::BAD_REQUEST);
+	}
+
+	/// A route taking the rest refuses nothing, even in a strict url space.
+	#[beet_core::test]
+	async fn a_rest_taker_refuses_nothing() {
+		let mut world = router_world();
+		let root = spawn_cli(&mut world, CliServer::default());
+		send(&mut world, root, "forward --nocapture --test-threads=1")
+			.await
+			.unwrap_str()
+			.await
+			.xpect_contains("nocapture,test-threads");
 	}
 
 	/// A router nested beneath a governed one is a url space of its own: the
-	/// site an opted-in CLI serves keeps accepting whatever it is linked with.
+	/// site a strict CLI serves keeps accepting whatever it is linked with.
 	#[beet_core::test]
 	async fn a_nested_router_is_not_governed() {
 		let mut world = router_world();

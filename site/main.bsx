@@ -8,14 +8,14 @@ every start.
 The workspace commands that take an entry as an argument (`beet check site`,
 `beet export-static site`) load it from the repo root.
 
-The root is a one-shot `<CliServer always=true {(CallOnReady, RejectUnknownParams)}>`
+The root is a one-shot `<CliServer always=true {CallOnReady}>`
 dispatcher whose `Router` is its child, so the entry is a set of commands and the
 served site is ONE of them: `serve`. `always=true` makes the dispatcher run on every
 boot regardless of `--server`, since `--server` selects the *served site's*
-transports, not this entry's. `RejectUnknownParams` refuses a flag no command
-declares, so `deploy --elevate` answers `did you mean --elevated?` rather than
-running a plain deploy; the site `serve` serves is its own url space and keeps
-accepting whatever a link carries (`?utm_source=..`). The box launches
+transports, not this entry's. A `CliServer` is strict by requirement, refusing a
+flag the command does not take, so `deploy --elevate` answers `did you mean
+--elevated?` rather than running a plain deploy; the site `serve` serves is its
+own url space and keeps accepting whatever a link carries (`?utm_source=..`). The box launches
 `app --repo=s3://.. --server=http,ssh serve` and a developer launches
 `beet --entry=site serve --server=http`: one process, one argv, the same verb,
 so local and deployed take the same path.
@@ -203,7 +203,7 @@ identifiers, not secrets, declared as spreads on the root `<Router>` below and
 resolved by ancestry. The social stack and the audit need only the Cloudflare
 token (plus AWS for the social stack's state bucket).
 -->
-<CliServer always=true {(CallOnReady, RejectUnknownParams)}>
+<CliServer always=true {CallOnReady}>
 <!-- the provider addresses every stack below deploys into, resolved by
      ancestry: the region, the Cloudflare account and the `beet.org` zone,
      identifiers public in every dashboard url and so declared here rather

@@ -20,7 +20,7 @@ watch shape and the served content are identical (see `crates/beet_extra/src/inf
 
 Live deploy needs AWS credentials in the environment, plus `tofu` and `cargo-zigbuild`.
 -->
-<CliServer {(CallOnReady, RejectUnknownParams)}>
+<CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
 	<RequireCfg cfg="feature:infra && feature:extra"/>
 	<Stack app_name="lightsail" {AwsRegion("us-west-2")}>

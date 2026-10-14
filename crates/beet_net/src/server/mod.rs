@@ -105,6 +105,10 @@ pub use call_on_start::*;
 mod cli_server;
 #[cfg(feature = "action")]
 pub use cli_server::*;
+// The strict url space every `CliServer` requires, and the query a router
+// makes to learn whether it heads one.
+mod reject_unknown_params;
+pub use reject_unknown_params::*;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 mod repl_server;
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]

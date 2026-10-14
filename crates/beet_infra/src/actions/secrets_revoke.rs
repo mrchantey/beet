@@ -8,18 +8,6 @@ use beet_net::prelude::*;
 use beet_router::prelude::*;
 use core::fmt::Write;
 
-/// Request params for [`SecretsRevoke`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RevokeParams {
-	/// The recipient (`age1..`) being removed. It must already be out of
-	/// every group's list in every declared document: the human edits the
-	/// lists first, and the verb refuses while they are still listed.
-	recipient: Option<String>,
-	/// Print the ledger of what would be re-sealed and rolled and change
-	/// nothing.
-	dry_run: bool,
-}
-
 /// `<Route path="secrets/revoke" {SecretsRevoke}/>` — remove a human from a
 /// stack: re-seal every group of every declared document to its current
 /// list, then roll every secret in the stack's store through its declared
@@ -47,11 +35,19 @@ struct RevokeParams {
 #[action]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<RevokeParams>())]
-pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<RevokeParams>()?;
-	let recipient = params
-		.recipient
+pub async fn SecretsRevoke(
+	/// The recipient (`age1..`) being removed. It must already be out of
+	/// every group's list in every declared document: the human edits the
+	/// lists first, and the verb refuses while they are still listed.
+	#[param]
+	recipient: Option<String>,
+	/// Print the ledger of what would be re-sealed and rolled and change
+	/// nothing.
+	#[param]
+	dry_run: bool,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let recipient = recipient
 		.as_deref()
 		.ok_or_else(|| {
 			bevyhow!(
@@ -60,8 +56,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 		})?
 		.parse::<AgeRecipient>()?;
 	let mut ledger = String::new();
-	let dry = params.dry_run;
-	if dry {
+	if dry_run {
 		writeln!(ledger, "dry run: nothing below is changed")?;
 	}
 
@@ -94,7 +89,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 	}
 	let identities = AgeIdentityFile::require()?;
 	for (handle, mut document) in opened {
-		let report = match dry {
+		let report = match dry_run {
 			true => RekeyReport {
 				rekeyed: document
 					.sealed
@@ -151,7 +146,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 			it where it was made"
 		)?;
 	}
-	if !dry {
+	if !dry_run {
 		if !plan.replace.is_empty() {
 			let project = terra::Project::resolve(&cx.caller).await?;
 			let resources = plan.resources();
@@ -178,7 +173,7 @@ pub async fn SecretsRevoke(cx: ActionContext<Request>) -> Result<Response> {
 	writeln!(
 		ledger,
 		"{}: {} replaced, {} re-minted, {} manual",
-		match dry {
+		match dry_run {
 			true => "would roll",
 			false => "rolled",
 		},

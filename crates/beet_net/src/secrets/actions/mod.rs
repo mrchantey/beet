@@ -1,6 +1,6 @@
-//! The `secrets` verbs, one file per verb, each a route action carrying its
-//! own params type so `--help` documents its flags. Every verb acts on a
-//! secrets document named by `--document=<label or path>`, the declared one
+//! The `secrets` verbs, one file per verb, each a route action taking its
+//! params in its signature so `--help` documents its flags. Every verb acts on
+//! a secrets document named by `--document=<label or path>`, the declared one
 //! by default ([`DocumentParams`]); every verb but `ls` resolves its
 //! identity through `AgeIdentityFile::require`, failing with the `keygen`
 //! guidance when none resolves. Values never reach a log: `get` prints its
@@ -49,13 +49,12 @@ pub(crate) struct DocumentParams {
 }
 
 impl DocumentParams {
-	/// The document the request names, resolved from `caller`.
+	/// The document `--document` names, resolved from `caller`.
 	pub(crate) async fn resolve(
-		request: &Request,
+		&self,
 		caller: &AsyncEntity,
 	) -> Result<SecretsHandle> {
-		let params = request.parse_params::<Self>()?;
-		SecretsHandle::resolve(caller, params.document.as_deref()).await
+		SecretsHandle::resolve(caller, self.document.as_deref()).await
 	}
 }
 

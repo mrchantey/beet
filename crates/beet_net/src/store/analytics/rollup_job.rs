@@ -226,13 +226,6 @@ impl core::fmt::Display for AnalyticsRollupReport {
 	}
 }
 
-/// Request params for [`AnalyticsRollupJob`], surfaced in `--help`.
-#[derive(Reflect)]
-struct AnalyticsRollupParams {
-	/// Rebuilds every complete archived day, not only new or uncovered days.
-	full: bool,
-}
-
 /// Compacts raw analytics segments into daily archives and aggregates.
 ///
 /// The route names its raw, rollup, and archive stores as fields of the job
@@ -243,7 +236,6 @@ struct AnalyticsRollupParams {
 #[action]
 #[derive(Default, Component, Reflect, MapEntities)]
 #[reflect(Component, Default, MapEntities)]
-#[require(ParamsPartial = ParamsPartial::new::<AnalyticsRollupParams>())]
 pub async fn AnalyticsRollupJob(
 	/// The blob store holding the raw [`AnalyticsSegment`] shards.
 	#[field(required)]
@@ -259,10 +251,12 @@ pub async fn AnalyticsRollupJob(
 	#[field(required)]
 	#[entities]
 	archive: Entity,
+	/// Rebuilds every complete archived day, not only new or uncovered days.
+	#[param]
+	full: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let world = cx.caller.world().clone();
-	let full = cx.input.parse_params::<AnalyticsRollupParams>()?.full;
 
 	let report = AnalyticsRollupRun::new(
 		StoreRef::resolve::<BlobStore>(&world, raw).await?,

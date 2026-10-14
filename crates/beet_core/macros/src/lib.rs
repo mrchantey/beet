@@ -292,6 +292,31 @@ pub fn beet_main(
 		.into()
 }
 
+/// Turns a function into an action component: a struct named after the
+/// function, requiring the `Action` its handler implements.
+///
+/// - `#[field]` parameters become struct fields, read live off the caller
+///   entity at call time.
+/// - `#[param]` parameters (a doc comment and an optional `short = 'x'`) and
+///   `Params<T>` parameters are request params, parsed off the request before
+///   the body runs and declared by the same signature, so `--help` lists them
+///   and a strict url space accepts them. `Params<Rest>` takes every param. An
+///   action taking params returns `Result`, a bad param being the caller's
+///   `400`, and its input is a request.
+///
+/// The full grammar is in `beet_action`'s README.
+///
+/// ```rust ignore
+/// #[action(route = "serve")]
+/// #[derive(Default, Clone, Component, Reflect)]
+/// async fn Serve(
+///     /// The port to listen on.
+///     #[param] port: u16,
+///     cx: ActionContext<RequestParts>,
+/// ) -> Result<String> {
+///     Ok(port.to_string())
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn action(
 	attr: proc_macro::TokenStream,

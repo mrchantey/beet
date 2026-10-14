@@ -90,7 +90,7 @@ pub struct LightsailBlock {
 	/// Networking mode, defaults to static IPv4.
 	networking: LightsailNetworking,
 	/// Explicit port the app server listens on. When `None`, resolved from
-	/// `--port` / `BEET_HTTP_PORT` or
+	/// `--port` / `BEET_PORT` or
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) via
 	/// [`app_port`](Self::app_port). Until infra declaration is wired to the
 	/// served site's state (like SST), this must match the markup `HttpServer{port}`.
@@ -306,7 +306,7 @@ impl LightsailBlock {
 
 	/// The port the application server listens on: the block's explicit
 	/// [`app_port`](Self::with_app_port) if set, else `--port` /
-	/// `BEET_HTTP_PORT`, else
+	/// `BEET_PORT`, else
 	/// [`DEFAULT_HTTP_PORT`](beet_net::prelude::DEFAULT_HTTP_PORT) (8337). Must
 	/// match the served site's markup port. With a domain Caddy reverse-proxies
 	/// 443 -> this port; without one the instance opens this port publicly.
@@ -415,7 +415,7 @@ impl LightsailBlock {
 		// absent by design: it is per-deploy, so it rides the release pointer.
 		let runtime = BootstrapConfig {
 			host: Some(core::net::Ipv4Addr::UNSPECIFIED.into()),
-			http_port: Some(app_port),
+			port: Some(app_port),
 			ssh_port: self.allow_ssh.then_some(22),
 			// the deployed stage, so the running process reports (and names cloud
 			// resources for) the stage it is actually deployed to.
@@ -2315,9 +2315,9 @@ mod tests {
 			.xpect_contains("dnf install -y caddy");
 	}
 
-	/// REGRESSION: the unit must write `BEET_HTTP_PORT`, the name the runtime
-	/// actually reads. It used to write `BEET_PORT`, which nothing read, so a
-	/// deploy on a non-default port silently bound 8337 anyway. Rendering through
+	/// REGRESSION: the unit must write the port under the name the runtime
+	/// reads. A hand-written name once drifted from it, so a deploy on a
+	/// non-default port silently bound 8337 anyway. Rendering through
 	/// `BootstrapConfig` makes that drift unrepresentable.
 	#[beet_core::test]
 	fn writes_the_port_name_the_runtime_reads() {
@@ -2325,10 +2325,8 @@ mod tests {
 			build_user_data(&LightsailBlock::default().with_app_port(9001));
 		script
 			.as_str()
-			.xpect_contains("Environment=BEET_HTTP_PORT=9001")
-			.xpect_contains("Environment=BEET_HOST=0.0.0.0")
-			.xnot()
-			.xpect_contains("BEET_PORT=");
+			.xpect_contains("Environment=BEET_PORT=9001")
+			.xpect_contains("Environment=BEET_HOST=0.0.0.0");
 	}
 
 	/// Boot selection rides the launch `exec` as validated argv, with the boot

@@ -201,8 +201,8 @@ impl RequestParts {
 	pub fn has_param(&self, key: &str) -> bool { self.url.has_param(key) }
 
 	/// The params this request carries, read into `T` through its reflected
-	/// fields: the typed read every route makes, so a flag is spelled once,
-	/// on the params type whose [`ParamsPartial`] documents it in `--help`.
+	/// fields: the read behind an `#[action]`'s `#[param]` and [`Params`]
+	/// arguments, which declare what they read in the same signature.
 	///
 	/// A field name is its kebab-case flag, an `Option` is optional, a `Vec`
 	/// repeats, a `bool` is a flag present or absent, a unit enum is named by

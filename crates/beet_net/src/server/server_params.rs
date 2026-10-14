@@ -11,8 +11,8 @@ use core::net::IpAddr;
 /// out-ranks env, so consulting it again here would invert that precedence. A
 /// start request is not a process launch, so this is a plain params type rather
 /// than a second [`BootstrapConfig`]; `server_params_match_bootstrap_knobs` pins
-/// its names to the flags a deploy renders, which is the drift the process config
-/// exists to prevent.
+/// its names to the flags a deploy renders, and `request_rank_is_what_servers_read`
+/// to the knobs [`BootstrapConfig::strip`] leaves in the process request.
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 pub struct ServerParams {
 	/// The address to bind, overriding the declared host.
@@ -24,6 +24,14 @@ pub struct ServerParams {
 	/// The route a freshly-opened tui/ssh surface navigates to, overriding the
 	/// request path.
 	pub path: Option<String>,
+}
+
+/// The boot selection every server reads off its start request, declared beside
+/// its own params so a strict url space accepts `--server`.
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+pub struct BootParams {
+	/// Which declared servers boot, comma separated, eg `http,ssh`.
+	pub server: Option<RunningSetFilter>,
 }
 
 impl ServerParams {
@@ -63,6 +71,22 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// The knobs left in the process request are exactly those a server reads
+	/// at request rank: its bind knobs and the boot selection.
+	#[beet_core::test]
+	fn request_rank_is_what_servers_read() {
+		let mut read = ParamMeta::of::<(BootParams, ServerParams)>()
+			.into_iter()
+			.map(|meta| meta.name().to_string())
+			.collect::<Vec<_>>();
+		read.sort();
+		let mut rank = BootstrapConfig::REQUEST_RANK
+			.map(ToString::to_string)
+			.to_vec();
+		rank.sort();
+		read.xpect_eq(rank);
+	}
+
 	/// The invariant that lets a start read plain params instead of a second
 	/// [`BootstrapConfig`]: every flag the deploy renders for a bind knob is a
 	/// flag [`ServerParams`] reads back. A renamed knob fails here rather than
@@ -71,7 +95,7 @@ mod test {
 	fn server_params_match_bootstrap_knobs() {
 		let argv = BootstrapConfig {
 			host: Some("0.0.0.0".parse().unwrap()),
-			http_port: Some(9090),
+			port: Some(9090),
 			ssh_port: Some(2222),
 			path: Some("docs/form".into()),
 			..default()

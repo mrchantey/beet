@@ -5,14 +5,6 @@ use super::write_recipients;
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`VaultRekey`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RekeyParams {
-	/// Who may read the file from now on, comma separated `age1..,age1..`;
-	/// absent, this identity file's own recipients.
-	recipients: Option<String>,
-}
-
 /// Re-encrypt an age file to a recipient list: the second half of adding a
 /// reader. Removing one is a rekey plus rolling what they could read, since
 /// git history keeps the old ciphertext. A secrets document's groups are
@@ -24,16 +16,18 @@ struct RekeyParams {
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(
-	PathPartial = PathPartial::new("rekey"),
-	ParamsPartial = ParamsPartial::new::<(VaultParams, RekeyParams)>()
-)]
-pub async fn VaultRekey(cx: ActionContext<Request>) -> Result<Response> {
-	let params = cx.input.parse_params::<RekeyParams>()?;
-	let vault = VaultParams::resolve(&cx.input)?;
+#[require(PathPartial = PathPartial::new("rekey"))]
+pub async fn VaultRekey(
+	vault: Params<VaultParams>,
+	/// Who may read the file from now on, comma separated `age1..,age1..`;
+	/// absent, this identity file's own recipients.
+	#[param]
+	recipients: Option<String>,
+	cx: ActionContext<Request>,
+) -> Result<Response> {
+	let vault = vault.resolve()?;
 	let identities = AgeIdentityFile::require()?;
-	let recipients =
-		write_recipients(params.recipients.as_deref(), &identities)?;
+	let recipients = write_recipients(recipients.as_deref(), &identities)?;
 	let plaintext = vault.read(&identities).await?;
 	vault.write(&plaintext, &recipients).await?;
 	Response::ok_text(format!(

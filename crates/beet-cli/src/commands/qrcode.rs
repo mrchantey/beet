@@ -22,9 +22,10 @@ struct QrCodeParams {
 #[action(route = "qrcode")]
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<QrCodeParams>())]
-pub async fn QrCode(parts: RequestParts) -> Result<String> {
-	let params = parts.parse_params::<QrCodeParams>()?;
+pub async fn QrCode(
+	params: Params<QrCodeParams>,
+	_parts: RequestParts,
+) -> Result<String> {
 	let output = params.output.as_deref().unwrap_or("qrcode.png");
 	let light = parse_rgb(params.light.as_deref().unwrap_or("255,255,255"))?;
 	let dark = parse_rgb(params.dark.as_deref().unwrap_or("0,0,0"))?;

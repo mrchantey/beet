@@ -56,7 +56,6 @@ pub fn DeployRoutes(
 	children![
 		(
 			PathPartial::new("deploy"),
-			ParamsPartial::new::<ElevationParams>(),
 			ExchangeGroup::default(),
 			RunGroup::<Request, Response>::new(deploy),
 			// the gate's overload in place of the group's own, declared rather
@@ -66,7 +65,6 @@ pub fn DeployRoutes(
 		),
 		(
 			PathPartial::new("destroy"),
-			ParamsPartial::new::<(DestroyParams, ElevationParams)>(),
 			ExchangeGroup::forced_by("force"),
 			RunGroup::<Request, Response>::reversed(destroy),
 			DeployGate,
@@ -82,14 +80,6 @@ pub fn DeployRoutes(
 		Rollback,
 		Rollforward
 	]
-}
-
-/// Request params for the destroy route, surfaced in `--help` and read by
-/// each step that honours `--force`.
-#[derive(Reflect)]
-pub(crate) struct DestroyParams {
-	/// Keep going past a failing step, and destroy lock-free.
-	pub force: bool,
 }
 
 impl terra::Project {
@@ -208,14 +198,6 @@ pub async fn List(cx: ActionContext) -> Result<String> {
 	terra::Project::resolve(&cx.caller).await?.list().await
 }
 
-/// Request params for [`Forget`], surfaced in `--help`.
-#[derive(Reflect)]
-struct ForgetParams {
-	/// The state addresses to forget, comma separated, spelled as `list`
-	/// prints them.
-	resources: String,
-}
-
 /// Remove resources from the stack's state without touching them: the live
 /// resource stays where it is and simply stops being managed (`tofu state
 /// rm`). For a resource whose declaration moved out of the apply, whose next
@@ -223,9 +205,13 @@ struct ForgetParams {
 /// import` is the way back.
 #[action(route = "forget")]
 #[derive(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<ForgetParams>())]
-pub async fn Forget(cx: ActionContext<Request>) -> Result<String> {
-	let resources = cx.input.parse_params::<ForgetParams>()?.resources;
+pub async fn Forget(
+	/// The state addresses to forget, comma separated, spelled as `list`
+	/// prints them.
+	#[param]
+	resources: String,
+	cx: ActionContext<Request>,
+) -> Result<String> {
 	let resources = str_ext::csv(&resources).collect::<Vec<_>>();
 	if resources.is_empty() {
 		bevybail!(
@@ -240,15 +226,6 @@ pub async fn Forget(cx: ActionContext<Request>) -> Result<String> {
 	report.xok()
 }
 
-/// Request params for [`RollState`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RollStateParams {
-	/// The environment variable holding the passphrase the state is encrypted
-	/// under now; the stack's `state_passphrase` variable holds the one it
-	/// moves to. `<that variable>_OLD` unless given.
-	retiring: Option<String>,
-}
-
 /// Re-encrypt the stack's state under its current passphrase, see
 /// [`terra::Project::roll_state`]: the stack half of rolling
 /// `TF_STATE_PASSPHRASE`, run once per stack after the document holds the
@@ -256,35 +233,32 @@ struct RollStateParams {
 /// encrypts a stack whose state is still plaintext.
 #[action(route = "roll-state")]
 #[derive(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<RollStateParams>())]
-pub async fn RollState(cx: ActionContext<Request>) -> Result<String> {
-	let retiring = cx.input.parse_params::<RollStateParams>()?.retiring;
+pub async fn RollState(
+	/// The environment variable holding the passphrase the state is encrypted
+	/// under now; the stack's `state_passphrase` variable holds the one it
+	/// moves to. `<that variable>_OLD` unless given.
+	#[param]
+	retiring: Option<String>,
+	cx: ActionContext<Request>,
+) -> Result<String> {
 	terra::Project::resolve(&cx.caller)
 		.await?
 		.roll_state(retiring.as_deref())
 		.await
 }
 
-/// Request params for [`Rollback`], surfaced in `--help`.
-#[derive(Reflect)]
-struct RollbackParams {
-	/// Number of versions to roll back, defaults to 1.
-	count: Option<usize>,
-}
-
 /// Roll back to a previous artifact version, then re-apply infrastructure
 /// with the rolled-back deploy_id.
 #[action(route = "rollback")]
 #[derive(Component)]
-#[require(ParamsPartial = ParamsPartial::new::<RollbackParams>())]
-pub async fn Rollback(cx: ActionContext<Request>) -> Result<String> {
-	let count = cx
-		.input
-		.parse_params::<RollbackParams>()?
-		.count
-		.unwrap_or(1);
+pub async fn Rollback(
+	/// Number of versions to roll back, defaults to 1.
+	#[param]
+	count: Option<usize>,
+	cx: ActionContext<Request>,
+) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
-	let version = client.rollback(count).await?;
+	let version = client.rollback(count.unwrap_or(1)).await?;
 	info!("rolled back to version {version}");
 	let result = apply_with_current_ledger(&cx.caller).await?;
 	info!("{result}");
@@ -356,15 +330,15 @@ mod tests {
 		tree.find(&["rollforward"]).xpect_some();
 	}
 
+	/// Each co-located reader declares its own: `ExchangeGroup` the
+	/// `--force` it is forced by, `DeployGate` its elevation params.
 	#[beet_core::test]
 	fn destroy_has_force_param() {
 		let mut world = cli_world();
 		let root = stack_with_verbs(&mut world);
 		let tree = RouteTree::of(&world, root).unwrap();
 		let destroy_node = tree.find(&["destroy"]).unwrap();
-		world
-			.entity(destroy_node.entity)
-			.get::<ParamsPartial>()
-			.xpect_some();
+		destroy_node.params.contains("force").xpect_true();
+		destroy_node.params.contains("elevated").xpect_true();
 	}
 }

@@ -74,7 +74,7 @@ beside its other tags rather than copying this one, or add the `_atproto.*`
 names to its audit allowlist with a reason. The block is its own tag precisely
 so it can be authored wherever the zone's owner is.
 -->
-<CliServer {(CallOnReady, RejectUnknownParams)}>
+<CliServer {CallOnReady}>
 <!-- the state backend is a property of the LAUNCH, not of a stack's identity, so
      the toggle is router middleware reading `--s3-backend` off the request and
      landing it on the process `Deployment`. Local by default, which is what keeps

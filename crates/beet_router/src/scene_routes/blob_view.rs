@@ -3,13 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// Request params for [`BlobView`], surfaced in `--help`.
-#[derive(Reflect)]
-struct BlobViewParams {
-	/// The file's path in the store, ie `docs/plan.docx`.
-	path: RelPath,
-}
-
 /// `view <path>`: any file in the nearest ancestor [`BlobStore`], parsed as
 /// its media type and rendered as the request accepts, exactly as a
 /// [`BlobPage`] serves its one file, so a markdown page, a Word file or a
@@ -22,19 +15,22 @@ struct BlobViewParams {
 /// ```sh
 /// beet view docs/plan.docx --accept=text/markdown
 /// ```
-#[action(route = "view/*path")]
+#[action(route = "view/*file")]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<BlobViewParams>())]
-pub async fn BlobView(cx: ActionContext<Request>) -> Result<PageRequest> {
-	let path = cx.input.parse_params::<BlobViewParams>()?.path;
+pub async fn BlobView(
+	/// The file's path in the store, ie `docs/plan.docx`.
+	#[param]
+	file: RelPath,
+	cx: ActionContext<Request>,
+) -> Result<PageRequest> {
 	let blob = cx
 		.caller
 		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
 			stores.get(entity).cloned()
 		})
 		.await??
-		.blob(path);
+		.blob(file);
 	BlobPage::serve(&cx.caller, cx.input.parts().clone(), blob).await
 }
 

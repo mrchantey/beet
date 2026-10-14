@@ -46,8 +46,6 @@ pub struct PageRoute;
 pub struct RouteTree {
 	/// The path pattern for this tree node.
 	pub path: PathPattern,
-	/// The params pattern for this tree node.
-	pub params: ParamsPattern,
 	/// The route at this exact path, if any.
 	node: Option<ActionNode>,
 	/// Child nodes in the tree.
@@ -68,7 +66,6 @@ impl RouteTree {
 		struct Node {
 			children: HashMap<String, Node>,
 			route: Option<ActionNode>,
-			params: Option<ParamsPattern>,
 			is_static: Option<bool>,
 		}
 
@@ -115,7 +112,6 @@ impl RouteTree {
 				node = node.children.entry(key).or_insert_with(|| Node {
 					is_static: Some(seg_is_static),
 					route: None,
-					params: None,
 					children: default(),
 				});
 
@@ -127,7 +123,6 @@ impl RouteTree {
 						);
 					}
 					node.route = Some(action_node.clone());
-					node.params = Some(action_node.params.clone());
 				}
 			}
 
@@ -139,16 +134,11 @@ impl RouteTree {
 					);
 				}
 				node.route = Some(action_node.clone());
-				node.params = Some(action_node.params.clone());
 			}
 		}
 
 		/// Recursively build the RouteTree, sorting children by their path.
-		fn build_tree(
-			pattern: PathPattern,
-			params: ParamsPattern,
-			node: &Node,
-		) -> RouteTree {
+		fn build_tree(pattern: PathPattern, node: &Node) -> RouteTree {
 			let mut children: Vec<RouteTree> = node
 				.children
 				.iter()
@@ -159,9 +149,7 @@ impl RouteTree {
 					child_segments.push(segment);
 					let child_pattern =
 						PathPattern::from_segments(child_segments).unwrap();
-					let child_params =
-						child_node.params.clone().unwrap_or(params.clone());
-					build_tree(child_pattern, child_params, child_node)
+					build_tree(child_pattern, child_node)
 				})
 				.collect();
 
@@ -169,18 +157,12 @@ impl RouteTree {
 
 			RouteTree {
 				path: pattern,
-				params: node.params.clone().unwrap_or(params),
 				node: node.route.clone(),
 				children,
 			}
 		}
 
-		build_tree(
-			PathPattern::from_segments(vec![]).unwrap(),
-			ParamsPattern::default(),
-			&root,
-		)
-		.xok()
+		build_tree(PathPattern::from_segments(vec![]).unwrap(), &root).xok()
 	}
 
 	/// System wrapper around
@@ -490,7 +472,7 @@ impl core::fmt::Display for RouteTree {
 					writeln!(f, "    input:  {}", input)?;
 					writeln!(f, "    output: {}", output)?;
 				}
-				for param in node.params.iter() {
+				for param in action.params.params() {
 					writeln!(f, "    {}", param)?;
 				}
 			}

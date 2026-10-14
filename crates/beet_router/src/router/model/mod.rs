@@ -1,7 +1,8 @@
 //! What a request is matched against: the route tree, the node at each of its
-//! paths, and the per-request context stack.
+//! paths, the params each route takes, and the per-request context stack.
 
 mod action_node;
+mod params_query;
 mod request_context;
 mod retired;
 /// The Rust route constructors: `route::new`, `route::exchange`, `route::fallback`.
@@ -10,6 +11,7 @@ mod route_tree;
 mod route_tree_builder;
 
 pub use action_node::*;
+pub use params_query::*;
 pub use request_context::*;
 pub(crate) use retired::*;
 pub use route_tree::*;

@@ -2,6 +2,7 @@
 //! BSX author wraps their pages in, with every region an overridable slot.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use beet_net::prelude::ParamsDeclaration;
 use beet_net::prelude::RequestParts;
 use beet_ui::prelude::*;
 // the document-chrome widgets, imported by name so the tags resolve regardless of
@@ -114,9 +115,9 @@ pub fn SiteLayout(
 	}
 }
 
-/// The param [`PageClasses::resolve`] reads, declared ([`DeclaresParams`]) by
-/// whatever themes a page through it: a [`Layout`], the [`HelpHandler`] page,
-/// a [`TuiServer`].
+/// The param [`PageClasses::resolve`] reads, declared under the reader name
+/// `PageClasses` ([`declaration`](Self::declaration)) by whatever themes a page
+/// through it: a [`Layout`], the [`HelpHandler`] page, a [`TuiServer`].
 #[derive(Debug, Default, Clone, Reflect)]
 pub struct ColorSchemeParams {
 	/// Pin the page's color scheme over the negotiated one.
@@ -124,6 +125,12 @@ pub struct ColorSchemeParams {
 }
 
 impl ColorSchemeParams {
+	/// The declaration of the scheme, read by [`PageClasses`] beneath whatever
+	/// declares it at middleware reach from its plugin.
+	pub fn declaration() -> ParamsDeclaration {
+		ParamsDeclaration::new::<PageClasses, Self>()
+	}
+
 	/// The scheme `parts` pins, if any. Lenient: a scheme no page knows is
 	/// the negotiated one rather than a failed render.
 	pub fn of(parts: &RequestParts) -> Option<ColorScheme> {

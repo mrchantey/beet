@@ -26,16 +26,19 @@ pub async fn TofuDestroy(
 	/// the destroy route sets it too, with one edge worth knowing: that mode
 	/// also continues past a failing step, and a step that fails takes the
 	/// request with it, so a `--force` run whose *earlier* steps failed reaches
-	/// this one without the flag. Declaring `force=true` here is how a stack
-	/// that is only ever torn down this way says so once, in the document.
+	/// this one without the flag. Declaring `lock_free=true` here is how a
+	/// stack that is only ever torn down this way says so once, in the
+	/// document.
 	#[field]
+	lock_free: bool,
+	/// Destroy lock-free as well as continuing past a failing step.
+	#[param]
 	force: bool,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let force = force || cx.input.parse_params::<DestroyParams>()?.force;
 	let result = terra::Project::resolve(&cx.caller)
 		.await?
-		.tofu_destroy(force)
+		.tofu_destroy(lock_free || force)
 		.await?;
 	trace!("{result}");
 	Pass(cx.input).xok()

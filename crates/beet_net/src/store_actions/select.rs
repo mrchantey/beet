@@ -2,14 +2,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
-/// Request params for [`SqlSelect`], surfaced in `--help`.
-#[derive(Reflect)]
-struct SqlSelectParams {
-	/// How the rows are written: `table` for aligned columns, `jsonl` for one
-	/// json object per line.
-	format: Option<RowFormat>,
-}
-
 /// How [`SqlSelect`] writes its rows.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Default)]
@@ -39,18 +31,17 @@ pub enum RowFormat {
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(ParamsPartial = ParamsPartial::new::<SqlSelectParams>())]
 pub async fn SqlSelect(
 	/// The `SELECT` or `WITH` this route answers.
 	#[field(required)]
 	sql: String,
+	/// How the rows are written: `table` for aligned columns, `jsonl` for one
+	/// json object per line.
+	#[param]
+	format: Option<RowFormat>,
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
-	let format = cx
-		.input
-		.parse_params::<SqlSelectParams>()?
-		.format
-		.unwrap_or_default();
+	let format = format.unwrap_or_default();
 	// the authored half first: a typo fails now rather than after the backoff
 	// a missing declaration spends
 	SqlSelect::guard(&sql)?;

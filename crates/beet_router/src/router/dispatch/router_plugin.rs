@@ -25,23 +25,27 @@ impl Plugin for RouterPlugin {
 			// `@res:PackageConfig.title`: registered and seeded there, so a
 			// routerless app can author one too.
 			.init_plugin::<BootstrapPlugin>()
-			.add_observer(insert_action_path_and_params)
+			.add_observer(insert_action_path)
 			.add_observer(insert_path_pattern_for_late_path_partial)
-			// the seven triggers that dirty a `RouteTree`: a url space root
+			// the eight triggers that dirty a `RouteTree`: a url space root
 			// appearing (a root `PathPartial`, so a routeless router still owns
 			// a tree), a route joining or leaving the tree (`PathPattern`
 			// insert/remove), a route being hidden or unhidden (`RouteHidden`
-			// insert/remove), a route's step declaring its params (a
-			// `ParamsPartial` off any route), and a template build settling its
-			// slots (`SpawnTemplate`, which reparents routes without touching
-			// any of those). Each just wakes `rebuild_dirty_route_trees`, which
-			// resolves what actually changed.
+			// insert/remove), a reader declaring its params (a `RouteParams` or
+			// `MiddlewareParams` insert, which can land after its route joined
+			// the tree, ie a `children!` step spawned behind the route), and a
+			// template build settling its slots (`SpawnTemplate`, which
+			// reparents routes without touching any of those). Each just wakes
+			// `rebuild_dirty_route_trees`, which resolves what actually changed.
 			.add_observer(queue_route_tree_rebuild_on_root)
 			.add_observer(queue_route_tree_rebuild_on_insert::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<PathPattern>)
 			.add_observer(queue_route_tree_rebuild_on_insert::<RouteHidden>)
 			.add_observer(queue_route_tree_rebuild_on_remove::<RouteHidden>)
-			.add_observer(queue_route_tree_rebuild_on_step_params)
+			.add_observer(queue_route_tree_rebuild_on_insert::<RouteParams>)
+			.add_observer(
+				queue_route_tree_rebuild_on_insert::<MiddlewareParams>,
+			)
 			.add_observer(rebuild_route_tree_on_build)
 			// a replaced route outlives the swap while a request holds it
 			.add_systems(Update, despawn_idle_retired);
@@ -63,9 +67,7 @@ impl Plugin for RouterPlugin {
 		app.register_type::<InterruptOnRun>()
 			.register_type::<InterruptOnEnd>()
 			.register_type::<PathPartial>()
-			.register_type::<ParamsPartial>()
 			.register_type::<PathPattern>()
-			.register_type::<ParamsPattern>()
 			// what `--help` says a route does, for the routes that share a
 			// handler and differ by what they carry
 			.register_type::<RouteDescription>()
@@ -75,7 +77,7 @@ impl Plugin for RouterPlugin {
 			.register_type::<CacheHeadersMiddleware>()
 			.register_type::<CorsHandler>()
 			.register_type::<CorsConfig>()
-			// the opt-in refusal of a param nothing on a route's path declares
+			// the strict url space, refusing a param its route does not take
 			.register_type::<RejectUnknownParams>()
 			.register_type::<Router>()
 			// a child-sequenced route is `<Route path=".." {ExchangeSequence}>` with
@@ -129,6 +131,12 @@ impl Plugin for RouterPlugin {
 				.init_resource::<Theme>()
 				.register_type::<HelpHandler>()
 				.register_type::<NavigateHandler>()
+				// the color scheme a page is themed by, read leniently by
+				// `PageClasses` beneath every reader rendering through it
+				.declare_params::<HelpHandler>(
+					Reach::Middleware,
+					ColorSchemeParams::declaration(),
+				)
 				// the diagnostic pages: the help/not-found route list and the
 				// navigation-failure error page, both rendered through the layout.
 				.register_template::<RouteList>()
@@ -148,6 +156,10 @@ impl Plugin for RouterPlugin {
 				// (`<RoutesDir/>`, a `Layout` spread) and the by-name
 				// route-aware head/sidebar widgets.
 				.register_type::<Layout>()
+				.declare_params::<Layout>(
+					Reach::Middleware,
+					ColorSchemeParams::declaration(),
+				)
 				.register_template::<RouteHead>()
 				.register_template::<RouteSidebar>()
 				// the generated page listing a content index page places instead
@@ -299,7 +311,18 @@ impl Plugin for RouterPlugin {
 			// (`<Router {(TuiServer, ..)}>`); its `on_add` hook boots the
 			// terminal app when the start walk selects `tui`.
 			#[cfg(feature = "tui")]
-			app.register_type::<TuiServer>();
+			app.register_type::<TuiServer>()
+				.declare_params::<TuiServer>(
+					Reach::Middleware,
+					ParamsDeclaration::new::<
+						TuiServer,
+						(BootParams, ServerParams),
+					>(),
+				)
+				.declare_params::<TuiServer>(
+					Reach::Middleware,
+					ColorSchemeParams::declaration(),
+				);
 			// a binary without the terminal (the browser runtime) still loads
 			// an entry declaring it, the spread a known featured-out name
 			#[cfg(not(feature = "tui"))]
@@ -309,7 +332,14 @@ impl Plugin for RouterPlugin {
 			// adds the per-connection behavior), so an entry naming it resolves in
 			// any binary that linked the transport.
 			#[cfg(feature = "ssh")]
-			app.register_type::<SshTuiServer>();
+			app.register_type::<SshTuiServer>()
+				.declare_params::<SshTuiServer>(
+					Reach::Middleware,
+					ParamsDeclaration::new::<
+						SshTuiServer,
+						(BootParams, ServerParams),
+					>(),
+				);
 			#[cfg(not(feature = "ssh"))]
 			app.allow_unregistered("SshTuiServer");
 			// the scripted route marker in the one instantiation `<ScriptRoute>`
@@ -360,20 +390,17 @@ impl Plugin for RouterPlugin {
 	}
 }
 
-/// Observer that listens for new actions and inserts their path and params patterns.
-/// Any [`PathPartial`] or [`ParamsPartial`] will be collected so long as they are
-/// spawned at the same time as the action, even if they come after it in the tuple.
-/// This is because, unlike OnAdd component hooks, observers run after the entire
-/// tree is spawned.
+/// Observer that listens for new actions and inserts their [`PathPattern`].
+/// Any [`PathPartial`] will be collected so long as it is spawned at the same
+/// time as the action, even if it comes after it in the tuple. This is because,
+/// unlike OnAdd component hooks, observers run after the entire tree is spawned.
 ///
 /// Only actions whose entity directly carries a [`PathPartial`] become routes.
 /// Descendants of a route entity (eg sequence steps) are skipped.
-fn insert_action_path_and_params(
+fn insert_action_path(
 	ev: On<Insert<ActionMeta>>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
-	params: Query<&ParamsPartial>,
-	metas: Query<&ActionMeta>,
 	mut commands: Commands,
 ) -> Result {
 	// only entities that have their own PathPartial become routes; children of a
@@ -382,59 +409,32 @@ fn insert_action_path_and_params(
 	if !paths.get(ev.entity).is_ok_and(|path| !path.is_root) {
 		return Ok(());
 	}
-	commands.entity(ev.entity).insert(route_patterns(
-		ev.entity, &ancestors, &paths, &params, &metas,
-	)?);
+	commands
+		.entity(ev.entity)
+		.insert(PathPattern::collect(ev.entity, &ancestors, &paths)?);
 	Ok(())
 }
 
-/// The [`PathPattern`] and [`ParamsPattern`] of the route at `entity`, its
-/// own partials and its ancestors'. A scene route's params include the render
-/// step's ([`RenderParams`]), since every page renders through it.
-fn route_patterns(
-	entity: Entity,
-	ancestors: &Query<&ChildOf>,
-	paths: &Query<&PathPartial>,
-	params: &Query<&ParamsPartial>,
-	metas: &Query<&ActionMeta>,
-) -> Result<(PathPattern, ParamsPattern)> {
-	let path = PathPattern::collect(entity, ancestors, paths)?;
-	#[allow(unused_mut)]
-	let mut items = ParamsPattern::collect(entity, ancestors, params)?.to_vec();
-	#[cfg(feature = "std")]
-	if metas
-		.get(entity)
-		.is_ok_and(|meta| meta.output_is::<PageRequest>())
-	{
-		items.extend(ParamsPartial::new::<RenderParams>().items);
-	}
-	#[cfg(not(feature = "std"))]
-	let _ = metas;
-	(path, ParamsPattern::from_metas(items)?).xok()
-}
-
 /// Observer that catches the scene-load case where [`PathPartial`] is
-/// inserted *after* [`ActionMeta`], so [`insert_action_path_and_params`]
-/// would have short-circuited. Re-runs the path/params collection here.
+/// inserted *after* [`ActionMeta`], so [`insert_action_path`] would have
+/// short-circuited. Re-runs the path collection here.
 fn insert_path_pattern_for_late_path_partial(
 	ev: On<Insert<PathPartial>>,
 	ancestors: Query<&ChildOf>,
 	paths: Query<&PathPartial>,
-	params: Query<&ParamsPartial>,
-	metas: Query<&ActionMeta>,
 	actions: Query<(), (With<ActionMeta>, Without<PathPattern>)>,
 	mut commands: Commands,
 ) -> Result {
 	// ActionMeta must already be present, PathPattern not yet computed, and a url
-	// space root is not itself a route (see `insert_action_path_and_params`).
+	// space root is not itself a route (see `insert_action_path`).
 	if !actions.contains(ev.entity)
 		|| paths.get(ev.entity).is_ok_and(|path| path.is_root)
 	{
 		return Ok(());
 	}
-	commands.entity(ev.entity).insert(route_patterns(
-		ev.entity, &ancestors, &paths, &params, &metas,
-	)?);
+	commands
+		.entity(ev.entity)
+		.insert(PathPattern::collect(ev.entity, &ancestors, &paths)?);
 	Ok(())
 }
 
@@ -453,24 +453,10 @@ fn queue_route_tree_rebuild_on_root(
 	}
 }
 
-/// Observer that wakes [`rebuild_dirty_route_trees`] when a step declares its
-/// params: a [`ParamsPartial`] on an entity that is not a route, which the
-/// tree lists under the route running it (see [`RouteTreeBuilder`]). A step
-/// can land after its route joined the tree, ie a `children!` step spawned
-/// behind the route's own insert, so the route's insert alone would miss it.
-fn queue_route_tree_rebuild_on_step_params(
-	ev: On<Insert<ParamsPartial>>,
-	paths: Query<(), With<PathPartial>>,
-	mut commands: Commands,
-) {
-	if !paths.contains(ev.entity) {
-		queue_route_tree_rebuild(&mut commands, ev.entity);
-	}
-}
-
 /// Observer that wakes [`rebuild_dirty_route_trees`] whenever `T` is inserted
-/// on any entity: a route joining the tree ([`PathPattern`]) or a route being
-/// hidden ([`RouteHidden`]).
+/// on any entity: a route joining the tree ([`PathPattern`]), a route being
+/// hidden ([`RouteHidden`]) or a reader declaring its params ([`RouteParams`],
+/// [`MiddlewareParams`]).
 ///
 /// The wake is deferred (queued rather than run inline), so by the time it
 /// runs the insert has settled — in particular so a route added via a bundle's
@@ -523,8 +509,9 @@ fn queue_route_tree_rebuild(commands: &mut Commands, entity: Entity) {
 /// funnels into, run once per dirty namespace root rather than once per
 /// changed entity.
 ///
-/// `trigger` is the entity whose [`PathPattern`]/[`RouteHidden`] (or, for a
-/// step, [`ParamsPartial`]) just changed, handed over by the waking observer.
+/// `trigger` is the entity whose [`PathPattern`], [`RouteHidden`],
+/// [`RouteParams`] or [`MiddlewareParams`] just changed, handed over by the
+/// waking observer.
 /// An insert or a live removal leaves the entity and its ancestry intact, so
 /// [`PathPattern::namespace_root`] answers
 /// and only that namespace is dirty. A despawn does not: by the time this runs
@@ -653,7 +640,8 @@ mod test {
 		for (path, expected) in [
 			("guide", "# Guide"),
 			("view/guide.md", "# Guide"),
-			#[cfg(feature = "serde")]
+			// a markdown table has cells only where markdown parses
+			#[cfg(all(feature = "serde", feature = "markdown_parser"))]
 			("cells/guide.md", "| t1r2c2 | d |"),
 		] {
 			world
