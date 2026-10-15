@@ -451,9 +451,8 @@ mod test {
 		assert!(
 			result.contains("let Self { label , variant } = self . clone ()")
 		);
-		// registration fn
-		assert!(result.contains("fn register_Button"));
-		// the prop schema, authored by the typed signature
+		// the prop schema, authored by the typed signature, through which
+		// `app.install_type::<Button>()` registers the template by name
 		assert!(result.contains("GetTemplateSchema for Button"));
 		assert!(result.contains("fn template_schema"));
 		// no scene machinery

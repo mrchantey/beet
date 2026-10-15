@@ -351,8 +351,8 @@ impl LightsailBlock {
 	fn service_name(stack: &ResolvedStack) -> &SmolStr { stack.app_name() }
 
 	/// Build the user data script that provisions the instance: the Caddy
-	/// install, the sshd relocation, the CloudWatch agent and the systemd unit
-	/// that runs the app.
+	/// install, the sshd relocation, the CloudWatch agent, the systemd unit
+	/// that runs the app, and the removal of the preinstalled SSM agent.
 	///
 	/// ## The rebuild rule
 	///
@@ -629,6 +629,21 @@ CWEOF
 "#
 		);
 
+		// Amazon's preinstalled SSM agent serves Session Manager and Run Command,
+		// neither of which beet uses: the box is managed over the relocated sshd,
+		// and the secret store reaches Parameter Store through the API, never the
+		// agent. Left running, every call it makes is denied (~100 `AccessDenied`
+		// a day in the journal), so remove it. Best-effort, and a no-op on an
+		// image that lacks it.
+		let ssm_removal = r#"
+# remove the preinstalled SSM agent: nothing here uses it, and every call it
+# makes is denied
+if rpm -q amazon-ssm-agent >/dev/null 2>&1; then
+  systemctl disable --now amazon-ssm-agent || true
+  dnf remove -y amazon-ssm-agent || echo "beet: could not remove amazon-ssm-agent" >&2
+fi
+"#;
+
 		// the two release scripts, the whole of the machine's knowledge about
 		// finding its binary. Neither names a version.
 		let fetch_script = self.fetch_script(stack, repo_bucket);
@@ -695,7 +710,7 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
 systemctl enable --now {app_name}.service
-{https_setup}{cloudwatch_setup}"#
+{https_setup}{cloudwatch_setup}{ssm_removal}"#
 		);
 
 		// build env var lines for terraform variable references
@@ -2313,6 +2328,24 @@ mod tests {
 			.xpect_contains("cloudsmith")
 			.xnot()
 			.xpect_contains("dnf install -y caddy");
+	}
+
+	/// REGRESSION: Amazon's preinstalled SSM agent is removed at boot. Nothing
+	/// in beet uses it, and left running it logged ~100 `AccessDenied` a day
+	/// into prod's journal. The step is guarded so an image without the package
+	/// still boots, and runs last so a slow or failing `dnf` holds up nothing
+	/// the box serves with.
+	#[beet_core::test]
+	fn removes_the_ssm_agent() {
+		let (script, _dir) = build_user_data(&LightsailBlock::default());
+		script
+			.as_str()
+			.xpect_contains("if rpm -q amazon-ssm-agent")
+			.xpect_contains("systemctl disable --now amazon-ssm-agent || true")
+			.xpect_contains("dnf remove -y amazon-ssm-agent ||");
+		let position = |needle: &str| script.find(needle).unwrap();
+		position("amazon-cloudwatch-agent-ctl")
+			.xpect_less_than(position("if rpm -q amazon-ssm-agent"));
 	}
 
 	/// REGRESSION: the unit must write the port under the name the runtime

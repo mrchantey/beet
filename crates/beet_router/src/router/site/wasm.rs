@@ -61,7 +61,7 @@ use beet_ui::prelude::*;
 /// ```
 #[template]
 pub fn Wasm(
-	/// The wasm artifact url, eg `/wasm/beet-min.wasm`.
+	/// The wasm runtime url, eg `/wasm/beet-min.wasm`.
 	#[prop]
 	src: String,
 	/// The wasm-bindgen glue url; defaults to `src` with `.wasm` swapped for `.js`.

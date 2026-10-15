@@ -17,7 +17,7 @@ very next fetch. `build` compiles the Worker alone, to inspect it before an
 upload; `deploy` builds it again and uploads what it just built, never an
 earlier build; `bench` times a `sync` against a full rebuild + redeploy. The
 site's page boots `beet-ui.wasm` in the browser, so every verb publishing the
-site builds that first (`<WasmArtifact/>`).
+site builds that first (`<WasmRuntime/>`).
 
 ## Usage
 
@@ -55,25 +55,25 @@ deploy`). Each action's `CloudflareAccess` names the groups its calls need.
 	<Route path="deploy" {ExchangeSequence}>
 		<CloudflareWorkerBlock name="beet-hello-worker" bucket="beet-hello-site"/>
 		<CloudflareWorkerDeployAction/>
-		<!-- the wasm binary the site's pages boot, built by this verb rather
+		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 		<!-- the Cloudflare rollout is instant, so tail briefly then exit -->
 		<CloudflareWatch name="beet-hello-worker" timeout="10s"/>
 	</Route>
 	<Route path="sync" {ExchangeSequence}>
-		<!-- the wasm binary the site's pages boot, built by this verb rather
+		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareR2Sync local_dir="examples/bsx_site" bucket="beet-hello-site"/>
 	</Route>
 	<!-- time a sync against a full rebuild + redeploy; add `url="https://
 	     beet-hello-worker.<subdomain>.workers.dev"` to also time the live fetch -->
 	<Route path="bench" {ExchangeSequence}>
-		<!-- the wasm binary the site's pages boot, built by this verb rather
+		<!-- the wasm runtime the site's pages boot, built by this verb rather
 		     than borrowed: the sync uploads it through the site's `wasm/` links -->
-		<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
+		<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>
 		<CloudflareBench name="beet-hello-worker" bucket="beet-hello-site" local_dir="examples/bsx_site"/>
 	</Route>
 	<Route path="destroy" {ExchangeSequence}>

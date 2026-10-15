@@ -1,34 +1,36 @@
-//! Building a wasm module as a deploy step.
+//! Building a wasm runtime as a deploy step.
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
-/// `<WasmArtifact package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>`:
-/// a deploy step that builds a release wasm module, so the step after it
-/// publishes the module this deploy built.
+/// `<WasmRuntime package="beet-cli" bin="beet" features="web_ui" out="target/wasm/beet-ui.wasm"/>`:
+/// a deploy step that builds a release wasm runtime, so the step after it
+/// publishes the runtime this deploy built.
 ///
-/// A wasm build is never borrowed as a stored file: whatever an earlier build
+/// A runtime is never borrowed as a stored file: whatever an earlier build
 /// (or a bucket pull) left at `out` is overwritten here, immediately before
-/// the publish reads it. Declared directly before the step that reads `out`,
+/// the publish reads it. Declare it directly before the step that reads `out`,
 /// ie a `<RepoStage>` whose source links to it, or an R2 sync of that source.
 ///
-/// The build itself is [`BuildWasm::build`], the same one the `build-wasm`
-/// command and the `just build-wasm-*` recipes run.
+/// The build is a release [`BuildWasm::build`], the same one the
+/// `build-wasm` command and the `just build-wasm-*` recipes run.
 #[action]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn WasmArtifact(
+pub async fn WasmRuntime(
 	/// The cargo package to build (`--package`).
 	#[field(required)]
 	package: SmolStr,
 	/// The binary target to build (`--bin`).
 	#[field(required)]
 	bin: SmolStr,
-	/// Comma-separated features to activate, over `--no-default-features`.
+	/// The comma-separated cargo features the runtime is built with (`--features`).
+	/// The build disables the package's default features, so only these are
+	/// enabled.
 	#[field]
 	features: SmolStr,
-	/// The workspace-relative `.wasm` path; its `.js` glue lands beside it.
+	/// The workspace-relative `.wasm` path; its `.js` glue is written beside it.
 	#[field(required)]
 	out: WsPath,
 	cx: ActionContext<Request>,
@@ -60,7 +62,7 @@ mod test {
 	async fn runs_as_a_deploy_step() {
 		(AsyncPlugin, InfraPlugin)
 			.into_world()
-			.spawn((ExchangeSequence, children![WasmArtifact::default()]))
+			.spawn((ExchangeSequence, children![WasmRuntime::default()]))
 			.call::<Request, Outcome<Request, Response>>(Request::get(""))
 			.await
 			.unwrap_err()

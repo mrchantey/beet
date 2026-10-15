@@ -3,10 +3,12 @@
 # Protocol: render a baseline from the CLEAN tree before touching the render
 # (`render_all.sh before`), make the change, then `render_all.sh after .agents/tmp/render/before`.
 # A source_code_hash-only diff is a rebuilt binary (a code-only deploy), not a config change.
+# A DIFFERS prints through `tf_diff.py`, which splits `user_data` into its script lines.
 # Exits non-zero on any DIFFERS, any failed render, or a stack rendered on one side only.
 # Usage: render_all.sh <out-dir-name> [<baseline-dir>]   (dumps land in .agents/tmp/render/<out-dir-name>)
 set -uo pipefail
-cd "$(dirname "$0")/../../.."
+skill_dir=$(cd "$(dirname "$0")" && pwd)
+cd "$skill_dir/../../.."
 export BEET_DEPLOY_ID=00000000-0000-7000-8000-000000000000
 export BEET_DEPLOY_TIMESTAMP=1756600000s
 out=.agents/tmp/render/${1:?out dir name required}
@@ -61,7 +63,8 @@ for name in "${names[@]}"; do
 		echo "HASH-ONLY: $name (rebuilt binary, not a config change)"
 	else
 		echo "DIFFERS: $name"
-		diff "$before" "$after" | head -40
+		# one line per changed leaf or script line, secrets as digests
+		python3 "$skill_dir/tf_diff.py" "$before" "$after" | head -80
 		status=1
 	fi
 done

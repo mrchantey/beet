@@ -15,7 +15,7 @@ use beet_net::prelude::*;
 /// so an updated file cannot go stale on the far side and nothing is written
 /// into the checkout; elsewhere (the local `assets` verb) `dest` is
 /// workspace-relative. Only source files are borrowed: a build output is built
-/// by the deploy that ships it ([`WasmArtifact`]), never copied from a stored
+/// by the deploy that ships it ([`WasmRuntime`]), never copied from a stored
 /// file.
 ///
 /// Mirror semantics per path: a destination file or directory is replaced, so a

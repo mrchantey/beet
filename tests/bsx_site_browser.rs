@@ -11,7 +11,7 @@
 //! trusted click on `More` reaches the button's entity, its `bx:click` script
 //! runs in the iframe backend, and the bound count repaints in place.
 //!
-//! Needs the artifact and a browser on PATH:
+//! Needs the wasm runtime and a browser on PATH:
 //!
 //! ```sh
 //! just test-bsx-site-browser   # builds beet-ui.wasm, then runs this

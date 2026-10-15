@@ -147,9 +147,10 @@ pub enum SyncDirection {
 /// - `dry_run`           -> `--dryrun`
 /// - `no_progress`       -> `--no-progress`
 /// - `exact_timestamps`  -> `--exact-timestamps`
-/// - `follow_symlinks`   -> `--follow-symlinks`
-/// - `acl`               -> `--acl <value>` (e.g. `public-read`)
-/// - `storage_class`     -> `--storage-class <value>` (e.g. `GLACIER_IR`)
+/// - `follow_symlinks`   -> `--follow-symlinks`, else `--no-follow-symlinks`,
+///   since the cli follows them when neither is passed
+/// - `acl`               -> `--acl <value>` (ie `public-read`)
+/// - `storage_class`     -> `--storage-class <value>` (ie `GLACIER_IR`)
 /// - `filter`            -> `--include <pat>` / `--exclude <pat>`, see [`S3Sync::filter_args`]
 /// - `additional_args`   -> appended verbatim at the end
 #[derive(Debug, Clone)]
@@ -170,7 +171,8 @@ pub struct S3Sync {
 	pub no_progress: bool,
 	/// Use exact timestamps instead of modified time heuristics.
 	pub exact_timestamps: bool,
-	/// Follow symbolic links when syncing from local.
+	/// Follow symbolic links when syncing from local, uploading each target
+	/// under the link's name; skipped otherwise.
 	pub follow_symlinks: bool,
 	/// Access control list for uploaded objects.
 	pub acl: Option<String>,
@@ -363,9 +365,14 @@ impl S3Sync {
 		if self.exact_timestamps {
 			out.push("--exact-timestamps".into());
 		}
-		if self.follow_symlinks {
-			out.push("--follow-symlinks".into());
-		}
+		// always explicit: the cli follows links when neither flag is passed
+		out.push(
+			match self.follow_symlinks {
+				true => "--follow-symlinks",
+				false => "--no-follow-symlinks",
+			}
+			.into(),
+		);
 		if let Some(acl) = &self.acl {
 			out.push("--acl".into());
 			out.push(acl.clone());
@@ -467,6 +474,29 @@ mod test {
 		argv.last().unwrap().as_str().xpect_eq("--only-show-errors");
 	}
 
+	/// An unset `follow_symlinks` SKIPS links. The cli follows them when
+	/// neither flag is passed, so omitting the flag silently followed them, and
+	/// a mirror's guard, which only inspects links it was told to follow, would
+	/// miss an empty linked dir.
+	#[beet_core::test]
+	fn skips_symlinks_unless_asked() {
+		let aws = AwsCli::new();
+		let local = AbsPath::new("some/dir").unwrap();
+		// `--follow-symlinks` is not a substring of `--no-follow-symlinks`
+		let args = |opts: &S3Sync| {
+			aws.build_s3_sync_args(local.as_str(), "s3://bucket", opts)
+				.join(" ")
+		};
+		args(&S3Sync::default())
+			.xpect_contains("--no-follow-symlinks")
+			.xnot()
+			.xpect_contains("--follow-symlinks");
+		args(&S3Sync::default().follow_symlinks(true))
+			.xpect_contains("--follow-symlinks")
+			.xnot()
+			.xpect_contains("--no-follow-symlinks");
+	}
+
 	/// The rules reach the cli in authored order, behind the `--exclude "*"` an
 	/// allowlist starts from.
 	#[beet_core::test]
@@ -514,7 +544,7 @@ mod test {
 				.filter(filter)
 				.to_args()
 				.into_iter()
-				.skip(1) // `--no-progress`
+				.skip(2) // the default `--no-progress --no-follow-symlinks`
 				.collect::<Vec<_>>()
 		};
 		args(GlobFilter::default()).xpect_eq(Vec::<String>::new());

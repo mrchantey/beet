@@ -10,7 +10,7 @@
 //! the pieces assemble there. An entry that forks is copied off disk into an
 //! in-memory store ([`BrowserHost::seeded_store`], the same seeding
 //! `TuiHost` does), so the fork the server writes on its first boot and the
-//! artifact its page boots land in memory and the on-disk fork left by a real
+//! wasm runtime its page boots land in memory and the on-disk fork left by a real
 //! session never leaks into a case; an entry that does not fork is served from
 //! its own directory. Either way the entry is built through the plain one-shot
 //! path the binary runs, its declared `<HttpServer>` booting on an OS port,
@@ -29,12 +29,12 @@ use core::ops::DerefMut;
 #[path = "../example_store/mod.rs"]
 mod example_store;
 
-/// The artifact the served pages boot (the build output the examples'
+/// The wasm runtime the served pages boot (the build output the examples'
 /// `wasm/beet-ui.wasm` links name), and the recipe that builds it.
-pub const ARTIFACT: &str = "target/wasm/beet-ui.wasm";
+pub const RUNTIME: &str = "target/wasm/beet-ui.wasm";
 pub const BUILD_RECIPE: &str = "just build-wasm-ui";
 
-/// How long a case waits for the tab to paint: the artifact fetched,
+/// How long a case waits for the tab to paint: the runtime fetched,
 /// instantiated and booted through the served repo store, generous for a
 /// loaded host.
 const PAINT_DEADLINE: Duration = Duration::from_secs(120);
@@ -83,12 +83,12 @@ impl BrowserHost {
 
 	/// Serve the entry at `entry` within `store` and open a tab on nothing
 	/// yet, its collectors attached, so the first [`Self::goto`] is watched
-	/// from its first byte. Fails unless the artifact the page boots is
+	/// from its first byte. Fails unless the wasm runtime the page boots is
 	/// built, naming the recipe.
 	pub async fn serve(store: BlobStore, entry: &str) -> Self {
-		let artifact = AbsPath::new_workspace_rel(ARTIFACT).unwrap();
-		if !fs_ext::exists(&artifact).unwrap_or_default() {
-			panic!("missing artifact `{artifact}`, run `{BUILD_RECIPE}`");
+		let runtime = AbsPath::new_workspace_rel(RUNTIME).unwrap();
+		if !fs_ext::exists(&runtime).unwrap_or_default() {
+			panic!("missing wasm runtime `{runtime}`, run `{BUILD_RECIPE}`");
 		}
 		let page = serve_entry(store.clone(), entry).await;
 		let console = page.console().await.unwrap();

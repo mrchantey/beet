@@ -191,9 +191,9 @@ web_render = ["web", "winit", "beet/webgpu"]
 # - `net`/`sockets`/`secure`/`ssh`/`aws_sdk`/`lambda` (the native transports, gated
 #   away in beet_net on wasm) and `qrcode`/`pdf` (whose deps sit in this manifest's
 #   own `not(wasm32)` table): all compile, and all add exactly zero packages to the
-#   wasm graph, so naming them would claim a capability the artifact does not have.
+#   wasm graph, so naming them would claim a capability the runtime does not have.
 # Between the ends is where narrower sets belong (`web_ui`, `web_render`, a
-# head-only build); add them as artifacts of their own rather than widening `min`.
+# head-only build); add them as runtimes of their own rather than widening `min`.
 web_full = [
 	"web_min",
 	"web_ui",

@@ -10,10 +10,10 @@
 //! - the GPU-less boot (default headless chrome, no adapter) still runs the
 //!   whole render stack but stays surfaceless: no canvas is claimed.
 //!
-//! Ignored by default since it needs artifacts and a browser on PATH:
+//! Ignored by default since it needs the wasm runtime and a browser on PATH:
 //!
 //! ```sh
-//! just check-wasm-render   # builds the artifact, then runs this (needs chromedriver + a chromium)
+//! just check-wasm-render   # builds the runtime, then runs this (needs chromedriver + a chromium)
 //! ```
 
 use super::browser_check::*;
@@ -24,7 +24,7 @@ use beet::prelude::*;
 /// served examples tree.
 const SCENE_REPO: &str = "/examples/spatial";
 const SCENE_MAIN: &str = "scene_3d.bsx";
-/// The artifact under test, built by `just build-wasm-render`.
+/// The runtime under test, built by `just build-wasm-render`.
 const WASM_SRC: &str = "/wasm/beet-render.wasm";
 
 /// Read the claimed canvas back: `null` when no canvas is claimed, else
@@ -65,7 +65,7 @@ fn render_page() -> Result<String> {
 #[beet::test(timeout_ms = 300_000)]
 #[ignore = "smoketest: needs `just build-wasm-render` + chromedriver"]
 async fn browser_render_boot() {
-	require_artifact("beet-render.wasm", "just build-wasm-render");
+	require_runtime("beet-render.wasm", "just build-wasm-render");
 	let port = serve_wasm_page(render_page().unwrap()).await.unwrap();
 	let url = format!("http://127.0.0.1:{port}/");
 

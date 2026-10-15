@@ -453,7 +453,7 @@ winit = ["bevy_default", "beet_core/bevy_window"]
 # The browser's surfaceless render backend (`wgpu/webgpu`), so the wasm render
 # runner can request an adapter off `navigator.gpu`: WebGL2 only yields adapters
 # on a canvas-backed surface, which a windowless boot never has. Enabled by the
-# wasm render artifacts (beet-cli `web_render`/`web_full`); inert natively (bevy
+# wasm render runtimes (beet-cli `web_render`/`web_full`); inert natively (bevy
 # guards every `webgpu` cfg behind `target_arch = "wasm32"`).
 webgpu = ["bevy/webgpu"]
 template_serde = ["beet_core/template_serde", "beet_net?/template_serde", "beet_router?/template_serde", "beet_thread?/template_serde", "beet_ui?/template_serde"]
@@ -880,7 +880,7 @@ required-features = ["router", "style", "markdown", "fs", "tui_server", "quickjs
 
 # the browser half: the served page boots the wasm binary on the same entry,
 # every route adopts untouched and the counter counts in the tab. Needs the built
-# artifact, `just test-bsx-site-browser`.
+# runtime, `just test-bsx-site-browser`.
 [[test]]
 name = "bsx_site_browser"
 path = "tests/bsx_site_browser.rs"

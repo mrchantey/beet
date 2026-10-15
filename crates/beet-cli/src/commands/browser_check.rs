@@ -6,7 +6,7 @@
 use beet::prelude::webdriver::*;
 use beet::prelude::*;
 
-/// Where the `just build-wasm-*` recipes write the artifacts under test,
+/// Where the `just build-wasm-*` recipes write the runtimes under test,
 /// workspace-relative.
 const WASM_DIR: &str = "target/wasm";
 
@@ -56,7 +56,7 @@ pub(crate) async fn serve_wasm_page(page: String) -> Result<u16> {
 							Response::ok_body(page.clone(), MediaType::Html)
 						})
 					),
-					// the artifact and the entry's repo, from the ancestor
+					// the runtime and the entry's repo, from the ancestor
 					// workspace store
 					AssetsDir {
 						src: WASM_DIR.into(),
@@ -105,14 +105,14 @@ pub(crate) fn drain(console: &Collector<ConsoleEntry>, log: &mut String) {
 	}
 }
 
-/// Fail unless the artifact `name` is built into [`WASM_DIR`], naming the
-/// recipe that builds it.
-pub(crate) fn require_artifact(name: &str, recipe: &str) {
+/// Fail unless the wasm runtime `name` is built into [`WASM_DIR`], naming
+/// the recipe that builds it.
+pub(crate) fn require_runtime(name: &str, recipe: &str) {
 	let path = format!("{WASM_DIR}/{name}");
 	if !AbsPath::new_workspace_rel(&path)
 		.and_then(fs_ext::exists)
 		.unwrap_or_default()
 	{
-		panic!("missing artifact `{path}`, run `{recipe}`");
+		panic!("missing wasm runtime `{path}`, run `{recipe}`");
 	}
 }

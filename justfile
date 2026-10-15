@@ -392,7 +392,7 @@ check-wasm-render *args:
 	just build-wasm-render
 	cargo test -p beet-cli --lib {{ args }} -- --include-ignored --include '*browser_render_boot*'
 
-# Headless-chrome verification of the browser bootstrap: builds the artifacts,
+# Headless-chrome verification of the browser bootstrap: builds the runtimes,
 # serves them at pages naming an entry through `<Wasm repo entry>` and reads
 # from the console that the entry resolved through the http repo and ran,
 # headless (beet-min.wasm on the `serve-wasm` hello entry) and under
@@ -449,9 +449,9 @@ test-scripting-fallback *args:
 	cargo test -p beet_action --lib --target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
 
-# The browser binaries are build outputs under target/wasm, never stored or
+# The browser runtimes are build outputs under target/wasm, never stored or
 # synced: every consumer (a test, a check, a served example) builds what it
-# boots first, and a deploy shipping one builds it (`<WasmArtifact/>`).
+# boots first, and a deploy shipping one builds it (`<WasmRuntime/>`).
 
 # The floor (target/wasm/beet-min.wasm): the smallest binary that is still a beet
 # runtime in the browser, the `web` base and nothing else. A page whose program uses
@@ -478,7 +478,7 @@ build-wasm-render:
 # head, the thread runtime, the tui host, infra definitions and the embedded
 # JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
 # Slower to build (the JS engine's wasi sysroot downloads once) and several times
-# the artifact, so a page mounts it only when its program needs more than the floor.
+# the floor's size, so a page mounts it only when its program needs more than it.
 build-wasm-full:
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
 

@@ -2,7 +2,7 @@
 {
 	"languages": {
 		"Rust": {
-			"enable_language_server": false,
+			// "enable_language_server": false,
 		},
 	},
 	// "show_completions_on_input": false,

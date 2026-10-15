@@ -90,7 +90,7 @@ borrowed. Under the deploy's `<RepoStage>` it borrows into the staging dir the
 mirror publishes, so nothing is written into the checkout; the `assets` verb
 borrows into `site/assets` for a local `serve`. Only source files are borrowed,
 never a build output: the site boots no wasm, and a deploy that ships one
-builds it right before its stage (`<WasmArtifact/>`).
+builds it right before its stage (`<WasmRuntime/>`).
 
 ## The deploy
 

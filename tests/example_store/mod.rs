@@ -5,7 +5,7 @@
 //! sources, so a suite over its on-disk directory would read the fork a real
 //! session left behind and rewrite it. Copying the entry and the documents it
 //! names off disk into memory keeps every case a first boot over the authored
-//! files alone, with the fork and the artifact landing in memory.
+//! files alone, with the fork and the wasm runtime landing in memory.
 //!
 //! Files in a `tests/` subdirectory are not compiled as their own test
 //! target, so each host `#[path]`-includes this module.

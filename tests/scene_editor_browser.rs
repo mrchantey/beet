@@ -21,8 +21,8 @@
 //!
 //! The example is served the way `beet --entry=examples/ui/scene_editor.bsx`
 //! serves it, from an in-memory copy of the entry, its scene, its shell and
-//! the artifact (the shared [`BrowserHost`]), so no on-disk fork leaks in.
-//! Needs the artifact and a browser on PATH:
+//! the wasm runtime (the shared [`BrowserHost`]), so no on-disk fork leaks in.
+//! Needs the wasm runtime and a browser on PATH:
 //!
 //! ```sh
 //! just test-scene-editor-browser   # builds beet-ui.wasm, then runs this
@@ -49,7 +49,7 @@ const SCENE: &str = "scene_editor/scene.bsx";
 /// on the first edit.
 const FORK: &str = "scene_editor/scene.json";
 /// What the entry's store must hold: the entry, the authored scene, the
-/// document shell, and the artifact its page boots (through the `wasm/`
+/// document shell, and the wasm runtime its page boots (through the `wasm/`
 /// links to the build output).
 const SEEDED: &[&str] = &[
 	ENTRY,
@@ -82,7 +82,7 @@ impl DerefMut for SceneHost {
 
 impl SceneHost {
 	/// Serve the example over a store holding the entry, the authored
-	/// original, the shell and the artifact alone, so the server's boot is a
+	/// original, the shell and the runtime alone, so the server's boot is a
 	/// first boot, and open the page: served, inert, the wasm not yet asked
 	/// for.
 	async fn new() -> Self {

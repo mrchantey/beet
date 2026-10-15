@@ -11,7 +11,7 @@ use beet_net::prelude::*;
 /// plus a few files owned elsewhere in the workspace. Staging composes them
 /// OUTSIDE the checkout, so no deploy step writes into source, and the staging
 /// dir IS the store's contents, so a test compares the two directly. A build
-/// output the document serves is never borrowed: a [`WasmArtifact`] declared
+/// output the document serves is never borrowed: a [`WasmRuntime`] declared
 /// before the stage builds it, and the stage reads what was just built.
 ///
 /// `src` is copied whole (or its `paths` alone, for an entry at a checkout's

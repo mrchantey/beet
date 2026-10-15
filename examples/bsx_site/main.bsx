@@ -22,7 +22,7 @@ description are set in markup with no compile-time host config.
 store the browser process reads the entry through, and `<AssetsDir>` mounts the
 wasm binary the page boots at `/wasm`: `wasm/beet-ui.{wasm,js}` link to the
 build output in `target/wasm`, so `just build-wasm-ui` is what provides it, and
-a deploy builds it before publishing (`<WasmArtifact/>`).
+a deploy builds it before publishing (`<WasmRuntime/>`).
 -->
 <CallOnReady {(HttpServer, TuiServer, SshTuiServer, DomServer, CliServer)}>
 <Router {(RequestLogger, HelpHandler, NavigateHandler, Layout{template:"Layout"})}>
