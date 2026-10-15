@@ -13,6 +13,12 @@ The script is a `;`-separated list of ops applied in order:
                 every time a doc or a blog post is added, and a stale `m:` clicks
                 whatever slid into that cell instead of failing.
   k:<keys>      send raw keys (`tab`, `enter`, `esc`, `down`, `up`, or literal text)
+  u:<secs>:<re> drain until the raw stream matches the bytes regex `re` (python
+                syntax, so `\x1b` is ESC; no `;`), or `secs` pass. For output
+                whose duration is the link's, not the server's: a 2.7MB kitty
+                transmit is instant on localhost and took ~75s over a ~40KB/s
+                path, so a fixed `w:` either wastes time or cuts it off. A miss
+                is not an error here; the caller's asserts report it.
 
 Output from ssh is fed through a small VT emulator so the FINAL 80x24 frame is
 reconstructed (the TUI repaints in place, so a raw byte dump is unreadable) and
@@ -291,6 +297,8 @@ class Session:
 		# the emulator drops APC, so keep the undecoded stream for image asserts
 		raw_path = os.environ.get("PTY_RAW")
 		self.raw = open(raw_path, "wb") if raw_path else None
+		# the whole undecoded stream, for `u:` to search
+		self.stream = bytearray()
 		self.master, slave = pty.openpty()
 		fcntl.ioctl(self.master, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
 		self.proc = subprocess.Popen(
@@ -303,10 +311,16 @@ class Session:
 		)
 		os.close(slave)
 
-	def drain(self, seconds: float):
-		"""Pump the pty into the emulator for `seconds`."""
+	def drain(self, seconds: float, until=None):
+		"""Pump the pty into the emulator for `seconds`, or until the raw stream
+		matches the compiled bytes regex `until`."""
 		deadline = time.monotonic() + seconds
+		# a match spans at most one escape header, so rescan only a short tail
+		searched = 0
 		while True:
+			if until is not None and until.search(self.stream, max(0, searched - 512)):
+				return
+			searched = len(self.stream)
 			remaining = deadline - time.monotonic()
 			if remaining <= 0:
 				return
@@ -320,6 +334,7 @@ class Session:
 			if not data:
 				return
 			self.screen.feed(data)
+			self.stream += data
 			if self.raw:
 				self.raw.write(data)
 				self.raw.flush()
@@ -353,6 +368,9 @@ class Session:
 				self.click(*cell)
 			elif verb == "k":
 				self.send(self.KEYS.get(arg, arg.encode()))
+			elif verb == "u":
+				seconds, _, pattern = arg.partition(":")
+				self.drain(float(seconds), re.compile(pattern.encode()))
 			else:
 				raise SystemExit(f"unknown op: {op}")
 

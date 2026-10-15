@@ -581,6 +581,10 @@ systemctl enable caddy
 		// required alongside it: the agent interprets a parsed stamp as LOCAL by
 		// default and beet emits `Z`. `multi_line_start_pattern` reuses that same
 		// regex so a panic backtrace stays one event instead of N.
+		//
+		// No `retention_in_days`: the stack's log group owns retention, and an
+		// agent told to manage it calls `logs:DescribeLogGroups`, which the box's
+		// identity is never granted.
 		let log_group = self.log_group(stack);
 		let (mem_log, mem_stream) = (guards.log_path(), guards.log_stream());
 		let cloudwatch_setup = format!(
@@ -606,7 +610,6 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
             "file_path": "/var/log/{app_name}.log",
             "log_group_name": "{log_group}",
             "log_stream_name": "{app_name}",
-            "retention_in_days": 30,
             "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
             "timezone": "UTC",
             "multi_line_start_pattern": "{{timestamp_format}}"
@@ -615,7 +618,6 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
             "file_path": "{mem_log}",
             "log_group_name": "{log_group}",
             "log_stream_name": "{mem_stream}",
-            "retention_in_days": 30,
             "timestamp_format": "%Y-%m-%dT%H:%M:%S.%fZ",
             "timezone": "UTC"
           }}
@@ -634,7 +636,10 @@ CWEOF
 		// and the secret store reaches Parameter Store through the API, never the
 		// agent. Left running, every call it makes is denied (~100 `AccessDenied`
 		// a day in the journal), so remove it. Best-effort, and a no-op on an
-		// image that lacks it.
+		// image that lacks it. Its first registration attempt still lands, four
+		// `AccessDenied` lines at first boot: Lightsail prepends its own shell
+		// script to `user_data`, so this runs in `cloud-final`, while the agent
+		// starts at `network-online.target`, before any user script can.
 		let ssm_removal = r#"
 # remove the preinstalled SSM agent: nothing here uses it, and every call it
 # makes is denied
@@ -1744,6 +1749,39 @@ mod tests {
 			.as_str()
 			.unwrap()
 			.xpect_eq(&format!("aws_cloudwatch_log_group.{logs_label}"));
+	}
+
+	/// The stack's log group owns retention; the box's CloudWatch agent only
+	/// ships lines.
+	///
+	/// On 2026-10-15 a rebuilt prod box's agent (1.300071.0) logged
+	/// `AccessDeniedException ... logs:DescribeLogGroups` at every boot: each
+	/// `collect_list` entry carried `retention_in_days`, so the agent tried to
+	/// manage a retention tofu already sets, with an identity never granted it.
+	#[beet_core::test]
+	fn the_stack_owns_log_retention() {
+		let block = LightsailBlock::default();
+		let (script, _dir) = build_user_data(&block);
+		script.as_str().xnot().xpect_contains("retention_in_days");
+
+		let (scope, _dir) = render_block(&block);
+		let logs_label = scope
+			.stack()
+			.resource_ident(block.build_label("logs"))
+			.label()
+			.to_string();
+		let json = scope.finish().unwrap().2.to_json_string().unwrap();
+		let config: serde_json::Value = serde_json::from_str(&json).unwrap();
+		config["resource"]["aws_cloudwatch_log_group"][&logs_label]
+			["retention_in_days"]
+			.as_i64()
+			.unwrap()
+			.xpect_eq(30);
+		json.as_str()
+			.xnot()
+			.xpect_contains("logs:DescribeLogGroups")
+			.xnot()
+			.xpect_contains("logs:PutRetentionPolicy");
 	}
 
 	/// The box's fetch script and the artifacts client name the SAME pointer,

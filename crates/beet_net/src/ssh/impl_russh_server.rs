@@ -49,6 +49,9 @@ pub(crate) async fn start_russh_server_with_tcp(
 			)
 		})
 		.await?;
+	// resolved before serving, so a declared key that cannot be parsed fails
+	// the server rather than serving under a stranger's fingerprint
+	let host_key = host_key()?;
 
 	let (new_conn_tx, new_conn_rx) =
 		async_channel::unbounded::<NewConnectionInfo>();
@@ -59,6 +62,7 @@ pub(crate) async fn start_russh_server_with_tcp(
 		new_conn_tx,
 		credentials,
 		idle_timeout,
+		host_key,
 	));
 
 	info!("SSH server listening on {}", addr);
@@ -159,12 +163,13 @@ async fn run_russh_server_inner(
 	new_conn_tx: async_channel::Sender<NewConnectionInfo>,
 	credentials: Option<SshCredentials>,
 	idle_timeout: Duration,
+	host_key: PrivateKey,
 ) {
 	let config = Arc::new(russh::server::Config {
 		inactivity_timeout: Some(idle_timeout),
 		auth_rejection_time: Duration::from_secs(3),
 		auth_rejection_time_initial: Some(Duration::from_secs(0)),
-		keys: vec![host_key()],
+		keys: vec![host_key],
 		..Default::default()
 	});
 
@@ -185,36 +190,47 @@ async fn run_russh_server_inner(
 }
 
 /// Selects the Ed25519 host key, in precedence order:
-/// 1. `BEET_SSH_HOST_KEY`: base64-encoded OpenSSH private key bytes, letting
-///    multiple processes present the same fingerprint. A malformed value warns
-///    and falls through rather than panicking.
+/// 1. `BEET_SSH_HOST_KEY`, letting every process present one fingerprint, in
+///    any form [`parse_host_key`] reads. A declared key that does not parse is
+///    an error: falling through would serve a new fingerprint every start.
 /// 2. debug builds: the stable [`DEBUG_HOST_KEY_BYTES`] const.
 /// 3. release builds: a fresh random key.
-fn host_key() -> PrivateKey {
-	if let Ok(encoded) = env_ext::var("BEET_SSH_HOST_KEY") {
-		// base64's no_std DecodeError lacks a std::error::Error impl, so render it
-		// into a message rather than relying on the `?`/`From<Error>` path.
-		match BASE64_STANDARD
-			.decode(encoded.as_str())
-			.map_err(|err| bevyhow!("{err}"))
-			.and_then(|bytes| {
-				PrivateKey::from_bytes(&bytes).map_err(Into::into)
-			}) {
-			Ok(key) => return key,
-			Err(err) => {
-				warn!("ignoring malformed BEET_SSH_HOST_KEY: {err}")
-			}
-		}
+fn host_key() -> Result<PrivateKey> {
+	if let Ok(value) = env_ext::var("BEET_SSH_HOST_KEY") {
+		return parse_host_key(&value)
+			.map_err(|err| bevyhow!("malformed BEET_SSH_HOST_KEY: {err}"));
 	}
 	#[cfg(debug_assertions)]
-	return PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)
-		.expect("failed to load debug SSH host key");
+	return PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)?.xok();
 	#[cfg(not(debug_assertions))]
 	return PrivateKey::random(
 		&mut rand::rng(),
 		russh::keys::Algorithm::Ed25519,
-	)
-	.expect("failed to generate SSH host key");
+	)?
+	.xok();
+}
+
+/// Parses an OpenSSH private key from the file `ssh-keygen` writes (its PEM
+/// armor), or from base64 of either that file or the binary encoding inside
+/// it. Whitespace in base64 is ignored, so wrapped `base64` output reads too.
+fn parse_host_key(value: &str) -> Result<PrivateKey> {
+	const PEM_PREFIX: &str = "-----BEGIN";
+	let value = value.trim();
+	let bytes = if value.starts_with(PEM_PREFIX) {
+		value.as_bytes().to_vec()
+	} else {
+		// base64's no_std DecodeError lacks a std::error::Error impl, so render
+		// it into a message rather than relying on the `?`/`From<Error>` path.
+		BASE64_STANDARD
+			.decode(value.split_whitespace().collect::<String>())
+			.map_err(|err| bevyhow!("{err}"))?
+	};
+	if bytes.starts_with(PEM_PREFIX.as_bytes()) {
+		PrivateKey::from_openssh(&bytes)
+	} else {
+		PrivateKey::from_bytes(&bytes)
+	}?
+	.xok()
 }
 
 /// Per-app state shared across connection handlers.
@@ -542,10 +558,45 @@ mod tests {
 		let expected =
 			fingerprint(PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES).unwrap());
 
-		fingerprint(host_key()).xpect_eq(expected);
-		fingerprint(host_key()).xpect_eq(expected);
+		fingerprint(host_key().unwrap()).xpect_eq(expected);
+		fingerprint(host_key().unwrap()).xpect_eq(expected);
 
 		// safety: see above.
 		unsafe { env_ext::remove_var("BEET_SSH_HOST_KEY") }.unwrap();
+	}
+
+	/// REGRESSION: a key rolled as `base64 -w0 <the ssh-keygen file>` was read
+	/// as malformed, so a release box served a random fingerprint every start.
+	/// Every form a rolled key takes parses to the same key.
+	#[beet_core::test]
+	fn parses_every_host_key_encoding() {
+		let key = PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES).unwrap();
+		let expected = key.public_key().fingerprint(Default::default());
+		let pem = key
+			.to_openssh(russh::keys::ssh_key::LineEnding::LF)
+			.unwrap()
+			.to_string();
+		let base64_pem = BASE64_STANDARD.encode(&pem);
+		// the line breaks `base64` inserts without `-w0`
+		let wrapped = base64_pem
+			.as_bytes()
+			.chunks(76)
+			.map(|line| str::from_utf8(line).unwrap())
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		for value in [
+			pem.clone(),
+			base64_pem,
+			wrapped,
+			BASE64_STANDARD.encode(DEBUG_HOST_KEY_BYTES),
+		] {
+			parse_host_key(&value)
+				.unwrap()
+				.public_key()
+				.fingerprint(Default::default())
+				.xpect_eq(expected);
+		}
+		parse_host_key(&BASE64_STANDARD.encode("not a key")).unwrap_err();
 	}
 }

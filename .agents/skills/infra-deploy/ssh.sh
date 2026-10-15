@@ -96,11 +96,14 @@ echo "-- images (kitty graphics) --"
 # carrying a raster, reached by label since every post added above it moves its
 # row. The image is well below the fold, so scroll it into view: a raster is
 # transmitted only once its box is on screen, and 31 downs lands it straddling
-# the bottom of the port.
+# the bottom of the port. The ~2.7MB transmit takes as long as the link does
+# (instant locally, ~75s over a ~40KB/s path), so drain until the cropped
+# placement arrives rather than for a fixed time.
 DOWNS="$(printf 'k:down;%.0s' {1..31})"
+CROPPED='\x1b_Ga=p[^\x1b]*,w='
 PTY_TERM=xterm-kitty PTY_RAW="$OUT/img.raw" \
 	python3 "$PTY" "$HOST" "$PORT" \
-	"w:$BOOT;m:3,1;w:$TICK;t:Folk Technology;w:$((NAV * 2));${DOWNS}w:$((NAV * 2))" \
+	"w:$BOOT;m:3,1;w:$TICK;t:Folk Technology;w:$((NAV * 2));${DOWNS}u:300:$CROPPED;w:$TICK" \
 	>"$OUT/img.txt" 2>&1
 # `a=t` is the transmit; the emulator drops APC, so grep the raw stream
 if grep -qa $'\x1b_Ga=t' "$OUT/img.raw"; then
