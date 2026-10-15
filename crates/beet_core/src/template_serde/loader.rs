@@ -336,7 +336,7 @@ mod test {
 		// a naive extractor serialize it and double-apply the hierarchy, so this
 		// guards that the builder skips the mirror and rebuilds it from `ChildOf`
 		// hooks. It also marks the clocks derived.
-		app.add_type::<MinimalTypesPlugin>();
+		app.install_type::<MinimalTypesPlugin>();
 		app.init();
 		app.update();
 		app

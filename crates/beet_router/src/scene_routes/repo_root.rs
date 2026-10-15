@@ -43,6 +43,6 @@ impl Prescan for RepoRoot {
 	}
 }
 
-impl TypePlugin<PrescanMarker> for RepoRoot {
-	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+impl TypeInstaller<PrescanMarker> for RepoRoot {
+	fn install(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }

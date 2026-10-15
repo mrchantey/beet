@@ -452,7 +452,7 @@ mod test {
 	fn allowed_unregistered_tag_builds_nothing() {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, DocumentPlugin))
-			.add(UnregisteredTag::allow("NotRegistered"));
+			.install(UnregisteredTag::allow("NotRegistered"));
 		let world = app.world_mut();
 		let nodes = BsxNode::parse_document(
 			"<NotRegistered><NorThis/></NotRegistered>",

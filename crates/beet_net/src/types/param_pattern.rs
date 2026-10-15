@@ -258,13 +258,18 @@ impl ParamsPattern {
 pub struct ParamMeta {
 	/// The kebab-case key of the route param, ie the `foo-bar` in `--foo-bar=3`.
 	/// Automatically converted from snake_case field names (e.g., `help_format` → `help-format`).
-	key: String,
+	key: SmolStr,
 	/// The param value arity (flag / single / multiple).
 	value: ParamValue,
-	/// The concrete Rust type the param parses into, eg `String`,
-	/// with any `Option<..>` wrapper stripped (its optionality is conveyed by
-	/// [`required`](Self::required)). This is the param's displayed `kind`.
-	type_path: String,
+	/// The full path of the Rust type the param parses into, ie
+	/// `alloc::string::String`, with any `Option<..>` wrapper stripped (its
+	/// optionality is conveyed by [`required`](Self::required)). Two
+	/// declarations of one key must agree on it.
+	type_path: SmolStr,
+	/// How the param is written, its displayed `kind`: the type's authored
+	/// hint (`a YYYY-MM-DD date`), a unit enum's variants, else the short
+	/// [`type_path`](Self::type_path), ie `String`.
+	kind: SmolStr,
 	/// Additional details for the param
 	options: ParamOptions,
 	/// Whether specifying the param is required, usually inferred
@@ -278,12 +283,7 @@ impl core::fmt::Display for ParamMeta {
 		if let Some(short) = self.short() {
 			write!(f, ", short: -{}", short)?;
 		}
-		write!(
-			f,
-			", required: {}, kind: {}",
-			self.is_required(),
-			self.type_path
-		)?;
+		write!(f, ", required: {}, kind: {}", self.is_required(), self.kind)?;
 		if let Some(desc) = self.description() {
 			write!(f, ", description: {}", desc)?;
 		}
@@ -294,9 +294,11 @@ impl core::fmt::Display for ParamMeta {
 impl ParamMeta {
 	/// Creates a new `ParamMeta` with the given name and value arity, deriving a
 	/// representative concrete type for the arity (no reflected field to read).
-	pub fn new(name: impl Into<String>, value: ParamValue) -> Self {
+	pub fn new(name: impl Into<SmolStr>, value: ParamValue) -> Self {
+		let type_path = value.placeholder_type_path();
 		Self {
-			type_path: value.placeholder_type_path().to_string(),
+			kind: type_ext::short_path(type_path),
+			type_path: type_path.into(),
 			value,
 			key: name.into(),
 			options: default(),
@@ -313,16 +315,16 @@ impl ParamMeta {
 		let some_inner = info.and_then(reflect_ext::option_some_inner);
 		let leaf_id = some_inner.map_or(field.type_id(), TypeInfo::type_id);
 		let value = ParamValue::of_leaf(leaf_id, some_inner.or(info));
+		let type_path = strip_option(field.type_path());
 
 		Self {
-			key: field.name().to_kebab_case(),
+			key: field.name().to_kebab_case().into(),
 			required: value == ParamValue::Single && some_inner.is_none(),
 			value,
-			type_path: authored_kind(leaf_id)
+			kind: authored_kind(leaf_id)
 				.or_else(|| variant_kind(some_inner.or(info)))
-				.unwrap_or_else(|| {
-					kind_from_type_path(field.type_path_table().short_path())
-				}),
+				.unwrap_or_else(|| type_ext::short_path(type_path)),
+			type_path: type_path.into(),
 			options: ParamOptions::from_reflect(field),
 		}
 	}
@@ -386,10 +388,14 @@ impl ParamMeta {
 	/// The name of the param
 	pub fn name(&self) -> &str { &self.key }
 
-	/// The concrete Rust type the param parses into, the displayed `kind`
-	/// (an `Option<..>` wrapper is stripped, its optionality given by
+	/// The full path of the Rust type the param parses into (an `Option<..>`
+	/// wrapper is stripped, its optionality given by
 	/// [`is_required`](Self::is_required)).
 	pub fn type_path(&self) -> &str { &self.type_path }
+
+	/// How the param is written, its displayed `kind`, ie `String` or
+	/// `a YYYY-MM-DD date`.
+	pub fn kind(&self) -> &str { &self.kind }
 
 	/// The description of the param
 	pub fn description(&self) -> Option<&str> {
@@ -402,9 +408,11 @@ impl ParamMeta {
 		self
 	}
 
-	/// Sets the concrete type path shown as the param's `kind`.
-	pub fn with_type_path(mut self, type_path: impl Into<String>) -> Self {
+	/// Sets the full path of the type the param parses into, shown as its
+	/// short path.
+	pub fn with_type_path(mut self, type_path: impl Into<SmolStr>) -> Self {
 		self.type_path = type_path.into();
+		self.kind = type_ext::short_path(&self.type_path);
 		self
 	}
 
@@ -426,7 +434,7 @@ impl ParamMeta {
 			.short()
 			.map(|short| format!(", `-{short}`"))
 			.unwrap_or_default();
-		let head = format!("`--{}`{short} ({})", self.key, self.type_path);
+		let head = format!("`--{}`{short} ({})", self.key, self.kind);
 		match self.description() {
 			Some(description) => format!("{head}: {description}"),
 			None => head,
@@ -480,8 +488,8 @@ impl ParamValue {
 	fn placeholder_type_path(&self) -> &'static str {
 		match self {
 			Self::Flag => "bool",
-			Self::Single => "String",
-			Self::Multiple => "Vec<String>",
+			Self::Single => "alloc::string::String",
+			Self::Multiple => "alloc::vec::Vec<alloc::string::String>",
 		}
 	}
 }
@@ -492,14 +500,14 @@ impl ParamValue {
 ///
 /// `None` for a type with no parser or no hint, which falls back to the type
 /// path: for a structural type that path is the only clue to what to write.
-fn authored_kind(type_id: TypeId) -> Option<String> {
-	LiteralParser::get(type_id)?.hint().map(str::to_string)
+fn authored_kind(type_id: TypeId) -> Option<SmolStr> {
+	LiteralParser::get(type_id)?.hint().map(SmolStr::from)
 }
 
 /// How a unit-only enum is written: its variants as the kebab-case words a
 /// flag takes, ie `one of: main, content` for a `--root`, since the
 /// type path names none of them.
-fn variant_kind(info: Option<&TypeInfo>) -> Option<String> {
+fn variant_kind(info: Option<&TypeInfo>) -> Option<SmolStr> {
 	let Some(TypeInfo::Enum(info)) = info else {
 		return None;
 	};
@@ -512,18 +520,16 @@ fn variant_kind(info: Option<&TypeInfo>) -> Option<String> {
 		})
 		.collect::<Option<Vec<_>>>()
 		.filter(|variants| !variants.is_empty())
-		.map(|variants| format!("one of: {}", variants.join(", ")))
+		.map(|variants| format!("one of: {}", variants.join(", ")).into())
 }
 
-/// The short type path shown as a param's `kind`, ie `Vec<String>`, with an
-/// `Option<..>` wrapper stripped (its optionality is conveyed by the param's
-/// `required` flag).
-fn kind_from_type_path(type_path: &str) -> String {
+/// `type_path` with a `core::option::Option<..>` wrapper stripped, since a
+/// param's optionality is conveyed by its `required` flag.
+fn strip_option(type_path: &str) -> &str {
 	type_path
-		.strip_prefix("Option<")
+		.strip_prefix("core::option::Option<")
 		.and_then(|inner| inner.strip_suffix('>'))
 		.unwrap_or(type_path)
-		.to_string()
 }
 
 /// Additional options for parameter metadata.
@@ -600,7 +606,7 @@ mod test {
 			panic!("expected struct");
 		};
 		ParamMeta::from_field(info.field("shape").unwrap())
-			.type_path()
+			.kind()
 			.xpect_eq("one of: round, sharp-edged");
 	}
 
@@ -622,14 +628,16 @@ mod test {
 			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
 		// a required `String` shows its concrete type, not the `single` arity
 		let package = by_name("package");
-		package.type_path().xpect_eq("String");
+		package.type_path().xpect_eq("alloc::string::String");
+		package.kind().xpect_eq("String");
 		package.is_required().xpect_true();
 		// an `Option<String>` is not required and its `kind` strips the wrapper
 		let out_dir = by_name("out_dir");
-		out_dir.type_path().xpect_eq("String");
+		out_dir.type_path().xpect_eq("alloc::string::String");
+		out_dir.kind().xpect_eq("String");
 		out_dir.is_required().xpect_false();
 		// a `bool` is a flag whose kind is `bool`
-		by_name("release").type_path().xpect_eq("bool");
+		by_name("release").kind().xpect_eq("bool");
 		// the Display form now carries the concrete type as `kind`
 		package.to_string().xpect_contains("kind: String");
 	}
@@ -652,13 +660,11 @@ mod test {
 		let by_name =
 			|name: &str| ParamMeta::from_field(info.field(name).unwrap());
 		by_name("timeout")
-			.type_path()
+			.kind()
 			.xpect_eq("a unit-suffixed duration, eg \"30s\"");
-		by_name("created")
-			.type_path()
-			.xpect_eq("a `YYYY-MM-DD` date");
+		by_name("created").kind().xpect_eq("a `YYYY-MM-DD` date");
 		// a type whose own name says how it is written keeps its path
-		by_name("label").type_path().xpect_eq("String");
+		by_name("label").kind().xpect_eq("String");
 	}
 
 	#[derive(Reflect)]
@@ -763,8 +769,9 @@ mod test {
 		recognised.contains_key("elevate").xpect_false();
 	}
 
-	/// One key of two types is a contradiction; one key of one type is two
-	/// extractors of the same param, kept once beside both.
+	/// One key of two types is a contradiction, even two sharing a short name;
+	/// one key of one type is two extractors of the same param, kept once
+	/// beside both.
 	#[beet_core::test]
 	fn conflicts_on_type_not_on_sources() {
 		let port = |name: &str, type_path: &str| {
@@ -775,10 +782,14 @@ mod test {
 				false,
 			)
 		};
-		pattern(&[port("HttpServer", "u16"), port("Serve", "String")])
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("conflicting declarations of `--port`");
+		for (left, right) in
+			[("u16", "alloc::string::String"), ("net::Port", "tui::Port")]
+		{
+			pattern(&[port("HttpServer", left), port("Serve", right)])
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("conflicting declarations of `--port`");
+		}
 		let pattern =
 			pattern(&[port("HttpServer", "u16"), port("TuiServer", "u16")])
 				.unwrap();
@@ -808,10 +819,10 @@ mod test {
 				.with_type_path("u32")
 				.required(),
 			ParamMeta::new("bar", ParamValue::Single)
-				.with_type_path("String")
+				.with_type_path("alloc::string::String")
 				.with_description("all about 'bar'"),
 			ParamMeta::new("bazz", ParamValue::Multiple)
-				.with_type_path("Vec<f64>")
+				.with_type_path("alloc::vec::Vec<f64>")
 				.with_description("all about 'bazz'")
 				.with_short('b'),
 			// .required(),

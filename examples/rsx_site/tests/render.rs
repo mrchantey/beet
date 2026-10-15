@@ -10,7 +10,8 @@ fn site_world() -> World {
 	let mut app =
 		App::new().with_plugins((RouterPlugin, material::MaterialStylePlugin));
 	// the layout the router names, registered here as `server_plugin` does
-	app.add_type::<BeetLayout>().insert_resource(pkg_config!());
+	app.install_type::<BeetLayout>()
+		.insert_resource(pkg_config!());
 	core::mem::take(app.world_mut())
 }
 

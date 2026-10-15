@@ -810,6 +810,11 @@ mod test {
 				vec![MediaType::other("text/x-shout")]
 			}
 		}
+		impl Installer for Shout {
+			fn install(self, app: &mut App) {
+				RenderTargets::register_on(app, self);
+			}
+		}
 		let (mut world, router) = site();
 		world.resource_mut::<RenderTargets>().register(Shout);
 		get(

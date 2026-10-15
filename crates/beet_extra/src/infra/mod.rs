@@ -21,31 +21,35 @@ pub struct InfraExamplesPlugin;
 
 impl Plugin for InfraExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<InfraPlugin>()
+		app.install_type::<(
+			InfraPlugin,
 			// the `beet` binary build artifact (zigbuild), for binary-shipping deploys.
-			.add_type::<BeetBinaryBuild>()
+			BeetBinaryBuild,
 			// an example-target binary build artifact (eg the `ssh_tui_site` server).
-			.add_type::<ExampleBinaryBuild>()
-			// the state-backend toggle middleware the bucket and handle examples
-			// put on their router. The IaC verb routes register upstream in
-			// `InfraPlugin`, beside the verbs.
-			.register_type::<StateBackendToggle>()
-			// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
-			// `.bsx` lambda deployer composes them (see `templates.rs`): the
-			// beet-site deployer's lightsail block, stage-aware through the
-			// `<Stack>` it resolves by ancestry. The resource declarations
-			// themselves are authored as their blocks (`<S3BucketBlock/>`,
-			// `<DynamoTableBlock/>`), registered upstream.
-			.add_type::<LightsailBeetSiteBlock>()
-			.add_type::<LambdaSiteBlock>()
+			ExampleBinaryBuild,
+		)>()
+		// the state-backend toggle middleware the bucket and handle examples
+		// put on their router. The IaC verb routes register upstream in
+		// `InfraPlugin`, beside the verbs.
+		.register_type::<StateBackendToggle>()
+		// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
+		// `.bsx` lambda deployer composes them (see `templates.rs`): the
+		// beet-site deployer's lightsail block, stage-aware through the
+		// `<Stack>` it resolves by ancestry. The resource declarations
+		// themselves are authored as their blocks (`<S3BucketBlock/>`,
+		// `<DynamoTableBlock/>`), registered upstream.
+		.install_type::<(
+			LightsailBeetSiteBlock,
+			LambdaSiteBlock,
 			// the invoke-only counterpart, the target a `<ScheduledJobBlock/>`
 			// drives on a timer.
-			.add_type::<LambdaJobBlock>()
-			.add_type::<LambdaWatch>()
-			.add_type::<LightsailSiteBlock>()
-			.add_type::<LightsailWatch>()
-			.add_type::<FargateSiteBlock>()
-			.add_type::<FargateSshBlock>()
-			.add_type::<FargateWatch>();
+			LambdaJobBlock,
+			LambdaWatch,
+			LightsailSiteBlock,
+			LightsailWatch,
+			FargateSiteBlock,
+			FargateSshBlock,
+			FargateWatch,
+		)>();
 	}
 }

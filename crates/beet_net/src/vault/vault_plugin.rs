@@ -11,8 +11,7 @@ pub struct VaultPlugin;
 
 impl Plugin for VaultPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<StorePlugin>()
-			.add_type::<VaultRoutes>()
+		app.install_type::<(StorePlugin, VaultRoutes)>()
 			.register_type::<VaultKeygen>()
 			.register_type::<VaultEncrypt>()
 			.register_type::<VaultDecrypt>()

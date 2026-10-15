@@ -69,7 +69,7 @@ impl PluginGroup for BeetPlugins {
 		// the default `bx:` event/verb vocabulary (`increment`/`decrement`/…), so a
 		// markup-only site that uses live widgets or reactive verbs resolves them. Added
 		// *before* the router so its inner `BsxPlugin` registers once: the router's
-		// charcell stack reaches `BsxDefaultsPlugin` through `add_type` (idempotent),
+		// charcell stack reaches `BsxDefaultsPlugin` through `install_type` (idempotent),
 		// which then no-ops rather than double-adding `BsxPlugin`.
 		#[cfg(feature = "ui")]
 		{
@@ -142,7 +142,7 @@ impl PluginGroup for BeetPlugins {
 		// the example capabilities (the spatial/render scenes, the example
 		// tools/templates, the cloudflare/aws deploy example templates), each
 		// self-selected by a `beet_extra` sub-feature. A regular `Plugin`, so it
-		// nests in this group; its inner plugins are idempotent (`add_type`),
+		// nests in this group; its inner plugins are idempotent (`install_type`),
 		// safe under a double-add.
 		#[cfg(feature = "extra")]
 		{
@@ -319,10 +319,12 @@ fn winit_default_plugins() -> PluginGroupBuilder {
 /// handler as an error with [`Severity::Panic`]. Both builds resume that unwind,
 /// see [`release_error_handler`].
 fn beet_runtime_plugin(app: &mut App) {
-	app.add_type::<AsyncPlugin>()
-		.add_type::<AppExitPlugin>()
-		.add_type::<BootstrapPlugin>()
-		.add_type::<CrateCheckPlugin>();
+	app.install_type::<(
+		AsyncPlugin,
+		AppExitPlugin,
+		BootstrapPlugin,
+		CrateCheckPlugin,
+	)>();
 	if app.get_error_handler().is_none() {
 		app.set_error_handler(if cfg!(debug_assertions) {
 			bevy::ecs::error::panic
@@ -354,12 +356,14 @@ fn release_error_handler(error: BevyError, cx: bevy::ecs::error::ErrorContext) {
 /// same navigator on every target the router builds for.
 #[cfg(any(feature = "router", feature = "router_render"))]
 fn router_plugin(app: &mut App) {
-	app.add_type::<DocumentPlugin>()
-		.add_type::<RouterPlugin>()
-		.add_type::<ServerPlugin>()
-		.add_type::<NavigatorPlugin>()
-		.add_type::<PageHostPlugin>()
-		.add_plugins(CardStackPlugin);
+	app.install_type::<(
+		DocumentPlugin,
+		RouterPlugin,
+		ServerPlugin,
+		NavigatorPlugin,
+		PageHostPlugin,
+	)>()
+	.add_plugins(CardStackPlugin);
 	// the scene-server meta-routes load/save scenes through world serde, so they
 	// are only available (and only useful) with `template_serde`.
 	#[cfg(feature = "template_serde")]
@@ -369,7 +373,5 @@ fn router_plugin(app: &mut App) {
 /// The navigable charcell host the `TuiServer` boots into, plus live-page repaint.
 #[cfg(all(not(target_arch = "wasm32"), feature = "tui_server"))]
 fn tui_server_plugin(app: &mut App) {
-	app.add_type::<CharcellTuiPlugin>()
-		.add_type::<NavigatorPlugin>()
-		.add_type::<PageHostPlugin>();
+	app.install_type::<(CharcellTuiPlugin, NavigatorPlugin, PageHostPlugin)>();
 }

@@ -11,7 +11,7 @@
 //!   build target;
 //! - a generics-aware `Unpin` opt-out of Bevy's blanket
 //!   `Template for T: Clone + Unpin` impl, the `subtree_template!` pattern;
-//! - a [`GetTemplateSchema`] impl, so `app.add_type::<Name>()` exposes the
+//! - a [`GetTemplateSchema`] impl, so `app.install_type::<Name>()` exposes the
 //!   template by name to the loader.
 //!
 //! There is no `NameProps` struct and no marker component: the data struct *is*

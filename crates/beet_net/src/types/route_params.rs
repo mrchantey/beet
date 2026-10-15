@@ -5,7 +5,7 @@
 //! entity, chosen by its [`ParamsScope`]: [`RouteParams`] for a plain action,
 //! read by the route it sits on, and [`SubtreeParams`] for middleware and
 //! servers, read by every route beneath them. An extractor that is not an
-//! action declares from its plugin with the [`OwnedPlugin`]
+//! action declares from its plugin with the [`Installer`]
 //! [`declare_on`](SubtreeParams::declare_on).
 use super::*;
 use beet_core::prelude::*;
@@ -120,10 +120,10 @@ macro_rules! scope_list {
 			}
 
 			#[doc = concat!(
-								"The `on_add` hook declaring that `Extractor` reads `T` at ",
-								$scope,
-								" scope, see [`push_on`](Self::push_on)."
-							)]
+												"The `on_add` hook declaring that `Extractor` reads `T` at ",
+												$scope,
+												" scope, see [`push_on`](Self::push_on)."
+											)]
 			pub fn declare<Extractor: Component, T: FromReflect + Typed>(
 				mut world: DeferredWorld,
 				cx: HookContext,
@@ -136,14 +136,14 @@ macro_rules! scope_list {
 			}
 
 			#[doc = concat!(
-								"The [`OwnedPlugin`] declaring that `Extractor` reads `T` at ",
-								$scope,
-								" scope, on every entity `Extractor` is inserted on: the \
+												"The [`Installer`] declaring that `Extractor` reads `T` at ",
+												$scope,
+												" scope, on every entity `Extractor` is inserted on: the \
 				 declaration of an extractor that is not an `#[action]`, ie a \
 				 server, made by the plugin registering it."
-							)]
+											)]
 			pub fn declare_on<Extractor: Component, T: FromReflect + Typed>()
-			-> impl FnOnce(&mut App) {
+			-> impl Installer {
 				Self::declare_on_with::<Extractor>(ParamsDeclaration::new::<
 					Extractor,
 					T,
@@ -156,7 +156,7 @@ macro_rules! scope_list {
 			/// reads beneath a `Layout`.
 			pub fn declare_on_with<Extractor: Component>(
 				declaration: ParamsDeclaration,
-			) -> impl FnOnce(&mut App) {
+			) -> impl Installer {
 				move |app: &mut App| {
 					app.add_observer(
 						move |ev: On<Insert<Extractor>>,
@@ -396,7 +396,7 @@ mod test {
 		#[derive(Component)]
 		struct Server;
 		let mut app = App::new();
-		app.add(SubtreeParams::declare_on::<Server, VerboseParams>());
+		app.install(SubtreeParams::declare_on::<Server, VerboseParams>());
 		let entity = app.world_mut().spawn(Server).flush();
 		names(app.world(), entity).xpect_eq(vec![SmolStr::new("Server")]);
 	}

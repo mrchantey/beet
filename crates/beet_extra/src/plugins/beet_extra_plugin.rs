@@ -10,7 +10,7 @@ use beet_core::prelude::*;
 /// sub-features.
 ///
 /// A regular `Plugin` (not a `PluginGroup`) so the facade's `BeetPlugins` group can
-/// nest it; idempotent inner plugins (`add_type`) keep a double-add safe.
+/// nest it; idempotent inner plugins (`install_type`) keep a double-add safe.
 #[derive(Default, Clone)]
 pub struct BeetExtraPlugin;
 

@@ -168,7 +168,8 @@ mod test {
 		size: ModelSize,
 	) -> (App, Entity) {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.install_type::<ThreadPlugin>();
 		let entity = app
 			.world_mut()
 			.spawn_template(ModelStreamer {
@@ -191,7 +192,8 @@ mod test {
 		use beet_core::prelude::*;
 
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.install_type::<ThreadPlugin>();
 		let source = r#"
 <Thread>
 	<CreateActor name="Agent" kind="Agent" {ModelStreamer{provider:Ollama, instructions:"be terse"}}/>

@@ -991,7 +991,7 @@ mod test {
 	/// edits.
 	#[cfg(feature = "template_serde")]
 	fn scene_editor_page(app: &mut App) -> Entity {
-		app.add_type::<MinimalTypesPlugin>();
+		app.install_type::<MinimalTypesPlugin>();
 		let host = app.world_mut().spawn_empty().id();
 		TemplateLoader::new(app.world_mut())
 			.with_entity(host)

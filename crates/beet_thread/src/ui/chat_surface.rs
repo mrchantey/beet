@@ -32,8 +32,7 @@ mod test {
 			PageHostPlugin,
 			CharcellTuiPlugin,
 		))
-		.add_type::<ThreadPlugin>()
-		.add_type::<ThreadUiPlugin>();
+		.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
 		app
 	}
 

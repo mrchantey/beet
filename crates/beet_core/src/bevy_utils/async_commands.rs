@@ -111,10 +111,9 @@ impl Plugin for AsyncPlugin {
 				.and_then(AsyncSpawner::ticker)
 		});
 
-		app.add(IfAbsent(MainSchedulePlugin))
+		app.install(MainSchedulePlugin)
 			// drives `tick_global_task_pools_on_main_thread()` in the Last schedule
-			.add_type::<TaskPoolPlugin>()
-			.add_type::<beet_async::AsyncPlugin>()
+			.install_type::<(TaskPoolPlugin, beet_async::AsyncPlugin)>()
 			.init_resource::<AsyncSpawner>()
 			.add_systems(
 				PreUpdate,

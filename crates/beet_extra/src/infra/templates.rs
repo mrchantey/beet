@@ -960,7 +960,7 @@ mod test {
 	#[beet_core::test]
 	fn host_mounts_slotted_routes() {
 		let mut app = test_app();
-		app.add_type::<SlottedHost>();
+		app.install_type::<SlottedHost>();
 		let world = app.world_mut();
 		world.insert_resource(PackageConfig {
 			app_name: "beetmash".into(),

@@ -86,7 +86,8 @@ mod test {
 		let store = ThreadStore::new(backing.clone());
 
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins).add_type::<ThreadPlugin>();
+		app.add_plugins(MinimalPlugins)
+			.install_type::<ThreadPlugin>();
 
 		let thread = app
 			.world_mut()

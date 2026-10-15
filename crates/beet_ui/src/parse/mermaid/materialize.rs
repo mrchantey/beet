@@ -429,7 +429,7 @@ mod raster_test {
 	) -> TestHost {
 		let mut host = TestHost::sized(size);
 		// the raster attaches from an async task
-		host.app.add_type::<AsyncPlugin>();
+		host.app.install_type::<AsyncPlugin>();
 		host.app.world_mut().entity_mut(host.host).insert(support);
 		parse_md(host.app.world_mut(), host.host, page);
 		host.step();
@@ -585,7 +585,7 @@ mod raster_test {
 		use crate::style::common_props::Width;
 
 		let mut host = TestHost::sized(UVec2::new(80, 80));
-		host.app.add_type::<AsyncPlugin>();
+		host.app.install_type::<AsyncPlugin>();
 		host.app
 			.world_mut()
 			.entity_mut(host.host)

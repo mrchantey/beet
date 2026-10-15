@@ -3,7 +3,7 @@
 //! Bevy resolves a `Template` by its concrete Rust type. beet additionally
 //! needs to resolve one by name (a short type path from markup or a serialized
 //! tag), so it owns [`ReflectTemplate`]: reflect type-data that builds a
-//! template from a reflected data value. `app.add_type::<T>()` installs it, and
+//! template from a reflected data value. `app.install_type::<T>()` installs it, and
 //! [`ReflectTemplate::build_named`] looks it up from the [`AppTypeRegistry`].
 //!
 //! A schema attaches alongside this registration: the type-data stays a thin
@@ -177,14 +177,14 @@ where
 	}
 }
 
-/// The [`TypePlugin`] marker for a template.
+/// The [`TypeInstaller`] marker for a template.
 pub struct TemplateMarker;
 
-/// A template adds itself by type, `app.add_type::<Route>()`: its type and
+/// A template installs by type, `app.install_type::<Route>()`: its type and
 /// [`ReflectTemplate`] type-data, which brings its [`ReflectTemplateSchema`]
 /// along, so it resolves by short type path, and its schema in the
 /// [`SchemaRegistry`].
-impl<T> TypePlugin<TemplateMarker> for T
+impl<T> TypeInstaller<TemplateMarker> for T
 where
 	T: FromReflect
 		+ Typed
@@ -192,7 +192,7 @@ where
 		+ GetTemplateSchema
 		+ Template<Output = ()>,
 {
-	fn build(app: &mut App) {
+	fn install(app: &mut App) {
 		let world = app.world_mut();
 		let registry = world.resource_mut::<AppTypeRegistry>();
 		let mut registry = registry.write();
@@ -239,9 +239,9 @@ impl UnregisteredTag {
 	pub fn new(tag: impl Into<SmolStr>) -> Self { Self(tag.into()) }
 
 	/// Allow `tag` to resolve to nothing when nothing is registered under
-	/// it, see [`AllowedUnregistered`], an [`OwnedPlugin`]:
-	/// `app.add(UnregisteredTag::allow("LiveReloadScript"))`.
-	pub fn allow(tag: impl Into<SmolStr>) -> impl FnOnce(&mut App) {
+	/// it, see [`AllowedUnregistered`]:
+	/// `app.install(UnregisteredTag::allow("LiveReloadScript"))`.
+	pub fn allow(tag: impl Into<SmolStr>) -> impl Installer {
 		let tag = tag.into();
 		move |app: &mut App| {
 			app.world_mut()
@@ -335,7 +335,7 @@ mod test {
 	#[crate::test]
 	fn builds_by_name() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).add_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_type::<Label>();
 		let world = app.world_mut();
 
 		// a partial patch over default, the loader's form.
@@ -405,7 +405,7 @@ mod test {
 	#[crate::test]
 	fn a_template_wins_an_ambiguous_short_path() {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).add_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_type::<Label>();
 		let world = app.world_mut();
 		let app_registry = world.resource::<AppTypeRegistry>().clone();
 		{
@@ -439,7 +439,7 @@ mod test {
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let patch = DynamicStruct::default();
 		let mut app = App::new();
-		app.add(UnregisteredTag::allow("Nope"));
+		app.install(UnregisteredTag::allow("Nope"));
 		let other = app.world_mut();
 		let root = other.spawn_empty().id();
 		other

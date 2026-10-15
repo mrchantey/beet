@@ -457,8 +457,8 @@ impl RenderTarget for LeafletRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
 }
 
-impl OwnedPlugin for LeafletRenderer {
-	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+impl Installer for LeafletRenderer {
+	fn install(self, app: &mut App) { RenderTargets::register_on(app, self); }
 }
 
 /// What the Leaflet walk reads off a rendered tree.

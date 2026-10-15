@@ -215,7 +215,7 @@ impl Plugin for FormPlugin {
 			// a `Blur` control's write is held while it has the focus and
 			// released, at once, by the blur that ends it: the policy rides
 			// the focus model, so the plugin gating writes by it declares it
-			.add_type::<FocusPlugin>()
+			.install_type::<FocusPlugin>()
 			.add_observer(super::write_policy::hold_write_on_focus)
 			.add_observer(super::write_policy::release_write_on_blur)
 			.add_systems(
@@ -240,7 +240,7 @@ impl Plugin for FormPlugin {
 			// a `Submit` handler doing real work is async by nature (the
 			// `SchemaEditor`'s commit evolves data through a js seam), so the
 			// plugin that fires the event declares the bridge that carries it.
-			.add_type::<AsyncPlugin>();
+			.install_type::<AsyncPlugin>();
 		// Enter-to-submit needs the keyboard/focus stack, gated with the renderer.
 		// `InputPlugin` is a hard dependency of it, not an ambient assumption: the
 		// `MessageReader` fails validation every frame without the message type,
@@ -250,7 +250,7 @@ impl Plugin for FormPlugin {
 		// line at once) has its typed chars committed to the field `Value` before
 		// the Enter in that same batch gathers and submits them.
 		#[cfg(feature = "tui")]
-		app.add_type::<bevy::input::InputPlugin>().add_systems(
+		app.install_type::<bevy::input::InputPlugin>().add_systems(
 			Update,
 			submit_form_on_enter.after(crate::prelude::write_focus_input),
 		);

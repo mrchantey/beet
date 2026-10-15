@@ -19,7 +19,7 @@
 //!
 //! # Systems and Plugins
 //!
-//! - [`TypePlugin`], [`OwnedPlugin`] - The plugin variants an [`App`] adds by type or by value
+//! - [`Installer`], [`TypeInstaller`] - What an [`App`] installs by value or by type
 //! - [`OnSpawn`] - Run logic when entities are spawned
 //! - [`When`] - Conditional system execution
 //!
@@ -54,7 +54,7 @@ mod despawn_after;
 mod entity_target_event;
 mod group;
 pub mod hook_ext;
-mod plugin_variants;
+mod install;
 mod required_field;
 mod subtree_trigger;
 #[cfg(all(
@@ -90,10 +90,10 @@ pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
 pub use group::*;
+pub use install::*;
 pub use on_spawn::*;
 #[cfg(feature = "std")]
 pub use perf_log::*;
-pub use plugin_variants::*;
 #[cfg(feature = "std")]
 pub use pretty_tracing::*;
 pub use required_field::*;

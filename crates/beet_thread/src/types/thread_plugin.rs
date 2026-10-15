@@ -14,12 +14,10 @@ pub struct ThreadPlugin {}
 
 impl Plugin for ThreadPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<AsyncPlugin>()
-			.add_type::<RouterPlugin>()
-			.add_type::<NetPlugin>();
+		app.install_type::<(AsyncPlugin, RouterPlugin, NetPlugin)>();
 
 		#[cfg(feature = "action")]
-		app.add_type::<ActionPlugin>()
+		app.install_type::<ActionPlugin>()
 			// agent-loop control flow, as markup. `StoreToolset` is registered
 			// upstream by `RouterPlugin` (init above); the store is a plain `FsStore`.
 			.register_type::<RepeatWhileFunctionCallOutput>()
@@ -43,7 +41,7 @@ impl Plugin for ThreadPlugin {
 			.register_type::<Provider>()
 			.register_type::<ModelApi>()
 			.register_type::<ModelSize>()
-			.add_type::<ModelStreamer>();
+			.install_type::<ModelStreamer>();
 
 		app
 			// ── Uuid7 instantiations ─────────────────────────────────────
@@ -74,8 +72,10 @@ impl Plugin for ThreadPlugin {
 			.register_type::<ToolChoice>()
 			.register_type::<StringEnumOptions>()
 			// ── Markup templates ──────────────────────────────────────────
-			.add_type::<CreatePost>()
-			.add_type::<CreateActor>()
+			.install_type::<(
+				CreatePost,
+				CreateActor,
+			)>()
 			.add_observer(reapply_string_enum_options)
 			// _
 			;

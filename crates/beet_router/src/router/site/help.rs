@@ -349,7 +349,7 @@ impl From<&ParamMeta> for RouteParam {
 	fn from(meta: &ParamMeta) -> Self {
 		Self {
 			name: meta.name().to_string(),
-			kind: meta.type_path().to_string(),
+			kind: meta.kind().to_string(),
 			required: meta.is_required(),
 			short: meta.short().map(|short| short.to_string()),
 			description: meta.description().map(String::from),
@@ -1115,7 +1115,7 @@ mod test {
 		}
 
 		let mut app = App::new().with_plugins((AsyncPlugin, RouterPlugin));
-		app.add_type::<HelpShell>();
+		app.install_type::<HelpShell>();
 		let world = app.world_mut();
 		let root = world
 			.spawn((

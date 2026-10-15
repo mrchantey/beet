@@ -34,10 +34,13 @@ use std::sync::Arc;
 /// names something the build resolves, ie another store), a `bx:cfg` subtree
 /// is left to the build, and a non-literal attribute is skipped.
 ///
-/// Added by type, `app.add_type::<RepoRoot>()`, in the order its
-/// [`preload`](Self::preload) should run: the type's [`TypePlugin`] impl
-/// forwards to [`PrescanRegistry::register_on`].
-pub trait Prescan: Default + Clone + FromReflect + Typed {
+/// Installed by type, `app.install_type::<RepoRoot>()`, in the order its
+/// [`preload`](Self::preload) should run. Its [`TypeInstaller`] impl, a
+/// supertrait so no prescan skips it, forwards to
+/// [`PrescanRegistry::register_on`].
+pub trait Prescan:
+	Default + Clone + FromReflect + Typed + TypeInstaller<PrescanMarker>
+{
 	/// One line of what the declaration does before the build, listed by
 	/// `--help` under "before the build".
 	fn describe() -> &'static str;
@@ -55,8 +58,8 @@ pub trait Prescan: Default + Clone + FromReflect + Typed {
 	}
 }
 
-/// The [`TypePlugin`] marker for a [`Prescan`], local so this crate can add
-/// one declared upstream (`<Secrets>`, `<RequireCfg>`).
+/// The [`TypeInstaller`] marker every [`Prescan`] installs under, local so
+/// this crate can install one declared upstream (`<Secrets>`, `<RequireCfg>`).
 pub struct PrescanMarker;
 
 /// The registered [`Prescan`] set, in registration order, which is the order
@@ -78,7 +81,7 @@ impl PrescanRegistry {
 
 	/// Register `T` on `app` as acting before the entry builds, and as a
 	/// reflect type so the built tree resolves the same tag, the body of every
-	/// [`Prescan`]'s [`TypePlugin`] impl. Call order is preload order.
+	/// [`Prescan`]'s [`TypeInstaller`] impl. Call order is preload order.
 	pub fn register_on<T: Prescan + GetTypeRegistration>(app: &mut App) {
 		app.register_type::<T>();
 		app.world_mut()
@@ -391,8 +394,8 @@ impl Prescan for RequireCfg {
 	}
 }
 
-impl TypePlugin<PrescanMarker> for RequireCfg {
-	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+impl TypeInstaller<PrescanMarker> for RequireCfg {
+	fn install(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }
 
 /// `<Secrets path="..">` sets its `EnvVar` records into the process
@@ -428,8 +431,8 @@ impl Prescan for Secrets {
 }
 
 #[cfg(feature = "vault")]
-impl TypePlugin<PrescanMarker> for Secrets {
-	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+impl TypeInstaller<PrescanMarker> for Secrets {
+	fn install(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }
 
 #[cfg(test)]
@@ -603,18 +606,18 @@ mod test {
 				})
 			}
 		}
-		impl TypePlugin for Warm {
-			fn build(app: &mut App) {
+		impl TypeInstaller<PrescanMarker> for Warm {
+			fn install(app: &mut App) {
 				PrescanRegistry::register_on::<Self>(app);
 			}
 		}
-		impl TypePlugin for Second {
-			fn build(app: &mut App) {
+		impl TypeInstaller<PrescanMarker> for Second {
+			fn install(app: &mut App) {
 				PrescanRegistry::register_on::<Self>(app);
 			}
 		}
 		let mut app = App::new();
-		app.add_type::<(Warm, Second)>();
+		app.install_type::<(Warm, Second)>();
 		let registry = app.world().resource::<PrescanRegistry>().clone();
 		registry.describe().xpect_eq(vec![
 			("Warm", "warms a cache"),

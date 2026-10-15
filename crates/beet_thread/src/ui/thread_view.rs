@@ -460,10 +460,11 @@ mod test {
 	#[beet_core::test]
 	fn projects_appended_posts() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.add_type::<DocumentPlugin>()
-			.add_type::<ThreadPlugin>()
-			.add_type::<ThreadUiPlugin>();
+		app.add_plugins(MinimalPlugins).install_type::<(
+			DocumentPlugin,
+			ThreadPlugin,
+			ThreadUiPlugin,
+		)>();
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
@@ -489,10 +490,11 @@ mod test {
 	#[beet_core::test]
 	fn projects_appended_posts_through_template() {
 		let mut app = App::new();
-		app.add_plugins(MinimalPlugins)
-			.add_type::<DocumentPlugin>()
-			.add_type::<ThreadPlugin>()
-			.add_type::<ThreadUiPlugin>();
+		app.add_plugins(MinimalPlugins).install_type::<(
+			DocumentPlugin,
+			ThreadPlugin,
+			ThreadUiPlugin,
+		)>();
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
@@ -575,8 +577,7 @@ mod test {
 			RealtimeParsePlugin,
 			PageHostPlugin,
 		))
-		.add_type::<ThreadPlugin>()
-		.add_type::<ThreadUiPlugin>();
+		.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
 		let thread = app
 			.world_mut()
 			.spawn((Thread::default(), ThreadWindow::default()))
@@ -664,8 +665,7 @@ mod test {
 	fn thread_view_binds_to_referenced_thread() {
 		let mut app = App::new();
 		app.add_plugins(MinimalPlugins)
-			.add_type::<ThreadPlugin>()
-			.add_type::<ThreadUiPlugin>();
+			.install_type::<(ThreadPlugin, ThreadUiPlugin)>();
 		let source = r#"
 <Fragment>
 	<Thread bx:ref="thread" {Sequence}/>

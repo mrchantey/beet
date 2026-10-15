@@ -9,8 +9,8 @@ use bevy::tasks::IoTaskPool;
 #[cfg(feature = "std")]
 use bevy::tasks::Task;
 
-/// The runners and builders on [`App`]: what it registers is a plugin variant
-/// instead, see [`TypePlugin`] and [`OwnedPlugin`].
+/// The runners and builders on [`App`]: what it registers is an installer
+/// instead, see [`Installer`] and [`TypeInstaller`].
 #[extend::ext(name=BeetCoreAppExt)]
 #[allow(async_fn_in_trait)]
 pub impl App {
@@ -72,7 +72,7 @@ pub impl App {
 	/// Awaits an IO task, updating the app while waiting.
 	#[cfg(feature = "std")]
 	async fn await_io_task<O>(&mut self, task: Task<O>) -> O {
-		self.add_type::<TaskPoolPlugin>();
+		self.install_type::<TaskPoolPlugin>();
 		// spin up async task pool
 		self.run_once();
 

@@ -16,8 +16,7 @@ pub struct ThreadExamplesPlugin;
 
 impl Plugin for ThreadExamplesPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<ThreadPlugin>()
-			.add_type::<ThreadUiPlugin>()
+		app.install_type::<(ThreadPlugin, ThreadUiPlugin)>()
 			// the tool_call example's inline tool, so `<AgentChoiceAction/>` resolves
 			.register_type::<AgentChoiceAction>();
 	}

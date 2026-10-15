@@ -10,49 +10,51 @@ pub struct ActionPlugin;
 
 impl Plugin for ActionPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<MinimalTypesPlugin>()
+		app.install_type::<(
+			MinimalTypesPlugin,
 			// async actions queue work onto the AsyncWorld; without this
 			// plugin the runtime never drives them
-			.add_type::<AsyncPlugin>()
-			// control-flow types
-			.register_type::<ChildError>()
-			.register_type::<CallOnSpawn<(), Outcome>>()
-			.add_systems(Update, call_on_spawn::<(), Outcome>)
-			.register_type::<BypassErrors>()
-			.register_type::<RunningError>()
-			.register_type::<BypassRunningErrors>()
-			.register_type::<Sequence<(), ()>>()
-			.register_type::<RunGroup<(), ()>>()
-			.register_type::<InfallibleSequence<(), ()>>()
-			.register_type::<Fallback<(), ()>>()
-			.register_type::<Parallel<(), ()>>()
-			.register_type::<HighestScore<(), ()>>()
-			.register_type::<Score>()
-			.register_type::<Repeat<(), ()>>()
-			.register_type::<RepeatTimes<(), ()>>()
-			// agent resolution types
-			.register_type::<ActionOf>()
-			.register_type::<Actions>()
-			.register_type::<AgentRoot>()
-			.register_type::<TargetEntity>()
-			// leaf / util actions
-			.register_type::<EndWith<Outcome>>()
-			.register_type::<Log>()
-			// the environment-agnostic drive leaf, the `DifferentialDrive` command it
-			// writes onto a driven body (via `AgentQuery`), and the typed velocity
-			// units its markup fields coerce from.
-			.register_type::<SetDrive>()
-			.register_type::<DifferentialDrive>()
-			.register_type::<DriveForDuration>()
-			.register_type::<LinearVelocity>()
-			.register_type::<AngularVelocity>()
-			.register_type::<SucceedTimes>()
-			.register_type::<RunTimer>()
-			.register_type::<RunNext>()
-			.register_type::<NoInterrupt>()
-			// long-running action lifecycle
-			.add_systems(Update, tick_run_timers)
-			.add_plugins(running_plugin::<(), Outcome>);
+			AsyncPlugin,
+		)>()
+		// control-flow types
+		.register_type::<ChildError>()
+		.register_type::<CallOnSpawn<(), Outcome>>()
+		.add_systems(Update, call_on_spawn::<(), Outcome>)
+		.register_type::<BypassErrors>()
+		.register_type::<RunningError>()
+		.register_type::<BypassRunningErrors>()
+		.register_type::<Sequence<(), ()>>()
+		.register_type::<RunGroup<(), ()>>()
+		.register_type::<InfallibleSequence<(), ()>>()
+		.register_type::<Fallback<(), ()>>()
+		.register_type::<Parallel<(), ()>>()
+		.register_type::<HighestScore<(), ()>>()
+		.register_type::<Score>()
+		.register_type::<Repeat<(), ()>>()
+		.register_type::<RepeatTimes<(), ()>>()
+		// agent resolution types
+		.register_type::<ActionOf>()
+		.register_type::<Actions>()
+		.register_type::<AgentRoot>()
+		.register_type::<TargetEntity>()
+		// leaf / util actions
+		.register_type::<EndWith<Outcome>>()
+		.register_type::<Log>()
+		// the environment-agnostic drive leaf, the `DifferentialDrive` command it
+		// writes onto a driven body (via `AgentQuery`), and the typed velocity
+		// units its markup fields coerce from.
+		.register_type::<SetDrive>()
+		.register_type::<DifferentialDrive>()
+		.register_type::<DriveForDuration>()
+		.register_type::<LinearVelocity>()
+		.register_type::<AngularVelocity>()
+		.register_type::<SucceedTimes>()
+		.register_type::<RunTimer>()
+		.register_type::<RunNext>()
+		.register_type::<NoInterrupt>()
+		// long-running action lifecycle
+		.add_systems(Update, tick_run_timers)
+		.add_plugins(running_plugin::<(), Outcome>);
 		// the one registered `Script` instantiation, so a `<Script>` tag resolves
 		// by base name unambiguously; the derived `ScriptAction` is inserted by
 		// `#[require]` via ComponentId and needs no reflect of its own.
@@ -64,7 +66,7 @@ impl Plugin for ActionPlugin {
 			.register_type::<ScriptConfig>()
 			// the behaviour-tree leaf marker and its markup front-end
 			.register_type::<OutcomeScript<Value, Value>>()
-			.add_type::<RunScript>();
+			.install_type::<RunScript>();
 		// the external-process leaf needs the native `ChildProcess` to spawn, so it
 		// (and its action marker) only exist on a native std build. `Command` is
 		// crate-qualified to disambiguate it from bevy's `Command` trait, both in

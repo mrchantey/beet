@@ -1528,7 +1528,7 @@ fn Greeting() -> impl Bundle {
 #[beet_core::test]
 fn mdx_resolves_embedded_template() {
 	let mut app = world_ext::ui_app();
-	app.add_type::<Greeting>();
+	app.install_type::<Greeting>();
 	let world = app.world_mut();
 	let bytes = MediaBytes::new_markdown("# Title\n\n<Greeting/>\n");
 	let mut entity = world.spawn_empty();
@@ -1573,7 +1573,7 @@ fn Wrap() -> impl Bundle {
 #[beet_core::test]
 fn mdx_resolves_component_with_children() {
 	let mut app = world_ext::ui_app();
-	app.add_type::<Wrap>();
+	app.install_type::<Wrap>();
 	let world = app.world_mut();
 	// the open tag, the markdown body, and the close arrive as separate events;
 	// the BSX build path resolves the whole subtree.

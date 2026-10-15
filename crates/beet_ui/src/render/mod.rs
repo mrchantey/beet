@@ -53,12 +53,12 @@
 //! 	}
 //! }
 //!
-//! impl OwnedPlugin for Shout {
-//! 	fn build(self, app: &mut App) { RenderTargets::register_on(app, self); }
+//! impl Installer for Shout {
+//! 	fn install(self, app: &mut App) { RenderTargets::register_on(app, self); }
 //! }
 //!
 //! let mut app = App::new();
-//! app.add_plugins(RenderPlugin).add(Shout);
+//! app.add_plugins(RenderPlugin).install(Shout);
 //! let world = app.world_mut();
 //! let page = world.spawn(rsx! { <p>"hello"</p> }).id();
 //! let request = RequestParts::default()

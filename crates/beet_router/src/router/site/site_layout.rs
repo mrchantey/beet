@@ -126,11 +126,11 @@ pub struct ColorSchemeParams {
 }
 
 impl ColorSchemeParams {
-	/// The [`OwnedPlugin`] declaring the scheme at subtree scope on every
+	/// The [`Installer`] declaring the scheme at subtree scope on every
 	/// entity `Extractor` is inserted on, read by [`PageClasses`] beneath it:
 	/// leniently, so a scheme no page knows is the negotiated one rather than a
 	/// refused request.
-	pub fn declare_on<Extractor: Component>() -> impl FnOnce(&mut App) {
+	pub fn declare_on<Extractor: Component>() -> impl Installer {
 		SubtreeParams::declare_on_with::<Extractor>(ParamsDeclaration::new::<
 			PageClasses,
 			Self,

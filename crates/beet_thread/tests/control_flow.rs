@@ -16,7 +16,7 @@ fn main() {
 			// 	..default()
 			// }
 		))
-		.add_type::<ThreadPlugin>()
+		.install_type::<ThreadPlugin>()
 		.add_systems(Startup, setup)
 		.run();
 }

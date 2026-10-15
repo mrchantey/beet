@@ -152,7 +152,7 @@ pub struct CapabilityBindingPlugin;
 
 impl Plugin for CapabilityBindingPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<PerceiveActCorePlugin>()
+		app.install_type::<PerceiveActCorePlugin>()
 			.register_type::<CapabilityServer>()
 			.register_type::<CapabilityBound>()
 			.add_observer(bind_on_connection_ready);

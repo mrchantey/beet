@@ -51,7 +51,7 @@ pub struct SocketServerPlugin;
 
 impl Plugin for SocketServerPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<AsyncPlugin>()
+		app.install_type::<AsyncPlugin>()
 			.register_type::<SocketServer>()
 			.register_type::<PersistentSocket>()
 			.register_type::<Tls>();

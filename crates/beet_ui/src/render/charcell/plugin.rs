@@ -42,42 +42,44 @@ impl Plugin for CharcellTuiPlugin {
 		// browser-like form behavior: editable controls and submit, so a live
 		// TUI's `<form>`/`<select>` work out of the box.
 		#[cfg(feature = "template")]
-		app.add_type::<crate::prelude::FormPlugin>();
-		app.add_type::<CharcellPlugin>()
-			.add_type::<RealtimeParsePlugin>()
-			.add_type::<crate::prelude::DocumentUiPlugin>()
-			.add_type::<crate::prelude::FocusPlugin>()
+		app.install_type::<crate::prelude::FormPlugin>();
+		app.install_type::<(
+			CharcellPlugin,
+			RealtimeParsePlugin,
+			crate::prelude::DocumentUiPlugin,
+			crate::prelude::FocusPlugin,
 			// pointer-driven `:hover` element state for the style cascade
-			.add_type::<crate::prelude::PointerStatePlugin>()
+			crate::prelude::PointerStatePlugin,
 			// the native `<select>` dropdown interaction
-			.add_type::<SelectPlugin>()
-			// terminal bytes to bevy input, before InputPlugin consumes the messages
-			// this frame so `ButtonInput` reflects them immediately.
-			.add_systems(
-				PreUpdate,
-				terminal_input_bridge.before(bevy::input::InputSystems),
-			)
-			// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
-			.add_systems(PreUpdate, resize_stdio_buffers)
-			// hit-test + scroll input ride the bridged bevy mouse/key messages.
-			// pointer_input runs first so a wheel's own hover is current when
-			// scroll_input reads it; scrollbar_mouse claims gutter presses, others
-			// fall through to pointer_input.
-			.add_systems(
-				Update,
-				(
-					(pointer_input, scroll_input).chain(),
-					scrollbar_mouse,
-					exit_on_ctrl_c,
-				),
-			)
-			// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
-			// for the web's native disclosure).
-			.add_observer(toggle_details_on_click)
-			// clicking a control carrying `aria-controls` toggles `aria-hidden`
-			// on its target (the ARIA disclosure pattern, eg the menu button
-			// collapsing the sidebar rail).
-			.add_observer(toggle_aria_controls_on_click);
+			SelectPlugin,
+		)>()
+		// terminal bytes to bevy input, before InputPlugin consumes the messages
+		// this frame so `ButtonInput` reflects them immediately.
+		.add_systems(
+			PreUpdate,
+			terminal_input_bridge.before(bevy::input::InputSystems),
+		)
+		// SIGWINCH-equivalent: poll the real tty size and resize stdio buffers.
+		.add_systems(PreUpdate, resize_stdio_buffers)
+		// hit-test + scroll input ride the bridged bevy mouse/key messages.
+		// pointer_input runs first so a wheel's own hover is current when
+		// scroll_input reads it; scrollbar_mouse claims gutter presses, others
+		// fall through to pointer_input.
+		.add_systems(
+			Update,
+			(
+				(pointer_input, scroll_input).chain(),
+				scrollbar_mouse,
+				exit_on_ctrl_c,
+			),
+		)
+		// clicking a `<summary>` toggles its `<details>` (the terminal stand-in
+		// for the web's native disclosure).
+		.add_observer(toggle_details_on_click)
+		// clicking a control carrying `aria-controls` toggles `aria-hidden`
+		// on its target (the ARIA disclosure pattern, eg the menu button
+		// collapsing the sidebar rail).
+		.add_observer(toggle_aria_controls_on_click);
 		// the sidebar rail's breakpoint seeding — the native twin of
 		// `sidebar.js`'s init/resize wiring (the menu-button click rides the
 		// `aria-controls` observer above). After the viewport sync so a resize
@@ -97,7 +99,7 @@ pub struct CharcellPlugin;
 
 impl Plugin for CharcellPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_type::<StylePlugin>()
+		app.install_type::<StylePlugin>()
 			.register_type::<crate::prelude::ScrollPosition>()
 			.register_type::<MediaViewport>()
 			.add_plugins((
@@ -189,7 +191,7 @@ impl Plugin for CharcellPlugin {
 		// repeated here (idempotently) so a charcell app that runs without the
 		// widget set can still copy and expire the toast.
 		#[cfg(all(feature = "tui", feature = "template"))]
-		app.add_type::<crate::prelude::ToastPlugin>();
+		app.install_type::<crate::prelude::ToastPlugin>();
 	}
 }
 

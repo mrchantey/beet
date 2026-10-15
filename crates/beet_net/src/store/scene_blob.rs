@@ -210,7 +210,7 @@ mod test {
 			DocumentPlugin,
 			StorePlugin,
 		));
-		app.add_type::<MinimalTypesPlugin>();
+		app.install_type::<MinimalTypesPlugin>();
 		let host = app
 			.world_mut()
 			.spawn((store, children![SceneBlob::new("app.json", "app.bsx")]))
@@ -234,7 +234,7 @@ mod test {
 			DocumentPlugin,
 			StorePlugin,
 		));
-		app.add_type::<MinimalTypesPlugin>();
+		app.install_type::<MinimalTypesPlugin>();
 		let host = app
 			.world_mut()
 			.spawn(SceneBlob::new("app.json", "app.bsx"))

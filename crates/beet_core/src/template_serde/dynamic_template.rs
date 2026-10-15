@@ -444,7 +444,7 @@ mod test {
 
 	fn world() -> World {
 		let mut app = App::new();
-		app.add_plugins(TemplatePlugin).add_type::<Label>();
+		app.add_plugins(TemplatePlugin).install_type::<Label>();
 		let world = core::mem::take(app.world_mut());
 		{
 			let registry = world.resource::<AppTypeRegistry>();

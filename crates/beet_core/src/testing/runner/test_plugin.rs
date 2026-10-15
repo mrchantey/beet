@@ -95,9 +95,8 @@ impl Plugin for TestPlugin {
 		#[cfg(feature = "vault")]
 		Secrets::load_env_vars_nearest();
 
-		app.add_type::<AsyncPlugin>()
-			.add_type::<TimePlugin>()
-			.add(InsertSchedule::before(Update, RunTests))
+		app.install_type::<(AsyncPlugin, TimePlugin)>()
+			.install(InsertSchedule::before(Update, RunTests))
 			// Force single-threaded execution so `spawn_local` in `run_tests_series`
 			// always lands on the main thread's local executor.
 			// With `bevy_multithreaded`, the default is `MultiThreaded`, which

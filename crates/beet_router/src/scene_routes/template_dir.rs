@@ -46,8 +46,8 @@ impl Prescan for TemplateDir {
 	}
 }
 
-impl TypePlugin<PrescanMarker> for TemplateDir {
-	fn build(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
+impl TypeInstaller<PrescanMarker> for TemplateDir {
+	fn install(app: &mut App) { PrescanRegistry::register_on::<Self>(app); }
 }
 
 /// The template names an owner (a [`TemplateFile`] entity, or the entry root

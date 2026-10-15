@@ -51,7 +51,7 @@ fn Badge(#[prop(required)] label: String, count: u32) -> impl Bundle {
 #[beet_core::test]
 fn rust_template_registers_schema() {
 	let mut app = world_ext::ui_app();
-	app.add_type::<Badge>();
+	app.install_type::<Badge>();
 	let world = app.world_mut();
 	// the prop schema is attached alongside the build bridge, derived from the
 	// typed signature: `label` required, `count` optional.
@@ -79,7 +79,7 @@ fn rust_template_registers_schema() {
 #[beet_core::test]
 fn macro_missing_required_rides_template_error() {
 	let mut app = world_ext::ui_app();
-	app.add_type::<Badge>();
+	app.install_type::<Badge>();
 	let world = app.world_mut();
 	// `<Badge/>` without `label` builds with the required prop unset.
 	let root = parse_bsx(world, "<Badge count=1/>");
@@ -90,7 +90,7 @@ fn macro_missing_required_rides_template_error() {
 #[beet_core::test]
 fn macro_required_prop_present_ok() {
 	let mut app = world_ext::ui_app();
-	app.add_type::<Badge>();
+	app.install_type::<Badge>();
 	let world = app.world_mut();
 	let root = parse_bsx(world, "<Badge label=\"hi\" count=1/>");
 	has_template_error(world, root).xpect_false();

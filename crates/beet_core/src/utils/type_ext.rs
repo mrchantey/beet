@@ -15,7 +15,13 @@ use crate::prelude::*;
 /// `<ArticleLayout/>`, so the name is a symbol the compiler checks and a
 /// rename follows, rather than a string.
 pub fn short_name<T: ?Sized>() -> SmolStr {
-	SmolStr::from(ShortName::of::<T>().to_string())
+	short_path(core::any::type_name::<T>())
+}
+
+/// [`short_name`] of a type by its full path, ie `Vec<String>` for
+/// `alloc::vec::Vec<alloc::string::String>`.
+pub fn short_path(type_path: &str) -> SmolStr {
+	SmolStr::from(ShortName(type_path).to_string())
 }
 
 #[cfg(test)]

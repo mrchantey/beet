@@ -9,7 +9,7 @@
 //! ([`SpawnTemplate`] then [`Ready`]). A failed root rides
 //! [`TemplateError`] rather than panicking.
 //!
-//! `app.add_type::<T>()` installs the [`ReflectTemplate`] bridge so a
+//! `app.install_type::<T>()` installs the [`ReflectTemplate`] bridge so a
 //! template resolves by name.
 //!
 //! This is the no_std core; async helpers sit behind the `bevy_async` feature,

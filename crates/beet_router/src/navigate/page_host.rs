@@ -87,8 +87,7 @@ impl Plugin for PageHostPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_observer(despawn_page_with_surface);
 		#[cfg(target_arch = "wasm32")]
-		app.add_type::<DomRenderPlugin>()
-			.add_type::<DomInputPlugin>()
+		app.install_type::<(DomRenderPlugin, DomInputPlugin)>()
 			.add_systems(PostUpdate, mount_dom_hosts.after(DomRenderSet));
 	}
 }
@@ -535,7 +534,7 @@ mod test {
 	#[beet_core::test]
 	async fn link_in_layouted_content_navigates() {
 		let mut app = nav_app();
-		app.add_type::<SlotLayout>();
+		app.install_type::<SlotLayout>();
 		let router = app
 			.world_mut()
 			.spawn((Router, Layout::of::<SlotLayout>(), children![

@@ -16,8 +16,8 @@ pub impl<T: Default + ScheduleLabel> T {
 }
 
 /// Initializes a schedule and runs it every frame, beside one already in the
-/// [`MainScheduleOrder`], an [`OwnedPlugin`]:
-/// `app.add(InsertSchedule::before(Update, RunTests))`.
+/// [`MainScheduleOrder`], an [`Installer`]:
+/// `app.install(InsertSchedule::before(Update, RunTests))`.
 ///
 /// ## Panics
 ///
@@ -49,10 +49,10 @@ impl<Anchor: ScheduleLabel, Schedule: ScheduleLabel>
 	}
 }
 
-impl<Anchor: ScheduleLabel, Schedule: ScheduleLabel> OwnedPlugin
+impl<Anchor: ScheduleLabel, Schedule: ScheduleLabel> Installer
 	for InsertSchedule<Anchor, Schedule>
 {
-	fn build(self, app: &mut App) {
+	fn install(self, app: &mut App) {
 		// the order compares the anchor by its concrete type, so only the
 		// schedule may be interned
 		let schedule = self.schedule.intern();

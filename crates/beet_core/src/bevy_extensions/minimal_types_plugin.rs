@@ -13,7 +13,7 @@ use crate::prelude::*;
 /// foreign type can carry the mark, so no dump site has to remember to deny
 /// them.
 ///
-/// Use [`App::add_type::<MinimalTypesPlugin>`](AppPluginVariantsExt::add_type)
+/// Use [`App::install_type::<MinimalTypesPlugin>`](AppInstallExt::install_type)
 /// to attach idempotently.
 #[derive(Default)]
 pub struct MinimalTypesPlugin;
