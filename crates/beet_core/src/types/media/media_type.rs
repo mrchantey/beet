@@ -8,6 +8,16 @@
 use crate::prelude::*;
 
 /// Common media types used in HTTP exchange.
+///
+/// ## Choosing a name
+///
+/// `text/*` is for content a person reads as written (prose, source code),
+/// `application/*` for content a program reads, which is nearly every
+/// structured format, json and yaml included. A format with a registered name
+/// takes it; an unregistered one sits in the vendor tree (`application/vnd.ron`,
+/// beet's own `application/vnd.beet.bsx`), never behind an `x-` prefix.
+/// [`MediaType::from_content_type`] still parses the superseded spellings,
+/// while everything beet writes uses the current one.
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
@@ -29,16 +39,17 @@ pub enum MediaType {
 	/// `application/manifest+json` — the web app manifest a `<link
 	/// rel="manifest">` names.
 	WebManifest,
-	/// `application/x-postcard`
+	/// `application/vnd.postcard`
 	Postcard,
-	/// `application/x-ron`
+	/// `application/vnd.ron`
 	Ron,
 	/// `application/vnd.ipld.dag-cbor`, the canonical CBOR an atproto repo
 	/// stores and hashes a record as.
 	DagCbor,
 	/// `text/markdown`
 	Markdown,
-	/// `application/x-bsx` — Beet Scripting XML, the `.bsx` template format.
+	/// `application/vnd.beet.bsx`, Beet Scripting XML, the `.bsx` template
+	/// format.
 	Bsx,
 	/// `text/event-stream` — Server-Sent Events.
 	EventStream,
@@ -56,7 +67,7 @@ pub enum MediaType {
 	Webp,
 	/// `image/svg+xml`
 	Svg,
-	/// `image/x-icon`
+	/// `image/vnd.microsoft.icon`
 	Ico,
 	/// `image/avif`
 	Avif,
@@ -111,7 +122,7 @@ pub enum MediaType {
 	VideoWebm,
 	/// `video/ogg`
 	VideoOgg,
-	/// `application/x-yaml` or `text/yaml`
+	/// `application/yaml` (RFC 9512)
 	Yaml,
 	/// `text/csv`
 	Csv,
@@ -123,7 +134,7 @@ pub enum MediaType {
 	FormUrlEncoded,
 	/// `multipart/form-data`
 	FormData,
-	/// `application/x-protobuf`
+	/// `application/protobuf`
 	Protobuf,
 	/// `application/msgpack`
 	MessagePack,
@@ -157,14 +168,14 @@ pub enum MediaType {
 impl MediaType {
 	// ── Canonical strings ──────────────────────────────────────────
 	const JSON: &'static str = "application/json";
-	const POSTCARD: &'static str = "application/x-postcard";
-	const RON: &'static str = "application/x-ron";
+	const POSTCARD: &'static str = "application/vnd.postcard";
+	const RON: &'static str = "application/vnd.ron";
 	const DAG_CBOR: &'static str = "application/vnd.ipld.dag-cbor";
 	const TEXT: &'static str = "text/plain";
 	const HTML: &'static str = "text/html";
 	const XML: &'static str = "application/xml";
 	const MARKDOWN: &'static str = "text/markdown";
-	const BSX: &'static str = "application/x-bsx";
+	const BSX: &'static str = "application/vnd.beet.bsx";
 	const BYTES: &'static str = "application/octet-stream";
 	const EVENT_STREAM: &'static str = "text/event-stream";
 	const CSS: &'static str = "text/css";
@@ -174,7 +185,7 @@ impl MediaType {
 	const GIF: &'static str = "image/gif";
 	const WEBP: &'static str = "image/webp";
 	const SVG: &'static str = "image/svg+xml";
-	const ICO: &'static str = "image/x-icon";
+	const ICO: &'static str = "image/vnd.microsoft.icon";
 	const AVIF: &'static str = "image/avif";
 	const BMP: &'static str = "image/bmp";
 	const TIFF: &'static str = "image/tiff";
@@ -206,7 +217,7 @@ impl MediaType {
 	const TOML: &'static str = "application/toml";
 	const FORM_URL_ENCODED: &'static str = "application/x-www-form-urlencoded";
 	const FORM_DATA: &'static str = "multipart/form-data";
-	const PROTOBUF: &'static str = "application/x-protobuf";
+	const PROTOBUF: &'static str = "application/protobuf";
 	const MESSAGE_PACK: &'static str = "application/msgpack";
 	const SHELL: &'static str = "application/x-sh";
 	const RUST: &'static str = "text/x-rust";
@@ -215,11 +226,23 @@ impl MediaType {
 	const C_LANG: &'static str = "text/x-c";
 	const CPP_LANG: &'static str = "text/x-c++";
 	const JAVA: &'static str = "text/x-java";
-	const YAML: &'static str = "application/x-yaml";
+	const YAML: &'static str = "application/yaml";
 	const CSV: &'static str = "text/csv";
 	const SQL: &'static str = "application/sql";
 	const GRAPHQL: &'static str = "application/graphql";
 	const ANSI_TERM: &'static str = "text/ansi-term";
+
+	/// Superseded spellings a peer may still send, each parsed as its
+	/// successor.
+	const SUPERSEDED: [(&'static str, &'static str); 7] = [
+		("application/x-postcard", Self::POSTCARD),
+		("application/x-ron", Self::RON),
+		("application/x-bsx", Self::BSX),
+		("application/x-yaml", Self::YAML),
+		("text/yaml", Self::YAML),
+		("application/x-protobuf", Self::PROTOBUF),
+		("image/x-icon", Self::ICO),
+	];
 
 	/// Parse a list of media types from an `Accept` header string, which may
 	/// contain multiple comma-separated media types with optional parameters.
@@ -232,13 +255,18 @@ impl MediaType {
 
 	/// Parse a media type from a content-type string.
 	///
-	/// Strips parameters like `; charset=utf-8` before matching.
+	/// Strips parameters like `; charset=utf-8` before matching, and parses a
+	/// superseded spelling as its successor.
 	pub fn from_content_type(content_type: &str) -> Self {
 		let raw = content_type
 			.split(';')
 			.next()
 			.unwrap_or(content_type)
 			.trim();
+		let raw = Self::SUPERSEDED
+			.iter()
+			.find(|(old, _)| raw.eq_ignore_ascii_case(old))
+			.map_or(raw, |(_, new)| new);
 		match raw {
 			// the Office types first, since their long names carry `xml`
 			val if val.contains(Self::DOCX) => MediaType::Docx,
@@ -288,9 +316,7 @@ impl MediaType {
 			val if val.contains(Self::MP4) => MediaType::Mp4,
 			val if val.contains(Self::VIDEO_WEBM) => MediaType::VideoWebm,
 			val if val.contains(Self::VIDEO_OGG) => MediaType::VideoOgg,
-			val if val.contains(Self::YAML) || val.contains("text/yaml") => {
-				MediaType::Yaml
-			}
+			val if val.contains(Self::YAML) => MediaType::Yaml,
 			val if val.contains(Self::CSV) => MediaType::Csv,
 			val if val.contains(Self::URL) => MediaType::Url,
 			val if val.contains(Self::TOML) => MediaType::Toml,
@@ -698,9 +724,18 @@ mod test {
 	}
 
 	#[crate::test]
-	fn from_content_type_postcard() {
-		MediaType::from_content_type("application/x-postcard")
-			.xpect_eq(MediaType::Postcard);
+	fn from_content_type_superseded() {
+		for (old, new) in [
+			("application/x-postcard", MediaType::Postcard),
+			("application/x-ron", MediaType::Ron),
+			("application/x-bsx", MediaType::Bsx),
+			("application/x-yaml", MediaType::Yaml),
+			("text/yaml; charset=utf-8", MediaType::Yaml),
+			("application/x-protobuf", MediaType::Protobuf),
+			("image/x-icon", MediaType::Ico),
+		] {
+			MediaType::from_content_type(old).xpect_eq(new);
+		}
 	}
 
 	#[crate::test]
@@ -750,7 +785,8 @@ mod test {
 		MediaType::from_content_type("image/gif").xpect_eq(MediaType::Gif);
 		MediaType::from_content_type("image/webp").xpect_eq(MediaType::Webp);
 		MediaType::from_content_type("image/svg+xml").xpect_eq(MediaType::Svg);
-		MediaType::from_content_type("image/x-icon").xpect_eq(MediaType::Ico);
+		MediaType::from_content_type("image/vnd.microsoft.icon")
+			.xpect_eq(MediaType::Ico);
 		MediaType::from_content_type("image/avif").xpect_eq(MediaType::Avif);
 	}
 
@@ -767,13 +803,6 @@ mod test {
 		MediaType::from_content_type("video/mp4").xpect_eq(MediaType::Mp4);
 		MediaType::from_content_type("video/webm")
 			.xpect_eq(MediaType::VideoWebm);
-	}
-
-	#[crate::test]
-	fn from_content_type_yaml() {
-		MediaType::from_content_type("application/x-yaml")
-			.xpect_eq(MediaType::Yaml);
-		MediaType::from_content_type("text/yaml").xpect_eq(MediaType::Yaml);
 	}
 
 	#[crate::test]
@@ -879,7 +908,9 @@ mod test {
 			MediaType::Json,
 			MediaType::WebManifest,
 			MediaType::Postcard,
+			MediaType::Ron,
 			MediaType::Markdown,
+			MediaType::Bsx,
 			MediaType::EventStream,
 			MediaType::Css,
 			MediaType::Javascript,
@@ -888,6 +919,7 @@ mod test {
 			MediaType::Gif,
 			MediaType::Webp,
 			MediaType::Svg,
+			MediaType::Ico,
 			MediaType::Pdf,
 			MediaType::Docx,
 			MediaType::Xlsx,
@@ -900,6 +932,7 @@ mod test {
 			MediaType::Csv,
 			MediaType::Toml,
 			MediaType::DagCbor,
+			MediaType::Protobuf,
 			MediaType::AnsiTerm,
 		];
 		for media_type in types {

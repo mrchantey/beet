@@ -1,4 +1,3 @@
-use super::string_primitive;
 use crate::prelude::*;
 
 /// An account's permanent identity, `did:plc:…` or `did:web:…`.
@@ -17,14 +16,21 @@ use crate::prelude::*;
 /// Did::parse("beet.org").unwrap_err();
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	StringPrimitive,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Did(SmolStr);
-
-string_primitive!(Did);
 
 /// The did methods the protocol supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

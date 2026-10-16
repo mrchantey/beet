@@ -8,7 +8,6 @@
 //! a canonical address or anything hashed must read back byte for byte, which
 //! a `Uri` does; [`to_url`](Uri::to_url) is the parsed view for the moment a
 //! request is sent.
-use crate::atproto::string_primitive;
 use crate::prelude::*;
 
 /// Any absolute uri, a publication's `https://beet.org/blog` or a record's
@@ -33,14 +32,21 @@ use crate::prelude::*;
 /// Uri::parse("beet.org").unwrap_err();
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	StringPrimitive,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Uri(pub(crate) SmolStr);
-
-string_primitive!(Uri);
 
 impl Uri {
 	/// The longest uri the atproto lexicons allow, and the longest this holds.

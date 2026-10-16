@@ -153,7 +153,9 @@ impl PluginGroup for BeetPlugins {
 }
 
 /// The headless frame: the cooperative 30Hz schedule loop that paces servers
-/// and tools without an OS event loop.
+/// and tools without an OS event loop. A browser with the render stack runs
+/// neither headless runner, so has none.
+#[cfg(any(not(feature = "winit"), not(target_arch = "wasm32")))]
 const HEADLESS_FRAME: Duration = Duration::from_millis(1000 / 30);
 
 /// The headless runner. Used when the `winit` feature is off, so the

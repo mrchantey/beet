@@ -62,7 +62,7 @@ pub(crate) fn write_recipients(
 		return identities.recipients().xok();
 	};
 	let recipients = str_ext::csv(list)
-		.map(AgeRecipient::new)
+		.map(AgeRecipient::parse)
 		.collect::<Result<Vec<_>>>()?;
 	if recipients.is_empty() {
 		bevybail!("`--recipients` names no recipient");

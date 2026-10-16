@@ -5,7 +5,7 @@
 //! the SSR is the first paint, and `<Wasm src repo entry server>` is the
 //! bootstrap of the browser process, emitting the `<script type="module">`
 //! that boots the wasm `beet` binary beside a
-//! `<script type="application/x-beet-bootstrap">` carrying the launch's argv.
+//! `<script type="application/vnd.beet.bootstrap">` carrying the launch's argv.
 //! The booted binary appends that argv to its location's own
 //! (`js_runtime::args`), so `BootstrapConfig::get()` and the entry's start
 //! request read `--entry`/`--repo`/`--server` through the one channel every
@@ -220,7 +220,7 @@ mod test {
 			.id();
 		let html = render(&mut world, root);
 		html.as_str().xpect_contains(
-			"<script type=\"application/x-beet-bootstrap\">--entry=scene_editor.bsx --repo=http:examples/ui --server=dom</script>",
+			"<script type=\"application/vnd.beet.bootstrap\">--entry=scene_editor.bsx --repo=http:examples/ui --server=dom</script>",
 		);
 		// the bootstrap precedes the loader, so it is in the document before
 		// the module boots

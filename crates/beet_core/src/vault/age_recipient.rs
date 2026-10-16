@@ -1,8 +1,6 @@
 //! The public half of an age key pair.
 
 use crate::prelude::*;
-use core::fmt;
-use core::str::FromStr;
 
 /// The public half of an [`AgeIdentity`], `age1..`: what a vault is
 /// encrypted to, safe in markup and git. Validated on construction, so a
@@ -23,7 +21,15 @@ use core::str::FromStr;
 /// bob.decrypt(ciphertext.as_bytes()).unwrap().xpect_eq(b"for both".to_vec());
 /// ```
 #[derive(
-	Debug, Clone, PartialEq, Eq, Hash, Reflect, Serialize, Deserialize,
+	Debug,
+	Clone,
+	PartialEq,
+	Eq,
+	Hash,
+	Reflect,
+	Serialize,
+	Deserialize,
+	StringPrimitive,
 )]
 // a dynamic value is validated on the way in, see the `FromReflect` impl
 #[reflect(
@@ -43,8 +49,8 @@ impl AgeRecipient {
 
 	/// Validate `value` as an age recipient, erroring with where one comes
 	/// from when it is not.
-	pub fn new(value: impl AsRef<str>) -> Result<Self> {
-		let value = value.as_ref().trim();
+	pub fn parse(value: &str) -> Result<Self> {
+		let value = value.trim();
 		value
 			.parse::<age::x25519::Recipient>()
 			.map(|recipient| Self::new_unchecked(recipient.to_string()))
@@ -62,9 +68,6 @@ impl AgeRecipient {
 	pub(crate) fn new_unchecked(value: impl Into<SmolStr>) -> Self {
 		Self(value.into())
 	}
-
-	/// The `age1..` string.
-	pub fn as_str(&self) -> &str { &self.0 }
 
 	/// Encrypt `plaintext` to every recipient, as armored text
 	/// (`-----BEGIN AGE ENCRYPTED FILE-----`), the form that survives git,
@@ -108,30 +111,6 @@ impl AgeRecipient {
 	}
 }
 
-impl FromStr for AgeRecipient {
-	type Err = BevyError;
-	fn from_str(value: &str) -> Result<Self> { Self::new(value) }
-}
-
-impl TryFrom<SmolStr> for AgeRecipient {
-	type Error = BevyError;
-	fn try_from(value: SmolStr) -> Result<Self> { Self::new(value) }
-}
-
-impl From<AgeRecipient> for SmolStr {
-	fn from(recipient: AgeRecipient) -> Self { recipient.0 }
-}
-
-impl AsRef<str> for AgeRecipient {
-	fn as_ref(&self) -> &str { &self.0 }
-}
-
-impl fmt::Display for AgeRecipient {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.write_str(&self.0)
-	}
-}
-
 /// Validates the string a dynamic value carries, so a reflected recipient is
 /// as trustworthy as a constructed one; a concrete value is cloned as is.
 impl FromReflect for AgeRecipient {
@@ -142,7 +121,7 @@ impl FromReflect for AgeRecipient {
 		match reflect.reflect_ref() {
 			bevy_reflect::ReflectRef::TupleStruct(tuple) => {
 				<SmolStr as FromReflect>::from_reflect(tuple.field(0)?)
-					.and_then(|value| Self::new(value).ok())
+					.and_then(|value| Self::parse(&value).ok())
 			}
 			_ => None,
 		}
@@ -202,7 +181,7 @@ mod test {
 
 	#[crate::test]
 	fn rejects_a_non_age1_string() {
-		AgeRecipient::new("ssh-ed25519 AAAAC3Nza")
+		AgeRecipient::parse("ssh-ed25519 AAAAC3Nza")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("age-keygen");

@@ -1,4 +1,3 @@
-use super::string_primitive;
 use crate::prelude::*;
 
 /// A record key: 1 to 512 characters of `A-Za-z0-9._:~-`, never `.` or `..`,
@@ -11,14 +10,21 @@ use crate::prelude::*;
 /// Rkey::parse("a/b").unwrap_err();
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	StringPrimitive,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Rkey(SmolStr);
-
-string_primitive!(Rkey);
 
 impl Rkey {
 	/// The longest rkey the protocol allows.

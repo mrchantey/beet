@@ -1,4 +1,3 @@
-use super::string_primitive;
 use crate::prelude::*;
 use sha2::Digest;
 use sha2::Sha256;
@@ -20,14 +19,21 @@ use sha2::Sha256;
 /// cid.codec().xpect_eq(Cid::RAW);
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	StringPrimitive,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Cid(SmolStr);
-
-string_primitive!(Cid);
 
 impl Cid {
 	/// The multicodec of raw bytes, the codec of a blob.

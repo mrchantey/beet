@@ -169,7 +169,7 @@ impl BootstrapConfig {
 	pub const PROD_STAGE: &'static str = "prod";
 	/// The `type` of the `<script>` a served page carries its browser launch
 	/// in, see [`to_script`](Self::to_script).
-	pub const SCRIPT_TYPE: &'static str = "application/x-beet-bootstrap";
+	pub const SCRIPT_TYPE: &'static str = "application/vnd.beet.bootstrap";
 	/// The knobs that stay in the process request when the rest are
 	/// [stripped](Self::strip), as flags: a server reads them at request rank,
 	/// overlaying them above its markup-declared fields, so `serve
@@ -437,7 +437,7 @@ impl BootstrapConfig {
 	/// This launch as the text of a served page's bootstrap script, the
 	/// [`to_argv`](Self::to_argv) tokens space-joined (each is whitespace-free
 	/// by construction), read back by [`script_argv`](Self::script_argv). A
-	/// page renders it in a `<script type="application/x-beet-bootstrap">`
+	/// page renders it in a `<script type="application/vnd.beet.bootstrap">`
 	/// ([`SCRIPT_TYPE`](Self::SCRIPT_TYPE)) beside its module loader, and the
 	/// browser process appends it to the location's own argv.
 	pub fn to_script(&self) -> Result<String> {

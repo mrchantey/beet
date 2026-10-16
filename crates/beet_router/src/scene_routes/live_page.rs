@@ -815,7 +815,7 @@ mod test {
 				let mut text = PlainTextRenderer::default();
 				cx.walk(&mut text);
 				MediaBytes::new_string(
-					MediaType::other("text/x-shout"),
+					MediaType::other("text/vnd.shout"),
 					format!(
 						"{}: {}",
 						cx.request.path_string(),
@@ -827,7 +827,7 @@ mod test {
 		}
 		impl RenderTarget for Shout {
 			fn media_types(&self) -> Vec<MediaType> {
-				vec![MediaType::other("text/x-shout")]
+				vec![MediaType::other("text/vnd.shout")]
 			}
 		}
 		impl Installer for Shout {
@@ -841,7 +841,7 @@ mod test {
 			&mut world,
 			router,
 			at(POST, "content"),
-			MediaType::other("text/x-shout"),
+			MediaType::other("text/vnd.shout"),
 		)
 		.await
 		.xpect_eq("/blog/full-stack-bevy: PAGE\n");

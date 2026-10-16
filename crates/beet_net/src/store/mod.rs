@@ -246,7 +246,7 @@ impl Plugin for StorePlugin {
 			.add_systems(PostUpdate, write_document_blobs);
 
 		// wasm localStorage watcher lifecycle (NonSend, owns the JS closure)
-		#[cfg(target_arch = "wasm32")]
+		#[cfg(all(target_arch = "wasm32", feature = "std"))]
 		app.register_type::<LocalStorageStore>()
 			.register_type::<IndexedDbStore>()
 			.init_non_send::<LocalStorageBlobWatcher>()

@@ -1,4 +1,3 @@
-use super::string_primitive;
 use crate::prelude::*;
 
 /// A lexicon's name: a reversed domain authority then a name segment of
@@ -18,14 +17,21 @@ use crate::prelude::*;
 /// Nsid::parse("beet.org").unwrap_err();
 /// ```
 #[derive(
-	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Hash,
+	Reflect,
+	StringPrimitive,
 )]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 #[cfg_attr(feature = "serde", reflect(Serialize, Deserialize))]
 pub struct Nsid(SmolStr);
-
-string_primitive!(Nsid);
 
 impl Nsid {
 	/// The longest nsid the protocol allows, fragment excluded.

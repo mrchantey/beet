@@ -304,7 +304,7 @@ fn add_domain(table: &mut Table) {
 		})
 		// one validated pattern, the item form of the filter above.
 		.add_hinted("a glob pattern", |value: &Value| match value {
-			Value::Str(pattern) => glob_pattern(pattern.as_str()).map(Some),
+			Value::Str(pattern) => GlobPattern::parse(pattern.as_str()).map(Some),
 			_ => Ok(None),
 		})
 		// an `Accept` list in the spelling `--accept` takes, so
@@ -380,7 +380,7 @@ fn glob_filter<'a>(
 ) -> Result<GlobFilter> {
 	let mut filter = GlobFilter::default();
 	for pattern in patterns {
-		glob_pattern(pattern)?;
+		GlobPattern::parse(pattern)?;
 		filter.include(pattern);
 	}
 	filter.xok()
@@ -418,7 +418,7 @@ fn glob_filter_lists(map: &Map) -> Result<Option<GlobFilter>> {
 	};
 	let mut filter = glob_filter(list("include")?)?;
 	for pattern in list("exclude")? {
-		glob_pattern(pattern)?;
+		GlobPattern::parse(pattern)?;
 		filter.exclude(pattern);
 	}
 	filter.xmap(Some).xok()
@@ -436,16 +436,6 @@ fn glob_patterns(items: &[Value]) -> Result<Vec<&str>> {
 			}
 		})
 		.collect()
-}
-
-/// One validated [`GlobPattern`].
-///
-/// `GlobPattern::new` panics on a malformed pattern, and a markup attribute is
-/// authored input, so it is validated into an error first.
-fn glob_pattern(pattern: &str) -> Result<GlobPattern> {
-	GlobFilter::parse_glob_pattern(pattern)
-		.map_err(|err| bevyhow!("invalid glob pattern {pattern:?}: {err}"))?;
-	GlobPattern::new(pattern).xok()
 }
 
 /// A [`ValueSchema`] from the one word a human means, or from a JSON Schema.

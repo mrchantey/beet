@@ -40,7 +40,7 @@
 //! 		let mut text = PlainTextRenderer::default();
 //! 		cx.walk(&mut text);
 //! 		MediaBytes::new_string(
-//! 			MediaType::other("text/x-shout"),
+//! 			MediaType::other("text/vnd.shout"),
 //! 			text.into_string().to_uppercase(),
 //! 		)
 //! 		.xok()
@@ -49,7 +49,7 @@
 //!
 //! impl RenderTarget for Shout {
 //! 	fn media_types(&self) -> Vec<MediaType> {
-//! 		vec![MediaType::other("text/x-shout")]
+//! 		vec![MediaType::other("text/vnd.shout")]
 //! 	}
 //! }
 //!
@@ -62,7 +62,7 @@
 //! let world = app.world_mut();
 //! let page = world.spawn(rsx! { <p>"hello"</p> }).id();
 //! let request = RequestParts::default()
-//! 	.with_accept(MediaType::other("text/x-shout"));
+//! 	.with_accept(MediaType::other("text/vnd.shout"));
 //! RenderTargets::render(world, page, &request)
 //! 	.unwrap()
 //! 	.to_string()

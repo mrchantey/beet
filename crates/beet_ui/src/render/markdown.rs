@@ -13,13 +13,23 @@ use beet_core::prelude::*;
 /// declaring it, so a parsed markdown file renders its metadata back and a
 /// Word file its core properties.
 ///
+/// A tag carrying no text ([`RenderTreeQuery::is_textless`]) is skipped,
+/// unless the [`HtmlPassthrough`] names it, by default the embedded ones
+/// (`video`, `iframe`, `svg`, ..): that element and everything inside it is
+/// written whole as raw HTML through an [`HtmlRenderer`], a block of its own
+/// between blocks and inline among words.
+///
 /// A tree read from a richer format reads as a person would write it: an
 /// inline wrapper's edge whitespace sits outside its marker, two adjacent
 /// wrappers of one look read as one, an empty wrapper or block writes
 /// nothing, and a table nested in a cell, which GFM cannot hold, follows its
 /// host, named in the cell.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, SetWith)]
+#[set_with(skip)]
 pub struct MarkdownRenderer {
+	/// The textless tags written as raw HTML rather than skipped.
+	#[set_with]
+	html_passthrough: HtmlPassthrough,
 	/// Shared block/inline tracking state and output buffer.
 	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
@@ -40,6 +50,9 @@ pub struct MarkdownRenderer {
 	blocks: Vec<BlockStart>,
 	/// The tables being collected, innermost last.
 	tables: Vec<TableCapture>,
+	/// The passthrough element open in the walk, written by its own
+	/// [`HtmlRenderer`] until it closes.
+	passthrough: Option<Passthrough>,
 	/// A checkbox was just written, so the words after it are spaced from
 	/// it unless they bring their own space.
 	after_box: bool,
@@ -50,6 +63,47 @@ pub struct MarkdownRenderer {
 	/// A block's prefix was just written, so the words after it lose their
 	/// leading whitespace.
 	at_block_start: bool,
+}
+
+/// The textless tags ([`RenderTreeQuery::is_textless`]) a [`MarkdownRenderer`]
+/// writes as raw HTML instead of skipping, set on the renderer a plugin
+/// installs:
+/// `app.install(MarkdownRenderer::default().with_html_passthrough(HtmlPassthrough::All))`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Reflect)]
+#[reflect(Default)]
+pub enum HtmlPassthrough {
+	/// None, the words alone.
+	Text,
+	/// The embedded tags ([`RenderTreeQuery::EMBEDDED_TAGS`]), ie a post's
+	/// `<video>` or a YouTube `<iframe>`, which markdown has no syntax for.
+	#[default]
+	Embedded,
+	/// The embedded tags and the metadata tags
+	/// ([`RenderTreeQuery::METADATA_TAGS`]), ie a `<style>` or a `<script>`.
+	/// A whole page render (no `--root`) writes the layout's `<head>` too.
+	All,
+}
+
+impl HtmlPassthrough {
+	/// Whether a markdown render writes `tag` as raw HTML.
+	pub fn passes(&self, tag: &str) -> bool {
+		match self {
+			Self::Text => false,
+			Self::Embedded => RenderTreeQuery::EMBEDDED_TAGS.contains(&tag),
+			Self::All => RenderTreeQuery::is_textless(tag),
+		}
+	}
+}
+
+/// A passthrough element being written as raw HTML.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Passthrough {
+	/// The element, whose leave ends the passthrough.
+	root: Entity,
+	/// Every visit from entering the element until leaving it.
+	html: HtmlRenderer,
+	/// Whether it is a block of its own rather than inline among words.
+	block: bool,
 }
 
 /// An inline element's markers, ie `**` and `**` for `<strong>`; a wrapper
@@ -199,6 +253,7 @@ impl MarkdownRenderer {
 
 	pub fn new() -> Self {
 		Self {
+			html_passthrough: HtmlPassthrough::default(),
 			state: TextRenderState::new(),
 			render_expressions: false,
 			inline_stack: Vec::new(),
@@ -206,6 +261,7 @@ impl MarkdownRenderer {
 			pending_closes: Vec::new(),
 			blocks: Vec::new(),
 			tables: Vec::new(),
+			passthrough: None,
 			after_box: false,
 			after_element: None,
 			at_block_start: false,
@@ -350,13 +406,15 @@ impl MarkdownRenderer {
 	}
 
 	/// Opens an inline HTML element, its `style` kept: `mark` always, any
-	/// other only when styled, since an unstyled `span` signals nothing.
+	/// other only when styled, since an unstyled `span` signals nothing. Only
+	/// the tags are HTML: CommonMark reads the words between them as markdown,
+	/// so they are written as any other words are.
 	fn open_html(&mut self, view: &ElementView, close: &'static str) {
 		let style = view.attribute_string("style");
 		let open = match (view.tag(), style.is_empty()) {
 			("mark", true) => "<mark>".to_string(),
 			(tag, false) => {
-				format!("<{tag} style=\"{}\">", style.replace('"', "&quot;"))
+				format!("<{tag} style=\"{}\">", escape_html_attribute(&style))
 			}
 			_ => {
 				self.inline_stack
@@ -365,6 +423,41 @@ impl MarkdownRenderer {
 			}
 		};
 		self.open_inline(InlineMark::new(InlineWrapper::Html, open, close));
+	}
+
+	/// Opens a passthrough element, written whole as HTML by an embedded
+	/// [`HtmlRenderer`] until it closes: a block of its own where no block or
+	/// table cell holds it, else inline among the words around it.
+	fn open_passthrough(&mut self, cx: &VisitContext, view: ElementView) {
+		let block = self.blocks.is_empty()
+			&& self.tables.last().is_none_or(|table| table.cell.is_none());
+		if block {
+			self.state.needs_block_separator = true;
+			self.state.ensure_block_separator_with_prefix(Some("> "));
+			if self.state.blockquote_depth > 0 {
+				let prefix = self.state.blockquote_prefix("> ");
+				self.push_str(&prefix);
+			}
+		}
+		let mut html = HtmlRenderer::new();
+		html.visit_element(cx, view);
+		self.passthrough = Some(Passthrough {
+			root: cx.entity,
+			html,
+			block,
+		});
+	}
+
+	/// Writes the passthrough element now that it has closed.
+	fn close_passthrough(&mut self) {
+		let Some(passthrough) = self.passthrough.take() else {
+			return;
+		};
+		self.push_str(&passthrough.html.into_string());
+		if passthrough.block {
+			self.state.ensure_newline();
+			self.state.needs_block_separator = true;
+		}
 	}
 
 	/// Records a suppressible block's start before its separator.
@@ -411,7 +504,25 @@ impl MarkdownRenderer {
 }
 
 impl NodeVisitor for MarkdownRenderer {
+	/// Skips a textless tag the [`HtmlPassthrough`] does not name, and
+	/// nothing inside a passthrough element, which is written whole.
+	fn skip_node(
+		&mut self,
+		_cx: &VisitContext,
+		(_, _, element, ..): &NodeView,
+	) -> bool {
+		self.passthrough.is_none()
+			&& element.is_some_and(|element| {
+				RenderTreeQuery::is_textless(element.tag())
+					&& !self.html_passthrough.passes(element.tag())
+			})
+	}
+
 	fn visit_element(&mut self, cx: &VisitContext, view: ElementView) {
+		if let Some(passthrough) = &mut self.passthrough {
+			passthrough.html.visit_element(cx, view);
+			return;
+		}
 		let name = view.tag();
 		let value = view.value;
 		let inline = matches!(
@@ -446,6 +557,10 @@ impl NodeVisitor for MarkdownRenderer {
 				self.push_char(' ')
 			}
 			_ => {}
+		}
+		if self.html_passthrough.passes(name) {
+			self.open_passthrough(cx, view);
+			return;
 		}
 		let block = Self::SUPPRESSIBLE
 			.contains(&name)
@@ -660,10 +775,24 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 	}
 
-	fn leave_element(&mut self, _cx: &VisitContext, element: &Element) {
+	fn leave_element(&mut self, cx: &VisitContext, element: &Element) {
 		let name = element.tag();
+		let passthrough_closed = match &mut self.passthrough {
+			Some(passthrough) => {
+				passthrough.html.leave_element(cx, element);
+				if passthrough.root != cx.entity {
+					return;
+				}
+				self.close_passthrough();
+				true
+			}
+			None => false,
+		};
 		self.after_element = Self::spaces_from_sibling(&self.state, name)
 			.then(|| Self::is_item(name));
+		if passthrough_closed {
+			return;
+		}
 		let inline = matches!(
 			name,
 			"em" | "i"
@@ -835,17 +964,21 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 	}
 
-	fn visit_value(&mut self, _cx: &VisitContext, value: &Value) {
+	fn visit_value(&mut self, cx: &VisitContext, value: &Value) {
+		if let Some(passthrough) = &mut self.passthrough {
+			passthrough.html.visit_value(cx, value);
+			return;
+		}
 		self.after_element = None;
 		let text = value.to_string();
 		self.push_words(&text);
 	}
 
-	fn visit_expression(
-		&mut self,
-		_cx: &VisitContext,
-		expression: &Expression,
-	) {
+	fn visit_expression(&mut self, cx: &VisitContext, expression: &Expression) {
+		if let Some(passthrough) = &mut self.passthrough {
+			passthrough.html.visit_expression(cx, expression);
+			return;
+		}
 		if self.render_expressions {
 			self.flush_inline();
 			self.push_char('{');
@@ -854,7 +987,11 @@ impl NodeVisitor for MarkdownRenderer {
 		}
 	}
 
-	fn visit_comment(&mut self, _cx: &VisitContext, comment: &Comment) {
+	fn visit_comment(&mut self, cx: &VisitContext, comment: &Comment) {
+		if let Some(passthrough) = &mut self.passthrough {
+			passthrough.html.visit_comment(cx, comment);
+			return;
+		}
 		self.flush_inline();
 		self.state.ensure_block_separator();
 		self.push_str("<!--");
@@ -1063,13 +1200,74 @@ mod test {
 	#[cfg(feature = "bsx")]
 	/// Parse HTML (with entities), then render as markdown.
 	fn render_unescaped(html: &str) -> String {
+		render_html_with(html, MarkdownRenderer::new())
+	}
+
+	#[cfg(feature = "bsx")]
+	/// Parse HTML, then render it with `renderer`.
+	fn render_html_with(html: &str, renderer: MarkdownRenderer) -> String {
 		let mut world = world_ext::ui_world();
 		let entity = world.spawn_empty().id();
 		let bytes = MediaBytes::new_html(html);
 		BsxParser::html()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		render_with(&mut world, entity, MarkdownRenderer::new())
+		render_with(&mut world, entity, renderer)
+	}
+
+	#[cfg(feature = "bsx")]
+	const VIDEO: &str = "<p>before</p><video controls><source src=\"clip.mp4\" type=\"video/mp4\">no video here</video><p>after</p>";
+
+	/// An embedded element is written whole as html by default, its children
+	/// and fallback text with it, a block of its own between blocks.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn passes_embedded_html_through() {
+		render_unescaped(VIDEO).xpect_eq(
+			"before\n\n<video controls><source src=\"clip.mp4\" type=\"video/mp4\" />no video here</video>\n\nafter\n",
+		);
+	}
+
+	/// An embedded element inside a paragraph stays among its words.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn passes_inline_html_through() {
+		render_unescaped("<p>see <svg><text>x &amp; y</text></svg> here</p>")
+			.xpect_eq("see <svg><text>x &amp; y</text></svg> here\n");
+	}
+
+	/// The words alone write nothing for an embedded element.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn text_passthrough_skips_embedded() {
+		render_html_with(
+			VIDEO,
+			MarkdownRenderer::new()
+				.with_html_passthrough(HtmlPassthrough::Text),
+		)
+		.xpect_eq("before\n\nafter\n");
+	}
+
+	/// Every textless tag passes through under `All`, a `<style>` with it;
+	/// the default skips one.
+	#[cfg(feature = "bsx")]
+	#[beet_core::test]
+	fn all_passthrough_keeps_metadata() {
+		let html = "<style>p { color: red; }</style><p>hi</p>";
+		render_html_with(
+			html,
+			MarkdownRenderer::new().with_html_passthrough(HtmlPassthrough::All),
+		)
+		.xpect_eq("<style>p { color: red; }</style>\n\nhi\n");
+		render_unescaped(html).xpect_eq("hi\n");
+	}
+
+	/// A markdown file carrying a raw `<video>` reads back as it was written.
+	#[beet_core::test]
+	fn roundtrips_raw_video() {
+		let md =
+			"# Clip\n\n<video src=\"clip.mp4\" controls></video>\n\nAfter\n";
+		roundtrip(md).xpect_eq(md);
 	}
 
 	#[cfg(feature = "bsx")]

@@ -91,6 +91,9 @@ pub(crate) struct StructConfig {
 	pub unwrap_trait: bool,
 	/// Ignore this derive entirely, generating no methods.
 	pub ignore: bool,
+	/// Skip every field that carries no attribute of its own, so a struct
+	/// opts in the few fields it exposes among its internal state.
+	pub skip: bool,
 }
 
 impl Default for StructConfig {
@@ -101,6 +104,7 @@ impl Default for StructConfig {
 			unwrap_option: false,
 			unwrap_trait: false,
 			ignore: false,
+			skip: false,
 		}
 	}
 }
@@ -141,6 +145,7 @@ const STRUCT_ALLOWED_KEYS: &[&str] = &[
 	"unwrap_option",
 	"unwrap_trait",
 	"ignore",
+	"skip",
 ];
 const FIELD_ALLOWED_KEYS: &[&str] = &[
 	"vis",
@@ -226,6 +231,7 @@ pub(crate) fn parse_struct_config(
 		config.ignore = true;
 		return Ok(config);
 	}
+	config.skip = map.contains_key("skip");
 
 	let mut _use_into = false;
 	let mut _not_into = false;
@@ -254,7 +260,7 @@ pub(crate) fn parse_field_config(
 		return_type: defaults.return_type,
 		unwrap_option: defaults.unwrap_option,
 		unwrap_trait: defaults.unwrap_trait,
-		skip: false,
+		skip: defaults.skip,
 		use_into: false,
 		not_into: false,
 	};
@@ -263,6 +269,8 @@ pub(crate) fn parse_field_config(
 	else {
 		return Ok(config);
 	};
+	// a field's own attribute, even a bare one, opts it in
+	config.skip = false;
 
 	let Some(tokens) = attr_tokens(attr, attr_name)? else {
 		return Ok(config);
@@ -598,6 +606,32 @@ mod test {
 		assert!(config.ignore);
 	}
 
+	/// A struct-level `skip` skips every field without an attribute of its
+	/// own, and a bare one opts a field back in.
+	#[test]
+	fn struct_config_skip_opts_fields_in() {
+		let input: DeriveInput = syn::parse_quote! {
+			#[set_with(skip)]
+			struct Foo {
+				#[set_with]
+				bar: String,
+				bazz: String,
+			}
+		};
+		let defaults = parse_struct_config(&input.attrs, "set_with").unwrap();
+		let fields = named_fields(&input);
+		assert!(
+			!parse_field_config(&fields[0].attrs, "set_with", &defaults)
+				.unwrap()
+				.skip
+		);
+		assert!(
+			parse_field_config(&fields[1].attrs, "set_with", &defaults)
+				.unwrap()
+				.skip
+		);
+	}
+
 	#[test]
 	fn struct_config_invalid_key() {
 		let input: DeriveInput = syn::parse_quote! {
@@ -617,6 +651,7 @@ mod test {
 			unwrap_option: true,
 			unwrap_trait: false,
 			ignore: false,
+			skip: false,
 		};
 		let input: DeriveInput = syn::parse_quote! {
 			struct Foo { bar: String }

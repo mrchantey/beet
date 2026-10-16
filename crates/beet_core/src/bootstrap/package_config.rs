@@ -43,9 +43,6 @@ pub struct PackageConfig {
 	/// path yields no preview at all. Unset omits the tag and the preview falls
 	/// back to the small summary card.
 	pub social_image: Option<Url>,
-	/// The brand colour a browser tints its own chrome with, ie the mobile
-	/// address bar and the Microsoft tile. Unset leaves the browser default.
-	pub theme_color: Option<SmolStr>,
 }
 
 /// The defaults govern unset fields for markup-only sites: a markup-declared
@@ -61,7 +58,6 @@ impl Default for PackageConfig {
 			version: "0.0.1".into(),
 			homepage: None,
 			social_image: None,
-			theme_color: None,
 		}
 	}
 }
@@ -127,10 +123,9 @@ macro_rules! pkg_config {
 				"" => None,
 				homepage => Some($crate::prelude::Url::coerce(homepage)),
 			},
-			// no cargo manifest key names a social card or a brand colour, so
-			// these stay the caller's to set.
+			// no cargo manifest key names a social card, so it stays the
+			// caller's to set.
 			social_image: None,
-			theme_color: None,
 		}
 	};
 }

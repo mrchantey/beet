@@ -387,7 +387,7 @@ pub fn args() -> Vec<SmolStr> {
 }
 
 /// The launch the served page describes: the argv of its
-/// `<script type="application/x-beet-bootstrap">`
+/// `<script type="application/vnd.beet.bootstrap">`
 /// ([`BootstrapConfig::to_script`]), empty for a page carrying none. Appended
 /// after the location's own args, so the page's `--entry`/`--repo`/`--server`
 /// reach [`BootstrapConfig::get`] and the entry's start request through the

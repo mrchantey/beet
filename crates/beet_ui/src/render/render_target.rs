@@ -397,7 +397,7 @@ mod test {
 			.0
 			.xpect_eq(MediaType::Json);
 		#[cfg(feature = "postcard")]
-		negotiate(Some("application/x-postcard"))
+		negotiate(Some("application/vnd.postcard"))
 			.unwrap()
 			.0
 			.xpect_eq(MediaType::Postcard);
@@ -438,7 +438,7 @@ mod test {
 		}
 		impl RenderTarget for Shout {
 			fn media_types(&self) -> Vec<MediaType> {
-				vec![MediaType::other("text/x-shout"), MediaType::Html]
+				vec![MediaType::other("text/vnd.shout"), MediaType::Html]
 			}
 		}
 		impl Installer for Shout {
@@ -453,7 +453,7 @@ mod test {
 		RenderTargets::render(
 			&mut world,
 			entity,
-			&accepting(MediaType::other("text/x-shout")),
+			&accepting(MediaType::other("text/vnd.shout")),
 		)
 		.unwrap()
 		.to_string()

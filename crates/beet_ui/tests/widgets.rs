@@ -219,6 +219,38 @@ fn head_marks_unlisted_pages_noindex() {
 		.xpect_contains(r#"name="robots" content="noindex""#);
 }
 
+/// The browser chrome takes the theme's light scheme primary tone, which for a
+/// key colour at tone 40 is that colour itself.
+#[beet_core::test]
+fn head_tints_with_the_theme() {
+	let mut world = layout_world();
+	world.insert_resource(Theme {
+		color: Srgba::hex("#006c4f").unwrap().into(),
+		..default()
+	});
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
+	render_html(&mut world, root)
+		.as_str()
+		.xpect_contains(r##"name="theme-color" content="#006C4F""##)
+		.xpect_contains(
+			r##"name="msapplication-TileColor" content="#006C4F""##,
+		);
+}
+
+/// A world with no theme names no tint, rather than inventing one.
+#[beet_core::test]
+fn head_without_a_theme_omits_the_tint() {
+	let mut world = layout_world();
+	world.remove_resource::<Theme>();
+	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
+	render_html(&mut world, root)
+		.as_str()
+		.xnot()
+		.xpect_contains("theme-color")
+		.xnot()
+		.xpect_contains("TileColor");
+}
+
 #[beet_core::test]
 fn header_renders_title_from_package_config() {
 	let mut world = layout_world();

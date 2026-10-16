@@ -21,6 +21,11 @@
 //! `PageMeta`), so `omit_title` drops this widget's own `<title>` to keep
 //! exactly one in the document.
 //!
+//! The brand tint (`theme-color`, `msapplication-TileColor`) is the [`Theme`]
+//! resource's light scheme [`Primary`](material::colors::Primary) tone, the
+//! same colour the page's own css bakes from it, so the browser chrome and the
+//! page cannot disagree.
+//!
 //! `og:site_name` is bound to [`PackageConfig::title`] through a
 //! [`ResourceFieldRef`] (the rsx counterpart of a bsx `@res:PackageConfig.title`
 //! binding) so the site name stays live with the resource. The bind is gated
@@ -36,9 +41,9 @@ use beet_core::prelude::*;
 /// [`JsonLd`] description of the page. Extra app-specific tags can be added
 /// through the default slot.
 ///
-/// The brand-dependent tags (the social card, the theme colour) render only when
-/// [`PackageConfig`] names them, so an app that has no card gets the small
-/// summary preview rather than a broken image.
+/// The social card renders only when [`PackageConfig`] or the page names one,
+/// so an app that has no card gets the small summary preview rather than a
+/// broken image, and the theme colour only in a world with a [`Theme`].
 #[template(system)]
 pub fn Head(
 	#[prop] fixed_scale: bool,
@@ -57,7 +62,8 @@ pub fn Head(
 	#[prop]
 	url: Option<Url>,
 	pkg_config: Res<PackageConfig>,
-) -> impl Bundle {
+	theme: Option<Res<Theme>>,
+) -> Result<impl Bundle> {
 	// every PWA/application value names the site, sourced from the package config.
 	let title = pkg_config.title.clone();
 	let description = pkg_config.description.clone();
@@ -72,13 +78,12 @@ pub fn Head(
 	// omits the tags entirely rather than rendering empty attributes.
 	let canonical = url.or_else(|| pkg_config.homepage.clone());
 	let version = pkg_config.version.clone();
-	// the social card and the brand tint, each omitted rather than defaulted:
-	// an invented card url is a broken preview and an invented tint is another
-	// brand's colour.
+	// the social card is omitted rather than defaulted, since an invented card
+	// url is a broken preview.
 	let social_image = meta
 		.social_image_url()
 		.or_else(|| pkg_config.social_image.clone());
-	let theme_color = pkg_config.theme_color.clone();
+	let theme_color = theme.map(|theme| theme_color(&theme)).transpose()?;
 	// a dated page is an ARTICLE to a crawler and to a link preview, which is
 	// what earns it a byline and a date in a search result; the `article:*`
 	// block hangs off that same fact rather than off a second switch.
@@ -139,7 +144,7 @@ pub fn Head(
 			<meta name="description" content={&card_description}/>
 			<meta name="version" content={&version}/>
 			<meta name="application-name" content={&title}/>
-			{theme_color.as_ref().map(|color| rsx!{ <meta name="theme-color" content={color.clone()}/> })}
+			{theme_color.as_ref().map(|color| rsx!{ <meta name="theme-color" content={color}/> })}
 			// Open Graph
 			<meta property="og:title" content={&card_title}/>
 			<meta property="og:type" content={og_type}/>
@@ -167,10 +172,23 @@ pub fn Head(
 			// Android PWA
 			<meta name="mobile-web-app-capable" content="yes"/>
 			// Microsoft tile
-			{theme_color.as_ref().map(|color| rsx!{ <meta name="msapplication-TileColor" content={color.clone()}/> })}
+			{theme_color.as_ref().map(|color| rsx!{ <meta name="msapplication-TileColor" content={color}/> })}
 			<Slot/>
 		</head>
 	}
+	.xok()
+}
+
+/// The colour a browser tints its own chrome with, ie the mobile address bar:
+/// the light scheme's primary tone as hex. The light scheme because the one tag
+/// names one colour, and that tone is the brand's key colour itself where the
+/// key sits at the palette's tone 40, as a brand colour usually does.
+fn theme_color(theme: &Theme) -> Result<String> {
+	theme
+		.resolve(ColorScheme::Light, material::colors::Primary)?
+		.to_srgba()
+		.to_hex()
+		.xok()
 }
 
 /// The `content` block attribute for the `og:site_name` meta: a [`Value`] seeded

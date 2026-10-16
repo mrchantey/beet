@@ -113,14 +113,6 @@ impl core::fmt::Display for GlobFilter {
 }
 
 impl GlobFilter {
-	/// Parses and validates a glob pattern string.
-	///
-	/// For use by clap parsers to verify a pattern before inserting.
-	pub fn parse_glob_pattern(pattern: &str) -> Result<String, String> {
-		validate_glob(pattern)?;
-		Ok(pattern.to_string())
-	}
-
 	/// Wraps each pattern with wildcards if they don't already have them.
 	///
 	/// Turns `foo/bar` into `*foo/bar*` which matches any string that contains `foo/bar`.
@@ -269,23 +261,55 @@ impl GlobFilter {
 /// Public because it is the item type of a [`GlobFilter`]'s lists, which a
 /// markup struct literal writes into (`{filter:{exclude:["blog/**"]}}`, each
 /// string coerced to a validated pattern).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, StringPrimitive)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(try_from = "SmolStr", into = "SmolStr"))]
 pub struct GlobPattern(SmolStr);
 
 impl GlobPattern {
-	/// Creates a new [`GlobPattern`], validating it is a valid glob pattern.
+	/// Parse a glob pattern, the only structural requirement being that every
+	/// `[` character class is terminated by a `]`.
+	pub fn parse(pattern: &str) -> Result<Self> {
+		let chars: Vec<char> = pattern.chars().collect();
+		let mut idx = 0;
+		while idx < chars.len() {
+			if chars[idx] != '[' {
+				idx += 1;
+				continue;
+			}
+			// scan for the terminator, allowing a leading `!` and a literal first `]`
+			let mut end = idx + 1;
+			if chars.get(end) == Some(&'!') {
+				end += 1;
+			}
+			let mut first = true;
+			let closed = loop {
+				match chars.get(end) {
+					Some(']') if !first => break true,
+					Some(_) => {
+						first = false;
+						end += 1;
+					}
+					None => break false,
+				}
+			};
+			if !closed {
+				bevybail!(
+					"invalid glob pattern {pattern:?}: unterminated character class"
+				);
+			}
+			idx = end + 1;
+		}
+		Self(pattern.into()).xok()
+	}
+
+	/// A pattern written in code, ie `GlobPattern::new("*.rs")`; authored
+	/// input goes through [`parse`](Self::parse).
 	///
 	/// # Panics
 	///
 	/// Panics if the pattern is invalid.
-	pub fn new(pattern: &str) -> Self {
-		validate_glob(pattern).expect("Invalid glob pattern");
-		Self(pattern.into())
-	}
-
-	/// Returns the pattern as a string slice.
-	pub fn as_str(&self) -> &str { &self.0 }
+	pub fn new(pattern: &str) -> Self { Self::parse(pattern).unwrap() }
 
 	/// Checks if the pattern matches the given text.
 	///
@@ -298,20 +322,6 @@ impl GlobPattern {
 			glob_match(&self.0, text)
 		}
 	}
-}
-
-impl core::fmt::Display for GlobPattern {
-	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-impl From<String> for GlobPattern {
-	fn from(pattern: String) -> Self { Self::new(&pattern) }
-}
-
-impl From<&str> for GlobPattern {
-	fn from(pattern: &str) -> Self { Self::new(pattern) }
 }
 
 /// Matches `text` against a glob `pattern`.
@@ -422,42 +432,6 @@ fn class_matches(
 		}
 	}
 	None
-}
-
-/// Validates a glob pattern, the only structural requirement being that every
-/// `[` character class is terminated by a `]`.
-fn validate_glob(pattern: &str) -> Result<(), String> {
-	let chars: Vec<char> = pattern.chars().collect();
-	let mut idx = 0;
-	while idx < chars.len() {
-		if chars[idx] != '[' {
-			idx += 1;
-			continue;
-		}
-		// scan for the terminator, allowing a leading `!` and a literal first `]`
-		let mut end = idx + 1;
-		if chars.get(end) == Some(&'!') {
-			end += 1;
-		}
-		let mut first = true;
-		let closed = loop {
-			match chars.get(end) {
-				Some(']') if !first => break true,
-				Some(_) => {
-					first = false;
-					end += 1;
-				}
-				None => break false,
-			}
-		};
-		if !closed {
-			return Err(format!(
-				"unterminated character class in glob pattern: {pattern}"
-			));
-		}
-		idx = end + 1;
-	}
-	Ok(())
 }
 
 #[cfg(test)]
