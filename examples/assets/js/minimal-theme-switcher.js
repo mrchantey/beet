@@ -13,19 +13,11 @@ const themeSwitcher = {
 	buttonsTarget: "a[data-theme-switcher]",
 	buttonAttribute: "data-theme-switcher",
 	rootAttribute: "data-theme",
-	localStorageKey: "picoPreferredColorScheme",
 
-	// Init
+	// Init, following the OS until a switcher pins a scheme; nothing is stored
 	init() {
-		this.scheme = this.schemeFromLocalStorage;
+		this.scheme = this._scheme;
 		this.initSwitchers();
-	},
-
-	// Get color scheme from local storage
-	get schemeFromLocalStorage() {
-		return (
-			globalThis.localStorage?.getItem(this.localStorageKey) ?? this._scheme
-		);
 	},
 
 	// Preferred color scheme
@@ -63,7 +55,6 @@ const themeSwitcher = {
 			this._scheme = scheme;
 		}
 		this.applyScheme();
-		this.schemeToLocalStorage();
 	},
 
 	// Get scheme
@@ -76,11 +67,6 @@ const themeSwitcher = {
 		document
 			.querySelector("html")
 			?.setAttribute(this.rootAttribute, this.scheme);
-	},
-
-	// Store scheme to local storage
-	schemeToLocalStorage() {
-		globalThis.localStorage?.setItem(this.localStorageKey, this.scheme);
 	},
 };
 

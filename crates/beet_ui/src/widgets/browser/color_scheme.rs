@@ -14,7 +14,9 @@ use beet_core::prelude::*;
 /// The script reads a `?color-scheme=light|dark` pin (else the OS
 /// `prefers-color-scheme`), toggling the matching class on `<html>`.
 /// `setColorScheme("light" | "dark")` becomes available globally for a theme
-/// switcher, pinning the scheme for the page; nothing is stored.
+/// switcher, pinning the scheme for the page; nothing is stored. A pin also
+/// points the browser chrome at that scheme's [`Head`](crate::prelude::Head) tint, so the script
+/// belongs after `<Head>`'s metas, in its slot, where every layout puts it.
 #[template]
 pub fn ColorSchemeScript() -> impl Bundle {
 	// inject the shared class-name constants so the script and the style rules

@@ -23,7 +23,8 @@
 //!
 //! The brand tint is read off the [`Theme`] resource, the palette the page's
 //! own css bakes from, so the browser chrome and the page cannot disagree: a
-//! `theme-color` per scheme the OS prefers, and the light one
+//! `theme-color` per scheme the OS prefers, each naming its `data-scheme` so
+//! [`ColorSchemeScript`] can point the browser at a scheme the page pins, and the light one
 //! as the `msapplication-TileColor`, which has no media query.
 //!
 //! `og:site_name` is bound to [`PackageConfig::title`] through a
@@ -145,8 +146,8 @@ pub fn Head(
 			<meta name="version" content={&version}/>
 			<meta name="application-name" content={&title}/>
 			{tints.as_ref().map(|tints| rsx!{
-				<meta name="theme-color" media="(prefers-color-scheme: light)" content={&tints.light}/>
-				<meta name="theme-color" media="(prefers-color-scheme: dark)" content={&tints.dark}/>
+				<meta name="theme-color" media="(prefers-color-scheme: light)" content={&tints.light} data-scheme="light"/>
+				<meta name="theme-color" media="(prefers-color-scheme: dark)" content={&tints.dark} data-scheme="dark"/>
 			})}
 			// Open Graph
 			<meta property="og:title" content={&card_title}/>

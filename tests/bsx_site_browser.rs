@@ -72,6 +72,30 @@ async fn the_counter_counts_in_the_browser() {
 	host.kill().await;
 }
 
+/// A pinned scheme reaches the browser chrome: whatever the OS prefers, the
+/// pinned scheme's `theme-color` matches and the other never does, through
+/// the boot.
+#[beet_core::test(timeout_ms = 300_000)]
+#[ignore = "smoketest: needs `just build-wasm-ui` + chromedriver"]
+async fn a_pinned_scheme_tints_the_browser() {
+	let mut host = serve_site().await;
+	host.goto("/counter?color-scheme=dark").await;
+	let tinted = async |host: &BrowserHost| {
+		host.find(r#"meta[name="theme-color"][data-scheme="dark"]"#)
+			.await
+			.xpect_attr("media", "all")
+			.await;
+		host.find(r#"meta[name="theme-color"][data-scheme="light"]"#)
+			.await
+			.xpect_attr("media", "not all")
+			.await;
+	};
+	tinted(&host).await;
+	host.painted("/counter").await;
+	tinted(&host).await;
+	host.kill().await;
+}
+
 /// The conformance probe over the whole site: every route's served page is
 /// adopted by the world that boots on it with nothing replaced or patched,
 /// and the served chrome keeps working through the boot (the sidebar's menu

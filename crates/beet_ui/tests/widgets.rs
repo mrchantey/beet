@@ -219,9 +219,10 @@ fn head_marks_unlisted_pages_noindex() {
 		.xpect_contains(r#"name="robots" content="noindex""#);
 }
 
-/// The browser chrome takes a tint per scheme: the light scheme's primary
-/// tone, which for a key colour at tone 40 is that colour itself, and the dark
-/// scheme's primary container. The tile, with no media query, takes the light.
+/// The browser chrome takes a tint per scheme, each naming its scheme for the
+/// pin in `color_scheme.js`: the light scheme's primary tone, which for a key
+/// colour at tone 40 is that colour itself, and the dark scheme's primary
+/// container. The tile, with no media query, takes the light.
 #[beet_core::test]
 fn head_tints_with_the_theme() {
 	let mut world = layout_world();
@@ -233,10 +234,10 @@ fn head_tints_with_the_theme() {
 	render_html(&mut world, root)
 		.as_str()
 		.xpect_contains(
-			r##"name="theme-color" media="(prefers-color-scheme: light)" content="#006C4F""##,
+			r##"name="theme-color" media="(prefers-color-scheme: light)" content="#006C4F" data-scheme="light""##,
 		)
 		.xpect_contains(
-			r##"name="theme-color" media="(prefers-color-scheme: dark)" content="#00513B""##,
+			r##"name="theme-color" media="(prefers-color-scheme: dark)" content="#00513B" data-scheme="dark""##,
 		)
 		.xpect_contains(
 			r##"name="msapplication-TileColor" content="#006C4F""##,
