@@ -7,7 +7,7 @@ terminal over ssh) to AWS Fargate, with cpu autoscaling and an ssh-capable NLB
 `BEET_HOST`/`BEET_PORT`/`BEET_SSH_PORT` (injected by the ssh-enabled block) and
 serves both protocols; `/health` is the http health check.
 
-Unlike the other site deployers this bakes a *specific example binary* into the
+Unlike the other site deploy entries this bakes a *specific example binary* into the
 image (`<ExampleBinaryBuild/>`) rather than the generic `beet` binary; the ssh
 TUI is compiled in, so there is no S3 site sync.
 

@@ -203,7 +203,7 @@ async fn check_banner(hostname: &str, timeout: Duration) -> Result {
 
 /// Ask for the JMAP session document, unauthenticated: the question is whether
 /// the box serves a trusted certificate on 443 and answers at all, not whether
-/// this deployer may sign in, so a `401` is a pass and only a transport failure
+/// this caller may sign in, so a `401` is a pass and only a transport failure
 /// or a `5xx` is not.
 async fn check_jmap(hostname: &str) -> Result {
 	let url = format!("https://{hostname}{}", JmapClient::SESSION_PATH);

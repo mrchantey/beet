@@ -1,5 +1,5 @@
-//! `<CloudflareDeployToken/>`: the Cloudflare deploy credential, every token
-//! the declarations ask for, minted in the one place that holds the group
+//! `<CloudflareDeployCredential/>`: the Cloudflare deploy credential, every
+//! token the declarations ask for, minted in the one place that holds the group
 //! which mints.
 
 use crate::actions::cloudflare_api_ext;
@@ -9,15 +9,15 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<CloudflareDeployToken/>` — the repo's Cloudflare deploy credential,
+/// `<CloudflareDeployCredential/>`: the repo's Cloudflare deploy credential,
 /// declared at the entry's root like `<Secrets/>`, and every Cloudflare token
 /// its declarations ask for:
 ///
 /// - **the deploy token**: one account-owned token per repo, scoped to exactly
-///   the permission groups the declarations need ([`DeployerToken`], lowered
-///   from what the stacks render and the Cloudflare actions their routes run),
-///   sealed into the credential document as `CLOUDFLARE_API_TOKEN` with the
-///   grants it holds in its record's metadata.
+///   the permission groups the declarations need ([`CloudflareDeployToken`],
+///   lowered from what the stacks render and the Cloudflare actions their
+///   routes run), sealed into the credential document as `CLOUDFLARE_API_TOKEN`
+///   with the grants it holds in its record's metadata.
 /// - **one token per declared `<R2BucketBlock/>`**, scoped to that bucket's
 ///   objects and nothing else, its S3 pair parked in the stack's own secret
 ///   store where the compute beside the bucket reads it. Not sealed in any
@@ -29,8 +29,8 @@ use serde_json::Value;
 /// here.
 ///
 /// ```jsx
-/// <CloudflareDeployToken/>
-/// <CloudflareDeployToken ttl_days=30 request_ips={["203.0.113.7/32"]}/>
+/// <CloudflareDeployCredential/>
+/// <CloudflareDeployCredential ttl_days=30 request_ips={["203.0.113.7/32"]}/>
 /// ```
 ///
 /// ## Which credential an elevated deploy runs this as
@@ -63,7 +63,7 @@ use serde_json::Value;
 /// ## The change the deploy token cannot make
 ///
 /// Some declared types are only REFRESHED by the deploy token, and written by
-/// a group it never holds ([`DeployerToken::elevated`]): an R2 bucket's
+/// a group it never holds ([`CloudflareDeployToken::elevated`]): an R2 bucket's
 /// configuration, since the group that writes its lock also lifts it, over
 /// every bucket in the account. A plain deploy that would change one is
 /// refused before it writes anything. The elevated deploy mints
@@ -137,7 +137,7 @@ use serde_json::Value;
 /// damage.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct CloudflareDeployToken {
+pub struct CloudflareDeployCredential {
 	/// The days a minted deploy token authenticates for, to the midnight UTC
 	/// it lands on, or until rolled when absent. At least twice the renewal
 	/// notice, so a token spends most of its life quiet.
@@ -150,7 +150,7 @@ pub struct CloudflareDeployToken {
 	pub mint_token: SmolStr,
 }
 
-impl Default for CloudflareDeployToken {
+impl Default for CloudflareDeployCredential {
 	fn default() -> Self {
 		Self {
 			ttl_days: None,
@@ -160,7 +160,7 @@ impl Default for CloudflareDeployToken {
 	}
 }
 
-impl DeployCredentialProvider for CloudflareDeployToken {
+impl DeployCredentialProvider for CloudflareDeployCredential {
 	fn id(&self) -> &'static str { "cloudflare" }
 
 	fn human_factor(&self) -> &'static str {
@@ -170,7 +170,7 @@ impl DeployCredentialProvider for CloudflareDeployToken {
 	fn records(&self) -> &'static [&'static str] { &[Self::RECORD] }
 
 	fn guards(&self, declared: &str) -> bool {
-		!DeployerToken::elevated_for(declared).is_empty()
+		!CloudflareDeployToken::elevated_for(declared).is_empty()
 	}
 
 	fn protects(
@@ -178,7 +178,7 @@ impl DeployCredentialProvider for CloudflareDeployToken {
 		change: &tofu::PlannedChange,
 		_stack: &ResolvedStack,
 	) -> Option<String> {
-		let needs = DeployerToken::elevated_for(&change.resource_type);
+		let needs = CloudflareDeployToken::elevated_for(&change.resource_type);
 		(!needs.is_empty()).then(|| {
 			format!(
 				"this deploy would {} `{}`, which the deploy token only reads: \
@@ -217,7 +217,7 @@ impl DeployCredentialProvider for CloudflareDeployToken {
 	}
 }
 
-impl CloudflareDeployToken {
+impl CloudflareDeployCredential {
 	/// The record the token is sealed under, which is the variable every
 	/// Cloudflare consumer reads: the tofu provider, `wrangler` and the zone
 	/// verbs all take it from the environment, so what the document holds is
@@ -276,7 +276,7 @@ impl CloudflareDeployToken {
 	/// metadata once converged, and what a plain deploy compares against.
 	fn grants(
 		&self,
-		lowered: &DeployerToken,
+		lowered: &CloudflareDeployToken,
 		buckets: &[String],
 	) -> Result<Vec<String>> {
 		let terms = self.terms(Timestamp::now())?;
@@ -333,7 +333,7 @@ impl CloudflareDeployToken {
 			self.grants(&lowered, &Self::bucket_names(caller).await?)?;
 		let (line, mint) = Self::converge(
 			caller,
-			&Self::token_name()?,
+			&DeployCredential::name()?,
 			&lowered,
 			&terms,
 			&steps,
@@ -367,7 +367,7 @@ impl CloudflareDeployToken {
 				.xok();
 		};
 		let mut out = Self::describe(
-			&Self::token_name()?,
+			&DeployCredential::name()?,
 			&lowered,
 			&self.terms(Timestamp::now())?,
 		)?;
@@ -382,10 +382,12 @@ impl CloudflareDeployToken {
 	/// action its routes carry, in one world pass, so a stack that cannot
 	/// render fails here rather than at the account. `None` when this launch
 	/// asks nothing of Cloudflare.
-	async fn lower(caller: &AsyncEntity) -> Result<Option<DeployerToken>> {
+	async fn lower(
+		caller: &AsyncEntity,
+	) -> Result<Option<CloudflareDeployToken>> {
 		caller
 			.with_world(|world, _| {
-				let mut lowered = DeployerToken::default();
+				let mut lowered = CloudflareDeployToken::default();
 				for (stack, _deployment, config) in
 					DeployCredential::render_stages(world)?.iter()
 				{
@@ -425,42 +427,11 @@ impl CloudflareDeployToken {
 			.collect()
 	}
 
-	/// The token every launch of this repo deploys with: the workspace
-	/// directory, kebab-cased, and `-deploy`. Named for the repo rather than for
-	/// an app, since a credential document holds one token however many apps it
-	/// deploys, and derived from the directory because a repo has no other name
-	/// ([`AwsDeployer::user_name`] names the AWS deployer the same way).
-	fn token_name() -> Result<String> {
-		format!("{}-deploy", Self::repo_name()?).xok()
-	}
-
 	/// The token an elevated run holds for its one command, named beside the
-	/// deploy token so the account's api tokens page reads as one repo's pair.
+	/// deploy token ([`DeployCredential::name`]) so the account's api tokens
+	/// page reads as one repo's pair.
 	fn elevated_name() -> Result<String> {
-		format!("{}-elevated", Self::repo_name()?).xok()
-	}
-
-	/// The workspace directory, kebab-cased: the one name a repo has.
-	fn repo_name() -> Result<String> {
-		let root = fs_ext::workspace_root();
-		let name = root
-			.file_name()
-			.and_then(|name| name.to_str())
-			.map(|name| name.replace('_', "-"))
-			.filter(|name| {
-				!name.is_empty()
-					&& name
-						.chars()
-						.all(|char| char.is_ascii_alphanumeric() || char == '-')
-			})
-			.ok_or_else(|| {
-				bevyhow!(
-					"cannot name a token after the workspace directory `{}`: \
-					a token name is alphanumeric",
-					root.display()
-				)
-			})?;
-		name.xok()
+		format!("{}-elevated", DeployCredential::repo_name()?).xok()
 	}
 
 	/// The token's half of the dry run: the token, its terms, every group with
@@ -472,7 +443,7 @@ impl CloudflareDeployToken {
 	/// whether or not anybody has said where its token would live.
 	fn describe(
 		name: &str,
-		lowered: &DeployerToken,
+		lowered: &CloudflareDeployToken,
 		terms: &TokenTerms,
 	) -> Result<String> {
 		let home = match lowered.account() {
@@ -502,7 +473,7 @@ impl CloudflareDeployToken {
 	async fn converge(
 		caller: &AsyncEntity,
 		name: &str,
-		lowered: &DeployerToken,
+		lowered: &CloudflareDeployToken,
 		terms: &TokenTerms,
 		steps: &MintSteps,
 		roll: bool,
@@ -529,8 +500,9 @@ impl CloudflareDeployToken {
 		let current = match existing.as_slice() {
 			[held_token] => {
 				held_token.active
-					&& DeployerToken::fingerprint_of(&held_token.policies)
-						== lowered.fingerprint()
+					&& CloudflareDeployToken::fingerprint_of(
+						&held_token.policies,
+					) == lowered.fingerprint()
 					&& terms.kept_by(held_token, Timestamp::now())
 					&& Self::holds(&account, held_value, &held_token.id).await
 			}
@@ -631,7 +603,7 @@ impl CloudflareDeployToken {
 	/// instant the token lapses on its own.
 	async fn mint_elevated(
 		mint: MintToken,
-		lowered: &DeployerToken,
+		lowered: &CloudflareDeployToken,
 		terms: &TokenTerms,
 	) -> Result<(
 		String,
@@ -736,7 +708,9 @@ impl CloudflareDeployToken {
 	/// Where a deploy token proves itself: one page of the zone's records, the
 	/// read every plan of it makes, or its own verify when it is scoped to no
 	/// zone at all.
-	fn deploy_proof(lowered: &DeployerToken) -> Result<(String, &'static str)> {
+	fn deploy_proof(
+		lowered: &CloudflareDeployToken,
+	) -> Result<(String, &'static str)> {
 		match lowered.zones().values().next() {
 			Some(zone) => (
 				format!("{API_BASE}/zones/{zone}/dns_records?per_page=1"),
@@ -1125,9 +1099,9 @@ impl MintToken {
 		}
 	}
 
-	/// [`CloudflareDeployToken::prove_token`], deleting the new token `id` when it
-	/// fails: unproven and unsealed, it would stay live beside the token it was
-	/// to replace, under the same name, with a value nobody holds.
+	/// [`CloudflareDeployCredential::prove_token`], deleting the new token `id`
+	/// when it fails: unproven and unsealed, it would stay live beside the
+	/// token it was to replace, under the same name, with a value nobody holds.
 	async fn prove_or_discard(
 		&self,
 		account: &str,
@@ -1137,7 +1111,7 @@ impl MintToken {
 		what: &str,
 	) -> Result {
 		let Err(err) =
-			CloudflareDeployToken::prove_token(value, url, what).await
+			CloudflareDeployCredential::prove_token(value, url, what).await
 		else {
 			return OK;
 		};
@@ -1445,8 +1419,9 @@ impl core::fmt::Display for TokenTerms {
 /// compares the declarations against.
 struct HeldToken {
 	id: SmolStr,
-	/// Its `policies`, compared through [`DeployerToken::fingerprint_of`] since
-	/// how Cloudflare groups the pairs is not what either side means.
+	/// Its `policies`, compared through
+	/// [`CloudflareDeployToken::fingerprint_of`] since how Cloudflare groups
+	/// the pairs is not what either side means.
 	policies: Value,
 	/// A token may be disabled at the account, which no scope comparison would
 	/// notice and every deploy would.
@@ -1504,7 +1479,7 @@ mod test {
 		world.spawn(MtaStsPublish::default());
 		world.spawn(AwsRegion::new("us-west-2"));
 		let mut found =
-			super::CloudflareDeployToken::declared_access(&mut world)
+			super::CloudflareDeployCredential::declared_access(&mut world)
 				.into_iter()
 				.map(|(_, access)| access)
 				.collect::<Vec<_>>();
@@ -1539,7 +1514,7 @@ mod test {
 		));
 		world.flush();
 		let declared =
-			CloudflareDeployToken::declared_buckets(&mut world).unwrap();
+			CloudflareDeployCredential::declared_buckets(&mut world).unwrap();
 		let (block, stack, store) = declared.into_iter().next().unwrap();
 		block
 			.token_name(&stack)
@@ -1554,13 +1529,6 @@ mod test {
 			.xpect_contains("/mail/prod/cold-backups-secret-access-key");
 	}
 
-	/// The token name is the repo's, not an app's: one document holds one token.
-	#[beet_core::test]
-	fn names_the_token_after_the_repo() {
-		CloudflareDeployToken::token_name()
-			.unwrap()
-			.xpect_eq("beet-deploy");
-	}
 	/// The steps an operator is relayed to run an elevated deploy, rendered
 	/// from the account and the deploy's own command, with every link whole,
 	/// and a refused credential answered with them.
@@ -1596,7 +1564,7 @@ mod test {
 	fn restates_only_a_stale_record() {
 		let grants = vec!["Zone > DNS Write on beet.org".to_string()];
 		let today = || {
-			super::CloudflareDeployToken::record(
+			super::CloudflareDeployCredential::record(
 				"beet-deploy",
 				"abc",
 				None,

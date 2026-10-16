@@ -1,13 +1,14 @@
-//! The Cloudflare api token a repo's deployer needs, LOWERED from the provider
-//! types its stacks render and the Cloudflare actions their routes run.
+//! The Cloudflare api token a repo's deploy credential needs, LOWERED from the
+//! provider types its stacks render and the Cloudflare actions their routes
+//! run.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// The Cloudflare counterpart of [`DeployerPolicy`]: that lowers the AWS types
-/// a stack renders into what the deployer applying it may do, this lowers the
+/// The Cloudflare counterpart of [`AwsDeployPolicy`]: that lowers the AWS types
+/// a stack renders into what the credential applying it may do, this lowers the
 /// CLOUDFLARE ones, plus the Cloudflare actions a deploy route runs, which
 /// reach the api without rendering anything at all.
 ///
@@ -48,7 +49,7 @@ use serde_json::json;
 ///
 /// ## What makes a token out of this
 ///
-/// An elevated deploy ([`CloudflareDeployToken`]) posts
+/// An elevated deploy ([`CloudflareDeployCredential`]) posts
 /// [`to_json`](Self::to_json) as an account-owned token and seals it as
 /// `CLOUDFLARE_API_TOKEN` with its [`grant_lines`](Self::grant_lines);
 /// [`Display`] prints the same lowering for a deploy's `--dry-run`. Each group
@@ -57,7 +58,7 @@ use serde_json::json;
 ///
 /// [`Display`]: std::fmt::Display
 #[derive(Debug, Default, Clone)]
-pub struct DeployerToken {
+pub struct CloudflareDeployToken {
 	/// The accounts the lowered stacks address: where the token lives, and the
 	/// `Account Resources` of an account-scoped group. Recorded for a zone-only
 	/// lowering too, since an account-owned token is created under an account
@@ -83,7 +84,7 @@ pub struct DeployerToken {
 	buckets: BTreeMap<SmolStr, BTreeMap<TokenPermission, BTreeSet<SmolStr>>>,
 }
 
-impl DeployerToken {
+impl CloudflareDeployToken {
 	/// The one declared-type prefix this lowers. Every other provider's types
 	/// lower through that provider's own policy, so they are skipped rather
 	/// than refused.
@@ -91,7 +92,7 @@ impl DeployerToken {
 
 	/// What a rendered provider type needs, by longest matching prefix so a
 	/// family rides one entry, and loud on a `cloudflare_` type with no entry
-	/// at all ([`DeployerPolicy::service`]'s rule, for the same reason: a
+	/// at all ([`AwsDeployPolicy::service`]'s rule, for the same reason: a
 	/// silently dropped type is a deploy that works until the apply that
 	/// touches it).
 	const RESOURCES: &'static [ResourceAccess] = &[
@@ -168,7 +169,7 @@ impl DeployerToken {
 		Self::place(declared).ok_or_else(|| {
 			bevyhow!(
 				"no deploy token permission is declared for `{declared}`: \
-				add its prefix to `DeployerToken::RESOURCES`"
+				add its prefix to `CloudflareDeployToken::RESOURCES`"
 			)
 		})
 	}
@@ -519,7 +520,7 @@ impl DeployerToken {
 	}
 }
 
-impl std::fmt::Display for DeployerToken {
+impl std::fmt::Display for CloudflareDeployToken {
 	/// The dashboard recipe, in the order the Create Custom Token form asks for
 	/// it: one line per group with what asked for it, then the resource list of
 	/// each scope that HAS a group, which is what the minted policies carry. An
@@ -589,7 +590,7 @@ struct ResourceAccess {
 	/// What the deploy token holds for it.
 	deploy: &'static [TokenPermission],
 	/// What only a change to it needs, held by an
-	/// [elevated](DeployerToken::elevate) token alone.
+	/// [elevated](CloudflareDeployToken::elevate) token alone.
 	elevated: &'static [TokenPermission],
 }
 
@@ -851,7 +852,7 @@ mod test {
 	#[beet_core::test]
 	fn places_every_cloudflare_type() {
 		let names = |declared| {
-			DeployerToken::resource(declared)
+			CloudflareDeployToken::resource(declared)
 				.unwrap()
 				.deploy
 				.iter()
@@ -859,7 +860,7 @@ mod test {
 				.collect::<Vec<_>>()
 		};
 		let elevated = |declared| {
-			DeployerToken::elevated_for(declared)
+			CloudflareDeployToken::elevated_for(declared)
 				.iter()
 				.map(TokenPermission::name)
 				.collect::<Vec<_>>()
@@ -883,7 +884,7 @@ mod test {
 			.xpect_eq(vec!["Load Balancers Write"]);
 		names("cloudflare_load_balancer_pool")
 			.xpect_eq(vec!["Load Balancing: Monitors and Pools Write"]);
-		DeployerToken::resource("cloudflare_queue")
+		CloudflareDeployToken::resource("cloudflare_queue")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("cloudflare_queue");
@@ -907,7 +908,7 @@ mod test {
 			CloudflareAccess::declared_by::<ZoneAudit>(),
 		]
 		.iter()
-		.try_fold(DeployerToken::default(), |token, access| {
+		.try_fold(CloudflareDeployToken::default(), |token, access| {
 			token.lower_access(&stack, access, None)
 		})
 		.unwrap();
@@ -952,7 +953,7 @@ mod test {
 			]),
 		]
 		.iter()
-		.try_fold(DeployerToken::default(), |token, access| {
+		.try_fold(CloudflareDeployToken::default(), |token, access| {
 			token.lower_access(&stack, access, None)
 		})
 		.unwrap();
@@ -976,7 +977,8 @@ mod test {
 			.xpect_eq(vec!["com.cloudflare.api.account.zone.zone123"]);
 		scoped(TokenPermission::WORKERS_R2_STORAGE_WRITE)
 			.xpect_eq(vec!["com.cloudflare.api.account.acct123"]);
-		DeployerToken::fingerprint_of(&policies).xpect_eq(token.fingerprint());
+		CloudflareDeployToken::fingerprint_of(&policies)
+			.xpect_eq(token.fingerprint());
 		// the same grants, one policy per pair, plus a deny: still a match
 		let regrouped = serde_json::json!([
 			{
@@ -998,7 +1000,8 @@ mod test {
 				"permission_groups": [{ "id": TokenPermission::API_TOKENS_WRITE.id() }],
 			},
 		]);
-		DeployerToken::fingerprint_of(&regrouped).xpect_eq(token.fingerprint());
+		CloudflareDeployToken::fingerprint_of(&regrouped)
+			.xpect_eq(token.fingerprint());
 	}
 
 	/// A rendered record lowers to the one group that publishes it and names
@@ -1018,7 +1021,9 @@ mod test {
 				"v=spf1 -all",
 			)
 			.unwrap();
-		let token = DeployerToken::default().lower(&stack, &config).unwrap();
+		let token = CloudflareDeployToken::default()
+			.lower(&stack, &config)
+			.unwrap();
 		token
 			.to_string()
 			.as_str()
@@ -1053,7 +1058,9 @@ mod test {
 			.with_retain_days(30)
 			.emit(&stack, &deployment, &mut config)
 			.unwrap();
-		let token = DeployerToken::default().lower(&stack, &config).unwrap();
+		let token = CloudflareDeployToken::default()
+			.lower(&stack, &config)
+			.unwrap();
 		token.escalating().is_none().xpect_true();
 		let names =
 			|permissions: &BTreeMap<TokenPermission, BTreeSet<SmolStr>>| {
@@ -1098,7 +1105,7 @@ mod test {
 		let sync = CloudflareAccess::new::<Sync>(&[
 			TokenPermission::BUCKET_ITEM_WRITE,
 		]);
-		let token = DeployerToken::default()
+		let token = CloudflareDeployToken::default()
 			.lower_access(&stack, &sync, Some("site"))
 			.unwrap();
 		token.asked().is_empty().xpect_true();
@@ -1120,11 +1127,12 @@ mod test {
 			.xpect_contains(TokenPermission::BUCKET_ITEM_WRITE.id())
 			.xnot()
 			.xpect_contains(TokenPermission::WORKERS_R2_STORAGE_WRITE.id());
-		DeployerToken::fingerprint_of(&policies).xpect_eq(token.fingerprint());
+		CloudflareDeployToken::fingerprint_of(&policies)
+			.xpect_eq(token.fingerprint());
 		token.grant_lines().xpect_eq(vec![
 			"Bucket > Workers R2 Storage Bucket Item Write on site".to_string(),
 		]);
-		DeployerToken::default()
+		CloudflareDeployToken::default()
 			.lower_access(&stack, &sync, None)
 			.unwrap_err()
 			.to_string()
@@ -1142,7 +1150,7 @@ mod test {
 		let purge =
 			CloudflareAccess::new::<Purge>(&[TokenPermission::CACHE_PURGE]);
 		let (bare, ..) = ResolvedStack::default_local();
-		DeployerToken::default()
+		CloudflareDeployToken::default()
 			.lower_access(&bare, &purge, None)
 			.unwrap_err()
 			.to_string()
@@ -1150,7 +1158,7 @@ mod test {
 		let zoned = ResolvedStack::default_local().0.with_cloudflare_zone(
 			CloudflareZone::new("beetmash.com", "zone123"),
 		);
-		let lowered = DeployerToken::default()
+		let lowered = CloudflareDeployToken::default()
 			.lower_access(&zoned, &purge, None)
 			.unwrap();
 		lowered

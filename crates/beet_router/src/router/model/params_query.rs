@@ -83,6 +83,17 @@ impl ParamsQuery<'_, '_> {
 		pattern.xok()
 	}
 
+	/// Every declaration read at the route `route`: its own and its steps',
+	/// without the middleware above it. What a route forwarding its requests
+	/// to `route` takes in turn.
+	pub fn route_declarations(&self, route: Entity) -> Vec<ParamsDeclaration> {
+		core::iter::once(route)
+			.chain(self.steps(route))
+			.filter_map(|entity| self.route_params.get(entity).ok())
+			.flat_map(|list| list.iter().cloned())
+			.collect()
+	}
+
 	/// Refuse a param named after a launch only knob, which the process
 	/// request never carries.
 	fn reject_launch_knobs(pattern: &ParamsPattern) -> Result {

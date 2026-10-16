@@ -28,7 +28,7 @@ use beet_core::prelude::*;
 ///
 /// What the strip does NOT cover is a record this launch's own document
 /// already put in the environment, because that is what most callers are here
-/// for: `secrets/exec -- aws s3 sync` wants this repo's deployer pair. The
+/// for: `secrets/exec -- aws s3 sync` wants this repo's AWS deploy pair. The
 /// consequence is that a call naming ANOTHER document inherits this one's
 /// records for every name the other does not hold, which for
 /// `TF_STATE_PASSPHRASE` means a tofu verb addressing another repo's state

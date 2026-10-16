@@ -42,7 +42,8 @@ pub struct Variable {
 pub enum VariableSource {
 	/// A fixed literal value.
 	Fixed(SmolStr),
-	/// Collected from the deployer's process environment via [`env_ext::var`].
+	/// Collected from the deploying process's environment via
+	/// [`env_ext::var`].
 	ProcessEnv,
 	/// Collected from the request headers, see [`RequestParts::headers`].
 	Header,
@@ -92,7 +93,7 @@ impl Variable {
 		}
 	}
 
-	/// Create a variable resolved from the deployer's process environment.
+	/// Create a variable resolved from the deploying process's environment.
 	pub fn process_env(key: impl Into<SmolStr>) -> Self {
 		Self {
 			key: key.into(),

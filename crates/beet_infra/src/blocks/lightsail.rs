@@ -1146,9 +1146,9 @@ impl LightsailBlock {
 	) -> Result {
 		// The box's RUNTIME identity: what the instance itself authenticates
 		// as, for the binary it downloads at boot and the stores it serves.
-		// Named `runtime-*` and not `deploy-*` because it is nothing to do
-		// with the deployer; the deploy MINTS it, which is exactly what every
-		// tier-2 identity in this account has in common.
+		// Named `runtime-*` and not `deploy-*` because it is nothing to do with
+		// the deploy credential; the deploy MINTS it, which is exactly what
+		// every tier-2 identity in this account has in common.
 		let boundary = RuntimeBoundary::arn(stack, config)?;
 		let user_ident = stack.resource_ident(self.build_label("runtime-user"));
 		let user = terra::ResourceDef::new_primary(

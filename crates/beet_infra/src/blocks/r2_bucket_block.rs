@@ -30,7 +30,7 @@ use beet_net::prelude::*;
 /// an AWS compute lowers them to `ssm:GetParameter` on exactly those.
 ///
 /// **An elevated deploy does that minting, not the apply**
-/// ([`CloudflareDeployToken`]), and the difference
+/// ([`CloudflareDeployCredential`]), and the difference
 /// is the whole reason the seam exists. Creating a token needs `Account API
 /// Tokens Write`, which can mint any token the account can hold, a wider one
 /// included; Cloudflare has no permissions boundary to cap that with and no mfa
@@ -91,8 +91,9 @@ pub struct R2BucketBlock {
 	/// two bucket-item groups ([`ITEM_PERMISSIONS`](Self::ITEM_PERMISSIONS),
 	/// the S3 data plane) for this one bucket. Nor can the deploy token, which
 	/// holds the account's R2 group read-only, enough for a plan to refresh the
-	/// lock: writing it is [elevated](DeployerToken::elevated), held only by
-	/// the token an elevated deploy mints for the one run that changes it.
+	/// lock: writing it is [elevated](CloudflareDeployToken::elevated), held
+	/// only by the token an elevated deploy mints for the one run that changes
+	/// it.
 	///
 	/// Must not exceed the window an
 	/// [`expire_prefixes`](Self::expire_prefixes) rule declares, since a lock
@@ -111,6 +112,14 @@ pub struct R2BucketBlock {
 	/// may go, where [`retain_days`](Self::retain_days) is when it may not: a
 	/// prefix not named here is kept forever.
 	expire_prefixes: Vec<PrefixExpiry>,
+	/// Adopt the bucket rather than create it: an `import` stanza, for a
+	/// stack taking over a bucket another state held, ie a stack moving to a
+	/// new AWS account while its cold copy stays where it is. The first apply
+	/// consumes it (`1 to import`), and it comes off once a plan reads `0 to
+	/// import`, since an import of a bucket that is gone refuses the apply.
+	/// The bucket alone: its lifecycle and lock are configuration a create
+	/// writes over in place.
+	adopt: bool,
 }
 
 impl Default for R2BucketBlock {
@@ -139,6 +148,7 @@ impl R2BucketBlock {
 			retain_days: 0,
 			accept_data_loss: false,
 			expire_prefixes: Vec::new(),
+			adopt: false,
 		}
 	}
 
@@ -485,6 +495,13 @@ impl EmitBlock for R2BucketBlock {
 			},
 		);
 		config.add_layer_resource(terra::Config::STORAGE_LAYER, &bucket)?;
+		if self.adopt {
+			// R2's import id: the account, the bucket and its jurisdiction
+			config.add_import(
+				bucket.address(),
+				format!("{account_id}/{}/default", self.bucket_name(stack)),
+			)?;
+		}
 		if !self.expire_prefixes.is_empty() {
 			config.add_resource(&ResourceDef::new_secondary(
 				stack.resource_ident(format!("{}-lifecycle", self.label)),
@@ -557,6 +574,16 @@ mod tests {
 			.xpect_contains(&format!("\"max_age\":{}", 180 * 86400))
 			.xpect_contains("\"type\":\"Age\"")
 			.xpect_contains("\"bucket_name\":\"${cloudflare_r2_bucket.");
+	}
+
+	/// An adopted bucket is imported by its account, name and jurisdiction,
+	/// and an ordinary one renders no import at all.
+	#[beet_core::test]
+	fn adopts_the_bucket_by_import() {
+		render(cold().with_adopt(true)).xpect_contains(
+			"\"id\":\"acct123/beet-infra--dev--cold-backups/default\"",
+		);
+		render(cold()).xnot().xpect_contains("\"import\"");
 	}
 
 	/// No versioning means no unfiltered sweep to render: a bucket declaring

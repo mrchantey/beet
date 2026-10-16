@@ -20,8 +20,9 @@ impl StalwartProvision {
 	/// The ssh user of the box's AMI.
 	pub const SSH_USER: &'static str = "ec2-user";
 
-	/// Where a deployer's key usually is, which is only a default: a box whose
-	/// declared public key came from elsewhere names the private half here.
+	/// Where the operator's key usually is, which is only a default: a box
+	/// whose declared public key came from elsewhere names the private half
+	/// here.
 	pub const SSH_KEY: &'static str = "~/.ssh/id_ed25519";
 
 	/// The unit the box runs, restarted once the objects exist: the mail
@@ -32,7 +33,7 @@ impl StalwartProvision {
 	/// A declared private key path, with a leading `~` expanded.
 	///
 	/// The mail box imports a public key rather than generating a pair, so the
-	/// private half is the deployer's own: there is no `ssh_private_key` output
+	/// private half is the operator's own: there is no `ssh_private_key` output
 	/// to read it from the way a Lightsail release does. Every mail step that
 	/// reaches the box reads it through here.
 	pub fn key_path(key: &str) -> Result<AbsPath> {
@@ -77,7 +78,7 @@ impl StalwartProvision {
 #[reflect(Component, Default)]
 pub async fn StalwartProvision(
 	/// The private half of the key pair the box imported. The box declares a
-	/// PUBLIC key and generates nothing, so the private half is the deployer's
+	/// PUBLIC key and generates nothing, so the private half is the operator's
 	/// own and is never an output of the stack; a leading `~` expands.
 	#[field(default = Self::SSH_KEY)]
 	ssh_key: SmolStr,
@@ -251,7 +252,7 @@ impl Management {
 				// channel, and a commissioned box retired that listener the
 				// first time it was provisioned. So on a box that is simply
 				// unreachable from here (a refused connection, a blocked
-				// deployer address) the next step is a wait on a port that will
+				// source address) the next step is a wait on a port that will
 				// never open, and without this line it reports as "the
 				// management endpoint never answered" rather than as the
 				// refusal it is.

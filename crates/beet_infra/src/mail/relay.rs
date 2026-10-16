@@ -43,6 +43,16 @@ pub struct SesRelay {
 }
 
 impl SesRelay {
+	/// The deploy layer holding each domain's SES identity, its configuration
+	/// set and event stream, its custom MAIL FROM and its Easy DKIM records:
+	/// what a new account must have verified before AWS reviews a production
+	/// access request from it, so `<TofuApply layer="ses"/>` converges them
+	/// ahead of the box. Every record in it is per account (an Easy DKIM
+	/// token is), so it publishes beside another account's identity for the
+	/// same domain without colliding; the records two accounts would share
+	/// (the MAIL FROM pair, the sovereign selector) stay out of it.
+	pub const LAYER: &'static str = "ses";
+
 	/// The relay route name every SES-relayed domain sends on. One route for
 	/// all of them, because one IAM user sends for every identity in the
 	/// account; comail's counterpart is per domain

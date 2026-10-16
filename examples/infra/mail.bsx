@@ -150,7 +150,7 @@ route.
 		     declares. Converged by an elevated deploy as the mint token rather
 		     than by an apply: an apply that minted a token would need `Account
 		     API Tokens Write` in the credential every deploy reads -->
-		<CloudflareDeployToken/>
+		<CloudflareDeployCredential/>
 		<Route path="secrets/restore" {SecretsRestore} bx:cfg="feature:vault"/>
 		<Route path="secrets/revoke" {SecretsRevoke} bx:cfg="feature:vault"/>
 

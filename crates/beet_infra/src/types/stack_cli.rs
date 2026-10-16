@@ -60,15 +60,13 @@ pub fn DeployRoutes(
 			RunGroup::<Request, Response>::new(deploy),
 			// the gate's overload in place of the group's own, declared rather
 			// than required so it wins
-			DeployGate::Deploy,
-			DeployGate::overload(),
+			DeployGate::Deploy.guard(Action::new_async(ExchangeGroup::run)),
 		),
 		(
 			PathPartial::new("destroy"),
 			ExchangeGroup::forced_by("force"),
 			RunGroup::<Request, Response>::reversed(destroy),
-			DeployGate::Destroy,
-			DeployGate::overload(),
+			DeployGate::Destroy.guard(Action::new_async(ExchangeGroup::run)),
 		),
 		Validate,
 		Plan,

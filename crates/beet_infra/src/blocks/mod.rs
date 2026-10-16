@@ -16,7 +16,7 @@ pub use atproto_handle_probe::*;
 // A block whose resource is a store, its erased half and the generic runtime
 // attach; the marker naming which store block is the repo store, and the
 // block naming a store this deploy does not create. Feature-free, so a lean
-// binary reads the same declarations the deployer does.
+// binary reads the same declarations a deploy does.
 mod store_block;
 pub use store_block::*;
 mod repo_store_block;

@@ -491,10 +491,10 @@ mod test {
 	/// knob it repeats wins.
 	///
 	/// REGRESSION: `beet admin -- <verb>` once spawned the first argument as a
-	/// program, so `beet admin -- deployer/mint` (a verb since folded into the
-	/// elevated deploy) died on `No such file or
-	/// directory` AFTER the mfa code had been typed and spent: the expensive
-	/// kind of bug, since the cost is a credential rather than a retry.
+	/// program, so the AWS mint verb (since folded into the elevated deploy)
+	/// died on `No such file or directory` AFTER the mfa code had been typed
+	/// and spent: the expensive kind of bug, since the cost is a credential
+	/// rather than a retry.
 	#[crate::test]
 	fn this_launch_runs_this_binary() {
 		let rendered =

@@ -33,8 +33,8 @@ impl Plugin for InfraExamplesPlugin {
 		// `InfraPlugin`, beside the verbs.
 		.register_type::<StateBackendToggle>()
 		// the AWS deploy templates, wrapping the non-`Reflect` infra types so a
-		// `.bsx` lambda deployer composes them (see `templates.rs`): the
-		// beet-site deployer's lightsail block, stage-aware through the
+		// `.bsx` deploy entry composes them (see `templates.rs`): the
+		// beet-site entry's lightsail block, stage-aware through the
 		// `<Stack>` it resolves by ancestry. The resource declarations
 		// themselves are authored as their blocks (`<S3BucketBlock/>`,
 		// `<DynamoTableBlock/>`), registered upstream.

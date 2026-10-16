@@ -252,6 +252,21 @@ impl Config {
 		Ok(self)
 	}
 
+	/// Assign `address`, a resource already added, to `layer` as well: for a
+	/// resource another emitter added and answered by address (a dns record),
+	/// which a block still wants converged ahead of its full apply.
+	pub fn add_to_layer(
+		&mut self,
+		layer: impl Into<SmolStr>,
+		address: impl Into<String>,
+	) -> &mut Self {
+		self.layers
+			.entry(layer.into())
+			.or_default()
+			.push(address.into());
+		self
+	}
+
 	/// The addresses declared under `layer`, as `tofu apply -target` takes them.
 	/// Non-empty by construction, since only
 	/// [`add_layer_resource`](Self::add_layer_resource) creates an entry.
@@ -276,7 +291,8 @@ impl Config {
 	/// alike, sorted and deduplicated: `aws_s3_bucket`, `aws_caller_identity`,
 	/// `cloudflare_dns_record`.
 	///
-	/// What a deployer's policy is lowered FROM (`DeployerPolicy`, in `types`):
+	/// What the AWS deploy credential's policy is lowered FROM
+	/// (`AwsDeployPolicy`, in `types`):
 	/// a type is the whole of what a provider call needs a permission for, and
 	/// a read (the data source) needs one exactly as a write does.
 	pub fn declared_types(&self) -> Vec<&str> {
@@ -303,7 +319,7 @@ impl Config {
 	/// from the policy documents its compute blocks emitted, which is how it
 	/// reuses [`IamPolicy`]'s lowering rather than running a second one beside
 	/// it. [`declared_types`](Self::declared_types) is the shallower read, and
-	/// what a deployer's own policy is lowered from.
+	/// what the AWS deploy credential's own policy is lowered from.
 	pub fn resources_of_type(
 		&self,
 		resource_type: &str,

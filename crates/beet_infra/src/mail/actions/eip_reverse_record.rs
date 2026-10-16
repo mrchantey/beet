@@ -40,7 +40,7 @@ pub fn EipReverseRecord(
 impl EipReverseDns {
 	/// The resolver the forward check asks. DNS-over-HTTPS rather than the
 	/// system resolver, so the answer comes from the public internet's view
-	/// rather than from whatever the deployer's machine caches.
+	/// rather than from whatever the deploying machine caches.
 	pub const RESOLVER: &'static str = "https://cloudflare-dns.com/dns-query";
 
 	/// Whether an `aws ec2` failure is "that address does not exist".

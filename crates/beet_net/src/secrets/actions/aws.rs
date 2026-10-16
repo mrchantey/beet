@@ -10,7 +10,14 @@ use beet_core::prelude::*;
 /// beet aws -- sts get-caller-identity
 /// beet aws -- iam list-roles
 /// beet aws -- logs tail /beet-site/main-lightsail/prod --region us-west-2
+/// beet aws --account=beetmash -- s3 ls      # inside a repo's own account
 /// ```
+///
+/// With `--account=<name>` the call runs inside that member account of the
+/// Organization: the administrator session chained into it
+/// ([`MemberAccount::ADMIN_ROLE`]) when one is live, else `beet-agent`
+/// assuming its read role ([`MemberAccount::READ_ROLE`]), so the same split of
+/// read by default and write behind a code holds in every account.
 ///
 /// **A regional service needs its region naming**, as the third line does.
 /// There is no `~/.aws/config` on a beet machine to supply one ambiently --
@@ -42,6 +49,10 @@ use beet_core::prelude::*;
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub async fn AwsExec(
+	/// The member account of the Organization to run inside, by name, ie the
+	/// repo's own. Unset is the management account.
+	#[param]
+	account: Option<String>,
 	/// The aws cli arguments, everything after `--`.
 	#[param]
 	nested_args: Vec<String>,
@@ -83,25 +94,31 @@ pub async fn AwsExec(
 			format!("`{}`, which can read and not write", AgentIdentity::USER),
 		),
 	};
+	// inside a member, by the role this identity holds there
+	let (vars, who) = match account.as_deref() {
+		Some(name) => {
+			let role = match &state {
+				SessionState::Live(_) => MemberAccount::ADMIN_ROLE,
+				_ => MemberAccount::READ_ROLE,
+			};
+			let member = MemberAccount::find(&vars, name).await?;
+			let inside = member.assume(&vars, role).await?;
+			(
+				inside.sdk_vars(),
+				format!(
+					"{who}, as `{role}` in `{}` ({})",
+					member.name, member.id
+				),
+			)
+		}
+		None => (vars, who),
+	};
 	info!("aws as {who}");
-	let status = vars
-		.iter()
-		.fold(ChildProcess::new("aws"), |process, (_, value)| {
-			process.with_secret(value.clone())
-		})
-		.without_launch_env()
-		// an inherited profile would address a different identity than the one
-		// just named
-		.without_env("AWS_PROFILE")
-		// and any stale token: a long-lived pair plus a foreign session token
-		// authenticates as nobody. Removals apply before additions, so a
-		// session re-adds its own token over this.
-		.without_env("AWS_SESSION_TOKEN")
-		.with_args(nested_args.iter().map(String::as_str))
-		.with_envs(vars)
-		.spawn()?
-		.status()
-		.await?;
+	let status =
+		AgentIdentity::aws(&vars, nested_args.iter().map(String::as_str))
+			.spawn()?
+			.status()
+			.await?;
 	match status.success() {
 		true => Response::ok().xok(),
 		// the cli already printed its own error, so this adds only the thing

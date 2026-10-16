@@ -10,14 +10,23 @@ use std::path::PathBuf;
 /// beet admin                                  # an hour, stored on tmpfs
 /// beet admin --duration=8h                    # a working day
 /// beet admin -- shared/plan --stage=prod       # one command, nothing kept
+/// beet admin --account=beetmash -- mail/plan   # one command inside a member
 /// ```
 ///
 /// Opens the global document for [`beet-agent`](AgentIdentity)'s pair, prompts
 /// for the six-digit code on the terminal, and calls `sts:AssumeRole` on the
 /// `beet-admin` role with that code. Without `--`, the temporary credentials go
 /// to `$XDG_RUNTIME_DIR/beet/admin-session` (tmpfs, mode 600) and every later
-/// [`beet aws`](AwsExec) uses them until they lapse. With `-- <command>`, they
-/// reach that one child and are persisted nowhere.
+/// [`beet aws`](AwsExec) uses them until they lapse. With `-- <command>`, the
+/// live session runs the command when it has twenty minutes or more left,
+/// else a fresh one is bought for it and persisted nowhere, so one code
+/// covers a batch of commands.
+///
+/// With `--account=<name>` the session is chained into that member account of
+/// the Organization ([`MemberAccount::ADMIN_ROLE`]) for the child, an hour at
+/// most since STS caps a chained role there. Kept on tmpfs, the session stays
+/// the management account's and the verb proves it reaches the member, so one
+/// code opens the hour every `beet aws --account=<name>` chains from.
 ///
 /// ## The code is typed, and that is the design
 ///
@@ -45,6 +54,10 @@ pub async fn AdminElevate(
 	/// its own floor of 15 minutes and the role's 12-hour ceiling.
 	#[param]
 	duration: Option<String>,
+	/// The member account of the Organization to act in, by name, ie the
+	/// repo's own. Unset is the management account.
+	#[param]
+	account: Option<String>,
 	/// A command to run under fresh credentials, everything after `--`.
 	/// Nothing is persisted, so the grant lives exactly as long as the
 	/// command.
@@ -53,17 +66,46 @@ pub async fn AdminElevate(
 	cx: ActionContext<Request>,
 ) -> Result<Response> {
 	let seconds = AdminElevate::parse_duration(duration.as_deref())?;
-	let session = AdminSession::mint(seconds).await?;
+	let session = match nested_args.is_empty() {
+		// a session kept on tmpfs is fresh, sized as asked
+		true => AdminSession::mint(seconds).await?,
+		// a command runs in the live one when it has time to spare
+		false => AdminSession::acquire(seconds).await?,
+	};
+	// the member and the session inside it, when one is named
+	let member = match account.as_deref() {
+		Some(name) => {
+			let member = MemberAccount::find(&session.sdk_vars(), name).await?;
+			let inside = member
+				.assume(&session.sdk_vars(), MemberAccount::ADMIN_ROLE)
+				.await?;
+			Some((member, inside))
+		}
+		None => None,
+	};
 	match nested_args.is_empty() {
 		// one verb, nothing kept: the grant lives as long as the child
 		false => {
 			let route = nested_args.join(" ");
-			info!(
-				"running `{route}` as the `{}` role, keeping nothing",
-				AgentIdentity::ADMIN_ROLE
-			);
-			let status = session
-				.sdk_vars()
+			let vars = match &member {
+				Some((member, inside)) => {
+					info!(
+						"running `{route}` as `{}` in `{}` ({}), keeping nothing",
+						MemberAccount::ADMIN_ROLE,
+						member.name,
+						member.id
+					);
+					inside.sdk_vars()
+				}
+				None => {
+					info!(
+						"running `{route}` as the `{}` role, keeping nothing",
+						AgentIdentity::ADMIN_ROLE
+					);
+					session.sdk_vars()
+				}
+			};
+			let status = vars
 				.iter()
 				.fold(
 					// NOT `without_launch_env`: this child is THIS launch, so it
@@ -73,7 +115,7 @@ pub async fn AdminElevate(
 					|process, (_, value)| process.with_secret(value.clone()),
 				)
 				.without_env("AWS_PROFILE")
-				.with_envs(session.sdk_vars())
+				.with_envs(vars.clone())
 				.spawn()?
 				.status()
 				.await?;
@@ -88,8 +130,16 @@ pub async fn AdminElevate(
 		true => {
 			session.write()?;
 			// the expiry and nothing else: the credential itself never prints
+			let reach = match &member {
+				Some((member, _)) => format!(
+					"; reaches `{0}` ({1}), which `beet aws --account={0}` \
+					chains into for each call\n",
+					member.name, member.id
+				),
+				None => "\n".to_string(),
+			};
 			Response::ok_text(format!(
-				"administrator until {} ({} from now), on tmpfs at {}\n",
+				"administrator until {} ({} from now), on tmpfs at {}{reach}",
 				Timestamp::from_secs(session.expires).format_iso8601(),
 				AwsExec::describe_remaining(session.remaining_secs()),
 				AdminSession::path()?.display()
@@ -100,21 +150,26 @@ pub async fn AdminElevate(
 }
 
 impl AdminSession {
+	/// The grant a session is bought for unless asked otherwise, an hour:
+	/// long enough for an elevated deploy, short enough that forgetting it
+	/// costs nothing.
+	pub const DEFAULT_SECS: i64 = 3600;
+
 	/// The least a reused session must have left: an elevated deploy, a
 	/// mail box replaced and provisioned, takes most of it.
 	const REUSE_FLOOR: i64 = 20 * 60;
 
 	/// An administrator session for one elevated command: the live one on
-	/// tmpfs when `beet admin` left one with time to spare, else a fresh hour
-	/// bought with a code from the phone, asked for on the terminal and kept
-	/// nowhere. Without a terminal the ask is the error.
-	pub async fn acquire() -> Result<Self> {
+	/// tmpfs when `beet admin` left one with time to spare, else a fresh one
+	/// of `seconds` bought with a code from the phone, asked for on the
+	/// terminal and kept nowhere. Without a terminal the ask is the error.
+	pub async fn acquire(seconds: i64) -> Result<Self> {
 		if let Ok(SessionState::Live(session)) = Self::read()
 			&& session.remaining_secs() >= Self::REUSE_FLOOR
 		{
 			return session.xok();
 		}
-		Self::mint(AdminElevate::DEFAULT).await
+		Self::mint(seconds).await
 	}
 
 	/// A fresh session of `seconds`: `beet-agent`'s pair from the global
@@ -130,12 +185,34 @@ impl AdminSession {
 		AdminElevate::check_code(&code)?;
 		AdminElevate::assume(&agent, &account, &code, seconds).await
 	}
+
+	/// A session from the four tab-separated fields an `sts:AssumeRole` call
+	/// answers when asked for `Credentials.[AccessKeyId,SecretAccessKey,
+	/// SessionToken,Expiration]` as text. Separated from the calls so the
+	/// shape is testable without an account.
+	pub fn parse(body: &str, seconds: i64) -> Result<Self> {
+		let fields = body.trim().split_whitespace().collect::<Vec<_>>();
+		let [key_id, secret, token, expiration] = fields.as_slice() else {
+			bevybail!(
+				"`sts:AssumeRole` answered {} field(s) rather than four, so 				there is no session to keep",
+				fields.len()
+			);
+		};
+		Self {
+			key_id: (*key_id).into(),
+			secret: (*secret).into(),
+			token: (*token).into(),
+			// the answer's own expiry rather than now plus the request, since
+			// STS clamps the duration to the role's ceiling without saying so
+			expires: Timestamp::parse_rfc3339(expiration)
+				.map(|stamp| stamp.secs())
+				.unwrap_or_else(|| Timestamp::now().secs() + seconds),
+		}
+		.xok()
+	}
 }
 
 impl AdminElevate {
-	/// The default grant, an hour: long enough for a mint or a roll, short
-	/// enough that forgetting it costs nothing.
-	const DEFAULT: i64 = 3600;
 	/// The role's own `MaxSessionDuration`, which STS refuses to exceed.
 	const CEILING: i64 = 43200;
 	/// STS's floor for an assumed role.
@@ -148,7 +225,7 @@ impl AdminElevate {
 		let Some(value) =
 			value.map(str::trim).filter(|value| !value.is_empty())
 		else {
-			return Self::DEFAULT.xok();
+			return AdminSession::DEFAULT_SECS.xok();
 		};
 		let (digits, multiplier) = match value.chars().last() {
 			Some('h') => (&value[..value.len() - 1], 3600),
@@ -194,37 +271,26 @@ impl AdminElevate {
 	/// This account, asked as the agent, so the role and device arns are
 	/// composed rather than written down anywhere.
 	async fn account_id(agent: &[(SmolStr, SmolStr)]) -> Result<String> {
-		agent
-			.iter()
-			.fold(ChildProcess::new("aws"), |process, (_, value)| {
-				process.with_secret(value.clone())
-			})
-			.without_launch_env()
-			.without_env("AWS_PROFILE")
-			// the agent pair carries no token of its own, so an inherited one
-			// would make it authenticate as nobody
-			.without_env("AWS_SESSION_TOKEN")
-			.with_args([
-				"sts",
-				"get-caller-identity",
-				"--query",
-				"Account",
-				"--output",
-				"text",
-			])
-			.with_envs(agent.to_vec())
-			.run_async_stdout()
-			.await
-			.map(|out| out.trim().to_string())
-			.map_err(|err| {
-				bevyhow!(
-					"`{}`'s pair does not answer `sts:GetCallerIdentity`, so \
+		AgentIdentity::aws(agent, [
+			"sts",
+			"get-caller-identity",
+			"--query",
+			"Account",
+			"--output",
+			"text",
+		])
+		.run_async_stdout()
+		.await
+		.map(|out| out.trim().to_string())
+		.map_err(|err| {
+			bevyhow!(
+				"`{}`'s pair does not answer `sts:GetCallerIdentity`, so \
 					there is nobody to elevate FROM: the key may have been \
 					rolled at the account without the global document \
 					following it. {err}",
-					AgentIdentity::USER
-				)
-			})
+				AgentIdentity::USER
+			)
+		})
 	}
 
 	/// Trade the code for the role's temporary credentials.
@@ -243,38 +309,27 @@ impl AdminElevate {
 			format!("arn:aws:iam::{account}:mfa/{}", AgentIdentity::USER);
 		let (request_path, request) =
 			Self::write_request(&role, &device, code, seconds)?;
-		let result = agent
-			.iter()
-			.fold(ChildProcess::new("aws"), |process, (_, value)| {
-				process.with_secret(value.clone())
-			})
-			.without_launch_env()
-			.without_env("AWS_PROFILE")
-			// the agent pair carries no token of its own, so an inherited one
-			// would make it authenticate as nobody
-			.without_env("AWS_SESSION_TOKEN")
-			.with_secret(code)
-			.with_args([
-				"sts",
-				"assume-role",
-				"--cli-input-json",
-				request.as_str(),
-				// the four fields as text rather than the json document: this
-				// crate links no json parser outside its `json` feature, and
-				// the cli's own `--query` is the narrower ask anyway
-				"--query",
-				"Credentials.[AccessKeyId,SecretAccessKey,SessionToken,Expiration]",
-				"--output",
-				"text",
-			])
-			.with_envs(agent.to_vec())
-			.run_async_stdout()
-			.await;
+		let result = AgentIdentity::aws(agent, [
+			"sts",
+			"assume-role",
+			"--cli-input-json",
+			request.as_str(),
+			// the four fields as text rather than the json document: this crate
+			// links no json parser outside its `json` feature, and the cli's
+			// own `--query` is the narrower ask anyway
+			"--query",
+			"Credentials.[AccessKeyId,SecretAccessKey,SessionToken,Expiration]",
+			"--output",
+			"text",
+		])
+		.with_secret(code)
+		.run_async_stdout()
+		.await;
 		// the request holds the code, so it goes the moment the call returns,
 		// whichever way it went
 		fs_ext::remove(&request_path)?;
 		let body = result.map_err(|err| Self::explain(err, &device))?;
-		Self::parse_credentials(&body, seconds)
+		AdminSession::parse(&body, seconds)
 	}
 
 	/// Write the request where the cli can read it: a `0600` file on tmpfs,
@@ -327,29 +382,6 @@ impl AdminElevate {
 			 \"TokenCode\":\"{code}\",\
 			 \"DurationSeconds\":{seconds}}}"
 		)
-	}
-
-	/// The four tab-separated fields `--query` asked for, in that order.
-	/// Separated from the call so the shape is testable without an account.
-	fn parse_credentials(body: &str, seconds: i64) -> Result<AdminSession> {
-		let fields = body.trim().split_whitespace().collect::<Vec<_>>();
-		let [key_id, secret, token, expiration] = fields.as_slice() else {
-			bevybail!(
-				"`sts:AssumeRole` answered {} field(s) rather than four, so 				there is no session to keep",
-				fields.len()
-			);
-		};
-		AdminSession {
-			key_id: (*key_id).into(),
-			secret: (*secret).into(),
-			token: (*token).into(),
-			// the answer's own expiry rather than now plus the request, since
-			// STS clamps the duration to the role's ceiling without saying so
-			expires: Timestamp::parse_rfc3339(expiration)
-				.map(|stamp| stamp.secs())
-				.unwrap_or_else(|| Timestamp::now().secs() + seconds),
-		}
-		.xok()
 	}
 
 	/// Turn the three failures that actually happen into what to do about
@@ -440,7 +472,7 @@ mod test {
 	/// command that fails halfway.
 	#[beet_core::test]
 	fn parses_the_credentials() {
-		let session = AdminElevate::parse_credentials(
+		let session = AdminSession::parse(
 			"ASIAEXAMPLE\tsecrethalf\tsessiontoken\t2026-09-30T12:00:00Z\n",
 			3600,
 		)
@@ -453,7 +485,7 @@ mod test {
 				.secs(),
 		);
 		// a short answer is no session rather than a half one
-		AdminElevate::parse_credentials("ASIAEXAMPLE\tsecrethalf", 3600)
+		AdminSession::parse("ASIAEXAMPLE\tsecrethalf", 3600)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("rather than four");

@@ -84,14 +84,8 @@ pub struct SecretRecord {
 	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub address: Option<SmolStr>,
 	/// How the secret is rolled, declared by whatever minted it; absent on a
-	/// hand-kept record. Read under its old name `rotation` too, and always
-	/// will be: the cold bucket's dated exports are history nothing rewrites,
-	/// and a restore from one must still open it.
-	#[serde(
-		default,
-		alias = "rotation",
-		skip_serializing_if = "Option::is_none"
-	)]
+	/// hand-kept record.
+	#[serde(default, skip_serializing_if = "Option::is_none")]
 	pub roll: Option<SecretRoll>,
 	/// Facts a writer records about the value, by its own keys, for a later
 	/// reader to compare against: ie what a deploy credential was minted to

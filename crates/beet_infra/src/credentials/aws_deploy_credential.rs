@@ -1,5 +1,5 @@
-//! `<AwsDeployer/>`: this repo's own AWS deployer user, its policies and the
-//! pair its credential document holds.
+//! `<AwsDeployCredential/>`: this repo's own AWS deploy user, its policies and
+//! the pair its credential document holds.
 
 use crate::actions::aws_cli_ext;
 use crate::prelude::*;
@@ -7,9 +7,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;
 
-/// `<AwsDeployer/>` — the repo's AWS deploy credential, declared at the
+/// `<AwsDeployCredential/>`: the repo's AWS deploy credential, declared at the
 /// entry's root like `<Secrets/>`: one IAM user for the credential document,
-/// one managed policy per app the entry declares ([`DeployerPolicy`], lowered
+/// one managed policy per app the entry declares ([`AwsDeployPolicy`], lowered
 /// from what the stacks render), one runtime boundary per app and stage
 /// ([`RuntimeBoundary`]), and one access key, sealed into the document as
 /// `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with the policies it was
@@ -22,24 +22,25 @@ use serde_json::Value;
 ///
 /// ## Why derived outside tofu rather than declared in a stack
 ///
-/// Everything else about a stack is declared, and a deployer user could be:
+/// Everything else about a stack is declared, and a deploy user could be:
 /// `aws_iam_user` and `aws_iam_access_key` are bound, so the apply that
 /// provisions a stack could provision the identity applying it. It should not.
-/// A deployer declared in its own stack has to hold `iam:PutUserPolicy` on its
-/// own user to plan, which is an administrator with extra steps; the stack's
-/// `destroy` would delete the credential it is authenticating with; and the
-/// tier cannot close, since the apply that mints the first deployer has to run
-/// as some earlier one. So the identity lives OUTSIDE tofu, and what the block
-/// would have bought (a policy derived from the declarations rather than
+/// A deploy user declared in its own stack has to hold `iam:PutUserPolicy` on
+/// its own user to plan, which is an administrator with extra steps; the
+/// stack's `destroy` would delete the credential it is authenticating with; and
+/// the tier cannot close, since the apply that mints the first deploy user has
+/// to run as some earlier one. So the identity lives OUTSIDE tofu, and what the
+/// block would have bought (a policy derived from the declarations rather than
 /// written by hand) is bought here instead, from the same render.
 ///
 /// ## Which credential an elevated deploy runs this as
 ///
 /// Minting an IAM user is an administrator's act, so the converge does not run
-/// as the deployer it converges: its scoped policy grants no `iam:` action over
-/// itself. It runs as an administrator session ([`AdminSession::acquire`]),
-/// the live one `beet admin` left on tmpfs when it has time to spare, else an
-/// hour bought with the code from the phone, kept nowhere.
+/// as the credential it converges: its scoped policy grants no `iam:` action
+/// over itself. It runs as an administrator session
+/// ([`AdminSession::acquire`]), the live one `beet admin` left on tmpfs when it
+/// has time to spare, else an hour bought with the code from the phone, kept
+/// nowhere.
 ///
 /// ## Every stage that deploys
 ///
@@ -54,7 +55,7 @@ use serde_json::Value;
 ///
 /// Per app it converges TWO kinds of managed policy: `<app>--<stage>--runtime-boundary`
 /// ([`RuntimeBoundary`], the ceiling on what a deploy may create) and
-/// `<app>--deploy` ([`DeployerPolicy`], what the deployer may do). The
+/// `<app>--deploy` ([`AwsDeployPolicy`], what the deploy user may do). The
 /// boundary goes first, and the deploy policy carries the conditions that name
 /// it only once every principal the render names already WEARS it, which this
 /// asks the account rather than taking on trust.
@@ -70,10 +71,11 @@ use serde_json::Value;
 ///
 /// ## What converges
 ///
-/// - the user, `<repo>-deployer`, created when absent. Named for the
+/// - the user, `<repo>-deploy` ([`DeployCredential::name`]), created when
+///   absent, or renamed in place from the `<repo>-deployer` it was once called
+///   (its keys, policies and attachments go with it). Named for the
 ///   CREDENTIAL DOCUMENT rather than for an app, since a document holds one
-///   `AWS_ACCESS_KEY_ID` however many apps a repo deploys, and derived from
-///   the workspace directory because a repo has no other name.
+///   `AWS_ACCESS_KEY_ID` however many apps a repo deploys.
 /// - one managed policy per app, attached to the user, rewritten only when its
 ///   document changed (managed rather than inline: a user's inline budget is
 ///   2048 characters for ALL of its policies together, which three apps of a
@@ -87,9 +89,9 @@ use serde_json::Value;
 ///   roll or grants are not what this writes now.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct AwsDeployer;
+pub struct AwsDeployCredential;
 
-impl DeployCredentialProvider for AwsDeployer {
+impl DeployCredentialProvider for AwsDeployCredential {
 	fn id(&self) -> &'static str { "aws" }
 
 	fn human_factor(&self) -> &'static str {
@@ -119,9 +121,10 @@ impl DeployCredentialProvider for AwsDeployer {
 			|| Self::WRITE_DENIED.contains(&kind);
 		denied.then(|| {
 			format!(
-				"this deploy would {} `{}`, which no stored deployer may \
-				outside the `{}` stage: it is a change a deployer is denied \
-				without the code from the phone, since it can make data final",
+				"this deploy would {} `{}`, which no stored deploy credential \
+				may outside the `{}` stage: it is a change the credential is \
+				denied without the code from the phone, since it can make data \
+				final",
 				change.action,
 				change.address,
 				BootstrapConfig::DEFAULT_STAGE
@@ -155,7 +158,7 @@ impl DeployCredentialProvider for AwsDeployer {
 /// and the principals those stacks name, which is what decides whether the
 /// deploy policy may carry the boundary conditions.
 struct AppPolicies {
-	deploy: DeployerPolicy,
+	deploy: AwsDeployPolicy,
 	/// Per STAGE, since a boundary's content is one stage's names. The deploy
 	/// policy is per app, and its condition matches any of them.
 	boundaries: BTreeMap<SmolStr, RuntimeBoundary>,
@@ -163,17 +166,30 @@ struct AppPolicies {
 	principals: Vec<(&'static str, SmolStr)>,
 }
 
-impl AwsDeployer {
+/// Where a converged key lives: the account's id, and the member of the
+/// Organization it is when an `<AwsAccount/>` is declared.
+struct KeyHome<'a> {
+	account: &'a str,
+	member: Option<&'a MemberAccount>,
+}
+
+impl AwsDeployCredential {
 	/// The record names the pair is sealed under, which are the sdk's own
 	/// variables: what the document holds is what the environment gets.
 	const KEY_ID: &'static str = "AWS_ACCESS_KEY_ID";
 	const KEY_SECRET: &'static str = "AWS_SECRET_ACCESS_KEY";
 
+	/// The key id record's metadata naming the account the user lives in.
+	const ACCOUNT: &'static str = "account";
+	/// ..and that account's name in the Organization, absent for the
+	/// management account itself.
+	const ACCOUNT_NAME: &'static str = "account_name";
+
 	/// The group a first converge seals into; a record already sealed stays
 	/// in its own.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
 
-	/// The types whose removal [`DeployerPolicy`] denies a deployer without
+	/// The types whose removal [`AwsDeployPolicy`] denies the user without
 	/// the code from the phone outside the default stage (its
 	/// `IrreversibleNeedsMfa` and `DataVolumeNeedsMfa` statements), so a plain
 	/// deploy refuses a plan that removes one rather than meeting the deny
@@ -209,14 +225,38 @@ impl AwsDeployer {
 		let grants = Self::grant_lines(&apps)?;
 		let held = DeployCredential::sealed(caller, Self::KEY_ID).await;
 		let ours = |line: &str| Self::lowers(&apps, line);
-		CredentialStatus::compare(
+		let mut status = CredentialStatus::compare(
 			self.id(),
 			Self::KEY_ID,
 			&grants,
 			held.as_ref(),
 			Some(&ours),
-		)
-		.xok()
+		);
+		// a credential in another account holds none of what this one needs
+		if let Some((account, _)) = AwsAccount::declared(caller).await?
+			&& let Some(held) = held.as_ref()
+		{
+			status
+				.stale
+				.extend(Self::elsewhere(held, &account.resolved_name()?));
+		}
+		status.xok()
+	}
+
+	/// Why the sealed key id `held` is not the declared account `name`'s,
+	/// `None` when it lives there.
+	fn elsewhere(held: &Secret, name: &str) -> Option<String> {
+		let lives = held.record.metadata.get(Self::ACCOUNT_NAME);
+		(lives.map(SmolStr::as_str) != Some(name)).then(|| {
+			format!(
+				"aws: the sealed `{}` lives in {}, not the declared account \
+				`{name}`",
+				Self::KEY_ID,
+				lives
+					.map(|lives| format!("`{lives}`"))
+					.unwrap_or_else(|| "the management account".into())
+			)
+		})
 	}
 
 	/// Whether a grant `line` names a policy this launch lowers: an app's
@@ -283,8 +323,10 @@ impl AwsDeployer {
 		lines.xok()
 	}
 
-	/// Buy an administrator session, converge the user, every boundary and
-	/// policy, and the key, and when `ask.run`, hand the deploy the session.
+	/// Buy an administrator session, converge the declared account
+	/// ([`AwsAccount`]) and act inside it, converge the user, every boundary
+	/// and policy, and the key, and when `ask.run`, hand the deploy the
+	/// session.
 	async fn elevate_with(
 		&self,
 		caller: &AsyncEntity,
@@ -293,20 +335,41 @@ impl AwsDeployer {
 		let Some(apps) = Self::apps(caller).await? else {
 			bevybail!(
 				"this launch declares no stack keeping its state at AWS, so \
-				there is no deployer to elevate"
+				there is no AWS deploy credential to elevate"
 			);
 		};
-		let session = AdminSession::acquire().await.map_err(|err| {
+		let session = AdminSession::acquire(AdminSession::DEFAULT_SECS)
+			.await
+			.map_err(|err| {
 			bevyhow!(
 				"an elevated deploy asks for the six-digit code from the phone, \
 				and {err}\n\nrun it in a terminal: `{}`",
 				ask.relay
 			)
 		})?;
-		let admin = AwsAdmin(session.sdk_vars());
+		let mut report = Vec::new();
+		// the account first, since the credential lives inside it
+		let management = AwsAdmin::new(session.sdk_vars());
+		let (admin, home) = match AwsAccount::declared(caller).await? {
+			Some((declared, region)) => {
+				let (home, inside, lines) = declared
+					.converge(
+						&AwsManagement::new(management, region.clone()),
+						&region,
+					)
+					.await?;
+				report.extend(lines);
+				(inside.into_admin(), Some(home))
+			}
+			None => (management, None),
+		};
 		let account = admin.account_id().await?;
-		let user = Self::user_name()?;
-		let mut report = vec![admin.ensure_user(&user).await?];
+		let user = DeployCredential::name()?;
+		report.push(
+			admin
+				.ensure_user(&user, &Self::retired_user_name()?)
+				.await?,
+		);
 		for app in apps.iter() {
 			// the boundaries FIRST: the deploy policy may only carry the
 			// conditions naming them once they exist and every principal wears one
@@ -321,14 +384,20 @@ impl AwsDeployer {
 			);
 		}
 		let grants = Self::grant_lines(&apps)?;
+		let home = KeyHome {
+			account: &account,
+			member: home.as_ref(),
+		};
 		report.push(
-			Self::converge_key(caller, &admin, &user, &apps, &grants, ask.roll)
-				.await?,
+			Self::converge_key(
+				caller, &admin, &user, home, &apps, &grants, ask.roll,
+			)
+			.await?,
 		);
 		CredentialElevation {
 			report,
 			env: match ask.run {
-				true => session.sdk_vars(),
+				true => admin.vars().to_vec(),
 				false => Vec::new(),
 			},
 			cleanup: None,
@@ -358,7 +427,7 @@ impl AwsDeployer {
 			let app =
 				apps.remove(stack.app_name())
 					.unwrap_or_else(|| AppPolicies {
-						deploy: DeployerPolicy::new(
+						deploy: AwsDeployPolicy::new(
 							stack.app_name().clone(),
 							state_bucket.clone(),
 						),
@@ -387,29 +456,10 @@ impl AwsDeployer {
 		Some(apps.into_values().collect::<Vec<_>>()).xok()
 	}
 
-	/// The user every launch of this repo deploys as: the workspace directory,
-	/// kebab-cased, and `-deployer`. See the type docs for why the repo rather
-	/// than the app names it.
-	pub(crate) fn user_name() -> Result<String> {
-		let root = fs_ext::workspace_root();
-		let name = root
-			.file_name()
-			.and_then(|name| name.to_str())
-			.map(|name| name.replace('_', "-"))
-			.filter(|name| {
-				!name.is_empty()
-					&& name
-						.chars()
-						.all(|char| char.is_ascii_alphanumeric() || char == '-')
-			})
-			.ok_or_else(|| {
-				bevyhow!(
-					"cannot name a deployer after the workspace directory \
-					`{}`: an iam user name is alphanumeric",
-					root.display()
-				)
-			})?;
-		format!("{name}-deployer").xok()
+	/// What the user was called before it shared the Cloudflare token's name,
+	/// which a converge finding no [`DeployCredential::name`] renames in place.
+	fn retired_user_name() -> Result<String> {
+		format!("{}-deployer", DeployCredential::repo_name()?).xok()
 	}
 
 	/// The dry run's answer, needing no credential: the user and every policy
@@ -422,7 +472,10 @@ impl AwsDeployer {
 				.to_string()
 				.xok();
 		};
-		let mut out = format!("user {}\n", Self::user_name()?);
+		let mut out = format!("user {}\n", DeployCredential::name()?);
+		if let Some((account, region)) = AwsAccount::declared(caller).await? {
+			out.push_str(&format!("{}\n", account.describe(&region)?));
+		}
 		for app in apps.iter() {
 			out.push_str(&format!(
 				"\npolicy {}\n{}\n",
@@ -446,11 +499,13 @@ impl AwsDeployer {
 	/// user's, or on `roll`, sealing the pair with `grants` before deleting
 	/// what it replaces; restate a current pair's records otherwise. The key
 	/// id's record keeps the grants of policies this launch does not lower
-	/// ([`Self::merge_grants`]).
+	/// ([`Self::merge_grants`]) while it lives in the same account, and none
+	/// once the credential moves into another, which holds none of them.
 	async fn converge_key(
 		caller: &AsyncEntity,
 		admin: &AwsAdmin,
 		user: &str,
+		home: KeyHome<'_>,
 		apps: &[AppPolicies],
 		grants: &[String],
 		roll: bool,
@@ -465,8 +520,19 @@ impl AwsDeployer {
 		let held_secret = opened
 			.as_ref()
 			.and_then(|opened| opened.get(Self::KEY_SECRET).cloned());
+		let same_home = held_id.as_ref().is_none_or(|secret| {
+			secret
+				.record
+				.metadata
+				.get(Self::ACCOUNT_NAME)
+				.map(SmolStr::as_str)
+				== home.member.map(|member| member.name.as_str())
+		});
 		let merged = Self::merge_grants(
-			DeployCredential::held_grants(held_id.as_ref()),
+			match same_home {
+				true => DeployCredential::held_grants(held_id.as_ref()),
+				false => Vec::new(),
+			},
 			apps,
 			grants,
 		);
@@ -482,7 +548,7 @@ impl AwsDeployer {
 		if holds_active && !roll {
 			let mut resealed = false;
 			for (secret, record) in [
-				(held_id.as_ref(), Self::id_record(user, &merged)),
+				(held_id.as_ref(), Self::id_record(user, &home, &merged)),
 				(held_secret.as_ref(), Self::secret_record(user)),
 			] {
 				if let Some((secret, record)) = secret.and_then(|secret| {
@@ -526,7 +592,7 @@ impl AwsDeployer {
 			&group,
 			Self::KEY_ID,
 			&id,
-			Self::id_record(user, &merged),
+			Self::id_record(user, &home, &merged),
 		)?;
 		document.set(
 			&identity,
@@ -550,24 +616,40 @@ impl AwsDeployer {
 		.xok()
 	}
 
-	/// The key id's record: what it is, how it rolls, and the grants a plain
-	/// deploy compares the declarations against.
-	fn id_record(user: &str, grants: &[String]) -> SecretRecord {
+	/// The key id's record: what it is, how it rolls, the account it lives
+	/// in, and the grants a plain deploy compares the declarations against.
+	fn id_record(
+		user: &str,
+		home: &KeyHome,
+		grants: &[String],
+	) -> SecretRecord {
 		SecretRecord {
 			role: Some(SecretRole::EnvVar),
 			note: Some(
 				format!(
-					"aws deployer `{user}`: the access key id of this repo's \
-					own iam user; the deploy verbs and every `aws s3 sync` \
-					read the pair from here, never from ~/.aws"
+					"aws deploy credential `{user}`: the access key id of \
+					this repo's own iam user; the deploy verbs and every \
+					`aws s3 sync` read the pair from here, never from ~/.aws"
 				)
 				.into(),
 			),
 			roll: Some(SecretRoll::Elevated),
-			metadata: BTreeMap::from([(
-				DeployCredential::GRANTS.into(),
-				grants.join("\n").into(),
-			)]),
+			metadata: [
+				(
+					DeployCredential::GRANTS,
+					Some(SmolStr::from(grants.join("\n"))),
+				),
+				(Self::ACCOUNT, Some(SmolStr::from(home.account))),
+				(
+					Self::ACCOUNT_NAME,
+					home.member.map(|member| member.name.clone()),
+				),
+			]
+			.into_iter()
+			.filter_map(|(key, value)| {
+				value.map(|value| (SmolStr::from(key), value))
+			})
+			.collect(),
 			..default()
 		}
 	}
@@ -578,8 +660,8 @@ impl AwsDeployer {
 			role: Some(SecretRole::EnvVar),
 			note: Some(
 				format!(
-					"aws deployer `{user}`: the secret half of {}, shown once \
-					at creation",
+					"aws deploy credential `{user}`: the secret half of {}, \
+					shown once at creation",
 					Self::KEY_ID
 				)
 				.into(),
@@ -623,10 +705,62 @@ impl AwsDeployer {
 
 /// The administrator session one elevated deploy acts as at IAM, handed to
 /// every `aws` call explicitly: the launch's own environment holds the sealed
-/// deployer pair, which is exactly the credential that cannot do this.
-struct AwsAdmin(Vec<(SmolStr, SmolStr)>);
+/// deploy pair, which is exactly the credential that cannot do this.
+pub(crate) struct AwsAdmin(Vec<(SmolStr, SmolStr)>);
 
 impl AwsAdmin {
+	/// The session `vars` acts as.
+	pub(crate) fn new(vars: Vec<(SmolStr, SmolStr)>) -> Self { Self(vars) }
+
+	/// The session's three variables.
+	pub(crate) fn vars(&self) -> &[(SmolStr, SmolStr)] { &self.0 }
+
+	/// `process` as this session, answering its stdout.
+	pub(crate) async fn run(&self, process: ChildProcess) -> Result<String> {
+		self.wrap(process).run_async_stdout().await
+	}
+
+	/// A `--output text` answer, `None` when empty or the cli's `None`.
+	pub(crate) fn text_option(out: String) -> Option<SmolStr> {
+		Some(out.trim())
+			.filter(|out| !out.is_empty() && *out != "None")
+			.map(SmolStr::from)
+	}
+
+	/// Every object key in `bucket`, none when the bucket does not exist.
+	pub(crate) async fn state_keys(
+		&self,
+		bucket: &str,
+		region: &str,
+	) -> Result<Vec<SmolStr>> {
+		match self
+			.run(aws_cli_ext::service("s3api", region, [
+				"list-objects-v2",
+				"--bucket",
+				bucket,
+				"--query",
+				"Contents[].Key",
+				"--output",
+				"text",
+			]))
+			.await
+		{
+			Ok(out) => out
+				.split_whitespace()
+				.filter(|key| *key != "None")
+				.map(SmolStr::from)
+				.collect::<Vec<_>>()
+				.xok(),
+			Err(err) if err.to_string().contains("NoSuchBucket") => {
+				Vec::new().xok()
+			}
+			Err(err) => Err(err),
+		}
+	}
+
+	/// The tag the deploy user carries, saying what made it.
+	const USER_TAG: &'static str = "Key=beet,Value=deploy-credential";
+
 	/// `process` as this session: its three variables set, an inherited
 	/// profile dropped, every value redacted from any rendering of the command.
 	fn wrap(&self, process: ChildProcess) -> ChildProcess {
@@ -639,7 +773,7 @@ impl AwsAdmin {
 	}
 
 	/// This session's own account, which every policy arn composes with.
-	async fn account_id(&self) -> Result<String> {
+	pub(crate) async fn account_id(&self) -> Result<String> {
 		self.wrap(aws_cli_ext::sts([
 			"get-caller-identity",
 			"--query",
@@ -659,17 +793,17 @@ impl AwsAdmin {
 	}
 
 	/// An `aws iam` call as this session.
-	async fn iam<'a>(
+	pub(crate) async fn iam<'a>(
 		&self,
 		args: impl IntoIterator<Item = &'a str>,
 	) -> Result<String> {
-		self.wrap(aws_cli_ext::iam(args)).run_async_stdout().await
+		self.run(aws_cli_ext::iam(args)).await
 	}
 
 	/// [`iam`](Self::iam) answering json, `None` when the entity does not
 	/// exist: every converge step is get-or-create, and absence is the one
 	/// failure that is not one.
-	async fn iam_json<'a>(
+	pub(crate) async fn iam_json<'a>(
 		&self,
 		args: impl IntoIterator<Item = &'a str>,
 	) -> Result<Option<Value>> {
@@ -680,21 +814,43 @@ impl AwsAdmin {
 		}
 	}
 
-	/// The user, created when absent.
-	async fn ensure_user(&self, user: &str) -> Result<String> {
-		if self
-			.iam_json(["get-user", "--user-name", user])
-			.await?
-			.is_some()
-		{
+	/// The user, renamed in place from `retired` when only that exists, else
+	/// created when absent. A rename keeps the user's id, so its keys,
+	/// policies and attachments go with it and the sealed pair still answers.
+	async fn ensure_user(&self, user: &str, retired: &str) -> Result<String> {
+		let exists = async |name: &str| {
+			self.iam_json(["get-user", "--user-name", name])
+				.await
+				.map(|found| found.is_some())
+		};
+		if exists(user).await? {
 			return format!("user {user} exists").xok();
+		}
+		if exists(retired).await? {
+			self.iam([
+				"update-user",
+				"--user-name",
+				retired,
+				"--new-user-name",
+				user,
+			])
+			.await?;
+			self.iam([
+				"tag-user",
+				"--user-name",
+				user,
+				"--tags",
+				Self::USER_TAG,
+			])
+			.await?;
+			return format!("user {retired} renamed to {user}").xok();
 		}
 		self.iam([
 			"create-user",
 			"--user-name",
 			user,
 			"--tags",
-			"Key=beet,Value=deployer",
+			Self::USER_TAG,
 		])
 		.await?;
 		format!("user {user} created").xok()
@@ -756,13 +912,13 @@ impl AppPolicies {
 	/// every principal its stacks render ALREADY wears the boundary.
 	///
 	/// The order of operations, enforced rather than remembered: see
-	/// [`AwsDeployer`]. An app with no principals at the account yet is
+	/// [`AwsDeployCredential`]. An app with no principals at the account yet is
 	/// conditioned from birth, since its `CreateRole` carries the boundary.
 	async fn deploy_policy(
 		&self,
 		admin: &AwsAdmin,
 		account: &str,
-	) -> Result<DeployerPolicy> {
+	) -> Result<AwsDeployPolicy> {
 		if self.boundaries.values().all(RuntimeBoundary::is_empty) {
 			return self.deploy.clone().xok();
 		}
@@ -830,7 +986,7 @@ impl RuntimeBoundary {
 			)
 			.xok();
 		}
-		DeployerPolicy::converge_document(
+		AwsDeployPolicy::converge_document(
 			admin,
 			account,
 			&self.policy_name(),
@@ -840,7 +996,7 @@ impl RuntimeBoundary {
 	}
 }
 
-impl DeployerPolicy {
+impl AwsDeployPolicy {
 	/// Converge this policy at the account and attach it to `user`: created
 	/// when absent, a new default version when its document changed, and
 	/// nothing at all when it already matches.
@@ -870,7 +1026,7 @@ impl DeployerPolicy {
 	/// absent, a new default version when it changed, nothing when it matches.
 	/// Shared with [`RuntimeBoundary`], which is the same act minus the
 	/// attachment, since a boundary is worn rather than attached.
-	async fn converge_document(
+	pub(crate) async fn converge_document(
 		admin: &AwsAdmin,
 		account: &str,
 		name: &str,
@@ -993,7 +1149,11 @@ impl DeployerPolicy {
 	}
 
 	/// Attach the policy to `user` unless it already is.
-	async fn attach(admin: &AwsAdmin, arn: &str, user: &str) -> Result {
+	pub(crate) async fn attach(
+		admin: &AwsAdmin,
+		arn: &str,
+		user: &str,
+	) -> Result {
 		let attached = admin
 			.iam([
 				"list-attached-user-policies",
@@ -1028,18 +1188,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
-	/// The user is the workspace directory, kebab-cased: in this checkout,
-	/// beet's own.
-	#[beet_core::test]
-	fn names_the_user_after_the_repo() {
-		AwsDeployer::user_name()
-			.unwrap()
-			.as_str()
-			.xpect_contains("-deployer")
-			.xnot()
-			.xpect_contains("_");
-	}
-
 	/// An elevated prod deploy renders prod alone, so it replaces the lines of
 	/// the policies it lowers and keeps another entry's app and the dev
 	/// boundary as they were sealed: dropping the dev line once left every
@@ -1048,7 +1196,7 @@ mod test {
 	#[beet_core::test]
 	fn keeps_the_grants_of_a_stage_it_did_not_render() {
 		let apps = vec![AppPolicies {
-			deploy: DeployerPolicy::new("beet-site", "state"),
+			deploy: AwsDeployPolicy::new("beet-site", "state"),
 			boundaries: BTreeMap::from([(
 				SmolStr::new(BootstrapConfig::PROD_STAGE),
 				RuntimeBoundary::new("beet-site", BootstrapConfig::PROD_STAGE),
@@ -1063,7 +1211,7 @@ mod test {
 		]
 		.map(SmolStr::from)
 		.to_vec();
-		AwsDeployer::merge_grants(held, &apps, &[
+		AwsDeployCredential::merge_grants(held, &apps, &[
 			"beet-site--deploy 55".into(),
 			"beet-site--prod--runtime-boundary 66".into(),
 		])
@@ -1073,6 +1221,34 @@ mod test {
 			"beet-site--dev--runtime-boundary 33".into(),
 			"beet-site--prod--runtime-boundary 66".into(),
 		]);
+	}
+
+	/// Declaring an account makes a key living anywhere else stale, the
+	/// management account included, so the first elevated deploy moves it.
+	#[beet_core::test]
+	fn a_key_in_another_account_is_stale() {
+		let held = |account: Option<&str>| Secret {
+			name: "AWS_ACCESS_KEY_ID".into(),
+			group: "default".into(),
+			value: "AKIA".into(),
+			record: SecretRecord {
+				metadata: account
+					.map(|account| {
+						(SmolStr::new("account_name"), SmolStr::new(account))
+					})
+					.into_iter()
+					.collect(),
+				..default()
+			},
+		};
+		AwsDeployCredential::elsewhere(&held(Some("beetmash")), "beetmash")
+			.xpect_none();
+		AwsDeployCredential::elsewhere(&held(None), "beetmash")
+			.unwrap()
+			.xpect_contains("the management account");
+		AwsDeployCredential::elsewhere(&held(Some("beet")), "beetmash")
+			.unwrap()
+			.xpect_contains("lives in `beet`");
 	}
 
 	/// Outside the disposable stage, removing a bucket, a table, a database or
@@ -1090,38 +1266,38 @@ mod test {
 		let dev = Stack::new("app")
 			.with_stage(BootstrapConfig::DEFAULT_STAGE)
 			.resolve(&default());
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_s3_bucket", "delete"), &prod)
 			.xpect_some();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_dynamodb_table", "replace"), &prod)
 			.xpect_some();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_s3_bucket", "update"), &prod)
 			.xpect_none();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_s3_bucket", "delete"), &dev)
 			.xpect_none();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_instance", "delete"), &prod)
 			.xpect_none();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_ebs_volume", "replace"), &prod)
 			.xpect_some();
-		AwsDeployer
+		AwsDeployCredential
 			.protects(&change("aws_ebs_volume", "update"), &prod)
 			.xpect_none();
 		for kind in [
 			"aws_s3_bucket_versioning",
 			"aws_s3_bucket_lifecycle_configuration",
 		] {
-			AwsDeployer
+			AwsDeployCredential
 				.protects(&change(kind, "create"), &prod)
 				.xpect_some();
-			AwsDeployer
+			AwsDeployCredential
 				.protects(&change(kind, "update"), &prod)
 				.xpect_some();
-			AwsDeployer
+			AwsDeployCredential
 				.protects(&change(kind, "update"), &dev)
 				.xpect_none();
 		}

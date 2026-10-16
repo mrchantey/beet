@@ -17,9 +17,9 @@ use std::path::PathBuf;
 ///
 /// A name may live in only one document a launch loads, and every repo's own
 /// document already holds `AWS_ACCESS_KEY_ID`. Naming these the same would mean
-/// a launch in any repo either shadowing its deployer with this read-only pair
-/// or refusing to load. So they are named for whose they are, and the mapping
-/// onto the sdk's names happens per child, where it is visible.
+/// a launch in any repo either shadowing its AWS deploy credential with this
+/// read-only pair or refusing to load. So they are named for whose they are,
+/// and the mapping onto the sdk's names happens per child, where it is visible.
 pub struct AgentIdentity;
 
 impl AgentIdentity {
@@ -56,6 +56,40 @@ impl AgentIdentity {
 			);
 		}
 		SecretsHandle::from_uri(&path.to_string_lossy())
+	}
+
+	/// The aws cli as `vars` and nothing else: each value redacted from any
+	/// rendering of the command, the launch's own variables dropped, and an
+	/// inherited profile and session token with them, since a long-lived pair
+	/// beside a foreign token authenticates as nobody. Removals apply before
+	/// additions, so a session's own token survives.
+	pub fn aws<'a>(
+		vars: &[(SmolStr, SmolStr)],
+		args: impl IntoIterator<Item = &'a str>,
+	) -> ChildProcess {
+		vars.iter()
+			.fold(ChildProcess::new("aws"), |process, (_, value)| {
+				process.with_secret(value.clone())
+			})
+			.without_launch_env()
+			.without_env("AWS_PROFILE")
+			.without_env("AWS_SESSION_TOKEN")
+			.with_args(args)
+			.with_envs(vars.to_vec())
+	}
+
+	/// The global document's record `name`, opened on demand like the pair
+	/// and handed to the caller alone, never to an environment. `None` when
+	/// the document holds no such record.
+	pub async fn record(name: &str) -> Result<Option<SmolStr>> {
+		Self::handle()
+			.await?
+			.read()
+			.await?
+			.open(&AgeIdentityFile::require()?)?
+			.get(name)
+			.map(|secret| secret.value.clone())
+			.xok()
 	}
 
 	/// `beet-agent`'s pair under the SDK's own names, ready for a child.

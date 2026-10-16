@@ -132,7 +132,7 @@ impl PluginGroup for BeetPlugins {
 		{
 			builder = builder.add(beet_thread::prelude::ThreadUiPlugin);
 		}
-		// the infra deploy block/action type registrations, so a deployer entry
+		// the infra deploy block/action type registrations, so a deploy entry
 		// resolves every compiled deploy type by tag independent of the example
 		// templates (`extra`).
 		#[cfg(feature = "infra")]

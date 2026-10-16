@@ -1,5 +1,5 @@
-//! The IAM policy a repo's deployer needs, LOWERED from the provider types the
-//! stacks it deploys declare.
+//! The IAM policy a repo's AWS deploy credential needs, LOWERED from the
+//! provider types the stacks it deploys declare.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -8,7 +8,7 @@ use serde_json::json;
 
 /// The deploy-side counterpart of [`IamPolicy`]: that lowers a stack's
 /// [`AccessGrant`]s into what the RUNNING process may do, this lowers the
-/// provider types a stack RENDERS into what the deployer applying it may do.
+/// provider types a stack RENDERS into what the credential applying it may do.
 /// One policy per app: every stage of it by name, and the services the
 /// launch's own stage renders.
 ///
@@ -24,7 +24,7 @@ use serde_json::json;
 ///   bucket, and any global service the stacks use.
 /// - the state bucket, read-only at the bucket level and read/write on the keys
 ///   named for this app alone (`<app>--*`, which is every stage's state object
-///   and the lock beside each), so one app's deployer cannot touch another's
+///   and the lock beside each), so one app's policy cannot touch another's
 ///   state.
 /// - `s3:*` on this app's own bucket namespace (`<app>--*`), which is every
 ///   bucket a stack of it composes, in any stage.
@@ -46,7 +46,7 @@ use serde_json::json;
 /// The last line is where this stops being least privilege: an action-level
 /// policy per service would be a list nobody can verify without applying every
 /// path of every stack, and a provider refresh reads far more than a deploy
-/// writes. What the scoping does buy is that a leaked deployer key is one app's
+/// writes. What the scoping does buy is that a leaked deploy key is one app's
 /// blast radius in one region, with no IAM outside that app's names, no access
 /// to another app's buckets or state, and nothing at the account level.
 ///
@@ -87,7 +87,7 @@ use serde_json::json;
 ///   so a destroy of something undeclared is denied. Put the declaration back,
 ///   destroy, then remove it.
 #[derive(Debug, Clone)]
-pub struct DeployerPolicy {
+pub struct AwsDeployPolicy {
 	/// The app every name is scoped to, ie `beet-site`.
 	app: SmolStr,
 	/// The state bucket this launch resolved, ie `beet-state-<account id>`.
@@ -113,7 +113,7 @@ pub struct DeployerPolicy {
 	boundary: bool,
 }
 
-impl DeployerPolicy {
+impl AwsDeployPolicy {
 	/// Which IAM service a provider type's api calls belong to, by longest
 	/// matching prefix, so a service's whole family rides one entry and an
 	/// exception (`aws_cloudwatch_log_group` is `logs`, not `cloudwatch`)
@@ -174,11 +174,11 @@ impl DeployerPolicy {
 	const GLOBAL: &'static [&'static str] = &["route53", "sts"];
 
 	/// Provider prefixes no IAM policy grants, for one of two reasons: the
-	/// provider answers to its own credential ([`DeployerToken`] lowers what
-	/// Cloudflare's asks for), or it makes no remote call at all (terraform's
-	/// own builtins, the local providers). Absence here is not a silent pass: a
-	/// prefix this does not name and [`SERVICES`](Self::SERVICES) does not
-	/// place FAILS the mint.
+	/// provider answers to its own credential ([`CloudflareDeployToken`] lowers
+	/// what Cloudflare's asks for), or it makes no remote call at all
+	/// (terraform's own builtins, the local providers). Absence here is not a
+	/// silent pass: a prefix this does not name and
+	/// [`SERVICES`](Self::SERVICES) does not place FAILS the mint.
 	const NO_GRANT: &'static [&'static str] = &[
 		"cloudflare_",
 		"local_",
@@ -284,8 +284,8 @@ impl DeployerPolicy {
 			.map(|(_, service)| Some(*service))
 			.ok_or_else(|| {
 				bevyhow!(
-					"no deployer permission is declared for `{declared}`: add \
-					its service prefix to `DeployerPolicy::SERVICES`"
+					"no deploy permission is declared for `{declared}`: add \
+					its service prefix to `AwsDeployPolicy::SERVICES`"
 				)
 			})
 	}
@@ -304,7 +304,7 @@ impl DeployerPolicy {
 				"Effect": "Allow",
 				"Action": regional,
 				"Resource": "*",
-				// every regional service in one condition: a deployer that
+				// every regional service in one condition: a credential that
 				// cannot call outside its stacks' regions cannot quietly run a
 				// workload in one nobody looks at
 				"Condition": {
@@ -369,7 +369,7 @@ impl DeployerPolicy {
 			}));
 			statements.extend(self.boundary_statements());
 		}
-		statements.extend(self.irreversible_statement());
+		statements.push(self.irreversible_statement());
 		statements.extend(self.data_volume_statement());
 		// the app's own parameter prefix, unconditionally: a stack's secret store
 		// defaults to exactly this prefix whether or not the config RENDERS a
@@ -461,7 +461,7 @@ impl DeployerPolicy {
 	///   principal to be capped and refuses to touch an uncapped one.
 	/// - **never uncap.** `Delete*PermissionsBoundary` is denied outright.
 	/// - **never rewrite the cap.** The boundary and this policy are both
-	///   `<app>--*`, which the `Iam` statement reaches, so a deployer could
+	///   `<app>--*`, which the `Iam` statement reaches, so the credential could
 	///   otherwise publish a new version of the document that grants it.
 	/// - **no service-linked roles.** They can never carry a boundary at all
 	///   (`PutRolePermissionsBoundary` answers `UnmodifiableEntity`), so the
@@ -472,7 +472,7 @@ impl DeployerPolicy {
 	/// that namespace capped, there is no uncapped role to pass.
 	///
 	/// **Every boundary deny is scoped to this app's own principals**, which is
-	/// not tidiness: one deployer user carries one policy PER APP, an explicit
+	/// not tidiness: one deploy user carries one policy PER APP, an explicit
 	/// deny is a union across all of them, and a deny on `*` would therefore
 	/// make each app's policy refuse every other app's deploys, since their
 	/// boundaries differ. `NeverUncap` is the deliberate exception, being a
@@ -533,7 +533,7 @@ impl DeployerPolicy {
 				"Sid": "NeverMintOrRewriteACap",
 				"Effect": "Deny",
 				// `CreatePolicy` belongs here because the condition above
-				// admits any boundary of this app: without it a deployer
+				// admits any boundary of this app: without it the credential
 				// mints `<app>--evil--runtime-boundary` granting `*`, wears
 				// it, and the cap is decorative. The mint runs as an
 				// administrator, so nothing legitimate loses anything.
@@ -558,37 +558,43 @@ impl DeployerPolicy {
 	/// The speed bump on the genuinely unrecoverable, `None` when the app's
 	/// stacks render nothing that can be one.
 	///
-	/// Everything else this policy grants is recoverable by design: a bucket
-	/// is versioned, a table has deletion protection, a noncurrent version has
-	/// a window. What would make any of that final is here: deleting the
-	/// bucket, deleting an object VERSION (which no deploy does; a prune or a
-	/// sync writes delete markers), suspending versioning, or rewriting the
-	/// lifecycle (a one-day noncurrent expiry is a deletion AWS performs).
-	/// **A plain deploy never does any of them**: a bucket's versioning and
+	/// Everything else this policy grants is recoverable by design: a bucket is
+	/// versioned, a table has deletion protection, a noncurrent version has a
+	/// window. What would make any of that final is here: deleting the bucket,
+	/// deleting an object VERSION (which no deploy does; a prune or a sync
+	/// writes delete markers), suspending versioning, or rewriting the
+	/// lifecycle (a one-day noncurrent expiry is a deletion AWS performs). **A
+	/// plain deploy never does any of them**: a bucket's versioning and
 	/// lifecycle change only when their declaration does, and the deploy gate
-	/// refuses that plan before it runs ([`AwsDeployer`]), so the change is an
-	/// elevated deploy, made as an administrator this deny does not name. That
-	/// also stops a `force_destroy` teardown of a prod bucket at its first
-	/// version delete, with nothing deleted, where the `DeleteBucket` deny alone
-	/// was reached only after the provider had emptied it.
+	/// refuses that plan before it runs ([`AwsDeployCredential`]), so the
+	/// change is an elevated deploy, made as an administrator this deny does
+	/// not name. That also stops a `force_destroy` teardown of a prod bucket at
+	/// its first version delete, with nothing deleted, where the `DeleteBucket`
+	/// deny alone was reached only after the provider had emptied it.
+	///
+	/// It holds the account's Recycle Bin rules ([`AwsAccount`]) too, whatever
+	/// the app renders: a deleted snapshot or data volume is restorable while
+	/// its rule holds, the rules are locked, and starting an unlock's delay is
+	/// the one way to weaken one, so `rbin:UnlockRule`, `UpdateRule` and
+	/// `DeleteRule` are denied on every rule.
 	///
 	/// `BoolIfExists`, never `Bool`: `aws:MultiFactorAuthPresent` is ABSENT
 	/// from a long-lived access key's requests rather than false, and a `Bool`
-	/// deny would therefore not fire for exactly the credential it is aimed
-	/// at. So this denies a deployer outright, and an operator who assumes a
-	/// role with a code is the only principal that gets through.
+	/// deny would therefore not fire for exactly the credential it is aimed at.
+	/// So this denies the deploy credential outright, and an operator who
+	/// assumes a role with a code is the only principal that gets through.
 	///
 	/// Scoped to the stages this launch RENDERED, plus `prod` unconditionally
-	/// and minus [`DEFAULT_STAGE`](BootstrapConfig::DEFAULT_STAGE), one resource
-	/// per stage. The rendered stages are what protects an app whose only stage
-	/// is `shared`: the assets buckets are a source of record and not a mirror,
-	/// and a hard-coded `--prod--` pattern named nothing that exists for them,
-	/// so their own deployer could delete them with no code. Prod stays named
-	/// regardless so a mint under the wrong stage cannot quietly drop the deny
-	/// from the stage that matters most.
+	/// and minus [`DEFAULT_STAGE`](BootstrapConfig::DEFAULT_STAGE), one
+	/// resource per stage. The rendered stages are what protects an app whose
+	/// only stage is `shared`: the assets buckets are a source of record and
+	/// not a mirror, and a hard-coded `--prod--` pattern named nothing that
+	/// exists for them, so their own deploy credential could delete them with
+	/// no code. Prod stays named regardless so a converge under the wrong
+	/// stage cannot quietly drop the deny from the stage that matters most.
 	///
-	/// **Tearing the default stage down stays free whatever stage the mint ran
-	/// under**, because it is excluded here rather than merely absent from what
+	/// **Tearing the default stage down stays free whatever stage the converge
+	/// ran under**, because it is excluded here rather than merely absent from what
 	/// a prod launch happens to render. It is the disposable stage: the
 	/// infra-deploy skill stands a dev stack up and tears it down every cycle,
 	/// so its teardown is routine rather than irreversible.
@@ -614,7 +620,7 @@ impl DeployerPolicy {
 	///   a user is destroy-then-create, and a rename is an ordinary change. An
 	///   IAM principal is also not a source of record: it is re-mintable from
 	///   the declarations, which is the whole of what makes it recoverable.
-	fn irreversible_statement(&self) -> Option<Value> {
+	fn irreversible_statement(&self) -> Value {
 		let mut actions = Vec::<&str>::new();
 		let mut resources = Vec::<String>::new();
 		// PROD is in the set whatever this launch rendered. Scoping to the
@@ -660,16 +666,24 @@ impl DeployerPolicy {
 			actions.push("rds:DeleteDBInstance");
 			per_stage("arn:aws:rds:*:*:db:{}");
 		}
-		(!actions.is_empty() && !resources.is_empty()).then(|| {
-			json!({
-				"Sid": "IrreversibleNeedsMfa",
-				"Effect": "Deny",
-				"Action": actions,
-				"Resource": resources,
-				"Condition": {
-					"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
-				},
-			})
+		// the account's Recycle Bin rules, whatever the app renders: a deleted
+		// snapshot or data volume stays restorable only while its rule holds,
+		// and the rules are locked, so the one way to weaken one is to start
+		// its unlock delay, which a deploy credential never may
+		actions.extend([
+			"rbin:UnlockRule",
+			"rbin:UpdateRule",
+			"rbin:DeleteRule",
+		]);
+		resources.push("arn:aws:rbin:*:*:rule/*".into());
+		json!({
+			"Sid": "IrreversibleNeedsMfa",
+			"Effect": "Deny",
+			"Action": actions,
+			"Resource": resources,
+			"Condition": {
+				"BoolIfExists": { "aws:MultiFactorAuthPresent": "false" }
+			},
 		})
 	}
 
@@ -709,9 +723,9 @@ impl DeployerPolicy {
 	}
 
 	/// One IAM arn pattern per resource category, each under the app's own
-	/// name, so a deployer can create the roles its stacks declare and reach
-	/// nothing else, its own user and policy included (both are named for the
-	/// repo and the policy, never `<app>--`).
+	/// name, so the credential can create the roles its stacks declare and
+	/// reach nothing else, its own user and policy included (both are named for
+	/// the repo and the policy, never `<app>--`).
 	fn iam_resources(&self) -> Vec<String> {
 		["role", "user", "policy", "instance-profile"]
 			.into_iter()
@@ -729,7 +743,7 @@ mod test {
 	/// loud error, and a Cloudflare resource lowers to nothing.
 	#[beet_core::test]
 	fn places_every_type() {
-		let service = |declared| DeployerPolicy::service(declared).unwrap();
+		let service = |declared| AwsDeployPolicy::service(declared).unwrap();
 		service("aws_s3_bucket_versioning").xpect_eq(Some("s3"));
 		// the longer prefix wins: a log group is `logs`, an alarm `cloudwatch`
 		service("aws_cloudwatch_log_group").xpect_eq(Some("logs"));
@@ -741,7 +755,7 @@ mod test {
 		service("cloudflare_r2_bucket").xpect_eq(None);
 		// terraform's own builtin: no remote call, so no grant
 		service("terraform_data").xpect_eq(None);
-		DeployerPolicy::service("aws_kinesis_stream")
+		AwsDeployPolicy::service("aws_kinesis_stream")
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("aws_kinesis_stream");
@@ -765,7 +779,7 @@ mod test {
 			},
 		);
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let policy = DeployerPolicy::new("my-egress", "beet-state-1234")
+		let policy = AwsDeployPolicy::new("my-egress", "beet-state-1234")
 			.lower(&stack, &config)
 			.unwrap();
 		policy.policy_name().xpect_eq("my-egress--deploy");
@@ -810,7 +824,7 @@ mod test {
 			.iter()
 			.any(|declared| declared.starts_with("aws_ssm"))
 			.xpect_false();
-		DeployerPolicy::new("my-egress", "beet-state-1234")
+		AwsDeployPolicy::new("my-egress", "beet-state-1234")
 			.lower(&stack, &config)
 			.unwrap()
 			.to_json()
@@ -842,7 +856,7 @@ mod test {
 		};
 		let ((prod, _, config), _prod_dir) = render("prod");
 		let ((shared, _, shared_config), _shared_dir) = render("shared");
-		let document = DeployerPolicy::new("beet-site", "beet-state-1234")
+		let document = AwsDeployPolicy::new("beet-site", "beet-state-1234")
 			.lower(&prod, &config)
 			.unwrap()
 			.lower(&shared, &shared_config)
@@ -855,7 +869,7 @@ mod test {
 			.xpect_contains("beet-state-1234/beet-site--*")
 			.xnot()
 			.xpect_contains("beet-site--prod--tofu-tfstate");
-		DeployerPolicy::new("beet-site", "beet-state-1234")
+		AwsDeployPolicy::new("beet-site", "beet-state-1234")
 			.lower(&Stack::new("other").resolve(&default()), &config)
 			.unwrap_err()
 			.to_string()
@@ -874,7 +888,7 @@ mod test {
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let policy = DeployerPolicy::new(stack.app_name().clone(), "state")
+		let policy = AwsDeployPolicy::new(stack.app_name().clone(), "state")
 			.lower(&stack, &config)
 			.unwrap();
 		// unconditioned until the account says every principal is capped
@@ -934,7 +948,7 @@ mod test {
 			.xpect_contains("--deploy");
 	}
 
-	/// One deployer user carries one policy PER APP and an explicit deny is a
+	/// One deploy user carries one policy PER APP and an explicit deny is a
 	/// union across all of them, so a boundary deny on `*` would make each
 	/// app's policy refuse every other app's deploys. The repo that found this
 	/// has three apps on one user.
@@ -952,7 +966,7 @@ mod test {
 				},
 			);
 			let (stack, _deployment, config) = scope.finish().unwrap();
-			DeployerPolicy::new(app, "state")
+			AwsDeployPolicy::new(app, "state")
 				.lower(&stack, &config)
 				.unwrap()
 				.with_boundary()
@@ -1012,7 +1026,7 @@ mod test {
 			},
 		);
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let document = DeployerPolicy::new("my-egress", "state")
+		let document = AwsDeployPolicy::new("my-egress", "state")
 			.lower(&stack, &config)
 			.unwrap()
 			.to_json();
@@ -1037,14 +1051,20 @@ mod test {
 			.xpect_contains("s3:DeleteObjectVersion")
 			.xpect_contains("s3:PutBucketVersioning")
 			.xpect_contains("s3:PutLifecycleConfiguration")
+			// the account's Recycle Bin rules, whose unlock clock no deploy
+			// credential may start
+			.xpect_contains("rbin:UnlockRule")
+			.xpect_contains("rbin:UpdateRule")
+			.xpect_contains("rbin:DeleteRule")
 			.xnot()
 			.xpect_contains("iam:DeleteRole");
-		// the buckets and their objects, and a dev teardown stays free, which
-		// the infra-deploy skill does often
+		// the buckets and their objects, the rules, and a dev teardown stays
+		// free, which the infra-deploy skill does often
 		deny["Resource"]
 			.to_string()
 			.xpect_contains("arn:aws:s3:::my-egress--prod--*\"")
 			.xpect_contains("arn:aws:s3:::my-egress--prod--*/*")
+			.xpect_contains("arn:aws:rbin:*:*:rule/*")
 			.xnot()
 			.xpect_contains("my-egress--dev");
 	}
@@ -1055,7 +1075,7 @@ mod test {
 	/// has no name an arn can pattern.
 	#[beet_core::test]
 	fn a_data_volume_needs_mfa() {
-		let mut policy = DeployerPolicy::new("mail", "state");
+		let mut policy = AwsDeployPolicy::new("mail", "state");
 		policy.services.insert("ec2".into());
 		let document = policy.to_json();
 		let deny = document["Statement"]
@@ -1077,7 +1097,7 @@ mod test {
 			.unwrap()
 			.xpect_eq(BootstrapConfig::DEFAULT_STAGE);
 		// and an app rendering no `ec2` carries no such statement
-		DeployerPolicy::new("site", "state")
+		AwsDeployPolicy::new("site", "state")
 			.to_json()
 			.to_string()
 			.xnot()
@@ -1087,8 +1107,8 @@ mod test {
 	/// The deny follows the stages the launch RENDERED, so an app whose only
 	/// stage is `shared` has its buckets protected too. A hard-coded `prod`
 	/// named nothing that existed for such an app, which left the assets
-	/// buckets — a source of record, not a mirror — deletable by their own
-	/// deployer with no code.
+	/// buckets, a source of record and not a mirror, deletable by their own
+	/// deploy credential with no code.
 	#[beet_core::test]
 	fn irreversible_follows_the_rendered_stages() {
 		let render = |stage: &str| {
@@ -1113,7 +1133,7 @@ mod test {
 			rendered
 				.iter()
 				.fold(
-					DeployerPolicy::new("beet-site", "state"),
+					AwsDeployPolicy::new("beet-site", "state"),
 					|policy, ((stack, _deployment, config), _dir)| {
 						policy.lower(stack, config).unwrap()
 					},
@@ -1165,7 +1185,7 @@ mod test {
 			},
 		);
 		let (stack, _deployment, config) = scope.finish().unwrap();
-		let deny = DeployerPolicy::new("beet-site", "state")
+		let deny = AwsDeployPolicy::new("beet-site", "state")
 			.lower(&stack, &config)
 			.unwrap()
 			.to_json()["Statement"]

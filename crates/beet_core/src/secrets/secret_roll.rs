@@ -165,11 +165,12 @@ mod test {
 				.roll
 				.xpect_eq(Some(roll));
 		}
-		// a record sealed before `roll` had its name still opens
+		// a record still carrying the retired `rotation` key opens, rolling by
+		// nothing: a record is lenient where its document and group are not
 		toml::from_str::<SecretRecord>("rotation = \"remint\"\n")
 			.unwrap()
 			.roll
-			.xpect_eq(Some(SecretRoll::Remint));
+			.xpect_none();
 		"replace:".parse::<SecretRoll>().unwrap_err();
 		"weekly".parse::<SecretRoll>().unwrap_err();
 		SecretRoll::Remint.kind().xpect_eq("remint");

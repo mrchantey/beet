@@ -6,7 +6,7 @@ use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
 
-/// The third policy in the model, beside [`DeployerPolicy`] (what the operator
+/// The third policy in the model, beside [`AwsDeployPolicy`] (what the operator
 /// may do) and [`IamPolicy`] (what one running process may do): the
 /// **permissions boundary**, a managed policy attached to a principal AS its
 /// boundary, capping what that principal can ever do whatever its own policies
@@ -14,13 +14,14 @@ use serde_json::json;
 ///
 /// ## What it is for
 ///
-/// A deployer holds `iam:*` on its own app's names, which bounds what it can
-/// REACH but not what it can GRANT: three calls create `role/<app>--prod--x`,
-/// attach the AWS-managed `AdministratorAccess` to it (the resource
-/// `iam:AttachRolePolicy` checks is the role, which is in scope) and pass it to
-/// a compute the same policy may create. The boundary closes that, because the
-/// effective permissions of a boundaried principal are the INTERSECTION of its
-/// own policies and the boundary, and this one grants no `iam:` action at all.
+/// The AWS deploy credential holds `iam:*` on its own app's names, which bounds
+/// what it can REACH but not what it can GRANT: three calls create
+/// `role/<app>--prod--x`, attach the AWS-managed `AdministratorAccess` to it
+/// (the resource `iam:AttachRolePolicy` checks is the role, which is in scope)
+/// and pass it to a compute the same policy may create. The boundary closes
+/// that, because the effective permissions of a boundaried principal are the
+/// INTERSECTION of its own policies and the boundary, and this one grants no
+/// `iam:` action at all.
 ///
 /// ## What it holds, and why it is derived rather than written
 ///
@@ -45,7 +46,7 @@ use serde_json::json;
 ///
 /// A grant added to a stack widens the rendered runtime policy but not this,
 /// until the next elevated deploy. The apply succeeds and the runtime silently
-/// cannot use the new permission. That is the same cadence [`DeployerPolicy`]
+/// cannot use the new permission. That is the same cadence [`AwsDeployPolicy`]
 /// already has, since a new SERVICE needs a re-mint too, and it is why the mint
 /// converges both policies from one render.
 #[derive(Debug, Clone)]

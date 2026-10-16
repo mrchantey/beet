@@ -416,8 +416,8 @@ mod test {
 
 	/// Stands in for a second extractor on the same entity.
 	#[derive(Component)]
-	#[component(on_add = SubtreeParams::declare::<Deployer, DeployParams>)]
-	struct Deployer;
+	#[component(on_add = SubtreeParams::declare::<Gate, DeployParams>)]
+	struct Gate;
 
 	fn names(world: &World, entity: Entity) -> Vec<SmolStr> {
 		world
@@ -434,10 +434,10 @@ mod test {
 	#[beet_core::test]
 	fn pushes_each_extractor_once() {
 		let mut world = World::new();
-		let entity = world.spawn((VerboseLogger, Deployer)).flush();
+		let entity = world.spawn((VerboseLogger, Gate)).flush();
 		names(&world, entity).xpect_eq(vec![
 			SmolStr::new("VerboseLogger"),
-			SmolStr::new("Deployer"),
+			SmolStr::new("Gate"),
 		]);
 		world.entity_mut(entity).remove::<VerboseLogger>();
 		world.entity_mut(entity).insert(VerboseLogger);
@@ -450,7 +450,7 @@ mod test {
 	#[beet_core::test]
 	fn any_params_takes_any() {
 		let declaration =
-			ParamsDeclaration::new::<Deployer, (DeployParams, AnyParams)>();
+			ParamsDeclaration::new::<Gate, (DeployParams, AnyParams)>();
 		declaration.takes_any().xpect_true();
 		declaration
 			.metas()

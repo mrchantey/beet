@@ -777,9 +777,9 @@ impl MailDomainBlock {
 			},
 		);
 		config
-			.add_resource(&set)?
-			.add_resource(&identity)?
-			.add_resource(&mail_from)?;
+			.add_layer_resource(SesRelay::LAYER, &set)?
+			.add_layer_resource(SesRelay::LAYER, &identity)?
+			.add_layer_resource(SesRelay::LAYER, &mail_from)?;
 		identity.xok()
 	}
 
@@ -810,23 +810,27 @@ impl MailDomainBlock {
 			"current",
 			&json!({}),
 		)?;
-		config.add_resource(&ResourceDef::new_secondary(
-			stack.resource_ident(self.label("ses-events")),
-			AwsSesv2ConfigurationSetEventDestinationDetails {
-				configuration_set_name: self.configuration_set_name().into(),
-				event_destination_name: SesRelay::EVENT_DESTINATION.into(),
-				// the set is named by string rather than by field reference,
-				// because the destination is a property OF the set rather than
-				// a resource pointing at one; terraform sees no edge in a
-				// string, so the order is stated
-				depends_on: Some(vec![
-					format!(
-						"aws_sesv2_configuration_set.{}",
-						stack.resource_ident(self.label("ses-set")).label()
-					)
-					.into(),
-				]),
-				event_destination: Some(vec![
+		config.add_layer_resource(
+			SesRelay::LAYER,
+			&ResourceDef::new_secondary(
+				stack.resource_ident(self.label("ses-events")),
+				AwsSesv2ConfigurationSetEventDestinationDetails {
+					configuration_set_name: self
+						.configuration_set_name()
+						.into(),
+					event_destination_name: SesRelay::EVENT_DESTINATION.into(),
+					// the set is named by string rather than by field reference,
+					// because the destination is a property OF the set rather than
+					// a resource pointing at one; terraform sees no edge in a
+					// string, so the order is stated
+					depends_on: Some(vec![
+						format!(
+							"aws_sesv2_configuration_set.{}",
+							stack.resource_ident(self.label("ses-set")).label()
+						)
+						.into(),
+					]),
+					event_destination: Some(vec![
 					AwsSesv2ConfigurationSetEventDestinationResourceBlockTypeEventDestination {
 						enabled: Some(true),
 						matching_event_types: SesRelay::EVENT_TYPES
@@ -841,9 +845,10 @@ impl MailDomainBlock {
 						..default()
 					},
 				]),
-				..default()
-			},
-		))?;
+					..default()
+				},
+			),
+		)?;
 		Ok(())
 	}
 
@@ -1041,13 +1046,15 @@ impl MailDomainBlock {
 			let token = identity.field_ref(&format!(
 				"dkim_signing_attributes[0].tokens[{index}]"
 			));
-			dns.emit_cname(
+			let address = dns.emit_cname(
 				stack,
 				config,
 				&self.label(&format!("dkim-{index}")),
 				&format!("{token}._domainkey.{}", self.domain),
 				&format!("{token}.dkim.amazonses.com"),
 			)?;
+			// the token is this account's, so the record is too
+			config.add_to_layer(SesRelay::LAYER, address);
 		}
 		let mail_from = SesRelay::mail_from_domain(&self.domain);
 		dns.emit_mx(
@@ -1647,6 +1654,29 @@ mod tests {
 			.as_str()
 			.xpect_contains(".dkim_signing_attributes[0].tokens[0]}")
 			.xpect_contains(".dkim.amazonses.com");
+	}
+
+	/// A new account verifies its identities before its box exists: the `ses`
+	/// layer holds each identity, its set, its MAIL FROM and its Easy DKIM
+	/// records, and none of the records another account's identity for the
+	/// same domain already publishes, which would collide.
+	#[beet_core::test]
+	fn the_ses_layer_holds_what_an_account_verifies() {
+		build_config(&ses(&[staging()]))
+			.layer_targets(SesRelay::LAYER)
+			.unwrap()
+			.join("\n")
+			.xpect_contains("aws_sesv2_email_identity.")
+			.xpect_contains("aws_sesv2_configuration_set.")
+			.xpect_contains("aws_sesv2_email_identity_mail_from_attributes.")
+			.xpect_contains("_dkim_0")
+			.xpect_contains("_dkim_2")
+			.xnot()
+			.xpect_contains("mail_from_mx")
+			.xnot()
+			.xpect_contains("mail_from_spf")
+			.xnot()
+			.xpect_contains("dkim_sovereign");
 	}
 
 	/// The set name is fixed by the account's existing resources so terraform

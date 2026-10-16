@@ -13,7 +13,7 @@ dispatcher whose `Router` is its child, so the entry is a set of commands and th
 served site is ONE of them: `serve`. `always=true` makes the dispatcher run on every
 boot regardless of `--server`, since `--server` selects the *served site's*
 transports, not this entry's. A `CliServer` is strict by requirement, refusing a
-flag the command does not take, so `deploy --elevate` answers `did you mean
+flag the command does not take, so `all/deploy --elevate` answers `did you mean
 --elevated?` rather than running a plain deploy; the site `serve` serves is its
 own url space and keeps accepting whatever a link carries (`?utm_source=..`). The box launches
 `app --repo=s3://.. --server=http,ssh serve` and a developer launches
@@ -112,7 +112,7 @@ fragment on purpose: the running site reaches them by `bx:ref`, and a `bx:cfg`
 on the stack itself once excluded the analytics store with them, so the served
 binary bound `StoreRef($analytics)` to nothing and dropped every event without
 an error anywhere. That is what lets the application declare its own
-infrastructure without shipping the deployer.
+infrastructure without shipping the deploy machinery.
 
 `<Stack>` is the identity every resource beneath it composes its name from, and it
 is a registered component in every native build rather than a template prop, so the
@@ -153,8 +153,19 @@ or sync ends with a `<CloudflarePurgeCache/>`. On the deploy route the purge com
 re-caches the old responses for the full edge TTL.
 
 The assets bucket lives on its own `shared` stage under the `shared/` route
-prefix, provisioned as its own step since a source shared by developers is a
+prefix, provisioned as its own stack since a source shared by developers is a
 different process from a stage deploy. No stage deploy or destroy touches it.
+
+## One deploy for the package
+
+The stage stack's verbs sit under `site/`, beside `shared/` and `social/`, and
+`<Route path="all" {RouteMatrix{..}}/>` runs `validate`, `plan` and `deploy`
+across the three in the order it lists them, every stack and verb named by
+hand. `all/deploy` is the site's deploy: it asks the deploy credentials once
+for all three stacks, refuses once naming every stack's reasons, and with
+`--elevated` asks for each human factor at most once, then deploys each stack
+in turn. `destroy` is not in the list, since `shared` is a source of record:
+tearing down stays per stack (`site/destroy`).
 
 ## The handles, and the zone
 
@@ -193,17 +204,19 @@ run from the `atproto` build too, so the handle records count as declared.
     just site-social probe --stage=prod    # after the claim: does each handle resolve
     just site-audit --stage=prod           # the zone holds exactly what we declare
 
-    just beet-deploy [--stage=prod]        # build -> stores -> sync -> release -> watch -> purge
+    just beet-deploy [--stage=prod]        # the package: site, shared, social, in that order
+    just site-stage deploy [--stage=prod]  # the stage stack alone: build -> stores -> sync -> release -> watch -> purge
     just beet-sync                         # re-publish the site + restart (no redeploy)
     just beet-watch                        # tail the instance logs
     just site-shared apply                 # provision the site assets bucket
     just site-shared pull                  # hydrate site/assets from it (no credentials)
     just site-shared push                  # publish site/assets to it
 
-Live deploy needs the deployer's credentials (the AWS pair of this repo's own
-`beet-deployer` user, which `<AwsDeployer/>` below declares and an elevated
-deploy converges, and `CLOUDFLARE_API_TOKEN`) and the box's ssh host key
-(`BEET_SSH_HOST_KEY`, which the apply writes into the stack) from the repo's `secrets.toml`,
+Live deploy needs the deploy credentials (the AWS pair of this repo's own
+`beet-deploy` user, which `<AwsDeployCredential/>` below declares and an
+elevated deploy converges, and `CLOUDFLARE_API_TOKEN`) and the box's ssh host
+key (`BEET_SSH_HOST_KEY`, which the apply writes into the stack) from the
+repo's `secrets.toml`,
 which the launch loads into the process environment before this entry builds
 (the top-level `<Secrets path="../secrets.toml"/>`; `beet secrets/check` says
 whether this machine's identity opens it), plus `tofu` and `cargo-zigbuild`.
@@ -218,7 +231,7 @@ token (plus AWS for the social stack's state bucket).
      identifiers public in every dashboard url and so declared here rather
      than read from anywhere -->
 <Router {(HelpHandler, AwsRegion("us-west-2"), CloudflareAccount("74aba4da669f57fc6fc3e63ebcfcff26"), CloudflareZone{domain:"beet.org", id:"45905c861559d9eb8c9b72ee87adca7b"})}>
-	<!-- the deployer's credentials: the repo's one document, above this
+	<!-- the deploy credentials: the repo's one document, above this
 	     entry's own directory, loaded into the process environment by the
 	     launch before this entry builds. Top level and unconditional so the
 	     prescan sees it; the deployed binary keeps it as an inert tag. -->
@@ -325,106 +338,110 @@ token (plus AWS for the social stack's state bucket).
 	     Cloudflare token as the MINT token, rolled on the dashboard for the
 	     run and kept nowhere. Built with `atproto` so the social app's policy
 	     renders too -->
-	<AwsDeployer bx:cfg="feature:infra && feature:extra"/>
-	<CloudflareDeployToken bx:cfg="feature:infra && feature:extra"/>
-	<!-- the stage stack: every resource the running site needs, then the verbs
-	     that provision them behind the one `bx:cfg`. The stores stay outside
-	     it: the served binary reaches them by `bx:ref`, and an excluded
-	     declaration binds to nothing (see "The deploy" above). -->
-	<Stack>
-		<!-- Raw segments and aggregate rows share ONE writable store, under the
-		     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
-		     A bucket is this codebase's unit of IAM grant, so it earns its place
-		     by a different writer or a different durability grade, not by
-		     holding a different dataset: these two have the same writer, the
-		     same grant, and neither is a sole copy for long (rollup rows use the
-		     blanket JSON-over-blob TableProvider and are re-derivable from the
-		     archive, segments are transient by design). A segment IS the only
-		     copy of its events between landing and that night's rollup, which
-		     is why the bucket is versioned. -->
-		<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
-		<!-- the REPO STORE, marked so the deploy publishes the site into it and
-		     the ledger names it; deploy-versioned by taking the default. The box
-		     does not bake the prefix into its `user_data` (that would rebuild it
-		     every deploy); it resolves it from the release pointer at every
-		     start, so a rollback moves the binary and its document together. -->
-		<S3BucketBlock label="repo" {RepoStoreBlock}/>
-		<!-- the `archive` profile: append-only cold data, the inverse of the app
-		     bucket by lifecycle. Never touched by a deploy sync, which would prune
-		     it. Analytics owns the `analytics/raw/` prefix; these compact daily
-		     objects are the primary raw history, so nothing here expires. -->
-		<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
-		<!-- the box's ssh host key, so every start presents one fingerprint: the
-		     `BEET_SSH_HOST_KEY` record, written by the full apply into this
-		     stack's parameter `/beet-site/<stage>/ssh-host-key` as a write-only
-		     value (versioned by the record's `modified`) and read by the box from
-		     there. Never in `user_data`, a plan, the tofu state or a rendered
-		     config. Outside the deployer fragment, since the serving binary
-		     reads it by `bx:ref`. -->
-		<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY" note="ssh host key of the site box: every stage presents one fingerprint"/>
-		<!-- everything from here down is the deployer, absent from the lean binary -->
-		<Fragment bx:cfg="feature:infra && feature:extra">
-		<!-- the block + its build artifact share one entity (the deploy pairs them);
-		     the box alone is granted read on the host key -->
-		<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
-		<!-- the box is replaceable, so it owns no durable timer: the rollup runs
-		     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
-		     `jobs` verb of this same document. -->
-		<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
-		<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
-		<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
-		     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
-		<Group bx:ref="site_up">
-			<TofuApply layer="storage"/>
-			<!-- the published document: the site plus what it borrows from the
-			     workspace, staged outside the checkout and mirrored whole -->
-			<RepoStage src="site">
-				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
+	<AwsDeployCredential bx:cfg="feature:infra && feature:extra"/>
+	<CloudflareDeployCredential bx:cfg="feature:infra && feature:extra"/>
+	<!-- the stage stack, under the `site` prefix so its verbs read
+	     `site/deploy` beside `shared/deploy` and `social/deploy`: every
+	     resource the running site needs, then the verbs that provision them
+	     behind the one `bx:cfg`. The stores stay outside it, and the route
+	     carries none: the served binary reaches them by `bx:ref`, and an
+	     excluded declaration binds to nothing (see "The deploy" above). -->
+	<Route path="site">
+		<Stack>
+			<!-- Raw segments and aggregate rows share ONE writable store, under the
+			     disjoint prefixes `analytics/raw/segments/` and `analytics/rollup/`.
+			     A bucket is this codebase's unit of IAM grant, so it earns its place
+			     by a different writer or a different durability grade, not by
+			     holding a different dataset: these two have the same writer, the
+			     same grant, and neither is a sole copy for long (rollup rows use the
+			     blanket JSON-over-blob TableProvider and are re-derivable from the
+			     archive, segments are transient by design). A segment IS the only
+			     copy of its events between landing and that night's rollup, which
+			     is why the bucket is versioned. -->
+			<S3BucketBlock bx:ref="analytics" label="analytics" deploy_versioned=false runtime_write=true object_versioning=true/>
+			<!-- the REPO STORE, marked so the deploy publishes the site into it and
+			     the ledger names it; deploy-versioned by taking the default. The box
+			     does not bake the prefix into its `user_data` (that would rebuild it
+			     every deploy); it resolves it from the release pointer at every
+			     start, so a rollback moves the binary and its document together. -->
+			<S3BucketBlock label="repo" {RepoStoreBlock}/>
+			<!-- the `archive` profile: append-only cold data, the inverse of the app
+			     bucket by lifecycle. Never touched by a deploy sync, which would prune
+			     it. Analytics owns the `analytics/raw/` prefix; these compact daily
+			     objects are the primary raw history, so nothing here expires. -->
+			<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
+			<!-- the box's ssh host key, so every start presents one fingerprint: the
+			     `BEET_SSH_HOST_KEY` record, written by the full apply into this
+			     stack's parameter `/beet-site/<stage>/ssh-host-key` as a write-only
+			     value (versioned by the record's `modified`) and read by the box from
+			     there. Never in `user_data`, a plan, the tofu state or a rendered
+			     config. Outside the deploy machinery's fragment, since the serving
+			     binary reads it by `bx:ref`. -->
+			<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY" note="ssh host key of the site box: every stage presents one fingerprint"/>
+			<!-- everything from here down is the deploy machinery, absent from the lean binary -->
+			<Fragment bx:cfg="feature:infra && feature:extra">
+			<!-- the block + its build artifact share one entity (the deploy pairs them);
+			     the box alone is granted read on the host key -->
+			<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+			<!-- the box is replaceable, so it owns no durable timer: the rollup runs
+			     as an invoke-only lambda the schedule calls at 03:00 UTC, booting the
+			     `jobs` verb of this same document. -->
+			<LambdaJobBlock bx:ref="rollup_fn" label="rollup" exec_route="jobs" features="aws_sdk,ssh,geoip,lambda"/>
+			<ScheduledJobBlock label="rollup-daily" {InvokeTarget($rollup_fn)} schedule="cron(0 3 * * ? *)" path="rollup"/>
+			<!-- 💡 what a deploy DOES, as an ordered group rather than a route: the
+			     `deploy` verb `<DeployRoutes/>` spawns runs this list forward. -->
+			<Group bx:ref="site_up">
+				<TofuApply layer="storage"/>
+				<!-- the published document: the site plus what it borrows from the
+				     workspace, staged outside the checkout and mirrored whole -->
+				<RepoStage src="site">
+					<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
+					<Derive/>
+				</RepoStage>
+				<RepoSync/>
+				<TofuApply/>
+				<PruneVersions/>
+				<LightsailRelease/>
+				<CloudflareZoneSetup/>
+				<LightsailWatch timeout="300s"/>
+				<CloudflarePurgeCache/>
+			</Group>
+			<!-- 💡 ..and the teardown, authored in the same CONVERGENCE order so
+			     `destroy` running it backwards takes the state carriers off last.
+			     This stack owns nothing outside terraform, so there is nothing
+			     between the two. -->
+			<Group bx:ref="site_down">
+				<StackTeardown/>
+				<TofuDestroy/>
+			</Group>
+			<DeployRoutes deploy={$site_up} destroy={$site_down}/>
+			<Route path="sync" {ExchangeSequence}>
+				<!-- publish into the version the RUNNING box reads, rather than
+				     minting one of this launch's own that nothing serves -->
+				<AdoptCurrentDeploy/>
+				<RepoStage src="site">
+					<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
+					<Derive/>
+				</RepoStage>
+				<RepoSync/>
+				<!-- content is read from the store per request, so the sync above is
+				     already live; the restart is for what the box resolves ONCE at
+				     boot: `<RoutesDir/>` discovery (a page added, removed, or renamed
+				     by its slug) and this entry document itself. Before the purge,
+				     since purging while the old process serves re-caches it. -->
+				<LightsailRestart/>
+				<CloudflarePurgeCache/>
+			</Route>
+			<Route path="watch" {ExchangeSequence}>
+				<LightsailWatch timeout="300s"/>
+			</Route>
+			<Route path="assets" {ExchangeSequence}>
+				<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
 				<Derive/>
-			</RepoStage>
-			<RepoSync/>
-			<TofuApply/>
-			<PruneVersions/>
-			<LightsailRelease/>
-			<CloudflareZoneSetup/>
-			<LightsailWatch timeout="300s"/>
-			<CloudflarePurgeCache/>
-		</Group>
-		<!-- 💡 ..and the teardown, authored in the same CONVERGENCE order so
-		     `destroy` running it backwards takes the state carriers off last.
-		     This stack owns nothing outside terraform, so there is nothing
-		     between the two. -->
-		<Group bx:ref="site_down">
-			<StackTeardown/>
-			<TofuDestroy/>
-		</Group>
-		<DeployRoutes deploy={$site_up} destroy={$site_down}/>
-		<Route path="sync" {ExchangeSequence}>
-			<!-- publish into the version the RUNNING box reads, rather than
-			     minting one of this launch's own that nothing serves -->
-			<AdoptCurrentDeploy/>
-			<RepoStage src="site">
-				<DirCopy src="assets" dest="assets" paths="extra/robot-eyes,databases/country.mmdb"/>
-				<Derive/>
-			</RepoStage>
-			<RepoSync/>
-			<!-- content is read from the store per request, so the sync above is
-			     already live; the restart is for what the box resolves ONCE at
-			     boot: `<RoutesDir/>` discovery (a page added, removed, or renamed
-			     by its slug) and this entry document itself. Before the purge,
-			     since purging while the old process serves re-caches it. -->
-			<LightsailRestart/>
-			<CloudflarePurgeCache/>
-		</Route>
-		<Route path="watch" {ExchangeSequence}>
-			<LightsailWatch timeout="300s"/>
-		</Route>
-		<Route path="assets" {ExchangeSequence}>
-			<DirCopy src="assets" dest="site/assets" paths="extra/robot-eyes,databases/country.mmdb"/>
-			<Derive/>
-		</Route>
-		</Fragment>
-	</Stack>
+			</Route>
+			</Fragment>
+		</Stack>
+	</Route>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the stage rides the `Stack` COMPONENT, so it is correct in every
 		     binary, including the lean one where the verbs around it are inert -->
@@ -486,6 +503,13 @@ token (plus AWS for the social stack's state bucket).
 			</Route>
 		</Stack>
 	</Route>
+	<!-- the package: one verb across every stack, each named by hand and in
+	     order, so `all/deploy` is THE deploy of the site and passes one gate
+	     for all three. `destroy` is left out: `shared` is the developers'
+	     source of record for site/assets, so tearing down stays per stack.
+	     Gated by the most restrictive target's features, `social`'s, else a
+	     build without `atproto` would fail the load on a missing target. -->
+	<Route path="all" bx:cfg="feature:infra && feature:extra && feature:atproto" {RouteMatrix{prefixes:["site","shared","social"], routes:["validate","plan","deploy"]}}/>
 	<!-- the zone is the unit, so its audit belongs to no stack: every record
 	     the stacks above declare is accounted for under `Zone` scope, and what
 	     remains below is only what NOTHING in this entry declares. -->

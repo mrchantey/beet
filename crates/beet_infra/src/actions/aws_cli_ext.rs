@@ -38,6 +38,18 @@ pub fn iam<'a>(args: impl IntoIterator<Item = &'a str>) -> ChildProcess {
 	self::service("iam", crate::bindings::aws::region::US_EAST_1, args)
 }
 
+/// An `aws organizations` invocation, see [`iam`] for the region: the
+/// Organization is answered by the management account alone, wherever it is.
+pub fn organizations<'a>(
+	args: impl IntoIterator<Item = &'a str>,
+) -> ChildProcess {
+	self::service(
+		"organizations",
+		crate::bindings::aws::region::US_EAST_1,
+		args,
+	)
+}
+
 /// An `aws sts` invocation, see [`iam`] for the region.
 pub fn sts<'a>(args: impl IntoIterator<Item = &'a str>) -> ChildProcess {
 	self::service("sts", crate::bindings::aws::region::US_EAST_1, args)

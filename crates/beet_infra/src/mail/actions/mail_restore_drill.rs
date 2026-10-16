@@ -104,8 +104,9 @@ impl MailRestoreDrill {
 ///
 /// The one thing this action will not do is run against the stage it is
 /// restoring FROM. Replacing the live stage's SQLite file is not a drill, it is
-/// the incident, so the stages are compared and a match fails before anything
-/// is downloaded.
+/// the incident (or a cutover), so the stages are compared and a match fails
+/// before anything is downloaded; [`MailRestore`] is that act, asked for by
+/// name.
 #[action]
 #[derive(Component, Reflect)]
 #[reflect(Component, Default)]
@@ -154,12 +155,136 @@ pub async fn MailRestoreDrill(
 			`--stage=drill`"
 		);
 	}
-	if source_domain.is_empty() {
+	// the SOURCE stage's bucket, which is the same declaration resolved against
+	// a different stage: the one place the two stacks touch. For the cold copy
+	// that includes the credential, since the token is the source's too.
+	let source = mail.stack.clone().with_stage(source_stage.clone());
+	restore_onto(&mail, &source, Restore {
+		source_snapshot,
+		key: None,
+		ssh_key: &ssh_key,
+		source_domain: &source_domain,
+		mailbox: &mailbox,
+		timeout,
+	})
+	.await?;
+	Pass(cx.input).xok()
+}
+
+/// `<MailRestore/>`: restore THIS stage's own snapshot onto this stage's
+/// box, replacing its live database: the act [`MailRestoreDrill`] refuses,
+/// for the two occasions it is the point. A box standing up in a new account
+/// restores the copy its predecessor left (the cutover), and a box whose store
+/// is lost restores its last good one (the incident).
+///
+/// So both halves of the decision are on the command line rather than in the
+/// declaration: the snapshot, by key, since the newest is whatever ran last
+/// and on a new box may be its own empty store's; and `--replace`, which says
+/// the live database is meant to go. The assertion is the drill's: a restored
+/// account signs in over the box's own address behind the restored
+/// certificate, so it holds before any record names the box.
+///
+/// ```bsx
+/// <Route path="restore" {MailRestore{source_snapshot:Cold, source_domain:"example.com"}}/>
+/// ```
+/// ```sh
+/// beet mail/restore --stage=prod --key=sqlite/2026-10-20T030000Z.db --replace
+/// ```
+#[action]
+#[derive(Component, Reflect)]
+#[reflect(Component, Default)]
+pub async fn MailRestore(
+	/// Which copy to restore from, see [`SnapshotSource`]. A box in a new
+	/// account restores `Cold`, since its own archive starts empty.
+	#[field]
+	source_snapshot: SnapshotSource,
+	/// The mail domain the restored account belongs to, ie one this stage
+	/// serves.
+	#[field]
+	source_domain: SmolStr,
+	/// The private half of the key pair the box imported, as
+	/// [`StalwartProvision`] takes it.
+	#[field(default = StalwartProvision::SSH_KEY)]
+	ssh_key: SmolStr,
+	/// The restored mailbox the assertion signs in as, by localpart.
+	#[field]
+	mailbox: SmolStr,
+	/// How long to wait for the restarted server to accept a restored
+	/// credential.
+	#[field(default = Duration::from_secs(300))]
+	timeout: Duration,
+	/// The snapshot to restore, by its key in the copy, ie
+	/// `sqlite/2026-10-20T030000Z.db`.
+	#[param]
+	key: Option<String>,
+	/// Replace this stage's live database with it.
+	#[param]
+	replace: bool,
+	cx: ActionContext<Request>,
+) -> Result<Outcome<Request, Response>> {
+	let key = MailRestore::requested(key, replace)?;
+	let mail = MailStack::of(&cx.caller).await?;
+	let source = mail.stack.clone();
+	restore_onto(&mail, &source, Restore {
+		source_snapshot,
+		key: Some(&key),
+		ssh_key: &ssh_key,
+		source_domain: &source_domain,
+		mailbox: &mailbox,
+		timeout,
+	})
+	.await?;
+	Pass(cx.input).xok()
+}
+
+impl MailRestore {
+	/// The snapshot a restore was asked for, refusing before anything is
+	/// resolved unless both halves of the decision are on the command line.
+	fn requested(key: Option<String>, replace: bool) -> Result<String> {
+		let Some(key) = key.filter(|key| !key.is_empty()) else {
+			bevybail!(
+				"name the snapshot to restore with `--key=sqlite/..`: the \
+				newest is whatever ran last, and on a new box that is its own \
+				empty store's"
+			);
+		};
+		if !replace {
+			bevybail!(
+				"this replaces the stage's live mail database with `{key}`: \
+				pass `--replace` to say it is meant to go"
+			);
+		}
+		key.xok()
+	}
+}
+
+/// What a restore is asked for, beside the stack it lands on and the stage
+/// it reads.
+struct Restore<'a> {
+	source_snapshot: SnapshotSource,
+	/// The snapshot by key, the newest when `None`.
+	key: Option<&'a str>,
+	ssh_key: &'a str,
+	source_domain: &'a str,
+	mailbox: &'a str,
+	timeout: Duration,
+}
+
+/// Restore `source`'s snapshot onto `mail`'s box: download it from the copy
+/// asked for, install it beside the live database, verify it while the server
+/// still runs, swap it in, and sign in as a restored account.
+async fn restore_onto(
+	mail: &MailStack,
+	source: &ResolvedStack,
+	ask: Restore<'_>,
+) -> Result {
+	let stage = mail.stack.stage().clone();
+	let source_stage = source.stage().clone();
+	if ask.source_domain.is_empty() {
 		bevybail!(
-			"no source_domain: the drill signs in as an account the RESTORE \
-			created, which belongs to a domain the '{}' stage serves and this \
-			stack deliberately does not declare",
-			source_stage
+			"no source_domain: a restore signs in as an account the RESTORE \
+			created, which belongs to a domain the '{source_stage}' stage \
+			serves"
 		);
 	}
 	if mail.mail_box.backup_bucket().is_empty() {
@@ -170,21 +295,23 @@ pub async fn MailRestoreDrill(
 		);
 	}
 
-	// the SOURCE stage's bucket, which is the same declaration resolved against
-	// a different stage: the one place the two stacks touch. For the cold copy
-	// that includes the credential, since the token is the source's too.
-	let source = mail.stack.clone().with_stage(source_stage.clone());
 	let prefix = format!("{}/", StalwartBlock::BACKUP_PREFIX);
 	let local = mail.project.work_dir().join("mail-restore.db");
-	let key = match source_snapshot {
+	let key = match ask.source_snapshot {
 		SnapshotSource::Backups => {
 			let live = LiveStore {
 				region: mail.stack.aws_region()?.to_string(),
 				bucket: source
 					.resource_name(mail.mail_box.backup_bucket().clone()),
 			};
-			let key =
-				newest_key(live.list(&prefix).await?, &live.bucket, &prefix)?;
+			let key = match ask.key {
+				Some(key) => key.to_string(),
+				None => newest_key(
+					live.list(&prefix).await?,
+					&live.bucket,
+					&prefix,
+				)?,
+			};
 			info!(
 				"restoring s3://{}/{key} into the {stage} stage",
 				live.bucket
@@ -196,12 +323,18 @@ pub async fn MailRestoreDrill(
 			// the SOURCE stage's parked pair, through this stack's store
 			let cold = ColdStore::resolve(
 				mail.cold_store()?,
-				&source,
+				source,
 				&mail.secrets.for_scope(&source.secret_scope())?,
 			)
 			.await?;
-			let key =
-				newest_key(cold.list(&prefix).await?, &cold.bucket, &prefix)?;
+			let key = match ask.key {
+				Some(key) => key.to_string(),
+				None => newest_key(
+					cold.list(&prefix).await?,
+					&cold.bucket,
+					&prefix,
+				)?,
+			};
 			info!(
 				"restoring the COLD copy s3://{}/{key} into the {stage} stage",
 				cold.bucket
@@ -215,7 +348,7 @@ pub async fn MailRestoreDrill(
 		host: mail.public_ip().await?,
 		user: StalwartProvision::SSH_USER.to_string(),
 		port: 22,
-		key_path: StalwartProvision::key_path(&ssh_key)?,
+		key_path: StalwartProvision::key_path(ask.ssh_key)?,
 	};
 	connection
 		.wait_for_ready(Duration::from_secs(300), Duration::from_secs(5))
@@ -255,17 +388,17 @@ pub async fn MailRestoreDrill(
 		))
 		.await?;
 
-	assert_restored(&mail, &source, &source_domain, &mailbox, timeout).await?;
+	assert_restored(mail, source, ask.source_domain, ask.mailbox, ask.timeout)
+		.await?;
 	info!(
-		"the {stage} stage serves {}'s restored mail from its {}: the backup \
-		is one",
-		source_stage,
-		match source_snapshot {
+		"the {stage} stage serves {source_stage}'s restored mail from its {}: \
+		the backup is one",
+		match ask.source_snapshot {
 			SnapshotSource::Backups => "archive",
 			SnapshotSource::Cold => "cold copy",
 		}
 	);
-	Pass(cx.input).xok()
+	OK
 }
 
 /// The newest `.db` under `prefix`, or the error that says which timer fills
@@ -486,6 +619,24 @@ mod tests {
 		.xmap(|secret| source.secret_path(&secret))
 		.xpect_contains("/prod/")
 		.xpect_contains("mail-account-probe-at-stalwart-beetmash-com");
+	}
+
+	/// Restoring over a stage's live database is asked for by name: the
+	/// snapshot by key, and `--replace`.
+	#[beet_core::test]
+	fn a_restore_names_its_snapshot_and_its_intent() {
+		let key = "sqlite/2026-10-20T030000Z.db".to_string();
+		MailRestore::requested(Some(key.clone()), true)
+			.unwrap()
+			.xpect_eq(key.clone());
+		MailRestore::requested(None, true)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("--key=");
+		MailRestore::requested(Some(key), false)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("--replace");
 	}
 
 	/// The snapshot is delivered to a path the login user can write and restored

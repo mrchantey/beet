@@ -197,6 +197,12 @@ impl StalwartBlock {
 	/// The stable EC2 attachment name. Nitro exposes it through an NVMe by-id
 	/// link containing the EBS volume id rather than at this path.
 	pub const DATA_DEVICE_NAME: &'static str = "/dev/sdf";
+
+	/// The deploy layer holding the box, its data volume and its address, and
+	/// no record naming them: `<TofuApply layer="box"/>` stands a box up that
+	/// nothing resolves to yet, so a store can be restored onto it
+	/// ([`MailRestore`]) before the first message arrives.
+	pub const BOX_LAYER: &'static str = "box";
 	/// The persistent volume's mount point and Stalwart's working directory.
 	pub const DATA_MOUNT: &'static str = "/var/lib/stalwart";
 	/// The embedded SQLite database on the persistent data volume.
@@ -1120,9 +1126,9 @@ impl StalwartBlock {
 			.add_resource(&log_group)?
 			.add_resource(&data_volume)?
 			.add_resource(&instance)?
-			.add_resource(&data_attachment)?
+			.add_layer_resource(Self::BOX_LAYER, &data_attachment)?
 			.add_resource(&eip)?
-			.add_resource(&association)?;
+			.add_layer_resource(Self::BOX_LAYER, &association)?;
 		if self.data_volume_protected(stack) {
 			config.set_lifecycle(
 				"aws_ebs_volume",
@@ -2222,6 +2228,21 @@ mod tests {
 			.as_str()
 			.xnot()
 			.xpect_contains(&deployment.deploy_id().to_string());
+	}
+
+	/// The box layer stands the box up with its volume and its address and no
+	/// record naming it, so a store is restored before any mail can arrive.
+	#[beet_core::test]
+	fn the_box_layer_names_no_record() {
+		let (_, _, config) = build_config(&mail_box());
+		config
+			.layer_targets(StalwartBlock::BOX_LAYER)
+			.unwrap()
+			.join("\n")
+			.xpect_contains("aws_volume_attachment.")
+			.xpect_contains("aws_eip_association.")
+			.xnot()
+			.xpect_contains("cloudflare_dns_record");
 	}
 
 	/// The rebuild rule is a terraform setting, not a convention: an edited

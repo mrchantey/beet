@@ -196,20 +196,12 @@ impl LocalBackend {
 	}
 }
 
-/// The default state bucket is `beet-state-` and the AWS account id, which is
-/// unique by construction where a fixed name is not: an S3 bucket name is
-/// global, so one account holding `beet-state` would leave every other account
-/// naming something else. Derived rather than declared, so the second project a
-/// user deploys finds the first one's state bucket with nothing authored.
-// only [`S3Backend::resolve`]'s `aws_sdk` branch reads these two, and the other
-// branch bails, so a build without the sdk uses neither. Kept out of the
-// `cfg_if!` so the field docs below can still link them in every build.
-#[allow(dead_code)]
-const DEFAULT_STATE_PREFIX: &str = "beet-state-";
-
 /// Where a state bucket is created when nothing says otherwise, and the
 /// endpoint a discovery asks: `sts:GetCallerIdentity` and `GetBucketLocation`
 /// both answer here for an account and a bucket anywhere.
+// only [`S3Backend::resolve`]'s `aws_sdk` branch reads it, and the other
+// branch bails, so a build without the sdk does not. Kept out of the
+// `cfg_if!` so the field docs below can still link it in every build.
 #[allow(dead_code)]
 const DEFAULT_STATE_REGION: &str = aws::region::US_EAST_1;
 
@@ -227,7 +219,7 @@ const DEFAULT_STATE_REGION: &str = aws::region::US_EAST_1;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Get, SetWith)]
 pub struct S3Backend {
 	/// The bucket holding every stack's state file. Unset is this account's
-	/// own, [`DEFAULT_STATE_PREFIX`] and its id.
+	/// own, [`S3Backend::default_bucket`].
 	bucket: Option<SmolStr>,
 	/// Where the bucket is. Unset is read off the bucket itself, which is what
 	/// lets one project find the state bucket another project of the same
@@ -250,8 +242,24 @@ impl Default for S3Backend {
 }
 
 impl S3Backend {
+	/// The prefix of an account's own state bucket, see
+	/// [`default_bucket`](Self::default_bucket).
+	pub const DEFAULT_PREFIX: &'static str = "beet-state-";
+
+	/// The state bucket of the AWS account `account_id`: `beet-state-` and
+	/// the id, which is unique by construction where a fixed name is not. An
+	/// S3 bucket name is global, so one account holding `beet-state` would
+	/// leave every other account naming something else. Derived rather than
+	/// declared, so the second project an account deploys finds the first one's
+	/// state bucket with nothing authored, and a repo's own member account
+	/// (`<AwsAccount/>`) has its own.
+	pub fn default_bucket(account_id: &str) -> SmolStr {
+		format!("{}{account_id}", Self::DEFAULT_PREFIX).into()
+	}
+
 	/// This declaration with both halves known: the bucket derived from the AWS
-	/// account (see [`DEFAULT_STATE_PREFIX`]) when it was not named, and the
+	/// account ([`default_bucket`](Self::default_bucket)) when it was not
+	/// named, and the
 	/// region read off that bucket. One `sts:GetCallerIdentity` per process and
 	/// one `GetBucketLocation` per declaration, both behind
 	/// [`StackBackend::resolve`]'s memo.
@@ -265,11 +273,9 @@ impl S3Backend {
 			if #[cfg(all(feature = "aws_sdk", not(target_arch = "wasm32")))] {
 				let bucket = match &self.bucket {
 					Some(bucket) => bucket.clone(),
-					None => format!(
-						"{DEFAULT_STATE_PREFIX}{}",
-						beet_net::prelude::aws_ext::account_id().await?
-					)
-					.into(),
+					None => Self::default_bucket(
+						&beet_net::prelude::aws_ext::account_id().await?,
+					),
 				};
 				let located = S3Store::from_uri(&StoreUri::S3 {
 					name: bucket.clone(),

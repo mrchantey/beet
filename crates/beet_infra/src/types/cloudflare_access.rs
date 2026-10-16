@@ -11,12 +11,13 @@ use beet_net::prelude::Request;
 /// itself, and the only way that action reaches the token.
 ///
 /// An action that calls Cloudflare requires one naming the groups its calls
-/// need, ie `#[require(CloudflareAccess = CloudflareAccess::new::<Self>(&[TokenPermission::CACHE_PURGE]))]`,
-/// so the declaration sits beside the calls it describes. The deploy
-/// credential ([`CloudflareDeployToken`]) lowers every one in the world into
-/// the repo's deploy token
-/// ([`DeployerToken::lower_access`]), and the action holds that token only
-/// through [`resolve`](Self::resolve) on its own entity.
+/// need, ie `#[require(CloudflareAccess =
+/// CloudflareAccess::new::<Self>(&[TokenPermission::CACHE_PURGE]))]`, so the
+/// declaration sits beside the calls it describes. The deploy credential
+/// ([`CloudflareDeployCredential`]) lowers every one in the world into the
+/// repo's deploy token ([`CloudflareDeployToken::lower_access`]), and the
+/// action holds that token only through [`resolve`](Self::resolve) on its own
+/// entity.
 ///
 /// The two halves are what keep the declaration honest. A table of action
 /// names kept anywhere else drifts silently, since an action missing from it

@@ -1,6 +1,7 @@
 //! One verb fanned across sibling namespaces: the single-command bring-up and
 //! teardown a multi-stack entry advertises.
 use crate::prelude::*;
+use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -32,7 +33,10 @@ use beet_net::prelude::*;
 ///   insert time: sibling routes are still registering then, and a target
 ///   arriving through a `<Template src>` include has not built yet. `Ready` is
 ///   precisely the point at which every level of include has settled, so it is
-///   both correct and the earliest correct moment.
+///   both correct and the earliest correct moment. The verb then takes every
+///   param its targets take, so a strict cli passes `all/destroy --force` on to
+///   each, and announces itself ([`RouteMatrixResolved`]) for a shell that
+///   wraps the whole fan-out according to what its targets are.
 ///
 /// The [`Ready`] sweep runs deepest-first with the loaded root last, so a
 /// child's resolution always lands before the root's `CallOnReady` dispatches
@@ -92,7 +96,6 @@ impl RouteMatrix {
 							prefixes: prefixes.clone(),
 							targets: Vec::new(),
 						},
-						RouteMatrixDispatch,
 					));
 				}
 			});
@@ -106,8 +109,15 @@ impl RouteMatrix {
 /// The resolution is cached here rather than repeated per call, so a request
 /// dispatches straight into the targets and a bad prefix is caught once, at
 /// load, instead of on the first invocation.
+///
+/// The route dispatches through an [`ExchangeOverload`] running
+/// [`run`](Self::run) rather than an action of its own, the way an
+/// [`ExchangeGroup`] does, so a shell standing in front of the whole fan-out
+/// replaces it by inserting its own and calls [`run_through`](Self::run_through)
+/// once it lets the verb through.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(ExchangeOverload = RouteMatrixStep::overload())]
 #[component(on_add = hook_ext::observe(RouteMatrixStep::resolve_on_ready))]
 pub struct RouteMatrixStep {
 	/// The verb this route serves, ie `deploy`.
@@ -139,20 +149,40 @@ impl Default for RouteMatrixTarget {
 	}
 }
 
+/// Triggered on a [`RouteMatrixStep`]'s route once its targets resolve: the
+/// moment a crate that wraps the verb according to what its targets are (one
+/// deploy gate in front of every gated stack) acts, without the matrix naming
+/// it. A failure it raises rides [`TemplateError`] on `root`, as the matrix's
+/// own does.
+#[derive(Debug, Clone, EntityEvent)]
+pub struct RouteMatrixResolved {
+	/// The verb's route entity.
+	pub entity: Entity,
+	/// The root the [`Ready`] sweep ran from.
+	pub root: Entity,
+}
+
 impl RouteMatrixStep {
+	/// The overload a verb's route dispatches through, see [`run`](Self::run).
+	fn overload() -> ExchangeOverload {
+		ActionOverload::new(Action::new_async(Self::run))
+	}
+
 	/// Observer: resolve every `<prefix>/<verb>` through the ancestor
-	/// [`RouteTree`] once the load settles.
+	/// [`RouteTree`] once the load settles, take every param the targets take,
+	/// and announce the resolution ([`RouteMatrixResolved`]).
 	///
 	/// A prefix that names no route is a HARD error: the list is hand-written,
 	/// so a typo must fail loudly rather than quietly shrinking the fan-out. The
 	/// failure rides [`TemplateError`] on the swept root, which is the same
 	/// channel a failed build uses and which `CallOnReady` (firing last, on that
-	/// root) turns into a nonzero exit — so nothing runs against a
+	/// root) turns into a nonzero exit, so nothing runs against a
 	/// half-resolved matrix.
 	fn resolve_on_ready(
 		ev: On<Ready>,
 		mut steps: Query<&mut RouteMatrixStep>,
 		trees: AncestorQuery<&RouteTree>,
+		params: ParamsQuery,
 		mut commands: Commands,
 	) {
 		let Ok(step) = steps.get(ev.entity) else {
@@ -170,9 +200,24 @@ impl RouteMatrixStep {
 			.and_then(|tree| Self::resolve(tree, &verb, &prefixes));
 		match resolved {
 			Ok(targets) => {
+				// what a target takes, the verb passes on to it
+				for declaration in targets
+					.iter()
+					.flat_map(|target| params.route_declarations(target.entity))
+				{
+					ParamsScope::Route.queue_push(
+						&mut commands,
+						ev.entity,
+						declaration,
+					);
+				}
 				if let Ok(mut step) = steps.get_mut(ev.entity) {
 					step.targets = targets;
 				}
+				commands.trigger(RouteMatrixResolved {
+					entity: ev.entity,
+					root: ev.trigger().root(),
+				});
 			}
 			Err(err) => {
 				error!("{err}");
@@ -210,47 +255,70 @@ impl RouteMatrixStep {
 	}
 }
 
-/// Run this verb across every namespace the matrix names, in order.
-#[action]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn RouteMatrixDispatch(
-	cx: ActionContext<Request>,
-) -> Result<Response> {
-	let step = cx.caller.get(|step: &RouteMatrixStep| step.clone()).await?;
-	if step.targets.is_empty() {
-		bevybail!(
-			"`{}` resolved no targets: the matrix's `Ready` pass never ran, so \
-			 nothing was dispatched",
-			step.verb
-		);
+impl RouteMatrixStep {
+	/// Run this verb across every namespace the matrix names, in order, each
+	/// target called as a request to it would be.
+	pub async fn run(cx: ActionContext<Request>) -> Result<Response> {
+		Self::run_through(
+			cx,
+			Action::new_async(async |cx: ActionContext<Request>| {
+				cx.caller.exchange(cx.input).await.xok()
+			}),
+		)
+		.await
 	}
-	// the incoming parts thread through unchanged apart from the path, so a
-	// `--stage=prod` or a `--force` reaches every namespace exactly as it would
-	// a direct call. The body does not: a cli verb carries none, and one body
-	// cannot be read by several targets.
-	let parts = cx.input.parts().clone();
-	let world = cx.caller.world();
-	let mut output = String::new();
-	for target in step.targets.iter() {
-		let path = target.path.join("/");
-		let mut parts = parts.clone();
-		parts.url_mut().set_path(target.path.clone());
-		info!("{} -> {path}", step.verb);
-		let response = world
-			.entity(target.entity)
-			.exchange(Request::from_parts(parts, Body::default()))
-			.await;
-		let status = response.status();
-		let body = response.text().await.unwrap_or_default();
-		output.push_str(&format!("== {path} ==\n{body}\n"));
-		// fail fast: a namespace that failed leaves the rest unattempted, since
-		// continuing would report a success the run did not have.
-		if !status.is_ok() {
-			return Response::from_status(status).with_body(output).xok();
+
+	/// [`run`](Self::run), calling `dispatch` on each target's route entity
+	/// in place of the route's own action: what a shell standing in front of
+	/// the whole fan-out runs once it lets the verb through, so the shell each
+	/// target carries is not passed a second time.
+	pub async fn run_through(
+		cx: ActionContext<Request>,
+		dispatch: Action<Request, Response>,
+	) -> Result<Response> {
+		let step = cx.caller.get(|step: &RouteMatrixStep| step.clone()).await?;
+		if step.targets.is_empty() {
+			bevybail!(
+				"`{}` resolved no targets: the matrix's `Ready` pass never ran, \
+				so nothing was dispatched",
+				step.verb
+			);
 		}
+		// the incoming parts thread through unchanged apart from the path, so
+		// a `--stage=prod` or a `--force` reaches every namespace exactly as it
+		// would a direct call. The body does not: a cli verb carries none, and
+		// one body cannot be read by several targets.
+		let parts = cx.input.parts().clone();
+		let world = cx.caller.world();
+		let mut output = String::new();
+		for target in step.targets.iter() {
+			let path = target.path.join("/");
+			let mut parts = parts.clone();
+			parts.url_mut().set_path(target.path.clone());
+			info!("{} -> {path}", step.verb);
+			let response = match world
+				.entity(target.entity)
+				.call_detached(
+					dispatch.clone(),
+					Request::from_parts(parts, Body::default()),
+				)
+				.await
+			{
+				Ok(response) => response,
+				// what ran before the failure is part of the answer
+				Err(err) => bevybail!("{output}== {path} ==\n{err}"),
+			};
+			let status = response.status();
+			let body = response.text().await.unwrap_or_default();
+			output.push_str(&format!("== {path} ==\n{body}\n"));
+			// fail fast: a namespace that failed leaves the rest unattempted,
+			// since continuing would report a success the run did not have.
+			if !status.is_ok() {
+				return Response::from_status(status).with_body(output).xok();
+			}
+		}
+		Response::ok().with_body(output).xok()
 	}
-	Response::ok().with_body(output).xok()
 }
 
 #[cfg(test)]
@@ -391,6 +459,60 @@ mod test {
 			.xpect_eq(StatusCode::IM_A_TEAPOT);
 		// site ran, social never did
 		log.get().len().xpect_eq(1);
+	}
+
+	/// A verb takes every param its targets take, so a strict cli passes
+	/// `all/destroy --force` on to each rather than refusing it.
+	#[beet_core::test]
+	fn takes_what_its_targets_take() {
+		let mut world = router_world();
+		let root = world
+			.spawn((Router::with_defaults(), children![
+				(PathPartial::new("site"), children![(
+					PathPartial::new("destroy"),
+					ExchangeGroup::forced_by("force"),
+				)]),
+				(
+					PathPartial::new("all"),
+					RouteMatrix::new(["site"], ["destroy"]),
+				),
+			]))
+			.flush();
+		settle(&mut world, root);
+		RouteTree::of(&world, root)
+			.unwrap()
+			.find(&["all", "destroy"])
+			.unwrap()
+			.params
+			.contains("force")
+			.xpect_true();
+	}
+
+	/// Once its targets resolve a verb announces it, naming the swept root a
+	/// crate wrapping the fan-out raises a load failure on.
+	#[beet_core::test]
+	fn announces_its_resolution() {
+		let mut world = router_world();
+		let announced = Store::new(Vec::<Entity>::new());
+		world.add_observer(move |ev: On<RouteMatrixResolved>| {
+			let mut all = announced.get();
+			all.push(ev.root);
+			announced.set(all);
+		});
+		let root = world
+			.spawn((Router::with_defaults(), children![
+				(PathPartial::new("site"), children![recorded(
+					"deploy",
+					Store::default()
+				)]),
+				(
+					PathPartial::new("all"),
+					RouteMatrix::new(["site"], ["deploy"])
+				),
+			]))
+			.flush();
+		settle(&mut world, root);
+		announced.get().xpect_eq(vec![root]);
 	}
 
 	/// A prefix naming no route fails the LOAD with the offending path named,

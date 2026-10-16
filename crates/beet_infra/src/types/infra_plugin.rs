@@ -45,7 +45,7 @@ impl Plugin for InfraPlugin {
 		);
 
 		// the store declarations' shared vocabulary, feature-free so a lean
-		// binary reads the same declaration the deployer does: the marker
+		// binary reads the same declaration a deploy does: the marker
 		// naming which store block is the repo store (one per world by its own
 		// insert hook, storeless markers checked at render) and the block
 		// naming a store this deploy does not create.
@@ -360,21 +360,28 @@ impl Plugin for InfraPlugin {
 		// the repo's deploy credentials, declared at an entry's root since one
 		// credential document holds one per provider however many stacks it
 		// deploys, each landing its handle for the deploy gate. The AWS one is
-		// gated with the IAM lowering it renders (`DeployerPolicy`); the
+		// gated with the IAM lowering it renders (`AwsDeployPolicy`); the
 		// Cloudflare one reads declared type names, so it needs no bindings.
 		#[cfg(all(
 			feature = "deploy",
 			feature = "bindings_aws_common",
 			not(target_arch = "wasm32")
 		))]
-		app.register_type::<crate::prelude::AwsDeployer>()
+		app.register_type::<crate::prelude::AwsDeployCredential>()
 			.add_observer(
 				crate::credentials::attach_deploy_credential::<
-					crate::prelude::AwsDeployer,
+					crate::prelude::AwsDeployCredential,
+				>,
+			)
+			// the account it deploys into, converged before it
+			.register_type::<crate::prelude::AwsAccount>()
+			.add_observer(
+				crate::credentials::attach_deploy_account::<
+					crate::prelude::AwsAccount,
 				>,
 			);
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-		app.register_type::<crate::prelude::CloudflareDeployToken>()
+		app.register_type::<crate::prelude::CloudflareDeployCredential>()
 			.register_type::<crate::prelude::DeployGate>()
 			.install(RouteParams::declare_on::<
 				crate::prelude::DeployGate,
@@ -382,9 +389,13 @@ impl Plugin for InfraPlugin {
 			>())
 			.add_observer(
 				crate::credentials::attach_deploy_credential::<
-					crate::prelude::CloudflareDeployToken,
+					crate::prelude::CloudflareDeployCredential,
 				>,
-			);
+			)
+			// one gate in front of a package's verb across its gated stacks
+			.add_observer(crate::credentials::gate_matrix)
+			// the package verb closing its deploy accounts
+			.register_type::<crate::prelude::CloseDeployAccounts>();
 		// the store's export into a secrets document, the restore back out
 		// of one, and a human's removal, in every deploy build
 		#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
@@ -422,6 +433,7 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::MailCredentials>()
 			.register_type::<crate::prelude::MailHealth>()
 			.register_type::<crate::prelude::MailRestoreDrill>()
+			.register_type::<crate::prelude::MailRestore>()
 			// the drill's copy selector, so `source_snapshot="Cold"` resolves
 			// the variant rather than silently keeping the archive default.
 			.register_type::<crate::prelude::SnapshotSource>()

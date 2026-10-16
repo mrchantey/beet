@@ -41,8 +41,12 @@ run() { # run <dump-name> <target-dir> <command...>
 	fi
 }
 
-run beet-site.dev.main.tf.json beet-site "${beet[@]}" --entry=site validate
-run beet-site.prod.main.tf.json beet-site "${beet[@]}" --entry=site validate --stage=prod
+# the stage stack's verbs moved under `site/` with the package deploy; a
+# baseline rendered from a checkout before that still serves them at the root
+site_validate=validate
+grep -q '<Route path="site">' site/main.bsx && site_validate=site/validate
+run beet-site.dev.main.tf.json beet-site "${beet[@]}" --entry=site $site_validate
+run beet-site.prod.main.tf.json beet-site "${beet[@]}" --entry=site $site_validate --stage=prod
 run mail-example.main.tf.json mail-example "${with_aws[@]}" --entry=examples/infra/mail.bsx validate
 run lambda.main.tf.json lambda "${with_aws[@]}" --entry=examples/infra/lambda.bsx validate
 run fargate.main.tf.json fargate "${with_aws[@]}" --entry=examples/infra/fargate.bsx validate

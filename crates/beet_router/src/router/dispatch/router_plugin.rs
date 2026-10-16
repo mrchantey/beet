@@ -87,8 +87,7 @@ impl Plugin for RouterPlugin {
 			// the matrix itself, the per-verb child route it spawns, and that
 			// child's dispatch action.
 			.register_type::<RouteMatrix>()
-			.register_type::<RouteMatrixStep>()
-			.register_type::<RouteMatrixDispatch>();
+			.register_type::<RouteMatrixStep>();
 
 		// std-only: the scene/asset/charcell rendering pipeline (help pages,
 		// markdown/html scenes → ANSI/text) and the reflect registrations for

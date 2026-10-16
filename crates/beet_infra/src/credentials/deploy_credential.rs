@@ -7,8 +7,8 @@ use std::fmt;
 use std::sync::Arc;
 
 /// The erased handle over one provider's deploy credential, landed on the
-/// entity of its declaration (`<AwsDeployer/>`, `<CloudflareDeployToken/>`)
-/// and collected by [`DeployCredentialQuery`].
+/// entity of its declaration (`<AwsDeployCredential/>`,
+/// `<CloudflareDeployCredential/>`) and collected by [`DeployCredentialQuery`].
 ///
 /// A deploy credential is infrastructure: derived from what the stacks
 /// declare, sealed in the repo's secrets document, and kept in line with the
@@ -88,16 +88,50 @@ impl DeployCredential {
 		self.provider.describe(caller.clone()).await
 	}
 
-	/// Whether this launch holds the sealed credential rather than one passed
-	/// for the command: its identity record's value in the environment is the
-	/// one the loaded document seals. A credential passed for the command (an
-	/// elevated run's, CI's) is the provider's to judge, so only the sealed one
-	/// is held to what a stored credential may do.
-	pub async fn holds_sealed(&self, caller: &AsyncEntity) -> Result<bool> {
-		let Some(record) = self.records().first() else {
-			return false.xok();
+	/// The name the repo's deploy credential carries at every provider (the
+	/// AWS user, the Cloudflare token): the repo's name and `-deploy`. Named
+	/// for the repo rather than an app, since a credential document holds one
+	/// credential per provider however many apps it deploys.
+	pub fn name() -> Result<String> {
+		format!("{}-deploy", Self::repo_name()?).xok()
+	}
+
+	/// The workspace directory, kebab-cased: the one name a repo has.
+	pub fn repo_name() -> Result<String> {
+		let root = fs_ext::workspace_root();
+		root.file_name()
+			.and_then(|name| name.to_str())
+			.map(|name| name.replace('_', "-"))
+			.filter(|name| {
+				!name.is_empty()
+					&& name
+						.chars()
+						.all(|char| char.is_ascii_alphanumeric() || char == '-')
+			})
+			.ok_or_else(|| {
+				bevyhow!(
+					"cannot name a deploy credential after the workspace \
+					directory `{}`: a credential's name is alphanumeric",
+					root.display()
+				)
+			})
+	}
+
+	/// See [`DeployCredentialProvider::holding`].
+	pub async fn holding(&self, caller: &AsyncEntity) -> Result<Holding> {
+		self.provider.holding(caller.clone()).await
+	}
+
+	/// What this launch runs as for the credential whose identity record is
+	/// `record`: the value the loaded document seals, another one in its
+	/// environment, or none at all.
+	pub async fn holding_of(
+		caller: &AsyncEntity,
+		record: Option<&'static str>,
+	) -> Result<Holding> {
+		let Some(record) = record else {
+			return Holding::None.xok();
 		};
-		let record = *record;
 		let sealed = caller
 			.with_world(move |world, _| {
 				OpenSecrets::find(world, record)
@@ -105,8 +139,11 @@ impl DeployCredential {
 					.map(|secret| secret.value)
 			})
 			.await?;
-		(sealed.is_some()
-			&& sealed == env_ext::var(record).ok().map(SmolStr::from))
+		match env_ext::var(record).ok().map(SmolStr::from) {
+			None => Holding::None,
+			Some(value) if Some(&value) == sealed.as_ref() => Holding::Sealed,
+			Some(_) => Holding::Another,
+		}
 		.xok()
 	}
 
@@ -228,6 +265,33 @@ pub trait DeployCredentialProvider: 'static + Send + Sync {
 	/// What the credential would be converged to, for a dry run: needs no
 	/// credential at all.
 	fn describe(&self, caller: AsyncEntity) -> SendBoxedFuture<Result<String>>;
+
+	/// What this launch runs as for this provider, by its identity record
+	/// ([`DeployCredential::holding_of`]).
+	fn holding(&self, caller: AsyncEntity) -> SendBoxedFuture<Result<Holding>> {
+		let record = self.records().first().copied();
+		Box::pin(
+			async move { DeployCredential::holding_of(&caller, record).await },
+		)
+	}
+}
+
+/// What a launch runs as at one provider, see
+/// [`DeployCredentialProvider::holding`].
+///
+/// Only the [`Sealed`](Self::Sealed) credential is held to what a stored
+/// credential may do. One passed for the command (an elevated run's, an
+/// administrator's, CI's) is the provider's to judge, so a deploy running as
+/// it is not refused for the sealed one's shortcomings; a launch holding none
+/// has nothing to run as, and is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Holding {
+	/// The value the loaded document seals.
+	Sealed,
+	/// Another value, passed for this command.
+	Another,
+	/// No value at all.
+	None,
 }
 
 /// Where one credential stands against the declarations, see
@@ -401,6 +465,13 @@ mod test {
 				..default()
 			},
 		}
+	}
+
+	/// The name is the repo's, not an app's, and the same at every provider:
+	/// one document holds one credential per provider.
+	#[beet_core::test]
+	fn names_the_credential_after_the_repo() {
+		DeployCredential::name().unwrap().xpect_eq("beet-deploy");
 	}
 
 	/// A credential lowers what `prod` declares from a launch of any stage: a

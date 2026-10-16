@@ -1,19 +1,19 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
+// what a repo's AWS deploy credential is allowed to do, lowered from the
+// provider types its stacks render. Gated with the AWS IAM lowering it mirrors
+// (`IamPolicy`), since both speak AWS policy documents.
+#[cfg(feature = "bindings_aws_common")]
+mod aws_deploy_policy;
 mod build_artifact;
 // what a Cloudflare action asks of the deploy token, declared on the action and
 // the only way it reaches that token.
 mod cloudflare_access;
-// what a repo's deployer is allowed to do, lowered from the provider types its
-// stacks render. Gated with the AWS IAM lowering it mirrors (`IamPolicy`),
-// since both speak AWS policy documents.
-#[cfg(feature = "bindings_aws_common")]
-mod deployer_policy;
 // the same lowering for Cloudflare, whose api token has no policy document and
 // no bindings behind it: the input is declared type names and the
 // `CloudflareAccess` each action declares, so it is ungated.
-mod deployer_token;
+mod cloudflare_deploy_token;
 // the source tree a deploy was built from, recorded on its ledger.
 mod deploy_source;
 mod deployment;
@@ -41,12 +41,12 @@ mod state_encryption;
 mod stack_cli;
 pub use access_grant::*;
 pub use artifacts::*;
+#[cfg(feature = "bindings_aws_common")]
+pub use aws_deploy_policy::*;
 pub use build_artifact::*;
 pub use cloudflare_access::*;
+pub use cloudflare_deploy_token::*;
 pub use deploy_source::*;
-#[cfg(feature = "bindings_aws_common")]
-pub use deployer_policy::*;
-pub use deployer_token::*;
 pub use deployment::*;
 pub use infra_plugin::*;
 pub use prefix_expiry::*;
