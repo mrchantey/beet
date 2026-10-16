@@ -332,9 +332,9 @@ impl<T: TableStoreRow> Table<T> {
 	}
 }
 
-/// A row's primary key within its table: any non-empty string, the source's
-/// natural id where it has one. Slashes are allowed, and the blob adapters
-/// store them as nested paths.
+/// A row's primary key within its table: any string, the source's natural id
+/// where it has one. Slashes are allowed, and the blob adapters store them as
+/// nested paths.
 #[derive(
 	Debug,
 	Clone,

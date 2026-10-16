@@ -1,9 +1,9 @@
 // Seeds the document color scheme before first paint to avoid a flash, then
-// follows the OS preference until the user makes an explicit choice.
-// `setColorScheme("light" | "dark")` persists an explicit choice and applies it.
+// follows the OS preference unless the page pins a scheme. Nothing is stored,
+// so a pin lasts as long as the page.
+// `setColorScheme("light" | "dark")` pins a scheme and applies it.
 // `LIGHT_SCHEME` / `DARK_SCHEME` are injected by the `ColorSchemeScript` widget.
 (function () {
-	const KEY = "color-scheme";
 	const root = document.documentElement;
 	const media = globalThis.matchMedia("(prefers-color-scheme: dark)");
 
@@ -12,28 +12,26 @@
 		root.classList.add(scheme === "dark" ? DARK_SCHEME : LIGHT_SCHEME);
 	}
 
-	function stored() {
-		return globalThis.localStorage?.getItem(KEY);
-	}
-
-	// an explicit `?color-scheme=light|dark` query param wins and is persisted,
+	// an explicit `?color-scheme=light|dark` query param pins the scheme,
 	// mirroring the CLI `--color-scheme` flag on the terminal target.
 	function queryOverride() {
-		const value = new URLSearchParams(globalThis.location?.search).get(KEY);
+		const value = new URLSearchParams(globalThis.location?.search).get(
+			"color-scheme",
+		);
 		return value === "light" || value === "dark" ? value : null;
 	}
 
+	let pinned = queryOverride();
+
 	globalThis.setColorScheme = function (scheme) {
-		globalThis.localStorage?.setItem(KEY, scheme);
+		pinned = scheme;
 		apply(scheme);
 	};
 
-	// follow the OS until an explicit choice is stored
+	// follow the OS until the page pins a scheme
 	media.addEventListener("change", () => {
-		if (!stored()) apply(media.matches ? "dark" : "light");
+		if (!pinned) apply(media.matches ? "dark" : "light");
 	});
 
-	const override = queryOverride();
-	if (override) globalThis.setColorScheme(override);
-	else apply(stored() ?? (media.matches ? "dark" : "light"));
+	apply(pinned ?? (media.matches ? "dark" : "light"));
 })();

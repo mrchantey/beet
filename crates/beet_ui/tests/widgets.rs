@@ -219,8 +219,9 @@ fn head_marks_unlisted_pages_noindex() {
 		.xpect_contains(r#"name="robots" content="noindex""#);
 }
 
-/// The browser chrome takes the theme's light scheme primary tone, which for a
-/// key colour at tone 40 is that colour itself.
+/// The browser chrome takes a tint per scheme: the light scheme's primary
+/// tone, which for a key colour at tone 40 is that colour itself, and the dark
+/// scheme's primary container. The tile, with no media query, takes the light.
 #[beet_core::test]
 fn head_tints_with_the_theme() {
 	let mut world = layout_world();
@@ -231,7 +232,12 @@ fn head_tints_with_the_theme() {
 	let root = world.spawn_template(rsx! { <Head/> }).unwrap().id();
 	render_html(&mut world, root)
 		.as_str()
-		.xpect_contains(r##"name="theme-color" content="#006C4F""##)
+		.xpect_contains(
+			r##"name="theme-color" media="(prefers-color-scheme: light)" content="#006C4F""##,
+		)
+		.xpect_contains(
+			r##"name="theme-color" media="(prefers-color-scheme: dark)" content="#00513B""##,
+		)
 		.xpect_contains(
 			r##"name="msapplication-TileColor" content="#006C4F""##,
 		);
@@ -654,12 +660,14 @@ fn color_scheme_script_emits_scheme_classes() {
 			.iter_descendant_values(root)
 			.filter_map(|v| v.as_str().ok())
 			.collect::<String>();
-		// the seed script references both scheme classes and the persistence key
+		// the seed script references both scheme classes and stores nothing
 		body.as_str()
 			.xpect_contains(&*classes::LIGHT_SCHEME.as_selector())
 			.xpect_contains(&*classes::DARK_SCHEME.as_selector())
 			.xpect_contains("prefers-color-scheme")
-			.xpect_contains("setColorScheme");
+			.xpect_contains("setColorScheme")
+			.xnot()
+			.xpect_contains("localStorage");
 	});
 }
 

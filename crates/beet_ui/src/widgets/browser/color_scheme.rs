@@ -1,6 +1,6 @@
 //! `ColorSchemeScript` widget — an inline `<script>` that seeds the document
-//! `.light-scheme`/`.dark-scheme` class before first paint and persists the
-//! user's explicit choice.
+//! `.light-scheme`/`.dark-scheme` class before first paint and follows the OS
+//! preference unless the page pins a scheme.
 //!
 //! Web target only — non-web targets carry the scheme class directly on an
 //! ancestor element. Drop it into the document `<head>` (eg the `head` slot) so
@@ -11,9 +11,10 @@ use beet_core::prelude::*;
 
 /// Emits the bundled color-scheme seed/persist script as an inline `<script>`.
 ///
-/// The script reads the persisted choice (else the OS `prefers-color-scheme`),
-/// toggling the matching class on `<html>`. `setColorScheme("light" | "dark")`
-/// becomes available globally for a theme switcher.
+/// The script reads a `?color-scheme=light|dark` pin (else the OS
+/// `prefers-color-scheme`), toggling the matching class on `<html>`.
+/// `setColorScheme("light" | "dark")` becomes available globally for a theme
+/// switcher, pinning the scheme for the page; nothing is stored.
 #[template]
 pub fn ColorSchemeScript() -> impl Bundle {
 	// inject the shared class-name constants so the script and the style rules

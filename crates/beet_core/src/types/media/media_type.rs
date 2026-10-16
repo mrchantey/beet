@@ -15,9 +15,8 @@ use crate::prelude::*;
 /// `application/*` for content a program reads, which is nearly every
 /// structured format, json and yaml included. A format with a registered name
 /// takes it; an unregistered one sits in the vendor tree (`application/vnd.ron`,
-/// beet's own `application/vnd.beet.bsx`), never behind an `x-` prefix.
-/// [`MediaType::from_content_type`] still parses the superseded spellings,
-/// while everything beet writes uses the current one.
+/// beet's own `application/vnd.beet.bsx`), never behind an `x-` prefix. A
+/// superseded spelling, ie `application/x-yaml`, parses as [`MediaType::Other`].
 #[derive(
 	Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect,
 )]
@@ -232,18 +231,6 @@ impl MediaType {
 	const GRAPHQL: &'static str = "application/graphql";
 	const ANSI_TERM: &'static str = "text/ansi-term";
 
-	/// Superseded spellings a peer may still send, each parsed as its
-	/// successor.
-	const SUPERSEDED: [(&'static str, &'static str); 7] = [
-		("application/x-postcard", Self::POSTCARD),
-		("application/x-ron", Self::RON),
-		("application/x-bsx", Self::BSX),
-		("application/x-yaml", Self::YAML),
-		("text/yaml", Self::YAML),
-		("application/x-protobuf", Self::PROTOBUF),
-		("image/x-icon", Self::ICO),
-	];
-
 	/// Parse a list of media types from an `Accept` header string, which may
 	/// contain multiple comma-separated media types with optional parameters.
 	pub fn from_accepts(accepts: &str) -> Vec<Self> {
@@ -255,18 +242,13 @@ impl MediaType {
 
 	/// Parse a media type from a content-type string.
 	///
-	/// Strips parameters like `; charset=utf-8` before matching, and parses a
-	/// superseded spelling as its successor.
+	/// Strips parameters like `; charset=utf-8` before matching.
 	pub fn from_content_type(content_type: &str) -> Self {
 		let raw = content_type
 			.split(';')
 			.next()
 			.unwrap_or(content_type)
 			.trim();
-		let raw = Self::SUPERSEDED
-			.iter()
-			.find(|(old, _)| raw.eq_ignore_ascii_case(old))
-			.map_or(raw, |(_, new)| new);
 		match raw {
 			// the Office types first, since their long names carry `xml`
 			val if val.contains(Self::DOCX) => MediaType::Docx,
@@ -721,21 +703,6 @@ mod test {
 	fn from_content_type_json_with_charset() {
 		MediaType::from_content_type("application/json; charset=utf-8")
 			.xpect_eq(MediaType::Json);
-	}
-
-	#[crate::test]
-	fn from_content_type_superseded() {
-		for (old, new) in [
-			("application/x-postcard", MediaType::Postcard),
-			("application/x-ron", MediaType::Ron),
-			("application/x-bsx", MediaType::Bsx),
-			("application/x-yaml", MediaType::Yaml),
-			("text/yaml; charset=utf-8", MediaType::Yaml),
-			("application/x-protobuf", MediaType::Protobuf),
-			("image/x-icon", MediaType::Ico),
-		] {
-			MediaType::from_content_type(old).xpect_eq(new);
-		}
 	}
 
 	#[crate::test]

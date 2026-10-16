@@ -21,10 +21,10 @@
 //! `PageMeta`), so `omit_title` drops this widget's own `<title>` to keep
 //! exactly one in the document.
 //!
-//! The brand tint (`theme-color`, `msapplication-TileColor`) is the [`Theme`]
-//! resource's light scheme [`Primary`](material::colors::Primary) tone, the
-//! same colour the page's own css bakes from it, so the browser chrome and the
-//! page cannot disagree.
+//! The brand tint is read off the [`Theme`] resource, the palette the page's
+//! own css bakes from, so the browser chrome and the page cannot disagree: a
+//! `theme-color` per scheme the OS prefers, and the light one
+//! as the `msapplication-TileColor`, which has no media query.
 //!
 //! `og:site_name` is bound to [`PackageConfig::title`] through a
 //! [`ResourceFieldRef`] (the rsx counterpart of a bsx `@res:PackageConfig.title`
@@ -83,7 +83,7 @@ pub fn Head(
 	let social_image = meta
 		.social_image_url()
 		.or_else(|| pkg_config.social_image.clone());
-	let theme_color = theme.map(|theme| theme_color(&theme)).transpose()?;
+	let tints = theme.map(|theme| ThemeTints::new(&theme)).transpose()?;
 	// a dated page is an ARTICLE to a crawler and to a link preview, which is
 	// what earns it a byline and a date in a search result; the `article:*`
 	// block hangs off that same fact rather than off a second switch.
@@ -144,7 +144,10 @@ pub fn Head(
 			<meta name="description" content={&card_description}/>
 			<meta name="version" content={&version}/>
 			<meta name="application-name" content={&title}/>
-			{theme_color.as_ref().map(|color| rsx!{ <meta name="theme-color" content={color}/> })}
+			{tints.as_ref().map(|tints| rsx!{
+				<meta name="theme-color" media="(prefers-color-scheme: light)" content={&tints.light}/>
+				<meta name="theme-color" media="(prefers-color-scheme: dark)" content={&tints.dark}/>
+			})}
 			// Open Graph
 			<meta property="og:title" content={&card_title}/>
 			<meta property="og:type" content={og_type}/>
@@ -172,23 +175,38 @@ pub fn Head(
 			// Android PWA
 			<meta name="mobile-web-app-capable" content="yes"/>
 			// Microsoft tile
-			{theme_color.as_ref().map(|color| rsx!{ <meta name="msapplication-TileColor" content={color}/> })}
+			{tints.as_ref().map(|tints| rsx!{ <meta name="msapplication-TileColor" content={&tints.light}/> })}
 			<Slot/>
 		</head>
 	}
 	.xok()
 }
 
-/// The colour a browser tints its own chrome with, ie the mobile address bar:
-/// the light scheme's primary tone as hex. The light scheme because the one tag
-/// names one colour, and that tone is the brand's key colour itself where the
-/// key sits at the palette's tone 40, as a brand colour usually does.
-fn theme_color(theme: &Theme) -> Result<String> {
-	theme
-		.resolve(ColorScheme::Light, material::colors::Primary)?
-		.to_srgba()
-		.to_hex()
+/// The colours a browser tints its own chrome with, ie the mobile address bar,
+/// one per scheme, as hex.
+struct ThemeTints {
+	/// The light scheme's primary tone, the brand's key colour itself where the
+	/// key sits at the palette's tone 40, as a brand colour usually does.
+	light: String,
+	/// The dark scheme's primary container, the deep brand tone a dark page
+	/// wears without a bright bar above it, where its primary is a pastel.
+	dark: String,
+}
+
+impl ThemeTints {
+	fn new(theme: &Theme) -> Result<Self> {
+		let hex = |scheme: ColorScheme, role: Token| -> Result<String> {
+			theme.resolve(scheme, role)?.to_srgba().to_hex().xok()
+		};
+		Self {
+			light: hex(ColorScheme::Light, material::colors::Primary.into())?,
+			dark: hex(
+				ColorScheme::Dark,
+				material::colors::PrimaryContainer.into(),
+			)?,
+		}
 		.xok()
+	}
 }
 
 /// The `content` block attribute for the `og:site_name` meta: a [`Value`] seeded
