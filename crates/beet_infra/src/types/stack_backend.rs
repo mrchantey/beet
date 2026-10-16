@@ -257,6 +257,16 @@ impl S3Backend {
 		format!("{}{account_id}", Self::DEFAULT_PREFIX).into()
 	}
 
+	/// The state bucket as seen from the AWS account `account_id`: the declared
+	/// one, else that account's own. Asks nothing of AWS, so a credential
+	/// moving into another account is lowered against the bucket it will
+	/// reach there rather than the one this launch resolves.
+	pub fn bucket_in(&self, account_id: &str) -> SmolStr {
+		self.bucket
+			.clone()
+			.unwrap_or_else(|| Self::default_bucket(account_id))
+	}
+
 	/// This declaration with both halves known: the bucket derived from the AWS
 	/// account ([`default_bucket`](Self::default_bucket)) when it was not
 	/// named, and the
@@ -385,4 +395,23 @@ pub fn S3StateBackend(
 			.with_region(region.map(SmolStr::from))
 			.into(),
 	);
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// A credential moving into a member account is lowered against the
+	/// bucket it reaches there: the declared one from anywhere, else that
+	/// account's own, never the launch's.
+	#[beet_core::test]
+	fn the_default_bucket_is_per_account() {
+		S3Backend::default()
+			.bucket_in("111")
+			.xpect_eq(SmolStr::new("beet-state-111"));
+		S3Backend::default()
+			.with_bucket(Some("shared-state".into()))
+			.bucket_in("111")
+			.xpect_eq(SmolStr::new("shared-state"));
+	}
 }

@@ -90,7 +90,9 @@ use serde_json::json;
 pub struct AwsDeployPolicy {
 	/// The app every name is scoped to, ie `beet-site`.
 	app: SmolStr,
-	/// The state bucket this launch resolved, ie `beet-state-<account id>`.
+	/// The state bucket of the account the user lives in, ie
+	/// `beet-state-<account id>`, which is not the launch's own while an
+	/// elevated deploy moves the credential into a member account.
 	state_bucket: SmolStr,
 	/// The regions the stacks declare, which every regional service is
 	/// conditioned on.

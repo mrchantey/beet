@@ -184,6 +184,9 @@ impl AwsDeployCredential {
 	/// ..and that account's name in the Organization, absent for the
 	/// management account itself.
 	const ACCOUNT_NAME: &'static str = "account_name";
+	/// Stands in for a member account's id in a dry run, which the move
+	/// learns, as [`AwsAccount`]'s own description writes it.
+	const UNKNOWN_ACCOUNT: &'static str = "<id>";
 
 	/// The group a first converge seals into; a record already sealed stays
 	/// in its own.
@@ -219,7 +222,9 @@ impl AwsDeployCredential {
 		&self,
 		caller: &AsyncEntity,
 	) -> Result<CredentialStatus> {
-		let Some(apps) = Self::apps(caller).await? else {
+		// the launch's own state bucket: a key not yet in the declared account
+		// is stale for living elsewhere, below, and one inside resolves its own
+		let Some(apps) = Self::apps(caller, None).await? else {
 			return CredentialStatus::not_needed().xok();
 		};
 		let grants = Self::grant_lines(&apps)?;
@@ -332,7 +337,9 @@ impl AwsDeployCredential {
 		caller: &AsyncEntity,
 		ask: ElevationAsk,
 	) -> Result<CredentialElevation> {
-		let Some(apps) = Self::apps(caller).await? else {
+		// rendered before the code is asked for, so a stack that cannot render
+		// costs no session
+		let Some(apps) = Self::apps(caller, None).await? else {
 			bevybail!(
 				"this launch declares no stack keeping its state at AWS, so \
 				there is no AWS deploy credential to elevate"
@@ -364,6 +371,15 @@ impl AwsDeployCredential {
 			None => (management, None),
 		};
 		let account = admin.account_id().await?;
+		// lowered against the launch's state bucket, which is another
+		// account's while the credential moves: inside a member it is granted
+		// that account's own, as the plain deploys after the move resolve it
+		let apps = match home {
+			Some(_) => {
+				Self::apps(caller, Some(&account)).await?.unwrap_or(apps)
+			}
+			None => apps,
+		};
 		let user = DeployCredential::name()?;
 		report.push(
 			admin
@@ -406,15 +422,18 @@ impl AwsDeployCredential {
 	}
 
 	/// One [`AppPolicies`] per app this launch declares, lowered from every
-	/// stack of it at the launch's stage and `prod`, in app order. Renders in
-	/// one world pass, so a stack that cannot render fails here rather than at
-	/// the account. `None` when this launch deploys nothing at AWS: no stack,
-	/// or state kept locally, which deploys as nobody.
-	async fn apps(caller: &AsyncEntity) -> Result<Option<Vec<AppPolicies>>> {
-		let state_bucket = match terra::Project::resolve_backend(caller).await?
-		{
-			ResolvedBackend::S3(s3) => s3.bucket().clone(),
-			ResolvedBackend::Local(_) => return None.xok(),
+	/// stack of it at the launch's stage and `prod`, in app order, granting the
+	/// state bucket of `account` (see [`Self::state_bucket`]). Renders in one
+	/// world pass, so a stack that cannot render fails here rather than at the
+	/// account. `None` when this launch deploys nothing at AWS: no stack, or
+	/// state kept locally, which deploys as nobody.
+	async fn apps(
+		caller: &AsyncEntity,
+		account: Option<&str>,
+	) -> Result<Option<Vec<AppPolicies>>> {
+		let Some(state_bucket) = Self::state_bucket(caller, account).await?
+		else {
+			return None.xok();
 		};
 		let rendered = caller
 			.with_world(|world, _| DeployCredential::render_stages(world))
@@ -456,6 +475,32 @@ impl AwsDeployCredential {
 		Some(apps.into_values().collect::<Vec<_>>()).xok()
 	}
 
+	/// The state bucket the policies grant, `None` when state is kept locally:
+	/// as seen from the AWS account `account` when the credential is to live
+	/// there ([`S3Backend::bucket_in`]), else the one this launch resolves,
+	/// which is the account of the credential it runs as.
+	async fn state_bucket(
+		caller: &AsyncEntity,
+		account: Option<&str>,
+	) -> Result<Option<SmolStr>> {
+		let backend = caller
+			.world()
+			.with_resource::<Deployment, _>(|deployment| {
+				deployment.backend().clone()
+			})
+			.await;
+		match (backend, account) {
+			(StackBackend::S3(s3), Some(account)) => {
+				Some(s3.bucket_in(account))
+			}
+			(backend, _) => match backend.resolve().await? {
+				ResolvedBackend::S3(s3) => Some(s3.bucket().clone()),
+				ResolvedBackend::Local(_) => None,
+			},
+		}
+		.xok()
+	}
+
 	/// What the user was called before it shared the Cloudflare token's name,
 	/// which a converge finding no [`DeployCredential::name`] renames in place.
 	fn retired_user_name() -> Result<String> {
@@ -467,13 +512,27 @@ impl AwsDeployCredential {
 	/// are absent, since whether they apply is an account read a dry run does
 	/// not make.
 	async fn describe_of(caller: &AsyncEntity) -> Result<String> {
-		let Some(apps) = Self::apps(caller).await? else {
+		let declared = AwsAccount::declared(caller).await?;
+		// a key not yet in the declared account is described as it will be
+		// there, granted that account's state bucket, whose id the move learns
+		let moving = match &declared {
+			Some((account, _)) => {
+				let name = account.resolved_name()?;
+				DeployCredential::sealed(caller, Self::KEY_ID)
+					.await
+					.is_none_or(|held| Self::elsewhere(&held, &name).is_some())
+			}
+			None => false,
+		};
+		let Some(apps) =
+			Self::apps(caller, moving.then_some(Self::UNKNOWN_ACCOUNT)).await?
+		else {
 			return "aws: this launch declares no stack keeping its state at AWS\n"
 				.to_string()
 				.xok();
 		};
 		let mut out = format!("user {}\n", DeployCredential::name()?);
-		if let Some((account, region)) = AwsAccount::declared(caller).await? {
+		if let Some((account, region)) = declared {
 			out.push_str(&format!("{}\n", account.describe(&region)?));
 		}
 		for app in apps.iter() {
