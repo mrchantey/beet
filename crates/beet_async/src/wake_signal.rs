@@ -35,19 +35,25 @@ pub(crate) fn pair() -> (WakeSignaler, WakeWaiter) {
 }
 
 impl WakeWaiter {
-	/// Waits until another cloned instance of [`WakeSignaler`] has been dropped.
-	/// If any cloned instance of [`WakeSignaler`] is dropped then this wait stops waiting.
+	/// Waits up to `timeout` for the [`WakeSignaler`] to drop, answering
+	/// whether it has.
 	#[inline]
-	pub(crate) fn wait(&self) {
+	pub(crate) fn wait_timeout(&self, timeout: core::time::Duration) -> bool {
 		#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 		{
 			let (lock, cv) = &*self.0;
-			let mut signaled = lock.lock().unwrap();
-			while !*signaled {
-				signaled = cv.wait(signaled).unwrap();
-			}
+			let signaled = lock.lock().unwrap();
+			*cv.wait_timeout_while(signaled, timeout, |signaled| !*signaled)
+				.unwrap()
+				.0
 		}
-		// no-op on no_std / wasm: futures are ticked synchronously before this point.
+		// always signaled on no_std / wasm: futures are ticked synchronously
+		// before this point.
+		#[cfg(not(all(feature = "std", not(target_arch = "wasm32"))))]
+		{
+			let _ = timeout;
+			true
+		}
 	}
 }
 impl Drop for WakeSignaler {

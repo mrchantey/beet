@@ -37,8 +37,8 @@ pub struct HttpStore {
 impl HttpStore {
 	/// The query flag that turns a mount request into a listing of the keys
 	/// under its path, `GET /repo/docs?list` answering `["a.md", "b/c.md"]`
-	/// relative to `docs`. Declared here so the server and this client cannot
-	/// disagree about its name.
+	/// relative to `docs`: the `list` param `ServeBlobs` declares, which a
+	/// strict mount refuses under any other name.
 	pub const LIST_PARAM: &'static str = "list";
 
 	/// A store mounted at `base`.

@@ -6,8 +6,9 @@ use beet_core::prelude::*;
 /// says exactly which object lands in each record and a name with no target
 /// fails listing the registered ones.
 ///
-/// Registered by `RouterPlugin`: `pub.leaflet.content` answered by the
-/// [`LeafletRenderer`](crate::prelude::LeafletRenderer).
+/// Initialized empty by `RouterPlugin`, each format registered by the
+/// installer of the target answering it: with the `leaflet` feature,
+/// `pub.leaflet.content` by the `LeafletRenderer`.
 #[derive(Debug, Default, Clone, Resource)]
 pub struct StandardSiteContentFormats(Vec<(Nsid, MediaType)>);
 
@@ -60,20 +61,27 @@ mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
 
+	/// A format of the tests' own, so the registry is tested apart from any
+	/// target.
+	fn example() -> (Nsid, MediaType) {
+		(
+			Nsid::new_static("com.example.content"),
+			MediaType::other("application/vnd.com.example.content+json"),
+		)
+	}
+
 	/// An unregistered NSID fails naming the registered ones.
 	#[beet_core::test]
 	fn names_the_registered_formats() {
+		let (nsid, media_type) = example();
 		let mut formats = StandardSiteContentFormats::default();
-		formats.register(
-			Nsid::new_static("pub.leaflet.content"),
-			MediaType::other("application/vnd.pub.leaflet.content+json"),
-		);
+		formats.register(nsid, media_type);
 		formats
-			.media_type(&Nsid::new_static("com.example.format"))
+			.media_type(&Nsid::new_static("com.example.unknown"))
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("com.example.format")
-			.xpect_contains("pub.leaflet.content");
+			.xpect_contains("com.example.unknown")
+			.xpect_contains("com.example.content");
 	}
 
 	/// The member's `$type` is the declared NSID, and an object naming
@@ -81,9 +89,7 @@ mod test {
 	#[cfg(feature = "json")]
 	#[beet_core::test]
 	fn wraps_under_the_nsid() {
-		let nsid = Nsid::new_static("pub.leaflet.content");
-		let media_type =
-			MediaType::other("application/vnd.pub.leaflet.content+json");
+		let (nsid, media_type) = example();
 		let mut formats = StandardSiteContentFormats::default();
 		formats.register(nsid.clone(), media_type.clone());
 		formats

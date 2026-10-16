@@ -26,7 +26,8 @@ pub struct StandardSitePub {
 	/// `textContent`.
 	pub text_content: bool,
 	/// The rich format each document's `content` carries, by NSID, ie
-	/// `pub.leaflet.content`; none for no rich body.
+	/// `pub.leaflet.content`, the default with the `leaflet` feature; none for
+	/// no rich body, the default without it.
 	pub content: Option<Nsid>,
 	/// The standard site media ingest policy the `content` format's embedded
 	/// media is resolved under.
@@ -43,7 +44,10 @@ impl Default for StandardSitePub {
 			// the lexicon's own default
 			show_in_discover: true,
 			text_content: true,
+			#[cfg(feature = "leaflet")]
 			content: Some(LeafletContent::NSID),
+			#[cfg(not(feature = "leaflet"))]
+			content: None,
 			media_ingest: default(),
 		}
 	}

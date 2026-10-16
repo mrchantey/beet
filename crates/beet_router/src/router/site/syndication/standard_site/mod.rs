@@ -19,10 +19,10 @@
 //! - [`StandardSiteDocument`], `site.standard.document`, built from a listed
 //!   page's metadata and rendered off its live page (the `publish` module:
 //!   the body forms, the cover, the blob upload)
-//! - [`LeafletContent`], `pub.leaflet.content`, the rich `content` format,
-//!   rendered by the [`LeafletRenderer`] target, and the
-//!   [`StandardSiteContentFormats`] registry a publication's `content` NSID
-//!   resolves through
+//! - the [`StandardSiteContentFormats`] registry a publication's `content`
+//!   NSID resolves through, and with the `leaflet` feature `LeafletContent`,
+//!   `pub.leaflet.content`, the rich `content` format, rendered by the
+//!   `LeafletRenderer` target
 //!
 //! # Limits
 //!
@@ -38,6 +38,7 @@
 //! [`Theme`]: beet_ui::prelude::Theme
 mod content_format;
 mod document;
+#[cfg(feature = "leaflet")]
 mod leaflet;
 mod publication;
 #[cfg(feature = "json")]
@@ -46,6 +47,7 @@ mod standard_site_pub;
 mod theme;
 pub use content_format::*;
 pub use document::*;
+#[cfg(feature = "leaflet")]
 pub use leaflet::*;
 pub use publication::*;
 pub use standard_site_pub::*;

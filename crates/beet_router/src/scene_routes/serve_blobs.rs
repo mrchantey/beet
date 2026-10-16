@@ -59,6 +59,11 @@ pub fn ServeBlobs(
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub(crate) async fn ServeBlobsHandler(
+	/// Answer the keys under the path as a JSON array, relative to it, rather
+	/// than the file: the listing an `HttpStore` reads the mount through, its
+	/// `LIST_PARAM`.
+	#[param]
+	list: bool,
 	cx: ActionContext<RequestParts>,
 ) -> Result<Response> {
 	// the nearest self-or-ancestor store (a `DirPath` co-located on this route has
@@ -75,9 +80,7 @@ pub(crate) async fn ServeBlobsHandler(
 		.get_params(STORE_PATH_PARAM)
 		.map(|segments| RelPath::from_segments(segments))
 		.unwrap_or_default();
-	// the listing endpoint an `HttpStore` reads the mount's keys through
-	#[cfg(feature = "json")]
-	if cx.input.has_param(HttpStore::LIST_PARAM) {
+	if list {
 		return list_blobs(&store, &path).await;
 	}
 	serve_blob(&store, &path)
@@ -99,6 +102,14 @@ async fn list_blobs(store: &BlobStore, path: &RelPath) -> Result<Response> {
 	})
 	.xref()
 	.xmap(Response::ok_json)
+}
+
+/// A listing answers json, so a build without it refuses one.
+#[cfg(not(feature = "json"))]
+async fn list_blobs(_store: &BlobStore, path: &RelPath) -> Result<Response> {
+	bevybail!(
+		"listing `{path}` answers json, which this build leaves out (the `json` feature)"
+	)
 }
 
 /// The request path segment whose misses earn the unhydrated-store hint.
@@ -330,7 +341,8 @@ mod test {
 	/// The mount read back through an [`HttpStore`] over a real listener: a
 	/// key reads, a listing lists (the root and a subdir), and a missing key is
 	/// absent rather than an error, the miss `SceneBlob` decides a first boot
-	/// on.
+	/// on. The url space is strict, as a served site's is, so the listing's
+	/// flag must be one the route declares.
 	#[cfg(all(
 		feature = "json",
 		feature = "http",
@@ -356,6 +368,7 @@ mod test {
 				.add_plugins((MinimalPlugins, RouterPlugin))
 				.spawn((server, on_spawn, store, children![(
 					Router::default(),
+					RejectUnknownParams,
 					children![serve_route("repo")]
 				)]))
 				.run();

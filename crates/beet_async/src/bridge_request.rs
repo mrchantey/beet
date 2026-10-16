@@ -331,9 +331,19 @@ fn wake_requests_and_wait(
 			     system_state,
 			     wake_signal,
 			 }| {
-				wake_signal.wait();
+				// a woken future may be polled by this thread alone (a local
+				// task, or every task without worker threads), and one tick
+				// runs at most 100 tasks per executor, so keep ticking until it
+				// has polled rather than block on a poll only this thread makes
+				while !wake_signal.wait_timeout(TICK_INTERVAL) {
+					ticker.tick();
+				}
 				CompletedBridgeRequest { system_state }
 			},
 		)
 		.collect()
 }
+
+/// How long the driver waits on a woken future's signal between ticks.
+const TICK_INTERVAL: core::time::Duration =
+	core::time::Duration::from_millis(1);

@@ -67,10 +67,14 @@ bsx_core = ["beet_core/bsx"]
 vault = ["std", "beet_net/vault"]
 json = ["serde", "dep:serde_json", "beet_core/json", "beet_net/json"]
 # The standard.site records (`router/site/syndication/standard_site`): plain
-# data in the atproto model, beside `beet_net`'s `Pds` family. With `json`, the
-# Leaflet render target, whose image blocks read an image's size off its header
-# (`imagesize`).
-dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor", "dep:imagesize"]
+# data in the atproto model, beside `beet_net`'s `Pds` family.
+dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net/dag_cbor"]
+# The Leaflet render target (`standard_site/leaflet.rs`), a page as
+# `pub.leaflet.content`, the rich body a standard site document carries by
+# default: json on the wire, its image blocks reading an image's size off its
+# header (`imagesize`). Only a binary that publishes needs it; without it a
+# request for the Leaflet media type answers 406.
+leaflet = ["dag_cbor", "json", "dep:imagesize"]
 postcard = ["serde", "beet_core/postcard", "beet_net/postcard"]
 serde = ["dep:serde", "beet_core/serde", "beet_action/serde", "beet_net/serde", "beet_ui?/serde"]
 markdown_parser = ["std", "beet_ui/markdown_parser"]
@@ -173,6 +177,9 @@ webbrowser = { workspace = true, optional = true }
 # `rand` feature mints the name of), since a store walk is exactly what they are
 # asserting.
 beet_core = { workspace = true, features = ["testing", "fs", "rand"] }
+# the standard.site tests read a record's wire form, json, in every build
+# carrying the records, `json` or not
+serde_json.workspace = true
 
 # `ureq` + `server`: the http store test reads a `<ServeBlobs>` mount over a
 # real listener, which needs a client transport beside the mini server.

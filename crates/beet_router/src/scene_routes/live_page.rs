@@ -715,6 +715,26 @@ mod test {
 		entities(&mut world).xpect_eq(baseline);
 	}
 
+	/// The Leaflet media type is answered by the `leaflet` feature's target,
+	/// and without it `406 Not Acceptable` like any unregistered type.
+	#[beet_core::test]
+	async fn leaflet_answers_with_its_feature() {
+		let (mut world, router) = site();
+		let status = if cfg!(feature = "leaflet") {
+			StatusCode::OK
+		} else {
+			StatusCode::NOT_ACCEPTABLE
+		};
+		world
+			.entity_mut(router)
+			.exchange(at(POST, "content").with_accept(MediaType::other(
+				"application/vnd.pub.leaflet.content+json",
+			)))
+			.await
+			.status()
+			.xpect_eq(status);
+	}
+
 	/// One live page renders as every type its holder asks for, each the body
 	/// a request for that type answers.
 	#[beet_core::test]

@@ -504,7 +504,7 @@ mod test {
 		.await;
 		for accept in [
 			MediaType::Html,
-			#[cfg(all(feature = "dag_cbor", feature = "json"))]
+			#[cfg(feature = "leaflet")]
 			LeafletRenderer::media_type(),
 		] {
 			world

@@ -457,8 +457,15 @@ impl RenderTarget for LeafletRenderer {
 	fn media_types(&self) -> Vec<MediaType> { vec![Self::media_type()] }
 }
 
+/// Registers the target and `pub.leaflet.content`, the standard site content
+/// format it answers.
 impl Installer for LeafletRenderer {
-	fn install(self, app: &mut App) { RenderTargets::register_on(app, self); }
+	fn install(self, app: &mut App) {
+		app.world_mut()
+			.get_resource_or_init::<StandardSiteContentFormats>()
+			.register(LeafletContent::NSID, Self::media_type());
+		RenderTargets::register_on(app, self);
+	}
 }
 
 /// What the Leaflet walk reads off a rendered tree.

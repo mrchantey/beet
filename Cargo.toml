@@ -410,6 +410,10 @@ json = ["serde", "beet_core/json", "beet_net?/json", "beet_router?/json"]
 # model's providers and records: the `Pds` family and `<AtprotoAccount/>`
 # (`beet_net`), the standard.site records (`beet_router`). No network.
 dag_cbor = ["serde", "beet_core/dag_cbor", "beet_net?/dag_cbor", "beet_router?/dag_cbor"]
+# The Leaflet render target (`beet_router`), a page as `pub.leaflet.content`,
+# the rich body a standard site document carries by default. Only a binary
+# that publishes needs it; a served site answers its media type 406.
+leaflet = ["dag_cbor", "json", "beet_router?/leaflet"]
 # offline geoip country lookup for analytics (pulls the pure-rust `maxminddb`
 # reader). Off by default; a deployed site enables it and commits a
 # `country.mmdb` to `assets/databases/` to populate the analytics country field.

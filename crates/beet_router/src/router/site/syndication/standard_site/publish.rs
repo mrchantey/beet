@@ -195,8 +195,8 @@ mod test {
 			.await
 	}
 
-	/// The document carries the post as plain text, as Leaflet blocks with
-	/// the image a blob, and its cover a blob, rendered off one tree.
+	/// The document carries the post as plain text and its cover a blob,
+	/// rendered off one tree, and no rich body in a build with no format.
 	#[beet_core::test]
 	async fn renders_the_body_forms() {
 		let (mut world, router) = site().await;
@@ -205,6 +205,17 @@ mod test {
 		document
 			.cover_image
 			.xpect_eq(Some(BlobRef::of(&png(2, 1), MediaType::Png)));
+		#[cfg(not(feature = "leaflet"))]
+		document.content.xpect_none();
+	}
+
+	/// With the `leaflet` feature the document carries the post as Leaflet
+	/// blocks, the image a blob.
+	#[cfg(feature = "leaflet")]
+	#[beet_core::test]
+	async fn renders_the_leaflet_body() {
+		let (mut world, router) = site().await;
+		let (document, _) = publish(&mut world, router, None).await.unwrap();
 		let content = document.content.unwrap();
 		content.r#type().xpect_eq(LeafletContent::NSID);
 		let content = content.into_serde::<LeafletContent>().unwrap();
@@ -238,10 +249,13 @@ mod test {
 		let (_, uploaded) = publish(&mut world, router, Some(pds.clone()))
 			.await
 			.unwrap();
-		uploaded.len().xpect_eq(2);
+		// the cover, and the image a Leaflet body references
+		let referenced = if cfg!(feature = "leaflet") { 2 } else { 1 };
+		uploaded.len().xpect_eq(referenced);
 		let mut stored = emulator.store().list().await.unwrap();
 		stored.sort();
-		stored.len().xpect_eq(3);
+		// the blobs and the record
+		stored.len().xpect_eq(referenced + 1);
 		publish(&mut world, router, Some(pds)).await.unwrap();
 		let mut again = emulator.store().list().await.unwrap();
 		again.sort();

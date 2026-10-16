@@ -39,7 +39,9 @@
 //!
 //!  -> Direct access: non-queued future polled during scope,
 //!  bypasses queue, acquires locks, completes (no signal)
-//!   4. Wait for all signal guards to drop + scope mutex released
+//!   4. Tick the driver thread's executors until all signal guards drop +
+//!   scope mutex released: a woken future may be polled by that thread alone,
+//!   and one tick reaches at most 100 tasks per executor
 //!   5. Unpublish pointer, scope ends.
 //!   6. Apply any deferred ops from `SystemState` of polled futures
 //!   7. Loop (up to [`AsyncTickBudget`]) or return
@@ -459,6 +461,52 @@ mod tests {
 		assert_eq!(COMPLETED.load(Ordering::Relaxed), 1);
 		// once inside the closure (queued), once woken by the driver
 		assert_eq!(SIBLING_POLLS.load(Ordering::Relaxed), 2);
+	}
+
+	/// A woken request whose task only the driver thread polls (a local task,
+	/// or every task in a build without worker threads) still polls when more
+	/// tasks are runnable than one tick of the pools reaches: bevy runs at
+	/// most 100 tasks per executor a tick, so a driver ticking once and then
+	/// blocking on the signal waits on a poll only it could make.
+	#[test]
+	fn a_woken_request_polls_behind_a_busy_executor() {
+		use bevy::tasks::futures_lite::future::yield_now;
+		use core::time::Duration;
+
+		struct MySyncPoint;
+		static COMPLETED: AtomicBool = AtomicBool::new(false);
+
+		let (done, finished) = std::sync::mpsc::channel();
+		// a driver that never returns would hang the suite, so it runs on a
+		// thread of its own, its local executor with it
+		std::thread::spawn(move || {
+			let mut app = App::new();
+			app.add_plugins((
+				AsyncPlugin::default(),
+				ScheduleRunnerPlugin::default(),
+				TaskPoolPlugin::default(),
+			));
+			app.add_systems(Update, async_world_sync_point::<MySyncPoint>);
+			let world = app.world().resource::<AsyncWorld>().clone();
+			let pool = AsyncComputeTaskPool::get();
+			pool.spawn_local(async move {
+				world.exclusive(MySyncPoint, |_| {}).await.unwrap();
+				COMPLETED.store(true, Ordering::Relaxed);
+			})
+			.detach();
+			// queued ahead of the woken request, each runnable every tick
+			for _ in 0..1000 {
+				pool.spawn_local(async {
+					while !COMPLETED.load(Ordering::Relaxed) {
+						yield_now().await;
+					}
+				})
+				.detach();
+			}
+			update_until(&mut app, || COMPLETED.load(Ordering::Relaxed));
+			done.send(COMPLETED.load(Ordering::Relaxed)).unwrap();
+		});
+		assert_eq!(finished.recv_timeout(Duration::from_secs(30)), Ok(true));
 	}
 
 	#[test]

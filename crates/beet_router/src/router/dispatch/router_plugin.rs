@@ -364,20 +364,12 @@ impl Plugin for RouterPlugin {
 			// an `<AnalyticsConfig/>` is spawned, so nothing records until a site
 			// opts in with that on-switch.
 			app.register_type::<AnalyticsMiddleware>();
-			// the standard.site `content` formats, each answered by a render
-			// target registered beside it
+			// the standard.site `content` formats, each registered by the
+			// render target answering it
 			#[cfg(feature = "dag_cbor")]
-			{
-				app.init_resource::<StandardSiteContentFormats>()
-					.world_mut()
-					.resource_mut::<StandardSiteContentFormats>()
-					.register(
-						LeafletContent::NSID,
-						LeafletRenderer::media_type(),
-					);
-				#[cfg(feature = "json")]
-				app.install(LeafletRenderer);
-			}
+			app.init_resource::<StandardSiteContentFormats>();
+			#[cfg(feature = "leaflet")]
+			app.install(LeafletRenderer);
 			#[cfg(feature = "json")]
 			app.add_plugins(analytics_plugin);
 		}
