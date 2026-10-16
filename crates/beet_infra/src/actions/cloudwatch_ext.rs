@@ -3,7 +3,7 @@
 //! The cli for the same reason [`SsmSecretStore`](super::SsmSecretStore) uses it: every step
 //! that would call this already shells out to `aws` for the parameters it reads
 //! first, so an SDK client here would be a dependency bought for one verb.
-use crate::actions::aws_cli_ext;
+use crate::types::aws_cli_ext;
 use beet_core::prelude::*;
 use serde_json::json;
 

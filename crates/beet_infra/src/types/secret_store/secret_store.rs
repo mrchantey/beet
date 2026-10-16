@@ -18,7 +18,9 @@ use std::sync::Arc;
 /// The erased-provider pattern (`AGENTS.md`): an `Arc<dyn SecretStoreProvider>`
 /// cloned by every consumer, landed on the declaring entity by the attach
 /// observer of its declaration (`<SsmSecrets/>`, `<DocumentSecrets/>`, each
-/// beside its provider) and resolved by [`StackQuery::secret_store`].
+/// beside its provider) and resolved by [`StackQuery::secret_store`]. In
+/// every build, since a deployed box reads its `<SecretBlock/>`s through it;
+/// only the document provider needs the vault layer.
 /// [`Debug`] prints the provider id and never a value.
 ///
 /// Values never reach a log: a consumer that prints one (`MailCredentials`)
@@ -26,13 +28,14 @@ use std::sync::Arc;
 ///
 /// ## Example
 ///
-/// The seam over a document in a temp store, the same calls a deploy makes
-/// against parameter store:
+/// The seam over a document in a temp store (the vault layer's provider),
+/// the same calls a deploy makes against parameter store:
 ///
 /// ```
 /// # use beet_core::prelude::*;
 /// # use beet_net::prelude::*;
 /// # use beet_infra::prelude::*;
+/// # #[cfg(feature = "vault")]
 /// async_ext::block_on(async {
 /// 	let mut identities = AgeIdentityFile::default();
 /// 	identities.push(AgeIdentity::generate());
@@ -408,7 +411,8 @@ impl SecretStoreError {
 	}
 }
 
-#[cfg(test)]
+// every seam test runs against a secrets document in a temp store
+#[cfg(all(test, feature = "vault"))]
 mod test {
 	use super::*;
 	use crate::types::test_support::*;
@@ -453,7 +457,7 @@ mod test {
 	/// With nothing declared the stack carries an implicit `<SsmSecrets/>`,
 	/// parameter store in the stack's region whatever the launch, and a
 	/// declared one is the same store.
-	#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+	#[cfg(not(target_arch = "wasm32"))]
 	#[beet_core::test]
 	fn an_undeclared_stack_is_ssm() {
 		let mut world = infra_world();

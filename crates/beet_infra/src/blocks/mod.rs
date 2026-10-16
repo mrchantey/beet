@@ -23,6 +23,11 @@ mod repo_store_block;
 pub use repo_store_block::*;
 mod store_uri_block;
 pub use store_uri_block::*;
+// A secret a deployed runtime reads from its stack's secret store, and the
+// relation a compute grants read on it through. Feature-free like the store
+// declarations: the deployed binary reads the same declaration.
+mod secret_block;
+pub use secret_block::*;
 // The machine-level memory config every box block shares: a swapfile, a ceiling
 // on the unit that matters, and a per-minute sampler. Ungated — a box block of
 // any provider renders the same three pieces.

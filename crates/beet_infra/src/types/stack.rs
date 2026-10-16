@@ -312,7 +312,6 @@ pub struct StackQuery<'w, 's> {
 	deployment: Option<Res<'w, Deployment>>,
 	/// The secret store a declaration landed, see
 	/// [`secret_store`](Self::secret_store).
-	#[cfg(feature = "vault")]
 	secret_stores: Query<'w, 's, &'static SecretStore>,
 }
 
@@ -397,7 +396,6 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`), else the implicit
 	/// `<SsmSecrets/>` every stack carries ([`SsmSecrets::store`]). Two
 	/// declarations under one stack is an error naming both, never a guess.
-	#[cfg(feature = "vault")]
 	pub fn secret_store(&self, entity: Entity) -> Result<SecretStore> {
 		let root = self
 			.stacks

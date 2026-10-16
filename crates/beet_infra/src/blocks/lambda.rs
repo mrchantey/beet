@@ -132,11 +132,16 @@ impl LambdaBlock {
 		stacks: StackQuery,
 		blocks: Query<(Entity, &LambdaBlock, Option<&BuildArtifact>)>,
 		repos: RepoStoreQuery,
+		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block, artifact) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
 				continue;
 			};
+			if let Err(err) = reads.refuse(entity) {
+				scope.error(bevyhow!("LambdaBlock '{}': {err}", block.label()));
+				continue;
+			}
 			// the function's code is read from the stack's repo store
 			let repo_bucket =
 				match repos.get(entity).and_then(|repo| repo.bucket_name()) {

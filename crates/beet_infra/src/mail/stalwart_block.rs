@@ -801,28 +801,10 @@ impl StalwartBlock {
 	/// write statement carries `s3:AbortMultipartUpload` through the
 	/// per-compute knob.
 	///
-	/// The `kms:Decrypt` statement is here because this box reads
-	/// `SecureString` parameters, and it states that grant rather than relying
-	/// on the AWS-managed `aws/ssm` key policy to supply it.
-	///
-	/// An unboundaried role reads a `SecureString` with no `kms:` grant of its
-	/// own, because that key policy allows `{"AWS": "*"}` under a
-	/// `kms:ViaService` condition. Whether the same holds for a role wearing a
-	/// [`RuntimeBoundary`] is NOT settled: AWS exempts a resource-based policy
-	/// from a boundary where it grants to the principal directly, and enforces
-	/// the boundary where it delegates to the account root, and a `"*"`
-	/// principal is arguably the first of those. The simulator calls this
-	/// statement redundant, and also allows an account-root delegation under a
-	/// boundary, which the documented rule forbids — so it does not settle it
-	/// either.
-	///
-	/// It is stated anyway, because the bet is asymmetric. One action under one
-	/// service condition costs nothing if redundant; if it were needed and
-	/// absent, the box decrypts at boot, at provision and on the cold-backup
-	/// timer, so a running box would pass every check made when the boundary
-	/// landed and fail at its next reboot. Declaring it also keeps the
-	/// derivation honest, since the boundary is the union of what the stacks
-	/// render and this is a thing the runtime genuinely does.
+	/// The box reads `SecureString` parameters at boot, at provision and on
+	/// the cold-backup timer, so it states the decryption grant rather than
+	/// relying on the `aws/ssm` key policy
+	/// ([`IamPolicy::decrypt_secure_strings`] says why).
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
@@ -840,21 +822,7 @@ impl StalwartBlock {
 					self.admin_secret_name(stack)
 				)
 			}))
-			// the key is addressed by condition rather than by arn: the
-			// account's `aws/ssm` key id is not knowable at render time, and
-			// `kms:ViaService` bounds the grant to decryption SSM itself
-			// performs, which is the only way this box ever asks.
-			.statement(json!({
-				"Sid": "SsmSecureStringDecrypt",
-				"Effect": "Allow",
-				"Action": ["kms:Decrypt"],
-				"Resource": "*",
-				"Condition": {
-					"StringEquals": {
-						"kms:ViaService": format!("ssm.{region}.amazonaws.com")
-					}
-				}
-			}))
+			.decrypt_secure_strings()
 			.write_action("s3:AbortMultipartUpload")
 			.lower(access)?
 			.statement(json!({
@@ -1549,13 +1517,16 @@ WantedBy=multi-user.target"#,
 	/// tracer is declared without colour: an escape sequence ahead of the
 	/// timestamp is a line the agent dates at ingestion), and the same prefix
 	/// keeps a multi-line backtrace one event.
+	///
+	/// No `retention_in_days`: the stack's log group owns retention, and an
+	/// agent told to manage it calls `logs:DescribeLogGroups`, which the box's
+	/// role is never granted.
 	fn cloudwatch_config(&self, stack: &ResolvedStack) -> Result<Value> {
 		let tail = |file_path: String, stream: &str| {
 			json!({
 				"file_path": file_path,
 				"log_group_name": self.log_group(stack),
 				"log_stream_name": stream,
-				"retention_in_days": 30,
 				"timestamp_format": "%Y-%m-%dT%H:%M:%S",
 				"timezone": "UTC",
 				"multi_line_start_pattern": "{timestamp_format}"
@@ -2850,6 +2821,40 @@ mod tests {
 			.matches("StandardOutput=append:/var/log/stalwart/stalwart.log")
 			.count()
 			.xpect_eq(2);
+	}
+
+	/// The stack's log group owns retention; the box's CloudWatch agent only
+	/// ships lines.
+	///
+	/// An agent whose `collect_list` entry carries `retention_in_days` manages
+	/// that retention itself, calling `logs:DescribeLogGroups` with a role never
+	/// granted it: the `AccessDeniedException` the site box logged at every
+	/// boot on 2026-10-15, from the same agent setting.
+	#[beet_core::test]
+	fn the_stack_owns_log_retention() {
+		let (stack, _deployment, config) = build_config(&mail_box());
+		rendered_user_data(&config)
+			.xpect_contains("amazon-cloudwatch-agent.json")
+			.xnot()
+			.xpect_contains("retention_in_days");
+
+		let json = config.to_json().into_json();
+		json["resource"]["aws_cloudwatch_log_group"]
+			.as_object()
+			.unwrap()
+			.values()
+			.find(|group| {
+				group["name"] == mail_box().log_group(&stack).as_str()
+			})
+			.unwrap()["retention_in_days"]
+			.as_i64()
+			.unwrap()
+			.xpect_eq(30);
+		json.to_string()
+			.xnot()
+			.xpect_contains("logs:DescribeLogGroups")
+			.xnot()
+			.xpect_contains("logs:PutRetentionPolicy");
 	}
 
 	/// The nightly dump is opt-in and complete: no bucket, no timer, and no

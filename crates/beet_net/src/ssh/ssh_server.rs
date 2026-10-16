@@ -12,6 +12,8 @@ pub struct SshServerPlugin;
 impl Plugin for SshServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.install_type::<AsyncPlugin>()
+			.register_type::<SshHostKeyRef>()
+			.register_type::<SshHostKeyConsumers>()
 			.add_observer(RequirePty::clear_on_pty)
 			.add_systems(Update, RequirePty::close_expired);
 	}
@@ -135,6 +137,10 @@ pub struct SshServer {
 	///
 	/// Enforced by [`SshServerPlugin`] (via [`RequirePty`]), not by the transport.
 	pub pty_timeout: Option<Duration>,
+	/// The key the server presents, its fingerprint the one clients pin. When
+	/// `None` the listener reads the [`SshHostKeyRef`] on its entity, else the
+	/// process default (see [`SshHostKey`]).
+	pub host_key: Option<SshHostKey>,
 }
 
 /// The default [`SshServer::idle_timeout`]: long enough to read a page without
@@ -157,6 +163,7 @@ impl std::fmt::Debug for SshServer {
 			)
 			.field("idle_timeout", &self.idle_timeout)
 			.field("pty_timeout", &self.pty_timeout)
+			.field("host_key", &self.host_key)
 			.finish()
 	}
 }
@@ -201,6 +208,7 @@ impl SshServer {
 			credentials: None,
 			idle_timeout: DEFAULT_IDLE_TIMEOUT,
 			pty_timeout: None,
+			host_key: None,
 		}
 	}
 
@@ -231,6 +239,13 @@ impl SshServer {
 	/// [`pty_timeout`](Self::pty_timeout).
 	pub fn with_pty_timeout(mut self, timeout: Duration) -> Self {
 		self.pty_timeout = Some(timeout);
+		self
+	}
+
+	/// Presents `key` rather than the process default, see
+	/// [`host_key`](Self::host_key).
+	pub fn with_host_key(mut self, key: SshHostKey) -> Self {
+		self.host_key = Some(key);
 		self
 	}
 
@@ -270,6 +285,96 @@ impl SshServer {
 		format!("{a}.{b}.{c}.{d}:{}", self.port.unwrap_or(0))
 	}
 }
+
+/// The ed25519 key an [`SshServer`] presents, held in the encoding it arrived
+/// in: the file `ssh-keygen` writes (its PEM armor), base64 of that file
+/// (wrapped or not), or base64 of the binary encoding inside it. [`Debug`]
+/// redacts.
+///
+/// A server with no declared key reads the process default: the launch's
+/// `BEET_SSH_HOST_KEY`, else in a debug build a fixed key so a restart keeps
+/// its fingerprint, else a random one. A deployed server declares its key
+/// instead ([`SshHostKeyRef`]), and a declared key that does not parse fails
+/// the server rather than serving under a stranger's fingerprint.
+#[derive(Clone)]
+pub struct SshHostKey(String);
+
+impl std::fmt::Debug for SshHostKey {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("SshHostKey(..)")
+	}
+}
+
+impl SshHostKey {
+	/// The fixed key a debug build presents when none is declared, so a local
+	/// restart keeps its fingerprint, as base64 of its binary encoding. Public
+	/// by design, so never a deployed key: a test needing a key that parses
+	/// under every feature set stores this one.
+	pub const DEBUG: &'static str = "b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZWQyNTUxOQAAACBUG35nYe8356vXPMw3zqK4+Q9H1/XX4UuCrbu2tQrSZAAAAIjdqOuF3ajrhQAAAAtzc2gtZWQyNTUxOQAAACBUG35nYe8356vXPMw3zqK4+Q9H1/XX4UuCrbu2tQrSZAAAAEDSBMO7QAGg41Elgt3IFRQGvS69bvIuQ7eNMcDGmcM9K1Qbfmdh7zfnq9c8zDfOorj5D0fX9dfhS4Ktu7a1CtJkAAAAAAECAwQF";
+
+	/// `encoded` as a host key, checked to parse wherever this build can serve
+	/// ssh, so a malformed key fails whoever declared it rather than the
+	/// listener later.
+	pub fn parse(encoded: impl Into<String>) -> Result<Self> {
+		let key = Self(encoded.into());
+		#[cfg(all(feature = "russh_server", not(target_arch = "wasm32")))]
+		super::impl_russh_server::parse_host_key(&key.0)?;
+		key.xok()
+	}
+
+	/// The key as given, for the listener to parse.
+	#[allow(unused)]
+	pub(crate) fn encoded(&self) -> &str { &self.0 }
+
+	/// The key `entity` declares through its [`SshHostKeyRef`], `None` when it
+	/// declares none or its source holds none (the process default then
+	/// applies). A source that cannot answer (a deployed secret missing from
+	/// its store) is an error naming it, never a fall back to a key nobody
+	/// pinned.
+	pub async fn resolve(entity: &AsyncEntity) -> Result<Option<Self>> {
+		let Ok(target) = entity
+			.get::<SshHostKeyRef, _>(|key_ref| key_ref.source())
+			.await
+		else {
+			return Ok(None);
+		};
+		let source = SecretSource::resolve(entity.world(), target).await?;
+		let Some(value) = source.get().await.map_err(|err| {
+			bevyhow!("ssh host key from {}: {err}", source.describe())
+		})?
+		else {
+			return Ok(None);
+		};
+		let key = Self::parse(value).map_err(|err| {
+			bevyhow!("malformed ssh host key from {}: {err}", source.describe())
+		})?;
+		info!("ssh host key from {}", source.describe());
+		Some(key).xok()
+	}
+}
+
+/// The secret an ssh server reads its [`SshHostKey`] from: the source half of
+/// the [`SshHostKeyConsumers`] relationship, on the server's entity,
+/// targeting a declaration that lands a [`SecretSource`]. Authored as
+/// `{SshHostKeyRef($ssh_host_key)}` beside a `<SecretBlock
+/// bx:ref="ssh_host_key" ../>`, so a local launch reads the record its
+/// `secrets.toml` loads and a deployed box reads its stack's secret store.
+#[derive(Debug, Clone, PartialEq, Eq, Reflect, Component)]
+#[reflect(Component)]
+#[relationship(relationship_target = SshHostKeyConsumers)]
+pub struct SshHostKeyRef(#[entities] pub Entity);
+
+impl SshHostKeyRef {
+	/// The declaration this server reads its key from.
+	pub fn source(&self) -> Entity { self.0 }
+}
+
+/// Every ssh server reading its key from a declaration: the target half of
+/// the [`SshHostKeyRef`] relationship.
+#[derive(Debug, Default, Reflect, Component)]
+#[reflect(Component)]
+#[relationship_target(relationship = SshHostKeyRef)]
+pub struct SshHostKeyConsumers(Vec<Entity>);
 
 impl Default for SshServer {
 	/// Reads the process [`BootstrapConfig`] (`--ssh-port` / `BEET_SSH_PORT` and

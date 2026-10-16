@@ -1,8 +1,8 @@
 //! The deploy machine's view of the buckets a cold copy spans: the live
 //! archive over the instance's own cloud, and the cold store over the S3 api
 //! at the other vendor's endpoint under the parked token.
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
+use crate::types::aws_cli_ext;
 use beet_core::prelude::*;
 use serde_json::Value;
 

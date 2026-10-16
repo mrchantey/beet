@@ -1,6 +1,6 @@
 //! Persistent Stalwart data-volume snapshots before an infrastructure apply.
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
+use crate::types::aws_cli_ext;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

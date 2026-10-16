@@ -374,6 +374,18 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 
 **Restore.** `<SecretsRestore/>` is the inverse: `beet mail/secrets/restore --document=mail-prod --stage=prod` writes every record back into the store by label, which is how a fresh account or a rebuilt stack starts with the DKIM key its published selector expects rather than a new one. It refuses where the store already holds a label unless you pass `--force`.
 
+**Mirror.** A record the *deployed* process needs, rather than the deployer, must never ride the box's own config: `user_data`, a task definition, the tofu state and every rendered `main.tf.json` are readable by more than the box. Declare it under the stack instead, and name it from both the consumer and the compute that runs it:
+
+```jsx
+<Route path="serve" {(HttpServer, SshTuiServer, SshHostKeyRef($ssh_host_key))}>..</Route>
+<Stack>
+	<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY"/>
+	<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+</Stack>
+```
+
+Every full deploy mirrors the launch's `BEET_SSH_HOST_KEY` record into the stack's secret store as `ssh-host-key`, the box is granted read on exactly that one parameter, and the deployed binary reads it from the store at every start, failing rather than inventing a key when it is missing. A local `serve` reads the same record from `secrets.toml`, so both present one fingerprint. Rolling it is `beet secrets/set` on the record, then a deploy of each stage.
+
 **Revoke.** Removing a person is their recipient out of every list by hand, then `beet mail/secrets/revoke --recipient=age1.. --stage=prod --dry-run` to read the ledger and the same without `--dry-run` to act: every document is re-sealed, every `replace` secret is replaced by an apply, every `remint` one is deleted and re-minted by the deploy, and the `manual` residue is printed with its reason. It never claims a roll it did not perform.
 
 [Self-hosted mail](/docs/mail) section 9 is where these run for real, and the [`beet_infra` README](https://github.com/mrchantey/beet/blob/main/crates/beet_infra/README.md#secrets) covers the seam: `SecretStore`, the two providers that ship (`<SsmSecrets/>` for parameter store, `<DocumentSecrets path=".."/>` for a document as a stack's store), and what a downstream provider (1Password, a KMS) implements, which is one trait, one declaration and one attach observer.
@@ -433,7 +445,7 @@ flowchart TB
 | 0a mint | the operator, and the one elevated deploy the value is pasted into | when a deploy needs `--elevated` at Cloudflare | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each elevated deploy | mints any token the account can hold, hence the login |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document | metadata disclosure |
 | 1 deploy | the operator and CI | every deploy | `<repo>-deployer` at AWS and `<repo>-deploy` at Cloudflare, both sealed in that repo's document with what they were converged to grant | its own app, recoverably |
-| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket; parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
+| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or mirrored from the repo's document by a deploy (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
 | break-glass | the operator, in the console | when 0a is broken | `pete`: password + MFA, no key | full admin, behind a phone and a browser |
 
 **The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** Recoverable is a claim about every credential a document holds: it cannot mint a credential wider than itself, and the worst it can destroy is rebuilt from the declarations, a version or a backup. What it can read is a separate question, settled by holding the key at all: whoever holds it reads everything it opens, which is why the key belongs to one person and is backed up rather than shared.

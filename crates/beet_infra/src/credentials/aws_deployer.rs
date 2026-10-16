@@ -1,8 +1,8 @@
 //! `<AwsDeployer/>`: this repo's own AWS deployer user, its policies and the
 //! pair its credential document holds.
 
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
+use crate::types::aws_cli_ext;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use serde_json::Value;

@@ -1,6 +1,11 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
+// the `aws` cli constructors every native AWS call shells out through: the
+// deploy verbs, and parameter store, which a deployed box reads its secrets
+// from, so native rather than `deploy`.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod aws_cli_ext;
 mod build_artifact;
 // what a Cloudflare action asks of the deploy token, declared on the action and
 // the only way it reaches that token.
@@ -14,6 +19,8 @@ mod deployer_policy;
 // no bindings behind it: the input is declared type names and the
 // `CloudflareAccess` each action declares, so it is ungated.
 mod deployer_token;
+// the source tree a deploy was built from, recorded on its ledger.
+mod deploy_source;
 mod deployment;
 mod infra_plugin;
 // a bucket's per-prefix retention, shared by every provider's bucket block.
@@ -29,8 +36,8 @@ mod runtime_boundary;
 // a push into it.
 mod s3_storage_class;
 mod secret_ref;
-// the provider-agnostic seam a stack's secrets live behind and its providers
-#[cfg(feature = "vault")]
+// the provider-agnostic seam a stack's secrets live behind and its providers,
+// in every build: a deployed box reads its secrets through it
 mod secret_store;
 mod stack;
 mod stack_backend;
@@ -42,6 +49,7 @@ pub use access_grant::*;
 pub use artifacts::*;
 pub use build_artifact::*;
 pub use cloudflare_access::*;
+pub use deploy_source::*;
 #[cfg(feature = "bindings_aws_common")]
 pub use deployer_policy::*;
 pub use deployer_token::*;
@@ -54,7 +62,6 @@ pub use resource_scope::*;
 pub use runtime_boundary::*;
 pub use s3_storage_class::*;
 pub use secret_ref::*;
-#[cfg(feature = "vault")]
 pub use secret_store::*;
 pub use stack::*;
 pub use stack_backend::*;

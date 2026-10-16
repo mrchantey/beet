@@ -86,6 +86,78 @@ impl IamPolicy {
 		self
 	}
 
+	/// Grant read on exactly `secrets`, each a `SecureString` at its
+	/// parameter store address under `stack` ([`SecretRef::name`]), with the
+	/// decryption that read needs ([`decrypt_secure_strings`](Self::decrypt_secure_strings)).
+	/// Never the stack's prefix: a box reads the secrets its
+	/// [`ReadsSecrets`] names and no other. Nothing when `secrets` is empty.
+	pub fn read_secrets(
+		self,
+		stack: &ResolvedStack,
+		secrets: &[SecretRef],
+	) -> Self {
+		if secrets.is_empty() {
+			return self;
+		}
+		let resource = secrets
+			.iter()
+			.map(|secret| {
+				format!(
+					"arn:aws:ssm:{}:*:parameter{}",
+					self.region,
+					secret.name(stack)
+				)
+			})
+			.collect::<Vec<_>>();
+		self.statement(json!({
+			"Sid": "StackSecrets",
+			"Effect": "Allow",
+			"Action": ["ssm:GetParameter"],
+			"Resource": resource
+		}))
+		.decrypt_secure_strings()
+	}
+
+	/// Allow `kms:Decrypt` through parameter store alone, for an identity
+	/// that reads `SecureString` parameters.
+	///
+	/// The key is addressed by condition rather than by arn: the account's
+	/// `aws/ssm` key id is not knowable at render time, and `kms:ViaService`
+	/// bounds the grant to decryption SSM itself performs, which is the only
+	/// way a beet runtime ever asks.
+	///
+	/// An unboundaried principal reads a `SecureString` with no `kms:` grant
+	/// of its own, because that key policy allows `{"AWS": "*"}` under a
+	/// `kms:ViaService` condition. Whether the same holds for a principal
+	/// wearing a [`RuntimeBoundary`] is NOT settled: AWS exempts a
+	/// resource-based policy from a boundary where it grants to the principal
+	/// directly, and enforces the boundary where it delegates to the account
+	/// root, and a `"*"` principal is arguably the first of those. The
+	/// simulator calls this statement redundant, and also allows an
+	/// account-root delegation under a boundary, which the documented rule
+	/// forbids, so it does not settle it either.
+	///
+	/// It is stated anyway, because the bet is asymmetric. One action under
+	/// one service condition costs nothing if redundant; if it were needed
+	/// and absent, a running box would pass every check made when the
+	/// boundary landed and fail at its next read. Declaring it also keeps the
+	/// derivation honest, since the boundary is the union of what the stacks
+	/// render and this is a thing the runtime genuinely does.
+	pub fn decrypt_secure_strings(self) -> Self {
+		let region = self.region.clone();
+		self.statement(json!({
+			"Sid": "SsmSecureStringDecrypt",
+			"Effect": "Allow",
+			"Action": ["kms:Decrypt"],
+			"Resource": "*",
+			"Condition": {
+				"StringEquals": {
+					"kms:ViaService": format!("ssm.{region}.amazonaws.com")
+				}
+			}
+		}))
+	}
+
 	/// Lower every declared grant, grouped by kind and scoped to each grant's
 	/// own [`AccessPermissions`]. Fails naming any kind this lowering does not
 	/// know, which is what replaces the compile-time exhaustiveness a closed

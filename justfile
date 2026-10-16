@@ -130,7 +130,7 @@ site-audit *args:
 # Build beet-cli in release into the real ./target (full incremental caching) and
 # symlink the binary into the cargo bin dir. This is far faster than `cargo install`,
 # which rebuilds from scratch in a throwaway target every time. Iterating? Just re-run
-# `cargo build --release -p beet-cli` on its own — the symlink points at
+# `cargo build --release -p beet-cli --all-features` on its own: the symlink points at
 # target/release/beet, so the fresh binary is picked up with no reinstall step.
 install-cli *args:
   #!/usr/bin/env bash
@@ -140,6 +140,13 @@ install-cli *args:
   dst="${CARGO_HOME:-$HOME/.cargo}/bin/beet"
   ln -sf "$bin" "$dst"
   echo "linked $dst -> $bin"
+
+# The installed cli every wasm recipe calls, as `.cargo/config.toml`'s
+# `beet run-wasm` runner or as `beet build-wasm`: installed when `beet` does not
+# resolve (a fresh checkout, or a cleaned target leaving the symlink dangling),
+# left as is when it does.
+_cli:
+  @command -v beet >/dev/null || just install-cli
 
 #💡 Aliases
 
@@ -325,7 +332,7 @@ _test-pkgs pkgs *args:
 # Every other feature is enabled, `testing_embedded` included — its `linkme`
 # slice is cfg'd out on wasm, so the feature is inert there rather than
 # unbuildable.
-_test-pkgs-wasm pkgs *args:
+_test-pkgs-wasm pkgs *args: _cli
 	#!/usr/bin/env bash
 	set -euo pipefail
 	feats=$(just _core-features "{{ pkgs }}" "cloudflare|sqlite")
@@ -348,7 +355,7 @@ _test-pkgs-wasm pkgs *args:
 test-atproto-live *args:
 	cargo test -p beet_net --lib --features atproto,ureq,rustls-tls {{ args }} -- --include-ignored --include '*live_test*'
 
-test-wasm-sqlite *args:
+test-wasm-sqlite *args: _cli
 	cargo test -p beet_net --lib --target wasm32-unknown-unknown \
 		--features beet_net/std,beet_net/json,beet_net/sqlite {{ args }} -- {{ test-threads }}
 
@@ -381,7 +388,7 @@ check-embedded:
 # `#[beet_core::test(browser)]` dom tests run there (everything else skips, and
 # vice versa under deno). Needs chromedriver + a chromium on PATH. For a
 # WebGPU-granting session append `-- --chrome-args='--enable-unsafe-webgpu --use-angle=gl'`.
-test-wasm-browser crate *args:
+test-wasm-browser crate *args: _cli
 	BEET_WASM_HOST=browser cargo test -p {{ crate }} --lib --target wasm32-unknown-unknown {{ args }}
 
 # Headless-chrome verification of the browser render boot: builds
@@ -444,7 +451,7 @@ _test-scene-editor-browser *args:
 # the fallbacks out. Native exercises the sandboxed deno child, wasm the
 # permissionless deno Worker. Both need deno on PATH, the same dependency the
 # wasm test runner already imposes.
-test-scripting-fallback *args:
+test-scripting-fallback *args: _cli
 	cargo test -p beet_action --lib {{ args }} -- {{ test-threads }}
 	cargo test -p beet_action --lib --target wasm32-unknown-unknown {{ args }} -- {{ test-threads }}
 
@@ -455,22 +462,22 @@ test-scripting-fallback *args:
 
 # The floor (target/wasm/beet-min.wasm): the smallest binary that is still a beet
 # runtime in the browser, the `web` base and nothing else. A page whose program uses
-# only the core vocabulary mounts this. Needs `just install-cli`.
-build-wasm-min:
+# only the core vocabulary mounts this.
+build-wasm-min: _cli
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_min --out=target/wasm/beet-min.wasm
 
 # The editor middle (target/wasm/beet-ui.wasm): the browser binary plus the
 # scripting seam, so a page edits its own scene and its `bx:<event>` scripts run
 # through the iframe backend, with no JavaScript engine compiled in; see the
-# `web_ui` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
-build-wasm-ui:
+# `web_ui` comment in crates/beet-cli/Cargo.toml.
+build-wasm-ui: _cli
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_ui --out=target/wasm/beet-ui.wasm
 
 # The render middle (target/wasm/beet-render.wasm): the browser binary plus the
 # windowed render stack (wgpu via WebGPU, the spatial + example scenes), so a
 # render scene `.bsx` boots in a tab without the full binary's weight; see the
-# `web_render` comment in crates/beet-cli/Cargo.toml. Needs `just install-cli`.
-build-wasm-render:
+# `web_render` comment in crates/beet-cli/Cargo.toml.
+build-wasm-render: _cli
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_render --out=target/wasm/beet-render.wasm
 
 # The ceiling (target/wasm/beet-full.wasm): every feature a browser binary can boot
@@ -479,7 +486,7 @@ build-wasm-render:
 # JavaScript engine; see the `web_full` comment in crates/beet-cli/Cargo.toml.
 # Slower to build (the JS engine's wasi sysroot downloads once) and several times
 # the floor's size, so a page mounts it only when its program needs more than it.
-build-wasm-full:
+build-wasm-full: _cli
 	beet build-wasm --release --package=beet-cli --bin=beet --features=web_full --out=target/wasm/beet-full.wasm
 
 # Build and serve the browser-wasm example at http://127.0.0.1:8337. Open the page
@@ -490,8 +497,7 @@ build-wasm-full:
 # live-reloads on edit. Its /render and /scripting pages boot the render and full
 # binaries, so build those first (`just build-wasm-render build-wasm-full`) to
 # serve them too.
-serve-wasm *args:
-	just build-wasm-min
+serve-wasm *args: build-wasm-min
 	beet --entry=examples/wasm --watch {{ args }}
 
 clear-rust-analyzer:

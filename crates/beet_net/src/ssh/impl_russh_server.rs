@@ -40,18 +40,23 @@ pub(crate) async fn start_russh_server_with_tcp(
 		.local_addr()
 		.map_err(|e| bevyhow!("Failed to get local address: {}", e))?;
 
-	let (credentials, idle_timeout, pty_timeout) = entity
+	let (credentials, idle_timeout, pty_timeout, declared) = entity
 		.get::<SshServer, _>(|server| {
 			(
 				server.credentials.clone(),
 				server.idle_timeout,
 				server.pty_timeout,
+				server.host_key.clone(),
 			)
 		})
 		.await?;
-	// resolved before serving, so a declared key that cannot be parsed fails
-	// the server rather than serving under a stranger's fingerprint
-	let host_key = host_key()?;
+	// resolved before serving, so a declared key that cannot be read or parsed
+	// fails the server rather than serving under a stranger's fingerprint
+	let declared = match declared {
+		Some(key) => Some(key),
+		None => SshHostKey::resolve(&entity).await?,
+	};
+	let host_key = host_key(declared.as_ref())?;
 
 	let (new_conn_tx, new_conn_rx) =
 		async_channel::unbounded::<NewConnectionInfo>();
@@ -190,18 +195,26 @@ async fn run_russh_server_inner(
 }
 
 /// Selects the Ed25519 host key, in precedence order:
-/// 1. `BEET_SSH_HOST_KEY`, letting every process present one fingerprint, in
-///    any form [`parse_host_key`] reads. A declared key that does not parse is
-///    an error: falling through would serve a new fingerprint every start.
-/// 2. debug builds: the stable [`DEBUG_HOST_KEY_BYTES`] const.
-/// 3. release builds: a fresh random key.
-fn host_key() -> Result<PrivateKey> {
+/// 1. the `declared` key ([`SshServer::host_key`], else its entity's
+///    [`SshHostKeyRef`]), how a deployed box presents its stack's key.
+/// 2. `BEET_SSH_HOST_KEY`, letting every local process present one
+///    fingerprint, in any form [`parse_host_key`] reads.
+/// 3. debug builds: the stable [`SshHostKey::DEBUG`].
+/// 4. release builds: a fresh random key.
+///
+/// A key given at 1 or 2 that does not parse is an error: falling through
+/// would serve a new fingerprint every start.
+fn host_key(declared: Option<&SshHostKey>) -> Result<PrivateKey> {
+	if let Some(key) = declared {
+		return parse_host_key(key.encoded())
+			.map_err(|err| bevyhow!("malformed declared ssh host key: {err}"));
+	}
 	if let Ok(value) = env_ext::var("BEET_SSH_HOST_KEY") {
 		return parse_host_key(&value)
 			.map_err(|err| bevyhow!("malformed BEET_SSH_HOST_KEY: {err}"));
 	}
 	#[cfg(debug_assertions)]
-	return PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES)?.xok();
+	return parse_host_key(SshHostKey::DEBUG);
 	#[cfg(not(debug_assertions))]
 	return PrivateKey::random(
 		&mut rand::rng(),
@@ -213,7 +226,7 @@ fn host_key() -> Result<PrivateKey> {
 /// Parses an OpenSSH private key from the file `ssh-keygen` writes (its PEM
 /// armor), or from base64 of either that file or the binary encoding inside
 /// it. Whitespace in base64 is ignored, so wrapped `base64` output reads too.
-fn parse_host_key(value: &str) -> Result<PrivateKey> {
+pub(crate) fn parse_host_key(value: &str) -> Result<PrivateKey> {
 	const PEM_PREFIX: &str = "-----BEGIN";
 	let value = value.trim();
 	let bytes = if value.starts_with(PEM_PREFIX) {
@@ -518,28 +531,6 @@ impl russh::server::Handler for BeetSshHandler {
 	}
 }
 
-/// Constant Ed25519 host key used in debug builds so the fingerprint stays
-/// stable between server restarts, avoiding spurious "host key changed" errors.
-///
-/// Generated once and baked in — never use this in production.
-#[cfg(debug_assertions)]
-const DEBUG_HOST_KEY_BYTES: &[u8] = &[
-	111, 112, 101, 110, 115, 115, 104, 45, 107, 101, 121, 45, 118, 49, 0, 0, 0,
-	0, 4, 110, 111, 110, 101, 0, 0, 0, 4, 110, 111, 110, 101, 0, 0, 0, 0, 0, 0,
-	0, 1, 0, 0, 0, 51, 0, 0, 0, 11, 115, 115, 104, 45, 101, 100, 50, 53, 53,
-	49, 57, 0, 0, 0, 32, 84, 27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204,
-	55, 206, 162, 184, 249, 15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182,
-	181, 10, 210, 100, 0, 0, 0, 136, 221, 168, 235, 133, 221, 168, 235, 133, 0,
-	0, 0, 11, 115, 115, 104, 45, 101, 100, 50, 53, 53, 49, 57, 0, 0, 0, 32, 84,
-	27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204, 55, 206, 162, 184, 249,
-	15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182, 181, 10, 210, 100, 0,
-	0, 0, 64, 210, 4, 195, 187, 64, 1, 160, 227, 81, 37, 130, 221, 200, 21, 20,
-	6, 189, 46, 189, 110, 242, 46, 67, 183, 141, 49, 192, 198, 153, 195, 61,
-	43, 84, 27, 126, 103, 97, 239, 55, 231, 171, 215, 60, 204, 55, 206, 162,
-	184, 249, 15, 71, 215, 245, 215, 225, 75, 130, 173, 187, 182, 181, 10, 210,
-	100, 0, 0, 0, 0, 1, 2, 3, 4, 5,
-];
-
 #[cfg(test)]
 #[cfg(all(debug_assertions, not(target_arch = "wasm32")))]
 mod tests {
@@ -549,17 +540,16 @@ mod tests {
 	/// baked-in debug key it was generated from.
 	#[beet_core::test]
 	fn stable_host_key_from_env() {
-		let encoded = BASE64_STANDARD.encode(DEBUG_HOST_KEY_BYTES);
+		let encoded = SshHostKey::DEBUG.to_string();
 		// safety: single-threaded test, restored before returning.
 		unsafe { env_ext::set_var("BEET_SSH_HOST_KEY", &encoded) }.unwrap();
 
 		let fingerprint =
 			|key: PrivateKey| key.public_key().fingerprint(Default::default());
-		let expected =
-			fingerprint(PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES).unwrap());
+		let expected = fingerprint(parse_host_key(SshHostKey::DEBUG).unwrap());
 
-		fingerprint(host_key().unwrap()).xpect_eq(expected);
-		fingerprint(host_key().unwrap()).xpect_eq(expected);
+		fingerprint(host_key(None).unwrap()).xpect_eq(expected);
+		fingerprint(host_key(None).unwrap()).xpect_eq(expected);
 
 		// safety: see above.
 		unsafe { env_ext::remove_var("BEET_SSH_HOST_KEY") }.unwrap();
@@ -570,7 +560,7 @@ mod tests {
 	/// Every form a rolled key takes parses to the same key.
 	#[beet_core::test]
 	fn parses_every_host_key_encoding() {
-		let key = PrivateKey::from_bytes(DEBUG_HOST_KEY_BYTES).unwrap();
+		let key = parse_host_key(SshHostKey::DEBUG).unwrap();
 		let expected = key.public_key().fingerprint(Default::default());
 		let pem = key
 			.to_openssh(russh::keys::ssh_key::LineEnding::LF)
@@ -589,7 +579,7 @@ mod tests {
 			pem.clone(),
 			base64_pem,
 			wrapped,
-			BASE64_STANDARD.encode(DEBUG_HOST_KEY_BYTES),
+			SshHostKey::DEBUG.to_string(),
 		] {
 			parse_host_key(&value)
 				.unwrap()
@@ -598,5 +588,74 @@ mod tests {
 				.xpect_eq(expected);
 		}
 		parse_host_key(&BASE64_STANDARD.encode("not a key")).unwrap_err();
+	}
+
+	/// A test [`SecretSource`]: a fixed answer, or an error standing for a
+	/// deployed secret its store does not hold.
+	#[derive(Clone)]
+	struct Fixed(Result<Option<String>, &'static str>);
+
+	impl SecretSourceProvider for Fixed {
+		fn box_clone(&self) -> Box<dyn SecretSourceProvider> {
+			Box::new(self.clone())
+		}
+		fn id(&self) -> &'static str { "fixed" }
+		fn describe(&self) -> String { "a fixed test source".into() }
+		fn get(&self) -> SendBoxedFuture<Result<Option<String>>> {
+			let answer = self.0.clone().map_err(|err| bevyhow!("{err}"));
+			Box::pin(async move { answer })
+		}
+	}
+
+	/// The fingerprint of the key a server whose [`SshHostKeyRef`] names a
+	/// source answering `answer` presents.
+	async fn declared_fingerprint(
+		answer: Result<Option<String>, &'static str>,
+	) -> Result<String> {
+		let mut world = AsyncPlugin.into_world();
+		let source = world.spawn(SecretSource::new(Fixed(answer))).id();
+		world
+			.spawn(SshHostKeyRef(source))
+			.run_async_then(async |entity| -> Result<String> {
+				let declared = SshHostKey::resolve(&entity).await?;
+				host_key(declared.as_ref())?
+					.public_key()
+					.fingerprint(Default::default())
+					.to_string()
+					.xok()
+			})
+			.await
+	}
+
+	/// A server presents the key its declaration's source holds, and a source
+	/// that cannot answer fails the server: a deployed box whose key is
+	/// missing from its stack's store never falls back to a key nobody pinned.
+	#[beet_core::test]
+	async fn serves_the_declared_key_or_fails() {
+		let pem = parse_host_key(SshHostKey::DEBUG)
+			.unwrap()
+			.to_openssh(russh::keys::ssh_key::LineEnding::LF)
+			.unwrap()
+			.to_string();
+		let expected = parse_host_key(SshHostKey::DEBUG)
+			.unwrap()
+			.public_key()
+			.fingerprint(Default::default())
+			.to_string();
+		declared_fingerprint(Ok(Some(BASE64_STANDARD.encode(&pem))))
+			.await
+			.unwrap()
+			.xpect_eq(expected);
+		declared_fingerprint(Err("no secret at /app/dev/ssh-host-key"))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("a fixed test source")
+			.xpect_contains("no secret at /app/dev/ssh-host-key");
+		declared_fingerprint(Ok(Some("not a key".into())))
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("malformed ssh host key");
 	}
 }

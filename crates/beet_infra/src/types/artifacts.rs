@@ -2,6 +2,7 @@
 //!
 //! Every read and write here goes through a [`BlobStore`], so nothing in this
 //! module knows or cares which backend holds the versions.
+use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bytes::Bytes;
@@ -40,6 +41,12 @@ pub struct ArtifactLedger {
 	/// back to them.
 	#[serde(default)]
 	pub repo: Option<StoreUri>,
+	/// The source tree this version was built from, see [`DeploySource`].
+	///
+	/// Defaulted on read to [`DeploySource::default`], which reads as not
+	/// recorded, for the same reason as [`repo`](Self::repo).
+	#[serde(default)]
+	pub source: DeploySource,
 }
 
 impl ArtifactLedger {
@@ -54,7 +61,15 @@ impl ArtifactLedger {
 			timestamp,
 			artifacts: default(),
 			repo: None,
+			source: default(),
 		}
+	}
+
+	/// One line naming this version and the source it was built from, ie
+	/// `version 0199.. built from 38f6913-dirty (38f69137d.., uncommitted diff
+	/// 5c1e..)`, what a verb moving the current version reports.
+	pub fn describe(&self) -> String {
+		format!("version {} built from {}", self.deploy_id, self.source)
 	}
 
 	/// Record the repo store this version's documents live in, so the release
@@ -222,6 +237,13 @@ impl ArtifactsClient {
 		self
 	}
 
+	/// Record the source tree this deploy was built from. See
+	/// [`ArtifactLedger::source`].
+	pub fn with_source(mut self, source: DeploySource) -> Self {
+		self.ledger.source = source;
+		self
+	}
+
 	/// Upload a single artifact binary to the versioned path.
 	pub async fn upload_artifact(
 		&mut self,
@@ -287,15 +309,16 @@ impl ArtifactsClient {
 		self.store.get(&key).await
 	}
 
-	/// Set a specific version as the current version.
-	pub async fn set_current(&self, version: &Uuid) -> Result {
+	/// Set a specific version as the current version, returning its ledger.
+	pub async fn set_current(&self, version: &Uuid) -> Result<ArtifactLedger> {
 		let key = ArtifactLedger::version_ledger_key(version);
 		let ledger_bytes = self.store.get(&key).await?;
 		let ledger: ArtifactLedger = serde_json::from_slice(&ledger_bytes)?;
 		self.store
 			.insert(&ArtifactLedger::current_ledger_key(), ledger_bytes)
 			.await?;
-		self.publish_release_pointers(&ledger).await
+		self.publish_release_pointers(&ledger).await?;
+		ledger.xok()
 	}
 
 	/// List all deployed versions, sorted chronologically: every
@@ -318,8 +341,9 @@ impl ArtifactsClient {
 		versions.xok()
 	}
 
-	/// Roll back N versions from the current version.
-	pub async fn rollback(&self, count: usize) -> Result<Uuid> {
+	/// Roll back N versions from the current version, returning the ledger
+	/// now current.
+	pub async fn rollback(&self, count: usize) -> Result<ArtifactLedger> {
 		let versions = self.list_versions().await?;
 		let current = self
 			.current_ledger()
@@ -336,9 +360,7 @@ impl ArtifactsClient {
 				"cannot rollback {count} versions, only {current_idx} available"
 			)
 		})?;
-		let target = versions[target_idx];
-		self.set_current(&target).await?;
-		Ok(target)
+		self.set_current(&versions[target_idx]).await
 	}
 
 	/// The versions a retention of `keep` drops: everything older than the newest
@@ -389,14 +411,13 @@ impl ArtifactsClient {
 		Ok(())
 	}
 
-	/// Roll forward to the latest version.
-	pub async fn rollforward(&self) -> Result<Uuid> {
+	/// Roll forward to the latest version, returning the ledger now current.
+	pub async fn rollforward(&self) -> Result<ArtifactLedger> {
 		let versions = self.list_versions().await?;
 		let target = versions.last().ok_or_else(|| {
 			bevyhow!("no versions available to rollforward to")
 		})?;
-		self.set_current(target).await?;
-		Ok(*target)
+		self.set_current(target).await
 	}
 }
 
@@ -454,8 +475,42 @@ mod tests {
 			.xpect_contains("BEET_ARTIFACT_KEY=versions/v1/app");
 	}
 
-	/// A ledger published before the store rode it is still a rollback target,
-	/// and a deploy that could not parse one could not roll back to it.
+	/// The ledger names the source each version was built from, and a
+	/// rollback answers with the version it moved to, so the verb can say what
+	/// now serves.
+	#[beet_core::test]
+	async fn the_ledger_records_its_source() {
+		let store = BlobStore::temp();
+		let source = |commit: &str| DeploySource::Git {
+			commit: commit.into(),
+			describe: commit[..7].into(),
+			diff_hash: None,
+		};
+		let first = ArtifactsClient::new(
+			store.clone(),
+			test_ledger(vec![("app", "versions/v1/app", "h1")]),
+		)
+		.with_source(source("38f69137d0"));
+		first.publish_ledger().await.unwrap();
+		ArtifactsClient::new(
+			store.clone(),
+			test_ledger(vec![("app", "versions/v2/app", "h2")]),
+		)
+		.with_source(source("c86e14a0a0"))
+		.publish_ledger()
+		.await
+		.unwrap();
+		first
+			.rollback(1)
+			.await
+			.unwrap()
+			.source
+			.xpect_eq(source("38f69137d0"));
+	}
+
+	/// A ledger published before the store and the source rode it is still a
+	/// rollback target, and a deploy that could not parse one could not roll
+	/// back to it.
 	#[beet_core::test]
 	async fn a_ledger_without_a_repo_still_parses() {
 		let store = BlobStore::temp();
@@ -472,13 +527,14 @@ mod tests {
 			)
 			.await
 			.unwrap();
-		ArtifactsClient::new(store, ArtifactLedger::default_test())
-			.current_ledger()
-			.await
-			.unwrap()
-			.unwrap()
-			.repo
-			.xpect_none();
+		let ledger =
+			ArtifactsClient::new(store, ArtifactLedger::default_test())
+				.current_ledger()
+				.await
+				.unwrap()
+				.unwrap();
+		ledger.repo.xpect_none();
+		ledger.source.xpect_eq(DeploySource::default());
 	}
 
 	fn test_ledger(artifacts: Vec<(&str, &str, &str)>) -> ArtifactLedger {
@@ -603,13 +659,10 @@ mod tests {
 		client.ledger = ledger3.clone();
 		client.publish_ledger().await.unwrap();
 		// rollback from latest
-		let rolled = client.rollback(1).await.unwrap();
-		rolled.xpect_eq(ledger2.deploy_id);
-		let rolled = client.rollback(1).await.unwrap();
-		rolled.xpect_eq(ledger1.deploy_id);
+		client.rollback(1).await.unwrap().xpect_eq(ledger2);
+		client.rollback(1).await.unwrap().xpect_eq(ledger1);
 		// rollforward to latest
-		let forwarded = client.rollforward().await.unwrap();
-		forwarded.xpect_eq(ledger3.deploy_id);
+		client.rollforward().await.unwrap().xpect_eq(ledger3);
 	}
 
 	/// Retention is by COUNT over the ledger's list, so a stack that has not

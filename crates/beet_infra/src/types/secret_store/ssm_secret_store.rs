@@ -3,21 +3,22 @@
 //! cli.
 //!
 //! The cli rather than the SDK because a deploy already depends on it (the log
-//! tail, the reverse-dns request, the SES probe) and because parameter store
-//! is five verbs: adding an SDK client for them would be more surface than
-//! the feature it buys. The provider is therefore native and `deploy`; the
-//! declaration registers on every target, since a lean binary's document
-//! still carries the tag.
+//! tail, the reverse-dns request, the SES probe), a Lightsail box ships with
+//! it (its boot already runs `aws s3 sync`), and parameter store is five
+//! verbs: adding an SDK client for them would be more surface than the
+//! feature it buys. The provider is therefore native, in the lean binary a box
+//! runs as well as the deployer; the declaration registers on every target,
+//! since a browser build's document still carries the tag.
 //!
 //! Nothing here logs a value. A `SecureString` that reaches a terminal is a
 //! `SecureString` that reaches a scrollback buffer, a CI log and whatever
 //! ingests it.
 
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
-use crate::actions::aws_cli_ext;
 use crate::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::types::aws_cli_ext;
 use beet_core::prelude::*;
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::Value;
 
 /// Declares that the stack's secrets live in AWS parameter store, in the
@@ -34,17 +35,18 @@ pub struct SsmSecrets;
 
 impl SsmSecrets {
 	/// The store this declaration means for `stack`: parameter store in its
-	/// region (native and `deploy`, since the provider drives the `aws`
-	/// cli), an error naming the feature otherwise.
+	/// region (native, since the provider drives the `aws` cli), an error
+	/// naming the target otherwise.
 	pub fn store(stack: ResolvedStack) -> Result<SecretStore> {
 		cfg_if! {
-			if #[cfg(all(feature = "deploy", not(target_arch = "wasm32")))] {
+			if #[cfg(not(target_arch = "wasm32"))] {
 				SecretStore::new(SsmSecretStore::new(stack)?).xok()
 			} else {
 				bevybail!(
 					"stack `{}--{}` keeps its secrets in parameter store and this \
-					build has no provider for it (the `deploy` feature, native): \
-					declare `<DocumentSecrets path=\"..\"/>` under the stack",
+					build has no provider for it (it drives the `aws` cli, so \
+					native only): declare `<DocumentSecrets path=\"..\"/>` under \
+					the stack",
 					stack.app_name(),
 					stack.stage()
 				)
@@ -91,7 +93,7 @@ pub(crate) fn attach_ssm_secrets(
 /// what an instance role grants in one statement and what
 /// [`list`](SecretStoreProvider::list) walks; another stack of the same
 /// region is [`for_stack`](SecretStoreProvider::for_stack) away.
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone)]
 pub struct SsmSecretStore {
 	stack: ResolvedStack,
@@ -99,7 +101,7 @@ pub struct SsmSecretStore {
 	region: SmolStr,
 }
 
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 impl SsmSecretStore {
 	/// The provider id.
 	pub const ID: &'static str = "ssm";
@@ -302,7 +304,7 @@ impl SsmSecretStore {
 	}
 }
 
-#[cfg(all(feature = "deploy", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 impl SecretStoreProvider for SsmSecretStore {
 	fn box_clone(&self) -> Box<dyn SecretStoreProvider> {
 		Box::new(self.clone())
@@ -429,7 +431,7 @@ impl SecretStoreProvider for SsmSecretStore {
 	}
 }
 
-#[cfg(all(test, feature = "deploy", not(target_arch = "wasm32")))]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod test {
 	use super::*;
 	use serde_json::json;

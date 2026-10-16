@@ -270,8 +270,13 @@ pub fn FargateWatch(timeout: Option<Duration>) -> impl Bundle {
 /// (2 GB, known monthly price, no NLB) serving http behind Caddy and the beet
 /// ssh TUI on port 22, with STAGE-AWARE Cloudflare DNS at the static IP.
 /// Runtime env wired so the binary reads its one repo store (site and assets
-/// alike) and presents one stable ssh fingerprint. Store names derived from the
-/// stack (declared once).
+/// alike). Store names derived from the stack (declared once).
+///
+/// The box presents one stable ssh fingerprint by reading its host key from
+/// the stack's secret store at every start, never from anything it was
+/// rendered with: the entry declares the key as a `<SecretBlock/>` and spreads
+/// `{ReadsSecrets([$ssh_host_key])}` on this tag, which grants the box read on
+/// exactly that secret.
 ///
 /// Every http hostname is PROXIED and edge-cached (an `A` record at the static
 /// IP): Cloudflare's edge caches per the origin's `CacheHeaders` and the zone
@@ -316,11 +321,7 @@ pub fn LightsailBeetSiteBlock(
 			server: Some(ServerFilter::new("http,ssh")),
 			service_access: ServiceAccess::Remote,
 			..default()
-		})
-		// private key material: its own channel, so no renderer can ever put it
-		// on an argv line, and read at render rather than here, since the
-		// entry's `<Secrets>` lands it in the environment after this builds.
-		.with_secret_env_from_process("BEET_SSH_HOST_KEY");
+		});
 	// prod claims the apex + www (proxied, edge-cached) plus the DNS-only `app`
 	// hostname carrying ssh + future live apps; other stages get their
 	// subdomain (proxied) + `app.dev` (DNS-only ssh).
@@ -501,9 +502,78 @@ mod test {
 		.xpect_empty();
 	}
 
-	/// The stores the served site reaches by `bx:ref` are declared OUTSIDE every
-	/// `bx:cfg`-excluded branch of the entry, so the lean binary still binds
-	/// them.
+	/// The site's ssh host key never renders: not into the box's `user_data`,
+	/// not anywhere in `main.tf.json`, in any of the forms a rolled record
+	/// takes. The deploying launch holds it in its environment (the
+	/// `secrets.toml` record) exactly as a real deploy does, and the box reads
+	/// it from the stack's secret store instead.
+	///
+	/// REGRESSION: the key rode the box's env file inside `user_data`, so it
+	/// was readable through the Lightsail api, the tofu state and every
+	/// rendered config, and a dumped render put it into a transcript.
+	#[beet_core::test]
+	fn the_host_key_never_renders() {
+		use base64::prelude::*;
+		// a stand-in key in every form a record takes: the binary encoding,
+		// the PEM file `ssh-keygen` writes around it, and base64 of that file
+		let binary =
+			b"openssh-key-v1\0beet render regression stand-in host key";
+		let body = BASE64_STANDARD.encode(binary);
+		let pem = format!(
+			"-----BEGIN OPENSSH PRIVATE KEY-----\n{body}\n-----END OPENSSH PRIVATE KEY-----\n"
+		);
+		let record = BASE64_STANDARD.encode(&pem);
+		// SAFETY: test-only, restored before returning
+		unsafe { env_ext::set_var("BEET_SSH_HOST_KEY", &record) }.unwrap();
+
+		let mut world = test_world();
+		world.insert_resource(PackageConfig {
+			app_name: "beet-site".into(),
+			..default()
+		});
+		let router = router(&mut world);
+		spawn_markup(
+			&mut world,
+			router,
+			r#"<Stack {(CloudflareAccount("account"), CloudflareZone{domain:"beet.org", id:"zone"})}>
+				<S3BucketBlock label="repo" {RepoStoreBlock}/>
+				<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY"/>
+				<LightsailBeetSiteBlock features="aws_sdk,ssh,geoip" {ReadsSecrets([$ssh_host_key])}/>
+			</Stack>"#,
+		);
+		let mut renders = Vec::new();
+		for stage in ["dev", "prod"] {
+			let scopes =
+				RenderScope::render_all_at(&mut world, &stage.into()).unwrap();
+			for scope in scopes {
+				let (stack, _deployment, config) = scope.finish().unwrap();
+				renders.push((stack, config.to_json_string().unwrap()));
+			}
+		}
+		// SAFETY: as above
+		unsafe { env_ext::remove_var("BEET_SSH_HOST_KEY") }.unwrap();
+
+		renders.len().xpect_eq(2);
+		for (stack, json) in renders {
+			json.as_str()
+				// the box is rendered, and reads the key from its store
+				.xpect_contains("user_data")
+				.xpect_contains(&SecretRef::new("ssh-host-key").name(&stack))
+				// in no form at all
+				.xnot()
+				.xpect_contains(&record)
+				.xnot()
+				.xpect_contains(&body)
+				.xnot()
+				.xpect_contains("OPENSSH PRIVATE KEY")
+				.xnot()
+				.xpect_contains("BEET_SSH_HOST_KEY=");
+		}
+	}
+
+	/// The declarations the served site reaches by `bx:ref` (its stores, its
+	/// ssh host key) are declared OUTSIDE every `bx:cfg`-excluded branch of the
+	/// entry, so the lean binary still binds them.
 	///
 	/// REGRESSION: `site/main.bsx` carried its `bx:cfg` on the `<Stack>` itself,
 	/// excluding the analytics store along with the deploy verbs. The served
@@ -544,7 +614,8 @@ mod test {
 		}
 		let mut refs = Vec::new();
 		declared_refs(&nodes, false, &mut refs);
-		for name in ["analytics", "archive"] {
+		// the host key too: the serving binary's ssh terminal reads it
+		for name in ["analytics", "archive", "ssh_host_key"] {
 			refs.iter()
 				.find(|(declared, _)| declared == name)
 				.unwrap()

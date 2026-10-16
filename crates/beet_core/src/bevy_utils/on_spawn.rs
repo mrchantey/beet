@@ -158,13 +158,14 @@ impl OnSpawn {
 	fn effect(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 
 	/// Creates a new [`OnSpawn`] effect that runs an async function as a task
-	/// of the entity, cancelled when it despawns.
+	/// of the entity, cancelled when it despawns. The future need only be
+	/// `Send`: a task is polled from one thread at a time, never shared.
 	#[cfg(feature = "std")]
 	pub fn new_async<Fut, Out>(
 		func: impl 'static + Send + Sync + FnOnce(AsyncEntity) -> Fut,
 	) -> Self
 	where
-		Fut: 'static + Send + Sync + Future<Output = Out>,
+		Fut: 'static + Send + Future<Output = Out>,
 		Out: 'static + Send + Sync + IntoResult,
 	{
 		Self(Box::new(move |entity| {

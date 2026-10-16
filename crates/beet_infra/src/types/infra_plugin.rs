@@ -230,14 +230,21 @@ impl Plugin for InfraPlugin {
 		// `<EnsureSecret secret="db-password"/>` attribute.
 		app.register_type::<crate::prelude::SecretRef>();
 
-		// the secrets document surface (`<Secrets/>`, the verbs), the secret
-		// store declarations (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`)
-		// and their attaches, on every target the seam compiles.
+		// the stack's secret store and the secrets a runtime reads from it, in
+		// every build since a deployed box reads its own: parameter store
+		// (`<SsmSecrets/>`, the implicit declaration), a `<SecretBlock/>` and
+		// the compute relation granting read on it.
+		app.register_type::<crate::prelude::SsmSecrets>()
+			.add_observer(crate::types::attach_ssm_secrets)
+			.register_type::<crate::prelude::SecretBlock>()
+			.register_type::<crate::prelude::ReadsSecrets>()
+			.add_observer(crate::blocks::attach_secret_block);
+		// ..and the secrets document surface (`<Secrets/>`, the verbs) with
+		// the document store declaration (`<DocumentSecrets path=".."/>`), on
+		// every target the vault layer compiles.
 		#[cfg(feature = "vault")]
 		app.install_type::<beet_net::prelude::SecretsPlugin>()
-			.register_type::<crate::prelude::SsmSecrets>()
 			.register_type::<crate::prelude::DocumentSecrets>()
-			.add_observer(crate::types::attach_ssm_secrets)
 			.add_observer(crate::types::attach_document_secrets);
 
 		// the zone a block publishes into, a field of every block that names a

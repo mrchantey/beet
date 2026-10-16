@@ -15,7 +15,8 @@ pub enum LightsailNetworking {
 
 /// Opinionated terraform configuration for a Lightsail instance:
 /// - Key pair for SSH access
-/// - IAM user with a least-privilege inline policy for runtime persistence
+/// - IAM user with a least-privilege inline policy for runtime persistence,
+///   and read on exactly the stack secrets its entity's [`ReadsSecrets`] names
 /// - Static IP with attachment (configurable via networking mode)
 /// - Systemd service that fetches its binary from S3 on startup
 /// - Optional HTTPS via Caddy reverse proxy with automatic Let's Encrypt, its
@@ -31,19 +32,12 @@ pub struct LightsailBlock {
 	/// Also used as the artifact name.
 	label: SmolStr,
 	/// Tofu variables to be inserted as environment variables
-	/// in the lightsail instance.
+	/// in the lightsail instance. Never a secret: everything the box is told
+	/// at boot is readable through the Lightsail api and the tofu state, so a
+	/// secret the box needs is a `<SecretBlock/>` it reads from its stack's
+	/// store ([`ReadsSecrets`]).
 	#[serde(default)]
 	env_vars: Vec<Variable>,
-	/// Env vars written directly into the unit's `Environment=` lines, last so
-	/// a deploy can override any default, and kept off the `ExecStart` argv.
-	/// Not a stronger channel than [`env_vars`](Self::env_vars): the rendered
-	/// user data still lands in terraform state either way. A
-	/// [`VariableSource::ProcessEnv`] value is read at render, after the
-	/// entry's `<Secrets>` has loaded, so a template never reads a secret at
-	/// build time.
-	#[serde(default)]
-	#[set_with(skip)]
-	secret_env: Vec<(SmolStr, VariableSource)>,
 	/// DNS records published at the instance's public address: an `A` record
 	/// per provider (`AAAA` under [`Ipv6`](LightsailNetworking::Ipv6)
 	/// networking). Each authority also lands in the Caddyfile, so declaring
@@ -118,7 +112,6 @@ impl Default for LightsailBlock {
 			bundle_id: "nano_3_0".into(),
 			networking: LightsailNetworking::default(),
 			env_vars: Vec::new(),
-			secret_env: Vec::new(),
 			dns: Vec::new(),
 			allow_ssh: false,
 			management_ssh_port: 2222,
@@ -181,30 +174,6 @@ impl LightsailBlock {
 		self
 	}
 
-	/// Add an env var delivered off-argv (repeatable, see
-	/// [`secret_env`](Self::secret_env)).
-	pub fn with_secret_env(
-		mut self,
-		key: impl Into<SmolStr>,
-		value: impl Into<SmolStr>,
-	) -> Self {
-		self.secret_env
-			.push((key.into(), VariableSource::Fixed(value.into())));
-		self
-	}
-
-	/// Add an env var delivered off-argv whose value is the deployer's own
-	/// process variable of the same name, read at render (see
-	/// [`secret_env`](Self::secret_env)).
-	pub fn with_secret_env_from_process(
-		mut self,
-		key: impl Into<SmolStr>,
-	) -> Self {
-		self.secret_env
-			.push((key.into(), VariableSource::ProcessEnv));
-		self
-	}
-
 	/// Every hostname Caddy serves: the manual [`domain`](Self::with_domain)
 	/// plus each [`dns`](Self::with_dns) authority. Non-empty means Caddy
 	/// terminates TLS on 80/443 and the app port stays private.
@@ -257,14 +226,16 @@ impl LightsailBlock {
 	/// from the [`AccessGrants`] the stack's blocks declared by the shared
 	/// [`IamPolicy`]. The grants this block owns internally are added here
 	/// because its declaration may grant nothing: the repo bucket it pulls its
-	/// binary from at boot, its own log group, and (with hostnames) the prefix
+	/// binary from at boot, its own log group, (with hostnames) the prefix
 	/// of that bucket it saves Caddy's certificate store to, write-only so a
-	/// compromised box still cannot touch a release.
+	/// compromised box still cannot touch a release, and read on exactly the
+	/// stack `secrets` its [`ReadsSecrets`] names.
 	fn runtime_policy(
 		&self,
 		stack: &ResolvedStack,
 		repo_bucket: &str,
 		access: &AccessGrants,
+		secrets: &[SecretRef],
 	) -> Result<String> {
 		let region = stack.aws_region()?;
 		let log_group = self.log_group(stack);
@@ -300,6 +271,7 @@ impl LightsailBlock {
 					format!("arn:aws:logs:{region}:*:log-group:{log_group}:*")
 				]
 			}))
+			.read_secrets(stack, secrets)
 			.render()
 			.xok()
 	}
@@ -443,21 +415,6 @@ impl LightsailBlock {
 			.iter()
 			.map(|(key, value)| format!("Environment={key}={value}\n"))
 			.collect::<String>();
-		// Secrets go to the ENV FILE rather than the unit, and last so a deploy
-		// can override any default above. A unit file is 0644 by convention and
-		// `systemctl cat` prints it for any local user: this box's own AWS
-		// secret and the TUI's private host key were both readable without
-		// sudo, and one of them reached an agent transcript that way.
-		let secret_env_lines = self
-			.secret_env
-			.iter()
-			.map(|(key, source)| {
-				source
-					.resolve_static(key)
-					.map(|value| format!("{key}={value}\n"))
-			})
-			.collect::<Result<String>>()?;
-
 		// free port 22 for the TUI: comment out any explicit `Port` in the main
 		// sshd config and declare the management port in a drop-in, ordered
 		// before the unit starts so 22 is unbound when the app claims it
@@ -692,7 +649,7 @@ install -m 600 /dev/null /etc/{app_name}.env
 cat > /etc/{app_name}.env <<'ENVEOF'
 AWS_ACCESS_KEY_ID=__ACCESS_KEY_ID__
 AWS_SECRET_ACCESS_KEY=__ACCESS_KEY_SECRET__
-{secret_env_lines}ENVEOF
+ENVEOF
 chmod 600 /etc/{app_name}.env
 # create systemd service; the credentials arrive through EnvironmentFile
 cat > /etc/systemd/system/{app_name}.service <<'EOF'
@@ -1130,13 +1087,14 @@ impl Block for LightsailBlock {
 /// The [`DeployRender`] render system, registered by [`InfraPlugin`] beside
 /// the type registration.
 impl LightsailBlock {
-	/// Render the box, lowering the stack's declared grants into its runtime
-	/// policy.
+	/// Render the box, lowering the stack's declared grants and the secrets
+	/// it reads into its runtime policy.
 	pub(crate) fn render(
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		stacks: StackQuery,
 		blocks: Query<(Entity, &LightsailBlock)>,
 		repos: RepoStoreQuery,
+		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
@@ -1157,9 +1115,16 @@ impl LightsailBlock {
 			let access = scope.access();
 			let stack = stacks.resolve(entity);
 			let (deployment, config) = scope.ctx();
-			if let Err(err) =
-				block.emit(&stack, &repo_bucket, deployment, &access, config)
-			{
+			if let Err(err) = reads.of(entity).and_then(|secrets| {
+				block.emit(
+					&stack,
+					&repo_bucket,
+					deployment,
+					&access,
+					&secrets,
+					config,
+				)
+			}) {
 				scope.error(bevyhow!(
 					"LightsailBlock '{}': {err}",
 					block.label()
@@ -1176,6 +1141,7 @@ impl LightsailBlock {
 		repo_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
+		secrets: &[SecretRef],
 		config: &mut terra::Config,
 	) -> Result {
 		// The box's RUNTIME identity: what the instance itself authenticates
@@ -1217,7 +1183,9 @@ impl LightsailBlock {
 			AwsIamUserPolicyDetails {
 				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
-				policy: self.runtime_policy(stack, repo_bucket, access)?.into(),
+				policy: self
+					.runtime_policy(stack, repo_bucket, access, secrets)?
+					.into(),
 				..default()
 			},
 		);
@@ -1999,32 +1967,11 @@ mod tests {
 			.xpect_contains("127.0.0.1:9001");
 	}
 
-	/// Secret env rides the 0600 ENV FILE, never `ExecStart` and never the
-	/// unit. REGRESSION-shaped: a unit file is world-readable by convention and
-	/// `systemctl cat` prints it to any local user, which is how this box's AWS
-	/// secret and the TUI's private host key were both readable without sudo.
-	#[beet_core::test]
-	fn secret_env_rides_the_private_env_file() {
-		let (script, _dir) = build_user_data(
-			&LightsailBlock::default()
-				.with_secret_env("BEET_SSH_HOST_KEY", "abc123"),
-		);
-		script
-			.as_str()
-			// in the env file, bare rather than prefixed
-			.xpect_contains("BEET_SSH_HOST_KEY=abc123")
-			.xpect_contains("install -m 600 /dev/null")
-			.xpect_contains("EnvironmentFile=")
-			// and NOT as a unit line, nor on the command line
-			.xnot()
-			.xpect_contains("Environment=BEET_SSH_HOST_KEY")
-			.xnot()
-			.xpect_contains("app abc123");
-	}
-
-	/// The AWS pair is in the env file too, and the unit names neither half.
-	/// The pair is what a boundary bounds rather than what it hides, so keeping
-	/// it out of a 0644 file is the other half of the job.
+	/// The AWS pair rides the 0600 env file, and the unit names neither half.
+	/// A unit file is world-readable by convention and `systemctl cat` prints
+	/// it to any local user, and the pair is what a boundary bounds rather than
+	/// what it hides, so keeping it out of a 0644 file is the other half of the
+	/// job.
 	#[beet_core::test]
 	fn the_unit_names_no_credential() {
 		let (script, _dir) = build_user_data(&LightsailBlock::default());
@@ -2046,23 +1993,100 @@ mod tests {
 			.xpect_contains("Environment=AWS_REGION=");
 	}
 
-	/// A process-sourced secret is read when the script renders, not when the
-	/// block is declared, so a `<Secrets>` loaded after the build still feeds
-	/// it; unset, it renders empty rather than failing a local plan.
+	/// The box reads exactly the stack secrets its `ReadsSecrets` names: one
+	/// parameter, decrypted through parameter store alone, in its own policy
+	/// and in the stage's runtime boundary. Never the stack's prefix, never a
+	/// secret it does not name, and never a sibling compute's grant.
 	#[beet_core::test]
-	fn process_secret_env_is_read_at_render() {
-		let block = LightsailBlock::default()
-			.with_secret_env_from_process("LIGHTSAIL_TEST_HOST_KEY");
-		build_user_data(&block)
-			.0
+	fn the_box_reads_exactly_its_secrets() {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
+			let host_key = parent
+				.spawn(SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY"))
+				.id();
+			parent.spawn(SecretBlock::new("other-secret", "OTHER_SECRET"));
+			parent.spawn((
+				LightsailBlock::default(),
+				ReadsSecrets(vec![host_key]),
+			));
+			parent.spawn(LambdaBlock::default());
+		});
+		let (stack, _deployment, config) = scope.finish().unwrap();
+		let parameter = format!(
+			"arn:aws:ssm:{}:*:parameter{}",
+			stack.aws_region().unwrap(),
+			SecretRef::new("ssh-host-key").name(&stack)
+		);
+		let policies = |resource_type: &str| {
+			config
+				.resources_of_type(resource_type)
+				.map(|(_, body)| {
+					body.get("policy").unwrap().as_str().unwrap().to_string()
+				})
+				.collect::<Vec<_>>()
+				.join("\n")
+		};
+		policies("aws_iam_user_policy")
 			.as_str()
-			.xpect_contains("LIGHTSAIL_TEST_HOST_KEY=\n");
-		unsafe { env_ext::set_var("LIGHTSAIL_TEST_HOST_KEY", "late") }.unwrap();
-		build_user_data(&block)
-			.0
+			.xpect_contains(&format!(r#""Resource":["{parameter}"]"#))
+			.xpect_contains(r#""Action":["ssm:GetParameter"]"#)
+			.xpect_contains("kms:Decrypt")
+			.xpect_contains(&format!(
+				r#""kms:ViaService":"ssm.{}.amazonaws.com""#,
+				stack.aws_region().unwrap()
+			))
+			.xnot()
+			.xpect_contains("other-secret")
+			.xnot()
+			.xpect_contains(&format!("{}/*", SecretRef::prefix(&stack)))
+			.xnot()
+			.xpect_contains("ssm:*");
+		// the rollup lambda beside it reads no secret
+		policies("aws_iam_role_policy")
 			.as_str()
-			.xpect_contains("LIGHTSAIL_TEST_HOST_KEY=late");
-		unsafe { env_ext::remove_var("LIGHTSAIL_TEST_HOST_KEY") }.unwrap();
+			.xnot()
+			.xpect_contains("ssm:");
+		// and the boundary a deploy converges carries the same one parameter
+		RuntimeBoundary::new(stack.app_name().clone(), stack.stage().clone())
+			.lower(&config)
+			.unwrap()
+			.to_json()
+			.to_string()
+			.xpect_contains(&parameter)
+			.xnot()
+			.xpect_contains("other-secret");
+	}
+
+	/// A compute names only `<SecretBlock/>`s of its own stack, and a compute
+	/// that cannot grant a secret refuses one at render rather than booting a
+	/// runtime denied its first read.
+	#[beet_core::test]
+	fn reads_secrets_is_checked_at_render() {
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
+			let not_a_secret = parent.spawn(LambdaBlock::default()).id();
+			parent.spawn((
+				LightsailBlock::default(),
+				ReadsSecrets(vec![not_a_secret]),
+			));
+		});
+		scope
+			.finish()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("no `<SecretBlock/>`");
+		let (scope, _dir) = RenderScope::test_render(|parent| {
+			parent.spawn(RepoStoreBlock::test_store());
+			let secret = parent
+				.spawn(SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY"))
+				.id();
+			parent.spawn((LambdaBlock::default(), ReadsSecrets(vec![secret])));
+		});
+		scope
+			.finish()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("only a `LightsailBlock` grants");
 	}
 
 	/// The IAM user carries ONE inline policy naming exactly the resources the
@@ -2141,6 +2165,7 @@ mod tests {
 						"readable-table",
 					),
 				]),
+				&[],
 			)
 			.unwrap();
 		policy
@@ -2179,6 +2204,7 @@ mod tests {
 					"gcs_bucket",
 					"some-bucket",
 				)]),
+				&[],
 			)
 			.unwrap_err()
 			.to_string()
@@ -2201,6 +2227,7 @@ mod tests {
 					&DynamoTableBlock::new("analytics"),
 					&stack,
 				)),
+				&[],
 			)
 			.unwrap()
 			.as_str()

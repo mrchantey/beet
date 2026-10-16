@@ -258,11 +258,11 @@ pub async fn Rollback(
 	cx: ActionContext<Request>,
 ) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
-	let version = client.rollback(count.unwrap_or(1)).await?;
-	info!("rolled back to version {version}");
+	let ledger = client.rollback(count.unwrap_or(1)).await?;
+	info!("rolled back to {}", ledger.describe());
 	let result = apply_with_current_ledger(&cx.caller).await?;
 	info!("{result}");
-	format!("Rolled back to version {version} and re-applied").xok()
+	format!("Rolled back to {} and re-applied", ledger.describe()).xok()
 }
 
 /// Roll forward to the latest artifact version, then re-apply infrastructure
@@ -271,11 +271,11 @@ pub async fn Rollback(
 #[derive(Component)]
 pub async fn Rollforward(cx: ActionContext) -> Result<String> {
 	let client = artifacts_client(&cx.caller).await?;
-	let version = client.rollforward().await?;
-	info!("rolled forward to version {version}");
+	let ledger = client.rollforward().await?;
+	info!("rolled forward to {}", ledger.describe());
 	let result = apply_with_current_ledger(&cx.caller).await?;
 	info!("{result}");
-	format!("Rolled forward to version {version} and re-applied").xok()
+	format!("Rolled forward to {} and re-applied", ledger.describe()).xok()
 }
 
 #[cfg(test)]

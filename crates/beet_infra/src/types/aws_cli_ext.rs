@@ -1,13 +1,16 @@
-//! AWS CLI process constructors shared by the deploy actions that shell out.
+//! AWS CLI process constructors shared by everything native that shells out:
+//! the deploy verbs, and parameter store, which a deployed box reads its
+//! secrets from.
 //!
 //! beet carries the S3 sdk and nothing else, so every other AWS service a
-//! deploy verb touches is reached through the `aws` cli. That is one line of
-//! boilerplate each time and one footgun each time, so it lives here once.
+//! deploy verb or a box touches is reached through the `aws` cli. That is one
+//! line of boilerplate each time and one footgun each time, so it lives here
+//! once.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Creates an `aws <service> <args..> --region <region>` invocation, as the
-/// deploy's own credential.
+/// process's own credential (the deployer's on a deploy, the box's on a box).
 pub fn service<'a>(
 	service: &'a str,
 	region: &str,

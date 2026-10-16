@@ -67,19 +67,6 @@ pub struct FargateBlock {
 	/// render time, so a caller never sets them.
 	#[serde(default)]
 	bootstrap: BootstrapConfig,
-	/// Secret env injected literally into the task definition, eg
-	/// `BEET_SSH_HOST_KEY` so every task shares one stable ssh fingerprint.
-	///
-	/// Its own list rather than a [`BootstrapConfig`] field, so the secret channel
-	/// is visible in the type and no renderer can ever put a secret on an argv
-	/// line, in a `CMD` array or in a systemd `ExecStart`. Baking a secret into
-	/// the task definition is a pre-existing exposure, noted, not widened. A
-	/// [`VariableSource::ProcessEnv`] value is read at render, after the
-	/// entry's `<Secrets>` has loaded, so a template never reads a secret at
-	/// build time.
-	#[serde(default)]
-	#[set_with(skip)]
-	secret_env: Vec<(SmolStr, VariableSource)>,
 	/// DNS + HTTPS configuration, one entry per hostname the NLB answers. When
 	/// non-empty, a single ACM certificate is provisioned covering every
 	/// authority (the first is the cert's primary domain, the rest are subject
@@ -141,7 +128,6 @@ impl Default for FargateBlock {
 			container_image: ContainerImage::default(),
 			env_vars: Vec::new(),
 			bootstrap: default(),
-			secret_env: Vec::new(),
 		}
 	}
 }
@@ -156,30 +142,6 @@ impl FargateBlock {
 	/// domain, the rest are subject alternative names). See [`dns`](Self::dns).
 	pub fn with_dns(mut self, dns: DnsProvider) -> Self {
 		self.dns.push(dns);
-		self
-	}
-
-	/// Add a secret environment variable to the task (see
-	/// [`secret_env`](Self::secret_env)).
-	pub fn with_secret_env(
-		mut self,
-		key: impl Into<SmolStr>,
-		value: impl Into<SmolStr>,
-	) -> Self {
-		self.secret_env
-			.push((key.into(), VariableSource::Fixed(value.into())));
-		self
-	}
-
-	/// Add a secret environment variable whose value is the deployer's own
-	/// process variable of the same name, read at render (see
-	/// [`secret_env`](Self::secret_env)).
-	pub fn with_secret_env_from_process(
-		mut self,
-		key: impl Into<SmolStr>,
-	) -> Self {
-		self.secret_env
-			.push((key.into(), VariableSource::ProcessEnv));
 		self
 	}
 
@@ -251,6 +213,7 @@ impl FargateBlock {
 		mut scopes: AncestorQuery<&mut RenderScope>,
 		stacks: StackQuery,
 		blocks: Query<(Entity, &FargateBlock)>,
+		reads: ReadsSecretsQuery,
 	) {
 		for (entity, block) in blocks.iter() {
 			let Ok(mut scope) = scopes.get_mut(entity) else {
@@ -259,7 +222,10 @@ impl FargateBlock {
 			let access = scope.access();
 			let stack = stacks.resolve(entity);
 			let (deployment, config) = scope.ctx();
-			if let Err(err) = block.emit(&stack, deployment, &access, config) {
+			if let Err(err) = reads
+				.refuse(entity)
+				.and_then(|()| block.emit(&stack, deployment, &access, config))
+			{
 				scope
 					.error(bevyhow!("FargateBlock '{}': {err}", block.label()));
 			}
@@ -639,11 +605,6 @@ impl FargateBlock {
 		for variable in &self.env_vars {
 			env_vars
 				.insert(variable.key().clone(), variable.tf_var_ref().into());
-		}
-		// secrets, last so a deploy can override any default above.
-		for (key, source) in &self.secret_env {
-			env_vars
-				.insert(key.clone(), source.resolve_static(key)?.to_string());
 		}
 
 		// Task definition. The http port is always mapped; the ssh port only
@@ -1333,10 +1294,10 @@ mod tests {
 			.xpect_contains("BEET_ASSETS_BUCKET");
 	}
 
-	/// Boot selection rides the container `CMD` as a real JSON array, and the
-	/// secret channel is visible in the type: a secret can only reach env.
+	/// Boot selection rides the container `CMD` as a real JSON array, never
+	/// the task definition's env.
 	#[beet_core::test]
-	fn splits_cmd_and_secret_channels() {
+	fn splits_cmd_and_env_channels() {
 		let block = FargateBlock::default().with_bootstrap(BootstrapConfig {
 			repo: Some(StoreUri::parse("s3://beet--dev--app").unwrap()),
 			server: Some(ServerFilter::new("http,ssh")),
@@ -1346,10 +1307,9 @@ mod tests {
 		block.cmd_bootstrap().to_cmd_json("/app").unwrap().xpect_eq(
 			r#"["/app", "--repo=s3://beet--dev--app", "--server=http,ssh"]"#,
 		);
-		build_json(&block.with_secret_env("BEET_SSH_HOST_KEY", "abc123"))
+		build_json(&block)
 			.as_str()
-			.xpect_contains(
-				r#"\"name\":\"BEET_SSH_HOST_KEY\",\"value\":\"abc123\""#,
-			);
+			.xnot()
+			.xpect_contains("--server=http,ssh");
 	}
 }

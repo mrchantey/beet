@@ -27,7 +27,9 @@ use bevy::math::UVec2;
 /// [`Running<Response>`](beet_action::prelude::Running) parks the process up.
 /// Reads `--ssh-port` / `--host` from the boot request (defaulting from
 /// `BEET_SSH_PORT` / `BEET_HOST`) and the opening `--path` (default home `/`).
-/// Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
+/// Presents the key an [`SshHostKeyRef`] beside it declares, failing the run
+/// when that key cannot be read (see [`SshHostKey`] for the default without
+/// one). Add [`SshTuiPlugin`] once for the per-connection behavior. Coexists with an
 /// [`HttpServer`] on the same root, so one process answers http and ssh at once.
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
@@ -110,6 +112,11 @@ async fn serve_ssh_tui(
 	// a session here is a terminal, so a connection that never asks for one
 	// is dropped rather than held to the transport's idle timeout.
 	server.pty_timeout = pty_timeout;
+	// the key a `SshHostKeyRef` declares, read here rather than by the
+	// listener so a key that cannot be read fails this facet and with it the
+	// whole run: a deployed box exits and its unit restarts loudly, rather
+	// than serving http beside a dead ssh listener.
+	server.host_key = SshHostKey::resolve(&entity).await?;
 	// the opening route each session navigates to, recorded on the server (the
 	// shared mechanism the local TUI server also reads), resolved against this
 	// server's own url space.

@@ -22,8 +22,10 @@ tokens = ["proc-macro2", "quote", "syn"]
 # spells its S3 end through `S3BucketBlock::store_uri`.
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
 deploy = ["beet_router", "dep:base64", "vault"]
-# The stack secret store seam and its export, restore and revoke verbs, on the
-# secrets document in `beet_net/secrets`.
+# A secrets document as a stack's secret store (`<DocumentSecrets/>`) and the
+# store's export, restore and revoke verbs, on the secrets document in
+# `beet_net/secrets`. The seam, parameter store and `<SecretBlock/>` need none
+# of it: a deployed box reads its secrets without the vault layer.
 vault = ["beet_net/vault", "beet_router?/vault"]
 # enables `beet_router`, unlocking the route actions (eg `build-wasm`) that need
 # it for dispatch. `brotli` and `blocking` serve the `build-wasm` report: the

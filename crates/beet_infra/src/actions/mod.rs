@@ -1,5 +1,4 @@
 mod adopt_current_deploy;
-pub mod aws_cli_ext;
 mod aws_watch;
 #[cfg(feature = "fargate_block")]
 mod build_docker_image;

@@ -1739,6 +1739,7 @@ dependencies = [
 name = "beet_extra"
 version = "0.0.9-dev.16"
 dependencies = [
+ "base64 0.22.1",
  "beet_action",
  "beet_core",
  "beet_infra",

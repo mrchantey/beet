@@ -8,6 +8,9 @@
 //!   data in every build, since a stack declaration renders it
 //! - [`Secrets`]: the `<Secrets path=".."/>` declaration, and the runner's
 //!   convention for the same file
+//! - [`SecretSource`]: where a running process reads one secret, the
+//!   launch's environment or a deployment's secret store, plain in every
+//!   build since a deployed binary carries no vault
 //!
 //! ## Cheatsheet
 //!
@@ -49,6 +52,11 @@
 //!   viewed, read by a system through [`OpenSecrets`].
 //! - **No identity is one warning, never an error.** A cloud box and a
 //!   contributor without the key build and run minus the records.
+//! - **A deployed process never reads a record from its environment.** A
+//!   secret a box needs is a `<SecretBlock/>` under its stack: the deploy
+//!   mirrors the record into the stack's secret store and the box reads it
+//!   from there through a [`SecretSource`], so no value rides a rendered
+//!   config (`user_data`, `main.tf.json`, tofu state) or a box's disk.
 //! - **Values never reach a log.** `Debug` redacts an identity, a sealed
 //!   record and an opened [`Secret`]; `secrets/get` and `vault/decrypt` print
 //!   deliberately as their response. `set` takes its value from a no-echo
@@ -75,6 +83,7 @@ mod open_secrets;
 #[cfg(feature = "vault")]
 mod secret_record;
 mod secret_roll;
+mod secret_source;
 #[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "vault")]
@@ -85,6 +94,7 @@ pub use open_secrets::*;
 #[cfg(feature = "vault")]
 pub use secret_record::*;
 pub use secret_roll::*;
+pub use secret_source::*;
 #[cfg(feature = "vault")]
 pub use secrets::*;
 #[cfg(feature = "vault")]

@@ -80,6 +80,8 @@ bevy = { workspace = true }
 
 [dev-dependencies]
 beet_core = { workspace = true, features = ["testing"] }
+# the forms a rolled ssh host key takes, for `the_host_key_never_renders`
+base64.workspace = true
 
 [lib]
 harness = false

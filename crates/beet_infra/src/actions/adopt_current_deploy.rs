@@ -49,13 +49,12 @@ pub async fn AdoptCurrentDeploy(
 			 no live version to publish into. Run the stack's `deploy` verb."
 		)
 	})?;
-	let deploy_id = ledger.deploy_id;
+	info!("publishing into the live {}", ledger.describe());
 	cx.caller
 		.world()
 		.with_resource::<Deployment, _>(move |mut deployment| {
 			deployment.update_from_ledger(&ledger);
 		})
 		.await;
-	info!("publishing into the live deploy {deploy_id}");
 	Pass(cx.input).xok()
 }
