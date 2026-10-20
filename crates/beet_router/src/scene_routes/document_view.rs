@@ -131,7 +131,7 @@ mod test {
 			.entity_mut(root)
 			.exchange(
 				Request::get("view/docs/plan.md")
-					.with_param("frontmatter", "true")
+					.with_param("frontmatter", "toml")
 					.with_header::<header::Accept>(vec![MediaType::Markdown]),
 			)
 			.await

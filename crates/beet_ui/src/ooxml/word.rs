@@ -574,7 +574,7 @@ pub(crate) mod test {
 			.render(&mut RenderContext::new(
 				&mut world,
 				root,
-				&RequestParts::default().with_flag("frontmatter"),
+				&RequestParts::default().with_param("frontmatter", "toml"),
 			))
 			.unwrap()
 			.to_string();

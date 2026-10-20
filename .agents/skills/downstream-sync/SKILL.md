@@ -1,6 +1,6 @@
 ---
 name: downstream-sync
-description: Refresh every downstream repo (beet_atproto, beet_egress, beet_esp, beet_eval) with beet's AGENTS.md marker block, its MIT/Apache licenses and shared config files. Use after changing AGENTS.md, the licenses or rustfmt.toml.
+description: Refresh every downstream repo (beet_atproto, beet_egress, beet_esp, beet_eval, beetmash) with beet's AGENTS.md marker block, its MIT/Apache licenses and shared config files. Use after changing AGENTS.md, the licenses or rustfmt.toml.
 ---
 
 # Downstream Sync
@@ -13,12 +13,13 @@ Beet has downstream repos (separate git repos building on beet via a path depend
 - `/home/pete/me/beet_egress`
 - `/home/pete/me/beet_esp`
 - `/home/pete/me/beet_eval`
+- `/home/pete/me/beetmash`, the business built on beet, which is not open source and so takes no license files (the `UNLICENSED` array below)
 
 `downstream-create` adds a new repo to this list and to the `DOWNSTREAM` array below.
 
 ## What is synced
 
-1. `rustfmt.toml`, `LICENSE-MIT.txt`, `LICENSE-APACHE.txt`: verbatim copies of beet's, so every downstream formats like beet and is dual licensed `MIT OR Apache-2.0` like beet.
+1. `rustfmt.toml`, `LICENSE-MIT.txt`, `LICENSE-APACHE.txt`: verbatim copies of beet's, so every downstream formats like beet and is dual licensed `MIT OR Apache-2.0` like beet. An `UNLICENSED` repo takes `rustfmt.toml` alone.
 2. `AGENTS.md` inherited block: everything between the markers is replaced with beet's current `AGENTS.md` (the working tree version, so in-flight edits propagate):
 
 ```md
@@ -45,10 +46,14 @@ Beet-repo procedures stay in `$BEET/.agents/skills`, since they name beet's just
 
 ```sh
 BEET=/home/pete/me/beet
-DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval)
+DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval /home/pete/me/beetmash)
+# not open source: beet's conventions, never its licenses
+UNLICENSED=(/home/pete/me/beetmash)
 
 for repo in "${DOWNSTREAM[@]}"; do
-	for file in rustfmt.toml LICENSE-MIT.txt LICENSE-APACHE.txt; do
+	files=(rustfmt.toml)
+	[[ " ${UNLICENSED[*]} " == *" $repo "* ]] || files+=(LICENSE-MIT.txt LICENSE-APACHE.txt)
+	for file in "${files[@]}"; do
 		cp "$BEET/$file" "$repo/$file"
 	done
 	if grep -q '<!-- beet:sync:begin' "$repo/AGENTS.md" 2>/dev/null; then
@@ -64,7 +69,7 @@ for repo in "${DOWNSTREAM[@]}"; do
 done
 ```
 
-Afterwards spot-check one downstream repo: `AGENTS.md` header intact, exactly one block with beet's current text inside it, and both license files present.
+Afterwards spot-check one downstream repo: `AGENTS.md` header intact, exactly one block with beet's current text inside it, and both license files present, or absent in an `UNLICENSED` repo.
 
 ## Candidates deliberately not synced
 

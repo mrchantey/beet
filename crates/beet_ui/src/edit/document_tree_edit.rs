@@ -52,7 +52,7 @@ impl core::fmt::Display for CellAddress {
 /// Each method is one edit: it plans from what it reads and queues what it
 /// writes, so a caller runs each in its own `world.with_state` and the next
 /// sees its result, ie
-/// `world.with_state::<DocumentTreeEdit, _>(|mut edit| edit.check_box(root, "Surveys"))`.
+/// `world.with_state::<DocumentTreeEdit, _>(|mut edit| edit.check_labeled_boxes(root, "Surveys"))`.
 /// A cell is addressed by its [`CellAddress`], a checkbox by the label in its
 /// paragraph, a paragraph by a text it carries; matching reads a no-break
 /// space as a space, since a form's placeholders carry them.
@@ -84,22 +84,16 @@ impl DocumentTreeEdit<'_, '_> {
 	/// paragraph keeps its place and the look of its first words, its other
 	/// words go, every other paragraph goes, and the rest of the lines follow
 	/// it as new paragraphs. A cell holding no paragraph, ie a markdown
-	/// table's or a workbook's, takes the text as its own words. A locked
-	/// cell is refused, as is a formula into a workbook cell. Answers the cell
-	/// written, a merged cell's range's first.
-	pub fn set_text(
+	/// table's or a workbook's, takes the text as its own words, a workbook
+	/// writing one led by `=` as its formula. A locked cell is refused.
+	/// Answers the cell written, a merged cell's range's first.
+	pub fn set_cell_text(
 		&mut self,
 		root: Entity,
 		cell: &CellAddress,
 		text: &str,
 	) -> Result<Entity> {
 		let entity = self.cell(root, cell)?;
-		#[cfg(feature = "ooxml")]
-		if let CellAddress::Sheet(address) = cell
-			&& text.trim().starts_with('=')
-		{
-			bevybail!("{address}: a formula is not a value");
-		}
 		let lines = text.split('\n').collect::<Vec<_>>();
 		let blocks = self.text.blocks(entity);
 		let Some((first, rest)) = blocks.split_first() else {
@@ -117,7 +111,7 @@ impl DocumentTreeEdit<'_, '_> {
 	/// Adds one paragraph per line of `text` after the cell's own, in the
 	/// tag of its first, for a box whose prompt shares the cell with its
 	/// answer. Answers the cell written.
-	pub fn append_text(
+	pub fn append_cell_text(
 		&mut self,
 		root: Entity,
 		cell: &CellAddress,
@@ -140,7 +134,11 @@ impl DocumentTreeEdit<'_, '_> {
 
 	/// Checks every checkbox whose paragraph carries `label`, its state its
 	/// value, answering how many.
-	pub fn check_box(&mut self, root: Entity, label: &str) -> Result<usize> {
+	pub fn check_labeled_boxes(
+		&mut self,
+		root: Entity,
+		label: &str,
+	) -> Result<usize> {
 		let needle = Self::needle(label)?;
 		let boxes = self
 			.descendants(root)
@@ -504,17 +502,21 @@ mod test {
 		let cell = |text| CellAddress::parse(text).unwrap();
 		world
 			.with_state::<DocumentTreeEdit, _>(|mut edit| {
-				edit.set_text(root, &cell("t1r1c2"), "Acme Stalls")
+				edit.set_cell_text(root, &cell("t1r1c2"), "Acme Stalls")
 			})
 			.unwrap();
 		world
 			.with_state::<DocumentTreeEdit, _>(|mut edit| {
-				edit.append_text(root, &cell("t1r2c1"), "rents fitted stalls")
+				edit.append_cell_text(
+					root,
+					&cell("t1r2c1"),
+					"rents fitted stalls",
+				)
 			})
 			.unwrap();
 		world
 			.with_state::<DocumentTreeEdit, _>(|mut edit| {
-				edit.check_box(root, "Surveys")
+				edit.check_labeled_boxes(root, "Surveys")
 			})
 			.unwrap()
 			.xpect_eq(1);

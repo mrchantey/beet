@@ -518,7 +518,7 @@ mod test {
 		get(
 			&mut world,
 			router,
-			at(POST, "content").with_param("frontmatter", "true"),
+			at(POST, "content").with_param("frontmatter", "toml"),
 			MediaType::Markdown,
 		)
 		.await

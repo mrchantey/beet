@@ -188,7 +188,7 @@ mod test {
 			.entity_mut(router)
 			.exchange(
 				Request::get("count")
-					.with_param("frontmatter", "true")
+					.with_param("frontmatter", "toml")
 					.with_param("root", "content")
 					.with_header::<header::Accept>(vec![MediaType::Markdown]),
 			)

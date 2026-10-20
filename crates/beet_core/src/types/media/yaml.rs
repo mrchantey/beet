@@ -18,7 +18,9 @@
 //!
 //! Refused: anchors and aliases, tags, block scalars (`|`, `>`), flow maps,
 //! nested lists, lists of maps, maps nested more than one level, a second
-//! document and tabs in indentation.
+//! document, tabs in indentation, a repeated key and a plain value holding
+//! `: `, which YAML reads as a map. The writer quotes whatever would not read
+//! back as the text it is.
 //!
 //! ```
 //! # use beet_core::prelude::*;
@@ -173,8 +175,10 @@ impl Yaml {
 			&& Self::plain(&text) == Value::str(text.as_str())
 			&& text.trim() == text
 			&& !text.contains(" #")
+			&& !text.contains(": ")
 			&& !text.starts_with([
-				'&', '*', '!', '|', '>', '[', '{', '"', '\'', '#', '-',
+				'&', '*', '!', '|', '>', '[', '{', ']', '}', '"', '\'', '#',
+				'-', '%', '@', '`', '?', ':', ',',
 			]) && !text.ends_with(':')
 			&& !(in_list && text.contains([',', '[', ']']));
 		match is_plain {
@@ -429,6 +433,11 @@ impl Yaml {
 				Self::unescape(quoted('"')?, number)?.xmap(Value::str).xok()
 			}
 			Some('\'') => Value::str(quoted('\'')?.replace("''", "'")).xok(),
+			// YAML reads a plain `a: b` value as a map, so it is quoted
+			_ if text.contains(": ") => bevybail!(
+				"YAML line {number}: a plain value holding `: ` reads as a map; \
+				quote `{text}`"
+			),
 			_ => Self::plain(text).xok(),
 		}
 	}
@@ -497,7 +506,7 @@ mod test {
 	#[crate::test]
 	fn reads_the_subset() {
 		let value = read(
-			"# a comment\ntitle: Plan: one, two\ncount: 42 # inline\n\
+			"# a comment\ntitle: \"Plan: one, two\"\ncount: 42 # inline\n\
 			 offset: -7\nweight: 3.5\ndraft: true\nnone: ~\nempty:\n\
 			 quoted: \"a \\\"b\\\" # c\"\nsingle: 'it''s'\n\
 			 tags: [ecs, \"web, http\", 3]\nblock:\n  - one\n  - 'two'\n\
@@ -548,6 +557,7 @@ mod test {
 			("a:\n\tb: 1\n", "a tab in indentation"),
 			("a: 1\na: 2\n", "appears twice"),
 			("a: \"open\n", "an unclosed quote"),
+			("a: b: c\n", "a plain value holding `: `"),
 		] {
 			refusal(text).xpect_contains(named);
 		}
@@ -573,7 +583,7 @@ mod test {
 		};
 		let bytes = MediaType::Yaml.serialize(&meta).unwrap();
 		String::from_utf8(bytes.clone()).unwrap().xpect_eq(
-			"title: Plan: one, two\nauthors: [Mel, \"Packwood, Geoff\"]\norder: 2\nnote: null\nflag: \"true\"\n",
+			"title: \"Plan: one, two\"\nauthors: [Mel, \"Packwood, Geoff\"]\norder: 2\nnote: null\nflag: \"true\"\n",
 		);
 		MediaType::Yaml
 			.deserialize::<Meta>(&bytes)

@@ -107,7 +107,8 @@ impl core::fmt::Display for SheetCellAddress {
 pub struct CellLocked;
 
 /// The formula a workbook cell computes, as written without its `=`: its
-/// shown text is the value last computed, and a writer refuses to replace it.
+/// shown text is the value last computed. An edit replaces it as typing into
+/// the cell would, with a value, or with another formula led by `=`.
 #[derive(Debug, Clone, PartialEq, Eq, Deref, Reflect, Component)]
 #[reflect(Component)]
 pub struct CellFormula(pub SmolStr);

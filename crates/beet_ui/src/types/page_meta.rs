@@ -278,10 +278,10 @@ mod test {
 
 	/// Resolve a frontmatter block exactly as a scan does: lower it to root
 	/// declarations, then reflect-build this one component out of them.
-	fn parse(content: &str, kind: FrontmatterKind) -> PageMeta {
+	fn parse(content: &str, media_type: MediaType) -> PageMeta {
 		let mut registry = TypeRegistry::default();
 		registry.register::<PageMeta>();
-		Frontmatter::parse(content, kind)
+		Frontmatter::parse(content, media_type)
 			.unwrap()
 			.declarations(&type_ext::short_name::<PageMeta>())
 			.get::<PageMeta>(&registry)
@@ -295,7 +295,7 @@ mod test {
 	fn frontmatter_reads_flat_keys() {
 		let meta = parse(
 			"title: Getting Started\ndescription: A guide\nvisibility: draft\norder: 2\nexpanded: true\ntags:\n  - ecs",
-			FrontmatterKind::Yaml,
+			MediaType::Yaml,
 		);
 		meta.tags.xpect_eq(vec![SmolStr::new("ecs")]);
 		meta.title.as_deref().unwrap().xpect_eq("Getting Started");
@@ -314,7 +314,7 @@ mod test {
 	fn frontmatter_reads_article_keys() {
 		let meta = parse(
 			"slug = \"full-stack-bevy\"\ncreated = \"2025-07-11\"\nupdated = \"2025-08-01\"\nauthors = [\"Pete Hayman\", \"Ada Lovelace\"]\nvideo_url = \"https://youtu.be/7koepBSRoUI\"\ntags = [\"bevy\", \"web\"]\nlabels = [\"graphic-media\"]",
-			FrontmatterKind::Toml,
+			MediaType::Toml,
 		);
 		meta.slug.as_deref().unwrap().xpect_eq("full-stack-bevy");
 		meta.tags
@@ -382,7 +382,7 @@ mod test {
 
 	#[beet_core::test]
 	fn defaults_when_empty() {
-		let meta = parse("", FrontmatterKind::Yaml);
+		let meta = parse("", MediaType::Yaml);
 		meta.xpect_eq(PageMeta::default());
 		meta.sidebar_label().is_none().xpect_true();
 	}
@@ -418,7 +418,7 @@ mod test {
 		registry.register::<PageMeta>();
 		let order = |file: &str, frontmatter: &str| {
 			let mut declarations =
-				Frontmatter::parse(frontmatter, FrontmatterKind::Toml)
+				Frontmatter::parse(frontmatter, MediaType::Toml)
 					.unwrap()
 					.declarations(&type_ext::short_name::<PageMeta>());
 			PageMeta::declare_file_defaults(

@@ -157,8 +157,8 @@ struct MdTreeBuilder<'a> {
 	/// Stack of (tag_name, attributes, source_slice, children).
 	/// The bottom entry is the synthetic root.
 	stack: Vec<StackFrame<'a>>,
-	/// Collected frontmatter content and kind.
-	frontmatter_content: Option<(String, FrontmatterKind)>,
+	/// Collected frontmatter content and its format.
+	frontmatter_content: Option<(String, MediaType)>,
 	/// Whether we're inside a metadata block.
 	in_metadata: bool,
 	/// Owned HTML parse config for embedded HTML.
@@ -550,15 +550,15 @@ impl<'a> MdTreeBuilder<'a> {
 				self.push(StackFrame::with_attributes("img", source, attrs));
 			}
 			Tag::MetadataBlock(kind) => {
-				let fm_kind = match kind {
+				let media_type = match kind {
 					pulldown_cmark::MetadataBlockKind::YamlStyle => {
-						FrontmatterKind::Yaml
+						MediaType::Yaml
 					}
 					pulldown_cmark::MetadataBlockKind::PlusesStyle => {
-						FrontmatterKind::Toml
+						MediaType::Toml
 					}
 				};
-				self.frontmatter_content = Some((String::new(), fm_kind));
+				self.frontmatter_content = Some((String::new(), media_type));
 				self.in_metadata = true;
 				// Push a dummy frame so pop works correctly
 				self.push(StackFrame::new("__metadata", source));
@@ -814,10 +814,14 @@ impl<'a> MdTreeBuilder<'a> {
 		// `<article>` that would otherwise paint as a blank first row).
 		drop_insignificant_whitespace(&mut nodes);
 
-		let frontmatter =
-			self.frontmatter_content.and_then(|(content, kind)| {
-				Frontmatter::parse(&content, kind).ok()
-			});
+		// a block its format refuses refuses the document, rather than
+		// leaving it without the metadata it declares
+		let frontmatter = self
+			.frontmatter_content
+			.map(|(content, media_type)| {
+				Frontmatter::parse(&content, media_type)
+			})
+			.transpose()?;
 
 		Ok(MarkdownTree { nodes, frontmatter })
 	}
@@ -1181,6 +1185,23 @@ mod test {
 		)
 		.unwrap();
 		result.frontmatter.is_none().xpect_true();
+	}
+
+	/// A block its format refuses refuses the document with the reason,
+	/// rather than leaving it without its metadata.
+	#[beet_core::test]
+	fn refuses_a_malformed_frontmatter() {
+		build_markdown_tree(
+			"---\nlogo: &shared x\n---\n\n# Title",
+			MarkdownParseConfig::default_cmark_options(),
+			&HtmlParseConfig::default(),
+			&HtmlDiffConfig::default(),
+			None,
+		)
+		.map(|_| ())
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("an anchor or alias");
 	}
 
 	fn build_with_expressions(text: &str) -> Vec<HtmlNode<'_>> {

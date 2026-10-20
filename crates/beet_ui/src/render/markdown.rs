@@ -6,8 +6,9 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
 pub struct MarkdownParams {
 	/// Lead a markdown render with the frontmatter its root's metadata
-	/// declares, its author and dates among it.
-	pub frontmatter: bool,
+	/// declares, its author and dates among it, in the format named,
+	/// `--frontmatter=toml` or `--frontmatter=yaml`.
+	pub frontmatter: Option<MediaType>,
 }
 
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
@@ -18,10 +19,10 @@ pub struct MarkdownParams {
 /// blockquotes, thematic breaks, inline code, GFM tables with their captions,
 /// and optional expression rendering. A `<mark>`, and a `<span>` carrying a
 /// `style`, pass through as inline HTML, since markdown has no syntax for what
-/// they signal. Asked for frontmatter, `--frontmatter` ([`MarkdownParams`]), a
-/// render leads with the TOML block declaring its root's frontmatter
-/// components ([`Frontmatter::write`]), so a parsed markdown file renders its
-/// metadata back and a Word file its core properties.
+/// they signal. Asked for frontmatter, `--frontmatter=toml` or `=yaml`
+/// ([`MarkdownParams`]), a render leads with the block declaring its root's
+/// frontmatter components ([`Frontmatter::write`]), so a parsed markdown file
+/// renders its metadata back and a Word file its core properties.
 ///
 /// A [`Comment`] is an authoring note, never a page's content, so it is
 /// skipped unless [`with_comments`](Self::with_comments) keeps it, as a writer
@@ -1047,7 +1048,9 @@ impl NodeRenderer for MarkdownRenderer {
 		// asked for, a document's metadata leads it as the frontmatter that
 		// declares it
 		#[cfg(feature = "bsx")]
-		if cx.request.parse_params::<MarkdownParams>()?.frontmatter {
+		if let Some(media_type) =
+			cx.request.parse_params::<MarkdownParams>()?.frontmatter
+		{
 			let entity = cx.entity;
 			let component = cx
 				.world
@@ -1056,7 +1059,7 @@ impl NodeRenderer for MarkdownRenderer {
 				})
 				.component;
 			if let Some(block) =
-				Frontmatter::write(cx.world, entity, &component)?
+				Frontmatter::write(cx.world, entity, &component, &media_type)?
 			{
 				self.push_str(&block);
 				self.state.needs_block_separator = true;
@@ -1228,9 +1231,18 @@ mod test {
 				.unwrap()
 				.to_string()
 		};
-		render(RequestParts::default().with_flag("frontmatter"))
+		let asked = |format: &str| {
+			RequestParts::default().with_param("frontmatter", format)
+		};
+		render(asked("toml"))
 			.xpect_eq("+++\ntitle = \"Plan\"\n+++\n\n# Plan\n");
+		render(asked("yaml")).xpect_eq("---\ntitle: Plan\n---\n\n# Plan\n");
 		render(RequestParts::default()).xpect_eq("# Plan\n");
+		MarkdownRenderer::new()
+			.render(&mut RenderContext::new(&mut world, entity, &asked("html")))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("is not a frontmatter format");
 	}
 
 	#[beet_core::test]

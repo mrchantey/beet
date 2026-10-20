@@ -33,7 +33,8 @@ struct SheetRead {
 
 struct RowRead {
 	entity: Entity,
-	index: u32,
+	/// Its number, as its `r` says or following the row before.
+	index: NonZeroU32,
 	/// The row's style when it carries one for its absent cells.
 	style: Option<u32>,
 	cells: Vec<CellRead>,
@@ -41,7 +42,8 @@ struct RowRead {
 
 struct CellRead {
 	entity: Entity,
-	column: u32,
+	/// Its column, as its `r` says or following the cell before.
+	column: NonZeroU32,
 	style: u32,
 	formula: Option<SmolStr>,
 }
@@ -107,7 +109,7 @@ impl WorkbookProjection {
 				continue;
 			};
 			let entity = OoxmlParser::spawn_part(world, root, file, part)?;
-			projection.project(world, entity, name);
+			projection.project(world, entity, name)?;
 		}
 		Ok(())
 	}
@@ -157,11 +159,17 @@ impl WorkbookProjection {
 	/// its rows `<tr>`s, its cells `<td>`s with their addresses, locks and
 	/// formulas, a merged range's first cell spanning the rest, and every
 	/// gap before a row's last cell filled by a projection-only `<td>`.
-	fn project(&self, world: &mut World, part: Entity, name: SmolStr) {
-		let sheet =
-			world.with_state::<OoxmlQuery, _>(|tree| self.read(&tree, part));
+	fn project(
+		&self,
+		world: &mut World,
+		part: Entity,
+		name: SmolStr,
+	) -> Result {
+		let sheet = world.with_state::<OoxmlQuery, _>(|tree| {
+			self.read(&tree, part, &name)
+		})?;
 		let Some(data) = sheet.data else {
-			return;
+			return Ok(());
 		};
 		Projected::apply(
 			world,
@@ -203,9 +211,15 @@ impl WorkbookProjection {
 				.iter()
 				.map(|cell| (cell.column, cell))
 				.collect::<HashMap<_, _>>();
-			let last =
-				row.cells.iter().map(|cell| cell.column).max().unwrap_or(0);
-			for column in 1..=last {
+			let last = row
+				.cells
+				.iter()
+				.map(|cell| cell.column.get())
+				.max()
+				.unwrap_or(0);
+			for offset in 0..last {
+				let column = NonZeroU32::MIN.saturating_add(offset);
+				let key = (column.get(), row.index.get());
 				let entity = match present.get(&column) {
 					Some(cell) => {
 						if let Some(formula) = &cell.formula {
@@ -217,7 +231,8 @@ impl WorkbookProjection {
 						cell.entity
 					}
 					None => {
-						let style = self.inherited_style(&sheet, row, column);
+						let style =
+							self.inherited_style(&sheet, row, column.get());
 						let gap = world.spawn(SheetCellStyle(style)).id();
 						let index =
 							Self::position(world, row.entity, &present, column);
@@ -226,21 +241,13 @@ impl WorkbookProjection {
 						gap
 					}
 				};
-				// a column counts from 1, as a row's index is read
-				if let (Some(address_column), Some(address_row)) =
-					(NonZeroU32::new(column), NonZeroU32::new(row.index))
-				{
-					world.entity_mut(entity).insert(SheetCellAddress {
-						sheet: name.clone(),
-						column: address_column,
-						row: address_row,
-					});
-				}
-				cells.insert((column, row.index), entity);
-				match (
-					masters.get(&(column, row.index)),
-					spans.get(&(column, row.index)),
-				) {
+				world.entity_mut(entity).insert(SheetCellAddress {
+					sheet: name.clone(),
+					column,
+					row: row.index,
+				});
+				cells.insert(key, entity);
+				match (masters.get(&key), spans.get(&key)) {
 					(Some(master), _) => covered.push((entity, *master)),
 					(None, Some((columns, rows))) => {
 						let mut cell = Tagged::new("td");
@@ -262,6 +269,7 @@ impl WorkbookProjection {
 				world.entity_mut(entity).insert(CoveredBy(*master));
 			}
 		}
+		Ok(())
 	}
 
 	/// The index in `row`'s children a gap at `column` is inserted at:
@@ -269,8 +277,8 @@ impl WorkbookProjection {
 	fn position(
 		world: &World,
 		row: Entity,
-		present: &HashMap<u32, &CellRead>,
-		column: u32,
+		present: &HashMap<NonZeroU32, &CellRead>,
+		column: NonZeroU32,
 	) -> usize {
 		let after = present
 			.iter()
@@ -312,11 +320,28 @@ impl WorkbookProjection {
 		})
 	}
 
-	fn read(&self, tree: &OoxmlQuery, part: Entity) -> SheetRead {
+	/// Reads the sheet `name` from its part, refusing a row number, cell
+	/// address or merged range that is present but malformed, a row numbered
+	/// 0 included: rows and columns count from 1, and a row or cell written
+	/// without one follows the one before.
+	fn read(
+		&self,
+		tree: &OoxmlQuery,
+		part: Entity,
+		name: &str,
+	) -> Result<SheetRead> {
 		let mut sheet = SheetRead::default();
 		let number = |entity: Entity, key: &str| {
 			tree.attribute(entity, None, key)
 				.and_then(|value| value.parse::<u32>().ok())
+		};
+		let a1 = |address: &str| {
+			SheetCellAddress::parse_a1(address).ok_or_else(|| {
+				bevyhow!(
+					"sheet `{name}`: `{address}` is not a cell address, whose \
+					column and row count from 1"
+				)
+			})
 		};
 		for entity in tree.descendants(part) {
 			let Some(element) = tree.element(entity) else {
@@ -350,31 +375,42 @@ impl WorkbookProjection {
 					}
 				}
 				"mergeCell" => {
-					let range = tree
-						.attribute(entity, None, "ref")
-						.and_then(|range| range.split_once(':'))
-						.and_then(|(first, last)| {
-							let corner = |a1| {
-								SheetCellAddress::parse_a1(a1).map(
-									|(column, row)| (column.get(), row.get()),
-								)
-							};
-							Some((corner(first)?, corner(last)?))
-						});
-					if let Some(range) = range {
-						sheet.merges.push(range);
-					}
+					let range =
+						tree.attribute(entity, None, "ref").unwrap_or("");
+					let Some((first, last)) = range.split_once(':') else {
+						bevybail!(
+							"sheet `{name}`: `{range}` is not a merged range"
+						);
+					};
+					let corner = |corner| {
+						a1(corner)
+							.map(|(column, row)| (column.get(), row.get()))
+					};
+					sheet.merges.push((corner(first)?, corner(last)?));
 				}
 				"row" => {
 					let custom = matches!(
 						tree.attribute(entity, None, "customFormat"),
 						Some("1" | "true")
 					);
+					let index = match tree.attribute(entity, None, "r") {
+						Some(index) => {
+							index.parse::<NonZeroU32>().map_err(|_| {
+								bevyhow!(
+									"sheet `{name}`: row `{index}` is not a row \
+									number, which counts from 1"
+								)
+							})?
+						}
+						None => {
+							sheet.rows.last().map_or(NonZeroU32::MIN, |row| {
+								row.index.saturating_add(1)
+							})
+						}
+					};
 					sheet.rows.push(RowRead {
 						entity,
-						index: number(entity, "r")
-							.filter(|index| *index > 0)
-							.unwrap_or(sheet.rows.len() as u32 + 1),
+						index,
 						style: custom.then(|| number(entity, "s").unwrap_or(0)),
 						cells: Vec::new(),
 					});
@@ -383,13 +419,14 @@ impl WorkbookProjection {
 					let Some(row) = sheet.rows.last_mut() else {
 						continue;
 					};
-					let column = tree
-						.attribute(entity, None, "r")
-						.and_then(SheetCellAddress::parse_a1)
-						.map(|(column, _)| column.get())
-						.unwrap_or_else(|| {
-							row.cells.last().map_or(1, |cell| cell.column + 1)
-						});
+					let column = match tree.attribute(entity, None, "r") {
+						Some(address) => a1(address)?.0,
+						None => {
+							row.cells.last().map_or(NonZeroU32::MIN, |cell| {
+								cell.column.saturating_add(1)
+							})
+						}
+					};
 					let formula = tree
 						.child(entity, Ns::SPREADSHEET, "f")
 						.map(|formula| SmolStr::new(tree.text(formula)));
@@ -428,7 +465,7 @@ impl WorkbookProjection {
 				_ => {}
 			}
 		}
-		sheet
+		sheet.xok()
 	}
 
 	/// The text nodes under `entity`.
@@ -437,5 +474,52 @@ impl WorkbookProjection {
 			.into_iter()
 			.filter(|descendant| tree.is_text(*descendant))
 			.collect()
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// The address of every cell a workbook holding `sheet_data` lists, every
+	/// cell unlocked, or the refusal of its read.
+	fn addresses(sheet_data: &str) -> Result<Vec<String>> {
+		let bytes = OoxmlFile::workbook(
+			"<xf><protection locked=\"0\"/></xf>",
+			&[("Sheet", &format!("<sheetData>{sheet_data}</sheetData>"))],
+		)?;
+		let mut world =
+			(TemplatePlugin, DocumentPlugin, ParsePlugin).into_world();
+		let root = world.spawn_empty().id();
+		MediaParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(root), &bytes))?;
+		CellText::listing(&mut world, root)
+			.into_iter()
+			.map(|cell| cell.address.to_string())
+			.collect::<Vec<_>>()
+			.xok()
+	}
+
+	/// A row or cell written without its number follows the one before, and
+	/// one malformed, a row numbered 0 included, refuses the read.
+	#[beet_core::test]
+	fn numbers_rows_and_cells_from_one() {
+		addresses("<row r=\"2\"><c r=\"B2\"/><c/></row><row><c/></row>")
+			.unwrap()
+			.xpect_eq(vec![
+				"Sheet!A2".to_string(),
+				"Sheet!B2".into(),
+				"Sheet!C2".into(),
+				"Sheet!A3".into(),
+			]);
+		addresses("<row r=\"0\"><c/></row>")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("row `0` is not a row number");
+		addresses("<row r=\"1\"><c r=\"A0\"/></row>")
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("`A0` is not a cell address");
 	}
 }

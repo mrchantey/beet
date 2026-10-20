@@ -14,7 +14,9 @@
 //! component its keys declare, and default fields left out when writing. A
 //! component is written into a block when its type data says it is
 //! frontmatter, `#[reflect(Frontmatter)]` ([`ReflectFrontmatter`]), and a
-//! written block is TOML.
+//! block is written in the format asked for. A block's format is its
+//! [`MediaType`], one of the formats [`Frontmatter::fence`] knows, so another
+//! format is a row there rather than a type of its own.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
@@ -37,15 +39,15 @@ use bevy::reflect::structs::DynamicStruct;
 /// ```rust
 /// # use beet_ui::prelude::*;
 /// # use beet_core::prelude::*;
-/// let fm = Frontmatter::parse("title: Hello\nauthor: World", FrontmatterKind::Yaml).unwrap();
-/// fm.kind.xpect_eq(FrontmatterKind::Yaml);
+/// let fm = Frontmatter::parse("title: Hello\nauthor: World", MediaType::Yaml).unwrap();
+/// fm.media_type.xpect_eq(MediaType::Yaml);
 /// ```
 #[derive(Debug, Component)]
 pub struct Frontmatter {
 	/// The parsed metadata as a dynamic struct for reflection.
 	pub value: DynamicStruct,
-	/// The frontmatter format that was parsed.
-	pub kind: FrontmatterKind,
+	/// The format the block was written in, one [`Frontmatter::fence`] knows.
+	pub media_type: MediaType,
 	/// The parsed pairs grouped by the component their section names, in source
 	/// order. Unsectioned pairs carry `None` and target the document's
 	/// [`FrontmatterType`].
@@ -115,29 +117,29 @@ struct FrontmatterSection {
 	pairs: Vec<(String, Value)>,
 }
 
-/// The format of a frontmatter metadata block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FrontmatterKind {
-	/// YAML frontmatter delimited by `---`.
-	Yaml,
-	/// TOML frontmatter delimited by `+++`.
-	Toml,
-}
-
-impl FrontmatterKind {
-	/// The media type the block is written in.
-	pub fn media_type(&self) -> MediaType {
-		match self {
-			Self::Yaml => MediaType::Yaml,
-			Self::Toml => MediaType::Toml,
-		}
-	}
-}
-
 impl Frontmatter {
 	/// The key the `toml` crate carries a datetime under, which a block's
 	/// `created = 2025-07-11` reads as.
 	const TOML_DATETIME: &str = "$__toml_private_datetime";
+
+	/// Each format a block is written in, with the fence it sits between.
+	const FORMATS: [(MediaType, &'static str); 2] =
+		[(MediaType::Yaml, "---"), (MediaType::Toml, "+++")];
+
+	/// The fence a block in `media_type` sits between, refusing a format no
+	/// block is written in.
+	pub fn fence(media_type: &MediaType) -> Result<&'static str> {
+		Self::FORMATS
+			.iter()
+			.find(|(format, _)| format == media_type)
+			.map(|(_, fence)| *fence)
+			.ok_or_else(|| {
+				bevyhow!(
+					"`{media_type}` is not a frontmatter format, a block is \
+					YAML or TOML"
+				)
+			})
+	}
 
 	/// Extract and parse a leading frontmatter block from a raw source: a
 	/// `---` fence parses as YAML, a `+++` fence as TOML. Returns `None` when
@@ -148,10 +150,11 @@ impl Frontmatter {
 	/// that must not pay for a content parse.
 	pub fn extract(source: &str) -> Result<Option<Self>> {
 		let trimmed = source.trim_start();
-		let (fence, kind) = match trimmed {
-			s if s.starts_with("---") => ("---", FrontmatterKind::Yaml),
-			s if s.starts_with("+++") => ("+++", FrontmatterKind::Toml),
-			_ => return Ok(None),
+		let Some((media_type, fence)) = Self::FORMATS
+			.iter()
+			.find(|(_, fence)| trimmed.starts_with(fence))
+		else {
+			return Ok(None);
 		};
 		// the fence must be a whole line, ie not a thematic break `--- foo`
 		let body = &trimmed[fence.len()..];
@@ -161,18 +164,17 @@ impl Frontmatter {
 		let Some(end) = body.find(&format!("\n{fence}")) else {
 			return Ok(None);
 		};
-		Self::parse(&body[..end], kind).map(Some)
+		Self::parse(&body[..end], media_type.clone()).map(Some)
 	}
 
 	/// Parse a raw frontmatter block, the text between its fences, through
-	/// serde in the format `kind` names: its keys holding a map are sections,
-	/// the rest unsectioned.
-	pub fn parse(content: &str, kind: FrontmatterKind) -> Result<Self> {
+	/// serde in `media_type`, refusing a format no block is written in: its
+	/// keys holding a map are sections, the rest unsectioned.
+	pub fn parse(content: &str, media_type: MediaType) -> Result<Self> {
+		Self::fence(&media_type)?;
 		let value = match content.trim().is_empty() {
 			true => Value::Map(default()),
-			false => {
-				kind.media_type().deserialize::<Value>(content.as_bytes())?
-			}
+			false => media_type.deserialize::<Value>(content.as_bytes())?,
 		};
 		let Value::Map(map) = Self::normalize(value) else {
 			bevybail!("a frontmatter block is a map of keys");
@@ -199,7 +201,7 @@ impl Frontmatter {
 		let value = sections[0].pairs.clone().xmap(build_dynamic_struct)?;
 		Ok(Self {
 			value,
-			kind,
+			media_type,
 			sections,
 		})
 	}
@@ -260,19 +262,22 @@ impl Frontmatter {
 			.xmap(RootDeclarations)
 	}
 
-	/// The TOML block declaring every frontmatter component `entity` carries,
-	/// the inverse of [`extract`](Self::extract) and
-	/// [`declarations`](Self::declarations): `default_component`, the
-	/// document's [`FrontmatterType`], unsectioned, every other as its own
-	/// `[Component]` table in name order, each with only the fields its
-	/// default does not hold, in field order. `None` when no field is
-	/// written, as in a world registering no frontmatter type.
+	/// The block declaring every frontmatter component `entity` carries, in
+	/// `media_type` between its fences, the inverse of
+	/// [`extract`](Self::extract) and [`declarations`](Self::declarations):
+	/// `default_component`, the document's [`FrontmatterType`], unsectioned,
+	/// every other as its own section in name order, each with only the
+	/// fields its default does not hold, in field order. `None` when no field
+	/// is written, as in a world registering no frontmatter type; a format no
+	/// block is written in, or a value the format cannot hold, is refused.
 	#[cfg(feature = "serde")]
 	pub fn write(
 		world: &World,
 		entity: Entity,
 		default_component: &str,
+		media_type: &MediaType,
 	) -> Result<Option<String>> {
+		let fence = Self::fence(media_type)?;
 		let Some(registry) = world.get_resource::<AppTypeRegistry>() else {
 			return Ok(None);
 		};
@@ -282,11 +287,11 @@ impl Frontmatter {
 		if block.fields.is_empty() && block.sections.is_empty() {
 			return Ok(None);
 		}
-		let text = MediaType::Toml
+		let text = media_type
 			.serialize_with_options(&block, SerializeOptions {
 				pretty: false,
 			})?;
-		format!("+++\n{}+++\n", String::from_utf8(text)?)
+		format!("{fence}\n{}{fence}\n", String::from_utf8(text)?)
 			.xsome()
 			.xok()
 	}
@@ -467,8 +472,8 @@ mod test {
 
 	/// The unsectioned pairs of a block, ie the group targeting the default
 	/// component.
-	fn pairs(content: &str, kind: FrontmatterKind) -> Vec<(String, Value)> {
-		Frontmatter::parse(content, kind)
+	fn pairs(content: &str, media_type: MediaType) -> Vec<(String, Value)> {
+		Frontmatter::parse(content, media_type)
 			.unwrap()
 			.sections
 			.into_iter()
@@ -492,16 +497,16 @@ mod test {
 		];
 		pairs(
 			"title: \"Hello, World\"\ncount: 42 # a comment\ndraft: true\ntags:\n  - ecs\n  - \"web, http\"",
-			FrontmatterKind::Yaml,
+			MediaType::Yaml,
 		)
 		.xpect_eq(expected.clone());
 		pairs(
 			"title = \"Hello, World\"\ncount = 42 # a comment\ndraft = true\ntags = [\"ecs\", \"web, http\",]",
-			FrontmatterKind::Toml,
+			MediaType::Toml,
 		)
 		.xpect_eq(expected);
 		// a TOML date reads as the text a quoted one does
-		pairs("created = 2025-07-11", FrontmatterKind::Toml)
+		pairs("created = 2025-07-11", MediaType::Toml)
 			.xpect_eq(vec![("created".into(), Value::str("2025-07-11"))]);
 	}
 
@@ -509,11 +514,11 @@ mod test {
 	/// the reason.
 	#[beet_core::test]
 	fn refuses_what_its_format_refuses() {
-		Frontmatter::parse("logo: &shared x", FrontmatterKind::Yaml)
+		Frontmatter::parse("logo: &shared x", MediaType::Yaml)
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("an anchor or alias");
-		Frontmatter::parse("title = Hello", FrontmatterKind::Toml).xpect_err();
+		Frontmatter::parse("title = Hello", MediaType::Toml).xpect_err();
 	}
 
 	/// Every key lowers to a literal against the default component, so nothing
@@ -522,7 +527,7 @@ mod test {
 	fn declares_the_default_component() {
 		let fm = Frontmatter::parse(
 			"title: Hello\norder: 2\nempty:",
-			FrontmatterKind::Yaml,
+			MediaType::Yaml,
 		)
 		.unwrap();
 		let RootDeclarations(declarations) = fm.declarations("PageMeta");
@@ -541,14 +546,11 @@ mod test {
 	/// table and a YAML key holding a map alike.
 	#[beet_core::test]
 	fn declares_sectioned_components() {
-		for (content, kind) in [
-			(
-				"title = \"Hello\"\n[Extra]\nnote = \"hi\"",
-				FrontmatterKind::Toml,
-			),
-			("title: Hello\nExtra:\n  note: hi", FrontmatterKind::Yaml),
+		for (content, media_type) in [
+			("title = \"Hello\"\n[Extra]\nnote = \"hi\"", MediaType::Toml),
+			("title: Hello\nExtra:\n  note: hi", MediaType::Yaml),
 		] {
-			let fm = Frontmatter::parse(content, kind).unwrap();
+			let fm = Frontmatter::parse(content, media_type).unwrap();
 			fm.declarations("PageMeta")
 				.0
 				.iter()
@@ -598,33 +600,50 @@ mod test {
 			weeks: 0,
 		};
 		let entity = world.spawn((meta.clone(), course.clone())).id();
-		let block = Frontmatter::write(world, entity, "PageMeta")
-			.unwrap()
-			.unwrap();
-		block.xpect_eq(
-			"+++\ntitle = \"Plan: one, two\"\ncreated = \"2025-07-09\"\n\
-			 authors = [\"Mel Richards\", \"Packwood, Geoff\"]\norder = 2\n\n\
-			 [Course]\nunit = \"BSBOPS404\"\n+++\n",
-		);
-		let registry = world.resource::<AppTypeRegistry>().read();
-		let declarations = Frontmatter::extract(&block)
-			.unwrap()
-			.unwrap()
-			.declarations("PageMeta");
-		declarations
-			.get::<PageMeta>(&registry)
-			.unwrap()
-			.xpect_eq(Some(meta));
-		declarations
-			.get::<Course>(&registry)
-			.unwrap()
-			.xpect_eq(Some(course));
-		drop(registry);
-		// nothing to declare writes no block
+		for (media_type, expected) in [
+			(
+				MediaType::Toml,
+				"+++\ntitle = \"Plan: one, two\"\ncreated = \"2025-07-09\"\n\
+				 authors = [\"Mel Richards\", \"Packwood, Geoff\"]\norder = 2\n\n\
+				 [Course]\nunit = \"BSBOPS404\"\n+++\n",
+			),
+			(
+				MediaType::Yaml,
+				"---\ntitle: \"Plan: one, two\"\ncreated: 2025-07-09\n\
+				 authors: [Mel Richards, \"Packwood, Geoff\"]\norder: 2\n\
+				 Course:\n  unit: BSBOPS404\n---\n",
+			),
+		] {
+			let block =
+				Frontmatter::write(world, entity, "PageMeta", &media_type)
+					.unwrap()
+					.unwrap();
+			block.clone().xpect_eq(expected);
+			let registry = world.resource::<AppTypeRegistry>().read();
+			let declarations = Frontmatter::extract(&block)
+				.unwrap()
+				.unwrap()
+				.declarations("PageMeta");
+			declarations
+				.get::<PageMeta>(&registry)
+				.unwrap()
+				.xpect_eq(Some(meta.clone()));
+			declarations
+				.get::<Course>(&registry)
+				.unwrap()
+				.xpect_eq(Some(course.clone()));
+		}
+		// nothing to declare writes no block, and no format but these two is
+		// a block's
 		let bare = world.spawn(PageMeta::default()).id();
-		Frontmatter::write(world, bare, "PageMeta")
+		Frontmatter::write(world, bare, "PageMeta", &MediaType::Toml)
 			.unwrap()
 			.xpect_none();
+		Frontmatter::write(world, entity, "PageMeta", &MediaType::Json)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("is not a frontmatter format");
+		Frontmatter::parse("{}", MediaType::Json).xpect_err();
 	}
 
 	// -- extraction from raw source --
@@ -636,7 +655,7 @@ mod test {
 		)
 		.unwrap()
 		.unwrap();
-		fm.kind.xpect_eq(FrontmatterKind::Toml);
+		fm.media_type.xpect_eq(MediaType::Toml);
 		fm.get_str("title").unwrap().xpect_eq("Hello");
 		fm.get_uint("order").unwrap().xpect_eq(2);
 	}
@@ -646,7 +665,7 @@ mod test {
 		let fm = Frontmatter::extract("---\ntitle: Hello\n---\n# Body")
 			.unwrap()
 			.unwrap();
-		fm.kind.xpect_eq(FrontmatterKind::Yaml);
+		fm.media_type.xpect_eq(MediaType::Yaml);
 		fm.get_str("title").unwrap().xpect_eq("Hello");
 	}
 
@@ -673,7 +692,7 @@ mod test {
 
 	#[beet_core::test]
 	fn frontmatter_empty() {
-		let fm = Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
+		let fm = Frontmatter::parse("", MediaType::Yaml).unwrap();
 		fm.value.field_len().xpect_eq(0);
 	}
 
@@ -681,7 +700,7 @@ mod test {
 	fn dynamic_struct_fields_accessible() {
 		let fm = Frontmatter::parse(
 			"title: Hello\ncount: 42\ndraft: true",
-			FrontmatterKind::Yaml,
+			MediaType::Yaml,
 		)
 		.unwrap();
 		fm.value.field_len().xpect_eq(3);

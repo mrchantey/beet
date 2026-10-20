@@ -18,9 +18,9 @@ type Ns = OoxmlNamespace;
 /// `checked` says, a newly checked box bold and highlighted so the mark
 /// survives an upload that drops the control, and keeps a paragraph in every
 /// cell. A workbook writes an edited cell's value, a number when it parses
-/// as one and an inline string otherwise, creates a gap's cell with its
-/// row's or column's style, refuses a locked cell or a formula, and marks
-/// the book to recalculate on open, since nothing here computes. Every part
+/// as one, a formula when led by `=` and an inline string otherwise, creates
+/// a gap's cell with its row's or column's style, refuses a locked cell, and
+/// marks the book to recalculate on open, since nothing here computes. Every part
 /// the tree holds is written, and every other part is kept as read.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct OoxmlRenderer;
@@ -608,17 +608,16 @@ impl WorkbookWriter {
 				.with_state::<ReaderText, _>(|text| text.own_text(cell))
 				.trim()
 				.to_string();
-			if value.starts_with('=') {
-				bevybail!("{address}: a formula is not a value");
-			}
 			Self::write(world, cell, &address, style, &value);
 			any = true;
 		}
 		Ok(any)
 	}
 
-	/// Writes `value` as `cell`'s only content: a number in a `v`, anything
-	/// else an inline string, a gap becoming the `c` it stands for.
+	/// Writes `value` as `cell`'s only content, as a person typing it would:
+	/// led by `=` its formula in an `f`, with no value until the book
+	/// recalculates on open, a number in a `v`, anything else an inline
+	/// string, a gap becoming the `c` it stands for.
 	fn write(
 		world: &mut World,
 		cell: Entity,
@@ -661,8 +660,9 @@ impl WorkbookWriter {
 		};
 		world.entity_mut(cell).despawn_children();
 		let mut written = named.clone();
+		let formula = value.strip_prefix('=').map(str::trim);
 		let is_number = Self::is_number(value);
-		match is_number {
+		match formula.is_some() || is_number {
 			true => {
 				written.remove_attribute(None, "t");
 			}
@@ -673,6 +673,16 @@ impl WorkbookWriter {
 			)),
 		}
 		world.entity_mut(cell).insert(OoxmlNode::Element(written));
+		if let Some(formula) = formula {
+			world.entity_mut(cell).insert(CellFormula(formula.into()));
+			world.spawn((
+				OoxmlNode::Element(named.sibling(Ns::SPREADSHEET, "f")),
+				ChildOf(cell),
+				children![Value::str(formula)],
+			));
+			return;
+		}
+		world.entity_mut(cell).remove::<CellFormula>();
 		match is_number {
 			true => {
 				world.spawn((
@@ -913,17 +923,21 @@ mod test {
 		let (mut world, root) = parse(&super::super::word::test::form());
 		let cell = |text| CellAddress::parse(text).unwrap();
 		edit(&mut world, |edit| {
-			edit.set_text(root, &cell("t1r1c2"), "Acme Stalls\nSecond line")
+			edit.set_cell_text(
+				root,
+				&cell("t1r1c2"),
+				"Acme Stalls\nSecond line",
+			)
 		})
 		.unwrap();
 		edit(&mut world, |edit| {
-			edit.append_text(root, &cell("t1r1c1"), "appended")
+			edit.append_cell_text(root, &cell("t1r1c1"), "appended")
 		})
 		.unwrap();
-		edit(&mut world, |edit| edit.check_box(root, "Surveys"))
+		edit(&mut world, |edit| edit.check_labeled_boxes(root, "Surveys"))
 			.unwrap()
 			.xpect_eq(1);
-		edit(&mut world, |edit| edit.check_box(root, "Nothing"))
+		edit(&mut world, |edit| edit.check_labeled_boxes(root, "Nothing"))
 			.unwrap()
 			.xpect_eq(0);
 		edit(&mut world, |edit| {
@@ -936,8 +950,10 @@ mod test {
 		})
 		.unwrap()
 		.xpect_eq(1);
-		edit(&mut world, |edit| edit.set_text(root, &cell("t9r1c1"), "x"))
-			.xpect_err();
+		edit(&mut world, |edit| {
+			edit.set_cell_text(root, &cell("t9r1c1"), "x")
+		})
+		.xpect_err();
 		edit(&mut world, |edit| edit.remove_paragraphs(root, " ")).xpect_err();
 
 		let written = write(&mut world, root, MediaType::Docx);
@@ -995,7 +1011,11 @@ mod test {
 			]);
 		let set = |world: &mut World, cell: &str, text: &str| {
 			edit(world, |edit| {
-				edit.set_text(root, &CellAddress::parse(cell).unwrap(), text)
+				edit.set_cell_text(
+					root,
+					&CellAddress::parse(cell).unwrap(),
+					text,
+				)
 			})
 		};
 		// a covered cell writes its range's first
@@ -1011,10 +1031,8 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("is locked");
-		set(&mut world, "Start Here!G3", "=2")
-			.unwrap_err()
-			.to_string()
-			.xpect_contains("a formula is not a value");
+		// a formula replaces a formula, computed when the book is next opened
+		set(&mut world, "Start Here!D4", "=G3*2").unwrap();
 		set(&mut world, "Nowhere!A1", "x").xpect_err();
 
 		let bytes = write(&mut world, root, MediaType::Xlsx);
@@ -1029,7 +1047,8 @@ mod test {
 		sheet
 			.xpect_contains("<c r=\"D3\" s=\"1\" t=\"inlineStr\"><is><t xml:space=\"preserve\">Acme Stalls</t></is></c>")
 			// the gap's cell, created with its column's style
-			.xpect_contains("<c r=\"G3\" s=\"1\"><v>120.5</v></c><c r=\"H3\"/>");
+			.xpect_contains("<c r=\"G3\" s=\"1\"><v>120.5</v></c><c r=\"H3\"/>")
+			.xpect_contains("<c r=\"D4\" s=\"1\"><f>G3*2</f></c>");
 		String::from_utf8(
 			file.data_at("xl/workbook.xml").unwrap().unwrap().to_vec(),
 		)
@@ -1041,7 +1060,7 @@ mod test {
 			"Acme Stalls".into(),
 			"Acme Stalls".into(),
 			"120.5".into(),
-			"=1+1".into(),
+			"=G3*2".into(),
 		]);
 	}
 }

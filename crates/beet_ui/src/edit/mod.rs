@@ -11,9 +11,9 @@
 //!
 //! | Method | Does |
 //! |---|---|
-//! | [`set_text`](DocumentTreeEdit::set_text) | replaces a cell's paragraphs with one per line, the first keeping its own and its first words' look |
-//! | [`append_text`](DocumentTreeEdit::append_text) | adds one paragraph per line after a cell's own |
-//! | [`check_box`](DocumentTreeEdit::check_box) | checks every checkbox whose paragraph carries a label |
+//! | [`set_cell_text`](DocumentTreeEdit::set_cell_text) | replaces a cell's paragraphs with one per line, the first keeping its own and its first words' look |
+//! | [`append_cell_text`](DocumentTreeEdit::append_cell_text) | adds one paragraph per line after a cell's own |
+//! | [`check_labeled_boxes`](DocumentTreeEdit::check_labeled_boxes) | checks every checkbox whose paragraph carries a label |
 //! | [`remove_paragraphs`](DocumentTreeEdit::remove_paragraphs) | removes every paragraph carrying a text, a cell keeping one empty |
 //! | [`replace_text`](DocumentTreeEdit::replace_text) | replaces a text inside the words that carry it, each piece keeping its look |
 //!
