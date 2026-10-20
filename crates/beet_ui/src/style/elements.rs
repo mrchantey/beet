@@ -110,6 +110,20 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 		Rule::tags(&["option", "optgroup"])
 			.with_media(MediaQuery::Terminal)
 			.with_canonical(Display::None),
+		// a checkbox is its box, ie `[x]`, read on its label's line: inline in
+		// the terminal whether or not it holds a value yet, a parsed `- [x]`
+		// carrying its `checked` attribute alone. The web lays out its native
+		// control.
+		Rule::new()
+			.with_selector(Selector::AllOf(vec![
+				Selector::tag("input"),
+				Selector::Attribute {
+					key: "type".into(),
+					value: Some(Value::str("checkbox")),
+				},
+			]))
+			.with_media(MediaQuery::Terminal)
+			.with_canonical(Display::Inline),
 		// an inline `<svg>` is a picture the web paints and a char grid cannot;
 		// its `<text>` would otherwise flow as prose. A diagram figure replaces
 		// its svg with text or a raster before this is reached (`parse/mermaid`).

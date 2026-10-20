@@ -449,8 +449,11 @@ impl<'w> DomPainter<'w> {
 		element: &web_sys::Element,
 		view: &ElementView,
 	) {
+		let is_checkbox = view.is_checkbox();
 		for attr in &view.attributes {
-			if attr.key() == "class" {
+			// a checkbox's `checked` is its state's, see `apply_value`
+			if attr.key() == "class" || (is_checkbox && attr.key() == "checked")
+			{
 				continue;
 			}
 			element
@@ -486,6 +489,11 @@ impl<'w> DomPainter<'w> {
 	/// `<textarea>`'s content.
 	fn apply_value(&mut self, element: &web_sys::Element, view: &ElementView) {
 		match (view.tag(), view.value) {
+			("input", _) if view.is_checkbox() => {
+				if view.checked() {
+					element.set_attribute("checked", "").ok();
+				}
+			}
 			("input", Some(value)) if !matches!(value, Value::Bool(_)) => {
 				element.set_attribute("value", &value.to_string()).ok();
 			}

@@ -93,13 +93,14 @@ pub(super) mod test {
 
 	const FLOWCHART: &str = "```mermaid\ngraph LR; A[Start] --> B[End]\n```";
 
-	/// Parse markdown under `root`, running the post-parse passes.
+	/// Parse markdown under `root` through the media parse, which runs the
+	/// post-parse passes.
 	pub(in crate::parse::mermaid) fn parse_md(
 		world: &mut World,
 		root: Entity,
 		md: &str,
 	) {
-		MarkdownParser::new()
+		MediaParser::new()
 			.parse(ParseContext::new(
 				&mut world.entity_mut(root),
 				&MediaBytes::new_markdown(md),

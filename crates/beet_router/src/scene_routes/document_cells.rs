@@ -1,54 +1,43 @@
-//! [`BlobCells`], the addressed cells of any store file.
+//! [`DocumentCells`], the addressed cells of any document in the store.
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use beet_ui::prelude::*;
 
-/// `cells <path>`: the addressed cells of any file in the nearest ancestor
-/// [`BlobStore`], parsed as its media type: every table cell, `t1r2c3`, in
+/// `cells <path>`: the addressed cells of any document in the nearest
+/// ancestor [`BlobStore`], parsed through the one parse [`DocumentView`]
+/// renders, root declarations and all: every table cell, `t1r2c3`, in
 /// document order, and every unlocked workbook cell, `Sheet!A1`, each with
 /// what a reader reads in it. The map an edit addresses a form by, answered
 /// as a table for a markup `Accept` and as its rows for a serde one.
 ///
 /// ```bsx
-/// <BlobCells/>
+/// <Route path="document"><DocumentCells/></Route>
 /// ```
 ///
 /// ```sh
-/// beet cells assets/forms/plan.docx --accept=text/markdown
+/// beet document/cells assets/forms/plan.docx --accept=text/markdown
 /// ```
 #[action(route = "cells/*file")]
 #[derive(Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn BlobCells(
+pub async fn DocumentCells(
 	/// The file's path in the store, ie `assets/forms/plan.docx`.
 	#[param]
 	file: RelPath,
 	cx: ActionContext<Request>,
 ) -> Result<DataPage<Vec<CellText>>> {
-	let bytes = cx
-		.caller
-		.with_state::<AncestorQuery<&BlobStore>, _>(|entity, stores| {
-			stores.get(entity).cloned()
-		})
-		.await??
-		.blob(file)
-		.get_media()
-		.await?;
+	let PageRequest(root) =
+		DocumentView::page(&cx.caller, cx.input.parts().clone(), file).await?;
 	let cells = cx
 		.caller
 		.world()
-		.with(move |world: &mut World| -> Result<Vec<CellText>> {
-			let root = world.spawn_empty().id();
-			MediaParser::new().parse(ParseContext::new(
-				&mut world.entity_mut(root),
-				&bytes,
-			))?;
+		.with(move |world: &mut World| {
 			let cells = CellText::listing(world, root);
 			world.entity_mut(root).despawn();
-			cells.xok()
+			cells
 		})
-		.await?;
+		.await;
 	let scene = CellText::table(&cells);
 	DataPage::new(&cx.caller, scene, cells).await
 }
@@ -73,7 +62,9 @@ mod test {
 			.await
 			.unwrap();
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
-		let root = world.spawn((store, Router, children![BlobCells])).flush();
+		let root = world
+			.spawn((store, Router, children![DocumentCells]))
+			.flush();
 		world
 			.entity_mut(root)
 			.exchange(

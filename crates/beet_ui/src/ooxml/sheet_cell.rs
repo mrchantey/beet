@@ -2,6 +2,7 @@
 //! the [`SheetCells`] that read them.
 use crate::prelude::*;
 use beet_core::prelude::*;
+use core::num::NonZeroU32;
 
 /// A workbook cell, `<sheet>!<column><row>`, ie `Start Here!D3`: the sheet by
 /// its tab name, the column in letters and the row from 1.
@@ -13,9 +14,9 @@ pub struct SheetCellAddress {
 	/// The sheet's tab name.
 	pub sheet: SmolStr,
 	/// The column, `A` being 1.
-	pub column: u32,
+	pub column: NonZeroU32,
 	/// The row, from 1.
-	pub row: u32,
+	pub row: NonZeroU32,
 }
 
 impl SheetCellAddress {
@@ -60,9 +61,9 @@ impl SheetCellAddress {
 	}
 
 	/// The letters naming column `column`, `1` being `A` and `27` `AA`.
-	pub fn column_letters(column: u32) -> String {
+	pub fn column_letters(column: NonZeroU32) -> String {
 		let mut letters = Vec::new();
-		let mut rest = column;
+		let mut rest = column.get();
 		while rest > 0 {
 			letters.push(b'A' + ((rest - 1) % 26) as u8);
 			rest = (rest - 1) / 26;
@@ -73,7 +74,7 @@ impl SheetCellAddress {
 
 	/// The column and row of an `A1` reference, uppercase letters then a row
 	/// with no leading zero.
-	pub fn parse_a1(a1: &str) -> Option<(u32, u32)> {
+	pub fn parse_a1(a1: &str) -> Option<(NonZeroU32, NonZeroU32)> {
 		let letters = a1
 			.chars()
 			.take_while(|char| char.is_ascii_uppercase())
@@ -84,7 +85,8 @@ impl SheetCellAddress {
 		}
 		let column = column
 			.bytes()
-			.fold(0, |acc, byte| acc * 26 + (byte - b'A' + 1) as u32);
+			.fold(0, |acc, byte| acc * 26 + (byte - b'A' + 1) as u32)
+			.xmap(NonZeroU32::new)?;
 		Some((column, TableCellAddress::parse_count(row)?))
 	}
 }
@@ -212,18 +214,20 @@ impl SheetCells<'_, '_> {
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
+	use core::num::NonZeroU32;
 
 	#[beet_core::test]
 	fn parses_sheet_cells() {
 		let cell = SheetCellAddress::parse("Start Here!D3").unwrap();
 		cell.sheet.as_str().xpect_eq("Start Here");
-		(cell.column, cell.row).xpect_eq((4, 3));
+		(cell.column.get(), cell.row.get()).xpect_eq((4, 3));
 		cell.to_string().xpect_eq("Start Here!D3");
 		SheetCellAddress::parse("'Table 1'!AA10")
 			.unwrap()
 			.to_string()
 			.xpect_eq("Table 1!AA10");
-		SheetCellAddress::column_letters(28).xpect_eq("AB");
+		SheetCellAddress::column_letters(NonZeroU32::new(28).unwrap())
+			.xpect_eq("AB");
 		for bad in ["Sheet!3", "!A1", "Sheet!A01", "A1", "Sheet!a1"] {
 			SheetCellAddress::parse(bad).xpect_err();
 		}

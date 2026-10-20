@@ -26,15 +26,15 @@ pub use live_page::*;
 // a store file served as a page, parsed per request
 mod blob_page;
 pub use blob_page::*;
-// any store file a request names, parsed like a `BlobPage` and rendered as the
-// request accepts
-mod blob_view;
-pub use blob_view::*;
-// any store file's addressed cells, the map an edit fills a form by
+// any document in the store a request names, parsed like a `BlobPage` and
+// rendered as the request accepts
+mod document_view;
+pub use document_view::*;
+// any document's addressed cells, the map an edit fills a form by
 #[cfg(feature = "serde")]
-mod blob_cells;
+mod document_cells;
 #[cfg(feature = "serde")]
-pub use blob_cells::*;
+pub use document_cells::*;
 // an answer that is both a scene and its data, rendered or serialized as the
 // request accepts
 #[cfg(feature = "serde")]

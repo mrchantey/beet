@@ -1,17 +1,28 @@
-//! Frontmatter parsing for YAML and TOML metadata blocks.
+//! Frontmatter: a document's leading metadata block, YAML between `---` fences
+//! or TOML between `+++`, read and written through serde
+//! ([`MediaType::Yaml`], [`MediaType::Toml`]).
 //!
-//! Provides the [`Frontmatter`] component and lightweight hand-rolled parsers
-//! for simple key-value frontmatter: scalars, plus a list of scalars written
-//! inline (`tags = ["ecs", "web"]`, `tags: [ecs, web]`) or, in YAML, as a block
-//! of `- item` lines. Values parse into the existing
-//! [`Value`](beet_core::prelude::Value) type, and the block as a whole lowers to
-//! [`RootDeclarations`]: frontmatter is the markdown surface for a document's
-//! root component declarations exactly as a root spread is the BSX surface, so
-//! both resolve through one reflect path rather than a hand-written key mapping.
+//! The block is the markdown surface for a document's root component
+//! declarations exactly as a root spread is the BSX surface, so both resolve
+//! through one reflect path rather than a hand-written key mapping. Its
+//! unsectioned keys declare the document's [`FrontmatterType`], [`PageMeta`]
+//! by default, and each table (`[Section]` in TOML, a key holding a map in
+//! YAML) the component it names.
+//!
+//! What is frontmatter's own is small: the fences, the unsectioned keys
+//! declaring the document's [`FrontmatterType`], a section naming the
+//! component its keys declare, and default fields left out when writing. A
+//! component is written into a block when its type data says it is
+//! frontmatter, `#[reflect(Frontmatter)]` ([`ReflectFrontmatter`]), and a
+//! written block is TOML.
 
 use crate::prelude::*;
 use beet_core::prelude::*;
+#[cfg(feature = "serde")]
+use bevy::reflect::CreateTypeData;
 use bevy::reflect::PartialReflect;
+#[cfg(feature = "serde")]
+use bevy::reflect::TypeRegistry;
 use bevy::reflect::list::DynamicList;
 use bevy::reflect::structs::DynamicStruct;
 
@@ -36,8 +47,8 @@ pub struct Frontmatter {
 	/// The frontmatter format that was parsed.
 	pub kind: FrontmatterKind,
 	/// The parsed pairs grouped by the component their section names, in source
-	/// order. Unsectioned pairs (and all of YAML, which is flat) carry `None` and
-	/// target the document's [`FrontmatterType`].
+	/// order. Unsectioned pairs carry `None` and target the document's
+	/// [`FrontmatterType`].
 	sections: Vec<FrontmatterSection>,
 }
 
@@ -46,8 +57,16 @@ pub struct Frontmatter {
 ///
 /// Defaults to [`PageMeta`], the general page metadata beet ships. A site
 /// declaring its own names it on the dir that discovers those documents,
-/// `<RoutesDir src="routes" {FrontmatterType{component:"MyMeta"}}/>`, and a TOML
-/// `[Section]` header names a component explicitly, winning over this default.
+/// `<RoutesDir src="routes" {FrontmatterType{component:"MyMeta"}}/>`, and a
+/// section names a component explicitly, winning over this default.
+///
+/// A component is frontmatter when its type data says so,
+/// `#[reflect(Component, Default, Frontmatter)]` beside its `Serialize`
+/// derive, which [`ReflectFrontmatter`] reads: the markdown renderer asked
+/// for frontmatter writes every such component a root carries, this one's
+/// keys unsectioned and every other as its own `[Component]` table, and the
+/// parser reads each back through the section naming it. A downstream
+/// component declares itself the same way and registers its type.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct FrontmatterType {
@@ -60,6 +79,29 @@ impl Default for FrontmatterType {
 	fn default() -> Self {
 		Self {
 			component: type_ext::short_name::<PageMeta>(),
+		}
+	}
+}
+
+/// Type data marking a component as frontmatter, see [`FrontmatterType`]:
+/// derived by `#[reflect(Frontmatter)]` on a `Component + Default + Serialize`
+/// type, it reads the fields a written block declares, those the component's
+/// default does not hold, in field order.
+#[cfg(feature = "serde")]
+#[derive(Clone)]
+pub struct ReflectFrontmatter {
+	/// The fields of the component on an entity its default does not hold,
+	/// `None` when the entity lacks it.
+	fields: fn(EntityRef) -> Option<Result<Vec<(SmolStr, Value)>>>,
+}
+
+#[cfg(feature = "serde")]
+impl<T: Component + Default + serde::Serialize> CreateTypeData<T>
+	for ReflectFrontmatter
+{
+	fn create_type_data(_input: ()) -> Self {
+		Self {
+			fields: |entity| entity.get::<T>().map(Frontmatter::fields_of),
 		}
 	}
 }
@@ -82,7 +124,21 @@ pub enum FrontmatterKind {
 	Toml,
 }
 
+impl FrontmatterKind {
+	/// The media type the block is written in.
+	pub fn media_type(&self) -> MediaType {
+		match self {
+			Self::Yaml => MediaType::Yaml,
+			Self::Toml => MediaType::Toml,
+		}
+	}
+}
+
 impl Frontmatter {
+	/// The key the `toml` crate carries a datetime under, which a block's
+	/// `created = 2025-07-11` reads as.
+	const TOML_DATETIME: &str = "$__toml_private_datetime";
+
 	/// Extract and parse a leading frontmatter block from a raw source: a
 	/// `---` fence parses as YAML, a `+++` fence as TOML. Returns `None` when
 	/// the source has no leading fence.
@@ -108,25 +164,39 @@ impl Frontmatter {
 		Self::parse(&body[..end], kind).map(Some)
 	}
 
-	/// Parse a raw frontmatter string into a [`Frontmatter`] component.
-	///
-	/// Dispatches to the appropriate parser based on `kind`.
+	/// Parse a raw frontmatter block, the text between its fences, through
+	/// serde in the format `kind` names: its keys holding a map are sections,
+	/// the rest unsectioned.
 	pub fn parse(content: &str, kind: FrontmatterKind) -> Result<Self> {
-		let sections = match kind {
-			FrontmatterKind::Yaml => vec![FrontmatterSection {
-				component: None,
-				pairs: parse_yaml_kv(content)?,
-			}],
-			FrontmatterKind::Toml => parse_toml_sections(content)?,
+		let value = match content.trim().is_empty() {
+			true => Value::Map(default()),
+			false => {
+				kind.media_type().deserialize::<Value>(content.as_bytes())?
+			}
 		};
+		let Value::Map(map) = Self::normalize(value) else {
+			bevybail!("a frontmatter block is a map of keys");
+		};
+		let mut sections = vec![FrontmatterSection {
+			component: None,
+			pairs: Vec::new(),
+		}];
+		for (key, value) in map.0 {
+			match value {
+				Value::Map(table) => sections.push(FrontmatterSection {
+					component: Some(key),
+					pairs: table
+						.0
+						.into_iter()
+						.map(|(key, value)| (key.to_string(), value))
+						.collect(),
+				}),
+				value => sections[0].pairs.push((key.to_string(), value)),
+			}
+		}
 		// the reflect surface mirrors the default component's keys, ie the
-		// unsectioned ones; a `[Section]` group is read through `declarations`.
-		let value = sections
-			.iter()
-			.filter(|section| section.component.is_none())
-			.flat_map(|section| section.pairs.iter().cloned())
-			.collect::<Vec<_>>()
-			.xmap(build_dynamic_struct)?;
+		// unsectioned ones; a section is read through `declarations`.
+		let value = sections[0].pairs.clone().xmap(build_dynamic_struct)?;
 		Ok(Self {
 			value,
 			kind,
@@ -134,13 +204,37 @@ impl Frontmatter {
 		})
 	}
 
-	/// This block as document root declarations: each `[Section]` names its own
+	/// A value typed alike whichever format wrote it: a TOML datetime, which
+	/// the `toml` crate hands serde as a one-key map, as the text it was
+	/// written as, so it coerces like a quoted date, and a whole number that
+	/// is not negative unsigned, as the YAML subset reads it.
+	fn normalize(value: Value) -> Value {
+		match value {
+			Value::Map(map) => match map.0.get(Self::TOML_DATETIME) {
+				Some(Value::Str(text)) if map.0.len() == 1 => {
+					Value::Str(text.clone())
+				}
+				_ => Value::Map(Map(map
+					.0
+					.into_iter()
+					.map(|(key, value)| (key, Self::normalize(value)))
+					.collect())),
+			},
+			Value::List(items) => {
+				Value::List(items.into_iter().map(Self::normalize).collect())
+			}
+			Value::Int(number) if number >= 0 => Value::Uint(number as u64),
+			value => value,
+		}
+	}
+
+	/// This block as document root declarations: each section names its own
 	/// component by short type path, and every unsectioned key declares
 	/// `default_component` (the document's [`FrontmatterType`]).
 	///
 	/// The one lowering, so a frontmatter key coerces to its field type through
 	/// the same [`DataLiteral`] rules a BSX spread does — `created = "2025-07-11"`
-	/// becomes a [`Timestamp`], `order = 2` a `u32`. A key with no value declares
+	/// becomes a [`Date`], `order = 2` a `u32`. A key with no value declares
 	/// nothing and is dropped rather than resolving to null.
 	pub fn declarations(&self, default_component: &str) -> RootDeclarations {
 		self.sections
@@ -166,22 +260,88 @@ impl Frontmatter {
 			.xmap(RootDeclarations)
 	}
 
-	/// The YAML block declaring every field of `component` its default does
-	/// not, the inverse of [`extract`](Self::extract) and [`declarations`](Self::declarations),
-	/// or `None` when every field is default. A flat struct writes one
-	/// `key: value` line per field, a list inline as `[a, b]`.
-	pub fn write<T: Default + serde::Serialize>(
-		component: &T,
+	/// The TOML block declaring every frontmatter component `entity` carries,
+	/// the inverse of [`extract`](Self::extract) and
+	/// [`declarations`](Self::declarations): `default_component`, the
+	/// document's [`FrontmatterType`], unsectioned, every other as its own
+	/// `[Component]` table in name order, each with only the fields its
+	/// default does not hold, in field order. `None` when no field is
+	/// written, as in a world registering no frontmatter type.
+	#[cfg(feature = "serde")]
+	pub fn write(
+		world: &World,
+		entity: Entity,
+		default_component: &str,
 	) -> Result<Option<String>> {
+		let Some(registry) = world.get_resource::<AppTypeRegistry>() else {
+			return Ok(None);
+		};
+		let mut block =
+			Self::block(world, entity, &registry.read(), default_component)?;
+		block.sections.retain(|(_, fields)| !fields.is_empty());
+		if block.fields.is_empty() && block.sections.is_empty() {
+			return Ok(None);
+		}
+		let text = MediaType::Toml
+			.serialize_with_options(&block, SerializeOptions {
+				pretty: false,
+			})?;
+		format!("+++\n{}+++\n", String::from_utf8(text)?)
+			.xsome()
+			.xok()
+	}
+
+	/// What [`write`](Self::write) writes, read off `entity`'s frontmatter
+	/// components.
+	#[cfg(feature = "serde")]
+	fn block(
+		world: &World,
+		entity: Entity,
+		registry: &TypeRegistry,
+		default_component: &str,
+	) -> Result<WrittenBlock> {
+		let mut block = WrittenBlock::default();
+		for (_, info) in world.inspect_entity(entity)? {
+			let Some(registration) =
+				info.type_id().and_then(|type_id| registry.get(type_id))
+			else {
+				continue;
+			};
+			let Some(frontmatter) = registration.data::<ReflectFrontmatter>()
+			else {
+				continue;
+			};
+			let Some(fields) = (frontmatter.fields)(world.entity(entity))
+			else {
+				continue;
+			};
+			let name = SmolStr::new(
+				registration.type_info().type_path_table().short_path(),
+			);
+			match name == default_component {
+				true => block.fields = fields?,
+				false => block.sections.push((name, fields?)),
+			}
+		}
+		block.sections.sort_by(|left, right| left.0.cmp(&right.0));
+		block.xok()
+	}
+
+	/// The fields of `component` its default does not hold, in field order,
+	/// an absent value left out since a block has no spelling for it.
+	#[cfg(feature = "serde")]
+	fn fields_of<T: Default + serde::Serialize>(
+		component: &T,
+	) -> Result<Vec<(SmolStr, Value)>> {
 		let default = Value::from_serde(T::default())?;
-		let lines = Value::from_serde(component)?
+		Value::from_serde(component)?
 			.as_map()?
 			.into_iter()
-			.filter(|(key, value)| default.get(key) != Some(*value))
-			.map(|(key, value)| format!("{key}: {}\n", write_yaml_value(value)))
-			.collect::<String>();
-		(!lines.is_empty())
-			.then(|| format!("---\n{lines}---\n"))
+			.filter(|(key, value)| {
+				!value.is_null() && default.get(key) != Some(*value)
+			})
+			.map(|(key, value)| (key.clone(), value.clone()))
+			.collect::<Vec<_>>()
 			.xok()
 	}
 
@@ -217,6 +377,54 @@ impl Frontmatter {
 	}
 }
 
+/// A block as [`Frontmatter::write`] writes it, its entries in their own
+/// order where a [`Value`] map sorts its keys: the unsectioned fields, then
+/// each section's table.
+#[cfg(feature = "serde")]
+#[derive(Default)]
+struct WrittenBlock {
+	fields: Vec<(SmolStr, Value)>,
+	sections: Vec<(SmolStr, Vec<(SmolStr, Value)>)>,
+}
+
+/// A table's fields in their own order.
+#[cfg(feature = "serde")]
+struct InOrder<'a>(&'a [(SmolStr, Value)]);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for InOrder<'_> {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		use serde::ser::SerializeMap;
+		let mut map = serializer.serialize_map(Some(self.0.len()))?;
+		for (key, value) in self.0 {
+			map.serialize_entry(key.as_str(), value)?;
+		}
+		map.end()
+	}
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for WrittenBlock {
+	fn serialize<S: serde::Serializer>(
+		&self,
+		serializer: S,
+	) -> Result<S::Ok, S::Error> {
+		use serde::ser::SerializeMap;
+		let mut map = serializer
+			.serialize_map(Some(self.fields.len() + self.sections.len()))?;
+		for (key, value) in &self.fields {
+			map.serialize_entry(key.as_str(), value)?;
+		}
+		for (name, fields) in &self.sections {
+			map.serialize_entry(name.as_str(), &InOrder(fields))?;
+		}
+		map.end()
+	}
+}
+
 /// Build a [`DynamicStruct`] from a list of key-value pairs.
 fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 	let mut dynamic = DynamicStruct::default();
@@ -228,7 +436,7 @@ fn build_dynamic_struct(pairs: Vec<(String, Value)>) -> Result<DynamicStruct> {
 }
 
 /// One frontmatter value as a reflect value: a scalar as its rust type, a list
-/// as a [`DynamicList`] of them. A map has no frontmatter spelling.
+/// as a [`DynamicList`] of them. A map belongs to a section.
 fn reflect_value(key: &str, value: Value) -> Result<Box<dyn PartialReflect>> {
 	match value {
 		Value::Null => Box::new(()) as Box<dyn PartialReflect>,
@@ -253,432 +461,68 @@ fn reflect_value(key: &str, value: Value) -> Result<Box<dyn PartialReflect>> {
 	.xok()
 }
 
-/// Parse simple YAML key-value pairs.
-///
-/// Supports flat `key: value` lines with scalar values, an inline `[a, b]`
-/// list, and a block list: a valueless `key:` followed by `- item` lines.
-/// Blank lines and comment lines (starting with `#`) are skipped. Quoted string
-/// values (single or double) have their quotes stripped.
-fn parse_yaml_kv(content: &str) -> Result<Vec<(String, Value)>> {
-	let mut pairs: Vec<(String, Value)> = Vec::new();
-
-	for line in content.lines() {
-		let trimmed = line.trim();
-
-		// skip blanks and comments
-		if trimmed.is_empty() || trimmed.starts_with('#') {
-			continue;
-		}
-
-		// a `- item` line extends the list a valueless key opened
-		if let Some(item) = trimmed.strip_prefix('-')
-			&& (item.is_empty() || item.starts_with(' '))
-			&& let Some((_, value)) = pairs.last_mut()
-			&& matches!(value, Value::Null | Value::List(_))
-		{
-			let item = parse_yaml_value(item.trim());
-			match value {
-				Value::List(items) => items.push(item),
-				_ => *value = Value::List(vec![item]),
-			}
-			continue;
-		}
-
-		// find the colon separator
-		let Some(colon_pos) = trimmed.find(':') else {
-			continue;
-		};
-
-		let key = trimmed[..colon_pos].trim().to_string();
-		if key.is_empty() {
-			continue;
-		}
-
-		let raw_value = trimmed[colon_pos + 1..].trim();
-		let value = parse_yaml_value(raw_value);
-		pairs.push((key, value));
-	}
-
-	Ok(pairs)
-}
-
-/// Parse a single YAML scalar value string into a [`Value`].
-fn parse_yaml_value(raw: &str) -> Value {
-	if raw.is_empty() || raw == "~" || raw == "null" || raw == "Null" {
-		return Value::Null;
-	}
-
-	// strip inline comments (but not inside quotes)
-	let effective = if !raw.starts_with('"')
-		&& !raw.starts_with('\'')
-		&& let Some(comment_pos) = raw.find(" #")
-	{
-		raw[..comment_pos].trim()
-	} else {
-		raw
-	};
-
-	if let Some(list) = parse_inline_list(effective, parse_yaml_value) {
-		return list;
-	}
-
-	// strip quotes
-	let unquoted = strip_quotes(effective);
-
-	// if it was quoted, treat as string
-	if unquoted.len() != effective.len() {
-		return Value::str(unquoted);
-	}
-
-	// try parsing as typed value
-	Value::parse_string(unquoted)
-}
-
-/// One YAML value as [`parse_yaml_value`] reads it back: a list inline, a
-/// string plain unless that would read as something else, quoted otherwise.
-fn write_yaml_value(value: &Value) -> String {
-	match value {
-		Value::List(items) => items
-			.iter()
-			.map(|item| match item {
-				Value::Str(text) => write_yaml_str(text, true),
-				item => write_yaml_value(item),
-			})
-			.collect::<Vec<_>>()
-			.join(", ")
-			.xmap(|items| format!("[{items}]")),
-		Value::Str(text) => write_yaml_str(text, false),
-		value => value.to_string(),
-	}
-}
-
-/// A string on one line, quoted where plain it would read as another type,
-/// lose its edges or comment, or split or close a list it is an item of.
-fn write_yaml_str(text: &str, in_list: bool) -> String {
-	let text = text.replace(['\r', '\n'], " ");
-	let is_plain = parse_yaml_value(&text) == Value::str(text.as_str())
-		&& text.trim() == text
-		&& !text.contains(" #")
-		&& !(in_list && text.contains([',', '[', ']']));
-	match (is_plain, text.contains('"')) {
-		(true, _) => text,
-		(false, false) => format!("\"{text}\""),
-		(false, true) => format!("'{text}'"),
-	}
-}
-
-/// Parse TOML key-value pairs, grouped by `[Section]` header.
-///
-/// Supports flat `key = value` lines, a value being a scalar or a one-line
-/// `[a, b]` array of scalars. Blank lines and comment lines (starting with `#`)
-/// are skipped; string values must be quoted. A `[Section]` header
-/// opens a new group naming the component its keys declare, so the keys before
-/// the first header are the unsectioned group.
-fn parse_toml_sections(content: &str) -> Result<Vec<FrontmatterSection>> {
-	let mut sections = vec![FrontmatterSection {
-		component: None,
-		pairs: Vec::new(),
-	}];
-
-	for line in content.lines() {
-		let trimmed = line.trim();
-
-		// skip blanks and comments
-		if trimmed.is_empty() || trimmed.starts_with('#') {
-			continue;
-		}
-
-		// a section header opens a new group, naming its component
-		if let Some(header) = trimmed.strip_prefix('[')
-			&& let Some(name) = header.strip_suffix(']')
-		{
-			sections.push(FrontmatterSection {
-				component: Some(SmolStr::new(name.trim())),
-				pairs: Vec::new(),
-			});
-			continue;
-		}
-
-		// find the equals separator
-		let Some(eq_pos) = trimmed.find('=') else {
-			continue;
-		};
-
-		let key = trimmed[..eq_pos].trim().to_string();
-		if key.is_empty() {
-			continue;
-		}
-
-		let raw_value = trimmed[eq_pos + 1..].trim();
-		let value = parse_toml_value(raw_value);
-		// unreachable-empty: the vec is seeded with the unsectioned group
-		if let Some(section) = sections.last_mut() {
-			section.pairs.push((key, value));
-		}
-	}
-
-	Ok(sections)
-}
-
-/// Parse a single TOML value string into a [`Value`].
-fn parse_toml_value(raw: &str) -> Value {
-	if raw.is_empty() {
-		return Value::Null;
-	}
-
-	// strip inline comments (but not inside quotes)
-	let effective = if !raw.starts_with('"')
-		&& !raw.starts_with('\'')
-		&& let Some(comment_pos) = raw.find(" #")
-	{
-		raw[..comment_pos].trim()
-	} else {
-		raw
-	};
-
-	// TOML booleans
-	if effective == "true" {
-		return Value::Bool(true);
-	}
-	if effective == "false" {
-		return Value::Bool(false);
-	}
-
-	if let Some(list) = parse_inline_list(effective, parse_toml_value) {
-		return list;
-	}
-
-	// quoted strings
-	let unquoted = strip_quotes(effective);
-	if unquoted.len() != effective.len() {
-		return Value::str(unquoted);
-	}
-
-	// try numeric parsing
-	Value::parse_string(effective)
-}
-
-/// Parse a one-line `[a, "b, c", 3]` list, each item through `item`, or `None`
-/// when `raw` is not bracketed. Commas inside quotes belong to their item, and a
-/// trailing comma is allowed.
-fn parse_inline_list(raw: &str, item: fn(&str) -> Value) -> Option<Value> {
-	let inner = raw.strip_prefix('[')?.strip_suffix(']')?;
-	let mut items = Vec::new();
-	let mut quote = None;
-	let mut start = 0;
-	for (index, char) in inner.char_indices() {
-		match (quote, char) {
-			(None, '"' | '\'') => quote = Some(char),
-			(Some(open), char) if char == open => quote = None,
-			(None, ',') => {
-				items.push(&inner[start..index]);
-				start = index + 1;
-			}
-			_ => {}
-		}
-	}
-	items.push(&inner[start..]);
-	items
-		.into_iter()
-		.map(str::trim)
-		.filter(|raw| !raw.is_empty())
-		.map(item)
-		.collect::<Vec<_>>()
-		.xmap(Value::List)
-		.xsome()
-}
-
-/// Strip matching single or double quotes from a string.
-fn strip_quotes(val: &str) -> &str {
-	if val.len() >= 2 {
-		if (val.starts_with('"') && val.ends_with('"'))
-			|| (val.starts_with('\'') && val.ends_with('\''))
-		{
-			return &val[1..val.len() - 1];
-		}
-	}
-	val
-}
-
 #[cfg(test)]
 mod test {
 	use super::*;
 
-	// -- YAML parsing --
-
-	#[beet_core::test]
-	fn yaml_simple_string() {
-		let pairs = parse_yaml_kv("title: Hello World").unwrap();
-		pairs.len().xpect_eq(1);
-		pairs[0].0.as_str().xpect_eq("title");
-		pairs[0].1.to_string().xpect_eq("Hello World");
-	}
-
-	#[beet_core::test]
-	fn yaml_quoted_string() {
-		let pairs = parse_yaml_kv("title: \"Hello World\"").unwrap();
-		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
-	}
-
-	#[beet_core::test]
-	fn yaml_single_quoted_string() {
-		let pairs = parse_yaml_kv("title: 'Hello World'").unwrap();
-		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
-	}
-
-	#[beet_core::test]
-	fn yaml_boolean() {
-		let pairs = parse_yaml_kv("draft: true\npublished: false").unwrap();
-		pairs[0].1.xpect_eq(Value::Bool(true));
-		pairs[1].1.xpect_eq(Value::Bool(false));
-	}
-
-	#[beet_core::test]
-	fn yaml_integer() {
-		let pairs = parse_yaml_kv("count: 42").unwrap();
-		pairs[0].1.xpect_eq(Value::Uint(42));
-	}
-
-	#[beet_core::test]
-	fn yaml_negative_integer() {
-		let pairs = parse_yaml_kv("offset: -7").unwrap();
-		pairs[0].1.xpect_eq(Value::Int(-7));
-	}
-
-	#[beet_core::test]
-	fn yaml_float() {
-		let pairs = parse_yaml_kv("weight: 3.14").unwrap();
-		pairs[0].1.xpect_eq(Value::Float(3.14));
-	}
-
-	#[beet_core::test]
-	fn yaml_null_variants() {
-		for input in ["empty:", "tilde: ~", "null_word: null"] {
-			let pairs = parse_yaml_kv(input).unwrap();
-			pairs[0].1.xpect_eq(Value::Null);
-		}
-	}
-
-	#[beet_core::test]
-	fn yaml_skips_comments_and_blanks() {
-		let content = "# comment\n\ntitle: Hello\n# another\nauthor: World";
-		let pairs = parse_yaml_kv(content).unwrap();
-		pairs.len().xpect_eq(2);
-		pairs[0].0.as_str().xpect_eq("title");
-		pairs[1].0.as_str().xpect_eq("author");
-	}
-
-	#[beet_core::test]
-	fn yaml_inline_comment() {
-		let pairs = parse_yaml_kv("title: Hello # a comment").unwrap();
-		pairs[0].1.to_string().xpect_eq("Hello");
-	}
-
-	/// Both list spellings parse to the same value, and an unbracketed comma
-	/// list stays the string it always was.
-	#[beet_core::test]
-	fn yaml_lists() {
-		let expected =
-			Value::List(vec![Value::str("ecs"), Value::str("web, http")]);
-		parse_yaml_kv("tags: [ecs, \"web, http\"]").unwrap()[0]
-			.1
-			.xpect_eq(expected.clone());
-		let pairs =
-			parse_yaml_kv("tags:\n  - ecs\n  - \"web, http\"\ntitle: Hi")
-				.unwrap();
-		pairs[0].1.xpect_eq(expected);
-		// the key after the block is its own pair
-		pairs[1].0.as_str().xpect_eq("title");
-		parse_yaml_kv("tags: rust, bevy").unwrap()[0]
-			.1
-			.xpect_eq(Value::str("rust, bevy"));
-	}
-
-	#[beet_core::test]
-	fn yaml_multiple_pairs() {
-		let content = "title: My Post\nauthor: Jane\ntags: rust, bevy";
-		let pairs = parse_yaml_kv(content).unwrap();
-		pairs.len().xpect_eq(3);
-	}
-
-	// -- TOML parsing --
-
-	/// The unsectioned pairs, ie the group targeting the default component.
-	fn toml_pairs(content: &str) -> Vec<(String, Value)> {
-		parse_toml_sections(content)
+	/// The unsectioned pairs of a block, ie the group targeting the default
+	/// component.
+	fn pairs(content: &str, kind: FrontmatterKind) -> Vec<(String, Value)> {
+		Frontmatter::parse(content, kind)
 			.unwrap()
+			.sections
 			.into_iter()
 			.filter(|section| section.component.is_none())
 			.flat_map(|section| section.pairs)
 			.collect()
 	}
 
+	/// Both formats read through serde to the same pairs in the order they
+	/// were written, scalars typed and lists in either YAML spelling.
 	#[beet_core::test]
-	fn toml_quoted_string() {
-		let pairs = toml_pairs("title = \"Hello World\"");
-		pairs.len().xpect_eq(1);
-		pairs[0].0.as_str().xpect_eq("title");
-		pairs[0].1.xpect_eq(Value::Str("Hello World".into()));
+	fn reads_both_formats() {
+		let expected = vec![
+			("title".to_string(), Value::str("Hello, World")),
+			("count".into(), Value::Uint(42)),
+			("draft".into(), Value::Bool(true)),
+			(
+				"tags".into(),
+				Value::List(vec![Value::str("ecs"), Value::str("web, http")]),
+			),
+		];
+		pairs(
+			"title: \"Hello, World\"\ncount: 42 # a comment\ndraft: true\ntags:\n  - ecs\n  - \"web, http\"",
+			FrontmatterKind::Yaml,
+		)
+		.xpect_eq(expected.clone());
+		pairs(
+			"title = \"Hello, World\"\ncount = 42 # a comment\ndraft = true\ntags = [\"ecs\", \"web, http\",]",
+			FrontmatterKind::Toml,
+		)
+		.xpect_eq(expected);
+		// a TOML date reads as the text a quoted one does
+		pairs("created = 2025-07-11", FrontmatterKind::Toml)
+			.xpect_eq(vec![("created".into(), Value::str("2025-07-11"))]);
 	}
 
+	/// A block beyond its format, or beyond YAML's subset, is refused with
+	/// the reason.
 	#[beet_core::test]
-	fn toml_boolean() {
-		toml_pairs("draft = true")[0].1.xpect_eq(Value::Bool(true));
+	fn refuses_what_its_format_refuses() {
+		Frontmatter::parse("logo: &shared x", FrontmatterKind::Yaml)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("an anchor or alias");
+		Frontmatter::parse("title = Hello", FrontmatterKind::Toml).xpect_err();
 	}
-
-	#[beet_core::test]
-	fn toml_integer() {
-		toml_pairs("count = 42")[0].1.xpect_eq(Value::Uint(42));
-	}
-
-	#[beet_core::test]
-	fn toml_float() {
-		toml_pairs("weight = 3.14")[0]
-			.1
-			.xpect_eq(Value::Float(3.14));
-	}
-
-	#[beet_core::test]
-	fn toml_inline_array() {
-		toml_pairs("tags = [\"ecs\", \"web\",]")[0]
-			.1
-			.xpect_eq(Value::List(vec![Value::str("ecs"), Value::str("web")]));
-		toml_pairs("sizes = [16, 32]")[0]
-			.1
-			.xpect_eq(Value::List(vec![Value::Uint(16), Value::Uint(32)]));
-		toml_pairs("empty = []")[0]
-			.1
-			.xpect_eq(Value::List(Vec::new()));
-	}
-
-	/// A `[Section]` header names the component its keys declare, so the pairs
-	/// after it leave the unsectioned group.
-	#[beet_core::test]
-	fn toml_groups_by_section() {
-		let sections =
-			parse_toml_sections("title = \"Hello\"\n[Extra]\ncount = 5")
-				.unwrap();
-		sections.len().xpect_eq(2);
-		sections[0].component.is_none().xpect_true();
-		sections[0].pairs.len().xpect_eq(1);
-		sections[1].component.as_deref().unwrap().xpect_eq("Extra");
-		sections[1].pairs[0].1.xpect_eq(Value::Uint(5));
-	}
-
-	#[beet_core::test]
-	fn toml_skips_comments() {
-		toml_pairs("# comment\ntitle = \"Hello\"").len().xpect_eq(1);
-	}
-
-	// -- root declarations --
 
 	/// Every key lowers to a literal against the default component, so nothing
 	/// hand-maps frontmatter to a struct.
 	#[beet_core::test]
 	fn declares_the_default_component() {
 		let fm = Frontmatter::parse(
-			"title = \"Hello\"\norder = 2\nempty =",
-			FrontmatterKind::Toml,
+			"title: Hello\norder: 2\nempty:",
+			FrontmatterKind::Yaml,
 		)
 		.unwrap();
 		let RootDeclarations(declarations) = fm.declarations("PageMeta");
@@ -693,10 +537,55 @@ mod test {
 		fields[1].1.xpect_eq(DataLiteral::Scalar(Value::Uint(2)));
 	}
 
-	/// A component writes as the block declaring it again, its default fields
-	/// unwritten.
+	/// A section declares its own component alongside the default, a TOML
+	/// table and a YAML key holding a map alike.
+	#[beet_core::test]
+	fn declares_sectioned_components() {
+		for (content, kind) in [
+			(
+				"title = \"Hello\"\n[Extra]\nnote = \"hi\"",
+				FrontmatterKind::Toml,
+			),
+			("title: Hello\nExtra:\n  note: hi", FrontmatterKind::Yaml),
+		] {
+			let fm = Frontmatter::parse(content, kind).unwrap();
+			fm.declarations("PageMeta")
+				.0
+				.iter()
+				.map(|named| named.name.to_string())
+				.collect::<Vec<_>>()
+				.xpect_eq(vec!["PageMeta".to_string(), "Extra".to_string()]);
+			// only the default component's keys reach the reflect surface
+			fm.get_str("title").unwrap().xpect_eq("Hello");
+			fm.get_str("note").is_none().xpect_true();
+		}
+	}
+
+	/// Stands in for a component declared frontmatter beside `PageMeta`.
+	#[derive(
+		Debug,
+		Default,
+		Clone,
+		PartialEq,
+		Component,
+		Reflect,
+		serde::Serialize,
+		serde::Deserialize,
+	)]
+	#[reflect(Component, Default, Frontmatter)]
+	struct Course {
+		unit: Option<SmolStr>,
+		weeks: u32,
+	}
+
+	/// The components a root carries write as the block declaring them
+	/// again, the default unsectioned and in field order, the rest as their
+	/// tables, every default field unwritten.
 	#[beet_core::test]
 	fn writes_what_it_reads() {
+		let mut app = App::new();
+		app.add_plugins(ParsePlugin).register_type::<Course>();
+		let world = app.world_mut();
 		let meta = PageMeta {
 			title: Some("Plan: one, two".into()),
 			created: Some(Date::parse("2025-07-09").unwrap()),
@@ -704,42 +593,38 @@ mod test {
 			order: Some(2),
 			..default()
 		};
-		let block = Frontmatter::write(&meta).unwrap().unwrap();
+		let course = Course {
+			unit: Some("BSBOPS404".into()),
+			weeks: 0,
+		};
+		let entity = world.spawn((meta.clone(), course.clone())).id();
+		let block = Frontmatter::write(world, entity, "PageMeta")
+			.unwrap()
+			.unwrap();
 		block.xpect_eq(
-			"---\ntitle: Plan: one, two\ncreated: 2025-07-09\n\
-			 authors: [Mel Richards, \"Packwood, Geoff\"]\norder: 2\n---\n",
+			"+++\ntitle = \"Plan: one, two\"\ncreated = \"2025-07-09\"\n\
+			 authors = [\"Mel Richards\", \"Packwood, Geoff\"]\norder = 2\n\n\
+			 [Course]\nunit = \"BSBOPS404\"\n+++\n",
 		);
-		let mut registry = bevy::reflect::TypeRegistry::default();
-		registry.register::<PageMeta>();
-		Frontmatter::extract(&block)
+		let registry = world.resource::<AppTypeRegistry>().read();
+		let declarations = Frontmatter::extract(&block)
 			.unwrap()
 			.unwrap()
-			.declarations("PageMeta")
+			.declarations("PageMeta");
+		declarations
 			.get::<PageMeta>(&registry)
 			.unwrap()
 			.xpect_eq(Some(meta));
-		Frontmatter::write(&PageMeta::default())
+		declarations
+			.get::<Course>(&registry)
+			.unwrap()
+			.xpect_eq(Some(course));
+		drop(registry);
+		// nothing to declare writes no block
+		let bare = world.spawn(PageMeta::default()).id();
+		Frontmatter::write(world, bare, "PageMeta")
 			.unwrap()
 			.xpect_none();
-	}
-
-	/// A `[Section]` header declares its own component alongside the default.
-	#[beet_core::test]
-	fn declares_sectioned_components() {
-		let fm = Frontmatter::parse(
-			"title = \"Hello\"\n[Extra]\nnote = \"hi\"",
-			FrontmatterKind::Toml,
-		)
-		.unwrap();
-		fm.declarations("PageMeta")
-			.0
-			.iter()
-			.map(|named| named.name.to_string())
-			.collect::<Vec<_>>()
-			.xpect_eq(vec!["PageMeta".to_string(), "Extra".to_string()]);
-		// only the default component's keys reach the reflect surface
-		fm.get_str("title").unwrap().xpect_eq("Hello");
-		fm.get_str("note").is_none().xpect_true();
 	}
 
 	// -- extraction from raw source --
@@ -787,43 +672,9 @@ mod test {
 	// -- Frontmatter component --
 
 	#[beet_core::test]
-	fn frontmatter_yaml() {
-		let fm = Frontmatter::parse(
-			"title: Hello\nauthor: World",
-			FrontmatterKind::Yaml,
-		)
-		.unwrap();
-		fm.kind.xpect_eq(FrontmatterKind::Yaml);
-		fm.value.field_len().xpect_eq(2);
-	}
-
-	#[beet_core::test]
-	fn frontmatter_toml() {
-		let fm = Frontmatter::parse(
-			"title = \"Hello\"\ncount = 42",
-			FrontmatterKind::Toml,
-		)
-		.unwrap();
-		fm.kind.xpect_eq(FrontmatterKind::Toml);
-		fm.value.field_len().xpect_eq(2);
-	}
-
-	#[beet_core::test]
 	fn frontmatter_empty() {
 		let fm = Frontmatter::parse("", FrontmatterKind::Yaml).unwrap();
 		fm.value.field_len().xpect_eq(0);
-	}
-
-	#[beet_core::test]
-	fn get_str_field() {
-		let fm = Frontmatter::parse(
-			"title: Hello\ncount: 42",
-			FrontmatterKind::Yaml,
-		)
-		.unwrap();
-		fm.get_str("title").unwrap().xpect_eq("Hello");
-		fm.get_str("count").is_none().xpect_true();
-		fm.get_str("missing").is_none().xpect_true();
 	}
 
 	#[beet_core::test]
@@ -834,8 +685,10 @@ mod test {
 		)
 		.unwrap();
 		fm.value.field_len().xpect_eq(3);
-		fm.value.field("title").is_some().xpect_true();
-		fm.value.field("count").is_some().xpect_true();
-		fm.value.field("draft").is_some().xpect_true();
+		fm.get_str("title").unwrap().xpect_eq("Hello");
+		fm.get_str("count").is_none().xpect_true();
+		fm.get_uint("count").unwrap().xpect_eq(42);
+		fm.get_bool("draft").unwrap().xpect_true();
+		fm.get_str("missing").is_none().xpect_true();
 	}
 }

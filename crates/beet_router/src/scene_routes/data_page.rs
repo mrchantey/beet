@@ -121,6 +121,12 @@ impl<T: 'static + Send + Sync + Serialize>
 			}
 		})
 	}
+
+	/// The scene renders as any page does, so it takes the render params a
+	/// page takes.
+	fn params() -> ParamsDeclaration {
+		<PageRequest as IntoResponseWithRequestParts<PageRequest>>::params()
+	}
 }
 
 #[cfg(test)]
@@ -165,5 +171,68 @@ mod test {
 			.await
 			.unwrap()
 			.xpect_eq("3");
+	}
+
+	/// The scene takes the render params any page takes, so a strict server
+	/// accepts them on a data page's route.
+	#[beet_core::test]
+	async fn takes_the_render_params() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let server = world
+			.spawn((CliServer::default(), children![(Router, children![
+				Count
+			])]))
+			.flush();
+		let router = world.entity(server).get::<Children>().unwrap()[0];
+		world
+			.entity_mut(router)
+			.exchange(
+				Request::get("count")
+					.with_param("frontmatter", "true")
+					.with_param("root", "content")
+					.with_header::<header::Accept>(vec![MediaType::Markdown]),
+			)
+			.await
+			.status()
+			.xpect_eq(StatusCode::UNPROCESSABLE_CONTENT);
+	}
+
+	/// A data page's scene renders exactly as a plain page holding the same
+	/// scene does, under every markup and text `Accept`, so the two answers
+	/// cannot drift.
+	#[beet_core::test]
+	async fn renders_its_scene_as_a_plain_page_does() {
+		let mut world = (AsyncPlugin, RouterPlugin).into_world();
+		let root = world
+			.spawn((Router, children![
+				Count,
+				(PathPartial::new("plain"), FixedPage, children![rsx! {
+					<p>"three"</p>
+				}]),
+			]))
+			.flush();
+		for accept in [
+			MediaType::Markdown,
+			MediaType::Html,
+			MediaType::Text,
+			MediaType::AnsiTerm,
+		] {
+			let mut body = async |path: &str| {
+				world
+					.entity_mut(root)
+					.exchange(
+						Request::get(path).with_header::<header::Accept>(vec![
+							accept.clone(),
+						]),
+					)
+					.await
+					.text()
+					.await
+					.unwrap()
+			};
+			let page = body("count").await;
+			page.clone().xpect_contains("three");
+			page.xpect_eq(body("plain").await);
+		}
 	}
 }

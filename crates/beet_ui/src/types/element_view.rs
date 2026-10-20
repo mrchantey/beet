@@ -66,6 +66,22 @@ impl<'a> ElementView<'a> {
 	/// The tag name of this element, ie `div`, `span`, `p`.
 	pub fn tag(&self) -> &str { self.element.tag() }
 
+	/// Whether this is a checkbox, an `<input type="checkbox">`.
+	pub fn is_checkbox(&self) -> bool {
+		self.tag() == "input" && self.attribute_string("type") == "checkbox"
+	}
+
+	/// Whether this checkbox is checked, as the DOM's model has it: its own
+	/// [`Value`] when it holds a bool, the live state, else its `checked`
+	/// attribute, the authored default. Every renderer reads a box through
+	/// this, so an unticked value overrides an authored `checked`.
+	pub fn checked(&self) -> bool {
+		match self.value {
+			Some(Value::Bool(checked)) => *checked,
+			_ => self.attribute("checked").is_some(),
+		}
+	}
+
 	/// Look up the first attribute matching `key` and return its value.
 	pub fn attribute<'b>(&'b self, key: &str) -> Option<&'b AttributeView<'a>> {
 		self.attributes

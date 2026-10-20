@@ -1,6 +1,15 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 
+/// The markdown target's own render params, which every scene route takes
+/// through its render params.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Reflect)]
+pub struct MarkdownParams {
+	/// Lead a markdown render with the frontmatter its root's metadata
+	/// declares, its author and dates among it.
+	pub frontmatter: bool,
+}
+
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
 ///
 /// Converts HTML-like element trees (as produced by [`MarkdownParser`])
@@ -9,9 +18,10 @@ use beet_core::prelude::*;
 /// blockquotes, thematic breaks, inline code, GFM tables with their captions,
 /// and optional expression rendering. A `<mark>`, and a `<span>` carrying a
 /// `style`, pass through as inline HTML, since markdown has no syntax for what
-/// they signal. A root carrying [`PageMeta`] leads with the YAML frontmatter
-/// declaring it, so a parsed markdown file renders its metadata back and a
-/// Word file its core properties.
+/// they signal. Asked for frontmatter, `--frontmatter` ([`MarkdownParams`]), a
+/// render leads with the TOML block declaring its root's frontmatter
+/// components ([`Frontmatter::write`]), so a parsed markdown file renders its
+/// metadata back and a Word file its core properties.
 ///
 /// A [`Comment`] is an authoring note, never a page's content, so it is
 /// skipped unless [`with_comments`](Self::with_comments) keeps it, as a writer
@@ -309,6 +319,11 @@ impl MarkdownRenderer {
 
 	/// Whether `tag` is a discrete item rather than a formatting run: a link,
 	/// an image or a control, spaced from an element directly beside it.
+	/// The punctuation that closes onto the word before it, which a space
+	/// beside an item never comes between.
+	const CLOSING_PUNCTUATION: [char; 8] =
+		['.', ',', ';', ':', '!', '?', ')', ']'];
+
 	fn is_item(tag: &str) -> bool {
 		matches!(
 			tag,
@@ -397,8 +412,12 @@ impl MarkdownRenderer {
 			return;
 		}
 		self.at_block_start = false;
+		// a space beside an item waits for the words, which bring their own
+		// or close the sentence it ends, ie the `.` a styled run puts after
+		// a link
 		if core::mem::take(&mut self.after_box)
 			&& !text.starts_with(char::is_whitespace)
+			&& !text.starts_with(Self::CLOSING_PUNCTUATION)
 		{
 			self.push_char(' ');
 		}
@@ -582,8 +601,7 @@ impl NodeVisitor for MarkdownRenderer {
 		let block = Self::SUPPRESSIBLE
 			.contains(&name)
 			.then(|| self.start_block());
-		let is_checkbox =
-			name == "input" && view.attribute_string("type") == "checkbox";
+		let is_checkbox = view.is_checkbox();
 
 		match name {
 			// ── Headings ──
@@ -707,9 +725,7 @@ impl NodeVisitor for MarkdownRenderer {
 
 			// ── A checkbox, as a task list writes it ──
 			"input" if is_checkbox => {
-				let checked = matches!(value, Some(Value::Bool(true)))
-					|| view.attribute("checked").is_some();
-				self.push_str(if checked { "[x]" } else { "[ ]" });
+				self.push_str(if view.checked() { "[x]" } else { "[ ]" });
 				self.after_box = true;
 			}
 
@@ -1028,17 +1044,23 @@ impl NodeRenderer for MarkdownRenderer {
 		cx: &mut RenderContext,
 	) -> Result<MediaBytes, RenderError> {
 		cx.check_accepts(&[MediaType::Markdown])?;
-		// a document's metadata leads it as the frontmatter that declares it
+		// asked for, a document's metadata leads it as the frontmatter that
+		// declares it
 		#[cfg(feature = "bsx")]
-		if let Some(block) = cx
-			.world
-			.get::<PageMeta>(cx.entity)
-			.map(Frontmatter::write)
-			.transpose()?
-			.flatten()
-		{
-			self.push_str(&block);
-			self.state.needs_block_separator = true;
+		if cx.request.parse_params::<MarkdownParams>()?.frontmatter {
+			let entity = cx.entity;
+			let component = cx
+				.world
+				.with_state::<AncestorQuery<&FrontmatterType>, _>(|types| {
+					types.get(entity).cloned().unwrap_or_default()
+				})
+				.component;
+			if let Some(block) =
+				Frontmatter::write(cx.world, entity, &component)?
+			{
+				self.push_str(&block);
+				self.state.needs_block_separator = true;
+			}
 		}
 		cx.walk(self);
 		self.flush_inline();
@@ -1183,10 +1205,11 @@ mod test {
 			.xpect_eq("# Title\n\nParagraph");
 	}
 
-	/// A root's metadata leads its render as the frontmatter declaring it.
+	/// Asked for, a root's metadata leads its render as the frontmatter
+	/// declaring it; unasked, the render is the body alone.
 	#[beet_core::test]
 	fn renders_page_meta_as_frontmatter() {
-		let mut world = World::new();
+		let mut world = ParsePlugin.into_world();
 		let entity = world
 			.spawn(PageMeta {
 				title: Some("Plan".into()),
@@ -1199,15 +1222,15 @@ mod test {
 				&MediaBytes::new_markdown("# Plan"),
 			))
 			.unwrap();
-		MarkdownRenderer::new()
-			.render(&mut RenderContext::new(
-				&mut world,
-				entity,
-				&RequestParts::default(),
-			))
-			.unwrap()
-			.to_string()
-			.xpect_eq("---\ntitle: Plan\n---\n\n# Plan\n");
+		let mut render = |request: RequestParts| {
+			MarkdownRenderer::new()
+				.render(&mut RenderContext::new(&mut world, entity, &request))
+				.unwrap()
+				.to_string()
+		};
+		render(RequestParts::default().with_flag("frontmatter"))
+			.xpect_eq("+++\ntitle = \"Plan\"\n+++\n\n# Plan\n");
+		render(RequestParts::default()).xpect_eq("# Plan\n");
 	}
 
 	#[beet_core::test]
@@ -1382,6 +1405,11 @@ mod test {
 		)
 		.trim()
 		.xpect_eq("[Docs](/docs) [Blog](/blog) **new**\n\nMore Less");
+		// punctuation closes onto the link it ends, a styled run or not
+		render_unescaped(
+			"<p><a href=\"/u\">u</a><span style=\"color: #404040\">. Then</span></p>",
+		)
+		.xpect_eq("[u](/u)<span style=\"color: #404040\">. Then</span>\n");
 	}
 
 	/// A tree read from a richer format reads as a person writes markdown:
@@ -1432,6 +1460,22 @@ mod test {
 			.trim()
 			.xpect_eq("- [x] done\n- [ ] not yet");
 		render_unescaped("<p><input type=\"checkbox\"> Surveys</p>")
+			.xpect_eq("[ ] Surveys\n");
+		// the box's value is its state, over the authored `checked`
+		let mut world = World::new();
+		let entity = world
+			.spawn(rsx! {
+				<p><input type="checkbox" checked {Value::Bool(false)}/>" Surveys"</p>
+			})
+			.id();
+		MarkdownRenderer::new()
+			.render(&mut RenderContext::new(
+				&mut world,
+				entity,
+				&RequestParts::default(),
+			))
+			.unwrap()
+			.to_string()
 			.xpect_eq("[ ] Surveys\n");
 	}
 

@@ -18,6 +18,12 @@ use beet_core::prelude::*;
 /// respective feature flags. When `plaintext_fallback` is enabled,
 /// any text-based media type without a dedicated parser falls back
 /// to [`PlainTextParser`].
+///
+/// Every parse ends in one [`PostParseTree`] run, whatever the format: the
+/// schedule [`ParsePlugin`] fills, where the document's tables are numbered
+/// ([`NumberTables`]) and whatever else extends a parsed tree runs, ie styles
+/// or a deck's triage. A world without it parses the tree and extends
+/// nothing.
 #[derive(Debug, Clone)]
 pub struct MediaParser {
 	/// Fall back to [`PlainTextParser`] for unrecognized text types.
@@ -154,12 +160,15 @@ impl NodeParser for MediaParser {
 				})
 			}
 		}?;
-		// a document's tables carry the addresses an edit names their cells
-		// by; an Office file's parser numbers its own
-		if matches!(media_type, MediaType::Markdown | MediaType::Html) {
-			let root = entity.id();
-			entity.world_scope(|world| TableCellAddress::assign(world, root));
+		// the parsed tree is extended once, whatever its format: its tables
+		// numbered, then whatever else is registered, ie styles or a deck's
+		// triage
+		if !entity.contains::<NumberTables>() {
+			entity.insert(NumberTables::default());
 		}
+		entity.world_scope(|world| {
+			let _ = world.try_run_schedule(PostParseTree);
+		});
 		Ok(())
 	}
 }

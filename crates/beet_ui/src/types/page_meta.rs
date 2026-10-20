@@ -36,6 +36,8 @@
 //!   and a closed vocabulary because an open one drifts into synonyms that
 //!   split one topic across two names nobody browses.
 
+#[cfg(feature = "serde")]
+use crate::prelude::ReflectFrontmatter;
 use beet_core::prelude::*;
 
 /// General metadata common to blog posts, docs pages, etc.
@@ -51,6 +53,7 @@ use beet_core::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", reflect(Frontmatter))]
 pub struct PageMeta {
 	/// Page title; overrides the package title in the document `Head`.
 	pub title: Option<String>,

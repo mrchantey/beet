@@ -1,6 +1,6 @@
 // The condvar handshake requires real OS threads. On `no_std` and on wasm
-// (where `std::sync::Condvar::wait` panics — there are no threads to notify it)
-// the handshake is a no-op: those targets drive futures synchronously via
+// (where `std::sync::Condvar::wait` panics, there being no threads to notify
+// it) the handshake is a no-op: those targets drive futures synchronously via
 // `spawn_local` + local task-pool ticking before the waiter is reached.
 #[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 use bevy::platform::sync::Arc;

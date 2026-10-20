@@ -4,13 +4,14 @@ use beet_core::prelude::*;
 
 /// Registers what an Office tree carries, so a scene holding one serializes,
 /// the [`OoxmlRenderer`] that writes one back, and appends a deck's triage in
-/// [`PostParseTree`].
+/// [`PostParseTree`], after its tables are numbered.
 #[derive(Default)]
 pub struct OoxmlPlugin;
 
 impl Plugin for OoxmlPlugin {
 	fn build(&self, app: &mut App) {
-		app.register_type::<ParagraphStyle>()
+		app.register_type::<CoreProperties>()
+			.register_type::<ParagraphStyle>()
 			.register_type::<ListLevel>()
 			.register_type::<RunLook>()
 			.register_type::<OoxmlNode>()
@@ -25,7 +26,10 @@ impl Plugin for OoxmlPlugin {
 			.register_type::<DeckReported>()
 			.install(OoxmlRenderer)
 			.init_schedule(PostParseTree)
-			.add_systems(PostParseTree, append_deck_reports);
+			.add_systems(
+				PostParseTree,
+				append_deck_reports.after(TableNumbering),
+			);
 	}
 }
 

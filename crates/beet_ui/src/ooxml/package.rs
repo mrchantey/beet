@@ -102,7 +102,31 @@ impl OoxmlFile {
 	/// A new Word file whose body is `body`, WordprocessingML with the `w:`,
 	/// `w14:` and `r:` prefixes bound, ie for a test fixture.
 	pub fn word(body: &str) -> Result<MediaBytes> {
+		Self::word_with_properties(body, None)
+	}
+
+	/// [`word`](Self::word) with core properties, the inner elements of
+	/// `docProps/core.xml` with the `cp:`, `dc:` and `dcterms:` prefixes
+	/// bound, ie `<dc:creator>Ada</dc:creator>`.
+	pub fn word_with_properties(
+		body: &str,
+		properties: Option<&str>,
+	) -> Result<MediaBytes> {
 		let mut file = WordprocessingDocument::create(Default::default());
+		if let Some(properties) = properties {
+			let part = file.add_core_file_properties_part()?;
+			part.set_data(
+				&mut file,
+				format!(
+					"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n\
+					 <cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"{}\" xmlns:dcterms=\"{}\">\
+					 {properties}</cp:coreProperties>",
+					OoxmlNamespace::CORE_PROPERTIES,
+					OoxmlNamespace::DUBLIN_CORE,
+					OoxmlNamespace::DUBLIN_CORE_TERMS,
+				),
+			)?;
+		}
 		let part = file.add_main_document_part()?;
 		part.set_data(
 			&mut file,

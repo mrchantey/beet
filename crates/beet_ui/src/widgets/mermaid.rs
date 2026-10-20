@@ -243,7 +243,8 @@ mod test {
 			.unwrap();
 		let mut world = (AsyncPlugin, CharcellPlugin).into_world();
 		let root = world.spawn(BlobStore::new(FsStore::new(routes))).id();
-		MarkdownParser::new()
+		// the diagrams are post-parse passes, which the media parse runs
+		MediaParser::new()
 			.parse(ParseContext::new(
 				&mut world.entity_mut(root),
 				&MediaBytes::new_markdown(&md),

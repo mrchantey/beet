@@ -19,8 +19,28 @@ pub struct ParamsPattern {
 	items: Vec<PatternParam>,
 	/// Every extractor, in the order the collector supplied them.
 	extractors: Vec<ParamsExtractor>,
+	/// Every extractor's declaration, which [`validate`](Self::validate)
+	/// reads a request by.
+	declarations: Vec<ParamsDeclaration>,
 	/// Whether any extractor takes any param, see [`AnyParams`].
 	takes_any: bool,
+}
+
+/// What [`ParamsPattern::validate`] holds a request's params to, each level
+/// adding to the one before.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParamsValidation {
+	/// Every present value readable by the type declaring it: what any routed
+	/// request is refused for before its route runs, since the extractor's
+	/// parse would refuse it anyway.
+	Readable,
+	/// And no key the pattern does not declare: a strict url space's
+	/// refusal, see [`RejectUnknownParams`].
+	Strict,
+	/// And every required param present: params stored to be sent later, ie
+	/// the check an eval names, which no middleware answers before its route
+	/// runs as `--help` answers a request leaving a required param out.
+	Complete,
 }
 
 /// One param of a [`ParamsPattern`], beside every extractor declaring it.
@@ -69,6 +89,7 @@ impl ParamsPattern {
 			for meta in declaration.metas() {
 				pattern.add(&extractor, meta)?;
 			}
+			pattern.declarations.push(declaration.clone());
 			if !pattern.extractors.contains(&extractor) {
 				pattern.extractors.push(extractor);
 			}
@@ -167,16 +188,44 @@ impl ParamsPattern {
 		})
 	}
 
-	/// Refuses, as a `400` [`HttpError`], a request carrying a param nothing
-	/// declares, with the [`unknown`](Self::unknown) message.
-	pub fn reject_unknown(
+	/// Refuses, as a `400` [`HttpError`] carrying the
+	/// [`refusal`](Self::refusal) message, params this pattern does not take
+	/// under `validation`: the read of a request without running its route,
+	/// which the router makes after matching and before the route runs.
+	pub fn validate(
 		&self,
 		params: &MultiMap<SmolStr, SmolStr>,
+		validation: ParamsValidation,
 	) -> Result {
-		match self.unknown(params) {
+		match self.refusal(params, validation) {
 			Some(message) => Err(HttpError::bad_request(message).into()),
 			None => Ok(()),
 		}
+	}
+
+	/// The message refusing `params` under `validation`, `None` when the
+	/// pattern takes them: from [`ParamsValidation::Strict`] on the
+	/// [`unknown`](Self::unknown) message first, then the first param a
+	/// declaration cannot read, under [`ParamsValidation::Complete`] a
+	/// required one absent included, [`explain`](Self::explain)ed as `--help`
+	/// lists it.
+	pub fn refusal(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
+		validation: ParamsValidation,
+	) -> Option<String> {
+		if validation != ParamsValidation::Readable
+			&& let Some(unknown) = self.unknown(params)
+		{
+			return Some(unknown);
+		}
+		let required = validation == ParamsValidation::Complete;
+		self.declarations
+			.iter()
+			.find_map(|declaration| {
+				declaration.validate(params, required).err()
+			})
+			.map(|err| self.explain(&err))
 	}
 
 	/// The message naming every param `params` carries that nothing declares,
@@ -303,6 +352,37 @@ impl ParamMeta {
 			key: name.into(),
 			options: default(),
 			required: false,
+		}
+	}
+
+	/// Read `params` by this param's arity alone, for a declaration built
+	/// from data with no type to parse: a bare key on a param wanting a
+	/// value, a repeated one taking one, and with `required` a required one
+	/// absent.
+	pub fn validate(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
+		required: bool,
+	) -> Result<(), ParamError> {
+		let values = params
+			.get_vec(self.key.as_str())
+			.or_else(|| params.get_vec(self.key.replace('-', "_").as_str()));
+		match (values, &self.value) {
+			(None, _) if required && self.required => {
+				Err(ParamError::missing(&self.key))
+			}
+			(Some(values), ParamValue::Single) if values.is_empty() => {
+				Err(ParamError::needs_value(&self.key, &self.kind))
+			}
+			(Some(values), ParamValue::Single | ParamValue::Flag)
+				if values.len() > 1 =>
+			{
+				Err(ParamError::invalid(
+					&self.key,
+					format!("takes one value, got {}", values.len()),
+				))
+			}
+			_ => Ok(()),
 		}
 	}
 
@@ -695,7 +775,10 @@ mod test {
 	#[beet_core::test]
 	fn accepts_declared_keys_in_either_spelling() {
 		deploy()
-			.reject_unknown(&params("--elevated --dry-run --dry_run"))
+			.validate(
+				&params("--elevated --dry-run --dry_run"),
+				ParamsValidation::Strict,
+			)
 			.unwrap();
 	}
 
@@ -718,7 +801,9 @@ mod test {
 	#[beet_core::test]
 	fn rejects_as_a_bad_request() {
 		let response = Response::from(
-			deploy().reject_unknown(&params("--elevate")).unwrap_err(),
+			deploy()
+				.validate(&params("--elevate"), ParamsValidation::Strict)
+				.unwrap_err(),
 		);
 		response.status().xpect_eq(StatusCode::BAD_REQUEST);
 	}
@@ -755,11 +840,72 @@ mod test {
 		>()])
 		.unwrap();
 		pattern.takes_any().xpect_true();
-		pattern.reject_unknown(&params("--nocapture")).unwrap();
+		pattern
+			.validate(&params("--nocapture"), ParamsValidation::Complete)
+			.unwrap();
 		pattern
 			.recognised(&params("--nocapture"))
 			.contains_key("nocapture")
 			.xpect_true();
+	}
+
+	/// Each level refuses what the one before does and more: a value no
+	/// declaration's type reads, an undeclared key, a required param absent,
+	/// each in the message the router's `400` carries.
+	#[beet_core::test]
+	fn validates_by_level() {
+		#[derive(Reflect)]
+		#[allow(dead_code)]
+		struct ServeParams {
+			/// The port to listen on.
+			port: u16,
+			verbose: bool,
+		}
+		let pattern =
+			pattern(&[ParamsDeclaration::new::<ServeParams, ServeParams>()])
+				.unwrap();
+		let refusal =
+			|args: &str, validation| pattern.refusal(&params(args), validation);
+		use ParamsValidation::*;
+		refusal("--port=abc", Readable)
+			.unwrap()
+			.xpect_starts_with("invalid param `--port`: invalid number")
+			.xpect_contains("\n`--port` (u16): The port to listen on.");
+		refusal("--verbose --colour", Readable).xpect_none();
+		refusal("--verbose --colour", Strict)
+			.unwrap()
+			.xpect_eq("unknown param `--colour`");
+		refusal("--verbose", Strict).xpect_none();
+		refusal("--verbose", Complete)
+			.unwrap()
+			.xpect_starts_with("missing required param `--port`");
+		refusal("--port=80", Complete).xpect_none();
+	}
+
+	/// A declaration built from data has no type to parse, so it reads by
+	/// its metas' arity.
+	#[beet_core::test]
+	fn validates_a_data_declaration_by_its_metas() {
+		let pattern = pattern(&[ParamsDeclaration::named(
+			"Group",
+			[
+				ParamMeta::new("force", ParamValue::Flag),
+				ParamMeta::new("name", ParamValue::Single).required(),
+			],
+			false,
+		)])
+		.unwrap();
+		let refusal =
+			|args: &str, validation| pattern.refusal(&params(args), validation);
+		refusal("--name", ParamsValidation::Readable)
+			.unwrap()
+			.xpect_starts_with("`--name` needs a value");
+		refusal("--name=a --name=b", ParamsValidation::Readable)
+			.unwrap()
+			.xpect_contains("takes one value, got 2");
+		refusal("--force", ParamsValidation::Complete)
+			.unwrap()
+			.xpect_starts_with("missing required param `--name`");
 	}
 
 	#[beet_core::test]

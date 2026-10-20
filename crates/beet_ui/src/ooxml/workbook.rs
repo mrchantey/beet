@@ -2,6 +2,7 @@
 use super::ooxml_query::*;
 use crate::prelude::*;
 use beet_core::prelude::*;
+use core::num::NonZeroU32;
 use ooxmlsdk::parts::PartRef;
 
 type Ns = OoxmlNamespace;
@@ -225,11 +226,16 @@ impl WorkbookProjection {
 						gap
 					}
 				};
-				world.entity_mut(entity).insert(SheetCellAddress {
-					sheet: name.clone(),
-					column,
-					row: row.index,
-				});
+				// a column counts from 1, as a row's index is read
+				if let (Some(address_column), Some(address_row)) =
+					(NonZeroU32::new(column), NonZeroU32::new(row.index))
+				{
+					world.entity_mut(entity).insert(SheetCellAddress {
+						sheet: name.clone(),
+						column: address_column,
+						row: address_row,
+					});
+				}
 				cells.insert((column, row.index), entity);
 				match (
 					masters.get(&(column, row.index)),
@@ -348,10 +354,12 @@ impl WorkbookProjection {
 						.attribute(entity, None, "ref")
 						.and_then(|range| range.split_once(':'))
 						.and_then(|(first, last)| {
-							Some((
-								SheetCellAddress::parse_a1(first)?,
-								SheetCellAddress::parse_a1(last)?,
-							))
+							let corner = |a1| {
+								SheetCellAddress::parse_a1(a1).map(
+									|(column, row)| (column.get(), row.get()),
+								)
+							};
+							Some((corner(first)?, corner(last)?))
 						});
 					if let Some(range) = range {
 						sheet.merges.push(range);
@@ -365,6 +373,7 @@ impl WorkbookProjection {
 					sheet.rows.push(RowRead {
 						entity,
 						index: number(entity, "r")
+							.filter(|index| *index > 0)
 							.unwrap_or(sheet.rows.len() as u32 + 1),
 						style: custom.then(|| number(entity, "s").unwrap_or(0)),
 						cells: Vec::new(),
@@ -377,7 +386,7 @@ impl WorkbookProjection {
 					let column = tree
 						.attribute(entity, None, "r")
 						.and_then(SheetCellAddress::parse_a1)
-						.map(|(column, _)| column)
+						.map(|(column, _)| column.get())
 						.unwrap_or_else(|| {
 							row.cells.last().map_or(1, |cell| cell.column + 1)
 						});

@@ -7,12 +7,12 @@
 //!
 //! Activation — a click, or Enter while focused via `activate_focused_on_enter`,
 //! which synthesizes the same `PointerUp` — flips the local [`Value`]
-//! ([`toggle_checkbox_on_activate`]); the document sync chain carries the flip
-//! into the bound field, exactly as typing does for a text field.
-//! [`sync_checkbox_checked`] keeps the bare `checked` attribute mirroring the
-//! value so a served render is correct HTML; the terminal paints a `[x]`/`[ ]`
-//! marker from the value instead (`decorate::checkbox_marker`). Both are
-//! registered by [`FormPlugin`](super::FormPlugin).
+//! ([`toggle_checkbox_on_activate`], registered by
+//! [`FormPlugin`](super::FormPlugin)); the document sync chain carries the
+//! flip into the bound field, exactly as typing does for a text field. The
+//! value is the box's state, read through [`ElementView::checked`]: HTML
+//! writes `checked` from it, the terminal paints a `[x]`/`[ ]` marker and
+//! markdown a task list's box.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
@@ -50,7 +50,7 @@ pub fn Checkbox(
 }
 
 /// Marks a [`Checkbox`]'s `<input>`, the target of
-/// [`toggle_checkbox_on_activate`] and [`sync_checkbox_checked`].
+/// [`toggle_checkbox_on_activate`].
 ///
 /// Requires its own `Value::Bool(false)`: a checkbox's resting state is a
 /// boolean, so it never takes the empty-string seed
@@ -79,42 +79,13 @@ pub(super) fn toggle_checkbox_on_activate(
 	}
 }
 
-/// System: keep a checkbox's bare `checked` attribute present exactly when its
-/// [`Value`] is `true`, so a served render emits correct HTML. The terminal
-/// marker reads the value directly, so this is markup state only.
-pub(super) fn sync_checkbox_checked(
-	checkboxes: Populated<
-		(Entity, &Value),
-		(With<CheckboxInput>, Changed<Value>),
-	>,
-	attributes: Query<&Attributes>,
-	attr_keys: Query<&Attribute>,
-	mut commands: Commands,
-) {
-	for (entity, value) in checkboxes.iter() {
-		let checked = matches!(value, Value::Bool(true));
-		let attr = attr_entity(&attributes, &attr_keys, entity, "checked");
-		match (checked, attr) {
-			// a null-valued attribute renders as the bare `checked` form
-			(true, None) => {
-				commands.spawn((
-					AttributeOf::new(entity),
-					Attribute::new("checked"),
-				));
-			}
-			(false, Some(attr)) => commands.entity(attr).despawn(),
-			_ => {}
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use crate::widgets::test_ext;
 	use beet_core::prelude::*;
 
-	/// The bare `checked` attribute tracks the bound document value: present
+	/// The served `checked` attribute is the bound document value's: present
 	/// when true, absent when false.
 	#[beet_core::test]
 	fn checked_attribute_mirrors_value() {
@@ -129,8 +100,7 @@ mod test {
 			world
 				.entity_mut(root)
 				.insert(Document::new(value!({ "done": done })));
-			// settle the doc sync then the attribute mirror
-			world.update_local();
+			// settle the doc sync
 			world.update_local();
 			test_ext::render_world(&mut world, root)
 		};

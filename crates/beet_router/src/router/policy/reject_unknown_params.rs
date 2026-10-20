@@ -5,19 +5,24 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 impl ActionNode {
-	/// Refuse, as a `400`, `params` this route does not take, naming each
-	/// and the declared param it most plausibly misspells and pointing at the
-	/// route's help. What it takes is its [`ParamsPattern`], so a route taking
-	/// [`AnyParams`] refuses nothing. The caller has already
-	/// established that the url space is governed
-	/// ([`RejectUnknownParamsQuery::governs`]).
-	pub(crate) fn reject_unknown_params(
+	/// Refuse, as a `400`, `params` this route cannot take under
+	/// `validation`, before it runs: in a strict url space
+	/// ([`RejectUnknownParamsQuery::governs`]) a param it does not declare,
+	/// named beside the declared one it most plausibly misspells, and in any a
+	/// value no declaration's type reads, named as `--help` lists it; each
+	/// pointing at the route's help. What it takes is its [`ParamsPattern`],
+	/// so a route taking [`AnyParams`] refuses no key.
+	///
+	/// A required param left out is the extractor's to refuse when the route
+	/// runs, since middleware may answer first, as `--help` does.
+	pub(crate) fn validate_params(
 		&self,
 		params: &MultiMap<SmolStr, SmolStr>,
+		validation: ParamsValidation,
 	) -> Result {
-		match self.params.unknown(params) {
-			Some(unknown) => Err(HttpError::bad_request(format!(
-				"{unknown}\n{}\n",
+		match self.params.refusal(params, validation) {
+			Some(refusal) => Err(HttpError::bad_request(format!(
+				"{refusal}\n{}\n",
 				self.help_hint()
 			))
 			.into()),
@@ -64,6 +69,14 @@ mod test {
 		Ok("deployed".into())
 	}
 
+	/// Stands in for a command with a required typed param.
+	#[action]
+	#[derive(Default, Clone, Component, Reflect)]
+	#[reflect(Component)]
+	async fn Retry(#[param] times: u32) -> Result<String> {
+		Ok(times.to_string())
+	}
+
 	/// Stands in for a command forwarding every param to a program it runs.
 	#[action]
 	#[derive(Default, Clone, Component, Reflect)]
@@ -89,6 +102,7 @@ mod test {
 				(Router, HelpHandler::default()),
 				children![
 					route::exchange("deploy", Deploy),
+					route::exchange("retry", Retry),
 					route::exchange("forward", Forward),
 					(PathPartial::new("audit"), ExchangeSequence, children![(
 						audit_step,
@@ -213,6 +227,46 @@ mod test {
 			.await
 			.status()
 			.xpect_eq(StatusCode::BAD_REQUEST);
+	}
+
+	/// A routed request is refused exactly when its route's pattern refuses
+	/// its params as a complete request, and with the pattern's message:
+	/// the validation a stored request is held to before it is sent.
+	#[beet_core::test]
+	async fn validate_agrees_with_a_routed_request() {
+		let mut world = router_world();
+		let root = spawn_cli(&mut world, CliServer::default());
+		let router = router(&world, root);
+		for args in [
+			"deploy --elevated",
+			"deploy --elevate",
+			"deploy --dry-run=maybe",
+			"retry --times=3",
+			"retry --times=three",
+			"retry",
+			"retry --times=3 --time=4",
+			"forward --anything",
+		] {
+			let request = Request::from_cli_str(args);
+			let refusal = RouteTree::of(&world, router)
+				.unwrap()
+				.find(request.path())
+				.unwrap()
+				.params
+				.refusal(request.params(), ParamsValidation::Complete);
+			let response = send(&mut world, root, args).await;
+			let status = response.status();
+			let text = response.text().await.unwrap();
+			match refusal {
+				Some(refusal) => {
+					status.xpect_eq(StatusCode::BAD_REQUEST);
+					text.xpect_starts_with(refusal);
+				}
+				None => {
+					status.xpect_eq(StatusCode::OK);
+				}
+			}
+		}
 	}
 
 	/// A route taking any param refuses nothing, even in a strict url space.

@@ -62,6 +62,9 @@ pub struct RenderParams {
 	/// fetched onto the tree before it renders, `upload` every source,
 	/// `local` the site's own, `link` none; unset fetches nothing.
 	pub media_ingest: Option<MediaIngestPolicy>,
+	/// The markdown target's own params, flattened: `--frontmatter` leads a
+	/// markdown render with its root's frontmatter.
+	pub markdown: MarkdownParams,
 }
 
 impl RenderParams {

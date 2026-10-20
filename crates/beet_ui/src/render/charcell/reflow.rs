@@ -150,7 +150,8 @@ mod test {
 				ChildOf(root),
 			))
 			.id();
-		MarkdownParser::new()
+		// the media parse runs the post-parse passes, the diagram's among them
+		MediaParser::new()
 			.parse(ParseContext::new(
 				&mut world.entity_mut(column),
 				&MediaBytes::new_markdown(&format!(

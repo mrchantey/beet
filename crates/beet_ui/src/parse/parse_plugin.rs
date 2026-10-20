@@ -34,12 +34,20 @@ impl Plugin for ParsePlugin {
 		// every `bx:click="..."` resolves through the core seam.
 		#[cfg(feature = "bsx")]
 		app.install_type::<crate::prelude::BsxDefaultsPlugin>();
-		// the cell addresses every parsed document's tables carry
-		app.register_type::<TableCellAddress>();
+		// a document's root metadata, which frontmatter declares and writes
+		app.register_type::<PageMeta>()
+			.register_type::<FrontmatterType>();
+		// the cell addresses every parsed document's tables carry, numbered
+		// once per document
+		app.register_type::<TableCellAddress>()
+			.add_systems(PostParseTree, number_tables.in_set(TableNumbering));
 		#[cfg(feature = "ooxml")]
 		app.install_type::<crate::prelude::OoxmlPlugin>();
 	}
 }
+
+/// Numbers the tables of every document parsed since the last run.
+fn number_tables(world: &mut World) { NumberTables::apply_all(world); }
 
 /// Opt-in plugin for realtime apps driven by the main loop: runs the
 /// [`PostParseTree`] pipeline after every [`Update`] so style changes and

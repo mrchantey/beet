@@ -40,7 +40,9 @@ pub enum ParamsScope {
 }
 
 /// The params one extractor takes: its short type name, the [`ParamMeta`] of
-/// each, and whether it takes any param ([`AnyParams`]).
+/// each, whether it takes any param ([`AnyParams`]), and how it reads them,
+/// so a request validates against it without running it
+/// ([`validate`](Self::validate)).
 #[derive(Debug, Clone, PartialEq, Get)]
 pub struct ParamsDeclaration {
 	/// The extractor's short type name, ie `CliServer`.
@@ -50,6 +52,10 @@ pub struct ParamsDeclaration {
 	/// Whether the extractor takes any param, see [`AnyParams`].
 	#[get(copy)]
 	takes_any: bool,
+	/// Each params group the extractor parses whole, empty for a declaration
+	/// built from data, which validates by its metas.
+	#[get(skip)]
+	reads: Vec<ParamsRead>,
 }
 
 impl ParamsDeclaration {
@@ -62,7 +68,10 @@ impl ParamsDeclaration {
 	pub fn new<Extractor: ?Sized, T: FromReflect + Typed>() -> Self {
 		let mut metas = Vec::new();
 		let takes_any = ParamMeta::walk(T::type_info(), &mut metas).unwrap();
-		Self::named(type_ext::short_name::<Extractor>(), metas, takes_any)
+		Self {
+			reads: ParamsRead::of(T::type_info()),
+			..Self::named(type_ext::short_name::<Extractor>(), metas, takes_any)
+		}
 	}
 
 	/// The params an extractor built from data takes, ie an `ExchangeGroup`'s
@@ -76,7 +85,36 @@ impl ParamsDeclaration {
 			name: name.into(),
 			metas: metas.into_iter().collect(),
 			takes_any,
+			reads: Vec::new(),
 		}
+	}
+
+	/// Read `params` as the extractor would, building nothing: every present
+	/// value through its type, and with `required` every required param
+	/// present. A declaration built from data reads by its metas, their
+	/// arity and whether they are required.
+	///
+	/// A params type the parse cannot read at all is the route author's
+	/// error, which the extractor raises when it runs, so it passes here.
+	pub fn validate(
+		&self,
+		params: &MultiMap<SmolStr, SmolStr>,
+		required: bool,
+	) -> Result<(), ParamError> {
+		if self.reads.is_empty() {
+			for meta in &self.metas {
+				meta.validate(params, required)?;
+			}
+			return Ok(());
+		}
+		for read in &self.reads {
+			if let Err(err) = params.validate_reflect(read.0, required)
+				&& let Some(err) = err.downcast_ref::<ParamError>()
+			{
+				return Err(err.clone());
+			}
+		}
+		Ok(())
 	}
 
 	/// A declaration of nothing, by `Extractor`.
@@ -91,7 +129,40 @@ impl ParamsDeclaration {
 	pub fn with(mut self, other: Self) -> Self {
 		self.metas.extend(other.metas);
 		self.takes_any |= other.takes_any;
+		self.reads.extend(other.reads);
 		self
+	}
+}
+
+/// One params group a [`ParamsDeclaration`] parses whole, a struct by its
+/// reflected fields.
+#[derive(Clone, Copy)]
+struct ParamsRead(&'static TypeInfo);
+
+impl ParamsRead {
+	/// The groups the declared `type_info` parses: itself for a struct, each
+	/// member of a tuple, recursively, less any [`AnyParams`], which takes
+	/// any param and so refuses none.
+	fn of(type_info: &'static TypeInfo) -> Vec<Self> {
+		match type_info {
+			_ if AnyParams::is(type_info) => Vec::new(),
+			TypeInfo::Tuple(info) => info
+				.iter()
+				.filter_map(|field| field.type_info())
+				.flat_map(Self::of)
+				.collect(),
+			_ => vec![Self(type_info)],
+		}
+	}
+}
+
+impl PartialEq for ParamsRead {
+	fn eq(&self, other: &Self) -> bool { self.0.type_id() == other.0.type_id() }
+}
+
+impl core::fmt::Debug for ParamsRead {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.write_str(self.0.type_path())
 	}
 }
 

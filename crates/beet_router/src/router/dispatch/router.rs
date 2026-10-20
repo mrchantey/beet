@@ -141,12 +141,15 @@ impl Router {
 							}
 							_ => {}
 						}
-						// a strict url space refuses a param the route does
-						// not take, before the path's own segments join the
-						// params
-						if rejects_unknown_params
-							&& let Err(err) =
-								node.reject_unknown_params(request.params())
+						// refuse a param the route cannot take before it runs,
+						// a strict url space an undeclared one too, before the
+						// path's own segments join the params
+						let validation = match rejects_unknown_params {
+							true => ParamsValidation::Strict,
+							false => ParamsValidation::Readable,
+						};
+						if let Err(err) =
+							node.validate_params(request.params(), validation)
 						{
 							return Response::from(err).xok();
 						}

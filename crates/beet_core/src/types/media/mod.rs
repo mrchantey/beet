@@ -6,3 +6,5 @@ pub mod media_serde;
 pub use media_serde::*;
 mod media_type;
 pub use media_type::*;
+#[cfg(feature = "serde")]
+mod yaml;

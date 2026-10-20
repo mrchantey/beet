@@ -66,6 +66,14 @@ impl CharcellNodeData<'_> {
 			})
 	}
 
+	/// Whether this node is a checkbox, an `<input>` painted as its `[x]` box
+	/// alone, the [`Marker`] the decorator gives it: a control that flows on
+	/// its label's line as text, where every other is an atomic box.
+	pub fn is_checkbox(&self) -> bool {
+		self.element.is_some_and(|element| element.tag() == "input")
+			&& self.marker.is_some()
+	}
+
 	/// Whether this node is a form control, ie displays and edits its own
 	/// [`Value`] rather than carrying text content.
 	pub fn is_control(&self) -> bool {

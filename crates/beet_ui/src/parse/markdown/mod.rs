@@ -137,10 +137,6 @@ impl MarkdownParser {
 			span_lookup.as_ref(),
 		)?;
 
-		// run post-parse systems (syntax highlighting, style resolution, ..)
-		// when registered, ie via `StylePlugin`.
-		let _ = world.try_run_schedule(PostParseTree);
-
 		// insert frontmatter on root if present
 		if self.config.parse_frontmatter {
 			if let Some(fm) = tree_result.frontmatter {
@@ -622,7 +618,8 @@ mod test {
 		app.add_plugins(StylePlugin);
 		let entity = app.world_mut().spawn_empty().id();
 		let bytes = MediaBytes::new_markdown("```rust\nfn main() {}\n```");
-		MarkdownParser::new()
+		// highlighting is a post-parse pass, which the media parse runs
+		MediaParser::new()
 			.parse(ParseContext::new(
 				&mut app.world_mut().entity_mut(entity),
 				&bytes,

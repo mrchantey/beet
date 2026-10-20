@@ -89,7 +89,7 @@ pub(crate) fn apply_markers(
 			"img" => Some(img_marker(&view)),
 			"iframe" => Some(iframe_marker(&view)),
 			"select" => Some(select_marker(&view, &elements, &values)),
-			"input" => checkbox_marker(&view, &values),
+			"input" => checkbox_marker(&view),
 			_ => None,
 		};
 		if let Some(marker) = marker {
@@ -437,20 +437,15 @@ fn select_marker(
 	format!("{label} ▾").into()
 }
 
-/// A checkbox `<input>`'s box, painted from its [`Value`]: the terminal has no
-/// native control to draw, so the state *is* the text. `None` for every other
-/// input type, which paints its value as an editable textbox instead.
-fn checkbox_marker(
-	view: &ElementView,
-	values: &Query<&Value, With<Element>>,
-) -> Option<SmolStr> {
-	if view.attribute_string("type") != "checkbox" {
-		return None;
-	}
-	match values.get(view.entity) {
-		Ok(Value::Bool(true)) => Some("[x]".into()),
-		_ => Some("[ ]".into()),
-	}
+/// A checkbox `<input>`'s box, painted from its state
+/// ([`ElementView::checked`]): the terminal has no native control to draw, so
+/// the state *is* the text. `None` for every other input type, which paints
+/// its value as an editable textbox instead.
+fn checkbox_marker(view: &ElementView) -> Option<SmolStr> {
+	view.is_checkbox().then(|| match view.checked() {
+		true => "[x]".into(),
+		false => "[ ]".into(),
+	})
 }
 
 /// The `[image]:`-prefixed placeholder text for an image, using the alt text and
@@ -520,6 +515,22 @@ mod tests {
 			.xpect_contains("quoted text")
 			.xnot()
 			.xpect_contains("▌");
+	}
+
+	/// A box paints its state: its value when it holds one, else its authored
+	/// `checked`, so a parsed `- [x]` paints ticked, beside its label.
+	#[beet_core::test]
+	fn checkbox_paints_its_state() {
+		render(rsx! { <p><input type="checkbox" checked/>" parsed"</p> })
+			.xpect_contains("[x] parsed");
+		render(rsx! {
+			<p><input type="checkbox" checked {Value::Bool(false)}/>" unticked"</p>
+		})
+		.xpect_contains("[ ] unticked");
+		render(
+			rsx! { <p><input type="checkbox" {Value::Bool(true)}/>" ticked"</p> },
+		)
+		.xpect_contains("[x] ticked");
 	}
 
 	#[beet_core::test]

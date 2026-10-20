@@ -891,6 +891,14 @@ mod test {
 			.collect()
 	}
 
+	/// Runs one edit on `world`'s document, its writes applied after.
+	fn edit<O>(
+		world: &mut World,
+		func: impl FnOnce(&mut DocumentTreeEdit) -> O,
+	) -> O {
+		world.with_state::<DocumentTreeEdit, _>(|mut edit| func(&mut edit))
+	}
+
 	#[beet_core::test]
 	fn untouched_files_write_back_render_identical() {
 		for bytes in [super::super::word::test::form(), workbook()] {
@@ -904,52 +912,33 @@ mod test {
 	fn fills_a_word_form() {
 		let (mut world, root) = parse(&super::super::word::test::form());
 		let cell = |text| CellAddress::parse(text).unwrap();
-		SetText {
-			cell: cell("t1r1c2"),
-			text: "Acme Stalls\nSecond line".into(),
-		}
-		.apply_to(&mut world, root)
+		edit(&mut world, |edit| {
+			edit.set_text(root, &cell("t1r1c2"), "Acme Stalls\nSecond line")
+		})
 		.unwrap();
-		AppendText {
-			cell: cell("t1r1c1"),
-			text: "appended".into(),
-		}
-		.apply_to(&mut world, root)
+		edit(&mut world, |edit| {
+			edit.append_text(root, &cell("t1r1c1"), "appended")
+		})
 		.unwrap();
-		CheckBox {
-			label: "Surveys".into(),
-		}
-		.apply_to(&mut world, root)
+		edit(&mut world, |edit| edit.check_box(root, "Surveys"))
+			.unwrap()
+			.xpect_eq(1);
+		edit(&mut world, |edit| edit.check_box(root, "Nothing"))
+			.unwrap()
+			.xpect_eq(0);
+		edit(&mut world, |edit| {
+			edit.remove_paragraphs(root, "Please delete this sentence")
+		})
 		.unwrap()
 		.xpect_eq(1);
-		CheckBox {
-			label: "Nothing".into(),
-		}
-		.apply_to(&mut world, root)
-		.unwrap()
-		.xpect_eq(0);
-		RemoveParagraphs {
-			text: "Please delete this sentence".into(),
-		}
-		.apply_to(&mut world, root)
+		edit(&mut world, |edit| {
+			edit.replace_text(root, "(Insert name)", "Acme")
+		})
 		.unwrap()
 		.xpect_eq(1);
-		ReplaceText {
-			old: "(Insert name)".into(),
-			new: "Acme".into(),
-		}
-		.apply_to(&mut world, root)
-		.unwrap()
-		.xpect_eq(1);
-		SetText {
-			cell: cell("t9r1c1"),
-			text: "x".into(),
-		}
-		.apply_to(&mut world, root)
-		.xpect_err();
-		RemoveParagraphs { text: " ".into() }
-			.apply_to(&mut world, root)
+		edit(&mut world, |edit| edit.set_text(root, &cell("t9r1c1"), "x"))
 			.xpect_err();
+		edit(&mut world, |edit| edit.remove_paragraphs(root, " ")).xpect_err();
 
 		let written = write(&mut world, root, MediaType::Docx);
 		let (mut world, root) = parse(&written);
@@ -1005,11 +994,9 @@ mod test {
 				"| Start Here!D4 | =1+1 |".into(),
 			]);
 		let set = |world: &mut World, cell: &str, text: &str| {
-			SetText {
-				cell: CellAddress::parse(cell).unwrap(),
-				text: text.into(),
-			}
-			.apply_to(world, root)
+			edit(world, |edit| {
+				edit.set_text(root, &CellAddress::parse(cell).unwrap(), text)
+			})
 		};
 		// a covered cell writes its range's first
 		let written = set(&mut world, "Start Here!E3", "Acme Stalls").unwrap();

@@ -119,6 +119,26 @@ pub impl<K: AsRef<str> + Eq + Hash, V: AsRef<str>> MultiMap<K, V> {
 		}
 		Ok(())
 	}
+
+	/// Read the map as [`parse_reflect`](Self::parse_reflect) reads the type
+	/// `type_info` describes, building nothing: every present value through
+	/// its field's type, and with `required` every required field present.
+	/// The check of a request without running what reads it, refusing
+	/// exactly what the parse would, a [`ParamError`] for the caller's
+	/// mistake.
+	fn validate_reflect(&self, type_info: &TypeInfo, required: bool) -> Result {
+		let absent = match required {
+			true => Absent::Complete,
+			false => Absent::Skip,
+		};
+		build_dynamic_from_type_info(
+			&normalize_snake_case(self),
+			type_info,
+			None,
+			absent,
+		)?;
+		Ok(())
+	}
 }
 
 /// A request param the caller got wrong: a client error, so a server answers
@@ -897,5 +917,33 @@ mod test {
 		base.host.xpect_eq("localhost".to_string());
 		base.port.xpect_eq(8080);
 		base.enabled.xpect_true();
+	}
+
+	/// `validate_reflect` refuses what `parse_reflect` refuses, building
+	/// nothing, and an absent required field only when told to require it.
+	#[crate::test]
+	fn validate_reflect_refuses_as_the_parse_does() {
+		#[derive(Debug, Reflect)]
+		#[allow(dead_code)]
+		struct Serve {
+			port: u16,
+			verbose: bool,
+		}
+		let validate = |args: &str, required: bool| {
+			CliArgs::parse(args)
+				.params
+				.validate_reflect(Serve::type_info(), required)
+				.map_err(|err| {
+					err.downcast_ref::<ParamError>().cloned().unwrap()
+				})
+		};
+		validate("--port=80 --verbose", true).unwrap();
+		validate("--verbose", false).unwrap();
+		validate("--verbose", true)
+			.unwrap_err()
+			.xpect_eq(ParamError::missing("port"));
+		validate("--port=abc", false)
+			.unwrap_err()
+			.xpect_eq(param_error::<Serve>("--port=abc"));
 	}
 }

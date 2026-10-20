@@ -127,8 +127,9 @@ template_serde = ["beet_core/template_serde", "serde"]
 [dependencies]
 # `serde` is unconditional: beet_core's `document` module (the `Document`/
 # `FieldRef`/`DocumentSync` binding layer beet_ui's own `document` module extends)
-# is serde-gated there, and beet_ui's core is document-driven.
-beet_core = { workspace = true, features = ["std", "serde"] }
+# is serde-gated there, and beet_ui's core is document-driven. `toml` reads and
+# writes a frontmatter block, as beet_core's own YAML subset does.
+beet_core = { workspace = true, features = ["std", "serde", "toml"] }
 # unconditional for `RequestParts`: every render answers a request, so the
 # no_std wire types are part of the render surface; `net` adds the std half.
 beet_net.workspace = true

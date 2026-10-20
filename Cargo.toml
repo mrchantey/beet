@@ -313,7 +313,7 @@ rust-embed = { version = "8", features = ["debug-embed"] }
 # `display` are the two directions, `serde` the bridge to `Value`; no
 # `preserve_order` (beet's `Value` map is ordered already) and no `toml_edit`
 # comment preservation.
-toml = { version = "1", default-features = false, features = ["parse", "display", "serde"] }
+toml = { version = "1", default-features = false, features = ["parse", "display", "serde", "preserve_order"] }
 # QR rendering, shared by the cli's png command (`image` on) and the vault
 # `backup --qr` terminal print (`beet_net/qrcode`, unicode only).
 qrcode = { version = "0.14", default-features = false }

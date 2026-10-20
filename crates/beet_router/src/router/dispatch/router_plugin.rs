@@ -248,9 +248,9 @@ impl Plugin for RouterPlugin {
 			// one store file served as a page (`<Route path="guide"
 			// {BlobPage{path:"guide.md"}}/>`)
 			.register_type::<BlobPage>()
-			// any store file a request names, rendered as it accepts
-			// (`<BlobView/>`, `view docs/plan.docx`)
-			.register_type::<BlobView>()
+			// any document in the store a request names, rendered as it
+			// accepts (`<DocumentView/>`, `view docs/plan.docx`)
+			.register_type::<DocumentView>()
 			// the markup-declared directory mount (`<AssetsDir src=.. prefix=..>`):
 			// `ServeBlobs` scoped to a subdir of the inherited store.
 			.install_type::<(
@@ -259,10 +259,10 @@ impl Plugin for RouterPlugin {
 				// a served page boots a wasm `beet` binary with.
 				Wasm,
 			)>();
-			// any store file's addressed cells (`<BlobCells/>`, `cells
+			// any document's addressed cells (`<DocumentCells/>`, `cells
 			// forms/plan.docx`), whose serde answer needs `serde`
 			#[cfg(feature = "serde")]
-			app.register_type::<BlobCells>();
+			app.register_type::<DocumentCells>();
 			// the server-to-client websocket channel and the dev-mode live
 			// reload watcher, plus its by-name `<LiveReloadScript/>` widget. The
 			// channel rides the main HTTP port: `Router::with_defaults` wires the
@@ -617,8 +617,8 @@ mod test {
 				&mut root,
 				&MediaBytes::new_bsx(
 					r#"<Route path="guide" {BlobPage{path:"guide.md"}}/>
-					<BlobView/>
-					<BlobCells/>"#,
+					<DocumentView/>
+					<DocumentCells/>"#,
 				),
 			))
 			.unwrap();

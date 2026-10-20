@@ -189,9 +189,10 @@ impl SecretsDocument {
 	}
 
 	/// The document serialized in its media type, the index plaintext and
-	/// every blob armored.
+	/// every blob armored, laid out for a person to read and review.
 	pub fn to_bytes(&self) -> Result<Vec<u8>> {
-		self.media_type.serialize(self)
+		self.media_type
+			.serialize_with_options(self, SerializeOptions { pretty: true })
 	}
 
 	/// The structural rules a parsed document must satisfy, see

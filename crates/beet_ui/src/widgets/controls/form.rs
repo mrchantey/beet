@@ -220,10 +220,7 @@ impl Plugin for FormPlugin {
 			.add_observer(super::write_policy::release_write_on_blur)
 			.add_systems(
 				Update,
-				(
-					ensure_form_field_value,
-					super::checkbox::sync_checkbox_checked,
-				),
+				ensure_form_field_value,
 			)
 			// the payload-enum control's select edits which variant its field
 			// carries, and the entity picker's which entity its field

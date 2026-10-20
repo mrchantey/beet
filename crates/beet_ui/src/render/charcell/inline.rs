@@ -47,7 +47,8 @@ struct InlineSpan {
 ///
 /// A control is excluded because it is an *atomic* inline box, the terminal's
 /// reading of CSS `inline-block`: it paints its own border and padding and its
-/// contents are its own business. Flowed as text it loses both — a `<select>`
+/// contents are its own business. A checkbox is the exception, its box being
+/// the text `[x]` read on its label's line. Flowed as text it loses both — a `<select>`
 /// that is the only child of a `<div>` would paint as a bare run of letters with
 /// no box, and [`collect_runs_inner`] would splice its open dropdown panel into
 /// the same run.
@@ -65,7 +66,9 @@ pub(super) fn establishes_inline_flow(
 	let mut any = false;
 	for child in node.flow_child_nodes(query) {
 		any = true;
-		if child.is_control() || !child.is_inline_level() {
+		if (child.is_control() && !child.is_checkbox())
+			|| !child.is_inline_level()
+		{
 			return false;
 		}
 	}
@@ -225,7 +228,8 @@ fn collect_runs_inner(
 			link: link.map(SmolStr::from),
 		});
 	}
-	if let Some(value) = node.value() {
+	// a checkbox's value is its state, which its marker already paints
+	if let Some(value) = node.value().filter(|_| !node.is_checkbox()) {
 		let text = value.to_string();
 		if !text.is_empty() {
 			runs.push(InlineRun {

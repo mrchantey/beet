@@ -61,7 +61,8 @@ impl NodeParser for OoxmlParser {
 		}
 		let file = OoxmlFile::open(cx.bytes)?;
 		let root = cx.entity.id();
-		cx.entity.insert(file.core_properties()?.page_meta());
+		let properties = file.core_properties()?;
+		cx.entity.insert((properties.page_meta(), properties));
 		cx.entity.world_scope(|world| -> Result {
 			match file.media_type() {
 				MediaType::Docx => WordProjection::build(world, root, &file)?,
@@ -76,8 +77,6 @@ impl NodeParser for OoxmlParser {
 			world
 				.entity_mut(root)
 				.insert(OoxmlPackage::new(cx.bytes.clone(), parsed));
-			// what extends a read tree, ie a deck's triage, when registered
-			let _ = world.try_run_schedule(PostParseTree);
 			Ok(())
 		})?;
 		Ok(())

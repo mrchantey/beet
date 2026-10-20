@@ -232,10 +232,13 @@ impl NodeVisitor for HtmlRenderer {
 		self.buffer.push('<');
 		self.buffer.push_str(view.tag());
 
+		let is_checkbox = view.is_checkbox();
 		for attr in &view.attributes {
 			// the `class` attribute is merged with the `Classes` component and
-			// emitted once below, so skip the raw attribute here
-			if attr.key() == "class" {
+			// emitted once below, so skip the raw attribute here, as is a
+			// checkbox's `checked`, which its state decides
+			if attr.key() == "class" || (is_checkbox && attr.key() == "checked")
+			{
 				continue;
 			}
 			// a null is a boolean attribute, present with no value
@@ -243,13 +246,17 @@ impl NodeVisitor for HtmlRenderer {
 			self.write_attribute(attr.key(), value.as_deref());
 		}
 
-		// a control's value is markup state, never a stray text node: an
-		// `<input>` carries it as its default value (a bool is a checkbox's,
-		// mirrored by its own `checked` attribute), a `<select>` marks the
-		// `<option>` it names, and a `<textarea>` holds it as content, below.
-		// The DOM sink writes the same, so the served page and the painted one
-		// agree.
+		// a control's value is markup state, never a stray text node: a
+		// checkbox writes `checked` from its state, an `<input>` carries any
+		// other value as its default value, a `<select>` marks the `<option>`
+		// it names, and a `<textarea>` holds it as content, below. The DOM
+		// sink writes the same, so the served page and the painted one agree.
 		match (view.tag(), view.value) {
+			("input", _) if is_checkbox => {
+				if view.checked() {
+					self.write_attribute("checked", None);
+				}
+			}
 			("input", Some(value)) if !matches!(value, Value::Bool(_)) => {
 				self.write_attribute("value", Some(&value.to_string()));
 			}
@@ -551,8 +558,8 @@ mod test {
 
 	/// A control's own value is markup state, never a stray text node after
 	/// the tag: an `<input>`'s default value, a `<select>`'s marked option, a
-	/// `<textarea>`'s content, and nothing for a checkbox, whose `checked`
-	/// attribute mirrors it.
+	/// `<textarea>`'s content, and a checkbox's `checked`, which its value
+	/// decides over the authored attribute.
 	#[cfg(feature = "bsx")]
 	#[beet_core::test]
 	fn a_control_value_is_markup() {
@@ -562,6 +569,8 @@ mod test {
 				<div>
 					<input type="text" {Value::str("typed")}/>
 					<input type="checkbox" {Value::Bool(true)}/>
+					<input type="checkbox" checked {Value::Bool(false)}/>
+					<input type="checkbox" checked/>
 					<textarea {Value::str("lines")}/>
 					<select {Value::str("b")}>
 						<option value="a">"A"</option>
@@ -573,7 +582,9 @@ mod test {
 			.id();
 		render_with(&mut world, root, HtmlRenderer::new())
 			.xpect_contains("<input type=\"text\" value=\"typed\" />")
-			.xpect_contains("<input type=\"checkbox\" />")
+			.xpect_contains(
+				"<input type=\"checkbox\" checked /><input type=\"checkbox\" /><input type=\"checkbox\" checked />",
+			)
 			.xpect_contains("<textarea>lines</textarea>")
 			.xpect_contains("<option value=\"b\" selected>B</option>")
 			.xnot()

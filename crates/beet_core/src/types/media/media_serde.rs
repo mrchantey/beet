@@ -15,7 +15,9 @@
 //! Each format rides its own feature (`json`, `ron`, `toml`, `postcard`,
 //! `serde_plain`, `dag_cbor`), and a build without it answers the same
 //! "feature is required" error from every caller, so a disabled format fails
-//! identically everywhere. [`MediaType::DagCbor`] is canonical DAG-CBOR
+//! identically everywhere. [`MediaType::Yaml`] is beet's own, the subset a
+//! frontmatter block uses read and written through [`Value`], so it needs no
+//! feature beyond `serde` (see the `yaml` module). [`MediaType::DagCbor`] is canonical DAG-CBOR
 //! through the atproto data model ([`AtprotoValue`]): a link is CBOR tag 42,
 //! bytes a byte string and a float the object it crosses as, so its output is
 //! exactly the block a PDS stores.
@@ -96,6 +98,7 @@ impl MediaType {
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
+	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
@@ -175,13 +178,16 @@ impl MediaType {
 			MediaType::Toml => {
 				cfg_if! {
 					if #[cfg(feature = "toml")] {
-						// toml has one layout, tables after scalars
-						let _ = options;
-						toml::to_string_pretty(value)
-							.map(|text| text.into_bytes())
-							.map_err(|err| {
-								bevyhow!("Failed to serialize TOML: {err}")
-							})
+						// tables after scalars either way; pretty spreads an
+						// array over a line per item
+						match options.pretty {
+							true => toml::to_string_pretty(value),
+							false => toml::to_string(value),
+						}
+						.map(|text| text.into_bytes())
+						.map_err(|err| {
+							bevyhow!("Failed to serialize TOML: {err}")
+						})
 					} else {
 						let _ = (value, options);
 						bevybail!(
@@ -189,6 +195,12 @@ impl MediaType {
 						)
 					}
 				}
+			}
+			// one layout, through the data model
+			MediaType::Yaml => {
+				let _ = options;
+				super::yaml::Yaml::write(&Value::from_serde(value)?)
+					.map(String::into_bytes)
 			}
 			MediaType::DagCbor => {
 				cfg_if! {
@@ -247,6 +259,7 @@ impl MediaType {
 	/// | `Json`               | JSON     | `json`          |
 	/// | `Ron`                | RON      | `ron`           |
 	/// | `Toml`               | TOML     | `toml`          |
+	/// | `Yaml`               | YAML, frontmatter's subset | `serde` |
 	/// | `DagCbor`            | DAG-CBOR | `dag_cbor`      |
 	/// | `Postcard` / `Bytes` | postcard | `postcard`      |
 	#[cfg(feature = "serde")]
@@ -318,6 +331,10 @@ impl MediaType {
 						)
 					}
 				}
+			}
+			MediaType::Yaml => {
+				super::yaml::Yaml::read(core::str::from_utf8(bytes)?)?
+					.into_serde()
 			}
 			MediaType::DagCbor => {
 				cfg_if! {

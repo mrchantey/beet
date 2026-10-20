@@ -380,42 +380,6 @@ impl WordProjection {
 	}
 }
 
-impl WordProjection {
-	/// Captions every numbered table under `part` with the number its cells
-	/// are addressed by, ie `t3`: a projection-only `<caption>` a reader sees
-	/// above the table and a writer never writes.
-	fn caption_tables(world: &mut World, part: Entity) {
-		let numbered = world.with_state::<(
-			Query<(Entity, &Element)>,
-			Query<&Children>,
-			Query<&TableCellAddress>,
-		), _>(|(elements, children, addresses)| {
-			children
-				.iter_descendants_depth_first(part)
-				.filter(|entity| {
-					elements
-						.get(*entity)
-						.is_ok_and(|(_, element)| element.tag() == "table")
-				})
-				.filter_map(|table| {
-					children
-						.iter_descendants_depth_first(table)
-						.find_map(|cell| addresses.get(cell).ok())
-						.map(|address| (table, address.table))
-				})
-				.collect::<Vec<_>>()
-		});
-		for (table, number) in numbered {
-			let caption = world
-				.spawn((Element::new("caption"), children![Value::Str(
-					format!("t{number}").into()
-				)]))
-				.id();
-			world.entity_mut(table).insert_child(0, caption);
-		}
-	}
-}
-
 impl ListLevel {
 	/// Groups every run of numbered paragraphs under `part` into
 	/// projection-only `<ul>`s, one per level, a deeper level nested in the
@@ -485,8 +449,9 @@ impl ListLevel {
 
 impl WordProjection {
 	/// Reads a Word package under `root`: its headers, its main document,
-	/// its footers and its notes, each a part read and projected, and the
-	/// main document's tables numbered.
+	/// its footers and its notes, each a part read and projected, its tables
+	/// left for [`NumberTables`] to number and caption, the main document's
+	/// alone since the rest are headers, footers and notes.
 	pub(crate) fn build(
 		world: &mut World,
 		root: Entity,
@@ -520,12 +485,10 @@ impl WordProjection {
 				images: package.images(&part),
 			}
 			.project(world, entity);
-			// the cells a fill addresses are the main document's alone
-			if part == main {
-				TableCellAddress::assign(world, entity);
-				Self::caption_tables(world, entity);
-			}
 		}
+		world
+			.entity_mut(root)
+			.insert(NumberTables { caption: true });
 		Ok(())
 	}
 }
@@ -589,6 +552,48 @@ pub(crate) mod test {
 			.iter(&world)
 			.any(|look| look.colour.as_deref() == Some("FF0000"))
 			.xpect_true();
+	}
+
+	/// A Word file's core properties lead its markdown as frontmatter, when
+	/// asked: what it shares with any page unsectioned, every property as
+	/// written in its own table, and the block reads back into both.
+	#[beet_core::test]
+	fn writes_its_core_properties_as_frontmatter() {
+		let (mut world, root) = parse(
+			OoxmlFile::word_with_properties(
+				"<w:p><w:r><w:t>Body</w:t></w:r></w:p>",
+				Some(
+					"<dc:title>Plan</dc:title><dc:creator>Ada</dc:creator>\
+					 <cp:lastModifiedBy>Grace</cp:lastModifiedBy><cp:revision>3</cp:revision>\
+					 <dcterms:created>2024-03-01T09:30:00Z</dcterms:created>",
+				),
+			)
+			.unwrap(),
+		);
+		let block = MarkdownRenderer::new()
+			.render(&mut RenderContext::new(
+				&mut world,
+				root,
+				&RequestParts::default().with_flag("frontmatter"),
+			))
+			.unwrap()
+			.to_string();
+		block.clone().xpect_starts_with(
+			"+++\ntitle = \"Plan\"\ncreated = \"2024-03-01\"\nauthors = [\"Ada\"]\n\n\
+			 [CoreProperties]\ntitle = \"Plan\"\ncreator = \"Ada\"\nlast_modified_by = \"Grace\"\n\
+			 revision = \"3\"\ncreated = \"2024-03-01T09:30:00Z\"\n+++\n\nBody",
+		);
+		let registry = world.resource::<AppTypeRegistry>().read();
+		Frontmatter::extract(&block)
+			.unwrap()
+			.unwrap()
+			.declarations("PageMeta")
+			.get::<CoreProperties>(&registry)
+			.unwrap()
+			.unwrap()
+			.revision
+			.unwrap()
+			.xpect_eq("3");
 	}
 
 	/// The cells a fill addresses, a checkbox read as its box.

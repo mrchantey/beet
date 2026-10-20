@@ -52,7 +52,8 @@ impl ReaderText<'_, '_> {
 	}
 
 	/// Whether `entity` is a checkbox `<input>`, and if so whether it is
-	/// checked, by its `checked` attribute or its own value.
+	/// checked, as [`ElementView::checked`] reads it: its own value when it
+	/// holds a bool, else its `checked` attribute.
 	pub fn checkbox(&self, entity: Entity) -> Option<bool> {
 		let (Some(element), value, ..) = self.nodes.get(entity).ok()? else {
 			return None;
@@ -62,9 +63,9 @@ impl ReaderText<'_, '_> {
 				.attributes
 				.find(entity, "type")
 				.is_some_and(|(_, value)| value.to_string() == "checkbox");
-		is_checkbox.then(|| {
-			matches!(value, Some(Value::Bool(true)))
-				|| self.attributes.find(entity, "checked").is_some()
+		is_checkbox.then(|| match value {
+			Some(Value::Bool(checked)) => *checked,
+			_ => self.attributes.find(entity, "checked").is_some(),
 		})
 	}
 
@@ -141,5 +142,37 @@ impl ReaderText<'_, '_> {
 		if ends_line && !is_start && !out.is_empty() && !out.ends_with('\n') {
 			out.push('\n');
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_core::prelude::*;
+
+	/// A box reads as its value says when it holds a bool, an unticked value
+	/// overriding an authored `checked`, and as its attribute otherwise.
+	#[beet_core::test]
+	fn reads_a_checkbox_by_its_state() {
+		let mut world = World::new();
+		let root = world
+			.spawn(rsx! {
+				<p>
+					<input type="checkbox" checked/>
+					<input type="checkbox" checked {Value::Bool(false)}/>
+					<input type="checkbox" {Value::Bool(true)}/>
+					<input type="checkbox"/>
+				</p>
+			})
+			.id();
+		world.with_state::<(ReaderText, Query<&Children>), _>(
+			|(text, children)| {
+				children
+					.iter_descendants(root)
+					.filter_map(|entity| text.checkbox(entity))
+					.collect::<Vec<_>>()
+					.xpect_eq(vec![true, false, true, false]);
+			},
+		);
 	}
 }
