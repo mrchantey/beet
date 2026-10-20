@@ -96,8 +96,6 @@ pub use dom::*;
 // back by the browser world once it has adopted it.
 mod pre_boot;
 pub use pre_boot::*;
-mod style_map;
-pub use style_map::*;
 mod render_target;
 pub use render_target::*;
 mod plaintext;

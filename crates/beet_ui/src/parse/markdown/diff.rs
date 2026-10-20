@@ -19,7 +19,6 @@
 use crate::prelude::*;
 
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 /// Controls how children of void elements are handled.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -54,7 +53,7 @@ pub struct HtmlDiffConfig {
 	/// and attribute values at parse time.
 	pub unescape_html: bool,
 	/// Elements that do not require a closing tag.
-	pub void_elements: Vec<Cow<'static, str>>,
+	pub void_elements: Vec<SmolStr>,
 	/// How to handle children of void elements.
 	pub void_element_children: VoidElementChildrenOpts,
 	/// How to handle malformed HTML.
@@ -67,22 +66,7 @@ impl Default for HtmlDiffConfig {
 			parse_text_nodes: false,
 			parse_attribute_values: false,
 			unescape_html: true,
-			void_elements: vec![
-				"area".into(),
-				"base".into(),
-				"br".into(),
-				"col".into(),
-				"embed".into(),
-				"hr".into(),
-				"img".into(),
-				"input".into(),
-				"link".into(),
-				"meta".into(),
-				"param".into(),
-				"source".into(),
-				"track".into(),
-				"wbr".into(),
-			],
+			void_elements: element_names(VOID_ELEMENTS),
 			void_element_children: VoidElementChildrenOpts::default(),
 			malformed_elements: MalformedElementsOpts::default(),
 		}
@@ -97,7 +81,7 @@ impl HtmlDiffConfig {
 	/// capitalized component tag (eg the `<Link>` widget) never matches the
 	/// lowercase void list and resolves through the BSX path keeping its children.
 	pub fn is_void_element(&self, name: &str) -> bool {
-		self.void_elements.iter().any(|el| el.as_ref() == name)
+		self.void_elements.iter().any(|el| el == name)
 	}
 
 	/// Convert an attribute token value to a [`Value`] based on config.

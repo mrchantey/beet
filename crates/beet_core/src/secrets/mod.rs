@@ -6,7 +6,8 @@
 //! In every build, since a deployed binary carries no vault:
 //!
 //! - [`SecretStore`]: the erased-provider seam, keyed by [`SecretRef`] and
-//!   scoped by [`SecretScope`], resolved by [`SecretStoreQuery`]. Providers:
+//!   scoped by [`SecretScope`], resolved by ancestry (`AncestorQuery<&SecretStore>`,
+//!   the nearest declaration winning, as for a `BlobStore`). Providers:
 //!   [`EnvSecretStore`] (the launch's environment, read-only) here, AWS
 //!   parameter store and a secrets document as a stack's store in `beet_infra`
 //! - [`StoredSecret`]: one secret a process reads, a store and its key,

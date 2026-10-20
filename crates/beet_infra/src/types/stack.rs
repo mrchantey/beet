@@ -337,7 +337,7 @@ pub struct StackQuery<'w, 's> {
 	deployment: Option<Res<'w, Deployment>>,
 	/// The secret store a declaration landed, see
 	/// [`secret_store`](Self::secret_store).
-	secret_stores: SecretStoreQuery<'w, 's>,
+	secret_stores: AncestorQuery<'w, 's, &'static SecretStore>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -419,7 +419,7 @@ impl<'w, 's> StackQuery<'w, 's> {
 	/// The [`SecretStore`] `entity`'s stack keeps its secrets in, scoped to
 	/// that stack: the one declared on its `<Stack>` or an ancestor
 	/// (`<Stack {SsmSecrets}>`, `{DocumentSecrets{path:".."}}`), nearest
-	/// wins as for any store ([`SecretStoreQuery`]), else the implicit
+	/// wins as for any store (`AncestorQuery<&SecretStore>`), else the implicit
 	/// `<SsmSecrets/>` every stack carries ([`SsmSecrets::store`]).
 	/// Resolved from the stack's root, which is why a store declared
 	/// beneath it is refused ([`refuse_nested_store`](Self::refuse_nested_store)).

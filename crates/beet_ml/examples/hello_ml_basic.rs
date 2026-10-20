@@ -11,20 +11,20 @@ use beet_ml::prelude::*;
 async fn main() -> Result {
 	PrettyTracing::default().init();
 	let mut bert = Bert::new(BertConfig::default()).await?;
-	let embeddings = bert.get_embeddings(vec![
-		"The cat sits outside".into(),
-		"A man is playing guitar".into(),
-		"I love pasta".into(),
-		"The new movie is awesome".into(),
-		"The cat plays in the garden".into(),
-		"A woman watches TV".into(),
-		"The new movie is so great".into(),
-		"Do you like pizza?".into(),
+	let embeddings = bert.get_embeddings([
+		"The cat sits outside",
+		"A man is playing guitar",
+		"I love pasta",
+		"The new movie is awesome",
+		"The cat plays in the garden",
+		"A woman watches TV",
+		"The new movie is so great",
+		"Do you like pizza?",
 	])?;
 
 	let results = embeddings.scores_sorted(0)?;
 	assert_eq!(
-		embeddings.sentences[results[0].0].as_ref(),
+		embeddings.sentences[results[0].0].as_str(),
 		"The cat plays in the garden"
 	);
 

@@ -558,7 +558,7 @@ mod test {
 		json["terraform"]["required_version"]
 			.as_str()
 			.unwrap()
-			.xpect_eq(terra::Config::EPHEMERAL_REQUIRED_VERSION);
+			.xpect_eq(">= 1.11.0");
 	}
 
 	/// The version is the record's `modified`, so rolling the record moves

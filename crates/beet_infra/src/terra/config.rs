@@ -14,7 +14,7 @@
 //! let bucket = AwsS3BucketDetails { bucket: Some("my-bucket".into()), ..Default::default() };
 //! let config = Config::new()
 //!     .with_backend(&S3Backend::default())
-//!     .with_required_version("~> 1.8")
+//!     .with_required_version(Version::new(1, 8, 0))
 //!     .with_resource("assets", &bucket)?
 //!     .with_output("bucket_name", Output {
 //!         value: "${aws_s3_bucket.assets.bucket}".into(),
@@ -41,6 +41,7 @@ use crate::prelude::*;
 use crate::terra::Resource;
 use crate::terra::*;
 use beet_core::prelude::*;
+use semver::Version;
 use serde::Serialize;
 
 /// A Terraform variable definition.
@@ -75,7 +76,7 @@ pub struct Output {
 /// ```rust,ignore
 /// let config = Config::new()
 ///     .with_backend(&S3Backend::default())
-///     .with_required_version("~> 1.8")
+///     .with_required_version(Version::new(1, 8, 0))
 ///     .with_resource("assets", &bucket)?
 ///     .with_output("bucket_name", Output {
 ///         value: "${aws_s3_bucket.assets.bucket}".into(),
@@ -91,8 +92,9 @@ pub struct Config {
 	/// State/plan encryption, serialised into `terraform.encryption`. See
 	/// [`StateEncryption`].
 	encryption: Option<Value>,
-	/// Optional `required_version` constraint in the `terraform` block.
-	required_version: Option<String>,
+	/// The oldest OpenTofu release the config runs on, rendered as the
+	/// `terraform` block's `required_version = ">= {version}"`.
+	required_version: Option<Version>,
 	required_providers: Map,
 	/// Provider config blocks. Values are [`Value::Map`] for a single config
 	/// or [`Value::List`] of maps when aliases are used.
@@ -120,10 +122,10 @@ impl Config {
 	pub const STORAGE_LAYER: &str = "storage";
 
 	/// The OpenTofu release ephemeral variables and write-only attributes
-	/// arrived in (1.11.0), which a config declaring an
+	/// arrived in, which a config declaring an
 	/// [`ephemeral`](Variable::ephemeral) variable requires, so an older
 	/// tofu refuses naming the version rather than misreading the attribute.
-	pub const EPHEMERAL_REQUIRED_VERSION: &str = ">= 1.11.0";
+	pub const EPHEMERAL_REQUIRED_VERSION: Version = Version::new(1, 11, 0);
 
 	/// Create a new empty configuration.
 	pub fn new() -> Self { Self::default() }
@@ -191,25 +193,20 @@ impl Config {
 		self
 	}
 
-	/// Set the required OpenTofu/Terraform version constraint (chaining).
+	/// Set the oldest OpenTofu release the config runs on (chaining).
 	///
 	/// ```ignore
-	/// let config = Config::new().with_required_version("~> 1.8");
+	/// let config = Config::new().with_required_version(Version::new(1, 8, 0));
 	/// ```
-	pub fn with_required_version(
-		mut self,
-		constraint: impl Into<String>,
-	) -> Self {
-		self.set_required_version(constraint);
+	pub fn with_required_version(mut self, version: Version) -> Self {
+		self.set_required_version(version);
 		self
 	}
 
-	/// Set the required OpenTofu/Terraform version constraint.
-	pub fn set_required_version(
-		&mut self,
-		constraint: impl Into<String>,
-	) -> &mut Self {
-		self.required_version = Some(constraint.into());
+	/// Set the oldest OpenTofu release the config runs on, rendered as
+	/// `required_version = ">= {version}"`.
+	pub fn set_required_version(&mut self, version: Version) -> &mut Self {
+		self.required_version = Some(version);
 		self
 	}
 
@@ -725,7 +722,7 @@ impl Config {
 		// terraform block: optional required_version, backend, required_providers
 		let mut tf_block = Map::default();
 		if let Some(version) = &self.required_version {
-			tf_block.insert("required_version", version.clone());
+			tf_block.insert("required_version", format!(">= {version}"));
 		}
 		if let Some(backend) = &self.backend {
 			tf_block.insert("backend", backend.clone());
@@ -847,9 +844,12 @@ impl Config {
 		}
 		if let Some(ephemeral) = variable.ephemeral {
 			obj.insert("ephemeral", ephemeral);
-			if ephemeral && self.required_version.is_none() {
-				self.required_version =
-					Some(Self::EPHEMERAL_REQUIRED_VERSION.into());
+			// raise the floor, keeping a later release already required
+			if ephemeral {
+				self.required_version = self
+					.required_version
+					.take()
+					.max(Some(Self::EPHEMERAL_REQUIRED_VERSION));
 			}
 		}
 		self.variables.insert(name, obj);

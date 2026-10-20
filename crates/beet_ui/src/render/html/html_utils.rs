@@ -4,7 +4,6 @@
 //! corresponding characters, covering the most common typographic
 //! and structural entities from the W3C reference.
 
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 /// The HTML block-level element names, the single list shared by everything that
@@ -55,10 +54,19 @@ pub(crate) fn is_block_element(name: &str) -> bool {
 		.any(|el| el.eq_ignore_ascii_case(name))
 }
 
-/// The default set of block-level element names as owned `Cow`s, for renderers
-/// that store an overridable list.
-pub(crate) fn default_block_elements() -> Vec<Cow<'static, str>> {
-	BLOCK_ELEMENTS.iter().map(|el| Cow::Borrowed(*el)).collect()
+/// The HTML void element names, those without a closing tag.
+pub(crate) const VOID_ELEMENTS: &[&str] = &[
+	"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
+	"param", "source", "track", "wbr",
+];
+
+/// The HTML raw text element names, whose children are never escaped.
+pub(crate) const RAW_TEXT_ELEMENTS: &[&str] = &["script", "style"];
+
+/// `names` as an owned list, for a renderer or parser that stores an
+/// overridable one, ie `element_names(VOID_ELEMENTS)`.
+pub(crate) fn element_names(names: &[&'static str]) -> Vec<SmolStr> {
+	names.iter().copied().map(SmolStr::new_static).collect()
 }
 
 /// Entity pairs as `(html_entity, character)`.

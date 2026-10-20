@@ -4,7 +4,6 @@ mod trigger_with_user_sentence;
 pub use self::trigger_with_user_sentence::*;
 
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 /// Registers [`Sentence`] and the [`Bert`] asset (+ `.ron` loader) for
 /// embedding-driven actions like [`NearestSentence`] and (with the
@@ -23,11 +22,11 @@ pub fn language_plugin(app: &mut App) {
 /// child behavior (a candidate). Used by sentence-similarity selectors.
 #[derive(Debug, Clone, Component, PartialEq, Reflect)]
 #[reflect(Component, Default)]
-pub struct Sentence(pub Cow<'static, str>);
+pub struct Sentence(pub SmolStr);
 
 impl Sentence {
 	/// Create a [`Sentence`] from any string-like type.
-	pub fn new(s: impl Into<Cow<'static, str>>) -> Self { Self(s.into()) }
+	pub fn new(text: impl Into<SmolStr>) -> Self { Self(text.into()) }
 }
 
 impl Default for Sentence {

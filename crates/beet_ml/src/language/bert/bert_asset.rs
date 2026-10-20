@@ -6,7 +6,6 @@ use burn::tensor::Tensor;
 use burn_store::ModuleSnapshot;
 use burn_store::PyTorchToBurnAdapter;
 use burn_store::SafetensorsStore;
-use std::borrow::Cow;
 use tokenizers::Tokenizer;
 
 /// A loaded bert encoder + tokenizer bundled as a bevy [`Asset`].
@@ -98,9 +97,10 @@ impl Bert {
 	/// is in the order of ~100ms per batch on desktop.
 	pub fn get_embeddings(
 		&mut self,
-		options: Vec<Cow<'static, str>>,
+		options: impl IntoIterator<Item = impl Into<SmolStr>>,
 	) -> Result<SentenceEmbeddings> {
-		let refs: Vec<&str> = options.iter().map(|s| s.as_ref()).collect();
+		let options = options.into_iter().map(Into::into).collect::<Vec<_>>();
+		let refs: Vec<&str> = options.iter().map(SmolStr::as_str).collect();
 		let (input_ids, attention_mask) =
 			tokenize_batch(&self.tokenizer, &refs, &self.device)?;
 		let output =
@@ -118,7 +118,7 @@ impl Bert {
 	/// `target`. Entities lacking a [`Sentence`] are skipped.
 	pub fn closest_sentence_entity(
 		&mut self,
-		target: impl Into<Cow<'static, str>>,
+		target: impl Into<SmolStr>,
 		options: impl IntoIterator<Item = Entity>,
 		sentences: &Query<&Sentence>,
 	) -> Result<Entity> {
@@ -134,12 +134,11 @@ impl Bert {
 	/// Returns the index of the option whose sentence is closest to `target`.
 	pub fn closest_option_index(
 		&mut self,
-		target: impl Into<Cow<'static, str>>,
-		options: impl IntoIterator<Item = Cow<'static, str>>,
+		target: impl Into<SmolStr>,
+		options: impl IntoIterator<Item = SmolStr>,
 	) -> Result<usize> {
-		let mut all_sentences = vec![target.into()];
-		all_sentences.extend(options);
-		let embeddings = self.get_embeddings(all_sentences)?;
+		let embeddings = self
+			.get_embeddings(core::iter::once(target.into()).chain(options))?;
 		let scores = embeddings.scores_from_first()?;
 		scores
 			.iter()
@@ -155,17 +154,14 @@ impl Bert {
 /// Container for a batch of sentence embeddings plus the input strings.
 pub struct SentenceEmbeddings {
 	/// One entry per input sentence, in input order.
-	pub sentences: Vec<Cow<'static, str>>,
+	pub sentences: Vec<SmolStr>,
 	/// Pooled (and optionally normalised) embeddings, shape
 	/// `[n_sentences, hidden]`.
 	pub embeddings: Tensor<2>,
 }
 
 impl SentenceEmbeddings {
-	pub(crate) fn new(
-		sentences: Vec<Cow<'static, str>>,
-		embeddings: Tensor<2>,
-	) -> Self {
+	pub(crate) fn new(sentences: Vec<SmolStr>, embeddings: Tensor<2>) -> Self {
 		Self {
 			sentences,
 			embeddings,
@@ -233,20 +229,20 @@ mod test {
 		pretty_env_logger::try_init().ok();
 		let mut bert = Bert::new(BertConfig::default()).await.unwrap();
 		let embeddings = bert
-			.get_embeddings(vec![
-				"The cat sits outside".into(),
-				"A man is playing guitar".into(),
-				"I love pasta".into(),
-				"The new movie is awesome".into(),
-				"The cat plays in the garden".into(),
-				"A woman watches TV".into(),
-				"The new movie is so great".into(),
-				"Do you like pizza?".into(),
+			.get_embeddings([
+				"The cat sits outside",
+				"A man is playing guitar",
+				"I love pasta",
+				"The new movie is awesome",
+				"The cat plays in the garden",
+				"A woman watches TV",
+				"The new movie is so great",
+				"Do you like pizza?",
 			])
 			.unwrap();
 		let results = embeddings.scores_sorted(0).unwrap();
 		embeddings.sentences[results[0].0]
-			.as_ref()
+			.as_str()
 			.xpect_eq("The cat plays in the garden");
 	}
 }

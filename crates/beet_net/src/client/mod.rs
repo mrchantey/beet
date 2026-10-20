@@ -23,9 +23,9 @@
 //! ```
 // an AWS api as SigV4-signed requests over this client, as the launch's
 // credentials: the identity, the signing and the JSON 1.1 protocol.
-#[cfg(feature = "aws_sigv4")]
+#[cfg(feature = "aws_rest_api")]
 mod aws_credentials;
-#[cfg(feature = "aws_sigv4")]
+#[cfg(feature = "aws_rest_api")]
 mod aws_json_client;
 #[cfg(feature = "http")]
 mod event_source;
@@ -54,9 +54,9 @@ mod impl_ureq;
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 mod impl_web_sys;
 mod send;
-#[cfg(feature = "aws_sigv4")]
+#[cfg(feature = "aws_rest_api")]
 pub use aws_credentials::*;
-#[cfg(feature = "aws_sigv4")]
+#[cfg(feature = "aws_rest_api")]
 pub use aws_json_client::*;
 #[cfg(feature = "http")]
 pub use event_source::*;

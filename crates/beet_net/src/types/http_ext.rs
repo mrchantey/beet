@@ -16,7 +16,7 @@
 //!   `WebSocketUpgrade` response type a route returns are gated behind
 //!   `tungstenite` (they pull `sha1`/`base64`). A backend lands the upgraded
 //!   stream as a `Socket` (see `mini_http_server`/`hyper_server`).
-//! - **`http`-crate helpers** ([`has_body`], [`version_to_string`],
+//! - **`http`-crate helpers** ([`has_body`], [`version_str`],
 //!   [`parse_version`]): convert to/from the `http` crate types and are gated
 //!   per-function behind the `http` feature, so the module itself still compiles
 //!   `no_std` without that feature.
@@ -454,16 +454,15 @@ pub fn has_body_by_transfer_encoding(headers: &http::HeaderMap) -> bool {
 		.unwrap_or(false)
 }
 
-/// Convert http version to string representation.
+/// The string form of an http version, ie `1.1`, the inverse of [`parse_version`].
 #[cfg(feature = "http")]
-pub fn version_to_string(version: http::Version) -> String {
+pub fn version_str(version: http::Version) -> &'static str {
 	match version {
-		http::Version::HTTP_09 => "0.9".to_string(),
-		http::Version::HTTP_10 => "1.0".to_string(),
-		http::Version::HTTP_11 => "1.1".to_string(),
-		http::Version::HTTP_2 => "2".to_string(),
-		http::Version::HTTP_3 => "3".to_string(),
-		_ => "1.1".to_string(),
+		http::Version::HTTP_09 => "0.9",
+		http::Version::HTTP_10 => "1.0",
+		http::Version::HTTP_2 => "2",
+		http::Version::HTTP_3 => "3",
+		_ => "1.1",
 	}
 }
 
@@ -780,8 +779,8 @@ mod test {
 	#[cfg(feature = "http")]
 	#[beet_core::test]
 	fn version_conversions() {
-		version_to_string(http::Version::HTTP_11).xpect_eq("1.1");
-		version_to_string(http::Version::HTTP_2).xpect_eq("2");
+		version_str(http::Version::HTTP_11).xpect_eq("1.1");
+		version_str(http::Version::HTTP_2).xpect_eq("2");
 		parse_version("1.1").xpect_eq(http::Version::HTTP_11);
 		parse_version("2").xpect_eq(http::Version::HTTP_2);
 	}

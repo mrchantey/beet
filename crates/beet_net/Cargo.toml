@@ -155,7 +155,7 @@ cloudflare = ["std", "dep:worker"]
 # An AWS JSON api (`AwsJsonClient`, ie parameter store) as SigV4-signed
 # requests through this crate's own http client, as the launch's credentials:
 # no SDK client, no runtime, no `aws` cli, so every target, wasm included.
-aws_sigv4 = [
+aws_rest_api = [
 	"std",
 	"http",
 	"serde",
@@ -281,7 +281,7 @@ qrcode = { workspace = true, optional = true }
 # http
 http = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
-#💡 aws_sigv4
+#💡 aws_rest_api
 aws-sigv4 = { workspace = true, optional = true }
 aws-credential-types = { workspace = true, optional = true }
 aws-smithy-runtime-api = { workspace = true, optional = true }

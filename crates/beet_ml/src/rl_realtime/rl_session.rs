@@ -3,7 +3,6 @@ use crate::PreTickSet;
 use crate::prelude::*;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
-use std::borrow::Cow;
 use std::marker::PhantomData;
 
 /// Emitted at the start of each episode within a session.
@@ -88,34 +87,17 @@ pub struct DespawnOnSessionEnd;
 #[derive(Debug, Clone, Copy, Component, Reflect)]
 pub struct DespawnOnEpisodeEnd;
 
-/// Session component, holding parameters, progress, and optional save path.
+/// Session component, holding parameters and progress.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
 pub struct RlSession<T: EpisodeParams> {
 	params: T,
-	filename: Option<Cow<'static, str>>,
 	episode: u32,
 }
 
 impl<T: EpisodeParams> RlSession<T> {
 	/// Create a session from the given parameters.
-	pub fn new(params: T) -> Self {
-		Self {
-			params,
-			filename: None,
-			episode: 0,
-		}
-	}
-
-	/// Attach a filename used by callers to save the trained policy when
-	/// the session ends.
-	pub fn with_outfile(
-		mut self,
-		filename: impl Into<Cow<'static, str>>,
-	) -> Self {
-		self.filename = Some(filename.into());
-		self
-	}
+	pub fn new(params: T) -> Self { Self { params, episode: 0 } }
 }
 
 /// On session-spawn, emits [`StartSession`] and the first [`StartEpisode`].

@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use core::marker::PhantomData;
@@ -11,7 +10,7 @@ use core::marker::PhantomData;
 pub fn SetTextOnRun<F>(
 	/// The text to set
 	#[field]
-	value: Cow<'static, str>,
+	value: SmolStr,
 	_cx: In<ActionContext>,
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,
@@ -30,7 +29,7 @@ where
 
 impl<F: Component> SetTextOnRun<F> {
 	/// Creates a new `SetTextOnRun` action.
-	pub fn new(value: impl Into<Cow<'static, str>>) -> Self {
+	pub fn new(value: impl Into<SmolStr>) -> Self {
 		Self {
 			value: value.into(),
 			_marker: PhantomData,

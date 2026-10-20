@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 /// Renders an entity tree back to a markdown string via [`NodeVisitor`].
@@ -222,7 +221,7 @@ impl MarkdownRenderer {
 	/// Override the set of block-level elements.
 	pub fn with_block_elements(
 		mut self,
-		elements: Vec<Cow<'static, str>>,
+		elements: impl IntoIterator<Item = impl Into<SmolStr>>,
 	) -> Self {
 		self.state = self.state.with_block_elements(elements);
 		self

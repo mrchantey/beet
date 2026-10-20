@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use alloc::borrow::Cow;
 use alloc::collections::VecDeque;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
@@ -38,7 +37,7 @@ pub enum NavigatorTransport {
 #[derive(Debug, Clone, Component)]
 #[component(on_add = on_add)]
 pub struct Navigator {
-	user_agent: Cow<'static, str>,
+	user_agent: SmolStr,
 	/// Media types accepted by this navigator, in preference order.
 	accepts: Vec<MediaType>,
 	/// How requests travel: a network fetch, or in-world router dispatch.
@@ -124,8 +123,7 @@ impl Default for Navigator {
 		// let mut history = VecDeque::new();
 		// history.push_back(home.clone());
 		Self {
-			// user_agent: "curl/8.17.0".into(),
-			user_agent: "Mozilla/5.0 Beet/0.1".into(),
+			user_agent: SmolStr::new_static("Mozilla/5.0 Beet/0.1"),
 			home_url: home.clone(),
 			accepts: vec![
 				// prefer markdown — beet skips scripts/styles so less content
@@ -337,7 +335,7 @@ impl Navigator {
 	async fn fetch_and_render(
 		entity: AsyncEntity,
 		transport: NavigatorTransport,
-		user_agent: Cow<'static, str>,
+		user_agent: SmolStr,
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result {
@@ -437,7 +435,7 @@ impl Navigator {
 	/// A pure data fetch with no UI side effect; a 404 renders its error body
 	/// rather than bailing.
 	async fn http_fetch(
-		user_agent: Cow<'static, str>,
+		user_agent: SmolStr,
 		url: Url,
 		accepts: Vec<MediaType>,
 	) -> Result<MediaBytes> {

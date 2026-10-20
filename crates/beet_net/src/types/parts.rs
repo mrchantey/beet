@@ -26,7 +26,6 @@
 //! ```
 
 use super::*;
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 use bevy::reflect::FromReflect;
 use bevy::reflect::Typed;
@@ -67,7 +66,7 @@ pub struct RequestParts {
 	/// HTTP headers or CLI environment variables.
 	pub headers: HeaderMap,
 	/// The HTTP version or CLI command version.
-	version: Cow<'static, str>,
+	version: SmolStr,
 }
 
 impl Default for RequestParts {
@@ -76,7 +75,7 @@ impl Default for RequestParts {
 			method: HttpMethod::Get,
 			url: Url::default(),
 			headers: default(),
-			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
+			version: SmolStr::new_static(DEFAULT_HTTP_VERSION),
 		}
 	}
 }
@@ -97,7 +96,7 @@ impl RequestParts {
 			method,
 			url: url.into().with_rooted(true),
 			headers: HeaderMap::default(),
-			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
+			version: SmolStr::new_static(DEFAULT_HTTP_VERSION),
 		}
 	}
 
@@ -334,7 +333,7 @@ pub struct ResponseParts {
 	/// HTTP headers.
 	pub headers: HeaderMap,
 	/// The HTTP version.
-	pub version: Cow<'static, str>,
+	pub version: SmolStr,
 	/// An internal error's unredacted report, which never goes on the wire:
 	/// the CLI claims it, a remote client's response logs it once sent.
 	pub report: Option<FailureReport>,
@@ -361,7 +360,7 @@ impl ResponseParts {
 		Self {
 			status,
 			headers: default(),
-			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
+			version: SmolStr::new_static(DEFAULT_HTTP_VERSION),
 			report: None,
 		}
 	}
@@ -420,7 +419,8 @@ impl From<http::request::Parts> for RequestParts {
 		let params =
 			uri.query().map(Url::parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
-		let version = http_ext::version_to_string(http_parts.version);
+		let version =
+			SmolStr::new_static(http_ext::version_str(http_parts.version));
 		let method = HttpMethod::from(http_parts.method);
 
 		let url = Url::new(scheme, authority, path, params, None);
@@ -429,7 +429,7 @@ impl From<http::request::Parts> for RequestParts {
 			method,
 			url,
 			headers,
-			version: Cow::Owned(version),
+			version,
 		}
 	}
 }
@@ -446,7 +446,8 @@ impl From<&http::request::Parts> for RequestParts {
 		let params =
 			uri.query().map(Url::parse_query_string).unwrap_or_default();
 		let headers = http_header_map_to_header_map(&http_parts.headers);
-		let version = http_ext::version_to_string(http_parts.version);
+		let version =
+			SmolStr::new_static(http_ext::version_str(http_parts.version));
 		let method = HttpMethod::from(&http_parts.method);
 
 		let url = Url::new(scheme, authority, path, params, None);
@@ -455,7 +456,7 @@ impl From<&http::request::Parts> for RequestParts {
 			method,
 			url,
 			headers,
-			version: Cow::Owned(version),
+			version,
 		}
 	}
 }
@@ -468,12 +469,13 @@ impl From<&http::request::Parts> for RequestParts {
 impl From<http::response::Parts> for ResponseParts {
 	fn from(http_parts: http::response::Parts) -> Self {
 		let headers = http_header_map_to_header_map(&http_parts.headers);
-		let version = http_ext::version_to_string(http_parts.version);
+		let version =
+			SmolStr::new_static(http_ext::version_str(http_parts.version));
 
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
-			version: Cow::Owned(version),
+			version,
 			report: None,
 		}
 	}
@@ -483,12 +485,13 @@ impl From<http::response::Parts> for ResponseParts {
 impl From<&http::response::Parts> for ResponseParts {
 	fn from(http_parts: &http::response::Parts) -> Self {
 		let headers = http_header_map_to_header_map(&http_parts.headers);
-		let version = http_ext::version_to_string(http_parts.version);
+		let version =
+			SmolStr::new_static(http_ext::version_str(http_parts.version));
 
 		ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
-			version: Cow::Owned(version),
+			version,
 			report: None,
 		}
 	}
@@ -509,12 +512,10 @@ impl From<CliArgs> for RequestParts {
 			method: HttpMethod::Get,
 			url,
 			headers: HeaderMap::default(),
-			version: Cow::Owned(
-				env_ext::var("CARGO_PKG_VERSION")
-					.as_deref()
-					.unwrap_or(DEFAULT_CLI_VERSION)
-					.to_string(),
-			),
+			version: env_ext::var("CARGO_PKG_VERSION")
+				.as_deref()
+				.unwrap_or(DEFAULT_CLI_VERSION)
+				.into(),
 		}
 	}
 }
@@ -887,15 +888,5 @@ mod test {
 			header::TransferEncodingValue::Chunked,
 		);
 		parts2.has_body().xpect_true();
-	}
-
-	#[beet_core::test]
-	fn version_is_cow_static() {
-		// Default version uses borrowed static string
-		let parts = RequestParts::default();
-		parts.version().xpect_eq("1.1");
-
-		let response = ResponseParts::default();
-		response.version().xpect_eq("1.1");
 	}
 }

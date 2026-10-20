@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 /// Renders an entity tree back to an HTML string via [`NodeVisitor`].
@@ -23,7 +22,7 @@ pub struct HtmlRenderer {
 	render_expressions: bool,
 	/// Elements without a closing tag, whose children
 	/// will be popped out to trailing siblings.
-	void_elements: Vec<Cow<'static, str>>,
+	void_elements: Vec<SmolStr>,
 	/// Current indentation depth, used with `indent`.
 	current_depth: usize,
 	/// When `true`, escape special characters in text content and
@@ -36,7 +35,7 @@ pub struct HtmlRenderer {
 	strip_comments: bool,
 	/// Raw text elements whose children should not be HTML-escaped,
 	/// per the HTML spec, ie `<script>`, `<style>`.
-	raw_text_elements: Vec<Cow<'static, str>>,
+	raw_text_elements: Vec<SmolStr>,
 	/// Tracks whether we are currently inside a raw text element.
 	in_raw_text_element: bool,
 	/// The value of the `<select>` being written, so the `<option>` it names
@@ -76,11 +75,11 @@ impl HtmlRenderer {
 			head_hoist: Vec::new(),
 			indent: None,
 			render_expressions: false,
-			void_elements: default_void_elements(),
+			void_elements: element_names(VOID_ELEMENTS),
 			current_depth: 0,
 			escape_html: true,
 			strip_comments: true,
-			raw_text_elements: default_raw_text_elements(),
+			raw_text_elements: element_names(RAW_TEXT_ELEMENTS),
 			in_raw_text_element: false,
 			select_value: None,
 		}
@@ -124,9 +123,9 @@ impl HtmlRenderer {
 	/// Override the set of void elements.
 	pub fn with_void_elements(
 		mut self,
-		elements: Vec<Cow<'static, str>>,
+		elements: impl IntoIterator<Item = impl Into<SmolStr>>,
 	) -> Self {
-		self.void_elements = elements;
+		self.void_elements = elements.into_iter().map(Into::into).collect();
 		self
 	}
 
@@ -145,11 +144,11 @@ impl HtmlRenderer {
 
 	fn is_void_element(&self, name: &str) -> bool {
 		let lower = name.to_ascii_lowercase();
-		self.void_elements.iter().any(|el| el.as_ref() == lower)
+		self.void_elements.iter().any(|el| *el == lower)
 	}
 
 	fn is_raw_text_element(&self, name: &str) -> bool {
-		self.raw_text_elements.iter().any(|el| el.as_ref() == name)
+		self.raw_text_elements.iter().any(|el| el == name)
 	}
 
 	fn is_pretty(&self) -> bool { self.indent.is_some() }
@@ -385,31 +384,6 @@ impl NodeRenderer for HtmlRenderer {
 		)
 		.xok()
 	}
-}
-
-fn default_void_elements() -> Vec<Cow<'static, str>> {
-	vec![
-		"area".into(),
-		"base".into(),
-		"br".into(),
-		"col".into(),
-		"embed".into(),
-		"hr".into(),
-		"img".into(),
-		"input".into(),
-		"link".into(),
-		"meta".into(),
-		"param".into(),
-		"source".into(),
-		"track".into(),
-		"wbr".into(),
-	]
-}
-
-/// Raw text elements whose children must not be HTML-escaped,
-/// per the HTML spec.
-fn default_raw_text_elements() -> Vec<Cow<'static, str>> {
-	vec!["script".into(), "style".into()]
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use bevy::ecs::system::SystemParam;
 use core::fmt;
 
 /// A secret store scoped to one [`SecretScope`]: the launch's environment
@@ -22,7 +21,8 @@ use core::fmt;
 ///
 /// The erased-provider pattern (`AGENTS.md`): an `Arc<dyn SecretStoreProvider>`
 /// cloned by every consumer, landed on the declaring entity by the attach
-/// observer of its declaration and resolved by [`SecretStoreQuery`]; a
+/// observer of its declaration and resolved by ancestry, an
+/// `AncestorQuery<&SecretStore>` as a `BlobStore` is; a
 /// process reading one secret holds the store beside its key, a
 /// [`StoredSecret`]. [`Debug`] prints the provider id and scope, never a
 /// value; a consumer that prints one says so in its own docs.
@@ -452,28 +452,6 @@ impl SecretStoreError {
 	}
 }
 
-/// Resolves the [`SecretStore`] an entity reads and writes through: its own,
-/// else its nearest ancestor's, so a store declared on a scene's root serves
-/// everything under it and a nearer declaration overrides it, exactly as a
-/// blob store resolves.
-#[derive(SystemParam)]
-pub struct SecretStoreQuery<'w, 's> {
-	stores: AncestorQuery<'w, 's, &'static SecretStore>,
-}
-
-impl SecretStoreQuery<'_, '_> {
-	/// The store `entity` declares or inherits, an error naming the entity
-	/// when neither it nor an ancestor declares one.
-	pub fn get(&self, entity: Entity) -> Result<&SecretStore> {
-		self.stores.get(entity).map_err(|_| {
-			bevyhow!(
-				"entity {entity} has no `SecretStore` on itself or an ancestor: \
-				declare one, ie a provider's declaration whose attach lands it"
-			)
-		})
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -517,22 +495,5 @@ mod test {
 			"secret /app/dev/x already exists"
 		))
 		.xpect_false();
-	}
-
-	/// The nearest declaration wins, from the entity itself upward.
-	#[crate::test]
-	fn resolves_the_nearest_store() {
-		let mut world = World::new();
-		let root = world.spawn(SecretStore::new(EnvSecretStore)).id();
-		let child = world.spawn(ChildOf(root)).id();
-		let orphan = world.spawn_empty().id();
-		world.with_state::<SecretStoreQuery, _>(|stores| {
-			stores.get(child).unwrap().id().xpect_eq("env");
-			stores
-				.get(orphan)
-				.unwrap_err()
-				.to_string()
-				.xpect_contains("has no `SecretStore`");
-		});
 	}
 }

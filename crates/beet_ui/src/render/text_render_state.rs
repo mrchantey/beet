@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use alloc::borrow::Cow;
 use beet_core::prelude::*;
 
 /// Sequential block/inline rendering state used by the [`MarkdownRenderer`].
@@ -12,7 +11,7 @@ pub struct TextRenderState {
 	/// Output buffer.
 	pub buffer: String,
 	/// Elements that produce block-level output with trailing newlines.
-	pub block_elements: Vec<Cow<'static, str>>,
+	pub block_elements: Vec<SmolStr>,
 	/// Track nested list depth for indentation.
 	pub list_depth: usize,
 	/// Stack tracking list item contexts for ordered list numbering.
@@ -46,7 +45,7 @@ impl TextRenderState {
 	pub fn new() -> Self {
 		Self {
 			buffer: String::new(),
-			block_elements: default_block_elements(),
+			block_elements: element_names(BLOCK_ELEMENTS),
 			list_depth: 0,
 			list_stack: Vec::new(),
 			in_preformatted: false,
@@ -61,15 +60,15 @@ impl TextRenderState {
 	/// Override the set of block-level elements.
 	pub fn with_block_elements(
 		mut self,
-		elements: Vec<Cow<'static, str>>,
+		elements: impl IntoIterator<Item = impl Into<SmolStr>>,
 	) -> Self {
-		self.block_elements = elements;
+		self.block_elements = elements.into_iter().map(Into::into).collect();
 		self
 	}
 
 	pub fn is_block_element(&self, name: &str) -> bool {
 		let lower = name.to_ascii_lowercase();
-		self.block_elements.iter().any(|el| el.as_ref() == lower)
+		self.block_elements.iter().any(|el| *el == lower)
 	}
 
 	/// Ensure the buffer ends with a newline.

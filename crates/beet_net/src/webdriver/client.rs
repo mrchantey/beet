@@ -11,14 +11,13 @@ use async_process::Stdio;
 use beet_core::prelude::*;
 use serde_json::Value;
 use serde_json::json;
-use std::borrow::Cow;
 use std::time::Duration;
 
 /// WebDriver client configuration for browser automation.
 #[derive(Debug, Clone, Get, SetWith)]
 pub struct Client {
 	/// The driver host, default `http://127.0.0.1`.
-	host: Cow<'static, str>,
+	host: SmolStr,
 	/// The browser driver process to speak to.
 	provider: Provider,
 	/// Port the driver process listens on. Concurrent drivers (eg parallel
@@ -53,7 +52,7 @@ impl Default for Client {
 		Self {
 			driver_port: DEFAULT_WEBDRIVER_PORT,
 			websocket_port: DEFAULT_WEBDRIVER_SESSION_PORT,
-			host: "http://127.0.0.1".into(),
+			host: SmolStr::new_static("http://127.0.0.1"),
 			provider: default(),
 			log_level: LogLevel::Warn,
 		}

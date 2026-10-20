@@ -17,6 +17,8 @@ use thiserror::Error;
 ///
 /// Use the built-in constants ([`Provider::AWS`], [`Provider::CLOUDFLARE`])
 /// for well-known providers, or construct a custom one with [`Provider::new`].
+// `Cow` rather than `SmolStr`: every generated binding borrows a constant as
+// `&'static Provider`, a promotion refused to a `SmolStr` constant (drop glue).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Provider {
 	/// Human-readable display name (e.g. "Amazon Web Services").

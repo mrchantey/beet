@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
-use std::borrow::Cow;
 
 /// Renders an entity tree to styled ANSI terminal output via the
 /// [`charcell`](crate::render::charcell) layout engine.
@@ -29,7 +28,7 @@ pub struct AnsiTermRenderer {
 	/// opts in via [`Self::with_clear_on_render`].
 	clear_on_render: bool,
 	/// A string prepended to the output, defaults to `\n`.
-	prefix: Cow<'static, str>,
+	prefix: SmolStr,
 }
 
 impl Default for AnsiTermRenderer {
@@ -40,7 +39,7 @@ impl AnsiTermRenderer {
 	pub fn new() -> Self {
 		Self {
 			clear_on_render: false,
-			prefix: "\n".into(),
+			prefix: SmolStr::new_static("\n"),
 		}
 	}
 

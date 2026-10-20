@@ -27,10 +27,7 @@ pub fn NearestSentenceAgent(
 }
 
 /// A candidate sentence child for a [`NearestSentenceAgent`], eg
-/// `<SentenceOption text="attack"/>`. Wraps [`Sentence`] so the text rides a string
-/// markup prop, since `Sentence`'s `Cow<'static, str>` field does not coerce from a
-/// bare markup spread value (a `{Sentence("attack")}` spread reflects the string as a
-/// `String`, which `Cow<'static, str>` cannot accept via `from_reflect`).
+/// `<SentenceOption text="attack"/>`: a [`Sentence`] authored as a named prop.
 #[template]
 pub fn SentenceOption(#[prop] text: String) -> impl Bundle {
 	Sentence::new(text)
