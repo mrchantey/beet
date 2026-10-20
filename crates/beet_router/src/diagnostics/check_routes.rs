@@ -695,7 +695,7 @@ mod test {
 			.xpect_true();
 		store.insert(&"notes.md".into(), "second").await.unwrap();
 		check(&mut world, router)
-			.awaittemplate_serde
+			.await
 			.xmap(derived)
 			.xpect_eq(vec![(
 				DiagnosticKind::StaleDerivedFile,

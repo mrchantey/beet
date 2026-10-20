@@ -21,25 +21,18 @@ pub struct AsyncRunner;
 /// Progress `world`'s local tasks.
 ///
 /// This is required because `spawn_local` tasks can only be polled by the
-/// thread that owns the `LocalExecutor`.
+/// thread that owns the executor.
 ///
-/// Natively that is bevy's global task pools, which the world does not select.
-/// On wasm each world's [`AsyncSpawner`] owns its own tickable executor (bevy's
-/// `spawn_local` uses the untickable JS event loop), and driving *that* one is
-/// the point: a tick that reached every executor in the process would poll the
-/// tasks of unrelated worlds, which is how a re-entrant tick used to chain
-/// through a whole test binary.
+/// That is the world's own [`AsyncSpawner`] executor, and driving *that* one
+/// is the point: a tick that reached every executor in the process would poll
+/// the tasks of unrelated worlds, which is how a re-entrant tick chains
+/// through a whole test binary. Natively bevy's global task pools are ticked
+/// too, for a future spawned onto them directly.
 #[inline]
 fn tick_task_pools(world: &World) {
-	#[cfg(not(target_arch = "wasm32"))]
-	{
-		let _ = world;
-		bevy::tasks::tick_global_task_pools_on_main_thread();
-	}
-	#[cfg(target_arch = "wasm32")]
-	if let Some(_spawner) = world.get_resource::<AsyncSpawner>() {
-		#[cfg(feature = "std")]
-		_spawner.tick();
+	match world.get_resource::<AsyncSpawner>() {
+		Some(spawner) => tick_spawner(spawner),
+		None => tick_bevy_pools(),
 	}
 }
 
@@ -48,15 +41,16 @@ fn tick_task_pools(world: &World) {
 /// world borrowed mutably for the length of the loop.
 #[inline]
 fn tick_spawner(spawner: &AsyncSpawner) {
-	#[cfg(not(target_arch = "wasm32"))]
-	{
-		let _ = spawner;
-		bevy::tasks::tick_global_task_pools_on_main_thread();
-	}
-	#[cfg(all(target_arch = "wasm32", feature = "std"))]
 	spawner.tick();
-	#[cfg(all(target_arch = "wasm32", not(feature = "std")))]
-	let _ = spawner;
+	tick_bevy_pools();
+}
+
+/// Tick bevy's global task pools, natively the main thread's executor; on wasm
+/// bevy's `spawn_local` is the JS event loop, which only yielding drives.
+#[inline]
+fn tick_bevy_pools() {
+	#[cfg(not(target_arch = "wasm32"))]
+	bevy::tasks::tick_global_task_pools_on_main_thread();
 }
 
 /// Yields control to the host executor.
@@ -159,8 +153,10 @@ impl AsyncRunner {
 	/// `in_flight` hits zero, so it can exit inside such a synchronous-only
 	/// window before the follow-up task spawns. This waits for stable idle.
 	///
-	/// Never settles if a task never completes (eg an http/socket listener),
-	/// returning at the safety cap instead of hanging indefinitely.
+	/// A listener parked on an outside event counts idle while it waits
+	/// ([`AsyncSpawner::idle`], ie a file watcher). Any other task that never
+	/// completes (eg an http/socket listener) keeps it from settling, so it
+	/// returns at the safety cap instead of hanging indefinitely.
 	pub async fn settle_async_tasks(world: &mut World) {
 		// idle frames needed to bridge an event → `Changed` → spawn latency
 		const STABLE_IDLE_FRAMES: usize = 8;

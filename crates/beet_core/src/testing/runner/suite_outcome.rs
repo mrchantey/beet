@@ -88,7 +88,7 @@ pub(crate) fn trigger_timeouts(
 	configs: Query<&TestRunnerConfig>,
 	mut query: Populated<
 		(Entity, &mut Test, &ChildOf, Option<&TestCaseParams>),
-		Without<TestOutcome>,
+		(With<TestRunning>, Without<TestOutcome>),
 	>,
 ) -> Result {
 	for (entity, mut test, parent, test_params) in query.iter_mut() {

@@ -29,26 +29,6 @@ pub(super) fn log_suite_running(
 }
 
 /// Collects test outcomes once all tests have finished running
-pub(super) fn log_case_running(
-	requests: Populated<(&TestRunnerConfig, &Children), With<TestRunnerConfig>>,
-	just_started: Populated<&Test, (Added<Test>, Without<TestOutcome>)>,
-) -> Result {
-	for (config, children) in requests {
-		if !config.log_runs {
-			continue;
-		}
-
-		for test in children
-			.iter()
-			.filter_map(|child| just_started.get(child).ok())
-		{
-			log_case_runs(&test, !config.no_color).xprint_display();
-		}
-	}
-	Ok(())
-}
-
-/// Collects test outcomes once all tests have finished running
 pub(super) fn log_case_outcomes(
 	requests: Populated<
 		(Entity, &TestRunnerConfig, &Children),
@@ -77,7 +57,8 @@ pub(super) fn log_case_outcomes(
 	Ok(())
 }
 
-fn log_case_runs(test: &Test, color: bool) -> String {
+/// The ` RUNS ` line naming a test as it starts.
+pub(super) fn log_case_runs(test: &Test, color: bool) -> String {
 	let prefix = TermStyle::new()
 		.fg(TermColor::Black)
 		.on(TermColor::Yellow)

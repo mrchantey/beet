@@ -19,15 +19,15 @@ use core::task::Context;
 /// Every queued bridge request is guaranteed to be *woken*. That wake guarantees the corresponding
 /// async future gets a chance to poll.
 /// It does *not* however guarantee the poll will finish its ECS work, because that
-/// poll may still fail to finish it's work for a *variety* of reasons, i.e. it is unable to acquire
+/// poll may still fail to finish its work for a *variety* of reasons, ie it is unable to acquire
 /// the typed `SystemState` lock and returns `Poll::Pending`.
 ///
 /// For [`bevy::tasks::TaskPool::spawn_local`] we *are* actually guaranteed that the poll will finish
-/// it's ECS work, because it's single threaded, so you can use `spawn_local` if you want
+/// its ECS work, because it is single threaded, so you can use `spawn_local` if you want
 /// determinism.
 ///
 /// This function attempts to tick queued work several times, up to `AsyncTickBudget`.
-/// If one internal tick finds no work, we opportunistically tick the local global task pool and
+/// If one internal tick finds no work, we opportunistically tick the world's executor and
 /// try once more before returning early.
 ///
 /// We tick queued work multiple times for two reasons. The first is that serial `.await` calls

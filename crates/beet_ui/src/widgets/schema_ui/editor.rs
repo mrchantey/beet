@@ -353,10 +353,10 @@ mod test {
 	/// The todo app's shape, settled: a data document of rows composing the row
 	/// schema by reference, a schema document holding that row schema, a view
 	/// generated from it, and an editor pointed at it.
-	fn app() -> (World, Entity, Entity) {
+	async fn app() -> (World, Entity, Entity) {
 		let mut world = test_ext::form_world();
 		let (schema_doc, data_doc) = spawn_app(&mut world);
-		settle(&mut world);
+		settle(&mut world).await;
 		(world, schema_doc, data_doc)
 	}
 
@@ -408,23 +408,23 @@ mod test {
 		(schema_doc, data_doc)
 	}
 
-	/// Run the frames a commit needs, plus the ones its regenerated controls
-	/// take to arrive: a nested generation syncs, rebuilds and syncs again.
-	fn settle(world: &mut World) {
-		for _ in 0..8 {
-			world.update_local();
-		}
+	/// Run frames until a commit's task has landed and the controls it
+	/// regenerates have arrived: the commit is a task, finishing on whichever
+	/// thread runs it, so no fixed frame count covers it, and a nested
+	/// generation syncs, rebuilds and syncs again after it.
+	async fn settle(world: &mut World) {
+		AsyncRunner::settle_async_tasks(world).await;
 	}
 
 	/// Write `schema` into the schema document from outside the form, the
 	/// whole input of a commit however a control lands it.
-	fn edit(world: &mut World, schema_doc: Entity, schema: &ValueSchema) {
+	async fn edit(world: &mut World, schema_doc: Entity, schema: &ValueSchema) {
 		world
 			.entity_mut(schema_doc)
 			.get_mut::<Document>()
 			.unwrap()
 			.0 = Value::from_serde(schema).unwrap();
-		settle(world);
+		settle(world).await;
 	}
 
 	/// The [`ValueSchema`] a schema document holds, read back the way any
@@ -463,8 +463,8 @@ mod test {
 	/// the schema document declares it, every existing row is backfilled, and
 	/// the view generated from that schema grows the column.
 	#[beet_core::test]
-	fn adding_a_field_evolves_the_schema_the_data_and_the_view() {
-		let (mut world, schema_doc, data_doc) = app();
+	async fn adding_a_field_evolves_the_schema_the_data_and_the_view() {
+		let (mut world, schema_doc, data_doc) = app().await;
 		test_ext::render_world(&mut world, data_doc)
 			.xnot()
 			.xpect_contains("is_really_difficult");
@@ -473,7 +473,8 @@ mod test {
 			&mut world,
 			schema_doc,
 			&with_difficulty(Some(OnMissing::Default(value!(false)))),
-		);
+		)
+		.await;
 
 		// the schema document declares the field
 		schema_of(&mut world, schema_doc)
@@ -497,11 +498,11 @@ mod test {
 	/// chosen with the variant select, and each lands as its own commit with
 	/// nothing to apply.
 	#[beet_core::test]
-	fn editing_through_the_generated_controls() {
-		let (mut world, schema_doc, data_doc) = app();
+	async fn editing_through_the_generated_controls() {
+		let (mut world, schema_doc, data_doc) = app().await;
 		let add = test_ext::collection_add(&mut world, "Struct.fields");
 		test_ext::click_world(&mut world, add);
-		settle(&mut world);
+		settle(&mut world).await;
 
 		// the appended row is the item schema's zero, so it arrives as a real
 		// `NamedFieldSchema` rather than a null, an optional `Any` field the
@@ -521,7 +522,7 @@ mod test {
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::str("String"));
-		settle(&mut world);
+		settle(&mut world).await;
 
 		error(&mut world).xpect_eq("");
 		schema_of(&mut world, schema_doc)
@@ -538,14 +539,14 @@ mod test {
 	/// Both documents are left exactly as they were: the schema document is
 	/// reverted to what was last committed.
 	#[beet_core::test]
-	fn a_required_field_without_a_value_is_refused() {
-		let (mut world, schema_doc, data_doc) = app();
+	async fn a_required_field_without_a_value_is_refused() {
+		let (mut world, schema_doc, data_doc) = app().await;
 		let (schema_before, data_before) = (
 			test_ext::document_of(&mut world, schema_doc),
 			test_ext::document_of(&mut world, data_doc),
 		);
 
-		edit(&mut world, schema_doc, &with_difficulty(None));
+		edit(&mut world, schema_doc, &with_difficulty(None)).await;
 
 		error(&mut world).xpect_contains("is_really_difficult");
 		test_ext::document_of(&mut world, schema_doc).xpect_eq(schema_before);
@@ -556,18 +557,18 @@ mod test {
 	/// field no row has a value for reverts with the document, so the form
 	/// never shows a schema the data does not satisfy.
 	#[beet_core::test]
-	fn a_refused_edit_snaps_the_control_back() {
-		let (mut world, schema_doc, _) = app();
+	async fn a_refused_edit_snaps_the_control_back() {
+		let (mut world, schema_doc, _) = app().await;
 		let add = test_ext::collection_add(&mut world, "Struct.fields");
 		test_ext::click_world(&mut world, add);
-		settle(&mut world);
+		settle(&mut world).await;
 		let key = test_ext::bound(&mut world, "Struct.fields.[1].key");
 		world
 			.entity_mut(key)
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::str("note"));
-		settle(&mut world);
+		settle(&mut world).await;
 		error(&mut world).xpect_eq("");
 
 		let required =
@@ -577,7 +578,7 @@ mod test {
 			.get_mut::<Value>()
 			.unwrap()
 			.set_if_neq(Value::Bool(true));
-		settle(&mut world);
+		settle(&mut world).await;
 		error(&mut world).xpect_contains("note");
 		world
 			.entity(required)
@@ -595,8 +596,8 @@ mod test {
 	/// validate under the new schema, or the commit names the conversion it
 	/// would need and touches neither document.
 	#[beet_core::test]
-	fn a_retype_is_accepted_only_where_the_values_survive() {
-		let (mut world, schema_doc, data_doc) = app();
+	async fn a_retype_is_accepted_only_where_the_values_survive() {
+		let (mut world, schema_doc, data_doc) = app().await;
 		let before = (
 			test_ext::document_of(&mut world, schema_doc),
 			test_ext::document_of(&mut world, data_doc),
@@ -608,7 +609,8 @@ mod test {
 				"label",
 				ValueSchema::U64(default()),
 			)]),
-		);
+		)
+		.await;
 		error(&mut world)
 			.xpect_contains("label")
 			.xpect_contains("computed conversion");
@@ -627,7 +629,8 @@ mod test {
 				NamedFieldSchema::new("count", ValueSchema::U64(default()))
 					.optional(),
 			]),
-		);
+		)
+		.await;
 		error(&mut world).xpect_eq("");
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["count"]))
@@ -639,16 +642,17 @@ mod test {
 	/// A refusal is not sticky: the next commit that succeeds clears the error
 	/// line.
 	#[beet_core::test]
-	fn a_later_success_clears_the_refusal() {
-		let (mut world, schema_doc, _) = app();
-		edit(&mut world, schema_doc, &with_difficulty(None));
+	async fn a_later_success_clears_the_refusal() {
+		let (mut world, schema_doc, _) = app().await;
+		edit(&mut world, schema_doc, &with_difficulty(None)).await;
 		error(&mut world).xpect_contains("is_really_difficult");
 
 		edit(
 			&mut world,
 			schema_doc,
 			&with_difficulty(Some(OnMissing::Default(value!(false)))),
-		);
+		)
+		.await;
 		error(&mut world).xpect_eq("");
 	}
 
@@ -656,9 +660,9 @@ mod test {
 	/// so does its data, which is the reading `allow_additional: false` already
 	/// had (item 89).
 	#[beet_core::test]
-	fn removing_a_field_is_the_same_commit() {
-		let (mut world, schema_doc, data_doc) = app();
-		edit(&mut world, schema_doc, &todo_schema(vec![]));
+	async fn removing_a_field_is_the_same_commit() {
+		let (mut world, schema_doc, data_doc) = app().await;
+		edit(&mut world, schema_doc, &todo_schema(vec![])).await;
 		schema_of(&mut world, schema_doc)
 			.get_field_schema(&FieldPath::new(["label"]))
 			.is_err()
@@ -671,8 +675,8 @@ mod test {
 	/// fields are the controls: the keystone closure, rendered. The key lands
 	/// on blur and the rest as typed, as the meta-schema declares.
 	#[beet_core::test]
-	fn the_form_is_generated_from_the_meta_schema() {
-		let (mut world, _, data_doc) = app();
+	async fn the_form_is_generated_from_the_meta_schema() {
+		let (mut world, _, data_doc) = app().await;
 		let html = test_ext::render_world(&mut world, data_doc);
 		html.clone()
 			// the schema is a value of the meta-schema's own enum...
@@ -704,19 +708,14 @@ mod test {
 	/// once the key control is left, not while it is typed into.
 	#[cfg(feature = "tui")]
 	#[beet_core::test]
-	fn typing_a_key_adds_the_column_on_blur() {
+	async fn typing_a_key_adds_the_column_on_blur() {
 		let mut app = test_ext::form_app();
 		let (_, data_doc) = spawn_app(app.world_mut());
-		let settle = |app: &mut App| {
-			for _ in 0..8 {
-				app.update();
-			}
-		};
-		settle(&mut app);
+		app.update_async().await;
 
 		let add = test_ext::collection_add(app.world_mut(), "Struct.fields");
 		test_ext::click(&mut app, add);
-		settle(&mut app);
+		app.update_async().await;
 
 		// the appended field's key control, typed into as the terminal does
 		let key = test_ext::bound(app.world_mut(), "Struct.fields.[1].key");
@@ -725,7 +724,7 @@ mod test {
 			.entity_mut(key)
 			.insert((Focus, RenderSurface(window)));
 		test_ext::type_text(&mut app, window, "note");
-		settle(&mut app);
+		app.update_async().await;
 		// held: the column is not there while the key is being typed
 		test_ext::render_world(app.world_mut(), data_doc)
 			.xnot()
@@ -733,7 +732,7 @@ mod test {
 
 		// the blur lands it, and the commit grows the column
 		app.world_mut().entity_mut(key).remove::<Focus>();
-		settle(&mut app);
+		app.update_async().await;
 		test_ext::render_world(app.world_mut(), data_doc)
 			.xpect_contains("<th>Note</th>");
 	}

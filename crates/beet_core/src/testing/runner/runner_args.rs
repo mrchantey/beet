@@ -38,6 +38,10 @@ pub struct TestRunnerConfig {
 	pub include_ignored: bool,
 	/// Timeout per test in milliseconds.
 	pub timeout_ms: u64,
+	/// Tests in flight at once, libtest's `--test-threads`. Here they are
+	/// tasks interleaved on the one runner thread, so the cap is what keeps a
+	/// test's timeout measuring its own work rather than the whole suite's.
+	pub test_threads: usize,
 }
 
 impl Default for TestRunnerConfig {
@@ -55,6 +59,7 @@ impl Default for TestRunnerConfig {
 			ignored: false,
 			include_ignored: false,
 			timeout_ms: Self::DEFAULT_TIMEOUT_MS,
+			test_threads: Self::default_test_threads(),
 		}
 	}
 }
@@ -62,6 +67,21 @@ impl Default for TestRunnerConfig {
 impl TestRunnerConfig {
 	/// Default per-test timeout in milliseconds.
 	const DEFAULT_TIMEOUT_MS: u64 = 5_000;
+
+	/// The default for [`test_threads`](Self::test_threads), as libtest's: the
+	/// host's parallelism, or eight where it cannot say.
+	fn default_test_threads() -> usize {
+		const FALLBACK: usize = 8;
+		cfg_if! {
+			if #[cfg(feature = "std")] {
+				std::thread::available_parallelism()
+					.map(core::num::NonZero::get)
+					.unwrap_or(FALLBACK)
+			} else {
+				FALLBACK
+			}
+		}
+	}
 
 	/// Creates a config from a [`CliArgs`] instance.
 	#[cfg(feature = "std")]
@@ -88,6 +108,12 @@ impl TestRunnerConfig {
 			.get("timeout-ms")
 			.and_then(|val| val.parse::<u64>().ok())
 			.unwrap_or(Self::DEFAULT_TIMEOUT_MS);
+		// zero would never start a test
+		let test_threads = params
+			.get("test-threads")
+			.and_then(|val| val.parse::<usize>().ok())
+			.unwrap_or_else(Self::default_test_threads)
+			.max(1);
 
 		// Build the glob filter from named params and positional args
 		let mut filter = GlobFilter::default();
@@ -118,6 +144,7 @@ impl TestRunnerConfig {
 			include_ignored,
 			filter,
 			timeout_ms,
+			test_threads,
 		}
 	}
 

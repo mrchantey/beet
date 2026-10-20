@@ -85,9 +85,7 @@ mod wake_signal;
 pub use crate::bridge_future::AsyncSystemState;
 pub use crate::bridge_future::BridgeError;
 pub use crate::bridge_request::async_world_sync_point;
-#[cfg(target_arch = "wasm32")]
 pub use crate::bridge_ticker::WorldTicker;
-#[cfg(target_arch = "wasm32")]
 pub use crate::bridge_ticker::WorldTickerHook;
 pub use crate::plugin::AsyncPlugin;
 pub use crate::plugin::AsyncTickBudget;

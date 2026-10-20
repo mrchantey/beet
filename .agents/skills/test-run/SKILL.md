@@ -11,7 +11,7 @@ Always use `tail` when running tests to preserve context. Run all tests piping t
 
 ## Hanging Tests
 
-If instructed, or you suspect, that some tests may hang, use `timeout` to catch these. Run an exponential backoff timeout, starting with two minutes, to catch hanging tests once you find a hanging test, shorten the timeout as much as possible to speed iteration cycles. When debugging hanging tests always pass the `log-runs` flag to detect the tests that dont finish, ie: `timeout 120 cargo test -p beet_core --lib -- --log-runs`. This will help you determine which test didnt complete
+If instructed, or you suspect, that some tests may hang, use `timeout` to catch these. Run an exponential backoff timeout, starting with two minutes, to catch hanging tests once you find a hanging test, shorten the timeout as much as possible to speed iteration cycles. When debugging hanging tests always pass the `log-runs` flag to detect the tests that dont finish, ie: `timeout 120 cargo test -p beet_core --lib -- --log-runs --test-threads=1`. A test logs `RUNS` as it starts and the runner starts at most `--test-threads` at once, so with one the last `RUNS` line is the test that didnt complete.
 
 ## Compile Errors
 

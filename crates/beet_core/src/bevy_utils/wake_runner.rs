@@ -8,11 +8,11 @@ use bevy::tasks::IoTaskPool;
 use core::time::Duration;
 
 /// The native headless runner: one [`App::update`] per frame, and between
-/// frames the task pools' main-thread executors run until the next frame is
-/// due.
+/// frames the world's own executor and the task pools' main-thread executors
+/// run until the next frame is due.
 ///
 /// Bevy's `ScheduleRunnerPlugin::run_loop` sleeps out the gap, and a task
-/// spawned onto the main thread (every `spawn_local`, and every spawn in a
+/// spawned onto the world thread (every `spawn_local`, and every spawn in a
 /// single-threaded build) is only polled by the sync point's tick burst once
 /// per update. A future that hops off the thread for a moment, ie any file or
 /// store call landing on the `blocking` pool, is woken microseconds later and
@@ -32,15 +32,17 @@ impl WakeRunnerPlugin {
 	/// A runner updating at most every `frame`.
 	pub fn new(frame: Duration) -> Self { Self { frame } }
 
-	/// Runs every main-thread executor until `deadline` elapses, parked on
-	/// their wakers in between.
-	fn run_tasks_for(deadline: Duration) {
+	/// Runs the world's executor and every main-thread executor until
+	/// `deadline` elapses, parked on their wakers in between.
+	fn run_tasks_for(spawner: &AsyncSpawner, deadline: Duration) {
 		IoTaskPool::get().with_local_executor(|io| {
 			AsyncComputeTaskPool::get().with_local_executor(|async_compute| {
 				ComputeTaskPool::get().with_local_executor(|compute| {
-					let tasks = io.run(
-						async_compute
-							.run(compute.run(async_ext::yield_forever())),
+					let tasks = spawner.run(
+						io.run(
+							async_compute
+								.run(compute.run(async_ext::yield_forever())),
+						),
 					);
 					futures_lite::future::block_on(futures_lite::future::or(
 						tasks,
@@ -64,13 +66,22 @@ impl Plugin for WakeRunnerPlugin {
 				app.finish();
 				app.cleanup();
 			}
+			// an app without `AsyncPlugin` runs an empty executor, harmlessly
+			let spawner = app
+				.world()
+				.get_resource::<AsyncSpawner>()
+				.cloned()
+				.unwrap_or_default();
 			loop {
 				let start = Instant::now();
 				app.update();
 				if let Some(exit) = app.should_exit() {
 					return exit;
 				}
-				Self::run_tasks_for(frame.saturating_sub(start.elapsed()));
+				Self::run_tasks_for(
+					&spawner,
+					frame.saturating_sub(start.elapsed()),
+				);
 			}
 		});
 	}

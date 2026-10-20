@@ -101,10 +101,10 @@ pub struct AsyncPlugin;
 
 impl Plugin for AsyncPlugin {
 	fn build(&self, app: &mut App) {
-		// on wasm the bridge drives our tickable executor instead of bevy's
-		// JS-event-loop `spawn_local`. Resolved from the world so a sync point
-		// only ever polls its own world's tasks (see `beet_async::WorldTicker`).
-		#[cfg(all(target_arch = "wasm32", feature = "std"))]
+		// the bridge drives each world's own executor, resolved from the world
+		// so a sync point only ever polls its own world's tasks (see
+		// `beet_async::WorldTicker`)
+		#[cfg(feature = "std")]
 		beet_async::WorldTickerHook::set(|world| {
 			world
 				.get_resource::<AsyncSpawner>()
@@ -119,7 +119,19 @@ impl Plugin for AsyncPlugin {
 				PreUpdate,
 				beet_async::async_world_sync_point::<BeetAsyncSyncPoint>,
 			);
+		// beside bevy's pools, so a task spawned this frame polls before the next
+		#[cfg(feature = "std")]
+		app.add_systems(Last, tick_world_executor);
 	}
+}
+
+/// Polls the world's own executor, on the thread holding the world.
+#[cfg(feature = "std")]
+fn tick_world_executor(
+	_: bevy::ecs::system::NonSendMarker,
+	spawner: Res<AsyncSpawner>,
+) {
+	spawner.tick();
 }
 
 /// A `'static` future suitable for spawning. `Send` is required only in
@@ -135,20 +147,21 @@ type SpawnLocalFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
 
 /// Runtime-agnostic task spawner plus an in-flight task counter.
 ///
-/// Spawning is pluggable so a future `tokio` / `embassy` backend can be selected;
-/// the default uses [`IoTaskPool`](bevy::tasks::IoTaskPool). The in-flight
-/// counter is the idle signal used by [`AsyncRunner`]. Every future is wrapped
-/// for cancellation before it reaches the backend, so the [`AsyncTask`] a
-/// spawn returns works the same on every runtime.
+/// Spawning is pluggable so a `tokio` / `embassy` backend can be selected
+/// ([`AsyncSpawner::new`]); the default spawns onto the world's own executor
+/// (see [`WorldExecutor`]). The in-flight counter is the idle signal used by
+/// [`AsyncRunner`]. Every future is wrapped for cancellation before it reaches
+/// the backend, so the [`AsyncTask`] a spawn returns works the same on every
+/// runtime.
 ///
 /// ## Every task shares the world thread unless `bevy_multithreaded` is on
 ///
 /// Without that feature (the default, including every deployed `beet-cli`
 /// binary) [`spawn`](Self::spawn) is [`spawn_local`](Self::spawn_local): the
-/// future joins the *calling* thread's local executor, which for anything
-/// spawned from a system or observer is the world-owning thread, ticked by
-/// `tick_global_task_pools_on_main_thread`. One server thread then runs the bevy
-/// schedule, the async bridge driver, every connection, and every store call.
+/// future joins the world's own executor, polled by the world-owning thread at
+/// each sync point and each frame's `Last`. One server thread then runs the
+/// bevy schedule, the async bridge driver, every connection, and every store
+/// call.
 ///
 /// So a future that blocks that thread inside `poll` — a `block_on`, blocking
 /// file or socket IO, a `std::thread::sleep`, a long synchronous compute — does
@@ -162,95 +175,136 @@ pub struct AsyncSpawner(Arc<AsyncSpawnerInner>);
 
 struct AsyncSpawnerInner {
 	in_flight: AtomicUsize,
-	spawn: Box<dyn Fn(SpawnFut) + Send + Sync>,
-	spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>,
-	/// Ticks this spawner's own [`BridgeExecutor`], which it shares with the
-	/// spawn functions above. `None` for a spawner built from custom spawn
-	/// functions (`tokio`, `embassy`), which drives itself.
-	///
-	/// Prebuilt rather than made on demand: the sync-point driver resolves it
-	/// once per run, and a closure capturing the *spawner* would cycle back
-	/// through this `Arc`.
-	#[cfg(all(target_arch = "wasm32", feature = "std"))]
-	tick: Option<Arc<dyn Fn() + Send + Sync>>,
+	backend: SpawnBackend,
+}
+
+/// Where an [`AsyncSpawner`]'s tasks run.
+enum SpawnBackend {
+	/// The default, the world's own executor.
+	#[cfg(feature = "std")]
+	World(WorldExecutor),
+	/// Custom spawn functions (`tokio`, `embassy`), a runtime that drives
+	/// itself.
+	Custom {
+		spawn: Box<dyn Fn(SpawnFut) + Send + Sync>,
+		spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>,
+	},
 }
 
 impl Default for AsyncSpawner {
 	fn default() -> Self {
-		// each backend detaches its own handle: cancellation is the `AsyncTask`
-		// wrapper `spawn` applies, not the runtime's
-		let spawn: Box<dyn Fn(SpawnFut) + Send + Sync>;
-		let spawn_local: Box<dyn Fn(SpawnLocalFut) + Send + Sync>;
 		cfg_if! {
-			// wasm: bevy `spawn_local` uses the JS event loop, which the
-			// synchronous bridge driver cannot tick. Use our own tickable
-			// executor instead (see `tick_executor`). `std`-gated with
-			// the executor itself, so a no_std wasm build falls through to the
-			// manual-spawner branch.
-			if #[cfg(all(target_arch = "wasm32", feature = "std"))] {
-				// one executor per spawner, shared by both spawn functions and
-				// the tick below
-				let executor = BridgeExecutor::new(alloc::rc::Rc::new(
-					async_executor::LocalExecutor::new(),
-				));
-				let spawn_executor = executor.clone();
-				spawn = Box::new(move |fut| {
-					spawn_executor.spawn(fut).detach();
-				});
-				let local_executor = executor.clone();
-				spawn_local = Box::new(move |fut| {
-					local_executor.spawn(fut).detach();
-				});
-			} else if #[cfg(all(feature = "std", feature = "bevy_multithreaded"))] {
-				spawn = Box::new(|fut| {
-					bevy::tasks::IoTaskPool::get().spawn(fut).detach();
-				});
-				spawn_local = Box::new(|fut| {
-					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
-				});
-			} else if #[cfg(feature = "std")] {
-				// `SpawnFut` is not `Send` here, so it cannot go through `spawn`
-				// (which requires `Send` whenever bevy's `multi_threaded` feature
-				// is active); spawn it locally instead.
-				spawn = Box::new(|fut| {
-					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
-				});
-				spawn_local = Box::new(|fut| {
-					bevy::tasks::IoTaskPool::get().spawn_local(fut).detach();
-				});
+			if #[cfg(feature = "std")] {
+				let backend = SpawnBackend::World(WorldExecutor::new());
 			} else {
-				spawn = Box::new(|_| {
-					panic!("no default AsyncSpawner on no_std; insert one manually")
-				});
-				spawn_local = Box::new(|_| {
-					panic!("no default AsyncSpawner on no_std; insert one manually")
-				});
+				let backend = SpawnBackend::Custom {
+					spawn: Box::new(|_| {
+						panic!("no default AsyncSpawner on no_std; insert one manually")
+					}),
+					spawn_local: Box::new(|_| {
+						panic!("no default AsyncSpawner on no_std; insert one manually")
+					}),
+				};
 			}
 		}
 		Self(Arc::new(AsyncSpawnerInner {
 			in_flight: AtomicUsize::new(0),
-			spawn,
-			spawn_local,
-			#[cfg(all(target_arch = "wasm32", feature = "std"))]
-			tick: Some(Arc::new(move || tick_executor(&executor)) as Arc<_>),
+			backend,
 		}))
 	}
 }
 
-// `thread_local!` and `async_executor` are both `std`, so a no_std wasm build
-// has no bridge executor and supplies its own spawner.
-/// One [`AsyncSpawner`]'s tickable executor, and so one world's.
+/// One [`AsyncSpawner`]'s tickable executor, and so one world's, bound to the
+/// thread that built it.
 ///
-/// `SendWrapper` because a `LocalExecutor` is `!Send` while an [`AsyncSpawner`]
-/// is both a [`Resource`] and a *detached handle*: [`AsyncCommands`] clones one
-/// out of the world and spawns from a task with no world in hand, so the
-/// executor has to travel on the handle rather than sit in a `NonSend`
-/// resource, which is only reachable through a world. wasm has the one thread,
-/// so the wrapper's cross-thread panic is unreachable.
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-type BridgeExecutor = send_wrapper::SendWrapper<
-	alloc::rc::Rc<async_executor::LocalExecutor<'static>>,
->;
+/// A world owning its executor is what keeps re-entrant ticking shallow: a
+/// sync point polls the tasks of the world it drives and no others (see
+/// `beet_async::WorldTicker`). A test binary is the load case, one task per
+/// test on the runner world's executor, each driving a world of its own, so a
+/// tick reaching every task on the thread would chain through the whole suite.
+/// Bevy's `spawn_local` is no use either way: natively it is the one executor
+/// per thread, on wasm the JS event loop, which a synchronous driver cannot
+/// tick at all.
+#[cfg(feature = "std")]
+struct WorldExecutor {
+	/// Shared with the prebuilt tick below.
+	executor: Arc<ThreadBound<async_executor::LocalExecutor<'static>>>,
+	/// Ticks `executor`, prebuilt rather than made on demand: the sync-point
+	/// driver resolves it once per run, and a closure capturing the *spawner*
+	/// would cycle back through its `Arc`.
+	tick: Arc<dyn Fn() + Send + Sync>,
+}
+
+#[cfg(feature = "std")]
+impl WorldExecutor {
+	fn new() -> Self {
+		let executor =
+			Arc::new(ThreadBound::new(async_executor::LocalExecutor::new()));
+		let ticked = executor.clone();
+		Self {
+			executor,
+			tick: Arc::new(move || {
+				if let Some(executor) = ticked.get() {
+					tick_executor(executor);
+				}
+			}),
+		}
+	}
+
+	/// Spawn onto this executor, or, off its thread, onto that thread's own
+	/// local executor as bevy's `spawn_local` would.
+	fn spawn_local(&self, fut: SpawnLocalFut) {
+		match self.executor.get() {
+			Some(executor) => executor.spawn(fut).detach(),
+			None => bevy::tasks::IoTaskPool::get().spawn_local(fut).detach(),
+		}
+	}
+}
+
+/// A `!Send` value made `Send + Sync` by refusing it to every thread but the
+/// one that made it.
+///
+/// Unlike [`SendWrapper`](send_wrapper::SendWrapper), which panics when
+/// dropped elsewhere, a drop off the owner thread leaks the value: a world's
+/// spawner may legitimately be dropped on another thread, and the executor's
+/// tasks were unreachable from there either way.
+#[cfg(feature = "std")]
+struct ThreadBound<T> {
+	owner: std::thread::ThreadId,
+	value: core::mem::ManuallyDrop<T>,
+}
+
+// SAFETY: `value` is only reached through `get`, which refuses every thread
+// but `owner`, and only dropped on `owner`.
+#[cfg(feature = "std")]
+unsafe impl<T> Send for ThreadBound<T> {}
+#[cfg(feature = "std")]
+unsafe impl<T> Sync for ThreadBound<T> {}
+
+#[cfg(feature = "std")]
+impl<T> ThreadBound<T> {
+	fn new(value: T) -> Self {
+		Self {
+			owner: std::thread::current().id(),
+			value: core::mem::ManuallyDrop::new(value),
+		}
+	}
+
+	/// The value, if this is the thread that made it.
+	fn get(&self) -> Option<&T> {
+		(std::thread::current().id() == self.owner).then(|| &*self.value)
+	}
+}
+
+#[cfg(feature = "std")]
+impl<T> Drop for ThreadBound<T> {
+	fn drop(&mut self) {
+		if std::thread::current().id() == self.owner {
+			// SAFETY: dropped once, here, and never read again
+			unsafe { core::mem::ManuallyDrop::drop(&mut self.value) };
+		}
+	}
+}
 
 #[cfg(all(target_arch = "wasm32", feature = "std"))]
 thread_local! {
@@ -267,7 +321,25 @@ thread_local! {
 /// Poll `executor`'s runnable tasks, so woken futures make progress while the
 /// sync-point driver has `&mut World` published.
 ///
-/// The loop is wrapped in [`js_runtime::catch_no_abort`]: wasm has no
+/// ## Re-entrancy
+/// Ticking is re-entrant by design: a ticked task may drive an app whose sync
+/// point ticks again so its bridged requests can poll while that world is
+/// published (`beet_async::wake_requests_and_wait`). Each world owning its
+/// executor keeps that nesting structural, so natively the tick is a plain
+/// burst: there the driver *waits* for a woken future to poll, so a guard
+/// refusing a nested tick could leave it waiting forever.
+///
+/// wasm never waits, and guards the stack besides. Re-entering *the same*
+/// executor from inside one of its own polls is refused: each sibling's runner
+/// loop would re-enter it again, growing the stack with the number of in-flight
+/// tasks rather than with any nesting. `MAX_TICK_DEPTH` then backstops genuine
+/// structural nesting (a test driving an app driving a nested runner) against a
+/// V8 stack overflow: that surfaces inside arbitrary tests as an opaque panic
+/// and, landing in deno's lazy-global machinery, permanently wedges
+/// `globalThis.setTimeout` into a `ReferenceError` that kills every later
+/// sleep.
+///
+/// The wasm loop is also wrapped in [`js_runtime::catch_no_abort`]: wasm has no
 /// unwinding, so a task panic is a JS trap that would otherwise propagate into
 /// whichever caller ticked (misattributing to an unrelated test's catch scope,
 /// or killing the frame). Catching drops the panicking task and defers the rest
@@ -275,54 +347,48 @@ thread_local! {
 /// `run_async_task_inner`, and buffers the escape for timeout reports. Hosts
 /// without a JS catch frame (a production browser app) run the loop directly
 /// and keep the trap.
-///
-/// ## Re-entrancy
-/// Ticking is re-entrant by design: a ticked task may drive an app whose sync
-/// point ticks again so its bridged requests can poll while that world is
-/// published (`beet_async::wake_requests_and_wait`).
-///
-/// What must never happen is re-entering *the same* executor. Polling a task's
-/// siblings is the whole job, but doing it from inside one of their own polls is
-/// not: each sibling's runner loop re-enters the executor again, so the stack
-/// grows with the number of in-flight tasks rather than with any nesting. A test
-/// binary spawns one task per test onto the runner's executor, so that chain
-/// reaches any depth cap on load alone. The `TICKING` guard cuts it at the first
-/// level, leaving genuine structural nesting (a test driving an app driving a
-/// nested runner) to `MAX_TICK_DEPTH`, a backstop against a V8 stack overflow:
-/// that surfaces inside arbitrary tests as an opaque panic and, landing in
-/// deno's lazy-global machinery, permanently wedges `globalThis.setTimeout` into
-/// a `ReferenceError` that kills every later sleep.
-#[cfg(all(target_arch = "wasm32", feature = "std"))]
-fn tick_executor(executor: &BridgeExecutor) {
-	/// nested tick entries permitted before deferring to a later frame; real
-	/// structural nesting is ≤5
-	const MAX_TICK_DEPTH: usize = 16;
-	let key = alloc::rc::Rc::as_ptr(executor) as usize;
-	// already ticking this executor further up the stack: its tasks are being
-	// polled, and re-entering is the chain described above
-	if TICKING.with(|ticking| ticking.borrow().contains(&key)) {
-		return;
-	}
-	let depth = TICK_DEPTH.with(core::cell::Cell::get);
-	if depth >= MAX_TICK_DEPTH {
-		return;
-	}
-	TICK_DEPTH.with(|cell| cell.set(depth + 1));
-	TICKING.with(|ticking| ticking.borrow_mut().push(key));
-	js_runtime::catch_no_abort(|| {
-		for _ in 0..100 {
+#[cfg(feature = "std")]
+fn tick_executor(executor: &async_executor::LocalExecutor<'static>) {
+	/// tasks polled per tick, matching bevy's per-executor burst
+	const BURST: usize = 100;
+	let burst = || {
+		for _ in 0..BURST {
 			if !executor.try_tick() {
 				break;
 			}
 		}
-		Ok(())
-	})
-	.map_err(|()| PanicContext::record_swallowed(None))
-	.ok();
-	TICKING.with(|ticking| {
-		ticking.borrow_mut().pop();
-	});
-	TICK_DEPTH.with(|cell| cell.set(depth));
+	};
+	cfg_if! {
+		if #[cfg(target_arch = "wasm32")] {
+			/// nested tick entries permitted before deferring to a later
+			/// frame; real structural nesting is ≤5
+			const MAX_TICK_DEPTH: usize = 16;
+			let key = executor as *const _ as usize;
+			// already ticking this executor further up the stack: its tasks
+			// are being polled, and re-entering is the chain described above
+			if TICKING.with(|ticking| ticking.borrow().contains(&key)) {
+				return;
+			}
+			let depth = TICK_DEPTH.with(core::cell::Cell::get);
+			if depth >= MAX_TICK_DEPTH {
+				return;
+			}
+			TICK_DEPTH.with(|cell| cell.set(depth + 1));
+			TICKING.with(|ticking| ticking.borrow_mut().push(key));
+			js_runtime::catch_no_abort(|| {
+				burst();
+				Ok(())
+			})
+			.map_err(|()| PanicContext::record_swallowed(None))
+			.ok();
+			TICKING.with(|ticking| {
+				ticking.borrow_mut().pop();
+			});
+			TICK_DEPTH.with(|cell| cell.set(depth));
+		} else {
+			burst();
+		}
+	}
 }
 
 /// Unwrap a bridged closure's output, re-raising a wasm trap the world scope
@@ -361,34 +427,49 @@ impl AsyncSpawner {
 	) -> Self {
 		Self(Arc::new(AsyncSpawnerInner {
 			in_flight: AtomicUsize::new(0),
-			spawn: Box::new(spawn),
-			spawn_local: Box::new(spawn_local),
-			// a custom runtime drives its own tasks
-			#[cfg(all(target_arch = "wasm32", feature = "std"))]
-			tick: None,
+			backend: SpawnBackend::Custom {
+				spawn: Box::new(spawn),
+				spawn_local: Box::new(spawn_local),
+			},
 		}))
 	}
 
 	/// The number of tasks currently in flight.
 	pub fn in_flight(&self) -> usize { self.0.in_flight.load(Ordering::SeqCst) }
 
-	/// The [`WorldTicker`] for this spawner's own executor, which is how the
-	/// sync-point driver reaches the tasks of the world it is driving and no
-	/// others.
-	#[cfg(all(target_arch = "wasm32", feature = "std"))]
+	/// The [`WorldTicker`](beet_async::WorldTicker) for this spawner's own
+	/// executor, which is how the sync-point driver reaches the tasks of the
+	/// world it is driving and no others. `None` for a custom runtime, which
+	/// drives itself.
+	#[cfg(feature = "std")]
 	fn ticker(&self) -> Option<beet_async::WorldTicker> {
-		self.0
-			.tick
-			.as_ref()
-			.map(|tick| beet_async::WorldTicker::new(tick.clone()))
+		match &self.0.backend {
+			SpawnBackend::World(executor) => {
+				beet_async::WorldTicker::new(executor.tick.clone()).xsome()
+			}
+			SpawnBackend::Custom { .. } => None,
+		}
 	}
 
 	/// Poll this spawner's runnable tasks. A no-op for a spawner whose runtime
-	/// drives itself.
-	#[cfg(all(target_arch = "wasm32", feature = "std"))]
+	/// drives itself, or off the thread that owns its executor.
+	#[cfg(feature = "std")]
 	pub(crate) fn tick(&self) {
-		if let Some(tick) = &self.0.tick {
-			tick();
+		if let SpawnBackend::World(executor) = &self.0.backend {
+			(executor.tick)();
+		}
+	}
+
+	/// Drive `fut` to completion while running this spawner's tasks as they
+	/// wake, for a runner parking between frames (see [`WakeRunnerPlugin`]).
+	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
+	pub(crate) async fn run<Out>(&self, fut: impl Future<Output = Out>) -> Out {
+		match &self.0.backend {
+			SpawnBackend::World(executor) => match executor.executor.get() {
+				Some(executor) => executor.run(fut).await,
+				None => fut.await,
+			},
+			SpawnBackend::Custom { .. } => fut.await,
 		}
 	}
 
@@ -399,8 +480,23 @@ impl AsyncSpawner {
 		Fut: 'static + MaybeSend + Future<Output = ()>,
 	{
 		let task = AsyncTask::new();
-		let counted = self.count(task.wrap(fut));
-		(self.0.spawn)(Box::pin(counted));
+		let fut: SpawnFut = Box::pin(self.count(task.wrap(fut)));
+		match &self.0.backend {
+			#[cfg(feature = "std")]
+			SpawnBackend::World(executor) => {
+				cfg_if! {
+					// a `Send` future takes a worker thread, leaving the world
+					// thread to the world
+					if #[cfg(all(feature = "bevy_multithreaded", not(target_arch = "wasm32")))] {
+						let _ = executor;
+						bevy::tasks::IoTaskPool::get().spawn(fut).detach();
+					} else {
+						executor.spawn_local(fut);
+					}
+				}
+			}
+			SpawnBackend::Custom { spawn, .. } => spawn(fut),
+		}
 		task
 	}
 
@@ -412,9 +508,34 @@ impl AsyncSpawner {
 		Fut: 'static + Future<Output = ()>,
 	{
 		let task = AsyncTask::new();
-		let counted = self.count(task.wrap(fut));
-		(self.0.spawn_local)(Box::pin(counted));
+		let fut: SpawnLocalFut = Box::pin(self.count(task.wrap(fut)));
+		match &self.0.backend {
+			#[cfg(feature = "std")]
+			SpawnBackend::World(executor) => executor.spawn_local(fut),
+			SpawnBackend::Custom { spawn_local, .. } => spawn_local(fut),
+		}
 		task
+	}
+
+	/// Await `fut` with the calling task counted idle rather than in flight,
+	/// for a listener parked on an outside event (a file watcher, an accept
+	/// loop) whose wait is not work: a settle then returns while it waits, and
+	/// it counts again from the moment `fut` resolves.
+	///
+	/// Only for a task spawned on this spawner, which holds the count it
+	/// releases.
+	pub async fn idle<Out>(&self, fut: impl Future<Output = Out>) -> Out {
+		/// Restores the released count on drop, so a task dropped mid-wait
+		/// still holds the one its own [`InFlight`] releases.
+		struct Idle<'a>(&'a AsyncSpawnerInner);
+		impl Drop for Idle<'_> {
+			fn drop(&mut self) {
+				self.0.in_flight.fetch_add(1, Ordering::SeqCst);
+			}
+		}
+		self.0.in_flight.fetch_sub(1, Ordering::SeqCst);
+		let _idle = Idle(&self.0);
+		fut.await
 	}
 
 	/// Wraps `fut` so the in-flight counter is held for as long as it lives.
@@ -427,19 +548,26 @@ impl AsyncSpawner {
 		&self,
 		fut: Fut,
 	) -> impl Future<Output = ()> + use<Fut> {
-		struct InFlight(Arc<AsyncSpawnerInner>);
-		impl Drop for InFlight {
-			fn drop(&mut self) {
-				self.0.in_flight.fetch_sub(1, Ordering::SeqCst);
-			}
-		}
-		self.0.in_flight.fetch_add(1, Ordering::SeqCst);
-		let guard = InFlight(self.0.clone());
+		let guard = InFlight::acquire(&self.0);
 		async move {
 			fut.await;
 			drop(guard);
 		}
 	}
+}
+
+/// One count on [`AsyncSpawner::in_flight`], released on drop.
+struct InFlight(Arc<AsyncSpawnerInner>);
+
+impl InFlight {
+	fn acquire(inner: &Arc<AsyncSpawnerInner>) -> Self {
+		inner.in_flight.fetch_add(1, Ordering::SeqCst);
+		Self(inner.clone())
+	}
+}
+
+impl Drop for InFlight {
+	fn drop(&mut self) { self.0.in_flight.fetch_sub(1, Ordering::SeqCst); }
 }
 
 /// The tasks spawned through an entity, cancelled with it.
@@ -1999,5 +2127,79 @@ mod test {
 			AsyncRunner::tick(app.world()).await;
 		}
 		ran.get().xpect_false();
+	}
+
+	/// A task parked through [`AsyncSpawner::idle`] reads idle while it waits
+	/// and releases exactly its own count once it ends.
+	#[crate::test]
+	async fn idle_releases_the_count_while_parked() {
+		let mut app = test_app();
+		let spawner = app.world().resource::<AsyncSpawner>().clone();
+		let (open, gate) = OnceValue::<()>::oneshot();
+		let parked = spawner.clone();
+		spawner
+			.spawn_local(async move { parked.idle(gate.wait()).await })
+			.detach();
+		AsyncRunner::tick(app.world()).await;
+		spawner.in_flight().xpect_eq(0);
+		open.signal(());
+		AsyncRunner::flush_async_tasks(app.world_mut()).await;
+		spawner.in_flight().xpect_eq(0);
+	}
+
+	/// Sibling tasks each driving a world of their own never poll one another.
+	/// A sync point ticking the thread's one shared executor polled the next
+	/// sibling from inside the current one's poll, nesting the stack once per
+	/// in-flight sibling until a loaded test binary overflowed it.
+	#[crate::test]
+	async fn sibling_drivers_do_not_nest() {
+		use core::cell::Cell;
+		use core::pin::Pin;
+		use core::task::Context;
+		use core::task::Poll;
+		use std::rc::Rc;
+
+		/// Records how deeply polls of its future nest on the stack.
+		struct Nest<F> {
+			fut: Pin<Box<F>>,
+			depth: Rc<Cell<usize>>,
+			deepest: Rc<Cell<usize>>,
+		}
+		impl<F: Future> Future for Nest<F> {
+			type Output = F::Output;
+			fn poll(
+				mut self: Pin<&mut Self>,
+				cx: &mut Context,
+			) -> Poll<F::Output> {
+				let depth = self.depth.get() + 1;
+				self.depth.set(depth);
+				self.deepest.set(self.deepest.get().max(depth));
+				let out = self.fut.as_mut().poll(cx);
+				self.depth.set(depth - 1);
+				out
+			}
+		}
+
+		let depth = Rc::new(Cell::new(0));
+		let deepest = Rc::new(Cell::new(0));
+		let mut app = test_app();
+		let spawner = app.world().resource::<AsyncSpawner>().clone();
+		for _ in 0..16 {
+			spawner
+				.spawn_local(Nest {
+					fut: Box::pin(async {
+						let mut app = test_app();
+						app.world_mut().run_async_local(async |world| {
+							world.insert_resource(Count(1)).await;
+						});
+						AsyncRunner::settle_async_tasks(app.world_mut()).await;
+					}),
+					depth: depth.clone(),
+					deepest: deepest.clone(),
+				})
+				.detach();
+		}
+		AsyncRunner::flush_async_tasks(app.world_mut()).await;
+		deepest.get().xpect_eq(1);
 	}
 }

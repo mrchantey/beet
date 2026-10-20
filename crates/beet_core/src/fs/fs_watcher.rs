@@ -129,6 +129,12 @@ struct FsWatcherTask {
 fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 	let entity = cx.entity;
 	let watcher = world.entity(entity).get::<FsWatcher>().unwrap().clone();
+	let Some(spawner) = world.get_resource::<AsyncSpawner>().cloned() else {
+		world.commands().queue(|_: &mut World| -> Result {
+			bevybail!("an FsWatcher needs the AsyncPlugin")
+		});
+		return;
+	};
 	let (kill_tx, kill_rx) = async_channel::bounded::<()>(1);
 	// try: on a spawn-then-despawn in the same flush the insert is dropped,
 	// closing the channel and ending the task before it starts watching.
@@ -151,7 +157,8 @@ fn start_fs_watcher(mut world: DeferredWorld, cx: HookContext) {
 			Ok(())
 		};
 		let watch = async {
-			while let Ok(ev) = rx.recv().await {
+			// parked on the os, idle: only handling an event is work
+			while let Ok(ev) = spawner.idle(rx.recv()).await {
 				let ev = match ev {
 					Ok(ev) => ev,
 					Err(errs) => {

@@ -98,11 +98,11 @@ impl Plugin for TestPlugin {
 		app.install_type::<(AsyncPlugin, TimePlugin)>()
 			.install(InsertSchedule::before(Update, RunTests))
 			// Force single-threaded execution so `spawn_local` in `run_tests_series`
-			// always lands on the main thread's local executor.
-			// With `bevy_multithreaded`, the default is `MultiThreaded`, which
-			// can dispatch systems to worker threads whose thread-local executors
-			// are not ticked by `tick_global_task_pools_on_main_thread`, causing
-			// async test tasks to never complete.
+			// always lands on the runner world's own executor, which only the
+			// world's thread reaches. With `bevy_multithreaded`, the default is
+			// `MultiThreaded`, which can dispatch systems to worker threads, where
+			// a spawn falls back to that thread's local executor, which nothing
+			// ticks, so async test tasks would never complete.
 			//
 			// We could alternatively just mark run_tests_series with NonSendMarker,
 			// but thats more error-prone
@@ -123,8 +123,9 @@ impl Plugin for TestPlugin {
 				(
 					log_suite_running,
 					filter_tests,
-					log_case_running,
-					(run_tests_series, run_non_send_tests_series),
+					// in turn, so the second sees the slots the first took
+					run_tests_series,
+					run_non_send_tests_series,
 					insert_suite_outcome,
 					log_case_outcomes,
 					log_file_outcomes,

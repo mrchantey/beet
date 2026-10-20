@@ -318,6 +318,9 @@ uuid = { workspace = true, optional = true, features = ["v4", "v7", "js"] }
 thiserror.workspace = true
 extend.workspace = true
 futures = { workspace = true, optional = true }
+# every world's own tickable executor (`AsyncSpawner`), and the `#[beet::main]`
+# driver's local executor
+async-executor = { workspace = true, optional = true }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -327,7 +330,6 @@ crossterm = { workspace = true, optional = true }
 # live TUI keeping logs off the alternate screen, with `crossterm`) and the
 # no-echo tty prompt `terminal_ext::read_secret_line` (`vault`).
 libc = { workspace = true, optional = true }
-async-executor = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-task = { workspace = true, optional = true }
 async-process = { workspace = true, optional = true }
@@ -362,9 +364,6 @@ console_error_panic_hook.workspace = true
 # the id-only `WebWindowHandle` the browser canvas surface stamps
 # (`web_utils/wasm_canvas.rs`); activated by `bevy_window`.
 raw-window-handle = { workspace = true, optional = true }
-# tickable local executor for the bevy_async bridge: wasm's bevy `spawn_local`
-# uses the JS event loop, which the synchronous sync-point driver cannot tick.
-async-executor = { workspace = true, optional = true }
 #https://rustwasm.github.io/wasm-bindgen/api/web_sys/
 #https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
 web-sys = {workspace = true, features = [
