@@ -94,6 +94,18 @@ impl SnsTopicBlock {
 		stack.resource_ident(self.label.clone())
 	}
 
+	/// The terraform ident the topic's access policy is emitted under.
+	fn policy_ident(&self, stack: &ResolvedStack) -> terra::Ident {
+		stack.resource_ident(format!("{}--policy", self.label))
+	}
+
+	/// The address of the topic's access policy, for a consumer that puts it
+	/// in a deploy layer beside what publishes into the topic: without it a
+	/// service publishes nothing, silently.
+	pub fn policy_address(&self, stack: &ResolvedStack) -> String {
+		format!("aws_sns_topic_policy.{}", self.policy_ident(stack).label())
+	}
+
 	/// An interpolated reference to the topic's arn: what a consumer that can
 	/// see this declaration should fire into, since a reference is also the
 	/// dependency edge a composed arn lacks. A fresh account otherwise races
@@ -202,7 +214,7 @@ impl EmitBlock for SnsTopicBlock {
 				..default()
 			});
 		let policy = ResourceDef::new_secondary(
-			stack.resource_ident(format!("{}--policy", self.label)),
+			self.policy_ident(stack),
 			AwsSnsTopicPolicyDetails {
 				arn: topic.field_ref("arn").into(),
 				policy: self.policy(stack, &topic.field_ref("arn")).into(),

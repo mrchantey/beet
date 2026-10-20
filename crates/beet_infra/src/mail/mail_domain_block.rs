@@ -402,13 +402,22 @@ impl MailDomainBlock {
 		topic: &SmolStr,
 		declared: &[SnsTopicBlock],
 	) -> Result<String> {
-		match declared
-			.iter()
-			.find(|block| block.topic_name(stack) == topic.as_str())
-		{
+		match Self::declared_topic(stack, topic, declared) {
 			Some(block) => block.arn_ref(stack).xok(),
 			None => SnsTopicBlock::composed_arn(stack, topic),
 		}
+	}
+
+	/// The [`SnsTopicBlock`] in scope declaring the topic named `topic`, if
+	/// any.
+	fn declared_topic<'a>(
+		stack: &ResolvedStack,
+		topic: &SmolStr,
+		declared: &'a [SnsTopicBlock],
+	) -> Option<&'a SnsTopicBlock> {
+		declared
+			.iter()
+			.find(|block| block.topic_name(stack) == topic.as_str())
 	}
 
 	/// The ARN of [`alarms_topic`](Self::alarms_topic), ie where every arm's
@@ -796,20 +805,22 @@ impl MailDomainBlock {
 		ses: &SesRelay,
 		topics: &[SnsTopicBlock],
 	) -> Result {
-		let Some(topic) = ses
-			.events_topic()
-			.as_ref()
-			.map(|topic| Self::topic_arn(stack, topic, topics))
-			.transpose()?
-		else {
+		let Some(name) = ses.events_topic().as_ref() else {
 			return Ok(());
 		};
+		let topic = Self::topic_arn(stack, name, topics)?;
 		// the account the apply runs in, since a topic name is not an address
 		config.add_untyped_data_source(
 			"aws_caller_identity",
 			"current",
 			&json!({}),
 		)?;
+		// SES drops every event it may not publish, without a word, so the
+		// policy granting it goes in the layer with the destination; the topic
+		// itself comes along by the arn reference
+		if let Some(block) = Self::declared_topic(stack, name, topics) {
+			config.add_to_layer(SesRelay::LAYER, block.policy_address(stack));
+		}
 		config.add_layer_resource(
 			SesRelay::LAYER,
 			&ResourceDef::new_secondary(
@@ -865,7 +876,9 @@ impl MailDomainBlock {
 		config: &mut terra::Config,
 		topics: &[SnsTopicBlock],
 	) -> Result {
-		self.emit_alarms(
+		// in the layer too: the production access review asks how bounces
+		// and complaints are watched, and these are the answer
+		for address in self.emit_alarms(
 			stack,
 			config,
 			topics,
@@ -884,7 +897,10 @@ impl MailDomainBlock {
 					"complaint rate: recipients marking this domain as spam",
 				),
 			],
-		)
+		)? {
+			config.add_to_layer(SesRelay::LAYER, address);
+		}
+		Ok(())
 	}
 
 	/// The same two alarms on the metrics [`ComailDeliverability`] publishes,
@@ -921,11 +937,12 @@ impl MailDomainBlock {
 				),
 			],
 		)
+		.map(|_| ())
 	}
 
 	/// One CloudWatch alarm per `(metric, threshold, description)`, all on
 	/// `namespace` scoped by one `dimension`, firing on
-	/// [`alarms_topic`](Self::alarms_topic).
+	/// [`alarms_topic`](Self::alarms_topic), answering each one's address.
 	///
 	/// Shared by both arms because a reputation alarm is the same statement
 	/// whoever publishes the numbers: only the namespace, the dimension and the
@@ -939,9 +956,9 @@ impl MailDomainBlock {
 		dimension: &str,
 		dimension_value: &str,
 		alarms: &[(&str, f64, &str)],
-	) -> Result {
+	) -> Result<Vec<String>> {
 		let Some(topic) = self.alarms_topic_arn(stack, topics)? else {
-			return Ok(());
+			return Ok(Vec::new());
 		};
 		// the account the apply runs in, since a topic name is not an address
 		config.add_untyped_data_source(
@@ -949,16 +966,19 @@ impl MailDomainBlock {
 			"current",
 			&json!({}),
 		)?;
+		let mut addresses = Vec::new();
 		for (metric, threshold, description) in alarms {
+			let label = stack
+				.resource_ident(self.label(&Self::alarm_label(metric)))
+				.label()
+				.to_string();
 			// UNTYPED, for the same reason the bucket's versioning is: a
 			// reputation threshold is a fraction of a percent and the generated
 			// binding types `threshold` as an integer, so 0.001 would round to
 			// an alarm that never fires.
 			config.add_untyped_resource(
 				"aws_cloudwatch_metric_alarm",
-				stack
-					.resource_ident(self.label(&Self::alarm_label(metric)))
-					.label(),
+				&label,
 				&json!({
 					"alarm_name": format!("{}-{metric}", self.slug()),
 					"alarm_description": format!("{} {description}", self.domain),
@@ -976,8 +996,9 @@ impl MailDomainBlock {
 					"ok_actions": [&topic],
 				}),
 			)?;
+			addresses.push(format!("aws_cloudwatch_metric_alarm.{label}"));
 		}
-		Ok(())
+		Ok(addresses)
 	}
 
 	/// The records that prove the identity: the relay's own selectors, and the
@@ -1272,6 +1293,34 @@ mod tests {
 		scope.finish().unwrap().2
 	}
 
+	/// `block` relayed through SES, its alarms and its event stream both on
+	/// `beetmash-ses-events`.
+	fn on_topic(block: MailDomainBlock) -> Relayed {
+		(
+			block.with_alarms_topic("beetmash-ses-events"),
+			RelayMode::Ses(
+				SesRelay::default().with_events_topic("beetmash-ses-events"),
+			),
+		)
+	}
+
+	/// [`build_config`] with the topic `blocks` name declared in the same
+	/// scope, as the mail stack declares it.
+	fn build_config_with_topic(blocks: &[Relayed]) -> terra::Config {
+		let blocks = blocks.to_vec();
+		let (scope, _dir) =
+			RenderScope::test_render_stack(sydney_stack(), |parent| {
+				for (block, mode) in blocks {
+					mode.insert(&mut parent.spawn(block));
+				}
+				parent.spawn(
+					SnsTopicBlock::new("ses-events")
+						.with_name("beetmash-ses-events"),
+				);
+			});
+		scope.finish().unwrap().2
+	}
+
 	/// Every dns record `blocks` render, as `(type, name)`, with any terraform
 	/// interpolation in the name collapsed to `<dkim-N>`. The dns specification
 	/// is a table of exactly these two columns, so the tests read as the table
@@ -1400,14 +1449,7 @@ mod tests {
 			.xnot()
 			.xpect_contains("aws_sesv2_configuration_set_event_destination");
 
-		let json = build_config(&[(
-			staging().with_alarms_topic("beetmash-ses-events"),
-			RelayMode::Ses(
-				SesRelay::default().with_events_topic("beetmash-ses-events"),
-			),
-		)])
-		.to_json()
-		.into_json();
+		let json = build_config(&[on_topic(staging())]).to_json().into_json();
 		let alarms = json["resource"]["aws_cloudwatch_metric_alarm"]
 			.as_object()
 			.unwrap()
@@ -1446,19 +1488,10 @@ mod tests {
 	/// drill firing into production's) stays a composed arn.
 	#[beet_core::test]
 	fn a_declared_topic_is_referenced_not_composed() {
-		let domain = staging().with_alarms_topic("beetmash-ses-events");
-		let mode = RelayMode::Ses(
-			SesRelay::default().with_events_topic("beetmash-ses-events"),
-		);
-		let (scope, _dir) =
-			RenderScope::test_render_stack(sydney_stack(), |parent| {
-				mode.insert(&mut parent.spawn(domain.clone()));
-				parent.spawn(
-					SnsTopicBlock::new("ses-events")
-						.with_name("beetmash-ses-events"),
-				);
-			});
-		let json = scope.finish().unwrap().2.to_json().into_json();
+		let relayed = on_topic(staging());
+		let json = build_config_with_topic(&[relayed.clone()])
+			.to_json()
+			.into_json();
 		let expected = "${aws_sns_topic.beet_infra__dev__ses_events.arn}";
 		json["resource"]["aws_sesv2_configuration_set_event_destination"]
 			.as_object()
@@ -1480,7 +1513,7 @@ mod tests {
 				.xpect_eq(expected);
 		}
 		// undeclared: composed against the account, as before
-		build_config(&[(domain, mode)])
+		build_config(&[relayed])
 			.to_json_string()
 			.unwrap()
 			.as_str()
@@ -1489,6 +1522,25 @@ mod tests {
 			)
 			.xnot()
 			.xpect_contains("${aws_sns_topic.");
+	}
+
+	/// The `ses` layer carries what the production access reply claims
+	/// handles bounces and complaints: the topic's access policy, without
+	/// which SES drops every event silently, once however many domains fire
+	/// into it, and each domain's two reputation alarms.
+	#[beet_core::test]
+	fn the_ses_layer_holds_what_the_review_reads() {
+		let config =
+			build_config_with_topic(&[on_topic(staging()), on_topic(news())]);
+		let layer = config.layer_targets(SesRelay::LAYER).unwrap();
+		let count = |prefix: &str| {
+			layer
+				.iter()
+				.filter(|address| address.starts_with(prefix))
+				.count()
+		};
+		count("aws_sns_topic_policy.").xpect_eq(1);
+		count("aws_cloudwatch_metric_alarm.").xpect_eq(4);
 	}
 
 	/// Exactly one SPF record per NAME, which is the invariant that makes the

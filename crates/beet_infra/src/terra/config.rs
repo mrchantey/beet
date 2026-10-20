@@ -254,16 +254,18 @@ impl Config {
 
 	/// Assign `address`, a resource already added, to `layer` as well: for a
 	/// resource another emitter added and answered by address (a dns record),
-	/// which a block still wants converged ahead of its full apply.
+	/// which a block still wants converged ahead of its full apply. Once per
+	/// layer, however many blocks name it (a topic every domain fires into).
 	pub fn add_to_layer(
 		&mut self,
 		layer: impl Into<SmolStr>,
 		address: impl Into<String>,
 	) -> &mut Self {
-		self.layers
-			.entry(layer.into())
-			.or_default()
-			.push(address.into());
+		let address = address.into();
+		let targets = self.layers.entry(layer.into()).or_default();
+		if !targets.contains(&address) {
+			targets.push(address);
+		}
 		self
 	}
 

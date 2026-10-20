@@ -136,28 +136,73 @@ Also stand up a website at the domain before you go further. This is not decorat
 
 Start this on day one. Everything else in this tutorial can proceed inside the SES sandbox, including the full deploy and both halves of the delivery probe, so the case runs in parallel with the build. But it gates real mail to real people, and it is measured in days.
 
-The reality is a two-step negotiation, not a form.
+The reality is a two-step exchange, not a form, and both steps are fixed.
 
-**Step one** is the request, in the SES console or by api: `aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL --website-url .. --use-case-description ..`, which needs no support plan. A one-paragraph request is auto-denied within a day, with a reply asking for detail and pointing out that you need a verified identity first. That is the normal path, not a rejection, and it is avoidable: verify the identities first, and put everything the reply below would say into step one's description, so there is nothing left to ask.
+**Step one is a short request**, in the SES console or by api: `aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL --website-url https://<domain> --use-case-description '<one paragraph>' --additional-contact-email-addresses <a mailbox you read>`, which needs no support plan. One paragraph is enough: the website, the streams, the volume, where recipients come from, and that bounces and complaints are suppressed. Whatever it says, an automated review answers within the hour asking for the same six details "even if it repeats details from your original request": ours did for a one-paragraph request (2026-08-25) and again for a complete four-thousand-character one (2026-10-20). So the full letter belongs in the reply alone, and writing it twice buys nothing. Two things to know about that answer:
 
-**Step two** is a written reply through the Support Center. It goes by hand: `aws support` requires a Business or Enterprise support plan and returns `SubscriptionRequiredException` on Basic, so there is no CLI path at any support tier worth paying for to get one.
+- `aws sesv2 get-account` reads `"ReviewDetails": {"Status": "DENIED", "CaseId": "<id>"}` while it waits. That is the request for detail, not a decision.
+- It arrives by email at the account's contact address (for a member account of an Organization, the root email it was created with) and the additional contact, so name a mailbox somebody reads.
 
-Before you write it, make the claims true. Reviewers check, and a present-tense claim that is aspirational is the thing that turns a three-day case into a three-week one. So section 5's work, at minimum, happens before you reply: verified domain identities, DKIM verified, custom MAIL FROM verified, configuration sets with suppression and event publishing live, a DMARC record actually published, and a test message whose headers you have read.
+**Step two is the reply**, through the Support Center and by hand: `aws support` requires a Business or Enterprise support plan and returns `SubscriptionRequiredException` on Basic, so there is no CLI path at any support tier worth paying for. A member account's case lives in that account, so sign in to the management account and switch role into the member (`OrganizationAccountAccessRole`). Write the reply from the template below before you file step one, and paste it the day the automated answer arrives: it asks for "complete and specific answers in a single response", and idle cases auto-resolve.
 
-A good reply is organised and specific. Cover, roughly in this order:
+Before you write it, make the claims true. Reviewers check, and a present-tense claim that is aspirational is the thing that turns a three-day case into a three-week one. So section 5's work, at minimum, happens before you reply: verified domain identities, DKIM verified, custom MAIL FROM verified, configuration sets with suppression and event publishing live (the topic's policy included, or SES publishes nothing), reputation alarms in place and a subscription on their topic confirmed, a DMARC record actually published, and a test message whose headers you have read. On a stack already declared, `<TofuApply layer="ses"/>` converges all of it but the subscription and the test ahead of the box (section 9).
 
-- **Who you are**, in two sentences, with the website they are about to open.
-- **Your domains**, and in particular the staging arrangement. Explain that your existing mail must keep running, that you are commissioning on a subdomain which is an independent mail domain for SMTP purposes with its own MX, SPF, DKIM and DMARC, and that the apex is added as an identity once it is proven. This reads as competence rather than evasion, and it pre-empts the obvious question about why the apex is not the identity in the request.
-- **What you send**, split by stream, one verified domain per stream. Be precise where the form's categories are not: "person-to-person correspondence written by staff from authenticated mailboxes" and "an opt-in publication to double opt-in subscribers" are two different things, and neither is quite what "Transactional" means. Say so.
-- **Volume and cadence**, with a real number for today and a real number for a year out.
-- **How lists are maintained.** State plainly that you hold no purchased, rented or scraped lists, and describe where addresses actually come from. For a publication, describe the confirmation step and say what you record about each consent.
-- **Bounces, complaints and unsubscribes**, which is the section they care most about. Name the mechanisms: a configuration set per domain publishing bounce, complaint, reject and delivery-delay events to a topic; the account-level suppression list enabled for bounces and complaints; `List-Unsubscribe` and `List-Unsubscribe-Post` (RFC 8058 one-click) plus a visible footer link on anything bulk; and what you watch and what would make you pause sending.
-- **Authentication**, concretely: DKIM key length, the custom MAIL FROM subdomain that makes SPF align with the From domain, the DMARC policy you publish, and the fact that you have confirmed all three passing end to end at a receiver rather than merely configured them.
-- **A sample of the actual mail.** One representative message per stream, redacted. This is the part that distinguishes a real correspondent from a bulk sender, and it is worth more than any of the preceding paragraphs.
+The automated answer asks for six things, in this order: the website, the email type, the volume, where recipients come from, bounce and complaint handling, and a sample. Answer each under its own heading in that order, and add two of your own: authentication, and, for any account that is not your first, why it exists.
 
-Send it within days. Idle cases auto-resolve, and while a resolved case can be reopened, momentum matters.
+```md
+Thank you. Complete answers to each point follow, in the order you asked.
 
-Ours was granted three days after the initial request and two after the detailed reply, moving the account out of the sandbox with a quota of 50,000 messages a day at 14 per second, effective immediately in the region. That grant is per account and per region, not per identity, so a grant earned while sending from a staging subdomain carries over to your apex at cutover with nothing to re-request. It does not carry to another region or another account: a repo moving into an account of its own starts in the sandbox there, so the request goes in first, from the new account, saying it is the same organisation and the same mail moving house and that the old account stops sending at cutover.
+**Website or application URL**
+
+https://<domain>
+
+**Why this is a new account**
+
+<only when you hold another: see below>
+
+**Email type**
+
+1. <domain>: <who writes it, to whom, how often>
+2. <domain>: <likewise, one numbered stream per verified domain>
+
+We selected "<category>" as the closest category: <where it is imprecise>.
+
+**Volume**
+
+<messages a day today, and a year out>
+
+**Recipient source**
+
+<no purchased, rented, scraped or third-party lists; where addresses come from; the confirmation step and what you record of each consent>
+
+**Bounce and complaint handling**
+
+- <each domain's configuration set publishing bounce, complaint, reject and delivery-delay events to a topic>
+- <suppression for BOUNCE and COMPLAINT, account-wide and on each set>
+- <the reputation alarms, their thresholds, who they notify, and what makes you pause>
+- <List-Unsubscribe, List-Unsubscribe-Post (RFC 8058 one-click) and a footer link on anything bulk>
+
+**Authentication and verified identities**
+
+<the identities verified in this region, the DKIM key length, the custom MAIL FROM, the DMARC policy, and that all three pass end to end at a receiver>
+
+**Sample email**
+
+<one representative message per stream, redacted>
+```
+
+What each heading needs:
+
+- **Website**: the site a human at Amazon opens while reading the case, live before you reply (section 3).
+- **Why this is a new account**: AWS's grant asks a new account "to send a different type of email than you are sending from your other account(s)", so a second account asking for the same mail reads as evasion unless it says otherwise. Say it is the same organisation and the same mail, name the earlier grant's case id, and say the old account stops sending at cutover, so two accounts never send the same mail at once.
+- **Email type**: split by stream, one verified domain per stream, and be precise where the form's categories are not: "person-to-person correspondence written by staff from authenticated mailboxes" and "an opt-in publication to double opt-in subscribers" are two different things, and neither is quite what "Transactional" means. Say so. If you are commissioning on a staging subdomain (section 2), say that here too: your existing mail keeps running, the subdomain is an independent mail domain for SMTP purposes with its own MX, SPF, DKIM and DMARC, and the apex is added as an identity once it is proven. That reads as competence rather than evasion.
+- **Volume**: a real number for today and a real number for a year out.
+- **Recipient source**: state plainly that you hold no purchased, rented or scraped lists, and describe where addresses actually come from; for a publication, the confirmation step and what you record about each consent.
+- **Bounce and complaint handling** is the section they care most about. Name the mechanisms, every one of them live in the account you are asking from.
+- **Authentication**: concretely, and confirmed at a receiver rather than merely configured.
+- **Sample email**: one representative message per stream, redacted. This is the part that distinguishes a real correspondent from a bulk sender, and it is worth more than any of the preceding paragraphs.
+
+Ours was granted three days after the initial request and two after the detailed reply, moving the account out of the sandbox with a quota of 50,000 messages a day at 14 per second, effective immediately in the region. That grant is per account and per region, not per identity, so a grant earned while sending from a staging subdomain carries over to your apex at cutover with nothing to re-request. It does not carry to another region or another account: a repo moving into an account of its own starts in the sandbox there, so the request goes in first, from the new account, with its reply's "Why this is a new account" above.
 
 Port 25 is the other per-account, per-region limit. AWS throttles OUTBOUND 25 from a new account's instances and releases it through a request form; inbound is never throttled. A box that relays all its outbound mail through SES, as this stack's does, never sends on 25 itself and needs no release, so check the relay configuration before asking (and test it from the box: `nc -vz gmail-smtp-in.l.google.com 25` hangs while throttled).
 
@@ -511,7 +556,7 @@ The drill is a whole parallel stage, not a spare database file. `deploy` it, `re
 
 Run it twice if you keep a cold copy: `restore-drill` restores the archive's newest snapshot and `restore-drill-cold` (`<MailRestoreDrill source_snapshot="Cold"/>`) pulls the same key back out of the other vendor's bucket with the source stage's parked token, and everything after the download is identical. Until the cold one has passed, the cold bucket is an upload rather than a backup.
 
-The drill refuses to restore a stage over itself, since replacing the live database is the incident. The day that IS the point (a box whose store is lost, or a stack moving into a new AWS account) the same restore runs over the stage's own box as `<MailRestore/>`, and asks for both halves of the decision on the command line: the snapshot by key, since the newest is whatever ran last, and `--replace`. A move stands the new box up with nothing resolving to it first, the storage and box layers alone (`<TofuApply layer="box"/>`), restores the old box's final snapshot by key, and only then runs the full deploy, so the first message the new box accepts lands in the restored store; the SES identities can go ahead of all of it (`<TofuApply layer="ses"/>`), since AWS reviews production access only for a verified identity and an Easy DKIM record is per account.
+The drill refuses to restore a stage over itself, since replacing the live database is the incident. The day that IS the point (a box whose store is lost, or a stack moving into a new AWS account) the same restore runs over the stage's own box as `<MailRestore/>`, and asks for both halves of the decision on the command line: the snapshot by key, since the newest is whatever ran last, and `--replace`. A move stands the new box up with nothing resolving to it first, the storage and box layers alone (`<TofuApply layer="box"/>`), restores the old box's final snapshot by key, and only then runs the full deploy, so the first message the new box accepts lands in the restored store; the SES identities can go ahead of all of it (`<TofuApply layer="ses"/>`), since AWS reviews production access only for a verified identity and an Easy DKIM record is per account, and with them everything section 4's reply claims handles bounces and complaints: the configuration sets and their event stream, the topic's policy and the reputation alarms.
 
 Three things about building one over a shared zone, each of which is a consequence rather than a preference:
 
