@@ -114,6 +114,13 @@ stays, an inert tag in a lean build.
 	     deploy converges it as an administrator: the scoped pair it seals
 	     cannot mint itself -->
 	<AwsDeployCredential bx:cfg="feature:infra && feature:extra"/>
+	<!-- the repo's own AWS account, a member of the Organization the AWS deploy
+	     credential lives and deploys in. The root carries no region, so it is
+	     spread here: the state bucket and the Recycle Bin rules land there -->
+	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra" {AwsRegion("us-west-2")}/>
+	<!-- `close-account --elevated`: the package's most final act, stated where
+	     the account is -->
+	<CloseDeployAccounts bx:cfg="feature:infra && feature:extra"/>
 	<Route path="shared" bx:cfg="feature:infra && feature:extra">
 		<!-- the region is an address declared on the stack, never read from
 		     the environment: a region that could fall back would plan a full

@@ -340,6 +340,9 @@ token (plus AWS for the social stack's state bucket).
 	     renders too -->
 	<AwsDeployCredential bx:cfg="feature:infra && feature:extra"/>
 	<CloudflareDeployCredential bx:cfg="feature:infra && feature:extra"/>
+	<!-- the repo's own AWS account, a member of the Organization the AWS
+	     deploy credential lives and deploys in, in the region above -->
+	<AwsAccount name="beet" bx:cfg="feature:infra && feature:extra"/>
 	<!-- the stage stack, under the `site` prefix so its verbs read
 	     `site/deploy` beside `shared/deploy` and `social/deploy`: every
 	     resource the running site needs, then the verbs that provision them

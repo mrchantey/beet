@@ -381,7 +381,10 @@ pub struct ElevationAsk {
 	pub roll: bool,
 	/// Mint what the deploy runs as, for a planned change no stored
 	/// credential may make. Without it the credential is only converged, and
-	/// the deploy runs as the credential it now seals.
+	/// the deploy runs as the credential it now seals, unless the elevation
+	/// already holds something stronger at no further cost (AWS's
+	/// administrator session), which it hands over regardless: a key whose
+	/// policies changed a moment ago races IAM's propagation.
 	pub run: bool,
 	/// The command a person runs in a terminal to elevate, which a run with no
 	/// terminal to ask on answers with.

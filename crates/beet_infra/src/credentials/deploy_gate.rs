@@ -193,7 +193,8 @@ impl DeployGate {
 
 	/// Ask every declared credential where it stands, once, and plan the
 	/// gated verb on each of `stacks` that declares a type a credential held
-	/// sealed guards.
+	/// sealed guards; a plan a stale credential cannot run counts as
+	/// protected ([`Self::unplanned`]).
 	async fn assess(
 		self,
 		caller: &AsyncEntity,
@@ -244,7 +245,20 @@ impl DeployGate {
 			if guarding.is_empty() {
 				continue;
 			}
-			for change in self.planned_changes(&project, input).await? {
+			let changes = match self.planned_changes(&project, input).await {
+				Ok(changes) => changes,
+				Err(err) => {
+					Self::unplanned(
+						&mut assessed,
+						&held,
+						&guarding,
+						label.as_deref(),
+						err,
+					)?;
+					continue;
+				}
+			};
+			for change in changes {
 				for index in guarding.iter() {
 					if let Some(reason) = assessed[*index]
 						.credential
@@ -276,6 +290,40 @@ impl DeployGate {
 			}
 			Self::Destroy => project.planned_destroy().await,
 		}
+	}
+
+	/// A stack whose plan failed, settled. A `held` credential already stale
+	/// may lack what planning reads, ie the state under a grant it is yet to
+	/// hold, and its staleness decides the deploy whatever the plan says. What
+	/// the deploy changes is unknown then, so every credential `guarding` the
+	/// stack counts it as protected, and an elevated run hands the deploy each
+	/// one's elevated credential rather than the sealed one. With every held
+	/// credential current, the failure is the error.
+	fn unplanned(
+		assessed: &mut [Assessed],
+		held: &[usize],
+		guarding: &[usize],
+		label: Option<&str>,
+		err: BevyError,
+	) -> Result {
+		let Some(stale) = held
+			.iter()
+			.copied()
+			.find(|index| !assessed[*index].status.stale.is_empty())
+		else {
+			return Err(err);
+		};
+		debug!("the plan failed as a stale credential: {err}");
+		let reason = format!(
+			"{}could not plan as the stale `{}` credential, so whether this \
+			deploy makes a protected change is unknown",
+			label.map(|label| format!("{label}: ")).unwrap_or_default(),
+			assessed[stale].credential.id()
+		);
+		for index in guarding {
+			assessed[*index].protected.push(reason.clone());
+		}
+		Ok(())
 	}
 
 	/// The refusal of a plain deploy that cannot proceed: every reason, the
@@ -921,6 +969,43 @@ mod test {
 		.xpect_contains("- this deploy would update `x.lock`")
 		.xpect_contains("the Cloudflare dashboard login")
 		.xpect_contains("mail/deploy --elevated");
+	}
+
+	/// A plan failing while a held credential is stale counts as protected
+	/// for every credential guarding the stack, since what it changes is
+	/// unknown: a key moved into a new account holds no grant on another
+	/// app's state, so its plan cannot take the lock. One failing while every
+	/// held credential is current is the error.
+	#[beet_core::test]
+	fn an_unplanned_stack_runs_elevated() {
+		let mut held = vec![
+			assessed(&[], &[]),
+			assessed(&["needs x"], &[]),
+			assessed(&[], &[]),
+		];
+		super::DeployGate::unplanned(
+			&mut held,
+			&[0, 1, 2],
+			&[0, 1],
+			Some("shared"),
+			bevyhow!("lock denied"),
+		)
+		.unwrap();
+		held[0].protected[0]
+			.clone()
+			.xpect_contains("shared: could not plan as the stale");
+		held[1].protected.len().xpect_eq(1);
+		held[2].blocks().xpect_false();
+		super::DeployGate::unplanned(
+			&mut [assessed(&[], &[])],
+			&[0],
+			&[0],
+			None,
+			bevyhow!("lock denied"),
+		)
+		.unwrap_err()
+		.to_string()
+		.xpect_contains("lock denied");
 	}
 
 	/// A relayed command is this request less the gate's own params, with

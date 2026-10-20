@@ -330,8 +330,9 @@ impl AwsDeployCredential {
 
 	/// Buy an administrator session, converge the declared account
 	/// ([`AwsAccount`]) and act inside it, converge the user, every boundary
-	/// and policy, and the key, and when `ask.run`, hand the deploy the
-	/// session.
+	/// and policy, and the key, and hand the deploy the session whatever
+	/// `ask.run` says: it is bought already, and the key's policies may have
+	/// changed a moment ago, which IAM takes a while to propagate.
 	async fn elevate_with(
 		&self,
 		caller: &AsyncEntity,
@@ -412,10 +413,7 @@ impl AwsDeployCredential {
 		);
 		CredentialElevation {
 			report,
-			env: match ask.run {
-				true => admin.vars().to_vec(),
-				false => Vec::new(),
-			},
+			env: admin.vars().to_vec(),
 			cleanup: None,
 		}
 		.xok()
