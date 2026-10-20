@@ -23,6 +23,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
 - Rendering (web + charcell): the `beet-rendering` skill
+- Derived files (`Derivation`, `<Derive/>`, `beet check`'s stale or missing one): `crates/beet_net/src/store/derivation.rs` + `Provenance`'s module docs
 - Secrets (the age identity, `secrets.toml`, the `vault`/`secrets` verbs, the `SecretStore` seam every secret a process reads or a deploy mints goes through): `crates/beet_core/src/secrets/mod.rs` + `site/routes/docs/secrets.md`
 - Atproto (records and their primitives, an account's repo as a `Pds`, the converge, `<AtprotoAccount/>`, the live test account): `crates/beet_core/src/atproto/mod.rs` + `crates/beet_net/src/atproto/mod.rs`; the standard.site records: `crates/beet_router/src/router/site/syndication/standard_site/mod.rs`
 

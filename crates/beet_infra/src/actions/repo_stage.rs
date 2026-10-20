@@ -17,11 +17,14 @@ use beet_net::prelude::*;
 /// `src` is copied whole (or its `paths` alone, for an entry at a checkout's
 /// root whose siblings are crates and a `target/`), then the children run in
 /// order: a [`DirCopy`] under a stage resolves its `dest` inside the staging
-/// dir, so the borrow manifest is the same tag the local `assets` verb uses.
+/// dir, so the borrow manifest is the same tag the local `assets` verb uses,
+/// and a [`Derive`] ensures the document's derived files there, after the
+/// borrows a derivation may read.
 ///
 /// ```bsx
 /// <RepoStage src="site">
 ///     <DirCopy src="assets" dest="assets" paths="databases/country.mmdb"/>
+///     <Derive/>
 /// </RepoStage>
 /// <RepoSync/>
 /// ```

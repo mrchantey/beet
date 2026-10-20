@@ -82,8 +82,9 @@ beet-sync *args:
 # Tail the deployed instance's logs.
 beet-watch *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site watch {{ args }}
-# Refresh the files site/assets borrows from the workspace tree (the wasm binary,
-# the geoip database, the robot faces). Runs ahead of every publish anyway.
+# Refresh the files site/assets borrows from the workspace tree (the geoip
+# database, the robot faces), and regenerate any of the site's derived files
+# that is stale or missing. Every publish does the same into its stage.
 beet-assets *args:
   cargo run -p beet-cli --features infra,extra -- --entry=site assets {{ args }}
 # Tear the deployed stack down (pass --stage=prod for the prod stack). Stage only:

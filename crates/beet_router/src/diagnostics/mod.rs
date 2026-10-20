@@ -4,7 +4,8 @@
 //! [`render_diagnostics`] walks a built render tree against the route set and
 //! [`RuleSet`](beet_ui::prelude::RuleSet), surfacing unknown tags, broken
 //! internal links and unknown classes; [`CheckReport::check_routes`] drives it across every
-//! static route for `beet check`, `export-static` and the dev serve. The
+//! static route for `beet check`, `export-static` and the dev serve, and adds a
+//! diagnostic for each missing or stale derived file the document declares. The
 //! [`RenderDiagnostics`] resource configures each check's severity.
 
 mod check_routes;

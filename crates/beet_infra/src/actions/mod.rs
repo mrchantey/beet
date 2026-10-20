@@ -11,6 +11,7 @@ mod cloudflare;
 pub mod cloudflare_api_ext;
 mod cloudflare_zone;
 pub mod cloudwatch_ext;
+mod derive;
 mod dir_copy;
 #[cfg(feature = "aws_sdk")]
 mod dir_sync;
@@ -42,6 +43,7 @@ pub use build_docker_image::*;
 pub use cloudflare::*;
 pub use cloudflare_zone::*;
 pub use cloudwatch_ext::MetricDatum;
+pub use derive::*;
 pub use dir_copy::*;
 #[cfg(feature = "aws_sdk")]
 pub use dir_sync::*;

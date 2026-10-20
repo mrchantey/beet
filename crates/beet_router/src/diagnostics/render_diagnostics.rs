@@ -35,8 +35,8 @@ pub enum DiagnosticSeverity {
 	Error,
 }
 
-/// Which render check produced a [`Diagnostic`], so a consumer can group or
-/// re-route by kind independent of the configured [`DiagnosticSeverity`].
+/// Which check produced a [`Diagnostic`], so a consumer can group or re-route
+/// by kind independent of the configured [`DiagnosticSeverity`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum DiagnosticKind {
 	/// An uppercase tag resolving to no component/resource/template/tag-resolver,
@@ -46,16 +46,24 @@ pub enum DiagnosticKind {
 	BrokenHref,
 	/// A `class`/[`Classes`] token with no matching selector in the [`RuleSet`].
 	UnknownClass,
+	/// A derived file the document declares, absent from its store.
+	MissingDerivedFile,
+	/// A derived file the document declares whose sources changed or whose ttl
+	/// ran out: it still serves, but no longer says what its sources do.
+	StaleDerivedFile,
 }
 
-/// Configures the [`DiagnosticSeverity`] of each render check, overridable by a site like
+/// Configures the [`DiagnosticSeverity`] of each check `beet check` runs,
+/// overridable by a site like
 /// [`PackageConfig`](beet_core::prelude::PackageConfig) (it is a reflected
 /// resource, patchable from markup).
 ///
 /// Defaults recover the typed-build guarantees: an unknown tag and a broken
 /// internal href are hard [`Error`](DiagnosticSeverity::Error)s, while an unknown class is
 /// a [`Warn`](DiagnosticSeverity::Warn) (a one-off marker class with no rule is sometimes
-/// intentional; classes carry no rule-existence guarantee even in Rust).
+/// intentional; classes carry no rule-existence guarantee even in Rust). A
+/// missing derived file is an error, since the site serves without it, and a
+/// stale one a warning, since it still serves.
 #[derive(Debug, Clone, Resource, Reflect)]
 #[reflect(Resource, Default)]
 pub struct RenderDiagnostics {
@@ -65,6 +73,10 @@ pub struct RenderDiagnostics {
 	pub broken_href: DiagnosticSeverity,
 	/// A class with no matching selector. Default [`Warn`](DiagnosticSeverity::Warn).
 	pub unknown_class: DiagnosticSeverity,
+	/// A declared derived file that is absent. Default [`Error`](DiagnosticSeverity::Error).
+	pub missing_derived_file: DiagnosticSeverity,
+	/// A declared derived file that is stale. Default [`Warn`](DiagnosticSeverity::Warn).
+	pub stale_derived_file: DiagnosticSeverity,
 }
 
 impl Default for RenderDiagnostics {
@@ -73,6 +85,8 @@ impl Default for RenderDiagnostics {
 			unknown_tag: DiagnosticSeverity::Error,
 			broken_href: DiagnosticSeverity::Error,
 			unknown_class: DiagnosticSeverity::Warn,
+			missing_derived_file: DiagnosticSeverity::Error,
+			stale_derived_file: DiagnosticSeverity::Warn,
 		}
 	}
 }
@@ -84,6 +98,8 @@ impl RenderDiagnostics {
 			DiagnosticKind::UnknownTag => self.unknown_tag,
 			DiagnosticKind::BrokenHref => self.broken_href,
 			DiagnosticKind::UnknownClass => self.unknown_class,
+			DiagnosticKind::MissingDerivedFile => self.missing_derived_file,
+			DiagnosticKind::StaleDerivedFile => self.stale_derived_file,
 		}
 	}
 }

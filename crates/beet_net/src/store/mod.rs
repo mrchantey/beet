@@ -93,6 +93,10 @@ mod jsonl;
 // the http-served store: its listing endpoint answers json.
 #[cfg(all(feature = "std", feature = "json"))]
 mod http_store;
+// a file computed from declared sources, regenerated when stale: the store
+// side of `Provenance`, its producer an action.
+#[cfg(feature = "std")]
+mod derivation;
 #[cfg(feature = "std")]
 mod store_ref;
 // the uri -> concrete component seam every store construction goes through.
@@ -108,6 +112,8 @@ mod scene_blob;
 pub use analytics::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "fs"))]
 pub use aws_cli::*;
+#[cfg(feature = "std")]
+pub use derivation::*;
 #[cfg(feature = "json")]
 pub use document_blob::*;
 #[cfg(feature = "json")]
@@ -205,6 +211,8 @@ impl Plugin for StorePlugin {
 		#[cfg(feature = "std")]
 		app.register_type::<FsStore>()
 			.register_type::<StoreRef>()
+			// a derived file declared beside the action producing it
+			.register_type::<Derivation>()
 			.register_type::<StoreConsumers>()
 			.init_resource::<BlobEventBus>()
 			.add_systems(PreUpdate, drain_blob_events)

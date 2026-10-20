@@ -1,6 +1,7 @@
 //! The route driver behind `beet check`, `export-static` and the `--watch` dev
 //! serve: render every static route's content into a persistent tree, run
-//! [`render_diagnostics`] over it, and aggregate the results.
+//! [`render_diagnostics`] over it, and aggregate the results, then, for the
+//! whole-document pass, check every derived file the document declares.
 //!
 //! Each scene route's own `Action<Request, PageRequest>` builds its content
 //! through the template substrate, so the built tree, incl any [`TemplateError`]
@@ -103,12 +104,18 @@ impl CheckReport {
 	/// The pass opens on `root`'s own structure: an unresolvable tag loads as an
 	/// inert [`UnregisteredTag`] entity in every binary, so this, run by a
 	/// binary that registers everything, is where the typo it might be surfaces
-	/// as an error.
+	/// as an error. It closes on the derived files the document declares, each
+	/// missing or stale one a diagnostic, which a narrowed pass skips since no
+	/// page edit changes them.
 	pub async fn check_routes(
 		world: &AsyncWorld,
 		root: Entity,
 	) -> Result<CheckReport> {
-		Self::check_routes_in(world, root, None).await
+		let mut report = Self::check_routes_in(world, root, None).await?;
+		report
+			.diagnostics
+			.extend(derived_file_diagnostics(world, root).await?);
+		Ok(report)
 	}
 
 	/// [`Self::check_routes`] narrowed to the `routes` entities, every static
@@ -201,6 +208,65 @@ fn unregistered_tags(
 				.collect()
 		},
 	)
+}
+
+/// A [`MissingDerivedFile`](DiagnosticKind::MissingDerivedFile) or
+/// [`StaleDerivedFile`](DiagnosticKind::StaleDerivedFile) diagnostic for each
+/// derived file declared under `root` that is not fresh in the store it
+/// resolves by ancestry.
+async fn derived_file_diagnostics(
+	world: &AsyncWorld,
+	root: Entity,
+) -> Result<Vec<Diagnostic>> {
+	let (config, derivations) = world
+		.with(move |world: &mut World| -> Result<_> {
+			let config = world
+				.get_resource::<RenderDiagnostics>()
+				.cloned()
+				.unwrap_or_default();
+			let derivations = Derivation::declared(world, root)
+				.into_iter()
+				.map(|entity| {
+					world
+						.with_state::<(Query<&Derivation>, AncestorQuery<&BlobStore>), _>(
+							|(derivations, stores)| {
+								(
+									entity,
+									derivations.get(entity)?.path.clone(),
+									stores.get(entity)?.clone(),
+								)
+									.xok()
+							},
+						)
+				})
+				.collect::<Result<Vec<_>>>()?;
+			(config, derivations).xok()
+		})
+		.await?;
+	let mut diagnostics = Vec::new();
+	for (entity, path, store) in derivations {
+		let (kind, message) =
+			match Derivation::fresh(world, entity, &store).await? {
+				Freshness::Fresh => continue,
+				Freshness::Missing => (
+					DiagnosticKind::MissingDerivedFile,
+					format!(
+						"derived file `{path}` is missing: the site serves without it"
+					),
+				),
+				stale => (
+					DiagnosticKind::StaleDerivedFile,
+					format!("derived file `{path}` is stale: {stale}"),
+				),
+			};
+		match config.severity(kind) {
+			DiagnosticSeverity::Off => {}
+			severity => {
+				diagnostics.push(Diagnostic::new(kind, severity, message))
+			}
+		}
+	}
+	diagnostics.xok()
 }
 
 /// Whether a route node is a static `GET` page worth scanning: a fully-static
@@ -567,5 +633,73 @@ mod test {
 			.unwrap_str()
 			.await
 			.xpect_contains("body");
+	}
+
+	/// A declared derived file is an error while missing, silent once fresh,
+	/// and a warning once a source changes, since a stale one still serves.
+	#[beet_core::test]
+	async fn reports_missing_and_stale_derived_files() {
+		let store = BlobStore::temp();
+		store.insert(&"notes.md".into(), "first").await.unwrap();
+		let mut world = check_world();
+		let router = world
+			.spawn((store.clone(), Router, children![
+				render_action::fixed_func_route("", || rsx! { <p>"home"</p> }),
+				(
+					Derivation::new("derived/notes.json"),
+					Action::<BlobStore, EntityBody>::new_async(
+						async |cx: ActionContext<BlobStore>| {
+							let bytes =
+								cx.input.get(&"notes.md".into()).await?;
+							EntityBody::default().with(&Provenance::new([
+								ProvenanceSource::file("notes.md", &bytes),
+							]))
+						}
+					)
+				)
+			]))
+			.flush();
+		let derived = |report: CheckReport| {
+			report
+				.diagnostics
+				.into_iter()
+				.filter(|diagnostic| {
+					matches!(
+						diagnostic.kind,
+						DiagnosticKind::MissingDerivedFile
+							| DiagnosticKind::StaleDerivedFile
+					)
+				})
+				.map(|diagnostic| (diagnostic.kind, diagnostic.severity))
+				.collect::<Vec<_>>()
+		};
+		check(&mut world, router)
+			.await
+			.xmap(derived)
+			.xpect_eq(vec![(
+				DiagnosticKind::MissingDerivedFile,
+				DiagnosticSeverity::Error,
+			)]);
+		let derivation = Derivation::declared(&mut world, router)[0];
+		let ensured = store.clone();
+		world
+			.run_async_then(async move |world| {
+				Derivation::ensure(&world, derivation, &ensured).await
+			})
+			.await
+			.unwrap();
+		check(&mut world, router)
+			.await
+			.xmap(derived)
+			.is_empty()
+			.xpect_true();
+		store.insert(&"notes.md".into(), "second").await.unwrap();
+		check(&mut world, router)
+			.awaittemplate_serde
+			.xmap(derived)
+			.xpect_eq(vec![(
+				DiagnosticKind::StaleDerivedFile,
+				DiagnosticSeverity::Warn,
+			)]);
 	}
 }
