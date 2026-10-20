@@ -1,63 +1,51 @@
-//! The provider-agnostic seam a stack's tier 2 secrets live behind.
+//! The provider-agnostic seam every secret a process reads or a deploy mints
+//! lives behind.
 
 use crate::prelude::*;
-use beet_core::prelude::*;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use bevy::ecs::system::SystemParam;
 use core::fmt;
-use std::sync::Arc;
 
-/// One stack's secret store: parameter store on AWS, a secrets document
-/// locally, 1Password or anything else downstream. A handle is scoped to
-/// the stack it was resolved for, exactly as a
-/// [`BlobStore`](beet_net::prelude::BlobStore) is scoped to a bucket and
-/// prefix, so every method takes a [`SecretRef`] label alone and the
-/// provider composes its own address from the pair; a label
-/// (`dkim-example-com`) never couples to a provider and an export restores
-/// into a different provider or region unchanged. Another stack's store is
-/// [`for_stack`](Self::for_stack), the `with_subdir` of the seam.
+/// A secret store scoped to one [`SecretScope`]: the launch's environment
+/// ([`EnvSecretStore`]), AWS parameter store and a secrets document in
+/// `beet_infra`, 1Password or anything else downstream. Every method takes
+/// a [`SecretRef`] label alone and the provider composes its own address
+/// from the pair, so a label (`dkim-example-com`) never couples to a
+/// provider and an export restores into a different provider or region
+/// unchanged. Another scope of the same provider is
+/// [`for_scope`](Self::for_scope), the `with_subdir` of the seam.
 ///
 /// The erased-provider pattern (`AGENTS.md`): an `Arc<dyn SecretStoreProvider>`
 /// cloned by every consumer, landed on the declaring entity by the attach
-/// observer of its declaration (`<SsmSecrets/>`, `<DocumentSecrets/>`, each
-/// beside its provider) and resolved by [`StackQuery::secret_store`]. In
-/// every build, since a deployed box reads its `<SecretBlock/>`s through it;
-/// only the document provider needs the vault layer.
-/// [`Debug`] prints the provider id and never a value.
-///
-/// Values never reach a log: a consumer that prints one (`MailCredentials`)
-/// says so in its own docs.
+/// observer of its declaration and resolved by [`SecretStoreQuery`]; a
+/// process reading one secret holds the store beside its key, a
+/// [`StoredSecret`]. [`Debug`] prints the provider id and scope, never a
+/// value; a consumer that prints one says so in its own docs.
 ///
 /// ## Example
 ///
-/// The seam over a document in a temp store (the vault layer's provider),
-/// the same calls a deploy makes against parameter store:
-///
 /// ```
 /// # use beet_core::prelude::*;
-/// # use beet_net::prelude::*;
-/// # use beet_infra::prelude::*;
-/// # #[cfg(feature = "vault")]
 /// async_ext::block_on(async {
-/// 	let mut identities = AgeIdentityFile::default();
-/// 	identities.push(AgeIdentity::generate());
-/// 	let stack = Stack::new("app").with_stage("dev").resolve(&default());
-/// 	let store = SecretStore::new(
-/// 		DocumentSecretStore::new(
-/// 			SecretsHandle::new(BlobStore::temp(), "secrets.toml")?,
-/// 			stack,
-/// 		)?
-/// 		.with_identities(identities),
-/// 	);
-/// 	let secret = SecretRef::new("db-password");
-/// 	// create-if-missing: the first call mints, the second reads back
-/// 	let (value, minted) = store
-/// 		.ensure(&secret, Some("the database"), SecretRoll::Remint, async || {
-/// 			Secret::generate("db-password", Secret::GENERATED_LENGTH)
-/// 				.map(String::from)
-/// 		})
-/// 		.await?;
-/// 	minted.xpect_true();
-/// 	store.get(&secret).await?.xpect_eq(Some(value));
-/// 	store.list().await?.len().xpect_eq(1);
+/// 	// SAFETY: a variable no other doctest reads
+/// 	unsafe { env_ext::set_var("BEET_DOC_SECRET", "hunter2") }?;
+/// 	let store = SecretStore::new(EnvSecretStore);
+/// 	store
+/// 		.get(&SecretRef::new("BEET_DOC_SECRET"))
+/// 		.await?
+/// 		.xpect_eq(Some("hunter2".into()));
+/// 	// absence is `None`, and a caller that needs the value names its source
+/// 	store
+/// 		.require(&SecretRef::new("BEET_DOC_UNSET"), || "set the record".into())
+/// 		.await
+/// 		.unwrap_err()
+/// 		.to_string()
+/// 		.xpect_contains("BEET_DOC_UNSET");
 /// 	Ok::<_, BevyError>(())
 /// })
 /// .unwrap();
@@ -71,7 +59,7 @@ impl fmt::Debug for SecretStore {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("SecretStore")
 			.field("provider", &self.provider.id())
-			.field("stack", &self.provider.stack().resource_name(""))
+			.field("scope", &self.provider.scope().to_string())
 			.finish()
 	}
 }
@@ -84,7 +72,7 @@ impl SecretStore {
 		}
 	}
 
-	/// The provider's id, ie `ssm`, `document`.
+	/// The provider's id, ie `env`, `ssm`, `document`.
 	pub fn id(&self) -> &'static str { self.provider.id() }
 
 	/// Where the provider lives, for an export's `origin.region`.
@@ -93,15 +81,15 @@ impl SecretStore {
 	/// How a log names this store: its id and region.
 	pub fn describe(&self) -> String { self.provider.describe() }
 
-	/// The stack this handle is scoped to.
-	pub fn stack(&self) -> &ResolvedStack { self.provider.stack() }
+	/// The scope this handle composes its addresses under.
+	pub fn scope(&self) -> &SecretScope { self.provider.scope() }
 
-	/// The same provider scoped to `stack`: how a drill reads its source
+	/// The same provider scoped to `scope`: how a drill reads its source
 	/// stage's credential through its own store. A provider that cannot
-	/// serve another stack (a document holds one) errors naming both.
-	pub fn for_stack(&self, stack: &ResolvedStack) -> Result<Self> {
+	/// serve another scope (a document holds one) errors naming both.
+	pub fn for_scope(&self, scope: &SecretScope) -> Result<Self> {
 		Self {
-			provider: Arc::from(self.provider.for_stack(stack)?),
+			provider: Arc::from(self.provider.for_scope(scope)?),
 		}
 		.xok()
 	}
@@ -137,8 +125,7 @@ impl SecretStore {
 	/// the loser re-reads the winner's value instead
 	/// ([`ensure`](Self::ensure)). `note` and `roll` are stored where the
 	/// provider can (SSM's description, a document's index); a note is never
-	/// a secret, and a roll is required so no secret arrives
-	/// un-rollable.
+	/// a secret, and a roll is required so no secret arrives un-rollable.
 	pub async fn create(
 		&self,
 		secret: &SecretRef,
@@ -147,10 +134,11 @@ impl SecretStore {
 		roll: SecretRoll,
 	) -> Result {
 		self.provider
-			.create(secret.clone(), value.into(), SecretMeta {
-				note: note.map(SmolStr::new),
-				roll: Some(roll),
-			})
+			.create(
+				secret.clone(),
+				value.into(),
+				SecretMeta::new(note, Some(roll)),
+			)
 			.await
 	}
 
@@ -158,7 +146,8 @@ impl SecretStore {
 	/// [`create`](Self::create), for the opposite ownership: a value some
 	/// OTHER system mints and this store mirrors (the bootstrap admin
 	/// credential a fresh mail server returns exactly once, a pin read off a
-	/// box), where an existing value is by definition stale.
+	/// box, a record of the deploying entry's secrets document), where an
+	/// existing value is by definition stale.
 	pub async fn overwrite(
 		&self,
 		secret: &SecretRef,
@@ -167,10 +156,11 @@ impl SecretStore {
 		roll: Option<SecretRoll>,
 	) -> Result {
 		self.provider
-			.overwrite(secret.clone(), value.into(), SecretMeta {
-				note: note.map(SmolStr::new),
-				roll,
-			})
+			.overwrite(
+				secret.clone(),
+				value.into(),
+				SecretMeta::new(note, roll),
+			)
 			.await
 	}
 
@@ -180,11 +170,12 @@ impl SecretStore {
 	}
 
 	/// Mirror a value another system derives (a public half, a pin read off
-	/// a box): [`overwrite`](Self::overwrite) when the stored value or its
-	/// metadata differs from what is declared, nothing when both match.
-	/// Answers whether it wrote, so a caller logs the change and not the
-	/// steady state; a stale note or roll converges around an unchanged
-	/// value exactly as [`ensure`](Self::ensure) does.
+	/// a box, a record of the deploying entry's document):
+	/// [`overwrite`](Self::overwrite) when the stored value or its metadata
+	/// differs from what is declared, nothing when both match. Answers
+	/// whether it wrote, so a caller logs the change and not the steady
+	/// state; a stale note or roll converges around an unchanged value
+	/// exactly as [`ensure`](Self::ensure) does.
 	pub async fn converge(
 		&self,
 		secret: &SecretRef,
@@ -192,10 +183,7 @@ impl SecretStore {
 		note: Option<&str>,
 		roll: Option<SecretRoll>,
 	) -> Result<bool> {
-		let declared = SecretMeta {
-			note: note.map(SmolStr::new),
-			roll: roll.clone(),
-		};
+		let declared = SecretMeta::new(note, roll.clone());
 		if self.get(secret).await?.as_deref() == Some(value)
 			&& self.meta(secret).await?.as_ref() == Some(&declared)
 		{
@@ -209,10 +197,10 @@ impl SecretStore {
 	/// its value, else (the loser of a race) the winner's value re-read.
 	/// Answers the value and whether this call minted it. The one shape
 	/// every generated credential in a stack takes, so no consumer can
-	/// roll one by accident. An existing value whose stored note or
-	/// roll differs from the declared is rewritten unchanged with the
-	/// declared metadata, since the mint site is where both are declared
-	/// and the store only mirrors them.
+	/// roll one by accident. An existing value whose stored note or roll
+	/// differs from the declared is rewritten unchanged with the declared
+	/// metadata, since the mint site is where both are declared and the
+	/// store only mirrors them.
 	pub async fn ensure(
 		&self,
 		secret: &SecretRef,
@@ -222,10 +210,7 @@ impl SecretStore {
 	) -> Result<(String, bool)> {
 		let address = self.address(secret);
 		if let Some(value) = self.get(secret).await? {
-			let declared = SecretMeta {
-				note: note.map(SmolStr::new),
-				roll: Some(roll),
-			};
+			let declared = SecretMeta::new(note, Some(roll));
 			if self.meta(secret).await?.as_ref() != Some(&declared) {
 				self.overwrite(secret, &value, note, declared.roll).await?;
 				info!("converged the metadata of secret {address}");
@@ -248,12 +233,12 @@ impl SecretStore {
 		}
 	}
 
-	/// Every secret of the stack, with its metadata and never a value.
+	/// Every secret of the scope, with its metadata and never a value.
 	pub async fn list(&self) -> Result<Vec<SecretEntry>> {
 		self.provider.list().await
 	}
 
-	/// Every secret of the stack with its value: what an export reads.
+	/// Every secret of the scope with its value: what an export reads.
 	pub async fn read_all(&self) -> Result<Vec<(SecretEntry, String)>> {
 		self.provider.read_all().await
 	}
@@ -268,17 +253,18 @@ impl SecretStore {
 	}
 }
 
-/// A secret store backend scoped to one stack, see [`SecretStore`].
+/// A secret store backend scoped to one [`SecretScope`], see
+/// [`SecretStore`].
 pub trait SecretStoreProvider: 'static + Send + Sync {
 	/// A boxed clone, so a default method can own the provider across an
 	/// await.
 	fn box_clone(&self) -> Box<dyn SecretStoreProvider>;
 
-	/// Stable provider discriminator, ie `ssm`, `document`.
+	/// Stable provider discriminator, ie `env`, `ssm`, `document`.
 	fn id(&self) -> &'static str;
 
 	/// The provider's region, where it has one.
-	fn region(&self) -> Option<SmolStr>;
+	fn region(&self) -> Option<SmolStr> { None }
 
 	/// Where the store lives, for a log: the id and region by default.
 	fn describe(&self) -> String {
@@ -288,13 +274,13 @@ pub trait SecretStoreProvider: 'static + Send + Sync {
 		}
 	}
 
-	/// The stack this provider is scoped to.
-	fn stack(&self) -> &ResolvedStack;
+	/// The scope this provider composes its addresses under.
+	fn scope(&self) -> &SecretScope;
 
-	/// See [`SecretStore::for_stack`].
-	fn for_stack(
+	/// See [`SecretStore::for_scope`].
+	fn for_scope(
 		&self,
-		stack: &ResolvedStack,
+		scope: &SecretScope,
 	) -> Result<Box<dyn SecretStoreProvider>>;
 
 	/// The provider's address for `secret`.
@@ -396,12 +382,67 @@ pub struct SecretMeta {
 	pub roll: Option<SecretRoll>,
 }
 
+impl SecretMeta {
+	/// The metadata of `note` and `roll`.
+	pub fn new(note: Option<&str>, roll: Option<SecretRoll>) -> Self {
+		Self {
+			note: note.map(SmolStr::new),
+			roll,
+		}
+	}
+
+	/// The one string a provider with a single description field holds
+	/// (a parameter's description): the roll, then ` :: `, then the note,
+	/// either half optional, so a listing reads both back
+	/// ([`parse_description`](Self::parse_description)) and a human reads
+	/// it in the console.
+	pub fn description(&self) -> String {
+		match (&self.roll, &self.note) {
+			(Some(roll), Some(note)) => format!("{roll} :: {note}"),
+			(Some(roll), None) => roll.to_string(),
+			(None, Some(note)) => note.to_string(),
+			(None, None) => String::new(),
+		}
+	}
+
+	/// The inverse of [`description`](Self::description): a leading half
+	/// that parses as a roll is one, the rest is the note.
+	pub fn parse_description(text: &str) -> Self {
+		let text = text.trim();
+		let note = |text: &str| {
+			Some(SmolStr::new(text)).filter(|note| !note.is_empty())
+		};
+		match text.split_once(" :: ") {
+			Some((head, rest)) if let Ok(roll) = head.parse::<SecretRoll>() => {
+				Self {
+					note: note(rest.trim()),
+					roll: Some(roll),
+				}
+			}
+			_ => match text.parse::<SecretRoll>() {
+				Ok(roll) => Self {
+					note: None,
+					roll: Some(roll),
+				},
+				Err(_) => Self {
+					note: note(text),
+					roll: None,
+				},
+			},
+		}
+	}
+}
+
 /// The one failure a consumer matches on: [`SecretStore::create`] found the
 /// secret already there, so the caller re-reads rather than overwrites.
 #[derive(Debug, thiserror::Error)]
 pub enum SecretStoreError {
+	/// The secret at `address` exists.
 	#[error("secret {address} already exists")]
-	AlreadyExists { address: SmolStr },
+	AlreadyExists {
+		/// The provider's address of the secret.
+		address: SmolStr,
+	},
 }
 
 impl SecretStoreError {
@@ -411,182 +452,61 @@ impl SecretStoreError {
 	}
 }
 
-// every seam test runs against a secrets document in a temp store
-#[cfg(all(test, feature = "vault"))]
+/// Resolves the [`SecretStore`] an entity reads and writes through: its own,
+/// else its nearest ancestor's, so a store declared on a scene's root serves
+/// everything under it and a nearer declaration overrides it, exactly as a
+/// blob store resolves.
+#[derive(SystemParam)]
+pub struct SecretStoreQuery<'w, 's> {
+	stores: AncestorQuery<'w, 's, &'static SecretStore>,
+}
+
+impl SecretStoreQuery<'_, '_> {
+	/// The store `entity` declares or inherits, an error naming the entity
+	/// when neither it nor an ancestor declares one.
+	pub fn get(&self, entity: Entity) -> Result<&SecretStore> {
+		self.stores.get(entity).map_err(|_| {
+			bevyhow!(
+				"entity {entity} has no `SecretStore` on itself or an ancestor: \
+				declare one, ie a provider's declaration whose attach lands it"
+			)
+		})
+	}
+}
+
+#[cfg(test)]
 mod test {
-	use super::*;
-	use crate::types::test_support::*;
-	use beet_net::prelude::*;
+	use crate::prelude::*;
 
-	/// A stack root carrying the repo store, with `declarations` under it.
-	fn stack_with(world: &mut World, declarations: impl Bundle) -> Entity {
-		let root = world
-			.spawn((
-				Stack::new("app").with_stage("prod"),
-				AwsRegion::new(Stack::TEST_AWS_REGION),
-				BlobStore::temp(),
-				RepoStore,
-				children![declarations],
-			))
-			.id();
-		world.flush();
-		root
-	}
-
-	/// The declared store wins, resolved from anywhere under the stack and
-	/// scoped to it.
-	#[beet_core::test]
-	fn resolution_picks_the_declared_store() {
-		let mut world = infra_world();
-		let root = stack_with(
-			&mut world,
-			DocumentSecrets::new("infra/secrets/app--prod.toml"),
+	/// A description carries the roll and the note and reads both back,
+	/// each half on its own.
+	#[crate::test]
+	fn descriptions_carry_the_roll_and_the_note() {
+		let replace = SecretRoll::replace("cloudflare_account_token.x");
+		let meta = SecretMeta::new(Some("r2 token"), Some(replace.clone()));
+		let text = meta.description();
+		text.as_str()
+			.xpect_eq("replace:cloudflare_account_token.x :: r2 token");
+		SecretMeta::parse_description(&text).xpect_eq(meta);
+		SecretMeta::parse_description("remint")
+			.xpect_eq(SecretMeta::new(None, Some(SecretRoll::Remint)));
+		SecretMeta::parse_description("just a note")
+			.xpect_eq(SecretMeta::new(Some("just a note"), None));
+		SecretMeta::parse_description("").xpect_eq(SecretMeta::default());
+		// a note happening to contain the separator stays a note
+		SecretMeta::parse_description("weekly :: by hand")
+			.xpect_eq(SecretMeta::new(Some("weekly :: by hand"), None));
+		// a note with a colon and a `>` in it, as a mint site writes one
+		let manual = SecretMeta::new(
+			Some("R2 token for bucket cold-backups: access key id"),
+			Some(SecretRoll::manual(
+				"dash.cloudflare.com/profile/api-tokens > Create Token > beet-deploy",
+			)),
 		);
-		let consumer = world.spawn(ChildOf(root)).id();
-		world.flush();
-		world.with_state::<StackQuery, _>(|stacks| {
-			let store = stacks.secret_store(consumer).unwrap();
-			store.id().xpect_eq("document");
-			store
-				.describe()
-				.xpect_contains("infra/secrets/app--prod.toml");
-			store.stack().clone().xpect_eq(stacks.resolve(root));
-		});
+		SecretMeta::parse_description(&manual.description()).xpect_eq(manual);
 	}
 
-	/// With nothing declared the stack carries an implicit `<SsmSecrets/>`,
-	/// parameter store in the stack's region whatever the launch, and a
-	/// declared one is the same store.
-	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test]
-	fn an_undeclared_stack_is_ssm() {
-		let mut world = infra_world();
-		let root = stack_with(&mut world, ());
-		world.with_state::<StackQuery, _>(|stacks| {
-			let stack = stacks.resolve(root);
-			let store = stacks.secret_store(root).unwrap();
-			store.id().xpect_eq("ssm");
-			store
-				.region()
-				.unwrap()
-				.xpect_eq(stack.aws_region().unwrap().clone());
-			store.stack().clone().xpect_eq(stack);
-		});
-		// (one repo store per world, so a second world)
-		let mut world = infra_world();
-		let declared = stack_with(&mut world, SsmSecrets);
-		world.with_state::<StackQuery, _>(|stacks| {
-			stacks.secret_store(declared).unwrap().id().xpect_eq("ssm");
-		});
-	}
-
-	/// Two declarations under one stack is an error naming both.
-	#[beet_core::test]
-	fn two_declarations_clobber() {
-		let mut world = infra_world();
-		let root = stack_with(
-			&mut world,
-			(DocumentSecrets::new("a.toml"), children![
-				DocumentSecrets::new("b.toml")
-			]),
-		);
-		world.with_state::<StackQuery, _>(|stacks| {
-			stacks
-				.secret_store(root)
-				.unwrap_err()
-				.to_string()
-				.xpect_contains("two secret stores")
-				.xpect_contains("a.toml")
-				.xpect_contains("b.toml");
-		});
-	}
-
-	/// The loser of a mint race re-reads the winner's value rather than
-	/// overwriting it: a store whose first read misses and whose create then
-	/// conflicts.
-	#[beet_core::test]
-	async fn ensure_re_reads_after_losing_a_race() {
-		#[derive(Clone)]
-		struct Racing {
-			inner: DocumentSecretStore,
-			misses: Arc<core::sync::atomic::AtomicUsize>,
-		}
-		impl SecretStoreProvider for Racing {
-			fn box_clone(&self) -> Box<dyn SecretStoreProvider> {
-				Box::new(self.clone())
-			}
-			fn id(&self) -> &'static str { "racing" }
-			fn region(&self) -> Option<SmolStr> { None }
-			fn stack(&self) -> &ResolvedStack { self.inner.stack() }
-			fn for_stack(
-				&self,
-				stack: &ResolvedStack,
-			) -> Result<Box<dyn SecretStoreProvider>> {
-				self.inner.for_stack(stack)
-			}
-			fn address(&self, secret: &SecretRef) -> SmolStr {
-				self.inner.address(secret)
-			}
-			/// The first read misses, as the loser's did.
-			fn get(
-				&self,
-				secret: SecretRef,
-			) -> SendBoxedFuture<Result<Option<String>>> {
-				use core::sync::atomic::Ordering;
-				match self.misses.fetch_sub(1, Ordering::Relaxed) > 0 {
-					true => Box::pin(async { None.xok() }),
-					false => self.inner.get(secret),
-				}
-			}
-			fn create(
-				&self,
-				secret: SecretRef,
-				value: SmolStr,
-				meta: SecretMeta,
-			) -> SendBoxedFuture<Result> {
-				self.inner.create(secret, value, meta)
-			}
-			fn overwrite(
-				&self,
-				secret: SecretRef,
-				value: SmolStr,
-				meta: SecretMeta,
-			) -> SendBoxedFuture<Result> {
-				self.inner.overwrite(secret, value, meta)
-			}
-			fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
-				self.inner.list()
-			}
-			fn delete(
-				&self,
-				secrets: Vec<SecretRef>,
-			) -> SendBoxedFuture<Result<Vec<SecretRef>>> {
-				self.inner.delete(secrets)
-			}
-		}
-		let stack = Stack::new("app").resolve(&PackageConfig::default());
-		let inner = memory_store(&stack);
-		let secret = SecretRef::new("db-password");
-		// the winner minted first
-		SecretStore::new(inner.clone())
-			.create(&secret, "winner", None, SecretRoll::Remint)
-			.await
-			.unwrap();
-		let store = SecretStore::new(Racing {
-			inner,
-			misses: Arc::new(1.into()),
-		});
-		let (value, minted) = store
-			.ensure(&secret, None, SecretRoll::Remint, async || {
-				"loser".to_string().xok()
-			})
-			.await
-			.unwrap();
-		value.as_str().xpect_eq("winner");
-		minted.xpect_false();
-	}
-
-	#[beet_core::test]
+	#[crate::test]
 	fn already_exists_is_matched_by_type() {
 		let err: BevyError = SecretStoreError::AlreadyExists {
 			address: "/app/dev/x".into(),
@@ -597,5 +517,22 @@ mod test {
 			"secret /app/dev/x already exists"
 		))
 		.xpect_false();
+	}
+
+	/// The nearest declaration wins, from the entity itself upward.
+	#[crate::test]
+	fn resolves_the_nearest_store() {
+		let mut world = World::new();
+		let root = world.spawn(SecretStore::new(EnvSecretStore)).id();
+		let child = world.spawn(ChildOf(root)).id();
+		let orphan = world.spawn_empty().id();
+		world.with_state::<SecretStoreQuery, _>(|stores| {
+			stores.get(child).unwrap().id().xpect_eq("env");
+			stores
+				.get(orphan)
+				.unwrap_err()
+				.to_string()
+				.xpect_contains("has no `SecretStore`");
+		});
 	}
 }

@@ -87,8 +87,9 @@ impl IamPolicy {
 	}
 
 	/// Grant read on exactly `secrets`, each a `SecureString` at its
-	/// parameter store address under `stack` ([`SecretRef::name`]), with the
-	/// decryption that read needs ([`decrypt_secure_strings`](Self::decrypt_secure_strings)).
+	/// parameter store path under `stack` ([`ResolvedStack::secret_path`]),
+	/// with the decryption that read needs
+	/// ([`decrypt_secure_strings`](Self::decrypt_secure_strings)).
 	/// Never the stack's prefix: a box reads the secrets its
 	/// [`ReadsSecrets`] names and no other. Nothing when `secrets` is empty.
 	pub fn read_secrets(
@@ -105,7 +106,7 @@ impl IamPolicy {
 				format!(
 					"arn:aws:ssm:{}:*:parameter{}",
 					self.region,
-					secret.name(stack)
+					stack.secret_path(secret)
 				)
 			})
 			.collect::<Vec<_>>();

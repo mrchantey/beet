@@ -217,7 +217,7 @@ Every record's metadata is sealed inside the blob beside its value, and the inde
 beet secrets/set DEMO_API_KEY --from-env --role=env_var --note="a demo key, with a better note" --roll="manual:https://example.com/keys > New key"
 ```
 
-`--from-env` reads the value out of the process environment, where the launch put it, and re-seals it unchanged with the new text. Run `beet secrets/ls` and see the new note. The only lines you ever edit by hand are the `recipients` lists, which is the next step.
+`--from-env` reads the value out of the process environment, where the launch put it, and re-seals it unchanged with the new text, keeping its `modified`, since the value did not change. Run `beet secrets/ls` and see the new note. The only lines you ever edit by hand are the `recipients` lists, which is the next step.
 
 ## Add a second reader
 
@@ -374,7 +374,7 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 
 **Restore.** `<SecretsRestore/>` is the inverse: `beet mail/secrets/restore --document=mail-prod --stage=prod` writes every record back into the store by label, which is how a fresh account or a rebuilt stack starts with the DKIM key its published selector expects rather than a new one. It refuses where the store already holds a label unless you pass `--force`.
 
-**Mirror.** A record the *deployed* process needs, rather than the deployer, must never ride the box's own config: `user_data`, a task definition, the tofu state and every rendered `main.tf.json` are readable by more than the box. Declare it under the stack instead, and name it from both the consumer and the compute that runs it:
+**Write-only.** A record the *deployed* process needs, rather than the deployer, must never ride the box's own config: `user_data`, a task definition, the tofu state, a plan and every rendered `main.tf.json` are readable by more than the box. Declare it under the stack instead, and name it from both the consumer and the compute that runs it:
 
 ```jsx
 <Route path="serve" {(HttpServer, SshTuiServer, SshHostKeyRef($ssh_host_key))}>..</Route>
@@ -384,11 +384,13 @@ The first is a committed file, overwritten only when a secret changed, so git ho
 </Stack>
 ```
 
-Every full deploy mirrors the launch's `BEET_SSH_HOST_KEY` record into the stack's secret store as `ssh-host-key`, the box is granted read on exactly that one parameter, and the deployed binary reads it from the store at every start, failing rather than inventing a key when it is missing. A local `serve` reads the same record from `secrets.toml`, so both present one fingerprint. Rolling it is `beet secrets/set` on the record, then a deploy of each stage.
+The declaration is a parameter of the stack's tofu config, `/beet-site/<stage>/ssh-host-key`, so the stack owns its creation, its updates and its removal with everything else. Its value is *write-only*: tofu reads it from an ephemeral variable that only an apply fills, from the launch's `BEET_SSH_HOST_KEY` record, and hands it to AWS without recording it in the config, the plan or the state, so a `plan` or a `validate` never needs the record at all. The box is granted read on exactly that one parameter and boots after it exists, and the deployed binary reads it at every start, failing rather than inventing a key when it is missing. A local `serve` reads the same record from `secrets.toml`, through the same seam with the launch's environment as the store, so both present one fingerprint and the server never knows which it read.
+
+Because tofu never sees the value again, it cannot tell when the value changes; it rewrites the parameter when its *version* moves, and the version is the record's `modified` time from the document's index. Rolling it is therefore `beet secrets/set` of a new value on the record, which stamps a new `modified`, then a deploy of each stage; a re-set of the same value (a reworded note through `--from-env`) keeps its `modified`, so it rewrites nothing.
 
 **Revoke.** Removing a person is their recipient out of every list by hand, then `beet mail/secrets/revoke --recipient=age1.. --stage=prod --dry-run` to read the ledger and the same without `--dry-run` to act: every document is re-sealed, every `replace` secret is replaced by an apply, every `remint` one is deleted and re-minted by the deploy, and the `manual` residue is printed with its reason. It never claims a roll it did not perform.
 
-[Self-hosted mail](/docs/mail) section 9 is where these run for real, and the [`beet_infra` README](https://github.com/mrchantey/beet/blob/main/crates/beet_infra/README.md#secrets) covers the seam: `SecretStore`, the two providers that ship (`<SsmSecrets/>` for parameter store, `<DocumentSecrets path=".."/>` for a document as a stack's store), and what a downstream provider (1Password, a KMS) implements, which is one trait, one declaration and one attach observer.
+[Self-hosted mail](/docs/mail) section 9 is where these run for real, and the [`beet_infra` README](https://github.com/mrchantey/beet/blob/main/crates/beet_infra/README.md#secrets) covers the stack side of the seam, `SecretStore` (`beet_core::secrets`): the providers that ship (the launch's environment for a local read, `{SsmSecrets}` for parameter store, reached as signed requests with no `aws` cli, `{DocumentSecrets{path:".."}}` for a document as a stack's store), and what a downstream provider (1Password, a KMS) implements, which is one trait, one declaration and one attach observer.
 
 ## Who holds what: the credential model
 
@@ -445,7 +447,7 @@ flowchart TB
 | 0a mint | the operator, and the one elevated deploy the value is pasted into | when a deploy needs `--elevated` at Cloudflare | `beet-mint`, holding `Account API Tokens Write` alone: rolled on the dashboard for each elevated deploy | mints any token the account can hold, hence the login |
 | 0c read | agents, constantly | constantly | `beet-agent`, sealed in the global document | metadata disclosure |
 | 1 deploy | the operator and CI | every deploy | `<repo>-deployer` at AWS and `<repo>-deploy` at Cloudflare, both sealed in that repo's document with what they were converged to grant | its own app, recoverably |
-| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or mirrored from the repo's document by a deploy (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
+| 2 runtime | the servers | continuous | minted by an apply, or by an elevated deploy for an R2 bucket, or written from the repo's document by an apply as a write-only parameter (a `<SecretBlock/>`); parked in the stack's store, and in its sealed export where it has one | its own app's data; for a bucket's token, nothing younger than the bucket's lock |
 | break-glass | the operator, in the console | when 0a is broken | `pete`: password + MFA, no key | full admin, behind a phone and a browser |
 
 **The invariant: the age key unlocks everything that is recoverable, and nothing that is not.** Recoverable is a claim about every credential a document holds: it cannot mint a credential wider than itself, and the worst it can destroy is rebuilt from the declarations, a version or a backup. What it can read is a separate question, settled by holding the key at all: whoever holds it reads everything it opens, which is why the key belongs to one person and is backed up rather than shared.

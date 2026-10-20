@@ -188,8 +188,8 @@ impl R2BucketBlock {
 			"an elevated deploy of the stack (`<stack>/deploy --elevated`) \
 			mints the token for {} and parks its S3 pair at {} and {}",
 			self.bucket_name(stack),
-			self.access_key_secret().name(stack),
-			self.secret_key_secret().name(stack),
+			stack.secret_path(&self.access_key_secret()),
+			stack.secret_path(&self.secret_key_secret()),
 		)
 	}
 
@@ -201,8 +201,8 @@ impl R2BucketBlock {
 	pub const UNPARKED: &'static str =
 		"not parked; an elevated deploy of the stack parks it";
 
-	/// The S3 pair the apply parked for this bucket, read from the stack's
-	/// secret store (the stack being the store's): what a deploy-machine
+	/// The S3 pair the apply parked for this bucket in `stack`, read from
+	/// `secrets`, that stack's store: what a deploy-machine
 	/// process reaches the bucket with, since its own credentials are the
 	/// other vendor's. Missing is an error naming the apply that parks it,
 	/// never a skip: a verb that quietly did nothing against an empty bucket
@@ -210,6 +210,7 @@ impl R2BucketBlock {
 	#[cfg(feature = "vault")]
 	pub async fn parked_pair(
 		&self,
+		stack: &ResolvedStack,
 		secrets: &SecretStore,
 	) -> Result<(String, String)> {
 		let access_key = secrets.get(&self.access_key_secret()).await?;
@@ -222,7 +223,7 @@ impl R2BucketBlock {
 				"no cold credential at {} and {}: {}",
 				secrets.address(&self.access_key_secret()),
 				secrets.address(&self.secret_key_secret()),
-				self.missing_credential(secrets.stack())
+				self.missing_credential(stack)
 			),
 		}
 	}
@@ -240,10 +241,11 @@ impl R2BucketBlock {
 	))]
 	pub async fn parked_store(
 		&self,
+		stack: &ResolvedStack,
 		secrets: &SecretStore,
 	) -> Result<BlobStore> {
-		let (access_key, secret_key) = self.parked_pair(secrets).await?;
-		S3Store::from_uri(&self.store_uri(secrets.stack())?)?
+		let (access_key, secret_key) = self.parked_pair(stack, secrets).await?;
+		S3Store::from_uri(&self.store_uri(stack)?)?
 			.with_credentials(S3Credentials::new(access_key, secret_key))
 			.xmap(BlobStore::new)
 			.xok()
@@ -439,11 +441,11 @@ impl Block for R2BucketBlock {
 		vec![
 			AccessGrant::read(
 				Self::ACCESS_KIND,
-				self.access_key_secret().name(stack),
+				stack.secret_path(&self.access_key_secret()),
 			),
 			AccessGrant::read(
 				Self::ACCESS_KIND,
-				self.secret_key_secret().name(stack),
+				stack.secret_path(&self.secret_key_secret()),
 			),
 		]
 	}

@@ -1,7 +1,7 @@
 //! The reverse-dns half of the box's identity: the record, and both halves of
 //! its lifecycle.
+use crate::actions::aws_cli_ext;
 use crate::prelude::*;
-use crate::types::aws_cli_ext;
 use beet_action::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;

@@ -372,7 +372,7 @@ impl StalwartBlock {
 
 	/// The full parameter name of [`admin_secret`](Self::admin_secret).
 	pub fn admin_secret_name(&self, stack: &ResolvedStack) -> String {
-		self.admin_secret().name(stack)
+		stack.secret_path(&self.admin_secret())
 	}
 
 	/// Where `MailDane` parks the served key's SHA-256, ie
@@ -417,7 +417,7 @@ impl StalwartBlock {
 
 	/// The full parameter name of [`ses_smtp_user_secret`](Self::ses_smtp_user_secret).
 	pub fn ses_smtp_user_secret_name(&self, stack: &ResolvedStack) -> String {
-		self.ses_smtp_user_secret().name(stack)
+		stack.secret_path(&self.ses_smtp_user_secret())
 	}
 
 	/// Where terraform puts the SES SMTP password, derived from the access key
@@ -432,7 +432,7 @@ impl StalwartBlock {
 		&self,
 		stack: &ResolvedStack,
 	) -> String {
-		self.ses_smtp_password_secret().name(stack)
+		stack.secret_path(&self.ses_smtp_password_secret())
 	}
 
 	/// The note the SES SMTP username is parked with.
@@ -479,16 +479,9 @@ impl StalwartBlock {
 		stack: &ResolvedStack,
 		kind: &str,
 	) -> BTreeMap<SmolStr, SmolStr> {
-		[
-			(
-				SmolStr::from("Name"),
-				self.build_label(kind).as_str().into(),
-			),
-			(SmolStr::from("Project"), stack.app_name().clone()),
-			(SmolStr::from("Stage"), stack.stage().clone()),
-		]
-		.into_iter()
-		.collect()
+		let mut tags = stack.tags();
+		tags.insert("Name".into(), self.build_label(kind).as_str().into());
+		tags
 	}
 
 	/// Whether the persistent data volume is protected from stack destruction.
@@ -907,10 +900,11 @@ impl StalwartBlock {
 				r#type: "SecureString".into(),
 				value: Some(key.field_ref("id").into()),
 				description: Some(
-					SecretRef::description(
+					SecretMeta::new(
 						Some(&self.ses_smtp_user_note(stack)),
-						Some(&roll),
+						Some(roll.clone()),
 					)
+					.description()
 					.into(),
 				),
 				..default()
@@ -923,10 +917,11 @@ impl StalwartBlock {
 				r#type: "SecureString".into(),
 				value: Some(key.field_ref("ses_smtp_password_v4").into()),
 				description: Some(
-					SecretRef::description(
+					SecretMeta::new(
 						Some(&self.ses_smtp_password_note(stack)),
-						Some(&roll),
+						Some(roll.clone()),
 					)
+					.description()
 					.into(),
 				),
 				..default()
@@ -1672,8 +1667,8 @@ echo "cold copy: __PREFIX__/$newest read-verified in __COLD_BUCKET__ ($(stat -c 
 		let blob_bucket = stack.resource_name(self.blob_bucket.clone());
 		let cold_bucket = cold.bucket_name(stack);
 		let endpoint = cold.endpoint(stack)?;
-		let access_key = cold.access_key_secret().name(stack);
-		let secret_key = cold.secret_key_secret().name(stack);
+		let access_key = stack.secret_path(&cold.access_key_secret());
+		let secret_key = stack.secret_path(&cold.secret_key_secret());
 		[
 			("__REGION__", stack.aws_region()?.as_str()),
 			("__ENDPOINT__", endpoint.as_str()),
@@ -2354,10 +2349,10 @@ mod tests {
 			.xpect_contains(".ses_smtp_password_v4}");
 		// both roll by replacing the access key, and say so
 		for param in [&user, &password] {
-			SecretRef::parse_description(
+			SecretMeta::parse_description(
 				param["description"].as_str().unwrap(),
 			)
-			.1
+			.roll
 			.unwrap()
 			.to_string()
 			.xpect_starts_with("replace:aws_iam_access_key.");
@@ -3220,7 +3215,7 @@ mod tests {
 		mail_box()
 			.with_dane(true)
 			.tlsa_secret()
-			.name(&stack)
+			.xmap(|secret| stack.secret_path(&secret))
 			.as_str()
 			.xpect_eq("/beet-infra/dev/mail-tlsa");
 		// off: nothing
@@ -3341,8 +3336,7 @@ mod tests {
 	///
 	/// Drives the native tofu cli, so it cannot compile for wasm.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test(timeout_ms = 240000)]
-	#[ignore = "very slow"]
+	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) =
 			RenderScope::test_render_stack(sydney_stack(), |parent| {
@@ -3353,7 +3347,7 @@ mod tests {
 			.resolve_project()
 			.await
 			.unwrap()
-			.validate()
+			.validate_offline()
 			.await
 			.unwrap();
 	}

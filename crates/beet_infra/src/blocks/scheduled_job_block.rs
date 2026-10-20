@@ -425,8 +425,7 @@ mod test {
 	/// lambda it targets, since the invoke reference must resolve.
 	// drives the native tofu Project, so it cannot compile for wasm
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
+	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
@@ -440,7 +439,7 @@ mod test {
 			.resolve_project()
 			.await
 			.unwrap()
-			.validate()
+			.validate_offline()
 			.await
 			.unwrap();
 	}

@@ -26,6 +26,7 @@
 //! # Debugging
 //!
 //! - [`BevyhowError`] - Error type for use with Bevy's error handling
+//! - [`ErrorReport`] - An error as it is finally reported, with its cause
 //! - [`LogPlugin`] - Drop-in replacement for bevy's `LogPlugin` using [`PrettyTracing`]
 //! - [`PrettyTracing`] - Enhanced tracing output for Bevy apps
 //!
@@ -52,6 +53,7 @@ mod common_systems;
 mod derived;
 mod despawn_after;
 mod entity_target_event;
+mod error_report;
 mod group;
 pub mod hook_ext;
 mod install;
@@ -89,6 +91,7 @@ pub use common_systems::*;
 pub use derived::*;
 pub use despawn_after::*;
 pub use entity_target_event::*;
+pub use error_report::*;
 pub use group::*;
 pub use install::*;
 pub use on_spawn::*;

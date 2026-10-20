@@ -101,13 +101,21 @@ pub impl AsyncEntity {
 				Ok(child) => {
 					server.world().entity(child).exchange(request).await
 				}
-				Err(err) => {
-					error!("Exchange failed on {:?}: {err}", server.id());
-					Response::internal_error()
-				}
+				Err(err) => failed_exchange(server.id(), err),
 			}
 		}
 	}
+}
+
+/// The bare `500` an exchange that could not run answers, its cause riding
+/// along as the [`FailureReport`] (claimed by a CLI, else logged once sent).
+fn failed_exchange(entity: Entity, err: BevyError) -> Response {
+	let mut response = Response::internal_error();
+	response.parts.report = Some(FailureReport::new(format!(
+		"Exchange failed on {entity:?}: {}",
+		ErrorReport::new(&err)
+	)));
+	response
 }
 
 /// Dispatch `request` through this entity's `Request -> Response` action, then
@@ -121,10 +129,7 @@ async fn exchange(entity: AsyncEntity, request: Request) -> Response {
 	let res = entity
 		.call::<Request, Response>(request)
 		.await
-		.unwrap_or_else(|err| {
-			error!("Exchange failed on {:?}: {err}", entity.id());
-			Response::internal_error()
-		});
+		.unwrap_or_else(|err| failed_exchange(entity.id(), err));
 	let status = res.status();
 	entity
 		.trigger(move |entity| EndExchange {

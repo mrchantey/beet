@@ -1141,7 +1141,7 @@ impl LightsailBlock {
 		repo_bucket: &str,
 		deployment: &Deployment,
 		access: &AccessGrants,
-		secrets: &[SecretRef],
+		secrets: &[SecretBlock],
 		config: &mut terra::Config,
 	) -> Result {
 		// The box's RUNTIME identity: what the instance itself authenticates
@@ -1184,7 +1184,15 @@ impl LightsailBlock {
 				name: Some(policy_ident.primary_identifier().clone()),
 				user: user_name_ref.clone().into(),
 				policy: self
-					.runtime_policy(stack, repo_bucket, access, secrets)?
+					.runtime_policy(
+						stack,
+						repo_bucket,
+						access,
+						&secrets
+							.iter()
+							.map(SecretBlock::secret)
+							.collect::<Vec<_>>(),
+					)?
 					.into(),
 				..default()
 			},
@@ -1248,7 +1256,9 @@ impl LightsailBlock {
 		// instance depends on it below: `user_data` names the group as a literal,
 		// so without the edge tofu destroys both at once, the group vanishes
 		// instantly while the box takes a while to terminate, and the agent's
-		// next batch recreates it unmanaged.
+		// next batch recreates it unmanaged. The same holds for each secret the
+		// box reads at start, which nothing in `user_data` names: a box booting
+		// before its parameter exists fails its first start.
 		let log_group_ident = stack.resource_ident(self.build_label("logs"));
 		let log_group = terra::ResourceDef::new_secondary(
 			log_group_ident,
@@ -1279,16 +1289,20 @@ impl LightsailBlock {
 			name: instance_ident.primary_identifier().clone(),
 			key_pair_name: Some(keypair.field_ref("name").into()),
 			user_data: Some(user_data),
-			// the group outlives the box on teardown, see above
-			depends_on: Some(vec![log_group.address().into()]),
-			tags: Some(
-				[
-					(SmolStr::from("Project"), stack.app_name().clone()),
-					(SmolStr::from("Stage"), stack.stage().clone()),
-				]
-				.into_iter()
-				.collect(),
+			// the group and the secrets outlive the box on teardown, and
+			// exist before it boots, see above
+			depends_on: Some(
+				[log_group.address()]
+					.into_iter()
+					.chain(
+						secrets
+							.iter()
+							.map(|secret| secret.parameter_address(stack)),
+					)
+					.map(SmolStr::from)
+					.collect(),
 			),
+			tags: Some(stack.tags()),
 			..default()
 		};
 
@@ -1996,26 +2010,36 @@ mod tests {
 	/// The box reads exactly the stack secrets its `ReadsSecrets` names: one
 	/// parameter, decrypted through parameter store alone, in its own policy
 	/// and in the stage's runtime boundary. Never the stack's prefix, never a
-	/// secret it does not name, and never a sibling compute's grant.
+	/// secret it does not name, and never a sibling compute's grant. It also
+	/// boots after that parameter, and after no other.
 	#[beet_core::test]
 	fn the_box_reads_exactly_its_secrets() {
+		let host_key = SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY");
+		let other = SecretBlock::new("other-secret", "OTHER_SECRET");
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
-			let host_key = parent
-				.spawn(SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY"))
-				.id();
-			parent.spawn(SecretBlock::new("other-secret", "OTHER_SECRET"));
-			parent.spawn((
-				LightsailBlock::default(),
-				ReadsSecrets(vec![host_key]),
-			));
+			parent.spawn(host_key.test_index(1));
+			parent.spawn(other.test_index(1));
+			let reads = parent.spawn(host_key.clone()).id();
+			parent.spawn(other.clone());
+			parent
+				.spawn((LightsailBlock::default(), ReadsSecrets(vec![reads])));
 			parent.spawn(LambdaBlock::default());
 		});
 		let (stack, _deployment, config) = scope.finish().unwrap();
+		let depends_on = config
+			.resources_of_type("aws_lightsail_instance")
+			.map(|(_, body)| body.get("depends_on").unwrap().to_string())
+			.collect::<String>();
+		depends_on
+			.as_str()
+			.xpect_contains(&host_key.parameter_address(&stack))
+			.xnot()
+			.xpect_contains(&other.parameter_address(&stack));
 		let parameter = format!(
 			"arn:aws:ssm:{}:*:parameter{}",
 			stack.aws_region().unwrap(),
-			SecretRef::new("ssh-host-key").name(&stack)
+			stack.secret_path(&SecretRef::new("ssh-host-key"))
 		);
 		let policies = |resource_type: &str| {
 			config
@@ -2038,7 +2062,7 @@ mod tests {
 			.xnot()
 			.xpect_contains("other-secret")
 			.xnot()
-			.xpect_contains(&format!("{}/*", SecretRef::prefix(&stack)))
+			.xpect_contains(&format!("{}/*", stack.secret_scope().prefix()))
 			.xnot()
 			.xpect_contains("ssm:*");
 		// the rollup lambda beside it reads no secret
@@ -2077,9 +2101,9 @@ mod tests {
 			.xpect_contains("no `<SecretBlock/>`");
 		let (scope, _dir) = RenderScope::test_render(|parent| {
 			parent.spawn(RepoStoreBlock::test_store());
-			let secret = parent
-				.spawn(SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY"))
-				.id();
+			let block = SecretBlock::new("ssh-host-key", "BEET_SSH_HOST_KEY");
+			parent.spawn(block.test_index(1));
+			let secret = parent.spawn(block).id();
 			parent.spawn((LambdaBlock::default(), ReadsSecrets(vec![secret])));
 		});
 		scope
@@ -2504,8 +2528,7 @@ mod tests {
 
 	// drives the native tofu Project, so it cannot compile for wasm
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
+	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) = render_block(&LightsailBlock::default());
 		StateEncryption::ensure_test_passphrase();
@@ -2513,7 +2536,7 @@ mod tests {
 			.resolve_project()
 			.await
 			.unwrap()
-			.validate()
+			.validate_offline()
 			.await
 			.unwrap();
 	}

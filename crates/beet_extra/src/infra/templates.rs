@@ -506,7 +506,11 @@ mod test {
 	/// not anywhere in `main.tf.json`, in any of the forms a rolled record
 	/// takes. The deploying launch holds it in its environment (the
 	/// `secrets.toml` record) exactly as a real deploy does, and the box reads
-	/// it from the stack's secret store instead.
+	/// it from the stack's secret store instead. The stack's parameter takes
+	/// it as a write-only `value_wo` from an ephemeral variable with no
+	/// default, so the value reaches the provider on apply alone and never a
+	/// plan or the state; the variable sets a plan and an apply hand tofu are
+	/// `write_only_variables_reach_an_apply_alone` in `beet_infra`.
 	///
 	/// REGRESSION: the key rode the box's env file inside `user_data`, so it
 	/// was readable through the Lightsail api, the tofu state and every
@@ -531,6 +535,20 @@ mod test {
 			app_name: "beet-site".into(),
 			..default()
 		});
+		// the plaintext index the launch's `<Secrets/>` load inserts, which
+		// versions the parameter
+		let mut index = SecretsDocument::default();
+		index.groups.insert("default".into(), SecretsGroup {
+			recipients: Vec::new(),
+			secrets: [("BEET_SSH_HOST_KEY".into(), SecretRecord {
+				role: Some(SecretRole::EnvVar),
+				modified: Some(Timestamp::from_millis(1_760_000_000_000)),
+				..default()
+			})]
+			.into_iter()
+			.collect(),
+		});
+		world.spawn(index);
 		let router = router(&mut world);
 		spawn_markup(
 			&mut world,
@@ -558,7 +576,9 @@ mod test {
 			json.as_str()
 				// the box is rendered, and reads the key from its store
 				.xpect_contains("user_data")
-				.xpect_contains(&SecretRef::new("ssh-host-key").name(&stack))
+				.xpect_contains(
+					&stack.secret_path(&SecretRef::new("ssh-host-key")),
+				)
 				// in no form at all
 				.xnot()
 				.xpect_contains(&record)
@@ -568,6 +588,32 @@ mod test {
 				.xpect_contains("OPENSSH PRIVATE KEY")
 				.xnot()
 				.xpect_contains("BEET_SSH_HOST_KEY=");
+			// the parameter's value is a reference to the write-only input,
+			// which is ephemeral, sensitive and has nothing to fall back to
+			let config =
+				serde_json::from_str::<serde_json::Value>(&json).unwrap();
+			let parameter = config["resource"]["aws_ssm_parameter"]
+				.as_object()
+				.unwrap()
+				.values()
+				.next()
+				.unwrap();
+			parameter["value_wo"]
+				.as_str()
+				.unwrap()
+				.xpect_eq("${var.BEET_SSH_HOST_KEY}");
+			parameter.get("value").xpect_none();
+			let variable = &config["variable"]["BEET_SSH_HOST_KEY"];
+			variable["ephemeral"].as_bool().unwrap().xpect_true();
+			variable["sensitive"].as_bool().unwrap().xpect_true();
+			variable.get("default").xpect_none();
+			// and the box boots after it
+			config["resource"]["aws_lightsail_instance"]
+				.to_string()
+				.xpect_contains(&format!(
+					"aws_ssm_parameter.{}",
+					stack.resource_ident("ssh-host-key").label()
+				));
 		}
 	}
 

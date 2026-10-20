@@ -53,7 +53,13 @@ pub async fn SecretsExport(
 	group: SmolStr,
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let store = secret_store(&cx.caller).await?;
+	let (stack, store) = cx
+		.caller
+		.with_state::<StackQuery, _>(|entity, stacks| {
+			(stacks.resolve(entity), stacks.secret_store(entity))
+		})
+		.await?;
+	let store = store?;
 	let target = export_target(&cx.caller, document, &store).await?;
 	let entries = store.read_all().await?;
 	if entries.is_empty() {
@@ -67,6 +73,7 @@ pub async fn SecretsExport(
 	let now = Timestamp::now();
 	let export = SecretsExport::document(
 		target.media_type()?,
+		&stack,
 		&store,
 		&group,
 		recipients,
@@ -149,6 +156,7 @@ impl SecretsExport {
 	/// store, and one record per label in `group`, sealed once.
 	pub fn document(
 		media_type: MediaType,
+		stack: &ResolvedStack,
 		store: &SecretStore,
 		group: &str,
 		recipients: Vec<AgeRecipient>,
@@ -157,8 +165,8 @@ impl SecretsExport {
 	) -> Result<SecretsDocument> {
 		let mut document = SecretsDocument::new(media_type);
 		document.origin = Some(SecretsOrigin {
-			app: store.stack().app_name().clone(),
-			stage: store.stack().stage().clone(),
+			app: stack.app_name().clone(),
+			stage: stack.stage().clone(),
 			region: store.region(),
 			provider: store.id().into(),
 			exported,
@@ -260,7 +268,12 @@ pub(crate) async fn export_target(
 		})
 		.await
 	{
-		let cold = block.parked_store(store).await?;
+		let stack = caller
+			.with_state::<StackQuery, _>(|entity, stacks| {
+				stacks.resolve(entity)
+			})
+			.await?;
+		let cold = block.parked_store(&stack, store).await?;
 		return SecretsHandle::new(cold, handle.path.as_str())?
 			.with_label(handle.label.clone().unwrap_or_default())
 			.xok();
@@ -290,7 +303,7 @@ pub(crate) mod tests {
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
 				RepoStore,
-				children![DocumentSecrets::new("store.toml")],
+				DocumentSecrets::new("store.toml"),
 			))
 			.id();
 		world.entity_mut(export).insert((
@@ -497,7 +510,7 @@ pub(crate) mod tests {
 				Stack::new("mail").with_stage("dev"),
 				BlobStore::temp(),
 				RepoStore,
-				children![DocumentSecrets::new("store.toml")],
+				DocumentSecrets::new("store.toml"),
 			))
 			.id();
 		let export = world.spawn((Secrets::new("x.toml"), ChildOf(root))).id();

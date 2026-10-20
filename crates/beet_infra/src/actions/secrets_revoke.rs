@@ -303,15 +303,12 @@ mod tests {
 				Stack::new("mail").with_stage("prod"),
 				BlobStore::temp(),
 				RepoStore,
-				children![
-					DocumentSecrets::new("store.toml"),
-					Secrets::default(),
-					Router::with_defaults()
-				],
+				DocumentSecrets::new("store.toml"),
+				children![Secrets::default(), Router::with_defaults()],
 			))
 			.id();
 		world.flush();
-		let router = world.entity(root).get::<Children>().unwrap()[2];
+		let router = world.entity(root).get::<Children>().unwrap()[1];
 		world
 			.entity_mut(router)
 			.insert_template(DeployRoutes {
@@ -394,7 +391,7 @@ mod tests {
 	async fn rides_its_route() {
 		let mut world = infra_world();
 		let (root, _, alice, _) = revocable_stack(&mut world).await;
-		let router = world.entity(root).get::<Children>().unwrap()[2];
+		let router = world.entity(root).get::<Children>().unwrap()[1];
 		world
 			.spawn(ChildOf(router))
 			.insert_template(

@@ -92,7 +92,7 @@ impl DynamoStore {
 				Box::pin(async move {
 					// configured-wins: an authored region is the declaration's
 					// answer, and env only fills the gap when there is none.
-					let mut loader = aws_config::from_env();
+					let mut loader = aws_ext::loader();
 					if let Some(region) = region {
 						loader = loader.region(Region::new(region.to_string()));
 					}

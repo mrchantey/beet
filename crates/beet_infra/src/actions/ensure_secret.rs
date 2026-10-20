@@ -120,7 +120,7 @@ mod tests {
 				Stack::new("app").with_stage("dev"),
 				BlobStore::temp(),
 				RepoStore,
-				children![DocumentSecrets::new("secrets.toml")],
+				DocumentSecrets::new("secrets.toml"),
 			))
 			.id();
 		world.flush();
@@ -157,8 +157,7 @@ mod tests {
 			.unwrap()
 			.xpect_eq(value.as_str());
 		// the note landed beside it
-		let declaration = world.entity(root).get::<Children>().unwrap()[0];
-		let store = world.get::<SecretStore>(declaration).unwrap().clone();
+		let store = world.get::<SecretStore>(root).unwrap().clone();
 		let entries = store.list().await.unwrap();
 		entries.len().xpect_eq(1);
 		entries[0]
@@ -199,7 +198,7 @@ mod tests {
 		let database = RdsPostgresBlock::new("db");
 		EnsureSecret::new(database.secret())
 			.secret
-			.name(&stack)
+			.xmap(|secret| stack.secret_path(&secret))
 			.xpect_eq(database.secret_name(&stack));
 	}
 }

@@ -1,11 +1,6 @@
 //! ECS types for interacting with terraform configurations.
 mod access_grant;
 mod artifacts;
-// the `aws` cli constructors every native AWS call shells out through: the
-// deploy verbs, and parameter store, which a deployed box reads its secrets
-// from, so native rather than `deploy`.
-#[cfg(not(target_arch = "wasm32"))]
-pub mod aws_cli_ext;
 mod build_artifact;
 // what a Cloudflare action asks of the deploy token, declared on the action and
 // the only way it reaches that token.
@@ -35,9 +30,8 @@ mod runtime_boundary;
 // the class a bucket keeps its objects in, read by its transition rule and by
 // a push into it.
 mod s3_storage_class;
-mod secret_ref;
-// the provider-agnostic seam a stack's secrets live behind and its providers,
-// in every build: a deployed box reads its secrets through it
+// the providers a stack's secrets live in, in every build: a deployed box
+// reads its secrets through them
 mod secret_store;
 mod stack;
 mod stack_backend;
@@ -61,7 +55,6 @@ pub use resource_scope::*;
 #[cfg(feature = "bindings_aws_common")]
 pub use runtime_boundary::*;
 pub use s3_storage_class::*;
-pub use secret_ref::*;
 pub use secret_store::*;
 pub use stack::*;
 pub use stack_backend::*;

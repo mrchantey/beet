@@ -248,6 +248,56 @@ pub struct ResourceMeta {
 }
 
 // ---------------------------------------------------------------------------
+// TofuVar
+// ---------------------------------------------------------------------------
+
+/// One input variable's value for a tofu invocation, handed to the child as
+/// `TF_VAR_<key>` by the `tofu` driver. A secret one (a
+/// [`StateEncryption`](crate::prelude::StateEncryption) passphrase, a
+/// `sensitive` variable's value) is also redacted from the child's reported
+/// output, and from this type's [`Debug`].
+#[derive(Clone, PartialEq, Eq)]
+pub struct TofuVar {
+	/// The variable's name in the config, ie `tf_state_passphrase`.
+	pub key: SmolStr,
+	/// Its value.
+	pub value: SmolStr,
+	/// Whether the value is redacted wherever the invocation reports it.
+	pub secret: bool,
+}
+
+impl TofuVar {
+	/// A value the invocation may print.
+	pub fn new(key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {
+		Self {
+			key: key.into(),
+			value: value.into(),
+			secret: false,
+		}
+	}
+
+	/// A value redacted wherever the invocation reports it.
+	pub fn secret(key: impl Into<SmolStr>, value: impl Into<SmolStr>) -> Self {
+		Self {
+			secret: true,
+			..Self::new(key, value)
+		}
+	}
+}
+
+impl core::fmt::Debug for TofuVar {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		f.debug_struct("TofuVar")
+			.field("key", &self.key)
+			.field("value", &match self.secret {
+				true => ChildProcess::REDACTED,
+				false => self.value.as_str(),
+			})
+			.finish()
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

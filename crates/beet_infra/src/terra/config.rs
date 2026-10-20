@@ -52,6 +52,11 @@ pub struct Variable {
 	/// an `EnsureSecret`-style action feeds through, and for the state
 	/// encryption passphrase.
 	pub sensitive: Option<bool>,
+	/// Keeps the value out of the plan and the state altogether, so only a
+	/// write-only attribute (`value_wo`) or another ephemeral context may
+	/// read it. An OpenTofu 1.11 feature, so declaring one pins the config
+	/// to [`Config::EPHEMERAL_REQUIRED_VERSION`].
+	pub ephemeral: Option<bool>,
 }
 
 /// A Terraform output definition.
@@ -114,6 +119,12 @@ impl Config {
 	/// the assignment as a field so a route can re-cut its layers.
 	pub const STORAGE_LAYER: &str = "storage";
 
+	/// The OpenTofu release ephemeral variables and write-only attributes
+	/// arrived in (1.11.0), which a config declaring an
+	/// [`ephemeral`](Variable::ephemeral) variable requires, so an older
+	/// tofu refuses naming the version rather than misreading the attribute.
+	pub const EPHEMERAL_REQUIRED_VERSION: &str = ">= 1.11.0";
+
 	/// Create a new empty configuration.
 	pub fn new() -> Self { Self::default() }
 
@@ -174,6 +185,7 @@ impl Config {
 						.into(),
 				),
 				sensitive: Some(true),
+				ephemeral: None,
 			});
 		}
 		self
@@ -278,6 +290,12 @@ impl Config {
 			.collect::<BTreeSet<_>>()
 			.into_iter()
 			.collect()
+	}
+
+	/// Whether the config declares any data source of `data_type`, ie the
+	/// `aws_ssm_parameter` a compute block reads its AMI id through.
+	pub fn declares_data_source(&self, data_type: &str) -> bool {
+		self.data_sources.contains(data_type)
 	}
 
 	/// Every rendered resource of `resource_type`, as `(label, body)` in
@@ -826,6 +844,13 @@ impl Config {
 		}
 		if let Some(sensitive) = variable.sensitive {
 			obj.insert("sensitive", sensitive);
+		}
+		if let Some(ephemeral) = variable.ephemeral {
+			obj.insert("ephemeral", ephemeral);
+			if ephemeral && self.required_version.is_none() {
+				self.required_version =
+					Some(Self::EPHEMERAL_REQUIRED_VERSION.into());
+			}
 		}
 		self.variables.insert(name, obj);
 		Ok(())

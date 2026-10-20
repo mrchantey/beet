@@ -590,32 +590,81 @@ mod tests {
 		parse_host_key(&BASE64_STANDARD.encode("not a key")).unwrap_err();
 	}
 
-	/// A test [`SecretSource`]: a fixed answer, or an error standing for a
-	/// deployed secret its store does not hold.
+	/// A test [`SecretStore`] holding `0` under every key, read-only.
 	#[derive(Clone)]
-	struct Fixed(Result<Option<String>, &'static str>);
+	struct Fixed(Option<String>);
 
-	impl SecretSourceProvider for Fixed {
-		fn box_clone(&self) -> Box<dyn SecretSourceProvider> {
+	impl SecretStoreProvider for Fixed {
+		fn box_clone(&self) -> Box<dyn SecretStoreProvider> {
 			Box::new(self.clone())
 		}
 		fn id(&self) -> &'static str { "fixed" }
-		fn describe(&self) -> String { "a fixed test source".into() }
-		fn get(&self) -> SendBoxedFuture<Result<Option<String>>> {
-			let answer = self.0.clone().map_err(|err| bevyhow!("{err}"));
-			Box::pin(async move { answer })
+		fn scope(&self) -> &SecretScope {
+			static ROOT: SecretScope = SecretScope::ROOT;
+			&ROOT
+		}
+		fn for_scope(
+			&self,
+			_scope: &SecretScope,
+		) -> Result<Box<dyn SecretStoreProvider>> {
+			Ok(self.box_clone())
+		}
+		fn address(&self, secret: &SecretRef) -> SmolStr {
+			format!("fixed#{}", secret.label()).into()
+		}
+		fn get(
+			&self,
+			_secret: SecretRef,
+		) -> SendBoxedFuture<Result<Option<String>>> {
+			let value = self.0.clone();
+			Box::pin(async move { value.xok() })
+		}
+		fn create(
+			&self,
+			_secret: SecretRef,
+			_value: SmolStr,
+			_meta: SecretMeta,
+		) -> SendBoxedFuture<Result> {
+			Box::pin(async { bevybail!("read-only") })
+		}
+		fn overwrite(
+			&self,
+			_secret: SecretRef,
+			_value: SmolStr,
+			_meta: SecretMeta,
+		) -> SendBoxedFuture<Result> {
+			Box::pin(async { bevybail!("read-only") })
+		}
+		fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
+			Box::pin(async { bevybail!("read-only") })
+		}
+		fn delete(
+			&self,
+			_secrets: Vec<SecretRef>,
+		) -> SendBoxedFuture<Result<Vec<SecretRef>>> {
+			Box::pin(async { bevybail!("read-only") })
 		}
 	}
 
-	/// The fingerprint of the key a server whose [`SshHostKeyRef`] names a
-	/// source answering `answer` presents.
+	/// The fingerprint of the key a server presents whose [`SshHostKeyRef`]
+	/// names a declaration landing the secret `ssh-host-key` in a [`Fixed`]
+	/// store holding `stored`, required or not.
 	async fn declared_fingerprint(
-		answer: Result<Option<String>, &'static str>,
+		stored: Option<String>,
+		required: bool,
 	) -> Result<String> {
+		let secret = StoredSecret::new(
+			SecretStore::new(Fixed(stored)),
+			SecretRef::new("ssh-host-key"),
+		);
+		let secret = match required {
+			true => secret.required("deploy the stack"),
+			false => secret,
+		};
 		let mut world = AsyncPlugin.into_world();
-		let source = world.spawn(SecretSource::new(Fixed(answer))).id();
+		let declaration = world.spawn(secret).id();
 		world
-			.spawn(SshHostKeyRef(source))
+			.spawn(SshHostKeyRef(declaration))
 			.run_async_then(async |entity| -> Result<String> {
 				let declared = SshHostKey::resolve(&entity).await?;
 				host_key(declared.as_ref())?
@@ -627,9 +676,10 @@ mod tests {
 			.await
 	}
 
-	/// A server presents the key its declaration's source holds, and a source
-	/// that cannot answer fails the server: a deployed box whose key is
-	/// missing from its stack's store never falls back to a key nobody pinned.
+	/// A server presents the key its declared secret holds, and a required
+	/// secret its store lacks fails the server: a deployed box whose key is
+	/// missing from its stack's store never falls back to a key nobody
+	/// pinned. An optional one absent is the process default.
 	#[beet_core::test]
 	async fn serves_the_declared_key_or_fails() {
 		let pem = parse_host_key(SshHostKey::DEBUG)
@@ -642,17 +692,23 @@ mod tests {
 			.public_key()
 			.fingerprint(Default::default())
 			.to_string();
-		declared_fingerprint(Ok(Some(BASE64_STANDARD.encode(&pem))))
+		declared_fingerprint(Some(BASE64_STANDARD.encode(&pem)), true)
 			.await
 			.unwrap()
-			.xpect_eq(expected);
-		declared_fingerprint(Err("no secret at /app/dev/ssh-host-key"))
+			.xpect_eq(expected.clone());
+		declared_fingerprint(None, true)
 			.await
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("a fixed test source")
-			.xpect_contains("no secret at /app/dev/ssh-host-key");
-		declared_fingerprint(Ok(Some("not a key".into())))
+			.xpect_contains("fixed")
+			.xpect_contains("no secret at fixed#ssh-host-key")
+			.xpect_contains("deploy the stack");
+		// the debug build's default, as `host_key(None)` answers
+		declared_fingerprint(None, false)
+			.await
+			.unwrap()
+			.xpect_eq(expected.clone());
+		declared_fingerprint(Some("not a key".into()), true)
 			.await
 			.unwrap_err()
 			.to_string()

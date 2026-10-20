@@ -21,7 +21,9 @@ tokens = ["proc-macro2", "quote", "syn"]
 # The S3/Dynamo runtime backends. Pulls the bucket declaration: a `<DirSync>`
 # spells its S3 end through `S3BucketBlock::store_uri`.
 aws_sdk = ["beet_net/aws_sdk", "bindings_aws_common"]
-deploy = ["beet_router", "dep:base64", "vault"]
+# A deployer renders every always-compiled declaration, so it carries the
+# binding `<SecretBlock/>`'s parameter renders through.
+deploy = ["beet_router", "dep:base64", "vault", "bindings_aws_ssm"]
 # A secrets document as a stack's secret store (`<DocumentSecrets/>`) and the
 # store's export, restore and revoke verbs, on the secrets document in
 # `beet_net/secrets`. The seam, parameter store and `<SecretBlock/>` need none
@@ -93,8 +95,8 @@ bindings_aws_vpc = []
 # SES v2 sending identities, their custom MAIL FROM attributes, and
 # configuration sets.
 bindings_aws_ses = []
-# SSM Parameter Store, for secrets (`EnsureSecret`) and non-secret config the
-# mail box fetches at boot.
+# SSM Parameter Store, for secrets (a `<SecretBlock/>`'s write-only parameter,
+# the mail relay pair) and non-secret config the mail box fetches at boot.
 bindings_aws_ssm = []
 # EventBridge Scheduler: the recurring timer a `ScheduledJobBlock` declares.
 bindings_aws_scheduler = []
@@ -126,7 +128,7 @@ required-features = ["bindings_generator"]
 
 [dependencies]
 beet_core = { workspace = true, features = ["std", "json", "rand", "fs"] }
-beet_net = { workspace = true, features = ["std", "serde", "fs", "http"] }
+beet_net = { workspace = true, features = ["std", "serde", "fs", "http", "aws_sigv4"] }
 bytes.workspace = true
 beet_action = { workspace = true, features = ["std", "reflect", "json"] }
 beet_router = { workspace = true, optional = true, features = ["json"] }

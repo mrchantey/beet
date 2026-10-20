@@ -319,6 +319,14 @@ qrcode = { version = "0.14", default-features = false }
 #💡 http
 http = "1"
 http-body-util = "0.1"
+# AWS Signature Version 4, so an AWS JSON api (parameter store) is a signed
+# request through beet's own http client rather than an SDK client or the
+# `aws` cli. Already in the tree through the S3 SDK; target agnostic, no
+# runtime. `sign-http` + `http1` sign an `http` 1.x request, and the two
+# crates beside it name the identity it signs as.
+aws-sigv4 = { version = "1", default-features = false, features = ["sign-http", "http1"] }
+aws-credential-types = { version = "1", default-features = false }
+aws-smithy-runtime-api = { version = "1", default-features = false, features = ["client"] }
 
 #💡 tui
 vte = "0.15.0"

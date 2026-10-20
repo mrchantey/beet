@@ -252,7 +252,7 @@ mod tests {
 			.resolve(&PackageConfig::default());
 		ComailRelay::secrets("news-example-com")
 			.into_iter()
-			.map(|(secret, _)| secret.name(&stack))
+			.map(|(secret, _)| stack.secret_path(&secret))
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
 				"/beetmash/prod/comail-did-news-example-com",
@@ -275,7 +275,7 @@ mod tests {
 		let missing = ComailRelay::secrets("news-example-com")
 			.into_iter()
 			.map(|(secret, holds)| {
-				format!("  {}  ({holds})", secret.name(&stack))
+				format!("  {}  ({holds})", stack.secret_path(&secret))
 			})
 			.collect::<Vec<_>>();
 		ComailEnroll::missing_message(

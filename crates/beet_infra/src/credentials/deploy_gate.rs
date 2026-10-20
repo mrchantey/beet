@@ -31,10 +31,12 @@ pub(crate) struct ElevationParams {
 ///
 /// - **`deploy`** never asks a person for anything. Before its first step it
 ///   asks every declared credential whether the sealed one holds what the
-///   declarations need, and plans the stack against its state (no refresh, a
-///   few seconds) when one guards a type the stack declares, for a change no
-///   stored credential may make. Either answer refuses the run before anything
-///   is written, naming every reason and the command with `--elevated`.
+///   declarations need, and plans the verb it gates against the stack's state
+///   (no refresh and no lock, a few seconds) when one guards a type the stack
+///   declares, for a change no stored credential may make: the apply's plan
+///   for a `deploy`, the destroy's for a `destroy`, so a teardown is judged on
+///   the deletions it makes. Either answer refuses the run before anything is
+///   written, naming every reason and the command with `--elevated`.
 /// - **`deploy --elevated`** asks only for the human factor of each provider
 ///   that needs one (a stale credential, a protected change, `--roll`),
 ///   converges those credentials, and runs the deploy as this launch in a
@@ -47,9 +49,16 @@ pub(crate) struct ElevationParams {
 ///
 /// No provider is named here: each declared credential answers for itself, so
 /// a provider added to an entry adds a credential to the same two commands.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct DeployGate;
+pub enum DeployGate {
+	/// Gates the verb that converges the stack, assessing the apply's plan.
+	#[default]
+	Deploy,
+	/// Gates the verb that tears the stack down, assessing the destroy's
+	/// plan: a `delete` for every resource the state holds.
+	Destroy,
+}
 
 /// What one credential answered for this run.
 struct Assessed {
@@ -91,7 +100,12 @@ impl DeployGate {
 			.caller
 			.with_state::<ParamsQuery, _>(|entity, query| query.of(entity))
 			.await??;
-		let assessed = Self::assess(&cx.caller, &cx.input).await?;
+		let assessed = cx
+			.caller
+			.get_cloned::<Self>()
+			.await?
+			.assess(&cx.caller, &cx.input)
+			.await?;
 		for note in assessed.iter().flat_map(|one| one.status.notes.iter()) {
 			info!("{note}");
 		}
@@ -114,9 +128,10 @@ impl DeployGate {
 		}
 	}
 
-	/// Ask every declared credential where it stands, and plan the stack for
-	/// the ones that guard a type it declares and are held sealed.
+	/// Ask every declared credential where it stands, and plan the gated verb
+	/// for the ones that guard a type the stack declares and are held sealed.
 	async fn assess(
+		self,
 		caller: &AsyncEntity,
 		input: &Request,
 	) -> Result<Vec<Assessed>> {
@@ -149,8 +164,7 @@ impl DeployGate {
 		if guarding.is_empty() {
 			return assessed.xok();
 		}
-		let vars = project.ambient_vars(input.parts())?;
-		for change in project.planned_changes(&vars, &[]).await? {
+		for change in self.planned_changes(&project, input).await? {
 			for index in guarding.iter() {
 				if let Some(reason) = assessed[*index]
 					.credential
@@ -161,6 +175,23 @@ impl DeployGate {
 			}
 		}
 		assessed.xok()
+	}
+
+	/// The writes the gated verb would make, planned against the stack's
+	/// state alone with the vars that verb runs with.
+	async fn planned_changes(
+		self,
+		project: &terra::Project,
+		input: &Request,
+	) -> Result<Vec<tofu::PlannedChange>> {
+		match self {
+			Self::Deploy => {
+				project
+					.planned_changes(&project.ambient_vars(input.parts())?, &[])
+					.await
+			}
+			Self::Destroy => project.planned_destroy().await,
+		}
 	}
 
 	/// The refusal of a plain deploy that cannot proceed: every reason, the
@@ -461,6 +492,49 @@ mod test {
 			.xpect_contains("mail/deploy")
 			.xpect_contains("'--note=a b'")
 			.xpect_ends_with("--elevated");
+	}
+
+	/// REGRESSION: the gate assessed a `destroy` on the apply's plan, which
+	/// for a standing stack holds no deletion, so a teardown no stored
+	/// credential may make (a prod bucket's) passed the gate to fail halfway
+	/// through the destroy. Each gate plans its own verb's change set.
+	#[beet_core::test(timeout_ms = 60_000)]
+	async fn assesses_the_verb_it_gates() {
+		terra::tofu::test_support::require().await.unwrap();
+		StateEncryption::ensure_test_passphrase();
+		let (stack, deployment, dir) = ResolvedStack::default_local();
+		let mut config = deployment.create_config(&stack);
+		config
+			.add_untyped_resource(
+				"terraform_data",
+				"box",
+				&serde_json::json!({ "input": "box" }),
+			)
+			.unwrap();
+		let project = terra::Project::new(
+			stack,
+			deployment,
+			config,
+			LocalBackend::new(dir.join("state")).into(),
+		);
+		project.apply().await.unwrap();
+		let request = Request::from_cli_str("destroy");
+		super::DeployGate::Deploy
+			.planned_changes(&project, &request)
+			.await
+			.unwrap()
+			.xpect_empty();
+		super::DeployGate::Destroy
+			.planned_changes(&project, &request)
+			.await
+			.unwrap()
+			.into_iter()
+			.map(|change| (change.address, change.action))
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![(
+				SmolStr::from("terraform_data.box"),
+				SmolStr::from("delete"),
+			)]);
 	}
 
 	/// REGRESSION: `deploy --elevate` (the `d` missing) ran a plain deploy whose

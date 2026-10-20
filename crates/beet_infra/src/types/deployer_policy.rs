@@ -33,11 +33,13 @@ use serde_json::json;
 ///   no IAM statement at all.
 /// - `ssm:*` under this app's own parameter prefix (`/<app>/`), which is the
 ///   stack's secret store, granted whether or not the config renders a
-///   parameter: a verb that parks a secret writes through the store, not
-///   through a rendered resource. Listing that store (a teardown's sweep,
-///   `secrets/ls`) is `ssm:DescribeParameters`, the one parameter call that
-///   takes no resource, so it is granted on `*` alongside. The provider's own
-///   parameter reads add AWS's public `/aws/service/` tree (an AMI id).
+///   parameter: a verb that parks a secret writes through the store, and
+///   tofu's own parameter calls for a rendered one (a `<SecretBlock/>`)
+///   name the same prefix. Listing that store (a teardown's sweep,
+///   `secrets/ls`, the provider's read of a parameter) is
+///   `ssm:DescribeParameters`, the one parameter call that takes no
+///   resource, so it is granted on `*` alongside. A parameter DATA source
+///   adds AWS's public `/aws/service/` tree (an AMI id).
 /// - `<service>:*` on `*` for every other service, conditioned on the regions
 ///   the stacks declare.
 ///
@@ -95,6 +97,11 @@ pub struct DeployerPolicy {
 	regions: BTreeSet<SmolStr>,
 	/// The IAM services the lowered types named.
 	services: BTreeSet<&'static str>,
+	/// Whether a stack reads a parameter as a DATA source, which is AWS's
+	/// public `/aws/service/` tree (a compute block's AMI id) rather than the
+	/// app's own prefix. A rendered parameter RESOURCE (a `<SecretBlock/>`)
+	/// lives under the prefix and needs nothing beyond it.
+	public_parameters: bool,
 	/// The stages the lowered stacks declare, which the irreversible deny is
 	/// scoped to alongside `prod`. Collected rather than assumed: an app whose
 	/// only stage is `shared` gets its buckets protected too, where a
@@ -192,6 +199,7 @@ impl DeployerPolicy {
 			state_bucket: state_bucket.into(),
 			regions: BTreeSet::new(),
 			services: BTreeSet::new(),
+			public_parameters: false,
 			stages: BTreeSet::new(),
 			boundary: false,
 		}
@@ -252,6 +260,8 @@ impl DeployerPolicy {
 				self.services.insert(service);
 			}
 		}
+		self.public_parameters |=
+			config.declares_data_source("aws_ssm_parameter");
 		self.regions.insert(stack.aws_region()?.clone());
 		self.stages.insert(stack.stage().clone());
 		self.xok()
@@ -387,11 +397,14 @@ impl DeployerPolicy {
 			"Action": "ssm:DescribeParameters",
 			"Resource": "*",
 		}));
-		if self.services.contains("ssm") {
+		if self.public_parameters {
 			// AWS's own public parameter tree, which a compute block reads its
 			// AMI id out of: public, outside every app's prefix, and the
-			// provider's read rather than a verb's, so gated on a rendered
-			// parameter
+			// provider's read rather than a verb's, so gated on a parameter
+			// data source. Every call tofu's provider makes for a parameter
+			// RESOURCE (`PutParameter`, `GetParameter`, `ListTagsForResource`,
+			// `AddTagsToResource`, `RemoveTagsFromResource`, `DeleteParameter`)
+			// names the app's prefix, and `DescribeParameters` is granted above.
 			statements.push(json!({
 				"Sid": "SsmPublic",
 				"Effect": "Allow",
@@ -773,7 +786,8 @@ mod test {
 	/// The stack's secret store, its prefix and the listing a teardown sweeps
 	/// it with, is granted whether or not the config renders a parameter,
 	/// because the verbs that park a secret write through the store rather
-	/// than through a rendered resource; the provider's public-tree read is not.
+	/// than through a rendered resource; the provider's public-tree read is
+	/// not, and a rendered parameter resource does not ask for it either.
 	#[beet_core::test]
 	fn the_secret_store_is_granted_without_a_rendered_parameter() {
 		let (scope, _dir) = RenderScope::test_render_stack(

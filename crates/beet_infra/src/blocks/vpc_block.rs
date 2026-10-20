@@ -288,13 +288,9 @@ impl VpcBlock {
 		stack: &ResolvedStack,
 		kind: &str,
 	) -> BTreeMap<SmolStr, SmolStr> {
-		[
-			(SmolStr::from("Name"), self.suffix(kind).as_str().into()),
-			(SmolStr::from("Project"), stack.app_name().clone()),
-			(SmolStr::from("Stage"), stack.stage().clone()),
-		]
-		.into_iter()
-		.collect()
+		let mut tags = stack.tags();
+		tags.insert("Name".into(), self.suffix(kind).as_str().into());
+		tags
 	}
 }
 

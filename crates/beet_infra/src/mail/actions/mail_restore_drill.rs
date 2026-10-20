@@ -196,7 +196,8 @@ pub async fn MailRestoreDrill(
 			// the SOURCE stage's parked pair, through this stack's store
 			let cold = ColdStore::resolve(
 				mail.cold_store()?,
-				&mail.secrets.for_stack(&source)?,
+				&source,
+				&mail.secrets.for_scope(&source.secret_scope())?,
 			)
 			.await?;
 			let key =
@@ -331,7 +332,7 @@ async fn assert_restored(
 	// every stack of its region
 	let password = mail
 		.secrets
-		.for_stack(source)?
+		.for_scope(&source.secret_scope())?
 		.require(&secret, || {
 			"the drill authenticates as one of the SOURCE stage's accounts, so \
 			its secrets must still exist"
@@ -482,7 +483,7 @@ mod tests {
 			"probe",
 			&MailDomainBlock::slug_of("stalwart.beetmash.com"),
 		)
-		.name(&source)
+		.xmap(|secret| source.secret_path(&secret))
 		.xpect_contains("/prod/")
 		.xpect_contains("mail-account-probe-at-stalwart-beetmash-com");
 	}

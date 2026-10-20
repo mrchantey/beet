@@ -26,16 +26,17 @@ use beet_net::prelude::*;
 ///
 /// A full apply builds the terraform config, records the source tree the
 /// deploy is built from ([`DeploySource`]), builds and uploads the artifacts
-/// into the stack's repo store, publishes the ledger, mirrors each declared
-/// [`SecretBlock`] into the stack's [`SecretStore`] and applies. The mirror
-/// is here rather than a step of its own for the reason the build is: this is
-/// the step that boots what reads it, and a mirror some entry forgets is a
-/// box that refuses to boot. It collects
+/// into the stack's repo store, publishes the ledger and applies. It collects
 /// each [`BuildArtifact`] paired with the
 /// [`artifact_label`](ErasedBlock::artifact_label) its [`ErasedBlock`] carries
 /// from stack descendants to build the [`ArtifactLedger`], using
 /// [`BuildArtifact::compute_source_hash`] for the hash. A layered apply skips
 /// the artifacts entirely, since nothing that reads one converges in it.
+///
+/// A declared [`SecretBlock`] needs nothing here: its parameter is a resource
+/// of the stack, written by the apply itself through a write-only value the
+/// project resolves from the launch's environment, and every apply refuses,
+/// naming the record, when the launch lacks it.
 ///
 /// The ledger lives in the repo store ([`RepoStoreQuery::artifacts_client`]),
 /// so a stack shipping an artifact must declare a versioned one and is told
@@ -63,29 +64,22 @@ pub async fn TofuApply(
 	// step 1: build the project and collect variables and artifact pairs
 	trace!("TofuApply: step 1 - building project and collecting artifacts");
 	let backend = terra::Project::resolve_backend(&cx.caller).await?;
-	let (project, artifacts, client, variables, mirrors) = cx
+	let (project, artifacts, client, variables) = cx
 		.caller
 		.with_world(move |world, entity| -> Result<_> {
 			let scope = RenderScope::render(world, entity)?;
 			let variables = scope.variables();
 			// each declared artifact, paired with the label its block declared,
-			// the client publishing them into the stack's repo store, the
-			// secret store a content variable resolves through, and the
-			// secrets the full apply mirrors into it
-			let (artifacts, client, secrets, mirrors) = world.with_state::<(
-				StackQuery,
-				Query<(&ErasedBlock, &BuildArtifact)>,
-				RepoStoreQuery,
-				Query<&SecretBlock>,
-			), _>(
-				|(stacks, artifacts, repos, secret_blocks)| -> Result<_> {
+			// the client publishing them into the stack's repo store, and the
+			// secret store a content variable resolves through
+			let (artifacts, client, secrets) =
+				world.with_state::<(
+					StackQuery,
+					Query<(&ErasedBlock, &BuildArtifact)>,
+					RepoStoreQuery,
+				), _>(|(stacks, artifacts, repos)| -> Result<_> {
 					let declared = stacks.declared(entity)?;
 					let secrets = stacks.secret_store(entity)?;
-					let mirrors = declared
-						.iter()
-						.filter_map(|child| secret_blocks.get(*child).ok())
-						.cloned()
-						.collect::<Vec<_>>();
 					let built = declared
 						.iter()
 						.filter_map(|child| artifacts.get(*child).ok())
@@ -103,9 +97,8 @@ pub async fn TofuApply(
 						true => repos.find_artifacts_client(entity)?,
 						false => Some(repos.artifacts_client(entity)?),
 					};
-					(built, client, secrets, mirrors).xok()
-				},
-			)?;
+					(built, client, secrets).xok()
+				})?;
 			let (stack, deployment, config) = scope.finish()?;
 			// with the declared variables, so the apply resolves the content
 			// ones from their source rather than expecting them on the request
@@ -116,8 +109,8 @@ pub async fn TofuApply(
 				backend,
 				variables.clone(),
 			)
-			.with_secret_store(secrets.clone());
-			(project, artifacts, client, variables, (secrets, mirrors)).xok()
+			.with_secret_store(secrets);
+			(project, artifacts, client, variables).xok()
 		})
 		.await??;
 	trace!(
@@ -180,30 +173,14 @@ pub async fn TofuApply(
 		);
 	}
 
-	// step 5 belongs to the full apply too: mirror each declared secret into
-	// the stack's store before the apply boots anything that reads one, so a
-	// rebuilt box finds its secrets at first boot. Never through tofu: a
-	// value tofu writes is a value its state holds.
-	if layer.is_none() {
-		let (store, mirrors) = &mirrors;
-		trace!("TofuApply: step 5 - mirroring {} secrets", mirrors.len());
-		for block in mirrors {
-			let address = store.address(&block.secret());
-			match block.mirror(store).await? {
-				true => info!("mirrored `{}` into {address}", block.env()),
-				false => info!("{address} already mirrors `{}`", block.env()),
-			}
-		}
-	}
-
-	// step 6: apply, narrowed to the layer's addresses when one is named. An
+	// step 5: apply, narrowed to the layer's addresses when one is named. An
 	// unknown layer errors rather than silently widening to the whole stack.
 	let resolved_vars = project.ambient_vars(cx.input.parts())?;
 	let targets: &[String] = match layer.as_ref() {
 		None => &[],
 		Some(layer) => project.config().layer_targets(layer)?,
 	};
-	trace!("TofuApply: step 6 - applying terraform");
+	trace!("TofuApply: step 5 - applying terraform");
 	let result = project.apply_with_vars(&resolved_vars, targets).await?;
 	trace!("TofuApply: terraform apply complete");
 	trace!("{result}");

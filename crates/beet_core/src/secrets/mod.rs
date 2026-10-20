@@ -1,23 +1,35 @@
-//! The secrets document: a plaintext index of records plus one age blob per
-//! group, sealed and opened with the vault layer (`crate::vault`).
+//! Secrets: the store every secret a process reads or a deploy mints lives
+//! behind, and the secrets document humans keep theirs in, a plaintext index
+//! of records plus one age blob per group sealed with the vault layer
+//! (`crate::vault`).
+//!
+//! In every build, since a deployed binary carries no vault:
+//!
+//! - [`SecretStore`]: the erased-provider seam, keyed by [`SecretRef`] and
+//!   scoped by [`SecretScope`], resolved by [`SecretStoreQuery`]. Providers:
+//!   [`EnvSecretStore`] (the launch's environment, read-only) here, AWS
+//!   parameter store and a secrets document as a stack's store in `beet_infra`
+//! - [`StoredSecret`]: one secret a process reads, a store and its key,
+//!   landed by a declaration and named by a consumer's relation
+//! - [`SecretRoll`]: how a secret is rolled, declared at mint, since a stack
+//!   declaration renders it
+//!
+//! Behind `vault`:
 //!
 //! - [`SecretsDocument`]: a [`SecretsGroup`] per recipient list, each the
 //!   index of its [`SecretRecord`]s, and one sealed blob per group, opened
 //!   into [`OpenSecrets`]
-//! - [`SecretRoll`]: how a record's secret is rolled, declared at mint; plain
-//!   data in every build, since a stack declaration renders it
 //! - [`Secrets`]: the `<Secrets path=".."/>` declaration, and the runner's
 //!   convention for the same file
-//! - [`SecretSource`]: where a running process reads one secret, the
-//!   launch's environment or a deployment's secret store, plain in every
-//!   build since a deployed binary carries no vault
 //!
 //! ## Cheatsheet
 //!
 //! The rules every consumer of this subsystem relies on; the tutorial at
 //! `site/routes/docs/secrets.md` walks them, `beet_net::secrets` holds the
-//! store I/O and the verbs, and `beet_infra`'s README "Secrets" the stack
-//! side (`SecretStore`, exports, restore, revoke).
+//! document I/O and the verbs, `beet_net`'s `AwsJsonClient` the signed
+//! requests parameter store is reached by, and `beet_infra`'s README
+//! "Secrets" the stack side (its store providers and declarations,
+//! `<SecretBlock/>`, exports, restore, revoke).
 //!
 //! - **One identity per human, in the OS config, never passed in.**
 //!   `~/.config/beet/age/keys.txt`, found by [`AgeIdentityFile::discover`](crate::vault::AgeIdentityFile::discover)
@@ -52,11 +64,20 @@
 //!   viewed, read by a system through [`OpenSecrets`].
 //! - **No identity is one warning, never an error.** A cloud box and a
 //!   contributor without the key build and run minus the records.
+//! - **One store, whichever side reads it.** Every secret a process reads
+//!   or a deploy mints goes through a [`SecretStore`] by label; a consumer
+//!   holds a [`StoredSecret`] (the store and the key) and never knows the
+//!   provider. Absence is `None`, and an error only where the declaration
+//!   says what supplies the value.
 //! - **A deployed process never reads a record from its environment.** A
-//!   secret a box needs is a `<SecretBlock/>` under its stack: the deploy
-//!   mirrors the record into the stack's secret store and the box reads it
-//!   from there through a [`SecretSource`], so no value rides a rendered
-//!   config (`user_data`, `main.tf.json`, tofu state) or a box's disk.
+//!   secret a box needs is a `<SecretBlock/>` under its stack: the stack's
+//!   tofu config owns it as a parameter whose value is write-only, which the
+//!   apply fills from the record on the tofu child's environment, and the
+//!   box reads it from the stack's secret store, while a local launch reads
+//!   the same record from its environment ([`EnvSecretStore`]). So no value
+//!   rides a rendered config (`user_data`, `main.tf.json`), a plan, the tofu
+//!   state or a box's disk; the record's `modified` versions the parameter,
+//!   so a roll rewrites it.
 //! - **Values never reach a log.** `Debug` redacts an identity, a sealed
 //!   record and an opened [`Secret`]; `secrets/get` and `vault/decrypt` print
 //!   deliberately as their response. `set` takes its value from a no-echo
@@ -78,24 +99,30 @@
 //!   the sole one, else `secrets.toml` beside the entry); `vault/*` verbs
 //!   take `--vault=<path or uri>` for one age file by path.
 
+mod env_secret_store;
 #[cfg(feature = "vault")]
 mod open_secrets;
 #[cfg(feature = "vault")]
 mod secret_record;
+mod secret_ref;
 mod secret_roll;
-mod secret_source;
+mod secret_store;
 #[cfg(feature = "vault")]
 mod secrets;
 #[cfg(feature = "vault")]
 mod secrets_document;
+mod stored_secret;
 
+pub use env_secret_store::*;
 #[cfg(feature = "vault")]
 pub use open_secrets::*;
 #[cfg(feature = "vault")]
 pub use secret_record::*;
+pub use secret_ref::*;
 pub use secret_roll::*;
-pub use secret_source::*;
+pub use secret_store::*;
 #[cfg(feature = "vault")]
 pub use secrets::*;
 #[cfg(feature = "vault")]
 pub use secrets_document::*;
+pub use stored_secret::*;

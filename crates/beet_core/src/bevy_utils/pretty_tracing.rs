@@ -14,11 +14,11 @@ use tracing_subscriber::util::SubscriberInitExt;
 /// beet app shares the same compact, cross-platform log format.
 #[derive(Clone)]
 pub struct LogPlugin {
-	/// Default level used when neither `RUST_LOG` nor the AWS lambda log level
-	/// is present in the environment.
+	/// See [`PrettyTracing::default_level`].
 	pub level: tracing::Level,
-	/// Extra comma-separated `EnvFilter` directives appended to the defaults,
-	/// eg `"ureq=off,ureq_proto=off"`.
+	/// See [`PrettyTracing::own_targets`].
+	pub own_targets: Vec<String>,
+	/// See [`PrettyTracing::filter`].
 	pub filter: String,
 	/// See [`PrettyTracing::interactive`].
 	pub interactive: bool,
@@ -33,11 +33,13 @@ impl Default for LogPlugin {
 	fn default() -> Self {
 		let PrettyTracing {
 			default_level,
+			own_targets,
 			filter,
 			interactive,
 		} = PrettyTracing::default();
 		Self {
 			level: default_level,
+			own_targets,
 			filter,
 			interactive,
 		}
@@ -48,6 +50,7 @@ impl Plugin for LogPlugin {
 	fn build(&self, _app: &mut App) {
 		PrettyTracing {
 			default_level: self.level,
+			own_targets: self.own_targets.clone(),
 			filter: self.filter.clone(),
 			interactive: self.interactive,
 		}
@@ -55,12 +58,33 @@ impl Plugin for LogPlugin {
 	}
 }
 
-/// Opinionated high level tracing initialization
+/// Opinionated high level tracing initialization.
+///
+/// ## Levels
+///
+/// Beet's own crates log at [`default_level`](Self::default_level), every
+/// other crate (rustls, hyper, the AWS SDK, bevy itself) warnings and errors
+/// only: a dependency's `debug` is its authors' diagnostics, not the app's.
+/// Which targets are beet's own is a prefix rule,
+/// [`own_targets`](Self::own_targets), so a downstream crate opts in by name.
+///
+/// `RUST_LOG` (or a lambda's `AWS_LAMBDA_LOG_LEVEL`), then
+/// [`filter`](Self::filter), override the defaults, each a comma separated
+/// directive list: a bare level sets the own targets' level
+/// (`RUST_LOG=info`), a `target=level` directive any target's, a dependency's
+/// included (`RUST_LOG=info,aws_smithy_runtime=debug`).
 #[derive(Clone)]
 pub struct PrettyTracing {
-	/// Level used when no level is found in the environment.
+	/// The level the [`own_targets`](Self::own_targets) log at, unless a bare
+	/// level in the environment or [`filter`](Self::filter) says otherwise.
 	pub default_level: tracing::Level,
-	/// Extra comma-separated `EnvFilter` directives appended to the defaults.
+	/// Target prefixes logging at the resolved level, everything else at
+	/// `warn`. Defaults to `beet`, the prefix of every beet crate's module
+	/// path (`beet_core`, `beet_cli`, ..), and the running binary's own crate
+	/// (an example, a downstream app).
+	pub own_targets: Vec<String>,
+	/// Extra comma separated directives, folded in last so they win: a bare
+	/// level is the own targets' level, `target=level` any target's.
 	pub filter: String,
 	/// Whether output is going to a human at a terminal, defaulting to
 	/// [`PrettyTracing::is_interactive`]. Interactive output is colored,
@@ -77,74 +101,12 @@ impl Default for PrettyTracing {
 		let default_level = tracing::Level::DEBUG;
 		Self {
 			default_level,
+			own_targets: Self::default_own_targets(),
 			filter: String::new(),
 			interactive: Self::is_interactive(),
 		}
 	}
 }
-
-/// Non-beet log targets pinned to `warn` by [`PrettyTracing::init`]: the bevy
-/// render / window / GPU / asset stack plus a few other chatty dependencies.
-/// These are never the beet app's own output, so their `debug`/`info` spam (eg
-/// `offset_allocator` freelist churn, `bevy_shader` setup) is suppressed while
-/// beet's crates and the running app keep the resolved level. Add origins here
-/// as new noise appears.
-const QUIET_TARGETS: &[&str] = &[
-	// gpu / allocator / shader churn
-	"offset_allocator",
-	"gpu_allocator",
-	"naga",
-	// bevy render + windowing stack
-	"bevy_app",
-	"bevy_render",
-	"bevy_shader",
-	"bevy_pbr",
-	"bevy_core_pipeline",
-	"bevy_sprite",
-	"bevy_sprite_render",
-	"bevy_text",
-	"bevy_ui",
-	"bevy_ui_render",
-	"bevy_gltf",
-	"bevy_scene",
-	"bevy_image",
-	"bevy_mesh",
-	"bevy_camera",
-	"bevy_light",
-	"bevy_material",
-	"bevy_anti_alias",
-	"bevy_post_process",
-	"bevy_gizmos",
-	"bevy_gizmos_render",
-	"bevy_picking",
-	"bevy_animation",
-	"bevy_audio",
-	"bevy_winit",
-	"bevy_window",
-	"bevy_a11y",
-	"bevy_gilrs",
-	"bevy_asset",
-	"bevy_diagnostic",
-	"bevy_dev_tools",
-	// windowing / input / text deps
-	"winit",
-	"gilrs",
-	"gilrs_core",
-	"cosmic_text",
-	"fontdb",
-	// ml backend (burn / cubecl): runtime setup, kernel compiler passes,
-	// build-id probing and the autotune cache database
-	"cubecl",
-	"pliron",
-	"buildid",
-	"turso",
-	"turso_core",
-	// networking / cloud / wasm tooling
-	"walrus",
-	"aws",
-	"hyper_util",
-	"ureq",
-];
 
 impl PrettyTracing {
 	/// Opinionated tracing defaults for bevy, using the provided level
@@ -198,8 +160,21 @@ impl PrettyTracing {
 		}
 	}
 
-	/// Builds the subscriber, writing formatted events to `writer`.
+	/// Builds the subscriber, writing formatted events to `writer` through
+	/// the environment's [`env_filter`](Self::env_filter).
 	fn dispatch<W>(&self, writer: W) -> tracing::Dispatch
+	where
+		W: 'static + Send + Sync + for<'a> MakeWriter<'a>,
+	{
+		self.dispatch_filtered(writer, self.env_filter())
+	}
+
+	/// Builds the subscriber, writing the events `filter` passes to `writer`.
+	fn dispatch_filtered<W>(
+		&self,
+		writer: W,
+		filter: EnvFilter,
+	) -> tracing::Dispatch
 	where
 		W: 'static + Send + Sync + for<'a> MakeWriter<'a>,
 	{
@@ -216,7 +191,7 @@ impl PrettyTracing {
 			// best effort like `cross_log!`: the subscriber's own report of
 			// the failure is an `eprintln!`, which panics on that same stream
 			.log_internal_errors(false)
-			.with_env_filter(self.env_filter());
+			.with_env_filter(filter);
 		match self.interactive {
 			// a human at a terminal: colored and roomy, and the wall clock is a
 			// glance away so the timestamp is just noise.
@@ -232,43 +207,72 @@ impl PrettyTracing {
 		}
 	}
 
-	/// The resolved [`EnvFilter`]: the environment or [`Self::default_level`],
-	/// with [`QUIET_TARGETS`] pinned to `warn` and [`Self::filter`] folded in
-	/// last so caller directives win.
+	/// `beet`, and the running binary's crate when it is named otherwise.
+	fn default_own_targets() -> Vec<String> {
+		let binary = env_ext::program()
+			.and_then(|program| Self::crate_of(&program))
+			.filter(|crate_name| !crate_name.starts_with("beet"));
+		core::iter::once("beet".to_string()).chain(binary).collect()
+	}
+
+	/// The crate an executable at `program` was built from: its file name
+	/// less a test binary's `-<hash>` suffix, dashes as underscores the way
+	/// rustc names a crate.
+	fn crate_of(program: &str) -> Option<String> {
+		let stem = std::path::Path::new(program).file_stem()?.to_string_lossy();
+		let name = match stem.rsplit_once('-') {
+			Some((name, hash))
+				if !hash.is_empty()
+					&& hash.chars().all(|char| char.is_ascii_hexdigit()) =>
+			{
+				name
+			}
+			_ => &stem,
+		};
+		name.replace('-', "_").xsome()
+	}
+
+	/// The resolved [`EnvFilter`], see [`PrettyTracing`]'s levels.
 	fn env_filter(&self) -> EnvFilter {
-		// The env may carry a plain level (`info`), a directive list
-		// (`info,beet_net=warn`), or nothing. A plain level (or the built-in
-		// default when the env is absent) becomes the catch-all directive; a
-		// directive list already carries its own catch-all through
-		// `EnvFilter::from_default_env`, so re-adding the default here would
-		// override the user's level (a bare level directive added later wins).
-		let env_level = env_ext::var("AWS_LAMBDA_LOG_LEVEL")
+		let env = env_ext::var("AWS_LAMBDA_LOG_LEVEL")
 			.or_else(|_| env_ext::var("RUST_LOG"))
 			.ok();
-		let log_level = match &env_level {
-			Some(val) => LevelFilter::from_str(val).ok(),
-			None => Some(self.default_level.into()),
-		};
+		self.filter_with(env.as_deref())
+	}
 
-		// every non-beet origin in `QUIET_TARGETS` is pinned to `warn` (`wgpu`
-		// lower still); the resolved level applies to everything else, ie the
-		// beet crates and the running app. caller-supplied directives win, so
-		// they are folded in last.
-		let mut base = tracing_subscriber::EnvFilter::from_default_env()
-			.add_directive("wgpu=error".parse().unwrap());
-		if let Some(log_level) = log_level {
-			base = base.add_directive(log_level.into());
-		}
-		let base = QUIET_TARGETS.iter().fold(base, |filter, target| {
-			filter.add_directive(format!("{target}=warn").parse().unwrap())
-		});
-		self.filter
-			.split(',')
+	/// The filter for the environment's directive list `env`, the pure half of
+	/// [`env_filter`](Self::env_filter).
+	fn filter_with(&self, env: Option<&str>) -> EnvFilter {
+		let directives = env
+			.into_iter()
+			.chain(core::iter::once(self.filter.as_str()))
+			.flat_map(|list| list.split(','))
 			.map(str::trim)
 			.filter(|directive| !directive.is_empty())
-			.fold(base, |filter, directive| {
-				filter.add_directive(directive.parse().unwrap())
-			})
+			.collect::<Vec<_>>();
+		// a bare level is the own targets' level, the last one winning
+		let level = directives
+			.iter()
+			.filter_map(|directive| LevelFilter::from_str(directive).ok())
+			.last()
+			.unwrap_or_else(|| self.default_level.into());
+		let defaults = EnvFilter::default()
+			.add_directive(LevelFilter::WARN.into())
+			.add_directive("wgpu=error".parse().unwrap());
+		let own = self
+			.own_targets
+			.iter()
+			.filter_map(|target| format!("{target}={level}").parse().ok())
+			.fold(defaults, |filter, directive| {
+				filter.add_directive(directive)
+			});
+		// every target directive after the defaults, so it wins; an
+		// unparseable one is dropped, as `EnvFilter` itself would
+		directives
+			.iter()
+			.filter(|directive| LevelFilter::from_str(directive).is_err())
+			.filter_map(|directive| directive.parse().ok())
+			.fold(own, |filter, directive| filter.add_directive(directive))
 	}
 }
 
@@ -424,29 +428,94 @@ mod test {
 			.xpect_contains("\u{1b}[");
 	}
 
-	/// A [`QUIET_TARGETS`](super::QUIET_TARGETS) origin's debug output is
-	/// dropped while the app's own survives (the ml backend's kernel compiler
-	/// logs thousands of lines per run).
-	#[crate::test]
-	fn quiets_dependency_noise() {
+	/// What `config` writes of the events `emit` logs, under the filter it
+	/// builds for the environment directives `env`.
+	fn captured(
+		config: PrettyTracing,
+		env: Option<&str>,
+		emit: fn(),
+	) -> String {
 		let writer = CaptureWriter::default();
 		let dispatch = PrettyTracing {
 			interactive: false,
-			// a catch-all `debug`, so neither the test build's `warn` default nor
-			// the ambient `RUST_LOG` hides what the quiet directive should
-			filter: "debug".into(),
+			..config.clone()
+		}
+		.dispatch_filtered(writer.clone(), config.filter_with(env));
+		tracing::dispatcher::with_default(&dispatch, emit);
+		writer.into_string()
+	}
+
+	/// One event per level of interest, for beet's crates, a downstream app's,
+	/// and two dependencies.
+	fn emit_levels() {
+		tracing::trace!(target: "beet_net::server", "beet trace");
+		tracing::debug!(target: "beet_infra::deploy", "beet debug");
+		tracing::info!(target: "beet_cli", "cli info");
+		tracing::debug!(target: "my_app::main", "app debug");
+		tracing::debug!(target: "rustls::client::hs", "rustls debug");
+		tracing::info!(target: "aws_smithy_runtime::client", "sdk info");
+		tracing::debug!(target: "aws_smithy_runtime::client", "sdk debug");
+		tracing::warn!(target: "hyper_util::client", "hyper warn");
+	}
+
+	/// The tracing of an app named `my_app` logging at `debug`.
+	fn my_app() -> PrettyTracing {
+		PrettyTracing {
+			default_level: tracing::Level::DEBUG,
+			own_targets: vec!["beet".into(), "my_app".into()],
 			..default()
 		}
-		.dispatch(writer.clone());
-		tracing::dispatcher::with_default(&dispatch, || {
-			tracing::debug!(target: "pliron::pass", "kernel pass");
-			tracing::debug!("app output");
-		});
-		writer
-			.into_string()
-			.xpect_contains("app output")
+	}
+
+	/// Every beet crate and the app log at the configured level, a dependency
+	/// warnings and errors only (rustls alone logged a dozen debug lines per
+	/// handshake into every deploy).
+	#[crate::test]
+	fn dependencies_only_warn() {
+		captured(my_app(), None, emit_levels)
+			.xpect_contains("beet debug")
+			.xpect_contains("cli info")
+			.xpect_contains("app debug")
+			.xpect_contains("hyper warn")
 			.xnot()
-			.xpect_contains("kernel pass");
+			.xpect_contains("beet trace")
+			.xnot()
+			.xpect_contains("rustls debug")
+			.xnot()
+			.xpect_contains("sdk info");
+	}
+
+	/// `RUST_LOG` overrides: a bare level is beet's own, a target directive
+	/// raises a dependency, and [`PrettyTracing::filter`] wins over both.
+	#[crate::test]
+	fn the_environment_overrides() {
+		captured(my_app(), Some("info,aws_smithy_runtime=debug"), emit_levels)
+			.xpect_contains("cli info")
+			.xpect_contains("sdk debug")
+			.xnot()
+			.xpect_contains("beet debug")
+			.xnot()
+			.xpect_contains("rustls debug");
+		let traced = PrettyTracing {
+			filter: "trace".into(),
+			..my_app()
+		};
+		captured(traced, Some("info"), emit_levels)
+			.xpect_contains("beet trace")
+			.xnot()
+			.xpect_contains("rustls debug");
+	}
+
+	/// The running binary's crate is the app's own: an example, a renamed
+	/// release binary, and not a test binary's hash suffix.
+	#[crate::test]
+	fn names_the_running_crate() {
+		PrettyTracing::crate_of("target/debug/examples/http_server")
+			.xpect_eq(Some("http_server".into()));
+		PrettyTracing::crate_of("target/debug/deps/beet_core-a05ed5b61105e20a")
+			.xpect_eq(Some("beet_core".into()));
+		PrettyTracing::crate_of("/usr/local/bin/main-lightsail")
+			.xpect_eq(Some("main_lightsail".into()));
 	}
 
 	#[crate::test]

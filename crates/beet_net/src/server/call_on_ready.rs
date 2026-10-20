@@ -4,8 +4,8 @@
 //!
 //! The canonical load signature is `Request -> Response`: argv/env is the
 //! request ([`Request::from_cli_args`]), stdout and the exit code are the
-//! response. Two fallbacks let a behavior scene load with no adapter, see
-//! [`CallOnReady::call`].
+//! response, and a failure is reported once, on stderr. Two fallbacks let a
+//! behavior scene load with no adapter, see [`CallOnReady::call`].
 //!
 //! The verb fires on every load, so a document says exactly what happens when
 //! it is loaded, wherever it is loaded. A loader building a document to render
@@ -105,33 +105,92 @@ impl CallOnReady {
 	/// never resolves, so the await parks here and the process stays up; a
 	/// one-shot resolves, streams, and exits.
 	///
-	/// A failed call is the process's result too: it logs and exits nonzero
-	/// rather than raising into the app's error handler, since there is no caller
-	/// above a load to hear it.
+	/// A failed call is the process's result too: it is reported once and
+	/// exits nonzero rather than raising into the app's error handler, since
+	/// there is no caller above a load to hear it (see [`Self::report_failure`]).
 	///
 	/// EVERY path below reaches an [`AppExit`], a panic included. A load's
 	/// parked call IS the process: nothing above it resolves it, so an unwind
 	/// that merely ended this task (which is what the async runtime does with
 	/// one) would leave a one-shot alive forever with nobody left to answer.
 	pub async fn call(entity: AsyncEntity, request: Request) -> Result {
-		match async_ext::catch_panic(Self::call_inner(&entity, request)).await {
+		let command = request.path_string();
+		match async_ext::catch_panic(Self::call_inner(
+			&entity, &command, request,
+		))
+		.await
+		{
 			Ok(()) => Ok(()),
 			// a run ended by whoever removed its `Running` (a driver stopping the
 			// server it booted) is neither a result nor a fault: the exit is theirs
 			Err(err) if ControlFlowError::is_interrupted(&err) => Ok(()),
 			Err(err) => {
-				error!("{err}");
-				entity.world().write_message(AppExit::error()).await;
+				let code = core::num::NonZeroU8::MIN;
+				Self::report_failure(&command, code, ErrorReport::new(&err));
+				entity.world().write_message(AppExit::Error(code)).await;
 				Ok(())
 			}
 		}
 	}
 
 	/// The call itself: resolve the response, then stream it and exit.
-	async fn call_inner(entity: &AsyncEntity, request: Request) -> Result {
+	async fn call_inner(
+		entity: &AsyncEntity,
+		command: &str,
+		request: Request,
+	) -> Result {
 		let response = Self::response(entity, request).await?;
 		// reached only for a one-shot; a long-running action parks the await.
-		stream_and_exit(entity, response).await
+		Self::stream_and_exit(entity, command, response).await
+	}
+
+	/// Stream a one-shot's [`Response`] and write the matching [`AppExit`].
+	///
+	/// A success's body is the program's answer, streamed to stdout. A
+	/// failure is reported once, on stderr: the [`FailureReport`] an internal
+	/// error carries, claimed so nothing else logs it (its body is the
+	/// redacted text a remote client reads), else the body, which for a usage
+	/// error or a refusal IS the report.
+	async fn stream_and_exit(
+		host: &AsyncEntity,
+		command: &str,
+		response: Response,
+	) -> Result {
+		let (parts, body) = response.into_parts();
+		let exit = match parts.status_to_exit_code() {
+			Ok(()) => {
+				stream_body_to_stdout(body).await?;
+				AppExit::Success
+			}
+			Err(code) => {
+				let report = match parts
+					.report
+					.as_ref()
+					.and_then(FailureReport::claim)
+				{
+					Some(report) => report.to_string(),
+					None => body.into_string().await?,
+				};
+				let report = match report.trim().is_empty() {
+					true => parts.status().to_string(),
+					false => report.trim_end().to_string(),
+				};
+				Self::report_failure(command, code, report);
+				AppExit::Error(code)
+			}
+		};
+		host.world().write_message(exit).await;
+		Ok(())
+	}
+
+	/// The one report of a failed command, on stderr: what failed, the exit
+	/// code it ends with, and why.
+	fn report_failure(
+		command: &str,
+		code: core::num::NonZeroU8,
+		report: impl core::fmt::Display,
+	) {
+		error!("`{command}` failed with exit code {code}: {report}");
 	}
 
 	/// The load call itself, resolving whichever of the three shapes the entity
@@ -191,24 +250,6 @@ fn on_ready_call(
 	commands
 		.entity(ev.entity)
 		.queue_async_local(|entity| CallOnReady::call(entity, request));
-}
-
-/// Stream a one-shot's [`Response`] to stdout and write the matching [`AppExit`].
-///
-/// The tail of the load path, reached once [`CallOnReady::call`]'s awaited call
-/// resolves. A long-running action never gets here: its parked call is the
-/// process.
-async fn stream_and_exit(host: &AsyncEntity, response: Response) -> Result {
-	let (parts, body) = response.into_parts();
-	stream_body_to_stdout(body).await?;
-	match parts.status_to_exit_code() {
-		Ok(()) => host.world().write_message(AppExit::Success).await,
-		Err(code) => {
-			error!("Command failed\nStatus code: {code}");
-			host.world().write_message(AppExit::Error(code)).await;
-		}
-	}
-	Ok(())
 }
 
 /// Streams a [`Response`] body to stdout chunk-by-chunk.
@@ -301,6 +342,63 @@ mod test {
 		load(app.world_mut(), entity);
 		app.run_async().await.xpect_eq(AppExit::Success);
 		seen.get().xpect_eq(vec![MediaType::AnsiTerm]);
+	}
+
+	/// Marks the child run of [`a_failed_command_reports_once`].
+	#[cfg(all(unix, feature = "http"))]
+	const FAILED_COMMAND_CHILD: &str = "--call-on-ready-failed-command-child";
+
+	/// The CLI path: a command whose route fails is reported once, on stderr,
+	/// with its cause and its exit code, and writes nothing to stdout. It was
+	/// three reports: the error logged where the `500` was built, its body
+	/// (with a footer meant for a remote client) streamed to stdout, and a
+	/// `Command failed` line naming the status.
+	#[cfg(all(unix, feature = "http"))]
+	#[beet_core::test]
+	async fn a_failed_command_reports_once() {
+		if env_ext::args()
+			.iter()
+			.any(|arg| arg == FAILED_COMMAND_CHILD)
+		{
+			PrettyTracing {
+				interactive: false,
+				..default()
+			}
+			.init();
+			let mut app = App::new();
+			app.add_plugins((MinimalPlugins, ServerPlugin));
+			app.world_mut().spawn((
+				CliServer::default(),
+				OnSpawn::new_async_local(|entity| {
+					CallOnReady::call(entity, Request::from_cli_str("burn"))
+				}),
+				children![exchange_ext::handler(|_| {
+					Response::from(bevyhow!("disk on fire"))
+				})],
+			));
+			let code = match app.run_async().await {
+				AppExit::Success => 0,
+				AppExit::Error(code) => code.get() as i32,
+			};
+			process_ext::exit(code);
+		}
+		let output =
+			std::process::Command::new(std::env::current_exe().unwrap())
+				.args([
+					"a_failed_command_reports_once",
+					"--quiet",
+					FAILED_COMMAND_CHILD,
+				])
+				.output()
+				.unwrap();
+		output.status.code().xpect_eq(Some(70));
+		output.stdout.is_empty().xpect_true();
+		let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+		stderr.matches("disk on fire").count().xpect_eq(1);
+		stderr
+			.xpect_contains("`/burn` failed with exit code 70: disk on fire")
+			.xnot()
+			.xpect_contains("will *not* be returned");
 	}
 
 	/// A disarmed build loads the tree and stops: [`DisableCallOnReady`] on the

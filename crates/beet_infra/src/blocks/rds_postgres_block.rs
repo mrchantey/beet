@@ -194,7 +194,7 @@ impl RdsPostgresBlock {
 		self.secret
 			.clone()
 			.map(Into::into)
-			.unwrap_or_else(|| self.secret().name(stack))
+			.unwrap_or_else(|| stack.secret_path(&self.secret()))
 	}
 
 	/// Names for RDS, which does not take the usual `app--stage--label`: an
@@ -251,16 +251,9 @@ impl RdsPostgresBlock {
 		stack: &ResolvedStack,
 		kind: &str,
 	) -> BTreeMap<SmolStr, SmolStr> {
-		[
-			(
-				SmolStr::from("Name"),
-				format!("{}--{kind}", self.label).as_str().into(),
-			),
-			(SmolStr::from("Project"), stack.app_name().clone()),
-			(SmolStr::from("Stage"), stack.stage().clone()),
-		]
-		.into_iter()
-		.collect()
+		let mut tags = stack.tags();
+		tags.insert("Name".into(), format!("{}--{kind}", self.label).into());
+		tags
 	}
 }
 
@@ -769,8 +762,7 @@ mod tests {
 	///
 	/// Drives the native tofu cli, so it cannot compile for wasm.
 	#[cfg(not(target_arch = "wasm32"))]
-	#[beet_core::test(timeout_ms = 120000)]
-	#[ignore = "very slow"]
+	#[beet_core::test(timeout_ms = 60_000)]
 	async fn validate() {
 		let (scope, _dir) =
 			RenderScope::test_render_stack(sydney_stack(), |parent| {
@@ -783,7 +775,7 @@ mod tests {
 			.resolve_project()
 			.await
 			.unwrap()
-			.validate()
+			.validate_offline()
 			.await
 			.unwrap();
 	}

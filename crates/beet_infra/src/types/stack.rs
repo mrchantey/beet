@@ -233,6 +233,31 @@ impl ResolvedStack {
 		self.resource_ident(label).primary_identifier().to_string()
 	}
 
+	/// The `Project`/`Stage` tags every tagged resource of this stack
+	/// carries, so a console reads as the stack does; a block adds its own
+	/// `Name` beside them.
+	pub fn tags(&self) -> BTreeMap<SmolStr, SmolStr> {
+		[
+			(SmolStr::from("Project"), self.app_name.clone()),
+			(SmolStr::from("Stage"), self.stage.clone()),
+		]
+		.into_iter()
+		.collect()
+	}
+
+	/// The scope this stack's secrets nest under, the app then the stage,
+	/// ie `beet-site/prod`: what its [`SecretStore`] composes addresses in.
+	pub fn secret_scope(&self) -> SecretScope {
+		SecretScope::new([&self.app_name, &self.stage])
+	}
+
+	/// The parameter store path of `secret` in this stack, ie
+	/// `/beet-site/prod/ssh-host-key`: the address `SsmSecretStore` reads
+	/// and writes, and the one a compute's grant names.
+	pub fn secret_path(&self, secret: &SecretRef) -> String {
+		self.secret_scope().path(secret)
+	}
+
 	/// A resolved stack plus the launch that deploys it locally: a local state
 	/// backend and a temporary work directory removed on drop.
 	#[cfg(test)]
@@ -312,7 +337,7 @@ pub struct StackQuery<'w, 's> {
 	deployment: Option<Res<'w, Deployment>>,
 	/// The secret store a declaration landed, see
 	/// [`secret_store`](Self::secret_store).
-	secret_stores: Query<'w, 's, &'static SecretStore>,
+	secret_stores: SecretStoreQuery<'w, 's>,
 }
 
 impl<'w, 's> StackQuery<'w, 's> {
@@ -392,32 +417,45 @@ impl<'w, 's> StackQuery<'w, 's> {
 	}
 
 	/// The [`SecretStore`] `entity`'s stack keeps its secrets in, scoped to
-	/// that stack: the one declared on or under its `<Stack>`
-	/// (`<SsmSecrets/>`, `<DocumentSecrets path=".."/>`), else the implicit
-	/// `<SsmSecrets/>` every stack carries ([`SsmSecrets::store`]). Two
-	/// declarations under one stack is an error naming both, never a guess.
+	/// that stack: the one declared on its `<Stack>` or an ancestor
+	/// (`<Stack {SsmSecrets}>`, `{DocumentSecrets{path:".."}}`), nearest
+	/// wins as for any store ([`SecretStoreQuery`]), else the implicit
+	/// `<SsmSecrets/>` every stack carries ([`SsmSecrets::store`]).
+	/// Resolved from the stack's root, which is why a store declared
+	/// beneath it is refused ([`refuse_nested_store`](Self::refuse_nested_store)).
 	pub fn secret_store(&self, entity: Entity) -> Result<SecretStore> {
 		let root = self
 			.stacks
 			.get(entity)
 			.map(|(root, _)| root)
 			.unwrap_or(entity);
-		let stack = self.resolve(entity);
-		let mut declared = self
-			.children
-			.iter_descendants_inclusive(root)
-			.filter_map(|child| self.secret_stores.get(child).ok());
-		match (declared.next(), declared.next()) {
-			(Some(store), None) => store.clone().xok(),
-			(Some(first), Some(second)) => bevybail!(
-				"stack `{}--{}` declares two secret stores ({} and {}): a stack \
-				keeps its secrets in exactly one",
-				stack.app_name(),
-				stack.stage(),
-				first.describe(),
-				second.describe()
-			),
-			(None, _) => SsmSecrets::store(stack),
+		match self.secret_stores.get(root) {
+			Ok(store) => store.clone().xok(),
+			Err(_) => SsmSecrets::store(self.resolve(entity)),
+		}
+	}
+
+	/// Refuse the store `declaration` on `entity` when it sits beneath a
+	/// stack rather than on it or an ancestor: the stack's store resolves
+	/// from its root upward, so one declared lower would serve nothing while
+	/// the stack's verbs quietly reached the implicit `<SsmSecrets/>`.
+	pub fn refuse_nested_store(
+		&self,
+		entity: Entity,
+		declaration: &str,
+	) -> Result {
+		match self.stacks.get(entity) {
+			Ok((root, _)) if root != entity => {
+				let stack = self.resolve(root);
+				bevybail!(
+					"`{declaration}` is declared beneath the stack `{}--{}`, \
+					where it serves nothing: declare it on the `<Stack>` or an \
+					ancestor, ie `<Stack {{{declaration}}}>`",
+					stack.app_name(),
+					stack.stage()
+				)
+			}
+			_ => Ok(()),
 		}
 	}
 }

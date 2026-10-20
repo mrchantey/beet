@@ -131,9 +131,9 @@ reaches the box over the management sshd on 2222 and rolls the unit onto the new
 binary, verifying the RUNNING process reports this deploy's id. A machine-config
 change still replaces the box, and rolls its access key with it. Either way the
 static IP re-attaches so DNS never moves, and the fingerprint never changes: the
-ssh host key is a `<SecretBlock/>` the full apply mirrors from `secrets.toml`
-into the stack's secret store, and the box reads it from there at every start,
-so it is in no rendered config and on no disk.
+ssh host key is a `<SecretBlock/>`, a parameter of the stack whose write-only
+value the full apply writes from `secrets.toml`, and the box reads it from
+there at every start, so it is in no rendered config, plan, state or disk.
 
 Cloudflare fronts the box: http hostnames are proxied and edge-cached `A` records
 at the static IP, ssh (and future live apps) ride the DNS-only `app.beet.org` /
@@ -196,7 +196,7 @@ run from the `atproto` build too, so the handle records count as declared.
 Live deploy needs the deployer's credentials (the AWS pair of this repo's own
 `beet-deployer` user, which `<AwsDeployer/>` below declares and an elevated
 deploy converges, and `CLOUDFLARE_API_TOKEN`) and the box's ssh host key
-(`BEET_SSH_HOST_KEY`, which the deploy mirrors into the stack) from the repo's `secrets.toml`,
+(`BEET_SSH_HOST_KEY`, which the apply writes into the stack) from the repo's `secrets.toml`,
 which the launch loads into the process environment before this entry builds
 (the top-level `<Secrets path="../secrets.toml"/>`; `beet secrets/check` says
 whether this machine's identity opens it), plus `tofu` and `cargo-zigbuild`.
@@ -348,9 +348,10 @@ token (plus AWS for the social stack's state bucket).
 		     objects are the primary raw history, so nothing here expires. -->
 		<S3BucketBlock bx:ref="archive" label="archive" deploy_versioned=false runtime_write=true object_versioning=true/>
 		<!-- the box's ssh host key, so every start presents one fingerprint: the
-		     `BEET_SSH_HOST_KEY` record, which the full apply mirrors into this
-		     stack's secret store (`/beet-site/<stage>/ssh-host-key`) and the box
-		     reads from there. Never in `user_data`, the tofu state or a rendered
+		     `BEET_SSH_HOST_KEY` record, written by the full apply into this
+		     stack's parameter `/beet-site/<stage>/ssh-host-key` as a write-only
+		     value (versioned by the record's `modified`) and read by the box from
+		     there. Never in `user_data`, a plan, the tofu state or a rendered
 		     config. Outside the deployer fragment, since the serving binary
 		     reads it by `bx:ref`. -->
 		<SecretBlock bx:ref="ssh_host_key" label="ssh-host-key" env="BEET_SSH_HOST_KEY" note="ssh host key of the site box: every stage presents one fingerprint"/>

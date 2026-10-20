@@ -1,8 +1,8 @@
 //! The deploy machine's view of the buckets a cold copy spans: the live
 //! archive over the instance's own cloud, and the cold store over the S3 api
 //! at the other vendor's endpoint under the parked token.
+use crate::actions::aws_cli_ext;
 use crate::prelude::*;
-use crate::types::aws_cli_ext;
 use beet_core::prelude::*;
 use serde_json::Value;
 
@@ -107,21 +107,23 @@ pub struct ColdStore {
 }
 
 impl ColdStore {
-	/// The store `block` declares, under the credential parked for the stack
-	/// `secrets` is scoped to: the stage whose token it is, which for a drill
-	/// is the SOURCE stage rather than the drill's own.
+	/// The store `block` declares in `stack`, under the credential parked
+	/// for it in `secrets`, that stack's store: the stage whose token it is,
+	/// which for a drill is the SOURCE stage rather than the drill's own.
 	///
 	/// Missing is an error naming the apply that parks it, never a skip: a
 	/// verb that quietly did nothing against an empty cold bucket is the
 	/// failure the cold copy exists to close.
 	pub async fn resolve(
 		block: &R2BucketBlock,
+		stack: &ResolvedStack,
 		secrets: &SecretStore,
 	) -> Result<Self> {
-		let (access_key, secret_key) = block.parked_pair(secrets).await?;
+		let (access_key, secret_key) =
+			block.parked_pair(stack, secrets).await?;
 		Self {
-			bucket: block.bucket_name(secrets.stack()),
-			endpoint: block.endpoint(secrets.stack())?,
+			bucket: block.bucket_name(stack),
+			endpoint: block.endpoint(stack)?,
 			access_key,
 			secret_key,
 		}

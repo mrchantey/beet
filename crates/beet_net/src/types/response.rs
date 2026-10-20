@@ -382,20 +382,18 @@ impl Response {
 	/// Convert the response into an error even if it is a 2xx status code,
 	/// extracting the status code and message from the body.
 	/// For a method that checks the status code see [`Response::into_result`].
+	///
+	/// An internal error keeps its [`FailureReport`], so a failure relayed
+	/// through an exchange is still reported once, in full.
 	pub async fn into_error(self) -> HttpError {
-		let status = self.status();
-		let Ok(bytes) = self.body.into_bytes().await else {
+		let (parts, body) = self.into_parts();
+		let Ok(bytes) = body.into_bytes().await else {
 			return HttpError::internal_error("Failed to read response body");
 		};
-		let message = if !bytes.is_empty() {
-			String::from_utf8_lossy(&bytes).to_string()
-		} else {
-			Default::default()
-		};
-
 		HttpError {
-			status_code: status,
-			message,
+			status_code: parts.status,
+			message: String::from_utf8_lossy(&bytes).to_string(),
+			report: parts.report,
 		}
 	}
 

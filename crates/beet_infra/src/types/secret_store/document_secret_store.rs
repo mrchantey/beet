@@ -6,9 +6,9 @@ use beet_core::prelude::*;
 use beet_net::prelude::*;
 
 /// Declares that the stack's secrets live in a secrets document:
-/// `<DocumentSecrets path="infra/secrets/app--prod.toml"/>` under a
-/// `<Stack>`, the file in the nearest ancestor `BlobStore` (the repo store).
-/// Target-agnostic, so the same file on either launch.
+/// `<Stack {DocumentSecrets{path:"infra/secrets/app--prod.toml"}}>`, on the
+/// stack or an ancestor, the file in the nearest ancestor `BlobStore` (the
+/// repo store). Target-agnostic, so the same file on either launch.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct DocumentSecrets {
@@ -35,17 +35,17 @@ impl DocumentSecrets {
 
 /// A [`SecretStore`] over one secrets document: every secret a record in
 /// the document's `default` group with its `note` and `modified`, the label
-/// its record name. The human-side store a `<DocumentSecrets path=".."/>`
+/// its record name. The human-side store a `{DocumentSecrets{path:".."}}`
 /// declares in the repo, and the explicit stand-in for parameter store on a
-/// run with no account (`<DocumentSecrets path="target/secrets/app--dev.toml"/>`).
+/// run with no account (`{DocumentSecrets{path:"target/secrets/app--dev.toml"}}`).
 ///
-/// One document holds one stack's secrets, so [`for_stack`] to any other
+/// One document holds one stack's secrets, so [`for_scope`] to any other
 /// stack refuses by name rather than reading the wrong file. The identity is
 /// the discovered one, allowed to be absent at construction so a `validate`
 /// with no identity still resolves a store: a read of a sealed group or any
 /// write then fails with the `keygen` guidance.
 ///
-/// [`for_stack`]: SecretStoreProvider::for_stack
+/// [`for_scope`]: SecretStoreProvider::for_scope
 ///
 /// The `default` group is seeded on the first write from `seed`'s own
 /// `default` list when a seed document is given (the entry's declared
@@ -55,7 +55,7 @@ impl DocumentSecrets {
 #[derive(Debug, Clone)]
 pub struct DocumentSecretStore {
 	handle: SecretsHandle,
-	stack: ResolvedStack,
+	scope: SecretScope,
 	identities: AgeIdentityFile,
 	seed: Option<SecretsHandle>,
 }
@@ -64,12 +64,12 @@ impl DocumentSecretStore {
 	/// The provider id.
 	pub const ID: &'static str = "document";
 
-	/// The store over `handle` for `stack`, opened with the discovered
+	/// The store over `handle` for `scope`, opened with the discovered
 	/// identity (an empty file when there is none).
-	pub fn new(handle: SecretsHandle, stack: ResolvedStack) -> Result<Self> {
+	pub fn new(handle: SecretsHandle, scope: SecretScope) -> Result<Self> {
 		Self {
 			handle,
-			stack,
+			scope,
 			identities: AgeIdentityFile::discover()?.unwrap_or_default(),
 			seed: None,
 		}
@@ -191,29 +191,24 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 	fn id(&self) -> &'static str { Self::ID }
 
-	fn region(&self) -> Option<SmolStr> { None }
-
 	fn describe(&self) -> String {
 		format!("{} {}", Self::ID, self.handle.describe())
 	}
 
-	fn stack(&self) -> &ResolvedStack { &self.stack }
+	fn scope(&self) -> &SecretScope { &self.scope }
 
 	/// The one document holds one stack: another is an error naming both.
-	fn for_stack(
+	fn for_scope(
 		&self,
-		stack: &ResolvedStack,
+		scope: &SecretScope,
 	) -> Result<Box<dyn SecretStoreProvider>> {
-		match stack == &self.stack {
+		match scope == &self.scope {
 			true => Ok(self.box_clone()),
 			false => bevybail!(
-				"document {} holds the secrets of `{}--{}`, not `{}--{}`: a \
+				"document {} holds the secrets of `{}`, not `{scope}`: a \
 				document store serves one stack",
 				self.handle.describe(),
-				self.stack.app_name(),
-				self.stack.stage(),
-				stack.app_name(),
-				stack.stage()
+				self.scope,
 			),
 		}
 	}
@@ -338,9 +333,10 @@ impl SecretStoreProvider for DocumentSecretStore {
 
 /// Observer: land the [`SecretStore`] a `<DocumentSecrets/>` declares on
 /// its entity, the document at its path in the nearest ancestor store (the
-/// repo store), bound to the stack it is declared under and seeded from the
-/// entry's declared document. Deferred through the command queue because
-/// the stack and the store are ancestors, which land after insertion.
+/// repo store), scoped to the stack it is declared on or under and seeded
+/// from the entry's declared document. Deferred through the command queue
+/// because the stack and the store are ancestors, which land after
+/// insertion.
 pub(crate) fn attach_document_secrets(
 	ev: On<Insert<DocumentSecrets>>,
 	mut commands: Commands,
@@ -357,17 +353,21 @@ pub(crate) fn attach_document_secrets(
 			}
 			let (stack, store, seed) = entity
 				.with_state::<(StackQuery, SecretsQuery), _>(
-					|entity, (stacks, documents)| {
+					|entity, (stacks, documents)| -> Result<_> {
+						stacks
+							.refuse_nested_store(entity, "DocumentSecrets")?;
 						(
 							stacks.resolve(entity),
 							documents.entry_store(entity),
 							documents.resolve_default(entity).ok(),
 						)
+							.xok()
 					},
-				);
+				)?;
 			let handle = SecretsHandle::new(store?, path.as_str())?;
 			entity.insert(SecretStore::new(
-				DocumentSecretStore::new(handle, stack)?.with_seed(seed),
+				DocumentSecretStore::new(handle, stack.secret_scope())?
+					.with_seed(seed),
 			));
 			Ok(())
 		});
@@ -402,7 +402,7 @@ pub(crate) mod test_support {
 		identities.push(process_identity());
 		DocumentSecretStore::new(
 			SecretsHandle::new(BlobStore::temp(), "secrets.toml").unwrap(),
-			stack.clone(),
+			stack.secret_scope(),
 		)
 		.unwrap()
 		.with_identities(identities)
@@ -422,12 +422,32 @@ pub(crate) mod test_support {
 	pub(crate) fn memory_secret_store(stack: &ResolvedStack) -> SecretStore {
 		SecretStore::new(memory_store(stack))
 	}
+
+	/// A stack root carrying the repo store and a region, with
+	/// `declarations` (a store declaration, ie) spread on it.
+	pub(crate) fn stack_root(
+		world: &mut World,
+		declarations: impl Bundle,
+	) -> Entity {
+		let root = world
+			.spawn((
+				Stack::new("app").with_stage("prod"),
+				AwsRegion::new(Stack::TEST_AWS_REGION),
+				BlobStore::temp(),
+				RepoStore,
+				declarations,
+			))
+			.id();
+		world.flush();
+		root
+	}
 }
 
 #[cfg(test)]
 mod test {
 	use super::test_support::*;
 	use super::*;
+	use std::sync::Arc;
 
 	fn stack() -> ResolvedStack {
 		Stack::new("beet_infra")
@@ -583,17 +603,124 @@ mod test {
 			.with_stage("prod")
 			.resolve(&PackageConfig::default());
 		store
-			.for_stack(&other)
+			.for_scope(&other.secret_scope())
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("`beet_infra--dev`")
-			.xpect_contains("`beet_infra--prod`");
+			.xpect_contains("`beet-infra/dev`")
+			.xpect_contains("`beet-infra/prod`");
 		store
-			.for_stack(&stack)
+			.for_scope(&stack.secret_scope())
 			.unwrap()
-			.stack()
+			.scope()
 			.clone()
-			.xpect_eq(stack);
+			.xpect_eq(stack.secret_scope());
+	}
+
+	/// The declared store wins, resolved from anywhere under the stack and
+	/// scoped to it.
+	#[beet_core::test]
+	fn resolution_picks_the_declared_store() {
+		let mut world = infra_world();
+		let root = stack_root(
+			&mut world,
+			DocumentSecrets::new("infra/secrets/app--prod.toml"),
+		);
+		let consumer = world.spawn(ChildOf(root)).id();
+		world.flush();
+		world.with_state::<StackQuery, _>(|stacks| {
+			let store = stacks.secret_store(consumer).unwrap();
+			store.id().xpect_eq("document");
+			store
+				.describe()
+				.xpect_contains("infra/secrets/app--prod.toml");
+			store
+				.scope()
+				.clone()
+				.xpect_eq(stacks.resolve(root).secret_scope());
+		});
+	}
+
+	/// The loser of a mint race re-reads the winner's value rather than
+	/// overwriting it: a store whose first read misses and whose create then
+	/// conflicts.
+	#[beet_core::test]
+	async fn ensure_re_reads_after_losing_a_race() {
+		#[derive(Clone)]
+		struct Racing {
+			inner: DocumentSecretStore,
+			misses: Arc<core::sync::atomic::AtomicUsize>,
+		}
+		impl SecretStoreProvider for Racing {
+			fn box_clone(&self) -> Box<dyn SecretStoreProvider> {
+				Box::new(self.clone())
+			}
+			fn id(&self) -> &'static str { "racing" }
+			fn scope(&self) -> &SecretScope { self.inner.scope() }
+			fn for_scope(
+				&self,
+				scope: &SecretScope,
+			) -> Result<Box<dyn SecretStoreProvider>> {
+				self.inner.for_scope(scope)
+			}
+			fn address(&self, secret: &SecretRef) -> SmolStr {
+				self.inner.address(secret)
+			}
+			/// The first read misses, as the loser's did.
+			fn get(
+				&self,
+				secret: SecretRef,
+			) -> SendBoxedFuture<Result<Option<String>>> {
+				use core::sync::atomic::Ordering;
+				match self.misses.fetch_sub(1, Ordering::Relaxed) > 0 {
+					true => Box::pin(async { None.xok() }),
+					false => self.inner.get(secret),
+				}
+			}
+			fn create(
+				&self,
+				secret: SecretRef,
+				value: SmolStr,
+				meta: SecretMeta,
+			) -> SendBoxedFuture<Result> {
+				self.inner.create(secret, value, meta)
+			}
+			fn overwrite(
+				&self,
+				secret: SecretRef,
+				value: SmolStr,
+				meta: SecretMeta,
+			) -> SendBoxedFuture<Result> {
+				self.inner.overwrite(secret, value, meta)
+			}
+			fn list(&self) -> SendBoxedFuture<Result<Vec<SecretEntry>>> {
+				self.inner.list()
+			}
+			fn delete(
+				&self,
+				secrets: Vec<SecretRef>,
+			) -> SendBoxedFuture<Result<Vec<SecretRef>>> {
+				self.inner.delete(secrets)
+			}
+		}
+		let inner = memory_store(&stack());
+		let secret = SecretRef::new("db-password");
+		// the winner minted first
+		SecretStore::new(inner.clone())
+			.create(&secret, "winner", None, SecretRoll::Remint)
+			.await
+			.unwrap();
+		let store = SecretStore::new(Racing {
+			inner,
+			misses: Arc::new(1.into()),
+		});
+		let (value, minted) = store
+			.ensure(&secret, None, SecretRoll::Remint, async || {
+				"loser".to_string().xok()
+			})
+			.await
+			.unwrap();
+		value.as_str().xpect_eq("winner");
+		minted.xpect_false();
 	}
 
 	/// A store with no identity lists the index and refuses to open a

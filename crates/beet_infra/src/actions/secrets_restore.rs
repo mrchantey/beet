@@ -1,7 +1,6 @@
 //! A secrets document written back into a stack's secret store.
 use crate::actions::export_target;
 use crate::actions::secret_store;
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 use core::fmt::Write;

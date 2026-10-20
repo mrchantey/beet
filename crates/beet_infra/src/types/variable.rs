@@ -1,5 +1,4 @@
 //! Variables for passing values to tofu commands.
-use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_net::prelude::*;
 
@@ -7,11 +6,13 @@ use beet_net::prelude::*;
 /// for inserting application-specific environment variables in runtimes,
 /// catching missing variables before deploy.
 ///
-/// Three independent things: where the value comes from
+/// Four independent things: where the value comes from
 /// ([`VariableSource`]), whether terraform may print it (`sensitive`, a
 /// property of the use, never implied by the source: the two store-backed
-/// variables today are public halves), and whether absence is a legal state,
-/// which only the store source can answer and carries itself.
+/// variables today are public halves), whether it may enter the plan and the
+/// state at all (`ephemeral`, the input of a write-only attribute), and
+/// whether absence is a legal state, which only the store source can answer
+/// and carries itself.
 #[derive(Debug, Clone, Get, SetWith, Serialize, Deserialize, Reflect)]
 pub struct Variable {
 	key: SmolStr,
@@ -20,6 +21,16 @@ pub struct Variable {
 	/// apply output, an `output` that reads it. State is NOT covered, which is
 	/// why a stack declaring one turns on state encryption.
 	sensitive: bool,
+	/// Keep this value out of the plan and the state altogether: the input of
+	/// a write-only attribute (`value_wo`), which tofu hands the provider on
+	/// apply and records nowhere. Such a value changes nothing a plan
+	/// proposes (its attribute's `_version` sibling does), so every verb that
+	/// plans or destroys passes it empty and only an apply resolves it,
+	/// refusing when it is absent. No terraform default, so a bare
+	/// invocation by hand must name it rather than write an empty value. See
+	/// [`write_only`](Self::write_only).
+	#[serde(default)]
+	ephemeral: bool,
 }
 
 /// Where a [`Variable`]'s value comes from at deploy time. Two families:
@@ -77,6 +88,7 @@ impl Variable {
 			key: key.into(),
 			source: VariableSource::Fixed(value.into()),
 			sensitive: false,
+			ephemeral: false,
 		}
 	}
 
@@ -86,6 +98,20 @@ impl Variable {
 			key: key.into(),
 			source: VariableSource::ProcessEnv,
 			sensitive: false,
+			ephemeral: false,
+		}
+	}
+
+	/// A write-only input read from the deployer's process environment by
+	/// every apply and by nothing that plans: declared `ephemeral`, so its
+	/// value reaches the provider on apply and never the plan, the state or a
+	/// rendered config. The key is the environment variable, so the record
+	/// `BEET_SSH_HOST_KEY` rides the tofu child as
+	/// `TF_VAR_BEET_SSH_HOST_KEY`. See [`ephemeral`](Self::ephemeral).
+	pub fn write_only(key: impl Into<SmolStr>) -> Self {
+		Self {
+			ephemeral: true,
+			..Self::process_env(key)
 		}
 	}
 
@@ -95,6 +121,7 @@ impl Variable {
 			key: key.into(),
 			source: VariableSource::Header,
 			sensitive: false,
+			ephemeral: false,
 		}
 	}
 
@@ -104,6 +131,7 @@ impl Variable {
 			key: key.into(),
 			source: VariableSource::Param,
 			sensitive: false,
+			ephemeral: false,
 		}
 	}
 
@@ -117,6 +145,7 @@ impl Variable {
 				optional: false,
 			},
 			sensitive: false,
+			ephemeral: false,
 		}
 	}
 
@@ -130,6 +159,7 @@ impl Variable {
 				optional: true,
 			},
 			sensitive: false,
+			ephemeral: false,
 		}
 	}
 
@@ -138,6 +168,26 @@ impl Variable {
 	/// before any render.
 	pub fn is_content(&self) -> bool {
 		matches!(self.source, VariableSource::Secret { .. })
+	}
+
+	/// The value an apply hands a write-only variable: its source's, an
+	/// error naming the record when the launch's environment lacks it.
+	/// `None` for a variable that is not [`ephemeral`](Self::ephemeral).
+	pub fn resolve_write_only(&self) -> Option<Result<SmolStr>> {
+		self.ephemeral.then(|| {
+			env_ext::var(self.key.as_str())
+				.map(SmolStr::new)
+				.map_err(|_| {
+					bevyhow!(
+						"`{}` is not in this launch's environment, and this apply \
+					writes it through a write-only attribute: the deploying \
+					entry's secrets document holds it as an `env_var` record \
+					(`beet secrets/check` says whether this machine's identity \
+					opens it)",
+						self.key
+					)
+				})
+		})
 	}
 
 	/// Whether an absent secret resolves to empty rather than refusing,
@@ -226,9 +276,14 @@ impl Variable {
 			// should refuse rather than render it. Every verb that renders
 			// resolves it first (`resolve_for_render`), so the only way to reach
 			// the refusal is a value that genuinely is not there yet.
-			default: (!self.is_content()).then(|| "".into()),
+			//
+			// Nor does an EPHEMERAL one: a write-only attribute writes whatever
+			// it is handed when its version moves, so a bare `tofu apply` by
+			// hand must name the value rather than write an empty one.
+			default: (!self.is_content() && !self.ephemeral).then(|| "".into()),
 			description: Some(format!("Variable: {}", self.key)),
 			sensitive: self.sensitive.then_some(true),
+			ephemeral: self.ephemeral.then_some(true),
 		}
 	}
 }

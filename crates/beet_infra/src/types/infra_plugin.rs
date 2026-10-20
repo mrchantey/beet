@@ -228,7 +228,7 @@ impl Plugin for InfraPlugin {
 
 		// the secret label every generated credential is named by, ie the
 		// `<EnsureSecret secret="db-password"/>` attribute.
-		app.register_type::<crate::prelude::SecretRef>();
+		app.register_type::<SecretRef>();
 
 		// the stack's secret store and the secrets a runtime reads from it, in
 		// every build since a deployed box reads its own: parameter store
@@ -239,6 +239,18 @@ impl Plugin for InfraPlugin {
 			.register_type::<crate::prelude::SecretBlock>()
 			.register_type::<crate::prelude::ReadsSecrets>()
 			.add_observer(crate::blocks::attach_secret_block);
+		// ..and its deploy meaning, the write-only parameter, versioned by its
+		// record in the secrets document the vault layer loads
+		#[cfg(all(feature = "bindings_aws_ssm", feature = "vault"))]
+		app.add_systems(
+			DeployRender,
+			(
+				crate::types::declare::<crate::prelude::SecretBlock>
+					.in_set(DeployRenderSet::Declare),
+				crate::prelude::SecretBlock::render
+					.in_set(DeployRenderSet::Render),
+			),
+		);
 		// ..and the secrets document surface (`<Secrets/>`, the verbs) with
 		// the document store declaration (`<DocumentSecrets path=".."/>`), on
 		// every target the vault layer compiles.

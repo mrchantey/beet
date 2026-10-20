@@ -1,4 +1,6 @@
 mod adopt_current_deploy;
+// the `aws` cli constructors every deploy verb shelling out to AWS shares
+pub mod aws_cli_ext;
 mod aws_watch;
 #[cfg(feature = "fargate_block")]
 mod build_docker_image;

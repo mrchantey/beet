@@ -831,13 +831,9 @@ impl FargateBlock {
 		stack: &ResolvedStack,
 		suffix: &str,
 	) -> BTreeMap<SmolStr, SmolStr> {
-		[
-			(SmolStr::from("Name"), self.build_label(suffix).into()),
-			(SmolStr::from("Project"), stack.app_name().clone()),
-			(SmolStr::from("Stage"), stack.stage().clone()),
-		]
-		.into_iter()
-		.collect()
+		let mut tags = stack.tags();
+		tags.insert("Name".into(), self.build_label(suffix).into());
+		tags
 	}
 
 	/// Provision a single DNS-validated ACM certificate covering every

@@ -1273,9 +1273,11 @@ mod tests {
 	#[beet_core::test]
 	fn account_secrets_park_under_the_stack_prefix() {
 		let plan = plan();
-		plan.domains[0].accounts[3].secret.name(&stack()).xpect_eq(
-			"/beetmash/prod/mail-account-probe-at-stalwart-beetmash-com",
-		);
+		stack()
+			.secret_path(&plan.domains[0].accounts[3].secret)
+			.xpect_eq(
+				"/beetmash/prod/mail-account-probe-at-stalwart-beetmash-com",
+			);
 	}
 
 	/// The catch-all is the publication domain's whole point (a reply to a

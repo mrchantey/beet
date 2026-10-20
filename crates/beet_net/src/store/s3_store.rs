@@ -341,7 +341,7 @@ impl S3Store {
 			Box::pin(async move {
 				// a configured region wins; an unset one leaves the SDK's own
 				// default chain in place, and so does an unset key pair.
-				let mut loader = aws_config::from_env();
+				let mut loader = aws_ext::loader();
 				if let Some(region) = region {
 					loader = loader.region(Region::new(region.to_string()));
 				}

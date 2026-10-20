@@ -1,3 +1,4 @@
+use crate::terra::TofuVar;
 use beet_core::prelude::*;
 
 /// The tofu variable name the passphrase is threaded through in generated
@@ -204,12 +205,13 @@ impl StateEncryption {
 		}
 	}
 
-	/// The `-var` pairs a live tofu invocation needs to read or write this
-	/// stack's state: empty when encryption is off, else the passphrase read
-	/// fresh from its environment variable.
+	/// The variables a live tofu invocation needs to read or write this
+	/// stack's state: empty when encryption is off, else the passphrase (and
+	/// a crossing's retiring one) read fresh from its environment variable,
+	/// each a secret the invocation redacts.
 	/// ## Errors
 	/// - if enabled and the environment variable is unset
-	pub fn vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
+	pub fn vars(&self) -> Result<Vec<TofuVar>> {
 		match self {
 			Self::None => Ok(Vec::new()),
 			Self::Passphrase { env_var, crossing } => {
@@ -221,10 +223,10 @@ impl StateEncryption {
 					})
 				};
 				let mut vars =
-					vec![(SmolStr::from(STATE_ENCRYPTION_VAR), read(env_var)?)];
+					vec![TofuVar::secret(STATE_ENCRYPTION_VAR, read(env_var)?)];
 				if let Some(StateCrossing::FromRetiring(retiring)) = crossing {
-					vars.push((
-						STATE_ENCRYPTION_RETIRING_VAR.into(),
+					vars.push(TofuVar::secret(
+						STATE_ENCRYPTION_RETIRING_VAR,
 						read(retiring)?,
 					));
 				}
@@ -420,9 +422,9 @@ mod tests {
 		StateEncryption::passphrase("BEET_TEST_STATE_ENCRYPTION_PASSPHRASE")
 			.vars()
 			.unwrap()
-			.xpect_eq(vec![(
-				STATE_ENCRYPTION_VAR.into(),
-				"super-secret".into(),
+			.xpect_eq(vec![TofuVar::secret(
+				STATE_ENCRYPTION_VAR,
+				"super-secret",
 			)]);
 		unsafe {
 			std::env::remove_var("BEET_TEST_STATE_ENCRYPTION_PASSPHRASE");

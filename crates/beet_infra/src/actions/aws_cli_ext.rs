@@ -1,16 +1,15 @@
-//! AWS CLI process constructors shared by everything native that shells out:
-//! the deploy verbs, and parameter store, which a deployed box reads its
-//! secrets from.
+//! AWS CLI process constructors shared by every deploy verb that shells out.
 //!
-//! beet carries the S3 sdk and nothing else, so every other AWS service a
-//! deploy verb or a box touches is reached through the `aws` cli. That is one
-//! line of boilerplate each time and one footgun each time, so it lives here
-//! once.
+//! beet carries the S3 sdk and a signed json client (parameter store, see
+//! `AwsJsonClient`), so the other AWS services a deploy verb touches (ec2,
+//! iam, sts, an R2 bucket over the S3 api) are reached through the `aws`
+//! cli. That is one line of boilerplate each time and one footgun each time,
+//! so it lives here once.
 use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// Creates an `aws <service> <args..> --region <region>` invocation, as the
-/// process's own credential (the deployer's on a deploy, the box's on a box).
+/// process's own credential (the deployer's).
 pub fn service<'a>(
 	service: &'a str,
 	region: &str,
@@ -31,14 +30,6 @@ pub fn ec2<'a>(
 	args: impl IntoIterator<Item = &'a str>,
 ) -> ChildProcess {
 	self::service("ec2", region, args)
-}
-
-/// An `aws ssm` invocation in `region`, see [`service`].
-pub fn ssm<'a>(
-	region: &str,
-	args: impl IntoIterator<Item = &'a str>,
-) -> ChildProcess {
-	self::service("ssm", region, args)
 }
 
 /// An `aws iam` invocation, see [`service`]. IAM is global, so the region is

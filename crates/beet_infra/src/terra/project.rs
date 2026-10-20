@@ -23,7 +23,7 @@ pub struct Project {
 	/// absent on a project built without one, where a content variable is an
 	/// error at render.
 	#[cfg(feature = "vault")]
-	secrets: Option<crate::types::SecretStore>,
+	secrets: Option<SecretStore>,
 }
 impl Project {
 	/// Written in the work directory once `tofu init` has finished, holding the
@@ -74,10 +74,7 @@ impl Project {
 
 	/// The project with the secret store its content variables read through.
 	#[cfg(feature = "vault")]
-	pub fn with_secret_store(
-		mut self,
-		secrets: crate::types::SecretStore,
-	) -> Self {
+	pub fn with_secret_store(mut self, secrets: SecretStore) -> Self {
 		self.secrets = Some(secrets);
 		self
 	}
@@ -85,7 +82,7 @@ impl Project {
 	/// The stack's secret store, an error naming the resolution when the
 	/// project was built without one.
 	#[cfg(feature = "vault")]
-	pub fn secret_store(&self) -> Result<&crate::types::SecretStore> {
+	pub fn secret_store(&self) -> Result<&SecretStore> {
 		self.secrets.as_ref().ok_or_else(|| {
 			bevyhow!(
 				"project `{}--{}` was built without a secret store: resolve it \
@@ -105,15 +102,47 @@ impl Project {
 	/// deploy pipeline through `apply_with_vars`, and a `plan` that invented
 	/// them would be lying in the other direction. Content variables carry no
 	/// terraform default, so an unresolved one refuses rather than renders.
-	async fn content_vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
+	async fn content_vars(&self) -> Result<Vec<TofuVar>> {
 		let mut resolved = Vec::new();
 		for variable in self.variables.iter() {
 			let Some(value) = self.resolve_content(variable).await? else {
 				continue;
 			};
-			resolved.push((variable.key().clone(), value));
+			resolved.push(Self::tofu_var(variable, value));
 		}
 		Ok(resolved)
+	}
+
+	/// `value` for `variable`, a secret the invocation redacts when the
+	/// variable is `sensitive`.
+	fn tofu_var(
+		variable: &crate::types::Variable,
+		value: impl Into<SmolStr>,
+	) -> TofuVar {
+		match variable.sensitive() {
+			true => TofuVar::secret(variable.key().clone(), value),
+			false => TofuVar::new(variable.key().clone(), value),
+		}
+	}
+
+	/// Every [`ephemeral`](crate::types::Variable::ephemeral) variable, for
+	/// an invocation that `applies`: its resolved value, refusing when the
+	/// launch lacks one, since the apply may write it. Empty for one that
+	/// plans or destroys: a write-only value changes nothing a plan proposes,
+	/// so neither ever needs it, and it never reaches more processes than the
+	/// one that writes it.
+	fn write_only_vars(&self, applies: bool) -> Result<Vec<TofuVar>> {
+		self.variables
+			.iter()
+			.filter_map(|variable| {
+				variable.resolve_write_only().map(|resolved| match applies {
+					true => {
+						resolved.map(|value| Self::tofu_var(variable, value))
+					}
+					false => Self::tofu_var(variable, "").xok(),
+				})
+			})
+			.collect()
 	}
 
 	/// Read one content variable's value, or `None` if it is ambient and so
@@ -176,11 +205,21 @@ impl Project {
 		}
 	}
 
-	/// [`required_vars`](Self::required_vars) plus the resolved content values,
-	/// the `-var` set any rendering invocation needs.
-	async fn render_vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
+	/// [`required_vars`](Self::required_vars) plus the resolved content values
+	/// and every write-only one empty, the set an invocation that PLANS needs.
+	async fn render_vars(&self) -> Result<Vec<TofuVar>> {
 		let mut vars = self.required_vars()?;
 		vars.extend(self.content_vars().await?);
+		vars.extend(self.write_only_vars(false)?);
+		Ok(vars)
+	}
+
+	/// [`render_vars`](Self::render_vars) with every write-only value
+	/// resolved, the set an invocation that APPLIES needs.
+	async fn apply_vars(&self) -> Result<Vec<TofuVar>> {
+		let mut vars = self.required_vars()?;
+		vars.extend(self.content_vars().await?);
+		vars.extend(self.write_only_vars(true)?);
 		Ok(vars)
 	}
 
@@ -193,7 +232,10 @@ impl Project {
 	/// the resource is going away, and a stack must always be tearable down. A
 	/// teardown blocked because a parameter it is about to orphan had already
 	/// been deleted would be a trap, not a guard.
-	async fn destroy_vars(&self) -> Vec<(SmolStr, SmolStr)> {
+	///
+	/// A write-only variable is empty here as in any plan: the resource
+	/// reading it is going away.
+	async fn destroy_vars(&self) -> Vec<TofuVar> {
 		let mut vars = self.required_vars().unwrap_or_default();
 		for variable in self.variables.iter().filter(|var| var.is_content()) {
 			let value = self
@@ -202,8 +244,9 @@ impl Project {
 				.ok()
 				.flatten()
 				.unwrap_or_default();
-			vars.push((variable.key().clone(), value));
+			vars.push(Self::tofu_var(variable, value));
 		}
+		vars.extend(self.write_only_vars(false).unwrap_or_default());
 		vars
 	}
 
@@ -262,7 +305,7 @@ impl Project {
 	/// `-var` pairs every state-touching invocation needs, currently just the
 	/// [`StateEncryption`] passphrase (empty when the deploy has it off),
 	/// resolved fresh from its environment variable each call.
-	fn required_vars(&self) -> Result<Vec<(SmolStr, SmolStr)>> {
+	fn required_vars(&self) -> Result<Vec<TofuVar>> {
 		self.deployment.state_encryption().vars()
 	}
 
@@ -271,6 +314,22 @@ impl Project {
 	pub async fn validate(&self) -> Result<String> {
 		self.init().await?;
 		tofu::validate(&self.dir()).await
+	}
+
+	/// [`validate`](Self::validate) with no network, for a test: the config
+	/// written and initialized from the plugin cache alone, see
+	/// [`tofu::test_support::init_offline`].
+	#[cfg(test)]
+	pub(crate) async fn validate_offline(&self) -> Result<String> {
+		let dir = self.dir();
+		fs_ext::create_dir_all(&dir)?;
+		fs_ext::write(
+			dir.join("main.tf.json"),
+			serde_json::to_vec_pretty(&self.config.to_json())?,
+		)?;
+		self.backend().ensure_exists().await?;
+		tofu::test_support::init_offline(&dir, &self.required_vars()?).await?;
+		tofu::validate(&dir).await
 	}
 
 	/// Show execution plan
@@ -282,20 +341,21 @@ impl Project {
 	/// Apply the execution plan.
 	pub async fn apply(&self) -> Result<String> {
 		self.init().await?;
-		tofu::apply(&self.dir(), &self.render_vars().await?).await
+		tofu::apply(&self.dir(), &self.apply_vars().await?).await
 	}
 
 	/// Apply the execution plan with Terraform variables, narrowed to `targets`
 	/// (resource addresses, ie a layer's [`Config::layer_targets`]) when
-	/// non-empty. `vars` is merged with [`Self::required_vars`], so a caller
-	/// never needs to thread the state encryption passphrase through itself.
+	/// non-empty. `vars` is merged with [`Self::required_vars`] and the
+	/// content and write-only values, so a caller never threads the state
+	/// encryption passphrase or a secret through itself.
 	pub async fn apply_with_vars(
 		&self,
-		vars: &[(SmolStr, SmolStr)],
+		vars: &[TofuVar],
 		targets: &[String],
 	) -> Result<String> {
 		self.init().await?;
-		let mut all_vars = self.render_vars().await?;
+		let mut all_vars = self.apply_vars().await?;
 		all_vars.extend_from_slice(vars);
 		tofu::apply_with_vars(&self.dir(), &all_vars, targets).await
 	}
@@ -305,7 +365,7 @@ impl Project {
 	/// [`tofu::planned_changes`].
 	pub async fn planned_changes(
 		&self,
-		vars: &[(SmolStr, SmolStr)],
+		vars: &[TofuVar],
 		targets: &[String],
 	) -> Result<Vec<tofu::PlannedChange>> {
 		self.init().await?;
@@ -314,23 +374,30 @@ impl Project {
 		tofu::planned_changes(&self.dir(), &all_vars, targets).await
 	}
 
+	/// The deletions [`tofu_destroy`](Self::tofu_destroy) would make, planned
+	/// against the state alone with the vars it destroys with, see
+	/// [`tofu::planned_destroy`].
+	pub async fn planned_destroy(&self) -> Result<Vec<tofu::PlannedChange>> {
+		self.init().await?;
+		tofu::planned_destroy(&self.dir(), &self.destroy_vars().await).await
+	}
+
 	/// The values `request` carries for this project's ambient variables:
-	/// every declared one that is not resource CONTENT, since a content value
-	/// is not in flight on a request but a fact about the stack, which
-	/// [`apply_with_vars`](Self::apply_with_vars) reads from its source beside
-	/// the state passphrase. Asking the request for one would fail, and
-	/// defaulting it is the revocation that split exists to prevent.
-	pub fn ambient_vars(
-		&self,
-		request: &RequestParts,
-	) -> Result<Vec<(SmolStr, SmolStr)>> {
+	/// every declared one that is neither resource CONTENT nor write-only,
+	/// since neither is in flight on a request. A content value is a fact
+	/// about the stack and a write-only one a record of the launch, both of
+	/// which [`apply_with_vars`](Self::apply_with_vars) reads from their source
+	/// beside the state passphrase. Asking the request for one would fail,
+	/// and defaulting a content value is the revocation that split exists to
+	/// prevent.
+	pub fn ambient_vars(&self, request: &RequestParts) -> Result<Vec<TofuVar>> {
 		self.variables
 			.iter()
-			.filter(|variable| !variable.is_content())
+			.filter(|variable| !variable.is_content() && !variable.ephemeral())
 			.map(|variable| {
 				variable
 					.resolve_value(request)
-					.map(|value| (variable.key().clone(), value))
+					.map(|value| Self::tofu_var(variable, value))
 			})
 			.collect()
 	}
@@ -343,12 +410,8 @@ impl Project {
 		resources: &[String],
 	) -> Result<String> {
 		self.init().await?;
-		tofu::apply_replacing(
-			&self.dir(),
-			&self.render_vars().await?,
-			resources,
-		)
-		.await
+		tofu::apply_replacing(&self.dir(), &self.apply_vars().await?, resources)
+			.await
 	}
 
 	/// Show the current state.
@@ -646,8 +709,8 @@ mod test {
 			.xpect_contains("without a secret store");
 		let project = project.with_secret_store(store.clone());
 		project.content_vars().await.unwrap().xpect_eq(vec![
-			("dkim".into(), "MIIB".into()),
-			("tlsa".into(), SmolStr::default()),
+			TofuVar::new("dkim", "MIIB"),
+			TofuVar::new("tlsa", ""),
 		]);
 		// a required secret that is absent refuses, naming the deploy verb
 		let project = Project::new_with_variables(
@@ -669,8 +732,53 @@ mod test {
 		project
 			.destroy_vars()
 			.await
-			.contains(&("other".into(), SmolStr::default()))
+			.contains(&TofuVar::new("other", ""))
 			.xpect_true();
+	}
+
+	/// A write-only variable reaches an apply alone: every verb that plans
+	/// or destroys hands it empty, so neither needs the record, while an
+	/// apply hands it the launch's value as a secret and refuses, naming the
+	/// record, when the launch lacks it. No request ever supplies one.
+	#[beet_core::test]
+	async fn write_only_variables_reach_an_apply_alone() {
+		const KEY: &str = "BEET_TEST_PROJECT_WRITE_ONLY";
+		let (stack, deployment, _dir) = ResolvedStack::default_local();
+		let config = deployment.create_config(&stack);
+		let project = Project::new_with_variables(
+			stack.clone(),
+			deployment,
+			config,
+			LocalBackend::default().into(),
+			vec![Variable::write_only(KEY).with_sensitive(true)],
+		)
+		.with_secret_store(memory_secret_store(&stack));
+		let empty = TofuVar::secret(KEY, "");
+		project
+			.render_vars()
+			.await
+			.unwrap()
+			.xpect_any(|var| var == &empty);
+		project.destroy_vars().await.xpect_any(|var| var == &empty);
+		project
+			.ambient_vars(&RequestParts::default())
+			.unwrap()
+			.xpect_empty();
+		project
+			.apply_vars()
+			.await
+			.unwrap_err()
+			.to_string()
+			.xpect_contains(&format!("`{KEY}` is not in this launch"));
+		// SAFETY: test-only, a name no other test reads
+		unsafe { env_ext::set_var(KEY, "write-only-value") }.unwrap();
+		project
+			.apply_vars()
+			.await
+			.unwrap()
+			.xpect_any(|var| var == &TofuVar::secret(KEY, "write-only-value"));
+		// SAFETY: as above
+		unsafe { env_ext::remove_var(KEY) }.unwrap();
 	}
 }
 

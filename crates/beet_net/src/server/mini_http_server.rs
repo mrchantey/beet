@@ -591,6 +591,24 @@ mod test {
 		.xpect_ends_with("hello world");
 	}
 
+	/// A remote client of a failed route reads a `500` whose body is the
+	/// report and, in a debug build, the reminder that a release build
+	/// withholds it: the report the server logs is not the client's to claim.
+	#[beet_core::test]
+	async fn a_remote_client_reads_an_internal_error() {
+		let port = serve_with(
+			ServerLimits::default(),
+			exchange_ext::handler(|_| Response::from(bevyhow!("disk on fire"))),
+		);
+		let reply =
+			raw_exchange(port, b"GET / HTTP/1.1\r\nhost: x\r\n\r\n").await;
+		reply.clone().xpect_starts_with("HTTP/1.1 500");
+		#[cfg(debug_assertions)]
+		reply
+			.xpect_contains("Internal Error: disk on fire")
+			.xpect_contains("will *not* be returned to the client");
+	}
+
 	/// A wait for a permit that expires is answered `503` rather than hanging.
 	///
 	/// The valve on the one way the cap could wedge a server: a handler that

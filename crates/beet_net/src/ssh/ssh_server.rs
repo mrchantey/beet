@@ -327,10 +327,10 @@ impl SshHostKey {
 	pub(crate) fn encoded(&self) -> &str { &self.0 }
 
 	/// The key `entity` declares through its [`SshHostKeyRef`], `None` when it
-	/// declares none or its source holds none (the process default then
-	/// applies). A source that cannot answer (a deployed secret missing from
-	/// its store) is an error naming it, never a fall back to a key nobody
-	/// pinned.
+	/// declares none or its [`StoredSecret`] holds none and allows that (the
+	/// process default then applies). A secret that cannot be read (a
+	/// deployed key missing from its stack's store, a store that refuses)
+	/// is an error naming it, never a fall back to a key nobody pinned.
 	pub async fn resolve(entity: &AsyncEntity) -> Result<Option<Self>> {
 		let Ok(target) = entity
 			.get::<SshHostKeyRef, _>(|key_ref| key_ref.source())
@@ -338,24 +338,24 @@ impl SshHostKey {
 		else {
 			return Ok(None);
 		};
-		let source = SecretSource::resolve(entity.world(), target).await?;
-		let Some(value) = source.get().await.map_err(|err| {
-			bevyhow!("ssh host key from {}: {err}", source.describe())
+		let secret = StoredSecret::resolve(entity.world(), target).await?;
+		let Some(value) = secret.get().await.map_err(|err| {
+			bevyhow!("ssh host key from {}: {err}", secret.describe())
 		})?
 		else {
 			return Ok(None);
 		};
 		let key = Self::parse(value).map_err(|err| {
-			bevyhow!("malformed ssh host key from {}: {err}", source.describe())
+			bevyhow!("malformed ssh host key from {}: {err}", secret.describe())
 		})?;
-		info!("ssh host key from {}", source.describe());
+		info!("ssh host key from {}", secret.describe());
 		Some(key).xok()
 	}
 }
 
 /// The secret an ssh server reads its [`SshHostKey`] from: the source half of
 /// the [`SshHostKeyConsumers`] relationship, on the server's entity,
-/// targeting a declaration that lands a [`SecretSource`]. Authored as
+/// targeting a declaration that lands a [`StoredSecret`]. Authored as
 /// `{SshHostKeyRef($ssh_host_key)}` beside a `<SecretBlock
 /// bx:ref="ssh_host_key" ../>`, so a local launch reads the record its
 /// `secrets.toml` loads and a deployed box reads its stack's secret store.

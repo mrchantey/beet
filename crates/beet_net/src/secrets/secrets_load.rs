@@ -4,9 +4,11 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 
 /// On `<Secrets>` insert, read its document through the store the
-/// declaration resolves to, open every group the discovered identity can,
-/// set its `EnvVar` records into the process environment (existing wins)
-/// and insert the opened document as [`OpenSecrets`] on the entity.
+/// declaration resolves to and insert it, the plaintext index, on the entity
+/// whatever this identity opens; then open every group the discovered
+/// identity can, set its `EnvVar` records into the process environment
+/// (existing wins) and insert the opened document as [`OpenSecrets`] beside
+/// it.
 ///
 /// The read parks a [`PendingGuard`] on the build root (or on this entity
 /// outside a build), deferring [`Ready`] until the document has loaded, so a
@@ -50,12 +52,17 @@ pub(crate) fn load_on_insert(
 	Ok(())
 }
 
-/// The load itself: the shared env var load, then `OpenSecrets` and the
-/// resolved handle on the entity once no other document in the world holds
-/// one of its names.
+/// The load itself: the index, then the shared env var load, then
+/// `OpenSecrets` and the resolved handle on the entity once no other document
+/// in the world holds one of its names.
 async fn load(entity: &AsyncEntity) -> Result {
 	let handle = SecretsHandle::of_declaration(entity).await?;
-	let Some(opened) = handle.load_env_vars().await? else {
+	let Some(document) = handle.read_written().await? else {
+		return OK;
+	};
+	// the index needs no identity: a render reads a record's metadata off it
+	entity.insert(document.clone()).await?;
+	let Some(opened) = handle.load_env_vars_of(&document)? else {
 		return OK;
 	};
 	// one map across the world: a name in two documents is an error naming
@@ -97,14 +104,9 @@ async fn load(entity: &AsyncEntity) -> Result {
 }
 
 impl SecretsHandle {
-	/// Read the document and open it with the discovered identity: `None`
-	/// when the file is not written yet (every entry's state before its
-	/// first `set`, logged at debug) or there is no identity to open it
-	/// with (one warning naming the identity path and the file), else the
-	/// document and what this identity opened, verified against the index.
-	pub async fn open_discovered(
-		&self,
-	) -> Result<Option<(SecretsDocument, OpenSecrets)>> {
+	/// The document, `None` when the file is not written yet (every entry's
+	/// state before its first `set`, logged at debug).
+	pub async fn read_written(&self) -> Result<Option<SecretsDocument>> {
 		if !self.exists().await? {
 			debug!(
 				"document {} is not written yet: `secrets/set` writes a \
@@ -113,7 +115,17 @@ impl SecretsHandle {
 			);
 			return None.xok();
 		}
-		let document = self.read().await?;
+		self.read().await?.xmap(Some).xok()
+	}
+
+	/// Open `document` with the discovered identity: `None` when there is
+	/// no identity to open it with (one warning naming the identity path and
+	/// the file), else what this identity opened, verified against the
+	/// index.
+	pub fn open_discovered(
+		&self,
+		document: &SecretsDocument,
+	) -> Result<Option<OpenSecrets>> {
 		let Some(identities) = AgeIdentityFile::discover()? else {
 			warn!(
 				"no age identity at `{}` to open document {} with: its {} \
@@ -125,16 +137,28 @@ impl SecretsHandle {
 			);
 			return None.xok();
 		};
-		let opened = document.open(&identities)?;
-		Some((document, opened)).xok()
+		document.open(&identities)?.xmap(Some).xok()
+	}
+
+	/// [`read_written`](Self::read_written), then
+	/// [`load_env_vars_of`](Self::load_env_vars_of): the load the launch runs
+	/// before the entry builds.
+	pub async fn load_env_vars(&self) -> Result<Option<OpenSecrets>> {
+		match self.read_written().await? {
+			Some(document) => self.load_env_vars_of(&document),
+			None => None.xok(),
+		}
 	}
 
 	/// [`open_discovered`](Self::open_discovered), then every `EnvVar`
 	/// record into the process environment (existing wins), one line
-	/// logged: the load the launch runs before the entry builds and the
-	/// `<Secrets>` load repeats on ready.
-	pub async fn load_env_vars(&self) -> Result<Option<OpenSecrets>> {
-		let Some((document, opened)) = self.open_discovered().await? else {
+	/// logged: what the launch and the `<Secrets>` load on ready both do with
+	/// a document they read.
+	pub fn load_env_vars_of(
+		&self,
+		document: &SecretsDocument,
+	) -> Result<Option<OpenSecrets>> {
+		let Some(opened) = self.open_discovered(document)? else {
 			return None.xok();
 		};
 		let count = opened.set_env_vars()?;
@@ -164,8 +188,8 @@ mod test {
 	use crate::vault::test_support::VerbWorld;
 	use beet_core::prelude::*;
 
-	/// A declared document loads on insert: the env var lands, the opened
-	/// document sits on the entity, and `Ready` waited for it.
+	/// A declared document loads on insert: the env var lands, the index and
+	/// the opened document sit on the entity, and `Ready` waited for it.
 	#[beet_core::test]
 	async fn loads_a_declared_document() {
 		let mut fixture = VerbWorld::new();
@@ -202,6 +226,12 @@ mod test {
 			.spawn((Secrets::default(), ChildOf(fixture.root)))
 			.id();
 		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture
+			.world
+			.get::<SecretsDocument>(entity)
+			.unwrap()
+			.record_count()
+			.xpect_eq(2);
 		let opened = fixture.world.get::<OpenSecrets>(entity).unwrap();
 		opened.secrets.len().xpect_eq(2);
 		opened
@@ -287,6 +317,7 @@ mod test {
 			.spawn((Secrets::new("missing.toml"), ChildOf(fixture.root)))
 			.id();
 		AsyncRunner::settle_async_tasks(&mut fixture.world).await;
+		fixture.world.get::<SecretsDocument>(entity).xpect_none();
 		fixture.world.get::<OpenSecrets>(entity).xpect_none();
 	}
 }

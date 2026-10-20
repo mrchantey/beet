@@ -81,21 +81,24 @@ pub async fn SecretsSet(
 	let identity = AgeIdentityFile::require()?;
 	let value = ValueSource::new(value, from_env, copy, generate, length)?
 		.resolve(&name, &document, &identity)?;
-	// no flag for the record's metadata: it describes the value, so a re-set
-	// of the same value keeps it and a new value drops it
-	let metadata = document
+	// no flag for the record's metadata or its `modified`: both describe the
+	// value, so a re-set of the same value keeps them and a new value drops
+	// them, and a new note never reads as a roll (`modified` versions what a
+	// deploy writes from the record)
+	let held = document
 		.open(&identity)
 		.ok()
 		.and_then(|opened| opened.get(&name).cloned())
 		.filter(|held| held.value == value)
-		.map(|held| held.record.metadata)
+		.map(|held| held.record)
 		.unwrap_or_default();
 	let record = SecretRecord {
 		role: role.as_deref().map(str::parse).transpose()?,
 		note: note.map(SmolStr::new),
 		roll: roll.as_deref().map(str::parse).transpose()?,
 		expires: expires.as_deref().map(SecretsSet::expires).transpose()?,
-		metadata,
+		modified: held.modified,
+		metadata: held.metadata,
 		..default()
 	};
 	let group = group.as_deref().unwrap_or(SecretsDocument::DEFAULT_GROUP);
@@ -329,13 +332,20 @@ mod test {
 			.xpect_contains("`2027-01-05`");
 	}
 
-	/// A record's metadata describes its value: a re-set of the same value
-	/// (a new note through `--from-env`) keeps it, a new value drops it.
+	/// A record's metadata and `modified` describe its value: a re-set of the
+	/// same value (a new note through `--from-env`) keeps them, a new value
+	/// drops the metadata and moves `modified`.
+	///
+	/// REGRESSION: a new note restamped `modified`, which versions the
+	/// parameter a `<SecretBlock/>` writes from the record, so re-wording a
+	/// note planned the parameter's rewrite as if the value had rolled.
 	#[beet_core::test]
 	async fn keeps_metadata_only_for_the_same_value() {
+		let sealed = Date::parse("2026-09-18").unwrap().timestamp();
 		let mut fixture = VerbWorld::new();
 		fixture
 			.set("CLOUDFLARE_API_TOKEN", "token-a", SecretRecord {
+				modified: Some(sealed),
 				metadata: BTreeMap::from([(
 					"grants".into(),
 					"DNS Write".into(),
@@ -343,7 +353,7 @@ mod test {
 				..default()
 			})
 			.await;
-		let metadata = async |fixture: &mut VerbWorld| {
+		let record = async |fixture: &mut VerbWorld| {
 			fixture
 				.document()
 				.await
@@ -352,7 +362,6 @@ mod test {
 				.get("CLOUDFLARE_API_TOKEN")
 				.unwrap()
 				.record
-				.metadata
 				.clone()
 		};
 		let set = async |fixture: &mut VerbWorld, args: &str| {
@@ -366,13 +375,18 @@ mod test {
 				.unwrap();
 		};
 		set(&mut fixture, "--value=token-a --note=renamed").await;
-		metadata(&mut fixture)
-			.await
+		let renamed = record(&mut fixture).await;
+		renamed
+			.metadata
 			.get("grants")
 			.cloned()
 			.xpect_eq(Some(SmolStr::from("DNS Write")));
+		renamed.modified.xpect_eq(Some(sealed));
 		set(&mut fixture, "--value=token-b").await;
-		metadata(&mut fixture).await.is_empty().xpect_true();
+		let rolled = record(&mut fixture).await;
+		rolled.metadata.is_empty().xpect_true();
+		rolled.modified.xpect_some();
+		(rolled.modified != Some(sealed)).xpect_true();
 	}
 
 	/// `--copy` takes another record's value without printing it, and names

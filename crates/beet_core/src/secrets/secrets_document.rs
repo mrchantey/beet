@@ -30,6 +30,11 @@ use crate::prelude::*;
 /// edited through [`set`](Self::set) and [`remove`](Self::remove) and never
 /// by hand.
 ///
+/// A component too: a `<Secrets>` load inserts the document it read on the
+/// declaring entity whatever this identity opens, the index a render reads a
+/// record's metadata off without its value (the `modified` that versions a
+/// write-only parameter, `beet_infra`'s `<SecretBlock/>`).
+///
 /// ## Example
 ///
 /// ```
@@ -51,7 +56,7 @@ use crate::prelude::*;
 /// opened.get("OPENAI_API_KEY").unwrap().value.as_str().xpect_eq("sk-test");
 /// opened.env_vars().len().xpect_eq(1);
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
 #[serde(deny_unknown_fields)]
 pub struct SecretsDocument {
 	/// The format the file and every sealed payload are written in, named

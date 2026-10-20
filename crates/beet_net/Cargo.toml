@@ -152,6 +152,18 @@ aws_sdk = [
 # referenced under the wasm target table, so `dep:worker` activates only there.
 # Mirrors `aws_sdk`'s shape (a store backend behind `std`), but target-gated.
 cloudflare = ["std", "dep:worker"]
+# An AWS JSON api (`AwsJsonClient`, ie parameter store) as SigV4-signed
+# requests through this crate's own http client, as the launch's credentials:
+# no SDK client, no runtime, no `aws` cli, so every target, wasm included.
+aws_sigv4 = [
+	"std",
+	"http",
+	"serde",
+	"dep:serde_json",
+	"dep:aws-sigv4",
+	"dep:aws-credential-types",
+	"dep:aws-smithy-runtime-api",
+]
 serde = [
 	"dep:serde",
 	"dep:base64",
@@ -269,6 +281,10 @@ qrcode = { workspace = true, optional = true }
 # http
 http = { workspace = true, optional = true }
 eventsource-stream = { version = "0.2.3", optional = true }
+#💡 aws_sigv4
+aws-sigv4 = { workspace = true, optional = true }
+aws-credential-types = { workspace = true, optional = true }
+aws-smithy-runtime-api = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-process = { workspace = true, optional = true }

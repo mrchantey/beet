@@ -327,7 +327,7 @@ impl RequestParts {
 }
 
 /// Response-specific parts including HTTP status code, headers, and version.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ResponseParts {
 	/// The HTTP status code of the response.
 	pub status: StatusCode,
@@ -335,16 +335,24 @@ pub struct ResponseParts {
 	pub headers: HeaderMap,
 	/// The HTTP version.
 	pub version: Cow<'static, str>,
+	/// An internal error's unredacted report, which never goes on the wire:
+	/// the CLI claims it, a remote client's response logs it once sent.
+	pub report: Option<FailureReport>,
 }
 
-impl Default for ResponseParts {
-	fn default() -> Self {
-		Self {
-			status: StatusCode::OK,
-			headers: default(),
-			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
-		}
+/// What goes on the wire: the report is diagnostics, not the response.
+impl PartialEq for ResponseParts {
+	fn eq(&self, other: &Self) -> bool {
+		self.status == other.status
+			&& self.headers == other.headers
+			&& self.version == other.version
 	}
+}
+
+impl Eq for ResponseParts {}
+
+impl Default for ResponseParts {
+	fn default() -> Self { Self::new(StatusCode::OK) }
 }
 
 impl ResponseParts {
@@ -354,6 +362,7 @@ impl ResponseParts {
 			status,
 			headers: default(),
 			version: Cow::Borrowed(DEFAULT_HTTP_VERSION),
+			report: None,
 		}
 	}
 
@@ -465,6 +474,7 @@ impl From<http::response::Parts> for ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
 			version: Cow::Owned(version),
+			report: None,
 		}
 	}
 }
@@ -479,6 +489,7 @@ impl From<&http::response::Parts> for ResponseParts {
 			status: StatusCode::from(http_parts.status),
 			headers,
 			version: Cow::Owned(version),
+			report: None,
 		}
 	}
 }

@@ -18,8 +18,16 @@ use bevy::prelude::BevyError;
 /// once: the [`TemplateError`](crate::prelude::TemplateError) component, the
 /// [`Ready`](crate::prelude::Ready) event, and the `spawn_template`
 /// return. That is only possible because the error is cloneable here.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CloneError(pub Arc<BevyError>);
+
+/// Transparent, so the error reads the same cloned or not (see
+/// [`ErrorReport`]).
+impl core::fmt::Debug for CloneError {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+		core::fmt::Debug::fmt(&*self.0, f)
+	}
+}
 
 impl CloneError {
 	/// Wrap an error so it can be cloned across the build error path.
