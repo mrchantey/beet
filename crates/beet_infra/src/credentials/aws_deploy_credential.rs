@@ -82,6 +82,12 @@ use serde_json::Value;
 ///   repo exceed). A policy of an app this launch does not declare is left
 ///   alone, so a repo whose entries declare different apps converges each from
 ///   its own entry, and the key id's record keeps every entry's grants.
+/// - each service-linked role the stacks need at the account
+///   ([`AwsDeployPolicy::service_linked_roles`]), created when absent: the key
+///   may never create one, and an account that has never held, ie, an API
+///   Gateway custom domain lacks it. The key id's grants record each as
+///   `service-linked-role <service>`, so a plain deploy into an account the
+///   converge has not prepared refuses before it writes.
 /// - an access key, minted when the document holds none of this user's, or on
 ///   `--roll`. The pair is sealed before the key it replaces is deleted, and
 ///   the new one is proven with `sts:GetCallerIdentity` before either. A
@@ -188,6 +194,12 @@ impl AwsDeployCredential {
 	/// learns, as [`AwsAccount`]'s own description writes it.
 	const UNKNOWN_ACCOUNT: &'static str = "<id>";
 
+	/// The grant line naming a service-linked role the account must hold, ie
+	/// `service-linked-role ops.apigateway.amazonaws.com`: not a policy the
+	/// key holds but one the converge made sure of, recorded so a plain deploy
+	/// into an account without it refuses before it writes.
+	const SERVICE_LINKED_LINE: &'static str = "service-linked-role";
+
 	/// The group a first converge seals into; a record already sealed stays
 	/// in its own.
 	const DEFAULT_GROUP: &'static str = SecretsDocument::DEFAULT_GROUP;
@@ -265,12 +277,16 @@ impl AwsDeployCredential {
 	}
 
 	/// Whether a grant `line` names a policy this launch lowers: an app's
-	/// deploy policy, or the boundary of a stage it rendered, empty or not.
-	/// Another entry's app is not this launch's to judge or replace, and
-	/// neither is the boundary of a stage it did not render: a prod launch
-	/// renders prod alone, so dev's boundary stays as a dev launch sealed it.
+	/// deploy policy, or the boundary of a stage it rendered, empty or not, or
+	/// a service-linked role its stacks need. Another entry's app is not this
+	/// launch's to judge or replace, and neither is the boundary of a stage it
+	/// did not render: a prod launch renders prod alone, so dev's boundary
+	/// stays as a dev launch sealed it.
 	fn lowers(apps: &[AppPolicies], line: &str) -> bool {
-		let name = line.split_once(' ').map_or(line, |(name, _)| name);
+		let (name, rest) = line.split_once(' ').unwrap_or((line, ""));
+		if name == Self::SERVICE_LINKED_LINE {
+			return Self::service_linked_roles(apps).contains(rest);
+		}
 		apps.iter().any(|app| {
 			app.deploy.policy_name() == name
 				|| app
@@ -278,6 +294,14 @@ impl AwsDeployCredential {
 					.values()
 					.any(|boundary| boundary.policy_name() == name)
 		})
+	}
+
+	/// The services whose service-linked role any of `apps` needs at the
+	/// account ([`AwsDeployPolicy::service_linked_roles`]).
+	fn service_linked_roles(apps: &[AppPolicies]) -> BTreeSet<&'static str> {
+		apps.iter()
+			.flat_map(|app| app.deploy.service_linked_roles().iter().copied())
+			.collect()
 	}
 
 	/// The grants a converge seals: this launch's `grants`, beside every
@@ -300,7 +324,8 @@ impl AwsDeployCredential {
 
 	/// One line per policy this launch's apps render: its name and a digest of
 	/// its document, the deploy policy unconditioned since whether it carries
-	/// the boundary conditions is an account read, not a declaration.
+	/// the boundary conditions is an account read, not a declaration. Then one
+	/// line per service-linked role they need ([`Self::SERVICE_LINKED_LINE`]).
 	fn grant_lines(apps: &[AppPolicies]) -> Result<Vec<String>> {
 		let digest = |document: &Value| {
 			digest_ext::hex::<sha2::Sha256>(document.to_string().as_bytes())
@@ -324,6 +349,11 @@ impl AwsDeployCredential {
 				));
 			}
 		}
+		lines.extend(
+			Self::service_linked_roles(apps).into_iter().map(|service| {
+				format!("{} {service}", Self::SERVICE_LINKED_LINE)
+			}),
+		);
 		lines.sort();
 		lines.xok()
 	}
@@ -387,6 +417,10 @@ impl AwsDeployCredential {
 				.ensure_user(&user, &Self::retired_user_name()?)
 				.await?,
 		);
+		// what the account must hold that the key may never create
+		for service in Self::service_linked_roles(&apps) {
+			report.push(admin.ensure_service_linked_role(service).await?);
+		}
 		for app in apps.iter() {
 			// the boundaries FIRST: the deploy policy may only carry the
 			// conditions naming them once they exist and every principal wears one
@@ -532,6 +566,9 @@ impl AwsDeployCredential {
 		let mut out = format!("user {}\n", DeployCredential::name()?);
 		if let Some((account, region)) = declared {
 			out.push_str(&format!("{}\n", account.describe(&region)?));
+		}
+		for service in Self::service_linked_roles(&apps) {
+			out.push_str(&format!("service-linked role for {service}\n"));
 		}
 		for app in apps.iter() {
 			out.push_str(&format!(
@@ -913,6 +950,43 @@ impl AwsAdmin {
 		format!("user {user} created").xok()
 	}
 
+	/// The account's service-linked role for `service`, created when absent.
+	/// AWS names the role itself and keeps it under
+	/// `/aws-service-role/<service>/`, so presence is a listing of that path.
+	async fn ensure_service_linked_role(
+		&self,
+		service: &str,
+	) -> Result<String> {
+		let path = format!("/aws-service-role/{service}/");
+		let held = self
+			.iam([
+				"list-roles",
+				"--path-prefix",
+				&path,
+				"--query",
+				"Roles[0].RoleName",
+				"--output",
+				"text",
+			])
+			.await?;
+		if let Some(name) = Self::text_option(held) {
+			return format!("service-linked role {name} exists").xok();
+		}
+		let name = self
+			.iam([
+				"create-service-linked-role",
+				"--aws-service-name",
+				service,
+				"--query",
+				"Role.RoleName",
+				"--output",
+				"text",
+			])
+			.await?;
+		format!("service-linked role {} created for {service}", name.trim())
+			.xok()
+	}
+
 	/// Every access key id of `user`, active or not: an inactive one still
 	/// counts against the limit of two.
 	async fn access_keys(&self, user: &str) -> Result<Vec<SmolStr>> {
@@ -1278,6 +1352,29 @@ mod test {
 			"beet-site--dev--runtime-boundary 33".into(),
 			"beet-site--prod--runtime-boundary 66".into(),
 		]);
+	}
+
+	/// A service-linked role the stacks need is a grant line of its own,
+	/// judged only by a launch that needs it: one rendering no custom domain
+	/// keeps the line as another entry sealed it.
+	#[beet_core::test]
+	fn records_the_service_linked_roles_the_stacks_need() {
+		let app = |declared: &[&str]| AppPolicies {
+			deploy: AwsDeployPolicy::test_lowered("my-site", declared),
+			boundaries: BTreeMap::new(),
+			principals: Vec::new(),
+		};
+		let line = "service-linked-role ops.apigateway.amazonaws.com";
+		let domain = vec![app(&["aws_apigatewayv2_domain_name"])];
+		AwsDeployCredential::grant_lines(&domain)
+			.unwrap()
+			.contains(&line.to_string())
+			.xpect_true();
+		AwsDeployCredential::lowers(&domain, line).xpect_true();
+		let bucket = vec![app(&[])];
+		AwsDeployCredential::lowers(&bucket, line).xpect_false();
+		AwsDeployCredential::merge_grants(vec![line.into()], &bucket, &[])
+			.xpect_eq(vec![line.to_string()]);
 	}
 
 	/// Declaring an account makes a key living anywhere else stale, the

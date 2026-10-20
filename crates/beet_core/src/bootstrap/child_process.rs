@@ -402,6 +402,22 @@ impl ChildProcess {
 			.map(|output| String::from_utf8_lossy(&output.stdout).to_string())
 	}
 
+	/// Run the command asynchronously, answering its output whatever its exit
+	/// status, for a tool that reports its failure on stdout, ie `tofu -json`.
+	/// Every declared secret is redacted from both streams.
+	pub async fn run_async_unchecked(self) -> Result<Output> {
+		let output = async_process::Command::from(self.into_command_std())
+			.output()
+			.await
+			.xmap(|result| self.map_result(result))?;
+		Output {
+			status: output.status,
+			stdout: self.redact_bytes(output.stdout),
+			stderr: self.redact_bytes(output.stderr),
+		}
+		.xok()
+	}
+
 	/// Spawn the command as a long-running child process, sharing the parent's
 	/// stdio. Returns a [`ChildHandle`] that kills the process on drop.
 	pub fn spawn(self) -> Result<ChildHandle> {
@@ -465,6 +481,15 @@ impl ChildProcess {
 		result: Result<Output, std::io::Error>,
 	) -> Result<Output> {
 		result.map_err(|err| self.map_spawn_error(err))
+	}
+
+	/// A stream with every declared secret replaced, its bytes as they were
+	/// when none is declared.
+	fn redact_bytes(&self, bytes: Vec<u8>) -> Vec<u8> {
+		match self.secrets.is_empty() {
+			true => bytes,
+			false => self.redact(&String::from_utf8_lossy(&bytes)).into_bytes(),
+		}
 	}
 	#[track_caller]
 	fn map_output(&self, output: Output) -> Result<Output> {
@@ -556,6 +581,22 @@ mod test {
 			.to_string();
 		err.contains("hunter2").xpect_false();
 		err.xpect_contains("<redacted>");
+	}
+
+	/// A failed run still answers its output, for a tool reporting its failure
+	/// on stdout, redacted as an error would be.
+	#[crate::test]
+	async fn an_unchecked_run_answers_a_failure() {
+		let output = ChildProcess::new("sh")
+			.with_args(["-c", "echo hunter2 failed; exit 3"])
+			.with_secret("hunter2")
+			.run_async_unchecked()
+			.await
+			.unwrap();
+		output.status.code().xpect_eq(Some(3));
+		String::from_utf8(output.stdout)
+			.unwrap()
+			.xpect_eq("<redacted> failed\n");
 	}
 
 	/// A spawn into a directory that is gone names the directory, where the

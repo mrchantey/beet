@@ -164,7 +164,7 @@ async fn assess(
 	vars: &[TofuVar],
 	args: impl IntoIterator<Item = String>,
 ) -> Result<Vec<PlannedChange>> {
-	[
+	let process = [
 		"plan",
 		"-refresh=false",
 		"-lock=false",
@@ -176,11 +176,49 @@ async fn assess(
 	.chain(args.into_iter().map(SmolStr::from))
 	.collect::<Vec<_>>()
 	.xmap(|args| tofu_process().with_cwd(dir.clone()).with_args(args))
-	.xmap(|process| with_vars(process, vars))
-	.run_async_stdout()
-	.await?
-	.xmap(|output| PlannedChange::parse(&output))
-	.xok()
+	.xmap(|process| with_vars(process, vars));
+	// `-json` reports a failure on stdout, so a failed plan is read for its
+	// errors rather than reduced to its exit status
+	let shown = process.to_string();
+	let output = process.run_async_unchecked().await?;
+	let stdout = String::from_utf8_lossy(&output.stdout);
+	if !output.status.success() {
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		bevybail!(
+			"process failed: {shown}\nexited with non-zero status: {}\n{}",
+			output.status,
+			errors(&stdout)
+				.into_iter()
+				.chain(Some(stderr.trim().to_string()))
+				.filter(|text| !text.is_empty())
+				.collect::<Vec<_>>()
+				.join("\n\n")
+		);
+	}
+	PlannedChange::parse(&stdout).xok()
+}
+
+/// The error diagnostics in a `tofu .. -json` output, one json message a
+/// line, each as tofu writes it without `-json`: its summary, then its
+/// detail.
+fn errors(output: &str) -> Vec<String> {
+	output
+		.lines()
+		.filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+		.filter(|message| message["type"] == "diagnostic")
+		.map(|message| message["diagnostic"].clone())
+		.filter(|diagnostic| diagnostic["severity"] == "error")
+		.map(|diagnostic| {
+			let summary = diagnostic["summary"].as_str().unwrap_or_default();
+			match diagnostic["detail"]
+				.as_str()
+				.filter(|detail| !detail.is_empty())
+			{
+				Some(detail) => format!("Error: {summary}\n{detail}"),
+				None => format!("Error: {summary}"),
+			}
+		})
+		.collect()
 }
 
 /// One write a plan would make, as `tofu plan -json` reports it.
@@ -567,6 +605,38 @@ mod test {
 				resource_type: "aws_instance".into(),
 				action: "replace".into(),
 			},
+		]);
+	}
+
+	/// A failed plan's errors are read off its error `diagnostic` messages, as
+	/// tofu writes them without `-json`, and a warning is not an error.
+	#[beet_core::test]
+	fn reads_a_failed_plans_errors() {
+		let diagnostic = |severity: &str, summary: &str, detail: &str| {
+			serde_json::json!({
+				"type": "diagnostic",
+				"diagnostic": {
+					"severity": severity,
+					"summary": summary,
+					"detail": detail,
+				},
+			})
+			.to_string()
+		};
+		let output = [
+			r#"{"type":"version","tofu":"1.10.0"}"#.to_string(),
+			diagnostic("warning", "Deprecated attribute", "use another"),
+			diagnostic(
+				"error",
+				"Error acquiring the state lock",
+				"AccessDenied",
+			),
+			diagnostic("error", "Invalid reference", ""),
+		]
+		.join("\n");
+		errors(&output).xpect_eq(vec![
+			"Error: Error acquiring the state lock\nAccessDenied".to_string(),
+			"Error: Invalid reference".into(),
 		]);
 	}
 }

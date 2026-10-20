@@ -104,6 +104,9 @@ pub struct AwsDeployPolicy {
 	/// app's own prefix. A rendered parameter RESOURCE (a `<SecretBlock/>`)
 	/// lives under the prefix and needs nothing beyond it.
 	public_parameters: bool,
+	/// The services whose service-linked role the lowered types need at the
+	/// account ([`SERVICE_LINKED`](Self::SERVICE_LINKED)).
+	service_linked: BTreeSet<&'static str>,
 	/// The stages the lowered stacks declare, which the irreversible deny is
 	/// scoped to alongside `prod`. Collected rather than assumed: an app whose
 	/// only stage is `shared` gets its buckets protected too, where a
@@ -191,6 +194,35 @@ impl AwsDeployPolicy {
 		"tls_",
 	];
 
+	/// The provider types whose first create makes AWS create a service-linked
+	/// role in the account, by prefix, and the service that role is for.
+	///
+	/// This policy never lets the deploy credential create one: a
+	/// service-linked role can carry no boundary
+	/// ([`boundary_statements`](Self::boundary_statements)), so it is outside
+	/// the app's names and `iam:CreateServiceLinkedRole` is never granted. An
+	/// account that has never held such a resource lacks the role, and the
+	/// apply fails mid-way (`AccessDeniedException: Caller does not have
+	/// permissions to create a Service Linked Role`, seen live on an API
+	/// Gateway custom domain in a new member account). So the elevated
+	/// converge creates each one the declarations need as an administrator
+	/// ([`AwsDeployCredential`]), and the key's grants record it, which makes
+	/// a plain deploy into an account without it refuse before it writes.
+	const SERVICE_LINKED: &'static [(&'static str, &'static str)] = &[
+		(
+			"aws_api_gateway_domain_name",
+			"ops.apigateway.amazonaws.com",
+		),
+		(
+			"aws_apigatewayv2_domain_name",
+			"ops.apigateway.amazonaws.com",
+		),
+		("aws_db_instance", "rds.amazonaws.com"),
+		("aws_ecs_cluster", "ecs.amazonaws.com"),
+		("aws_lb", "elasticloadbalancing.amazonaws.com"),
+		("aws_rds_cluster", "rds.amazonaws.com"),
+	];
+
 	/// A policy for `app`, whose stacks keep their state in `state_bucket`.
 	pub fn new(
 		app: impl Into<SmolStr>,
@@ -202,6 +234,7 @@ impl AwsDeployPolicy {
 			regions: BTreeSet::new(),
 			services: BTreeSet::new(),
 			public_parameters: false,
+			service_linked: BTreeSet::new(),
 			stages: BTreeSet::new(),
 			boundary: false,
 		}
@@ -233,6 +266,13 @@ impl AwsDeployPolicy {
 	/// The app every name is scoped to, ie `beet-site`.
 	pub fn app(&self) -> &SmolStr { &self.app }
 
+	/// The services whose service-linked role the lowered stacks need at the
+	/// account, ie `ops.apigateway.amazonaws.com`, which the deploy credential
+	/// may never create, so the elevated converge does.
+	pub fn service_linked_roles(&self) -> &BTreeSet<&'static str> {
+		&self.service_linked
+	}
+
 	/// The managed policy this lowering writes, ie `beet-site--deploy`.
 	/// Deliberately outside the `<app>--<stage>--<label>` convention every
 	/// resource name follows, so no stack's own IAM statement can reach the
@@ -261,6 +301,12 @@ impl AwsDeployPolicy {
 			if let Some(service) = Self::service(declared)? {
 				self.services.insert(service);
 			}
+			self.service_linked.extend(
+				Self::SERVICE_LINKED
+					.iter()
+					.filter(|(prefix, _)| declared.starts_with(prefix))
+					.map(|(_, service)| *service),
+			);
 		}
 		self.public_parameters |=
 			config.declares_data_source("aws_ssm_parameter");
@@ -467,7 +513,9 @@ impl AwsDeployPolicy {
 	///   otherwise publish a new version of the document that grants it.
 	/// - **no service-linked roles.** They can never carry a boundary at all
 	///   (`PutRolePermissionsBoundary` answers `UnmodifiableEntity`), so the
-	///   only cap available is not creating them.
+	///   only cap available is not creating them: the elevated converge
+	///   creates the ones the declarations need
+	///   ([`SERVICE_LINKED`](Self::SERVICE_LINKED)).
 	///
 	/// `iam:PassRole` takes no boundary condition, and is bounded instead by
 	/// the `Iam` statement's own `role/<app>--*` resource: with every role in
@@ -737,6 +785,36 @@ impl AwsDeployPolicy {
 }
 
 #[cfg(test)]
+impl AwsDeployPolicy {
+	/// The policy of `app`'s prod stack holding one bucket and a resource of
+	/// each type in `declared`, as a stack rendering them lowers it.
+	pub(crate) fn test_lowered(app: &str, declared: &[&str]) -> Self {
+		let (scope, _dir) = RenderScope::test_render_stack(
+			(
+				Stack::new(app).with_stage("prod"),
+				AwsRegion::new("us-west-2"),
+			),
+			|parent| {
+				parent.spawn(
+					S3BucketBlock::new("store")
+						.with_deploy_versioned(false)
+						.with_accept_data_loss(true),
+				);
+			},
+		);
+		let (stack, _deployment, mut config) = scope.finish().unwrap();
+		for kind in declared {
+			config
+				.add_untyped_resource(kind, "test", &serde_json::json!({}))
+				.unwrap();
+		}
+		Self::new(app, "beet-state-1234")
+			.lower(&stack, &config)
+			.unwrap()
+	}
+}
+
+#[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use beet_core::prelude::*;
@@ -838,6 +916,31 @@ mod test {
 			// the provider's read is the gated half
 			.xnot()
 			.xpect_contains("parameter/aws/service/*");
+	}
+
+	/// An API Gateway custom domain needs its service's service-linked role at
+	/// the account where a bucket needs none, and the document never grants
+	/// creating one, which is the converge's to do as an administrator.
+	#[beet_core::test]
+	fn names_the_service_linked_roles_a_stack_needs() {
+		AwsDeployPolicy::test_lowered("my-site", &[])
+			.service_linked_roles()
+			.is_empty()
+			.xpect_true();
+		let policy = AwsDeployPolicy::test_lowered("my-site", &[
+			"aws_apigatewayv2_domain_name",
+		]);
+		policy
+			.service_linked_roles()
+			.iter()
+			.copied()
+			.collect::<Vec<_>>()
+			.xpect_eq(vec!["ops.apigateway.amazonaws.com"]);
+		policy
+			.to_json()
+			.to_string()
+			.xnot()
+			.xpect_contains("CreateServiceLinkedRole");
 	}
 
 	/// Two stages of one app share one policy and one state key pattern; a
