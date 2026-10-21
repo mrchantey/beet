@@ -1,6 +1,7 @@
 +++
 title = "Plugins"
 order = 3
+visibility = "unlisted"
 +++
 
 # Plugins

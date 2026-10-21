@@ -57,7 +57,7 @@ pub fn RouteIndex(
 				.filter(|(_, node)| node.is_page_route)
 				.filter_map(|(child, node)| {
 					let meta = metas.get(node.entity).ok()?;
-					lists(meta, is_prod)
+					meta.is_browsable(is_prod)
 						.then(|| (child.path.annotated_path(), meta.clone()))
 				})
 				.collect()
@@ -109,18 +109,6 @@ pub(crate) fn route_index_rules() -> Vec<Rule> {
 			]))
 			.with_canonical(DecorationLine::underline()),
 	]
-}
-
-/// Whether a child page appears in the index, ie its
-/// [`PageVisibility`](beet_ui::prelude::PageVisibility) read as a listing rule.
-fn lists(meta: &PageMeta, is_prod: bool) -> bool {
-	match meta.visibility {
-		PageVisibility::Public => true,
-		// an unlisted page is reachable by its link and from no index
-		PageVisibility::Unlisted => false,
-		// a draft is previewed everywhere but production, matching `StaticExport`
-		PageVisibility::Draft => !is_prod,
-	}
 }
 
 /// One index entry: the `<hr/>` separating it from the entry above (every entry

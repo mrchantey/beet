@@ -1,5 +1,6 @@
 +++
 title = "Teach it new words"
+visibility = "unlisted"
 +++
 
 # Teach it new words

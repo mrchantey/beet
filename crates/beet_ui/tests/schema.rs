@@ -96,6 +96,62 @@ fn macro_required_prop_present_ok() {
 	has_template_error(world, root).xpect_false();
 }
 
+// ---- attributes beyond the props forward to the root element -----------------
+
+/// Render `root` to HTML.
+fn render_html(world: &mut World, root: Entity) -> String {
+	HtmlRenderer::new()
+		.render(&mut RenderContext::new(
+			world,
+			root,
+			&RequestParts::default(),
+		))
+		.unwrap()
+		.to_string()
+}
+
+/// A Rust template forwards the attributes beyond its props onto the element
+/// it builds: `hidden` and a `class` land on `<Badge>`'s `<span>`, its props
+/// do not.
+#[beet_core::test]
+fn rust_template_forwards_attributes() {
+	let mut app = world_ext::ui_app();
+	app.install_type::<Badge>();
+	let world = app.world_mut();
+	let root = parse_bsx(world, r#"<Badge label="hi" class="extra" hidden/>"#);
+	has_template_error(world, root).xpect_false();
+	render_html(world, root)
+		.xpect_contains(" hidden")
+		.xpect_contains(r#"class="extra""#)
+		.xnot()
+		.xpect_contains("label=");
+}
+
+/// A BSX template declaring its props forwards the rest, replacing the root's
+/// own value; with two roots there is no element to take them, an error rather
+/// than a silent drop.
+#[beet_core::test]
+fn bsx_template_forwards_attributes() {
+	let mut world = world();
+	let schema = r#"<script type="json" bx:schema>{ "title": { "type": "string" } }</script>"#;
+	let mut registry = BsxTemplateRegistry::default();
+	registry
+		.insert_source("Card", &format!(r#"{schema}<section id="card"/>"#))
+		.unwrap();
+	registry
+		.insert_source("Pair", &format!("{schema}<a/><b/>"))
+		.unwrap();
+	world.insert_resource(registry);
+
+	let card = parse_bsx(&mut world, r#"<Card title="hi" id="main"/>"#);
+	render_html(&mut world, card)
+		.xpect_contains(r#"<section id="main""#)
+		.xnot()
+		.xpect_contains("title=");
+	let pair = parse_bsx(&mut world, r#"<Pair id="main"/>"#);
+	has_template_error(&world, pair).xpect_true();
+}
+
 // ---- missing required prop -> graceful TemplateError (loader path) -----------
 
 #[beet_core::test]

@@ -72,6 +72,7 @@ pub(super) fn tab_focus(
 	focusables: Query<Entity, With<Focusable>>,
 	children: Query<&Children>,
 	parents: Query<&ChildOf>,
+	layouts: LayoutQuery,
 	surfaces: SurfaceQuery,
 	focused: Query<Entity, With<Focus>>,
 	mut commands: Commands,
@@ -89,7 +90,8 @@ pub(super) fn tab_focus(
 		}
 	}
 
-	let full_order = focusables_in_order(&focusables, &children, &parents);
+	let full_order =
+		focusables_in_order(&focusables, &children, &parents, &layouts);
 	for (window, (tabs, shift)) in per_window {
 		if tabs == 0 {
 			continue;
@@ -122,12 +124,34 @@ pub(super) fn tab_focus(
 	}
 }
 
+cfg_if! {
+	if #[cfg(feature = "style")] {
+		/// The resolved layouts a Tab walk prunes by.
+		type LayoutQuery<'w, 's> =
+			Query<'w, 's, &'static crate::style::LayoutStyle>;
+		/// Whether `entity` is removed from layout (`display: none`, ie a
+		/// `hidden` element), taking its subtree with it.
+		fn is_removed(layouts: &LayoutQuery, entity: Entity) -> bool {
+			layouts.get(entity).is_ok_and(|layout| {
+				layout.display == crate::style::Display::None
+			})
+		}
+	} else {
+		/// Without the style pipeline nothing resolves a display.
+		type LayoutQuery<'w, 's> = ();
+		fn is_removed(_layouts: &LayoutQuery, _entity: Entity) -> bool { false }
+	}
+}
+
 /// The focusables in document (tree pre-order) order, roots sorted by entity for
-/// stability. A focusable with no [`ChildOf`] is its own root.
+/// stability. A focusable with no [`ChildOf`] is its own root. A subtree removed
+/// from layout is skipped whole: it has no rect, so focus there would be
+/// invisible and Enter would activate an element nobody can see.
 fn focusables_in_order(
 	focusables: &Query<Entity, With<Focusable>>,
 	children: &Query<&Children>,
 	parents: &Query<&ChildOf>,
+	layouts: &LayoutQuery,
 ) -> Vec<Entity> {
 	let is_focusable: HashSet<Entity> = focusables.iter().collect();
 	// roots: ancestors-most entity of each focusable (walk up ChildOf).
@@ -150,6 +174,9 @@ fn focusables_in_order(
 	for root in roots {
 		let mut stack = vec![root];
 		while let Some(entity) = stack.pop() {
+			if is_removed(layouts, entity) {
+				continue;
+			}
 			if is_focusable.contains(&entity) {
 				order.push(entity);
 			}
@@ -470,5 +497,35 @@ mod test {
 		// Shift+Tab goes back, wrapping to the last
 		type_keys(&mut app, window, [Key::Shift, Key::Tab]);
 		is_focused(&app, second).xpect_true();
+	}
+
+	/// A subtree removed from layout (a `hidden` link's `display: none`) takes
+	/// no focus: Tab steps over it, and over everything beneath it.
+	#[cfg(feature = "style")]
+	#[beet_core::test]
+	fn tab_skips_removed_subtrees() {
+		use crate::style::Display;
+		use crate::style::LayoutStyle;
+		let mut app = app();
+		let first = app.world_mut().spawn(Focusable).id();
+		let removed = app
+			.world_mut()
+			.spawn(LayoutStyle {
+				display: Display::None,
+				..LayoutStyle::DEFAULT
+			})
+			.with_child(Focusable)
+			.id();
+		let last = app.world_mut().spawn(Focusable).id();
+		let window = app.world_mut().spawn_empty().id();
+		app.world_mut()
+			.spawn(RenderSurface(window))
+			.add_children(&[first, removed, last]);
+		app.update();
+
+		type_keys(&mut app, window, [Key::Tab]);
+		is_focused(&app, first).xpect_true();
+		type_keys(&mut app, window, [Key::Tab]);
+		is_focused(&app, last).xpect_true();
 	}
 }

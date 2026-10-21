@@ -140,6 +140,18 @@ impl PageMeta {
 	/// Whether the page is unfinished, ie must not reach production.
 	pub fn is_draft(&self) -> bool { self.visibility == PageVisibility::Draft }
 
+	/// Whether a reader browsing the site finds the page, ie it appears in a
+	/// sidebar or a route index: an [`Unlisted`](PageVisibility::Unlisted) page
+	/// is reachable by its link alone, and a [`Draft`](PageVisibility::Draft)
+	/// is previewed everywhere but production, matching static export.
+	pub fn is_browsable(&self, is_prod: bool) -> bool {
+		match self.visibility {
+			PageVisibility::Public => true,
+			PageVisibility::Unlisted => false,
+			PageVisibility::Draft => !is_prod,
+		}
+	}
+
 	/// The authors as one line, joined by `, `, or `None` when there are none:
 	/// the byline a header, a feed item or a search result shows.
 	pub fn byline(&self) -> Option<String> {

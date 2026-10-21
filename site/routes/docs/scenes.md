@@ -1,6 +1,7 @@
 +++
 title = "Scenes"
 order = 1
+visibility = "unlisted"
 +++
 
 # Scenes

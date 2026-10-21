@@ -1,5 +1,6 @@
 +++
 title = "beet_spatial"
+visibility = "unlisted"
 +++
 
 # beet_spatial

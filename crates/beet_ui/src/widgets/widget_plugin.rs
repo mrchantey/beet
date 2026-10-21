@@ -51,7 +51,8 @@ pub(crate) fn widget_plugin(app: &mut App) {
 		SidebarScript,
 		MenuButton,
 		Table,
-	)>();
+	)>()
+	.install_type::<RepositoryLink>();
 	// a baked `<Stylesheet/>` follows rules registered after it baked; gated on
 	// a sheet existing, as a sheet only bakes where the style resources are
 	// (a world without them, ie a bare markdown parse, has no `StyleQuery`)

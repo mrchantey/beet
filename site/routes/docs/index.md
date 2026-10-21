@@ -2,6 +2,7 @@
 title = "Docs"
 order = 0
 expanded = true
+visibility = "unlisted"
 +++
 
 # Beet

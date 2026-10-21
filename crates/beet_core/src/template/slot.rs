@@ -221,39 +221,68 @@ fn plan_scope(
 
 	// fixpoint: a filled transfer target re-opens, so deeper content flows.
 	let mut next = 0;
-	while next < targets.len() {
-		let (target_name, target) = targets[next].clone();
-		next += 1;
+	let mut filled = HashSet::<Entity>::default();
+	let mut opened = HashSet::<Entity>::default();
+	loop {
+		while next < targets.len() {
+			let (target_name, target) = targets[next].clone();
+			next += 1;
 
-		let mut matched = Vec::new();
-		sources.retain(|(name, content)| {
-			// a relay must not consume itself: its `SlotChild` side and its
-			// re-opened `SlotTarget` side share one entity and slot name.
-			if *name == target_name && *content != target {
-				matched.push(*content);
-				false
-			} else {
-				true
+			let mut matched = Vec::new();
+			sources.retain(|(name, content)| {
+				// a relay must not consume itself: its `SlotChild` side and its
+				// re-opened `SlotTarget` side share one entity and slot name.
+				if *name == target_name && *content != target {
+					matched.push(*content);
+					false
+				} else {
+					true
+				}
+			});
+			if matched.is_empty() {
+				continue;
 			}
-		});
-		if matched.is_empty() {
-			continue;
-		}
-		// a matched transfer (a `SlotChild` that is itself a `SlotTarget`)
-		// re-opens as a target named by its own slot, forwarding deeper content.
-		for content in matched.iter().copied() {
-			if let Ok(child_target) = slot_targets.get(content) {
-				targets.push((child_target.slot_name().into(), content));
+			filled.insert(target);
+			// a matched transfer (a `SlotChild` that is itself a `SlotTarget`)
+			// re-opens as a target named by its own slot, forwarding deeper
+			// content.
+			for content in matched.iter().copied() {
+				if let Ok(child_target) = slot_targets.get(content) {
+					targets.push((child_target.slot_name().into(), content));
+				}
 			}
+			// a relay target (also a `SlotChild`) must survive splicing to
+			// forward its new content onward; a structural target collapses
+			// transparently.
+			let is_relay = slot_children.contains(target);
+			plan.wirings.push(SlotWiring {
+				target,
+				content: matched,
+				is_relay,
+			});
 		}
-		// a relay target (also a `SlotChild`) must survive splicing to forward its
-		// new content onward; a structural target collapses transparently.
-		let is_relay = slot_children.contains(target);
-		plan.wirings.push(SlotWiring {
-			target,
-			content: matched,
-			is_relay,
-		});
+		// an unfilled target keeps its fallback, so a slot nested in that
+		// fallback is this scope's to fill, the shadow DOM rule: a shell's
+		// default header still takes the caller's `nav` links. A filled one
+		// drops its fallback, and the slots inside it with it.
+		let fallback_targets = targets
+			.iter()
+			.map(|(_, target)| *target)
+			.filter(|target| !filled.contains(target) && opened.insert(*target))
+			.flat_map(|target| {
+				collect_targets(
+					target,
+					scopes,
+					children,
+					slot_children,
+					slot_targets,
+				)
+			})
+			.collect::<Vec<_>>();
+		if fallback_targets.is_empty() {
+			break;
+		}
+		targets.extend(fallback_targets);
 	}
 
 	// any content left over is an error, except a forwarding relay (a `SlotChild`
@@ -446,6 +475,58 @@ mod test {
 		// the filled default target collapses, its body landing in the scope.
 		world.get_entity(default_target).is_err().xpect_true();
 		child_names(&world, scope).xpect_eq(vec!["body".to_string()]);
+	}
+
+	/// A shell's `header` slot whose fallback holds a `nav` slot, the
+	/// `<SiteLayout>` shape.
+	fn shell(world: &mut World) -> (Entity, Entity) {
+		let scope = node(world, "scope");
+		let header = world
+			.spawn((SlotTarget::named("header"), ChildOf(scope)))
+			.id();
+		let bar = world.spawn((Name::new("bar"), ChildOf(header))).id();
+		world.spawn((SlotTarget::named("nav"), ChildOf(bar)));
+		(scope, bar)
+	}
+
+	/// While the outer slot is unfilled its fallback stays, so a slot nested in
+	/// that fallback takes the caller's content.
+	#[crate::test]
+	fn fills_a_slot_nested_in_an_unfilled_fallback() {
+		let mut world = World::new();
+		let (scope, bar) = shell(&mut world);
+		world.spawn((
+			Name::new("blog"),
+			SlotChild::named("nav"),
+			ChildOf(scope),
+		));
+
+		resolve_slots(&mut world, scope).unwrap();
+
+		child_names(&world, bar).xpect_eq(vec!["blog".to_string()]);
+	}
+
+	/// Filling the outer slot drops its fallback, and the slots inside it: the
+	/// nested slot's content is unconsumed rather than silently dropped.
+	#[crate::test]
+	fn a_filled_slot_offers_no_fallback_slots() {
+		let mut world = World::new();
+		let (scope, _) = shell(&mut world);
+		world.spawn((
+			Name::new("custom"),
+			SlotChild::named("header"),
+			ChildOf(scope),
+		));
+		world.spawn((
+			Name::new("blog"),
+			SlotChild::named("nav"),
+			ChildOf(scope),
+		));
+
+		resolve_slots(&mut world, scope)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("\"nav\"");
 	}
 
 	#[crate::test]

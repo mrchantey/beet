@@ -176,11 +176,17 @@ pub(crate) fn default_token_map() -> CssTokenMap {
 
 /// The Material component rules: the user-agent [`non_visual_rule`] (so
 /// metadata/scripting tags resolve to `display: none`), the component
-/// [`classes::all_rules`], and the light/dark scheme rules.
+/// [`classes::all_rules`], the light/dark scheme rules, and last the
+/// user-agent [`hidden_attribute_rule`], so `hidden` wins over a component
+/// class's `display`.
 pub(crate) fn default_material_rules() -> Vec<Rule> {
 	core::iter::once(non_visual_rule())
 		.chain(classes::all_rules())
-		.chain([themes::light_scheme(), themes::dark_scheme()])
+		.chain([
+			themes::light_scheme(),
+			themes::dark_scheme(),
+			hidden_attribute_rule(),
+		])
 		.collect()
 }
 

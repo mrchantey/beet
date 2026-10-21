@@ -1,5 +1,6 @@
 +++
 title = "beet_infra"
+visibility = "unlisted"
 +++
 
 # beet_infra

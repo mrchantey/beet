@@ -1,5 +1,6 @@
 +++
 title = "Design"
+visibility = "unlisted"
 +++
 
 # Design

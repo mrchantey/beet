@@ -108,9 +108,10 @@ fn route_title(seed: &str) -> Result<impl Bundle> {
 ///
 /// Registered by name (see [`RouterPlugin`](crate::prelude::RouterPlugin)), so
 /// a BSX layout places it with `<RouteSidebar/>`. Builds inside a layout render
-/// (it reads [`RequestContext`]); only [`PageRoute`] routes appear (so infra
-/// routes like the `app-info` scene are absent), and `exclude` adds
-/// site-specific globs.
+/// (it reads [`RequestContext`]); only [`PageRoute`] routes a reader may browse
+/// to appear ([`PageMeta::is_browsable`], so infra routes like the `app-info`
+/// scene and unlisted pages are absent), and `exclude` adds site-specific
+/// globs.
 #[template(system)]
 pub fn RouteSidebar(
 	/// Show the synthetic `Home` entry. Disable when the header links home.
@@ -124,6 +125,7 @@ pub fn RouteSidebar(
 	metas: Query<&PageMeta>,
 ) -> impl Bundle {
 	let cx = stack.current();
+	let is_prod = BootstrapConfig::get().is_prod();
 	let nodes = trees
 		.get(cx.router())
 		.map(|tree| {
@@ -132,11 +134,13 @@ pub fn RouteSidebar(
 			for pattern in &exclude {
 				state = state.with_exclude(pattern);
 			}
-			// each route's metadata drives its label/order/expansion
+			// each route's metadata drives its label/order/expansion/visibility
 			for node in tree.flatten_nodes() {
 				if let Ok(meta) = metas.get(node.entity) {
-					state = state
-						.with_info(node.path.annotated_path(), meta.into());
+					state = state.with_info(
+						node.path.annotated_path(),
+						SidebarInfo::of_page(meta, is_prod),
+					);
 				}
 			}
 			state.collect(tree)
@@ -160,19 +164,26 @@ pub struct SidebarInfo {
 	/// Force the branch open (`Some(true)`) or closed (`Some(false)`); `None`
 	/// auto-expands when the current path is a descendant.
 	pub expanded: Option<bool>,
+	/// Omit the page's own entry; its browsable children are still listed,
+	/// under a branch that no longer links.
+	pub hidden: bool,
 }
 
-/// The nav slice of a page's metadata, with the label resolved through
-/// [`PageMeta::sidebar_label`] so an unlabelled page falls back to its title.
-///
-/// The conversion lives here rather than on [`PageMeta`] because the nav is a
-/// router concern: the page merely declares label, order and expansion.
-impl From<&PageMeta> for SidebarInfo {
-	fn from(meta: &PageMeta) -> Self {
+impl SidebarInfo {
+	/// The nav slice of a page's metadata in a process of the given stage: the
+	/// label resolved through [`PageMeta::sidebar_label`], so an unlabelled
+	/// page falls back to its title, and hidden unless
+	/// [`PageMeta::is_browsable`].
+	///
+	/// Lives here rather than on [`PageMeta`] because the nav is a router
+	/// concern: the page merely declares label, order, expansion and
+	/// visibility.
+	pub fn of_page(meta: &PageMeta, is_prod: bool) -> Self {
 		Self {
 			label: meta.sidebar_label().map(String::from),
 			order: meta.order,
 			expanded: meta.expanded,
+			hidden: !meta.is_browsable(is_prod),
 		}
 	}
 }
@@ -277,8 +288,10 @@ impl SidebarState {
 			.filter_map(|child| self.collect_node(child))
 			.collect();
 		// only page routes belong in the nav; infra/data routes (eg the
-		// `app-info` scene, `/health`) carry no [`PageRoute`] marker.
-		let has_page_route = tree.node().is_some_and(|node| node.is_page_route);
+		// `app-info` scene, `/health`) carry no [`PageRoute`] marker, and a
+		// hidden page is reachable by its link alone.
+		let has_page_route = tree.node().is_some_and(|node| node.is_page_route)
+			&& !info.is_some_and(|info| info.hidden);
 
 		if children.is_empty() {
 			// leaf: only render if it is a page route
@@ -570,6 +583,46 @@ mod test {
 			.iter()
 			.any(|n| n.display_name == "about")
 			.xpect_false();
+	}
+
+	/// A page a browsing reader must not find is omitted, even when it is the
+	/// current page: an unlisted one always, a draft in production. A hidden
+	/// branch keeps its browsable children under a label that no longer links.
+	#[beet_core::test]
+	fn omits_unbrowsable_pages() {
+		let mut world = router_world();
+		let root = world
+			.spawn(children![
+				page_route("about"),
+				(page_route("docs"), children![page_route("intro")]),
+			])
+			.flush();
+		let tree = tree_of(&mut world, root);
+		let page = |visibility| PageMeta {
+			visibility,
+			..default()
+		};
+
+		let nodes = SidebarState::new("about")
+			.with_info(
+				"about",
+				SidebarInfo::of_page(&page(PageVisibility::Unlisted), false),
+			)
+			.with_info(
+				"docs",
+				SidebarInfo::of_page(&page(PageVisibility::Draft), true),
+			)
+			.collect(&tree);
+		nodes
+			.iter()
+			.any(|node| node.display_name == "about")
+			.xpect_false();
+		let docs = nodes
+			.iter()
+			.find(|node| node.display_name == "docs")
+			.unwrap();
+		docs.path.is_none().xpect_true();
+		docs.children.len().xpect_eq(1);
 	}
 
 	#[beet_core::test]

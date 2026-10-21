@@ -274,39 +274,47 @@ fn apply_attributes(
 	entity: &mut EntityWorldMut,
 	entity_refs: &HashMap<SmolStr, Entity>,
 ) -> Result<()> {
-	let parent = entity.id();
-	for attr in &el.attributes {
-		// directives and spreads are not HTML attributes.
-		if is_directive(&attr.key) || attr.key.is_empty() {
-			if let AttrValue::Spread(_) = &attr.value {
-				// spreads handled separately below.
-			}
-			continue;
-		}
-		// `on*` event handlers are not implemented as data attributes here.
-		entity.world_scope(|world| -> Result<()> {
-			let mut attr_entity = world.spawn((
-				AttributeOf::new(parent),
-				Attribute::new(attr.key.clone()),
-			));
-			match &attr.value {
-				AttrValue::Flag => {}
-				AttrValue::Str(string) => {
-					attr_entity.insert(Value::Str(string.into()));
-				}
-				AttrValue::Expr(expr) => {
-					// attribute position: an `@comp` binds the element unless
-					// `$ref` retargets.
-					let comp_target =
-						attr_comp_target(expr, parent, entity_refs);
-					apply_value_expr(expr, &mut attr_entity, comp_target)?;
-				}
-				// spreads and `bx:style` are handled elsewhere (the
-				// directives pass / spread pass).
-				AttrValue::Spread(_) | AttrValue::Style { .. } => {}
-			}
-			Ok(())
-		})?;
+	// directives and spreads are not HTML attributes; spreads apply below.
+	for attr in el
+		.attributes
+		.iter()
+		.filter(|attr| !is_directive(&attr.key) && !attr.key.is_empty())
+	{
+		apply_attribute(attr, entity, entity_refs)?;
 	}
 	apply_spreads(el, entity, entity_refs)
+}
+
+/// Spawn one HTML attribute of `entity` as an attribute entity, its value a
+/// literal, a flag or a bound expression. Shared by a lowercase element and the
+/// attributes a template tag forwards to its root element.
+pub(super) fn apply_attribute(
+	attr: &BsxAttribute,
+	entity: &mut EntityWorldMut,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> Result<()> {
+	let parent = entity.id();
+	// `on*` event handlers are not implemented as data attributes here.
+	entity.world_scope(|world| -> Result<()> {
+		let mut attr_entity = world.spawn((
+			AttributeOf::new(parent),
+			Attribute::new(attr.key.clone()),
+		));
+		match &attr.value {
+			AttrValue::Flag => {}
+			AttrValue::Str(string) => {
+				attr_entity.insert(Value::Str(string.into()));
+			}
+			AttrValue::Expr(expr) => {
+				// attribute position: an `@comp` binds the element unless
+				// `$ref` retargets.
+				let comp_target = attr_comp_target(expr, parent, entity_refs);
+				apply_value_expr(expr, &mut attr_entity, comp_target)?;
+			}
+			// spreads and `bx:style` are handled elsewhere (the directives
+			// pass / spread pass).
+			AttrValue::Spread(_) | AttrValue::Style { .. } => {}
+		}
+		Ok(())
+	})
 }

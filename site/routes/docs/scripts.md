@@ -1,6 +1,7 @@
 +++
 title = "Scripts"
 order = 2
+visibility = "unlisted"
 +++
 
 # Scripts

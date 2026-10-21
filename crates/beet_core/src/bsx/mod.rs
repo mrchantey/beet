@@ -147,6 +147,15 @@
 //! assert_eq!(world.entity(title).get::<Value>().unwrap(), &Value::Str("Intro".into()));
 //! ```
 //!
+//! A template's root element is the tag's own entity, so an attribute beyond
+//! its declared props (a Rust template's fields, a `.bsx` template's
+//! `bx:schema`) falls through to that element: `<Link href="/docs" hidden>`
+//! renders `<a href="/docs" hidden class="btn ..">`. A `class` joins the
+//! element's own, any other key replaces its value, and a template with no
+//! single root element refuses the attribute rather than dropping it. A `.bsx`
+//! template declaring no schema, like `<Card>` above, takes every attribute as
+//! a prop.
+//!
 //! The remaining surface (bare-position component spreads `{(A, B)}`, the `$ref`
 //! entity references, enum/struct/list literals) lives in the value grammar
 //! (`parse`) and AST-to-world resolution (`resolve`).

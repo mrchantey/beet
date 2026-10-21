@@ -37,6 +37,10 @@ pub struct PackageConfig {
 	/// app publishes is resolved against (see
 	/// [`absolute_url`](Self::absolute_url)).
 	pub homepage: Option<Url>,
+	/// The package's source repository, ie `https://github.com/mrchantey/beet`,
+	/// usually set via `CARGO_PKG_REPOSITORY` in [`pkg_config!`]. A site shell
+	/// links it from the header, and unset omits the link.
+	pub repository: Option<Url>,
 	/// The absolute URL of the social card, the image a link preview shows.
 	///
 	/// Absolute because a crawler resolves it against nothing, so a relative
@@ -57,6 +61,7 @@ impl Default for PackageConfig {
 			app_name: Self::DEFAULT_APP_NAME.into(),
 			version: "0.0.1".into(),
 			homepage: None,
+			repository: None,
 			social_image: None,
 		}
 	}
@@ -123,6 +128,10 @@ macro_rules! pkg_config {
 				"" => None,
 				homepage => Some($crate::prelude::Url::coerce(homepage)),
 			},
+			repository: match env!("CARGO_PKG_REPOSITORY") {
+				"" => None,
+				repository => Some($crate::prelude::Url::coerce(repository)),
+			},
 			// no cargo manifest key names a social card, so it stays the
 			// caller's to set.
 			social_image: None,
@@ -183,6 +192,7 @@ mod test {
 		config.app_name.as_str().xpect_eq("beet-app");
 		config.version.as_str().xpect_eq("0.0.1");
 		config.homepage.xpect_none();
+		config.repository.xpect_none();
 	}
 
 	/// A markup-declared `<PackageConfig/>` patches only its named fields over

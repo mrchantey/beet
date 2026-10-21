@@ -1,8 +1,9 @@
 //! The browser half of the deploy skill's client verification (check `b`),
 //! the in-house replacement for the retired playwright `verify_client.js`:
 //! drive the live site through the webdriver, fail on any client error, and
-//! prove the counter page's first paint, in-page navigability, asset store
-//! topology and the desktop and mobile layouts.
+//! prove the counter page's first paint, in-page navigability, that the
+//! unlisted docs stay out of sight, asset store topology and the desktop and
+//! mobile layouts.
 //!
 //! Client-side interactivity is not asserted here: the deployed site does not
 //! yet boot the wasm runtime its pages could carry (`<Wasm/>`, see
@@ -60,25 +61,53 @@ async fn verifies_client() {
 	page.find_text("More").await;
 	page.find_text("Less").await;
 
-	// in-page navigability: the site's own links reach docs and the
-	// counter (proves navigation, not just direct loads)
+	// in-page navigability: the site's own links reach the blog and a post
+	// (proves navigation, not just direct loads)
 	cross_log!("stage: counter done");
 	// `Page::click` re-queries on staleness: the client-side router
 	// re-renders the page, invalidating held node references
 	page.navigate(&base).await.unwrap();
-	page.click("a[href='/docs']").await.unwrap();
-	page.xpect_url(&format!("{base}/docs")).await;
-	// the counter link on /docs sits in a collapsed nav subtree
-	// (zero-size, unclickable for a real user too), so walk the
-	// visible hierarchy: the design section first
-	page.click("a[href='/docs/design']").await.unwrap();
-	page.xpect_url(&format!("{base}/docs/design")).await;
-	page.click("a[href='/docs/design/counter']").await.unwrap();
-	page.xpect_url(&format!("{base}/docs/design/counter")).await;
+	page.click("a[href='/blog']").await.unwrap();
+	page.xpect_url(&format!("{base}/blog")).await;
+	page.click("a[href='/blog/bevys-five-and-beets-alive']")
+		.await
+		.unwrap();
+	page.xpect_url(&format!("{base}/blog/bevys-five-and-beets-alive"))
+		.await;
+
+	// the docs are unlisted: they serve (the counter above) but nobody
+	// browsing finds them, so the landing page shows no link in, `/docs` asks
+	// crawlers not to index it, and the sitemap leaves every docs page out
+	cross_log!("stage: in-page nav done");
+	page.navigate(&base).await.unwrap();
+	page.evaluate_value(
+		r#"[...document.querySelectorAll("a[href^='/docs']")]
+			.filter(link => link.getClientRects().length > 0).length"#,
+	)
+	.await
+	.unwrap()
+	.as_u64()
+	.xpect_eq(Some(0));
+	page.evaluate_value(
+		r#"fetch('/sitemap.xml').then(res => res.text()).then(text => text.includes('/docs'))"#,
+	)
+	.await
+	.unwrap()
+	.as_bool()
+	.xpect_eq(Some(false));
+	page.navigate(&format!("{base}/docs")).await.unwrap();
+	page.evaluate_value(
+		r#"document.querySelector('meta[name=robots]')?.content ?? null"#,
+	)
+	.await
+	.unwrap()
+	.as_str()
+	.map(str::to_string)
+	.xpect_eq(Some("noindex".to_string()));
 
 	// the beacon runs on content pages, where the client error class
 	// was originally reported
-	cross_log!("stage: in-page nav done");
+	cross_log!("stage: unlisted docs done");
 	for path in ["/blog", "/blog/bevys-five-and-beets-alive"] {
 		page.navigate(&format!("{base}{path}")).await.unwrap();
 		page.find("body").await;

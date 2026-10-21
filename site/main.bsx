@@ -231,6 +231,7 @@ token (plus AWS for the social stack's state bucket).
 		description="An Atmospheric OS for homegrown tech"
 		version="0.0.9-dev.16"
 		homepage="https://beet.org"
+		repository="https://github.com/mrchantey/beet"
 		social_image="https://beet.org/assets/branding/social-card.png"/>
 	<!-- the atproto accounts this entry reads and writes, each declared once
 	     and named by `bx:ref` wherever a declaration needs one (the handle

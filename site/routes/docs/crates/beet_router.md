@@ -1,5 +1,6 @@
 +++
 title = "beet_router"
+visibility = "unlisted"
 +++
 
 # beet_router

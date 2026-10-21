@@ -1,5 +1,6 @@
 +++
 title = "A guestbook from a scene"
+visibility = "unlisted"
 +++
 
 # A guestbook from a scene

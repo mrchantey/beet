@@ -1,10 +1,9 @@
 <!--
-The document layout wrapping every route: the shipped <SiteLayout> shell, whose
-defaults reproduce the reference `BeetLayout` exactly, the head/header/sidebar/
-footer chrome plus the body `page` + color-scheme class. The layout middleware
-transcludes each route's body in as SiteLayout's default-slot child, so it lands
-in <main> with no relay here. No overrides: the no-code site is the full beet
-chrome with nothing excluded.
+The document layout wrapping every route: the shipped <SiteLayout> shell, the
+head/header/sidebar/footer chrome plus the body `page` + color-scheme class. The
+layout middleware transcludes each route's body in as SiteLayout's default-slot
+child, so it lands in <main> with no relay here. No region is replaced: the site
+only adds to the `head` and `nav` slots.
 
 The `head` slot carries the site's own identity links: the self hosted Inter the
 brand type names, then the icon set and web app manifest under `assets/branding`.
@@ -18,6 +17,11 @@ party request and the site keeps working with the rest of the web unavailable.
 Without it the heaviest weights the type scale asks for are a browser's synthetic
 bold, so the wordmark and every display heading would arrive at the wrong weight.
 
+The `nav` slot carries the site's own header links, ahead of the repository
+link the shell adds from `<PackageConfig repository=..>`. The Docs link is
+`hidden`, like the unlisted pages it leads to: they serve to whoever holds a
+url, and nobody browsing the site is shown the way in.
+
 <Analytics/> injects the page-view beacon script on every page (web only; the
 runtime ignores the <script> on terminal targets, whose page views come from the
 in-world navigator instead).
@@ -29,6 +33,10 @@ in-world navigator instead).
 		<link rel="icon" type="image/png" sizes="16x16" href="/assets/branding/favicon-16x16.png"/>
 		<link rel="apple-touch-icon" sizes="180x180" href="/assets/branding/apple-touch-icon.png"/>
 		<link rel="manifest" href="/assets/branding/site.webmanifest"/>
+	</Fragment>
+	<Fragment slot="nav">
+		<Link href="/docs" variant=ButtonVariant::Text hidden>Docs</Link>
+		<Link href="/blog" variant=ButtonVariant::Text>Blog</Link>
 	</Fragment>
 	<Analytics/>
 </SiteLayout>

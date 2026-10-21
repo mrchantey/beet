@@ -16,7 +16,8 @@ title = "Beet"
 			</p>
 			<div bx:style="display=Flex justify-content=Center align-items=Center column-gap=Rem(1.0)">
 				<Link href="https://github.com/mrchantey/beet" variant=ButtonVariant::Outlined>GitHub</Link>
-				<Link href="/docs" variant=ButtonVariant::Filled>Get Started</Link>
+				<Link href="/blog" variant=ButtonVariant::Filled>Blog</Link>
+				<Link href="/docs" variant=ButtonVariant::Filled hidden>Get Started</Link>
 			</div>
 		</div>
 	</div>
@@ -61,5 +62,5 @@ Beet software grows with your needs, offering a gentle slope from user to tinker
 
 - Your software is records and blobs in a repo that belongs to your account, with your atproto PDS as its home.
 - Local-first by design, so the repo works with no network and syncs when one appears.
-- The [scene format](/docs/scenes) is built for standardization, so other software can read what you made.
+- The scene format is built for standardization, so other software can read what you made.
 - Use a git repo as the source of truth if that is how you like to work.

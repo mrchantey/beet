@@ -68,6 +68,16 @@ pub(super) fn build_uppercase(
 		cx.entity.build_template(&nested)?;
 		apply_common_directives(el, refs, cx)?;
 		apply_spreads(el, cx.entity, &entity_refs)?;
+		// only a template declaring its props can tell one from an attribute:
+		// without a `bx:schema`, every attribute is a prop.
+		if let Some(ValueSchema::Struct(schema)) = &def.schema {
+			let props = schema
+				.fields
+				.iter()
+				.map(|field| field.key.as_str())
+				.collect::<Vec<_>>();
+			forward_attributes(el, &props, cx.entity, &entity_refs)?;
+		}
 		// caller content becomes slot children on this entity.
 		build_slot_children(el, registry, refs, cx)?;
 		return Ok(());
@@ -132,6 +142,12 @@ pub(super) fn build_uppercase(
 			)?;
 			apply_common_directives(el, refs, cx)?;
 			apply_spreads(el, cx.entity, &entity_refs)?;
+			// a template's props are its fields
+			let props = match type_info {
+				bevy::reflect::TypeInfo::Struct(info) => info.field_names(),
+				_ => &[],
+			};
+			forward_attributes(el, props, cx.entity, &entity_refs)?;
 			build_slot_children(el, registry, refs, cx)?;
 		}
 		UppercaseKind::Resource => {
@@ -198,6 +214,73 @@ fn build_unregistered(
 		el.tag
 	);
 	build_children(el, registry, refs, cx)
+}
+
+/// Forward the attributes a template tag carries beyond its `props` onto the
+/// root element the template built into the tag's own entity, so
+/// `<Link href="/docs" hidden>` lands `hidden` on the `<a>`.
+///
+/// A `class` joins the element's own classes (the renderer merges the attribute
+/// with them); any other key replaces the element's value. A template that
+/// built no single root element has nowhere to put one, so a forwarded
+/// attribute there is an error naming the tag, never a silent drop.
+fn forward_attributes(
+	el: &BsxElement,
+	props: &[&str],
+	entity: &mut EntityWorldMut,
+	entity_refs: &HashMap<SmolStr, Entity>,
+) -> Result<()> {
+	let forwarded = el
+		.attributes
+		.iter()
+		.filter(|attr| !is_directive(&attr.key) && !attr.key.is_empty())
+		.filter(|attr| !props.contains(&attr.key.as_str()))
+		.collect::<Vec<_>>();
+	if forwarded.is_empty() {
+		return Ok(());
+	}
+	if !entity.contains::<Element>() {
+		bevybail!(
+			"`<{}>` has no prop {} and builds no single root element to forward it to: {}",
+			el.tag,
+			forwarded
+				.iter()
+				.map(|attr| format!("`{}`", attr.key))
+				.collect::<Vec<_>>()
+				.join(", "),
+			match props {
+				[] => "it has no props".to_string(),
+				props => format!("its props are {}", props.join(", ")),
+			}
+		);
+	}
+	for attr in forwarded {
+		if attr.key != "class" {
+			remove_attribute(entity, &attr.key);
+		}
+		apply_attribute(attr, entity, entity_refs)?;
+	}
+	Ok(())
+}
+
+/// Despawn the attribute entities of `entity` named `key`.
+fn remove_attribute(entity: &mut EntityWorldMut, key: &str) {
+	let existing = entity
+		.get::<Attributes>()
+		.into_iter()
+		.flat_map(|attributes| attributes.iter())
+		.filter(|attribute| {
+			entity
+				.world()
+				.get::<Attribute>(*attribute)
+				.is_some_and(|attribute| attribute.as_str() == key)
+		})
+		.collect::<Vec<_>>();
+	entity.world_scope(|world| {
+		for attribute in existing {
+			world.despawn(attribute);
+		}
+	});
 }
 
 /// How an uppercase tag's type registration resolves.

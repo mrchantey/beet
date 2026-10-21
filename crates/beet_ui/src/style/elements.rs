@@ -126,7 +126,25 @@ pub(crate) fn default_element_rules() -> Vec<Rule> {
 			]))
 			.with_media(MediaQuery::Terminal)
 			.with_canonical(Display::Block),
+		// last, so it wins the tie with a later tag rule's `display`
+		hidden_attribute_rule(),
 	]
+}
+
+/// User-agent rule removing an element with the HTML `hidden` attribute from
+/// terminal layout: no rect, so it neither paints nor takes a click, and Tab
+/// skips it (`focusables_in_order`).
+///
+/// The terminal twin of the web reset's `[hidden]` rule (`preflight.css`),
+/// which also honours `hidden="until-found"`, so the web keeps its own. Ends
+/// every rule set it joins, since an attribute ties a class on specificity and
+/// a later class declaring `display` (`.grid`) would otherwise show the
+/// element.
+pub(crate) fn hidden_attribute_rule() -> Rule {
+	Rule::new()
+		.with_selector(Selector::attribute("hidden", None))
+		.with_media(MediaQuery::Terminal)
+		.with_canonical(Display::None)
 }
 
 /// User-agent rule removing metadata and scripting tags
@@ -199,4 +217,50 @@ fn link() -> Rule {
 // surface, primary left rule) comes from the theme's `blockquote_prose` rule.
 fn blockquote() -> Rule {
 	block_spaced(&["blockquote"])
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use crate::style::Display;
+	use crate::style::LayoutStyle;
+	use beet_core::prelude::*;
+
+	/// A `hidden` element leaves terminal layout, even one whose class declares
+	/// its own `display` (`.grid`): the attribute rule ends the rule set, so it
+	/// wins the specificity tie.
+	#[beet_core::test]
+	fn hidden_attribute_removes_from_layout() {
+		let mut world = (
+			TemplatePlugin,
+			DocumentPlugin,
+			CharcellPlugin,
+			crate::style::material::MaterialStylePlugin::default(),
+		)
+			.into_world();
+		let root = world
+			.spawn_template(rsx! {
+				<main>
+					<div {Classes::new([classes::GRID])} hidden>"Docs"</div>
+					<div {Classes::new([classes::GRID])}>"Blog"</div>
+				</main>
+			})
+			.unwrap()
+			.id();
+		world
+			.entity_mut(root)
+			.insert(Buffer::new(UVec2::new(80, 24)).into_double_buffer());
+		world.run_schedule(crate::parse::PostParseTree);
+		world
+			.entity(root)
+			.get::<Children>()
+			.unwrap()
+			.iter()
+			.map(|div| {
+				world.entity(div).get::<LayoutStyle>().unwrap().display
+					== Display::None
+			})
+			.collect::<Vec<_>>()
+			.xpect_eq(vec![true, false]);
+	}
 }

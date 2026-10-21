@@ -27,7 +27,8 @@ Load the `docs-diataxis` skill and pick one mode per page before writing. Mixing
 ## Conventions
 
 - TOML frontmatter for the title: `+++\ntitle = "Foo"\n+++`.
-- Routes mirror the file tree under `site/routes/docs`. A new `foo.md` becomes `/docs/foo`; nested dirs need an `index.md`. The sidebar is auto-collected, no manual wiring.
+- Every docs page is unlisted until a human has reviewed it: `visibility = "unlisted"` in its frontmatter (a `.bsx` page spreads `{PageMeta{visibility: PageVisibility::Unlisted}}` on its root). It serves to whoever holds the url, and appears in no sidebar, sitemap, search index or feed. A new page starts unlisted; only the reviewer removes the line.
+- Routes mirror the file tree under `site/routes/docs`. A new `foo.md` becomes `/docs/foo`; nested dirs need an `index.md`. The sidebar is auto-collected from the listed pages, no manual wiring.
 - Link internally with absolute paths, eg `/docs/crates/beet_router`.
 - Use language fences (` ```rust `, ` ```sh `) so syntax highlighting works.
 - LLMs love writing text, humans hate reading it. Include exactly what must be there and nothing more. Short code snippets over prose where a snippet says it better.

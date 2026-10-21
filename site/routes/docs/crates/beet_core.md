@@ -1,5 +1,6 @@
 +++
 title = "beet_core"
+visibility = "unlisted"
 +++
 
 # beet_core

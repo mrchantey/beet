@@ -3,8 +3,8 @@ The document layout wrapping every route: a thin use of the shipped <SiteLayout>
 shell, which carries the full beet chrome (head/header/sidebar/footer + the body
 `page` + color-scheme class). The layout middleware transcludes each route's body
 in as SiteLayout's default-slot child, so it lands in <main> with no relay here;
-<LiveReloadScript/> and <Wasm/> append to the head chrome, and the sidebar
-override excludes the `export` route.
+<LiveReloadScript/> and <Wasm/> append to the head chrome, the `nav` links name
+this site's own sections, and the sidebar override excludes the `export` route.
 
 <Wasm/> is what makes the served page a launch: the browser boots the wasm
 `beet` binary on this same entry (`main.bsx` read through the `/repo` store the
@@ -14,5 +14,7 @@ its event scripts (`routes/counter.bsx`) run on click.
 <SiteLayout>
 	<LiveReloadScript slot="head"/>
 	<Wasm src="/wasm/beet-ui.wasm" repo="/repo" entry="main.bsx" server="dom" slot="head"/>
+	<Link slot="nav" href="/docs" variant=ButtonVariant::Text>Docs</Link>
+	<Link slot="nav" href="/blog" variant=ButtonVariant::Text>Blog</Link>
 	<RouteSidebar home=false exclude={["export"]} slot="sidebar"/>
 </SiteLayout>

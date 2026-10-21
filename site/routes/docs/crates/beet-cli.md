@@ -1,5 +1,6 @@
 +++
 title = "beet-cli"
+visibility = "unlisted"
 +++
 
 # beet-cli

@@ -1,6 +1,7 @@
 +++
 title = "Glossary"
 order = 6
+visibility = "unlisted"
 +++
 
 # Glossary

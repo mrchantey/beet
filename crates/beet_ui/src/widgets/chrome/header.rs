@@ -51,3 +51,60 @@ fn site_title(title: &SmolStr) -> impl Bundle {
 	#[cfg(not(feature = "json"))]
 	return value;
 }
+
+/// A [`Header`] `nav` link to the package's source repository
+/// ([`PackageConfig::repository`]), labelled by its forge, ie `GitHub`, else
+/// `Source`. Renders nothing when the package names no repository, so a shell
+/// places it unconditionally.
+#[template(system)]
+pub fn RepositoryLink(pkg_config: Res<PackageConfig>) -> impl Bundle {
+	let link = pkg_config.repository.as_ref().map(|repository| {
+		let label = forge_label(repository);
+		rsx! {
+			<Link href={repository.to_string()} variant=ButtonVariant::Text>{label}</Link>
+		}
+	});
+	rsx! { {link} }
+}
+
+/// The name a repository link shows: its forge's, else `Source`.
+fn forge_label(repository: &Url) -> &'static str {
+	match repository
+		.host()
+		.map(|host| host.trim_start_matches("www."))
+	{
+		Some("github.com") => "GitHub",
+		Some("codeberg.org") => "Codeberg",
+		Some("gitlab.com") => "GitLab",
+		Some("tangled.org" | "tangled.sh") => "Tangled",
+		_ => "Source",
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	/// Render `<RepositoryLink/>` against a package naming `repository`.
+	fn render(repository: Option<&str>) -> String {
+		let mut world = world_ext::ui_world();
+		world.insert_resource(PackageConfig {
+			repository: repository.map(Url::coerce),
+			..default()
+		});
+		let root = world
+			.spawn_template(rsx! { <RepositoryLink/> })
+			.unwrap()
+			.id();
+		crate::widgets::test_ext::render_world(&mut world, root)
+	}
+
+	#[beet_core::test]
+	fn links_the_repository_by_its_forge() {
+		render(Some("https://github.com/mrchantey/beet"))
+			.xpect_contains("href=\"https://github.com/mrchantey/beet\"")
+			.xpect_contains("GitHub");
+		render(Some("https://git.example.com/beet")).xpect_contains("Source");
+		render(None).xnot().xpect_contains("<a");
+	}
+}

@@ -39,8 +39,13 @@ use beet_ui::prelude::Reset;
 ///   [`RouteHead`] (eg a page-view beacon, or the site's icon links: the
 ///   layout links no icon of its own, since it cannot know the site has one),
 ///   so a site adds to the head without losing the chrome.
-/// - `header`: defaults to the library [`Header`] with a [`MenuButton`] and the
-///   Docs/Blog/GitHub nav links.
+/// - `header`: defaults to the library [`Header`] with a [`MenuButton`], the
+///   `nav` slot's links, then a [`RepositoryLink`] when the package names a
+///   repository. The shell links nothing of its own, since it cannot know the
+///   site's routes.
+/// - `nav`: the default header's navigation links, ie
+///   `<Link slot="nav" href="/blog" variant=ButtonVariant::Text>Blog</Link>`,
+///   so a site adds links without restating the header.
 /// - `sidebar`: defaults to the route-tree [`RouteSidebar`] (`home=false`).
 /// - `footer`: defaults to the library [`Footer`].
 /// - the default `<Slot/>` inside `<main>` holds the page body, transcluded by
@@ -95,9 +100,8 @@ pub fn SiteLayout(
 				<Slot name="header">
 					<Header>
 						<MenuButton slot="leading"/>
-						<Link slot="nav" href="/docs" variant=ButtonVariant::Text>"Docs"</Link>
-						<Link slot="nav" href="/blog" variant=ButtonVariant::Text>"Blog"</Link>
-						<Link slot="nav" href="https://github.com/mrchantey/beet" variant=ButtonVariant::Text>"GitHub"</Link>
+						<Slot name="nav" slot="nav"/>
+						<RepositoryLink slot="nav"/>
 					</Header>
 				</Slot>
 				<div {Classes::new([classes::CONTAINER])}>
@@ -229,14 +233,19 @@ mod test {
 	/// Render `<SiteLayout>` (with a page-body slot child) to HTML in `world`, so a
 	/// test can seed the world first (eg spawn a `ClientIo` channel).
 	fn render_world(world: &mut World) -> String {
-		let entity = world
-			.spawn_template(rsx! {
-				<SiteLayout>
-					<p>"page body"</p>
-				</SiteLayout>
-			})
-			.unwrap()
-			.id();
+		render_template(world, rsx! {
+			<SiteLayout>
+				<p>"page body"</p>
+			</SiteLayout>
+		})
+	}
+
+	/// Render `template` to HTML in `world`.
+	fn render_template(
+		world: &mut World,
+		template: impl bevy::ecs::template::Template<Output = ()>,
+	) -> String {
+		let entity = world.spawn_template(template).unwrap().id();
 		HtmlRenderer::new()
 			.render(&mut RenderContext::new(
 				world,
@@ -263,6 +272,29 @@ mod test {
 		render(request("", MediaType::Html))
 			.xnot()
 			.xpect_contains("CLIENT_IO_PATH");
+	}
+
+	/// The shell links nothing of its own: a site's `nav` content lands in the
+	/// default header, followed by the package's repository link.
+	#[beet_core::test]
+	fn header_carries_the_site_nav_then_the_repository() {
+		let mut world = layout_world(request("", MediaType::Html));
+		world.insert_resource(PackageConfig {
+			repository: Some(Url::coerce("https://github.com/mrchantey/beet")),
+			..default()
+		});
+		let html = render_template(&mut world, rsx! {
+			<SiteLayout>
+				<Link slot="nav" href="/blog" variant=ButtonVariant::Text>"Blog"</Link>
+				<p>"page body"</p>
+			</SiteLayout>
+		});
+		html.find("href=\"/blog\"")
+			.unwrap()
+			.xpect_less_than(html.find("GitHub").unwrap());
+		html.xpect_contains("page body")
+			.xnot()
+			.xpect_contains("href=\"/docs\"");
 	}
 
 	/// A pinned `?color-scheme=light` request paints `page` plus the light-scheme
