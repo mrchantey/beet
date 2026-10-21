@@ -151,7 +151,9 @@ impl CssRule {
 				})
 			}
 			Selector::Tag(tag) => vec![tag.to_string()],
-			Selector::Class(class) => vec![format!(".{}", class)],
+			Selector::Class(class) => {
+				vec![format!(".{}", Self::escape_identifier(class))]
+			}
 			Selector::State(state) => vec![Self::state_to_css(state)],
 			Selector::Attribute { key, value } => vec![match value {
 				Some(value) => format!("[{}=\"{}\"]", key, value),
@@ -179,6 +181,31 @@ impl CssRule {
 				" > ",
 			),
 		}
+	}
+
+	/// Serialize an identifier per CSSOM, so a class like `hl-type.builtin`
+	/// is one class (`.hl-type\.builtin`), not the compound `.hl-type.builtin`.
+	fn escape_identifier(ident: &str) -> String {
+		let mut out = String::with_capacity(ident.len());
+		let first = ident.chars().next();
+		for (index, ch) in ident.chars().enumerate() {
+			let leading_digit = ch.is_ascii_digit()
+				&& (index == 0 || (index == 1 && first == Some('-')));
+			match ch {
+				'\0' => out.push('\u{FFFD}'),
+				_ if leading_digit || ch.is_ascii_control() => {
+					out.push_str(&format!("\\{:x} ", ch as u32))
+				}
+				'-' if ident.len() == 1 => out.push_str("\\-"),
+				'-' | '_' => out.push(ch),
+				_ if ch.is_ascii_alphanumeric() || !ch.is_ascii() => out.push(ch),
+				_ => {
+					out.push('\\');
+					out.push(ch);
+				}
+			}
+		}
+		out
 	}
 
 	/// Every `left` alternative joined to every `right` alternative.
@@ -401,6 +428,22 @@ mod tests {
 			))
 			.selector_to_css()
 			.xpect_eq("main .prose");
+	}
+
+	// a class is one identifier: a `.` or leading digit in it is escaped rather
+	// than read as a second class or an invalid selector
+	#[beet_core::test]
+	fn escapes_class_identifiers() {
+		let css = |class: &str| {
+			CssRule::default()
+				.with_selector(Selector::class(class))
+				.selector_to_css()
+		};
+		css("hl-type.builtin").xpect_eq(r".hl-type\.builtin");
+		css("w-1/2").xpect_eq(r".w-1\/2");
+		css("2xl").xpect_eq(r".\32 xl");
+		css("-2").xpect_eq(r".-\32 ");
+		css("plain_name-1").xpect_eq(".plain_name-1");
 	}
 
 	// a nested `AnyOf` distributes into a top-level list: `button, .btn:focus-visible`

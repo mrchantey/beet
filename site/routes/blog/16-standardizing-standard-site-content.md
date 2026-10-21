@@ -153,7 +153,7 @@ interface Website {
 }
 ```
 
-**Definition**
+**Example**
 
 ```json
 {

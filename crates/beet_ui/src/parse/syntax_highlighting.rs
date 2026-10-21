@@ -5,6 +5,9 @@
 //! slice, [`Self::highlight`] returns a sequence of [`HighlightSpan`]s
 //! covering every byte of the input exactly once.
 //!
+//! Where several patterns capture the same range the last one wins, as in
+//! tree-sitter-highlight, so queries list general patterns before specific ones.
+//!
 //! Capture names are emitted verbatim, with no colour resolution: the
 //! renderer is responsible for mapping `hl-<capture>` classes to styles.
 //!
@@ -25,8 +28,8 @@ use tree_sitter::QueryCursor;
 /// Registry of tree-sitter grammars used to tokenize fenced code blocks.
 ///
 /// [`Default`] returns a registry pre-populated with rust, javascript,
-/// json, html and bash grammars; this is what [`StylePlugin`] inserts via
-/// `init_resource`.
+/// typescript, json, html and bash grammars; this is what [`StylePlugin`]
+/// inserts via `init_resource`.
 #[derive(Clone, Resource)]
 pub struct SyntaxHighlighting {
 	languages: HashMap<SmolStr, LanguageEntry>,
@@ -66,26 +69,33 @@ pub struct HighlightSpan {
 }
 
 impl SyntaxHighlighting {
-	/// A highlighter pre-registered with `rust`, `javascript`, `json`,
-	/// `html` and `bash` (plus common aliases like `rs`, `jsonc` and `sh`).
+	/// A highlighter pre-registered with `rust`, `javascript`, `typescript`,
+	/// `tsx`, `json`, `html` and `bash` (plus common aliases like `rs`, `ts`,
+	/// `jsonc` and `sh`).
 	pub fn with_defaults() -> Self {
 		let mut this = Self {
 			languages: HashMap::default(),
 		};
 		this.add_rust();
 		this.add_javascript();
+		this.add_typescript();
 		this.add_json();
 		this.add_html();
 		this.add_bash();
 		this
 	}
 
-	/// Register the rust grammar.
+	/// Register the rust grammar. Upstream's all-caps constant pattern carries
+	/// a stray `'` that never matches, so a working one is appended.
 	pub fn add_rust(&mut self) -> &mut Self {
 		self.add_language(
 			"rust",
 			tree_sitter_rust::LANGUAGE.into(),
-			tree_sitter_rust::HIGHLIGHTS_QUERY,
+			format!(
+				"{}\n{}",
+				tree_sitter_rust::HIGHLIGHTS_QUERY,
+				r#"((identifier) @constant (#match? @constant "^[A-Z][A-Z\\d_]+$"))"#
+			),
 			&["rs"],
 		)
 	}
@@ -100,13 +110,39 @@ impl SyntaxHighlighting {
 		)
 	}
 
+	/// Register the typescript and tsx grammars. The typescript query covers only
+	/// what typescript adds, so it is layered last over the javascript query.
+	pub fn add_typescript(&mut self) -> &mut Self {
+		let query = format!(
+			"{}\n{}",
+			tree_sitter_javascript::HIGHLIGHT_QUERY,
+			tree_sitter_typescript::HIGHLIGHTS_QUERY
+		);
+		self.add_language(
+			"typescript",
+			tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into(),
+			query.as_str(),
+			&["ts", "mts", "cts"],
+		)
+		.add_language(
+			"tsx",
+			tree_sitter_typescript::LANGUAGE_TSX.into(),
+			query,
+			&[],
+		)
+	}
+
 	/// Register the json grammar. The grammar treats comments as extras, so
-	/// `jsonc` resolves to it too.
+	/// `jsonc` resolves to it too. Upstream lists its key pattern before the
+	/// `(string)` pattern that would shadow it, so it is repeated last.
 	pub fn add_json(&mut self) -> &mut Self {
 		self.add_language(
 			"json",
 			tree_sitter_json::LANGUAGE.into(),
-			tree_sitter_json::HIGHLIGHTS_QUERY,
+			format!(
+				"{}\n(pair key: (_) @string.special.key)",
+				tree_sitter_json::HIGHLIGHTS_QUERY
+			),
 			&["jsonc"],
 		)
 	}
@@ -212,9 +248,12 @@ impl SyntaxHighlighting {
 				if end <= start {
 					continue;
 				}
-				// keep the longest non-overlapping run for any starting byte
+				// keep the longest run for any starting byte; captures of one
+				// range arrive in pattern order and the last one wins, as in
+				// tree-sitter-highlight, so a query lists general patterns
+				// before specific ones
 				let entry = events.entry(start).or_insert((end, cap.index));
-				if end > entry.0 {
+				if end >= entry.0 {
 					*entry = (end, cap.index);
 				}
 			}
@@ -373,6 +412,45 @@ mod test {
 		captured("comment").xpect_true();
 		captured("keyword").xpect_true();
 		captured("string").xpect_true();
+	}
+
+	#[beet_core::test]
+	fn highlights_typescript() {
+		let hl = SyntaxHighlighting::with_defaults();
+		let spans = hl.highlight(
+			"ts",
+			"interface Doc {\n\t// hi\n\tcontent?: string\n}\nfunction foo(bar: Doc) {}\n",
+		);
+		let captured = |name: &str, text: &str| {
+			spans.iter().any(|s| {
+				s.capture.as_deref() == Some(name) && s.text.as_str() == text
+			})
+		};
+		captured("keyword", "interface").xpect_true();
+		captured("type", "Doc").xpect_true();
+		captured("type.builtin", "string").xpect_true();
+		captured("comment", "// hi").xpect_true();
+		captured("function", "foo").xpect_true();
+		captured("variable.parameter", "bar").xpect_true();
+	}
+
+	#[beet_core::test]
+	fn last_pattern_wins() {
+		let hl = SyntaxHighlighting::with_defaults();
+		let captures = |lang: &str, src: &str| {
+			hl.highlight(lang, src)
+				.into_iter()
+				.filter_map(|s| Some(format!("{} {}\n", s.capture?, s.text)))
+				.collect::<String>()
+		};
+		// javascript lists its catch-all `(identifier) @variable` first
+		captures("js", "new Foo(); baz();")
+			.xpect_contains("constructor Foo\n")
+			.xpect_contains("function baz\n");
+		captures("rust", "/// doc\nconst MAX_LEN: u8 = Foo::BAR;")
+			.xpect_contains("comment.documentation /// doc\n")
+			.xpect_contains("constant MAX_LEN\n")
+			.xpect_contains("type Foo\n");
 	}
 
 	#[beet_core::test]

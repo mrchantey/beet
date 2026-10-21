@@ -106,6 +106,7 @@ syntax_highlighting = [
 	"dep:tree-sitter",
 	"dep:tree-sitter-rust",
 	"dep:tree-sitter-javascript",
+	"dep:tree-sitter-typescript",
 	"dep:tree-sitter-json",
 	"dep:tree-sitter-html",
 	"dep:tree-sitter-bash",
@@ -175,6 +176,7 @@ libc = {workspace = true, optional = true}
 tree-sitter = { version = "0.26", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }
 tree-sitter-javascript = { version = "0.25", optional = true }
+tree-sitter-typescript = { version = "0.23", optional = true }
 tree-sitter-json = { version = "0.24", optional = true }
 tree-sitter-html = { version = "0.23", optional = true }
 tree-sitter-bash = { version = "0.25", optional = true }
