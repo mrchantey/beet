@@ -19,6 +19,13 @@ Sequential syncing has a consequence worth knowing before you report success. Ea
 
 Only then does `git rev-list --left-right --count HEAD...main` report `0	0` from every worktree, which is the real end condition.
 
+## Someone else's work
+
+A long sync races whoever else uses the repo, so check the state again right before each write rather than trusting what you started from.
+
+- **Push only into a clean, unmoved `main`.** Before each fast-forward, `git -C ~/me/beet status --porcelain` is empty and `main` is still what you rebased onto; if it moved, rebase again first. Uncommitted work there is someone's edit in flight: never stash, commit or route around it. Rebase each worktree onto the previous one's tip instead, so they chain into one line, and fast-forward `main` once when it is clean, or leave the operator that one command.
+- **A worktree with uncommitted changes** is the same: run its rebase from a clean worktree (`git checkout --detach <its HEAD>` there), then level it with `checkout --detach`, which carries its edits along unless the new commits touch the same files.
+
 ## Rules
 
 - Do not run `cargo fmt`; formatting is `just fmt`.

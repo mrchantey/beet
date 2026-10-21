@@ -1,6 +1,6 @@
 ---
 name: worktree-sync-upstream
-description: Sync a detached-HEAD worktree with its upstream branch in the main repo in both directions, rebasing only owned commits and fast-forwarding upstream, with recovery steps for tangled history. Use from inside a worktree.
+description: Sync a detached-HEAD worktree with its upstream branch in the main repo in both directions, rebasing only owned commits and fast-forwarding upstream, with recovery steps for tangled history and helpers for prose and secrets.toml conflicts. Use from inside a worktree.
 ---
 
 # Worktree Sync Upstream
@@ -45,6 +45,13 @@ Symptom: many commits in `<up>..HEAD` share messages with upstream commits (dupl
 3. Replay only your work onto upstream: `git rebase --onto <up> <last-duplicate-commit>`.
 4. Verify no content changed: `git diff HEAD backup/<name>` is empty.
 5. Then fast-forward upstream as in step 4 above.
+
+## Resolving conflicts
+
+Read a conflicted file against its base, `git checkout --conflict=diff3 -- <file>`: who changed what is only legible beside the base. After resolving, compile the touched crates before `git rebase --continue`, so a later commit never builds on a broken resolution.
+
+- **Prose.** A markdown paragraph is one line, so two sides editing different sentences of it conflict on the whole paragraph. `python3 ~/me/beet/.agents/skills/worktree-sync-upstream/word_merge.py <file>...` merges each hunk word by word and leaves the rest conflicted. A clean merge can still be wrong (both sides renaming one thing), so read every result.
+- **`secrets.toml`.** Each group is one age blob, so two sides that each sealed something conflict on ciphertext, and taking a side silently drops the other's records. `python3 ~/me/beet/.agents/skills/worktree-sync-upstream/secrets_merge.py` decrypts the three stages in memory and prints which side changed each record, never a value; `--write` writes the merge, resealing only what needs it, and checks every blob against its index. It stops on a field the sides changed differently, ie a credential's `grants` after a converge on each: rerun with `--take=ours|theirs`, naming the side that sealed the credential the provider holds now. Grants it leaves behind the code only make the next plain deploy refuse with `--elevated`, which is the gate working.
 
 ## Testing
 
