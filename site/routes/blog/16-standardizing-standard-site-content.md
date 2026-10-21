@@ -21,16 +21,16 @@ This is the Standard Site document lexicon as it currently stands.
 type NSID = string;
 
 interface OpenUnion {
-	$type: NSID
+  $type: NSID
   [key: string]: unknown
 }
 
 interface Document {
   $type: 'site.standard.document'
-	// an open content type, ie
-	// 'pub.leaflet.content'
-	// 'blog.pckt.content'
-	// 'app.offprint.content'
+  // an open content type, ie
+  // 'pub.leaflet.content'
+  // 'blog.pckt.content'
+  // 'app.offprint.content'
   content?: OpenUnion
   //...
 }
@@ -58,7 +58,7 @@ interface Document {
       }
     ]
   }
-	...
+  ...
 }
 ```
 
@@ -77,13 +77,13 @@ interface Document {
 }
 
 interface Entity {
-	$type: 'site.standard.entity'
-	// here the key matches the Component $type
+  $type: 'site.standard.entity'
+  // here the key matches the Component $type
   [key: NSID]: Component
 }
 
 interface Component {
-	$type: NSID
+  $type: NSID
   [key: string]: unknown
 }
 ```
@@ -104,7 +104,7 @@ interface Component {
         ...
     },
   }
-	...
+  ...
 }
 ```
 
@@ -127,7 +127,7 @@ interface Entity {
 }
 
 interface Component {
-	$type: NSID
+  $type: NSID
   [key: string]: unknown
 }
 
@@ -145,11 +145,11 @@ interface Paragraph {
 // completely extensible, each reader can freely use its own lexicons as components
 // in addition to those we have standardized
 interface Website {
-	$type: 'pub.leaflet.blocks.website'
-	src: string
-	title?: string
-	description?: string
-	previewImage?: string
+  $type: 'pub.leaflet.blocks.website'
+  src: string
+  title?: string
+  description?: string
+  previewImage?: string
 }
 ```
 
@@ -197,7 +197,7 @@ interface Document {
 }
 
 interface Scene {
-	$type: 'site.standard.scene'
+  $type: 'site.standard.scene'
   [key: EntityId]: Entity
 }
 
@@ -207,27 +207,27 @@ interface Entity {
 }
 
 interface Component {
-	$type: NSID
+  $type: NSID
   [key: string]: unknown
 }
 
 // --- COMPONENTS ---
 
 interface Children {
-	$type: 'site.standard.children',
-	children: EntityId[]
+  $type: 'site.standard.children',
+  children: EntityId[]
 }
 
 // ie a html ElementNode
 interface Element {
-	$type: 'site.standard.element',
-	tag: string
+  $type: 'site.standard.element',
+  tag: string
 }
 
 // ie a html TextNode
 interface Text {
-	$type: 'site.standard.text',
-	text: string
+  $type: 'site.standard.text',
+  text: string
 }
 ```
 
@@ -239,22 +239,22 @@ interface Text {
   "content": {
     "$type": "site.standard.scene",
     "0": {
-    	"site.standard.element": {
-     		"$type": "site.standard.element",
-     		"tag": "h1",
-     	},
-    	"site.standard.children": {
-     		"$type": "site.standard.children",
-       	"children": [1]
-     	},
+      "site.standard.element": {
+        "$type": "site.standard.element",
+        "tag": "h1",
+      },
+      "site.standard.children": {
+        "$type": "site.standard.children",
+        "children": [1]
+      },
     },
     "1": {
-    	"site.standard.text": {
-     		"$type": "site.standard.text",
-     		"text": "hello world",
-     	},
+      "site.standard.text": {
+        "$type": "site.standard.text",
+        "text": "hello world",
+      },
     },
-	...
+  ...
 }
 ```
 
@@ -262,7 +262,7 @@ And with that our Standard Site is standardized top to tail, extensible and comp
 
 ## We can just build things
 
-The beauty of the lexicon as it currently stands is *nothing needs to change!* Any reader can implement any one of the above ideas, or not. Option 4 is how Beet works, its the format used by Bevy and other ECS engines and the 'Entity Graph' scene format has proven so simple and generic I'm yet to find a domain it cannot describe elegantly. Stay tuned for a beet standard site read that works for 99.75% Standard Site documents.
+The beauty of the lexicon as it currently stands is *nothing needs to change!* Any reader can implement any one of the above ideas, or not. Option 4 is how Beet works, its the format used by Bevy and other ECS engines and the 'Entity Graph' scene format has proven so simple and generic I'm yet to find a domain it cannot describe elegantly. Stay tuned for a beet standard site reader that works for 99.75% Standard Site documents.
 
 ## References
 
