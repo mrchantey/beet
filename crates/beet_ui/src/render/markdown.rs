@@ -13,6 +13,10 @@ use beet_core::prelude::*;
 /// declaring it, so a parsed markdown file renders its metadata back and a
 /// Word file its core properties.
 ///
+/// A [`Comment`] is an authoring note, never a page's content, so it is
+/// skipped unless [`with_comments`](Self::with_comments) keeps it, as a writer
+/// round-tripping a source must.
+///
 /// A tag carrying no text ([`RenderTreeQuery::is_textless`]) is skipped,
 /// unless the [`HtmlPassthrough`] names it, by default the embedded ones
 /// (`video`, `iframe`, `svg`, ..): that element and everything inside it is
@@ -34,6 +38,8 @@ pub struct MarkdownRenderer {
 	state: TextRenderState,
 	/// Render [`Expression`] values verbatim as `{expr}` in output.
 	render_expressions: bool,
+	/// Skip [`Comment`] nodes, the default.
+	strip_comments: bool,
 	/// The inline elements open in the walk, innermost last, each with the
 	/// markers it writes.
 	inline_stack: Vec<InlineMark>,
@@ -256,6 +262,7 @@ impl MarkdownRenderer {
 			html_passthrough: HtmlPassthrough::default(),
 			state: TextRenderState::new(),
 			render_expressions: false,
+			strip_comments: true,
 			inline_stack: Vec::new(),
 			pending_opens: Vec::new(),
 			pending_closes: Vec::new(),
@@ -271,6 +278,13 @@ impl MarkdownRenderer {
 	/// Enable rendering of [`Expression`] nodes as `{expr}`.
 	pub fn with_expressions(mut self) -> Self {
 		self.render_expressions = true;
+		self
+	}
+
+	/// Keep [`Comment`] nodes (`<!-- note -->`) rather than skipping them, for
+	/// a writer round-tripping a source rather than rendering a page.
+	pub fn with_comments(mut self) -> Self {
+		self.strip_comments = false;
 		self
 	}
 
@@ -439,7 +453,10 @@ impl MarkdownRenderer {
 				self.push_str(&prefix);
 			}
 		}
-		let mut html = HtmlRenderer::new();
+		let mut html = match self.strip_comments {
+			true => HtmlRenderer::new(),
+			false => HtmlRenderer::new().with_comments(),
+		};
 		html.visit_element(cx, view);
 		self.passthrough = Some(Passthrough {
 			root: cx.entity,
@@ -988,6 +1005,9 @@ impl NodeVisitor for MarkdownRenderer {
 	}
 
 	fn visit_comment(&mut self, cx: &VisitContext, comment: &Comment) {
+		if self.strip_comments {
+			return;
+		}
 		if let Some(passthrough) = &mut self.passthrough {
 			passthrough.html.visit_comment(cx, comment);
 			return;
@@ -1061,7 +1081,7 @@ mod test {
 		MarkdownParser::new()
 			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
 			.unwrap();
-		render_with(&mut world, entity, MarkdownRenderer::new())
+		render_with(&mut world, entity, MarkdownRenderer::new().with_comments())
 	}
 
 	/// Parse markdown then render with expression support.
@@ -1076,7 +1096,7 @@ mod test {
 		render_with(
 			&mut world,
 			entity,
-			MarkdownRenderer::new().with_expressions(),
+			MarkdownRenderer::new().with_expressions().with_comments(),
 		)
 	}
 
@@ -1195,6 +1215,19 @@ mod test {
 		roundtrip("<!-- hello -->")
 			.trim()
 			.xpect_eq("<!-- hello -->");
+	}
+
+	/// A comment is an authoring note, so a page leaves it out.
+	#[beet_core::test]
+	fn strips_comments_by_default() {
+		let mut world = World::new();
+		let entity = world.spawn_empty().id();
+		let bytes = MediaBytes::new_markdown("<!-- note -->\n\n# Title\n");
+		MarkdownParser::new()
+			.parse(ParseContext::new(&mut world.entity_mut(entity), &bytes))
+			.unwrap();
+		render_with(&mut world, entity, MarkdownRenderer::new())
+			.xpect_eq("# Title\n");
 	}
 
 	#[cfg(feature = "bsx")]
@@ -1371,12 +1404,12 @@ mod test {
 	#[beet_core::test]
 	fn writes_captions_and_nested_tables() {
 		render_unescaped(
-			"<table><caption><!-- t1 --></caption><tr><td>a</td><td>\
-			 <table><caption><!-- t2 --></caption><tr><td>x</td></tr></table>\
+			"<table><caption>t1</caption><tr><td>a</td><td>\
+			 <table><caption>t2</caption><tr><td>x</td></tr></table>\
 			 </td></tr></table>",
 		)
 		.xpect_eq(
-			"<!-- t1 -->\n\n| a | [table t2] |\n|---|---|\n\n<!-- t2 -->\n\n| x |\n|---|\n",
+			"t1\n\n| a | [table t2] |\n|---|---|\n\nt2\n\n| x |\n|---|\n",
 		);
 	}
 

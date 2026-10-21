@@ -382,8 +382,8 @@ impl WordProjection {
 
 impl WordProjection {
 	/// Captions every numbered table under `part` with the number its cells
-	/// are addressed by, as a comment, ie `<!-- t3 -->`: a projection-only
-	/// `<caption>` a reader sees above the table and a writer never writes.
+	/// are addressed by, ie `t3`: a projection-only `<caption>` a reader sees
+	/// above the table and a writer never writes.
 	fn caption_tables(world: &mut World, part: Entity) {
 		let numbered = world.with_state::<(
 			Query<(Entity, &Element)>,
@@ -407,8 +407,8 @@ impl WordProjection {
 		});
 		for (table, number) in numbered {
 			let caption = world
-				.spawn((Element::new("caption"), children![Comment::new(
-					format!(" t{number} ")
+				.spawn((Element::new("caption"), children![Value::Str(
+					format!("t{number}").into()
 				)]))
 				.id();
 			world.entity_mut(table).insert_child(0, caption);
@@ -578,7 +578,7 @@ pub(crate) mod test {
 		markdown(&mut world, root)
 			.xpect_contains("# Cover\n\nWhere is it? <span style=\"color: #FF0000\">(Please delete this)</span>\n")
 			.xpect_contains("- one\n  - nested\n")
-			.xpect_contains("<!-- t1 -->\n\n| **Name** | <mark>a < b</mark> |  |\n|---|---|---|\n")
+			.xpect_contains("t1\n\n| **Name** | <mark>a < b</mark> |  |\n|---|---|---|\n")
 			// edge whitespace sits outside the emphasis, a field's
 			// instruction is no reader's
 			.xpect_contains("**Date** due\n")

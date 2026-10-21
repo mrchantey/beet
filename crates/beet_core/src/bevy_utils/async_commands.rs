@@ -119,9 +119,19 @@ impl Plugin for AsyncPlugin {
 				PreUpdate,
 				beet_async::async_world_sync_point::<BeetAsyncSyncPoint>,
 			);
-		// beside bevy's pools, so a task spawned this frame polls before the next
 		#[cfg(feature = "std")]
-		app.add_systems(Last, tick_world_executor);
+		{
+			// beside bevy's pools, so a task spawned this frame polls before
+			// the next
+			app.add_systems(Last, tick_world_executor);
+			// once: a replaced guard would drop the executor it shares
+			if !app.world().contains_resource::<AsyncExecutorGuard>()
+				&& let Some(guard) =
+					app.world().resource::<AsyncSpawner>().guard()
+			{
+				app.insert_resource(guard);
+			}
+		}
 	}
 }
 
@@ -174,7 +184,9 @@ type SpawnLocalFut = Pin<Box<dyn 'static + Future<Output = ()>>>;
 pub struct AsyncSpawner(Arc<AsyncSpawnerInner>);
 
 struct AsyncSpawnerInner {
-	in_flight: AtomicUsize,
+	/// Shared with every task's [`InFlight`], which so holds the count alone
+	/// rather than the spawner.
+	in_flight: Arc<AtomicUsize>,
 	backend: SpawnBackend,
 }
 
@@ -208,7 +220,7 @@ impl Default for AsyncSpawner {
 			}
 		}
 		Self(Arc::new(AsyncSpawnerInner {
-			in_flight: AtomicUsize::new(0),
+			in_flight: default(),
 			backend,
 		}))
 	}
@@ -227,8 +239,9 @@ impl Default for AsyncSpawner {
 /// tick at all.
 #[cfg(feature = "std")]
 struct WorldExecutor {
-	/// Shared with the prebuilt tick below.
-	executor: Arc<ThreadBound<async_executor::LocalExecutor<'static>>>,
+	/// Shared with the prebuilt tick below and the world's
+	/// [`AsyncExecutorGuard`].
+	executor: Arc<ThreadBound<ExecutorSlot>>,
 	/// Ticks `executor`, prebuilt rather than made on demand: the sync-point
 	/// driver resolves it once per run, and a closure capturing the *spawner*
 	/// would cycle back through its `Arc`.
@@ -238,25 +251,81 @@ struct WorldExecutor {
 #[cfg(feature = "std")]
 impl WorldExecutor {
 	fn new() -> Self {
-		let executor =
-			Arc::new(ThreadBound::new(async_executor::LocalExecutor::new()));
+		let executor = Arc::new(ThreadBound::new(ExecutorSlot::new()));
 		let ticked = executor.clone();
 		Self {
 			executor,
 			tick: Arc::new(move || {
-				if let Some(executor) = ticked.get() {
-					tick_executor(executor);
+				if let Some(executor) = ticked.get().and_then(ExecutorSlot::get)
+				{
+					tick_executor(&executor);
 				}
 			}),
 		}
 	}
 
-	/// Spawn onto this executor, or, off its thread, onto that thread's own
-	/// local executor as bevy's `spawn_local` would.
+	/// The executor, on its own thread and until its world drops.
+	fn local(&self) -> Option<LocalExecutorRc> {
+		self.executor.get().and_then(ExecutorSlot::get)
+	}
+
+	/// Spawn onto this executor, or, off its thread or once its world has
+	/// dropped, onto that thread's own local executor as bevy's `spawn_local`
+	/// would.
 	fn spawn_local(&self, fut: SpawnLocalFut) {
-		match self.executor.get() {
+		match self.local() {
 			Some(executor) => executor.spawn(fut).detach(),
 			None => bevy::tasks::IoTaskPool::get().spawn_local(fut).detach(),
+		}
+	}
+}
+
+#[cfg(feature = "std")]
+type LocalExecutorRc = alloc::rc::Rc<async_executor::LocalExecutor<'static>>;
+
+/// A world's executor, until the world drops it (see
+/// [`AsyncExecutorGuard`]).
+#[cfg(feature = "std")]
+struct ExecutorSlot(core::cell::RefCell<Option<LocalExecutorRc>>);
+
+#[cfg(feature = "std")]
+impl ExecutorSlot {
+	fn new() -> Self {
+		Self(core::cell::RefCell::new(Some(alloc::rc::Rc::new(
+			async_executor::LocalExecutor::new(),
+		))))
+	}
+
+	/// The executor, cloned out so no borrow is held while its tasks poll.
+	fn get(&self) -> Option<LocalExecutorRc> { self.0.borrow().clone() }
+
+	/// Drop the executor and every task still pending on it, taken out first
+	/// so a task spawning as it drops falls back rather than meeting a held
+	/// borrow.
+	fn clear(&self) {
+		let executor = self.0.borrow_mut().take();
+		drop(executor);
+	}
+}
+
+/// Drops a world's [`AsyncSpawner`] executor with the world, and with it every
+/// task still pending there.
+///
+/// A task may hold its own spawner (a watcher idling through it, a task
+/// spawning the next), and the spawner owns the executor holding the task, so
+/// left to the handles the two would keep each other alive: a world dropped
+/// with a listener running would leak both, the listener never polled again
+/// to see its world was gone.
+#[cfg(feature = "std")]
+#[derive(Resource)]
+struct AsyncExecutorGuard(Arc<ThreadBound<ExecutorSlot>>);
+
+#[cfg(feature = "std")]
+impl Drop for AsyncExecutorGuard {
+	fn drop(&mut self) {
+		// off the executor's thread its tasks are unreachable, and leak
+		if let Some(slot) = self.0.get() {
+			slot.clear();
 		}
 	}
 }
@@ -426,7 +495,7 @@ impl AsyncSpawner {
 		spawn_local: impl 'static + Send + Sync + Fn(SpawnLocalFut),
 	) -> Self {
 		Self(Arc::new(AsyncSpawnerInner {
-			in_flight: AtomicUsize::new(0),
+			in_flight: default(),
 			backend: SpawnBackend::Custom {
 				spawn: Box::new(spawn),
 				spawn_local: Box::new(spawn_local),
@@ -465,11 +534,23 @@ impl AsyncSpawner {
 	#[cfg(all(feature = "std", not(target_arch = "wasm32")))]
 	pub(crate) async fn run<Out>(&self, fut: impl Future<Output = Out>) -> Out {
 		match &self.0.backend {
-			SpawnBackend::World(executor) => match executor.executor.get() {
+			SpawnBackend::World(executor) => match executor.local() {
 				Some(executor) => executor.run(fut).await,
 				None => fut.await,
 			},
 			SpawnBackend::Custom { .. } => fut.await,
+		}
+	}
+
+	/// The guard dropping this spawner's executor with the world holding it,
+	/// `None` for a custom runtime.
+	#[cfg(feature = "std")]
+	fn guard(&self) -> Option<AsyncExecutorGuard> {
+		match &self.0.backend {
+			SpawnBackend::World(executor) => {
+				AsyncExecutorGuard(executor.executor.clone()).xsome()
+			}
+			SpawnBackend::Custom { .. } => None,
 		}
 	}
 
@@ -527,14 +608,12 @@ impl AsyncSpawner {
 	pub async fn idle<Out>(&self, fut: impl Future<Output = Out>) -> Out {
 		/// Restores the released count on drop, so a task dropped mid-wait
 		/// still holds the one its own [`InFlight`] releases.
-		struct Idle<'a>(&'a AsyncSpawnerInner);
+		struct Idle<'a>(&'a AtomicUsize);
 		impl Drop for Idle<'_> {
-			fn drop(&mut self) {
-				self.0.in_flight.fetch_add(1, Ordering::SeqCst);
-			}
+			fn drop(&mut self) { self.0.fetch_add(1, Ordering::SeqCst); }
 		}
 		self.0.in_flight.fetch_sub(1, Ordering::SeqCst);
-		let _idle = Idle(&self.0);
+		let _idle = Idle(&self.0.in_flight);
 		fut.await
 	}
 
@@ -548,7 +627,7 @@ impl AsyncSpawner {
 		&self,
 		fut: Fut,
 	) -> impl Future<Output = ()> + use<Fut> {
-		let guard = InFlight::acquire(&self.0);
+		let guard = InFlight::acquire(&self.0.in_flight);
 		async move {
 			fut.await;
 			drop(guard);
@@ -557,17 +636,17 @@ impl AsyncSpawner {
 }
 
 /// One count on [`AsyncSpawner::in_flight`], released on drop.
-struct InFlight(Arc<AsyncSpawnerInner>);
+struct InFlight(Arc<AtomicUsize>);
 
 impl InFlight {
-	fn acquire(inner: &Arc<AsyncSpawnerInner>) -> Self {
-		inner.in_flight.fetch_add(1, Ordering::SeqCst);
-		Self(inner.clone())
+	fn acquire(count: &Arc<AtomicUsize>) -> Self {
+		count.fetch_add(1, Ordering::SeqCst);
+		Self(count.clone())
 	}
 }
 
 impl Drop for InFlight {
-	fn drop(&mut self) { self.0.in_flight.fetch_sub(1, Ordering::SeqCst); }
+	fn drop(&mut self) { self.0.fetch_sub(1, Ordering::SeqCst); }
 }
 
 /// The tasks spawned through an entity, cancelled with it.
@@ -2145,6 +2224,33 @@ mod test {
 		open.signal(());
 		AsyncRunner::flush_async_tasks(app.world_mut()).await;
 		spawner.in_flight().xpect_eq(0);
+	}
+
+	/// Dropping a world drops the tasks still pending on its executor, even one
+	/// holding the spawner that owns them, rather than leaking the pair.
+	#[crate::test]
+	fn dropping_the_world_drops_its_tasks() {
+		use core::sync::atomic::AtomicBool;
+		use core::sync::atomic::Ordering;
+		use std::sync::Arc;
+
+		struct Probe(Arc<AtomicBool>);
+		impl Drop for Probe {
+			fn drop(&mut self) { self.0.store(true, Ordering::SeqCst); }
+		}
+		let dropped = Arc::new(AtomicBool::new(false));
+		let probe = Probe(dropped.clone());
+		let app = test_app();
+		let spawner = app.world().resource::<AsyncSpawner>().clone();
+		spawner
+			.clone()
+			.spawn_local(async move {
+				let _held = (probe, spawner);
+				futures_lite::future::pending::<()>().await;
+			})
+			.detach();
+		drop(app);
+		dropped.load(Ordering::SeqCst).xpect_true();
 	}
 
 	/// Sibling tasks each driving a world of their own never poll one another.

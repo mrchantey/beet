@@ -42,7 +42,7 @@
 //!
 //! | Format | Read as |
 //! |---|---|
-//! | Word | its headers, main document, footers and notes, the main document's tables numbered as a fill addresses them and captioned `<!-- t<n> -->` |
+//! | Word | its headers, main document, footers and notes, the main document's tables numbered as a fill addresses them and captioned `t<n>` |
 //! | Slide deck | each listed slide a `<section>` in presentation order headed `Slide <n>`, its shapes in reading order, each text frame labelled by its kind, its tables, its SmartArt read from its data part, its pictures `<img>`s with their [`SlidePicture`], and its speaker notes an `<aside>`; [`OoxmlPlugin`] appends a triage of the deck in [`PostParseTree`] |
 //! | Workbook | each worksheet a `<table>` captioned with its tab name, every cell a [`SheetCellAddress`] with its [`CellLocked`] and [`CellFormula`], shared strings resolved, a merged range's first cell spanning the rest, and every gap before a row's last cell a projection-only `<td>` |
 //!

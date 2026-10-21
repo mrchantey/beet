@@ -1,6 +1,6 @@
 ---
 name: downstream-sync
-description: Refresh every downstream repo (beet_atproto, beet_connect, beet_egress, beet_esp, beet_eval) with beet's AGENTS.md marker block, its MIT/Apache licenses and shared config files. Use after changing AGENTS.md, the licenses or rustfmt.toml.
+description: Refresh every downstream repo (beet_atproto, beet_egress, beet_esp, beet_eval) with beet's AGENTS.md marker block, its MIT/Apache licenses and shared config files. Use after changing AGENTS.md, the licenses or rustfmt.toml.
 ---
 
 # Downstream Sync
@@ -10,7 +10,6 @@ Beet has downstream repos (separate git repos building on beet via a path depend
 ## Downstream repos
 
 - `/home/pete/me/beet_atproto`
-- `/home/pete/me/beet_connect`
 - `/home/pete/me/beet_egress`
 - `/home/pete/me/beet_esp`
 - `/home/pete/me/beet_eval`
@@ -46,7 +45,7 @@ Beet-repo procedures stay in `$BEET/.agents/skills`, since they name beet's just
 
 ```sh
 BEET=/home/pete/me/beet
-DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_connect /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval)
+DOWNSTREAM=(/home/pete/me/beet_atproto /home/pete/me/beet_egress /home/pete/me/beet_esp /home/pete/me/beet_eval)
 
 for repo in "${DOWNSTREAM[@]}"; do
 	for file in rustfmt.toml LICENSE-MIT.txt LICENSE-APACHE.txt; do
